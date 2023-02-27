@@ -2,8 +2,6 @@
 use strict;
 use CGI qw(:standard);
 use CGI::Carp qw ( fatalsToBrowser ); 
-use URI::Escape::XS;
-#use Date::Calc qw(:all);
 use JSON::XS;
 use DBI;
 use Bio::SeqIO;

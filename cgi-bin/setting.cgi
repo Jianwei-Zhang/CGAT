@@ -2,7 +2,6 @@
 use strict;
 use CGI qw(:standard);
 use CGI::Carp "fatalsToBrowser"; # send fatal (die, confess) errors to the browser
-use URI::Escape::XS;
 use lib "lib/";
 use lib "lib/pangu";
 use pangu;
