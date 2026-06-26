@@ -1,2 +1,19 @@
-
 .DS_Store
+
+# Local AI/editor/tooling state anywhere in this repo
+**/.trellis/
+**/.agents/
+**/.codex/
+**/.claude/
+**/.kiro/
+
+# Common dependency/build outputs
+**/node_modules/
+**/target/
+**/src-tauri/gen/
+
+# Local runtime artifacts
+**/*.sqlite
+**/*.zip
+**/imported/
+**/exports/
