@@ -1,0 +1,37 @@
+# Local project artifacts
+*.zip
+*.sqlite
+/*.exe
+imported/
+exports/
+/test_import_project*/
+
+# Local AI/editor/tooling state
+.kiro/
+.trellis/
+.agents/
+.claude/
+.codex/
+
+# Rust / Tauri build artifacts
+src-tauri/target/
+src-tauri/gen/
+app/src-tauri/target/
+app/src-tauri/gen/
+**/src-tauri/target/
+**/src-tauri/gen/
+
+# Generated data
+.worktrees/
+tests/*
+!tests/gpm_server/
+!tests/gpm_server/*.sh
+tests/output/
+tests/tmp/
+tests/gpm_server/output/
+tests/gpm_server/tmp/
+tests/**/*.sqlite
+tests/**/*.zip
+AGENTS.md
+docs/superpowers/
+app/docs/superpowers/

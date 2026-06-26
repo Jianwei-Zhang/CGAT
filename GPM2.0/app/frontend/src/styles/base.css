@@ -1,0 +1,35 @@
+:root {
+  color-scheme: light;
+  font-family: Tahoma, Verdana, Arial, sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+  background: #e6e6e6;
+  color: #222;
+  --helper-hint-bg: #fff7ed;
+  --helper-hint-border: #f59e0b;
+  --helper-hint-text: #92400e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #e6e6e6;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+input,
+select,
+button,
+textarea {
+  font: inherit;
+}
