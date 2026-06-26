@@ -1,0 +1,247 @@
+name: GPM2.0 Release installers
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v0.1.0. Defaults to GPM2.0/app/src-tauri/tauri.conf.json."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-installers-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  prepare-release:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.release-vars.outputs.tag_name }}
+      version: ${{ steps.release-vars.outputs.version }}
+      build_timestamp: ${{ steps.release-vars.outputs.build_timestamp }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve release version
+        id: release-vars
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' GPM2.0/app/src-tauri/tauri.conf.json | head -n 1)"
+          tag="${{ github.ref_name }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.tag }}"
+          fi
+
+          if [[ -z "$tag" ]]; then
+            tag="v${version}"
+          fi
+
+          if [[ -z "$version" ]]; then
+            echo "Failed to resolve app version from GPM2.0/app/src-tauri/tauri.conf.json." >&2
+            exit 1
+          fi
+
+          if [[ "$tag" != v* ]]; then
+            echo "Release tag must start with v, got: ${tag}" >&2
+            exit 1
+          fi
+
+          build_timestamp="$(TZ=Asia/Shanghai date +%Y%m%d%H%M%S)"
+
+          echo "tag_name=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "build_timestamp=${build_timestamp}" >> "$GITHUB_OUTPUT"
+
+      - name: Create release if needed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.release-vars.outputs.tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Release ${TAG_NAME} already exists."
+            exit 0
+          fi
+
+          gh release create "$TAG_NAME" \
+            --target "$GITHUB_SHA" \
+            --title "GPM Next ${TAG_NAME}" \
+            --notes "Installers for GPM Next ${TAG_NAME}."
+
+      - name: Clear existing installer assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.release-vars.outputs.tag_name }}
+          VERSION: ${{ steps.release-vars.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t assets < <(
+            gh release view "$TAG_NAME" --json assets --jq '.assets[].name' |
+              grep -E "^gpm-next_${VERSION}_.+_(setup\\.exe|installer\\.dmg)$" || true
+          )
+
+          if (( ${#assets[@]} == 0 )); then
+            echo "No existing installer assets to delete for ${TAG_NAME}."
+            exit 0
+          fi
+
+          printf 'Deleting existing installer assets for %s:\n' "$TAG_NAME"
+          printf '  %s\n' "${assets[@]}"
+          for asset in "${assets[@]}"; do
+            gh release delete-asset "$TAG_NAME" "$asset" --yes
+          done
+
+  build-windows:
+    name: Build Windows ${{ matrix.asset_platform }}
+    needs: prepare-release
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            asset_platform: win-x86
+            tauri_arch: x64
+            vcvars_arg: amd64
+          - target: aarch64-pc-windows-msvc
+            asset_platform: win-arm64
+            tauri_arch: arm64
+            vcvars_arg: amd64_arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: GPM2.0/app/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: GPM2.0/app/frontend
+        run: npm ci
+
+      - name: Install Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Install Tauri CLI
+        run: npm install --global @tauri-apps/cli@^2
+
+      - name: Build NSIS installer
+        working-directory: GPM2.0/app/src-tauri
+        shell: cmd
+        run: |
+          for /f "usebackq delims=" %%I in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALL=%%I"
+          if not defined VSINSTALL (
+            echo Failed to locate Visual Studio installation.
+            exit /b 1
+          )
+          call "%VSINSTALL%\VC\Auxiliary\Build\vcvarsall.bat" ${{ matrix.vcvars_arg }}
+          if errorlevel 1 exit /b %errorlevel%
+          tauri build --bundles nsis --target ${{ matrix.target }}
+
+      - name: Upload Windows installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.prepare-release.outputs.tag_name }}
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+          BUILD_TIMESTAMP: ${{ needs.prepare-release.outputs.build_timestamp }}
+          ASSET_PLATFORM: ${{ matrix.asset_platform }}
+          TAURI_ARCH: ${{ matrix.tauri_arch }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $installers = Get-ChildItem -Path "GPM2.0/app/src-tauri/target" -Recurse -Filter "*.exe" |
+            Where-Object {
+              $_.FullName -like "*\bundle\nsis\*" -and
+              $_.Name -like "*_${env:TAURI_ARCH}-setup.exe"
+            } |
+            Sort-Object FullName
+
+          if ($installers.Count -ne 1) {
+            Write-Error "Expected exactly one Windows installer for $env:TAURI_ARCH, found $($installers.Count): $($installers.FullName -join ', ')"
+          }
+
+          $asset = "gpm-next_${env:VERSION}_${env:BUILD_TIMESTAMP}_${env:ASSET_PLATFORM}_setup.exe"
+          Copy-Item -LiteralPath $installers[0].FullName -Destination $asset -Force
+          gh release upload $env:TAG_NAME $asset --clobber
+
+  build-macos:
+    name: Build macOS ${{ matrix.asset_platform }}
+    needs: prepare-release
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            asset_platform: mac-x86
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            asset_platform: mac-arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: GPM2.0/app/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: GPM2.0/app/frontend
+        run: npm ci
+
+      - name: Install Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Install Tauri CLI
+        run: npm install --global @tauri-apps/cli@^2
+
+      - name: Build DMG
+        working-directory: GPM2.0/app/src-tauri
+        run: tauri build --bundles dmg --target ${{ matrix.target }}
+
+      - name: Upload macOS installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.prepare-release.outputs.tag_name }}
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+          BUILD_TIMESTAMP: ${{ needs.prepare-release.outputs.build_timestamp }}
+          ASSET_PLATFORM: ${{ matrix.asset_platform }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dmgs=()
+          while IFS= read -r dmg; do
+            dmgs+=("$dmg")
+          done < <(find GPM2.0/app/src-tauri/target -path "*/release/bundle/dmg/*.dmg" -type f | sort)
+          if (( ${#dmgs[@]} != 1 )); then
+            printf 'Expected exactly one DMG, found %s:\n' "${#dmgs[@]}" >&2
+            printf '%s\n' "${dmgs[@]}" >&2
+            exit 1
+          fi
+
+          asset="gpm-next_${VERSION}_${BUILD_TIMESTAMP}_${ASSET_PLATFORM}_installer.dmg"
+          cp "${dmgs[0]}" "$asset"
+          gh release upload "$TAG_NAME" "$asset" --clobber
