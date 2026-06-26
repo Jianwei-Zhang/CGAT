@@ -1,4 +1,4 @@
-# ![Pangu](docs/images/logo.png) CGAT
+# ![Pangu](LIMS/docs/images/logo.png) CGAT
 ## Complete Genome Assembly Toolkit
 
 Read [CGAT Docs](https://jianwei-zhang.github.io/CGAT/) to learn more about how to install and use this system.
