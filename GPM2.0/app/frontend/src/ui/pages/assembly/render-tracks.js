@@ -3454,15 +3454,19 @@ function buildSubviewFragmentRects({
   referenceChrName,
   segmentStartBp,
   segmentEndBp,
-  ctgTitle,
   phasedTrackId,
   phasedTrackItemId,
   phasedHaplotypeKey,
 }) {
-  const hoverTitle = String(ctgTitle || "").trim()
-    || buildTrackCtgHoverTitle(ctgName, { startBp: 0, lengthBp: ctgLengthBp });
   return fragments.map((fragment) => {
     const safeLengthBp = Math.max(1, Number(ctgLengthBp || 0));
+    const fragmentStart = normalizePositiveInt(fragment.start) || 1;
+    const fragmentEnd = normalizePositiveInt(fragment.end) || fragmentStart;
+    const fragmentLengthBp = Math.max(0, fragmentEnd - fragmentStart + 1);
+    const hoverTitle = buildTrackCtgHoverTitle(ctgName, {
+      startBp: fragmentStart,
+      lengthBp: fragmentLengthBp,
+    });
     const startRatio = Math.max(0, (Number(fragment.start || 1) - 1) / safeLengthBp);
     const endRatio = Math.max(startRatio, Number(fragment.end || 0) / safeLengthBp);
     const x = Number(barX || 0) + Number(barWidth || 0) * startRatio;
@@ -4004,7 +4008,6 @@ function renderSubviewAlignmentCard(subview, supportContext, trackPrefs, subview
                     referenceChrName: topCtg?.referenceChrName,
                     segmentStartBp: topCtg?.segmentStartBp,
                     segmentEndBp: topCtg?.segmentEndBp,
-                    ctgTitle: topCtgTitle,
                     phasedTrackId: topCtg?.phasedTrackId,
                     phasedTrackItemId: topCtg?.phasedTrackItemId,
                     phasedHaplotypeKey: topCtg?.phasedHaplotypeKey,
@@ -4053,7 +4056,6 @@ function renderSubviewAlignmentCard(subview, supportContext, trackPrefs, subview
                     referenceChrName: bottomCtg?.referenceChrName,
                     segmentStartBp: bottomCtg?.segmentStartBp,
                     segmentEndBp: bottomCtg?.segmentEndBp,
-                    ctgTitle: bottomCtgTitle,
                     phasedTrackId: bottomCtg?.phasedTrackId,
                     phasedTrackItemId: bottomCtg?.phasedTrackItemId,
                     phasedHaplotypeKey: bottomCtg?.phasedHaplotypeKey,
