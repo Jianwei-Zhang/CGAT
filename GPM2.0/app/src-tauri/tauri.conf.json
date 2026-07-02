@@ -6,13 +6,13 @@
   "build": {
     "beforeDevCommand": {
       "cwd": "../frontend",
-      "script": "node ./node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5173"
+      "script": "node ./node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5174"
     },
     "beforeBuildCommand": {
       "cwd": "../frontend",
       "script": "node ./node_modules/vite/bin/vite.js build"
     },
-    "devUrl": "http://127.0.0.1:5173",
+    "devUrl": "http://127.0.0.1:5174",
     "frontendDist": "../frontend/dist"
   },
   "app": {
