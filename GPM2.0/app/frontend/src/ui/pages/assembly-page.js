@@ -315,9 +315,13 @@ function renderAssemblyConfirmModal(state) {
     return "";
   }
   const pageI18n = getAssemblyI18n(state).page || {};
+  const promptsI18n = getAssemblyI18n(state).prompts || {};
   const id = String(dialog.id || "");
-  const mode = dialog.mode === "prompt" ? "prompt" : "confirm";
-  const title = pageI18n.confirmDialogTitle || "确认操作";
+  const rawMode = String(dialog.mode || "").trim();
+  const mode = rawMode === "prompt" || rawMode === "anchor-offset" ? rawMode : "confirm";
+  const title = mode === "anchor-offset"
+    ? (promptsI18n.anchorOffsetTitle || pageI18n.confirmDialogTitle || "确认操作")
+    : (pageI18n.confirmDialogTitle || "确认操作");
   const message = String(dialog.message || "");
   const confirmLabel = pageI18n.confirmDialogConfirm || "确定";
   const cancelLabel = pageI18n.confirmDialogCancel || "取消";
@@ -334,6 +338,49 @@ function renderAssemblyConfirmModal(state) {
         >
       `
     : "";
+  const offsetDirection = String(dialog.defaultDirection || "right").trim() === "left" ? "left" : "right";
+  const anchorOffsetFields = mode === "anchor-offset"
+    ? `
+        <div class="assembly-anchor-offset-fields">
+          <fieldset class="assembly-anchor-offset-direction">
+            <legend>${escapeHtml(promptsI18n.anchorOffsetDirectionLabel || "Direction")}</legend>
+            <label>
+              <input
+                type="radio"
+                name="assembly-anchor-offset-direction-${escapeAttr(id)}"
+                value="right"
+                data-assembly-anchor-offset-direction="${escapeAttr(id)}"
+                ${offsetDirection === "right" ? "checked" : ""}
+              >
+              <span>${escapeHtml(promptsI18n.anchorOffsetRight || "right")}</span>
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="assembly-anchor-offset-direction-${escapeAttr(id)}"
+                value="left"
+                data-assembly-anchor-offset-direction="${escapeAttr(id)}"
+                ${offsetDirection === "left" ? "checked" : ""}
+              >
+              <span>${escapeHtml(promptsI18n.anchorOffsetLeft || "left")}</span>
+            </label>
+          </fieldset>
+          <label class="assembly-anchor-offset-bp-field">
+            <span>${escapeHtml(promptsI18n.anchorOffsetBpLabel || "Offset bp")}</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              inputmode="numeric"
+              class="assembly-confirm-input"
+              value="${escapeAttr(String(dialog.defaultValue || ""))}"
+              data-assembly-confirm-input="${escapeAttr(id)}"
+              autofocus
+            >
+          </label>
+        </div>
+      `
+    : "";
   return `
     <div class="modal-overlay assembly-confirm-overlay" data-assembly-confirm-overlay="true">
       <article
@@ -347,6 +394,7 @@ function renderAssemblyConfirmModal(state) {
         <h4 class="assembly-confirm-title${dangerClass}">${escapeHtml(title)}</h4>
         <p class="assembly-confirm-message${dangerClass}">${escapeHtml(message)}</p>
         ${promptInput}
+        ${anchorOffsetFields}
         <div class="assembly-confirm-actions">
           <button
             type="button"
@@ -430,11 +478,52 @@ function requestAssemblyPrompt(host, store, message, defaultValue = "") {
   });
 }
 
+function requestAssemblyAnchorOffsetPrompt(host, store, defaultValue = "") {
+  const message = tAssembly(store?.getState?.() || "zh", "prompts.anchorOffsetMessage");
+  if (!host || !store) {
+    if (typeof globalThis.window?.prompt !== "function") {
+      return Promise.resolve(null);
+    }
+    const offsetInput = globalThis.window.prompt(message, String(defaultValue)) ?? "";
+    return Promise.resolve({
+      direction: "right",
+      offsetBp: offsetInput,
+    });
+  }
+  const state = store.getState();
+  const id = `assembly-confirm-${assemblyConfirmDialogSeq += 1}`;
+  const previousId = String(state.assembly?.confirmDialog?.id || "");
+  const previousResolve = pendingAssemblyConfirmResolvers.get(previousId);
+  if (previousResolve) {
+    pendingAssemblyConfirmResolvers.delete(previousId);
+    previousResolve(null);
+  }
+  return new Promise((resolve) => {
+    pendingAssemblyConfirmResolvers.set(id, resolve);
+    store.setState({
+      assembly: {
+        ...state.assembly,
+        confirmDialog: {
+          open: true,
+          id,
+          mode: "anchor-offset",
+          danger: false,
+          message,
+          defaultDirection: "right",
+          defaultValue: String(defaultValue ?? ""),
+        },
+      },
+    });
+    rerender(host, store);
+  });
+}
+
 function resolveAssemblyConfirmDialog(host, store, { id, confirmed, value }) {
   const state = store.getState();
   const dialogId = String(id || state.assembly?.confirmDialog?.id || "");
   const resolve = pendingAssemblyConfirmResolvers.get(dialogId);
-  const mode = state.assembly?.confirmDialog?.mode === "prompt" ? "prompt" : "confirm";
+  const rawMode = String(state.assembly?.confirmDialog?.mode || "").trim();
+  const mode = rawMode === "prompt" || rawMode === "anchor-offset" ? rawMode : "confirm";
   pendingAssemblyConfirmResolvers.delete(dialogId);
   store.setState({
     assembly: {
@@ -444,6 +533,10 @@ function resolveAssemblyConfirmDialog(host, store, { id, confirmed, value }) {
   });
   rerender(host, store);
   if (resolve) {
+    if (mode === "anchor-offset") {
+      resolve(confirmed && value && typeof value === "object" ? value : null);
+      return;
+    }
     resolve(mode === "prompt"
       ? (confirmed ? String(value ?? "") : "")
       : Boolean(confirmed));
@@ -1131,6 +1224,10 @@ export function __testEnterSubviewFromTrackSelections(host, store) {
   return enterSubviewFromTrackSelections(host, store);
 }
 
+export function __testHandleSubviewSwapTrackOrder(host, store) {
+  return handleSubviewSwapTrackOrder(host, store);
+}
+
 function handleTrackSubviewCandidateSelection(host, store, {
   trackRole,
   contigId,
@@ -1293,11 +1390,18 @@ function handleSubviewSwapTrackOrder(host, store) {
     state.assembly.subview?.pairwiseEvidence,
     state,
   );
+  const persistedAnchorState = resolveSubviewAnchorStateForSummary(
+    state.assembly.subviewAnchorStateByKey,
+    nextSubview.summary,
+    state.assembly.selectedChrName,
+  );
   store.setState({
     assembly: {
       ...state.assembly,
       subview: {
         ...nextSubview,
+        activeAnchors: persistedAnchorState.activeAnchors,
+        manualAnchors: persistedAnchorState.manualAnchors,
         pairwiseEvidence,
       },
       subviewTrackDragOffsets: swapSubviewTrackDragOffsetsForSummarySwap(
@@ -1816,13 +1920,19 @@ function enterSubviewFromTrackSelections(host, store) {
     currentSubview.pairwiseEvidence,
     state,
   );
+  const persistedAnchorState = resolveSubviewAnchorStateForSummary(
+    state.assembly.subviewAnchorStateByKey,
+    result.value,
+    state.assembly.selectedChrName,
+  );
   store.setState({
     assembly: {
       ...state.assembly,
       subviewTrackView: nextSubviewTrackView,
       subview: {
         ...currentSubview,
-        activeAnchors: [],
+        activeAnchors: persistedAnchorState.activeAnchors,
+        manualAnchors: persistedAnchorState.manualAnchors,
         flippedCtgs: [],
         selectedAContigId: null,
         selectedARole: "",
@@ -1950,34 +2060,23 @@ async function toggleSubviewAnchorEdge(host, store, { hitKey, edge }) {
 }
 
 async function copySubviewAnchorWithOffset(host, store, sourceEdge) {
-  const state = store.getState();
-  const directionInput = await requestAssemblyPrompt(
-    host,
-    store,
-    tAssembly(state, "prompts.anchorOffsetDirection"),
-    "right",
-  );
-  const direction = String(directionInput || "").trim();
-  if (!direction) {
+  const promptResult = await requestAssemblyAnchorOffsetPrompt(host, store);
+  if (!promptResult) {
     return;
   }
-  const offsetInput = await requestAssemblyPrompt(
-    host,
-    store,
-    tAssembly(store.getState(), "prompts.anchorOffsetBp"),
-    "",
-  );
-  const offsetBp = Number(String(offsetInput || "").trim());
+  const direction = String(promptResult.direction || "").trim();
+  const offsetText = String(promptResult.offsetBp ?? "").trim();
+  const offsetBp = Number(offsetText);
   const result = createOffsetSubviewManualAnchor(sourceEdge, { direction, offsetBp });
   if (!result.ok) {
+    const errorKey = result.reason === "out-of-range"
+      ? "runtime.subviewAnchorOffsetOutOfRange"
+      : result.reason === "invalid-anchor"
+        ? "runtime.subviewAnchorOffsetInvalidAnchor"
+        : "runtime.subviewAnchorOffsetInvalid";
     setAssemblyActionFeedback(host, store, {
       actionStatus: "",
-      actionError: tAssembly(
-        store.getState(),
-        result.reason === "out-of-range"
-          ? "runtime.subviewAnchorOffsetOutOfRange"
-          : "runtime.subviewAnchorOffsetInvalid",
-      ),
+      actionError: tAssembly(store.getState(), errorKey),
     });
     return;
   }
@@ -2168,6 +2267,7 @@ function createAssemblyPageBindingDeps() {
     },
     persistMainTrackViewState,
     requestAssemblyConfirm,
+    requestAssemblyAnchorOffsetPrompt,
     rerenderAssemblyMainTab,
     refreshSubviewPairwiseEvidence,
     rememberTrackViewportAnchor,

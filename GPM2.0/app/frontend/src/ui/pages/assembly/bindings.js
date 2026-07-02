@@ -630,10 +630,20 @@ export function bindAssemblyPage(host, store, deps) {
       const input = Array.from(queryHostAll("[data-assembly-confirm-input]")).find(
         (node) => node.dataset.assemblyConfirmInput === button.dataset.assemblyConfirmId,
       );
+      const directionInput = Array.from(queryHostAll("[data-assembly-anchor-offset-direction]")).find(
+        (node) => node.dataset.assemblyAnchorOffsetDirection === button.dataset.assemblyConfirmId
+          && node.checked,
+      );
+      const value = directionInput
+        ? {
+          direction: directionInput.value || "",
+          offsetBp: input?.value ?? "",
+        }
+        : input?.value ?? "";
       resolveAssemblyConfirmDialog(host, store, {
         id: button.dataset.assemblyConfirmId,
         confirmed: button.dataset.assemblyConfirmAction === "confirm",
-        value: input?.value ?? "",
+        value,
       });
     });
   });

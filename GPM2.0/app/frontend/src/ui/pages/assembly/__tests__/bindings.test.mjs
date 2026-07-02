@@ -1323,3 +1323,85 @@ test("confirmation dialog confirm button passes prompt input value", async () =>
     },
   ]);
 });
+
+test("confirmation dialog confirm button passes anchor offset fields together", async () => {
+  const listeners = new Map();
+  const confirmButton = {
+    dataset: {
+      assemblyConfirmAction: "confirm",
+      assemblyConfirmId: "anchor-offset",
+    },
+    addEventListener(type, handler) {
+      listeners.set(type, handler);
+    },
+  };
+  const promptInput = {
+    dataset: {
+      assemblyConfirmInput: "anchor-offset",
+    },
+    value: "75",
+  };
+  const rightDirection = {
+    dataset: {
+      assemblyAnchorOffsetDirection: "anchor-offset",
+    },
+    checked: false,
+    value: "right",
+  };
+  const leftDirection = {
+    dataset: {
+      assemblyAnchorOffsetDirection: "anchor-offset",
+    },
+    checked: true,
+    value: "left",
+  };
+  const asNodeList = (nodes) => ({
+    forEach(callback) {
+      nodes.forEach(callback);
+    },
+    [Symbol.iterator]() {
+      return nodes[Symbol.iterator]();
+    },
+  });
+  const host = {
+    querySelector() {
+      return null;
+    },
+    querySelectorAll(selector) {
+      if (selector === "[data-assembly-confirm-action][data-assembly-confirm-id]") {
+        return asNodeList([confirmButton]);
+      }
+      if (selector === "[data-assembly-confirm-input]") {
+        return asNodeList([promptInput]);
+      }
+      if (selector === "[data-assembly-anchor-offset-direction]") {
+        return asNodeList([rightDirection, leftDirection]);
+      }
+      return [];
+    },
+    addEventListener() {},
+  };
+  const store = createStore(createState());
+  const calls = [];
+  const deps = createBindingDeps({
+    resolveAssemblyConfirmDialog(_host, _store, payload) {
+      calls.push(payload);
+    },
+  });
+
+  bindAssemblyPageImpl(host, store, deps);
+  await listeners.get("click")?.({
+    preventDefault() {},
+  });
+
+  assert.deepEqual(calls, [
+    {
+      id: "anchor-offset",
+      confirmed: true,
+      value: {
+        direction: "left",
+        offsetBp: "75",
+      },
+    },
+  ]);
+});

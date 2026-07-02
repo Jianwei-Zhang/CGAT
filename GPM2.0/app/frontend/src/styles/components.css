@@ -3210,6 +3210,44 @@ select {
   margin-top: 16px;
 }
 
+.assembly-anchor-offset-fields {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.assembly-anchor-offset-direction {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.assembly-anchor-offset-direction legend,
+.assembly-anchor-offset-bp-field span {
+  width: 100%;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.assembly-anchor-offset-direction label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.assembly-anchor-offset-bp-field {
+  display: grid;
+}
+
+.assembly-anchor-offset-bp-field .assembly-confirm-input {
+  margin-top: 0;
+}
+
 .assembly-confirm-actions {
   display: flex;
   justify-content: flex-end;

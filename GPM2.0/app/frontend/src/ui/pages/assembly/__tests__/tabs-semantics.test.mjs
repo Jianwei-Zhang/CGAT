@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as renderTracks from "../render-tracks.js";
+import { setSubviewAnchorStateForSummary } from "../subview-anchor-state.js";
 import {
   addCtgToPhasedChrTrack,
   createPhasedChrTrack,
@@ -25,6 +26,7 @@ import {
   __testGetAssemblyActionFeedbackSignature,
   __testEnterSubviewFromCandidates,
   __testEnterSubviewFromTrackSelections,
+  __testHandleSubviewSwapTrackOrder,
   __testHandleTrackDeleteHotkey,
   __testBindTrackScrollSync,
   __testCancelSubviewPairwiseEvidence,
@@ -750,6 +752,30 @@ test("assembly page renders an app-level bp threshold prompt dialog", () => {
   assert.match(html, /删除小于多少 bp 的主 ds contig？/);
   assert.match(html, /data-assembly-confirm-input="delete-shorter-than"/);
   assert.match(html, /value="100000"/);
+});
+
+test("assembly page renders anchor offset direction and bp in one dialog", () => {
+  const html = renderAssemblyPage(
+    createState({
+      assembly: {
+        confirmDialog: {
+          open: true,
+          id: "anchor-offset",
+          mode: "anchor-offset",
+          message: "设置偏移方向和 bp 距离。",
+          defaultDirection: "left",
+          defaultValue: "50",
+        },
+      },
+    }),
+  );
+
+  assert.match(html, /data-assembly-confirm-dialog="anchor-offset"/);
+  assert.match(html, /data-assembly-confirm-mode="anchor-offset"/);
+  assert.match(html, /value="right"[\s\S]*data-assembly-anchor-offset-direction="anchor-offset"/);
+  assert.match(html, /value="left"[\s\S]*data-assembly-anchor-offset-direction="anchor-offset"[\s\S]*checked/);
+  assert.match(html, /data-assembly-confirm-input="anchor-offset"/);
+  assert.match(html, /value="50"/);
 });
 
 test("assembly tab renders a project-chr members card above main track with name length and member count", () => {
@@ -9821,6 +9847,73 @@ test("enterSubviewFromTrackSelections copies main-track scale prefs into subview
   });
 });
 
+test("enterSubviewFromTrackSelections restores persisted subview anchors for track pairs", () => {
+  const host = {
+    closest() {
+      return null;
+    },
+  };
+  const summary = {
+    mode: "track-pair",
+    topTrack: { role: "support", source: "mother", datasetId: 22, isMirror: false },
+    bottomTrack: { role: "primary", source: "mother", datasetId: null, isMirror: false },
+  };
+  const storedAnchorState = {
+    activeAnchors: [{ hitKey: "hit-1", edge: "left" }],
+    manualAnchors: [{
+      manualAnchorId: "manual:support:120:primary:220",
+      endpointA: { endpointKey: "role-primary:ctg-2", contigId: 2, cutBp: 220, lengthBp: 1000 },
+      endpointB: { endpointKey: "role-support:ctg-30:ds-22", contigId: 30, cutBp: 120, lengthBp: 900 },
+    }],
+  };
+  let state = createState({
+    assembly: {
+      subviewAnchorStateByKey: setSubviewAnchorStateForSummary(
+        {},
+        summary,
+        "Chr01",
+        storedAnchorState,
+      ),
+      subview: {
+        selectedTrackSelections: [
+          { role: "support", source: "mother", datasetId: 22, isMirror: false },
+          { role: "primary", source: "mother", datasetId: null, isMirror: false },
+        ],
+        selectedTrackARole: "support",
+        selectedTrackBRole: "primary",
+        summary: null,
+        message: "",
+        error: "",
+      },
+    },
+  });
+  const store = {
+    getState() {
+      return state;
+    },
+    setState(nextState) {
+      state = {
+        ...state,
+        ...nextState,
+      };
+    },
+  };
+
+  __testEnterSubviewFromTrackSelections(host, store);
+
+  assert.deepEqual(store.getState().assembly.subview.activeAnchors, storedAnchorState.activeAnchors);
+  assert.equal(store.getState().assembly.subview.manualAnchors[0]?.manualAnchorId, storedAnchorState.manualAnchors[0].manualAnchorId);
+  assert.deepEqual(
+    store.getState().assembly.subview.manualAnchors[0]
+      ? [
+        store.getState().assembly.subview.manualAnchors[0].endpointA.cutBp,
+        store.getState().assembly.subview.manualAnchors[0].endpointB.cutBp,
+      ]
+      : [],
+    [220, 120],
+  );
+});
+
 test("enterSubviewFromTrackSelections starts pairwise evidence loading for ds track pairs", () => {
   const host = {
     closest() {
@@ -9883,6 +9976,70 @@ test("enterSubviewFromTrackSelections starts pairwise evidence loading for ds tr
     "track-pair:support:mother:22:30|primary:2",
   );
   assert.notEqual(String(evidence?.requestKey || ""), "");
+});
+
+test("swap subview track order keeps persisted anchors visible", () => {
+  const host = {
+    closest() {
+      return null;
+    },
+  };
+  const summary = {
+    mode: "track-pair",
+    topTrack: { role: "support", source: "mother", datasetId: 22, isMirror: false },
+    bottomTrack: { role: "primary", source: "mother", datasetId: null, isMirror: false },
+  };
+  const storedAnchorState = {
+    activeAnchors: [{ hitKey: "hit-1", edge: "right" }],
+    manualAnchors: [{
+      manualAnchorId: "manual:support:150:primary:250",
+      endpointA: { endpointKey: "role-primary:ctg-2", contigId: 2, cutBp: 250, lengthBp: 1000 },
+      endpointB: { endpointKey: "role-support:ctg-30:ds-22", contigId: 30, cutBp: 150, lengthBp: 900 },
+    }],
+  };
+  let state = createState({
+    assembly: {
+      subviewAnchorStateByKey: setSubviewAnchorStateForSummary(
+        {},
+        summary,
+        "Chr01",
+        storedAnchorState,
+      ),
+      subview: {
+        summary,
+        activeAnchors: [],
+        manualAnchors: [],
+        message: "",
+        error: "",
+      },
+    },
+  });
+  const store = {
+    getState() {
+      return state;
+    },
+    setState(nextState) {
+      state = {
+        ...state,
+        ...nextState,
+      };
+    },
+  };
+
+  __testHandleSubviewSwapTrackOrder(host, store);
+
+  assert.equal(store.getState().assembly.subview.summary.topTrack.role, "primary");
+  assert.deepEqual(store.getState().assembly.subview.activeAnchors, storedAnchorState.activeAnchors);
+  assert.equal(store.getState().assembly.subview.manualAnchors[0]?.manualAnchorId, storedAnchorState.manualAnchors[0].manualAnchorId);
+  assert.deepEqual(
+    store.getState().assembly.subview.manualAnchors[0]
+      ? [
+        store.getState().assembly.subview.manualAnchors[0].endpointA.cutBp,
+        store.getState().assembly.subview.manualAnchors[0].endpointB.cutBp,
+      ]
+      : [],
+    [250, 150],
+  );
 });
 
 test("track label selection inherits main-track scale prefs when entering subview-track", () => {
