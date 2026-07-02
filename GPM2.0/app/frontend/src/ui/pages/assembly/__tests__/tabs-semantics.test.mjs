@@ -12677,6 +12677,79 @@ test("subview track-pair mode also renders active anchors and fragment hit zones
   );
 });
 
+test("swapped subview track-pair keeps original evidence anchors active", () => {
+  const previousOrderHitKey = "pair:30:hit-1:2:hit-1";
+  const swappedOrderHitKey = "pair:2:hit-1:30:hit-1";
+  const html = renderAssemblyPage(
+    createState({
+      assembly: {
+        supportDatasetId: 22,
+        supportChrCtgs: [
+          {
+            assemblyCtgId: 30,
+            name: "support-bottom",
+            assignedChrName: "Chr01",
+            memberCount: 1,
+            totalLength: 20000,
+            anchorStart: 320,
+            hits: [
+              { refStart: 5000, refEnd: 6200, ctgStart: 2200, ctgEnd: 3400, blockLength: 1300, mapq: 60 },
+            ],
+          },
+        ],
+        chrCtgs: [
+          {
+            assemblyCtgId: 2,
+            name: "primary-top",
+            assignedChrName: "Chr01",
+            memberCount: 1,
+            totalLength: 20000,
+            anchorStart: 100,
+            hits: [
+              { refStart: 5000, refEnd: 6200, ctgStart: 2400, ctgEnd: 3600, blockLength: 1400, mapq: 60 },
+            ],
+          },
+        ],
+        subviewTrackView: {
+          minTickUnitKb: 1000,
+          maxTickCount: 10,
+          alignmentLength: 1000,
+          mapq: 0,
+        },
+        subview: {
+          activeAnchors: [{ hitKey: previousOrderHitKey, edge: "left" }],
+          manualAnchors: [{
+            manualAnchorId: "manual:primary:2500:support:2300",
+            endpointA: { endpointKey: "role:primary:ctg:2:src:mother", contigId: 2, cutBp: 2500, lengthBp: 20000 },
+            endpointB: { endpointKey: "role:support:ctg:30:ds:22:src:mother", contigId: 30, cutBp: 2300, lengthBp: 20000 },
+          }],
+          summary: {
+            mode: "track-pair",
+            topTrack: { role: "primary", source: "mother" },
+            bottomTrack: { role: "support", source: "mother", datasetId: 22 },
+          },
+        },
+      },
+      initializer: {
+        datasets: [
+          { datasetId: 11, name: "hifiasm", label: "hifiasm" },
+          { datasetId: 22, name: "flye", label: "flye" },
+        ],
+        existingProjects: [{ projectId: 7, primaryDatasetId: 11, supportDatasetIds: [22] }],
+      },
+    }),
+  );
+
+  assert.match(
+    html,
+    new RegExp(`class="subview-anchor-hit-zone is-active"[^>]*data-subview-anchor-hit-key="${swappedOrderHitKey}"[^>]*data-subview-anchor-edge="left"`),
+  );
+  assert.match(
+    html,
+    /class="subview-anchor-hit-zone is-active"[^>]*data-subview-anchor-kind="manual"/,
+  );
+});
+
 test("track-pair anchors keep the same paired hit after alignment length changes", () => {
   const stablePairHitKey = "pair:30:hit-2:2:hit-2";
   const renderWithAlignmentLength = (alignmentLength) =>

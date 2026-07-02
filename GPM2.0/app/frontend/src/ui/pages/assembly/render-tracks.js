@@ -3213,11 +3213,20 @@ function renderSubviewTrackOrderToggleButton({ className = "", style = "", swapT
 }
 
 function buildSubviewActiveAnchorKeySet(activeAnchors) {
-  return new Set(
-    (Array.isArray(activeAnchors) ? activeAnchors : []).map(
-      (anchor) => `${String(anchor?.hitKey || "").trim()}:${String(anchor?.edge || "").trim()}`,
-    ),
-  );
+  const keys = new Set();
+  (Array.isArray(activeAnchors) ? activeAnchors : []).forEach((anchor) => {
+    const hitKey = String(anchor?.hitKey || "").trim();
+    const edge = String(anchor?.edge || "").trim();
+    if (!hitKey || !edge) {
+      return;
+    }
+    keys.add(`${hitKey}:${edge}`);
+    const match = hitKey.match(/^pair:([^:]*):([^:]*):([^:]*):([^:]*)$/);
+    if (match) {
+      keys.add(`pair:${match[3]}:${match[4]}:${match[1]}:${match[2]}:${edge}`);
+    }
+  });
+  return keys;
 }
 
 function buildSubviewFlippedCtgKeySet(flippedCtgs) {
