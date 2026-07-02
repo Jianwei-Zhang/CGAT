@@ -65,6 +65,8 @@ function createContextMenuActionsCapture(calls = []) {
     toggleSupportTrackCtgMirror: capture("toggleSupportTrackCtgMirror"),
     togglePrimaryTrackCtgHidden: capture("togglePrimaryTrackCtgHidden"),
     toggleSubviewAnchorEdge: capture("toggleSubviewAnchorEdge"),
+    copySubviewAnchorWithOffset: capture("copySubviewAnchorWithOffset"),
+    deleteSubviewManualAnchor: capture("deleteSubviewManualAnchor"),
     appendTrackContigToFinalPath: capture("appendTrackContigToFinalPath"),
     addTrackContigToPhasedTrack: capture("addTrackContigToPhasedTrack"),
     removePhasedTrackItem: capture("removePhasedTrackItem"),
@@ -217,9 +219,18 @@ test("resolveSubviewAnchorEdgeContextTarget parses anchor edge metadata", () => 
   };
 
   assert.deepEqual(resolveSubviewAnchorEdgeContextTarget(target), {
+    kind: "evidence",
     hitKey: "hit-1",
     edge: "left",
     active: true,
+    topEndpointKey: "",
+    bottomEndpointKey: "",
+    topContigId: null,
+    bottomContigId: null,
+    topCutBp: null,
+    bottomCutBp: null,
+    topLengthBp: null,
+    bottomLengthBp: null,
   });
 });
 
@@ -785,7 +796,7 @@ test("buildAssemblyContextMenuItems exposes anchor-off when a subview edge is ac
     actions: createContextMenuActionsCapture(),
   });
 
-  assert.deepEqual(items.map((item) => item.label), ["anchor off"]);
+  assert.deepEqual(items.map((item) => item.label), ["anchor off", "复制偏移锚点"]);
 });
 
 test("buildAssemblyContextMenuItems exposes fragment append and direct flip actions in 2-contig mode", async () => {

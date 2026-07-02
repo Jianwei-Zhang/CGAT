@@ -25,6 +25,17 @@ test("loadProjectAssemblyViewState normalizes segment-based finalPathByChr, fina
           hiddenPrimaryCtgIdsByChr: { Chr01: [9, "9", 0], "": [1] },
           trackDragOffsets: [],
           subviewTrackDragOffsets: [],
+          subviewAnchorStateByKey: {
+            "2-contig|chr:Chr01|a|b": {
+              activeAnchors: [{ hitKey: "hit-1", edge: "left" }],
+              manualAnchors: [{
+                manualAnchorId: "m1",
+                endpointA: { endpointKey: "a", contigId: 9, cutBp: 100 },
+                endpointB: { endpointKey: "b", contigId: 10, cutBp: 200 },
+              }],
+            },
+            "": { activeAnchors: [{ hitKey: "bad", edge: "left" }] },
+          },
           trackScrollState: {},
           subviewTrackScrollState: {},
           finalPathTrackScrollState: {
@@ -102,6 +113,20 @@ test("loadProjectAssemblyViewState normalizes segment-based finalPathByChr, fina
   });
   assert.equal(result.degapProjectState.settingsPanelDismissed, true);
   assert.equal(result.degapProjectState.jobs[0].jobId, "CtgA_vs_CtgB_Left-job");
+  assert.deepEqual(result.subviewAnchorStateByKey, {
+    "2-contig|chr:Chr01|a|b": {
+      activeAnchors: [{ hitKey: "hit-1", edge: "left" }],
+      manualAnchors: [{
+        manualAnchorId: "m1",
+        sourceHitKey: "",
+        sourceEdge: "left",
+        direction: "",
+        offsetBp: null,
+        endpointA: { endpointKey: "a", contigId: 9, cutBp: 100 },
+        endpointB: { endpointKey: "b", contigId: 10, cutBp: 200 },
+      }],
+    },
+  });
 });
 
 test("persistProjectAssemblyViewState sends and returns normalized segment-based finalPathByChr and membersCardCollapsed", async () => {
@@ -121,6 +146,15 @@ test("persistProjectAssemblyViewState sends and returns normalized segment-based
       hiddenPrimaryCtgIdsByChr: { Chr01: [9, "9", 0], "": [1] },
       trackDragOffsets: [],
       subviewTrackDragOffsets: [],
+      subviewAnchorStateByKey: {
+        "2-contig|chr:Chr01|a|b": {
+          activeAnchors: [{ hitKey: "hit-1", edge: "right" }],
+          manualAnchors: [{
+            endpointA: { endpointKey: "b", contigId: 10, cutBp: 200 },
+            endpointB: { endpointKey: "a", contigId: 9, cutBp: 100 },
+          }],
+        },
+      },
       trackScrollState: {},
       subviewTrackScrollState: {},
       finalPathTrackScrollState: {
@@ -199,6 +233,21 @@ test("persistProjectAssemblyViewState sends and returns normalized segment-based
   assert.deepEqual(sent[0].hiddenPrimaryCtgIdsByChr, { Chr01: [9] });
   assert.deepEqual(result.hiddenPrimaryCtgIdsByChr, { Chr01: [9] });
   assert.equal(result.finalPathViewMode, "table");
+  assert.deepEqual(sent[0].subviewAnchorStateByKey, {
+    "2-contig|chr:Chr01|a|b": {
+      activeAnchors: [{ hitKey: "hit-1", edge: "right" }],
+      manualAnchors: [{
+        manualAnchorId: "manual:a:100:b:200",
+        sourceHitKey: "",
+        sourceEdge: "left",
+        direction: "",
+        offsetBp: null,
+        endpointA: { endpointKey: "a", contigId: 9, cutBp: 100 },
+        endpointB: { endpointKey: "b", contigId: 10, cutBp: 200 },
+      }],
+    },
+  });
+  assert.deepEqual(result.subviewAnchorStateByKey, sent[0].subviewAnchorStateByKey);
   assert.equal(sent[0].membersCardCollapsed, false);
   assert.equal(result.membersCardCollapsed, false);
   assert.deepEqual(sent[0].finalPathTrackScrollState, {

@@ -30,6 +30,8 @@ function createStubActions() {
     openAssemblyContextMenuAt() {},
     toggleSupportTrackCtgMirror() {},
     togglePrimaryTrackCtgHidden() {},
+    copySubviewAnchorWithOffset() {},
+    deleteSubviewManualAnchor() {},
     addTrackContigToPhasedTrack() {},
     removePhasedTrackItem() {},
     deletePhasedTrack() {},

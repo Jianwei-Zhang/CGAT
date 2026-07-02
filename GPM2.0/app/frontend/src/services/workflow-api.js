@@ -1018,6 +1018,7 @@ export async function setProjectAssemblyViewState({
   hiddenPrimaryCtgIdsByChr = {},
   trackDragOffsets = [],
   subviewTrackDragOffsets = [],
+  subviewAnchorStateByKey = {},
   trackScrollState = {},
   subviewTrackScrollState = {},
   finalPathTrackScrollState = {},
@@ -1037,6 +1038,7 @@ export async function setProjectAssemblyViewState({
       hiddenPrimaryCtgIdsByChr,
       trackDragOffsets,
       subviewTrackDragOffsets,
+      subviewAnchorStateByKey,
       trackScrollState,
       subviewTrackScrollState,
       finalPathTrackScrollState,
@@ -1057,6 +1059,7 @@ export async function setProjectAssemblyViewState({
       hiddenPrimaryCtgIdsByChr,
       trackDragOffsets,
       subviewTrackDragOffsets,
+      subviewAnchorStateByKey,
       trackScrollState,
       subviewTrackScrollState,
       finalPathTrackScrollState,
@@ -1078,6 +1081,7 @@ export async function setProjectAssemblyViewState({
     hiddenPrimaryCtgIdsByChr,
     trackDragOffsets,
     subviewTrackDragOffsets,
+    subviewAnchorStateByKey,
     trackScrollState,
     subviewTrackScrollState,
     finalPathTrackScrollState,
@@ -2034,6 +2038,7 @@ async function getProjectAssemblyViewStateMock({ projectId }) {
     hiddenPrimaryCtgIdsByChr: {},
     trackDragOffsets: [],
     subviewTrackDragOffsets: [],
+    subviewAnchorStateByKey: {},
     trackScrollState: {},
     subviewTrackScrollState: {},
     finalPathTrackScrollState: {},
@@ -2053,6 +2058,7 @@ async function setProjectAssemblyViewStateMock({
   hiddenPrimaryCtgIdsByChr = {},
   trackDragOffsets = [],
   subviewTrackDragOffsets = [],
+  subviewAnchorStateByKey = {},
   trackScrollState = {},
   subviewTrackScrollState = {},
   finalPathTrackScrollState = {},
@@ -2084,6 +2090,12 @@ async function setProjectAssemblyViewStateMock({
         : {},
     trackDragOffsets: Array.isArray(trackDragOffsets) ? trackDragOffsets : [],
     subviewTrackDragOffsets: Array.isArray(subviewTrackDragOffsets) ? subviewTrackDragOffsets : [],
+    subviewAnchorStateByKey:
+      subviewAnchorStateByKey
+      && typeof subviewAnchorStateByKey === "object"
+      && !Array.isArray(subviewAnchorStateByKey)
+        ? subviewAnchorStateByKey
+        : {},
     trackScrollState:
       trackScrollState && typeof trackScrollState === "object" && !Array.isArray(trackScrollState)
         ? trackScrollState
@@ -2696,6 +2708,7 @@ async function setProjectAssemblyViewStateTauri({
   hiddenPrimaryCtgIdsByChr = {},
   trackDragOffsets = [],
   subviewTrackDragOffsets = [],
+  subviewAnchorStateByKey = {},
   trackScrollState = {},
   subviewTrackScrollState = {},
   finalPathTrackScrollState = {},
@@ -2714,6 +2727,7 @@ async function setProjectAssemblyViewStateTauri({
     hiddenPrimaryCtgIdsByChr,
     trackDragOffsets,
     subviewTrackDragOffsets,
+    subviewAnchorStateByKey,
     trackScrollState,
     subviewTrackScrollState,
     finalPathTrackScrollState,

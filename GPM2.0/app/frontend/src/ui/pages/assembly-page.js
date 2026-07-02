@@ -208,7 +208,12 @@ import {
   shouldRefetchSubviewPairwiseEvidence,
 } from "./assembly/subview-pairwise-evidence-state.js";
 import {
+  createOffsetSubviewManualAnchor,
+  removeSubviewManualAnchor as removeSubviewManualAnchorImpl,
+  resolveSubviewAnchorStateForSummary,
+  setSubviewAnchorStateForSummary,
   toggleSubviewAnchorEdge as toggleSubviewAnchorEdgeImpl,
+  upsertSubviewManualAnchor,
 } from "./assembly/subview-anchor-state.js";
 import {
   buildChrLengthsByName,
@@ -1197,6 +1202,13 @@ function handleTrackSubviewTrackSelection(host, store, {
         state,
       )
     : null;
+  const persistedAnchorState = hasEnteredTrackSubview
+    ? resolveSubviewAnchorStateForSummary(
+        state.assembly.subviewAnchorStateByKey,
+        nextSubview.summary,
+        state.assembly.selectedChrName,
+      )
+    : { activeAnchors: [], manualAnchors: [] };
   store.setState({
     assembly: {
       ...state.assembly,
@@ -1204,7 +1216,8 @@ function handleTrackSubviewTrackSelection(host, store, {
       subview: hasEnteredTrackSubview
         ? {
           ...nextSubview,
-          activeAnchors: [],
+          activeAnchors: persistedAnchorState.activeAnchors,
+          manualAnchors: persistedAnchorState.manualAnchors,
           flippedCtgs: [],
           pairwiseEvidence,
         }
@@ -1626,6 +1639,7 @@ function enterSubviewFromCandidates(host, store) {
         subview: {
           ...currentSubview,
           activeAnchors: [],
+          manualAnchors: [],
           flippedCtgs: [],
           error: result.error,
           summary: null,
@@ -1643,13 +1657,19 @@ function enterSubviewFromCandidates(host, store) {
     currentSubview.pairwiseEvidence,
     state,
   );
+  const persistedAnchorState = resolveSubviewAnchorStateForSummary(
+    state.assembly.subviewAnchorStateByKey,
+    result.value,
+    state.assembly.selectedChrName,
+  );
   store.setState({
     assembly: {
       ...state.assembly,
       subviewTrackView: nextSubviewTrackView,
         subview: {
           ...currentSubview,
-          activeAnchors: [],
+          activeAnchors: persistedAnchorState.activeAnchors,
+          manualAnchors: persistedAnchorState.manualAnchors,
           flippedCtgs: [],
           selectedTrackSelections: [],
         selectedTrackARole: "",
@@ -1882,7 +1902,36 @@ function setSubviewTrackPairCtgHidden(host, store, { trackRole, contigId, hidden
   rerender(host, store);
 }
 
-function toggleSubviewAnchorEdge(host, store, { hitKey, edge }) {
+function buildSubviewAnchorStateByKeyForCurrentSubview(assembly, subview) {
+  return setSubviewAnchorStateForSummary(
+    assembly?.subviewAnchorStateByKey,
+    subview?.summary,
+    assembly?.selectedChrName,
+    {
+      activeAnchors: subview?.activeAnchors || [],
+      manualAnchors: subview?.manualAnchors || [],
+    },
+  );
+}
+
+async function commitSubviewAnchorState(host, store, nextSubview) {
+  const state = store.getState();
+  const nextSubviewAnchorStateByKey = buildSubviewAnchorStateByKeyForCurrentSubview(
+    state.assembly,
+    nextSubview,
+  );
+  store.setState({
+    assembly: {
+      ...state.assembly,
+      subview: nextSubview,
+      subviewAnchorStateByKey: nextSubviewAnchorStateByKey,
+    },
+  });
+  rerender(host, store);
+  await persistProjectAssemblyViewStateFromStore(host, store);
+}
+
+async function toggleSubviewAnchorEdge(host, store, { hitKey, edge }) {
   const state = store.getState();
   const currentSubview = getSubviewState(state.assembly);
   const nextActiveAnchors = toggleSubviewAnchorEdgeImpl(currentSubview.activeAnchors, { hitKey, edge });
@@ -1894,16 +1943,74 @@ function toggleSubviewAnchorEdge(host, store, { hitKey, edge }) {
   ) {
     return;
   }
-  store.setState({
-    assembly: {
-      ...state.assembly,
-      subview: {
-        ...currentSubview,
-        activeAnchors: nextActiveAnchors,
-      },
-    },
+  await commitSubviewAnchorState(host, store, {
+    ...currentSubview,
+    activeAnchors: nextActiveAnchors,
   });
-  rerender(host, store);
+}
+
+async function copySubviewAnchorWithOffset(host, store, sourceEdge) {
+  const state = store.getState();
+  const directionInput = await requestAssemblyPrompt(
+    host,
+    store,
+    tAssembly(state, "prompts.anchorOffsetDirection"),
+    "right",
+  );
+  const direction = String(directionInput || "").trim();
+  if (!direction) {
+    return;
+  }
+  const offsetInput = await requestAssemblyPrompt(
+    host,
+    store,
+    tAssembly(store.getState(), "prompts.anchorOffsetBp"),
+    "",
+  );
+  const offsetBp = Number(String(offsetInput || "").trim());
+  const result = createOffsetSubviewManualAnchor(sourceEdge, { direction, offsetBp });
+  if (!result.ok) {
+    setAssemblyActionFeedback(host, store, {
+      actionStatus: "",
+      actionError: tAssembly(
+        store.getState(),
+        result.reason === "out-of-range"
+          ? "runtime.subviewAnchorOffsetOutOfRange"
+          : "runtime.subviewAnchorOffsetInvalid",
+      ),
+    });
+    return;
+  }
+  const currentState = store.getState();
+  const currentSubview = getSubviewState(currentState.assembly);
+  await commitSubviewAnchorState(host, store, {
+    ...currentSubview,
+    manualAnchors: upsertSubviewManualAnchor(currentSubview.manualAnchors, result.anchor),
+  });
+  setAssemblyActionFeedback(host, store, {
+    actionStatus: tAssembly(store.getState(), "runtime.subviewAnchorOffsetCreated"),
+    actionError: "",
+  });
+}
+
+async function deleteSubviewManualAnchor(host, store, { manualAnchorId }) {
+  const state = store.getState();
+  const currentSubview = getSubviewState(state.assembly);
+  const nextManualAnchors = removeSubviewManualAnchorImpl(
+    currentSubview.manualAnchors,
+    manualAnchorId,
+  );
+  if (nextManualAnchors.length === currentSubview.manualAnchors.length) {
+    return;
+  }
+  await commitSubviewAnchorState(host, store, {
+    ...currentSubview,
+    manualAnchors: nextManualAnchors,
+  });
+  setAssemblyActionFeedback(host, store, {
+    actionStatus: tAssembly(store.getState(), "runtime.subviewManualAnchorDeleted"),
+    actionError: "",
+  });
 }
 
 function toggleSubviewContigFlip(host, store, { slot, assemblyCtgId }, options = {}) {
@@ -2330,6 +2437,8 @@ const contextMenuRuntimeDeps = {
   togglePrimaryTrackCtgHidden,
   toggleSubviewContigFlip,
   toggleSubviewAnchorEdge,
+  copySubviewAnchorWithOffset,
+  deleteSubviewManualAnchor,
   toggleSupportTrackCtgMirror,
   updateDeletedCtgSelection,
   updateTrackSelection,
@@ -4421,6 +4530,12 @@ async function persistProjectAssemblyViewStateFromStore(
       subviewTrackDragOffsets: Array.isArray(state.assembly.subviewTrackDragOffsets)
         ? state.assembly.subviewTrackDragOffsets
         : [],
+      subviewAnchorStateByKey:
+        state.assembly.subviewAnchorStateByKey
+        && typeof state.assembly.subviewAnchorStateByKey === "object"
+        && !Array.isArray(state.assembly.subviewAnchorStateByKey)
+          ? state.assembly.subviewAnchorStateByKey
+          : {},
       trackScrollState: normalizeViewportScrollState(state.assembly.trackScrollState),
       subviewTrackScrollState: normalizeViewportScrollState(state.assembly.subviewTrackScrollState),
       finalPathTrackScrollState: normalizeViewportScrollState(state.assembly.finalPathTrackScrollState),
@@ -5038,6 +5153,12 @@ async function applySupportDatasetSelection(
     subviewTrackDragOffsets: Array.isArray(nextAssemblyState.subviewTrackDragOffsets)
       ? nextAssemblyState.subviewTrackDragOffsets
       : [],
+    subviewAnchorStateByKey:
+      nextAssemblyState.subviewAnchorStateByKey
+      && typeof nextAssemblyState.subviewAnchorStateByKey === "object"
+      && !Array.isArray(nextAssemblyState.subviewAnchorStateByKey)
+        ? nextAssemblyState.subviewAnchorStateByKey
+        : {},
     trackScrollState: normalizeViewportScrollState(nextAssemblyState.trackScrollState),
     subviewTrackScrollState: normalizeViewportScrollState(nextAssemblyState.subviewTrackScrollState),
     finalPathTrackScrollState: normalizeViewportScrollState(nextAssemblyState.finalPathTrackScrollState),

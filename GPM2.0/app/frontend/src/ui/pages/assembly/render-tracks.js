@@ -48,6 +48,7 @@ import {
   resolveSubviewTrackSummaryCtgs,
 } from "./subview-state.js";
 import {
+  buildSubviewAnchorEndpointKey,
   deriveSubviewContigFragments,
 } from "./subview-anchor-state.js";
 import {
@@ -3349,6 +3350,82 @@ function buildSubviewActiveAnchorCutsByContig(anchorEdges) {
   return cutsByContig;
 }
 
+function resolveSubviewAnchorEndpointX({ barX, barWidth, lengthBp, cutBp }) {
+  const safeLengthBp = Math.max(1, normalizePositiveInt(lengthBp) ?? 1);
+  const normalizedCutBp = Math.max(1, Math.min(safeLengthBp, Number(cutBp || 1)));
+  return Number(barX || 0) + Number(barWidth || 0) * ((normalizedCutBp - 1) / safeLengthBp);
+}
+
+function buildSubviewManualAnchorEdges(manualAnchors, { topEndpoint, bottomEndpoint }) {
+  if (!topEndpoint?.endpointKey || !bottomEndpoint?.endpointKey) {
+    return [];
+  }
+  return (Array.isArray(manualAnchors) ? manualAnchors : []).flatMap((anchor) => {
+    const endpointA = anchor?.endpointA || null;
+    const endpointB = anchor?.endpointB || null;
+    const topManualEndpoint = endpointA?.endpointKey === topEndpoint.endpointKey
+      ? endpointA
+      : endpointB?.endpointKey === topEndpoint.endpointKey
+        ? endpointB
+        : null;
+    const bottomManualEndpoint = endpointA?.endpointKey === bottomEndpoint.endpointKey
+      ? endpointA
+      : endpointB?.endpointKey === bottomEndpoint.endpointKey
+        ? endpointB
+        : null;
+    const topCutBp = normalizePositiveInt(topManualEndpoint?.cutBp);
+    const bottomCutBp = normalizePositiveInt(bottomManualEndpoint?.cutBp);
+    if (!topManualEndpoint || !bottomManualEndpoint || !topCutBp || !bottomCutBp) {
+      return [];
+    }
+    return [{
+      manualAnchorId: String(anchor?.manualAnchorId || "").trim(),
+      hitKey: String(anchor?.manualAnchorId || "").trim(),
+      edge: "manual",
+      active: true,
+      topX: topEndpoint.xForCut(topCutBp),
+      bottomX: bottomEndpoint.xForCut(bottomCutBp),
+      topY: topEndpoint.topY,
+      bottomY: bottomEndpoint.bottomY,
+      hitTopY: topEndpoint.hitY,
+      hitBottomY: bottomEndpoint.hitY,
+      topContigId: topEndpoint.contigId,
+      bottomContigId: bottomEndpoint.contigId,
+      topEndpointKey: topEndpoint.endpointKey,
+      bottomEndpointKey: bottomEndpoint.endpointKey,
+      topCutBp,
+      bottomCutBp,
+      topLengthBp: topEndpoint.lengthBp,
+      bottomLengthBp: bottomEndpoint.lengthBp,
+    }];
+  }).filter((edge) => edge.manualAnchorId);
+}
+
+function buildSubviewManualAnchorEdgesFromEndpointMaps(manualAnchors, { topEndpointsByKey, bottomEndpointsByKey }) {
+  const topMap = topEndpointsByKey instanceof Map ? topEndpointsByKey : new Map();
+  const bottomMap = bottomEndpointsByKey instanceof Map ? bottomEndpointsByKey : new Map();
+  return (Array.isArray(manualAnchors) ? manualAnchors : []).flatMap((anchor) => {
+    const endpointA = anchor?.endpointA || null;
+    const endpointB = anchor?.endpointB || null;
+    const topManualEndpoint = topMap.has(endpointA?.endpointKey)
+      ? endpointA
+      : topMap.has(endpointB?.endpointKey)
+        ? endpointB
+        : null;
+    const bottomManualEndpoint = bottomMap.has(endpointA?.endpointKey)
+      ? endpointA
+      : bottomMap.has(endpointB?.endpointKey)
+        ? endpointB
+        : null;
+    if (!topManualEndpoint || !bottomManualEndpoint) {
+      return [];
+    }
+    const topEndpoint = topMap.get(topManualEndpoint.endpointKey);
+    const bottomEndpoint = bottomMap.get(bottomManualEndpoint.endpointKey);
+    return buildSubviewManualAnchorEdges([anchor], { topEndpoint, bottomEndpoint });
+  });
+}
+
 function buildSubviewFragmentRects({
   fragments,
   slot,
@@ -3430,7 +3507,10 @@ function buildSubviewFragmentRects({
 function renderSubviewAnchorLines(anchorEdges, { topY, bottomY, hitTopY, hitBottomY }) {
   return (Array.isArray(anchorEdges) ? anchorEdges : [])
     .map(
-      (edge) => `<line
+      (edge) => {
+        const anchorKind = edge.manualAnchorId ? "manual" : "evidence";
+        const anchorEdge = edge.manualAnchorId ? "manual" : String(edge.edge || "");
+        return `<line
                   class="subview-anchor-line${edge.active ? " is-active" : ""}"
                   x1="${Number(edge.topX || 0).toFixed(2)}"
                   y1="${Number(hitTopY ?? edge.hitTopY ?? edge.topY ?? topY ?? 0).toFixed(2)}"
@@ -3449,10 +3529,21 @@ function renderSubviewAnchorLines(anchorEdges, { topY, bottomY, hitTopY, hitBott
                   stroke="transparent"
                   stroke-width="3"
                   pointer-events="stroke"
+                  data-subview-anchor-kind="${anchorKind}"
                   data-subview-anchor-hit-key="${escapeAttr(edge.hitKey)}"
-                  data-subview-anchor-edge="${escapeAttr(edge.edge)}"
+                  data-subview-anchor-edge="${escapeAttr(anchorEdge)}"
                   data-subview-anchor-active="${edge.active ? "1" : "0"}"
-                />`,
+                  data-subview-manual-anchor-id="${escapeAttr(edge.manualAnchorId || "")}"
+                  data-subview-anchor-top-endpoint-key="${escapeAttr(edge.topEndpointKey || "")}"
+                  data-subview-anchor-bottom-endpoint-key="${escapeAttr(edge.bottomEndpointKey || "")}"
+                  data-subview-anchor-top-contig-id="${Number(edge.topContigId || 0)}"
+                  data-subview-anchor-bottom-contig-id="${Number(edge.bottomContigId || 0)}"
+                  data-subview-anchor-top-cut-bp="${Number(edge.topCutBp || 0)}"
+                  data-subview-anchor-bottom-cut-bp="${Number(edge.bottomCutBp || 0)}"
+                  data-subview-anchor-top-length-bp="${Number(edge.topLengthBp || 0)}"
+                  data-subview-anchor-bottom-length-bp="${Number(edge.bottomLengthBp || 0)}"
+                />`;
+      },
     )
     .join("");
 }
@@ -3717,10 +3808,61 @@ function renderSubviewAlignmentCard(subview, supportContext, trackPrefs, subview
   });
   const trackOrderButtonTopPx = ((Number(svgModel.topLabelTop) + Number(svgModel.bottomLabelTop)) / 2).toFixed(2);
   const activeAnchorKeys = buildSubviewActiveAnchorKeySet(subview?.activeAnchors);
-  const anchorEdges = (Array.isArray(svgModel.anchorEdges) ? svgModel.anchorEdges : []).map((edge) => ({
+  const topEndpointKey = buildSubviewAnchorEndpointKey({
+    ...topSelection,
+    role: topSelection.role,
+    contigId: topSelection.contigId,
+    datasetId: topCtg?.datasetId,
+    isMirror: String(topCtg?.subviewSource || "") === "mirror",
+    sourceKind: topCtg?.sourceKind,
+  });
+  const bottomEndpointKey = buildSubviewAnchorEndpointKey({
+    ...bottomSelection,
+    role: bottomSelection.role,
+    contigId: bottomSelection.contigId,
+    datasetId: bottomCtg?.datasetId,
+    isMirror: String(bottomCtg?.subviewSource || "") === "mirror",
+    sourceKind: bottomCtg?.sourceKind,
+  });
+  const evidenceAnchorEdges = (Array.isArray(svgModel.anchorEdges) ? svgModel.anchorEdges : []).map((edge) => ({
     ...edge,
+    topEndpointKey,
+    bottomEndpointKey,
+    topLengthBp: svgModel.topLengthBp,
+    bottomLengthBp: svgModel.bottomLengthBp,
     active: activeAnchorKeys.has(`${String(edge.hitKey || "").trim()}:${String(edge.edge || "").trim()}`),
   }));
+  const manualAnchorEdges = buildSubviewManualAnchorEdges(subview?.manualAnchors, {
+    topEndpoint: {
+      endpointKey: topEndpointKey,
+      contigId: topSelection.contigId,
+      lengthBp: svgModel.topLengthBp,
+      topY: svgModel.topBarY,
+      bottomY: svgModel.topBarY + svgModel.barHeight,
+      hitY: svgModel.topBarY + svgModel.barHeight,
+      xForCut: (cutBp) => resolveSubviewAnchorEndpointX({
+        barX: svgModel.topBarX,
+        barWidth: svgModel.topBarWidth,
+        lengthBp: svgModel.topLengthBp,
+        cutBp,
+      }),
+    },
+    bottomEndpoint: {
+      endpointKey: bottomEndpointKey,
+      contigId: bottomSelection.contigId,
+      lengthBp: svgModel.bottomLengthBp,
+      topY: svgModel.bottomBarY,
+      bottomY: svgModel.bottomBarY + svgModel.barHeight,
+      hitY: svgModel.bottomBarY,
+      xForCut: (cutBp) => resolveSubviewAnchorEndpointX({
+        barX: svgModel.bottomBarX,
+        barWidth: svgModel.bottomBarWidth,
+        lengthBp: svgModel.bottomLengthBp,
+        cutBp,
+      }),
+    },
+  });
+  const anchorEdges = [...evidenceAnchorEdges, ...manualAnchorEdges];
   const activeAnchorCutsByContig = buildSubviewActiveAnchorCutsByContig(anchorEdges);
   const topFragments = deriveSubviewContigFragments({
     contig: {
@@ -3999,8 +4141,11 @@ function renderSubviewTrackPairAlignmentCard(
   const topLayout = {
     id: "top",
     role: topTrack.role,
+    source: topTrack.source,
     datasetId: topTrack.datasetId,
     isMirror: topTrack.isMirror === true,
+    phasedTrackId: topTrack.phasedTrackId,
+    haplotypeKey: topTrack.haplotypeKey,
     trackModel: pairModel.companion || buildEmptyTrackModelLike(),
     className: resolveTrackToneClass(topTrack.role).trim(),
     emptyMessage: i18n.trackControls.topTrackEmpty,
@@ -4008,8 +4153,11 @@ function renderSubviewTrackPairAlignmentCard(
   const bottomLayout = {
     id: "bottom",
     role: bottomTrack.role,
+    source: bottomTrack.source,
     datasetId: bottomTrack.datasetId,
     isMirror: bottomTrack.isMirror === true,
+    phasedTrackId: bottomTrack.phasedTrackId,
+    haplotypeKey: bottomTrack.haplotypeKey,
     trackModel: pairModel.primary || buildEmptyTrackModelLike(),
     className: resolveTrackToneClass(bottomTrack.role).trim(),
     emptyMessage: i18n.trackControls.bottomTrackEmpty,
@@ -4196,6 +4344,16 @@ function renderSubviewTrackPairAlignmentCard(
       const rect = resolveTrackPairDisplayRect(layout, ctg, index);
       const barTop = layout.laneTop + Math.max(0, Number(ctg?.laneIndex || 0)) * TRACK_LANE_HEIGHT;
       const barBottom = barTop + TRACK_BAR_HEIGHT;
+      const endpointKey = buildSubviewAnchorEndpointKey({
+        role: layout.role,
+        contigId: ctg?.assemblyCtgId,
+        datasetId: layout.datasetId,
+        source: layout.source,
+        isMirror: layout.isMirror === true,
+        phasedTrackId: ctg?.phasedTrackId ?? layout.phasedTrackId,
+        phasedTrackItemId: ctg?.phasedTrackItemId ?? ctg?.itemId,
+        phasedHaplotypeKey: ctg?.phasedHaplotypeKey ?? layout.haplotypeKey,
+      });
       return collectSubviewRenderableHits(ctg, { blockLength, minMapq }).map((hit) => {
         const hitRect = buildTrackHitRectWithinCtgDisplay({
           ctgRect: rect,
@@ -4220,6 +4378,7 @@ function renderSubviewTrackPairAlignmentCard(
           role: layout.role,
           datasetId: normalizeSupportDatasetId(layout.datasetId),
           isMirror: layout.isMirror === true,
+          endpointKey,
           x: hitRect.x,
           width: hitRect.width,
           midX: hitRect.centerX,
@@ -4239,7 +4398,17 @@ function renderSubviewTrackPairAlignmentCard(
           const rect = resolveTrackPairDisplayRect(layout, ctg, index);
           const barTop = layout.laneTop + Math.max(0, Number(ctg?.laneIndex || 0)) * TRACK_LANE_HEIGHT;
           const barBottom = barTop + TRACK_BAR_HEIGHT;
-          return [ctgId, { ctg, rect, barTop, barBottom }];
+          const endpointKey = buildSubviewAnchorEndpointKey({
+            role: layout.role,
+            contigId: ctg?.assemblyCtgId,
+            datasetId: layout.datasetId,
+            source: layout.source,
+            isMirror: layout.isMirror === true,
+            phasedTrackId: ctg?.phasedTrackId ?? layout.phasedTrackId,
+            phasedTrackItemId: ctg?.phasedTrackItemId ?? ctg?.itemId,
+            phasedHaplotypeKey: ctg?.phasedHaplotypeKey ?? layout.haplotypeKey,
+          });
+          return [ctgId, { ctg, rect, barTop, barBottom, endpointKey }];
         })
         .filter(Boolean),
     );
@@ -4299,6 +4468,7 @@ function renderSubviewTrackPairAlignmentCard(
         role: resolvedTopLayout.role,
         datasetId: normalizeSupportDatasetId(resolvedTopLayout.datasetId),
         isMirror: resolvedTopLayout.isMirror === true,
+        endpointKey: topEntry.endpointKey,
         x: topRect.x,
         width: topRect.width,
         midX: topRect.centerX,
@@ -4323,6 +4493,7 @@ function renderSubviewTrackPairAlignmentCard(
         role: resolvedBottomLayout.role,
         datasetId: normalizeSupportDatasetId(resolvedBottomLayout.datasetId),
         isMirror: resolvedBottomLayout.isMirror === true,
+        endpointKey: bottomEntry.endpointKey,
         x: bottomRect.x,
         width: bottomRect.width,
         midX: bottomRect.centerX,
@@ -4418,11 +4589,22 @@ function renderSubviewTrackPairAlignmentCard(
       const barTop = layout.laneTop + Math.max(0, Number(ctg?.laneIndex || 0)) * TRACK_LANE_HEIGHT;
       const barBottom = barTop + TRACK_BAR_HEIGHT;
       const bounds = resolveRefTrackSegmentBounds(ctg);
+      const endpointKey = buildSubviewAnchorEndpointKey({
+        role: layout.role,
+        contigId: ctg?.assemblyCtgId,
+        datasetId: layout.datasetId,
+        source: layout.source,
+        isMirror: layout.isMirror === true,
+        phasedTrackId: ctg?.phasedTrackId ?? layout.phasedTrackId,
+        phasedTrackItemId: ctg?.phasedTrackItemId ?? ctg?.itemId,
+        phasedHaplotypeKey: ctg?.phasedHaplotypeKey ?? layout.haplotypeKey,
+      });
       return {
         ctg,
         rect,
         barTop,
         barBottom,
+        endpointKey,
         segmentStartBp: bounds.segmentStartBp,
         segmentEndBp: bounds.segmentEndBp,
       };
@@ -4471,6 +4653,7 @@ function renderSubviewTrackPairAlignmentCard(
           role: layout.role,
           datasetId: normalizeSupportDatasetId(segment?.datasetId ?? null),
           isMirror: false,
+          endpointKey: refEntry.endpointKey,
           x: hitRect.x,
           width: hitRect.width,
           midX: hitRect.centerX,
@@ -4611,8 +4794,12 @@ function renderSubviewTrackPairAlignmentCard(
           hitBottomY: bottomSegment.barTop,
           topContigId: topSegment.ctgId,
           bottomContigId: bottomSegment.ctgId,
+          topEndpointKey: topSegment.endpointKey,
+          bottomEndpointKey: bottomSegment.endpointKey,
           topCutBp: topLeftCutBp,
           bottomCutBp: reversed ? bottomRightCutBp : bottomLeftCutBp,
+          topLengthBp: topSegment.ctgLengthBp,
+          bottomLengthBp: bottomSegment.ctgLengthBp,
         },
         {
           hitKey,
@@ -4625,8 +4812,12 @@ function renderSubviewTrackPairAlignmentCard(
           hitBottomY: bottomSegment.barTop,
           topContigId: topSegment.ctgId,
           bottomContigId: bottomSegment.ctgId,
+          topEndpointKey: topSegment.endpointKey,
+          bottomEndpointKey: bottomSegment.endpointKey,
           topCutBp: topRightCutBp,
           bottomCutBp: reversed ? bottomLeftCutBp : bottomRightCutBp,
+          topLengthBp: topSegment.ctgLengthBp,
+          bottomLengthBp: bottomSegment.ctgLengthBp,
         },
       ];
     })
@@ -4634,7 +4825,53 @@ function renderSubviewTrackPairAlignmentCard(
       ...edge,
       active: activeAnchorKeys.has(`${String(edge.hitKey || "").trim()}:${String(edge.edge || "").trim()}`),
     }));
-  const activeAnchorCutsByContig = buildSubviewActiveAnchorCutsByContig(anchorEdges);
+  const buildManualEndpointMapForLayout = (layout) =>
+    new Map(
+      (layout.trackModel?.ctgs || [])
+        .map((ctg, index) => {
+          const contigId = normalizeSupportDatasetId(ctg?.assemblyCtgId);
+          if (!contigId) {
+            return null;
+          }
+          const rect = resolveTrackPairDisplayRect(layout, ctg, index);
+          const lengthBp = Math.max(1, normalizePositiveInt(ctg?.lengthBp ?? ctg?.totalLength) ?? 1);
+          const laneTop = layout.laneTop + Math.max(0, Number(ctg?.laneIndex || 0)) * TRACK_LANE_HEIGHT;
+          const endpointKey = buildSubviewAnchorEndpointKey({
+            role: layout.role,
+            contigId,
+            datasetId: layout.datasetId,
+            source: layout.source,
+            isMirror: layout.isMirror === true,
+            phasedTrackId: ctg?.phasedTrackId ?? layout.phasedTrackId,
+            phasedTrackItemId: ctg?.phasedTrackItemId ?? ctg?.itemId,
+            phasedHaplotypeKey: ctg?.phasedHaplotypeKey ?? layout.haplotypeKey,
+          });
+          if (!endpointKey) {
+            return null;
+          }
+          return [endpointKey, {
+            endpointKey,
+            contigId,
+            lengthBp,
+            topY: laneTop,
+            bottomY: laneTop + TRACK_BAR_HEIGHT,
+            hitY: layout.id === "top" ? laneTop + TRACK_BAR_HEIGHT : laneTop,
+            xForCut: (cutBp) => resolveSubviewAnchorEndpointX({
+              barX: rect.x,
+              barWidth: rect.width,
+              lengthBp,
+              cutBp,
+            }),
+          }];
+        })
+        .filter(Boolean),
+    );
+  const manualAnchorEdges = buildSubviewManualAnchorEdgesFromEndpointMaps(subview?.manualAnchors, {
+    topEndpointsByKey: buildManualEndpointMapForLayout(resolvedTopLayout),
+    bottomEndpointsByKey: buildManualEndpointMapForLayout(resolvedBottomLayout),
+  });
+  const allAnchorEdges = [...anchorEdges, ...manualAnchorEdges];
+  const activeAnchorCutsByContig = buildSubviewActiveAnchorCutsByContig(allAnchorEdges);
   const selectedTrackPairKeySet = new Set(
     normalizeSubviewTrackPairSelectionCtgs(subview?.trackPairSelectedCtgs).map((entry) =>
       buildSubviewTrackPairHiddenCtgKey(entry.trackRole, entry.contigId),
@@ -4851,7 +5088,7 @@ function renderSubviewTrackPairAlignmentCard(
             </g>
             ${renderTrackCtgs(resolvedTopLayout, topRoleClass)}
             ${renderTrackCtgs(resolvedBottomLayout, bottomRoleClass)}
-            ${renderSubviewAnchorLines(anchorEdges, {
+            ${renderSubviewAnchorLines(allAnchorEdges, {
               topY: resolvedTopLayout.laneTop,
               bottomY: resolvedBottomLayout.laneTop + TRACK_BAR_HEIGHT,
             })}

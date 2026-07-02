@@ -17,6 +17,9 @@ import { resolveTrackPrefs } from "./track-prefs.js";
 import {
   normalizeSupportDsCtgLenRulesByChr,
 } from "./support-ds-ctg-len-rules.js";
+import {
+  normalizeSubviewAnchorStateByKey,
+} from "./subview-anchor-state.js";
 
 function normalizeFinalPathViewMode(value) {
   return normalizeFinalPathViewModeState(value);
@@ -52,6 +55,7 @@ export async function loadProjectAssemblyViewState({ workspaceRoot, projectId },
       hiddenPrimaryCtgIdsByChr: {},
       trackDragOffsets: [],
       subviewTrackDragOffsets: [],
+      subviewAnchorStateByKey: {},
       trackScrollState: normalizeTrackScrollState({}),
       subviewTrackScrollState: normalizeTrackScrollState({}),
       finalPathTrackScrollState: normalizeTrackScrollState({}),
@@ -71,6 +75,7 @@ export async function loadProjectAssemblyViewState({ workspaceRoot, projectId },
     hiddenPrimaryCtgIdsByChr: normalizeHiddenPrimaryCtgIdsByChr(result?.hiddenPrimaryCtgIdsByChr),
     trackDragOffsets: normalizeTrackOffsets(result?.trackDragOffsets),
     subviewTrackDragOffsets: normalizeSubviewOffsets(result?.subviewTrackDragOffsets),
+    subviewAnchorStateByKey: normalizeSubviewAnchorStateByKey(result?.subviewAnchorStateByKey),
     trackScrollState: normalizeTrackScrollState(result?.trackScrollState),
     subviewTrackScrollState: normalizeTrackScrollState(result?.subviewTrackScrollState),
     finalPathTrackScrollState: normalizeTrackScrollState(result?.finalPathTrackScrollState),
@@ -93,6 +98,7 @@ export async function persistProjectAssemblyViewState(
     hiddenPrimaryCtgIdsByChr = {},
     trackDragOffsets = [],
     subviewTrackDragOffsets = [],
+    subviewAnchorStateByKey = {},
     trackScrollState = {},
     subviewTrackScrollState = {},
     finalPathTrackScrollState = {},
@@ -127,6 +133,7 @@ export async function persistProjectAssemblyViewState(
   const normalizedHiddenIdsByChr = normalizeHiddenPrimaryCtgIdsByChr(hiddenPrimaryCtgIdsByChr);
   const normalizedTrackOffsets = normalizeTrackOffsets(trackDragOffsets);
   const normalizedSubviewOffsets = normalizeSubviewOffsets(subviewTrackDragOffsets);
+  const normalizedSubviewAnchorStateByKey = normalizeSubviewAnchorStateByKey(subviewAnchorStateByKey);
   const normalizedTrackScrollState = normalizeTrackScrollState(trackScrollState);
   const normalizedSubviewTrackScrollState = normalizeTrackScrollState(subviewTrackScrollState);
   const normalizedFinalPathTrackScrollState = normalizeTrackScrollState(finalPathTrackScrollState);
@@ -144,6 +151,7 @@ export async function persistProjectAssemblyViewState(
       hiddenPrimaryCtgIdsByChr: normalizedHiddenIdsByChr,
       trackDragOffsets: normalizedTrackOffsets,
       subviewTrackDragOffsets: normalizedSubviewOffsets,
+      subviewAnchorStateByKey: normalizedSubviewAnchorStateByKey,
       trackScrollState: normalizedTrackScrollState,
       subviewTrackScrollState: normalizedSubviewTrackScrollState,
       finalPathTrackScrollState: normalizedFinalPathTrackScrollState,
@@ -164,6 +172,7 @@ export async function persistProjectAssemblyViewState(
     hiddenPrimaryCtgIdsByChr: normalizedHiddenIdsByChr,
     trackDragOffsets: normalizedTrackOffsets,
     subviewTrackDragOffsets: normalizedSubviewOffsets,
+    subviewAnchorStateByKey: normalizedSubviewAnchorStateByKey,
     trackScrollState: normalizedTrackScrollState,
     subviewTrackScrollState: normalizedSubviewTrackScrollState,
     finalPathTrackScrollState: normalizedFinalPathTrackScrollState,
@@ -186,6 +195,9 @@ export async function persistProjectAssemblyViewState(
     trackDragOffsets: normalizeTrackOffsets(result?.trackDragOffsets ?? normalizedTrackOffsets),
     subviewTrackDragOffsets: normalizeSubviewOffsets(
       result?.subviewTrackDragOffsets ?? normalizedSubviewOffsets,
+    ),
+    subviewAnchorStateByKey: normalizeSubviewAnchorStateByKey(
+      result?.subviewAnchorStateByKey ?? normalizedSubviewAnchorStateByKey,
     ),
     trackScrollState: normalizeTrackScrollState(
       result?.trackScrollState ?? normalizedTrackScrollState,

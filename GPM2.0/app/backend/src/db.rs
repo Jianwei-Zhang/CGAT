@@ -374,6 +374,7 @@ pub fn init_workspace_schema(conn: &Connection) -> Result<()> {
             hidden_primary_ctg_ids_by_chr_json TEXT NOT NULL DEFAULT '{}',
             track_drag_offsets_json TEXT NOT NULL DEFAULT '[]',
             subview_track_drag_offsets_json TEXT NOT NULL DEFAULT '[]',
+            subview_anchor_state_by_key_json TEXT NOT NULL DEFAULT '{}',
             final_path_view_mode TEXT NOT NULL DEFAULT 'graph',
             final_path_by_chr_json TEXT NOT NULL DEFAULT '{}',
             degap_project_state_json TEXT NOT NULL DEFAULT '{}',
@@ -582,6 +583,12 @@ pub fn init_workspace_schema(conn: &Connection) -> Result<()> {
         "project_assembly_view_state",
         "subview_track_drag_offsets_json",
         "TEXT NOT NULL DEFAULT '[]'",
+    )?;
+    ensure_column_exists(
+        conn,
+        "project_assembly_view_state",
+        "subview_anchor_state_by_key_json",
+        "TEXT NOT NULL DEFAULT '{}'",
     )?;
     ensure_column_exists(
         conn,

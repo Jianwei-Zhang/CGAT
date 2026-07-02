@@ -36,6 +36,8 @@ const REQUIRED_ACTION_NAMES = [
   "toggleSupportTrackCtgMirror",
   "togglePrimaryTrackCtgHidden",
   "toggleSubviewAnchorEdge",
+  "copySubviewAnchorWithOffset",
+  "deleteSubviewManualAnchor",
   "appendTrackContigToFinalPath",
   "addTrackContigToPhasedTrack",
   "removePhasedTrackItem",
@@ -214,15 +216,33 @@ export function resolveSubviewAnchorEdgeContextTarget(target) {
   if (!node) {
     return null;
   }
+  const kind = String(node.getAttribute("data-subview-anchor-kind") || "evidence").trim();
+  const manualAnchorId = String(node.getAttribute("data-subview-manual-anchor-id") || "").trim();
+  if (kind === "manual" && manualAnchorId) {
+    return {
+      kind: "manual",
+      manualAnchorId,
+      active: true,
+    };
+  }
   const hitKey = String(node.getAttribute("data-subview-anchor-hit-key") || "").trim();
   const edge = String(node.getAttribute("data-subview-anchor-edge") || "").trim().toLowerCase();
   if (!hitKey || (edge !== "left" && edge !== "right")) {
     return null;
   }
   return {
+    kind: "evidence",
     hitKey,
     edge,
     active: node.getAttribute("data-subview-anchor-active") === "1",
+    topEndpointKey: String(node.getAttribute("data-subview-anchor-top-endpoint-key") || "").trim(),
+    bottomEndpointKey: String(node.getAttribute("data-subview-anchor-bottom-endpoint-key") || "").trim(),
+    topContigId: normalizeSupportDatasetId(node.getAttribute("data-subview-anchor-top-contig-id")),
+    bottomContigId: normalizeSupportDatasetId(node.getAttribute("data-subview-anchor-bottom-contig-id")),
+    topCutBp: normalizeSupportDatasetId(node.getAttribute("data-subview-anchor-top-cut-bp")),
+    bottomCutBp: normalizeSupportDatasetId(node.getAttribute("data-subview-anchor-bottom-cut-bp")),
+    topLengthBp: normalizeSupportDatasetId(node.getAttribute("data-subview-anchor-top-length-bp")),
+    bottomLengthBp: normalizeSupportDatasetId(node.getAttribute("data-subview-anchor-bottom-length-bp")),
   };
 }
 
@@ -419,6 +439,8 @@ export function buildAssemblyContextMenuItems({
     toggleSupportTrackCtgMirror,
     togglePrimaryTrackCtgHidden,
     toggleSubviewAnchorEdge,
+    copySubviewAnchorWithOffset,
+    deleteSubviewManualAnchor,
     appendTrackContigToFinalPath,
     addTrackContigToPhasedTrack,
     removePhasedTrackItem,
@@ -591,17 +613,36 @@ export function buildAssemblyContextMenuItems({
   };
 
   if (subviewAnchorEdgeContext) {
+    if (subviewAnchorEdgeContext.kind === "manual") {
+      items.push({
+        label: i18n.contextMenu.deleteManualAnchor,
+        run: async () => {
+          await deleteSubviewManualAnchor(host, store, {
+            manualAnchorId: subviewAnchorEdgeContext.manualAnchorId,
+          });
+        },
+      });
+      return items;
+    }
     const nextActive = subviewAnchorEdgeContext.active !== true;
     items.push({
       label: nextActive ? i18n.contextMenu.anchorOn : i18n.contextMenu.anchorOff,
       run: async () => {
-        toggleSubviewAnchorEdge(host, store, {
+        await toggleSubviewAnchorEdge(host, store, {
           hitKey: subviewAnchorEdgeContext.hitKey,
           edge: subviewAnchorEdgeContext.edge,
           active: nextActive,
         });
       },
     });
+    if (subviewAnchorEdgeContext.active === true) {
+      items.push({
+        label: i18n.contextMenu.copyAnchorWithOffset,
+        run: async () => {
+          await copySubviewAnchorWithOffset(host, store, subviewAnchorEdgeContext);
+        },
+      });
+    }
     return items;
   }
 

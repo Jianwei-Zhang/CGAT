@@ -17,8 +17,8 @@ use gpm_next_backend::ctg_editor::{
     restore_deleted_ctg as backend_restore_deleted_ctg, set_end_type, show_seq,
 };
 use gpm_next_backend::degap_jobs::{
-    ExportDegapJobsParams, export_degap_jobs as backend_export_degap_jobs,
-    parse_degap_export_jobs, parse_degap_export_settings,
+    ExportDegapJobsParams, export_degap_jobs as backend_export_degap_jobs, parse_degap_export_jobs,
+    parse_degap_export_settings,
 };
 use gpm_next_backend::exporter::{
     ExportFinalPathFastaParams, ExportProjectFinalPathFastaParams, FinalPathExportSegment,
@@ -2127,6 +2127,8 @@ pub fn get_project_assembly_view_state(
                 .unwrap_or_else(|_| json!([])),
             "subviewTrackDragOffsets": serde_json::from_str::<Value>(&state.subview_track_drag_offsets_json)
                 .unwrap_or_else(|_| json!([])),
+            "subviewAnchorStateByKey": serde_json::from_str::<Value>(&state.subview_anchor_state_by_key_json)
+                .unwrap_or_else(|_| json!({})),
             "finalPathViewMode": state.final_path_view_mode,
             "finalPathByChr": final_path_by_chr,
             "degapProjectState": serde_json::from_str::<Value>(&state.degap_project_state_json)
@@ -2153,6 +2155,7 @@ pub fn update_project_assembly_view_state(
     hiddenPrimaryCtgIdsByChr: Value,
     trackDragOffsets: Value,
     subviewTrackDragOffsets: Value,
+    subviewAnchorStateByKey: Value,
     finalPathViewMode: String,
     finalPathByChr: Value,
     degapProjectState: Value,
@@ -2203,6 +2206,11 @@ pub fn update_project_assembly_view_state(
         } else {
             json!([])
         };
+        let normalized_subview_anchor_state_by_key = if subviewAnchorStateByKey.is_object() {
+            subviewAnchorStateByKey
+        } else {
+            json!({})
+        };
         let normalized_final_path_by_chr = if finalPathByChr.is_object() {
             finalPathByChr
         } else {
@@ -2245,6 +2253,9 @@ pub fn update_project_assembly_view_state(
                 subview_track_drag_offsets_json: serde_json::to_string(
                     &normalized_subview_track_drag_offsets,
                 )?,
+                subview_anchor_state_by_key_json: serde_json::to_string(
+                    &normalized_subview_anchor_state_by_key,
+                )?,
                 final_path_view_mode: normalized_final_path_view_mode,
                 final_path_by_chr_json: serde_json::to_string(&normalized_final_path_by_chr)?,
                 degap_project_state_json: serde_json::to_string(&normalized_degap_project_state)?,
@@ -2275,6 +2286,8 @@ pub fn update_project_assembly_view_state(
                 .unwrap_or_else(|_| json!([])),
             "subviewTrackDragOffsets": serde_json::from_str::<Value>(&state.subview_track_drag_offsets_json)
                 .unwrap_or_else(|_| json!([])),
+            "subviewAnchorStateByKey": serde_json::from_str::<Value>(&state.subview_anchor_state_by_key_json)
+                .unwrap_or_else(|_| json!({})),
             "finalPathViewMode": state.final_path_view_mode,
             "finalPathByChr": final_path_by_chr,
             "degapProjectState": serde_json::from_str::<Value>(&state.degap_project_state_json)

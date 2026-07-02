@@ -247,6 +247,8 @@ export const zh = {
     leftAnchorOff: "left anchor off",
     rightAnchorOn: "right anchor on",
     rightAnchorOff: "right anchor off",
+    copyAnchorWithOffset: "复制偏移锚点",
+    deleteManualAnchor: "删除此偏移锚点",
     enterContigMenu: "进入 {ctgName} 菜单",
     deleteLocalSubviewContig: "在Subview中删除 contig（仅当前视图）",
     deleteLocalSubviewSelected: "在Subview中删除已框选 contig（{count}，仅当前视图）",
@@ -357,6 +359,10 @@ export const zh = {
     phasedTrackItemRemoveFailed: "从分型轨道移除失败。",
     phasedTrackDeleted: "已删除分型轨道 {key}。",
     phasedTrackDeleteFailed: "删除分型轨道失败。",
+    subviewAnchorOffsetCreated: "已创建偏移锚点。",
+    subviewAnchorOffsetInvalid: "偏移锚点参数无效：请选择左/右方向并输入正整数 bp。",
+    subviewAnchorOffsetOutOfRange: "偏移后锚点超出 contig 范围，未创建。",
+    subviewManualAnchorDeleted: "已删除偏移锚点。",
   },
   prompts: {
     renameContig: "请输入 Ctg{assemblyCtgId} 的新名称",
@@ -364,6 +370,8 @@ export const zh = {
     seqRangeStart: "请输入 Seq{assemblySeqId} 的起始位点（source_start）",
     seqRangeEnd: "请输入 Seq{assemblySeqId} 的终止位点（source_end）",
     splitContigName: "请输入拆分后新 contig 名称（break_after_member_id={memberId}, seq={assemblySeqId}）",
+    anchorOffsetDirection: "偏移方向？请输入 left/right 或 左/右",
+    anchorOffsetBp: "偏移多少 bp？请输入正整数",
   },
 };
 
@@ -616,6 +624,8 @@ export const en = {
     leftAnchorOff: "left anchor off",
     rightAnchorOn: "right anchor on",
     rightAnchorOff: "right anchor off",
+    copyAnchorWithOffset: "Copy Offset Anchor",
+    deleteManualAnchor: "Delete This Offset Anchor",
     enterContigMenu: "Enter {ctgName} Menu",
     deleteLocalSubviewContig: "Delete Contig in Subview (current view only)",
     deleteLocalSubviewSelected: "Delete Selected Contigs in Subview ({count}, current view only)",
@@ -726,6 +736,10 @@ export const en = {
     phasedTrackItemRemoveFailed: "Failed to remove from phased track.",
     phasedTrackDeleted: "Deleted phased track {key}.",
     phasedTrackDeleteFailed: "Failed to delete phased track.",
+    subviewAnchorOffsetCreated: "Created offset anchor.",
+    subviewAnchorOffsetInvalid: "Invalid offset anchor input: choose left/right and enter a positive integer bp.",
+    subviewAnchorOffsetOutOfRange: "Offset anchor is outside the contig range and was not created.",
+    subviewManualAnchorDeleted: "Deleted offset anchor.",
   },
   prompts: {
     renameContig: "Enter the new name for Ctg{assemblyCtgId}",
@@ -733,5 +747,7 @@ export const en = {
     seqRangeStart: "Enter the source_start for Seq{assemblySeqId}",
     seqRangeEnd: "Enter the source_end for Seq{assemblySeqId}",
     splitContigName: "Enter the new contig name after split (break_after_member_id={memberId}, seq={assemblySeqId})",
+    anchorOffsetDirection: "Offset direction? Enter left or right",
+    anchorOffsetBp: "Offset by how many bp? Enter a positive integer",
   },
 };

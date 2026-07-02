@@ -30,6 +30,7 @@ pub struct ProjectAssemblyViewState {
     pub hidden_primary_ctg_ids_by_chr_json: String,
     pub track_drag_offsets_json: String,
     pub subview_track_drag_offsets_json: String,
+    pub subview_anchor_state_by_key_json: String,
     pub final_path_view_mode: String,
     pub final_path_by_chr_json: String,
     pub degap_project_state_json: String,
@@ -49,6 +50,7 @@ pub struct UpdateProjectAssemblyViewStateParams {
     pub hidden_primary_ctg_ids_by_chr_json: String,
     pub track_drag_offsets_json: String,
     pub subview_track_drag_offsets_json: String,
+    pub subview_anchor_state_by_key_json: String,
     pub final_path_view_mode: String,
     pub final_path_by_chr_json: String,
     pub degap_project_state_json: String,
@@ -182,6 +184,7 @@ fn get_project_assembly_view_state_with_connection(
                     hidden_primary_ctg_ids_by_chr_json,
                     track_drag_offsets_json,
                     subview_track_drag_offsets_json,
+                    subview_anchor_state_by_key_json,
                     final_path_view_mode,
                     final_path_by_chr_json,
                     degap_project_state_json,
@@ -202,10 +205,11 @@ fn get_project_assembly_view_state_with_connection(
                     hidden_primary_ctg_ids_by_chr_json: row.get(8)?,
                     track_drag_offsets_json: row.get(9)?,
                     subview_track_drag_offsets_json: row.get(10)?,
-                    final_path_view_mode: row.get(11)?,
-                    final_path_by_chr_json: row.get(12)?,
-                    degap_project_state_json: row.get(13)?,
-                    updated_at: row.get(14)?,
+                    subview_anchor_state_by_key_json: row.get(11)?,
+                    final_path_view_mode: row.get(12)?,
+                    final_path_by_chr_json: row.get(13)?,
+                    degap_project_state_json: row.get(14)?,
+                    updated_at: row.get(15)?,
                 })
             },
         )
@@ -269,10 +273,11 @@ fn update_project_assembly_view_state_with_connection(
              hidden_primary_ctg_ids_by_chr_json = ?9,
              track_drag_offsets_json = ?10,
              subview_track_drag_offsets_json = ?11,
-             final_path_view_mode = ?12,
-             final_path_by_chr_json = ?13,
-             degap_project_state_json = ?14,
-             updated_at = ?15
+             subview_anchor_state_by_key_json = ?12,
+             final_path_view_mode = ?13,
+             final_path_by_chr_json = ?14,
+             degap_project_state_json = ?15,
+             updated_at = ?16
          WHERE project_id = ?1",
         params![
             params.project_id,
@@ -286,6 +291,7 @@ fn update_project_assembly_view_state_with_connection(
             normalize_project_assembly_map_json(&params.hidden_primary_ctg_ids_by_chr_json),
             normalize_project_assembly_view_state_json(&params.track_drag_offsets_json),
             normalize_project_assembly_view_state_json(&params.subview_track_drag_offsets_json),
+            normalize_project_assembly_map_json(&params.subview_anchor_state_by_key_json),
             normalize_project_assembly_view_mode(&params.final_path_view_mode),
             normalize_project_assembly_map_json(&params.final_path_by_chr_json),
             normalize_project_assembly_map_json(&params.degap_project_state_json),
@@ -408,6 +414,7 @@ fn ensure_project_assembly_view_state_row(conn: &Connection, project_id: i64) ->
             hidden_primary_ctg_ids_by_chr_json,
             track_drag_offsets_json,
             subview_track_drag_offsets_json,
+            subview_anchor_state_by_key_json,
             final_path_view_mode,
             final_path_by_chr_json,
             degap_project_state_json,
@@ -424,6 +431,7 @@ fn ensure_project_assembly_view_state_row(conn: &Connection, project_id: i64) ->
             '{}',
             '[]',
             '[]',
+            '{}',
             'graph',
             '{}',
             '{}',
@@ -580,6 +588,7 @@ mod tests {
         assert_eq!(initial.hidden_primary_ctg_ids_by_chr_json, "{}");
         assert_eq!(initial.track_drag_offsets_json, "[]");
         assert_eq!(initial.subview_track_drag_offsets_json, "[]");
+        assert_eq!(initial.subview_anchor_state_by_key_json, "{}");
         assert_eq!(initial.support_ds_ctg_len_rules_by_chr_json, "{}");
         assert_eq!(initial.final_path_view_mode, "graph");
         assert_eq!(initial.final_path_by_chr_json, "{}");
@@ -609,6 +618,9 @@ mod tests {
                     r#"[{"trackRole":"primary","assemblyCtgId":1909,"offsetBp":120}]"#.to_string(),
                 subview_track_drag_offsets_json:
                     r#"[{"slot":"top","contigId":1909,"offsetBp":80}]"#.to_string(),
+                subview_anchor_state_by_key_json:
+                    r#"{"2-contig|chr:Chr01|a|b":{"activeAnchors":[{"hitKey":"h1","edge":"left"}],"manualAnchors":[]}}"#
+                        .to_string(),
                 final_path_view_mode: "degap".to_string(),
                 final_path_by_chr_json: "{}".to_string(),
                 degap_project_state_json: r#"{"jobs":[{"jobId":"a"}]}"#.to_string(),
@@ -653,6 +665,10 @@ mod tests {
             updated.subview_track_drag_offsets_json,
             r#"[{"slot":"top","contigId":1909,"offsetBp":80}]"#,
         );
+        assert_eq!(
+            updated.subview_anchor_state_by_key_json,
+            r#"{"2-contig|chr:Chr01|a|b":{"activeAnchors":[{"hitKey":"h1","edge":"left"}],"manualAnchors":[]}}"#,
+        );
         assert_eq!(updated.final_path_view_mode, "degap");
         assert_eq!(updated.final_path_by_chr_json, "{}");
 
@@ -690,6 +706,10 @@ mod tests {
             reloaded_project_one.subview_track_drag_offsets_json,
             r#"[{"slot":"top","contigId":1909,"offsetBp":80}]"#,
         );
+        assert_eq!(
+            reloaded_project_one.subview_anchor_state_by_key_json,
+            r#"{"2-contig|chr:Chr01|a|b":{"activeAnchors":[{"hitKey":"h1","edge":"left"}],"manualAnchors":[]}}"#,
+        );
         assert_eq!(reloaded_project_one.final_path_view_mode, "degap");
         assert_eq!(reloaded_project_one.final_path_by_chr_json, "{}");
 
@@ -707,6 +727,7 @@ mod tests {
         );
         assert_eq!(untouched_project_two.track_drag_offsets_json, "[]");
         assert_eq!(untouched_project_two.subview_track_drag_offsets_json, "[]");
+        assert_eq!(untouched_project_two.subview_anchor_state_by_key_json, "{}");
         assert_eq!(untouched_project_two.final_path_view_mode, "graph");
         assert_eq!(untouched_project_two.final_path_by_chr_json, "{}");
         Ok(())
@@ -733,6 +754,7 @@ mod tests {
                 hidden_primary_ctg_ids_by_chr_json: "{}".to_string(),
                 track_drag_offsets_json: "[]".to_string(),
                 subview_track_drag_offsets_json: "[]".to_string(),
+                subview_anchor_state_by_key_json: "{}".to_string(),
                 final_path_view_mode: "log".to_string(),
                 final_path_by_chr_json: r#"{"Chr01":{"mode":"direct-ctg","chrName":"Chr01","assemblyCtgId":19,"ctgName":"flye_ctg19","totalLength":1800,"updatedAt":"1"}}"#.to_string(),
                 degap_project_state_json: "{}".to_string(),

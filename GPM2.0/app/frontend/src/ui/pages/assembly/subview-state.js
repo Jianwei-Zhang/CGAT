@@ -9,6 +9,7 @@ import {
 } from "./track-prefs.js";
 import {
   normalizeSubviewActiveAnchors,
+  normalizeSubviewManualAnchors,
 } from "./subview-anchor-state.js";
 import {
   buildChrLengthsByName,
@@ -585,6 +586,7 @@ export function getSubviewState(assembly) {
     selectedTrackBDatasetId: supportTrackSelection?.datasetId || null,
     selectedTrackBIsMirror: supportTrackSelection?.isMirror === true,
     activeAnchors: normalizeSubviewActiveAnchors(subview.activeAnchors),
+    manualAnchors: normalizeSubviewManualAnchors(subview.manualAnchors),
     flippedCtgs: normalizeSubviewFlippedCtgs(subview.flippedCtgs),
     trackPairHiddenCtgs: normalizeSubviewTrackPairHiddenCtgs(subview.trackPairHiddenCtgs),
     trackPairSelectedCtgs: normalizeSubviewTrackPairSelectionCtgs(subview.trackPairSelectedCtgs),
