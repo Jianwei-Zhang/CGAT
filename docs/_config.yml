@@ -1,2 +1,4 @@
 theme: jekyll-theme-leap-day
-show_downloads: true
+title: Home
+description: CGAT site update in progress.
+show_downloads: false
