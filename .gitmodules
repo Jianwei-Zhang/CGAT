@@ -1,3 +1,4 @@
 [submodule "DEGAP2.0"]
 	path = DEGAP2.0
 	url = https://github.com/Jianwei-Zhang/DEGAP
+	branch = main
