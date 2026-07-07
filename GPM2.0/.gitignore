@@ -4,6 +4,7 @@
 /*.exe
 imported/
 exports/
+tmp/
 /test_import_project*/
 
 # Local AI/editor/tooling state
