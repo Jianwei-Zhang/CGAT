@@ -1,4 +1,4 @@
-# ![Pangu](docs/images/logo.png) LIMS
+# ![Pangu](docs/images/logo.png) LIMS (!!!Legacy...out of support...Try CGAT (GPM2.0 + DEGAP2.0 + ...))
 ## Laboratory Information Management System
 
 Read [LIMS Docs](https://jianwei-zhang.github.io/CGAT/LIMS/) to learn more about how to install and use this system.
