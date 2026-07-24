@@ -7,6 +7,10 @@
 **/.claude/
 **/.kiro/
 
+# Local presentation and manuscript materials
+/ppt/
+/paper/
+
 # Common dependency/build outputs
 **/node_modules/
 **/target/
