@@ -16,6 +16,12 @@
 **/target/
 **/src-tauri/gen/
 
+# Local documentation source, toolchain, and deployment artifacts
+/docs/
+/DOCS_DEPLOY.md
+/package.json
+/package-lock.json
+
 # Local runtime artifacts
 **/*.sqlite
 **/*.zip
