@@ -5,6 +5,7 @@
   "scripts": {
     "docs:dev": "node node_modules/vitepress/bin/vitepress.js dev docs",
     "docs:build": "node node_modules/vitepress/bin/vitepress.js build docs && node docs/scripts/copy-public.mjs",
+    "docs:build:web": "node docs/scripts/build-web.mjs",
     "docs:preview": "node node_modules/vitepress/bin/vitepress.js preview docs",
     "docs:validate": "node docs/scripts/validate-docs.mjs"
   },

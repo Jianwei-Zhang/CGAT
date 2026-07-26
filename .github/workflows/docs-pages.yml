@@ -1,13 +1,11 @@
-name: Deploy CGAT Docs
+name: Deploy CGAT Docs Redirect
 
 on:
   push:
     branches:
       - master
     paths:
-      - "docs/**"
-      - "package.json"
-      - "package-lock.json"
+      - ".github/pages-redirect/**"
       - ".github/workflows/docs-pages.yml"
   workflow_dispatch:
 
@@ -27,28 +25,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v4
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Validate documentation sources
-        run: npm run docs:validate
-
-      - name: Build documentation
-        run: npm run docs:build
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/.vitepress/dist
+          path: .github/pages-redirect
 
   deploy:
     name: Deploy

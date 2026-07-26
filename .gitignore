@@ -19,6 +19,11 @@
 **/.vitepress/dist/
 **/.vitepress/.temp/
 
+# Documentation deployment output and local server snapshots
+/docs/web/
+/docs/web_nginx/
+/docs/cgat_docs.tar.gz
+
 # Local runtime artifacts
 **/*.sqlite
 **/*.zip

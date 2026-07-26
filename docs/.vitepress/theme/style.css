@@ -16,9 +16,23 @@
   --vp-c-brand-soft: rgba(45, 212, 191, 0.16);
 }
 
+.VPNavBarTitle .logo {
+  box-sizing: content-box;
+  width: auto;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: #071019;
+}
+
 .VPHomeHero .image-src {
-  max-width: 250px;
-  max-height: 250px;
+  box-sizing: border-box;
+  width: min(100%, 420px);
+  max-width: 420px;
+  max-height: none;
+  padding: 20px 24px;
+  border-radius: 18px;
+  background: #071019;
+  box-shadow: 0 18px 48px rgba(7, 16, 25, 0.24);
 }
 
 .VPFeature {

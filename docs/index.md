@@ -6,8 +6,8 @@ hero:
   text: "Complete Genome Assembly Toolkit"
   tagline: Official documentation for an integrated, visual genome assembly workflow.
   image:
-    src: /logo.svg
-    alt: CGAT
+    src: /gpm-logo.png
+    alt: Pangu GPM
   actions:
     - theme: brand
       text: 简体中文

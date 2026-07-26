@@ -6,8 +6,8 @@ hero:
   text: "完整基因组组装工具集"
   tagline: 整合多种 de novo 组装结果，通过可视化检查、人工决策与序列完善构建可靠的染色体级 final path。
   image:
-    src: /logo.svg
-    alt: CGAT
+    src: /gpm-logo.png
+    alt: Pangu GPM
   actions:
     - theme: brand
       text: 开始使用

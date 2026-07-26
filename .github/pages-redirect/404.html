@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="0; url=https://riceome.hzau.edu.cn/cgat/">
+    <title>CGAT documentation has moved</title>
+    <script>
+      const sourceBase = "/CGAT";
+      const targetBase = "https://riceome.hzau.edu.cn/cgat";
+      let path = window.location.pathname.startsWith(`${sourceBase}/`)
+        ? window.location.pathname.slice(sourceBase.length)
+        : "/";
+
+      if (!path) path = "/";
+      window.location.replace(`${targetBase}${path}${window.location.search}${window.location.hash}`);
+    </script>
+  </head>
+  <body>
+    <p>
+      CGAT documentation has moved to
+      <a href="https://riceome.hzau.edu.cn/cgat/">https://riceome.hzau.edu.cn/cgat/</a>.
+    </p>
+  </body>
+</html>

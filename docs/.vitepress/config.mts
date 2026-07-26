@@ -2,9 +2,11 @@ import { defineConfig } from "vitepress";
 
 const repositoryUrl = "https://github.com/Jianwei-Zhang/CGAT";
 const releaseUrl = `${repositoryUrl}/releases/latest`;
+const siteBase = process.env.CGAT_DOCS_BASE || "/CGAT/";
+const siteHostname = process.env.CGAT_DOCS_HOSTNAME || "https://jianwei-zhang.github.io/CGAT/";
 
 const sharedTheme = {
-  logo: "/logo.svg",
+  logo: { src: "/gpm-logo.png", alt: "Pangu GPM" },
   socialLinks: [{ icon: "github", link: repositoryUrl }],
   search: {
     provider: "local" as const,
@@ -40,12 +42,12 @@ export default defineConfig({
   title: "CGAT Docs",
   description: "Official documentation for the Complete Genome Assembly Toolkit",
   lang: "en-US",
-  base: "/CGAT/",
+  base: siteBase,
   cleanUrls: true,
   outDir: process.env.CGAT_DOCS_OUT_DIR || ".vitepress/dist",
   lastUpdated: true,
   sitemap: {
-    hostname: "https://jianwei-zhang.github.io/CGAT/"
+    hostname: siteHostname
   },
   vite: {
     build: {
@@ -53,12 +55,12 @@ export default defineConfig({
     }
   },
   head: [
-    ["link", { rel: "icon", type: "image/svg+xml", href: "/CGAT/logo.svg" }],
+    ["link", { rel: "icon", type: "image/svg+xml", href: `${siteBase}logo.svg` }],
     ["meta", { name: "theme-color", content: "#0f766e" }]
   ],
   locales: {
     root: {
-      label: "Language",
+      label: "English",
       lang: "en-US",
       title: "CGAT Docs",
       description: "Official documentation for the Complete Genome Assembly Toolkit",
@@ -130,22 +132,6 @@ export default defineConfig({
         darkModeSwitchLabel: "主题",
         langMenuLabel: "切换语言",
         externalLinkIcon: true
-      }
-    },
-    en: {
-      label: "English",
-      lang: "en-US",
-      link: "/en/",
-      title: "CGAT Docs",
-      description: "Official documentation for the Complete Genome Assembly Toolkit",
-      themeConfig: {
-        ...sharedTheme,
-        nav: [
-          { text: "Documentation status", link: "/en/" },
-          { text: "中文文档", link: "/zh/" },
-          { text: "Download", link: releaseUrl }
-        ],
-        sidebar: false
       }
     }
   },
