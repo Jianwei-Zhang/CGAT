@@ -16,8 +16,11 @@
 **/target/
 **/src-tauri/gen/
 
-# Local documentation source, toolchain, and deployment artifacts
-/docs/
+# Local documentation source, toolchain, and deployment artifacts.
+# Keep only the two redirect pages used by branch-based GitHub Pages.
+/docs/*
+!/docs/index.html
+!/docs/404.html
 /DOCS_DEPLOY.md
 /package.json
 /package-lock.json
