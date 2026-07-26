@@ -15,6 +15,9 @@
 **/node_modules/
 **/target/
 **/src-tauri/gen/
+**/.vitepress/cache/
+**/.vitepress/dist/
+**/.vitepress/.temp/
 
 # Local runtime artifacts
 **/*.sqlite
