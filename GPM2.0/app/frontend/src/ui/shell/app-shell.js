@@ -9,7 +9,7 @@ export function renderAppShell(state) {
       <header class="topbar panel">
         <div class="topbar-brand">
           <div class="topbar-brand-text">
-            <p class="kicker">GPM Next</p>
+            <p class="kicker">GPM2.0</p>
             <h1>${labels.title}</h1>
           </div>
         </div>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" role="img" aria-labelledby="title">
+  <title id="title">GPM2.0</title>
+  <path fill="#003366" d="M4 0 5 1 4 2 3 1Z"/>
+  <path fill="#cc0033" d="M0 2h2l1 1 1-1 1 1 1-1h2L5 5 4 4 3 5Z"/>
+  <path fill="#003366" d="M3 5 4 6 3 7 2 6Zm2 0 1 1-1 1-1-1ZM3 7l1 1H2Zm2 0 1 1H4Z"/>
+</svg>
