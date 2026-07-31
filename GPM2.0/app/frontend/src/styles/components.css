@@ -1212,6 +1212,40 @@ select {
   gap: 8px;
 }
 
+.degap-job-card {
+  margin-top: 10px;
+  border: 1px solid #d4d9df;
+  background: #f8fafc;
+  padding: 8px;
+}
+
+.degap-job-card.is-collapsed {
+  gap: 0;
+}
+
+.degap-job-card-toggle {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  padding: 4px 6px;
+  color: #263544;
+  cursor: pointer;
+}
+
+.degap-job-card-toggle:hover,
+.degap-job-card-toggle:focus-visible {
+  background: #eceff3;
+}
+
+.degap-job-card-indicator {
+  width: 12px;
+  color: #607080;
+  text-align: center;
+}
+
 .degap-job-list {
   display: grid;
   gap: 8px;

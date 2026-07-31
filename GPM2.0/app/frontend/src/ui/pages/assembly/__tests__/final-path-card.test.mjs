@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { renderFinalPathCard } from "../final-path-card.js";
-import { renderDegapPanel } from "../degap-card.js";
+import { renderDegapJobCard, renderDegapRuntime } from "../degap-card.js";
 
 function createDeps() {
   return {
@@ -78,6 +78,8 @@ function createI18n() {
       addRightJob: "添加 Right-job",
       addAllJob: "添加 All-job",
       jobsTitle: "任务",
+      expandJobsCard: "展开 DEGAP 任务卡片",
+      collapseJobsCard: "收起 DEGAP 任务卡片",
       noJobs: "暂无 DEGAP 任务",
       removeJobAria: "删除任务",
       reset: "重置",
@@ -86,23 +88,25 @@ function createI18n() {
   };
 }
 
-test("renderFinalPathCard renders DEGAP as a final path view between table and log", () => {
+test("renderFinalPathCard migrates the legacy DEGAP view to Graph and embeds DEGAP jobs below the graph", () => {
   const deps = createDeps();
   const entry = createEntry();
-  const degapBody = renderDegapPanel(
+  const degap = {
+    panelOpen: true,
+    settingsPanelDismissed: false,
+    jobs: [{
+      jobId: "Ctg9_vs_Ctg10_Left-job",
+      label: "Ctg9_vs_Ctg10 Left-job",
+      chrName: "Chr01",
+      outPath: "/server/degap_out/Ctg9_vs_Ctg10_Left-job",
+      left: { assemblyCtgId: 9, start: 1, end: 1200 },
+      right: { assemblyCtgId: 10, start: 1, end: 900 },
+    }],
+  };
+  const graphAddon = renderDegapJobCard(
     {
-      finalPathEntry: entry,
-      trackView: null,
-      trackViewportPx: 900,
-      primaryDatasetName: "hifiasm",
-      degap: {
-        settingsPanelDismissed: false,
-        jobs: [{
-          jobId: "Ctg9_vs_Ctg10_Left-job",
-          label: "Ctg9_vs_Ctg10 Left-job",
-          outPath: "/server/degap_out/Ctg9_vs_Ctg10_Left-job",
-        }],
-      },
+      chrName: "Chr01",
+      degap,
     },
     {
       ...deps,
@@ -117,11 +121,15 @@ test("renderFinalPathCard renders DEGAP as a final path view between table and l
       viewMode: "degap",
       trackViewportPx: 900,
       primaryDatasetName: "hifiasm",
-      degapTrackView: {
+      trackView: {
         minTickUnitKb: 500,
         maxTickCount: 15,
       },
-      degapBody,
+      graphAddonByChr: { Chr01: graphAddon },
+      degapRuntimeBody: renderDegapRuntime(
+        { degap },
+        { ...deps, i18n: createI18n() },
+      ),
       canExportDegapJobs: true,
     },
     {
@@ -130,10 +138,12 @@ test("renderFinalPathCard renders DEGAP as a final path view between table and l
     },
   );
 
-  assert.match(html, /data-final-path-view-mode="graph"[\s\S]*data-final-path-view-mode="table"[\s\S]*data-final-path-view-mode="degap"[\s\S]*data-final-path-view-mode="log"/);
-  assert.match(html, /<article class="card final-path-card" data-final-path-view-mode="degap"/);
-  assert.match(html, /data-degap-panel/);
+  assert.match(html, /data-final-path-view-mode="graph"[\s\S]*data-final-path-view-mode="table"[\s\S]*data-final-path-view-mode="log"/);
+  assert.doesNotMatch(html, /data-final-path-view-mode="degap"/);
+  assert.match(html, /<article class="card final-path-card" data-final-path-view-mode="graph"/);
+  assert.match(html, /data-degap-runtime/);
   assert.match(html, /data-degap-settings-modal/);
+  assert.match(html, /data-final-path-graph-viewport[\s\S]*data-degap-job-card/);
   assert.match(html, /data-degap-settings-open/);
   assert.doesNotMatch(html, /配置服务器端 DEGAP gapfiller 路径；HiFi Reads PATH 或 ONT Reads PATH 至少填写一个。/);
   assert.doesNotMatch(html, /DEGAP PATH 为必填项。/);
@@ -143,12 +153,11 @@ test("renderFinalPathCard renders DEGAP as a final path view between table and l
   assert.match(html, /<p class="helper-hint degap-form-help">READS path 为服务器端原始测序数据；HiFi 或 ONT 至少填写一个。<\/p>/);
   assert.match(html, /DEGAP-JOBS/);
   assert.match(html, /data-final-path-export-action="all"[\s\S]*final-path-export-divider[\s\S]*data-final-path-export-action="degap-jobs"/);
-  assert.match(html, /class="final-path-card-head-controls"[\s\S]*最小刻度单位\(kb\)[\s\S]*data-track-combo-field="minTickUnitKb" data-degap-scale-combo-field="minTickUnitKb"[\s\S]*data-degap-scale-field="minTickUnitKb"[\s\S]*value="500"[\s\S]*最多可展示数[\s\S]*data-track-combo-field="maxTickCount" data-degap-scale-combo-field="maxTickCount"[\s\S]*data-degap-scale-field="maxTickCount"[\s\S]*value="15"[\s\S]*Export/);
+  assert.match(html, /class="final-path-card-head-controls"[\s\S]*最小刻度单位\(kb\)[\s\S]*data-track-combo-field="minTickUnitKb"[\s\S]*value="500"[\s\S]*最多可展示数[\s\S]*data-track-combo-field="maxTickCount"[\s\S]*value="15"[\s\S]*Export/);
+  assert.doesNotMatch(html, /data-degap-scale-(?:combo-)?field/);
   assert.doesNotMatch(html, /degap-graph-toolbar/);
-  assert.match(html, /height="78"/);
   assert.doesNotMatch(html, /DEGAP-gapfiller-config/);
   assert.doesNotMatch(html, /DEGAP job added/);
-  assert.doesNotMatch(html, /<span class="muted">1<\/span>/);
 });
 
 test("DEGAP reads help uses reusable helper hint styling", () => {
@@ -168,21 +177,19 @@ test("DEGAP reads help uses reusable helper hint styling", () => {
   );
 });
 
-test("renderDegapPanel renders compact expanded job settings and icon controls", () => {
+test("renderDegapJobCard renders compact expanded job settings and icon controls", () => {
   const deps = createDeps();
   const jobId = "Ctg9_vs_Ctg10_Left-job";
-  const html = renderDegapPanel(
+  const html = renderDegapJobCard(
     {
-      finalPathEntry: createEntry(),
-      trackView: null,
-      trackViewportPx: 900,
-      primaryDatasetName: "hifiasm",
+      chrName: "Chr01",
       degap: {
         settingsPanelDismissed: true,
         expandedJobId: jobId,
         jobs: [{
           jobId,
           label: "Ctg9_vs_Ctg10 Left-job",
+          chrName: "Chr01",
           outPath: "/server/degap_out/Ctg9_vs_Ctg10_Left-job",
           left: { assemblyCtgId: 9, start: 1, end: 1200 },
           right: { assemblyCtgId: 10, start: 1, end: 900 },
@@ -222,14 +229,11 @@ test("renderDegapPanel renders compact expanded job settings and icon controls",
   assert.match(html, /class="degap-job-editor-foot"[\s\S]*data-degap-job-reset[\s\S]*data-degap-job-save/);
 });
 
-test("renderDegapPanel styles DEGAP job type badges", () => {
+test("renderDegapJobCard styles DEGAP job type badges", () => {
   const deps = createDeps();
-  const html = renderDegapPanel(
+  const html = renderDegapJobCard(
     {
-      finalPathEntry: createEntry(),
-      trackView: null,
-      trackViewportPx: 900,
-      primaryDatasetName: "hifiasm",
+      chrName: "Chr01",
       degap: {
         settingsPanelDismissed: true,
         jobs: [
@@ -237,6 +241,7 @@ test("renderDegapPanel styles DEGAP job type badges", () => {
             jobId: "gapfiller-job",
             jobType: "gapfiller",
             label: "gapfiller job",
+            chrName: "Chr01",
             outPath: "/server/degap_out/gapfiller-job",
             left: { assemblyCtgId: 9, start: 1, end: 1200 },
             right: { assemblyCtgId: 10, start: 1, end: 900 },
@@ -245,6 +250,7 @@ test("renderDegapPanel styles DEGAP job type badges", () => {
             jobId: "telseeker-job",
             jobType: "telseeker_ctg",
             label: "telseeker job",
+            chrName: "Chr01",
             outPath: "/server/degap_out/telseeker-job",
             endpointCtg: "hifiasm_Ctg9",
             endpointEnd: "L",
@@ -264,14 +270,10 @@ test("renderDegapPanel styles DEGAP job type badges", () => {
   assert.doesNotMatch(html, /telseeker-ctg/);
 });
 
-test("renderDegapPanel renders DEGAP messages as a card toast outside Jobs flow", () => {
+test("renderDegapRuntime renders DEGAP messages as a card toast without an empty jobs card", () => {
   const deps = createDeps();
-  const html = renderDegapPanel(
+  const html = renderDegapRuntime(
     {
-      finalPathEntry: createEntry(),
-      trackView: null,
-      trackViewportPx: 900,
-      primaryDatasetName: "hifiasm",
       degap: {
         settingsPanelDismissed: true,
         error: "已有该任务 Ctg9_vs_Ctg10 Left-job",
@@ -286,7 +288,32 @@ test("renderDegapPanel renders DEGAP messages as a card toast outside Jobs flow"
 
   assert.match(html, /class="degap-toast is-danger"[\s\S]*data-degap-toast[\s\S]*已有该任务 Ctg9_vs_Ctg10 Left-job/);
   assert.doesNotMatch(html, /degap-feedback/);
-  assert.match(html, /data-degap-toast[\s\S]*<div class="degap-panel-body">[\s\S]*<section class="degap-jobs-panel"/);
+  assert.doesNotMatch(html, /data-degap-jobs-panel/);
+});
+
+test("renderDegapJobCard hides zero jobs and preserves collapsed state per chromosome", () => {
+  const deps = { ...createDeps(), i18n: createI18n() };
+  assert.equal(renderDegapJobCard({ chrName: "Chr01", degap: { jobs: [] } }, deps), "");
+
+  const html = renderDegapJobCard({
+    chrName: "Chr01",
+    degap: {
+      collapsedJobCardChrNames: ["Chr01"],
+      jobs: [{
+        jobId: "Ctg9_vs_Ctg10_Left-job",
+        label: "Ctg9_vs_Ctg10 Left-job",
+        chrName: "Chr01",
+        left: { assemblyCtgId: 9, start: 1, end: 1200 },
+        right: { assemblyCtgId: 10, start: 1, end: 900 },
+      }],
+    },
+  }, deps);
+
+  assert.match(html, /degap-job-card is-collapsed/);
+  assert.match(html, /data-degap-job-card-chr-name="Chr01"/);
+  assert.match(html, /aria-expanded="false"/);
+  assert.match(html, /任务 \(1\)/);
+  assert.doesNotMatch(html, /data-degap-job-card-body/);
 });
 
 function extractFinalPathSegmentHtml(html, segmentId) {

@@ -5960,7 +5960,7 @@ test("phased all final path graph renders haplotype labels in the graph label co
   assert.match(html, /data-final-path-target-chr-name="Chr01B"[\s\S]*data-final-path-segment-id="hap-b"/);
 });
 
-test("phased all DEGAP view renders haplotype graphs and groups only tracks with jobs", () => {
+test("phased all Graph view renders one DEGAP jobs card under each haplotype that has jobs", () => {
   const html = renderAssemblyPage(
     createState({
       session: {
@@ -6027,13 +6027,17 @@ test("phased all DEGAP view renders haplotype graphs and groups only tracks with
     }),
   );
 
-  assert.match(html, /data-final-path-view-mode="degap"/);
+  assert.match(html, /data-final-path-view-mode="graph"/);
+  assert.doesNotMatch(html, /data-final-path-view-mode="degap"/);
   assert.match(html, /data-final-path-all-card="Chr01A"[\s\S]*data-final-path-all-graph-label="Chr01A"/);
   assert.match(html, /data-final-path-all-card="Chr01B"[\s\S]*data-final-path-all-graph-label="Chr01B"/);
   assert.match(html, /data-final-path-target-chr-name="Chr01A"[\s\S]*data-final-path-segment-id="gap-a"/);
   assert.match(html, /data-final-path-target-chr-name="Chr01B"[\s\S]*data-final-path-segment-id="gap-b"/);
-  assert.doesNotMatch(html, /data-degap-job-group="Chr01A"/);
-  assert.match(html, /data-degap-job-group="Chr01B"[\s\S]*B-left_vs_B-right Left-job/);
+  const chrAStart = html.indexOf('data-final-path-all-card="Chr01A"');
+  const chrBStart = html.indexOf('data-final-path-all-card="Chr01B"');
+  assert.ok(chrAStart >= 0 && chrBStart > chrAStart);
+  assert.doesNotMatch(html.slice(chrAStart, chrBStart), /data-degap-job-card/);
+  assert.match(html.slice(chrBStart), /data-final-path-segment-id="gap-b"[\s\S]*data-degap-job-card[\s\S]*data-degap-job-card-chr-name="Chr01B"[\s\S]*B-left_vs_B-right Left-job/);
 });
 
 test("phased all final path log renders one titled log card per haplotype", () => {
@@ -9125,11 +9129,7 @@ test("assembly page public binder wires host-level listeners once for the same h
     "click",
     "pointerover",
     "pointerout",
-    "contextmenu",
     "click",
-    "change",
-    "pointerover",
-    "pointerout",
     "click",
     "scroll",
     "contextmenu",

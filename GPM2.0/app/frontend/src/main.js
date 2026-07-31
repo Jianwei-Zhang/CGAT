@@ -147,7 +147,9 @@ const store = createStore({
       feedback: "",
       error: "",
       menu: null,
+      pendingJobIntent: null,
       expandedJobId: "",
+      collapsedJobCardChrNames: [],
       trackView: {
         minTickUnitKb: 10000,
         maxTickCount: 10,

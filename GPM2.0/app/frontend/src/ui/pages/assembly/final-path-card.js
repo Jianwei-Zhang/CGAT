@@ -1646,8 +1646,8 @@ export function renderFinalPathCard(
     trackViewportPx = null,
     primaryDatasetName = "",
     graphPreviewSegmentOrder = null,
-    degapBody = "",
-    degapTrackView = null,
+    graphAddonByChr = {},
+    degapRuntimeBody = "",
     canExportFasta = true,
     canExportDegapJobs = false,
     finalPathLogModel = null,
@@ -1706,7 +1706,6 @@ export function renderFinalPathCard(
   const title = `${normalizedProjectName}_${normalizedChrName} path`;
   const graphLabel = String(labels.finalPathGraph || "Graph");
   const tableLabel = String(labels.finalPathTable || "Table");
-  const degapLabel = String(labels.finalPathDegap || "DEGAP");
   const logLabel = String(labels.finalPathLog || "Log");
   const phasedSelector = renderPhasedFinalPathSelector({
     escapeAttr,
@@ -1738,11 +1737,6 @@ export function renderFinalPathCard(
     maxTickCount: DEFAULT_MAX_TICK_COUNT,
     ...(trackView || {}),
   });
-  const degapTrackControls = resolveTrackPrefs({
-    minTickUnitKb: DEFAULT_MIN_TICK_UNIT_KB,
-    maxTickCount: DEFAULT_MAX_TICK_COUNT,
-    ...(degapTrackView || trackView || {}),
-  });
   const headControls = normalizedViewMode === "graph"
     ? renderFinalPathHeadControls({
       escapeAttr,
@@ -1752,18 +1746,6 @@ export function renderFinalPathCard(
       trackControls,
       exportMenu,
     })
-    : normalizedViewMode === "degap"
-      ? renderFinalPathHeadControls({
-        escapeAttr,
-        escapeHtml,
-        ariaLabel: labels.finalPathDegapControls || `${title} DEGAP controls`,
-        labels: trackControlLabels,
-        trackControls: degapTrackControls,
-        exportMenu,
-        extraComboFieldAttr: "data-degap-scale-combo-field",
-        inputFieldAttr: "data-degap-scale-field",
-        idPrefix: "degap-track",
-      })
     : `<div class="final-path-card-head-controls is-table-mode">${exportMenu}</div>`;
 
   const isAllMode = displayEntries.length > 1;
@@ -1776,20 +1758,6 @@ export function renderFinalPathCard(
   };
 
   const renderSingleBody = (entry, { allMode = false } = {}) => {
-    if (normalizedViewMode === "degap") {
-      return normalizeString(degapBody) || renderFinalPathGraph({
-        escapeAttr,
-        escapeHtml,
-        finalPathEntry: entry.finalPathEntry,
-        trackControls,
-        trackViewportPx,
-        primaryDatasetName,
-        previewSegmentOrder: allMode ? entry.graphPreviewSegmentOrder : graphPreviewSegmentOrder,
-        targetChrName: allMode ? entry.chrName : "",
-        allGraphLabel: allMode ? entry.label : "",
-        compact: "degap",
-      });
-    }
     const entryLogModel = entry.finalPathLogModel || buildFinalPathLogModel({
       chrName: entry.chrName,
       finalPathEntry: entry.finalPathEntry,
@@ -1823,8 +1791,15 @@ export function renderFinalPathCard(
           targetChrName: allMode ? entry.chrName : "",
           allGraphLabel: allMode ? entry.label : "",
         });
+    const graphAddon = normalizedViewMode === "graph"
+      && graphAddonByChr
+      && typeof graphAddonByChr === "object"
+      && !Array.isArray(graphAddonByChr)
+        ? String(graphAddonByChr[entry.chrName] || "")
+        : "";
+    const bodyWithAddon = `${bodyMarkup}${graphAddon}`;
     if (!allMode) {
-      return bodyMarkup;
+      return bodyWithAddon;
     }
     const logTitle = normalizedViewMode === "log"
       ? `<div class="final-path-all-card-head"><strong class="final-path-all-card-title">${escapeHtml(entry.label)}</strong></div>`
@@ -1832,14 +1807,12 @@ export function renderFinalPathCard(
     return `
       <section class="final-path-all-card is-${escapeAttr(normalizedViewMode)}" data-final-path-all-card="${escapeAttr(entry.chrName)}" data-final-path-target-chr-name="${escapeAttr(entry.chrName)}">
         ${logTitle}
-        ${bodyMarkup}
+        ${bodyWithAddon}
       </section>
     `;
   };
 
-  const body = normalizedViewMode === "degap"
-    ? renderSingleBody(singleEntry)
-    : isAllMode
+  const body = isAllMode
     ? `<div class="final-path-all-card-stack" data-final-path-all-stack="true">${displayEntries.map((entry) => renderSingleBody(entry, { allMode: true })).join("")}</div>`
     : renderSingleBody(singleEntry);
 
@@ -1860,11 +1833,6 @@ export function renderFinalPathCard(
               class="button ghost tiny${normalizedViewMode === "table" ? " is-active" : ""} final-path-card-toggle-button"
               data-final-path-view-mode="table"
             >${escapeHtml(tableLabel)}</button>
-            <button
-              type="button"
-              class="button ghost tiny${normalizedViewMode === "degap" ? " is-active" : ""} final-path-card-toggle-button"
-              data-final-path-view-mode="degap"
-            >${escapeHtml(degapLabel)}</button>
             ${canLog ? `
               <button
                 type="button"
@@ -1877,6 +1845,7 @@ export function renderFinalPathCard(
         ${headControls}
       </div>
       <div class="final-path-card-body">
+        ${String(degapRuntimeBody || "")}
         ${body}
       </div>
     </article>

@@ -110,6 +110,9 @@ import {
 } from "./assembly/final-path-export-runtime.js";
 import {
   bindDegapCard as bindDegapCardImpl,
+  openDegapSettings as openDegapSettingsImpl,
+  requestDegapGapJob as requestDegapGapJobImpl,
+  requestDegapTelseekerJob as requestDegapTelseekerJobImpl,
 } from "./assembly/degap-runtime.js";
 import {
   FINAL_PATH_ALL_KEY,
@@ -2235,13 +2238,7 @@ function createAssemblyPageBindingDeps() {
         writeFinalPathExportTextFile,
       },
     }),
-    bindDegapCard: (host, store) => bindDegapCardImpl(host, store, {
-      rerender,
-      confirm: (message) => requestAssemblyConfirm(host, store, message),
-      mapAssemblyError,
-      persistDegapProjectState: (nextHost, nextStore) =>
-        persistProjectAssemblyViewStateFromStore(nextHost, nextStore, projectAssemblyViewStateRuntimeDeps),
-    }),
+    bindDegapCard: (host, store) => bindDegapCardImpl(host, store, degapRuntimeDeps),
     bindBandCanvasRuntime: (host) => bindBandCanvasRuntimeImpl(host),
     bindSeqActions: (host, store) => bindSeqActionsImpl(host, store, seqActionsRuntimeDeps),
     bindStickyCtgLabels: (host) => bindStickyCtgLabelsImpl(host),
@@ -2503,6 +2500,14 @@ const editorActionsRuntimeDeps = {
 
 const editorActionRuntimeAdapters = createEditorActionRuntimeAdapters(editorActionsRuntimeDeps);
 
+const degapRuntimeDeps = {
+  rerender,
+  confirm: (message, context = {}) => requestAssemblyConfirm(context.host, context.store, message),
+  mapAssemblyError,
+  persistDegapProjectState: (host, store) =>
+    persistProjectAssemblyViewStateFromStore(host, store, projectAssemblyViewStateRuntimeDeps),
+};
+
 const contextMenuRuntimeDeps = {
   addFinalPathContigRelativeToSegment,
   addFinalPathGapRelativeToSegment,
@@ -2519,6 +2524,11 @@ const contextMenuRuntimeDeps = {
   escapeAttr,
   escapeHtml,
   flipFinalPathSegment,
+  openDegapSettings: (host, store) => openDegapSettingsImpl(host, store, degapRuntimeDeps),
+  requestDegapGapJob: (host, store, payload) =>
+    requestDegapGapJobImpl(host, store, payload, degapRuntimeDeps),
+  requestDegapTelseekerJob: (host, store, payload) =>
+    requestDegapTelseekerJobImpl(host, store, payload, degapRuntimeDeps),
   addTrackContigToPhasedTrack,
   deletePhasedTrack,
   importAddCtgIntoTrack,

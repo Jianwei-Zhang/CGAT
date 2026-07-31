@@ -31,9 +31,6 @@ export function normalizeFinalPathViewMode(value, { allowLog = true } = {}) {
   if (allowLog && normalized === "log") {
     return "log";
   }
-  if (normalized === "degap") {
-    return "degap";
-  }
   if (normalized === "table") {
     return "table";
   }

@@ -44,6 +44,53 @@ function normalizeStringList(value) {
     .filter(Boolean);
 }
 
+function normalizeUniqueStringList(value) {
+  const seen = new Set();
+  return (Array.isArray(value) ? value : [])
+    .map(normalizeString)
+    .filter((item) => {
+      if (!item || seen.has(item)) {
+        return false;
+      }
+      seen.add(item);
+      return true;
+    });
+}
+
+function normalizeDegapPendingJobIntent(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const kind = normalizeString(source.kind).toLowerCase();
+  const chrName = normalizeString(source.chrName);
+  if (!chrName) {
+    return null;
+  }
+  if (kind === "gapfiller") {
+    const gapSegmentId = normalizeString(source.gapSegmentId);
+    if (!gapSegmentId) {
+      return null;
+    }
+    return {
+      kind,
+      chrName,
+      gapSegmentId,
+      side: normalizeString(source.side).toLowerCase() === "right" ? "right" : "left",
+    };
+  }
+  if (kind === "telseeker") {
+    const segmentId = normalizeString(source.segmentId);
+    if (!segmentId) {
+      return null;
+    }
+    return {
+      kind,
+      chrName,
+      segmentId,
+      endpointSide: normalizeString(source.endpointSide).toLowerCase() === "right" ? "right" : "left",
+    };
+  }
+  return null;
+}
+
 function normalizePositiveInt(value, fallback) {
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric > 0 ? Math.trunc(numeric) : fallback;
@@ -115,6 +162,7 @@ export function normalizeDegapProjectState(value = {}) {
   return {
     jobs: normalizeDegapJobs(source.jobs),
     settingsPanelDismissed: source.settingsPanelDismissed === true,
+    collapsedJobCardChrNames: normalizeUniqueStringList(source.collapsedJobCardChrNames),
   };
 }
 
@@ -129,7 +177,9 @@ export function normalizeDegapRuntimeState(value = {}) {
     feedback: normalizeString(source.feedback),
     error: normalizeString(source.error),
     menu: source.menu && typeof source.menu === "object" ? source.menu : null,
+    pendingJobIntent: normalizeDegapPendingJobIntent(source.pendingJobIntent),
     expandedJobId: normalizeString(source.expandedJobId),
+    collapsedJobCardChrNames: projectState.collapsedJobCardChrNames,
     trackView: source.trackView && typeof source.trackView === "object" && !Array.isArray(source.trackView)
       ? source.trackView
       : {},
@@ -143,6 +193,7 @@ export function buildDegapProjectStateForPersistence(degap) {
   return {
     jobs: runtime.jobs,
     settingsPanelDismissed: runtime.settingsPanelDismissed,
+    collapsedJobCardChrNames: runtime.collapsedJobCardChrNames,
   };
 }
 
@@ -431,6 +482,24 @@ function findEndpointDegapCtgSegment(segments, direction) {
     return isDegapCtgSegment(segment) ? { segment, index } : null;
   }
   return null;
+}
+
+export function resolveDegapTerminalCtgSides(finalPathEntry, segmentId) {
+  const normalizedSegmentId = normalizeString(segmentId);
+  if (!normalizedSegmentId) {
+    return [];
+  }
+  const segments = Array.isArray(finalPathEntry?.segments) ? finalPathEntry.segments : [];
+  const left = findEndpointDegapCtgSegment(segments, "left")?.segment || null;
+  const right = findEndpointDegapCtgSegment(segments, "right")?.segment || null;
+  const sides = [];
+  if (normalizeString(left?.segmentId) === normalizedSegmentId) {
+    sides.push("left");
+  }
+  if (normalizeString(right?.segmentId) === normalizedSegmentId) {
+    sides.push("right");
+  }
+  return sides;
 }
 
 export function buildTelseekerCtgJobsForFinalPath({

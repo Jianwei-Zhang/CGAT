@@ -10,6 +10,7 @@ import {
   findDuplicateDegapJobs,
   mergeDegapJobs,
   normalizeDegapSettings,
+  resolveDegapTerminalCtgSides,
   resolveDegapExportSettings,
   resolveDegapJobOutPath,
   resolveDegapJobSettings,
@@ -325,6 +326,23 @@ test("DEGAP job identity is scoped by final path chromosome", () => {
   assert.equal(mergeDegapJobs([jobA], [jobB]).length, 2);
   assert.equal(findDuplicateDegapJobs([jobA], [jobB]).length, 0);
   assert.equal(findDuplicateDegapJobs([jobA], [jobA]).length, 1);
+});
+
+test("resolveDegapTerminalCtgSides distinguishes middle, endpoint, and single-contig paths", () => {
+  assert.deepEqual(resolveDegapTerminalCtgSides(finalPathEntry, "ctg-a"), ["left"]);
+  assert.deepEqual(resolveDegapTerminalCtgSides(finalPathEntry, "ctg-b"), ["right"]);
+  assert.deepEqual(resolveDegapTerminalCtgSides({
+    chrName: "Chr01",
+    segments: [
+      { segmentId: "left", type: "ctg", assemblyCtgId: 1 },
+      { segmentId: "middle", type: "ctg", assemblyCtgId: 2 },
+      { segmentId: "right", type: "ctg", assemblyCtgId: 3 },
+    ],
+  }, "middle"), []);
+  assert.deepEqual(resolveDegapTerminalCtgSides({
+    chrName: "Chr01",
+    segments: [{ segmentId: "only", type: "ctg", assemblyCtgId: 1 }],
+  }, "only"), ["left", "right"]);
 });
 
 test("validateDegapSettings requires one reads group and server paths", () => {

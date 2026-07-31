@@ -57,7 +57,7 @@ import {
   hasAdvancedSupportDsCtgLenRules,
 } from "./support-ds-ctg-len-rules.js";
 import { renderFinalPathCard } from "./final-path-card.js";
-import { renderDegapPanel } from "./degap-card.js";
+import { renderDegapJobCard, renderDegapRuntime } from "./degap-card.js";
 import {
   FINAL_PATH_ALL_KEY,
   buildFinalPathEntry,
@@ -1448,6 +1448,16 @@ function createRenderTracksRenderer(deps = {}) {
       primaryDatasetName,
     }),
   }));
+  const degapRenderDeps = { escapeAttr, escapeHtml, i18n };
+  const graphAddonByChr = Object.fromEntries(
+    finalPathEntriesWithLog.map((entry) => [
+      entry.chrName,
+      renderDegapJobCard(
+        { chrName: entry.chrName, degap: assembly.degap },
+        degapRenderDeps,
+      ),
+    ]),
+  );
   const finalPathCard = renderFinalPathCard(
     {
       projectName: String(session.projectName || session.projectId || "project"),
@@ -1458,22 +1468,8 @@ function createRenderTracksRenderer(deps = {}) {
       trackViewportPx: getMeasuredTrackViewportPx("final-path"),
       primaryDatasetName,
       graphPreviewSegmentOrder,
-      degapTrackView: assembly.degap?.trackView || assembly.finalPathTrackView,
-      degapBody: renderDegapPanel(
-        {
-          finalPathEntry: currentFinalPath,
-          finalPathEntries: finalPathEntriesWithLog,
-          trackView: assembly.degap?.trackView || assembly.finalPathTrackView,
-          trackViewportPx: getMeasuredTrackViewportPx("final-path"),
-          primaryDatasetName,
-          degap: assembly.degap,
-        },
-        {
-          escapeAttr,
-          escapeHtml,
-          i18n,
-        },
-      ),
+      graphAddonByChr,
+      degapRuntimeBody: renderDegapRuntime({ degap: assembly.degap }, degapRenderDeps),
       canExportFasta: canProjectExportFinalPathFasta(state, currentProject),
       canExportDegapJobs: Array.isArray(assembly.degap?.jobs) && assembly.degap.jobs.length > 0,
       finalPathLogModel,

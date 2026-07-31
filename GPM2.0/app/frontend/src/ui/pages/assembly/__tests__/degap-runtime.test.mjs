@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { bindDegapCard, buildDegapExportPayload } from "../degap-runtime.js";
+import {
+  bindDegapCard,
+  buildDegapExportPayload,
+  requestDegapGapJob,
+  requestDegapTelseekerJob,
+} from "../degap-runtime.js";
 
 function createStore(initialState) {
   let state = initialState;
@@ -449,19 +454,11 @@ test("bindDegapCard does not collapse an expanded job editor on pointer leave", 
   const host = createHost();
 
   bindDegapCard(host, store, { rerender() {} });
-  host.listeners.pointerout({
-    target: {
-      closest(selector) {
-        return selector === ".degap-job-shell" ? { contains: () => false } : null;
-      },
-    },
-    relatedTarget: null,
-  });
-
+  assert.equal(host.listeners.pointerout, undefined);
   assert.equal(store.getState().assembly.degap.expandedJobId, job.jobId);
 });
 
-test("bindDegapCard creates All-mode gap jobs for the clicked haplotype final path", () => {
+test("requestDegapGapJob creates All-mode gap jobs for the clicked haplotype final path", () => {
   const listeners = {};
   const host = {
     listeners,
@@ -544,35 +541,21 @@ test("bindDegapCard creates All-mode gap jobs for the clicked haplotype final pa
     },
   };
 
-  bindDegapCard(host, store, { rerender() {}, persistDegapProjectState() {} });
-  listeners.contextmenu({
-    target: {
-      closest(selector) {
-        return selector === "[data-final-path-segment-type='gap']" ? gapNode : null;
-      },
-    },
-    clientX: 10,
-    clientY: 20,
-    preventDefault() {},
-  });
-  listeners.click({
-    target: {
-      closest(selector) {
-        return selector === "[data-degap-gap-action]"
-          ? { dataset: { degapGapAction: "left" } }
-          : null;
-      },
-    },
-  });
+  const created = requestDegapGapJob(host, store, {
+    chrName: "Chr01B",
+    gapSegmentId: "gap-b",
+    side: "left",
+  }, { rerender() {}, persistDegapProjectState() {} });
 
   const jobs = store.getState().assembly.degap.jobs;
+  assert.equal(created, true);
   assert.equal(jobs.length, 1);
   assert.equal(jobs[0].chrName, "Chr01B");
   assert.equal(jobs[0].leftCtg, "B-left");
   assert.equal(jobs[0].rightCtg, "B-right");
 });
 
-test("bindDegapCard creates All-mode telseeker jobs from the clicked haplotype endpoint ctg", () => {
+test("requestDegapTelseekerJob creates an All-mode job for the selected endpoint", () => {
   const listeners = {};
   const host = {
     listeners,
@@ -655,32 +638,155 @@ test("bindDegapCard creates All-mode telseeker jobs from the clicked haplotype e
     },
   };
 
-  bindDegapCard(host, store, { rerender() {}, persistDegapProjectState() {} });
-  listeners.contextmenu({
-    target: {
-      closest(selector) {
-        return selector === "[data-final-path-segment-type='ctg']" ? ctgNode : null;
-      },
-    },
-    clientX: 10,
-    clientY: 20,
-    preventDefault() {},
-  });
-  listeners.click({
-    target: {
-      closest(selector) {
-        return selector === "[data-degap-telseeker-action]"
-          ? { dataset: { degapTelseekerAction: "right" } }
-          : null;
-      },
-    },
-  });
+  const created = requestDegapTelseekerJob(host, store, {
+    chrName: "Chr01B",
+    segmentId: "b-right",
+    endpointSide: "right",
+  }, { rerender() {}, persistDegapProjectState() {} });
 
   const jobs = store.getState().assembly.degap.jobs;
+  assert.equal(created, true);
   assert.equal(jobs.length, 1);
   assert.equal(jobs[0].jobType, "telseeker_ctg");
   assert.equal(jobs[0].chrName, "Chr01B");
   assert.equal(jobs[0].endpointCtg, "B-right");
   assert.equal(jobs[0].endpointEnd, "R");
   assert.deepEqual(jobs[0].endpoint, { assemblyCtgId: 4, start: 100, end: 1 });
+});
+
+function createFirstJobGateStore(settings = {}) {
+  return createStore({
+    session: {},
+    assembly: {
+      selectedChrName: "Chr01",
+      finalPathByChr: {
+        Chr01: {
+          chrName: "Chr01",
+          segments: [
+            { segmentId: "left", type: "ctg", assemblyCtgId: 1, ctgName: "Left", overallLen: 100, start: 1, end: 100 },
+            { segmentId: "gap", type: "gap", gapSizeBp: 20 },
+            { segmentId: "right", type: "ctg", assemblyCtgId: 2, ctgName: "Right", overallLen: 100, start: 100, end: 1 },
+          ],
+        },
+      },
+      degap: {
+        settings,
+        settingsPanelDismissed: true,
+        jobs: [],
+      },
+    },
+  });
+}
+
+test("first DEGAP job waits for valid settings and resumes exactly once after save", async () => {
+  const host = createHost();
+  const panel = createSettingsPanel();
+  host.querySelector = (selector) => selector === "[data-degap-settings-panel]" ? panel : null;
+  const store = createFirstJobGateStore();
+  store.setState({
+    ...store.getState(),
+    assembly: {
+      ...store.getState().assembly,
+      degap: {
+        ...store.getState().assembly.degap,
+        collapsedJobCardChrNames: ["Chr01"],
+      },
+    },
+  });
+
+  const created = requestDegapGapJob(host, store, {
+    chrName: "Chr01",
+    gapSegmentId: "gap",
+    side: "right",
+  }, { rerender() {} });
+  assert.equal(created, false);
+  assert.equal(store.getState().assembly.degap.panelOpen, true);
+  assert.deepEqual(store.getState().assembly.degap.pendingJobIntent, {
+    kind: "gapfiller",
+    chrName: "Chr01",
+    gapSegmentId: "gap",
+    side: "right",
+  });
+  assert.equal(store.getState().assembly.degap.jobs.length, 0);
+
+  bindDegapCard(host, store, {
+    storage: createStorage(),
+    rerender() {},
+    async updateRuntimeSettings() {},
+    persistDegapProjectState() {},
+  });
+  host.listeners.click(createSaveClickEvent());
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  const degap = store.getState().assembly.degap;
+  assert.equal(degap.panelOpen, false);
+  assert.equal(degap.pendingJobIntent, null);
+  assert.equal(degap.jobs.length, 1);
+  assert.equal(degap.jobs[0].side, "right");
+  assert.deepEqual(degap.collapsedJobCardChrNames, []);
+});
+
+test("closing first-job settings cancels the pending job", () => {
+  const host = createHost();
+  const store = createFirstJobGateStore();
+  requestDegapTelseekerJob(host, store, {
+    chrName: "Chr01",
+    segmentId: "left",
+    endpointSide: "left",
+  }, { rerender() {} });
+  bindDegapCard(host, store, { rerender() {}, persistDegapProjectState() {} });
+
+  host.listeners.click({
+    target: {
+      closest(selector) {
+        return selector === "[data-degap-settings-close]" ? {} : null;
+      },
+    },
+  });
+
+  const degap = store.getState().assembly.degap;
+  assert.equal(degap.panelOpen, false);
+  assert.equal(degap.pendingJobIntent, null);
+  assert.equal(degap.jobs.length, 0);
+});
+
+test("manual per-chromosome job-card collapse persists and survives later additions", () => {
+  const host = createHost();
+  const store = createFirstJobGateStore({
+    degapPath: "/opt/DEGAP/bin/DEGAP.py",
+    hifiReads: ["/reads/a.fq.gz"],
+    gpmServerPath: "/srv/gpm_server",
+    outRoot: "/srv/degap",
+  });
+  const persists = [];
+  const deps = {
+    rerender() {},
+    persistDegapProjectState() {
+      persists.push([...store.getState().assembly.degap.collapsedJobCardChrNames]);
+    },
+  };
+  requestDegapGapJob(host, store, {
+    chrName: "Chr01",
+    gapSegmentId: "gap",
+    side: "left",
+  }, deps);
+  bindDegapCard(host, store, deps);
+  host.listeners.click({
+    target: {
+      closest(selector) {
+        return selector === "[data-degap-job-card-toggle]"
+          ? { dataset: { degapJobCardChrName: "Chr01" } }
+          : null;
+      },
+    },
+  });
+  requestDegapGapJob(host, store, {
+    chrName: "Chr01",
+    gapSegmentId: "gap",
+    side: "right",
+  }, deps);
+
+  assert.deepEqual(store.getState().assembly.degap.collapsedJobCardChrNames, ["Chr01"]);
+  assert.equal(store.getState().assembly.degap.jobs.length, 2);
+  assert.ok(persists.length >= 3);
 });

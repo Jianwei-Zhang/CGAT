@@ -585,6 +585,8 @@ export async function loadAssemblyView(host, store, options, deps) {
           ...store.getState().assembly.degap,
           jobs: persistedDegapProjectState.jobs,
           settingsPanelDismissed: persistedDegapProjectState.settingsPanelDismissed,
+          collapsedJobCardChrNames: persistedDegapProjectState.collapsedJobCardChrNames,
+          pendingJobIntent: null,
         },
         membersCardCollapsed: persistedMembersCardCollapsed,
         hiddenPrimaryCtgIds: persistedHiddenPrimaryCtgIds,

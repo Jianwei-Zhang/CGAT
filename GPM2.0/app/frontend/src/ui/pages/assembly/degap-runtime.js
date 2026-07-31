@@ -11,6 +11,7 @@ import {
   normalizeDegapRuntimeState,
   normalizeDegapSettings,
   readDegapSoftwareSettings,
+  resolveDegapTerminalCtgSides,
   resolveDegapExportSettings,
   validateDegapSettings,
   writeDegapSoftwareSettings,
@@ -26,7 +27,6 @@ import {
 import { tAssembly } from "./i18n.js";
 
 const DEGAP_CARD_BOUND = Symbol("degapCardBound");
-const DEGAP_CLOSE_DELAY_MS = 400;
 const DEGAP_TOAST_DISMISS_MS = 800;
 
 function normalizeString(value) {
@@ -54,7 +54,7 @@ function getDegapState(store) {
 
 function getDegapToastSignature(degap) {
   const runtime = normalizeDegapRuntimeState(degap);
-  if (runtime.panelOpen || !runtime.settingsPanelDismissed) {
+  if (runtime.panelOpen) {
     return "";
   }
   return runtime.error ? `error:${runtime.error}` : runtime.feedback ? `feedback:${runtime.feedback}` : "";
@@ -108,9 +108,13 @@ function getConfirm(deps = {}) {
   return (message) => globalThis.window?.confirm?.(message) ?? false;
 }
 
-function scrollDegapJobsToBottom(host) {
+function scrollDegapJobsToBottom(host, chrName = "") {
   const doc = host?.ownerDocument || globalThis.document;
-  const scrollTarget = host?.querySelector?.("[data-degap-jobs-panel]")
+  const normalizedChrName = normalizeString(chrName);
+  const matchingJobCard = Array.from(host?.querySelectorAll?.("[data-degap-job-card]") || [])
+    .find((node) => normalizeString(node?.dataset?.degapJobCardChrName) === normalizedChrName);
+  const scrollTarget = matchingJobCard
+    || host?.querySelector?.("[data-degap-jobs-panel]")
     || host?.querySelector?.("[data-degap-panel]")
     || host;
   const scrollContainers = [
@@ -172,7 +176,7 @@ function areWorkspaceSettingsEqual(left, right) {
 export async function ensureDegapWorkspaceSettingsLoaded(host, store, deps = {}) {
   const state = store.getState();
   const workspaceRoot = normalizeString(state?.session?.workspacePath);
-  if (!workspaceRoot || !host?.querySelector?.("[data-degap-panel]")) {
+  if (!workspaceRoot || !host?.querySelector?.("[data-degap-runtime]")) {
     return;
   }
   const degap = getDegapState(store);
@@ -214,7 +218,9 @@ async function saveGlobalSettings(host, store, deps = {}) {
     return;
   }
   const state = store.getState();
-  const previousSettings = getDegapState(store).settings;
+  const currentDegap = getDegapState(store);
+  const previousSettings = currentDegap.settings;
+  const pendingJobIntent = currentDegap.pendingJobIntent;
   const settings = collectSettings(panel, "data-degap-setting-field");
   const validation = validateDegapSettings(settings, { stateOrLocale: state });
   if (validation) {
@@ -237,6 +243,9 @@ async function saveGlobalSettings(host, store, deps = {}) {
       feedback: tAssembly(state, "degap.saveSuccess"),
       error: "",
     }, deps, { persist: true });
+    if (pendingJobIntent) {
+      createDegapJobFromIntent(host, store, pendingJobIntent, deps);
+    }
   } catch (error) {
     updateDegapState(host, store, {
       error: String(error?.message || error || ""),
@@ -249,101 +258,17 @@ function closeGlobalSettings(host, store, deps = {}) {
   updateDegapState(host, store, {
     panelOpen: false,
     settingsPanelDismissed: true,
+    pendingJobIntent: null,
     error: "",
   }, deps, { persist: true });
 }
 
-function openGlobalSettings(host, store, deps = {}) {
+export function openDegapSettings(host, store, deps = {}) {
   updateDegapState(host, store, {
     panelOpen: true,
+    pendingJobIntent: null,
     error: "",
   }, deps);
-}
-
-function closeMenu(host, store, deps = {}) {
-  const degap = getDegapState(store);
-  if (!degap.menu) {
-    return;
-  }
-  updateDegapState(host, store, { menu: null }, deps);
-}
-
-function openGapMenu(host, store, event, deps = {}) {
-  const gapNode = event.target?.closest?.("[data-final-path-segment-type='gap']");
-  if (!gapNode || !gapNode.closest?.("[data-degap-panel]")) {
-    return false;
-  }
-  event.preventDefault();
-  const graphRoot = gapNode.closest?.("[data-degap-graph]") || gapNode.closest?.("[data-degap-panel]");
-  const rect = graphRoot?.getBoundingClientRect?.() || { left: 0, top: 0 };
-  updateDegapState(host, store, {
-    menu: {
-      gapSegmentId: normalizeString(gapNode.dataset.finalPathSegmentId),
-      chrName: normalizeString(gapNode.dataset.finalPathTargetChrName)
-        || normalizeString(gapNode.closest?.("[data-final-path-target-chr-name]")?.dataset?.finalPathTargetChrName),
-      x: Number(event.clientX || 0) - Number(rect.left || 0),
-      y: Number(event.clientY || 0) - Number(rect.top || 0),
-    },
-    error: "",
-  }, deps);
-  return true;
-}
-
-function isDegapEndpointCtgSegment(segment) {
-  return normalizeString(segment?.type).toLowerCase() !== "gap" && Number(segment?.assemblyCtgId || 0) > 0;
-}
-
-function resolveTerminalCtgSides(finalPathEntry, segmentId) {
-  const normalizedSegmentId = normalizeString(segmentId);
-  if (!normalizedSegmentId) {
-    return [];
-  }
-  const segments = Array.isArray(finalPathEntry?.segments) ? finalPathEntry.segments : [];
-  const left = segments.find((segment) => isDegapEndpointCtgSegment(segment));
-  const right = segments.slice().reverse().find((segment) => isDegapEndpointCtgSegment(segment));
-  const sides = [];
-  if (normalizeString(left?.segmentId) === normalizedSegmentId) {
-    sides.push("left");
-  }
-  if (normalizeString(right?.segmentId) === normalizedSegmentId && normalizeString(right?.segmentId) !== normalizeString(left?.segmentId)) {
-    sides.push("right");
-  } else if (
-    normalizeString(right?.segmentId) === normalizedSegmentId
-    && normalizeString(right?.segmentId) === normalizeString(left?.segmentId)
-  ) {
-    sides.push("right");
-  }
-  return sides;
-}
-
-function openCtgEndMenu(host, store, event, deps = {}) {
-  const ctgNode = event.target?.closest?.("[data-final-path-segment-type='ctg']");
-  if (!ctgNode || !ctgNode.closest?.("[data-degap-panel]")) {
-    return false;
-  }
-  const state = store.getState();
-  const chrName = normalizeString(ctgNode.dataset.finalPathTargetChrName)
-    || normalizeString(ctgNode.closest?.("[data-final-path-target-chr-name]")?.dataset?.finalPathTargetChrName);
-  const finalPathEntry = resolveDegapMenuFinalPathEntry(state.assembly, { chrName });
-  const endpointSides = resolveTerminalCtgSides(finalPathEntry, ctgNode.dataset.finalPathSegmentId);
-  if (!endpointSides.length) {
-    return false;
-  }
-  event.preventDefault();
-  const graphRoot = ctgNode.closest?.("[data-degap-graph]") || ctgNode.closest?.("[data-degap-panel]");
-  const rect = graphRoot?.getBoundingClientRect?.() || { left: 0, top: 0 };
-  updateDegapState(host, store, {
-    menu: {
-      type: "ctg-end",
-      chrName,
-      segmentId: normalizeString(ctgNode.dataset.finalPathSegmentId),
-      endpointSides,
-      x: Number(event.clientX || 0) - Number(rect.left || 0),
-      y: Number(event.clientY || 0) - Number(rect.top || 0),
-    },
-    error: "",
-  }, deps);
-  return true;
 }
 
 function resolveDegapMenuFinalPathEntry(assembly, menu) {
@@ -357,82 +282,101 @@ function resolveDegapMenuFinalPathEntry(assembly, menu) {
   return getCurrentChrFinalPath(assembly);
 }
 
-function addJobsForGap(host, store, action, deps = {}) {
+function createDegapJobFromIntent(host, store, intent, deps = {}) {
   const state = store.getState();
   const degap = getDegapState(store);
-  const finalPathEntry = resolveDegapMenuFinalPathEntry(state.assembly, degap.menu);
-  const sides = action === "all" ? ["left", "right"] : [action === "right" ? "right" : "left"];
+  const finalPathEntry = resolveDegapMenuFinalPathEntry(state.assembly, intent);
   try {
-    const nextJobs = buildDegapJobsForGap({
-      finalPathEntry,
-      gapSegmentId: degap.menu?.gapSegmentId || "",
-      sides,
-      settings: degap.settings,
-      stateOrLocale: state,
-    });
+    if (
+      intent?.kind === "telseeker"
+      && !resolveDegapTerminalCtgSides(finalPathEntry, intent.segmentId).includes(intent.endpointSide)
+    ) {
+      throw new Error(tAssembly(state, "degap.missingEndpointCtg"));
+    }
+    const nextJobs = intent?.kind === "telseeker"
+      ? buildTelseekerCtgJobsForFinalPath({
+        finalPathEntry,
+        ends: [intent.endpointSide],
+        settings: degap.settings,
+        stateOrLocale: state,
+      })
+      : buildDegapJobsForGap({
+        finalPathEntry,
+        gapSegmentId: intent?.gapSegmentId || "",
+        sides: [intent?.side === "right" ? "right" : "left"],
+        settings: degap.settings,
+        stateOrLocale: state,
+      });
     const duplicateJobs = findDuplicateDegapJobs(degap.jobs, nextJobs);
     if (duplicateJobs.length) {
       const duplicateLabels = duplicateJobs.map((job) => job.label || job.jobId).join(", ");
       updateDegapState(host, store, {
         menu: null,
+        pendingJobIntent: null,
         feedback: "",
         error: tAssembly(state, "degap.duplicateJob", { label: duplicateLabels }),
       }, deps, { persist: true });
-      return;
+      return false;
     }
+    const chrName = normalizeString(finalPathEntry?.chrName || intent?.chrName);
+    const hadJobsForChr = degap.jobs.some((job) => normalizeString(job.chrName) === chrName);
+    const collapsedJobCardChrNames = hadJobsForChr
+      ? degap.collapsedJobCardChrNames
+      : degap.collapsedJobCardChrNames.filter((item) => item !== chrName);
     updateDegapState(host, store, {
       jobs: mergeDegapJobs(degap.jobs, nextJobs),
       menu: null,
-      feedback: "",
+      pendingJobIntent: null,
+      collapsedJobCardChrNames,
+      feedback: tAssembly(state, "degap.jobAdded", { label: nextJobs[0]?.label || "" }),
       error: "",
     }, deps, { persist: true });
-    scrollDegapJobsToBottom(host);
+    scrollDegapJobsToBottom(host, chrName);
+    return true;
   } catch (error) {
     updateDegapState(host, store, {
       menu: null,
+      pendingJobIntent: null,
       feedback: "",
       error: String(error?.message || error || ""),
     }, deps);
+    return false;
   }
 }
 
-function addTelseekerJobsForPathEnds(host, store, action, deps = {}) {
+function requestDegapJobIntent(host, store, intent, deps = {}) {
   const state = store.getState();
   const degap = getDegapState(store);
-  const finalPathEntry = resolveDegapMenuFinalPathEntry(state.assembly, degap.menu);
-  const entries = finalPathEntry ? [finalPathEntry] : [];
-  const ends = action === "all" ? ["left", "right"] : [action === "right" ? "right" : "left"];
-  try {
-    const nextJobs = entries.flatMap((finalPathEntry) => buildTelseekerCtgJobsForFinalPath({
-      finalPathEntry,
-      ends,
-      settings: degap.settings,
-      stateOrLocale: state,
-    }));
-    const duplicateJobs = findDuplicateDegapJobs(degap.jobs, nextJobs);
-    if (duplicateJobs.length) {
-      const duplicateLabels = duplicateJobs.map((job) => job.label || job.jobId).join(", ");
-      updateDegapState(host, store, {
-        menu: null,
-        feedback: "",
-        error: tAssembly(state, "degap.duplicateJob", { label: duplicateLabels }),
-      }, deps, { persist: true });
-      return;
-    }
-    updateDegapState(host, store, {
-      jobs: mergeDegapJobs(degap.jobs, nextJobs),
-      menu: null,
-      feedback: "",
-      error: "",
-    }, deps, { persist: true });
-    scrollDegapJobsToBottom(host);
-  } catch (error) {
+  const validation = validateDegapSettings(degap.settings, { stateOrLocale: state });
+  if (validation) {
     updateDegapState(host, store, {
       menu: null,
+      pendingJobIntent: intent,
+      panelOpen: true,
       feedback: "",
-      error: String(error?.message || error || ""),
+      error: validation,
     }, deps);
+    return false;
   }
+  return createDegapJobFromIntent(host, store, intent, deps);
+}
+
+export function requestDegapGapJob(host, store, payload, deps = {}) {
+  return requestDegapJobIntent(host, store, {
+    kind: "gapfiller",
+    chrName: normalizeString(payload?.chrName),
+    gapSegmentId: normalizeString(payload?.gapSegmentId),
+    side: normalizeString(payload?.side).toLowerCase() === "right" ? "right" : "left",
+  }, deps);
+}
+
+export function requestDegapTelseekerJob(host, store, payload, deps = {}) {
+  return requestDegapJobIntent(host, store, {
+    kind: "telseeker",
+    chrName: normalizeString(payload?.chrName),
+    segmentId: normalizeString(payload?.segmentId),
+    endpointSide: normalizeString(payload?.endpointSide).toLowerCase() === "right" ? "right" : "left",
+  }, deps);
 }
 
 async function removeJob(host, store, jobKey, deps = {}) {
@@ -447,12 +391,34 @@ async function removeJob(host, store, jobKey, deps = {}) {
   if (!(await confirm(tAssembly(state, "degap.confirmRemoveJob", { label: job.label || job.jobId }), { host, store }))) {
     return;
   }
+  const nextJobs = degap.jobs.filter((item) => buildDegapJobKey(item) !== resolvedJobKey);
+  const chrName = normalizeString(job.chrName);
+  const hasJobsForChr = nextJobs.some((item) => normalizeString(item.chrName) === chrName);
   updateDegapState(host, store, {
-    jobs: degap.jobs.filter((job) => buildDegapJobKey(job) !== resolvedJobKey),
+    jobs: nextJobs,
+    collapsedJobCardChrNames: hasJobsForChr
+      ? degap.collapsedJobCardChrNames
+      : degap.collapsedJobCardChrNames.filter((item) => item !== chrName),
     expandedJobId: degap.expandedJobId === resolvedJobKey || degap.expandedJobId === job.jobId
       ? ""
       : degap.expandedJobId,
     feedback: tAssembly(state, "degap.jobRemoved"),
+    error: "",
+  }, deps, { persist: true });
+}
+
+function toggleJobCard(host, store, chrName, deps = {}) {
+  const normalizedChrName = normalizeString(chrName);
+  if (!normalizedChrName) {
+    return;
+  }
+  const degap = getDegapState(store);
+  const collapsed = degap.collapsedJobCardChrNames.includes(normalizedChrName);
+  const collapsedJobCardChrNames = collapsed
+    ? degap.collapsedJobCardChrNames.filter((item) => item !== normalizedChrName)
+    : [...degap.collapsedJobCardChrNames, normalizedChrName];
+  updateDegapState(host, store, {
+    collapsedJobCardChrNames,
     error: "",
   }, deps, { persist: true });
 }
@@ -521,103 +487,15 @@ function resetJob(host, store, jobKey, deps = {}) {
   }, deps, { persist: true });
 }
 
-function updateScale(host, store, node, deps = {}) {
-  const field = normalizeString(node?.dataset?.degapScaleField);
-  if (!field) {
-    return;
-  }
-  const degap = getDegapState(store);
-  updateDegapState(host, store, {
-    trackView: {
-      ...degap.trackView,
-      [field]: Number(node.value || 0),
-    },
-  }, deps);
-}
-
-function scheduleClose(host, key, callback) {
-  clearTimeout(host[key]);
-  host[key] = setTimeout(callback, DEGAP_CLOSE_DELAY_MS);
-}
-
-function cancelClose(host, key) {
-  clearTimeout(host[key]);
-  host[key] = null;
-}
-
-function setDegapScaleComboOpenState(comboNode, isOpen) {
-  if (!comboNode) {
-    return;
-  }
-  const input = comboNode.querySelector?.(".assembly-track-combo-input");
-  const toggle = comboNode.querySelector?.("[data-track-combo-toggle]");
-  const menu = comboNode.querySelector?.(".assembly-track-combo-menu");
-  comboNode.classList.toggle("is-open", isOpen);
-  input?.setAttribute("aria-expanded", isOpen ? "true" : "false");
-  toggle?.setAttribute("aria-expanded", isOpen ? "true" : "false");
-  menu?.classList.toggle("is-hidden", !isOpen);
-}
-
-function closeDegapScaleCombos(host, keepNode = null) {
-  host.querySelectorAll?.("[data-degap-scale-combo-field]")?.forEach((comboNode) => {
-    if (keepNode && comboNode === keepNode) {
-      return;
-    }
-    setDegapScaleComboOpenState(comboNode, false);
-  });
-}
-
-function syncDegapScaleComboSelection(comboNode, selectedValue) {
-  comboNode?.querySelectorAll?.("[data-track-combo-option]")?.forEach((optionNode) => {
-    const active = Number(optionNode.dataset.trackComboValue || 0) === Number(selectedValue);
-    optionNode.classList.toggle("is-active", active);
-    optionNode.setAttribute("aria-selected", active ? "true" : "false");
-  });
-}
-
 export function bindDegapCard(host, store, deps = {}) {
   void ensureDegapWorkspaceSettingsLoaded(host, store, deps);
   if (typeof host?.addEventListener !== "function" || host[DEGAP_CARD_BOUND]) {
     return;
   }
-  host.addEventListener("contextmenu", (event) => {
-    if (openGapMenu(host, store, event, deps)) {
-      return;
-    }
-    openCtgEndMenu(host, store, event, deps);
-  });
   host.addEventListener("click", (event) => {
-    const scaleCombo = event.target?.closest?.("[data-degap-scale-combo-field]");
-    const scaleToggle = event.target?.closest?.("[data-degap-scale-combo-field] [data-track-combo-toggle]");
-    if (scaleToggle) {
-      event.preventDefault();
-      const comboNode = scaleToggle.closest("[data-degap-scale-combo-field]");
-      const isOpen = comboNode?.classList.contains("is-open");
-      closeDegapScaleCombos(host, isOpen ? null : comboNode);
-      setDegapScaleComboOpenState(comboNode, !isOpen);
-      comboNode?.querySelector?.(".assembly-track-combo-input")?.focus?.();
-      return;
-    }
-    const scaleOption = event.target?.closest?.("[data-degap-scale-combo-field] [data-track-combo-option]");
-    if (scaleOption) {
-      event.preventDefault();
-      const comboNode = scaleOption.closest("[data-degap-scale-combo-field]");
-      const input = comboNode?.querySelector?.("[data-degap-scale-field]");
-      if (input) {
-        input.value = scaleOption.dataset.trackComboValue || "";
-        updateScale(host, store, input, deps);
-        syncDegapScaleComboSelection(comboNode, input.value);
-      }
-      setDegapScaleComboOpenState(comboNode, false);
-      input?.focus?.();
-      return;
-    }
-    if (!scaleCombo) {
-      closeDegapScaleCombos(host);
-    }
     const settingsOpen = event.target?.closest?.("[data-degap-settings-open]");
     if (settingsOpen) {
-      openGlobalSettings(host, store, deps);
+      openDegapSettings(host, store, deps);
       return;
     }
     if (event.target?.closest?.("[data-degap-settings-close]")) {
@@ -628,19 +506,9 @@ export function bindDegapCard(host, store, deps = {}) {
       void saveGlobalSettings(host, store, deps);
       return;
     }
-    const gapAction = event.target?.closest?.("[data-degap-gap-action]");
-    if (gapAction) {
-      addJobsForGap(host, store, normalizeString(gapAction.dataset.degapGapAction), deps);
-      return;
-    }
-    const telseekerAction = event.target?.closest?.("[data-degap-telseeker-action]");
-    if (telseekerAction) {
-      addTelseekerJobsForPathEnds(
-        host,
-        store,
-        normalizeString(telseekerAction.dataset.degapTelseekerAction),
-        deps,
-      );
+    const cardToggle = event.target?.closest?.("[data-degap-job-card-toggle]");
+    if (cardToggle) {
+      toggleJobCard(host, store, normalizeString(cardToggle.dataset.degapJobCardChrName), deps);
       return;
     }
     const remove = event.target?.closest?.("[data-degap-job-remove]");
@@ -661,24 +529,6 @@ export function bindDegapCard(host, store, deps = {}) {
     const reset = event.target?.closest?.("[data-degap-job-reset]");
     if (reset) {
       resetJob(host, store, resolveDegapJobKeyFromNode(reset), deps);
-    }
-  });
-  host.addEventListener("change", (event) => {
-    const scale = event.target?.closest?.("[data-degap-scale-field]");
-    if (scale) {
-      updateScale(host, store, scale, deps);
-      syncDegapScaleComboSelection(scale.closest?.("[data-degap-scale-combo-field]"), scale.value);
-    }
-  });
-  host.addEventListener("pointerover", (event) => {
-    if (event.target?.closest?.("[data-degap-gap-menu]")) {
-      cancelClose(host, "__degapMenuCloseTimer");
-    }
-  });
-  host.addEventListener("pointerout", (event) => {
-    const menu = event.target?.closest?.("[data-degap-gap-menu]");
-    if (menu && !menu.contains(event.relatedTarget)) {
-      scheduleClose(host, "__degapMenuCloseTimer", () => closeMenu(host, store, deps));
     }
   });
   host[DEGAP_CARD_BOUND] = true;

@@ -46,6 +46,7 @@ test("loadProjectAssemblyViewState normalizes segment-based finalPathByChr, fina
           finalPathViewMode: "degap",
           degapProjectState: {
             settingsPanelDismissed: true,
+            collapsedJobCardChrNames: ["Chr01", "Chr01", "Chr02"],
             jobs: [{
               jobId: "CtgA_vs_CtgB_Left-job",
               left: { assemblyCtgId: 9, start: 1200, end: 1 },
@@ -101,7 +102,7 @@ test("loadProjectAssemblyViewState normalizes segment-based finalPathByChr, fina
       updatedAt: "1",
     },
   });
-  assert.equal(result.finalPathViewMode, "degap");
+  assert.equal(result.finalPathViewMode, "graph");
   assert.deepEqual(result.supportDsCtgLenRulesByChr, {
     Chr01: [{ startBp: 1, endBp: 5000000, supportDsCtgLen: 100000 }],
   });
@@ -112,6 +113,7 @@ test("loadProjectAssemblyViewState normalizes segment-based finalPathByChr, fina
     scrollLeft: 320,
   });
   assert.equal(result.degapProjectState.settingsPanelDismissed, true);
+  assert.deepEqual(result.degapProjectState.collapsedJobCardChrNames, ["Chr01", "Chr02"]);
   assert.equal(result.degapProjectState.jobs[0].jobId, "CtgA_vs_CtgB_Left-job");
   assert.deepEqual(result.subviewAnchorStateByKey, {
     "2-contig|chr:Chr01|a|b": {
@@ -165,6 +167,7 @@ test("persistProjectAssemblyViewState sends and returns normalized segment-based
       finalPathViewMode: "table",
       degapProjectState: {
         settingsPanelDismissed: true,
+        collapsedJobCardChrNames: ["Chr01"],
         jobs: [{
           jobId: "CtgA_vs_CtgB_Right-job",
           left: { assemblyCtgId: 9, start: 1, end: 1200 },
@@ -259,6 +262,8 @@ test("persistProjectAssemblyViewState sends and returns normalized segment-based
     scrollLeft: 320,
   });
   assert.equal(sent[0].degapProjectState.settingsPanelDismissed, true);
+  assert.deepEqual(sent[0].degapProjectState.collapsedJobCardChrNames, ["Chr01"]);
+  assert.deepEqual(result.degapProjectState.collapsedJobCardChrNames, ["Chr01"]);
   assert.equal(result.degapProjectState.jobs[0].jobId, "CtgA_vs_CtgB_Right-job");
 });
 

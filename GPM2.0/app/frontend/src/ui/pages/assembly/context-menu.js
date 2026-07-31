@@ -15,6 +15,8 @@ import {
   normalizeSubviewTrackSource,
   resolveFilteredSubviewTrackPairSelectionsFromAssembly,
 } from "./subview-state.js";
+import { resolveDegapTerminalCtgSides } from "./degap-state.js";
+import { getCurrentChrFinalPath } from "./final-path-state.js";
 import { getAssemblyI18n, tAssembly } from "./i18n.js";
 
 const REQUIRED_ACTION_NAMES = [
@@ -33,6 +35,9 @@ const REQUIRED_ACTION_NAMES = [
   "addFinalPathGapRelativeToSegment",
   "deleteFinalPathSegment",
   "flipFinalPathSegment",
+  "openDegapSettings",
+  "requestDegapGapJob",
+  "requestDegapTelseekerJob",
   "toggleSupportTrackCtgMirror",
   "togglePrimaryTrackCtgHidden",
   "toggleSubviewAnchorEdge",
@@ -436,6 +441,9 @@ export function buildAssemblyContextMenuItems({
     addFinalPathGapRelativeToSegment,
     deleteFinalPathSegment,
     flipFinalPathSegment,
+    openDegapSettings,
+    requestDegapGapJob,
+    requestDegapTelseekerJob,
     toggleSupportTrackCtgMirror,
     togglePrimaryTrackCtgHidden,
     toggleSubviewAnchorEdge,
@@ -694,12 +702,49 @@ export function buildAssemblyContextMenuItems({
       return items;
     }
     const targetArgs = targetChrName ? { targetChrName } : {};
+    const finalPathEntry = targetChrName
+      ? state.assembly.finalPathByChr?.[targetChrName] || null
+      : getCurrentChrFinalPath(state.assembly);
+    const settingsItem = {
+      label: i18n.contextMenu.degapSettings,
+      run: async () => {
+        await openDegapSettings(host, store);
+      },
+    };
     items.push({
       label: i18n.contextMenu.finalPathDeleteSegment,
       run: async () => {
         await deleteFinalPathSegment(host, store, { segmentId, ...targetArgs });
       },
     });
+    if (segmentType === "gap") {
+      items.push({
+        label: i18n.contextMenu.degap,
+        children: [
+          {
+            label: i18n.contextMenu.degapGapfillerLeft,
+            run: async () => {
+              await requestDegapGapJob(host, store, {
+                chrName: targetChrName || finalPathEntry?.chrName || "",
+                gapSegmentId: segmentId,
+                side: "left",
+              });
+            },
+          },
+          {
+            label: i18n.contextMenu.degapGapfillerRight,
+            run: async () => {
+              await requestDegapGapJob(host, store, {
+                chrName: targetChrName || finalPathEntry?.chrName || "",
+                gapSegmentId: segmentId,
+                side: "right",
+              });
+            },
+          },
+          settingsItem,
+        ],
+      });
+    }
     if (segmentType === "ctg") {
       items.push({
         label: i18n.contextMenu.finalPathFlipSegment,
@@ -741,6 +786,36 @@ export function buildAssemblyContextMenuItems({
           },
         ],
       });
+      const endpointSides = resolveDegapTerminalCtgSides(finalPathEntry, segmentId);
+      if (endpointSides.length) {
+        const telseekerItems = endpointSides.length > 1
+          ? endpointSides.map((endpointSide) => ({
+            label: endpointSide === "right"
+              ? i18n.contextMenu.degapTelseekerRight
+              : i18n.contextMenu.degapTelseekerLeft,
+            run: async () => {
+              await requestDegapTelseekerJob(host, store, {
+                chrName: targetChrName || finalPathEntry?.chrName || "",
+                segmentId,
+                endpointSide,
+              });
+            },
+          }))
+          : [{
+            label: i18n.contextMenu.degapTelseeker,
+            run: async () => {
+              await requestDegapTelseekerJob(host, store, {
+                chrName: targetChrName || finalPathEntry?.chrName || "",
+                segmentId,
+                endpointSide: endpointSides[0],
+              });
+            },
+          }];
+        items.push({
+          label: i18n.contextMenu.degap,
+          children: [...telseekerItems, settingsItem],
+        });
+      }
     }
     return items;
   }

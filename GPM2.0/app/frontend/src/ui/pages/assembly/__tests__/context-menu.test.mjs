@@ -62,6 +62,9 @@ function createContextMenuActionsCapture(calls = []) {
     addFinalPathGapRelativeToSegment: capture("addFinalPathGapRelativeToSegment"),
     deleteFinalPathSegment: capture("deleteFinalPathSegment"),
     flipFinalPathSegment: capture("flipFinalPathSegment"),
+    openDegapSettings: capture("openDegapSettings"),
+    requestDegapGapJob: capture("requestDegapGapJob"),
+    requestDegapTelseekerJob: capture("requestDegapTelseekerJob"),
     toggleSupportTrackCtgMirror: capture("toggleSupportTrackCtgMirror"),
     togglePrimaryTrackCtgHidden: capture("togglePrimaryTrackCtgHidden"),
     toggleSubviewAnchorEdge: capture("toggleSubviewAnchorEdge"),
@@ -1152,10 +1155,23 @@ test("buildAssemblyContextMenuItems exposes final-path graph ctg actions", async
   });
 });
 
-test("buildAssemblyContextMenuItems exposes delete only for final-path graph gaps", async () => {
+test("buildAssemblyContextMenuItems exposes precise GapFiller actions and settings for graph gaps", async () => {
   const calls = [];
   const host = {};
-  const store = createStore();
+  const store = createStore({
+    selectedChrName: "Chr01",
+    finalPathByChr: {
+      Chr01: {
+        mode: "segments",
+        chrName: "Chr01",
+        segments: [
+          { segmentId: "seg-1", type: "ctg", assemblyCtgId: 2, ctgName: "left", overallLen: 100, start: 1, end: 100 },
+          { segmentId: "seg-2", type: "gap", gapSizeBp: 100 },
+          { segmentId: "seg-3", type: "ctg", assemblyCtgId: 8, ctgName: "right", overallLen: 100, start: 1, end: 100 },
+        ],
+      },
+    },
+  });
 
   const items = buildAssemblyContextMenuItems({
     ctgContext: null,
@@ -1172,11 +1188,120 @@ test("buildAssemblyContextMenuItems exposes delete only for final-path graph gap
     actions: createContextMenuActionsCapture(calls),
   });
 
-  assert.deepEqual(items.map((item) => item.label), ["删除"]);
+  assert.deepEqual(items.map((item) => item.label), ["删除", "DEGAP"]);
+  assert.deepEqual(items[1].children.map((item) => item.label), [
+    "GapFiller Left",
+    "GapFiller Right",
+    "设置",
+  ]);
   await items[0].run();
   assert.deepEqual(calls.at(-1), {
     name: "deleteFinalPathSegment",
     args: [host, store, { segmentId: "seg-2" }],
+  });
+  await items[1].children[1].run();
+  assert.deepEqual(calls.at(-1), {
+    name: "requestDegapGapJob",
+    args: [host, store, {
+      chrName: "Chr01",
+      gapSegmentId: "seg-2",
+      side: "right",
+    }],
+  });
+  await items[1].children[2].run();
+  assert.deepEqual(calls.at(-1), {
+    name: "openDegapSettings",
+    args: [host, store],
+  });
+});
+
+test("buildAssemblyContextMenuItems exposes TelSeeker only for terminal contigs", async () => {
+  const calls = [];
+  const host = {};
+  const store = createStore({
+    selectedChrName: "Chr01",
+    finalPathByChr: {
+      Chr01: {
+        mode: "segments",
+        chrName: "Chr01",
+        segments: [
+          { segmentId: "left", type: "ctg", assemblyCtgId: 2, ctgName: "left", overallLen: 100, start: 1, end: 100 },
+          { segmentId: "gap-1", type: "gap", gapSizeBp: 100 },
+          { segmentId: "middle", type: "ctg", assemblyCtgId: 8, ctgName: "middle", overallLen: 100, start: 1, end: 100 },
+          { segmentId: "gap-2", type: "gap", gapSizeBp: 100 },
+          { segmentId: "right", type: "ctg", assemblyCtgId: 9, ctgName: "right", overallLen: 100, start: 1, end: 100 },
+        ],
+      },
+    },
+  });
+  const buildItems = (segmentId) => buildAssemblyContextMenuItems({
+    ctgContext: null,
+    trackLabelContext: null,
+    subviewTrackPairContext: null,
+    deletedCtgContext: null,
+    finalPathSegmentContext: { segmentId, segmentType: "ctg" },
+    memberNode: null,
+    store,
+    host,
+    actions: createContextMenuActionsCapture(calls),
+  });
+
+  const leftItems = buildItems("left");
+  assert.deepEqual(leftItems.map((item) => item.label), ["删除", "翻转", "Add Gap", "Add Ctg", "DEGAP"]);
+  assert.deepEqual(leftItems.at(-1).children.map((item) => item.label), ["TelSeeker", "设置"]);
+  await leftItems.at(-1).children[0].run();
+  assert.deepEqual(calls.at(-1), {
+    name: "requestDegapTelseekerJob",
+    args: [host, store, {
+      chrName: "Chr01",
+      segmentId: "left",
+      endpointSide: "left",
+    }],
+  });
+
+  assert.doesNotMatch(buildItems("middle").map((item) => item.label).join("|"), /DEGAP/);
+});
+
+test("buildAssemblyContextMenuItems lets a single-contig path choose the TelSeeker end", async () => {
+  const calls = [];
+  const host = {};
+  const store = createStore({
+    selectedChrName: "Chr01",
+    finalPathByChr: {
+      Chr01: {
+        mode: "segments",
+        chrName: "Chr01",
+        segments: [{ segmentId: "only", type: "ctg", assemblyCtgId: 2, ctgName: "only", overallLen: 100, start: 1, end: 100 }],
+      },
+    },
+  });
+  const items = buildAssemblyContextMenuItems({
+    ctgContext: null,
+    trackLabelContext: null,
+    subviewTrackPairContext: null,
+    deletedCtgContext: null,
+    finalPathSegmentContext: { segmentId: "only", segmentType: "ctg" },
+    memberNode: null,
+    store,
+    host,
+    actions: createContextMenuActionsCapture(calls),
+  });
+  const degapItem = items.at(-1);
+
+  assert.equal(degapItem.label, "DEGAP");
+  assert.deepEqual(degapItem.children.map((item) => item.label), [
+    "TelSeeker Left",
+    "TelSeeker Right",
+    "设置",
+  ]);
+  await degapItem.children[1].run();
+  assert.deepEqual(calls.at(-1), {
+    name: "requestDegapTelseekerJob",
+    args: [host, store, {
+      chrName: "Chr01",
+      segmentId: "only",
+      endpointSide: "right",
+    }],
   });
 });
 
