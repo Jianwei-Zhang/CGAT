@@ -1,12 +1,12 @@
-# GPM Next
+# GPM2.0
 
 **English** | [中文](README_zh.md)
 
-GPM Next is a visual assembly tool anchored to a reference genome and designed to integrate the strengths of multiple de novo assembly approaches. It brings outputs from different assembly tools into one unified workflow for import, inspection, and lightweight editing.
+GPM2.0 is a visual assembly tool anchored to a reference genome and designed to integrate the strengths of multiple de novo assembly approaches. It brings outputs from different assembly tools into one unified workflow for import, inspection, and lightweight editing.
 
 ## Architecture
 
-GPM Next uses a split architecture between the server side and the client side:
+GPM2.0 uses a split architecture between the server side and the client side:
 
 - The server side runs alignment commands and generates the delivery zip package in a Linux environment. Upload the `server/` directory to the server before running the workflow.
 - The client side imports the server-generated delivery package and provides visualization and lightweight editing. Users can download the platform-specific installer from GitHub Releases; currently supported builds are `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64`.
@@ -116,7 +116,7 @@ By default this writes `gpm_server/add_ds4_name.zip`. To choose a different outp
 bash ./gpm_server/add_dataset.sh --ds ds4_name /path/to/ds4.fa -o /path/to/add_ds4_name.zip
 ```
 
-The generated `add_ds4_name.zip` is an add package, not a full delivery bundle. Use it only with an existing desktop workspace/project: open the existing workspace in GPM Next, choose the add-package action on the target project row, and select the zip.
+The generated `add_ds4_name.zip` is an add package, not a full delivery bundle. Use it only with an existing desktop workspace/project: open the existing workspace in GPM2.0, choose the add-package action on the target project row, and select the zip.
 
 Because the script also merges the new dataset into the server-side `gpm_server/` directory, run the full packager again when you need a fresh full import bundle that already includes the new dataset. Use that full delivery bundle for new desktop workspaces or full re-imports:
 
@@ -148,13 +148,13 @@ For delivery packages:
 
 The light delivery bundle can still be imported, inspected, and used for final path PNG/TSV export. The client hides final path FASTA export when FASTA files are unavailable; the All action remains available and exports PNG + TSV only.
 
-### Install and launch GPM Next
+### Install and launch GPM2.0
 
-Install the GPM Next desktop application on the client machine from the project GitHub Releases page. Choose the installer matching the client platform: Windows x86, Windows ARM64, macOS x86, or macOS ARM64.
+Install the GPM2.0 desktop application on the client machine from the project GitHub Releases page. Choose the installer matching the client platform: Windows x86, Windows ARM64, macOS x86, or macOS ARM64.
 
 ### Import the server delivery bundle
 
-Import `gpm_server.zip` into GPM Next to start visual inspection and lightweight editing.
+Import `gpm_server.zip` into GPM2.0 to start visual inspection and lightweight editing.
 
 ### Export final path FASTA on the server
 

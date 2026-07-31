@@ -1,12 +1,12 @@
-# GPM Next
+# GPM2.0
 
 **中文** | [English](README.md)
 
-GPM Next 是一款以参考基因组为锚点、整合多种 de novo 组装优势的可视化组装工具。它将不同组装工具的结果汇集到统一流程中，便于用户进行导入、浏览与轻量编辑。
+GPM2.0 是一款以参考基因组为锚点、整合多种 de novo 组装优势的可视化组装工具。它将不同组装工具的结果汇集到统一流程中，便于用户进行导入、浏览与轻量编辑。
 
 ## 项目架构
 
-GPM Next 采用服务端与客户端分离的工作模式：
+GPM2.0 采用服务端与客户端分离的工作模式：
 
 - 服务端在 Linux 环境中执行比对命令并生成 zip 交付包；部署时将 `server/` 目录上传到服务器使用。
 - 客户端负责导入服务端生成的交付包，并提供可视化查看与轻量编辑能力。用户可从 GitHub Releases 下载对应平台的安装包，当前支持 `win-x86`、`win-arm64`、`mac-x86`、`mac-arm64` 四个版本。
@@ -116,7 +116,7 @@ bash ./gpm_server/add_dataset.sh --ds ds4_name /path/to/ds4.fa
 bash ./gpm_server/add_dataset.sh --ds ds4_name /path/to/ds4.fa -o /path/to/add_ds4_name.zip
 ```
 
-生成的 `add_ds4_name.zip` 是追加包，不是完整交付包；它只用于应用到已有桌面端工作区/项目。请先在 GPM Next 打开已有项目区，再在目标项目行上选择导入追加包并选中该 zip。
+生成的 `add_ds4_name.zip` 是追加包，不是完整交付包；它只用于应用到已有桌面端工作区/项目。请先在 GPM2.0 打开已有项目区，再在目标项目行上选择导入追加包并选中该 zip。
 
 由于脚本也会把新 dataset 合并回服务端 `gpm_server/` 目录，如需得到已经包含新 dataset 的完整包，请重新运行完整打包脚本。该完整 zip 可用于创建新的桌面端项目区或执行完整重新导入：
 
@@ -148,13 +148,13 @@ bash ./gpm_server/package_light_no_fasta_zip.sh
 
 轻量交付包可正常导入、浏览与导出 final path PNG/TSV；客户端会隐藏 final path FASTA 导出入口，All 导出仍可使用，但只导出 PNG + TSV。
 
-### 安装并打开 GPM Next
+### 安装并打开 GPM2.0
 
-在客户端设备安装 GPM Next。请从 GitHub Releases 下载与当前平台匹配的安装包。
+在客户端设备安装 GPM2.0。请从 GitHub Releases 下载与当前平台匹配的安装包。
 
 ### 导入服务端交付包
 
-将服务端生成的 `gpm_server.zip` 导入 GPM Next，即可进入可视化浏览与轻量编辑流程。
+将服务端生成的 `gpm_server.zip` 导入 GPM2.0，即可进入可视化浏览与轻量编辑流程。
 
 ### 在服务器端导出 final path FASTA
 

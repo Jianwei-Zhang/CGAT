@@ -17,7 +17,7 @@ Usage:
     [--ds <dataset_name> ...]
 
 Behavior:
-  - Reads the final path TSV exported by GPM Next.
+  - Reads the final path TSV exported by GPM2.0.
   - Reads metadata/datasets.tsv and metadata/reference.tsv under --gpm_server.
   - If locator manifests exist, resolves source/reference FASTA paths from
     metadata/source_seq_locator.tsv and metadata/reference_chr_locator.tsv.

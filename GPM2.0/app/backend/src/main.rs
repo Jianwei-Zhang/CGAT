@@ -44,7 +44,7 @@ use gpm_next_backend::workspace::resolve_extracted_bundle_workspace;
 
 #[derive(Debug, Parser)]
 #[command(name = "gpm_next_backend")]
-#[command(about = "GPM Next backend bootstrap CLI")]
+#[command(about = "GPM2.0 backend bootstrap CLI")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,

@@ -2821,7 +2821,7 @@ write_export_final_path_fasta_script "$WORK_ROOT"
 write_add_dataset_script "$WORK_ROOT"
 write_add_ctg_script "$WORK_ROOT"
 
-echo "Prepared GPM Next server workspace at: ${WORK_ROOT}"
+echo "Prepared GPM2.0 server workspace at: ${WORK_ROOT}"
 echo "Generated:"
 echo "  - ${WORK_ROOT}/metadata/package.tsv"
 echo "  - ${WORK_ROOT}/metadata/prepare_options.tsv"
