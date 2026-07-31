@@ -3652,9 +3652,8 @@ select {
   vertical-align: top;
 }
 
-.context-menu {
-  position: fixed;
-  z-index: 9999;
+.context-menu,
+.context-menu-submenu {
   border: 1px solid #9d9d9d;
   background: #f9f9f9;
   min-width: 180px;
@@ -3664,7 +3663,52 @@ select {
   gap: 2px;
 }
 
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+}
+
 .context-menu.is-hidden {
+  display: none;
+}
+
+.context-menu-submenu-group {
+  position: relative;
+  display: grid;
+}
+
+.context-menu-submenu-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.context-menu-submenu-indicator {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.context-menu-submenu {
+  position: absolute;
+  z-index: 1;
+  top: -4px;
+  left: calc(100% - 2px);
+  display: none;
+}
+
+.context-menu-submenu.opens-left {
+  right: calc(100% - 2px);
+  left: auto;
+}
+
+.context-menu-submenu-group:hover > .context-menu-submenu,
+.context-menu-submenu-group.is-open > .context-menu-submenu {
+  display: grid;
+}
+
+.context-menu-submenu-group.is-disabled:hover > .context-menu-submenu {
   display: none;
 }
 

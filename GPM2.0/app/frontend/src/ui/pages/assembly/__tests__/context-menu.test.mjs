@@ -1134,16 +1134,18 @@ test("buildAssemblyContextMenuItems exposes final-path graph ctg actions", async
 
   assert.deepEqual(
     items.map((item) => item.label),
-    ["删除", "翻转", "左侧 add gap", "右侧 add gap", "左侧 add ctg", "右侧 add ctg"],
+    ["删除", "翻转", "Add Gap", "Add Ctg"],
   );
+  assert.deepEqual(items[2].children.map((item) => item.label), ["左侧 add gap", "右侧 add gap"]);
+  assert.deepEqual(items[3].children.map((item) => item.label), ["左侧 add ctg", "右侧 add ctg"]);
 
-  await items[2].run();
+  await items[2].children[0].run();
   assert.deepEqual(calls.at(-1), {
     name: "addFinalPathGapRelativeToSegment",
     args: [host, store, { segmentId: "seg-1", placement: "before" }],
   });
 
-  await items[5].run();
+  await items[3].children[1].run();
   assert.deepEqual(calls.at(-1), {
     name: "addFinalPathContigRelativeToSegment",
     args: [host, store, { segmentId: "seg-1", placement: "after" }],

@@ -116,23 +116,125 @@ function positionContextMenuWithinViewport(menu, clientX, clientY) {
   menu.style.top = `${nextTop}px`;
 }
 
-export function renderContextMenuItems(items, deps) {
+function renderContextMenuItem(item, path, deps) {
   const { escapeAttr, escapeHtml } = deps;
-  return items
-    .map((item, index) => {
-      const disabled = Boolean(item.disabled);
-      const attrs = [];
-      if (typeof item.run === "function" && !disabled) {
-        attrs.push(`data-menu-action-index="${index}"`);
-      }
-      if (disabled) {
-        attrs.push("disabled");
-        attrs.push('aria-disabled="true"');
-      }
-      attrs.push(`title="${escapeAttr(item.title || item.label)}"`);
-      return `<button class="context-menu-item${disabled ? " is-disabled" : ""}" ${attrs.join(" ")}>${escapeHtml(item.label)}</button>`;
-    })
+  const disabled = Boolean(item?.disabled);
+  const children = Array.isArray(item?.children) ? item.children.filter(Boolean) : [];
+  const title = escapeAttr(item?.title || item?.label || "");
+  const label = escapeHtml(item?.label || "");
+
+  if (children.length) {
+    const disabledAttrs = disabled ? ' disabled aria-disabled="true"' : "";
+    return `
+      <div class="context-menu-submenu-group${disabled ? " is-disabled" : ""}" data-context-submenu-group="1">
+        <button type="button" class="context-menu-item context-menu-submenu-trigger${disabled ? " is-disabled" : ""}" data-context-submenu-trigger="1" aria-haspopup="menu" aria-expanded="false" title="${title}"${disabledAttrs}>
+          <span>${label}</span><span class="context-menu-submenu-indicator" aria-hidden="true">›</span>
+        </button>
+        <div class="context-menu-submenu" data-context-submenu="1" role="menu">
+          ${children.map((child, index) => renderContextMenuItem(child, `${path}.${index}`, deps)).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  const attrs = ['type="button"'];
+  if (typeof item?.run === "function" && !disabled) {
+    attrs.push(`data-menu-action-path="${path}"`);
+    if (!path.includes(".")) {
+      attrs.push(`data-menu-action-index="${path}"`);
+    }
+  }
+  if (disabled) {
+    attrs.push("disabled");
+    attrs.push('aria-disabled="true"');
+  }
+  attrs.push(`title="${title}"`);
+  return `<button class="context-menu-item${disabled ? " is-disabled" : ""}" ${attrs.join(" ")}>${label}</button>`;
+}
+
+export function renderContextMenuItems(items, deps) {
+  return (Array.isArray(items) ? items : [])
+    .map((item, index) => renderContextMenuItem(item, String(index), deps))
     .join("");
+}
+
+function resolveContextMenuItemByPath(items, path) {
+  const normalizedPath = String(path ?? "").trim();
+  if (!/^\d+(?:\.\d+)*$/.test(normalizedPath)) {
+    return null;
+  }
+  const indexes = normalizedPath
+    .split(".")
+    .map((value) => Number(value));
+  let entries = Array.isArray(items) ? items : [];
+  let item = null;
+  for (const index of indexes) {
+    if (index >= entries.length) {
+      return null;
+    }
+    item = entries[index];
+    entries = Array.isArray(item?.children) ? item.children : [];
+  }
+  return item;
+}
+
+export function positionContextSubmenuWithinViewport(group, submenu) {
+  if (!group || !submenu || typeof group.getBoundingClientRect !== "function") {
+    return;
+  }
+  const viewportWidth = Number(globalThis.window?.innerWidth)
+    || Number(globalThis.document?.documentElement?.clientWidth)
+    || 0;
+  const viewportHeight = Number(globalThis.window?.innerHeight)
+    || Number(globalThis.document?.documentElement?.clientHeight)
+    || 0;
+  if (viewportWidth <= 0 || viewportHeight <= 0) {
+    return;
+  }
+  const margin = 8;
+  const groupRect = group.getBoundingClientRect();
+  const submenuRect = typeof submenu.getBoundingClientRect === "function"
+    ? submenu.getBoundingClientRect()
+    : {};
+  const submenuWidth = Math.max(0, Number(submenuRect?.width || submenu.offsetWidth || 0));
+  const submenuHeight = Math.max(0, Number(submenuRect?.height || submenu.offsetHeight || 0));
+  const availableRight = Math.max(0, viewportWidth - Number(groupRect?.right || 0) - margin);
+  const availableLeft = Math.max(0, Number(groupRect?.left || 0) - margin);
+  submenu.classList?.toggle?.(
+    "opens-left",
+    submenuWidth > availableRight && availableLeft > availableRight,
+  );
+
+  const groupTop = Number(groupRect?.top || 0);
+  const defaultTop = -4;
+  const minTop = margin - groupTop;
+  const maxTop = viewportHeight - margin - groupTop - submenuHeight;
+  submenu.style.top = `${Math.max(minTop, Math.min(defaultTop, maxTop))}px`;
+}
+
+export function bindContextSubmenuInteractions(menu) {
+  menu?.querySelectorAll?.("[data-context-submenu-group]").forEach((group) => {
+    const submenu = group.querySelector?.("[data-context-submenu]");
+    const trigger = group.querySelector?.("[data-context-submenu-trigger]");
+    if (!submenu || trigger?.disabled || group.classList?.contains?.("is-disabled")) {
+      return;
+    }
+    const open = () => {
+      group.classList?.add?.("is-open");
+      trigger?.setAttribute?.("aria-expanded", "true");
+      positionContextSubmenuWithinViewport(group, submenu);
+    };
+    const close = () => {
+      group.classList?.remove?.("is-open");
+      trigger?.setAttribute?.("aria-expanded", "false");
+    };
+    group.addEventListener?.("pointerenter", open);
+    group.addEventListener?.("pointerleave", close);
+    trigger?.addEventListener?.("click", (event) => {
+      event?.stopPropagation?.();
+      open();
+    });
+  });
 }
 
 export function buildAssemblyContextMenuActions(actionDeps, overrides = {}) {
@@ -275,16 +377,17 @@ export function bindAssemblyContextMenu(host, store, deps) {
     menu.innerHTML = renderContextMenuItems(items, runtimeDeps);
     menu.classList.remove("is-hidden");
     positionContextMenuWithinViewport(menu, clientX, clientY);
+    bindContextSubmenuInteractions(menu);
 
-    menu.querySelectorAll("[data-menu-action-index]").forEach((button) => {
+    menu.querySelectorAll("[data-menu-action-path]").forEach((button) => {
       button.addEventListener("click", async (event) => {
         event?.stopPropagation?.();
-        const index = Number(button.getAttribute("data-menu-action-index") || -1);
+        const item = resolveContextMenuItemByPath(items, button.getAttribute("data-menu-action-path"));
         closeMenu();
-        if (!Number.isFinite(index) || index < 0 || index >= items.length) {
+        if (typeof item?.run !== "function") {
           return;
         }
-        await items[index].run();
+        await item.run();
       });
     });
   };

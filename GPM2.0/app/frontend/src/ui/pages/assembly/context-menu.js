@@ -708,28 +708,38 @@ export function buildAssemblyContextMenuItems({
         },
       });
       items.push({
-        label: i18n.contextMenu.finalPathAddGapLeft,
-        run: async () => {
-          await addFinalPathGapRelativeToSegment(host, store, { segmentId, placement: "before", ...targetArgs });
-        },
+        label: i18n.contextMenu.finalPathAddGap,
+        children: [
+          {
+            label: i18n.contextMenu.finalPathAddGapLeft,
+            run: async () => {
+              await addFinalPathGapRelativeToSegment(host, store, { segmentId, placement: "before", ...targetArgs });
+            },
+          },
+          {
+            label: i18n.contextMenu.finalPathAddGapRight,
+            run: async () => {
+              await addFinalPathGapRelativeToSegment(host, store, { segmentId, placement: "after", ...targetArgs });
+            },
+          },
+        ],
       });
       items.push({
-        label: i18n.contextMenu.finalPathAddGapRight,
-        run: async () => {
-          await addFinalPathGapRelativeToSegment(host, store, { segmentId, placement: "after", ...targetArgs });
-        },
-      });
-      items.push({
-        label: i18n.contextMenu.finalPathAddCtgLeft,
-        run: async () => {
-          await addFinalPathContigRelativeToSegment(host, store, { segmentId, placement: "before", ...targetArgs });
-        },
-      });
-      items.push({
-        label: i18n.contextMenu.finalPathAddCtgRight,
-        run: async () => {
-          await addFinalPathContigRelativeToSegment(host, store, { segmentId, placement: "after", ...targetArgs });
-        },
+        label: i18n.contextMenu.finalPathAddCtg,
+        children: [
+          {
+            label: i18n.contextMenu.finalPathAddCtgLeft,
+            run: async () => {
+              await addFinalPathContigRelativeToSegment(host, store, { segmentId, placement: "before", ...targetArgs });
+            },
+          },
+          {
+            label: i18n.contextMenu.finalPathAddCtgRight,
+            run: async () => {
+              await addFinalPathContigRelativeToSegment(host, store, { segmentId, placement: "after", ...targetArgs });
+            },
+          },
+        ],
       });
     }
     return items;
