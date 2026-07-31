@@ -30,3 +30,12 @@ test("resolveRootDirFromFileUrl handles POSIX file URLs", () => {
 
   assert.equal(rootDir, "/mnt/d/desktop/gpm/gpm_next/app/frontend");
 });
+
+test("resolveRootDirFromFileUrl decodes URL-encoded path segments with injected POSIX semantics", () => {
+  const rootDir = resolveRootDirFromFileUrl(
+    "file:///mnt/d/desktop/GPM%20Project/app/frontend/vite.config.js",
+    path.posix,
+  );
+
+  assert.equal(rootDir, "/mnt/d/desktop/GPM Project/app/frontend");
+});
