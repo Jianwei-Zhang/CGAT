@@ -1405,3 +1405,141 @@ test("confirmation dialog confirm button passes anchor offset fields together", 
     },
   ]);
 });
+
+test("anchor offset dialog validates both endpoints while the automatic value is edited", async () => {
+  const confirmListeners = new Map();
+  const inputListeners = new Map();
+  const directionListeners = new Map();
+  const confirmButton = {
+    dataset: {
+      assemblyConfirmAction: "confirm",
+      assemblyConfirmId: "anchor-offset-live",
+    },
+    disabled: false,
+    addEventListener(type, handler) {
+      confirmListeners.set(type, handler);
+    },
+  };
+  const promptInput = {
+    dataset: {
+      assemblyConfirmInput: "anchor-offset-live",
+    },
+    value: "200",
+    addEventListener(type, handler) {
+      inputListeners.set(type, handler);
+    },
+  };
+  const leftDirection = {
+    dataset: {
+      assemblyAnchorOffsetDirection: "anchor-offset-live",
+    },
+    checked: true,
+    value: "left",
+    addEventListener(type, handler) {
+      directionListeners.set(type, handler);
+    },
+  };
+  const rightDirection = {
+    dataset: {
+      assemblyAnchorOffsetDirection: "anchor-offset-live",
+    },
+    checked: false,
+    value: "right",
+    addEventListener() {},
+  };
+  let errorHidden = true;
+  const errorNode = {
+    dataset: {
+      assemblyAnchorOffsetError: "anchor-offset-live",
+    },
+    textContent: "",
+    classList: {
+      toggle(_name, hidden) {
+        errorHidden = hidden;
+      },
+    },
+  };
+  const asNodeList = (nodes) => ({
+    forEach(callback) {
+      nodes.forEach(callback);
+    },
+    [Symbol.iterator]() {
+      return nodes[Symbol.iterator]();
+    },
+  });
+  const host = {
+    querySelector() {
+      return null;
+    },
+    querySelectorAll(selector) {
+      if (selector === "[data-assembly-confirm-action][data-assembly-confirm-id]") {
+        return asNodeList([confirmButton]);
+      }
+      if (selector === "[data-assembly-confirm-input]") {
+        return asNodeList([promptInput]);
+      }
+      if (selector === "[data-assembly-anchor-offset-direction]") {
+        return asNodeList([rightDirection, leftDirection]);
+      }
+      if (selector === "[data-assembly-anchor-offset-error]") {
+        return asNodeList([errorNode]);
+      }
+      return asNodeList([]);
+    },
+    addEventListener() {},
+  };
+  const baseState = createState();
+  const store = createStore({
+    ...baseState,
+    assembly: {
+      ...baseState.assembly,
+      confirmDialog: {
+        open: true,
+        id: "anchor-offset-live",
+        mode: "anchor-offset",
+        anchorOffsetSourceEdge: {
+          hitKey: "hit-1",
+          edge: "left",
+          topEndpointKey: "top",
+          bottomEndpointKey: "bottom",
+          topContigId: 30,
+          bottomContigId: 8,
+          topCutBp: 400,
+          bottomCutBp: 100,
+          topLengthBp: 1000,
+          bottomLengthBp: 500,
+        },
+      },
+    },
+  });
+  const calls = [];
+  bindAssemblyPageImpl(host, store, createBindingDeps({
+    resolveAssemblyConfirmDialog(_host, _store, payload) {
+      calls.push(payload);
+    },
+  }));
+
+  inputListeners.get("input")?.();
+  assert.equal(confirmButton.disabled, true);
+  assert.match(errorNode.textContent, /超出 contig 范围/);
+  assert.equal(errorHidden, false);
+
+  promptInput.value = "50";
+  inputListeners.get("input")?.();
+  assert.equal(confirmButton.disabled, false);
+  assert.equal(errorNode.textContent, "");
+  assert.equal(errorHidden, true);
+
+  await confirmListeners.get("click")?.({ preventDefault() {} });
+  assert.deepEqual(calls, [
+    {
+      id: "anchor-offset-live",
+      confirmed: true,
+      value: {
+        direction: "left",
+        offsetBp: "50",
+      },
+    },
+  ]);
+  assert.equal(typeof directionListeners.get("change"), "function");
+});

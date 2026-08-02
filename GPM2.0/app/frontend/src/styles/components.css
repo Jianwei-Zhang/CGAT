@@ -3282,6 +3282,12 @@ select {
   margin-top: 0;
 }
 
+.assembly-anchor-offset-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.85rem;
+}
+
 .assembly-confirm-actions {
   display: flex;
   justify-content: flex-end;

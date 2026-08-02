@@ -221,6 +221,36 @@ export function resolveSubviewAnchorEdgeContextTarget(target) {
   if (!node) {
     return null;
   }
+  const parseFiniteNumber = (value) => {
+    if (value === null || value === undefined || String(value).trim() === "") {
+      return null;
+    }
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  };
+  const parseEvidenceEdge = (edgeNode) => {
+    const hitKey = String(edgeNode?.getAttribute?.("data-subview-anchor-hit-key") || "").trim();
+    const edge = String(edgeNode?.getAttribute?.("data-subview-anchor-edge") || "").trim().toLowerCase();
+    if (!hitKey || (edge !== "left" && edge !== "right")) {
+      return null;
+    }
+    return {
+      kind: "evidence",
+      hitKey,
+      edge,
+      active: edgeNode.getAttribute("data-subview-anchor-active") === "1",
+      topEndpointKey: String(edgeNode.getAttribute("data-subview-anchor-top-endpoint-key") || "").trim(),
+      bottomEndpointKey: String(edgeNode.getAttribute("data-subview-anchor-bottom-endpoint-key") || "").trim(),
+      topContigId: normalizeSupportDatasetId(edgeNode.getAttribute("data-subview-anchor-top-contig-id")),
+      bottomContigId: normalizeSupportDatasetId(edgeNode.getAttribute("data-subview-anchor-bottom-contig-id")),
+      topCutBp: normalizeSupportDatasetId(edgeNode.getAttribute("data-subview-anchor-top-cut-bp")),
+      bottomCutBp: normalizeSupportDatasetId(edgeNode.getAttribute("data-subview-anchor-bottom-cut-bp")),
+      topLengthBp: normalizeSupportDatasetId(edgeNode.getAttribute("data-subview-anchor-top-length-bp")),
+      bottomLengthBp: normalizeSupportDatasetId(edgeNode.getAttribute("data-subview-anchor-bottom-length-bp")),
+      topX: parseFiniteNumber(edgeNode.getAttribute("data-subview-anchor-top-x")),
+      bottomX: parseFiniteNumber(edgeNode.getAttribute("data-subview-anchor-bottom-x")),
+    };
+  };
   const kind = String(node.getAttribute("data-subview-anchor-kind") || "evidence").trim();
   const manualAnchorId = String(node.getAttribute("data-subview-manual-anchor-id") || "").trim();
   if (kind === "manual" && manualAnchorId) {
@@ -230,24 +260,19 @@ export function resolveSubviewAnchorEdgeContextTarget(target) {
       active: true,
     };
   }
-  const hitKey = String(node.getAttribute("data-subview-anchor-hit-key") || "").trim();
-  const edge = String(node.getAttribute("data-subview-anchor-edge") || "").trim().toLowerCase();
-  if (!hitKey || (edge !== "left" && edge !== "right")) {
+  const context = parseEvidenceEdge(node);
+  if (!context) {
     return null;
   }
+  const subviewPanel = node.closest?.("[data-subview-panel='1']") || null;
+  const activeOriginalEdges = Array.from(subviewPanel?.querySelectorAll?.(
+    "[data-subview-anchor-kind='evidence'][data-subview-anchor-active='1'][data-subview-anchor-hit-key][data-subview-anchor-edge]",
+  ) || [])
+    .map((edgeNode) => parseEvidenceEdge(edgeNode))
+    .filter(Boolean);
   return {
-    kind: "evidence",
-    hitKey,
-    edge,
-    active: node.getAttribute("data-subview-anchor-active") === "1",
-    topEndpointKey: String(node.getAttribute("data-subview-anchor-top-endpoint-key") || "").trim(),
-    bottomEndpointKey: String(node.getAttribute("data-subview-anchor-bottom-endpoint-key") || "").trim(),
-    topContigId: normalizeSupportDatasetId(node.getAttribute("data-subview-anchor-top-contig-id")),
-    bottomContigId: normalizeSupportDatasetId(node.getAttribute("data-subview-anchor-bottom-contig-id")),
-    topCutBp: normalizeSupportDatasetId(node.getAttribute("data-subview-anchor-top-cut-bp")),
-    bottomCutBp: normalizeSupportDatasetId(node.getAttribute("data-subview-anchor-bottom-cut-bp")),
-    topLengthBp: normalizeSupportDatasetId(node.getAttribute("data-subview-anchor-top-length-bp")),
-    bottomLengthBp: normalizeSupportDatasetId(node.getAttribute("data-subview-anchor-bottom-length-bp")),
+    ...context,
+    activeOriginalEdges,
   };
 }
 

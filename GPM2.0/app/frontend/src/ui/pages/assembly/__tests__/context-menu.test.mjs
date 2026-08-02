@@ -234,7 +234,77 @@ test("resolveSubviewAnchorEdgeContextTarget parses anchor edge metadata", () => 
     bottomCutBp: null,
     topLengthBp: null,
     bottomLengthBp: null,
+    topX: null,
+    bottomX: null,
+    activeOriginalEdges: [],
   });
+});
+
+test("resolveSubviewAnchorEdgeContextTarget collects active original edges from the same subview", () => {
+  let panel = null;
+  const createEdgeNode = (values) => ({
+    closest(selector) {
+      return selector === "[data-subview-panel='1']" ? panel : null;
+    },
+    getAttribute(name) {
+      return values[name] ?? null;
+    },
+  });
+  const sourceNode = createEdgeNode({
+    "data-subview-anchor-kind": "evidence",
+    "data-subview-anchor-hit-key": "hit-left",
+    "data-subview-anchor-edge": "right",
+    "data-subview-anchor-active": "1",
+    "data-subview-anchor-top-endpoint-key": "top-10",
+    "data-subview-anchor-bottom-endpoint-key": "bottom-30",
+    "data-subview-anchor-top-contig-id": "10",
+    "data-subview-anchor-bottom-contig-id": "30",
+    "data-subview-anchor-top-cut-bp": "400",
+    "data-subview-anchor-bottom-cut-bp": "500",
+    "data-subview-anchor-top-length-bp": "1000",
+    "data-subview-anchor-bottom-length-bp": "900",
+    "data-subview-anchor-top-x": "60.5",
+    "data-subview-anchor-bottom-x": "20.25",
+  });
+  const partnerNode = createEdgeNode({
+    "data-subview-anchor-kind": "evidence",
+    "data-subview-anchor-hit-key": "hit-right",
+    "data-subview-anchor-edge": "left",
+    "data-subview-anchor-active": "1",
+    "data-subview-anchor-top-endpoint-key": "top-10",
+    "data-subview-anchor-bottom-endpoint-key": "bottom-31",
+    "data-subview-anchor-top-contig-id": "10",
+    "data-subview-anchor-bottom-contig-id": "31",
+    "data-subview-anchor-top-cut-bp": "200",
+    "data-subview-anchor-bottom-cut-bp": "700",
+    "data-subview-anchor-top-length-bp": "1000",
+    "data-subview-anchor-bottom-length-bp": "1100",
+    "data-subview-anchor-top-x": "40.5",
+    "data-subview-anchor-bottom-x": "80.25",
+  });
+  panel = {
+    querySelectorAll() {
+      return [sourceNode, partnerNode];
+    },
+  };
+  const target = {
+    closest(selector) {
+      return selector === "[data-subview-anchor-hit-key][data-subview-anchor-edge]"
+        ? sourceNode
+        : null;
+    },
+  };
+
+  const context = resolveSubviewAnchorEdgeContextTarget(target);
+  assert.equal(context.topX, 60.5);
+  assert.equal(context.bottomX, 20.25);
+  assert.deepEqual(
+    context.activeOriginalEdges.map((edge) => [edge.hitKey, edge.edge, edge.topX, edge.bottomX]),
+    [
+      ["hit-left", "right", 60.5, 20.25],
+      ["hit-right", "left", 40.5, 80.25],
+    ],
+  );
 });
 
 test("resolveSubviewFragmentContextTarget parses fragment metadata", () => {

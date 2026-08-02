@@ -3551,6 +3551,8 @@ function renderSubviewAnchorLines(anchorEdges, { topY, bottomY, hitTopY, hitBott
                   data-subview-anchor-bottom-cut-bp="${Number(edge.bottomCutBp || 0)}"
                   data-subview-anchor-top-length-bp="${Number(edge.topLengthBp || 0)}"
                   data-subview-anchor-bottom-length-bp="${Number(edge.bottomLengthBp || 0)}"
+                  data-subview-anchor-top-x="${Number(edge.topX || 0).toFixed(4)}"
+                  data-subview-anchor-bottom-x="${Number(edge.bottomX || 0).toFixed(4)}"
                 />`;
       },
     )

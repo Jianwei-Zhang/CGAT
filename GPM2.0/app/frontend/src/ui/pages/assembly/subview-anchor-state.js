@@ -10,6 +10,14 @@ function normalizePositiveInt(value) {
   return numeric;
 }
 
+function normalizeFiniteNumber(value) {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return null;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 function normalizeHitKey(value) {
   return String(value || "").trim();
 }
@@ -332,6 +340,124 @@ export function createOffsetSubviewManualAnchor(sourceEdge, { direction, offsetB
       endpointA: firstEndpoint,
       endpointB: secondEndpoint,
     },
+  };
+}
+
+function buildEmptyOffsetSuggestion(reason) {
+  return {
+    ok: false,
+    reason: String(reason || "no-suggestion"),
+    direction: "",
+    offsetBp: null,
+    offsetPrimarySlot: "",
+    partnerHitKey: "",
+    partnerEdge: "",
+    validationReason: "",
+  };
+}
+
+function isSameEvidenceAnchor(left, right) {
+  return normalizeHitKey(left?.hitKey) === normalizeHitKey(right?.hitKey)
+    && normalizeEdge(left?.edge) === normalizeEdge(right?.edge);
+}
+
+function isSameTrackEndpoint(leftKey, rightKey, leftContigId, rightContigId) {
+  const normalizedLeftKey = String(leftKey || "").trim();
+  const normalizedRightKey = String(rightKey || "").trim();
+  if (normalizedLeftKey && normalizedRightKey) {
+    return normalizedLeftKey === normalizedRightKey;
+  }
+  const normalizedLeftContigId = normalizePositiveInt(leftContigId);
+  const normalizedRightContigId = normalizePositiveInt(rightContigId);
+  return normalizedLeftContigId !== null
+    && normalizedLeftContigId === normalizedRightContigId;
+}
+
+function doSubviewAnchorEdgesCross(left, right) {
+  const leftTopX = normalizeFiniteNumber(left?.topX);
+  const rightTopX = normalizeFiniteNumber(right?.topX);
+  const leftBottomX = normalizeFiniteNumber(left?.bottomX);
+  const rightBottomX = normalizeFiniteNumber(right?.bottomX);
+  if (leftTopX === null || rightTopX === null || leftBottomX === null || rightBottomX === null) {
+    return false;
+  }
+  const topDelta = leftTopX - rightTopX;
+  const bottomDelta = leftBottomX - rightBottomX;
+  return Number.isFinite(topDelta)
+    && Number.isFinite(bottomDelta)
+    && topDelta !== 0
+    && bottomDelta !== 0
+    && Math.sign(topDelta) !== Math.sign(bottomDelta);
+}
+
+export function deriveSubviewAnchorOffsetSuggestion(sourceEdge, activeOriginalEdges) {
+  const sourceHitKey = normalizeHitKey(sourceEdge?.hitKey);
+  if (!sourceHitKey || sourceEdge?.kind === "manual" || sourceEdge?.manualAnchorId) {
+    return buildEmptyOffsetSuggestion("invalid-anchor");
+  }
+  const crossingPartners = (Array.isArray(activeOriginalEdges) ? activeOriginalEdges : [])
+    .filter((candidate) =>
+      candidate?.active === true
+      && candidate?.kind !== "manual"
+      && !candidate?.manualAnchorId
+      && normalizeHitKey(candidate?.hitKey)
+      && !isSameEvidenceAnchor(sourceEdge, candidate)
+      && doSubviewAnchorEdgesCross(sourceEdge, candidate))
+    .filter((candidate, index, candidates) =>
+      candidates.findIndex((entry) => isSameEvidenceAnchor(entry, candidate)) === index);
+  if (crossingPartners.length !== 1) {
+    return buildEmptyOffsetSuggestion(
+      crossingPartners.length > 1 ? "ambiguous-crossing" : "no-crossing",
+    );
+  }
+  const partner = crossingPartners[0];
+  const topIsContinuous = isSameTrackEndpoint(
+    sourceEdge?.topEndpointKey,
+    partner?.topEndpointKey,
+    sourceEdge?.topContigId,
+    partner?.topContigId,
+  );
+  const bottomIsContinuous = isSameTrackEndpoint(
+    sourceEdge?.bottomEndpointKey,
+    partner?.bottomEndpointKey,
+    sourceEdge?.bottomContigId,
+    partner?.bottomContigId,
+  );
+  if (topIsContinuous === bottomIsContinuous) {
+    return buildEmptyOffsetSuggestion("ambiguous-offset-primary");
+  }
+  const offsetPrimarySlot = topIsContinuous ? "top" : "bottom";
+  const sourceX = normalizeFiniteNumber(sourceEdge?.[`${offsetPrimarySlot}X`]);
+  const partnerX = normalizeFiniteNumber(partner?.[`${offsetPrimarySlot}X`]);
+  const sourceCutBp = normalizePositiveInt(sourceEdge?.[`${offsetPrimarySlot}CutBp`]);
+  const partnerCutBp = normalizePositiveInt(partner?.[`${offsetPrimarySlot}CutBp`]);
+  if (
+    sourceX === null
+    || partnerX === null
+    || sourceX === partnerX
+    || sourceCutBp === null
+    || partnerCutBp === null
+  ) {
+    return buildEmptyOffsetSuggestion("invalid-offset-primary");
+  }
+  const offsetBp = Math.abs(sourceCutBp - partnerCutBp);
+  if (!offsetBp) {
+    return buildEmptyOffsetSuggestion("invalid-offset-primary");
+  }
+  const direction = sourceX > partnerX ? "left" : "right";
+  const validation = createOffsetSubviewManualAnchor(sourceEdge, { direction, offsetBp });
+  if (!validation.ok && validation.reason !== "out-of-range") {
+    return buildEmptyOffsetSuggestion(validation.reason || "invalid-anchor");
+  }
+  return {
+    ok: true,
+    reason: "",
+    direction,
+    offsetBp,
+    offsetPrimarySlot,
+    partnerHitKey: normalizeHitKey(partner?.hitKey),
+    partnerEdge: normalizeEdge(partner?.edge),
+    validationReason: validation.ok ? "" : validation.reason,
   };
 }
 

@@ -765,6 +765,18 @@ test("assembly page renders anchor offset direction and bp in one dialog", () =>
           message: "设置偏移方向和 bp 距离。",
           defaultDirection: "left",
           defaultValue: "50",
+          anchorOffsetSourceEdge: {
+            hitKey: "hit-1",
+            edge: "left",
+            topEndpointKey: "top",
+            bottomEndpointKey: "bottom",
+            topContigId: 30,
+            bottomContigId: 8,
+            topCutBp: 100,
+            bottomCutBp: 200,
+            topLengthBp: 1000,
+            bottomLengthBp: 500,
+          },
         },
       },
     }),
@@ -776,6 +788,75 @@ test("assembly page renders anchor offset direction and bp in one dialog", () =>
   assert.match(html, /value="left"[\s\S]*data-assembly-anchor-offset-direction="anchor-offset"[\s\S]*checked/);
   assert.match(html, /data-assembly-confirm-input="anchor-offset"/);
   assert.match(html, /value="50"/);
+  assert.doesNotMatch(html, /data-assembly-confirm-action="confirm"[^>]*disabled/);
+});
+
+test("assembly anchor offset dialog keeps ambiguous defaults empty and disables confirmation", () => {
+  const html = renderAssemblyPage(
+    createState({
+      assembly: {
+        confirmDialog: {
+          open: true,
+          id: "anchor-offset-empty",
+          mode: "anchor-offset",
+          message: "设置偏移方向和 bp 距离。",
+          defaultDirection: "",
+          defaultValue: "",
+          anchorOffsetSourceEdge: {
+            hitKey: "hit-1",
+            edge: "left",
+            topEndpointKey: "top",
+            bottomEndpointKey: "bottom",
+            topContigId: 30,
+            bottomContigId: 8,
+            topCutBp: 100,
+            bottomCutBp: 200,
+            topLengthBp: 1000,
+            bottomLengthBp: 500,
+          },
+        },
+      },
+    }),
+  );
+
+  assert.doesNotMatch(html, /data-assembly-anchor-offset-direction="anchor-offset-empty"[^>]*checked/);
+  assert.match(html, /data-assembly-confirm-input="anchor-offset-empty"/);
+  assert.match(html, /data-assembly-confirm-action="confirm"[^>]*disabled/);
+  assert.match(html, /data-assembly-anchor-offset-error="anchor-offset-empty"/);
+  assert.doesNotMatch(html, /偏移后锚点超出 contig 范围/);
+});
+
+test("assembly anchor offset dialog preserves an automatic out-of-range value with an inline error", () => {
+  const html = renderAssemblyPage(
+    createState({
+      assembly: {
+        confirmDialog: {
+          open: true,
+          id: "anchor-offset-invalid",
+          mode: "anchor-offset",
+          message: "设置偏移方向和 bp 距离。",
+          defaultDirection: "left",
+          defaultValue: "200",
+          anchorOffsetSourceEdge: {
+            hitKey: "hit-1",
+            edge: "left",
+            topEndpointKey: "top",
+            bottomEndpointKey: "bottom",
+            topContigId: 30,
+            bottomContigId: 8,
+            topCutBp: 400,
+            bottomCutBp: 100,
+            topLengthBp: 1000,
+            bottomLengthBp: 500,
+          },
+        },
+      },
+    }),
+  );
+
+  assert.match(html, /value="200"/);
+  assert.match(html, /偏移后锚点超出 contig 范围，未创建。/);
+  assert.match(html, /data-assembly-confirm-action="confirm"[^>]*disabled/);
 });
 
 test("assembly tab renders a project-chr members card above main track with name length and member count", () => {
@@ -12182,6 +12263,10 @@ test("active subview anchors render on the same gap-edge geometry as their hit z
   assert.match(
     html,
     /class="subview-anchor-hit-zone is-active"[^>]*data-subview-anchor-hit-key="hit-1"[^>]*data-subview-anchor-edge="left"/,
+  );
+  assert.match(
+    html,
+    /class="subview-anchor-hit-zone is-active"[^>]*data-subview-anchor-top-x="[0-9.]+"[^>]*data-subview-anchor-bottom-x="[0-9.]+"/,
   );
   const topBarMatch = html.match(/data-subview-track-slot="top"[^>]*data-subview-rect-y="([^"]+)"[^>]*data-subview-rect-height="([^"]+)"/);
   const bottomBarMatch = html.match(/data-subview-track-slot="bottom"[^>]*data-subview-rect-y="([^"]+)"/);

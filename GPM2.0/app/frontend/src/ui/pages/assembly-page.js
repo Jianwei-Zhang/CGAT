@@ -212,6 +212,7 @@ import {
 } from "./assembly/subview-pairwise-evidence-state.js";
 import {
   createOffsetSubviewManualAnchor,
+  deriveSubviewAnchorOffsetSuggestion,
   removeSubviewManualAnchor as removeSubviewManualAnchorImpl,
   resolveSubviewAnchorStateForSummary,
   setSubviewAnchorStateForSummary,
@@ -312,6 +313,16 @@ let suppressTrackContigClickUntil = 0;
 let assemblyConfirmDialogSeq = 0;
 const pendingAssemblyConfirmResolvers = new Map();
 
+function resolveAnchorOffsetErrorKey(reason) {
+  if (reason === "out-of-range") {
+    return "runtime.subviewAnchorOffsetOutOfRange";
+  }
+  if (reason === "invalid-anchor") {
+    return "runtime.subviewAnchorOffsetInvalidAnchor";
+  }
+  return "runtime.subviewAnchorOffsetInvalid";
+}
+
 function renderAssemblyConfirmModal(state) {
   const dialog = state.assembly?.confirmDialog;
   if (!dialog?.open) {
@@ -341,7 +352,20 @@ function renderAssemblyConfirmModal(state) {
         >
       `
     : "";
-  const offsetDirection = String(dialog.defaultDirection || "right").trim() === "left" ? "left" : "right";
+  const offsetDirection = ["left", "right"].includes(String(dialog.defaultDirection || "").trim())
+    ? String(dialog.defaultDirection).trim()
+    : "";
+  const anchorOffsetResult = mode === "anchor-offset"
+    ? createOffsetSubviewManualAnchor(dialog.anchorOffsetSourceEdge, {
+      direction: offsetDirection,
+      offsetBp: dialog.defaultValue,
+    })
+    : null;
+  const hasAnchorOffsetDraft = mode === "anchor-offset"
+    && Boolean(offsetDirection || String(dialog.defaultValue ?? "").trim());
+  const anchorOffsetError = hasAnchorOffsetDraft && !anchorOffsetResult?.ok
+    ? tAssembly(state, resolveAnchorOffsetErrorKey(anchorOffsetResult?.reason))
+    : "";
   const anchorOffsetFields = mode === "anchor-offset"
     ? `
         <div class="assembly-anchor-offset-fields">
@@ -381,6 +405,11 @@ function renderAssemblyConfirmModal(state) {
               autofocus
             >
           </label>
+          <p
+            class="assembly-anchor-offset-error${anchorOffsetError ? "" : " is-hidden"}"
+            data-assembly-anchor-offset-error="${escapeAttr(id)}"
+            aria-live="polite"
+          >${escapeHtml(anchorOffsetError)}</p>
         </div>
       `
     : "";
@@ -404,6 +433,7 @@ function renderAssemblyConfirmModal(state) {
             class="button primary"
             data-assembly-confirm-action="confirm"
             data-assembly-confirm-id="${escapeAttr(id)}"
+            ${mode === "anchor-offset" && !anchorOffsetResult?.ok ? "disabled" : ""}
           >${escapeHtml(confirmLabel)}</button>
           <button
             type="button"
@@ -481,7 +511,19 @@ function requestAssemblyPrompt(host, store, message, defaultValue = "") {
   });
 }
 
-function requestAssemblyAnchorOffsetPrompt(host, store, defaultValue = "") {
+function requestAssemblyAnchorOffsetPrompt(host, store, options = {}) {
+  const normalizedOptions = options && typeof options === "object" && !Array.isArray(options)
+    ? options
+    : { defaultValue: options };
+  const defaultDirection = ["left", "right"].includes(
+    String(normalizedOptions.defaultDirection || "").trim(),
+  )
+    ? String(normalizedOptions.defaultDirection).trim()
+    : "";
+  const defaultValue = String(normalizedOptions.defaultValue ?? "");
+  const sourceEdge = normalizedOptions.sourceEdge && typeof normalizedOptions.sourceEdge === "object"
+    ? normalizedOptions.sourceEdge
+    : null;
   const message = tAssembly(store?.getState?.() || "zh", "prompts.anchorOffsetMessage");
   if (!host || !store) {
     if (typeof globalThis.window?.prompt !== "function") {
@@ -489,7 +531,7 @@ function requestAssemblyAnchorOffsetPrompt(host, store, defaultValue = "") {
     }
     const offsetInput = globalThis.window.prompt(message, String(defaultValue)) ?? "";
     return Promise.resolve({
-      direction: "right",
+      direction: defaultDirection || "right",
       offsetBp: offsetInput,
     });
   }
@@ -512,8 +554,9 @@ function requestAssemblyAnchorOffsetPrompt(host, store, defaultValue = "") {
           mode: "anchor-offset",
           danger: false,
           message,
-          defaultDirection: "right",
-          defaultValue: String(defaultValue ?? ""),
+          defaultDirection,
+          defaultValue,
+          anchorOffsetSourceEdge: sourceEdge,
         },
       },
     });
@@ -2063,7 +2106,15 @@ async function toggleSubviewAnchorEdge(host, store, { hitKey, edge }) {
 }
 
 async function copySubviewAnchorWithOffset(host, store, sourceEdge) {
-  const promptResult = await requestAssemblyAnchorOffsetPrompt(host, store);
+  const suggestion = deriveSubviewAnchorOffsetSuggestion(
+    sourceEdge,
+    sourceEdge?.activeOriginalEdges,
+  );
+  const promptResult = await requestAssemblyAnchorOffsetPrompt(host, store, {
+    defaultDirection: suggestion.ok ? suggestion.direction : "",
+    defaultValue: suggestion.ok ? suggestion.offsetBp : "",
+    sourceEdge,
+  });
   if (!promptResult) {
     return;
   }
@@ -2072,14 +2123,9 @@ async function copySubviewAnchorWithOffset(host, store, sourceEdge) {
   const offsetBp = Number(offsetText);
   const result = createOffsetSubviewManualAnchor(sourceEdge, { direction, offsetBp });
   if (!result.ok) {
-    const errorKey = result.reason === "out-of-range"
-      ? "runtime.subviewAnchorOffsetOutOfRange"
-      : result.reason === "invalid-anchor"
-        ? "runtime.subviewAnchorOffsetInvalidAnchor"
-        : "runtime.subviewAnchorOffsetInvalid";
     setAssemblyActionFeedback(host, store, {
       actionStatus: "",
-      actionError: tAssembly(store.getState(), errorKey),
+      actionError: tAssembly(store.getState(), resolveAnchorOffsetErrorKey(result.reason)),
     });
     return;
   }

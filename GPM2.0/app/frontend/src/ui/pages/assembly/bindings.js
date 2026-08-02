@@ -14,6 +14,7 @@ import {
   normalizeViewportScrollState,
 } from "./scroll-position-state.js";
 import { shouldRefetchSubviewPairwiseEvidence } from "./subview-pairwise-evidence-state.js";
+import { createOffsetSubviewManualAnchor } from "./subview-anchor-state.js";
 
 const ASSEMBLY_TRACK_COMBO_BOUND = Symbol("assemblyTrackComboBound");
 const ASSEMBLY_DROPDOWN_CLOSE_DELAY_MS = 400;
@@ -493,6 +494,9 @@ export function bindAssemblyPage(host, store, deps) {
   const restoreAllDeletedCtgsButton = queryHost("[data-restore-all-deleted-ctgs='1']");
   const resetMembersStateButton = queryHost("[data-reset-members-state='1']");
   const assemblyConfirmButtons = queryHostAll("[data-assembly-confirm-action][data-assembly-confirm-id]");
+  const assemblyConfirmInputs = queryHostAll("[data-assembly-confirm-input]");
+  const assemblyAnchorOffsetDirectionInputs = queryHostAll("[data-assembly-anchor-offset-direction]");
+  const assemblyAnchorOffsetErrors = queryHostAll("[data-assembly-anchor-offset-error]");
   const addCtgImportCloseButton = queryHost("[data-add-ctg-import-close='1']");
   const finalPathViewModeButtons = queryHostAll("button[data-final-path-view-mode]");
   const phasedFinalPathButtons = queryHostAll("button[data-phased-final-path-key]");
@@ -624,22 +628,79 @@ export function bindAssemblyPage(host, store, deps) {
   searchButton?.addEventListener("click", async () => {
     await runCtgSearch(host, store, searchInput?.value || "");
   });
+  const resolveAnchorOffsetDraft = (id) => {
+    const input = Array.from(assemblyConfirmInputs).find(
+      (node) => node.dataset.assemblyConfirmInput === id,
+    );
+    const directionInput = Array.from(assemblyAnchorOffsetDirectionInputs).find(
+      (node) => node.dataset.assemblyAnchorOffsetDirection === id && node.checked,
+    );
+    return {
+      direction: directionInput?.value || "",
+      offsetBp: input?.value ?? "",
+    };
+  };
+  const syncAnchorOffsetValidation = (id) => {
+    const state = store.getState();
+    const dialog = state.assembly?.confirmDialog;
+    if (
+      String(dialog?.mode || "").trim() !== "anchor-offset"
+      || String(dialog?.id || "") !== String(id || "")
+    ) {
+      return null;
+    }
+    const draft = resolveAnchorOffsetDraft(id);
+    const result = createOffsetSubviewManualAnchor(dialog.anchorOffsetSourceEdge, draft);
+    const confirmButton = Array.from(assemblyConfirmButtons).find(
+      (node) => node.dataset.assemblyConfirmId === id
+        && node.dataset.assemblyConfirmAction === "confirm",
+    );
+    if (confirmButton) {
+      confirmButton.disabled = !result.ok;
+    }
+    const errorNode = Array.from(assemblyAnchorOffsetErrors).find(
+      (node) => node.dataset.assemblyAnchorOffsetError === id,
+    );
+    if (errorNode) {
+      const hasDraft = Boolean(String(draft.direction || "").trim() || String(draft.offsetBp || "").trim());
+      const errorKey = result.reason === "out-of-range"
+        ? "runtime.subviewAnchorOffsetOutOfRange"
+        : result.reason === "invalid-anchor"
+          ? "runtime.subviewAnchorOffsetInvalidAnchor"
+          : "runtime.subviewAnchorOffsetInvalid";
+      const errorText = hasDraft && !result.ok ? tAssembly(state, errorKey) : "";
+      errorNode.textContent = errorText;
+      errorNode.classList?.toggle?.("is-hidden", !errorText);
+    }
+    return { draft, result };
+  };
+  Array.from(assemblyConfirmInputs).forEach((input) => {
+    input.addEventListener?.("input", () => {
+      syncAnchorOffsetValidation(input.dataset.assemblyConfirmInput);
+    });
+  });
+  Array.from(assemblyAnchorOffsetDirectionInputs).forEach((input) => {
+    input.addEventListener?.("change", () => {
+      syncAnchorOffsetValidation(input.dataset.assemblyAnchorOffsetDirection);
+    });
+  });
   assemblyConfirmButtons.forEach((button) => {
     button.addEventListener("click", (event) => {
       event.preventDefault();
-      const input = Array.from(queryHostAll("[data-assembly-confirm-input]")).find(
+      const dialogMode = String(store.getState().assembly?.confirmDialog?.mode || "").trim();
+      const isAnchorOffsetConfirm = dialogMode === "anchor-offset"
+        && button.dataset.assemblyConfirmAction === "confirm";
+      const validation = isAnchorOffsetConfirm
+        ? syncAnchorOffsetValidation(button.dataset.assemblyConfirmId)
+        : null;
+      if (validation && !validation.result.ok) {
+        return;
+      }
+      const draft = resolveAnchorOffsetDraft(button.dataset.assemblyConfirmId);
+      const input = Array.from(assemblyConfirmInputs).find(
         (node) => node.dataset.assemblyConfirmInput === button.dataset.assemblyConfirmId,
       );
-      const directionInput = Array.from(queryHostAll("[data-assembly-anchor-offset-direction]")).find(
-        (node) => node.dataset.assemblyAnchorOffsetDirection === button.dataset.assemblyConfirmId
-          && node.checked,
-      );
-      const value = directionInput
-        ? {
-          direction: directionInput.value || "",
-          offsetBp: input?.value ?? "",
-        }
-        : input?.value ?? "";
+      const value = draft.direction ? draft : input?.value ?? "";
       resolveAssemblyConfirmDialog(host, store, {
         id: button.dataset.assemblyConfirmId,
         confirmed: button.dataset.assemblyConfirmAction === "confirm",
