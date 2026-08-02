@@ -458,7 +458,7 @@ test("bindDegapCard does not collapse an expanded job editor on pointer leave", 
   assert.equal(store.getState().assembly.degap.expandedJobId, job.jobId);
 });
 
-test("requestDegapGapJob creates All-mode gap jobs for the clicked haplotype final path", () => {
+test("requestDegapGapJob creates both GapFiller jobs for the clicked haplotype final path", () => {
   const listeners = {};
   const host = {
     listeners,
@@ -544,15 +544,16 @@ test("requestDegapGapJob creates All-mode gap jobs for the clicked haplotype fin
   const created = requestDegapGapJob(host, store, {
     chrName: "Chr01B",
     gapSegmentId: "gap-b",
-    side: "left",
+    side: "all",
   }, { rerender() {}, persistDegapProjectState() {} });
 
   const jobs = store.getState().assembly.degap.jobs;
   assert.equal(created, true);
-  assert.equal(jobs.length, 1);
-  assert.equal(jobs[0].chrName, "Chr01B");
-  assert.equal(jobs[0].leftCtg, "B-left");
-  assert.equal(jobs[0].rightCtg, "B-right");
+  assert.equal(jobs.length, 2);
+  assert.deepEqual(jobs.map((job) => job.side), ["left", "right"]);
+  assert.ok(jobs.every((job) => job.chrName === "Chr01B"));
+  assert.ok(jobs.every((job) => job.leftCtg === "B-left"));
+  assert.ok(jobs.every((job) => job.rightCtg === "B-right"));
 });
 
 test("requestDegapTelseekerJob creates an All-mode job for the selected endpoint", () => {
@@ -654,6 +655,47 @@ test("requestDegapTelseekerJob creates an All-mode job for the selected endpoint
   assert.deepEqual(jobs[0].endpoint, { assemblyCtgId: 4, start: 100, end: 1 });
 });
 
+test("requestDegapTelseekerJob creates both endpoint jobs for a single-contig path", () => {
+  const host = createHost();
+  const store = createStore({
+    session: {},
+    assembly: {
+      selectedChrName: "Chr01",
+      finalPathByChr: {
+        Chr01: {
+          chrName: "Chr01",
+          segments: [
+            { segmentId: "only", type: "ctg", assemblyCtgId: 1, ctgName: "Only", overallLen: 100, start: 1, end: 100 },
+          ],
+        },
+      },
+      degap: {
+        settingsPanelDismissed: true,
+        settings: {
+          degapPath: "/opt/DEGAP/bin/DEGAP.py",
+          hifiReads: ["/reads/a.fq.gz"],
+          gpmServerPath: "/srv/gpm_server",
+          outRoot: "/srv/degap",
+        },
+        jobs: [],
+      },
+    },
+  });
+
+  const created = requestDegapTelseekerJob(host, store, {
+    chrName: "Chr01",
+    segmentId: "only",
+    endpointSide: "all",
+  }, { rerender() {}, persistDegapProjectState() {} });
+
+  const jobs = store.getState().assembly.degap.jobs;
+  assert.equal(created, true);
+  assert.equal(jobs.length, 2);
+  assert.deepEqual(jobs.map((job) => job.side), ["left", "right"]);
+  assert.deepEqual(jobs.map((job) => job.endpointEnd), ["L", "R"]);
+  assert.ok(jobs.every((job) => job.endpointCtg === "Only"));
+});
+
 function createFirstJobGateStore(settings = {}) {
   return createStore({
     session: {},
@@ -678,6 +720,41 @@ function createFirstJobGateStore(settings = {}) {
   });
 }
 
+test("GapFiller All preserves an existing side and creates only the missing side", () => {
+  const host = createHost();
+  const store = createFirstJobGateStore({
+    degapPath: "/opt/DEGAP/bin/DEGAP.py",
+    hifiReads: ["/reads/a.fq.gz"],
+    gpmServerPath: "/srv/gpm_server",
+    outRoot: "/srv/degap",
+  });
+  const deps = { rerender() {}, persistDegapProjectState() {} };
+
+  assert.equal(requestDegapGapJob(host, store, {
+    chrName: "Chr01",
+    gapSegmentId: "gap",
+    side: "left",
+  }, deps), true);
+  assert.equal(requestDegapGapJob(host, store, {
+    chrName: "Chr01",
+    gapSegmentId: "gap",
+    side: "all",
+  }, deps), true);
+
+  const jobs = store.getState().assembly.degap.jobs;
+  assert.equal(jobs.length, 2);
+  assert.deepEqual(jobs.map((job) => job.side), ["left", "right"]);
+  assert.equal(store.getState().assembly.degap.error, "");
+
+  assert.equal(requestDegapGapJob(host, store, {
+    chrName: "Chr01",
+    gapSegmentId: "gap",
+    side: "all",
+  }, deps), false);
+  assert.equal(store.getState().assembly.degap.jobs.length, 2);
+  assert.match(store.getState().assembly.degap.error, /已有该任务/);
+});
+
 test("first DEGAP job waits for valid settings and resumes exactly once after save", async () => {
   const host = createHost();
   const panel = createSettingsPanel();
@@ -697,7 +774,7 @@ test("first DEGAP job waits for valid settings and resumes exactly once after sa
   const created = requestDegapGapJob(host, store, {
     chrName: "Chr01",
     gapSegmentId: "gap",
-    side: "right",
+    side: "all",
   }, { rerender() {} });
   assert.equal(created, false);
   assert.equal(store.getState().assembly.degap.panelOpen, true);
@@ -705,7 +782,7 @@ test("first DEGAP job waits for valid settings and resumes exactly once after sa
     kind: "gapfiller",
     chrName: "Chr01",
     gapSegmentId: "gap",
-    side: "right",
+    side: "all",
   });
   assert.equal(store.getState().assembly.degap.jobs.length, 0);
 
@@ -721,8 +798,8 @@ test("first DEGAP job waits for valid settings and resumes exactly once after sa
   const degap = store.getState().assembly.degap;
   assert.equal(degap.panelOpen, false);
   assert.equal(degap.pendingJobIntent, null);
-  assert.equal(degap.jobs.length, 1);
-  assert.equal(degap.jobs[0].side, "right");
+  assert.equal(degap.jobs.length, 2);
+  assert.deepEqual(degap.jobs.map((job) => job.side), ["left", "right"]);
   assert.deepEqual(degap.collapsedJobCardChrNames, []);
 });
 

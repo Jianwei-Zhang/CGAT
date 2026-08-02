@@ -34,6 +34,14 @@ function normalizeString(value) {
   return String(value || "").trim();
 }
 
+export function normalizeDegapRequestedSide(value) {
+  const normalized = normalizeString(value).toLowerCase();
+  if (normalized === "all") {
+    return "all";
+  }
+  return normalized === "right" ? "right" : "left";
+}
+
 function normalizeStringList(value) {
   if (Array.isArray(value)) {
     return value.map(normalizeString).filter(Boolean);
@@ -73,7 +81,7 @@ function normalizeDegapPendingJobIntent(value) {
       kind,
       chrName,
       gapSegmentId,
-      side: normalizeString(source.side).toLowerCase() === "right" ? "right" : "left",
+      side: normalizeDegapRequestedSide(source.side),
     };
   }
   if (kind === "telseeker") {
@@ -85,7 +93,7 @@ function normalizeDegapPendingJobIntent(value) {
       kind,
       chrName,
       segmentId,
-      endpointSide: normalizeString(source.endpointSide).toLowerCase() === "right" ? "right" : "left",
+      endpointSide: normalizeDegapRequestedSide(source.endpointSide),
     };
   }
   return null;

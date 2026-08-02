@@ -8,6 +8,7 @@ import {
   buildTelseekerCtgJobsForFinalPath,
   findDuplicateDegapJobs,
   mergeDegapJobs,
+  normalizeDegapRequestedSide,
   normalizeDegapRuntimeState,
   normalizeDegapSettings,
   readDegapSoftwareSettings,
@@ -31,6 +32,11 @@ const DEGAP_TOAST_DISMISS_MS = 800;
 
 function normalizeString(value) {
   return String(value || "").trim();
+}
+
+function resolveDegapRequestedSides(value) {
+  const side = normalizeDegapRequestedSide(value);
+  return side === "all" ? ["left", "right"] : [side];
 }
 
 function normalizeStringList(value) {
@@ -287,28 +293,35 @@ function createDegapJobFromIntent(host, store, intent, deps = {}) {
   const degap = getDegapState(store);
   const finalPathEntry = resolveDegapMenuFinalPathEntry(state.assembly, intent);
   try {
+    const requestedSides = resolveDegapRequestedSides(
+      intent?.kind === "telseeker" ? intent?.endpointSide : intent?.side,
+    );
     if (
       intent?.kind === "telseeker"
-      && !resolveDegapTerminalCtgSides(finalPathEntry, intent.segmentId).includes(intent.endpointSide)
+      && requestedSides.some(
+        (side) => !resolveDegapTerminalCtgSides(finalPathEntry, intent.segmentId).includes(side),
+      )
     ) {
       throw new Error(tAssembly(state, "degap.missingEndpointCtg"));
     }
     const nextJobs = intent?.kind === "telseeker"
       ? buildTelseekerCtgJobsForFinalPath({
         finalPathEntry,
-        ends: [intent.endpointSide],
+        ends: requestedSides,
         settings: degap.settings,
         stateOrLocale: state,
       })
       : buildDegapJobsForGap({
         finalPathEntry,
         gapSegmentId: intent?.gapSegmentId || "",
-        sides: [intent?.side === "right" ? "right" : "left"],
+        sides: requestedSides,
         settings: degap.settings,
         stateOrLocale: state,
       });
     const duplicateJobs = findDuplicateDegapJobs(degap.jobs, nextJobs);
-    if (duplicateJobs.length) {
+    const duplicateKeys = new Set(duplicateJobs.map((job) => buildDegapJobKey(job)));
+    const jobsToAdd = nextJobs.filter((job) => !duplicateKeys.has(buildDegapJobKey(job)));
+    if (!jobsToAdd.length) {
       const duplicateLabels = duplicateJobs.map((job) => job.label || job.jobId).join(", ");
       updateDegapState(host, store, {
         menu: null,
@@ -324,11 +337,13 @@ function createDegapJobFromIntent(host, store, intent, deps = {}) {
       ? degap.collapsedJobCardChrNames
       : degap.collapsedJobCardChrNames.filter((item) => item !== chrName);
     updateDegapState(host, store, {
-      jobs: mergeDegapJobs(degap.jobs, nextJobs),
+      jobs: mergeDegapJobs(degap.jobs, jobsToAdd),
       menu: null,
       pendingJobIntent: null,
       collapsedJobCardChrNames,
-      feedback: tAssembly(state, "degap.jobAdded", { label: nextJobs[0]?.label || "" }),
+      feedback: tAssembly(state, "degap.jobAdded", {
+        label: jobsToAdd.map((job) => job.label || job.jobId).join(", "),
+      }),
       error: "",
     }, deps, { persist: true });
     scrollDegapJobsToBottom(host, chrName);
@@ -366,7 +381,7 @@ export function requestDegapGapJob(host, store, payload, deps = {}) {
     kind: "gapfiller",
     chrName: normalizeString(payload?.chrName),
     gapSegmentId: normalizeString(payload?.gapSegmentId),
-    side: normalizeString(payload?.side).toLowerCase() === "right" ? "right" : "left",
+    side: normalizeDegapRequestedSide(payload?.side),
   }, deps);
 }
 
@@ -375,7 +390,7 @@ export function requestDegapTelseekerJob(host, store, payload, deps = {}) {
     kind: "telseeker",
     chrName: normalizeString(payload?.chrName),
     segmentId: normalizeString(payload?.segmentId),
-    endpointSide: normalizeString(payload?.endpointSide).toLowerCase() === "right" ? "right" : "left",
+    endpointSide: normalizeDegapRequestedSide(payload?.endpointSide),
   }, deps);
 }
 

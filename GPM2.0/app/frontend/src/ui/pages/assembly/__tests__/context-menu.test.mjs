@@ -1262,6 +1262,7 @@ test("buildAssemblyContextMenuItems exposes precise GapFiller actions and settin
   assert.deepEqual(items[1].children.map((item) => item.label), [
     "GapFiller Left",
     "GapFiller Right",
+    "GapFiller All",
     "设置",
   ]);
   await items[0].run();
@@ -1279,6 +1280,15 @@ test("buildAssemblyContextMenuItems exposes precise GapFiller actions and settin
     }],
   });
   await items[1].children[2].run();
+  assert.deepEqual(calls.at(-1), {
+    name: "requestDegapGapJob",
+    args: [host, store, {
+      chrName: "Chr01",
+      gapSegmentId: "seg-2",
+      side: "all",
+    }],
+  });
+  await items[1].children[3].run();
   assert.deepEqual(calls.at(-1), {
     name: "openDegapSettings",
     args: [host, store],
@@ -1362,6 +1372,7 @@ test("buildAssemblyContextMenuItems lets a single-contig path choose the TelSeek
   assert.deepEqual(degapItem.children.map((item) => item.label), [
     "TelSeeker Left",
     "TelSeeker Right",
+    "TelSeeker All",
     "设置",
   ]);
   await degapItem.children[1].run();
@@ -1371,6 +1382,15 @@ test("buildAssemblyContextMenuItems lets a single-contig path choose the TelSeek
       chrName: "Chr01",
       segmentId: "only",
       endpointSide: "right",
+    }],
+  });
+  await degapItem.children[2].run();
+  assert.deepEqual(calls.at(-1), {
+    name: "requestDegapTelseekerJob",
+    args: [host, store, {
+      chrName: "Chr01",
+      segmentId: "only",
+      endpointSide: "all",
     }],
   });
 });

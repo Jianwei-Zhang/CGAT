@@ -9,6 +9,7 @@ import {
   buildTelseekerCtgJobsForFinalPath,
   findDuplicateDegapJobs,
   mergeDegapJobs,
+  normalizeDegapRuntimeState,
   normalizeDegapSettings,
   resolveDegapTerminalCtgSides,
   resolveDegapExportSettings,
@@ -88,6 +89,28 @@ const adjacentGapFinalPathEntry = {
     },
   ],
 };
+
+test("normalizeDegapRuntimeState preserves pending All job intents", () => {
+  const gapfiller = normalizeDegapRuntimeState({
+    pendingJobIntent: {
+      kind: "gapfiller",
+      chrName: "Chr01",
+      gapSegmentId: "gap-1",
+      side: "all",
+    },
+  });
+  const telseeker = normalizeDegapRuntimeState({
+    pendingJobIntent: {
+      kind: "telseeker",
+      chrName: "Chr01",
+      segmentId: "only",
+      endpointSide: "all",
+    },
+  });
+
+  assert.equal(gapfiller.pendingJobIntent.side, "all");
+  assert.equal(telseeker.pendingJobIntent.endpointSide, "all");
+});
 
 test("buildDegapJobsForGap creates ordered left and right jobs with oriented seeds", () => {
   const jobs = buildDegapJobsForGap({

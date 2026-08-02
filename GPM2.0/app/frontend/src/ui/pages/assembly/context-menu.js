@@ -766,6 +766,16 @@ export function buildAssemblyContextMenuItems({
               });
             },
           },
+          {
+            label: i18n.contextMenu.degapGapfillerAll,
+            run: async () => {
+              await requestDegapGapJob(host, store, {
+                chrName: targetChrName || finalPathEntry?.chrName || "",
+                gapSegmentId: segmentId,
+                side: "all",
+              });
+            },
+          },
           settingsItem,
         ],
       });
@@ -814,18 +824,30 @@ export function buildAssemblyContextMenuItems({
       const endpointSides = resolveDegapTerminalCtgSides(finalPathEntry, segmentId);
       if (endpointSides.length) {
         const telseekerItems = endpointSides.length > 1
-          ? endpointSides.map((endpointSide) => ({
-            label: endpointSide === "right"
-              ? i18n.contextMenu.degapTelseekerRight
-              : i18n.contextMenu.degapTelseekerLeft,
-            run: async () => {
-              await requestDegapTelseekerJob(host, store, {
-                chrName: targetChrName || finalPathEntry?.chrName || "",
-                segmentId,
-                endpointSide,
-              });
+          ? [
+            ...endpointSides.map((endpointSide) => ({
+              label: endpointSide === "right"
+                ? i18n.contextMenu.degapTelseekerRight
+                : i18n.contextMenu.degapTelseekerLeft,
+              run: async () => {
+                await requestDegapTelseekerJob(host, store, {
+                  chrName: targetChrName || finalPathEntry?.chrName || "",
+                  segmentId,
+                  endpointSide,
+                });
+              },
+            })),
+            {
+              label: i18n.contextMenu.degapTelseekerAll,
+              run: async () => {
+                await requestDegapTelseekerJob(host, store, {
+                  chrName: targetChrName || finalPathEntry?.chrName || "",
+                  segmentId,
+                  endpointSide: "all",
+                });
+              },
             },
-          }))
+          ]
           : [{
             label: i18n.contextMenu.degapTelseeker,
             run: async () => {
