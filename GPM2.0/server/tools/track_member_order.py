@@ -40,12 +40,9 @@ def require_header(path, actual, expected):
 def parse_anchor(row, row_number):
     raw = (row.get("anchor_start") or "").strip()
     try:
-        anchor = int(raw)
+        return int(raw)
     except ValueError:
         fail(f"invalid anchor_start at chr_assignments.tsv row {row_number}: {raw!r}")
-    if anchor < 1:
-        fail(f"anchor_start must be >= 1 at chr_assignments.tsv row {row_number}")
-    return anchor
 
 
 def load_existing_ranks(path):

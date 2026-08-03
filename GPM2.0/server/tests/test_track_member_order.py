@@ -90,6 +90,30 @@ class TrackMemberOrderTests(unittest.TestCase):
             )
             self.assertEqual(output_path.read_bytes().count(b"\r\n"), 0)
 
+    def test_sorts_signed_anchor_estimates(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            server_dir = Path(temporary_dir)
+            write_tsv(
+                server_dir / "metadata" / "chr_assignments.tsv",
+                ASSIGNMENT_FIELDS,
+                [
+                    assignment("ds_a", "ctg_positive", 10),
+                    assignment("ds_a", "ctg_zero", 0),
+                    assignment("ds_a", "ctg_negative", -5),
+                ],
+            )
+
+            _output_path, rows = TRACK_MEMBER_ORDER.build_member_rows(server_dir)
+
+            self.assertEqual(
+                [(row["member_ctg"], row["member_order"]) for row in rows],
+                [
+                    ("ctg_negative", 1),
+                    ("ctg_zero", 2),
+                    ("ctg_positive", 3),
+                ],
+            )
+
     def test_equal_anchor_derived_member_follows_existing_authoritative_order(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             server_dir = Path(temporary_dir)
