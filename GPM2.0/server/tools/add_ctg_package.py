@@ -115,6 +115,11 @@ def main(argv):
         payload_root / "metadata" / "chr_assignments.tsv",
         lambda row: row.get("dataset_name") == DERIVED_DATASET and row.get("seq_name") == ctg_name,
     )
+    write_filtered_tsv(
+        metadata_dir / "track_member_orders.tsv",
+        payload_root / "metadata" / "track_member_orders.tsv",
+        lambda row: row.get("target_track") == target_track and row.get("target_chr") == target_chr,
+    )
     locator_rows = write_filtered_tsv(
         metadata_dir / "source_seq_locator.tsv",
         payload_root / "metadata" / "source_seq_locator.tsv",

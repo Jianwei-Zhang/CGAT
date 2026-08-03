@@ -170,9 +170,9 @@ struct TrackMemberRow {
 #[derive(Debug, Clone)]
 struct ValidatedAddCtgPackage {
     target_dataset_id: i64,
-    chr_order: i64,
     source_length: i64,
     anchor_start: i64,
+    track_member_orders: Vec<ImportedTrackMemberOrderRow>,
 }
 
 #[derive(Debug, Clone)]
@@ -190,6 +190,15 @@ struct ImportedChrAssignmentRow {
     support_bp: i64,
     support_percent: f64,
     anchor_start: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ImportedTrackMemberOrderRow {
+    target_track: String,
+    target_chr: String,
+    member_dataset: String,
+    member_ctg: String,
+    member_order: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -833,8 +842,8 @@ where
                 catalog.source_seq_id,
                 &manifest.ctg_name,
                 &manifest.target_chr,
-                validated.chr_order,
                 validated.anchor_start,
+                &validated.track_member_orders,
             )?;
             recorder.record(
                 "append_derived_ctg_assembly",
@@ -1760,6 +1769,8 @@ fn sync_catalog_from_bundle(project_db_path: &Path, bundle_root: &Path) -> Resul
     }
     let package = read_package_row(bundle_root)?;
     let chr_assignments = read_imported_chr_assignment_rows(bundle_root)?;
+    let track_member_orders = read_imported_track_member_order_rows(bundle_root)?;
+    validate_track_member_orders_against_assignments(&track_member_orders, &chr_assignments)?;
     let reference_chr_locators = read_reference_chr_locator_rows(bundle_root)?;
     let source_seq_locators = read_source_seq_locator_rows(bundle_root)?;
     let source_seq_n_regions = read_source_seq_n_region_rows(bundle_root)?;
@@ -1844,6 +1855,7 @@ fn sync_catalog_from_bundle(project_db_path: &Path, bundle_root: &Path) -> Resul
 
     sync_workspace_package_metadata(&tx, &package)?;
     sync_imported_chr_assignment_rows(&tx, &chr_assignments)?;
+    sync_imported_track_member_order_rows(&tx, &track_member_orders)?;
     sync_reference_chr_locator_rows(&tx, bundle_root, &reference_chr_locators)?;
     sync_source_seq_locator_rows(&tx, bundle_root, &source_seq_locators)?;
     sync_source_seq_n_region_rows(&tx, &source_seq_n_regions)?;
@@ -2375,14 +2387,14 @@ fn validate_add_ctg_package(
         );
     }
 
-    let (_target_reference_chr_id, chr_order): (i64, i64) = conn
+    let target_reference_chr_id: i64 = conn
         .query_row(
-            "SELECT id, chr_order
+            "SELECT id
              FROM reference_chr
              WHERE reference_genome_id = ?1
                AND chr_name = ?2",
             params![reference_genome_id, manifest.target_chr],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| row.get(0),
         )
         .optional()
         .context("failed to resolve add_ctg target chr")?
@@ -2473,6 +2485,14 @@ fn validate_add_ctg_package(
             chr_assignment.assigned_chr_name
         );
     }
+    let track_member_orders = read_imported_track_member_order_rows(payload_root)?;
+    validate_add_ctg_track_member_order_snapshot(
+        &conn,
+        manifest,
+        target_dataset_id,
+        target_reference_chr_id,
+        &track_member_orders,
+    )?;
     let derived_row = read_derived_ctg_rows(payload_root)?
         .into_iter()
         .next()
@@ -2487,10 +2507,82 @@ fn validate_add_ctg_package(
     read_single_add_ctg_locator(payload_root, manifest)?;
     Ok(ValidatedAddCtgPackage {
         target_dataset_id,
-        chr_order,
         source_length: chr_assignment.seq_length_bp,
         anchor_start: chr_assignment.anchor_start,
+        track_member_orders,
     })
+}
+
+fn validate_add_ctg_track_member_order_snapshot(
+    conn: &rusqlite::Connection,
+    manifest: &AddCtgManifest,
+    target_dataset_id: i64,
+    reference_chr_id: i64,
+    rows: &[ImportedTrackMemberOrderRow],
+) -> Result<()> {
+    if rows.is_empty()
+        || rows.iter().any(|row| {
+            row.target_track != manifest.target_track || row.target_chr != manifest.target_chr
+        })
+    {
+        bail!(
+            "add_ctg metadata/track_member_orders.tsv must be a full snapshot for {}:{}; regenerate the package with the current server scripts",
+            manifest.target_track,
+            manifest.target_chr
+        );
+    }
+    let new_member_count = rows
+        .iter()
+        .filter(|row| {
+            row.member_dataset == manifest.derived_dataset && row.member_ctg == manifest.ctg_name
+        })
+        .count();
+    if new_member_count != 1 {
+        bail!(
+            "add_ctg track order snapshot must contain the new member {} exactly once",
+            manifest.ctg_name
+        );
+    }
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT member_d.name, member_ss.seq_name
+             FROM imported_track_member_order ilmo
+             JOIN source_seq member_ss ON member_ss.id = ilmo.source_seq_id
+             JOIN dataset member_d ON member_d.id = member_ss.dataset_id
+             WHERE ilmo.target_dataset_id = ?1
+               AND ilmo.reference_chr_id = ?2
+             ORDER BY ilmo.member_order",
+        )
+        .context("failed to prepare existing track member order lookup")?;
+    let existing_members = stmt
+        .query_map(params![target_dataset_id, reference_chr_id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .context("failed to query existing track member orders")?
+        .collect::<std::result::Result<HashSet<_>, _>>()
+        .context("failed to decode existing track member orders")?;
+    if existing_members.is_empty() {
+        bail!(
+            "workspace has no authoritative order for {}:{}; reimport a package generated with the current server scripts",
+            manifest.target_track,
+            manifest.target_chr
+        );
+    }
+    let mut expected_members = existing_members;
+    expected_members.insert((manifest.derived_dataset.clone(), manifest.ctg_name.clone()));
+    let payload_members = rows
+        .iter()
+        .map(|row| (row.member_dataset.clone(), row.member_ctg.clone()))
+        .collect::<HashSet<_>>();
+    if payload_members != expected_members {
+        bail!(
+            "add_ctg track order snapshot is incomplete for {}:{}; regenerate the package from the matching server workspace",
+            manifest.target_track,
+            manifest.target_chr
+        );
+    }
+    Ok(())
 }
 
 fn validate_add_dataset_alignment_engine(
@@ -2749,6 +2841,18 @@ fn validate_add_payload_files(
             manifest.dataset_name
         );
     }
+    let track_member_orders = read_imported_track_member_order_rows(payload_root)?;
+    if track_member_orders.is_empty()
+        || track_member_orders
+            .iter()
+            .any(|row| row.target_track != manifest.dataset_name)
+    {
+        bail!(
+            "add dataset payload metadata/track_member_orders.tsv must contain only target track {}; regenerate the package with the current server scripts",
+            manifest.dataset_name
+        );
+    }
+    validate_track_member_orders_against_assignments(&track_member_orders, &chr_assignment_rows)?;
     let locator_rows = read_source_seq_locator_rows(payload_root)?;
     if locator_rows.is_empty()
         || locator_rows
@@ -3153,6 +3257,7 @@ fn validate_add_ctg_payload_merge_targets(
         if is_appendable_add_ctg_payload_tsv(&rel)
             || is_appendable_add_ctg_fasta(&rel)
             || is_appendable_add_ctg_fai(&rel)
+            || rel == "metadata/track_member_orders.tsv"
             || rel == "metadata/datasets.tsv"
         {
             continue;
@@ -3236,6 +3341,164 @@ fn read_imported_chr_assignment_rows(bundle_root: &Path) -> Result<Vec<ImportedC
         })
     })
     .with_context(|| format!("failed to parse {}", path.display()))
+}
+
+fn read_imported_track_member_order_rows(
+    bundle_root: &Path,
+) -> Result<Vec<ImportedTrackMemberOrderRow>> {
+    let path = bundle_root.join("metadata/track_member_orders.tsv");
+    if !path.exists() {
+        bail!(
+            "server delivery package requires metadata/track_member_orders.tsv; regenerate the package with the current server scripts"
+        );
+    }
+    let expected_header = [
+        "target_track",
+        "target_chr",
+        "member_dataset",
+        "member_ctg",
+        "member_order",
+    ];
+    let file = File::open(&path).with_context(|| format!("failed to open {}", path.display()))?;
+    let header_line = BufReader::new(file)
+        .lines()
+        .next()
+        .transpose()
+        .with_context(|| format!("failed to read header from {}", path.display()))?
+        .ok_or_else(|| anyhow::anyhow!("missing header in {}", path.display()))?;
+    let header = header_line.split('\t').map(str::trim).collect::<Vec<_>>();
+    if header != expected_header {
+        bail!(
+            "invalid metadata/track_member_orders.tsv header; regenerate the package with the current server scripts"
+        );
+    }
+    let rows = read_tsv_rows(&path, |header, cols| {
+        let member_order = value_by_header(header, cols, "member_order")?
+            .parse::<i64>()
+            .with_context(|| "invalid member_order".to_string())?;
+        Ok(ImportedTrackMemberOrderRow {
+            target_track: value_by_header(header, cols, "target_track")?,
+            target_chr: value_by_header(header, cols, "target_chr")?,
+            member_dataset: value_by_header(header, cols, "member_dataset")?,
+            member_ctg: value_by_header(header, cols, "member_ctg")?,
+            member_order,
+        })
+    })
+    .with_context(|| format!("failed to parse {}", path.display()))?;
+    validate_imported_track_member_order_rows(&rows)?;
+    Ok(rows)
+}
+
+fn validate_imported_track_member_order_rows(rows: &[ImportedTrackMemberOrderRow]) -> Result<()> {
+    let mut groups: HashMap<(&str, &str), Vec<&ImportedTrackMemberOrderRow>> = HashMap::new();
+    let mut members = HashSet::new();
+    for row in rows {
+        if row.target_track.is_empty()
+            || row.target_chr.is_empty()
+            || row.member_dataset.is_empty()
+            || row.member_ctg.is_empty()
+            || row.member_order < 1
+        {
+            bail!(
+                "invalid metadata/track_member_orders.tsv row; regenerate the package with the current server scripts"
+            );
+        }
+        let member_key = (
+            row.target_track.as_str(),
+            row.target_chr.as_str(),
+            row.member_dataset.as_str(),
+            row.member_ctg.as_str(),
+        );
+        if !members.insert(member_key) {
+            bail!(
+                "duplicate member in metadata/track_member_orders.tsv for {}:{} {}:{}",
+                row.target_track,
+                row.target_chr,
+                row.member_dataset,
+                row.member_ctg
+            );
+        }
+        groups
+            .entry((row.target_track.as_str(), row.target_chr.as_str()))
+            .or_default()
+            .push(row);
+    }
+    for ((target_track, target_chr), group) in groups {
+        let mut orders = group.iter().map(|row| row.member_order).collect::<Vec<_>>();
+        orders.sort_unstable();
+        let expected = (1..=orders.len() as i64).collect::<Vec<_>>();
+        if orders != expected {
+            bail!(
+                "member_order must be unique and contiguous from 1 for {}:{}; regenerate the package with the current server scripts",
+                target_track,
+                target_chr
+            );
+        }
+    }
+    Ok(())
+}
+
+fn validate_track_member_orders_against_assignments(
+    order_rows: &[ImportedTrackMemberOrderRow],
+    assignment_rows: &[ImportedChrAssignmentRow],
+) -> Result<()> {
+    let assignments = assignment_rows
+        .iter()
+        .map(|row| {
+            (
+                row.dataset_name.as_str(),
+                row.seq_name.as_str(),
+                row.assigned_chr_name.as_str(),
+            )
+        })
+        .collect::<HashSet<_>>();
+    for row in order_rows {
+        if !assignments.contains(&(
+            row.member_dataset.as_str(),
+            row.member_ctg.as_str(),
+            row.target_chr.as_str(),
+        )) {
+            bail!(
+                "track member order has no matching chr assignment: {}:{} on {}; regenerate the package with the current server scripts",
+                row.member_dataset,
+                row.member_ctg,
+                row.target_chr
+            );
+        }
+    }
+    for assignment in assignment_rows {
+        let matching = order_rows
+            .iter()
+            .filter(|row| {
+                row.member_dataset == assignment.dataset_name
+                    && row.member_ctg == assignment.seq_name
+                    && row.target_chr == assignment.assigned_chr_name
+            })
+            .count();
+        if matching != 1 {
+            bail!(
+                "chr assignment {}:{} on {} must have exactly one track member order; regenerate the package with the current server scripts",
+                assignment.dataset_name,
+                assignment.seq_name,
+                assignment.assigned_chr_name
+            );
+        }
+        if assignment.dataset_name != "derived_ctg"
+            && !order_rows.iter().any(|row| {
+                row.target_track == assignment.dataset_name
+                    && row.target_chr == assignment.assigned_chr_name
+                    && row.member_dataset == assignment.dataset_name
+                    && row.member_ctg == assignment.seq_name
+            })
+        {
+            bail!(
+                "normal chr assignment {}:{} is ordered under the wrong target track; regenerate the package with the current server scripts",
+                assignment.dataset_name,
+                assignment.seq_name
+            );
+        }
+    }
+    Ok(())
 }
 
 fn read_reference_chr_locator_rows(bundle_root: &Path) -> Result<Vec<ReferenceChrLocatorRow>> {
@@ -3721,6 +3984,121 @@ fn sync_imported_chr_assignment_rows(
     Ok(())
 }
 
+fn sync_imported_track_member_order_rows(
+    tx: &Transaction<'_>,
+    rows: &[ImportedTrackMemberOrderRow],
+) -> Result<()> {
+    tx.execute("DELETE FROM imported_track_member_order", [])
+        .context("failed to clear imported_track_member_order rows")?;
+    insert_imported_track_member_order_rows(tx, rows)
+}
+
+fn append_imported_track_member_order_rows(
+    tx: &Transaction<'_>,
+    rows: &[ImportedTrackMemberOrderRow],
+) -> Result<()> {
+    insert_imported_track_member_order_rows(tx, rows)
+}
+
+fn replace_imported_track_member_order_groups(
+    tx: &Transaction<'_>,
+    rows: &[ImportedTrackMemberOrderRow],
+) -> Result<()> {
+    let groups = rows
+        .iter()
+        .map(|row| (row.target_track.as_str(), row.target_chr.as_str()))
+        .collect::<HashSet<_>>();
+    for (target_track, target_chr) in groups {
+        let target_dataset_id: i64 = tx
+            .query_row(
+                "SELECT id FROM dataset WHERE name = ?1",
+                params![target_track],
+                |row| row.get(0),
+            )
+            .with_context(|| format!("failed to resolve ordered target track {target_track}"))?;
+        let reference_chr_id: i64 = tx
+            .query_row(
+                "SELECT id FROM reference_chr WHERE chr_name = ?1",
+                params![target_chr],
+                |row| row.get(0),
+            )
+            .with_context(|| format!("failed to resolve ordered target chr {target_chr}"))?;
+        tx.execute(
+            "DELETE FROM imported_track_member_order
+             WHERE target_dataset_id = ?1 AND reference_chr_id = ?2",
+            params![target_dataset_id, reference_chr_id],
+        )
+        .with_context(|| {
+            format!("failed to replace imported track member order for {target_track}:{target_chr}")
+        })?;
+    }
+    insert_imported_track_member_order_rows(tx, rows)
+}
+
+fn insert_imported_track_member_order_rows(
+    tx: &Transaction<'_>,
+    rows: &[ImportedTrackMemberOrderRow],
+) -> Result<()> {
+    for row in rows {
+        let target_dataset_id: i64 = tx
+            .query_row(
+                "SELECT id FROM dataset WHERE name = ?1",
+                params![row.target_track],
+                |query_row| query_row.get(0),
+            )
+            .with_context(|| {
+                format!(
+                    "failed to resolve ordered target track {}",
+                    row.target_track
+                )
+            })?;
+        let source_seq_id: i64 = tx
+            .query_row(
+                "SELECT ss.id
+                 FROM source_seq ss
+                 JOIN dataset d ON d.id = ss.dataset_id
+                 WHERE d.name = ?1 AND ss.seq_name = ?2",
+                params![row.member_dataset, row.member_ctg],
+                |query_row| query_row.get(0),
+            )
+            .with_context(|| {
+                format!(
+                    "failed to resolve ordered track member {}:{}",
+                    row.member_dataset, row.member_ctg
+                )
+            })?;
+        let reference_chr_id: i64 = tx
+            .query_row(
+                "SELECT id FROM reference_chr WHERE chr_name = ?1",
+                params![row.target_chr],
+                |query_row| query_row.get(0),
+            )
+            .with_context(|| format!("failed to resolve ordered target chr {}", row.target_chr))?;
+        tx.execute(
+            "INSERT INTO imported_track_member_order (
+                target_dataset_id, reference_chr_id, source_seq_id, member_order
+             ) VALUES (?1, ?2, ?3, ?4)",
+            params![
+                target_dataset_id,
+                reference_chr_id,
+                source_seq_id,
+                row.member_order
+            ],
+        )
+        .with_context(|| {
+            format!(
+                "failed to insert track member order {}:{} {}:{} -> {}",
+                row.target_track,
+                row.target_chr,
+                row.member_dataset,
+                row.member_ctg,
+                row.member_order
+            )
+        })?;
+    }
+    Ok(())
+}
+
 fn sync_reference_chr_locator_rows(
     tx: &Transaction<'_>,
     bundle_root: &Path,
@@ -4103,6 +4481,10 @@ fn copy_add_ctg_payload_entry(
             append_dataset_tsv_if_new(&source, &target, "derived_ctg")?;
             continue;
         }
+        if rel == "metadata/track_member_orders.tsv" {
+            replace_track_member_order_groups(&source, &target)?;
+            continue;
+        }
         if is_appendable_add_ctg_payload_tsv(&rel) {
             append_tsv_payload_rows(&source, &target)?;
             continue;
@@ -4144,6 +4526,7 @@ fn is_allowed_add_payload_file(rel: &str) -> bool {
 
 fn is_allowed_add_ctg_payload_file(rel: &str) -> bool {
     rel == "metadata/datasets.tsv"
+        || rel == "metadata/track_member_orders.tsv"
         || is_appendable_add_ctg_payload_tsv(rel)
         || rel.starts_with("data/derived_ctgs/")
         || rel == "data/datasets/derived_ctg.fa"
@@ -4155,6 +4538,7 @@ fn is_allowed_add_ctg_payload_file(rel: &str) -> bool {
 fn is_appendable_add_payload_tsv(rel: &str) -> bool {
     rel == "metadata/datasets.tsv"
         || rel == "metadata/chr_assignments.tsv"
+        || rel == "metadata/track_member_orders.tsv"
         || rel == "metadata/source_seq_locator.tsv"
         || rel == "metadata/source_seq_n_regions.tsv"
         || (rel.starts_with("tel/chr_") && rel.ends_with(".tsv"))
@@ -4225,6 +4609,84 @@ fn append_tsv_payload_rows(source: &Path, target: &Path) -> Result<()> {
         writeln!(file, "{row}")
             .with_context(|| format!("failed to append row to {}", target.display()))?;
     }
+    Ok(())
+}
+
+fn replace_track_member_order_groups(source: &Path, target: &Path) -> Result<()> {
+    let source_text = fs::read_to_string(source).with_context(|| {
+        format!(
+            "failed to read add_ctg track order tsv {}",
+            source.display()
+        )
+    })?;
+    let mut source_lines = source_text.lines();
+    let source_header = source_lines
+        .next()
+        .context("add_ctg track member order tsv is empty")?;
+    let source_rows = source_lines
+        .filter(|line| !line.trim().is_empty())
+        .collect::<Vec<_>>();
+    if source_rows.is_empty() {
+        bail!("add_ctg track member order snapshot has no members");
+    }
+    let groups = source_rows
+        .iter()
+        .map(|line| {
+            let columns = line.split('\t').collect::<Vec<_>>();
+            if columns.len() != 5 {
+                bail!("invalid add_ctg track member order row: {line}");
+            }
+            Ok((columns[0].to_string(), columns[1].to_string()))
+        })
+        .collect::<Result<HashSet<_>>>()?;
+
+    let mut merged_rows = Vec::new();
+    if target.exists() {
+        let target_text = fs::read_to_string(target).with_context(|| {
+            format!(
+                "failed to read workspace track order tsv {}",
+                target.display()
+            )
+        })?;
+        let mut target_lines = target_text.lines();
+        let target_header = target_lines.next().unwrap_or_default();
+        if target_header != source_header {
+            bail!(
+                "add_ctg track member order tsv header mismatch for {}",
+                target.display()
+            );
+        }
+        for line in target_lines.filter(|line| !line.trim().is_empty()) {
+            let columns = line.split('\t').collect::<Vec<_>>();
+            if columns.len() != 5 {
+                bail!("invalid workspace track member order row: {line}");
+            }
+            if !groups.contains(&(columns[0].to_string(), columns[1].to_string())) {
+                merged_rows.push(line.to_string());
+            }
+        }
+    } else if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create track member order metadata dir {}",
+                parent.display()
+            )
+        })?;
+    }
+    merged_rows.extend(source_rows.into_iter().map(ToString::to_string));
+    let mut output = String::new();
+    output.push_str(source_header);
+    output.push('\n');
+    for row in merged_rows {
+        output.push_str(&row);
+        output.push('\n');
+    }
+    fs::write(target, output).with_context(|| {
+        format!(
+            "failed to replace track member order groups in {}",
+            target.display()
+        )
+    })?;
     Ok(())
 }
 
@@ -4415,6 +4877,7 @@ fn append_catalog_from_add_payload(
         );
     }
     let chr_assignments = read_imported_chr_assignment_rows(payload_root)?;
+    let track_member_orders = read_imported_track_member_order_rows(payload_root)?;
     let source_seq_locators = read_source_seq_locator_rows(payload_root)?;
     let source_seq_n_regions = read_source_seq_n_region_rows(payload_root)?;
     let telomere_rules = read_telomere_rule_rows(payload_root)?;
@@ -4437,17 +4900,14 @@ fn append_catalog_from_add_payload(
             dataset.assembler_version,
             path_to_string(&fasta_path)?,
             path_to_string(&fai_path)?,
-            if dataset.self_alignment_available {
-                1_i64
-            } else {
-                0_i64
-            }
+            if dataset.self_alignment_available { 1_i64 } else { 0_i64 }
         ],
     )
     .with_context(|| format!("failed to insert add dataset {}", manifest.dataset_name))?;
     let dataset_id = tx.last_insert_rowid();
     sync_source_seq_rows(&tx, dataset_id, &fai_path)?;
     append_imported_chr_assignment_rows(&tx, &chr_assignments)?;
+    append_imported_track_member_order_rows(&tx, &track_member_orders)?;
     append_source_seq_locator_rows(&tx, workspace_root, &source_seq_locators)?;
     append_source_seq_n_region_rows(&tx, &source_seq_n_regions)?;
     append_telomere_rows(&tx, &telomere_rules, &telomere_marks)?;
@@ -4497,6 +4957,7 @@ fn append_catalog_from_add_ctg_payload(
         validated.source_length,
     )?;
     append_imported_chr_assignment_rows(&tx, &[chr_assignment])?;
+    replace_imported_track_member_order_groups(&tx, &validated.track_member_orders)?;
     append_source_seq_locator_rows(&tx, workspace_root, &[locator])?;
     append_source_seq_n_region_rows(&tx, &source_seq_n_regions)?;
     insert_derived_ctg_row(&tx, source_seq_id, &derived_row)?;
@@ -4546,7 +5007,11 @@ fn ensure_derived_dataset_in_transaction(
             dataset.assembler_version,
             path_to_string(&fasta_path)?,
             path_to_string(&fai_path)?,
-            if dataset.self_alignment_available { 1_i64 } else { 0_i64 }
+            if dataset.self_alignment_available {
+                1_i64
+            } else {
+                0_i64
+            }
         ],
     )
     .context("failed to insert derived_ctg dataset")?;
@@ -4960,8 +5425,8 @@ fn append_project_derived_ctg_assembly(
     source_seq_id: i64,
     ctg_name: &str,
     target_chr: &str,
-    chr_order: i64,
     anchor_start: i64,
+    track_member_orders: &[ImportedTrackMemberOrderRow],
 ) -> Result<i64> {
     let mut conn = open_workspace_db(project_db_path)?;
     let tx = conn
@@ -5005,6 +5470,13 @@ fn append_project_derived_ctg_assembly(
         );
     }
     let created_at = now_timestamp_string();
+    let new_chr_order = track_member_orders
+        .iter()
+        .find(|row| row.member_dataset == "derived_ctg" && row.member_ctg == ctg_name)
+        .map(|row| row.member_order)
+        .with_context(|| {
+            format!("track member order snapshot is missing derived ctg {ctg_name}")
+        })?;
     tx.execute(
         "INSERT INTO assembly_seq (
             project_id, source_seq_id, instance_key, orient, source_start, source_end,
@@ -5031,7 +5503,7 @@ fn append_project_derived_ctg_assembly(
             assembly_seq_id,
             ctg_name,
             target_chr,
-            chr_order,
+            new_chr_order,
             anchor_start,
             created_at,
             "derived_ctg"
@@ -5039,6 +5511,48 @@ fn append_project_derived_ctg_assembly(
     )
     .with_context(|| format!("failed to insert derived_ctg assembly_ctg for {ctg_name}"))?;
     let assembly_ctg_id = tx.last_insert_rowid();
+    for order_row in track_member_orders {
+        let updated = tx
+            .execute(
+                "UPDATE assembly_ctg
+                 SET chr_order = ?1
+                 WHERE project_id = ?2
+                   AND assigned_chr_name = ?3
+                   AND assembly_seq_id IN (
+                       SELECT assembly_seq.id
+                       FROM assembly_seq
+                       JOIN source_seq ON source_seq.id = assembly_seq.source_seq_id
+                       JOIN dataset ON dataset.id = source_seq.dataset_id
+                       WHERE assembly_seq.project_id = ?2
+                         AND dataset.name = ?4
+                         AND source_seq.seq_name = ?5
+                   )",
+                params![
+                    order_row.member_order,
+                    project_id,
+                    order_row.target_chr,
+                    order_row.member_dataset,
+                    order_row.member_ctg
+                ],
+            )
+            .with_context(|| {
+                format!(
+                    "failed to apply track member order for {}:{}",
+                    order_row.member_dataset, order_row.member_ctg
+                )
+            })?;
+        let is_new_member =
+            order_row.member_dataset == "derived_ctg" && order_row.member_ctg == ctg_name;
+        if (is_new_member && updated != 1) || updated > 1 {
+            bail!(
+                "track member order snapshot member {}:{} resolved to {} assembly rows in project_id {}",
+                order_row.member_dataset,
+                order_row.member_ctg,
+                updated,
+                project_id
+            );
+        }
+    }
     tx.commit()
         .context("failed to commit derived_ctg assembly append transaction")?;
     Ok(assembly_ctg_id)
@@ -5486,6 +6000,15 @@ mod tests {
             })
             .unwrap();
         assert_eq!(imported_rows, 1);
+        assert_eq!(
+            conn.query_row(
+                "SELECT member_order FROM imported_track_member_order",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap(),
+            1
+        );
     }
 
     #[test]
@@ -5885,20 +6408,25 @@ mod tests {
             query_project_assembly_rows_excluding_dataset(&conn, project_id, ds4_id),
             existing_assembly_rows
         );
-        let ds4_assembly_row: (String, String, Option<String>) = conn
+        let ds4_assembly_row: (String, Option<i64>, String, Option<String>) = conn
             .query_row(
-                "SELECT c.name, s.orient, c.ref_orient
+                "SELECT c.name, c.chr_order, s.orient, c.ref_orient
                  FROM assembly_ctg c
                  JOIN assembly_seq s ON s.id = c.assembly_seq_id
                  JOIN source_seq ss ON ss.id = s.source_seq_id
                  WHERE c.project_id = ?1 AND ss.dataset_id = ?2",
                 params![project_id, ds4_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .unwrap();
         assert_eq!(
             ds4_assembly_row,
-            ("x@r".to_string(), "+".to_string(), Some("+".to_string()))
+            (
+                "x@r".to_string(),
+                Some(1),
+                "+".to_string(),
+                Some("+".to_string())
+            )
         );
         assert_eq!(
             count_rows(&outcome.project_db_path, "source_seq_locator"),
@@ -6073,6 +6601,13 @@ mod tests {
             Some(target_dataset_id),
         )
         .unwrap();
+        assert_eq!(
+            target_track_ctgs
+                .iter()
+                .map(|item| (item.name.as_str(), item.chr_order))
+                .collect::<Vec<_>>(),
+            vec![("gap_filled", Some(1)), ("d@r", Some(2))]
+        );
         let derived_item = target_track_ctgs
             .iter()
             .find(|item| item.name == "gap_filled")
@@ -6083,6 +6618,27 @@ mod tests {
             Some(target_dataset_id)
         );
         assert_eq!(derived_item.hits.len(), 2);
+        let workspace_orders =
+            read_imported_track_member_order_rows(&outcome.workspace_root).unwrap();
+        assert_eq!(
+            workspace_orders
+                .iter()
+                .filter(|row| row.target_track == "ds_a" && row.target_chr == "r")
+                .map(|row| {
+                    (
+                        row.member_dataset.as_str(),
+                        row.member_ctg.as_str(),
+                        row.member_order,
+                    )
+                })
+                .collect::<Vec<_>>(),
+            vec![("derived_ctg", "gap_filled", 1), ("ds_a", "d", 2)]
+        );
+        assert!(
+            workspace_orders
+                .iter()
+                .any(|row| row.target_track == "ds_b" && row.member_ctg == "e")
+        );
     }
 
     #[test]
@@ -6111,6 +6667,35 @@ mod tests {
         assert!(
             error.to_string().contains("该 add_ctg 包属于 r / ds_a 轨道"),
             "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn rejects_legacy_add_ctg_package_without_server_member_order_metadata() {
+        let temp = tempdir().unwrap();
+        let (outcome, project_id) = import_workspace_with_project(temp.path());
+        let original_source_count = count_rows(&outcome.project_db_path, "source_seq");
+        let add_zip_path = temp.path().join("legacy_add_gap_filled.zip");
+        write_add_ctg_zip_with_order(&add_zip_path, false);
+
+        let error =
+            import_add_ctg_package(&add_zip_path, &outcome.workspace_root, project_id).unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("metadata/track_member_orders.tsv"),
+            "{error:#}"
+        );
+        assert_eq!(
+            count_rows(&outcome.project_db_path, "source_seq"),
+            original_source_count
+        );
+        assert!(
+            !outcome
+                .workspace_root
+                .join("data/derived_ctgs/gap_filled.fa")
+                .exists()
         );
     }
 
@@ -6274,6 +6859,14 @@ mod tests {
                     ..AddZipOptions::default()
                 },
                 "payload",
+            ),
+            (
+                "missing server member order metadata",
+                AddZipOptions {
+                    include_track_member_orders: false,
+                    ..AddZipOptions::default()
+                },
+                "metadata/track_member_orders.tsv",
             ),
             (
                 "missing self alignment payload",
@@ -6471,6 +7064,24 @@ mod tests {
         assert!(error.to_string().contains("expected a .zip file"));
     }
 
+    #[test]
+    fn rejects_legacy_initial_package_without_server_member_order_metadata() {
+        let temp = tempdir().unwrap();
+        let bundle_root = temp.path().join("gpm_server");
+        create_bundle_root(&bundle_root);
+        fs::remove_file(bundle_root.join("metadata/track_member_orders.tsv")).unwrap();
+
+        let error = import_from_extracted_bundle(&bundle_root).unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("metadata/track_member_orders.tsv"),
+            "{error:#}"
+        );
+        assert!(error.to_string().contains("regenerate"), "{error:#}");
+    }
+
     fn create_bundle_root(bundle_root: &Path) {
         fs::create_dir_all(bundle_root.join("metadata")).unwrap();
         fs::create_dir_all(bundle_root.join("data/reference")).unwrap();
@@ -6499,6 +7110,11 @@ mod tests {
         fs::write(
             bundle_root.join("metadata/chr_assignments.tsv"),
             "dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsupport_bp\tsupport_percent\tanchor_start\nds_a\td\t2\tr\t2\t100.000\t1\n",
+        )
+        .unwrap();
+        fs::write(
+            bundle_root.join("metadata/track_member_orders.tsv"),
+            "target_track\ttarget_chr\tmember_dataset\tmember_ctg\tmember_order\nds_a\tr\tds_a\td\t1\n",
         )
         .unwrap();
         fs::write(
@@ -6562,6 +7178,11 @@ mod tests {
         )
         .unwrap();
         fs::write(
+            bundle_root.join("metadata/track_member_orders.tsv"),
+            "target_track\ttarget_chr\tmember_dataset\tmember_ctg\tmember_order\nds_a\tr\tds_a\td\t1\n",
+        )
+        .unwrap();
+        fs::write(
             bundle_root.join("metadata/reference_chr_locator.tsv"),
             "reference_chr_name\tfasta_relpath\nr\tdata/reference/chrs/r.fa\n",
         )
@@ -6599,6 +7220,10 @@ mod tests {
         append_text(
             &bundle_root.join("metadata/chr_assignments.tsv"),
             "ds_b\te\t4\tr\t4\t100.000\t1\n",
+        );
+        append_text(
+            &bundle_root.join("metadata/track_member_orders.tsv"),
+            "ds_b\tr\tds_b\te\t1\n",
         );
         append_text(
             &bundle_root.join("metadata/source_seq_locator.tsv"),
@@ -6654,6 +7279,7 @@ mod tests {
         include_tel_payload: bool,
         include_cen_payload: bool,
         include_extra_payload_file: bool,
+        include_track_member_orders: bool,
     }
 
     impl Default for AddZipOptions {
@@ -6686,6 +7312,7 @@ mod tests {
                 include_tel_payload: false,
                 include_cen_payload: false,
                 include_extra_payload_file: false,
+                include_track_member_orders: true,
             }
         }
     }
@@ -6858,6 +7485,10 @@ mod tests {
     }
 
     fn write_add_ctg_zip(zip_path: &Path) {
+        write_add_ctg_zip_with_order(zip_path, true);
+    }
+
+    fn write_add_ctg_zip_with_order(zip_path: &Path, include_track_member_orders: bool) {
         let file = File::create(zip_path).unwrap();
         let mut zip = zip::ZipWriter::new(file);
         let options = FileOptions::default().compression_method(CompressionMethod::Stored);
@@ -6920,6 +7551,16 @@ derived_ctg\tgap_filled\tr\tds_a\tderived\t1\n",
 derived_ctg\tgap_filled\t4\tr\t4\t100.000\t2\n",
         )
         .unwrap();
+        if include_track_member_orders {
+            zip.start_file("gpm_server/metadata/track_member_orders.tsv", options)
+                .unwrap();
+            zip.write_all(
+                b"target_track\ttarget_chr\tmember_dataset\tmember_ctg\tmember_order\n\
+ds_a\tr\tderived_ctg\tgap_filled\t1\n\
+ds_a\tr\tds_a\td\t2\n",
+            )
+            .unwrap();
+        }
         zip.start_file("gpm_server/metadata/source_seq_locator.tsv", options)
             .unwrap();
         zip.write_all(
@@ -7050,6 +7691,17 @@ derived_ctg\tgap_filled\t2\t2\t1\n",
             .as_bytes(),
         )
         .unwrap();
+        if options.include_track_member_orders {
+            zip.start_file("gpm_server/metadata/track_member_orders.tsv", zip_options)
+                .unwrap();
+            zip.write_all(
+                format!(
+                    "target_track\ttarget_chr\tmember_dataset\tmember_ctg\tmember_order\n{dataset_name}\tr\t{dataset_name}\t{seq_name}\t1\n"
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+        }
         zip.start_file("gpm_server/metadata/source_seq_locator.tsv", zip_options)
             .unwrap();
         zip.write_all(
@@ -7186,6 +7838,12 @@ derived_ctg\tgap_filled\t2\t2\t1\n",
             b"dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsupport_bp\tsupport_percent\tanchor_start\nds_a\tds\t4\tref\t4\t100.000\t1\n",
         )
         .unwrap();
+        zip.start_file("gpm_server/metadata/track_member_orders.tsv", options)
+            .unwrap();
+        zip.write_all(
+            b"target_track\ttarget_chr\tmember_dataset\tmember_ctg\tmember_order\nds_a\tref\tds_a\tds\t1\n",
+        )
+        .unwrap();
         zip.start_file("gpm_server/metadata/reference_chr_locator.tsv", options)
             .unwrap();
         zip.write_all(b"reference_chr_name\tfasta_relpath\nref\tdata/reference/chrs/ref.fa\n")
@@ -7260,6 +7918,12 @@ derived_ctg\tgap_filled\t2\t2\t1\n",
             b"dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsupport_bp\tsupport_percent\tanchor_start\nds_a\tds\t4\tref\t4\t100.000\t1\n",
         )
         .unwrap();
+        zip.start_file("gpm_server/metadata/track_member_orders.tsv", options)
+            .unwrap();
+        zip.write_all(
+            b"target_track\ttarget_chr\tmember_dataset\tmember_ctg\tmember_order\nds_a\tref\tds_a\tds\t1\n",
+        )
+        .unwrap();
         zip.start_file("gpm_server/metadata/reference_chr_locator.tsv", options)
             .unwrap();
         zip.write_all(b"reference_chr_name\tfasta_relpath\nref\tdata/reference/chrs/ref.fa\n")
@@ -7330,6 +7994,12 @@ derived_ctg\tgap_filled\t2\t2\t1\n",
             .unwrap();
         zip.write_all(
             b"dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsupport_bp\tsupport_percent\tanchor_start\nds_a\tds\t4\tref\t4\t100.000\t1\n",
+        )
+        .unwrap();
+        zip.start_file("gpm_server/metadata/track_member_orders.tsv", options)
+            .unwrap();
+        zip.write_all(
+            b"target_track\ttarget_chr\tmember_dataset\tmember_ctg\tmember_order\nds_a\tref\tds_a\tds\t1\n",
         )
         .unwrap();
         zip.start_file("gpm_server/metadata/reference_chr_locator.tsv", options)

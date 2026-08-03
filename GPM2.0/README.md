@@ -97,7 +97,7 @@ If needed, you can also use the printed alignment commands to choose a manual ex
 Execution order is strict:
 
 1. finish every `*_vs_ref/result.paf`
-2. run `assign_chr_groups.sh`
+2. run `assign_chr_groups.sh`; it also writes the authoritative dataset-track member order to `metadata/track_member_orders.tsv`
 3. run each generated `runs/chr_<chr>/command.sh`
 
 This is why `run_all.sh` keeps the commands in staged order.
@@ -117,6 +117,8 @@ bash ./gpm_server/add_dataset.sh --ds ds4_name /path/to/ds4.fa -o /path/to/add_d
 ```
 
 The generated `add_ds4_name.zip` is an add package, not a full delivery bundle. Use it only with an existing desktop workspace/project: open the existing workspace in GPM2.0, choose the add-package action on the target project row, and select the zip.
+
+The initial workflow and generated add scripts calculate dataset-track contig order on the server. The desktop imports `metadata/track_member_orders.tsv` and does not recalculate that order from anchors. Packages produced by older scripts without this file are intentionally unsupported and must be regenerated.
 
 Because the script also merges the new dataset into the server-side `gpm_server/` directory, run the full packager again when you need a fresh full import bundle that already includes the new dataset. Use that full delivery bundle for new desktop workspaces or full re-imports:
 

@@ -186,6 +186,19 @@ pub fn init_workspace_schema(conn: &Connection) -> Result<()> {
             FOREIGN KEY(reference_chr_id) REFERENCES reference_chr(id) ON DELETE CASCADE
         );
 
+        CREATE TABLE IF NOT EXISTS imported_track_member_order (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            target_dataset_id INTEGER NOT NULL,
+            reference_chr_id INTEGER NOT NULL,
+            source_seq_id INTEGER NOT NULL,
+            member_order INTEGER NOT NULL CHECK(member_order >= 1),
+            UNIQUE(target_dataset_id, reference_chr_id, source_seq_id),
+            UNIQUE(target_dataset_id, reference_chr_id, member_order),
+            FOREIGN KEY(target_dataset_id) REFERENCES dataset(id) ON DELETE CASCADE,
+            FOREIGN KEY(reference_chr_id) REFERENCES reference_chr(id) ON DELETE CASCADE,
+            FOREIGN KEY(source_seq_id) REFERENCES source_seq(id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS reference_chr_locator (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             reference_chr_id INTEGER NOT NULL UNIQUE,
@@ -445,6 +458,10 @@ pub fn init_workspace_schema(conn: &Connection) -> Result<()> {
             ON imported_chr_assignment(source_seq_id);
         CREATE INDEX IF NOT EXISTS idx_imported_chr_assignment_chr
             ON imported_chr_assignment(reference_chr_id);
+        CREATE INDEX IF NOT EXISTS idx_imported_track_member_order_member
+            ON imported_track_member_order(source_seq_id);
+        CREATE INDEX IF NOT EXISTS idx_imported_track_member_order_group
+            ON imported_track_member_order(target_dataset_id, reference_chr_id, member_order);
         CREATE INDEX IF NOT EXISTS idx_reference_chr_locator_chr
             ON reference_chr_locator(reference_chr_id);
         CREATE INDEX IF NOT EXISTS idx_source_seq_locator_source_seq

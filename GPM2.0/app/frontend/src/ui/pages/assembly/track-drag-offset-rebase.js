@@ -39,7 +39,7 @@ export function rebaseTrackDragOffsetsForStableCtgPositions({
 
 function buildBaseStartBpByAssemblyCtgId(ctgs) {
   const starts = new Map();
-  normalizeCtgs(ctgs).forEach((ctg) => {
+  normalizeCtgs(ctgs, { preserveInputOrder: true }).forEach((ctg) => {
     const assemblyCtgId = normalizeSupportDatasetId(ctg?.assemblyCtgId);
     if (!assemblyCtgId) {
       return;

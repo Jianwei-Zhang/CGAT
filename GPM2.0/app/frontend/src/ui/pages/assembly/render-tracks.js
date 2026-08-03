@@ -1282,6 +1282,7 @@ function createRenderTracksRenderer(deps = {}) {
     selectedPrimaryCtgId: assembly.selectedCtgId,
     selectedCompanionCtgId: assembly.selectedCtgId,
     prefs: trackPrefs,
+    preserveInputOrder: true,
   });
   const supportMirroredCtgs = buildSupportMirroredCtgsForRender({
     supportMirroredCtgs: assembly.supportMirroredCtgs,
@@ -1615,6 +1616,7 @@ function createRenderTracksRenderer(deps = {}) {
       selectedPrimaryCtgId: assembly.selectedCtgId,
       selectedCompanionCtgId: assembly.selectedCtgId,
       prefs: trackPrefs,
+      preserveInputOrder: true,
     });
     const supportMirroredCtgs = buildSupportMirroredCtgsForRender({
       supportMirroredCtgs: assembly.supportMirroredCtgs,

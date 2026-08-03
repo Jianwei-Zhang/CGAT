@@ -75,6 +75,7 @@ Behavior:
   - Creates .fai with samtools faidx when missing
   - Generates metadata/reference.tsv and metadata/datasets.tsv
   - Generates metadata/package.tsv
+  - Generates authoritative metadata/track_member_orders.tsv during chr assignment
   - Generates runs/*/command.sh and <work_root>/run_all.sh
   - Chains run_all.sh commands with && so execution stops on the first failed command
   - Generates package_full_zip.sh, package_light_no_fasta_zip.sh, and export_final_path_fasta.sh
@@ -1113,6 +1114,9 @@ python3 "${stage_dir}/.prepare_lib/tools/add_ctg_stage.py" finalize \
   --track "$target_track" \
   --input "$input_src" \
   --source "$source_text"
+
+python3 "${stage_dir}/.prepare_lib/tools/track_member_order.py" \
+  --server-dir "$stage_dir"
 
 python3 - "$stage_dir" "$server_dir" <<'PY'
 import shutil
@@ -2434,6 +2438,8 @@ for chr_name in reference_chr_names:
 
     write_generated_command_script(chr_run_dir / "generated_command.sh", command_paths, chr_name)
 PY
+python3 "\${GPM_FAST_WORK_ROOT}/.prepare_lib/tools/track_member_order.py" \
+  --server-dir "\${GPM_FAST_WORK_ROOT}"
 EOF
   chmod +x "$output_path"
 }

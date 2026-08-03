@@ -58,3 +58,25 @@ test("rebaseTrackDragOffsetsForStableCtgPositions does not create offsets for un
 
   assert.deepEqual(result, []);
 });
+
+test("rebaseTrackDragOffsetsForStableCtgPositions uses server order instead of anchor order", () => {
+  const result = rebaseTrackDragOffsetsForStableCtgPositions({
+    trackRole: "primary",
+    previousCtgs: [
+      { assemblyCtgId: 2, name: "B", anchorStart: 200, totalLength: 50 },
+      { assemblyCtgId: 1, name: "A", anchorStart: 100, totalLength: 100 },
+    ],
+    nextCtgs: [
+      { assemblyCtgId: 3, name: "C", anchorStart: 300, totalLength: 20 },
+      { assemblyCtgId: 2, name: "B", anchorStart: 200, totalLength: 50 },
+      { assemblyCtgId: 1, name: "A", anchorStart: 100, totalLength: 100 },
+    ],
+    trackDragOffsets: [
+      { trackRole: "primary", assemblyCtgId: 1, offsetBp: 10 },
+    ],
+  });
+
+  assert.deepEqual(result, [
+    { trackRole: "primary", assemblyCtgId: 1, offsetBp: -10 },
+  ]);
+});

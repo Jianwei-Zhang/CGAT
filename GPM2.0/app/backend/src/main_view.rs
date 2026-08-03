@@ -432,9 +432,7 @@ pub fn list_chr_view_ctgs_with_connection(
          ORDER BY
             CASE WHEN c.assigned_chr_name IS NULL OR c.assigned_chr_name = '' THEN 1 ELSE 0 END,
             c.assigned_chr_name,
-            c.chr_order,
-            c.anchor_start,
-            c.id",
+            c.chr_order",
     );
     let mut stmt = conn
         .prepare(&sql)

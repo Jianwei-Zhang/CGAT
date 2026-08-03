@@ -97,7 +97,7 @@ bash ./gpm_server/run_all.sh
 执行顺序必须固定：
 
 1. 先完成所有 `*_vs_ref/result.paf`
-2. 再执行 `assign_chr_groups.sh`
+2. 再执行 `assign_chr_groups.sh`；该脚本同时把 dataset 轨道的权威成员顺序写入 `metadata/track_member_orders.tsv`
 3. 最后执行每个 `runs/chr_<chr>/command.sh`
 
 因此 `run_all.sh` 会按这个阶段顺序组织命令。
@@ -117,6 +117,8 @@ bash ./gpm_server/add_dataset.sh --ds ds4_name /path/to/ds4.fa -o /path/to/add_d
 ```
 
 生成的 `add_ds4_name.zip` 是追加包，不是完整交付包；它只用于应用到已有桌面端工作区/项目。请先在 GPM2.0 打开已有项目区，再在目标项目行上选择导入追加包并选中该 zip。
+
+初始流程和生成的追加脚本都会在服务端计算 dataset 轨道的 ctg 顺序。桌面端只导入 `metadata/track_member_orders.tsv`，不会再根据 anchor 重算顺序。旧脚本生成且缺少该文件的包不再兼容，需要使用当前服务端脚本重新生成。
 
 由于脚本也会把新 dataset 合并回服务端 `gpm_server/` 目录，如需得到已经包含新 dataset 的完整包，请重新运行完整打包脚本。该完整 zip 可用于创建新的桌面端项目区或执行完整重新导入：
 

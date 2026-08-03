@@ -144,6 +144,7 @@ struct WorkspacePackageMetadata {
 #[derive(Debug, Clone, PartialEq)]
 struct ImportedChrAssignmentSeed {
     chr_name: String,
+    chr_order: i64,
     support_bp: i64,
     support_percent: f64,
     anchor_start: i64,
@@ -957,12 +958,17 @@ fn load_imported_chr_assignment_seeds(
             "SELECT
                 ica.source_seq_id,
                 rc.chr_name,
+                ilmo.member_order,
                 ica.support_bp,
                 ica.support_percent,
                 ica.anchor_start
              FROM imported_chr_assignment ica
              JOIN reference_chr rc ON rc.id = ica.reference_chr_id
              JOIN source_seq ss ON ss.id = ica.source_seq_id
+             JOIN imported_track_member_order ilmo
+               ON ilmo.source_seq_id = ica.source_seq_id
+              AND ilmo.reference_chr_id = ica.reference_chr_id
+              AND ilmo.target_dataset_id = ss.dataset_id
              JOIN project_dataset pd ON pd.dataset_id = ss.dataset_id
              WHERE pd.project_id = ?1
              ORDER BY pd.display_order, ss.seq_order, rc.chr_order, rc.id",
@@ -974,9 +980,10 @@ fn load_imported_chr_assignment_seeds(
                 row.get::<_, i64>(0)?,
                 ImportedChrAssignmentSeed {
                     chr_name: row.get(1)?,
-                    support_bp: row.get(2)?,
-                    support_percent: row.get(3)?,
-                    anchor_start: row.get(4)?,
+                    chr_order: row.get(2)?,
+                    support_bp: row.get(3)?,
+                    support_percent: row.get(4)?,
+                    anchor_start: row.get(5)?,
                 },
             ))
         })
@@ -1066,12 +1073,13 @@ fn insert_bootstrap_auto_seed(
         "INSERT INTO assembly_ctg (
             project_id, assembly_seq_id, name, assigned_chr_name, chr_order, anchor_start,
             ref_orient, placement_mode, created_at, note
-        ) VALUES (?1, ?2, ?3, ?4, NULL, ?5, NULL, 'auto', ?6, ?7)",
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, 'auto', ?7, ?8)",
         params![
             project_id,
             assembly_seq_id,
             format!("{}@{}", ctg_base_name, seed.chr_name),
             seed.chr_name,
+            seed.chr_order,
             seed.anchor_start,
             created_at,
             note
@@ -2067,6 +2075,13 @@ mod tests {
             params![source_seq_id, reference_chr_id],
         )
         .unwrap();
+        conn.execute(
+            "INSERT INTO imported_track_member_order (
+                target_dataset_id, reference_chr_id, source_seq_id, member_order
+             ) VALUES (11, ?1, ?2, 1)",
+            params![reference_chr_id, source_seq_id],
+        )
+        .unwrap();
 
         let project = initialize_project_with_connection(
             &mut conn,
@@ -2087,9 +2102,9 @@ mod tests {
             bootstrap_project_assembly_with_connection(&mut conn, project.project_id).unwrap();
         assert_eq!(summary.assembly_seq_count, 1);
 
-        let row: (String, Option<String>, Option<i64>, String, String) = conn
+        let row: (String, Option<String>, Option<i64>, Option<i64>, String, String) = conn
             .query_row(
-                "SELECT c.name, c.assigned_chr_name, c.anchor_start, c.placement_mode, s.instance_key
+                "SELECT c.name, c.assigned_chr_name, c.chr_order, c.anchor_start, c.placement_mode, s.instance_key
                  FROM assembly_ctg c
                  JOIN assembly_seq s ON s.id = c.assembly_seq_id
                  WHERE c.project_id = ?1",
@@ -2101,6 +2116,7 @@ mod tests {
                         row.get(2)?,
                         row.get(3)?,
                         row.get(4)?,
+                        row.get(5)?,
                     ))
                 },
             )
@@ -2110,6 +2126,7 @@ mod tests {
             (
                 "primary_ctg1@chr1".to_string(),
                 Some("chr1".to_string()),
+                Some(1),
                 Some(42),
                 "auto".to_string(),
                 "chr:chr1".to_string(),
@@ -2171,6 +2188,13 @@ mod tests {
         )
         .unwrap();
         conn.execute(
+            "INSERT INTO imported_track_member_order (
+                target_dataset_id, reference_chr_id, source_seq_id, member_order
+             ) VALUES (14, ?1, ?2, 1)",
+            params![reference_chr_id, ds4_source_seq_id],
+        )
+        .unwrap();
+        conn.execute(
             "INSERT INTO project_dataset (project_id, dataset_id, dataset_role, display_order)
              VALUES (?1, 14, 'support', 2)",
             params![project.project_id],
@@ -2189,9 +2213,9 @@ mod tests {
             before_existing_rows
         );
 
-        let ds4_row: (String, Option<String>, Option<i64>, String, String) = conn
+        let ds4_row: (String, Option<String>, Option<i64>, Option<i64>, String, String) = conn
             .query_row(
-                "SELECT c.name, c.assigned_chr_name, c.anchor_start, c.placement_mode, s.orient
+                "SELECT c.name, c.assigned_chr_name, c.chr_order, c.anchor_start, c.placement_mode, s.orient
                  FROM assembly_ctg c
                  JOIN assembly_seq s ON s.id = c.assembly_seq_id
                  JOIN source_seq ss ON ss.id = s.source_seq_id
@@ -2204,6 +2228,7 @@ mod tests {
                         row.get(2)?,
                         row.get(3)?,
                         row.get(4)?,
+                        row.get(5)?,
                     ))
                 },
             )
@@ -2213,6 +2238,7 @@ mod tests {
             (
                 "ds4_ctg1@chr1".to_string(),
                 Some("chr1".to_string()),
+                Some(1),
                 Some(444),
                 "auto".to_string(),
                 "+".to_string(),
@@ -2276,6 +2302,13 @@ mod tests {
                 params![source_seq_id, reference_chr_id, anchor_start],
             )
             .unwrap();
+            conn.execute(
+                "INSERT INTO imported_track_member_order (
+                    target_dataset_id, reference_chr_id, source_seq_id, member_order
+                 ) VALUES (?1, ?2, ?3, 1)",
+                params![dataset_id, reference_chr_id, source_seq_id],
+            )
+            .unwrap();
         }
 
         let project = initialize_project_with_connection(
@@ -2300,7 +2333,7 @@ mod tests {
         let rows = {
             let mut stmt = conn
                 .prepare(
-                    "SELECT name, assigned_chr_name, anchor_start
+                    "SELECT name, assigned_chr_name, chr_order, anchor_start
                      FROM assembly_ctg
                      WHERE project_id = ?1
                      ORDER BY id",
@@ -2311,6 +2344,7 @@ mod tests {
                     row.get::<_, String>(0)?,
                     row.get::<_, Option<String>>(1)?,
                     row.get::<_, Option<i64>>(2)?,
+                    row.get::<_, Option<i64>>(3)?,
                 ))
             })
             .unwrap()
@@ -2323,11 +2357,13 @@ mod tests {
                 (
                     "hifiasm_ont:ctg1514@chr1".to_string(),
                     Some("chr1".to_string()),
+                    Some(1),
                     Some(100),
                 ),
                 (
                     "hifiasm_hifi:ctg1514@chr1".to_string(),
                     Some("chr1".to_string()),
+                    Some(1),
                     Some(200),
                 ),
             ]

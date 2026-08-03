@@ -13,6 +13,8 @@ tmp/
 .agents/
 .claude/
 .codex/
+**/__pycache__/
+*.py[cod]
 
 # Rust / Tauri build artifacts
 src-tauri/target/

@@ -28,6 +28,21 @@ test("normalizeCtgs sorts contigs by anchor start and lays out from zero with co
   );
 });
 
+test("normalizeCtgs preserves server order when requested even if anchors disagree", () => {
+  const result = normalizeCtgs(
+    [
+      { assemblyCtgId: 2, name: "server-first", anchorStart: 999, totalLength: 20 },
+      { assemblyCtgId: 1, name: "server-second", anchorStart: 1, totalLength: 10 },
+    ],
+    { preserveInputOrder: true },
+  );
+
+  assert.deepEqual(
+    result.map((item) => [item.name, item.startBp]),
+    [["server-first", 0], ["server-second", 20]],
+  );
+});
+
 test("normalizeCtgs keeps contiguous data coordinates for adjacent long contigs", () => {
   const result = normalizeCtgs([
     { assemblyCtgId: 1, name: "A", anchorStart: 10, totalLength: 10_000_000 },
