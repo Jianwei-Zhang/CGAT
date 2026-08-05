@@ -1,0 +1,2 @@
+source_card_key	dataset_name	contig_name	original_assignment	target_chr	placement_mode	ref_alignment_status	anchor_start	orientation	accepted_event_ids_json	final_path_segment_ids_json	pairwise_evidence_ids_json
+support:donor1:Chr01:grt_promoted	support	donor1	unplaced	Chr01	grt_promoted	no_hit	5	+	["evt-step1-round1"]	["seg-patch-1"]	["ev-display-donor1"]

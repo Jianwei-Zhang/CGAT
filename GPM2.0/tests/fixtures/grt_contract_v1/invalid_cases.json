@@ -1,0 +1,120 @@
+[
+  {
+    "name": "missing_required_file",
+    "expected_code": "MISSING_REQUIRED_FILE",
+    "operation": {
+      "type": "remove",
+      "path": "metadata/grt_recipe.tsv"
+    }
+  },
+  {
+    "name": "unsupported_workflow",
+    "expected_code": "UNSUPPORTED_SCHEMA",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/package.tsv",
+      "old": "gpm_grt_precomputed_v1",
+      "new": "gpm_legacy"
+    }
+  },
+  {
+    "name": "bad_tsv_header",
+    "expected_code": "INVALID_TSV",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/grt_recipe.tsv",
+      "old": "recipe_id",
+      "new": "legacy_recipe_id"
+    }
+  },
+  {
+    "name": "broken_event_reference",
+    "expected_code": "BROKEN_REFERENCE",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/grt_donor_usage.tsv",
+      "old": "evt-step1-round1",
+      "new": "evt-missing"
+    }
+  },
+  {
+    "name": "invalid_source_coordinate",
+    "expected_code": "INVALID_COORDINATE",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/grt_donor_members.tsv",
+      "old": "d0-test\td0-donor1-1-4\tsupport\tdonor1\t1\t4",
+      "new": "d0-test\td0-donor1-1-4\tsupport\tdonor1\t0\t4"
+    }
+  },
+  {
+    "name": "donor_fasta_checksum_mismatch",
+    "expected_code": "CHECKSUM_MISMATCH",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/grt_donor_sets.tsv",
+      "old": "611075347bdeb46d6c6f402d4e86dd141d5fd0ccf139078eb7fa7d27b309c1a4",
+      "new": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  {
+    "name": "unknown_recipe_donor_set",
+    "expected_code": "BROKEN_REFERENCE",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/grt_recipe.tsv",
+      "old": "d0-test\tdtel-test",
+      "new": "d0-missing\tdtel-test"
+    }
+  },
+  {
+    "name": "final_path_q4_checksum_mismatch",
+    "expected_code": "CHECKSUM_MISMATCH",
+    "operation": {
+      "type": "replace_text",
+      "path": "grt/q/q4.fa",
+      "old": "AAAACCCC",
+      "new": "AAAACCCA"
+    }
+  },
+  {
+    "name": "missing_display_evidence_link",
+    "expected_code": "BROKEN_REFERENCE",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/grt_used_contigs.tsv",
+      "old": "[\"ev-display-donor1\"]",
+      "new": "[\"ev-display-missing\"]"
+    }
+  },
+  {
+    "name": "raw_evidence_checksum_mismatch",
+    "expected_code": "CHECKSUM_MISMATCH",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/grt_evidence_registry.tsv",
+      "old": "2aa2e549ae78be9c324c50a455adfa2bd5ba0700e972cced0e5303fffd6837f8",
+      "new": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  {
+    "name": "q0_source_mapping_length_mismatch",
+    "expected_code": "INVALID_COORDINATE",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/grt_q_segments.tsv",
+      "old": "q0\tChr01\tq0-primary-1\t1\t4\tprimary\tprimary1\t1\t4",
+      "new": "q0\tChr01\tq0-primary-1\t1\t4\tprimary\tprimary1\t1\t3"
+    }
+  },
+  {
+    "name": "checkpoint_checksum_mismatch",
+    "expected_code": "CHECKSUM_MISMATCH",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/grt_stage_status.tsv",
+      "old": "grt/checkpoints/donor_freeze.json\tca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+      "new": "grt/checkpoints/donor_freeze.json\t0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  }
+]

@@ -1,0 +1,2 @@
+reference_name	species_name	assembly_label	fasta_relpath	fai_relpath
+ref	unknown	ref	data/reference/ref.fa	data/reference/ref.fa.fai

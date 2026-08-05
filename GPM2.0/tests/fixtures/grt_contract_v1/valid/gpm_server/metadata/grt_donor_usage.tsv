@@ -1,0 +1,2 @@
+usage_id	donor_set_id	member_id	source_dataset	source_contig	source_start	source_end	stage	status	event_id	final_path_segment_id	reason
+use-donor1-1-4	d0-test	d0-donor1-1-4	support	donor1	1	4	step1_round1	consumed	evt-step1-round1	seg-patch-1	accepted_after_global_arbitration

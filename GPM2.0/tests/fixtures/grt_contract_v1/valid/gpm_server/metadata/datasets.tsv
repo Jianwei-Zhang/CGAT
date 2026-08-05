@@ -1,0 +1,3 @@
+dataset_name	assembler	assembler_version	fasta_relpath	fai_relpath	self_alignment_available
+primary	primary		data/datasets/primary.fa	data/datasets/primary.fa.fai	true
+support	support		data/datasets/support.fa	data/datasets/support.fa.fai	true

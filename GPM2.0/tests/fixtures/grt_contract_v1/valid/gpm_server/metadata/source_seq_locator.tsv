@@ -1,0 +1,4 @@
+dataset_name	seq_name	fasta_relpath
+primary	primary1	data/datasets/primary.fa
+support	donor1	data/datasets/support.fa
+support	tel1	data/datasets/support.fa

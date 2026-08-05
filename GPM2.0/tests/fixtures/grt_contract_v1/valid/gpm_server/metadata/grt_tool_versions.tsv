@@ -1,0 +1,3 @@
+tool	version	executable
+minimap2	2.28	/usr/bin/minimap2
+nucmer	4.0.0rc1	/usr/bin/nucmer

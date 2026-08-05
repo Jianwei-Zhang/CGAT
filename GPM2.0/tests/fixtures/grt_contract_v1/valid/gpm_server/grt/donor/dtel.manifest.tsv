@@ -1,0 +1,2 @@
+donor_set_id	member_id	dataset_name	contig_name	source_start	source_end	orientation	fasta_record_name	sequence_sha256
+dtel-test	dtel-tel1-1-12	support	tel1	1	12	+	dtel__support__tel1__1_12	5dafe2db240b6de9de07413f3cd07829b09d3113a461e92c16ec0b9bcaf4f7e3

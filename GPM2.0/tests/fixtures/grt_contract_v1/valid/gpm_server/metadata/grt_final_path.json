@@ -1,0 +1,44 @@
+{
+  "workflow": "gpm_grt_precomputed_v1",
+  "schema_version": "1",
+  "q4_relpath": "grt/q/q4.fa",
+  "chromosomes": [
+    {
+      "chr": "Chr01",
+      "q4_length": 8,
+      "q4_sha256": "a6c7cf707ec32204560c3967f3af57cb57cd3faa8302c0a1a6f36a5d78abfa2e",
+      "segments": [
+        {
+          "segment_id": "seg-primary-1",
+          "kind": "source",
+          "length": 4,
+          "orientation": "+",
+          "event_id": null,
+          "source": {
+            "dataset": "primary",
+            "contig": "primary1",
+            "start": 1,
+            "end": 4,
+            "orientation": "+"
+          },
+          "evidence_ids": ["ev-ref-primary"]
+        },
+        {
+          "segment_id": "seg-patch-1",
+          "kind": "patch",
+          "length": 4,
+          "orientation": "+",
+          "event_id": "evt-step1-round1",
+          "source": {
+            "dataset": "support",
+            "contig": "donor1",
+            "start": 1,
+            "end": 4,
+            "orientation": "+"
+          },
+          "evidence_ids": ["ev-step1-round1", "ev-display-donor1"]
+        }
+      ]
+    }
+  ]
+}

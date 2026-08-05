@@ -1,0 +1,2 @@
+workflow	schema_version	package_mode	sequence_layout	preassigned_chr	self_alignment_scope	cross_alignment_scope	chr_assignment_min_coverage_percent	grt_precompute_enabled	recipe_locked	final_path_schema_version	reads_qc_enabled
+gpm_grt_precomputed_v1	1	full	partitioned	true	chr_partition	chr_partition	60	true	true	1	false

@@ -1,0 +1,2 @@
+recipe_id	primary_dataset	support_datasets_json	reads_qc_enabled	donor_set_id	tel_donor_set_id	q0_relpath	final_q_relpath
+recipe-test	primary	["support"]	false	d0-test	dtel-test	grt/q/q0.fa	grt/q/q4.fa

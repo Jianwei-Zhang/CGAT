@@ -1,0 +1,3 @@
+donor_set_id	donor_kind	manifest_relpath	fasta_relpath	fasta_sha256	member_count
+d0-test	ordinary	grt/donor/d0.manifest.tsv	grt/donor/d0.fa	611075347bdeb46d6c6f402d4e86dd141d5fd0ccf139078eb7fa7d27b309c1a4	1
+dtel-test	telomere	grt/donor/dtel.manifest.tsv	grt/donor/dtel.fa	624d9151605bd17d8f3619eaadf025bb3347e9a336548ec8556463287ba03b33	1

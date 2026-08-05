@@ -1,0 +1,4 @@
+dataset_name	contig_name	q_eligible	donor_eligible	tel_donor_eligible	q_rejection_reason	donor_rejection_reason	tel_rejection_reason
+primary	primary1	true	false	false		used_in_q0	no_telomere_signal
+support	donor1	false	true	false	not_primary		no_telomere_signal
+support	tel1	false	false	true	not_primary	below_minimum_length	eligible

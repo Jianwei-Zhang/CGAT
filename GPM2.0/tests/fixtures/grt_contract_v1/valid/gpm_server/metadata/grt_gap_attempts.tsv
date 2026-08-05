@@ -1,0 +1,2 @@
+attempt_id	chr	object_id	stage	status	reason	candidate_count	accepted_event_id
+attempt-gap1-step1r1	Chr01	gap-1	step1_round1	accepted	two_sided_anchor	1	evt-step1-round1

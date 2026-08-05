@@ -1,0 +1,317 @@
+{
+  "workflow": "gpm_grt_precomputed_v1",
+  "schema_version": "1",
+  "final_path_schema_version": "1",
+  "hash_semantics": {
+    "artifact": "sha256 of exact file bytes",
+    "sequence": "sha256 of uppercase sequence bytes without FASTA header or whitespace"
+  },
+  "required_files": [
+    "metadata/package.tsv",
+    "metadata/reference.tsv",
+    "metadata/datasets.tsv",
+    "metadata/source_seq_locator.tsv",
+    "metadata/grt_recipe.tsv",
+    "metadata/grt_contig_roles.tsv",
+    "metadata/grt_q_segments.tsv",
+    "metadata/grt_donor_sets.tsv",
+    "metadata/grt_donor_members.tsv",
+    "metadata/grt_evidence_registry.tsv",
+    "metadata/grt_donor_usage.tsv",
+    "metadata/grt_used_contigs.tsv",
+    "metadata/grt_events.jsonl",
+    "metadata/grt_gap_attempts.tsv",
+    "metadata/grt_stage_status.tsv",
+    "metadata/grt_tool_versions.tsv",
+    "metadata/grt_final_path.json",
+    "grt/q/q0.fa",
+    "grt/q/q0r1.fa",
+    "grt/q/q0f.fa",
+    "grt/q/q1.fa",
+    "grt/q/q2.fa",
+    "grt/q/q3.fa",
+    "grt/q/q4.fa"
+  ],
+  "tables": {
+    "metadata/package.tsv": {
+      "header": [
+        "workflow",
+        "schema_version",
+        "package_mode",
+        "sequence_layout",
+        "preassigned_chr",
+        "self_alignment_scope",
+        "cross_alignment_scope",
+        "chr_assignment_min_coverage_percent",
+        "grt_precompute_enabled",
+        "recipe_locked",
+        "final_path_schema_version",
+        "reads_qc_enabled"
+      ],
+      "min_rows": 1,
+      "max_rows": 1
+    },
+    "metadata/reference.tsv": {
+      "header": [
+        "reference_name",
+        "species_name",
+        "assembly_label",
+        "fasta_relpath",
+        "fai_relpath"
+      ],
+      "min_rows": 1,
+      "max_rows": 1
+    },
+    "metadata/datasets.tsv": {
+      "header": [
+        "dataset_name",
+        "assembler",
+        "assembler_version",
+        "fasta_relpath",
+        "fai_relpath",
+        "self_alignment_available"
+      ],
+      "min_rows": 1
+    },
+    "metadata/source_seq_locator.tsv": {
+      "header": ["dataset_name", "seq_name", "fasta_relpath"],
+      "min_rows": 1
+    },
+    "metadata/grt_recipe.tsv": {
+      "header": [
+        "recipe_id",
+        "primary_dataset",
+        "support_datasets_json",
+        "reads_qc_enabled",
+        "donor_set_id",
+        "tel_donor_set_id",
+        "q0_relpath",
+        "final_q_relpath"
+      ],
+      "min_rows": 1,
+      "max_rows": 1
+    },
+    "metadata/grt_contig_roles.tsv": {
+      "header": [
+        "dataset_name",
+        "contig_name",
+        "q_eligible",
+        "donor_eligible",
+        "tel_donor_eligible",
+        "q_rejection_reason",
+        "donor_rejection_reason",
+        "tel_rejection_reason"
+      ],
+      "min_rows": 1
+    },
+    "metadata/grt_q_segments.tsv": {
+      "header": [
+        "q_version",
+        "chr",
+        "segment_id",
+        "q_start",
+        "q_end",
+        "dataset_name",
+        "contig_name",
+        "source_start",
+        "source_end",
+        "orientation",
+        "source_card_key",
+        "evidence_ids_json"
+      ],
+      "min_rows": 1
+    },
+    "metadata/grt_donor_sets.tsv": {
+      "header": [
+        "donor_set_id",
+        "donor_kind",
+        "manifest_relpath",
+        "fasta_relpath",
+        "fasta_sha256",
+        "member_count"
+      ],
+      "min_rows": 2
+    },
+    "metadata/grt_donor_members.tsv": {
+      "header": [
+        "donor_set_id",
+        "member_id",
+        "dataset_name",
+        "contig_name",
+        "source_start",
+        "source_end",
+        "orientation",
+        "fasta_record_name",
+        "sequence_sha256"
+      ],
+      "min_rows": 1
+    },
+    "metadata/grt_evidence_registry.tsv": {
+      "header": [
+        "evidence_id",
+        "stage",
+        "evidence_type",
+        "status",
+        "q_version",
+        "q_source_sha256",
+        "query_artifact_relpath",
+        "query_sha256",
+        "donor_set_id",
+        "target_artifact_relpath",
+        "target_sha256",
+        "source_dataset",
+        "source_contig",
+        "source_start",
+        "source_end",
+        "orientation",
+        "target_chr",
+        "target_start",
+        "target_end",
+        "tool",
+        "tool_version",
+        "preset",
+        "parameters_json",
+        "raw_artifact_relpath",
+        "raw_artifact_sha256",
+        "coordinate_system",
+        "projection_status"
+      ],
+      "min_rows": 1
+    },
+    "metadata/grt_donor_usage.tsv": {
+      "header": [
+        "usage_id",
+        "donor_set_id",
+        "member_id",
+        "source_dataset",
+        "source_contig",
+        "source_start",
+        "source_end",
+        "stage",
+        "status",
+        "event_id",
+        "final_path_segment_id",
+        "reason"
+      ],
+      "min_rows": 1
+    },
+    "metadata/grt_used_contigs.tsv": {
+      "header": [
+        "source_card_key",
+        "dataset_name",
+        "contig_name",
+        "original_assignment",
+        "target_chr",
+        "placement_mode",
+        "ref_alignment_status",
+        "anchor_start",
+        "orientation",
+        "accepted_event_ids_json",
+        "final_path_segment_ids_json",
+        "pairwise_evidence_ids_json"
+      ],
+      "min_rows": 0
+    },
+    "metadata/grt_gap_attempts.tsv": {
+      "header": [
+        "attempt_id",
+        "chr",
+        "object_id",
+        "stage",
+        "status",
+        "reason",
+        "candidate_count",
+        "accepted_event_id"
+      ],
+      "min_rows": 0
+    },
+    "metadata/grt_stage_status.tsv": {
+      "header": [
+        "stage",
+        "q_input_version",
+        "q_input_sha256",
+        "q_output_version",
+        "q_output_sha256",
+        "donor_set_id",
+        "status",
+        "checkpoint_relpath",
+        "checkpoint_sha256"
+      ],
+      "min_rows": 8,
+      "max_rows": 8
+    },
+    "metadata/grt_tool_versions.tsv": {
+      "header": ["tool", "version", "executable"],
+      "min_rows": 1
+    }
+  },
+  "enums": {
+    "donor_kind": ["ordinary", "telomere"],
+    "orientation": ["+", "-"],
+    "evidence_status": ["candidate", "accepted", "rejected", "conflicted", "background"],
+    "evidence_stage": [
+      "assignment",
+      "step1_round1",
+      "step1_round2",
+      "step2",
+      "step3",
+      "step4_telomere",
+      "candidate_validation",
+      "display_pairwise"
+    ],
+    "usage_status": ["available", "candidate", "accepted", "consumed", "rejected", "conflicted"],
+    "event_status": ["accepted", "rejected", "conflicted", "unresolved"],
+    "event_stage": [
+      "step1_round1",
+      "step1_filter",
+      "step1_round2",
+      "step2",
+      "step3",
+      "step4_telomere"
+    ],
+    "event_action": [
+      "fill",
+      "filter_component",
+      "patch",
+      "delete",
+      "replace",
+      "correct_boundary",
+      "refill",
+      "extend_telomere"
+    ],
+    "stage_status": ["success"],
+    "original_assignment": ["assigned", "unplaced", "cross_chr"],
+    "placement_mode": ["normal", "grt_promoted", "cross_chr_grt_usage"],
+    "ref_alignment_status": ["hit", "weak_hit", "multi_hit", "other_chr_only", "no_hit"],
+    "coordinate_system": ["paf_0_based_half_open", "mummer_1_based_closed", "app_1_based_closed"],
+    "projection_status": ["native", "projected"],
+    "segment_kind": ["source", "patch", "correction", "telomere", "gap"]
+  },
+  "stage_transitions": [
+    ["donor_freeze", "q0", "q0"],
+    ["step1_round1", "q0", "q0r1"],
+    ["step1_filter", "q0r1", "q0f"],
+    ["step1_round2", "q0f", "q1"],
+    ["step2", "q1", "q2"],
+    ["step3", "q2", "q3"],
+    ["step4_telomere", "q3", "q4"],
+    ["finalize", "q4", "q4"]
+  ],
+  "event_required_fields": [
+    "run_id",
+    "event_id",
+    "stage",
+    "chr",
+    "object_id",
+    "action",
+    "status",
+    "reason",
+    "q_before",
+    "q_after",
+    "source",
+    "evidence_ids",
+    "usage_ids",
+    "source_card_key",
+    "final_path_segment_id"
+  ]
+}
