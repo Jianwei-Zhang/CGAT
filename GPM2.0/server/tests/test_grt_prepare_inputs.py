@@ -6,10 +6,14 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).parents[2]
 TOOL = REPO_ROOT / "server" / "tools" / "grt_prepare_inputs.py"
+sys.path.insert(0, str(REPO_ROOT / "server/tools"))
+
+from grt_prepare_inputs import commit_prepared_outputs
 
 
 def write_fasta(path, records):
@@ -394,6 +398,55 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
             )
             self.assertEqual(rebuilt.returncode, 0, rebuilt.stderr)
             self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 10)
+
+    def test_atomic_publish_restores_previous_outputs_when_metadata_install_fails(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+            server = root / "gpm_server"
+            old_grt = server / "grt"
+            old_metadata = server / "metadata"
+            old_grt.mkdir(parents=True)
+            old_metadata.mkdir(parents=True)
+            (old_grt / "old.txt").write_text("old-grt\n", encoding="utf-8")
+            (old_metadata / "grt_old.tsv").write_text("old-metadata\n", encoding="utf-8")
+            (old_metadata / "package.tsv").write_text("keep\n", encoding="utf-8")
+
+            stage_root = root / "stage"
+            stage_grt = stage_root / "grt"
+            stage_metadata = stage_root / "metadata"
+            stage_grt.mkdir(parents=True)
+            stage_metadata.mkdir(parents=True)
+            (stage_grt / "new.txt").write_text("new-grt\n", encoding="utf-8")
+            (stage_metadata / "grt_new.tsv").write_text("new-metadata\n", encoding="utf-8")
+
+            real_replace = os.replace
+            injected = False
+
+            def fail_once_during_metadata_install(source, destination):
+                nonlocal injected
+                if Path(source).name == "grt_new.tsv" and not injected:
+                    injected = True
+                    raise OSError("injected metadata install failure")
+                return real_replace(source, destination)
+
+            with mock.patch(
+                "grt_prepare_inputs.os.replace",
+                side_effect=fail_once_during_metadata_install,
+            ):
+                with self.assertRaisesRegex(OSError, "injected metadata install failure"):
+                    commit_prepared_outputs(stage_grt, stage_metadata, server)
+
+            self.assertEqual((server / "grt/old.txt").read_text(encoding="utf-8"), "old-grt\n")
+            self.assertFalse((server / "grt/new.txt").exists())
+            self.assertEqual(
+                (server / "metadata/grt_old.tsv").read_text(encoding="utf-8"),
+                "old-metadata\n",
+            )
+            self.assertFalse((server / "metadata/grt_new.tsv").exists())
+            self.assertEqual(
+                (server / "metadata/package.tsv").read_text(encoding="utf-8"),
+                "keep\n",
+            )
 
     def test_rejects_non_grt_v1_package_instead_of_falling_back(self):
         with tempfile.TemporaryDirectory() as temporary_dir:

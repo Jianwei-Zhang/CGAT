@@ -22,6 +22,8 @@ GPM2.0 采用服务端与客户端分离的工作模式：
   - `minimap2`：推荐 `2.31`；仍兼容支持 `-x asm10/asm5`、`-t` 和 PAF 输出的旧版本
   - `blastn`：推荐 BLAST+ `2.17.0`，并需要 `makeblastdb`
   - `winnowmap`：推荐 `2.03`，并需要 `meryl`
+- GRT 预计算 Final Path：`minimap2`，以及 MUMmer4 的 `nucmer`、`delta-filter`、`show-coords`
+- 可选 reads 组装质控：`meryl`、`merqury.sh`、`craq`；只有传入一个或多个 `--reads` 时才要求这些工具
 - 输入数据：`ref_genome.fa`、`hifiasm.fa`、`flye.fa`、`canu2.fa`
 
 注：本文档仅以此类数据为例展示流程，并非仅支持此类输入。
@@ -51,6 +53,16 @@ bash server/prepare.sh \
   [--cen /path/to/ref_cen.fa] \
   [--cen-min-len 10000] \
   [--cen-min-identity 80] \
+  [--reads /path/to/reads.fastq.gz ...] \
+  [--grt-meryl /path/to/meryl] \
+  [--grt-merqury /path/to/merqury.sh] \
+  [--grt-craq /path/to/craq] \
+  [--grt-minimap2 /path/to/minimap2] \
+  [--grt-nucmer /path/to/nucmer] \
+  [--grt-delta-filter /path/to/delta-filter] \
+  [--grt-show-coords /path/to/show-coords] \
+  [--grt-qc-memory-gb 80] \
+  [--grt-kmer-size 21] \
   [--skip-self]
 ```
 
@@ -67,6 +79,9 @@ bash server/prepare.sh \
 - `--cen-min-len`：着丝粒比对最小长度，默认 `10000`
 - `--cen-min-identity`：着丝粒比对最小一致性百分比，默认 `80`
 - `--skip-self`：跳过同一 dataset 的 self alignment；导入、方向矫正和跨 dataset Subview 不受影响，同 dataset 的 ctg-to-ctg Subview 不可用
+- 第一个 `--ds` 固定为 primary，后续所有初始 `--ds` 固定为 support
+- 可重复的 `--reads`：启用一个共享 Meryl 数据库和逐 dataset Merqury/CRAQ 质控；不传 reads 时只跳过 reads 质控，完整 GRT 修复流程仍会执行
+- `--grt-*`：覆盖 Step1、Step2/3、端粒恢复和可选 reads 质控所用工具路径；`--grt-qc-memory-gb` 与 `--grt-kmer-size` 用于调整 reads 质控
 
 > [!IMPORTANT]
 > 引擎专属参数均为可选覆盖项，只能和对应 `--aligner` 一起使用；若传入与所选引擎不匹配的参数，脚本会在写入输出前失败。
@@ -97,10 +112,15 @@ bash ./gpm_server/run_all.sh
 执行顺序必须固定：
 
 1. 先完成所有 `*_vs_ref/result.paf`
-2. 再执行 `assign_chr_groups.sh`；该脚本同时把 dataset 轨道的权威成员顺序写入 `metadata/track_member_orders.tsv`
-3. 最后执行每个 `runs/chr_<chr>/command.sh`
+2. 执行 `assign_chr_groups.sh`；该脚本同时把 dataset 轨道的权威成员顺序写入 `metadata/track_member_orders.tsv`
+3. 构建 q0，并冻结普通 donor 集合 D0 和独立端粒 donor 集合 Dtel
+4. 对同一 D0 运行两轮规范 Step1 minimap2
+5. 用 MUMmer 执行 q1 vs D0 的 Step2 和 q2 vs D0 的 Step3
+6. 执行端粒恢复并生成 q4 与可追溯 Final Path
+7. 执行染色体局部主视图比对
+8. 完成 GRT source card/展示证据并校验完整包契约
 
-因此 `run_all.sh` 会按这个阶段顺序组织命令。
+`run_all.sh` 会严格保持该顺序，遇到程序错误立即停止，并且只复用输入、参数、工具和输出 hash 均仍匹配的检查点。
 
 ### 向已有服务端项目追加一个 dataset
 
@@ -118,6 +138,8 @@ bash ./gpm_server/add_dataset.sh --ds ds4_name /path/to/ds4.fa -o /path/to/add_d
 
 生成的 `add_ds4_name.zip` 是追加包，不是完整交付包；它只用于应用到已有桌面端工作区/项目。请先在 GPM2.0 打开已有项目区，再在目标项目行上选择导入追加包并选中该 zip。
 
+追加 dataset 不会追溯加入已锁定的 GRT recipe，也不会改写预计算 Final Path；它仍可在 App 中展示，并允许用户把其中的 contig 手工加入项目可编辑路径。
+
 初始流程和生成的追加脚本都会在服务端计算 dataset 轨道的 ctg 顺序。桌面端只导入 `metadata/track_member_orders.tsv`，不会再根据 anchor 重算顺序。旧脚本生成且缺少该文件的包不再兼容，需要使用当前服务端脚本重新生成。
 
 由于脚本也会把新 dataset 合并回服务端 `gpm_server/` 目录，如需得到已经包含新 dataset 的完整包，请重新运行完整打包脚本。该完整 zip 可用于创建新的桌面端项目区或执行完整重新导入：
@@ -128,11 +150,7 @@ bash ./gpm_server/package_full_zip.sh
 
 ### 打包服务端交付文件
 
-```bash
-zip -r gpm_server.zip gpm_server
-```
-
-也可以直接运行准备脚本生成的打包脚本：
+请使用 `server/prepare.sh` 生成的打包脚本；两种脚本都会在创建 zip 前执行 GRT 可执行契约校验器：
 
 ```bash
 # 完整交付包：包含 .fa/.fasta，可在客户端导出 final path FASTA
@@ -157,6 +175,8 @@ bash ./gpm_server/package_light_no_fasta_zip.sh
 ### 导入服务端交付包
 
 将服务端生成的 `gpm_server.zip` 导入 GPM2.0，即可进入可视化浏览与轻量编辑流程。
+
+交付包已经固定 primary/support recipe。建项目只需输入项目名；App 会直接载入 Server 预计算的 Final Path、生物学未解决对象、source card、事件与证据。Server baseline 保持不可变，项目级 Final Path 仍可编辑，并可继续进入 DEGAP 或导出流程。旧的非 GRT 包明确不兼容。
 
 ### 在服务器端导出 final path FASTA
 

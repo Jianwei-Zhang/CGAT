@@ -269,7 +269,13 @@ else:
             env=env,
         )
 
-    def run_step23(self, server: Path, tools: dict[str, Path], env: dict[str, str]):
+    def run_step23(
+        self,
+        server: Path,
+        tools: dict[str, Path],
+        env: dict[str, str],
+        threads: int = 2,
+    ):
         return subprocess.run(
             [
                 sys.executable,
@@ -285,7 +291,7 @@ else:
                 "--show-coords",
                 str(tools["show_coords"]),
                 "--threads",
-                "2",
+                str(threads),
             ],
             check=False,
             capture_output=True,
@@ -405,6 +411,7 @@ else:
 
             q3 = dict(read_fasta(server / "grt/q/q3.fa"))
             self.assertFalse(re.search(r"N{100,}", q3["Chr01"]))
+            q2_hash = prepare_fixture.sha256(server / "grt/q/q2.fa")
             q3_hash = prepare_fixture.sha256(server / "grt/q/q3.fa")
             mummer_calls = mummer_log.read_text(encoding="utf-8").splitlines()
             minimap_calls = minimap_log.read_text(encoding="utf-8").splitlines()
@@ -412,6 +419,35 @@ else:
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
             self.assertEqual(mummer_log.read_text(encoding="utf-8").splitlines(), mummer_calls)
             self.assertEqual(minimap_log.read_text(encoding="utf-8").splitlines(), minimap_calls)
+            self.assertEqual(prepare_fixture.sha256(server / "grt/q/q3.fa"), q3_hash)
+
+            with (server / "grt/q/q2.fa").open("a", encoding="utf-8", newline="") as handle:
+                handle.write("# injected output hash mismatch\n")
+            output_invalidated = self.run_step23(server, tools, env)
+            self.assertEqual(output_invalidated.returncode, 0, output_invalidated.stderr)
+            self.assertIn("GRT step2 complete", output_invalidated.stdout)
+            self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 2)
+            self.assertEqual(prepare_fixture.sha256(server / "grt/q/q2.fa"), q2_hash)
+            self.assertEqual(prepare_fixture.sha256(server / "grt/q/q3.fa"), q3_hash)
+
+            parameter_invalidated = self.run_step23(server, tools, env, threads=3)
+            self.assertEqual(parameter_invalidated.returncode, 0, parameter_invalidated.stderr)
+            self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 4)
+            self.assertEqual(prepare_fixture.sha256(server / "grt/q/q3.fa"), q3_hash)
+
+            nucmer_path = tools["nucmer"]
+            nucmer_path.write_text(
+                nucmer_path.read_text(encoding="utf-8").replace(
+                    "nucmer fixture step23 1",
+                    "nucmer fixture step23 2",
+                    1,
+                ),
+                encoding="utf-8",
+                newline="",
+            )
+            tool_invalidated = self.run_step23(server, tools, env, threads=3)
+            self.assertEqual(tool_invalidated.returncode, 0, tool_invalidated.stderr)
+            self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 6)
             self.assertEqual(prepare_fixture.sha256(server / "grt/q/q3.fa"), q3_hash)
 
     def test_coords_parser_uses_real_show_coords_columns(self):

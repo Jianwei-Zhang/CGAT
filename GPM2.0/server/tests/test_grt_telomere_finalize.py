@@ -1,6 +1,7 @@
 import copy
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -412,6 +413,70 @@ print(
             broken["chromosomes"][0]["q4_length"] += 1
             with self.assertRaisesRegex(SystemExit, "does not exactly reconstruct"):
                 verify_final_path(broken, q4, sources)
+
+    def test_interrupted_step4_recovers_to_fresh_run_checksums(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+
+            base_root = root / "base"
+            base_root.mkdir()
+            base_server = self.make_server(base_root)
+            fresh_server = root / "fresh/gpm_server"
+            resumed_server = root / "resumed/gpm_server"
+            fresh_server.parent.mkdir()
+            resumed_server.parent.mkdir()
+            shutil.copytree(base_server, fresh_server)
+            shutil.copytree(base_server, resumed_server)
+
+            tools_root = root / "tools"
+            tools_root.mkdir()
+            tools = self.make_tools(tools_root)
+            fresh_env = os.environ.copy()
+            fresh_env["FAKE_TEL_MUMMER_LOG"] = str(root / "fresh_tel_mummer.log")
+            fresh_env["FAKE_TEL_MINIMAP_LOG"] = str(root / "fresh_tel_minimap.log")
+            fresh = self.run_finalize(fresh_server, tools, fresh_env)
+            self.assertEqual(fresh.returncode, 0, fresh.stderr)
+
+            resumed_env = os.environ.copy()
+            resumed_env["FAKE_TEL_MUMMER_LOG"] = str(root / "resumed_tel_mummer.log")
+            resumed_env["FAKE_TEL_MINIMAP_LOG"] = str(root / "resumed_tel_minimap.log")
+            partial_evidence = resumed_server / "grt/evidence/step4_telomere"
+            partial_evidence.mkdir(parents=True, exist_ok=True)
+            (partial_evidence / "partial.txt").write_text(
+                "interrupted\n",
+                encoding="utf-8",
+            )
+            (resumed_server / "grt/q/q4.fa").write_text(
+                ">Chr01\nPARTIAL\n",
+                encoding="utf-8",
+                newline="",
+            )
+            (resumed_server / "metadata/grt_final_path.json").write_text(
+                "{\"interrupted\":true}\n",
+                encoding="utf-8",
+                newline="",
+            )
+
+            resumed = self.run_finalize(resumed_server, tools, resumed_env)
+            self.assertEqual(resumed.returncode, 0, resumed.stderr)
+            self.assertFalse((partial_evidence / "partial.txt").exists())
+
+            for q_version in ("q0", "q0r1", "q0f", "q1", "q2", "q3", "q4"):
+                self.assertEqual(
+                    prepare_fixture.sha256(fresh_server / f"grt/q/{q_version}.fa"),
+                    prepare_fixture.sha256(resumed_server / f"grt/q/{q_version}.fa"),
+                    q_version,
+                )
+            for relpath in (
+                "metadata/grt_events.jsonl",
+                "metadata/grt_donor_usage.tsv",
+                "metadata/grt_final_path.json",
+            ):
+                self.assertEqual(
+                    prepare_fixture.sha256(fresh_server / relpath),
+                    prepare_fixture.sha256(resumed_server / relpath),
+                    relpath,
+                )
 
 
 if __name__ == "__main__":

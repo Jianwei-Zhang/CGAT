@@ -15,6 +15,7 @@ sys.path.insert(0, str(REPO_ROOT / "server/tools"))
 import test_grt_prepare_inputs as prepare_fixture
 import test_grt_telomere_finalize as telomere_fixture
 from grt_contract import ContractError, validate_contract
+from grt_evidence_package import build_ref_evidence
 from grt_prepare_inputs import read_fasta
 from grt_step1 import source_assignment
 
@@ -52,6 +53,73 @@ class GrtEvidencePackageTests(unittest.TestCase):
                 "support:multi:Chr03:cross_chr_grt_usage",
             ),
         )
+
+    def test_ref_profile_explicitly_classifies_hit_weak_multi_other_and_no_hit(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+            server = prepare_fixture.GrtPrepareInputsTests(
+                "test_no_reads_builds_traceable_q0_and_frozen_global_donors"
+            ).make_server(root)
+            dataset_row = next(
+                row
+                for row in prepare_fixture.read_tsv(server / "metadata/datasets.tsv")
+                if row["dataset_name"] == "support"
+            )
+            reference_row = prepare_fixture.read_tsv(server / "metadata/reference.tsv")[0]
+            paf_path = server / "runs/support_vs_ref/result.paf"
+            target_hit = (
+                "s_assigned\t1500\t0\t1500\t+\tChr01\t5000\t3000\t4500"
+                "\t1500\t1500\t60\n"
+            )
+            other_hit = (
+                "s_assigned\t1500\t0\t1400\t+\tChr02\t5000\t100\t1500"
+                "\t1400\t1400\t40\n"
+            )
+            cases = [
+                ("hit", "assigned", target_hit, "hit", 3001, 1, 1),
+                ("weak", "unplaced", target_hit, "weak_hit", 3001, 1, 1),
+                ("multi", "unplaced", target_hit + other_hit, "multi_hit", 3001, 2, 1),
+                ("other", "cross_chr", other_hit, "other_chr_only", 777, 1, 0),
+                ("none", "unplaced", "", "no_hit", 777, 0, 0),
+            ]
+
+            for (
+                name,
+                assignment,
+                paf,
+                expected_status,
+                expected_anchor,
+                source_hits,
+                target_hits,
+            ) in cases:
+                with self.subTest(name=name):
+                    paf_path.write_text(paf, encoding="utf-8", newline="")
+                    evidence, status, anchor = build_ref_evidence(
+                        server,
+                        {
+                            "dataset_name": "support",
+                            "contig_name": "s_assigned",
+                            "target_chr": "Chr01",
+                            "original_assignment": assignment,
+                            "orientation": "+",
+                            "source_card_key": f"support:s_assigned:Chr01:{name}",
+                            "grt_anchor": 777,
+                        },
+                        "T" * 1500,
+                        dataset_row,
+                        reference_row,
+                    )
+                    parameters = json.loads(evidence["parameters_json"])
+                    self.assertEqual(status, expected_status)
+                    self.assertEqual(anchor, expected_anchor)
+                    self.assertEqual(parameters["source_hit_count"], source_hits)
+                    self.assertEqual(parameters["target_hit_count"], target_hits)
+                    self.assertEqual(
+                        parameters["anchor_source"],
+                        "grt_final_path"
+                        if expected_status in {"other_chr_only", "no_hit"}
+                        else "reference_paf",
+                    )
 
     def write_executable(self, path: Path, source: str) -> Path:
         path.write_text(source, encoding="utf-8", newline="")
