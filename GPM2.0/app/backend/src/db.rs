@@ -60,6 +60,114 @@ pub fn init_workspace_schema(conn: &Connection) -> Result<()> {
             cross_alignment_scope TEXT NOT NULL DEFAULT 'chr_partition'
         );
 
+        CREATE TABLE IF NOT EXISTS grt_package (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            workflow TEXT NOT NULL,
+            schema_version TEXT NOT NULL,
+            final_path_schema_version TEXT NOT NULL,
+            recipe_id TEXT NOT NULL UNIQUE,
+            primary_dataset TEXT NOT NULL,
+            support_datasets_json TEXT NOT NULL,
+            reads_qc_enabled INTEGER NOT NULL CHECK(reads_qc_enabled IN (0, 1)),
+            donor_set_id TEXT NOT NULL,
+            tel_donor_set_id TEXT NOT NULL,
+            q0_relpath TEXT NOT NULL,
+            final_q_relpath TEXT NOT NULL,
+            q0_artifact_sha256 TEXT NOT NULL,
+            q4_artifact_sha256 TEXT NOT NULL,
+            final_path_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_contig_role (
+            dataset_name TEXT NOT NULL,
+            contig_name TEXT NOT NULL,
+            row_json TEXT NOT NULL,
+            PRIMARY KEY(dataset_name, contig_name)
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_donor_set (
+            donor_set_id TEXT PRIMARY KEY,
+            row_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_donor_member (
+            donor_set_id TEXT NOT NULL,
+            member_id TEXT NOT NULL,
+            row_json TEXT NOT NULL,
+            PRIMARY KEY(donor_set_id, member_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_q_segment (
+            segment_id TEXT PRIMARY KEY,
+            row_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_evidence (
+            evidence_id TEXT PRIMARY KEY,
+            row_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_donor_usage (
+            usage_id TEXT PRIMARY KEY,
+            row_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_source_card (
+            source_card_key TEXT PRIMARY KEY,
+            row_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_object_attempt (
+            attempt_id TEXT PRIMARY KEY,
+            chr TEXT NOT NULL,
+            object_id TEXT NOT NULL,
+            object_kind TEXT NOT NULL CHECK(object_kind IN ('gap', 'terminal')),
+            stage TEXT NOT NULL,
+            status TEXT NOT NULL,
+            accepted_event_id TEXT NOT NULL,
+            row_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_stage_status (
+            stage TEXT PRIMARY KEY,
+            row_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_tool_version (
+            tool TEXT PRIMARY KEY,
+            row_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_event (
+            event_id TEXT PRIMARY KEY,
+            stage TEXT NOT NULL,
+            chr TEXT NOT NULL,
+            object_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            status TEXT NOT NULL,
+            source_card_key TEXT NOT NULL,
+            final_path_segment_id TEXT NOT NULL,
+            event_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_final_path_chr (
+            chr TEXT PRIMARY KEY,
+            q4_length INTEGER NOT NULL CHECK(q4_length >= 1),
+            q4_sha256 TEXT NOT NULL,
+            chromosome_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS grt_final_path_segment (
+            segment_id TEXT PRIMARY KEY,
+            chr TEXT NOT NULL,
+            segment_order INTEGER NOT NULL CHECK(segment_order >= 1),
+            kind TEXT NOT NULL,
+            event_id TEXT,
+            segment_json TEXT NOT NULL,
+            UNIQUE(chr, segment_order),
+            FOREIGN KEY(chr) REFERENCES grt_final_path_chr(chr) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS source_seq (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             dataset_id INTEGER NOT NULL,

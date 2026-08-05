@@ -5,6 +5,7 @@ pub mod ctg_editor;
 pub mod db;
 pub mod degap_jobs;
 pub mod exporter;
+pub mod grt_package;
 pub mod importer;
 pub mod junction_inspection;
 pub mod main_view;

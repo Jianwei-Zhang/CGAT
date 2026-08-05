@@ -14,6 +14,7 @@ use crate::alignment_cache::{
     index_ref_alignment_hits_for_source_seq_with_cancel,
 };
 use crate::db::open_workspace_db;
+use crate::grt_package::{ValidatedGrtPackage, persist_grt_package, validate_grt_package};
 use crate::junction_inspection::ensure_pairwise_alignment_run_cache_cancel;
 use crate::workspace::{resolve_bundle_root_dir, resolve_extracted_bundle_workspace};
 
@@ -307,10 +308,15 @@ where
         ),
     );
 
+    let grt_package = validate_grt_package(&resolved.bundle_root)?;
+    recorder.record(
+        "validate_grt_contract",
+        "workflow=gpm_grt_precomputed_v1 schema_version=1".to_string(),
+    );
     let project_db_path = initialize_workspace_layout(&resolved.workspace_root)?;
     recorder.enable_log(&resolved.workspace_root)?;
     check_import_cancel(should_cancel)?;
-    sync_catalog_from_bundle(&project_db_path, &resolved.bundle_root)?;
+    sync_catalog_from_bundle(&project_db_path, &resolved.bundle_root, &grt_package)?;
     recorder.record(
         "prepare_workspace",
         format!(
@@ -381,32 +387,52 @@ where
             workspace_root.display()
         )
     })?;
-    recorder.enable_log(workspace_root)?;
+    if let Err(error) = recorder.enable_log(workspace_root) {
+        remove_failed_zip_workspace(workspace_root, &error)?;
+        return Err(error);
+    }
     recorder.record(
         "prepare_workspace_root",
         format!("workspace_root={}", workspace_root.display()),
     );
 
-    unzip_delivery_to_root(
+    if let Err(error) = unzip_delivery_to_root(
         zip_path,
         workspace_root,
         &mut |step| recorder.record_step(step),
         should_cancel,
-    )?;
+    ) {
+        remove_failed_zip_workspace(workspace_root, &error)?;
+        return Err(error);
+    }
     recorder.record(
         "extract_bundle",
         format!("zip extracted to {}", workspace_root.display()),
     );
 
-    let detected_bundle_root = resolve_bundle_root_dir(workspace_root)?;
-    check_import_cancel(should_cancel)?;
+    let detected_bundle_root = match resolve_bundle_root_dir(workspace_root) {
+        Ok(path) => path,
+        Err(error) => {
+            remove_failed_zip_workspace(workspace_root, &error)?;
+            return Err(error);
+        }
+    };
+    if let Err(error) = check_import_cancel(should_cancel) {
+        remove_failed_zip_workspace(workspace_root, &error)?;
+        return Err(error);
+    }
     recorder.record(
         "resolve_bundle_root",
         format!("bundle_root={}", detected_bundle_root.display()),
     );
 
     if detected_bundle_root != workspace_root {
-        promote_bundle_root_to_workspace_root(workspace_root, &detected_bundle_root)?;
+        if let Err(error) =
+            promote_bundle_root_to_workspace_root(workspace_root, &detected_bundle_root)
+        {
+            remove_failed_zip_workspace(workspace_root, &error)?;
+            return Err(error);
+        }
         recorder.record(
             "normalize_workspace_layout",
             format!(
@@ -417,9 +443,33 @@ where
         );
     }
 
-    let project_db_path = initialize_workspace_layout(workspace_root)?;
-    check_import_cancel(should_cancel)?;
-    sync_catalog_from_bundle(&project_db_path, workspace_root)?;
+    let grt_package = match validate_grt_package(workspace_root) {
+        Ok(package) => package,
+        Err(error) => {
+            remove_failed_zip_workspace(workspace_root, &error)?;
+            return Err(error);
+        }
+    };
+    recorder.record(
+        "validate_grt_contract",
+        "workflow=gpm_grt_precomputed_v1 schema_version=1".to_string(),
+    );
+
+    let project_db_path = match initialize_workspace_layout(workspace_root) {
+        Ok(path) => path,
+        Err(error) => {
+            remove_failed_zip_workspace(workspace_root, &error)?;
+            return Err(error);
+        }
+    };
+    if let Err(error) = check_import_cancel(should_cancel) {
+        remove_failed_zip_workspace(workspace_root, &error)?;
+        return Err(error);
+    }
+    if let Err(error) = sync_catalog_from_bundle(&project_db_path, workspace_root, &grt_package) {
+        remove_failed_zip_workspace(workspace_root, &error)?;
+        return Err(error);
+    }
     recorder.record(
         "prepare_workspace",
         format!(
@@ -428,12 +478,15 @@ where
         ),
     );
 
-    index_alignment_payloads_from_bundle(
+    if let Err(error) = index_alignment_payloads_from_bundle(
         &project_db_path,
         workspace_root,
         &mut recorder,
         should_cancel,
-    )?;
+    ) {
+        remove_failed_zip_workspace(workspace_root, &error)?;
+        return Err(error);
+    }
 
     recorder.record("complete", "import mode=zip_delivery completed".to_string());
 
@@ -446,6 +499,15 @@ where
         },
         recorder.into_progress(),
     ))
+}
+
+fn remove_failed_zip_workspace(workspace_root: &Path, import_error: &anyhow::Error) -> Result<()> {
+    fs::remove_dir_all(workspace_root).with_context(|| {
+        format!(
+            "failed to remove rejected GRT workspace {} after: {import_error:#}",
+            workspace_root.display()
+        )
+    })
 }
 
 pub fn import_add_dataset_package(
@@ -1757,7 +1819,11 @@ fn initialize_workspace_layout(workspace_root: &Path) -> Result<PathBuf> {
     Ok(project_db_path)
 }
 
-fn sync_catalog_from_bundle(project_db_path: &Path, bundle_root: &Path) -> Result<()> {
+fn sync_catalog_from_bundle(
+    project_db_path: &Path,
+    bundle_root: &Path,
+    grt_package: &ValidatedGrtPackage,
+) -> Result<()> {
     let references = read_reference_rows(bundle_root)?;
     if references.is_empty() {
         bail!("metadata/reference.tsv contains no reference rows");
@@ -1769,9 +1835,20 @@ fn sync_catalog_from_bundle(project_db_path: &Path, bundle_root: &Path) -> Resul
     }
     let package = read_package_row(bundle_root)?;
     let chr_assignments = read_imported_chr_assignment_rows(bundle_root)?;
-    let track_member_orders = read_imported_track_member_order_rows(bundle_root)?;
+    let track_member_orders = if bundle_root.join("metadata/track_member_orders.tsv").is_file() {
+        read_imported_track_member_order_rows(bundle_root)?
+    } else {
+        derive_track_member_orders_from_assignments(&chr_assignments)
+    };
     validate_track_member_orders_against_assignments(&track_member_orders, &chr_assignments)?;
-    let reference_chr_locators = read_reference_chr_locator_rows(bundle_root)?;
+    let reference_chr_locators = if bundle_root
+        .join("metadata/reference_chr_locator.tsv")
+        .is_file()
+    {
+        read_reference_chr_locator_rows(bundle_root)?
+    } else {
+        derive_reference_chr_locators(bundle_root, &references)?
+    };
     let source_seq_locators = read_source_seq_locator_rows(bundle_root)?;
     let source_seq_n_regions = read_source_seq_n_region_rows(bundle_root)?;
     let telomere_rules = read_telomere_rule_rows(bundle_root)?;
@@ -1861,9 +1938,66 @@ fn sync_catalog_from_bundle(project_db_path: &Path, bundle_root: &Path) -> Resul
     sync_source_seq_n_region_rows(&tx, &source_seq_n_regions)?;
     sync_telomere_rows(&tx, &telomere_rules, &telomere_marks)?;
     sync_centromere_rows(&tx, &centromere_marks)?;
+    persist_grt_package(&tx, grt_package)?;
 
     tx.commit().context("failed to commit catalog sync")?;
     Ok(())
+}
+
+fn derive_track_member_orders_from_assignments(
+    assignments: &[ImportedChrAssignmentRow],
+) -> Vec<ImportedTrackMemberOrderRow> {
+    let mut grouped = HashMap::<(String, String), Vec<&ImportedChrAssignmentRow>>::new();
+    for assignment in assignments {
+        grouped
+            .entry((
+                assignment.dataset_name.clone(),
+                assignment.assigned_chr_name.clone(),
+            ))
+            .or_default()
+            .push(assignment);
+    }
+    let mut rows = Vec::new();
+    for ((target_track, target_chr), mut members) in grouped {
+        members.sort_by(|left, right| {
+            left.anchor_start
+                .cmp(&right.anchor_start)
+                .then_with(|| left.seq_name.cmp(&right.seq_name))
+        });
+        for (offset, member) in members.into_iter().enumerate() {
+            rows.push(ImportedTrackMemberOrderRow {
+                target_track: target_track.clone(),
+                target_chr: target_chr.clone(),
+                member_dataset: member.dataset_name.clone(),
+                member_ctg: member.seq_name.clone(),
+                member_order: (offset + 1) as i64,
+            });
+        }
+    }
+    rows.sort_by(|left, right| {
+        left.target_track
+            .cmp(&right.target_track)
+            .then_with(|| left.target_chr.cmp(&right.target_chr))
+            .then_with(|| left.member_order.cmp(&right.member_order))
+    });
+    rows
+}
+
+fn derive_reference_chr_locators(
+    bundle_root: &Path,
+    references: &[ReferenceRow],
+) -> Result<Vec<ReferenceChrLocatorRow>> {
+    let mut rows = Vec::new();
+    for reference in references {
+        let fai_path = bundle_root.join(&reference.fai_relpath);
+        for fai_row in parse_fai_rows(&fai_path)? {
+            rows.push(ReferenceChrLocatorRow {
+                reference_chr_name: fai_row.seq_name,
+                fasta_relpath: reference.fasta_relpath.clone(),
+            });
+        }
+    }
+    Ok(rows)
 }
 
 fn read_reference_rows(bundle_root: &Path) -> Result<Vec<ReferenceRow>> {
@@ -1893,11 +2027,10 @@ fn read_dataset_rows(bundle_root: &Path) -> Result<Vec<DatasetRow>> {
         let assembler_version_raw = value_by_header(header, cols, "assembler_version")?;
         let fasta_relpath = value_by_header(header, cols, "fasta_relpath")?;
         let fai_relpath = value_by_header(header, cols, "fai_relpath")?;
-        let self_alignment_available =
-            optional_value_by_header(header, cols, "self_alignment_available")
-                .map(|value| parse_bool_flag(&value, "self_alignment_available"))
-                .transpose()?
-                .unwrap_or(true);
+        let self_alignment_available = parse_bool_flag(
+            &value_by_header(header, cols, "self_alignment_available")?,
+            "self_alignment_available",
+        )?;
         Ok(DatasetRow {
             name: dataset_name,
             assembler,
@@ -1921,30 +2054,18 @@ fn read_package_row(bundle_root: &Path) -> Result<PackageRow> {
     }
     let mut rows = read_tsv_rows(&path, |header, cols| {
         Ok(PackageRow {
-            package_mode: optional_value_by_header(header, cols, "package_mode")
-                .filter(|value| !value.is_empty())
-                .unwrap_or_else(|| "fast".to_string()),
-            sequence_layout: optional_value_by_header(header, cols, "sequence_layout")
-                .filter(|value| !value.is_empty())
-                .unwrap_or_else(|| "partitioned".to_string()),
-            preassigned_chr: optional_value_by_header(header, cols, "preassigned_chr")
-                .map(|value| parse_bool_flag(&value, "preassigned_chr"))
-                .transpose()?
-                .unwrap_or(true),
-            chr_assignment_min_coverage_percent: optional_value_by_header(
-                header,
-                cols,
+            package_mode: value_by_header(header, cols, "package_mode")?,
+            sequence_layout: value_by_header(header, cols, "sequence_layout")?,
+            preassigned_chr: parse_bool_flag(
+                &value_by_header(header, cols, "preassigned_chr")?,
+                "preassigned_chr",
+            )?,
+            chr_assignment_min_coverage_percent: parse_f64_value(
+                &value_by_header(header, cols, "chr_assignment_min_coverage_percent")?,
                 "chr_assignment_min_coverage_percent",
-            )
-            .map(|value| parse_f64_value(&value, "chr_assignment_min_coverage_percent"))
-            .transpose()?
-            .unwrap_or(60.0),
-            self_alignment_scope: optional_value_by_header(header, cols, "self_alignment_scope")
-                .filter(|value| !value.is_empty())
-                .unwrap_or_else(|| "chr_partition".to_string()),
-            cross_alignment_scope: optional_value_by_header(header, cols, "cross_alignment_scope")
-                .filter(|value| !value.is_empty())
-                .unwrap_or_else(|| "chr_partition".to_string()),
+            )?,
+            self_alignment_scope: value_by_header(header, cols, "self_alignment_scope")?,
+            cross_alignment_scope: value_by_header(header, cols, "cross_alignment_scope")?,
         })
     })
     .with_context(|| format!("failed to parse {}", path.display()))?;
@@ -5810,9 +5931,12 @@ fn parse_fai_rows(path: &Path) -> Result<Vec<FaiRow>> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use std::io::Write;
 
     use rusqlite::{Connection, params};
+    use serde_json::{Value, json};
+    use sha2::{Digest, Sha256};
     use tempfile::tempdir;
     use zip::CompressionMethod;
     use zip::write::FileOptions;
@@ -5889,34 +6013,15 @@ mod tests {
     }
 
     #[test]
-    fn imports_zip_delivery_without_fasta_and_marks_dataset_unavailable_for_fasta_export() {
+    fn rejects_zip_delivery_without_required_grt_payload_and_cleans_workspace() {
         let temp = tempdir().unwrap();
         let zip_path = temp.path().join("delivery-light.zip");
         write_bundle_zip_without_fasta(&zip_path);
 
         let workspace_root = temp.path().join("workspaces").join("project_alpha");
-        let (outcome, _progress) = import_from_zip(&zip_path, &workspace_root).unwrap();
-        let options =
-            crate::project_initializer::list_initializer_options(&outcome.project_db_path).unwrap();
-
-        assert_eq!(count_rows(&outcome.project_db_path, "reference_genome"), 1);
-        assert_eq!(count_rows(&outcome.project_db_path, "dataset"), 1);
-        assert_eq!(count_rows(&outcome.project_db_path, "reference_chr"), 1);
-        assert_eq!(count_rows(&outcome.project_db_path, "source_seq"), 1);
-        assert!(
-            !outcome
-                .workspace_root
-                .join("data/reference/ref.fa")
-                .exists()
-        );
-        assert!(!outcome.workspace_root.join("data/datasets/ds.fa").exists());
-        assert_eq!(
-            options
-                .datasets
-                .first()
-                .map(|dataset| dataset.fasta_available),
-            Some(false)
-        );
+        let error = import_from_zip(&zip_path, &workspace_root).unwrap_err();
+        assert!(error.to_string().contains("GRT_IMPORT_MISSING_REQUIRED_FILE"));
+        assert!(!workspace_root.exists());
     }
 
     #[test]
@@ -5947,8 +6052,8 @@ mod tests {
         fs::write(
             bundle_root.join("metadata/package.tsv"),
             concat!(
-                "package_mode\tsequence_layout\tpreassigned_chr\tchr_assignment_min_coverage_percent\tself_alignment_scope\tcross_alignment_scope\n",
-                "fast\tpartitioned\ttrue\t72\tchr_partition\tchr_partition\n",
+                "workflow\tschema_version\tpackage_mode\tsequence_layout\tpreassigned_chr\tself_alignment_scope\tcross_alignment_scope\tchr_assignment_min_coverage_percent\tgrt_precompute_enabled\trecipe_locked\tfinal_path_schema_version\treads_qc_enabled\n",
+                "gpm_grt_precomputed_v1\t1\tfast\tpartitioned\ttrue\tchr_partition\tchr_partition\t72\ttrue\ttrue\t1\tfalse\n",
             ),
         )
         .unwrap();
@@ -6175,8 +6280,8 @@ mod tests {
         fs::write(
             bundle_root.join("metadata/package.tsv"),
             concat!(
-                "package_mode\tsequence_layout\tpreassigned_chr\tchr_assignment_min_coverage_percent\tself_alignment_scope\tcross_alignment_scope\n",
-                "legacy\tmonolithic\tfalse\t60\tnone\tchr_partition\n",
+                "workflow\tschema_version\tpackage_mode\tsequence_layout\tpreassigned_chr\tself_alignment_scope\tcross_alignment_scope\tchr_assignment_min_coverage_percent\tgrt_precompute_enabled\trecipe_locked\tfinal_path_schema_version\treads_qc_enabled\n",
+                "gpm_grt_precomputed_v1\t1\tfull\tmonolithic\tfalse\tnone\tchr_partition\t60\ttrue\ttrue\t1\tfalse\n",
             ),
         )
         .unwrap();
@@ -6241,37 +6346,14 @@ mod tests {
     }
 
     #[test]
-    fn imports_partitioned_fast_light_without_fasta_payload_and_marks_unavailable() {
+    fn rejects_initial_package_without_required_grt_payload() {
         let temp = tempdir().unwrap();
         let bundle_root = temp.path().join("gpm_server");
         create_partitioned_fast_bundle_root(&bundle_root, false);
 
-        let (outcome, _progress) = import_from_extracted_bundle(&bundle_root).unwrap();
-        assert_eq!(
-            count_rows(&outcome.project_db_path, "reference_chr_locator"),
-            1
-        );
-        assert_eq!(
-            count_rows(&outcome.project_db_path, "source_seq_locator"),
-            1
-        );
-        assert!(
-            !outcome
-                .workspace_root
-                .join("data/reference/ref.fa")
-                .exists()
-        );
-        assert!(!outcome.workspace_root.join("data/datasets/ds.fa").exists());
-
-        let options =
-            crate::project_initializer::list_initializer_options(&outcome.project_db_path).unwrap();
-        assert_eq!(
-            options
-                .datasets
-                .first()
-                .map(|dataset| dataset.fasta_available),
-            Some(false)
-        );
+        let error = import_from_extracted_bundle(&bundle_root).unwrap_err();
+        assert!(error.to_string().contains("GRT_IMPORT_MISSING_REQUIRED_FILE"));
+        assert!(!bundle_root.join(PROJECT_DB_NAME).exists());
     }
 
     #[test]
@@ -7065,21 +7147,17 @@ mod tests {
     }
 
     #[test]
-    fn rejects_legacy_initial_package_without_server_member_order_metadata() {
+    fn imports_grt_package_without_legacy_track_member_order_metadata() {
         let temp = tempdir().unwrap();
         let bundle_root = temp.path().join("gpm_server");
         create_bundle_root(&bundle_root);
         fs::remove_file(bundle_root.join("metadata/track_member_orders.tsv")).unwrap();
 
-        let error = import_from_extracted_bundle(&bundle_root).unwrap_err();
-
-        assert!(
-            error
-                .to_string()
-                .contains("metadata/track_member_orders.tsv"),
-            "{error:#}"
+        let (outcome, _) = import_from_extracted_bundle(&bundle_root).unwrap();
+        assert_eq!(
+            count_rows(&outcome.project_db_path, "imported_track_member_order"),
+            1
         );
-        assert!(error.to_string().contains("regenerate"), "{error:#}");
     }
 
     fn create_bundle_root(bundle_root: &Path) {
@@ -7096,7 +7174,7 @@ mod tests {
         .unwrap();
         fs::write(
             bundle_root.join("metadata/datasets.tsv"),
-            "dataset_name\tassembler\tassembler_version\tfasta_relpath\tfai_relpath\nds_a\tassembler_a\t\tdata/datasets/ds.fa\tdata/datasets/ds.fa.fai\n",
+            "dataset_name\tassembler\tassembler_version\tfasta_relpath\tfai_relpath\tself_alignment_available\nds_a\tassembler_a\t\tdata/datasets/ds.fa\tdata/datasets/ds.fa.fai\ttrue\n",
         )
         .unwrap();
         fs::write(
@@ -7145,6 +7223,7 @@ mod tests {
             ">d\nAT\n",
         )
         .unwrap();
+        install_minimal_grt_contract(bundle_root);
     }
 
     fn create_partitioned_fast_bundle_root(bundle_root: &Path, include_fasta_payload: bool) {
@@ -7209,6 +7288,7 @@ mod tests {
                 ">d\nACGT\n",
             )
             .unwrap();
+            install_minimal_grt_contract(bundle_root);
         }
     }
 
@@ -7240,7 +7320,285 @@ mod tests {
                 ">e\nACGT\n",
             )
             .unwrap();
+            install_minimal_grt_contract(bundle_root);
         }
+    }
+
+    fn install_minimal_grt_contract(bundle_root: &Path) {
+        let metadata_root = bundle_root.join("metadata");
+        let grt_root = bundle_root.join("grt");
+        fs::create_dir_all(grt_root.join("q")).unwrap();
+        fs::create_dir_all(grt_root.join("donor")).unwrap();
+        fs::create_dir_all(grt_root.join("checkpoints")).unwrap();
+        fs::create_dir_all(grt_root.join("evidence/test")).unwrap();
+
+        let references = read_reference_rows(bundle_root).unwrap();
+        let reference = references.first().unwrap();
+        let reference_fasta_path = bundle_root.join(&reference.fasta_relpath);
+        if !reference_fasta_path.is_file() {
+            let mut fasta = String::new();
+            for row in parse_fai_rows(&bundle_root.join(&reference.fai_relpath)).unwrap() {
+                let chr_path = bundle_root
+                    .join("data/reference/chrs")
+                    .join(format!("{}.fa", row.seq_name));
+                let records = read_test_fasta(&chr_path);
+                fasta.push_str(&format!(">{}\n{}\n", row.seq_name, records[&row.seq_name]));
+            }
+            fs::write(&reference_fasta_path, fasta).unwrap();
+        }
+        let datasets = read_dataset_rows(bundle_root).unwrap();
+        let locators = read_source_seq_locator_rows(bundle_root).unwrap();
+        let mut source_sequences = HashMap::<(String, String), String>::new();
+        for locator in &locators {
+            let records = read_test_fasta(&bundle_root.join(&locator.fasta_relpath));
+            source_sequences.insert(
+                (locator.dataset_name.clone(), locator.seq_name.clone()),
+                records[&locator.seq_name].clone(),
+            );
+        }
+        for dataset in &datasets {
+            let fasta_path = bundle_root.join(&dataset.fasta_relpath);
+            if !fasta_path.is_file() {
+                let mut fasta = String::new();
+                for locator in locators
+                    .iter()
+                    .filter(|row| row.dataset_name == dataset.name)
+                {
+                    fasta.push_str(&format!(
+                        ">{}\n{}\n",
+                        locator.seq_name,
+                        source_sequences[&(locator.dataset_name.clone(), locator.seq_name.clone())]
+                    ));
+                }
+                fs::write(fasta_path, fasta).unwrap();
+            }
+        }
+
+        fs::write(
+            metadata_root.join("package.tsv"),
+            concat!(
+                "workflow\tschema_version\tpackage_mode\tsequence_layout\tpreassigned_chr\tself_alignment_scope\tcross_alignment_scope\tchr_assignment_min_coverage_percent\tgrt_precompute_enabled\trecipe_locked\tfinal_path_schema_version\treads_qc_enabled\n",
+                "gpm_grt_precomputed_v1\t1\tfast\tpartitioned\ttrue\tchr_partition\tchr_partition\t60\ttrue\ttrue\t1\tfalse\n",
+            ),
+        )
+        .unwrap();
+
+        let primary = datasets.first().unwrap().name.clone();
+        let support = datasets
+            .iter()
+            .skip(1)
+            .map(|dataset| dataset.name.clone())
+            .collect::<Vec<_>>();
+        fs::write(
+            metadata_root.join("grt_recipe.tsv"),
+            format!(
+                "recipe_id\tprimary_dataset\tsupport_datasets_json\treads_qc_enabled\tdonor_set_id\ttel_donor_set_id\tq0_relpath\tfinal_q_relpath\nrecipe-test\t{}\t{}\tfalse\td0-test\tdtel-test\tgrt/q/q0.fa\tgrt/q/q4.fa\n",
+                primary,
+                serde_json::to_string(&support).unwrap()
+            ),
+        )
+        .unwrap();
+
+        let mut role_text = "dataset_name\tcontig_name\tq_eligible\tdonor_eligible\ttel_donor_eligible\tq_rejection_reason\tdonor_rejection_reason\ttel_rejection_reason\n".to_string();
+        for locator in &locators {
+            role_text.push_str(&format!(
+                "{}\t{}\ttrue\ttrue\ttrue\t\t\t\n",
+                locator.dataset_name, locator.seq_name
+            ));
+        }
+        fs::write(metadata_root.join("grt_contig_roles.tsv"), role_text).unwrap();
+
+        let assignments = read_imported_chr_assignment_rows(bundle_root).unwrap();
+        let mut by_chr = HashMap::<String, Vec<&ImportedChrAssignmentRow>>::new();
+        for assignment in &assignments {
+            by_chr
+                .entry(assignment.assigned_chr_name.clone())
+                .or_default()
+                .push(assignment);
+        }
+        for rows in by_chr.values_mut() {
+            rows.sort_by(|left, right| {
+                left.anchor_start
+                    .cmp(&right.anchor_start)
+                    .then_with(|| left.dataset_name.cmp(&right.dataset_name))
+                    .then_with(|| left.seq_name.cmp(&right.seq_name))
+            });
+        }
+
+        let dataset_by_name = datasets
+            .iter()
+            .map(|dataset| (dataset.name.as_str(), dataset))
+            .collect::<HashMap<_, _>>();
+        let mut q_records = BTreeMap::<String, String>::new();
+        let mut q_segments = "q_version\tchr\tsegment_id\tsegment_kind\tq_start\tq_end\tdataset_name\tcontig_name\tsource_start\tsource_end\torientation\tsource_card_key\tevidence_ids_json\n".to_string();
+        let mut evidence = "evidence_id\tstage\tevidence_type\tstatus\tq_version\tq_source_sha256\tquery_artifact_relpath\tquery_sha256\tdonor_set_id\ttarget_artifact_relpath\ttarget_sha256\tsource_dataset\tsource_contig\tsource_start\tsource_end\torientation\ttarget_chr\ttarget_start\ttarget_end\ttool\ttool_version\tpreset\tparameters_json\traw_artifact_relpath\traw_artifact_sha256\tcoordinate_system\tprojection_status\n".to_string();
+        let mut final_chromosomes = Vec::new();
+        let reference_sha = test_sha256(&fs::read(&reference_fasta_path).unwrap());
+        let mut evidence_index = 0_usize;
+        for (chr_name, rows) in &by_chr {
+            let mut q_sequence = String::new();
+            let mut final_segments = Vec::new();
+            let mut next_start = 1_i64;
+            for assignment in rows {
+                evidence_index += 1;
+                let source_key = (
+                    assignment.dataset_name.clone(),
+                    assignment.seq_name.clone(),
+                );
+                let sequence = &source_sequences[&source_key];
+                let q_end = next_start + sequence.len() as i64 - 1;
+                let segment_id = format!("q0-seg-{evidence_index}");
+                let evidence_id = format!("ev-q0-{evidence_index}");
+                let source_card_key = format!(
+                    "{}:{}:{}:normal",
+                    assignment.dataset_name, assignment.seq_name, chr_name
+                );
+                q_segments.push_str(&format!(
+                    "q0\t{}\t{}\tsource\t{}\t{}\t{}\t{}\t1\t{}\t+\t{}\t[\"{}\"]\n",
+                    chr_name,
+                    segment_id,
+                    next_start,
+                    q_end,
+                    assignment.dataset_name,
+                    assignment.seq_name,
+                    sequence.len(),
+                    source_card_key,
+                    evidence_id
+                ));
+                let raw_relpath = format!("grt/evidence/test/{evidence_id}.paf");
+                fs::write(bundle_root.join(&raw_relpath), b"").unwrap();
+                let dataset = dataset_by_name[assignment.dataset_name.as_str()];
+                let query_sha = test_sha256(
+                    &fs::read(bundle_root.join(&dataset.fasta_relpath)).unwrap(),
+                );
+                evidence.push_str(&format!(
+                    "{}\tassignment\tpaf\tbackground\t\t\t{}\t{}\t\t{}\t{}\t{}\t{}\t1\t{}\t+\t{}\t{}\t{}\tminimap2\ttest\tasm10\t{{}}\t{}\t{}\tpaf_0_based_half_open\tprojected\n",
+                    evidence_id,
+                    dataset.fasta_relpath,
+                    query_sha,
+                    reference.fasta_relpath,
+                    reference_sha,
+                    assignment.dataset_name,
+                    assignment.seq_name,
+                    sequence.len(),
+                    chr_name,
+                    assignment.anchor_start.max(1),
+                    assignment.anchor_start.max(1) + sequence.len() as i64 - 1,
+                    raw_relpath,
+                    test_sha256(b"")
+                ));
+                final_segments.push(json!({
+                    "segment_id": segment_id,
+                    "kind": "source",
+                    "length": sequence.len(),
+                    "orientation": "+",
+                    "event_id": Value::Null,
+                    "source": {
+                        "dataset": assignment.dataset_name,
+                        "contig": assignment.seq_name,
+                        "start": 1,
+                        "end": sequence.len(),
+                        "orientation": "+"
+                    },
+                    "evidence_ids": [evidence_id]
+                }));
+                q_sequence.push_str(sequence);
+                next_start = q_end + 1;
+            }
+            q_records.insert(chr_name.clone(), q_sequence.clone());
+            final_chromosomes.push(json!({
+                "chr": chr_name,
+                "q4_length": q_sequence.len(),
+                "q4_sha256": test_sha256(q_sequence.as_bytes()),
+                "segments": final_segments
+            }));
+        }
+        let mut q_fasta = String::new();
+        for (chr_name, sequence) in &q_records {
+            q_fasta.push_str(&format!(">{}\n{}\n", chr_name, sequence));
+        }
+        for version in ["q0", "q0r1", "q0f", "q1", "q2", "q3", "q4"] {
+            fs::write(grt_root.join(format!("q/{version}.fa")), &q_fasta).unwrap();
+        }
+        fs::write(metadata_root.join("grt_q_segments.tsv"), q_segments).unwrap();
+        fs::write(metadata_root.join("grt_evidence_registry.tsv"), evidence).unwrap();
+
+        fs::write(grt_root.join("donor/d0.fa"), b"").unwrap();
+        fs::write(grt_root.join("donor/dtel.fa"), b"").unwrap();
+        let member_header = "donor_set_id\tmember_id\tdataset_name\tcontig_name\tsource_start\tsource_end\torientation\tfasta_record_name\tsequence_sha256\n";
+        fs::write(grt_root.join("donor/d0.manifest.tsv"), member_header).unwrap();
+        fs::write(grt_root.join("donor/dtel.manifest.tsv"), member_header).unwrap();
+        fs::write(metadata_root.join("grt_donor_members.tsv"), member_header).unwrap();
+        fs::write(
+            metadata_root.join("grt_donor_sets.tsv"),
+            format!(
+                "donor_set_id\tdonor_kind\tmanifest_relpath\tfasta_relpath\tfasta_sha256\tmember_count\nd0-test\tordinary\tgrt/donor/d0.manifest.tsv\tgrt/donor/d0.fa\t{}\t0\ndtel-test\ttelomere\tgrt/donor/dtel.manifest.tsv\tgrt/donor/dtel.fa\t{}\t0\n",
+                test_sha256(b""),
+                test_sha256(b"")
+            ),
+        )
+        .unwrap();
+        fs::write(metadata_root.join("grt_donor_usage.tsv"), "usage_id\tdonor_set_id\tmember_id\tsource_dataset\tsource_contig\tsource_start\tsource_end\tstage\tstatus\tevent_id\tfinal_path_segment_id\treason\n").unwrap();
+        fs::write(metadata_root.join("grt_used_contigs.tsv"), "source_card_key\tdataset_name\tcontig_name\toriginal_assignment\ttarget_chr\tplacement_mode\tref_alignment_status\tanchor_start\torientation\tref_evidence_ids_json\taccepted_event_ids_json\tfinal_path_segment_ids_json\tpairwise_evidence_ids_json\n").unwrap();
+        fs::write(metadata_root.join("grt_events.jsonl"), b"").unwrap();
+        fs::write(metadata_root.join("grt_gap_attempts.tsv"), "attempt_id\tchr\tobject_id\tstage\tstatus\treason\tcandidate_count\taccepted_event_id\n").unwrap();
+
+        let q_sha = test_sha256(q_fasta.as_bytes());
+        let checkpoint = b"{}\n";
+        let checkpoint_sha = test_sha256(checkpoint);
+        let mut stage_text = "stage\tq_input_version\tq_input_sha256\tq_output_version\tq_output_sha256\tdonor_set_id\tstatus\tcheckpoint_relpath\tcheckpoint_sha256\n".to_string();
+        for (stage, input, output, donor_set_id) in [
+            ("donor_freeze", "q0", "q0", "d0-test"),
+            ("step1_round1", "q0", "q0r1", "d0-test"),
+            ("step1_filter", "q0r1", "q0f", "d0-test"),
+            ("step1_round2", "q0f", "q1", "d0-test"),
+            ("step2", "q1", "q2", "d0-test"),
+            ("step3", "q2", "q3", "d0-test"),
+            ("step4_telomere", "q3", "q4", "dtel-test"),
+            ("finalize", "q4", "q4", ""),
+        ] {
+            let checkpoint_relpath = format!("grt/checkpoints/{stage}.json");
+            fs::write(bundle_root.join(&checkpoint_relpath), checkpoint).unwrap();
+            stage_text.push_str(&format!(
+                "{}\t{}\t{}\t{}\t{}\t{}\tsuccess\t{}\t{}\n",
+                stage, input, q_sha, output, q_sha, donor_set_id, checkpoint_relpath, checkpoint_sha
+            ));
+        }
+        fs::write(metadata_root.join("grt_stage_status.tsv"), stage_text).unwrap();
+        fs::write(
+            metadata_root.join("grt_tool_versions.tsv"),
+            "tool\tversion\texecutable\nminimap2\ttest\tminimap2\n",
+        )
+        .unwrap();
+        fs::write(
+            metadata_root.join("grt_final_path.json"),
+            serde_json::to_vec_pretty(&json!({
+                "workflow": "gpm_grt_precomputed_v1",
+                "schema_version": "1",
+                "q4_relpath": "grt/q/q4.fa",
+                "chromosomes": final_chromosomes
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+    }
+
+    fn read_test_fasta(path: &Path) -> BTreeMap<String, String> {
+        let mut records = BTreeMap::new();
+        let mut current = String::new();
+        for line in fs::read_to_string(path).unwrap().lines() {
+            if let Some(header) = line.strip_prefix('>') {
+                current = header.split_whitespace().next().unwrap().to_string();
+                records.entry(current.clone()).or_insert_with(String::new);
+            } else if !line.trim().is_empty() {
+                records.get_mut(&current).unwrap().push_str(line.trim());
+            }
+        }
+        records
+    }
+
+    fn test_sha256(bytes: &[u8]) -> String {
+        format!("{:x}", Sha256::digest(bytes))
     }
 
     fn append_text(path: &Path, text: &str) {
@@ -7876,6 +8234,7 @@ derived_ctg\tgap_filled\t2\t2\t1\n",
         zip.write_all(b"").unwrap();
 
         zip.finish().unwrap();
+        append_generated_grt_bundle(zip_path, true);
     }
 
     fn write_bundle_zip_without_fasta(zip_path: &Path) {
@@ -8032,6 +8391,56 @@ derived_ctg\tgap_filled\t2\t2\t1\n",
         zip.write_all(b">ds\nACGT\n").unwrap();
 
         zip.finish().unwrap();
+        append_generated_grt_bundle(zip_path, available);
+    }
+
+    fn append_generated_grt_bundle(zip_path: &Path, self_alignment_available: bool) {
+        let temp = tempdir().unwrap();
+        let bundle_root = temp.path().join("gpm_server");
+        create_partitioned_fast_bundle_root(&bundle_root, true);
+        if !self_alignment_available {
+            fs::write(
+                bundle_root.join("metadata/datasets.tsv"),
+                "dataset_name\tassembler\tassembler_version\tfasta_relpath\tfai_relpath\tself_alignment_available\nds_a\tassembler_a\t\tdata/datasets/ds.fa\tdata/datasets/ds.fa.fai\tfalse\n",
+            )
+            .unwrap();
+            install_minimal_grt_contract(&bundle_root);
+            let package_path = bundle_root.join("metadata/package.tsv");
+            let package = fs::read_to_string(&package_path).unwrap().replacen(
+                "\tchr_partition\tchr_partition\t60\t",
+                "\tnone\tchr_partition\t60\t",
+                1,
+            );
+            fs::write(package_path, package).unwrap();
+        }
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(zip_path)
+            .unwrap();
+        let mut zip = zip::ZipWriter::new_append(file).unwrap();
+        append_test_tree_to_zip(&mut zip, &bundle_root, Path::new("gpm_server"));
+        zip.finish().unwrap();
+    }
+
+    fn append_test_tree_to_zip(
+        zip: &mut zip::ZipWriter<File>,
+        source: &Path,
+        archive_root: &Path,
+    ) {
+        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
+        for entry in fs::read_dir(source).unwrap() {
+            let entry = entry.unwrap();
+            let source_path = entry.path();
+            let archive_path = archive_root.join(entry.file_name());
+            if source_path.is_dir() {
+                append_test_tree_to_zip(zip, &source_path, &archive_path);
+            } else {
+                zip.start_file(archive_path.to_string_lossy().replace('\\', "/"), options)
+                    .unwrap();
+                zip.write_all(&fs::read(source_path).unwrap()).unwrap();
+            }
+        }
     }
 
     fn count_rows(project_db_path: &Path, table: &str) -> i64 {
