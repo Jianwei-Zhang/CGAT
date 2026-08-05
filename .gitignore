@@ -11,6 +11,7 @@
 /ppt/
 /paper/
 /Genome-Repair-Tools/
+/GPM2.0/docs/
 
 # Common dependency/build outputs
 **/node_modules/
