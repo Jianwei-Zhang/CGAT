@@ -306,19 +306,51 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
 
     dataset_rows = tables["metadata/datasets.tsv"]
     dataset_names = set()
+    datasets_by_name = {}
     for row_number, row in enumerate(dataset_rows, start=2):
         dataset_name = row["dataset_name"].strip()
         if not dataset_name or dataset_name in dataset_names:
             fail("DUPLICATE_ID", f"metadata/datasets.tsv:{row_number} has empty or duplicate dataset_name")
         dataset_names.add(dataset_name)
+        datasets_by_name[dataset_name] = row
         bundle_path(bundle_root, row["fasta_relpath"], f"dataset {dataset_name} FASTA")
         bundle_path(bundle_root, row["fai_relpath"], f"dataset {dataset_name} FAI")
         parse_bool(row["self_alignment_available"], f"dataset {dataset_name}.self_alignment_available")
 
     reference = tables["metadata/reference.tsv"][0]
-    bundle_path(bundle_root, reference["fasta_relpath"], "reference FASTA")
+    reference_path = bundle_path(bundle_root, reference["fasta_relpath"], "reference FASTA")
     bundle_path(bundle_root, reference["fai_relpath"], "reference FAI")
+    reference_records = read_fasta(reference_path, "reference FASTA")
     sources = source_catalog(bundle_root, tables["metadata/source_seq_locator.tsv"])
+
+    assignment_chromosomes = defaultdict(set)
+    assignment_keys = set()
+    for row_number, row in enumerate(tables["metadata/chr_assignments.tsv"], start=2):
+        source_key = (row["dataset_name"], row["seq_name"])
+        chromosome = row["assigned_chr_name"]
+        assignment_key = (*source_key, chromosome)
+        if source_key not in sources:
+            fail("BROKEN_REFERENCE", f"chr assignment references unknown source {source_key}")
+        if chromosome not in reference_records:
+            fail("BROKEN_REFERENCE", f"chr assignment references unknown chromosome {chromosome}")
+        if assignment_key in assignment_keys:
+            fail("DUPLICATE_ID", f"duplicate chr assignment for {source_key[0]}:{source_key[1]}:{chromosome}")
+        assignment_keys.add(assignment_key)
+        if parse_int(row["seq_length_bp"], f"chr assignment row {row_number}.seq_length_bp", 1) != len(
+            sources[source_key]
+        ):
+            fail("COUNT_MISMATCH", f"chr assignment source length differs for {source_key}")
+        support_bp = parse_int(row["support_bp"], f"chr assignment row {row_number}.support_bp", 1)
+        if support_bp > len(sources[source_key]):
+            fail("INVALID_COORDINATE", f"chr assignment support exceeds source length for {source_key}")
+        parse_float(
+            row["support_percent"],
+            f"chr assignment row {row_number}.support_percent",
+            0,
+            100,
+        )
+        parse_int(row["anchor_start"], f"chr assignment row {row_number}.anchor_start")
+        assignment_chromosomes[source_key].add(chromosome)
 
     recipe = tables["metadata/grt_recipe.tsv"][0]
     if recipe["primary_dataset"] not in dataset_names:
@@ -357,6 +389,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     q_segment_ids = set()
     q_segments_by_record = defaultdict(list)
     q_segment_evidence = {}
+    q0_segment_sources = {}
     for row_number, row in enumerate(q_segment_rows, start=2):
         q_version = row["q_version"]
         chr_name = row["chr"]
@@ -398,6 +431,19 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                 fail("INVALID_VALUE", f"q segment {segment_id} has invalid orientation")
             if not row["source_card_key"]:
                 fail("BROKEN_REFERENCE", f"q segment {segment_id} lacks source_card_key")
+            if q_version == "q0":
+                if chr_name not in assignment_chromosomes[source_key]:
+                    fail("BROKEN_REFERENCE", f"q0 segment {segment_id} source is not assigned to {chr_name}")
+                if row["source_card_key"] != (
+                    f"{source_key[0]}:{source_key[1]}:{chr_name}:normal"
+                ):
+                    fail("BROKEN_REFERENCE", f"q0 segment {segment_id} has a non-canonical source card key")
+                q0_segment_sources[segment_id] = (
+                    source_key,
+                    chr_name,
+                    source_start,
+                    source_end,
+                )
             if not evidence_ids:
                 fail("BROKEN_REFERENCE", f"q segment {segment_id} lacks source evidence")
             sequence = sources[source_key][source_start - 1 : source_end]
@@ -573,6 +619,29 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     for segment_id, evidence_ids in q_segment_evidence.items():
         if any(evidence_id not in evidence for evidence_id in evidence_ids):
             fail("BROKEN_REFERENCE", f"q segment {segment_id} references unknown evidence")
+    for segment_id, (source_key, chr_name, source_start, source_end) in q0_segment_sources.items():
+        for evidence_id in q_segment_evidence[segment_id]:
+            row = evidence[evidence_id]
+            evidence_source_start = parse_int(
+                row["source_start"], f"evidence {evidence_id}.source_start", 1
+            )
+            evidence_source_end = parse_int(
+                row["source_end"], f"evidence {evidence_id}.source_end", 1
+            )
+            if (
+                row["stage"] != "assignment"
+                or row["status"] not in {"accepted", "background"}
+                or (row["source_dataset"], row["source_contig"]) != source_key
+                or row["target_chr"] != chr_name
+                or evidence_source_start > source_start
+                or evidence_source_end < source_end
+                or row["raw_artifact_relpath"]
+                != f"runs/{source_key[0]}_vs_ref/result.paf"
+            ):
+                fail(
+                    "BROKEN_REFERENCE",
+                    f"q0 segment {segment_id} is not backed by its assigned source/ref evidence",
+                )
 
     usage_rows = tables["metadata/grt_donor_usage.tsv"]
     usage = unique_index(usage_rows, "usage_id", "metadata/grt_donor_usage.tsv")
@@ -703,6 +772,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     q4_records = read_fasta(q4_path, recipe["final_q_relpath"])
     segment_ids = set()
     segment_event = {}
+    segments_by_id = {}
     chromosome_names = set()
     for chromosome in chromosomes:
         if not isinstance(chromosome, dict):
@@ -729,6 +799,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             if not segment_id or segment_id in segment_ids:
                 fail("DUPLICATE_ID", f"invalid or duplicate Final Path segment_id={segment_id}")
             segment_ids.add(segment_id)
+            segments_by_id[segment_id] = segment
             if kind not in enums["segment_kind"]:
                 fail("INVALID_VALUE", f"segment {segment_id} has invalid kind")
             length = parse_int(segment.get("length"), f"segment {segment_id}.length", 1)
@@ -782,6 +853,22 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                 fail("BROKEN_REFERENCE", f"accepted event {event_id} references an unknown Final Path segment")
             if segment_event.get(segment_id) != event_id:
                 fail("BROKEN_REFERENCE", f"accepted event {event_id} and segment {segment_id} are not bidirectional")
+            source = event["source"]
+            segment_source = segments_by_id[segment_id].get("source")
+            if source is None or not isinstance(segment_source, dict) or (
+                source["dataset"],
+                source["contig"],
+                int(source["start"]),
+                int(source["end"]),
+                source["orientation"],
+            ) != (
+                segment_source.get("dataset"),
+                segment_source.get("contig"),
+                int(segment_source.get("start", 0)),
+                int(segment_source.get("end", 0)),
+                segment_source.get("orientation"),
+            ):
+                fail("BROKEN_REFERENCE", f"accepted event {event_id} and segment source intervals disagree")
         elif event["status"] == "accepted" and event_is_path_producing(event):
             fail("BROKEN_REFERENCE", f"accepted path-producing event {event_id} lacks a Final Path segment")
 
@@ -798,6 +885,8 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         "source_card_key",
         "metadata/grt_used_contigs.tsv",
     )
+    card_event_ids = {}
+    card_segment_ids = {}
     for source_card_key, row in used_contigs.items():
         source_key = (row["dataset_name"], row["contig_name"])
         if source_key not in sources:
@@ -810,7 +899,41 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         ):
             if row[field] not in enums[enum_name]:
                 fail("INVALID_VALUE", f"used contig {source_card_key} has invalid {field}")
-        parse_int(row["anchor_start"], f"used contig {source_card_key}.anchor_start")
+        if not row["target_chr"]:
+            fail("INVALID_VALUE", f"used contig {source_card_key} has empty target_chr")
+        parse_int(row["anchor_start"], f"used contig {source_card_key}.anchor_start", 1)
+        expected_card_key = (
+            f"{row['dataset_name']}:{row['contig_name']}:{row['target_chr']}:"
+            f"{row['placement_mode']}"
+        )
+        if source_card_key != expected_card_key:
+            fail("BROKEN_REFERENCE", f"used contig {source_card_key} has a non-canonical card key")
+        expected_mode = {
+            "assigned": "normal",
+            "unplaced": "grt_promoted",
+            "cross_chr": "cross_chr_grt_usage",
+        }[row["original_assignment"]]
+        if row["placement_mode"] != expected_mode:
+            fail(
+                "INVALID_VALUE",
+                f"used contig {source_card_key} placement disagrees with original assignment",
+            )
+        assigned_targets = assignment_chromosomes[source_key]
+        expected_original_assignment = (
+            "assigned"
+            if row["target_chr"] in assigned_targets
+            else ("cross_chr" if assigned_targets else "unplaced")
+        )
+        if row["original_assignment"] != expected_original_assignment:
+            fail(
+                "BROKEN_REFERENCE",
+                f"used contig {source_card_key} disagrees with chr_assignments.tsv",
+            )
+        ref_ids = parse_json(
+            row["ref_evidence_ids_json"],
+            f"used contig {source_card_key}.ref_evidence_ids_json",
+            list,
+        )
         event_ids = parse_json(
             row["accepted_event_ids_json"],
             f"used contig {source_card_key}.accepted_event_ids_json",
@@ -826,20 +949,198 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             f"used contig {source_card_key}.pairwise_evidence_ids_json",
             list,
         )
-        if not event_ids or not final_segment_ids or not pairwise_ids:
+        for label, values in (
+            ("ref evidence", ref_ids),
+            ("accepted event", event_ids),
+            ("Final Path segment", final_segment_ids),
+            ("pairwise evidence", pairwise_ids),
+        ):
+            if len(values) != len(set(values)):
+                fail("DUPLICATE_ID", f"used contig {source_card_key} duplicates {label} links")
+        if not ref_ids or not event_ids or not final_segment_ids or not pairwise_ids:
             fail("BROKEN_REFERENCE", f"used contig {source_card_key} has an incomplete trace chain")
+        card_event_ids[source_card_key] = set(event_ids)
+        card_segment_ids[source_card_key] = set(final_segment_ids)
         if any(value not in events or events[value]["status"] != "accepted" for value in event_ids):
             fail("BROKEN_REFERENCE", f"used contig {source_card_key} references invalid accepted event")
         if any(value not in segment_ids for value in final_segment_ids):
             fail("BROKEN_REFERENCE", f"used contig {source_card_key} references unknown segment")
         if any(value not in evidence for value in pairwise_ids):
             fail("BROKEN_REFERENCE", f"used contig {source_card_key} references unknown pairwise evidence")
+        if any(value not in evidence for value in ref_ids):
+            fail("BROKEN_REFERENCE", f"used contig {source_card_key} references unknown ref evidence")
         if any(evidence[value]["stage"] != "display_pairwise" for value in pairwise_ids):
             fail("BROKEN_REFERENCE", f"used contig {source_card_key} pairwise evidence has the wrong role")
-        if row["original_assignment"] == "unplaced" and row["placement_mode"] != "grt_promoted":
-            fail("INVALID_VALUE", f"unplaced used contig {source_card_key} must be grt_promoted")
-        if row["ref_alignment_status"] == "no_hit" and row["anchor_start"] == "":
-            fail("BROKEN_REFERENCE", f"no-hit used contig {source_card_key} requires GRT-derived anchor")
+        if any(evidence[value]["status"] != "accepted" for value in pairwise_ids):
+            fail("BROKEN_REFERENCE", f"used contig {source_card_key} pairwise evidence is not accepted")
+        if any(evidence[value]["stage"] != "assignment" for value in ref_ids):
+            fail("BROKEN_REFERENCE", f"used contig {source_card_key} ref evidence has the wrong role")
+        if any(evidence[value]["status"] != "accepted" for value in ref_ids):
+            fail("BROKEN_REFERENCE", f"used contig {source_card_key} ref evidence is not accepted")
+        for evidence_id in [*ref_ids, *pairwise_ids]:
+            evidence_row = evidence[evidence_id]
+            if (
+                evidence_row["source_dataset"],
+                evidence_row["source_contig"],
+                evidence_row["source_start"],
+                evidence_row["source_end"],
+            ) != (
+                row["dataset_name"],
+                row["contig_name"],
+                "1",
+                str(len(sources[source_key])),
+            ):
+                fail(
+                    "BROKEN_REFERENCE",
+                    f"used contig {source_card_key} evidence {evidence_id} is not full-source evidence",
+                )
+        pairwise_parameters = [
+            parse_json(
+                evidence[value]["parameters_json"],
+                f"evidence {value}.parameters_json",
+                dict,
+            )
+            for value in pairwise_ids
+        ]
+        if any(parameters.get("role") != "display_pairwise" for parameters in pairwise_parameters):
+            fail("BROKEN_REFERENCE", f"used contig {source_card_key} lacks display-pairwise role metadata")
+        pairwise_provenance = {parameters.get("provenance") for parameters in pairwise_parameters}
+        if row["placement_mode"] == "normal":
+            if pairwise_provenance != {"existing_main_view"}:
+                fail("BROKEN_REFERENCE", f"normal used contig {source_card_key} must reuse main-view PAF")
+            expected_prefix = f"runs/chr_{row['target_chr']}/"
+            if any(
+                not evidence[value]["raw_artifact_relpath"].startswith(expected_prefix)
+                for value in pairwise_ids
+            ):
+                fail("BROKEN_REFERENCE", f"normal used contig {source_card_key} points outside chr-local PAFs")
+            for evidence_id, parameters in zip(pairwise_ids, pairwise_parameters):
+                pairwise = evidence[evidence_id]
+                source_role = parameters.get("source_paf_role")
+                if source_role not in {"query", "target", "both"}:
+                    fail("INVALID_VALUE", f"normal pairwise evidence {evidence_id} lacks source PAF role")
+                artifact_field = (
+                    "query_artifact_relpath"
+                    if source_role == "query"
+                    else "target_artifact_relpath"
+                )
+                source_records = read_fasta(
+                    bundle_path(
+                        bundle_root,
+                        pairwise[artifact_field],
+                        f"evidence {evidence_id} source-side FASTA",
+                    ),
+                    f"evidence {evidence_id} source-side FASTA",
+                )
+                if source_records.get(row["contig_name"]) != sources[source_key]:
+                    fail(
+                        "BROKEN_REFERENCE",
+                        f"normal pairwise evidence {evidence_id} omits the full source contig",
+                    )
+        else:
+            if pairwise_provenance != {"grt_supplement"}:
+                fail("BROKEN_REFERENCE", f"promoted/cross used contig {source_card_key} requires supplemental PAF")
+            for evidence_id in pairwise_ids:
+                pairwise = evidence[evidence_id]
+                query_records = read_fasta(
+                    bundle_path(
+                        bundle_root,
+                        pairwise["query_artifact_relpath"],
+                        f"evidence {evidence_id} supplemental query",
+                    ),
+                    f"evidence {evidence_id} supplemental query",
+                )
+                if query_records != {row["contig_name"]: sources[source_key]}:
+                    fail(
+                        "BROKEN_REFERENCE",
+                        f"supplemental evidence {evidence_id} query is not the full original source",
+                    )
+                read_fasta(
+                    bundle_path(
+                        bundle_root,
+                        pairwise["target_artifact_relpath"],
+                        f"evidence {evidence_id} supplemental target",
+                    ),
+                    f"evidence {evidence_id} supplemental target",
+                )
+        ref_profiles = [evidence[value] for value in ref_ids]
+        profile_parameters = [
+            parse_json(
+                profile["parameters_json"],
+                f"evidence {profile['evidence_id']}.parameters_json",
+                dict,
+            )
+            for profile in ref_profiles
+        ]
+        if any(profile.get("role") != "source_ref_profile" for profile in profile_parameters):
+            fail("BROKEN_REFERENCE", f"used contig {source_card_key} lacks source ref-profile evidence")
+        expected_ref_raw = f"runs/{row['dataset_name']}_vs_ref/result.paf"
+        expected_dataset_fasta = datasets_by_name[row["dataset_name"]]["fasta_relpath"]
+        if any(
+            profile["query_artifact_relpath"] != expected_dataset_fasta
+            or profile["target_artifact_relpath"] != reference["fasta_relpath"]
+            or profile["raw_artifact_relpath"] != expected_ref_raw
+            for profile in ref_profiles
+        ):
+            fail("BROKEN_REFERENCE", f"used contig {source_card_key} ref profile does not reuse ds-vs-ref PAF")
+        target_profiles = [
+            profile
+            for profile in ref_profiles
+            if profile["target_chr"] == row["target_chr"] and profile["target_start"]
+        ]
+        hit_chromosomes = {
+            chromosome
+            for profile in profile_parameters
+            for chromosome in profile.get("hit_chromosomes", [])
+        }
+        try:
+            source_hit_counts = {
+                int(profile["source_hit_count"]) for profile in profile_parameters
+            }
+            target_hit_counts = {
+                int(profile["target_hit_count"]) for profile in profile_parameters
+            }
+        except (KeyError, TypeError, ValueError):
+            fail("INVALID_VALUE", f"used contig {source_card_key} has invalid ref-hit counts")
+        if (
+            len(source_hit_counts) != 1
+            or len(target_hit_counts) != 1
+            or min(source_hit_counts | target_hit_counts) < 0
+        ):
+            fail("INVALID_VALUE", f"used contig {source_card_key} has inconsistent ref-hit counts")
+        source_hit_count = next(iter(source_hit_counts))
+        target_hit_count = next(iter(target_hit_counts))
+        if target_hit_count > source_hit_count:
+            fail("INVALID_VALUE", f"used contig {source_card_key} target hits exceed source hits")
+        status = row["ref_alignment_status"]
+        if status in {"hit", "weak_hit", "multi_hit"} and not target_profiles:
+            fail("BROKEN_REFERENCE", f"used contig {source_card_key} status requires a target-chr ref hit")
+        if status in {"hit", "weak_hit", "multi_hit"} and target_hit_count < 1:
+            fail("BROKEN_REFERENCE", f"used contig {source_card_key} lacks counted target-chr hits")
+        if status in {"other_chr_only", "no_hit"} and target_profiles:
+            fail("BROKEN_REFERENCE", f"used contig {source_card_key} status forbids a target-chr ref hit")
+        if status in {"other_chr_only", "no_hit"} and target_hit_count != 0:
+            fail("BROKEN_REFERENCE", f"used contig {source_card_key} counts a forbidden target-chr hit")
+        if status == "no_hit" and (hit_chromosomes or source_hit_count != 0):
+            fail("BROKEN_REFERENCE", f"no-hit used contig {source_card_key} has ref-hit evidence")
+        if status == "other_chr_only" and (
+            not hit_chromosomes or row["target_chr"] in hit_chromosomes
+        ):
+            fail("BROKEN_REFERENCE", f"other-chr used contig {source_card_key} has invalid ref-hit semantics")
+        if status == "multi_hit" and source_hit_count <= 1:
+            fail("BROKEN_REFERENCE", f"multi-hit used contig {source_card_key} lacks multiple ref hits")
+        if status in {"hit", "weak_hit"} and source_hit_count != 1:
+            fail("BROKEN_REFERENCE", f"single-hit used contig {source_card_key} has invalid ref-hit count")
+        if status == "hit" and row["original_assignment"] != "assigned":
+            fail("BROKEN_REFERENCE", f"ref-hit used contig {source_card_key} is not target-assigned")
+        if status == "weak_hit" and row["original_assignment"] == "assigned":
+            fail("BROKEN_REFERENCE", f"weak-hit used contig {source_card_key} is target-assigned")
+        anchor_sources = {profile.get("anchor_source") for profile in profile_parameters}
+        if status in {"other_chr_only", "no_hit"} and anchor_sources != {"grt_final_path"}:
+            fail(
+                "BROKEN_REFERENCE",
+                f"used contig {source_card_key} requires an explicit GRT-derived target anchor",
+            )
 
     for event_id, event in events.items():
         if (
@@ -859,6 +1160,11 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             event["chr"],
         ):
             fail("BROKEN_REFERENCE", f"accepted event {event_id} and used-contig card disagree")
+        if (
+            card["orientation"] != source["orientation"]
+            or card["original_assignment"] != source["original_assignment"]
+        ):
+            fail("BROKEN_REFERENCE", f"accepted event {event_id} and used-contig card placement disagree")
         if event_id not in parse_json(
             card["accepted_event_ids_json"],
             f"used contig {source_card_key}.accepted_event_ids_json",
@@ -871,6 +1177,31 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             list,
         ):
             fail("BROKEN_REFERENCE", f"used-contig card does not point to event {event_id} segment")
+        if not any(
+            evidence[evidence_id]["stage"]
+            not in {"assignment", "display_pairwise"}
+            for evidence_id in event["evidence_ids"]
+        ):
+            fail("BROKEN_REFERENCE", f"accepted event {event_id} lacks GRT-stage evidence")
+
+    expected_card_events = defaultdict(set)
+    expected_card_segments = defaultdict(set)
+    for event_id, event in events.items():
+        if (
+            event["status"] == "accepted"
+            and event["source"] is not None
+            and event_is_path_producing(event)
+        ):
+            expected_card_events[event["source_card_key"]].add(event_id)
+            expected_card_segments[event["source_card_key"]].add(event["final_path_segment_id"])
+    if set(used_contigs) != set(expected_card_events):
+        fail("BROKEN_REFERENCE", "used-contig cards do not exactly match accepted path sources")
+    for source_card_key in used_contigs:
+        if (
+            card_event_ids[source_card_key] != expected_card_events[source_card_key]
+            or card_segment_ids[source_card_key] != expected_card_segments[source_card_key]
+        ):
+            fail("BROKEN_REFERENCE", f"used contig {source_card_key} reverse links are not exact")
 
     for usage_id, row in usage.items():
         if row["status"] not in {"accepted", "consumed"}:

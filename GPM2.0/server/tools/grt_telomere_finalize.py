@@ -1355,22 +1355,24 @@ def build_events_usage_attempts(
     return events, usage_rows, attempts
 
 
-def assignment_map(server_dir: Path) -> dict[tuple[str, str], str]:
-    return {
-        (row["dataset_name"], row["seq_name"]): row["assigned_chr_name"]
-        for row in read_tsv(
-            server_dir / "metadata/chr_assignments.tsv",
-            [
-                "dataset_name",
-                "seq_name",
-                "seq_length_bp",
-                "assigned_chr_name",
-                "support_bp",
-                "support_percent",
-                "anchor_start",
-            ],
+def assignment_map(server_dir: Path) -> dict[tuple[str, str], set[str]]:
+    assignments: dict[tuple[str, str], set[str]] = defaultdict(set)
+    for row in read_tsv(
+        server_dir / "metadata/chr_assignments.tsv",
+        [
+            "dataset_name",
+            "seq_name",
+            "seq_length_bp",
+            "assigned_chr_name",
+            "support_bp",
+            "support_percent",
+            "anchor_start",
+        ],
+    ):
+        assignments[(row["dataset_name"], row["seq_name"])].add(
+            row["assigned_chr_name"]
         )
-    }
+    return assignments
 
 
 def evidence_status(outcome: str) -> str:

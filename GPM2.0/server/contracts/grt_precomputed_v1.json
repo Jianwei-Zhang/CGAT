@@ -11,6 +11,7 @@
     "metadata/reference.tsv",
     "metadata/datasets.tsv",
     "metadata/source_seq_locator.tsv",
+    "metadata/chr_assignments.tsv",
     "metadata/grt_recipe.tsv",
     "metadata/grt_contig_roles.tsv",
     "metadata/grt_q_segments.tsv",
@@ -75,6 +76,18 @@
     },
     "metadata/source_seq_locator.tsv": {
       "header": ["dataset_name", "seq_name", "fasta_relpath"],
+      "min_rows": 1
+    },
+    "metadata/chr_assignments.tsv": {
+      "header": [
+        "dataset_name",
+        "seq_name",
+        "seq_length_bp",
+        "assigned_chr_name",
+        "support_bp",
+        "support_percent",
+        "anchor_start"
+      ],
       "min_rows": 1
     },
     "metadata/grt_recipe.tsv": {
@@ -207,6 +220,7 @@
         "ref_alignment_status",
         "anchor_start",
         "orientation",
+        "ref_evidence_ids_json",
         "accepted_event_ids_json",
         "final_path_segment_ids_json",
         "pairwise_evidence_ids_json"

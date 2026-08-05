@@ -1,0 +1,2 @@
+dataset_name	seq_name	seq_length_bp	assigned_chr_name	support_bp	support_percent	anchor_start
+primary	primary1	4	Chr01	4	100.000	1

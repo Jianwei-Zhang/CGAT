@@ -88,6 +88,16 @@
     }
   },
   {
+    "name": "missing_ref_profile_link",
+    "expected_code": "BROKEN_REFERENCE",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/grt_used_contigs.tsv",
+      "old": "[\"ev-ref-donor1\"]",
+      "new": "[\"ev-ref-missing\"]"
+    }
+  },
+  {
     "name": "raw_evidence_checksum_mismatch",
     "expected_code": "CHECKSUM_MISMATCH",
     "operation": {

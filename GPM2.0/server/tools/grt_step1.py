@@ -612,16 +612,22 @@ def arbitrate_candidates(
 
 
 def source_assignment(
-    assignments: dict[tuple[str, str], str],
+    assignments: dict[tuple[str, str], object],
     candidate: dict[str, object],
 ) -> tuple[str, str, str]:
     key = (str(candidate["source_dataset"]), str(candidate["source_contig"]))
     target_chr = str(candidate["chr"])
-    assigned_chr = assignments.get(key)
-    if assigned_chr is None:
+    assigned_value = assignments.get(key)
+    if assigned_value is None:
+        assigned_chromosomes: set[str] = set()
+    elif isinstance(assigned_value, str):
+        assigned_chromosomes = {assigned_value}
+    else:
+        assigned_chromosomes = {str(value) for value in assigned_value}
+    if not assigned_chromosomes:
         original_assignment = "unplaced"
         placement_mode = "grt_promoted"
-    elif assigned_chr == target_chr:
+    elif target_chr in assigned_chromosomes:
         original_assignment = "assigned"
         placement_mode = "normal"
     else:
@@ -2062,21 +2068,22 @@ def execute(args: argparse.Namespace) -> None:
     base_evidence_rows = [row for row in all_evidence_rows if row["stage"] == "assignment"]
     base_tool_rows = read_tsv(server_dir / "metadata/grt_tool_versions.tsv", TOOL_FIELDS)
     minimap = executable_identity(args.minimap2)
-    assignments = {
-        (row["dataset_name"], row["seq_name"]): row["assigned_chr_name"]
-        for row in read_tsv(
-            server_dir / "metadata/chr_assignments.tsv",
-            [
-                "dataset_name",
-                "seq_name",
-                "seq_length_bp",
-                "assigned_chr_name",
-                "support_bp",
-                "support_percent",
-                "anchor_start",
-            ],
+    assignments: dict[tuple[str, str], set[str]] = defaultdict(set)
+    for row in read_tsv(
+        server_dir / "metadata/chr_assignments.tsv",
+        [
+            "dataset_name",
+            "seq_name",
+            "seq_length_bp",
+            "assigned_chr_name",
+            "support_bp",
+            "support_percent",
+            "anchor_start",
+        ],
+    ):
+        assignments[(row["dataset_name"], row["seq_name"])].add(
+            row["assigned_chr_name"]
         )
-    }
     chromosome_order, q0_paths, q0_records = load_q_paths(
         server_dir, "q0", base_q_rows, sources
     )
