@@ -529,7 +529,12 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             if row[path_field] or row[hash_field]:
                 if not row[path_field] or not row[hash_field]:
                     fail("INVALID_VALUE", f"evidence {evidence_id} has partial artifact identity")
-                validate_artifact(bundle_root, row[path_field], row[hash_field], f"evidence {evidence_id}.{path_field}")
+                validate_artifact(
+                    bundle_root,
+                    row[path_field],
+                    row[hash_field],
+                    f"evidence {evidence_id}.{path_field}",
+                )
         validate_artifact(
             bundle_root,
             row["raw_artifact_relpath"],
@@ -537,7 +542,11 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             f"evidence {evidence_id}.raw_artifact",
         )
         if row["q_version"]:
-            q_path = bundle_path(bundle_root, f"grt/q/{row['q_version']}.fa", f"evidence {evidence_id} q source")
+            q_path = bundle_path(
+                bundle_root,
+                f"grt/q/{row['q_version']}.fa",
+                f"evidence {evidence_id} q source",
+            )
             validate_sha256(row["q_source_sha256"], f"evidence {evidence_id}.q_source_sha256")
             if sha256_file(q_path) != row["q_source_sha256"]:
                 fail("CHECKSUM_MISMATCH", f"evidence {evidence_id} q source hash mismatch")
@@ -638,6 +647,33 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         if row["event_id"] and row["event_id"] not in events:
             fail("BROKEN_REFERENCE", f"usage {usage_id} references unknown event {row['event_id']}")
 
+    for event_id, event in events.items():
+        superseded_by = event.get("superseded_by_event_id")
+        if event["status"] == "superseded":
+            if not isinstance(superseded_by, str) or superseded_by not in events:
+                fail("BROKEN_REFERENCE", f"superseded event {event_id} lacks its replacing event")
+            replacement = events[superseded_by]
+            if replacement["status"] != "accepted" or replacement["action"] not in {
+                "filter_component",
+                "delete",
+                "replace",
+                "correct_boundary",
+            }:
+                fail("BROKEN_REFERENCE", f"superseded event {event_id} has an invalid replacing event")
+            if event_id not in replacement.get("superseded_event_ids", []):
+                fail("BROKEN_REFERENCE", f"superseded event {event_id} is not linked bidirectionally")
+        elif superseded_by is not None:
+            fail("INVALID_VALUE", f"non-superseded event {event_id} declares superseded_by_event_id")
+        superseded_ids = event.get("superseded_event_ids", [])
+        if not isinstance(superseded_ids, list):
+            fail("INVALID_JSON", f"event {event_id}.superseded_event_ids must be an array")
+        for superseded_id in superseded_ids:
+            if (
+                superseded_id not in events
+                or events[superseded_id].get("superseded_by_event_id") != event_id
+            ):
+                fail("BROKEN_REFERENCE", f"event {event_id} has an invalid superseded event link")
+
     final_path = read_json_file(bundle_root, "metadata/grt_final_path.json")
     if (
         final_path.get("workflow") != schema["workflow"]
@@ -691,6 +727,8 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             if event_id:
                 if event_id not in events:
                     fail("BROKEN_REFERENCE", f"segment {segment_id} references unknown event {event_id}")
+                if events[event_id]["status"] != "accepted":
+                    fail("BROKEN_REFERENCE", f"segment {segment_id} references a non-accepted event")
                 segment_event[segment_id] = event_id
             if kind == "gap":
                 if segment.get("source") is not None or event_id:
@@ -724,11 +762,19 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
 
     for event_id, event in events.items():
         segment_id = event["final_path_segment_id"]
-        if event["status"] == "accepted":
-            if not segment_id or segment_id not in segment_ids:
-                fail("BROKEN_REFERENCE", f"accepted event {event_id} lacks a valid Final Path segment")
+        if event["status"] == "accepted" and segment_id:
+            if segment_id not in segment_ids:
+                fail("BROKEN_REFERENCE", f"accepted event {event_id} references an unknown Final Path segment")
             if segment_event.get(segment_id) != event_id:
                 fail("BROKEN_REFERENCE", f"accepted event {event_id} and segment {segment_id} are not bidirectional")
+        elif event["status"] == "accepted" and event["action"] in {
+            "fill",
+            "patch",
+            "replace",
+            "refill",
+            "extend_telomere",
+        }:
+            fail("BROKEN_REFERENCE", f"accepted path-producing event {event_id} lacks a Final Path segment")
 
     for usage_id, row in usage.items():
         if row["final_path_segment_id"] and row["final_path_segment_id"] not in segment_ids:

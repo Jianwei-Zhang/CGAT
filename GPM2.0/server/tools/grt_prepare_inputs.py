@@ -213,7 +213,7 @@ def path_hashes(paths: Iterable[Path], root: Path) -> dict[str, str]:
 def executable_identity(command: str) -> dict[str, str]:
     resolved = shutil.which(command) if "/" not in command else str(Path(command).resolve())
     if not resolved or not Path(resolved).is_file() or not os.access(resolved, os.X_OK):
-        fail(f"required QC executable is unavailable: {command}")
+        fail(f"required executable is unavailable: {command}")
     version = "unknown"
     try:
         completed = subprocess.run(
@@ -780,7 +780,7 @@ def prepare(args: argparse.Namespace) -> None:
                 ],
             )
             stage_checkpoint_matches = (
-                len(stage_rows) == 1
+                len(stage_rows) >= 1
                 and stage_rows[0]["stage"] == "donor_freeze"
                 and stage_rows[0]["q_input_version"] == "q0"
                 and stage_rows[0]["q_input_sha256"] == checkpoint.get("q0_sha256")
@@ -1318,7 +1318,17 @@ def prepare(args: argparse.Namespace) -> None:
             ["tool", "version", "executable"],
             tool_rows,
         )
-        metadata_outputs.extend(stage_metadata.iterdir())
+        mutable_stage_metadata = {
+            "grt_q_segments.tsv",
+            "grt_evidence_registry.tsv",
+            "grt_stage_status.tsv",
+            "grt_tool_versions.tsv",
+        }
+        metadata_outputs.extend(
+            path
+            for path in stage_metadata.iterdir()
+            if path.name not in mutable_stage_metadata
+        )
 
         output_files = [
             q0_path,

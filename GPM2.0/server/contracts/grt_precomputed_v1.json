@@ -249,7 +249,7 @@
   "enums": {
     "donor_kind": ["ordinary", "telomere"],
     "orientation": ["+", "-"],
-    "evidence_status": ["candidate", "accepted", "rejected", "conflicted", "background"],
+    "evidence_status": ["candidate", "accepted", "superseded", "rejected", "conflicted", "background"],
     "evidence_stage": [
       "assignment",
       "step1_round1",
@@ -260,8 +260,8 @@
       "candidate_validation",
       "display_pairwise"
     ],
-    "usage_status": ["available", "candidate", "accepted", "consumed", "rejected", "conflicted"],
-    "event_status": ["accepted", "rejected", "conflicted", "unresolved"],
+    "usage_status": ["available", "candidate", "accepted", "consumed", "superseded", "rejected", "conflicted"],
+    "event_status": ["accepted", "superseded", "rejected", "conflicted", "unresolved"],
     "event_stage": [
       "step1_round1",
       "step1_filter",

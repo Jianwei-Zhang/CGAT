@@ -133,6 +133,50 @@ class GrtContractTests(unittest.TestCase):
 
         self.assertEqual(summary["workflow"], "gpm_grt_precomputed_v1")
 
+    def test_accepted_filter_event_does_not_require_a_final_path_segment(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            bundle_root = Path(temporary_dir) / "gpm_server"
+            shutil.copytree(VALID_BUNDLE, bundle_root)
+            events_path = bundle_root / "metadata/grt_events.jsonl"
+            with events_path.open("a", encoding="utf-8", newline="") as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "run_id": "run-test",
+                            "event_id": "evt-step1-filter",
+                            "stage": "step1_filter",
+                            "chr": "Chr01",
+                            "object_id": "component-filter-1",
+                            "action": "filter_component",
+                            "status": "accepted",
+                            "reason": "removed_isolated_component",
+                            "q_before": {
+                                "version": "q0r1",
+                                "start": 1,
+                                "end": 8,
+                                "sha256": "312928223060ab1febdcedd56532d45eab299979a64b219df997979212c81481",
+                            },
+                            "q_after": {
+                                "version": "q0f",
+                                "start": 1,
+                                "end": 8,
+                                "sha256": "312928223060ab1febdcedd56532d45eab299979a64b219df997979212c81481",
+                            },
+                            "source": None,
+                            "evidence_ids": [],
+                            "usage_ids": [],
+                            "source_card_key": "",
+                            "final_path_segment_id": "",
+                        },
+                        separators=(",", ":"),
+                    )
+                    + "\n"
+                )
+
+            summary = GRT_CONTRACT.validate_contract(bundle_root, SCHEMA_PATH)
+
+        self.assertEqual(summary["events"], 2)
+
     def test_cli_rejects_legacy_package(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             bundle_root = Path(temporary_dir) / "gpm_server"
