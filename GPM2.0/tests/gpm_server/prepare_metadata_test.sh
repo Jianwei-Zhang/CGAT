@@ -26,7 +26,7 @@ cat > "${FAKE_BIN}/minimap2" <<'EOF'
 exit 0
 EOF
 
-for grt_tool in nucmer delta-filter show-coords; do
+for grt_tool in nucmer delta-filter show-coords merqury.sh craq; do
   cat > "${FAKE_BIN}/${grt_tool}" <<EOF
 #!/usr/bin/env bash
 exit 0
@@ -59,7 +59,7 @@ exit 0
 EOF
 
 chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/makeblastdb" "${FAKE_BIN}/blastn" "${FAKE_BIN}/meryl" "${FAKE_BIN}/winnowmap" "${FAKE_BIN}/zip" \
-  "${FAKE_BIN}/nucmer" "${FAKE_BIN}/delta-filter" "${FAKE_BIN}/show-coords"
+  "${FAKE_BIN}/nucmer" "${FAKE_BIN}/delta-filter" "${FAKE_BIN}/show-coords" "${FAKE_BIN}/merqury.sh" "${FAKE_BIN}/craq"
 
 write_multi_fasta() {
   local path="$1"
@@ -99,6 +99,23 @@ assert_prepare_option() {
   ' "$path"
 }
 
+make_restricted_path() {
+  local output_dir="$1"
+  local missing_command="$2"
+  mkdir -p "$output_dir"
+  local command_name
+  for command_name in dirname gzip python3; do
+    ln -s "$(command -v "$command_name")" "${output_dir}/${command_name}"
+  done
+  for command_name in \
+    samtools zip minimap2 nucmer delta-filter show-coords meryl merqury.sh craq
+  do
+    if [[ "$command_name" != "$missing_command" ]]; then
+      ln -s "${FAKE_BIN}/${command_name}" "${output_dir}/${command_name}"
+    fi
+  done
+}
+
 ref="${TMP_DIR}/ref.fa"
 ds="${TMP_DIR}/ds.fa"
 cen="${TMP_DIR}/cen.fa"
@@ -121,10 +138,6 @@ printf 'stale_ds\t1\t0\t1\t2\n' > "${output_root}/data/datasets/ds_add.fa.fai"
     --minimap-preset asm5 \
     --tel TTAGGG 2 \
     --cen "$cen" \
-    --grt-minimap2 bin/minimap2 \
-    --grt-nucmer bin/nucmer \
-    --grt-delta-filter bin/delta-filter \
-    --grt-show-coords bin/show-coords \
     -o "$output_root" >/dev/null
 )
 
@@ -154,6 +167,91 @@ assert_prepare_option "$metadata_path" cen_min_identity 80
 grep -F -- "--minimap2 ${FAKE_BIN}/minimap2" "${output_root}/run_grt_step1.sh" >/dev/null
 grep -F -- "--minimap2 ${FAKE_BIN}/minimap2 --nucmer ${FAKE_BIN}/nucmer --delta-filter ${FAKE_BIN}/delta-filter --show-coords ${FAKE_BIN}/show-coords" \
   "${output_root}/run_grt_step23.sh" >/dev/null
+
+help_output="$(bash "$SCRIPT" --help)"
+for removed_option in \
+  --grt-meryl \
+  --grt-merqury \
+  --grt-craq \
+  --grt-minimap2 \
+  --grt-nucmer \
+  --grt-delta-filter \
+  --grt-show-coords
+do
+  if grep -F -- "$removed_option" <<<"$help_output" >/dev/null; then
+    echo "prepare.sh --help still advertises removed option: ${removed_option}" >&2
+    exit 1
+  fi
+  error_path="${TMP_DIR}/${removed_option#--}.err"
+  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+    --ref ref_removed_grt_option "$ref" \
+    --ds ds_removed_grt_option "$ds" \
+    "$removed_option" "${FAKE_BIN}/minimap2" \
+    >/dev/null 2>"$error_path"; then
+    echo "expected removed option to fail: ${removed_option}" >&2
+    exit 1
+  fi
+  grep -F "Unknown argument: ${removed_option}" "$error_path" >/dev/null || {
+    echo "expected unknown-argument error for ${removed_option}" >&2
+    cat "$error_path" >&2
+    exit 1
+  }
+done
+
+reads="${TMP_DIR}/reads.fastq"
+reads_output_root="${TMP_DIR}/reads_gpm_server"
+printf 'reads\n' > "$reads"
+PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  --ref ref_reads_qc "$ref" \
+  --ds ds_reads_qc "$ds" \
+  --reads "$reads" \
+  -o "$reads_output_root" >/dev/null
+reads_metadata_path="${reads_output_root}/metadata/prepare_options.tsv"
+assert_prepare_option "$reads_metadata_path" grt_reads_qc_enabled true
+assert_prepare_option "$reads_metadata_path" grt_meryl "${FAKE_BIN}/meryl"
+assert_prepare_option "$reads_metadata_path" grt_merqury "${FAKE_BIN}/merqury.sh"
+assert_prepare_option "$reads_metadata_path" grt_craq "${FAKE_BIN}/craq"
+grep -F -- "--meryl ${FAKE_BIN}/meryl --merqury ${FAKE_BIN}/merqury.sh --craq ${FAKE_BIN}/craq" \
+  "${reads_output_root}/prepare_grt_inputs.sh" >/dev/null
+
+for missing_command in minimap2 nucmer delta-filter show-coords; do
+  restricted_bin="${TMP_DIR}/missing-${missing_command}-bin"
+  error_path="${TMP_DIR}/missing-${missing_command}.err"
+  make_restricted_path "$restricted_bin" "$missing_command"
+  if PATH="$restricted_bin" /bin/bash "$SCRIPT" \
+    --ref ref_missing_grt_tool "$ref" \
+    --ds ds_missing_grt_tool "$ds" \
+    -o "${TMP_DIR}/missing-${missing_command}-output" \
+    >/dev/null 2>"$error_path"; then
+    echo "expected missing ${missing_command} to fail" >&2
+    exit 1
+  fi
+  grep -F "Required command not found in PATH: ${missing_command}" "$error_path" >/dev/null || {
+    echo "expected missing-command error for ${missing_command}" >&2
+    cat "$error_path" >&2
+    exit 1
+  }
+done
+
+for missing_command in meryl merqury.sh craq; do
+  restricted_bin="${TMP_DIR}/missing-${missing_command}-bin"
+  error_path="${TMP_DIR}/missing-${missing_command}.err"
+  make_restricted_path "$restricted_bin" "$missing_command"
+  if PATH="$restricted_bin" /bin/bash "$SCRIPT" \
+    --ref ref_missing_grt_qc "$ref" \
+    --ds ds_missing_grt_qc "$ds" \
+    --reads "$reads" \
+    -o "${TMP_DIR}/missing-${missing_command}-output" \
+    >/dev/null 2>"$error_path"; then
+    echo "expected missing ${missing_command} with reads to fail" >&2
+    exit 1
+  fi
+  grep -F "Required command not found in PATH: ${missing_command}" "$error_path" >/dev/null || {
+    echo "expected missing-command error for ${missing_command}" >&2
+    cat "$error_path" >&2
+    exit 1
+  }
+done
 
 grep -q $'^Chr01\t20\t' "${output_root}/data/reference/ref_add_options.fa.fai" || {
   echo "reference .fai was not regenerated from the current FASTA" >&2

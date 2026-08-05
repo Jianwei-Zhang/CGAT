@@ -56,13 +56,6 @@ Usage:
     [--cen-min-len <min_alignment_bp>] \
     [--cen-min-identity <min_identity_percent>] \
     [--reads <reads_fastq_path> ...] \
-    [--grt-meryl <meryl_executable>] \
-    [--grt-merqury <merqury.sh_executable>] \
-    [--grt-craq <craq_executable>] \
-    [--grt-minimap2 <minimap2_executable>] \
-    [--grt-nucmer <nucmer_executable>] \
-    [--grt-delta-filter <delta-filter_executable>] \
-    [--grt-show-coords <show-coords_executable>] \
     [--grt-qc-memory-gb <memory_gb>] \
     [--grt-kmer-size <kmer_size>] \
     [--ds <dataset_name> <dataset_fasta_path> ...]
@@ -87,7 +80,9 @@ Behavior:
   - Supports --cen <reference_centromere_fasta> to mark complete reference centromere regions
   - Supports --cen-min-len and --cen-min-identity to filter centromere alignments
   - The first --ds is the locked GRT primary dataset; later initial --ds inputs are support datasets
+  - Discovers minimap2, nucmer, delta-filter, and show-coords from PATH and records their resolved paths
   - Repeatable --reads enables one shared Meryl database plus Merqury/CRAQ for every initial dataset
+  - With --reads, also discovers meryl, merqury.sh, and craq from PATH
   - With no --reads, only reads-based QC is skipped; q0 and frozen D0/Dtel are still prepared
   - Generates staged chromosome-partitioned run commands
   - Supports --skip-self to omit dataset vs self alignments
@@ -383,13 +378,15 @@ resolve_output_root() {
   fi
 }
 
-resolve_command_argument() {
-  local value="$1"
-  if [[ "$value" == */* && "$value" != /* ]]; then
-    printf '%s/%s\n' "$(pwd)" "$value"
-  else
-    printf '%s\n' "$value"
+resolve_required_command() {
+  local command_name="$1"
+  local resolved
+  resolved="$(command -v "$command_name")" \
+    || die "Required command not found in PATH: $command_name"
+  if [[ "$resolved" != /* ]]; then
+    resolved="$(cd "$(dirname "$resolved")" && pwd)/$(basename "$resolved")"
   fi
+  printf '%s\n' "$resolved"
 }
 
 write_package_scripts() {
@@ -2795,41 +2792,6 @@ while [[ $# -gt 0 ]]; do
       READS_SRCS+=("$2")
       shift 2
       ;;
-    --grt-meryl)
-      [[ $# -ge 2 && -n "$2" ]] || die "--grt-meryl requires <meryl_executable>"
-      GRT_MERYL="$2"
-      shift 2
-      ;;
-    --grt-merqury)
-      [[ $# -ge 2 && -n "$2" ]] || die "--grt-merqury requires <merqury.sh_executable>"
-      GRT_MERQURY="$2"
-      shift 2
-      ;;
-    --grt-craq)
-      [[ $# -ge 2 && -n "$2" ]] || die "--grt-craq requires <craq_executable>"
-      GRT_CRAQ="$2"
-      shift 2
-      ;;
-    --grt-minimap2)
-      [[ $# -ge 2 && -n "$2" ]] || die "--grt-minimap2 requires <minimap2_executable>"
-      GRT_MINIMAP2="$2"
-      shift 2
-      ;;
-    --grt-nucmer)
-      [[ $# -ge 2 && -n "$2" ]] || die "--grt-nucmer requires <nucmer_executable>"
-      GRT_NUCMER="$2"
-      shift 2
-      ;;
-    --grt-delta-filter)
-      [[ $# -ge 2 && -n "$2" ]] || die "--grt-delta-filter requires <delta-filter_executable>"
-      GRT_DELTA_FILTER="$2"
-      shift 2
-      ;;
-    --grt-show-coords)
-      [[ $# -ge 2 && -n "$2" ]] || die "--grt-show-coords requires <show-coords_executable>"
-      GRT_SHOW_COORDS="$2"
-      shift 2
-      ;;
     --grt-qc-memory-gb)
       [[ $# -ge 2 ]] || die "--grt-qc-memory-gb requires <memory_gb>"
       validate_positive_integer "--grt-qc-memory-gb" "$2"
@@ -2860,10 +2822,15 @@ require_cmd samtools
 require_cmd zip
 require_cmd gzip
 require_cmd python3
-require_cmd "$GRT_MINIMAP2"
-require_cmd "$GRT_NUCMER"
-require_cmd "$GRT_DELTA_FILTER"
-require_cmd "$GRT_SHOW_COORDS"
+GRT_MINIMAP2="$(resolve_required_command minimap2)"
+GRT_NUCMER="$(resolve_required_command nucmer)"
+GRT_DELTA_FILTER="$(resolve_required_command delta-filter)"
+GRT_SHOW_COORDS="$(resolve_required_command show-coords)"
+if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
+  GRT_MERYL="$(resolve_required_command meryl)"
+  GRT_MERQURY="$(resolve_required_command merqury.sh)"
+  GRT_CRAQ="$(resolve_required_command craq)"
+fi
 case "$ALIGNER" in
   minimap2)
     require_cmd minimap2
@@ -2901,13 +2868,6 @@ for i in "${!READS_SRCS[@]}"; do
     READS_SRCS[$i]="$(cd "$(dirname "${READS_SRCS[$i]}")" && pwd)/$(basename "${READS_SRCS[$i]}")"
   fi
 done
-GRT_MERYL="$(resolve_command_argument "$GRT_MERYL")"
-GRT_MERQURY="$(resolve_command_argument "$GRT_MERQURY")"
-GRT_CRAQ="$(resolve_command_argument "$GRT_CRAQ")"
-GRT_MINIMAP2="$(resolve_command_argument "$GRT_MINIMAP2")"
-GRT_NUCMER="$(resolve_command_argument "$GRT_NUCMER")"
-GRT_DELTA_FILTER="$(resolve_command_argument "$GRT_DELTA_FILTER")"
-GRT_SHOW_COORDS="$(resolve_command_argument "$GRT_SHOW_COORDS")"
 
 mkdir -p \
   "${WORK_ROOT}/metadata" \
