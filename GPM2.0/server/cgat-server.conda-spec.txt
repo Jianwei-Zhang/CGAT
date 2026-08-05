@@ -1,0 +1,11 @@
+python=3.11.14
+samtools=1.23.1
+minimap2=2.31
+mummer4=4.0.1
+meryl=1.4.1
+merqury=1.4.1
+craq=1.10
+blast=2.17.0
+winnowmap=2.03
+zip
+gzip

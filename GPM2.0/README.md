@@ -17,13 +17,31 @@ GPM2.0 uses a split architecture between the server side and the client side:
 
 ### Prerequisites
 
+On the Linux server, create the complete `cgat-server` environment once:
+
+```bash
+bash server/env.sh
+```
+
+The installer reuses `mamba`, `micromamba`, or `conda` when available. If none is installed, it installs micromamba for the current user and creates the environment without `sudo`. It prints the exact commands for the selected manager when finished. For example:
+
+```bash
+# Activate
+micromamba activate cgat-server
+
+# Deactivate
+micromamba deactivate
+```
+
+If the installer selects `mamba` or `conda`, replace `micromamba` with the manager name printed by `env.sh`. Re-running `bash server/env.sh` validates the existing managed environment and updates it only when the dependency specification changes.
+
 - Required tools: `SAMtools 1.9+`, `Python 3`, `zip`, `gzip`
 - Alignment tools by engine:
   - `minimap2`: recommended `2.31`; older versions that support `-x asm10/asm5`, `-t`, and PAF output remain usable
   - `blastn`: recommended BLAST+ `2.17.0`, with `makeblastdb`
   - `winnowmap`: recommended `2.03`, with `meryl`
-- GRT precomputed Final Path: `minimap2`, plus MUMmer4 commands `nucmer`, `delta-filter`, and `show-coords`; install them in the execution environment so they are available through `PATH`
-- Optional reads-based assembly QC: `meryl`, `merqury.sh`, and `craq`; these must be available through `PATH` only when one or more `--reads` inputs are provided
+- GRT precomputed Final Path: `minimap2`, plus MUMmer4 commands `nucmer`, `delta-filter`, and `show-coords`; `server/env.sh` installs them and makes them available through `PATH` after activation
+- Optional reads-based assembly QC: `meryl`, `merqury.sh`, and `craq`; `server/env.sh` installs them, while the workflow invokes them only when one or more `--reads` inputs are provided
 - Input data: `ref_genome.fa`, `hifiasm.fa`, `flye.fa`, `canu2.fa`
 
 Note: This document uses these data only as an example to illustrate the workflow. The workflow is not limited to this specific kind of input.

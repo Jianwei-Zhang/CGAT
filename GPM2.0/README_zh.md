@@ -17,13 +17,31 @@ GPM2.0 采用服务端与客户端分离的工作模式：
 
 ### 环境准备
 
+首次在 Linux Server 上创建完整的 `cgat-server` 环境：
+
+```bash
+bash server/env.sh
+```
+
+安装脚本会复用已有的 `mamba`、`micromamba` 或 `conda`；三者都不存在时，会为当前用户无 sudo 安装 micromamba 并创建环境。完成后脚本会根据实际采用的 manager 打印准确命令。例如：
+
+```bash
+# 激活
+micromamba activate cgat-server
+
+# 退出
+micromamba deactivate
+```
+
+如果脚本选择的是 `mamba` 或 `conda`，把示例中的 `micromamba` 换成 `env.sh` 打印的 manager 名称。再次运行 `bash server/env.sh` 会校验已托管的环境，只在依赖配置变化时更新。
+
 - 必需工具：`SAMtools 1.9+`、`Python 3`、`zip`、`gzip`
 - 各比对引擎工具：
   - `minimap2`：推荐 `2.31`；仍兼容支持 `-x asm10/asm5`、`-t` 和 PAF 输出的旧版本
   - `blastn`：推荐 BLAST+ `2.17.0`，并需要 `makeblastdb`
   - `winnowmap`：推荐 `2.03`，并需要 `meryl`
-- GRT 预计算 Final Path：`minimap2`，以及 MUMmer4 的 `nucmer`、`delta-filter`、`show-coords`；请将其安装到执行环境并确保可通过 `PATH` 调用
-- 可选 reads 组装质控：`meryl`、`merqury.sh`、`craq`；只有传入一个或多个 `--reads` 时才要求这些工具可通过 `PATH` 调用
+- GRT 预计算 Final Path：`minimap2`，以及 MUMmer4 的 `nucmer`、`delta-filter`、`show-coords`；`server/env.sh` 会安装这些工具，激活环境后即可通过 `PATH` 调用
+- 可选 reads 组装质控：`meryl`、`merqury.sh`、`craq`；`server/env.sh` 会统一安装，但流程仅在传入一个或多个 `--reads` 时调用
 - 输入数据：`ref_genome.fa`、`hifiasm.fa`、`flye.fa`、`canu2.fa`
 
 注：本文档仅以此类数据为例展示流程，并非仅支持此类输入。
