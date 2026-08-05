@@ -26,6 +26,13 @@ cat > "${FAKE_BIN}/minimap2" <<'EOF'
 exit 0
 EOF
 
+for grt_tool in nucmer delta-filter show-coords; do
+  cat > "${FAKE_BIN}/${grt_tool}" <<EOF
+#!/usr/bin/env bash
+exit 0
+EOF
+done
+
 cat > "${FAKE_BIN}/makeblastdb" <<'EOF'
 #!/usr/bin/env bash
 exit 0
@@ -51,7 +58,8 @@ cat > "${FAKE_BIN}/zip" <<'EOF'
 exit 0
 EOF
 
-chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/makeblastdb" "${FAKE_BIN}/blastn" "${FAKE_BIN}/meryl" "${FAKE_BIN}/winnowmap" "${FAKE_BIN}/zip"
+chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/makeblastdb" "${FAKE_BIN}/blastn" "${FAKE_BIN}/meryl" "${FAKE_BIN}/winnowmap" "${FAKE_BIN}/zip" \
+  "${FAKE_BIN}/nucmer" "${FAKE_BIN}/delta-filter" "${FAKE_BIN}/show-coords"
 
 write_multi_fasta() {
   local path="$1"
@@ -103,15 +111,22 @@ mkdir -p "${output_root}/data/reference" "${output_root}/data/datasets"
 printf 'stale_ref\t1\t0\t1\t2\n' > "${output_root}/data/reference/ref_add_options.fa.fai"
 printf 'stale_ds\t1\t0\t1\t2\n' > "${output_root}/data/datasets/ds_add.fa.fai"
 
-PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
-  --ref ref_add_options "$ref" \
-  --ds ds_add "$ds" \
-  --skip-self \
-  --score 71 \
-  --minimap-preset asm5 \
-  --tel TTAGGG 2 \
-  --cen "$cen" \
-  -o "$output_root" >/dev/null
+(
+  cd "$TMP_DIR"
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+    --ref ref_add_options "$ref" \
+    --ds ds_add "$ds" \
+    --skip-self \
+    --score 71 \
+    --minimap-preset asm5 \
+    --tel TTAGGG 2 \
+    --cen "$cen" \
+    --grt-minimap2 bin/minimap2 \
+    --grt-nucmer bin/nucmer \
+    --grt-delta-filter bin/delta-filter \
+    --grt-show-coords bin/show-coords \
+    -o "$output_root" >/dev/null
+)
 
 metadata_path="${output_root}/metadata/prepare_options.tsv"
 [[ -f "$metadata_path" ]] || {
@@ -135,6 +150,10 @@ assert_prepare_option "$metadata_path" tel_enabled true
 assert_prepare_option "$metadata_path" cen_enabled true
 assert_prepare_option "$metadata_path" cen_min_len 10000
 assert_prepare_option "$metadata_path" cen_min_identity 80
+
+grep -F -- "--minimap2 ${FAKE_BIN}/minimap2" "${output_root}/run_grt_step1.sh" >/dev/null
+grep -F -- "--minimap2 ${FAKE_BIN}/minimap2 --nucmer ${FAKE_BIN}/nucmer --delta-filter ${FAKE_BIN}/delta-filter --show-coords ${FAKE_BIN}/show-coords" \
+  "${output_root}/run_grt_step23.sh" >/dev/null
 
 grep -q $'^Chr01\t20\t' "${output_root}/data/reference/ref_add_options.fa.fai" || {
   echo "reference .fai was not regenerated from the current FASTA" >&2

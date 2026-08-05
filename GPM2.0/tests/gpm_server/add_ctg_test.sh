@@ -89,6 +89,16 @@ printf '%s\t%s\t0\t%s\t+\t%s\t%s\t0\t%s\t%s\t%s\t60\n' \
 printf 'preset=%s target=%s query=%s output=%s\n' "$preset" "$target" "$query" "$output" >> "${GPM_TEST_MINIMAP_LOG:?}"
 EOF
 
+for grt_tool in nucmer delta-filter show-coords; do
+  cat > "${FAKE_BIN}/${grt_tool}" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "--version" ]]; then
+  printf '%s fixture 1\n' "${grt_tool}"
+fi
+exit 0
+EOF
+done
+
 cat > "${FAKE_BIN}/makeblastdb" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -225,7 +235,8 @@ for root in "${roots[@]}"; do
 done
 EOF
 
-chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/makeblastdb" "${FAKE_BIN}/blastn" "${FAKE_BIN}/zip"
+chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/makeblastdb" "${FAKE_BIN}/blastn" "${FAKE_BIN}/zip" \
+  "${FAKE_BIN}/nucmer" "${FAKE_BIN}/delta-filter" "${FAKE_BIN}/show-coords"
 
 repeat_base() {
   local base="$1"

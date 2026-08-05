@@ -88,6 +88,18 @@ def parse_json(value, label, expected_type=None):
     return parsed
 
 
+def event_is_path_producing(event):
+    return event["action"] in {
+        "fill",
+        "patch",
+        "refill",
+        "extend_telomere",
+    } or (
+        event["action"] == "replace"
+        and event.get("edit", {}).get("replacement_kind") == "source"
+    )
+
+
 def safe_relative_path(value, label):
     if not value:
         fail("INVALID_PATH", f"{label} is empty")
@@ -580,8 +592,8 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         member_end = int(member["source_end"])
         if start < member_start or end > member_end:
             fail("INVALID_COORDINATE", f"usage {usage_id} is outside donor member interval")
-        if row["status"] in {"accepted", "consumed"} and (not row["event_id"] or not row["final_path_segment_id"]):
-            fail("BROKEN_REFERENCE", f"usage {usage_id} accepted/consumed row lacks event or segment")
+        if row["status"] in {"accepted", "consumed"} and not row["event_id"]:
+            fail("BROKEN_REFERENCE", f"usage {usage_id} accepted/consumed row lacks event")
 
     events = unique_index(read_jsonl(bundle_root, "metadata/grt_events.jsonl"), "event_id", "metadata/grt_events.jsonl")
     required_event_fields = set(schema["event_required_fields"])
@@ -658,6 +670,8 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                 "delete",
                 "replace",
                 "correct_boundary",
+                "patch",
+                "refill",
             }:
                 fail("BROKEN_REFERENCE", f"superseded event {event_id} has an invalid replacing event")
             if event_id not in replacement.get("superseded_event_ids", []):
@@ -767,18 +781,16 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                 fail("BROKEN_REFERENCE", f"accepted event {event_id} references an unknown Final Path segment")
             if segment_event.get(segment_id) != event_id:
                 fail("BROKEN_REFERENCE", f"accepted event {event_id} and segment {segment_id} are not bidirectional")
-        elif event["status"] == "accepted" and event["action"] in {
-            "fill",
-            "patch",
-            "replace",
-            "refill",
-            "extend_telomere",
-        }:
+        elif event["status"] == "accepted" and event_is_path_producing(event):
             fail("BROKEN_REFERENCE", f"accepted path-producing event {event_id} lacks a Final Path segment")
 
     for usage_id, row in usage.items():
         if row["final_path_segment_id"] and row["final_path_segment_id"] not in segment_ids:
             fail("BROKEN_REFERENCE", f"usage {usage_id} references unknown Final Path segment")
+        if row["status"] in {"accepted", "consumed"}:
+            event = events[row["event_id"]]
+            if event_is_path_producing(event) and not row["final_path_segment_id"]:
+                fail("BROKEN_REFERENCE", f"usage {usage_id} for a path-producing event lacks a segment")
 
     used_contigs = unique_index(
         tables["metadata/grt_used_contigs.tsv"],
@@ -829,7 +841,11 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             fail("BROKEN_REFERENCE", f"no-hit used contig {source_card_key} requires GRT-derived anchor")
 
     for event_id, event in events.items():
-        if event["status"] != "accepted" or event["source"] is None:
+        if (
+            event["status"] != "accepted"
+            or event["source"] is None
+            or not event_is_path_producing(event)
+        ):
             continue
         source_card_key = event["source_card_key"]
         if source_card_key not in used_contigs:

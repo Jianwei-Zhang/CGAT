@@ -678,6 +678,7 @@ def apply_round(
     assignments: dict[tuple[str, str], str],
     q_input_sha256: str,
     sources: dict[tuple[str, str], str],
+    action: str = "fill",
 ) -> tuple[
     dict[str, list[dict[str, object]]],
     dict[str, str],
@@ -756,6 +757,9 @@ def apply_round(
             candidate["event_id"] = event_id
             candidate["final_path_segment_id"] = final_path_segment_id
             candidate["evidence_id"] = evidence_id
+            candidate_evidence_ids = list(
+                candidate.get("evidence_ids", [evidence_id])
+            )
             donor_segment = {
                 "segment_kind": "source",
                 "length": int(candidate["fill_length"]),
@@ -765,7 +769,7 @@ def apply_round(
                 "source_end": int(candidate["source_end"]),
                 "orientation": candidate["orientation"],
                 "source_card_key": source_card_key,
-                "evidence_ids": [evidence_id],
+                "evidence_ids": candidate_evidence_ids,
             }
             if sequence_from_segment(donor_segment, sources) != candidate["fill_sequence"]:
                 fail(f"accepted donor source projection mismatch: {candidate['candidate_id']}")
@@ -858,14 +862,23 @@ def apply_round(
                 }
             )
             event_usage_ids.extend([candidate_usage_id, outcome_usage_id])
-        evidence_ids = [str(row["evidence_id"]) for row in related if row.get("evidence_id")]
+        evidence_ids = sorted(
+            {
+                str(evidence_id)
+                for row in related
+                for evidence_id in row.get(
+                    "evidence_ids",
+                    [row["evidence_id"]] if row.get("evidence_id") else [],
+                )
+            }
+        )
         event = {
             "run_id": run_id,
             "event_id": event_id,
             "stage": stage,
             "chr": prototype["chr"],
             "object_id": object_id,
-            "action": "fill",
+            "action": action,
             "status": prototype["status"],
             "reason": prototype["reason"],
             "q_before": {
@@ -889,6 +902,7 @@ def apply_round(
         if candidate is not None:
             event["edit"] = {
                 "operation": "replace_interval",
+                "replacement_kind": "source",
                 "input_start": prototype["q_before_start"],
                 "input_end": prototype["q_before_end"],
                 "trim_left": candidate["trim_left"],
@@ -1360,6 +1374,7 @@ def cached_chromosome_alignment(
     minimap: dict[str, str],
     parameters: dict[str, object],
     threads: int,
+    cache_scope: str = "step1",
 ) -> tuple[Path, bool, str]:
     flank_payload = fasta_bytes(flank_records)
     fingerprint_payload = {
@@ -1378,7 +1393,7 @@ def cached_chromosome_alignment(
     }
     fingerprint = json_hash(fingerprint_payload)
     chromosome_key = stable_id("chr", chromosome, 16)
-    cache_parent = server_dir / f"grt/cache/step1/{stage}/{chromosome_key}"
+    cache_parent = server_dir / f"grt/cache/{cache_scope}/{stage}/{chromosome_key}"
     cache_dir = cache_parent / fingerprint
     checkpoint_path = cache_dir / "cache.json"
     if checkpoint_path.is_file():

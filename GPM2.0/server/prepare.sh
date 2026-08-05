@@ -22,6 +22,9 @@ GRT_MERYL="meryl"
 GRT_MERQURY="merqury.sh"
 GRT_CRAQ="craq"
 GRT_MINIMAP2="minimap2"
+GRT_NUCMER="nucmer"
+GRT_DELTA_FILTER="delta-filter"
+GRT_SHOW_COORDS="show-coords"
 GRT_QC_MEMORY_GB="80"
 GRT_KMER_SIZE="21"
 MINIMAP_PRESET_SET=false
@@ -57,6 +60,9 @@ Usage:
     [--grt-merqury <merqury.sh_executable>] \
     [--grt-craq <craq_executable>] \
     [--grt-minimap2 <minimap2_executable>] \
+    [--grt-nucmer <nucmer_executable>] \
+    [--grt-delta-filter <delta-filter_executable>] \
+    [--grt-show-coords <show-coords_executable>] \
     [--grt-qc-memory-gb <memory_gb>] \
     [--grt-kmer-size <kmer_size>] \
     [--ds <dataset_name> <dataset_fasta_path> ...]
@@ -95,7 +101,7 @@ Behavior:
   - Generates runs/*/command.sh and <work_root>/run_all.sh
   - Chains run_all.sh commands with && so execution stops on the first failed command
   - Generates package_full_zip.sh, package_light_no_fasta_zip.sh, and export_final_path_fasta.sh
-  - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> per-chr commands
+  - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> GRT Step2/3 -> per-chr commands
   - With --skip-self, same-dataset self alignments are omitted and marked unavailable in metadata/datasets.tsv
   - Prints all generated alignment commands to the terminal for manual copy/paste
 EOF
@@ -2527,6 +2533,25 @@ write_grt_step1_script() {
   chmod +x "$output_path"
 }
 
+write_grt_step23_script() {
+  local output_path="$1"
+  local work_root="$2"
+
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'set -euo pipefail\n'
+    printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s\n' \
+      "$(shell_quote "${work_root}/.prepare_lib/tools/grt_step23.py")" \
+      "$(shell_quote "$work_root")" \
+      "$(shell_quote "$THREADS")" \
+      "$(shell_quote "$GRT_MINIMAP2")" \
+      "$(shell_quote "$GRT_NUCMER")" \
+      "$(shell_quote "$GRT_DELTA_FILTER")" \
+      "$(shell_quote "$GRT_SHOW_COORDS")"
+  } > "$output_path"
+  chmod +x "$output_path"
+}
+
 write_chr_placeholder_script() {
   local run_dir="$1"
   local chr_name="$2"
@@ -2755,6 +2780,21 @@ while [[ $# -gt 0 ]]; do
       GRT_MINIMAP2="$2"
       shift 2
       ;;
+    --grt-nucmer)
+      [[ $# -ge 2 && -n "$2" ]] || die "--grt-nucmer requires <nucmer_executable>"
+      GRT_NUCMER="$2"
+      shift 2
+      ;;
+    --grt-delta-filter)
+      [[ $# -ge 2 && -n "$2" ]] || die "--grt-delta-filter requires <delta-filter_executable>"
+      GRT_DELTA_FILTER="$2"
+      shift 2
+      ;;
+    --grt-show-coords)
+      [[ $# -ge 2 && -n "$2" ]] || die "--grt-show-coords requires <show-coords_executable>"
+      GRT_SHOW_COORDS="$2"
+      shift 2
+      ;;
     --grt-qc-memory-gb)
       [[ $# -ge 2 ]] || die "--grt-qc-memory-gb requires <memory_gb>"
       validate_positive_integer "--grt-qc-memory-gb" "$2"
@@ -2786,6 +2826,9 @@ require_cmd zip
 require_cmd gzip
 require_cmd python3
 require_cmd "$GRT_MINIMAP2"
+require_cmd "$GRT_NUCMER"
+require_cmd "$GRT_DELTA_FILTER"
+require_cmd "$GRT_SHOW_COORDS"
 case "$ALIGNER" in
   minimap2)
     require_cmd minimap2
@@ -2826,6 +2869,10 @@ done
 GRT_MERYL="$(resolve_command_argument "$GRT_MERYL")"
 GRT_MERQURY="$(resolve_command_argument "$GRT_MERQURY")"
 GRT_CRAQ="$(resolve_command_argument "$GRT_CRAQ")"
+GRT_MINIMAP2="$(resolve_command_argument "$GRT_MINIMAP2")"
+GRT_NUCMER="$(resolve_command_argument "$GRT_NUCMER")"
+GRT_DELTA_FILTER="$(resolve_command_argument "$GRT_DELTA_FILTER")"
+GRT_SHOW_COORDS="$(resolve_command_argument "$GRT_SHOW_COORDS")"
 
 mkdir -p \
   "${WORK_ROOT}/metadata" \
@@ -2920,7 +2967,7 @@ RUN_ALL="${WORK_ROOT}/run_all.sh"
 DATASET_COUNT=${#DATASET_NAMES[@]}
 mapfile -t REFERENCE_CHR_NAMES < <(collect_reference_chr_names "$REF_DST")
 
-TOTAL_COMMANDS=$(( DATASET_COUNT + 3 + ${#REFERENCE_CHR_NAMES[@]} ))
+TOTAL_COMMANDS=$(( DATASET_COUNT + 4 + ${#REFERENCE_CHR_NAMES[@]} ))
 COMMAND_INDEX=1
 
 for ((i = 0; i < DATASET_COUNT; i++)); do
@@ -2953,6 +3000,13 @@ append_run_all_command "${WORK_ROOT}/run_grt_step1.sh" "$COMMAND_INDEX" "$TOTAL_
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_grt_step1"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_step1.sh"
+COMMAND_INDEX=$((COMMAND_INDEX + 1))
+
+write_grt_step23_script "${WORK_ROOT}/run_grt_step23.sh" "$WORK_ROOT"
+append_run_all_command "${WORK_ROOT}/run_grt_step23.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_grt_step23"
+printf 'cd %s\n' "$WORK_ROOT"
+printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_step23.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
@@ -2988,6 +3042,7 @@ echo "  - ${WORK_ROOT}/add_dataset.sh"
 echo "  - ${WORK_ROOT}/add_ctg.sh"
 echo "  - ${WORK_ROOT}/prepare_grt_inputs.sh"
 echo "  - ${WORK_ROOT}/run_grt_step1.sh"
+echo "  - ${WORK_ROOT}/run_grt_step23.sh"
 echo "  - ${WORK_ROOT}/export_final_path_fasta.sh"
 echo "  - ${WORK_ROOT}/.prepare_lib/lib"
 echo "  - ${WORK_ROOT}/.prepare_lib/tools"
@@ -2997,7 +3052,7 @@ echo
 echo "Next:"
 echo "  1. Run: bash ${WORK_ROOT}/run_all.sh"
 echo "  2. Or copy the alignment commands printed above and execute them one by one"
-echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, GRT q0/D0/Dtel, GRT Step1, then chr-local jobs"
+echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, GRT q0/D0/Dtel, GRT Step1, GRT Step2/3, then chr-local jobs"
 if [[ "$SKIP_SELF" == "true" ]]; then
   echo "     - chr-local same-dataset self alignments remain skipped"
 fi

@@ -177,6 +177,67 @@ class GrtContractTests(unittest.TestCase):
 
         self.assertEqual(summary["events"], 2)
 
+    def test_accepted_gap_correction_usage_does_not_require_a_final_path_segment(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            bundle_root = Path(temporary_dir) / "gpm_server"
+            shutil.copytree(VALID_BUNDLE, bundle_root)
+            events_path = bundle_root / "metadata/grt_events.jsonl"
+            with events_path.open("a", encoding="utf-8", newline="") as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "run_id": "run-test",
+                            "event_id": "evt-step3-correction",
+                            "stage": "step3",
+                            "chr": "Chr01",
+                            "object_id": "gap-step3-1",
+                            "action": "replace",
+                            "status": "accepted",
+                            "reason": "crossing_alignment_error_region",
+                            "q_before": {
+                                "version": "q2",
+                                "start": 1,
+                                "end": 4,
+                                "sha256": "312928223060ab1febdcedd56532d45eab299979a64b219df997979212c81481",
+                            },
+                            "q_after": {
+                                "version": "q3",
+                                "start": 1,
+                                "end": 4,
+                                "sha256": "312928223060ab1febdcedd56532d45eab299979a64b219df997979212c81481",
+                            },
+                            "source": {
+                                "dataset": "support",
+                                "contig": "donor1",
+                                "start": 1,
+                                "end": 4,
+                                "orientation": "+",
+                                "original_assignment": "unplaced",
+                            },
+                            "evidence_ids": [],
+                            "usage_ids": ["use-step3-correction"],
+                            "source_card_key": "",
+                            "final_path_segment_id": "",
+                            "edit": {
+                                "operation": "replace_interval",
+                                "replacement_kind": "gap",
+                            },
+                        },
+                        separators=(",", ":"),
+                    )
+                    + "\n"
+                )
+            usage_path = bundle_root / "metadata/grt_donor_usage.tsv"
+            with usage_path.open("a", encoding="utf-8", newline="") as handle:
+                handle.write(
+                    "use-step3-correction\td0-test\td0-donor1-1-4\tsupport\tdonor1\t"
+                    "1\t4\tstep3\taccepted\tevt-step3-correction\t\tstructural_evidence\n"
+                )
+
+            summary = GRT_CONTRACT.validate_contract(bundle_root, SCHEMA_PATH)
+
+        self.assertEqual(summary["events"], 2)
+
     def test_cli_rejects_legacy_package(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             bundle_root = Path(temporary_dir) / "gpm_server"
