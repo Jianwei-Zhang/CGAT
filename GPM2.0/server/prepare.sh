@@ -18,6 +18,11 @@ CHR_ASSIGNMENT_MIN_COVERAGE_PERCENT="60"
 CEN_SRC=""
 CEN_MIN_LEN="10000"
 CEN_MIN_IDENTITY="80"
+GRT_MERYL="meryl"
+GRT_MERQURY="merqury.sh"
+GRT_CRAQ="craq"
+GRT_QC_MEMORY_GB="80"
+GRT_KMER_SIZE="21"
 MINIMAP_PRESET_SET=false
 BLASTN_TASK_SET=false
 BLASTN_EVALUE_SET=false
@@ -46,6 +51,12 @@ Usage:
     [--cen <reference_centromere_fasta>] \
     [--cen-min-len <min_alignment_bp>] \
     [--cen-min-identity <min_identity_percent>] \
+    [--reads <reads_fastq_path> ...] \
+    [--grt-meryl <meryl_executable>] \
+    [--grt-merqury <merqury.sh_executable>] \
+    [--grt-craq <craq_executable>] \
+    [--grt-qc-memory-gb <memory_gb>] \
+    [--grt-kmer-size <kmer_size>] \
     [--ds <dataset_name> <dataset_fasta_path> ...]
 
 Example:
@@ -67,6 +78,9 @@ Behavior:
   - Supports repeatable --tel <motif> <min_repeat> to mark telomere-like tandem repeats
   - Supports --cen <reference_centromere_fasta> to mark complete reference centromere regions
   - Supports --cen-min-len and --cen-min-identity to filter centromere alignments
+  - The first --ds is the locked GRT primary dataset; later initial --ds inputs are support datasets
+  - Repeatable --reads enables one shared Meryl database plus Merqury/CRAQ for every initial dataset
+  - With no --reads, only reads-based QC is skipped; q0 and frozen D0/Dtel are still prepared
   - Generates staged chromosome-partitioned run commands
   - Supports --skip-self to omit dataset vs self alignments
   - Accepts plain FASTA inputs such as .fa/.fasta/.fna
@@ -79,7 +93,7 @@ Behavior:
   - Generates runs/*/command.sh and <work_root>/run_all.sh
   - Chains run_all.sh commands with && so execution stops on the first failed command
   - Generates package_full_zip.sh, package_light_no_fasta_zip.sh, and export_final_path_fasta.sh
-  - run_all.sh is staged as: vs_ref -> chr assignment helper -> per-chr commands
+  - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> per-chr commands
   - With --skip-self, same-dataset self alignments are omitted and marked unavailable in metadata/datasets.tsv
   - Prints all generated alignment commands to the terminal for manual copy/paste
 EOF
@@ -220,6 +234,12 @@ validate_threads() {
   [[ "$value" =~ ^[1-9][0-9]*$ ]] || die "Invalid --threads value '$value'. Use a positive integer."
 }
 
+validate_positive_integer() {
+  local option_name="$1"
+  local value="$2"
+  [[ "$value" =~ ^[1-9][0-9]*$ ]] || die "Invalid ${option_name} '$value'. Use a positive integer."
+}
+
 ensure_readable_file() {
   local path="$1"
   [[ -f "$path" ]] || die "File not found: $path"
@@ -285,6 +305,7 @@ write_alignment_command_script() {
     printf 'cd %s\n' "$(shell_quote "$run_dir")"
     case "$ALIGNER" in
       minimap2)
+        printf '(minimap2 --version > tool_version.txt 2>&1 || printf %s > tool_version.txt)\n' "$(shell_quote $'unknown\n')"
         printf 'minimap2 -x %s ' "$(shell_quote "$MINIMAP_PRESET")"
         if [[ "$self_mode" == "true" ]]; then
           printf -- '-X '
@@ -296,6 +317,7 @@ write_alignment_command_script() {
           "$(shell_quote "$query_fa")"
         ;;
       blastn)
+        printf '(blastn -version > tool_version.txt 2>&1 || printf %s > tool_version.txt)\n' "$(shell_quote $'unknown\n')"
         printf 'rm -rf %s\n' "$(shell_quote "$target_db_dir")"
         printf 'mkdir -p %s\n' "$(shell_quote "$target_db_dir")"
         printf 'makeblastdb -in %s -dbtype nucl -out %s > makeblastdb.stdout.log 2> makeblastdb.stderr.log\n' \
@@ -316,6 +338,7 @@ write_alignment_command_script() {
           "$(shell_quote "$result_name")"
         ;;
       winnowmap)
+        printf '(winnowmap --version > tool_version.txt 2>&1 || printf %s > tool_version.txt)\n' "$(shell_quote $'unknown\n')"
         printf 'rm -rf %s\n' "$(shell_quote "$repetitive_db_dir")"
         printf 'meryl count k=%s output %s %s > meryl.stdout.log 2> meryl.stderr.log\n' \
           "$(shell_quote "$WINNOWMAP_KMER")" \
@@ -349,6 +372,15 @@ resolve_output_root() {
     printf '%s\n' "$path"
   else
     printf '%s\n' "$(pwd)/$path"
+  fi
+}
+
+resolve_command_argument() {
+  local value="$1"
+  if [[ "$value" == */* && "$value" != /* ]]; then
+    printf '%s/%s\n' "$(pwd)" "$value"
+  else
+    printf '%s\n' "$value"
   fi
 }
 
@@ -388,15 +420,21 @@ write_prepare_lib() {
   local lib_dst="${work_root}/.prepare_lib/lib"
   local tools_src="${SCRIPT_DIR}/tools"
   local tools_dst="${work_root}/.prepare_lib/tools"
+  local contracts_src="${SCRIPT_DIR}/contracts"
+  local contracts_dst="${work_root}/.prepare_lib/contracts"
 
   [[ -d "$lib_src" ]] || die "Missing server library directory: $lib_src"
   [[ -d "$tools_src" ]] || die "Missing server tools directory: $tools_src"
+  [[ -d "$contracts_src" ]] || die "Missing server contracts directory: $contracts_src"
   rm -rf "$lib_dst"
   rm -rf "$tools_dst"
+  rm -rf "$contracts_dst"
   mkdir -p "$(dirname "$lib_dst")"
   mkdir -p "$tools_dst"
+  mkdir -p "$contracts_dst"
   cp -R "$lib_src" "$lib_dst"
   cp -f "$tools_src"/*.py "$tools_dst"/
+  cp -f "$contracts_src"/*.json "$contracts_dst"/
 }
 
 write_add_dataset_script() {
@@ -626,27 +664,6 @@ threads = sys.argv[13]
 skip_self = sys.argv[14].lower() == "true"
 metadata_dir = stage_dir / "metadata"
 options = read_key_values(metadata_dir / "prepare_options.tsv")
-
-package_fields = [
-    "package_mode",
-    "sequence_layout",
-    "preassigned_chr",
-    "chr_assignment_min_coverage_percent",
-    "self_alignment_scope",
-    "cross_alignment_scope",
-]
-package_values = {
-    "package_mode": options.get("package_mode", "fast"),
-    "sequence_layout": options.get("sequence_layout", "partitioned"),
-    "preassigned_chr": options.get("preassigned_chr", "true"),
-    "chr_assignment_min_coverage_percent": chr_score,
-    "self_alignment_scope": "none" if skip_self else options.get("self_alignment_scope", "chr_partition"),
-    "cross_alignment_scope": options.get("cross_alignment_scope", "chr_partition"),
-}
-with (metadata_dir / "package.tsv").open("w", encoding="utf-8", newline="") as handle:
-    writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
-    writer.writerow(package_fields)
-    writer.writerow([package_values[field] for field in package_fields])
 
 datasets_path = metadata_dir / "datasets.tsv"
 with datasets_path.open(newline="", encoding="utf-8") as handle:
@@ -1274,16 +1291,26 @@ write_package_metadata() {
   local preassigned_chr="$4"
   local self_alignment_scope="$5"
   local cross_alignment_scope="$6"
+  local reads_qc_enabled="false"
+  if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
+    reads_qc_enabled="true"
+  fi
 
   {
-    printf 'package_mode\tsequence_layout\tpreassigned_chr\tchr_assignment_min_coverage_percent\tself_alignment_scope\tcross_alignment_scope\n'
-    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    printf 'workflow\tschema_version\tpackage_mode\tsequence_layout\tpreassigned_chr\tself_alignment_scope\tcross_alignment_scope\tchr_assignment_min_coverage_percent\tgrt_precompute_enabled\trecipe_locked\tfinal_path_schema_version\treads_qc_enabled\n'
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "gpm_grt_precomputed_v1" \
+      "1" \
       "$package_mode" \
       "$sequence_layout" \
       "$preassigned_chr" \
-      "$CHR_ASSIGNMENT_MIN_COVERAGE_PERCENT" \
       "$self_alignment_scope" \
-      "$cross_alignment_scope"
+      "$cross_alignment_scope" \
+      "$CHR_ASSIGNMENT_MIN_COVERAGE_PERCENT" \
+      "true" \
+      "true" \
+      "1" \
+      "$reads_qc_enabled"
   } > "$output_path"
 }
 
@@ -1296,12 +1323,16 @@ write_prepare_options_metadata() {
   local cross_alignment_scope="$6"
   local tel_enabled="false"
   local cen_enabled="false"
+  local reads_qc_enabled="false"
 
   if [[ "${#TEL_RULE_ARGS[@]}" -gt 0 ]]; then
     tel_enabled="true"
   fi
   if [[ -n "$CEN_SRC" ]]; then
     cen_enabled="true"
+  fi
+  if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
+    reads_qc_enabled="true"
   fi
 
   {
@@ -1326,6 +1357,14 @@ write_prepare_options_metadata() {
     printf 'cen_enabled\t%s\n' "$cen_enabled"
     printf 'cen_min_len\t%s\n' "$CEN_MIN_LEN"
     printf 'cen_min_identity\t%s\n' "$CEN_MIN_IDENTITY"
+    printf 'grt_workflow\t%s\n' "gpm_grt_precomputed_v1"
+    printf 'grt_primary_dataset\t%s\n' "${DATASET_NAMES[0]}"
+    printf 'grt_reads_qc_enabled\t%s\n' "$reads_qc_enabled"
+    printf 'grt_meryl\t%s\n' "$GRT_MERYL"
+    printf 'grt_merqury\t%s\n' "$GRT_MERQURY"
+    printf 'grt_craq\t%s\n' "$GRT_CRAQ"
+    printf 'grt_qc_memory_gb\t%s\n' "$GRT_QC_MEMORY_GB"
+    printf 'grt_kmer_size\t%s\n' "$GRT_KMER_SIZE"
   } > "$output_path"
 }
 
@@ -2444,6 +2483,32 @@ EOF
   chmod +x "$output_path"
 }
 
+write_grt_prepare_script() {
+  local output_path="$1"
+  local work_root="$2"
+  shift 2
+
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'set -euo pipefail\n'
+    printf 'python3 %s --server-dir %s --threads %s --memory-gb %s --kmer-size %s --meryl %s --merqury %s --craq %s' \
+      "$(shell_quote "${work_root}/.prepare_lib/tools/grt_prepare_inputs.py")" \
+      "$(shell_quote "$work_root")" \
+      "$(shell_quote "$THREADS")" \
+      "$(shell_quote "$GRT_QC_MEMORY_GB")" \
+      "$(shell_quote "$GRT_KMER_SIZE")" \
+      "$(shell_quote "$GRT_MERYL")" \
+      "$(shell_quote "$GRT_MERQURY")" \
+      "$(shell_quote "$GRT_CRAQ")"
+    while [[ $# -gt 0 ]]; do
+      printf ' --reads %s' "$(shell_quote "$1")"
+      shift
+    done
+    printf '\n'
+  } > "$output_path"
+  chmod +x "$output_path"
+}
+
 write_chr_placeholder_script() {
   local run_dir="$1"
   local chr_name="$2"
@@ -2535,6 +2600,7 @@ REF_SRC=""
 declare -a DATASET_NAMES=()
 declare -a DATASET_SRCS=()
 declare -a TEL_RULE_ARGS=()
+declare -a READS_SRCS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -2646,6 +2712,38 @@ while [[ $# -gt 0 ]]; do
       CEN_MIN_IDENTITY="$2"
       shift 2
       ;;
+    --reads)
+      [[ $# -ge 2 ]] || die "--reads requires <reads_fastq_path>"
+      READS_SRCS+=("$2")
+      shift 2
+      ;;
+    --grt-meryl)
+      [[ $# -ge 2 && -n "$2" ]] || die "--grt-meryl requires <meryl_executable>"
+      GRT_MERYL="$2"
+      shift 2
+      ;;
+    --grt-merqury)
+      [[ $# -ge 2 && -n "$2" ]] || die "--grt-merqury requires <merqury.sh_executable>"
+      GRT_MERQURY="$2"
+      shift 2
+      ;;
+    --grt-craq)
+      [[ $# -ge 2 && -n "$2" ]] || die "--grt-craq requires <craq_executable>"
+      GRT_CRAQ="$2"
+      shift 2
+      ;;
+    --grt-qc-memory-gb)
+      [[ $# -ge 2 ]] || die "--grt-qc-memory-gb requires <memory_gb>"
+      validate_positive_integer "--grt-qc-memory-gb" "$2"
+      GRT_QC_MEMORY_GB="$2"
+      shift 2
+      ;;
+    --grt-kmer-size)
+      [[ $# -ge 2 ]] || die "--grt-kmer-size requires <kmer_size>"
+      validate_positive_integer "--grt-kmer-size" "$2"
+      GRT_KMER_SIZE="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -2694,6 +2792,16 @@ for i in "${!DATASET_NAMES[@]}"; do
   fi
   SEEN_DATASET_NAMES["${DATASET_NAMES[$i]}"]=1
 done
+
+for i in "${!READS_SRCS[@]}"; do
+  ensure_readable_file "${READS_SRCS[$i]}"
+  if [[ "${READS_SRCS[$i]}" != /* ]]; then
+    READS_SRCS[$i]="$(cd "$(dirname "${READS_SRCS[$i]}")" && pwd)/$(basename "${READS_SRCS[$i]}")"
+  fi
+done
+GRT_MERYL="$(resolve_command_argument "$GRT_MERYL")"
+GRT_MERQURY="$(resolve_command_argument "$GRT_MERQURY")"
+GRT_CRAQ="$(resolve_command_argument "$GRT_CRAQ")"
 
 mkdir -p \
   "${WORK_ROOT}/metadata" \
@@ -2788,7 +2896,7 @@ RUN_ALL="${WORK_ROOT}/run_all.sh"
 DATASET_COUNT=${#DATASET_NAMES[@]}
 mapfile -t REFERENCE_CHR_NAMES < <(collect_reference_chr_names "$REF_DST")
 
-TOTAL_COMMANDS=$(( DATASET_COUNT + 1 + ${#REFERENCE_CHR_NAMES[@]} ))
+TOTAL_COMMANDS=$(( DATASET_COUNT + 2 + ${#REFERENCE_CHR_NAMES[@]} ))
 COMMAND_INDEX=1
 
 for ((i = 0; i < DATASET_COUNT; i++)); do
@@ -2807,6 +2915,13 @@ append_run_all_command "${WORK_ROOT}/assign_chr_groups.sh" "$COMMAND_INDEX" "$TO
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "assign_chr_groups"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/assign_chr_groups.sh"
+COMMAND_INDEX=$((COMMAND_INDEX + 1))
+
+write_grt_prepare_script "${WORK_ROOT}/prepare_grt_inputs.sh" "$WORK_ROOT" "${READS_SRCS[@]}"
+append_run_all_command "${WORK_ROOT}/prepare_grt_inputs.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "prepare_grt_inputs"
+printf 'cd %s\n' "$WORK_ROOT"
+printf 'bash %s\n\n' "${WORK_ROOT}/prepare_grt_inputs.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
@@ -2840,6 +2955,7 @@ if [[ "${#TEL_RULE_ARGS[@]}" -gt 0 ]]; then
 fi
 echo "  - ${WORK_ROOT}/add_dataset.sh"
 echo "  - ${WORK_ROOT}/add_ctg.sh"
+echo "  - ${WORK_ROOT}/prepare_grt_inputs.sh"
 echo "  - ${WORK_ROOT}/export_final_path_fasta.sh"
 echo "  - ${WORK_ROOT}/.prepare_lib/lib"
 echo "  - ${WORK_ROOT}/.prepare_lib/tools"
@@ -2849,7 +2965,7 @@ echo
 echo "Next:"
 echo "  1. Run: bash ${WORK_ROOT}/run_all.sh"
 echo "  2. Or copy the alignment commands printed above and execute them one by one"
-echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, then chr-local jobs"
+echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, GRT q0/D0/Dtel, then chr-local jobs"
 if [[ "$SKIP_SELF" == "true" ]]; then
   echo "     - chr-local same-dataset self alignments remain skipped"
 fi

@@ -80,6 +80,59 @@ class GrtContractTests(unittest.TestCase):
         summary = json.loads(completed.stdout)
         self.assertEqual(summary["workflow"], "gpm_grt_precomputed_v1")
 
+    def test_empty_telomere_donor_set_is_valid(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            bundle_root = Path(temporary_dir) / "gpm_server"
+            shutil.copytree(VALID_BUNDLE, bundle_root)
+            members_path = bundle_root / "metadata/grt_donor_members.tsv"
+            members_lines = members_path.read_text(encoding="utf-8").splitlines()
+            members_path.write_text(
+                "\n".join(line for line in members_lines if not line.startswith("dtel-test\t"))
+                + "\n",
+                encoding="utf-8",
+                newline="",
+            )
+            manifest_path = bundle_root / "grt/donor/dtel.manifest.tsv"
+            manifest_path.write_text(members_lines[0] + "\n", encoding="utf-8", newline="")
+            fasta_path = bundle_root / "grt/donor/dtel.fa"
+            fasta_path.write_text("", encoding="utf-8", newline="")
+            donor_sets_path = bundle_root / "metadata/grt_donor_sets.tsv"
+            donor_sets_path.write_text(
+                donor_sets_path.read_text(encoding="utf-8").replace(
+                    "624d9151605bd17d8f3619eaadf025bb3347e9a336548ec8556463287ba03b33\t1",
+                    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\t0",
+                ),
+                encoding="utf-8",
+                newline="",
+            )
+
+            summary = GRT_CONTRACT.validate_contract(bundle_root, SCHEMA_PATH)
+
+        self.assertEqual(summary["donor_sets"], 2)
+
+    def test_post_recipe_dataset_does_not_require_retroactive_grt_roles(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            bundle_root = Path(temporary_dir) / "gpm_server"
+            shutil.copytree(VALID_BUNDLE, bundle_root)
+            datasets_path = bundle_root / "metadata/datasets.tsv"
+            with datasets_path.open("a", encoding="utf-8", newline="") as handle:
+                handle.write(
+                    "later\tlater\t\tdata/datasets/later.fa\t"
+                    "data/datasets/later.fa.fai\ttrue\n"
+                )
+            locator_path = bundle_root / "metadata/source_seq_locator.tsv"
+            with locator_path.open("a", encoding="utf-8", newline="") as handle:
+                handle.write("later\tlater1\tdata/datasets/later.fa\n")
+            later_fasta = bundle_root / "data/datasets/later.fa"
+            later_fasta.write_text(">later1\nACGT\n", encoding="utf-8", newline="")
+            (bundle_root / "data/datasets/later.fa.fai").write_text(
+                "later1\t4\t0\t4\t5\n", encoding="utf-8", newline=""
+            )
+
+            summary = GRT_CONTRACT.validate_contract(bundle_root, SCHEMA_PATH)
+
+        self.assertEqual(summary["workflow"], "gpm_grt_precomputed_v1")
+
     def test_cli_rejects_legacy_package(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             bundle_root = Path(temporary_dir) / "gpm_server"

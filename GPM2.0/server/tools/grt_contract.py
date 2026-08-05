@@ -161,7 +161,7 @@ def read_jsonl(bundle_root, relpath):
     return rows
 
 
-def read_fasta(path, label):
+def read_fasta(path, label, allow_empty=False):
     records = {}
     current_name = None
     chunks = []
@@ -182,13 +182,15 @@ def read_fasta(path, label):
                     if current_name is None:
                         fail("INVALID_FASTA", f"{label}:{line_number} has sequence before header")
                     sequence = "".join(stripped.split()).upper()
-                    if not re.fullmatch(r"[ACGTN]+", sequence):
+                    if not re.fullmatch(r"[ACGTRYSWKMBDHVN]+", sequence):
                         fail("INVALID_FASTA", f"{label}:{line_number} has unsupported bases")
                     chunks.append(sequence)
     except UnicodeDecodeError as exc:
         fail("INVALID_FASTA", f"{label} is not UTF-8: {exc}")
     if current_name is not None:
         records[current_name] = "".join(chunks).upper()
+    if not records and allow_empty:
+        return records
     if not records or any(not sequence for sequence in records.values()):
         fail("INVALID_FASTA", f"{label} has no non-empty records")
     return records
@@ -245,7 +247,9 @@ def source_catalog(bundle_root, locator_rows):
 
 
 def reverse_complement(sequence):
-    return sequence.translate(str.maketrans("ACGTN", "TGCAN"))[::-1]
+    return sequence.translate(
+        str.maketrans("ACGTRYSWKMBDHVN", "TGCAYRSWMKVHDBN")
+    )[::-1]
 
 
 def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
@@ -312,6 +316,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         fail("BROKEN_REFERENCE", "recipe support_datasets_json references an unknown dataset")
     if recipe["primary_dataset"] in support_datasets or len(support_datasets) != len(set(support_datasets)):
         fail("INVALID_VALUE", "recipe support datasets must be unique and exclude primary")
+    recipe_dataset_names = {recipe["primary_dataset"], *support_datasets}
     if parse_bool(recipe["reads_qc_enabled"], "recipe.reads_qc_enabled") != reads_qc_enabled:
         fail("INVALID_VALUE", "recipe and package reads_qc_enabled disagree")
     q0_path = bundle_path(bundle_root, recipe["q0_relpath"], "recipe.q0_relpath")
@@ -329,8 +334,12 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         role_keys.add(key)
         for field in ("q_eligible", "donor_eligible", "tel_donor_eligible"):
             parse_bool(row[field], f"grt_contig_roles.tsv:{row_number}.{field}")
-    if role_keys != set(sources):
-        fail("BROKEN_REFERENCE", "contig roles must cover every source locator exactly once")
+    expected_role_keys = {key for key in sources if key[0] in recipe_dataset_names}
+    if role_keys != expected_role_keys:
+        fail(
+            "BROKEN_REFERENCE",
+            "contig roles must cover every source from the locked initial recipe exactly once",
+        )
 
     q_segment_rows = tables["metadata/grt_q_segments.tsv"]
     q_segment_ids = set()
@@ -340,33 +349,49 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         q_version = row["q_version"]
         chr_name = row["chr"]
         segment_id = row["segment_id"]
+        segment_kind = row["segment_kind"]
         if not q_version or not chr_name or not segment_id:
             fail("INVALID_VALUE", f"grt_q_segments.tsv:{row_number} has empty identity")
+        if segment_kind not in enums["q_segment_kind"]:
+            fail("INVALID_VALUE", f"q segment {segment_id} has invalid segment_kind")
         if segment_id in q_segment_ids:
             fail("DUPLICATE_ID", f"duplicate q segment_id={segment_id}")
         q_segment_ids.add(segment_id)
         q_start, q_end = validate_interval(row["q_start"], row["q_end"], f"q segment {segment_id}.q")
-        source_start, source_end = validate_interval(
-            row["source_start"], row["source_end"], f"q segment {segment_id}.source"
-        )
-        source_key = (row["dataset_name"], row["contig_name"])
-        if source_key not in sources:
-            fail("BROKEN_REFERENCE", f"q segment {segment_id} references unknown source")
-        if source_end > len(sources[source_key]) or q_end - q_start != source_end - source_start:
-            fail("INVALID_COORDINATE", f"q segment {segment_id} q/source lengths differ")
-        if row["orientation"] not in enums["orientation"]:
-            fail("INVALID_VALUE", f"q segment {segment_id} has invalid orientation")
-        if not row["source_card_key"]:
-            fail("BROKEN_REFERENCE", f"q segment {segment_id} lacks source_card_key")
         evidence_ids = parse_json(
             row["evidence_ids_json"], f"q segment {segment_id}.evidence_ids_json", list
         )
-        if not evidence_ids:
-            fail("BROKEN_REFERENCE", f"q segment {segment_id} lacks source evidence")
+        if segment_kind == "gap":
+            source_fields = [
+                row["dataset_name"],
+                row["contig_name"],
+                row["source_start"],
+                row["source_end"],
+                row["orientation"],
+                row["source_card_key"],
+            ]
+            if any(source_fields) or evidence_ids:
+                fail("INVALID_VALUE", f"q gap segment {segment_id} cannot carry source/evidence")
+            sequence = "N" * (q_end - q_start + 1)
+        else:
+            source_start, source_end = validate_interval(
+                row["source_start"], row["source_end"], f"q segment {segment_id}.source"
+            )
+            source_key = (row["dataset_name"], row["contig_name"])
+            if source_key not in sources:
+                fail("BROKEN_REFERENCE", f"q segment {segment_id} references unknown source")
+            if source_end > len(sources[source_key]) or q_end - q_start != source_end - source_start:
+                fail("INVALID_COORDINATE", f"q segment {segment_id} q/source lengths differ")
+            if row["orientation"] not in enums["orientation"]:
+                fail("INVALID_VALUE", f"q segment {segment_id} has invalid orientation")
+            if not row["source_card_key"]:
+                fail("BROKEN_REFERENCE", f"q segment {segment_id} lacks source_card_key")
+            if not evidence_ids:
+                fail("BROKEN_REFERENCE", f"q segment {segment_id} lacks source evidence")
+            sequence = sources[source_key][source_start - 1 : source_end]
+            if row["orientation"] == "-":
+                sequence = reverse_complement(sequence)
         q_segment_evidence[segment_id] = evidence_ids
-        sequence = sources[source_key][source_start - 1 : source_end]
-        if row["orientation"] == "-":
-            sequence = reverse_complement(sequence)
         q_segments_by_record[(q_version, chr_name)].append((q_start, q_end, sequence, segment_id))
 
     q_fasta_cache = {}
@@ -407,7 +432,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             f"donor set {donor_set_id} FASTA",
         )
         donor_fasta_records[donor_set_id] = read_fasta(
-            donor_fasta_path, f"donor set {donor_set_id} FASTA"
+            donor_fasta_path, f"donor set {donor_set_id} FASTA", allow_empty=True
         )
         bundle_path(bundle_root, row["manifest_relpath"], f"donor set {donor_set_id} manifest")
     if donor_kinds != Counter({"ordinary": 1, "telomere": 1}):

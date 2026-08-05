@@ -109,6 +109,7 @@
         "q_version",
         "chr",
         "segment_id",
+        "segment_kind",
         "q_start",
         "q_end",
         "dataset_name",
@@ -144,7 +145,7 @@
         "fasta_record_name",
         "sequence_sha256"
       ],
-      "min_rows": 1
+      "min_rows": 0
     },
     "metadata/grt_evidence_registry.tsv": {
       "header": [
@@ -193,7 +194,7 @@
         "final_path_segment_id",
         "reason"
       ],
-      "min_rows": 1
+      "min_rows": 0
     },
     "metadata/grt_used_contigs.tsv": {
       "header": [
@@ -285,7 +286,8 @@
     "ref_alignment_status": ["hit", "weak_hit", "multi_hit", "other_chr_only", "no_hit"],
     "coordinate_system": ["paf_0_based_half_open", "mummer_1_based_closed", "app_1_based_closed"],
     "projection_status": ["native", "projected"],
-    "segment_kind": ["source", "patch", "correction", "telomere", "gap"]
+    "segment_kind": ["source", "patch", "correction", "telomere", "gap"],
+    "q_segment_kind": ["source", "gap"]
   },
   "stage_transitions": [
     ["donor_freeze", "q0", "q0"],

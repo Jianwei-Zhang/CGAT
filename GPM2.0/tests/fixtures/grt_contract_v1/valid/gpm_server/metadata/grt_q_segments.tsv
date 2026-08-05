@@ -1,2 +1,2 @@
-q_version	chr	segment_id	q_start	q_end	dataset_name	contig_name	source_start	source_end	orientation	source_card_key	evidence_ids_json
-q0	Chr01	q0-primary-1	1	4	primary	primary1	1	4	+	primary:primary1:Chr01:normal	["ev-ref-primary"]
+q_version	chr	segment_id	segment_kind	q_start	q_end	dataset_name	contig_name	source_start	source_end	orientation	source_card_key	evidence_ids_json
+q0	Chr01	q0-primary-1	source	1	4	primary	primary1	1	4	+	primary:primary1:Chr01:normal	["ev-ref-primary"]

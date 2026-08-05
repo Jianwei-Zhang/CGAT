@@ -103,8 +103,8 @@
     "operation": {
       "type": "replace_text",
       "path": "metadata/grt_q_segments.tsv",
-      "old": "q0\tChr01\tq0-primary-1\t1\t4\tprimary\tprimary1\t1\t4",
-      "new": "q0\tChr01\tq0-primary-1\t1\t4\tprimary\tprimary1\t1\t3"
+      "old": "q0\tChr01\tq0-primary-1\tsource\t1\t4\tprimary\tprimary1\t1\t4",
+      "new": "q0\tChr01\tq0-primary-1\tsource\t1\t4\tprimary\tprimary1\t1\t3"
     }
   },
   {
