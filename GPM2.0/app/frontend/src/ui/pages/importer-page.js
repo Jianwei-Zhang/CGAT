@@ -628,6 +628,7 @@ async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
     applyWorkspaceLoadedState(store, {
       workspaceRoot,
       packageMetadata: options.packageMetadata,
+      grtRecipe: options.grtRecipe,
       references: options.references,
       datasets: options.datasets,
       existingProjects: options.existingProjects,
@@ -853,6 +854,7 @@ async function enterWorkspaceAfterImport(store, payload) {
   applyWorkspaceLoadedState(store, {
     workspaceRoot,
     packageMetadata: options.packageMetadata,
+    grtRecipe: options.grtRecipe,
     references: options.references,
     datasets: options.datasets,
     existingProjects: options.existingProjects,
@@ -868,6 +870,7 @@ function applyWorkspaceLoadedState(store, payload) {
   const {
     workspaceRoot,
     packageMetadata,
+    grtRecipe,
     references,
     datasets,
     existingProjects,
@@ -905,6 +908,7 @@ function applyWorkspaceLoadedState(store, payload) {
       optionsLoaded: true,
       optionsError: "",
       packageMetadata: packageMetadata || current.initializer.packageMetadata,
+      grtRecipe: grtRecipe || null,
       references,
       datasets,
       existingProjects,

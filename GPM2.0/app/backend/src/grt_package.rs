@@ -1,14 +1,20 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{Context, Result, anyhow};
-use rusqlite::{OptionalExtension, Transaction, params};
+use anyhow::{Context, Result, anyhow, bail};
+use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
 use crate::db::open_workspace_db;
+use crate::project_initializer::{
+    ProjectInitializationRequest, bootstrap_project_assembly_with_connection,
+    delete_project_with_connection, initialize_project_with_connection,
+    list_initializer_options_with_connection, set_project_auto_pipeline_done_with_connection,
+};
 
 pub const GRT_WORKFLOW: &str = "gpm_grt_precomputed_v1";
 pub const GRT_SCHEMA_VERSION: &str = "1";
@@ -73,6 +79,31 @@ pub struct GrtFinalPathVerification {
     pub chromosome_count: usize,
     pub segment_count: usize,
     pub q4_artifact_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GrtProjectInitializationSummary {
+    pub project_id: i64,
+    pub project_name: String,
+    pub version: i64,
+    pub reference_genome_id: i64,
+    pub primary_dataset_id: i64,
+    pub support_dataset_ids: Vec<i64>,
+    pub project_dataset_count: i64,
+    pub phased_assembly_enabled: bool,
+    pub chr_assignment_min_coverage_percent: f64,
+    pub assembly_seq_count: i64,
+    pub assembly_ctg_count: i64,
+    pub materialized_source_card_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GrtProjectView {
+    pub recipe: GrtLockedRecipe,
+    pub final_path_by_chr: BTreeMap<String, Value>,
+    pub object_attempts: Vec<Value>,
+    pub source_cards: Vec<Value>,
+    pub verification: GrtFinalPathVerification,
 }
 
 const REQUIRED_FILES: &[&str] = &[
@@ -2786,6 +2817,253 @@ pub fn load_grt_object_attempts(project_db_path: &Path) -> Result<Vec<Value>> {
         .collect()
 }
 
+pub fn load_grt_source_cards(project_db_path: &Path) -> Result<Vec<Value>> {
+    let conn = open_workspace_db(project_db_path)?;
+    load_matching_json(
+        &conn,
+        "SELECT row_json FROM grt_source_card ORDER BY source_card_key",
+        |_| true,
+    )
+}
+
+pub fn load_grt_project_view(project_db_path: &Path) -> Result<GrtProjectView> {
+    Ok(GrtProjectView {
+        recipe: load_grt_locked_recipe(project_db_path)?,
+        final_path_by_chr: load_grt_final_path_by_chr(project_db_path)?,
+        object_attempts: load_grt_object_attempts(project_db_path)?,
+        source_cards: load_grt_source_cards(project_db_path)?,
+        verification: verify_persisted_grt_final_path(project_db_path)?,
+    })
+}
+
+pub fn initialize_grt_project(
+    project_db_path: &Path,
+    project_name: &str,
+) -> Result<GrtProjectInitializationSummary> {
+    let recipe = load_grt_locked_recipe(project_db_path)?;
+    let mut conn = open_workspace_db(project_db_path)?;
+    let options = list_initializer_options_with_connection(&conn)?;
+    if options.references.len() != 1 {
+        bail!(
+            "GRT locked recipe requires exactly one imported reference, found {}",
+            options.references.len()
+        );
+    }
+    let reference_genome_id = options.references[0].id;
+    let dataset_id_by_name = options
+        .datasets
+        .iter()
+        .map(|dataset| (dataset.name.as_str(), dataset.id))
+        .collect::<HashMap<_, _>>();
+    let primary_dataset_id = dataset_id_by_name
+        .get(recipe.primary_dataset.as_str())
+        .copied()
+        .ok_or_else(|| {
+            anyhow!(
+                "GRT locked primary dataset '{}' is not present in the workspace catalog",
+                recipe.primary_dataset
+            )
+        })?;
+    let support_dataset_ids =
+        recipe
+            .support_datasets
+            .iter()
+            .map(|name| {
+                dataset_id_by_name.get(name.as_str()).copied().ok_or_else(|| {
+                anyhow!(
+                    "GRT locked support dataset '{}' is not present in the workspace catalog",
+                    name
+                )
+            })
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+    let initialized = initialize_project_with_connection(
+        &mut conn,
+        &ProjectInitializationRequest {
+            project_name: project_name.to_string(),
+            reference_genome_id,
+            primary_dataset_id,
+            support_dataset_ids: support_dataset_ids.clone(),
+            auto_check_new_seq: false,
+            phased_assembly_enabled: Some(false),
+            chr_assignment_min_coverage_percent: None,
+            description: Some(format!("locked GRT recipe {}", recipe.recipe_id)),
+        },
+    )?;
+    let project_id = initialized.project_id;
+    let completed = (|| {
+        let assembly = bootstrap_project_assembly_with_connection(&mut conn, project_id)?;
+        let materialized_source_card_count =
+            materialize_grt_source_cards_with_connection(&mut conn, project_id)?;
+        set_project_auto_pipeline_done_with_connection(&mut conn, project_id, true)?;
+        Ok((assembly, materialized_source_card_count))
+    })();
+    let (assembly, materialized_source_card_count) = match completed {
+        Ok(value) => value,
+        Err(error) => {
+            delete_project_with_connection(&mut conn, project_id).with_context(|| {
+                format!("failed to clean up incomplete locked GRT project after: {error:#}")
+            })?;
+            return Err(error);
+        }
+    };
+
+    Ok(GrtProjectInitializationSummary {
+        project_id,
+        project_name: initialized.project_name,
+        version: initialized.version,
+        reference_genome_id: initialized.reference_genome_id,
+        primary_dataset_id: initialized.primary_dataset_id,
+        support_dataset_ids,
+        project_dataset_count: initialized.project_dataset_count,
+        phased_assembly_enabled: initialized.phased_assembly_enabled,
+        chr_assignment_min_coverage_percent: initialized.chr_assignment_min_coverage_percent,
+        assembly_seq_count: assembly.assembly_seq_count + materialized_source_card_count as i64,
+        assembly_ctg_count: assembly.assembly_ctg_count + materialized_source_card_count as i64,
+        materialized_source_card_count,
+    })
+}
+
+fn materialize_grt_source_cards_with_connection(
+    conn: &mut Connection,
+    project_id: i64,
+) -> Result<usize> {
+    let source_cards = load_matching_json(
+        conn,
+        "SELECT row_json FROM grt_source_card ORDER BY source_card_key",
+        |_| true,
+    )?;
+    let tx = conn
+        .transaction()
+        .context("failed to start GRT source-card materialization transaction")?;
+    let created_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        .to_string();
+    let mut inserted = 0_usize;
+    for card in source_cards {
+        let object = card
+            .as_object()
+            .ok_or_else(|| anyhow!("persisted GRT source card must be an object"))?;
+        let placement_mode = json_nonempty_str(object, "placement_mode", "GRT source card")?;
+        if placement_mode != "grt_promoted" && placement_mode != "cross_chr_grt_usage" {
+            continue;
+        }
+        let source_card_key = json_nonempty_str(object, "source_card_key", "GRT source card")?;
+        let dataset_name = json_nonempty_str(object, "dataset_name", "GRT source card")?;
+        let contig_name = json_nonempty_str(object, "contig_name", "GRT source card")?;
+        let target_chr = json_nonempty_str(object, "target_chr", "GRT source card")?;
+        let anchor_start = parse_positive_i64(
+            json_nonempty_str(object, "anchor_start", "GRT source card")?,
+            "GRT source card.anchor_start",
+        )?;
+        let orient = orientation(
+            json_nonempty_str(object, "orientation", "GRT source card")?,
+            "GRT source card orientation",
+        )?;
+        let original_assignment =
+            json_nonempty_str(object, "original_assignment", "GRT source card")?;
+        let ref_alignment_status =
+            json_nonempty_str(object, "ref_alignment_status", "GRT source card")?;
+        let (source_seq_id, source_length): (i64, i64) = tx
+            .query_row(
+                "SELECT ss.id, ss.length
+                 FROM source_seq ss
+                 JOIN dataset d ON d.id = ss.dataset_id
+                 JOIN project_dataset pd ON pd.dataset_id = d.id
+                 WHERE pd.project_id = ?1 AND d.name = ?2 AND ss.seq_name = ?3",
+                params![project_id, dataset_name, contig_name],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .with_context(|| {
+                format!(
+                    "failed to resolve GRT source card {source_card_key} to a project source sequence"
+                )
+            })?;
+        let already_visible: Option<i64> = tx
+            .query_row(
+                "SELECT c.id
+                 FROM assembly_ctg c
+                 JOIN assembly_seq s ON s.id = c.assembly_seq_id
+                 WHERE c.project_id = ?1 AND s.source_seq_id = ?2 AND c.assigned_chr_name = ?3
+                 LIMIT 1",
+                params![project_id, source_seq_id, target_chr],
+                |row| row.get(0),
+            )
+            .optional()
+            .context("failed to check existing GRT source-card placement")?;
+        if already_visible.is_some() {
+            continue;
+        }
+        let assembly_seq_id = {
+            tx.execute(
+                "INSERT INTO assembly_seq (
+                    project_id, source_seq_id, instance_key, orient, source_start, source_end,
+                    left_end_type, right_end_type, hidden, created_at, note
+                 ) VALUES (?1, ?2, ?3, ?4, 1, ?5, 'normal', 'normal', 0, ?6, ?7)",
+                params![
+                    project_id,
+                    source_seq_id,
+                    format!("grt:{source_card_key}"),
+                    orient,
+                    source_length,
+                    created_at,
+                    format!("grt_source_card_key={source_card_key}")
+                ],
+            )
+            .with_context(|| format!("failed to materialize GRT source card {source_card_key}"))?;
+            tx.last_insert_rowid()
+        };
+        let chr_order: i64 = tx
+            .query_row(
+                "SELECT COALESCE(MAX(chr_order), 0) + 1
+                 FROM assembly_ctg
+                 WHERE project_id = ?1 AND assigned_chr_name = ?2",
+                params![project_id, target_chr],
+                |row| row.get(0),
+            )
+            .context("failed to allocate GRT source-card chromosome order")?;
+        let preferred_name = format!("{contig_name}@{target_chr}");
+        let name_exists: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM assembly_ctg WHERE project_id = ?1 AND name = ?2)",
+            params![project_id, preferred_name],
+            |row| row.get::<_, i64>(0),
+        )? > 0;
+        let ctg_name = if name_exists {
+            format!("{dataset_name}:{contig_name}@{target_chr}")
+        } else {
+            preferred_name
+        };
+        tx.execute(
+            "INSERT INTO assembly_ctg (
+                project_id, assembly_seq_id, name, assigned_chr_name, chr_order, anchor_start,
+                ref_orient, placement_mode, created_at, note
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                project_id,
+                assembly_seq_id,
+                ctg_name,
+                target_chr,
+                chr_order,
+                anchor_start,
+                orient,
+                placement_mode,
+                created_at,
+                format!(
+                    "grt_source_card_key={source_card_key}; original_assignment={original_assignment}; ref_alignment_status={ref_alignment_status}"
+                )
+            ],
+        )
+        .with_context(|| format!("failed to place GRT source card {source_card_key}"))?;
+        inserted += 1;
+    }
+    tx.commit()
+        .context("failed to commit GRT source-card materialization")?;
+    Ok(inserted)
+}
+
 pub fn load_grt_evidence(project_db_path: &Path, evidence_id: &str) -> Result<Value> {
     load_row_json(
         project_db_path,
@@ -3312,6 +3590,70 @@ mod tests {
         assert_eq!(verification.chromosome_count, 1);
         assert_eq!(verification.segment_count, 2);
         assert_eq!(verification.q4_artifact_sha256, recipe.q4_artifact_sha256);
+    }
+
+    #[test]
+    fn initializes_locked_recipe_and_materializes_used_unplaced_source_card() {
+        let temp = tempdir().unwrap();
+        let bundle_root = temp.path().join("gpm_server");
+        copy_tree(&fixture_root(), &bundle_root);
+        let (outcome, _) = crate::importer::import_from_extracted_bundle(&bundle_root).unwrap();
+
+        let initialized = initialize_grt_project(&outcome.project_db_path, "locked-project")
+            .expect("initialize locked GRT project");
+        assert_eq!(initialized.primary_dataset_id, 1);
+        assert_eq!(initialized.support_dataset_ids, vec![2]);
+        assert_eq!(initialized.project_dataset_count, 2);
+        assert_eq!(initialized.assembly_seq_count, 4);
+        assert_eq!(initialized.assembly_ctg_count, 4);
+        assert_eq!(initialized.materialized_source_card_count, 1);
+
+        let conn = open_workspace_db(&outcome.project_db_path).unwrap();
+        let promoted: (String, String, String, String) = conn
+            .query_row(
+                "SELECT d.name, ss.seq_name, c.assigned_chr_name, c.placement_mode
+                 FROM assembly_ctg c
+                 JOIN assembly_seq s ON s.id = c.assembly_seq_id
+                 JOIN source_seq ss ON ss.id = s.source_seq_id
+                 JOIN dataset d ON d.id = ss.dataset_id
+                 WHERE c.project_id = ?1 AND c.placement_mode = 'grt_promoted'",
+                params![initialized.project_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            promoted,
+            (
+                "support".to_string(),
+                "donor1".to_string(),
+                "Chr01".to_string(),
+                "grt_promoted".to_string(),
+            )
+        );
+        let auto_pipeline_done: i64 = conn
+            .query_row(
+                "SELECT auto_pipeline_done FROM project WHERE id = ?1",
+                params![initialized.project_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(auto_pipeline_done, 1);
+        let final_counts: (i64, i64) = conn
+            .query_row(
+                "SELECT
+                    (SELECT COUNT(*) FROM assembly_seq WHERE project_id = ?1),
+                    (SELECT COUNT(*) FROM assembly_ctg WHERE project_id = ?1)",
+                params![initialized.project_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(final_counts, (4, 4));
+
+        let view = load_grt_project_view(&outcome.project_db_path).unwrap();
+        assert_eq!(view.recipe.recipe_id, "recipe-test");
+        assert_eq!(view.final_path_by_chr.len(), 1);
+        assert_eq!(view.object_attempts.len(), 1);
+        assert_eq!(view.source_cards.len(), 1);
     }
 
     #[test]

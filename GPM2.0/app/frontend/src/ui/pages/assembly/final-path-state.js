@@ -26,6 +26,19 @@ function normalizePositiveIntegerList(value) {
     });
 }
 
+function normalizeStringList(value) {
+  const seen = new Set();
+  return (Array.isArray(value) ? value : [])
+    .map((item) => normalizeString(item))
+    .filter((item) => {
+      if (!item || seen.has(item)) {
+        return false;
+      }
+      seen.add(item);
+      return true;
+    });
+}
+
 export function normalizeFinalPathViewMode(value, { allowLog = true } = {}) {
   const normalized = normalizeString(value).toLowerCase();
   if (allowLog && normalized === "log") {
@@ -137,6 +150,15 @@ export function buildFinalPathCtgSegment(
     orient = "",
     start = null,
     end = null,
+    grtKind = "",
+    eventId = "",
+    evidenceIds = [],
+    sourceCardKey = "",
+    placementMode = "",
+    refAlignmentStatus = "",
+    anchorSource = "",
+    source = null,
+    serverBaseline = false,
   } = {},
   index = 0,
 ) {
@@ -153,6 +175,21 @@ export function buildFinalPathCtgSegment(
   const normalizedStart = normalizePositiveInteger(start);
   const normalizedEnd = normalizePositiveInteger(end);
   const normalizedOrient = normalizeSegmentOrient(orient);
+  const traceMetadata = {
+    ...(normalizeString(grtKind) ? { grtKind: normalizeString(grtKind) } : {}),
+    ...(normalizeString(eventId) ? { eventId: normalizeString(eventId) } : {}),
+    ...(normalizeStringList(evidenceIds).length
+      ? { evidenceIds: normalizeStringList(evidenceIds) }
+      : {}),
+    ...(normalizeString(sourceCardKey) ? { sourceCardKey: normalizeString(sourceCardKey) } : {}),
+    ...(normalizeString(placementMode) ? { placementMode: normalizeString(placementMode) } : {}),
+    ...(normalizeString(refAlignmentStatus)
+      ? { refAlignmentStatus: normalizeString(refAlignmentStatus) }
+      : {}),
+    ...(normalizeString(anchorSource) ? { anchorSource: normalizeString(anchorSource) } : {}),
+    ...(source && typeof source === "object" && !Array.isArray(source) ? { source: { ...source } } : {}),
+    ...(serverBaseline === true ? { serverBaseline: true } : {}),
+  };
   const isDraft = normalizedSourceKind !== "ref_segment"
     && !normalizedAssemblyCtgId
     && !normalizedDatasetName
@@ -171,6 +208,7 @@ export function buildFinalPathCtgSegment(
       overallLen: null,
       start: null,
       end: null,
+      ...traceMetadata,
     };
   }
   if (
@@ -215,6 +253,7 @@ export function buildFinalPathCtgSegment(
       memberEndBp: normalizedMemberEndBp,
       start: orientedStart,
       end: orientedEnd,
+      ...traceMetadata,
     };
     return {
       ...refSegment,
@@ -234,6 +273,7 @@ export function buildFinalPathCtgSegment(
     overallLen: normalizedOverallLen,
     start: orientedStart,
     end: orientedEnd,
+    ...traceMetadata,
   };
 }
 
@@ -281,6 +321,15 @@ function normalizeSegment(segment, index = 0) {
       orient: segment.orient,
       start: segment.start,
       end: segment.end,
+      grtKind: segment.grtKind,
+      eventId: segment.eventId,
+      evidenceIds: segment.evidenceIds,
+      sourceCardKey: segment.sourceCardKey,
+      placementMode: segment.placementMode,
+      refAlignmentStatus: segment.refAlignmentStatus,
+      anchorSource: segment.anchorSource,
+      source: segment.source,
+      serverBaseline: segment.serverBaseline,
     },
     index,
   );
@@ -292,6 +341,9 @@ export function buildFinalPathEntry({
   totalLength = null,
   updatedAt = "",
   hiddenPrimaryCtgIds = [],
+  q4Length = null,
+  q4Sha256 = "",
+  serverBaseline = false,
 }) {
   const normalizedChrName = normalizeString(chrName);
   if (!normalizedChrName) {
@@ -313,6 +365,9 @@ export function buildFinalPathEntry({
     totalLength: normalizedTotalLength,
     updatedAt: String(updatedAt || ""),
     ...(normalizedHiddenPrimaryCtgIds.length ? { hiddenPrimaryCtgIds: normalizedHiddenPrimaryCtgIds } : {}),
+    ...(normalizePositiveInteger(q4Length) ? { q4Length: normalizePositiveInteger(q4Length) } : {}),
+    ...(normalizeString(q4Sha256) ? { q4Sha256: normalizeString(q4Sha256) } : {}),
+    ...(serverBaseline === true ? { serverBaseline: true } : {}),
   };
 }
 
@@ -327,6 +382,9 @@ function normalizeSegmentEntry(chrName, entry) {
     totalLength: entry?.totalLength,
     updatedAt: entry?.updatedAt,
     hiddenPrimaryCtgIds: entry?.hiddenPrimaryCtgIds,
+    q4Length: entry?.q4Length,
+    q4Sha256: entry?.q4Sha256,
+    serverBaseline: entry?.serverBaseline,
   });
 }
 

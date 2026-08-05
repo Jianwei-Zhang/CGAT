@@ -10,6 +10,10 @@ import {
   exportDegapJobs,
   exportFinalPathFasta,
   exportProjectFinalPathFasta,
+  getGrtEventTrace,
+  getGrtEvidence,
+  getGrtProjectView,
+  getGrtSourceCardTrace,
   initializeProject,
   listPhasedChrTracks,
   listProjectInitializerOptions,
@@ -277,6 +281,13 @@ test("listProjectInitializerOptions preserves partitioned package metadata from 
           invoke: async (command) => {
             assert.equal(command, "list_project_initializer_options");
             return {
+              grtRecipe: {
+                workflow: "gpm_grt_precomputed_v1",
+                recipeId: "recipe-1",
+                primaryDataset: "hifiasm",
+                supportDatasets: ["flye"],
+                readsQcEnabled: true,
+              },
               packageMetadata: {
                 packageMode: "fast",
                 sequenceLayout: "partitioned",
@@ -302,8 +313,146 @@ test("listProjectInitializerOptions preserves partitioned package metadata from 
     assert.equal(result.packageMetadata.sequenceLayout, "partitioned");
     assert.equal(result.packageMetadata.preassignedChr, true);
     assert.equal(result.packageMetadata.selfAlignmentScope, "chr_partition");
+    assert.equal(result.grtRecipe.recipeId, "recipe-1");
+    assert.deepEqual(result.grtRecipe.supportDatasets, ["flye"]);
   } finally {
     globalThis.window = previousWindow;
+  }
+});
+
+test("initializeProject sends only the workspace and project name to the locked GRT command", async () => {
+  const previousWindow = globalThis.window;
+  const calls = [];
+  try {
+    globalThis.window = {
+      __TAURI__: {
+        core: {
+          invoke: async (command, args) => {
+            calls.push({ command, args });
+            return {
+              projectId: 7,
+              projectName: "grt-project",
+              supportDatasetIds: [2, 3],
+              phasedAssemblyEnabled: false,
+              grtProjectView: { recipe: { recipeId: "recipe-1" } },
+              existingProjects: [],
+            };
+          },
+        },
+      },
+    };
+
+    const result = await initializeProject({
+      workspaceRoot: "D:\\Desktop\\GPM\\ws1",
+      projectName: "grt-project",
+      referenceGenomeId: 999,
+      primaryDatasetId: 999,
+      supportDatasetIds: [999],
+      phasedAssemblyEnabled: true,
+    });
+
+    assert.deepEqual(calls, [{
+      command: "initialize_project",
+      args: {
+        workspaceRoot: "D:\\Desktop\\GPM\\ws1",
+        projectName: "grt-project",
+      },
+    }]);
+    assert.deepEqual(result.supportDatasetIds, [2, 3]);
+    assert.equal(result.phasedAssemblyEnabled, false);
+    assert.equal(result.grtProjectView.recipe.recipeId, "recipe-1");
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test("GRT trace services route project, source-card, event, and evidence requests", async () => {
+  const previousWindow = globalThis.window;
+  const calls = [];
+  try {
+    globalThis.window = {
+      __TAURI__: {
+        core: {
+          invoke: async (command, args) => {
+            calls.push({ command, args });
+            return { command, args };
+          },
+        },
+      },
+    };
+
+    await getGrtProjectView({ workspaceRoot: "D:\\ws", projectId: 7 });
+    await getGrtSourceCardTrace({ workspaceRoot: "D:\\ws", projectId: 7, sourceCardKey: "support:ctg1" });
+    await getGrtEventTrace({ workspaceRoot: "D:\\ws", projectId: 7, eventId: "evt-1" });
+    await getGrtEvidence({ workspaceRoot: "D:\\ws", projectId: 7, evidenceId: "ev-1" });
+
+    assert.deepEqual(calls.map((call) => call.command), [
+      "get_grt_project_view",
+      "get_grt_source_card_trace",
+      "get_grt_event_trace",
+      "get_grt_evidence",
+    ]);
+    assert.deepEqual(calls[1].args, {
+      workspaceRoot: "D:\\ws",
+      projectId: 7,
+      sourceCardKey: "support:ctg1",
+    });
+    assert.equal(calls[2].args.eventId, "evt-1");
+    assert.equal(calls[3].args.evidenceId, "ev-1");
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test("GRT trace services use the dev bridge when tauri is unavailable", async () => {
+  const previousWindow = globalThis.window;
+  const previousFetch = globalThis.fetch;
+  const calls = [];
+  try {
+    globalThis.window = {};
+    globalThis.fetch = async (path, options) => {
+      const payload = JSON.parse(options.body);
+      calls.push({ path, payload });
+      return {
+        ok: true,
+        json: async () => ({ path, payload, status: "server" }),
+      };
+    };
+
+    const projectView = await getGrtProjectView({ workspaceRoot: "D:\\ws", projectId: 7 });
+    const sourceTrace = await getGrtSourceCardTrace({
+      workspaceRoot: "D:\\ws",
+      projectId: 7,
+      sourceCardKey: "support:ctg1",
+    });
+    const eventTrace = await getGrtEventTrace({
+      workspaceRoot: "D:\\ws",
+      projectId: 7,
+      eventId: "evt-1",
+    });
+    const evidence = await getGrtEvidence({
+      workspaceRoot: "D:\\ws",
+      projectId: 7,
+      evidenceId: "ev-1",
+    });
+
+    assert.deepEqual(calls.map((call) => call.path), [
+      "/api/get-grt-project-view",
+      "/api/get-grt-source-card-trace",
+      "/api/get-grt-event-trace",
+      "/api/get-grt-evidence",
+    ]);
+    assert.deepEqual(calls[0].payload, { workspaceRoot: "D:\\ws", projectId: 7 });
+    assert.equal(calls[1].payload.sourceCardKey, "support:ctg1");
+    assert.equal(calls[2].payload.eventId, "evt-1");
+    assert.equal(calls[3].payload.evidenceId, "ev-1");
+    assert.equal(projectView.status, "server");
+    assert.equal(sourceTrace.status, "server");
+    assert.equal(eventTrace.status, "server");
+    assert.equal(evidence.status, "server");
+  } finally {
+    globalThis.window = previousWindow;
+    globalThis.fetch = previousFetch;
   }
 });
 
@@ -482,10 +631,17 @@ test("mock phased track lifecycle allows duplicate ctg references, exact reorder
     const created = await initializeProject({
       workspaceRoot: "D:\\Desktop\\GPM\\ws1",
       projectName: `project-phased-${Date.now()}`,
+    });
+    await updateProject({
+      workspaceRoot: "D:\\Desktop\\GPM\\ws1",
+      projectId: created.projectId,
+      projectName: created.projectName,
       referenceGenomeId: 1,
       primaryDatasetId: 1,
-      supportDatasetIds: [2],
+      supportDatasetIds: [2, 3],
+      chrAssignmentMinCoveragePercent: 60,
       phasedAssemblyEnabled: true,
+      stateOrLocale: { locale: "en" },
     });
 
     const createdTrack = await createPhasedChrTrack({

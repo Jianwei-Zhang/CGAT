@@ -14,6 +14,31 @@ function normalizeOrient(value) {
   return normalizeString(value) === "-" ? "-" : "+";
 }
 
+function annotateGrtSourceCards(ctgs, sourceCards, chrName) {
+  const normalizedChrName = normalizeString(chrName);
+  const cards = Array.isArray(sourceCards) ? sourceCards : [];
+  return (Array.isArray(ctgs) ? ctgs : []).map((ctg) => {
+    const datasetName = normalizeString(ctg?.datasetName);
+    const originId = normalizeString(ctg?.originId || ctg?.name).replace(/@[^@]+$/, "");
+    const card = cards.find(
+      (candidate) => candidate.targetChr === normalizedChrName
+        && candidate.datasetName === datasetName
+        && candidate.contigName === originId,
+    );
+    if (!card) {
+      return ctg;
+    }
+    return {
+      ...ctg,
+      grtSourceCardKey: card.sourceCardKey,
+      grtPlacementMode: card.placementMode,
+      grtRefAlignmentStatus: card.refAlignmentStatus,
+      grtAnchorSource: "grt_final_path",
+      grtOriginalAssignment: card.originalAssignment,
+    };
+  });
+}
+
 function backfillFinalPathOriginIds(finalPathByChr, chrName, primaryCtgs, supportCtgs) {
   const source = finalPathByChr && typeof finalPathByChr === "object" && !Array.isArray(finalPathByChr)
     ? finalPathByChr
@@ -28,7 +53,8 @@ function backfillFinalPathOriginIds(finalPathByChr, chrName, primaryCtgs, suppor
   }
 
   const originByCtgId = new Map();
-  [...(Array.isArray(primaryCtgs) ? primaryCtgs : []), ...(Array.isArray(supportCtgs) ? supportCtgs : [])]
+  const ctgs = [...(Array.isArray(primaryCtgs) ? primaryCtgs : []), ...(Array.isArray(supportCtgs) ? supportCtgs : [])];
+  ctgs
     .forEach((ctg) => {
       const ctgId = Number(ctg?.assemblyCtgId || 0);
       const originId = normalizeString(ctg?.originId);
@@ -36,24 +62,38 @@ function backfillFinalPathOriginIds(finalPathByChr, chrName, primaryCtgs, suppor
         originByCtgId.set(ctgId, originId);
       }
     });
+  const ctgBySource = new Map();
+  ctgs.forEach((ctg) => {
+    const datasetName = normalizeString(ctg?.datasetName).toLowerCase();
+    const originId = normalizeString(ctg?.originId || ctg?.name).replace(/@[^@]+$/, "").toLowerCase();
+    if (datasetName && originId) {
+      ctgBySource.set(`${datasetName}\u0000${originId}`, ctg);
+    }
+  });
 
   let changed = false;
   const nextSegments = entry.segments.map((segment) => {
     if (normalizeString(segment?.type).toLowerCase() === "gap") {
       return segment;
     }
-    if (normalizeString(segment?.originId)) {
-      return segment;
-    }
     const ctgId = Number(segment?.assemblyCtgId || 0);
-    const originId = ctgId > 0 ? originByCtgId.get(ctgId) || "" : "";
-    if (!originId) {
+    const sourceDataset = normalizeString(segment?.source?.dataset || segment?.datasetName).toLowerCase();
+    const sourceContig = normalizeString(
+      segment?.source?.contig || segment?.originId || segment?.ctgName,
+    ).toLowerCase();
+    const matchedCtg = ctgBySource.get(`${sourceDataset}\u0000${sourceContig}`) || null;
+    const nextCtgId = ctgId > 0 ? ctgId : Number(matchedCtg?.assemblyCtgId || 0);
+    const originId = normalizeString(segment?.originId)
+      || (nextCtgId > 0 ? originByCtgId.get(nextCtgId) || "" : "")
+      || normalizeString(matchedCtg?.originId);
+    if (!originId && !nextCtgId) {
       return segment;
     }
     changed = true;
     return {
       ...segment,
-      originId,
+      ...(originId ? { originId } : {}),
+      ...(nextCtgId ? { assemblyCtgId: nextCtgId } : {}),
     };
   });
 
@@ -363,6 +403,21 @@ export async function loadAssemblyView(host, store, options, deps) {
       workspaceRoot: state.session.workspacePath,
       projectId: state.session.projectId,
     });
+    const rawGrtProjectView = typeof deps.getGrtProjectView === "function"
+      ? await deps.getGrtProjectView({
+          workspaceRoot: state.session.workspacePath,
+          projectId: state.session.projectId,
+        })
+      : state.assembly.grtProjectView || {};
+    const grtProjectView = typeof deps.normalizeGrtProjectView === "function"
+      ? deps.normalizeGrtProjectView(rawGrtProjectView)
+      : {
+          baselineFinalPathByChr: rawGrtProjectView.baselineFinalPathByChr || {},
+          objectAttempts: rawGrtProjectView.objectAttempts || [],
+          sourceCards: rawGrtProjectView.sourceCards || [],
+          verification: rawGrtProjectView.verification || {},
+          recipe: rawGrtProjectView.recipe || {},
+        };
     const persistedSupportMirroredCtgs = deps.normalizeSupportMirroredCtgs(
       projectAssemblyViewState?.supportMirroredCtgs,
     );
@@ -375,9 +430,15 @@ export async function loadAssemblyView(host, store, options, deps) {
     const persistedSupportDatasetId = deps.normalizeSupportDatasetId(
       projectAssemblyViewState?.supportDatasetId,
     );
-    const persistedFinalPathByChr = normalizeFinalPathByChrImpl(
+    const savedFinalPathByChr = normalizeFinalPathByChrImpl(
       projectAssemblyViewState?.finalPathByChr,
     );
+    const baselineFinalPathByChr = normalizeFinalPathByChrImpl(
+      grtProjectView.baselineFinalPathByChr,
+    );
+    const persistedFinalPathByChr = Object.keys(savedFinalPathByChr).length
+      ? savedFinalPathByChr
+      : baselineFinalPathByChr;
     const persistedHiddenPrimaryCtgIdsByChr = normalizeHiddenPrimaryCtgIdsByChr(
       projectAssemblyViewState?.hiddenPrimaryCtgIdsByChr,
     );
@@ -461,20 +522,30 @@ export async function loadAssemblyView(host, store, options, deps) {
             supportDatasetId,
           )
         : [];
+    const annotatedPrimaryCtgs = annotateGrtSourceCards(
+      chrCtgResult.items,
+      grtProjectView.sourceCards,
+      selectedChrName,
+    );
+    const annotatedSupportCtgs = annotateGrtSourceCards(
+      supportChrCtgs,
+      grtProjectView.sourceCards,
+      selectedChrName,
+    );
     const hydratedFinalPathByChr = backfillFinalPathOriginIds(
       persistedFinalPathByChr,
       selectedChrName,
-      chrCtgResult.items,
-      supportChrCtgs,
+      annotatedPrimaryCtgs,
+      annotatedSupportCtgs,
     );
     const persistedTrackDragOffsets = deps.filterTrackDragOffsets(
       projectAssemblyViewState?.trackDragOffsets,
       {
         ...state.assembly,
-        chrCtgs: chrCtgResult.items,
+        chrCtgs: annotatedPrimaryCtgs,
         phasedChrTracks,
         refTrackMembers: refTrackMemberResult.items,
-        supportChrCtgs,
+        supportChrCtgs: annotatedSupportCtgs,
       },
       { preserveUnmatchedSupportOffsets: true },
     );
@@ -497,7 +568,7 @@ export async function loadAssemblyView(host, store, options, deps) {
         )
       : [];
     const selectedCtgId = resolveSelectedCtgId(
-      chrCtgResult.items,
+      annotatedPrimaryCtgs,
       state.assembly.selectedCtgId,
       keepCurrentCtg,
     );
@@ -512,7 +583,7 @@ export async function loadAssemblyView(host, store, options, deps) {
       state.assembly.selectedMemberSeqId,
     );
     const filteredTrackSelections = deps.normalizeTrackSelectionCtgIds(state.assembly.trackSelectedCtgIds).filter((ctgId) =>
-      containsAssemblyCtgId(chrCtgResult.items, [], ctgId),
+      containsAssemblyCtgId(annotatedPrimaryCtgs, [], ctgId),
     );
     const persistedHiddenPrimaryCtgIds = deps.filterPrimaryTrackSelectionCtgIds(
       persistedHiddenPrimaryCtgIdsByChr[selectedChrName]
@@ -520,16 +591,16 @@ export async function loadAssemblyView(host, store, options, deps) {
         || projectAssemblyViewState?.hiddenPrimaryCtgIds,
       {
         ...state.assembly,
-        chrCtgs: chrCtgResult.items,
+        chrCtgs: annotatedPrimaryCtgs,
       },
     );
     const filteredTrackDragOffsets = persistedTrackDragOffsets;
     const filteredSubviewTrackDragOffsets = persistedSubviewTrackDragOffsets;
     const subviewTrackPairPools = deps.buildSubviewTrackPairPoolsFromAssembly({
       ...state.assembly,
-      chrCtgs: chrCtgResult.items,
+      chrCtgs: annotatedPrimaryCtgs,
       refTrackMembers: refTrackMemberResult.items,
-      supportChrCtgs,
+      supportChrCtgs: annotatedSupportCtgs,
       selectedChrName,
     });
     const filteredSubviewTrackPairHiddenCtgs = deps.filterSubviewTrackPairHiddenCtgs(
@@ -563,7 +634,7 @@ export async function loadAssemblyView(host, store, options, deps) {
         chromosomes: chromosomeResult.items,
         chrPickerOpen: false,
         selectedChrName,
-        chrCtgs: chrCtgResult.items,
+        chrCtgs: annotatedPrimaryCtgs,
         phasedChrTracks,
         isChrPhased,
         activePhasedTrackKey,
@@ -573,12 +644,13 @@ export async function loadAssemblyView(host, store, options, deps) {
         trackView: persistedTrackView,
         supportDsCtgLenRulesByChr: persistedSupportDsCtgLenRulesByChr,
         supportDsCtgLenRulesDialogOpen: false,
-        supportChrCtgs,
+        supportChrCtgs: annotatedSupportCtgs,
         deletedCtgs,
         selectedDeletedCtgRecordIds: filteredDeletedSelections,
         trackSelectedCtgIds: filteredTrackSelections,
         supportMirroredCtgs: persistedSupportMirroredCtgs,
         finalPathByChr: hydratedFinalPathByChr,
+        grtProjectView,
         finalPathViewMode: persistedFinalPathViewMode,
         degapProjectState: persistedDegapProjectState,
         degap: {
@@ -722,13 +794,30 @@ export async function selectChromosome(host, store, chrName, deps) {
             supportDatasetId,
           )
         : [];
+    const grtSourceCards = state.assembly.grtProjectView?.sourceCards || [];
+    const annotatedPrimaryCtgs = annotateGrtSourceCards(
+      chrCtgResult.items,
+      grtSourceCards,
+      chrName,
+    );
+    const annotatedSupportCtgs = annotateGrtSourceCards(
+      supportChrCtgs,
+      grtSourceCards,
+      chrName,
+    );
+    const hydratedFinalPathByChr = backfillFinalPathOriginIds(
+      state.assembly.finalPathByChr,
+      chrName,
+      annotatedPrimaryCtgs,
+      annotatedSupportCtgs,
+    );
     const deletedCtgs = await deps.loadDeletedCtgsForChr(
       state.session.workspacePath,
       state.session.projectId,
       chrName,
       primaryDatasetId,
     );
-    const selectedCtgId = resolveSelectedCtgId(chrCtgResult.items, null, false);
+    const selectedCtgId = resolveSelectedCtgId(annotatedPrimaryCtgs, null, false);
     const filterPrimaryHiddenIds = typeof deps.filterPrimaryTrackSelectionCtgIds === "function"
       ? deps.filterPrimaryTrackSelectionCtgIds
       : (values) => values;
@@ -738,7 +827,7 @@ export async function selectChromosome(host, store, chrName, deps) {
         || [],
       {
         ...state.assembly,
-        chrCtgs: chrCtgResult.items,
+        chrCtgs: annotatedPrimaryCtgs,
       },
     );
     const sideData = await deps.loadSideDataForCtg(
@@ -754,13 +843,14 @@ export async function selectChromosome(host, store, chrName, deps) {
       assembly: {
         ...store.getState().assembly,
         loading: false,
-        chrCtgs: chrCtgResult.items,
+        chrCtgs: annotatedPrimaryCtgs,
         phasedChrTracks,
         isChrPhased,
         activePhasedTrackKey,
         activeHitsTrackKey,
         refTrackMembers: refTrackMemberResult.items,
-        supportChrCtgs,
+        supportChrCtgs: annotatedSupportCtgs,
+        finalPathByChr: hydratedFinalPathByChr,
         deletedCtgs,
         selectedDeletedCtgRecordIds: [],
         trackSelectedCtgIds: [],

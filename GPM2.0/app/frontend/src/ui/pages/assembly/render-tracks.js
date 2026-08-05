@@ -1187,6 +1187,118 @@ function createRenderTracksRenderer(deps = {}) {
     `;
   }
 
+  function renderGrtTraceAction(kind, id, label, extraAttrs = "") {
+    const normalizedId = String(id || "").trim();
+    if (!normalizedId) {
+      return "";
+    }
+    return `<button type="button" class="button ghost tiny grt-trace-action" data-grt-trace-kind="${escapeAttr(kind)}" data-grt-trace-id="${escapeAttr(normalizedId)}" ${extraAttrs}>${escapeHtml(label || normalizedId)}</button>`;
+  }
+
+  function collectGrtDetailActions(detail, i18n) {
+    const sourceCardKeys = new Set();
+    const eventIds = new Set();
+    const evidenceIds = new Set();
+    const finalPathSegmentIds = new Set();
+    const visit = (value) => {
+      if (Array.isArray(value)) {
+        value.forEach(visit);
+        return;
+      }
+      if (!value || typeof value !== "object") {
+        return;
+      }
+      Object.entries(value).forEach(([key, child]) => {
+        if ((key === "source_card_key" || key === "sourceCardKey") && child) {
+          sourceCardKeys.add(String(child));
+        } else if ((key === "event_id" || key === "eventId") && child) {
+          eventIds.add(String(child));
+        } else if ((key === "evidence_id" || key === "evidenceId") && child) {
+          evidenceIds.add(String(child));
+        } else if (key === "evidence_ids" || key === "evidenceIds") {
+          (Array.isArray(child) ? child : []).forEach((id) => evidenceIds.add(String(id)));
+        } else if ((key === "final_path_segment_id" || key === "finalPathSegmentId" || key === "segment_id" || key === "segmentId") && child) {
+          finalPathSegmentIds.add(String(child));
+        }
+        visit(child);
+      });
+    };
+    visit(detail);
+    return [
+      ...Array.from(sourceCardKeys, (id) => renderGrtTraceAction("source-card", id, `${i18n.grt.sourceCard}: ${id}`)),
+      ...Array.from(eventIds, (id) => renderGrtTraceAction("event", id, `${i18n.grt.event}: ${id}`)),
+      ...Array.from(evidenceIds, (id) => renderGrtTraceAction("evidence", id, `${i18n.grt.evidence}: ${id}`)),
+      ...Array.from(finalPathSegmentIds, (id) => `<button type="button" class="button ghost tiny" data-grt-locate-final-path-segment-id="${escapeAttr(id)}">${escapeHtml(`${i18n.grt.locateFinalPath}: ${id}`)}</button>`),
+    ].join("");
+  }
+
+  function renderGrtTracePanel(assembly, i18n) {
+    const grt = assembly.grtProjectView || {};
+    const selectedChrName = String(assembly.selectedChrName || "").trim();
+    const baselineEntry = grt.baselineFinalPathByChr?.[selectedChrName] || null;
+    const baselineSegments = Array.isArray(baselineEntry?.segments) ? baselineEntry.segments : [];
+    const unresolved = (Array.isArray(grt.objectAttempts) ? grt.objectAttempts : [])
+      .filter((attempt) => attempt.chr === selectedChrName && attempt.status === "unresolved");
+    const sourceCards = (Array.isArray(grt.sourceCards) ? grt.sourceCards : [])
+      .filter((card) => card.targetChr === selectedChrName);
+    const trace = assembly.grtTrace || {};
+    const segmentRows = baselineSegments.map((segment) => {
+      const traceKind = segment.eventId ? "event" : (segment.sourceCardKey ? "source-card" : "");
+      const traceId = segment.eventId || segment.sourceCardKey || "";
+      const status = segment.placementMode && segment.placementMode !== "normal"
+        ? `<span class="grt-status-badge is-${escapeAttr(segment.placementMode)}">${escapeHtml(segment.placementMode)}</span>`
+        : "";
+      const traceAction = traceKind
+        ? renderGrtTraceAction(traceKind, traceId, i18n.grt.openTrace)
+        : "";
+      const locateAction = segment.assemblyCtgId
+        ? `<button type="button" class="button ghost tiny" data-grt-locate-ctg-id="${escapeAttr(String(segment.assemblyCtgId))}" data-grt-locate-chr="${escapeAttr(selectedChrName)}">${escapeHtml(i18n.grt.locateMainCard)}</button>`
+        : "";
+      return `<li data-grt-baseline-segment-id="${escapeAttr(segment.segmentId || "")}">
+        <strong>${escapeHtml(segment.segmentId || "-")}</strong>
+        <span>${escapeHtml(segment.datasetName || segment.type || "-")}:${escapeHtml(segment.originId || segment.ctgName || "-")}</span>
+        ${status}${traceAction}${locateAction}
+      </li>`;
+    }).join("");
+    const unresolvedRows = unresolved.length
+      ? unresolved.map((attempt) => `<li>
+          <span class="grt-status-badge is-unresolved">${escapeHtml(i18n.grt.unresolved)}</span>
+          <strong>${escapeHtml(attempt.objectKind)} ${escapeHtml(attempt.objectId)}</strong>
+          <span>${escapeHtml(i18n.grt.reason)}: ${escapeHtml(attempt.reason || "-")}</span>
+          <span>${escapeHtml(i18n.grt.candidateCount)}: ${escapeHtml(String(attempt.candidateCount || 0))}</span>
+        </li>`).join("")
+      : `<li class="muted">${escapeHtml(i18n.grt.noUnresolvedObjects)}</li>`;
+    const sourceRows = sourceCards.length
+      ? sourceCards.map((card) => `<li>
+          <span class="grt-status-badge is-${escapeAttr(card.placementMode || "normal")}">${escapeHtml(card.placementMode || "normal")}</span>
+          <strong>${escapeHtml(card.datasetName)}:${escapeHtml(card.contigName)}</strong>
+          <span>${escapeHtml(i18n.grt.refStatus)}: ${escapeHtml(card.refAlignmentStatus || "-")}</span>
+          <span>${escapeHtml(i18n.grt.anchorSource)}: ${escapeHtml(i18n.grt.grtFinalPathAnchor)}</span>
+          ${renderGrtTraceAction("source-card", card.sourceCardKey, i18n.grt.openTrace)}
+          <button type="button" class="button ghost tiny" data-grt-locate-source-card="${escapeAttr(card.sourceCardKey)}">${escapeHtml(i18n.grt.locateMainCard)}</button>
+        </li>`).join("")
+      : `<li class="muted">${escapeHtml(i18n.grt.noSourceCards)}</li>`;
+    const traceBody = trace.loading
+      ? `<p class="muted">${escapeHtml(i18n.grt.loadingTrace)}</p>`
+      : trace.error
+        ? `<p class="error-text"><strong>${escapeHtml(i18n.grt.programError)}:</strong> ${escapeHtml(trace.error)}</p>`
+        : trace.detail
+          ? `<div class="grt-trace-detail-actions">${collectGrtDetailActions(trace.detail, i18n)}</div><pre class="grt-trace-json">${escapeHtml(JSON.stringify(trace.detail, null, 2))}</pre>`
+          : `<p class="muted">${escapeHtml(i18n.grt.traceEmpty)}</p>`;
+    return `<article class="card grt-trace-panel" data-grt-trace-panel="true">
+      <header class="page-header">
+        <div><h4>${escapeHtml(i18n.grt.title)}</h4><p class="muted">${escapeHtml(i18n.grt.baselineImmutable)}</p></div>
+        ${trace.kind ? `<button type="button" class="button ghost tiny" data-grt-trace-close="true">${escapeHtml(i18n.grt.closeTrace)}</button>` : ""}
+      </header>
+      <div class="grt-trace-grid">
+        <section><h5>${escapeHtml(i18n.grt.baseline)}</h5><ul>${segmentRows || `<li class="muted">-</li>`}</ul></section>
+        <section><h5>${escapeHtml(i18n.grt.unresolvedObjects)}</h5><ul>${unresolvedRows}</ul></section>
+        <section><h5>${escapeHtml(i18n.grt.sourceCards)}</h5><ul>${sourceRows}</ul></section>
+      </div>
+      <section class="grt-trace-detail" aria-live="polite">${traceBody}</section>
+    </article>`;
+  }
+
   function renderAssemblyMainTab(state) {
   const assembly = state.assembly;
   const session = state.session || {};
@@ -1370,6 +1482,9 @@ function createRenderTracksRenderer(deps = {}) {
           const fullName = resolveTrackCtgDisplayName(ctg, ctg.assemblyCtgId);
           const visibleName = resolveTrackCtgVisibleName(ctg, ctg.assemblyCtgId);
           const sourceTagMarkup = renderDerivedSourceHtmlTag(ctg);
+          const grtStatusMarkup = ctg.grtSourceCardKey
+            ? `<span class="grt-status-badge is-${escapeAttr(ctg.grtPlacementMode || "normal")}" role="button" tabindex="0" data-grt-trace-kind="source-card" data-grt-trace-id="${escapeAttr(ctg.grtSourceCardKey)}" title="${escapeAttr(`${i18n.grt.refStatus}: ${ctg.grtRefAlignmentStatus || "-"}; ${i18n.grt.anchorSource}: ${i18n.grt.grtFinalPathAnchor}`)}">${escapeHtml(ctg.grtPlacementMode || "normal")}</span>`
+            : "";
           const coAssignedChrNames = Array.isArray(ctg.coAssignedChrNames)
             ? ctg.coAssignedChrNames
                 .map((chrName) => String(chrName || "").trim())
@@ -1381,13 +1496,13 @@ function createRenderTracksRenderer(deps = {}) {
           if (coAssignedTooltip) {
             const nameTitle = `${escapeAttr(fullName)}&#10;${escapeAttr(coAssignedTooltip)}`;
             return `<button class="ctg-chip ${active}${selectedClass}${hiddenClass}" data-assembly-ctg-id="${ctg.assemblyCtgId}" data-track-focus-mode="start">
-              <strong><span class="ctg-chip-name is-coassigned" title="${nameTitle}">${escapeHtml(visibleName)}</span>${sourceTagMarkup}${hiddenTag}</strong>
+              <strong><span class="ctg-chip-name is-coassigned" title="${nameTitle}">${escapeHtml(visibleName)}</span>${sourceTagMarkup}${grtStatusMarkup}${hiddenTag}</strong>
               <span class="ctg-chip-meta">${formatBp(ctg.totalLength)}</span>
             </button>`;
           }
           const nameTitle = escapeAttr(fullName);
           return `<button class="ctg-chip ${active}${selectedClass}${hiddenClass}" data-assembly-ctg-id="${ctg.assemblyCtgId}" data-track-focus-mode="start" title="${nameTitle}">
-            <strong>${escapeHtml(visibleName)}${sourceTagMarkup}${hiddenTag}</strong>
+            <strong>${escapeHtml(visibleName)}${sourceTagMarkup}${grtStatusMarkup}${hiddenTag}</strong>
             <span class="ctg-chip-meta">${formatBp(ctg.totalLength)}</span>
           </button>`;
         })
@@ -1483,6 +1598,7 @@ function createRenderTracksRenderer(deps = {}) {
       i18n,
     },
   );
+  const grtTracePanel = renderGrtTracePanel(assembly, i18n);
 
   return `
       <div class="chr-strip has-members-panel">
@@ -1576,6 +1692,7 @@ function createRenderTracksRenderer(deps = {}) {
           ${subviewPanel}
         </section>
         ${finalPathCard}
+        ${grtTracePanel}
       </section>
   `;
 }
@@ -2803,7 +2920,11 @@ function renderAssemblyTracks({
           const rect = resolveTrackCtgDisplayRect(layout, ctg, index);
           const ctgVerticalOffset = resolveTrackCtgVerticalOffset(layout.role, ctg.assemblyCtgId);
           const y = layout.laneTop + ctg.laneIndex * TRACK_LANE_HEIGHT + ctgVerticalOffset;
-          const labelText = resolveTrackCtgLabelText(ctg, ctg.assemblyCtgId);
+          const baseLabelText = resolveTrackCtgLabelText(ctg, ctg.assemblyCtgId);
+          const grtPlacementMode = String(ctg?.grtPlacementMode || "").trim();
+          const labelText = grtPlacementMode && grtPlacementMode !== "normal"
+            ? `${baseLabelText} [${grtPlacementMode}]`
+            : baseLabelText;
           const labelPlacement = resolveBoundedTrackCtgLabelPlacement({
             ctgName: labelText,
             role: layout.interactiveRole || layout.role,
@@ -2837,8 +2958,11 @@ function renderAssemblyTracks({
           const phasedLabelAttrs = (layout.interactiveRole || layout.role) === "phased"
             ? ` data-track-label-phased-track-id="${phasedTrackId || 0}" data-track-label-phased-track-item-id="${phasedTrackItemId || 0}" data-track-label-phased-haplotype-key="${escapeAttr(phasedHaplotypeKey)}"`
             : "";
+          const grtAttrs = ctg?.grtSourceCardKey
+            ? ` data-grt-trace-kind="source-card" data-grt-trace-id="${escapeAttr(ctg.grtSourceCardKey)}" data-grt-placement-mode="${escapeAttr(grtPlacementMode || "normal")}" data-grt-ref-status="${escapeAttr(ctg.grtRefAlignmentStatus || "")}"`
+            : "";
           const groupAttrs = layout.selectable
-            ? `data-track-contig-id="${ctg.assemblyCtgId}" data-track-role="${layout.interactiveRole || layout.role}" data-track-contig-name="${escapeAttr(ctg.name)}" data-track-is-mirror="${layout.isMirror ? "1" : "0"}" data-track-dataset-id="${Number(layout.datasetId || 0)}" data-track-ref-orient="${escapeAttr(resolveTrackCtgOrient(ctg))}"${phasedAttrs} ${rectMetricsAttrs}`
+            ? `data-track-contig-id="${ctg.assemblyCtgId}" data-track-role="${layout.interactiveRole || layout.role}" data-track-contig-name="${escapeAttr(ctg.name)}" data-track-is-mirror="${layout.isMirror ? "1" : "0"}" data-track-dataset-id="${Number(layout.datasetId || 0)}" data-track-ref-orient="${escapeAttr(resolveTrackCtgOrient(ctg))}"${phasedAttrs}${grtAttrs} ${rectMetricsAttrs}`
             : "";
           const labelAttrs = layout.selectable
             ? ` data-track-label-for-contig-id="${ctg.assemblyCtgId}" data-track-label-role="${escapeAttr(layout.interactiveRole || layout.role)}" data-track-label-is-mirror="${layout.isMirror ? "1" : "0"}"${phasedLabelAttrs}`

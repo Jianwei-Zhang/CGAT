@@ -132,6 +132,97 @@ test("bindings create phased track from the main track toolbar", async () => {
   assert.equal(createCalls, 1);
 });
 
+test("GRT trace and locate controls dispatch bidirectional navigation actions", async () => {
+  const createTarget = (dataset = {}) => {
+    const listeners = new Map();
+    return {
+      dataset,
+      addEventListener(type, handler) {
+        listeners.set(type, handler);
+      },
+      fire(type, overrides = {}) {
+        listeners.get(type)?.({
+          key: "",
+          preventDefault() {},
+          stopPropagation() {},
+          stopImmediatePropagation() {},
+          ...overrides,
+        });
+      },
+    };
+  };
+  const eventTarget = createTarget({ grtTraceKind: "event", grtTraceId: "evt-1" });
+  const evidenceTarget = createTarget({ grtTraceKind: "evidence", grtTraceId: "ev-1" });
+  const tableRowTarget = createTarget({ grtTraceKind: "event", grtTraceId: "evt-table" });
+  const locateCtgTarget = createTarget({ grtLocateCtgId: "202", grtLocateChr: "Chr01" });
+  const locateSourceTarget = createTarget({ grtLocateSourceCard: "flye:donor1:Chr01:grt_promoted" });
+  const locateFinalPathTarget = createTarget({ grtLocateFinalPathSegmentId: "seg-patch" });
+  const closeTarget = createTarget();
+  const host = {
+    querySelector(selector) {
+      return selector === "[data-grt-trace-close='true']" ? closeTarget : null;
+    },
+    querySelectorAll(selector) {
+      if (selector === "[data-grt-trace-kind][data-grt-trace-id]") {
+        return [eventTarget, evidenceTarget, tableRowTarget];
+      }
+      if (selector === "[data-grt-locate-ctg-id]") {
+        return [locateCtgTarget];
+      }
+      if (selector === "[data-grt-locate-source-card]") {
+        return [locateSourceTarget];
+      }
+      if (selector === "[data-grt-locate-final-path-segment-id]") {
+        return [locateFinalPathTarget];
+      }
+      return [];
+    },
+    addEventListener() {},
+  };
+  const calls = [];
+  const deps = createBindingDeps({
+    openGrtTrace(_host, _store, payload) {
+      calls.push(["trace", payload]);
+    },
+    locateGrtCtg(_host, _store, payload) {
+      calls.push(["ctg", payload]);
+    },
+    locateGrtSourceCard(_host, _store, sourceCardKey) {
+      calls.push(["source", sourceCardKey]);
+    },
+    locateGrtFinalPathSegment(_host, _store, segmentId) {
+      calls.push(["final-path", segmentId]);
+    },
+    closeGrtTrace() {
+      calls.push(["close"]);
+    },
+  });
+
+  bindAssemblyPageImpl(host, createStore(createState()), deps);
+  eventTarget.fire("click");
+  evidenceTarget.fire("keydown", { key: "Enter" });
+  tableRowTarget.fire("click", {
+    target: {
+      closest(selector) {
+        return selector.includes("input") ? this : null;
+      },
+    },
+  });
+  locateCtgTarget.fire("click");
+  locateSourceTarget.fire("click");
+  locateFinalPathTarget.fire("click");
+  closeTarget.fire("click");
+
+  assert.deepEqual(calls, [
+    ["trace", { kind: "event", id: "evt-1" }],
+    ["trace", { kind: "evidence", id: "ev-1" }],
+    ["ctg", { assemblyCtgId: "202", chrName: "Chr01" }],
+    ["source", "flye:donor1:Chr01:grt_promoted"],
+    ["final-path", "seg-patch"],
+    ["close"],
+  ]);
+});
+
 test("support ds ctg len rules dialog only closes from X and confirms dirty drafts", async () => {
   const makeButton = () => {
     const listeners = new Map();

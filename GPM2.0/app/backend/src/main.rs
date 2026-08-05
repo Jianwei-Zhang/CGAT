@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -10,13 +10,16 @@ use gpm_next_backend::ctg_editor::{
     hide_seq, list_deleted_ctgs, rename_ctg, restore_deleted_ctg, set_end_type, show_seq,
 };
 use gpm_next_backend::degap_jobs::{
-    ExportDegapJobsParams, export_degap_jobs, parse_degap_export_jobs,
-    parse_degap_export_settings,
+    ExportDegapJobsParams, export_degap_jobs, parse_degap_export_jobs, parse_degap_export_settings,
 };
 use gpm_next_backend::exporter::{
     ExportChrAgpParams, ExportChrFastaParams, ExportCtgAgpParams, ExportCtgFastaParams,
     ListExportRecordsParams, export_chr_agp, export_chr_fasta, export_ctg_agp, export_ctg_fasta,
     list_export_records,
+};
+use gpm_next_backend::grt_package::{
+    initialize_grt_project, load_grt_event_trace, load_grt_evidence, load_grt_locked_recipe,
+    load_grt_project_view, load_grt_source_card_trace,
 };
 use gpm_next_backend::importer::{
     AddDatasetImportOutcome, ImportOutcome, import_from_extracted_bundle, import_from_zip,
@@ -32,8 +35,8 @@ use gpm_next_backend::phased_assembly::{
     list_phased_chr_tracks, remove_phased_chr_track_item, reorder_phased_chr_track_items,
 };
 use gpm_next_backend::project_initializer::{
-    ProjectInitializationRequest, ProjectUpdateRequest, bootstrap_project_assembly, delete_project,
-    initialize_project, list_initializer_options, set_project_auto_pipeline_done, update_project,
+    ProjectUpdateRequest, bootstrap_project_assembly, delete_project, list_initializer_options,
+    set_project_auto_pipeline_done, update_project,
 };
 use gpm_next_backend::runtime_persistence::{
     AppendEditAuditLogParams, ListEditAuditLogsParams, UpdateRuntimeSettingsParams,
@@ -72,16 +75,25 @@ enum Commands {
     InitializeProject {
         workspace_root: PathBuf,
         project_name: String,
-        reference_genome_id: i64,
-        primary_dataset_id: i64,
-        #[arg(long)]
-        support_dataset_ids: Option<String>,
-        #[arg(long, default_value_t = false)]
-        auto_check_new_seq: bool,
-        #[arg(long)]
-        phased_assembly_enabled: Option<bool>,
-        #[arg(long)]
-        description: Option<String>,
+    },
+    GetGrtProjectView {
+        workspace_root: PathBuf,
+        project_id: i64,
+    },
+    GetGrtSourceCardTrace {
+        workspace_root: PathBuf,
+        project_id: i64,
+        source_card_key: String,
+    },
+    GetGrtEventTrace {
+        workspace_root: PathBuf,
+        project_id: i64,
+        event_id: String,
+    },
+    GetGrtEvidence {
+        workspace_root: PathBuf,
+        project_id: i64,
+        evidence_id: String,
     },
     DeleteProject {
         workspace_root: PathBuf,
@@ -363,6 +375,21 @@ fn main() -> Result<()> {
         Commands::ListProjectInitializerOptions { workspace_root } => {
             let project_db_path = workspace_root.join("project.sqlite");
             let options = list_initializer_options(&project_db_path)?;
+            let recipe = load_grt_locked_recipe(&project_db_path)?;
+            println!("grt_recipe_json={}", serde_json::to_string(&recipe)?);
+            println!(
+                "package_metadata_json={}",
+                serde_json::to_string(&serde_json::json!({
+                    "packageMode": options.package_metadata.package_mode,
+                    "sequenceLayout": options.package_metadata.sequence_layout,
+                    "preassignedChr": options.package_metadata.preassigned_chr,
+                    "chrAssignmentMinCoveragePercent": options
+                        .package_metadata
+                        .chr_assignment_min_coverage_percent,
+                    "selfAlignmentScope": options.package_metadata.self_alignment_scope,
+                    "crossAlignmentScope": options.package_metadata.cross_alignment_scope,
+                }))?
+            );
             println!("references={}", options.references.len());
             for reference in options.references {
                 println!(
@@ -373,13 +400,15 @@ fn main() -> Result<()> {
             println!("datasets={}", options.datasets.len());
             for dataset in options.datasets {
                 println!(
-                    "dataset id={} name={} assembler={} assembler_version={} fasta_available={} self_alignment_available={}",
+                    "dataset id={} name={} assembler={} assembler_version={} contig_count={} total_length_bp={} fasta_available={} self_alignment_available={}",
                     dataset.id,
                     dataset.name,
                     dataset.assembler,
                     dataset
                         .assembler_version
                         .unwrap_or_else(|| "NULL".to_string()),
+                    dataset.contig_count,
+                    dataset.total_length_bp,
                     dataset.fasta_available,
                     dataset.self_alignment_available
                 );
@@ -397,7 +426,7 @@ fn main() -> Result<()> {
                         .join(",")
                 };
                 println!(
-                    "project id={} name={} version={} reference_id={} primary_dataset_id={} support_dataset_ids={} is_processed={} auto_pipeline_done={} auto_check_new_seq={} phased_assembly_enabled={} description={} created_at={}",
+                    "project id={} name={} version={} reference_id={} primary_dataset_id={} support_dataset_ids={} is_processed={} auto_pipeline_done={} auto_check_new_seq={} phased_assembly_enabled={} chr_assignment_min_coverage_percent={} description={} created_at={}",
                     project.id,
                     project.name,
                     project.version,
@@ -408,6 +437,7 @@ fn main() -> Result<()> {
                     project.auto_pipeline_done,
                     project.auto_check_new_seq,
                     project.phased_assembly_enabled,
+                    project.chr_assignment_min_coverage_percent,
                     project.description.unwrap_or_else(|| "NULL".to_string()),
                     project.created_at
                 );
@@ -435,37 +465,91 @@ fn main() -> Result<()> {
         Commands::InitializeProject {
             workspace_root,
             project_name,
-            reference_genome_id,
-            primary_dataset_id,
-            support_dataset_ids,
-            auto_check_new_seq,
-            phased_assembly_enabled,
-            description,
         } => {
             let project_db_path = workspace_root.join("project.sqlite");
-            let support_dataset_ids = parse_support_dataset_ids(support_dataset_ids)?;
-            let summary = initialize_project(
-                &project_db_path,
-                &ProjectInitializationRequest {
-                    project_name,
-                    reference_genome_id,
-                    primary_dataset_id,
-                    support_dataset_ids,
-                    auto_check_new_seq,
-                    phased_assembly_enabled,
-                    chr_assignment_min_coverage_percent: None,
-                    description,
-                },
-            )?;
+            let summary = initialize_grt_project(&project_db_path, &project_name)?;
             println!("project_id={}", summary.project_id);
             println!("project_name={}", summary.project_name);
             println!("version={}", summary.version);
             println!("reference_genome_id={}", summary.reference_genome_id);
             println!("primary_dataset_id={}", summary.primary_dataset_id);
+            println!(
+                "support_dataset_ids={}",
+                summary
+                    .support_dataset_ids
+                    .iter()
+                    .map(i64::to_string)
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
             println!("project_dataset_count={}", summary.project_dataset_count);
             println!(
                 "phased_assembly_enabled={}",
                 summary.phased_assembly_enabled
+            );
+            println!(
+                "chr_assignment_min_coverage_percent={}",
+                summary.chr_assignment_min_coverage_percent
+            );
+            println!("assembly_seq_count={}", summary.assembly_seq_count);
+            println!("assembly_ctg_count={}", summary.assembly_ctg_count);
+            println!(
+                "materialized_source_card_count={}",
+                summary.materialized_source_card_count
+            );
+            println!(
+                "grt_project_view_json={}",
+                serde_json::to_string(&load_grt_project_view(&project_db_path)?)?
+            );
+        }
+        Commands::GetGrtProjectView {
+            workspace_root,
+            project_id,
+        } => {
+            let project_db_path = workspace_root.join("project.sqlite");
+            ensure_project_exists(&project_db_path, project_id)?;
+            println!(
+                "json={}",
+                serde_json::to_string(&load_grt_project_view(&project_db_path)?)?
+            );
+        }
+        Commands::GetGrtSourceCardTrace {
+            workspace_root,
+            project_id,
+            source_card_key,
+        } => {
+            let project_db_path = workspace_root.join("project.sqlite");
+            ensure_project_exists(&project_db_path, project_id)?;
+            println!(
+                "json={}",
+                serde_json::to_string(&load_grt_source_card_trace(
+                    &project_db_path,
+                    &source_card_key,
+                )?)?
+            );
+        }
+        Commands::GetGrtEventTrace {
+            workspace_root,
+            project_id,
+            event_id,
+        } => {
+            let project_db_path = workspace_root.join("project.sqlite");
+            ensure_project_exists(&project_db_path, project_id)?;
+            println!(
+                "json={}",
+                serde_json::to_string(&load_grt_event_trace(&project_db_path, &event_id)?)?
+            );
+        }
+        Commands::GetGrtEvidence {
+            workspace_root,
+            project_id,
+            evidence_id,
+        } => {
+            let project_db_path = workspace_root.join("project.sqlite");
+            ensure_project_exists(&project_db_path, project_id)?;
+            println!(
+                "json={}",
+                serde_json::to_string(&load_grt_evidence(&project_db_path, &evidence_id)?)?
             );
         }
         Commands::UpdateProject {
@@ -1190,7 +1274,10 @@ fn main() -> Result<()> {
             )?;
             println!("output_dir={}", summary.output_dir.display());
             println!("manifest_path={}", summary.manifest_path.display());
-            println!("prepare_script_path={}", summary.prepare_script_path.display());
+            println!(
+                "prepare_script_path={}",
+                summary.prepare_script_path.display()
+            );
             for script in summary.scripts {
                 println!(
                     "script job_id={} script_path={} out_path={} seqleft_path={} seqright_path={} ctg_path={}",
@@ -1379,6 +1466,18 @@ fn print_add_dataset_outcome(outcome: &AddDatasetImportOutcome) {
     println!("project_id={}", opt_i64(outcome.project_id));
     println!("dataset_id={}", outcome.dataset_id);
     println!("dataset_name={}", outcome.dataset_name);
+}
+
+fn ensure_project_exists(project_db_path: &Path, project_id: i64) -> Result<()> {
+    let options = list_initializer_options(project_db_path)?;
+    if options
+        .existing_projects
+        .iter()
+        .any(|project| project.id == project_id)
+    {
+        return Ok(());
+    }
+    anyhow::bail!("project_id {project_id} does not exist")
 }
 
 fn parse_support_dataset_ids(input: Option<String>) -> Result<Vec<i64>> {

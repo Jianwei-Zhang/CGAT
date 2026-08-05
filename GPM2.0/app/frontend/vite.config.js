@@ -76,6 +76,30 @@ function backendBridgePlugin() {
             return;
           }
 
+          if (url.pathname === "/get-grt-project-view") {
+            const result = await getGrtProjectView(payload);
+            sendJson(res, 200, result);
+            return;
+          }
+
+          if (url.pathname === "/get-grt-source-card-trace") {
+            const result = await getGrtSourceCardTrace(payload);
+            sendJson(res, 200, result);
+            return;
+          }
+
+          if (url.pathname === "/get-grt-event-trace") {
+            const result = await getGrtEventTrace(payload);
+            sendJson(res, 200, result);
+            return;
+          }
+
+          if (url.pathname === "/get-grt-evidence") {
+            const result = await getGrtEvidence(payload);
+            sendJson(res, 200, result);
+            return;
+          }
+
           if (url.pathname === "/update-project") {
             const result = await updateProject(payload);
             sendJson(res, 200, result);
@@ -427,7 +451,7 @@ async function listProjectInitializerOptions(payload) {
     }
 
     const datasetMatch = line.match(
-      /^dataset id=(\d+) name=(.*?) assembler=(.*?) assembler_version=(.*?)(?: fasta_available=(\w+) self_alignment_available=(\w+))?$/,
+      /^dataset id=(\d+) name=(.*?) assembler=(.*?) assembler_version=(.*?) contig_count=(\d+) total_length_bp=(\d+) fasta_available=(\w+) self_alignment_available=(\w+)$/,
     );
     if (datasetMatch) {
       const datasetId = Number(datasetMatch[1]);
@@ -439,15 +463,17 @@ async function listProjectInitializerOptions(payload) {
         name,
         assembler,
         assemblerVersion,
-        fastaAvailable: datasetMatch[5] !== "false",
-        selfAlignmentAvailable: datasetMatch[6] !== "false",
+        contigCount: Number(datasetMatch[5]),
+        totalLengthBp: Number(datasetMatch[6]),
+        fastaAvailable: datasetMatch[7] !== "false",
+        selfAlignmentAvailable: datasetMatch[8] !== "false",
         label: name,
       });
       continue;
     }
 
     const projectMatch = line.match(
-      /^project id=(\d+) name=(.*?) version=(\d+) reference_id=(\d+) primary_dataset_id=(\d+) support_dataset_ids=(.*?) is_processed=(\w+) auto_pipeline_done=(\w+) auto_check_new_seq=(\w+)(?: phased_assembly_enabled=(\w+))? description=(.*?) created_at=(.*)$/,
+      /^project id=(\d+) name=(.*?) version=(\d+) reference_id=(\d+) primary_dataset_id=(\d+) support_dataset_ids=(.*?) is_processed=(\w+) auto_pipeline_done=(\w+) auto_check_new_seq=(\w+) phased_assembly_enabled=(\w+) chr_assignment_min_coverage_percent=([0-9.]+) description=(.*?) created_at=(.*)$/,
     );
     if (projectMatch) {
       const supportDatasetIdsText = projectMatch[6];
@@ -469,14 +495,17 @@ async function listProjectInitializerOptions(payload) {
         autoPipelineDone: projectMatch[8] === "true",
         autoCheckNewSeq: projectMatch[9] === "true",
         phasedAssemblyEnabled: projectMatch[10] === "true",
-        description: normalizeNull(projectMatch[11]),
-        createdAt: projectMatch[12],
+        chrAssignmentMinCoveragePercent: Number(projectMatch[11]),
+        description: normalizeNull(projectMatch[12]),
+        createdAt: projectMatch[13],
       });
     }
   }
 
   return {
     workspaceRoot,
+    packageMetadata: parseJsonLine(output.stdout, "package_metadata_json"),
+    grtRecipe: mapGrtRecipeToApi(parseJsonLine(output.stdout, "grt_recipe_json")),
     references,
     datasets,
     existingProjects,
@@ -484,54 +513,82 @@ async function listProjectInitializerOptions(payload) {
 }
 
 async function initializeProject(payload) {
-  const {
-    workspaceRoot,
-    projectName,
-    referenceGenomeId,
-    primaryDatasetId,
-    supportDatasetIds,
-    phasedAssemblyEnabled,
-  } = payload || {};
+  const { workspaceRoot, projectName } = payload || {};
   requireString("workspaceRoot", workspaceRoot);
   requireString("projectName", projectName);
-  requireNumber("referenceGenomeId", referenceGenomeId);
-  requireNumber("primaryDatasetId", primaryDatasetId);
-  const supportIds = Array.isArray(supportDatasetIds) ? supportDatasetIds : [];
-
-  const args = [
-    "initialize-project",
-    workspaceRoot,
-    projectName,
-    String(referenceGenomeId),
-    String(primaryDatasetId),
-  ];
-
-  if (supportIds.length > 0) {
-    args.push("--support-dataset-ids", supportIds.join(","));
-  }
-  if (typeof phasedAssemblyEnabled === "boolean") {
-    args.push("--phased-assembly-enabled", phasedAssemblyEnabled ? "true" : "false");
-  }
-
-  const output = await runBackend(args);
-  const lines = output.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const record = {};
-  for (const line of lines) {
-    const [key, ...rest] = line.split("=");
-    if (!key || rest.length === 0) {
-      continue;
-    }
-    record[key] = rest.join("=").trim();
-  }
+  const output = await runBackend(["initialize-project", workspaceRoot, projectName]);
+  const record = parseKeyValueLines(output.stdout);
 
   const options = await listProjectInitializerOptions({ workspaceRoot });
   return {
     projectId: Number(record.project_id || 0),
     projectName: record.project_name || projectName,
     version: Number(record.version || 0),
+    referenceGenomeId: Number(record.reference_genome_id || 0),
+    primaryDatasetId: Number(record.primary_dataset_id || 0),
+    supportDatasetIds: parseIdList(record.support_dataset_ids),
+    projectDatasetCount: Number(record.project_dataset_count || 0),
     phasedAssemblyEnabled: record.phased_assembly_enabled === "true",
+    chrAssignmentMinCoveragePercent: Number(
+      record.chr_assignment_min_coverage_percent || 60,
+    ),
+    assemblySeqCount: Number(record.assembly_seq_count || 0),
+    assemblyCtgCount: Number(record.assembly_ctg_count || 0),
+    materializedSourceCardCount: Number(record.materialized_source_card_count || 0),
+    grtProjectView: parseJsonLine(output.stdout, "grt_project_view_json"),
     existingProjects: options.existingProjects,
   };
+}
+
+async function getGrtProjectView(payload) {
+  const { workspaceRoot, projectId } = payload || {};
+  requireString("workspaceRoot", workspaceRoot);
+  requireNumber("projectId", projectId);
+  return runGrtJsonCommand(["get-grt-project-view", workspaceRoot, String(projectId)]);
+}
+
+async function getGrtSourceCardTrace(payload) {
+  const { workspaceRoot, projectId, sourceCardKey } = payload || {};
+  requireString("workspaceRoot", workspaceRoot);
+  requireNumber("projectId", projectId);
+  requireString("sourceCardKey", sourceCardKey);
+  return runGrtJsonCommand([
+    "get-grt-source-card-trace",
+    workspaceRoot,
+    String(projectId),
+    sourceCardKey,
+  ]);
+}
+
+async function getGrtEventTrace(payload) {
+  const { workspaceRoot, projectId, eventId } = payload || {};
+  requireString("workspaceRoot", workspaceRoot);
+  requireNumber("projectId", projectId);
+  requireString("eventId", eventId);
+  return runGrtJsonCommand([
+    "get-grt-event-trace",
+    workspaceRoot,
+    String(projectId),
+    eventId,
+  ]);
+}
+
+async function getGrtEvidence(payload) {
+  const { workspaceRoot, projectId, evidenceId } = payload || {};
+  requireString("workspaceRoot", workspaceRoot);
+  requireNumber("projectId", projectId);
+  requireString("evidenceId", evidenceId);
+  return runGrtJsonCommand([
+    "get-grt-evidence",
+    workspaceRoot,
+    String(projectId),
+    evidenceId,
+  ]);
+}
+
+async function runGrtJsonCommand(args) {
+  const output = await runBackend(args);
+  return parseJsonLine(output.stdout, "json");
 }
 
 async function updateProject(payload) {
@@ -1792,6 +1849,47 @@ function parseJsonObject(value) {
   } catch {
     return {};
   }
+}
+
+function parseJsonLine(stdout, key) {
+  const prefix = `${key}=`;
+  const line = stdout
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(prefix));
+  if (!line) {
+    throw new Error(`backend output missing ${key}`);
+  }
+  try {
+    return JSON.parse(line.slice(prefix.length));
+  } catch (error) {
+    throw new Error(`backend output contains invalid ${key}: ${error.message}`);
+  }
+}
+
+function parseIdList(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => Number(item.trim()))
+    .filter((item) => Number.isFinite(item) && item > 0);
+}
+
+function mapGrtRecipeToApi(recipe) {
+  return {
+    workflow: recipe.workflow || "",
+    schemaVersion: recipe.schema_version || "",
+    finalPathSchemaVersion: recipe.final_path_schema_version || "",
+    recipeId: recipe.recipe_id || "",
+    primaryDataset: recipe.primary_dataset || "",
+    supportDatasets: Array.isArray(recipe.support_datasets) ? recipe.support_datasets : [],
+    readsQcEnabled: Boolean(recipe.reads_qc_enabled),
+    donorSetId: recipe.donor_set_id || "",
+    telDonorSetId: recipe.tel_donor_set_id || "",
+    q0Relpath: recipe.q0_relpath || "",
+    finalQRelpath: recipe.final_q_relpath || "",
+    q0ArtifactSha256: recipe.q0_artifact_sha256 || "",
+    q4ArtifactSha256: recipe.q4_artifact_sha256 || "",
+  };
 }
 
 function normalizeNullableText(value) {

@@ -2,6 +2,17 @@ import { t } from "../ui/i18n/index.js";
 import { invokeCommand, isTauriRuntime, listenBackendEvent } from "./backend-api.js";
 
 const mockStore = {
+  grtRecipe: {
+    workflow: "gpm_grt_precomputed_v1",
+    schemaVersion: "1",
+    finalPathSchemaVersion: "1",
+    recipeId: "mock-grt-recipe",
+    primaryDataset: "hifiasm",
+    supportDatasets: ["flye", "wtdbg2"],
+    readsQcEnabled: false,
+    donorSetId: "mock-d0",
+    telDonorSetId: "mock-dtel",
+  },
   packageMetadata: {
     packageMode: "fast",
     sequenceLayout: "partitioned",
@@ -221,32 +232,17 @@ export async function deleteWorkspaceDirectory({ workspaceRoot }) {
 export async function initializeProject({
   workspaceRoot,
   projectName,
-  referenceGenomeId,
-  primaryDatasetId,
-  supportDatasetIds,
-  chrAssignmentMinCoveragePercent = 60,
-  phasedAssemblyEnabled = false,
 }) {
   if (isTauriRuntime()) {
     return initializeProjectTauri({
       workspaceRoot,
       projectName,
-      referenceGenomeId,
-      primaryDatasetId,
-      supportDatasetIds,
-      chrAssignmentMinCoveragePercent,
-      phasedAssemblyEnabled,
     });
   }
   try {
     return await callDevBridge("/api/initialize-project", {
       workspaceRoot,
       projectName,
-      referenceGenomeId,
-      primaryDatasetId,
-      supportDatasetIds,
-      chrAssignmentMinCoveragePercent,
-      phasedAssemblyEnabled,
     });
   } catch {
     // fallback to mock flow
@@ -254,12 +250,90 @@ export async function initializeProject({
   return initializeProjectMock({
     workspaceRoot,
     projectName,
-    referenceGenomeId,
-    primaryDatasetId,
-    supportDatasetIds,
-    chrAssignmentMinCoveragePercent,
-    phasedAssemblyEnabled,
   });
+}
+
+export async function getGrtProjectView({ workspaceRoot, projectId }) {
+  if (isTauriRuntime()) {
+    return invokeCommand("get_grt_project_view", { workspaceRoot, projectId });
+  }
+  try {
+    return await callDevBridge("/api/get-grt-project-view", { workspaceRoot, projectId });
+  } catch {
+    // fallback to mock flow
+  }
+  return buildMockGrtProjectView();
+}
+
+export async function getGrtSourceCardTrace({ workspaceRoot, projectId, sourceCardKey }) {
+  if (isTauriRuntime()) {
+    return invokeCommand("get_grt_source_card_trace", {
+      workspaceRoot,
+      projectId,
+      sourceCardKey,
+    });
+  }
+  try {
+    return await callDevBridge("/api/get-grt-source-card-trace", {
+      workspaceRoot,
+      projectId,
+      sourceCardKey,
+    });
+  } catch {
+    // fallback to mock flow
+  }
+  const view = buildMockGrtProjectView();
+  const sourceCard = view.source_cards.find(
+    (card) => String(card.source_card_key || "") === String(sourceCardKey || ""),
+  );
+  return {
+    source_card: sourceCard || {},
+    accepted_events: [],
+    final_path_segments: [],
+    ref_evidence: [],
+    pairwise_evidence: [],
+    donor_usage: [],
+    donor_members: [],
+    donor_sets: [],
+  };
+}
+
+export async function getGrtEventTrace({ workspaceRoot, projectId, eventId }) {
+  if (isTauriRuntime()) {
+    return invokeCommand("get_grt_event_trace", { workspaceRoot, projectId, eventId });
+  }
+  try {
+    return await callDevBridge("/api/get-grt-event-trace", {
+      workspaceRoot,
+      projectId,
+      eventId,
+    });
+  } catch {
+    // fallback to mock flow
+  }
+  return {
+    event: { event_id: eventId },
+    evidence: [],
+    donor_usage: [],
+    final_path_segment: null,
+    source_card: null,
+  };
+}
+
+export async function getGrtEvidence({ workspaceRoot, projectId, evidenceId }) {
+  if (isTauriRuntime()) {
+    return invokeCommand("get_grt_evidence", { workspaceRoot, projectId, evidenceId });
+  }
+  try {
+    return await callDevBridge("/api/get-grt-evidence", {
+      workspaceRoot,
+      projectId,
+      evidenceId,
+    });
+  } catch {
+    // fallback to mock flow
+  }
+  return { evidence_id: evidenceId, status: "mock" };
 }
 
 export async function deleteProject({ workspaceRoot, projectId }) {
@@ -1141,6 +1215,7 @@ async function listProjectInitializerOptionsMock({ workspaceRoot }) {
   await sleep(200);
   return {
     workspaceRoot,
+    grtRecipe: mockStore.grtRecipe,
     packageMetadata: mockStore.packageMetadata,
     references: mockStore.references,
     datasets: mockStore.datasets,
@@ -1151,17 +1226,21 @@ async function listProjectInitializerOptionsMock({ workspaceRoot }) {
 async function initializeProjectMock({
   workspaceRoot,
   projectName,
-  referenceGenomeId,
-  primaryDatasetId,
-  supportDatasetIds,
-  chrAssignmentMinCoveragePercent = 60,
-  phasedAssemblyEnabled = false,
 }) {
   await sleep(240);
   const effectiveThreshold = Number(
     mockStore.packageMetadata?.chrAssignmentMinCoveragePercent ?? 60,
   );
   const projectId = mockStore.existingProjects.length + 1;
+  const referenceGenomeId = Number(mockStore.references[0]?.referenceGenomeId || 1);
+  const primaryDatasetId = Number(
+    mockStore.datasets.find((dataset) => dataset.label === mockStore.grtRecipe.primaryDataset)?.datasetId
+      || mockStore.datasets[0]?.datasetId
+      || 1,
+  );
+  const supportDatasetIds = mockStore.grtRecipe.supportDatasets
+    .map((name) => mockStore.datasets.find((dataset) => dataset.label === name)?.datasetId)
+    .filter((datasetId) => Number(datasetId) > 0);
   mockStore.existingProjects = [
     ...mockStore.existingProjects,
     {
@@ -1171,9 +1250,9 @@ async function initializeProjectMock({
       primaryDatasetId,
       supportDatasetIds: [...supportDatasetIds],
       chrAssignmentMinCoveragePercent: effectiveThreshold,
-      phasedAssemblyEnabled: Boolean(phasedAssemblyEnabled),
-      isProcessed: false,
-      autoPipelineDone: false,
+      phasedAssemblyEnabled: false,
+      isProcessed: true,
+      autoPipelineDone: true,
       workspaceRoot,
     },
   ];
@@ -1181,9 +1260,34 @@ async function initializeProjectMock({
     projectId,
     projectName,
     chrAssignmentMinCoveragePercent: effectiveThreshold,
-    phasedAssemblyEnabled: Boolean(phasedAssemblyEnabled),
+    phasedAssemblyEnabled: false,
     supportDatasetIds: [...supportDatasetIds],
     existingProjects: mockStore.existingProjects,
+    grtProjectView: buildMockGrtProjectView(),
+  };
+}
+
+function buildMockGrtProjectView() {
+  return {
+    recipe: {
+      workflow: mockStore.grtRecipe.workflow,
+      schema_version: mockStore.grtRecipe.schemaVersion,
+      final_path_schema_version: mockStore.grtRecipe.finalPathSchemaVersion,
+      recipe_id: mockStore.grtRecipe.recipeId,
+      primary_dataset: mockStore.grtRecipe.primaryDataset,
+      support_datasets: [...mockStore.grtRecipe.supportDatasets],
+      reads_qc_enabled: mockStore.grtRecipe.readsQcEnabled,
+      donor_set_id: mockStore.grtRecipe.donorSetId,
+      tel_donor_set_id: mockStore.grtRecipe.telDonorSetId,
+    },
+    final_path_by_chr: {},
+    object_attempts: [],
+    source_cards: [],
+    verification: {
+      chromosome_count: 0,
+      segment_count: 0,
+      q4_artifact_sha256: "",
+    },
   };
 }
 
@@ -2266,6 +2370,7 @@ async function listProjectInitializerOptionsTauri({ workspaceRoot }) {
       selfAlignmentScope: "chr_partition",
       crossAlignmentScope: "chr_partition",
     },
+    grtRecipe: result.grtRecipe || null,
     references: result.references || [],
     datasets: result.datasets || [],
     existingProjects: result.existingProjects || [],
@@ -2286,6 +2391,7 @@ async function openWorkspaceTauri({ workspaceRoot }) {
       selfAlignmentScope: "chr_partition",
       crossAlignmentScope: "chr_partition",
     },
+    grtRecipe: result.grtRecipe || null,
     references: result.references || [],
     datasets: result.datasets || [],
     existingProjects: result.existingProjects || [],
@@ -2307,27 +2413,19 @@ async function deleteWorkspaceDirectoryTauri({ workspaceRoot }) {
 async function initializeProjectTauri({
   workspaceRoot,
   projectName,
-  referenceGenomeId,
-  primaryDatasetId,
-  supportDatasetIds,
-  chrAssignmentMinCoveragePercent = 60,
-  phasedAssemblyEnabled = false,
 }) {
   const result = await invokeCommand("initialize_project", {
     workspaceRoot,
     projectName,
-    referenceGenomeId,
-    primaryDatasetId,
-    supportDatasetIds,
-    chrAssignmentMinCoveragePercent,
-    phasedAssemblyEnabled,
   });
   return {
     projectId: result.projectId,
     projectName: result.projectName || projectName,
     chrAssignmentMinCoveragePercent:
-      result.chrAssignmentMinCoveragePercent ?? chrAssignmentMinCoveragePercent,
+      result.chrAssignmentMinCoveragePercent ?? 60,
     phasedAssemblyEnabled: Boolean(result.phasedAssemblyEnabled),
+    supportDatasetIds: result.supportDatasetIds || [],
+    grtProjectView: result.grtProjectView || null,
     existingProjects: result.existingProjects || [],
   };
 }

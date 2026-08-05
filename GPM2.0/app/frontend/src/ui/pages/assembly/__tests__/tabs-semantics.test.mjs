@@ -7,6 +7,7 @@ import {
   addCtgToPhasedChrTrack,
   createPhasedChrTrack,
   initializeProject,
+  updateProject,
 } from "../../../../services/workflow-api.js";
 
 import { bindAssemblyPage as bindAssemblyPageImpl } from "../bindings.js";
@@ -4815,10 +4816,17 @@ test("creating a phased track refreshes only the main assembly card", async () =
     const created = await initializeProject({
       workspaceRoot: "/tmp/workspace",
       projectName: `project-phased-local-refresh-${Date.now()}`,
+    });
+    await updateProject({
+      workspaceRoot: "/tmp/workspace",
+      projectId: created.projectId,
+      projectName: created.projectName,
       referenceGenomeId: 1,
       primaryDatasetId: 1,
-      supportDatasetIds: [],
+      supportDatasetIds: created.supportDatasetIds,
+      chrAssignmentMinCoveragePercent: 60,
       phasedAssemblyEnabled: true,
+      stateOrLocale: { locale: "en" },
     });
     const store = createStore(createState({
       session: {
@@ -5107,10 +5115,17 @@ test("removing a phased track item refreshes only the main assembly card", async
     const created = await initializeProject({
       workspaceRoot: "/tmp/workspace",
       projectName: `project-phased-remove-local-refresh-${Date.now()}`,
+    });
+    await updateProject({
+      workspaceRoot: "/tmp/workspace",
+      projectId: created.projectId,
+      projectName: created.projectName,
       referenceGenomeId: 1,
       primaryDatasetId: 1,
-      supportDatasetIds: [],
+      supportDatasetIds: created.supportDatasetIds,
+      chrAssignmentMinCoveragePercent: 60,
       phasedAssemblyEnabled: true,
+      stateOrLocale: { locale: "en" },
     });
     const createdTrack = await createPhasedChrTrack({
       workspaceRoot: "/tmp/workspace",

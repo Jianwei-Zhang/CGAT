@@ -3887,3 +3887,119 @@ select {
   font-size: 11px;
   word-break: break-all;
 }
+.workspace-locked-recipe {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted, #f7f8fa);
+}
+
+.workspace-locked-recipe p {
+  margin: 4px 0;
+}
+
+.grt-status-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid #6686a8;
+  background: #e8f2ff;
+  color: #214e78;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.grt-status-badge[role="button"] {
+  cursor: pointer;
+}
+
+.grt-status-badge.is-grt_promoted {
+  border-color: #8b6bb3;
+  background: #f1eaff;
+  color: #563783;
+}
+
+.grt-status-badge.is-cross_chr_grt_usage {
+  border-color: #b97932;
+  background: #fff0da;
+  color: #7a4514;
+}
+
+.grt-status-badge.is-unresolved {
+  border-color: #ba7a14;
+  background: #fff4d6;
+  color: #704400;
+}
+
+.grt-trace-panel {
+  margin-top: 12px;
+}
+
+.grt-trace-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.grt-trace-grid section {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.grt-trace-grid h5 {
+  margin: 0 0 8px;
+}
+
+.grt-trace-grid ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.grt-trace-grid li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.grt-trace-detail {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.grt-trace-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.grt-trace-json {
+  max-height: 360px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 8px;
+  background: #111827;
+  color: #e5eefb;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 980px) {
+  .grt-trace-grid {
+    grid-template-columns: 1fr;
+  }
+}

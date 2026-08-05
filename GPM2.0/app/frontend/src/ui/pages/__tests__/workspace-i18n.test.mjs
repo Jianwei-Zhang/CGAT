@@ -44,6 +44,13 @@ function createState(overrides = {}) {
         selfAlignmentScope: "chr_partition",
         crossAlignmentScope: "chr_partition",
       },
+      grtRecipe: {
+        workflow: "gpm_grt_precomputed_v1",
+        recipeId: "recipe-test",
+        primaryDataset: "hifiasm",
+        supportDatasets: ["flye", "canu"],
+        readsQcEnabled: false,
+      },
       autoPipelineModalOpen: false,
       autoPipelineRunning: false,
       autoPipelineCanClose: true,
@@ -271,121 +278,21 @@ test("workspace page renders english create-project modal labels", () => {
   assert.match(html, />Create New Project</);
   assert.match(html, />Close</);
   assert.match(html, />Project Name</);
-  assert.match(html, />Reference Genome</);
+  assert.match(html, />Locked GRT recipe</);
   assert.match(html, />Primary Dataset</);
   assert.match(html, />Support Dataset</);
+  assert.match(html, />Reads QC</);
+  assert.match(html, />Primary Dataset<\/strong> hifiasm/);
+  assert.match(html, />Support Dataset<\/strong> flye, canu/);
   assert.match(html, />Cancel</);
+  assert.doesNotMatch(html, /id="initializer-reference-select"/);
+  assert.doesNotMatch(html, /id="initializer-primary-dataset-select"/);
+  assert.doesNotMatch(html, /id="initializer-support-dataset-list"/);
+  assert.doesNotMatch(html, /id="initializer-chr-assignment-threshold-input"/);
+  assert.doesNotMatch(html, /id="initializer-phased-assembly-enabled-input"/);
 });
 
-test("workspace create-project modal renders server-owned chr assignment threshold as disabled", () => {
-  const html = renderWorkspacePage(createState({
-    initializer: {
-      createModalOpen: true,
-      chrAssignmentMinCoveragePercentInput: "72.5",
-      packageMetadata: {
-        packageMode: "fast",
-        sequenceLayout: "partitioned",
-        preassignedChr: true,
-        chrAssignmentMinCoveragePercent: 72.5,
-        selfAlignmentScope: "chr_partition",
-        crossAlignmentScope: "chr_partition",
-      },
-    },
-  }));
-
-  assert.match(
-    html,
-    />Chr assignment threshold \(%\)<span class="muted"> fixed by the imported server delivery package and used on the server for chromosome grouping<\/span><\/label>/,
-  );
-  assert.match(
-    html,
-    /<input\s+id="initializer-chr-assignment-threshold-input"[\s\S]*?value="72\.5"[\s\S]*?disabled[\s\S]*?\/>/,
-  );
-});
-
-test("workspace create-project modal renders phased assembly switch off by default", () => {
-  const html = renderWorkspacePage(createState({
-    initializer: {
-      createModalOpen: true,
-    },
-  }));
-
-  assert.match(html, /Enable phased assembly/);
-  assert.match(
-    html,
-    /<input\s+id="initializer-phased-assembly-enabled-input"[\s\S]*?type="checkbox"[\s\S]*?role="switch"[\s\S]*?\/>/,
-  );
-  assert.doesNotMatch(
-    html,
-    /<input\s+id="initializer-phased-assembly-enabled-input"[\s\S]*?checked[\s\S]*?\/>/,
-  );
-});
-
-test("workspace create-project phased assembly switch updates the create draft", async () => {
-  const phasedAssemblyCheckbox = createCheckbox(false);
-  const host = createRouteHost({
-    "#initializer-phased-assembly-enabled-input": phasedAssemblyCheckbox,
-  });
-  const store = createStore(createState({
-    initializer: {
-      createModalOpen: true,
-      phasedAssemblyEnabledInput: false,
-    },
-  }));
-
-  bindWorkspacePage(host, store);
-  await phasedAssemblyCheckbox.change(true);
-
-  assert.equal(store.getState().initializer.phasedAssemblyEnabledInput, true);
-  assert.equal(host.renderCount, 0);
-});
-
-test("workspace create-project modal renders server-owned chr assignment threshold as disabled for server delivery packages", () => {
-  const html = renderWorkspacePage(createState({
-    initializer: {
-      createModalOpen: true,
-      chrAssignmentMinCoveragePercentInput: "72",
-      packageMetadata: {
-        packageMode: "fast",
-        sequenceLayout: "partitioned",
-        preassignedChr: true,
-        chrAssignmentMinCoveragePercent: 72,
-        selfAlignmentScope: "chr_partition",
-        crossAlignmentScope: "chr_partition",
-      },
-    },
-  }));
-
-  assert.match(
-    html,
-    />Chr assignment threshold \(%\)<span class="muted"> fixed by the imported server delivery package and used on the server for chromosome grouping<\/span><\/label>/,
-  );
-  assert.match(
-    html,
-    /<input\s+id="initializer-chr-assignment-threshold-input"[\s\S]*?value="72"[\s\S]*?disabled[\s\S]*?\/>/,
-  );
-});
-
-test("workspace page renders english dataset option summaries when locale is en", () => {
-  const html = renderWorkspacePage(createState({
-    initializer: {
-      createModalOpen: true,
-      datasets: [
-        {
-          datasetId: 2,
-          name: "canu2",
-          contigCount: 1234,
-          totalLengthBp: 567890,
-        },
-      ],
-    },
-  }));
-
-  assert.match(html, /canu2 \(contigs = 1,234, total length = 567,890 bp\)/);
-  assert.doesNotMatch(html, /contig数/);
-});
-
-test("processed projects render only unsafe selected-project fields as locked", () => {
+test("selected GRT project renders immutable recipe fields and an editable name only", () => {
   const html = renderWorkspacePage(createState({
     session: {
       projectId: 7,
@@ -405,17 +312,15 @@ test("processed projects render only unsafe selected-project fields as locked", 
           isProcessed: true,
         },
       ],
-      references: [{ referenceId: 1, name: "ref_a" }],
+      references: [{ referenceGenomeId: 1, name: "ref_a" }],
       datasets: [
         { datasetId: 11, name: "hifiasm", contigCount: 10, totalLengthBp: 1000 },
         { datasetId: 12, name: "flye", contigCount: 11, totalLengthBp: 2000 },
         { datasetId: 14, name: "canu", contigCount: 12, totalLengthBp: 3000 },
       ],
-      editPhasedAssemblyEnabledInput: true,
     },
   }));
 
-  assert.match(html, />Chr assignment threshold \(%\)<span class="muted"> fixed by the imported server delivery package and used on the server for chromosome grouping<\/span><\/label>/);
   assert.match(
     html,
     /<input\s+id="selected-project-name-input"[\s\S]*?value="project_locked"[\s\S]*?\/>/,
@@ -424,26 +329,15 @@ test("processed projects render only unsafe selected-project fields as locked", 
     html.match(/<input\s+id="selected-project-name-input"[\s\S]*?\/>/)?.[0] || "",
     /disabled/,
   );
-  assert.match(
-    html,
-    /<input\s+id="selected-project-chr-assignment-threshold-input"[\s\S]*?value="60"[\s\S]*?disabled[\s\S]*?\/>/,
-  );
-  assert.match(
-    html,
-    /data-edit-support-dataset-id="12" checked disabled/,
-  );
-  assert.match(
-    html,
-    /data-edit-support-dataset-id="14"\s+ \/>canu/,
-  );
-  assert.match(
-    html,
-    /<input\s+id="selected-project-phased-assembly-enabled-input"[\s\S]*?checked[\s\S]*?disabled[\s\S]*?\/>/,
-  );
-  assert.match(
-    html,
-    />This project has entered assembly: you can rename it, append support datasets, and enable phased assembly; reference, primary dataset, and chr assignment threshold stay locked\.<\/p>/,
-  );
+  assert.match(html, />Reference Genome<\/strong> ref_a/);
+  assert.match(html, />Primary Dataset<\/strong> hifiasm/);
+  assert.match(html, />Support Dataset<\/strong> flye, canu/);
+  assert.match(html, /Only the project name can be changed here/);
+  assert.doesNotMatch(html, /id="selected-project-reference-select"/);
+  assert.doesNotMatch(html, /id="selected-project-primary-dataset-select"/);
+  assert.doesNotMatch(html, /id="selected-project-support-dataset-list"/);
+  assert.doesNotMatch(html, /id="selected-project-chr-assignment-threshold-input"/);
+  assert.doesNotMatch(html, /id="selected-project-phased-assembly-enabled-input"/);
 });
 
 test("processed selected-project name input mutates the edit draft", async () => {
@@ -529,7 +423,7 @@ test("processed selected-project phased assembly switch does not mutate the edit
   assert.equal(host.renderCount, 0);
 });
 
-test("selected-project phased assembly switch can be saved before assembly starts", async () => {
+test("synthetic legacy phased control is ignored", async () => {
   const previousWindow = globalThis.window;
   const previousDocument = globalThis.document;
   const phasedAssemblyCheckbox = createCheckbox(true);
@@ -611,20 +505,20 @@ test("selected-project phased assembly switch can be saved before assembly start
 
     bindWorkspacePage(host, store);
     await phasedAssemblyCheckbox.change(false);
-    assert.equal(store.getState().initializer.editPhasedAssemblyEnabledInput, false);
+    assert.equal(store.getState().initializer.editPhasedAssemblyEnabledInput, true);
 
     await saveButton.click();
 
-    assert.equal(calls.length, 1);
-    assert.equal(store.getState().initializer.existingProjects[0].phasedAssemblyEnabled, false);
-    assert.equal(store.getState().initializer.editPhasedAssemblyEnabledInput, false);
+    assert.equal(calls.length, 0);
+    assert.equal(store.getState().initializer.existingProjects[0].phasedAssemblyEnabled, true);
+    assert.equal(store.getState().initializer.editPhasedAssemblyEnabledInput, true);
   } finally {
     globalThis.window = previousWindow;
     globalThis.document = previousDocument;
   }
 });
 
-test("selected-project primary and support dataset changes persist before assembly starts", async () => {
+test("selected-project rename preserves the locked GRT recipe fields", async () => {
   const previousWindow = globalThis.window;
   const previousDocument = globalThis.document;
   const projectNameInput = createInput("project_editable");
@@ -657,17 +551,17 @@ test("selected-project primary and support dataset changes persist before assemb
             assert.equal(command, "update_project");
             assert.equal(args.projectId, 7);
             assert.equal(args.projectName, "project_renamed");
-            assert.equal(args.referenceGenomeId, 2);
-            assert.equal(args.primaryDatasetId, 13);
-            assert.deepEqual(args.supportDatasetIds, [12, 14]);
-            assert.equal(args.phasedAssemblyEnabled, true);
+            assert.equal(args.referenceGenomeId, 1);
+            assert.equal(args.primaryDatasetId, 11);
+            assert.deepEqual(args.supportDatasetIds, [12]);
+            assert.equal(args.phasedAssemblyEnabled, false);
             return {
               projectId: 7,
               projectName: "project_renamed",
-              referenceGenomeId: 2,
-              primaryDatasetId: 13,
-              supportDatasetIds: [12, 14],
-              phasedAssemblyEnabled: true,
+              referenceGenomeId: 1,
+              primaryDatasetId: 11,
+              supportDatasetIds: [12],
+              phasedAssemblyEnabled: false,
               chrAssignmentMinCoveragePercent: 60,
               isProcessed: false,
             };
@@ -734,21 +628,21 @@ test("selected-project primary and support dataset changes persist before assemb
     assert.equal(store.getState().session.projectName, "project_renamed");
     assert.equal(store.getState().initializer.existingProjects.length, 1);
     assert.equal(store.getState().initializer.existingProjects[0].projectName, "project_renamed");
-    assert.equal(store.getState().initializer.existingProjects[0].referenceGenomeId, 2);
-    assert.equal(store.getState().initializer.existingProjects[0].primaryDatasetId, 13);
-    assert.deepEqual(store.getState().initializer.existingProjects[0].supportDatasetIds, [12, 14]);
-    assert.equal(store.getState().initializer.existingProjects[0].phasedAssemblyEnabled, true);
+    assert.equal(store.getState().initializer.existingProjects[0].referenceGenomeId, 1);
+    assert.equal(store.getState().initializer.existingProjects[0].primaryDatasetId, 11);
+    assert.deepEqual(store.getState().initializer.existingProjects[0].supportDatasetIds, [12]);
+    assert.equal(store.getState().initializer.existingProjects[0].phasedAssemblyEnabled, false);
     assert.equal(store.getState().initializer.editProjectNameInput, "project_renamed");
-    assert.equal(store.getState().initializer.editPrimaryDatasetId, "13");
-    assert.deepEqual(store.getState().initializer.editSupportDatasetIds, [12, 14]);
-    assert.equal(store.getState().initializer.editPhasedAssemblyEnabledInput, true);
+    assert.equal(store.getState().initializer.editPrimaryDatasetId, "11");
+    assert.deepEqual(store.getState().initializer.editSupportDatasetIds, [12]);
+    assert.equal(store.getState().initializer.editPhasedAssemblyEnabledInput, false);
   } finally {
     globalThis.window = previousWindow;
     globalThis.document = previousDocument;
   }
 });
 
-test("processed selected-project panel saves rename, support append, and phased enablement", async () => {
+test("processed selected-project rename ignores synthetic legacy recipe controls", async () => {
   const previousWindow = globalThis.window;
   const previousDocument = globalThis.document;
   const projectNameInput = createInput("project_processed");
@@ -785,15 +679,15 @@ test("processed selected-project panel saves rename, support append, and phased 
               assert.equal(args.projectName, "project_processed_renamed");
               assert.equal(args.referenceGenomeId, 1);
               assert.equal(args.primaryDatasetId, 11);
-              assert.deepEqual(args.supportDatasetIds, [12, 14]);
-              assert.equal(args.phasedAssemblyEnabled, true);
+              assert.deepEqual(args.supportDatasetIds, [12]);
+              assert.equal(args.phasedAssemblyEnabled, false);
               return {
                 projectId: 7,
                 projectName: "project_processed_renamed",
                 referenceGenomeId: 1,
                 primaryDatasetId: 11,
-                supportDatasetIds: [12, 14],
-                phasedAssemblyEnabled: true,
+                supportDatasetIds: [12],
+                phasedAssemblyEnabled: false,
                 chrAssignmentMinCoveragePercent: 60,
                 isProcessed: true,
               };
@@ -871,32 +765,22 @@ test("processed selected-project panel saves rename, support append, and phased 
     await phasedAssemblyCheckbox.change(true);
     await saveButton.click();
 
-    assert.equal(calls.length, 2);
-    assert.deepEqual(calls.map((call) => call.command), [
-      "update_project",
-      "auto_orient_contigs_for_dataset",
-    ]);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls.map((call) => call.command), ["update_project"]);
     assert.equal(store.getState().session.projectName, "project_processed_renamed");
     assert.equal(store.getState().initializer.existingProjects[0].projectName, "project_processed_renamed");
     assert.equal(store.getState().initializer.existingProjects[0].referenceGenomeId, 1);
     assert.equal(store.getState().initializer.existingProjects[0].primaryDatasetId, 11);
-    assert.deepEqual(store.getState().initializer.existingProjects[0].supportDatasetIds, [12, 14]);
-    assert.equal(store.getState().initializer.existingProjects[0].phasedAssemblyEnabled, true);
+    assert.deepEqual(store.getState().initializer.existingProjects[0].supportDatasetIds, [12]);
+    assert.equal(store.getState().initializer.existingProjects[0].phasedAssemblyEnabled, false);
     assert.equal(store.getState().initializer.editProjectNameInput, "project_processed_renamed");
     assert.equal(store.getState().initializer.editReferenceId, "1");
     assert.equal(store.getState().initializer.editPrimaryDatasetId, "11");
-    assert.deepEqual(store.getState().initializer.editSupportDatasetIds, [12, 14]);
-    assert.equal(store.getState().initializer.editPhasedAssemblyEnabledInput, true);
-    assert.equal(store.getState().initializer.autoPipelineModalOpen, true);
+    assert.deepEqual(store.getState().initializer.editSupportDatasetIds, [12]);
+    assert.equal(store.getState().initializer.editPhasedAssemblyEnabledInput, false);
+    assert.equal(store.getState().initializer.autoPipelineModalOpen, false);
     assert.equal(store.getState().initializer.autoPipelineRunning, false);
-    assert.deepEqual(
-      store.getState().initializer.autoPipelineSteps.map((step) => [step.id, step.status]),
-      [
-        ["save_project", "done"],
-        ["append_support", "done"],
-        ["auto_orient_dataset", "done"],
-      ],
-    );
+    assert.deepEqual(store.getState().initializer.autoPipelineSteps, []);
   } finally {
     globalThis.window = previousWindow;
     globalThis.document = previousDocument;
@@ -929,7 +813,7 @@ test("workspace auto pipeline marks local chr assignment as skipped for server p
   );
 });
 
-test("create project uses the imported server chr assignment threshold", async () => {
+test("create project ignores legacy draft fields and uses the locked GRT recipe", async () => {
   const previousWindow = globalThis.window;
   try {
     globalThis.window = {};
@@ -971,10 +855,16 @@ test("create project uses the imported server chr assignment threshold", async (
       (project) => project.projectName === "project_custom_threshold",
     );
     assert.ok(createdProject, "expected project to be created");
+    assert.equal(createdProject.referenceGenomeId, 1);
+    assert.equal(createdProject.primaryDatasetId, 1);
+    assert.deepEqual(createdProject.supportDatasetIds, [2, 3]);
     assert.equal(createdProject.chrAssignmentMinCoveragePercent, 60);
-    assert.equal(createdProject.phasedAssemblyEnabled, true);
+    assert.equal(createdProject.phasedAssemblyEnabled, false);
+    assert.equal(createdProject.isProcessed, true);
+    assert.equal(createdProject.autoPipelineDone, true);
     assert.equal(store.getState().initializer.editChrAssignmentMinCoveragePercentInput, "60");
-    assert.equal(store.getState().initializer.editPhasedAssemblyEnabledInput, true);
+    assert.equal(store.getState().initializer.editPhasedAssemblyEnabledInput, false);
+    assert.equal(store.getState().assembly.grtProjectView.recipe.recipeId, "mock-grt-recipe");
   } finally {
     globalThis.window = previousWindow;
   }

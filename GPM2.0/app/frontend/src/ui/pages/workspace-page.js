@@ -16,6 +16,7 @@ import {
   restoreAssemblyState,
 } from "../shell/assembly-session-cache.js";
 import { buildEmptyProjectExportState } from "../shell/session-switchers.js";
+import { buildEmptyGrtTraceState, normalizeGrtProjectView } from "./assembly/grt-state.js";
 
 function buildEmptyAssemblyViewState(stateOrLocale) {
   return {
@@ -67,6 +68,16 @@ function buildEmptyAssemblyViewState(stateOrLocale) {
     supportMirroredCtgs: [],
     supportDsCtgLenRulesByChr: {},
     supportDsCtgLenRulesDialogOpen: false,
+    finalPathByChr: {},
+    finalPathViewMode: "graph",
+    grtProjectView: {
+      recipe: {},
+      baselineFinalPathByChr: {},
+      objectAttempts: [],
+      sourceCards: [],
+      verification: {},
+    },
+    grtTrace: buildEmptyGrtTraceState(),
     hiddenPrimaryCtgIds: [],
     hiddenPrimaryCtgIdsByChr: {},
     trackDragOffsets: [],
@@ -185,29 +196,11 @@ export function bindWorkspacePage(host, store) {
   const enterAssemblyButton = host.querySelector("#initializer-enter-assembly-button");
 
   const createProjectNameInput = host.querySelector("#initializer-project-name-input");
-  const createReferenceSelect = host.querySelector("#initializer-reference-select");
-  const createPrimaryDatasetSelect = host.querySelector("#initializer-primary-dataset-select");
-  const createSupportDatasetList = host.querySelector("#initializer-support-dataset-list");
-  const createChrAssignmentThresholdInput = host.querySelector(
-    "#initializer-chr-assignment-threshold-input",
-  );
-  const createPhasedAssemblyCheckbox = host.querySelector(
-    "#initializer-phased-assembly-enabled-input",
-  );
 
   const projectSelectButtons = host.querySelectorAll("[data-project-select-id]");
   const projectDeleteButtons = host.querySelectorAll("[data-project-delete-id]");
 
   const editProjectNameInput = host.querySelector("#selected-project-name-input");
-  const editReferenceSelect = host.querySelector("#selected-project-reference-select");
-  const editPrimaryDatasetSelect = host.querySelector("#selected-project-primary-dataset-select");
-  const editSupportDatasetList = host.querySelector("#selected-project-support-dataset-list");
-  const editChrAssignmentThresholdInput = host.querySelector(
-    "#selected-project-chr-assignment-threshold-input",
-  );
-  const editPhasedAssemblyCheckbox = host.querySelector(
-    "#selected-project-phased-assembly-enabled-input",
-  );
   const saveSelectedProjectButton = host.querySelector("#selected-project-save-button");
 
   openCreateModalButton?.addEventListener("click", () => {
@@ -286,97 +279,6 @@ export function bindWorkspacePage(host, store) {
       initializer: {
         ...current,
         projectNameInput: String(event.target.value || "").trim(),
-      },
-    });
-  });
-
-  createReferenceSelect?.addEventListener("change", (event) => {
-    const current = store.getState().initializer;
-    store.setState({
-      initializer: {
-        ...current,
-        selectedReferenceId: String(event.target.value || ""),
-      },
-    });
-  });
-
-  createPrimaryDatasetSelect?.addEventListener("change", (event) => {
-    const nextPrimary = String(event.target.value || "");
-    const current = store.getState().initializer;
-    const nextSupport = (current.selectedSupportDatasetIds || []).filter(
-      (id) => String(id) !== nextPrimary,
-    );
-    store.setState({
-      initializer: {
-        ...current,
-        selectedPrimaryDatasetId: nextPrimary,
-        selectedSupportDatasetIds: nextSupport,
-      },
-    });
-    rerender(host, store);
-  });
-
-  createSupportDatasetList?.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
-    checkbox.addEventListener("change", () => {
-      const current = store.getState().initializer;
-      const datasetId = Number(checkbox.dataset.supportDatasetId);
-      const has = (current.selectedSupportDatasetIds || []).includes(datasetId);
-      const nextSupport = has
-        ? current.selectedSupportDatasetIds.filter((id) => id !== datasetId)
-        : [...current.selectedSupportDatasetIds, datasetId];
-      store.setState({
-        initializer: {
-          ...current,
-          selectedSupportDatasetIds: nextSupport,
-        },
-      });
-    });
-  });
-
-  createChrAssignmentThresholdInput?.addEventListener("input", (event) => {
-    if (isChrAssignmentServerOwned(store.getState().initializer)) {
-      return;
-    }
-    const current = store.getState().initializer;
-    store.setState({
-      initializer: {
-        ...current,
-        chrAssignmentMinCoveragePercentInput: String(event.target.value || "").trim(),
-      },
-    });
-  });
-  const commitCreateChrAssignmentThreshold = (rawValue) => {
-    const current = store.getState().initializer;
-    if (isChrAssignmentServerOwned(current)) {
-      return;
-    }
-    const nextValue = clampChrAssignmentThresholdInput(
-      rawValue ?? current.chrAssignmentMinCoveragePercentInput,
-      60,
-    );
-    if (nextValue === String(current.chrAssignmentMinCoveragePercentInput || "").trim()) {
-      return;
-    }
-    store.setState({
-      initializer: {
-        ...current,
-        chrAssignmentMinCoveragePercentInput: nextValue,
-      },
-    });
-    rerender(host, store);
-  };
-  createChrAssignmentThresholdInput?.addEventListener("blur", (event) => {
-    commitCreateChrAssignmentThreshold(event.target.value);
-  });
-  createChrAssignmentThresholdInput?.addEventListener("change", (event) => {
-    commitCreateChrAssignmentThreshold(event.target.value);
-  });
-  createPhasedAssemblyCheckbox?.addEventListener("change", (event) => {
-    const current = store.getState().initializer;
-    store.setState({
-      initializer: {
-        ...current,
-        phasedAssemblyEnabledInput: Boolean(event.target.checked),
       },
     });
   });
@@ -466,129 +368,6 @@ export function bindWorkspacePage(host, store) {
     syncSelectedProjectSaveButton(saveSelectedProjectButton, nextInitializer, selectedProject);
   });
 
-  editReferenceSelect?.addEventListener("change", (event) => {
-    if (selectedProject?.isProcessed) {
-      return;
-    }
-    const current = store.getState().initializer;
-    store.setState({
-      initializer: {
-        ...current,
-        editProjectId: selectedProject?.projectId || current.editProjectId,
-        editReferenceId: String(event.target.value || ""),
-      },
-    });
-    rerender(host, store);
-  });
-
-  editPrimaryDatasetSelect?.addEventListener("change", (event) => {
-    if (selectedProject?.isProcessed) {
-      return;
-    }
-    const nextPrimary = String(event.target.value || "");
-    const current = store.getState().initializer;
-    const nextSupport = (current.editSupportDatasetIds || []).filter(
-      (id) => String(id) !== nextPrimary,
-    );
-    store.setState({
-      initializer: {
-        ...current,
-        editProjectId: selectedProject?.projectId || current.editProjectId,
-        editPrimaryDatasetId: nextPrimary,
-        editSupportDatasetIds: nextSupport,
-      },
-    });
-    rerender(host, store);
-  });
-
-  editSupportDatasetList?.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
-    checkbox.addEventListener("change", () => {
-      const current = store.getState().initializer;
-      const datasetId = Number(checkbox.dataset.editSupportDatasetId);
-      const isExistingProcessedSupport =
-        Boolean(selectedProject?.isProcessed) &&
-        normalizeSupportDatasetIds(
-          selectedProject?.supportDatasetIds || [],
-          selectedProject?.primaryDatasetId,
-        ).includes(datasetId);
-      if (isExistingProcessedSupport && !checkbox.checked) {
-        checkbox.checked = true;
-        return;
-      }
-      const has = (current.editSupportDatasetIds || []).includes(datasetId);
-      if (has === Boolean(checkbox.checked)) {
-        return;
-      }
-      const nextSupport = checkbox.checked
-        ? [...current.editSupportDatasetIds, datasetId]
-        : current.editSupportDatasetIds.filter((id) => id !== datasetId);
-      store.setState({
-        initializer: {
-          ...current,
-          editProjectId: selectedProject?.projectId || current.editProjectId,
-          editSupportDatasetIds: nextSupport,
-        },
-      });
-      rerender(host, store);
-    });
-  });
-
-  editChrAssignmentThresholdInput?.addEventListener("input", (event) => {
-    if (selectedProject?.isProcessed || isChrAssignmentServerOwned(store.getState().initializer)) {
-      return;
-    }
-    const current = store.getState().initializer;
-    store.setState({
-      initializer: {
-        ...current,
-        editProjectId: selectedProject?.projectId || current.editProjectId,
-        editChrAssignmentMinCoveragePercentInput: String(event.target.value || "").trim(),
-      },
-    });
-  });
-  const commitEditChrAssignmentThreshold = (rawValue) => {
-    if (selectedProject?.isProcessed || isChrAssignmentServerOwned(store.getState().initializer)) {
-      return;
-    }
-    const current = store.getState().initializer;
-    const nextValue = clampChrAssignmentThresholdInput(
-      rawValue ?? current.editChrAssignmentMinCoveragePercentInput,
-      selectedProject?.chrAssignmentMinCoveragePercent ?? 60,
-    );
-    if (nextValue === String(current.editChrAssignmentMinCoveragePercentInput || "").trim()) {
-      return;
-    }
-    store.setState({
-      initializer: {
-        ...current,
-        editProjectId: selectedProject?.projectId || current.editProjectId,
-        editChrAssignmentMinCoveragePercentInput: nextValue,
-      },
-    });
-    rerender(host, store);
-  };
-  editChrAssignmentThresholdInput?.addEventListener("blur", (event) => {
-    commitEditChrAssignmentThreshold(event.target.value);
-  });
-  editChrAssignmentThresholdInput?.addEventListener("change", (event) => {
-    commitEditChrAssignmentThreshold(event.target.value);
-  });
-  editPhasedAssemblyCheckbox?.addEventListener("change", (event) => {
-    if (selectedProject?.isProcessed && selectedProject.phasedAssemblyEnabled) {
-      event.target.checked = true;
-      return;
-    }
-    const current = store.getState().initializer;
-    store.setState({
-      initializer: {
-        ...current,
-        editProjectId: selectedProject?.projectId || current.editProjectId,
-        editPhasedAssemblyEnabledInput: Boolean(event.target.checked),
-      },
-    });
-    rerender(host, store);
-  });
-
   saveSelectedProjectButton?.addEventListener("click", async () => {
     await saveSelectedProject(host, store);
   });
@@ -606,48 +385,8 @@ function closeCreateModal(host, store) {
 }
 
 function renderCreateProjectModal(initializer, messages, locale) {
-  const thresholdServerOwned = isChrAssignmentServerOwned(initializer);
-  const thresholdHint = thresholdServerOwned
-    ? messages.cards.chrAssignmentThresholdLockedHint
-    : messages.cards.chrAssignmentThresholdHint;
-  const referenceOptions = initializer.references.length
-    ? initializer.references
-        .map(
-          (reference) =>
-            `<option value="${reference.referenceGenomeId}" ${
-              String(reference.referenceGenomeId) === String(initializer.selectedReferenceId)
-                ? "selected"
-                : ""
-            }>${escapeHtml(reference.name || reference.label)}</option>`,
-        )
-        .join("")
-    : `<option value="">${messages.page.noReference}</option>`;
-  const primaryDatasetOptions = initializer.datasets.length
-    ? initializer.datasets
-        .map(
-          (dataset) =>
-            `<option value="${dataset.datasetId}" ${
-              String(dataset.datasetId) === String(initializer.selectedPrimaryDatasetId)
-                ? "selected"
-                : ""
-            }>${escapeHtml(formatDatasetOptionLabel(messages, locale, dataset))}</option>`,
-        )
-        .join("")
-    : `<option value="">${messages.page.noDataset}</option>`;
-  const supportDatasetList = initializer.datasets.length
-    ? initializer.datasets
-        .map((dataset) => {
-          const checked = initializer.selectedSupportDatasetIds.includes(dataset.datasetId)
-            ? "checked"
-            : "";
-          const disabled =
-            String(dataset.datasetId) === String(initializer.selectedPrimaryDatasetId)
-              ? "disabled"
-              : "";
-          return `<label class="checkbox-item"><input type="checkbox" data-support-dataset-id="${dataset.datasetId}" ${checked} ${disabled} />${escapeHtml(formatDatasetOptionLabel(messages, locale, dataset))}</label>`;
-        })
-        .join("")
-    : messages.page.noOptions;
+  const recipe = initializer.grtRecipe || {};
+  const supportDatasets = Array.isArray(recipe.supportDatasets) ? recipe.supportDatasets : [];
   return `
     <div class="modal-overlay">
       <article class="card modal-dialog">
@@ -657,38 +396,13 @@ function renderCreateProjectModal(initializer, messages, locale) {
         </header>
         <label>${messages.cards.projectName}</label>
         <input id="initializer-project-name-input" type="text" placeholder="${escapeAttr(messages.page.projectNamePlaceholder)}" value="${escapeAttr(initializer.projectNameInput)}" />
-        <label>${messages.cards.referenceGenome}</label>
-        <select id="initializer-reference-select">
-          <option value="">${messages.page.chooseReference}</option>
-          ${referenceOptions}
-        </select>
-        <label>${messages.cards.primaryDataset}</label>
-        <select id="initializer-primary-dataset-select">
-          <option value="">${messages.page.choosePrimaryDataset}</option>
-          ${primaryDatasetOptions}
-        </select>
-        <label>${messages.cards.supportDataset}</label>
-        <div id="initializer-support-dataset-list" class="checklist ${initializer.datasets.length ? "" : "muted"}">${supportDatasetList}</div>
-        <label>${messages.cards.chrAssignmentThreshold}<span class="muted"> ${thresholdHint}</span></label>
-        <input
-          id="initializer-chr-assignment-threshold-input"
-          type="number"
-          min="0"
-          max="100"
-          step="0.1"
-          value="${escapeAttr(String(getChrAssignmentThresholdInputValue(initializer)))}"
-          ${thresholdServerOwned ? "disabled" : ""}
-        />
-        <label class="checkbox-item">
-          <input
-            id="initializer-phased-assembly-enabled-input"
-            type="checkbox"
-            role="switch"
-            ${initializer.phasedAssemblyEnabledInput ? "checked" : ""}
-          />
-          ${messages.cards.phasedAssemblyEnabled}
-          <span class="muted">${messages.cards.phasedAssemblyEnabledHint}</span>
-        </label>
+        <div class="workspace-locked-recipe" data-grt-locked-recipe="true">
+          <p><strong>${messages.cards.lockedRecipe}</strong> ${escapeHtml(recipe.recipeId || "-")}</p>
+          <p><strong>${messages.cards.primaryDataset}</strong> ${escapeHtml(recipe.primaryDataset || "-")}</p>
+          <p><strong>${messages.cards.supportDataset}</strong> ${escapeHtml(supportDatasets.join(", ") || "-")}</p>
+          <p><strong>${messages.cards.readsQc}</strong> ${recipe.readsQcEnabled ? messages.cards.enabled : messages.cards.disabled}</p>
+          <p class="muted">${messages.cards.lockedRecipeHint}</p>
+        </div>
         <div class="inline-input">
           <button id="initializer-create-modal-cancel-button" class="button ghost" type="button">${messages.buttons.cancel}</button>
           <button id="initializer-create-project-confirm-button" class="button" ${
@@ -748,54 +462,13 @@ function renderPipelineStepIcon(status) {
 }
 
 function renderSelectedProjectCard({ initializer, selectedProject, editDraft, editDirty, locale, messages }) {
-  const isProcessed = Boolean(selectedProject.isProcessed);
-  const thresholdServerOwned = isChrAssignmentServerOwned(initializer);
-  const thresholdLocked = isProcessed || thresholdServerOwned;
-  const existingProcessedSupportDatasetIds = normalizeSupportDatasetIds(
-    selectedProject.supportDatasetIds || [],
-    selectedProject.primaryDatasetId,
-  );
-  const thresholdHint = thresholdServerOwned
-    ? messages.cards.chrAssignmentThresholdLockedHint
-    : messages.cards.chrAssignmentThresholdHint;
-  const referenceOptions = initializer.references.length
-    ? initializer.references
-        .map(
-          (reference) =>
-            `<option value="${reference.referenceGenomeId}" ${
-              String(reference.referenceGenomeId) === String(editDraft.referenceGenomeId)
-                ? "selected"
-                : ""
-            }>${escapeHtml(reference.name || reference.label)}</option>`,
-        )
-        .join("")
-    : `<option value="">${messages.page.noReference}</option>`;
-  const primaryDatasetOptions = initializer.datasets.length
-    ? initializer.datasets
-        .map(
-          (dataset) =>
-            `<option value="${dataset.datasetId}" ${
-              String(dataset.datasetId) === String(editDraft.primaryDatasetId) ? "selected" : ""
-            }>${escapeHtml(formatDatasetOptionLabel(messages, locale, dataset))}</option>`,
-        )
-        .join("")
-    : `<option value="">${messages.page.noDataset}</option>`;
-  const editSupportDatasetList = initializer.datasets.length
-    ? initializer.datasets
-        .map((dataset) => {
-          const checked = (editDraft.supportDatasetIds || []).includes(dataset.datasetId)
-            ? "checked"
-            : "";
-          const isExistingProcessedSupport =
-            isProcessed && existingProcessedSupportDatasetIds.includes(dataset.datasetId);
-          const disabled =
-            isExistingProcessedSupport || String(dataset.datasetId) === String(editDraft.primaryDatasetId)
-              ? "disabled"
-              : "";
-          return `<label class="checkbox-item"><input type="checkbox" data-edit-support-dataset-id="${dataset.datasetId}" ${checked} ${disabled} />${escapeHtml(formatDatasetOptionLabel(messages, locale, dataset))}</label>`;
-        })
-        .join("")
-    : messages.page.noOptions;
+  const recipe = initializer.grtRecipe || {};
+  const supportDatasets = Array.isArray(recipe.supportDatasets) ? recipe.supportDatasets : [];
+  const referenceName = selectedProject.referenceName
+    || initializer.references.find(
+      (reference) => Number(reference.referenceGenomeId) === Number(selectedProject.referenceGenomeId),
+    )?.name
+    || "-";
 
   return `
     <article class="card workspace-selected-card">
@@ -814,44 +487,13 @@ function renderSelectedProjectCard({ initializer, selectedProject, editDraft, ed
         type="text"
         value="${escapeAttr(editDraft.projectName)}"
       />
-      <label>${messages.cards.referenceGenome}</label>
-      <select id="selected-project-reference-select" ${isProcessed ? "disabled" : ""}>
-        <option value="">${messages.page.chooseReference}</option>
-        ${referenceOptions}
-      </select>
-      <label>${messages.cards.primaryDataset}</label>
-      <select id="selected-project-primary-dataset-select" ${isProcessed ? "disabled" : ""}>
-        <option value="">${messages.page.choosePrimaryDataset}</option>
-        ${primaryDatasetOptions}
-      </select>
-      <label>${messages.cards.supportDataset}</label>
-      <div id="selected-project-support-dataset-list" class="checklist ${initializer.datasets.length ? "" : "muted"}">${editSupportDatasetList}</div>
-      <label>${messages.cards.chrAssignmentThreshold}<span class="muted"> ${thresholdHint}</span></label>
-      <input
-        id="selected-project-chr-assignment-threshold-input"
-        type="number"
-        min="0"
-        max="100"
-        step="0.1"
-        value="${escapeAttr(String(thresholdServerOwned ? getServerChrAssignmentThreshold(initializer) : editDraft.chrAssignmentMinCoveragePercent))}"
-        ${thresholdLocked ? "disabled" : ""}
-      />
-      <label class="checkbox-item">
-        <input
-          id="selected-project-phased-assembly-enabled-input"
-          type="checkbox"
-          role="switch"
-          ${editDraft.phasedAssemblyEnabled ? "checked" : ""}
-          ${isProcessed && selectedProject.phasedAssemblyEnabled ? "disabled" : ""}
-        />
-        ${messages.cards.phasedAssemblyEnabled}
-        <span class="muted">${messages.cards.phasedAssemblyEnabledHint}</span>
-      </label>
-      ${
-        isProcessed
-          ? `<p class="muted">${messages.runtime.processedProjectHint}</p>`
-          : `<p class="muted">${messages.runtime.editableProjectHint}</p>`
-      }
+      <div class="workspace-locked-recipe" data-grt-locked-recipe="true">
+        <p><strong>${messages.cards.referenceGenome}</strong> ${escapeHtml(referenceName)}</p>
+        <p><strong>${messages.cards.primaryDataset}</strong> ${escapeHtml(recipe.primaryDataset || selectedProject.primaryDatasetName || "-")}</p>
+        <p><strong>${messages.cards.supportDataset}</strong> ${escapeHtml(supportDatasets.join(", ") || "-")}</p>
+        <p><strong>${messages.cards.lockedRecipe}</strong> ${escapeHtml(recipe.recipeId || "-")}</p>
+        <p class="muted">${messages.runtime.grtProjectLocked}</p>
+      </div>
     </article>
   `;
 }
@@ -872,33 +514,11 @@ async function createProject(host, store) {
     return;
   }
 
-  if (
-    !initializer.projectNameInput ||
-    !initializer.selectedReferenceId ||
-    !initializer.selectedPrimaryDatasetId
-  ) {
+  if (!initializer.projectNameInput) {
     store.setState({
       initializer: {
         ...initializer,
         optionsError: i18nT(state, "workspace.runtime.requiredFields"),
-      },
-    });
-    rerender(host, store);
-    return;
-  }
-
-  const chrAssignmentMinCoveragePercent = isChrAssignmentServerOwned(initializer)
-    ? getServerChrAssignmentThreshold(initializer)
-    : normalizeChrAssignmentThreshold(initializer.chrAssignmentMinCoveragePercentInput ?? "60");
-  if (
-    !Number.isFinite(chrAssignmentMinCoveragePercent) ||
-    chrAssignmentMinCoveragePercent < 0 ||
-    chrAssignmentMinCoveragePercent > 100
-  ) {
-    store.setState({
-      initializer: {
-        ...initializer,
-        optionsError: "chr_assignment_min_coverage_percent must be between 0 and 100",
       },
     });
     rerender(host, store);
@@ -919,14 +539,10 @@ async function createProject(host, store) {
     const result = await initializeProject({
       workspaceRoot,
       projectName: initializer.projectNameInput,
-      referenceGenomeId: Number(initializer.selectedReferenceId),
-      primaryDatasetId: Number(initializer.selectedPrimaryDatasetId),
-      supportDatasetIds: initializer.selectedSupportDatasetIds,
-      chrAssignmentMinCoveragePercent,
-      phasedAssemblyEnabled: Boolean(initializer.phasedAssemblyEnabledInput),
     });
     const selectedProject = findProjectById(result.existingProjects || [], result.projectId);
     const nextDraft = buildEditDraftFromProject(selectedProject);
+    const grtProjectView = normalizeGrtProjectView(result.grtProjectView);
 
     store.setState({
       session: {
@@ -953,6 +569,8 @@ async function createProject(host, store) {
       assembly: {
         ...store.getState().assembly,
         ...buildEmptyAssemblyViewState(store.getState()),
+        finalPathByChr: grtProjectView.baselineFinalPathByChr,
+        grtProjectView,
       },
       projectExport: buildEmptyProjectExportState(),
     });
@@ -1340,6 +958,7 @@ async function runAutoPipelineBeforeAssembly(host, store, project) {
       initializer: {
         ...store.getState().initializer,
         packageMetadata: normalizePackageMetadata(latestOptions.packageMetadata),
+        grtRecipe: latestOptions.grtRecipe || store.getState().initializer.grtRecipe,
         existingProjects: refreshedProjects,
       },
     });
@@ -1695,35 +1314,13 @@ function getEffectiveEditDraft(initializer, selectedProject) {
   if (!selectedProject) {
     return buildEditDraftFromProject(null);
   }
+  const source = buildEditDraftFromProject(selectedProject);
   if (Number(initializer.editProjectId || 0) !== Number(selectedProject.projectId || 0)) {
-    return buildEditDraftFromProject(selectedProject);
-  }
-  if (selectedProject.isProcessed) {
-    const source = buildEditDraftFromProject(selectedProject);
-    return {
-      ...source,
-      projectName: String(initializer.editProjectNameInput || "").trim(),
-      supportDatasetIds: mergeAppendOnlySupportDatasetIds(
-        source.supportDatasetIds,
-        initializer.editSupportDatasetIds || [],
-        source.primaryDatasetId,
-      ),
-      phasedAssemblyEnabled:
-        Boolean(source.phasedAssemblyEnabled) || Boolean(initializer.editPhasedAssemblyEnabledInput),
-    };
+    return source;
   }
   return {
+    ...source,
     projectName: String(initializer.editProjectNameInput || "").trim(),
-    referenceGenomeId: Number(initializer.editReferenceId || 0),
-    primaryDatasetId: Number(initializer.editPrimaryDatasetId || 0),
-    supportDatasetIds: normalizeSupportDatasetIds(
-      initializer.editSupportDatasetIds || [],
-      initializer.editPrimaryDatasetId,
-    ),
-    chrAssignmentMinCoveragePercent: isChrAssignmentServerOwned(initializer)
-      ? getServerChrAssignmentThreshold(initializer)
-      : normalizeChrAssignmentThreshold(initializer.editChrAssignmentMinCoveragePercentInput),
-    phasedAssemblyEnabled: Boolean(initializer.editPhasedAssemblyEnabledInput),
   };
 }
 
@@ -1875,25 +1472,7 @@ function isEditDirty(initializer, project, draft) {
     return false;
   }
   const source = buildEditDraftFromProject(project);
-  if (project.isProcessed) {
-    return (
-      source.projectName !== String(draft.projectName || "").trim() ||
-      !sameNumberArray(source.supportDatasetIds, draft.supportDatasetIds || []) ||
-      (!source.phasedAssemblyEnabled && Boolean(draft.phasedAssemblyEnabled))
-    );
-  }
-  const thresholdDirty = isChrAssignmentServerOwned(initializer)
-    ? false
-    : Number(source.chrAssignmentMinCoveragePercent) !==
-      Number(draft.chrAssignmentMinCoveragePercent);
-  return (
-    source.projectName !== String(draft.projectName || "").trim() ||
-    Number(source.referenceGenomeId) !== Number(draft.referenceGenomeId || 0) ||
-    Number(source.primaryDatasetId) !== Number(draft.primaryDatasetId || 0) ||
-    !sameNumberArray(source.supportDatasetIds, draft.supportDatasetIds || []) ||
-    Boolean(source.phasedAssemblyEnabled) !== Boolean(draft.phasedAssemblyEnabled) ||
-    thresholdDirty
-  );
+  return source.projectName !== String(draft.projectName || "").trim();
 }
 
 function syncSelectedProjectSaveButton(button, initializer, selectedProject) {

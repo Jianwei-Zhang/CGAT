@@ -27,6 +27,14 @@ use gpm_next_backend::exporter::{
     export_project_final_path_fasta as backend_export_project_final_path_fasta,
     list_export_records as backend_list_export_records,
 };
+use gpm_next_backend::grt_package::{
+    GrtLockedRecipe, initialize_grt_project as backend_initialize_grt_project,
+    load_grt_event_trace as backend_load_grt_event_trace,
+    load_grt_evidence as backend_load_grt_evidence,
+    load_grt_locked_recipe as backend_load_grt_locked_recipe,
+    load_grt_project_view as backend_load_grt_project_view,
+    load_grt_source_card_trace as backend_load_grt_source_card_trace,
+};
 use gpm_next_backend::importer::{
     AddCtgImportTarget, ImportProgress, import_add_ctg_package_with_hooks,
     import_from_extracted_bundle_with_hooks, import_from_zip_with_hooks,
@@ -55,9 +63,9 @@ use gpm_next_backend::phased_assembly::{
     reorder_phased_chr_track_items as backend_reorder_phased_chr_track_items,
 };
 use gpm_next_backend::project_initializer::{
-    ProjectInitializationRequest, ProjectUpdateRequest,
+    ProjectUpdateRequest,
     bootstrap_project_assembly_cancel as backend_bootstrap_project_assembly_cancel,
-    delete_project as backend_delete_project, initialize_project as backend_initialize_project,
+    delete_project as backend_delete_project,
     list_initializer_options as backend_list_initializer_options,
     set_project_auto_pipeline_done as backend_set_project_auto_pipeline_done,
     update_project as backend_update_project,
@@ -82,6 +90,24 @@ use crate::import_cancel;
 
 fn project_db_path(workspace_root: &str) -> PathBuf {
     Path::new(workspace_root).join("project.sqlite")
+}
+
+fn map_grt_recipe(recipe: &GrtLockedRecipe) -> Value {
+    json!({
+        "workflow": recipe.workflow,
+        "schemaVersion": recipe.schema_version,
+        "finalPathSchemaVersion": recipe.final_path_schema_version,
+        "recipeId": recipe.recipe_id,
+        "primaryDataset": recipe.primary_dataset,
+        "supportDatasets": recipe.support_datasets,
+        "readsQcEnabled": recipe.reads_qc_enabled,
+        "donorSetId": recipe.donor_set_id,
+        "telDonorSetId": recipe.tel_donor_set_id,
+        "q0Relpath": recipe.q0_relpath,
+        "finalQRelpath": recipe.final_q_relpath,
+        "q0ArtifactSha256": recipe.q0_artifact_sha256,
+        "q4ArtifactSha256": recipe.q4_artifact_sha256,
+    })
 }
 
 fn ensure_existing_workspace_db(workspace_root: &str) -> Result<PathBuf> {
@@ -161,6 +187,7 @@ fn read_initializer_options(workspace_root: &str, strict_existing: bool) -> Resu
         project_db_path(workspace_root)
     };
     let options = backend_list_initializer_options(&project_db)?;
+    let grt_recipe = backend_load_grt_locked_recipe(&project_db)?;
     let references = options
         .references
         .into_iter()
@@ -203,6 +230,7 @@ fn read_initializer_options(workspace_root: &str, strict_existing: bool) -> Resu
     Ok(json!({
         "workspaceRoot": workspace_root,
         "packageMetadata": package_metadata,
+        "grtRecipe": map_grt_recipe(&grt_recipe),
         "references": references,
         "datasets": datasets,
         "existingProjects": existing_projects
@@ -887,43 +915,121 @@ pub fn delete_workspace_directory(workspaceRoot: String) -> Result<Value, String
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn initialize_project(
-    workspaceRoot: String,
-    projectName: String,
-    referenceGenomeId: i64,
-    primaryDatasetId: i64,
-    supportDatasetIds: Option<Vec<i64>>,
-    chrAssignmentMinCoveragePercent: Option<f64>,
-    phasedAssemblyEnabled: Option<bool>,
-) -> Result<Value, String> {
+pub fn initialize_project(workspaceRoot: String, projectName: String) -> Result<Value, String> {
     (|| {
         let project_db = project_db_path(&workspaceRoot);
-        let summary = backend_initialize_project(
-            &project_db,
-            &ProjectInitializationRequest {
-                project_name: projectName.clone(),
-                reference_genome_id: referenceGenomeId,
-                primary_dataset_id: primaryDatasetId,
-                support_dataset_ids: supportDatasetIds.unwrap_or_default(),
-                auto_check_new_seq: false,
-                phased_assembly_enabled: phasedAssemblyEnabled,
-                chr_assignment_min_coverage_percent: chrAssignmentMinCoveragePercent,
-                description: None,
-            },
-        )?;
+        let summary = backend_initialize_grt_project(&project_db, &projectName)?;
         let options = backend_list_initializer_options(&project_db)?;
         let existing_projects = map_existing_projects(options.existing_projects);
+        let grt_project_view = backend_load_grt_project_view(&project_db)?;
         Ok(json!({
             "projectId": summary.project_id,
             "projectName": summary.project_name,
             "version": summary.version,
             "referenceGenomeId": summary.reference_genome_id,
             "primaryDatasetId": summary.primary_dataset_id,
+            "supportDatasetIds": summary.support_dataset_ids,
             "projectDatasetCount": summary.project_dataset_count,
             "phasedAssemblyEnabled": summary.phased_assembly_enabled,
             "chrAssignmentMinCoveragePercent": summary.chr_assignment_min_coverage_percent,
+            "assemblySeqCount": summary.assembly_seq_count,
+            "assemblyCtgCount": summary.assembly_ctg_count,
+            "materializedSourceCardCount": summary.materialized_source_card_count,
+            "grtProjectView": serde_json::to_value(grt_project_view)?,
             "existingProjects": existing_projects
         }))
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn get_grt_project_view(workspaceRoot: String, projectId: i64) -> Result<Value, String> {
+    (|| {
+        let project_db = project_db_path(&workspaceRoot);
+        let options = backend_list_initializer_options(&project_db)?;
+        if !options
+            .existing_projects
+            .iter()
+            .any(|project| project.id == projectId)
+        {
+            bail!("project_id {projectId} does not exist");
+        }
+        Ok(serde_json::to_value(backend_load_grt_project_view(
+            &project_db,
+        )?)?)
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn get_grt_source_card_trace(
+    workspaceRoot: String,
+    projectId: i64,
+    sourceCardKey: String,
+) -> Result<Value, String> {
+    (|| {
+        let project_db = project_db_path(&workspaceRoot);
+        let options = backend_list_initializer_options(&project_db)?;
+        if !options
+            .existing_projects
+            .iter()
+            .any(|project| project.id == projectId)
+        {
+            bail!("project_id {projectId} does not exist");
+        }
+        Ok(serde_json::to_value(backend_load_grt_source_card_trace(
+            &project_db,
+            &sourceCardKey,
+        )?)?)
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn get_grt_event_trace(
+    workspaceRoot: String,
+    projectId: i64,
+    eventId: String,
+) -> Result<Value, String> {
+    (|| {
+        let project_db = project_db_path(&workspaceRoot);
+        let options = backend_list_initializer_options(&project_db)?;
+        if !options
+            .existing_projects
+            .iter()
+            .any(|project| project.id == projectId)
+        {
+            bail!("project_id {projectId} does not exist");
+        }
+        Ok(serde_json::to_value(backend_load_grt_event_trace(
+            &project_db,
+            &eventId,
+        )?)?)
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn get_grt_evidence(
+    workspaceRoot: String,
+    projectId: i64,
+    evidenceId: String,
+) -> Result<Value, String> {
+    (|| {
+        let project_db = project_db_path(&workspaceRoot);
+        let options = backend_list_initializer_options(&project_db)?;
+        if !options
+            .existing_projects
+            .iter()
+            .any(|project| project.id == projectId)
+        {
+            bail!("project_id {projectId} does not exist");
+        }
+        backend_load_grt_evidence(&project_db, &evidenceId)
     })()
     .map_err(format_error)
 }

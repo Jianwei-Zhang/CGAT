@@ -31,6 +31,20 @@ function normalizeString(value) {
   return String(value || "").trim();
 }
 
+function buildGrtSegmentTraceAttrs(segment, escapeAttr) {
+  const eventId = normalizeString(segment?.eventId);
+  const sourceCardKey = normalizeString(segment?.sourceCardKey);
+  const traceKind = eventId ? "event" : (sourceCardKey ? "source-card" : "");
+  const traceId = eventId || sourceCardKey;
+  const evidenceIds = Array.isArray(segment?.evidenceIds)
+    ? segment.evidenceIds.map((id) => normalizeString(id)).filter(Boolean)
+    : [];
+  if (!traceKind && !evidenceIds.length) {
+    return "";
+  }
+  return ` data-grt-traceable="true"${traceKind ? ` data-grt-trace-kind="${escapeAttr(traceKind)}" data-grt-trace-id="${escapeAttr(traceId)}"` : ""}${evidenceIds.length ? ` data-grt-evidence-ids="${escapeAttr(evidenceIds.join(","))}"` : ""}`;
+}
+
 function resolveFinalPathDisplayCtgName(segment) {
   return resolveFinalPathSegmentDisplayName(segment);
 }
@@ -1245,6 +1259,7 @@ export function renderFinalPathGraph({
     .map((item, index, items) => {
       const { segment } = item;
       const segmentId = normalizeString(segment.segmentId);
+      const grtTraceAttrs = buildGrtSegmentTraceAttrs(segment, escapeAttr);
       if (isFinalPathGapSegment(segment)) {
         const { markerWidth, markerX } = gapMarkerLayouts[index] || resolveGapMarkerLayout(item, innerWidth);
         const labelLayout = gapLabelLayouts[index];
@@ -1256,6 +1271,7 @@ export function renderFinalPathGraph({
           <g
             data-final-path-segment-id="${escapeAttr(segmentId)}"
             data-final-path-segment-type="gap"
+            ${grtTraceAttrs}
            ${targetChrAttr}
             data-final-path-slot-left="${escapeAttr(slotLeft.toFixed(2))}"
             data-final-path-slot-right="${escapeAttr(slotRight.toFixed(2))}"
@@ -1309,6 +1325,7 @@ export function renderFinalPathGraph({
           class="${groupClass}"
           data-final-path-segment-id="${escapeAttr(segmentId)}"
           data-final-path-segment-type="ctg"
+          ${grtTraceAttrs}
          ${targetChrAttr}
           data-final-path-source-kind="${escapeAttr(String(segment?.sourceKind || "assembly_ctg"))}"
           data-final-path-contig-id="${escapeAttr(String(segment?.assemblyCtgId || ""))}"
@@ -1389,6 +1406,7 @@ function renderFinalPathTable({
   const rows = segments.length
     ? segments.map((segment, index) => {
       const segmentId = normalizeString(segment.segmentId) || `seg-${index + 1}`;
+      const grtTraceAttrs = buildGrtSegmentTraceAttrs(segment, escapeAttr);
       const isGap = isFinalPathGapSegment(segment);
       const isRefSegment = isFinalPathRefSegment(segment);
       const metrics = rowMetrics[index] || {};
@@ -1424,7 +1442,7 @@ function renderFinalPathTable({
               `;
       const rowTypeClass = isGap ? " is-gap" : "";
       return `
-        <div data-final-path-row-id="${escapeAttr(segmentId)}"${targetChrAttr} class="final-path-sort-row${rowTypeClass}">
+        <div data-final-path-row-id="${escapeAttr(segmentId)}" data-final-path-segment-id="${escapeAttr(segmentId)}"${targetChrAttr}${grtTraceAttrs} class="final-path-sort-row${rowTypeClass}">
           <div class="final-path-row-index-cell">
             <span class="final-path-card-index">${index + 1}</span>
           </div>
