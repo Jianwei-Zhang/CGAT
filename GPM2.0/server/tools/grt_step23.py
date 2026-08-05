@@ -1268,6 +1268,13 @@ def invalidate_from(server_dir: Path, stage: str) -> None:
         artifact = server_dir / f"grt/evidence/{invalid_stage}"
         if artifact.is_dir():
             shutil.rmtree(artifact)
+    for downstream_stage in ("step4_telomere", "finalize"):
+        (server_dir / f"grt/checkpoints/{downstream_stage}.json").unlink(missing_ok=True)
+    (server_dir / "grt/q/q4.fa").unlink(missing_ok=True)
+    step4_artifact = server_dir / "grt/evidence/step4_telomere"
+    if step4_artifact.is_dir():
+        shutil.rmtree(step4_artifact)
+    (server_dir / "metadata/grt_final_path.json").unlink(missing_ok=True)
 
 
 def run_step2(
@@ -2527,33 +2534,37 @@ def publish_metadata(
     q_rows = [
         row
         for row in read_tsv(metadata / "grt_q_segments.tsv", Q_SEGMENT_FIELDS)
-        if row["q_version"] not in {"q2", "q3"}
+        if row["q_version"] not in {"q2", "q3", "q4"}
     ]
     evidence_rows = [
         row
         for row in read_tsv(metadata / "grt_evidence_registry.tsv", EVIDENCE_FIELDS)
-        if row["stage"] not in {"step2", "step3", "candidate_validation"}
+        if row["stage"] not in {"step2", "step3", "step4_telomere", "candidate_validation"}
     ]
     usage_rows = [
         row
         for row in read_tsv(metadata / "grt_donor_usage.tsv", USAGE_FIELDS)
-        if row["stage"] not in {"step2", "step3"}
+        if row["stage"] not in {"step2", "step3", "step4_telomere"}
     ]
     events = [
         json.loads(line)
         for line in (metadata / "grt_events.jsonl").read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    events = [row for row in events if row["stage"] not in {"step2", "step3"}]
+    events = [
+        row
+        for row in events
+        if row["stage"] not in {"step2", "step3", "step4_telomere"}
+    ]
     attempts = [
         row
         for row in read_tsv(metadata / "grt_gap_attempts.tsv", ATTEMPT_FIELDS)
-        if row["stage"] not in {"step2", "step3"}
+        if row["stage"] not in {"step2", "step3", "step4_telomere"}
     ]
     stage_rows = [
         row
         for row in read_tsv(metadata / "grt_stage_status.tsv", STAGE_FIELDS)
-        if row["stage"] not in {"step2", "step3"}
+        if row["stage"] not in {"step2", "step3", "step4_telomere", "finalize"}
     ]
     for result in results:
         q_rows.extend(result["q_rows"])

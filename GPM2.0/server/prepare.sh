@@ -101,7 +101,7 @@ Behavior:
   - Generates runs/*/command.sh and <work_root>/run_all.sh
   - Chains run_all.sh commands with && so execution stops on the first failed command
   - Generates package_full_zip.sh, package_light_no_fasta_zip.sh, and export_final_path_fasta.sh
-  - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> GRT Step2/3 -> per-chr commands
+  - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> GRT Step2/3 -> GRT telomere/q4 finalization -> per-chr commands
   - With --skip-self, same-dataset self alignments are omitted and marked unavailable in metadata/datasets.tsv
   - Prints all generated alignment commands to the terminal for manual copy/paste
 EOF
@@ -2552,6 +2552,25 @@ write_grt_step23_script() {
   chmod +x "$output_path"
 }
 
+write_grt_telomere_finalize_script() {
+  local output_path="$1"
+  local work_root="$2"
+
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'set -euo pipefail\n'
+    printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s\n' \
+      "$(shell_quote "${work_root}/.prepare_lib/tools/grt_telomere_finalize.py")" \
+      "$(shell_quote "$work_root")" \
+      "$(shell_quote "$THREADS")" \
+      "$(shell_quote "$GRT_MINIMAP2")" \
+      "$(shell_quote "$GRT_NUCMER")" \
+      "$(shell_quote "$GRT_DELTA_FILTER")" \
+      "$(shell_quote "$GRT_SHOW_COORDS")"
+  } > "$output_path"
+  chmod +x "$output_path"
+}
+
 write_chr_placeholder_script() {
   local run_dir="$1"
   local chr_name="$2"
@@ -2967,7 +2986,7 @@ RUN_ALL="${WORK_ROOT}/run_all.sh"
 DATASET_COUNT=${#DATASET_NAMES[@]}
 mapfile -t REFERENCE_CHR_NAMES < <(collect_reference_chr_names "$REF_DST")
 
-TOTAL_COMMANDS=$(( DATASET_COUNT + 4 + ${#REFERENCE_CHR_NAMES[@]} ))
+TOTAL_COMMANDS=$(( DATASET_COUNT + 5 + ${#REFERENCE_CHR_NAMES[@]} ))
 COMMAND_INDEX=1
 
 for ((i = 0; i < DATASET_COUNT; i++)); do
@@ -3009,6 +3028,13 @@ printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_step23.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
+write_grt_telomere_finalize_script "${WORK_ROOT}/run_grt_telomere_finalize.sh" "$WORK_ROOT"
+append_run_all_command "${WORK_ROOT}/run_grt_telomere_finalize.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_grt_telomere_finalize"
+printf 'cd %s\n' "$WORK_ROOT"
+printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_telomere_finalize.sh"
+COMMAND_INDEX=$((COMMAND_INDEX + 1))
+
 for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
   run_chr_dir="${WORK_ROOT}/runs/chr_${chr_name}"
   mkdir -p "$run_chr_dir"
@@ -3043,6 +3069,7 @@ echo "  - ${WORK_ROOT}/add_ctg.sh"
 echo "  - ${WORK_ROOT}/prepare_grt_inputs.sh"
 echo "  - ${WORK_ROOT}/run_grt_step1.sh"
 echo "  - ${WORK_ROOT}/run_grt_step23.sh"
+echo "  - ${WORK_ROOT}/run_grt_telomere_finalize.sh"
 echo "  - ${WORK_ROOT}/export_final_path_fasta.sh"
 echo "  - ${WORK_ROOT}/.prepare_lib/lib"
 echo "  - ${WORK_ROOT}/.prepare_lib/tools"
@@ -3052,7 +3079,7 @@ echo
 echo "Next:"
 echo "  1. Run: bash ${WORK_ROOT}/run_all.sh"
 echo "  2. Or copy the alignment commands printed above and execute them one by one"
-echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, GRT q0/D0/Dtel, GRT Step1, GRT Step2/3, then chr-local jobs"
+echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, GRT q0/D0/Dtel, GRT Step1, GRT Step2/3, GRT telomere/q4 finalization, then chr-local jobs"
 if [[ "$SKIP_SELF" == "true" ]]; then
   echo "     - chr-local same-dataset self alignments remain skipped"
 fi

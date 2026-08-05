@@ -672,6 +672,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                 "correct_boundary",
                 "patch",
                 "refill",
+                "extend_telomere",
             }:
                 fail("BROKEN_REFERENCE", f"superseded event {event_id} has an invalid replacing event")
             if event_id not in replacement.get("superseded_event_ids", []):

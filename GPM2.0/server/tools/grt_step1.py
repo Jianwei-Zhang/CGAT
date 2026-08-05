@@ -1291,6 +1291,20 @@ def invalidate_from(server_dir: Path, stage: str) -> None:
         artifact = artifact_paths[invalid_stage]
         if artifact.is_dir():
             shutil.rmtree(artifact)
+    for downstream_stage, q_output in (
+        ("step2", "q2"),
+        ("step3", "q3"),
+        ("step4_telomere", "q4"),
+        ("finalize", ""),
+    ):
+        (server_dir / f"grt/checkpoints/{downstream_stage}.json").unlink(missing_ok=True)
+        if q_output:
+            (server_dir / f"grt/q/{q_output}.fa").unlink(missing_ok=True)
+    for downstream_artifact in ("step2", "step3", "step4_telomere"):
+        path = server_dir / f"grt/evidence/{downstream_artifact}"
+        if path.is_dir():
+            shutil.rmtree(path)
+    (server_dir / "metadata/grt_final_path.json").unlink(missing_ok=True)
 
 
 def write_checkpoint(
