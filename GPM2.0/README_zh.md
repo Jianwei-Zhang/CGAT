@@ -114,13 +114,18 @@ bash server/prepare.sh \
 - `--winnowmap-kmer`：meryl k-mer 大小，默认 `19`
 - `--winnowmap-repeat-fraction`：高频 k-mer 阈值，默认 `0.9998`
 
-### 执行批量比对任务
+### 执行完整 Server 流程
 
 ```bash
 bash ./gpm_server/run_all.sh
 ```
 
-如有需要，也可以根据脚本打印的命令自行安排执行方式，例如串行或并行。
+这一条命令会完成全部分阶段计算，并在 `gpm_server/` 同级目录自动生成两个交付包：
+
+- `gpm_server.zip`：完整包，包含客户端导出 final path FASTA 所需的 FASTA 载荷
+- `gpm_server.no_fasta.zip`：轻量包，不包含 `.fa` / `.fasta` 载荷
+
+初始流程无需再单独执行打包命令。如需手工安排阶段，也可以依次执行 `prepare.sh` 打印的命令，但必须包含最后的完整包与轻量包命令。
 
 执行顺序必须固定：
 
@@ -132,8 +137,10 @@ bash ./gpm_server/run_all.sh
 6. 执行端粒恢复并生成 q4 与可追溯 Final Path
 7. 执行染色体局部主视图比对
 8. 完成 GRT source card/展示证据并校验完整包契约
+9. 再次校验并原子生成 `gpm_server.zip`
+10. 再次校验并原子生成 `gpm_server.no_fasta.zip`
 
-`run_all.sh` 会严格保持该顺序，遇到程序错误立即停止，并且只复用输入、参数、工具和输出 hash 均仍匹配的检查点。
+`run_all.sh` 会严格保持该顺序，遇到程序或打包错误立即停止，并且只复用输入、参数、工具和输出 hash 均仍匹配的计算检查点。每个打包脚本都会先生成全新的临时 zip，成功后才替换最终文件，因此重跑不会保留已经删除的旧条目，也不会用失败的半成品覆盖有效交付包。
 
 ### 向已有服务端项目追加一个 dataset
 
@@ -161,9 +168,9 @@ bash ./gpm_server/add_dataset.sh --ds ds4_name /path/to/ds4.fa -o /path/to/add_d
 bash ./gpm_server/package_full_zip.sh
 ```
 
-### 打包服务端交付文件
+### Server 工作目录后续变化后的重新打包
 
-请使用 `server/prepare.sh` 生成的打包脚本；两种脚本都会在创建 zip 前执行 GRT 可执行契约校验器：
+初始 `run_all.sh` 已经自动生成两种交付包。只有在后续执行 `add_dataset.sh`、`add_ctg.sh` 等操作并需要重建交付包时，才需要使用生成的独立打包脚本；两种脚本都会在创建 zip 前执行 GRT 可执行契约校验器：
 
 ```bash
 # 完整交付包：包含 .fa/.fasta，可在客户端导出 final path FASTA

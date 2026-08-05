@@ -187,6 +187,12 @@ test -x "${output_root}/add_dataset.sh"
 
 PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh"
 
+test -f "${TMP_DIR}/gpm_server.zip"
+test -f "${TMP_DIR}/gpm_server.no_fasta.zip"
+assert_file_contains "${TMP_DIR}/gpm_server.zip" "--- gpm_server/data/datasets/ds1.fa"
+assert_file_not_contains "${TMP_DIR}/gpm_server.no_fasta.zip" '^--- gpm_server/data/datasets/ds1[.]fa$'
+assert_file_contains "${TMP_DIR}/gpm_server.no_fasta.zip" "--- gpm_server/data/datasets/ds1.fa.fai"
+
 awk -F '\t' 'BEGIN { OFS = "\t" } $1 == "chr_assignment_min_coverage_percent" { $2 = "72" } { print }' \
   "${output_root}/metadata/prepare_options.tsv" > "${output_root}/metadata/prepare_options.tsv.tmp"
 mv "${output_root}/metadata/prepare_options.tsv.tmp" "${output_root}/metadata/prepare_options.tsv"

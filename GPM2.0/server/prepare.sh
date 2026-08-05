@@ -96,9 +96,10 @@ Behavior:
   - Generates runs/*/command.sh and <work_root>/run_all.sh
   - Chains run_all.sh commands with && so execution stops on the first failed command
   - Generates package_full_zip.sh, package_light_no_fasta_zip.sh, and export_final_path_fasta.sh
-  - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> GRT Step2/3 -> GRT telomere/q4 finalization -> per-chr commands -> GRT evidence/package validation
+  - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> GRT Step2/3 -> GRT telomere/q4 finalization -> per-chr commands -> GRT evidence/package validation -> full zip -> light zip
+  - A successful run_all.sh creates both delivery archives in the parent directory of the work root
   - With --skip-self, same-dataset self alignments are omitted and marked unavailable in metadata/datasets.tsv
-  - Prints all generated alignment commands to the terminal for manual copy/paste
+  - Prints all generated staged commands to the terminal for manual copy/paste
 EOF
 }
 
@@ -2962,7 +2963,7 @@ RUN_ALL="${WORK_ROOT}/run_all.sh"
 DATASET_COUNT=${#DATASET_NAMES[@]}
 mapfile -t REFERENCE_CHR_NAMES < <(collect_reference_chr_names "$REF_DST")
 
-TOTAL_COMMANDS=$(( DATASET_COUNT + 6 + ${#REFERENCE_CHR_NAMES[@]} ))
+TOTAL_COMMANDS=$(( DATASET_COUNT + 8 + ${#REFERENCE_CHR_NAMES[@]} ))
 COMMAND_INDEX=1
 
 for ((i = 0; i < DATASET_COUNT; i++)); do
@@ -3029,6 +3030,18 @@ printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/finalize_grt_evidence.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
+append_run_all_command "${WORK_ROOT}/package_full_zip.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "package_full_zip"
+printf 'cd %s\n' "$WORK_ROOT"
+printf 'bash %s\n\n' "${WORK_ROOT}/package_full_zip.sh"
+COMMAND_INDEX=$((COMMAND_INDEX + 1))
+
+append_run_all_command "${WORK_ROOT}/package_light_no_fasta_zip.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "package_light_no_fasta_zip"
+printf 'cd %s\n' "$WORK_ROOT"
+printf 'bash %s\n\n' "${WORK_ROOT}/package_light_no_fasta_zip.sh"
+COMMAND_INDEX=$((COMMAND_INDEX + 1))
+
 chmod +x "$RUN_ALL"
 write_package_scripts "$WORK_ROOT" "$package_mode" "$sequence_layout"
 write_prepare_lib "$WORK_ROOT"
@@ -3062,14 +3075,15 @@ echo "  - ${WORK_ROOT}/package_light_no_fasta_zip.sh"
 echo
 echo "Next:"
 echo "  1. Run: bash ${WORK_ROOT}/run_all.sh"
-echo "  2. Or copy the alignment commands printed above and execute them one by one"
-echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, GRT q0/D0/Dtel, GRT Step1, GRT Step2/3, GRT telomere/q4 finalization, then chr-local jobs"
+echo "     - This automatically creates both the full and light delivery archives"
+echo "  2. Or execute the staged commands printed above one by one, including the final two package commands"
+echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, GRT q0/D0/Dtel, GRT Step1, GRT Step2/3, GRT telomere/q4 finalization, chr-local jobs, evidence finalization, full packaging, and light packaging"
 if [[ "$SKIP_SELF" == "true" ]]; then
   echo "     - chr-local same-dataset self alignments remain skipped"
 fi
-echo "  4. After all result.paf files are ready, package the delivery bundle:"
-echo "     - Full package: bash ${WORK_ROOT}/package_full_zip.sh"
-echo "     - Light package without .fa/.fasta: bash ${WORK_ROOT}/package_light_no_fasta_zip.sh"
+echo "  4. Output archives:"
+echo "     - Full package: $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").zip"
+echo "     - Light package: $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").no_fasta.zip"
 echo "  5. To add a dataset later, run:"
 echo "     - bash ${WORK_ROOT}/add_dataset.sh --ds <dataset_name> /path/to/dataset.fa"
 echo "  6. To add a derived ctg later, run:"
