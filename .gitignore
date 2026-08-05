@@ -10,6 +10,7 @@
 # Local presentation and manuscript materials
 /ppt/
 /paper/
+/Genome-Repair-Tools/
 
 # Common dependency/build outputs
 **/node_modules/
