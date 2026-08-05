@@ -22,8 +22,8 @@ GPM2.0 uses a split architecture between the server side and the client side:
   - `minimap2`: recommended `2.31`; older versions that support `-x asm10/asm5`, `-t`, and PAF output remain usable
   - `blastn`: recommended BLAST+ `2.17.0`, with `makeblastdb`
   - `winnowmap`: recommended `2.03`, with `meryl`
-- GRT precomputed Final Path: `minimap2`, plus MUMmer4 commands `nucmer`, `delta-filter`, and `show-coords`
-- Optional reads-based assembly QC: `meryl`, `merqury.sh`, and `craq`; these are required only when one or more `--reads` inputs are provided
+- GRT precomputed Final Path: `minimap2`, plus MUMmer4 commands `nucmer`, `delta-filter`, and `show-coords`; install them in the execution environment so they are available through `PATH`
+- Optional reads-based assembly QC: `meryl`, `merqury.sh`, and `craq`; these must be available through `PATH` only when one or more `--reads` inputs are provided
 - Input data: `ref_genome.fa`, `hifiasm.fa`, `flye.fa`, `canu2.fa`
 
 Note: This document uses these data only as an example to illustrate the workflow. The workflow is not limited to this specific kind of input.
@@ -54,13 +54,6 @@ bash server/prepare.sh \
   [--cen-min-len 10000] \
   [--cen-min-identity 80] \
   [--reads /path/to/reads.fastq.gz ...] \
-  [--grt-meryl /path/to/meryl] \
-  [--grt-merqury /path/to/merqury.sh] \
-  [--grt-craq /path/to/craq] \
-  [--grt-minimap2 /path/to/minimap2] \
-  [--grt-nucmer /path/to/nucmer] \
-  [--grt-delta-filter /path/to/delta-filter] \
-  [--grt-show-coords /path/to/show-coords] \
   [--grt-qc-memory-gb 80] \
   [--grt-kmer-size 21] \
   [--skip-self]
@@ -81,7 +74,9 @@ Bracketed arguments are optional.
 - `--skip-self`: skip same-dataset self alignment; import and cross-dataset Subview remain available, while same-dataset contig-to-contig Subview is unavailable
 - The first `--ds` is the locked primary dataset; every later initial `--ds` is a locked support dataset
 - Repeatable `--reads`: enable one shared Meryl database and per-dataset Merqury/CRAQ QC; without reads, only reads-based QC is skipped and the complete GRT repair workflow still runs
-- `--grt-*`: override executable paths used by GRT Step1, Step2/3, telomere recovery, and optional reads QC; `--grt-qc-memory-gb` and `--grt-kmer-size` tune reads QC
+- `--grt-qc-memory-gb` and `--grt-kmer-size`: tune optional reads QC, defaults `80` and `21`
+
+Do not provide paths for the GRT executables. The workflow automatically calls `minimap2`, `nucmer`, `delta-filter`, and `show-coords` from the active environment; when reads QC is enabled, it also calls `meryl`, `merqury.sh`, and `craq`. Run both `prepare.sh` and the generated `run_all.sh` in an environment whose `PATH` contains the required commands.
 
 > [!IMPORTANT]
 > Engine-specific options are optional override knobs. Use them only with the matching `--aligner`; passing an option for another engine fails before output is written.

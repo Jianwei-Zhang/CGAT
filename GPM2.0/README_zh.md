@@ -22,8 +22,8 @@ GPM2.0 采用服务端与客户端分离的工作模式：
   - `minimap2`：推荐 `2.31`；仍兼容支持 `-x asm10/asm5`、`-t` 和 PAF 输出的旧版本
   - `blastn`：推荐 BLAST+ `2.17.0`，并需要 `makeblastdb`
   - `winnowmap`：推荐 `2.03`，并需要 `meryl`
-- GRT 预计算 Final Path：`minimap2`，以及 MUMmer4 的 `nucmer`、`delta-filter`、`show-coords`
-- 可选 reads 组装质控：`meryl`、`merqury.sh`、`craq`；只有传入一个或多个 `--reads` 时才要求这些工具
+- GRT 预计算 Final Path：`minimap2`，以及 MUMmer4 的 `nucmer`、`delta-filter`、`show-coords`；请将其安装到执行环境并确保可通过 `PATH` 调用
+- 可选 reads 组装质控：`meryl`、`merqury.sh`、`craq`；只有传入一个或多个 `--reads` 时才要求这些工具可通过 `PATH` 调用
 - 输入数据：`ref_genome.fa`、`hifiasm.fa`、`flye.fa`、`canu2.fa`
 
 注：本文档仅以此类数据为例展示流程，并非仅支持此类输入。
@@ -54,13 +54,6 @@ bash server/prepare.sh \
   [--cen-min-len 10000] \
   [--cen-min-identity 80] \
   [--reads /path/to/reads.fastq.gz ...] \
-  [--grt-meryl /path/to/meryl] \
-  [--grt-merqury /path/to/merqury.sh] \
-  [--grt-craq /path/to/craq] \
-  [--grt-minimap2 /path/to/minimap2] \
-  [--grt-nucmer /path/to/nucmer] \
-  [--grt-delta-filter /path/to/delta-filter] \
-  [--grt-show-coords /path/to/show-coords] \
   [--grt-qc-memory-gb 80] \
   [--grt-kmer-size 21] \
   [--skip-self]
@@ -81,7 +74,9 @@ bash server/prepare.sh \
 - `--skip-self`：跳过同一 dataset 的 self alignment；导入、方向矫正和跨 dataset Subview 不受影响，同 dataset 的 ctg-to-ctg Subview 不可用
 - 第一个 `--ds` 固定为 primary，后续所有初始 `--ds` 固定为 support
 - 可重复的 `--reads`：启用一个共享 Meryl 数据库和逐 dataset Merqury/CRAQ 质控；不传 reads 时只跳过 reads 质控，完整 GRT 修复流程仍会执行
-- `--grt-*`：覆盖 Step1、Step2/3、端粒恢复和可选 reads 质控所用工具路径；`--grt-qc-memory-gb` 与 `--grt-kmer-size` 用于调整 reads 质控
+- `--grt-qc-memory-gb` 与 `--grt-kmer-size`：调整可选 reads 质控，默认值分别为 `80` 和 `21`
+
+无需提供 GRT 工具路径。流程会自动从当前环境调用 `minimap2`、`nucmer`、`delta-filter`、`show-coords`；启用 reads 质控时还会调用 `meryl`、`merqury.sh`、`craq`。请确保执行 `prepare.sh` 和随后生成的 `run_all.sh` 时，所用环境的 `PATH` 均能找到相应命令。
 
 > [!IMPORTANT]
 > 引擎专属参数均为可选覆盖项，只能和对应 `--aligner` 一起使用；若传入与所选引擎不匹配的参数，脚本会在写入输出前失败。
