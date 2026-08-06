@@ -2935,7 +2935,34 @@ pub fn load_grt_project_view(project_db_path: &Path) -> Result<GrtProjectView> {
         final_path_by_chr: load_grt_final_path_by_chr(project_db_path)?,
         object_attempts: load_grt_object_attempts(project_db_path)?,
         source_cards: load_grt_source_cards(project_db_path)?,
-        verification: verify_persisted_grt_final_path(project_db_path)?,
+        verification: load_persisted_grt_final_path_verification(project_db_path)?,
+    })
+}
+
+pub fn load_persisted_grt_final_path_verification(
+    project_db_path: &Path,
+) -> Result<GrtFinalPathVerification> {
+    let conn = open_workspace_db(project_db_path)?;
+    let (chromosome_count, segment_count, q4_artifact_sha256): (i64, i64, String) = conn
+        .query_row(
+            "SELECT
+                (SELECT COUNT(*) FROM grt_final_path_chr),
+                (SELECT COUNT(*) FROM grt_final_path_segment),
+                q4_artifact_sha256
+             FROM grt_package
+             WHERE id = 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .optional()
+        .context("failed to load persisted GRT Final Path verification summary")?
+        .ok_or_else(|| anyhow!("precomputed GRT Final Path is not available"))?;
+    Ok(GrtFinalPathVerification {
+        chromosome_count: usize::try_from(chromosome_count)
+            .context("persisted GRT chromosome count is invalid")?,
+        segment_count: usize::try_from(segment_count)
+            .context("persisted GRT segment count is invalid")?,
+        q4_artifact_sha256,
     })
 }
 
@@ -3949,6 +3976,28 @@ mod tests {
         assert_eq!(view.final_path_by_chr.len(), 1);
         assert_eq!(view.object_attempts.len(), 1);
         assert_eq!(view.source_cards.len(), 1);
+    }
+
+    #[test]
+    fn project_view_reuses_persisted_verification_without_reading_q4() {
+        let temp = tempdir().unwrap();
+        let bundle_root = temp.path().join("gpm_server");
+        copy_tree(&fixture_root(), &bundle_root);
+        let (outcome, _) = crate::importer::import_from_extracted_bundle(&bundle_root).unwrap();
+        let expected = verify_persisted_grt_final_path(&outcome.project_db_path).unwrap();
+        let recipe = load_grt_locked_recipe(&outcome.project_db_path).unwrap();
+        let q4_path = outcome
+            .project_db_path
+            .parent()
+            .unwrap()
+            .join(recipe.final_q_relpath);
+        fs::remove_file(&q4_path).unwrap();
+
+        let view = load_grt_project_view(&outcome.project_db_path).unwrap();
+        assert_eq!(view.verification, expected);
+
+        let error = verify_persisted_grt_final_path(&outcome.project_db_path).unwrap_err();
+        assert!(error.to_string().contains("failed to read artifact"));
     }
 
     #[test]
