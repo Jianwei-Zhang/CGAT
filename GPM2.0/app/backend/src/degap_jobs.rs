@@ -214,10 +214,10 @@ fn optional_i64_from_object(object: &Map<String, Value>, key: &str) -> Result<Op
     if value.is_null() {
         return Ok(None);
     }
-    if let Some(text) = value.as_str() {
-        if is_optional_number_unset_text(text) {
-            return Ok(None);
-        }
+    if let Some(text) = value.as_str()
+        && is_optional_number_unset_text(text)
+    {
+        return Ok(None);
     }
     value_to_i64(value, key).map(Some)
 }

@@ -131,6 +131,14 @@ struct ValidatedRequest {
     description: Option<String>,
 }
 
+struct ProcessedProjectState<'a> {
+    reference_genome_id: i64,
+    primary_dataset_id: i64,
+    phased_assembly_enabled: bool,
+    chr_assignment_min_coverage_percent: f64,
+    support_dataset_ids: &'a [i64],
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct WorkspacePackageMetadata {
     package_mode: String,
@@ -399,11 +407,13 @@ pub fn update_project_with_connection(
         if is_processed {
             validate_processed_project_update(
                 request,
-                before_reference_genome_id,
-                before_primary_dataset_id,
-                before_phased_assembly_enabled,
-                before_chr_assignment_min_coverage_percent,
-                &before_support_dataset_ids,
+                ProcessedProjectState {
+                    reference_genome_id: before_reference_genome_id,
+                    primary_dataset_id: before_primary_dataset_id,
+                    phased_assembly_enabled: before_phased_assembly_enabled,
+                    chr_assignment_min_coverage_percent: before_chr_assignment_min_coverage_percent,
+                    support_dataset_ids: &before_support_dataset_ids,
+                },
                 &requested_support_dataset_ids,
                 phased_assembly_enabled,
             )?
@@ -517,35 +527,31 @@ pub fn update_project_with_connection(
 
 fn validate_processed_project_update(
     request: &ProjectUpdateRequest,
-    before_reference_genome_id: i64,
-    before_primary_dataset_id: i64,
-    before_phased_assembly_enabled: bool,
-    before_chr_assignment_min_coverage_percent: f64,
-    before_support_dataset_ids: &[i64],
+    before: ProcessedProjectState<'_>,
     requested_support_dataset_ids: &[i64],
     requested_phased_assembly_enabled: bool,
 ) -> Result<(Vec<i64>, Vec<i64>, bool)> {
-    if request.reference_genome_id != before_reference_genome_id {
+    if request.reference_genome_id != before.reference_genome_id {
         bail!("该项目已进入装配流程，禁止修改 reference_genome_id。");
     }
-    if request.primary_dataset_id != before_primary_dataset_id {
+    if request.primary_dataset_id != before.primary_dataset_id {
         bail!("该项目已进入装配流程，禁止修改 primary_dataset_id。");
     }
     if let Some(requested_threshold) = request.chr_assignment_min_coverage_percent
-        && (requested_threshold - before_chr_assignment_min_coverage_percent).abs() > f64::EPSILON
+        && (requested_threshold - before.chr_assignment_min_coverage_percent).abs() > f64::EPSILON
     {
         bail!("该项目已进入装配流程，禁止修改 chr_assignment_min_coverage_percent。");
     }
-    for dataset_id in before_support_dataset_ids {
+    for dataset_id in before.support_dataset_ids {
         if !requested_support_dataset_ids.contains(dataset_id) {
             bail!("该项目已进入装配流程，support_dataset_ids 只允许追加，不能移除。");
         }
     }
-    if before_phased_assembly_enabled && !requested_phased_assembly_enabled {
+    if before.phased_assembly_enabled && !requested_phased_assembly_enabled {
         bail!("该项目已进入装配流程，phased_assembly_enabled 只允许开启，不能关闭。");
     }
 
-    let mut effective_support_dataset_ids = before_support_dataset_ids.to_vec();
+    let mut effective_support_dataset_ids = before.support_dataset_ids.to_vec();
     let mut append_support_dataset_ids = Vec::new();
     let mut seen = effective_support_dataset_ids
         .iter()
@@ -561,7 +567,7 @@ fn validate_processed_project_update(
     Ok((
         effective_support_dataset_ids,
         append_support_dataset_ids,
-        before_phased_assembly_enabled || requested_phased_assembly_enabled,
+        before.phased_assembly_enabled || requested_phased_assembly_enabled,
     ))
 }
 

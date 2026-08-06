@@ -958,9 +958,7 @@ where
         index_add_ctg_alignment_payloads(
             &project_db_path,
             workspace_root,
-            &payload_root,
             &manifest,
-            &validated,
             &catalog,
             project_id,
             &mut recorder,
@@ -1410,9 +1408,7 @@ where
 fn index_add_ctg_alignment_payloads<P, C>(
     project_db_path: &Path,
     bundle_root: &Path,
-    _payload_root: &Path,
     manifest: &AddCtgManifest,
-    _validated: &ValidatedAddCtgPackage,
     catalog: &AddCtgCatalogAppend,
     project_id: i64,
     recorder: &mut ImportProgressWriter<'_, P>,

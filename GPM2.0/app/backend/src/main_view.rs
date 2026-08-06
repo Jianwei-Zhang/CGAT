@@ -9,8 +9,9 @@ use rusqlite::{Connection, OptionalExtension, ToSql, params, params_from_iter};
 use crate::db::open_workspace_db;
 use crate::exporter::load_named_sequences_from_fasta;
 use crate::reference_segments::{
-    ReferenceGapInterval, ReferenceSegment, SplitReferenceBlock, detect_reference_gap_intervals,
-    detect_reference_segments, map_paf_query_interval_to_ref_span, split_paf_hit_by_reference_gaps,
+    PafQueryIntervalMapping, ReferenceGapInterval, ReferenceSegment, SplitReferenceBlock,
+    detect_reference_gap_intervals, detect_reference_segments, map_paf_query_interval_to_ref_span,
+    split_paf_hit_by_reference_gaps,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -459,9 +460,9 @@ pub fn list_chr_view_ctgs_with_connection(
         .with_context(|| format!("project_id {} does not exist", project_id))?;
 
     for ctg in &mut ctgs {
-        let hit_dataset_filter = if dataset_param == Some(primary_dataset_id) {
-            None
-        } else if ctg.derived_target_dataset_id == dataset_param {
+        let hit_dataset_filter = if dataset_param == Some(primary_dataset_id)
+            || ctg.derived_target_dataset_id == dataset_param
+        {
             None
         } else {
             dataset_param
@@ -1303,10 +1304,10 @@ fn split_hit_around_n_regions(
         if region.start_bp > clipped_end {
             break;
         }
-        if region.start_bp > cursor {
-            if let Some(segment) = map_query_segment_to_ref(row, cursor, region.start_bp - 1) {
-                segments.push(segment);
-            }
+        if region.start_bp > cursor
+            && let Some(segment) = map_query_segment_to_ref(row, cursor, region.start_bp - 1)
+        {
+            segments.push(segment);
         }
         cursor = cursor.max(region.end_bp + 1);
         if cursor > clipped_end {
@@ -1328,16 +1329,16 @@ fn map_query_segment_to_ref(
 ) -> Option<ChrViewHitSegment> {
     let cg_tag = row.cg_tag.as_deref().unwrap_or("").trim();
     if !cg_tag.is_empty()
-        && let Ok(Some(block)) = map_paf_query_interval_to_ref_span(
-            row.query_start,
-            row.query_end,
-            row.ref_start,
-            row.ref_end,
-            &row.strand,
+        && let Ok(Some(block)) = map_paf_query_interval_to_ref_span(PafQueryIntervalMapping {
+            query_start_bp: row.query_start,
+            query_end_bp: row.query_end,
+            ref_start_bp: row.ref_start,
+            ref_end_bp: row.ref_end,
+            strand: &row.strand,
             cg_tag,
-            query_start,
-            query_end,
-        )
+            interval_start_bp: query_start,
+            interval_end_bp: query_end,
+        })
     {
         return Some(ChrViewHitSegment {
             query_start: block.query_start_bp,

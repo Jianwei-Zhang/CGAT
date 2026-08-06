@@ -22,6 +22,18 @@ pub struct SplitReferenceBlock {
     pub ref_end_bp: i64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PafQueryIntervalMapping<'a> {
+    pub query_start_bp: i64,
+    pub query_end_bp: i64,
+    pub ref_start_bp: i64,
+    pub ref_end_bp: i64,
+    pub strand: &'a str,
+    pub cg_tag: &'a str,
+    pub interval_start_bp: i64,
+    pub interval_end_bp: i64,
+}
+
 pub fn detect_reference_segments(
     reference_chr_name: &str,
     sequence: &str,
@@ -201,15 +213,18 @@ pub fn split_paf_hit_by_reference_gaps(
 }
 
 pub fn map_paf_query_interval_to_ref_span(
-    query_start_bp: i64,
-    query_end_bp: i64,
-    ref_start_bp: i64,
-    ref_end_bp: i64,
-    strand: &str,
-    cg_tag: &str,
-    interval_start_bp: i64,
-    interval_end_bp: i64,
+    params: PafQueryIntervalMapping<'_>,
 ) -> Result<Option<SplitReferenceBlock>> {
+    let PafQueryIntervalMapping {
+        query_start_bp,
+        query_end_bp,
+        ref_start_bp,
+        ref_end_bp,
+        strand,
+        cg_tag,
+        interval_start_bp,
+        interval_end_bp,
+    } = params;
     if query_start_bp < 1 || query_end_bp < query_start_bp {
         bail!("invalid query range {}..{}", query_start_bp, query_end_bp);
     }
@@ -528,8 +543,8 @@ fn can_merge_split_blocks(
 #[cfg(test)]
 mod tests {
     use super::{
-        ReferenceGapInterval, detect_reference_segments, map_paf_query_interval_to_ref_span,
-        split_paf_hit_by_reference_gaps,
+        PafQueryIntervalMapping, ReferenceGapInterval, detect_reference_segments,
+        map_paf_query_interval_to_ref_span, split_paf_hit_by_reference_gaps,
     };
 
     #[test]
@@ -592,17 +607,33 @@ mod tests {
 
     #[test]
     fn maps_query_interval_to_ref_span_with_insertion_and_deletion_offsets() {
-        let block =
-            map_paf_query_interval_to_ref_span(10, 40, 100, 129, "+", "10M3I5M2D13M", 10, 24)
-                .unwrap()
-                .unwrap();
+        let block = map_paf_query_interval_to_ref_span(PafQueryIntervalMapping {
+            query_start_bp: 10,
+            query_end_bp: 40,
+            ref_start_bp: 100,
+            ref_end_bp: 129,
+            strand: "+",
+            cg_tag: "10M3I5M2D13M",
+            interval_start_bp: 10,
+            interval_end_bp: 24,
+        })
+        .unwrap()
+        .unwrap();
         assert_eq!((block.query_start_bp, block.query_end_bp), (10, 24));
         assert_eq!((block.ref_start_bp, block.ref_end_bp), (100, 111));
 
-        let block =
-            map_paf_query_interval_to_ref_span(10, 40, 100, 129, "+", "10M3I5M2D13M", 31, 40)
-                .unwrap()
-                .unwrap();
+        let block = map_paf_query_interval_to_ref_span(PafQueryIntervalMapping {
+            query_start_bp: 10,
+            query_end_bp: 40,
+            ref_start_bp: 100,
+            ref_end_bp: 129,
+            strand: "+",
+            cg_tag: "10M3I5M2D13M",
+            interval_start_bp: 31,
+            interval_end_bp: 40,
+        })
+        .unwrap()
+        .unwrap();
         assert_eq!((block.query_start_bp, block.query_end_bp), (31, 40));
         assert_eq!((block.ref_start_bp, block.ref_end_bp), (120, 129));
     }

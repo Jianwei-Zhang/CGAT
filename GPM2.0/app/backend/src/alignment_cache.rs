@@ -34,6 +34,15 @@ enum RefHitClearScope {
     SourceSeq(i64),
 }
 
+struct RefPafLoadParams<'a> {
+    dataset_id: i64,
+    clear_scope: RefHitClearScope,
+    run_name: &'a str,
+    run_paf_path: &'a Path,
+    source_seq_by_name: &'a HashMap<String, i64>,
+    ref_chr_by_name: &'a HashMap<String, i64>,
+}
+
 pub fn ensure_project_ref_alignment_hits(
     conn: &mut Connection,
     project_id: i64,
@@ -391,12 +400,14 @@ where
     source_seq_by_name.insert(seq_name.to_string(), source_seq_id);
     load_ref_paf_hits(
         conn,
-        dataset_id,
-        RefHitClearScope::SourceSeq(source_seq_id),
-        run_name,
-        run_paf_path,
-        &source_seq_by_name,
-        &ref_chr_by_name,
+        RefPafLoadParams {
+            dataset_id,
+            clear_scope: RefHitClearScope::SourceSeq(source_seq_id),
+            run_name,
+            run_paf_path,
+            source_seq_by_name: &source_seq_by_name,
+            ref_chr_by_name: &ref_chr_by_name,
+        },
         should_cancel,
     )
 }
@@ -429,26 +440,31 @@ fn load_ref_paf_hits_for_dataset(
 ) -> Result<i64> {
     load_ref_paf_hits(
         conn,
-        dataset_id,
-        RefHitClearScope::Dataset(dataset_id),
-        run_name,
-        run_paf_path,
-        source_seq_by_name,
-        ref_chr_by_name,
+        RefPafLoadParams {
+            dataset_id,
+            clear_scope: RefHitClearScope::Dataset(dataset_id),
+            run_name,
+            run_paf_path,
+            source_seq_by_name,
+            ref_chr_by_name,
+        },
         should_cancel,
     )
 }
 
 fn load_ref_paf_hits(
     conn: &Connection,
-    dataset_id: i64,
-    clear_scope: RefHitClearScope,
-    run_name: &str,
-    run_paf_path: &Path,
-    source_seq_by_name: &HashMap<String, i64>,
-    ref_chr_by_name: &HashMap<String, i64>,
+    params: RefPafLoadParams<'_>,
     should_cancel: &mut impl FnMut() -> bool,
 ) -> Result<i64> {
+    let RefPafLoadParams {
+        dataset_id,
+        clear_scope,
+        run_name,
+        run_paf_path,
+        source_seq_by_name,
+        ref_chr_by_name,
+    } = params;
     if should_cancel() {
         bail!("auto pipeline cancelled");
     }
