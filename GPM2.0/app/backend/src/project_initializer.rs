@@ -1086,10 +1086,7 @@ fn insert_bootstrap_auto_seed(
     let assembly_seq_id = tx.last_insert_rowid();
     let note = format!(
         "imported_assignment=1; source_orientation={}; orientation_source={}; support_bp={}; support_percent={:.3}",
-        seed.source_orientation,
-        seed.orientation_source,
-        seed.support_bp,
-        seed.support_percent
+        seed.source_orientation, seed.orientation_source, seed.support_bp, seed.support_percent
     );
     tx.execute(
         "INSERT INTO assembly_ctg (
@@ -2125,7 +2122,15 @@ mod tests {
             bootstrap_project_assembly_with_connection(&mut conn, project.project_id).unwrap();
         assert_eq!(summary.assembly_seq_count, 1);
 
-        let row: (String, Option<String>, Option<i64>, Option<i64>, String, String, String) = conn
+        let row: (
+            String,
+            Option<String>,
+            Option<i64>,
+            Option<i64>,
+            String,
+            String,
+            String,
+        ) = conn
             .query_row(
                 "SELECT c.name, c.assigned_chr_name, c.chr_order, c.anchor_start,
                         c.placement_mode, s.instance_key, s.orient

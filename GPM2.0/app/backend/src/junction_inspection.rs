@@ -1494,7 +1494,9 @@ fn read_cross_dataset_server_hits(
                     &run_path.run_name,
                     &run_path.paf_path,
                 )
-                .with_context(|| format!("failed to cache pair paf {}", run_path.paf_path.display()))?;
+                .with_context(|| {
+                    format!("failed to cache pair paf {}", run_path.paf_path.display())
+                })?;
                 let pair_hits = query_pairwise_cached_hits(
                     conn,
                     run_cache.id,
@@ -2240,7 +2242,10 @@ mod tests {
         assert_eq!(junction_report.hits[0].query_start, 101);
         assert_eq!(junction_report.hits[0].query_end, 600);
         assert_eq!(junction_report.hits[0].subject_assembly_ctg_id, 402);
-        assert_eq!(junction_report.hits[0].subject_source_seq_name, "gapfiller-t1");
+        assert_eq!(
+            junction_report.hits[0].subject_source_seq_name,
+            "gapfiller-t1"
+        );
         assert_eq!(junction_report.hits[0].subject_start, 11);
         assert_eq!(junction_report.hits[0].subject_end, 510);
 

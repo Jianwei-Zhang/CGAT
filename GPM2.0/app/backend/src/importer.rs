@@ -324,10 +324,10 @@ where
         "validate_grt_contract_start",
         "starting full GRT package validation".to_string(),
     );
-    let grt_package = validate_grt_package_with_progress(
-        &resolved.bundle_root,
-        &mut |stage, detail| recorder.record(stage, detail.to_string()),
-    )?;
+    let grt_package =
+        validate_grt_package_with_progress(&resolved.bundle_root, &mut |stage, detail| {
+            recorder.record(stage, detail.to_string())
+        })?;
     recorder.record(
         "validate_grt_contract",
         "workflow=gpm_grt_precomputed_v1 schema_version=1".to_string(),
@@ -473,16 +473,16 @@ where
         "validate_grt_contract_start",
         "starting full GRT package validation".to_string(),
     );
-    let grt_package = match validate_grt_package_with_progress(
-        workspace_root,
-        &mut |stage, detail| recorder.record(stage, detail.to_string()),
-    ) {
-        Ok(package) => package,
-        Err(error) => {
-            remove_failed_zip_workspace(workspace_root, &error)?;
-            return Err(error);
-        }
-    };
+    let grt_package =
+        match validate_grt_package_with_progress(workspace_root, &mut |stage, detail| {
+            recorder.record(stage, detail.to_string())
+        }) {
+            Ok(package) => package,
+            Err(error) => {
+                remove_failed_zip_workspace(workspace_root, &error)?;
+                return Err(error);
+            }
+        };
     recorder.record(
         "validate_grt_contract",
         "workflow=gpm_grt_precomputed_v1 schema_version=1".to_string(),
@@ -1021,8 +1021,16 @@ fn validate_expected_add_ctg_target(
             "该 add_ctg 包属于 {} / {} 轨道，不能导入到当前 {} / {} 轨道。",
             manifest.target_chr,
             manifest.target_track,
-            if expected_chr.is_empty() { "-" } else { expected_chr },
-            if expected_track.is_empty() { "-" } else { expected_track }
+            if expected_chr.is_empty() {
+                "-"
+            } else {
+                expected_chr
+            },
+            if expected_track.is_empty() {
+                "-"
+            } else {
+                expected_track
+            }
         );
     }
     Ok(())
@@ -1421,7 +1429,13 @@ where
     } else {
         discover_add_ctg_pairwise_import_runs(&conn, bundle_root, project_id, manifest)?
     };
-    recorder.reserve_remaining(2 + if pairwise_runs.is_empty() { 0 } else { pairwise_runs.len() + 1 });
+    recorder.reserve_remaining(
+        2 + if pairwise_runs.is_empty() {
+            0
+        } else {
+            pairwise_runs.len() + 1
+        },
+    );
     let ref_run_name = format!("{}_vs_ref", manifest.ctg_name);
     let ref_paf_path = bundle_root
         .join("runs")
@@ -1430,7 +1444,11 @@ where
         .join("result.paf");
     recorder.record(
         "index_ref_paf",
-        format!("{} ({})", ref_run_name, path_relative_to(bundle_root, &ref_paf_path)),
+        format!(
+            "{} ({})",
+            ref_run_name,
+            path_relative_to(bundle_root, &ref_paf_path)
+        ),
     );
     let loaded_ref_hits = index_ref_alignment_hits_for_source_seq_with_cancel(
         &mut conn,
@@ -1886,7 +1904,10 @@ fn sync_catalog_from_bundle(
     }
     let package = read_package_row(bundle_root)?;
     let chr_assignments = read_imported_chr_assignment_rows(bundle_root)?;
-    let track_member_orders = if bundle_root.join("metadata/track_member_orders.tsv").is_file() {
+    let track_member_orders = if bundle_root
+        .join("metadata/track_member_orders.tsv")
+        .is_file()
+    {
         read_imported_track_member_order_rows(bundle_root)?
     } else {
         derive_track_member_orders_from_assignments(&chr_assignments)
@@ -2315,8 +2336,14 @@ fn read_add_ctg_manifest(extract_root: &Path) -> Result<AddCtgManifest> {
         .cloned()
         .unwrap_or_else(|| "0.9998".to_string());
     let skip_self = parse_bool_flag(&required_key_value(&values, "skip_self")?, "skip_self")?;
-    let self_alignment_scope = values.get("self_alignment_scope").cloned().unwrap_or_default();
-    let cross_alignment_scope = values.get("cross_alignment_scope").cloned().unwrap_or_default();
+    let self_alignment_scope = values
+        .get("self_alignment_scope")
+        .cloned()
+        .unwrap_or_default();
+    let cross_alignment_scope = values
+        .get("cross_alignment_scope")
+        .cloned()
+        .unwrap_or_default();
     let sequence_layout = required_key_value(&values, "sequence_layout")?;
     let preassigned_chr = parse_bool_flag(
         &required_key_value(&values, "preassigned_chr")?,
@@ -2550,7 +2577,12 @@ fn validate_add_ctg_package(
         )
         .optional()
         .context("failed to resolve add_ctg target track")?
-        .with_context(|| format!("add_ctg target track does not exist: {}", manifest.target_track))?;
+        .with_context(|| {
+            format!(
+                "add_ctg target track does not exist: {}",
+                manifest.target_track
+            )
+        })?;
     if target_project_count == 0 {
         bail!(
             "add_ctg target track {} is not part of project_id {}",
@@ -2921,7 +2953,10 @@ fn read_workspace_prepare_options_for_add(
     values.insert("blastn_dust".to_string(), "no".to_string());
     values.insert("winnowmap_preset".to_string(), "asm20".to_string());
     values.insert("winnowmap_kmer".to_string(), "19".to_string());
-    values.insert("winnowmap_repeat_fraction".to_string(), "0.9998".to_string());
+    values.insert(
+        "winnowmap_repeat_fraction".to_string(),
+        "0.9998".to_string(),
+    );
     values.insert("skip_self".to_string(), skip_self.to_string());
     values.insert(
         "self_alignment_scope".to_string(),
@@ -3124,14 +3159,15 @@ fn validate_add_ctg_payload_files(
     }
     let chr_assignment = read_single_add_ctg_chr_assignment(payload_root, manifest)?;
     let locator = read_single_add_ctg_locator(payload_root, manifest)?;
-    let locator_source_names = HashSet::from([(
-        manifest.derived_dataset.clone(),
-        manifest.ctg_name.clone(),
-    )]);
+    let locator_source_names =
+        HashSet::from([(manifest.derived_dataset.clone(), manifest.ctg_name.clone())]);
     let n_regions = read_source_seq_n_region_rows(payload_root)?;
     validate_add_ctg_n_region_payload(manifest, &locator_source_names, &n_regions)?;
 
-    validate_add_payload_relpath("derived source_seq_locator fasta_relpath", &locator.fasta_relpath)?;
+    validate_add_payload_relpath(
+        "derived source_seq_locator fasta_relpath",
+        &locator.fasta_relpath,
+    )?;
     require_payload_file(payload_root, &locator.fasta_relpath)?;
     require_payload_file(payload_root, &format!("{}.fai", locator.fasta_relpath))?;
     require_payload_file(
@@ -3420,7 +3456,10 @@ fn validate_add_ctg_payload_merge_targets(
             continue;
         }
         let relpath = source.strip_prefix(payload_root).with_context(|| {
-            format!("failed to relativize add_ctg payload path {}", source.display())
+            format!(
+                "failed to relativize add_ctg payload path {}",
+                source.display()
+            )
         })?;
         let rel = relpath.to_string_lossy().replace('\\', "/");
         if !is_allowed_add_ctg_payload_file(&rel) {
@@ -3436,7 +3475,10 @@ fn validate_add_ctg_payload_merge_targets(
         }
         let target = workspace_root.join(relpath);
         if target.exists() {
-            bail!("add_ctg payload target already exists: {}", target.display());
+            bail!(
+                "add_ctg payload target already exists: {}",
+                target.display()
+            );
         }
     }
     Ok(())
@@ -4366,10 +4408,7 @@ fn sync_source_seq_locator_rows(
     Ok(())
 }
 
-fn sync_source_seq_n_region_rows(
-    tx: &Transaction<'_>,
-    rows: &[SourceSeqNRegionRow],
-) -> Result<()> {
+fn sync_source_seq_n_region_rows(tx: &Transaction<'_>, rows: &[SourceSeqNRegionRow]) -> Result<()> {
     tx.execute("DELETE FROM source_seq_n_region", [])
         .context("failed to clear source_seq_n_region rows")?;
 
@@ -4658,7 +4697,10 @@ fn copy_add_ctg_payload_entry(
             continue;
         }
         let relpath = source.strip_prefix(payload_root).with_context(|| {
-            format!("failed to relativize add_ctg payload path {}", source.display())
+            format!(
+                "failed to relativize add_ctg payload path {}",
+                source.display()
+            )
         })?;
         let target = workspace_root.join(relpath);
         let rel = relpath.to_string_lossy().replace('\\', "/");
@@ -4683,11 +4725,17 @@ fn copy_add_ctg_payload_entry(
             continue;
         }
         if target.exists() {
-            bail!("add_ctg payload target already exists: {}", target.display());
+            bail!(
+                "add_ctg payload target already exists: {}",
+                target.display()
+            );
         }
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).with_context(|| {
-                format!("failed to create add_ctg payload target dir {}", parent.display())
+                format!(
+                    "failed to create add_ctg payload target dir {}",
+                    parent.display()
+                )
             })?;
         }
         fs::copy(&source, &target).with_context(|| {
@@ -4894,7 +4942,10 @@ fn append_dataset_tsv_if_new(source: &Path, target: &Path, dataset_name: &str) -
     if !target.exists() {
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).with_context(|| {
-                format!("failed to create add_ctg dataset tsv dir {}", parent.display())
+                format!(
+                    "failed to create add_ctg dataset tsv dir {}",
+                    parent.display()
+                )
             })?;
         }
         fs::copy(source, target).with_context(|| {
@@ -4911,7 +4962,10 @@ fn append_dataset_tsv_if_new(source: &Path, target: &Path, dataset_name: &str) -
         .with_context(|| format!("failed to read workspace dataset tsv {}", target.display()))?;
     let target_header = target_text.lines().next().unwrap_or_default();
     if target_header != source_header {
-        bail!("add_ctg dataset tsv header mismatch for {}", target.display());
+        bail!(
+            "add_ctg dataset tsv header mismatch for {}",
+            target.display()
+        );
     }
     let already_present = target_text
         .lines()
@@ -4937,7 +4991,10 @@ fn append_fasta_payload_records(source: &Path, target: &Path) -> Result<()> {
     let source_text = fs::read_to_string(source)
         .with_context(|| format!("failed to read add_ctg fasta {}", source.display()))?;
     if !source_text.lines().any(|line| line.starts_with('>')) {
-        bail!("add_ctg fasta payload has no FASTA header: {}", source.display());
+        bail!(
+            "add_ctg fasta payload has no FASTA header: {}",
+            source.display()
+        );
     }
     if !target.exists() {
         if let Some(parent) = target.parent() {
@@ -4959,7 +5016,12 @@ fn append_fasta_payload_records(source: &Path, target: &Path) -> Result<()> {
     let source_headers = source_text
         .lines()
         .filter_map(|line| line.strip_prefix('>'))
-        .map(|line| line.split_whitespace().next().unwrap_or_default().to_string())
+        .map(|line| {
+            line.split_whitespace()
+                .next()
+                .unwrap_or_default()
+                .to_string()
+        })
         .collect::<Vec<_>>();
     for header in &source_headers {
         if target_text
@@ -5085,7 +5147,11 @@ fn append_catalog_from_add_payload(
             dataset.assembler_version,
             path_to_string(&fasta_path)?,
             path_to_string(&fai_path)?,
-            if dataset.self_alignment_available { 1_i64 } else { 0_i64 }
+            if dataset.self_alignment_available {
+                1_i64
+            } else {
+                0_i64
+            }
         ],
     )
     .with_context(|| format!("failed to insert add dataset {}", manifest.dataset_name))?;
@@ -5290,7 +5356,12 @@ fn insert_derived_ctg_track_member_row(
             row.created_at
         ],
     )
-    .with_context(|| format!("failed to insert derived_ctg track member for {}", row.member_ctg))?;
+    .with_context(|| {
+        format!(
+            "failed to insert derived_ctg track member for {}",
+            row.member_ctg
+        )
+    })?;
     Ok(())
 }
 
@@ -5402,10 +5473,7 @@ fn append_source_seq_n_region_rows(
     Ok(())
 }
 
-fn insert_source_seq_n_region_row(
-    tx: &Transaction<'_>,
-    row: &SourceSeqNRegionRow,
-) -> Result<()> {
+fn insert_source_seq_n_region_row(tx: &Transaction<'_>, row: &SourceSeqNRegionRow) -> Result<()> {
     let source_seq_id: i64 = tx
         .query_row(
             "SELECT ss.id
@@ -6068,13 +6136,9 @@ mod tests {
         assert_eq!(progress.first().unwrap().phase_index, Some(1));
         assert_eq!(progress.last().unwrap().phase_index, Some(7));
         assert!(progress.windows(2).all(|items| {
-            items[0].phase_index.unwrap_or_default()
-                <= items[1].phase_index.unwrap_or_default()
+            items[0].phase_index.unwrap_or_default() <= items[1].phase_index.unwrap_or_default()
         }));
-        let stages = progress
-            .iter()
-            .map(|item| item.stage)
-            .collect::<Vec<_>>();
+        let stages = progress.iter().map(|item| item.stage).collect::<Vec<_>>();
         let normalize_index = stages
             .iter()
             .position(|stage| *stage == "normalize_workspace_layout")
@@ -6121,7 +6185,11 @@ mod tests {
             &mut || false,
         )
         .unwrap_err();
-        assert!(error.to_string().contains("GRT_IMPORT_MISSING_REQUIRED_FILE"));
+        assert!(
+            error
+                .to_string()
+                .contains("GRT_IMPORT_MISSING_REQUIRED_FILE")
+        );
         assert!(!workspace_root.exists());
         assert_eq!(
             observed_progress.last().map(|step| step.stage),
@@ -6477,7 +6545,11 @@ mod tests {
         create_partitioned_fast_bundle_root(&bundle_root, false);
 
         let error = import_from_extracted_bundle(&bundle_root).unwrap_err();
-        assert!(error.to_string().contains("GRT_IMPORT_MISSING_REQUIRED_FILE"));
+        assert!(
+            error
+                .to_string()
+                .contains("GRT_IMPORT_MISSING_REQUIRED_FILE")
+        );
         assert!(!bundle_root.join(PROJECT_DB_NAME).exists());
     }
 
@@ -6743,8 +6815,7 @@ mod tests {
                 .any(|item| item.stage == "index_pairwise_paf")
         );
         assert!(progress.iter().any(|item| {
-            item.stage == "index_pairwise_paf_complete"
-                && item.detail.contains("indexed_runs=2")
+            item.stage == "index_pairwise_paf_complete" && item.detail.contains("indexed_runs=2")
         }));
 
         let conn = Connection::open(&outcome.project_db_path).unwrap();
@@ -6872,7 +6943,9 @@ mod tests {
         )
         .unwrap_err();
         assert!(
-            error.to_string().contains("该 add_ctg 包属于 r / ds_a 轨道"),
+            error
+                .to_string()
+                .contains("该 add_ctg 包属于 r / ds_a 轨道"),
             "unexpected error: {error}"
         );
     }
@@ -7566,10 +7639,7 @@ mod tests {
             let mut next_start = 1_i64;
             for assignment in rows {
                 evidence_index += 1;
-                let source_key = (
-                    assignment.dataset_name.clone(),
-                    assignment.seq_name.clone(),
-                );
+                let source_key = (assignment.dataset_name.clone(), assignment.seq_name.clone());
                 let source_sequence = &source_sequences[&source_key];
                 let projected_sequence = if assignment.source_orientation == "-" {
                     test_reverse_complement(source_sequence)
@@ -7599,9 +7669,8 @@ mod tests {
                 let raw_relpath = format!("grt/evidence/test/{evidence_id}.paf");
                 fs::write(bundle_root.join(&raw_relpath), b"").unwrap();
                 let dataset = dataset_by_name[assignment.dataset_name.as_str()];
-                let query_sha = test_sha256(
-                    &fs::read(bundle_root.join(&dataset.fasta_relpath)).unwrap(),
-                );
+                let query_sha =
+                    test_sha256(&fs::read(bundle_root.join(&dataset.fasta_relpath)).unwrap());
                 evidence.push_str(&format!(
                     "{}\tassignment\tpaf\tbackground\t\t\t{}\t{}\t\t{}\t{}\t{}\t{}\t1\t{}\t{}\t{}\t{}\t{}\tminimap2\ttest\tasm10\t{{}}\t{}\t{}\tpaf_0_based_half_open\tprojected\n",
                     evidence_id,
@@ -7693,7 +7762,14 @@ mod tests {
             fs::write(bundle_root.join(&checkpoint_relpath), checkpoint).unwrap();
             stage_text.push_str(&format!(
                 "{}\t{}\t{}\t{}\t{}\t{}\tsuccess\t{}\t{}\n",
-                stage, input, q_sha, output, q_sha, donor_set_id, checkpoint_relpath, checkpoint_sha
+                stage,
+                input,
+                q_sha,
+                output,
+                q_sha,
+                donor_set_id,
+                checkpoint_relpath,
+                checkpoint_sha
             ));
         }
         fs::write(metadata_root.join("grt_stage_status.tsv"), stage_text).unwrap();
@@ -8094,8 +8170,11 @@ derived_ctg\tgap_filled\t2\t2\t1\n",
         zip.start_file("gpm_server/runs/chr_r/datasets/derived_ctg.fa", options)
             .unwrap();
         zip.write_all(b">gap_filled\nANCG\n").unwrap();
-        zip.start_file("gpm_server/runs/add_ctg/gap_filled_vs_ref/result.paf", options)
-            .unwrap();
+        zip.start_file(
+            "gpm_server/runs/add_ctg/gap_filled_vs_ref/result.paf",
+            options,
+        )
+        .unwrap();
         zip.write_all(b"gap_filled\t4\t0\t4\t+\tr\t4\t0\t4\t4\t4\t60\n")
             .unwrap();
         zip.start_file(
@@ -8569,11 +8648,7 @@ derived_ctg\tgap_filled\t2\t2\t1\n",
         zip.finish().unwrap();
     }
 
-    fn append_test_tree_to_zip(
-        zip: &mut zip::ZipWriter<File>,
-        source: &Path,
-        archive_root: &Path,
-    ) {
+    fn append_test_tree_to_zip(zip: &mut zip::ZipWriter<File>, source: &Path, archive_root: &Path) {
         let options = FileOptions::default().compression_method(CompressionMethod::Stored);
         for entry in fs::read_dir(source).unwrap() {
             let entry = entry.unwrap();

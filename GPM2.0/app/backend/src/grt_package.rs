@@ -516,8 +516,7 @@ where
     )?;
 
     let mut assignments: HashMap<(String, String), HashSet<String>> = HashMap::new();
-    let mut assignment_baselines: HashMap<(String, String, String), (String, i64)> =
-        HashMap::new();
+    let mut assignment_baselines: HashMap<(String, String, String), (String, i64)> = HashMap::new();
     let mut assignment_ids = HashSet::new();
     for row in &table(&tables, "metadata/chr_assignments.tsv")?.rows {
         let key = (
@@ -546,8 +545,10 @@ where
                 format!("duplicate chr assignment {}:{}:{chromosome}", key.0, key.1),
             );
         }
-        let source_orientation =
-            orientation(field(row, "source_orientation")?, "chr assignment source_orientation")?;
+        let source_orientation = orientation(
+            field(row, "source_orientation")?,
+            "chr assignment source_orientation",
+        )?;
         if field(row, "orientation_source")? != "ref_alignment" {
             return grt_err(
                 "INVALID_VALUE",
@@ -583,8 +584,7 @@ where
                 "chr assignment support_percent must be between 0 and 100",
             );
         }
-        let anchor_start =
-            parse_i64(field(row, "anchor_start")?, "chr assignment anchor_start")?;
+        let anchor_start = parse_i64(field(row, "anchor_start")?, "chr assignment anchor_start")?;
         assignment_baselines.insert(
             (key.0.clone(), key.1.clone(), chromosome.to_string()),
             (source_orientation.to_string(), anchor_start),
@@ -595,10 +595,7 @@ where
             .insert(chromosome.to_string());
     }
 
-    on_progress(
-        "validate_grt_recipe",
-        "validating the locked GRT recipe",
-    );
+    on_progress("validate_grt_recipe", "validating the locked GRT recipe");
     let recipe = one_row(&tables, "metadata/grt_recipe.tsv")?;
     let primary_dataset = nonempty(recipe, "primary_dataset", "recipe primary dataset")?;
     if !dataset_names.contains(primary_dataset) {
@@ -3724,10 +3721,9 @@ mod tests {
     #[test]
     fn reports_grt_validation_stages_in_execution_order() {
         let mut stages = Vec::new();
-        let package = validate_grt_package_with_progress(
-            &fixture_root(),
-            &mut |stage, _detail| stages.push(stage),
-        )
+        let package = validate_grt_package_with_progress(&fixture_root(), &mut |stage, _detail| {
+            stages.push(stage)
+        })
         .unwrap();
 
         assert_eq!(package.events.len(), 1);
@@ -3761,10 +3757,9 @@ mod tests {
         .unwrap();
 
         let mut stages = Vec::new();
-        let error = validate_grt_package_with_progress(
-            &bundle_root,
-            &mut |stage, _detail| stages.push(stage),
-        )
+        let error = validate_grt_package_with_progress(&bundle_root, &mut |stage, _detail| {
+            stages.push(stage)
+        })
         .unwrap_err();
 
         assert!(error.to_string().contains("GRT_IMPORT_INVALID_JSON"));
