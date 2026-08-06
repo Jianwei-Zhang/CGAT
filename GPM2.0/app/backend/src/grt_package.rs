@@ -2049,14 +2049,25 @@ fn read_tsv(
             format!("cannot read {relpath} as UTF-8: {error}"),
         )
     })?;
-    let mut lines = text.lines();
-    let header = lines
+    let mut reader = csv::ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(false)
+        .flexible(false)
+        .from_reader(text.as_bytes());
+    let mut records = reader.records();
+    let header = records
         .next()
-        .unwrap_or("")
-        .trim_end_matches('\r')
-        .split('\t')
+        .transpose()
+        .map_err(|error| grt_anyhow("INVALID_TSV", format!("{relpath}: {error}")))?
+        .unwrap_or_default()
+        .iter()
+        .map(ToString::to_string)
         .collect::<Vec<_>>();
-    if header != expected_header {
+    if !header
+        .iter()
+        .map(String::as_str)
+        .eq(expected_header.iter().copied())
+    {
         return grt_err(
             "INVALID_TSV",
             format!(
@@ -2066,28 +2077,14 @@ fn read_tsv(
         );
     }
     let mut rows = Vec::new();
-    for (offset, line) in lines.enumerate() {
-        let line = line.trim_end_matches('\r');
-        if line.is_empty() {
-            continue;
-        }
-        let values = line.split('\t').collect::<Vec<_>>();
-        if values.len() != header.len() {
-            return grt_err(
-                "INVALID_TSV",
-                format!(
-                    "{relpath}:{} expected {} columns, got {}",
-                    offset + 2,
-                    header.len(),
-                    values.len()
-                ),
-            );
-        }
+    for record in records {
+        let values =
+            record.map_err(|error| grt_anyhow("INVALID_TSV", format!("{relpath}: {error}")))?;
         rows.push(
             header
                 .iter()
-                .zip(values)
-                .map(|(key, value)| ((*key).to_string(), value.to_string()))
+                .zip(values.iter())
+                .map(|(key, value)| (key.clone(), value.to_string()))
                 .collect(),
         );
     }
@@ -3487,6 +3484,46 @@ mod tests {
         let package = validate_grt_package(&fixture_root()).unwrap();
         assert_eq!(package.final_path["workflow"].as_str(), Some(GRT_WORKFLOW));
         assert_eq!(package.events.len(), 1);
+    }
+
+    #[test]
+    fn reads_standard_quoted_tsv_fields() {
+        let temp = tempdir().unwrap();
+        fs::write(
+            temp.path().join("quoted.tsv"),
+            concat!(
+                "id\tpayload\tnote\n",
+                "row-1\t\"{\"\"items\"\":[\"\"a\"\",\"\"b\"\"]}\"\t\"left\tright\"\n"
+            ),
+        )
+        .unwrap();
+
+        let table = read_tsv(
+            temp.path(),
+            "quoted.tsv",
+            &["id", "payload", "note"],
+            1,
+            Some(1),
+        )
+        .unwrap();
+        assert_eq!(
+            field(&table.rows[0], "payload").unwrap(),
+            r#"{"items":["a","b"]}"#
+        );
+        assert_eq!(field(&table.rows[0], "note").unwrap(), "left\tright");
+    }
+
+    #[test]
+    fn rejects_inconsistent_quoted_tsv_width_with_stable_code() {
+        let temp = tempdir().unwrap();
+        fs::write(
+            temp.path().join("bad.tsv"),
+            "id\tpayload\nrow-1\tvalue\textra\n",
+        )
+        .unwrap();
+
+        let error = read_tsv(temp.path(), "bad.tsv", &["id", "payload"], 1, Some(1)).unwrap_err();
+        assert!(error.to_string().contains("GRT_IMPORT_INVALID_TSV"));
     }
 
     #[test]
