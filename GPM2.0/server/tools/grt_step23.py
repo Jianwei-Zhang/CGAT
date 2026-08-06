@@ -16,6 +16,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from grt_prepare_inputs import (
+    CHR_ASSIGNMENT_FIELDS,
     EVIDENCE_FIELDS,
     Q_SEGMENT_FIELDS,
     WORKFLOW,
@@ -1148,15 +1149,7 @@ def assignment_map(server_dir: Path) -> dict[tuple[str, str], set[str]]:
     assignments: dict[tuple[str, str], set[str]] = defaultdict(set)
     for row in read_tsv(
         server_dir / "metadata/chr_assignments.tsv",
-        [
-            "dataset_name",
-            "seq_name",
-            "seq_length_bp",
-            "assigned_chr_name",
-            "support_bp",
-            "support_percent",
-            "anchor_start",
-        ],
+        CHR_ASSIGNMENT_FIELDS,
     ):
         assignments[(row["dataset_name"], row["seq_name"])].add(
             row["assigned_chr_name"]

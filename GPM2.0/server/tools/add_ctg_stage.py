@@ -387,6 +387,7 @@ def parse_ref_paf_assignment(server_dir, ctg_name, chr_name, sequence):
     seq_length = max(len(sequence), 1)
     intervals = []
     anchor_weights = []
+    strand_block_bp = {"+": 0, "-": 0}
     with paf_path.open(encoding="utf-8") as handle:
         for raw_line in handle:
             line = raw_line.strip()
@@ -415,6 +416,7 @@ def parse_ref_paf_assignment(server_dir, ctg_name, chr_name, sequence):
             candidate_anchor = ref_start - query_start + 1 if strand == "+" else ref_start - seq_length + query_end
             intervals.append((query_start, query_end))
             anchor_weights.append((candidate_anchor, block_length))
+            strand_block_bp[strand] += block_length
 
     if not intervals:
         fail(f"add_ctg reference alignment has no qualified hit for {ctg_name} on {chr_name}")
@@ -426,6 +428,8 @@ def parse_ref_paf_assignment(server_dir, ctg_name, chr_name, sequence):
         "seq_name": ctg_name,
         "seq_length_bp": str(seq_length),
         "assigned_chr_name": chr_name,
+        "source_orientation": "-" if strand_block_bp["-"] > strand_block_bp["+"] else "+",
+        "orientation_source": "ref_alignment",
         "support_bp": str(support_bp),
         "support_percent": f"{support_percent:.3f}",
         "anchor_start": str(weighted_median_of_positions(anchor_weights)),
@@ -534,7 +538,17 @@ def command_finalize(args):
     assignment_row = parse_ref_paf_assignment(server_dir, args.ctg, args.chr, sequence)
     append_unique_row(
         server_dir / "metadata" / "chr_assignments.tsv",
-        ["dataset_name", "seq_name", "seq_length_bp", "assigned_chr_name", "support_bp", "support_percent", "anchor_start"],
+        [
+            "dataset_name",
+            "seq_name",
+            "seq_length_bp",
+            "assigned_chr_name",
+            "source_orientation",
+            "orientation_source",
+            "support_bp",
+            "support_percent",
+            "anchor_start",
+        ],
         assignment_row,
         lambda row: row.get("dataset_name") == DERIVED_DATASET and row.get("seq_name") == args.ctg,
         f"ctg name already exists: {args.ctg}\nPlease choose a different --ctg name and rerun add_ctg.sh.",

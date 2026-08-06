@@ -2233,10 +2233,15 @@ for dataset_name in dataset_order:
             key = (dataset_name, query_name, seq_length, target_name)
             bucket = candidate_map.setdefault(
                 key,
-                {"intervals": [], "anchor_weights": []},
+                {
+                    "intervals": [],
+                    "anchor_weights": [],
+                    "strand_block_bp": {"+": 0, "-": 0},
+                },
             )
             bucket["intervals"].append((query_start, query_end))
             bucket["anchor_weights"].append((candidate_anchor, block_length))
+            bucket["strand_block_bp"][strand] += block_length
 
 assignment_rows = []
 selected_by_chr_dataset = {
@@ -2255,18 +2260,27 @@ for dataset_name in dataset_order:
                 continue
             intervals = bucket["intervals"]
             anchor_weights = bucket["anchor_weights"]
+            strand_block_bp = bucket["strand_block_bp"]
             assert isinstance(intervals, list)
             assert isinstance(anchor_weights, list)
+            assert isinstance(strand_block_bp, dict)
             support_bp = merged_interval_coverage(intervals)
             support_percent = (support_bp * 100.0) / seq_length
             if support_percent < threshold:
                 continue
+            source_orientation = (
+                "-"
+                if int(strand_block_bp.get("-", 0)) > int(strand_block_bp.get("+", 0))
+                else "+"
+            )
             assignment_rows.append(
                 {
                     "dataset_name": dataset_name,
                     "seq_name": seq_name,
                     "seq_length_bp": seq_length,
                     "assigned_chr_name": chr_name,
+                    "source_orientation": source_orientation,
+                    "orientation_source": "ref_alignment",
                     "support_bp": support_bp,
                     "support_percent": f"{support_percent:.3f}",
                     "anchor_start": weighted_median_of_positions(anchor_weights),
@@ -2283,6 +2297,8 @@ with chr_assignments_path.open("w", encoding="utf-8", newline="") as handle:
             "seq_name",
             "seq_length_bp",
             "assigned_chr_name",
+            "source_orientation",
+            "orientation_source",
             "support_bp",
             "support_percent",
             "anchor_start",
@@ -2295,6 +2311,8 @@ with chr_assignments_path.open("w", encoding="utf-8", newline="") as handle:
                 row["seq_name"],
                 row["seq_length_bp"],
                 row["assigned_chr_name"],
+                row["source_orientation"],
+                row["orientation_source"],
                 row["support_bp"],
                 row["support_percent"],
                 row["anchor_start"],

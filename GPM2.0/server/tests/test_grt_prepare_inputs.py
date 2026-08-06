@@ -158,6 +158,8 @@ class GrtPrepareInputsTests(unittest.TestCase):
                 "seq_name",
                 "seq_length_bp",
                 "assigned_chr_name",
+                "source_orientation",
+                "orientation_source",
                 "support_bp",
                 "support_percent",
                 "anchor_start",
@@ -168,6 +170,8 @@ class GrtPrepareInputsTests(unittest.TestCase):
                     "seq_name": name,
                     "seq_length_bp": length,
                     "assigned_chr_name": chromosome,
+                    "source_orientation": "-" if name == "p_reverse" else "+",
+                    "orientation_source": "ref_alignment",
                     "support_bp": support,
                     "support_percent": f"{support * 100 / length:.3f}",
                     "anchor_start": anchor,
@@ -299,6 +303,21 @@ class GrtPrepareInputsTests(unittest.TestCase):
             self.assertNotIn("are current", rebuilt.stdout)
             self.assertFalse(stale_stage.exists())
             self.assertFalse(stale_metadata.exists())
+
+    def test_q0_consumes_assignment_orientation_without_recomputing_paf_strand(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            server = self.make_server(Path(temporary_dir))
+            assignments_path = server / "metadata/chr_assignments.tsv"
+            assignments = read_tsv(assignments_path)
+            reverse = next(row for row in assignments if row["seq_name"] == "p_reverse")
+            reverse["source_orientation"] = "+"
+            write_tsv(assignments_path, list(assignments[0]), assignments)
+
+            completed = self.run_tool(server)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            q_rows = read_tsv(server / "metadata/grt_q_segments.tsv")
+            reverse_q0 = next(row for row in q_rows if row["contig_name"] == "p_reverse")
+            self.assertEqual(reverse_q0["orientation"], "+")
 
     def test_reads_run_one_meryl_and_per_dataset_merqury_craq(self):
         with tempfile.TemporaryDirectory() as temporary_dir:

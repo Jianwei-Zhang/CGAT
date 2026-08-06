@@ -28,6 +28,46 @@
     }
   },
   {
+    "name": "invalid_assignment_source_orientation",
+    "expected_code": "INVALID_VALUE",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/chr_assignments.tsv",
+      "old": "Chr01\t+\tref_alignment",
+      "new": "Chr01\t?\tref_alignment"
+    }
+  },
+  {
+    "name": "invalid_assignment_orientation_source",
+    "expected_code": "INVALID_VALUE",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/chr_assignments.tsv",
+      "old": "+\tref_alignment\t4",
+      "new": "+\tlegacy\t4"
+    }
+  },
+  {
+    "name": "q0_assignment_orientation_mismatch",
+    "expected_code": "BROKEN_REFERENCE",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/grt_q_segments.tsv",
+      "old": "q0\tChr01\tq0-primary-1\tsource\t1\t4\tprimary\tprimary1\t1\t4\t+",
+      "new": "q0\tChr01\tq0-primary-1\tsource\t1\t4\tprimary\tprimary1\t1\t4\t-"
+    }
+  },
+  {
+    "name": "normal_used_card_assignment_orientation_mismatch",
+    "expected_code": "BROKEN_REFERENCE",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/grt_used_contigs.tsv",
+      "old": "support:donor1:Chr01:grt_promoted\tsupport\tdonor1\tunplaced\tChr01\tgrt_promoted\tno_hit\t5\t+",
+      "new": "primary:primary1:Chr01:normal\tprimary\tprimary1\tassigned\tChr01\tnormal\thit\t1\t-"
+    }
+  },
+  {
     "name": "broken_event_reference",
     "expected_code": "BROKEN_REFERENCE",
     "operation": {

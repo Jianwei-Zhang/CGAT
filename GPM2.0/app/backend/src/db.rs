@@ -286,6 +286,8 @@ pub fn init_workspace_schema(conn: &Connection) -> Result<()> {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             source_seq_id INTEGER NOT NULL,
             reference_chr_id INTEGER NOT NULL,
+            source_orientation TEXT NOT NULL DEFAULT '+' CHECK(source_orientation IN ('+', '-')),
+            orientation_source TEXT NOT NULL DEFAULT 'ref_alignment' CHECK(orientation_source = 'ref_alignment'),
             support_bp INTEGER NOT NULL,
             support_percent REAL NOT NULL,
             anchor_start INTEGER NOT NULL,

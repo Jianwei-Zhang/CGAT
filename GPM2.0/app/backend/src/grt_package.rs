@@ -169,6 +169,8 @@ const CHR_ASSIGNMENTS_HEADER: &[&str] = &[
     "seq_name",
     "seq_length_bp",
     "assigned_chr_name",
+    "source_orientation",
+    "orientation_source",
     "support_bp",
     "support_percent",
     "anchor_start",
@@ -514,6 +516,8 @@ where
     )?;
 
     let mut assignments: HashMap<(String, String), HashSet<String>> = HashMap::new();
+    let mut assignment_baselines: HashMap<(String, String, String), (String, i64)> =
+        HashMap::new();
     let mut assignment_ids = HashSet::new();
     for row in &table(&tables, "metadata/chr_assignments.tsv")?.rows {
         let key = (
@@ -540,6 +544,14 @@ where
             return grt_err(
                 "DUPLICATE_ID",
                 format!("duplicate chr assignment {}:{}:{chromosome}", key.0, key.1),
+            );
+        }
+        let source_orientation =
+            orientation(field(row, "source_orientation")?, "chr assignment source_orientation")?;
+        if field(row, "orientation_source")? != "ref_alignment" {
+            return grt_err(
+                "INVALID_VALUE",
+                "chr assignment orientation_source must be ref_alignment",
             );
         }
         if parse_positive_i64(field(row, "seq_length_bp")?, "chr assignment seq_length_bp")?
@@ -571,7 +583,12 @@ where
                 "chr assignment support_percent must be between 0 and 100",
             );
         }
-        parse_i64(field(row, "anchor_start")?, "chr assignment anchor_start")?;
+        let anchor_start =
+            parse_i64(field(row, "anchor_start")?, "chr assignment anchor_start")?;
+        assignment_baselines.insert(
+            (key.0.clone(), key.1.clone(), chromosome.to_string()),
+            (source_orientation.to_string(), anchor_start),
+        );
         assignments
             .entry(key)
             .or_default()
@@ -762,6 +779,24 @@ where
                         return grt_err(
                             "BROKEN_REFERENCE",
                             format!("q0 segment {segment_id} source is not assigned to {chr_name}"),
+                        );
+                    }
+                    let Some(baseline) = assignment_baselines.get(&(
+                        key.0.clone(),
+                        key.1.clone(),
+                        chr_name.to_string(),
+                    )) else {
+                        return grt_err(
+                            "BROKEN_REFERENCE",
+                            format!("q0 segment {segment_id} lacks an assignment baseline"),
+                        );
+                    };
+                    if orientation != baseline.0.as_str() {
+                        return grt_err(
+                            "BROKEN_REFERENCE",
+                            format!(
+                                "q0 segment {segment_id} orientation disagrees with chr_assignments.tsv"
+                            ),
                         );
                     }
                     let expected = format!("{}:{}:{chr_name}:normal", key.0, key.1);
@@ -1684,6 +1719,7 @@ where
     validate_source_cards(
         table(&tables, "metadata/grt_used_contigs.tsv")?,
         &sources,
+        &assignment_baselines,
         &evidence,
         &event_index,
         &final_segments,
@@ -1760,6 +1796,7 @@ fn validate_tool_versions(table: &TsvTable) -> Result<()> {
 fn validate_source_cards(
     table: &TsvTable,
     sources: &HashMap<(String, String), String>,
+    assignment_baselines: &HashMap<(String, String, String), (String, i64)>,
     evidence: &HashMap<String, &TsvRow>,
     events: &HashMap<String, &Value>,
     segments: &HashMap<String, (&Value, String)>,
@@ -1795,11 +1832,33 @@ fn validate_source_cards(
             &["hit", "weak_hit", "multi_hit", "other_chr_only", "no_hit"],
             &format!("source card {card}.ref_alignment_status"),
         )?;
-        orientation(field(row, "orientation")?, &format!("source card {card}"))?;
-        parse_i64(
+        let card_orientation =
+            orientation(field(row, "orientation")?, &format!("source card {card}"))?;
+        let card_anchor = parse_i64(
             field(row, "anchor_start")?,
             &format!("source card {card}.anchor_start"),
         )?;
+        if field(row, "placement_mode")? == "normal" {
+            let assignment_key = (
+                key.0.clone(),
+                key.1.clone(),
+                field(row, "target_chr")?.to_string(),
+            );
+            let Some((baseline_orientation, baseline_anchor)) =
+                assignment_baselines.get(&assignment_key)
+            else {
+                return grt_err(
+                    "BROKEN_REFERENCE",
+                    format!("normal source card {card} lacks an assignment baseline"),
+                );
+            };
+            if card_orientation != baseline_orientation || card_anchor != *baseline_anchor {
+                return grt_err(
+                    "BROKEN_REFERENCE",
+                    format!("normal source card {card} disagrees with chr assignment baseline"),
+                );
+            }
+        }
         let expected = format!(
             "{}:{}:{}:{}",
             key.0,
@@ -2940,6 +2999,7 @@ pub fn initialize_grt_project(
         let assembly = bootstrap_project_assembly_with_connection(&mut conn, project_id)?;
         let materialized_source_card_count =
             materialize_grt_source_cards_with_connection(&mut conn, project_id)?;
+        verify_project_assignment_orientation_projection(&conn, project_id)?;
         set_project_auto_pipeline_done_with_connection(&mut conn, project_id, true)?;
         Ok((assembly, materialized_source_card_count))
     })();
@@ -3026,19 +3086,38 @@ fn materialize_grt_source_cards_with_connection(
                     "failed to resolve GRT source card {source_card_key} to a project source sequence"
                 )
             })?;
-        let already_visible: Option<i64> = tx
+        let already_visible: Option<(i64, String, Option<i64>, String)> = tx
             .query_row(
-                "SELECT c.id
+                "SELECT c.id, s.orient, c.anchor_start, c.placement_mode
                  FROM assembly_ctg c
                  JOIN assembly_seq s ON s.id = c.assembly_seq_id
                  WHERE c.project_id = ?1 AND s.source_seq_id = ?2 AND c.assigned_chr_name = ?3
                  LIMIT 1",
                 params![project_id, source_seq_id, target_chr],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .optional()
             .context("failed to check existing GRT source-card placement")?;
-        if already_visible.is_some() {
+        if placement_mode == "normal" {
+            let Some((_, existing_orient, existing_anchor, _)) = already_visible else {
+                bail!("normal GRT source card {source_card_key} is absent from the main view");
+            };
+            if existing_orient != orient || existing_anchor != Some(anchor_start) {
+                bail!(
+                    "normal GRT source card {source_card_key} disagrees with the main-view source orientation or anchor"
+                );
+            }
+            continue;
+        }
+        if let Some((_, existing_orient, existing_anchor, existing_mode)) = already_visible {
+            if existing_orient != orient
+                || existing_anchor != Some(anchor_start)
+                || existing_mode != placement_mode
+            {
+                bail!(
+                    "GRT source card {source_card_key} conflicts with an existing main-view placement"
+                );
+            }
             continue;
         }
         let assembly_seq_id = {
@@ -3106,6 +3185,88 @@ fn materialize_grt_source_cards_with_connection(
     tx.commit()
         .context("failed to commit GRT source-card materialization")?;
     Ok(inserted)
+}
+
+fn verify_project_assignment_orientation_projection(
+    conn: &Connection,
+    project_id: i64,
+) -> Result<()> {
+    let mut baseline_stmt = conn
+        .prepare(
+            "SELECT
+                ica.source_seq_id,
+                d.name,
+                ss.seq_name,
+                rc.chr_name,
+                ica.source_orientation,
+                ica.orientation_source,
+                ica.anchor_start
+             FROM imported_chr_assignment ica
+             JOIN source_seq ss ON ss.id = ica.source_seq_id
+             JOIN dataset d ON d.id = ss.dataset_id
+             JOIN reference_chr rc ON rc.id = ica.reference_chr_id
+             JOIN project_dataset pd ON pd.dataset_id = ss.dataset_id
+             WHERE pd.project_id = ?1
+             ORDER BY d.id, ss.id, rc.id",
+        )
+        .context("failed to prepare GRT assignment projection verification")?;
+    let baselines = baseline_stmt
+        .query_map(params![project_id], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, i64>(6)?,
+            ))
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let mut projected_stmt = conn
+        .prepare(
+            "SELECT s.orient, c.anchor_start
+             FROM assembly_ctg c
+             JOIN assembly_seq s ON s.id = c.assembly_seq_id
+             WHERE c.project_id = ?1
+               AND s.source_seq_id = ?2
+               AND c.assigned_chr_name = ?3",
+        )
+        .context("failed to prepare projected GRT assignment query")?;
+    for (
+        source_seq_id,
+        dataset_name,
+        seq_name,
+        chr_name,
+        source_orientation,
+        orientation_source,
+        anchor_start,
+    ) in baselines
+    {
+        if orientation_source != "ref_alignment" {
+            bail!(
+                "assignment baseline {dataset_name}:{seq_name}:{chr_name} has unsupported orientation_source={orientation_source}"
+            );
+        }
+        let projected = projected_stmt
+            .query_map(params![project_id, source_seq_id, chr_name], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Option<i64>>(1)?))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        if projected.len() != 1 {
+            bail!(
+                "assignment baseline {dataset_name}:{seq_name}:{chr_name} projected {} main-view cards, expected 1",
+                projected.len()
+            );
+        }
+        let (projected_orientation, projected_anchor) = &projected[0];
+        if projected_orientation != &source_orientation || *projected_anchor != Some(anchor_start) {
+            bail!(
+                "assignment baseline {dataset_name}:{seq_name}:{chr_name} disagrees with main-view source orientation or anchor"
+            );
+        }
+    }
+    Ok(())
 }
 
 pub fn load_grt_evidence(project_db_path: &Path, evidence_id: &str) -> Result<Value> {
@@ -3788,6 +3949,53 @@ mod tests {
         assert_eq!(view.final_path_by_chr.len(), 1);
         assert_eq!(view.object_attempts.len(), 1);
         assert_eq!(view.source_cards.len(), 1);
+    }
+
+    #[test]
+    fn initialization_cleans_project_when_assignment_projection_is_corrupted() {
+        let temp = tempdir().unwrap();
+        let bundle_root = temp.path().join("gpm_server");
+        copy_tree(&fixture_root(), &bundle_root);
+        let (outcome, _) = crate::importer::import_from_extracted_bundle(&bundle_root).unwrap();
+        let conn = open_workspace_db(&outcome.project_db_path).unwrap();
+        let primary_source_seq_id: i64 = conn
+            .query_row(
+                "SELECT ss.id
+                 FROM source_seq ss
+                 JOIN dataset d ON d.id = ss.dataset_id
+                 WHERE d.name = 'primary' AND ss.seq_name = 'primary1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        conn.execute_batch(&format!(
+            "CREATE TRIGGER corrupt_assignment_projection
+             AFTER INSERT ON assembly_seq
+             WHEN NEW.source_seq_id = {primary_source_seq_id}
+             BEGIN
+                 UPDATE assembly_seq SET orient = '-' WHERE id = NEW.id;
+             END;"
+        ))
+        .unwrap();
+        drop(conn);
+
+        let error = initialize_grt_project(&outcome.project_db_path, "corrupt-project")
+            .expect_err("projection mismatch must reject locked project initialization");
+        assert!(
+            error
+                .to_string()
+                .contains("disagrees with main-view source orientation or anchor")
+        );
+
+        let conn = open_workspace_db(&outcome.project_db_path).unwrap();
+        let project_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM project WHERE name = 'corrupt-project'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(project_count, 0);
     }
 
     #[test]

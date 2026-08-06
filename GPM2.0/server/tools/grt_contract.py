@@ -324,6 +324,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     sources = source_catalog(bundle_root, tables["metadata/source_seq_locator.tsv"])
 
     assignment_chromosomes = defaultdict(set)
+    assignment_baselines = {}
     assignment_keys = set()
     for row_number, row in enumerate(tables["metadata/chr_assignments.tsv"], start=2):
         source_key = (row["dataset_name"], row["seq_name"])
@@ -336,6 +337,16 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         if assignment_key in assignment_keys:
             fail("DUPLICATE_ID", f"duplicate chr assignment for {source_key[0]}:{source_key[1]}:{chromosome}")
         assignment_keys.add(assignment_key)
+        if row["source_orientation"] not in enums["orientation"]:
+            fail(
+                "INVALID_VALUE",
+                f"chr assignment row {row_number} has invalid source_orientation",
+            )
+        if row["orientation_source"] != "ref_alignment":
+            fail(
+                "INVALID_VALUE",
+                f"chr assignment row {row_number}.orientation_source must be ref_alignment",
+            )
         if parse_int(row["seq_length_bp"], f"chr assignment row {row_number}.seq_length_bp", 1) != len(
             sources[source_key]
         ):
@@ -349,7 +360,13 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             0,
             100,
         )
-        parse_int(row["anchor_start"], f"chr assignment row {row_number}.anchor_start")
+        anchor_start = parse_int(
+            row["anchor_start"], f"chr assignment row {row_number}.anchor_start"
+        )
+        assignment_baselines[assignment_key] = {
+            "source_orientation": row["source_orientation"],
+            "anchor_start": anchor_start,
+        }
         assignment_chromosomes[source_key].add(chromosome)
 
     recipe = tables["metadata/grt_recipe.tsv"][0]
@@ -434,6 +451,12 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             if q_version == "q0":
                 if chr_name not in assignment_chromosomes[source_key]:
                     fail("BROKEN_REFERENCE", f"q0 segment {segment_id} source is not assigned to {chr_name}")
+                baseline = assignment_baselines[(*source_key, chr_name)]
+                if row["orientation"] != baseline["source_orientation"]:
+                    fail(
+                        "BROKEN_REFERENCE",
+                        f"q0 segment {segment_id} orientation disagrees with chr_assignments.tsv",
+                    )
                 if row["source_card_key"] != (
                     f"{source_key[0]}:{source_key[1]}:{chr_name}:normal"
                 ):
@@ -929,6 +952,23 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                 "BROKEN_REFERENCE",
                 f"used contig {source_card_key} disagrees with chr_assignments.tsv",
             )
+        if row["placement_mode"] == "normal":
+            baseline = assignment_baselines.get((*source_key, row["target_chr"]))
+            if baseline is None:
+                fail(
+                    "BROKEN_REFERENCE",
+                    f"normal used contig {source_card_key} lacks an assignment baseline",
+                )
+            if row["orientation"] != baseline["source_orientation"]:
+                fail(
+                    "BROKEN_REFERENCE",
+                    f"normal used contig {source_card_key} orientation disagrees with chr_assignments.tsv",
+                )
+            if int(row["anchor_start"]) != baseline["anchor_start"]:
+                fail(
+                    "BROKEN_REFERENCE",
+                    f"normal used contig {source_card_key} anchor disagrees with chr_assignments.tsv",
+                )
         ref_ids = parse_json(
             row["ref_evidence_ids_json"],
             f"used contig {source_card_key}.ref_evidence_ids_json",

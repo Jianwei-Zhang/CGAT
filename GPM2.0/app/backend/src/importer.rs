@@ -194,6 +194,8 @@ struct ImportedChrAssignmentRow {
     seq_name: String,
     seq_length_bp: i64,
     assigned_chr_name: String,
+    source_orientation: String,
+    orientation_source: String,
     support_bp: i64,
     support_percent: f64,
     anchor_start: i64,
@@ -3491,6 +3493,14 @@ fn read_imported_chr_assignment_rows(bundle_root: &Path) -> Result<Vec<ImportedC
         bail!("server delivery package requires metadata/chr_assignments.tsv");
     }
     read_tsv_rows(&path, |header, cols| {
+        let source_orientation = value_by_header(header, cols, "source_orientation")?;
+        if source_orientation != "+" && source_orientation != "-" {
+            bail!("invalid source_orientation: {source_orientation}");
+        }
+        let orientation_source = value_by_header(header, cols, "orientation_source")?;
+        if orientation_source != "ref_alignment" {
+            bail!("invalid orientation_source: {orientation_source}");
+        }
         Ok(ImportedChrAssignmentRow {
             dataset_name: value_by_header(header, cols, "dataset_name")?,
             seq_name: value_by_header(header, cols, "seq_name")?,
@@ -3498,6 +3508,8 @@ fn read_imported_chr_assignment_rows(bundle_root: &Path) -> Result<Vec<ImportedC
                 .parse()
                 .with_context(|| "invalid seq_length_bp".to_string())?,
             assigned_chr_name: value_by_header(header, cols, "assigned_chr_name")?,
+            source_orientation,
+            orientation_source,
             support_bp: value_by_header(header, cols, "support_bp")?
                 .parse()
                 .with_context(|| "invalid support_bp".to_string())?,
@@ -4134,11 +4146,14 @@ fn sync_imported_chr_assignment_rows(
             })?;
         tx.execute(
             "INSERT INTO imported_chr_assignment (
-                source_seq_id, reference_chr_id, support_bp, support_percent, anchor_start
-             ) VALUES (?1, ?2, ?3, ?4, ?5)",
+                source_seq_id, reference_chr_id, source_orientation, orientation_source,
+                support_bp, support_percent, anchor_start
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 source_seq_id,
                 reference_chr_id,
+                row.source_orientation,
+                row.orientation_source,
                 row.support_bp,
                 row.support_percent,
                 row.anchor_start
@@ -5314,11 +5329,14 @@ fn append_imported_chr_assignment_rows(
             })?;
         tx.execute(
             "INSERT INTO imported_chr_assignment (
-                source_seq_id, reference_chr_id, support_bp, support_percent, anchor_start
-             ) VALUES (?1, ?2, ?3, ?4, ?5)",
+                source_seq_id, reference_chr_id, source_orientation, orientation_source,
+                support_bp, support_percent, anchor_start
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 source_seq_id,
                 reference_chr_id,
+                row.source_orientation,
+                row.orientation_source,
                 row.support_bp,
                 row.support_percent,
                 row.anchor_start
@@ -6141,18 +6159,19 @@ mod tests {
         let bundle_root = temp.path().join("gpm_server");
         create_bundle_root(&bundle_root);
         fs::write(
+            bundle_root.join("metadata/chr_assignments.tsv"),
+            concat!(
+                "dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsource_orientation\torientation_source\tsupport_bp\tsupport_percent\tanchor_start\n",
+                "ds_a\td\t2\tr\t-\tref_alignment\t2\t100.000\t9\n",
+            ),
+        )
+        .unwrap();
+        install_minimal_grt_contract(&bundle_root);
+        fs::write(
             bundle_root.join("metadata/package.tsv"),
             concat!(
                 "workflow\tschema_version\tpackage_mode\tsequence_layout\tpreassigned_chr\tself_alignment_scope\tcross_alignment_scope\tchr_assignment_min_coverage_percent\tgrt_precompute_enabled\trecipe_locked\tfinal_path_schema_version\treads_qc_enabled\n",
                 "gpm_grt_precomputed_v1\t1\tfast\tpartitioned\ttrue\tchr_partition\tchr_partition\t72\ttrue\ttrue\t1\tfalse\n",
-            ),
-        )
-        .unwrap();
-        fs::write(
-            bundle_root.join("metadata/chr_assignments.tsv"),
-            concat!(
-                "dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsupport_bp\tsupport_percent\tanchor_start\n",
-                "ds_a\td\t2\tr\t2\t100.000\t9\n",
             ),
         )
         .unwrap();
@@ -6190,12 +6209,27 @@ mod tests {
             )
         );
 
-        let imported_rows = conn
-            .query_row("SELECT COUNT(*) FROM imported_chr_assignment", [], |row| {
-                row.get::<_, i64>(0)
-            })
+        let imported_row = conn
+            .query_row(
+                "SELECT source_orientation, orientation_source, support_bp,
+                        support_percent, anchor_start
+                 FROM imported_chr_assignment",
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, f64>(3)?,
+                        row.get::<_, i64>(4)?,
+                    ))
+                },
+            )
             .unwrap();
-        assert_eq!(imported_rows, 1);
+        assert_eq!(
+            imported_row,
+            ("-".to_string(), "ref_alignment".to_string(), 2, 100.0, 9)
+        );
         assert_eq!(
             conn.query_row(
                 "SELECT member_order FROM imported_track_member_order",
@@ -7278,7 +7312,7 @@ mod tests {
         .unwrap();
         fs::write(
             bundle_root.join("metadata/chr_assignments.tsv"),
-            "dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsupport_bp\tsupport_percent\tanchor_start\nds_a\td\t2\tr\t2\t100.000\t1\n",
+            "dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsource_orientation\torientation_source\tsupport_bp\tsupport_percent\tanchor_start\nds_a\td\t2\tr\t+\tref_alignment\t2\t100.000\t1\n",
         )
         .unwrap();
         fs::write(
@@ -7344,7 +7378,7 @@ mod tests {
         .unwrap();
         fs::write(
             bundle_root.join("metadata/chr_assignments.tsv"),
-            "dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsupport_bp\tsupport_percent\tanchor_start\nds_a\td\t4\tr\t4\t100.000\t1\n",
+            "dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsource_orientation\torientation_source\tsupport_bp\tsupport_percent\tanchor_start\nds_a\td\t4\tr\t+\tref_alignment\t4\t100.000\t1\n",
         )
         .unwrap();
         fs::write(
@@ -7390,7 +7424,7 @@ mod tests {
         );
         append_text(
             &bundle_root.join("metadata/chr_assignments.tsv"),
-            "ds_b\te\t4\tr\t4\t100.000\t1\n",
+            "ds_b\te\t4\tr\t+\tref_alignment\t4\t100.000\t1\n",
         );
         append_text(
             &bundle_root.join("metadata/track_member_orders.tsv"),
@@ -7536,8 +7570,13 @@ mod tests {
                     assignment.dataset_name.clone(),
                     assignment.seq_name.clone(),
                 );
-                let sequence = &source_sequences[&source_key];
-                let q_end = next_start + sequence.len() as i64 - 1;
+                let source_sequence = &source_sequences[&source_key];
+                let projected_sequence = if assignment.source_orientation == "-" {
+                    test_reverse_complement(source_sequence)
+                } else {
+                    source_sequence.clone()
+                };
+                let q_end = next_start + projected_sequence.len() as i64 - 1;
                 let segment_id = format!("q0-seg-{evidence_index}");
                 let evidence_id = format!("ev-q0-{evidence_index}");
                 let source_card_key = format!(
@@ -7545,14 +7584,15 @@ mod tests {
                     assignment.dataset_name, assignment.seq_name, chr_name
                 );
                 q_segments.push_str(&format!(
-                    "q0\t{}\t{}\tsource\t{}\t{}\t{}\t{}\t1\t{}\t+\t{}\t[\"{}\"]\n",
+                    "q0\t{}\t{}\tsource\t{}\t{}\t{}\t{}\t1\t{}\t{}\t{}\t[\"{}\"]\n",
                     chr_name,
                     segment_id,
                     next_start,
                     q_end,
                     assignment.dataset_name,
                     assignment.seq_name,
-                    sequence.len(),
+                    source_sequence.len(),
+                    assignment.source_orientation,
                     source_card_key,
                     evidence_id
                 ));
@@ -7563,7 +7603,7 @@ mod tests {
                     &fs::read(bundle_root.join(&dataset.fasta_relpath)).unwrap(),
                 );
                 evidence.push_str(&format!(
-                    "{}\tassignment\tpaf\tbackground\t\t\t{}\t{}\t\t{}\t{}\t{}\t{}\t1\t{}\t+\t{}\t{}\t{}\tminimap2\ttest\tasm10\t{{}}\t{}\t{}\tpaf_0_based_half_open\tprojected\n",
+                    "{}\tassignment\tpaf\tbackground\t\t\t{}\t{}\t\t{}\t{}\t{}\t{}\t1\t{}\t{}\t{}\t{}\t{}\tminimap2\ttest\tasm10\t{{}}\t{}\t{}\tpaf_0_based_half_open\tprojected\n",
                     evidence_id,
                     dataset.fasta_relpath,
                     query_sha,
@@ -7571,29 +7611,30 @@ mod tests {
                     reference_sha,
                     assignment.dataset_name,
                     assignment.seq_name,
-                    sequence.len(),
+                    source_sequence.len(),
+                    assignment.source_orientation,
                     chr_name,
                     assignment.anchor_start.max(1),
-                    assignment.anchor_start.max(1) + sequence.len() as i64 - 1,
+                    assignment.anchor_start.max(1) + source_sequence.len() as i64 - 1,
                     raw_relpath,
                     test_sha256(b"")
                 ));
                 final_segments.push(json!({
                     "segment_id": segment_id,
                     "kind": "source",
-                    "length": sequence.len(),
-                    "orientation": "+",
+                    "length": source_sequence.len(),
+                    "orientation": assignment.source_orientation,
                     "event_id": Value::Null,
                     "source": {
                         "dataset": assignment.dataset_name,
                         "contig": assignment.seq_name,
                         "start": 1,
-                        "end": sequence.len(),
-                        "orientation": "+"
+                        "end": source_sequence.len(),
+                        "orientation": assignment.source_orientation
                     },
                     "evidence_ids": [evidence_id]
                 }));
-                q_sequence.push_str(sequence);
+                q_sequence.push_str(&projected_sequence);
                 next_start = q_end + 1;
             }
             q_records.insert(chr_name.clone(), q_sequence.clone());
@@ -7690,6 +7731,20 @@ mod tests {
 
     fn test_sha256(bytes: &[u8]) -> String {
         format!("{:x}", Sha256::digest(bytes))
+    }
+
+    fn test_reverse_complement(sequence: &str) -> String {
+        sequence
+            .chars()
+            .rev()
+            .map(|base| match base.to_ascii_uppercase() {
+                'A' => 'T',
+                'C' => 'G',
+                'G' => 'C',
+                'T' => 'A',
+                other => other,
+            })
+            .collect()
     }
 
     fn append_text(path: &Path, text: &str) {
@@ -7996,8 +8051,8 @@ derived_ctg\tgap_filled\tr\tds_a\tderived\t1\n",
         zip.start_file("gpm_server/metadata/chr_assignments.tsv", options)
             .unwrap();
         zip.write_all(
-            b"dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsupport_bp\tsupport_percent\tanchor_start\n\
-derived_ctg\tgap_filled\t4\tr\t4\t100.000\t2\n",
+            b"dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsource_orientation\torientation_source\tsupport_bp\tsupport_percent\tanchor_start\n\
+derived_ctg\tgap_filled\t4\tr\t+\tref_alignment\t4\t100.000\t2\n",
         )
         .unwrap();
         if include_track_member_orders {
@@ -8135,7 +8190,7 @@ derived_ctg\tgap_filled\t2\t2\t1\n",
             .unwrap();
         zip.write_all(
             format!(
-                "dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsupport_bp\tsupport_percent\tanchor_start\n{dataset_name}\t{seq_name}\t4\tr\t4\t100.000\t2\n"
+                "dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsource_orientation\torientation_source\tsupport_bp\tsupport_percent\tanchor_start\n{dataset_name}\t{seq_name}\t4\tr\t+\tref_alignment\t4\t100.000\t2\n"
             )
             .as_bytes(),
         )
@@ -8284,7 +8339,7 @@ derived_ctg\tgap_filled\t2\t2\t1\n",
         zip.start_file("gpm_server/metadata/chr_assignments.tsv", options)
             .unwrap();
         zip.write_all(
-            b"dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsupport_bp\tsupport_percent\tanchor_start\nds_a\tds\t4\tref\t4\t100.000\t1\n",
+            b"dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsource_orientation\torientation_source\tsupport_bp\tsupport_percent\tanchor_start\nds_a\tds\t4\tref\t+\tref_alignment\t4\t100.000\t1\n",
         )
         .unwrap();
         zip.start_file("gpm_server/metadata/track_member_orders.tsv", options)
@@ -8365,7 +8420,7 @@ derived_ctg\tgap_filled\t2\t2\t1\n",
         zip.start_file("gpm_server/metadata/chr_assignments.tsv", options)
             .unwrap();
         zip.write_all(
-            b"dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsupport_bp\tsupport_percent\tanchor_start\nds_a\tds\t4\tref\t4\t100.000\t1\n",
+            b"dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsource_orientation\torientation_source\tsupport_bp\tsupport_percent\tanchor_start\nds_a\tds\t4\tref\t+\tref_alignment\t4\t100.000\t1\n",
         )
         .unwrap();
         zip.start_file("gpm_server/metadata/track_member_orders.tsv", options)
@@ -8443,7 +8498,7 @@ derived_ctg\tgap_filled\t2\t2\t1\n",
         zip.start_file("gpm_server/metadata/chr_assignments.tsv", options)
             .unwrap();
         zip.write_all(
-            b"dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsupport_bp\tsupport_percent\tanchor_start\nds_a\tds\t4\tref\t4\t100.000\t1\n",
+            b"dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsource_orientation\torientation_source\tsupport_bp\tsupport_percent\tanchor_start\nds_a\tds\t4\tref\t+\tref_alignment\t4\t100.000\t1\n",
         )
         .unwrap();
         zip.start_file("gpm_server/metadata/track_member_orders.tsv", options)

@@ -84,8 +84,12 @@ if [[ "$align_len" -gt "$target_len" ]]; then
 fi
 
 mkdir -p "$(dirname "$output")"
-printf '%s\t%s\t0\t%s\t+\t%s\t%s\t0\t%s\t%s\t%s\t60\n' \
-  "$query_name" "$query_len" "$align_len" "$target_name" "$target_len" "$align_len" "$align_len" "$align_len" > "$output"
+strand="+"
+if [[ "$query_name" == "Chr01_gap3_filled" && "$target_name" == "Chr01" ]]; then
+  strand="-"
+fi
+printf '%s\t%s\t0\t%s\t%s\t%s\t%s\t0\t%s\t%s\t%s\t60\n' \
+  "$query_name" "$query_len" "$align_len" "$strand" "$target_name" "$target_len" "$align_len" "$align_len" "$align_len" > "$output"
 printf 'preset=%s target=%s query=%s output=%s\n' "$preset" "$target" "$query" "$output" >> "${GPM_TEST_MINIMAP_LOG:?}"
 EOF
 
@@ -293,7 +297,7 @@ PATH="${FAKE_BIN}:$PATH" bash "${output_root}/add_ctg.sh" \
 
 test -f "${output_root}/add_Chr01_gap3_filled.zip"
 grep -q $'^derived_ctg\t' "${output_root}/metadata/datasets.tsv"
-grep -q $'^derived_ctg\tChr01_gap3_filled\t' "${output_root}/metadata/chr_assignments.tsv"
+grep -q $'^derived_ctg\tChr01_gap3_filled\t[0-9][0-9]*\tChr01\t-\tref_alignment\t' "${output_root}/metadata/chr_assignments.tsv"
 grep -q $'^derived_ctg\tChr01_gap3_filled\tdata/derived_ctgs/Chr01_gap3_filled.fa$' "${output_root}/metadata/source_seq_locator.tsv"
 grep -q $'^derived_ctg\tChr01_gap3_filled\t401\t410\t10$' "${output_root}/metadata/source_seq_n_regions.tsv"
 grep -q $'^derived_ctg\tChr01_gap3_filled\tgapfiller\tgap.final.fa\t' "${output_root}/metadata/derived_ctgs.tsv"

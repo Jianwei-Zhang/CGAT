@@ -87,6 +87,17 @@ EVIDENCE_FIELDS = [
     "coordinate_system",
     "projection_status",
 ]
+CHR_ASSIGNMENT_FIELDS = [
+    "dataset_name",
+    "seq_name",
+    "seq_length_bp",
+    "assigned_chr_name",
+    "source_orientation",
+    "orientation_source",
+    "support_bp",
+    "support_percent",
+    "anchor_start",
+]
 
 
 def fail(message: str) -> None:
@@ -631,15 +642,7 @@ def prepare(args: argparse.Namespace) -> None:
     options = read_key_values(metadata_dir / "prepare_options.tsv")
     assignments = read_tsv(
         metadata_dir / "chr_assignments.tsv",
-        [
-            "dataset_name",
-            "seq_name",
-            "seq_length_bp",
-            "assigned_chr_name",
-            "support_bp",
-            "support_percent",
-            "anchor_start",
-        ],
+        CHR_ASSIGNMENT_FIELDS,
     )
     member_orders = read_tsv(
         metadata_dir / "track_member_orders.tsv",
@@ -827,6 +830,16 @@ def prepare(args: argparse.Namespace) -> None:
         telomere_rules = load_telomere_rules(server_dir)
         assignment_by_key: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
         for row in assignments:
+            if row["source_orientation"] not in {"+", "-"}:
+                fail(
+                    "chr assignment has invalid source_orientation: "
+                    f"{row['dataset_name']}:{row['seq_name']}:{row['assigned_chr_name']}"
+                )
+            if row["orientation_source"] != "ref_alignment":
+                fail(
+                    "chr assignment has unsupported orientation_source: "
+                    f"{row['dataset_name']}:{row['seq_name']}:{row['assigned_chr_name']}"
+                )
             key = (row["dataset_name"], row["seq_name"])
             if key in sequences:
                 assignment_by_key[key].append(row)
@@ -890,10 +903,6 @@ def prepare(args: argparse.Namespace) -> None:
             footprint = merged_intervals(
                 (int(hit["target_start"]), int(hit["target_end"])) for hit in hits
             )
-            strand_weight = defaultdict(int)
-            for hit in hits:
-                strand_weight[str(hit["strand"])] += int(hit["block_length"])
-            orientation = min(("+", "-"), key=lambda strand: (-strand_weight[strand], strand))
             candidate_by_chr[assignment["assigned_chr_name"]].append(
                 {
                     "key": key,
@@ -901,7 +910,7 @@ def prepare(args: argparse.Namespace) -> None:
                     "assignment": assignment,
                     "hits": hits,
                     "footprint": footprint,
-                    "orientation": orientation,
+                    "orientation": assignment["source_orientation"],
                     "quality_rank": quality_rank(
                         key, sequence, qv_scores, craq_scores, source_rank, reads_qc_enabled
                     ),

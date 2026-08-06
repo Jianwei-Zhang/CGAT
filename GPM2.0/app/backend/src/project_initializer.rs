@@ -145,6 +145,8 @@ struct WorkspacePackageMetadata {
 struct ImportedChrAssignmentSeed {
     chr_name: String,
     chr_order: i64,
+    source_orientation: String,
+    orientation_source: String,
     support_bp: i64,
     support_percent: f64,
     anchor_start: i64,
@@ -959,6 +961,8 @@ fn load_imported_chr_assignment_seeds(
                 ica.source_seq_id,
                 rc.chr_name,
                 ilmo.member_order,
+                ica.source_orientation,
+                ica.orientation_source,
                 ica.support_bp,
                 ica.support_percent,
                 ica.anchor_start
@@ -981,9 +985,11 @@ fn load_imported_chr_assignment_seeds(
                 ImportedChrAssignmentSeed {
                     chr_name: row.get(1)?,
                     chr_order: row.get(2)?,
-                    support_bp: row.get(3)?,
-                    support_percent: row.get(4)?,
-                    anchor_start: row.get(5)?,
+                    source_orientation: row.get(3)?,
+                    orientation_source: row.get(4)?,
+                    support_bp: row.get(5)?,
+                    support_percent: row.get(6)?,
+                    anchor_start: row.get(7)?,
                 },
             ))
         })
@@ -1045,15 +1051,28 @@ fn insert_bootstrap_auto_seed(
     seed: &ImportedChrAssignmentSeed,
     created_at: &str,
 ) -> Result<()> {
+    if seed.source_orientation != "+" && seed.source_orientation != "-" {
+        bail!(
+            "imported assignment has invalid source_orientation: {}",
+            seed.source_orientation
+        );
+    }
+    if seed.orientation_source != "ref_alignment" {
+        bail!(
+            "imported assignment has invalid orientation_source: {}",
+            seed.orientation_source
+        );
+    }
     tx.execute(
         "INSERT INTO assembly_seq (
             project_id, source_seq_id, instance_key, orient, source_start, source_end,
             left_end_type, right_end_type, hidden, created_at, note
-        ) VALUES (?1, ?2, ?3, '+', 1, ?4, 'normal', 'normal', 0, ?5, NULL)",
+        ) VALUES (?1, ?2, ?3, ?4, 1, ?5, 'normal', 'normal', 0, ?6, NULL)",
         params![
             project_id,
             source_seq_id,
             format!("chr:{}", seed.chr_name),
+            seed.source_orientation,
             source_length,
             created_at
         ],
@@ -1066,8 +1085,11 @@ fn insert_bootstrap_auto_seed(
     })?;
     let assembly_seq_id = tx.last_insert_rowid();
     let note = format!(
-        "imported_assignment=1; support_bp={}; support_percent={:.3}",
-        seed.support_bp, seed.support_percent
+        "imported_assignment=1; source_orientation={}; orientation_source={}; support_bp={}; support_percent={:.3}",
+        seed.source_orientation,
+        seed.orientation_source,
+        seed.support_bp,
+        seed.support_percent
     );
     tx.execute(
         "INSERT INTO assembly_ctg (
@@ -2070,8 +2092,9 @@ mod tests {
             .unwrap();
         conn.execute(
             "INSERT INTO imported_chr_assignment (
-                source_seq_id, reference_chr_id, support_bp, support_percent, anchor_start
-             ) VALUES (?1, ?2, 1000, 100.0, 42)",
+                source_seq_id, reference_chr_id, source_orientation, orientation_source,
+                support_bp, support_percent, anchor_start
+             ) VALUES (?1, ?2, '-', 'ref_alignment', 1000, 100.0, 42)",
             params![source_seq_id, reference_chr_id],
         )
         .unwrap();
@@ -2102,9 +2125,10 @@ mod tests {
             bootstrap_project_assembly_with_connection(&mut conn, project.project_id).unwrap();
         assert_eq!(summary.assembly_seq_count, 1);
 
-        let row: (String, Option<String>, Option<i64>, Option<i64>, String, String) = conn
+        let row: (String, Option<String>, Option<i64>, Option<i64>, String, String, String) = conn
             .query_row(
-                "SELECT c.name, c.assigned_chr_name, c.chr_order, c.anchor_start, c.placement_mode, s.instance_key
+                "SELECT c.name, c.assigned_chr_name, c.chr_order, c.anchor_start,
+                        c.placement_mode, s.instance_key, s.orient
                  FROM assembly_ctg c
                  JOIN assembly_seq s ON s.id = c.assembly_seq_id
                  WHERE c.project_id = ?1",
@@ -2117,6 +2141,7 @@ mod tests {
                         row.get(3)?,
                         row.get(4)?,
                         row.get(5)?,
+                        row.get(6)?,
                     ))
                 },
             )
@@ -2130,6 +2155,7 @@ mod tests {
                 Some(42),
                 "auto".to_string(),
                 "chr:chr1".to_string(),
+                "-".to_string(),
             )
         );
     }

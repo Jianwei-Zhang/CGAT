@@ -83,6 +83,8 @@ def build_member_rows(server_dir):
             "seq_name",
             "seq_length_bp",
             "assigned_chr_name",
+            "source_orientation",
+            "orientation_source",
             "support_bp",
             "support_percent",
             "anchor_start",

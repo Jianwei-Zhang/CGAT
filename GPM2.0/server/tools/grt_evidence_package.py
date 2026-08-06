@@ -15,6 +15,7 @@ from pathlib import Path
 
 from grt_contract import ContractError, validate_contract
 from grt_prepare_inputs import (
+    CHR_ASSIGNMENT_FIELDS,
     EVIDENCE_FIELDS,
     WORKFLOW,
     canonical_json,
@@ -50,15 +51,6 @@ USED_CONTIG_FIELDS = [
     "accepted_event_ids_json",
     "final_path_segment_ids_json",
     "pairwise_evidence_ids_json",
-]
-ASSIGNMENT_FIELDS = [
-    "dataset_name",
-    "seq_name",
-    "seq_length_bp",
-    "assigned_chr_name",
-    "support_bp",
-    "support_percent",
-    "anchor_start",
 ]
 DATASET_FIELDS = [
     "dataset_name",
@@ -651,7 +643,9 @@ def execute(args: argparse.Namespace) -> None:
         server_dir / "metadata/reference.tsv",
         ["reference_name", "species_name", "assembly_label", "fasta_relpath", "fai_relpath"],
     )
-    assignment_rows = read_tsv(server_dir / "metadata/chr_assignments.tsv", ASSIGNMENT_FIELDS)
+    assignment_rows = read_tsv(
+        server_dir / "metadata/chr_assignments.tsv", CHR_ASSIGNMENT_FIELDS
+    )
     assignments: dict[tuple[str, str], set[str]] = defaultdict(set)
     for row in assignment_rows:
         assignments[(row["dataset_name"], row["seq_name"])].add(
