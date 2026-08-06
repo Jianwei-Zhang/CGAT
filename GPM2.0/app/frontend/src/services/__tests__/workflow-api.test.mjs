@@ -21,6 +21,7 @@ import {
   removePhasedChrTrackItem,
   reorderPhasedChrTrackItems,
   runCtgEditorAction,
+  setProjectAssemblyViewState,
   setProjectAutoPipelineDone,
   updateProject,
   writeFinalPathExportBinaryFile,
@@ -488,6 +489,114 @@ test("openWorkspace preserves partitioned package metadata from tauri", async ()
 
     assert.equal(result.packageMetadata.sequenceLayout, "partitioned");
     assert.equal(result.datasets[0].fastaAvailable, false);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test("updateProject tauri wraps the camelCase request payload", async () => {
+  const previousWindow = globalThis.window;
+  const calls = [];
+  try {
+    globalThis.window = {
+      __TAURI__: {
+        core: {
+          invoke: async (command, args) => {
+            calls.push({ command, args });
+            return {
+              projectId: 7,
+              projectName: "renamed",
+              referenceGenomeId: 1,
+              primaryDatasetId: 2,
+              projectDatasetCount: 2,
+              phasedAssemblyEnabled: true,
+              chrAssignmentMinCoveragePercent: 60,
+              isProcessed: true,
+              existingProjects: [],
+            };
+          },
+        },
+      },
+    };
+
+    const result = await updateProject({
+      workspaceRoot: "D:\\Desktop\\GPM\\ws1",
+      projectId: 7,
+      projectName: "renamed",
+      referenceGenomeId: 1,
+      primaryDatasetId: 2,
+      supportDatasetIds: [3],
+      chrAssignmentMinCoveragePercent: 60,
+      phasedAssemblyEnabled: true,
+      stateOrLocale: { locale: "en" },
+    });
+
+    assert.deepEqual(calls, [{
+      command: "update_project",
+      args: {
+        request: {
+          workspaceRoot: "D:\\Desktop\\GPM\\ws1",
+          projectId: 7,
+          projectName: "renamed",
+          referenceGenomeId: 1,
+          primaryDatasetId: 2,
+          supportDatasetIds: [3],
+          chrAssignmentMinCoveragePercent: 60,
+          phasedAssemblyEnabled: true,
+        },
+      },
+    }]);
+    assert.equal(result.projectName, "renamed");
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test("setProjectAssemblyViewState tauri wraps the complete request payload", async () => {
+  const previousWindow = globalThis.window;
+  const calls = [];
+  try {
+    globalThis.window = {
+      __TAURI__: {
+        core: {
+          invoke: async (command, args) => {
+            calls.push({ command, args });
+            return { projectId: 9, finalPathViewMode: "table" };
+          },
+        },
+      },
+    };
+
+    await setProjectAssemblyViewState({
+      workspaceRoot: "D:\\Desktop\\GPM\\ws1",
+      projectId: 9,
+      finalPathViewMode: "table",
+    });
+
+    assert.deepEqual(calls, [{
+      command: "update_project_assembly_view_state",
+      args: {
+        request: {
+          workspaceRoot: "D:\\Desktop\\GPM\\ws1",
+          projectId: 9,
+          supportDatasetId: null,
+          trackView: {},
+          supportDsCtgLenRulesByChr: {},
+          supportMirroredCtgs: [],
+          hiddenPrimaryCtgIds: [],
+          hiddenPrimaryCtgIdsByChr: {},
+          trackDragOffsets: [],
+          subviewTrackDragOffsets: [],
+          subviewAnchorStateByKey: {},
+          trackScrollState: {},
+          subviewTrackScrollState: {},
+          finalPathTrackScrollState: {},
+          finalPathViewMode: "table",
+          finalPathByChr: {},
+          degapProjectState: {},
+        },
+      },
+    }]);
   } finally {
     globalThis.window = previousWindow;
   }

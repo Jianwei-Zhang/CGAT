@@ -82,11 +82,46 @@ use gpm_next_backend::runtime_persistence::{
 };
 use gpm_next_backend::workspace::looks_like_bundle_root;
 use rfd::FileDialog;
+use serde::Deserialize;
 use serde_json::{Value, json};
 use tauri::{AppHandle, Emitter};
 
 use crate::auto_pipeline_cancel;
 use crate::import_cancel;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateProjectCommandRequest {
+    workspace_root: String,
+    project_id: i64,
+    project_name: String,
+    reference_genome_id: i64,
+    primary_dataset_id: i64,
+    support_dataset_ids: Option<Vec<i64>>,
+    chr_assignment_min_coverage_percent: Option<f64>,
+    phased_assembly_enabled: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateProjectAssemblyViewStateCommandRequest {
+    workspace_root: String,
+    project_id: i64,
+    support_dataset_id: Option<i64>,
+    track_view: Value,
+    support_ds_ctg_len_rules_by_chr: Value,
+    track_scroll_state: Value,
+    subview_track_scroll_state: Value,
+    support_mirrored_ctgs: Value,
+    hidden_primary_ctg_ids: Value,
+    hidden_primary_ctg_ids_by_chr: Value,
+    track_drag_offsets: Value,
+    subview_track_drag_offsets: Value,
+    subview_anchor_state_by_key: Value,
+    final_path_view_mode: String,
+    final_path_by_chr: Value,
+    degap_project_state: Value,
+}
 
 fn project_db_path(workspace_root: &str) -> PathBuf {
     Path::new(workspace_root).join("project.sqlite")
@@ -804,13 +839,13 @@ pub fn request_import_cancel(runId: String) -> Result<Value, String> {
 #[tauri::command]
 #[allow(non_snake_case)]
 pub fn list_project_initializer_options(workspaceRoot: String) -> Result<Value, String> {
-    (|| read_initializer_options(&workspaceRoot, false))().map_err(format_error)
+    read_initializer_options(&workspaceRoot, false).map_err(format_error)
 }
 
 #[tauri::command]
 #[allow(non_snake_case)]
 pub fn open_workspace(workspaceRoot: String) -> Result<Value, String> {
-    (|| read_initializer_options(&workspaceRoot, true))().map_err(format_error)
+    read_initializer_options(&workspaceRoot, true).map_err(format_error)
 }
 
 #[tauri::command]
@@ -1041,29 +1076,29 @@ pub fn get_grt_evidence(
 }
 
 #[tauri::command]
-#[allow(non_snake_case)]
-pub fn update_project(
-    workspaceRoot: String,
-    projectId: i64,
-    projectName: String,
-    referenceGenomeId: i64,
-    primaryDatasetId: i64,
-    supportDatasetIds: Option<Vec<i64>>,
-    chrAssignmentMinCoveragePercent: Option<f64>,
-    phasedAssemblyEnabled: Option<bool>,
-) -> Result<Value, String> {
+pub fn update_project(request: UpdateProjectCommandRequest) -> Result<Value, String> {
+    let UpdateProjectCommandRequest {
+        workspace_root,
+        project_id,
+        project_name,
+        reference_genome_id,
+        primary_dataset_id,
+        support_dataset_ids,
+        chr_assignment_min_coverage_percent,
+        phased_assembly_enabled,
+    } = request;
     (|| {
-        let project_db = project_db_path(&workspaceRoot);
+        let project_db = project_db_path(&workspace_root);
         let summary = backend_update_project(
             &project_db,
             &ProjectUpdateRequest {
-                project_id: projectId,
-                project_name: projectName.clone(),
-                reference_genome_id: referenceGenomeId,
-                primary_dataset_id: primaryDatasetId,
-                support_dataset_ids: supportDatasetIds.unwrap_or_default(),
-                phased_assembly_enabled: phasedAssemblyEnabled,
-                chr_assignment_min_coverage_percent: chrAssignmentMinCoveragePercent,
+                project_id,
+                project_name,
+                reference_genome_id,
+                primary_dataset_id,
+                support_dataset_ids: support_dataset_ids.unwrap_or_default(),
+                phased_assembly_enabled,
+                chr_assignment_min_coverage_percent,
             },
         )?;
         let options = backend_list_initializer_options(&project_db)?;
@@ -1290,16 +1325,13 @@ pub fn request_auto_pipeline_cancel(
     projectId: i64,
     runId: String,
 ) -> Result<Value, String> {
-    (|| {
-        let requested = auto_pipeline_cancel::request_cancel(&workspaceRoot, projectId, &runId);
-        Ok(json!({
-            "workspaceRoot": workspaceRoot,
-            "projectId": projectId,
-            "runId": runId,
-            "requested": requested
-        }))
-    })()
-    .map_err(format_error)
+    let requested = auto_pipeline_cancel::request_cancel(&workspaceRoot, projectId, &runId);
+    Ok(json!({
+        "workspaceRoot": workspaceRoot,
+        "projectId": projectId,
+        "runId": runId,
+        "requested": requested
+    }))
 }
 
 #[tauri::command]
@@ -2253,97 +2285,100 @@ pub fn get_project_assembly_view_state(
 }
 
 #[tauri::command]
-#[allow(non_snake_case)]
 pub fn update_project_assembly_view_state(
-    workspaceRoot: String,
-    projectId: i64,
-    supportDatasetId: Option<i64>,
-    trackView: Value,
-    supportDsCtgLenRulesByChr: Value,
-    trackScrollState: Value,
-    subviewTrackScrollState: Value,
-    supportMirroredCtgs: Value,
-    hiddenPrimaryCtgIds: Value,
-    hiddenPrimaryCtgIdsByChr: Value,
-    trackDragOffsets: Value,
-    subviewTrackDragOffsets: Value,
-    subviewAnchorStateByKey: Value,
-    finalPathViewMode: String,
-    finalPathByChr: Value,
-    degapProjectState: Value,
+    request: UpdateProjectAssemblyViewStateCommandRequest,
 ) -> Result<Value, String> {
+    let UpdateProjectAssemblyViewStateCommandRequest {
+        workspace_root,
+        project_id,
+        support_dataset_id,
+        track_view,
+        support_ds_ctg_len_rules_by_chr,
+        track_scroll_state,
+        subview_track_scroll_state,
+        support_mirrored_ctgs,
+        hidden_primary_ctg_ids,
+        hidden_primary_ctg_ids_by_chr,
+        track_drag_offsets,
+        subview_track_drag_offsets,
+        subview_anchor_state_by_key,
+        final_path_view_mode,
+        final_path_by_chr,
+        degap_project_state,
+    } = request;
     (|| {
-        let normalized_support_mirrored_ctgs = if supportMirroredCtgs.is_array() {
-            supportMirroredCtgs
+        let normalized_support_mirrored_ctgs = if support_mirrored_ctgs.is_array() {
+            support_mirrored_ctgs
         } else {
             json!([])
         };
-        let normalized_track_view = if trackView.is_object() {
-            trackView
+        let normalized_track_view = if track_view.is_object() {
+            track_view
         } else {
             json!({})
         };
-        let normalized_support_ds_ctg_len_rules_by_chr = if supportDsCtgLenRulesByChr.is_object() {
-            supportDsCtgLenRulesByChr
+        let normalized_support_ds_ctg_len_rules_by_chr = if support_ds_ctg_len_rules_by_chr.is_object()
+        {
+            support_ds_ctg_len_rules_by_chr
         } else {
             json!({})
         };
-        let normalized_track_scroll_state = if trackScrollState.is_object() {
-            trackScrollState
+        let normalized_track_scroll_state = if track_scroll_state.is_object() {
+            track_scroll_state
         } else {
             json!({})
         };
-        let normalized_subview_track_scroll_state = if subviewTrackScrollState.is_object() {
-            subviewTrackScrollState
+        let normalized_subview_track_scroll_state = if subview_track_scroll_state.is_object() {
+            subview_track_scroll_state
         } else {
             json!({})
         };
-        let normalized_hidden_primary_ctg_ids = if hiddenPrimaryCtgIds.is_array() {
-            hiddenPrimaryCtgIds
+        let normalized_hidden_primary_ctg_ids = if hidden_primary_ctg_ids.is_array() {
+            hidden_primary_ctg_ids
         } else {
             json!([])
         };
-        let normalized_hidden_primary_ctg_ids_by_chr = if hiddenPrimaryCtgIdsByChr.is_object() {
-            hiddenPrimaryCtgIdsByChr
+        let normalized_hidden_primary_ctg_ids_by_chr = if hidden_primary_ctg_ids_by_chr.is_object() {
+            hidden_primary_ctg_ids_by_chr
         } else {
             json!({})
         };
-        let normalized_track_drag_offsets = if trackDragOffsets.is_array() {
-            trackDragOffsets
+        let normalized_track_drag_offsets = if track_drag_offsets.is_array() {
+            track_drag_offsets
         } else {
             json!([])
         };
-        let normalized_subview_track_drag_offsets = if subviewTrackDragOffsets.is_array() {
-            subviewTrackDragOffsets
+        let normalized_subview_track_drag_offsets = if subview_track_drag_offsets.is_array() {
+            subview_track_drag_offsets
         } else {
             json!([])
         };
-        let normalized_subview_anchor_state_by_key = if subviewAnchorStateByKey.is_object() {
-            subviewAnchorStateByKey
+        let normalized_subview_anchor_state_by_key = if subview_anchor_state_by_key.is_object() {
+            subview_anchor_state_by_key
         } else {
             json!({})
         };
-        let normalized_final_path_by_chr = if finalPathByChr.is_object() {
-            finalPathByChr
+        let normalized_final_path_by_chr = if final_path_by_chr.is_object() {
+            final_path_by_chr
         } else {
             json!({})
         };
-        let normalized_degap_project_state = if degapProjectState.is_object() {
-            degapProjectState
+        let normalized_degap_project_state = if degap_project_state.is_object() {
+            degap_project_state
         } else {
             json!({})
         };
-        let normalized_final_path_view_mode = match finalPathViewMode.trim() {
+        let normalized_final_path_view_mode = match final_path_view_mode.trim() {
             "log" => "log".to_string(),
             "degap" => "degap".to_string(),
             "table" => "table".to_string(),
             _ => "graph".to_string(),
         };
         let state = backend_update_project_assembly_view_state(
-            &project_db_path(&workspaceRoot),
+            &project_db_path(&workspace_root),
             &UpdateProjectAssemblyViewStateParams {
-                project_id: projectId,
-                support_dataset_id: supportDatasetId.filter(|value| *value > 0),
+                project_id,
+                support_dataset_id: support_dataset_id.filter(|value| *value > 0),
                 track_view_json: serde_json::to_string(&normalized_track_view)?,
                 support_ds_ctg_len_rules_by_chr_json: serde_json::to_string(
                     &normalized_support_ds_ctg_len_rules_by_chr,
@@ -2691,6 +2726,48 @@ mod tests {
         assert_eq!(payload["progressTotal"], 674);
         assert_eq!(payload["phaseIndex"], 4);
         assert_eq!(payload["phaseTotal"], 7);
+    }
+
+    #[test]
+    fn command_requests_decode_nested_camel_case_fields() {
+        let project_request: UpdateProjectCommandRequest = serde_json::from_value(json!({
+            "workspaceRoot": "D:\\Desktop\\GPM\\ws1",
+            "projectId": 7,
+            "projectName": "project-7",
+            "referenceGenomeId": 1,
+            "primaryDatasetId": 2,
+            "supportDatasetIds": [3],
+            "chrAssignmentMinCoveragePercent": 60,
+            "phasedAssemblyEnabled": true,
+        }))
+        .expect("decode update-project request");
+        assert_eq!(project_request.project_id, 7);
+        assert_eq!(project_request.project_name, "project-7");
+        assert_eq!(project_request.support_dataset_ids, Some(vec![3]));
+
+        let view_state_request: UpdateProjectAssemblyViewStateCommandRequest =
+            serde_json::from_value(json!({
+                "workspaceRoot": "D:\\Desktop\\GPM\\ws1",
+                "projectId": 9,
+                "supportDatasetId": null,
+                "trackView": {},
+                "supportDsCtgLenRulesByChr": {},
+                "trackScrollState": {},
+                "subviewTrackScrollState": {},
+                "supportMirroredCtgs": [],
+                "hiddenPrimaryCtgIds": [],
+                "hiddenPrimaryCtgIdsByChr": {},
+                "trackDragOffsets": [],
+                "subviewTrackDragOffsets": [],
+                "subviewAnchorStateByKey": {},
+                "finalPathViewMode": "table",
+                "finalPathByChr": {},
+                "degapProjectState": {},
+            }))
+            .expect("decode assembly-view request");
+        assert_eq!(view_state_request.project_id, 9);
+        assert_eq!(view_state_request.final_path_view_mode, "table");
+        assert!(view_state_request.track_view.is_object());
     }
 
     #[test]

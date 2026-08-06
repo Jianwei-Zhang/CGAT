@@ -2467,14 +2467,16 @@ async function updateProjectTauri({
   stateOrLocale = "zh",
 }) {
   const result = await invokeCommand("update_project", {
-    workspaceRoot,
-    projectId,
-    projectName,
-    referenceGenomeId,
-    primaryDatasetId,
-    supportDatasetIds,
-    chrAssignmentMinCoveragePercent,
-    phasedAssemblyEnabled,
+    request: {
+      workspaceRoot,
+      projectId,
+      projectName,
+      referenceGenomeId,
+      primaryDatasetId,
+      supportDatasetIds,
+      chrAssignmentMinCoveragePercent,
+      phasedAssemblyEnabled,
+    },
   }, stateOrLocale);
   return {
     projectId: result.projectId || projectId,
@@ -2825,23 +2827,25 @@ async function setProjectAssemblyViewStateTauri({
   degapProjectState = {},
 }) {
   return invokeCommand("update_project_assembly_view_state", {
-    workspaceRoot,
-    projectId,
-    supportDatasetId,
-    trackView,
-    supportDsCtgLenRulesByChr,
-    supportMirroredCtgs,
-    hiddenPrimaryCtgIds,
-    hiddenPrimaryCtgIdsByChr,
-    trackDragOffsets,
-    subviewTrackDragOffsets,
-    subviewAnchorStateByKey,
-    trackScrollState,
-    subviewTrackScrollState,
-    finalPathTrackScrollState,
-    finalPathViewMode,
-    finalPathByChr,
-    degapProjectState,
+    request: {
+      workspaceRoot,
+      projectId,
+      supportDatasetId,
+      trackView,
+      supportDsCtgLenRulesByChr,
+      supportMirroredCtgs,
+      hiddenPrimaryCtgIds,
+      hiddenPrimaryCtgIdsByChr,
+      trackDragOffsets,
+      subviewTrackDragOffsets,
+      subviewAnchorStateByKey,
+      trackScrollState,
+      subviewTrackScrollState,
+      finalPathTrackScrollState,
+      finalPathViewMode,
+      finalPathByChr,
+      degapProjectState,
+    },
   });
 }
 
