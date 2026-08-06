@@ -383,17 +383,36 @@ const STAGE_TRANSITIONS: &[(&str, &str, &str)] = &[
     ("finalize", "q4", "q4"),
 ];
 
+#[cfg(test)]
 pub(crate) fn validate_grt_package(bundle_root: &Path) -> Result<ValidatedGrtPackage> {
+    validate_grt_package_with_progress(bundle_root, &mut |_, _| {})
+}
+
+pub(crate) fn validate_grt_package_with_progress<P>(
+    bundle_root: &Path,
+    on_progress: &mut P,
+) -> Result<ValidatedGrtPackage>
+where
+    P: FnMut(&'static str, &'static str),
+{
     if !bundle_root.is_dir() {
         return grt_err(
             "MISSING_BUNDLE",
             format!("bundle directory does not exist: {}", bundle_root.display()),
         );
     }
+    on_progress(
+        "validate_grt_required_files",
+        "checking required GRT package files",
+    );
     for relpath in REQUIRED_FILES {
         required_bundle_file(bundle_root, relpath, relpath)?;
     }
 
+    on_progress(
+        "validate_grt_metadata_tables",
+        "parsing GRT metadata tables",
+    );
     let mut tables = HashMap::new();
     for (relpath, header, minimum, maximum) in TABLE_SPECS {
         tables.insert(
@@ -448,6 +467,10 @@ pub(crate) fn validate_grt_package(bundle_root: &Path) -> Result<ValidatedGrtPac
         "package.reads_qc_enabled",
     )?;
 
+    on_progress(
+        "validate_grt_source_fastas",
+        "validating reference and dataset FASTA/FAI",
+    );
     let dataset_rows = table(&tables, "metadata/datasets.tsv")?;
     let mut dataset_names = HashSet::new();
     for row in &dataset_rows.rows {
@@ -555,6 +578,10 @@ pub(crate) fn validate_grt_package(bundle_root: &Path) -> Result<ValidatedGrtPac
             .insert(chromosome.to_string());
     }
 
+    on_progress(
+        "validate_grt_recipe",
+        "validating the locked GRT recipe",
+    );
     let recipe = one_row(&tables, "metadata/grt_recipe.tsv")?;
     let primary_dataset = nonempty(recipe, "primary_dataset", "recipe primary dataset")?;
     if !dataset_names.contains(primary_dataset) {
@@ -630,6 +657,10 @@ pub(crate) fn validate_grt_package(bundle_root: &Path) -> Result<ValidatedGrtPac
         );
     }
 
+    on_progress(
+        "validate_grt_q_artifacts",
+        "validating q0-q4 artifacts and segment reconstruction",
+    );
     let mut q_records = HashMap::<String, BTreeMap<String, String>>::new();
     let mut q_artifact_hashes = HashMap::<String, String>::new();
     for q_version in ["q0", "q0r1", "q0f", "q1", "q2", "q3", "q4"] {
@@ -799,6 +830,10 @@ pub(crate) fn validate_grt_package(bundle_root: &Path) -> Result<ValidatedGrtPac
         );
     }
 
+    on_progress(
+        "validate_grt_donor_artifacts",
+        "validating D0/Dtel donor artifacts and member manifests",
+    );
     let donor_sets_table = table(&tables, "metadata/grt_donor_sets.tsv")?;
     let mut donor_sets = HashMap::<String, &TsvRow>::new();
     let mut donor_kind_count = HashMap::<String, usize>::new();
@@ -960,6 +995,10 @@ pub(crate) fn validate_grt_package(bundle_root: &Path) -> Result<ValidatedGrtPac
         }
     }
 
+    on_progress(
+        "validate_grt_evidence",
+        "validating evidence, usage, and event links",
+    );
     let evidence_table = table(&tables, "metadata/grt_evidence_registry.tsv")?;
     let mut evidence = HashMap::<String, &TsvRow>::new();
     for row in &evidence_table.rows {
@@ -1375,6 +1414,10 @@ pub(crate) fn validate_grt_package(bundle_root: &Path) -> Result<ValidatedGrtPac
         }
     }
 
+    on_progress(
+        "validate_grt_final_path",
+        "rebuilding and validating the Final Path",
+    );
     validate_stage_status(
         bundle_root,
         table(&tables, "metadata/grt_stage_status.tsv")?,
@@ -1634,6 +1677,10 @@ pub(crate) fn validate_grt_package(bundle_root: &Path) -> Result<ValidatedGrtPac
         }
     }
 
+    on_progress(
+        "validate_grt_trace_integrity",
+        "validating source-card trace integrity",
+    );
     validate_source_cards(
         table(&tables, "metadata/grt_used_contigs.tsv")?,
         &sources,
@@ -3484,6 +3531,56 @@ mod tests {
         let package = validate_grt_package(&fixture_root()).unwrap();
         assert_eq!(package.final_path["workflow"].as_str(), Some(GRT_WORKFLOW));
         assert_eq!(package.events.len(), 1);
+    }
+
+    #[test]
+    fn reports_grt_validation_stages_in_execution_order() {
+        let mut stages = Vec::new();
+        let package = validate_grt_package_with_progress(
+            &fixture_root(),
+            &mut |stage, _detail| stages.push(stage),
+        )
+        .unwrap();
+
+        assert_eq!(package.events.len(), 1);
+        assert_eq!(
+            stages,
+            vec![
+                "validate_grt_required_files",
+                "validate_grt_metadata_tables",
+                "validate_grt_source_fastas",
+                "validate_grt_recipe",
+                "validate_grt_q_artifacts",
+                "validate_grt_donor_artifacts",
+                "validate_grt_evidence",
+                "validate_grt_final_path",
+                "validate_grt_trace_integrity",
+            ]
+        );
+    }
+
+    #[test]
+    fn reports_recipe_validation_before_quoted_json_failure() {
+        let temp = tempdir().unwrap();
+        let bundle_root = temp.path().join("gpm_server");
+        copy_tree(&fixture_root(), &bundle_root);
+        let recipe_path = bundle_root.join("metadata/grt_recipe.tsv");
+        let recipe = fs::read_to_string(&recipe_path).unwrap();
+        fs::write(
+            recipe_path,
+            recipe.replace("\"[\"\"support\"\"]\"", "not-json"),
+        )
+        .unwrap();
+
+        let mut stages = Vec::new();
+        let error = validate_grt_package_with_progress(
+            &bundle_root,
+            &mut |stage, _detail| stages.push(stage),
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("GRT_IMPORT_INVALID_JSON"));
+        assert_eq!(stages.last(), Some(&"validate_grt_recipe"));
     }
 
     #[test]

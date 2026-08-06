@@ -1148,7 +1148,7 @@ function renderImportProgressOverlay(importer, messages) {
           const isRunning = !importer.importCancelling && index === recentStages.length - 1;
           const status = isRunning ? "running" : "done";
           return `<li class="pipeline-step-row import-progress-step ${status}">
-            <span class="pipeline-step-label">${escapeHtml(formatImportProgressStage(stage, absoluteIndex, progressMeta))}</span>
+            <span class="pipeline-step-label">${escapeHtml(formatImportProgressStage(stage, absoluteIndex, progressMeta, messages))}</span>
             <span class="pipeline-step-icon">${renderImportProgressStepIcon(status)}</span>
           </li>`;
         })
@@ -1166,7 +1166,7 @@ function renderImportProgressOverlay(importer, messages) {
           <div>
             <div class="import-progress-title-row">
               <h4>${escapeHtml(messages.page.importProgressTitle)}</h4>
-              ${renderImportProgressMeter(progressMeta)}
+              ${renderImportProgressMeter(progressMeta, messages)}
             </div>
             <p class="muted">${escapeHtml(importer.importCancelling ? messages.runtime.importCancellingSummary : importer.summary)}</p>
           </div>
@@ -1323,6 +1323,26 @@ function formatImportFailureSummary(error, stateOrLocale) {
 }
 
 function buildImportProgressMeta(stages) {
+  let latestPhaseIndex = 0;
+  let latestPhaseTotal = 0;
+  for (const stage of stages) {
+    const phaseIndex = getStagePhaseIndex(stage);
+    const phaseTotal = getStagePhaseTotal(stage);
+    if (phaseIndex > latestPhaseIndex) {
+      latestPhaseIndex = phaseIndex;
+    }
+    if (phaseTotal > latestPhaseTotal) {
+      latestPhaseTotal = phaseTotal;
+    }
+  }
+  if (latestPhaseTotal > 0) {
+    return {
+      mode: "phase",
+      current: Math.min(latestPhaseIndex, latestPhaseTotal),
+      total: latestPhaseTotal,
+    };
+  }
+
   const progressOffset = findFirstProgressStageIndex(stages);
   const offset = progressOffset >= 0 ? progressOffset : 0;
   let latestProgressIndex = 0;
@@ -1342,6 +1362,7 @@ function buildImportProgressMeta(stages) {
     : stages.length;
   const total = Math.max(stages.length, latestProgressTotal > 0 ? offset + latestProgressTotal : stages.length);
   return {
+    mode: "step",
     offset,
     current: Math.min(current, total),
     total,
@@ -1352,8 +1373,11 @@ function findFirstProgressStageIndex(stages) {
   return stages.findIndex((stage) => getStageProgressIndex(stage) > 0);
 }
 
-function formatImportProgressStage(stage, absoluteIndex, progressMeta) {
-  const label = stripImportProgressSuffix(getImportStageLabel(stage));
+function formatImportProgressStage(stage, absoluteIndex, progressMeta, messages) {
+  const label = stripImportProgressSuffix(getImportStageLabel(stage, messages));
+  if (progressMeta.mode === "phase") {
+    return label;
+  }
   const progressIndex = getStageProgressIndex(stage);
   const displayIndex = progressIndex > 0
     ? progressMeta.offset + progressIndex
@@ -1364,8 +1388,13 @@ function formatImportProgressStage(stage, absoluteIndex, progressMeta) {
   return `${label} (${displayIndex}/${progressMeta.total})`;
 }
 
-function getImportStageLabel(stage) {
+function getImportStageLabel(stage, messages) {
   if (stage && typeof stage === "object") {
+    const stageCode = String(stage.stageCode || "").trim();
+    const template = messages?.progressStages?.[stageCode];
+    if (template) {
+      return String(template).replaceAll("{detail}", String(stage.detail || ""));
+    }
     return String(stage.label || stage.text || "");
   }
   return String(stage || "");
@@ -1387,20 +1416,43 @@ function getStageProgressTotal(stage) {
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
+function getStagePhaseIndex(stage) {
+  if (!stage || typeof stage !== "object") {
+    return 0;
+  }
+  const value = Number(stage.phaseIndex);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function getStagePhaseTotal(stage) {
+  if (!stage || typeof stage !== "object") {
+    return 0;
+  }
+  const value = Number(stage.phaseTotal);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
 function stripImportProgressSuffix(value) {
   return String(value || "").replace(/\s+\(\d+\/\d+\)\s*$/, "");
 }
 
-function renderImportProgressMeter(progressMeta) {
+function renderImportProgressMeter(progressMeta, messages) {
   if (!progressMeta.total) {
     return "";
   }
   const percent = Math.max(0, Math.min(100, (progressMeta.current / progressMeta.total) * 100));
+  const meterText = progressMeta.mode === "phase"
+    ? String(messages.runtime.importPhaseProgress || "Phase {current}/{total}")
+        .replaceAll("{current}", String(progressMeta.current))
+        .replaceAll("{total}", String(progressMeta.total))
+    : String(messages.runtime.importStepProgress || "Steps {current}/{total}")
+        .replaceAll("{current}", String(progressMeta.current))
+        .replaceAll("{total}", String(progressMeta.total));
   return `<div class="import-progress-meter" aria-label="import progress">
     <div class="import-progress-meter-track">
       <div class="import-progress-meter-fill" style="width: ${percent.toFixed(1)}%;"></div>
     </div>
-    <span class="import-progress-meter-text">${progressMeta.current}/${progressMeta.total}</span>
+    <span class="import-progress-meter-text">${escapeHtml(meterText)}</span>
   </div>`;
 }
 

@@ -14,13 +14,17 @@ use crate::alignment_cache::{
     index_ref_alignment_hits_for_source_seq_with_cancel,
 };
 use crate::db::open_workspace_db;
-use crate::grt_package::{ValidatedGrtPackage, persist_grt_package, validate_grt_package};
+use crate::grt_package::{
+    ValidatedGrtPackage, persist_grt_package, validate_grt_package_with_progress,
+};
 use crate::junction_inspection::ensure_pairwise_alignment_run_cache_cancel;
 use crate::workspace::{resolve_bundle_root_dir, resolve_extracted_bundle_workspace};
 
 pub const EXPORTS_DIR: &str = "exports";
 pub const CACHE_DIR: &str = "cache";
 pub const PROJECT_DB_NAME: &str = "project.sqlite";
+const ZIP_IMPORT_PHASE_TOTAL: usize = 7;
+const EXTRACTED_IMPORT_PHASE_TOTAL: usize = 5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImportMode {
@@ -34,6 +38,8 @@ pub struct ImportProgress {
     pub detail: String,
     pub progress_index: Option<usize>,
     pub progress_total: Option<usize>,
+    pub phase_index: Option<usize>,
+    pub phase_total: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -277,6 +283,8 @@ where
     log_path: Option<PathBuf>,
     emitted_count: usize,
     expected_total: Option<usize>,
+    phase_index: Option<usize>,
+    phase_total: Option<usize>,
 }
 
 pub fn import_from_extracted_bundle(path: &Path) -> Result<(ImportOutcome, Vec<ImportProgress>)> {
@@ -294,6 +302,7 @@ where
 {
     check_import_cancel(should_cancel)?;
     let mut recorder = ImportProgressWriter::new(on_progress);
+    recorder.set_phase(1, EXTRACTED_IMPORT_PHASE_TOTAL);
     recorder.record("validate_input", format!("extract_path={}", path.display()));
     recorder.reserve_remaining(6);
 
@@ -308,11 +317,20 @@ where
         ),
     );
 
-    let grt_package = validate_grt_package(&resolved.bundle_root)?;
+    recorder.set_phase(2, EXTRACTED_IMPORT_PHASE_TOTAL);
+    recorder.record(
+        "validate_grt_contract_start",
+        "starting full GRT package validation".to_string(),
+    );
+    let grt_package = validate_grt_package_with_progress(
+        &resolved.bundle_root,
+        &mut |stage, detail| recorder.record(stage, detail.to_string()),
+    )?;
     recorder.record(
         "validate_grt_contract",
         "workflow=gpm_grt_precomputed_v1 schema_version=1".to_string(),
     );
+    recorder.set_phase(3, EXTRACTED_IMPORT_PHASE_TOTAL);
     let project_db_path = initialize_workspace_layout(&resolved.workspace_root)?;
     recorder.enable_log(&resolved.workspace_root)?;
     check_import_cancel(should_cancel)?;
@@ -325,6 +343,7 @@ where
         ),
     );
 
+    recorder.set_phase(4, EXTRACTED_IMPORT_PHASE_TOTAL);
     index_alignment_payloads_from_bundle(
         &project_db_path,
         &resolved.bundle_root,
@@ -332,6 +351,7 @@ where
         should_cancel,
     )?;
 
+    recorder.set_phase(5, EXTRACTED_IMPORT_PHASE_TOTAL);
     recorder.record(
         "complete",
         "import mode=extracted_bundle completed".to_string(),
@@ -367,6 +387,7 @@ where
 {
     check_import_cancel(should_cancel)?;
     let mut recorder = ImportProgressWriter::new(on_progress);
+    recorder.set_phase(1, ZIP_IMPORT_PHASE_TOTAL);
     recorder.record(
         "validate_input",
         format!(
@@ -380,6 +401,7 @@ where
     let archive_entry_count = count_zip_entries(zip_path)?;
     recorder.reserve_remaining(archive_entry_count + 5);
 
+    recorder.set_phase(2, ZIP_IMPORT_PHASE_TOTAL);
     ensure_workspace_root_can_be_created(workspace_root)?;
     fs::create_dir_all(workspace_root).with_context(|| {
         format!(
@@ -410,6 +432,7 @@ where
         format!("zip extracted to {}", workspace_root.display()),
     );
 
+    recorder.set_phase(3, ZIP_IMPORT_PHASE_TOTAL);
     let detected_bundle_root = match resolve_bundle_root_dir(workspace_root) {
         Ok(path) => path,
         Err(error) => {
@@ -443,7 +466,15 @@ where
         );
     }
 
-    let grt_package = match validate_grt_package(workspace_root) {
+    recorder.set_phase(4, ZIP_IMPORT_PHASE_TOTAL);
+    recorder.record(
+        "validate_grt_contract_start",
+        "starting full GRT package validation".to_string(),
+    );
+    let grt_package = match validate_grt_package_with_progress(
+        workspace_root,
+        &mut |stage, detail| recorder.record(stage, detail.to_string()),
+    ) {
         Ok(package) => package,
         Err(error) => {
             remove_failed_zip_workspace(workspace_root, &error)?;
@@ -455,6 +486,7 @@ where
         "workflow=gpm_grt_precomputed_v1 schema_version=1".to_string(),
     );
 
+    recorder.set_phase(5, ZIP_IMPORT_PHASE_TOTAL);
     let project_db_path = match initialize_workspace_layout(workspace_root) {
         Ok(path) => path,
         Err(error) => {
@@ -478,6 +510,7 @@ where
         ),
     );
 
+    recorder.set_phase(6, ZIP_IMPORT_PHASE_TOTAL);
     if let Err(error) = index_alignment_payloads_from_bundle(
         &project_db_path,
         workspace_root,
@@ -488,6 +521,7 @@ where
         return Err(error);
     }
 
+    recorder.set_phase(7, ZIP_IMPORT_PHASE_TOTAL);
     recorder.record("complete", "import mode=zip_delivery completed".to_string());
 
     Ok((
@@ -1003,7 +1037,14 @@ where
             log_path: None,
             emitted_count: 0,
             expected_total: None,
+            phase_index: None,
+            phase_total: None,
         }
+    }
+
+    fn set_phase(&mut self, phase_index: usize, phase_total: usize) {
+        self.phase_index = Some(phase_index);
+        self.phase_total = Some(phase_total.max(phase_index));
     }
 
     fn reserve_remaining(&mut self, remaining_count: usize) {
@@ -1054,6 +1095,12 @@ where
             .max(progress_index);
         item.progress_index = Some(progress_index);
         item.progress_total = Some(progress_total);
+        if item.phase_index.is_none() {
+            item.phase_index = self.phase_index;
+        }
+        if item.phase_total.is_none() {
+            item.phase_total = self.phase_total;
+        }
         (self.on_progress)(item.clone());
         if let Some(log_path) = self.log_path.as_deref() {
             let _ = append_import_log_step(log_path, &item);
@@ -1594,6 +1641,8 @@ fn step(stage: &'static str, detail: String) -> ImportProgress {
         detail,
         progress_index: None,
         progress_total: None,
+        phase_index: None,
+        phase_total: None,
     }
 }
 
@@ -5997,6 +6046,33 @@ mod tests {
         assert_eq!(progress.last().unwrap().stage, "complete");
         assert!(progress.iter().all(|item| item.progress_index.is_some()
             && item.progress_total == progress.last().unwrap().progress_total));
+        assert!(progress.iter().all(|item| item.phase_total == Some(7)));
+        assert_eq!(progress.first().unwrap().phase_index, Some(1));
+        assert_eq!(progress.last().unwrap().phase_index, Some(7));
+        assert!(progress.windows(2).all(|items| {
+            items[0].phase_index.unwrap_or_default()
+                <= items[1].phase_index.unwrap_or_default()
+        }));
+        let stages = progress
+            .iter()
+            .map(|item| item.stage)
+            .collect::<Vec<_>>();
+        let normalize_index = stages
+            .iter()
+            .position(|stage| *stage == "normalize_workspace_layout")
+            .unwrap();
+        let validation_start_index = stages
+            .iter()
+            .position(|stage| *stage == "validate_grt_contract_start")
+            .unwrap();
+        let validation_complete_index = stages
+            .iter()
+            .position(|stage| *stage == "validate_grt_contract")
+            .unwrap();
+        assert!(normalize_index < validation_start_index);
+        assert!(validation_start_index < validation_complete_index);
+        assert!(stages.contains(&"validate_grt_source_fastas"));
+        assert!(stages.contains(&"validate_grt_final_path"));
         assert!(
             progress
                 .iter()
@@ -6019,9 +6095,24 @@ mod tests {
         write_bundle_zip_without_fasta(&zip_path);
 
         let workspace_root = temp.path().join("workspaces").join("project_alpha");
-        let error = import_from_zip(&zip_path, &workspace_root).unwrap_err();
+        let mut observed_progress = Vec::new();
+        let error = import_from_zip_with_hooks(
+            &zip_path,
+            &workspace_root,
+            &mut |step| observed_progress.push(step),
+            &mut || false,
+        )
+        .unwrap_err();
         assert!(error.to_string().contains("GRT_IMPORT_MISSING_REQUIRED_FILE"));
         assert!(!workspace_root.exists());
+        assert_eq!(
+            observed_progress.last().map(|step| step.stage),
+            Some("validate_grt_required_files")
+        );
+        assert_eq!(
+            observed_progress.last().and_then(|step| step.phase_index),
+            Some(4)
+        );
     }
 
     #[test]

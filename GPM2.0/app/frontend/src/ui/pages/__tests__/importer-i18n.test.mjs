@@ -151,6 +151,8 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.runtime.addPackageHint, "（added {datasetName}）");
   assert.equal(zh.runtime.importFailedSummary, "导入失败：{message}");
   assert.equal(zh.runtime.tauriImportAddPackageStage, "调用后端 import_add_dataset_package");
+  assert.equal(zh.progressStages.validate_grt_source_fastas, "校验 reference/dataset FASTA 与 FAI");
+  assert.equal(zh.runtime.importPhaseProgress, "阶段 {current}/{total}");
 
   assert.equal(en.buttons.importAddPackage, "Import add package");
   assert.equal(en.runtime.importAddPackageSummary, "Importing the dataset add package.");
@@ -160,6 +162,8 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.runtime.addPackageHint, "(added {datasetName})");
   assert.equal(en.runtime.importFailedSummary, "Import failed: {message}");
   assert.equal(en.runtime.tauriImportAddPackageStage, "Invoke backend import_add_dataset_package");
+  assert.equal(en.progressStages.validate_grt_source_fastas, "Validate reference/dataset FASTA and FAI");
+  assert.equal(en.runtime.importPhaseProgress, "Phase {current}/{total}");
 });
 
 test("importer renders concise failed import feedback while keeping open-workspace option visible", () => {
@@ -849,6 +853,72 @@ test("import progress modal is the only import summary and shows per-row status 
     assert.match(html, /class="import-progress-meter"/);
     assert.match(html, /551\/621/);
     assert.doesNotMatch(html, /导入摘要/);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test("import progress uses phase metadata and labels GRT validation instead of archive-entry completion", () => {
+  const previousWindow = globalThis.window;
+  try {
+    globalThis.window = {
+      localStorage: {
+        getItem() {
+          return null;
+        },
+      },
+    };
+    const html = renderImporterPage({
+      locale: "zh",
+      importer: {
+        zipPath: "",
+        workspaceRoot: "",
+        extractedPath: "",
+        openWorkspacePath: "",
+        historyValidation: {},
+        deleteConfirmOpen: false,
+        deleteWithFiles: false,
+        deleteTargets: [],
+        inFlight: true,
+        importRunId: "import-phase-test",
+        importCancelling: false,
+        status: "导入中",
+        stages: [
+          {
+            stageCode: "normalize_workspace_layout",
+            detail: "promoted D:\\Desktop\\example1\\gpm_server into D:\\Desktop\\example1",
+            label: "normalize_workspace_layout：promoted ...",
+            phaseIndex: 3,
+            phaseTotal: 7,
+          },
+          {
+            stageCode: "validate_grt_contract_start",
+            detail: "starting full GRT package validation",
+            label: "validate_grt_contract_start：starting full GRT package validation",
+            phaseIndex: 4,
+            phaseTotal: 7,
+            progressIndex: 673,
+            progressTotal: 674,
+          },
+          {
+            stageCode: "validate_grt_source_fastas",
+            detail: "validating reference and dataset FASTA/FAI",
+            label: "validate_grt_source_fastas：validating reference and dataset FASTA/FAI",
+            phaseIndex: 4,
+            phaseTotal: 7,
+            progressIndex: 674,
+            progressTotal: 674,
+          },
+        ],
+        summary: "正在导入",
+      },
+    });
+
+    assert.match(html, /整理项目区目录/);
+    assert.match(html, /校验 reference\/dataset FASTA 与 FAI/);
+    assert.match(html, /阶段 4\/7/);
+    assert.doesNotMatch(html, /673\/674/);
+    assert.doesNotMatch(html, /validate_grt_source_fastas：/);
   } finally {
     globalThis.window = previousWindow;
   }

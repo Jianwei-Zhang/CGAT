@@ -2250,16 +2250,26 @@ async function withImportProgressListener(runId, onStage, operation) {
       }
       const fallback = `${payload.stage || ""}：${payload.detail || ""}`;
       const stage = {
+        stageCode: String(payload.stage || ""),
+        detail: String(payload.detail || ""),
         label: String(payload.label || fallback),
         text: String(payload.text || payload.label || fallback),
       };
       const progressIndex = Number(payload.progressIndex);
       const progressTotal = Number(payload.progressTotal);
+      const phaseIndex = Number(payload.phaseIndex);
+      const phaseTotal = Number(payload.phaseTotal);
       if (Number.isFinite(progressIndex) && progressIndex > 0) {
         stage.progressIndex = progressIndex;
       }
       if (Number.isFinite(progressTotal) && progressTotal > 0) {
         stage.progressTotal = progressTotal;
+      }
+      if (Number.isFinite(phaseIndex) && phaseIndex > 0) {
+        stage.phaseIndex = phaseIndex;
+      }
+      if (Number.isFinite(phaseTotal) && phaseTotal > 0) {
+        stage.phaseTotal = phaseTotal;
       }
       onStage?.(stage);
     });

@@ -329,16 +329,22 @@ fn emit_import_progress(app: &AppHandle, run_id: Option<&str>, step: ImportProgr
     };
     let _ = app.emit(
         "gpm-next://import-progress",
-        json!({
-            "runId": run_id,
-            "stage": step.stage,
-            "detail": step.detail,
-            "label": format!("{}：{}", step.stage, step.detail),
-            "text": format_import_stage(&step),
-            "progressIndex": step.progress_index,
-            "progressTotal": step.progress_total
-        }),
+        import_progress_payload(run_id, &step),
     );
+}
+
+fn import_progress_payload(run_id: &str, step: &ImportProgress) -> Value {
+    json!({
+        "runId": run_id,
+        "stage": step.stage,
+        "detail": step.detail,
+        "label": format!("{}：{}", step.stage, step.detail),
+        "text": format_import_stage(step),
+        "progressIndex": step.progress_index,
+        "progressTotal": step.progress_total,
+        "phaseIndex": step.phase_index,
+        "phaseTotal": step.phase_total
+    })
 }
 
 fn path_to_string(path: &Path) -> String {
@@ -2663,6 +2669,28 @@ mod tests {
         let path = std::env::temp_dir().join(unique);
         fs::create_dir_all(&path).expect("create temp workspace root");
         path
+    }
+
+    #[test]
+    fn import_progress_payload_includes_phase_metadata() {
+        let payload = import_progress_payload(
+            "run-1",
+            &ImportProgress {
+                stage: "validate_grt_source_fastas",
+                detail: "validating reference and dataset FASTA/FAI".to_string(),
+                progress_index: Some(673),
+                progress_total: Some(674),
+                phase_index: Some(4),
+                phase_total: Some(7),
+            },
+        );
+
+        assert_eq!(payload["runId"], "run-1");
+        assert_eq!(payload["stage"], "validate_grt_source_fastas");
+        assert_eq!(payload["progressIndex"], 673);
+        assert_eq!(payload["progressTotal"], 674);
+        assert_eq!(payload["phaseIndex"], 4);
+        assert_eq!(payload["phaseTotal"], 7);
     }
 
     #[test]
