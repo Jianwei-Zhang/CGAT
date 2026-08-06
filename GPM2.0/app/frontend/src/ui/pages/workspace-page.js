@@ -178,7 +178,7 @@ export function renderWorkspacePage(state) {
       <p class="muted">${escapeHtml(initializer.summary)}</p>
       ${initializer.optionsError ? `<p class="error-text">${escapeHtml(initializer.optionsError)}</p>` : ""}
     </section>
-    ${initializer.createModalOpen ? renderCreateProjectModal(initializer, messages, state.locale) : ""}
+    ${initializer.createModalOpen ? renderCreateProjectModal(initializer, messages) : ""}
     ${initializer.autoPipelineModalOpen ? renderAutoPipelineModal(initializer, messages) : ""}
   `;
 }
@@ -384,32 +384,62 @@ function closeCreateModal(host, store) {
   rerender(host, store);
 }
 
-function renderCreateProjectModal(initializer, messages, locale) {
+function renderCreateProjectModal(initializer, messages) {
   const recipe = initializer.grtRecipe || {};
-  const supportDatasets = Array.isArray(recipe.supportDatasets) ? recipe.supportDatasets : [];
   return `
     <div class="modal-overlay">
-      <article class="card modal-dialog">
-        <header class="page-header">
+      <article class="card modal-dialog workspace-create-dialog">
+        <header class="workspace-card-header">
           <h4>${messages.cards.createNewProject}</h4>
           <button id="initializer-create-modal-close-button" class="button ghost" type="button">${messages.buttons.close}</button>
         </header>
-        <label>${messages.cards.projectName}</label>
-        <input id="initializer-project-name-input" type="text" placeholder="${escapeAttr(messages.page.projectNamePlaceholder)}" value="${escapeAttr(initializer.projectNameInput)}" />
-        <div class="workspace-locked-recipe" data-grt-locked-recipe="true">
-          <p><strong>${messages.cards.lockedRecipe}</strong> ${escapeHtml(recipe.recipeId || "-")}</p>
-          <p><strong>${messages.cards.primaryDataset}</strong> ${escapeHtml(recipe.primaryDataset || "-")}</p>
-          <p><strong>${messages.cards.supportDataset}</strong> ${escapeHtml(supportDatasets.join(", ") || "-")}</p>
-          <p><strong>${messages.cards.readsQc}</strong> ${recipe.readsQcEnabled ? messages.cards.enabled : messages.cards.disabled}</p>
-          <p class="muted">${messages.cards.lockedRecipeHint}</p>
+        <div class="workspace-project-name-field">
+          <label for="initializer-project-name-input">${messages.cards.projectName}</label>
+          <input id="initializer-project-name-input" type="text" placeholder="${escapeAttr(messages.page.projectNamePlaceholder)}" value="${escapeAttr(initializer.projectNameInput)}" />
         </div>
-        <div class="inline-input">
+        ${renderWorkspaceRecipeSummary({ recipe, messages })}
+        <footer class="workspace-card-actions">
           <button id="initializer-create-modal-cancel-button" class="button ghost" type="button">${messages.buttons.cancel}</button>
           <button id="initializer-create-project-confirm-button" class="button" ${
             initializer.creating ? "disabled" : ""
           } type="button">${messages.buttons.createProject}</button>
-        </div>
+        </footer>
       </article>
+    </div>
+  `;
+}
+
+function renderWorkspaceRecipeSummary({ recipe = {}, messages, referenceName = "" }) {
+  const supportDatasets = Array.isArray(recipe.supportDatasets)
+    ? recipe.supportDatasets.filter((value) => String(value || "").trim())
+    : [];
+  const fields = [];
+  if (referenceName) {
+    fields.push({ label: messages.cards.referenceGenome, value: referenceName });
+  }
+  fields.push(
+    { label: messages.cards.primaryDataset, value: recipe.primaryDataset || "-" },
+    { label: messages.cards.supportDataset, value: supportDatasets.join(", ") || "-" },
+    {
+      label: messages.cards.readsQc,
+      value: recipe.readsQcEnabled ? messages.cards.enabled : messages.cards.disabled,
+      valueClass: recipe.readsQcEnabled ? "is-enabled" : "is-disabled",
+    },
+  );
+  return `
+    <div class="workspace-recipe-summary" data-grt-recipe-summary="true">
+      <div class="workspace-recipe-grid">
+        ${fields
+          .map(
+            ({ label, value, valueClass = "" }) => `
+              <div class="workspace-recipe-field">
+                <span class="workspace-recipe-label">${label}</span>
+                <span class="workspace-recipe-value${valueClass ? ` ${valueClass}` : ""}">${escapeHtml(value)}</span>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
     </div>
   `;
 }
@@ -463,7 +493,6 @@ function renderPipelineStepIcon(status) {
 
 function renderSelectedProjectCard({ initializer, selectedProject, editDraft, editDirty, locale, messages }) {
   const recipe = initializer.grtRecipe || {};
-  const supportDatasets = Array.isArray(recipe.supportDatasets) ? recipe.supportDatasets : [];
   const referenceName = selectedProject.referenceName
     || initializer.references.find(
       (reference) => Number(reference.referenceGenomeId) === Number(selectedProject.referenceGenomeId),
@@ -472,7 +501,7 @@ function renderSelectedProjectCard({ initializer, selectedProject, editDraft, ed
 
   return `
     <article class="card workspace-selected-card">
-      <header class="page-header">
+      <header class="workspace-card-header">
         <div>
           <h4>${escapeHtml(i18nT(locale, "workspace.cards.selectedProject", { projectName: selectedProject.projectName }))}</h4>
           <p class="muted">${messages.page.createdAt}${escapeHtml(formatCreatedAt(selectedProject.createdAt, locale))}</p>
@@ -481,19 +510,22 @@ function renderSelectedProjectCard({ initializer, selectedProject, editDraft, ed
           initializer.updating || !editDirty ? "disabled" : ""
         }>${messages.buttons.save}</button>
       </header>
-      <label>${messages.cards.projectName}</label>
-      <input
-        id="selected-project-name-input"
-        type="text"
-        value="${escapeAttr(editDraft.projectName)}"
-      />
-      <div class="workspace-locked-recipe" data-grt-locked-recipe="true">
-        <p><strong>${messages.cards.referenceGenome}</strong> ${escapeHtml(referenceName)}</p>
-        <p><strong>${messages.cards.primaryDataset}</strong> ${escapeHtml(recipe.primaryDataset || selectedProject.primaryDatasetName || "-")}</p>
-        <p><strong>${messages.cards.supportDataset}</strong> ${escapeHtml(supportDatasets.join(", ") || "-")}</p>
-        <p><strong>${messages.cards.lockedRecipe}</strong> ${escapeHtml(recipe.recipeId || "-")}</p>
-        <p class="muted">${messages.runtime.grtProjectLocked}</p>
+      <div class="workspace-project-name-field">
+        <label for="selected-project-name-input">${messages.cards.projectName}</label>
+        <input
+          id="selected-project-name-input"
+          type="text"
+          value="${escapeAttr(editDraft.projectName)}"
+        />
       </div>
+      ${renderWorkspaceRecipeSummary({
+        recipe: {
+          ...recipe,
+          primaryDataset: recipe.primaryDataset || selectedProject.primaryDatasetName || "-",
+        },
+        messages,
+        referenceName,
+      })}
     </article>
   `;
 }

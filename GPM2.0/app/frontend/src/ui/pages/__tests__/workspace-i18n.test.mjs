@@ -10,12 +10,13 @@ import { clearAssemblySessionCache } from "../../shell/assembly-session-cache.js
 
 function createState(overrides = {}) {
   const {
+    locale = "en",
     session: sessionOverrides = {},
     initializer: initializerOverrides = {},
     assembly: assemblyOverrides = {},
   } = overrides;
   return {
-    locale: "en",
+    locale,
     session: {
       workspacePath: "D:/ws",
       projectName: "",
@@ -278,18 +279,39 @@ test("workspace page renders english create-project modal labels", () => {
   assert.match(html, />Create New Project</);
   assert.match(html, />Close</);
   assert.match(html, />Project Name</);
-  assert.match(html, />Locked GRT recipe</);
   assert.match(html, />Primary Dataset</);
   assert.match(html, />Support Dataset</);
   assert.match(html, />Reads QC</);
-  assert.match(html, />Primary Dataset<\/strong> hifiasm/);
-  assert.match(html, />Support Dataset<\/strong> flye, canu/);
+  assert.match(html, /class="workspace-recipe-summary"/);
+  assert.match(html, /class="workspace-recipe-grid"/);
+  assert.match(html, /class="workspace-recipe-label">Primary Dataset<\/span>/);
+  assert.match(html, /class="workspace-recipe-value">hifiasm<\/span>/);
+  assert.match(html, /class="workspace-recipe-value">flye, canu<\/span>/);
+  assert.match(html, /class="workspace-recipe-value is-disabled">Disabled<\/span>/);
+  assert.doesNotMatch(html, /recipe-test/);
+  assert.doesNotMatch(html, /Primary\/support datasets, the reads-QC branch/);
   assert.match(html, />Cancel</);
   assert.doesNotMatch(html, /id="initializer-reference-select"/);
   assert.doesNotMatch(html, /id="initializer-primary-dataset-select"/);
   assert.doesNotMatch(html, /id="initializer-support-dataset-list"/);
   assert.doesNotMatch(html, /id="initializer-chr-assignment-threshold-input"/);
   assert.doesNotMatch(html, /id="initializer-phased-assembly-enabled-input"/);
+});
+
+test("workspace create-project summary removes legacy lock copy in Chinese", () => {
+  const html = renderWorkspacePage(createState({
+    locale: "zh",
+    initializer: {
+      createModalOpen: true,
+    },
+  }));
+
+  assert.match(html, />创建新项目</);
+  assert.match(html, /class="workspace-recipe-label">主 Dataset<\/span>/);
+  assert.match(html, /class="workspace-recipe-label">辅助 Dataset<\/span>/);
+  assert.match(html, /class="workspace-recipe-value is-disabled">未启用<\/span>/);
+  assert.doesNotMatch(html, /GRT 固定 recipe/);
+  assert.doesNotMatch(html, /primary\/support、reads QC 分支和 donor set/);
 });
 
 test("selected GRT project renders immutable recipe fields and an editable name only", () => {
@@ -329,10 +351,14 @@ test("selected GRT project renders immutable recipe fields and an editable name 
     html.match(/<input\s+id="selected-project-name-input"[\s\S]*?\/>/)?.[0] || "",
     /disabled/,
   );
-  assert.match(html, />Reference Genome<\/strong> ref_a/);
-  assert.match(html, />Primary Dataset<\/strong> hifiasm/);
-  assert.match(html, />Support Dataset<\/strong> flye, canu/);
-  assert.match(html, /Only the project name can be changed here/);
+  assert.match(html, /class="workspace-recipe-summary"/);
+  assert.match(html, /class="workspace-recipe-label">Reference Genome<\/span>/);
+  assert.match(html, /class="workspace-recipe-value">ref_a<\/span>/);
+  assert.match(html, /class="workspace-recipe-value">hifiasm<\/span>/);
+  assert.match(html, /class="workspace-recipe-value">flye, canu<\/span>/);
+  assert.match(html, /class="workspace-recipe-value is-disabled">Disabled<\/span>/);
+  assert.doesNotMatch(html, /recipe-test/);
+  assert.doesNotMatch(html, /Only the project name can be changed here/);
   assert.doesNotMatch(html, /id="selected-project-reference-select"/);
   assert.doesNotMatch(html, /id="selected-project-primary-dataset-select"/);
   assert.doesNotMatch(html, /id="selected-project-support-dataset-list"/);
