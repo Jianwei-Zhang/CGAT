@@ -122,8 +122,10 @@ bash ./gpm_server/run_all.sh
 
 This one command completes the staged computation and automatically creates both delivery archives next to `gpm_server/`:
 
-- `gpm_server.zip`: full package with the FASTA payload required for client-side final path FASTA export
-- `gpm_server.no_fasta.zip`: light package without `.fa` / `.fasta` payloads
+- `gpm_server.zip`: App full package, including source/reference FASTA and the authoritative q4 FASTA
+- `gpm_server.no_fasta.zip`: App no-FASTA package, retaining `.fai`, metadata, Final Path, source-card state, and PAF views
+
+These are the only delivery archives. There is no separate Server audit zip: the Server workdir is validated before projection, while q0–q3, D0/Dtel, raw evidence FASTA, caches, checkpoints, raw traces, Server scripts, and tool caches stay on the Server side.
 
 No separate packaging command is needed for the initial workflow. If needed, you can instead execute the staged commands printed by `prepare.sh` manually, including the final full-package and light-package commands.
 
@@ -136,9 +138,9 @@ Execution order is strict:
 5. run Step2 on q1 vs D0 and Step3 on q2 vs D0 with MUMmer
 6. run telomere recovery and finalize q4 plus the traceable Final Path
 7. run chromosome-local main-view alignments
-8. finalize GRT source cards/display evidence and validate the complete package contract
-9. validate again and atomically create `gpm_server.zip`
-10. validate again and atomically create `gpm_server.no_fasta.zip`
+8. finalize the Server GRT result and validate the complete Server workdir contract
+9. project the App allowlist and atomically create `gpm_server.zip`
+10. project the same App contract without FASTA and atomically create `gpm_server.no_fasta.zip`
 
 `run_all.sh` keeps this staged order, stops on program or packaging errors, and resumes computation only from checkpoints whose input, parameter, tool, and output hashes still match. Each packager builds a fresh temporary archive and replaces the final zip only after success, so reruns do not retain removed entries or overwrite a valid archive with a partial result.
 
@@ -173,17 +175,17 @@ bash ./gpm_server/package_full_zip.sh
 The initial `run_all.sh` already creates both archives. Use the generated standalone packaging scripts only when you need to rebuild delivery archives after a later Server workspace change such as `add_dataset.sh` or `add_ctg.sh`; both run the executable GRT contract validator before creating a zip:
 
 ```bash
-# Full delivery bundle: includes .fa/.fasta and supports client-side final path FASTA export
+# App full package: includes source/reference FASTA and q4 for client-side FASTA export
 bash ./gpm_server/package_full_zip.sh
 
-# Light delivery bundle: excludes .fa/.fasta while keeping .fai, metadata, and runs
+# App no-FASTA package: excludes every .fa/.fasta while keeping .fai, metadata, Final Path, and PAFs
 bash ./gpm_server/package_light_no_fasta_zip.sh
 ```
 
 For delivery packages:
 
-- full delivery bundles exclude the original input FASTA files and carry the partitioned FASTA payloads referenced by the locator manifests
-- light zips exclude every `.fa`/`.fasta` payload, including partitioned FASTA files
+- the full App package carries the partitioned source/reference FASTA referenced by the locator manifests plus `grt/q/q4.fa`; it does not carry Server intermediate GRT artifacts
+- the no-FASTA App package excludes every `.fa`/`.fasta` payload, including q4 and partitioned FASTA files, but retains `.fai` and q4 length/hash metadata
 - `--skip-self` keeps the same behavior as before: same-dataset Subview is disabled, but import, orientation, and cross-dataset inspection still work
 
 The light delivery bundle can still be imported, inspected, and used for final path PNG/TSV export. The client hides final path FASTA export when FASTA files are unavailable; the All action remains available and exports PNG + TSV only.
@@ -196,7 +198,7 @@ Install the GPM2.0 desktop application on the client machine from the project Gi
 
 Import `gpm_server.zip` into GPM2.0 to start visual inspection and lightweight editing.
 
-The package fixes the primary/support recipe. Creating a project requires only a project name; the App loads the Server-precomputed Final Path and the minimal read-only source-card status needed by the main view. The Final Path header can restore the current chromosome to its immutable Server GRT baseline; project-level edits remain editable and can continue into DEGAP or export workflows. The complete event/evidence/donor/attempt closure stays in the Server package for validation and operator audit, while App/Tauri no longer exposes a trace browser. Legacy non-GRT packages are intentionally unsupported.
+The package fixes the primary/support recipe. Creating a project requires only a project name; the App loads the Server-precomputed Final Path and the minimal read-only source-card status needed by the main view. The Final Path header can restore the current chromosome to its immutable Server GRT baseline; project-level edits remain editable and can continue into DEGAP or export workflows. The complete event/evidence/donor/attempt closure is validated before packaging but is not copied into the App delivery archive; App/Tauri does not expose a trace browser. Legacy non-GRT packages are intentionally unsupported.
 
 ### Export final path FASTA on the server
 

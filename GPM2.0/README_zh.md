@@ -122,8 +122,10 @@ bash ./gpm_server/run_all.sh
 
 这一条命令会完成全部分阶段计算，并在 `gpm_server/` 同级目录自动生成两个交付包：
 
-- `gpm_server.zip`：完整包，包含客户端导出 final path FASTA 所需的 FASTA 载荷
-- `gpm_server.no_fasta.zip`：轻量包，不包含 `.fa` / `.fasta` 载荷
+- `gpm_server.zip`：App 完整包，包含 source/reference FASTA 与权威 q4 FASTA
+- `gpm_server.no_fasta.zip`：App no-FASTA 包，保留 `.fai`、metadata、Final Path、source-card 状态和 PAF 视图
+
+最终只交付这两个 zip，不再额外提供 Server 审计包。Server 工作目录会在投影前完成完整校验；q0–q3、D0/Dtel、raw evidence FASTA、cache、checkpoint、原始 trace、Server 脚本和工具缓存均留在 Server 侧，不进入 App 交付包。
 
 初始流程无需再单独执行打包命令。如需手工安排阶段，也可以依次执行 `prepare.sh` 打印的命令，但必须包含最后的完整包与轻量包命令。
 
@@ -136,9 +138,9 @@ bash ./gpm_server/run_all.sh
 5. 用 MUMmer 执行 q1 vs D0 的 Step2 和 q2 vs D0 的 Step3
 6. 执行端粒恢复并生成 q4 与可追溯 Final Path
 7. 执行染色体局部主视图比对
-8. 完成 GRT source card/展示证据并校验完整包契约
-9. 再次校验并原子生成 `gpm_server.zip`
-10. 再次校验并原子生成 `gpm_server.no_fasta.zip`
+8. 完成 Server GRT 结果并校验完整 Server 工作目录契约
+9. 投影 App allowlist 并原子生成 `gpm_server.zip`
+10. 投影同一 App 契约的无 FASTA 版本并原子生成 `gpm_server.no_fasta.zip`
 
 `run_all.sh` 会严格保持该顺序，遇到程序或打包错误立即停止，并且只复用输入、参数、工具和输出 hash 均仍匹配的计算检查点。每个打包脚本都会先生成全新的临时 zip，成功后才替换最终文件，因此重跑不会保留已经删除的旧条目，也不会用失败的半成品覆盖有效交付包。
 
@@ -173,17 +175,17 @@ bash ./gpm_server/package_full_zip.sh
 初始 `run_all.sh` 已经自动生成两种交付包。只有在后续执行 `add_dataset.sh`、`add_ctg.sh` 等操作并需要重建交付包时，才需要使用生成的独立打包脚本；两种脚本都会在创建 zip 前执行 GRT 可执行契约校验器：
 
 ```bash
-# 完整交付包：包含 .fa/.fasta，可在客户端导出 final path FASTA
+# App 完整包：包含 source/reference FASTA 与 q4，可在客户端导出 FASTA
 bash ./gpm_server/package_full_zip.sh
 
-# 轻量交付包：排除 .fa/.fasta，仅保留 .fai、metadata 与 runs
+# App no-FASTA 包：排除所有 .fa/.fasta，保留 .fai、metadata、Final Path 与 PAF
 bash ./gpm_server/package_light_no_fasta_zip.sh
 ```
 
 对于交付包：
 
-- 完整 zip 会去掉原始单体 FASTA，只保留 locator 清单所指向的 partitioned FASTA 载荷
-- 轻量 zip 会排除所有 `.fa`/`.fasta`，包括 partitioned FASTA
+- 完整 App zip 只携带 locator 清单所指向的 partitioned source/reference FASTA、q4 以及 App 所需元数据，不携带 Server GRT 中间产物
+- no-FASTA zip 会排除所有 `.fa`/`.fasta`，包括 q4 和 partitioned FASTA，但保留 `.fai` 及 q4 长度/hash 元数据
 - `--skip-self` 的行为保持不变：同 dataset 的 Subview 关闭，但导入、方向矫正、跨 dataset 浏览仍然可用
 
 轻量交付包可正常导入、浏览与导出 final path PNG/TSV；客户端会隐藏 final path FASTA 导出入口，All 导出仍可使用，但只导出 PNG + TSV。
@@ -196,7 +198,7 @@ bash ./gpm_server/package_light_no_fasta_zip.sh
 
 将服务端生成的 `gpm_server.zip` 导入 GPM2.0，即可进入可视化浏览与轻量编辑流程。
 
-交付包已经固定 primary/support recipe。建项目只需输入项目名；App 直接载入 Server 预计算的 Final Path 和主视图所需的最小只读 source-card 状态。Final Path 标题栏可将当前 chromosome 恢复为不可变的 Server GRT baseline；项目级 Final Path 仍可编辑，并可继续进入 DEGAP 或导出流程。完整 event/evidence/donor/attempt 闭包继续保留在 Server 包中用于校验和运维审计，但 App/Tauri 不再暴露 trace 浏览器。旧的非 GRT 包明确不兼容。
+交付包已经固定 primary/support recipe。建项目只需输入项目名；App 直接载入 Server 预计算的 Final Path 和主视图所需的最小只读 source-card 状态。Final Path 标题栏可将当前 chromosome 恢复为不可变的 Server GRT baseline；项目级 Final Path 仍可编辑，并可继续进入 DEGAP 或导出流程。完整 event/evidence/donor/attempt 闭包会在打包前校验，但不会复制进 App 交付 zip；App/Tauri 不再暴露 trace 浏览器。旧的非 GRT 包明确不兼容。
 
 ### 在服务器端导出 final path FASTA
 

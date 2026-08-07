@@ -17,10 +17,12 @@ use crate::project_initializer::{
 };
 
 pub const GRT_WORKFLOW: &str = "gpm_grt_precomputed_v1";
+pub const GRT_APP_WORKFLOW: &str = "gpm_grt_app_precomputed_v1";
 pub const GRT_SCHEMA_VERSION: &str = "1";
 pub const GRT_FINAL_PATH_SCHEMA_VERSION: &str = "1";
 
 type TsvRow = BTreeMap<String, String>;
+type AppQ4Validation = (BTreeMap<String, usize>, Option<BTreeMap<String, String>>);
 
 #[derive(Debug, Clone)]
 struct TsvTable {
@@ -1742,6 +1744,808 @@ where
         q0_artifact_sha256: q_artifact_hashes.remove("q0").unwrap(),
         q4_artifact_sha256: q_artifact_hashes.remove("q4").unwrap(),
     })
+}
+
+/// Validate the delivery contract selected by metadata/package.tsv.  Server
+/// workdirs keep using the exhaustive GRT closure validator; App delivery
+/// archives use the projected contract and therefore do not need Server-only
+/// q-stage, donor, evidence, cache, or checkpoint artifacts.
+pub(crate) fn validate_grt_delivery_package_with_progress<P>(
+    bundle_root: &Path,
+    on_progress: &mut P,
+) -> Result<ValidatedGrtPackage>
+where
+    P: FnMut(&'static str, &'static str),
+{
+    let workflow = fs::read_to_string(bundle_root.join("metadata/package.tsv"))
+        .ok()
+        .and_then(|text| {
+            let mut lines = text.lines();
+            let header = lines.next()?.split('\t').collect::<Vec<_>>();
+            let workflow_index = header.iter().position(|column| *column == "workflow")?;
+            let row = lines
+                .find(|line| !line.trim().is_empty())?
+                .split('\t')
+                .collect::<Vec<_>>();
+            row.get(workflow_index).map(|value| value.to_string())
+        });
+    if workflow.as_deref() == Some(GRT_APP_WORKFLOW) {
+        validate_grt_app_package_with_progress(bundle_root, on_progress)
+    } else {
+        validate_grt_package_with_progress(bundle_root, on_progress)
+    }
+}
+
+fn validate_grt_app_package_with_progress<P>(
+    bundle_root: &Path,
+    on_progress: &mut P,
+) -> Result<ValidatedGrtPackage>
+where
+    P: FnMut(&'static str, &'static str),
+{
+    if !bundle_root.is_dir() {
+        return grt_err(
+            "MISSING_BUNDLE",
+            format!("bundle directory does not exist: {}", bundle_root.display()),
+        );
+    }
+    on_progress(
+        "validate_grt_app_required_files",
+        "checking minimal App delivery files",
+    );
+    let core_specs: &[(&str, &[&str], usize, Option<usize>)] = &[
+        ("metadata/package.tsv", PACKAGE_HEADER, 1, Some(1)),
+        ("metadata/reference.tsv", REFERENCE_HEADER, 1, Some(1)),
+        ("metadata/datasets.tsv", DATASETS_HEADER, 1, None),
+        (
+            "metadata/source_seq_locator.tsv",
+            SOURCE_LOCATOR_HEADER,
+            1,
+            None,
+        ),
+        (
+            "metadata/chr_assignments.tsv",
+            CHR_ASSIGNMENTS_HEADER,
+            1,
+            None,
+        ),
+        ("metadata/grt_recipe.tsv", RECIPE_HEADER, 1, Some(1)),
+        (
+            "metadata/grt_used_contigs.tsv",
+            USED_CONTIGS_HEADER,
+            0,
+            None,
+        ),
+    ];
+    let mut tables = HashMap::new();
+    for (relpath, header, minimum, maximum) in core_specs {
+        tables.insert(
+            *relpath,
+            read_tsv(bundle_root, relpath, header, *minimum, *maximum)?,
+        );
+    }
+    let package = one_row(&tables, "metadata/package.tsv")?;
+    if field(package, "workflow")? != GRT_APP_WORKFLOW
+        || field(package, "schema_version")? != GRT_SCHEMA_VERSION
+        || field(package, "final_path_schema_version")? != GRT_FINAL_PATH_SCHEMA_VERSION
+    {
+        return grt_err(
+            "UNSUPPORTED_SCHEMA",
+            "expected gpm_grt_app_precomputed_v1 schema 1 / Final Path schema 1",
+        );
+    }
+    if !parse_bool(
+        field(package, "grt_precompute_enabled")?,
+        "package.grt_precompute_enabled",
+    )? || !parse_bool(field(package, "recipe_locked")?, "package.recipe_locked")?
+    {
+        return grt_err(
+            "INVALID_VALUE",
+            "App package must retain a precomputed and locked GRT result",
+        );
+    }
+    if field(package, "sequence_layout")? != "partitioned"
+        || !parse_bool(
+            field(package, "preassigned_chr")?,
+            "package.preassigned_chr",
+        )?
+    {
+        return grt_err(
+            "INVALID_VALUE",
+            "App package requires partitioned, preassigned chromosome data",
+        );
+    }
+    let package_mode = field(package, "package_mode")?;
+    if !matches!(package_mode, "full" | "no_fasta") {
+        return grt_err(
+            "INVALID_VALUE",
+            format!("unsupported App package_mode={package_mode}"),
+        );
+    }
+    let threshold = parse_f64(
+        field(package, "chr_assignment_min_coverage_percent")?,
+        "package threshold",
+    )?;
+    if !(0.0..=100.0).contains(&threshold) {
+        return grt_err(
+            "INVALID_VALUE",
+            "package threshold must be between 0 and 100",
+        );
+    }
+    let reads_qc = parse_bool(
+        field(package, "reads_qc_enabled")?,
+        "package.reads_qc_enabled",
+    )?;
+
+    let manifest = read_json(bundle_root, "metadata/grt_app_manifest.json")?;
+    let manifest_object = manifest.as_object().ok_or_else(|| {
+        grt_anyhow(
+            "INVALID_JSON",
+            "metadata/grt_app_manifest.json must be an object",
+        )
+    })?;
+    if json_str(manifest_object, "workflow", "App manifest")? != GRT_APP_WORKFLOW
+        || json_str(manifest_object, "schema_version", "App manifest")? != GRT_SCHEMA_VERSION
+        || json_str(manifest_object, "package_kind", "App manifest")? != package_mode
+    {
+        return grt_err(
+            "UNSUPPORTED_SCHEMA",
+            "App manifest and package metadata disagree",
+        );
+    }
+    let fasta_available = manifest_object
+        .get("fasta_available")
+        .and_then(Value::as_bool)
+        .ok_or_else(|| {
+            grt_anyhow(
+                "INVALID_JSON",
+                "App manifest.fasta_available must be boolean",
+            )
+        })?;
+    if fasta_available != (package_mode == "full") {
+        return grt_err(
+            "INVALID_VALUE",
+            "App manifest FASTA mode disagrees with package mode",
+        );
+    }
+    let q4_relpath = json_str(manifest_object, "q4_relpath", "App manifest")?;
+    if q4_relpath != "grt/q/q4.fa" {
+        return grt_err(
+            "INVALID_PATH",
+            "App manifest q4_relpath must be grt/q/q4.fa",
+        );
+    }
+    let q4_artifact_sha256 =
+        json_nonempty_str(manifest_object, "q4_artifact_sha256", "App manifest")?;
+    validate_sha256(q4_artifact_sha256, "App manifest.q4_artifact_sha256")?;
+    validate_sha256(
+        json_nonempty_str(manifest_object, "final_path_sha256", "App manifest")?,
+        "App manifest.final_path_sha256",
+    )?;
+
+    on_progress(
+        "validate_grt_app_fai",
+        "validating source and reference FAI lengths",
+    );
+    let datasets = table(&tables, "metadata/datasets.tsv")?;
+    let mut dataset_names = HashSet::new();
+    let mut dataset_fai = HashMap::<String, BTreeMap<String, usize>>::new();
+    for row in &datasets.rows {
+        let dataset = nonempty(row, "dataset_name", "dataset")?;
+        if !dataset_names.insert(dataset.to_string()) {
+            return grt_err("DUPLICATE_ID", format!("duplicate dataset_name={dataset}"));
+        }
+        let fai_path = required_bundle_file(
+            bundle_root,
+            field(row, "fai_relpath")?,
+            &format!("dataset {dataset} FAI"),
+        )?;
+        dataset_fai.insert(
+            dataset.to_string(),
+            read_fai_lengths(&fai_path, &format!("dataset {dataset}"))?,
+        );
+        parse_bool(
+            field(row, "self_alignment_available")?,
+            &format!("dataset {dataset}.self_alignment_available"),
+        )?;
+    }
+    let reference = one_row(&tables, "metadata/reference.tsv")?;
+    let reference_fai = required_bundle_file(
+        bundle_root,
+        field(reference, "fai_relpath")?,
+        "reference FAI",
+    )?;
+    let reference_records = read_fai_lengths(&reference_fai, "reference")?;
+    let sources = source_length_catalog(
+        bundle_root,
+        table(&tables, "metadata/source_seq_locator.tsv")?,
+        &dataset_fai,
+    )?;
+
+    let mut assignment_baselines = HashMap::<(String, String, String), (String, i64)>::new();
+    let mut assignment_ids = HashSet::new();
+    for row in &table(&tables, "metadata/chr_assignments.tsv")?.rows {
+        let dataset = field(row, "dataset_name")?.to_string();
+        let seq = field(row, "seq_name")?.to_string();
+        let key = (dataset.clone(), seq.clone());
+        let source_length = sources.get(&key).ok_or_else(|| {
+            grt_anyhow(
+                "BROKEN_REFERENCE",
+                format!("chr assignment references unknown source {dataset}:{seq}"),
+            )
+        })?;
+        let chr = nonempty(row, "assigned_chr_name", "chr assignment chromosome")?;
+        if !reference_records.contains_key(chr) {
+            return grt_err(
+                "BROKEN_REFERENCE",
+                format!("chr assignment references unknown chromosome {chr}"),
+            );
+        }
+        if !assignment_ids.insert((key.clone(), chr.to_string())) {
+            return grt_err(
+                "DUPLICATE_ID",
+                format!("duplicate chr assignment {dataset}:{seq}:{chr}"),
+            );
+        }
+        let orient = orientation(
+            field(row, "source_orientation")?,
+            "chr assignment source_orientation",
+        )?;
+        if field(row, "orientation_source")? != "ref_alignment" {
+            return grt_err(
+                "INVALID_VALUE",
+                "chr assignment orientation_source must be ref_alignment",
+            );
+        }
+        if parse_positive_i64(field(row, "seq_length_bp")?, "chr assignment seq_length_bp")?
+            as usize
+            != *source_length
+        {
+            return grt_err(
+                "COUNT_MISMATCH",
+                format!("chr assignment source length differs for {dataset}:{seq}"),
+            );
+        }
+        let support =
+            parse_positive_i64(field(row, "support_bp")?, "chr assignment support_bp")? as usize;
+        if support > *source_length {
+            return grt_err(
+                "INVALID_COORDINATE",
+                "chr assignment support exceeds source length",
+            );
+        }
+        let support_percent = parse_f64(
+            field(row, "support_percent")?,
+            "chr assignment support_percent",
+        )?;
+        if !(0.0..=100.0).contains(&support_percent) {
+            return grt_err(
+                "INVALID_VALUE",
+                "chr assignment support_percent must be between 0 and 100",
+            );
+        }
+        assignment_baselines.insert(
+            (dataset, seq, chr.to_string()),
+            (
+                orient.to_string(),
+                parse_i64(field(row, "anchor_start")?, "chr assignment anchor_start")?,
+            ),
+        );
+    }
+
+    let recipe = one_row(&tables, "metadata/grt_recipe.tsv")?;
+    let primary_dataset = nonempty(recipe, "primary_dataset", "recipe primary dataset")?;
+    if !dataset_names.contains(primary_dataset) {
+        return grt_err(
+            "BROKEN_REFERENCE",
+            "recipe primary_dataset is absent from datasets.tsv",
+        );
+    }
+    let support_datasets = json_string_list(
+        field(recipe, "support_datasets_json")?,
+        "recipe.support_datasets_json",
+    )?;
+    let mut support_seen = HashSet::new();
+    if support_datasets.iter().any(|name| {
+        name == primary_dataset
+            || !dataset_names.contains(name)
+            || !support_seen.insert(name.clone())
+    }) {
+        return grt_err(
+            "BROKEN_REFERENCE",
+            "recipe support datasets must be unique, known, and exclude primary",
+        );
+    }
+    if parse_bool(
+        field(recipe, "reads_qc_enabled")?,
+        "recipe.reads_qc_enabled",
+    )? != reads_qc
+    {
+        return grt_err(
+            "INVALID_VALUE",
+            "recipe and package reads_qc_enabled disagree",
+        );
+    }
+    if field(recipe, "final_q_relpath")? != q4_relpath {
+        return grt_err(
+            "BROKEN_REFERENCE",
+            "recipe final_q_relpath differs from App manifest",
+        );
+    }
+
+    validate_app_source_cards(
+        table(&tables, "metadata/grt_used_contigs.tsv")?,
+        &sources,
+        &assignment_baselines,
+        &reference_records,
+    )?;
+    let source_sequences = if fasta_available {
+        Some(source_catalog(
+            bundle_root,
+            table(&tables, "metadata/source_seq_locator.tsv")?,
+        )?)
+    } else {
+        None
+    };
+    let final_path = read_json(bundle_root, "metadata/grt_final_path.json")?;
+    let (q4_lengths, _q4_records) = validate_app_final_path(
+        bundle_root,
+        &final_path,
+        &reference_records,
+        &sources,
+        manifest_object,
+        fasta_available,
+        source_sequences.as_ref(),
+    )?;
+    if let Some(expected_lengths) = manifest_object
+        .get("q4_chromosome_lengths")
+        .and_then(Value::as_object)
+    {
+        for (chr, expected) in expected_lengths {
+            let value = expected.as_u64().ok_or_else(|| {
+                grt_anyhow("INVALID_JSON", "App manifest chromosome length is invalid")
+            })?;
+            if q4_lengths.get(chr).copied() != Some(value as usize) {
+                return grt_err(
+                    "FINAL_PATH_MISMATCH",
+                    format!("App manifest q4 length differs for {chr}"),
+                );
+            }
+        }
+    }
+    let expected_total =
+        json_positive_i64(manifest_object, "q4_length_bp", "App manifest")? as usize;
+    if expected_total != q4_lengths.values().sum::<usize>() {
+        return grt_err(
+            "FINAL_PATH_MISMATCH",
+            "App manifest q4_length_bp differs from chromosome lengths",
+        );
+    }
+
+    // The catalog persistence layer intentionally keeps the Server-shaped
+    // tables, but App packages do not carry those trace tables.  Empty tables
+    // make the absence explicit without retaining any Server audit payload.
+    for (relpath, header, _, _) in TABLE_SPECS {
+        tables
+            .entry(*relpath)
+            .or_insert_with(|| TsvTable { rows: Vec::new() });
+        let _ = header;
+    }
+    Ok(ValidatedGrtPackage {
+        tables,
+        events: Vec::new(),
+        final_path,
+        q0_artifact_sha256: String::new(),
+        q4_artifact_sha256: q4_artifact_sha256.to_string(),
+    })
+}
+
+fn read_fai_lengths(path: &Path, label: &str) -> Result<BTreeMap<String, usize>> {
+    let text = fs::read_to_string(path)
+        .map_err(|error| grt_anyhow("INVALID_TSV", format!("{label} FAI is not UTF-8: {error}")))?;
+    let mut lengths = BTreeMap::new();
+    for (offset, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let columns = line.trim_end_matches('\r').split('\t').collect::<Vec<_>>();
+        if columns.len() < 2 || columns[0].is_empty() {
+            return grt_err(
+                "INVALID_TSV",
+                format!("{label} FAI row {} is invalid", offset + 1),
+            );
+        }
+        let length = columns[1].parse::<usize>().map_err(|_| {
+            grt_anyhow(
+                "INVALID_VALUE",
+                format!("{label} FAI row {} has invalid length", offset + 1),
+            )
+        })?;
+        if length == 0 || lengths.insert(columns[0].to_string(), length).is_some() {
+            return grt_err(
+                "DUPLICATE_ID",
+                format!("{label} FAI has empty or duplicate sequence {}", columns[0]),
+            );
+        }
+    }
+    if lengths.is_empty() {
+        return grt_err("INVALID_TSV", format!("{label} FAI contains no records"));
+    }
+    Ok(lengths)
+}
+
+fn source_length_catalog(
+    _bundle_root: &Path,
+    table: &TsvTable,
+    dataset_fai: &HashMap<String, BTreeMap<String, usize>>,
+) -> Result<HashMap<(String, String), usize>> {
+    let mut sources = HashMap::new();
+    for row in &table.rows {
+        let dataset = nonempty(row, "dataset_name", "source locator dataset")?.to_string();
+        let contig = nonempty(row, "seq_name", "source locator sequence")?.to_string();
+        let relpath = field(row, "fasta_relpath")?;
+        validate_relpath(relpath, "source locator fasta_relpath")?;
+        let records = if let Some(records) = dataset_fai.get(&dataset) {
+            records
+        } else {
+            return grt_err(
+                "BROKEN_REFERENCE",
+                format!("source locator references unknown dataset {dataset}"),
+            );
+        };
+        let length = records.get(&contig).copied().ok_or_else(|| {
+            grt_anyhow(
+                "BROKEN_REFERENCE",
+                format!("source locator {dataset}:{contig} is absent from its dataset FAI"),
+            )
+        })?;
+        if sources
+            .insert((dataset.clone(), contig.clone()), length)
+            .is_some()
+        {
+            return grt_err(
+                "DUPLICATE_ID",
+                format!("duplicate source locator for {dataset}:{contig}"),
+            );
+        }
+    }
+    Ok(sources)
+}
+
+fn validate_app_source_cards(
+    table: &TsvTable,
+    sources: &HashMap<(String, String), usize>,
+    assignment_baselines: &HashMap<(String, String, String), (String, i64)>,
+    reference_records: &BTreeMap<String, usize>,
+) -> Result<()> {
+    let mut ids = HashSet::new();
+    for row in &table.rows {
+        let card = nonempty(row, "source_card_key", "source card key")?;
+        if !ids.insert(card.to_string()) {
+            return grt_err("DUPLICATE_ID", format!("duplicate source card {card}"));
+        }
+        let dataset = field(row, "dataset_name")?;
+        let contig = field(row, "contig_name")?;
+        let target_chr = nonempty(row, "target_chr", "source card target chromosome")?;
+        if !reference_records.contains_key(target_chr) {
+            return grt_err(
+                "BROKEN_REFERENCE",
+                format!("source card {card} references unknown chromosome {target_chr}"),
+            );
+        }
+        let key = (dataset.to_string(), contig.to_string());
+        if !sources.contains_key(&key) {
+            return grt_err(
+                "BROKEN_REFERENCE",
+                format!("source card {card} references unknown source"),
+            );
+        }
+        enum_value(
+            field(row, "original_assignment")?,
+            &["assigned", "unplaced", "cross_chr"],
+            &format!("source card {card}.original_assignment"),
+        )?;
+        let placement = field(row, "placement_mode")?;
+        enum_value(
+            placement,
+            &["normal", "grt_promoted", "cross_chr_grt_usage"],
+            &format!("source card {card}.placement_mode"),
+        )?;
+        enum_value(
+            field(row, "ref_alignment_status")?,
+            &["hit", "weak_hit", "multi_hit", "other_chr_only", "no_hit"],
+            &format!("source card {card}.ref_alignment_status"),
+        )?;
+        orientation(field(row, "orientation")?, &format!("source card {card}"))?;
+        let anchor = parse_positive_i64(
+            field(row, "anchor_start")?,
+            &format!("source card {card}.anchor_start"),
+        )?;
+        let expected = format!("{}:{}:{}:{}", dataset, contig, target_chr, placement);
+        if card != expected {
+            return grt_err(
+                "BROKEN_REFERENCE",
+                format!("source card {card} is non-canonical"),
+            );
+        }
+        if placement == "normal" {
+            let baseline_key = (
+                dataset.to_string(),
+                contig.to_string(),
+                target_chr.to_string(),
+            );
+            let Some((baseline_orientation, baseline_anchor)) =
+                assignment_baselines.get(&baseline_key)
+            else {
+                return grt_err(
+                    "BROKEN_REFERENCE",
+                    format!("normal source card {card} lacks assignment baseline"),
+                );
+            };
+            if field(row, "orientation")? != baseline_orientation || anchor != *baseline_anchor {
+                return grt_err(
+                    "BROKEN_REFERENCE",
+                    format!("normal source card {card} disagrees with assignment baseline"),
+                );
+            }
+        }
+        for trace_field in [
+            "ref_evidence_ids_json",
+            "accepted_event_ids_json",
+            "final_path_segment_ids_json",
+            "pairwise_evidence_ids_json",
+        ] {
+            let value = field(row, trace_field)?;
+            if !value.is_empty() {
+                let ids = json_string_list(value, &format!("source card {card}.{trace_field}"))?;
+                if !ids.is_empty() {
+                    return grt_err(
+                        "INVALID_VALUE",
+                        format!("App source card {card} retains Server trace links"),
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_app_final_path(
+    bundle_root: &Path,
+    final_path: &Value,
+    reference_records: &BTreeMap<String, usize>,
+    sources: &HashMap<(String, String), usize>,
+    manifest: &Map<String, Value>,
+    fasta_available: bool,
+    source_sequences: Option<&HashMap<(String, String), String>>,
+) -> Result<AppQ4Validation> {
+    let object = final_path
+        .as_object()
+        .ok_or_else(|| grt_anyhow("INVALID_JSON", "App Final Path must be an object"))?;
+    if json_str(object, "workflow", "App Final Path")? != GRT_APP_WORKFLOW
+        || json_str(object, "schema_version", "App Final Path")? != GRT_SCHEMA_VERSION
+        || json_str(object, "q4_relpath", "App Final Path")? != "grt/q/q4.fa"
+    {
+        return grt_err(
+            "UNSUPPORTED_SCHEMA",
+            "App Final Path has unsupported workflow/schema",
+        );
+    }
+    let chromosomes = object
+        .get("chromosomes")
+        .and_then(Value::as_array)
+        .filter(|items| !items.is_empty())
+        .ok_or_else(|| {
+            grt_anyhow(
+                "INVALID_JSON",
+                "App Final Path chromosomes must be non-empty",
+            )
+        })?;
+    let mut final_lengths = BTreeMap::new();
+    let mut segment_ids = HashSet::new();
+    for chromosome in chromosomes {
+        let chr = chromosome.as_object().ok_or_else(|| {
+            grt_anyhow(
+                "INVALID_JSON",
+                "App Final Path chromosome must be an object",
+            )
+        })?;
+        let chr_name = json_nonempty_str(chr, "chr", "App Final Path chromosome")?;
+        if final_lengths
+            .insert(
+                chr_name.to_string(),
+                json_positive_i64(chr, "q4_length", chr_name)? as usize,
+            )
+            .is_some()
+        {
+            return grt_err(
+                "DUPLICATE_ID",
+                format!("duplicate App Final Path chromosome {chr_name}"),
+            );
+        }
+        if !reference_records.contains_key(chr_name) {
+            return grt_err(
+                "BROKEN_REFERENCE",
+                format!("App Final Path references unknown chromosome {chr_name}"),
+            );
+        }
+        validate_sha256(
+            json_nonempty_str(chr, "q4_sha256", chr_name)?,
+            &format!("App Final Path {chr_name}.q4_sha256"),
+        )?;
+        let segments = chr
+            .get("segments")
+            .and_then(Value::as_array)
+            .filter(|items| !items.is_empty())
+            .ok_or_else(|| {
+                grt_anyhow(
+                    "INVALID_JSON",
+                    format!("App Final Path {chr_name}.segments must be non-empty"),
+                )
+            })?;
+        let mut segment_total = 0_usize;
+        for segment in segments {
+            let segment = segment.as_object().ok_or_else(|| {
+                grt_anyhow("INVALID_JSON", "App Final Path segment must be an object")
+            })?;
+            let id = json_nonempty_str(segment, "segment_id", "App Final Path segment")?;
+            if !segment_ids.insert(id.to_string()) {
+                return grt_err(
+                    "DUPLICATE_ID",
+                    format!("duplicate App Final Path segment {id}"),
+                );
+            }
+            let length = json_positive_i64(segment, "length", id)? as usize;
+            segment_total = segment_total.checked_add(length).ok_or_else(|| {
+                grt_anyhow(
+                    "INVALID_COORDINATE",
+                    "App Final Path segment lengths overflow",
+                )
+            })?;
+            let kind = json_str(segment, "kind", id)?;
+            enum_value(
+                kind,
+                &["source", "patch", "correction", "telomere", "gap"],
+                &format!("App segment {id}.kind"),
+            )?;
+            if kind == "gap" {
+                continue;
+            }
+            let orient = orientation(
+                json_str(segment, "orientation", id)?,
+                &format!("App segment {id}"),
+            )?;
+            let source = segment
+                .get("source")
+                .and_then(Value::as_object)
+                .ok_or_else(|| {
+                    grt_anyhow(
+                        "INVALID_JSON",
+                        format!("App segment {id}.source is invalid"),
+                    )
+                })?;
+            let source_key = (
+                json_nonempty_str(source, "dataset", id)?.to_string(),
+                json_nonempty_str(source, "contig", id)?.to_string(),
+            );
+            let source_length = sources.get(&source_key).ok_or_else(|| {
+                grt_anyhow(
+                    "BROKEN_REFERENCE",
+                    format!("App segment {id} references unknown source"),
+                )
+            })?;
+            let start = json_positive_i64(source, "start", id)?;
+            let end = json_positive_i64(source, "end", id)?;
+            if end < start || end as usize > *source_length || (end - start + 1) as usize != length
+            {
+                return grt_err(
+                    "INVALID_COORDINATE",
+                    format!("App segment {id} source interval does not match length"),
+                );
+            }
+            if orientation(
+                json_str(source, "orientation", id)?,
+                &format!("App segment {id}.source"),
+            )? != orient
+            {
+                return grt_err(
+                    "INVALID_VALUE",
+                    format!("App segment {id} orientation differs from source"),
+                );
+            }
+        }
+        if segment_total != final_lengths[chr_name] {
+            return grt_err(
+                "FINAL_PATH_MISMATCH",
+                format!("App Final Path segment lengths differ for {chr_name}"),
+            );
+        }
+    }
+    if final_lengths.keys().collect::<HashSet<_>>()
+        != reference_records.keys().collect::<HashSet<_>>()
+    {
+        return grt_err(
+            "FINAL_PATH_MISMATCH",
+            "App Final Path chromosome set differs from reference FAI",
+        );
+    }
+    let mut q4_records = None;
+    let q4_path = bundle_root.join("grt/q/q4.fa");
+    if fasta_available {
+        let records = read_fasta(
+            &required_bundle_file(bundle_root, "grt/q/q4.fa", "App q4 FASTA")?,
+            "App q4 FASTA",
+            false,
+        )?;
+        if sha256_file(&q4_path)?
+            != json_nonempty_str(manifest, "q4_artifact_sha256", "App manifest")?
+        {
+            return grt_err(
+                "CHECKSUM_MISMATCH",
+                "App q4 artifact checksum differs from manifest",
+            );
+        }
+        for chromosome in chromosomes {
+            let chr = chromosome.as_object().unwrap();
+            let name = json_str(chr, "chr", "App Final Path chromosome")?;
+            let sequence = records.get(name).ok_or_else(|| {
+                grt_anyhow(
+                    "FINAL_PATH_MISMATCH",
+                    format!("App q4 FASTA lacks chromosome {name}"),
+                )
+            })?;
+            if sequence.len() != final_lengths[name]
+                || sha256_bytes(sequence.as_bytes()) != json_str(chr, "q4_sha256", name)?
+            {
+                return grt_err(
+                    "FINAL_PATH_MISMATCH",
+                    format!("App q4 FASTA differs from Final Path for {name}"),
+                );
+            }
+            if let Some(source_sequences) = source_sequences {
+                let mut rebuilt = String::new();
+                for segment in chr["segments"].as_array().unwrap() {
+                    let segment = segment.as_object().unwrap();
+                    let length = json_positive_i64(segment, "length", name)? as usize;
+                    if segment.get("kind").and_then(Value::as_str) == Some("gap") {
+                        rebuilt.push_str(&"N".repeat(length));
+                        continue;
+                    }
+                    let source = segment["source"].as_object().unwrap();
+                    let key = (
+                        json_str(source, "dataset", name)?.to_string(),
+                        json_str(source, "contig", name)?.to_string(),
+                    );
+                    let start = json_positive_i64(source, "start", name)?;
+                    let end = json_positive_i64(source, "end", name)?;
+                    let orient = orientation(json_str(source, "orientation", name)?, name)?;
+                    let source_sequence = source_sequences.get(&key).ok_or_else(|| {
+                        grt_anyhow(
+                            "BROKEN_REFERENCE",
+                            format!("App q4 source record is missing for {name}"),
+                        )
+                    })?;
+                    rebuilt.push_str(&orient_sequence(
+                        &source_sequence[(start - 1) as usize..end as usize],
+                        orient,
+                    ));
+                }
+                if rebuilt != *sequence {
+                    return grt_err(
+                        "FINAL_PATH_MISMATCH",
+                        format!("App Final Path source reconstruction differs from q4 for {name}"),
+                    );
+                }
+            }
+        }
+        q4_records = Some(records);
+    } else if q4_path.exists() {
+        return grt_err(
+            "INVALID_VALUE",
+            "no_fasta App package must not contain grt/q/q4.fa",
+        );
+    }
+    Ok((final_lengths, q4_records))
 }
 
 fn validate_stage_status(

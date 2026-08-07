@@ -15,7 +15,7 @@ use crate::alignment_cache::{
 };
 use crate::db::open_workspace_db;
 use crate::grt_package::{
-    ValidatedGrtPackage, persist_grt_package, validate_grt_package_with_progress,
+    ValidatedGrtPackage, persist_grt_package, validate_grt_delivery_package_with_progress,
 };
 use crate::junction_inspection::ensure_pairwise_alignment_run_cache_cancel;
 use crate::workspace::{resolve_bundle_root_dir, resolve_extracted_bundle_workspace};
@@ -322,15 +322,15 @@ where
     recorder.set_phase(2, EXTRACTED_IMPORT_PHASE_TOTAL);
     recorder.record(
         "validate_grt_contract_start",
-        "starting full GRT package validation".to_string(),
+        "starting delivery GRT contract validation".to_string(),
     );
-    let grt_package =
-        validate_grt_package_with_progress(&resolved.bundle_root, &mut |stage, detail| {
-            recorder.record(stage, detail.to_string())
-        })?;
+    let grt_package = validate_grt_delivery_package_with_progress(
+        &resolved.bundle_root,
+        &mut |stage, detail| recorder.record(stage, detail.to_string()),
+    )?;
     recorder.record(
         "validate_grt_contract",
-        "workflow=gpm_grt_precomputed_v1 schema_version=1".to_string(),
+        "delivery GRT contract validated".to_string(),
     );
     recorder.set_phase(3, EXTRACTED_IMPORT_PHASE_TOTAL);
     let project_db_path = initialize_workspace_layout(&resolved.workspace_root)?;
@@ -471,10 +471,10 @@ where
     recorder.set_phase(4, ZIP_IMPORT_PHASE_TOTAL);
     recorder.record(
         "validate_grt_contract_start",
-        "starting full GRT package validation".to_string(),
+        "starting delivery GRT contract validation".to_string(),
     );
     let grt_package =
-        match validate_grt_package_with_progress(workspace_root, &mut |stage, detail| {
+        match validate_grt_delivery_package_with_progress(workspace_root, &mut |stage, detail| {
             recorder.record(stage, detail.to_string())
         }) {
             Ok(package) => package,
@@ -485,7 +485,7 @@ where
         };
     recorder.record(
         "validate_grt_contract",
-        "workflow=gpm_grt_precomputed_v1 schema_version=1".to_string(),
+        "delivery GRT contract validated".to_string(),
     );
 
     recorder.set_phase(5, ZIP_IMPORT_PHASE_TOTAL);

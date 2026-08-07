@@ -75,6 +75,31 @@ if os.environ.get("FAKE_CONTRACT_FAIL") == "true":
 sys.stdout.write('{"valid":true}\n')
 PY
 
+cat > "${SERVER_DIR}/.prepare_lib/tools/grt_app_package.py" <<'PY'
+import argparse
+import shutil
+from pathlib import Path
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--source', type=Path, required=True)
+parser.add_argument('--staging', type=Path, required=True)
+mode = parser.add_mutually_exclusive_group(required=True)
+mode.add_argument('--include-fasta', action='store_true')
+mode.add_argument('--no-fasta', action='store_true')
+args = parser.parse_args()
+if args.staging.exists():
+    shutil.rmtree(args.staging)
+args.staging.mkdir(parents=True)
+for source in args.source.rglob('*'):
+    if not source.is_file() or '.prepare_lib' in source.parts:
+        continue
+    if args.no_fasta and source.suffix.lower() in {'.fa', '.fasta'}:
+        continue
+    target = args.staging / source.relative_to(args.source)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, target)
+PY
+
 cp "${REPO_ROOT}/server/templates/package_full_zip.sh" "${SERVER_DIR}/package_full_zip.sh"
 cp "${REPO_ROOT}/server/templates/package_light_no_fasta_zip.sh" "${SERVER_DIR}/package_light_no_fasta_zip.sh"
 chmod +x "${SERVER_DIR}/package_full_zip.sh" "${SERVER_DIR}/package_light_no_fasta_zip.sh"

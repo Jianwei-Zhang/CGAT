@@ -31,6 +31,49 @@ CARGO_TARGET_DIR="${task_cargo_target}" cargo build \
   --manifest-path app/backend/Cargo.toml >/dev/null
 backend_exe="${task_cargo_target}/debug/gpm_next_backend"
 
+app_full_stage="${task_tmp_dir}/app-full/gpm_server"
+app_no_fasta_stage="${task_tmp_dir}/app-no-fasta/gpm_server"
+python3 server/tools/grt_app_package.py \
+  --source "${fixture_root}" \
+  --staging "${app_full_stage}" \
+  --include-fasta >/dev/null
+python3 server/tools/grt_app_package.py \
+  --source "${fixture_root}" \
+  --staging "${app_no_fasta_stage}" \
+  --no-fasta >/dev/null
+(cd "${task_tmp_dir}/app-full" && zip -qr "${task_tmp_dir}/gpm_server.zip" gpm_server)
+(cd "${task_tmp_dir}/app-no-fasta" && zip -qr "${task_tmp_dir}/gpm_server.no_fasta.zip" gpm_server)
+python3 - "${task_tmp_dir}/gpm_server.zip" "${task_tmp_dir}/gpm_server.no_fasta.zip" <<'PY'
+from pathlib import Path
+from zipfile import ZipFile
+import sys
+
+for archive_name in sys.argv[1:]:
+    with ZipFile(archive_name) as archive:
+        names = [name for name in archive.namelist() if not name.endswith('/')]
+        assert not any('/.prepare_lib/' in name for name in names), archive_name
+        assert not any(name.endswith(('.sh', '.py')) for name in names), archive_name
+        assert not any('/grt/cache/' in name or '/grt/checkpoints/' in name or '/grt/donors/' in name for name in names), archive_name
+        assert not any('/grt/evidence/' in name for name in names), archive_name
+        assert sum(name.lower().endswith(('.fa', '.fasta')) for name in names) == (4 if archive_name.endswith('gpm_server.zip') else 0), archive_name
+        assert 'gpm_server/metadata/grt_app_manifest.json' in names, archive_name
+        assert 'gpm_server/metadata/grt_final_path.json' in names, archive_name
+        assert 'gpm_server/runs/primary_vs_ref/result.paf' in names, archive_name
+print('App delivery allowlist passed')
+PY
+
+full_zip_workspace="${task_tmp_dir}/zip-full"
+no_fasta_zip_workspace="${task_tmp_dir}/zip-no-fasta"
+"${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.zip" "${full_zip_workspace}" >/dev/null
+"${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.no_fasta.zip" "${no_fasta_zip_workspace}" >/dev/null
+full_zip_options="$(${backend_exe} list-project-initializer-options "${full_zip_workspace}")"
+no_fasta_zip_options="$(${backend_exe} list-project-initializer-options "${no_fasta_zip_workspace}")"
+assert_contains "${full_zip_options}" 'fasta_available=true'
+assert_contains "${no_fasta_zip_options}" 'fasta_available=false'
+"${backend_exe}" initialize-project "${full_zip_workspace}" full-zip-project >/dev/null
+"${backend_exe}" initialize-project "${no_fasta_zip_workspace}" no-fasta-project >/dev/null
+"${backend_exe}" get-grt-project-view "${no_fasta_zip_workspace}" 1 >/dev/null
+
 workspace="${task_tmp_dir}/valid/gpm_server"
 mkdir -p "$(dirname "${workspace}")"
 cp -a "${fixture_root}" "${workspace}"
