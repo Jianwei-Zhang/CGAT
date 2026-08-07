@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag, for example v0.1.0. Defaults to GPM2.0/app/src-tauri/tauri.conf.json."
+        description: "Release tag to update or create, for example 2.0.1-beta or v0.1.0."
         required: false
         type: string
 
@@ -37,9 +37,11 @@ jobs:
           set -euo pipefail
 
           version="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' GPM2.0/app/src-tauri/tauri.conf.json | head -n 1)"
-          tag="${{ github.ref_name }}"
+          tag=""
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             tag="${{ inputs.tag }}"
+          else
+            tag="${{ github.ref_name }}"
           fi
 
           if [[ -z "$tag" ]]; then
@@ -51,8 +53,8 @@ jobs:
             exit 1
           fi
 
-          if [[ "$tag" != v* ]]; then
-            echo "Release tag must start with v, got: ${tag}" >&2
+          if [[ ! "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            echo "Release tag contains unsupported characters, got: ${tag}" >&2
             exit 1
           fi
 
@@ -84,14 +86,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ steps.release-vars.outputs.tag_name }}
-          VERSION: ${{ steps.release-vars.outputs.version }}
         shell: bash
         run: |
           set -euo pipefail
 
           mapfile -t assets < <(
             gh release view "$TAG_NAME" --json assets --jq '.assets[].name' |
-              grep -E "^gpm-next_${VERSION}_.+_(setup\\.exe|installer\\.dmg)$" || true
+              grep -E "_(setup\\.exe|installer\\.dmg)$" || true
           )
 
           if (( ${#assets[@]} == 0 )); then
