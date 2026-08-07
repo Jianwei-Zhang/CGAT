@@ -2,10 +2,107 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  canonicalizeFinalPathOverallLengths,
   getCurrentChrFinalPath,
   normalizeFinalPathByChr,
   resolveCurrentFinalPathChrName,
 } from "../final-path-state.js";
+
+test("canonicalizes persisted GRT overall lengths without changing source slices", () => {
+  const authoritative = {
+    Chr01: {
+      mode: "segments",
+      chrName: "Chr01",
+      serverBaseline: true,
+      q4Length: 44_826_469,
+      q4Sha256: "q4-sha",
+      hiddenPrimaryCtgIds: [7],
+      segments: [
+        {
+          segmentId: "patch-1",
+          type: "ctg",
+          datasetName: "hifiasm",
+          ctgName: "ptg000002l",
+          originId: "ptg000002l",
+          overallLen: 43_726_252,
+          start: 28_911_543,
+          end: 28_911_536,
+          source: {
+            dataset: "hifiasm",
+            contig: "ptg000002l",
+            start: 28_911_536,
+            end: 28_911_543,
+            orientation: "-",
+          },
+          serverBaseline: true,
+        },
+        {
+          segmentId: "patch-2",
+          type: "ctg",
+          datasetName: "hifiasm",
+          ctgName: "ptg000002l",
+          originId: "ptg000002l",
+          overallLen: 43_726_252,
+          start: 22_722_235,
+          end: 22_716_743,
+          source: {
+            dataset: "hifiasm",
+            contig: "ptg000002l",
+            start: 22_716_743,
+            end: 22_722_235,
+            orientation: "-",
+          },
+          serverBaseline: true,
+        },
+      ],
+    },
+  };
+  const persisted = structuredClone(authoritative);
+  persisted.Chr01.segments[0].overallLen = 28_911_543;
+  persisted.Chr01.segments[1].overallLen = 22_722_235;
+
+  const canonical = canonicalizeFinalPathOverallLengths(persisted, authoritative);
+
+  assert.deepEqual(
+    canonical.Chr01.segments.map((segment) => segment.overallLen),
+    [43_726_252, 43_726_252],
+  );
+  assert.deepEqual(
+    canonical.Chr01.segments.map((segment) => [segment.start, segment.end]),
+    [[28_911_543, 28_911_536], [22_722_235, 22_716_743]],
+  );
+  assert.deepEqual(canonical.Chr01.hiddenPrimaryCtgIds, [7]);
+  assert.equal(canonical.Chr01.q4Length, 44_826_469);
+  assert.equal(canonical.Chr01.q4Sha256, "q4-sha");
+});
+
+test("rejects persisted GRT slices beyond the authoritative source length", () => {
+  const entry = {
+    mode: "segments",
+    chrName: "Chr01",
+    serverBaseline: true,
+    segments: [{
+      segmentId: "source-1",
+      type: "ctg",
+      datasetName: "flye",
+      ctgName: "ctg1",
+      originId: "ctg1",
+      overallLen: 12,
+      start: 1,
+      end: 12,
+      source: { dataset: "flye", contig: "ctg1", start: 1, end: 12, orientation: "+" },
+      serverBaseline: true,
+    }],
+  };
+  const authoritative = structuredClone(entry);
+  authoritative.segments[0].overallLen = 10;
+  authoritative.segments[0].end = 10;
+
+  assert.throws(
+    () => canonicalizeFinalPathOverallLengths({ Chr01: entry }, { Chr01: authoritative }),
+    /exceeds authoritative source length 10/,
+  );
+});
 
 test("normalizeFinalPathByChr only keeps segment-based entries and drops legacy direct rows", () => {
   const normalized = normalizeFinalPathByChr({

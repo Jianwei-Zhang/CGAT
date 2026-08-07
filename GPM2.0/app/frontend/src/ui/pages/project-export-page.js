@@ -1,6 +1,7 @@
 import { pickDirectoryPath, pickSaveFilePath } from "../../services/backend-api.js";
 import {
   exportProjectFinalPathFasta,
+  getGrtProjectView,
   getProjectAssemblyViewState,
   listChrViewCtgs,
   listPhasedChrTracks,
@@ -16,6 +17,7 @@ import {
 } from "./assembly/final-path-export-runtime.js";
 import { bindDelegatedDelayedFloatingClose } from "./floating-menu-runtime.js";
 import {
+  canonicalizeFinalPathOverallLengths,
   normalizeFinalPathByChr,
   isFinalPathCtgSegment,
   isFinalPathGapSegment,
@@ -24,6 +26,7 @@ import {
   resolveFinalPathSegmentLengthBp,
   resolveFinalPathTotalLengthBp,
 } from "./assembly/final-path-state.js";
+import { normalizeGrtProjectView } from "./assembly/grt-state.js";
 import { normalizeHiddenPrimaryCtgIds } from "./assembly/selection-state.js";
 import { buildProjectExportLogText, buildProjectExportStatsModel } from "./project-export-state.js";
 import { buildEmptyProjectExportState } from "../shell/session-switchers.js";
@@ -1773,6 +1776,8 @@ async function loadProjectExportData(host, store, deps = {}) {
     const listCtgs = deps.listChrViewCtgs || listChrViewCtgs;
     const listPhasedTracks = deps.listPhasedChrTracks || listPhasedChrTracks;
     const getViewState = deps.getProjectAssemblyViewState || getProjectAssemblyViewState;
+    const getGrtView = deps.getGrtProjectView || getGrtProjectView;
+    const normalizeGrtView = deps.normalizeGrtProjectView || normalizeGrtProjectView;
     const chromosomeResult = await listChromosomes({
       workspaceRoot: requestedWorkspacePath,
       projectId: requestedProjectId,
@@ -1781,6 +1786,18 @@ async function loadProjectExportData(host, store, deps = {}) {
       workspaceRoot: requestedWorkspacePath,
       projectId: requestedProjectId,
     });
+    const rawGrtProjectView = typeof deps.getGrtProjectView === "function"
+      ? await getGrtView({
+          workspaceRoot: requestedWorkspacePath,
+          projectId: requestedProjectId,
+        })
+      : typeof window === "undefined"
+        ? (store.getState().assembly?.grtProjectView || {})
+        : await getGrtView({
+            workspaceRoot: requestedWorkspacePath,
+            projectId: requestedProjectId,
+          });
+    const grtProjectView = normalizeGrtView(rawGrtProjectView);
     const primaryDatasetId = normalizeDatasetId(currentProject.primaryDatasetId);
     const primaryCtgsByChr = {};
     const ctgsByChr = {};
@@ -1816,9 +1833,12 @@ async function loadProjectExportData(host, store, deps = {}) {
         }
       }
     }
-    const mergedFinalPathByChr = mergeFinalPathByChr(
-      viewState.finalPathByChr,
-      store.getState().assembly?.finalPathByChr,
+    const mergedFinalPathByChr = canonicalizeFinalPathOverallLengths(
+      mergeFinalPathByChr(
+        viewState.finalPathByChr,
+        store.getState().assembly?.finalPathByChr,
+      ),
+      grtProjectView.baselineFinalPathByChr,
     );
     const latestState = store.getState();
     if (

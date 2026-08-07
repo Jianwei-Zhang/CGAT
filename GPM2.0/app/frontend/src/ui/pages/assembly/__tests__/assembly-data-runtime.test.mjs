@@ -1424,7 +1424,7 @@ test("loadAssemblyView hydrates persisted mirrored ctgs from project assembly vi
   ]);
 });
 
-test("loadAssemblyView hydrates finalPathByChr from project assembly view state and backfills missing origin ids", async () => {
+test("loadAssemblyView canonicalizes persisted GRT overallLen and backfills origin ids", async () => {
   const host = {};
   let state = {
     session: {
@@ -1510,11 +1510,19 @@ test("loadAssemblyView hydrates finalPathByChr from project assembly view state 
                 segmentId: "seg-1",
                 type: "ctg",
                 assemblyCtgId: 7,
-                datasetName: "",
+                datasetName: "flye",
                 ctgName: "flye_ctg7",
                 overallLen: 900,
                 start: 1,
                 end: 900,
+                source: {
+                  dataset: "flye",
+                  contig: "utig4-001122l",
+                  start: 1,
+                  end: 900,
+                  orientation: "+",
+                },
+                serverBaseline: true,
               },
             ],
             updatedAt: "1",
@@ -1524,7 +1532,42 @@ test("loadAssemblyView hydrates finalPathByChr from project assembly view state 
     },
     async listChrViewCtgs() {
       return {
-        items: [{ assemblyCtgId: 7, name: "Ctg7", originId: "utig4-001122l" }],
+        items: [{
+          assemblyCtgId: 7,
+          name: "Ctg7",
+          originId: "utig4-001122l",
+          datasetName: "flye",
+          totalLength: 1200,
+        }],
+      };
+    },
+    async getGrtProjectView() {
+      return {
+        baselineFinalPathByChr: {
+          Chr01: {
+            mode: "segments",
+            chrName: "Chr01",
+            segments: [{
+              segmentId: "seg-1",
+              type: "ctg",
+              assemblyCtgId: null,
+              datasetName: "flye",
+              ctgName: "flye_ctg7",
+              originId: "utig4-001122l",
+              overallLen: 1200,
+              start: 1,
+              end: 900,
+              source: {
+                dataset: "flye",
+                contig: "utig4-001122l",
+                start: 1,
+                end: 900,
+                orientation: "+",
+              },
+              serverBaseline: true,
+            }],
+          },
+        },
       };
     },
     async listProjectChromosomes() {
@@ -1576,12 +1619,20 @@ test("loadAssemblyView hydrates finalPathByChr from project assembly view state 
           segmentId: "seg-1",
           type: "ctg",
           assemblyCtgId: 7,
-          datasetName: "",
+          datasetName: "flye",
           ctgName: "flye_ctg7",
           originId: "utig4-001122l",
-          overallLen: 900,
+          overallLen: 1200,
           start: 1,
           end: 900,
+          source: {
+            dataset: "flye",
+            contig: "utig4-001122l",
+            start: 1,
+            end: 900,
+            orientation: "+",
+          },
+          serverBaseline: true,
         },
       ],
       updatedAt: "1",

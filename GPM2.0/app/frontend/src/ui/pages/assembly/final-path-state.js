@@ -401,6 +401,104 @@ export function normalizeFinalPathByChr(value) {
   return next;
 }
 
+function normalizeCanonicalFinalPathByChr(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const normalizedSource = Object.fromEntries(Object.entries(source).map(([chrName, entry]) => {
+    if (
+      entry
+      && typeof entry === "object"
+      && !Array.isArray(entry)
+      && !Object.prototype.hasOwnProperty.call(entry, "mode")
+      && Array.isArray(entry.segments)
+    ) {
+      return [chrName, { mode: "segments", ...entry }];
+    }
+    return [chrName, entry];
+  }));
+  return normalizeFinalPathByChr(normalizedSource);
+}
+
+function buildFinalPathSourceIdentityKey(segment) {
+  const source = segment?.source && typeof segment.source === "object" && !Array.isArray(segment.source)
+    ? segment.source
+    : {};
+  const datasetName = normalizeString(source.dataset || segment?.datasetName).toLowerCase();
+  const contigName = normalizeString(source.contig || segment?.originId)
+    .replace(/@[^@]+$/, "")
+    .toLowerCase();
+  return datasetName && contigName ? `${datasetName}\u0000${contigName}` : "";
+}
+
+function rememberAuthoritativeLength(catalog, key, length, label) {
+  if (!key || !length) {
+    return;
+  }
+  const existing = catalog.get(key);
+  if (existing && existing !== length) {
+    throw new TypeError(`Conflicting authoritative Final Path source length for ${label}`);
+  }
+  catalog.set(key, length);
+}
+
+export function canonicalizeFinalPathOverallLengths(value, authoritativeValue) {
+  const current = normalizeCanonicalFinalPathByChr(value);
+  const authoritative = normalizeCanonicalFinalPathByChr(authoritativeValue);
+  const lengthBySegmentId = new Map();
+  const lengthBySourceIdentity = new Map();
+
+  Object.entries(authoritative).forEach(([chrName, entry]) => {
+    entry.segments.forEach((segment) => {
+      if (isFinalPathGapSegment(segment) || isFinalPathRefSegment(segment)) {
+        return;
+      }
+      const overallLen = normalizePositiveInteger(segment?.overallLen);
+      const segmentId = normalizeString(segment?.segmentId);
+      rememberAuthoritativeLength(
+        lengthBySegmentId,
+        segmentId ? `${chrName}\u0000${segmentId}` : "",
+        overallLen,
+        `${chrName}:${segmentId}`,
+      );
+      const sourceKey = buildFinalPathSourceIdentityKey(segment);
+      rememberAuthoritativeLength(
+        lengthBySourceIdentity,
+        sourceKey,
+        overallLen,
+        sourceKey.replace("\u0000", ":"),
+      );
+    });
+  });
+
+  return Object.fromEntries(Object.entries(current).map(([chrName, entry]) => {
+    const segments = entry.segments.map((segment) => {
+      if (
+        isFinalPathGapSegment(segment)
+        || isFinalPathRefSegment(segment)
+        || (segment?.serverBaseline !== true && entry?.serverBaseline !== true)
+      ) {
+        return segment;
+      }
+      const segmentId = normalizeString(segment?.segmentId);
+      const sourceKey = buildFinalPathSourceIdentityKey(segment);
+      const overallLen = lengthBySegmentId.get(`${chrName}\u0000${segmentId}`)
+        || lengthBySourceIdentity.get(sourceKey)
+        || null;
+      if (!overallLen) {
+        return segment;
+      }
+      const start = normalizePositiveInteger(segment?.start);
+      const end = normalizePositiveInteger(segment?.end);
+      if (!start || !end || start > overallLen || end > overallLen) {
+        throw new TypeError(
+          `Final Path segment ${chrName}:${segmentId} exceeds authoritative source length ${overallLen}`,
+        );
+      }
+      return segment.overallLen === overallLen ? segment : { ...segment, overallLen };
+    });
+    return [chrName, { ...entry, segments }];
+  }));
+}
+
 function buildFinalPathSemanticSegment(segment) {
   if (isFinalPathGapSegment(segment)) {
     return {

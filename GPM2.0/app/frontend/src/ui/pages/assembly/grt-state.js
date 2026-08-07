@@ -98,6 +98,14 @@ function normalizeGrtSegment(segment, index, chrName) {
   const sourceLocator = source.source && typeof source.source === "object" ? source.source : {};
   const start = normalizePositiveInteger(sourceLocator.start) || 1;
   const end = normalizePositiveInteger(sourceLocator.end) || Math.max(start, length);
+  const sourceLength = normalizePositiveInteger(
+    firstDefined(source, "sourceLength", "source_length"),
+  );
+  if (!sourceLength || start > sourceLength || end > sourceLength) {
+    throw new TypeError(
+      `Invalid GRT source_length for ${chrName}:${segmentId}: ${String(sourceLength || "missing")}`,
+    );
+  }
   const orientation = normalizeString(sourceLocator.orientation || source.orientation) === "-" ? "-" : "+";
   return {
     segmentId,
@@ -106,7 +114,7 @@ function normalizeGrtSegment(segment, index, chrName) {
     datasetName: normalizeString(sourceLocator.dataset),
     ctgName: normalizeString(sourceLocator.contig),
     originId: normalizeString(sourceLocator.contig),
-    overallLen: Math.max(start, end, length),
+    overallLen: sourceLength,
     orient: orientation,
     start: orientation === "-" ? Math.max(start, end) : Math.min(start, end),
     end: orientation === "-" ? Math.min(start, end) : Math.max(start, end),

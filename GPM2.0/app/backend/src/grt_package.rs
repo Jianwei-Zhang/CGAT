@@ -3684,6 +3684,7 @@ pub fn load_grt_final_path(project_db_path: &Path) -> Result<Value> {
 
 pub fn load_grt_final_path_by_chr(project_db_path: &Path) -> Result<BTreeMap<String, Value>> {
     let conn = open_workspace_db(project_db_path)?;
+    let source_lengths = load_persisted_source_lengths(&conn)?;
     let mut stmt = conn
         .prepare("SELECT chr, chromosome_json FROM grt_final_path_chr ORDER BY chr")
         .context("failed to prepare precomputed GRT Final Path chromosome query")?;
@@ -3696,12 +3697,51 @@ pub fn load_grt_final_path_by_chr(project_db_path: &Path) -> Result<BTreeMap<Str
         .map(|(chr_name, json)| {
             let chromosome: Value = serde_json::from_str(&json)
                 .context("persisted GRT Final Path chromosome JSON is invalid")?;
-            Ok((chr_name, project_grt_final_path_chromosome(chromosome)?))
+            let projected =
+                project_grt_final_path_chromosome(chromosome, &chr_name, &source_lengths)?;
+            Ok((chr_name, projected))
         })
         .collect()
 }
 
-fn project_grt_final_path_chromosome(mut chromosome: Value) -> Result<Value> {
+fn load_persisted_source_lengths(conn: &Connection) -> Result<HashMap<(String, String), i64>> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT d.name, ss.seq_name, ss.length
+             FROM source_seq ss
+             JOIN dataset d ON d.id = ss.dataset_id
+             ORDER BY d.name, ss.seq_name",
+        )
+        .context("failed to prepare persisted source length query")?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let mut source_lengths = HashMap::with_capacity(rows.len());
+    for (dataset_name, contig_name, source_length) in rows {
+        if source_length < 1 {
+            bail!("persisted source length must be positive for {dataset_name}:{contig_name}");
+        }
+        if source_lengths
+            .insert((dataset_name.clone(), contig_name.clone()), source_length)
+            .is_some()
+        {
+            bail!("duplicate persisted source identity {dataset_name}:{contig_name}");
+        }
+    }
+    Ok(source_lengths)
+}
+
+fn project_grt_final_path_chromosome(
+    mut chromosome: Value,
+    chr_name: &str,
+    source_lengths: &HashMap<(String, String), i64>,
+) -> Result<Value> {
     let object = chromosome
         .as_object_mut()
         .ok_or_else(|| anyhow!("persisted GRT Final Path chromosome JSON is invalid"))?;
@@ -3709,10 +3749,53 @@ fn project_grt_final_path_chromosome(mut chromosome: Value) -> Result<Value> {
         .get_mut("segments")
         .and_then(Value::as_array_mut)
         .ok_or_else(|| anyhow!("persisted GRT Final Path chromosome segments are invalid"))?;
-    for segment in segments {
+    for (index, segment) in segments.iter_mut().enumerate() {
         let segment_object = segment
             .as_object_mut()
             .ok_or_else(|| anyhow!("persisted GRT Final Path segment JSON is invalid"))?;
+        let label = format!("persisted GRT Final Path {chr_name} segment {}", index + 1);
+        let kind = segment_object
+            .get("kind")
+            .and_then(Value::as_str)
+            .ok_or_else(|| anyhow!("{label}.kind must be a string"))?;
+        if kind != "gap" {
+            let source = segment_object
+                .get("source")
+                .and_then(Value::as_object)
+                .ok_or_else(|| anyhow!("{label}.source must be an object"))?;
+            let dataset_name = source
+                .get("dataset")
+                .and_then(Value::as_str)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| anyhow!("{label}.source.dataset must be a non-empty string"))?;
+            let contig_name = source
+                .get("contig")
+                .and_then(Value::as_str)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| anyhow!("{label}.source.contig must be a non-empty string"))?;
+            let start = source
+                .get("start")
+                .and_then(Value::as_i64)
+                .filter(|value| *value > 0)
+                .ok_or_else(|| anyhow!("{label}.source.start must be a positive integer"))?;
+            let end = source
+                .get("end")
+                .and_then(Value::as_i64)
+                .filter(|value| *value > 0)
+                .ok_or_else(|| anyhow!("{label}.source.end must be a positive integer"))?;
+            let source_length = source_lengths
+                .get(&(dataset_name.to_string(), contig_name.to_string()))
+                .copied()
+                .ok_or_else(|| {
+                    anyhow!("{label} references missing source {dataset_name}:{contig_name}")
+                })?;
+            if start > source_length || end > source_length {
+                bail!(
+                    "{label} interval {start}-{end} exceeds source length {source_length} for {dataset_name}:{contig_name}"
+                );
+            }
+            segment_object.insert("source_length".to_string(), Value::from(source_length));
+        }
         for key in [
             "event_id",
             "eventId",
@@ -4591,6 +4674,126 @@ mod tests {
     }
 
     #[test]
+    fn project_view_uses_authoritative_source_lengths_for_repeated_and_split_segments() {
+        let source_lengths = HashMap::from([
+            (
+                ("hifiasm".to_string(), "ptg000002l".to_string()),
+                43_726_252,
+            ),
+            (("flye".to_string(), "scaffold_50".to_string()), 30_370_176),
+        ]);
+        let chromosome = serde_json::json!({
+            "chr": "Chr01",
+            "q4_length": 1,
+            "q4_sha256": "sha",
+            "segments": [
+                {
+                    "segment_id": "patch-1",
+                    "kind": "patch",
+                    "length": 8,
+                    "source": {
+                        "dataset": "hifiasm",
+                        "contig": "ptg000002l",
+                        "start": 28_911_536,
+                        "end": 28_911_543,
+                        "orientation": "-"
+                    }
+                },
+                {
+                    "segment_id": "patch-2",
+                    "kind": "patch",
+                    "length": 5_493,
+                    "source": {
+                        "dataset": "hifiasm",
+                        "contig": "ptg000002l",
+                        "start": 22_716_743,
+                        "end": 22_722_235,
+                        "orientation": "-"
+                    }
+                },
+                {
+                    "segment_id": "source-left",
+                    "kind": "source",
+                    "length": 30_205_115,
+                    "source": {
+                        "dataset": "flye",
+                        "contig": "scaffold_50",
+                        "start": 1,
+                        "end": 30_205_115,
+                        "orientation": "+"
+                    }
+                },
+                {
+                    "segment_id": "source-right",
+                    "kind": "source",
+                    "length": 164_937,
+                    "source": {
+                        "dataset": "flye",
+                        "contig": "scaffold_50",
+                        "start": 30_205_229,
+                        "end": 30_370_165,
+                        "orientation": "+"
+                    }
+                }
+            ]
+        });
+
+        let projected =
+            project_grt_final_path_chromosome(chromosome, "Chr01", &source_lengths).unwrap();
+        let segments = projected["segments"].as_array().unwrap();
+        assert_eq!(segments[0]["source_length"], 43_726_252);
+        assert_eq!(segments[1]["source_length"], 43_726_252);
+        assert_eq!(segments[2]["source_length"], 30_370_176);
+        assert_eq!(segments[3]["source_length"], 30_370_176);
+        assert_eq!(segments[0]["source"]["start"], 28_911_536);
+        assert_eq!(segments[0]["source"]["end"], 28_911_543);
+        assert_eq!(segments[3]["source"]["start"], 30_205_229);
+        assert_eq!(segments[3]["source"]["end"], 30_370_165);
+    }
+
+    #[test]
+    fn project_view_rejects_missing_or_out_of_range_source_lengths() {
+        let chromosome = serde_json::json!({
+            "chr": "Chr01",
+            "q4_length": 1,
+            "q4_sha256": "sha",
+            "segments": [{
+                "segment_id": "source-1",
+                "kind": "source",
+                "length": 5,
+                "source": {
+                    "dataset": "primary",
+                    "contig": "ctg1",
+                    "start": 8,
+                    "end": 12,
+                    "orientation": "+"
+                }
+            }]
+        });
+
+        let missing_error =
+            project_grt_final_path_chromosome(chromosome.clone(), "Chr01", &HashMap::new())
+                .unwrap_err();
+        assert!(
+            missing_error
+                .to_string()
+                .contains("missing source primary:ctg1")
+        );
+
+        let out_of_range_error = project_grt_final_path_chromosome(
+            chromosome,
+            "Chr01",
+            &HashMap::from([(("primary".to_string(), "ctg1".to_string()), 10)]),
+        )
+        .unwrap_err();
+        assert!(
+            out_of_range_error
+                .to_string()
+                .contains("interval 8-12 exceeds source length 10")
+        );
+    }
+
+    #[test]
     fn validates_shared_grt_v1_fixture() {
         let package = validate_grt_package(&fixture_root()).unwrap();
         assert_eq!(package.final_path["workflow"].as_str(), Some(GRT_WORKFLOW));
@@ -4760,6 +4963,14 @@ mod tests {
             final_path_by_chr["Chr01"]["segments"][1]
                 .get("evidence_ids")
                 .is_none()
+        );
+        assert_eq!(
+            final_path_by_chr["Chr01"]["segments"][0]["source_length"],
+            4
+        );
+        assert_eq!(
+            final_path_by_chr["Chr01"]["segments"][1]["source_length"],
+            4
         );
         let object_attempts = load_grt_object_attempts(&outcome.project_db_path).unwrap();
         assert_eq!(object_attempts.len(), 2);

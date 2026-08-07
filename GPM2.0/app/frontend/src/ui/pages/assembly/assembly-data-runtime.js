@@ -438,6 +438,10 @@ export async function loadAssemblyView(host, store, options, deps) {
     const persistedFinalPathByChr = Object.keys(savedFinalPathByChr).length
       ? savedFinalPathByChr
       : baselineFinalPathByChr;
+    const canonicalFinalPathByChr = canonicalizeFinalPathOverallLengths(
+      persistedFinalPathByChr,
+      baselineFinalPathByChr,
+    );
     const persistedHiddenPrimaryCtgIdsByChr = normalizeHiddenPrimaryCtgIdsByChr(
       projectAssemblyViewState?.hiddenPrimaryCtgIdsByChr,
     );
@@ -532,7 +536,7 @@ export async function loadAssemblyView(host, store, options, deps) {
       selectedChrName,
     );
     const hydratedFinalPathByChr = backfillFinalPathOriginIds(
-      persistedFinalPathByChr,
+      canonicalFinalPathByChr,
       selectedChrName,
       annotatedPrimaryCtgs,
       annotatedSupportCtgs,
@@ -1078,6 +1082,7 @@ export async function loadDeletedCtgsForChr(workspaceRoot, projectId, chrName, d
   }
 }
 import {
+  canonicalizeFinalPathOverallLengths,
   normalizeFinalPathByChr,
   normalizeFinalPathViewMode as normalizeFinalPathViewModeState,
 } from "./final-path-state.js";

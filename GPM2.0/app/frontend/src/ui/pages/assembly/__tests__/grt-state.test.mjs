@@ -9,7 +9,7 @@ import { normalizeFinalPathByChr } from "../final-path-state.js";
 function buildRawView() {
   return {
     recipe: {
-      workflow: "gpm_grt_precomputed_v1",
+      workflow: "gpm_grt_app_precomputed_v1",
       schema_version: "1",
       final_path_schema_version: "1",
       recipe_id: "recipe-1",
@@ -29,6 +29,7 @@ function buildRawView() {
             segment_id: "seg-source",
             kind: "source",
             length: 4,
+            source_length: 10,
             event_id: null,
             evidence_ids: ["ev-ref"],
             source: {
@@ -43,6 +44,7 @@ function buildRawView() {
             segment_id: "seg-patch",
             kind: "patch",
             length: 4,
+            source_length: 12,
             event_id: "evt-step1",
             evidence_ids: ["ev-step1", "ev-display"],
             source: {
@@ -93,6 +95,7 @@ test("normalizes the lean App GRT projection without trace payloads", () => {
   assert.equal(patch.placementMode, undefined);
   assert.equal(patch.refAlignmentStatus, undefined);
   assert.equal(patch.anchorSource, undefined);
+  assert.equal(patch.overallLen, 12);
   assert.deepEqual(patch.source, {
     dataset: "support",
     contig: "donor1",
@@ -108,6 +111,97 @@ test("normalizes the lean App GRT projection without trace payloads", () => {
     placementMode: "grt_promoted",
     refAlignmentStatus: "no_hit",
   }]);
+});
+
+test("uses one authoritative source length for repeated and N-split GRT slices", () => {
+  const raw = buildRawView();
+  raw.final_path_by_chr.Chr01.segments = [
+    {
+      segment_id: "patch-1",
+      kind: "patch",
+      length: 8,
+      source_length: 43_726_252,
+      source: {
+        dataset: "hifiasm",
+        contig: "ptg000002l",
+        start: 28_911_536,
+        end: 28_911_543,
+        orientation: "-",
+      },
+    },
+    {
+      segment_id: "patch-2",
+      kind: "patch",
+      length: 5_493,
+      source_length: 43_726_252,
+      source: {
+        dataset: "hifiasm",
+        contig: "ptg000002l",
+        start: 22_716_743,
+        end: 22_722_235,
+        orientation: "-",
+      },
+    },
+    {
+      segment_id: "source-left",
+      kind: "source",
+      length: 30_205_115,
+      source_length: 30_370_176,
+      source: {
+        dataset: "flye",
+        contig: "scaffold_50",
+        start: 1,
+        end: 30_205_115,
+        orientation: "+",
+      },
+    },
+    {
+      segment_id: "source-right",
+      kind: "source",
+      length: 164_937,
+      source_length: 30_370_176,
+      source: {
+        dataset: "flye",
+        contig: "scaffold_50",
+        start: 30_205_229,
+        end: 30_370_165,
+        orientation: "+",
+      },
+    },
+  ];
+
+  const segments = normalizeGrtProjectView(raw).baselineFinalPathByChr.Chr01.segments;
+  assert.deepEqual(segments.map((segment) => segment.overallLen), [
+    43_726_252,
+    43_726_252,
+    30_370_176,
+    30_370_176,
+  ]);
+  assert.deepEqual(
+    segments.map((segment) => [segment.start, segment.end]),
+    [
+      [28_911_543, 28_911_536],
+      [22_722_235, 22_716_743],
+      [1, 30_205_115],
+      [30_205_229, 30_370_165],
+    ],
+  );
+});
+
+test("rejects missing or too-small authoritative source lengths", () => {
+  const missing = buildRawView();
+  delete missing.final_path_by_chr.Chr01.segments[1].source_length;
+  assert.throws(
+    () => normalizeGrtProjectView(missing),
+    /Invalid GRT source_length for Chr01:seg-patch: missing/,
+  );
+
+  const tooSmall = buildRawView();
+  tooSmall.final_path_by_chr.Chr01.segments[1].source_length = 3;
+  assert.throws(
+    () => normalizeGrtProjectView(tooSmall),
+    /Invalid GRT source_length for Chr01:seg-patch: 3/,
+  );
 });
 
 test("editable Final Path round-trip preserves source intervals and q4 identity", () => {

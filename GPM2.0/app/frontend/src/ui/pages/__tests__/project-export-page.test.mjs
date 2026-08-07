@@ -355,6 +355,106 @@ test("loadProjectExportData clears previous project results before loading curre
   assert.equal(await loading, true);
 });
 
+test("project export loading canonicalizes persisted GRT overallLen from the project view", async () => {
+  let state = createState({
+    projectExport: {
+      ...createState().projectExport,
+      finalPathByChr: {},
+    },
+    assembly: {
+      finalPathByChr: {},
+      grtProjectView: {},
+    },
+  });
+  const store = {
+    getState() {
+      return state;
+    },
+    setState(nextState) {
+      state = nextState;
+    },
+  };
+  const host = {
+    innerHTML: "",
+    addEventListener() {},
+    querySelectorAll() {
+      return [];
+    },
+  };
+
+  const loaded = await __test.loadProjectExportData(host, store, {
+    listProjectChromosomes: async () => ({
+      items: [{ chrName: "Chr01" }],
+      unplacedCtgCount: 0,
+      unplacedBp: 0,
+    }),
+    listChrViewCtgs: async () => ({ items: [] }),
+    getProjectAssemblyViewState: async () => ({
+      finalPathByChr: {
+        Chr01: {
+          mode: "segments",
+          chrName: "Chr01",
+          segments: [{
+            segmentId: "patch-1",
+            type: "ctg",
+            datasetName: "hifiasm",
+            ctgName: "ptg000002l",
+            originId: "ptg000002l",
+            overallLen: 28_911_543,
+            start: 28_911_543,
+            end: 28_911_536,
+            source: {
+              dataset: "hifiasm",
+              contig: "ptg000002l",
+              start: 28_911_536,
+              end: 28_911_543,
+              orientation: "-",
+            },
+            serverBaseline: true,
+          }],
+        },
+      },
+      hiddenPrimaryCtgIds: [],
+      hiddenPrimaryCtgIdsByChr: {},
+    }),
+    getGrtProjectView: async () => ({
+      final_path_by_chr: {
+        Chr01: {
+          chr: "Chr01",
+          q4_length: 8,
+          q4_sha256: "q4-sha",
+          segments: [{
+            segment_id: "patch-1",
+            kind: "patch",
+            length: 8,
+            source_length: 43_726_252,
+            source: {
+              dataset: "hifiasm",
+              contig: "ptg000002l",
+              start: 28_911_536,
+              end: 28_911_543,
+              orientation: "-",
+            },
+          }],
+        },
+      },
+    }),
+  });
+
+  assert.equal(loaded, true);
+  assert.equal(
+    state.projectExport.finalPathByChr.Chr01.segments[0].overallLen,
+    43_726_252,
+  );
+  assert.deepEqual(
+    [
+      state.projectExport.finalPathByChr.Chr01.segments[0].start,
+      state.projectExport.finalPathByChr.Chr01.segments[0].end,
+    ],
+    [28_911_543, 28_911_536],
+  );
+});
+
 test("loadProjectExportData ignores late responses after switching projects", async () => {
   let state = createState({
     session: {
