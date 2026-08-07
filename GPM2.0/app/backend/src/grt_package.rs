@@ -53,6 +53,16 @@ pub struct GrtLockedRecipe {
     pub q4_artifact_sha256: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GrtSourceCardStatus {
+    pub source_card_key: String,
+    pub dataset_name: String,
+    pub contig_name: String,
+    pub target_chr: String,
+    pub placement_mode: String,
+    pub ref_alignment_status: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GrtSourceCardTrace {
     pub source_card: Value,
@@ -101,8 +111,7 @@ pub struct GrtProjectInitializationSummary {
 pub struct GrtProjectView {
     pub recipe: GrtLockedRecipe,
     pub final_path_by_chr: BTreeMap<String, Value>,
-    pub object_attempts: Vec<Value>,
-    pub source_cards: Vec<Value>,
+    pub source_cards: Vec<GrtSourceCardStatus>,
     pub verification: GrtFinalPathVerification,
 }
 
@@ -2881,13 +2890,37 @@ pub fn load_grt_final_path_by_chr(project_db_path: &Path) -> Result<BTreeMap<Str
         .collect::<std::result::Result<Vec<_>, _>>()?;
     rows.into_iter()
         .map(|(chr_name, json)| {
-            Ok((
-                chr_name,
-                serde_json::from_str(&json)
-                    .context("persisted GRT Final Path chromosome JSON is invalid")?,
-            ))
+            let chromosome: Value = serde_json::from_str(&json)
+                .context("persisted GRT Final Path chromosome JSON is invalid")?;
+            Ok((chr_name, project_grt_final_path_chromosome(chromosome)?))
         })
         .collect()
+}
+
+fn project_grt_final_path_chromosome(mut chromosome: Value) -> Result<Value> {
+    let object = chromosome
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("persisted GRT Final Path chromosome JSON is invalid"))?;
+    let segments = object
+        .get_mut("segments")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| anyhow!("persisted GRT Final Path chromosome segments are invalid"))?;
+    for segment in segments {
+        let segment_object = segment
+            .as_object_mut()
+            .ok_or_else(|| anyhow!("persisted GRT Final Path segment JSON is invalid"))?;
+        for key in [
+            "event_id",
+            "eventId",
+            "evidence_ids",
+            "evidenceIds",
+            "source_card_key",
+            "sourceCardKey",
+        ] {
+            segment_object.remove(key);
+        }
+    }
+    Ok(chromosome)
 }
 
 pub fn load_grt_object_attempts(project_db_path: &Path) -> Result<Vec<Value>> {
@@ -2926,12 +2959,54 @@ pub fn load_grt_source_cards(project_db_path: &Path) -> Result<Vec<Value>> {
     )
 }
 
+pub fn load_grt_source_card_statuses(project_db_path: &Path) -> Result<Vec<GrtSourceCardStatus>> {
+    load_grt_source_cards(project_db_path)?
+        .into_iter()
+        .map(|value| {
+            let object = value
+                .as_object()
+                .ok_or_else(|| anyhow!("persisted GRT source card JSON is invalid"))?;
+            Ok(GrtSourceCardStatus {
+                source_card_key: object
+                    .get("source_card_key")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                dataset_name: object
+                    .get("dataset_name")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                contig_name: object
+                    .get("contig_name")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                target_chr: object
+                    .get("target_chr")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                placement_mode: object
+                    .get("placement_mode")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                ref_alignment_status: object
+                    .get("ref_alignment_status")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+            })
+        })
+        .collect()
+}
+
 pub fn load_grt_project_view(project_db_path: &Path) -> Result<GrtProjectView> {
     Ok(GrtProjectView {
         recipe: load_grt_locked_recipe(project_db_path)?,
         final_path_by_chr: load_grt_final_path_by_chr(project_db_path)?,
-        object_attempts: load_grt_object_attempts(project_db_path)?,
-        source_cards: load_grt_source_cards(project_db_path)?,
+        source_cards: load_grt_source_card_statuses(project_db_path)?,
         verification: load_persisted_grt_final_path_verification(project_db_path)?,
     })
 }
@@ -3872,6 +3947,16 @@ mod tests {
                 .len(),
             2
         );
+        assert!(
+            final_path_by_chr["Chr01"]["segments"][0]
+                .get("event_id")
+                .is_none()
+        );
+        assert!(
+            final_path_by_chr["Chr01"]["segments"][1]
+                .get("evidence_ids")
+                .is_none()
+        );
         let object_attempts = load_grt_object_attempts(&outcome.project_db_path).unwrap();
         assert_eq!(object_attempts.len(), 2);
         assert_eq!(object_attempts[0]["object_kind"], "gap");
@@ -3969,8 +4054,21 @@ mod tests {
         let view = load_grt_project_view(&outcome.project_db_path).unwrap();
         assert_eq!(view.recipe.recipe_id, "recipe-test");
         assert_eq!(view.final_path_by_chr.len(), 1);
-        assert_eq!(view.object_attempts.len(), 1);
         assert_eq!(view.source_cards.len(), 1);
+        assert_eq!(view.source_cards[0].placement_mode, "grt_promoted");
+        let serialized = serde_json::to_value(&view).unwrap();
+        assert!(serialized.get("object_attempts").is_none());
+        assert_eq!(serialized["source_cards"][0].as_object().unwrap().len(), 6);
+        assert!(
+            serialized["source_cards"][0]
+                .get("accepted_events")
+                .is_none()
+        );
+        assert!(
+            serialized["final_path_by_chr"]["Chr01"]["segments"][0]
+                .get("event_id")
+                .is_none()
+        );
     }
 
     #[test]

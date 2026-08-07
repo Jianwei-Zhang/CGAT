@@ -151,26 +151,6 @@ function createState() {
             q4Sha256: "q4-sha",
           },
         },
-        objectAttempts: [
-          {
-            attemptId: "attempt-terminal",
-            chr: "Chr01",
-            objectId: "terminal-right",
-            objectKind: "terminal",
-            status: "unresolved",
-            reason: "no_candidate",
-            candidateCount: 0,
-          },
-          {
-            attemptId: "attempt-other-chr",
-            chr: "Chr02",
-            objectId: "gap-other",
-            objectKind: "gap",
-            status: "unresolved",
-            reason: "no_candidate",
-            candidateCount: 0,
-          },
-        ],
         sourceCards: [
           {
             sourceCardKey: "flye:donor_unplaced:Chr01:grt_promoted",
@@ -213,7 +193,6 @@ test("renders passive GRT placement status and a current-path baseline reset", (
 
 test("does not render persistent trace controls from GRT metadata", () => {
   const state = createState();
-  state.assembly.grtProjectView.objectAttempts = [];
   state.assembly.grtProjectView.sourceCards = [];
   const html = renderAssemblyPage(state);
 

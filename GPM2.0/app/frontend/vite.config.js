@@ -82,24 +82,6 @@ function backendBridgePlugin() {
             return;
           }
 
-          if (url.pathname === "/get-grt-source-card-trace") {
-            const result = await getGrtSourceCardTrace(payload);
-            sendJson(res, 200, result);
-            return;
-          }
-
-          if (url.pathname === "/get-grt-event-trace") {
-            const result = await getGrtEventTrace(payload);
-            sendJson(res, 200, result);
-            return;
-          }
-
-          if (url.pathname === "/get-grt-evidence") {
-            const result = await getGrtEvidence(payload);
-            sendJson(res, 200, result);
-            return;
-          }
-
           if (url.pathname === "/update-project") {
             const result = await updateProject(payload);
             sendJson(res, 200, result);
@@ -545,45 +527,6 @@ async function getGrtProjectView(payload) {
   requireString("workspaceRoot", workspaceRoot);
   requireNumber("projectId", projectId);
   return runGrtJsonCommand(["get-grt-project-view", workspaceRoot, String(projectId)]);
-}
-
-async function getGrtSourceCardTrace(payload) {
-  const { workspaceRoot, projectId, sourceCardKey } = payload || {};
-  requireString("workspaceRoot", workspaceRoot);
-  requireNumber("projectId", projectId);
-  requireString("sourceCardKey", sourceCardKey);
-  return runGrtJsonCommand([
-    "get-grt-source-card-trace",
-    workspaceRoot,
-    String(projectId),
-    sourceCardKey,
-  ]);
-}
-
-async function getGrtEventTrace(payload) {
-  const { workspaceRoot, projectId, eventId } = payload || {};
-  requireString("workspaceRoot", workspaceRoot);
-  requireNumber("projectId", projectId);
-  requireString("eventId", eventId);
-  return runGrtJsonCommand([
-    "get-grt-event-trace",
-    workspaceRoot,
-    String(projectId),
-    eventId,
-  ]);
-}
-
-async function getGrtEvidence(payload) {
-  const { workspaceRoot, projectId, evidenceId } = payload || {};
-  requireString("workspaceRoot", workspaceRoot);
-  requireNumber("projectId", projectId);
-  requireString("evidenceId", evidenceId);
-  return runGrtJsonCommand([
-    "get-grt-evidence",
-    workspaceRoot,
-    String(projectId),
-    evidenceId,
-  ]);
 }
 
 async function runGrtJsonCommand(args) {

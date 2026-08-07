@@ -413,7 +413,6 @@ export async function loadAssemblyView(host, store, options, deps) {
       ? deps.normalizeGrtProjectView(rawGrtProjectView)
       : {
           baselineFinalPathByChr: rawGrtProjectView.baselineFinalPathByChr || {},
-          objectAttempts: rawGrtProjectView.objectAttempts || [],
           sourceCards: rawGrtProjectView.sourceCards || [],
           verification: rawGrtProjectView.verification || {},
           recipe: rawGrtProjectView.recipe || {},

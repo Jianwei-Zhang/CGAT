@@ -56,19 +56,6 @@ function buildRawView() {
         ],
       },
     },
-    object_attempts: [
-      {
-        attempt_id: "attempt-terminal",
-        chr: "Chr01",
-        object_id: "terminal-right",
-        object_kind: "terminal",
-        stage: "step4_telomere",
-        status: "unresolved",
-        reason: "no_candidate",
-        candidate_count: "0",
-        accepted_event_id: "",
-      },
-    ],
     source_cards: [
       {
         source_card_key: "support:donor1:Chr01:grt_promoted",
@@ -94,18 +81,18 @@ function buildRawView() {
   };
 }
 
-test("normalizes Server GRT Final Path without dropping trace identifiers", () => {
+test("normalizes the lean App GRT projection without trace payloads", () => {
   const view = normalizeGrtProjectView(buildRawView());
   const patch = view.baselineFinalPathByChr.Chr01.segments[1];
 
   assert.equal(view.recipe.recipeId, "recipe-1");
   assert.equal(patch.segmentId, "seg-patch");
-  assert.equal(patch.eventId, "evt-step1");
-  assert.equal(patch.sourceCardKey, "support:donor1:Chr01:grt_promoted");
-  assert.deepEqual(patch.evidenceIds, ["ev-step1", "ev-display"]);
-  assert.equal(patch.placementMode, "grt_promoted");
-  assert.equal(patch.refAlignmentStatus, "no_hit");
-  assert.equal(patch.anchorSource, "grt_final_path");
+  assert.equal(patch.eventId, undefined);
+  assert.equal(patch.sourceCardKey, undefined);
+  assert.equal(patch.evidenceIds, undefined);
+  assert.equal(patch.placementMode, undefined);
+  assert.equal(patch.refAlignmentStatus, undefined);
+  assert.equal(patch.anchorSource, undefined);
   assert.deepEqual(patch.source, {
     dataset: "support",
     contig: "donor1",
@@ -113,19 +100,25 @@ test("normalizes Server GRT Final Path without dropping trace identifiers", () =
     end: 4,
     orientation: "+",
   });
-  assert.equal(view.objectAttempts[0].status, "unresolved");
-  assert.equal(view.objectAttempts[0].objectKind, "terminal");
+  assert.deepEqual(view.sourceCards, [{
+    sourceCardKey: "support:donor1:Chr01:grt_promoted",
+    datasetName: "support",
+    contigName: "donor1",
+    targetChr: "Chr01",
+    placementMode: "grt_promoted",
+    refAlignmentStatus: "no_hit",
+  }]);
 });
 
-test("editable Final Path round-trip preserves event, source-card, and evidence IDs", () => {
+test("editable Final Path round-trip preserves source intervals and q4 identity", () => {
   const view = normalizeGrtProjectView(buildRawView());
   const firstRoundTrip = normalizeFinalPathByChr(view.baselineFinalPathByChr);
   const secondRoundTrip = normalizeFinalPathByChr(JSON.parse(JSON.stringify(firstRoundTrip)));
   const segment = secondRoundTrip.Chr01.segments[1];
 
-  assert.equal(segment.eventId, "evt-step1");
-  assert.equal(segment.sourceCardKey, "support:donor1:Chr01:grt_promoted");
-  assert.deepEqual(segment.evidenceIds, ["ev-step1", "ev-display"]);
+  assert.equal(segment.eventId, undefined);
+  assert.equal(segment.sourceCardKey, undefined);
+  assert.deepEqual(segment.evidenceIds, undefined);
   assert.equal(segment.source.dataset, "support");
   assert.equal(secondRoundTrip.Chr01.q4Sha256, "q4-sha");
 });

@@ -10,10 +10,7 @@ import {
   exportDegapJobs,
   exportFinalPathFasta,
   exportProjectFinalPathFasta,
-  getGrtEventTrace,
-  getGrtEvidence,
   getGrtProjectView,
-  getGrtSourceCardTrace,
   initializeProject,
   listPhasedChrTracks,
   listProjectInitializerOptions,
@@ -367,7 +364,7 @@ test("initializeProject sends only the workspace and project name to the locked 
   }
 });
 
-test("GRT trace services route project, source-card, event, and evidence requests", async () => {
+test("GRT project view routes only the lean project-view command", async () => {
   const previousWindow = globalThis.window;
   const calls = [];
   try {
@@ -383,29 +380,17 @@ test("GRT trace services route project, source-card, event, and evidence request
     };
 
     await getGrtProjectView({ workspaceRoot: "D:\\ws", projectId: 7 });
-    await getGrtSourceCardTrace({ workspaceRoot: "D:\\ws", projectId: 7, sourceCardKey: "support:ctg1" });
-    await getGrtEventTrace({ workspaceRoot: "D:\\ws", projectId: 7, eventId: "evt-1" });
-    await getGrtEvidence({ workspaceRoot: "D:\\ws", projectId: 7, evidenceId: "ev-1" });
 
-    assert.deepEqual(calls.map((call) => call.command), [
-      "get_grt_project_view",
-      "get_grt_source_card_trace",
-      "get_grt_event_trace",
-      "get_grt_evidence",
-    ]);
-    assert.deepEqual(calls[1].args, {
-      workspaceRoot: "D:\\ws",
-      projectId: 7,
-      sourceCardKey: "support:ctg1",
-    });
-    assert.equal(calls[2].args.eventId, "evt-1");
-    assert.equal(calls[3].args.evidenceId, "ev-1");
+    assert.deepEqual(calls, [{
+      command: "get_grt_project_view",
+      args: { workspaceRoot: "D:\\ws", projectId: 7 },
+    }]);
   } finally {
     globalThis.window = previousWindow;
   }
 });
 
-test("GRT trace services use the dev bridge when tauri is unavailable", async () => {
+test("GRT project view uses the dev bridge without trace endpoints", async () => {
   const previousWindow = globalThis.window;
   const previousFetch = globalThis.fetch;
   const calls = [];
@@ -421,36 +406,10 @@ test("GRT trace services use the dev bridge when tauri is unavailable", async ()
     };
 
     const projectView = await getGrtProjectView({ workspaceRoot: "D:\\ws", projectId: 7 });
-    const sourceTrace = await getGrtSourceCardTrace({
-      workspaceRoot: "D:\\ws",
-      projectId: 7,
-      sourceCardKey: "support:ctg1",
-    });
-    const eventTrace = await getGrtEventTrace({
-      workspaceRoot: "D:\\ws",
-      projectId: 7,
-      eventId: "evt-1",
-    });
-    const evidence = await getGrtEvidence({
-      workspaceRoot: "D:\\ws",
-      projectId: 7,
-      evidenceId: "ev-1",
-    });
 
-    assert.deepEqual(calls.map((call) => call.path), [
-      "/api/get-grt-project-view",
-      "/api/get-grt-source-card-trace",
-      "/api/get-grt-event-trace",
-      "/api/get-grt-evidence",
-    ]);
+    assert.deepEqual(calls.map((call) => call.path), ["/api/get-grt-project-view"]);
     assert.deepEqual(calls[0].payload, { workspaceRoot: "D:\\ws", projectId: 7 });
-    assert.equal(calls[1].payload.sourceCardKey, "support:ctg1");
-    assert.equal(calls[2].payload.eventId, "evt-1");
-    assert.equal(calls[3].payload.evidenceId, "ev-1");
     assert.equal(projectView.status, "server");
-    assert.equal(sourceTrace.status, "server");
-    assert.equal(eventTrace.status, "server");
-    assert.equal(evidence.status, "server");
   } finally {
     globalThis.window = previousWindow;
     globalThis.fetch = previousFetch;

@@ -73,7 +73,6 @@ function buildEmptyAssemblyViewState(stateOrLocale) {
     grtProjectView: {
       recipe: {},
       baselineFinalPathByChr: {},
-      objectAttempts: [],
       sourceCards: [],
       verification: {},
     },

@@ -141,7 +141,6 @@ const store = createStore({
     grtProjectView: {
       recipe: {},
       baselineFinalPathByChr: {},
-      objectAttempts: [],
       sourceCards: [],
       verification: {},
     },

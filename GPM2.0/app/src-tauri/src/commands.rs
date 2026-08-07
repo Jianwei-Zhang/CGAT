@@ -29,11 +29,8 @@ use gpm_next_backend::exporter::{
 };
 use gpm_next_backend::grt_package::{
     GrtLockedRecipe, initialize_grt_project as backend_initialize_grt_project,
-    load_grt_event_trace as backend_load_grt_event_trace,
-    load_grt_evidence as backend_load_grt_evidence,
     load_grt_locked_recipe as backend_load_grt_locked_recipe,
     load_grt_project_view as backend_load_grt_project_view,
-    load_grt_source_card_trace as backend_load_grt_source_card_trace,
 };
 use gpm_next_backend::importer::{
     AddCtgImportTarget, ImportProgress, import_add_ctg_package_with_hooks,
@@ -999,78 +996,6 @@ pub fn get_grt_project_view(workspaceRoot: String, projectId: i64) -> Result<Val
         Ok(serde_json::to_value(backend_load_grt_project_view(
             &project_db,
         )?)?)
-    })()
-    .map_err(format_error)
-}
-
-#[tauri::command]
-#[allow(non_snake_case)]
-pub fn get_grt_source_card_trace(
-    workspaceRoot: String,
-    projectId: i64,
-    sourceCardKey: String,
-) -> Result<Value, String> {
-    (|| {
-        let project_db = project_db_path(&workspaceRoot);
-        let options = backend_list_initializer_options(&project_db)?;
-        if !options
-            .existing_projects
-            .iter()
-            .any(|project| project.id == projectId)
-        {
-            bail!("project_id {projectId} does not exist");
-        }
-        Ok(serde_json::to_value(backend_load_grt_source_card_trace(
-            &project_db,
-            &sourceCardKey,
-        )?)?)
-    })()
-    .map_err(format_error)
-}
-
-#[tauri::command]
-#[allow(non_snake_case)]
-pub fn get_grt_event_trace(
-    workspaceRoot: String,
-    projectId: i64,
-    eventId: String,
-) -> Result<Value, String> {
-    (|| {
-        let project_db = project_db_path(&workspaceRoot);
-        let options = backend_list_initializer_options(&project_db)?;
-        if !options
-            .existing_projects
-            .iter()
-            .any(|project| project.id == projectId)
-        {
-            bail!("project_id {projectId} does not exist");
-        }
-        Ok(serde_json::to_value(backend_load_grt_event_trace(
-            &project_db,
-            &eventId,
-        )?)?)
-    })()
-    .map_err(format_error)
-}
-
-#[tauri::command]
-#[allow(non_snake_case)]
-pub fn get_grt_evidence(
-    workspaceRoot: String,
-    projectId: i64,
-    evidenceId: String,
-) -> Result<Value, String> {
-    (|| {
-        let project_db = project_db_path(&workspaceRoot);
-        let options = backend_list_initializer_options(&project_db)?;
-        if !options
-            .existing_projects
-            .iter()
-            .any(|project| project.id == projectId)
-        {
-            bail!("project_id {projectId} does not exist");
-        }
-        backend_load_grt_evidence(&project_db, &evidenceId)
     })()
     .map_err(format_error)
 }

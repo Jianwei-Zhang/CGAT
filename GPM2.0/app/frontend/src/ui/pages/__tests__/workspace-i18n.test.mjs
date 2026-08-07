@@ -575,12 +575,12 @@ test("selected-project rename preserves the locked GRT recipe fields", async () 
           invoke: async (command, args) => {
             calls.push({ command, args });
             assert.equal(command, "update_project");
-            assert.equal(args.projectId, 7);
-            assert.equal(args.projectName, "project_renamed");
-            assert.equal(args.referenceGenomeId, 1);
-            assert.equal(args.primaryDatasetId, 11);
-            assert.deepEqual(args.supportDatasetIds, [12]);
-            assert.equal(args.phasedAssemblyEnabled, false);
+            assert.equal(args.request.projectId, 7);
+            assert.equal(args.request.projectName, "project_renamed");
+            assert.equal(args.request.referenceGenomeId, 1);
+            assert.equal(args.request.primaryDatasetId, 11);
+            assert.deepEqual(args.request.supportDatasetIds, [12]);
+            assert.equal(args.request.phasedAssemblyEnabled, false);
             return {
               projectId: 7,
               projectName: "project_renamed",
@@ -701,12 +701,12 @@ test("processed selected-project rename ignores synthetic legacy recipe controls
           invoke: async (command, args) => {
             calls.push({ command, args });
             if (command === "update_project") {
-              assert.equal(args.projectId, 7);
-              assert.equal(args.projectName, "project_processed_renamed");
-              assert.equal(args.referenceGenomeId, 1);
-              assert.equal(args.primaryDatasetId, 11);
-              assert.deepEqual(args.supportDatasetIds, [12]);
-              assert.equal(args.phasedAssemblyEnabled, false);
+              assert.equal(args.request.projectId, 7);
+              assert.equal(args.request.projectName, "project_processed_renamed");
+              assert.equal(args.request.referenceGenomeId, 1);
+              assert.equal(args.request.primaryDatasetId, 11);
+              assert.deepEqual(args.request.supportDatasetIds, [12]);
+              assert.equal(args.request.phasedAssemblyEnabled, false);
               return {
                 projectId: 7,
                 projectName: "project_processed_renamed",

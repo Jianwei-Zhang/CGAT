@@ -196,7 +196,7 @@ Install the GPM2.0 desktop application on the client machine from the project Gi
 
 Import `gpm_server.zip` into GPM2.0 to start visual inspection and lightweight editing.
 
-The package fixes the primary/support recipe. Creating a project requires only a project name; the App loads the Server-precomputed Final Path, unresolved biological objects, source cards, events, and evidence. The baseline remains immutable while the project-level Final Path remains editable and can continue into DEGAP or export workflows. Legacy non-GRT packages are intentionally unsupported.
+The package fixes the primary/support recipe. Creating a project requires only a project name; the App loads the Server-precomputed Final Path and the minimal read-only source-card status needed by the main view. The Final Path header can restore the current chromosome to its immutable Server GRT baseline; project-level edits remain editable and can continue into DEGAP or export workflows. The complete event/evidence/donor/attempt closure stays in the Server package for validation and operator audit, while App/Tauri no longer exposes a trace browser. Legacy non-GRT packages are intentionally unsupported.
 
 ### Export final path FASTA on the server
 

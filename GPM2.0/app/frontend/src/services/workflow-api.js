@@ -265,77 +265,6 @@ export async function getGrtProjectView({ workspaceRoot, projectId }) {
   return buildMockGrtProjectView();
 }
 
-export async function getGrtSourceCardTrace({ workspaceRoot, projectId, sourceCardKey }) {
-  if (isTauriRuntime()) {
-    return invokeCommand("get_grt_source_card_trace", {
-      workspaceRoot,
-      projectId,
-      sourceCardKey,
-    });
-  }
-  try {
-    return await callDevBridge("/api/get-grt-source-card-trace", {
-      workspaceRoot,
-      projectId,
-      sourceCardKey,
-    });
-  } catch {
-    // fallback to mock flow
-  }
-  const view = buildMockGrtProjectView();
-  const sourceCard = view.source_cards.find(
-    (card) => String(card.source_card_key || "") === String(sourceCardKey || ""),
-  );
-  return {
-    source_card: sourceCard || {},
-    accepted_events: [],
-    final_path_segments: [],
-    ref_evidence: [],
-    pairwise_evidence: [],
-    donor_usage: [],
-    donor_members: [],
-    donor_sets: [],
-  };
-}
-
-export async function getGrtEventTrace({ workspaceRoot, projectId, eventId }) {
-  if (isTauriRuntime()) {
-    return invokeCommand("get_grt_event_trace", { workspaceRoot, projectId, eventId });
-  }
-  try {
-    return await callDevBridge("/api/get-grt-event-trace", {
-      workspaceRoot,
-      projectId,
-      eventId,
-    });
-  } catch {
-    // fallback to mock flow
-  }
-  return {
-    event: { event_id: eventId },
-    evidence: [],
-    donor_usage: [],
-    final_path_segment: null,
-    source_card: null,
-  };
-}
-
-export async function getGrtEvidence({ workspaceRoot, projectId, evidenceId }) {
-  if (isTauriRuntime()) {
-    return invokeCommand("get_grt_evidence", { workspaceRoot, projectId, evidenceId });
-  }
-  try {
-    return await callDevBridge("/api/get-grt-evidence", {
-      workspaceRoot,
-      projectId,
-      evidenceId,
-    });
-  } catch {
-    // fallback to mock flow
-  }
-  return { evidence_id: evidenceId, status: "mock" };
-}
-
 export async function deleteProject({ workspaceRoot, projectId }) {
   if (isTauriRuntime()) {
     return deleteProjectTauri({ workspaceRoot, projectId });
@@ -1281,7 +1210,6 @@ function buildMockGrtProjectView() {
       tel_donor_set_id: mockStore.grtRecipe.telDonorSetId,
     },
     final_path_by_chr: {},
-    object_attempts: [],
     source_cards: [],
     verification: {
       chromosome_count: 0,
