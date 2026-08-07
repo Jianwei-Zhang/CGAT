@@ -513,7 +513,7 @@ test("appendTrackContigToFinalPath backfills mirror origin id from the support c
   assert.equal(store.getState().assembly.finalPathByChr.Chr01.segments[0].originId, "ptg0003531l");
 });
 
-test("appendTrackContigToFinalPath flips explicit fragment ranges when the source track is reversed", async () => {
+test("appendTrackContigToFinalPath projects reversed display fragments into original source coordinates", async () => {
   const store = createStore({
     chrCtgs: [
       {
@@ -550,8 +550,51 @@ test("appendTrackContigToFinalPath flips explicit fragment ranges when the sourc
       ctgName: "Ctg9",
       originId: "utig4-001122l",
       overallLen: 1200,
-      start: 500,
-      end: 101,
+      start: 1100,
+      end: 701,
+    },
+  ]);
+});
+
+test("appendTrackContigToFinalPath canonicalizes the example2 reversed anchor fragment", async () => {
+  const store = createStore({
+    chrCtgs: [
+      {
+        assemblyCtgId: 9,
+        name: "ptg000002l@Chr01",
+        originId: "ptg000002l",
+        totalLength: 43726252,
+        datasetId: 11,
+        refOrient: "-",
+      },
+    ],
+  });
+
+  await appendTrackContigToFinalPath(
+    {},
+    store,
+    {
+      assemblyCtgId: 9,
+      trackRole: "primary",
+      isMirror: false,
+      datasetId: 11,
+      start: 14814691,
+      end: 14814725,
+    },
+    createDeps(),
+  );
+
+  assert.deepEqual(store.getState().assembly.finalPathByChr.Chr01.segments, [
+    {
+      segmentId: "seg-1",
+      type: "ctg",
+      assemblyCtgId: 9,
+      datasetName: "hifiasm",
+      ctgName: "ptg000002l@Chr01",
+      originId: "ptg000002l",
+      overallLen: 43726252,
+      start: 28911562,
+      end: 28911528,
     },
   ]);
 });
@@ -596,8 +639,8 @@ test("appendTrackContigToFinalPath honors a subview-local refOrient override wit
       ctgName: "Ctg9",
       originId: "utig4-001122l",
       overallLen: 1200,
-      start: 500,
-      end: 101,
+      start: 1100,
+      end: 701,
     },
   ]);
 });

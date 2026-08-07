@@ -1535,9 +1535,10 @@ pub(crate) fn load_named_sequences_from_fasta(
 #[cfg(test)]
 mod tests {
     use super::{
-        ExportChrAgpParams, ExportChrFastaParams, ExportCtgAgpParams, ExportCtgFastaParams,
-        ExportFinalPathFastaParams, ExportProjectFinalPathFastaParams, FinalPathExportSegment,
-        FinalPathFastaRecord, ListExportRecordsParams, export_chr_agp_with_connection,
+        CtgExportModel, CtgMemberModel, ExportChrAgpParams, ExportChrFastaParams,
+        ExportCtgAgpParams, ExportCtgFastaParams, ExportFinalPathFastaParams,
+        ExportProjectFinalPathFastaParams, FinalPathExportSegment, FinalPathFastaRecord,
+        ListExportRecordsParams, build_final_path_sequence, export_chr_agp_with_connection,
         export_chr_fasta_with_connection, export_ctg_agp_with_connection,
         export_ctg_fasta_with_connection, export_final_path_fasta_with_connection,
         export_project_final_path_fasta_with_connection, list_export_records_with_connection,
@@ -1545,6 +1546,7 @@ mod tests {
     use crate::db::init_workspace_schema;
     use rusqlite::{Connection, params};
     use std::{
+        collections::HashMap,
         fs,
         path::{Path, PathBuf},
     };
@@ -1999,6 +2001,90 @@ mod tests {
         assert!(project_text.contains(">Chr01\nAAAANNNACGATCGT\n"));
         assert!(project_text.contains(">Chr02\nAA\n"));
         assert_eq!(project_summary.output_path, project_output_path);
+    }
+
+    #[test]
+    fn final_path_export_equates_grt_and_canonicalized_anchor_boundary_splits() {
+        let build_ctg = |id, source_seq_id, source_seq_name: &str, source_end| CtgExportModel {
+            id,
+            name: source_seq_name.to_string(),
+            assigned_chr_name: Some("Chr01".to_string()),
+            chr_order: Some(id),
+            anchor_start: None,
+            ref_orient: None,
+            members: vec![CtgMemberModel {
+                member_order: 1,
+                source_seq_id,
+                source_seq_name: source_seq_name.to_string(),
+                orient: "+".to_string(),
+                source_start: 1,
+                source_end,
+                hidden: false,
+                left_end_type: "normal".to_string(),
+                right_end_type: "normal".to_string(),
+            }],
+        };
+        let ctg_by_id = HashMap::from([
+            (1, build_ctg(1, 101, "left", 6)),
+            (2, build_ctg(2, 102, "donor", 12)),
+            (3, build_ctg(3, 103, "right", 6)),
+        ]);
+        let source_sequences = HashMap::from([
+            (101, "AAAAGC".to_string()),
+            (102, "GGGTAACGCAAA".to_string()),
+            (103, "TACCCC".to_string()),
+        ]);
+        let reference_sequences = HashMap::new();
+
+        let grt_split = build_final_path_sequence(
+            &[
+                FinalPathExportSegment::Ctg {
+                    assembly_ctg_id: 1,
+                    start: 1,
+                    end: 6,
+                },
+                FinalPathExportSegment::Ctg {
+                    assembly_ctg_id: 2,
+                    start: 7,
+                    end: 6,
+                },
+                FinalPathExportSegment::Ctg {
+                    assembly_ctg_id: 3,
+                    start: 1,
+                    end: 6,
+                },
+            ],
+            &ctg_by_id,
+            &source_sequences,
+            &reference_sequences,
+        )
+        .unwrap();
+        let canonicalized_anchor_split = build_final_path_sequence(
+            &[
+                FinalPathExportSegment::Ctg {
+                    assembly_ctg_id: 1,
+                    start: 1,
+                    end: 4,
+                },
+                FinalPathExportSegment::Ctg {
+                    assembly_ctg_id: 2,
+                    start: 9,
+                    end: 4,
+                },
+                FinalPathExportSegment::Ctg {
+                    assembly_ctg_id: 3,
+                    start: 3,
+                    end: 6,
+                },
+            ],
+            &ctg_by_id,
+            &source_sequences,
+            &reference_sequences,
+        )
+        .unwrap();
+
+        assert_eq!(grt_split, "AAAAGCGTTACCCC");
+        assert_eq!(canonicalized_anchor_split, grt_split);
     }
 
     #[test]

@@ -673,6 +673,15 @@ function buildTrackContigFinalPathSegment(state, ctgContext, ctg, segmentId) {
   }
   const resolvedStart = rangeStart || 1;
   const resolvedEnd = rangeEnd || overallLen;
+  const sourceRange = orient === "-"
+    ? {
+        start: overallLen - resolvedStart + 1,
+        end: overallLen - resolvedEnd + 1,
+      }
+    : {
+        start: resolvedStart,
+        end: resolvedEnd,
+      };
   return buildFinalPathCtgSegment({
     segmentId,
     sourceKind: "assembly_ctg",
@@ -681,8 +690,8 @@ function buildTrackContigFinalPathSegment(state, ctgContext, ctg, segmentId) {
     ctgName: ctg.name || `Ctg${ctg.assemblyCtgId}`,
     originId: resolveTrackContigOriginId(state?.assembly, ctgContext, ctg),
     overallLen,
-    start: orient === "-" ? resolvedEnd : resolvedStart,
-    end: orient === "-" ? resolvedStart : resolvedEnd,
+    start: sourceRange.start,
+    end: sourceRange.end,
   });
 }
 
