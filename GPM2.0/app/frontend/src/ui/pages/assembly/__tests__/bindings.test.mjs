@@ -58,6 +58,7 @@ function createBindingDeps(overrides = {}) {
     "bindSeqActions",
     "bindStickyCtgLabels",
     "bindSubviewBandTooltips",
+    "bindSubviewRulerRuntime",
     "bindSubviewTrackContigDrag",
     "bindTrackBoxSelection",
     "bindTrackContigDrag",
@@ -699,7 +700,7 @@ test("bindings wire final path export alongside the existing final path runtimes
   assert.equal(exportBound, 1);
 });
 
-test("bindings wire the band canvas runtime before subview tooltip bindings", () => {
+test("bindings order band canvas, subview tooltip, and virtual ruler runtimes", () => {
   const host = {
     querySelector() {
       return null;
@@ -718,11 +719,15 @@ test("bindings wire the band canvas runtime before subview tooltip bindings", ()
     bindSubviewBandTooltips() {
       calls.push("tooltips");
     },
+    bindSubviewRulerRuntime() {
+      calls.push("ruler");
+    },
   });
 
   bindAssemblyPageImpl(host, store, deps);
 
   assert.deepEqual(calls.slice(0, 2), ["canvas", "tooltips"]);
+  assert.equal(calls.at(-1), "ruler");
 });
 
 test("track contig clicks preserve the current viewport when selecting ctg details", async () => {

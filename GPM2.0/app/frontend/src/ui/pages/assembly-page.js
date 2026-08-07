@@ -58,6 +58,9 @@ import {
   bindBandCanvasRuntime as bindBandCanvasRuntimeImpl,
 } from "./assembly/band-canvas-runtime.js";
 import {
+  bindSubviewRulerRuntime as bindSubviewRulerRuntimeImpl,
+} from "./assembly/subview-ruler-runtime.js";
+import {
   clearSubviewTrackDragPreview,
   clearTrackDragPreview,
   previewSubviewTrackContigDrag,
@@ -2312,6 +2315,7 @@ function createAssemblyPageBindingDeps(options = {}) {
     }),
     bindDegapCard: (host, store) => bindDegapCardImpl(host, store, degapRuntimeDeps),
     bindBandCanvasRuntime: (host) => bindBandCanvasRuntimeImpl(host),
+    bindSubviewRulerRuntime: (host) => bindSubviewRulerRuntimeImpl(host),
     bindSeqActions: (host, store) => bindSeqActionsImpl(host, store, seqActionsRuntimeDeps),
     bindStickyCtgLabels: (host) => bindStickyCtgLabelsImpl(host),
     bindSubviewBandTooltips,

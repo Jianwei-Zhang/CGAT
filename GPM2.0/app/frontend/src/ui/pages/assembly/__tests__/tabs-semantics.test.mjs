@@ -2426,6 +2426,62 @@ test("subview 2-contig keeps ref bars and labels on the ref gray palette", () =>
   assert.match(html, /<div class="assembly-track-label-row is-ref"[^>]*>ref_Chr01:1-5000<\/div>/);
   assert.match(html, /data-subview-track-slot="top"[\s\S]*class="track-ctg subview-track-ctg is-ref"/);
   assert.match(html, /<text class="track-ctg-label[^"]*is-ref[^"]*"[^>]*data-subview-label-slot="top"/);
+  const subviewSvg = html.match(/<svg class="assembly-track-svg subview-track-svg"[\s\S]*?<\/svg>/)?.[0] || "";
+  assert.match(subviewSvg, /data-subview-virtual-ruler="1"/);
+  assert.doesNotMatch(subviewSvg, /track-tick-guide/);
+});
+
+test("Subview renderer keeps fine-scale ruler serialization bounded", () => {
+  const html = renderAssemblyPage(createState({
+    initializer: {
+      datasets: [
+        { datasetId: 11, name: "hifiasm", label: "hifiasm" },
+        { datasetId: 22, name: "flye", label: "flye" },
+      ],
+      existingProjects: [{ projectId: 7, primaryDatasetId: 11, supportDatasetIds: [22] }],
+    },
+    assembly: {
+      supportDatasetId: 22,
+      supportChrCtgs: [{
+        assemblyCtgId: 30,
+        name: "support-43mb",
+        assignedChrName: "Chr01",
+        totalLength: 43_726_252,
+        anchorStart: 1,
+        hits: [],
+      }],
+      chrCtgs: [{
+        assemblyCtgId: 2,
+        name: "primary-43mb",
+        assignedChrName: "Chr01",
+        totalLength: 43_726_252,
+        anchorStart: 1,
+        hits: [],
+      }],
+      subviewTrackView: {
+        minTickUnitKb: 1,
+        maxTickCount: 10,
+        alignmentLength: 1000,
+        mapq: 0,
+      },
+      subview: {
+        mode: "2-contig",
+        selectedAContigId: 2,
+        selectedARole: "primary",
+        selectedBContigId: 30,
+        selectedBRole: "support",
+        summary: {
+          mode: "2-contig",
+          top: { contigId: 2, role: "primary", contigName: "primary-43mb" },
+          bottom: { contigId: 30, role: "support", contigName: "support-43mb" },
+        },
+      },
+    },
+  }));
+  const subviewSvg = html.match(/<svg class="assembly-track-svg subview-track-svg"[\s\S]*?<\/svg>/)?.[0] || "";
+
+  assert.match(subviewSvg, /data-subview-virtual-ruler="1"/);
+  assert.doesNotMatch(subviewSvg, /track-tick-guide/);
 });
 
 test("subview 2-contig hides labels that do not fit inside bars and keeps hover titles", () => {

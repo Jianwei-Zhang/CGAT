@@ -421,6 +421,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     bindStickyCtgLabels,
     bindBandCanvasRuntime,
     bindSubviewBandTooltips,
+    bindSubviewRulerRuntime = () => {},
     bindSubviewTrackContigDrag,
     bindTrackBoxSelection,
     bindTrackContigDrag,
@@ -1437,6 +1438,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     rerender(host, store);
     return;
   }
+  bindSubviewRulerRuntime(host);
   bindStickyCtgLabels(host);
 
   const state = store.getState();

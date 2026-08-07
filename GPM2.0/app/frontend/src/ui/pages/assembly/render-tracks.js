@@ -3988,16 +3988,17 @@ function renderSubviewAlignmentCard(subview, supportContext, trackPrefs, subview
           ></div>
           <svg class="assembly-track-svg subview-track-svg" width="${svgModel.renderInnerWidth}" height="${svgModel.contentBottom}" viewBox="0 0 ${svgModel.renderInnerWidth} ${svgModel.contentBottom}" preserveAspectRatio="xMinYMin meet">
             <line class="track-ruler-line" x1="0" y1="${svgModel.rulerTop}" x2="${svgModel.renderInnerWidth}" y2="${svgModel.rulerTop}" />
-            ${svgModel.tickItems
-              .map(
-                (tick) => `<line class="track-tick-guide is-major" x1="${tick.x.toFixed(2)}" y1="${svgModel.tickY1.toFixed(2)}" x2="${tick.x.toFixed(2)}" y2="${svgModel.tickY2.toFixed(2)}" />
-                ${
-                  tick.showLabel
-                    ? `<text class="track-tick-label" x="${tick.labelX.toFixed(2)}" y="${svgModel.tickLabelY.toFixed(2)}" text-anchor="${tick.labelAnchor}">${escapeHtml(tick.labelText)}</text>`
-                    : ""
-                }`,
-              )
-              .join("")}
+            ${renderSubviewVirtualRuler({
+              windowStart: 0,
+              windowEnd: svgModel.domainSpanBp,
+              tickBp: svgModel.tickBp,
+              innerWidth: svgModel.renderInnerWidth,
+              domainSpanBp: svgModel.domainSpanBp,
+              tickY1: svgModel.tickY1,
+              tickY2: svgModel.tickY2,
+              tickLabelY: svgModel.tickLabelY,
+              edgeLabelPadding: 16,
+            })}
             ${svgModel.collinearityBands
               .map(
                 (band) => {
@@ -4237,38 +4238,6 @@ function renderSubviewTrackPairAlignmentCard(
     maxTickCount: resolvedTrackPrefs.maxTickCount,
     fallbackTickBp: resolvedTrackPrefs.tickBp,
   });
-  const tickItems = buildTrackTickItems({
-    windowStart: domainStart,
-    windowEnd: domainEnd,
-    tickBp,
-    innerWidth: baseInnerWidth,
-    domainSpanBp,
-  }).map((tick, index, all) => {
-    const isFirst = index === 0;
-    const isLast = index === all.length - 1;
-    const isSingle = isFirst && isLast;
-    const labelAnchor = isSingle ? "middle" : isFirst ? "start" : isLast ? "end" : "middle";
-    const labelX = isSingle
-      ? tick.x
-      : isFirst
-        ? Math.min(baseInnerWidth, tick.x + TRACK_EDGE_LABEL_PADDING)
-        : isLast
-          ? Math.max(0, tick.x - TRACK_EDGE_LABEL_PADDING)
-          : tick.x;
-    return {
-      ...tick,
-      labelAnchor,
-      labelX,
-      labelText: isLast ? formatBp(tick.bp) : formatRulerTickLabel(tick.bp),
-    };
-  });
-  if (tickItems.length >= 2) {
-    const endTick = tickItems[tickItems.length - 1];
-    const previousTick = tickItems[tickItems.length - 2];
-    if (isTrackTickLabelOverlap(previousTick, endTick)) {
-      previousTick.showLabel = false;
-    }
-  }
   const buildRectsForLayout = (layout) =>
     buildTrackRectsWithMinGap(layout.trackModel?.ctgs || [], {
       windowStart: domainStart,
@@ -5119,16 +5088,17 @@ function renderSubviewTrackPairAlignmentCard(
               </clipPath>
             </defs>
             <line class="track-ruler-line" x1="0" y1="${rulerTop}" x2="${baseInnerWidth}" y2="${rulerTop}" />
-            ${tickItems
-              .map(
-                (tick) => `<line class="track-tick-guide is-major" x1="${tick.x.toFixed(2)}" y1="${(rulerTop + TRACK_LABEL_OFFSET_Y).toFixed(2)}" x2="${tick.x.toFixed(2)}" y2="${(contentBottom - 3 * TRACK_HEIGHT_SCALE).toFixed(2)}" />
-                ${
-                  tick.showLabel === false
-                    ? ""
-                    : `<text class="track-tick-label" x="${tick.labelX.toFixed(2)}" y="${(rulerTop - TRACK_LABEL_OFFSET_Y).toFixed(2)}" text-anchor="${tick.labelAnchor}">${escapeHtml(tick.labelText)}</text>`
-                }`,
-              )
-              .join("")}
+            ${renderSubviewVirtualRuler({
+              windowStart: domainStart,
+              windowEnd: domainEnd,
+              tickBp,
+              innerWidth: baseInnerWidth,
+              domainSpanBp,
+              tickY1: rulerTop + TRACK_LABEL_OFFSET_Y,
+              tickY2: contentBottom - 3 * TRACK_HEIGHT_SCALE,
+              tickLabelY: rulerTop - TRACK_LABEL_OFFSET_Y,
+              edgeLabelPadding: TRACK_EDGE_LABEL_PADDING,
+            })}
             <g clip-path="url(#${bandClipId})">
               ${collinearityBands
                 .map(
@@ -5261,36 +5231,6 @@ function buildSubviewAlignmentSvgModel({
     maxTickCount: safeMaxTickCount,
     fallbackTickBp: safeMinTickUnitKb * 1000,
   });
-  const tickItems = buildTrackTickItems({
-    windowStart: domainStart,
-    windowEnd: domainEnd,
-    tickBp,
-    innerWidth: renderInnerWidth,
-    domainSpanBp: domainSpan,
-  }).map((tick, index, items) => {
-    const isFirst = index === 0;
-    const isLast = index === items.length - 1;
-    const labelText = isLast ? formatBp(tick.bp) : formatRulerTickLabel(tick.bp);
-    const labelX = isFirst
-      ? Math.min(renderInnerWidth, tick.x + TRACK_EDGE_LABEL_PADDING)
-      : isLast
-        ? Math.max(0, tick.x - TRACK_EDGE_LABEL_PADDING)
-        : tick.x;
-    const labelAnchor = isFirst ? "start" : isLast ? "end" : "middle";
-    return {
-      ...tick,
-      labelText,
-      labelX,
-      labelAnchor,
-      showLabel: true,
-    };
-  });
-  const endTick = tickItems[tickItems.length - 1];
-  const previousTick = tickItems[tickItems.length - 2];
-  if (isTrackTickLabelOverlap(previousTick, endTick)) {
-    previousTick.showLabel = false;
-  }
-
   const toX = (bpValue) =>
     (Math.max(0, Math.min(domainEnd, Number(bpValue) || 0)) / domainSpan) * Math.max(1, renderInnerWidth);
   const topBarWidth = toX(topLengthBp);
@@ -5448,7 +5388,7 @@ function buildSubviewAlignmentSvgModel({
     tickY1: rulerTop + TRACK_LABEL_OFFSET_Y,
     tickY2: contentBottom - 3 * TRACK_HEIGHT_SCALE,
     tickLabelY: rulerTop - TRACK_LABEL_OFFSET_Y,
-    tickItems,
+    tickBp,
     topBarY,
     bottomBarY,
     topBarX,
@@ -5641,6 +5581,34 @@ function buildTrackTickItems({ windowStart, windowEnd, tickBp, innerWidth, domai
     ticks.push({ bp: resolvedEnd, x: endX });
   }
   return ticks;
+}
+
+function renderSubviewVirtualRuler({
+  windowStart,
+  windowEnd,
+  tickBp,
+  innerWidth,
+  domainSpanBp,
+  tickY1,
+  tickY2,
+  tickLabelY,
+  edgeLabelPadding = 16,
+}) {
+  const attributes = [
+    ["data-subview-virtual-ruler", "1"],
+    ["data-subview-ruler-window-start", windowStart],
+    ["data-subview-ruler-window-end", windowEnd],
+    ["data-subview-ruler-tick-bp", tickBp],
+    ["data-subview-ruler-inner-width", innerWidth],
+    ["data-subview-ruler-domain-span-bp", domainSpanBp],
+    ["data-subview-ruler-tick-y1", tickY1],
+    ["data-subview-ruler-tick-y2", tickY2],
+    ["data-subview-ruler-tick-label-y", tickLabelY],
+    ["data-subview-ruler-edge-label-padding", edgeLabelPadding],
+  ]
+    .map(([name, value]) => `${name}="${name === "data-subview-virtual-ruler" ? value : Number(value || 0).toFixed(4)}"`)
+    .join(" ");
+  return `<g ${attributes}></g>`;
 }
 
 function isTrackTickLabelOverlap(previousTick, endTick) {
