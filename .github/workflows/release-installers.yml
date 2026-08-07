@@ -135,13 +135,19 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: GPM2.0/app/frontend
-        run: npm ci
+        run: >-
+          npm ci
+          --registry=https://registry.npmjs.org
+          --fetch-retries=5
+          --fetch-retry-factor=2
+          --fetch-retry-mintimeout=1000
+          --fetch-retry-maxtimeout=60000
 
       - name: Install Rust target
         run: rustup target add ${{ matrix.target }}
 
       - name: Install Tauri CLI
-        run: npm install --global @tauri-apps/cli@^2
+        run: npm install --global --registry=https://registry.npmjs.org @tauri-apps/cli@^2
 
       - name: Build NSIS installer
         working-directory: GPM2.0/app/src-tauri
@@ -210,13 +216,19 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: GPM2.0/app/frontend
-        run: npm ci
+        run: >-
+          npm ci
+          --registry=https://registry.npmjs.org
+          --fetch-retries=5
+          --fetch-retry-factor=2
+          --fetch-retry-mintimeout=1000
+          --fetch-retry-maxtimeout=60000
 
       - name: Install Rust target
         run: rustup target add ${{ matrix.target }}
 
       - name: Install Tauri CLI
-        run: npm install --global @tauri-apps/cli@^2
+        run: npm install --global --registry=https://registry.npmjs.org @tauri-apps/cli@^2
 
       - name: Build DMG
         working-directory: GPM2.0/app/src-tauri
