@@ -18,8 +18,8 @@ use gpm_next_backend::exporter::{
     list_export_records,
 };
 use gpm_next_backend::grt_package::{
-    initialize_grt_project, load_grt_event_trace, load_grt_evidence, load_grt_locked_recipe,
-    load_grt_project_view, load_grt_source_card_trace,
+    initialize_grt_project_with_options, load_grt_event_trace, load_grt_evidence,
+    load_grt_locked_recipe, load_grt_project_view, load_grt_source_card_trace,
 };
 use gpm_next_backend::importer::{
     AddDatasetImportOutcome, ImportOutcome, import_from_extracted_bundle, import_from_zip,
@@ -75,6 +75,8 @@ enum Commands {
     InitializeProject {
         workspace_root: PathBuf,
         project_name: String,
+        #[arg(long)]
+        phased_assembly_enabled: Option<bool>,
     },
     GetGrtProjectView {
         workspace_root: PathBuf,
@@ -465,9 +467,14 @@ fn main() -> Result<()> {
         Commands::InitializeProject {
             workspace_root,
             project_name,
+            phased_assembly_enabled,
         } => {
             let project_db_path = workspace_root.join("project.sqlite");
-            let summary = initialize_grt_project(&project_db_path, &project_name)?;
+            let summary = initialize_grt_project_with_options(
+                &project_db_path,
+                &project_name,
+                phased_assembly_enabled.unwrap_or(false),
+            )?;
             println!("project_id={}", summary.project_id);
             println!("project_name={}", summary.project_name);
             println!("version={}", summary.version);

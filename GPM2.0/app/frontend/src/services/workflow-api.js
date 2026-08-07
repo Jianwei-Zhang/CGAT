@@ -232,17 +232,20 @@ export async function deleteWorkspaceDirectory({ workspaceRoot }) {
 export async function initializeProject({
   workspaceRoot,
   projectName,
+  phasedAssemblyEnabled = false,
 }) {
   if (isTauriRuntime()) {
     return initializeProjectTauri({
       workspaceRoot,
       projectName,
+      phasedAssemblyEnabled,
     });
   }
   try {
     return await callDevBridge("/api/initialize-project", {
       workspaceRoot,
       projectName,
+      phasedAssemblyEnabled,
     });
   } catch {
     // fallback to mock flow
@@ -250,6 +253,7 @@ export async function initializeProject({
   return initializeProjectMock({
     workspaceRoot,
     projectName,
+    phasedAssemblyEnabled,
   });
 }
 
@@ -1155,6 +1159,7 @@ async function listProjectInitializerOptionsMock({ workspaceRoot }) {
 async function initializeProjectMock({
   workspaceRoot,
   projectName,
+  phasedAssemblyEnabled = false,
 }) {
   await sleep(240);
   const effectiveThreshold = Number(
@@ -1179,7 +1184,7 @@ async function initializeProjectMock({
       primaryDatasetId,
       supportDatasetIds: [...supportDatasetIds],
       chrAssignmentMinCoveragePercent: effectiveThreshold,
-      phasedAssemblyEnabled: false,
+      phasedAssemblyEnabled: Boolean(phasedAssemblyEnabled),
       isProcessed: true,
       autoPipelineDone: true,
       workspaceRoot,
@@ -1189,7 +1194,7 @@ async function initializeProjectMock({
     projectId,
     projectName,
     chrAssignmentMinCoveragePercent: effectiveThreshold,
-    phasedAssemblyEnabled: false,
+    phasedAssemblyEnabled: Boolean(phasedAssemblyEnabled),
     supportDatasetIds: [...supportDatasetIds],
     existingProjects: mockStore.existingProjects,
     grtProjectView: buildMockGrtProjectView(),
@@ -2351,10 +2356,14 @@ async function deleteWorkspaceDirectoryTauri({ workspaceRoot }) {
 async function initializeProjectTauri({
   workspaceRoot,
   projectName,
+  phasedAssemblyEnabled = false,
 }) {
   const result = await invokeCommand("initialize_project", {
-    workspaceRoot,
-    projectName,
+    request: {
+      workspaceRoot,
+      projectName,
+      phasedAssemblyEnabled: Boolean(phasedAssemblyEnabled),
+    },
   });
   return {
     projectId: result.projectId,

@@ -28,7 +28,8 @@ use gpm_next_backend::exporter::{
     list_export_records as backend_list_export_records,
 };
 use gpm_next_backend::grt_package::{
-    GrtLockedRecipe, initialize_grt_project as backend_initialize_grt_project,
+    GrtLockedRecipe,
+    initialize_grt_project_with_options as backend_initialize_grt_project_with_options,
     load_grt_locked_recipe as backend_load_grt_locked_recipe,
     load_grt_project_view as backend_load_grt_project_view,
 };
@@ -85,6 +86,14 @@ use tauri::{AppHandle, Emitter};
 
 use crate::auto_pipeline_cancel;
 use crate::import_cancel;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InitializeProjectCommandRequest {
+    workspace_root: String,
+    project_name: String,
+    phased_assembly_enabled: bool,
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -952,11 +961,19 @@ pub fn delete_workspace_directory(workspaceRoot: String) -> Result<Value, String
 }
 
 #[tauri::command]
-#[allow(non_snake_case)]
-pub fn initialize_project(workspaceRoot: String, projectName: String) -> Result<Value, String> {
+pub fn initialize_project(request: InitializeProjectCommandRequest) -> Result<Value, String> {
+    let InitializeProjectCommandRequest {
+        workspace_root,
+        project_name,
+        phased_assembly_enabled,
+    } = request;
     (|| {
-        let project_db = project_db_path(&workspaceRoot);
-        let summary = backend_initialize_grt_project(&project_db, &projectName)?;
+        let project_db = project_db_path(&workspace_root);
+        let summary = backend_initialize_grt_project_with_options(
+            &project_db,
+            &project_name,
+            phased_assembly_enabled,
+        )?;
         let options = backend_list_initializer_options(&project_db)?;
         let existing_projects = map_existing_projects(options.existing_projects);
         let grt_project_view = backend_load_grt_project_view(&project_db)?;
@@ -2655,6 +2672,15 @@ mod tests {
 
     #[test]
     fn command_requests_decode_nested_camel_case_fields() {
+        let initialize_request: InitializeProjectCommandRequest = serde_json::from_value(json!({
+            "workspaceRoot": "D:\\Desktop\\GPM\\ws1",
+            "projectName": "phased-project",
+            "phasedAssemblyEnabled": true,
+        }))
+        .expect("decode initialize-project request");
+        assert_eq!(initialize_request.project_name, "phased-project");
+        assert!(initialize_request.phased_assembly_enabled);
+
         let project_request: UpdateProjectCommandRequest = serde_json::from_value(json!({
             "workspaceRoot": "D:\\Desktop\\GPM\\ws1",
             "projectId": 7,

@@ -248,6 +248,20 @@ test("workspace page renders english labels for page shell and empty project sta
   assert.match(html, />No projects loaded\./);
 });
 
+test("create-project modal renders the phased assembly switch", () => {
+  const html = renderWorkspacePage(createState({
+    initializer: {
+      createModalOpen: true,
+      phasedAssemblyEnabledInput: true,
+    },
+  }));
+
+  assert.match(html, /id="initializer-phased-assembly-enabled-input"/);
+  assert.match(html, /id="initializer-phased-assembly-enabled-input"[^>]*checked/);
+  assert.match(html, />Enable phased assembly</);
+  assert.match(html, /enables the capability only/);
+});
+
 test("workspace project rows do not expose add-package context menu", () => {
   const html = renderWorkspacePage(createState({
     initializer: {
@@ -295,7 +309,7 @@ test("workspace page renders english create-project modal labels", () => {
   assert.doesNotMatch(html, /id="initializer-primary-dataset-select"/);
   assert.doesNotMatch(html, /id="initializer-support-dataset-list"/);
   assert.doesNotMatch(html, /id="initializer-chr-assignment-threshold-input"/);
-  assert.doesNotMatch(html, /id="initializer-phased-assembly-enabled-input"/);
+  assert.match(html, /id="initializer-phased-assembly-enabled-input"/);
 });
 
 test("workspace create-project summary removes legacy lock copy in Chinese", () => {
@@ -839,14 +853,16 @@ test("workspace auto pipeline marks local chr assignment as skipped for server p
   );
 });
 
-test("create project ignores legacy draft fields and uses the locked GRT recipe", async () => {
+test("create project preserves the phased choice while using the locked GRT recipe", async () => {
   const previousWindow = globalThis.window;
   try {
     globalThis.window = {};
 
     const createProjectConfirmButton = createButton();
+    const phasedAssemblyCheckbox = createCheckbox(false);
     const host = createHost({
       "#initializer-create-project-confirm-button": createProjectConfirmButton,
+      "#initializer-phased-assembly-enabled-input": phasedAssemblyCheckbox,
     });
     const store = createStore(createState({
       initializer: {
@@ -875,6 +891,7 @@ test("create project ignores legacy draft fields and uses the locked GRT recipe"
     }));
 
     bindWorkspacePage(host, store);
+    await phasedAssemblyCheckbox.change(true);
     await createProjectConfirmButton.click();
 
     const createdProject = store.getState().initializer.existingProjects.find(
@@ -885,11 +902,11 @@ test("create project ignores legacy draft fields and uses the locked GRT recipe"
     assert.equal(createdProject.primaryDatasetId, 1);
     assert.deepEqual(createdProject.supportDatasetIds, [2, 3]);
     assert.equal(createdProject.chrAssignmentMinCoveragePercent, 60);
-    assert.equal(createdProject.phasedAssemblyEnabled, false);
+    assert.equal(createdProject.phasedAssemblyEnabled, true);
     assert.equal(createdProject.isProcessed, true);
     assert.equal(createdProject.autoPipelineDone, true);
     assert.equal(store.getState().initializer.editChrAssignmentMinCoveragePercentInput, "60");
-    assert.equal(store.getState().initializer.editPhasedAssemblyEnabledInput, false);
+    assert.equal(store.getState().initializer.editPhasedAssemblyEnabledInput, true);
     assert.equal(store.getState().assembly.grtProjectView.recipe.recipeId, "mock-grt-recipe");
   } finally {
     globalThis.window = previousWindow;

@@ -318,7 +318,7 @@ test("listProjectInitializerOptions preserves partitioned package metadata from 
   }
 });
 
-test("initializeProject sends only the workspace and project name to the locked GRT command", async () => {
+test("initializeProject sends the phased capability to the locked GRT command", async () => {
   const previousWindow = globalThis.window;
   const calls = [];
   try {
@@ -331,7 +331,7 @@ test("initializeProject sends only the workspace and project name to the locked 
               projectId: 7,
               projectName: "grt-project",
               supportDatasetIds: [2, 3],
-              phasedAssemblyEnabled: false,
+              phasedAssemblyEnabled: true,
               grtProjectView: { recipe: { recipeId: "recipe-1" } },
               existingProjects: [],
             };
@@ -352,12 +352,15 @@ test("initializeProject sends only the workspace and project name to the locked 
     assert.deepEqual(calls, [{
       command: "initialize_project",
       args: {
-        workspaceRoot: "D:\\Desktop\\GPM\\ws1",
-        projectName: "grt-project",
+        request: {
+          workspaceRoot: "D:\\Desktop\\GPM\\ws1",
+          projectName: "grt-project",
+          phasedAssemblyEnabled: true,
+        },
       },
     }]);
     assert.deepEqual(result.supportDatasetIds, [2, 3]);
-    assert.equal(result.phasedAssemblyEnabled, false);
+    assert.equal(result.phasedAssemblyEnabled, true);
     assert.equal(result.grtProjectView.recipe.recipeId, "recipe-1");
   } finally {
     globalThis.window = previousWindow;

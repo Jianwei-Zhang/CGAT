@@ -495,10 +495,19 @@ async function listProjectInitializerOptions(payload) {
 }
 
 async function initializeProject(payload) {
-  const { workspaceRoot, projectName } = payload || {};
+  const { workspaceRoot, projectName, phasedAssemblyEnabled = false } = payload || {};
   requireString("workspaceRoot", workspaceRoot);
   requireString("projectName", projectName);
-  const output = await runBackend(["initialize-project", workspaceRoot, projectName]);
+  if (typeof phasedAssemblyEnabled !== "boolean") {
+    throw new Error("phasedAssemblyEnabled must be boolean");
+  }
+  const output = await runBackend([
+    "initialize-project",
+    workspaceRoot,
+    projectName,
+    "--phased-assembly-enabled",
+    phasedAssemblyEnabled ? "true" : "false",
+  ]);
   const record = parseKeyValueLines(output.stdout);
 
   const options = await listProjectInitializerOptions({ workspaceRoot });

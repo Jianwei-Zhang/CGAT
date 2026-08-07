@@ -194,6 +194,9 @@ export function bindWorkspacePage(host, store) {
   const enterAssemblyButton = host.querySelector("#initializer-enter-assembly-button");
 
   const createProjectNameInput = host.querySelector("#initializer-project-name-input");
+  const createPhasedAssemblyCheckbox = host.querySelector(
+    "#initializer-phased-assembly-enabled-input",
+  );
 
   const projectSelectButtons = host.querySelectorAll("[data-project-select-id]");
   const projectDeleteButtons = host.querySelectorAll("[data-project-delete-id]");
@@ -277,6 +280,16 @@ export function bindWorkspacePage(host, store) {
       initializer: {
         ...current,
         projectNameInput: String(event.target.value || "").trim(),
+      },
+    });
+  });
+
+  createPhasedAssemblyCheckbox?.addEventListener("change", (event) => {
+    const current = store.getState().initializer;
+    store.setState({
+      initializer: {
+        ...current,
+        phasedAssemblyEnabledInput: Boolean(event.target.checked),
       },
     });
   });
@@ -396,6 +409,18 @@ function renderCreateProjectModal(initializer, messages) {
           <input id="initializer-project-name-input" type="text" placeholder="${escapeAttr(messages.page.projectNamePlaceholder)}" value="${escapeAttr(initializer.projectNameInput)}" />
         </div>
         ${renderWorkspaceRecipeSummary({ recipe, messages })}
+        <label class="workspace-create-option">
+          <span class="workspace-create-option-copy">
+            <span class="workspace-create-option-title">${messages.cards.phasedAssemblyEnabled}</span>
+            <span class="muted">${messages.cards.phasedAssemblyEnabledHint}</span>
+          </span>
+          <input
+            id="initializer-phased-assembly-enabled-input"
+            type="checkbox"
+            role="switch"
+            ${initializer.phasedAssemblyEnabledInput ? "checked" : ""}
+          />
+        </label>
         <footer class="workspace-card-actions">
           <button id="initializer-create-modal-cancel-button" class="button ghost" type="button">${messages.buttons.cancel}</button>
           <button id="initializer-create-project-confirm-button" class="button" ${
@@ -569,6 +594,7 @@ async function createProject(host, store) {
     const result = await initializeProject({
       workspaceRoot,
       projectName: initializer.projectNameInput,
+      phasedAssemblyEnabled: Boolean(initializer.phasedAssemblyEnabledInput),
     });
     const selectedProject = findProjectById(result.existingProjects || [], result.projectId);
     const nextDraft = buildEditDraftFromProject(selectedProject);

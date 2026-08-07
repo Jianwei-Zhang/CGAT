@@ -3210,6 +3210,37 @@ select {
   color: #666;
 }
 
+.workspace-create-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #c8c8c8;
+  border-radius: 5px;
+  background: #f7f7f7;
+  cursor: pointer;
+}
+
+.workspace-create-option-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.workspace-create-option-title {
+  color: #222;
+  font-weight: 700;
+}
+
+.workspace-create-option input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
 .workspace-card-actions {
   display: flex;
   justify-content: flex-end;

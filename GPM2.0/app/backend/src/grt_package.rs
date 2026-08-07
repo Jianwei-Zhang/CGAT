@@ -3929,6 +3929,14 @@ pub fn initialize_grt_project(
     project_db_path: &Path,
     project_name: &str,
 ) -> Result<GrtProjectInitializationSummary> {
+    initialize_grt_project_with_options(project_db_path, project_name, false)
+}
+
+pub fn initialize_grt_project_with_options(
+    project_db_path: &Path,
+    project_name: &str,
+    phased_assembly_enabled: bool,
+) -> Result<GrtProjectInitializationSummary> {
     let recipe = load_grt_locked_recipe(project_db_path)?;
     let mut conn = open_workspace_db(project_db_path)?;
     let options = list_initializer_options_with_connection(&conn)?;
@@ -3975,7 +3983,7 @@ pub fn initialize_grt_project(
             primary_dataset_id,
             support_dataset_ids: support_dataset_ids.clone(),
             auto_check_new_seq: false,
-            phased_assembly_enabled: Some(false),
+            phased_assembly_enabled: Some(phased_assembly_enabled),
             chr_assignment_min_coverage_percent: None,
             description: Some(format!("locked GRT recipe {}", recipe.recipe_id)),
         },
@@ -5153,6 +5161,32 @@ mod tests {
             )
             .unwrap();
         assert_eq!(project_count, 0);
+    }
+
+    #[test]
+    fn initializes_locked_recipe_with_requested_phased_assembly_capability() {
+        let temp = tempdir().unwrap();
+        let bundle_root = temp.path().join("gpm_server");
+        copy_tree(&fixture_root(), &bundle_root);
+        let (outcome, _) = crate::importer::import_from_extracted_bundle(&bundle_root).unwrap();
+
+        let initialized = initialize_grt_project_with_options(
+            &outcome.project_db_path,
+            "phased-locked-project",
+            true,
+        )
+        .expect("initialize phased locked GRT project");
+        assert!(initialized.phased_assembly_enabled);
+
+        let conn = open_workspace_db(&outcome.project_db_path).unwrap();
+        let enabled: i64 = conn
+            .query_row(
+                "SELECT phased_assembly_enabled FROM project WHERE id = ?1",
+                params![initialized.project_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(enabled, 1);
     }
 
     #[test]
