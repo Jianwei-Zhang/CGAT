@@ -144,6 +144,7 @@ jobs:
           --fetch-retry-maxtimeout=60000
 
       - name: Install Rust target
+        working-directory: GPM2.0
         run: rustup target add ${{ matrix.target }}
 
       - name: Install Tauri CLI
@@ -225,6 +226,7 @@ jobs:
           --fetch-retry-maxtimeout=60000
 
       - name: Install Rust target
+        working-directory: GPM2.0
         run: rustup target add ${{ matrix.target }}
 
       - name: Install Tauri CLI
