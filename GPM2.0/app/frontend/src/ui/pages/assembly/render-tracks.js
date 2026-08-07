@@ -1188,7 +1188,109 @@ function createRenderTracksRenderer(deps = {}) {
     `;
   }
 
-  function renderAssemblyMainTab(state) {
+  function renderAssemblyFinalPathCard(state) {
+    const assembly = state.assembly;
+    if (assembly.loading) {
+      return "";
+    }
+    const session = state.session || {};
+    const i18n = getAssemblyI18n(state);
+    const currentProject = getCurrentProject(state);
+    const primaryDatasetName = getDatasetNameById(
+      state.initializer?.datasets || [],
+      currentProject?.primaryDatasetId,
+    );
+    const currentChrLabel = String(assembly.selectedChrName || "current-chr");
+    const currentFinalPathChrName = resolveCurrentFinalPathChrName(assembly) || currentChrLabel;
+    const finalPathDisplayEntries = buildFinalPathDisplayEntries(assembly);
+    const currentFinalPath = finalPathDisplayEntries[0]?.finalPathEntry
+      || getCurrentChrFinalPath(assembly)
+      || (currentFinalPathChrName
+        ? buildFinalPathEntry({
+          chrName: currentFinalPathChrName,
+          segments: [],
+          updatedAt: "",
+        })
+        : null);
+    const phasedFinalPathOptions = buildPhasedFinalPathOptions(assembly);
+    const graphPreviewState = getFinalPathGraphPreviewState();
+    const graphPreviewSegmentOrder =
+      String(assembly.finalPathViewMode || "").trim() === "graph"
+      && String(graphPreviewState?.selectedChrName || "").trim() === currentFinalPathChrName
+        ? graphPreviewState.previewSegmentOrder
+        : null;
+    const finalPathLogModel = buildFinalPathLogModel({
+      chrName: currentFinalPathChrName,
+      finalPathEntry: currentFinalPath,
+      finalPathByChr: assembly.finalPathByChr,
+      primaryCtgs: assembly.chrCtgs,
+      hiddenPrimaryCtgIds: assembly.hiddenPrimaryCtgIds,
+      primaryDatasetName,
+    });
+    const finalPathEntriesWithLog = finalPathDisplayEntries.map((entry) => ({
+      ...entry,
+      graphPreviewSegmentOrder:
+        String(assembly.finalPathViewMode || "").trim() === "graph"
+        && String(graphPreviewState?.selectedChrName || "").trim() === entry.chrName
+          ? graphPreviewState.previewSegmentOrder
+          : null,
+      finalPathLogModel: buildFinalPathLogModel({
+        chrName: entry.chrName,
+        finalPathEntry: entry.finalPathEntry,
+        finalPathByChr: assembly.finalPathByChr,
+        primaryCtgs: assembly.chrCtgs,
+        hiddenPrimaryCtgIds: assembly.hiddenPrimaryCtgIds,
+        primaryDatasetName,
+      }),
+    }));
+    const degapRenderDeps = { escapeAttr, escapeHtml, i18n };
+    const graphAddonByChr = Object.fromEntries(
+      finalPathEntriesWithLog.map((entry) => [
+        entry.chrName,
+        renderDegapJobCard(
+          { chrName: entry.chrName, degap: assembly.degap },
+          degapRenderDeps,
+        ),
+      ]),
+    );
+    const grtBaselineEntry = finalPathEntriesWithLog.length === 1
+      ? assembly.grtProjectView?.baselineFinalPathByChr?.[currentFinalPathChrName] || null
+      : null;
+    const grtBaselineRestore = grtBaselineEntry
+      ? {
+        available: true,
+        targetChrName: currentFinalPathChrName,
+        current: areFinalPathEntriesSemanticallyEqual(currentFinalPath, grtBaselineEntry),
+      }
+      : { available: false };
+    return renderFinalPathCard(
+      {
+        projectName: String(session.projectName || session.projectId || "project"),
+        chrName: currentFinalPathChrName,
+        finalPathEntry: currentFinalPath,
+        viewMode: assembly.finalPathViewMode,
+        trackView: assembly.finalPathTrackView,
+        trackViewportPx: getMeasuredTrackViewportPx("final-path"),
+        primaryDatasetName,
+        graphPreviewSegmentOrder,
+        graphAddonByChr,
+        degapRuntimeBody: renderDegapRuntime({ degap: assembly.degap }, degapRenderDeps),
+        canExportFasta: canProjectExportFinalPathFasta(state, currentProject),
+        canExportDegapJobs: Array.isArray(assembly.degap?.jobs) && assembly.degap.jobs.length > 0,
+        finalPathLogModel,
+        phasedFinalPathOptions,
+        finalPathEntries: finalPathEntriesWithLog,
+        grtBaselineRestore,
+      },
+      {
+        escapeAttr,
+        escapeHtml,
+        i18n,
+      },
+    );
+  }
+
+  function renderAssemblyMainTab(state, options = {}) {
   const assembly = state.assembly;
   const session = state.session || {};
   const i18n = getAssemblyI18n(state);
@@ -1293,52 +1395,56 @@ function createRenderTracksRenderer(deps = {}) {
     supportModelCtgs: trackModel.companion?.ctgs || [],
     supportDatasetOptions,
   });
-  const supportSubviewCtgs = buildSupportSubviewCtgPool({
-    supportChrCtgs: supportTrackCtgs,
-    supportMirroredCtgs,
-    selectedChrName,
-    deletedCtgs: assembly.deletedCtgs,
-    minSupportLengthBp: supportDsCtgLenBp,
-    supportDsCtgLenRules,
-  });
-  const phasedSubviewCtgs = buildPhasedSubviewCtgPool({
-    phasedChrTracks: assembly.phasedChrTracks || [],
-    primaryCtgs: assembly.chrCtgs || [],
-    deletedCtgs: assembly.deletedCtgs,
-  });
-  const refSubviewCtgs = getCachedFilteredRefSubviewCtgs({
-    refTrackMembers: assembly.refTrackMembers || [],
-    subview,
-    supportContext: {
-      primaryDatasetId: normalizeSupportDatasetId(currentProject?.primaryDatasetId),
-      supportDatasetId,
-      selectedChrName,
-      refTrackLabel: resolveReferenceTrackLabel(assembly.selectedChrName),
-      primaryCtgs: assembly.chrCtgs,
-      supportCtgs: supportSubviewCtgs,
-      supportMirrorCtgs: normalizeSupportMirroredCtgs(supportMirroredCtgs),
-      phasedCtgs: phasedSubviewCtgs,
-    },
-  });
-  const subviewPanel = renderSubviewSelectionPanel(
-    assembly,
-    {
-      supportDatasetId,
-      supportDatasetOptions,
-      supportDatasetName: selectedSupportDataset?.label || "",
-      primaryDatasetId: normalizeSupportDatasetId(currentProject?.primaryDatasetId),
-      primaryDatasetName,
-      primaryCtgs: assembly.chrCtgs,
-      supportCtgs: supportSubviewCtgs,
-      supportMirrorCtgs: normalizeSupportMirroredCtgs(supportMirroredCtgs),
-      phasedCtgs: phasedSubviewCtgs,
-      phasedChrTracks: assembly.phasedChrTracks || [],
-      refCtgs: refSubviewCtgs,
-      refTrackLabel: resolveReferenceTrackLabel(assembly.selectedChrName),
-    },
-    subviewTrackPrefs,
-    i18n,
-  );
+  const subviewPanel = options.includeSubview === false
+    ? ""
+    : (() => {
+      const supportSubviewCtgs = buildSupportSubviewCtgPool({
+        supportChrCtgs: supportTrackCtgs,
+        supportMirroredCtgs,
+        selectedChrName,
+        deletedCtgs: assembly.deletedCtgs,
+        minSupportLengthBp: supportDsCtgLenBp,
+        supportDsCtgLenRules,
+      });
+      const phasedSubviewCtgs = buildPhasedSubviewCtgPool({
+        phasedChrTracks: assembly.phasedChrTracks || [],
+        primaryCtgs: assembly.chrCtgs || [],
+        deletedCtgs: assembly.deletedCtgs,
+      });
+      const refSubviewCtgs = getCachedFilteredRefSubviewCtgs({
+        refTrackMembers: assembly.refTrackMembers || [],
+        subview,
+        supportContext: {
+          primaryDatasetId: normalizeSupportDatasetId(currentProject?.primaryDatasetId),
+          supportDatasetId,
+          selectedChrName,
+          refTrackLabel: resolveReferenceTrackLabel(assembly.selectedChrName),
+          primaryCtgs: assembly.chrCtgs,
+          supportCtgs: supportSubviewCtgs,
+          supportMirrorCtgs: normalizeSupportMirroredCtgs(supportMirroredCtgs),
+          phasedCtgs: phasedSubviewCtgs,
+        },
+      });
+      return renderSubviewSelectionPanel(
+        assembly,
+        {
+          supportDatasetId,
+          supportDatasetOptions,
+          supportDatasetName: selectedSupportDataset?.label || "",
+          primaryDatasetId: normalizeSupportDatasetId(currentProject?.primaryDatasetId),
+          primaryDatasetName,
+          primaryCtgs: assembly.chrCtgs,
+          supportCtgs: supportSubviewCtgs,
+          supportMirrorCtgs: normalizeSupportMirroredCtgs(supportMirroredCtgs),
+          phasedCtgs: phasedSubviewCtgs,
+          phasedChrTracks: assembly.phasedChrTracks || [],
+          refCtgs: refSubviewCtgs,
+          refTrackLabel: resolveReferenceTrackLabel(assembly.selectedChrName),
+        },
+        subviewTrackPrefs,
+        i18n,
+      );
+    })();
   const chromosomeOptions = assembly.chromosomes.length
     ? assembly.chromosomes
         .map((chr) => {
@@ -1411,93 +1517,9 @@ function createRenderTracksRenderer(deps = {}) {
   const membersPanelClassName = membersCardCollapsed
     ? "card assembly-members-panel assembly-members-panel-inline is-collapsed"
     : "card assembly-members-panel assembly-members-panel-inline";
-  const currentFinalPathChrName = resolveCurrentFinalPathChrName(assembly) || currentChrLabel;
-  const finalPathDisplayEntries = buildFinalPathDisplayEntries(assembly);
-  const currentFinalPath = finalPathDisplayEntries[0]?.finalPathEntry
-    || getCurrentChrFinalPath(assembly)
-    || (currentFinalPathChrName
-      ? buildFinalPathEntry({
-        chrName: currentFinalPathChrName,
-        segments: [],
-        updatedAt: "",
-      })
-      : null);
-  const phasedFinalPathOptions = buildPhasedFinalPathOptions(assembly);
-  const graphPreviewState = getFinalPathGraphPreviewState();
-  const graphPreviewSegmentOrder =
-    String(assembly.finalPathViewMode || "").trim() === "graph"
-    && String(graphPreviewState?.selectedChrName || "").trim() === currentFinalPathChrName
-      ? graphPreviewState.previewSegmentOrder
-      : null;
-  const finalPathLogModel = buildFinalPathLogModel({
-    chrName: currentFinalPathChrName,
-    finalPathEntry: currentFinalPath,
-    finalPathByChr: assembly.finalPathByChr,
-    primaryCtgs: assembly.chrCtgs,
-    hiddenPrimaryCtgIds: assembly.hiddenPrimaryCtgIds,
-    primaryDatasetName,
-  });
-  const finalPathEntriesWithLog = finalPathDisplayEntries.map((entry) => ({
-    ...entry,
-    graphPreviewSegmentOrder:
-      String(assembly.finalPathViewMode || "").trim() === "graph"
-      && String(graphPreviewState?.selectedChrName || "").trim() === entry.chrName
-        ? graphPreviewState.previewSegmentOrder
-        : null,
-    finalPathLogModel: buildFinalPathLogModel({
-      chrName: entry.chrName,
-      finalPathEntry: entry.finalPathEntry,
-      finalPathByChr: assembly.finalPathByChr,
-      primaryCtgs: assembly.chrCtgs,
-      hiddenPrimaryCtgIds: assembly.hiddenPrimaryCtgIds,
-      primaryDatasetName,
-    }),
-  }));
-  const degapRenderDeps = { escapeAttr, escapeHtml, i18n };
-  const graphAddonByChr = Object.fromEntries(
-    finalPathEntriesWithLog.map((entry) => [
-      entry.chrName,
-      renderDegapJobCard(
-        { chrName: entry.chrName, degap: assembly.degap },
-        degapRenderDeps,
-      ),
-    ]),
-  );
-  const grtBaselineEntry = finalPathEntriesWithLog.length === 1
-    ? assembly.grtProjectView?.baselineFinalPathByChr?.[currentFinalPathChrName] || null
-    : null;
-  const grtBaselineRestore = grtBaselineEntry
-    ? {
-      available: true,
-      targetChrName: currentFinalPathChrName,
-      current: areFinalPathEntriesSemanticallyEqual(currentFinalPath, grtBaselineEntry),
-    }
-    : { available: false };
-  const finalPathCard = renderFinalPathCard(
-    {
-      projectName: String(session.projectName || session.projectId || "project"),
-      chrName: currentFinalPathChrName,
-      finalPathEntry: currentFinalPath,
-      viewMode: assembly.finalPathViewMode,
-      trackView: assembly.finalPathTrackView,
-      trackViewportPx: getMeasuredTrackViewportPx("final-path"),
-      primaryDatasetName,
-      graphPreviewSegmentOrder,
-      graphAddonByChr,
-      degapRuntimeBody: renderDegapRuntime({ degap: assembly.degap }, degapRenderDeps),
-      canExportFasta: canProjectExportFinalPathFasta(state, currentProject),
-      canExportDegapJobs: Array.isArray(assembly.degap?.jobs) && assembly.degap.jobs.length > 0,
-      finalPathLogModel,
-      phasedFinalPathOptions,
-      finalPathEntries: finalPathEntriesWithLog,
-      grtBaselineRestore,
-    },
-    {
-      escapeAttr,
-      escapeHtml,
-      i18n,
-    },
-  );
+  const finalPathCard = options.includeFinalPath === false
+    ? ""
+    : renderAssemblyFinalPathCard(state);
   return `
       <div class="chr-strip has-members-panel">
         <div class="chr-title-wrap">
@@ -6165,15 +6187,35 @@ function getSubviewSlotToken(subview, role, contigId) {
   return matchedIndex === 0 ? "A" : "B";
 }
 
-  return { renderAssemblyMainTab, renderAssemblySubviewPanel };
+  return {
+    renderAssemblyFinalPathCard,
+    renderAssemblyMainTab,
+    renderAssemblyStatusToast,
+    renderAssemblySubviewPanel,
+  };
+}
+
+export function renderAssemblyFinalPathCard(state, deps = {}) {
+  return createRenderTracksRenderer(deps).renderAssemblyFinalPathCard(state);
 }
 
 export function renderAssemblyMainTab(state, deps = {}) {
   return createRenderTracksRenderer(deps).renderAssemblyMainTab(state);
 }
 
+export function renderAssemblyMainTrackSections(state, deps = {}) {
+  return createRenderTracksRenderer(deps).renderAssemblyMainTab(state, {
+    includeFinalPath: false,
+    includeSubview: false,
+  });
+}
+
 export function renderAssemblySubviewPanel(state, deps = {}) {
   return createRenderTracksRenderer(deps).renderAssemblySubviewPanel(state);
+}
+
+export function renderAssemblyStatusToast(state, deps = {}) {
+  return createRenderTracksRenderer(deps).renderAssemblyStatusToast(state?.assembly);
 }
 
 export function roundTrackMetric(value) {

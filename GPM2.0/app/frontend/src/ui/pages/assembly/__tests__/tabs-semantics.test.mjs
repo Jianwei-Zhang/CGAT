@@ -46,6 +46,8 @@ import {
   __testRestoreSelectedDeletedCtgs,
   __testRerenderBatchDeleteProgress,
   __testRerenderSubviewPanel,
+  __testRenderAssemblyFinalPathCard,
+  __testRenderAssemblyMainTrackSections,
   __testResolveAppendToPathFocusPatch,
   __testSyncSupportDatasetSelection,
   __testTogglePrimaryTrackCtgHidden,
@@ -481,6 +483,26 @@ test("assembly main view renders unified single-card track container", () => {
   assert.doesNotMatch(html, /run-junction-inspection-button/);
   assert.doesNotMatch(html, /subview2-a-ctg-id/);
   assert.doesNotMatch(html, /enter-subview-2/);
+});
+
+test("local refresh renderers exclude unrelated assembly regions", () => {
+  const state = createState({
+    assembly: {
+      supportDatasetId: null,
+      supportChrCtgs: [],
+    },
+  });
+  const mainHtml = __testRenderAssemblyMainTrackSections(state);
+  const finalPathHtml = __testRenderAssemblyFinalPathCard(state);
+
+  assert.match(mainHtml, /chr-strip has-members-panel/);
+  assert.match(mainHtml, /assembly-track-unified/);
+  assert.doesNotMatch(mainHtml, /data-subview-panel="1"/);
+  assert.doesNotMatch(mainHtml, /class="card final-path-card"/);
+
+  assert.match(finalPathHtml, /class="card final-path-card"/);
+  assert.doesNotMatch(finalPathHtml, /assembly-track-unified/);
+  assert.doesNotMatch(finalPathHtml, /data-subview-panel="1"/);
 });
 
 test("assembly main view shows phased-track creation only when project enables phased assembly", () => {
@@ -9058,6 +9080,46 @@ test("track scroll sync restores and persists project-scoped final-path scroll p
   assert.deepEqual(persisted.at(-1), {
     viewportKey: "7:Chr01:graph:10000:10",
     scrollLeft: 620,
+  });
+  __testResetMeasuredTrackViewportWidths();
+});
+
+test("scoped track scroll sync preserves unrelated viewport state", () => {
+  __testResetMeasuredTrackViewportWidths();
+  const store = createStore(createState({
+    assembly: {
+      trackScrollState: { viewportKey: "main", scrollLeft: 320 },
+      subviewTrackScrollState: { viewportKey: "subview", scrollLeft: 180 },
+      finalPathTrackScrollState: { viewportKey: "final-path", scrollLeft: 480 },
+    },
+  }));
+  const host = {
+    querySelector() {
+      return null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+  };
+
+  __testBindTrackScrollSync(host, store, {
+    scope: "final-path",
+    schedulePersistAssemblyScrollState() {
+      assert.fail("a scoped bind without its viewport must not clear or persist sibling state");
+    },
+  });
+
+  assert.deepEqual(store.getState().assembly.trackScrollState, {
+    viewportKey: "main",
+    scrollLeft: 320,
+  });
+  assert.deepEqual(store.getState().assembly.subviewTrackScrollState, {
+    viewportKey: "subview",
+    scrollLeft: 180,
+  });
+  assert.deepEqual(store.getState().assembly.finalPathTrackScrollState, {
+    viewportKey: "final-path",
+    scrollLeft: 480,
   });
   __testResetMeasuredTrackViewportWidths();
 });

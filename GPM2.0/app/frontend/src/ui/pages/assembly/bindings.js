@@ -151,9 +151,20 @@ function closeTrackComboMenus(host, keepNode = null) {
   });
 }
 
+function resolveLiveFinalPathBindingRoot(host) {
+  if (host?.isConnected !== false) {
+    return host;
+  }
+  const doc = host?.ownerDocument || globalThis.document;
+  return doc?.querySelector?.("#route-host") || host;
+}
+
 function keepFinalPathCardVisible(host) {
   const windowObject = globalThis.window;
-  const cardNode = host.querySelector?.(".final-path-card");
+  const root = resolveLiveFinalPathBindingRoot(host);
+  const cardNode = root?.matches?.(".final-path-card")
+    ? root
+    : root?.querySelector?.(".final-path-card");
   if (!cardNode || typeof cardNode.getBoundingClientRect !== "function" || typeof windowObject?.scrollBy !== "function") {
     return;
   }
@@ -216,19 +227,22 @@ function keepFinalPathNodeBottomVisible(node) {
 }
 
 function scrollFinalPathTableToBottom(host) {
-  const listNode = host.querySelector?.("[data-final-path-card-list]");
+  const root = resolveLiveFinalPathBindingRoot(host);
+  const listNode = root?.querySelector?.("[data-final-path-card-list]");
   if (listNode) {
     const nextScrollTop = Number(listNode.scrollHeight || 0);
     if (Number.isFinite(nextScrollTop) && nextScrollTop >= 0) {
       listNode.scrollTop = nextScrollTop;
     }
   }
-  const addButtonNode = host.querySelector?.("[data-final-path-add-row]");
+  const addButtonNode = root?.querySelector?.("[data-final-path-add-row]");
   if (addButtonNode) {
     keepFinalPathNodeBottomVisible(addButtonNode);
     return;
   }
-  keepFinalPathNodeBottomVisible(host.querySelector?.(".final-path-card"));
+  keepFinalPathNodeBottomVisible(
+    root?.matches?.(".final-path-card") ? root : root?.querySelector?.(".final-path-card"),
+  );
 }
 
 function resolveFinalPathTargetChrName(node) {
@@ -388,8 +402,13 @@ function getCreateEmptyFinalPathRow(deps) {
   return async () => null;
 }
 
-export function bindAssemblyPage(host, store, deps) {
+export function bindAssemblyPage(host, store, deps, options = {}) {
   assertAssemblyBindingDeps(deps);
+  const requestedScope = String(options?.scope || "all").trim().toLowerCase();
+  const bindingScope = ["main", "subview", "final-path"].includes(requestedScope)
+    ? requestedScope
+    : "all";
+  const isFullPageBinding = bindingScope === "all";
   const {
     appendFinalPathRow,
     applySupportDatasetSelection,
@@ -425,6 +444,8 @@ export function bindAssemblyPage(host, store, deps) {
     normalizeTrackFocusMode,
     rerender,
     rerenderAssemblyMainTab = rerender,
+    rerenderFinalPathCard = rerender,
+    rerenderSubviewPanel = rerender,
     resolveTrackContigClickAction,
     removeFinalPathRow,
     restoreFinalPathFromGrtBaseline = async () => {},
@@ -446,10 +467,12 @@ export function bindAssemblyPage(host, store, deps) {
   bindTrackComboDismiss(host);
   bindAssemblyActionFeedbackDismiss(host, store);
   const initialState = store.getState();
-  const supportDatasetSync = syncSupportDatasetSelection(store);
-  if (supportDatasetSync.changed) {
-    void applySupportDatasetSelection(host, store, supportDatasetSync.supportDatasetId);
-    return;
+  if (isFullPageBinding) {
+    const supportDatasetSync = syncSupportDatasetSelection(store);
+    if (supportDatasetSync.changed) {
+      void applySupportDatasetSelection(host, store, supportDatasetSync.supportDatasetId);
+      return;
+    }
   }
 
   const queryHost = typeof host.querySelector === "function"
@@ -824,7 +847,7 @@ export function bindAssemblyPage(host, store, deps) {
           finalPathViewMode: nextViewMode,
         },
       });
-      rerender(host, store);
+      rerenderFinalPathCard(host, store);
       keepFinalPathCardVisible(host);
       await persistMainTrackViewState(host, store);
     });
@@ -999,12 +1022,12 @@ export function bindAssemblyPage(host, store, deps) {
   });
   (deps.bindFinalPathGraphDrag || bindFinalPathGraphDrag)(host, store, {
     moveFinalPathRow,
-    rerender,
+    rerender: rerenderFinalPathCard,
   });
   (deps.bindFinalPathExport || bindFinalPathExport)(host, store, deps);
   deps.bindDegapCard?.(host, store);
 
-  if (initialState.assembly.activeTab === "check-new-sequences") {
+  if (isFullPageBinding && initialState.assembly.activeTab === "check-new-sequences") {
     void loadNewSequencesTab(host, store);
   }
 
@@ -1271,7 +1294,13 @@ export function bindAssemblyPage(host, store, deps) {
             : current.trackSelectedCtgIds,
       },
     });
-    rerender(host, store);
+    if (viewKey === "finalPathTrackView") {
+      rerenderFinalPathCard(host, store);
+    } else if (viewKey === "subviewTrackView") {
+      rerenderSubviewPanel(host, store);
+    } else {
+      rerenderAssemblyMainTab(host, store);
+    }
     if (viewKey === "trackView") {
       void persistMainTrackViewState(host, store);
     }
@@ -1393,13 +1422,17 @@ export function bindAssemblyPage(host, store, deps) {
   bindDeletedMemberChipBoxSelection(host, store);
   bindBandCanvasRuntime(host);
   bindSubviewBandTooltips(host);
-  bindTrackViewportResize(host, store);
+  if (isFullPageBinding) {
+    bindTrackViewportResize(host, store);
+  }
   bindTrackContigDrag(host, store);
   bindSubviewTrackContigDrag(host, store);
   bindTrackBoxSelection(host, store);
-  bindTrackSelectionHotkeys(host, store);
+  if (isFullPageBinding) {
+    bindTrackSelectionHotkeys(host, store);
+  }
 
-  const viewportChanged = bindTrackScrollSync(host, store);
+  const viewportChanged = bindTrackScrollSync(host, store, { scope: bindingScope });
   if (viewportChanged) {
     rerender(host, store);
     return;
@@ -1408,6 +1441,8 @@ export function bindAssemblyPage(host, store, deps) {
 
   const state = store.getState();
   if (
+    isFullPageBinding
+    &&
     state.session?.workspacePath &&
     state.session?.projectId &&
     state.assembly.chromosomes.length === 0 &&

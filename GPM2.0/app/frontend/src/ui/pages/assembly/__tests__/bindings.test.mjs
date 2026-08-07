@@ -164,6 +164,90 @@ test("bindings dispatch current Final Path GRT baseline restore", async () => {
   assert.deepEqual(calls, [{ targetChrName: "Chr01" }]);
 });
 
+test("Final Path view switches use the card refresh boundary", async () => {
+  const listeners = new Map();
+  const tableButton = {
+    dataset: { finalPathViewMode: "table" },
+    addEventListener(type, handler) {
+      listeners.set(type, handler);
+    },
+  };
+  const host = {
+    querySelector() {
+      return null;
+    },
+    querySelectorAll(selector) {
+      return selector === "button[data-final-path-view-mode]" ? [tableButton] : [];
+    },
+    addEventListener() {},
+  };
+  const state = createState();
+  state.assembly.finalPathViewMode = "graph";
+  const store = createStore(state);
+  let fullRerenders = 0;
+  let cardRerenders = 0;
+  let persistCalls = 0;
+  const deps = createBindingDeps({
+    rerender() {
+      fullRerenders += 1;
+    },
+    rerenderFinalPathCard() {
+      cardRerenders += 1;
+    },
+    async persistMainTrackViewState() {
+      persistCalls += 1;
+    },
+  });
+
+  bindAssemblyPageImpl(host, store, deps);
+  await listeners.get("click")?.({ preventDefault() {} });
+
+  assert.equal(store.getState().assembly.finalPathViewMode, "table");
+  assert.equal(cardRerenders, 1);
+  assert.equal(fullRerenders, 0);
+  assert.equal(persistCalls, 1);
+});
+
+test("partial Final Path binding preserves unrelated page lifecycle state", () => {
+  const host = {
+    querySelector() {
+      return null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+    addEventListener() {},
+  };
+  const store = createStore(createState());
+  let supportSyncCalls = 0;
+  let viewportResizeCalls = 0;
+  let hotkeyCalls = 0;
+  const scrollScopes = [];
+  const deps = createBindingDeps({
+    syncSupportDatasetSelection() {
+      supportSyncCalls += 1;
+      return { changed: false, supportDatasetId: null };
+    },
+    bindTrackViewportResize() {
+      viewportResizeCalls += 1;
+    },
+    bindTrackSelectionHotkeys() {
+      hotkeyCalls += 1;
+    },
+    bindTrackScrollSync(_host, _store, options) {
+      scrollScopes.push(options?.scope);
+      return false;
+    },
+  });
+
+  bindAssemblyPageImpl(host, store, deps, { scope: "final-path" });
+
+  assert.equal(supportSyncCalls, 0);
+  assert.equal(viewportResizeCalls, 0);
+  assert.equal(hotkeyCalls, 0);
+  assert.deepEqual(scrollScopes, ["final-path"]);
+});
+
 test("support ds ctg len rules dialog only closes from X and confirms dirty drafts", async () => {
   const makeButton = () => {
     const listeners = new Map();
@@ -576,15 +660,20 @@ test("bindings wire final path graph drag alongside the existing table drag runt
   };
   const store = createStore(createState());
   let graphDragBound = 0;
+  let graphDragRerender = null;
+  const rerenderFinalPathCard = () => {};
   const deps = createBindingDeps({
-    bindFinalPathGraphDrag() {
+    bindFinalPathGraphDrag(_host, _store, options) {
       graphDragBound += 1;
+      graphDragRerender = options?.rerender;
     },
+    rerenderFinalPathCard,
   });
 
   bindAssemblyPageImpl(host, store, deps);
 
   assert.equal(graphDragBound, 1);
+  assert.equal(graphDragRerender, rerenderFinalPathCard);
 });
 
 test("bindings wire final path export alongside the existing final path runtimes", () => {

@@ -236,7 +236,10 @@ import {
 } from "./assembly/context-menu.js";
 import {
   convertTrackOffsetPxToBp,
+  renderAssemblyFinalPathCard as renderAssemblyFinalPathCardImpl,
   renderAssemblyMainTab as renderAssemblyMainTabImpl,
+  renderAssemblyMainTrackSections as renderAssemblyMainTrackSectionsImpl,
+  renderAssemblyStatusToast as renderAssemblyStatusToastImpl,
   renderAssemblySubviewPanel as renderAssemblySubviewPanelImpl,
   resolveSubviewTrackDragOffsetBp,
   resolveTrackDragOffsetBp,
@@ -266,6 +269,9 @@ const renderTracksDeps = {
 };
 function renderAssemblyMainTab(state) {
   return renderAssemblyMainTabImpl(state, renderTracksDeps);
+}
+function renderAssemblyMainTrackSections(state) {
+  return renderAssemblyMainTrackSectionsImpl(state, renderTracksDeps);
 }
 const assemblyPageShellDeps = {
   buildAssemblyStats,
@@ -1314,7 +1320,7 @@ function handleTrackSubviewCandidateSelection(host, store, {
     enterSubviewFromCandidates(host, store);
     return;
   }
-  rerender(host, store);
+  rerenderSubviewPanel(host, store);
 }
 
 function handleTrackSubviewTrackSelection(host, store, {
@@ -1371,7 +1377,7 @@ function handleTrackSubviewTrackSelection(host, store, {
       subviewTrackDragOffsets: [],
     },
   });
-  rerender(host, store);
+  rerenderSubviewPanel(host, store);
   if (pairwiseEvidence && String(pairwiseEvidence.status || "") === "loading") {
     loadSubviewPairwiseEvidence(host, store, nextSubview.summary);
   }
@@ -1401,7 +1407,7 @@ function handleSubviewCandidateRemoval(host, store, {
       subviewTrackDragOffsets: [],
     },
   });
-  rerender(host, store);
+  rerenderSubviewPanel(host, store);
 }
 
 function handleSubviewTrackSelectionRemoval(host, store, { trackRole, source, datasetId, isMirror }) {
@@ -1421,7 +1427,7 @@ function handleSubviewTrackSelectionRemoval(host, store, { trackRole, source, da
       subviewTrackDragOffsets: [],
     },
   });
-  rerender(host, store);
+  rerenderSubviewPanel(host, store);
 }
 
 function handleSubviewSwapTrackOrder(host, store) {
@@ -1458,7 +1464,7 @@ function handleSubviewSwapTrackOrder(host, store) {
       ),
     },
   });
-  rerender(host, store);
+  rerenderSubviewPanel(host, store);
   if (pairwiseEvidence && String(pairwiseEvidence.status || "") === "loading") {
     loadSubviewPairwiseEvidence(host, store, nextSubview.summary);
   }
@@ -1800,7 +1806,7 @@ function enterSubviewFromCandidates(host, store) {
         subviewTrackDragOffsets: [],
       },
     });
-    rerender(host, store);
+    rerenderSubviewPanel(host, store);
     return;
   }
   const nextSubviewTrackView = inheritSubviewTrackViewFromMainTrack(state.assembly);
@@ -1840,7 +1846,7 @@ function enterSubviewFromCandidates(host, store) {
       subviewTrackDragOffsets: [],
     },
   });
-  rerender(host, store);
+  rerenderSubviewPanel(host, store);
   if (pairwiseEvidence && String(pairwiseEvidence.status || "") === "loading") {
     loadSubviewPairwiseEvidence(host, store, result.value);
   }
@@ -1874,7 +1880,7 @@ function refreshSubviewPairwiseEvidence(host, store) {
     },
   });
   if (shouldUpdateState) {
-    rerender(host, store);
+    rerenderSubviewPanel(host, store);
   }
   if (shouldFetch) {
     loadSubviewPairwiseEvidence(host, store, summary);
@@ -1882,7 +1888,9 @@ function refreshSubviewPairwiseEvidence(host, store) {
 }
 
 function cancelSubviewPairwiseEvidence(host, store, options = {}) {
-  const rerenderImpl = typeof options?.rerender === "function" ? options.rerender : rerender;
+  const rerenderImpl = typeof options?.rerender === "function"
+    ? options.rerender
+    : rerenderSubviewPanel;
   const rerenderAfter = options?.rerenderAfter !== false;
   const state = store.getState();
   const currentSubview = getSubviewState(state.assembly);
@@ -1959,7 +1967,7 @@ function enterSubviewFromTrackSelections(host, store) {
         subviewTrackDragOffsets: [],
       },
     });
-    rerender(host, store);
+    rerenderSubviewPanel(host, store);
     return;
   }
   const nextSubviewTrackView = inheritSubviewTrackViewFromMainTrack(state.assembly);
@@ -1997,7 +2005,7 @@ function enterSubviewFromTrackSelections(host, store) {
       subviewTrackDragOffsets: [],
     },
   });
-  rerender(host, store);
+  rerenderSubviewPanel(host, store);
   if (pairwiseEvidence && String(pairwiseEvidence.status || "") === "loading") {
     loadSubviewPairwiseEvidence(host, store, result.value);
   }
@@ -2058,7 +2066,7 @@ function setSubviewTrackPairCtgHidden(host, store, { trackRole, contigId, hidden
       },
     },
   });
-  rerender(host, store);
+  rerenderSubviewPanel(host, store);
 }
 
 function buildSubviewAnchorStateByKeyForCurrentSubview(assembly, subview) {
@@ -2086,7 +2094,7 @@ async function commitSubviewAnchorState(host, store, nextSubview) {
       subviewAnchorStateByKey: nextSubviewAnchorStateByKey,
     },
   });
-  rerender(host, store);
+  rerenderSubviewPanel(host, store);
   await persistProjectAssemblyViewStateFromStore(host, store);
 }
 
@@ -2209,16 +2217,23 @@ function clearSubviewTrackPairHiddenCtgs(host, store) {
       },
     },
   });
-  rerender(host, store);
+  rerenderSubviewPanel(host, store);
 }
 
 function normalizeTrackFocusMode(rawMode) {
   return String(rawMode || "").trim().toLowerCase() === "start" ? "start" : "center";
 }
 
-export function bindAssemblyPage(host, store) {
-  const result = bindAssemblyPageImpl(host, store, createAssemblyPageBindingDeps());
-  scrollAssemblyToBottomIfRequested(host, store);
+export function bindAssemblyPage(host, store, options = {}) {
+  const result = bindAssemblyPageImpl(
+    host,
+    store,
+    createAssemblyPageBindingDeps(options),
+    { scope: options.scope },
+  );
+  if (!options.scope) {
+    scrollAssemblyToBottomIfRequested(host, store);
+  }
   return result;
 }
 
@@ -2255,13 +2270,21 @@ function scrollAssemblyToBottomIfRequested(host, store) {
   requestFrame(() => requestFrame(applyScroll));
 }
 
-function createAssemblyPageBindingDeps() {
+function createAssemblyPageBindingDeps(options = {}) {
+  const rerenderImpl = typeof options.rerender === "function" ? options.rerender : rerender;
+  const rerenderAssemblyMainTabImpl = typeof options.rerenderAssemblyMainTab === "function"
+    ? options.rerenderAssemblyMainTab
+    : rerenderAssemblyMainTab;
   return {
     appendFinalPathRow,
     createEmptyFinalPathRow,
     applySupportDatasetSelection,
     cancelSubviewPairwiseEvidence,
-    bindAssemblyActionFeedbackDismiss,
+    bindAssemblyActionFeedbackDismiss: (host, store) => bindAssemblyActionFeedbackDismiss(
+      host,
+      store,
+      { rerender: rerenderImpl },
+    ),
     bindAssemblyContextMenu: (host, store) => bindAssemblyContextMenuImpl(host, store, contextMenuRuntimeDeps),
     bindCtgActions: (host, store) => bindCtgActionsImpl(host, store, {
       ...ctgActionsRuntimeDeps,
@@ -2314,10 +2337,12 @@ function createAssemblyPageBindingDeps() {
     persistMainTrackViewState,
     requestAssemblyConfirm,
     requestAssemblyAnchorOffsetPrompt,
-    rerenderAssemblyMainTab,
+    rerenderAssemblyMainTab: rerenderAssemblyMainTabImpl,
+    rerenderFinalPathCard,
+    rerenderSubviewPanel,
     refreshSubviewPairwiseEvidence,
     rememberTrackViewportAnchor,
-    rerender,
+    rerender: rerenderImpl,
     resolveAssemblyConfirmDialog,
     resolveTrackContigClickAction,
     removeFinalPathRow,
@@ -3200,7 +3225,7 @@ function setActivePhasedFinalPathTrack(host, store, { trackKey = "" }) {
       },
     },
   });
-  rerender(host, store);
+  rerenderFinalPathCard(host, store);
 }
 
 function resolveAppendToPathFocusPatch(assembly, activePhasedTrackKey) {
@@ -3420,7 +3445,7 @@ async function appendTrackContigToFinalPath(host, store, ctgContext, options = {
   return appendTrackContigToFinalPathImpl(host, store, ctgContext, {
     persistProjectAssemblyViewState:
       projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender,
+    rerender: rerenderFinalPathCard,
   }, options);
 }
 
@@ -3428,7 +3453,7 @@ async function appendFinalPathRow(host, store, payload = {}) {
   return appendFinalPathRowImpl(host, store, payload, {
     persistProjectAssemblyViewState:
       projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender,
+    rerender: rerenderFinalPathCard,
   });
 }
 
@@ -3437,7 +3462,7 @@ async function restoreFinalPathFromGrtBaseline(host, store, payload = {}) {
     confirm: (message) => requestAssemblyConfirm(host, store, message),
     persistProjectAssemblyViewState:
       projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender,
+    rerender: rerenderFinalPathCard,
   });
 }
 
@@ -3445,7 +3470,7 @@ async function addFinalPathGapRelativeToSegment(host, store, payload) {
   return addFinalPathGapRelativeToSegmentImpl(host, store, payload, {
     persistProjectAssemblyViewState:
       projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender,
+    rerender: rerenderFinalPathCard,
   });
 }
 
@@ -3453,7 +3478,7 @@ async function addFinalPathContigRelativeToSegment(host, store, payload) {
   return addFinalPathContigRelativeToSegmentImpl(host, store, payload, {
     persistProjectAssemblyViewState:
       projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender,
+    rerender: rerenderFinalPathCard,
   });
 }
 
@@ -3461,7 +3486,7 @@ async function createEmptyFinalPathRow(host, store, payload) {
   return createEmptyFinalPathRowImpl(host, store, payload, {
     persistProjectAssemblyViewState:
       projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender,
+    rerender: rerenderFinalPathCard,
   });
 }
 
@@ -3469,7 +3494,7 @@ async function flipFinalPathSegment(host, store, payload) {
   return flipFinalPathSegmentImpl(host, store, payload, {
     persistProjectAssemblyViewState:
       projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender,
+    rerender: rerenderFinalPathCard,
   });
 }
 
@@ -3477,7 +3502,7 @@ async function updateFinalPathRow(host, store, payload) {
   return updateFinalPathRowImpl(host, store, payload, {
     persistProjectAssemblyViewState:
       projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender,
+    rerender: rerenderFinalPathCard,
   });
 }
 
@@ -3485,7 +3510,7 @@ async function deleteFinalPathSegment(host, store, payload) {
   return removeFinalPathRowImpl(host, store, payload, {
     persistProjectAssemblyViewState:
       projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender,
+    rerender: rerenderFinalPathCard,
   });
 }
 
@@ -3493,7 +3518,7 @@ async function removeFinalPathRow(host, store, payload) {
   return removeFinalPathRowImpl(host, store, payload, {
     persistProjectAssemblyViewState:
       projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender,
+    rerender: rerenderFinalPathCard,
   });
 }
 
@@ -3501,7 +3526,7 @@ async function moveFinalPathRow(host, store, payload) {
   return moveFinalPathRowImpl(host, store, payload, {
     persistProjectAssemblyViewState:
       projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender,
+    rerender: rerenderFinalPathCard,
   });
 }
 
@@ -3574,11 +3599,15 @@ function schedulePersistAssemblyScrollState(
 function bindTrackScrollSync(host, store, deps = {}) {
   const schedulePersistScrollState =
     deps.schedulePersistAssemblyScrollState || schedulePersistAssemblyScrollState;
+  const requestedScope = String(deps.scope || "all").trim().toLowerCase();
+  const scope = ["main", "subview", "final-path"].includes(requestedScope)
+    ? requestedScope
+    : "all";
+  const shouldBindMain = scope === "all" || scope === "main";
+  const shouldBindSubview = scope === "all" || scope === "subview";
+  const shouldBindFinalPath = scope === "all" || scope === "final-path";
+  const shouldClearMissing = scope === "all";
   let viewportChanged = false;
-  const finalPathScrollEl =
-    host?.querySelector?.("[data-final-path-graph-viewport]")
-    || host?.querySelector?.(".assembly-final-path-svg-wrap")
-    || null;
   const nextMeasuredTrackViewportWidths = resolveMeasuredTrackViewportWidths(
     readAssemblyTrackViewportWidths(host),
     measuredTrackViewportPxByRole,
@@ -3594,14 +3623,15 @@ function bindTrackScrollSync(host, store, deps = {}) {
   const syncedTrackScrollEls = trackScrollEls.filter(
     (element) => String(element.dataset.trackRole || "").trim() !== "subview",
   );
-  if (!syncedTrackScrollEls.length) {
+
+  if (shouldBindMain && !syncedTrackScrollEls.length && shouldClearMissing) {
     lastTrackViewportKey = "";
     lastTrackScrollLeft = 0;
     lastPrimaryTrackViewboxMinX = 0;
     if (setAssemblyViewportScrollState(store, "trackScrollState", {})) {
       schedulePersistScrollState(host, store);
     }
-  } else {
+  } else if (shouldBindMain && syncedTrackScrollEls.length) {
     const primaryScroll = syncedTrackScrollEls.find(
       (element) => element.dataset.trackRole === "primary",
     );
@@ -3626,7 +3656,7 @@ function bindTrackScrollSync(host, store, deps = {}) {
       pendingPrimaryViewportAnchorBp = null;
     }
 
-    let state = store.getState();
+    const state = store.getState();
     const nextViewportKey = buildMainTrackViewportKey(state);
     const shouldApplyPendingFocus = Boolean(pendingTrackAutoFocusMode);
     if (nextViewportKey !== lastTrackViewportKey || shouldApplyPendingFocus) {
@@ -3659,10 +3689,8 @@ function bindTrackScrollSync(host, store, deps = {}) {
       viewportKey: lastTrackViewportKey,
       scrollLeft: lastTrackScrollLeft,
     })) {
-      state = store.getState();
       schedulePersistScrollState(host, store);
     }
-
     applyTrackScrollLeft(syncedTrackScrollEls, lastTrackScrollLeft);
 
     let syncing = false;
@@ -3683,65 +3711,71 @@ function bindTrackScrollSync(host, store, deps = {}) {
         syncing = false;
       });
     });
+  }
 
-    if (!subviewTrackScrollEls.length) {
-      lastSubviewViewportKey = "";
-      lastSubviewScrollLeft = 0;
-      if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {})) {
-        schedulePersistScrollState(host, store);
-      }
-    } else {
-      state = store.getState();
-      const nextSubviewViewportKey = buildSubviewTrackViewportKey(state);
-      if (nextSubviewViewportKey !== lastSubviewViewportKey) {
-        lastSubviewViewportKey = nextSubviewViewportKey;
-        lastSubviewScrollLeft = resolvePersistedViewportScrollLeft(
-          state.assembly.subviewTrackScrollState,
-          nextSubviewViewportKey,
-        ) ?? 0;
-      }
-      const primarySubviewScroll = subviewTrackScrollEls[0] || null;
-      if (pendingSubviewViewportAnchorBp !== null) {
-        const anchoredScrollLeft = resolveScrollLeftForViewportAnchorBp(
-          pendingSubviewViewportAnchorBp,
-          readTrackViewportMetrics(primarySubviewScroll, "subview"),
-        );
-        if (anchoredScrollLeft !== null) {
-          lastSubviewScrollLeft = anchoredScrollLeft;
-        }
-        pendingSubviewViewportAnchorBp = null;
-      }
-      if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {
-        viewportKey: lastSubviewViewportKey,
-        scrollLeft: lastSubviewScrollLeft,
-      })) {
-        schedulePersistScrollState(host, store);
-      }
-      applyTrackScrollLeft(subviewTrackScrollEls, lastSubviewScrollLeft);
-
-      let subviewSyncing = false;
-      subviewTrackScrollEls.forEach((element) => {
-        element.addEventListener("scroll", () => {
-          if (subviewSyncing) {
-            return;
-          }
-          subviewSyncing = true;
-          lastSubviewScrollLeft = element.scrollLeft;
-          applyTrackScrollLeft(subviewTrackScrollEls, lastSubviewScrollLeft, element);
-          if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {
-            viewportKey: lastSubviewViewportKey,
-            scrollLeft: lastSubviewScrollLeft,
-          })) {
-            schedulePersistScrollState(host, store);
-          }
-          subviewSyncing = false;
-        });
-      });
+  if (shouldBindSubview && !subviewTrackScrollEls.length && shouldClearMissing) {
+    lastSubviewViewportKey = "";
+    lastSubviewScrollLeft = 0;
+    if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {})) {
+      schedulePersistScrollState(host, store);
     }
+  } else if (shouldBindSubview && subviewTrackScrollEls.length) {
+    const state = store.getState();
+    const nextSubviewViewportKey = buildSubviewTrackViewportKey(state);
+    if (nextSubviewViewportKey !== lastSubviewViewportKey) {
+      lastSubviewViewportKey = nextSubviewViewportKey;
+      lastSubviewScrollLeft = resolvePersistedViewportScrollLeft(
+        state.assembly.subviewTrackScrollState,
+        nextSubviewViewportKey,
+      ) ?? 0;
+    }
+    const primarySubviewScroll = subviewTrackScrollEls[0] || null;
+    if (pendingSubviewViewportAnchorBp !== null) {
+      const anchoredScrollLeft = resolveScrollLeftForViewportAnchorBp(
+        pendingSubviewViewportAnchorBp,
+        readTrackViewportMetrics(primarySubviewScroll, "subview"),
+      );
+      if (anchoredScrollLeft !== null) {
+        lastSubviewScrollLeft = anchoredScrollLeft;
+      }
+      pendingSubviewViewportAnchorBp = null;
+    }
+    if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {
+      viewportKey: lastSubviewViewportKey,
+      scrollLeft: lastSubviewScrollLeft,
+    })) {
+      schedulePersistScrollState(host, store);
+    }
+    applyTrackScrollLeft(subviewTrackScrollEls, lastSubviewScrollLeft);
 
-    state = store.getState();
-    const nextFinalPathViewportKey = buildFinalPathTrackViewportKey(state);
+    let subviewSyncing = false;
+    subviewTrackScrollEls.forEach((element) => {
+      element.addEventListener("scroll", () => {
+        if (subviewSyncing) {
+          return;
+        }
+        subviewSyncing = true;
+        lastSubviewScrollLeft = element.scrollLeft;
+        applyTrackScrollLeft(subviewTrackScrollEls, lastSubviewScrollLeft, element);
+        if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {
+          viewportKey: lastSubviewViewportKey,
+          scrollLeft: lastSubviewScrollLeft,
+        })) {
+          schedulePersistScrollState(host, store);
+        }
+        subviewSyncing = false;
+      });
+    });
+  }
+
+  if (shouldBindFinalPath) {
+    const finalPathScrollEl =
+      host?.querySelector?.("[data-final-path-graph-viewport]")
+      || host?.querySelector?.(".assembly-final-path-svg-wrap")
+      || null;
     if (finalPathScrollEl) {
+      const state = store.getState();
+      const nextFinalPathViewportKey = buildFinalPathTrackViewportKey(state);
       if (nextFinalPathViewportKey !== lastFinalPathViewportKey) {
         lastFinalPathViewportKey = nextFinalPathViewportKey;
         lastFinalPathScrollLeft = resolvePersistedViewportScrollLeft(
@@ -3774,17 +3808,8 @@ function bindTrackScrollSync(host, store, deps = {}) {
         });
       }
     }
-    return viewportChanged;
   }
-
-  if (!subviewTrackScrollEls.length) {
-    lastSubviewViewportKey = "";
-    lastSubviewScrollLeft = 0;
-    if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {})) {
-      schedulePersistScrollState(host, store);
-    }
-  }
-  return false;
+  return viewportChanged;
 }
 
 function applyTrackScrollLeft(trackScrollEls, scrollLeft, sourceElement = null) {
@@ -3973,7 +3998,7 @@ function rerenderAssemblyMainTab(host, store) {
     return;
   }
   const template = doc.createElement("template");
-  template.innerHTML = renderAssemblyMainTab(store.getState());
+  template.innerHTML = renderAssemblyMainTrackSections(store.getState());
   const nextContent = template.content;
   const replacedNodes = [
     replaceRenderedAssemblySection(routeHost, nextContent, ".chr-strip.has-members-panel"),
@@ -3983,9 +4008,66 @@ function rerenderAssemblyMainTab(host, store) {
     rerender(host, store);
     return;
   }
+  patchAssemblyStatusToast(routeHost, nextContent);
   replacedNodes.forEach((node) => {
-    bindAssemblyPage(node, store);
+    bindAssemblyPage(node, store, {
+      scope: "main",
+      rerender: rerenderAssemblyMainTab,
+      rerenderAssemblyMainTab,
+    });
   });
+}
+
+function rerenderFinalPathCard(host, store) {
+  cancelDeferredRerender();
+  const routeHost = resolveCurrentRouteHost(host);
+  if (!routeHost) {
+    rerender(host, store);
+    return;
+  }
+  const currentCard = routeHost.querySelector?.(".final-path-card") || null;
+  const doc = routeHost.ownerDocument || host?.ownerDocument || globalThis.document;
+  if (!currentCard || !doc?.createElement) {
+    rerender(host, store);
+    return;
+  }
+  const currentScrollEl = currentCard.querySelector?.("[data-final-path-graph-viewport]")
+    || currentCard.querySelector?.(".assembly-final-path-svg-wrap")
+    || null;
+  const currentScrollLeft = Number(currentScrollEl?.scrollLeft || 0);
+  const currentState = store.getState();
+  if (currentScrollEl && Number.isFinite(currentScrollLeft)) {
+    const nextScrollState = normalizeViewportScrollState({
+      viewportKey: buildFinalPathTrackViewportKey(currentState),
+      scrollLeft: currentScrollLeft,
+    });
+    if (!areViewportScrollStatesEqual(currentState.assembly?.finalPathTrackScrollState, nextScrollState)) {
+      store.setState({
+        ...currentState,
+        assembly: {
+          ...currentState.assembly,
+          finalPathTrackScrollState: nextScrollState,
+        },
+      });
+    }
+  }
+  const template = doc.createElement("template");
+  template.innerHTML = renderAssemblyFinalPathCardImpl(store.getState(), renderTracksDeps);
+  const nextCard = template.content.firstElementChild;
+  if (!nextCard || !nextCard.matches?.(".final-path-card")) {
+    rerender(host, store);
+    return;
+  }
+  currentCard.replaceWith(nextCard);
+
+  const toastTemplate = doc.createElement("template");
+  toastTemplate.innerHTML = `<section class="assembly-main-view">${renderAssemblyStatusToastImpl(store.getState(), renderTracksDeps)}</section>`;
+  patchAssemblyStatusToast(routeHost, toastTemplate.content);
+  bindAssemblyPage(nextCard, store, {
+    scope: "final-path",
+    rerender: rerenderFinalPathCard,
+  });
+  return nextCard;
 }
 
 function isConnectedToDocument(node, doc) {
@@ -4082,7 +4164,7 @@ function createRenderedAssemblyMainTabContent(routeHost, state) {
     return null;
   }
   const template = doc.createElement("template");
-  template.innerHTML = renderAssemblyMainTab(state);
+  template.innerHTML = renderAssemblyMainTrackSections(state);
   return template.content;
 }
 
@@ -4341,6 +4423,10 @@ function rerenderSubviewPanel(host, store) {
     rerender(host, store);
     return;
   }
+  if (typeof routeHost.querySelector !== "function") {
+    rerender(host, store);
+    return;
+  }
   const currentPanel = routeHost.querySelector("[data-subview-panel='1']");
   if (!currentPanel) {
     rerender(host, store);
@@ -4352,7 +4438,10 @@ function rerenderSubviewPanel(host, store) {
     rerender(host, store);
     return;
   }
-  bindAssemblyPage(nextPanel, store);
+  bindAssemblyPage(nextPanel, store, {
+    scope: "subview",
+    rerender: rerenderSubviewPanel,
+  });
 }
 
 export async function __testLoadNewSequencesTabData(
@@ -4583,7 +4672,7 @@ function applyTrackDragOffset(host, store, nextOffset) {
       trackDragOffsets: normalizedNext,
     },
   });
-  rerender(host, store);
+  rerenderAssemblyMainTab(host, store);
 }
 
 async function rebaseTrackDragOffsetsAfterRestore(
@@ -4629,7 +4718,7 @@ function applySubviewTrackDragOffset(host, store, nextOffset) {
       subviewTrackDragOffsets: normalizedNext,
     },
   });
-  rerender(host, store);
+  rerenderSubviewPanel(host, store);
 }
 
 async function persistProjectAssemblyViewStateFromStore(
@@ -5128,6 +5217,14 @@ export function __testRerenderAssemblyMainTab(host, store) {
   return rerenderAssemblyMainTab(host, store);
 }
 
+export function __testRenderAssemblyMainTrackSections(state) {
+  return renderAssemblyMainTrackSections(state);
+}
+
+export function __testRenderAssemblyFinalPathCard(state) {
+  return renderAssemblyFinalPathCardImpl(state, renderTracksDeps);
+}
+
 export function __testRerenderSubviewPanel(host, store) {
   return rerenderSubviewPanel(host, store);
 }
@@ -5522,21 +5619,25 @@ function appendAuditLog(store, { category, action, detail }) {
   }
 }
 
-function bindAssemblyActionFeedbackDismiss(host, store) {
-  const binding = ensureAssemblyActionFeedbackDismissBinding(host);
+function bindAssemblyActionFeedbackDismiss(host, store, options = {}) {
+  const binding = ensureAssemblyActionFeedbackDismissBinding(host, options);
   binding.store = store;
   const signature = getAssemblyActionFeedbackSignature(store.getState().assembly);
   binding.coordinator.onFeedbackChange(signature);
 }
 
-function ensureAssemblyActionFeedbackDismissBinding(host) {
+function ensureAssemblyActionFeedbackDismissBinding(host, options = {}) {
   if (host[ASSEMBLY_ACTION_FEEDBACK_DISMISS]) {
+    if (typeof options.rerender === "function") {
+      host[ASSEMBLY_ACTION_FEEDBACK_DISMISS].rerender = options.rerender;
+    }
     return host[ASSEMBLY_ACTION_FEEDBACK_DISMISS];
   }
   const timerApi = resolveTimerApi();
   const binding = {
     store: null,
     coordinator: null,
+    rerender: typeof options.rerender === "function" ? options.rerender : rerender,
   };
   binding.coordinator = createActionFeedbackDismissCoordinator({
     setTimeoutFn: timerApi.setTimeout.bind(timerApi),
@@ -5547,7 +5648,7 @@ function ensureAssemblyActionFeedbackDismissBinding(host) {
       if (!binding.store) {
         return;
       }
-      clearAssemblyActionFeedback(host, binding.store);
+      clearAssemblyActionFeedback(host, binding.store, binding.rerender);
     },
   });
   if (typeof host?.addEventListener !== "function") {
@@ -5583,7 +5684,7 @@ function resolveTimerApi() {
   return globalThis;
 }
 
-function clearAssemblyActionFeedback(host, store) {
+function clearAssemblyActionFeedback(host, store, rerenderImpl = rerender) {
   const currentAssembly = store.getState().assembly;
   if (!currentAssembly.actionStatus && !currentAssembly.actionError) {
     return;
@@ -5595,7 +5696,7 @@ function clearAssemblyActionFeedback(host, store) {
       actionError: "",
     },
   });
-  rerender(host, store);
+  rerenderImpl(host, store);
 }
 
 function createActionFeedbackDismissCoordinator({
