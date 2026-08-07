@@ -31,20 +31,6 @@ function normalizeString(value) {
   return String(value || "").trim();
 }
 
-function buildGrtSegmentTraceAttrs(segment, escapeAttr) {
-  const eventId = normalizeString(segment?.eventId);
-  const sourceCardKey = normalizeString(segment?.sourceCardKey);
-  const traceKind = eventId ? "event" : (sourceCardKey ? "source-card" : "");
-  const traceId = eventId || sourceCardKey;
-  const evidenceIds = Array.isArray(segment?.evidenceIds)
-    ? segment.evidenceIds.map((id) => normalizeString(id)).filter(Boolean)
-    : [];
-  if (!traceKind && !evidenceIds.length) {
-    return "";
-  }
-  return ` data-grt-traceable="true"${traceKind ? ` data-grt-trace-kind="${escapeAttr(traceKind)}" data-grt-trace-id="${escapeAttr(traceId)}"` : ""}${evidenceIds.length ? ` data-grt-evidence-ids="${escapeAttr(evidenceIds.join(","))}"` : ""}`;
-}
-
 function resolveFinalPathDisplayCtgName(segment) {
   return resolveFinalPathSegmentDisplayName(segment);
 }
@@ -517,6 +503,7 @@ function renderFinalPathHeadControls({
   labels,
   trackControls,
   exportMenu = "",
+  restoreAction = "",
   extraComboFieldAttr = "",
   inputFieldAttr = "",
   idPrefix = "final-path-track",
@@ -555,6 +542,7 @@ function renderFinalPathHeadControls({
           })}
         </label>
       </div>
+      ${restoreAction}
       ${exportMenu}
     </div>
   `;
@@ -1259,7 +1247,6 @@ export function renderFinalPathGraph({
     .map((item, index, items) => {
       const { segment } = item;
       const segmentId = normalizeString(segment.segmentId);
-      const grtTraceAttrs = buildGrtSegmentTraceAttrs(segment, escapeAttr);
       if (isFinalPathGapSegment(segment)) {
         const { markerWidth, markerX } = gapMarkerLayouts[index] || resolveGapMarkerLayout(item, innerWidth);
         const labelLayout = gapLabelLayouts[index];
@@ -1271,7 +1258,6 @@ export function renderFinalPathGraph({
           <g
             data-final-path-segment-id="${escapeAttr(segmentId)}"
             data-final-path-segment-type="gap"
-            ${grtTraceAttrs}
            ${targetChrAttr}
             data-final-path-slot-left="${escapeAttr(slotLeft.toFixed(2))}"
             data-final-path-slot-right="${escapeAttr(slotRight.toFixed(2))}"
@@ -1325,7 +1311,6 @@ export function renderFinalPathGraph({
           class="${groupClass}"
           data-final-path-segment-id="${escapeAttr(segmentId)}"
           data-final-path-segment-type="ctg"
-          ${grtTraceAttrs}
          ${targetChrAttr}
           data-final-path-source-kind="${escapeAttr(String(segment?.sourceKind || "assembly_ctg"))}"
           data-final-path-contig-id="${escapeAttr(String(segment?.assemblyCtgId || ""))}"
@@ -1406,7 +1391,6 @@ function renderFinalPathTable({
   const rows = segments.length
     ? segments.map((segment, index) => {
       const segmentId = normalizeString(segment.segmentId) || `seg-${index + 1}`;
-      const grtTraceAttrs = buildGrtSegmentTraceAttrs(segment, escapeAttr);
       const isGap = isFinalPathGapSegment(segment);
       const isRefSegment = isFinalPathRefSegment(segment);
       const metrics = rowMetrics[index] || {};
@@ -1442,7 +1426,7 @@ function renderFinalPathTable({
               `;
       const rowTypeClass = isGap ? " is-gap" : "";
       return `
-        <div data-final-path-row-id="${escapeAttr(segmentId)}" data-final-path-segment-id="${escapeAttr(segmentId)}"${targetChrAttr}${grtTraceAttrs} class="final-path-sort-row${rowTypeClass}">
+        <div data-final-path-row-id="${escapeAttr(segmentId)}" data-final-path-segment-id="${escapeAttr(segmentId)}"${targetChrAttr} class="final-path-sort-row${rowTypeClass}">
           <div class="final-path-row-index-cell">
             <span class="final-path-card-index">${index + 1}</span>
           </div>
@@ -1671,6 +1655,7 @@ export function renderFinalPathCard(
     finalPathLogModel = null,
     phasedFinalPathOptions = [],
     finalPathEntries = [],
+    grtBaselineRestore = null,
   },
   deps = {},
 ) {
@@ -1755,17 +1740,6 @@ export function renderFinalPathCard(
     maxTickCount: DEFAULT_MAX_TICK_COUNT,
     ...(trackView || {}),
   });
-  const headControls = normalizedViewMode === "graph"
-    ? renderFinalPathHeadControls({
-      escapeAttr,
-      escapeHtml,
-      ariaLabel: `${title} controls`,
-      labels: trackControlLabels,
-      trackControls,
-      exportMenu,
-    })
-    : `<div class="final-path-card-head-controls is-table-mode">${exportMenu}</div>`;
-
   const isAllMode = displayEntries.length > 1;
   const singleEntry = displayEntries[0] || {
     key: "",
@@ -1774,6 +1748,31 @@ export function renderFinalPathCard(
     finalPathEntry,
     finalPathLogModel: logModel,
   };
+  const canRestoreGrtBaseline = !isAllMode
+    && grtBaselineRestore?.available === true
+    && normalizeString(grtBaselineRestore?.targetChrName) === normalizeString(singleEntry.chrName);
+  const restoreGrtBaselineDisabled = grtBaselineRestore?.current === true;
+  const restoreAction = canRestoreGrtBaseline
+    ? `<button
+        type="button"
+        class="button ghost tiny final-path-restore-grt-baseline"
+        data-final-path-restore-grt-baseline="${escapeAttr(singleEntry.chrName)}"
+        aria-label="${escapeAttr(restoreGrtBaselineDisabled ? (labels.finalPathRestoreGrtBaselineCurrent || "Already at GRT baseline") : (labels.finalPathRestoreGrtBaseline || "Restore GRT baseline"))}"
+        title="${escapeAttr(restoreGrtBaselineDisabled ? (labels.finalPathRestoreGrtBaselineCurrent || "Already at GRT baseline") : (labels.finalPathRestoreGrtBaseline || "Restore GRT baseline"))}"
+        ${restoreGrtBaselineDisabled ? "disabled" : ""}
+      >${escapeHtml(labels.finalPathRestoreGrtBaseline || "Restore GRT baseline")}</button>`
+    : "";
+  const headControls = normalizedViewMode === "graph"
+    ? renderFinalPathHeadControls({
+      escapeAttr,
+      escapeHtml,
+      ariaLabel: `${title} controls`,
+      labels: trackControlLabels,
+      trackControls,
+      restoreAction,
+      exportMenu,
+    })
+    : `<div class="final-path-card-head-controls is-table-mode">${restoreAction}${exportMenu}</div>`;
 
   const renderSingleBody = (entry, { allMode = false } = {}) => {
     const entryLogModel = entry.finalPathLogModel || buildFinalPathLogModel({

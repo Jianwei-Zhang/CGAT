@@ -16,7 +16,7 @@ import {
   restoreAssemblyState,
 } from "../shell/assembly-session-cache.js";
 import { buildEmptyProjectExportState } from "../shell/session-switchers.js";
-import { buildEmptyGrtTraceState, normalizeGrtProjectView } from "./assembly/grt-state.js";
+import { normalizeGrtProjectView } from "./assembly/grt-state.js";
 
 function buildEmptyAssemblyViewState(stateOrLocale) {
   return {
@@ -77,7 +77,6 @@ function buildEmptyAssemblyViewState(stateOrLocale) {
       sourceCards: [],
       verification: {},
     },
-    grtTrace: buildEmptyGrtTraceState(),
     hiddenPrimaryCtgIds: [],
     hiddenPrimaryCtgIdsByChr: {},
     trackDragOffsets: [],

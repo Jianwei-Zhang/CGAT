@@ -401,6 +401,60 @@ export function normalizeFinalPathByChr(value) {
   return next;
 }
 
+function buildFinalPathSemanticSegment(segment) {
+  if (isFinalPathGapSegment(segment)) {
+    return {
+      type: "gap",
+      gapSizeBp: normalizePositiveInteger(segment?.gapSizeBp) || FINAL_PATH_GAP_BP,
+    };
+  }
+  const sourceKind = normalizeSourceKind(segment?.sourceKind);
+  const source = segment?.source && typeof segment.source === "object" && !Array.isArray(segment.source)
+    ? segment.source
+    : {};
+  return {
+    type: "ctg",
+    sourceKind,
+    datasetName: normalizeString(segment?.datasetName),
+    sourceContig: normalizeString(source.contig) || normalizeString(segment?.originId) || normalizeString(segment?.ctgName),
+    sourceStart: normalizePositiveInteger(source.start) || normalizePositiveInteger(segment?.start),
+    sourceEnd: normalizePositiveInteger(source.end) || normalizePositiveInteger(segment?.end),
+    referenceChrId: normalizePositiveInteger(segment?.referenceChrId),
+    referenceChrName: normalizeString(segment?.referenceChrName),
+    memberStartBp: normalizePositiveInteger(segment?.memberStartBp),
+    memberEndBp: normalizePositiveInteger(segment?.memberEndBp),
+    overallLen: normalizePositiveInteger(segment?.overallLen),
+    start: normalizePositiveInteger(segment?.start),
+    end: normalizePositiveInteger(segment?.end),
+  };
+}
+
+/**
+ * Return the path-content projection used to decide whether a project path
+ * differs from its immutable Server baseline. Runtime-only assembly IDs,
+ * trace metadata, hidden-member state, and timestamps are deliberately not
+ * part of this projection.
+ */
+export function buildFinalPathSemanticFingerprint(entry) {
+  const normalized = normalizeFinalPathByChr({
+    [normalizeString(entry?.chrName) || "__entry__"]: entry,
+  });
+  const normalizedEntry = Object.values(normalized)[0];
+  if (!normalizedEntry) {
+    return "";
+  }
+  return JSON.stringify({
+    chrName: normalizedEntry.chrName,
+    segments: normalizedEntry.segments.map(buildFinalPathSemanticSegment),
+  });
+}
+
+export function areFinalPathEntriesSemanticallyEqual(left, right) {
+  const leftFingerprint = buildFinalPathSemanticFingerprint(left);
+  const rightFingerprint = buildFinalPathSemanticFingerprint(right);
+  return Boolean(leftFingerprint) && leftFingerprint === rightFingerprint;
+}
+
 export function resolveFinalPathTotalLengthBp(entry) {
   const normalizedTotal = normalizePositiveInteger(entry?.totalLength);
   if (normalizedTotal) {

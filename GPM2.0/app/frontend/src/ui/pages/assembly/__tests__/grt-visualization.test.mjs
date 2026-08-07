@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { renderAssemblyPage } from "../../assembly-page.js";
 
-function createState(grtTrace = {}) {
+function createState() {
   const baselineSegment = {
     segmentId: "seg-patch",
     type: "source",
@@ -65,7 +65,16 @@ function createState(grtTrace = {}) {
       }],
       chrPickerOpen: false,
       membersCardCollapsed: false,
-      chrCtgs: [],
+      chrCtgs: [{
+        assemblyCtgId: 101,
+        name: "primary_grt",
+        originId: "primary_grt",
+        totalLength: 1000,
+        datasetId: 1,
+        grtSourceCardKey: "flye:donor_unplaced:Chr01:grt_promoted",
+        grtPlacementMode: "grt_promoted",
+        grtRefAlignmentStatus: "no_hit",
+      }],
       supportDatasetId: 2,
       supportChrCtgs: [{
         assemblyCtgId: 202,
@@ -105,6 +114,7 @@ function createState(grtTrace = {}) {
       finalPathTrackView: { minTickUnitKb: 10_000, maxTickCount: 10 },
       finalPathByChr: {
         Chr01: {
+          mode: "segments",
           chrName: "Chr01",
           segments: [{ ...baselineSegment }],
           q4Length: 800,
@@ -134,6 +144,7 @@ function createState(grtTrace = {}) {
         recipe: { recipeId: "recipe-1" },
         baselineFinalPathByChr: {
           Chr01: {
+            mode: "segments",
             chrName: "Chr01",
             segments: [{ ...baselineSegment }],
             q4Length: 800,
@@ -180,49 +191,33 @@ function createState(grtTrace = {}) {
         ],
         verification: {},
       },
-      grtTrace,
     },
   };
 }
 
-test("renders immutable baseline, unresolved workflow results, and explicit GRT usage status", () => {
+test("renders passive GRT placement status and a current-path baseline reset", () => {
   const html = renderAssemblyPage(createState());
 
-  assert.match(html, /data-grt-trace-panel="true"/);
-  assert.match(html, /Server precomputed baseline/);
-  assert.match(html, /Project-level Final Path edits below never overwrite it/);
-  assert.match(html, /data-grt-baseline-segment-id="seg-patch"/);
-  assert.match(html, /data-grt-trace-kind="event" data-grt-trace-id="evt-step1"/);
-  assert.match(html, /unresolved \(workflow result\)/);
-  assert.match(html, /terminal-right/);
-  assert.doesNotMatch(html, /gap-other/);
+  assert.doesNotMatch(html, /data-grt-trace-panel="true"/);
+  assert.doesNotMatch(html, /Server precomputed baseline/);
+  assert.doesNotMatch(html, /data-grt-trace-kind=/);
+  assert.doesNotMatch(html, /data-grt-locate-/);
   assert.match(html, /grt_promoted/);
-  assert.match(html, /cross_chr_grt_usage/);
   assert.match(html, /Ref status: no_hit/);
-  assert.match(html, /Ref status: multi_hit/);
   assert.match(html, /Anchor source: GRT Final Path/);
-  assert.match(html, /data-grt-placement-mode="grt_promoted"/);
+  assert.match(html, /class="grt-status-badge is-grt_promoted"/);
+  assert.doesNotMatch(html, /class="grt-status-badge is-grt_promoted"[^>]*role="button"/);
+  assert.match(html, /data-final-path-restore-grt-baseline="Chr01"/);
   assert.doesNotMatch(html, /Program error/);
 });
 
-test("renders source, event, and evidence links from an opened trace detail", () => {
-  const html = renderAssemblyPage(createState({
-    loading: false,
-    error: "",
-    kind: "event",
-    id: "evt-step1",
-    detail: {
-      event_id: "evt-step1",
-      final_path_segment_id: "seg-patch",
-      source_card_key: "flye:donor_unplaced:Chr01:grt_promoted",
-      evidence_ids: ["ev-step1", "ev-display"],
-    },
-  }));
+test("does not render persistent trace controls from GRT metadata", () => {
+  const state = createState();
+  state.assembly.grtProjectView.objectAttempts = [];
+  state.assembly.grtProjectView.sourceCards = [];
+  const html = renderAssemblyPage(state);
 
-  assert.match(html, /data-grt-trace-close="true"/);
-  assert.match(html, /data-grt-trace-kind="source-card"/);
-  assert.match(html, /data-grt-trace-kind="event" data-grt-trace-id="evt-step1"/);
-  assert.match(html, /data-grt-trace-kind="evidence" data-grt-trace-id="ev-step1"/);
-  assert.match(html, /data-grt-trace-kind="evidence" data-grt-trace-id="ev-display"/);
-  assert.match(html, /data-grt-locate-final-path-segment-id="seg-patch"/);
+  assert.doesNotMatch(html, /data-grt-trace/);
+  assert.doesNotMatch(html, /data-grt-locate/);
+  assert.doesNotMatch(html, /object-attempt/);
 });

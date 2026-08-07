@@ -427,6 +427,7 @@ export function bindAssemblyPage(host, store, deps) {
     rerenderAssemblyMainTab = rerender,
     resolveTrackContigClickAction,
     removeFinalPathRow,
+    restoreFinalPathFromGrtBaseline = async () => {},
     resolveAssemblyConfirmDialog = () => {},
     restoreSelectedDeletedCtgs = async () => {},
     runCtgSearch,
@@ -505,66 +506,19 @@ export function bindAssemblyPage(host, store, deps) {
   const finalPathRemoveButtons = queryHostAll("[data-final-path-remove-row]");
   const finalPathCellInputs = queryHostAll("[data-final-path-cell][data-final-path-segment-id]");
   const finalPathEmptyCellInputs = queryHostAll("[data-final-path-empty-cell]");
-  const grtTraceTargets = queryHostAll("[data-grt-trace-kind][data-grt-trace-id]");
-  const grtLocateCtgTargets = queryHostAll("[data-grt-locate-ctg-id]");
-  const grtLocateSourceCardTargets = queryHostAll("[data-grt-locate-source-card]");
-  const grtLocateFinalPathTargets = queryHostAll("[data-grt-locate-final-path-segment-id]");
-  const grtTraceCloseButton = queryHost("[data-grt-trace-close='true']");
+  const finalPathRestoreGrtBaselineButtons = queryHostAll("[data-final-path-restore-grt-baseline]");
   const subviewPairwiseCancelButtons = queryHostAll("[data-subview-pairwise-cancel='1']");
 
-  grtTraceTargets.forEach((target) => {
-    const open = (event) => {
-      const interactiveDescendant = event.target !== target
-        && event.target?.closest?.("input, select, textarea, button, a");
-      if (interactiveDescendant) {
+  finalPathRestoreGrtBaselineButtons.forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.preventDefault();
+      if (button.disabled) {
         return;
       }
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation?.();
-      void deps.openGrtTrace?.(host, store, {
-        kind: target.dataset.grtTraceKind,
-        id: target.dataset.grtTraceId,
-      });
-    };
-    target.addEventListener("click", open);
-    target.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        open(event);
-      }
-    });
-  });
-  grtLocateCtgTargets.forEach((target) => {
-    target.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      void deps.locateGrtCtg?.(host, store, {
-        assemblyCtgId: target.dataset.grtLocateCtgId,
-        chrName: target.dataset.grtLocateChr,
+      await restoreFinalPathFromGrtBaseline(host, store, {
+        targetChrName: button.dataset.finalPathRestoreGrtBaseline,
       });
     });
-  });
-  grtLocateSourceCardTargets.forEach((target) => {
-    target.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      void deps.locateGrtSourceCard?.(host, store, target.dataset.grtLocateSourceCard);
-    });
-  });
-  grtLocateFinalPathTargets.forEach((target) => {
-    target.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      void deps.locateGrtFinalPathSegment?.(
-        host,
-        store,
-        target.dataset.grtLocateFinalPathSegmentId,
-      );
-    });
-  });
-  grtTraceCloseButton?.addEventListener("click", (event) => {
-    event.preventDefault();
-    deps.closeGrtTrace?.(host, store);
   });
 
   const openSupportDsCtgLenRulesDialog = () => {

@@ -10,6 +10,7 @@ import {
   flipFinalPathSegment,
   moveFinalPathRow,
   removeFinalPathRow,
+  restoreFinalPathFromGrtBaseline,
   updateFinalPathRow,
 } from "../final-path-runtime.js";
 
@@ -1373,4 +1374,143 @@ test("moveFinalPathRow supports before/after placement and removeFinalPathRow ke
     store.getState().assembly.finalPathByChr.Chr01.segments.map((row) => row.segmentId),
     ["seg-3", "seg-2"],
   );
+});
+
+function createGrtRestoreState() {
+  const baselineEntry = {
+    mode: "segments",
+    chrName: "Chr01",
+    segments: [
+      {
+        segmentId: "baseline-ctg",
+        type: "ctg",
+        datasetName: "flye",
+        ctgName: "Ctg30",
+        originId: "contig_98",
+        overallLen: 2200,
+        start: 1,
+        end: 2200,
+        source: {
+          dataset: "flye",
+          contig: "contig_98",
+          start: 1,
+          end: 2200,
+          orientation: "+",
+        },
+      },
+    ],
+    q4Length: 2200,
+    q4Sha256: "baseline-sha",
+  };
+  return {
+    baselineEntry,
+    store: createStore({
+      finalPathByChr: {
+        Chr01: {
+          ...baselineEntry,
+          segments: [{ ...baselineEntry.segments[0], start: 2200, end: 1 }],
+          q4Sha256: "edited-sha",
+        },
+        Chr02: {
+          mode: "segments",
+          chrName: "Chr02",
+          segments: [{ segmentId: "other", type: "gap", gapSizeBp: 10 }],
+        },
+      },
+      grtProjectView: {
+        baselineFinalPathByChr: { Chr01: baselineEntry },
+      },
+    }),
+  };
+}
+
+test("restoreFinalPathFromGrtBaseline is cancellable and leaves the edited path untouched", async () => {
+  const { store } = createGrtRestoreState();
+  let persistCount = 0;
+  let rerenderCount = 0;
+  const result = await restoreFinalPathFromGrtBaseline(
+    {},
+    store,
+    { targetChrName: "Chr01" },
+    createDeps({
+      confirm() {
+        return false;
+      },
+      async persistProjectAssemblyViewState() {
+        persistCount += 1;
+      },
+      rerender() {
+        rerenderCount += 1;
+      },
+    }),
+  );
+
+  assert.equal(result, null);
+  assert.equal(persistCount, 0);
+  assert.equal(rerenderCount, 0);
+  assert.equal(store.getState().assembly.finalPathByChr.Chr01.q4Sha256, "edited-sha");
+});
+
+test("restoreFinalPathFromGrtBaseline replaces only the current chromosome and preserves hidden state", async () => {
+  const { store, baselineEntry } = createGrtRestoreState();
+  store.setState({
+    assembly: {
+      ...store.getState().assembly,
+      hiddenPrimaryCtgIds: [9],
+    },
+  });
+  const persisted = [];
+  const confirms = [];
+  const result = await restoreFinalPathFromGrtBaseline(
+    {},
+    store,
+    { targetChrName: "Chr01" },
+    createDeps({
+      confirm(message) {
+        confirms.push(message);
+        return true;
+      },
+      async persistProjectAssemblyViewState(payload) {
+        persisted.push(payload);
+        return payload;
+      },
+    }),
+  );
+
+  assert.equal(result.segments[0].assemblyCtgId, 30);
+  assert.equal(result.segments[0].start, 1);
+  assert.equal(result.segments[0].end, 2200);
+  assert.deepEqual(store.getState().assembly.finalPathByChr.Chr02.segments, [
+    { segmentId: "other", type: "gap", gapSizeBp: 10 },
+  ]);
+  assert.deepEqual(persisted[0].finalPathByChr.Chr01.segments, result.segments);
+  assert.deepEqual(persisted[0].hiddenPrimaryCtgIds, [9]);
+  assert.equal(confirms.length, 1);
+  assert.match(confirms[0], /Chr01/);
+  assert.equal(store.getState().assembly.actionError, "");
+  assert.match(store.getState().assembly.actionStatus, /GRT/);
+  assert.equal(result.q4Sha256, baselineEntry.q4Sha256);
+});
+
+test("restoreFinalPathFromGrtBaseline reports persistence errors without replacing the path", async () => {
+  const { store } = createGrtRestoreState();
+  let rerenderCount = 0;
+  const result = await restoreFinalPathFromGrtBaseline(
+    {},
+    store,
+    { targetChrName: "Chr01" },
+    createDeps({
+      async persistProjectAssemblyViewState() {
+        throw new Error("server unavailable");
+      },
+      rerender() {
+        rerenderCount += 1;
+      },
+    }),
+  );
+
+  assert.equal(result, null);
+  assert.equal(store.getState().assembly.finalPathByChr.Chr01.q4Sha256, "edited-sha");
+  assert.match(store.getState().assembly.actionError, /server unavailable/);
+  assert.equal(rerenderCount, 1);
 });

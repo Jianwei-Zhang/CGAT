@@ -11,10 +11,7 @@ import {
   exportDegapJobs,
   exportFinalPathFasta,
   getCtgDetail,
-  getGrtEvidence,
-  getGrtEventTrace,
   getGrtProjectView,
-  getGrtSourceCardTrace,
   importAddCtgPackage,
   getJunctionInspection,
   getTrackPairwiseEvidence,
@@ -107,6 +104,7 @@ import {
   flipFinalPathSegment as flipFinalPathSegmentImpl,
   moveFinalPathRow as moveFinalPathRowImpl,
   removeFinalPathRow as removeFinalPathRowImpl,
+  restoreFinalPathFromGrtBaseline as restoreFinalPathFromGrtBaselineImpl,
   updateFinalPathRow as updateFinalPathRowImpl,
 } from "./assembly/final-path-runtime.js";
 import {
@@ -123,10 +121,7 @@ import {
   normalizeFinalPathViewMode,
   resolveFinalPathSelectionKey,
 } from "./assembly/final-path-state.js";
-import {
-  buildEmptyGrtTraceState,
-  normalizeGrtProjectView,
-} from "./assembly/grt-state.js";
+import { normalizeGrtProjectView } from "./assembly/grt-state.js";
 import {
   getAssemblyI18n,
   tAssembly,
@@ -2260,156 +2255,6 @@ function scrollAssemblyToBottomIfRequested(host, store) {
   requestFrame(() => requestFrame(applyScroll));
 }
 
-async function openGrtTrace(host, store, { kind, id }) {
-  const normalizedKind = String(kind || "").trim();
-  const normalizedId = String(id || "").trim();
-  const state = store.getState();
-  if (!state.session.workspacePath || !state.session.projectId || !normalizedId) {
-    return;
-  }
-  store.setState({
-    assembly: {
-      ...state.assembly,
-      grtTrace: {
-        kind: normalizedKind,
-        id: normalizedId,
-        loading: true,
-        error: "",
-        detail: null,
-      },
-    },
-  });
-  rerenderAssemblyMainTab(host, store);
-  try {
-    const args = {
-      workspaceRoot: state.session.workspacePath,
-      projectId: state.session.projectId,
-    };
-    let detail;
-    if (normalizedKind === "source-card") {
-      detail = await getGrtSourceCardTrace({ ...args, sourceCardKey: normalizedId });
-    } else if (normalizedKind === "event") {
-      detail = await getGrtEventTrace({ ...args, eventId: normalizedId });
-    } else if (normalizedKind === "evidence") {
-      detail = await getGrtEvidence({ ...args, evidenceId: normalizedId });
-    } else {
-      throw new Error(`unsupported GRT trace kind: ${normalizedKind}`);
-    }
-    const latest = store.getState();
-    if (latest.assembly.grtTrace?.kind !== normalizedKind || latest.assembly.grtTrace?.id !== normalizedId) {
-      return;
-    }
-    store.setState({
-      assembly: {
-        ...latest.assembly,
-        grtTrace: {
-          kind: normalizedKind,
-          id: normalizedId,
-          loading: false,
-          error: "",
-          detail,
-        },
-      },
-    });
-  } catch (error) {
-    const latest = store.getState();
-    if (latest.assembly.grtTrace?.kind !== normalizedKind || latest.assembly.grtTrace?.id !== normalizedId) {
-      return;
-    }
-    store.setState({
-      assembly: {
-        ...latest.assembly,
-        grtTrace: {
-          kind: normalizedKind,
-          id: normalizedId,
-          loading: false,
-          error: String(error?.message || error),
-          detail: null,
-        },
-      },
-    });
-  }
-  rerenderAssemblyMainTab(host, store);
-  const panel = resolveCurrentRouteHost(host)?.querySelector?.("[data-grt-trace-panel='true']");
-  panel?.scrollIntoView?.({ block: "nearest" });
-}
-
-function closeGrtTrace(host, store) {
-  const state = store.getState();
-  store.setState({
-    assembly: {
-      ...state.assembly,
-      grtTrace: buildEmptyGrtTraceState(),
-    },
-  });
-  rerenderAssemblyMainTab(host, store);
-}
-
-async function locateGrtCtg(host, store, { assemblyCtgId, chrName = "" }) {
-  const normalizedCtgId = normalizeSupportDatasetId(assemblyCtgId);
-  const normalizedChrName = String(chrName || "").trim();
-  if (!normalizedCtgId) {
-    return;
-  }
-  if (normalizedChrName && normalizedChrName !== String(store.getState().assembly.selectedChrName || "")) {
-    await selectChromosome(host, store, normalizedChrName);
-  }
-  await selectCtg(host, store, normalizedCtgId, { focusMode: "center" });
-}
-
-async function locateGrtSourceCard(host, store, sourceCardKey) {
-  const normalizedKey = String(sourceCardKey || "").trim();
-  const initial = store.getState();
-  const card = (initial.assembly.grtProjectView?.sourceCards || [])
-    .find((item) => item.sourceCardKey === normalizedKey);
-  if (!card) {
-    return;
-  }
-  if (card.targetChr && card.targetChr !== String(initial.assembly.selectedChrName || "")) {
-    await selectChromosome(host, store, card.targetChr);
-  }
-  const afterChr = store.getState();
-  const supportDataset = (afterChr.initializer.datasets || [])
-    .find((dataset) => String(dataset.name || dataset.label || "") === card.datasetName);
-  const currentProject = getCurrentProject(afterChr);
-  if (
-    supportDataset
-    && Number(supportDataset.datasetId) !== Number(currentProject?.primaryDatasetId)
-    && Number(supportDataset.datasetId) !== Number(afterChr.assembly.supportDatasetId)
-  ) {
-    await applySupportDatasetSelection(host, store, supportDataset.datasetId);
-  }
-  const latest = store.getState();
-  const matched = [...(latest.assembly.chrCtgs || []), ...(latest.assembly.supportChrCtgs || [])]
-    .find((ctg) => ctg.grtSourceCardKey === normalizedKey);
-  if (matched?.assemblyCtgId) {
-    await locateGrtCtg(host, store, {
-      assemblyCtgId: matched.assemblyCtgId,
-      chrName: card.targetChr,
-    });
-  }
-}
-
-async function locateGrtFinalPathSegment(host, store, segmentId) {
-  const normalizedId = String(segmentId || "").trim();
-  if (!normalizedId) {
-    return;
-  }
-  const initial = store.getState();
-  const entries = initial.assembly.grtProjectView?.baselineFinalPathByChr || {};
-  const targetChr = Object.entries(entries).find(([, entry]) =>
-    (entry?.segments || []).some((segment) => segment.segmentId === normalizedId),
-  )?.[0] || "";
-  if (targetChr && targetChr !== String(initial.assembly.selectedChrName || "")) {
-    await selectChromosome(host, store, targetChr);
-  }
-  const routeHost = resolveCurrentRouteHost(host);
-  const target = Array.from(
-    routeHost?.querySelectorAll?.("[data-final-path-segment-id]") || [],
-  ).find((node) => String(node.dataset?.finalPathSegmentId || "") === normalizedId);
-  target?.scrollIntoView?.({ block: "center", inline: "center" });
-}
-
 function createAssemblyPageBindingDeps() {
   return {
     appendFinalPathRow,
@@ -2454,7 +2299,6 @@ function createAssemblyPageBindingDeps() {
     bindTrackSelectionHotkeys: (host, store) => bindTrackSelectionHotkeysImpl(host, store, trackHotkeyBindingDeps),
     bindTrackViewportResize,
     createPhasedChrTrack,
-    closeGrtTrace,
     handleNewSequenceRowAction,
     handleSubviewCandidateRemoval,
     handleSubviewSwapTrackOrder,
@@ -2463,11 +2307,7 @@ function createAssemblyPageBindingDeps() {
     handleTrackSubviewTrackSelection,
     loadAssemblyView,
     loadNewSequencesTab,
-    locateGrtCtg,
-    locateGrtFinalPathSegment,
-    locateGrtSourceCard,
     normalizeTrackFocusMode,
-    openGrtTrace,
     markNextTrackAutoFocusSuppressed: () => {
       suppressNextTrackAutoFocus = true;
     },
@@ -2481,6 +2321,7 @@ function createAssemblyPageBindingDeps() {
     resolveAssemblyConfirmDialog,
     resolveTrackContigClickAction,
     removeFinalPathRow,
+    restoreFinalPathFromGrtBaseline,
     restoreSelectedDeletedCtgs: editorActionRuntimeAdapters.restoreSelectedDeletedCtgs,
     runCtgSearch,
     selectChromosome,
@@ -3585,6 +3426,15 @@ async function appendTrackContigToFinalPath(host, store, ctgContext, options = {
 
 async function appendFinalPathRow(host, store, payload = {}) {
   return appendFinalPathRowImpl(host, store, payload, {
+    persistProjectAssemblyViewState:
+      projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
+    rerender,
+  });
+}
+
+async function restoreFinalPathFromGrtBaseline(host, store, payload = {}) {
+  return restoreFinalPathFromGrtBaselineImpl(host, store, payload, {
+    confirm: (message) => requestAssemblyConfirm(host, store, message),
     persistProjectAssemblyViewState:
       projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
     rerender,

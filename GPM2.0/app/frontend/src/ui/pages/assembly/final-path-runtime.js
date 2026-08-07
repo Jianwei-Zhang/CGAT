@@ -3,6 +3,7 @@ import {
   buildFinalPathCtgSegment,
   buildFinalPathEntry,
   buildFinalPathGapSegment,
+  areFinalPathEntriesSemanticallyEqual,
   isFinalPathCtgSegment,
   isFinalPathGapSegment,
   isFinalPathRefSegment,
@@ -442,6 +443,153 @@ async function persistCurrentEntrySegments(host, store, context, nextSegments, d
     statusPatch,
   );
   return normalizedPersistedFinalPathByChr[chrName] || null;
+}
+
+function normalizeBaselineSourceContig(segment) {
+  const source = segment?.source && typeof segment.source === "object" && !Array.isArray(segment.source)
+    ? segment.source
+    : {};
+  return normalizeString(source.contig || segment?.originId || segment?.ctgName)
+    .replace(/@[^@]+$/, "")
+    .toLowerCase();
+}
+
+function resolveBaselineAssemblyCtgId(state, currentEntry, segment) {
+  const directId = normalizePositiveInteger(segment?.assemblyCtgId);
+  if (directId) {
+    return directId;
+  }
+  const sourceDataset = normalizeString(segment?.source?.dataset || segment?.datasetName).toLowerCase();
+  const sourceContig = normalizeBaselineSourceContig(segment);
+  const currentSegment = (Array.isArray(currentEntry?.segments) ? currentEntry.segments : []).find((candidate) => {
+    if (normalizeString(candidate?.segmentId) === normalizeString(segment?.segmentId)) {
+      return true;
+    }
+    const candidateDataset = normalizeString(candidate?.source?.dataset || candidate?.datasetName).toLowerCase();
+    return candidateDataset === sourceDataset && normalizeBaselineSourceContig(candidate) === sourceContig;
+  });
+  const currentId = normalizePositiveInteger(currentSegment?.assemblyCtgId);
+  if (currentId) {
+    return currentId;
+  }
+  const pools = [
+    Array.isArray(state?.assembly?.chrCtgs) ? state.assembly.chrCtgs : [],
+    Array.isArray(state?.assembly?.supportChrCtgs) ? state.assembly.supportChrCtgs : [],
+    Array.isArray(state?.assembly?.supportMirroredCtgs) ? state.assembly.supportMirroredCtgs : [],
+  ];
+  for (const pool of pools) {
+    const match = pool.find((candidate) => {
+      const candidateDataset = normalizeString(candidate?.datasetName)
+        || findDatasetNameById(state?.initializer, candidate?.datasetId);
+      const candidateContig = normalizeString(candidate?.originId || candidate?.name)
+        .replace(/@[^@]+$/, "")
+        .toLowerCase();
+      return candidateDataset.toLowerCase() === sourceDataset && candidateContig === sourceContig;
+    });
+    const candidateId = normalizePositiveInteger(match?.assemblyCtgId);
+    if (candidateId) {
+      return candidateId;
+    }
+  }
+  return null;
+}
+
+function materializeGrtBaselineEntry(state, currentEntry, baselineEntry, chrName) {
+  const baselineSegments = Array.isArray(baselineEntry?.segments) ? baselineEntry.segments : [];
+  const segments = baselineSegments.map((segment) => {
+    if (!isFinalPathCtgSegment(segment)) {
+      return segment;
+    }
+    const assemblyCtgId = resolveBaselineAssemblyCtgId(state, currentEntry, segment);
+    if (!assemblyCtgId) {
+      return null;
+    }
+    return {
+      ...segment,
+      assemblyCtgId,
+    };
+  });
+  if (segments.some((segment) => segment === null)) {
+    return null;
+  }
+  const preservedHiddenPrimaryCtgIds = currentEntry?.hiddenPrimaryCtgIds
+    || state?.assembly?.hiddenPrimaryCtgIds
+    || [];
+  return buildFinalPathEntry({
+    ...baselineEntry,
+    chrName,
+    segments,
+    updatedAt: String(Math.floor(Date.now() / 1000)),
+    hiddenPrimaryCtgIds: preservedHiddenPrimaryCtgIds,
+    serverBaseline: true,
+  });
+}
+
+export async function restoreFinalPathFromGrtBaseline(host, store, payload = {}, deps = {}) {
+  const context = getCurrentFinalPathContext(store, payload);
+  if (!context) {
+    return null;
+  }
+  const { state, chrName, finalPathByChr, currentEntry } = context;
+  const baselineEntry = normalizeFinalPathByChr(
+    state.assembly?.grtProjectView?.baselineFinalPathByChr,
+  )[chrName];
+  if (!baselineEntry) {
+    setRuntimeError(
+      host,
+      store,
+      deps,
+      tAssembly(state, "runtime.finalPathGrtBaselineUnavailable", { chrName }),
+    );
+    return null;
+  }
+  if (areFinalPathEntriesSemanticallyEqual(currentEntry, baselineEntry)) {
+    return currentEntry;
+  }
+  const confirm = typeof deps.confirm === "function" ? deps.confirm : () => true;
+  const confirmed = await confirm(
+    tAssembly(state, "runtime.finalPathGrtBaselineConfirm", { chrName }),
+  );
+  if (!confirmed) {
+    return null;
+  }
+  const restoredEntry = materializeGrtBaselineEntry(state, currentEntry, baselineEntry, chrName);
+  if (!restoredEntry) {
+    setRuntimeError(
+      host,
+      store,
+      deps,
+      tAssembly(state, "runtime.finalPathGrtBaselineMissingSource", { chrName }),
+    );
+    return null;
+  }
+  try {
+    const persisted = await persistCurrentFinalPathByChr(
+      host,
+      store,
+      {
+        ...finalPathByChr,
+        [chrName]: restoredEntry,
+      },
+      deps,
+      {
+        actionStatus: tAssembly(state, "runtime.finalPathGrtBaselineRestored", { chrName }),
+        actionError: "",
+      },
+    );
+    return persisted?.[chrName] || null;
+  } catch (error) {
+    setRuntimeError(
+      host,
+      store,
+      deps,
+      tAssembly(state, "runtime.finalPathGrtBaselineFailed", {
+        chrName,
+        error: String(error?.message || error),
+      }),
+    );
+    return null;
+  }
 }
 
 function buildTrackContigFinalPathSegment(state, ctgContext, ctg, segmentId) {

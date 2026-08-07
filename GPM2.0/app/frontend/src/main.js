@@ -145,13 +145,6 @@ const store = createStore({
       sourceCards: [],
       verification: {},
     },
-    grtTrace: {
-      kind: "",
-      id: "",
-      loading: false,
-      error: "",
-      detail: null,
-    },
     finalPathViewMode: "graph",
     degapProjectState: {},
     degap: {

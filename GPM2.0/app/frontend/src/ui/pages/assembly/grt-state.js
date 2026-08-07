@@ -250,16 +250,6 @@ export function normalizeGrtProjectView(value) {
   };
 }
 
-export function buildEmptyGrtTraceState() {
-  return {
-    kind: "",
-    id: "",
-    loading: false,
-    error: "",
-    detail: null,
-  };
-}
-
 export function buildEmptyGrtProjectView() {
   return {
     recipe: normalizeGrtRecipe({}),
