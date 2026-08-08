@@ -219,6 +219,45 @@ grep -F -- "--minimap2 ${FAKE_BIN}/minimap2" "${output_root}/run_grt_step1.sh" >
 grep -F -- "--minimap2 ${FAKE_BIN}/minimap2 --nucmer ${FAKE_BIN}/nucmer --delta-filter ${FAKE_BIN}/delta-filter --show-coords ${FAKE_BIN}/show-coords" \
   "${output_root}/run_grt_step23.sh" >/dev/null
 
+no_chmod_bin="${TMP_DIR}/no-chmod-bin"
+no_chmod_log="${TMP_DIR}/no-chmod.log"
+no_chmod_output="${TMP_DIR}/no-chmod-gpm_server"
+mkdir -p "$no_chmod_bin"
+cat > "${no_chmod_bin}/chmod" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${GPM_TEST_CHMOD_LOG:?}"
+exit 1
+EOF
+chmod +x "${no_chmod_bin}/chmod"
+
+GPM_TEST_CHMOD_LOG="$no_chmod_log" PATH="${no_chmod_bin}:${FAKE_BIN}:$PATH" \
+  bash "$SCRIPT" \
+  --ref ref_no_chmod "$ref" \
+  --ds ds_no_chmod "$ds" \
+  --skip-self \
+  -o "$no_chmod_output" >/dev/null
+
+[[ -s "$no_chmod_log" ]] || {
+  echo "expected prepare to attempt best-effort executable-bit updates" >&2
+  exit 1
+}
+[[ ! -x "${no_chmod_output}/run_all.sh" ]] || {
+  echo "run_all.sh unexpectedly became executable through failing chmod" >&2
+  exit 1
+}
+bash "${no_chmod_output}/run_all.sh" --help >/dev/null
+while IFS= read -r generated_script; do
+  bash -n "$generated_script"
+done < <(find "$no_chmod_output" -type f -name '*.sh' | LC_ALL=C sort)
+! grep -q '\.chmod(0o755)' "$SCRIPT" || {
+  echo "prepare.sh still embeds mandatory Python chmod calls" >&2
+  exit 1
+}
+! grep -q '\.chmod(0o755)' "${REPO_ROOT}/server/tools/add_ctg_stage.py" || {
+  echo "add_ctg_stage.py still requires generated command scripts to be executable" >&2
+  exit 1
+}
+
 help_output="$(bash "$SCRIPT" --help)"
 for removed_option in \
   --grt-meryl \

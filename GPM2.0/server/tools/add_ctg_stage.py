@@ -366,7 +366,6 @@ def write_alignment_command(path, run_dir, target_fa, query_fa, options, self_mo
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    path.chmod(0o755)
 
 
 def server_tool_path(run_dir, tool_name):

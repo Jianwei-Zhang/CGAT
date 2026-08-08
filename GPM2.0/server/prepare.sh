@@ -114,6 +114,12 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
 }
 
+make_executable_if_supported() {
+  local path="$1"
+  [[ -f "$path" ]] || die "Generated script is missing: $path"
+  chmod +x "$path" 2>/dev/null || true
+}
+
 validate_name() {
   local value="$1"
   [[ "$value" =~ ^[A-Za-z0-9._-]+$ ]] || die "Invalid name '$value'. Use only letters, numbers, dot, underscore, and hyphen."
@@ -369,7 +375,7 @@ write_alignment_command_script() {
         ;;
     esac
   } > "$output_path"
-  chmod +x "$output_path"
+  make_executable_if_supported "$output_path"
 }
 
 resolve_output_root() {
@@ -456,10 +462,10 @@ write_package_scripts() {
     -e "s/__PACKAGE_MODE__/${package_mode}/g" \
     -e "s/__SEQUENCE_LAYOUT__/${sequence_layout}/g" \
     "${work_root}/package_full_zip.sh"
-  chmod +x "${work_root}/package_full_zip.sh"
+  make_executable_if_supported "${work_root}/package_full_zip.sh"
 
   cp -f "$light_template" "${work_root}/package_light_no_fasta_zip.sh"
-  chmod +x "${work_root}/package_light_no_fasta_zip.sh"
+  make_executable_if_supported "${work_root}/package_light_no_fasta_zip.sh"
 }
 
 write_export_final_path_fasta_script() {
@@ -468,7 +474,7 @@ write_export_final_path_fasta_script() {
 
   [[ -f "$template_path" ]] || die "Missing template: $template_path"
   cp -f "$template_path" "${work_root}/export_final_path_fasta.sh"
-  chmod +x "${work_root}/export_final_path_fasta.sh"
+  make_executable_if_supported "${work_root}/export_final_path_fasta.sh"
 }
 
 write_prepare_lib() {
@@ -774,7 +780,6 @@ for line in text.splitlines():
             break
     updated_lines.append(line)
 assign_script.write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
-assign_script.chmod(0o755)
 
 ref_path = metadata_dir / "reference.tsv"
 with ref_path.open(newline="", encoding="utf-8") as handle:
@@ -862,7 +867,6 @@ elif alignment_engine == "winnowmap":
 else:
     fail(f"unsupported alignment engine: {alignment_engine}")
 command_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-command_path.chmod(0o755)
 PY
 
 bash "${stage_dir}/runs/${dataset_name}_vs_ref/command.sh"
@@ -920,7 +924,6 @@ for path in stage_dir.rglob("*.sh"):
     text = path.read_text(encoding="utf-8")
     text = text.replace(str(stage_dir), str(server_dir))
     path.write_text(text, encoding="utf-8")
-    path.chmod(0o755)
 
 for name in [
     "metadata",
@@ -949,8 +952,6 @@ for name in [
         shutil.copytree(src, dst)
     else:
         shutil.copy2(src, dst)
-        if name.endswith(".sh"):
-            dst.chmod(0o755)
 PY
 
 package_dir="$(mktemp -d "$(dirname "$server_dir")/.add_package.${dataset_name}.XXXXXX")"
@@ -979,7 +980,7 @@ mkdir -p "$(dirname "$out_path")"
 echo "Added dataset '${dataset_name}' to: ${server_dir}"
 echo "Add package: ${out_path}"
 EOF
-  chmod +x "${work_root}/add_dataset.sh"
+  make_executable_if_supported "${work_root}/add_dataset.sh"
 }
 
 write_add_ctg_script() {
@@ -1205,7 +1206,6 @@ for path in stage_dir.rglob("*.sh"):
     text = path.read_text(encoding="utf-8")
     text = text.replace(str(stage_dir), str(server_dir))
     path.write_text(text, encoding="utf-8")
-    path.chmod(0o755)
 
 for name in [
     "metadata",
@@ -1235,8 +1235,6 @@ for name in [
         shutil.copytree(src, dst)
     else:
         shutil.copy2(src, dst)
-        if name.endswith(".sh"):
-            dst.chmod(0o755)
 PY
 
 package_dir="$(mktemp -d "$(dirname "$server_dir")/.add_ctg_package.${ctg_name}.XXXXXX")"
@@ -1253,7 +1251,7 @@ mkdir -p "$(dirname "$out_path")"
 echo "Added ctg '${ctg_name}' to track '${target_track}' on ${chr_name}: ${server_dir}"
 echo "Add ctg package: ${out_path}"
 EOF
-  chmod +x "${work_root}/add_ctg.sh"
+  make_executable_if_supported "${work_root}/add_ctg.sh"
 }
 
 write_reference_segments_metadata() {
@@ -1669,7 +1667,6 @@ def write_run_command_script(path, run_dir, left_fa, right_fa, self_mode, thread
     else:
         fail(f"unsupported alignment engine: {alignment_engine}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    path.chmod(0o755)
 
 
 def write_tel_scan_command_script(path, run_dir, work_root, chr_name, selected_dataset_fastas):
@@ -1836,7 +1833,6 @@ for dataset_name, fasta_path in dataset_specs:
         "PY\n",
         encoding="utf-8",
     )
-    path.chmod(0o755)
 
 
 def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_dataset_fastas, threads, minimap_preset):
@@ -2101,7 +2097,6 @@ with output_path.open("w", encoding="utf-8", newline="") as handle:
 '''
     lines.extend(["", python_invocation, parser, "PY"])
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    path.chmod(0o755)
     return True
 
 
@@ -2113,7 +2108,6 @@ def write_generated_command_script(path, command_paths, chr_name):
             f"echo {shlex.quote(f'No chr-local alignments to run for {chr_name}.')} >&2\n"
         )
         path.write_text(body, encoding="utf-8")
-        path.chmod(0o755)
         return
 
     lines = ["#!/usr/bin/env bash", "set -euo pipefail", ""]
@@ -2124,7 +2118,6 @@ def write_generated_command_script(path, command_paths, chr_name):
         else:
             lines.append(f"bash {quoted}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    path.chmod(0o755)
 
 
 work_root = Path(os.environ["GPM_FAST_WORK_ROOT"])
@@ -2490,7 +2483,7 @@ PY
 python3 "\${GPM_FAST_WORK_ROOT}/.prepare_lib/tools/track_member_order.py" \
   --server-dir "\${GPM_FAST_WORK_ROOT}"
 EOF
-  chmod +x "$output_path"
+  make_executable_if_supported "$output_path"
 }
 
 write_grt_prepare_script() {
@@ -2516,7 +2509,7 @@ write_grt_prepare_script() {
     done
     printf '\n'
   } > "$output_path"
-  chmod +x "$output_path"
+  make_executable_if_supported "$output_path"
 }
 
 write_grt_step1_script() {
@@ -2532,7 +2525,7 @@ write_grt_step1_script() {
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$GRT_MINIMAP2")"
   } > "$output_path"
-  chmod +x "$output_path"
+  make_executable_if_supported "$output_path"
 }
 
 write_grt_step23_script() {
@@ -2551,7 +2544,7 @@ write_grt_step23_script() {
       "$(shell_quote "$GRT_DELTA_FILTER")" \
       "$(shell_quote "$GRT_SHOW_COORDS")"
   } > "$output_path"
-  chmod +x "$output_path"
+  make_executable_if_supported "$output_path"
 }
 
 write_grt_telomere_finalize_script() {
@@ -2570,7 +2563,7 @@ write_grt_telomere_finalize_script() {
       "$(shell_quote "$GRT_DELTA_FILTER")" \
       "$(shell_quote "$GRT_SHOW_COORDS")"
   } > "$output_path"
-  chmod +x "$output_path"
+  make_executable_if_supported "$output_path"
 }
 
 write_grt_evidence_package_script() {
@@ -2586,7 +2579,7 @@ write_grt_evidence_package_script() {
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$GRT_MINIMAP2")"
   } > "$output_path"
-  chmod +x "$output_path"
+  make_executable_if_supported "$output_path"
 }
 
 write_chr_placeholder_script() {
@@ -2604,7 +2597,7 @@ generated_command="./generated_command.sh"
 }
 bash "\${generated_command}"
 EOF
-  chmod +x "${run_dir}/command.sh"
+  make_executable_if_supported "${run_dir}/command.sh"
 }
 
 write_self_command_script() {
@@ -3063,7 +3056,7 @@ printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/package_light_no_fasta_zip.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-chmod +x "$RUN_ALL"
+make_executable_if_supported "$RUN_ALL"
 write_package_scripts "$WORK_ROOT" "$package_mode" "$sequence_layout"
 write_prepare_lib "$WORK_ROOT"
 write_export_final_path_fasta_script "$WORK_ROOT"
