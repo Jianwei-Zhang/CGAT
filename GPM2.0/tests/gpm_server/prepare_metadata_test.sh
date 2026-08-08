@@ -202,6 +202,10 @@ grep -F -- '.prepare_lib/tools/run_all_runner.py' "${output_root}/run_all.sh" >/
   echo "generated workspace is missing run_all_runner.py" >&2
   exit 1
 }
+[[ -f "${output_root}/.prepare_lib/tools/reference_segments.py" ]] || {
+  echo "generated workspace is missing reference_segments.py" >&2
+  exit 1
+}
 
 grep -F -- "--minimap2 ${FAKE_BIN}/minimap2" "${output_root}/run_grt_step1.sh" >/dev/null
 grep -F -- "--minimap2 ${FAKE_BIN}/minimap2 --nucmer ${FAKE_BIN}/nucmer --delta-filter ${FAKE_BIN}/delta-filter --show-coords ${FAKE_BIN}/show-coords" \

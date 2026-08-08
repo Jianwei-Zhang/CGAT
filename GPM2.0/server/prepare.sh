@@ -1210,76 +1210,10 @@ EOF
 write_reference_segments_metadata() {
   local ref_fa="$1"
   local output_path="$2"
+  local scanner="${SCRIPT_DIR}/tools/reference_segments.py"
 
-  awk -v min_gap_run_bp=100 -v output_path="$output_path" '
-    function emit_segment(end_bp) {
-      if (current_chr != "" && end_bp >= segment_start_bp) {
-        segment_order += 1
-        printf "%s\t%d\t%d\t%d\n", current_chr, segment_order, segment_start_bp, end_bp >> output_path
-      }
-    }
-
-    function close_gap_if_needed(next_bp) {
-      if (gap_run_length >= min_gap_run_bp) {
-        emit_segment(gap_start_bp - 1)
-        segment_start_bp = next_bp
-      }
-      gap_run_length = 0
-      gap_start_bp = 0
-    }
-
-    function finish_record() {
-      if (current_chr == "") {
-        return
-      }
-      if (gap_run_length > 0) {
-        close_gap_if_needed(sequence_bp + 1)
-      }
-      emit_segment(sequence_bp)
-    }
-
-    BEGIN {
-      print "reference_chr_name\tsegment_order\tsegment_start_bp\tsegment_end_bp" > output_path
-      current_chr = ""
-      segment_order = 0
-      segment_start_bp = 1
-      sequence_bp = 0
-      gap_run_length = 0
-      gap_start_bp = 0
-    }
-
-    /^>/ {
-      finish_record()
-      current_chr = substr($0, 2)
-      sub(/[[:space:]].*$/, "", current_chr)
-      segment_order = 0
-      segment_start_bp = 1
-      sequence_bp = 0
-      gap_run_length = 0
-      gap_start_bp = 0
-      next
-    }
-
-    {
-      gsub(/[[:space:]]/, "", $0)
-      for (i = 1; i <= length($0); i++) {
-        base = substr($0, i, 1)
-        sequence_bp += 1
-        if (base == "N" || base == "n") {
-          if (gap_run_length == 0) {
-            gap_start_bp = sequence_bp
-          }
-          gap_run_length += 1
-        } else if (gap_run_length > 0) {
-          close_gap_if_needed(sequence_bp)
-        }
-      }
-    }
-
-    END {
-      finish_record()
-    }
-  ' "$ref_fa"
+  [[ -f "$scanner" ]] || die "Missing reference segment scanner: $scanner"
+  python3 "$scanner" "$ref_fa" "$output_path"
 }
 
 collect_reference_chr_names() {
