@@ -298,7 +298,7 @@ def executable_identity(command: str) -> dict[str, str]:
             [resolved, "--version"], check=False, capture_output=True, text=True, timeout=10
         )
         text = (completed.stdout or completed.stderr).strip()
-        if text:
+        if completed.returncode == 0 and text:
             version = text.splitlines()[0][:200]
     except (OSError, subprocess.TimeoutExpired):
         pass

@@ -13,7 +13,11 @@ REPO_ROOT = Path(__file__).parents[2]
 TOOL = REPO_ROOT / "server" / "tools" / "grt_prepare_inputs.py"
 sys.path.insert(0, str(REPO_ROOT / "server/tools"))
 
-from grt_prepare_inputs import commit_prepared_outputs, donor_fragment_rows
+from grt_prepare_inputs import (
+    commit_prepared_outputs,
+    donor_fragment_rows,
+    executable_identity,
+)
 
 
 def write_fasta(path, records):
@@ -41,6 +45,38 @@ def sha256(path):
 
 
 class GrtPrepareInputsTests(unittest.TestCase):
+    def write_version_tool(self, root, name, body):
+        path = root / name
+        path.write_text("#!/bin/sh\n" + body, encoding="utf-8")
+        path.chmod(0o755)
+        return path
+
+    def test_executable_identity_records_successful_version_output(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            tool = self.write_version_tool(
+                Path(temporary_dir),
+                "version-ok",
+                "printf '\\nfixture 2.1\\nextra detail\\n'\nexit 0\n",
+            )
+
+            identity = executable_identity(str(tool))
+
+            self.assertEqual(identity["version"], "fixture 2.1")
+            self.assertEqual(identity["sha256"], sha256(tool))
+
+    def test_executable_identity_ignores_failed_probe_error_text(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            tool = self.write_version_tool(
+                Path(temporary_dir),
+                "version-unsupported",
+                "printf 'invalid option -- -\\n' >&2\nexit 1\n",
+            )
+
+            identity = executable_identity(str(tool))
+
+            self.assertEqual(identity["version"], "unknown")
+            self.assertEqual(identity["sha256"], sha256(tool))
+
     def test_donor_fragments_split_long_n_runs_without_changing_source_coordinates(self):
         sequence = "A" * 1200 + "N" * 100 + "C" * 1400
         member = {
