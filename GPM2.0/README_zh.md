@@ -126,6 +126,18 @@ bash ./gpm_server/run_all.sh
 
 `run_all.sh` 会严格保持该顺序，遇到程序或打包错误立即停止，并且只复用输入、参数、工具和输出 hash 均仍匹配的计算检查点。每个打包脚本都会先生成全新的临时 zip，成功后才替换最终文件，因此重跑不会保留已经删除的旧条目，也不会用失败的半成品覆盖有效交付包。
 
+#### 断点恢复与运行监控
+
+断点恢复不需要额外参数：重新执行同一条 `bash ./gpm_server/run_all.sh` 即可。有效的 reference、assignment 和染色体局部 checkpoint 会直接跳过；GRT wrapper 会复用其内部已经校验的 cache；失效或未完成的工作会重新计算。线程数仍以 `prepare.sh -t/--threads` 生成时的值为准；`run_all.sh` 当前不提供运行时线程覆盖，也不提供 `--from`、`--until` 或 `--stage`。
+
+运行期间可持续查看唯一的追加式主日志：
+
+```bash
+tail -F ./gpm_server/logs/run_all.log
+```
+
+`gpm_server/logs/status.tsv` 会以原子方式更新，表示当前各单元状态。后续恢复会在同一个 `run_all.log` 中追加新的 invocation 段，不创建单独的 history 目录。同一 Server 工作目录同时只允许一个 `run_all.sh` 进程持有运行锁。
+
 ### 向已有服务端项目追加一个 dataset
 
 初始 `gpm_server/` 完成比对并交付后，可以在服务端追加一个新 dataset，并生成一个小型增量包：

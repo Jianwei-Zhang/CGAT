@@ -57,6 +57,95 @@ class RunAllRunnerTests(unittest.TestCase):
             **kwargs,
         )
 
+    def configure_reference_inputs(
+        self, server: Path, root: Path, dataset_names: list[str]
+    ) -> dict[str, str]:
+        (server / "metadata/prepare_options.tsv").write_text(
+            "key\tvalue\nalignment_engine\tminimap2\nthreads\t12\nminimap_preset\tasm10\n",
+            encoding="utf-8",
+        )
+        (server / "metadata/reference.tsv").write_text(
+            "reference_name\tfasta_relpath\tfai_relpath\n"
+            "ref\tdata/reference/ref.fa\tdata/reference/ref.fa.fai\n",
+            encoding="utf-8",
+        )
+        dataset_rows = [
+            "dataset_name\tassembler\tassembler_version\tfasta_relpath\tfai_relpath\t"
+            "self_alignment_available"
+        ]
+        for name in dataset_names:
+            dataset_rows.append(
+                f"{name}\t{name}\t\tdata/datasets/{name}.fa\t"
+                f"data/datasets/{name}.fa.fai\ttrue"
+            )
+        (server / "metadata/datasets.tsv").write_text(
+            "\n".join(dataset_rows) + "\n", encoding="utf-8"
+        )
+        files = [
+            ("data/reference/ref.fa", ">target\nAAAAAAAAAAAA\n"),
+            ("data/reference/ref.fa.fai", "target\t12\t8\t12\t13\n"),
+        ]
+        files.extend(
+            (f"data/datasets/{name}.fa", ">query\nAAAAAAAAAA\n")
+            for name in dataset_names
+        )
+        files.extend(
+            (f"data/datasets/{name}.fa.fai", "query\t10\t7\t10\t11\n")
+            for name in dataset_names
+        )
+        for relpath, content in files:
+            path = server / relpath
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        fake_bin = root / "bin"
+        fake_bin.mkdir()
+        minimap2 = fake_bin / "minimap2"
+        minimap2.write_text("#!/usr/bin/env bash\necho fixture\n", encoding="utf-8")
+        minimap2.chmod(0o755)
+        environment = os.environ.copy()
+        environment["PATH"] = f"{fake_bin}{os.pathsep}{environment.get('PATH', '')}"
+        return environment
+
+    def configure_chromosome_inputs(
+        self, server: Path, root: Path, chromosome_names: list[str]
+    ) -> dict[str, str]:
+        (server / "metadata/prepare_options.tsv").write_text(
+            "key\tvalue\nalignment_engine\tminimap2\nthreads\t12\n"
+            "minimap_preset\tasm10\nskip_self\tfalse\ntel_enabled\tfalse\n"
+            "cen_enabled\tfalse\n",
+            encoding="utf-8",
+        )
+        (server / "metadata/chr_assignments.tsv").write_text(
+            "dataset_name\tseq_name\tassigned_chr_name\n",
+            encoding="utf-8",
+        )
+        (server / "metadata/track_member_orders.tsv").write_text(
+            "target_track\ttarget_chr\tmember_dataset\tmember_ctg\tmember_order\n",
+            encoding="utf-8",
+        )
+        for chromosome in chromosome_names:
+            run_dir = server / f"runs/chr_{chromosome}"
+            dataset = run_dir / "datasets/ds.fa"
+            dataset.parent.mkdir(parents=True, exist_ok=True)
+            dataset.write_text(">query\nAAAAAAAAAA\n", encoding="utf-8")
+            operation = run_dir / "ds_vs_self"
+            operation.mkdir()
+            (operation / "command.sh").write_text(
+                "#!/usr/bin/env bash\n# fixture\n", encoding="utf-8"
+            )
+            (run_dir / "generated_command.sh").write_text(
+                "#!/usr/bin/env bash\nbash ./ds_vs_self/command.sh\n",
+                encoding="utf-8",
+            )
+        fake_bin = root / "bin"
+        fake_bin.mkdir()
+        minimap2 = fake_bin / "minimap2"
+        minimap2.write_text("#!/usr/bin/env bash\necho fixture\n", encoding="utf-8")
+        minimap2.chmod(0o755)
+        environment = os.environ.copy()
+        environment["PATH"] = f"{fake_bin}{os.pathsep}{environment.get('PATH', '')}"
+        return environment
+
     def test_success_streams_output_and_writes_atomic_status(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -104,36 +193,7 @@ class RunAllRunnerTests(unittest.TestCase):
                     )
                 ],
             )
-            (server / "metadata/prepare_options.tsv").write_text(
-                "key\tvalue\nalignment_engine\tminimap2\nthreads\t12\nminimap_preset\tasm10\n",
-                encoding="utf-8",
-            )
-            (server / "metadata/reference.tsv").write_text(
-                "reference_name\tfasta_relpath\tfai_relpath\n"
-                "ref\tdata/reference/ref.fa\tdata/reference/ref.fa.fai\n",
-                encoding="utf-8",
-            )
-            (server / "metadata/datasets.tsv").write_text(
-                "dataset_name\tassembler\tassembler_version\tfasta_relpath\tfai_relpath\tself_alignment_available\n"
-                "ds\tds\t\tdata/datasets/ds.fa\tdata/datasets/ds.fa.fai\ttrue\n",
-                encoding="utf-8",
-            )
-            for relpath, content in [
-                ("data/reference/ref.fa", ">target\nAAAAAAAAAAAA\n"),
-                ("data/reference/ref.fa.fai", "target\t12\t8\t12\t13\n"),
-                ("data/datasets/ds.fa", ">query\nAAAAAAAAAA\n"),
-                ("data/datasets/ds.fa.fai", "query\t10\t7\t10\t11\n"),
-            ]:
-                path = server / relpath
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(content, encoding="utf-8")
-            fake_bin = root / "bin"
-            fake_bin.mkdir()
-            minimap2 = fake_bin / "minimap2"
-            minimap2.write_text("#!/usr/bin/env bash\necho fixture\n", encoding="utf-8")
-            minimap2.chmod(0o755)
-            environment = os.environ.copy()
-            environment["PATH"] = f"{fake_bin}{os.pathsep}{environment.get('PATH', '')}"
+            environment = self.configure_reference_inputs(server, root, ["ds"])
 
             first = self.run_runner(server, env=environment)
             self.assertEqual(first.returncode, 0, first.stderr)
@@ -156,6 +216,242 @@ class RunAllRunnerTests(unittest.TestCase):
                 (server / "run-count.txt").read_text(encoding="utf-8"), "run\nrun\n"
             )
             self.assertEqual(read_status(server / "logs/status.tsv")[0]["attempt"], "2")
+
+    def test_interrupted_reference_resume_skips_earlier_valid_unit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            ready = root / "ds2.ready"
+            allow = root / "ds2.continue"
+            completed = root / "completed"
+            paf = (
+                "printf 'query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\n'"
+            )
+            server = self.make_workspace(
+                root,
+                [
+                    (
+                        "ref:ds1",
+                        "printf 'run\\n' >> ref-ds1.count\n"
+                        "mkdir -p runs/ds1_vs_ref\n"
+                        f"{paf} > runs/ds1_vs_ref/result.paf\n"
+                        "printf 'fixture\\n' > runs/ds1_vs_ref/tool_version.txt",
+                    ),
+                    (
+                        "ref:ds2",
+                        "printf 'run\\n' >> ref-ds2.count\n"
+                        f"touch {ready}\n"
+                        f"if [[ ! -f {allow} ]]; then sleep 30; fi\n"
+                        "mkdir -p runs/ds2_vs_ref\n"
+                        f"{paf} > runs/ds2_vs_ref/result.paf\n"
+                        "printf 'fixture\\n' > runs/ds2_vs_ref/tool_version.txt",
+                    ),
+                    ("last", f"touch {completed}"),
+                ],
+            )
+            environment = self.configure_reference_inputs(server, root, ["ds1", "ds2"])
+            process = subprocess.Popen(
+                ["python3", str(RUNNER), "--server-dir", str(server)],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=environment,
+            )
+            for _ in range(200):
+                if ready.exists():
+                    break
+                time.sleep(0.02)
+            self.assertTrue(ready.exists())
+            process.send_signal(signal.SIGTERM)
+            _stdout, stderr = process.communicate(timeout=5)
+            self.assertEqual(process.returncode, 128 + signal.SIGTERM, stderr)
+            rows = read_status(server / "logs/status.tsv")
+            self.assertEqual([row["state"] for row in rows], ["success", "interrupted", "pending"])
+            self.assertEqual(
+                len(list((server / ".run_all/checkpoints").glob("ref-ds1.*.json"))), 1
+            )
+
+            allow.touch()
+            resumed = self.run_runner(server, env=environment)
+            self.assertEqual(resumed.returncode, 0, resumed.stderr)
+            self.assertIn("[SKIP_VALID] [ref:ds1]", resumed.stdout)
+            self.assertEqual((server / "ref-ds1.count").read_text(encoding="utf-8"), "run\n")
+            self.assertEqual(
+                (server / "ref-ds2.count").read_text(encoding="utf-8"), "run\nrun\n"
+            )
+            self.assertTrue(completed.exists())
+            rows = read_status(server / "logs/status.tsv")
+            self.assertEqual([row["state"] for row in rows], ["success", "success", "success"])
+            self.assertEqual([row["attempt"] for row in rows], ["1", "2", "1"])
+
+    def test_interrupted_grt_unit_reuses_completed_internal_checkpoint(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            ready = root / "grt.ready"
+            allow = root / "grt.continue"
+            server = self.make_workspace(
+                root, [("grt_step1", "python3 commands/fake_grt_step1.py")]
+            )
+            script = server / "commands/fake_grt_step1.py"
+            script.write_text(
+                f'''#!/usr/bin/env python3
+import csv
+import hashlib
+import json
+import time
+from pathlib import Path
+
+server = Path(__file__).resolve().parents[1]
+ready = Path({str(ready)!r})
+allow = Path({str(allow)!r})
+stages = ("step1_round1", "step1_filter", "step1_round2")
+fields = ("stage", "q_input_version", "q_input_sha256", "q_output_version", "q_output_sha256", "donor_set_id", "status", "checkpoint_relpath", "checkpoint_sha256")
+
+def sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+def write_stage(stage):
+    output_relpath = f"grt/evidence/{{stage}}/result.txt"
+    output = server / output_relpath
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(stage + "\\n", encoding="utf-8")
+    checkpoint = server / f"grt/checkpoints/{{stage}}.json"
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint.write_text(json.dumps({{
+        "workflow": "gpm_grt_precomputed_v2",
+        "stage": stage,
+        "status": "success",
+        "input_fingerprint": "input-" + stage,
+        "output_hashes": {{output_relpath: sha(output)}},
+    }}, sort_keys=True) + "\\n", encoding="utf-8")
+
+def write_status(selected):
+    path = server / "metadata/grt_stage_status.tsv"
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\\t", lineterminator="\\n")
+        writer.writeheader()
+        for stage in selected:
+            checkpoint_relpath = f"grt/checkpoints/{{stage}}.json"
+            checkpoint = server / checkpoint_relpath
+            writer.writerow({{
+                "stage": stage,
+                "q_input_version": "q0",
+                "q_input_sha256": "a" * 64,
+                "q_output_version": "q1",
+                "q_output_sha256": "b" * 64,
+                "donor_set_id": "donor",
+                "status": "success",
+                "checkpoint_relpath": checkpoint_relpath,
+                "checkpoint_sha256": sha(checkpoint),
+            }})
+
+first = server / "grt/checkpoints/step1_round1.json"
+if first.is_file():
+    print("GRT step1_round1 cache hit: fixture", flush=True)
+else:
+    write_stage("step1_round1")
+write_status(("step1_round1",))
+ready.touch()
+if not allow.is_file():
+    time.sleep(30)
+for stage in stages[1:]:
+    write_stage(stage)
+write_status(stages)
+''',
+                encoding="utf-8",
+            )
+            process = subprocess.Popen(
+                ["python3", str(RUNNER), "--server-dir", str(server)],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            for _ in range(200):
+                if ready.exists():
+                    break
+                time.sleep(0.02)
+            self.assertTrue(ready.exists())
+            process.send_signal(signal.SIGTERM)
+            _stdout, stderr = process.communicate(timeout=5)
+            self.assertEqual(process.returncode, 128 + signal.SIGTERM, stderr)
+            first_checkpoint = server / "grt/checkpoints/step1_round1.json"
+            self.assertTrue(first_checkpoint.is_file())
+            first_hash = hashlib.sha256(first_checkpoint.read_bytes()).hexdigest()
+            self.assertFalse((server / "grt/checkpoints/step1_filter.json").exists())
+
+            allow.touch()
+            resumed = self.run_runner(server)
+            self.assertEqual(resumed.returncode, 0, resumed.stderr)
+            self.assertIn("[CHILD] [grt_step1] GRT step1_round1 cache hit", resumed.stdout)
+            self.assertNotIn("[CACHE_HIT] [grt_step1]", resumed.stdout)
+            self.assertEqual(
+                hashlib.sha256(first_checkpoint.read_bytes()).hexdigest(), first_hash
+            )
+            self.assertTrue((server / "grt/checkpoints/step1_filter.json").is_file())
+            row = read_status(server / "logs/status.tsv")[0]
+            self.assertEqual((row["state"], row["attempt"]), ("success", "2"))
+
+    def test_interrupted_chromosome_resume_skips_earlier_valid_unit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            ready = root / "chr2.ready"
+            allow = root / "chr2.continue"
+            completed = root / "completed"
+            paf = (
+                "printf 'query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\n'"
+            )
+            server = self.make_workspace(
+                root,
+                [
+                    (
+                        "chr:Chr1",
+                        "printf 'run\\n' >> chr1.count\n"
+                        f"{paf} > runs/chr_Chr1/ds_vs_self/result.paf",
+                    ),
+                    (
+                        "chr:Chr2",
+                        "printf 'run\\n' >> chr2.count\n"
+                        f"touch {ready}\n"
+                        f"if [[ ! -f {allow} ]]; then sleep 30; fi\n"
+                        f"{paf} > runs/chr_Chr2/ds_vs_self/result.paf",
+                    ),
+                    ("last", f"touch {completed}"),
+                ],
+            )
+            environment = self.configure_chromosome_inputs(
+                server, root, ["Chr1", "Chr2"]
+            )
+            process = subprocess.Popen(
+                ["python3", str(RUNNER), "--server-dir", str(server)],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=environment,
+            )
+            for _ in range(200):
+                if ready.exists():
+                    break
+                time.sleep(0.02)
+            self.assertTrue(ready.exists())
+            process.send_signal(signal.SIGTERM)
+            _stdout, stderr = process.communicate(timeout=5)
+            self.assertEqual(process.returncode, 128 + signal.SIGTERM, stderr)
+            rows = read_status(server / "logs/status.tsv")
+            self.assertEqual([row["state"] for row in rows], ["success", "interrupted", "pending"])
+            self.assertEqual(
+                len(list((server / ".run_all/checkpoints").glob("chr-Chr1.*.json"))), 1
+            )
+
+            allow.touch()
+            resumed = self.run_runner(server, env=environment)
+            self.assertEqual(resumed.returncode, 0, resumed.stderr)
+            self.assertIn("[SKIP_VALID] [chr:Chr1]", resumed.stdout)
+            self.assertEqual((server / "chr1.count").read_text(encoding="utf-8"), "run\n")
+            self.assertEqual(
+                (server / "chr2.count").read_text(encoding="utf-8"), "run\nrun\n"
+            )
+            self.assertTrue(completed.exists())
+            rows = read_status(server / "logs/status.tsv")
+            self.assertEqual([row["attempt"] for row in rows], ["1", "2", "1"])
 
     def test_failure_stops_downstream_and_is_actionable(self):
         with tempfile.TemporaryDirectory() as temporary:

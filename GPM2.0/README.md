@@ -126,6 +126,18 @@ Execution order is strict:
 
 `run_all.sh` keeps this staged order, stops on program or packaging errors, and resumes computation only from checkpoints whose input, parameter, tool, and output hashes still match. Each packager builds a fresh temporary archive and replaces the final zip only after success, so reruns do not retain removed entries or overwrite a valid archive with a partial result.
 
+#### Resume and monitor a Server run
+
+Resume requires no extra option: rerun the same `bash ./gpm_server/run_all.sh` command. Valid reference, assignment, and chromosome-local checkpoints are skipped; GRT wrappers reuse their own validated internal caches; stale or incomplete work is recomputed. The thread count remains the value chosen by `prepare.sh -t/--threads`; `run_all.sh` does not expose runtime thread overrides or `--from`/`--until`/`--stage` selectors.
+
+Follow the single append-only run log while the workflow is active:
+
+```bash
+tail -F ./gpm_server/logs/run_all.log
+```
+
+`gpm_server/logs/status.tsv` is atomically refreshed as the current unit-state summary. A later resume appends a new invocation section to the same `run_all.log`; no separate history directory is created. Only one `run_all.sh` process may own a Server workspace at a time.
+
 ### Add one dataset to an existing server project
 
 After the original `gpm_server/` has completed and been delivered, the server can append one new dataset and emit a small add package:
