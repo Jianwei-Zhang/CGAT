@@ -18,9 +18,11 @@ import test_grt_step1 as step1_fixture
 from grt_prepare_inputs import read_fasta
 from grt_step23 import (
     build_correction_candidates,
+    build_step2_fallback_candidates,
     parse_mummer_coords,
     project_interval_after_refills,
     reject_candidates_spanning_other_gaps,
+    step2_strategy,
 )
 
 
@@ -30,6 +32,46 @@ STEP23_TOOL = REPO_ROOT / "server/tools/grt_step23.py"
 
 
 class GrtStep23Tests(unittest.TestCase):
+    def test_step2_controller_selects_all_three_grt_branches(self):
+        self.assertEqual(step2_strategy(3, 0, 0), "no_patch_fixer")
+        self.assertEqual(step2_strategy(3, 4, 0), "full_fixer_reuse_patches")
+        self.assertEqual(step2_strategy(3, 4, 2), "partial_success_no_fixer")
+
+    def test_step2_fallback_reuses_explicit_donor_source(self):
+        member = {
+            "member_id": "m-d1",
+            "dataset_name": "d0",
+            "contig_name": "d1",
+            "orientation": "+",
+            "source_start": "1",
+            "source_end": "2000",
+        }
+        alignment = {
+            "chr": "Chr01",
+            "line_number": 1,
+            "ref_record": "d1",
+            "ref_min": 101,
+            "ref_max": 500,
+            "query_min": 900,
+            "query_max": 1200,
+            "query_length": 2000,
+            "query_aligned": 301,
+            "ref_length": 2000,
+            "ref_aligned": 400,
+            "identity": 0.99,
+            "orientation": "+",
+        }
+        gap = {"chr": "Chr01", "object_id": "gap-1", "start0": 999, "end0": 1099}
+        sources = {("d0", "d1"): "ACGT" * 500}
+        candidates = build_step2_fallback_candidates(
+            [gap], [alignment], {"d1": member}, sources
+        )
+        self.assertEqual(len(candidates), 1)
+        self.assertTrue(candidates[0]["fallback"])
+        self.assertEqual(candidates[0]["action"], "patch")
+        self.assertEqual(candidates[0]["fill_sequence"], sources[("d0", "d1")][100:500])
+        self.assertEqual(candidates[0]["fallback_strategy"], "correctrefill_source_retry")
+
     def test_step3_classifies_grt_type1_to_type6(self):
         members = {
             "d1": {

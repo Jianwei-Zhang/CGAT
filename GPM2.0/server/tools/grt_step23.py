@@ -150,6 +150,18 @@ REJECTION_FIELDS = [
     "right_line",
     "reason",
 ]
+STRATEGY_FIELDS = [
+    "chr",
+    "strategy",
+    "strategy_applied",
+    "gap_count",
+    "patch_candidate_count",
+    "validated_patch_count",
+    "accepted_patch_count",
+    "fallback_candidate_count",
+    "accepted_fallback_count",
+    "reason",
+]
 
 
 def fail(message: str) -> None:
@@ -1263,6 +1275,17 @@ def checkpoint_result(server_dir: Path, stage: str, fingerprint: str) -> dict[st
         return None
 
 
+def step2_strategy(gap_count: int, patch_candidate_count: int, accepted_patch_count: int) -> str:
+    """Return the GRT controller branch for one chromosome."""
+    if gap_count == 0:
+        return "no_gaps"
+    if patch_candidate_count == 0:
+        return "no_patch_fixer"
+    if accepted_patch_count == 0:
+        return "full_fixer_reuse_patches"
+    return "partial_success_no_fixer"
+
+
 def invalidate_from(server_dir: Path, stage: str) -> None:
     order = ["step2", "step3"]
     outputs = {"step2": "q2", "step3": "q3"}
@@ -1297,8 +1320,11 @@ def run_step2(
     tools: dict[str, dict[str, str]],
     minimap: dict[str, str],
     threads: int,
+    repair_mode: str = DEFAULT_REPAIR_MODE,
 ) -> tuple[dict[str, object], bool]:
     stage = "step2"
+    if repair_mode not in REPAIR_MODES:
+        fail(f"unsupported Step2 repair mode: {repair_mode}")
     q_input_sha256 = sha256_file(server_dir / "grt/q/q1.fa")
     fingerprint_payload = {
         "workflow": WORKFLOW,
@@ -1318,6 +1344,15 @@ def run_step2(
             "min_match": PATCH_MIN_MATCH,
             "min_mapq": PATCH_MIN_MAPQ,
             "search_range": PATCH_SEARCH_RANGE,
+        },
+        "fallback_parameters": {
+            "repair_mode": repair_mode,
+            "controller": "server_native_correctrefill_source_retry",
+            "strategies": [
+                "no_patch_fixer",
+                "full_fixer_reuse_patches",
+                "partial_success_no_fixer",
+            ],
         },
         "consumed_intervals_sha256": json_hash(consumed),
     }
@@ -1351,6 +1386,10 @@ def run_step2(
         donor_records = dict(read_fasta_allow_empty(server_dir / donor_set["fasta_relpath"]))
         gaps = [gap for chromosome in chromosome_order for gap in gap_objects(chromosome, "q1", input_records[chromosome])]
         candidates, rejections = build_step2_candidates(gaps, alignments, members_by_record, donor_records)
+        patch_candidate_counts = {
+            chromosome: sum(1 for row in candidates if str(row["chr"]) == chromosome)
+            for chromosome in chromosome_order
+        }
         validation_identities: dict[str, dict[str, str]] = {}
         validation_rows: list[dict[str, object]] = []
         for chromosome in chromosome_order:
@@ -1390,6 +1429,78 @@ def run_step2(
         validate_step2_candidates(candidates, validation_rows, members_by_record, rejections)
         reject_candidates_spanning_other_gaps(candidates, gaps, rejections)
         candidates = arbitrate(candidates, consumed)
+        validated_patch_counts = {
+            chromosome: sum(
+                1 for row in candidates
+                if str(row["chr"]) == chromosome and row.get("validation_passed")
+            )
+            for chromosome in chromosome_order
+        }
+        accepted_patch_counts = {
+            chromosome: sum(
+                1 for row in candidates
+                if str(row["chr"]) == chromosome and row.get("outcome") == "accepted"
+            )
+            for chromosome in chromosome_order
+        }
+        strategy_rows: list[dict[str, object]] = []
+        fallback_candidates: list[dict[str, object]] = []
+        for chromosome in chromosome_order:
+            gap_count = sum(1 for gap in gaps if str(gap["chr"]) == chromosome)
+            patch_count = patch_candidate_counts[chromosome]
+            accepted_count = accepted_patch_counts[chromosome]
+            strategy = step2_strategy(gap_count, patch_count, accepted_count)
+            if strategy in {"no_patch_fixer", "full_fixer_reuse_patches"}:
+                chromosome_gaps = [gap for gap in gaps if str(gap["chr"]) == chromosome]
+                chromosome_alignments = [row for row in alignments if str(row["chr"]) == chromosome]
+                fallback_candidates.extend(
+                    build_step2_fallback_candidates(
+                        chromosome_gaps,
+                        chromosome_alignments,
+                        members_by_record,
+                        sources,
+                        repair_mode=repair_mode,
+                    )
+                )
+            strategy_rows.append(
+                {
+                    "chr": chromosome,
+                    "strategy": strategy,
+                    "strategy_applied": "pending",
+                    "gap_count": gap_count,
+                    "patch_candidate_count": patch_count,
+                    "validated_patch_count": validated_patch_counts[chromosome],
+                    "accepted_patch_count": accepted_count,
+                    "fallback_candidate_count": 0,
+                    "accepted_fallback_count": 0,
+                    "reason": "",
+                }
+            )
+        if fallback_candidates:
+            fallback_candidates = arbitrate(fallback_candidates, consumed)
+            candidates.extend(fallback_candidates)
+        fallback_by_chr: dict[str, list[dict[str, object]]] = defaultdict(list)
+        for row in fallback_candidates:
+            fallback_by_chr[str(row["chr"])].append(row)
+        for strategy_row in strategy_rows:
+            rows = fallback_by_chr.get(strategy_row["chr"], [])
+            strategy_row["fallback_candidate_count"] = len(rows)
+            strategy_row["accepted_fallback_count"] = sum(
+                1 for row in rows if row.get("outcome") == "accepted"
+            )
+            if strategy_row["strategy"] == "partial_success_no_fixer":
+                strategy_row["strategy_applied"] = "patcher_result"
+                strategy_row["reason"] = "at_least_one_validated_patch_accepted"
+            elif strategy_row["accepted_fallback_count"]:
+                strategy_row["strategy_applied"] = (
+                    "fixer_and_new_patches"
+                    if strategy_row["strategy"] == "no_patch_fixer"
+                    else "fixer_and_reused_patches"
+                )
+                strategy_row["reason"] = "correctrefill_source_retry_accepted"
+            else:
+                strategy_row["strategy_applied"] = "fixer_only"
+                strategy_row["reason"] = "no_validated_fallback_source_interval"
         evidence_rows: list[dict[str, object]] = []
         for candidate in candidates:
             mummer_evidence_id = stable_id("ev-step2-mummer", candidate["candidate_id"], 22)
@@ -1421,29 +1532,58 @@ def run_step2(
                 )
             )
             validation_identity = validation_identities[str(candidate["chr"])]
-            evidence_rows.append(
-                evidence_row(
-                    evidence_id=validation_evidence_id,
-                    stage="candidate_validation",
-                    evidence_type="patch_flank_revalidation",
-                    status=str(candidate["outcome"]),
-                    q_version="q1",
-                    q_source_sha256=q_input_sha256,
-                    query_relpath=validation_identity["query_relpath"],
-                    query_sha256=validation_identity["query_sha256"],
-                    donor_set_id="",
-                    target_relpath=validation_identity["target_relpath"],
-                    target_sha256=validation_identity["target_sha256"],
-                    candidate=candidate,
-                    tool="minimap2",
-                    tool_version=minimap["version"],
-                    preset=MINIMAP_PRESET,
-                    parameters=fingerprint_payload["validation_parameters"],
-                    raw_relpath=validation_identity["raw_relpath"],
-                    raw_sha256=validation_identity["raw_sha256"],
-                    coordinate_system="paf_0_based_half_open",
+            if candidate.get("fallback"):
+                evidence_rows.append(
+                    evidence_row(
+                        evidence_id=validation_evidence_id,
+                        stage="step2",
+                        evidence_type="correctrefill_fallback",
+                        status=str(candidate["outcome"]),
+                        q_version="q1",
+                        q_source_sha256=q_input_sha256,
+                        query_relpath=mummer_identity["query_relpath"],
+                        query_sha256=mummer_identity["query_sha256"],
+                        donor_set_id=donor_set["donor_set_id"],
+                        target_relpath=donor_set["fasta_relpath"],
+                        target_sha256=donor_set["fasta_sha256"],
+                        candidate=candidate,
+                        tool="grt_step3_structural_adapter",
+                        tool_version=str(ENGINE_VERSION),
+                        preset="grt-type1-type6-source-retry",
+                        parameters={
+                            "repair_mode": repair_mode,
+                            "fallback_strategy": candidate.get("fallback_strategy", ""),
+                            "parent_candidate_id": candidate.get("fallback_parent_candidate_id", ""),
+                        },
+                        raw_relpath=mummer_identity["coords_relpath"],
+                        raw_sha256=mummer_identity["coords_sha256"],
+                        coordinate_system="mummer_1_based_closed",
+                    )
                 )
-            )
+            else:
+                evidence_rows.append(
+                    evidence_row(
+                        evidence_id=validation_evidence_id,
+                        stage="candidate_validation",
+                        evidence_type="patch_flank_revalidation",
+                        status=str(candidate["outcome"]),
+                        q_version="q1",
+                        q_source_sha256=q_input_sha256,
+                        query_relpath=validation_identity["query_relpath"],
+                        query_sha256=validation_identity["query_sha256"],
+                        donor_set_id="",
+                        target_relpath=validation_identity["target_relpath"],
+                        target_sha256=validation_identity["target_sha256"],
+                        candidate=candidate,
+                        tool="minimap2",
+                        tool_version=minimap["version"],
+                        preset=MINIMAP_PRESET,
+                        parameters=fingerprint_payload["validation_parameters"],
+                        raw_relpath=validation_identity["raw_relpath"],
+                        raw_sha256=validation_identity["raw_sha256"],
+                        coordinate_system="paf_0_based_half_open",
+                    )
+                )
         output_paths, output_records, events, usage_rows, attempts = apply_round(
             run_id,
             stage,
@@ -1459,6 +1599,31 @@ def run_step2(
             sources,
             action="patch",
         )
+        candidate_by_event = {
+            str(candidate.get("event_id")): candidate
+            for candidate in candidates
+            if candidate.get("event_id")
+        }
+        for event in events:
+            candidate = candidate_by_event.get(str(event["event_id"]))
+            if candidate is None:
+                continue
+            event["strategy"] = next(
+                (
+                    row["strategy"]
+                    for row in strategy_rows
+                    if row["chr"] == event["chr"]
+                ),
+                "partial_success_no_fixer",
+            )
+            if candidate.get("fallback"):
+                event["fallback"] = {
+                    "parent_candidate_id": candidate.get("fallback_parent_candidate_id", ""),
+                    "strategy": candidate.get("fallback_strategy", ""),
+                    "error_type": candidate.get("error_type", "unknown"),
+                    "error_subtype": candidate.get("error_subtype", "unspecified"),
+                    "repair_mode": repair_mode,
+                }
         for row in usage_rows:
             row["donor_set_id"] = donor_set["donor_set_id"]
         q_rows = q_rows_for_paths("q2", chromosome_order, output_paths)
@@ -1472,6 +1637,7 @@ def run_step2(
         write_tsv(temporary / "evidence.tsv", EVIDENCE_FIELDS, evidence_rows)
         write_tsv(temporary / "usage.tsv", USAGE_FIELDS, usage_rows)
         write_tsv(temporary / "gap_attempts.tsv", ATTEMPT_FIELDS, attempts)
+        write_tsv(temporary / "strategy.tsv", STRATEGY_FIELDS, strategy_rows)
         write_jsonl(temporary / "events.jsonl", events)
         accepted_intervals = [
             {
@@ -1501,6 +1667,8 @@ def run_step2(
             "usage_rows": usage_rows,
             "events": events,
             "attempts": attempts,
+            "strategies": strategy_rows,
+            "fallback_candidate_count": len(fallback_candidates),
             "accepted_intervals": accepted_intervals,
         }
         (temporary / "result.json").write_text(
@@ -1895,6 +2063,78 @@ def build_correction_candidates(
                 }
             )
     return candidates
+
+
+def build_step2_fallback_candidates(
+    gaps: list[dict[str, object]],
+    alignments: list[dict[str, object]],
+    members_by_record: dict[str, dict[str, str]],
+    sources: dict[tuple[str, str], str],
+    repair_mode: str = DEFAULT_REPAIR_MODE,
+) -> list[dict[str, object]]:
+    """Turn CorrectRefill structural evidence into an auditable Step2 retry.
+
+    The original GRT controller runs a fixer and then re-runs the patcher.  In
+    Server mode the donor source and coordinates are already explicit, so the
+    equivalent retry can use the validated source interval directly.  This
+    avoids reconstructing implicit assemblies while still reusing the same
+    Type1--Type6 boundary decision and donor provenance.
+    """
+    structural = build_correction_candidates(
+        gaps, alignments, members_by_record, repair_mode=repair_mode
+    )
+    fallback: list[dict[str, object]] = []
+    for correction in structural:
+        if not correction.get("eligible", True):
+            continue
+        source_key = (str(correction["source_dataset"]), str(correction["source_contig"]))
+        source_sequence = sources.get(source_key, "")
+        source_start = int(correction["source_start"])
+        source_end = int(correction["source_end"])
+        if source_start < 1 or source_end < source_start or source_end > len(source_sequence):
+            continue
+        fill_sequence = source_sequence[source_start - 1 : source_end]
+        if correction["orientation"] == "-":
+            fill_sequence = reverse_complement(fill_sequence)
+        if not fill_sequence or len(fill_sequence) > REFILL_MAX_LENGTH or re.search(r"N{100,}", fill_sequence):
+            continue
+        payload = {
+            "stage": "step2",
+            "fallback": True,
+            "parent_candidate_id": correction["candidate_id"],
+            "object_id": correction["object_id"],
+            "source_dataset": correction["source_dataset"],
+            "source_contig": correction["source_contig"],
+            "source_start": source_start,
+            "source_end": source_end,
+            "input_start": correction["input_start"],
+            "input_end": correction["input_end"],
+            "error_type": correction.get("error_type", "unknown"),
+            "error_subtype": correction.get("error_subtype", "unspecified"),
+        }
+        candidate = dict(correction)
+        candidate.update(
+            {
+                "candidate_id": stable_id("step2-fallback", payload, 24),
+                "stage": "step2",
+                "action": "patch",
+                "fill_sequence": fill_sequence,
+                "fill_length": len(fill_sequence),
+                "trim_left": int(correction["target_start"]) - int(correction["input_start"]),
+                "trim_right": int(correction["input_end"]) - int(correction["target_end"]),
+                "validation_passed": True,
+                "outcome": "candidate",
+                "reason": "fallback_source_interval_candidate",
+                "fallback": True,
+                "fallback_parent_candidate_id": correction["candidate_id"],
+                "fallback_strategy": "correctrefill_source_retry",
+                "repair_reason": correction.get("repair_reason", ""),
+                "event_id": "",
+                "final_path_segment_id": "",
+            }
+        )
+        fallback.append(candidate)
+    return fallback
 
 
 def correction_usage_rows(
@@ -2942,6 +3182,7 @@ def execute(args: argparse.Namespace) -> None:
         tools,
         minimap,
         args.threads,
+        args.repair_mode,
     )
     publish_metadata(server_dir, [step2], tools, minimap)
     _, q2_paths, q2_records = load_q_paths(server_dir, "q2", step2["q_rows"], sources)
