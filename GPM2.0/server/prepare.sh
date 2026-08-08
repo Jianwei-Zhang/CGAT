@@ -93,8 +93,10 @@ Behavior:
   - Generates metadata/reference.tsv and metadata/datasets.tsv
   - Generates metadata/package.tsv
   - Generates authoritative metadata/track_member_orders.tsv during chr assignment
-  - Generates runs/*/command.sh and <work_root>/run_all.sh
-  - Chains run_all.sh commands with && so execution stops on the first failed command
+  - Generates runs/*/command.sh, <work_root>/.run_all/plan.tsv, and <work_root>/run_all.sh
+  - run_all.sh executes the generated plan serially and stops on the first failed command
+  - run_all.sh writes live progress to <work_root>/logs/run_all.log and current state to logs/status.tsv
+  - run_all.sh holds an exclusive workspace lock while active
   - Generates package_full_zip.sh, package_light_no_fasta_zip.sh, and export_final_path_fasta.sh
   - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> GRT Step2/3 -> GRT telomere/q4 finalization -> per-chr commands -> GRT evidence/package validation -> full zip -> light zip
   - A successful run_all.sh creates both delivery archives in the parent directory of the work root
@@ -2678,16 +2680,15 @@ print_ds_pair_command() {
   printf '\n'
 }
 
-append_run_all_command() {
-  local command_script="$1"
-  local index="$2"
-  local total="$3"
+append_run_all_unit() {
+  local unit_id="$1"
+  local command_relpath="$2"
+  local detail_log_relpath="$3"
 
-  if [[ "$index" -lt "$total" ]]; then
-    printf 'bash %s && \\\n' "$(shell_quote "$command_script")" >> "$RUN_ALL"
-  else
-    printf 'bash %s\n' "$(shell_quote "$command_script")" >> "$RUN_ALL"
-  fi
+  printf '%s\t%s\t%s\n' \
+    "$unit_id" \
+    "$command_relpath" \
+    "$detail_log_relpath" >> "$RUN_ALL_PLAN"
 }
 
 REF_NAME=""
@@ -2973,11 +2974,18 @@ write_prepare_options_metadata \
 } > "${WORK_ROOT}/metadata/datasets.tsv"
 
 RUN_ALL="${WORK_ROOT}/run_all.sh"
+RUN_ALL_STATE_DIR="${WORK_ROOT}/.run_all"
+RUN_ALL_PLAN="${RUN_ALL_STATE_DIR}/plan.tsv"
+rm -rf "$RUN_ALL_STATE_DIR" "${WORK_ROOT}/logs"
+mkdir -p "$RUN_ALL_STATE_DIR"
 {
   printf '#!/usr/bin/env bash\n'
   printf 'set -euo pipefail\n'
   printf '\n'
+  printf 'server_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
+  printf 'exec python3 "${server_dir}/.prepare_lib/tools/run_all_runner.py" --server-dir "$server_dir" "$@"\n'
 } > "$RUN_ALL"
+printf 'unit_id\tcommand_relpath\tdetail_log_relpath\n' > "$RUN_ALL_PLAN"
 
 DATASET_COUNT=${#DATASET_NAMES[@]}
 mapfile -t REFERENCE_CHR_NAMES < <(collect_reference_chr_names "$REF_DST")
@@ -2991,41 +2999,47 @@ for ((i = 0; i < DATASET_COUNT; i++)); do
   run_ref_dir="${WORK_ROOT}/runs/${ds_name}_vs_ref"
   mkdir -p "$run_ref_dir"
   write_ref_command_script "$run_ref_dir" "$REF_DST" "$ds_fa"
-  append_run_all_command "${run_ref_dir}/command.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+  append_run_all_unit \
+    "ref:${ds_name}" \
+    "runs/${ds_name}_vs_ref/command.sh" \
+    "runs/${ds_name}_vs_ref/stderr.log"
   print_ref_command "$COMMAND_INDEX" "$TOTAL_COMMANDS" "${ds_name}_vs_ref" "$run_ref_dir" "$REF_DST" "$ds_fa"
   COMMAND_INDEX=$((COMMAND_INDEX + 1))
 done
 
 write_assignment_script "${WORK_ROOT}/assign_chr_groups.sh" "$WORK_ROOT" "${DATASET_NAMES[@]}"
-append_run_all_command "${WORK_ROOT}/assign_chr_groups.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+append_run_all_unit "assign" "assign_chr_groups.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "assign_chr_groups"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/assign_chr_groups.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 write_grt_prepare_script "${WORK_ROOT}/prepare_grt_inputs.sh" "$WORK_ROOT" "${READS_SRCS[@]}"
-append_run_all_command "${WORK_ROOT}/prepare_grt_inputs.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+append_run_all_unit "grt_prepare" "prepare_grt_inputs.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "prepare_grt_inputs"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/prepare_grt_inputs.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 write_grt_step1_script "${WORK_ROOT}/run_grt_step1.sh" "$WORK_ROOT"
-append_run_all_command "${WORK_ROOT}/run_grt_step1.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+append_run_all_unit "grt_step1" "run_grt_step1.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_grt_step1"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_step1.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 write_grt_step23_script "${WORK_ROOT}/run_grt_step23.sh" "$WORK_ROOT"
-append_run_all_command "${WORK_ROOT}/run_grt_step23.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+append_run_all_unit "grt_step23" "run_grt_step23.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_grt_step23"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_step23.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 write_grt_telomere_finalize_script "${WORK_ROOT}/run_grt_telomere_finalize.sh" "$WORK_ROOT"
-append_run_all_command "${WORK_ROOT}/run_grt_telomere_finalize.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+append_run_all_unit \
+  "grt_telomere_finalize" \
+  "run_grt_telomere_finalize.sh" \
+  "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_grt_telomere_finalize"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_telomere_finalize.sh"
@@ -3035,7 +3049,10 @@ for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
   run_chr_dir="${WORK_ROOT}/runs/chr_${chr_name}"
   mkdir -p "$run_chr_dir"
   write_chr_placeholder_script "$run_chr_dir" "$chr_name"
-  append_run_all_command "${run_chr_dir}/command.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+  append_run_all_unit \
+    "chr:${chr_name}" \
+    "runs/chr_${chr_name}/command.sh" \
+    "logs/run_all.log"
   printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "chr_${chr_name}"
   printf 'cd %s\n' "$run_chr_dir"
   printf 'bash %s\n\n' "${run_chr_dir}/command.sh"
@@ -3043,19 +3060,19 @@ for chr_name in "${REFERENCE_CHR_NAMES[@]}"; do
 done
 
 write_grt_evidence_package_script "${WORK_ROOT}/finalize_grt_evidence.sh" "$WORK_ROOT"
-append_run_all_command "${WORK_ROOT}/finalize_grt_evidence.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+append_run_all_unit "finalize_evidence" "finalize_grt_evidence.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "finalize_grt_evidence"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/finalize_grt_evidence.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-append_run_all_command "${WORK_ROOT}/package_full_zip.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+append_run_all_unit "package_full" "package_full_zip.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "package_full_zip"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/package_full_zip.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-append_run_all_command "${WORK_ROOT}/package_light_no_fasta_zip.sh" "$COMMAND_INDEX" "$TOTAL_COMMANDS"
+append_run_all_unit "package_light" "package_light_no_fasta_zip.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "package_light_no_fasta_zip"
 printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/package_light_no_fasta_zip.sh"
@@ -3076,6 +3093,7 @@ echo "  - ${WORK_ROOT}/metadata/reference.tsv"
 echo "  - ${WORK_ROOT}/metadata/reference_segments.tsv"
 echo "  - ${WORK_ROOT}/metadata/datasets.tsv"
 echo "  - ${WORK_ROOT}/run_all.sh"
+echo "  - ${WORK_ROOT}/.run_all/plan.tsv"
 if [[ "${#TEL_RULE_ARGS[@]}" -gt 0 ]]; then
   echo "  - ${WORK_ROOT}/tel/rules.tsv"
 fi

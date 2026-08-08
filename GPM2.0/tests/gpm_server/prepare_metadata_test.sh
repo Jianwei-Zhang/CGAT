@@ -164,6 +164,45 @@ assert_prepare_option "$metadata_path" cen_enabled true
 assert_prepare_option "$metadata_path" cen_min_len 10000
 assert_prepare_option "$metadata_path" cen_min_identity 80
 
+plan_path="${output_root}/.run_all/plan.tsv"
+[[ -f "$plan_path" ]] || {
+  echo "expected generated run_all plan: $plan_path" >&2
+  exit 1
+}
+grep -F $'unit_id\tcommand_relpath\tdetail_log_relpath' "$plan_path" >/dev/null
+[[ "$(tail -n +2 "$plan_path" | wc -l)" -eq 10 ]] || {
+  echo "expected 10 units in generated run_all plan" >&2
+  exit 1
+}
+expected_plan="$(cat <<'EOF'
+unit_id	command_relpath	detail_log_relpath
+ref:ds_add	runs/ds_add_vs_ref/command.sh	runs/ds_add_vs_ref/stderr.log
+assign	assign_chr_groups.sh	logs/run_all.log
+grt_prepare	prepare_grt_inputs.sh	logs/run_all.log
+grt_step1	run_grt_step1.sh	logs/run_all.log
+grt_step23	run_grt_step23.sh	logs/run_all.log
+grt_telomere_finalize	run_grt_telomere_finalize.sh	logs/run_all.log
+chr:Chr01	runs/chr_Chr01/command.sh	logs/run_all.log
+finalize_evidence	finalize_grt_evidence.sh	logs/run_all.log
+package_full	package_full_zip.sh	logs/run_all.log
+package_light	package_light_no_fasta_zip.sh	logs/run_all.log
+EOF
+)"
+[[ "$(cat "$plan_path")" == "$expected_plan" ]] || {
+  echo "generated run_all plan does not match canonical order" >&2
+  cat "$plan_path" >&2
+  exit 1
+}
+grep -F -- '.prepare_lib/tools/run_all_runner.py' "${output_root}/run_all.sh" >/dev/null
+! grep -q '^bash ' "${output_root}/run_all.sh" || {
+  echo "generated run_all.sh still contains a static bash chain" >&2
+  exit 1
+}
+[[ -f "${output_root}/.prepare_lib/tools/run_all_runner.py" ]] || {
+  echo "generated workspace is missing run_all_runner.py" >&2
+  exit 1
+}
+
 grep -F -- "--minimap2 ${FAKE_BIN}/minimap2" "${output_root}/run_grt_step1.sh" >/dev/null
 grep -F -- "--minimap2 ${FAKE_BIN}/minimap2 --nucmer ${FAKE_BIN}/nucmer --delta-filter ${FAKE_BIN}/delta-filter --show-coords ${FAKE_BIN}/show-coords" \
   "${output_root}/run_grt_step23.sh" >/dev/null
