@@ -63,7 +63,7 @@ from grt_step1 import (
 )
 
 
-ENGINE_VERSION = 1
+ENGINE_VERSION = 2
 MUMMER_MIN_CLUSTER = 1_000
 MUMMER_MIN_MATCH = 100
 MUMMER_MIN_ALIGNMENT = 10_000
@@ -80,6 +80,8 @@ CORRECTION_SEARCH_RANGE = 500_000
 CORRECTION_MARGIN = 100
 NORMALIZED_GAP_LENGTH = 100
 MINIMAP_PRESET = "asm5"
+REPAIR_MODES = {"conservative", "aggressive"}
+DEFAULT_REPAIR_MODE = "aggressive"
 
 MUMMER_ALIGNMENT_FIELDS = [
     "stage",
@@ -129,6 +131,14 @@ CANDIDATE_FIELDS = [
     "reason",
     "event_id",
     "final_path_segment_id",
+    "error_type",
+    "error_subtype",
+    "error_features_json",
+    "confidence",
+    "confidence_score",
+    "gap_in_error_region",
+    "repair_mode",
+    "repair_reason",
 ]
 
 REJECTION_FIELDS = [
@@ -1528,11 +1538,258 @@ def run_step2(
         raise
 
 
+def _step3_alignment_features(
+    gap_pos: int,
+    left: dict[str, object],
+    right: dict[str, object] | None,
+) -> dict[str, object]:
+    """Return the alignment feature vector used by GRT's gap analyzer.
+
+    MUMmer rows are already normalized to 1-based closed coordinates by
+    :func:`parse_mummer_coords`.  Keeping this adapter on those rows avoids
+    importing the standalone GRT package (which would lose GPM provenance).
+    """
+    if right is None:
+        return {
+            "crossing_alignment": True,
+            "query_overlap": True,
+            "query_overlap_length": int(left["query_max"]) - int(left["query_min"]) + 1,
+            "query_overlap_region": (int(left["query_min"]), int(left["query_max"])),
+            "ref_overlap": False,
+            "ref_overlap_length": 0,
+            "ref_overlap_region": (0, 0),
+            "ref_overlap_ratio": 0.0,
+            "direction_match": True,
+            "ref_contig_match": True,
+            "left_distance": 0,
+            "right_distance": 0,
+            "left_anchor_quality": int(left["query_aligned"]) * float(left["identity"]),
+            "right_anchor_quality": 0.0,
+            "left_anchor_length": int(left["query_aligned"]),
+            "right_anchor_length": 0,
+            "total_gap_size": 0,
+            "ref_record": str(left["ref_record"]),
+        }
+
+    left_q_min, left_q_max = int(left["query_min"]), int(left["query_max"])
+    right_q_min, right_q_max = int(right["query_min"]), int(right["query_max"])
+    query_overlap_start = max(left_q_min, right_q_min)
+    query_overlap_end = min(left_q_max, right_q_max)
+    query_overlap = query_overlap_start <= query_overlap_end
+    same_ref = str(left["ref_record"]) == str(right["ref_record"])
+    ref_overlap_start = max(int(left["ref_min"]), int(right["ref_min"]))
+    ref_overlap_end = min(int(left["ref_max"]), int(right["ref_max"]))
+    ref_overlap = same_ref and ref_overlap_start <= ref_overlap_end
+    ref_overlap_length = ref_overlap_end - ref_overlap_start + 1 if ref_overlap else 0
+    min_anchor = min(
+        int(left["ref_max"]) - int(left["ref_min"]) + 1,
+        int(right["ref_max"]) - int(right["ref_min"]) + 1,
+    )
+    return {
+        "crossing_alignment": False,
+        "query_overlap": query_overlap,
+        "query_overlap_length": query_overlap_length if query_overlap else 0,
+        "query_overlap_region": (
+            (query_overlap_start, query_overlap_end) if query_overlap else (0, 0)
+        ),
+        "ref_overlap": ref_overlap,
+        "ref_overlap_length": ref_overlap_length,
+        "ref_overlap_region": (
+            (ref_overlap_start, ref_overlap_end) if ref_overlap else (0, 0)
+        ),
+        "ref_overlap_ratio": ref_overlap_length / min_anchor if ref_overlap and min_anchor else 0.0,
+        "direction_match": left["orientation"] == right["orientation"],
+        "ref_contig_match": same_ref,
+        "left_distance": gap_pos - left_q_max,
+        "right_distance": right_q_min - gap_pos,
+        "left_anchor_quality": int(left["query_aligned"]) * float(left["identity"]),
+        "right_anchor_quality": int(right["query_aligned"]) * float(right["identity"]),
+        "left_anchor_length": int(left["query_aligned"]),
+        "right_anchor_length": int(right["query_aligned"]),
+        "total_gap_size": (gap_pos - left_q_max) + (right_q_min - gap_pos),
+        "ref_record": str(left["ref_record"]),
+    }
+
+
+def _step3_classify_features(features: dict[str, object]) -> tuple[str, str, list[str], float]:
+    """Classify one anchor pair using GRT Type1--Type6 precedence."""
+    if features.get("crossing_alignment"):
+        return "type1", "crossing_alignment", ["crossing_alignment"], 0.90
+
+    feature_names: list[str] = []
+    if features["query_overlap"]:
+        feature_names.append(f"query_overlap_{features['query_overlap_length']}")
+    if features["ref_overlap"]:
+        feature_names.append(f"ref_overlap_{features['ref_overlap_length']}")
+    if not features["direction_match"]:
+        feature_names.append("direction_conflict")
+    if not features["ref_contig_match"]:
+        feature_names.append("ref_contig_conflict")
+    if int(features["left_distance"]) > 100_000:
+        feature_names.append(f"large_left_gap_{features['left_distance']}")
+    if int(features["right_distance"]) > 100_000:
+        feature_names.append(f"large_right_gap_{features['right_distance']}")
+    gap_size = int(features["total_gap_size"])
+    feature_names.append(
+        "small_gap" if gap_size < 1_000 else "medium_gap" if gap_size < 50_000 else "large_gap"
+    )
+
+    conflicts = sum(
+        [
+            not bool(features["direction_match"]),
+            not bool(features["ref_contig_match"]),
+            bool(features["query_overlap"]) and bool(features["ref_overlap"]),
+        ]
+    )
+    if conflicts >= 2:
+        error_type, subtype = "type6", "complex_conflict"
+    elif features["ref_overlap"] and float(features["ref_overlap_ratio"]) >= 0.10:
+        error_type = "type5"
+        overlap = int(features["ref_overlap_length"])
+        subtype = "small_ref_overlap" if overlap < 10_000 else (
+            "medium_ref_overlap" if overlap < 50_000 else "large_ref_overlap"
+        )
+    elif features["ref_overlap"]:
+        error_type, subtype = "type4", "small_ref_overlap"
+    elif not features["direction_match"]:
+        error_type, subtype = "type2", "direction_conflict"
+    elif not features["ref_contig_match"]:
+        error_type, subtype = "type3", "simple_translocation"
+    elif features["query_overlap"]:
+        error_type, subtype = "type4", "query_overlap"
+    else:
+        error_type = "type1"
+        subtype = "small_gap" if gap_size < 1_000 else (
+            "medium_gap" if gap_size < 50_000 else "large_gap"
+        )
+
+    anchor_quality = float(features["left_anchor_quality"]) + float(features["right_anchor_quality"])
+    quality_factor = min(anchor_quality / 1_000_000.0, 1.0)
+    distance_factor = 1.0 if max(int(features["left_distance"]), int(features["right_distance"])) <= 10_000 else (
+        0.9 if max(int(features["left_distance"]), int(features["right_distance"])) <= 100_000 else 0.5
+    )
+    base = {"type1": 0.55, "type2": 0.75, "type3": 0.70, "type4": 0.70, "type5": 0.85, "type6": 0.80}[error_type]
+    confidence_score = min(1.0, 0.45 * base + 0.35 * quality_factor + 0.20 * distance_factor)
+    if error_type in {"type2", "type3", "type5", "type6"}:
+        confidence_score = max(confidence_score, 0.60)
+    return error_type, subtype, sorted(set(feature_names)), confidence_score
+
+
+def _step3_project_ref_interval(row: dict[str, object], ref_start: int, ref_end: int) -> tuple[int, int]:
+    ref_min, ref_max = int(row["ref_min"]), int(row["ref_max"])
+    query_min, query_max = int(row["query_min"]), int(row["query_max"])
+    ref_span = max(1, ref_max - ref_min)
+    query_span = max(1, query_max - query_min)
+    if row["orientation"] == "+":
+        start = query_min + round((ref_start - ref_min) * query_span / ref_span)
+        end = query_min + round((ref_end - ref_min) * query_span / ref_span)
+    else:
+        start = query_max - round((ref_end - ref_min) * query_span / ref_span)
+        end = query_max - round((ref_start - ref_min) * query_span / ref_span)
+    return min(start, end), max(start, end)
+
+
+def _step3_replace_region(
+    gap_pos: int,
+    gap_end: int,
+    left: dict[str, object],
+    right: dict[str, object] | None,
+    error_type: str,
+) -> tuple[int, int, str]:
+    if right is None:
+        return int(left["query_min"]), int(left["query_max"]), "crossing_alignment_error_region"
+    if error_type in {"type1", "type6"}:
+        return int(left["query_max"]) + 1, int(right["query_min"]) - 1, (
+            "complex_conflict" if error_type == "type6" else "simple_gap"
+        )
+    if error_type == "type2":
+        reverse_anchor = left if left["orientation"] == "-" else right
+        return int(reverse_anchor["query_min"]), int(reverse_anchor["query_max"]), "direction_conflict"
+    if error_type in {"type3", "type4"}:
+        shorter = left if int(left["query_aligned"]) <= int(right["query_aligned"]) else right
+        return int(shorter["query_min"]), int(shorter["query_max"]), (
+            "reference_contig_conflict" if error_type == "type3" else "reference_overlap"
+        )
+    if error_type == "type5":
+        overlap_start = max(int(left["ref_min"]), int(right["ref_min"]))
+        overlap_end = min(int(left["ref_max"]), int(right["ref_max"]))
+        overlap_row = right
+        query_start, query_end = _step3_project_ref_interval(overlap_row, overlap_start, overlap_end)
+        if overlap_row["orientation"] == "+":
+            return query_start, query_end + CORRECTION_MARGIN, "reference_overlap_with_margin"
+        return max(1, query_start - CORRECTION_MARGIN), query_end, "reference_overlap_with_margin"
+    return gap_pos, gap_end, "unclassified_structural_error"
+
+
+def _step3_repair_decision(
+    error_type: str,
+    confidence_score: float,
+    left: dict[str, object],
+    right: dict[str, object] | None,
+    start: int,
+    end: int,
+    repair_mode: str,
+) -> tuple[bool, str]:
+    if repair_mode not in REPAIR_MODES:
+        fail(f"unsupported Step3 repair mode: {repair_mode}")
+    if right is None:
+        return True, "crossing alignment is an error-region anchor"
+    anchor_distance = int(right["query_min"]) - int(left["query_max"])
+    large_distance = anchor_distance > CORRECTION_SEARCH_RANGE
+    if not large_distance and confidence_score >= 0.40:
+        return True, "conservative_conditions_met"
+    if repair_mode == "aggressive":
+        anchor_length = int(left["query_aligned"]) + int(right["query_aligned"])
+        replacement_length = max(1, end - start + 1)
+        if anchor_length > replacement_length:
+            return True, "aggressive_sufficient_anchors"
+    return False, "repair_mode_conditions_not_met"
+
+
+def _step3_anchor_pairs(
+    gap_pos: int,
+    chromosome_alignments: list[dict[str, object]],
+) -> list[tuple[dict[str, object], dict[str, object]]]:
+    lefts = [row for row in chromosome_alignments if int(row["query_max"]) < gap_pos]
+    rights = [row for row in chromosome_alignments if int(row["query_min"]) > gap_pos]
+    lefts = [row for row in lefts if gap_pos - int(row["query_max"]) <= CORRECTION_SEARCH_RANGE]
+    rights = [row for row in rights if int(row["query_min"]) - gap_pos <= CORRECTION_SEARCH_RANGE]
+    if not lefts or not rights:
+        return []
+    pairs: list[tuple[dict[str, object], dict[str, object]]] = []
+    seen: set[tuple[int, int]] = set()
+    grouped_left: dict[str, list[dict[str, object]]] = defaultdict(list)
+    grouped_right: dict[str, list[dict[str, object]]] = defaultdict(list)
+    for row in lefts:
+        grouped_left[str(row["ref_record"])].append(row)
+    for row in rights:
+        grouped_right[str(row["ref_record"])].append(row)
+    for ref_record in sorted(set(grouped_left) & set(grouped_right)):
+        left = max(grouped_left[ref_record], key=lambda row: (int(row["query_max"]), float(row["identity"]), -int(row["line_number"])))
+        right = min(grouped_right[ref_record], key=lambda row: (int(row["query_min"]), -float(row["identity"]), int(row["line_number"])))
+        seen.add((int(left["line_number"]), int(right["line_number"])))
+        pairs.append((left, right))
+    left = max(lefts, key=lambda row: (int(row["query_max"]), float(row["identity"]), -int(row["line_number"])))
+    right = min(rights, key=lambda row: (int(row["query_min"]), -float(row["identity"]), int(row["line_number"])))
+    if (int(left["line_number"]), int(right["line_number"])) not in seen:
+        pairs.append((left, right))
+    return pairs
+
+
 def build_correction_candidates(
     gaps: list[dict[str, object]],
     alignments: list[dict[str, object]],
     members_by_record: dict[str, dict[str, str]],
+    repair_mode: str = DEFAULT_REPAIR_MODE,
 ) -> list[dict[str, object]]:
+    """Build Server-native Type1--Type6 CorrectRefill candidates.
+
+    The standalone GRT analyzer operates on implicit files.  This adapter uses
+    the already parsed, hash-bound MUMmer rows so source cards and donor-set
+    coordinates remain owned by GPM.
+    """
+    if repair_mode not in REPAIR_MODES:
+        fail(f"unsupported Step3 repair mode: {repair_mode}")
     by_chr: dict[str, list[dict[str, object]]] = defaultdict(list)
     for alignment in alignments:
         by_chr[str(alignment["chr"])].append(alignment)
@@ -1542,74 +1799,32 @@ def build_correction_candidates(
         gap_pos = int(gap["start0"]) + 1
         chromosome_alignments = by_chr.get(chromosome, [])
         crossing = [
-            row for row in chromosome_alignments if int(row["query_min"]) <= gap_pos <= int(row["query_max"])
+            row for row in chromosome_alignments
+            if int(row["query_min"]) <= gap_pos <= int(row["query_max"])
         ]
-        prototypes: list[tuple[dict[str, object], dict[str, object] | None, str, int, int, str]] = []
+        prototypes: list[tuple[dict[str, object], dict[str, object] | None]] = []
         if crossing:
-            best = sorted(
+            prototypes.append((sorted(
                 crossing,
                 key=lambda row: (-float(row["identity"]), -int(row["query_aligned"]), int(row["line_number"])),
-            )[0]
-            prototypes.append(
-                (
-                    best,
-                    None,
-                    "replace",
-                    int(best["query_min"]),
-                    int(best["query_max"]),
-                    "crossing_alignment_error_region",
-                )
-            )
+            )[0], None))
         else:
-            grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
-            for row in chromosome_alignments:
-                grouped[str(row["ref_record"])].append(row)
-            for ref_record, rows in sorted(grouped.items()):
-                lefts = [row for row in rows if int(row["query_max"]) < gap_pos]
-                rights = [row for row in rows if int(row["query_min"]) > gap_pos]
-                if not lefts or not rights:
-                    continue
-                left = max(lefts, key=lambda row: (int(row["query_max"]), float(row["identity"])))
-                right = min(rights, key=lambda row: (int(row["query_min"]), -float(row["identity"])))
-                if min(gap_pos - int(left["query_max"]), int(right["query_min"]) - gap_pos) > CORRECTION_SEARCH_RANGE:
-                    continue
-                action = ""
-                reason = ""
-                start = gap_pos
-                end = int(gap["end0"])
-                if left["orientation"] != right["orientation"]:
-                    action = "correct_boundary"
-                    reverse_anchor = left if left["orientation"] == "-" else right
-                    start = min(gap_pos, int(reverse_anchor["query_min"]))
-                    end = max(int(gap["end0"]), int(reverse_anchor["query_max"]))
-                    reason = "direction_conflict"
-                else:
-                    ref_overlap_start = max(int(left["ref_min"]), int(right["ref_min"]))
-                    ref_overlap_end = min(int(left["ref_max"]), int(right["ref_max"]))
-                    if ref_overlap_start <= ref_overlap_end:
-                        action = "delete"
-                        start = min(gap_pos, int(right["query_min"]))
-                        end = max(int(gap["end0"]), int(right["query_min"]) + (ref_overlap_end - ref_overlap_start) + CORRECTION_MARGIN)
-                        reason = "reference_overlap_with_margin"
-                    else:
-                        ordered = (
-                            int(left["ref_max"]) < int(right["ref_min"])
-                            if left["orientation"] == "+"
-                            else int(right["ref_max"]) < int(left["ref_min"])
-                        )
-                        if not ordered:
-                            action = "correct_boundary"
-                            start = min(gap_pos, int(left["query_max"]) + 1)
-                            end = max(int(gap["end0"]), int(right["query_min"]) - 1)
-                            reason = "donor_order_conflict"
-                if action:
-                    prototypes.append((left, right, action, start, end, reason))
-        for left, right, action, start, end, reason in prototypes:
-            end = min(end, int(left["query_length"]))
-            start = max(1, start)
+            prototypes.extend(_step3_anchor_pairs(gap_pos, chromosome_alignments))
+        for left, right in prototypes:
+            features = _step3_alignment_features(gap_pos, left, right)
+            error_type, subtype, feature_names, confidence_score = _step3_classify_features(features)
+            start, end, reason = _step3_replace_region(
+                gap_pos, int(gap["end0"]), left, right, error_type
+            )
+            query_length = int(left["query_length"])
+            start = max(1, min(start, query_length))
+            end = max(start, min(end, query_length))
+            eligible, repair_reason = _step3_repair_decision(
+                error_type, confidence_score, left, right, start, end, repair_mode
+            )
             ref_start = int(left["ref_min"])
             ref_end = int(left["ref_max"])
-            if right is not None:
+            if right is not None and str(left["ref_record"]) == str(right["ref_record"]):
                 ref_start = min(ref_start, int(right["ref_min"]))
                 ref_end = max(ref_end, int(right["ref_max"]))
             member = members_by_record[str(left["ref_record"])]
@@ -1617,14 +1832,19 @@ def build_correction_candidates(
             payload = {
                 "stage": "step3",
                 "object_id": gap["object_id"],
-                "action": action,
+                "action": "replace" if error_type in {"type1", "type3"} else (
+                    "delete" if error_type in {"type4", "type5"} else "correct_boundary"
+                ),
                 "member_id": member["member_id"],
                 "source_start": source_start,
                 "source_end": source_end,
                 "input_start": start,
                 "input_end": end,
-                "reason": reason,
+                "error_type": error_type,
+                "error_subtype": subtype,
+                "repair_mode": repair_mode,
             }
+            action = str(payload["action"])
             candidates.append(
                 {
                     "candidate_id": stable_id("step3-correction", payload, 24),
@@ -1657,9 +1877,19 @@ def build_correction_candidates(
                     "left_line": left["line_number"],
                     "right_line": "" if right is None else right["line_number"],
                     "validation_passed": True,
-                    "outcome": "candidate",
-                    "reason": reason,
+                    "outcome": "candidate" if eligible else "rejected",
+                    "reason": reason if eligible else repair_reason,
                     "classification_reason": reason,
+                    "error_type": error_type,
+                    "error_subtype": subtype,
+                    "error_features": feature_names,
+                    "error_features_json": canonical_json(feature_names),
+                    "confidence": "high" if confidence_score >= 0.70 else "medium" if confidence_score >= 0.40 else "low",
+                    "confidence_score": confidence_score,
+                    "gap_in_error_region": True,
+                    "repair_mode": repair_mode,
+                    "repair_reason": repair_reason,
+                    "eligible": eligible,
                     "event_id": "",
                     "final_path_segment_id": "",
                 }
@@ -2127,6 +2357,18 @@ def build_correction_events(
             if superseded:
                 event["superseded_by_event_id"] = refill_event["event_id"]
                 refill_event.setdefault("superseded_event_ids", []).append(event_id)
+        classification = candidate or (related[0] if related else None)
+        if classification is not None:
+            event["classification"] = {
+                "error_type": classification.get("error_type", "unknown"),
+                "error_subtype": classification.get("error_subtype", "unspecified"),
+                "features": classification.get("error_features", []),
+                "confidence": classification.get("confidence", "low"),
+                "confidence_score": classification.get("confidence_score", 0.0),
+                "gap_in_error_region": bool(classification.get("gap_in_error_region", False)),
+            }
+            event["repair_mode"] = classification.get("repair_mode", DEFAULT_REPAIR_MODE)
+            event["repair_reason"] = classification.get("repair_reason", "")
         events.append(event)
         attempts.append(
             {
@@ -2211,8 +2453,11 @@ def run_step3(
     tools: dict[str, dict[str, str]],
     minimap: dict[str, str],
     threads: int,
+    repair_mode: str = DEFAULT_REPAIR_MODE,
 ) -> tuple[dict[str, object], bool]:
     stage = "step3"
+    if repair_mode not in REPAIR_MODES:
+        fail(f"unsupported Step3 repair mode: {repair_mode}")
     q_input_sha256 = sha256_file(server_dir / "grt/q/q2.fa")
     fingerprint_payload = {
         "workflow": WORKFLOW,
@@ -2226,7 +2471,7 @@ def run_step3(
         "tools": {name: command_identity(value) for name, value in {**tools, "minimap2": minimap}.items()},
         "mummer_parameters": mummer_parameters(threads),
         "correction_parameters": {
-            "repair_mode": "conservative",
+            "repair_mode": repair_mode,
             "max_search_distance": CORRECTION_SEARCH_RANGE,
             "normalized_gap_length": NORMALIZED_GAP_LENGTH,
             "reference_overlap_margin": CORRECTION_MARGIN,
@@ -2267,9 +2512,13 @@ def run_step3(
         )
         members_by_record = {row["fasta_record_name"]: row for row in donor_members}
         gaps = [gap for chromosome in chromosome_order for gap in gap_objects(chromosome, "q2", input_records[chromosome])]
-        correction_candidates = build_correction_candidates(gaps, alignments, members_by_record)
+        correction_candidates = build_correction_candidates(
+            gaps, alignments, members_by_record, repair_mode=repair_mode
+        )
         reject_candidates_spanning_other_gaps(correction_candidates, gaps)
-        correction_candidates = arbitrate(correction_candidates, consumed)
+        ineligible = [row for row in correction_candidates if not row.get("eligible", True)]
+        eligible = [row for row in correction_candidates if row.get("eligible", True)]
+        correction_candidates = [*arbitrate(eligible, consumed), *ineligible]
         correction_usage = correction_usage_rows(run_id, donor_set["donor_set_id"], correction_candidates)
         correction_evidence: list[dict[str, object]] = []
         for candidate in correction_candidates:
@@ -2297,6 +2546,14 @@ def run_step3(
                     parameters={
                         **mummer_parameters(threads),
                         **fingerprint_payload["correction_parameters"],
+                        "classification": {
+                            "error_type": candidate.get("error_type", "unknown"),
+                            "error_subtype": candidate.get("error_subtype", "unspecified"),
+                            "features": candidate.get("error_features", []),
+                            "confidence": candidate.get("confidence", "low"),
+                            "confidence_score": candidate.get("confidence_score", 0.0),
+                            "gap_in_error_region": bool(candidate.get("gap_in_error_region", False)),
+                        },
                     },
                     raw_relpath=identity["coords_relpath"],
                     raw_sha256=identity["coords_sha256"],
@@ -2704,6 +2961,7 @@ def execute(args: argparse.Namespace) -> None:
         tools,
         minimap,
         args.threads,
+        args.repair_mode,
     )
     publish_metadata(server_dir, [step2, step3], tools, minimap)
     if step2["donor_set_id"] != donor_set["donor_set_id"] or step3["donor_set_id"] != donor_set["donor_set_id"]:
@@ -2724,6 +2982,12 @@ def main() -> None:
     parser.add_argument("--show-coords", dest="show_coords", default="show-coords")
     parser.add_argument("--minimap2", default="minimap2")
     parser.add_argument("--threads", type=int, default=10)
+    parser.add_argument(
+        "--repair-mode",
+        choices=sorted(REPAIR_MODES),
+        default=DEFAULT_REPAIR_MODE,
+        help="CorrectRefill structural repair mode (default: aggressive)",
+    )
     args = parser.parse_args()
     if args.threads < 1:
         fail("threads must be a positive integer")

@@ -17,6 +17,7 @@ import test_grt_prepare_inputs as prepare_fixture
 import test_grt_step1 as step1_fixture
 from grt_prepare_inputs import read_fasta
 from grt_step23 import (
+    build_correction_candidates,
     parse_mummer_coords,
     project_interval_after_refills,
     reject_candidates_spanning_other_gaps,
@@ -29,6 +30,78 @@ STEP23_TOOL = REPO_ROOT / "server/tools/grt_step23.py"
 
 
 class GrtStep23Tests(unittest.TestCase):
+    def test_step3_classifies_grt_type1_to_type6(self):
+        members = {
+            "d1": {
+                "member_id": "m-d1",
+                "dataset_name": "d0",
+                "contig_name": "d1",
+                "orientation": "+",
+                "source_start": "1",
+                "source_end": "200000",
+            },
+            "d2": {
+                "member_id": "m-d2",
+                "dataset_name": "d0",
+                "contig_name": "d2",
+                "orientation": "+",
+                "source_start": "1",
+                "source_end": "200000",
+            },
+        }
+
+        def row(line, q_start, q_end, ref_start, ref_end, record="d1", orientation="+"):
+            return {
+                "chr": "Chr01",
+                "line_number": line,
+                "ref_record": record,
+                "ref_min": ref_start,
+                "ref_max": ref_end,
+                "query_min": q_start,
+                "query_max": q_end,
+                "query_length": 10000,
+                "query_aligned": q_end - q_start + 1,
+                "ref_length": 200000,
+                "ref_aligned": ref_end - ref_start + 1,
+                "identity": 0.99,
+                "orientation": orientation,
+            }
+
+        gaps = [
+            {"chr": "Chr01", "object_id": f"gap-{index}", "start0": start - 1, "end0": start + 99}
+            for index, start in enumerate((1001, 2001, 3001, 4501, 5501, 7001), start=1)
+        ]
+        alignments = [
+            row(1, 900, 1200, 100, 400),  # Type1 crossing
+            row(2, 1500, 1900, 1000, 1400),
+            row(3, 2100, 2500, 1401, 1800, orientation="-"),  # Type2
+            row(4, 2500, 2900, 2000, 2400),
+            row(5, 3100, 3500, 2401, 2800, record="d2"),  # Type3
+            row(6, 3500, 3900, 3000, 3400),
+            row(7, 4100, 4500, 4000, 4400),
+            row(8, 4600, 5000, 4395, 4800),  # Type4: 6 bp reference overlap
+            row(9, 5100, 5500, 5000, 5700),
+            row(10, 5600, 6000, 5600, 6300),  # Type5: 101 bp overlap (>10%)
+            row(11, 6500, 6900, 7000, 7400),
+            row(12, 7100, 7500, 8000, 8400, record="d2", orientation="-"),  # Type6
+        ]
+        candidates = build_correction_candidates(gaps, alignments, members)
+        by_gap = {}
+        for candidate in candidates:
+            if candidate["outcome"] != "rejected":
+                by_gap.setdefault(str(candidate["object_id"]), []).append(candidate)
+        self.assertEqual(
+            {row["error_type"] for rows in by_gap.values() for row in rows},
+            {"type1", "type2", "type3", "type4", "type5", "type6"},
+        )
+        self.assertEqual(by_gap["gap-1"][0]["error_subtype"], "crossing_alignment")
+        self.assertTrue(any(row["error_subtype"] == "direction_conflict" for row in by_gap["gap-2"]))
+        self.assertTrue(any(row["error_subtype"] == "simple_translocation" for row in by_gap["gap-3"]))
+        self.assertTrue(any(row["error_type"] == "type4" for row in by_gap["gap-4"]))
+        self.assertTrue(any(row["error_type"] == "type5" for row in by_gap["gap-5"]))
+        self.assertTrue(any(row["error_subtype"] == "complex_conflict" for row in by_gap["gap-6"]))
+        self.assertTrue(all(row["repair_mode"] == "aggressive" for rows in by_gap.values() for row in rows))
+
     def make_server(self, root: Path) -> Path:
         server = step1_fixture.GrtStep1Tests(
             "test_two_round_cache_global_interval_ledger_and_resume"
