@@ -197,6 +197,10 @@ PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh" > "${TMP_DIR}/resume.o
 grep -Fq '[SKIP_VALID] [ref:ds1]' "${TMP_DIR}/resume.out"
 grep -Fq '[SKIP_VALID] [assign]' "${TMP_DIR}/resume.out"
 grep -Fq '[SKIP_VALID] [chr:Chr01]' "${TMP_DIR}/resume.out"
+grep -Fq '[CACHE_HIT] [grt_prepare]' "${TMP_DIR}/resume.out"
+grep -Fq '[CACHE_HIT] [grt_step1]' "${TMP_DIR}/resume.out"
+grep -Fq '[CACHE_HIT] [grt_step23]' "${TMP_DIR}/resume.out"
+grep -Fq '[CACHE_HIT] [grt_telomere_finalize]' "${TMP_DIR}/resume.out"
 awk -F '\t' '
   $1 == "ref:ds1" || $1 == "assign" || $1 == "chr:Chr01" {
     if ($4 != "success" || $5 != "1") exit 1

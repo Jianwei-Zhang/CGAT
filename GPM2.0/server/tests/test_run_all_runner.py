@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import os
 import signal
@@ -178,6 +179,100 @@ class RunAllRunnerTests(unittest.TestCase):
             self.assertIn("[FAILED] [broken] exit_code=17", log)
             self.assertIn("detail=logs/run_all.log", log)
             self.assertIn("rerun='bash", log)
+
+    def test_grt_cache_hit_requires_valid_authoritative_checkpoints(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            server = self.make_workspace(
+                root,
+                [
+                    (
+                        "grt_step1",
+                        "echo 'GRT step1_round1 cache hit: fixture'\n"
+                        "echo 'GRT step1_filter cache hit: fixture'\n"
+                        "echo 'GRT step1_round2 cache hit: fixture'",
+                    )
+                ],
+            )
+            fields = [
+                "stage",
+                "q_input_version",
+                "q_input_sha256",
+                "q_output_version",
+                "q_output_sha256",
+                "donor_set_id",
+                "status",
+                "checkpoint_relpath",
+                "checkpoint_sha256",
+            ]
+            rows = []
+            for stage in ("step1_round1", "step1_filter", "step1_round2"):
+                output_relpath = f"grt/evidence/{stage}/result.txt"
+                output = server / output_relpath
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(f"{stage}\n", encoding="utf-8")
+                checkpoint_relpath = f"grt/checkpoints/{stage}.json"
+                checkpoint = server / checkpoint_relpath
+                checkpoint.parent.mkdir(parents=True, exist_ok=True)
+                checkpoint.write_text(
+                    json.dumps(
+                        {
+                            "workflow": "gpm_grt_precomputed_v2",
+                            "stage": stage,
+                            "status": "success",
+                            "input_fingerprint": f"input-{stage}",
+                            "output_hashes": {
+                                output_relpath: hashlib.sha256(output.read_bytes()).hexdigest()
+                            },
+                        },
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                rows.append(
+                    {
+                        "stage": stage,
+                        "q_input_version": "q0",
+                        "q_input_sha256": "a" * 64,
+                        "q_output_version": "q1",
+                        "q_output_sha256": "b" * 64,
+                        "donor_set_id": "donor",
+                        "status": "success",
+                        "checkpoint_relpath": checkpoint_relpath,
+                        "checkpoint_sha256": hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
+                    }
+                )
+            with (server / "metadata/grt_stage_status.tsv").open(
+                "w", newline="", encoding="utf-8"
+            ) as handle:
+                writer = csv.DictWriter(
+                    handle, fieldnames=fields, delimiter="\t", lineterminator="\n"
+                )
+                writer.writeheader()
+                writer.writerows(rows)
+
+            result = self.run_runner(server)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("[CACHE_HIT] [grt_step1]", result.stdout)
+
+            (server / "commands/grt_step1.sh").write_text(
+                "#!/usr/bin/env bash\nset -euo pipefail\n"
+                "echo 'GRT step1_round1 cache hit: fixture'\n"
+                "echo 'GRT step1_filter complete: recomputed'\n",
+                encoding="utf-8",
+            )
+            partial = self.run_runner(server)
+            self.assertEqual(partial.returncode, 0, partial.stderr)
+            self.assertNotIn("[CACHE_HIT] [grt_step1]", partial.stdout)
+
+            (server / "grt/evidence/step1_filter/result.txt").write_text(
+                "corrupt\n", encoding="utf-8"
+            )
+            failed = self.run_runner(server)
+            self.assertEqual(failed.returncode, 2)
+            self.assertIn("terminal validation failed", failed.stdout)
+            self.assertEqual(read_status(server / "logs/status.tsv")[0]["state"], "failed")
 
     def test_concurrent_runner_is_rejected_without_disturbing_owner(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -83,6 +83,7 @@ for archive_name in sys.argv[1:]:
     with ZipFile(archive_name) as archive:
         names = [name for name in archive.namelist() if not name.endswith('/')]
         assert not any('/.prepare_lib/' in name for name in names), archive_name
+        assert not any('/logs/' in name or '/.run_all/' in name for name in names), archive_name
         assert not any(name.endswith(('.sh', '.py')) for name in names), archive_name
         assert not any('/grt/cache/' in name or '/grt/checkpoints/' in name or '/grt/donors/' in name for name in names), archive_name
         assert not any('/grt/evidence/' in name for name in names), archive_name

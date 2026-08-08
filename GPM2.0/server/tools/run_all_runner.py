@@ -37,6 +37,16 @@ STATUS_FIELDS = [
     "exit_code",
     "detail_log_relpath",
 ]
+GRT_CACHE_MARKERS = {
+    "grt_prepare": ("GRT prepare inputs are current:",),
+    "grt_step1": (
+        "GRT step1_round1 cache hit:",
+        "GRT step1_filter cache hit:",
+        "GRT step1_round2 cache hit:",
+    ),
+    "grt_step23": ("GRT step2 cache hit:", "GRT step3 cache hit:"),
+    "grt_telomere_finalize": ("GRT step4_telomere cache hit:",),
+}
 
 
 class RunnerError(RuntimeError):
@@ -286,6 +296,7 @@ class Runner:
         self.active_child: subprocess.Popen[str] | None = None
         self.received_signal: int | None = None
         self.outer_checkpoints = OuterCheckpointManager(server_dir)
+        self.child_cache_markers: set[str] = set()
 
     def _event(self, event: str, unit: PlanUnit | None, message: str) -> None:
         if unit is None:
@@ -311,6 +322,9 @@ class Runner:
         assert self.log_handle is not None
         for raw_line in child.stdout:
             line = raw_line.rstrip("\r\n")
+            for marker in GRT_CACHE_MARKERS.get(unit.unit_id, ()):
+                if line.startswith(marker):
+                    self.child_cache_markers.add(marker)
             rendered = f"{timestamp()} [run={self.run_id}] [CHILD] [{unit.unit_id}] {line}"
             print(rendered, flush=True)
             self.log_handle.write(rendered + "\n")
@@ -328,6 +342,17 @@ class Runner:
 
     def _row(self, unit: PlanUnit) -> dict[str, str]:
         return next(row for row in self.status_rows if row["unit_id"] == unit.unit_id)
+
+    def _terminal_validation(self, unit_id: str) -> tuple[bool, str]:
+        if unit_id in GRT_CACHE_MARKERS:
+            return self.outer_checkpoints.validate_grt_unit(unit_id)
+        if unit_id == "finalize_evidence":
+            return self.outer_checkpoints.validate_evidence()
+        if unit_id == "package_full":
+            return self.outer_checkpoints.validate_package("full")
+        if unit_id == "package_light":
+            return self.outer_checkpoints.validate_package("light")
+        return True, "no terminal validation required"
 
     def run(self) -> int:
         self.logs_dir.mkdir(parents=True, exist_ok=True)
@@ -419,7 +444,8 @@ class Runner:
                             self._event(
                                 "SKIP_VALID",
                                 unit,
-                                f"checkpoint={prepared.path.relative_to(self.server_dir)} {reason}",
+                                f"elapsed=0.000s checkpoint="
+                                f"{prepared.path.relative_to(self.server_dir)} {reason}",
                             )
                             continue
                         if prepared.path.is_file():
@@ -446,6 +472,7 @@ class Runner:
                     )
                     atomic_write_status(self.status_path, self.status_rows)
                     self._event("START", unit, f"attempt={attempt} command={unit.command_relpath}")
+                    self.child_cache_markers.clear()
                     child = subprocess.Popen(
                         ["bash", str(self.server_dir / unit.command_relpath)],
                         cwd=self.server_dir,
@@ -499,6 +526,25 @@ class Runner:
                             f"rerun='bash {self.server_dir / 'run_all.sh'}'",
                         )
                         return exit_code
+                    try:
+                        valid, reason = self._terminal_validation(unit.unit_id)
+                    except (OSError, OrchestrationContractError) as exc:
+                        valid, reason = False, str(exc)
+                    if not valid:
+                        row["state"] = "failed"
+                        row["exit_code"] = "2"
+                        atomic_write_status(self.status_path, self.status_rows)
+                        self._event(
+                            "FAILED",
+                            unit,
+                            f"exit_code=2 terminal validation failed: {reason} "
+                            f"detail={unit.detail_log_relpath} "
+                            f"rerun='bash {self.server_dir / 'run_all.sh'}'",
+                        )
+                        return 2
+                    cache_markers = GRT_CACHE_MARKERS.get(unit.unit_id, ())
+                    if cache_markers and self.child_cache_markers == set(cache_markers):
+                        self._event("CACHE_HIT", unit, f"elapsed={elapsed:.3f}s {reason}")
                     if prepared is not None:
                         try:
                             checkpoint_path = self.outer_checkpoints.commit(prepared)

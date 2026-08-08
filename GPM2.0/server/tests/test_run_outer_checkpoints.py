@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -100,6 +101,40 @@ class OuterCheckpointTests(unittest.TestCase):
     def path_environment(self, fake_bin: Path) -> dict[str, str]:
         return {"PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"}
 
+    def write_grt_stage(self, server: Path, stage: str) -> dict[str, str]:
+        output_relpath = f"grt/evidence/{stage}/result.txt"
+        output = server / output_relpath
+        write(output, f"{stage}\n")
+        checkpoint_relpath = f"grt/checkpoints/{stage}.json"
+        checkpoint = server / checkpoint_relpath
+        write(
+            checkpoint,
+            json.dumps(
+                {
+                    "workflow": "gpm_grt_precomputed_v2",
+                    "stage": stage,
+                    "status": "success",
+                    "input_fingerprint": f"input-{stage}",
+                    "output_hashes": {
+                        output_relpath: hashlib.sha256(output.read_bytes()).hexdigest()
+                    },
+                },
+                sort_keys=True,
+            )
+            + "\n",
+        )
+        return {
+            "stage": stage,
+            "q_input_version": "q0",
+            "q_input_sha256": "a" * 64,
+            "q_output_version": "q1",
+            "q_output_sha256": "b" * 64,
+            "donor_set_id": "donor",
+            "status": "success",
+            "checkpoint_relpath": checkpoint_relpath,
+            "checkpoint_sha256": hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
+        }
+
     def test_reference_checkpoint_reuses_valid_empty_paf_and_rejects_corruption(self):
         with tempfile.TemporaryDirectory() as temporary:
             server, fake_bin = self.make_server(Path(temporary))
@@ -188,6 +223,60 @@ class OuterCheckpointTests(unittest.TestCase):
 
                 chromosome_result.write_text(PAF_LINE, encoding="utf-8")
                 self.assertFalse(manager.validate(chromosome)[0])
+
+    def test_grt_stage_mapping_requires_checkpoint_status_and_output_hashes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            server, _fake_bin = self.make_server(Path(temporary))
+            rows = [
+                self.write_grt_stage(server, stage)
+                for stage in ("step1_round1", "step1_filter", "step1_round2")
+            ]
+            fields = list(rows[0])
+            write(
+                server / "metadata/grt_stage_status.tsv",
+                "\t".join(fields)
+                + "\n"
+                + "".join("\t".join(row[field] for field in fields) + "\n" for row in rows),
+            )
+            manager = OuterCheckpointManager(server)
+            valid, reason = manager.validate_grt_unit("grt_step1")
+            self.assertTrue(valid, reason)
+
+            (server / "grt/evidence/step1_filter/result.txt").write_text(
+                "corrupt\n", encoding="utf-8"
+            )
+            valid, reason = manager.validate_grt_unit("grt_step1")
+            self.assertFalse(valid)
+            self.assertIn("output hash changed", reason)
+
+    def test_evidence_and_package_completion_validation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            server, _fake_bin = self.make_server(Path(temporary))
+            summary = {
+                "workflow": "gpm_grt_precomputed_v2",
+                "schema_version": "2",
+                "q0_sha256": "a" * 64,
+                "q4_sha256": "b" * 64,
+            }
+            write(server / "metadata/grt_contract_summary.json", json.dumps(summary) + "\n")
+            write(server / "metadata/grt_used_contigs.tsv", "source_card_key\n")
+            write(server / "metadata/grt_final_path.json", "{}\n")
+            write(server / "grt/q/q4.fa", ">Chr1\nA\n")
+            manager = OuterCheckpointManager(server)
+            with mock.patch("run_outer_checkpoints.validate_contract", return_value=summary):
+                self.assertTrue(manager.validate_evidence()[0])
+                recorded = {**summary, "q4_sha256": "c" * 64}
+                write(
+                    server / "metadata/grt_contract_summary.json",
+                    json.dumps(recorded) + "\n",
+                )
+                self.assertFalse(manager.validate_evidence()[0])
+
+            self.assertFalse(manager.validate_package("full")[0])
+            write(server.parent / f"{server.name}.zip", "archive\n")
+            self.assertTrue(manager.validate_package("full")[0])
+            write(server.parent / f"{server.name}.no_fasta.zip", "")
+            self.assertFalse(manager.validate_package("light")[0])
 
 
 if __name__ == "__main__":

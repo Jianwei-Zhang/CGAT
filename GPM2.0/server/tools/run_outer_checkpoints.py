@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from grt_contract import ContractError, validate_contract
 from run_orchestration import (
     CHECKPOINT_SCHEMA_VERSION,
     EXECUTION_ENGINE_VERSION,
@@ -24,6 +25,13 @@ from run_orchestration import (
 
 
 WORKFLOW = "gpm_run_outer_v1"
+GRT_WORKFLOW = "gpm_grt_precomputed_v2"
+GRT_STAGE_MAP = {
+    "grt_prepare": ("donor_freeze",),
+    "grt_step1": ("step1_round1", "step1_filter", "step1_round2"),
+    "grt_step23": ("step2", "step3"),
+    "grt_telomere_finalize": ("step4_telomere", "finalize"),
+}
 
 
 @dataclass(frozen=True)
@@ -117,6 +125,109 @@ class OuterCheckpointManager:
         }
         atomic_write_json(prepared.path, checkpoint)
         return prepared.path
+
+    def validate_grt_unit(self, unit_id: str) -> tuple[bool, str]:
+        stages = GRT_STAGE_MAP.get(unit_id)
+        if stages is None:
+            return True, "no GRT checkpoint validation required"
+        status_rows = self._read_tsv("metadata/grt_stage_status.tsv")
+        for stage in stages:
+            checkpoint_path = self.server_dir / f"grt/checkpoints/{stage}.json"
+            if not checkpoint_path.is_file():
+                return False, f"GRT checkpoint is missing: {checkpoint_path}"
+            try:
+                checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+                return False, f"GRT checkpoint cannot be read: {checkpoint_path}: {exc}"
+            if not isinstance(checkpoint, dict):
+                return False, f"GRT checkpoint is not an object: {checkpoint_path}"
+            if (
+                checkpoint.get("workflow") != GRT_WORKFLOW
+                or checkpoint.get("stage") != stage
+                or checkpoint.get("status") != "success"
+                or not isinstance(checkpoint.get("input_fingerprint"), str)
+                or not checkpoint.get("input_fingerprint")
+            ):
+                return False, f"GRT checkpoint identity/status is invalid: {checkpoint_path}"
+            output_hashes = checkpoint.get("output_hashes")
+            if not isinstance(output_hashes, dict) or not output_hashes:
+                return False, f"GRT checkpoint output manifest is invalid: {checkpoint_path}"
+            for relpath, expected_hash in output_hashes.items():
+                if not isinstance(relpath, str) or not isinstance(expected_hash, str):
+                    return False, f"GRT checkpoint output entry is invalid: {checkpoint_path}"
+                try:
+                    output_path = self._server_artifact(relpath)
+                except OrchestrationContractError as exc:
+                    return False, str(exc)
+                if not output_path.is_file():
+                    return False, f"GRT checkpoint output is missing: {output_path}"
+                if sha256_file(output_path) != expected_hash:
+                    return False, f"GRT checkpoint output hash changed: {output_path}"
+            required_directories = checkpoint.get("required_directories", [])
+            if not isinstance(required_directories, list):
+                return False, f"GRT checkpoint directory manifest is invalid: {checkpoint_path}"
+            for relpath in required_directories:
+                try:
+                    directory = self._server_artifact(relpath) if isinstance(relpath, str) else None
+                except OrchestrationContractError as exc:
+                    return False, str(exc)
+                if directory is None or not directory.is_dir():
+                    return False, f"GRT checkpoint directory is missing: {directory}"
+            matching_rows = [row for row in status_rows if row.get("stage") == stage]
+            if len(matching_rows) != 1 or matching_rows[0].get("status") != "success":
+                return False, f"GRT stage status is incomplete: {stage}"
+            row = matching_rows[0]
+            if row.get("checkpoint_relpath") != f"grt/checkpoints/{stage}.json":
+                return False, f"GRT stage checkpoint path is invalid: {stage}"
+            if row.get("checkpoint_sha256") != sha256_file(checkpoint_path):
+                return False, f"GRT stage checkpoint hash changed: {stage}"
+        return True, f"GRT checkpoints valid: {', '.join(stages)}"
+
+    def validate_evidence(self) -> tuple[bool, str]:
+        required = [
+            self.server_dir / "metadata/grt_contract_summary.json",
+            self.server_dir / "metadata/grt_used_contigs.tsv",
+            self.server_dir / "metadata/grt_final_path.json",
+            self.server_dir / "grt/q/q4.fa",
+        ]
+        missing = next((path for path in required if not path.is_file()), None)
+        if missing is not None:
+            return False, f"evidence output is missing: {missing}"
+        try:
+            summary = validate_contract(self.server_dir)
+            recorded = json.loads(
+                (self.server_dir / "metadata/grt_contract_summary.json").read_text(encoding="utf-8")
+            )
+            if not isinstance(recorded, dict):
+                return False, "evidence contract summary is not an object"
+            for key in ("workflow", "schema_version", "q0_sha256", "q4_sha256"):
+                if recorded.get(key) != summary.get(key):
+                    return False, f"evidence contract summary disagrees for {key}"
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError, ContractError) as exc:
+            return False, f"evidence contract validation failed: {exc}"
+        return True, "evidence and Server contract are valid"
+
+    def _server_artifact(self, relpath: str) -> Path:
+        path = Path(relpath)
+        if not relpath or path.is_absolute() or ".." in path.parts or "\\" in relpath:
+            raise OrchestrationContractError(f"invalid GRT artifact path: {relpath!r}")
+        resolved = (self.server_dir / path).resolve()
+        try:
+            resolved.relative_to(self.server_dir)
+        except ValueError as exc:
+            raise OrchestrationContractError(
+                f"GRT artifact escapes the Server workspace: {relpath!r}"
+            ) from exc
+        return resolved
+
+    def validate_package(self, package_kind: str) -> tuple[bool, str]:
+        if package_kind not in {"full", "light"}:
+            return False, f"unsupported delivery package kind: {package_kind}"
+        suffix = ".zip" if package_kind == "full" else ".no_fasta.zip"
+        archive = self.server_dir.parent / f"{self.server_dir.name}{suffix}"
+        if not archive.is_file() or archive.stat().st_size < 1:
+            return False, f"{package_kind} delivery archive is missing or empty: {archive}"
+        return True, f"{package_kind} delivery archive is present: {archive.name}"
 
     def _read_options(self) -> dict[str, str]:
         if self._options is not None:
