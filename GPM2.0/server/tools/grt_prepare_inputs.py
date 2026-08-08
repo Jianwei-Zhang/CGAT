@@ -58,6 +58,18 @@ DONOR_MEMBER_FIELDS = [
     "fasta_record_name",
     "sequence_sha256",
 ]
+DONOR_FRAGMENT_FIELDS = [
+    "donor_set_id",
+    "member_id",
+    "fragment_id",
+    "fasta_record_name",
+    "fragment_start",
+    "fragment_end",
+    "fragment_length",
+    "sequence_sha256",
+    "left_boundary",
+    "right_boundary",
+]
 EVIDENCE_FIELDS = [
     "evidence_id",
     "stage",
@@ -126,6 +138,60 @@ def stable_id(prefix: str, value: object, length: int = 24) -> str:
 
 def reverse_complement(sequence: str) -> str:
     return sequence.translate(COMPLEMENT)[::-1]
+
+
+def donor_fragment_rows(
+    donor_set_id: str,
+    members: list[dict[str, str]],
+    sequences: dict[tuple[str, str], str],
+) -> list[dict[str, object]]:
+    """Index D0 sequence fragments without changing the frozen donor FASTA.
+
+    GRT treats long N-runs as fragment boundaries.  The fragment table is an
+    index only: all repair candidates still point to the original D0 member,
+    source coordinates and donor-set hash.
+    """
+    rows: list[dict[str, object]] = []
+    for member in members:
+        sequence = sequences[(member["dataset_name"], member["contig_name"])]
+        intervals: list[tuple[int, int]] = []
+        cursor = 0
+        for match in re.finditer(r"N{100,}", sequence):
+            if cursor < match.start():
+                intervals.append((cursor, match.start()))
+            cursor = match.end()
+        if cursor < len(sequence):
+            intervals.append((cursor, len(sequence)))
+        for start0, end0 in intervals:
+            fragment = sequence[start0:end0]
+            fragment_start = start0 + 1
+            fragment_end = end0
+            fragment_id = stable_id(
+                "d0-fragment",
+                {
+                    "donor_set_id": donor_set_id,
+                    "member_id": member["member_id"],
+                    "start": fragment_start,
+                    "end": fragment_end,
+                    "sequence_sha256": sha256_bytes(fragment.encode("ascii")),
+                },
+                20,
+            )
+            rows.append(
+                {
+                    "donor_set_id": donor_set_id,
+                    "member_id": member["member_id"],
+                    "fragment_id": fragment_id,
+                    "fasta_record_name": member["fasta_record_name"],
+                    "fragment_start": fragment_start,
+                    "fragment_end": fragment_end,
+                    "fragment_length": len(fragment),
+                    "sequence_sha256": sha256_bytes(fragment.encode("ascii")),
+                    "left_boundary": str(start0 == 0).lower(),
+                    "right_boundary": str(end0 == len(sequence)).lower(),
+                }
+            )
+    return rows
 
 
 def read_tsv(path: Path, expected_header: list[str] | None = None) -> list[dict[str, str]]:
@@ -749,7 +815,7 @@ def prepare(args: argparse.Namespace) -> None:
         input_identity.append({"path": label, "sha256": sha256_file(path)})
     fingerprint_payload = {
         "workflow": WORKFLOW,
-        "builder_version": 1,
+        "builder_version": 2,
         "inputs": input_identity,
         "reads_qc_enabled": reads_qc_enabled,
         "tools": tools,
@@ -1213,6 +1279,9 @@ def prepare(args: argparse.Namespace) -> None:
         telomere_set, telomere_members = build_donor_set("telomere", telomere_keys)
         donor_sets = [ordinary_set, telomere_set]
         donor_members = ordinary_members + telomere_members
+        ordinary_fragments = donor_fragment_rows(
+            str(ordinary_set["donor_set_id"]), ordinary_members, sequences
+        )
 
         q0_hash = sha256_file(q0_path)
         recipe_id = stable_id(
@@ -1282,6 +1351,11 @@ def prepare(args: argparse.Namespace) -> None:
             donor_sets,
         )
         write_tsv(stage_metadata / "grt_donor_members.tsv", DONOR_MEMBER_FIELDS, donor_members)
+        write_tsv(
+            stage_metadata / "grt_donor_fragments.tsv",
+            DONOR_FRAGMENT_FIELDS,
+            ordinary_fragments,
+        )
         write_tsv(stage_metadata / "grt_evidence_registry.tsv", EVIDENCE_FIELDS, evidence_rows)
         write_tsv(
             stage_metadata / "grt_contig_quality.tsv",
@@ -1309,7 +1383,7 @@ def prepare(args: argparse.Namespace) -> None:
         tool_rows = [
             {
                 "tool": "grt_prepare_inputs",
-                "version": "1",
+                "version": "2",
                 "executable": ".prepare_lib/tools/grt_prepare_inputs.py",
             },
             {

@@ -17,6 +17,7 @@ import test_grt_prepare_inputs as prepare_fixture
 import test_grt_step1 as step1_fixture
 from grt_prepare_inputs import read_fasta
 from grt_step23 import (
+    arbitrate,
     build_correction_candidates,
     build_step2_fallback_candidates,
     parse_mummer_coords,
@@ -32,6 +33,36 @@ STEP23_TOOL = REPO_ROOT / "server/tools/grt_step23.py"
 
 
 class GrtStep23Tests(unittest.TestCase):
+    def test_step23_reuses_same_orientation_donor_on_distinct_targets(self):
+        def candidate(candidate_id, object_id, chromosome, orientation):
+            return {
+                "candidate_id": candidate_id,
+                "object_id": object_id,
+                "chr": chromosome,
+                "source_dataset": "support",
+                "source_contig": "donor",
+                "source_start": 1001,
+                "source_end": 2000,
+                "orientation": orientation,
+                "target_start": 5001,
+                "target_end": 5100,
+                "input_start": 5001,
+                "input_end": 5100,
+                "identity": 0.99,
+                "aligned_length": 2000,
+                "mapq": 60,
+                "validation_passed": True,
+                "outcome": "candidate",
+                "reason": "",
+            }
+
+        rows = arbitrate(
+            [candidate("c1", "gap-1", "Chr01", "+"), candidate("c2", "gap-2", "Chr02", "+")],
+            [],
+        )
+        self.assertEqual([row["outcome"] for row in rows], ["accepted", "accepted"])
+        self.assertEqual(next(row for row in rows if row.get("donor_reuse"))["donor_reuse_of"], "c1")
+
     def test_step2_controller_selects_all_three_grt_branches(self):
         self.assertEqual(step2_strategy(3, 0, 0), "no_patch_fixer")
         self.assertEqual(step2_strategy(3, 4, 0), "full_fixer_reuse_patches")

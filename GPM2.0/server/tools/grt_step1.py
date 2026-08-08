@@ -18,6 +18,7 @@ from typing import Iterable
 
 from grt_prepare_inputs import (
     CHR_ASSIGNMENT_FIELDS,
+    DONOR_FRAGMENT_FIELDS,
     EVIDENCE_FIELDS,
     Q_SEGMENT_FIELDS,
     WORKFLOW,
@@ -34,7 +35,7 @@ from grt_prepare_inputs import (
 )
 
 
-ENGINE_VERSION = 1
+ENGINE_VERSION = 2
 MIN_GAP_LENGTH = 100
 FLANK_LENGTH = 10_000
 MIN_ALIGNMENT_LENGTH = 1_000
@@ -99,6 +100,9 @@ CANDIDATE_FIELDS = [
     "mapq",
     "left_paf_line",
     "right_paf_line",
+    "fragment_id",
+    "donor_reuse",
+    "donor_reuse_of",
 ]
 ARBITRATION_FIELDS = CANDIDATE_FIELDS + ["outcome", "reason", "event_id", "final_path_segment_id"]
 REJECTION_FIELDS = ["stage", "chr", "object_id", "left_paf_line", "right_paf_line", "reason"]
@@ -443,6 +447,7 @@ def build_candidates(
     gaps: list[dict[str, object]],
     members_by_record: dict[str, dict[str, str]],
     donor_records: dict[str, str],
+    fragments_by_record: dict[str, list[dict[str, str]]] | None = None,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     alignments: dict[tuple[str, str], list[dict[str, object]]] = defaultdict(list)
     rejections: list[dict[str, object]] = []
@@ -501,7 +506,18 @@ def build_candidates(
                         rejection["reason"] = "fill_length_gt_1000000"
                     else:
                         donor_sequence = donor_records[str(left["target"])][local_start - 1 : local_end]
-                        if re.search(r"N{100,}", donor_sequence):
+                        fragment = next(
+                            (
+                                row
+                                for row in (fragments_by_record or {}).get(str(left["target"]), [])
+                                if int(row["fragment_start"]) <= local_start
+                                and local_end <= int(row["fragment_end"])
+                            ),
+                            None,
+                        )
+                        if fragments_by_record is not None and fragment is None:
+                            rejection["reason"] = "donor_interval_not_within_fragment"
+                        elif re.search(r"N{100,}", donor_sequence):
                             rejection["reason"] = "donor_interval_crosses_unresolved_gap"
                         else:
                             member = members_by_record[str(left["target"])]
@@ -524,6 +540,7 @@ def build_candidates(
                                 "orientation": orientation,
                                 "left_line": left["line_number"],
                                 "right_line": right["line_number"],
+                                "fragment_id": "" if fragment is None else fragment["fragment_id"],
                             }
                             candidates.append(
                                 {
@@ -548,6 +565,9 @@ def build_candidates(
                                     "mapq": min(int(left["mapq"]), int(right["mapq"])),
                                     "left_paf_line": left["line_number"],
                                     "right_paf_line": right["line_number"],
+                                    "fragment_id": "" if fragment is None else fragment["fragment_id"],
+                                    "donor_reuse": False,
+                                    "donor_reuse_of": "",
                                 }
                             )
                             continue
@@ -601,12 +621,33 @@ def arbitrate_candidates(
             ),
             None,
         )
-        if collision is not None:
+        collision_same_object = (
+            collision is not None
+            and collision.get("object_id")
+            and str(collision.get("object_id")) == object_id
+        )
+        collision_orientation_conflict = (
+            collision is not None
+            and collision.get("orientation")
+            and str(collision.get("orientation")) != str(candidate.get("orientation"))
+        )
+        if collision is not None and (collision_same_object or collision_orientation_conflict):
             candidate["outcome"] = "conflicted"
-            candidate["reason"] = f"source_interval_consumed_by:{collision['candidate_id']}"
+            candidate["reason"] = (
+                "source_interval_reuse_orientation_conflict"
+                if collision_orientation_conflict
+                else f"source_interval_consumed_by:{collision['candidate_id']}"
+            )
             continue
         candidate["outcome"] = "accepted"
-        candidate["reason"] = "accepted_by_global_interval_arbitration"
+        candidate["reason"] = (
+            f"accepted_with_donor_reuse_of:{collision['candidate_id']}"
+            if collision is not None
+            else "accepted_by_global_interval_arbitration"
+        )
+        if collision is not None:
+            candidate["donor_reuse"] = True
+            candidate["donor_reuse_of"] = collision.get("candidate_id", "")
         accepted_gaps.add(object_id)
         occupied.append(candidate)
     return ordered
@@ -916,6 +957,13 @@ def apply_round(
                 "trim_right": candidate["trim_right"],
                 "replacement_sequence_sha256": sha256_bytes(str(candidate["fill_sequence"]).encode("ascii")),
             }
+            event["fragment_id"] = candidate.get("fragment_id", "")
+            if candidate.get("donor_reuse"):
+                event["donor_reuse"] = {
+                    "reused": True,
+                    "reused_from_candidate_id": candidate.get("donor_reuse_of", ""),
+                    "policy": "same_orientation_distinct_target",
+                }
         events.append(event)
         attempts.append(
             {
@@ -1532,7 +1580,7 @@ def run_round_stage(
         "min_alignment_length": MIN_ALIGNMENT_LENGTH,
         "min_identity": MIN_IDENTITY,
         "max_fill_length": MAX_FILL_LENGTH,
-        "arbitration": "identity,aligned_length,mapq,source_identity,source_interval,target_gap",
+        "arbitration": "identity,aligned_length,mapq,fragment,same_orientation_distinct_target_reuse",
     }
     fingerprint_payload = {
         "workflow": WORKFLOW,
@@ -1544,6 +1592,9 @@ def run_round_stage(
         "flank_query_sha256": flank_sha256,
         "donor_set_id": donor_set["donor_set_id"],
         "donor_target_sha256": donor_set["fasta_sha256"],
+        "donor_fragment_index_sha256": sha256_file(
+            server_dir / "metadata/grt_donor_fragments.tsv"
+        ),
         "tool": minimap,
         "parameters": parameters,
         "consumed_intervals_sha256": json_hash(consumed),
@@ -1569,6 +1620,12 @@ def run_round_stage(
         members_by_record = {row["fasta_record_name"]: row for row in donor_members}
         if set(donor_records) != set(members_by_record):
             fail("ordinary D0 FASTA records differ from its frozen member manifest")
+        donor_fragments = read_donor_fragments(
+            server_dir, donor_set, donor_members, donor_records
+        )
+        fragments_by_record: dict[str, list[dict[str, str]]] = defaultdict(list)
+        for fragment in donor_fragments:
+            fragments_by_record[fragment["fasta_record_name"]].append(fragment)
         artifact_identity_by_chr: dict[str, dict[str, str]] = {}
         chromosome_task_rows: list[dict[str, object]] = []
         paf_parts: list[bytes] = []
@@ -1650,7 +1707,12 @@ def run_round_stage(
             chromosome_task_rows,
         )
         candidates, rejections = build_candidates(
-            stage, paf_rows, gaps, members_by_record, donor_records
+            stage,
+            paf_rows,
+            gaps,
+            members_by_record,
+            donor_records,
+            fragments_by_record,
         )
         candidates = arbitrate_candidates(candidates, consumed)
         query_relpath = f"{artifact_relpath}/flanks.fa"
@@ -1713,10 +1775,13 @@ def run_round_stage(
         accepted_intervals = [
             {
                 "candidate_id": row["candidate_id"],
+                "object_id": row["object_id"],
+                "chr": row["chr"],
                 "source_dataset": row["source_dataset"],
                 "source_contig": row["source_contig"],
                 "source_start": row["source_start"],
                 "source_end": row["source_end"],
+                "orientation": row["orientation"],
                 "stage": stage,
             }
             for row in candidates
@@ -1964,6 +2029,50 @@ def publish_metadata(
     atomic_write_tsv(metadata / "grt_tool_versions.tsv", TOOL_FIELDS, tool_rows)
 
 
+def read_donor_fragments(
+    server_dir: Path,
+    donor_set: dict[str, str],
+    donor_members: list[dict[str, str]],
+    donor_records: dict[str, str],
+) -> list[dict[str, str]]:
+    path = server_dir / "metadata/grt_donor_fragments.tsv"
+    rows = [
+        row
+        for row in read_tsv(path, DONOR_FRAGMENT_FIELDS)
+        if row["donor_set_id"] == donor_set["donor_set_id"]
+    ]
+    members_by_id = {row["member_id"]: row for row in donor_members}
+    actual_by_record: dict[str, list[tuple[int, int]]] = defaultdict(list)
+    for row in rows:
+        member = members_by_id.get(row["member_id"])
+        if member is None or row["fasta_record_name"] != member["fasta_record_name"]:
+            fail("D0 fragment references an unknown or mismatched donor member")
+        sequence = donor_records[row["fasta_record_name"]]
+        start, end = int(row["fragment_start"]), int(row["fragment_end"])
+        if not (1 <= start <= end <= len(sequence)):
+            fail("D0 fragment has invalid member coordinates")
+        fragment = sequence[start - 1 : end]
+        if (
+            int(row["fragment_length"]) != len(fragment)
+            or row["sequence_sha256"] != sha256_bytes(fragment.encode("ascii"))
+            or re.search(r"N{100,}", fragment)
+        ):
+            fail("D0 fragment content or checksum is invalid")
+        actual_by_record[row["fasta_record_name"]].append((start, end))
+    for record_name, sequence in donor_records.items():
+        expected: list[tuple[int, int]] = []
+        cursor = 0
+        for match in re.finditer(r"N{100,}", sequence):
+            if cursor < match.start():
+                expected.append((cursor + 1, match.start()))
+            cursor = match.end()
+        if cursor < len(sequence):
+            expected.append((cursor + 1, len(sequence)))
+        if sorted(actual_by_record.get(record_name, [])) != expected:
+            fail(f"D0 fragment index does not exactly cover non-gap sequence: {record_name}")
+    return rows
+
+
 def verify_donor_freeze(
     server_dir: Path,
     recipe: dict[str, str],
@@ -2023,6 +2132,12 @@ def verify_donor_freeze(
     ])
     if manifest_rows != member_rows:
         fail("frozen ordinary donor manifest differs from member registry")
+    read_donor_fragments(
+        server_dir,
+        donor_set,
+        member_rows,
+        dict(read_fasta_allow_empty(donor_path)),
+    )
     stage_rows = read_tsv(server_dir / "metadata/grt_stage_status.tsv", STAGE_FIELDS)
     donor_rows = [row for row in stage_rows if row["stage"] == "donor_freeze"]
     if len(donor_rows) != 1:

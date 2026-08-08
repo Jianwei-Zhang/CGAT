@@ -15,6 +15,7 @@ sys.path.insert(0, str(REPO_ROOT / "server/tools"))
 import test_grt_prepare_inputs as prepare_fixture
 from grt_step1 import (
     apply_filter,
+    arbitrate_candidates,
     reconcile_filtered_round1_events,
     replay_filter_records,
 )
@@ -25,6 +26,43 @@ STEP1_TOOL = REPO_ROOT / "server/tools/grt_step1.py"
 
 
 class GrtStep1Tests(unittest.TestCase):
+    def test_donor_interval_reuse_is_allowed_across_targets_but_not_orientations(self):
+        def candidate(candidate_id, object_id, chromosome, orientation):
+            return {
+                "candidate_id": candidate_id,
+                "stage": "step1_round1",
+                "chr": chromosome,
+                "object_id": object_id,
+                "source_dataset": "support",
+                "source_contig": "donor",
+                "source_start": 1001,
+                "source_end": 2000,
+                "orientation": orientation,
+                "identity": 0.99,
+                "aligned_length": 2000,
+                "mapq": 60,
+            }
+
+        accepted = arbitrate_candidates(
+            [candidate("c1", "gap-1", "Chr01", "+"), candidate("c2", "gap-2", "Chr02", "+")],
+            [],
+        )
+        self.assertEqual([row["outcome"] for row in accepted], ["accepted", "accepted"])
+        reused = next(row for row in accepted if row.get("donor_reuse"))
+        self.assertEqual(reused["donor_reuse_of"], "c1")
+
+        conflicted = arbitrate_candidates(
+            [candidate("c1", "gap-1", "Chr01", "+"), candidate("c2", "gap-2", "Chr02", "-")],
+            [],
+        )
+        self.assertEqual(
+            sorted(row["outcome"] for row in conflicted),
+            ["accepted", "conflicted"],
+        )
+        self.assertTrue(
+            any(row["reason"] == "source_interval_reuse_orientation_conflict" for row in conflicted)
+        )
+
     def make_server(self, root: Path) -> Path:
         helper = prepare_fixture.GrtPrepareInputsTests(
             "test_no_reads_builds_traceable_q0_and_frozen_global_donors"
@@ -262,16 +300,17 @@ with open(out, 'w', encoding='utf-8', newline='') as handle:
             consumed = [row for row in usage if row["status"] == "consumed"]
             conflicted = [row for row in usage if row["status"] == "conflicted"]
             self.assertEqual(len(consumed), 2)
-            self.assertTrue(conflicted)
+            self.assertFalse(conflicted)
             first = (int(consumed[0]["source_start"]), int(consumed[0]["source_end"]))
             second = (int(consumed[1]["source_start"]), int(consumed[1]["source_end"]))
-            self.assertLess(first[1], second[0])
+            self.assertLessEqual(max(first[0], second[0]), min(first[1], second[1]))
             self.assertTrue(
-                any(
-                    int(row["source_start"]) <= first[1] and int(row["source_end"]) >= first[0]
-                    for row in conflicted
-                )
+                any("accepted_with_donor_reuse_of:" in row["reason"] for row in consumed)
             )
+            round_candidates = prepare_fixture.read_tsv(
+                server / "grt/evidence/step1/round1/candidates.tsv"
+            )
+            self.assertTrue(all(row["fragment_id"] for row in round_candidates))
             evidence = prepare_fixture.read_tsv(server / "metadata/grt_evidence_registry.tsv")
             round_evidence = [row for row in evidence if row["stage"].startswith("step1_")]
             donor_hash = next(

@@ -17,6 +17,7 @@ from pathlib import Path
 
 from grt_prepare_inputs import (
     CHR_ASSIGNMENT_FIELDS,
+    DONOR_FRAGMENT_FIELDS,
     EVIDENCE_FIELDS,
     Q_SEGMENT_FIELDS,
     WORKFLOW,
@@ -63,7 +64,7 @@ from grt_step1 import (
 )
 
 
-ENGINE_VERSION = 2
+ENGINE_VERSION = 3
 MUMMER_MIN_CLUSTER = 1_000
 MUMMER_MIN_MATCH = 100
 MUMMER_MIN_ALIGNMENT = 10_000
@@ -139,6 +140,9 @@ CANDIDATE_FIELDS = [
     "gap_in_error_region",
     "repair_mode",
     "repair_reason",
+    "fragment_id",
+    "donor_reuse",
+    "donor_reuse_of",
 ]
 
 REJECTION_FIELDS = [
@@ -329,6 +333,9 @@ def cached_mummer_chromosome(
         "query_artifact_sha256": sha256_bytes(query_payload),
         "donor_set_id": donor_set["donor_set_id"],
         "donor_target_sha256": donor_set["fasta_sha256"],
+        "donor_fragment_index_sha256": sha256_file(
+            server_dir / "metadata/grt_donor_fragments.tsv"
+        ),
         "tools": {name: command_identity(value) for name, value in tools.items()},
         "parameters": parameters,
         "should_align": should_align,
@@ -811,6 +818,9 @@ def cached_validation_alignment(
         "target_sha256": sha256_bytes(target_payload),
         "donor_set_id": donor_set["donor_set_id"],
         "donor_target_sha256": donor_set["fasta_sha256"],
+        "donor_fragment_index_sha256": sha256_file(
+            server_dir / "metadata/grt_donor_fragments.tsv"
+        ),
         "tool": command_identity(minimap),
         "parameters": parameters,
     }
@@ -1119,10 +1129,26 @@ def arbitrate(
             ),
             None,
         )
-        if source_collision is not None:
+        source_collision_same_object = (
+            source_collision is not None
+            and source_collision.get("object_id")
+            and str(source_collision.get("object_id")) == object_id
+        )
+        source_collision_orientation_conflict = (
+            source_collision is not None
+            and source_collision.get("orientation")
+            and str(source_collision.get("orientation")) != str(candidate.get("orientation"))
+        )
+        if source_collision is not None and (
+            source_collision_same_object or source_collision_orientation_conflict
+        ):
             candidate["outcome"] = "conflicted"
             blocker = source_collision.get("candidate_id") or source_collision.get("usage_id") or "prior_usage"
-            candidate["reason"] = f"source_interval_consumed_by:{blocker}"
+            candidate["reason"] = (
+                "source_interval_reuse_orientation_conflict"
+                if source_collision_orientation_conflict
+                else f"source_interval_consumed_by:{blocker}"
+            )
             continue
         target_collision = next(
             (
@@ -1143,7 +1169,14 @@ def arbitrate(
             candidate["reason"] = f"target_interval_overlaps:{target_collision['candidate_id']}"
             continue
         candidate["outcome"] = "accepted"
-        candidate["reason"] = "accepted_by_global_interval_arbitration"
+        candidate["reason"] = (
+            f"accepted_with_donor_reuse_of:{source_collision.get('candidate_id', '')}"
+            if source_collision is not None
+            else "accepted_by_global_interval_arbitration"
+        )
+        if source_collision is not None:
+            candidate["donor_reuse"] = True
+            candidate["donor_reuse_of"] = source_collision.get("candidate_id", "")
         accepted_objects.add(object_id)
         occupied_sources.append(candidate)
         occupied_targets.append(candidate)
@@ -1179,7 +1212,15 @@ def assignment_map(server_dir: Path) -> dict[tuple[str, str], set[str]]:
     return assignments
 
 
-def consumed_intervals(usage_rows: list[dict[str, str]]) -> list[dict[str, object]]:
+def consumed_intervals(
+    usage_rows: list[dict[str, str]],
+    event_rows: list[dict[str, object]] | None = None,
+) -> list[dict[str, object]]:
+    events_by_id = {
+        str(row["event_id"]): row
+        for row in (event_rows or [])
+        if row.get("event_id")
+    }
     return [
         {
             "candidate_id": row.get("event_id") or row["usage_id"],
@@ -1189,10 +1230,47 @@ def consumed_intervals(usage_rows: list[dict[str, str]]) -> list[dict[str, objec
             "source_start": int(row["source_start"]),
             "source_end": int(row["source_end"]),
             "stage": row["stage"],
+            "object_id": str(events_by_id.get(str(row.get("event_id")), {}).get("object_id", "")),
+            "chr": str(events_by_id.get(str(row.get("event_id")), {}).get("chr", "")),
+            "orientation": str(events_by_id.get(str(row.get("event_id")), {}).get("source", {}).get("orientation", "")),
         }
         for row in usage_rows
         if row["status"] in {"consumed", "accepted", "superseded"}
     ]
+
+
+def annotate_candidate_fragments(
+    candidates: list[dict[str, object]],
+    donor_members: list[dict[str, str]],
+    fragment_rows: list[dict[str, str]],
+) -> None:
+    members_by_id = {row["member_id"]: row for row in donor_members}
+    fragments_by_member: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for row in fragment_rows:
+        fragments_by_member[row["member_id"]].append(row)
+    for candidate in candidates:
+        member = members_by_id.get(str(candidate.get("member_id", "")))
+        if member is None:
+            continue
+        source_start = int(candidate["source_start"])
+        source_end = int(candidate["source_end"])
+        fragment = None
+        for row in fragments_by_member.get(member["member_id"], []):
+            fragment_start, fragment_end = member_source_interval(
+                member,
+                int(row["fragment_start"]),
+                int(row["fragment_end"]),
+            )
+            if fragment_start <= source_start and source_end <= fragment_end:
+                fragment = row
+                break
+        if fragment is None:
+            if candidate.get("outcome") == "candidate":
+                candidate["outcome"] = "rejected"
+                candidate["reason"] = "donor_interval_not_within_fragment"
+            candidate["fragment_id"] = ""
+        else:
+            candidate["fragment_id"] = fragment["fragment_id"]
 
 
 def evidence_row(
@@ -1335,6 +1413,9 @@ def run_step2(
         "q_segments_sha256": json_hash(input_q_rows),
         "donor_set_id": donor_set["donor_set_id"],
         "donor_target_sha256": donor_set["fasta_sha256"],
+        "donor_fragment_index_sha256": sha256_file(
+            server_dir / "metadata/grt_donor_fragments.tsv"
+        ),
         "tools": {name: command_identity(value) for name, value in {**tools, "minimap2": minimap}.items()},
         "mummer_parameters": mummer_parameters(threads),
         "validation_parameters": {
@@ -1384,6 +1465,14 @@ def run_step2(
         )
         members_by_record = {row["fasta_record_name"]: row for row in donor_members}
         donor_records = dict(read_fasta_allow_empty(server_dir / donor_set["fasta_relpath"]))
+        fragment_rows = [
+            row
+            for row in read_tsv(
+                server_dir / "metadata/grt_donor_fragments.tsv",
+                DONOR_FRAGMENT_FIELDS,
+            )
+            if row["donor_set_id"] == donor_set["donor_set_id"]
+        ]
         gaps = [gap for chromosome in chromosome_order for gap in gap_objects(chromosome, "q1", input_records[chromosome])]
         candidates, rejections = build_step2_candidates(gaps, alignments, members_by_record, donor_records)
         patch_candidate_counts = {
@@ -1428,6 +1517,7 @@ def run_step2(
             }
         validate_step2_candidates(candidates, validation_rows, members_by_record, rejections)
         reject_candidates_spanning_other_gaps(candidates, gaps, rejections)
+        annotate_candidate_fragments(candidates, donor_members, fragment_rows)
         candidates = arbitrate(candidates, consumed)
         validated_patch_counts = {
             chromosome: sum(
@@ -1477,6 +1567,9 @@ def run_step2(
                 }
             )
         if fallback_candidates:
+            annotate_candidate_fragments(
+                fallback_candidates, donor_members, fragment_rows
+            )
             fallback_candidates = arbitrate(fallback_candidates, consumed)
             candidates.extend(fallback_candidates)
         fallback_by_chr: dict[str, list[dict[str, object]]] = defaultdict(list)
@@ -2609,6 +2702,13 @@ def build_correction_events(
             }
             event["repair_mode"] = classification.get("repair_mode", DEFAULT_REPAIR_MODE)
             event["repair_reason"] = classification.get("repair_reason", "")
+            event["fragment_id"] = classification.get("fragment_id", "")
+            if classification.get("donor_reuse"):
+                event["donor_reuse"] = {
+                    "reused": True,
+                    "reused_from_candidate_id": classification.get("donor_reuse_of", ""),
+                    "policy": "same_orientation_distinct_target",
+                }
         events.append(event)
         attempts.append(
             {
@@ -2708,6 +2808,9 @@ def run_step3(
         "q_segments_sha256": json_hash(input_q_rows),
         "donor_set_id": donor_set["donor_set_id"],
         "donor_target_sha256": donor_set["fasta_sha256"],
+        "donor_fragment_index_sha256": sha256_file(
+            server_dir / "metadata/grt_donor_fragments.tsv"
+        ),
         "tools": {name: command_identity(value) for name, value in {**tools, "minimap2": minimap}.items()},
         "mummer_parameters": mummer_parameters(threads),
         "correction_parameters": {
@@ -2751,11 +2854,22 @@ def run_step3(
             threads,
         )
         members_by_record = {row["fasta_record_name"]: row for row in donor_members}
+        fragment_rows = [
+            row
+            for row in read_tsv(
+                server_dir / "metadata/grt_donor_fragments.tsv",
+                DONOR_FRAGMENT_FIELDS,
+            )
+            if row["donor_set_id"] == donor_set["donor_set_id"]
+        ]
         gaps = [gap for chromosome in chromosome_order for gap in gap_objects(chromosome, "q2", input_records[chromosome])]
         correction_candidates = build_correction_candidates(
             gaps, alignments, members_by_record, repair_mode=repair_mode
         )
         reject_candidates_spanning_other_gaps(correction_candidates, gaps)
+        annotate_candidate_fragments(
+            correction_candidates, donor_members, fragment_rows
+        )
         ineligible = [row for row in correction_candidates if not row.get("eligible", True)]
         eligible = [row for row in correction_candidates if row.get("eligible", True)]
         correction_candidates = [*arbitrate(eligible, consumed), *ineligible]
@@ -2843,6 +2957,9 @@ def run_step3(
             refill_candidates,
             corrected_gaps,
             refill_rejections,
+        )
+        annotate_candidate_fragments(
+            refill_candidates, donor_members, fragment_rows
         )
         refill_candidates = arbitrate(
             refill_candidates,
@@ -3153,8 +3270,14 @@ def execute(args: argparse.Namespace) -> None:
     }
     minimap = executable_identity(args.minimap2)
     existing_usage = read_tsv(server_dir / "metadata/grt_donor_usage.tsv", USAGE_FIELDS)
+    existing_events = [
+        json.loads(line)
+        for line in (server_dir / "metadata/grt_events.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
     initial_consumed = consumed_intervals(
-        [row for row in existing_usage if row["stage"].startswith("step1_")]
+        [row for row in existing_usage if row["stage"].startswith("step1_")],
+        existing_events,
     )
     run_id = stable_id(
         "grt-run",

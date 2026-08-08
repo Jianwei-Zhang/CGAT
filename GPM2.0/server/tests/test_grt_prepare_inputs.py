@@ -13,7 +13,7 @@ REPO_ROOT = Path(__file__).parents[2]
 TOOL = REPO_ROOT / "server" / "tools" / "grt_prepare_inputs.py"
 sys.path.insert(0, str(REPO_ROOT / "server/tools"))
 
-from grt_prepare_inputs import commit_prepared_outputs
+from grt_prepare_inputs import commit_prepared_outputs, donor_fragment_rows
 
 
 def write_fasta(path, records):
@@ -41,6 +41,29 @@ def sha256(path):
 
 
 class GrtPrepareInputsTests(unittest.TestCase):
+    def test_donor_fragments_split_long_n_runs_without_changing_source_coordinates(self):
+        sequence = "A" * 1200 + "N" * 100 + "C" * 1400
+        member = {
+            "donor_set_id": "d0-test",
+            "member_id": "member-test",
+            "dataset_name": "support",
+            "contig_name": "donor",
+            "source_start": 1,
+            "source_end": len(sequence),
+            "orientation": "+",
+            "fasta_record_name": "grt_member-test",
+            "sequence_sha256": hashlib.sha256(sequence.encode("ascii")).hexdigest(),
+        }
+        rows = donor_fragment_rows(
+            "d0-test", [member], {("support", "donor"): sequence}
+        )
+        self.assertEqual(
+            [(int(row["fragment_start"]), int(row["fragment_end"])) for row in rows],
+            [(1, 1200), (1301, 2700)],
+        )
+        self.assertEqual([int(row["fragment_length"]) for row in rows], [1200, 1400])
+        self.assertTrue(all(row["donor_set_id"] == "d0-test" for row in rows))
+
     def make_server(self, root, reads_qc_enabled=False):
         server = root / "gpm_server"
         metadata = server / "metadata"
@@ -281,8 +304,24 @@ class GrtPrepareInputsTests(unittest.TestCase):
                 [("support", "s_assigned"), ("support", "s_unplaced"), ("primary", "p_redundant")],
             )
             self.assertNotIn("p_cover", {row["contig_name"] for row in ordinary})
+            fragments = read_tsv(server / "metadata/grt_donor_fragments.tsv")
+            self.assertEqual(
+                {row["member_id"] for row in fragments},
+                {row["member_id"] for row in ordinary},
+            )
 
-            tracked = [server / "grt/q/q0.fa", server / "metadata/grt_donor_sets.tsv", server / "metadata/grt_q_segments.tsv"]
+            ordinary_set = next(
+                row
+                for row in read_tsv(server / "metadata/grt_donor_sets.tsv")
+                if row["donor_set_id"] == recipe["donor_set_id"]
+            )
+            tracked = [
+                server / "grt/q/q0.fa",
+                server / ordinary_set["fasta_relpath"],
+                server / "metadata/grt_donor_sets.tsv",
+                server / "metadata/grt_donor_fragments.tsv",
+                server / "metadata/grt_q_segments.tsv",
+            ]
             before = {path: sha256(path) for path in tracked}
             repeated = self.run_tool(server)
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
