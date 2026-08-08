@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
 from run_orchestration import OrchestrationContractError, atomic_write_json
 
 
@@ -284,6 +285,7 @@ class Runner:
         self.log_handle = None
         self.active_child: subprocess.Popen[str] | None = None
         self.received_signal: int | None = None
+        self.outer_checkpoints = OuterCheckpointManager(server_dir)
 
     def _event(self, event: str, unit: PlanUnit | None, message: str) -> None:
         if unit is None:
@@ -376,6 +378,59 @@ class Runner:
                         )
                         return 128 + self.received_signal
                     row = self._row(unit)
+                    prepared: PreparedOuterCheckpoint | None = None
+                    try:
+                        prepared = self.outer_checkpoints.prepare(
+                            unit.unit_id, unit.command_relpath
+                        )
+                    except OrchestrationContractError as exc:
+                        row.update(
+                            {
+                                "state": "failed",
+                                "attempt": str(int(row["attempt"] or "0") + 1),
+                                "started_at": timestamp(),
+                                "ended_at": timestamp(),
+                                "elapsed_seconds": "0.000",
+                                "exit_code": "2",
+                            }
+                        )
+                        atomic_write_status(self.status_path, self.status_rows)
+                        self._event(
+                            "FAILED",
+                            unit,
+                            f"exit_code=2 checkpoint preparation failed: {exc} "
+                            f"detail={unit.detail_log_relpath} "
+                            f"rerun='bash {self.server_dir / 'run_all.sh'}'",
+                        )
+                        return 2
+
+                    if prepared is not None:
+                        valid, reason = self.outer_checkpoints.validate(prepared)
+                        if valid:
+                            row.update(
+                                {
+                                    "state": "success",
+                                    "ended_at": timestamp(),
+                                    "elapsed_seconds": "0.000",
+                                    "exit_code": "0",
+                                }
+                            )
+                            atomic_write_status(self.status_path, self.status_rows)
+                            self._event(
+                                "SKIP_VALID",
+                                unit,
+                                f"checkpoint={prepared.path.relative_to(self.server_dir)} {reason}",
+                            )
+                            continue
+                        if prepared.path.is_file():
+                            row["state"] = "stale"
+                            atomic_write_status(self.status_path, self.status_rows)
+                            self._event(
+                                "STALE",
+                                unit,
+                                f"checkpoint={prepared.path.relative_to(self.server_dir)} {reason}; rerunning",
+                            )
+
                     attempt = int(row["attempt"] or "0") + 1
                     started_at = timestamp()
                     started_monotonic = datetime.now(timezone.utc)
@@ -444,6 +499,29 @@ class Runner:
                             f"rerun='bash {self.server_dir / 'run_all.sh'}'",
                         )
                         return exit_code
+                    if prepared is not None:
+                        try:
+                            checkpoint_path = self.outer_checkpoints.commit(prepared)
+                        except (OSError, OrchestrationContractError) as exc:
+                            row["state"] = "failed"
+                            row["exit_code"] = "2"
+                            atomic_write_status(self.status_path, self.status_rows)
+                            self._event(
+                                "FAILED",
+                                unit,
+                                f"exit_code=2 output validation/checkpoint failed: {exc} "
+                                f"detail={unit.detail_log_relpath} "
+                                f"rerun='bash {self.server_dir / 'run_all.sh'}'",
+                            )
+                            return 2
+                        row["state"] = "success"
+                        atomic_write_status(self.status_path, self.status_rows)
+                        self._event(
+                            "SUCCESS",
+                            unit,
+                            f"elapsed={elapsed:.3f}s checkpoint={checkpoint_path.relative_to(self.server_dir)}",
+                        )
+                        continue
                     row["state"] = "success"
                     atomic_write_status(self.status_path, self.status_rows)
                     self._event("SUCCESS", unit, f"elapsed={elapsed:.3f}s")

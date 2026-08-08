@@ -87,6 +87,75 @@ class RunAllRunnerTests(unittest.TestCase):
             repeat_log = (server / "logs/run_all.log").read_text(encoding="utf-8")
             self.assertIn("[RESUME] [run_all] rechecking the prepared execution plan", repeat_log)
 
+    def test_outer_checkpoint_skips_valid_ref_and_reruns_corrupt_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            server = self.make_workspace(
+                root,
+                [
+                    (
+                        "ref:ds",
+                        "printf 'run\\n' >> run-count.txt\n"
+                        "mkdir -p runs/ds_vs_ref\n"
+                        "printf 'query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\n' "
+                        "> runs/ds_vs_ref/result.paf\n"
+                        "printf 'fixture\\n' > runs/ds_vs_ref/tool_version.txt",
+                    )
+                ],
+            )
+            (server / "metadata/prepare_options.tsv").write_text(
+                "key\tvalue\nalignment_engine\tminimap2\nthreads\t12\nminimap_preset\tasm10\n",
+                encoding="utf-8",
+            )
+            (server / "metadata/reference.tsv").write_text(
+                "reference_name\tfasta_relpath\tfai_relpath\n"
+                "ref\tdata/reference/ref.fa\tdata/reference/ref.fa.fai\n",
+                encoding="utf-8",
+            )
+            (server / "metadata/datasets.tsv").write_text(
+                "dataset_name\tassembler\tassembler_version\tfasta_relpath\tfai_relpath\tself_alignment_available\n"
+                "ds\tds\t\tdata/datasets/ds.fa\tdata/datasets/ds.fa.fai\ttrue\n",
+                encoding="utf-8",
+            )
+            for relpath, content in [
+                ("data/reference/ref.fa", ">target\nAAAAAAAAAAAA\n"),
+                ("data/reference/ref.fa.fai", "target\t12\t8\t12\t13\n"),
+                ("data/datasets/ds.fa", ">query\nAAAAAAAAAA\n"),
+                ("data/datasets/ds.fa.fai", "query\t10\t7\t10\t11\n"),
+            ]:
+                path = server / relpath
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            minimap2 = fake_bin / "minimap2"
+            minimap2.write_text("#!/usr/bin/env bash\necho fixture\n", encoding="utf-8")
+            minimap2.chmod(0o755)
+            environment = os.environ.copy()
+            environment["PATH"] = f"{fake_bin}{os.pathsep}{environment.get('PATH', '')}"
+
+            first = self.run_runner(server, env=environment)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertEqual((server / "run-count.txt").read_text(encoding="utf-8"), "run\n")
+            self.assertEqual(len(list((server / ".run_all/checkpoints").glob("*.json"))), 1)
+
+            second = self.run_runner(server, env=environment)
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertIn("[SKIP_VALID] [ref:ds]", second.stdout)
+            self.assertEqual((server / "run-count.txt").read_text(encoding="utf-8"), "run\n")
+            self.assertEqual(read_status(server / "logs/status.tsv")[0]["attempt"], "1")
+
+            (server / "runs/ds_vs_ref/result.paf").write_text(
+                "malformed\n", encoding="utf-8"
+            )
+            third = self.run_runner(server, env=environment)
+            self.assertEqual(third.returncode, 0, third.stderr)
+            self.assertIn("[STALE] [ref:ds]", third.stdout)
+            self.assertEqual(
+                (server / "run-count.txt").read_text(encoding="utf-8"), "run\nrun\n"
+            )
+            self.assertEqual(read_status(server / "logs/status.tsv")[0]["attempt"], "2")
+
     def test_failure_stops_downstream_and_is_actionable(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

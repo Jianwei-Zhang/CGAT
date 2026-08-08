@@ -193,6 +193,18 @@ assert_file_contains "${TMP_DIR}/gpm_server.zip" "--- gpm_server/data/datasets/d
 assert_file_not_contains "${TMP_DIR}/gpm_server.no_fasta.zip" '^--- gpm_server/data/datasets/ds1[.]fa$'
 assert_file_contains "${TMP_DIR}/gpm_server.no_fasta.zip" "--- gpm_server/data/datasets/ds1.fa.fai"
 
+PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh" > "${TMP_DIR}/resume.out"
+grep -Fq '[SKIP_VALID] [ref:ds1]' "${TMP_DIR}/resume.out"
+grep -Fq '[SKIP_VALID] [assign]' "${TMP_DIR}/resume.out"
+grep -Fq '[SKIP_VALID] [chr:Chr01]' "${TMP_DIR}/resume.out"
+awk -F '\t' '
+  $1 == "ref:ds1" || $1 == "assign" || $1 == "chr:Chr01" {
+    if ($4 != "success" || $5 != "1") exit 1
+    seen += 1
+  }
+  END { exit seen == 3 ? 0 : 1 }
+' "${output_root}/logs/status.tsv"
+
 awk -F '\t' 'BEGIN { OFS = "\t" } $1 == "chr_assignment_min_coverage_percent" { $2 = "72" } { print }' \
   "${output_root}/metadata/prepare_options.tsv" > "${output_root}/metadata/prepare_options.tsv.tmp"
 mv "${output_root}/metadata/prepare_options.tsv.tmp" "${output_root}/metadata/prepare_options.tsv"
