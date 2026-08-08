@@ -29,6 +29,14 @@ EOF
 for grt_tool in nucmer delta-filter show-coords merqury.sh craq; do
   cat > "${FAKE_BIN}/${grt_tool}" <<EOF
 #!/usr/bin/env bash
+case "${grt_tool}:\${1:-}" in
+  nucmer:--help)
+    printf '%s\n' '     --batch=BASES' ' -t, --threads=NUM'
+    ;;
+  delta-filter:-h|show-coords:-h)
+    printf '%s\n' '-r    reference-order option' '-l    sequence-length option'
+    ;;
+esac
 exit 0
 EOF
 done
@@ -104,7 +112,7 @@ make_restricted_path() {
   local missing_command="$2"
   mkdir -p "$output_dir"
   local command_name
-  for command_name in dirname gzip python3; do
+  for command_name in bash dirname gzip python3; do
     ln -s "$(command -v "$command_name")" "${output_dir}/${command_name}"
   done
   for command_name in \
@@ -272,6 +280,52 @@ for missing_command in minimap2 nucmer delta-filter show-coords; do
   grep -F "Required command not found in PATH: ${missing_command}" "$error_path" >/dev/null || {
     echo "expected missing-command error for ${missing_command}" >&2
     cat "$error_path" >&2
+    exit 1
+  }
+done
+
+capability_stub="${TMP_DIR}/mummer-capability-stub"
+cat > "$capability_stub" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "${GPM_TEST_MUMMER_HELP:-}"
+EOF
+chmod +x "$capability_stub"
+
+capability_commands=(nucmer nucmer delta-filter show-coords)
+capability_help=(
+  $' -t, --threads=NUM'
+  $'     --batch=BASES'
+  $'-r    reference-order option'
+  $'-l    sequence-length option'
+)
+capability_missing=(--batch -t/--threads -l -r)
+
+for capability_index in "${!capability_commands[@]}"; do
+  capability_command="${capability_commands[$capability_index]}"
+  restricted_bin="${TMP_DIR}/incompatible-${capability_index}-bin"
+  output_path="${TMP_DIR}/incompatible-${capability_index}-output"
+  error_path="${TMP_DIR}/incompatible-${capability_index}.err"
+  make_restricted_path "$restricted_bin" ""
+  rm -f "${restricted_bin}/${capability_command}"
+  cp "$capability_stub" "${restricted_bin}/${capability_command}"
+
+  if GPM_TEST_MUMMER_HELP="${capability_help[$capability_index]}" \
+    PATH="$restricted_bin" /bin/bash "$SCRIPT" \
+    --ref ref_incompatible_mummer "$ref" \
+    --ds ds_incompatible_mummer "$ds" \
+    -o "$output_path" \
+    >/dev/null 2>"$error_path"; then
+    echo "expected incompatible ${capability_command} to fail" >&2
+    exit 1
+  fi
+  grep -F "Incompatible MUMmer tool '${restricted_bin}/${capability_command}': missing required option ${capability_missing[$capability_index]}." \
+    "$error_path" >/dev/null || {
+      echo "expected missing MUMmer capability error for ${capability_command}" >&2
+      cat "$error_path" >&2
+      exit 1
+    }
+  [[ ! -e "$output_path" ]] || {
+    echo "incompatible MUMmer preflight created output workspace: $output_path" >&2
     exit 1
   }
 done

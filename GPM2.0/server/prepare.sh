@@ -392,6 +392,55 @@ resolve_required_command() {
   printf '%s\n' "$resolved"
 }
 
+require_mummer_help_option() {
+  local executable="$1"
+  local help_flag="$2"
+  local option_pattern="$3"
+  local option_label="$4"
+  local install_guidance="$5"
+  local help_output
+  local help_line
+  local found="false"
+
+  help_output="$("$executable" "$help_flag" 2>&1 || true)"
+  while IFS= read -r help_line; do
+    if [[ "$help_line" =~ $option_pattern ]]; then
+      found="true"
+      break
+    fi
+  done <<<"$help_output"
+  if [[ "$found" != "true" ]]; then
+    die "Incompatible MUMmer tool '$executable': missing required option $option_label. $install_guidance"
+  fi
+}
+
+validate_mummer4_capabilities() {
+  local nucmer_path="$1"
+  local delta_filter_path="$2"
+  local show_coords_path="$3"
+  local nucmer_guidance="Install a current MUMmer4 build with nucmer --batch and -t/--threads support."
+  local utility_guidance="Install a complete MUMmer4 build whose delta-filter and show-coords utilities support the GRT recipe."
+
+  require_mummer_help_option \
+    "$nucmer_path" --help '^[[:space:]]*--batch([=[:space:]]|$)' --batch \
+    "$nucmer_guidance"
+  require_mummer_help_option \
+    "$nucmer_path" --help '^[[:space:]]*-t([|,[:space:]]|$)' -t/--threads \
+    "$nucmer_guidance"
+  require_mummer_help_option \
+    "$delta_filter_path" -h '^[[:space:]]*-r([|,[:space:]]|$)' -r \
+    "$utility_guidance"
+  require_mummer_help_option \
+    "$delta_filter_path" -h '^[[:space:]]*-l([|,[:space:]]|$)' -l \
+    "$utility_guidance"
+  require_mummer_help_option \
+    "$show_coords_path" -h '^[[:space:]]*-r([|,[:space:]]|$)' -r \
+    "$utility_guidance"
+  require_mummer_help_option \
+    "$show_coords_path" -h '^[[:space:]]*-l([|,[:space:]]|$)' -l \
+    "$utility_guidance"
+}
+
 write_package_scripts() {
   local work_root="$1"
   local package_mode="$2"
@@ -2781,6 +2830,8 @@ GRT_MINIMAP2="$(resolve_required_command minimap2)"
 GRT_NUCMER="$(resolve_required_command nucmer)"
 GRT_DELTA_FILTER="$(resolve_required_command delta-filter)"
 GRT_SHOW_COORDS="$(resolve_required_command show-coords)"
+validate_mummer4_capabilities \
+  "$GRT_NUCMER" "$GRT_DELTA_FILTER" "$GRT_SHOW_COORDS"
 if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
   GRT_MERYL="$(resolve_required_command meryl)"
   GRT_MERQURY="$(resolve_required_command merqury.sh)"

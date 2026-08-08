@@ -73,6 +73,14 @@ EOF
 for grt_tool in nucmer delta-filter show-coords; do
   cat > "${FAKE_BIN}/${grt_tool}" <<EOF
 #!/usr/bin/env bash
+case "${grt_tool}:\${1:-}" in
+  nucmer:--help)
+    printf '%s\n' '     --batch=BASES' ' -t, --threads=NUM'
+    ;;
+  delta-filter:-h|show-coords:-h)
+    printf '%s\n' '-r    reference-order option' '-l    sequence-length option'
+    ;;
+esac
 if [[ "\${1:-}" == "--version" ]]; then
   printf '%s fixture 1\n' "${grt_tool}"
 fi
