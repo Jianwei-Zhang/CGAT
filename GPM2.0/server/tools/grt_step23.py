@@ -65,7 +65,7 @@ from grt_step1 import (
 )
 
 
-ENGINE_VERSION = 3
+ENGINE_VERSION = 4
 MUMMER_MIN_CLUSTER = 1_000
 MUMMER_MIN_MATCH = 100
 MUMMER_MIN_ALIGNMENT = 10_000
@@ -80,10 +80,13 @@ REFILL_MIN_IDENTITY = 0.40
 REFILL_MAX_LENGTH = 1_000_000
 CORRECTION_SEARCH_RANGE = 500_000
 CORRECTION_MARGIN = 100
+CORRECTION_LARGE_EDIT_BP = 1_000_000
+CORRECTION_MAX_OVERLAP_EDIT_RATIO = 10.0
 NORMALIZED_GAP_LENGTH = 100
 MINIMAP_PRESET = "asm5"
 REPAIR_MODES = {"conservative", "aggressive"}
 DEFAULT_REPAIR_MODE = "aggressive"
+ENGINE_SHA256 = sha256_file(Path(__file__).resolve())
 
 MUMMER_ALIGNMENT_FIELDS = [
     "stage",
@@ -344,6 +347,7 @@ def cached_mummer_chromosome(
     fingerprint_payload = {
         "workflow": WORKFLOW,
         "engine_version": ENGINE_VERSION,
+        "engine_sha256": ENGINE_SHA256,
         "stage": stage,
         "chr": chromosome,
         "q_source_sha256": q_source_sha256,
@@ -492,6 +496,7 @@ def cached_mummer_chromosome(
         checkpoint = {
             "workflow": WORKFLOW,
             "engine_version": ENGINE_VERSION,
+            "engine_sha256": ENGINE_SHA256,
             "stage": stage,
             "chr": chromosome,
             "status": "success",
@@ -829,6 +834,7 @@ def cached_validation_alignment(
     fingerprint_payload = {
         "workflow": WORKFLOW,
         "engine_version": ENGINE_VERSION,
+        "engine_sha256": ENGINE_SHA256,
         "stage": "step2_candidate_validation",
         "chr": chromosome,
         "q_source_sha256": q_source_sha256,
@@ -907,6 +913,7 @@ def cached_validation_alignment(
         checkpoint = {
             "workflow": WORKFLOW,
             "engine_version": ENGINE_VERSION,
+            "engine_sha256": ENGINE_SHA256,
             "stage": "step2_candidate_validation",
             "chr": chromosome,
             "status": "success",
@@ -1426,6 +1433,7 @@ def run_step2(
     fingerprint_payload = {
         "workflow": WORKFLOW,
         "engine_version": ENGINE_VERSION,
+        "engine_sha256": ENGINE_SHA256,
         "stage": stage,
         "q_version": "q1",
         "q_source_sha256": q_input_sha256,
@@ -1769,6 +1777,7 @@ def run_step2(
         result: dict[str, object] = {
             "workflow": WORKFLOW,
             "engine_version": ENGINE_VERSION,
+            "engine_sha256": ENGINE_SHA256,
             "stage": stage,
             "input_fingerprint": fingerprint,
             "q_input_version": "q1",
@@ -1899,11 +1908,21 @@ def _step3_classify_features(features: dict[str, object]) -> tuple[str, str, lis
     if features.get("crossing_alignment"):
         return "type1", "crossing_alignment", ["crossing_alignment"], 0.90
 
+    if features["ref_overlap"]:
+        overlap = int(features["ref_overlap_length"])
+        subtype = "small_ref_overlap" if overlap < 10_000 else (
+            "medium_ref_overlap" if overlap < 50_000 else "large_ref_overlap"
+        )
+        return (
+            "type5",
+            subtype,
+            [f"ref_overlap_{overlap}"],
+            min(0.9 + overlap / 1_000_000.0, 0.99),
+        )
+
     feature_names: list[str] = []
     if features["query_overlap"]:
         feature_names.append(f"query_overlap_{features['query_overlap_length']}")
-    if features["ref_overlap"]:
-        feature_names.append(f"ref_overlap_{features['ref_overlap_length']}")
     if not features["direction_match"]:
         feature_names.append("direction_conflict")
     if not features["ref_contig_match"]:
@@ -1926,14 +1945,6 @@ def _step3_classify_features(features: dict[str, object]) -> tuple[str, str, lis
     )
     if conflicts >= 2:
         error_type, subtype = "type6", "complex_conflict"
-    elif features["ref_overlap"] and float(features["ref_overlap_ratio"]) >= 0.10:
-        error_type = "type5"
-        overlap = int(features["ref_overlap_length"])
-        subtype = "small_ref_overlap" if overlap < 10_000 else (
-            "medium_ref_overlap" if overlap < 50_000 else "large_ref_overlap"
-        )
-    elif features["ref_overlap"]:
-        error_type, subtype = "type4", "small_ref_overlap"
     elif not features["direction_match"]:
         error_type, subtype = "type2", "direction_conflict"
     elif not features["ref_contig_match"]:
@@ -1956,6 +1967,25 @@ def _step3_classify_features(features: dict[str, object]) -> tuple[str, str, lis
     if error_type in {"type2", "type3", "type5", "type6"}:
         confidence_score = max(confidence_score, 0.60)
     return error_type, subtype, sorted(set(feature_names)), confidence_score
+
+
+def _step3_edit_scope_decision(
+    error_type: str,
+    features: dict[str, object],
+    start: int,
+    end: int,
+) -> tuple[bool, str]:
+    """Reject overlap-driven automatic edits that greatly exceed their evidence."""
+    edit_length = max(1, end - start + 1)
+    if error_type not in {"type4", "type5"} or edit_length <= CORRECTION_LARGE_EDIT_BP:
+        return True, ""
+    overlap_length = max(
+        int(features.get("query_overlap_length", 0)),
+        int(features.get("ref_overlap_length", 0)),
+    )
+    if overlap_length > 0 and edit_length > overlap_length * CORRECTION_MAX_OVERLAP_EDIT_RATIO:
+        return False, "automatic_edit_exceeds_overlap_evidence"
+    return True, ""
 
 
 def _step3_project_ref_interval(row: dict[str, object], ref_start: int, ref_end: int) -> tuple[int, int]:
@@ -2099,12 +2129,20 @@ def build_correction_candidates(
             start, end, reason = _step3_replace_region(
                 gap_pos, int(gap["end0"]), left, right, error_type
             )
+            start = min(start, gap_pos)
+            end = max(end, int(gap["end0"]))
             query_length = int(left["query_length"])
             start = max(1, min(start, query_length))
             end = max(start, min(end, query_length))
             eligible, repair_reason = _step3_repair_decision(
                 error_type, confidence_score, left, right, start, end, repair_mode
             )
+            edit_scope_safe, edit_scope_reason = _step3_edit_scope_decision(
+                error_type, features, start, end
+            )
+            if not edit_scope_safe:
+                eligible = False
+                repair_reason = edit_scope_reason
             ref_start = int(left["ref_min"])
             ref_end = int(left["ref_max"])
             if right is not None and str(left["ref_record"]) == str(right["ref_record"]):
@@ -2324,6 +2362,8 @@ def apply_corrections(
         sequence = input_records[chromosome]
         path = input_paths[chromosome]
         accepted = sorted(accepted_by_chr.get(chromosome, []), key=lambda row: int(row["input_start"]))
+        chromosome_gaps = [gap for gap in gaps if gap["chr"] == chromosome]
+        gaps_by_object = {str(gap["object_id"]): gap for gap in chromosome_gaps}
         cursor = 0
         output_cursor = 0
         result_path: list[dict[str, object]] = []
@@ -2331,6 +2371,14 @@ def apply_corrections(
         for candidate in accepted:
             start0 = int(candidate["input_start"]) - 1
             end0 = int(candidate["input_end"])
+            associated_gap = gaps_by_object.get(str(candidate["object_id"]))
+            if associated_gap is None:
+                fail(f"Step3 correction references an unknown q2 gap: {candidate['candidate_id']}")
+            if start0 > int(associated_gap["start0"]) or end0 < int(associated_gap["end0"]):
+                fail(
+                    "Step3 correction edit does not cover associated q2 gap: "
+                    f"{candidate['candidate_id']}"
+                )
             if start0 < cursor or end0 < start0 or end0 > len(sequence):
                 fail(f"overlapping or invalid Step3 correction edit: {candidate['candidate_id']}")
             result_path.extend(slice_path(path, cursor, start0))
@@ -2370,7 +2418,6 @@ def apply_corrections(
         result_path.extend(slice_path(path, cursor, len(sequence)))
         output_paths[chromosome] = result_path
         output_records[chromosome] = path_sequence(result_path, sources)
-        chromosome_gaps = [gap for gap in gaps if gap["chr"] == chromosome]
         for gap in chromosome_gaps:
             if str(gap["object_id"]) in accepted_by_object:
                 continue
@@ -2824,6 +2871,7 @@ def run_step3(
     fingerprint_payload = {
         "workflow": WORKFLOW,
         "engine_version": ENGINE_VERSION,
+        "engine_sha256": ENGINE_SHA256,
         "stage": stage,
         "q_version": "q2",
         "q_source_sha256": q_input_sha256,
@@ -2840,6 +2888,9 @@ def run_step3(
             "max_search_distance": CORRECTION_SEARCH_RANGE,
             "normalized_gap_length": NORMALIZED_GAP_LENGTH,
             "reference_overlap_margin": CORRECTION_MARGIN,
+            "any_reference_overlap_is_type5": True,
+            "large_edit_bp": CORRECTION_LARGE_EDIT_BP,
+            "max_overlap_edit_ratio": CORRECTION_MAX_OVERLAP_EDIT_RATIO,
         },
         "refill_parameters": {
             "preset": MINIMAP_PRESET,
@@ -3130,6 +3181,7 @@ def run_step3(
         result: dict[str, object] = {
             "workflow": WORKFLOW,
             "engine_version": ENGINE_VERSION,
+            "engine_sha256": ENGINE_SHA256,
             "stage": stage,
             "input_fingerprint": fingerprint,
             "q_input_version": "q2",
@@ -3355,6 +3407,7 @@ def execute(args: argparse.Namespace) -> None:
             "donor_set_id": donor_set["donor_set_id"],
             "q1_sha256": sha256_file(server_dir / "grt/q/q1.fa"),
             "engine_version": ENGINE_VERSION,
+            "engine_sha256": ENGINE_SHA256,
             "tools": {name: command_identity(value) for name, value in {**tools, "minimap2": minimap}.items()},
         },
         24,

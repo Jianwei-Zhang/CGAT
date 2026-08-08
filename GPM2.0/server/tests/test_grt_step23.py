@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -18,6 +19,8 @@ import test_grt_step1 as step1_fixture
 from grt_prepare_inputs import read_fasta
 from grt_step23 import (
     _step3_classify_features,
+    _step3_edit_scope_decision,
+    apply_corrections,
     arbitrate,
     build_correction_candidates,
     build_step2_fallback_candidates,
@@ -127,7 +130,7 @@ class GrtStep23Tests(unittest.TestCase):
         self.assertEqual(candidates[0]["fill_sequence"], sources[("d0", "d1")][100:500])
         self.assertEqual(candidates[0]["fallback_strategy"], "correctrefill_source_retry")
 
-    def test_step3_classifies_grt_type1_to_type6(self):
+    def test_step3_classifies_realizable_anchor_pairs_with_type5_overlap_override(self):
         members = {
             "d1": {
                 "member_id": "m-d1",
@@ -176,7 +179,7 @@ class GrtStep23Tests(unittest.TestCase):
             row(5, 3100, 3500, 2401, 2800, record="d2"),  # Type3
             row(6, 3500, 3900, 3000, 3400),
             row(7, 4100, 4500, 4000, 4400),
-            row(8, 4600, 5000, 4395, 4800),  # Type4: 6 bp reference overlap
+            row(8, 4600, 5000, 4395, 4800),  # Type5: any reference overlap
             row(9, 5100, 5500, 5000, 5700),
             row(10, 5600, 6000, 5600, 6300),  # Type5: 101 bp overlap (>10%)
             row(11, 6500, 6900, 7000, 7400),
@@ -189,15 +192,166 @@ class GrtStep23Tests(unittest.TestCase):
                 by_gap.setdefault(str(candidate["object_id"]), []).append(candidate)
         self.assertEqual(
             {row["error_type"] for rows in by_gap.values() for row in rows},
-            {"type1", "type2", "type3", "type4", "type5", "type6"},
+            {"type1", "type2", "type3", "type5", "type6"},
         )
         self.assertEqual(by_gap["gap-1"][0]["error_subtype"], "crossing_alignment")
         self.assertTrue(any(row["error_subtype"] == "direction_conflict" for row in by_gap["gap-2"]))
         self.assertTrue(any(row["error_subtype"] == "simple_translocation" for row in by_gap["gap-3"]))
-        self.assertTrue(any(row["error_type"] == "type4" for row in by_gap["gap-4"]))
+        self.assertTrue(any(row["error_type"] == "type5" for row in by_gap["gap-4"]))
         self.assertTrue(any(row["error_type"] == "type5" for row in by_gap["gap-5"]))
         self.assertTrue(any(row["error_subtype"] == "complex_conflict" for row in by_gap["gap-6"]))
         self.assertTrue(all(row["repair_mode"] == "aggressive" for rows in by_gap.values() for row in rows))
+
+    def test_step3_small_reference_overlap_uses_type5_and_covers_origin_gap(self):
+        member = {
+            "member_id": "m-d1",
+            "dataset_name": "support",
+            "contig_name": "donor",
+            "orientation": "+",
+            "source_start": "1",
+            "source_end": "5000",
+        }
+
+        def row(line, query_start, query_end, ref_start, ref_end):
+            return {
+                "chr": "Chr01",
+                "line_number": line,
+                "ref_record": "d1",
+                "ref_min": ref_start,
+                "ref_max": ref_end,
+                "query_min": query_start,
+                "query_max": query_end,
+                "query_length": 3000,
+                "query_aligned": query_end - query_start + 1,
+                "ref_length": 5000,
+                "ref_aligned": ref_end - ref_start + 1,
+                "identity": 0.99,
+                "orientation": "+",
+            }
+
+        gap = {"chr": "Chr01", "object_id": "gap-1", "start0": 1000, "end0": 1100}
+        candidates = build_correction_candidates(
+            [gap],
+            [
+                row(1, 1, 900, 1, 1000),
+                row(2, 1101, 1500, 995, 1300),
+            ],
+            {"d1": member},
+        )
+
+        self.assertEqual(len(candidates), 1)
+        candidate = candidates[0]
+        self.assertEqual(candidate["error_type"], "type5")
+        self.assertEqual(candidate["classification_reason"], "reference_overlap_with_margin")
+        self.assertEqual(candidate["input_start"], 1001)
+        self.assertEqual(candidate["input_end"], 1208)
+        self.assertLessEqual(candidate["input_start"], candidate["target_start"])
+        self.assertGreaterEqual(candidate["input_end"], candidate["target_end"])
+
+    def test_step3_real_chr05_overlap_does_not_delete_the_full_shorter_alignment(self):
+        member = {
+            "member_id": "m-flye-scaffold-50",
+            "dataset_name": "flye",
+            "contig_name": "scaffold_50",
+            "orientation": "+",
+            "source_start": "1",
+            "source_end": "30370176",
+        }
+
+        def row(line, query_start, query_end, ref_start, ref_end):
+            return {
+                "chr": "Chr05",
+                "line_number": line,
+                "ref_record": "flye-scaffold-50",
+                "ref_min": ref_start,
+                "ref_max": ref_end,
+                "query_min": query_start,
+                "query_max": query_end,
+                "query_length": 30424813,
+                "query_aligned": query_end - query_start + 1,
+                "ref_length": 30370176,
+                "ref_aligned": ref_end - ref_start + 1,
+                "identity": 0.9999,
+                "orientation": "+",
+            }
+
+        gap = {
+            "chr": "Chr05",
+            "object_id": "gap-real-chr05",
+            "start0": 27328070,
+            "end0": 27328170,
+        }
+        candidates = build_correction_candidates(
+            [gap],
+            [
+                row(1, 1, 27318714, 4147, 27322873),
+                row(2, 27328171, 30219970, 27312687, 30204494),
+            ],
+            {"flye-scaffold-50": member},
+        )
+
+        self.assertEqual(len(candidates), 1)
+        candidate = candidates[0]
+        self.assertEqual(candidate["error_type"], "type5")
+        self.assertEqual(candidate["input_start"], 27328071)
+        self.assertEqual(candidate["input_end"], 27338457)
+        self.assertLess(candidate["input_end"] - candidate["input_start"] + 1, 20_000)
+
+    def test_step3_rejects_large_overlap_edit_without_matching_evidence_scope(self):
+        safe, reason = _step3_edit_scope_decision(
+            "type4",
+            {
+                "query_overlap_length": 10_000,
+                "ref_overlap_length": 0,
+            },
+            1,
+            2_000_000,
+        )
+        self.assertFalse(safe)
+        self.assertEqual(reason, "automatic_edit_exceeds_overlap_evidence")
+
+        safe, reason = _step3_edit_scope_decision(
+            "type5",
+            {
+                "query_overlap_length": 0,
+                "ref_overlap_length": 10_000,
+            },
+            1,
+            20_000,
+        )
+        self.assertTrue(safe)
+        self.assertEqual(reason, "")
+
+    def test_apply_corrections_rejects_edit_that_does_not_cover_origin_gap(self):
+        gap_segment = {
+            "segment_kind": "gap",
+            "length": 3000,
+            "dataset_name": "",
+            "contig_name": "",
+            "source_start": None,
+            "source_end": None,
+            "orientation": "",
+            "source_card_key": "",
+            "evidence_ids": [],
+        }
+        gap = {"chr": "Chr01", "object_id": "gap-1", "start0": 1000, "end0": 1100}
+        candidate = {
+            "candidate_id": "candidate-1",
+            "chr": "Chr01",
+            "object_id": "gap-1",
+            "input_start": 1101,
+            "input_end": 1500,
+            "outcome": "accepted",
+        }
+        with self.assertRaisesRegex(SystemExit, "does not cover associated q2 gap"):
+            apply_corrections(
+                ["Chr01"],
+                {"Chr01": [gap_segment]},
+                {"Chr01": "N" * 3000},
+                [gap],
+                [candidate],
+                {},
+            )
 
     def make_server(self, root: Path) -> Path:
         server = step1_fixture.GrtStep1Tests(
@@ -445,11 +599,12 @@ else:
         tools: dict[str, Path],
         env: dict[str, str],
         threads: int = 2,
+        step23_tool: Path = STEP23_TOOL,
     ):
         return subprocess.run(
             [
                 sys.executable,
-                str(STEP23_TOOL),
+                str(step23_tool),
                 "--server-dir",
                 str(server),
                 "--minimap2",
@@ -468,6 +623,52 @@ else:
             text=True,
             env=env,
         )
+
+    def test_step23_runtime_script_hash_invalidates_successful_checkpoints(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+            server = self.make_server(root)
+            tools = self.make_tools(root)
+            minimap_log = root / "minimap.log"
+            mummer_log = root / "mummer.log"
+            env = os.environ.copy()
+            env["FAKE_GRT_MINIMAP_LOG"] = str(minimap_log)
+            env["FAKE_GRT_MUMMER_LOG"] = str(mummer_log)
+            env["PYTHONPATH"] = os.pathsep.join(
+                filter(
+                    None,
+                    [str(REPO_ROOT / "server/tools"), env.get("PYTHONPATH", "")],
+                )
+            )
+            runtime_tool = root / "grt_step23_runtime.py"
+            shutil.copy2(STEP23_TOOL, runtime_tool)
+
+            step1 = self.run_step1(server, tools, env)
+            self.assertEqual(step1.returncode, 0, step1.stderr)
+            first = self.run_step23(server, tools, env, step23_tool=runtime_tool)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            initial_calls = mummer_log.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(initial_calls), 2)
+
+            repeated = self.run_step23(server, tools, env, step23_tool=runtime_tool)
+            self.assertEqual(repeated.returncode, 0, repeated.stderr)
+            self.assertEqual(mummer_log.read_text(encoding="utf-8").splitlines(), initial_calls)
+
+            runtime_tool.write_text(
+                runtime_tool.read_text(encoding="utf-8") + "\n# runtime fingerprint mutation\n",
+                encoding="utf-8",
+                newline="",
+            )
+            changed = self.run_step23(server, tools, env, step23_tool=runtime_tool)
+            self.assertEqual(changed.returncode, 0, changed.stderr)
+            self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 4)
+            checkpoint = json.loads(
+                (server / "grt/checkpoints/step3.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                checkpoint["fingerprint_payload"]["engine_sha256"],
+                prepare_fixture.sha256(runtime_tool),
+            )
 
     def test_fixed_d0_step2_step3_interval_usage_replay_and_resume(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
