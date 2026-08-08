@@ -281,6 +281,11 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         relpath: read_tsv(bundle_root, relpath, table_spec)
         for relpath, table_spec in schema["tables"].items()
     }
+    optional_tables = {}
+    for relpath, table_spec in schema.get("optional_tables", {}).items():
+        if (bundle_root / relpath).is_file():
+            optional_tables[relpath] = read_tsv(bundle_root, relpath, table_spec)
+    tables.update(optional_tables)
     enums = schema["enums"]
 
     package = tables["metadata/package.tsv"][0]
@@ -574,6 +579,39 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         if set(donor_fasta_records[donor_set_id]) != expected_records:
             fail("BROKEN_REFERENCE", f"donor set {donor_set_id} FASTA records differ from manifest")
 
+    fragment_ids = set()
+    fragment_intervals = defaultdict(list)
+    for row in optional_tables.get("metadata/grt_donor_fragments.tsv", []):
+        fragment_id = row["fragment_id"]
+        if not fragment_id or fragment_id in fragment_ids:
+            fail("DUPLICATE_ID", f"duplicate donor fragment {fragment_id}")
+        member_key = (row["donor_set_id"], row["member_id"])
+        member = members.get(member_key)
+        if member is None or row["fasta_record_name"] != member["fasta_record_name"]:
+            fail("BROKEN_REFERENCE", f"fragment {fragment_id} references an invalid donor member")
+        start, end = validate_interval(
+            row["fragment_start"], row["fragment_end"], f"fragment {fragment_id}"
+        )
+        sequence = donor_fasta_records[row["donor_set_id"]][row["fasta_record_name"]]
+        if end > len(sequence) or parse_int(
+            row["fragment_length"], f"fragment {fragment_id}.fragment_length", 1
+        ) != end - start + 1:
+            fail("INVALID_COORDINATE", f"fragment {fragment_id} length or coordinates are invalid")
+        fragment_sequence = sequence[start - 1 : end]
+        validate_sha256(row["sequence_sha256"], f"fragment {fragment_id}.sequence_sha256")
+        if sha256_bytes(fragment_sequence.encode("ascii")) != row["sequence_sha256"]:
+            fail("CHECKSUM_MISMATCH", f"fragment {fragment_id} sequence checksum differs from D0")
+        if re.search(r"N{100,}", fragment_sequence):
+            fail("INVALID_VALUE", f"fragment {fragment_id} crosses an unresolved N-run")
+        parse_bool(row["left_boundary"], f"fragment {fragment_id}.left_boundary")
+        parse_bool(row["right_boundary"], f"fragment {fragment_id}.right_boundary")
+        fragment_ids.add(fragment_id)
+        fragment_intervals[member_key].append((start, end))
+    for member_key, intervals in fragment_intervals.items():
+        ordered = sorted(intervals)
+        if any(left[1] >= right[0] for left, right in zip(ordered, ordered[1:])):
+            fail("INVALID_COORDINATE", f"donor fragments overlap for member {member_key[1]}")
+
     evidence_rows = tables["metadata/grt_evidence_registry.tsv"]
     evidence = unique_index(evidence_rows, "evidence_id", "metadata/grt_evidence_registry.tsv")
     for evidence_id, row in evidence.items():
@@ -687,6 +725,76 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         if row["status"] in {"accepted", "consumed"} and not row["event_id"]:
             fail("BROKEN_REFERENCE", f"usage {usage_id} accepted/consumed row lacks event")
 
+    strategy_chromosomes = set()
+    for row in optional_tables.get("metadata/grt_step2_strategies.tsv", []):
+        chromosome = row["chr"]
+        if chromosome not in reference_records or chromosome in strategy_chromosomes:
+            fail("BROKEN_REFERENCE", f"invalid or duplicate Step2 strategy chromosome: {chromosome}")
+        if row["strategy"] not in enums["step2_strategy"]:
+            fail("INVALID_VALUE", f"Step2 strategy for {chromosome} has invalid strategy")
+        if row["strategy_applied"] not in enums["step2_strategy_applied"]:
+            fail("INVALID_VALUE", f"Step2 strategy for {chromosome} has invalid applied strategy")
+        counts = {
+            field: parse_int(row[field], f"Step2 strategy {chromosome}.{field}", 0)
+            for field in (
+                "gap_count",
+                "patch_candidate_count",
+                "validated_patch_count",
+                "accepted_patch_count",
+                "fallback_candidate_count",
+                "accepted_fallback_count",
+            )
+        }
+        if (
+            counts["accepted_patch_count"] > counts["validated_patch_count"]
+            or counts["validated_patch_count"] > counts["patch_candidate_count"]
+            or counts["accepted_fallback_count"] > counts["fallback_candidate_count"]
+        ):
+            fail("COUNT_MISMATCH", f"Step2 strategy counts are inconsistent for {chromosome}")
+        strategy_chromosomes.add(chromosome)
+
+    classification_rows = optional_tables.get("metadata/grt_step3_classifications.tsv", [])
+    classification_candidates = set()
+    for row in classification_rows:
+        candidate_id = row["candidate_id"]
+        if not candidate_id or candidate_id in classification_candidates:
+            fail("DUPLICATE_ID", f"duplicate Step3 classification candidate {candidate_id}")
+        if row["chr"] not in reference_records or not row["object_id"]:
+            fail("BROKEN_REFERENCE", f"Step3 classification {candidate_id} has invalid target")
+        if row["error_type"] not in enums["step3_error_type"]:
+            fail("INVALID_VALUE", f"Step3 classification {candidate_id} has invalid error type")
+        features = parse_json(
+            row["error_features_json"],
+            f"Step3 classification {candidate_id}.error_features_json",
+            list,
+        )
+        if any(not isinstance(value, str) or not value for value in features):
+            fail("INVALID_JSON", f"Step3 classification {candidate_id} has invalid features")
+        if row["confidence"] not in enums["step3_confidence"]:
+            fail("INVALID_VALUE", f"Step3 classification {candidate_id} has invalid confidence")
+        parse_float(
+            row["confidence_score"],
+            f"Step3 classification {candidate_id}.confidence_score",
+            0,
+            1,
+        )
+        parse_bool(
+            row["gap_in_error_region"],
+            f"Step3 classification {candidate_id}.gap_in_error_region",
+        )
+        if row["repair_mode"] not in enums["repair_mode"]:
+            fail("INVALID_VALUE", f"Step3 classification {candidate_id} has invalid repair mode")
+        if row["outcome"] not in enums["candidate_outcome"]:
+            fail("INVALID_VALUE", f"Step3 classification {candidate_id} has invalid outcome")
+        if row["fragment_id"] and row["fragment_id"] not in fragment_ids:
+            fail("BROKEN_REFERENCE", f"Step3 classification {candidate_id} references unknown fragment")
+        reused = parse_bool(
+            row["donor_reuse"], f"Step3 classification {candidate_id}.donor_reuse"
+        )
+        if reused != bool(row["donor_reuse_of"]):
+            fail("BROKEN_REFERENCE", f"Step3 classification {candidate_id} has invalid reuse lineage")
+        classification_candidates.add(candidate_id)
+
     events = unique_index(read_jsonl(bundle_root, "metadata/grt_events.jsonl"), "event_id", "metadata/grt_events.jsonl")
     required_event_fields = set(schema["event_required_fields"])
     for event_id, event in events.items():
@@ -699,6 +807,67 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             fail("INVALID_VALUE", f"event {event_id} has invalid stage")
         if event["action"] not in enums["event_action"]:
             fail("INVALID_VALUE", f"event {event_id} has invalid action")
+        strategy = event.get("strategy")
+        if strategy is not None and strategy not in enums["step2_strategy"]:
+            fail("INVALID_VALUE", f"event {event_id} has invalid Step2 strategy")
+        repair_mode = event.get("repair_mode")
+        if repair_mode is not None and repair_mode not in enums["repair_mode"]:
+            fail("INVALID_VALUE", f"event {event_id} has invalid repair mode")
+        classification = event.get("classification")
+        if classification is not None:
+            required_classification = {
+                "error_type",
+                "error_subtype",
+                "features",
+                "confidence",
+                "confidence_score",
+                "gap_in_error_region",
+            }
+            if not isinstance(classification, dict) or set(classification) != required_classification:
+                fail("INVALID_JSON", f"event {event_id}.classification has invalid shape")
+            if classification["error_type"] not in enums["step3_error_type"]:
+                fail("INVALID_VALUE", f"event {event_id}.classification has invalid error type")
+            if classification["confidence"] not in enums["step3_confidence"]:
+                fail("INVALID_VALUE", f"event {event_id}.classification has invalid confidence")
+            if not isinstance(classification["features"], list):
+                fail("INVALID_JSON", f"event {event_id}.classification.features must be an array")
+            parse_float(
+                classification["confidence_score"],
+                f"event {event_id}.classification.confidence_score",
+                0,
+                1,
+            )
+            if not isinstance(classification["gap_in_error_region"], bool):
+                fail("INVALID_JSON", f"event {event_id}.classification gap flag must be boolean")
+        fragment_id = event.get("fragment_id")
+        if fragment_id and fragment_id not in fragment_ids:
+            fail("BROKEN_REFERENCE", f"event {event_id} references unknown donor fragment")
+        donor_reuse = event.get("donor_reuse")
+        if donor_reuse is not None:
+            if (
+                not isinstance(donor_reuse, dict)
+                or donor_reuse.get("reused") is not True
+                or not donor_reuse.get("reused_from_candidate_id")
+                or donor_reuse.get("policy") != "same_orientation_distinct_target"
+            ):
+                fail("INVALID_JSON", f"event {event_id}.donor_reuse has invalid shape")
+        fallback = event.get("fallback")
+        if fallback is not None:
+            required_fallback = {
+                "parent_candidate_id",
+                "strategy",
+                "error_type",
+                "error_subtype",
+                "repair_mode",
+            }
+            if not isinstance(fallback, dict) or set(fallback) != required_fallback:
+                fail("INVALID_JSON", f"event {event_id}.fallback has invalid shape")
+            if (
+                not fallback["parent_candidate_id"]
+                or fallback["error_type"] not in enums["step3_error_type"]
+                or fallback["repair_mode"] not in enums["repair_mode"]
+            ):
+                fail("INVALID_VALUE", f"event {event_id}.fallback has invalid values")
         if not isinstance(event["evidence_ids"], list) or not isinstance(event["usage_ids"], list):
             fail("INVALID_JSON", f"event {event_id} evidence_ids and usage_ids must be arrays")
         for evidence_id in event["evidence_ids"]:
@@ -746,6 +915,17 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                 or source["original_assignment"] not in enums["original_assignment"]
             ):
                 fail("INVALID_VALUE", f"event {event_id} source enum is invalid")
+
+    for row in classification_rows:
+        if (
+            not row["event_id"]
+            or row["event_id"] not in events
+            or events[row["event_id"]]["stage"] != "step3"
+        ):
+            fail(
+                "BROKEN_REFERENCE",
+                f"Step3 classification {row['candidate_id']} references unknown event",
+            )
 
     for usage_id, row in usage.items():
         if row["event_id"] and row["event_id"] not in events:

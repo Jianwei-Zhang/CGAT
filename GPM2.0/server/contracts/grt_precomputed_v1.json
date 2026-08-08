@@ -262,6 +262,59 @@
       "min_rows": 1
     }
   },
+  "optional_tables": {
+    "metadata/grt_donor_fragments.tsv": {
+      "header": [
+        "donor_set_id",
+        "member_id",
+        "fragment_id",
+        "fasta_record_name",
+        "fragment_start",
+        "fragment_end",
+        "fragment_length",
+        "sequence_sha256",
+        "left_boundary",
+        "right_boundary"
+      ],
+      "min_rows": 0
+    },
+    "metadata/grt_step2_strategies.tsv": {
+      "header": [
+        "chr",
+        "strategy",
+        "strategy_applied",
+        "gap_count",
+        "patch_candidate_count",
+        "validated_patch_count",
+        "accepted_patch_count",
+        "fallback_candidate_count",
+        "accepted_fallback_count",
+        "reason"
+      ],
+      "min_rows": 1
+    },
+    "metadata/grt_step3_classifications.tsv": {
+      "header": [
+        "chr",
+        "object_id",
+        "candidate_id",
+        "error_type",
+        "error_subtype",
+        "error_features_json",
+        "confidence",
+        "confidence_score",
+        "gap_in_error_region",
+        "repair_mode",
+        "repair_reason",
+        "outcome",
+        "event_id",
+        "fragment_id",
+        "donor_reuse",
+        "donor_reuse_of"
+      ],
+      "min_rows": 0
+    }
+  },
   "enums": {
     "donor_kind": ["ordinary", "telomere"],
     "orientation": ["+", "-"],
@@ -303,7 +356,23 @@
     "coordinate_system": ["paf_0_based_half_open", "mummer_1_based_closed", "app_1_based_closed"],
     "projection_status": ["native", "projected"],
     "segment_kind": ["source", "patch", "correction", "telomere", "gap"],
-    "q_segment_kind": ["source", "gap"]
+    "q_segment_kind": ["source", "gap"],
+    "step2_strategy": [
+      "no_gaps",
+      "no_patch_fixer",
+      "full_fixer_reuse_patches",
+      "partial_success_no_fixer"
+    ],
+    "step2_strategy_applied": [
+      "patcher_result",
+      "fixer_only",
+      "fixer_and_new_patches",
+      "fixer_and_reused_patches"
+    ],
+    "step3_error_type": ["type1", "type2", "type3", "type4", "type5", "type6"],
+    "step3_confidence": ["low", "medium", "high"],
+    "repair_mode": ["conservative", "aggressive"],
+    "candidate_outcome": ["candidate", "accepted", "superseded", "rejected", "conflicted"]
   },
   "stage_transitions": [
     ["donor_freeze", "q0", "q0"],

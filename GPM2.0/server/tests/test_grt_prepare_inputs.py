@@ -273,6 +273,10 @@ class GrtPrepareInputsTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, completed.stderr)
 
             q0 = (server / "grt/q/q0.fa").read_text(encoding="utf-8")
+            self.assertEqual(
+                sha256(server / "grt/q/q0.fa"),
+                "e736adbe311565c992046974c889ea48fe9a94605595b9223e84f64d9ee0220e",
+            )
             self.assertIn("A" * 80, q0)
             self.assertIn("N" * 80, q0)
             self.assertIn("G" * 80, q0)
@@ -314,6 +318,10 @@ class GrtPrepareInputsTests(unittest.TestCase):
                 row
                 for row in read_tsv(server / "metadata/grt_donor_sets.tsv")
                 if row["donor_set_id"] == recipe["donor_set_id"]
+            )
+            self.assertEqual(
+                sha256(server / ordinary_set["fasta_relpath"]),
+                "a15c5b2a58c751b60c77ddb332db7c5036574bbc8697e224dbbe1e5ad58f1f63",
             )
             tracked = [
                 server / "grt/q/q0.fa",

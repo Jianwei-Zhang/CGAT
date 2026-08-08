@@ -166,6 +166,24 @@ STRATEGY_FIELDS = [
     "accepted_fallback_count",
     "reason",
 ]
+CLASSIFICATION_FIELDS = [
+    "chr",
+    "object_id",
+    "candidate_id",
+    "error_type",
+    "error_subtype",
+    "error_features_json",
+    "confidence",
+    "confidence_score",
+    "gap_in_error_region",
+    "repair_mode",
+    "repair_reason",
+    "outcome",
+    "event_id",
+    "fragment_id",
+    "donor_reuse",
+    "donor_reuse_of",
+]
 
 
 def fail(message: str) -> None:
@@ -1581,7 +1599,10 @@ def run_step2(
             strategy_row["accepted_fallback_count"] = sum(
                 1 for row in rows if row.get("outcome") == "accepted"
             )
-            if strategy_row["strategy"] == "partial_success_no_fixer":
+            if strategy_row["strategy"] == "no_gaps":
+                strategy_row["strategy_applied"] = "patcher_result"
+                strategy_row["reason"] = "chromosome_has_no_gap_objects"
+            elif strategy_row["strategy"] == "partial_success_no_fixer":
                 strategy_row["strategy_applied"] = "patcher_result"
                 strategy_row["reason"] = "at_least_one_validated_patch_accepted"
             elif strategy_row["accepted_fallback_count"]:
@@ -3056,7 +3077,33 @@ def run_step3(
         if replay_step3(input_records, correction_events, refill_events, sources) != output_records:
             fail("Step3 accepted events do not deterministically reconstruct q3")
         q_rows = q_rows_for_paths("q3", chromosome_order, output_paths)
+        classification_rows = [
+            {
+                "chr": row["chr"],
+                "object_id": row["object_id"],
+                "candidate_id": row["candidate_id"],
+                "error_type": row.get("error_type", "unknown"),
+                "error_subtype": row.get("error_subtype", "unspecified"),
+                "error_features_json": canonical_json(row.get("error_features", [])),
+                "confidence": row.get("confidence", "low"),
+                "confidence_score": f"{float(row.get('confidence_score', 0.0)):.9f}",
+                "gap_in_error_region": str(bool(row.get("gap_in_error_region", False))).lower(),
+                "repair_mode": row.get("repair_mode", repair_mode),
+                "repair_reason": row.get("repair_reason", ""),
+                "outcome": row.get("outcome", "rejected"),
+                "event_id": row.get("event_id", ""),
+                "fragment_id": row.get("fragment_id", ""),
+                "donor_reuse": str(bool(row.get("donor_reuse", False))).lower(),
+                "donor_reuse_of": row.get("donor_reuse_of", ""),
+            }
+            for row in correction_candidates
+        ]
         write_tsv(temporary / "correction_candidates.tsv", CANDIDATE_FIELDS, candidate_table_rows(correction_candidates))
+        write_tsv(
+            temporary / "classifications.tsv",
+            CLASSIFICATION_FIELDS,
+            classification_rows,
+        )
         write_tsv(temporary / "refill_candidates.tsv", CANDIDATE_FIELDS, candidate_table_rows(refill_candidates))
         write_tsv(temporary / "refill_rejections.tsv", REJECTION_FIELDS, refill_rejections)
         write_tsv(temporary / "q_segments.tsv", Q_SEGMENT_FIELDS, q_rows)
@@ -3095,6 +3142,7 @@ def run_step3(
             "usage_rows": usage_rows,
             "events": events,
             "attempts": attempts,
+            "classification_rows": classification_rows,
             "accepted_intervals": accepted_intervals,
         }
         (temporary / "result.json").write_text(
@@ -3223,6 +3271,16 @@ def publish_metadata(
             },
         ]
     )
+    strategy_rows = [
+        row
+        for result in results
+        for row in result.get("strategies", [])
+    ]
+    classification_rows = [
+        row
+        for result in results
+        for row in result.get("classification_rows", [])
+    ]
     atomic_write_tsv(metadata / "grt_q_segments.tsv", Q_SEGMENT_FIELDS, q_rows)
     atomic_write_tsv(metadata / "grt_evidence_registry.tsv", EVIDENCE_FIELDS, evidence_rows)
     atomic_write_tsv(metadata / "grt_donor_usage.tsv", USAGE_FIELDS, usage_rows)
@@ -3230,6 +3288,22 @@ def publish_metadata(
     atomic_write_tsv(metadata / "grt_gap_attempts.tsv", ATTEMPT_FIELDS, attempts)
     atomic_write_tsv(metadata / "grt_stage_status.tsv", STAGE_FIELDS, stage_rows)
     atomic_write_tsv(metadata / "grt_tool_versions.tsv", TOOL_FIELDS, tool_rows)
+    if strategy_rows:
+        atomic_write_tsv(
+            metadata / "grt_step2_strategies.tsv",
+            STRATEGY_FIELDS,
+            strategy_rows,
+        )
+    else:
+        (metadata / "grt_step2_strategies.tsv").unlink(missing_ok=True)
+    if classification_rows:
+        atomic_write_tsv(
+            metadata / "grt_step3_classifications.tsv",
+            CLASSIFICATION_FIELDS,
+            classification_rows,
+        )
+    else:
+        (metadata / "grt_step3_classifications.tsv").unlink(missing_ok=True)
 
 
 def execute(args: argparse.Namespace) -> None:

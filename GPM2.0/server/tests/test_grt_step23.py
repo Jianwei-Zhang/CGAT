@@ -17,6 +17,7 @@ import test_grt_prepare_inputs as prepare_fixture
 import test_grt_step1 as step1_fixture
 from grt_prepare_inputs import read_fasta
 from grt_step23 import (
+    _step3_classify_features,
     arbitrate,
     build_correction_candidates,
     build_step2_fallback_candidates,
@@ -33,6 +34,29 @@ STEP23_TOOL = REPO_ROOT / "server/tools/grt_step23.py"
 
 
 class GrtStep23Tests(unittest.TestCase):
+    def test_grt_server_golden_decisions_match_documented_source_strategies(self):
+        golden = json.loads(
+            (REPO_ROOT / "server/tests/fixtures/grt_server_golden.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            golden["provenance"]["source"],
+            "Genome-Repair-Tools/scripts/gap_analyzer.py",
+        )
+        for row in golden["step2"]:
+            self.assertEqual(
+                step2_strategy(
+                    row["gap_count"],
+                    row["patch_candidate_count"],
+                    row["accepted_patch_count"],
+                ),
+                row["strategy"],
+            )
+        for row in golden["step3"]:
+            error_type, subtype, _features, _score = _step3_classify_features(row["features"])
+            self.assertEqual((error_type, subtype), (row["error_type"], row["subtype"]))
+
     def test_step23_reuses_same_orientation_donor_on_distinct_targets(self):
         def candidate(candidate_id, object_id, chromosome, orientation):
             return {
@@ -495,6 +519,17 @@ else:
             self.assertEqual({row["donor_set_id"] for row in stages}, {recipe["donor_set_id"]})
             self.assertEqual(stages[-2]["q_input_sha256"], prepare_fixture.sha256(server / "grt/q/q1.fa"))
             self.assertEqual(stages[-1]["q_input_sha256"], prepare_fixture.sha256(server / "grt/q/q2.fa"))
+            strategies = prepare_fixture.read_tsv(server / "metadata/grt_step2_strategies.tsv")
+            self.assertEqual(
+                {row["strategy"] for row in strategies},
+                {"partial_success_no_fixer", "no_gaps"},
+            )
+            self.assertTrue(all(row["strategy_applied"] == "patcher_result" for row in strategies))
+            classifications = prepare_fixture.read_tsv(
+                server / "metadata/grt_step3_classifications.tsv"
+            )
+            self.assertTrue(classifications)
+            self.assertTrue(all(row["repair_mode"] == "aggressive" for row in classifications))
 
             evidence = prepare_fixture.read_tsv(server / "metadata/grt_evidence_registry.tsv")
             mummer_evidence = [
