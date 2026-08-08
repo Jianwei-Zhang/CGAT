@@ -21,7 +21,7 @@ from grt_step1 import source_assignment
 
 
 TOOL = REPO_ROOT / "server/tools/grt_evidence_package.py"
-SCHEMA = REPO_ROOT / "server/contracts/grt_precomputed_v1.json"
+SCHEMA = REPO_ROOT / "server/contracts/grt_precomputed_v2.json"
 
 
 class GrtEvidencePackageTests(unittest.TestCase):

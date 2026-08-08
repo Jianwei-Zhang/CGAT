@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-fixture_root="${repo_root}/tests/fixtures/grt_contract_v1/valid/gpm_server"
+fixture_root="${repo_root}/tests/fixtures/grt_contract_v2/valid/gpm_server"
 task_tmp_dir="$(mktemp -d /tmp/gpm2-grt-server-app-e2e.XXXXXX)"
 task_cargo_target="${GPM_GRT_E2E_CARGO_TARGET_DIR:-/tmp/gpm2-grt-e2e-cargo-target}"
 
@@ -24,7 +24,7 @@ cd "${repo_root}"
 
 python3 server/tools/grt_contract.py \
   --bundle "${fixture_root}" \
-  --schema server/contracts/grt_precomputed_v1.json >/dev/null
+  --schema server/contracts/grt_precomputed_v2.json >/dev/null
 
 CARGO_TARGET_DIR="${task_cargo_target}" cargo build \
   --locked \
@@ -43,6 +43,37 @@ python3 server/tools/grt_app_package.py \
   --no-fasta >/dev/null
 (cd "${task_tmp_dir}/app-full" && zip -qr "${task_tmp_dir}/gpm_server.zip" gpm_server)
 (cd "${task_tmp_dir}/app-no-fasta" && zip -qr "${task_tmp_dir}/gpm_server.no_fasta.zip" gpm_server)
+legacy_app_stage="${task_tmp_dir}/app-v1/gpm_server"
+mkdir -p "$(dirname "${legacy_app_stage}")"
+cp -a "${app_full_stage}" "${legacy_app_stage}"
+python3 - "${legacy_app_stage}" <<'PY'
+import csv
+import json
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+package_path = root / "metadata/package.tsv"
+with package_path.open(newline="", encoding="utf-8") as handle:
+    reader = csv.DictReader(handle, delimiter="\t")
+    rows = list(reader)
+    fields = list(reader.fieldnames or [])
+rows[0]["workflow"] = "gpm_grt_app_precomputed_v1"
+rows[0]["schema_version"] = "1"
+with package_path.open("w", newline="", encoding="utf-8") as handle:
+    writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t", lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+
+for name in ("grt_app_manifest.json", "grt_final_path.json"):
+    path = root / "metadata" / name
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["workflow"] = "gpm_grt_app_precomputed_v1"
+    if name == "grt_app_manifest.json":
+        payload["schema_version"] = "1"
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="")
+PY
+(cd "${task_tmp_dir}/app-v1" && zip -qr "${task_tmp_dir}/gpm_server.v1.zip" gpm_server)
 python3 - "${task_tmp_dir}/gpm_server.zip" "${task_tmp_dir}/gpm_server.no_fasta.zip" <<'PY'
 from pathlib import Path
 from zipfile import ZipFile
@@ -66,6 +97,14 @@ full_zip_workspace="${task_tmp_dir}/zip-full"
 no_fasta_zip_workspace="${task_tmp_dir}/zip-no-fasta"
 "${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.zip" "${full_zip_workspace}" >/dev/null
 "${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.no_fasta.zip" "${no_fasta_zip_workspace}" >/dev/null
+if "${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.v1.zip" "${task_tmp_dir}/zip-v1" >/dev/null 2>&1; then
+  echo "v1 App package unexpectedly imported" >&2
+  exit 1
+fi
+if [[ -e "${task_tmp_dir}/zip-v1/project.sqlite" ]]; then
+  echo "rejected v1 App package left project.sqlite behind" >&2
+  exit 1
+fi
 full_zip_options="$(${backend_exe} list-project-initializer-options "${full_zip_workspace}")"
 no_fasta_zip_options="$(${backend_exe} list-project-initializer-options "${no_fasta_zip_workspace}")"
 assert_contains "${full_zip_options}" 'fasta_available=true'
@@ -123,7 +162,7 @@ import sys
 path = Path(sys.argv[1])
 value = path.read_text(encoding="utf-8")
 path.write_text(
-    value.replace("gpm_grt_precomputed_v1", "gpm_legacy", 1),
+    value.replace("gpm_grt_precomputed_v2", "gpm_grt_precomputed_v1", 1),
     encoding="utf-8",
     newline="",
 )

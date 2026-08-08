@@ -13,8 +13,32 @@
     "operation": {
       "type": "replace_text",
       "path": "metadata/package.tsv",
-      "old": "gpm_grt_precomputed_v1",
-      "new": "gpm_legacy"
+      "old": "gpm_grt_precomputed_v2",
+      "new": "gpm_grt_precomputed_v1"
+    }
+  },
+  {
+    "name": "missing_donor_fragment_table",
+    "expected_code": "MISSING_REQUIRED_FILE",
+    "operation": {
+      "type": "remove",
+      "path": "metadata/grt_donor_fragments.tsv"
+    }
+  },
+  {
+    "name": "missing_step2_strategy_table",
+    "expected_code": "MISSING_REQUIRED_FILE",
+    "operation": {
+      "type": "remove",
+      "path": "metadata/grt_step2_strategies.tsv"
+    }
+  },
+  {
+    "name": "missing_step3_classification_table",
+    "expected_code": "MISSING_REQUIRED_FILE",
+    "operation": {
+      "type": "remove",
+      "path": "metadata/grt_step3_classifications.tsv"
     }
   },
   {

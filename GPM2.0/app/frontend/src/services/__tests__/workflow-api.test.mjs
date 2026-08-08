@@ -280,7 +280,7 @@ test("listProjectInitializerOptions preserves partitioned package metadata from 
             assert.equal(command, "list_project_initializer_options");
             return {
               grtRecipe: {
-                workflow: "gpm_grt_precomputed_v1",
+                workflow: "gpm_grt_precomputed_v2",
                 recipeId: "recipe-1",
                 primaryDataset: "hifiasm",
                 supportDatasets: ["flye"],

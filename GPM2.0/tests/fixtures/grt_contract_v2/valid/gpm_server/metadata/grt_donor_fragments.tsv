@@ -1,0 +1,2 @@
+donor_set_id	member_id	fragment_id	fasta_record_name	fragment_start	fragment_end	fragment_length	sequence_sha256	left_boundary	right_boundary
+d0-test	d0-donor1-1-4	d0-fragment-test	d0__support__donor1__1_4	1	4	4	90b4853e06e722c63b4270463cf558684d7a1e77605d3ad36489d6146e42ab87	true	true

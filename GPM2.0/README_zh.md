@@ -198,7 +198,7 @@ bash ./gpm_server/package_light_no_fasta_zip.sh
 
 将服务端生成的 `gpm_server.zip` 导入 GPM2.0，即可进入可视化浏览与轻量编辑流程。
 
-交付包已经固定 primary/support recipe。建项目只需输入项目名；App 直接载入 Server 预计算的 Final Path 和主视图所需的最小只读 source-card 状态。Final Path 标题栏可将当前 chromosome 恢复为不可变的 Server GRT baseline；项目级 Final Path 仍可编辑，并可继续进入 DEGAP 或导出流程。完整 event/evidence/donor/attempt 闭包会在打包前校验，但不会复制进 App 交付 zip；App/Tauri 不再暴露 trace 浏览器。旧的非 GRT 包明确不兼容。
+交付包已经固定 primary/support recipe。建项目只需输入项目名；App 直接载入 Server 预计算的 Final Path 和主视图所需的最小只读 source-card 状态。Final Path 标题栏可将当前 chromosome 恢复为不可变的 Server GRT baseline；项目级 Final Path 仍可编辑，并可继续进入 DEGAP 或导出流程。完整 event/evidence/donor/attempt 闭包会在打包前校验，但不会复制进 App 交付 zip；App/Tauri 不再暴露 trace 浏览器。开发阶段只支持当前 v2 GRT 交付契约；v1 与非 GRT 包都会被明确拒绝，必须使用当前 Server 脚本重新生成。
 
 ### 在服务器端导出 final path FASTA
 

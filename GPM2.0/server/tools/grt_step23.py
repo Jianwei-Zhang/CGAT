@@ -20,6 +20,7 @@ from grt_prepare_inputs import (
     DONOR_FRAGMENT_FIELDS,
     EVIDENCE_FIELDS,
     Q_SEGMENT_FIELDS,
+    SCHEMA_VERSION,
     WORKFLOW,
     canonical_json,
     executable_identity,
@@ -3288,22 +3289,16 @@ def publish_metadata(
     atomic_write_tsv(metadata / "grt_gap_attempts.tsv", ATTEMPT_FIELDS, attempts)
     atomic_write_tsv(metadata / "grt_stage_status.tsv", STAGE_FIELDS, stage_rows)
     atomic_write_tsv(metadata / "grt_tool_versions.tsv", TOOL_FIELDS, tool_rows)
-    if strategy_rows:
-        atomic_write_tsv(
-            metadata / "grt_step2_strategies.tsv",
-            STRATEGY_FIELDS,
-            strategy_rows,
-        )
-    else:
-        (metadata / "grt_step2_strategies.tsv").unlink(missing_ok=True)
-    if classification_rows:
-        atomic_write_tsv(
-            metadata / "grt_step3_classifications.tsv",
-            CLASSIFICATION_FIELDS,
-            classification_rows,
-        )
-    else:
-        (metadata / "grt_step3_classifications.tsv").unlink(missing_ok=True)
+    atomic_write_tsv(
+        metadata / "grt_step2_strategies.tsv",
+        STRATEGY_FIELDS,
+        strategy_rows,
+    )
+    atomic_write_tsv(
+        metadata / "grt_step3_classifications.tsv",
+        CLASSIFICATION_FIELDS,
+        classification_rows,
+    )
 
 
 def execute(args: argparse.Namespace) -> None:
@@ -3311,7 +3306,7 @@ def execute(args: argparse.Namespace) -> None:
     package = read_single(server_dir / "metadata/package.tsv")
     if (
         package.get("workflow") != WORKFLOW
-        or package.get("schema_version") != "1"
+        or package.get("schema_version") != SCHEMA_VERSION
         or package.get("grt_precompute_enabled") != "true"
         or package.get("recipe_locked") != "true"
     ):

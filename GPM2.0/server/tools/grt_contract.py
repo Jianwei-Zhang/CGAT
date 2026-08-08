@@ -10,7 +10,7 @@ from collections import Counter, defaultdict
 from pathlib import Path, PurePosixPath
 
 
-DEFAULT_SCHEMA_PATH = Path(__file__).parents[1] / "contracts" / "grt_precomputed_v1.json"
+DEFAULT_SCHEMA_PATH = Path(__file__).parents[1] / "contracts" / "grt_precomputed_v2.json"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 TRUE_VALUES = {"true"}
 FALSE_VALUES = {"false"}
@@ -281,11 +281,6 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         relpath: read_tsv(bundle_root, relpath, table_spec)
         for relpath, table_spec in schema["tables"].items()
     }
-    optional_tables = {}
-    for relpath, table_spec in schema.get("optional_tables", {}).items():
-        if (bundle_root / relpath).is_file():
-            optional_tables[relpath] = read_tsv(bundle_root, relpath, table_spec)
-    tables.update(optional_tables)
     enums = schema["enums"]
 
     package = tables["metadata/package.tsv"][0]
@@ -581,7 +576,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
 
     fragment_ids = set()
     fragment_intervals = defaultdict(list)
-    for row in optional_tables.get("metadata/grt_donor_fragments.tsv", []):
+    for row in tables["metadata/grt_donor_fragments.tsv"]:
         fragment_id = row["fragment_id"]
         if not fragment_id or fragment_id in fragment_ids:
             fail("DUPLICATE_ID", f"duplicate donor fragment {fragment_id}")
@@ -726,7 +721,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             fail("BROKEN_REFERENCE", f"usage {usage_id} accepted/consumed row lacks event")
 
     strategy_chromosomes = set()
-    for row in optional_tables.get("metadata/grt_step2_strategies.tsv", []):
+    for row in tables["metadata/grt_step2_strategies.tsv"]:
         chromosome = row["chr"]
         if chromosome not in reference_records or chromosome in strategy_chromosomes:
             fail("BROKEN_REFERENCE", f"invalid or duplicate Step2 strategy chromosome: {chromosome}")
@@ -753,7 +748,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             fail("COUNT_MISMATCH", f"Step2 strategy counts are inconsistent for {chromosome}")
         strategy_chromosomes.add(chromosome)
 
-    classification_rows = optional_tables.get("metadata/grt_step3_classifications.tsv", [])
+    classification_rows = tables["metadata/grt_step3_classifications.tsv"]
     classification_candidates = set()
     for row in classification_rows:
         candidate_id = row["candidate_id"]

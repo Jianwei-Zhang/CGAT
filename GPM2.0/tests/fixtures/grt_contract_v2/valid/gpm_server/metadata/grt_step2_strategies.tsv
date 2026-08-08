@@ -1,0 +1,2 @@
+chr	strategy	strategy_applied	gap_count	patch_candidate_count	validated_patch_count	accepted_patch_count	fallback_candidate_count	accepted_fallback_count	reason
+Chr01	partial_success_no_fixer	patcher_result	1	1	1	1	0	0	fixture

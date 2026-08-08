@@ -3,8 +3,8 @@ import { invokeCommand, isTauriRuntime, listenBackendEvent } from "./backend-api
 
 const mockStore = {
   grtRecipe: {
-    workflow: "gpm_grt_precomputed_v1",
-    schemaVersion: "1",
+    workflow: "gpm_grt_precomputed_v2",
+    schemaVersion: "2",
     finalPathSchemaVersion: "1",
     recipeId: "mock-grt-recipe",
     primaryDataset: "hifiasm",

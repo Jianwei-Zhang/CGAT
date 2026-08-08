@@ -1306,8 +1306,8 @@ write_package_metadata() {
   {
     printf 'workflow\tschema_version\tpackage_mode\tsequence_layout\tpreassigned_chr\tself_alignment_scope\tcross_alignment_scope\tchr_assignment_min_coverage_percent\tgrt_precompute_enabled\trecipe_locked\tfinal_path_schema_version\treads_qc_enabled\n'
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "gpm_grt_precomputed_v1" \
-      "1" \
+      "gpm_grt_precomputed_v2" \
+      "2" \
       "$package_mode" \
       "$sequence_layout" \
       "$preassigned_chr" \
@@ -1364,7 +1364,7 @@ write_prepare_options_metadata() {
     printf 'cen_enabled\t%s\n' "$cen_enabled"
     printf 'cen_min_len\t%s\n' "$CEN_MIN_LEN"
     printf 'cen_min_identity\t%s\n' "$CEN_MIN_IDENTITY"
-    printf 'grt_workflow\t%s\n' "gpm_grt_precomputed_v1"
+    printf 'grt_workflow\t%s\n' "gpm_grt_precomputed_v2"
     printf 'grt_primary_dataset\t%s\n' "${DATASET_NAMES[0]}"
     printf 'grt_reads_qc_enabled\t%s\n' "$reads_qc_enabled"
     printf 'grt_meryl\t%s\n' "$GRT_MERYL"

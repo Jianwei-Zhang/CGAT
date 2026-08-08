@@ -107,8 +107,8 @@ class GrtPrepareInputsTests(unittest.TestCase):
             ],
             [
                 {
-                    "workflow": "gpm_grt_precomputed_v1",
-                    "schema_version": "1",
+                    "workflow": "gpm_grt_precomputed_v2",
+                    "schema_version": "2",
                     "package_mode": "fast",
                     "sequence_layout": "partitioned",
                     "preassigned_chr": "true",
@@ -514,13 +514,13 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
                 "keep\n",
             )
 
-    def test_rejects_non_grt_v1_package_instead_of_falling_back(self):
+    def test_rejects_v1_package_instead_of_falling_back(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             server = self.make_server(Path(temporary_dir))
             package = server / "metadata/package.tsv"
             package.write_text(
                 package.read_text(encoding="utf-8").replace(
-                    "gpm_grt_precomputed_v1", "gpm_legacy", 1
+                    "gpm_grt_precomputed_v2", "gpm_grt_precomputed_v1", 1
                 ),
                 encoding="utf-8",
                 newline="",

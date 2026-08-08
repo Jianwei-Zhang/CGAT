@@ -1,6 +1,6 @@
 {
-  "workflow": "gpm_grt_precomputed_v1",
-  "schema_version": "1",
+  "workflow": "gpm_grt_precomputed_v2",
+  "schema_version": "2",
   "final_path_schema_version": "1",
   "hash_semantics": {
     "artifact": "sha256 of exact file bytes",
@@ -17,11 +17,14 @@
     "metadata/grt_q_segments.tsv",
     "metadata/grt_donor_sets.tsv",
     "metadata/grt_donor_members.tsv",
+    "metadata/grt_donor_fragments.tsv",
     "metadata/grt_evidence_registry.tsv",
     "metadata/grt_donor_usage.tsv",
     "metadata/grt_used_contigs.tsv",
     "metadata/grt_events.jsonl",
     "metadata/grt_gap_attempts.tsv",
+    "metadata/grt_step2_strategies.tsv",
+    "metadata/grt_step3_classifications.tsv",
     "metadata/grt_stage_status.tsv",
     "metadata/grt_tool_versions.tsv",
     "metadata/grt_final_path.json",
@@ -260,9 +263,7 @@
     "metadata/grt_tool_versions.tsv": {
       "header": ["tool", "version", "executable"],
       "min_rows": 1
-    }
-  },
-  "optional_tables": {
+    },
     "metadata/grt_donor_fragments.tsv": {
       "header": [
         "donor_set_id",

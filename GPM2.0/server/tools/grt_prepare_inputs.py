@@ -19,8 +19,9 @@ from pathlib import Path
 from typing import Iterable
 
 
-WORKFLOW = "gpm_grt_precomputed_v1"
-SCHEMA_VERSION = "1"
+WORKFLOW = "gpm_grt_precomputed_v2"
+SCHEMA_VERSION = "2"
+FINAL_PATH_SCHEMA_VERSION = "1"
 Q_GAP_LENGTH = 100
 MIN_DONOR_LENGTH = 1_000
 MIN_QV = 30.0
@@ -675,7 +676,7 @@ def prepare(args: argparse.Namespace) -> None:
     if (
         package["workflow"] != WORKFLOW
         or package["schema_version"] != SCHEMA_VERSION
-        or package["final_path_schema_version"] != SCHEMA_VERSION
+        or package["final_path_schema_version"] != FINAL_PATH_SCHEMA_VERSION
     ):
         fail(
             f"unsupported package workflow/schema: "

@@ -46,7 +46,7 @@ function createState(overrides = {}) {
         crossAlignmentScope: "chr_partition",
       },
       grtRecipe: {
-        workflow: "gpm_grt_precomputed_v1",
+        workflow: "gpm_grt_precomputed_v2",
         recipeId: "recipe-test",
         primaryDataset: "hifiasm",
         supportDatasets: ["flye", "canu"],

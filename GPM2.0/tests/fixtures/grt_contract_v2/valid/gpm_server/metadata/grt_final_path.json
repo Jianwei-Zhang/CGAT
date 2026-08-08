@@ -1,5 +1,5 @@
 {
-  "workflow": "gpm_grt_precomputed_v1",
+  "workflow": "gpm_grt_precomputed_v2",
   "schema_version": "1",
   "q4_relpath": "grt/q/q4.fa",
   "chromosomes": [

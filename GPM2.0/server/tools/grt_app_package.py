@@ -17,8 +17,8 @@ import shutil
 from pathlib import Path
 
 
-APP_WORKFLOW = "gpm_grt_app_precomputed_v1"
-APP_SCHEMA_VERSION = "1"
+APP_WORKFLOW = "gpm_grt_app_precomputed_v2"
+APP_SCHEMA_VERSION = "2"
 FINAL_PATH_SCHEMA_VERSION = "1"
 FASTA_SUFFIXES = {".fa", ".fasta"}
 
@@ -29,8 +29,6 @@ REQUIRED_METADATA = (
     "chr_assignments.tsv",
     "grt_recipe.tsv",
     "grt_used_contigs.tsv",
-)
-OPTIONAL_METADATA = (
     "track_member_orders.tsv",
     "reference_chr_locator.tsv",
     "source_seq_n_regions.tsv",
@@ -178,7 +176,7 @@ def project_final_path(source: Path, target: Path) -> tuple[dict, dict[str, int]
     if not isinstance(payload, dict) or not isinstance(payload.get("chromosomes"), list):
         raise ValueError("metadata/grt_final_path.json has an invalid shape")
     payload["workflow"] = APP_WORKFLOW
-    payload["schema_version"] = APP_SCHEMA_VERSION
+    payload["schema_version"] = FINAL_PATH_SCHEMA_VERSION
     payload["q4_relpath"] = "grt/q/q4.fa"
     q4_lengths: dict[str, int] = {}
     for chromosome in payload["chromosomes"]:
@@ -248,9 +246,6 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
         elif filename == "grt_used_contigs.tsv":
             project_used_contigs(source_root / "metadata/grt_used_contigs.tsv", staging_root / "metadata/grt_used_contigs.tsv")
         else:
-            copy_file(source_root, staging_root, f"metadata/{filename}")
-    for filename in OPTIONAL_METADATA:
-        if (source_root / "metadata" / filename).is_file():
             copy_file(source_root, staging_root, f"metadata/{filename}")
     final_path, q4_lengths = project_final_path(source_root / "metadata/grt_final_path.json", staging_root / "metadata/grt_final_path.json")
     project_package_table(source_root / "metadata/package.tsv", staging_root / "metadata/package.tsv", "full" if include_fasta else "no_fasta")

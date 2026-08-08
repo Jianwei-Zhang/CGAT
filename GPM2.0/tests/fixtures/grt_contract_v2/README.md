@@ -1,4 +1,4 @@
-# GRT contract v1 fixtures
+# GRT contract v2 fixtures
 
 `valid/gpm_server/` is the smallest complete package accepted by
 `server/tools/grt_contract.py`. It deliberately contains:
@@ -14,5 +14,5 @@
 copy of the valid package. The mutation format is intentionally language-neutral
 so the same cases can be reused by the later Rust importer tests.
 
-This fixture family only represents `gpm_grt_precomputed_v1`. Legacy package
-formats are unsupported by design.
+This fixture family only represents `gpm_grt_precomputed_v2`. The former v1
+workflow and package schema are unsupported by design.

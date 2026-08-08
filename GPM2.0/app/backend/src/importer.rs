@@ -1900,23 +1900,9 @@ fn sync_catalog_from_bundle(
     }
     let package = read_package_row(bundle_root)?;
     let chr_assignments = read_imported_chr_assignment_rows(bundle_root)?;
-    let track_member_orders = if bundle_root
-        .join("metadata/track_member_orders.tsv")
-        .is_file()
-    {
-        read_imported_track_member_order_rows(bundle_root)?
-    } else {
-        derive_track_member_orders_from_assignments(&chr_assignments)
-    };
+    let track_member_orders = read_imported_track_member_order_rows(bundle_root)?;
     validate_track_member_orders_against_assignments(&track_member_orders, &chr_assignments)?;
-    let reference_chr_locators = if bundle_root
-        .join("metadata/reference_chr_locator.tsv")
-        .is_file()
-    {
-        read_reference_chr_locator_rows(bundle_root)?
-    } else {
-        derive_reference_chr_locators(bundle_root, &references)?
-    };
+    let reference_chr_locators = read_reference_chr_locator_rows(bundle_root)?;
     let source_seq_locators = read_source_seq_locator_rows(bundle_root)?;
     let source_seq_n_regions = read_source_seq_n_region_rows(bundle_root)?;
     let telomere_rules = read_telomere_rule_rows(bundle_root)?;
@@ -2010,62 +1996,6 @@ fn sync_catalog_from_bundle(
 
     tx.commit().context("failed to commit catalog sync")?;
     Ok(())
-}
-
-fn derive_track_member_orders_from_assignments(
-    assignments: &[ImportedChrAssignmentRow],
-) -> Vec<ImportedTrackMemberOrderRow> {
-    let mut grouped = HashMap::<(String, String), Vec<&ImportedChrAssignmentRow>>::new();
-    for assignment in assignments {
-        grouped
-            .entry((
-                assignment.dataset_name.clone(),
-                assignment.assigned_chr_name.clone(),
-            ))
-            .or_default()
-            .push(assignment);
-    }
-    let mut rows = Vec::new();
-    for ((target_track, target_chr), mut members) in grouped {
-        members.sort_by(|left, right| {
-            left.anchor_start
-                .cmp(&right.anchor_start)
-                .then_with(|| left.seq_name.cmp(&right.seq_name))
-        });
-        for (offset, member) in members.into_iter().enumerate() {
-            rows.push(ImportedTrackMemberOrderRow {
-                target_track: target_track.clone(),
-                target_chr: target_chr.clone(),
-                member_dataset: member.dataset_name.clone(),
-                member_ctg: member.seq_name.clone(),
-                member_order: (offset + 1) as i64,
-            });
-        }
-    }
-    rows.sort_by(|left, right| {
-        left.target_track
-            .cmp(&right.target_track)
-            .then_with(|| left.target_chr.cmp(&right.target_chr))
-            .then_with(|| left.member_order.cmp(&right.member_order))
-    });
-    rows
-}
-
-fn derive_reference_chr_locators(
-    bundle_root: &Path,
-    references: &[ReferenceRow],
-) -> Result<Vec<ReferenceChrLocatorRow>> {
-    let mut rows = Vec::new();
-    for reference in references {
-        let fai_path = bundle_root.join(&reference.fai_relpath);
-        for fai_row in parse_fai_rows(&fai_path)? {
-            rows.push(ReferenceChrLocatorRow {
-                reference_chr_name: fai_row.seq_name,
-                fasta_relpath: reference.fasta_relpath.clone(),
-            });
-        }
-    }
-    Ok(rows)
 }
 
 fn read_reference_rows(bundle_root: &Path) -> Result<Vec<ReferenceRow>> {
@@ -6235,7 +6165,7 @@ mod tests {
             bundle_root.join("metadata/package.tsv"),
             concat!(
                 "workflow\tschema_version\tpackage_mode\tsequence_layout\tpreassigned_chr\tself_alignment_scope\tcross_alignment_scope\tchr_assignment_min_coverage_percent\tgrt_precompute_enabled\trecipe_locked\tfinal_path_schema_version\treads_qc_enabled\n",
-                "gpm_grt_precomputed_v1\t1\tfast\tpartitioned\ttrue\tchr_partition\tchr_partition\t72\ttrue\ttrue\t1\tfalse\n",
+                "gpm_grt_precomputed_v2\t2\tfast\tpartitioned\ttrue\tchr_partition\tchr_partition\t72\ttrue\ttrue\t1\tfalse\n",
             ),
         )
         .unwrap();
@@ -6470,7 +6400,7 @@ mod tests {
             bundle_root.join("metadata/package.tsv"),
             concat!(
                 "workflow\tschema_version\tpackage_mode\tsequence_layout\tpreassigned_chr\tself_alignment_scope\tcross_alignment_scope\tchr_assignment_min_coverage_percent\tgrt_precompute_enabled\trecipe_locked\tfinal_path_schema_version\treads_qc_enabled\n",
-                "gpm_grt_precomputed_v1\t1\tfull\tmonolithic\tfalse\tnone\tchr_partition\t60\ttrue\ttrue\t1\tfalse\n",
+                "gpm_grt_precomputed_v2\t2\tfull\tmonolithic\tfalse\tnone\tchr_partition\t60\ttrue\ttrue\t1\tfalse\n",
             ),
         )
         .unwrap();
@@ -7341,16 +7271,17 @@ mod tests {
     }
 
     #[test]
-    fn imports_grt_package_without_legacy_track_member_order_metadata() {
+    fn rejects_delivery_without_track_member_order_metadata() {
         let temp = tempdir().unwrap();
         let bundle_root = temp.path().join("gpm_server");
         create_bundle_root(&bundle_root);
         fs::remove_file(bundle_root.join("metadata/track_member_orders.tsv")).unwrap();
 
-        let (outcome, _) = import_from_extracted_bundle(&bundle_root).unwrap();
-        assert_eq!(
-            count_rows(&outcome.project_db_path, "imported_track_member_order"),
-            1
+        let error = import_from_extracted_bundle(&bundle_root).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("metadata/track_member_orders.tsv")
         );
     }
 
@@ -7572,7 +7503,7 @@ mod tests {
             metadata_root.join("package.tsv"),
             concat!(
                 "workflow\tschema_version\tpackage_mode\tsequence_layout\tpreassigned_chr\tself_alignment_scope\tcross_alignment_scope\tchr_assignment_min_coverage_percent\tgrt_precompute_enabled\trecipe_locked\tfinal_path_schema_version\treads_qc_enabled\n",
-                "gpm_grt_precomputed_v1\t1\tfast\tpartitioned\ttrue\tchr_partition\tchr_partition\t60\ttrue\ttrue\t1\tfalse\n",
+                "gpm_grt_precomputed_v2\t2\tfast\tpartitioned\ttrue\tchr_partition\tchr_partition\t60\ttrue\ttrue\t1\tfalse\n",
             ),
         )
         .unwrap();
@@ -7736,9 +7667,23 @@ mod tests {
         )
         .unwrap();
         fs::write(metadata_root.join("grt_donor_usage.tsv"), "usage_id\tdonor_set_id\tmember_id\tsource_dataset\tsource_contig\tsource_start\tsource_end\tstage\tstatus\tevent_id\tfinal_path_segment_id\treason\n").unwrap();
+        fs::write(metadata_root.join("grt_donor_fragments.tsv"), "donor_set_id\tmember_id\tfragment_id\tfasta_record_name\tfragment_start\tfragment_end\tfragment_length\tsequence_sha256\tleft_boundary\tright_boundary\n").unwrap();
         fs::write(metadata_root.join("grt_used_contigs.tsv"), "source_card_key\tdataset_name\tcontig_name\toriginal_assignment\ttarget_chr\tplacement_mode\tref_alignment_status\tanchor_start\torientation\tref_evidence_ids_json\taccepted_event_ids_json\tfinal_path_segment_ids_json\tpairwise_evidence_ids_json\n").unwrap();
         fs::write(metadata_root.join("grt_events.jsonl"), b"").unwrap();
         fs::write(metadata_root.join("grt_gap_attempts.tsv"), "attempt_id\tchr\tobject_id\tstage\tstatus\treason\tcandidate_count\taccepted_event_id\n").unwrap();
+        let mut strategy_text = "chr\tstrategy\tstrategy_applied\tgap_count\tpatch_candidate_count\tvalidated_patch_count\taccepted_patch_count\tfallback_candidate_count\taccepted_fallback_count\treason\n".to_string();
+        for chr_name in q_records.keys() {
+            strategy_text.push_str(&format!(
+                "{}\tno_gaps\tpatcher_result\t0\t0\t0\t0\t0\t0\tchromosome_has_no_gap_objects\n",
+                chr_name
+            ));
+        }
+        fs::write(
+            metadata_root.join("grt_step2_strategies.tsv"),
+            strategy_text,
+        )
+        .unwrap();
+        fs::write(metadata_root.join("grt_step3_classifications.tsv"), "chr\tobject_id\tcandidate_id\terror_type\terror_subtype\terror_features_json\tconfidence\tconfidence_score\tgap_in_error_region\trepair_mode\trepair_reason\toutcome\tevent_id\tfragment_id\tdonor_reuse\tdonor_reuse_of\n").unwrap();
 
         let q_sha = test_sha256(q_fasta.as_bytes());
         let checkpoint = b"{}\n";
@@ -7777,7 +7722,7 @@ mod tests {
         fs::write(
             metadata_root.join("grt_final_path.json"),
             serde_json::to_vec_pretty(&json!({
-                "workflow": "gpm_grt_precomputed_v1",
+                "workflow": "gpm_grt_precomputed_v2",
                 "schema_version": "1",
                 "q4_relpath": "grt/q/q4.fa",
                 "chromosomes": final_chromosomes

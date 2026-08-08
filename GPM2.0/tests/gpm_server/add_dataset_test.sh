@@ -200,7 +200,7 @@ mv "${output_root}/metadata/prepare_options.tsv.tmp" "${output_root}/metadata/pr
 PATH="${FAKE_BIN}:$PATH" bash "${output_root}/add_dataset.sh" --ds ds4 "$ds4" >/dev/null
 
 test -f "${output_root}/add_ds4.zip"
-grep -q '^gpm_grt_precomputed_v1' "${output_root}/metadata/package.tsv"
+grep -q '^gpm_grt_precomputed_v2' "${output_root}/metadata/package.tsv"
 grep -q $'^recipe-.*\tds1\t\[\]\tfalse\t' "${output_root}/metadata/grt_recipe.tsv"
 grep -q $'^ds4\t' "${output_root}/metadata/datasets.tsv"
 grep -q $'^ds4\tds4_ctg\t' "${output_root}/metadata/chr_assignments.tsv"

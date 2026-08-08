@@ -16,9 +16,9 @@ use crate::project_initializer::{
     list_initializer_options_with_connection, set_project_auto_pipeline_done_with_connection,
 };
 
-pub const GRT_WORKFLOW: &str = "gpm_grt_precomputed_v1";
-pub const GRT_APP_WORKFLOW: &str = "gpm_grt_app_precomputed_v1";
-pub const GRT_SCHEMA_VERSION: &str = "1";
+pub const GRT_WORKFLOW: &str = "gpm_grt_precomputed_v2";
+pub const GRT_APP_WORKFLOW: &str = "gpm_grt_app_precomputed_v2";
+pub const GRT_SCHEMA_VERSION: &str = "2";
 pub const GRT_FINAL_PATH_SCHEMA_VERSION: &str = "1";
 
 type TsvRow = BTreeMap<String, String>;
@@ -128,11 +128,14 @@ const REQUIRED_FILES: &[&str] = &[
     "metadata/grt_q_segments.tsv",
     "metadata/grt_donor_sets.tsv",
     "metadata/grt_donor_members.tsv",
+    "metadata/grt_donor_fragments.tsv",
     "metadata/grt_evidence_registry.tsv",
     "metadata/grt_donor_usage.tsv",
     "metadata/grt_used_contigs.tsv",
     "metadata/grt_events.jsonl",
     "metadata/grt_gap_attempts.tsv",
+    "metadata/grt_step2_strategies.tsv",
+    "metadata/grt_step3_classifications.tsv",
     "metadata/grt_stage_status.tsv",
     "metadata/grt_tool_versions.tsv",
     "metadata/grt_final_path.json",
@@ -175,6 +178,21 @@ const DATASETS_HEADER: &[&str] = &[
     "self_alignment_available",
 ];
 const SOURCE_LOCATOR_HEADER: &[&str] = &["dataset_name", "seq_name", "fasta_relpath"];
+const SOURCE_N_REGIONS_HEADER: &[&str] = &[
+    "dataset_name",
+    "seq_name",
+    "start_bp",
+    "end_bp",
+    "length_bp",
+];
+const TRACK_MEMBER_ORDERS_HEADER: &[&str] = &[
+    "target_track",
+    "target_chr",
+    "member_dataset",
+    "member_ctg",
+    "member_order",
+];
+const REFERENCE_CHR_LOCATOR_HEADER: &[&str] = &["reference_chr_name", "fasta_relpath"];
 const CHR_ASSIGNMENTS_HEADER: &[&str] = &[
     "dataset_name",
     "seq_name",
@@ -239,6 +257,18 @@ const DONOR_MEMBERS_HEADER: &[&str] = &[
     "orientation",
     "fasta_record_name",
     "sequence_sha256",
+];
+const DONOR_FRAGMENTS_HEADER: &[&str] = &[
+    "donor_set_id",
+    "member_id",
+    "fragment_id",
+    "fasta_record_name",
+    "fragment_start",
+    "fragment_end",
+    "fragment_length",
+    "sequence_sha256",
+    "left_boundary",
+    "right_boundary",
 ];
 const EVIDENCE_HEADER: &[&str] = &[
     "evidence_id",
@@ -308,6 +338,36 @@ const GAP_ATTEMPTS_HEADER: &[&str] = &[
     "candidate_count",
     "accepted_event_id",
 ];
+const STEP2_STRATEGIES_HEADER: &[&str] = &[
+    "chr",
+    "strategy",
+    "strategy_applied",
+    "gap_count",
+    "patch_candidate_count",
+    "validated_patch_count",
+    "accepted_patch_count",
+    "fallback_candidate_count",
+    "accepted_fallback_count",
+    "reason",
+];
+const STEP3_CLASSIFICATIONS_HEADER: &[&str] = &[
+    "chr",
+    "object_id",
+    "candidate_id",
+    "error_type",
+    "error_subtype",
+    "error_features_json",
+    "confidence",
+    "confidence_score",
+    "gap_in_error_region",
+    "repair_mode",
+    "repair_reason",
+    "outcome",
+    "event_id",
+    "fragment_id",
+    "donor_reuse",
+    "donor_reuse_of",
+];
 const STAGE_STATUS_HEADER: &[&str] = &[
     "stage",
     "q_input_version",
@@ -353,6 +413,12 @@ const TABLE_SPECS: &[(&str, &[&str], usize, Option<usize>)] = &[
         None,
     ),
     (
+        "metadata/grt_donor_fragments.tsv",
+        DONOR_FRAGMENTS_HEADER,
+        0,
+        None,
+    ),
+    (
         "metadata/grt_evidence_registry.tsv",
         EVIDENCE_HEADER,
         1,
@@ -368,6 +434,18 @@ const TABLE_SPECS: &[(&str, &[&str], usize, Option<usize>)] = &[
     (
         "metadata/grt_gap_attempts.tsv",
         GAP_ATTEMPTS_HEADER,
+        0,
+        None,
+    ),
+    (
+        "metadata/grt_step2_strategies.tsv",
+        STEP2_STRATEGIES_HEADER,
+        1,
+        None,
+    ),
+    (
+        "metadata/grt_step3_classifications.tsv",
+        STEP3_CLASSIFICATIONS_HEADER,
         0,
         None,
     ),
@@ -441,7 +519,7 @@ where
     {
         return grt_err(
             "UNSUPPORTED_SCHEMA",
-            "expected gpm_grt_precomputed_v1 schema 1 / Final Path schema 1",
+            "expected gpm_grt_precomputed_v2 schema 2 / Final Path schema 1",
         );
     }
     if !parse_bool(
@@ -1474,7 +1552,7 @@ where
         .as_object()
         .ok_or_else(|| grt_anyhow("INVALID_JSON", "grt_final_path.json must contain an object"))?;
     if json_str(final_object, "workflow", "Final Path")? != GRT_WORKFLOW
-        || json_str(final_object, "schema_version", "Final Path")? != GRT_SCHEMA_VERSION
+        || json_str(final_object, "schema_version", "Final Path")? != GRT_FINAL_PATH_SCHEMA_VERSION
     {
         return grt_err(
             "UNSUPPORTED_SCHEMA",
@@ -1769,7 +1847,10 @@ where
                 .collect::<Vec<_>>();
             row.get(workflow_index).map(|value| value.to_string())
         });
-    if workflow.as_deref() == Some(GRT_APP_WORKFLOW) {
+    if workflow
+        .as_deref()
+        .is_some_and(|value| value.starts_with("gpm_grt_app_"))
+    {
         validate_grt_app_package_with_progress(bundle_root, on_progress)
     } else {
         validate_grt_package_with_progress(bundle_root, on_progress)
@@ -1809,6 +1890,24 @@ where
             1,
             None,
         ),
+        (
+            "metadata/track_member_orders.tsv",
+            TRACK_MEMBER_ORDERS_HEADER,
+            1,
+            None,
+        ),
+        (
+            "metadata/reference_chr_locator.tsv",
+            REFERENCE_CHR_LOCATOR_HEADER,
+            1,
+            None,
+        ),
+        (
+            "metadata/source_seq_n_regions.tsv",
+            SOURCE_N_REGIONS_HEADER,
+            0,
+            None,
+        ),
         ("metadata/grt_recipe.tsv", RECIPE_HEADER, 1, Some(1)),
         (
             "metadata/grt_used_contigs.tsv",
@@ -1831,7 +1930,7 @@ where
     {
         return grt_err(
             "UNSUPPORTED_SCHEMA",
-            "expected gpm_grt_app_precomputed_v1 schema 1 / Final Path schema 1",
+            "expected gpm_grt_app_precomputed_v2 schema 2 / Final Path schema 1",
         );
     }
     if !parse_bool(
@@ -2323,7 +2422,7 @@ fn validate_app_final_path(
         .as_object()
         .ok_or_else(|| grt_anyhow("INVALID_JSON", "App Final Path must be an object"))?;
     if json_str(object, "workflow", "App Final Path")? != GRT_APP_WORKFLOW
-        || json_str(object, "schema_version", "App Final Path")? != GRT_SCHEMA_VERSION
+        || json_str(object, "schema_version", "App Final Path")? != GRT_FINAL_PATH_SCHEMA_VERSION
         || json_str(object, "q4_relpath", "App Final Path")? != "grt/q/q4.fa"
     {
         return grt_err(
@@ -4628,12 +4727,12 @@ mod tests {
 
     fn fixture_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/fixtures/grt_contract_v1/valid/gpm_server")
+            .join("../../tests/fixtures/grt_contract_v2/valid/gpm_server")
     }
 
     fn invalid_cases_path() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/fixtures/grt_contract_v1/invalid_cases.json")
+            .join("../../tests/fixtures/grt_contract_v2/invalid_cases.json")
     }
 
     fn copy_tree(source: &Path, target: &Path) {
@@ -4802,7 +4901,7 @@ mod tests {
     }
 
     #[test]
-    fn validates_shared_grt_v1_fixture() {
+    fn validates_shared_grt_v2_fixture() {
         let package = validate_grt_package(&fixture_root()).unwrap();
         assert_eq!(package.final_path["workflow"].as_str(), Some(GRT_WORKFLOW));
         assert_eq!(package.events.len(), 1);

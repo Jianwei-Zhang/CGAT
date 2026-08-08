@@ -9,8 +9,8 @@ import { normalizeFinalPathByChr } from "../final-path-state.js";
 function buildRawView() {
   return {
     recipe: {
-      workflow: "gpm_grt_app_precomputed_v1",
-      schema_version: "1",
+      workflow: "gpm_grt_app_precomputed_v2",
+      schema_version: "2",
       final_path_schema_version: "1",
       recipe_id: "recipe-1",
       primary_dataset: "primary",

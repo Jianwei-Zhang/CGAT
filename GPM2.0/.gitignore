@@ -30,8 +30,8 @@ tests/*
 !tests/gpm_server/
 !tests/gpm_server/*.sh
 !tests/fixtures/
-!tests/fixtures/grt_contract_v1/
-!tests/fixtures/grt_contract_v1/**
+!tests/fixtures/grt_contract_v2/
+!tests/fixtures/grt_contract_v2/**
 tests/output/
 tests/tmp/
 tests/gpm_server/output/
