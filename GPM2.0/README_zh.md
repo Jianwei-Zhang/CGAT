@@ -54,30 +54,10 @@ bash server/prepare.sh \
   --ds hifiasm /path/to/hifi.fa \
   --ds flye /path/to/flye.fa \
   --ds canu2 /path/to/canu2.fa \
-  [-o|--out /path/to/gpm_server] \
-  [-s|--score 60] \
-  [--aligner minimap2|blastn|winnowmap] \
-  # minimap2 特有参数，仅在 --aligner minimap2 时使用
-  [--minimap-preset asm10|asm5] \
-  # blastn 特有参数，仅在 --aligner blastn 时使用
-  [--blastn-task blastn|megablast|dc-megablast] \
-  [--blastn-evalue 1e-10] \
-  # winnowmap 特有参数，仅在 --aligner winnowmap 时使用
-  [--winnowmap-preset asm20|asm10|asm5] \
-  [--winnowmap-kmer 19] \
-  [--winnowmap-repeat-fraction 0.9998] \
-  [-t|--threads 10] \
-  [--tel TTAGGG 20] \
-  [--cen /path/to/ref_cen.fa] \
-  [--cen-min-len 10000] \
-  [--cen-min-identity 80] \
-  [--reads /path/to/reads.fastq.gz ...] \
-  [--grt-qc-memory-gb 80] \
-  [--grt-kmer-size 21] \
-  [--skip-self]
+  --threads 10
 ```
 
-方括号中的参数均为可选项。
+上面是可直接执行的最小示例。需要添加可选设置时，请参阅下方参数列表，不要把参数说明中的方括号和占位写法直接粘贴到 shell 命令中。
 
 **通用参数：**
 
@@ -125,6 +105,8 @@ bash ./gpm_server/run_all.sh
 - `gpm_server.zip`：App 完整包，包含 source/reference FASTA 与权威 q4 FASTA
 - `gpm_server.no_fasta.zip`：App no-FASTA 包，保留 `.fai`、metadata、Final Path、source-card 状态和 PAF 视图
 
+两个压缩包均使用当前 v2 交付契约：App workflow 为 `gpm_grt_app_precomputed_v2`，package schema 为 `2`，Final Path structure schema 为 `1`。v1 和非 GRT 包会被拒绝，必须使用当前服务端脚本重新生成。
+
 最终只交付这两个 zip，不再额外提供 Server 审计包。Server 工作目录会在投影前完成完整校验；q0–q3、D0/Dtel、raw evidence FASTA、cache、checkpoint、原始 trace、Server 脚本和工具缓存均留在 Server 侧，不进入 App 交付包。
 
 初始流程无需再单独执行打包命令。如需手工安排阶段，也可以依次执行 `prepare.sh` 打印的命令，但必须包含最后的完整包与轻量包命令。
@@ -162,7 +144,7 @@ bash ./gpm_server/add_dataset.sh --ds ds4_name /path/to/ds4.fa -o /path/to/add_d
 
 追加 dataset 不会追溯加入已锁定的 GRT recipe，也不会改写预计算 Final Path；它仍可在 App 中展示，并允许用户把其中的 contig 手工加入项目可编辑路径。
 
-初始流程和生成的追加脚本都会在服务端计算 dataset 轨道的 ctg 顺序。桌面端只导入 `metadata/track_member_orders.tsv`，不会再根据 anchor 重算顺序。旧脚本生成且缺少该文件的包不再兼容，需要使用当前服务端脚本重新生成。
+初始流程和生成的追加脚本都会在服务端计算 dataset 轨道的 ctg 顺序。桌面端只导入 `metadata/track_member_orders.tsv`，不会再根据 anchor 重算顺序。v1 包以及旧脚本生成且缺少该文件的包均不再兼容，需要使用当前服务端脚本重新生成。
 
 由于脚本也会把新 dataset 合并回服务端 `gpm_server/` 目录，如需得到已经包含新 dataset 的完整包，请重新运行完整打包脚本。该完整 zip 可用于创建新的桌面端项目区或执行完整重新导入：
 

@@ -54,30 +54,10 @@ bash server/prepare.sh \
   --ds hifiasm /path/to/hifi.fa \
   --ds flye /path/to/flye.fa \
   --ds canu2 /path/to/canu2.fa \
-  [-o|--out /path/to/gpm_server] \
-  [-s|--score 60] \
-  [--aligner minimap2|blastn|winnowmap] \
-  # minimap2-specific option; only valid with --aligner minimap2
-  [--minimap-preset asm10|asm5] \
-  # blastn-specific options; only valid with --aligner blastn
-  [--blastn-task blastn|megablast|dc-megablast] \
-  [--blastn-evalue 1e-10] \
-  # winnowmap-specific options; only valid with --aligner winnowmap
-  [--winnowmap-preset asm20|asm10|asm5] \
-  [--winnowmap-kmer 19] \
-  [--winnowmap-repeat-fraction 0.9998] \
-  [-t|--threads 10] \
-  [--tel TTAGGG 20] \
-  [--cen /path/to/ref_cen.fa] \
-  [--cen-min-len 10000] \
-  [--cen-min-identity 80] \
-  [--reads /path/to/reads.fastq.gz ...] \
-  [--grt-qc-memory-gb 80] \
-  [--grt-kmer-size 21] \
-  [--skip-self]
+  --threads 10
 ```
 
-Bracketed arguments are optional.
+The command above is a minimal executable example. Use the option lists below to add optional settings; do not paste the option descriptions into the shell command.
 
 **Common options:**
 
@@ -125,6 +105,8 @@ This one command completes the staged computation and automatically creates both
 - `gpm_server.zip`: App full package, including source/reference FASTA and the authoritative q4 FASTA
 - `gpm_server.no_fasta.zip`: App no-FASTA package, retaining `.fai`, metadata, Final Path, source-card state, and PAF views
 
+Both archives use the current v2 delivery contract: App workflow `gpm_grt_app_precomputed_v2`, package schema `2`, and Final Path structure schema `1`. v1 and non-GRT packages are rejected and must be regenerated with the current Server scripts.
+
 These are the only delivery archives. There is no separate Server audit zip: the Server workdir is validated before projection, while q0–q3, D0/Dtel, raw evidence FASTA, caches, checkpoints, raw traces, Server scripts, and tool caches stay on the Server side.
 
 No separate packaging command is needed for the initial workflow. If needed, you can instead execute the staged commands printed by `prepare.sh` manually, including the final full-package and light-package commands.
@@ -162,7 +144,7 @@ The generated `add_ds4_name.zip` is an add package, not a full delivery bundle. 
 
 An appended dataset does not retroactively join the locked GRT recipe or rewrite the precomputed Final Path. It remains visible in the App and its contigs can be added manually to the editable project path.
 
-The initial workflow and generated add scripts calculate dataset-track contig order on the server. The desktop imports `metadata/track_member_orders.tsv` and does not recalculate that order from anchors. Packages produced by older scripts without this file are intentionally unsupported and must be regenerated.
+The initial workflow and generated add scripts calculate dataset-track contig order on the server. The desktop imports `metadata/track_member_orders.tsv` and does not recalculate that order from anchors. v1 packages and packages produced by older scripts without this file are intentionally unsupported and must be regenerated.
 
 Because the script also merges the new dataset into the server-side `gpm_server/` directory, run the full packager again when you need a fresh full import bundle that already includes the new dataset. Use that full delivery bundle for new desktop workspaces or full re-imports:
 
