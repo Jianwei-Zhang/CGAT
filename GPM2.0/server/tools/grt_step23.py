@@ -65,7 +65,7 @@ from grt_step1 import (
 )
 
 
-ENGINE_VERSION = 4
+ENGINE_VERSION = 5
 MUMMER_MIN_CLUSTER = 1_000
 MUMMER_MIN_MATCH = 100
 MUMMER_MIN_ALIGNMENT = 10_000
@@ -82,6 +82,10 @@ CORRECTION_SEARCH_RANGE = 500_000
 CORRECTION_MARGIN = 100
 CORRECTION_LARGE_EDIT_BP = 1_000_000
 CORRECTION_MAX_OVERLAP_EDIT_RATIO = 10.0
+PRIMARY_OVERLAP_MIN_BP = 10_000
+PRIMARY_OVERLAP_MAX_BP = CORRECTION_SEARCH_RANGE
+PRIMARY_OVERLAP_MAX_LEFT_TRIM = CORRECTION_MARGIN
+PRIMARY_OVERLAP_POLICY = "keep_left_trim_right"
 NORMALIZED_GAP_LENGTH = 100
 MINIMAP_PRESET = "asm5"
 REPAIR_MODES = {"conservative", "aggressive"}
@@ -1988,6 +1992,215 @@ def _step3_edit_scope_decision(
     return True, ""
 
 
+def _exact_suffix_prefix_by_left_trim(
+    left_sequence: str,
+    right_sequence: str,
+    max_overlap: int,
+    max_left_trim: int,
+) -> list[int]:
+    """Return exact terminal overlaps for every left trim in one O(n) scan."""
+    maximum_trim = min(max_left_trim, max(0, len(left_sequence) - 1))
+    results = [0] * (maximum_trim + 1)
+    limit = min(max_overlap, len(left_sequence), len(right_sequence))
+    if limit <= 0:
+        return results
+    pattern = right_sequence[:limit].upper()
+    prefix = [0] * len(pattern)
+    for index in range(1, len(pattern)):
+        matched = prefix[index - 1]
+        while matched and pattern[index] != pattern[matched]:
+            matched = prefix[matched - 1]
+        if pattern[index] == pattern[matched]:
+            matched += 1
+        prefix[index] = matched
+
+    scan_start = max(0, len(left_sequence) - max_overlap - maximum_trim)
+    boundaries = {
+        len(left_sequence) - left_trim: left_trim
+        for left_trim in range(maximum_trim + 1)
+    }
+    matched = 0
+    for absolute_index, base in enumerate(
+        left_sequence[scan_start:].upper(), start=scan_start
+    ):
+        while matched and base != pattern[matched]:
+            matched = prefix[matched - 1]
+        if base == pattern[matched]:
+            matched += 1
+        boundary = absolute_index + 1
+        left_trim = boundaries.get(boundary)
+        if left_trim is not None:
+            results[left_trim] = matched
+        if matched == len(pattern):
+            matched = prefix[matched - 1]
+    return results
+
+
+def _longest_exact_suffix_prefix(
+    left_sequence: str,
+    right_sequence: str,
+    max_overlap: int,
+) -> int:
+    """Return the longest exact left-suffix/right-prefix overlap in O(n)."""
+    return _exact_suffix_prefix_by_left_trim(
+        left_sequence, right_sequence, max_overlap, 0
+    )[0]
+
+
+def _adjacent_primary_segments(
+    path: list[dict[str, object]],
+    gap: dict[str, object],
+    primary_dataset: str,
+) -> tuple[dict[str, object], dict[str, object]] | None:
+    """Resolve the exact source-gap-source triplet around one q gap."""
+    gap_start0 = int(gap["start0"])
+    gap_end0 = int(gap["end0"])
+    cursor = 0
+    left: dict[str, object] | None = None
+    right: dict[str, object] | None = None
+    exact_gap = False
+    for segment in path:
+        segment_end = cursor + int(segment["length"])
+        if segment_end == gap_start0 and segment["segment_kind"] == "source":
+            left = segment
+        if (
+            cursor == gap_start0
+            and segment_end == gap_end0
+            and segment["segment_kind"] == "gap"
+        ):
+            exact_gap = True
+        if cursor == gap_end0 and segment["segment_kind"] == "source":
+            right = segment
+        cursor = segment_end
+    if not exact_gap or left is None or right is None:
+        return None
+    if (
+        str(left["dataset_name"]) != primary_dataset
+        or str(right["dataset_name"]) != primary_dataset
+        or str(left["contig_name"]) == str(right["contig_name"])
+    ):
+        return None
+    return left, right
+
+
+def promote_direct_primary_overlap_merges(
+    gaps: list[dict[str, object]],
+    candidates: list[dict[str, object]],
+    input_paths: dict[str, list[dict[str, object]]],
+    sources: dict[tuple[str, str], str],
+    primary_dataset: str,
+    *,
+    min_overlap: int = PRIMARY_OVERLAP_MIN_BP,
+    max_overlap: int = PRIMARY_OVERLAP_MAX_BP,
+    max_left_trim: int = PRIMARY_OVERLAP_MAX_LEFT_TRIM,
+) -> None:
+    """Promote safe Type5 gaps to primary-only direct overlap deletions.
+
+    A flush suffix-prefix match always wins.  Trimming a short unsupported
+    left tail is considered only when no flush overlap reaches ``min_overlap``.
+    """
+    gaps_by_key = {(str(row["chr"]), str(row["object_id"])): row for row in gaps}
+    overlap_by_gap: dict[tuple[str, str], dict[str, object] | None] = {}
+    for candidate in candidates:
+        if candidate.get("outcome") != "candidate" or candidate.get("error_type") != "type5":
+            continue
+        key = (str(candidate["chr"]), str(candidate["object_id"]))
+        if key not in overlap_by_gap:
+            gap = gaps_by_key[key]
+            adjacent = _adjacent_primary_segments(
+                input_paths[str(candidate["chr"])], gap, primary_dataset
+            )
+            resolution: dict[str, object] | None = None
+            if adjacent is not None:
+                left, right = adjacent
+                left_length = int(left["length"])
+                right_length = int(right["length"])
+                left_sequence = path_sequence(
+                    slice_path(
+                        [left],
+                        max(0, left_length - max_overlap - max_left_trim),
+                        left_length,
+                    ),
+                    sources,
+                )
+                right_sequence = path_sequence(
+                    slice_path([right], 0, min(right_length, max_overlap)),
+                    sources,
+                )
+                maximum_trim = min(max_left_trim, max(0, left_length - 1))
+                overlaps = _exact_suffix_prefix_by_left_trim(
+                    left_sequence,
+                    right_sequence,
+                    max_overlap,
+                    maximum_trim,
+                )
+                selected: tuple[int, int] | None = None
+                if overlaps[0] >= right_length:
+                    # Do not manufacture a one-base right remainder by shifting
+                    # the left boundary when the flush overlap consumes it all.
+                    selected = None
+                elif min_overlap <= overlaps[0]:
+                    selected = (0, overlaps[0])
+                else:
+                    shifted = [
+                        (overlap, -left_trim, left_trim)
+                        for left_trim, overlap in enumerate(overlaps[1:], start=1)
+                        if min_overlap <= overlap < right_length
+                    ]
+                    if shifted:
+                        overlap, _negative_trim, left_trim = max(shifted)
+                        selected = (left_trim, overlap)
+                if selected is not None:
+                    left_trim, right_trim = selected
+                    resolution = {
+                        "left": left,
+                        "right": right,
+                        "left_trim": left_trim,
+                        "right_trim": right_trim,
+                    }
+            overlap_by_gap[key] = resolution
+
+        resolution = overlap_by_gap[key]
+        if resolution is None:
+            continue
+        gap = gaps_by_key[key]
+        left = resolution["left"]
+        right = resolution["right"]
+        left_trim = int(resolution["left_trim"])
+        right_trim = int(resolution["right_trim"])
+        feature_names = list(candidate.get("error_features", []))
+        feature_names.extend(
+            [
+                f"direct_primary_overlap_{right_trim}",
+                f"junction_policy_{PRIMARY_OVERLAP_POLICY}",
+                f"left_trim_{left_trim}",
+                f"right_trim_{right_trim}",
+            ]
+        )
+        candidate.update(
+            {
+                "input_start": int(gap["start0"]) + 1 - left_trim,
+                "input_end": int(gap["end0"]) + right_trim,
+                "trim_left": left_trim,
+                "trim_right": right_trim,
+                "fill_length": 0,
+                "reason": "direct_primary_overlap_keep_left_trim_right",
+                "classification_reason": "direct_primary_overlap_keep_left_trim_right",
+                "error_features": sorted(set(feature_names)),
+                "error_features_json": canonical_json(sorted(set(feature_names))),
+                "direct_primary_overlap": True,
+                "direct_overlap_bp": right_trim,
+                "junction_policy": PRIMARY_OVERLAP_POLICY,
+                "primary_left_dataset": left["dataset_name"],
+                "primary_left_contig": left["contig_name"],
+                "primary_left_orientation": left["orientation"],
+                "primary_right_dataset": right["dataset_name"],
+                "primary_right_contig": right["contig_name"],
+                "primary_right_orientation": right["orientation"],
+            }
+        )
+
+
 def _step3_project_ref_interval(row: dict[str, object], ref_start: int, ref_end: int) -> tuple[int, int]:
     ref_min, ref_max = int(row["ref_min"]), int(row["ref_max"])
     query_min, query_max = int(row["query_min"]), int(row["query_max"])
@@ -2383,21 +2596,28 @@ def apply_corrections(
                 fail(f"overlapping or invalid Step3 correction edit: {candidate['candidate_id']}")
             result_path.extend(slice_path(path, cursor, start0))
             output_cursor += start0 - cursor
-            gap_segment = {
-                "segment_kind": "gap",
-                "length": NORMALIZED_GAP_LENGTH,
-                "dataset_name": "",
-                "contig_name": "",
-                "source_start": None,
-                "source_end": None,
-                "orientation": "",
-                "source_card_key": "",
-                "evidence_ids": [],
-            }
-            result_path.append(gap_segment)
+            direct_overlap = candidate.get("junction_policy") == PRIMARY_OVERLAP_POLICY
+            replacement_length = 0 if direct_overlap else NORMALIZED_GAP_LENGTH
             output_start = output_cursor + 1
-            output_end = output_start + NORMALIZED_GAP_LENGTH - 1
-            output_cursor = output_end
+            if direct_overlap:
+                # q_after identifies the first retained right-side base.  The
+                # edit itself inserts no sequence and creates no corrected gap.
+                output_end = output_start
+            else:
+                gap_segment = {
+                    "segment_kind": "gap",
+                    "length": NORMALIZED_GAP_LENGTH,
+                    "dataset_name": "",
+                    "contig_name": "",
+                    "source_start": None,
+                    "source_end": None,
+                    "orientation": "",
+                    "source_card_key": "",
+                    "evidence_ids": [],
+                }
+                result_path.append(gap_segment)
+                output_end = output_start + NORMALIZED_GAP_LENGTH - 1
+                output_cursor = output_end
             cursor = end0
             prototype = {
                 "candidate": candidate,
@@ -2407,14 +2627,16 @@ def apply_corrections(
                 "input_end": int(candidate["input_end"]),
                 "intermediate_start": output_start,
                 "intermediate_end": output_end,
+                "replacement_length": replacement_length,
             }
             prototypes.append(prototype)
-            gap_origin_by_output[(chromosome, output_start - 1, output_end)] = {
-                "object_id": candidate["object_id"],
-                "q2_start": int(candidate["input_start"]),
-                "q2_end": int(candidate["input_end"]),
-                "correction_candidate_id": candidate["candidate_id"],
-            }
+            if not direct_overlap:
+                gap_origin_by_output[(chromosome, output_start - 1, output_end)] = {
+                    "object_id": candidate["object_id"],
+                    "q2_start": int(candidate["input_start"]),
+                    "q2_end": int(candidate["input_end"]),
+                    "correction_candidate_id": candidate["candidate_id"],
+                }
         result_path.extend(slice_path(path, cursor, len(sequence)))
         output_paths[chromosome] = result_path
         output_records[chromosome] = path_sequence(result_path, sources)
@@ -2424,7 +2646,7 @@ def apply_corrections(
             shift = 0
             for candidate in accepted:
                 if int(candidate["input_end"]) < int(gap["start0"]) + 1:
-                    shift += NORMALIZED_GAP_LENGTH - (
+                    shift += int(candidate.get("fill_length", NORMALIZED_GAP_LENGTH)) - (
                         int(candidate["input_end"]) - int(candidate["input_start"]) + 1
                     )
             output_start0 = int(gap["start0"]) + shift
@@ -2746,16 +2968,38 @@ def build_correction_events(
                 "final_path_segment_id": "",
                 "edit": {
                     "operation": "replace_interval",
-                    "replacement_kind": "gap",
+                    "replacement_kind": (
+                        "none" if candidate.get("junction_policy") == PRIMARY_OVERLAP_POLICY else "gap"
+                    ),
                     "input_coordinate_space": "q2_1_based_closed",
                     "input_start": int(candidate["input_start"]),
                     "input_end": int(candidate["input_end"]),
                     "intermediate_output_start": prototype["intermediate_start"],
                     "intermediate_output_end": prototype["intermediate_end"],
-                    "replacement_length": NORMALIZED_GAP_LENGTH,
-                    "replacement_sequence_sha256": sha256_bytes(("N" * NORMALIZED_GAP_LENGTH).encode("ascii")),
+                    "replacement_length": int(prototype["replacement_length"]),
+                    "replacement_sequence_sha256": sha256_bytes(
+                        ("N" * int(prototype["replacement_length"])).encode("ascii")
+                    ),
                 },
             }
+            if candidate.get("junction_policy") == PRIMARY_OVERLAP_POLICY:
+                event["junction"] = {
+                    "policy": PRIMARY_OVERLAP_POLICY,
+                    "left_trim": int(candidate["trim_left"]),
+                    "right_trim": int(candidate["trim_right"]),
+                    "direct_overlap_bp": int(candidate["direct_overlap_bp"]),
+                    "left_source": {
+                        "dataset": candidate["primary_left_dataset"],
+                        "contig": candidate["primary_left_contig"],
+                        "orientation": candidate["primary_left_orientation"],
+                    },
+                    "right_source": {
+                        "dataset": candidate["primary_right_dataset"],
+                        "contig": candidate["primary_right_contig"],
+                        "orientation": candidate["primary_right_orientation"],
+                    },
+                    "support_sequence_inserted": False,
+                }
             if superseded:
                 event["superseded_by_event_id"] = refill_event["event_id"]
                 refill_event.setdefault("superseded_event_ids", []).append(event_id)
@@ -2858,6 +3102,7 @@ def run_step3(
     donor_members: list[dict[str, str]],
     assignments: dict[tuple[str, str], str],
     sources: dict[tuple[str, str], str],
+    primary_dataset: str,
     consumed: list[dict[str, object]],
     tools: dict[str, dict[str, str]],
     minimap: dict[str, str],
@@ -2891,6 +3136,15 @@ def run_step3(
             "any_reference_overlap_is_type5": True,
             "large_edit_bp": CORRECTION_LARGE_EDIT_BP,
             "max_overlap_edit_ratio": CORRECTION_MAX_OVERLAP_EDIT_RATIO,
+            "primary_dataset": primary_dataset,
+            "direct_primary_overlap": {
+                "minimum_bp": PRIMARY_OVERLAP_MIN_BP,
+                "maximum_bp": PRIMARY_OVERLAP_MAX_BP,
+                "maximum_left_trim": PRIMARY_OVERLAP_MAX_LEFT_TRIM,
+                "policy": PRIMARY_OVERLAP_POLICY,
+                "matching": "exact_oriented_suffix_prefix",
+                "support_sequence_inserted": False,
+            },
         },
         "refill_parameters": {
             "preset": MINIMAP_PRESET,
@@ -2938,6 +3192,13 @@ def run_step3(
         gaps = [gap for chromosome in chromosome_order for gap in gap_objects(chromosome, "q2", input_records[chromosome])]
         correction_candidates = build_correction_candidates(
             gaps, alignments, members_by_record, repair_mode=repair_mode
+        )
+        promote_direct_primary_overlap_merges(
+            gaps,
+            correction_candidates,
+            input_paths,
+            sources,
+            primary_dataset,
         )
         reject_candidates_spanning_other_gaps(correction_candidates, gaps)
         annotate_candidate_fragments(
@@ -3443,6 +3704,7 @@ def execute(args: argparse.Namespace) -> None:
         donor_members,
         assignments,
         sources,
+        recipe["primary_dataset"],
         step3_consumed,
         tools,
         minimap,

@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -16,17 +17,21 @@ sys.path.insert(0, str(REPO_ROOT / "server/tools"))
 
 import test_grt_prepare_inputs as prepare_fixture
 import test_grt_step1 as step1_fixture
-from grt_prepare_inputs import read_fasta
+from grt_prepare_inputs import read_fasta, reverse_complement
 from grt_step23 import (
+    _longest_exact_suffix_prefix,
     _step3_classify_features,
     _step3_edit_scope_decision,
     apply_corrections,
     arbitrate,
     build_correction_candidates,
+    build_correction_events,
     build_step2_fallback_candidates,
     parse_mummer_coords,
+    promote_direct_primary_overlap_merges,
     project_interval_after_refills,
     reject_candidates_spanning_other_gaps,
+    replay_step3,
     step2_strategy,
 )
 
@@ -37,6 +42,39 @@ STEP23_TOOL = REPO_ROOT / "server/tools/grt_step23.py"
 
 
 class GrtStep23Tests(unittest.TestCase):
+    @staticmethod
+    def source_segment(
+        dataset: str,
+        contig: str,
+        length: int,
+        orientation: str,
+    ) -> dict[str, object]:
+        return {
+            "segment_kind": "source",
+            "length": length,
+            "dataset_name": dataset,
+            "contig_name": contig,
+            "source_start": 1,
+            "source_end": length,
+            "orientation": orientation,
+            "source_card_key": f"{dataset}:{contig}:Chr05:normal",
+            "evidence_ids": [f"assignment-{contig}"],
+        }
+
+    @staticmethod
+    def gap_segment(length: int = 100) -> dict[str, object]:
+        return {
+            "segment_kind": "gap",
+            "length": length,
+            "dataset_name": "",
+            "contig_name": "",
+            "source_start": None,
+            "source_end": None,
+            "orientation": "",
+            "source_card_key": "",
+            "evidence_ids": [],
+        }
+
     def test_grt_server_golden_decisions_match_documented_source_strategies(self):
         golden = json.loads(
             (REPO_ROOT / "server/tests/fixtures/grt_server_golden.json").read_text(
@@ -296,6 +334,283 @@ class GrtStep23Tests(unittest.TestCase):
         self.assertEqual(candidate["input_start"], 27328071)
         self.assertEqual(candidate["input_end"], 27338457)
         self.assertLess(candidate["input_end"] - candidate["input_start"] + 1, 20_000)
+
+    def test_step3_direct_primary_overlap_keeps_left_and_trims_right(self):
+        rng = random.Random(20260809)
+        overlap = "".join(rng.choice("ACGT") for _ in range(19_542))
+        left_oriented = "".join(rng.choice("ACGT") for _ in range(2_000)) + overlap
+        right_oriented = overlap + "".join(rng.choice("ACGT") for _ in range(3_000))
+        sources = {
+            ("hifiasm", "ptg000004l"): reverse_complement(left_oriented),
+            ("hifiasm", "ptg000011l"): reverse_complement(right_oriented),
+        }
+        path = [
+            self.source_segment("hifiasm", "ptg000004l", len(left_oriented), "-"),
+            self.gap_segment(),
+            self.source_segment("hifiasm", "ptg000011l", len(right_oriented), "-"),
+        ]
+        gap = {
+            "chr": "Chr05",
+            "object_id": "gap-real-shape",
+            "start0": len(left_oriented),
+            "end0": len(left_oriented) + 100,
+        }
+        candidate = {
+            "candidate_id": "type5-real-shape",
+            "chr": "Chr05",
+            "object_id": gap["object_id"],
+            "error_type": "type5",
+            "error_features": ["ref_overlap_10187"],
+            "outcome": "candidate",
+            "input_start": gap["start0"] + 1,
+            "input_end": gap["end0"] + 10_287,
+            "trim_left": 0,
+            "trim_right": 10_287,
+            "fill_length": 100,
+        }
+
+        promote_direct_primary_overlap_merges(
+            [gap],
+            [candidate],
+            {"Chr05": path},
+            sources,
+            "hifiasm",
+        )
+
+        self.assertEqual(candidate["junction_policy"], "keep_left_trim_right")
+        self.assertEqual(candidate["trim_left"], 0)
+        self.assertEqual(candidate["trim_right"], 19_542)
+        self.assertEqual(candidate["fill_length"], 0)
+        self.assertEqual(candidate["input_start"], len(left_oriented) + 1)
+        self.assertEqual(candidate["input_end"], len(left_oriented) + 100 + 19_542)
+
+        candidate["outcome"] = "accepted"
+        input_sequence = left_oriented + "N" * 100 + right_oriented
+        output_paths, output_records, prototypes, gap_origins = apply_corrections(
+            ["Chr05"],
+            {"Chr05": path},
+            {"Chr05": input_sequence},
+            [gap],
+            [candidate],
+            sources,
+        )
+        expected = left_oriented + right_oriented[19_542:]
+        self.assertEqual(output_records["Chr05"], expected)
+        self.assertNotIn("N" * 100, output_records["Chr05"])
+        self.assertEqual(gap_origins, {})
+        self.assertEqual(prototypes[0]["replacement_length"], 0)
+        self.assertEqual(output_paths["Chr05"][0]["source_end"], len(left_oriented))
+        self.assertEqual(output_paths["Chr05"][1]["source_start"], 1)
+        self.assertEqual(
+            output_paths["Chr05"][1]["source_end"],
+            len(right_oriented) - 19_542,
+        )
+        replayed = replay_step3(
+            {"Chr05": input_sequence},
+            [
+                {
+                    "status": "accepted",
+                    "chr": "Chr05",
+                    "edit": {
+                        "input_start": candidate["input_start"],
+                        "input_end": candidate["input_end"],
+                        "replacement_length": 0,
+                    },
+                }
+            ],
+            [],
+            sources,
+        )
+        self.assertEqual(replayed, output_records)
+
+    def test_step3_direct_overlap_trims_left_only_without_flush_match(self):
+        rng = random.Random(7)
+        overlap = "".join(rng.choice("ACGT") for _ in range(1_000))
+        left = "".join(rng.choice("ACGT") for _ in range(500)) + overlap + "TTT"
+        right = overlap + "".join(rng.choice("ACGT") for _ in range(500))
+        sources = {("primary", "left"): left, ("primary", "right"): right}
+        path = [
+            self.source_segment("primary", "left", len(left), "+"),
+            self.gap_segment(),
+            self.source_segment("primary", "right", len(right), "+"),
+        ]
+        gap = {
+            "chr": "Chr05",
+            "object_id": "gap-shifted",
+            "start0": len(left),
+            "end0": len(left) + 100,
+        }
+        candidate = {
+            "candidate_id": "type5-shifted",
+            "chr": "Chr05",
+            "object_id": gap["object_id"],
+            "error_type": "type5",
+            "error_features": [],
+            "outcome": "candidate",
+        }
+        promote_direct_primary_overlap_merges(
+            [gap],
+            [candidate],
+            {"Chr05": path},
+            sources,
+            "primary",
+            min_overlap=500,
+            max_overlap=2_000,
+            max_left_trim=5,
+        )
+        self.assertEqual(candidate["trim_left"], 3)
+        self.assertEqual(candidate["trim_right"], 1_000)
+
+    def test_step3_direct_overlap_event_uses_valid_junction_anchor(self):
+        gap = {
+            "chr": "Chr05",
+            "object_id": "gap-direct",
+            "start0": 1_000,
+            "end0": 1_100,
+        }
+        candidate = {
+            "candidate_id": "candidate-direct",
+            "chr": "Chr05",
+            "object_id": "gap-direct",
+            "outcome": "accepted",
+            "action": "delete",
+            "classification_reason": "direct_primary_overlap_keep_left_trim_right",
+            "input_start": 1_001,
+            "input_end": 11_100,
+            "source_dataset": "flye",
+            "source_contig": "scaffold_50",
+            "source_start": 1,
+            "source_end": 20_000,
+            "orientation": "+",
+            "evidence_ids": ["evidence-direct"],
+            "usage_ids": ["usage-direct"],
+            "error_type": "type5",
+            "error_subtype": "medium_ref_overlap",
+            "error_features": ["direct_primary_overlap_10000"],
+            "confidence": "high",
+            "confidence_score": 0.91,
+            "gap_in_error_region": True,
+            "repair_mode": "aggressive",
+            "repair_reason": "conservative_conditions_met",
+            "fragment_id": "fragment-flye",
+            "junction_policy": "keep_left_trim_right",
+            "trim_left": 0,
+            "trim_right": 10_000,
+            "direct_overlap_bp": 10_000,
+            "primary_left_dataset": "hifiasm",
+            "primary_left_contig": "ptg000004l",
+            "primary_left_orientation": "-",
+            "primary_right_dataset": "hifiasm",
+            "primary_right_contig": "ptg000011l",
+            "primary_right_orientation": "-",
+        }
+        events, attempts = build_correction_events(
+            "run-direct",
+            "1" * 64,
+            "2" * 64,
+            [gap],
+            [],
+            [candidate],
+            [
+                {
+                    "object_id": "gap-direct",
+                    "intermediate_start": 1_001,
+                    "intermediate_end": 1_001,
+                    "replacement_length": 0,
+                }
+            ],
+            [],
+            {},
+            {("flye", "scaffold_50"): {"Chr05"}},
+        )
+        self.assertEqual(len(events), 1)
+        event = events[0]
+        self.assertEqual(event["action"], "delete")
+        self.assertEqual((event["q_after"]["start"], event["q_after"]["end"]), (1_001, 1_001))
+        self.assertEqual(event["edit"]["replacement_kind"], "none")
+        self.assertEqual(event["edit"]["replacement_length"], 0)
+        self.assertEqual(event["junction"]["policy"], "keep_left_trim_right")
+        self.assertFalse(event["junction"]["support_sequence_inserted"])
+        self.assertEqual(attempts[0]["status"], "accepted")
+
+    def test_step3_direct_overlap_rejects_unsafe_or_non_primary_cases(self):
+        rng = random.Random(11)
+        overlap = "".join(rng.choice("ACGT") for _ in range(1_000))
+        suffix = "".join(rng.choice("ACGT") for _ in range(200))
+
+        def candidate(error_type: str = "type5") -> dict[str, object]:
+            return {
+                "candidate_id": f"candidate-{error_type}",
+                "chr": "Chr05",
+                "object_id": "gap-guard",
+                "error_type": error_type,
+                "error_features": [],
+                "outcome": "candidate",
+            }
+
+        cases = [
+            (
+                "whole_right_source",
+                "primary",
+                overlap,
+                overlap,
+                candidate(),
+                500,
+            ),
+            (
+                "non_primary_neighbors",
+                "support",
+                overlap,
+                overlap + suffix,
+                candidate(),
+                500,
+            ),
+            (
+                "non_type5_candidate",
+                "primary",
+                overlap,
+                overlap + suffix,
+                candidate("type4"),
+                500,
+            ),
+            (
+                "short_overlap",
+                "primary",
+                overlap[-100:],
+                overlap[-100:] + suffix,
+                candidate(),
+                500,
+            ),
+        ]
+        for name, dataset, left, right, row, minimum in cases:
+            with self.subTest(name=name):
+                gap = {
+                    "chr": "Chr05",
+                    "object_id": "gap-guard",
+                    "start0": len(left),
+                    "end0": len(left) + 100,
+                }
+                path = [
+                    self.source_segment(dataset, "left", len(left), "+"),
+                    self.gap_segment(),
+                    self.source_segment(dataset, "right", len(right), "+"),
+                ]
+                promote_direct_primary_overlap_merges(
+                    [gap],
+                    [row],
+                    {"Chr05": path},
+                    {(dataset, "left"): left, (dataset, "right"): right},
+                    "primary",
+                    min_overlap=minimum,
+                    max_overlap=2_000,
+                    max_left_trim=5,
+                )
+                self.assertNotIn("junction_policy", row)
+
+    def test_exact_overlap_matcher_returns_longest_terminal_match(self):
+        self.assertEqual(_longest_exact_suffix_prefix("AACCGGTT", "GGTTAA", 20), 4)
+        self.assertEqual(_longest_exact_suffix_prefix("aacCGGtt", "GGTTAA", 20), 4)
+        self.assertEqual(_longest_exact_suffix_prefix("AACCGGTA", "GGTTAA", 20), 0)
 
     def test_step3_rejects_large_overlap_edit_without_matching_evidence_scope(self):
         safe, reason = _step3_edit_scope_decision(
