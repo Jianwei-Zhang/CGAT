@@ -1,0 +1,205 @@
+# State Management
+
+> How state is managed in this project.
+
+---
+
+## Overview
+
+The application uses `createStore` from `src/state/store.js`. `setState(partial)`
+performs a shallow top-level merge and notifies subscribers; therefore every
+changed nested object/array must be replaced explicitly. `main.js` is the
+composition root for the initial serializable state. Feature modules own
+normalizers, selectors, and action-specific updates.
+
+---
+
+## State Categories
+
+| Category | Owner and examples | Rule |
+| --- | --- | --- |
+| Authoritative server data | projects, chromosomes, contigs, GRT view | Load through a service; do not infer missing required fields in UI. |
+| Persisted workspace view state | Final Path, drag offsets, hidden IDs, support rules | Normalize on load and persist through the one workspace-state service. |
+| Session/navigation state | current workspace/project/route/locale | Owned at app shell; clear or rekey when identity changes. |
+| Transient UI state | open menu/modal, loading/error, pointer preview | Keep in the nearest feature unless multiple routes/render passes require it. |
+| Derived view data | sorted rows, geometry, labels, filters | Recompute with pure functions; do not persist/cache without measured need. |
+| DOM/runtime cache | detached assembly DOM, listener flags | Key by workspace/project/locale and clear through lifecycle code. |
+
+---
+
+## When to Use Global State
+
+Promote state to the app store only when it must survive rerender, be consumed
+by multiple sibling modules/routes, or be persisted/restored. Pointer-local
+coordinates, temporary DOM nodes, and pure derived models remain local. A new
+top-level state key needs an owner, reset rule, persistence decision, and at
+least one state transition test.
+
+Nested updates replace the complete changed branch:
+
+```js
+store.setState({
+  assembly: {
+    ...state.assembly,
+    finalPathByChr: nextFinalPathByChr,
+  },
+});
+```
+
+---
+
+## Server State
+
+Server responses are normalized once before entering the store. A load captures
+the requested workspace/project identity and discards a late response after the
+session changes. Mutations update state from the returned authoritative summary,
+then perform any scoped refresh. Browser mocks mirror backend validation and
+state transitions but never define production semantics.
+
+Persisted view state is not a blind cache: canonicalize versioned/default fields
+and cross-check authoritative IDs/lengths before using it. Preserve successful
+state when a later optional refresh fails, and expose the secondary error.
+
+---
+
+## Common Mistakes
+
+- Mutating `state.assembly.finalPathByChr` in place and then shallow-merging the
+  unchanged `assembly` object.
+- Writing derived geometry or localized labels into persisted workspace state.
+- Applying a late response to a different project after a session switch.
+- Keeping module-level mutable state that is neither keyed nor reset.
+- Recomputing a source/display coordinate transform in multiple state/render layers.
+
+## Recommended Patterns
+
+- Pure `normalize*`, `build*`, and `set*` functions return new values and accept
+  all authoritative inputs explicitly.
+- Store stable identities and source facts; derive labels, ordering, filters,
+  and geometry at the nearest consumer.
+- Use per-workspace/project cache keys and clone snapshots when restoring state.
+
+## Prohibited Patterns
+
+- Direct nested mutation followed by notification.
+- Persisting transient DOM handles, callbacks, `Error` objects, or unbounded raw
+  transport payloads.
+- Using display names or array positions as entity identity.
+- Silent fallback from malformed required server state to a plausible empty model.
+
+## Review Checklist
+
+- [ ] Is the state category, owner, reset rule, and persistence rule explicit?
+- [ ] Does each nested update replace every changed branch immutably?
+- [ ] Are server/storage payloads normalized exactly once before store use?
+- [ ] Are async responses guarded by workspace/project/request identity?
+- [ ] Is derived state kept out of persistence unless a contract requires it?
+- [ ] Do tests cover transition, restore, stale response, and invalid payload cases?
+
+## Scenario: Authoritative Final Path Source Length
+
+### 1. Scope / Trigger
+
+- Applies when normalizing GRT project views, loading persisted Final Path state, restoring the immutable GRT baseline, or exporting Final Path tables.
+- Trigger: a GRT source contig is used through an internal slice, reverse slice, repeated segment, N-aware split, or terminal replacement.
+
+### 2. Contracts
+
+- Backend `source_length` is the complete original Dataset contig length and maps to frontend `overallLen`.
+- `overallLen` does not describe the contribution length. The contribution remains `abs(end - start) + 1` in original source coordinates.
+- Frontend must not infer `overallLen` from source start/end or segment length. Missing, non-positive, or too-small authoritative length is an invalid project-view contract.
+- Immutable GRT baseline and persisted baseline-derived rows are canonicalized from the same authoritative source identity before display, comparison, restore, edit validation, or export.
+- Current-chromosome assembly rows may additionally supply `assemblyCtgId`, `originId`, and the same `totalLength`, but may not override the backend authoritative length with a different value.
+- Canonicalization preserves segment order, source interval, orientation, gap rows, hidden-primary state, q4 length/hash, and user edits.
+
+### 3. Validation Matrix
+
+| Case | Expected behavior |
+| --- | --- |
+| Same source contig appears in three reverse GRT slices | All rows share one `overallLen`; each keeps its own reversed start/end. |
+| One source contig is split around an internal N run | Both rows use the full contig `overallLen`; the N-aware source intervals remain unchanged. |
+| Persisted project state contains old endpoint-derived `overallLen` | Load replaces it from the matching immutable source identity before display/export. |
+| Backend omits `source_length` or reports less than a source endpoint | Project-view normalization fails; do not guess a fallback length. |
+| no-FASTA delivery package | Behavior matches full package because imported FAI still supplies `source_seq.length`. |
+
+### 4. Tests Required
+
+- GRT state test covers repeated internal source intervals with one shared complete source length.
+- Assembly load test covers persisted endpoint-derived values and proves canonicalization preserves coordinates, orientation, order, hidden state, and q4 metadata.
+- Restore-baseline test proves the restored rows use canonical complete lengths.
+- Final Path card and TSV/project TSV tests assert displayed/exported `overall_len` uses the canonical value.
+
+## Scenario: Subview Fragment Coordinates in Final Path
+
+### 1. Scope / Trigger
+
+- Applies when an anchor-derived Subview fragment is appended to Final Path.
+- Trigger: the fragment range comes from pairwise evidence already projected into the current ctg display space.
+
+### 2. Contracts
+
+- Subview `start` / `end` are display coordinates; persisted Final Path `start` / `end` are original-source coordinates.
+- Forward display ranges persist unchanged.
+- Reversed display ranges project each endpoint once with `sourcePos = overallLen - displayPos + 1`; descending source order records `-` orientation.
+- The effective Subview context orientation overrides the stored source orientation so local flips are materialized without mutating the source ctg.
+- Backend export consumes the canonical source range directly and must not repeat the projection.
+- Existing persisted user-edited rows are not inferred or silently rewritten.
+
+### 3. Validation Matrix
+
+| Case | Expected behavior |
+| --- | --- |
+| Forward fragment `101..500`, length 1,200 | Persist `101..500`. |
+| Reversed fragment `101..500`, length 1,200 | Persist `1100..701`. |
+| Reversed whole ctg `1..1200` | Persist `1200..1`. |
+| Source ctg is `+`, but Subview-local context is `-` | Project by the local `-` orientation; keep source state unchanged. |
+| Canonical App split moves aligned flank bases into a donor fragment | Exported concatenated sequence may equal the GRT split even when per-row boundaries differ. |
+
+## Scenario: Processed Project Selected-Panel Drafts
+
+### 1. Scope / Trigger
+- Trigger: changing the selected-project edit panel in `app/frontend/src/ui/pages/workspace-page.js` for projects with `isProcessed: true`.
+- Applies to workspace state fields under `initializer.edit*`, `initializer.existingProjects`, and `session.projectName`.
+
+### 2. Signatures
+- Frontend API call: `updateProject({ workspaceRoot, projectId, projectName, referenceGenomeId, primaryDatasetId, supportDatasetIds, chrAssignmentMinCoveragePercent, phasedAssemblyEnabled })`.
+- Selected project source fields: `projectName`, `referenceGenomeId`, `primaryDatasetId`, `supportDatasetIds`, `chrAssignmentMinCoveragePercent`, `phasedAssemblyEnabled`, `isProcessed`.
+
+### 3. Contracts
+- For processed projects, the panel may edit only:
+  - project name;
+  - append-only support dataset IDs;
+  - phased assembly enablement (`false -> true`).
+- The effective draft sent to `updateProject` must force locked fields from the selected project source: `referenceGenomeId`, `primaryDatasetId`, and `chrAssignmentMinCoveragePercent`.
+- Existing processed support datasets remain selected and cannot be removed from UI state. Newly checked support datasets may be unchecked before saving.
+- If the selected project already has phased assembly enabled, the switch is locked. If it is disabled, the switch may be enabled.
+- After save, update both `session.projectName` and the matching row in `initializer.existingProjects`, then rebuild the edit draft from the saved project.
+- When a processed-project save appends support datasets, show the existing auto-pipeline modal style and run scoped orientation for the newly appended dataset IDs after the save succeeds.
+- If the save succeeds but scoped orientation fails, keep the saved project state visible and report the orientation failure in the modal.
+- Assembly support-dataset selection must recover when a project changes from zero support datasets to one or more support datasets in the same session: choose the first available support dataset, persist it, and load its support track instead of leaving `assembly.supportDatasetId` as `null`.
+
+### 4. Validation & Error Matrix
+| Case | Expected frontend behavior |
+| --- | --- |
+| Processed project name input changes | Update `initializer.editProjectNameInput` and allow save. |
+| Existing processed support checkbox is unchecked | Ignore the event; draft keeps the existing support dataset. |
+| New processed support checkbox is checked | Add dataset ID to `initializer.editSupportDatasetIds`. |
+| Processed project has phased enabled and switch changes to false | Ignore the event. |
+| Processed project has phased disabled and switch changes to true | Update draft and allow save. |
+
+### 5. Good/Base/Bad Cases
+- Good: user renames a processed project, checks a new support dataset, enables phased assembly, saves, and the selected-project card immediately reflects the returned project.
+- Base: unprocessed projects keep the full edit behavior for reference, primary dataset, support datasets, and phased switch.
+- Bad: only asserting that `updateProject` was called; this misses stale selected-panel state where the save succeeds but the visible current project does not change.
+
+### 6. Tests Required
+- Workspace panel test must drive DOM-like events for the selected processed project and assert the outgoing payload uses locked source fields.
+- Workspace panel test must assert `session.projectName`, `initializer.existingProjects`, and edit draft fields all update after save.
+- Service mock test must mirror backend processed-project validation so dev-mode UI tests catch the same one-way constraints.
+
+### 7. Wrong vs Correct
+#### Wrong
+Return early from selected-project handlers whenever `selectedProject.isProcessed` is true.
+
+#### Correct
+Gate each control by field semantics: keep unsafe fields locked, but allow project name, support append, and phased enablement to flow through the normal save path.
