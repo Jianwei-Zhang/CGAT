@@ -162,14 +162,10 @@ export function renderImporterPage(state) {
                     .map((path) => `<div class="list-item">${escapeHtml(path)}</div>`)
                     .join("")}
                 </div>
-                ${
-                  deleteFailedHistoryOnly
-                    ? `<p class="muted">${messages.page.deleteFailedHistoryOnlyNote}</p>`
-                    : `<label class="checkbox-item">
-                        <input id="delete-with-files-checkbox" type="checkbox" ${importer.deleteWithFiles ? "checked" : ""} />
-                        ${messages.page.deleteWithFiles}
-                      </label>`
-                }
+                <label class="checkbox-item">
+                  <input id="delete-with-files-checkbox" type="checkbox" ${importer.deleteWithFiles ? "checked" : ""} />
+                  ${messages.page.deleteWithFiles}
+                </label>
                 <div class="inline-input">
                   <button id="confirm-delete-selected-button" class="button">${
                     deleteFailedHistoryOnly ? messages.buttons.confirmDeleteFailed : messages.buttons.confirmDelete
@@ -801,7 +797,7 @@ async function runDeleteSelectedFlow(host, store) {
   const selectedPaths = failedHistoryPaths
     ? requestedPaths.filter((path) => failedHistoryPaths.has(path))
     : requestedPaths;
-  const deleteWithFiles = !deleteFailedHistoryOnly && importer.deleteWithFiles === true;
+  const deleteWithFiles = importer.deleteWithFiles === true;
   if (selectedPaths.length === 0) {
     updateImporterState(store, {
       deleteConfirmOpen: false,
@@ -855,7 +851,7 @@ async function runDeleteSelectedFlow(host, store) {
   removeWorkspaceHistoryPaths(selectedPaths);
 
   const nextSession = { ...store.getState().session };
-  if (!deleteFailedHistoryOnly && selectedPaths.includes(nextSession.workspacePath)) {
+  if ((!deleteFailedHistoryOnly || deleteWithFiles) && selectedPaths.includes(nextSession.workspacePath)) {
     nextSession.workspacePath = "";
     nextSession.projectId = null;
     nextSession.projectName = "";
@@ -876,7 +872,8 @@ async function runDeleteSelectedFlow(host, store) {
       deleteWithFiles: false,
       deleteTargets: [],
       historyValidation: nextValidation,
-      openWorkspacePath: !deleteFailedHistoryOnly && selectedPaths.includes(currentImporter.openWorkspacePath)
+      openWorkspacePath: (!deleteFailedHistoryOnly || deleteWithFiles)
+        && selectedPaths.includes(currentImporter.openWorkspacePath)
         ? ""
         : currentImporter.openWorkspacePath,
       status: i18nT(store.getState(), "importer.runtime.deleteDoneStatus"),

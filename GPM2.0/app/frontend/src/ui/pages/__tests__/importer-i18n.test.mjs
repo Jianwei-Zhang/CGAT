@@ -67,6 +67,14 @@ function createButton() {
       }
       return undefined;
     },
+    change(checked) {
+      this.checked = checked;
+      const handler = listeners.get("change");
+      if (handler) {
+        return handler({ currentTarget: this, target: this });
+      }
+      return undefined;
+    },
   };
 }
 
@@ -158,7 +166,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.runtime.importPhaseProgress, "阶段 {current}/{total}");
   assert.equal(zh.buttons.deleteFailedRecords, "一键删除失败记录（{count}）");
   assert.equal(zh.page.deleteFailedConfirmTitle, "删除失败记录");
-  assert.equal(zh.page.deleteFailedHistoryOnlyNote, "仅删除历史记录和本次校验结果，不删除项目区目录或原始 ZIP。");
+  assert.equal(zh.page.deleteWithFiles, "是否同步删除对应文件（此操作不可逆，请谨慎操作）");
   assert.equal(zh.runtime.deleteDoneFailedHistorySummary, "已删除 {count} 条校验失败记录。");
 
   assert.equal(en.buttons.importAddPackage, "Import add package");
@@ -175,7 +183,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.runtime.importPhaseProgress, "Phase {current}/{total}");
   assert.equal(en.buttons.deleteFailedRecords, "Delete failed records ({count})");
   assert.equal(en.page.deleteFailedConfirmTitle, "Delete failed records");
-  assert.equal(en.page.deleteFailedHistoryOnlyNote, "Only history records and their validation results will be deleted. Project directories and source ZIP files will remain unchanged.");
+  assert.equal(en.page.deleteWithFiles, "Also delete files on disk (irreversible).");
   assert.equal(en.runtime.deleteDoneFailedHistorySummary, "Deleted {count} failed validation records.");
 });
 
@@ -219,10 +227,12 @@ test("importer bulk delete removes only current failed history records", async (
     const deleteFailedButton = createButton();
     const cancelDeleteButton = createButton();
     const confirmDeleteButton = createButton();
+    const deleteWithFilesCheckbox = createButton();
     const host = createHost({
       "#delete-failed-history-button": deleteFailedButton,
       "#cancel-delete-selected-button": cancelDeleteButton,
       "#confirm-delete-selected-button": confirmDeleteButton,
+      "#delete-with-files-checkbox": deleteWithFilesCheckbox,
     });
     const state = createImporterScrollState({
       zipPath: "D:/source-package.zip",
@@ -263,8 +273,9 @@ test("importer bulk delete removes only current failed history records", async (
     assert.match(confirmHtml, /删除失败记录/);
     assert.match(confirmHtml, /D:\/ws-failed-a/);
     assert.match(confirmHtml, /D:\/ws-failed-b/);
-    assert.match(confirmHtml, /不删除项目区目录或原始 ZIP/);
-    assert.doesNotMatch(confirmHtml, /delete-with-files-checkbox/);
+    assert.match(confirmHtml, /id="delete-with-files-checkbox" type="checkbox"/);
+    assert.match(confirmHtml, /是否同步删除对应文件（此操作不可逆，请谨慎操作）/);
+    assert.doesNotMatch(confirmHtml, /id="delete-with-files-checkbox" type="checkbox" checked/);
 
     cancelDeleteButton.click();
     assert.equal(store.getState().importer.deleteConfirmOpen, false);
@@ -275,7 +286,6 @@ test("importer bulk delete removes only current failed history records", async (
     store.setState({
       importer: {
         ...store.getState().importer,
-        deleteWithFiles: true,
         deleteTargets: [
           ...store.getState().importer.deleteTargets,
           "D:/ws-valid",
@@ -306,6 +316,120 @@ test("importer bulk delete removes only current failed history records", async (
     globalThis.document = previousDocument;
     globalThis.window = previousWindow;
     globalThis.fetch = previousFetch;
+    globalThis.setTimeout = previousSetTimeout;
+    globalThis.clearTimeout = previousClearTimeout;
+  }
+});
+
+test("importer bulk delete optionally removes only failed workspace directories", async () => {
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  const previousSetTimeout = globalThis.setTimeout;
+  const previousClearTimeout = globalThis.clearTimeout;
+  try {
+    globalThis.document = {
+      querySelector() {
+        return null;
+      },
+    };
+    let persistedHistory = [
+      { path: "D:/ws-valid", lastUsedAt: 2 },
+      { path: "D:/ws-failed", lastUsedAt: 1 },
+    ];
+    const invokeCalls = [];
+    globalThis.window = {
+      __TAURI__: {
+        core: {
+          async invoke(command, payload) {
+            invokeCalls.push({ command, payload });
+            return {
+              workspaceRoot: payload.workspaceRoot,
+              deleted: true,
+            };
+          },
+        },
+      },
+      dispatchEvent() {},
+      localStorage: {
+        getItem() {
+          return JSON.stringify(persistedHistory);
+        },
+        setItem(_key, value) {
+          persistedHistory = JSON.parse(value);
+        },
+      },
+    };
+    globalThis.setTimeout = () => ({ cancelled: false });
+    globalThis.clearTimeout = () => {};
+
+    const deleteFailedButton = createButton();
+    const deleteWithFilesCheckbox = createButton();
+    const confirmDeleteButton = createButton();
+    const host = createHost({
+      "#delete-failed-history-button": deleteFailedButton,
+      "#delete-with-files-checkbox": deleteWithFilesCheckbox,
+      "#confirm-delete-selected-button": confirmDeleteButton,
+    });
+    const state = createImporterScrollState({
+      zipPath: "D:/source-package.zip",
+      openWorkspacePath: "D:/ws-failed",
+      historyValidation: {
+        "D:/ws-valid": { ok: true, message: "" },
+        "D:/ws-failed": { ok: false, message: "missing project.sqlite" },
+        "D:/stale-failed": { ok: false, message: "stale result" },
+      },
+      deleteConfirmOpen: false,
+      deleteSelectionMode: "",
+      deleteWithFiles: false,
+      deleteTargets: [],
+      inFlight: false,
+      importRunId: null,
+      status: "",
+      summary: "",
+    });
+    state.session = {
+      workspacePath: "D:/ws-failed",
+      projectName: "active-project",
+      projectId: 42,
+    };
+    const store = createStore(state);
+
+    bindImporterPage(host, store);
+    deleteFailedButton.click();
+    deleteWithFilesCheckbox.change(true);
+    store.setState({
+      importer: {
+        ...store.getState().importer,
+        deleteTargets: ["D:/ws-failed", "D:/ws-valid", "D:/stale-failed"],
+      },
+    });
+    await confirmDeleteButton.click();
+
+    assert.deepEqual(invokeCalls, [
+      {
+        command: "delete_workspace_directory",
+        payload: { workspaceRoot: "D:/ws-failed" },
+      },
+    ]);
+    assert.deepEqual(persistedHistory, [
+      { path: "D:/ws-valid", lastUsedAt: 2 },
+    ]);
+    assert.deepEqual(store.getState().importer.historyValidation, {
+      "D:/ws-valid": { ok: true, message: "" },
+      "D:/stale-failed": { ok: false, message: "stale result" },
+    });
+    assert.equal(store.getState().importer.zipPath, "D:/source-package.zip");
+    assert.equal(store.getState().importer.openWorkspacePath, "");
+    assert.deepEqual(store.getState().session, {
+      workspacePath: "",
+      projectName: "",
+      projectId: null,
+    });
+    assert.equal(store.getState().importer.summary, "已删除 1 条记录，其中目录删除 1 条。");
+    assert.match(store.getState().importer.stages[0], /已删除目录：D:\/ws-failed/);
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
     globalThis.setTimeout = previousSetTimeout;
     globalThis.clearTimeout = previousClearTimeout;
   }
