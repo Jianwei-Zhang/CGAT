@@ -11,6 +11,8 @@ GPM2.0 采用服务端与客户端分离的工作模式：
 - 服务端在 Linux 环境中执行比对命令并生成 zip 交付包；部署时将 `server/` 目录上传到服务器使用。
 - 客户端负责导入服务端生成的交付包，并提供可视化查看与轻量编辑能力。用户可从 GitHub Releases 下载对应平台的安装包，当前支持 `win-x86`、`win-arm64`、`mac-x86`、`mac-arm64` 四个版本。
 
+本地开发与 CI 使用仓库内同一组检查；各平台命令与发布约束见[质量门禁](QUALITY_zh.md)。
+
 ## 服务端流程
 
 ![GPM 服务端流程](app/readme-assets/serve_pipeline_zh.png)

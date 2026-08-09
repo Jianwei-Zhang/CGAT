@@ -11,6 +11,8 @@ GPM2.0 uses a split architecture between the server side and the client side:
 - The server side runs alignment commands and generates the delivery zip package in a Linux environment. Upload the `server/` directory to the server before running the workflow.
 - The client side imports the server-generated delivery package and provides visualization and lightweight editing. Users can download the platform-specific installer from GitHub Releases; currently supported builds are `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64`.
 
+Development and CI use the same repository-owned checks; see [Quality gates](QUALITY.md) for the platform-specific commands and release policy.
+
 ## Server-Side Workflow
 
 ![GPM server-side workflow](app/readme-assets/serve_pipeline_en.png)

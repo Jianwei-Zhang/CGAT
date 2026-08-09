@@ -1,0 +1,84 @@
+name: GPM2.0 Quality
+
+on:
+  pull_request:
+    paths:
+      - "GPM2.0/**"
+      - ".github/workflows/quality.yml"
+      - ".github/workflows/release-installers.yml"
+  push:
+    branches:
+      - master
+    paths:
+      - "GPM2.0/**"
+      - ".github/workflows/quality.yml"
+      - ".github/workflows/release-installers.yml"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-app:
+    name: Windows app
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: GPM2.0/app/frontend/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install frontend dependencies
+        working-directory: GPM2.0/app/frontend
+        run: >-
+          npm ci
+          --registry=https://registry.npmjs.org
+          --fetch-retries=5
+          --fetch-retry-factor=2
+          --fetch-retry-mintimeout=1000
+          --fetch-retry-maxtimeout=60000
+
+      - name: Install Rust quality components
+        working-directory: GPM2.0
+        run: rustup component add rustfmt clippy
+
+      - name: Run Windows quality gate
+        working-directory: GPM2.0
+        shell: pwsh
+        run: ./scripts/quality-gate-windows.ps1
+
+  linux-server:
+    name: Linux server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Rust quality components
+        working-directory: GPM2.0
+        run: rustup component add rustfmt clippy
+
+      - name: Run server quality gate
+        working-directory: GPM2.0
+        run: bash scripts/quality-gate-server.sh

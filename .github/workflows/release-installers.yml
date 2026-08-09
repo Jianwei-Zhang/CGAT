@@ -19,8 +19,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  quality:
+    name: Quality gate
+    uses: ./.github/workflows/quality.yml
+
   prepare-release:
     name: Prepare release
+    needs: quality
     runs-on: ubuntu-latest
     outputs:
       tag_name: ${{ steps.release-vars.outputs.tag_name }}

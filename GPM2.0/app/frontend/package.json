@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "node --test src/ui/pages/assembly/__tests__/track-prefs.test.mjs",
+    "test": "node --test",
     "build": "vite build",
     "preview": "vite preview"
   },
