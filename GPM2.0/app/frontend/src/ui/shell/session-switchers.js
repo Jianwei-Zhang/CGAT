@@ -4,6 +4,7 @@ import {
   rememberAssemblyState,
   restoreAssemblyState,
 } from "./assembly-session-cache.js";
+import { resetAssemblyPageSession } from "../pages/assembly/page-session.js";
 
 function normalizeWorkspacePath(value) {
   return String(value || "").trim();
@@ -201,6 +202,7 @@ export async function switchWorkspaceFromShell(store, workspaceRoot, { openWorks
     return false;
   }
   const options = await openWorkspace({ workspaceRoot: normalizedPath });
+  resetAssemblyPageSession();
   clearAssemblySessionCache();
   const current = store.getState();
   const references = Array.isArray(options?.references) ? options.references : [];
@@ -278,6 +280,7 @@ export function switchProjectFromShell(store, projectId) {
   if (!selected) {
     return false;
   }
+  resetAssemblyPageSession();
   rememberAssemblyState(current);
   const nextDraft = buildEditDraftFromProject(selected);
   const nextSession = {

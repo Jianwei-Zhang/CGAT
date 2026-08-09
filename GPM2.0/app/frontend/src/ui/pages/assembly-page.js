@@ -34,6 +34,10 @@ import {
   saveSupportDsState,
 } from "./assembly/support-ds-session.js";
 import {
+  assemblyPageSession,
+  resetAssemblyPageSession,
+} from "./assembly/page-session.js";
+import {
   loadProjectAssemblyViewState as loadProjectAssemblyViewStateImpl,
   persistProjectAssemblyViewState as persistProjectAssemblyViewStateImpl,
 } from "./assembly/project-view-state.js";
@@ -294,36 +298,11 @@ const assemblyPageShellDeps = {
 export function renderAssemblyPage(state) {
   return renderAssemblyPageShell(state, assemblyPageShellDeps);
 }
-let lastSupportDsSessionKey = "";
-let lastSupportDsSelection = null;
-let lastTrackViewportKey = "";
-let lastTrackScrollLeft = 0;
-let lastPrimaryTrackViewboxMinX = 0;
-let lastSubviewViewportKey = "";
-let lastSubviewScrollLeft = 0;
-let lastFinalPathViewportKey = "";
-let lastFinalPathScrollLeft = 0;
-let pendingAssemblyScrollStatePersistTimer = null;
-let measuredTrackViewportPxByRole = {
-  primary: 1200,
-  subview: 1200,
-  finalPath: 1200,
-};
-let suppressNextTrackAutoFocus = false;
-let subviewPairwiseEvidenceRequestSeq = 0;
-let pendingTrackAutoFocusMode = null;
-let trackContigDragActive = false;
-let pendingPrimaryViewportAnchorBp = null;
-let pendingSubviewViewportAnchorBp = null;
-let deferredRerenderCoordinator = null;
 const ASSEMBLY_ACTION_FEEDBACK_DISMISS = Symbol("assemblyActionFeedbackDismiss");
 const ASSEMBLY_TRACK_RESIZE_BOUND = Symbol("assemblyTrackResizeBound");
 const ASSEMBLY_SUBVIEW_BAND_TOOLTIP_BOUND = Symbol("assemblySubviewBandTooltipBound");
 const ACTION_FEEDBACK_AUTO_DISMISS_MS = 1000;
 const ACTION_FEEDBACK_POINTER_DISMISS_MS = 500;
-let suppressTrackContigClickUntil = 0;
-let assemblyConfirmDialogSeq = 0;
-const pendingAssemblyConfirmResolvers = new Map();
 
 function resolveAnchorOffsetErrorKey(reason) {
   if (reason === "out-of-range") {
@@ -464,15 +443,15 @@ function requestAssemblyConfirm(host, store, message) {
     return Promise.resolve(globalThis.window?.confirm?.(message) ?? false);
   }
   const state = store.getState();
-  const id = `assembly-confirm-${assemblyConfirmDialogSeq += 1}`;
+  const id = `assembly-confirm-${assemblyPageSession.assemblyConfirmDialogSeq += 1}`;
   const previousId = String(state.assembly?.confirmDialog?.id || "");
-  const previousResolve = pendingAssemblyConfirmResolvers.get(previousId);
+  const previousResolve = assemblyPageSession.pendingAssemblyConfirmResolvers.get(previousId);
   if (previousResolve) {
-    pendingAssemblyConfirmResolvers.delete(previousId);
+    assemblyPageSession.pendingAssemblyConfirmResolvers.delete(previousId);
     previousResolve(false);
   }
   return new Promise((resolve) => {
-    pendingAssemblyConfirmResolvers.set(id, resolve);
+    assemblyPageSession.pendingAssemblyConfirmResolvers.set(id, resolve);
     store.setState({
       assembly: {
         ...state.assembly,
@@ -497,15 +476,15 @@ function requestAssemblyPrompt(host, store, message, defaultValue = "") {
     return Promise.resolve(globalThis.window.prompt(message, String(defaultValue)) ?? "");
   }
   const state = store.getState();
-  const id = `assembly-confirm-${assemblyConfirmDialogSeq += 1}`;
+  const id = `assembly-confirm-${assemblyPageSession.assemblyConfirmDialogSeq += 1}`;
   const previousId = String(state.assembly?.confirmDialog?.id || "");
-  const previousResolve = pendingAssemblyConfirmResolvers.get(previousId);
+  const previousResolve = assemblyPageSession.pendingAssemblyConfirmResolvers.get(previousId);
   if (previousResolve) {
-    pendingAssemblyConfirmResolvers.delete(previousId);
+    assemblyPageSession.pendingAssemblyConfirmResolvers.delete(previousId);
     previousResolve("");
   }
   return new Promise((resolve) => {
-    pendingAssemblyConfirmResolvers.set(id, resolve);
+    assemblyPageSession.pendingAssemblyConfirmResolvers.set(id, resolve);
     store.setState({
       assembly: {
         ...state.assembly,
@@ -548,15 +527,15 @@ function requestAssemblyAnchorOffsetPrompt(host, store, options = {}) {
     });
   }
   const state = store.getState();
-  const id = `assembly-confirm-${assemblyConfirmDialogSeq += 1}`;
+  const id = `assembly-confirm-${assemblyPageSession.assemblyConfirmDialogSeq += 1}`;
   const previousId = String(state.assembly?.confirmDialog?.id || "");
-  const previousResolve = pendingAssemblyConfirmResolvers.get(previousId);
+  const previousResolve = assemblyPageSession.pendingAssemblyConfirmResolvers.get(previousId);
   if (previousResolve) {
-    pendingAssemblyConfirmResolvers.delete(previousId);
+    assemblyPageSession.pendingAssemblyConfirmResolvers.delete(previousId);
     previousResolve(null);
   }
   return new Promise((resolve) => {
-    pendingAssemblyConfirmResolvers.set(id, resolve);
+    assemblyPageSession.pendingAssemblyConfirmResolvers.set(id, resolve);
     store.setState({
       assembly: {
         ...state.assembly,
@@ -579,10 +558,10 @@ function requestAssemblyAnchorOffsetPrompt(host, store, options = {}) {
 function resolveAssemblyConfirmDialog(host, store, { id, confirmed, value }) {
   const state = store.getState();
   const dialogId = String(id || state.assembly?.confirmDialog?.id || "");
-  const resolve = pendingAssemblyConfirmResolvers.get(dialogId);
+  const resolve = assemblyPageSession.pendingAssemblyConfirmResolvers.get(dialogId);
   const rawMode = String(state.assembly?.confirmDialog?.mode || "").trim();
   const mode = rawMode === "prompt" || rawMode === "anchor-offset" ? rawMode : "confirm";
-  pendingAssemblyConfirmResolvers.delete(dialogId);
+  assemblyPageSession.pendingAssemblyConfirmResolvers.delete(dialogId);
   store.setState({
     assembly: {
       ...state.assembly,
@@ -675,10 +654,10 @@ function createDeferredRerenderCoordinator(options = {}) {
 }
 
 function getDeferredRerenderCoordinator() {
-  if (!deferredRerenderCoordinator) {
-    deferredRerenderCoordinator = createDeferredRerenderCoordinator();
+  if (!assemblyPageSession.deferredRerenderCoordinator) {
+    assemblyPageSession.deferredRerenderCoordinator = createDeferredRerenderCoordinator();
   }
-  return deferredRerenderCoordinator;
+  return assemblyPageSession.deferredRerenderCoordinator;
 }
 
 function scheduleDeferredRerender(host, store) {
@@ -1518,8 +1497,8 @@ function issueSubviewPairwiseEvidenceRequestKey(summary, scope = {}) {
   if (!key) {
     return "";
   }
-  subviewPairwiseEvidenceRequestSeq += 1;
-  return `${key}|req:${subviewPairwiseEvidenceRequestSeq}`;
+  assemblyPageSession.subviewPairwiseEvidenceRequestSeq += 1;
+  return `${key}|req:${assemblyPageSession.subviewPairwiseEvidenceRequestSeq}`;
 }
 
 function shouldLoadSubviewPairwiseEvidence(summary) {
@@ -2336,7 +2315,7 @@ function createAssemblyPageBindingDeps(options = {}) {
     loadNewSequencesTab,
     normalizeTrackFocusMode,
     markNextTrackAutoFocusSuppressed: () => {
-      suppressNextTrackAutoFocus = true;
+      assemblyPageSession.suppressNextTrackAutoFocus = true;
     },
     persistMainTrackViewState,
     requestAssemblyConfirm,
@@ -2398,7 +2377,7 @@ function normalizeTrackViewportWidths(widths) {
   };
 }
 
-function resolveMeasuredTrackViewportWidths(nextWidths, currentWidths = measuredTrackViewportPxByRole) {
+function resolveMeasuredTrackViewportWidths(nextWidths, currentWidths = assemblyPageSession.measuredTrackViewportPxByRole) {
   const normalizedCurrent = normalizeTrackViewportWidths(currentWidths);
   const normalizedNext = normalizeTrackViewportWidths(nextWidths);
   return {
@@ -2422,7 +2401,7 @@ function haveMeasuredTrackViewportWidthsChanged(currentWidths, nextWidths) {
 
 function getMeasuredTrackViewportPx(role = "primary") {
   const normalizedRole = normalizeTrackViewportRole(role);
-  return measuredTrackViewportPxByRole[normalizedRole] || measuredTrackViewportPxByRole.primary || 1200;
+  return assemblyPageSession.measuredTrackViewportPxByRole[normalizedRole] || assemblyPageSession.measuredTrackViewportPxByRole.primary || 1200;
 }
 
 function readAssemblyTrackViewportWidths(host) {
@@ -2555,7 +2534,7 @@ const assemblyDataRuntimeDeps = {
   ),
   setAssemblyActionFeedback,
   setPendingTrackAutoFocusMode: (mode) => {
-    pendingTrackAutoFocusMode = mode;
+    assemblyPageSession.pendingTrackAutoFocusMode = mode;
   },
 };
 
@@ -2650,10 +2629,10 @@ const trackDragRuntimeDeps = {
   resolveTrackDragOffsetBp,
   roundTrackMetric,
   setTrackContigDragActive: (value) => {
-    trackContigDragActive = Boolean(value);
+    assemblyPageSession.trackContigDragActive = Boolean(value);
   },
   setSuppressTrackContigClickUntil: (value) => {
-    suppressTrackContigClickUntil = value;
+    assemblyPageSession.suppressTrackContigClickUntil = value;
   },
 };
 
@@ -3551,9 +3530,9 @@ function bindTrackViewportResize(host, store) {
   }
   const coordinator = createTrackViewportResizeCoordinator({
     getViewportWidths: () => readAssemblyTrackViewportWidths(host),
-    getMeasuredWidths: () => measuredTrackViewportPxByRole,
+    getMeasuredWidths: () => assemblyPageSession.measuredTrackViewportPxByRole,
     setMeasuredWidths: (nextWidths) => {
-      measuredTrackViewportPxByRole = resolveMeasuredTrackViewportWidths(nextWidths, measuredTrackViewportPxByRole);
+      assemblyPageSession.measuredTrackViewportPxByRole = resolveMeasuredTrackViewportWidths(nextWidths, assemblyPageSession.measuredTrackViewportPxByRole);
     },
     onViewportResize: () => {
       rerender(host, store);
@@ -3591,11 +3570,11 @@ function schedulePersistAssemblyScrollState(
   deps = projectAssemblyViewStateRuntimeDeps,
   timerApi = resolveTimerApi(),
 ) {
-  if (pendingAssemblyScrollStatePersistTimer !== null) {
-    timerApi.clearTimeout(pendingAssemblyScrollStatePersistTimer);
+  if (assemblyPageSession.pendingAssemblyScrollStatePersistTimer !== null) {
+    timerApi.clearTimeout(assemblyPageSession.pendingAssemblyScrollStatePersistTimer);
   }
-  pendingAssemblyScrollStatePersistTimer = timerApi.setTimeout(() => {
-    pendingAssemblyScrollStatePersistTimer = null;
+  assemblyPageSession.pendingAssemblyScrollStatePersistTimer = timerApi.setTimeout(() => {
+    assemblyPageSession.pendingAssemblyScrollStatePersistTimer = null;
     void persistProjectAssemblyViewStateFromStore(host, store, deps);
   }, 120);
 }
@@ -3614,10 +3593,10 @@ function bindTrackScrollSync(host, store, deps = {}) {
   let viewportChanged = false;
   const nextMeasuredTrackViewportWidths = resolveMeasuredTrackViewportWidths(
     readAssemblyTrackViewportWidths(host),
-    measuredTrackViewportPxByRole,
+    assemblyPageSession.measuredTrackViewportPxByRole,
   );
-  if (haveMeasuredTrackViewportWidthsChanged(measuredTrackViewportPxByRole, nextMeasuredTrackViewportWidths)) {
-    measuredTrackViewportPxByRole = nextMeasuredTrackViewportWidths;
+  if (haveMeasuredTrackViewportWidthsChanged(assemblyPageSession.measuredTrackViewportPxByRole, nextMeasuredTrackViewportWidths)) {
+    assemblyPageSession.measuredTrackViewportPxByRole = nextMeasuredTrackViewportWidths;
     viewportChanged = true;
   }
   const trackScrollEls = Array.from(host?.querySelectorAll?.(".assembly-track-scroll[data-track-role]") || []);
@@ -3629,9 +3608,9 @@ function bindTrackScrollSync(host, store, deps = {}) {
   );
 
   if (shouldBindMain && !syncedTrackScrollEls.length && shouldClearMissing) {
-    lastTrackViewportKey = "";
-    lastTrackScrollLeft = 0;
-    lastPrimaryTrackViewboxMinX = 0;
+    assemblyPageSession.lastTrackViewportKey = "";
+    assemblyPageSession.lastTrackScrollLeft = 0;
+    assemblyPageSession.lastPrimaryTrackViewboxMinX = 0;
     if (setAssemblyViewportScrollState(store, "trackScrollState", {})) {
       schedulePersistScrollState(host, store);
     }
@@ -3641,30 +3620,30 @@ function bindTrackScrollSync(host, store, deps = {}) {
     );
     const currentPrimaryViewboxMinX = Number(primaryScroll?.dataset.trackViewboxMinX || 0);
     if (Number.isFinite(currentPrimaryViewboxMinX)) {
-      lastTrackScrollLeft = resolveTrackScrollLeftForViewboxShift(
-        lastTrackScrollLeft,
-        lastPrimaryTrackViewboxMinX,
+      assemblyPageSession.lastTrackScrollLeft = resolveTrackScrollLeftForViewboxShift(
+        assemblyPageSession.lastTrackScrollLeft,
+        assemblyPageSession.lastPrimaryTrackViewboxMinX,
         currentPrimaryViewboxMinX,
-        { preserveViewport: !trackContigDragActive },
+        { preserveViewport: !assemblyPageSession.trackContigDragActive },
       );
-      lastPrimaryTrackViewboxMinX = currentPrimaryViewboxMinX;
+      assemblyPageSession.lastPrimaryTrackViewboxMinX = currentPrimaryViewboxMinX;
     }
-    if (pendingPrimaryViewportAnchorBp !== null) {
+    if (assemblyPageSession.pendingPrimaryViewportAnchorBp !== null) {
       const anchoredScrollLeft = resolveScrollLeftForViewportAnchorBp(
-        pendingPrimaryViewportAnchorBp,
+        assemblyPageSession.pendingPrimaryViewportAnchorBp,
         readTrackViewportMetrics(primaryScroll, "primary"),
       );
       if (anchoredScrollLeft !== null) {
-        lastTrackScrollLeft = anchoredScrollLeft;
+        assemblyPageSession.lastTrackScrollLeft = anchoredScrollLeft;
       }
-      pendingPrimaryViewportAnchorBp = null;
+      assemblyPageSession.pendingPrimaryViewportAnchorBp = null;
     }
 
     const state = store.getState();
     const nextViewportKey = buildMainTrackViewportKey(state);
-    const shouldApplyPendingFocus = Boolean(pendingTrackAutoFocusMode);
-    if (nextViewportKey !== lastTrackViewportKey || shouldApplyPendingFocus) {
-      lastTrackViewportKey = nextViewportKey;
+    const shouldApplyPendingFocus = Boolean(assemblyPageSession.pendingTrackAutoFocusMode);
+    if (nextViewportKey !== assemblyPageSession.lastTrackViewportKey || shouldApplyPendingFocus) {
+      assemblyPageSession.lastTrackViewportKey = nextViewportKey;
       const persistedScrollLeft = resolvePersistedViewportScrollLeft(
         state.assembly.trackScrollState,
         nextViewportKey,
@@ -3673,29 +3652,29 @@ function bindTrackScrollSync(host, store, deps = {}) {
         const focusCenter = Number(primaryScroll?.dataset.focusCenter || 0);
         const focusStart = Number(primaryScroll?.dataset.focusStart || 0);
         const viewportWidth = primaryScroll?.clientWidth || 0;
-        if (pendingTrackAutoFocusMode === "start") {
-          lastTrackScrollLeft = Math.max(0, Math.round(focusStart));
+        if (assemblyPageSession.pendingTrackAutoFocusMode === "start") {
+          assemblyPageSession.lastTrackScrollLeft = Math.max(0, Math.round(focusStart));
         } else {
-          lastTrackScrollLeft = Math.max(0, Math.round(focusCenter - viewportWidth / 2));
+          assemblyPageSession.lastTrackScrollLeft = Math.max(0, Math.round(focusCenter - viewportWidth / 2));
         }
-      } else if (suppressNextTrackAutoFocus) {
-        suppressNextTrackAutoFocus = false;
+      } else if (assemblyPageSession.suppressNextTrackAutoFocus) {
+        assemblyPageSession.suppressNextTrackAutoFocus = false;
       } else if (persistedScrollLeft !== null) {
-        lastTrackScrollLeft = persistedScrollLeft;
+        assemblyPageSession.lastTrackScrollLeft = persistedScrollLeft;
       } else {
         const focusCenter = Number(primaryScroll?.dataset.focusCenter || 0);
         const viewportWidth = primaryScroll?.clientWidth || 0;
-        lastTrackScrollLeft = Math.max(0, Math.round(focusCenter - viewportWidth / 2));
+        assemblyPageSession.lastTrackScrollLeft = Math.max(0, Math.round(focusCenter - viewportWidth / 2));
       }
-      pendingTrackAutoFocusMode = null;
+      assemblyPageSession.pendingTrackAutoFocusMode = null;
     }
     if (setAssemblyViewportScrollState(store, "trackScrollState", {
-      viewportKey: lastTrackViewportKey,
-      scrollLeft: lastTrackScrollLeft,
+      viewportKey: assemblyPageSession.lastTrackViewportKey,
+      scrollLeft: assemblyPageSession.lastTrackScrollLeft,
     })) {
       schedulePersistScrollState(host, store);
     }
-    applyTrackScrollLeft(syncedTrackScrollEls, lastTrackScrollLeft);
+    applyTrackScrollLeft(syncedTrackScrollEls, assemblyPageSession.lastTrackScrollLeft);
 
     let syncing = false;
     syncedTrackScrollEls.forEach((element) => {
@@ -3704,11 +3683,11 @@ function bindTrackScrollSync(host, store, deps = {}) {
           return;
         }
         syncing = true;
-        lastTrackScrollLeft = element.scrollLeft;
-        applyTrackScrollLeft(syncedTrackScrollEls, lastTrackScrollLeft, element);
+        assemblyPageSession.lastTrackScrollLeft = element.scrollLeft;
+        applyTrackScrollLeft(syncedTrackScrollEls, assemblyPageSession.lastTrackScrollLeft, element);
         if (setAssemblyViewportScrollState(store, "trackScrollState", {
-          viewportKey: lastTrackViewportKey,
-          scrollLeft: lastTrackScrollLeft,
+          viewportKey: assemblyPageSession.lastTrackViewportKey,
+          scrollLeft: assemblyPageSession.lastTrackScrollLeft,
         })) {
           schedulePersistScrollState(host, store);
         }
@@ -3718,39 +3697,39 @@ function bindTrackScrollSync(host, store, deps = {}) {
   }
 
   if (shouldBindSubview && !subviewTrackScrollEls.length && shouldClearMissing) {
-    lastSubviewViewportKey = "";
-    lastSubviewScrollLeft = 0;
+    assemblyPageSession.lastSubviewViewportKey = "";
+    assemblyPageSession.lastSubviewScrollLeft = 0;
     if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {})) {
       schedulePersistScrollState(host, store);
     }
   } else if (shouldBindSubview && subviewTrackScrollEls.length) {
     const state = store.getState();
     const nextSubviewViewportKey = buildSubviewTrackViewportKey(state);
-    if (nextSubviewViewportKey !== lastSubviewViewportKey) {
-      lastSubviewViewportKey = nextSubviewViewportKey;
-      lastSubviewScrollLeft = resolvePersistedViewportScrollLeft(
+    if (nextSubviewViewportKey !== assemblyPageSession.lastSubviewViewportKey) {
+      assemblyPageSession.lastSubviewViewportKey = nextSubviewViewportKey;
+      assemblyPageSession.lastSubviewScrollLeft = resolvePersistedViewportScrollLeft(
         state.assembly.subviewTrackScrollState,
         nextSubviewViewportKey,
       ) ?? 0;
     }
     const primarySubviewScroll = subviewTrackScrollEls[0] || null;
-    if (pendingSubviewViewportAnchorBp !== null) {
+    if (assemblyPageSession.pendingSubviewViewportAnchorBp !== null) {
       const anchoredScrollLeft = resolveScrollLeftForViewportAnchorBp(
-        pendingSubviewViewportAnchorBp,
+        assemblyPageSession.pendingSubviewViewportAnchorBp,
         readTrackViewportMetrics(primarySubviewScroll, "subview"),
       );
       if (anchoredScrollLeft !== null) {
-        lastSubviewScrollLeft = anchoredScrollLeft;
+        assemblyPageSession.lastSubviewScrollLeft = anchoredScrollLeft;
       }
-      pendingSubviewViewportAnchorBp = null;
+      assemblyPageSession.pendingSubviewViewportAnchorBp = null;
     }
     if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {
-      viewportKey: lastSubviewViewportKey,
-      scrollLeft: lastSubviewScrollLeft,
+      viewportKey: assemblyPageSession.lastSubviewViewportKey,
+      scrollLeft: assemblyPageSession.lastSubviewScrollLeft,
     })) {
       schedulePersistScrollState(host, store);
     }
-    applyTrackScrollLeft(subviewTrackScrollEls, lastSubviewScrollLeft);
+    applyTrackScrollLeft(subviewTrackScrollEls, assemblyPageSession.lastSubviewScrollLeft);
 
     let subviewSyncing = false;
     subviewTrackScrollEls.forEach((element) => {
@@ -3759,11 +3738,11 @@ function bindTrackScrollSync(host, store, deps = {}) {
           return;
         }
         subviewSyncing = true;
-        lastSubviewScrollLeft = element.scrollLeft;
-        applyTrackScrollLeft(subviewTrackScrollEls, lastSubviewScrollLeft, element);
+        assemblyPageSession.lastSubviewScrollLeft = element.scrollLeft;
+        applyTrackScrollLeft(subviewTrackScrollEls, assemblyPageSession.lastSubviewScrollLeft, element);
         if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {
-          viewportKey: lastSubviewViewportKey,
-          scrollLeft: lastSubviewScrollLeft,
+          viewportKey: assemblyPageSession.lastSubviewViewportKey,
+          scrollLeft: assemblyPageSession.lastSubviewScrollLeft,
         })) {
           schedulePersistScrollState(host, store);
         }
@@ -3780,20 +3759,20 @@ function bindTrackScrollSync(host, store, deps = {}) {
     if (finalPathScrollEl) {
       const state = store.getState();
       const nextFinalPathViewportKey = buildFinalPathTrackViewportKey(state);
-      if (nextFinalPathViewportKey !== lastFinalPathViewportKey) {
-        lastFinalPathViewportKey = nextFinalPathViewportKey;
-        lastFinalPathScrollLeft = resolvePersistedViewportScrollLeft(
+      if (nextFinalPathViewportKey !== assemblyPageSession.lastFinalPathViewportKey) {
+        assemblyPageSession.lastFinalPathViewportKey = nextFinalPathViewportKey;
+        assemblyPageSession.lastFinalPathScrollLeft = resolvePersistedViewportScrollLeft(
           state.assembly.finalPathTrackScrollState,
           nextFinalPathViewportKey,
         ) ?? 0;
       }
       if (setAssemblyViewportScrollState(store, "finalPathTrackScrollState", {
-        viewportKey: lastFinalPathViewportKey,
-        scrollLeft: lastFinalPathScrollLeft,
+        viewportKey: assemblyPageSession.lastFinalPathViewportKey,
+        scrollLeft: assemblyPageSession.lastFinalPathScrollLeft,
       })) {
         schedulePersistScrollState(host, store);
       }
-      finalPathScrollEl.scrollLeft = lastFinalPathScrollLeft;
+      finalPathScrollEl.scrollLeft = assemblyPageSession.lastFinalPathScrollLeft;
       let finalPathSyncing = false;
       if (typeof finalPathScrollEl.addEventListener === "function") {
         finalPathScrollEl.addEventListener("scroll", () => {
@@ -3801,10 +3780,10 @@ function bindTrackScrollSync(host, store, deps = {}) {
             return;
           }
           finalPathSyncing = true;
-          lastFinalPathScrollLeft = Number(finalPathScrollEl.scrollLeft || 0);
+          assemblyPageSession.lastFinalPathScrollLeft = Number(finalPathScrollEl.scrollLeft || 0);
           if (setAssemblyViewportScrollState(store, "finalPathTrackScrollState", {
-            viewportKey: lastFinalPathViewportKey,
-            scrollLeft: lastFinalPathScrollLeft,
+            viewportKey: assemblyPageSession.lastFinalPathViewportKey,
+            scrollLeft: assemblyPageSession.lastFinalPathScrollLeft,
           })) {
             schedulePersistScrollState(host, store);
           }
@@ -3916,8 +3895,8 @@ function syncSupportDatasetSelection(store, storage = null) {
   const storageKey = buildSupportDsStorageKey(workspacePath, projectId);
 
   if (!storageKey) {
-    lastSupportDsSessionKey = "";
-    lastSupportDsSelection = null;
+    assemblyPageSession.lastSupportDsSessionKey = "";
+    assemblyPageSession.lastSupportDsSelection = null;
     return { changed: false, supportDatasetId: null };
   }
 
@@ -3925,11 +3904,11 @@ function syncSupportDatasetSelection(store, storage = null) {
   const candidateIds = new Set(supportDatasetOptions.map((dataset) => dataset.datasetId));
   const currentSelection = normalizeSupportDatasetId(state.assembly.supportDatasetId);
 
-  if (storageKey !== lastSupportDsSessionKey) {
-    lastSupportDsSessionKey = storageKey;
+  if (storageKey !== assemblyPageSession.lastSupportDsSessionKey) {
+    assemblyPageSession.lastSupportDsSessionKey = storageKey;
     if (currentSelection !== null && candidateIds.has(currentSelection)) {
       saveSupportDsState(workspacePath, projectId, { supportDatasetId: currentSelection }, storage || undefined);
-      lastSupportDsSelection = currentSelection;
+      assemblyPageSession.lastSupportDsSelection = currentSelection;
       return { changed: false, supportDatasetId: currentSelection };
     }
     const savedState = loadSupportDsState(workspacePath, projectId, storage || undefined);
@@ -3941,7 +3920,7 @@ function syncSupportDatasetSelection(store, storage = null) {
     if (nextSelection !== null && nextSelection !== restoredDatasetId) {
       saveSupportDsState(workspacePath, projectId, { supportDatasetId: nextSelection }, storage || undefined);
     }
-    lastSupportDsSelection = nextSelection;
+    assemblyPageSession.lastSupportDsSelection = nextSelection;
     if (normalizeSupportDatasetId(state.assembly.supportDatasetId) !== nextSelection) {
       return { changed: true, supportDatasetId: nextSelection };
     }
@@ -3957,23 +3936,23 @@ function syncSupportDatasetSelection(store, storage = null) {
   });
   if (reconciliation.invalidated) {
     const fallbackSelection = supportDatasetOptions[0]?.datasetId || null;
-    lastSupportDsSelection = fallbackSelection;
+    assemblyPageSession.lastSupportDsSelection = fallbackSelection;
     if (currentSelection !== fallbackSelection) {
       return { changed: true, supportDatasetId: fallbackSelection };
     }
   }
   if (currentSelection === null && supportDatasetOptions.length > 0) {
     const fallbackSelection = supportDatasetOptions[0]?.datasetId || null;
-    lastSupportDsSelection = fallbackSelection;
+    assemblyPageSession.lastSupportDsSelection = fallbackSelection;
     if (fallbackSelection !== null) {
       saveSupportDsState(workspacePath, projectId, { supportDatasetId: fallbackSelection }, storage || undefined);
       return { changed: true, supportDatasetId: fallbackSelection };
     }
   }
 
-  if (currentSelection !== lastSupportDsSelection) {
+  if (currentSelection !== assemblyPageSession.lastSupportDsSelection) {
     saveSupportDsState(workspacePath, projectId, { supportDatasetId: currentSelection }, storage || undefined);
-    lastSupportDsSelection = currentSelection;
+    assemblyPageSession.lastSupportDsSelection = currentSelection;
   }
 
   return { changed: false, supportDatasetId: currentSelection };
@@ -4565,16 +4544,16 @@ function rememberTrackViewportAnchor(host, viewKey = "trackView") {
   const centerBp = resolveViewportAnchorBp(scrollEl?.scrollLeft || 0, metrics);
   if (centerBp === null) {
     if (isSubview) {
-      pendingSubviewViewportAnchorBp = null;
+      assemblyPageSession.pendingSubviewViewportAnchorBp = null;
     } else {
-      pendingPrimaryViewportAnchorBp = null;
+      assemblyPageSession.pendingPrimaryViewportAnchorBp = null;
     }
     return null;
   }
   if (isSubview) {
-    pendingSubviewViewportAnchorBp = centerBp;
+    assemblyPageSession.pendingSubviewViewportAnchorBp = centerBp;
   } else {
-    pendingPrimaryViewportAnchorBp = centerBp;
+    assemblyPageSession.pendingPrimaryViewportAnchorBp = centerBp;
   }
   return centerBp;
 }
@@ -4659,7 +4638,7 @@ function togglePrimaryTrackSelection(host, store, assemblyCtgId) {
 }
 
 function shouldSuppressTrackContigClick() {
-  return Date.now() <= suppressTrackContigClickUntil;
+  return Date.now() <= assemblyPageSession.suppressTrackContigClickUntil;
 }
 
 function applyTrackDragOffset(host, store, nextOffset) {
@@ -4669,7 +4648,7 @@ function applyTrackDragOffset(host, store, nextOffset) {
   if (areTrackDragOffsetsEqual(normalizedCurrent, normalizedNext)) {
     return;
   }
-  suppressNextTrackAutoFocus = true;
+  assemblyPageSession.suppressNextTrackAutoFocus = true;
   store.setState({
     assembly: {
       ...state.assembly,
@@ -5493,28 +5472,7 @@ export function __testBindTrackScrollSync(host, store, deps = {}) {
 }
 
 export function __testResetMeasuredTrackViewportWidths(nextWidths = null) {
-  lastTrackViewportKey = "";
-  lastTrackScrollLeft = 0;
-  lastPrimaryTrackViewboxMinX = 0;
-  lastSubviewViewportKey = "";
-  lastSubviewScrollLeft = 0;
-  lastFinalPathViewportKey = "";
-  lastFinalPathScrollLeft = 0;
-  pendingPrimaryViewportAnchorBp = null;
-  pendingSubviewViewportAnchorBp = null;
-  measuredTrackViewportPxByRole = resolveMeasuredTrackViewportWidths(
-    nextWidths || {
-      primary: 1200,
-      subview: 1200,
-      finalPath: 1200,
-    },
-    {
-      primary: 1200,
-      subview: 1200,
-      finalPath: 1200,
-    },
-  );
-  return measuredTrackViewportPxByRole;
+  return resetAssemblyPageSession(nextWidths);
 }
 
 function pickSelectedMember(assembly) {
