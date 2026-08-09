@@ -1,6 +1,22 @@
 import { normalizeNonNegativeInt, normalizePositiveInt } from "./track-prefs.js";
 import { normalizeSupportDatasetId } from "./selection-state.js";
 
+export function roundTrackMetric(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+export function buildEmptyTrackModelLike() {
+  return {
+    windowStart: 0,
+    windowEnd: 0,
+    viewSpanBp: 1,
+    innerWidth: 0,
+    domainSpanBp: 1,
+    laneCount: 1,
+    ticks: [],
+  };
+}
+
 export function buildTrackTickItems({ windowStart, windowEnd, tickBp, innerWidth, domainSpanBp }) {
   const ticks = [];
   const resolvedEnd = Math.max(windowStart, windowEnd);
