@@ -185,10 +185,7 @@ import {
 import {
   areViewportScrollStatesEqual,
   buildFinalPathTrackViewportKey,
-  buildMainTrackViewportKey,
-  buildSubviewTrackViewportKey,
   normalizeViewportScrollState,
-  resolvePersistedViewportScrollLeft,
 } from "./assembly/scroll-position-state.js";
 import {
   applySubviewSelections as applySubviewSelectionsImpl,
@@ -265,15 +262,28 @@ import {
 } from "./assembly/render-tracks.js";
 import { renderAssemblyPage as renderAssemblyPageShell } from "./assembly/render-shell.js";
 import {
-  readTrackViewportMetrics,
   resolveActiveTrackScrollElement,
   resolveTrackPointerContentPoint,
-  resolveScrollLeftForViewportAnchorBp,
-  resolveTrackScrollLeftForViewboxShift,
-  resolveViewportAnchorBp,
 } from "./assembly/track-viewport.js";
+import {
+  createAssemblyViewportController,
+  createTrackViewportResizeCoordinator,
+} from "./assembly/viewport-runtime.js";
 
 const endTypeOptions = ["normal", "gap", "telomere"];
+const {
+  bindTrackScrollSync,
+  bindTrackViewportResize,
+  getMeasuredTrackViewportPx,
+  rememberTrackViewportAnchor,
+} = createAssemblyViewportController({
+  session: assemblyPageSession,
+  getPersistDeps: () => projectAssemblyViewStateRuntimeDeps,
+  getTimerApi: () => resolveTimerApi(),
+  persistProjectAssemblyViewStateFromStore: (host, store, deps) =>
+    persistProjectAssemblyViewStateFromStore(host, store, deps),
+  rerender: (host, store) => rerender(host, store),
+});
 const renderTracksDeps = {
   escapeAttr,
   escapeHtml,
@@ -337,7 +347,6 @@ export function renderAssemblyPage(state) {
   return renderAssemblyPageShell(state, assemblyPageShellDeps);
 }
 const ASSEMBLY_ACTION_FEEDBACK_DISMISS = Symbol("assemblyActionFeedbackDismiss");
-const ASSEMBLY_TRACK_RESIZE_BOUND = Symbol("assemblyTrackResizeBound");
 const ASSEMBLY_SUBVIEW_BAND_TOOLTIP_BOUND = Symbol("assemblySubviewBandTooltipBound");
 const ACTION_FEEDBACK_AUTO_DISMISS_MS = 1000;
 const ACTION_FEEDBACK_POINTER_DISMISS_MS = 500;
@@ -2033,79 +2042,6 @@ function createAssemblyPageBindingDeps(options = {}) {
   };
 }
 
-function normalizeTrackViewportRole(role) {
-  const normalized = String(role || "").trim().toLowerCase();
-  if (normalized === "subview") {
-    return "subview";
-  }
-  if (normalized === "final-path" || normalized === "finalpath") {
-    return "finalPath";
-  }
-  return "primary";
-}
-
-function normalizeViewportWidthValue(value) {
-  const numeric = Math.round(Number(value || 0));
-  return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
-}
-
-function normalizeTrackViewportWidths(widths) {
-  if (typeof widths === "number") {
-    const resolvedWidth = normalizeViewportWidthValue(widths);
-    return {
-      primary: resolvedWidth,
-      subview: resolvedWidth,
-      finalPath: resolvedWidth,
-    };
-  }
-  return {
-    primary: normalizeViewportWidthValue(widths?.primary),
-    subview: normalizeViewportWidthValue(widths?.subview),
-    finalPath: normalizeViewportWidthValue(widths?.finalPath ?? widths?.["final-path"]),
-  };
-}
-
-function resolveMeasuredTrackViewportWidths(nextWidths, currentWidths = assemblyPageSession.measuredTrackViewportPxByRole) {
-  const normalizedCurrent = normalizeTrackViewportWidths(currentWidths);
-  const normalizedNext = normalizeTrackViewportWidths(nextWidths);
-  return {
-    primary: normalizedNext.primary || normalizedCurrent.primary || 1200,
-    subview: normalizedNext.subview || normalizedCurrent.subview || normalizedCurrent.primary || 1200,
-    finalPath: normalizedNext.finalPath || normalizedCurrent.finalPath || normalizedCurrent.primary || 1200,
-  };
-}
-
-function haveMeasuredTrackViewportWidthsChanged(currentWidths, nextWidths) {
-  const normalizedCurrent = normalizeTrackViewportWidths(currentWidths);
-  const normalizedNext = normalizeTrackViewportWidths(nextWidths);
-  return ["primary", "subview", "finalPath"].some((role) => {
-    const nextValue = normalizedNext[role];
-    if (nextValue <= 0) {
-      return false;
-    }
-    return Math.abs(nextValue - normalizedCurrent[role]) > 1;
-  });
-}
-
-function getMeasuredTrackViewportPx(role = "primary") {
-  const normalizedRole = normalizeTrackViewportRole(role);
-  return assemblyPageSession.measuredTrackViewportPxByRole[normalizedRole] || assemblyPageSession.measuredTrackViewportPxByRole.primary || 1200;
-}
-
-function readAssemblyTrackViewportWidths(host) {
-  const primaryScroll = host?.querySelector?.(".assembly-track-scroll[data-track-role='primary']") || null;
-  const subviewScroll = host?.querySelector?.(".assembly-track-scroll.subview-track-scroll") || null;
-  const finalPathScroll =
-    host?.querySelector?.("[data-final-path-graph-viewport]")
-    || host?.querySelector?.(".assembly-final-path-svg-wrap")
-    || null;
-  return {
-    primary: normalizeViewportWidthValue(primaryScroll?.clientWidth),
-    subview: normalizeViewportWidthValue(subviewScroll?.clientWidth),
-    finalPath: normalizeViewportWidthValue(finalPathScroll?.clientWidth),
-  };
-}
-
 function createEditorActionRuntimeAdapters(editorRuntimeDeps, impls = {}) {
   const {
     applyEditorAction = applyEditorActionImpl,
@@ -3205,293 +3141,6 @@ async function updateSupportDatasetSelection(host, store, rawSupportDatasetId) {
   await applySupportDatasetSelection(host, store, rawSupportDatasetId);
 }
 
-function bindTrackViewportResize(host, store) {
-  const routeHost = host?.closest?.("#route-host") || null;
-  if (routeHost && routeHost !== host) {
-    return;
-  }
-  if (typeof globalThis.window?.addEventListener !== "function") {
-    return;
-  }
-  if (host[ASSEMBLY_TRACK_RESIZE_BOUND]) {
-    return;
-  }
-  const coordinator = createTrackViewportResizeCoordinator({
-    getViewportWidths: () => readAssemblyTrackViewportWidths(host),
-    getMeasuredWidths: () => assemblyPageSession.measuredTrackViewportPxByRole,
-    setMeasuredWidths: (nextWidths) => {
-      assemblyPageSession.measuredTrackViewportPxByRole = resolveMeasuredTrackViewportWidths(nextWidths, assemblyPageSession.measuredTrackViewportPxByRole);
-    },
-    onViewportResize: () => {
-      rerender(host, store);
-    },
-  });
-  const onResize = () => {
-    coordinator.onResize();
-  };
-  globalThis.window.addEventListener("resize", onResize);
-  host[ASSEMBLY_TRACK_RESIZE_BOUND] = {
-    coordinator,
-    onResize,
-  };
-}
-
-function setAssemblyViewportScrollState(store, fieldName, nextValue) {
-  const state = store.getState();
-  const normalizedNextValue = normalizeViewportScrollState(nextValue);
-  if (areViewportScrollStatesEqual(state.assembly?.[fieldName], normalizedNextValue)) {
-    return false;
-  }
-  store.setState({
-    ...state,
-    assembly: {
-      ...state.assembly,
-      [fieldName]: normalizedNextValue,
-    },
-  });
-  return true;
-}
-
-function schedulePersistAssemblyScrollState(
-  host,
-  store,
-  deps = projectAssemblyViewStateRuntimeDeps,
-  timerApi = resolveTimerApi(),
-) {
-  if (assemblyPageSession.pendingAssemblyScrollStatePersistTimer !== null) {
-    timerApi.clearTimeout(assemblyPageSession.pendingAssemblyScrollStatePersistTimer);
-  }
-  assemblyPageSession.pendingAssemblyScrollStatePersistTimer = timerApi.setTimeout(() => {
-    assemblyPageSession.pendingAssemblyScrollStatePersistTimer = null;
-    void persistProjectAssemblyViewStateFromStore(host, store, deps);
-  }, 120);
-}
-
-function bindTrackScrollSync(host, store, deps = {}) {
-  const schedulePersistScrollState =
-    deps.schedulePersistAssemblyScrollState || schedulePersistAssemblyScrollState;
-  const requestedScope = String(deps.scope || "all").trim().toLowerCase();
-  const scope = ["main", "subview", "final-path"].includes(requestedScope)
-    ? requestedScope
-    : "all";
-  const shouldBindMain = scope === "all" || scope === "main";
-  const shouldBindSubview = scope === "all" || scope === "subview";
-  const shouldBindFinalPath = scope === "all" || scope === "final-path";
-  const shouldClearMissing = scope === "all";
-  let viewportChanged = false;
-  const nextMeasuredTrackViewportWidths = resolveMeasuredTrackViewportWidths(
-    readAssemblyTrackViewportWidths(host),
-    assemblyPageSession.measuredTrackViewportPxByRole,
-  );
-  if (haveMeasuredTrackViewportWidthsChanged(assemblyPageSession.measuredTrackViewportPxByRole, nextMeasuredTrackViewportWidths)) {
-    assemblyPageSession.measuredTrackViewportPxByRole = nextMeasuredTrackViewportWidths;
-    viewportChanged = true;
-  }
-  const trackScrollEls = Array.from(host?.querySelectorAll?.(".assembly-track-scroll[data-track-role]") || []);
-  const subviewTrackScrollEls = trackScrollEls.filter(
-    (element) => String(element.dataset.trackRole || "").trim() === "subview",
-  );
-  const syncedTrackScrollEls = trackScrollEls.filter(
-    (element) => String(element.dataset.trackRole || "").trim() !== "subview",
-  );
-
-  if (shouldBindMain && !syncedTrackScrollEls.length && shouldClearMissing) {
-    assemblyPageSession.lastTrackViewportKey = "";
-    assemblyPageSession.lastTrackScrollLeft = 0;
-    assemblyPageSession.lastPrimaryTrackViewboxMinX = 0;
-    if (setAssemblyViewportScrollState(store, "trackScrollState", {})) {
-      schedulePersistScrollState(host, store);
-    }
-  } else if (shouldBindMain && syncedTrackScrollEls.length) {
-    const primaryScroll = syncedTrackScrollEls.find(
-      (element) => element.dataset.trackRole === "primary",
-    );
-    const currentPrimaryViewboxMinX = Number(primaryScroll?.dataset.trackViewboxMinX || 0);
-    if (Number.isFinite(currentPrimaryViewboxMinX)) {
-      assemblyPageSession.lastTrackScrollLeft = resolveTrackScrollLeftForViewboxShift(
-        assemblyPageSession.lastTrackScrollLeft,
-        assemblyPageSession.lastPrimaryTrackViewboxMinX,
-        currentPrimaryViewboxMinX,
-        { preserveViewport: !assemblyPageSession.trackContigDragActive },
-      );
-      assemblyPageSession.lastPrimaryTrackViewboxMinX = currentPrimaryViewboxMinX;
-    }
-    if (assemblyPageSession.pendingPrimaryViewportAnchorBp !== null) {
-      const anchoredScrollLeft = resolveScrollLeftForViewportAnchorBp(
-        assemblyPageSession.pendingPrimaryViewportAnchorBp,
-        readTrackViewportMetrics(primaryScroll, "primary"),
-      );
-      if (anchoredScrollLeft !== null) {
-        assemblyPageSession.lastTrackScrollLeft = anchoredScrollLeft;
-      }
-      assemblyPageSession.pendingPrimaryViewportAnchorBp = null;
-    }
-
-    const state = store.getState();
-    const nextViewportKey = buildMainTrackViewportKey(state);
-    const shouldApplyPendingFocus = Boolean(assemblyPageSession.pendingTrackAutoFocusMode);
-    if (nextViewportKey !== assemblyPageSession.lastTrackViewportKey || shouldApplyPendingFocus) {
-      assemblyPageSession.lastTrackViewportKey = nextViewportKey;
-      const persistedScrollLeft = resolvePersistedViewportScrollLeft(
-        state.assembly.trackScrollState,
-        nextViewportKey,
-      );
-      if (shouldApplyPendingFocus) {
-        const focusCenter = Number(primaryScroll?.dataset.focusCenter || 0);
-        const focusStart = Number(primaryScroll?.dataset.focusStart || 0);
-        const viewportWidth = primaryScroll?.clientWidth || 0;
-        if (assemblyPageSession.pendingTrackAutoFocusMode === "start") {
-          assemblyPageSession.lastTrackScrollLeft = Math.max(0, Math.round(focusStart));
-        } else {
-          assemblyPageSession.lastTrackScrollLeft = Math.max(0, Math.round(focusCenter - viewportWidth / 2));
-        }
-      } else if (assemblyPageSession.suppressNextTrackAutoFocus) {
-        assemblyPageSession.suppressNextTrackAutoFocus = false;
-      } else if (persistedScrollLeft !== null) {
-        assemblyPageSession.lastTrackScrollLeft = persistedScrollLeft;
-      } else {
-        const focusCenter = Number(primaryScroll?.dataset.focusCenter || 0);
-        const viewportWidth = primaryScroll?.clientWidth || 0;
-        assemblyPageSession.lastTrackScrollLeft = Math.max(0, Math.round(focusCenter - viewportWidth / 2));
-      }
-      assemblyPageSession.pendingTrackAutoFocusMode = null;
-    }
-    if (setAssemblyViewportScrollState(store, "trackScrollState", {
-      viewportKey: assemblyPageSession.lastTrackViewportKey,
-      scrollLeft: assemblyPageSession.lastTrackScrollLeft,
-    })) {
-      schedulePersistScrollState(host, store);
-    }
-    applyTrackScrollLeft(syncedTrackScrollEls, assemblyPageSession.lastTrackScrollLeft);
-
-    let syncing = false;
-    syncedTrackScrollEls.forEach((element) => {
-      element.addEventListener("scroll", () => {
-        if (syncing) {
-          return;
-        }
-        syncing = true;
-        assemblyPageSession.lastTrackScrollLeft = element.scrollLeft;
-        applyTrackScrollLeft(syncedTrackScrollEls, assemblyPageSession.lastTrackScrollLeft, element);
-        if (setAssemblyViewportScrollState(store, "trackScrollState", {
-          viewportKey: assemblyPageSession.lastTrackViewportKey,
-          scrollLeft: assemblyPageSession.lastTrackScrollLeft,
-        })) {
-          schedulePersistScrollState(host, store);
-        }
-        syncing = false;
-      });
-    });
-  }
-
-  if (shouldBindSubview && !subviewTrackScrollEls.length && shouldClearMissing) {
-    assemblyPageSession.lastSubviewViewportKey = "";
-    assemblyPageSession.lastSubviewScrollLeft = 0;
-    if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {})) {
-      schedulePersistScrollState(host, store);
-    }
-  } else if (shouldBindSubview && subviewTrackScrollEls.length) {
-    const state = store.getState();
-    const nextSubviewViewportKey = buildSubviewTrackViewportKey(state);
-    if (nextSubviewViewportKey !== assemblyPageSession.lastSubviewViewportKey) {
-      assemblyPageSession.lastSubviewViewportKey = nextSubviewViewportKey;
-      assemblyPageSession.lastSubviewScrollLeft = resolvePersistedViewportScrollLeft(
-        state.assembly.subviewTrackScrollState,
-        nextSubviewViewportKey,
-      ) ?? 0;
-    }
-    const primarySubviewScroll = subviewTrackScrollEls[0] || null;
-    if (assemblyPageSession.pendingSubviewViewportAnchorBp !== null) {
-      const anchoredScrollLeft = resolveScrollLeftForViewportAnchorBp(
-        assemblyPageSession.pendingSubviewViewportAnchorBp,
-        readTrackViewportMetrics(primarySubviewScroll, "subview"),
-      );
-      if (anchoredScrollLeft !== null) {
-        assemblyPageSession.lastSubviewScrollLeft = anchoredScrollLeft;
-      }
-      assemblyPageSession.pendingSubviewViewportAnchorBp = null;
-    }
-    if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {
-      viewportKey: assemblyPageSession.lastSubviewViewportKey,
-      scrollLeft: assemblyPageSession.lastSubviewScrollLeft,
-    })) {
-      schedulePersistScrollState(host, store);
-    }
-    applyTrackScrollLeft(subviewTrackScrollEls, assemblyPageSession.lastSubviewScrollLeft);
-
-    let subviewSyncing = false;
-    subviewTrackScrollEls.forEach((element) => {
-      element.addEventListener("scroll", () => {
-        if (subviewSyncing) {
-          return;
-        }
-        subviewSyncing = true;
-        assemblyPageSession.lastSubviewScrollLeft = element.scrollLeft;
-        applyTrackScrollLeft(subviewTrackScrollEls, assemblyPageSession.lastSubviewScrollLeft, element);
-        if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {
-          viewportKey: assemblyPageSession.lastSubviewViewportKey,
-          scrollLeft: assemblyPageSession.lastSubviewScrollLeft,
-        })) {
-          schedulePersistScrollState(host, store);
-        }
-        subviewSyncing = false;
-      });
-    });
-  }
-
-  if (shouldBindFinalPath) {
-    const finalPathScrollEl =
-      host?.querySelector?.("[data-final-path-graph-viewport]")
-      || host?.querySelector?.(".assembly-final-path-svg-wrap")
-      || null;
-    if (finalPathScrollEl) {
-      const state = store.getState();
-      const nextFinalPathViewportKey = buildFinalPathTrackViewportKey(state);
-      if (nextFinalPathViewportKey !== assemblyPageSession.lastFinalPathViewportKey) {
-        assemblyPageSession.lastFinalPathViewportKey = nextFinalPathViewportKey;
-        assemblyPageSession.lastFinalPathScrollLeft = resolvePersistedViewportScrollLeft(
-          state.assembly.finalPathTrackScrollState,
-          nextFinalPathViewportKey,
-        ) ?? 0;
-      }
-      if (setAssemblyViewportScrollState(store, "finalPathTrackScrollState", {
-        viewportKey: assemblyPageSession.lastFinalPathViewportKey,
-        scrollLeft: assemblyPageSession.lastFinalPathScrollLeft,
-      })) {
-        schedulePersistScrollState(host, store);
-      }
-      finalPathScrollEl.scrollLeft = assemblyPageSession.lastFinalPathScrollLeft;
-      let finalPathSyncing = false;
-      if (typeof finalPathScrollEl.addEventListener === "function") {
-        finalPathScrollEl.addEventListener("scroll", () => {
-          if (finalPathSyncing) {
-            return;
-          }
-          finalPathSyncing = true;
-          assemblyPageSession.lastFinalPathScrollLeft = Number(finalPathScrollEl.scrollLeft || 0);
-          if (setAssemblyViewportScrollState(store, "finalPathTrackScrollState", {
-            viewportKey: assemblyPageSession.lastFinalPathViewportKey,
-            scrollLeft: assemblyPageSession.lastFinalPathScrollLeft,
-          })) {
-            schedulePersistScrollState(host, store);
-          }
-          finalPathSyncing = false;
-        });
-      }
-    }
-  }
-  return viewportChanged;
-}
-
-function applyTrackScrollLeft(trackScrollEls, scrollLeft, sourceElement = null) {
-  trackScrollEls.forEach((element) => {
-    if (element === sourceElement) {
-      return;
-    }
-    element.scrollLeft = scrollLeft;
-  });
-}
-
 function bindSubviewBandTooltips(host) {
   const timerApi = resolveTimerApi();
   const scrollNodes = host.querySelectorAll?.(".subview-track-scroll") || [];
@@ -3972,28 +3621,6 @@ function renderNewSequenceRowActions(item, state = { locale: "zh" }) {
       </button>
     </div>
   `;
-}
-
-function rememberTrackViewportAnchor(host, viewKey = "trackView") {
-  const isSubview = viewKey === "subviewTrackView";
-  const trackRole = isSubview ? "subview" : "primary";
-  const scrollEl = resolveActiveTrackScrollElement(host, trackRole, null);
-  const metrics = readTrackViewportMetrics(scrollEl, trackRole);
-  const centerBp = resolveViewportAnchorBp(scrollEl?.scrollLeft || 0, metrics);
-  if (centerBp === null) {
-    if (isSubview) {
-      assemblyPageSession.pendingSubviewViewportAnchorBp = null;
-    } else {
-      assemblyPageSession.pendingPrimaryViewportAnchorBp = null;
-    }
-    return null;
-  }
-  if (isSubview) {
-    assemblyPageSession.pendingSubviewViewportAnchorBp = centerBp;
-  } else {
-    assemblyPageSession.pendingPrimaryViewportAnchorBp = centerBp;
-  }
-  return centerBp;
 }
 
 function isTrackRectOverlap(leftRect, rightRect) {
@@ -5257,38 +4884,6 @@ function createSubviewBandTooltipCoordinator({
     hide,
     dispose() {
       hide();
-    },
-  };
-}
-
-function createTrackViewportResizeCoordinator({
-  getViewportWidths,
-  getViewportWidth,
-  getMeasuredWidths,
-  getMeasuredWidth,
-  setMeasuredWidths,
-  setMeasuredWidth,
-  onViewportResize,
-}) {
-  return {
-    onResize() {
-      const currentWidths = normalizeTrackViewportWidths(
-        getMeasuredWidths?.() ?? getMeasuredWidth?.(),
-      );
-      const nextWidths = resolveMeasuredTrackViewportWidths(
-        getViewportWidths?.() ?? getViewportWidth?.(),
-        currentWidths,
-      );
-      if (!haveMeasuredTrackViewportWidthsChanged(currentWidths, nextWidths)) {
-        return false;
-      }
-      if (typeof setMeasuredWidths === "function") {
-        setMeasuredWidths(nextWidths);
-      } else if (typeof setMeasuredWidth === "function") {
-        setMeasuredWidth(nextWidths.primary);
-      }
-      onViewportResize?.(typeof getViewportWidths === "function" ? nextWidths : nextWidths.primary);
-      return true;
     },
   };
 }
