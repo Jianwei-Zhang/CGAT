@@ -96,6 +96,88 @@ state when a later optional refresh fails, and expose the secondary error.
 - [ ] Is derived state kept out of persistence unless a contract requires it?
 - [ ] Do tests cover transition, restore, stale response, and invalid payload cases?
 
+## Scenario: Assembly Runtime Cache Lifecycle
+
+### 1. Scope / Trigger
+
+- Applies when adding or changing Assembly renderer caches, pointer previews,
+  timers, pending dialogs, viewport measurements, or other mutable values that
+  must survive a local rerender but must not cross workspace/project identity.
+- Trigger: a feature would otherwise introduce a module-level `let`, `Map`, or
+  `WeakMap` under `ui/pages/assembly/`.
+
+### 2. Signatures
+
+- Session factory: `createAssemblyPageSession()`.
+- Reset entry point: `resetAssemblyPageSession(nextWidths?, { timerApi? }?)`.
+- Destroy entry point: `destroyAssemblyPageSession(options?)`.
+- Render-cache fields:
+  - `subviewRenderCache.filteredRefCtgs: WeakMap`;
+  - `subviewRenderCache.segmentPairs: Map`, limited to 256 entries;
+  - `finalPathGraphPreviewState: object | null`.
+
+### 3. Contracts
+
+- Mutable renderer/runtime state belongs to the explicit Assembly page session,
+  not an independent module global.
+- `resetAssemblyPageSession()` rebuilds cache containers, clears pointer
+  previews, cancels timers/coordinators, and resolves pending dialogs before a
+  workspace/project switch can render the next identity.
+- `destroyAssemblyPageSession()` delegates to the same reset contract.
+- Cache entries are derived presentation values only. They are never persisted
+  into project assembly view state or the app store.
+- Strong-reference caches must have a fixed capacity or identity-scoped eviction;
+  a `WeakMap` may use authoritative array/object identity for automatic release.
+- Cache reset must not change canonical coordinates, selection state, or
+  persisted payloads; the next render recomputes equivalent presentation data.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Local rerender in the same project | Reuse eligible cache/preview state until the interaction finishes. |
+| Workspace switch | Rebuild cache containers and clear previews before the new workspace renders. |
+| Project switch | Rebuild cache containers and clear previews before cached/new project state renders. |
+| Segment-pair cache reaches 256 entries | Evict the oldest entry before inserting another. |
+| Pointer drag ends or is canceled | Clear `finalPathGraphPreviewState` and remove temporary window listeners. |
+| Reset occurs with pending timers/dialogs | Cancel timers/coordinators and resolve pending dialogs without applying stale UI state. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: Subview pair geometry is cached in `assemblyPageSession`, capped, and
+  both workspace/project switch tests prove a fresh cache object is installed.
+- Base: a pointer preview lives only for one drag and becomes `null` on pointerup.
+- Bad: a module-level `Map` retains project-specific geometry indefinitely, or
+  a module-level preview object remains visible after switching projects.
+
+### 6. Tests Required
+
+- `page-session.test.mjs` seeds render-cache and preview values, calls reset, and
+  asserts new cache identity, zero strong-cache entries, and a null preview.
+- `session-switchers.test.mjs` seeds Assembly render cache before both workspace
+  and project switches and asserts each switch installs a fresh empty cache.
+- Feature runtime tests still assert cache reuse within one identity and pointer
+  preview cleanup after commit/cancel.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```js
+const pairCache = new Map();
+let graphPreview = null;
+```
+
+#### Correct
+
+```js
+const pairCache = assemblyPageSession.subviewRenderCache.segmentPairs;
+assemblyPageSession.finalPathGraphPreviewState = nextPreview;
+
+// Workspace/project switching calls this shared lifecycle boundary.
+resetAssemblyPageSession();
+```
+
 ## Scenario: Authoritative Final Path Source Length
 
 ### 1. Scope / Trigger
