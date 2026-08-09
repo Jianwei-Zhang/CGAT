@@ -24,33 +24,15 @@ import {
   normalizeSubviewTrackDragOffsets,
 } from "./selection-state.js";
 import {
-  buildRefSubviewCtgPool,
-  buildSubviewFlippedCtgKey,
-  buildSubviewTrackSelectionKey,
   buildSupportSubviewCtgPool,
   buildPhasedSubviewCtgPool,
-  buildSubviewTrackPairHiddenCtgKey,
-  buildSubviewCandidateSelectionKey,
   buildPhasedSubviewCtgHits,
-  flipSubviewHitRange,
-  getSubviewSelections,
   getSubviewState as getSubviewStateImpl,
   getSubviewTrackSelections,
   resolveSubviewCtgOrientValue,
-  normalizeSubviewRole,
-  normalizeSubviewSummarySelection,
-  normalizeSubviewTrackPairHiddenCtgs,
-  normalizeSubviewTrackPairSelectionCtgs,
   normalizeSubviewTrackSelectionItem,
   normalizeSubviewTrackSource,
-  normalizeSubviewTrackSummary,
-  resolveSubviewSelectionCtg,
-  resolveSubviewTrackSummaryCtgs,
 } from "./subview-state.js";
-import {
-  buildSubviewAnchorEndpointKey,
-  deriveSubviewContigFragments,
-} from "./subview-anchor-state.js";
 import {
   filterSupportCtgsBySupportDsCtgLenRules,
   getSupportDsCtgLenRulesForChr,
@@ -78,7 +60,6 @@ import {
   buildTrackReferenceWidth,
   buildTrackTickItems,
   isTrackTickLabelOverlap,
-  renderSubviewVirtualRuler,
   resolveHitMapq,
   resolveMaxTrackEndBp,
   roundTrackMetric,

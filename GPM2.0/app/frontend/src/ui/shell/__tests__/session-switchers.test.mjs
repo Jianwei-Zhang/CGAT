@@ -8,6 +8,7 @@ import {
   switchWorkspaceFromShell,
 } from "../session-switchers.js";
 import { clearAssemblySessionCache } from "../assembly-session-cache.js";
+import { assemblyPageSession } from "../../pages/assembly/page-session.js";
 
 function createStore(initialState) {
   let state = initialState;
@@ -73,6 +74,8 @@ test("buildProjectSwitchItems returns placeholder when no project is selected", 
 });
 
 test("switchWorkspaceFromShell opens a new workspace and clears the current project selection", async () => {
+  const previousSubviewRenderCache = assemblyPageSession.subviewRenderCache;
+  assemblyPageSession.subviewRenderCache.segmentPairs.set("old-workspace", [{ id: 1 }]);
   const store = createStore({
     activeRoute: "assembly",
     locale: "zh",
@@ -116,10 +119,14 @@ test("switchWorkspaceFromShell opens a new workspace and clears the current proj
   assert.deepEqual(next.initializer.existingProjects, [{ projectId: 22, projectName: "new-project" }]);
   assert.equal(next.assembly.selectedChrName, "");
   assert.deepEqual(next.assembly.chrCtgs, []);
+  assert.notEqual(assemblyPageSession.subviewRenderCache, previousSubviewRenderCache);
+  assert.equal(assemblyPageSession.subviewRenderCache.segmentPairs.size, 0);
 });
 
 test("switchProjectFromShell updates the current project and resets assembly runtime state", () => {
   clearAssemblySessionCache();
+  const previousSubviewRenderCache = assemblyPageSession.subviewRenderCache;
+  assemblyPageSession.subviewRenderCache.segmentPairs.set("old-project", [{ id: 1 }]);
   const store = createStore({
     activeRoute: "assembly",
     locale: "zh",
@@ -182,6 +189,8 @@ test("switchProjectFromShell updates the current project and resets assembly run
   assert.equal(next.assembly.selectedChrName, "");
   assert.deepEqual(next.assembly.chrCtgs, []);
   assert.deepEqual(next.assembly.finalPathByChr, {});
+  assert.notEqual(assemblyPageSession.subviewRenderCache, previousSubviewRenderCache);
+  assert.equal(assemblyPageSession.subviewRenderCache.segmentPairs.size, 0);
 });
 
 test("switchProjectFromShell restores cached assembly state when returning to an opened project", () => {

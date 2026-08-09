@@ -26,12 +26,6 @@ import {
   writeFinalPathExportTextFile,
 } from "../../services/workflow-api.js";
 import {
-  buildSupportDsStorageKey,
-  loadSupportDsState,
-  reconcileSupportDsSelection,
-  saveSupportDsState,
-} from "./assembly/support-ds-session.js";
-import {
   assemblyPageSession,
   resetAssemblyPageSession,
 } from "./assembly/page-session.js";
@@ -63,6 +57,12 @@ import {
 import {
   createMainTrackStateController,
 } from "./assembly/main-track-state-controller.js";
+import {
+  createSupportDatasetController,
+} from "./assembly/support-dataset-controller.js";
+import {
+  createBatchDeleteRefreshController,
+} from "./assembly/batch-delete-refresh-controller.js";
 import {
   loadProjectAssemblyViewState as loadProjectAssemblyViewStateImpl,
   persistProjectAssemblyViewState as persistProjectAssemblyViewStateImpl,
@@ -170,7 +170,6 @@ import {
   MAX_TICK_COUNT_OPTIONS,
   MIN_TICK_UNIT_KB_OPTIONS,
   SUPPORT_DS_CTG_LEN_BP_OPTIONS,
-  normalizeNonNegativeInt,
   resolveTrackInnerWidthFromScale,
   resolveTickBpFromScale,
 } from "./assembly/track-prefs.js";
@@ -257,6 +256,9 @@ import {
 } from "./assembly/render-tracks.js";
 import { renderAssemblyPage as renderAssemblyPageShell } from "./assembly/render-shell.js";
 import {
+  createAssemblyProgressModalRenderer,
+} from "./assembly/progress-modals.js";
+import {
   resolveActiveTrackScrollElement,
   resolveTrackPointerContentPoint,
 } from "./assembly/track-viewport.js";
@@ -308,6 +310,15 @@ const {
   getAssemblyI18n,
   rerender,
   tAssembly,
+});
+const {
+  renderAddCtgImportProgressModal,
+  renderBatchDeleteProgressModal,
+  renderFinalPathExportModal,
+} = createAssemblyProgressModalRenderer({
+  escapeAttr,
+  escapeHtml,
+  getAssemblyI18n,
 });
 const assemblyPageShellDeps = {
   buildAssemblyStats,
@@ -434,6 +445,34 @@ const {
   rerender: (host, store) => rerender(host, store),
   rerenderAssemblyMainTab: (host, store) => rerenderAssemblyMainTab(host, store),
 });
+const {
+  applySupportDatasetSelection,
+  syncSupportDatasetSelection,
+} = createSupportDatasetController({
+  buildClearedSubviewState,
+  getSupportDatasetOptions,
+  loadSupportChrCtgs: (workspaceRoot, projectId, chrName, datasetId) =>
+    loadDatasetChrCtgs(workspaceRoot, projectId, chrName, datasetId),
+  persistProjectAssemblyViewState: (args) =>
+    projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState(args),
+  rerender: (host, store) => rerender(host, store),
+  session: assemblyPageSession,
+});
+const {
+  refreshAfterBatchDelete,
+} = createBatchDeleteRefreshController({
+  bindAssemblyPage: (host, store) => bindAssemblyPage(host, store),
+  buildClearedSubviewState,
+  createRenderedAssemblyMainTabContent,
+  getCurrentProject,
+  loadDeletedCtgsForChr: (workspaceRoot, projectId, chrName, datasetId) =>
+    loadDeletedCtgsForChr(workspaceRoot, projectId, chrName, datasetId),
+  patchAssemblyStatusToast,
+  patchDeletedPrimaryTrackCtgsDom,
+  replaceRenderedAssemblySection,
+  rerenderAssemblyMainTab: (host, store) => rerenderAssemblyMainTab(host, store),
+  rerenderSubviewPanel: (host, store) => rerenderSubviewPanel(host, store),
+});
 export function renderAssemblyPage(state) {
   return renderAssemblyPageShell(state, assemblyPageShellDeps);
 }
@@ -462,375 +501,6 @@ function scheduleDeferredSubviewPanelRerender(host, store) {
 
 function cancelDeferredRerender() {
   getDeferredRerenderCoordinator().cancel();
-}
-
-function resolveFinalPathExportKindLabel(job, labels) {
-  const kind = String(job?.kind || "").trim().toLowerCase();
-  if (kind === "png") {
-    return labels.finalPathExportPng || "图(.png)";
-  }
-  if (kind === "tsv") {
-    return labels.finalPathExportTsv || "表(.tsv)";
-  }
-  if (kind === "fasta") {
-    return labels.finalPathExportFasta || "序列(.fasta)";
-  }
-  if (kind === "log") {
-    return labels.finalPathExportLog || "日志(.log)";
-  }
-  if (kind === "degap-jobs") {
-    return labels.finalPathExportDegapJobs || "DEGAP-JOBS";
-  }
-  if (kind === "all") {
-    return labels.finalPathExportAll || "All";
-  }
-  return kind || (labels.finalPathExport || "Export");
-}
-
-function resolveFinalPathExportStatusText(job, labels) {
-  if (job?.status === "success") {
-    return labels.finalPathExportCompleted || "已完成导出";
-  }
-  if (job?.status === "error") {
-    return labels.finalPathExportFailed || "导出失败";
-  }
-  if (job?.status === "canceled") {
-    return labels.finalPathExportCanceled || "已终止，已保留已导出的文件";
-  }
-  const template = labels.finalPathExportRunning || "正在执行：{step}";
-  return template.replace("{step}", String(job?.currentStep || "").trim());
-}
-
-function renderFinalPathExportStepIcon(status) {
-  if (status === "running") {
-    return `<span class="pipeline-spinner" aria-hidden="true"></span>`;
-  }
-  if (status === "done") {
-    return `<span class="pipeline-done" aria-hidden="true">&#10003;</span>`;
-  }
-  if (status === "error") {
-    return `<span class="pipeline-error" aria-hidden="true">&#10007;</span>`;
-  }
-  if (status === "skipped") {
-    return `<span class="pipeline-skipped" aria-hidden="true">-</span>`;
-  }
-  return `<span class="pipeline-pending" aria-hidden="true">&#9675;</span>`;
-}
-
-function resolveFinalPathExportStepStatus(job, step) {
-  const completedOutputs = Array.isArray(job?.completedOutputs) ? job.completedOutputs : [];
-  const completedStepIds = Array.isArray(job?.completedStepIds) ? job.completedStepIds : [];
-  const currentStep = String(job?.currentStep || "").trim();
-  const stepLabel = String(step?.label || "").trim();
-  const stepId = String(step?.id || "").trim();
-  if (stepId && completedStepIds.includes(stepId)) {
-    return "done";
-  }
-  if (completedOutputs.includes(step?.outputPath)) {
-    return "done";
-  }
-  if (job?.kind === "degap-jobs" && ["degap-prepare", "degap-job", "degap-manifest"].includes(step?.kind)) {
-    if (job?.status === "running") {
-      return "running";
-    }
-    if (job?.status === "error") {
-      return "error";
-    }
-  }
-  if (job?.status === "running" && currentStep && stepLabel && currentStep.includes(stepLabel)) {
-    return "running";
-  }
-  if (job?.status === "error" && currentStep && stepLabel && currentStep.includes(stepLabel)) {
-    return "error";
-  }
-  if (job?.status === "canceled") {
-    return "skipped";
-  }
-  return "pending";
-}
-
-function renderFinalPathExportSteps(job) {
-  const displaySteps = Array.isArray(job?.displaySteps) ? job.displaySteps : [];
-  const steps = displaySteps.length ? displaySteps : Array.isArray(job?.steps) ? job.steps : [];
-  if (!steps.length) {
-    return "";
-  }
-  return `
-    <div class="assembly-final-path-export-steps">
-      ${steps.map((step) => {
-        const stepStatus = resolveFinalPathExportStepStatus(job, step);
-        return `
-          <div
-            class="pipeline-step-row assembly-final-path-export-step ${stepStatus}"
-            data-final-path-export-step-status="${escapeAttr(stepStatus)}"
-          >
-            <span class="pipeline-step-label">${escapeHtml(String(step?.label || ""))}</span>
-            <span class="pipeline-step-icon">${renderFinalPathExportStepIcon(stepStatus)}</span>
-          </div>
-        `;
-      }).join("")}
-    </div>
-  `;
-}
-
-function renderFinalPathExportCompletedOutputs(job) {
-  const outputs = Array.isArray(job?.completedOutputs) ? job.completedOutputs : [];
-  if (!outputs.length) {
-    return "";
-  }
-  return `
-    <ul class="assembly-final-path-export-output-list">
-      ${outputs.map((outputPath) => `<li>${escapeHtml(String(outputPath || ""))}</li>`).join("")}
-    </ul>
-  `;
-}
-
-function resolveBatchDeleteProgressIconStatus(status) {
-  if (status === "success") {
-    return "done";
-  }
-  if (status === "error") {
-    return "error";
-  }
-  if (status === "running") {
-    return "running";
-  }
-  return "pending";
-}
-
-function renderAddCtgImportProgressModal(state) {
-  const progress = state.assembly?.addCtgImportProgress;
-  if (!progress?.open) {
-    return "";
-  }
-  const runtimeI18n = getAssemblyI18n(state).runtime || {};
-  const allStages = Array.isArray(progress.stages) ? progress.stages : [];
-  const recentOffset = Math.max(0, allStages.length - 60);
-  const recentStages = allStages.slice(recentOffset);
-  const progressMeta = buildAssemblyImportProgressMeta(allStages);
-  const status = String(progress.status || "running");
-  const isTerminal = status === "success" || status === "error";
-  const title = runtimeI18n.addCtgImportProgressTitle || "add_ctg 导入进度";
-  const summary = String(progress.summary || runtimeI18n.addCtgImportProgressSubtitle || "正在导入 add_ctg 包。");
-  const stageItems = recentStages.length
-    ? recentStages.map((stage, index) => {
-      const absoluteIndex = recentOffset + index;
-      const rowStatus = isTerminal && index === recentStages.length - 1
-        ? status
-        : index === recentStages.length - 1
-          ? "running"
-          : "done";
-      const iconStatus = resolveAddCtgImportProgressIconStatus(rowStatus);
-      return `
-        <div class="pipeline-step-row import-progress-step add-ctg-import-progress-step ${escapeAttr(rowStatus)}">
-          <span class="pipeline-step-label">${escapeHtml(formatAssemblyImportProgressStage(stage, absoluteIndex, progressMeta))}</span>
-          <span class="pipeline-step-icon">${renderFinalPathExportStepIcon(iconStatus)}</span>
-        </div>
-      `;
-    }).join("")
-    : `<div class="pipeline-step-row import-progress-step add-ctg-import-progress-step running">
-        <span class="pipeline-step-label">${escapeHtml(runtimeI18n.addCtgImportNotStarted || "准备导入...")}</span>
-        <span class="pipeline-step-icon">${renderFinalPathExportStepIcon("running")}</span>
-      </div>`;
-  const closeButton = isTerminal
-    ? `<button type="button" class="button ghost tiny import-progress-close" data-add-ctg-import-close="1" title="${escapeAttr(runtimeI18n.addCtgImportClose || "关闭")}">x</button>`
-    : "";
-  const percent = progressMeta.total > 0
-    ? Math.max(0, Math.min(100, (progressMeta.current / progressMeta.total) * 100))
-    : 0;
-  const meter = progressMeta.total > 0
-    ? `<div class="import-progress-meter" aria-label="${escapeAttr(`${progressMeta.current}/${progressMeta.total}`)}">
-        <div class="import-progress-meter-track">
-          <div class="import-progress-meter-fill" style="width: ${escapeAttr(percent.toFixed(1))}%;"></div>
-        </div>
-        <span class="import-progress-meter-text">${escapeHtml(`${progressMeta.current}/${progressMeta.total}`)}</span>
-      </div>`
-    : "";
-  return `
-    <div class="modal-overlay import-progress-overlay add-ctg-import-progress-overlay" data-add-ctg-import-progress-overlay="true">
-      <article class="card modal-dialog import-progress-dialog add-ctg-import-progress-dialog" role="dialog" aria-modal="true" aria-label="${escapeAttr(title)}">
-        ${closeButton}
-        <div class="import-progress-heading">
-          ${isTerminal ? "" : `<span class="pipeline-spinner" aria-hidden="true"></span>`}
-          <div>
-            <div class="import-progress-title-row">
-              <h4>${escapeHtml(title)}</h4>
-              ${meter}
-            </div>
-            <p class="muted">${escapeHtml(summary)}</p>
-            ${progress.error ? `<p class="error-text">${escapeHtml(String(progress.error))}</p>` : ""}
-          </div>
-        </div>
-        <div class="import-progress-list add-ctg-import-progress-list">${stageItems}</div>
-      </article>
-    </div>
-  `;
-}
-
-function resolveAddCtgImportProgressIconStatus(status) {
-  if (status === "success") {
-    return "done";
-  }
-  if (status === "error") {
-    return "error";
-  }
-  if (status === "running") {
-    return "running";
-  }
-  return "pending";
-}
-
-function buildAssemblyImportProgressMeta(stages) {
-  const list = Array.isArray(stages) ? stages : [];
-  const progressOffset = list.findIndex((stage) => {
-    if (!stage || typeof stage !== "object") {
-      return false;
-    }
-    const progressIndex = Number(stage.progressIndex);
-    return Number.isFinite(progressIndex) && progressIndex > 0;
-  });
-  const offset = progressOffset >= 0 ? progressOffset : 0;
-  let latestProgressIndex = 0;
-  let latestProgressTotal = 0;
-  for (const stage of list) {
-    if (stage && typeof stage === "object") {
-      const progressIndex = Number(stage.progressIndex);
-      const progressTotal = Number(stage.progressTotal);
-      if (Number.isFinite(progressIndex) && progressIndex > latestProgressIndex) {
-        latestProgressIndex = progressIndex;
-      }
-      if (Number.isFinite(progressTotal) && progressTotal > latestProgressTotal) {
-        latestProgressTotal = progressTotal;
-      }
-    }
-  }
-  const current = latestProgressIndex > 0
-    ? Math.max(list.length, offset + latestProgressIndex)
-    : list.length;
-  const total = Math.max(list.length, latestProgressTotal > 0 ? offset + latestProgressTotal : list.length);
-  return {
-    offset,
-    current: Math.min(current, total),
-    total,
-  };
-}
-
-function formatAssemblyImportProgressStage(stage, index, progressMeta) {
-  const label = stage && typeof stage === "object"
-    ? String(stage.label || stage.text || "")
-    : String(stage || "");
-  const progressIndex = stage && typeof stage === "object" ? Number(stage.progressIndex) : 0;
-  const displayIndex = Number.isFinite(progressIndex) && progressIndex > 0
-    ? progressMeta.offset + progressIndex
-    : index + 1;
-  if (!progressMeta.total) {
-    return label;
-  }
-  return `${label} (${displayIndex}/${progressMeta.total})`;
-}
-
-function renderBatchDeleteProgressModal(state) {
-  const progress = state.assembly?.batchDeleteProgress;
-  if (!progress?.open) {
-    return "";
-  }
-  const runtimeI18n = getAssemblyI18n(state).runtime || {};
-  const items = Array.isArray(progress.items) ? progress.items : [];
-  const total = Math.max(0, Number(progress.total) || items.length);
-  const current = Math.min(total, Math.max(0, Number(progress.current) || 0));
-  const percent = total > 0 ? Math.round((current / total) * 100) : 0;
-  const title = runtimeI18n.batchDeleteProgressTitle || "批量删除进度";
-  const subtitle = runtimeI18n.batchDeleteProgressSubtitle || "正在删除选中的 contig。";
-  return `
-    <div
-      class="modal-overlay import-progress-overlay batch-delete-progress-overlay"
-      data-batch-delete-progress-overlay="true"
-    >
-      <article
-        class="card modal-dialog import-progress-dialog batch-delete-progress-dialog"
-        data-batch-delete-progress-modal="true"
-        role="dialog"
-        aria-modal="true"
-        aria-label="${escapeAttr(title)}"
-      >
-        <div class="import-progress-heading">
-          <span class="pipeline-spinner" aria-hidden="true"></span>
-          <div>
-            <div class="import-progress-title-row">
-              <h4>${escapeHtml(title)}</h4>
-              <div class="import-progress-meter" aria-label="${escapeAttr(`${current}/${total}`)}">
-                <div class="import-progress-meter-track">
-                  <div class="import-progress-meter-fill" style="width: ${escapeAttr(percent)}%;"></div>
-                </div>
-                <span class="import-progress-meter-text">${escapeHtml(`${current}/${total}`)}</span>
-              </div>
-            </div>
-            <p class="muted">${escapeHtml(subtitle)}</p>
-          </div>
-        </div>
-        <div class="import-progress-list batch-delete-progress-list">
-          ${items.map((item) => {
-            const status = String(item?.status || "pending");
-            const iconStatus = resolveBatchDeleteProgressIconStatus(status);
-            const label = String(item?.label || `Ctg${item?.assemblyCtgId ?? ""}`).trim();
-            const idText = `assembly_ctg_id=${item?.assemblyCtgId ?? ""}`;
-            return `
-              <div
-                class="pipeline-step-row import-progress-step batch-delete-progress-step ${escapeAttr(status)}"
-                data-batch-delete-progress-row="${escapeAttr(item?.assemblyCtgId ?? "")}"
-                data-batch-delete-progress-status="${escapeAttr(status)}"
-              >
-                <span class="pipeline-step-label">
-                  ${escapeHtml(label)}
-                  <span class="muted">${escapeHtml(idText)}</span>
-                  ${item?.error ? `<span class="error-text">${escapeHtml(String(item.error))}</span>` : ""}
-                </span>
-                <span class="pipeline-step-icon">${renderFinalPathExportStepIcon(iconStatus)}</span>
-              </div>
-            `;
-          }).join("")}
-        </div>
-      </article>
-    </div>
-  `;
-}
-
-function renderFinalPathExportModal(state) {
-  const job = state.assembly?.finalPathExportJob;
-  if (!job?.open) {
-    return "";
-  }
-  const pageI18n = getAssemblyI18n(state).page || {};
-  const kindLabel = resolveFinalPathExportKindLabel(job, pageI18n);
-  const statusText = resolveFinalPathExportStatusText(job, pageI18n);
-  const statusClass = job?.status === "success" ? "success" : "";
-  return `
-    <div class="modal-overlay assembly-final-path-export-overlay" data-final-path-export-overlay="true">
-      <article
-        class="card modal-dialog assembly-final-path-export-dialog"
-        data-final-path-export-modal="true"
-        role="dialog"
-        aria-modal="true"
-        aria-label="${escapeAttr(pageI18n.finalPathExportDialogTitle || "正在导出 final path")}"
-      >
-        <button
-          type="button"
-          class="button ghost tiny assembly-final-path-export-close"
-          data-final-path-export-close="true"
-        >x</button>
-        <div class="assembly-final-path-export-body">
-          <header class="assembly-final-path-export-head">
-            <h4>${escapeHtml(pageI18n.finalPathExportDialogTitle || "正在导出 final path")}</h4>
-            <p class="muted">${escapeHtml(`${String(job?.chrName || "").trim()} · ${kindLabel}`)}</p>
-          </header>
-          ${renderFinalPathExportSteps(job)}
-          <p class="muted assembly-final-path-export-status ${escapeAttr(statusClass)}">${escapeHtml(statusText)}</p>
-          ${job?.error ? `<p class="error-text">${escapeHtml(String(job.error || ""))}</p>` : ""}
-          ${renderFinalPathExportCompletedOutputs(job)}
-        </div>
-      </article>
-    </div>
-  `;
 }
 
 function getSubviewSelections(subview) {
@@ -1466,84 +1136,6 @@ function resolveAppendToPathFocusPatch(assembly, activePhasedTrackKey) {
   };
 }
 
-async function refreshAfterBatchDelete(host, store, payload = {}) {
-  const state = store.getState();
-  const deletedIds = filterPrimaryTrackSelectionCtgIds(
-    payload.deletedAssemblyCtgIds,
-    state.assembly,
-  );
-  const deletedIdSet = new Set(deletedIds);
-  const removedCtgs = (Array.isArray(state.assembly?.chrCtgs) ? state.assembly.chrCtgs : [])
-    .filter((ctg) => deletedIdSet.has(Number(ctg?.assemblyCtgId || 0)));
-  const nextChrCtgs = (Array.isArray(state.assembly?.chrCtgs) ? state.assembly.chrCtgs : [])
-    .filter((ctg) => !deletedIdSet.has(Number(ctg?.assemblyCtgId || 0)));
-  const currentProject = getCurrentProject(state);
-  const primaryDatasetId = normalizeSupportDatasetId(currentProject?.primaryDatasetId);
-  const deletedCtgs = await loadDeletedCtgsForChr(
-    state.session.workspacePath,
-    state.session.projectId,
-    state.assembly.selectedChrName,
-    primaryDatasetId,
-  );
-  const selectedCtgWasDeleted = deletedIdSet.has(Number(state.assembly?.selectedCtgId || 0));
-  const nextAssemblyBase = {
-    ...state.assembly,
-    chromosomes: updateChromosomeSummariesAfterLocalDelete(
-      state.assembly?.chromosomes,
-      state.assembly?.selectedChrName,
-      removedCtgs,
-    ),
-    chrCtgs: nextChrCtgs,
-    deletedCtgs,
-    selectedDeletedCtgRecordIds: [],
-    trackSelectedCtgIds: [],
-    hiddenPrimaryCtgIds: filterPrimaryTrackSelectionCtgIds(
-      state.assembly?.hiddenPrimaryCtgIds,
-      { ...state.assembly, chrCtgs: nextChrCtgs },
-    ),
-    selectedCtgId: selectedCtgWasDeleted ? null : state.assembly?.selectedCtgId,
-    selectedMemberSeqId: selectedCtgWasDeleted ? null : state.assembly?.selectedMemberSeqId,
-    ctgDetail: selectedCtgWasDeleted ? null : state.assembly?.ctgDetail,
-    editCandidates: selectedCtgWasDeleted
-      ? { moveTargetCtgs: [], addSeqCandidates: [] }
-      : state.assembly?.editCandidates,
-    subview: deletedIds.length ? buildClearedSubviewState(state.assembly) : state.assembly?.subview,
-    subviewTrackDragOffsets: deletedIds.length ? [] : state.assembly?.subviewTrackDragOffsets,
-  };
-  const nextAssembly = {
-    ...nextAssemblyBase,
-    trackDragOffsets: filterTrackDragOffsets(state.assembly?.trackDragOffsets, nextAssemblyBase),
-  };
-  store.setState({
-    ...state,
-    assembly: nextAssembly,
-  });
-
-  const routeHost = host?.closest?.("#route-host") || null;
-  if (!routeHost) {
-    rerenderAssemblyMainTab(host, store);
-    return;
-  }
-  const nextContent = createRenderedAssemblyMainTabContent(routeHost, store.getState());
-  if (!nextContent) {
-    rerenderAssemblyMainTab(host, store);
-    return;
-  }
-  const replacedMembersPanel = replaceRenderedAssemblySection(
-    routeHost,
-    nextContent,
-    ".assembly-members-panel",
-  );
-  if (replacedMembersPanel) {
-    bindAssemblyPage(replacedMembersPanel, store);
-  }
-  patchAssemblyStatusToast(routeHost, nextContent);
-  patchDeletedPrimaryTrackCtgsDom(routeHost, deletedIds);
-  if (deletedIds.length) {
-    rerenderSubviewPanel(host, store);
-  }
-}
-
 async function selectChromosome(host, store, chrName) {
   return selectChromosomeImpl(host, store, chrName, assemblyDataRuntimeDeps);
 }
@@ -1604,28 +1196,6 @@ function getDatasetNameById(datasets, datasetId) {
     ? datasets.find((dataset) => Number(dataset.datasetId) === normalizedDatasetId)
     : null;
   return String(matched?.name || matched?.label || `ds-${normalizedDatasetId}`);
-}
-
-function updateChromosomeSummariesAfterLocalDelete(chromosomes, chrName, removedCtgs) {
-  const selectedChrName = String(chrName || "").trim();
-  const removedList = Array.isArray(removedCtgs) ? removedCtgs : [];
-  if (!selectedChrName || !removedList.length || !Array.isArray(chromosomes)) {
-    return Array.isArray(chromosomes) ? chromosomes : [];
-  }
-  const removedBp = removedList.reduce(
-    (sum, ctg) => sum + Math.max(0, normalizeNonNegativeInt(ctg?.totalLength) ?? 0),
-    0,
-  );
-  return chromosomes.map((chromosome) => {
-    if (String(chromosome?.chrName || "").trim() !== selectedChrName) {
-      return chromosome;
-    }
-    return {
-      ...chromosome,
-      ctgCount: Math.max(0, Math.max(0, normalizeNonNegativeInt(chromosome?.ctgCount) ?? 0) - removedList.length),
-      placedBp: Math.max(0, Math.max(0, normalizeNonNegativeInt(chromosome?.placedBp) ?? 0) - removedBp),
-    };
-  });
 }
 
 async function loadDatasetChrCtgs(workspaceRoot, projectId, chrName, datasetId) {
@@ -1749,10 +1319,6 @@ async function moveFinalPathRow(host, store, payload) {
   });
 }
 
-async function updateSupportDatasetSelection(host, store, rawSupportDatasetId) {
-  await applySupportDatasetSelection(host, store, rawSupportDatasetId);
-}
-
 function bindSubviewBandTooltips(host) {
   const timerApi = resolveTimerApi();
   const scrollNodes = host.querySelectorAll?.(".subview-track-scroll") || [];
@@ -1835,76 +1401,6 @@ function showSubviewBandTooltip(scrollNode, tooltipNode, text, point) {
 function hideSubviewBandTooltip(tooltipNode) {
   tooltipNode.classList.add("is-hidden");
   tooltipNode.setAttribute("aria-hidden", "true");
-}
-
-function syncSupportDatasetSelection(store, storage = null) {
-  const state = store.getState();
-  const workspacePath = String(state?.session?.workspacePath || "").trim();
-  const projectId = Number(state?.session?.projectId || 0);
-  const storageKey = buildSupportDsStorageKey(workspacePath, projectId);
-
-  if (!storageKey) {
-    assemblyPageSession.lastSupportDsSessionKey = "";
-    assemblyPageSession.lastSupportDsSelection = null;
-    return { changed: false, supportDatasetId: null };
-  }
-
-  const supportDatasetOptions = getSupportDatasetOptions(state);
-  const candidateIds = new Set(supportDatasetOptions.map((dataset) => dataset.datasetId));
-  const currentSelection = normalizeSupportDatasetId(state.assembly.supportDatasetId);
-
-  if (storageKey !== assemblyPageSession.lastSupportDsSessionKey) {
-    assemblyPageSession.lastSupportDsSessionKey = storageKey;
-    if (currentSelection !== null && candidateIds.has(currentSelection)) {
-      saveSupportDsState(workspacePath, projectId, { supportDatasetId: currentSelection }, storage || undefined);
-      assemblyPageSession.lastSupportDsSelection = currentSelection;
-      return { changed: false, supportDatasetId: currentSelection };
-    }
-    const savedState = loadSupportDsState(workspacePath, projectId, storage || undefined);
-    const restoredDatasetId = normalizeSupportDatasetId(savedState?.supportDatasetId);
-    const nextSelection =
-      restoredDatasetId !== null && candidateIds.has(restoredDatasetId)
-        ? restoredDatasetId
-        : supportDatasetOptions[0]?.datasetId || null;
-    if (nextSelection !== null && nextSelection !== restoredDatasetId) {
-      saveSupportDsState(workspacePath, projectId, { supportDatasetId: nextSelection }, storage || undefined);
-    }
-    assemblyPageSession.lastSupportDsSelection = nextSelection;
-    if (normalizeSupportDatasetId(state.assembly.supportDatasetId) !== nextSelection) {
-      return { changed: true, supportDatasetId: nextSelection };
-    }
-    return { changed: false, supportDatasetId: nextSelection };
-  }
-
-  const reconciliation = reconcileSupportDsSelection({
-    workspacePath,
-    projectId,
-    currentSelection,
-    candidateIds,
-    storage: storage || undefined,
-  });
-  if (reconciliation.invalidated) {
-    const fallbackSelection = supportDatasetOptions[0]?.datasetId || null;
-    assemblyPageSession.lastSupportDsSelection = fallbackSelection;
-    if (currentSelection !== fallbackSelection) {
-      return { changed: true, supportDatasetId: fallbackSelection };
-    }
-  }
-  if (currentSelection === null && supportDatasetOptions.length > 0) {
-    const fallbackSelection = supportDatasetOptions[0]?.datasetId || null;
-    assemblyPageSession.lastSupportDsSelection = fallbackSelection;
-    if (fallbackSelection !== null) {
-      saveSupportDsState(workspacePath, projectId, { supportDatasetId: fallbackSelection }, storage || undefined);
-      return { changed: true, supportDatasetId: fallbackSelection };
-    }
-  }
-
-  if (currentSelection !== assemblyPageSession.lastSupportDsSelection) {
-    saveSupportDsState(workspacePath, projectId, { supportDatasetId: currentSelection }, storage || undefined);
-    assemblyPageSession.lastSupportDsSelection = currentSelection;
-  }
-
-  return { changed: false, supportDatasetId: currentSelection };
 }
 
 function rerender(host, store) {
@@ -2677,122 +2173,6 @@ function buildRenameCtgActionArgs(assemblyCtgId, rawName) {
     assemblyCtgId: normalizedAssemblyCtgId,
     newName,
   };
-}
-
-function buildAssemblyStateForSupportDatasetSelection(assembly, supportDatasetId) {
-  const nextSupportDatasetClearedAssembly = {
-    ...assembly,
-    supportChrCtgs: [],
-  };
-  return {
-    ...nextSupportDatasetClearedAssembly,
-    supportDatasetId,
-    trackSelectedCtgIds: [],
-    trackDragOffsets: filterTrackDragOffsets(
-      nextSupportDatasetClearedAssembly.trackDragOffsets,
-      nextSupportDatasetClearedAssembly,
-      { preserveUnmatchedSupportOffsets: true },
-    ),
-    subviewTrackDragOffsets: [],
-    selectedDeletedCtgRecordIds: [],
-    subview: buildClearedSubviewState(assembly),
-    summary: "",
-  };
-}
-
-async function applySupportDatasetSelection(
-  host,
-  store,
-  rawSupportDatasetId,
-  {
-    loadSupportChrCtgs = loadDatasetChrCtgs,
-    persistProjectAssemblyViewState = projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerenderView = rerender,
-  } = {},
-) {
-  const state = store.getState();
-  const supportDatasetId = normalizeSupportDatasetId(rawSupportDatasetId);
-  const currentSupportDatasetId = normalizeSupportDatasetId(state.assembly.supportDatasetId);
-  if (supportDatasetId === currentSupportDatasetId) {
-    return false;
-  }
-
-  const nextAssemblyState = buildAssemblyStateForSupportDatasetSelection(state.assembly, supportDatasetId);
-  store.setState({
-    ...state,
-    assembly: nextAssemblyState,
-  });
-  rerenderView(host, store);
-  await persistProjectAssemblyViewState({
-    workspaceRoot: state.session.workspacePath,
-    projectId: state.session.projectId,
-    supportDatasetId,
-    trackView: nextAssemblyState.trackView,
-    supportMirroredCtgs: Array.isArray(nextAssemblyState.supportMirroredCtgs)
-      ? nextAssemblyState.supportMirroredCtgs
-      : [],
-    hiddenPrimaryCtgIds: Array.isArray(nextAssemblyState.hiddenPrimaryCtgIds)
-      ? nextAssemblyState.hiddenPrimaryCtgIds
-      : [],
-    trackDragOffsets: Array.isArray(nextAssemblyState.trackDragOffsets)
-      ? nextAssemblyState.trackDragOffsets
-      : [],
-    subviewTrackDragOffsets: Array.isArray(nextAssemblyState.subviewTrackDragOffsets)
-      ? nextAssemblyState.subviewTrackDragOffsets
-      : [],
-    subviewAnchorStateByKey:
-      nextAssemblyState.subviewAnchorStateByKey
-      && typeof nextAssemblyState.subviewAnchorStateByKey === "object"
-      && !Array.isArray(nextAssemblyState.subviewAnchorStateByKey)
-        ? nextAssemblyState.subviewAnchorStateByKey
-        : {},
-    trackScrollState: normalizeViewportScrollState(nextAssemblyState.trackScrollState),
-    subviewTrackScrollState: normalizeViewportScrollState(nextAssemblyState.subviewTrackScrollState),
-    finalPathTrackScrollState: normalizeViewportScrollState(nextAssemblyState.finalPathTrackScrollState),
-    membersCardCollapsed: nextAssemblyState.membersCardCollapsed === false ? false : true,
-    finalPathViewMode: normalizeFinalPathViewMode(nextAssemblyState.finalPathViewMode),
-    finalPathByChr:
-      nextAssemblyState.finalPathByChr &&
-      typeof nextAssemblyState.finalPathByChr === "object" &&
-      !Array.isArray(nextAssemblyState.finalPathByChr)
-        ? nextAssemblyState.finalPathByChr
-        : {},
-  });
-
-  if (
-    !state.session.workspacePath ||
-    !state.session.projectId ||
-    !state.assembly.selectedChrName ||
-    supportDatasetId === null
-  ) {
-    return true;
-  }
-
-  const supportChrCtgs = await loadSupportChrCtgs(
-    state.session.workspacePath,
-    state.session.projectId,
-    state.assembly.selectedChrName,
-    supportDatasetId,
-  );
-  const latestState = store.getState();
-  if (
-    normalizeSupportDatasetId(latestState.assembly.supportDatasetId) !== supportDatasetId ||
-    String(latestState.assembly.selectedChrName || "").trim() !==
-      String(state.assembly.selectedChrName || "").trim()
-  ) {
-    return true;
-  }
-
-  store.setState({
-    ...latestState,
-    assembly: {
-      ...latestState.assembly,
-      supportChrCtgs,
-      summary: "",
-    },
-  });
-  rerenderView(host, store);
-  return true;
 }
 
 export async function __testApplySupportDatasetSelection(store, rawSupportDatasetId, options = {}) {

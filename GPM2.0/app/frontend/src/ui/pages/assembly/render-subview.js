@@ -4,7 +4,6 @@ import {
   MAPQ_OPTIONS,
   MAX_TICK_COUNT_OPTIONS,
   MIN_TICK_UNIT_KB_OPTIONS,
-  SUPPORT_DS_CTG_LEN_BP_OPTIONS,
   normalizeNonNegativeInt,
   normalizePositiveInt,
   resolveTrackInnerWidthFromScale,
@@ -12,37 +11,22 @@ import {
   resolveTrackPrefs,
 } from "./track-prefs.js";
 import {
-  buildSubviewTrackDragOffsetKey,
-  buildTrackDragOffsetKey,
-  filterPrimaryTrackSelectionCtgIds,
-  normalizeDeletedCtgRecordIds,
   normalizeSupportDatasetId,
-  normalizeSupportMirroredCtgs,
-  normalizeTrackDragOffsets,
-  normalizeTrackRole,
-  normalizeTrackSelectionCtgIds,
-  normalizeSubviewTrackDragOffsets,
 } from "./selection-state.js";
 import {
   buildRefSubviewCtgPool,
   buildSubviewFlippedCtgKey,
   buildSubviewTrackSelectionKey,
-  buildSupportSubviewCtgPool,
-  buildPhasedSubviewCtgPool,
   buildSubviewTrackPairHiddenCtgKey,
   buildSubviewCandidateSelectionKey,
-  buildPhasedSubviewCtgHits,
   flipSubviewHitRange,
   getSubviewSelections,
   getSubviewState as getSubviewStateImpl,
   getSubviewTrackSelections,
-  resolveSubviewCtgOrientValue,
   normalizeSubviewRole,
   normalizeSubviewSummarySelection,
   normalizeSubviewTrackPairHiddenCtgs,
   normalizeSubviewTrackPairSelectionCtgs,
-  normalizeSubviewTrackSelectionItem,
-  normalizeSubviewTrackSource,
   normalizeSubviewTrackSummary,
   resolveSubviewSelectionCtg,
   resolveSubviewTrackSummaryCtgs,
@@ -51,13 +35,8 @@ import {
   buildSubviewAnchorEndpointKey,
   deriveSubviewContigFragments,
 } from "./subview-anchor-state.js";
-import {
-  filterSupportCtgsBySupportDsCtgLenRules,
-  getSupportDsCtgLenRulesForChr,
-  hasAdvancedSupportDsCtgLenRules,
-} from "./support-ds-ctg-len-rules.js";
 import { resolveSubviewAutoTrackOffsets } from "./subview-offset-state.js";
-import { renderAssemblyFinalPathCard as renderAssemblyFinalPathCardImpl } from "./render-final-path.js";
+import { assemblyPageSession } from "./page-session.js";
 import {
   buildTrackCtgHoverTitle,
   resolveBoundedTrackCtgLabelPlacement,
@@ -87,8 +66,7 @@ import {
 } from "./track-render-geometry.js";
 
 export const SUBVIEW_BAND_TOOLTIP_HOVER_DELAY_MS = 500;
-const filteredRefSubviewCtgCache = new WeakMap();
-const refSubviewSegmentPairCache = new Map();
+const MAX_SEGMENT_PAIR_CACHE_ENTRIES = 256;
 
 function resolveRefOverlapBpCached(leftSegment, rightSegment) {
   const leftStart = Math.min(Number(leftSegment?.refStart) || 0, Number(leftSegment?.refEnd) || 0);
@@ -568,10 +546,11 @@ export function getCachedFilteredRefSubviewCtgs({
   const datasetId = resolveSubviewRefDatasetId(subview, supportContext);
   const selectionKey = buildSubviewRefCacheSelectionKey(subview?.summary || null);
   const cacheKey = `${String(supportContext?.refTrackLabel || supportContext?.selectedChrName || "")}|${selectionKey}|${normalizeSupportDatasetId(datasetId) || 0}`;
-  let cacheBySelection = filteredRefSubviewCtgCache.get(list);
+  const filteredRefCtgs = assemblyPageSession.subviewRenderCache.filteredRefCtgs;
+  let cacheBySelection = filteredRefCtgs.get(list);
   if (!cacheBySelection) {
     cacheBySelection = new Map();
-    filteredRefSubviewCtgCache.set(list, cacheBySelection);
+    filteredRefCtgs.set(list, cacheBySelection);
   }
   if (cacheBySelection.has(cacheKey)) {
     return cacheBySelection.get(cacheKey);
@@ -612,13 +591,17 @@ function pairRefSubviewSegmentsWithCache({
     buildSubviewSegmentSignature(topSegments),
     buildSubviewSegmentSignature(bottomSegments),
   ].join("::");
-  if (refSubviewSegmentPairCache.has(pairCacheKey)) {
-    return refSubviewSegmentPairCache.get(pairCacheKey);
+  const segmentPairs = assemblyPageSession.subviewRenderCache.segmentPairs;
+  if (segmentPairs.has(pairCacheKey)) {
+    return segmentPairs.get(pairCacheKey);
   }
   const value = trackMode === "track-pair"
     ? pairSubviewTrackSegmentsByReferenceCached(topSegments, bottomSegments)
     : pairSubviewSegmentsByReferenceCached(topSegments, bottomSegments);
-  refSubviewSegmentPairCache.set(pairCacheKey, value);
+  if (segmentPairs.size >= MAX_SEGMENT_PAIR_CACHE_ENTRIES) {
+    segmentPairs.delete(segmentPairs.keys().next().value);
+  }
+  segmentPairs.set(pairCacheKey, value);
   return value;
 }
 

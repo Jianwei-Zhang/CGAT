@@ -14,6 +14,13 @@ function normalizeViewportWidths(nextWidths = null) {
   );
 }
 
+function createSubviewRenderCache() {
+  return {
+    filteredRefCtgs: new WeakMap(),
+    segmentPairs: new Map(),
+  };
+}
+
 export function createAssemblyPageSession() {
   return {
     lastSupportDsSessionKey: "",
@@ -37,6 +44,7 @@ export function createAssemblyPageSession() {
     suppressTrackContigClickUntil: 0,
     assemblyConfirmDialogSeq: 0,
     pendingAssemblyConfirmResolvers: new Map(),
+    subviewRenderCache: createSubviewRenderCache(),
   };
 }
 
