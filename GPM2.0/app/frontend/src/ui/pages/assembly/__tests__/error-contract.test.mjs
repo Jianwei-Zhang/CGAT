@@ -27,6 +27,26 @@ test("maps object not found errors to Chinese-first message", () => {
   assert.match(mapped.userMessage, /未找到/);
 });
 
+test("stable envelope codes classify without depending on message wording", () => {
+  const notFound = mapAssemblyError({
+    error: { code: "NOT_FOUND", message: "wording can change freely" },
+  });
+  const invalid = mapAssemblyError({
+    error: { code: "INVALID_REQUEST", message: "payload rejected" },
+  });
+  const conflict = mapAssemblyError({
+    error: { code: "STATE_CONFLICT", message: "operation rejected" },
+  });
+  const runtime = mapAssemblyError({
+    error: { code: "RUNTIME_ERROR", message: "process stopped" },
+  });
+
+  assert.equal(notFound.category, "not-found");
+  assert.equal(invalid.category, "invalid-params");
+  assert.equal(conflict.category, "state-conflict");
+  assert.equal(runtime.category, "runtime");
+});
+
 test("maps current chromosome contig search miss to centralized Chinese-first message", () => {
   const mapped = mapAssemblyError({
     error: {

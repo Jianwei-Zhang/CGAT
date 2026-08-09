@@ -6,7 +6,7 @@ pub fn list_export_records(
     workspaceRoot: String,
     projectId: i64,
     limit: Option<i64>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let items = backend_list_export_records(
             &project_db_path(&workspaceRoot),
@@ -37,7 +37,7 @@ pub fn list_export_records(
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn get_runtime_settings(workspaceRoot: String) -> Result<Value, String> {
+pub fn get_runtime_settings(workspaceRoot: String) -> CommandResult<Value> {
     (|| {
         let runtime = backend_get_runtime_settings(&project_db_path(&workspaceRoot))?;
         Ok(json!({
@@ -55,7 +55,7 @@ pub fn get_runtime_settings(workspaceRoot: String) -> Result<Value, String> {
 pub fn update_runtime_settings(
     workspaceRoot: String,
     degapWorkspaceSettings: Option<Value>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let normalized_degap_workspace_settings = degapWorkspaceSettings
             .filter(Value::is_object)
@@ -83,7 +83,7 @@ pub fn update_runtime_settings(
 pub fn get_project_assembly_view_state(
     workspaceRoot: String,
     projectId: i64,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let state =
             backend_get_project_assembly_view_state(&project_db_path(&workspaceRoot), projectId)?;
@@ -128,7 +128,7 @@ pub fn get_project_assembly_view_state(
 #[tauri::command]
 pub fn update_project_assembly_view_state(
     request: UpdateProjectAssemblyViewStateCommandRequest,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     let UpdateProjectAssemblyViewStateCommandRequest {
         workspace_root,
         project_id,
@@ -295,7 +295,7 @@ pub fn append_edit_audit_log(
     category: String,
     action: String,
     detail: Option<String>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let item = backend_append_edit_audit_log(
             &project_db_path(&workspaceRoot),
@@ -324,7 +324,7 @@ pub fn list_edit_audit_logs(
     workspaceRoot: String,
     projectId: i64,
     limit: Option<i64>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let items = backend_list_edit_audit_logs(
             &project_db_path(&workspaceRoot),
@@ -353,7 +353,7 @@ pub fn list_edit_audit_logs(
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn clear_edit_audit_logs(workspaceRoot: String, projectId: i64) -> Result<Value, String> {
+pub fn clear_edit_audit_logs(workspaceRoot: String, projectId: i64) -> CommandResult<Value> {
     (|| {
         let deleted_count =
             backend_clear_edit_audit_logs(&project_db_path(&workspaceRoot), projectId)?;

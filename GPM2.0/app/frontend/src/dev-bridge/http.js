@@ -101,7 +101,7 @@ export function normalizeDevBridgeError(error, operation = "") {
     return error;
   }
   return new DevBridgeError(
-    typeof error?.code === "string" && error.code ? error.code : "DEV_BRIDGE_RUNTIME_ERROR",
+    typeof error?.code === "string" && error.code ? error.code : "RUNTIME_ERROR",
     String(error?.message || error || "dev bridge runtime error"),
     {
       status: Number.isInteger(error?.status) ? error.status : 500,

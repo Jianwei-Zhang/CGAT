@@ -9,9 +9,9 @@
 - Contract validators expose stable machine codes. Python uses
   `ContractError(code, message)`; Rust GRT validation prefixes errors through
   `grt_anyhow(code, message)`.
-- Tauri currently returns `Result<Value, String>` using the full anyhow context
-  chain. This string shape is an existing compatibility boundary.
-- The dev bridge currently returns HTTP JSON containing at least `{ error }`;
+- Tauri commands return `CommandResult<T>` with a serializable `CommandError`
+  envelope; the full anyhow context chain remains in `message`.
+- The dev bridge returns the same stable envelope plus the legacy `error` field;
   `workflow-api.js` normalizes transport failures into an `Error` with `code`,
   `source`, `operation`, `detail`, `data`, and `cause`.
 
@@ -21,15 +21,16 @@
 
 - Trigger: adding or changing an operation exposed through Tauri, the backend
   CLI/dev bridge, and `workflow-api.js`.
-- Existing string-returning Tauri commands remain compatible until a dedicated
-  transport migration changes all consumers together.
+- Legacy message parsing is allowed only for errors carrying an explicit legacy
+  wrapper code and has a documented removal condition.
 
 ### 2. Signatures
 
 ```text
 Rust service: Result<T, anyhow::Error> with stable domain-code context
-Tauri today: Result<serde_json::Value, String>
-Dev bridge today: HTTP non-2xx { error, code?, detail? }
+Tauri: CommandResult<T> = Result<T, CommandError>
+CommandError: { code, message, operation, data }
+Dev bridge: HTTP non-2xx { code, message, operation, data, error }
 Frontend normalized Error: { message, code, source, operation, detail, data, cause }
 ```
 
@@ -43,6 +44,13 @@ Frontend normalized Error: { message, code, source, operation, detail, data, cau
 - Convert an error only once per boundary. The frontend service normalizes
   Tauri/dev-bridge errors; renderers consume the normalized shape and do not
   parse backend strings again.
+- Generic adapter categories use `INVALID_REQUEST`, `NOT_FOUND`,
+  `STATE_CONFLICT`, and `RUNTIME_ERROR`; a more specific stable backend prefix
+  such as `GRT_IMPORT_INVALID_JSON` survives unchanged.
+- `assembly/error-contract.js` may use message regex only for
+  `ASSEMBLY_ERROR`, `WORKFLOW_ERROR`, `TAURI_INVOKE_ERROR`, or
+  `DEV_BRIDGE_ERROR`. Remove that compatibility set after persisted, mock, and
+  third-party producers all emit stable codes.
 - Compatibility changes are explicit: either preserve the existing payload, or
   version/update Tauri, dev bridge, frontend adapter, mocks, and tests together.
 
@@ -54,7 +62,9 @@ Frontend normalized Error: { message, code, source, operation, detail, data, cau
 | Invalid ID/state/coordinate | Domain service | Stable domain code plus contextual message; no writes. |
 | SQLite/filesystem/tool failure | Persistence/external boundary | Preserve source cause and add operation/path context. |
 | Tauri task join failure | Tauri adapter | Runtime code/source/operation; never classify as domain validation. |
-| Unknown error | Frontend adapter | `WORKFLOW_ERROR`/transport default and safe generic localized message. |
+| Unknown backend error | Tauri/dev adapter | `BACKEND_ERROR`, preserved diagnostic message, no domain guess. |
+| Task/process/runtime failure | Tauri/dev adapter | `RUNTIME_ERROR`; never classify as domain validation. |
+| Legacy string/wrapper error | Frontend adapter | Compatibility message parsing only for the named legacy wrapper codes. |
 
 ### 5. Good/Base/Bad Cases
 
@@ -67,8 +77,8 @@ Frontend normalized Error: { message, code, source, operation, detail, data, cau
 ### 6. Tests Required
 
 - Domain test for good, missing, invalid, conflict, and no-write-on-error cases.
-- Tauri request deserialization and exact error propagation test.
-- Dev-bridge non-2xx envelope test.
+- Tauri request deserialization plus exact `CommandError` serialization/code test.
+- Dev-bridge non-2xx envelope test for invalid/not-found/conflict/runtime.
 - Frontend normalization test for string, `Error`, nested `data`, and unknown
   values, followed by localized category tests using stable codes.
 

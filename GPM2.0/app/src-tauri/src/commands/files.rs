@@ -1,7 +1,7 @@
 use super::*;
 
 #[tauri::command]
-pub fn pick_zip_file_path() -> Result<Option<String>, String> {
+pub fn pick_zip_file_path() -> CommandResult<Option<String>> {
     let selected = FileDialog::new()
         .add_filter("zip", &["zip"])
         .pick_file()
@@ -10,7 +10,7 @@ pub fn pick_zip_file_path() -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
-pub fn pick_directory_path() -> Result<Option<String>, String> {
+pub fn pick_directory_path() -> CommandResult<Option<String>> {
     let selected = FileDialog::new()
         .pick_folder()
         .map(|path| path_to_string(&path));
@@ -22,7 +22,7 @@ pub fn pick_directory_path() -> Result<Option<String>, String> {
 pub fn pick_save_file_path(
     defaultPath: Option<String>,
     filters: Value,
-) -> Result<Option<String>, String> {
+) -> CommandResult<Option<String>> {
     let mut dialog = FileDialog::new();
     if let Some(file_name) = defaultPath
         .as_deref()
@@ -39,10 +39,7 @@ pub fn pick_save_file_path(
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn write_final_path_export_text_file(
-    outputPath: String,
-    text: String,
-) -> Result<Value, String> {
+pub fn write_final_path_export_text_file(outputPath: String, text: String) -> CommandResult<Value> {
     (|| {
         let output_path = PathBuf::from(outputPath.trim());
         if let Some(parent) = output_path.parent() {
@@ -61,7 +58,7 @@ pub fn write_final_path_export_text_file(
 pub fn write_final_path_export_binary_file(
     outputPath: String,
     bytesBase64: String,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let output_path = PathBuf::from(outputPath.trim());
         if let Some(parent) = output_path.parent() {
@@ -86,7 +83,7 @@ pub fn export_final_path_fasta(
     chrName: String,
     finalPathEntry: Value,
     outputPath: String,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let summary = backend_export_final_path_fasta(
             &project_db_path(&workspaceRoot),
@@ -109,7 +106,7 @@ pub fn export_project_final_path_fasta(
     projectId: i64,
     finalPathByChr: Value,
     outputPath: String,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let summary = backend_export_project_final_path_fasta(
             &project_db_path(&workspaceRoot),
@@ -132,7 +129,7 @@ pub fn export_degap_jobs(
     outputDir: String,
     settings: Value,
     jobs: Value,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let params = ExportDegapJobsParams {
             output_dir: PathBuf::from(outputDir),

@@ -7,7 +7,7 @@ pub fn list_chr_view_ctgs(
     projectId: i64,
     chrName: Option<String>,
     datasetId: Option<i64>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let items = backend_list_chr_view_ctgs(
             &project_db_path(&workspaceRoot),
@@ -125,7 +125,7 @@ pub fn list_deleted_ctgs(
     projectId: i64,
     chrName: Option<String>,
     datasetId: Option<i64>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let items = backend_list_deleted_ctgs(
             &project_db_path(&workspaceRoot),
@@ -163,7 +163,7 @@ pub fn list_reference_track_members(
     workspaceRoot: String,
     projectId: i64,
     chrName: String,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let items = backend_list_reference_track_members(
             &project_db_path(&workspaceRoot),
@@ -220,7 +220,7 @@ pub fn list_phased_chr_tracks(
     workspaceRoot: String,
     projectId: i64,
     parentChrName: String,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let result = backend_list_phased_chr_tracks(
             &project_db_path(&workspaceRoot),
@@ -247,7 +247,7 @@ pub fn create_phased_chr_track(
     workspaceRoot: String,
     projectId: i64,
     parentChrName: String,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let summary = backend_create_phased_chr_track(
             &project_db_path(&workspaceRoot),
@@ -265,7 +265,7 @@ pub fn delete_phased_chr_track(
     workspaceRoot: String,
     projectId: i64,
     phasedTrackId: i64,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let summary = backend_delete_phased_chr_track(
             &project_db_path(&workspaceRoot),
@@ -291,7 +291,7 @@ pub fn add_ctg_to_phased_chr_track(
     projectId: i64,
     phasedTrackId: i64,
     assemblyCtgId: i64,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let summary = backend_add_ctg_to_phased_chr_track(
             &project_db_path(&workspaceRoot),
@@ -310,7 +310,7 @@ pub fn remove_phased_chr_track_item(
     workspaceRoot: String,
     projectId: i64,
     phasedTrackItemId: i64,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let summary = backend_remove_phased_chr_track_item(
             &project_db_path(&workspaceRoot),
@@ -334,7 +334,7 @@ pub fn reorder_phased_chr_track_items(
     projectId: i64,
     phasedTrackId: i64,
     itemIds: Vec<i64>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let summary = backend_reorder_phased_chr_track_items(
             &project_db_path(&workspaceRoot),
@@ -357,7 +357,7 @@ pub fn get_ctg_detail(
     workspaceRoot: String,
     projectId: i64,
     assemblyCtgId: i64,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let detail =
             backend_get_ctg_detail(&project_db_path(&workspaceRoot), projectId, assemblyCtgId)?;
@@ -402,7 +402,7 @@ pub fn list_ctg_edit_candidates(
     workspaceRoot: String,
     projectId: i64,
     assemblyCtgId: i64,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let candidates = backend_list_ctg_edit_candidates(
             &project_db_path(&workspaceRoot),
@@ -450,7 +450,7 @@ pub fn restore_deleted_ctg(
     workspaceRoot: String,
     projectId: i64,
     deletedCtgRecordId: i64,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let summary = backend_restore_deleted_ctg(
             &project_db_path(&workspaceRoot),
@@ -477,7 +477,7 @@ pub fn run_ctg_editor_action(
     projectId: i64,
     action: String,
     args: Value,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let project_db = project_db_path(&workspaceRoot);
         let normalized = action.trim().to_ascii_lowercase();
@@ -599,7 +599,7 @@ pub async fn get_junction_inspection(
     rightAssemblyCtgId: i64,
     minAlignmentLength: Option<i64>,
     minMapq: Option<i64>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     let workspace_root = workspaceRoot;
     tauri::async_runtime::spawn_blocking(move || {
         let params = GetJunctionInspectionParams {
@@ -689,7 +689,7 @@ pub async fn get_track_pairwise_evidence(
     bottomAssemblyCtgIds: Vec<i64>,
     minAlignmentLength: Option<i64>,
     minMapq: Option<i64>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     let workspace_root = workspaceRoot;
     tauri::async_runtime::spawn_blocking(move || {
         let params = GetTrackPairwiseEvidenceParams {

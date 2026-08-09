@@ -6,7 +6,11 @@ export function isTauriRuntime() {
 
 export async function invokeCommand(command, args = {}, stateOrLocale = "zh") {
   if (!isTauriRuntime()) {
-    throw new Error(t(stateOrLocale, "importer.runtime.backendCommandUnavailable", { command }));
+    const error = new Error(t(stateOrLocale, "importer.runtime.backendCommandUnavailable", { command }));
+    error.code = "RUNTIME_ERROR";
+    error.source = "browser-preview";
+    error.operation = command;
+    throw error;
   }
   return window.__TAURI__.core.invoke(command, args);
 }

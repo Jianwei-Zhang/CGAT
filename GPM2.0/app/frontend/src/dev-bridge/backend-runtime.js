@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 
 import { resolveDefaultBackendExe, resolveRootDirFromFileUrl } from "../../dev-bridge-paths.js";
+import { classifyBridgeErrorCode } from "./contracts.js";
 
 export function resolveBackendRuntime({
   fileUrl = import.meta.url,
@@ -44,11 +45,13 @@ export function runBackendCommand({ args, backendExe, cwd, spawnProcess = spawn,
     child.on("error", reject);
     child.on("close", (code) => {
       if (code !== 0) {
-        reject(
-          new Error(
-            `backend command failed (code=${code})\nargs=${args.join(" ")}\n${stderr || stdout}`,
-          ),
+        const detail = stderr || stdout;
+        const error = new Error(
+          `backend command failed (code=${code})\nargs=${args.join(" ")}\n${detail}`,
         );
+        error.code = classifyBridgeErrorCode(detail);
+        error.data = { exitCode: code };
+        reject(error);
         return;
       }
       resolve({ stdout, stderr });

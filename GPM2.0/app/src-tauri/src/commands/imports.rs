@@ -7,7 +7,7 @@ pub async fn import_zip(
     zipPath: String,
     workspaceRoot: String,
     runId: Option<String>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     let zip_path = zipPath;
     let workspace_root = workspaceRoot;
     let run_id = normalize_optional_run_id(runId);
@@ -59,7 +59,7 @@ pub async fn import_extracted(
     app: AppHandle,
     extractedPath: String,
     runId: Option<String>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     let extracted_path = extractedPath;
     let run_id = normalize_optional_run_id(runId);
     if let Some(run_id) = run_id.as_deref() {
@@ -110,7 +110,7 @@ pub async fn import_add_dataset_package(
     workspaceRoot: String,
     zipPath: String,
     runId: Option<String>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     let workspace_root = workspaceRoot;
     let zip_path = zipPath;
     let run_id = normalize_optional_run_id(runId);
@@ -179,7 +179,7 @@ pub async fn import_add_ctg_package(
     expectedTargetChr: Option<String>,
     expectedTargetTrack: Option<String>,
     runId: Option<String>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     let workspace_root = workspaceRoot;
     let zip_path = zipPath;
     let expected_target = AddCtgImportTarget {
@@ -250,7 +250,7 @@ pub async fn import_add_ctg_package(
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn request_import_cancel(runId: String) -> Result<Value, String> {
+pub fn request_import_cancel(runId: String) -> CommandResult<Value> {
     let registered = import_cancel::request_cancel(&runId);
     Ok(json!({
         "runId": runId,

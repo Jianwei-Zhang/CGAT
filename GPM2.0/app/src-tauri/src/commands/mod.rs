@@ -80,7 +80,7 @@ use gpm_next_backend::runtime_persistence::{
 };
 use gpm_next_backend::workspace::looks_like_bundle_root;
 use rfd::FileDialog;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tauri::{AppHandle, Emitter};
 
@@ -127,6 +127,79 @@ pub struct UpdateProjectAssemblyViewStateCommandRequest {
     final_path_view_mode: String,
     final_path_by_chr: Value,
     degap_project_state: Value,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandError {
+    code: String,
+    message: String,
+    operation: String,
+    data: Value,
+}
+
+type CommandResult<T> = std::result::Result<T, CommandError>;
+
+impl CommandError {
+    fn backend(error: anyhow::Error) -> Self {
+        let message = format!("{error:#}");
+        Self {
+            code: classify_command_error_code(&message).to_string(),
+            message,
+            operation: String::new(),
+            data: Value::Null,
+        }
+    }
+
+    fn runtime(message: impl Into<String>) -> Self {
+        Self {
+            code: "RUNTIME_ERROR".to_string(),
+            message: message.into(),
+            operation: String::new(),
+            data: Value::Null,
+        }
+    }
+}
+
+impl From<String> for CommandError {
+    fn from(message: String) -> Self {
+        Self::runtime(message)
+    }
+}
+
+fn classify_command_error_code(message: &str) -> &str {
+    if let Some(code) = message.split_whitespace().find_map(|token| {
+        let candidate = token.trim_end_matches(':');
+        (token.ends_with(':')
+            && candidate.contains('_')
+            && candidate.chars().all(|character| {
+                character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
+            }))
+        .then_some(candidate)
+    }) {
+        return code;
+    }
+
+    let normalized = message.to_ascii_lowercase();
+    if normalized.contains("does not exist") || normalized.contains("not found") {
+        return "NOT_FOUND";
+    }
+    if normalized.contains("already")
+        || normalized.contains("conflict")
+        || normalized.contains("cannot")
+        || normalized.contains("only allow")
+        || normalized.contains("entered assembly")
+    {
+        return "STATE_CONFLICT";
+    }
+    if normalized.contains("invalid")
+        || normalized.contains("missing")
+        || normalized.contains("must ")
+        || normalized.contains("required")
+    {
+        return "INVALID_REQUEST";
+    }
+    "BACKEND_ERROR"
 }
 
 fn project_db_path(workspace_root: &str) -> PathBuf {
@@ -333,8 +406,8 @@ fn map_phased_track(track: PhasedChrTrack) -> Value {
     })
 }
 
-fn format_error(error: anyhow::Error) -> String {
-    format!("{error:#}")
+fn format_error(error: anyhow::Error) -> CommandError {
+    CommandError::backend(error)
 }
 
 fn is_auto_pipeline_cancelled(workspace_root: &str, project_id: i64, run_id: Option<&str>) -> bool {
@@ -970,6 +1043,32 @@ mod tests {
         assert_eq!(
             records[1].final_path_segments,
             vec![FinalPathExportSegment::Gap { gap_size_bp: 50 }]
+        );
+    }
+
+    #[test]
+    fn command_errors_preserve_stable_codes_and_structured_envelope() {
+        let prefixed = CommandError::backend(anyhow!(
+            "validation failed: GRT_IMPORT_INVALID_JSON: malformed recipe"
+        ));
+        let not_found = CommandError::backend(anyhow!("project_id 42 does not exist"));
+        let invalid = CommandError::backend(anyhow!("projectId must be a positive integer"));
+        let conflict = CommandError::backend(anyhow!("project name already exists"));
+        let runtime = CommandError::runtime("join task failed");
+
+        assert_eq!(prefixed.code, "GRT_IMPORT_INVALID_JSON");
+        assert_eq!(not_found.code, "NOT_FOUND");
+        assert_eq!(invalid.code, "INVALID_REQUEST");
+        assert_eq!(conflict.code, "STATE_CONFLICT");
+        assert_eq!(runtime.code, "RUNTIME_ERROR");
+        assert_eq!(
+            serde_json::to_value(&not_found).expect("serialize command error"),
+            json!({
+                "code": "NOT_FOUND",
+                "message": "project_id 42 does not exist",
+                "operation": "",
+                "data": null
+            })
         );
     }
 }

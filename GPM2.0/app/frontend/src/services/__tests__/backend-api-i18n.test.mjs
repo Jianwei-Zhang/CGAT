@@ -19,10 +19,12 @@ test("backend-api preview prompts and errors use english copy when locale is en"
       },
     };
 
-    await assert.rejects(
-      invokeCommand("import_zip", {}, { locale: "en" }),
-      /Browser preview cannot invoke backend command: import_zip/,
-    );
+    await assert.rejects(invokeCommand("import_zip", {}, { locale: "en" }), (error) => {
+      assert.match(error.message, /Browser preview cannot invoke backend command: import_zip/);
+      assert.equal(error.code, "RUNTIME_ERROR");
+      assert.equal(error.operation, "import_zip");
+      return true;
+    });
     assert.equal(await pickZipFilePath({ locale: "en" }), "D:/tmp/input");
     assert.equal(await pickDirectoryPath({ locale: "en" }), "D:/tmp/input");
     assert.equal(

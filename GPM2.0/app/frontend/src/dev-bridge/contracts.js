@@ -1,12 +1,54 @@
+export function classifyBridgeErrorCode(message, fallback = "RUNTIME_ERROR") {
+  const text = String(message || "");
+  const prefixedCode = text
+    .split(/\s+/)
+    .map((token) => token.replace(/:$/, ""))
+    .find((token) =>
+      token.includes("_") && /^[A-Z][A-Z0-9_]+$/.test(token));
+  if (prefixedCode) {
+    return prefixedCode;
+  }
+
+  const normalized = text.toLowerCase();
+  if (normalized.includes("does not exist") || normalized.includes("not found")) {
+    return "NOT_FOUND";
+  }
+  if (
+    normalized.includes("already")
+    || normalized.includes("conflict")
+    || normalized.includes("cannot")
+    || normalized.includes("only allow")
+    || normalized.includes("entered assembly")
+  ) {
+    return "STATE_CONFLICT";
+  }
+  if (
+    normalized.includes("invalid")
+    || normalized.includes("missing")
+    || normalized.includes("must ")
+    || normalized.includes("required")
+  ) {
+    return "INVALID_REQUEST";
+  }
+  return fallback;
+}
+
+function invalidRequest(message) {
+  const error = new Error(message);
+  error.code = "INVALID_REQUEST";
+  error.status = 400;
+  return error;
+}
+
 export function requireString(name, value) {
   if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`missing required field: ${name}`);
+    throw invalidRequest(`missing required field: ${name}`);
   }
 }
 
 export function requireNumber(name, value) {
   if (typeof value !== "number" || Number.isNaN(value)) {
-    throw new Error(`missing required number field: ${name}`);
+    throw invalidRequest(`missing required number field: ${name}`);
   }
 }
 

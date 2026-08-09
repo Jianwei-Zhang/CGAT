@@ -6,6 +6,7 @@ import { createBackendOperations } from "../backend-operations.js";
 import { runBackendCommand } from "../backend-runtime.js";
 import {
   applyListLimit,
+  classifyBridgeErrorCode,
   normalizeToken,
   parseJsonLine,
   parseKeyValueLines,
@@ -30,6 +31,9 @@ test("shared dev bridge contracts validate and normalize boundary values", () =>
   assert.equal(normalizeToken("Chr01"), "Chr01");
   assert.deepEqual(applyListLimit([1, 2, 3], 2), [1, 2]);
   assert.deepEqual(applyListLimit([1, 2, 3], -1), [1, 2, 3]);
+  assert.equal(classifyBridgeErrorCode("GRT_IMPORT_INVALID_JSON: bad recipe"), "GRT_IMPORT_INVALID_JSON");
+  assert.equal(classifyBridgeErrorCode("project_id 7 does not exist"), "NOT_FOUND");
+  assert.equal(classifyBridgeErrorCode("project name already exists"), "STATE_CONFLICT");
 });
 
 test("shared stdout parsers preserve spaced values and reject malformed JSON lines", () => {

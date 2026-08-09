@@ -160,6 +160,6 @@ test("middleware distinguishes malformed JSON from handler failures", async () =
   assert.equal(malformed.status, 400);
   assert.equal(malformed.body.code, "INVALID_JSON_BODY");
   assert.equal(failed.status, 500);
-  assert.equal(failed.body.code, "DEV_BRIDGE_RUNTIME_ERROR");
+  assert.equal(failed.body.code, "RUNTIME_ERROR");
   assert.equal(failed.body.message, "backend unavailable");
 });

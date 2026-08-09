@@ -2,19 +2,19 @@ use super::*;
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn list_project_initializer_options(workspaceRoot: String) -> Result<Value, String> {
+pub fn list_project_initializer_options(workspaceRoot: String) -> CommandResult<Value> {
     read_initializer_options(&workspaceRoot, false).map_err(format_error)
 }
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn open_workspace(workspaceRoot: String) -> Result<Value, String> {
+pub fn open_workspace(workspaceRoot: String) -> CommandResult<Value> {
     read_initializer_options(&workspaceRoot, true).map_err(format_error)
 }
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn validate_workspace_integrity(workspaceRoot: String) -> Result<Value, String> {
+pub fn validate_workspace_integrity(workspaceRoot: String) -> CommandResult<Value> {
     (|| {
         let workspace_root = Path::new(&workspaceRoot);
         if !workspace_root.exists() {
@@ -78,7 +78,7 @@ pub fn validate_workspace_integrity(workspaceRoot: String) -> Result<Value, Stri
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn delete_workspace_directory(workspaceRoot: String) -> Result<Value, String> {
+pub fn delete_workspace_directory(workspaceRoot: String) -> CommandResult<Value> {
     (|| {
         let workspace_root = Path::new(&workspaceRoot);
         if !workspace_root.exists() {
@@ -115,7 +115,7 @@ pub fn delete_workspace_directory(workspaceRoot: String) -> Result<Value, String
 }
 
 #[tauri::command]
-pub fn initialize_project(request: InitializeProjectCommandRequest) -> Result<Value, String> {
+pub fn initialize_project(request: InitializeProjectCommandRequest) -> CommandResult<Value> {
     let InitializeProjectCommandRequest {
         workspace_root,
         project_name,
@@ -153,7 +153,7 @@ pub fn initialize_project(request: InitializeProjectCommandRequest) -> Result<Va
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn get_grt_project_view(workspaceRoot: String, projectId: i64) -> Result<Value, String> {
+pub fn get_grt_project_view(workspaceRoot: String, projectId: i64) -> CommandResult<Value> {
     (|| {
         let project_db = project_db_path(&workspaceRoot);
         let options = backend_list_initializer_options(&project_db)?;
@@ -172,7 +172,7 @@ pub fn get_grt_project_view(workspaceRoot: String, projectId: i64) -> Result<Val
 }
 
 #[tauri::command]
-pub fn update_project(request: UpdateProjectCommandRequest) -> Result<Value, String> {
+pub fn update_project(request: UpdateProjectCommandRequest) -> CommandResult<Value> {
     let UpdateProjectCommandRequest {
         workspace_root,
         project_id,
@@ -216,7 +216,7 @@ pub fn update_project(request: UpdateProjectCommandRequest) -> Result<Value, Str
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub async fn delete_project(workspaceRoot: String, projectId: i64) -> Result<Value, String> {
+pub async fn delete_project(workspaceRoot: String, projectId: i64) -> CommandResult<Value> {
     tauri::async_runtime::spawn_blocking(move || {
         (|| {
             let project_db = project_db_path(&workspaceRoot);
@@ -238,7 +238,7 @@ pub async fn bootstrap_project_assembly(
     workspaceRoot: String,
     projectId: i64,
     runId: Option<String>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     tauri::async_runtime::spawn_blocking(move || {
         (|| {
             let run_id = runId.as_deref();
@@ -277,7 +277,7 @@ pub async fn auto_assign_chr(
     workspaceRoot: String,
     projectId: i64,
     runId: Option<String>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     tauri::async_runtime::spawn_blocking(move || {
         (|| {
             let run_id = runId.as_deref();
@@ -327,7 +327,7 @@ pub async fn auto_orient_contigs(
     workspaceRoot: String,
     projectId: i64,
     runId: Option<String>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     tauri::async_runtime::spawn_blocking(move || {
         (|| {
             let run_id = runId.as_deref();
@@ -373,7 +373,7 @@ pub async fn auto_orient_contigs_for_dataset(
     projectId: i64,
     datasetId: i64,
     runId: Option<String>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     tauri::async_runtime::spawn_blocking(move || {
         (|| {
             let run_id = runId.as_deref();
@@ -420,7 +420,7 @@ pub fn request_auto_pipeline_cancel(
     workspaceRoot: String,
     projectId: i64,
     runId: String,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     let requested = auto_pipeline_cancel::request_cancel(&workspaceRoot, projectId, &runId);
     Ok(json!({
         "workspaceRoot": workspaceRoot,
@@ -436,7 +436,7 @@ pub fn set_project_auto_pipeline_done(
     workspaceRoot: String,
     projectId: i64,
     done: Option<bool>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let project_db = project_db_path(&workspaceRoot);
         let done = done.unwrap_or(true);
@@ -454,7 +454,7 @@ pub fn set_project_auto_pipeline_done(
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn list_project_chromosomes(workspaceRoot: String, projectId: i64) -> Result<Value, String> {
+pub fn list_project_chromosomes(workspaceRoot: String, projectId: i64) -> CommandResult<Value> {
     (|| {
         let chromosomes =
             backend_list_project_chromosomes(&project_db_path(&workspaceRoot), projectId)?;
@@ -488,7 +488,7 @@ pub fn list_new_sequences(
     workspaceRoot: String,
     projectId: i64,
     limit: Option<i64>,
-) -> Result<Value, String> {
+) -> CommandResult<Value> {
     (|| {
         let items = apply_item_limit(
             backend_list_project_new_sequences(&project_db_path(&workspaceRoot), projectId)?,

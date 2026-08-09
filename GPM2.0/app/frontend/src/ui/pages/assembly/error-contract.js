@@ -1,5 +1,18 @@
 import { getAssemblyI18n } from "./i18n.js";
 
+const LEGACY_MESSAGE_FALLBACK_CODES = new Set([
+  "ASSEMBLY_ERROR",
+  "WORKFLOW_ERROR",
+  "TAURI_INVOKE_ERROR",
+  "DEV_BRIDGE_ERROR",
+]);
+const INVALID_PARAM_CODES = new Set([
+  "INVALID_REQUEST",
+  "INVALID_PARAMS",
+  "GAP_SIZE_REQUIRED_FOR_JOIN_GAP",
+  "MISSING_MEMBER_ID_FOR_MEMBER_ACTION",
+]);
+
 export function mapAssemblyError({ error, fallbackMessage, stateOrLocale = "zh" } = {}) {
   const i18n = getAssemblyI18n(stateOrLocale);
   const resolvedFallbackMessage = fallbackMessage || i18n.errors.generic;
@@ -14,19 +27,65 @@ function normalizeAssemblyError(error) {
   const message = extractMessage(error);
   const normalizedMessage = message.toLowerCase();
   const code = extractCode(error);
-  const normalizedCode = code.toLowerCase();
-
-  if (normalizedCode === "current_chr_no_matching_ctg") {
-    return { code, category: "current-chr-no-matching-ctg", rawMessage: message };
+  const normalizedCode = code.toUpperCase();
+  const stableCategory = classifyStableCode(normalizedCode);
+  if (stableCategory) {
+    return { code, category: stableCategory, rawMessage: message };
   }
 
-  if (normalizedCode === "ctg_search_keyword_required") {
-    return { code, category: "ctg-search-keyword-required", rawMessage: message };
+  // Remove this branch after every persisted/mock/third-party error producer emits a stable code.
+  if (LEGACY_MESSAGE_FALLBACK_CODES.has(normalizedCode)) {
+    return classifyLegacyMessage(code, message, normalizedMessage);
   }
 
+  return {
+    code,
+    category: "generic",
+    rawMessage: message || getAssemblyI18n("zh").errors.generic,
+  };
+}
+
+function classifyStableCode(code) {
+  if (code === "CURRENT_CHR_NO_MATCHING_CTG") {
+    return "current-chr-no-matching-ctg";
+  }
+  if (code === "CTG_SEARCH_KEYWORD_REQUIRED") {
+    return "ctg-search-keyword-required";
+  }
   if (
-    normalizedCode.includes("invalid") ||
-    normalizedCode.includes("missing") ||
+    INVALID_PARAM_CODES.has(code)
+    || code.includes("INVALID")
+    || code.includes("MISSING")
+  ) {
+    return "invalid-params";
+  }
+  if (code === "NOT_FOUND" || code.endsWith("_NOT_FOUND")) {
+    return "not-found";
+  }
+  if (code === "STATE_CONFLICT" || code.includes("CONFLICT")) {
+    return "state-conflict";
+  }
+  if (code === "SUPPORT_DS_NOT_SELECTED") {
+    return "support-ds-not-selected";
+  }
+  if (code === "SUPPORT_DS_NO_MATCHING_CHR") {
+    return "support-ds-no-matching-chr";
+  }
+  if (code === "SUPPORT_DS_UNAVAILABLE") {
+    return "support-ds-unavailable";
+  }
+  if (
+    code === "RUNTIME_ERROR"
+    || code.endsWith("_RUNTIME_ERROR")
+    || code === "BROWSER_EXPORT_UNAVAILABLE"
+  ) {
+    return "runtime";
+  }
+  return "";
+}
+
+function classifyLegacyMessage(code, message, normalizedMessage) {
+  if (
     /must be (provided|present|a positive integer|non-empty|not be blank)|missing|required|invalid param|invalid argument|invalid .+ id|not a valid (integer|number)/.test(
       normalizedMessage,
     )
@@ -38,10 +97,7 @@ function normalizeAssemblyError(error) {
     return { code, category: "not-found", rawMessage: message };
   }
 
-  if (
-    normalizedCode.includes("conflict") ||
-    /state conflict|already |only allow|only allowed|cannot |entered assembly/.test(normalizedMessage)
-  ) {
+  if (/state conflict|already |only allow|only allowed|cannot |entered assembly/.test(normalizedMessage)) {
     return { code, category: "state-conflict", rawMessage: message };
   }
 
@@ -62,8 +118,6 @@ function normalizeAssemblyError(error) {
   }
 
   if (
-    normalizedCode.startsWith("tauri") ||
-    normalizedCode.includes("runtime") ||
     /当前为浏览器预览，无法调用后端命令|failed to invoke command|dev bridge error|failed to fetch|networkerror|load failed|tauri/.test(
       normalizedMessage,
     )
@@ -71,11 +125,7 @@ function normalizeAssemblyError(error) {
     return { code, category: "runtime", rawMessage: message };
   }
 
-  return {
-    code,
-    category: "generic",
-    rawMessage: message || getAssemblyI18n("zh").errors.generic,
-  };
+  return { code, category: "generic", rawMessage: message };
 }
 
 function resolveUserMessage(category, fallbackMessage, i18n) {
