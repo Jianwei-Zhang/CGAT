@@ -15,6 +15,7 @@ const WORKSPACE_HISTORY_KEY = "gpm_next:workspace_history";
 const IMPORT_PROGRESS_BOTTOM_THRESHOLD_PX = 24;
 const IMPORTER_STATUS_TOAST_AUTO_DISMISS_MS = 1000;
 const IMPORTER_STATUS_TOAST_DISMISS = Symbol("importerStatusToastDismiss");
+const DELETE_SELECTION_MODE_FAILED_HISTORY = "failed-history";
 
 export function renderImporterPage(state) {
   const importer = state.importer;
@@ -27,9 +28,14 @@ export function renderImporterPage(state) {
   const validationMap = importer.historyValidation && typeof importer.historyValidation === "object"
     ? importer.historyValidation
     : {};
+  const failedHistoryPaths = getFailedHistoryPaths(recentRecords, validationMap);
+  const hasHistoryValidation = recentRecords.some((item) => (
+    Object.prototype.hasOwnProperty.call(validationMap, item.path)
+  ));
   const addPackageHints = importer.addPackageHintsByWorkspacePath || {};
   const workspaceContextMenu = importer.workspaceContextMenu || {};
   const deleteTargets = normalizePathList(importer.deleteTargets);
+  const deleteFailedHistoryOnly = importer.deleteSelectionMode === DELETE_SELECTION_MODE_FAILED_HISTORY;
   const recentList = recentRecords.length
     ? recentRecords
         .map((item, index) => {
@@ -125,6 +131,15 @@ export function renderImporterPage(state) {
           <button id="validate-history-button" class="button ghost" ${
             importer.inFlight ? "disabled" : ""
           }>${messages.buttons.validateHistory}</button>
+          ${
+            hasHistoryValidation
+              ? `<button id="delete-failed-history-button" class="button danger" ${
+                importer.inFlight || failedHistoryPaths.length === 0 ? "disabled" : ""
+              }>${escapeHtml(i18nT(state, "importer.buttons.deleteFailedRecords", {
+                count: failedHistoryPaths.length,
+              }))}</button>`
+              : ""
+          }
         </div>
         <div class="list">
           ${recentList}
@@ -135,20 +150,30 @@ export function renderImporterPage(state) {
         importer.deleteConfirmOpen
           ? `
             <div class="modal-overlay" data-modal-close="true">
-              <article class="card modal-dialog" role="dialog" aria-modal="true" aria-label="${messages.page.deleteConfirmTitle}" data-modal-dialog="true">
-                <h4>${messages.page.deleteConfirmTitle}</h4>
-                <p>${messages.page.deleteConfirmMessage}</p>
+              <article class="card modal-dialog" role="dialog" aria-modal="true" aria-label="${escapeAttr(
+                deleteFailedHistoryOnly ? messages.page.deleteFailedConfirmTitle : messages.page.deleteConfirmTitle,
+              )}" data-modal-dialog="true">
+                <h4>${deleteFailedHistoryOnly ? messages.page.deleteFailedConfirmTitle : messages.page.deleteConfirmTitle}</h4>
+                <p>${deleteFailedHistoryOnly
+                  ? escapeHtml(i18nT(state, "importer.page.deleteFailedConfirmMessage", { count: deleteTargets.length }))
+                  : messages.page.deleteConfirmMessage}</p>
                 <div class="list">
                   ${deleteTargets
                     .map((path) => `<div class="list-item">${escapeHtml(path)}</div>`)
                     .join("")}
                 </div>
-                <label class="checkbox-item">
-                  <input id="delete-with-files-checkbox" type="checkbox" ${importer.deleteWithFiles ? "checked" : ""} />
-                  ${messages.page.deleteWithFiles}
-                </label>
+                ${
+                  deleteFailedHistoryOnly
+                    ? `<p class="muted">${messages.page.deleteFailedHistoryOnlyNote}</p>`
+                    : `<label class="checkbox-item">
+                        <input id="delete-with-files-checkbox" type="checkbox" ${importer.deleteWithFiles ? "checked" : ""} />
+                        ${messages.page.deleteWithFiles}
+                      </label>`
+                }
                 <div class="inline-input">
-                  <button id="confirm-delete-selected-button" class="button">${messages.buttons.confirmDelete}</button>
+                  <button id="confirm-delete-selected-button" class="button">${
+                    deleteFailedHistoryOnly ? messages.buttons.confirmDeleteFailed : messages.buttons.confirmDelete
+                  }</button>
                   <button id="cancel-delete-selected-button" class="button ghost">${messages.buttons.cancel}</button>
                 </div>
               </article>
@@ -176,6 +201,7 @@ export function bindImporterPage(host, store) {
   const importExtractedStartButton = host.querySelector("#import-extracted-start-button");
   const openWorkspaceButton = host.querySelector("#open-workspace-button");
   const validateHistoryButton = host.querySelector("#validate-history-button");
+  const deleteFailedHistoryButton = host.querySelector("#delete-failed-history-button");
   const confirmDeleteSelectedButton = host.querySelector("#confirm-delete-selected-button");
   const cancelDeleteSelectedButton = host.querySelector("#cancel-delete-selected-button");
   const deleteWithFilesCheckbox = host.querySelector("#delete-with-files-checkbox");
@@ -268,6 +294,15 @@ export function bindImporterPage(host, store) {
     await runValidateHistoryFlow(host, store);
   });
 
+  deleteFailedHistoryButton?.addEventListener("click", () => {
+    const snapshot = store.getState();
+    const failedPaths = getFailedHistoryPaths(
+      readWorkspaceHistory(),
+      snapshot.importer.historyValidation,
+    );
+    openDeleteSelectionConfirm(host, store, failedPaths, DELETE_SELECTION_MODE_FAILED_HISTORY);
+  });
+
   confirmDeleteSelectedButton?.addEventListener("click", async () => {
     await runDeleteSelectedFlow(host, store);
   });
@@ -275,6 +310,7 @@ export function bindImporterPage(host, store) {
   cancelDeleteSelectedButton?.addEventListener("click", () => {
     updateImporterState(store, {
       deleteConfirmOpen: false,
+      deleteSelectionMode: "",
       deleteWithFiles: false,
       deleteTargets: [],
     });
@@ -284,6 +320,7 @@ export function bindImporterPage(host, store) {
   modalOverlay?.addEventListener("click", () => {
     updateImporterState(store, {
       deleteConfirmOpen: false,
+      deleteSelectionMode: "",
       deleteWithFiles: false,
       deleteTargets: [],
     });
@@ -730,7 +767,7 @@ async function runValidateHistoryFlow(host, store) {
   rerender(host, store);
 }
 
-function openDeleteSelectionConfirm(host, store, deleteTargets) {
+function openDeleteSelectionConfirm(host, store, deleteTargets, deleteSelectionMode = "") {
   const selectedPaths = normalizePathList(deleteTargets);
   if (selectedPaths.length === 0) {
     updateImporterState(store, {
@@ -742,6 +779,7 @@ function openDeleteSelectionConfirm(host, store, deleteTargets) {
   }
   updateImporterState(store, {
     deleteConfirmOpen: true,
+    deleteSelectionMode,
     deleteWithFiles: false,
     deleteTargets: selectedPaths,
     status: i18nT(store.getState(), "importer.runtime.deleteConfirmStatus"),
@@ -755,10 +793,19 @@ function openDeleteSelectionConfirm(host, store, deleteTargets) {
 async function runDeleteSelectedFlow(host, store) {
   const snapshot = store.getState();
   const importer = snapshot.importer;
-  const selectedPaths = normalizePathList(importer.deleteTargets);
+  const deleteFailedHistoryOnly = importer.deleteSelectionMode === DELETE_SELECTION_MODE_FAILED_HISTORY;
+  const requestedPaths = normalizePathList(importer.deleteTargets);
+  const failedHistoryPaths = deleteFailedHistoryOnly
+    ? new Set(getFailedHistoryPaths(readWorkspaceHistory(), importer.historyValidation))
+    : null;
+  const selectedPaths = failedHistoryPaths
+    ? requestedPaths.filter((path) => failedHistoryPaths.has(path))
+    : requestedPaths;
+  const deleteWithFiles = !deleteFailedHistoryOnly && importer.deleteWithFiles === true;
   if (selectedPaths.length === 0) {
     updateImporterState(store, {
       deleteConfirmOpen: false,
+      deleteSelectionMode: "",
       deleteWithFiles: false,
       deleteTargets: [],
       status: i18nT(snapshot, "importer.runtime.notSelectedStatus"),
@@ -771,16 +818,18 @@ async function runDeleteSelectedFlow(host, store) {
   updateImporterState(store, {
     inFlight: true,
     status: i18nT(snapshot, "importer.runtime.deleteInProgressStatus"),
-    summary: importer.deleteWithFiles
+    summary: deleteWithFiles
       ? i18nT(snapshot, "importer.runtime.deleteWithFilesSummary")
-      : i18nT(snapshot, "importer.runtime.deleteHistorySummary"),
+      : i18nT(snapshot, deleteFailedHistoryOnly
+        ? "importer.runtime.deleteFailedHistorySummary"
+        : "importer.runtime.deleteHistorySummary"),
     stages: [],
   });
   rerender(host, store);
 
   const stages = [];
   let deletedDirCount = 0;
-  if (importer.deleteWithFiles) {
+  if (deleteWithFiles) {
     for (const workspaceRoot of selectedPaths) {
       try {
         const result = await deleteWorkspaceDirectory({ workspaceRoot });
@@ -806,7 +855,7 @@ async function runDeleteSelectedFlow(host, store) {
   removeWorkspaceHistoryPaths(selectedPaths);
 
   const nextSession = { ...store.getState().session };
-  if (selectedPaths.includes(nextSession.workspacePath)) {
+  if (!deleteFailedHistoryOnly && selectedPaths.includes(nextSession.workspacePath)) {
     nextSession.workspacePath = "";
     nextSession.projectId = null;
     nextSession.projectName = "";
@@ -823,19 +872,22 @@ async function runDeleteSelectedFlow(host, store) {
       ...currentImporter,
       inFlight: false,
       deleteConfirmOpen: false,
+      deleteSelectionMode: "",
       deleteWithFiles: false,
       deleteTargets: [],
       historyValidation: nextValidation,
-      openWorkspacePath: selectedPaths.includes(currentImporter.openWorkspacePath)
+      openWorkspacePath: !deleteFailedHistoryOnly && selectedPaths.includes(currentImporter.openWorkspacePath)
         ? ""
         : currentImporter.openWorkspacePath,
       status: i18nT(store.getState(), "importer.runtime.deleteDoneStatus"),
-      summary: importer.deleteWithFiles
+      summary: deleteWithFiles
         ? i18nT(store.getState(), "importer.runtime.deleteDoneWithFilesSummary", {
           count: selectedPaths.length,
           deletedDirCount,
         })
-        : i18nT(store.getState(), "importer.runtime.deleteDoneHistorySummary", {
+        : i18nT(store.getState(), deleteFailedHistoryOnly
+          ? "importer.runtime.deleteDoneFailedHistorySummary"
+          : "importer.runtime.deleteDoneHistorySummary", {
           count: selectedPaths.length,
         }),
       stages,
@@ -897,6 +949,7 @@ function applyWorkspaceLoadedState(store, payload) {
       openWorkspacePath: workspaceRoot,
       historyValidation: {},
       deleteConfirmOpen: false,
+      deleteSelectionMode: "",
       deleteWithFiles: false,
       deleteTargets: [],
       status: importerStatus,
@@ -1597,6 +1650,13 @@ function removeWorkspaceHistoryPaths(paths) {
   }
   const nextRecords = readWorkspaceHistory().filter((item) => !dropSet.has(item.path));
   writeWorkspaceHistory(nextRecords);
+}
+
+function getFailedHistoryPaths(historyRecords, validationMap) {
+  const validation = validationMap && typeof validationMap === "object" ? validationMap : {};
+  return historyRecords
+    .map((item) => item.path)
+    .filter((path) => validation[path]?.ok === false);
 }
 
 function normalizePathList(paths) {

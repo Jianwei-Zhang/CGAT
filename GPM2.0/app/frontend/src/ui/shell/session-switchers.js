@@ -222,6 +222,7 @@ export async function switchWorkspaceFromShell(store, workspaceRoot, { openWorks
       openWorkspacePath: normalizedPath,
       historyValidation: {},
       deleteConfirmOpen: false,
+      deleteSelectionMode: "",
       deleteWithFiles: false,
       deleteTargets: [],
       status: i18nT(current, "importer.runtime.workspaceLoadedStatus"),

@@ -38,6 +38,7 @@ const store = createStore({
     openWorkspacePath: "",
     historyValidation: {},
     deleteConfirmOpen: false,
+    deleteSelectionMode: "",
     deleteWithFiles: false,
     deleteTargets: [],
     inFlight: false,
