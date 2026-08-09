@@ -54,6 +54,13 @@ import {
   createSubviewSelectionController,
 } from "./assembly/subview-selection-controller.js";
 import {
+  compactFinalPathByDeletedPhasedTrack,
+  createPhasedTrackController,
+} from "./assembly/phased-track-controller.js";
+import {
+  createAddCtgImportController,
+} from "./assembly/add-ctg-import-controller.js";
+import {
   loadProjectAssemblyViewState as loadProjectAssemblyViewStateImpl,
   persistProjectAssemblyViewState as persistProjectAssemblyViewStateImpl,
 } from "./assembly/project-view-state.js";
@@ -379,6 +386,35 @@ const {
   getCurrentProject: (state) => getCurrentProject(state),
   loadSubviewPairwiseEvidence,
   rerenderSubviewPanel: (host, store) => rerenderSubviewPanel(host, store),
+});
+const {
+  addTrackContigToPhasedTrack,
+  createPhasedChrTrack,
+  deletePhasedTrack,
+  inheritPrimaryTrackDragOffsetForPhasedItem,
+  refreshPhasedTracksForCurrentChr,
+  removePhasedTrackItem,
+} = createPhasedTrackController({
+  addCtgToPhasedChrTrack: addCtgToPhasedChrTrackApi,
+  createPhasedChrTrack: createPhasedChrTrackApi,
+  deletePhasedChrTrack: deletePhasedChrTrackApi,
+  listPhasedChrTracks,
+  mapAssemblyError,
+  persistMainTrackViewState: (host, store) => persistMainTrackViewState(host, store),
+  persistTrackDragOffsets: (host, store) => persistTrackDragOffsets(host, store),
+  removePhasedChrTrackItem: removePhasedChrTrackItemApi,
+  rerenderAssemblyMainTab: (host, store) => rerenderAssemblyMainTab(host, store),
+  setAssemblyActionFeedbackInMainTab: (host, store, feedback) =>
+    setAssemblyActionFeedbackInMainTab(host, store, feedback),
+});
+const {
+  importAddCtgIntoTrack,
+} = createAddCtgImportController({
+  importAddCtgPackage,
+  mapAssemblyError,
+  pickZipFilePath,
+  rerender: (host, store) => rerender(host, store),
+  selectChromosome: (host, store, chrName) => selectChromosome(host, store, chrName),
 });
 export function renderAssemblyPage(state) {
   return renderAssemblyPageShell(state, assemblyPageShellDeps);
@@ -1366,488 +1402,6 @@ async function loadAssemblyViewForLocalAssemblyRefresh(host, store, options) {
     ...assemblyDataRuntimeDeps,
     rerender: rerenderAssemblyMainTab,
   });
-}
-
-async function createPhasedChrTrack(host, store) {
-  const state = store.getState();
-  const workspaceRoot = state.session?.workspacePath;
-  const projectId = state.session?.projectId;
-  const parentChrName = String(state.assembly?.selectedChrName || "").trim();
-  if (!workspaceRoot || !projectId || !parentChrName) {
-    return;
-  }
-  try {
-    await createPhasedChrTrackApi({
-      workspaceRoot,
-      projectId,
-      parentChrName,
-    });
-    await refreshPhasedTracksForCurrentChr(host, store);
-    setAssemblyActionFeedbackInMainTab(host, store, {
-      actionError: "",
-      actionStatus: tAssembly(store.getState(), "runtime.phasedTrackCreated"),
-    });
-  } catch (error) {
-    const mappedError = mapAssemblyError({ error, stateOrLocale: store.getState() });
-    setAssemblyActionFeedbackInMainTab(host, store, {
-      actionError: mappedError.userMessage,
-      actionStatus: tAssembly(store.getState(), "runtime.phasedTrackCreateFailed"),
-    });
-  }
-}
-
-function hydratePhasedTracksForCurrentAssembly(tracks, assembly) {
-  const primaryById = new Map(
-    (Array.isArray(assembly?.chrCtgs) ? assembly.chrCtgs : [])
-      .map((ctg) => [normalizeSupportDatasetId(ctg?.assemblyCtgId), ctg])
-      .filter(([ctgId]) => ctgId !== null),
-  );
-  return (Array.isArray(tracks) ? tracks : [])
-    .map((track) => ({
-      ...track,
-      phasedTrackId: normalizeSupportDatasetId(track?.phasedTrackId),
-      displayOrder: Number(track?.displayOrder || 0),
-      haplotypeKey: String(track?.haplotypeKey || "").trim(),
-      label: String(track?.label || "").trim(),
-      items: (Array.isArray(track?.items) ? track.items : [])
-        .slice()
-        .sort((left, right) =>
-          Number(left?.displayOrder || 0) - Number(right?.displayOrder || 0)
-          || Number(left?.itemId || left?.phasedTrackItemId || 0) - Number(right?.itemId || right?.phasedTrackItemId || 0),
-        )
-        .map((item) => ({
-          ...item,
-          itemId: normalizeSupportDatasetId(item?.itemId ?? item?.phasedTrackItemId),
-          phasedTrackId: normalizeSupportDatasetId(item?.phasedTrackId ?? track?.phasedTrackId),
-          assemblyCtgId: normalizeSupportDatasetId(item?.assemblyCtgId),
-          sourceCtg: primaryById.get(normalizeSupportDatasetId(item?.assemblyCtgId)) || item?.sourceCtg || null,
-        })),
-    }))
-    .filter((track) => track.phasedTrackId && track.haplotypeKey)
-    .sort((left, right) => left.displayOrder - right.displayOrder || left.phasedTrackId - right.phasedTrackId);
-}
-
-function resolvePrimaryTrackDragOffsetForCtg(assembly, assemblyCtgId) {
-  const normalizedCtgId = normalizeSupportDatasetId(assemblyCtgId);
-  if (!normalizedCtgId) {
-    return null;
-  }
-  const targetKey = buildTrackDragOffsetKey("primary", normalizedCtgId);
-  return normalizeTrackDragOffsets(assembly?.trackDragOffsets).find(
-    (entry) => buildTrackDragOffsetKey(entry.trackRole, entry.assemblyCtgId, entry) === targetKey,
-  ) || null;
-}
-
-function inheritPrimaryTrackDragOffsetForPhasedItem(store, {
-  assemblyCtgId,
-  phasedTrackId,
-  phasedTrackItemId,
-}) {
-  const state = store.getState();
-  const normalizedCtgId = normalizeSupportDatasetId(assemblyCtgId);
-  const normalizedTrackId = normalizeSupportDatasetId(phasedTrackId);
-  const normalizedItemId = normalizeSupportDatasetId(phasedTrackItemId);
-  if (!normalizedCtgId || !normalizedTrackId || !normalizedItemId) {
-    return false;
-  }
-  const sourceOffset = resolvePrimaryTrackDragOffsetForCtg(state.assembly, normalizedCtgId);
-  if (!sourceOffset) {
-    return false;
-  }
-  const nextOffset = {
-    trackRole: "phased",
-    assemblyCtgId: normalizedCtgId,
-    phasedTrackId: normalizedTrackId,
-    phasedTrackItemId: normalizedItemId,
-    ...(Number.isFinite(Number(sourceOffset.offsetBp))
-      ? { offsetBp: sourceOffset.offsetBp }
-      : { offsetPx: sourceOffset.offsetPx }),
-  };
-  const currentOffsets = normalizeTrackDragOffsets(state.assembly?.trackDragOffsets);
-  const nextOffsets = setTrackDragOffset(currentOffsets, nextOffset);
-  if (areTrackDragOffsetsEqual(currentOffsets, nextOffsets)) {
-    return false;
-  }
-  store.setState({
-    assembly: {
-      ...state.assembly,
-      trackDragOffsets: nextOffsets,
-    },
-  });
-  return true;
-}
-
-async function refreshPhasedTracksForCurrentChr(host, store) {
-  const state = store.getState();
-  const workspaceRoot = state.session?.workspacePath;
-  const projectId = state.session?.projectId;
-  const parentChrName = String(state.assembly?.selectedChrName || "").trim();
-  if (!workspaceRoot || !projectId || !parentChrName) {
-    return [];
-  }
-  const result = await listPhasedChrTracks({
-    workspaceRoot,
-    projectId,
-    parentChrName,
-  });
-  const phasedChrTracks = hydratePhasedTracksForCurrentAssembly(result?.tracks, store.getState().assembly);
-  const nextActiveKey = phasedChrTracks.some((track) =>
-    track.haplotypeKey === store.getState().assembly?.activePhasedTrackKey,
-  )
-    ? store.getState().assembly.activePhasedTrackKey
-    : (phasedChrTracks[0]?.haplotypeKey || "");
-  store.setState({
-    assembly: {
-      ...store.getState().assembly,
-      phasedChrTracks,
-      isChrPhased: Boolean(phasedChrTracks.length),
-      activePhasedTrackKey: nextActiveKey,
-      activePhasedTrackKeyByChr: {
-        ...(store.getState().assembly?.activePhasedTrackKeyByChr || {}),
-        [parentChrName]: nextActiveKey,
-      },
-    },
-  });
-  rerenderAssemblyMainTab(host, store);
-  return phasedChrTracks;
-}
-
-async function addTrackContigToPhasedTrack(host, store, { phasedTrackId, assemblyCtgId, haplotypeKey = "" }) {
-  const state = store.getState();
-  const workspaceRoot = state.session?.workspacePath;
-  const projectId = state.session?.projectId;
-  const normalizedTrackId = normalizeSupportDatasetId(phasedTrackId);
-  const normalizedCtgId = normalizeSupportDatasetId(assemblyCtgId);
-  const normalizedKey = String(haplotypeKey || "").trim();
-  if (!workspaceRoot || !projectId || !normalizedTrackId || !normalizedCtgId) {
-    return;
-  }
-  try {
-    const addedResult = await addCtgToPhasedChrTrackApi({
-      workspaceRoot,
-      projectId,
-      phasedTrackId: normalizedTrackId,
-      assemblyCtgId: normalizedCtgId,
-    });
-    const inheritedDragOffset = inheritPrimaryTrackDragOffsetForPhasedItem(store, {
-      assemblyCtgId: normalizedCtgId,
-      phasedTrackId: normalizedTrackId,
-      phasedTrackItemId: addedResult?.item?.itemId ?? addedResult?.item?.phasedTrackItemId,
-    });
-    if (state.assembly?.selectedChrName && normalizedKey) {
-      store.setState({
-        assembly: {
-          ...store.getState().assembly,
-          activePhasedTrackKey: normalizedKey,
-          activePhasedTrackKeyByChr: {
-            ...(store.getState().assembly?.activePhasedTrackKeyByChr || {}),
-            [state.assembly.selectedChrName]: normalizedKey,
-          },
-        },
-      });
-    }
-    await refreshPhasedTracksForCurrentChr(host, store);
-    if (inheritedDragOffset) {
-      void persistTrackDragOffsets(host, store);
-    }
-    setAssemblyActionFeedbackInMainTab(host, store, {
-      actionError: "",
-      actionStatus: tAssembly(store.getState(), "runtime.phasedTrackItemAdded", { key: normalizedKey }),
-    });
-  } catch (error) {
-    const mappedError = mapAssemblyError({ error, stateOrLocale: store.getState() });
-    setAssemblyActionFeedbackInMainTab(host, store, {
-      actionError: mappedError.userMessage,
-      actionStatus: tAssembly(store.getState(), "runtime.phasedTrackItemAddFailed"),
-    });
-  }
-}
-
-async function removePhasedTrackItem(host, store, { phasedTrackItemId }) {
-  const state = store.getState();
-  const workspaceRoot = state.session?.workspacePath;
-  const projectId = state.session?.projectId;
-  const normalizedItemId = normalizeSupportDatasetId(phasedTrackItemId);
-  if (!workspaceRoot || !projectId || !normalizedItemId) {
-    return;
-  }
-  try {
-    await removePhasedChrTrackItemApi({
-      workspaceRoot,
-      projectId,
-      phasedTrackItemId: normalizedItemId,
-    });
-    await refreshPhasedTracksForCurrentChr(host, store);
-    setAssemblyActionFeedbackInMainTab(host, store, {
-      actionError: "",
-      actionStatus: tAssembly(store.getState(), "runtime.phasedTrackItemRemoved"),
-    });
-  } catch (error) {
-    const mappedError = mapAssemblyError({ error, stateOrLocale: store.getState() });
-    setAssemblyActionFeedbackInMainTab(host, store, {
-      actionError: mappedError.userMessage,
-      actionStatus: tAssembly(store.getState(), "runtime.phasedTrackItemRemoveFailed"),
-    });
-  }
-}
-
-function compactFinalPathByDeletedPhasedTrack(finalPathByChr, {
-  parentChrName,
-  tracksBefore,
-  deletedPhasedTrackId,
-}) {
-  const source = finalPathByChr && typeof finalPathByChr === "object" ? finalPathByChr : {};
-  const orderedTracks = (Array.isArray(tracksBefore) ? tracksBefore : [])
-    .slice()
-    .sort((left, right) =>
-      Number(left?.displayOrder || 0) - Number(right?.displayOrder || 0)
-      || Number(left?.phasedTrackId || 0) - Number(right?.phasedTrackId || 0),
-    );
-  const deletedIndex = orderedTracks.findIndex(
-    (track) => normalizeSupportDatasetId(track?.phasedTrackId) === deletedPhasedTrackId,
-  );
-  if (deletedIndex < 0) {
-    return { ...source };
-  }
-  const next = { ...source };
-  const deletedLabel = String(orderedTracks[deletedIndex]?.label || "").trim();
-  if (deletedLabel) {
-    delete next[deletedLabel];
-  }
-  orderedTracks.slice(deletedIndex + 1).forEach((track, index) => {
-    const oldLabel = String(track?.label || "").trim();
-    const nextKey = String.fromCharCode("A".charCodeAt(0) + deletedIndex + index);
-    const nextLabel = `${parentChrName}${nextKey}`;
-    if (!oldLabel || oldLabel === nextLabel || !Object.prototype.hasOwnProperty.call(next, oldLabel)) {
-      return;
-    }
-    next[nextLabel] = {
-      ...next[oldLabel],
-      chrName: nextLabel,
-    };
-    delete next[oldLabel];
-  });
-  return next;
-}
-
-function resolveActivePhasedKeyAfterDelete({ currentKey, tracksAfter, deletedKey }) {
-  const keys = (Array.isArray(tracksAfter) ? tracksAfter : [])
-    .map((track) => String(track?.haplotypeKey || "").trim())
-    .filter(Boolean);
-  if (!keys.length) {
-    return "";
-  }
-  if (currentKey && currentKey !== deletedKey && keys.includes(currentKey)) {
-    return currentKey;
-  }
-  if (deletedKey && keys.includes(deletedKey)) {
-    return deletedKey;
-  }
-  return keys[Math.max(0, keys.length - 1)] || "";
-}
-
-async function deletePhasedTrack(host, store, { phasedTrackId, haplotypeKey = "" }) {
-  const state = store.getState();
-  const workspaceRoot = state.session?.workspacePath;
-  const projectId = state.session?.projectId;
-  const parentChrName = String(state.assembly?.selectedChrName || "").trim();
-  const normalizedTrackId = normalizeSupportDatasetId(phasedTrackId);
-  const normalizedKey = String(haplotypeKey || "").trim();
-  if (!workspaceRoot || !projectId || !parentChrName || !normalizedTrackId) {
-    return;
-  }
-  const tracksBefore = Array.isArray(state.assembly?.phasedChrTracks)
-    ? state.assembly.phasedChrTracks
-    : [];
-  try {
-    await deletePhasedChrTrackApi({
-      workspaceRoot,
-      projectId,
-      phasedTrackId: normalizedTrackId,
-    });
-    const nextFinalPathByChr = compactFinalPathByDeletedPhasedTrack(state.assembly?.finalPathByChr, {
-      parentChrName,
-      tracksBefore,
-      deletedPhasedTrackId: normalizedTrackId,
-    });
-    store.setState({
-      assembly: {
-        ...store.getState().assembly,
-        finalPathByChr: nextFinalPathByChr,
-      },
-    });
-    const tracksAfter = await refreshPhasedTracksForCurrentChr(host, store);
-    const nextActiveKey = resolveActivePhasedKeyAfterDelete({
-      currentKey: state.assembly?.activePhasedTrackKey,
-      tracksAfter,
-      deletedKey: normalizedKey,
-    });
-    store.setState({
-      assembly: {
-        ...store.getState().assembly,
-        activePhasedTrackKey: nextActiveKey,
-        activePhasedTrackKeyByChr: {
-          ...(store.getState().assembly?.activePhasedTrackKeyByChr || {}),
-          [parentChrName]: nextActiveKey,
-        },
-      },
-    });
-    rerenderAssemblyMainTab(host, store);
-    await persistMainTrackViewState(host, store);
-    setAssemblyActionFeedbackInMainTab(host, store, {
-      actionError: "",
-      actionStatus: tAssembly(store.getState(), "runtime.phasedTrackDeleted", { key: normalizedKey }),
-    });
-  } catch (error) {
-    const mappedError = mapAssemblyError({ error, stateOrLocale: store.getState() });
-    setAssemblyActionFeedbackInMainTab(host, store, {
-      actionError: mappedError.userMessage,
-      actionStatus: tAssembly(store.getState(), "runtime.phasedTrackDeleteFailed"),
-    });
-  }
-}
-
-async function importAddCtgIntoTrack(host, store, payload = {}) {
-  const snapshot = store.getState();
-  const workspaceRoot = String(snapshot.session?.workspacePath || "").trim();
-  const projectId = Number(snapshot.session?.projectId || 0);
-  const selectedChrName = String(snapshot.assembly?.selectedChrName || "").trim();
-  const targetChr = String(payload.targetChr || selectedChrName).trim();
-  const targetTrack = String(payload.targetTrack || "").trim();
-  if (!workspaceRoot || !projectId || !targetChr || !targetTrack) {
-    setAssemblyActionFeedback(host, store, {
-      actionStatus: "",
-      actionError: tAssembly(snapshot, "runtime.addCtgImportMissingTarget"),
-    });
-    return;
-  }
-  const zipPath = await pickZipFilePath(snapshot);
-  if (!zipPath) {
-    return;
-  }
-  const runId = createAddCtgImportRunId();
-  setAddCtgImportProgress(host, store, {
-    open: true,
-    status: "running",
-    runId,
-    summary: tAssembly(snapshot, "runtime.addCtgImportProgressSubtitle"),
-    stages: [
-      `workspace_root=${workspaceRoot}`,
-      `project_id=${projectId}`,
-      `target=${targetChr}/${targetTrack}`,
-      `add_ctg_zip_path=${zipPath}`,
-    ],
-    error: "",
-  });
-  try {
-    const result = await importAddCtgPackage({
-      workspaceRoot,
-      projectId,
-      zipPath,
-      expectedTargetChr: targetChr,
-      expectedTargetTrack: targetTrack,
-      runId,
-      stateOrLocale: snapshot,
-      onStage: (stage) => {
-        if (String(store.getState().assembly?.addCtgImportProgress?.runId || "") !== runId) {
-          return;
-        }
-        appendAddCtgImportStage(host, store, stage);
-      },
-    });
-    if (String(store.getState().assembly?.addCtgImportProgress?.runId || "") !== runId) {
-      return;
-    }
-    const importedMessage = result?.message || tAssembly(store.getState(), "runtime.addCtgImportDone");
-    appendAddCtgImportStage(host, store, tAssembly(store.getState(), "runtime.addCtgImportRefreshStage"));
-    await selectChromosome(host, store, targetChr);
-    const latest = store.getState();
-    store.setState({
-      ...latest,
-      initializer: {
-        ...latest.initializer,
-        ...(Array.isArray(result?.datasets) ? { datasets: result.datasets } : {}),
-        ...(Array.isArray(result?.existingProjects) ? { existingProjects: result.existingProjects } : {}),
-        ...(Array.isArray(result?.references) ? { references: result.references } : {}),
-        ...(result?.packageMetadata ? { packageMetadata: result.packageMetadata } : {}),
-      },
-      assembly: {
-        ...latest.assembly,
-        addCtgImportProgress: {
-          ...(latest.assembly?.addCtgImportProgress || {}),
-          open: true,
-          status: "success",
-          summary: importedMessage,
-          error: "",
-        },
-        actionStatus: tAssembly(latest, "runtime.addCtgImportDoneWithName", {
-          ctgName: result?.ctgName || "-",
-          targetTrack,
-        }),
-        actionError: "",
-      },
-    });
-    rerender(host, store);
-  } catch (error) {
-    if (String(store.getState().assembly?.addCtgImportProgress?.runId || "") !== runId) {
-      return;
-    }
-    const latest = store.getState();
-    const mappedError = mapAssemblyError({ error, stateOrLocale: latest });
-    store.setState({
-      ...latest,
-      assembly: {
-        ...latest.assembly,
-        addCtgImportProgress: {
-          ...(latest.assembly?.addCtgImportProgress || {}),
-          open: true,
-          status: "error",
-          summary: tAssembly(latest, "runtime.addCtgImportFailed"),
-          stages: [
-            ...(latest.assembly?.addCtgImportProgress?.stages || []),
-            tAssembly(latest, "runtime.addCtgImportFailed"),
-          ],
-          error: mappedError.userMessage,
-        },
-        actionStatus: tAssembly(latest, "runtime.addCtgImportFailed"),
-        actionError: mappedError.userMessage,
-      },
-    });
-    rerender(host, store);
-  }
-}
-
-function createAddCtgImportRunId() {
-  const randomPart = Math.random().toString(36).slice(2, 10);
-  return `add-ctg-${Date.now()}-${randomPart}`;
-}
-
-function setAddCtgImportProgress(host, store, progress) {
-  const state = store.getState();
-  store.setState({
-    ...state,
-    assembly: {
-      ...state.assembly,
-      addCtgImportProgress: progress,
-    },
-  });
-  rerender(host, store);
-}
-
-function appendAddCtgImportStage(host, store, stage) {
-  const state = store.getState();
-  const current = state.assembly?.addCtgImportProgress || {};
-  store.setState({
-    ...state,
-    assembly: {
-      ...state.assembly,
-      addCtgImportProgress: {
-        ...current,
-        stages: [...(Array.isArray(current.stages) ? current.stages : []), stage],
-      },
-    },
-  });
-  rerender(host, store);
 }
 
 function setActiveHitsTrack(host, store, { trackKey = "primary" }) {
