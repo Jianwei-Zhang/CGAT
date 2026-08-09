@@ -61,6 +61,9 @@ import {
   createAddCtgImportController,
 } from "./assembly/add-ctg-import-controller.js";
 import {
+  createMainTrackStateController,
+} from "./assembly/main-track-state-controller.js";
+import {
   loadProjectAssemblyViewState as loadProjectAssemblyViewStateImpl,
   persistProjectAssemblyViewState as persistProjectAssemblyViewStateImpl,
 } from "./assembly/project-view-state.js";
@@ -168,15 +171,12 @@ import {
   MIN_TICK_UNIT_KB_OPTIONS,
   SUPPORT_DS_CTG_LEN_BP_OPTIONS,
   normalizeNonNegativeInt,
-  normalizePositiveInt,
   resolveTrackInnerWidthFromScale,
   resolveTickBpFromScale,
-  resolveTrackPrefs,
 } from "./assembly/track-prefs.js";
 import {
   areSubviewTrackDragOffsetsEqual,
   areTrackDragOffsetsEqual,
-  buildSupportMirrorKey,
   buildSubviewTrackDragOffsetKey,
   buildTrackDragOffsetKey,
   filterPrimaryTrackSelectionCtgIds,
@@ -184,7 +184,6 @@ import {
   filterTrackDragOffsets,
   normalizeDeletedCtgRecordIds,
   normalizeHiddenPrimaryCtgIdsByChr,
-  normalizeSupportMirrorEntry,
   normalizeSupportMirroredCtgs,
   normalizeSupportDatasetId,
   normalizeTrackDragOffsets,
@@ -237,11 +236,6 @@ import {
 import {
   createOffsetSubviewManualAnchor,
 } from "./assembly/subview-anchor-state.js";
-import {
-  buildChrLengthsByName,
-  filterSupportCtgsBySupportDsCtgLenRules,
-  getSupportDsCtgLenRulesForChr,
-} from "./assembly/support-ds-ctg-len-rules.js";
 import {
   buildAssemblyContextMenuItems,
   resolveAssemblyCtgContextTarget,
@@ -415,6 +409,30 @@ const {
   pickZipFilePath,
   rerender: (host, store) => rerender(host, store),
   selectChromosome: (host, store, chrName) => selectChromosome(host, store, chrName),
+});
+const {
+  setActiveHitsTrack,
+  setSelectedPrimaryTrackCtgsHidden,
+  togglePrimaryTrackCtgHidden,
+  togglePrimaryTrackSelection,
+  toggleSupportTrackCtgMirror,
+  updateDeletedCtgSelection,
+  updateTrackSelection,
+} = createMainTrackStateController({
+  buildDualTrackModel,
+  getDatasetNameById,
+  patchPrimaryHiddenCtgDom,
+  persistProjectAssemblyViewStateFromStore: (host, store, overrides) =>
+    persistProjectAssemblyViewStateFromStore(
+      host,
+      store,
+      typeof overrides?.persistProjectAssemblyViewState === "function"
+        ? overrides
+        : projectAssemblyViewStateRuntimeDeps,
+    ),
+  refreshFinalPathLogAfterPrimaryHiddenPatch,
+  rerender: (host, store) => rerender(host, store),
+  rerenderAssemblyMainTab: (host, store) => rerenderAssemblyMainTab(host, store),
 });
 export function renderAssemblyPage(state) {
   return renderAssemblyPageShell(state, assemblyPageShellDeps);
@@ -1404,26 +1422,6 @@ async function loadAssemblyViewForLocalAssemblyRefresh(host, store, options) {
   });
 }
 
-function setActiveHitsTrack(host, store, { trackKey = "primary" }) {
-  const state = store.getState();
-  const selectedChrName = String(state.assembly?.selectedChrName || "").trim();
-  const normalizedTrackKey = String(trackKey || "").trim();
-  if (!selectedChrName) {
-    return;
-  }
-  store.setState({
-    assembly: {
-      ...state.assembly,
-      activeHitsTrackKey: normalizedTrackKey,
-      activeHitsTrackKeyByChr: {
-        ...(state.assembly?.activeHitsTrackKeyByChr || {}),
-        [selectedChrName]: normalizedTrackKey || "__none",
-      },
-    },
-  });
-  rerender(host, store);
-}
-
 function setActivePhasedFinalPathTrack(host, store, { trackKey = "" }) {
   const state = store.getState();
   const selectedChrName = String(state.assembly?.selectedChrName || "").trim();
@@ -2246,22 +2244,6 @@ function isTrackRectOverlap(leftRect, rightRect) {
   );
 }
 
-function updateTrackSelection(host, store, selectedIds) {
-  const state = store.getState();
-  const normalized = filterPrimaryTrackSelectionCtgIds(selectedIds, state.assembly);
-  const current = normalizeTrackSelectionCtgIds(state.assembly.trackSelectedCtgIds);
-  if (current.length === normalized.length && current.every((value, index) => value === normalized[index])) {
-    return;
-  }
-  store.setState({
-    assembly: {
-      ...state.assembly,
-      trackSelectedCtgIds: normalized,
-    },
-  });
-  rerender(host, store);
-}
-
 function updateSubviewTrackPairSelection(host, store, selectedEntries) {
   const state = store.getState();
   const currentSubview = getSubviewState(state.assembly);
@@ -2298,22 +2280,6 @@ function updateSubviewTrackPairSelection(host, store, selectedEntries) {
     },
   });
   rerender(host, store);
-}
-
-function togglePrimaryTrackSelection(host, store, assemblyCtgId) {
-  const normalizedCtgId = normalizeSupportDatasetId(assemblyCtgId);
-  if (!normalizedCtgId) {
-    return;
-  }
-  const state = store.getState();
-  const current = filterPrimaryTrackSelectionCtgIds(state.assembly.trackSelectedCtgIds, state.assembly);
-  const nextSet = new Set(current);
-  if (nextSet.has(normalizedCtgId)) {
-    nextSet.delete(normalizedCtgId);
-  } else {
-    nextSet.add(normalizedCtgId);
-  }
-  updateTrackSelection(host, store, Array.from(nextSet.values()));
 }
 
 function shouldSuppressTrackContigClick() {
@@ -2494,315 +2460,6 @@ async function persistSubviewTrackDragOffsets(host, store, deps = projectAssembl
 
 async function persistMainTrackViewState(host, store, deps = projectAssemblyViewStateRuntimeDeps) {
   return persistProjectAssemblyViewStateFromStore(host, store, deps);
-}
-
-async function persistHiddenPrimaryCtgIds(host, store, deps = projectAssemblyViewStateRuntimeDeps) {
-  return persistProjectAssemblyViewStateFromStore(host, store, deps);
-}
-
-function setSelectedPrimaryTrackCtgsHidden(
-  host,
-  store,
-  selectedIds,
-  shouldHide,
-  deps = projectAssemblyViewStateRuntimeDeps,
-) {
-  const state = store.getState();
-  const normalized = filterPrimaryTrackSelectionCtgIds(selectedIds, state.assembly);
-  if (!normalized.length) {
-    return;
-  }
-  const currentHiddenIds = new Set(
-    filterPrimaryTrackSelectionCtgIds(state.assembly.hiddenPrimaryCtgIds, state.assembly),
-  );
-  normalized.forEach((ctgId) => {
-    if (shouldHide) {
-      currentHiddenIds.add(ctgId);
-      return;
-    }
-    currentHiddenIds.delete(ctgId);
-  });
-  const nextHiddenIds = filterPrimaryTrackSelectionCtgIds(Array.from(currentHiddenIds.values()), state.assembly);
-  const selectedChrName = String(state.assembly.selectedChrName || "").trim();
-  const hiddenPrimaryCtgIdsByChr = {
-    ...normalizeHiddenPrimaryCtgIdsByChr(state.assembly.hiddenPrimaryCtgIdsByChr),
-  };
-  if (selectedChrName) {
-    if (nextHiddenIds.length) {
-      hiddenPrimaryCtgIdsByChr[selectedChrName] = nextHiddenIds;
-    } else {
-      delete hiddenPrimaryCtgIdsByChr[selectedChrName];
-    }
-  }
-  const nextAssemblyState = {
-    ...state.assembly,
-    hiddenPrimaryCtgIds: nextHiddenIds,
-    hiddenPrimaryCtgIdsByChr,
-    actionStatus: shouldHide
-      ? tAssembly(state, "runtime.hideSelectedDone", {
-        visibilityVerb: tAssembly(state, "runtime.hideSelectedVerbHide"),
-        count: normalized.length,
-      })
-      : tAssembly(state, "runtime.hideSelectedDone", {
-        visibilityVerb: tAssembly(state, "runtime.hideSelectedVerbShow"),
-        count: normalized.length,
-      }),
-    actionError: "",
-  };
-  store.setState({
-    ...state,
-    assembly: nextAssemblyState,
-  });
-  const didPatchDom = (deps.patchPrimaryHiddenCtgDom || patchPrimaryHiddenCtgDom)(
-    host,
-    store,
-    nextHiddenIds,
-    { changedIds: normalized },
-  );
-  if (didPatchDom) {
-    (deps.refreshFinalPathLogAfterPrimaryHiddenPatch || refreshFinalPathLogAfterPrimaryHiddenPatch)(
-      host,
-      store,
-    );
-  }
-  if (!didPatchDom) {
-    rerenderAssemblyMainTab(host, store);
-  }
-  return persistHiddenPrimaryCtgIds(host, {
-    getState() {
-      return {
-        ...state,
-        assembly: nextAssemblyState,
-      };
-    },
-  }, deps);
-}
-
-function togglePrimaryTrackCtgHidden(
-  host,
-  store,
-  assemblyCtgId,
-  shouldHide,
-  deps = projectAssemblyViewStateRuntimeDeps,
-) {
-  const normalizedCtgId = normalizeSupportDatasetId(assemblyCtgId);
-  if (!normalizedCtgId) {
-    return;
-  }
-  const state = store.getState();
-  const currentHiddenIds = new Set(
-    filterPrimaryTrackSelectionCtgIds(state.assembly.hiddenPrimaryCtgIds, state.assembly),
-  );
-  if (shouldHide) {
-    currentHiddenIds.add(normalizedCtgId);
-  } else {
-    currentHiddenIds.delete(normalizedCtgId);
-  }
-  const nextHiddenIds = filterPrimaryTrackSelectionCtgIds(Array.from(currentHiddenIds.values()), state.assembly);
-  const previousHiddenIds = filterPrimaryTrackSelectionCtgIds(state.assembly.hiddenPrimaryCtgIds, state.assembly);
-  if (
-    nextHiddenIds.length === previousHiddenIds.length &&
-    nextHiddenIds.every((value, index) => value === previousHiddenIds[index])
-  ) {
-    return;
-  }
-  const selectedChrName = String(state.assembly.selectedChrName || "").trim();
-  const hiddenPrimaryCtgIdsByChr = {
-    ...normalizeHiddenPrimaryCtgIdsByChr(state.assembly.hiddenPrimaryCtgIdsByChr),
-  };
-  if (selectedChrName) {
-    if (nextHiddenIds.length) {
-      hiddenPrimaryCtgIdsByChr[selectedChrName] = nextHiddenIds;
-    } else {
-      delete hiddenPrimaryCtgIdsByChr[selectedChrName];
-    }
-  }
-  const nextAssemblyState = {
-    ...state.assembly,
-    hiddenPrimaryCtgIds: nextHiddenIds,
-    hiddenPrimaryCtgIdsByChr,
-    actionStatus: shouldHide
-      ? tAssembly(state, "runtime.hideContigDone", {
-        assemblyCtgId: normalizedCtgId,
-        visibilityVerb: tAssembly(state, "runtime.hideContigVerbHide"),
-      })
-      : tAssembly(state, "runtime.hideContigDone", {
-        assemblyCtgId: normalizedCtgId,
-        visibilityVerb: tAssembly(state, "runtime.hideContigVerbShow"),
-      }),
-    actionError: "",
-  };
-  store.setState({
-    ...state,
-    assembly: nextAssemblyState,
-  });
-  const didPatchDom = (deps.patchPrimaryHiddenCtgDom || patchPrimaryHiddenCtgDom)(
-    host,
-    store,
-    nextHiddenIds,
-    { changedIds: [normalizedCtgId] },
-  );
-  if (didPatchDom) {
-    (deps.refreshFinalPathLogAfterPrimaryHiddenPatch || refreshFinalPathLogAfterPrimaryHiddenPatch)(
-      host,
-      store,
-    );
-  }
-  if (!didPatchDom) {
-    rerenderAssemblyMainTab(host, store);
-  }
-  return persistHiddenPrimaryCtgIds(host, {
-    getState() {
-      return {
-        ...state,
-        assembly: nextAssemblyState,
-      };
-    },
-  }, deps);
-}
-
-function buildSupportMirrorEntryFromAssemblyState(state, datasetId, assemblyCtgId) {
-  const normalizedDatasetId = normalizeSupportDatasetId(datasetId);
-  const normalizedAssemblyCtgId = normalizeSupportDatasetId(assemblyCtgId);
-  if (!normalizedDatasetId || !normalizedAssemblyCtgId) {
-    return null;
-  }
-  const activeSupportDatasetId = normalizeSupportDatasetId(state.assembly.supportDatasetId);
-  if (activeSupportDatasetId !== normalizedDatasetId) {
-    return null;
-  }
-  const trackPrefs = resolveTrackPrefs(state.assembly.trackView);
-  const supportDsCtgLenBp = Math.max(0, normalizeNonNegativeInt(trackPrefs.supportDsCtgLen) ?? 0);
-  const chrLengthsByName = buildChrLengthsByName(state.assembly.chromosomes);
-  const selectedChrName = String(state.assembly.selectedChrName || "").trim();
-  const supportDsCtgLenRules = getSupportDsCtgLenRulesForChr(
-    state.assembly.supportDsCtgLenRulesByChr,
-    selectedChrName,
-    { chrLength: chrLengthsByName[selectedChrName] },
-  );
-  const supportTrackCtgs = filterSupportCtgsBySupportDsCtgLenRules(
-    Array.isArray(state.assembly.supportChrCtgs) ? state.assembly.supportChrCtgs : [],
-    {
-      rules: supportDsCtgLenRules,
-      defaultSupportDsCtgLen: supportDsCtgLenBp,
-    },
-  );
-  const model = buildDualTrackModel({
-    primaryCtgs: state.assembly.chrCtgs,
-    companionCtgs: supportTrackCtgs,
-    selectedPrimaryCtgId: state.assembly.selectedCtgId,
-    selectedCompanionCtgId: state.assembly.selectedCtgId,
-    prefs: trackPrefs,
-  });
-  const liveCtg = (Array.isArray(model?.companion?.ctgs) ? model.companion.ctgs : []).find(
-    (ctg) => normalizeSupportDatasetId(ctg?.assemblyCtgId) === normalizedAssemblyCtgId,
-  );
-  if (!liveCtg) {
-    return null;
-  }
-  const datasetName = getDatasetNameById(state.initializer?.datasets || [], normalizedDatasetId);
-  return normalizeSupportMirrorEntry({
-    datasetId: normalizedDatasetId,
-    datasetName,
-    chrName: String(state.assembly.selectedChrName || "").trim(),
-    assemblyCtgId: normalizedAssemblyCtgId,
-    name: String(liveCtg?.name || `Ctg${normalizedAssemblyCtgId}`),
-    totalLength: Math.max(
-      1,
-      normalizePositiveInt(liveCtg?.totalLength ?? liveCtg?.lengthBp) ?? 1,
-    ),
-    anchorStart: normalizeNonNegativeInt(liveCtg?.anchorStart),
-    lengthBp: Math.max(1, normalizePositiveInt(liveCtg?.lengthBp ?? liveCtg?.totalLength) ?? 1),
-    startBp: Math.max(0, normalizeNonNegativeInt(liveCtg?.startBp) ?? 0),
-    endBp: Math.max(
-      1,
-      normalizePositiveInt(liveCtg?.endBp)
-        ?? (Math.max(0, normalizeNonNegativeInt(liveCtg?.startBp) ?? 0)
-          + Math.max(1, normalizePositiveInt(liveCtg?.lengthBp ?? liveCtg?.totalLength) ?? 1)
-          - 1),
-    ),
-    laneIndex: Math.max(0, normalizeNonNegativeInt(liveCtg?.laneIndex) ?? 0),
-    hits: Array.isArray(liveCtg?.hits) ? liveCtg.hits.map((hit) => ({ ...hit })) : [],
-  });
-}
-
-async function toggleSupportTrackCtgMirror(
-  host,
-  store,
-  { datasetId, assemblyCtgId, shouldMirror },
-  deps = projectAssemblyViewStateRuntimeDeps,
-) {
-  const normalizedDatasetId = normalizeSupportDatasetId(datasetId);
-  const normalizedAssemblyCtgId = normalizeSupportDatasetId(assemblyCtgId);
-  if (!normalizedDatasetId || !normalizedAssemblyCtgId) {
-    return;
-  }
-  const state = store.getState();
-  const currentMirrors = normalizeSupportMirroredCtgs(state.assembly.supportMirroredCtgs);
-  const targetKey = buildSupportMirrorKey(normalizedDatasetId, normalizedAssemblyCtgId);
-  const hasTarget = currentMirrors.some(
-    (entry) => buildSupportMirrorKey(entry.datasetId, entry.assemblyCtgId) === targetKey,
-  );
-  let nextMirrors = currentMirrors;
-  if (shouldMirror) {
-    if (hasTarget) {
-      return;
-    }
-    const nextEntry = buildSupportMirrorEntryFromAssemblyState(
-      state,
-      normalizedDatasetId,
-      normalizedAssemblyCtgId,
-    );
-    if (!nextEntry) {
-      store.setState({
-        assembly: {
-          ...state.assembly,
-          actionStatus: "",
-          actionError: tAssembly(state, "runtime.mirrorMissingSupport", {
-            assemblyCtgId: normalizedAssemblyCtgId,
-          }),
-        },
-      });
-      rerender(host, store);
-      return;
-    }
-    nextMirrors = normalizeSupportMirroredCtgs([...currentMirrors, nextEntry]);
-  } else {
-    if (!hasTarget) {
-      return;
-    }
-    nextMirrors = currentMirrors.filter(
-      (entry) => buildSupportMirrorKey(entry.datasetId, entry.assemblyCtgId) !== targetKey,
-    );
-  }
-  store.setState({
-    assembly: {
-      ...state.assembly,
-      supportMirroredCtgs: nextMirrors,
-      actionStatus: shouldMirror
-        ? tAssembly(state, "runtime.mirrorDone", { assemblyCtgId: normalizedAssemblyCtgId })
-        : tAssembly(state, "runtime.unmirrorDone", { assemblyCtgId: normalizedAssemblyCtgId }),
-      actionError: "",
-    },
-  });
-  rerender(host, store);
-  await persistProjectAssemblyViewStateFromStore(host, store, deps);
-}
-
-function updateDeletedCtgSelection(host, store, selectedRecordIds) {
-  const normalized = normalizeDeletedCtgRecordIds(selectedRecordIds);
-  const state = store.getState();
-  const current = normalizeDeletedCtgRecordIds(state.assembly.selectedDeletedCtgRecordIds);
-  if (current.length === normalized.length && current.every((value, index) => value === normalized[index])) {
-    return;
-  }
-  store.setState({
-    assembly: {
-      ...state.assembly,
-      selectedDeletedCtgRecordIds: normalized,
-    },
-  });
-  rerender(host, store);
 }
 
 export function __testBindAssemblyContextMenu(host, store) {
