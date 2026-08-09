@@ -35,8 +35,8 @@ and strict review of new warnings are mandatory.
 
 These thresholds trigger analysis, not mandatory splitting. A cohesive catalog,
 data table, or single renderer may remain large with one owner and focused tests.
-Audit findings F3 (`assembly-page.js`, `render-tracks.js`,
-`tabs-semantics.test.mjs`), F4 (`workflow-api.js`/dev bridge), and F10
+Audit findings F3 (`assembly-page.js`, `render-tracks.js`, and the former
+`tabs-semantics.test.mjs` monolith), F4 (`workflow-api.js`/dev bridge), and F10
 (`components.css`) trigger review because size coincides with mixed ownership.
 
 ### Audit Rule Calibration
@@ -169,8 +169,8 @@ deleteWithFiles = importer.deleteWithFiles === true;
 - `app/frontend/src/ui/pages/assembly/__tests__/bindings.test.mjs`
   - Assert Final Path view switching and graph drag receive the Final Path card refresh callback, not the full-route callback.
   - Assert partial Final Path binding skips unrelated lifecycle hooks and passes the `final-path` scroll scope.
-- `app/frontend/src/ui/pages/assembly/__tests__/tabs-semantics.test.mjs`
-  - Keep main-track, Subview, Final Path, coordinate, and phased-track rendering regressions green after renderer extraction.
+- Assembly feature suites under `app/frontend/src/ui/pages/assembly/__tests__/`
+  - Keep page-shell, main-track, Subview, Final Path, coordinate, and phased-track rendering regressions green after renderer extraction.
 
 #### 4. Wrong vs Correct
 #### Wrong
@@ -265,7 +265,9 @@ const points = [ctgLeft, ctgRight, refRight, refLeft];
 ```
 
 #### 6. Tests Required
-- `app/frontend/src/ui/pages/assembly/__tests__/tabs-semantics.test.mjs`
+- Files: `assembly-main-track-layout.test.mjs`,
+  `assembly-main-track-coordinates.test.mjs`, and
+  `assembly-subview-pairwise.test.mjs` under the Assembly `__tests__/` directory.
   - Assert a flipped ctg with backend-projected right-side `ctgStart/ctgEnd` still renders the hit band on the right.
   - Assert `orient` and `strand` mismatch reverses the ref-side point order so the band crosses.
   - Assert `subview-ctg` and `subview-track` pairwise `strand: "-"` hit bands cross in display space.
@@ -304,7 +306,8 @@ Treat `list_chr_view_ctgs` hit coordinates as the display contract for main trac
 | User opens context menu on a reversed evidence band | The active state shown in the menu must match the preserved anchor state. |
 
 #### 4. Tests Required
-- `app/frontend/src/ui/pages/assembly/__tests__/tabs-semantics.test.mjs`
+- Files: `assembly-subview-state.test.mjs` and
+  `assembly-subview-anchors.test.mjs` under the Assembly `__tests__/` directory.
   - Assert swapped `subview-track` order keeps original evidence anchors active.
   - Assert copied/manual anchors remain active after the same order swap.
 
@@ -365,7 +368,9 @@ Canonicalize or alias order-encoded evidence keys at the active-state boundary, 
 | Primary dataset has `selfAlignmentAvailable: false`, and the user selects primary + phased or phased + phased | Keep the selections visible, but do not enter Subview; return the existing self-alignment-unavailable error. |
 
 #### 5. Tests Required
-- `app/frontend/src/ui/pages/assembly/__tests__/tabs-semantics.test.mjs`
+- Files: `assembly-context-phased.test.mjs`,
+  `assembly-subview-track-rendering.test.mjs`, and
+  `assembly-subview-pairwise.test.mjs` under the Assembly `__tests__/` directory.
   - Assert phased item context menus expose all haplotype append targets, flip, and remove actions.
   - Assert adding a dragged primary ctg to a phased track copies the primary offset to the new phased item id.
   - Assert phased item removal refreshes only the main assembly card.
@@ -412,7 +417,7 @@ Carry phased item and track identity separately: use `phasedTrackItemId` for ite
 | Same-contig hit appears with a distinct interval pair | Keep it if the interval pair is distinct; dedupe only identical reciprocal copies. |
 
 #### 4. Tests Required
-- Add a regression in `app/frontend/src/ui/pages/assembly/__tests__/tabs-semantics.test.mjs` that loads reciprocal self-hit rows for the same contig and asserts only one `track-collinearity-band` polygon is rendered.
+- Add a regression in `app/frontend/src/ui/pages/assembly/__tests__/assembly-subview-pairwise.test.mjs` that loads reciprocal self-hit rows for the same contig and asserts only one `track-collinearity-band` polygon is rendered.
 - Keep the existing ds-ds pairwise interval test to ensure the non-self path still uses true pairwise coordinates.
 
 #### 5. Wrong vs Correct
@@ -576,8 +581,9 @@ Treat add-package import as a selected-project operation that passes `workspaceR
 - Place pure state/model tests beside the owning feature under `__tests__`.
   Runtime tests inject host/window/service dependencies and drive event-shaped
   objects. Broad page tests verify composition, not every low-level branch.
-- Reuse authoritative project/GRT fixtures and feature fixture builders. Do not
-  copy thousands of lines from `tabs-semantics.test.mjs` into a new suite.
+- Reuse authoritative project/GRT fixtures and
+  `tabs-semantics-harness.mjs`. Do not copy shared state/DOM fixture builders or
+  business assertions between Assembly feature suites.
 - Every transport operation test asserts command/route, exact nested camelCase
   request, normalized response, normalized error, and mock parity when preview
   mode intentionally supports the operation.

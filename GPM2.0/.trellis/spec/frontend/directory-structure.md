@@ -76,8 +76,8 @@ not mechanical split limits.
 A cohesive data table, localized catalog, or focused renderer may exceed a
 threshold when it has one owner, an indexable structure, and isolated tests.
 Split by feature responsibility and dependency direction, never by line ranges.
-The audit findings for `assembly-page.js`, `render-tracks.js`,
-`tabs-semantics.test.mjs`, `workflow-api.js`, and `components.css` trigger review
+The audit findings for `assembly-page.js`, `render-tracks.js`, the former
+`tabs-semantics.test.mjs` monolith, `workflow-api.js`, and `components.css` trigger review
 because they combine size with independent change axes.
 
 ## Recommended Pattern
