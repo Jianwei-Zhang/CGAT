@@ -1,0 +1,63 @@
+const DEFINITIONS = {
+  imports: [
+    ["importZipBundle", "bridge"],
+    ["importExtractedBundle", "bridge"],
+    ["importAddDatasetPackage", "bridge"],
+    ["importAddCtgPackage", "mock"],
+    ["requestImportCancel", "mock"],
+  ],
+  workspace: [
+    ["listProjectInitializerOptions", "bridge"],
+    ["openWorkspace", "bridge"],
+    ["validateWorkspaceIntegrity", "mock"],
+    ["deleteWorkspaceDirectory", "mock"],
+    ["initializeProject", "bridge"],
+    ["getGrtProjectView", "bridge"],
+    ["deleteProject", "bridge"],
+    ["updateProject", "bridge"],
+    ["bootstrapProjectAssembly", "bridge"],
+    ["autoAssignChr", "bridge"],
+    ["autoOrientContigs", "bridge"],
+    ["autoOrientContigsForDataset", "mock"],
+    ["requestAutoPipelineCancel", "mock"],
+    ["setProjectAutoPipelineDone", "bridge"],
+    ["listProjectChromosomes", "bridge"],
+    ["listNewSequences", "bridge"],
+  ],
+  assembly: [
+    ["listChrViewCtgs", "bridge"],
+    ["listReferenceTrackMembers", "bridge"],
+    ["listPhasedChrTracks", "bridge"],
+    ["createPhasedChrTrack", "bridge"],
+    ["deletePhasedChrTrack", "bridge"],
+    ["addCtgToPhasedChrTrack", "bridge"],
+    ["removePhasedChrTrackItem", "bridge"],
+    ["reorderPhasedChrTrackItems", "bridge"],
+    ["listDeletedCtgs", "bridge"],
+    ["restoreDeletedCtg", "bridge"],
+    ["getCtgDetail", "bridge"],
+    ["listCtgEditCandidates", "bridge"],
+    ["runCtgEditorAction", "bridge"],
+    ["getJunctionInspection", "bridge"],
+    ["getTrackPairwiseEvidence", "mock"],
+    ["appendEditAuditLog", "bridge"],
+  ],
+  export: [
+    ["writeFinalPathExportTextFile", "unavailable"],
+    ["writeFinalPathExportBinaryFile", "unavailable"],
+    ["exportFinalPathFasta", "unavailable"],
+    ["exportProjectFinalPathFasta", "unavailable"],
+    ["exportDegapJobs", "bridge"],
+  ],
+  state: [
+    ["getRuntimeSettings", "bridge"],
+    ["updateRuntimeSettings", "bridge"],
+    ["getProjectAssemblyViewState", "mock"],
+    ["setProjectAssemblyViewState", "mock"],
+  ],
+};
+
+export const WORKFLOW_OPERATION_CONTRACTS = Object.freeze(
+  Object.entries(DEFINITIONS).flatMap(([domain, operations]) =>
+    operations.map(([name, preview]) => Object.freeze({ domain, name, preview }))),
+);
