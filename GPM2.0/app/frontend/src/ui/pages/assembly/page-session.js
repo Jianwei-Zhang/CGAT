@@ -45,6 +45,7 @@ export function createAssemblyPageSession() {
     assemblyConfirmDialogSeq: 0,
     pendingAssemblyConfirmResolvers: new Map(),
     subviewRenderCache: createSubviewRenderCache(),
+    finalPathGraphPreviewState: null,
   };
 }
 

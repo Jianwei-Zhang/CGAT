@@ -1,8 +1,8 @@
 import { resolveCurrentFinalPathChrName } from "./final-path-state.js";
+import { assemblyPageSession } from "./page-session.js";
 
 const FINAL_PATH_GRAPH_DRAG_BOUND = Symbol("finalPathGraphDragBound");
 const GRAPH_DRAG_START_DISTANCE_PX = 4;
-let finalPathGraphPreviewState = null;
 
 function normalizeSegmentId(value) {
   return String(value || "").trim();
@@ -36,7 +36,7 @@ function assertFinalPathGraphDragDeps(deps) {
 }
 
 function setFinalPathGraphPreviewState(nextState) {
-  finalPathGraphPreviewState = nextState && typeof nextState === "object"
+  assemblyPageSession.finalPathGraphPreviewState = nextState && typeof nextState === "object"
     ? {
         selectedChrName: normalizeSegmentId(nextState.selectedChrName),
         previewSegmentOrder: normalizeSegmentIdList(nextState.previewSegmentOrder),
@@ -45,11 +45,11 @@ function setFinalPathGraphPreviewState(nextState) {
 }
 
 export function getFinalPathGraphPreviewState() {
-  return finalPathGraphPreviewState;
+  return assemblyPageSession.finalPathGraphPreviewState;
 }
 
 function clearFinalPathGraphPreviewState() {
-  finalPathGraphPreviewState = null;
+  assemblyPageSession.finalPathGraphPreviewState = null;
 }
 
 function buildPointerLocalX(scrollWrapNode, clientX) {
@@ -183,7 +183,7 @@ export function __testResolveGraphDragCommitMove(args) {
 }
 
 export function __testGetFinalPathGraphPreviewState() {
-  return finalPathGraphPreviewState;
+  return assemblyPageSession.finalPathGraphPreviewState;
 }
 
 export function bindFinalPathGraphDrag(host, store, deps = {}) {

@@ -34,6 +34,7 @@ test("resetAssemblyPageSession clears disposable state and restores defaults", (
   assemblyPageSession.pendingAssemblyConfirmResolvers.set("dialog-1", (value) => resolved.push(value));
   assemblyPageSession.lastTrackViewportKey = "project-7";
   assemblyPageSession.trackContigDragActive = true;
+  assemblyPageSession.finalPathGraphPreviewState = { previewSegmentOrder: ["seg-1"] };
   const previousSubviewRenderCache = assemblyPageSession.subviewRenderCache;
   assemblyPageSession.subviewRenderCache.segmentPairs.set("pair-1", [{ id: 1 }]);
 
@@ -48,6 +49,7 @@ test("resetAssemblyPageSession clears disposable state and restores defaults", (
   assert.equal(assemblyPageSession.pendingAssemblyConfirmResolvers.size, 0);
   assert.equal(assemblyPageSession.lastTrackViewportKey, "");
   assert.equal(assemblyPageSession.trackContigDragActive, false);
+  assert.equal(assemblyPageSession.finalPathGraphPreviewState, null);
   assert.notEqual(assemblyPageSession.subviewRenderCache, previousSubviewRenderCache);
   assert.equal(assemblyPageSession.subviewRenderCache.segmentPairs.size, 0);
   assert.deepEqual(widths, { primary: 720, subview: 480, finalPath: 1200 });
