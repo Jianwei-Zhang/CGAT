@@ -878,7 +878,6 @@ pub fn validate_workspace_integrity(workspaceRoot: String) -> Result<Value, Stri
         let data_reference_dir = workspace_root.join("data/reference");
         let data_datasets_dir = workspace_root.join("data/datasets");
         let runs_dir = workspace_root.join("runs");
-        let run_all = workspace_root.join("run_all.sh");
 
         let mut missing = Vec::new();
         if !project_db.exists() || !project_db.is_file() {
@@ -902,9 +901,6 @@ pub fn validate_workspace_integrity(workspaceRoot: String) -> Result<Value, Stri
         }
         if !runs_dir.exists() || !runs_dir.is_dir() {
             missing.push("runs".to_string());
-        }
-        if !run_all.exists() || !run_all.is_file() {
-            missing.push("run_all.sh".to_string());
         }
 
         let result_paf_count = count_named_files_recursive(&runs_dir, "result.paf")?;
@@ -2668,6 +2664,48 @@ mod tests {
         assert_eq!(payload["progressTotal"], 674);
         assert_eq!(payload["phaseIndex"], 4);
         assert_eq!(payload["phaseTotal"], 7);
+    }
+
+    #[test]
+    fn validate_workspace_integrity_accepts_app_delivery_without_server_scripts() {
+        let workspace_root = create_test_workspace_root();
+        fs::create_dir_all(workspace_root.join("metadata")).expect("create metadata directory");
+        fs::create_dir_all(workspace_root.join("data/reference"))
+            .expect("create reference directory");
+        fs::create_dir_all(workspace_root.join("data/datasets"))
+            .expect("create datasets directory");
+        fs::create_dir_all(workspace_root.join("runs/primary_vs_ref"))
+            .expect("create alignment run directory");
+        fs::write(workspace_root.join("project.sqlite"), b"").expect("write project database");
+        fs::write(workspace_root.join("metadata/reference.tsv"), b"")
+            .expect("write reference metadata");
+        fs::write(workspace_root.join("metadata/datasets.tsv"), b"")
+            .expect("write dataset metadata");
+        fs::write(
+            workspace_root.join("data/reference/ref.fa.fai"),
+            b"Chr01\t100\n",
+        )
+        .expect("write reference index");
+        fs::write(
+            workspace_root.join("data/datasets/primary.fa.fai"),
+            b"ctg1\t100\n",
+        )
+        .expect("write dataset index");
+        fs::write(
+            workspace_root.join("runs/primary_vs_ref/result.paf"),
+            b"ctg1\t100\t0\t100\t+\tChr01\t100\t0\t100\t100\t100\t60\n",
+        )
+        .expect("write alignment result");
+
+        assert!(!workspace_root.join("run_all.sh").exists());
+        let result = validate_workspace_integrity(workspace_root.to_string_lossy().into_owned())
+            .expect("validate imported App workspace");
+
+        assert_eq!(result["ok"].as_bool(), Some(true));
+        assert_eq!(result["missing"].as_array().map(Vec::len), Some(0));
+        assert_eq!(result["resultPafCount"].as_u64(), Some(1));
+
+        fs::remove_dir_all(workspace_root).expect("remove temp workspace root");
     }
 
     #[test]
