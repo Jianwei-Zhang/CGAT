@@ -3,8 +3,13 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use rusqlite::Connection;
 
+#[path = "db_migrations.rs"]
+mod migrations;
+
+pub const CURRENT_SCHEMA_VERSION: i64 = 1;
+
 pub fn open_workspace_db(project_db_path: &Path) -> Result<Connection> {
-    let conn = Connection::open(project_db_path).with_context(|| {
+    let mut conn = Connection::open(project_db_path).with_context(|| {
         format!(
             "failed to open workspace db at {}",
             project_db_path.display()
@@ -12,11 +17,26 @@ pub fn open_workspace_db(project_db_path: &Path) -> Result<Connection> {
     })?;
     conn.execute_batch("PRAGMA foreign_keys = ON;")
         .context("failed to enable sqlite foreign keys")?;
-    init_workspace_schema(&conn)?;
+    migrate_workspace_schema(&mut conn).with_context(|| {
+        format!(
+            "failed to prepare workspace db at {}",
+            project_db_path.display()
+        )
+    })?;
     Ok(conn)
 }
 
+pub fn migrate_workspace_schema(conn: &mut Connection) -> Result<()> {
+    migrations::migrate_workspace_schema(conn)
+}
+
+/// Compatibility entry point for tests and adapters that hold a shared connection.
+/// Production workspace opens should use [`open_workspace_db`].
 pub fn init_workspace_schema(conn: &Connection) -> Result<()> {
+    migrations::migrate_workspace_schema(conn)
+}
+
+pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "
         CREATE TABLE IF NOT EXISTS reference_genome (
@@ -604,202 +624,5 @@ pub fn init_workspace_schema(conn: &Connection) -> Result<()> {
             ON pairwise_alignment_scoped_hit(scope_id, target_source_seq_id, query_source_seq_id, align_length, mapq);
         ",
     )
-    .context("failed to initialize workspace sqlite schema")?;
-
-    ensure_column_exists(
-        conn,
-        "project",
-        "auto_pipeline_done",
-        "INTEGER NOT NULL DEFAULT 0",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project",
-        "auto_check_new_seq",
-        "INTEGER NOT NULL DEFAULT 0",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project",
-        "phased_assembly_enabled",
-        "INTEGER NOT NULL DEFAULT 0",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project",
-        "chr_assignment_min_coverage_percent",
-        "REAL NOT NULL DEFAULT 60.0",
-    )?;
-    ensure_column_exists(conn, "project", "description", "TEXT")?;
-    ensure_column_exists(
-        conn,
-        "runtime_settings",
-        "degap_workspace_settings_json",
-        "TEXT NOT NULL DEFAULT '{}'",
-    )?;
-    ensure_column_exists(
-        conn,
-        "runtime_settings",
-        "updated_at",
-        "TEXT NOT NULL DEFAULT '0'",
-    )?;
-    ensure_column_exists(conn, "runtime_settings", "note", "TEXT")?;
-    ensure_column_exists(
-        conn,
-        "dataset",
-        "self_alignment_available",
-        "INTEGER NOT NULL DEFAULT 1",
-    )?;
-    ensure_column_exists(conn, "ref_alignment_hit", "cg_tag", "TEXT")?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "support_dataset_id",
-        "INTEGER",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "track_view_json",
-        "TEXT NOT NULL DEFAULT '{}'",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "support_ds_ctg_len_rules_by_chr_json",
-        "TEXT NOT NULL DEFAULT '{}'",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "track_scroll_state_json",
-        "TEXT NOT NULL DEFAULT '{}'",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "subview_track_scroll_state_json",
-        "TEXT NOT NULL DEFAULT '{}'",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "support_mirrored_ctgs_json",
-        "TEXT NOT NULL DEFAULT '[]'",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "hidden_primary_ctg_ids_json",
-        "TEXT NOT NULL DEFAULT '[]'",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "hidden_primary_ctg_ids_by_chr_json",
-        "TEXT NOT NULL DEFAULT '{}'",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "track_drag_offsets_json",
-        "TEXT NOT NULL DEFAULT '[]'",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "subview_track_drag_offsets_json",
-        "TEXT NOT NULL DEFAULT '[]'",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "subview_anchor_state_by_key_json",
-        "TEXT NOT NULL DEFAULT '{}'",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "final_path_view_mode",
-        "TEXT NOT NULL DEFAULT 'graph'",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "final_path_by_chr_json",
-        "TEXT NOT NULL DEFAULT '{}'",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "degap_project_state_json",
-        "TEXT NOT NULL DEFAULT '{}'",
-    )?;
-    ensure_column_exists(
-        conn,
-        "project_assembly_view_state",
-        "updated_at",
-        "TEXT NOT NULL DEFAULT '0'",
-    )?;
-    ensure_column_exists(conn, "project_assembly_view_state", "note", "TEXT")?;
-    ensure_column_exists(
-        conn,
-        "phased_chr_track_item",
-        "orient",
-        "TEXT NOT NULL DEFAULT '+'",
-    )?;
-    backfill_phased_track_item_orient(conn)?;
-    Ok(())
-}
-
-fn backfill_phased_track_item_orient(conn: &Connection) -> Result<()> {
-    conn.execute(
-        "UPDATE phased_chr_track_item
-         SET orient = COALESCE((
-             SELECT s.orient
-             FROM assembly_ctg c
-             JOIN assembly_seq s ON s.id = c.assembly_seq_id
-             WHERE c.id = phased_chr_track_item.assembly_ctg_id
-               AND s.orient IN ('+', '-')
-         ), '+')
-         WHERE orient IS NULL OR TRIM(orient) NOT IN ('+', '-')",
-        [],
-    )
-    .context("failed to backfill phased track item orient")?;
-    Ok(())
-}
-
-fn ensure_column_exists(
-    conn: &Connection,
-    table_name: &str,
-    column_name: &str,
-    column_definition: &str,
-) -> Result<()> {
-    let pragma_sql = format!("PRAGMA table_info({})", table_name);
-    let mut stmt = conn
-        .prepare(&pragma_sql)
-        .with_context(|| format!("failed to inspect table schema {}", table_name))?;
-    let existing_columns = stmt
-        .query_map([], |row| row.get::<_, String>(1))
-        .with_context(|| format!("failed to read table columns {}", table_name))?
-        .collect::<std::result::Result<Vec<_>, _>>()
-        .with_context(|| format!("failed to collect table columns {}", table_name))?;
-    if existing_columns
-        .iter()
-        .any(|existing| existing == column_name)
-    {
-        return Ok(());
-    }
-
-    let alter_sql = format!(
-        "ALTER TABLE {} ADD COLUMN {} {}",
-        table_name, column_name, column_definition
-    );
-    conn.execute_batch(&alter_sql).with_context(|| {
-        format!(
-            "failed to add missing column {}.{}",
-            table_name, column_name
-        )
-    })?;
-    Ok(())
+    .context("failed to create current workspace sqlite schema")
 }

@@ -6,10 +6,12 @@
 
 - Every workspace owns `project.sqlite`.
 - `app/backend/src/db.rs::open_workspace_db` opens the database, enables
-  `PRAGMA foreign_keys = ON`, and invokes schema initialization.
+  `PRAGMA foreign_keys = ON`, and invokes versioned schema migration.
 - Rust uses `rusqlite`; values must be passed with `params!` or named parameters.
-- The current `CREATE TABLE IF NOT EXISTS` plus `ensure_column_exists` sequence
-  is legacy compatibility code. It is not the pattern for future schema growth.
+- `app/backend/src/db.rs::create_current_schema` owns the fresh-schema snapshot;
+  `app/backend/src/db_migrations.rs` owns immutable upgrade history.
+- Historical `ensure_column_exists` calls now exist only inside migration 1's
+  unversioned-workspace baseline. They are not the pattern for future growth.
 
 ## Query and Transaction Patterns
 
@@ -49,11 +51,14 @@
 Target application entrypoint:
 
 ```rust
+pub const CURRENT_SCHEMA_VERSION: i64 = 1;
 pub fn migrate_workspace_schema(conn: &mut rusqlite::Connection) -> anyhow::Result<()>;
 ```
 
 SQLite ledger: `PRAGMA user_version` is the integer version applied in strict
-ascending order. Fresh databases run the same ordered migrations as old ones.
+ascending order. The production open path is `open_workspace_db`; the retained
+`init_workspace_schema(&Connection)` function is a compatibility entrypoint for
+tests and adapters, not a second schema owner.
 
 ### 3. Contracts
 
@@ -61,36 +66,60 @@ ascending order. Fresh databases run the same ordered migrations as old ones.
   and tests. Never edit an already released migration.
 - Read `user_version`, reject a database newer than the application, then apply
   every missing migration in one transaction per version.
+- A truly empty version-0 database creates the current schema snapshot and sets
+  the current version in one transaction. A version-0 database with user tables
+  is a historical workspace and must run migration 1 before later migrations.
+- Every new schema version updates both owners: append one immutable migration
+  for old workspaces and update `create_current_schema` for fresh workspaces.
+  Fresh creation and stepwise upgrade must expose the same required schema.
 - Set `user_version = N` only after migration N and its backfill succeed.
 - A data backfill must be deterministic, restart-safe through rollback, and
   preserve existing rows not in its scope.
+- Migration 1 is the only compatibility baseline allowed to inspect historical
+  columns. It also restores imported assignment orientation from authoritative
+  reference-hit `block_length` totals; reverse wins only when strictly greater,
+  while positive and ties resolve to `+`.
+- Run `PRAGMA foreign_key_check` before committing fresh initialization or an
+  upgrade step. A violation fails and rolls back the current transaction.
 - Schema initialization and normal application queries do not silently add
   columns after the migration framework lands.
+- The application does not create an automatic backup. Before a manual upgrade
+  of an irreplaceable workspace, close every process using it and copy the whole
+  workspace directory. Never repair a failed upgrade by manually changing
+  `PRAGMA user_version`.
 
 ### 4. Validation & Error Matrix
 
 | Condition | Required result |
 | --- | --- |
-| Fresh database at version 0 | Apply all migrations; final schema and version match current. |
+| Empty database at version 0 | Create the current snapshot transactionally; final version is `CURRENT_SCHEMA_VERSION`. |
+| Unversioned database with user tables | Run migration 1, including historical columns/backfills, without replacing user rows. |
 | Supported old workspace | Apply only missing versions and preserve user data. |
-| Database version is newer than the binary | Reject before writes with current/observed versions. |
-| SQL or backfill fails | Roll back that version; leave `user_version` unchanged. |
+| Database version is newer than the binary | Reject before writes with `WORKSPACE_SCHEMA_FUTURE_VERSION` and current/observed versions. |
+| A required version is absent from the registry | Reject with `WORKSPACE_SCHEMA_MIGRATION_MISSING`. |
+| SQL, backfill, or foreign-key validation fails | Return `WORKSPACE_SCHEMA_MIGRATION_FAILED` with migration id/name, roll back that version, and leave `user_version` unchanged. |
 | Migration is run again | No data duplication or additional schema change. |
 
 ### 5. Good/Base/Bad Cases
 
-- Good: add a nullable column, backfill from authoritative rows, add a validated
-  constraint/index, and advance the version after success.
-- Base: a fresh workspace reaches the same schema through the full migration list.
+- Good: add migration 2 as a new registry entry and function, backfill from
+  authoritative rows, validate constraints/indexes, then advance the version.
+- Base: a fresh workspace uses the current snapshot; a historical version-0
+  fixture uses migration 1 and reaches the same required tables and columns.
 - Bad: append another unconditional `ensure_column_exists` call with no version,
   order, downgrade detection, or old-workspace regression test.
+- Bad: edit migration 1 after release or set `user_version` before its backfill
+  and foreign-key check complete.
 
 ### 6. Tests Required
 
-- Fresh database schema and final `user_version`.
-- Upgrade fixtures for every supported historical version.
-- Failure injection proving schema/data/version rollback.
-- Idempotent reopen plus `PRAGMA foreign_key_check`.
+- Fresh database schema and final `user_version` through the real open path.
+- Upgrade fixtures for every supported historical version, including fully
+  missing and partially existing historical columns.
+- Failure injection proving DDL/data/version rollback and a multi-version test
+  proving strict step order.
+- Future-version rejection before schema writes.
+- Idempotent reopen plus successful `PRAGMA foreign_key_check`.
 - Read/write behavior test for the feature that required the migration.
 
 ### 7. Wrong vs Correct
@@ -98,13 +127,28 @@ ascending order. Fresh databases run the same ordered migrations as old ones.
 #### Wrong
 
 ```rust
-ensure_column_exists(conn, "project", "new_flag", "INTEGER DEFAULT 0")?;
+pub fn open_workspace_db(path: &Path) -> Result<Connection> {
+    let conn = Connection::open(path)?;
+    ensure_column_exists(&conn, "project", "new_flag", "INTEGER DEFAULT 0")?;
+    Ok(conn)
+}
 ```
 
 #### Correct
 
 ```rust
-Migration::new(12, "add_project_new_flag", migrate_project_new_flag)
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "baseline_unversioned_workspace",
+        apply: migrate_unversioned_workspace_to_v1,
+    },
+    Migration {
+        version: 2,
+        name: "add_project_new_flag",
+        apply: migrate_project_new_flag,
+    },
+];
 ```
 
 ## Scenario: Processed Project Safe Settings Update
