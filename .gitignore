@@ -28,6 +28,7 @@
 /package-lock.json
 
 # Local runtime artifacts
+/tmp/
 **/*.sqlite
 **/*.zip
 **/imported/
