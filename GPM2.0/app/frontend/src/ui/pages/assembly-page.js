@@ -42,6 +42,9 @@ import {
   resolveAnchorOffsetErrorKey,
 } from "./assembly/confirm-controller.js";
 import {
+  createDeferredRerenderCoordinator,
+} from "./assembly/deferred-rerender-runtime.js";
+import {
   loadProjectAssemblyViewState as loadProjectAssemblyViewStateImpl,
   persistProjectAssemblyViewState as persistProjectAssemblyViewStateImpl,
 } from "./assembly/project-view-state.js";
@@ -322,82 +325,12 @@ const ASSEMBLY_SUBVIEW_BAND_TOOLTIP_BOUND = Symbol("assemblySubviewBandTooltipBo
 const ACTION_FEEDBACK_AUTO_DISMISS_MS = 1000;
 const ACTION_FEEDBACK_POINTER_DISMISS_MS = 500;
 
-function createDeferredRerenderCoordinator(options = {}) {
-  const request = typeof options?.requestAnimationFrame === "function"
-    ? options.requestAnimationFrame
-    : (typeof globalThis.requestAnimationFrame === "function"
-      ? globalThis.requestAnimationFrame.bind(globalThis)
-      : (callback) => globalThis.setTimeout(() => callback(Date.now()), 16));
-  const cancel = typeof options?.cancelAnimationFrame === "function"
-    ? options.cancelAnimationFrame
-    : (typeof globalThis.cancelAnimationFrame === "function"
-      ? globalThis.cancelAnimationFrame.bind(globalThis)
-      : (token) => globalThis.clearTimeout(token));
-  const rerenderImpl = typeof options?.rerender === "function" ? options.rerender : rerender;
-  const rerenderSubviewPanelImpl =
-    typeof options?.rerenderSubviewPanel === "function"
-      ? options.rerenderSubviewPanel
-      : rerenderImpl;
-  let frameToken = null;
-  let pendingHost = null;
-  let pendingStore = null;
-  let pendingMode = "";
-
-  const scheduleWithMode = (host, store, mode) => {
-    pendingHost = host;
-    pendingStore = store;
-    if (mode === "full" || !pendingMode) {
-      pendingMode = mode;
-    }
-    if (frameToken !== null) {
-      return;
-    }
-    frameToken = request(() => {
-      frameToken = null;
-      const nextHost = pendingHost;
-      const nextStore = pendingStore;
-      const nextMode = pendingMode;
-      pendingHost = null;
-      pendingStore = null;
-      pendingMode = "";
-      if (!nextHost || !nextStore) {
-        return;
-      }
-      if (nextMode === "subview-panel") {
-        rerenderSubviewPanelImpl(nextHost, nextStore);
-        return;
-      }
-      rerenderImpl(nextHost, nextStore);
-    });
-  };
-
-  return {
-    schedule(host, store) {
-      scheduleWithMode(host, store, "full");
-    },
-    scheduleSubviewPanel(host, store) {
-      scheduleWithMode(host, store, "subview-panel");
-    },
-    cancel() {
-      if (frameToken === null) {
-        pendingHost = null;
-        pendingStore = null;
-        pendingMode = "";
-        return false;
-      }
-      cancel(frameToken);
-      frameToken = null;
-      pendingHost = null;
-      pendingStore = null;
-      pendingMode = "";
-      return true;
-    },
-  };
-}
-
 function getDeferredRerenderCoordinator() {
   if (!assemblyPageSession.deferredRerenderCoordinator) {
-    assemblyPageSession.deferredRerenderCoordinator = createDeferredRerenderCoordinator();
+    assemblyPageSession.deferredRerenderCoordinator = createDeferredRerenderCoordinator({
+      rerender,
+      rerenderSubviewPanel,
+    });
   }
   return assemblyPageSession.deferredRerenderCoordinator;
 }
@@ -412,10 +345,6 @@ function scheduleDeferredSubviewPanelRerender(host, store) {
 
 function cancelDeferredRerender() {
   getDeferredRerenderCoordinator().cancel();
-}
-
-export function __testCreateDeferredRerenderCoordinator(options = {}) {
-  return createDeferredRerenderCoordinator(options);
 }
 
 function resolveFinalPathExportKindLabel(job, labels) {

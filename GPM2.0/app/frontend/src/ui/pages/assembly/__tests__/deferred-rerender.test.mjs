@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { __testCreateDeferredRerenderCoordinator } from "../../assembly-page.js";
+import { createDeferredRerenderCoordinator } from "../deferred-rerender-runtime.js";
 
 test("deferred rerender coordinator schedules one rerender for the next animation frame", () => {
   const scheduled = [];
   const rerenderCalls = [];
-  const coordinator = __testCreateDeferredRerenderCoordinator({
+  const coordinator = createDeferredRerenderCoordinator({
     requestAnimationFrame(callback) {
       scheduled.push(callback);
       return scheduled.length;
@@ -34,7 +34,7 @@ test("deferred rerender coordinator can schedule a subview panel-only rerender",
   const scheduled = [];
   const rerenderCalls = [];
   const subviewPanelCalls = [];
-  const coordinator = __testCreateDeferredRerenderCoordinator({
+  const coordinator = createDeferredRerenderCoordinator({
     requestAnimationFrame(callback) {
       scheduled.push(callback);
       return scheduled.length;
@@ -67,7 +67,7 @@ test("deferred full rerender takes precedence over a pending subview panel reren
   const scheduled = [];
   const rerenderCalls = [];
   const subviewPanelCalls = [];
-  const coordinator = __testCreateDeferredRerenderCoordinator({
+  const coordinator = createDeferredRerenderCoordinator({
     requestAnimationFrame(callback) {
       scheduled.push(callback);
       return scheduled.length;
@@ -96,7 +96,7 @@ test("deferred rerender coordinator cancels a pending frame", () => {
   const scheduled = [];
   const cancelled = [];
   const rerenderCalls = [];
-  const coordinator = __testCreateDeferredRerenderCoordinator({
+  const coordinator = createDeferredRerenderCoordinator({
     requestAnimationFrame(callback) {
       scheduled.push(callback);
       return scheduled.length;
