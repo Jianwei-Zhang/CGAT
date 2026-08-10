@@ -70,6 +70,42 @@ test("Tauri transport preserves exact command payload and normalizes failures", 
   });
 });
 
+test("Tauri transport normalizes each domain at the injected invoke boundary", async () => {
+  const rejected = { code: "INVALID_PARAMS", message: "invalid request" };
+  const tauri = createTauriTransport({
+    async invoke() {
+      throw rejected;
+    },
+    listen: async () => () => {},
+  });
+  const cases = [
+    [
+      "import_zip",
+      () => tauri.importZipBundle({ zipPath: "D:/input.zip", workspaceRoot: "D:/workspace" }),
+    ],
+    ["open_workspace", () => tauri.openWorkspace({ workspaceRoot: "D:/workspace" })],
+    [
+      "list_chr_view_ctgs",
+      () => tauri.listChrViewCtgs({
+        workspaceRoot: "D:/workspace",
+        projectId: 7,
+        chrName: "Chr01",
+      }),
+    ],
+    ["get_runtime_settings", () => tauri.getRuntimeSettings({ workspaceRoot: "D:/workspace" })],
+  ];
+
+  for (const [operation, invokeOperation] of cases) {
+    await assert.rejects(invokeOperation, (error) => {
+      assert.equal(error.code, "INVALID_PARAMS");
+      assert.equal(error.source, "tauri");
+      assert.equal(error.operation, operation);
+      assert.equal(error.cause, rejected);
+      return true;
+    });
+  }
+});
+
 test("dev transport preserves structured error envelope fields", async () => {
   await assert.rejects(
     callDevBridge("/api/open-workspace", { workspaceRoot: "D:/missing" }, {

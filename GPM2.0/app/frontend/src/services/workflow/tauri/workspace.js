@@ -228,7 +228,7 @@ async function requestAutoPipelineCancelTauri({ workspaceRoot, projectId, runId 
 }
 
 async function listProjectChromosomesTauri({ workspaceRoot, projectId }) {
-  const result = await invokeWorkflowCommand("list_project_chromosomes", {
+  const result = await invokeCommand("list_project_chromosomes", {
     workspaceRoot,
     projectId,
   });
@@ -242,7 +242,7 @@ async function listProjectChromosomesTauri({ workspaceRoot, projectId }) {
 }
 
 async function listNewSequencesTauri({ workspaceRoot, projectId, limit }) {
-  const result = await invokeWorkflowCommand("list_new_sequences", {
+  const result = await invokeCommand("list_new_sequences", {
     workspaceRoot,
     projectId,
     limit,

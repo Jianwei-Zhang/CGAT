@@ -13,13 +13,7 @@ export function createTauriTransport({
   listen = defaultListenBackendEvent,
   getPackageMetadataFallback = () => ({}),
 } = {}) {
-  const context = {
-    invokeCommand: invoke,
-    listenBackendEvent: listen,
-    getPackageMetadataFallback,
-  };
-
-  async function invokeNormalized(command, args, stateOrLocale = "zh") {
+  async function invokeNormalized(command, args, stateOrLocale) {
     try {
       return await invoke(command, args, stateOrLocale);
     } catch (error) {
@@ -31,12 +25,18 @@ export function createTauriTransport({
     }
   }
 
+  const context = {
+    invokeCommand: invokeNormalized,
+    listenBackendEvent: listen,
+    getPackageMetadataFallback,
+  };
+
   return {
     requestImportCancel({ runId, stateOrLocale = "zh" }) {
-      return invoke("request_import_cancel", { runId }, stateOrLocale);
+      return invokeNormalized("request_import_cancel", { runId }, stateOrLocale);
     },
     getGrtProjectView({ workspaceRoot, projectId }) {
-      return invoke("get_grt_project_view", { workspaceRoot, projectId });
+      return invokeNormalized("get_grt_project_view", { workspaceRoot, projectId });
     },
     writeFinalPathExportTextFile({ outputPath, text, stateOrLocale = "zh" }) {
       return invokeNormalized("write_final_path_export_text_file", { outputPath, text }, stateOrLocale);

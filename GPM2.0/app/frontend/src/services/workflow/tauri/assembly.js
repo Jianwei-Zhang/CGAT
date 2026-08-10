@@ -1,8 +1,6 @@
-import { normalizeWorkflowError } from "../contracts.js";
-
 export function createTauriAssemblyOperations({ invokeCommand }) {
 async function listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId = null }) {
-  const result = await invokeWorkflowCommand("list_chr_view_ctgs", {
+  const result = await invokeCommand("list_chr_view_ctgs", {
     workspaceRoot,
     projectId,
     chrName,
@@ -14,7 +12,7 @@ async function listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, dataset
 }
 
 async function listReferenceTrackMembersTauri({ workspaceRoot, projectId, chrName }) {
-  const result = await invokeWorkflowCommand("list_reference_track_members", {
+  const result = await invokeCommand("list_reference_track_members", {
     workspaceRoot,
     projectId,
     chrName,
@@ -25,7 +23,7 @@ async function listReferenceTrackMembersTauri({ workspaceRoot, projectId, chrNam
 }
 
 async function listPhasedChrTracksTauri({ workspaceRoot, projectId, parentChrName }) {
-  const result = await invokeWorkflowCommand("list_phased_chr_tracks", {
+  const result = await invokeCommand("list_phased_chr_tracks", {
     workspaceRoot,
     projectId,
     parentChrName,
@@ -38,7 +36,7 @@ async function listPhasedChrTracksTauri({ workspaceRoot, projectId, parentChrNam
 }
 
 async function createPhasedChrTrackTauri({ workspaceRoot, projectId, parentChrName }) {
-  return invokeWorkflowCommand("create_phased_chr_track", {
+  return invokeCommand("create_phased_chr_track", {
     workspaceRoot,
     projectId,
     parentChrName,
@@ -46,7 +44,7 @@ async function createPhasedChrTrackTauri({ workspaceRoot, projectId, parentChrNa
 }
 
 async function deletePhasedChrTrackTauri({ workspaceRoot, projectId, phasedTrackId }) {
-  return invokeWorkflowCommand("delete_phased_chr_track", {
+  return invokeCommand("delete_phased_chr_track", {
     workspaceRoot,
     projectId,
     phasedTrackId,
@@ -59,7 +57,7 @@ async function addCtgToPhasedChrTrackTauri({
   phasedTrackId,
   assemblyCtgId,
 }) {
-  return invokeWorkflowCommand("add_ctg_to_phased_chr_track", {
+  return invokeCommand("add_ctg_to_phased_chr_track", {
     workspaceRoot,
     projectId,
     phasedTrackId,
@@ -72,7 +70,7 @@ async function removePhasedChrTrackItemTauri({
   projectId,
   phasedTrackItemId,
 }) {
-  return invokeWorkflowCommand("remove_phased_chr_track_item", {
+  return invokeCommand("remove_phased_chr_track_item", {
     workspaceRoot,
     projectId,
     phasedTrackItemId,
@@ -85,7 +83,7 @@ async function reorderPhasedChrTrackItemsTauri({
   phasedTrackId,
   itemIds,
 }) {
-  return invokeWorkflowCommand("reorder_phased_chr_track_items", {
+  return invokeCommand("reorder_phased_chr_track_items", {
     workspaceRoot,
     projectId,
     phasedTrackId,
@@ -94,7 +92,7 @@ async function reorderPhasedChrTrackItemsTauri({
 }
 
 async function listDeletedCtgsTauri({ workspaceRoot, projectId, chrName = "", datasetId = null }) {
-  const result = await invokeWorkflowCommand("list_deleted_ctgs", {
+  const result = await invokeCommand("list_deleted_ctgs", {
     workspaceRoot,
     projectId,
     chrName: String(chrName || "").trim() || null,
@@ -106,7 +104,7 @@ async function listDeletedCtgsTauri({ workspaceRoot, projectId, chrName = "", da
 }
 
 async function restoreDeletedCtgTauri({ workspaceRoot, projectId, deletedCtgRecordId }) {
-  return invokeWorkflowCommand("restore_deleted_ctg", {
+  return invokeCommand("restore_deleted_ctg", {
     workspaceRoot,
     projectId,
     deletedCtgRecordId,
@@ -114,7 +112,7 @@ async function restoreDeletedCtgTauri({ workspaceRoot, projectId, deletedCtgReco
 }
 
 async function getCtgDetailTauri({ workspaceRoot, projectId, assemblyCtgId }) {
-  return invokeWorkflowCommand("get_ctg_detail", {
+  return invokeCommand("get_ctg_detail", {
     workspaceRoot,
     projectId,
     assemblyCtgId,
@@ -122,7 +120,7 @@ async function getCtgDetailTauri({ workspaceRoot, projectId, assemblyCtgId }) {
 }
 
 async function listCtgEditCandidatesTauri({ workspaceRoot, projectId, assemblyCtgId }) {
-  const result = await invokeWorkflowCommand("list_ctg_edit_candidates", {
+  const result = await invokeCommand("list_ctg_edit_candidates", {
     workspaceRoot,
     projectId,
     assemblyCtgId,
@@ -134,7 +132,7 @@ async function listCtgEditCandidatesTauri({ workspaceRoot, projectId, assemblyCt
 }
 
 async function runCtgEditorActionTauri({ workspaceRoot, projectId, action, args }) {
-  return invokeWorkflowCommand("run_ctg_editor_action", {
+  return invokeCommand("run_ctg_editor_action", {
     workspaceRoot,
     projectId,
     action,
@@ -150,7 +148,7 @@ async function getJunctionInspectionTauri({
   minAlignmentLength = null,
   minMapq = null,
 }) {
-  return invokeWorkflowCommand("get_junction_inspection", {
+  return invokeCommand("get_junction_inspection", {
     workspaceRoot,
     projectId,
     leftAssemblyCtgId,
@@ -168,7 +166,7 @@ async function getTrackPairwiseEvidenceTauri({
   minAlignmentLength = null,
   minMapq = null,
 }) {
-  return invokeWorkflowCommand("get_track_pairwise_evidence", {
+  return invokeCommand("get_track_pairwise_evidence", {
     workspaceRoot,
     projectId,
     topAssemblyCtgIds,
@@ -186,18 +184,6 @@ async function appendEditAuditLogTauri({ workspaceRoot, projectId, category, act
     action,
     detail,
   });
-}
-
-async function invokeWorkflowCommand(command, args) {
-  try {
-    return await invokeCommand(command, args);
-  } catch (error) {
-    throw normalizeWorkflowError(error, {
-      code: "TAURI_INVOKE_ERROR",
-      source: "tauri",
-      operation: command,
-    });
-  }
 }
 
   return {
