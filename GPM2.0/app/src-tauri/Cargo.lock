@@ -1552,7 +1552,7 @@ dependencies = [
 
 [[package]]
 name = "gpm_next_backend"
-version = "0.1.0"
+version = "2.0.1-beta"
 dependencies = [
  "anyhow",
  "clap",
@@ -1566,7 +1566,7 @@ dependencies = [
 
 [[package]]
 name = "gpm_next_desktop"
-version = "0.1.0"
+version = "2.0.1-beta"
 dependencies = [
  "anyhow",
  "base64 0.22.1",

@@ -1,6 +1,6 @@
 {
   "name": "gpm-next-frontend",
-  "version": "0.1.0",
+  "version": "2.0.1-beta",
   "private": true,
   "type": "module",
   "scripts": {
