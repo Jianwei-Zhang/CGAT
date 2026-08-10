@@ -2,53 +2,49 @@
 
 **中文** | [English](README.md)
 
-GPM2.0 是一款以参考基因组为锚点、整合多种 de novo 组装优势的可视化组装工具。它将不同组装工具的结果汇集到统一流程中，便于用户进行导入、浏览与轻量编辑。
+GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流程中，用于导入、浏览、轻量编辑和 Final Path 导出。
 
 ## 项目架构
 
-GPM2.0 采用服务端与客户端分离的工作模式：
+| 组件 | 职责 |
+| --- | --- |
+| Linux 服务端 | 执行比对与 GRT 计算，生成 App 交付包。部署时上传仓库中的 `server/` 目录。 |
+| 桌面端 App | 导入交付包，提供可视化、编辑、DEGAP 集成与导出。 |
 
-- 服务端在 Linux 环境中执行比对命令并生成 zip 交付包；部署时将 `server/` 目录上传到服务器使用。
-- 客户端负责导入服务端生成的交付包，并提供可视化查看与轻量编辑能力。用户可从 GitHub Releases 下载对应平台的安装包，当前支持 `win-x86`、`win-arm64`、`mac-x86`、`mac-arm64` 四个版本。
-
-本地开发与 CI 使用仓库内同一组检查；各平台命令与发布约束见[质量门禁](QUALITY_zh.md)。
+`win-x86`、`win-arm64`、`mac-x86`、`mac-arm64` 安装包发布在 [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases)。开发和发布检查见[质量门禁](QUALITY_zh.md)。
 
 ## 服务端流程
 
 ![GPM 服务端流程](app/readme-assets/serve_pipeline_zh.png)
 
-### 环境准备
+### 1. 创建环境
 
-首次在 Linux Server 上创建完整的 `cgat-server` 环境：
+首次在 Linux 服务端执行：
 
 ```bash
 bash server/env.sh
 ```
 
-安装脚本会复用已有的 `mamba`、`micromamba` 或 `conda`；三者都不存在时，会为当前用户无 sudo 安装 micromamba 并创建环境。完成后脚本会根据实际采用的 manager 打印准确命令。例如：
+脚本会复用 `mamba`、`micromamba` 或 `conda`；均不存在时，为当前用户无 sudo 安装 micromamba。随后按脚本打印的命令激活环境，例如：
 
 ```bash
-# 激活
 micromamba activate cgat-server
-
-# 退出
-micromamba deactivate
 ```
 
-如果脚本选择的是 `mamba` 或 `conda`，把示例中的 `micromamba` 换成 `env.sh` 打印的 manager 名称。再次运行 `bash server/env.sh` 会校验已托管的环境，只在依赖配置变化时更新。
+再次运行 `env.sh` 会校验托管环境，仅在依赖配置变化时更新。
 
-- 必需工具：`SAMtools 1.9+`、`Python 3`、`zip`、`gzip`
-- 各比对引擎工具：
-  - `minimap2`：推荐 `2.31`；仍兼容支持 `-x asm10/asm5`、`-t` 和 PAF 输出的旧版本
-  - `blastn`：推荐 BLAST+ `2.17.0`，并需要 `makeblastdb`
-  - `winnowmap`：推荐 `2.03`，并需要 `meryl`
-- GRT 预计算 Final Path：`minimap2`，以及 MUMmer4 的 `nucmer`、`delta-filter`、`show-coords`；`server/env.sh` 会安装这些工具，激活环境后即可通过 `PATH` 调用
-- 可选 reads 组装质控：`meryl`、`merqury.sh`、`craq`；`server/env.sh` 会统一安装，但流程仅在传入一个或多个 `--reads` 时调用
-- 输入数据：`ref_genome.fa`、`hifiasm.fa`、`flye.fa`、`canu2.fa`
+| 用途 | 安装或要求的命令 |
+| --- | --- |
+| 核心流程 | `python3`、`samtools`、`zip`、`gzip` |
+| GRT Final Path | `minimap2`、`nucmer`、`delta-filter`、`show-coords` |
+| 可选比对引擎 | `blastn` + `makeblastdb`，或 `winnowmap` + `meryl` |
+| 可选 reads 质控 | `meryl`、`merqury.sh`、`craq`；仅传入 `--reads` 时使用 |
 
-注：本文档仅以此类数据为例展示流程，并非仅支持此类输入。
+执行 `prepare.sh` 和生成的 `run_all.sh` 时都应保持该环境已激活。
 
-### 执行服务端准备脚本
+### 2. 准备工作目录
+
+显式指定输出目录的最简示例：
 
 ```bash
 bash server/prepare.sh \
@@ -56,149 +52,97 @@ bash server/prepare.sh \
   --ds hifiasm /path/to/hifi.fa \
   --ds flye /path/to/flye.fa \
   --ds canu2 /path/to/canu2.fa \
-  --threads 10
+  -o ./gpm_server \
+  -t 10
 ```
 
-上面是可直接执行的最小示例。需要添加可选设置时，请参阅下方参数列表，不要把参数说明中的方括号和占位写法直接粘贴到 shell 命令中。
+第一个 `--ds` 固定为 primary dataset，后续初始 `--ds` 为 support dataset。支持普通或 gzip 压缩的 `.fa`、`.fasta`、`.fna` 输入。
 
-**通用参数：**
+#### 通用参数
 
-- `-o/--out`：指定输出目录；不指定时默认写入当前工作目录下的 `./gpm_server`
-- `-s/--score`：chr 分配阈值，默认 `60`
-- `--aligner`：选择 `minimap2`、`blastn` 或 `winnowmap`；默认 `minimap2`
-- `-t/--threads`：生成比对命令时使用的线程数，默认 `10`
-- `--tel <motif> <min_repeat>`：可重复指定的端粒样串联重复扫描规则；例如 `--tel TTAGGG 20` 会标记连续 20 次及以上的精确 `TTAGGG` 重复，同时包含反向互补链
-- `--cen <ref_cen.fa>`：可选的参考基因组完整着丝粒区域 FASTA；每条记录必须命名为 `<ref_chr_name>_centromere`，例如 `Chr01_centromere`
-- `--cen-min-len`：着丝粒比对最小长度，默认 `10000`
-- `--cen-min-identity`：着丝粒比对最小一致性百分比，默认 `80`
-- `--skip-self`：跳过同一 dataset 的 self alignment；导入、方向矫正和跨 dataset Subview 不受影响，同 dataset 的 ctg-to-ctg Subview 不可用
-- 第一个 `--ds` 固定为 primary，后续所有初始 `--ds` 固定为 support
-- 可重复的 `--reads`：启用一个共享 Meryl 数据库和逐 dataset Merqury/CRAQ 质控；不传 reads 时只跳过 reads 质控，完整 GRT 修复流程仍会执行
-- `--grt-qc-memory-gb` 与 `--grt-kmer-size`：调整可选 reads 质控，默认值分别为 `80` 和 `21`
+| 参数 | 必填 / 默认值 | 说明 |
+| --- | --- | --- |
+| `--ref <名称> <fasta>` | 必填，一次 | 参考基因组名称与 FASTA。 |
+| `--ds <名称> <fasta>` | 必填，可重复 | 组装 dataset；第一个为 primary，后续为 support。 |
+| `-o, --out <目录>` | `./gpm_server` | 服务端工作目录及生成脚本的位置。 |
+| `-s, --score <0-100>` | `60` | 染色体分配的最小覆盖率百分比。 |
+| `--aligner <引擎>` | `minimap2` | 主比对引擎：`minimap2`、`blastn` 或 `winnowmap`。 |
+| `-t, --threads <数量>` | `10` | 写入生成命令的工作线程数。 |
+| `--skip-self` | 关闭 | 跳过同 dataset 自比对；同 dataset Subview 将不可用。 |
+| `--tel <motif> <次数>` | 可选，可重复 | 标记双链上的精确端粒样重复。例如 `--tel TTAGGG 20`。 |
+| `--cen <fasta>` | 可选 | 参考着丝粒 FASTA；记录名必须以 `_centromere` 结尾，例如 `Chr01_centromere`。 |
+| `--cen-min-len <bp>` | `10000` | 着丝粒比对最小长度。 |
+| `--cen-min-identity <百分比>` | `80` | 着丝粒比对最小一致性百分比。 |
+| `--reads <fastq>` | 可选，可重复 | 启用共享 Meryl 数据及逐 dataset Merqury/CRAQ 质控。 |
+| `--grt-qc-memory-gb <数量>` | `80` | 可选 reads 质控的内存上限。 |
+| `--grt-kmer-size <数量>` | `21` | 可选 reads 质控的 k-mer 大小。 |
 
-无需提供 GRT 工具路径。流程会自动从当前环境调用 `minimap2`、`nucmer`、`delta-filter`、`show-coords`；启用 reads 质控时还会调用 `meryl`、`merqury.sh`、`craq`。请确保执行 `prepare.sh` 和随后生成的 `run_all.sh` 时，所用环境的 `PATH` 均能找到相应命令。
+#### 比对引擎专属参数
 
-> [!IMPORTANT]
-> 引擎专属参数均为可选覆盖项，只能和对应 `--aligner` 一起使用；若传入与所选引擎不匹配的参数，脚本会在写入输出前失败。
+| 引擎 | 参数 | 可选值 / 默认值 |
+| --- | --- | --- |
+| `minimap2` | `--minimap-preset` | `asm10` 或 `asm5`；默认 `asm10` |
+| `blastn` | `--blastn-task` | `blastn`、`megablast` 或 `dc-megablast`；默认 `blastn` |
+| `blastn` | `--blastn-evalue` | 正数；默认 `1e-10` |
+| `winnowmap` | `--winnowmap-preset` | `asm20`、`asm10` 或 `asm5`；默认 `asm20` |
+| `winnowmap` | `--winnowmap-kmer` | 正整数；默认 `19` |
+| `winnowmap` | `--winnowmap-repeat-fraction` | `(0, 1)`；默认 `0.9998` |
 
-**minimap2 参数，用于 `--aligner minimap2`：**
+引擎专属参数只能与对应的 `--aligner` 一起使用。GRT 计算始终从 `PATH` 解析 `minimap2` 和 MUMmer4 命令。
 
-- `--minimap-preset`：assembly preset；可选 `asm10` 或 `asm5`，默认 `asm10`
-
-**blastn 参数，用于 `--aligner blastn`：**
-
-- `--blastn-task`：BLAST task；可选 `blastn`、`megablast` 或 `dc-megablast`，默认 `blastn`
-- `--blastn-evalue`：e-value 阈值，默认 `1e-10`
-
-**winnowmap 参数，用于 `--aligner winnowmap`：**
-
-- `--winnowmap-preset`：assembly preset；可选 `asm20`、`asm10` 或 `asm5`，默认 `asm20`
-- `--winnowmap-kmer`：meryl k-mer 大小，默认 `19`
-- `--winnowmap-repeat-fraction`：高频 k-mer 阈值，默认 `0.9998`
-
-### 执行完整 Server 流程
+### 3. 运行、恢复与监控
 
 ```bash
 bash ./gpm_server/run_all.sh
 ```
 
-这一条命令会完成全部分阶段计算，并在 `gpm_server/` 同级目录自动生成两个交付包：
+该命令串行执行生成的计划，遇到首个错误即停止，复用前会重新校验 checkpoint，并在 `gpm_server/` 同级目录生成两个交付包：
 
-- `gpm_server.zip`：App 完整包，包含 source/reference FASTA 与权威 q4 FASTA
-- `gpm_server.no_fasta.zip`：App no-FASTA 包，保留 `.fai`、metadata、Final Path、source-card 状态和 PAF 视图
+| 交付包 | 内容与用途 |
+| --- | --- |
+| `gpm_server.zip` | 完整 App 包，包含 source/reference FASTA 与权威 q4 FASTA，可在客户端导出 FASTA。 |
+| `gpm_server.no_fasta.zip` | 无 FASTA App 包，保留 `.fai`、metadata、Final Path、source-card 状态和 PAF 视图，可导入、浏览并导出 PNG/TSV。 |
 
-两个压缩包均使用当前 v2 交付契约：App workflow 为 `gpm_grt_app_precomputed_v2`，package schema 为 `2`，Final Path structure schema 为 `1`。v1 和非 GRT 包会被拒绝，必须使用当前服务端脚本重新生成。
-
-最终只交付这两个 zip，不再额外提供 Server 审计包。Server 工作目录会在投影前完成完整校验；q0–q3、D0/Dtel、raw evidence FASTA、cache、checkpoint、原始 trace、Server 脚本和工具缓存均留在 Server 侧，不进入 App 交付包。
-
-初始流程无需再单独执行打包命令。如需手工安排阶段，也可以依次执行 `prepare.sh` 打印的命令，但必须包含最后的完整包与轻量包命令。
-
-执行顺序必须固定：
-
-1. 先完成所有 `*_vs_ref/result.paf`
-2. 执行 `assign_chr_groups.sh`；该脚本同时把 dataset 轨道的权威成员顺序写入 `metadata/track_member_orders.tsv`
-3. 构建 q0，并冻结普通 donor 集合 D0 和独立端粒 donor 集合 Dtel
-4. 对同一 D0 运行两轮规范 Step1 minimap2
-5. 用 MUMmer 执行 q1 vs D0 的 Step2 和 q2 vs D0 的 Step3
-6. 执行端粒恢复并生成 q4 与可追溯 Final Path
-7. 执行染色体局部主视图比对
-8. 完成 Server GRT 结果并校验完整 Server 工作目录契约
-9. 投影 App allowlist 并原子生成 `gpm_server.zip`
-10. 投影同一 App 契约的无 FASTA 版本并原子生成 `gpm_server.no_fasta.zip`
-
-`run_all.sh` 会严格保持该顺序，遇到程序或打包错误立即停止，并且只复用输入、参数、工具和输出 hash 均仍匹配的计算检查点。每个打包脚本都会先生成全新的临时 zip，成功后才替换最终文件，因此重跑不会保留已经删除的旧条目，也不会用失败的半成品覆盖有效交付包。
-
-#### 断点恢复与运行监控
-
-断点恢复不需要额外参数：重新执行同一条 `bash ./gpm_server/run_all.sh` 即可。有效的 reference、assignment 和染色体局部 checkpoint 会直接跳过；GRT wrapper 会复用其内部已经校验的 cache；失效或未完成的工作会重新计算。线程数仍以 `prepare.sh -t/--threads` 生成时的值为准；`run_all.sh` 当前不提供运行时线程覆盖，也不提供 `--from`、`--until` 或 `--stage`。
-
-运行期间可持续查看唯一的追加式主日志：
+恢复时无需附加参数，重新执行同一条 `run_all.sh` 即可。线程数固定为准备阶段的值；不支持运行时 `--threads`、`--from`、`--until` 或 `--stage` 覆盖。
 
 ```bash
 tail -F ./gpm_server/logs/run_all.log
 ```
 
-`gpm_server/logs/status.tsv` 会以原子方式更新，表示当前各单元状态。后续恢复会在同一个 `run_all.log` 中追加新的 invocation 段，不创建单独的 history 目录。同一 Server 工作目录同时只允许一个 `run_all.sh` 进程持有运行锁。
+当前单元状态写入 `gpm_server/logs/status.tsv`。同一工作目录同时只允许一个 runner。
 
-### 向已有服务端项目追加一个 dataset
+### 4. 追加数据与重新打包
 
-初始 `gpm_server/` 完成比对并交付后，可以在服务端追加一个新 dataset，并生成一个小型增量包：
-
-```bash
-bash ./gpm_server/add_dataset.sh --ds ds4_name /path/to/ds4.fa
-```
-
-默认输出为 `gpm_server/add_ds4_name.zip`。如需指定输出路径，使用 `-o/--out`：
+向已有桌面端工作区/项目追加一个 dataset：
 
 ```bash
-bash ./gpm_server/add_dataset.sh --ds ds4_name /path/to/ds4.fa -o /path/to/add_ds4_name.zip
+bash ./gpm_server/add_dataset.sh \
+  --ds ds4_name /path/to/ds4.fa \
+  -o ./gpm_server/add_ds4_name.zip
 ```
 
-生成的 `add_ds4_name.zip` 是追加包，不是完整交付包；它只用于应用到已有桌面端工作区/项目。请先在 GPM2.0 打开已有项目区，再在目标项目行上选择导入追加包并选中该 zip。
+新 dataset 会合并进服务端工作目录，但不会加入已经锁定的 GRT recipe，也不会改写预计算 Final Path；其 contig 仍可在 App 中手工编辑。
 
-追加 dataset 不会追溯加入已锁定的 GRT recipe，也不会改写预计算 Final Path；它仍可在 App 中展示，并允许用户把其中的 contig 手工加入项目可编辑路径。
-
-初始流程和生成的追加脚本都会在服务端计算 dataset 轨道的 ctg 顺序。桌面端只导入 `metadata/track_member_orders.tsv`，不会再根据 anchor 重算顺序。v1 包以及旧脚本生成且缺少该文件的包均不再兼容，需要使用当前服务端脚本重新生成。
-
-由于脚本也会把新 dataset 合并回服务端 `gpm_server/` 目录，如需得到已经包含新 dataset 的完整包，请重新运行完整打包脚本。该完整 zip 可用于创建新的桌面端项目区或执行完整重新导入：
+初次 `run_all.sh` 已自动生成两种交付包。仅在后续执行 `add_dataset.sh`、`add_ctg.sh` 等操作后按需重新打包：
 
 ```bash
 bash ./gpm_server/package_full_zip.sh
-```
-
-### Server 工作目录后续变化后的重新打包
-
-初始 `run_all.sh` 已经自动生成两种交付包。只有在后续执行 `add_dataset.sh`、`add_ctg.sh` 等操作并需要重建交付包时，才需要使用生成的独立打包脚本；两种脚本都会在创建 zip 前执行 GRT 可执行契约校验器：
-
-```bash
-# App 完整包：包含 source/reference FASTA 与 q4，可在客户端导出 FASTA
-bash ./gpm_server/package_full_zip.sh
-
-# App no-FASTA 包：排除所有 .fa/.fasta，保留 .fai、metadata、Final Path 与 PAF
 bash ./gpm_server/package_light_no_fasta_zip.sh
 ```
 
-对于交付包：
+新建桌面端工作区或完整重新导入时使用重新生成的完整包；追加包只用于已有工作区/项目。
 
-- 完整 App zip 只携带 locator 清单所指向的 partitioned source/reference FASTA、q4 以及 App 所需元数据，不携带 Server GRT 中间产物
-- no-FASTA zip 会排除所有 `.fa`/`.fasta`，包括 q4 和 partitioned FASTA，但保留 `.fai` 及 q4 长度/hash 元数据
-- `--skip-self` 的行为保持不变：同 dataset 的 Subview 关闭，但导入、方向矫正、跨 dataset 浏览仍然可用
+## 桌面端 App
 
-轻量交付包可正常导入、浏览与导出 final path PNG/TSV；客户端会隐藏 final path FASTA 导出入口，All 导出仍可使用，但只导出 PNG + TSV。
+### 安装与导入
 
-### 安装并打开 GPM2.0
+从 [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases) 下载与客户端架构匹配的安装包，然后导入任一服务端交付包。
 
-在客户端设备安装 GPM2.0。请从 GitHub Releases 下载与当前平台匹配的安装包。
+交付包固定 primary/support recipe，并直接载入服务端预计算的 Final Path。项目级路径仍可编辑，并可继续进入 DEGAP 或导出流程。当前仅支持 v2 GRT 交付契约；v1 与非 GRT 包需要使用当前服务端脚本重新生成。
 
-### 导入服务端交付包
+### 从无 FASTA 包导出 Final Path FASTA
 
-将服务端生成的 `gpm_server.zip` 导入 GPM2.0，即可进入可视化浏览与轻量编辑流程。
-
-交付包已经固定 primary/support recipe。建项目只需输入项目名；App 直接载入 Server 预计算的 Final Path 和主视图所需的最小只读 source-card 状态。Final Path 标题栏可将当前 chromosome 恢复为不可变的 Server GRT baseline；项目级 Final Path 仍可编辑，并可继续进入 DEGAP 或导出流程。完整 event/evidence/donor/attempt 闭包会在打包前校验，但不会复制进 App 交付 zip；App/Tauri 不再暴露 trace 浏览器。开发阶段只支持当前 v2 GRT 交付契约；v1 与非 GRT 包都会被明确拒绝，必须使用当前 Server 脚本重新生成。
-
-### 在服务器端导出 final path FASTA
-
-如果客户端导入的是轻量交付包，先在客户端导出 final path `.tsv`，再把 `.tsv` 放回仍保留原始 FASTA 的服务器，执行：
+先在 App 中导出 Final Path TSV，再将 TSV 放回保留原始 FASTA 的服务器：
 
 ```bash
 bash server/export_final_path_fasta.sh \
@@ -207,7 +151,7 @@ bash server/export_final_path_fasta.sh \
   -o /path/to/project_Chr01_path.fa
 ```
 
-如果从生成后的 `gpm_server/` 目录使用，也可以调用生成脚本并省略 `--gpm_server`：
+`gpm_server/` 内生成的 helper 会自动识别工作目录：
 
 ```bash
 bash ./gpm_server/export_final_path_fasta.sh \
