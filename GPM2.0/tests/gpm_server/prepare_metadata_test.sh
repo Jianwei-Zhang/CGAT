@@ -214,6 +214,24 @@ grep -F -- '.prepare_lib/tools/run_all_runner.py' "${output_root}/run_all.sh" >/
   echo "generated workspace is missing reference_segments.py" >&2
   exit 1
 }
+[[ -f "${output_root}/.prepare_lib/tools/grt_core/__init__.py" ]] || {
+  echo "generated workspace is missing the recursive grt_core package" >&2
+  exit 1
+}
+[[ -f "${output_root}/.prepare_lib/tools/grt_core/stage_replay.py" ]] || {
+  echo "generated workspace is missing grt_core stage services" >&2
+  exit 1
+}
+[[ -f "${output_root}/.prepare_lib/tools/grt_core/contract/validator.py" ]] || {
+  echo "generated workspace is missing the recursive grt_core contract package" >&2
+  exit 1
+}
+python3 "${output_root}/.prepare_lib/tools/grt_prepare_inputs.py" --help >/dev/null
+python3 "${output_root}/.prepare_lib/tools/grt_step1.py" --help >/dev/null
+python3 "${output_root}/.prepare_lib/tools/grt_step23.py" --help >/dev/null
+python3 "${output_root}/.prepare_lib/tools/grt_telomere_finalize.py" --help >/dev/null
+python3 "${output_root}/.prepare_lib/tools/grt_evidence_package.py" --help >/dev/null
+python3 "${output_root}/.prepare_lib/tools/grt_contract.py" --help >/dev/null
 
 grep -F -- "--minimap2 ${FAKE_BIN}/minimap2" "${output_root}/run_grt_step1.sh" >/dev/null
 grep -F -- "--minimap2 ${FAKE_BIN}/minimap2 --nucmer ${FAKE_BIN}/nucmer --delta-filter ${FAKE_BIN}/delta-filter --show-coords ${FAKE_BIN}/show-coords" \

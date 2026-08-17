@@ -488,6 +488,7 @@ write_prepare_lib() {
 
   [[ -d "$lib_src" ]] || die "Missing server library directory: $lib_src"
   [[ -d "$tools_src" ]] || die "Missing server tools directory: $tools_src"
+  [[ -d "$tools_src/grt_core" ]] || die "Missing GRT core package: $tools_src/grt_core"
   [[ -f "$tools_src/grt_app_package.py" ]] || die "Missing App delivery package builder: $tools_src/grt_app_package.py"
   [[ -d "$contracts_src" ]] || die "Missing server contracts directory: $contracts_src"
   rm -rf "$lib_dst"
@@ -498,6 +499,8 @@ write_prepare_lib() {
   mkdir -p "$contracts_dst"
   cp -R "$lib_src" "$lib_dst"
   cp -f "$tools_src"/*.py "$tools_dst"/
+  cp -R "$tools_src/grt_core" "$tools_dst/grt_core"
+  find "$tools_dst/grt_core" -type d -name '__pycache__' -prune -exec rm -rf {} +
   cp -f "$contracts_src"/*.json "$contracts_dst"/
 }
 

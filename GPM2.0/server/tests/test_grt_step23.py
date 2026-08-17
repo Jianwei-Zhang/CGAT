@@ -11,14 +11,10 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).parents[2]
-TEST_ROOT = Path(__file__).parent
-sys.path.insert(0, str(TEST_ROOT))
-sys.path.insert(0, str(REPO_ROOT / "server/tools"))
-
-import test_grt_prepare_inputs as prepare_fixture
-import test_grt_step1 as step1_fixture
-from grt_prepare_inputs import read_fasta, reverse_complement
-from grt_step23 import (
+from server.tests import test_grt_prepare_inputs as prepare_fixture
+from server.tests import test_grt_step1 as step1_fixture
+from server.tools.grt_prepare_inputs import read_fasta, reverse_complement
+from server.tools.grt_step23 import (
     _longest_exact_suffix_prefix,
     _step3_classify_features,
     _step3_edit_scope_decision,

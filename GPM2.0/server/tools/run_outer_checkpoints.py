@@ -11,17 +11,30 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-from grt_contract import ContractError, validate_contract
-from run_orchestration import (
-    CHECKPOINT_SCHEMA_VERSION,
-    EXECUTION_ENGINE_VERSION,
-    OrchestrationContractError,
-    atomic_write_json,
-    file_identity,
-    fingerprint,
-    sha256_file,
-    validate_paf,
-)
+try:
+    from grt_contract import ContractError, validate_contract
+    from run_orchestration import (
+        CHECKPOINT_SCHEMA_VERSION,
+        EXECUTION_ENGINE_VERSION,
+        OrchestrationContractError,
+        atomic_write_json,
+        file_identity,
+        fingerprint,
+        sha256_file,
+        validate_paf,
+    )
+except ModuleNotFoundError:  # Imported as server.tools.run_outer_checkpoints.
+    from .grt_contract import ContractError, validate_contract
+    from .run_orchestration import (
+        CHECKPOINT_SCHEMA_VERSION,
+        EXECUTION_ENGINE_VERSION,
+        OrchestrationContractError,
+        atomic_write_json,
+        file_identity,
+        fingerprint,
+        sha256_file,
+        validate_paf,
+    )
 
 
 WORKFLOW = "gpm_run_outer_v1"

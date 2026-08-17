@@ -13,27 +13,14 @@ import subprocess
 from collections import defaultdict
 from pathlib import Path
 
-from grt_contract import ContractError, validate_contract
-from grt_prepare_inputs import (
-    CHR_ASSIGNMENT_FIELDS,
-    EVIDENCE_FIELDS,
-    SCHEMA_VERSION,
-    WORKFLOW,
-    canonical_json,
-    executable_identity,
-    read_fasta,
-    read_tsv,
-    sha256_file,
-    stable_id,
-    write_fasta,
-)
-from grt_step1 import (
-    TOOL_FIELDS,
-    atomic_write_tsv,
-    read_single,
-    source_assignment,
-    source_catalog,
-)
+try:
+    from grt_contract import ContractError, validate_contract
+    from grt_core import *
+    from grt_core.common import *
+except ModuleNotFoundError:  # Imported as server.tools.grt_evidence_package.
+    from .grt_contract import ContractError, validate_contract
+    from .grt_core import *
+    from .grt_core.common import *
 
 
 ENGINE_VERSION = 1
@@ -61,21 +48,6 @@ DATASET_FIELDS = [
     "fai_relpath",
     "self_alignment_available",
 ]
-
-
-def fail(message: str) -> None:
-    raise SystemExit(f"ERROR: {message}")
-
-
-def atomic_write_json(path: Path, value: object) -> None:
-    temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
-    temporary.parent.mkdir(parents=True, exist_ok=True)
-    temporary.write_text(
-        json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n",
-        encoding="utf-8",
-        newline="",
-    )
-    os.replace(temporary, path)
 
 
 def json_list(values: list[str]) -> str:

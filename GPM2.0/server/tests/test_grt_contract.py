@@ -1,5 +1,4 @@
 import csv
-import importlib.util
 import json
 import shutil
 import subprocess
@@ -15,9 +14,7 @@ SCHEMA_PATH = REPO_ROOT / "server" / "contracts" / "grt_precomputed_v2.json"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "grt_contract_v2"
 VALID_BUNDLE = FIXTURE_ROOT / "valid" / "gpm_server"
 
-SPEC = importlib.util.spec_from_file_location("grt_contract", MODULE_PATH)
-GRT_CONTRACT = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(GRT_CONTRACT)
+from server.tools import grt_contract as GRT_CONTRACT
 
 
 def apply_operation(bundle_root, operation):

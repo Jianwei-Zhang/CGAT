@@ -11,9 +11,7 @@ from unittest import mock
 
 REPO_ROOT = Path(__file__).parents[2]
 TOOL = REPO_ROOT / "server" / "tools" / "grt_prepare_inputs.py"
-sys.path.insert(0, str(REPO_ROOT / "server/tools"))
-
-from grt_prepare_inputs import (
+from server.tools.grt_prepare_inputs import (
     commit_prepared_outputs,
     donor_fragment_rows,
     executable_identity,
@@ -532,7 +530,7 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
                 return real_replace(source, destination)
 
             with mock.patch(
-                "grt_prepare_inputs.os.replace",
+                "server.tools.grt_prepare_inputs.os.replace",
                 side_effect=fail_once_during_metadata_install,
             ):
                 with self.assertRaisesRegex(OSError, "injected metadata install failure"):

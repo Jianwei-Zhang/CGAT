@@ -13,9 +13,7 @@ from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO_ROOT / "server/tools"))
-
-from run_outer_checkpoints import OuterCheckpointManager
+from server.tools.run_outer_checkpoints import OuterCheckpointManager
 
 
 PAF_LINE = "query\t10\t0\t10\t+\ttarget\t12\t1\t11\t10\t10\t60\n"
@@ -263,7 +261,10 @@ class OuterCheckpointTests(unittest.TestCase):
             write(server / "metadata/grt_final_path.json", "{}\n")
             write(server / "grt/q/q4.fa", ">Chr1\nA\n")
             manager = OuterCheckpointManager(server)
-            with mock.patch("run_outer_checkpoints.validate_contract", return_value=summary):
+            with mock.patch(
+                "server.tools.run_outer_checkpoints.validate_contract",
+                return_value=summary,
+            ):
                 self.assertTrue(manager.validate_evidence()[0])
                 recorded = {**summary, "q4_sha256": "c" * 64}
                 write(

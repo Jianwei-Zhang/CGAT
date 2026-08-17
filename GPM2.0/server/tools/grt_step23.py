@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 
-"""Run traceable GRT PatchRepair and CorrectRefill against one frozen D0."""
+"""Run traceable GRT PatchRepair and CorrectRefill against one frozen D0.
+
+This module intentionally retains the cohesive Step2/Step3 repair algorithm.
+Checkpoint fingerprints hash this exact runtime entrypoint, so moving algorithm
+blocks behind imported files would silently weaken the current engine identity.
+A later split must first version the checkpoint contract to hash the entrypoint
+and its imported algorithm modules as one engine closure.
+"""
 
 from __future__ import annotations
 
@@ -15,54 +22,14 @@ import tempfile
 from collections import defaultdict
 from pathlib import Path
 
-from grt_prepare_inputs import (
-    CHR_ASSIGNMENT_FIELDS,
-    DONOR_FRAGMENT_FIELDS,
-    EVIDENCE_FIELDS,
-    Q_SEGMENT_FIELDS,
-    SCHEMA_VERSION,
-    WORKFLOW,
-    canonical_json,
-    executable_identity,
-    read_tsv,
-    reverse_complement,
-    sha256_bytes,
-    sha256_file,
-    stable_id,
-    write_fasta,
-    write_tsv,
-)
-from grt_step1 import (
-    ATTEMPT_FIELDS,
-    STAGE_FIELDS,
-    TOOL_FIELDS,
-    USAGE_FIELDS,
-    apply_round,
-    atomic_write_jsonl,
-    atomic_write_tsv,
-    build_candidates,
-    build_flanks,
-    cached_chromosome_alignment,
-    commit_stage_directory,
-    fasta_bytes,
-    gap_objects,
-    json_hash,
-    load_q_paths,
-    member_source_interval,
-    parse_paf,
-    path_sequence,
-    q_rows_for_paths,
-    read_fasta_allow_empty,
-    read_single,
-    slice_path,
-    source_assignment,
-    source_catalog,
-    stage_evidence_rows,
-    stage_status_row,
-    verify_donor_freeze,
-    write_checkpoint,
-    write_jsonl,
-)
+try:
+    from grt_core import *
+    from grt_core.common import *
+    from grt_core.mummer import command_identity, mummer_parameters, parse_mummer_coords, run_logged
+except ModuleNotFoundError:  # Imported as server.tools.grt_step23.
+    from .grt_core import *
+    from .grt_core.common import *
+    from .grt_core.mummer import command_identity, mummer_parameters, parse_mummer_coords, run_logged
 
 
 ENGINE_VERSION = 5
@@ -194,142 +161,10 @@ CLASSIFICATION_FIELDS = [
 ]
 
 
-def fail(message: str) -> None:
-    raise SystemExit(f"ERROR: {message}")
 
 
-def command_identity(identity: dict[str, str]) -> dict[str, str]:
-    return {
-        "resolved": identity["resolved"],
-        "sha256": identity["sha256"],
-        "version": identity["version"],
-    }
 
 
-def run_logged(
-    command: list[str],
-    cwd: Path,
-    command_path: Path,
-    stdout_path: Path,
-    stderr_path: Path,
-    stdout_redirect: Path | None = None,
-) -> None:
-    command_path.write_text(shlex.join(command) + "\n", encoding="utf-8", newline="")
-    with stderr_path.open("w", encoding="utf-8", newline="") as stderr_handle:
-        if stdout_redirect is None:
-            with stdout_path.open("w", encoding="utf-8", newline="") as stdout_handle:
-                completed = subprocess.run(
-                    command,
-                    cwd=cwd,
-                    stdout=stdout_handle,
-                    stderr=stderr_handle,
-                    check=False,
-                )
-        else:
-            stdout_path.write_text("redirected to " + stdout_redirect.name + "\n", encoding="utf-8")
-            with stdout_redirect.open("w", encoding="utf-8", newline="") as output_handle:
-                completed = subprocess.run(
-                    command,
-                    cwd=cwd,
-                    stdout=output_handle,
-                    stderr=stderr_handle,
-                    check=False,
-                )
-    if completed.returncode != 0:
-        fail(
-            f"command failed with exit code {completed.returncode}; "
-            f"command={command_path}, stderr={stderr_path}"
-        )
-
-
-def mummer_parameters(threads: int) -> dict[str, object]:
-    return {
-        "nucmer": {
-            "min_cluster": MUMMER_MIN_CLUSTER,
-            "min_match": MUMMER_MIN_MATCH,
-            "batch": 500_000_000,
-            "threads": threads,
-        },
-        "delta_filter": {"reference_best": True, "min_alignment": MUMMER_MIN_ALIGNMENT},
-        "show_coords": {"reference_sorted": True, "include_lengths": True},
-    }
-
-
-def parse_mummer_coords(
-    path: Path,
-    stage: str,
-    chromosome: str,
-    chromosome_length: int,
-    members_by_record: dict[str, dict[str, str]],
-    donor_lengths: dict[str, int],
-) -> list[dict[str, object]]:
-    rows: list[dict[str, object]] = []
-    with path.open(encoding="utf-8") as handle:
-        for line_number, raw in enumerate(handle, start=1):
-            line = raw.rstrip("\n")
-            stripped = line.strip()
-            if (
-                not stripped
-                or stripped.startswith("/")
-                or stripped.startswith("NUCMER")
-                or stripped.startswith("[")
-                or stripped.startswith("=")
-            ):
-                continue
-            fields = [value for value in stripped.split() if value != "|"]
-            if len(fields) < 11:
-                fail(f"invalid MUMmer coords row at {path}:{line_number}")
-            try:
-                ref_start, ref_end, query_start, query_end = map(int, fields[:4])
-                ref_aligned, query_aligned = map(int, fields[4:6])
-                identity = float(fields[6])
-                ref_length, query_length = map(int, fields[7:9])
-            except ValueError:
-                fail(f"non-numeric MUMmer coords row at {path}:{line_number}")
-            ref_record, query_record = fields[-2:]
-            if ref_record not in members_by_record:
-                fail(f"MUMmer coords references unknown D0 member at {path}:{line_number}")
-            if query_record != chromosome:
-                fail(f"MUMmer coords query is not {chromosome} at {path}:{line_number}")
-            if ref_length != donor_lengths[ref_record] or query_length != chromosome_length:
-                fail(f"MUMmer coords length columns disagree with FASTA at {path}:{line_number}")
-            if not (
-                1 <= min(ref_start, ref_end) <= max(ref_start, ref_end) <= ref_length
-                and 1 <= min(query_start, query_end) <= max(query_start, query_end) <= query_length
-                and ref_aligned >= 1
-                and query_aligned >= 1
-                and 0 <= identity <= 100
-            ):
-                fail(f"MUMmer coords has invalid coordinates at {path}:{line_number}")
-            member = members_by_record[ref_record]
-            orientation = "+" if (ref_end - ref_start) * (query_end - query_start) >= 0 else "-"
-            rows.append(
-                {
-                    "stage": stage,
-                    "chr": chromosome,
-                    "line_number": line_number,
-                    "member_id": member["member_id"],
-                    "source_dataset": member["dataset_name"],
-                    "source_contig": member["contig_name"],
-                    "ref_record": ref_record,
-                    "ref_start": ref_start,
-                    "ref_end": ref_end,
-                    "ref_min": min(ref_start, ref_end),
-                    "ref_max": max(ref_start, ref_end),
-                    "query_start": query_start,
-                    "query_end": query_end,
-                    "query_min": min(query_start, query_end),
-                    "query_max": max(query_start, query_end),
-                    "orientation": orientation,
-                    "identity": identity / 100.0,
-                    "ref_aligned": ref_aligned,
-                    "query_aligned": query_aligned,
-                    "ref_length": ref_length,
-                    "query_length": query_length,
-                    "raw_line": line,
-                }
-            )
-    return rows
 
 
 def cached_mummer_chromosome(
@@ -1066,8 +901,6 @@ def validate_step2_candidates(
         )
 
 
-def intervals_overlap(left_start: int, left_end: int, right_start: int, right_end: int) -> bool:
-    return left_start <= right_end and right_start <= left_end
 
 
 def reject_candidates_spanning_other_gaps(
@@ -1230,18 +1063,6 @@ def candidate_table_rows(candidates: list[dict[str, object]]) -> list[dict[str, 
     return rows
 
 
-def assignment_map(server_dir: Path) -> dict[tuple[str, str], set[str]]:
-    assignments: dict[tuple[str, str], set[str]] = defaultdict(set)
-    for row in read_tsv(
-        server_dir / "metadata/chr_assignments.tsv",
-        CHR_ASSIGNMENT_FIELDS,
-    ):
-        assignments[(row["dataset_name"], row["seq_name"])].add(
-            row["assigned_chr_name"]
-        )
-    return assignments
-
-
 def consumed_intervals(
     usage_rows: list[dict[str, str]],
     event_rows: list[dict[str, object]] | None = None,
@@ -1356,33 +1177,6 @@ def evidence_row(
     }
 
 
-def checkpoint_result(server_dir: Path, stage: str, fingerprint: str) -> dict[str, object] | None:
-    checkpoint_path = server_dir / f"grt/checkpoints/{stage}.json"
-    if not checkpoint_path.is_file():
-        return None
-    try:
-        checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
-        hashes = checkpoint.get("output_hashes", {})
-        if (
-            checkpoint.get("workflow") != WORKFLOW
-            or checkpoint.get("stage") != stage
-            or checkpoint.get("status") != "success"
-            or checkpoint.get("input_fingerprint") != fingerprint
-            or not hashes
-        ):
-            return None
-        for relpath, expected in hashes.items():
-            path = server_dir / relpath
-            if not path.is_file() or sha256_file(path) != expected:
-                return None
-        result = json.loads((server_dir / checkpoint["result_relpath"]).read_text(encoding="utf-8"))
-        if result.get("stage") != stage or result.get("input_fingerprint") != fingerprint:
-            return None
-        return result
-    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
-        return None
-
-
 def step2_strategy(gap_count: int, patch_candidate_count: int, accepted_patch_count: int) -> str:
     """Return the GRT controller branch for one chromosome."""
     if gap_count == 0:
@@ -1392,25 +1186,6 @@ def step2_strategy(gap_count: int, patch_candidate_count: int, accepted_patch_co
     if accepted_patch_count == 0:
         return "full_fixer_reuse_patches"
     return "partial_success_no_fixer"
-
-
-def invalidate_from(server_dir: Path, stage: str) -> None:
-    order = ["step2", "step3"]
-    outputs = {"step2": "q2", "step3": "q3"}
-    start = order.index(stage)
-    for invalid_stage in order[start:]:
-        (server_dir / f"grt/checkpoints/{invalid_stage}.json").unlink(missing_ok=True)
-        (server_dir / f"grt/q/{outputs[invalid_stage]}.fa").unlink(missing_ok=True)
-        artifact = server_dir / f"grt/evidence/{invalid_stage}"
-        if artifact.is_dir():
-            shutil.rmtree(artifact)
-    for downstream_stage in ("step4_telomere", "finalize"):
-        (server_dir / f"grt/checkpoints/{downstream_stage}.json").unlink(missing_ok=True)
-    (server_dir / "grt/q/q4.fa").unlink(missing_ok=True)
-    step4_artifact = server_dir / "grt/evidence/step4_telomere"
-    if step4_artifact.is_dir():
-        shutil.rmtree(step4_artifact)
-    (server_dir / "metadata/grt_final_path.json").unlink(missing_ok=True)
 
 
 def run_step2(
@@ -1473,7 +1248,7 @@ def run_step2(
     if cached is not None:
         print(f"GRT step2 cache hit: {fingerprint}")
         return cached, True
-    invalidate_from(server_dir, stage)
+    invalidate_step23_from(server_dir, stage)
     artifact_relpath = "grt/evidence/step2"
     artifact_dir = server_dir / artifact_relpath
     artifact_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -3159,7 +2934,7 @@ def run_step3(
     if cached is not None:
         print(f"GRT step3 cache hit: {fingerprint}")
         return cached, True
-    invalidate_from(server_dir, stage)
+    invalidate_step23_from(server_dir, stage)
     artifact_relpath = "grt/evidence/step3"
     artifact_dir = server_dir / artifact_relpath
     artifact_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -3495,7 +3270,7 @@ def run_step3(
         raise
 
 
-def publish_metadata(
+def publish_step23_metadata(
     server_dir: Path,
     results: list[dict[str, object]],
     tools: dict[str, dict[str, str]],
@@ -3690,7 +3465,7 @@ def execute(args: argparse.Namespace) -> None:
         args.threads,
         args.repair_mode,
     )
-    publish_metadata(server_dir, [step2], tools, minimap)
+    publish_step23_metadata(server_dir, [step2], tools, minimap)
     _, q2_paths, q2_records = load_q_paths(server_dir, "q2", step2["q_rows"], sources)
     step3_consumed = [*initial_consumed, *step2["accepted_intervals"]]
     step3, _step3_cached = run_step3(
@@ -3711,7 +3486,7 @@ def execute(args: argparse.Namespace) -> None:
         args.threads,
         args.repair_mode,
     )
-    publish_metadata(server_dir, [step2, step3], tools, minimap)
+    publish_step23_metadata(server_dir, [step2, step3], tools, minimap)
     if step2["donor_set_id"] != donor_set["donor_set_id"] or step3["donor_set_id"] != donor_set["donor_set_id"]:
         fail("Step2/3 do not reference the same frozen donor set as Step1")
     if step2["target_sha256"] != donor_set["fasta_sha256"] or step3["target_sha256"] != donor_set["fasta_sha256"]:

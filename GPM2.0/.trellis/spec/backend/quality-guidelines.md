@@ -57,7 +57,7 @@ mixed responsibilities and weak test seams.
 | F5 `importer.rs` | Triggered by production size/function count and distinct initial/add-dataset/add-ctg validation, transaction, promotion, and rollback owners; split by import operation plus shared package/persistence services. |
 | F6 `db.rs` schema evolution | Fails the versioned-migration rule because ordered history and newer-version rejection are absent; migrate through the database-guideline contract before adding schema growth. |
 | F7 `grt_package.rs` | Triggered by contract parsing, persistence, initialization, view, and trace query change axes; preserve one shared contract model while separating those services. |
-| F8 GRT Python stages | Triggered by large executable stages importing/repeating shared semantics; extract neutral I/O/hash/interval/state modules and keep stage `main()` thin. |
+| F8 GRT Python stages | Shared I/O/hash/interval/checkpoint/metadata semantics now live in `server/tools/grt_core/`, and stage entrypoints have no executable-stage import chain. `grt_step23.py` and `grt_telomere_finalize.py` remain cohesive algorithm owners pending a versioned multi-module checkpoint engine identity. |
 | F9 `prepare.sh` | Triggered by embedded programs over 100 lines and repeated shell utilities; promote programs to directly lintable/testable templates. |
 
 ---

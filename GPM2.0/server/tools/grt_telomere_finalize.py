@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 
-"""Recover missing q3 telomeres from frozen Dtel and finalize traceable q4."""
+"""Recover missing q3 telomeres from frozen Dtel and finalize traceable q4.
+
+The remaining production body is one terminal-recovery/final-path algorithm:
+candidate construction, arbitration, trace emission, and q4 reconciliation are
+validated as a single atomic stage result. A later split should introduce an
+explicit multi-module engine identity before moving those coupled steps behind
+the entrypoint.
+"""
 
 from __future__ import annotations
 
@@ -13,54 +20,14 @@ import tempfile
 from collections import defaultdict
 from pathlib import Path
 
-from grt_prepare_inputs import (
-    CHR_ASSIGNMENT_FIELDS,
-    DONOR_MEMBER_FIELDS,
-    EVIDENCE_FIELDS,
-    FINAL_PATH_SCHEMA_VERSION,
-    Q_SEGMENT_FIELDS,
-    SCHEMA_VERSION,
-    WORKFLOW,
-    canonical_json,
-    executable_identity,
-    read_fasta,
-    read_tsv,
-    reverse_complement,
-    sha256_bytes,
-    sha256_file,
-    stable_id,
-    write_fasta,
-    write_tsv,
-)
-from grt_step1 import (
-    ATTEMPT_FIELDS,
-    STAGE_FIELDS,
-    TOOL_FIELDS,
-    USAGE_FIELDS,
-    atomic_write_jsonl,
-    atomic_write_tsv,
-    commit_stage_directory,
-    fasta_bytes,
-    json_hash,
-    load_q_paths,
-    member_source_interval,
-    path_sequence,
-    q_rows_for_paths,
-    read_fasta_allow_empty,
-    read_single,
-    slice_path,
-    source_assignment,
-    source_catalog,
-    stage_status_row,
-    write_checkpoint,
-    write_jsonl,
-)
-from grt_step23 import (
-    command_identity,
-    intervals_overlap,
-    parse_mummer_coords,
-    run_logged,
-)
+try:
+    from grt_core import *
+    from grt_core.common import *
+    from grt_core.mummer import command_identity, mummer_parameters, parse_mummer_coords, run_logged
+except ModuleNotFoundError:  # Imported as server.tools.grt_telomere_finalize.
+    from .grt_core import *
+    from .grt_core.common import *
+    from .grt_core.mummer import command_identity, mummer_parameters, parse_mummer_coords, run_logged
 
 
 ENGINE_VERSION = 1
@@ -131,11 +98,7 @@ CANDIDATE_FIELDS = [
 ]
 
 
-def fail(message: str) -> None:
-    raise SystemExit(f"ERROR: {message}")
-
-
-def load_telomere_rules(server_dir: Path) -> list[dict[str, object]]:
+def load_locked_telomere_rules(server_dir: Path) -> list[dict[str, object]]:
     rows = read_tsv(server_dir / "metadata/grt_telomere_rules.tsv", RULE_FIELDS)
     rules: list[dict[str, object]] = []
     seen: set[tuple[str, int, int, int]] = set()
@@ -246,10 +209,6 @@ def candidate_terminal_signal(
     }
 
 
-def compose_orientation(left: str, right: str) -> str:
-    return "+" if left == right else "-"
-
-
 def oriented_interval_to_record(
     record_length: int,
     orientation: str,
@@ -327,19 +286,6 @@ def verify_telomere_donor_freeze(
     if donor_freeze.get("tel_donor_set_id") != donor_set["donor_set_id"]:
         fail("donor-freeze checkpoint does not reference the recipe Dtel")
     return donor_set, members, donor_freeze
-
-
-def mummer_parameters(threads: int) -> dict[str, object]:
-    return {
-        "nucmer": {
-            "min_cluster": MUMMER_MIN_CLUSTER,
-            "min_match": MUMMER_MIN_MATCH,
-            "batch": 500_000_000,
-            "threads": threads,
-        },
-        "delta_filter": {"reference_best": True, "min_alignment": MUMMER_MIN_ALIGNMENT},
-        "show_coords": {"reference_sorted": True, "include_lengths": True},
-    }
 
 
 def cached_terminal_mummer(
@@ -969,7 +915,7 @@ def candidate_rank_key(candidate: dict[str, object]) -> tuple[object, ...]:
     )
 
 
-def arbitrate_candidates(
+def arbitrate_terminal_candidates(
     chromosome_order: list[str],
     candidates: list[dict[str, object]],
 ) -> list[dict[str, object]]:
@@ -1358,18 +1304,6 @@ def build_events_usage_attempts(
     return events, usage_rows, attempts
 
 
-def assignment_map(server_dir: Path) -> dict[tuple[str, str], set[str]]:
-    assignments: dict[tuple[str, str], set[str]] = defaultdict(set)
-    for row in read_tsv(
-        server_dir / "metadata/chr_assignments.tsv",
-        CHR_ASSIGNMENT_FIELDS,
-    ):
-        assignments[(row["dataset_name"], row["seq_name"])].add(
-            row["assigned_chr_name"]
-        )
-    return assignments
-
-
 def evidence_status(outcome: str) -> str:
     if outcome == "accepted":
         return "accepted"
@@ -1434,47 +1368,6 @@ def common_evidence_row(
         "coordinate_system": coordinate_system,
         "projection_status": "projected",
     }
-
-
-def checkpoint_result(
-    server_dir: Path, stage: str, fingerprint: str
-) -> dict[str, object] | None:
-    checkpoint_path = server_dir / f"grt/checkpoints/{stage}.json"
-    if not checkpoint_path.is_file():
-        return None
-    try:
-        checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
-        hashes = checkpoint.get("output_hashes", {})
-        if (
-            checkpoint.get("workflow") != WORKFLOW
-            or checkpoint.get("stage") != stage
-            or checkpoint.get("status") != "success"
-            or checkpoint.get("input_fingerprint") != fingerprint
-            or not hashes
-        ):
-            return None
-        for relpath, expected in hashes.items():
-            path = server_dir / relpath
-            if not path.is_file() or sha256_file(path) != expected:
-                return None
-        result = json.loads(
-            (server_dir / str(checkpoint["result_relpath"])).read_text(encoding="utf-8")
-        )
-        if result.get("stage") != stage or result.get("input_fingerprint") != fingerprint:
-            return None
-        return result
-    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
-        return None
-
-
-def invalidate_step4(server_dir: Path) -> None:
-    for stage in ("step4_telomere", "finalize"):
-        (server_dir / f"grt/checkpoints/{stage}.json").unlink(missing_ok=True)
-    (server_dir / "grt/q/q4.fa").unlink(missing_ok=True)
-    (server_dir / "metadata/grt_final_path.json").unlink(missing_ok=True)
-    artifact = server_dir / "grt/evidence/step4_telomere"
-    if artifact.is_dir():
-        shutil.rmtree(artifact)
 
 
 def run_step4(
@@ -1682,7 +1575,7 @@ def run_step4(
                 len(input_records[str(candidate["chr"])]),
             )
 
-        arbitrate_candidates(chromosome_order, candidates)
+        arbitrate_terminal_candidates(chromosome_order, candidates)
         output_paths, output_records, placements = apply_telomere_candidates(
             chromosome_order,
             input_paths,
@@ -2135,16 +2028,6 @@ def verify_final_path(
         fail("Final Path chromosome set differs from q4")
 
 
-def atomic_write_json(path: Path, value: object) -> None:
-    temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
-    temporary.write_text(
-        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-        newline="",
-    )
-    os.replace(temporary, path)
-
-
 def reconcile_terminal_supersession(
     server_dir: Path,
     q3_rows: list[dict[str, object]],
@@ -2279,7 +2162,7 @@ def write_finalize_checkpoint(
     }
     path = server_dir / "grt/checkpoints/finalize.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_json(path, checkpoint)
+    atomic_write_json(path, checkpoint, pretty=True)
     return path
 
 
@@ -2391,7 +2274,7 @@ def publish_metadata_and_finalize(
     atomic_write_jsonl(metadata / "grt_events.jsonl", events)
     atomic_write_tsv(metadata / "grt_gap_attempts.tsv", ATTEMPT_FIELDS, attempts)
     atomic_write_tsv(metadata / "grt_tool_versions.tsv", TOOL_FIELDS, tool_rows)
-    atomic_write_json(metadata / "grt_final_path.json", final_path)
+    atomic_write_json(metadata / "grt_final_path.json", final_path, pretty=True)
     verify_final_path(
         json.loads((metadata / "grt_final_path.json").read_text(encoding="utf-8")),
         dict(read_fasta(server_dir / "grt/q/q4.fa")),
@@ -2458,7 +2341,7 @@ def execute(args: argparse.Namespace) -> None:
     chromosome_order, q3_paths, q3_records = load_q_paths(
         server_dir, "q3", q3_rows, sources
     )
-    rules = load_telomere_rules(server_dir)
+    rules = load_locked_telomere_rules(server_dir)
     tools = {
         "nucmer": executable_identity(args.nucmer),
         "delta-filter": executable_identity(args.delta_filter),

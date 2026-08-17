@@ -8,12 +8,8 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).parents[2]
-TEST_ROOT = Path(__file__).parent
-sys.path.insert(0, str(TEST_ROOT))
-sys.path.insert(0, str(REPO_ROOT / "server/tools"))
-
-import test_grt_prepare_inputs as prepare_fixture
-from grt_step1 import (
+from server.tests import test_grt_prepare_inputs as prepare_fixture
+from server.tools.grt_step1 import (
     apply_filter,
     arbitrate_candidates,
     reconcile_filtered_round1_events,

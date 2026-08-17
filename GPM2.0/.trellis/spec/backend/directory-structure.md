@@ -21,7 +21,9 @@ app/src-tauri/src/
 └── *_cancel.rs             # adapter-owned cancellation registries
 server/
 ├── prepare.sh              # Linux bundle entrypoint and legacy generator
-├── tools/*.py              # executable stages and reusable server logic
+├── tools/*.py              # executable stage/CLI facades
+├── tools/grt_core/         # shared GRT I/O, domain, checkpoint, execution logic
+├── tools/grt_core/contract/# Python contract validator subdomains
 ├── templates/*.sh          # directly lintable generated-program sources
 ├── contracts/*.json        # delivery contract schemas
 └── tests/test_*.py         # server unit and integration tests
@@ -44,9 +46,9 @@ rusqlite and filesystem helpers            persistence and external I/O
 
 server/*.sh                                operator entrypoints
                  ↓
-server/tools entrypoint modules             stage orchestration
+server/tools entrypoint modules             stage orchestration/algorithms
                  ↓
-server/tools shared modules                 parsing, hashing, intervals, state
+server/tools/grt_core                       parsing, hashing, intervals, state
 ```
 
 - Composition roots register commands and assemble dependencies. They do not
@@ -76,18 +78,27 @@ tests. Split when two sections change for different reasons, require unrelated
 dependencies, need separate rollback/transaction boundaries, or cannot be
 tested without constructing the whole subsystem.
 
-Current migration targets found by the engineering audit include the GRT stage
-scripts and the programs embedded by `prepare.sh`. The completed importer split
-keeps its public facade in `importer.rs` and owns workflow, validation, catalog,
-alignment, payload, and rollback concerns in focused modules under `importer/`.
-Existing public contracts must be preserved while ownership moves.
+The completed GRT shared-semantics split keeps executable CLI contracts under
+`server/tools/` and gives reusable I/O, domain, alignment, checkpoint,
+invalidation, metadata, and contract validation logic a single authority under
+`server/tools/grt_core/`. Stage entrypoints never import another executable
+stage. `grt_step23.py` and `grt_telomere_finalize.py` remain large cohesive
+algorithm owners until a versioned checkpoint engine identity can hash an
+entrypoint plus imported algorithm modules; that engine-closure change is the
+required follow-up before splitting them further.
+
+The completed importer split keeps its public facade in `importer.rs` and owns
+workflow, validation, catalog, alignment, payload, and rollback concerns in
+focused modules under `importer/`. Existing public contracts must be preserved
+while ownership moves. The programs embedded by `prepare.sh` remain a migration
+target.
 
 ## Naming and Placement
 
 - Rust modules and files use `snake_case`; request/response structs use the
   operation name, such as `ProjectUpdateRequest`.
 - Python modules use `snake_case`; a stage entrypoint keeps `main()` and argument
-  parsing thin, while reusable functions move to a stage-neutral module.
+  parsing thin, while reusable functions move to `server/tools/grt_core/`.
 - Shell templates describe the generated command (`package_full_zip.sh`), not
   the generator implementation detail.
 - Put tests beside Rust production code in `#[cfg(test)] mod tests` until a

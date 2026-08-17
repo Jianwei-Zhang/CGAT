@@ -10,14 +10,10 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).parents[2]
-TEST_ROOT = Path(__file__).parent
-sys.path.insert(0, str(TEST_ROOT))
-sys.path.insert(0, str(REPO_ROOT / "server/tools"))
-
-import test_grt_prepare_inputs as prepare_fixture
-import test_grt_step23 as step23_fixture
-from grt_prepare_inputs import read_fasta
-from grt_telomere_finalize import verify_final_path
+from server.tests import test_grt_prepare_inputs as prepare_fixture
+from server.tests import test_grt_step23 as step23_fixture
+from server.tools.grt_prepare_inputs import read_fasta
+from server.tools.grt_telomere_finalize import verify_final_path
 
 
 PREPARE_TOOL = REPO_ROOT / "server/tools/grt_prepare_inputs.py"

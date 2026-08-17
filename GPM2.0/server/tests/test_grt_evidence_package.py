@@ -8,16 +8,12 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).parents[2]
-TEST_ROOT = Path(__file__).parent
-sys.path.insert(0, str(TEST_ROOT))
-sys.path.insert(0, str(REPO_ROOT / "server/tools"))
-
-import test_grt_prepare_inputs as prepare_fixture
-import test_grt_telomere_finalize as telomere_fixture
-from grt_contract import ContractError, validate_contract
-from grt_evidence_package import build_ref_evidence
-from grt_prepare_inputs import read_fasta
-from grt_step1 import source_assignment
+from server.tests import test_grt_prepare_inputs as prepare_fixture
+from server.tests import test_grt_telomere_finalize as telomere_fixture
+from server.tools.grt_contract import ContractError, validate_contract
+from server.tools.grt_evidence_package import build_ref_evidence
+from server.tools.grt_prepare_inputs import read_fasta
+from server.tools.grt_step1 import source_assignment
 
 
 TOOL = REPO_ROOT / "server/tools/grt_evidence_package.py"
