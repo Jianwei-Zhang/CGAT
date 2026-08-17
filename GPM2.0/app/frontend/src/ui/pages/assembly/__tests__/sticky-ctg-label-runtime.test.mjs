@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
 import { bindStickyCtgLabels, resolveStickyLabelDisplay } from "../sticky-ctg-label-runtime.js";
+import { readStylesheetTree } from "../../../../styles/__tests__/style-test-support.mjs";
 
 function createClassList(initial = []) {
   const values = new Set(initial);
@@ -544,7 +544,7 @@ test("off-screen ctgs do not render sticky labels", () => {
 });
 
 test("sticky ctg label css defines overlay and hidden-label rules", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );

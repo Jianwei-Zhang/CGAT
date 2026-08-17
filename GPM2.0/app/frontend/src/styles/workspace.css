@@ -1,0 +1,186 @@
+/* Owner: workspace feature. Existing-project selection, recipe summary, creation controls, and workspace tools. */
+
+.workspace-existing-card {
+  align-content: start;
+}
+
+.workspace-selected-card {
+  align-content: start;
+}
+
+.workspace-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workspace-card-header > div {
+  min-width: 0;
+}
+
+.workspace-card-header h4 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.workspace-project-name-field {
+  display: grid;
+  gap: 4px;
+}
+
+.workspace-recipe-summary {
+  margin-top: 4px;
+  border: 1px solid #d1d1d1;
+  border-radius: 4px;
+  background: #d8d8d8;
+  overflow: hidden;
+}
+
+.workspace-recipe-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: #d8d8d8;
+}
+
+.workspace-recipe-field {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  background: #f7f7f7;
+}
+
+.workspace-recipe-label {
+  color: #666;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.workspace-recipe-value {
+  min-width: 0;
+  color: #222;
+  overflow-wrap: anywhere;
+}
+
+.workspace-recipe-value.is-enabled,
+.workspace-recipe-value.is-disabled {
+  width: fit-content;
+  max-width: 100%;
+  padding: 1px 7px;
+  border: 1px solid #a7a7a7;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.workspace-recipe-value.is-enabled {
+  border-color: #56825d;
+  background: #edf7ef;
+  color: #285b31;
+}
+
+.workspace-recipe-value.is-disabled {
+  border-color: #b0b0b0;
+  background: #f1f1f1;
+  color: #666;
+}
+
+.workspace-create-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #c8c8c8;
+  border-radius: 5px;
+  background: #f7f7f7;
+  cursor: pointer;
+}
+
+.workspace-create-option-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.workspace-create-option-title {
+  color: #222;
+  font-weight: 700;
+}
+
+.workspace-create-option input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.workspace-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 2px;
+}
+
+.project-list-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.project-select-button {
+  border-bottom: 0;
+  flex: 1;
+  width: auto;
+}
+
+.project-select-button span {
+  display: block;
+}
+
+.tool-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.tool-grid .inline-input {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px;
+}
+
+.tool-grid label.inline-input {
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+}
+
+.tool-grid input[type="number"],
+.tool-grid input[type="text"],
+.tool-grid select {
+  width: 100%;
+}
+
+@media (max-width: 560px) {
+  .workspace-card-header {
+    align-items: flex-start;
+  }
+
+  .workspace-recipe-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-card-actions {
+    justify-content: stretch;
+  }
+
+  .workspace-card-actions .button {
+    flex: 1 1 120px;
+  }
+}

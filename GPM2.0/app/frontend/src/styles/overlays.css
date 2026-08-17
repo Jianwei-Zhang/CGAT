@@ -1,0 +1,354 @@
+/* Owner: shared overlays and feedback. Modal shells, progress pipelines, importer toasts, export progress, and context menus used across features. */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+  padding: 16px;
+}
+
+.modal-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+
+.import-progress-overlay {
+  z-index: 70;
+}
+
+.import-progress-dialog {
+  position: relative;
+  width: min(720px, calc(100vw - 32px));
+}
+
+.import-progress-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  min-width: 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.import-progress-heading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding-right: 40px;
+}
+
+.import-progress-title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.import-progress-title-row h4 {
+  margin: 0;
+}
+
+.import-progress-meter {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.import-progress-meter-track {
+  height: 12px;
+  border: 1px solid #a8a8a8;
+  background: #f3f3f3;
+  overflow: hidden;
+}
+
+.import-progress-meter-fill {
+  height: 100%;
+  background: #6f8fb7;
+}
+
+.import-progress-meter-text {
+  color: #333;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.import-progress-list {
+  max-height: min(48vh, 420px);
+  overflow: auto;
+  margin-top: 12px;
+}
+
+.pipeline-step-row.import-progress-step {
+  grid-template-columns: minmax(0, 1fr) 20px;
+  gap: 12px;
+}
+
+.import-progress-step .pipeline-step-label {
+  grid-column: 1 / 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.import-progress-step .pipeline-step-icon {
+  grid-column: 2 / 3;
+}
+
+.assembly-final-path-export-overlay {
+  z-index: 65;
+  padding: 32px;
+}
+
+.assembly-final-path-export-dialog {
+  position: relative;
+  width: min(680px, calc(100vw - 64px));
+  display: block;
+  padding: 28px 32px;
+  box-sizing: border-box;
+}
+
+.assembly-final-path-export-close {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+}
+
+.assembly-final-path-export-body {
+  width: min(100%, 560px);
+  margin: 0 auto 0 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.assembly-final-path-export-head {
+  display: grid;
+  gap: 6px;
+  padding-right: 48px;
+}
+
+.assembly-final-path-export-head h4 {
+  margin: 0;
+}
+
+.assembly-final-path-export-head .muted {
+  margin: 0;
+}
+
+.assembly-final-path-export-output-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.assembly-final-path-export-steps {
+  display: grid;
+  gap: 10px;
+}
+
+.assembly-final-path-export-step {
+  grid-template-columns: minmax(0, 1fr) 20px;
+  width: 100%;
+  gap: 16px;
+}
+
+.pipeline-step-label {
+  display: block;
+  white-space: nowrap;
+}
+
+.pipeline-step-icon {
+  justify-self: end;
+}
+
+.assembly-final-path-export-status {
+  margin: 0;
+}
+
+.assembly-final-path-export-status.success {
+  color: #2c6b2f;
+}
+
+.pipeline-done,
+.pipeline-error,
+.pipeline-pending,
+.pipeline-skipped {
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.pipeline-done {
+  color: #2c6b2f;
+}
+
+.pipeline-error {
+  color: #a12622;
+}
+
+.pipeline-pending,
+.pipeline-skipped {
+  color: #888;
+}
+
+.pipeline-step-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.pipeline-step-row .muted {
+  grid-column: 2 / 3;
+}
+
+.pipeline-step-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+}
+
+.pipeline-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #c7c7c7;
+  border-top-color: #666;
+  border-radius: 50%;
+  animation: pipeline-spin 0.9s linear infinite;
+}
+
+@keyframes pipeline-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.status-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.importer-status-toast-wrap {
+  position: fixed;
+  top: 72px;
+  right: 24px;
+  z-index: 30;
+  display: grid;
+  gap: 6px;
+  max-width: min(560px, calc(100vw - 48px));
+  pointer-events: none;
+}
+
+.importer-status-toast {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid #d7d7d7;
+  border-radius: 6px;
+  background: rgba(247, 247, 247, 0.98);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  color: #333;
+}
+
+.importer-status-toast.error {
+  border-color: #e2b1b1;
+  background: rgba(255, 245, 245, 0.98);
+  color: #8f2424;
+}
+
+.context-menu,
+.context-menu-submenu {
+  border: 1px solid #9d9d9d;
+  background: #f9f9f9;
+  min-width: 180px;
+  box-shadow: 1px 1px 6px rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  display: grid;
+  gap: 2px;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+}
+
+.context-menu.is-hidden {
+  display: none;
+}
+
+.context-menu-submenu-group {
+  position: relative;
+  display: grid;
+}
+
+.context-menu-submenu-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.context-menu-submenu-indicator {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.context-menu-submenu {
+  position: absolute;
+  z-index: 1;
+  top: -4px;
+  left: calc(100% - 2px);
+  display: none;
+}
+
+.context-menu-submenu.opens-left {
+  right: calc(100% - 2px);
+  left: auto;
+}
+
+.context-menu-submenu-group:hover > .context-menu-submenu,
+.context-menu-submenu-group.is-open > .context-menu-submenu {
+  display: grid;
+}
+
+.context-menu-submenu-group.is-disabled:hover > .context-menu-submenu {
+  display: none;
+}
+
+.context-menu-item {
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.context-menu-item:hover {
+  border-color: #b8b8b8;
+  background: #ececec;
+}
+
+.context-menu-item:disabled {
+  color: #8c8c8c;
+  cursor: not-allowed;
+  border-color: transparent;
+  background: transparent;
+}
+
+.context-menu-item:disabled:hover {
+  border-color: transparent;
+  background: transparent;
+}

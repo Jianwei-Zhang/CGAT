@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
 import { FLOATING_MENU_CLOSE_DELAY_MS } from "../floating-menu-runtime.js";
 import { __test, bindProjectExportPage, renderProjectExportPage } from "../project-export-page.js";
+import { readStylesheetTree } from "../../../styles/__tests__/style-test-support.mjs";
 
-const componentsCss = readFileSync(new URL("../../../styles/components.css", import.meta.url), "utf8");
+const componentsCss = readStylesheetTree(new URL("../../../styles/components.css", import.meta.url));
 
 function createState(overrides = {}) {
   return {

@@ -49,6 +49,64 @@ Audit findings F3 (`assembly-page.js`, `render-tracks.js`, and the former
 
 ---
 
+## Feature Stylesheet Ownership and Cascade
+
+`src/main.js` imports `base.css`, `layout.css`, and `components.css` in that
+order. `base.css` owns reset rules and global tokens, `layout.css` owns global
+page/shell geometry, and `components.css` is a short compatibility manifest.
+It imports component owners in this dependency order:
+
+```text
+shared-components → overlays → shell → importer → workspace → assembly
+                  → subview → final-path → degap → project-export
+```
+
+Reusable modal shells therefore load before feature dialog modifiers. Assembly
+track foundations load before Subview and Final Path specializations; Final
+Path foundations load before DEGAP and project-export integrations. This order
+is protected by `src/styles/__tests__/stylesheet-architecture.test.mjs`; do not
+alphabetize it or add cascade layers without a dedicated migration.
+
+| Stylesheet | Owner |
+| --- | --- |
+| `shared-components.css` | Cards, form controls, lists, status text, tables, and documented cross-feature selectors. |
+| `overlays.css` | Modal shells, progress pipelines, context menus, toasts, and import/export progress. |
+| `shell.css` | Top bar, route navigation, and session metadata. |
+| `importer.css` | Importer option cards and workspace-history import affordances. |
+| `workspace.css` | Project initialization, recipe summaries, project selection, and workspace tools. |
+| `assembly.css` | Assembly shell, chromosome/member controls, primary tracks, confirmations, and GRT visualization. |
+| `subview.css` | Subview selection, evidence, anchors, fragments, canvas overlays, and track overrides. |
+| `final-path.css` | Final Path cards, table/graph modes, sorting, logs, and export-menu triggers. |
+| `degap.css` | DEGAP settings, forms, jobs, and graph integration. |
+| `project-export.css` | Project statistics, filters, detail tables, and Final Path previews. |
+
+A selector with one feature prefix belongs to that feature. A rule combining
+multiple feature prefixes belongs in shared styles only when its declaration is
+one semantic contract for every consumer. Keep responsive overrides and
+`@keyframes` with their owner; animation names are global and unique. Add a
+token to `base.css` only when equal values also have equal semantic meaning.
+
+Before moving a rule, search renderer markup, runtime selectors, tests,
+responsive variants, combined selectors, and animation references. Move the
+complete contract. Preserve rules when dead-code evidence is incomplete.
+
+```css
+/* Wrong: feature CSS added back to the compatibility manifest. */
+.subview-track-svg .track-collinearity-band { cursor: crosshair; }
+
+/* Correct: keep the rule in subview.css after the Assembly track base. */
+.subview-track-svg .track-collinearity-band { cursor: crosshair; }
+```
+
+CSS assertions must expand the manifest with
+`src/styles/__tests__/style-test-support.mjs`; reading the import-only entry does
+not prove that a feature rule exists. For a mechanical split, compare pre/post
+rule inventories, run relevant render/runtime tests, full `npm test`, and
+`npm run build`, then review importer, workspace, Assembly/Subview/Final Path,
+and project-export selectors for visual parity.
+
+---
+
 ## Recommended and Required Patterns
 
 ### Import Progress Semantics

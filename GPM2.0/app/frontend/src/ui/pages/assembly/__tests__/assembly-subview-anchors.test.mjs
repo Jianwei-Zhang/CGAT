@@ -1,7 +1,7 @@
 import {
   test,
   assert,
-  readFileSync,
+  readStylesheetTree,
   __testCancelSubviewPairwiseEvidence,
   renderAssemblyPage,
   createState,
@@ -516,7 +516,7 @@ test("anchor-enabled ctgs expose fragment hit zones instead of only whole-contig
 });
 
 test("subview fragment hover keeps track-colored outlines instead of red", () => {
-  const css = readFileSync(new URL("../../../../styles/components.css", import.meta.url), "utf8");
+  const css = readStylesheetTree(new URL("../../../../styles/components.css", import.meta.url));
 
   assert.match(
     css,

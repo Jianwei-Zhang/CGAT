@@ -23,7 +23,17 @@ app/frontend/
     └── styles/
         ├── base.css
         ├── layout.css
-        └── components.css            # legacy style monolith; migration target
+        ├── components.css            # short compatibility/import manifest
+        ├── shared-components.css     # cross-feature component primitives
+        ├── shell.css
+        ├── importer.css
+        ├── workspace.css
+        ├── assembly.css
+        ├── subview.css
+        ├── final-path.css
+        ├── degap.css
+        ├── project-export.css
+        └── overlays.css              # shared modal/progress/menu/toast layer
 ```
 
 This frontend is framework-free ES modules. React component/hook conventions do
@@ -95,7 +105,9 @@ tests in separately owned files while the page remains their composition point.
 - Tests use `<owner>.test.mjs` and live in the nearest `__tests__/` directory.
 - CSS selectors use stable feature prefixes (`assembly-`, `subview-`,
   `final-path-`, `importer-`, `workspace-`, `degap-`) before moving to the
-  corresponding feature stylesheet.
+  corresponding feature stylesheet. Follow the
+  [feature stylesheet ownership contract](./quality-guidelines.md#feature-stylesheet-ownership-and-cascade)
+  for manifest order and cross-feature rules.
 
 ## Prohibited Patterns
 

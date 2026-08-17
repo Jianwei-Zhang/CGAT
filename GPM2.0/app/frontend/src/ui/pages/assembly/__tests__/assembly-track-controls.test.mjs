@@ -1,7 +1,7 @@
 import {
   test,
   assert,
-  readFileSync,
+  readStylesheetTree,
   __testApplySupportDatasetSelection,
   __testSyncSupportDatasetSelection,
   renderAssemblyPage,
@@ -162,7 +162,7 @@ test("support ds ctg len rules dialog renders close in header and actions in foo
 });
 
 test("track combo styles keep dropdown menu unclipped", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -176,7 +176,7 @@ test("track combo styles keep dropdown menu unclipped", () => {
 });
 
 test("final path card body css keeps a shared bottom padding for graph and table modes", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -185,7 +185,7 @@ test("final path card body css keeps a shared bottom padding for graph and table
 });
 
 test("assembly card spacing css uses one shared stack gap instead of a standalone final-path margin", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -196,7 +196,7 @@ test("assembly card spacing css uses one shared stack gap instead of a standalon
 });
 
 test("main track panel css uses the same horizontal inset rhythm as subview and final path cards", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -208,7 +208,7 @@ test("main track panel css uses the same horizontal inset rhythm as subview and 
 });
 
 test("final path table body css keeps a graph-like minimum height without vertical centering", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -219,7 +219,7 @@ test("final path table body css keeps a graph-like minimum height without vertic
 });
 
 test("final path index header css centers the # label over the index column", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -229,7 +229,7 @@ test("final path index header css centers the # label over the index column", ()
 });
 
 test("final path table css uses responsive grids instead of the old fixed 1550px layout", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -243,7 +243,7 @@ test("final path table css uses responsive grids instead of the old fixed 1550px
 });
 
 test("final path header css places the mode toggle after title and highlights the active mode", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -257,7 +257,7 @@ test("final path header css places the mode toggle after title and highlights th
 });
 
 test("track tick label css does not force middle anchor", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -266,7 +266,7 @@ test("track tick label css does not force middle anchor", () => {
 });
 
 test("subview candidate row uses left flow for inline placement next to guide text", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -281,7 +281,7 @@ test("subview selection panel exposes a stable local refresh anchor", () => {
 });
 
 test("subview band tooltip keeps each contig interval on its own unwrapped line", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -291,7 +291,7 @@ test("subview band tooltip keeps each contig interval on its own unwrapped line"
 });
 
 test("subview hit bands follow top-track color", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -307,7 +307,7 @@ test("subview hit bands follow top-track color", () => {
 });
 
 test("transparent hit-band proxies are hidden only after canvas is ready", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -323,7 +323,7 @@ test("transparent hit-band proxies are hidden only after canvas is ready", () =>
 });
 
 test("hidden contig css uses dashed chips, blue hidden tag, and outline-only bars", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -338,7 +338,7 @@ test("hidden contig css uses dashed chips, blue hidden tag, and outline-only bar
 });
 
 test("mirror contig css preserves fill color while keeping interaction enabled", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -355,7 +355,7 @@ test("mirror contig css preserves fill color while keeping interaction enabled",
 });
 
 test("mirror contig labels do not force bold font weight", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -364,7 +364,7 @@ test("mirror contig labels do not force bold font weight", () => {
 });
 
 test("track labels stay on one line and truncate overflow", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );

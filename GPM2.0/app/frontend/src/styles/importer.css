@@ -1,0 +1,29 @@
+/* Owner: importer feature. Importer option cards and workspace-history add-package affordances. */
+
+.importer-option-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.importer-start-button {
+  min-height: 32px;
+  margin-top: auto;
+}
+
+.list-item-button .add-package-hint {
+  display: inline;
+  color: #2c6b2f;
+  font-weight: 700;
+  margin-left: 6px;
+}
+
+.list-item-button .add-package-hint strong {
+  color: #111111;
+  font-weight: 700;
+}
+
+.list-item-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

@@ -1,0 +1,370 @@
+/* Owner: assembly Subview feature. Subview selection, pairwise evidence, canvas overlays, anchors, fragments, and responsive controls. */
+
+.subview-same-contig-warning {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 1px 6px;
+  border: 1px solid #e1b55b;
+  background: #fff7db;
+  color: #7a5800;
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.subview-track-svg .track-collinearity-band {
+  fill: rgba(97, 129, 170, 0.24);
+  stroke: rgba(97, 129, 170, 0.38);
+  cursor: crosshair;
+}
+
+.subview-track-svg .track-collinearity-band.is-companion {
+  fill: rgba(154, 126, 78, 0.22);
+  stroke: rgba(154, 126, 78, 0.34);
+}
+
+.subview-track-ctg,
+.subview-track-ctg.is-companion {
+  cursor: grab;
+}
+
+.subview-selection-panel {
+  gap: 10px;
+}
+
+.subview-panel-head {
+  display: grid;
+  gap: 8px;
+}
+
+.subview-panel-guide-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.subview-panel-guide-inline > .muted {
+  margin: 0;
+}
+
+.subview-candidate-row {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.subview-candidate-badge {
+  border: 1px solid #c2c2c2;
+  background: #f1f1f1;
+  color: #333;
+  font-size: 12px;
+  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.subview-candidate-badge strong {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #8f8f8f;
+  background: #fff;
+}
+
+.subview-candidate-remove {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #b8b8b8;
+  background: #fff;
+  color: #555;
+  display: inline-grid;
+  place-items: center;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.subview-candidate-remove:hover {
+  background: #f2f5f8;
+  color: #1f3855;
+  border-color: #95abc2;
+}
+
+.subview-alignment-card {
+  position: relative;
+  gap: 8px;
+}
+
+.subview-pairwise-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248, 248, 248, 0.72);
+}
+
+.subview-pairwise-loading-panel {
+  position: relative;
+  min-width: 220px;
+  padding: 16px 18px 14px;
+  border: 1px solid #c8c8c8;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.subview-pairwise-loading-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: transparent;
+  color: #555;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.subview-pairwise-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #d8d8d8;
+  border-top-color: #5f81aa;
+  border-radius: 999px;
+  animation: subview-pairwise-spin 0.8s linear infinite;
+}
+
+.subview-pairwise-loading-text {
+  margin: 0;
+  font-size: 12px;
+  color: #444;
+}
+
+@keyframes subview-pairwise-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.subview-track-order-toggle {
+  min-width: 42px;
+  height: 30px;
+  line-height: 1;
+  padding: 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.subview-track-order-toggle.is-in-label-column {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+
+.subview-track-inline-controls {
+  justify-content: flex-end;
+}
+
+.subview-track-inline-controls .assembly-track-inline-field {
+  width: auto;
+  min-width: 0;
+}
+
+.subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="alignmentLength"],
+.subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="minTickUnitKb"],
+.subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="maxTickCount"],
+.subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="mapq"] {
+  width: 86px;
+  min-width: 86px;
+}
+
+.subview-track-meta {
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.subview-track-layout .assembly-track-label-column {
+  position: relative;
+  left: auto;
+  border-right: 0;
+}
+
+.subview-track-label-column .assembly-track-label-row {
+  position: absolute;
+}
+
+.subview-track-svg {
+  display: block;
+  position: relative;
+  z-index: 2;
+  background: transparent;
+}
+
+.subview-anchor-line {
+  vector-effect: non-scaling-stroke;
+}
+
+.track-band-canvas-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.track-band-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.subview-anchor-hit-zone {
+  cursor: crosshair;
+  vector-effect: non-scaling-stroke;
+}
+
+.subview-fragment-hit-zone {
+  cursor: pointer;
+}
+
+.subview-track-svg [data-subview-hit-key] {
+  transition: stroke 120ms ease, stroke-width 120ms ease;
+}
+
+.assembly-track-scroll.is-track-band-canvas-ready .subview-track-svg .track-collinearity-band[data-track-band-proxy="1"] {
+  fill: transparent;
+  stroke: transparent;
+}
+
+.assembly-track-scroll.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"] {
+  fill: transparent;
+  stroke: transparent;
+}
+
+.is-track-drag-preview [data-track-band-canvas-scene-kind="main-track"] {
+  visibility: hidden;
+}
+
+.is-track-drag-preview .assembly-track-scroll.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"],
+.is-track-drag-preview [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"] {
+  fill: rgba(97, 129, 170, 0.24);
+  stroke: rgba(97, 129, 170, 0.38);
+}
+
+.is-track-drag-preview .assembly-track-scroll.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band.is-companion[data-track-band-proxy="1"],
+.is-track-drag-preview [data-track-band-svg-overlay="1"] .track-collinearity-band.is-companion[data-track-band-proxy="1"] {
+  fill: rgba(154, 126, 78, 0.22);
+  stroke: rgba(154, 126, 78, 0.34);
+}
+
+.is-subview-track-drag-preview [data-track-band-canvas-scene-kind="subview-ctg"],
+.is-subview-track-drag-preview [data-track-band-canvas-scene-kind="subview-track-pair"] {
+  visibility: hidden;
+}
+
+.is-subview-track-drag-preview .assembly-track-scroll.is-track-band-canvas-ready .subview-track-svg .track-collinearity-band[data-track-band-proxy="1"],
+.is-subview-track-drag-preview .subview-track-svg .track-collinearity-band[data-track-band-proxy="1"] {
+  fill: rgba(97, 129, 170, 0.24);
+  stroke: rgba(97, 129, 170, 0.38);
+}
+
+.is-subview-track-drag-preview .assembly-track-scroll.is-track-band-canvas-ready .subview-track-svg .track-collinearity-band.is-companion[data-track-band-proxy="1"],
+.is-subview-track-drag-preview .subview-track-svg .track-collinearity-band.is-companion[data-track-band-proxy="1"] {
+  fill: rgba(154, 126, 78, 0.22);
+  stroke: rgba(154, 126, 78, 0.34);
+}
+
+.is-subview-track-drag-preview .subview-anchor-line,
+.is-subview-track-drag-preview .subview-anchor-hit-zone,
+.is-subview-track-drag-preview .subview-fragment-hit-zone {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.subview-track-svg .track-collinearity-band[data-subview-hit-key]:hover,
+.subview-track-svg .track-collinearity-band[data-subview-hit-key].is-menu-active {
+  stroke: rgba(46, 86, 127, 0.88);
+  fill: rgba(97, 129, 170, 0.3);
+  stroke-width: 2;
+}
+
+.subview-track-svg .track-collinearity-band.is-companion[data-subview-hit-key]:hover,
+.subview-track-svg .track-collinearity-band.is-companion[data-subview-hit-key].is-menu-active {
+  stroke: rgba(124, 100, 64, 0.88);
+  fill: rgba(154, 126, 78, 0.28);
+  stroke-width: 2;
+}
+
+.subview-fragment-outline {
+  stroke: transparent;
+  transition: stroke 120ms ease;
+}
+
+.subview-fragment-hit-zone[data-subview-fragment-role="primary"]:hover + .subview-fragment-outline,
+.subview-fragment-hit-zone[data-subview-fragment-role="primary"].is-menu-active + .subview-fragment-outline,
+.subview-fragment-hit-zone[data-subview-fragment-role="phased"]:hover + .subview-fragment-outline,
+.subview-fragment-hit-zone[data-subview-fragment-role="phased"].is-menu-active + .subview-fragment-outline {
+  stroke: #2e567f;
+}
+
+.subview-fragment-hit-zone[data-subview-fragment-role="support"]:hover + .subview-fragment-outline,
+.subview-fragment-hit-zone[data-subview-fragment-role="support"].is-menu-active + .subview-fragment-outline {
+  stroke: #7c6440;
+}
+
+.subview-fragment-hit-zone[data-subview-fragment-role="ref"]:hover + .subview-fragment-outline,
+.subview-fragment-hit-zone[data-subview-fragment-role="ref"].is-menu-active + .subview-fragment-outline {
+  stroke: #8e8e8e;
+}
+
+.subview-band-tooltip {
+  position: absolute;
+  z-index: 4;
+  min-width: 180px;
+  max-width: min(360px, calc(100% - 16px));
+  padding: 6px 8px;
+  border: 1px solid rgba(75, 75, 75, 0.45);
+  background: rgba(255, 252, 244, 0.96);
+  color: #2f2415;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+
+.subview-band-tooltip.is-hidden {
+  display: none;
+}
+
+@media (max-width: 1200px) {
+  .subview-track-inline-controls .assembly-track-inline-field {
+    width: calc(50% - 6px);
+  }
+
+  .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="minTickUnitKb"],
+  .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="maxTickCount"],
+  .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="alignmentLength"],
+  .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="mapq"] {
+    width: 100%;
+    min-width: 0;
+  }
+
+}

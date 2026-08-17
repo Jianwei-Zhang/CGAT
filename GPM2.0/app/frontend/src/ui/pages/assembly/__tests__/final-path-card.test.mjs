@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
 import { renderFinalPathCard } from "../final-path-card.js";
 import { renderDegapJobCard, renderDegapRuntime } from "../degap-card.js";
+import { readStylesheetTree } from "../../../../styles/__tests__/style-test-support.mjs";
 
 function createDeps() {
   return {
@@ -163,8 +163,8 @@ test("renderFinalPathCard migrates the legacy DEGAP view to Graph and embeds DEG
 });
 
 test("DEGAP reads help uses reusable helper hint styling", () => {
-  const baseCss = readFileSync(new URL("../../../../styles/base.css", import.meta.url), "utf8");
-  const componentsCss = readFileSync(new URL("../../../../styles/components.css", import.meta.url), "utf8");
+  const baseCss = readStylesheetTree(new URL("../../../../styles/base.css", import.meta.url));
+  const componentsCss = readStylesheetTree(new URL("../../../../styles/components.css", import.meta.url));
 
   assert.match(baseCss, /--helper-hint-bg:\s*#fff7ed;/);
   assert.match(baseCss, /--helper-hint-border:\s*#f59e0b;/);

@@ -1,0 +1,453 @@
+/* Owner: project export feature. Project-level summaries, detail filters, and Final Path previews. */
+
+.project-export-page {
+  display: grid;
+  gap: 14px;
+}
+
+.project-export-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.project-export-head h3 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.project-export-title-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.project-export-title-row .muted {
+  margin: 0;
+}
+
+.project-export-actions,
+.project-export-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.project-export-summary-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.project-export-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.project-export-panel {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d1d1d1;
+  background: #fbfbfb;
+}
+
+.project-export-panel h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.project-export-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.project-export-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  font-size: 11px;
+  color: #555;
+}
+
+.project-export-legend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.project-export-used-metrics,
+.project-export-assignment {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 10px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.project-export-used-row {
+  display: contents;
+}
+
+.project-export-used-row > span {
+  font-weight: 700;
+}
+
+.project-export-used-row strong {
+  text-align: left;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.project-export-used-row .final-path-log-ratio-bar {
+  min-width: 0;
+}
+
+.project-export-detail-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.project-export-detail-section .final-path-log-table-wrap {
+  overflow: visible;
+}
+
+.project-export-detail-table th {
+  position: relative;
+  background: #f3f3f3;
+}
+
+.project-export-detail-table {
+  border: 1px solid #d1d1d1;
+}
+
+.project-export-detail-table td {
+  background: #fff;
+}
+
+.project-export-detail-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.project-export-detail-filter {
+  position: relative;
+  display: inline-block;
+}
+
+.project-export-detail-filter > summary {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #bdbdbd;
+  background: #fff;
+  cursor: pointer;
+  list-style: none;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.project-export-detail-filter > summary::-webkit-details-marker {
+  display: none;
+}
+
+.project-export-detail-filter > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-top: 5px solid #333;
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+}
+
+.project-export-detail-filter[open] > summary::before {
+  border-top: 0;
+  border-bottom: 5px solid #333;
+}
+
+.project-export-detail-filter > summary:hover,
+.project-export-detail-filter[open] > summary {
+  border-color: #8ba9c9;
+  background: #f4f8fc;
+}
+
+.project-export-detail-filter.is-active > summary {
+  border-color: #4d78a8;
+  background: #eef6ff;
+}
+
+.project-export-detail-filter-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  display: grid;
+  gap: 4px;
+  min-width: 160px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid #bdbdbd;
+  background: #fff;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 16%);
+}
+
+.project-export-detail-filter-menu label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.project-export-detail-filter-menu input {
+  margin: 0;
+}
+
+.project-export-detail-sort {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+}
+
+.project-export-assignment-row {
+  display: contents;
+}
+
+.project-export-assignment-row > span:first-child {
+  font-weight: 700;
+}
+
+.project-export-assignment-value {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+}
+
+.project-export-assignment-value-token {
+  white-space: nowrap;
+}
+
+.project-export-assignment-value-part {
+  white-space: nowrap;
+}
+
+.project-export-assignment-value-separator {
+  color: #111;
+}
+
+.project-export-assignment-bar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 12px;
+  overflow: hidden;
+  background: #e6e6e6;
+  border: 1px solid #c9c9c9;
+}
+
+.project-export-assignment-segment {
+  display: block;
+  position: relative;
+  height: 100%;
+  min-width: 0;
+}
+
+.project-export-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+}
+
+.project-export-swatch.is-placed,
+.project-export-assignment-segment.is-placed {
+  background: #2f8f4e;
+  --stat-segment-highlight: #14532d;
+}
+
+.project-export-swatch.is-unassigned,
+.project-export-assignment-segment.is-unassigned {
+  background: #d1d5db;
+  --stat-segment-highlight: #6b7280;
+}
+
+@media (max-width: 1180px) {
+  .project-export-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.project-export-job {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #cfcfcf;
+  background: #f8f8f8;
+}
+
+.project-export-job ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.project-export-final-path-list {
+  display: grid;
+  gap: 8px;
+}
+
+.project-export-final-path-row {
+  display: grid;
+  grid-template-columns: minmax(72px, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 4px 10px;
+  border: 1px solid #d1d1d1;
+  background: #fbfbfb;
+  cursor: pointer;
+}
+
+.project-export-final-path-row:hover,
+.project-export-final-path-row:focus-visible {
+  border-color: #7c9bbc;
+  background: #f4f8fc;
+  box-shadow: inset 0 0 0 1px #7c9bbc;
+  outline: none;
+}
+
+.project-export-final-path-row-label {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.project-export-final-path-row-graph {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.project-export-final-path-row-graph .assembly-final-path-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.project-export-final-path-row-graph .assembly-final-path-label-spacer {
+  display: none;
+}
+
+.project-export-final-path-row-graph .assembly-final-path-svg-wrap {
+  margin-top: 0;
+  overflow-x: hidden;
+}
+
+.project-export-final-path-row-graph .assembly-final-path-svg {
+  width: 100%;
+  max-width: 100%;
+  height: 52px;
+}
+
+.project-export-final-path-preview-track {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 52px;
+  overflow: hidden;
+  border: 1px solid #d2d2d2;
+  background: #fff;
+}
+
+.project-export-final-path-preview-ctg {
+  position: absolute;
+  z-index: 1;
+  top: 20px;
+  height: 16px;
+  overflow: hidden;
+  border: 1px solid #38516c;
+  border-radius: 2px;
+  background: #b9d0ea;
+  color: #17324d;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.project-export-final-path-preview-ctg.is-companion {
+  border-color: #725d39;
+  background: #dccba4;
+  color: #4d3c20;
+}
+
+.project-export-final-path-preview-ctg.is-ref {
+  border-color: #8e8e8e;
+  background: #cfcfcf;
+  color: #333;
+}
+
+.project-export-final-path-preview-ctg span {
+  display: block;
+  overflow: hidden;
+  padding: 0 4px;
+  text-overflow: clip;
+}
+
+.project-export-final-path-preview-ctg.is-after-gap span {
+  padding-left: 10px;
+}
+
+.project-export-final-path-preview-ctg.is-label-hidden span {
+  visibility: hidden;
+}
+
+.project-export-final-path-preview-gap {
+  position: absolute;
+  z-index: 3;
+  top: 20px;
+  width: 8px;
+  height: 16px;
+  border: 1px solid #555;
+  border-radius: 2px;
+  background: #f8f8f8;
+}
+
+.project-export-final-path-preview-gap-label {
+  position: absolute;
+  z-index: 4;
+  top: 8px;
+  transform: translateX(-50%);
+  color: #111;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.project-export-final-path-preview-length {
+  flex: 0 0 120px;
+  color: #4f4f4f;
+  font-size: 12px;
+  white-space: nowrap;
+}

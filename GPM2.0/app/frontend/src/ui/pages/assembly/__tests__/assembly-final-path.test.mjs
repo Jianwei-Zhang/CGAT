@@ -1,7 +1,7 @@
 import {
   test,
   assert,
-  readFileSync,
+  readStylesheetTree,
   bindAssemblyPageImpl,
   __testRerenderBatchDeleteProgress,
   __testResolveAppendToPathFocusPatch,
@@ -884,7 +884,7 @@ test("assembly page renders completed export steps with a check mark icon", () =
 });
 
 test("export dialog css centers its content block and keeps step icons pinned on the right", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );

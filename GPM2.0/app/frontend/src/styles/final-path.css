@@ -1,0 +1,528 @@
+/* Owner: assembly Final Path feature. Final Path cards, sortable rows, graphs, logs, menus, and responsive presentation. */
+
+.final-path-card-head {
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.final-path-card-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.final-path-card-head-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.final-path-card-head-controls.is-table-mode {
+  justify-content: flex-end;
+}
+
+.final-path-card-body {
+  padding-bottom: 12px;
+}
+
+.final-path-all-card-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.final-path-all-card {
+  min-width: 0;
+}
+
+.final-path-all-card.is-table,
+.final-path-all-card.is-log {
+  border: 1px solid #d2d2d2;
+  background: #fbfbfb;
+  padding: 10px;
+}
+
+.final-path-all-card-head {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  margin-bottom: 8px;
+}
+
+.final-path-all-card-title {
+  font-size: 13px;
+}
+
+.final-path-card-table-body {
+  min-height: 170px;
+  --final-path-table-columns:
+    34px
+    minmax(140px, 1.35fr)
+    minmax(124px, 1fr)
+    minmax(92px, 0.72fr)
+    minmax(64px, 0.5fr)
+    minmax(100px, 0.9fr)
+    minmax(100px, 0.9fr)
+    minmax(100px, 0.9fr)
+    minmax(100px, 0.9fr)
+    34px;
+}
+
+.final-path-card-list-shell {
+  overflow-x: auto;
+}
+
+.final-path-card-list-head,
+.final-path-sort-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+}
+
+.final-path-card-list-head-card,
+.final-path-sort-card-grid {
+  display: grid;
+  grid-template-columns: var(--final-path-table-columns);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.final-path-card-list-head {
+  padding: 0 10px 6px;
+  color: #424242;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.final-path-card-list-head > :first-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.final-path-card-list {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.final-path-sort-card {
+  border: 1px solid #cfcfcf;
+  background: linear-gradient(#ffffff, #f7f7f7);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 10px;
+  transition: box-shadow 120ms ease, transform 120ms ease, opacity 120ms ease, border-color 120ms ease;
+}
+
+.final-path-sort-row.is-gap .final-path-sort-card {
+  background: linear-gradient(#fafafa, #f1f1f1);
+}
+
+.final-path-sort-row.is-dragging .final-path-sort-card {
+  opacity: 0.28;
+  transform: scale(0.992);
+}
+
+.final-path-sort-row.is-drop-before .final-path-sort-card {
+  box-shadow: inset 0 3px 0 #7d7d7d, 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.final-path-sort-row.is-drop-after .final-path-sort-card {
+  box-shadow: inset 0 -3px 0 #7d7d7d, 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.final-path-sort-card.is-drag-ghost {
+  margin: 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  opacity: 0.96;
+}
+
+.final-path-card-cell {
+  min-width: 0;
+}
+
+.final-path-card-drag-cell,
+.final-path-card-delete-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.final-path-card-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.final-path-card-toggle-button {
+  min-width: 28px;
+}
+
+.final-path-card-toggle-button.is-active {
+  border-color: #7c7c7c;
+  background: linear-gradient(#ededed, #d3d3d3);
+  font-weight: 700;
+}
+
+.final-path-phased-selector {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+}
+
+.final-path-phased-selector-toggle {
+  min-width: 34px;
+  font-weight: 700;
+}
+
+.final-path-phased-selector-menu {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 0;
+  z-index: 20;
+  min-width: 52px;
+  padding: 4px;
+  border: 1px solid #b9b9b9;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
+}
+
+.final-path-phased-selector-menu.is-hidden {
+  display: none;
+}
+
+.final-path-phased-selector-option {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  padding: 4px 9px;
+  color: #202020;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.final-path-phased-selector-option:hover,
+.final-path-phased-selector-option.is-active {
+  background: #ececec;
+  font-weight: 700;
+}
+
+.final-path-export {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.final-path-export-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 132px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  background: #ffffff;
+  border: 1px solid #c9c9c9;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  z-index: 20;
+}
+
+.final-path-export-menu.is-hidden {
+  display: none;
+}
+
+.final-path-export-item {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.final-path-export-item:hover {
+  background: #f0f0f0;
+}
+
+.final-path-export-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: #e4e4e4;
+}
+
+.assembly-final-path-svg-wrap {
+  margin-top: 4px;
+}
+
+.assembly-final-path-svg {
+  min-width: 100%;
+}
+
+.assembly-final-path-layout {
+  gap: 0;
+}
+
+.assembly-final-path-label-spacer {
+  width: 136px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 10px;
+  font-size: 13px;
+}
+
+.final-path-track-inline-controls {
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.assembly-final-path-graph {
+  padding: 6px 4px 4px;
+}
+
+.assembly-final-path-graph-track {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 18px;
+}
+
+.final-path-log-body {
+  display: grid;
+  gap: 14px;
+  min-height: 170px;
+}
+
+.final-path-log-summary {
+  display: grid;
+  position: relative;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  column-gap: 10px;
+  gap: 8px;
+  padding: 22px 12px 12px;
+  border: 1px solid #d1d1d1;
+  background: #fbfbfb;
+}
+
+.final-path-log-legend {
+  display: flex;
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  justify-content: flex-end;
+  gap: 12px;
+  font-size: 11px;
+  color: #555;
+}
+
+.final-path-log-legend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.final-path-log-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+}
+
+.final-path-log-swatch.is-appended,
+.final-path-log-ratio-segment.is-appended {
+  background: #2f8f4e;
+  --stat-segment-highlight: #14532d;
+}
+
+.final-path-log-swatch.is-log-hidden,
+.final-path-log-ratio-segment.is-log-hidden {
+  background: #f59e0b;
+  --stat-segment-highlight: #b45309;
+}
+
+.final-path-log-stat {
+  display: contents;
+  font-size: 13px;
+}
+
+.final-path-log-stat-label {
+  font-weight: 700;
+}
+
+.final-path-log-stat-value {
+  font-size: 14px;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.final-path-log-ratio-bar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 12px;
+  overflow: hidden;
+  background: #e6e6e6;
+  border: 1px solid #c9c9c9;
+}
+
+.final-path-log-ratio-segment {
+  display: block;
+  position: relative;
+  height: 100%;
+  min-width: 0;
+}
+
+.final-path-log-section {
+  display: grid;
+  gap: 10px;
+}
+
+.final-path-log-section h5 {
+  margin: 0;
+  font-size: 12px;
+}
+
+.final-path-log-table-wrap {
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.final-path-log-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.final-path-log-table th,
+.final-path-log-table td {
+  border: 1px solid #dedede;
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.final-path-log-table th {
+  background: #f3f3f3;
+  font-weight: 700;
+}
+
+.final-path-log-table .final-path-log-type-cell {
+  vertical-align: middle;
+  font-weight: 600;
+}
+
+.final-path-log-empty {
+  padding: 8px 0;
+}
+
+.final-path-length-label {
+  fill: #4f4f4f;
+  font-size: 10px;
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .final-path-log-summary {
+    padding-top: 34px;
+  }
+
+  .final-path-log-stat {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .final-path-log-stat-value {
+    text-align: left;
+  }
+
+  .final-path-log-legend {
+    left: 12px;
+    right: auto;
+    justify-content: flex-start;
+  }
+}
+
+.final-path-card-cell input {
+  width: 100%;
+  min-width: 0;
+}
+
+.final-path-ctg-cell {
+  display: flex;
+  align-items: center;
+}
+
+.final-path-ctg-cell input {
+  flex: 1 1 auto;
+}
+
+.final-path-card-static-value {
+  display: flex;
+  align-items: center;
+  min-height: 31px;
+  border: 1px solid #d7d7d7;
+  background: #fafafa;
+  padding: 0 10px;
+  color: #444444;
+}
+
+.final-path-row-index-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.final-path-card-index {
+  min-width: 20px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.final-path-row-drag-handle {
+  min-width: 28px;
+  height: 30px;
+  padding: 0 6px;
+  cursor: grab;
+}
+
+.final-path-row-drag-handle:active {
+  cursor: grabbing;
+}
+
+.final-path-table-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.final-path-add-button {
+  min-width: 30px;
+  padding: 2px 8px;
+}
+
+.final-path-gap-marker {
+  fill: #ffffff;
+  stroke: #1b1b1b;
+  stroke-width: 1;
+}
+
+.final-path-gap-label {
+  fill: #1b1b1b;
+  font-size: 10px;
+  font-weight: 700;
+}

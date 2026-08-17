@@ -1,0 +1,78 @@
+/* Owner: application shell. Top bar, route navigation, and session metadata presentation. */
+
+.app-nav {
+  padding: 4px 8px;
+}
+
+.topbar h1 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-brand-text {
+  display: grid;
+  gap: 2px;
+}
+
+.meta-item-language {
+  display: grid;
+  gap: 4px;
+}
+
+.meta-item select {
+  width: 100%;
+  min-width: 0;
+}
+
+.meta-item-language select {
+  min-width: 96px;
+}
+
+.topbar-logo {
+  display: block;
+  height: 44px;
+  width: auto;
+  object-fit: contain;
+}
+
+.route-nav {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.route-button {
+  border: 1px solid #b9b9b9;
+  background: linear-gradient(#fafafa, #e6e6e6);
+  color: #333;
+  text-align: center;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.route-button.is-active {
+  background: linear-gradient(#f0f0f0, #d7d7d7);
+  border-color: #8c8c8c;
+  font-weight: 700;
+}
+
+.meta-item {
+  border: 1px solid #b9b9b9;
+  background: #f3f3f3;
+  padding: 4px 8px;
+  min-width: 180px;
+  display: grid;
+  gap: 4px;
+}
+
+.meta-item span {
+  display: block;
+  color: #666;
+  font-size: 11px;
+}

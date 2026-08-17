@@ -1,0 +1,222 @@
+/* Owner: shared UI primitives. Reusable cards, controls, lists, status text, legacy detail blocks, and cross-feature statistics interactions. */
+
+.panel {
+  border: 1px solid #9f9f9f;
+  background: linear-gradient(#f6f6f6, #ebebeb);
+  padding: 8px;
+}
+
+.kicker {
+  color: #666;
+  font-size: 11px;
+}
+
+.muted {
+  color: #666;
+}
+
+.helper-hint {
+  margin: 0;
+  border-left: 3px solid var(--helper-hint-border);
+  background: var(--helper-hint-bg);
+  color: var(--helper-hint-text);
+  padding: 5px 8px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.card {
+  border: 1px solid #c2c2c2;
+  background: #f8f8f8;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.card h4 {
+  font-size: 16px;
+}
+
+label {
+  color: #333;
+  font-weight: 700;
+}
+
+input,
+select {
+  border: 1px solid #b9b9b9;
+  background: #fff;
+  padding: 5px 6px;
+}
+
+.inline-input {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.button {
+  border: 1px solid #a2a2a2;
+  background: linear-gradient(#fbfbfb, #dfdfdf);
+  color: #222;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.button.ghost {
+  background: linear-gradient(#ffffff, #ececec);
+}
+
+.button.tiny {
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+.button.menu::after {
+  content: "  >";
+  color: #555;
+}
+
+.final-path-log-ratio-segment:hover,
+.project-export-assignment-segment:hover {
+  z-index: 1;
+  box-shadow: inset 0 0 0 2px var(--stat-segment-highlight, #4f7aa8);
+}
+
+.notice.warning {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #e3b35f;
+  background: #fff8e8;
+  color: #5b4300;
+}
+
+.list,
+.checklist {
+  border: 1px solid #d1d1d1;
+  background: #fafafa;
+  min-height: 120px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 8px;
+}
+
+.list-item {
+  padding: 4px 0;
+  border-bottom: 1px dashed #d7d7d7;
+}
+
+.list-item:last-child {
+  border-bottom: 0;
+}
+
+.checkbox-item {
+  display: block;
+  padding: 2px 0;
+}
+
+.checkbox-item input {
+  margin-right: 6px;
+}
+
+.error-text {
+  color: #b33030;
+  font-weight: 700;
+}
+
+.path-error-suffix {
+  white-space: nowrap;
+}
+
+.is-hidden {
+  display: none;
+}
+
+.list-item-button {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px dashed #d7d7d7;
+  background: transparent;
+  text-align: left;
+  padding: 6px 2px;
+  cursor: pointer;
+}
+
+.list-item-button.is-active {
+  background: #ececec;
+  font-weight: 700;
+}
+
+.icon-button {
+  min-width: 28px;
+  padding: 2px 6px;
+  line-height: 1;
+}
+
+.icon-button.danger {
+  color: #a12626;
+  border-color: #bf9999;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detail-meta {
+  color: #666;
+  margin: 6px 0;
+}
+
+.detail-members {
+  display: grid;
+  gap: 6px;
+}
+
+.detail-member {
+  border: 1px solid #d7d7d7;
+  background: #fafafa;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+}
+
+.detail-member span {
+  color: #666;
+}
+
+.junction-report {
+  border: 1px solid #d7d7d7;
+  background: #fafafa;
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.table-wrap {
+  overflow: auto;
+  max-height: 520px;
+}
+
+.records-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.records-table th,
+.records-table td {
+  border: 1px solid #d8d8d8;
+  padding: 6px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.records-table th {
+  background: #efefef;
+}
+
+.records-table code {
+  font-size: 11px;
+  word-break: break-all;
+}

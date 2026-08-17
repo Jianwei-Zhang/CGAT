@@ -1,0 +1,1495 @@
+/* Owner: assembly feature. Assembly shell, chromosome/member controls, primary tracks, confirmations, tables, and GRT badges. */
+
+.assembly-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.assembly-toolbar-left,
+.assembly-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assembly-toolbar-right {
+  justify-content: flex-end;
+}
+
+.tools-menu {
+  position: relative;
+}
+
+.tools-menu[open] .tools-menu-body {
+  display: grid;
+}
+
+.tools-menu-body {
+  display: none;
+  position: absolute;
+  z-index: 5;
+  top: 30px;
+  left: 0;
+  background: #f8f8f8;
+  border: 1px solid #bfbfbf;
+  padding: 6px;
+  min-width: 180px;
+  gap: 4px;
+}
+
+.assembly-tabs {
+  padding: 0;
+}
+
+.tab-row {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid #b9b9b9;
+  background: #ebebeb;
+  padding: 4px 4px 0 4px;
+}
+
+.tab {
+  border: 1px solid #b9b9b9;
+  border-bottom: 0;
+  background: #f0f0f0;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.tab.is-active {
+  background: #fff;
+  font-weight: 700;
+}
+
+.tab-body {
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.assembly-tabular-card {
+  gap: 10px;
+}
+
+.assembly-tab-table th,
+.assembly-tab-table td {
+  white-space: nowrap;
+}
+
+.chr-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chr-strip.has-members-panel {
+  align-items: flex-start;
+}
+
+.chr-title {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.chr-title-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chr-title-and-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chr-top-tools {
+  display: inline-flex;
+  align-items: center;
+}
+
+.chr-picker-inline {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.chr-picker-menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  width: 260px;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid #c7c7c7;
+  background: #f9f9f9;
+  padding: 6px;
+  z-index: 20;
+}
+
+.ctg-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.ctg-chip {
+  border: 1px solid #c7c7c7;
+  background: #efefef;
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  flex: 0 0 auto;
+  min-width: 120px;
+}
+
+.ctg-chip.is-active {
+  border-color: #7c7c7c;
+  background: #e0e0e0;
+}
+
+.ctg-chip.is-multi-selected {
+  border-color: #2e567f;
+  box-shadow: inset 0 0 0 1px #2e567f;
+}
+
+.ctg-chip.is-hidden-contig {
+  border-style: dashed;
+}
+
+.ctg-chip strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.2;
+}
+
+.ctg-chip-hidden-tag {
+  color: #2e567f;
+  font-weight: 700;
+}
+
+.ctg-chip-name.is-coassigned {
+  color: #c46a00;
+}
+
+.ctg-chip .ctg-chip-meta {
+  display: block;
+  color: #666;
+  font-size: 12px;
+}
+
+.canvas-placeholder {
+  border: 1px dashed #b9b9b9;
+  background: #f7f7f7;
+  min-height: 220px;
+  padding: 10px;
+}
+
+.assembly-track-wrap {
+  border: 1px solid #c7c7c7;
+  background: #f3f3f3;
+  padding: 6px;
+  display: grid;
+  gap: 6px;
+}
+
+.assembly-track-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.assembly-track-panel {
+  border: 1px solid #c7c7c7;
+  background: #f3f3f3;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.assembly-track-panel.is-companion {
+  background: #f7f5ef;
+}
+
+.assembly-track-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.assembly-track-panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.track-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.track-controls input,
+.track-controls select {
+  min-width: 110px;
+}
+
+.track-controls label {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.assembly-v1-tool-strip {
+  display: flex;
+  align-items: start;
+  margin-bottom: 0;
+}
+
+.assembly-v1-tool-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.assembly-v1-tool-menu {
+  position: relative;
+  border: 1px solid #c7c7c7;
+  background: linear-gradient(#fafafa, #efefef);
+  padding: 0;
+  width: 104px;
+  min-width: 104px;
+  align-self: flex-start;
+}
+
+.assembly-v1-tool-menu[data-tool-menu="about-chr"] {
+  width: 118px;
+  min-width: 118px;
+}
+
+.assembly-v1-tool-menu > summary {
+  list-style: none;
+}
+
+.assembly-v1-tool-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.assembly-v1-tool-menu-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #333;
+  min-height: 30px;
+  white-space: nowrap;
+}
+
+.assembly-v1-tool-menu-summary:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.assembly-v1-tool-menu-hint {
+  color: #666;
+  font-size: 12px;
+  font-weight: 600;
+  transition: transform 0.12s ease;
+}
+
+.assembly-v1-tool-menu[open] .assembly-v1-tool-menu-summary {
+  border-bottom: 1px solid #cfcfcf;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.assembly-v1-tool-menu[open] .assembly-v1-tool-menu-hint {
+  transform: rotate(180deg);
+}
+
+.assembly-v1-tool-menu-body {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 2px);
+  z-index: 8;
+  min-width: 260px;
+  max-width: min(520px, 72vw);
+  border: 1px solid #bdbdbd;
+  background: #ffffff;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+  padding: 8px;
+  display: none;
+  gap: 8px;
+}
+
+.assembly-v1-tool-menu[open] .assembly-v1-tool-menu-body {
+  display: grid;
+}
+
+.assembly-v1-tool-card {
+  border: 1px solid #c7c7c7;
+  background: linear-gradient(#fafafa, #efefef);
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+  min-height: 100%;
+}
+
+.assembly-v1-tool-card-right {
+  align-content: start;
+}
+
+.assembly-v1-tool-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #333;
+}
+
+.assembly-v1-tool-list {
+  display: grid;
+  gap: 4px;
+  color: #444;
+  font-size: 12px;
+}
+
+.assembly-v1-tool-action-list {
+  gap: 6px;
+}
+
+.assembly-v1-tool-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.assembly-v1-action-entry,
+.assembly-v1-summary-link {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.assembly-v1-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+}
+
+.assembly-v1-summary-row {
+  display: grid;
+  gap: 2px;
+}
+
+.assembly-v1-summary-row strong {
+  font-size: 12px;
+  font-weight: 700;
+  color: #222;
+}
+
+.assembly-main-view {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+
+.assembly-track-content-stack {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+
+.assembly-track-content-stack.is-loading {
+  min-height: 460px;
+}
+
+.assembly-track-loading-shell {
+  min-height: 420px;
+  border-style: dashed;
+  background: #f7f7f7;
+}
+
+.assembly-loading-curtain {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(248, 248, 248, 0.78);
+  pointer-events: none;
+}
+
+.assembly-loading-panel {
+  min-width: 220px;
+  padding: 16px 18px 14px;
+  border: 1px solid #c8c8c8;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.assembly-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #d8d8d8;
+  border-top-color: #5f81aa;
+  border-radius: 999px;
+  animation: subview-pairwise-spin 0.8s linear infinite;
+}
+
+.assembly-loading-text {
+  margin: 0;
+  font-size: 12px;
+  color: #444;
+}
+
+.assembly-members-panel {
+  --member-chip-row-height: 44px;
+  margin-bottom: 8px;
+}
+
+.assembly-members-panel-inline {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.assembly-members-panel-inline.is-collapsed {
+  align-self: center;
+  padding: 2px 8px;
+}
+
+.assembly-members-panel-inline.is-collapsed .assembly-members-panel-head {
+  margin-bottom: 0;
+}
+
+.assembly-members-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.assembly-members-panel-title-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.assembly-members-icon-action {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0 2px;
+  line-height: 1;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.assembly-members-icon-action:hover {
+  color: #111;
+}
+
+.assembly-members-panel .ctg-chip-grid {
+  position: relative;
+  max-height: calc(var(--member-chip-row-height) * 3 + 12px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+}
+
+.assembly-member-chip-region,
+.assembly-member-chip-region * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.assembly-members-panel .ctg-chip {
+  min-height: var(--member-chip-row-height);
+}
+
+.assembly-members-panel .chip-group-separator {
+  flex-basis: 100%;
+  margin-top: 4px;
+  margin-bottom: 2px;
+}
+
+.assembly-status-toast-wrap {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  display: grid;
+  gap: 6px;
+  max-width: min(560px, 62vw);
+  pointer-events: none;
+}
+
+.assembly-status-toast-wrap p {
+  margin: 0;
+  border: 1px solid #d7d7d7;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 6px 9px;
+}
+
+.assembly-status-toast-wrap .error-text {
+  border-color: #d4a3a3;
+  background: #fff0f0;
+}
+
+.assembly-v1-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+}
+
+.assembly-v1-control-item {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.assembly-v1-control-item-wide {
+  grid-column: 1 / -1;
+}
+
+.assembly-v1-control-item label {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.assembly-v1-control-item select,
+.assembly-v1-control-item .assembly-track-combo,
+.assembly-v1-control-item .assembly-track-combo-input {
+  width: 100%;
+}
+
+.assembly-v1-control-note {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.assembly-track-meta {
+  display: flex;
+  gap: 10px;
+  color: #666;
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.assembly-track-topline {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.assembly-track-inline-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.assembly-track-inline-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #444;
+}
+
+.assembly-track-inline-field > span {
+  white-space: nowrap;
+}
+
+.assembly-track-inline-field select,
+.assembly-track-inline-field .assembly-track-select-shell,
+.assembly-track-inline-field .assembly-track-combo {
+  min-width: 118px;
+}
+
+.assembly-track-select-shell,
+.assembly-track-combo {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  min-width: 118px;
+  border: 1px solid #b9b9b9;
+  background: #fff;
+  overflow: visible;
+}
+
+.assembly-track-select-shell {
+  overflow: hidden;
+}
+
+.assembly-track-fixed-select,
+.assembly-track-combo-input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  border: 0;
+  padding: 5px 24px 5px 8px;
+  outline: 0;
+  background: transparent;
+}
+
+.assembly-track-fixed-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assembly-track-fixed-select::-ms-expand {
+  display: none;
+}
+
+.assembly-track-combo-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  border: 0;
+  background: transparent;
+  color: #222;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.assembly-track-control-marker {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  border-left: 1px solid #b9b9b9;
+  background: linear-gradient(#fafafa, #e6e6e6);
+  color: #222;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.assembly-track-combo.is-open {
+  border-color: #8c8c8c;
+}
+
+.assembly-track-combo.is-open .assembly-track-combo-toggle {
+  background: transparent;
+}
+
+.assembly-track-combo.is-open .assembly-track-control-marker {
+  background: linear-gradient(#f0f0f0, #dcdcdc);
+}
+
+.assembly-track-combo-menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: -1px;
+  right: -1px;
+  z-index: 30;
+  display: grid;
+  gap: 0;
+  border: 1px solid #b9b9b9;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.assembly-track-combo-option {
+  border: 0;
+  border-top: 1px solid #ececec;
+  background: #fff;
+  color: #222;
+  text-align: left;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.assembly-track-combo-option:first-child {
+  border-top: 0;
+}
+
+.assembly-track-combo-option:hover,
+.assembly-track-combo-option.is-active {
+  background: #efefef;
+}
+
+.assembly-track-inline-field .assembly-track-select-shell.is-support {
+  width: 86px;
+  min-width: 86px;
+}
+
+.assembly-track-inline-field [data-track-combo-field="minTickUnitKb"] {
+  width: 86px;
+  min-width: 86px;
+}
+
+.assembly-track-inline-field [data-track-combo-field="supportDsCtgLen"] {
+  width: 86px;
+  min-width: 86px;
+}
+
+.assembly-support-ds-len-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.assembly-support-ds-len-settings-button {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #c9cdd3;
+  background: #fff;
+  color: #323842;
+  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  line-height: 1;
+  font-size: 11px;
+  padding: 0;
+}
+
+.assembly-support-ds-len-settings-button:hover,
+.assembly-support-ds-len-settings-button:focus-visible {
+  background: #f3f5f7;
+}
+
+.assembly-track-combo.is-readonly-summary .assembly-track-combo-input {
+  cursor: pointer;
+  color: #1f2937;
+  background: #f8fafc;
+}
+
+.assembly-track-inline-field [data-track-combo-field="maxTickCount"] {
+  width: 86px;
+  min-width: 86px;
+}
+
+.assembly-track-inline-field [data-track-combo-field="alignmentLength"] {
+  width: 86px;
+  min-width: 86px;
+}
+
+.assembly-track-inline-field [data-track-combo-field="mapq"] {
+  width: 86px;
+  min-width: 86px;
+}
+
+.assembly-track-layout {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr);
+  gap: 0;
+  align-items: start;
+}
+
+.assembly-track-label-column {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  border: 1px solid #d2d2d2;
+  border-right: 0;
+  background: linear-gradient(#fafafa, #efefef);
+}
+
+.assembly-track-label-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  min-height: 18px;
+  padding: 0 6px 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 700;
+  color: #4a4a4a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assembly-track-label-row > span {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assembly-track-label-row.is-ref {
+  color: #2f2f2f;
+}
+
+.assembly-track-label-row.is-companion {
+  color: #6a5536;
+}
+
+.assembly-track-label-row.is-mirror-track {
+  color: #6a5536;
+}
+
+.assembly-track-label-row.is-track-selectable {
+  cursor: pointer;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.assembly-track-label-row.is-track-selectable:hover {
+  background: rgba(95, 130, 171, 0.12);
+}
+
+.assembly-track-label-row.is-subview-track-selected {
+  background: rgba(95, 130, 171, 0.2);
+  box-shadow: inset -2px 0 0 #4f7aa8;
+}
+
+.assembly-track-scroll {
+  position: relative;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid #d2d2d2;
+  background: #fff;
+}
+
+.track-sticky-label-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.track-selection-box {
+  position: absolute;
+  z-index: 3;
+  border: 1px dashed #4f7aa8;
+  background: rgba(122, 161, 203, 0.16);
+  pointer-events: none;
+}
+
+.track-selection-box.is-hidden {
+  display: none;
+}
+
+.member-chip-selection-box {
+  position: absolute;
+  z-index: 2;
+  border: 1px dashed #4f7aa8;
+  background: rgba(122, 161, 203, 0.16);
+  pointer-events: none;
+}
+
+.member-chip-selection-box.is-hidden {
+  display: none;
+}
+
+.assembly-track-svg {
+  display: block;
+  background: #fff;
+}
+
+[data-track-band-svg-overlay="1"] {
+  position: relative;
+  z-index: 2;
+  background: transparent;
+}
+
+.track-ruler-line {
+  stroke: #5f5f5f;
+  stroke-width: 1;
+}
+
+.track-tick-guide {
+  stroke-dasharray: 3,3;
+  stroke-width: 1;
+  stroke: #d7d7d7;
+}
+
+.track-tick-guide.is-major {
+  stroke: #8d8d8d;
+}
+
+.track-tick-guide.is-minor {
+  display: none;
+}
+
+.track-tick-label {
+  fill: #666;
+  font-size: 10px;
+}
+
+.track-reference-bar {
+  fill: #e4e4e4;
+  stroke: #a6a6a6;
+  stroke-width: 1;
+}
+
+.track-reference-member {
+  fill: #cfcfcf;
+  stroke: #8e8e8e;
+  stroke-width: 1;
+}
+
+.track-reference-member-label {
+  fill: #4f4f4f;
+  font-size: 10px;
+  pointer-events: none;
+}
+
+.track-reference-gap-marker {
+  fill: #b8aca0;
+  stroke: #a09386;
+  stroke-width: 1;
+}
+
+.track-collinearity-band {
+  fill: rgba(97, 129, 170, 0.24);
+  stroke: rgba(97, 129, 170, 0.38);
+  stroke-width: 1;
+}
+
+.track-collinearity-band.is-companion {
+  fill: rgba(154, 126, 78, 0.22);
+  stroke: rgba(154, 126, 78, 0.34);
+}
+
+.track-ctg {
+  fill: #d2dfef;
+  stroke: #6d85a1;
+  stroke-width: 1;
+  cursor: pointer;
+}
+
+.track-ctg.is-active {
+  fill: #b9d0ea;
+  stroke: #38516c;
+}
+
+.track-ctg.is-ref,
+.track-ctg.is-ref.is-active {
+  fill: #cfcfcf;
+  stroke: #8e8e8e;
+}
+
+.track-ctg.is-companion {
+  fill: #e7dec4;
+  stroke: #8a7551;
+  cursor: default;
+}
+
+.track-ctg.is-companion.is-active {
+  fill: #dccba4;
+  stroke: #725d39;
+}
+
+.track-ctg.is-subview-selected {
+  stroke-width: 2;
+}
+
+.track-ctg.is-multi-selected {
+  stroke-width: 2;
+  stroke: #2e567f;
+}
+
+.track-ctg.is-companion.is-multi-selected {
+  stroke: #7c6440;
+}
+
+.track-ctg.is-hidden-contig,
+.track-ctg.is-hidden-contig.is-active,
+.track-ctg.is-hidden-contig.is-multi-selected {
+  fill: none;
+  pointer-events: all;
+}
+
+.track-ctg.is-mirror,
+.track-ctg.is-mirror.is-active,
+.track-ctg.is-mirror.is-multi-selected,
+.track-ctg.is-mirror.is-subview-selected {
+  pointer-events: all;
+  stroke-width: 1.2;
+}
+
+.track-telomere-marker {
+  fill: #b33f4a;
+  stroke: #ffffff;
+  stroke-width: 0.8;
+  opacity: 0.9;
+  pointer-events: all;
+}
+
+.track-telomere-marker:hover {
+  opacity: 1;
+  stroke-width: 1.2;
+}
+
+.track-telomere-marker.is-rule-1 {
+  fill: #b33f4a;
+}
+
+.track-telomere-marker.is-rule-2 {
+  fill: #7b5db8;
+}
+
+.track-telomere-marker.is-rule-3 {
+  fill: #2f7d73;
+}
+
+.track-telomere-marker.is-rule-4 {
+  fill: #c27a25;
+}
+
+.track-telomere-marker.is-rule-5 {
+  fill: #4e78a8;
+}
+
+.track-telomere-marker.is-rule-6 {
+  fill: #8b5a2b;
+}
+
+.track-centromere-marker {
+  fill: #0f766e;
+  stroke: #ffffff;
+  stroke-width: 0.9;
+  opacity: 0.92;
+  pointer-events: all;
+}
+
+.track-centromere-marker:hover {
+  opacity: 1;
+  stroke-width: 1.3;
+}
+
+.track-n-region-marker {
+  fill: #ffffff;
+  stroke: #111827;
+  stroke-width: 1;
+  opacity: 0.96;
+  pointer-events: all;
+}
+
+.track-n-region-marker:hover {
+  opacity: 1;
+  stroke-width: 1.4;
+}
+
+.track-ctg-label {
+  fill: #243a54;
+  font-size: 10px;
+  pointer-events: none;
+}
+
+.track-ctg-label.is-sticky-hidden {
+  display: none;
+}
+
+.track-sticky-label {
+  position: absolute;
+  white-space: nowrap;
+  font-size: 10px;
+  color: #243a54;
+  pointer-events: none;
+}
+
+.track-sticky-label.is-companion {
+  color: #5c492a;
+}
+
+.track-sticky-label.is-ref {
+  color: #4f4f4f;
+}
+
+.track-ctg-label.is-companion {
+  fill: #5c492a;
+}
+
+.track-ctg-label.is-ref {
+  fill: #4f4f4f;
+}
+
+.track-ctg-source-tag {
+  font-weight: 700;
+  fill: #a33f00;
+}
+
+.track-ctg-source-tag.is-source-gapfiller {
+  fill: #b3261e;
+}
+
+.track-ctg-source-tag.is-source-telseeker {
+  fill: #006c7a;
+}
+
+.track-ctg-source-tag.is-source-derived {
+  fill: #5c4a00;
+}
+
+.ctg-chip-source-tag {
+  margin-left: 4px;
+  color: #a33f00;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ctg-chip-source-tag.is-source-gapfiller {
+  color: #b3261e;
+}
+
+.ctg-chip-source-tag.is-source-telseeker {
+  color: #006c7a;
+}
+
+.ctg-chip-source-tag.is-source-derived {
+  color: #5c4a00;
+}
+
+.track-ctg-label.is-outside {
+  font-size: 9px;
+}
+
+.track-ctg-group.is-active .track-ctg-label {
+  fill: #1f3248;
+  font-weight: 700;
+}
+
+.track-ctg-group.is-active .track-ctg-label.is-ref {
+  fill: #4f4f4f;
+}
+
+.track-sticky-label.is-active {
+  color: #1f3248;
+  font-weight: 700;
+}
+
+.track-ctg-group.is-companion.is-active .track-ctg-label {
+  fill: #4d3c21;
+}
+
+.track-sticky-label.is-companion.is-active {
+  color: #4d3c21;
+}
+
+.track-sticky-label.is-ref.is-active {
+  color: #3d3d3d;
+}
+
+.track-slot-badge {
+  fill: #111;
+  font-size: 10px;
+  font-weight: 700;
+  text-anchor: end;
+  pointer-events: none;
+}
+
+.track-row-empty-label {
+  fill: #777;
+  font-size: 11px;
+}
+
+.assembly-support-ds-len-rules-dialog {
+  width: min(760px, calc(100vw - 32px));
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.assembly-support-ds-len-rules-head,
+.assembly-support-ds-len-rules-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.assembly-support-ds-len-rules-head h4 {
+  margin: 0;
+}
+
+.assembly-support-ds-len-rules-close {
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.assembly-support-ds-len-rules-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.assembly-support-ds-len-rules-body {
+  overflow: auto;
+}
+
+.assembly-support-ds-len-rules-table input {
+  width: 100%;
+  min-width: 96px;
+}
+
+.assembly-confirm-dialog {
+  width: min(520px, calc(100vw - 32px));
+  padding: 24px;
+}
+
+.assembly-confirm-dialog h4 {
+  margin: 0 0 12px;
+}
+
+.assembly-confirm-title.is-danger,
+.assembly-confirm-message.is-danger {
+  color: #b91c1c;
+}
+
+.assembly-confirm-message {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.assembly-confirm-input {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.assembly-anchor-offset-fields {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.assembly-anchor-offset-direction {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.assembly-anchor-offset-direction legend,
+.assembly-anchor-offset-bp-field span {
+  width: 100%;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.assembly-anchor-offset-direction label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.assembly-anchor-offset-bp-field {
+  display: grid;
+}
+
+.assembly-anchor-offset-bp-field .assembly-confirm-input {
+  margin-top: 0;
+}
+
+.assembly-anchor-offset-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.85rem;
+}
+
+.assembly-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.chr-picker-option {
+  width: 100%;
+  border: 1px solid #d1d1d1;
+  background: #f7f7f7;
+  text-align: left;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+
+.chr-picker-option span {
+  color: #666;
+}
+
+.chr-picker-option.is-active {
+  border-color: #8d8d8d;
+  background: #ececec;
+}
+
+@media (max-width: 1200px) {
+  .assembly-toolbar,
+  .assembly-toolbar-left,
+  .assembly-toolbar-right {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .assembly-v1-tool-strip {
+    display: block;
+  }
+
+  .chr-title-wrap {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .assembly-v1-tool-left {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .assembly-v1-tool-menu,
+  .assembly-v1-tool-menu[data-tool-menu="about-chr"] {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .assembly-v1-tool-menu-summary {
+    padding: 8px 10px;
+  }
+
+  .assembly-v1-tool-menu-body {
+    position: static;
+    min-width: 0;
+    max-width: none;
+    border: 0;
+    border-top: 1px solid #d8d8d8;
+    box-shadow: none;
+    padding: 0 10px 10px;
+  }
+
+  .assembly-v1-summary-grid,
+  .assembly-v1-control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .assembly-track-topline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .assembly-track-inline-controls {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .assembly-track-inline-field {
+    min-width: 0;
+    width: calc(50% - 6px);
+  }
+
+  .assembly-track-inline-field select,
+  .assembly-track-inline-field .assembly-track-select-shell,
+  .assembly-track-inline-field .assembly-track-combo,
+  .assembly-track-inline-field .assembly-track-combo-input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .assembly-track-inline-field .assembly-track-select-shell.is-support,
+  .assembly-track-inline-field [data-track-combo-field="supportDsCtgLen"],
+  .assembly-track-inline-field [data-track-combo-field="minTickUnitKb"],
+  .assembly-track-inline-field [data-track-combo-field="maxTickCount"],
+  .assembly-track-inline-field [data-track-combo-field="alignmentLength"],
+  .assembly-track-inline-field [data-track-combo-field="mapq"] {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .assembly-status-toast-wrap {
+    position: static;
+    max-width: none;
+    margin-bottom: 6px;
+    pointer-events: auto;
+  }
+
+}
+
+.grt-status-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid #6686a8;
+  background: #e8f2ff;
+  color: #214e78;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.grt-status-badge.is-grt_promoted {
+  border-color: #8b6bb3;
+  background: #f1eaff;
+  color: #563783;
+}
+
+.grt-status-badge.is-cross_chr_grt_usage {
+  border-color: #b97932;
+  background: #fff0da;
+  color: #7a4514;
+}
+
+.grt-status-badge.is-unresolved {
+  border-color: #ba7a14;
+  background: #fff4d6;
+  color: #704400;
+}

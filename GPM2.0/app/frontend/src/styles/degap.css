@@ -1,0 +1,360 @@
+/* Owner: DEGAP feature. DEGAP settings, forms, job controls, and graph integration. */
+
+.degap-settings-button,
+.degap-icon-button {
+  min-width: 30px;
+}
+
+.degap-settings-button {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #40464f;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.degap-settings-button:hover,
+.degap-settings-button:focus-visible {
+  background: #eceff3;
+}
+
+.degap-panel {
+  position: relative;
+}
+
+.degap-toast {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 30;
+  max-width: min(420px, calc(100% - 16px));
+  padding: 7px 10px;
+  border: 1px solid #bfcbd8;
+  background: #ffffff;
+  color: #26313f;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.16);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.degap-toast.is-danger {
+  border-color: #d7a7a7;
+  color: #8a2020;
+}
+
+.degap-panel-body {
+  display: grid;
+  gap: 12px;
+}
+
+.degap-settings-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(22, 26, 31, 0.28);
+}
+
+.degap-settings-dialog {
+  width: min(920px, calc(100vw - 48px));
+  max-height: min(760px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  overflow: hidden;
+  border: 1px solid #bfc5ce;
+  background: #ffffff;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.22);
+}
+
+.degap-job-editor {
+  border: 1px solid #c6ccd4;
+  background: #fbfcfd;
+  padding: 10px;
+}
+
+.degap-settings-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.degap-settings-head,
+.degap-settings-foot,
+.degap-jobs-head,
+.degap-job-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.degap-job-editor-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.degap-settings-head,
+.degap-settings-foot {
+  padding: 0 12px;
+}
+
+.degap-settings-head {
+  padding-top: 12px;
+}
+
+.degap-settings-foot {
+  padding-bottom: 12px;
+}
+
+.degap-settings-body {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 12px;
+}
+
+.degap-param-group {
+  border: 1px solid #d7d7d7;
+  margin: 0;
+  padding: 12px 10px 10px;
+}
+
+.degap-param-group legend {
+  max-width: calc(100% - 12px);
+  padding: 0 6px;
+  background: #ffffff;
+  color: #363636;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.degap-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 8px 14px;
+}
+
+.degap-form-field,
+.degap-check-field {
+  display: grid;
+  grid-template-columns: minmax(112px, 0.42fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.degap-check-field {
+  grid-template-columns: auto 1fr;
+  justify-content: start;
+}
+
+.degap-form-field.is-wide {
+  grid-column: 1 / -1;
+}
+
+.degap-form-help {
+  grid-column: 1 / -1;
+}
+
+.degap-form-field > span,
+.degap-check-field > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.degap-form-field input,
+.degap-form-field textarea,
+.degap-param-group select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #c5c5c5;
+  background: #fff;
+  padding: 5px 7px;
+  font: inherit;
+}
+
+.degap-form-field textarea {
+  min-height: 34px;
+  resize: vertical;
+}
+
+.degap-graph-wrap {
+  position: relative;
+}
+
+.degap-graph-wrap .assembly-final-path-layout {
+  border: 1px solid #dedede;
+  background: #fff;
+  padding: 6px 0;
+}
+
+.degap-gap-menu {
+  position: absolute;
+  z-index: 25;
+  display: grid;
+  gap: 2px;
+  min-width: 128px;
+  padding: 6px;
+  border: 1px solid #bdbdbd;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+}
+
+.degap-gap-menu button {
+  border: 0;
+  background: transparent;
+  padding: 6px 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.degap-gap-menu button:hover {
+  background: #eeeeee;
+}
+
+.degap-jobs-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.degap-job-card {
+  margin-top: 10px;
+  border: 1px solid #d4d9df;
+  background: #f8fafc;
+  padding: 8px;
+}
+
+.degap-job-card.is-collapsed {
+  gap: 0;
+}
+
+.degap-job-card-toggle {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  padding: 4px 6px;
+  color: #263544;
+  cursor: pointer;
+}
+
+.degap-job-card-toggle:hover,
+.degap-job-card-toggle:focus-visible {
+  background: #eceff3;
+}
+
+.degap-job-card-indicator {
+  width: 12px;
+  color: #607080;
+  text-align: center;
+}
+
+.degap-job-list {
+  display: grid;
+  gap: 8px;
+}
+
+.degap-job-group-list {
+  display: grid;
+  gap: 10px;
+}
+
+.degap-job-group {
+  display: grid;
+  gap: 6px;
+}
+
+.degap-job-group-head {
+  border-left: 3px solid #57728f;
+  background: #f5f7f9;
+  padding: 5px 8px;
+  color: #263544;
+  font-size: 12px;
+}
+
+.degap-job-shell {
+  display: grid;
+  gap: 6px;
+}
+
+.degap-job-row {
+  min-height: 40px;
+  border: 1px solid #cecece;
+  background: #ffffff;
+  padding: 5px 6px;
+}
+
+.degap-job-label {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.degap-job-type-badge {
+  flex: 0 0 auto;
+  border: 1px solid #c8d0d8;
+  border-radius: 4px;
+  background: #f5f7f9;
+  padding: 2px 6px;
+  color: #3a4a5a;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.degap-job-type-badge.is-gapfiller {
+  border-color: #e0b66d;
+  background: #fff8e8;
+  color: #7a4f00;
+}
+
+.degap-job-type-badge.is-telseeker {
+  border-color: #75b7c6;
+  background: #eaf8fb;
+  color: #075f6b;
+}
+
+.degap-job-remove,
+.degap-job-expand {
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  min-width: 32px;
+  min-height: 32px;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.degap-job-remove:hover,
+.degap-job-expand:hover,
+.degap-job-remove:focus-visible,
+.degap-job-expand:focus-visible {
+  background: #edf0f3;
+}
+
+.degap-empty {
+  border: 1px dashed #c8c8c8;
+  padding: 10px;
+}

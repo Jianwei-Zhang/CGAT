@@ -1,6 +1,5 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
 import {
   __testCreateImporterStatusToastDismissCoordinator,
@@ -8,6 +7,7 @@ import {
   renderImporterPage,
 } from "../importer-page.js";
 import { en, zh } from "../../i18n/messages/importer.js";
+import { readStylesheetTree } from "../../../styles/__tests__/style-test-support.mjs";
 
 function createStore(initialState) {
   let state = initialState;
@@ -829,7 +829,7 @@ test("importer workspace history add-package menu auto-hides on leave and closes
 });
 
 test("importer add-package hint keeps added black and dataset names bold", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -845,7 +845,7 @@ test("importer add-package hint keeps added black and dataset names bold", () =>
 });
 
 test("importer feedback renders as a fixed toast instead of an inline banner", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../styles/components.css", import.meta.url),
     "utf8",
   );
@@ -1222,7 +1222,7 @@ test("import progress uses phase metadata and labels GRT validation instead of a
 });
 
 test("import progress css keeps labels in the wide column and icons pinned right", () => {
-  const css = readFileSync(
+  const css = readStylesheetTree(
     new URL("../../../styles/components.css", import.meta.url),
     "utf8",
   );

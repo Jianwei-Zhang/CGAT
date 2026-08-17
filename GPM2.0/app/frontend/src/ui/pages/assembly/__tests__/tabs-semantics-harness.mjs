@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import * as renderTracks from "../render-tracks.js";
 import { setSubviewAnchorStateForSummary } from "../subview-anchor-state.js";
+import { readStylesheetTree } from "../../../../styles/__tests__/style-test-support.mjs";
 import {
   addCtgToPhasedChrTrack,
   createPhasedChrTrack,
@@ -258,7 +258,7 @@ function createFakeTimerApi() {
 export {
   test,
   assert,
-  readFileSync,
+  readStylesheetTree,
   renderTracks,
   setSubviewAnchorStateForSummary,
   addCtgToPhasedChrTrack,
