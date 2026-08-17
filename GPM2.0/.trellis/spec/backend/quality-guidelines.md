@@ -58,7 +58,7 @@ mixed responsibilities and weak test seams.
 | F6 `db.rs` schema evolution | Fails the versioned-migration rule because ordered history and newer-version rejection are absent; migrate through the database-guideline contract before adding schema growth. |
 | F7 `grt_package.rs` | Triggered by contract parsing, persistence, initialization, view, and trace query change axes; preserve one shared contract model while separating those services. |
 | F8 GRT Python stages | Shared I/O/hash/interval/checkpoint/metadata semantics now live in `server/tools/grt_core/`, and stage entrypoints have no executable-stage import chain. `grt_step23.py` and `grt_telomere_finalize.py` remain cohesive algorithm owners pending a versioned multi-module checkpoint engine identity. |
-| F9 `prepare.sh` | Triggered by embedded programs over 100 lines and repeated shell utilities; promote programs to directly lintable/testable templates. |
+| F9 `prepare.sh` | Completed: full add-dataset/add-ctg programs are static templates, assignment and staging programs are Python tools, and generated incremental scripts share `.prepare_lib/lib/incremental_common.sh`. |
 
 ---
 
@@ -173,6 +173,15 @@ cross-chunk gaps, and preservation of an existing output after failed input.
 - Root-level `gpm_server_prepare.sh` and `gpm_server_export_final_path_fasta.sh` compatibility entrypoints are not part of the public contract.
 - `server/prepare.sh` defaults `-o/--out` to `./gpm_server` under the current working directory, not under the `server/` tool directory.
 - `server/prepare.sh` may read templates from `server/templates/`; generated scripts must remain runnable after the generated `gpm_server/` directory is copied.
+- Static templates such as `add_dataset.sh` and `add_ctg.sh` are copied
+  byte-for-byte. Configured templates use `server/tools/render_template.py`;
+  every placeholder and value name must exactly match an explicit allowlist,
+  values are shell-escaped, missing/unexpected variables fail, and unresolved
+  placeholders never reach the generated workspace.
+- When extracting a program from an unquoted shell heredoc, compare and execute
+  the generated result rather than assuming the source body is byte-equivalent:
+  the outer shell consumes one escaping layer for backslashes, dollar signs,
+  and command substitutions before the nested program runs.
 - `server/prepare.sh` must copy runtime dependencies into `gpm_server/.prepare_lib/`.
 - Shared shell/library logic belongs under `server/lib/` and should be copied to `gpm_server/.prepare_lib/lib/`.
 - Standalone Python tools belong under `server/tools/` and should be copied to `gpm_server/.prepare_lib/tools/`.
@@ -193,6 +202,8 @@ cross-chunk gaps, and preservation of an existing output after failed input.
 | `server/templates/package_full_zip.sh` is missing during prepare | Fail before writing an incomplete generated package script. |
 | `server/templates/package_light_no_fasta_zip.sh` is missing during prepare | Fail before writing an incomplete generated package script. |
 | `server/templates/export_final_path_fasta.sh` is missing during prepare | Fail before writing an incomplete generated export helper. |
+| `server/templates/add_dataset.sh` or `add_ctg.sh` is missing during prepare | Fail before writing an incomplete incremental helper. |
+| An assignment template placeholder/value is missing or unexpected | Fail before publishing `assign_chr_groups.sh`; never leave unresolved input. |
 | `server/lib/` is missing during prepare | Fail before writing generated helpers that depend on runtime libraries. |
 | `server/tools/` is missing during prepare | Fail before writing generated helpers that depend on runtime tools. |
 | `server/export_final_path_fasta.sh` is called without `--gpm_server` outside a generated `gpm_server/` directory | Fail with `Missing --gpm_server`. |
@@ -211,6 +222,9 @@ cross-chunk gaps, and preservation of an existing output after failed input.
 - Prepare regression asserting the package scripts are the final two fail-fast stages in generated `run_all.sh`.
 - End-to-end Server shell regression asserting one `run_all.sh` invocation creates both delivery archives and that the light archive excludes all `.fa` / `.fasta` payloads.
 - Prepare regression asserting generated `gpm_server/.prepare_lib/lib/` and `gpm_server/.prepare_lib/tools/` contain required runtime files.
+- Prepare regression asserting static add templates and generated add scripts
+  are byte-identical, generated assignment placeholders are fully resolved, and
+  all source/generated shell programs pass `bash -n` with LF endings.
 - Prepare regression with a failing `chmod` command asserting workspace
   generation succeeds and non-executable scripts pass syntax checks and run
   through explicit `bash`.

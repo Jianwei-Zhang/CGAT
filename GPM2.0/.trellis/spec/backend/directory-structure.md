@@ -20,11 +20,12 @@ app/src-tauri/src/
 ├── commands.rs             # legacy IPC adapter monolith; migration target
 └── *_cancel.rs             # adapter-owned cancellation registries
 server/
-├── prepare.sh              # Linux bundle entrypoint and legacy generator
+├── prepare.sh              # Linux CLI, validation, and workspace materializer
+├── lib/*.sh                # portable generated-workspace shell services
 ├── tools/*.py              # executable stage/CLI facades
 ├── tools/grt_core/         # shared GRT I/O, domain, checkpoint, execution logic
 ├── tools/grt_core/contract/# Python contract validator subdomains
-├── templates/*.sh          # directly lintable generated-program sources
+├── templates/*.sh          # directly lintable generated shell programs
 ├── contracts/*.json        # delivery contract schemas
 └── tests/test_*.py         # server unit and integration tests
 ```
@@ -87,11 +88,19 @@ algorithm owners until a versioned checkpoint engine identity can hash an
 entrypoint plus imported algorithm modules; that engine-closure change is the
 required follow-up before splitting them further.
 
+The completed Server-template split keeps full generated shell programs in
+`server/templates/`, shared incremental shell primitives in `server/lib/`, and
+assignment/staging/validation/promotion programs in `server/tools/`.
+`prepare.sh` validates input, materializes the workspace, copies static
+templates byte-for-byte, and renders only the allowlisted assignment variables
+through the shell-escaping template renderer. Generated add scripts source the
+copied `.prepare_lib/lib/incremental_common.sh`; no full add script or Python
+program body remains embedded in `prepare.sh`.
+
 The completed importer split keeps its public facade in `importer.rs` and owns
 workflow, validation, catalog, alignment, payload, and rollback concerns in
 focused modules under `importer/`. Existing public contracts must be preserved
-while ownership moves. The programs embedded by `prepare.sh` remain a migration
-target.
+while ownership moves.
 
 ## Naming and Placement
 

@@ -2,6 +2,15 @@
 
 set -euo pipefail
 
+final_path_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+final_path_base_lib="${final_path_lib_dir}/common.sh"
+[[ -f "$final_path_base_lib" ]] || {
+  echo "ERROR: Missing Server shell library: $final_path_base_lib" >&2
+  exit 1
+}
+# shellcheck source=common.sh
+source "$final_path_base_lib"
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -32,15 +41,6 @@ Notes:
   - Run this script on the server where the original FASTA files are still present.
   - Requires samtools.
 EOF
-}
-
-die() {
-  echo "ERROR: $*" >&2
-  exit 1
-}
-
-require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
 }
 
 normalize_gpm_server_dir() {

@@ -214,6 +214,31 @@ grep -F -- '.prepare_lib/tools/run_all_runner.py' "${output_root}/run_all.sh" >/
   echo "generated workspace is missing reference_segments.py" >&2
   exit 1
 }
+[[ -f "${output_root}/.prepare_lib/lib/incremental_common.sh" ]] || {
+  echo "generated workspace is missing incremental shell helpers" >&2
+  exit 1
+}
+for tool_name in \
+  add_dataset_stage.py \
+  assign_chr_groups.py \
+  cen_reference_metadata.py \
+  promote_server_stage.py \
+  render_template.py \
+  validate_add_dataset_stage.py; do
+  [[ -f "${output_root}/.prepare_lib/tools/${tool_name}" ]] || {
+    echo "generated workspace is missing ${tool_name}" >&2
+    exit 1
+  }
+done
+cmp "${REPO_ROOT}/server/templates/add_dataset.sh" "${output_root}/add_dataset.sh"
+cmp "${REPO_ROOT}/server/templates/add_ctg.sh" "${output_root}/add_ctg.sh"
+bash -n "${output_root}/add_dataset.sh"
+bash -n "${output_root}/add_ctg.sh"
+grep -F -- '.prepare_lib/tools/assign_chr_groups.py' "${output_root}/assign_chr_groups.sh" >/dev/null
+! grep -Eq '__[A-Z][A-Z0-9_]*__' "${output_root}/assign_chr_groups.sh" || {
+  echo "generated assignment script contains an unresolved template variable" >&2
+  exit 1
+}
 [[ -f "${output_root}/.prepare_lib/tools/grt_core/__init__.py" ]] || {
   echo "generated workspace is missing the recursive grt_core package" >&2
   exit 1
