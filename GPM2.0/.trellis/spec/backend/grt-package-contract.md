@@ -341,6 +341,11 @@ ERROR <STABLE_CODE>: <message>
 ## App Import and Persistence
 
 - The Rust backend independently enforces the same v2 package schema, Final Path v1 structure schema, and stable-code semantics; desktop import does not shell out to Python.
+- Rust dependency direction is `grt_package` facade -> pure contract/delivery
+  validators -> parsing/domain helpers. Only an already validated in-memory
+  package crosses into persistence, where the importer-owned transaction writes
+  the complete graph. Read models, project initialization, and trace queries
+  consume persisted rows and do not depend on raw package parser state.
 - Server workdirs are validated against the complete GRT artifact closure before projection. Initial App import accepts only `gpm_grt_app_precomputed_v2` delivery payloads (plus the complete v2 Server fixture path used by operator/backend tests); validation finishes before `project.sqlite`, `exports/`, or `cache/` is created. A rejected ZIP workspace is removed as a whole.
 - App delivery packages deliberately omit q0–q3, D0/Dtel, raw evidence FASTA, `grt/cache`, checkpoints, raw trace files, Server scripts, and tool caches. Full packages include source/reference FASTA and q4; no-FASTA packages retain `.fai`, Final Path length/hash metadata, and import with `fasta_available=false`.
 - Legacy `package.tsv` headers, unknown workflow/schema versions, incomplete App payloads, malformed FAI, broken IDs/coordinates/source chains, and checksum mismatches fail as `GRT_IMPORT_<STABLE_CODE>`.

@@ -11,7 +11,8 @@ app/backend/src/
 ├── db.rs                   # workspace SQLite connection and schema entrypoint
 ├── importer.rs             # import facade and rollback/dependency contract
 ├── importer/               # initial/add-dataset/add-ctg workflows and services
-├── grt_package.rs          # legacy GRT monolith; migration target
+├── grt_package.rs          # GRT facade and dependency contract
+├── grt_package/            # pure validation, persistence, views, and traces
 ├── ctg_editor/             # feature package split by operation
 └── <feature>.rs            # domain/service modules
 app/src-tauri/src/
@@ -75,12 +76,11 @@ tests. Split when two sections change for different reasons, require unrelated
 dependencies, need separate rollback/transaction boundaries, or cannot be
 tested without constructing the whole subsystem.
 
-Current migration targets found by the engineering audit include
-`grt_package.rs`, the GRT stage scripts, and the programs embedded by
-`prepare.sh`. The completed importer split keeps its public facade in
-`importer.rs` and owns workflow, validation, catalog, alignment, payload, and
-rollback concerns in focused modules under `importer/`. Existing public
-contracts must be preserved while ownership moves.
+Current migration targets found by the engineering audit include the GRT stage
+scripts and the programs embedded by `prepare.sh`. The completed importer split
+keeps its public facade in `importer.rs` and owns workflow, validation, catalog,
+alignment, payload, and rollback concerns in focused modules under `importer/`.
+Existing public contracts must be preserved while ownership moves.
 
 ## Naming and Placement
 
@@ -97,11 +97,12 @@ contracts must be preserved while ownership moves.
 
 ## Recommended Pattern
 
-`app/backend/src/ctg_editor/` and `app/backend/src/importer/` are preferred
-feature-package shapes: the package exposes a narrow facade, shares invariants
-through domain-focused modules, and keeps operation-specific workflows and
-tests in separate files. Incremental file-plus-database workflows also document
-and test their rollback owner explicitly.
+`app/backend/src/ctg_editor/`, `app/backend/src/importer/`, and
+`app/backend/src/grt_package/` are preferred feature-package shapes: the
+package exposes a narrow facade, shares invariants through domain-focused
+modules, and keeps operation-specific workflows and tests in separate files.
+Incremental file-plus-database workflows also document and test their rollback
+owner explicitly; package validators remain independent from persistence.
 
 ## Prohibited Patterns
 
