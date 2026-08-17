@@ -9,7 +9,8 @@ app/backend/src/
 ├── lib.rs                  # public domain/service module registry
 ├── main.rs                 # CLI composition root and output adapter
 ├── db.rs                   # workspace SQLite connection and schema entrypoint
-├── importer.rs             # legacy import monolith; migration target
+├── importer.rs             # import facade and rollback/dependency contract
+├── importer/               # initial/add-dataset/add-ctg workflows and services
 ├── grt_package.rs          # legacy GRT monolith; migration target
 ├── ctg_editor/             # feature package split by operation
 └── <feature>.rs            # domain/service modules
@@ -75,9 +76,11 @@ dependencies, need separate rollback/transaction boundaries, or cannot be
 tested without constructing the whole subsystem.
 
 Current migration targets found by the engineering audit include
-`importer.rs`, `grt_package.rs`, Tauri `commands.rs`, the GRT stage scripts, and
-the programs embedded by `prepare.sh`. Their existing public contracts must be
-preserved while ownership moves.
+`grt_package.rs`, the GRT stage scripts, and the programs embedded by
+`prepare.sh`. The completed importer split keeps its public facade in
+`importer.rs` and owns workflow, validation, catalog, alignment, payload, and
+rollback concerns in focused modules under `importer/`. Existing public
+contracts must be preserved while ownership moves.
 
 ## Naming and Placement
 
@@ -94,9 +97,11 @@ preserved while ownership moves.
 
 ## Recommended Pattern
 
-`app/backend/src/ctg_editor/` is the preferred feature-package shape: the
-package exposes a narrow public API from `mod.rs`, shares invariants through
-`common.rs`, and keeps operation-specific writes and tests in separate files.
+`app/backend/src/ctg_editor/` and `app/backend/src/importer/` are preferred
+feature-package shapes: the package exposes a narrow facade, shares invariants
+through domain-focused modules, and keeps operation-specific workflows and
+tests in separate files. Incremental file-plus-database workflows also document
+and test their rollback owner explicitly.
 
 ## Prohibited Patterns
 
