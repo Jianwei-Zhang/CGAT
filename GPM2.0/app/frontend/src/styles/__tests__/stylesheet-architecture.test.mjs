@@ -57,3 +57,14 @@ test("component stylesheet tree keeps unique animation owners", () => {
   assert.deepEqual(keyframes.sort(), ["pipeline-spin", "subview-pairwise-spin"]);
   assert.equal(new Set(keyframes).size, keyframes.length);
 });
+
+test("assembly combo menus keep their feature-owned hidden display override", () => {
+  const stylesheet = readStylesheetTree(entryUrl);
+  const menuRule = stylesheet.match(/\.assembly-track-combo-menu\s*\{([^}]*)\}/);
+  const hiddenMenuRule = stylesheet.match(/\.assembly-track-combo-menu\.is-hidden\s*\{([^}]*)\}/);
+
+  assert.ok(menuRule, "expanded component styles should define the assembly combo menu");
+  assert.match(menuRule[1], /display:\s*grid;/);
+  assert.ok(hiddenMenuRule, "the Assembly owner should override the shared hidden utility");
+  assert.match(hiddenMenuRule[1], /display:\s*none;/);
+});

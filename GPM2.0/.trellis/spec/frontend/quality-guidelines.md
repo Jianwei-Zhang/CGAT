@@ -105,6 +105,27 @@ rule inventories, run relevant render/runtime tests, full `npm test`, and
 `npm run build`, then review importer, workspace, Assembly/Subview/Final Path,
 and project-export selectors for visual parity.
 
+### Visibility Utility Cascade Contract
+
+The shared `.is-hidden { display: none; }` utility loads before feature
+stylesheets. A feature component that later declares its own `display` value
+must also own a more-specific hidden-state rule; otherwise equal-specificity
+feature CSS can make a node visible even while runtime code correctly retains
+the `is-hidden` class and `aria-expanded="false"` state.
+
+```css
+/* Wrong: later feature CSS overrides the earlier shared utility. */
+.assembly-track-combo-menu { display: grid; }
+
+/* Correct: the feature owner makes its closed state order-independent. */
+.assembly-track-combo-menu.is-hidden { display: none; }
+```
+
+When adding or moving a feature rule with `display`, search its rendered markup
+and runtime class toggles for shared visibility utilities. Test the expanded
+stylesheet tree for the scoped hidden selector as well as testing the markup or
+class mutation; DOM-only assertions do not validate the computed cascade.
+
 ---
 
 ## Recommended and Required Patterns

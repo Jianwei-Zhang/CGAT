@@ -738,6 +738,10 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
+.assembly-track-combo-menu.is-hidden {
+  display: none;
+}
+
 .assembly-track-combo-option {
   border: 0;
   border-top: 1px solid #ececec;
