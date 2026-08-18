@@ -2249,7 +2249,7 @@ function renderAssemblyTracks({
           return {
             ctg,
             rect,
-            markup: `<g class="${groupClass}" ${groupAttrs}>
+            markup: `<g class="${groupClass}" ${groupAttrs} data-grt-result-entry-key="${escapeAttr(grtOverlayKey)}">
             <rect
               class="track-ctg${activeClass}${slotClass}${multiSelectedClass}${hiddenClass}${mirrorClass}${rowBgClass}"
               data-track-focus="${ctg.isSelected ? "true" : "false"}"

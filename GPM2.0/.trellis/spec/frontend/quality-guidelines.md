@@ -365,6 +365,53 @@ Recomputing main-track hit display positions in the frontend from `orient` or `r
 #### Correct
 Treat `list_chr_view_ctgs` hit coordinates as the display contract for main tracks; use `hit.strand` only to choose band point order, and only transform coordinates for explicitly local, unsaved subview state.
 
+### Assembly Drag Preview Overlay Synchronization
+
+#### 1. Scope / Trigger
+- Applies when a main-track or Subview contig drag previews geometry that is rendered outside the dragged contig `<g>`.
+- Trigger: GRT result junctions, labels, hover targets, or any future overlay whose endpoints depend on one or more movable contigs.
+
+#### 2. Signatures
+- Movable contig group: `data-grt-result-entry-key` identifies the GRT entry represented by that group.
+- Junction group: `data-grt-result-junction-left-entry-key` and `data-grt-result-junction-right-entry-key` identify its endpoint owners.
+- Cross-entry junction children use `data-grt-result-junction-line="1"`; a movable gap label uses `data-grt-result-junction-label="1"`.
+- `previewTrackContigDrag` and `previewSubviewTrackContigDrag` are responsible for applying the same transient drag offset to dependent GRT geometry.
+
+#### 3. Contracts
+- Drag preview remains a transient DOM transform. It must not mutate persisted contig coordinates or GRT baseline data.
+- When exactly one junction endpoint belongs to the dragged contig, move only that endpoint on every visible and hover line; move its gap label to the new midpoint.
+- When both endpoints belong to the dragged contig, translate the whole junction group. This preserves same-contig arcs and moves all group-owned geometry together.
+- A zero preview offset must restore the original geometry even when only one endpoint matched. Endpoint ownership, not numeric offset equality, determines whether the whole group moves.
+- Clearing or cancelling preview must restore original `x`, `x1`, and `x2` values and remove all transient preview attributes and transforms.
+- Main-track and Subview drag paths must implement the same behavior.
+
+#### 4. Validation & Error Matrix
+| Case | Expected preview behavior |
+|------|---------------------------|
+| Dragged contig owns only the left endpoint | Move `x1` on visible and hover lines; move the label by half the drag offset. |
+| Dragged contig owns only the right endpoint | Move `x2` on visible and hover lines; move the label by half the drag offset. |
+| Dragged contig owns both endpoints | Translate the junction group, including same-contig arcs. |
+| Preview offset returns to zero | Restore the original endpoint and label geometry without waiting for cleanup. |
+| Drag is cancelled or committed | Cleanup restores originals and removes transient attributes. |
+| Junction has no dragged endpoint | Leave its geometry unchanged. |
+
+#### 5. Good/Base/Bad Cases
+- Good: a cross-contig junction stretches with the moved endpoint while its hover target and gap label stay aligned.
+- Base: a junction unrelated to the dragged contig remains unchanged.
+- Bad: move only the contig `<g>`, leaving an independently rendered GRT line at its old coordinates.
+
+#### 6. Tests Required
+- `track-drag-preview-runtime.test.mjs` covers one-endpoint movement, hover geometry, label midpoint, both-endpoint group translation, zero-offset restoration, cleanup, and main/Subview parity.
+- `grt-result-state.test.mjs` verifies stable endpoint identity and junction-child markers in rendered GRT markup.
+- `grt-visualization.test.mjs` verifies main and Subview contigs expose matching entry identities and keeps the Subview GRT switch in the inline control row before the minimum tick control.
+
+#### 7. Wrong vs Correct
+#### Wrong
+Apply drag transforms only to the contig group and ordinary PAF polygons.
+
+#### Correct
+Resolve dependent junctions by stable entry identity, update every geometry consumer during preview, and restore their original attributes during cleanup.
+
 ### Subview Anchor Identity Contracts
 
 #### 1. Scope / Trigger

@@ -211,11 +211,33 @@ test("schema 2 renders independent GRT result switches and exact main-track over
   state.assembly.grtResultDisplayByChr = {
     Chr01: { main: true, subview: false },
   };
+  state.assembly.subview = {
+    mode: "2-contig",
+    selectedAContigId: 101,
+    selectedARole: "primary",
+    selectedBContigId: 202,
+    selectedBRole: "support",
+    message: "",
+    error: "",
+    summary: {
+      mode: "2-contig",
+      top: { contigId: 202, role: "support", contigName: "donor_unplaced" },
+      bottom: { contigId: 101, role: "primary", contigName: "primary_grt" },
+    },
+  };
 
   const html = renderAssemblyPage(state);
 
   assert.match(html, /data-grt-result-toggle="main" checked/);
   assert.match(html, /data-grt-result-toggle="subview"/);
+  const subviewToggleIndex = html.indexOf('data-grt-result-toggle="subview"');
+  const subviewMinTickIndex = html.indexOf('id="subview-track-min-tick-unit-kb"');
+  assert.ok(subviewToggleIndex >= 0 && subviewToggleIndex < subviewMinTickIndex);
+  const subviewTitleRow = html.match(/<div class="subview-panel-title-row"[^>]*>[\s\S]*?<\/div>/)?.[0] || "";
+  assert.doesNotMatch(subviewTitleRow, /data-grt-result-toggle=/);
+  assert.match(html, /data-grt-result-entry-key="support:202:0"/);
+  assert.match(html, /data-grt-result-entry-key="top"/);
+  assert.match(html, /data-grt-result-entry-key="bottom"/);
   assert.match(html, /class="grt-result-mask"/);
   assert.match(html, /data-grt-result-interval="1"/);
   assert.doesNotMatch(html, /data-grt-result-toggle="subview" checked/);

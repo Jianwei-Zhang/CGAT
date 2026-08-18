@@ -139,6 +139,9 @@ test("renders cross-lane links as lines, same-ctg links as arcs, and gap labels 
   });
   assert.equal(crossScene.hasVisibleJunction, true);
   assert.match(crossScene.junctionMarkup, /<line class="grt-result-junction is-gap"/);
+  assert.match(crossScene.junctionMarkup, /data-grt-result-junction-left-entry-key="top"/);
+  assert.match(crossScene.junctionMarkup, /data-grt-result-junction-right-entry-key="bottom"/);
+  assert.match(crossScene.junctionMarkup, /data-grt-result-junction-line="1"/);
   assert.match(crossScene.junctionMarkup, /GRT gap · 300 bp/);
 
   const sameCtgPlan = buildGrtResultPlan(entry([
@@ -152,5 +155,7 @@ test("renders cross-lane links as lines, same-ctg links as arcs, and gap labels 
     ],
   });
   assert.equal(sameCtgScene.hasVisibleJunction, true);
+  assert.match(sameCtgScene.junctionMarkup, /data-grt-result-junction-left-entry-key="only"/);
+  assert.match(sameCtgScene.junctionMarkup, /data-grt-result-junction-right-entry-key="only"/);
   assert.match(sameCtgScene.junctionMarkup, /<path class="grt-result-junction"/);
 });

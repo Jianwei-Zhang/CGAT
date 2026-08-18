@@ -704,12 +704,6 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
     i18n,
     { context: grtResultContext, plan: grtResultPlan },
   );
-  const grtResultSwitch = grtResultContext.available
-    ? `<label class="grt-result-switch">
-        <input type="checkbox" data-grt-result-toggle="subview" ${grtResultContext.subviewEnabled ? "checked" : ""} />
-        <span>${escapeHtml(i18n.grtResult.showResult)}</span>
-      </label>`
-    : "";
   const grtResultToast = assembly?.grtResultToast?.scope === "subview"
     && assembly?.grtResultToast?.chrName === grtResultContext.chrName
     ? `<div class="grt-result-toast" role="status">${escapeHtml(i18n.grtResult.noSubviewLinks)}</div>`
@@ -719,7 +713,6 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
       <div class="subview-panel-head">
         <div class="subview-panel-title-row" data-grt-result-card="subview">
           <h4>${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
-          ${grtResultSwitch}
         </div>
         <div class="subview-panel-guide-inline">
           <p class="muted">${escapeHtml(i18n.subview.guide)}</p>
@@ -737,7 +730,13 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
   `;
 }
 
-function renderSubviewTrackInlineControls(trackPrefs, i18n) {
+function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = null) {
+  const grtResultSwitch = grtResultContext?.available
+    ? `<label class="grt-result-switch">
+        <input type="checkbox" data-grt-result-toggle="subview" ${grtResultContext.subviewEnabled ? "checked" : ""} />
+        <span>${escapeHtml(i18n.grtResult.showResult)}</span>
+      </label>`
+    : "";
   const minTickUnitInput = renderTrackNumberInput({
     field: "minTickUnitKb",
     id: "subview-track-min-tick-unit-kb",
@@ -773,6 +772,7 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n) {
   });
   return `
     <div class="assembly-track-inline-controls subview-track-inline-controls" role="group" aria-label="${escapeAttr(i18n.subview.trackControlsAria)}">
+      ${grtResultSwitch}
       <label class="assembly-track-inline-field">
         <span>${escapeHtml(i18n.trackControls.minTickUnitKb)}</span>
         ${minTickUnitInput}
@@ -1543,7 +1543,7 @@ function renderSubviewAlignmentCard(
     <article class="assembly-track-panel subview-alignment-card" data-grt-result-scene-visible="${grtResultScene.hasVisibleJunction ? "1" : "0"}">
       <div class="assembly-track-panel-head">
         <strong>${escapeHtml(`${topVisibleCtgName} vs ${bottomVisibleCtgName}`)}</strong>
-        ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n)}
+        ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context)}
       </div>
       <div class="assembly-track-layout subview-track-layout">
         <div class="assembly-track-label-column subview-track-label-column" style="width:${svgModel.labelColumnWidth}px;height:${svgModel.contentBottom}px">
@@ -1610,6 +1610,7 @@ function renderSubviewAlignmentCard(
               data-subview-track-ref-orient="${escapeAttr(resolveTrackCtgOrient(topCtg))}"
               data-subview-track-role="${escapeAttr(topSelection.role)}"
               data-subview-contig-id="${topSelection.contigId}"
+              data-grt-result-entry-key="top"
               data-subview-rect-x="${svgModel.topBarX.toFixed(2)}"
               data-subview-rect-y="${svgModel.topBarY.toFixed(2)}"
               data-subview-rect-width="${svgModel.topBarWidth.toFixed(2)}"
@@ -1659,6 +1660,7 @@ function renderSubviewAlignmentCard(
               data-subview-track-ref-orient="${escapeAttr(resolveTrackCtgOrient(bottomCtg))}"
               data-subview-track-role="${escapeAttr(bottomSelection.role)}"
               data-subview-contig-id="${bottomSelection.contigId}"
+              data-grt-result-entry-key="bottom"
               data-subview-rect-x="${svgModel.bottomBarX.toFixed(2)}"
               data-subview-rect-y="${svgModel.bottomBarY.toFixed(2)}"
               data-subview-rect-width="${svgModel.bottomBarWidth.toFixed(2)}"
@@ -2609,6 +2611,7 @@ function renderSubviewTrackPairAlignmentCard(
               data-subview-track-slot="${escapeAttr(resolveLayoutSlot(layout.id))}"
               data-subview-track-role="${escapeAttr(layout.role)}"
               data-subview-contig-id="${contigId}"
+              data-grt-result-entry-key="${escapeAttr(grtOverlayKey)}"
               data-subview-rect-x="${rect.x.toFixed(2)}"
               data-subview-rect-y="${y.toFixed(2)}"
               data-subview-rect-width="${rect.width.toFixed(2)}"
@@ -2667,7 +2670,7 @@ function renderSubviewTrackPairAlignmentCard(
     <article class="assembly-track-panel subview-alignment-card" data-grt-result-scene-visible="${grtResultScene.hasVisibleJunction ? "1" : "0"}">
       <div class="assembly-track-panel-head">
         <strong>${escapeHtml(`${topTrackLabel} vs ${bottomTrackLabel}`)}</strong>
-        ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n)}
+        ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context)}
       </div>
       <div class="assembly-track-layout subview-track-layout">
         <div class="assembly-track-label-column subview-track-label-column" style="width:${LABEL_COLUMN_WIDTH_PX}px;height:${contentBottom}px">

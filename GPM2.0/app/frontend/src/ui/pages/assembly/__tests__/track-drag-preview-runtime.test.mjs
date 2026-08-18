@@ -8,7 +8,7 @@ import {
   previewSubviewTrackContigDrag,
 } from "../track-drag-preview-runtime.js";
 
-function createNode(attrs = {}) {
+function createNode(attrs = {}, queryMap = {}) {
   const attributes = new Map(Object.entries(attrs));
   const classNames = new Set();
   return {
@@ -35,6 +35,9 @@ function createNode(attrs = {}) {
     },
     removeAttribute(name) {
       attributes.delete(name);
+    },
+    querySelectorAll(selector) {
+      return queryMap[selector] || [];
     },
   };
 }
@@ -107,6 +110,100 @@ test("previewTrackContigDrag limits duplicate phased bands by phased item id", (
   assert.equal(draggedBandNode.getAttribute("points"), "0,0 1,0 10,1 0,1");
 });
 
+test("previewTrackContigDrag shifts only the dragged GRT junction endpoint and restores it", () => {
+  const draggedGroup = createNode({
+    "data-track-contig-id": "22",
+    "data-track-role": "primary",
+    "data-track-is-mirror": "0",
+    "data-grt-result-entry-key": "primary:22:0",
+  });
+  const visibleLine = createNode({ x1: "10", x2: "30" });
+  const hoverLine = createNode({ x1: "10", x2: "30" });
+  const gapLabel = createNode({ x: "20" });
+  const junctionNode = createNode({
+    "data-grt-result-junction": "gap",
+    "data-grt-result-junction-left-entry-key": "support:11:0",
+    "data-grt-result-junction-right-entry-key": "primary:22:0",
+  }, {
+    "[data-grt-result-junction-line='1']": [visibleLine, hoverLine],
+    "[data-grt-result-junction-label='1']": [gapLabel],
+  });
+  const host = createHost({
+    '[data-track-contig-id="22"][data-track-role="primary"]': [draggedGroup],
+    '[data-sticky-label-key="track:primary:22:0"]': [],
+    '[data-band-track-role="primary"][data-band-contig-id="22"]': [],
+    "[data-grt-result-junction]": [junctionNode],
+    "[data-drag-preview-group='1']": [draggedGroup],
+    "[data-drag-preview-band='1']": [],
+    "[data-drag-preview-sticky-label='1']": [],
+    "[data-drag-preview-junction-line='1']": [visibleLine, hoverLine],
+    "[data-drag-preview-junction-label='1']": [gapLabel],
+  });
+
+  previewTrackContigDrag(host, {
+    trackRole: "primary",
+    assemblyCtgId: 22,
+    offsetPx: 12,
+  });
+
+  assert.equal(visibleLine.getAttribute("x1"), "10.00");
+  assert.equal(visibleLine.getAttribute("x2"), "42.00");
+  assert.equal(hoverLine.getAttribute("x2"), "42.00");
+  assert.equal(gapLabel.getAttribute("x"), "26.00");
+
+  previewTrackContigDrag(host, {
+    trackRole: "primary",
+    assemblyCtgId: 22,
+    offsetPx: 0,
+  });
+  assert.equal(visibleLine.getAttribute("x2"), "30.00");
+  assert.equal(gapLabel.getAttribute("x"), "20.00");
+
+  clearTrackDragPreview(host);
+
+  assert.equal(draggedGroup.getAttribute("transform"), null);
+  assert.equal(visibleLine.getAttribute("x1"), "10");
+  assert.equal(visibleLine.getAttribute("x2"), "30");
+  assert.equal(gapLabel.getAttribute("x"), "20");
+  assert.equal(visibleLine.getAttribute("data-drag-preview-original-x1"), null);
+});
+
+test("previewTrackContigDrag translates a same-ctg GRT junction arc", () => {
+  const draggedGroup = createNode({
+    "data-track-contig-id": "22",
+    "data-track-role": "primary",
+    "data-track-is-mirror": "0",
+    "data-grt-result-entry-key": "primary:22:0",
+  });
+  const junctionNode = createNode({
+    "data-grt-result-junction": "link",
+    "data-grt-result-junction-left-entry-key": "primary:22:0",
+    "data-grt-result-junction-right-entry-key": "primary:22:0",
+  });
+  const host = createHost({
+    '[data-track-contig-id="22"][data-track-role="primary"]': [draggedGroup],
+    '[data-sticky-label-key="track:primary:22:0"]': [],
+    '[data-band-track-role="primary"][data-band-contig-id="22"]': [],
+    "[data-grt-result-junction]": [junctionNode],
+    "[data-drag-preview-group='1']": [draggedGroup, junctionNode],
+    "[data-drag-preview-band='1']": [],
+    "[data-drag-preview-sticky-label='1']": [],
+    "[data-drag-preview-junction-line='1']": [],
+    "[data-drag-preview-junction-label='1']": [],
+  });
+
+  previewTrackContigDrag(host, {
+    trackRole: "primary",
+    assemblyCtgId: 22,
+    offsetPx: 15,
+  });
+
+  assert.equal(junctionNode.getAttribute("transform"), "translate(15.00 0)");
+
+  clearTrackDragPreview(host);
+  assert.equal(junctionNode.getAttribute("transform"), null);
+});
+
 test("previewTrackContigDrag shifts matching phased sticky labels by phased item id", () => {
   const groupNode = createNode({
     "data-track-contig-id": "8",
@@ -175,6 +272,45 @@ test("previewSubviewTrackContigDrag shifts matching sticky labels together with 
 
   assert.equal(groupNode.getAttribute("transform"), null);
   assert.equal(stickyLabelNode.style.transform, "");
+});
+
+test("previewSubviewTrackContigDrag shifts the matching GRT junction endpoint", () => {
+  const groupNode = createNode({
+    "data-subview-track-slot": "top",
+    "data-subview-track-role": "support",
+    "data-subview-contig-id": "12",
+    "data-grt-result-entry-key": "top",
+  });
+  const visibleLine = createNode({ x1: "5", x2: "25" });
+  const junctionNode = createNode({
+    "data-grt-result-junction": "link",
+    "data-grt-result-junction-left-entry-key": "top",
+    "data-grt-result-junction-right-entry-key": "bottom",
+  }, {
+    "[data-grt-result-junction-line='1']": [visibleLine],
+    "[data-grt-result-junction-label='1']": [],
+  });
+  const host = createHost({
+    '[data-subview-track-slot="top"][data-subview-contig-id="12"]': [groupNode],
+    '[data-subview-top-contig-id="12"]': [],
+    '[data-sticky-label-key="subview:top:support:12"]': [],
+    '[data-subview-label-slot="top"][data-subview-label-role="support"][data-subview-label-contig-id="12"]': [],
+    "[data-grt-result-junction]": [junctionNode],
+    "[data-drag-preview-group='1']": [groupNode],
+    "[data-drag-preview-band='1']": [],
+    "[data-drag-preview-sticky-label='1']": [],
+    "[data-drag-preview-junction-line='1']": [visibleLine],
+    "[data-drag-preview-junction-label='1']": [],
+  });
+
+  previewSubviewTrackContigDrag(host, { slot: "top", contigId: 12, offsetPx: 9 });
+
+  assert.equal(visibleLine.getAttribute("x1"), "14.00");
+  assert.equal(visibleLine.getAttribute("x2"), "25.00");
+
+  clearSubviewTrackDragPreview(host);
+  assert.equal(visibleLine.getAttribute("x1"), "5");
+  assert.equal(visibleLine.getAttribute("x2"), "25");
 });
 
 test("previewSubviewTrackContigDrag shifts external subview-ctg labels with the dragged contig", () => {

@@ -71,6 +71,9 @@ function renderJunction(junction, entries, escapeHtml, gapLabel) {
   const left = buildEndpoint(junction.left, junction.left.exitSourcePosition, entries);
   const right = buildEndpoint(junction.right, junction.right.entrySourcePosition, entries);
   if (!left || !right) return "";
+  const leftEntryKey = String(left.entry?.key || "");
+  const rightEntryKey = String(right.entry?.key || "");
+  const endpointAttrs = `data-grt-result-junction-left-entry-key="${escapeHtml(leftEntryKey)}" data-grt-result-junction-right-entry-key="${escapeHtml(rightEntryKey)}"`;
   const sameEntry = left.entry === right.entry;
   const leftCenterY = left.entry.y + left.entry.height / 2;
   const rightCenterY = right.entry.y + right.entry.height / 2;
@@ -84,7 +87,7 @@ function renderJunction(junction, entries, escapeHtml, gapLabel) {
     const label = junction.kind === "gap"
       ? `<text class="grt-result-gap-label" x="${((left.x + right.x) / 2).toFixed(2)}" y="${Math.max(10, controlY - 2).toFixed(2)}" text-anchor="middle">${escapeHtml(title)}</text>`
       : "";
-    return `<g class="grt-result-junction-group${cssClass}" data-grt-result-junction="${junction.kind}">
+    return `<g class="grt-result-junction-group${cssClass}" data-grt-result-junction="${junction.kind}" ${endpointAttrs}>
       <path class="grt-result-junction${cssClass}" d="${path}" pointer-events="none" />
       <path class="grt-result-hover-proxy" d="${path}" fill="none" stroke="transparent" stroke-width="8" pointer-events="stroke"><title>${escapeHtml(title)}</title></path>
       ${label}
@@ -94,11 +97,11 @@ function renderJunction(junction, entries, escapeHtml, gapLabel) {
   const y1 = fromTop ? left.entry.y + left.entry.height : left.entry.y;
   const y2 = fromTop ? right.entry.y : right.entry.y + right.entry.height;
   const label = junction.kind === "gap"
-    ? `<text class="grt-result-gap-label" x="${((left.x + right.x) / 2).toFixed(2)}" y="${((y1 + y2) / 2 - 4).toFixed(2)}" text-anchor="middle">${escapeHtml(title)}</text>`
+    ? `<text class="grt-result-gap-label" data-grt-result-junction-label="1" x="${((left.x + right.x) / 2).toFixed(2)}" y="${((y1 + y2) / 2 - 4).toFixed(2)}" text-anchor="middle">${escapeHtml(title)}</text>`
     : "";
-  return `<g class="grt-result-junction-group${cssClass}" data-grt-result-junction="${junction.kind}">
-    <line class="grt-result-junction${cssClass}" x1="${left.x.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${right.x.toFixed(2)}" y2="${y2.toFixed(2)}" pointer-events="none" />
-    <line class="grt-result-hover-proxy" x1="${left.x.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${right.x.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="transparent" stroke-width="8" pointer-events="stroke"><title>${escapeHtml(title)}</title></line>
+  return `<g class="grt-result-junction-group${cssClass}" data-grt-result-junction="${junction.kind}" ${endpointAttrs}>
+    <line class="grt-result-junction${cssClass}" data-grt-result-junction-line="1" x1="${left.x.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${right.x.toFixed(2)}" y2="${y2.toFixed(2)}" pointer-events="none" />
+    <line class="grt-result-hover-proxy" data-grt-result-junction-line="1" x1="${left.x.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${right.x.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="transparent" stroke-width="8" pointer-events="stroke"><title>${escapeHtml(title)}</title></line>
     ${label}
   </g>`;
 }

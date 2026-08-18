@@ -3,9 +3,14 @@ const SUBVIEW_TRACK_PREVIEW_CLASS = "is-subview-track-drag-preview";
 const ORIGINAL_POINTS_ATTR = "data-drag-preview-original-points";
 const ORIGINAL_TRANSFORM_ATTR = "data-drag-preview-original-transform";
 const ORIGINAL_STYLE_TRANSFORM_ATTR = "data-drag-preview-original-style-transform";
+const ORIGINAL_X1_ATTR = "data-drag-preview-original-x1";
+const ORIGINAL_X2_ATTR = "data-drag-preview-original-x2";
+const ORIGINAL_X_ATTR = "data-drag-preview-original-x";
 const PREVIEW_GROUP_ATTR = "data-drag-preview-group";
 const PREVIEW_BAND_ATTR = "data-drag-preview-band";
 const PREVIEW_STICKY_LABEL_ATTR = "data-drag-preview-sticky-label";
+const PREVIEW_JUNCTION_LINE_ATTR = "data-drag-preview-junction-line";
+const PREVIEW_JUNCTION_LABEL_ATTR = "data-drag-preview-junction-label";
 
 function parsePolygonPoints(pointsText) {
   return String(pointsText || "")
@@ -83,6 +88,74 @@ function applyStickyLabelPreview(labelNode, offsetPx) {
   labelNode.setAttribute?.(PREVIEW_STICKY_LABEL_ATTR, "1");
 }
 
+function applyJunctionLinePreview(lineNode, leftOffsetPx, rightOffsetPx) {
+  if (!lineNode) {
+    return;
+  }
+  if (!lineNode.hasAttribute?.(ORIGINAL_X1_ATTR)) {
+    lineNode.setAttribute?.(ORIGINAL_X1_ATTR, lineNode.getAttribute?.("x1") || "0");
+  }
+  if (!lineNode.hasAttribute?.(ORIGINAL_X2_ATTR)) {
+    lineNode.setAttribute?.(ORIGINAL_X2_ATTR, lineNode.getAttribute?.("x2") || "0");
+  }
+  const originalX1 = Number(lineNode.getAttribute?.(ORIGINAL_X1_ATTR) || 0);
+  const originalX2 = Number(lineNode.getAttribute?.(ORIGINAL_X2_ATTR) || 0);
+  lineNode.setAttribute?.("x1", (originalX1 + Number(leftOffsetPx || 0)).toFixed(2));
+  lineNode.setAttribute?.("x2", (originalX2 + Number(rightOffsetPx || 0)).toFixed(2));
+  lineNode.setAttribute?.(PREVIEW_JUNCTION_LINE_ATTR, "1");
+}
+
+function applyJunctionLabelPreview(labelNode, offsetPx) {
+  if (!labelNode) {
+    return;
+  }
+  if (!labelNode.hasAttribute?.(ORIGINAL_X_ATTR)) {
+    labelNode.setAttribute?.(ORIGINAL_X_ATTR, labelNode.getAttribute?.("x") || "0");
+  }
+  const originalX = Number(labelNode.getAttribute?.(ORIGINAL_X_ATTR) || 0);
+  labelNode.setAttribute?.("x", (originalX + Number(offsetPx || 0)).toFixed(2));
+  labelNode.setAttribute?.(PREVIEW_JUNCTION_LABEL_ATTR, "1");
+}
+
+function applyGrtJunctionPreview(host, groupNodes, offsetPx) {
+  const entryKeys = new Set();
+  groupNodes.forEach((groupNode) => {
+    const entryKey = String(groupNode.getAttribute?.("data-grt-result-entry-key") || "").trim();
+    if (entryKey) {
+      entryKeys.add(entryKey);
+    }
+  });
+  if (!entryKeys.size) {
+    return;
+  }
+  const normalizedOffset = Number(offsetPx || 0);
+  const junctionNodes = host?.querySelectorAll?.("[data-grt-result-junction]") || [];
+  junctionNodes.forEach((junctionNode) => {
+    const leftEntryKey = String(
+      junctionNode.getAttribute?.("data-grt-result-junction-left-entry-key") || "",
+    ).trim();
+    const rightEntryKey = String(
+      junctionNode.getAttribute?.("data-grt-result-junction-right-entry-key") || "",
+    ).trim();
+    const leftMatched = entryKeys.has(leftEntryKey);
+    const rightMatched = entryKeys.has(rightEntryKey);
+    if (!leftMatched && !rightMatched) {
+      return;
+    }
+    const leftOffset = leftMatched ? normalizedOffset : 0;
+    const rightOffset = rightMatched ? normalizedOffset : 0;
+    if (leftMatched && rightMatched) {
+      applyGroupPreview(junctionNode, leftOffset);
+      return;
+    }
+    const lineNodes = junctionNode.querySelectorAll?.("[data-grt-result-junction-line='1']") || [];
+    lineNodes.forEach((lineNode) => applyJunctionLinePreview(lineNode, leftOffset, rightOffset));
+    const labelOffset = (leftOffset + rightOffset) / 2;
+    const labelNodes = junctionNode.querySelectorAll?.("[data-grt-result-junction-label='1']") || [];
+    labelNodes.forEach((labelNode) => applyJunctionLabelPreview(labelNode, labelOffset));
+  });
+}
+
 function isLabelInsideGroup(labelNode, groupNode) {
   if (!labelNode || !groupNode || typeof groupNode.contains !== "function") {
     return false;
@@ -115,6 +188,20 @@ function clearPreviewNodes(host, previewClassName) {
     labelNode.style.transform = labelNode.getAttribute?.(ORIGINAL_STYLE_TRANSFORM_ATTR) || "";
     labelNode.removeAttribute?.(PREVIEW_STICKY_LABEL_ATTR);
     labelNode.removeAttribute?.(ORIGINAL_STYLE_TRANSFORM_ATTR);
+  });
+  const previewJunctionLines = host?.querySelectorAll?.(`[${PREVIEW_JUNCTION_LINE_ATTR}='1']`) || [];
+  previewJunctionLines.forEach((lineNode) => {
+    lineNode.setAttribute?.("x1", lineNode.getAttribute?.(ORIGINAL_X1_ATTR) || "0");
+    lineNode.setAttribute?.("x2", lineNode.getAttribute?.(ORIGINAL_X2_ATTR) || "0");
+    lineNode.removeAttribute?.(PREVIEW_JUNCTION_LINE_ATTR);
+    lineNode.removeAttribute?.(ORIGINAL_X1_ATTR);
+    lineNode.removeAttribute?.(ORIGINAL_X2_ATTR);
+  });
+  const previewJunctionLabels = host?.querySelectorAll?.(`[${PREVIEW_JUNCTION_LABEL_ATTR}='1']`) || [];
+  previewJunctionLabels.forEach((labelNode) => {
+    labelNode.setAttribute?.("x", labelNode.getAttribute?.(ORIGINAL_X_ATTR) || "0");
+    labelNode.removeAttribute?.(PREVIEW_JUNCTION_LABEL_ATTR);
+    labelNode.removeAttribute?.(ORIGINAL_X_ATTR);
   });
 }
 
@@ -182,6 +269,7 @@ export function previewTrackContigDrag(host, {
     ) || [];
     stickyLabelNodes.forEach((labelNode) => applyStickyLabelPreview(labelNode, offsetPx));
   });
+  applyGrtJunctionPreview(host, groupNodes, offsetPx);
 
   const edgeIndexes = String(trackRole || "").trim() === "support" ? [0, 1] : [2, 3];
   const bandNodes = host.querySelectorAll?.(
@@ -221,6 +309,7 @@ export function previewSubviewTrackContigDrag(host, { slot, contigId, offsetPx }
       }
     });
   });
+  applyGrtJunctionPreview(host, groupNodes, offsetPx);
 
   const edgeIndexes = String(slot || "").trim() === "top" ? [0, 1] : [2, 3];
   const bandSelector = String(slot || "").trim() === "top"
