@@ -13,6 +13,7 @@ import {
   restoreFinalPathFromGrtBaseline,
   updateFinalPathRow,
 } from "../final-path-runtime.js";
+import { resolveGrtResultContext } from "../grt-result-state.js";
 
 function createStore(assemblyOverrides = {}) {
   let state = {
@@ -172,38 +173,84 @@ test("appendTrackContigToFinalPath appends after existing segments instead of ov
 });
 
 test("a semantic Final Path edit clears both current-chromosome GRT result switches", async () => {
+  const baselineEntry = {
+    mode: "segments",
+    chrName: "Chr01",
+    grtDisplayAvailable: true,
+    segments: [{
+      segmentId: "seg-1",
+      type: "ctg",
+      assemblyCtgId: 30,
+      datasetName: "flye",
+      ctgName: "Ctg30",
+      originId: "contig_98",
+      overallLen: 2200,
+      start: 1,
+      end: 2200,
+    }],
+  };
   const store = createStore({
     grtResultDisplayByChr: { Chr01: { main: true, subview: true } },
+    grtProjectView: {
+      recipe: { finalPathSchemaVersion: "2" },
+      baselineFinalPathByChr: { Chr01: baselineEntry },
+    },
     finalPathByChr: {
-      Chr01: {
-        mode: "segments",
-        chrName: "Chr01",
-        segments: [{
-          segmentId: "seg-1",
-          type: "ctg",
-          assemblyCtgId: 30,
-          datasetName: "flye",
-          ctgName: "Ctg30",
-          originId: "contig_98",
-          overallLen: 2200,
-          start: 1,
-          end: 2200,
-        }],
-      },
+      Chr01: baselineEntry,
     },
   });
+  let grtConsumerRerenders = 0;
 
   await appendTrackContigToFinalPath(
     {},
     store,
     { assemblyCtgId: 9, trackRole: "primary", isMirror: false, datasetId: 11 },
-    createDeps(),
+    createDeps({
+      rerenderGrtResultConsumers() {
+        grtConsumerRerenders += 1;
+      },
+    }),
   );
 
   assert.deepEqual(
     store.getState().assembly.grtResultDisplayByChr.Chr01,
     { main: false, subview: false },
   );
+  const editedGrtContext = resolveGrtResultContext(store.getState().assembly);
+  assert.deepEqual(
+    {
+      available: editedGrtContext.available,
+      mainEnabled: editedGrtContext.mainEnabled,
+      subviewEnabled: editedGrtContext.subviewEnabled,
+    },
+    { available: false, mainEnabled: false, subviewEnabled: false },
+  );
+  assert.equal(grtConsumerRerenders, 1);
+});
+
+test("a Final Path edit does not refresh GRT consumers while availability stays false", async () => {
+  const store = createStore({
+    finalPathByChr: {
+      Chr01: {
+        mode: "segments",
+        chrName: "Chr01",
+        segments: [{ segmentId: "seg-1", type: "gap", gapSizeBp: 100 }],
+      },
+    },
+  });
+  let grtConsumerRerenders = 0;
+
+  await appendFinalPathRow(
+    {},
+    store,
+    createDeps({
+      rerenderGrtResultConsumers() {
+        grtConsumerRerenders += 1;
+      },
+    }),
+  );
+
+  assert.equal(grtConsumerRerenders, 0);
 });
 
 test("appendFinalPathRow writes to the active final-path haplotype key", async () => {
@@ -1458,6 +1505,7 @@ function createGrtRestoreState() {
   const baselineEntry = {
     mode: "segments",
     chrName: "Chr01",
+    grtDisplayAvailable: true,
     segments: [
       {
         segmentId: "baseline-ctg",
@@ -1496,8 +1544,10 @@ function createGrtRestoreState() {
         },
       },
       grtProjectView: {
+        recipe: { finalPathSchemaVersion: "2" },
         baselineFinalPathByChr: { Chr01: baselineEntry },
       },
+      grtResultDisplayByChr: { Chr01: { main: false, subview: false } },
     }),
   };
 }
@@ -1539,6 +1589,7 @@ test("restoreFinalPathFromGrtBaseline replaces only the current chromosome and p
   });
   const persisted = [];
   const confirms = [];
+  let grtConsumerRerenders = 0;
   const result = await restoreFinalPathFromGrtBaseline(
     {},
     store,
@@ -1551,6 +1602,9 @@ test("restoreFinalPathFromGrtBaseline replaces only the current chromosome and p
       async persistProjectAssemblyViewState(payload) {
         persisted.push(payload);
         return payload;
+      },
+      rerenderGrtResultConsumers() {
+        grtConsumerRerenders += 1;
       },
     }),
   );
@@ -1568,6 +1622,20 @@ test("restoreFinalPathFromGrtBaseline replaces only the current chromosome and p
   assert.equal(store.getState().assembly.actionError, "");
   assert.match(store.getState().assembly.actionStatus, /GRT/);
   assert.equal(result.q4Sha256, baselineEntry.q4Sha256);
+  assert.deepEqual(
+    store.getState().assembly.grtResultDisplayByChr.Chr01,
+    { main: false, subview: false },
+  );
+  const restoredGrtContext = resolveGrtResultContext(store.getState().assembly);
+  assert.deepEqual(
+    {
+      available: restoredGrtContext.available,
+      mainEnabled: restoredGrtContext.mainEnabled,
+      subviewEnabled: restoredGrtContext.subviewEnabled,
+    },
+    { available: true, mainEnabled: false, subviewEnabled: false },
+  );
+  assert.equal(grtConsumerRerenders, 1);
 });
 
 test("restoreFinalPathFromGrtBaseline reports persistence errors without replacing the path", async () => {

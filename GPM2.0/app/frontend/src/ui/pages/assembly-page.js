@@ -1212,6 +1212,21 @@ async function loadDeletedCtgsForChr(workspaceRoot, projectId, chrName, datasetI
   );
 }
 
+function rerenderGrtResultConsumers(host, store) {
+  rerenderAssemblyMainTab(host, store);
+  rerenderSubviewPanel(host, store);
+}
+
+function createFinalPathMutationRuntimeDeps(overrides = {}) {
+  return {
+    persistProjectAssemblyViewState:
+      projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
+    rerender: rerenderFinalPathCard,
+    rerenderGrtResultConsumers,
+    ...overrides,
+  };
+}
+
 async function appendTrackContigToFinalPath(host, store, ctgContext, options = {}) {
   const activePhasedTrackKey = String(options.activePhasedTrackKey || "").trim();
   if (activePhasedTrackKey) {
@@ -1231,92 +1246,65 @@ async function appendTrackContigToFinalPath(host, store, ctgContext, options = {
       });
     }
   }
-  return appendTrackContigToFinalPathImpl(host, store, ctgContext, {
-    persistProjectAssemblyViewState:
-      projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender: rerenderFinalPathCard,
-  }, options);
+  return appendTrackContigToFinalPathImpl(
+    host,
+    store,
+    ctgContext,
+    createFinalPathMutationRuntimeDeps(),
+    options,
+  );
 }
 
 async function appendFinalPathRow(host, store, payload = {}) {
-  return appendFinalPathRowImpl(host, store, payload, {
-    persistProjectAssemblyViewState:
-      projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender: rerenderFinalPathCard,
-  });
+  return appendFinalPathRowImpl(host, store, payload, createFinalPathMutationRuntimeDeps());
 }
 
 async function restoreFinalPathFromGrtBaseline(host, store, payload = {}) {
-  return restoreFinalPathFromGrtBaselineImpl(host, store, payload, {
+  return restoreFinalPathFromGrtBaselineImpl(host, store, payload, createFinalPathMutationRuntimeDeps({
     confirm: (message) => requestAssemblyConfirm(host, store, message),
-    persistProjectAssemblyViewState:
-      projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender: rerenderFinalPathCard,
-  });
+  }));
 }
 
 async function addFinalPathGapRelativeToSegment(host, store, payload) {
-  return addFinalPathGapRelativeToSegmentImpl(host, store, payload, {
-    persistProjectAssemblyViewState:
-      projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender: rerenderFinalPathCard,
-  });
+  return addFinalPathGapRelativeToSegmentImpl(
+    host,
+    store,
+    payload,
+    createFinalPathMutationRuntimeDeps(),
+  );
 }
 
 async function addFinalPathContigRelativeToSegment(host, store, payload) {
-  return addFinalPathContigRelativeToSegmentImpl(host, store, payload, {
-    persistProjectAssemblyViewState:
-      projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender: rerenderFinalPathCard,
-  });
+  return addFinalPathContigRelativeToSegmentImpl(
+    host,
+    store,
+    payload,
+    createFinalPathMutationRuntimeDeps(),
+  );
 }
 
 async function createEmptyFinalPathRow(host, store, payload) {
-  return createEmptyFinalPathRowImpl(host, store, payload, {
-    persistProjectAssemblyViewState:
-      projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender: rerenderFinalPathCard,
-  });
+  return createEmptyFinalPathRowImpl(host, store, payload, createFinalPathMutationRuntimeDeps());
 }
 
 async function flipFinalPathSegment(host, store, payload) {
-  return flipFinalPathSegmentImpl(host, store, payload, {
-    persistProjectAssemblyViewState:
-      projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender: rerenderFinalPathCard,
-  });
+  return flipFinalPathSegmentImpl(host, store, payload, createFinalPathMutationRuntimeDeps());
 }
 
 async function updateFinalPathRow(host, store, payload) {
-  return updateFinalPathRowImpl(host, store, payload, {
-    persistProjectAssemblyViewState:
-      projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender: rerenderFinalPathCard,
-  });
+  return updateFinalPathRowImpl(host, store, payload, createFinalPathMutationRuntimeDeps());
 }
 
 async function deleteFinalPathSegment(host, store, payload) {
-  return removeFinalPathRowImpl(host, store, payload, {
-    persistProjectAssemblyViewState:
-      projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender: rerenderFinalPathCard,
-  });
+  return removeFinalPathRowImpl(host, store, payload, createFinalPathMutationRuntimeDeps());
 }
 
 async function removeFinalPathRow(host, store, payload) {
-  return removeFinalPathRowImpl(host, store, payload, {
-    persistProjectAssemblyViewState:
-      projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender: rerenderFinalPathCard,
-  });
+  return removeFinalPathRowImpl(host, store, payload, createFinalPathMutationRuntimeDeps());
 }
 
 async function moveFinalPathRow(host, store, payload) {
-  return moveFinalPathRowImpl(host, store, payload, {
-    persistProjectAssemblyViewState:
-      projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
-    rerender: rerenderFinalPathCard,
-  });
+  return moveFinalPathRowImpl(host, store, payload, createFinalPathMutationRuntimeDeps());
 }
 
 function bindSubviewBandTooltips(host) {

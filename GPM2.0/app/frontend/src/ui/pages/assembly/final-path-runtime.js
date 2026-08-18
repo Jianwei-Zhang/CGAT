@@ -17,6 +17,7 @@ import {
   buildFinalPathTrackViewportKey,
   normalizeViewportScrollState,
 } from "./scroll-position-state.js";
+import { resolveGrtResultContext } from "./grt-result-state.js";
 
 function normalizeTrackContigId(value) {
   const numeric = Number(value);
@@ -371,6 +372,7 @@ async function persistCurrentFinalPathByChr(host, store, nextFinalPathByChr, dep
     },
   });
   const currentState = store.getState();
+  const previousGrtResultAvailable = resolveGrtResultContext(currentState.assembly).available;
   const persisted = await getPersistProjectAssemblyViewState(deps)({
     workspaceRoot: currentState.session.workspacePath,
     projectId: currentState.session.projectId,
@@ -399,16 +401,22 @@ async function persistCurrentFinalPathByChr(host, store, nextFinalPathByChr, dep
       nextGrtResultDisplayByChr[chrName] = { main: false, subview: false };
     }
   });
-  store.setState({
-    assembly: {
-      ...store.getState().assembly,
-      finalPathByChr: normalizedPersistedFinalPathByChr,
-      grtResultDisplayByChr: nextGrtResultDisplayByChr,
-      actionStatus: normalizeString(statusPatch.actionStatus),
-      actionError: normalizeString(statusPatch.actionError),
-    },
-  });
+  const nextAssembly = {
+    ...store.getState().assembly,
+    finalPathByChr: normalizedPersistedFinalPathByChr,
+    grtResultDisplayByChr: nextGrtResultDisplayByChr,
+    actionStatus: normalizeString(statusPatch.actionStatus),
+    actionError: normalizeString(statusPatch.actionError),
+  };
+  const nextGrtResultAvailable = resolveGrtResultContext(nextAssembly).available;
+  store.setState({ assembly: nextAssembly });
   getRerender(deps)(host, store);
+  if (
+    previousGrtResultAvailable !== nextGrtResultAvailable
+    && typeof deps.rerenderGrtResultConsumers === "function"
+  ) {
+    deps.rerenderGrtResultConsumers(host, store);
+  }
   return normalizedPersistedFinalPathByChr;
 }
 

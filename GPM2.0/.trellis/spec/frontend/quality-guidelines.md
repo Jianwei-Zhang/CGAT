@@ -236,7 +236,9 @@ deleteWithFiles = importer.deleteWithFiles === true;
 - Trigger: adding, editing, deleting, reordering, restoring, dragging, flipping, switching a local view mode, or changing local track controls.
 
 #### 2. Contracts
-- A Final Path-only mutation must render and replace only `.final-path-card`. It must not regenerate the main-track or Subview renderer output.
+- A Final Path-only mutation normally renders and replaces only `.final-path-card`. It must not regenerate the main-track or Subview renderer output while their derived state is unchanged.
+- GRT result availability is the explicit exception: compare `resolveGrtResultContext().available` before and after Final Path persistence. When it changes, refresh the Final Path card and both GRT consumer regions (main track and Subview) after committing the new state. This removes stale enabled overlays/switches when the path diverges and recreates both unchecked switches when the baseline is restored.
+- A Final Path mutation that starts and ends with GRT unavailable must not refresh the main track or Subview. Do not widen every Final Path edit into a three-region refresh.
 - A main-track-only mutation must replace only the chromosome/member strip and `.assembly-track-unified`. The main-track refresh renderer must skip Subview and Final Path generation.
 - A Subview-only mutation must replace only `[data-subview-panel='1']`.
 - Partial bindings must pass an explicit `main`, `subview`, or `final-path` scope. They must not run route initialization, register route-level resize/hotkey listeners, or clear persisted scroll state for absent sibling regions.
@@ -248,15 +250,19 @@ deleteWithFiles = importer.deleteWithFiles === true;
 - `app/frontend/src/ui/pages/assembly/__tests__/bindings.test.mjs`
   - Assert Final Path view switching and graph drag receive the Final Path card refresh callback, not the full-route callback.
   - Assert partial Final Path binding skips unrelated lifecycle hooks and passes the `final-path` scroll scope.
+- `app/frontend/src/ui/pages/assembly/__tests__/final-path-runtime.test.mjs`
+  - Assert a baseline edit transitions GRT availability from true to false, clears both display states, and refreshes both GRT consumer regions.
+  - Assert restoring the baseline transitions availability from false to true, refreshes both consumers, and keeps both recreated switches disabled by default.
+  - Assert another edit while availability remains false does not refresh either GRT consumer region.
 - Assembly feature suites under `app/frontend/src/ui/pages/assembly/__tests__/`
   - Keep page-shell, main-track, Subview, Final Path, coordinate, and phased-track rendering regressions green after renderer extraction.
 
 #### 4. Wrong vs Correct
 #### Wrong
-Calling the route-level `rerender` after a local Final Path edit or Subview drag, which recreates unrelated large SVG trees.
+Calling the route-level `rerender` after a local Final Path edit or Subview drag, which recreates unrelated large SVG trees; or always refreshing main/Subview for every Final Path edit without checking the GRT availability transition.
 
 #### Correct
-Persist the authoritative state, replace only the affected region, rebind that region with its explicit scope, and leave sibling DOM untouched.
+Persist the authoritative state, replace only the affected region, and leave sibling DOM untouched unless a documented derived-state transition changes a sibling consumer. For GRT availability, refresh main and Subview only when the before/after boolean differs.
 
 ### Subview Ruler Virtualization
 
