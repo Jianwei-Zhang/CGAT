@@ -130,7 +130,7 @@ pub fn initialize_project(request: InitializeProjectCommandRequest) -> CommandRe
         )?;
         let options = backend_list_initializer_options(&project_db)?;
         let existing_projects = map_existing_projects(options.existing_projects);
-        let grt_project_view = backend_load_grt_project_view(&project_db)?;
+        let grt_project_view = backend_load_grt_project_view(&project_db, summary.project_id)?;
         Ok(json!({
             "projectId": summary.project_id,
             "projectName": summary.project_name,
@@ -166,6 +166,7 @@ pub fn get_grt_project_view(workspaceRoot: String, projectId: i64) -> CommandRes
         }
         Ok(serde_json::to_value(backend_load_grt_project_view(
             &project_db,
+            projectId,
         )?)?)
     })()
     .map_err(format_error)

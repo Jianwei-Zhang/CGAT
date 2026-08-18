@@ -309,7 +309,7 @@ function normalizeSegment(segment, index = 0) {
     {
       segmentId: segment.segmentId,
       sourceKind: segment.sourceKind,
-      assemblyCtgId: segment.assemblyCtgId,
+      assemblyCtgId: segment.serverBaseline === true ? null : segment.assemblyCtgId,
       referenceChrId: segment.referenceChrId,
       referenceChrName: segment.referenceChrName,
       memberStartBp: segment.memberStartBp,
@@ -517,6 +517,7 @@ function buildFinalPathSemanticSegment(segment) {
     sourceContig: normalizeString(source.contig) || normalizeString(segment?.originId) || normalizeString(segment?.ctgName),
     sourceStart: normalizePositiveInteger(source.start) || normalizePositiveInteger(segment?.start),
     sourceEnd: normalizePositiveInteger(source.end) || normalizePositiveInteger(segment?.end),
+    orient: normalizeSegmentOrient(source.orientation || segment?.orient),
     referenceChrId: normalizePositiveInteger(segment?.referenceChrId),
     referenceChrName: normalizeString(segment?.referenceChrName),
     memberStartBp: normalizePositiveInteger(segment?.memberStartBp),

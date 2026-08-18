@@ -37,6 +37,8 @@ import {
 } from "./subview-anchor-state.js";
 import { resolveSubviewAutoTrackOffsets } from "./subview-offset-state.js";
 import { assemblyPageSession } from "./page-session.js";
+import { buildGrtResultPlan, resolveGrtResultContext } from "./grt-result-state.js";
+import { buildGrtResultScene } from "./grt-result-render.js";
 import {
   buildTrackCtgHoverTitle,
   resolveBoundedTrackCtgLabelPlacement,
@@ -690,10 +692,35 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
     .join("");
   const allBadges = `${candidateBadges}${trackBadges}`;
   const sameContigWarning = resolveSubviewPanelSameContigWarningText(subview, supportContext, i18n);
+  const grtResultContext = resolveGrtResultContext(assembly);
+  const grtResultPlan = grtResultContext.available
+    ? buildGrtResultPlan(grtResultContext.baselineEntry)
+    : null;
+  const alignmentCard = renderSubviewAlignmentCard(
+    subview,
+    supportContext,
+    trackPrefs,
+    assembly?.subviewTrackDragOffsets,
+    i18n,
+    { context: grtResultContext, plan: grtResultPlan },
+  );
+  const grtResultSwitch = grtResultContext.available
+    ? `<label class="grt-result-switch">
+        <input type="checkbox" data-grt-result-toggle="subview" ${grtResultContext.subviewEnabled ? "checked" : ""} />
+        <span>${escapeHtml(i18n.grtResult.showResult)}</span>
+      </label>`
+    : "";
+  const grtResultToast = assembly?.grtResultToast?.scope === "subview"
+    && assembly?.grtResultToast?.chrName === grtResultContext.chrName
+    ? `<div class="grt-result-toast" role="status">${escapeHtml(i18n.grtResult.noSubviewLinks)}</div>`
+    : "";
   return `
     <article class="card subview-selection-panel" data-subview-panel="1">
       <div class="subview-panel-head">
-        <h4>${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
+        <div class="subview-panel-title-row" data-grt-result-card="subview">
+          <h4>${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
+          ${grtResultSwitch}
+        </div>
         <div class="subview-panel-guide-inline">
           <p class="muted">${escapeHtml(i18n.subview.guide)}</p>
           ${
@@ -703,8 +730,9 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
           }
         </div>
       </div>
+      ${grtResultToast}
       ${subview.error ? `<p class="error-text">${escapeHtml(subview.error)}</p>` : ""}
-      ${renderSubviewAlignmentCard(subview, supportContext, trackPrefs, assembly?.subviewTrackDragOffsets, i18n)}
+      ${alignmentCard}
     </article>
   `;
 }
@@ -1217,7 +1245,14 @@ function resolveSubviewSegmentCtgBpByRef(segment, refBp) {
   return normalized > 0 ? normalized : null;
 }
 
-function renderSubviewAlignmentCard(subview, supportContext, trackPrefs, subviewTrackDragOffsets = [], i18n) {
+function renderSubviewAlignmentCard(
+  subview,
+  supportContext,
+  trackPrefs,
+  subviewTrackDragOffsets = [],
+  i18n,
+  grtResult = {},
+) {
   const summary = subview?.summary || null;
   if (!summary) {
     return "";
@@ -1229,6 +1264,7 @@ function renderSubviewAlignmentCard(subview, supportContext, trackPrefs, subview
       trackPrefs,
       subviewTrackDragOffsets,
       i18n,
+      grtResult,
     );
   }
   const topSelection = normalizeSubviewSummarySelection(summary.top);
@@ -1446,6 +1482,29 @@ function renderSubviewAlignmentCard(subview, supportContext, trackPrefs, subview
     },
   });
   const anchorEdges = [...evidenceAnchorEdges, ...manualAnchorEdges];
+  const grtResultScene = grtResult.context?.available
+    ? buildGrtResultScene({
+      plan: grtResult.plan,
+      entries: [
+        {
+          key: "top",
+          ctg: { ...topCtg, orient: resolveTrackCtgOrient(topCtg) },
+          rect: { x: svgModel.topBarX, width: svgModel.topBarWidth },
+          y: svgModel.topBarY,
+          height: svgModel.barHeight,
+        },
+        {
+          key: "bottom",
+          ctg: { ...bottomCtg, orient: resolveTrackCtgOrient(bottomCtg) },
+          rect: { x: svgModel.bottomBarX, width: svgModel.bottomBarWidth },
+          y: svgModel.bottomBarY,
+          height: svgModel.barHeight,
+        },
+      ],
+      escapeHtml,
+      gapLabel: i18n.grtResult.gapLabel,
+    })
+    : { hasVisibleResult: false, hasVisibleJunction: false, overlaysByKey: new Map(), junctionMarkup: "" };
   const activeAnchorCutsByContig = buildSubviewActiveAnchorCutsByContig(anchorEdges);
   const topFragments = deriveSubviewContigFragments({
     contig: {
@@ -1481,7 +1540,7 @@ function renderSubviewAlignmentCard(subview, supportContext, trackPrefs, subview
     lengthBp: svgModel.bottomLengthBp,
   });
   return `
-    <article class="assembly-track-panel subview-alignment-card">
+    <article class="assembly-track-panel subview-alignment-card" data-grt-result-scene-visible="${grtResultScene.hasVisibleJunction ? "1" : "0"}">
       <div class="assembly-track-panel-head">
         <strong>${escapeHtml(`${topVisibleCtgName} vs ${bottomVisibleCtgName}`)}</strong>
         ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n)}
@@ -1537,6 +1596,7 @@ function renderSubviewAlignmentCard(subview, supportContext, trackPrefs, subview
                 },
               )
               .join("")}
+            ${grtResult.context?.subviewEnabled ? grtResultScene.junctionMarkup : ""}
             <g
               class="subview-track-ctg-group${topRowClass}"
               data-subview-track-pair-role="${escapeAttr(topSelection.role)}"
@@ -1559,6 +1619,7 @@ function renderSubviewAlignmentCard(subview, supportContext, trackPrefs, subview
               <rect class="track-ctg subview-track-ctg${topRowClass}" x="${svgModel.topBarX.toFixed(2)}" y="${svgModel.topBarY.toFixed(2)}" width="${svgModel.topBarWidth.toFixed(2)}" height="${svgModel.barHeight}" rx="4" ry="4" pointer-events="all">
                 <title>${escapeHtml(topCtgTitle)}</title>
               </rect>
+              ${grtResult.context?.subviewEnabled ? grtResultScene.overlaysByKey.get("top") || "" : ""}
               ${topFragments.length
                 ? buildSubviewFragmentRects({
                     fragments: topFragments,
@@ -1607,6 +1668,7 @@ function renderSubviewAlignmentCard(subview, supportContext, trackPrefs, subview
               <rect class="track-ctg subview-track-ctg${bottomRowClass}" x="${svgModel.bottomBarX.toFixed(2)}" y="${svgModel.bottomBarY.toFixed(2)}" width="${svgModel.bottomBarWidth.toFixed(2)}" height="${svgModel.barHeight}" rx="4" ry="4" pointer-events="all">
                 <title>${escapeHtml(bottomCtgTitle)}</title>
               </rect>
+              ${grtResult.context?.subviewEnabled ? grtResultScene.overlaysByKey.get("bottom") || "" : ""}
               ${bottomFragments.length
                 ? buildSubviewFragmentRects({
                     fragments: bottomFragments,
@@ -1657,6 +1719,7 @@ function renderSubviewTrackPairAlignmentCard(
   trackPrefs,
   subviewTrackDragOffsets = [],
   i18n,
+  grtResult = {},
 ) {
   const summary = subview?.summary || null;
   const topTrack = normalizeSubviewTrackSummary(summary?.topTrack);
@@ -2450,6 +2513,27 @@ function renderSubviewTrackPairAlignmentCard(
         </div>
       </div>`
     : "";
+  const grtResultEntries = rowLayouts.flatMap((layout) =>
+    (layout.trackModel?.ctgs || []).map((ctg, index) => {
+      const rect = resolveTrackPairDisplayRect(layout, ctg, index);
+      return {
+        key: `${layout.id}:${ctg.assemblyCtgId}:${index}`,
+        ctg: { ...ctg, orient: resolveTrackCtgOrient(ctg) },
+        rect,
+        y: layout.laneTop + Math.max(0, Number(ctg?.laneIndex || 0)) * TRACK_LANE_HEIGHT,
+        height: TRACK_BAR_HEIGHT,
+        isMirror: layout.isMirror === true,
+      };
+    }),
+  );
+  const grtResultScene = grtResult.context?.available
+    ? buildGrtResultScene({
+      plan: grtResult.plan,
+      entries: grtResultEntries,
+      escapeHtml,
+      gapLabel: i18n.grtResult.gapLabel,
+    })
+    : { hasVisibleResult: false, hasVisibleJunction: false, overlaysByKey: new Map(), junctionMarkup: "" };
   const renderTrackCtgs = (layout, roleClass) => {
     const ctgs = Array.isArray(layout.trackModel?.ctgs) ? layout.trackModel.ctgs : [];
     if (!ctgs.length) {
@@ -2508,6 +2592,7 @@ function renderSubviewTrackPairAlignmentCard(
         const labelMarkup = placement.hidden
           ? ""
           : `<text class="track-ctg-label${roleClass}${placement.classSuffix}" x="${placement.x.toFixed(2)}" y="${placement.y.toFixed(2)}"${placement.transformAttr} text-anchor="${placement.textAnchor}" data-subview-label-slot="${escapeAttr(resolveLayoutSlot(layout.id))}" data-subview-label-role="${escapeAttr(layout.role)}" data-subview-label-contig-id="${contigId}">${escapeHtml(labelText)}</text>`;
+        const grtOverlayKey = `${layout.id}:${ctg.assemblyCtgId}:${index}`;
         return {
           ctg,
           rect,
@@ -2542,6 +2627,7 @@ function renderSubviewTrackPairAlignmentCard(
               >
                 <title>${escapeHtml(ctgTitle)}</title>
               </rect>
+              ${grtResult.context?.subviewEnabled ? grtResultScene.overlaysByKey.get(grtOverlayKey) || "" : ""}
               ${fragments.length
                 ? buildSubviewFragmentRects({
                     fragments,
@@ -2578,7 +2664,7 @@ function renderSubviewTrackPairAlignmentCard(
       .join("");
   };
   return `
-    <article class="assembly-track-panel subview-alignment-card">
+    <article class="assembly-track-panel subview-alignment-card" data-grt-result-scene-visible="${grtResultScene.hasVisibleJunction ? "1" : "0"}">
       <div class="assembly-track-panel-head">
         <strong>${escapeHtml(`${topTrackLabel} vs ${bottomTrackLabel}`)}</strong>
         ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n)}
@@ -2637,6 +2723,7 @@ function renderSubviewTrackPairAlignmentCard(
                 )
                 .join("")}
             </g>
+            ${grtResult.context?.subviewEnabled ? grtResultScene.junctionMarkup : ""}
             ${renderTrackCtgs(resolvedTopLayout, topRoleClass)}
             ${renderTrackCtgs(resolvedBottomLayout, bottomRoleClass)}
             ${renderSubviewAnchorLines(allAnchorEdges, {

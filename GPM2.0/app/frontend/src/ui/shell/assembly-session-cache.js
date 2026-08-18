@@ -69,11 +69,16 @@ export function rememberAssemblyState(state, options = {}) {
   if (!key || !state?.assembly) {
     return false;
   }
+  const {
+    grtResultDisplayByChr: _grtResultDisplayByChr,
+    grtResultToast: _grtResultToast,
+    ...cacheableAssembly
+  } = state.assembly;
   return touchEntry(
     assemblyStateCache,
     key,
     cloneValue({
-      ...state.assembly,
+      ...cacheableAssembly,
       loading: false,
       bootstrapping: false,
     }),

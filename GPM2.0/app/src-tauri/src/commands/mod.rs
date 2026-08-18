@@ -31,7 +31,7 @@ use gpm_next_backend::grt_package::{
     GrtLockedRecipe,
     initialize_grt_project_with_options as backend_initialize_grt_project_with_options,
     load_grt_locked_recipe as backend_load_grt_locked_recipe,
-    load_grt_project_view as backend_load_grt_project_view,
+    load_grt_project_view_for_project as backend_load_grt_project_view,
 };
 use gpm_next_backend::importer::{
     AddCtgImportTarget, ImportProgress, import_add_ctg_package_with_hooks,

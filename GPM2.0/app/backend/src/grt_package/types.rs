@@ -4,6 +4,14 @@ pub const GRT_WORKFLOW: &str = "gpm_grt_precomputed_v2";
 pub const GRT_APP_WORKFLOW: &str = "gpm_grt_app_precomputed_v2";
 pub const GRT_SCHEMA_VERSION: &str = "2";
 pub const GRT_FINAL_PATH_SCHEMA_VERSION: &str = "1";
+pub const GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION: &str = "2";
+
+pub(super) fn is_supported_app_final_path_schema(value: &str) -> bool {
+    matches!(
+        value,
+        GRT_FINAL_PATH_SCHEMA_VERSION | GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION
+    )
+}
 
 pub(super) type TsvRow = BTreeMap<String, String>;
 pub(super) type AppQ4Validation = (BTreeMap<String, usize>, Option<BTreeMap<String, String>>);

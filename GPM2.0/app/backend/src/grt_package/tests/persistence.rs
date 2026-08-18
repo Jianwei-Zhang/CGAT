@@ -168,6 +168,54 @@ fn initializes_locked_recipe_and_materializes_used_unplaced_source_card() {
 }
 
 #[test]
+fn display_contract_project_view_maps_segments_to_project_ctgs_or_disables_chromosome() {
+    let temp = tempdir().unwrap();
+    let bundle_root = temp.path().join("gpm_server");
+    copy_tree(&fixture_root(), &bundle_root);
+    let (outcome, _) = crate::importer::import_from_extracted_bundle(&bundle_root).unwrap();
+    let initialized = initialize_grt_project(&outcome.project_db_path, "display-project").unwrap();
+    let conn = open_workspace_db(&outcome.project_db_path).unwrap();
+    conn.execute(
+        "UPDATE grt_package SET final_path_schema_version = ?1 WHERE id = 1",
+        params![GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION],
+    )
+    .unwrap();
+    drop(conn);
+
+    let view = load_grt_project_view_for_project(&outcome.project_db_path, initialized.project_id)
+        .unwrap();
+    let chr = &view.final_path_by_chr["Chr01"];
+    assert_eq!(chr["grt_display_available"], true);
+    for segment in chr["segments"].as_array().unwrap() {
+        assert!(segment["assembly_ctg_id"].as_i64().unwrap() > 0);
+        assert_eq!(segment["assembly_source_start"], 1);
+        assert_eq!(segment["assembly_source_end"], 4);
+    }
+
+    let conn = open_workspace_db(&outcome.project_db_path).unwrap();
+    conn.execute(
+        "UPDATE assembly_seq SET hidden = 1
+         WHERE project_id = ?1
+           AND source_seq_id = (
+               SELECT ss.id
+               FROM source_seq ss
+               JOIN dataset d ON d.id = ss.dataset_id
+               WHERE d.name = 'support' AND ss.seq_name = 'donor1'
+           )",
+        params![initialized.project_id],
+    )
+    .unwrap();
+    drop(conn);
+
+    let view = load_grt_project_view_for_project(&outcome.project_db_path, initialized.project_id)
+        .unwrap();
+    let chr = &view.final_path_by_chr["Chr01"];
+    assert_eq!(chr["grt_display_available"], false);
+    assert!(chr["segments"][0].get("assembly_ctg_id").is_none());
+    assert!(chr["segments"][1].get("assembly_ctg_id").is_none());
+}
+
+#[test]
 fn project_view_reuses_persisted_verification_without_reading_q4() {
     let temp = tempdir().unwrap();
     let bundle_root = temp.path().join("gpm_server");

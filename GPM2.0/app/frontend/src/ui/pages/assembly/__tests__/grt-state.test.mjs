@@ -226,3 +226,27 @@ test("project edits do not mutate the immutable Server baseline", () => {
   assert.equal(view.baselineFinalPathByChr.Chr01.segments[1].ctgName, "donor1");
   assert.equal(view.baselineFinalPathByChr.Chr01.segments[1].source.contig, "donor1");
 });
+
+test("schema 2 keeps App-owned display mappings separate from the editable path", () => {
+  const raw = buildRawView();
+  raw.recipe.final_path_schema_version = "2";
+  raw.final_path_by_chr.Chr01.grt_display_available = true;
+  raw.final_path_by_chr.Chr01.segments[0].assembly_ctg_id = 101;
+  raw.final_path_by_chr.Chr01.segments[0].assembly_source_start = 1;
+  raw.final_path_by_chr.Chr01.segments[0].assembly_source_end = 10;
+  raw.final_path_by_chr.Chr01.segments[1].assembly_ctg_id = 202;
+  raw.final_path_by_chr.Chr01.segments[1].assembly_source_start = 1;
+  raw.final_path_by_chr.Chr01.segments[1].assembly_source_end = 12;
+
+  const view = normalizeGrtProjectView(raw);
+  const baselineSegment = view.baselineFinalPathByChr.Chr01.segments[1];
+  const editableSegment = normalizeFinalPathByChr(view.baselineFinalPathByChr).Chr01.segments[1];
+
+  assert.equal(view.baselineFinalPathByChr.Chr01.grtDisplayAvailable, true);
+  assert.equal(baselineSegment.assemblyCtgId, 202);
+  assert.equal(baselineSegment.assemblySourceStart, 1);
+  assert.equal(baselineSegment.assemblySourceEnd, 12);
+  assert.equal(editableSegment.assemblyCtgId, null);
+  assert.equal(editableSegment.assemblySourceStart, undefined);
+  assert.equal(editableSegment.assemblySourceEnd, undefined);
+});

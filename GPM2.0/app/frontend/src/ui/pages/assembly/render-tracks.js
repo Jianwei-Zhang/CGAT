@@ -70,6 +70,8 @@ import {
   getCachedFilteredRefSubviewCtgs,
   getSubviewSlotToken,
 } from "./render-subview.js";
+import { buildGrtResultPlan, resolveGrtResultContext } from "./grt-result-state.js";
+import { buildGrtResultScene } from "./grt-result-render.js";
 
 export {
   SUBVIEW_BAND_TOOLTIP_HOVER_DELAY_MS,
@@ -657,6 +659,10 @@ function createRenderTracksRenderer(deps = {}) {
   const trackPrefs = resolveTrackPrefs(assembly.trackView);
   const subviewTrackPrefs = resolveTrackPrefs(assembly.subviewTrackView || assembly.trackView);
   const subview = getSubviewStateImpl(assembly);
+  const grtResultContext = resolveGrtResultContext(assembly);
+  const grtResultPlan = grtResultContext.available
+    ? buildGrtResultPlan(grtResultContext.baselineEntry)
+    : null;
   const supportDsCtgLenBp = Math.max(0, normalizeNonNegativeInt(trackPrefs.supportDsCtgLen) ?? 0);
   const selectedChrName = String(assembly.selectedChrName || "").trim();
   const supportDsCtgLenRules = getSupportDsCtgLenRulesForChr(
@@ -899,6 +905,9 @@ function createRenderTracksRenderer(deps = {}) {
             activeHitsTrackKey: assembly.activeHitsTrackKey,
             phasedAssemblyEnabled: Boolean(currentProject?.phasedAssemblyEnabled),
             phasedChrTracks: assembly.phasedChrTracks,
+            grtResultContext,
+            grtResultPlan,
+            grtResultToast: assembly.grtResultToast,
             i18n,
           })}
           ${subviewPanel}
@@ -1329,6 +1338,9 @@ function renderAssemblyTracks({
   activeHitsTrackKey = "primary",
   phasedAssemblyEnabled = false,
   phasedChrTracks = [],
+  grtResultContext = null,
+  grtResultPlan = null,
+  grtResultToast = null,
   i18n,
 }) {
   const TRACK_HEIGHT_SCALE = 2;
@@ -1964,6 +1976,31 @@ function renderAssemblyTracks({
   const hiddenPrimaryCtgIdSet = new Set(normalizeTrackSelectionCtgIds(hiddenPrimaryCtgIds));
   const resolveTrackCtgVerticalOffset = (layoutRole, assemblyCtgId) =>
     layoutRole === "primary" && hiddenPrimaryCtgIdSet.has(Number(assemblyCtgId)) ? -30 : 0;
+  const grtResultEntries = rowLayouts
+    .filter((layout) => layout.role === "primary" || layout.role === "support" || layout.isMirror)
+    .flatMap((layout) => layout.trackModel.ctgs.map((ctg, index) => {
+      if (layout.role === "primary" && hiddenPrimaryCtgIdSet.has(Number(ctg.assemblyCtgId))) {
+        return null;
+      }
+      const rect = resolveTrackCtgDisplayRect(layout, ctg, index);
+      return {
+        key: `${layout.id}:${ctg.assemblyCtgId}:${index}`,
+        ctg: { ...ctg, orient: resolveTrackCtgOrient(ctg) },
+        rect,
+        y: layout.laneTop + ctg.laneIndex * TRACK_LANE_HEIGHT,
+        height: TRACK_BAR_HEIGHT,
+        isMirror: layout.isMirror === true,
+      };
+    }).filter(Boolean));
+  const grtResultScene = grtResultContext?.available
+    ? buildGrtResultScene({
+      plan: grtResultPlan,
+      entries: grtResultEntries,
+      maskVisibleCtgs: true,
+      escapeHtml,
+      gapLabel: i18n.grtResult.gapLabel,
+    })
+    : { hasVisibleResult: false, overlaysByKey: new Map(), junctionMarkup: "" };
 
   const subviewTrackSelections = getSubviewTrackSelections(subview);
   const isSubviewTrackLabelSelected = (layout, trackLabelRole) => {
@@ -2205,6 +2242,10 @@ function renderAssemblyTracks({
             role: layout.interactiveRole || layout.role,
             isMirror: layout.isMirror,
           });
+          const grtOverlayKey = `${layout.id}:${ctg.assemblyCtgId}:${index}`;
+          const grtOverlayMarkup = grtResultContext?.mainEnabled
+            ? grtResultScene.overlaysByKey.get(grtOverlayKey) || ""
+            : "";
           return {
             ctg,
             rect,
@@ -2221,6 +2262,7 @@ function renderAssemblyTracks({
             >
               <title>${escapeHtml(ctg.name)} | start=${ctg.startBp} | len=${ctg.lengthBp}</title>
             </rect>
+            ${grtOverlayMarkup}
             ${telomereMarkerMarkup}
             ${centromereMarkerMarkup}
             ${nRegionMarkerMarkup}
@@ -2272,6 +2314,16 @@ function renderAssemblyTracks({
     phasedTrackCount: phasedChrTracks.length,
     i18n,
   });
+  const grtResultSwitch = grtResultContext?.available
+    ? `<label class="grt-result-switch">
+        <input type="checkbox" data-grt-result-toggle="main" ${grtResultContext.mainEnabled ? "checked" : ""} />
+        <span>${escapeHtml(i18n.grtResult.showResult)}</span>
+      </label>`
+    : "";
+  const grtResultToastMarkup = grtResultToast?.scope === "main"
+    && grtResultToast?.chrName === selectedChrName
+    ? `<div class="grt-result-toast" role="status">${escapeHtml(i18n.grtResult.noMainIntervals)}</div>`
+    : "";
   const supportDsCtgLenRulesDialog = supportDsCtgLenRulesDialogOpen
     ? renderSupportDsCtgLenRulesDialog({
       rules: supportDsCtgLenRules,
@@ -2282,13 +2334,15 @@ function renderAssemblyTracks({
     : "";
   return `
     <div class="assembly-track-unified assembly-track-panel">
-      <div class="assembly-track-panel-head">
+      <div class="assembly-track-panel-head" data-grt-result-card="main" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
         <strong>${escapeHtml(i18n.page.primaryAlignmentViewSingleCardTitle)}</strong>
         <div class="assembly-track-panel-actions">
+          ${grtResultSwitch}
           ${createPhasedTrackButton}
           ${inlineControls}
         </div>
       </div>
+      ${grtResultToastMarkup}
       <div class="assembly-track-layout">
         <div class="assembly-track-label-column" style="width:${LABEL_COLUMN_WIDTH_PX}px;height:${contentBottom}px">
           ${labelRows}
@@ -2314,6 +2368,7 @@ function renderAssemblyTracks({
             <line class="track-ruler-line" x1="${refTrackX.toFixed(2)}" y1="${rulerTop}" x2="${(refTrackX + refTrackWidth).toFixed(2)}" y2="${rulerTop}" />
             ${tickLines}
             ${collinearityBands}
+            ${grtResultContext?.mainEnabled ? grtResultScene.junctionMarkup : ""}
             ${rowBlocks}
             ${refRow}
           </svg>

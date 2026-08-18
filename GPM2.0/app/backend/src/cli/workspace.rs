@@ -134,7 +134,10 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             );
             println!(
                 "grt_project_view_json={}",
-                serde_json::to_string(&load_grt_project_view(&project_db_path)?)?
+                serde_json::to_string(&load_grt_project_view_for_project(
+                    &project_db_path,
+                    summary.project_id,
+                )?)?
             );
         }
         Commands::GetGrtProjectView {
@@ -145,7 +148,10 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             ensure_project_exists(&project_db_path, project_id)?;
             println!(
                 "json={}",
-                serde_json::to_string(&load_grt_project_view(&project_db_path)?)?
+                serde_json::to_string(&load_grt_project_view_for_project(
+                    &project_db_path,
+                    project_id,
+                )?)?
             );
         }
         Commands::GetGrtSourceCardTrace {

@@ -200,3 +200,30 @@ test("does not render persistent trace controls from GRT metadata", () => {
   assert.doesNotMatch(html, /data-grt-locate/);
   assert.doesNotMatch(html, /object-attempt/);
 });
+
+test("schema 2 renders independent GRT result switches and exact main-track overlays", () => {
+  const state = createState();
+  const baseline = state.assembly.grtProjectView.baselineFinalPathByChr.Chr01;
+  state.assembly.grtProjectView.recipe.finalPathSchemaVersion = "2";
+  baseline.grtDisplayAvailable = true;
+  baseline.segments[0].assemblySourceStart = 1;
+  baseline.segments[0].assemblySourceEnd = 800;
+  state.assembly.grtResultDisplayByChr = {
+    Chr01: { main: true, subview: false },
+  };
+
+  const html = renderAssemblyPage(state);
+
+  assert.match(html, /data-grt-result-toggle="main" checked/);
+  assert.match(html, /data-grt-result-toggle="subview"/);
+  assert.match(html, /class="grt-result-mask"/);
+  assert.match(html, /data-grt-result-interval="1"/);
+  assert.doesNotMatch(html, /data-grt-result-toggle="subview" checked/);
+});
+
+test("legacy schema 1 keeps both GRT result switches hidden", () => {
+  const html = renderAssemblyPage(createState());
+
+  assert.doesNotMatch(html, /data-grt-result-toggle=/);
+  assert.doesNotMatch(html, /class="grt-result-mask"/);
+});

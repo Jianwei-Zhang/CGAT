@@ -171,6 +171,41 @@ test("appendTrackContigToFinalPath appends after existing segments instead of ov
   assert.equal(store.getState().assembly.finalPathByChr.Chr01.segments[1].assemblyCtgId, 9);
 });
 
+test("a semantic Final Path edit clears both current-chromosome GRT result switches", async () => {
+  const store = createStore({
+    grtResultDisplayByChr: { Chr01: { main: true, subview: true } },
+    finalPathByChr: {
+      Chr01: {
+        mode: "segments",
+        chrName: "Chr01",
+        segments: [{
+          segmentId: "seg-1",
+          type: "ctg",
+          assemblyCtgId: 30,
+          datasetName: "flye",
+          ctgName: "Ctg30",
+          originId: "contig_98",
+          overallLen: 2200,
+          start: 1,
+          end: 2200,
+        }],
+      },
+    },
+  });
+
+  await appendTrackContigToFinalPath(
+    {},
+    store,
+    { assemblyCtgId: 9, trackRole: "primary", isMirror: false, datasetId: 11 },
+    createDeps(),
+  );
+
+  assert.deepEqual(
+    store.getState().assembly.grtResultDisplayByChr.Chr01,
+    { main: false, subview: false },
+  );
+});
+
 test("appendFinalPathRow writes to the active final-path haplotype key", async () => {
   const store = createStore({
     isChrPhased: true,

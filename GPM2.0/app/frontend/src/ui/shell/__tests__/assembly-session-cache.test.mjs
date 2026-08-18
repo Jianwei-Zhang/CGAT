@@ -104,3 +104,18 @@ test("assembly DOM cache preserves node identity across route detach and restore
   assert.equal(host.childNodes[0], node);
   assert.equal(host.dataset.route, "assembly");
 });
+
+test("GRT result switches and transient toast do not survive a project-session restore", () => {
+  clearAssemblySessionCache();
+  rememberAssemblyState(createState({
+    projectId: 7,
+    assembly: {
+      grtResultDisplayByChr: { Chr01: { main: true, subview: true } },
+      grtResultToast: { scope: "subview", chrName: "Chr01", token: "toast" },
+    },
+  }));
+
+  const restored = restoreAssemblyState(createState({ projectId: 7 }), {});
+  assert.equal(restored.grtResultDisplayByChr, undefined);
+  assert.equal(restored.grtResultToast, undefined);
+});

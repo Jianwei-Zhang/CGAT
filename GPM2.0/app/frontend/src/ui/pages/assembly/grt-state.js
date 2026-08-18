@@ -107,10 +107,21 @@ function normalizeGrtSegment(segment, index, chrName) {
     );
   }
   const orientation = normalizeString(sourceLocator.orientation || source.orientation) === "-" ? "-" : "+";
+  const assemblyCtgId = normalizePositiveInteger(
+    firstDefined(source, "assemblyCtgId", "assembly_ctg_id"),
+  );
+  const assemblySourceStart = normalizePositiveInteger(
+    firstDefined(source, "assemblySourceStart", "assembly_source_start"),
+  );
+  const assemblySourceEnd = normalizePositiveInteger(
+    firstDefined(source, "assemblySourceEnd", "assembly_source_end"),
+  );
   return {
     segmentId,
     type: "ctg",
-    assemblyCtgId: null,
+    assemblyCtgId,
+    ...(assemblySourceStart ? { assemblySourceStart } : {}),
+    ...(assemblySourceEnd ? { assemblySourceEnd } : {}),
     datasetName: normalizeString(sourceLocator.dataset),
     ctgName: normalizeString(sourceLocator.contig),
     originId: normalizeString(sourceLocator.contig),
@@ -151,6 +162,11 @@ export function normalizeGrtFinalPathByChr(value) {
       updatedAt: "server-precomputed",
       q4Length: normalizePositiveInteger(firstDefined(entry, "q4Length", "q4_length")),
       q4Sha256: normalizeString(firstDefined(entry, "q4Sha256", "q4_sha256")),
+      grtDisplayAvailable: firstDefined(
+        entry,
+        "grtDisplayAvailable",
+        "grt_display_available",
+      ) === true,
       serverBaseline: true,
     };
   });

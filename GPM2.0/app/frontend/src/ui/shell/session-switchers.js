@@ -96,6 +96,8 @@ function buildEmptyAssemblyViewState(stateOrLocale) {
     supportDsCtgLenRulesByChr: {},
     supportDsCtgLenRulesDialogOpen: false,
     finalPathByChr: {},
+    grtResultDisplayByChr: {},
+    grtResultToast: null,
     trackSelectedCtgIds: [],
     hiddenPrimaryCtgIds: [],
     hiddenPrimaryCtgIdsByChr: {},

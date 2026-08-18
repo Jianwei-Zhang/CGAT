@@ -19,7 +19,8 @@ from pathlib import Path
 
 APP_WORKFLOW = "gpm_grt_app_precomputed_v2"
 APP_SCHEMA_VERSION = "2"
-FINAL_PATH_SCHEMA_VERSION = "1"
+SERVER_FINAL_PATH_SCHEMA_VERSION = "1"
+FINAL_PATH_SCHEMA_VERSION = "2"
 FASTA_SUFFIXES = {".fa", ".fasta"}
 
 REQUIRED_METADATA = (
@@ -171,19 +172,120 @@ def project_used_contigs(source: Path, target: Path) -> None:
         writer.writerows(rows)
 
 
-def project_final_path(source: Path, target: Path) -> tuple[dict, dict[str, int]]:
+def load_display_source_cards(source_root: Path) -> set[tuple[str, str, str]]:
+    cards: set[tuple[str, str, str]] = set()
+    table_specs = (
+        (
+            source_root / "metadata/chr_assignments.tsv",
+            ("dataset_name", "seq_name", "assigned_chr_name"),
+        ),
+        (
+            source_root / "metadata/grt_used_contigs.tsv",
+            ("dataset_name", "contig_name", "target_chr"),
+        ),
+    )
+    for path, columns in table_specs:
+        with path.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle, delimiter="\t")
+            fieldnames = set(reader.fieldnames or [])
+            if not set(columns).issubset(fieldnames):
+                raise ValueError(f"{path.relative_to(source_root)} is missing App display-card columns")
+            for row_number, row in enumerate(reader, 2):
+                values = tuple(str(row.get(column, "")).strip() for column in columns)
+                if not all(values):
+                    raise ValueError(
+                        f"{path.relative_to(source_root)}:{row_number} has an empty App display-card identity"
+                    )
+                cards.add(values)
+    return cards
+
+
+def validate_display_final_path(
+    payload: dict,
+    source_lengths: dict[tuple[str, str], int],
+    display_source_cards: set[tuple[str, str, str]],
+) -> dict[str, int]:
+    if payload.get("workflow") != "gpm_grt_precomputed_v2" or str(payload.get("schema_version")) != SERVER_FINAL_PATH_SCHEMA_VERSION:
+        raise ValueError("metadata/grt_final_path.json has an unsupported Server workflow/schema")
+    chromosomes = payload.get("chromosomes")
+    if not isinstance(chromosomes, list) or not chromosomes:
+        raise ValueError("metadata/grt_final_path.json chromosomes must be non-empty")
+
+    q4_lengths: dict[str, int] = {}
+    segment_ids: set[str] = set()
+    for chromosome in chromosomes:
+        if not isinstance(chromosome, dict):
+            raise ValueError("Final Path chromosome must be an object")
+        chr_name = str(chromosome.get("chr", "")).strip()
+        if not chr_name or chr_name in q4_lengths:
+            raise ValueError(f"invalid or duplicate Final Path chromosome: {chr_name or '<empty>'}")
+        segments = chromosome.get("segments")
+        if not isinstance(segments, list) or not segments:
+            raise ValueError(f"Final Path chromosome {chr_name} must contain segments")
+        total_length = 0
+        for index, segment in enumerate(segments, 1):
+            if not isinstance(segment, dict):
+                raise ValueError(f"Final Path {chr_name} segment {index} must be an object")
+            segment_id = str(segment.get("segment_id", "")).strip()
+            if not segment_id or segment_id in segment_ids:
+                raise ValueError(f"invalid or duplicate Final Path segment_id: {segment_id or '<empty>'}")
+            segment_ids.add(segment_id)
+            length = segment.get("length")
+            if not isinstance(length, int) or isinstance(length, bool) or length <= 0:
+                raise ValueError(f"Final Path segment {segment_id} has an invalid length")
+            total_length += length
+            if segment.get("kind") == "gap":
+                continue
+            orientation = segment.get("orientation")
+            source = segment.get("source")
+            if orientation not in {"+", "-"} or not isinstance(source, dict):
+                raise ValueError(f"Final Path segment {segment_id} has an invalid source/orientation")
+            dataset_name = str(source.get("dataset", "")).strip()
+            contig_name = str(source.get("contig", "")).strip()
+            start = source.get("start")
+            end = source.get("end")
+            if source.get("orientation") != orientation:
+                raise ValueError(f"Final Path segment {segment_id} source orientation does not match")
+            source_length = source_lengths.get((dataset_name, contig_name))
+            if (
+                not dataset_name
+                or not contig_name
+                or not isinstance(start, int)
+                or isinstance(start, bool)
+                or not isinstance(end, int)
+                or isinstance(end, bool)
+                or start <= 0
+                or end < start
+                or source_length is None
+                or end > source_length
+                or end - start + 1 != length
+            ):
+                raise ValueError(f"Final Path segment {segment_id} has an invalid App source interval")
+            if (dataset_name, contig_name, chr_name) not in display_source_cards:
+                raise ValueError(
+                    f"Final Path segment {segment_id} has no App display source card for {dataset_name}:{contig_name}:{chr_name}"
+                )
+        q4_length = chromosome.get("q4_length")
+        if not isinstance(q4_length, int) or isinstance(q4_length, bool) or q4_length != total_length:
+            raise ValueError(f"Final Path chromosome {chr_name} q4_length does not match its segments")
+        q4_lengths[chr_name] = q4_length
+    return q4_lengths
+
+
+def project_final_path(
+    source: Path,
+    target: Path,
+    source_lengths: dict[tuple[str, str], int],
+    display_source_cards: set[tuple[str, str, str]],
+) -> tuple[dict, dict[str, int]]:
     payload = json.loads(source.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict) or not isinstance(payload.get("chromosomes"), list):
+    if not isinstance(payload, dict):
         raise ValueError("metadata/grt_final_path.json has an invalid shape")
+    q4_lengths = validate_display_final_path(payload, source_lengths, display_source_cards)
     payload["workflow"] = APP_WORKFLOW
     payload["schema_version"] = FINAL_PATH_SCHEMA_VERSION
     payload["q4_relpath"] = "grt/q/q4.fa"
-    q4_lengths: dict[str, int] = {}
     for chromosome in payload["chromosomes"]:
-        if not isinstance(chromosome, dict):
-            raise ValueError("Final Path chromosome must be an object")
-        chr_name = chromosome.get("chr")
-        q4_lengths[chr_name] = int(chromosome["q4_length"])
         for segment in chromosome.get("segments", []):
             if isinstance(segment, dict):
                 for key in ("event_id", "eventId", "evidence_ids", "evidenceIds", "source_card_key", "sourceCardKey"):
@@ -193,23 +295,23 @@ def project_final_path(source: Path, target: Path) -> tuple[dict, dict[str, int]
     return payload, q4_lengths
 
 
-def validate_source_locators(source_root: Path) -> dict[str, int]:
+def validate_source_locators(source_root: Path) -> dict[tuple[str, str], int]:
     path = source_root / "metadata/source_seq_locator.tsv"
     dataset_fai: dict[str, dict[str, int]] = {}
     with (source_root / "metadata/datasets.tsv").open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle, delimiter="\t"):
             dataset_fai[row["dataset_name"]] = read_fai_lengths(source_root / row["fai_relpath"])
-    lengths: dict[str, int] = {}
+    lengths: dict[tuple[str, str], int] = {}
     with path.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle, delimiter="\t"):
-            key = f"{row['dataset_name']}:{row['seq_name']}"
+            key = (row["dataset_name"], row["seq_name"])
             if key in lengths:
-                raise ValueError(f"duplicate source locator: {key}")
+                raise ValueError(f"duplicate source locator: {key[0]}:{key[1]}")
             records = dataset_fai.get(row["dataset_name"])
             if records is None:
-                raise ValueError(f"source locator references unknown dataset: {key}")
+                raise ValueError(f"source locator references unknown dataset: {key[0]}:{key[1]}")
             if row["seq_name"] not in records:
-                raise ValueError(f"source locator sequence is missing from FAI: {key}")
+                raise ValueError(f"source locator sequence is missing from FAI: {key[0]}:{key[1]}")
             lengths[key] = records[row["seq_name"]]
     return lengths
 
@@ -239,7 +341,7 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
     staging_root.mkdir(parents=True)
 
     source_lengths = validate_source_locators(source_root)
-    del source_lengths
+    display_source_cards = load_display_source_cards(source_root)
     for filename in REQUIRED_METADATA:
         if filename == "grt_recipe.tsv":
             project_recipe(source_root / "metadata/grt_recipe.tsv", staging_root / "metadata/grt_recipe.tsv")
@@ -247,7 +349,12 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
             project_used_contigs(source_root / "metadata/grt_used_contigs.tsv", staging_root / "metadata/grt_used_contigs.tsv")
         else:
             copy_file(source_root, staging_root, f"metadata/{filename}")
-    final_path, q4_lengths = project_final_path(source_root / "metadata/grt_final_path.json", staging_root / "metadata/grt_final_path.json")
+    final_path, q4_lengths = project_final_path(
+        source_root / "metadata/grt_final_path.json",
+        staging_root / "metadata/grt_final_path.json",
+        source_lengths,
+        display_source_cards,
+    )
     project_package_table(source_root / "metadata/package.tsv", staging_root / "metadata/package.tsv", "full" if include_fasta else "no_fasta")
 
     copy_tree_filtered(source_root, staging_root, "data", include_fasta)

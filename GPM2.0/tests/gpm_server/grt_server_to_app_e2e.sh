@@ -43,6 +43,40 @@ python3 server/tools/grt_app_package.py \
   --no-fasta >/dev/null
 (cd "${task_tmp_dir}/app-full" && zip -qr "${task_tmp_dir}/gpm_server.zip" gpm_server)
 (cd "${task_tmp_dir}/app-no-fasta" && zip -qr "${task_tmp_dir}/gpm_server.no_fasta.zip" gpm_server)
+legacy_final_path_stage="${task_tmp_dir}/app-final-path-v1/gpm_server"
+mkdir -p "$(dirname "${legacy_final_path_stage}")"
+cp -a "${app_full_stage}" "${legacy_final_path_stage}"
+python3 - "${legacy_final_path_stage}" <<'PY'
+import csv
+import hashlib
+import json
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+package_path = root / "metadata/package.tsv"
+with package_path.open(newline="", encoding="utf-8") as handle:
+    reader = csv.DictReader(handle, delimiter="\t")
+    rows = list(reader)
+    fields = list(reader.fieldnames or [])
+rows[0]["final_path_schema_version"] = "1"
+with package_path.open("w", newline="", encoding="utf-8") as handle:
+    writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t", lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+
+path = root / "metadata/grt_final_path.json"
+payload = json.loads(path.read_text(encoding="utf-8"))
+payload["schema_version"] = "1"
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="")
+manifest_path = root / "metadata/grt_app_manifest.json"
+manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+manifest["final_path_sha256"] = hashlib.sha256(
+    json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+).hexdigest()
+manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="")
+PY
+(cd "${task_tmp_dir}/app-final-path-v1" && zip -qr "${task_tmp_dir}/gpm_server.final_path_v1.zip" gpm_server)
 legacy_app_stage="${task_tmp_dir}/app-v1/gpm_server"
 mkdir -p "$(dirname "${legacy_app_stage}")"
 cp -a "${app_full_stage}" "${legacy_app_stage}"
@@ -96,8 +130,10 @@ PY
 
 full_zip_workspace="${task_tmp_dir}/zip-full"
 no_fasta_zip_workspace="${task_tmp_dir}/zip-no-fasta"
+legacy_final_path_workspace="${task_tmp_dir}/zip-final-path-v1"
 "${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.zip" "${full_zip_workspace}" >/dev/null
 "${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.no_fasta.zip" "${no_fasta_zip_workspace}" >/dev/null
+"${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.final_path_v1.zip" "${legacy_final_path_workspace}" >/dev/null
 if "${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.v1.zip" "${task_tmp_dir}/zip-v1" >/dev/null 2>&1; then
   echo "v1 App package unexpectedly imported" >&2
   exit 1
@@ -112,7 +148,19 @@ assert_contains "${full_zip_options}" 'fasta_available=true'
 assert_contains "${no_fasta_zip_options}" 'fasta_available=false'
 "${backend_exe}" initialize-project "${full_zip_workspace}" full-zip-project >/dev/null
 "${backend_exe}" initialize-project "${no_fasta_zip_workspace}" no-fasta-project >/dev/null
+"${backend_exe}" initialize-project "${legacy_final_path_workspace}" final-path-v1-project >/dev/null
+full_zip_view="$("${backend_exe}" get-grt-project-view "${full_zip_workspace}" 1)"
+assert_contains "${full_zip_view}" '"final_path_schema_version":"2"'
+assert_contains "${full_zip_view}" '"grt_display_available":true'
+assert_contains "${full_zip_view}" '"assembly_ctg_id":'
+assert_contains "${full_zip_view}" '"assembly_source_start":1'
 "${backend_exe}" get-grt-project-view "${no_fasta_zip_workspace}" 1 >/dev/null
+legacy_final_path_view="$("${backend_exe}" get-grt-project-view "${legacy_final_path_workspace}" 1)"
+assert_contains "${legacy_final_path_view}" '"final_path_schema_version":"1"'
+if [[ "${legacy_final_path_view}" == *'"grt_display_available":true'* ]]; then
+  echo "legacy Final Path schema unexpectedly enabled GRT display" >&2
+  exit 1
+fi
 
 workspace="${task_tmp_dir}/valid/gpm_server"
 mkdir -p "$(dirname "${workspace}")"

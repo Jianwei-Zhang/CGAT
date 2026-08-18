@@ -19,7 +19,7 @@ use gpm_next_backend::exporter::{
 };
 use gpm_next_backend::grt_package::{
     initialize_grt_project_with_options, load_grt_event_trace, load_grt_evidence,
-    load_grt_locked_recipe, load_grt_project_view, load_grt_source_card_trace,
+    load_grt_locked_recipe, load_grt_project_view_for_project, load_grt_source_card_trace,
 };
 use gpm_next_backend::importer::{
     AddDatasetImportOutcome, ImportOutcome, import_from_extracted_bundle, import_from_zip,

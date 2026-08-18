@@ -390,10 +390,20 @@ async function persistCurrentFinalPathByChr(host, store, nextFinalPathByChr, dep
   const normalizedPersistedFinalPathByChr = normalizeFinalPathByChr(
     persisted?.finalPathByChr ?? nextFinalPathByChr,
   );
+  const nextGrtResultDisplayByChr = { ...(currentState.assembly.grtResultDisplayByChr || {}) };
+  Object.keys(nextGrtResultDisplayByChr).forEach((chrName) => {
+    if (!areFinalPathEntriesSemanticallyEqual(
+      currentState.assembly.finalPathByChr?.[chrName],
+      normalizedPersistedFinalPathByChr?.[chrName],
+    )) {
+      nextGrtResultDisplayByChr[chrName] = { main: false, subview: false };
+    }
+  });
   store.setState({
     assembly: {
       ...store.getState().assembly,
       finalPathByChr: normalizedPersistedFinalPathByChr,
+      grtResultDisplayByChr: nextGrtResultDisplayByChr,
       actionStatus: normalizeString(statusPatch.actionStatus),
       actionError: normalizeString(statusPatch.actionError),
     },

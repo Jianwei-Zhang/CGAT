@@ -16,6 +16,7 @@ import {
   restoreAssemblyState,
 } from "../shell/assembly-session-cache.js";
 import { buildEmptyProjectExportState } from "../shell/session-switchers.js";
+import { normalizeFinalPathByChr } from "./assembly/final-path-state.js";
 import { normalizeGrtProjectView } from "./assembly/grt-state.js";
 
 function buildEmptyAssemblyViewState(stateOrLocale) {
@@ -76,6 +77,8 @@ function buildEmptyAssemblyViewState(stateOrLocale) {
       sourceCards: [],
       verification: {},
     },
+    grtResultDisplayByChr: {},
+    grtResultToast: null,
     hiddenPrimaryCtgIds: [],
     hiddenPrimaryCtgIdsByChr: {},
     trackDragOffsets: [],
@@ -625,7 +628,7 @@ async function createProject(host, store) {
       assembly: {
         ...store.getState().assembly,
         ...buildEmptyAssemblyViewState(store.getState()),
-        finalPathByChr: grtProjectView.baselineFinalPathByChr,
+        finalPathByChr: normalizeFinalPathByChr(grtProjectView.baselineFinalPathByChr),
         grtProjectView,
       },
       projectExport: buildEmptyProjectExportState(),

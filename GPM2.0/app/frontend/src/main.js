@@ -145,6 +145,8 @@ const store = createStore({
       sourceCards: [],
       verification: {},
     },
+    grtResultDisplayByChr: {},
+    grtResultToast: null,
     finalPathViewMode: "graph",
     degapProjectState: {},
     degap: {

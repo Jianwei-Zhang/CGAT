@@ -21,10 +21,10 @@ The executable sources of truth are:
 
 - Server workdir workflow: `gpm_grt_precomputed_v2`.
 - App delivery workflow: `gpm_grt_app_precomputed_v2`.
-- Package schema version: `2`; Final Path structure schema remains `1`.
-- Development builds support only v2. v1 Server workdirs and App ZIPs are rejected rather than upgraded or inferred.
-- Required package and Final Path schema version: `1`.
-- No legacy package/project compatibility or migration is implemented.
+- Package schema version: `2`; the Server workdir Final Path schema remains `1`, while newly projected App deliveries use Final Path display schema `2`.
+- Development builds reject v1 workflows/package schemas rather than upgrading or inferring them.
+- App workflow/schema v2 packages with legacy Final Path schema `1` remain importable, but GRT result-display controls stay hidden because they do not carry the display mapping contract.
+- No legacy workflow/package-schema or project migration is implemented.
 - Unknown workflow/schema values must fail with `UNSUPPORTED_SCHEMA`; never fall back to an empty or legacy Final Path.
 
 ## Coordinate and Hash Contracts
@@ -40,6 +40,73 @@ The executable sources of truth are:
   tools that reject the flag use `version=unknown` rather than persisting the
   command's error text as an apparent version.
 - Step3 refill may align against an internal corrected-q2 working FASTA. Its raw query artifact/hash remains exact, while public target coordinates are projected once to the origin q2 object and event `q_after` coordinates are projected to final q3.
+
+## Scenario: App Final Path Display Schema 2
+
+### 1. Scope / Trigger
+
+- Applies when changing Server-to-App projection, App import validation, project-view reads, Final Path semantics, or main/Subview GRT-result rendering.
+- The feature displays only the current accepted GRT result. It is not a trace/evidence projection.
+
+### 2. Signatures
+
+- Server input: `gpm_grt_precomputed_v2`, package schema `2`, Final Path schema `1`.
+- New App output: `gpm_grt_app_precomputed_v2`, package schema `2`, `final_path_schema_version=2` in `metadata/package.tsv`, and `schema_version="2"` in `metadata/grt_final_path.json`.
+- Project-view chromosome field: `grt_display_available: boolean`.
+- Project-view non-gap segment fields when available: `assembly_ctg_id: positive integer`, `assembly_source_start: positive integer`, `assembly_source_end: positive integer`.
+- Tauri/CLI project-view reads require `project_id`; the mapping is derived from that project's visible `assembly_ctg -> assembly_seq -> source_seq -> dataset` rows.
+
+### 3. Contracts
+
+- The Server projector must validate every non-gap source interval against the authoritative Dataset FAI and require a current-chromosome display card from `chr_assignments.tsv` or `grt_used_contigs.tsv` before emitting schema 2.
+- Source coordinates remain 1-based closed, increasing, and orientation-explicit. A segment length is exactly `source.end - source.start + 1`.
+- The App backend maps each schema-2 segment to exactly one visible current-project assembly ctg whose source window contains the result interval. If any segment is absent or ambiguous, the whole chromosome gets `grt_display_available=false` and no segment mapping fields.
+- Mapping fields are derived read-model data. They remain in `grtProjectView.baselineFinalPathByChr` and must not be copied into editable/persisted Final Path rows.
+- Frontend controls require schema 2, `grt_display_available=true`, an unphased single current path, and semantic equality with the immutable baseline. Semantic equality includes ordered source identity, range, orientation, and gap values.
+- Schema-1 App Final Path packages remain importable for compatibility but never expose either GRT-result switch.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| Server Final Path source is missing from FAI or range/length is invalid | Projector fails; no App package is emitted |
+| Non-gap source lacks an assignment/used-contig display card for the target chromosome | Projector fails; no App package is emitted |
+| App package/JSON Final Path schema values disagree | Import fails with `GRT_IMPORT_UNSUPPORTED_SCHEMA` |
+| App Final Path schema is neither `1` nor `2` | Import fails with `GRT_IMPORT_UNSUPPORTED_SCHEMA` |
+| Schema-2 source has no unique visible project ctg mapping | Import/project creation remains valid; chromosome read model sets `grt_display_available=false` |
+| Current Final Path differs semantically or chromosome is phased | Hide both controls and clear any active display state |
+| Current main tracks / Subview combination contain no display interval/link | Do not fabricate a mapping; show the scoped three-second empty-result toast only on off-to-on |
+
+### 5. Good/Base/Bad Cases
+
+- Good: schema-2 App package maps every segment uniquely; the unchanged current path exposes independent main and Subview switches.
+- Base: a valid schema-1 App package imports and its Final Path remains editable, but both switches are absent.
+- Bad: frontend matches `dataset_name + contig_name` strings and guesses an assembly ctg when the backend did not provide a unique ID.
+
+### 6. Tests Required
+
+- Python projector unit tests assert schema-2 output and reject missing display cards or invalid source ranges.
+- Rust persistence tests assert unique `assembly_ctg_id/source_start/source_end` mappings and whole-chromosome disablement after a required ctg becomes hidden.
+- Server-to-App E2E imports schema 2 and legacy Final Path schema 1; schema 2 exposes mappings, while schema 1 does not enable display.
+- Frontend unit tests cover semantic invalidation, `+`/`-` continuity, noncontiguous source ranges, real gap labels, repeated `×N` occurrences, independent switches, and old-package hiding.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```text
+frontend sees source name -> guesses visible ctg -> renders partial GRT result
+```
+
+#### Correct
+
+```text
+Server validates source/card completeness
+  -> App schema 2 import
+  -> project-aware backend resolves one exact assembly_ctg mapping per segment
+  -> whole chromosome available or unavailable
+  -> frontend only renders the supplied IDs and 1-based closed intervals
+```
 
 ## Scenario: App Workspace History Integrity Validation
 
@@ -340,7 +407,7 @@ ERROR <STABLE_CODE>: <message>
 
 ## App Import and Persistence
 
-- The Rust backend independently enforces the same v2 package schema, Final Path v1 structure schema, and stable-code semantics; desktop import does not shell out to Python.
+- The Rust backend independently enforces package schema v2, Server Final Path schema 1, App Final Path schema 1-or-2 compatibility, and stable-code semantics; desktop import does not shell out to Python.
 - Rust dependency direction is `grt_package` facade -> pure contract/delivery
   validators -> parsing/domain helpers. Only an already validated in-memory
   package crosses into persistence, where the importer-owned transaction writes
@@ -357,7 +424,7 @@ ERROR <STABLE_CODE>: <message>
   executable from `.prepare_lib/tools` without repository `sys.path` injection.
 - Server workdirs are validated against the complete GRT artifact closure before projection. Initial App import accepts only `gpm_grt_app_precomputed_v2` delivery payloads (plus the complete v2 Server fixture path used by operator/backend tests); validation finishes before `project.sqlite`, `exports/`, or `cache/` is created. A rejected ZIP workspace is removed as a whole.
 - App delivery packages deliberately omit q0–q3, D0/Dtel, raw evidence FASTA, `grt/cache`, checkpoints, raw trace files, Server scripts, and tool caches. Full packages include source/reference FASTA and q4; no-FASTA packages retain `.fai`, Final Path length/hash metadata, and import with `fasta_available=false`.
-- Legacy `package.tsv` headers, unknown workflow/schema versions, incomplete App payloads, malformed FAI, broken IDs/coordinates/source chains, and checksum mismatches fail as `GRT_IMPORT_<STABLE_CODE>`.
+- Legacy `package.tsv` headers, unknown workflow/package schema versions, App Final Path schemas outside `1|2`, incomplete App payloads, malformed FAI, broken IDs/coordinates/source chains, and checksum mismatches fail as `GRT_IMPORT_<STABLE_CODE>`.
 - After validation, the base catalog, immutable assignment orientation/provenance baseline, locked recipe, minimal source cards, and projected Final Path rows are written in one SQLite transaction. Trace tables are empty for App delivery packages; no Server audit package or legacy-project backfill is used.
 - Server-normalized coordinate strings are stored verbatim in row JSON. Raw PAF/MUMmer coordinate-system declarations remain unchanged; the backend never projects them a second time.
 - Rust/backend operator queries retain access to the locked recipe, whole Final Path, gap/terminal attempts, evidence rows, and bidirectional Final Path -> event -> source card -> evidence/usage/donor traces. The desktop App/Tauri `get_grt_project_view` boundary intentionally exposes only the locked recipe, projected `final_path_by_chr`, six-field source-card status rows, and the persisted verification summary.
@@ -389,7 +456,7 @@ ERROR <STABLE_CODE>: <message>
 ### App Project-View Projection
 
 - The Server workdir retains the complete evidence closure for validation and operator audit; the App package and SQLite import retain only the projected result contract.
-- App-facing project view is a result contract, not a trace browser: Final Path segments retain source dataset/contig intervals, orientation, lengths, q4 hashes, and gap structure; event/evidence/source-card link arrays and object attempts are not serialized across the Tauri boundary.
+- App-facing project view is a result contract, not a trace browser: Final Path segments retain source dataset/contig intervals, orientation, lengths, q4 hashes, and gap structure; schema-2 reads additionally include only project-resolved display IDs/source windows and chromosome availability. Event/evidence/source-card link arrays and object attempts are not serialized across the Tauri boundary.
 - Every non-gap project-view segment carries `source_length`, resolved from the imported SQLite `source_seq.length` row for its `(source.dataset, source.contig)`. This is the authoritative complete source-contig length; it is independent of the segment interval and orientation.
 - Project-view projection must reject a missing source catalog row, a non-positive source length, or a source interval outside `source_length`. It must never infer complete length from `max(source.start, source.end, segment.length)`.
 - Normal project-view length enrichment remains SQLite-only. Full and no-FASTA imports obtain the same `source_seq.length` from Dataset FAI, so this projection must not open Dataset FASTA or q4.

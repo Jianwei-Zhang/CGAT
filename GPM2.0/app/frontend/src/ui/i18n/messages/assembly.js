@@ -199,6 +199,12 @@ export const zh = {
     topTrackEmpty: "当前顶部 ds 轨道暂无可展示 contig。",
     bottomTrackEmpty: "当前底部 ds 轨道暂无可展示 contig。",
   },
+  grtResult: {
+    showResult: "显示 GRT 结果",
+    noMainIntervals: "当前轨道无 GRT 使用区间",
+    noSubviewLinks: "当前组合无 GRT 连接",
+    gapLabel: "GRT gap",
+  },
   degap: {
     settingsTitle: "DEGAP 设置",
     close: "关闭",
@@ -632,6 +638,12 @@ export const en = {
     mirrorTrackEmpty: "The mirror track has no contigs.",
     topTrackEmpty: "No contigs can be shown on the top dataset track.",
     bottomTrackEmpty: "No contigs can be shown on the bottom dataset track.",
+  },
+  grtResult: {
+    showResult: "Show GRT result",
+    noMainIntervals: "No GRT-used interval exists on the current tracks",
+    noSubviewLinks: "No GRT connection exists for the current combination",
+    gapLabel: "GRT gap",
   },
   degap: {
     settingsTitle: "DEGAP settings",

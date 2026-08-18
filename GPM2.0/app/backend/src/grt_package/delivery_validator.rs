@@ -100,13 +100,14 @@ where
         );
     }
     let package = one_row(&tables, "metadata/package.tsv")?;
+    let final_path_schema_version = field(package, "final_path_schema_version")?;
     if field(package, "workflow")? != GRT_APP_WORKFLOW
         || field(package, "schema_version")? != GRT_SCHEMA_VERSION
-        || field(package, "final_path_schema_version")? != GRT_FINAL_PATH_SCHEMA_VERSION
+        || !is_supported_app_final_path_schema(final_path_schema_version)
     {
         return grt_err(
             "UNSUPPORTED_SCHEMA",
-            "expected gpm_grt_app_precomputed_v2 schema 2 / Final Path schema 1",
+            "expected gpm_grt_app_precomputed_v2 schema 2 / Final Path schema 1 or 2",
         );
     }
     if !parse_bool(
@@ -354,6 +355,14 @@ where
         &assignment_baselines,
         &reference_records,
     )?;
+    let mut display_source_cards = assignment_baselines.keys().cloned().collect::<HashSet<_>>();
+    for row in &table(&tables, "metadata/grt_used_contigs.tsv")?.rows {
+        display_source_cards.insert((
+            field(row, "dataset_name")?.to_string(),
+            field(row, "contig_name")?.to_string(),
+            field(row, "target_chr")?.to_string(),
+        ));
+    }
     let source_sequences = if fasta_available {
         Some(source_catalog(
             bundle_root,
@@ -366,11 +375,15 @@ where
     let (q4_lengths, _q4_records) = validate_app_final_path(
         bundle_root,
         &final_path,
-        &reference_records,
-        &sources,
-        manifest_object,
-        fasta_available,
-        source_sequences.as_ref(),
+        AppFinalPathValidationContext {
+            reference_records: &reference_records,
+            sources: &sources,
+            manifest: manifest_object,
+            fasta_available,
+            source_sequences: source_sequences.as_ref(),
+            expected_schema_version: final_path_schema_version,
+            display_source_cards: &display_source_cards,
+        },
     )?;
     if let Some(expected_lengths) = manifest_object
         .get("q4_chromosome_lengths")

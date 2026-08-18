@@ -170,20 +170,36 @@ pub(super) fn validate_app_source_cards(
     Ok(())
 }
 
+pub(super) struct AppFinalPathValidationContext<'a> {
+    pub(super) reference_records: &'a BTreeMap<String, usize>,
+    pub(super) sources: &'a HashMap<(String, String), usize>,
+    pub(super) manifest: &'a Map<String, Value>,
+    pub(super) fasta_available: bool,
+    pub(super) source_sequences: Option<&'a HashMap<(String, String), String>>,
+    pub(super) expected_schema_version: &'a str,
+    pub(super) display_source_cards: &'a HashSet<(String, String, String)>,
+}
+
 pub(super) fn validate_app_final_path(
     bundle_root: &Path,
     final_path: &Value,
-    reference_records: &BTreeMap<String, usize>,
-    sources: &HashMap<(String, String), usize>,
-    manifest: &Map<String, Value>,
-    fasta_available: bool,
-    source_sequences: Option<&HashMap<(String, String), String>>,
+    context: AppFinalPathValidationContext<'_>,
 ) -> Result<AppQ4Validation> {
+    let AppFinalPathValidationContext {
+        reference_records,
+        sources,
+        manifest,
+        fasta_available,
+        source_sequences,
+        expected_schema_version,
+        display_source_cards,
+    } = context;
     let object = final_path
         .as_object()
         .ok_or_else(|| grt_anyhow("INVALID_JSON", "App Final Path must be an object"))?;
     if json_str(object, "workflow", "App Final Path")? != GRT_APP_WORKFLOW
-        || json_str(object, "schema_version", "App Final Path")? != GRT_FINAL_PATH_SCHEMA_VERSION
+        || json_str(object, "schema_version", "App Final Path")? != expected_schema_version
+        || !is_supported_app_final_path_schema(expected_schema_version)
         || json_str(object, "q4_relpath", "App Final Path")? != "grt/q/q4.fa"
     {
         return grt_err(
@@ -311,6 +327,21 @@ pub(super) fn validate_app_final_path(
                 return grt_err(
                     "INVALID_VALUE",
                     format!("App segment {id} orientation differs from source"),
+                );
+            }
+            if expected_schema_version == GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION
+                && !display_source_cards.contains(&(
+                    source_key.0.clone(),
+                    source_key.1.clone(),
+                    chr_name.to_string(),
+                ))
+            {
+                return grt_err(
+                    "BROKEN_REFERENCE",
+                    format!(
+                        "App segment {id} has no display source card for {}:{}:{chr_name}",
+                        source_key.0, source_key.1
+                    ),
                 );
             }
         }

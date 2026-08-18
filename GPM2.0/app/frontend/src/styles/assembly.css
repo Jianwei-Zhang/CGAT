@@ -216,6 +216,7 @@
   padding: 10px;
   display: grid;
   gap: 8px;
+  position: relative;
 }
 
 .assembly-track-panel.is-companion {
@@ -236,6 +237,78 @@
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.grt-result-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 2px 8px;
+  border: 1px solid #aeb9b0;
+  background: #f8fbf8;
+  color: #245f35;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.grt-result-switch input {
+  accent-color: #2f9e44;
+}
+
+.grt-result-toast {
+  position: absolute;
+  z-index: 8;
+  top: 42px;
+  right: 12px;
+  max-width: min(360px, calc(100% - 24px));
+  padding: 7px 10px;
+  border: 1px solid #9aa79d;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #364139;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.grt-result-mask {
+  fill: rgba(224, 229, 225, 0.76);
+}
+
+.grt-result-interval {
+  fill: rgba(47, 158, 68, 0.72);
+  stroke: #1f7a34;
+  stroke-width: 1;
+}
+
+.grt-result-junction {
+  fill: none;
+  stroke: #2f9e44;
+  stroke-width: 2.5;
+}
+
+.grt-result-junction.is-gap {
+  stroke: #747c76;
+  stroke-dasharray: 7 5;
+}
+
+.grt-result-gap-label,
+.grt-result-repeat-count {
+  fill: #285f37;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.94);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.grt-result-gap-label {
+  fill: #545c56;
 }
 
 .track-controls {

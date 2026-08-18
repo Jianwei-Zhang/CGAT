@@ -46,6 +46,7 @@ export function createAssemblyPageSession() {
     pendingAssemblyConfirmResolvers: new Map(),
     subviewRenderCache: createSubviewRenderCache(),
     finalPathGraphPreviewState: null,
+    grtResultToastTimer: null,
   };
 }
 
@@ -54,6 +55,9 @@ export const assemblyPageSession = createAssemblyPageSession();
 export function resetAssemblyPageSession(nextWidths = null, { timerApi = globalThis } = {}) {
   if (assemblyPageSession.pendingAssemblyScrollStatePersistTimer !== null) {
     timerApi?.clearTimeout?.(assemblyPageSession.pendingAssemblyScrollStatePersistTimer);
+  }
+  if (assemblyPageSession.grtResultToastTimer !== null) {
+    timerApi?.clearTimeout?.(assemblyPageSession.grtResultToastTimer);
   }
   assemblyPageSession.deferredRerenderCoordinator?.destroy?.();
   assemblyPageSession.deferredRerenderCoordinator?.cancel?.();

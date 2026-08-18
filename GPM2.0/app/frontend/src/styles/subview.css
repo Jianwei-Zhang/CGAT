@@ -32,11 +32,24 @@
 
 .subview-selection-panel {
   gap: 10px;
+  position: relative;
 }
 
 .subview-panel-head {
   display: grid;
   gap: 8px;
+}
+
+.subview-panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.subview-panel-title-row h4 {
+  margin: 0;
 }
 
 .subview-panel-guide-inline {

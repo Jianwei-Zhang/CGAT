@@ -15,6 +15,11 @@ import {
 } from "./scroll-position-state.js";
 import { shouldRefetchSubviewPairwiseEvidence } from "./subview-pairwise-evidence-state.js";
 import { createOffsetSubviewManualAnchor } from "./subview-anchor-state.js";
+import {
+  resolveGrtResultContext,
+  setGrtResultDisplayEnabled,
+} from "./grt-result-state.js";
+import { assemblyPageSession } from "./page-session.js";
 
 const ASSEMBLY_TRACK_COMBO_BOUND = Symbol("assemblyTrackComboBound");
 const ASSEMBLY_DROPDOWN_CLOSE_DELAY_MS = 400;
@@ -531,6 +536,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   const finalPathCellInputs = queryHostAll("[data-final-path-cell][data-final-path-segment-id]");
   const finalPathEmptyCellInputs = queryHostAll("[data-final-path-empty-cell]");
   const finalPathRestoreGrtBaselineButtons = queryHostAll("[data-final-path-restore-grt-baseline]");
+  const grtResultToggles = queryHostAll("[data-grt-result-toggle]");
   const subviewPairwiseCancelButtons = queryHostAll("[data-subview-pairwise-cancel='1']");
 
   finalPathRestoreGrtBaselineButtons.forEach((button) => {
@@ -542,6 +548,68 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
       await restoreFinalPathFromGrtBaseline(host, store, {
         targetChrName: button.dataset.finalPathRestoreGrtBaseline,
       });
+    });
+  });
+
+  grtResultToggles.forEach((toggle) => {
+    toggle.addEventListener("change", () => {
+      const timerApi = deps.timerApi || globalThis;
+      const state = store.getState();
+      const context = resolveGrtResultContext(state.assembly);
+      const scope = String(toggle.dataset.grtResultToggle || "").trim();
+      if (!context.available || !["main", "subview"].includes(scope)) {
+        return;
+      }
+      const enabled = toggle.checked === true;
+      if (assemblyPageSession.grtResultToastTimer !== null) {
+        timerApi.clearTimeout?.(assemblyPageSession.grtResultToastTimer);
+        assemblyPageSession.grtResultToastTimer = null;
+      }
+      store.setState({
+        assembly: {
+          ...state.assembly,
+          grtResultDisplayByChr: setGrtResultDisplayEnabled(
+            state.assembly.grtResultDisplayByChr,
+            context.chrName,
+            scope,
+            enabled,
+          ),
+          grtResultToast: null,
+        },
+      });
+      deps.rerender(host, store);
+      if (!enabled) {
+        return;
+      }
+      const resultCard = host.querySelector?.(`[data-grt-result-card="${scope}"]`);
+      const resultRoot = scope === "subview"
+        ? resultCard?.closest?.("[data-subview-panel]") || resultCard
+        : resultCard;
+      if (
+        resultRoot?.dataset?.grtResultSceneVisible === "1"
+        || resultRoot?.querySelector?.('[data-grt-result-scene-visible="1"]')
+      ) {
+        return;
+      }
+      const token = `${scope}:${context.chrName}:${Date.now()}`;
+      store.setState({
+        assembly: {
+          ...store.getState().assembly,
+          grtResultToast: { scope, chrName: context.chrName, token },
+        },
+      });
+      deps.rerender(host, store);
+      assemblyPageSession.grtResultToastTimer = timerApi.setTimeout?.(() => {
+        const current = store.getState();
+        if (current.assembly?.grtResultToast?.token !== token) {
+          return;
+        }
+        store.setState({
+          assembly: { ...current.assembly, grtResultToast: null },
+        });
+        assemblyPageSession.grtResultToastTimer = null;
+        deps.rerender(host, store);
+      }, 3000) ?? null;
     });
   });
 

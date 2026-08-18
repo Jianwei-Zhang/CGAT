@@ -165,6 +165,145 @@ test("bindings dispatch current Final Path GRT baseline restore", async () => {
   assert.deepEqual(calls, [{ targetChrName: "Chr01" }]);
 });
 
+test("GRT result bindings toggle only the selected main-view scope", () => {
+  const listeners = new Map();
+  const toggle = {
+    checked: true,
+    dataset: { grtResultToggle: "main" },
+    addEventListener(type, handler) {
+      listeners.set(type, handler);
+    },
+  };
+  const resultCard = { dataset: { grtResultSceneVisible: "1" } };
+  const host = {
+    querySelector(selector) {
+      return selector === '[data-grt-result-card="main"]' ? resultCard : null;
+    },
+    querySelectorAll(selector) {
+      return selector === "[data-grt-result-toggle]" ? [toggle] : [];
+    },
+    addEventListener() {},
+  };
+  const segment = {
+    segmentId: "seg-1",
+    type: "ctg",
+    datasetName: "primary",
+    ctgName: "ctg1",
+    originId: "ctg1",
+    overallLen: 100,
+    start: 1,
+    end: 100,
+    source: { dataset: "primary", contig: "ctg1", start: 1, end: 100, orientation: "+" },
+  };
+  const entry = { mode: "segments", chrName: "Chr01", segments: [segment] };
+  const state = createState();
+  state.assembly.selectedChrName = "Chr01";
+  state.assembly.isChrPhased = false;
+  state.assembly.finalPathByChr = { Chr01: structuredClone(entry) };
+  state.assembly.grtProjectView = {
+    recipe: { finalPathSchemaVersion: "2" },
+    baselineFinalPathByChr: {
+      Chr01: { ...entry, grtDisplayAvailable: true },
+    },
+  };
+  state.assembly.grtResultDisplayByChr = { Chr01: { main: false, subview: false } };
+  const store = createStore(state);
+  let rerenders = 0;
+
+  bindAssemblyPageImpl(host, store, createBindingDeps({
+    rerender() {
+      rerenders += 1;
+    },
+  }));
+  listeners.get("change")?.();
+
+  assert.deepEqual(
+    store.getState().assembly.grtResultDisplayByChr.Chr01,
+    { main: true, subview: false },
+  );
+  assert.equal(store.getState().assembly.grtResultToast, null);
+  assert.equal(rerenders, 1);
+});
+
+test("Subview GRT result binding shows each empty-result toast for exactly three seconds", () => {
+  const listeners = new Map();
+  const toggle = {
+    checked: true,
+    dataset: { grtResultToggle: "subview" },
+    addEventListener(type, handler) {
+      listeners.set(type, handler);
+    },
+  };
+  const resultPanel = {
+    dataset: { grtResultSceneVisible: "0" },
+    querySelector() {
+      return null;
+    },
+  };
+  const resultCard = {
+    closest() {
+      return resultPanel;
+    },
+  };
+  const host = {
+    querySelector(selector) {
+      return selector === '[data-grt-result-card="subview"]' ? resultCard : null;
+    },
+    querySelectorAll(selector) {
+      return selector === "[data-grt-result-toggle]" ? [toggle] : [];
+    },
+    addEventListener() {},
+  };
+  const segment = {
+    segmentId: "seg-1",
+    type: "ctg",
+    datasetName: "primary",
+    ctgName: "ctg1",
+    originId: "ctg1",
+    overallLen: 100,
+    start: 1,
+    end: 100,
+    source: { dataset: "primary", contig: "ctg1", start: 1, end: 100, orientation: "+" },
+  };
+  const entry = { mode: "segments", chrName: "Chr01", segments: [segment] };
+  const state = createState();
+  state.assembly.selectedChrName = "Chr01";
+  state.assembly.isChrPhased = false;
+  state.assembly.finalPathByChr = { Chr01: structuredClone(entry) };
+  state.assembly.grtProjectView = {
+    recipe: { finalPathSchemaVersion: "2" },
+    baselineFinalPathByChr: { Chr01: { ...entry, grtDisplayAvailable: true } },
+  };
+  state.assembly.grtResultDisplayByChr = {};
+  const store = createStore(state);
+  let timeoutCallback = null;
+  let timeoutDelay = null;
+  let rerenders = 0;
+
+  bindAssemblyPageImpl(host, store, createBindingDeps({
+    rerender() {
+      rerenders += 1;
+    },
+    timerApi: {
+      clearTimeout() {},
+      setTimeout(callback, delay) {
+        timeoutCallback = callback;
+        timeoutDelay = delay;
+        return 41;
+      },
+    },
+  }));
+  listeners.get("change")?.();
+
+  assert.equal(timeoutDelay, 3000);
+  assert.equal(store.getState().assembly.grtResultToast.scope, "subview");
+  assert.equal(rerenders, 2);
+
+  timeoutCallback?.();
+  assert.equal(store.getState().assembly.grtResultToast, null);
+  assert.equal(rerenders, 3);
+});
+
 test("Final Path view switches use the card refresh boundary", async () => {
   const listeners = new Map();
   const tableButton = {
