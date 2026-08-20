@@ -1146,7 +1146,11 @@ printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/assign_chr_groups.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-write_grt_prepare_script "${WORK_ROOT}/prepare_grt_inputs.sh" "$WORK_ROOT" "${READS_SRCS[@]}"
+if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
+  write_grt_prepare_script "${WORK_ROOT}/prepare_grt_inputs.sh" "$WORK_ROOT" "${READS_SRCS[@]}"
+else
+  write_grt_prepare_script "${WORK_ROOT}/prepare_grt_inputs.sh" "$WORK_ROOT"
+fi
 append_run_all_unit "grt_prepare" "prepare_grt_inputs.sh" "logs/run_all.log"
 printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "prepare_grt_inputs"
 printf 'cd %s\n' "$WORK_ROOT"

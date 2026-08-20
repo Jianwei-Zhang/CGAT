@@ -603,6 +603,40 @@ required, explicit UTF-8/newline handling for contract files, `pathlib.Path`,
 and typed/stable contract exceptions. Shell code uses `set -euo pipefail`,
 quotes expansions, validates commands before work, and uses LF line endings.
 
+### Bash 4.2 Nounset Compatibility for Optional Arrays
+
+`server/prepare.sh` supports GNU Bash 4.2 and newer. Bash 3.x is outside the
+support boundary because the Server scripts use Bash 4 features such as
+associative arrays and `mapfile`.
+
+Under Bash 4.2, expanding a declared-but-empty indexed array as
+`"${values[@]}"` can fail with `unbound variable` when `set -u` is active.
+Whenever an optional array is forwarded to a function or command, branch on
+its length and expand it only in the non-empty branch. The empty branch must
+omit the optional arguments entirely; do not add an empty-string sentinel and
+do not disable nounset.
+
+Wrong:
+
+```bash
+write_command "$output" "${optional_inputs[@]}"
+```
+
+Correct:
+
+```bash
+if [[ "${#optional_inputs[@]}" -gt 0 ]]; then
+  write_command "$output" "${optional_inputs[@]}"
+else
+  write_command "$output"
+fi
+```
+
+Regression tests must cover empty, one-item, and multi-item inputs. A focused
+Server test that needs to validate a specific Bash runtime should accept an
+explicit executable through `GPM_TEST_BASH`; its default remains the Bash on
+`PATH` so the canonical quality gate has no undeclared runtime dependency.
+
 ---
 
 ## Code Review Checklist

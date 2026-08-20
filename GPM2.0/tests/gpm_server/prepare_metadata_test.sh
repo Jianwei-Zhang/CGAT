@@ -4,6 +4,10 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPT="${REPO_ROOT}/server/prepare.sh"
+PREPARE_BASH="$(command -v "${GPM_TEST_BASH:-bash}")" || {
+  echo "prepare test Bash not found: ${GPM_TEST_BASH:-bash}" >&2
+  exit 1
+}
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -112,7 +116,7 @@ make_restricted_path() {
   local missing_command="$2"
   mkdir -p "$output_dir"
   local command_name
-  for command_name in bash dirname gzip python3; do
+  for command_name in awk basename bash cat chmod cp dirname find gzip mkdir python3 rm sed; do
     ln -s "$(command -v "$command_name")" "${output_dir}/${command_name}"
   done
   for command_name in \
@@ -138,7 +142,7 @@ printf 'stale_ds\t1\t0\t1\t2\n' > "${output_root}/data/datasets/ds_add.fa.fai"
 
 (
   cd "$TMP_DIR"
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
     --ref ref_add_options "$ref" \
     --ds ds_add "$ds" \
     --skip-self \
@@ -171,6 +175,11 @@ assert_prepare_option "$metadata_path" tel_enabled true
 assert_prepare_option "$metadata_path" cen_enabled true
 assert_prepare_option "$metadata_path" cen_min_len 10000
 assert_prepare_option "$metadata_path" cen_min_identity 80
+assert_prepare_option "$metadata_path" grt_reads_qc_enabled false
+! grep -F -- " --reads " "${output_root}/prepare_grt_inputs.sh" >/dev/null || {
+  echo "no-reads prepare generated an unexpected --reads argument" >&2
+  exit 1
+}
 
 plan_path="${output_root}/.run_all/plan.tsv"
 [[ -f "$plan_path" ]] || {
@@ -274,7 +283,7 @@ EOF
 chmod +x "${no_chmod_bin}/chmod"
 
 GPM_TEST_CHMOD_LOG="$no_chmod_log" PATH="${no_chmod_bin}:${FAKE_BIN}:$PATH" \
-  bash "$SCRIPT" \
+  "$PREPARE_BASH" "$SCRIPT" \
   --ref ref_no_chmod "$ref" \
   --ds ds_no_chmod "$ds" \
   --skip-self \
@@ -301,7 +310,7 @@ done < <(find "$no_chmod_output" -type f -name '*.sh' | LC_ALL=C sort)
   exit 1
 }
 
-help_output="$(bash "$SCRIPT" --help)"
+help_output="$("$PREPARE_BASH" "$SCRIPT" --help)"
 for removed_option in \
   --grt-meryl \
   --grt-merqury \
@@ -316,7 +325,7 @@ do
     exit 1
   fi
   error_path="${TMP_DIR}/${removed_option#--}.err"
-  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
     --ref ref_removed_grt_option "$ref" \
     --ds ds_removed_grt_option "$ds" \
     "$removed_option" "${FAKE_BIN}/minimap2" \
@@ -334,7 +343,7 @@ done
 reads="${TMP_DIR}/reads.fastq"
 reads_output_root="${TMP_DIR}/reads_gpm_server"
 printf 'reads\n' > "$reads"
-PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
   --ref ref_reads_qc "$ref" \
   --ds ds_reads_qc "$ds" \
   --reads "$reads" \
@@ -346,12 +355,37 @@ assert_prepare_option "$reads_metadata_path" grt_merqury "${FAKE_BIN}/merqury.sh
 assert_prepare_option "$reads_metadata_path" grt_craq "${FAKE_BIN}/craq"
 grep -F -- "--meryl ${FAKE_BIN}/meryl --merqury ${FAKE_BIN}/merqury.sh --craq ${FAKE_BIN}/craq" \
   "${reads_output_root}/prepare_grt_inputs.sh" >/dev/null
+grep -F -- " --reads ${reads}" "${reads_output_root}/prepare_grt_inputs.sh" >/dev/null
+[[ "$(grep -oF -- " --reads " "${reads_output_root}/prepare_grt_inputs.sh" | wc -l)" -eq 1 ]] || {
+  echo "single-read prepare did not generate exactly one --reads argument" >&2
+  exit 1
+}
+
+reads_second="${TMP_DIR}/reads-second.fastq"
+multiple_reads_output_root="${TMP_DIR}/multiple-reads-gpm-server"
+printf 'reads-second\n' > "$reads_second"
+PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
+  --ref ref_multiple_reads_qc "$ref" \
+  --ds ds_multiple_reads_qc "$ds" \
+  --reads "$reads" \
+  --reads "$reads_second" \
+  -o "$multiple_reads_output_root" >/dev/null
+assert_prepare_option \
+  "${multiple_reads_output_root}/metadata/prepare_options.tsv" \
+  grt_reads_qc_enabled \
+  true
+grep -F -- " --reads ${reads} --reads ${reads_second}" \
+  "${multiple_reads_output_root}/prepare_grt_inputs.sh" >/dev/null
+[[ "$(grep -oF -- " --reads " "${multiple_reads_output_root}/prepare_grt_inputs.sh" | wc -l)" -eq 2 ]] || {
+  echo "multiple-read prepare did not generate exactly two --reads arguments" >&2
+  exit 1
+}
 
 for missing_command in minimap2 nucmer delta-filter show-coords; do
   restricted_bin="${TMP_DIR}/missing-${missing_command}-bin"
   error_path="${TMP_DIR}/missing-${missing_command}.err"
   make_restricted_path "$restricted_bin" "$missing_command"
-  if PATH="$restricted_bin" /bin/bash "$SCRIPT" \
+  if PATH="$restricted_bin" "$PREPARE_BASH" "$SCRIPT" \
     --ref ref_missing_grt_tool "$ref" \
     --ds ds_missing_grt_tool "$ds" \
     -o "${TMP_DIR}/missing-${missing_command}-output" \
@@ -392,7 +426,7 @@ for capability_index in "${!capability_commands[@]}"; do
   cp "$capability_stub" "${restricted_bin}/${capability_command}"
 
   if GPM_TEST_MUMMER_HELP="${capability_help[$capability_index]}" \
-    PATH="$restricted_bin" /bin/bash "$SCRIPT" \
+    PATH="$restricted_bin" "$PREPARE_BASH" "$SCRIPT" \
     --ref ref_incompatible_mummer "$ref" \
     --ds ds_incompatible_mummer "$ds" \
     -o "$output_path" \
@@ -413,10 +447,18 @@ for capability_index in "${!capability_commands[@]}"; do
 done
 
 for missing_command in meryl merqury.sh craq; do
+  no_reads_bin="${TMP_DIR}/no-reads-missing-${missing_command}-bin"
+  make_restricted_path "$no_reads_bin" "$missing_command"
+  PATH="$no_reads_bin" "$PREPARE_BASH" "$SCRIPT" \
+    --ref ref_no_reads_qc_tool "$ref" \
+    --ds ds_no_reads_qc_tool "$ds" \
+    -o "${TMP_DIR}/no-reads-missing-${missing_command}-output" \
+    >/dev/null
+
   restricted_bin="${TMP_DIR}/missing-${missing_command}-bin"
   error_path="${TMP_DIR}/missing-${missing_command}.err"
   make_restricted_path "$restricted_bin" "$missing_command"
-  if PATH="$restricted_bin" /bin/bash "$SCRIPT" \
+  if PATH="$restricted_bin" "$PREPARE_BASH" "$SCRIPT" \
     --ref ref_missing_grt_qc "$ref" \
     --ds ds_missing_grt_qc "$ds" \
     --reads "$reads" \
