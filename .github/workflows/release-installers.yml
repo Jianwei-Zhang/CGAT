@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to update or create, for example 2.0.1-beta or v0.1.0."
+        description: "Release tag to update or create, for example v2.0.1."
         required: false
         type: string
 
@@ -84,8 +84,8 @@ jobs:
 
           gh release create "$TAG_NAME" \
             --target "$GITHUB_SHA" \
-            --title "GPM Next ${TAG_NAME}" \
-            --notes "Installers for GPM Next ${TAG_NAME}."
+            --title "GPM ${TAG_NAME}" \
+            --notes "Installers for GPM ${TAG_NAME}."
 
       - name: Clear existing installer assets
         env:
@@ -191,7 +191,7 @@ jobs:
             Write-Error "Expected exactly one Windows installer for $env:TAURI_ARCH, found $($installers.Count): $($installers.FullName -join ', ')"
           }
 
-          $asset = "gpm-next_${env:VERSION}_${env:BUILD_TIMESTAMP}_${env:ASSET_PLATFORM}_setup.exe"
+          $asset = "GPM_${env:VERSION}_${env:BUILD_TIMESTAMP}_${env:ASSET_PLATFORM}_setup.exe"
           Copy-Item -LiteralPath $installers[0].FullName -Destination $asset -Force
           gh release upload $env:TAG_NAME $asset --clobber
 
@@ -262,6 +262,6 @@ jobs:
             exit 1
           fi
 
-          asset="gpm-next_${VERSION}_${BUILD_TIMESTAMP}_${ASSET_PLATFORM}_installer.dmg"
+          asset="GPM_${VERSION}_${BUILD_TIMESTAMP}_${ASSET_PLATFORM}_installer.dmg"
           cp "${dmgs[0]}" "$asset"
           gh release upload "$TAG_NAME" "$asset" --clobber
