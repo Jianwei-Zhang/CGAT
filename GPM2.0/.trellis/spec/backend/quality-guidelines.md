@@ -81,6 +81,8 @@ When computing `assembly_ctg.anchor_start` from reference alignment hits, use th
 
 Do not use an unweighted median or raw hit count for placement anchors. Short repetitive hits must not have the same voting power as long alignment blocks. Keep hit filtering and chromosome support coverage separate from anchor weighting: merged query coverage still determines `support_bp` and `support_percent`; hit `block_length` determines anchor vote weight.
 
+The resulting assignment anchor is a signed placement estimate. Evidence packaging must copy that exact target-chromosome baseline into every `placement_mode=normal` used card; it must not select one best PAF hit or clamp the value. Only `grt_promoted` and `cross_chr_grt_usage` cards require positive Final Path-derived anchors.
+
 Required regression test point: include a contig with multiple short anchors and one long alignment block, and assert the chosen `anchor_start` follows the long block.
 
 ### Assembly Source Orientation Weighting

@@ -301,6 +301,55 @@ with open(output, 'w', encoding='utf-8', newline='') as handle:
                 validate_contract(server, SCHEMA)
             self.assertEqual(raised.exception.code, "BROKEN_REFERENCE")
 
+    def test_normal_used_card_reuses_signed_target_assignment_anchor(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+            server = self.make_finalized_server(root)
+            assignments_path = server / "metadata/chr_assignments.tsv"
+            assignments = prepare_fixture.read_tsv(assignments_path)
+            chr01 = next(
+                row
+                for row in assignments
+                if row["dataset_name"] == "support"
+                and row["seq_name"] == "s_tel_assigned"
+                and row["assigned_chr_name"] == "Chr01"
+            )
+            chr01["anchor_start"] = "-205687"
+            chr02 = dict(chr01)
+            chr02["assigned_chr_name"] = "Chr02"
+            chr02["anchor_start"] = "-172703"
+            assignments.append(chr02)
+            prepare_fixture.write_tsv(
+                assignments_path, list(assignments[0]), assignments
+            )
+            with (server / "runs/support_vs_ref/result.paf").open(
+                "a", encoding="utf-8", newline=""
+            ) as handle:
+                handle.write(
+                    "s_tel_assigned\t20000\t1000\t20000\t+\tChr02\t60000\t100\t19100"
+                    "\t19000\t19000\t60\n"
+                )
+            self.write_existing_main_view_results(server)
+            minimap = self.make_minimap(root)
+            env = os.environ.copy()
+            env["FAKE_DISPLAY_MINIMAP_LOG"] = str(root / "signed_anchor_display.log")
+
+            completed = self.run_tool(server, minimap, env)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            card = next(
+                row
+                for row in prepare_fixture.read_tsv(
+                    server / "metadata/grt_used_contigs.tsv"
+                )
+                if row["contig_name"] == "s_tel_assigned"
+            )
+
+            self.assertEqual(card["source_card_key"], "support:s_tel_assigned:Chr01:normal")
+            self.assertEqual(card["target_chr"], "Chr01")
+            self.assertEqual(card["anchor_start"], "-205687")
+            self.assertEqual(card["ref_alignment_status"], "multi_hit")
+            validate_contract(server, SCHEMA)
+
     def test_cross_chr_source_is_linked_without_moving_original_card(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)

@@ -92,6 +92,16 @@
     }
   },
   {
+    "name": "non_normal_used_card_anchor_not_positive",
+    "expected_code": "INVALID_COORDINATE",
+    "operation": {
+      "type": "replace_text",
+      "path": "metadata/grt_used_contigs.tsv",
+      "old": "grt_promoted\tno_hit\t5\t+",
+      "new": "grt_promoted\tno_hit\t0\t+"
+    }
+  },
+  {
     "name": "broken_event_reference",
     "expected_code": "BROKEN_REFERENCE",
     "operation": {

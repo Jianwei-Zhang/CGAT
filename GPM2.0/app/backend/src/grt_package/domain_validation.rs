@@ -117,10 +117,7 @@ pub(super) fn validate_app_source_cards(
             &format!("source card {card}.ref_alignment_status"),
         )?;
         orientation(field(row, "orientation")?, &format!("source card {card}"))?;
-        let anchor = parse_positive_i64(
-            field(row, "anchor_start")?,
-            &format!("source card {card}.anchor_start"),
-        )?;
+        let anchor = source_card_anchor(row, card, placement)?;
         let expected = format!("{}:{}:{}:{}", dataset, contig, target_chr, placement);
         if card != expected {
             return grt_err(
@@ -178,6 +175,15 @@ pub(super) struct AppFinalPathValidationContext<'a> {
     pub(super) source_sequences: Option<&'a HashMap<(String, String), String>>,
     pub(super) expected_schema_version: &'a str,
     pub(super) display_source_cards: &'a HashSet<(String, String, String)>,
+}
+
+fn source_card_anchor(row: &TsvRow, card: &str, placement: &str) -> Result<i64> {
+    let label = format!("source card {card}.anchor_start");
+    if placement == "normal" {
+        parse_i64(field(row, "anchor_start")?, &label)
+    } else {
+        parse_positive_i64(field(row, "anchor_start")?, &label)
+    }
 }
 
 pub(super) fn validate_app_final_path(
@@ -523,8 +529,9 @@ pub(super) fn validate_source_cards(
             &["assigned", "unplaced", "cross_chr"],
             &format!("source card {card}.original_assignment"),
         )?;
+        let placement = field(row, "placement_mode")?;
         enum_value(
-            field(row, "placement_mode")?,
+            placement,
             &["normal", "grt_promoted", "cross_chr_grt_usage"],
             &format!("source card {card}.placement_mode"),
         )?;
@@ -535,11 +542,8 @@ pub(super) fn validate_source_cards(
         )?;
         let card_orientation =
             orientation(field(row, "orientation")?, &format!("source card {card}"))?;
-        let card_anchor = parse_i64(
-            field(row, "anchor_start")?,
-            &format!("source card {card}.anchor_start"),
-        )?;
-        if field(row, "placement_mode")? == "normal" {
+        let card_anchor = source_card_anchor(row, card, placement)?;
+        if placement == "normal" {
             let assignment_key = (
                 key.0.clone(),
                 key.1.clone(),
@@ -565,7 +569,7 @@ pub(super) fn validate_source_cards(
             key.0,
             key.1,
             field(row, "target_chr")?,
-            field(row, "placement_mode")?
+            placement
         );
         if card != expected {
             return grt_err(

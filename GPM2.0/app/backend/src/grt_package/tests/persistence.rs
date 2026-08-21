@@ -168,6 +168,42 @@ fn initializes_locked_recipe_and_materializes_used_unplaced_source_card() {
 }
 
 #[test]
+fn initializes_locked_recipe_with_signed_assignment_anchor() {
+    let temp = tempdir().unwrap();
+    let bundle_root = temp.path().join("gpm_server");
+    copy_tree(&fixture_root(), &bundle_root);
+    let assignments_path = bundle_root.join("metadata/chr_assignments.tsv");
+    let assignments = fs::read_to_string(&assignments_path).unwrap();
+    assert!(assignments.contains("primary\tprimary1\t4\tChr01\t+\tref_alignment\t4\t100.000\t1\n"));
+    fs::write(
+        assignments_path,
+        assignments.replace(
+            "primary\tprimary1\t4\tChr01\t+\tref_alignment\t4\t100.000\t1\n",
+            "primary\tprimary1\t4\tChr01\t+\tref_alignment\t4\t100.000\t-205687\n",
+        ),
+    )
+    .unwrap();
+    let (outcome, _) = crate::importer::import_from_extracted_bundle(&bundle_root).unwrap();
+
+    let initialized = initialize_grt_project(&outcome.project_db_path, "signed-anchor").unwrap();
+    let conn = open_workspace_db(&outcome.project_db_path).unwrap();
+    let anchor: i64 = conn
+        .query_row(
+            "SELECT c.anchor_start
+             FROM assembly_ctg c
+             JOIN assembly_seq s ON s.id = c.assembly_seq_id
+             JOIN source_seq ss ON ss.id = s.source_seq_id
+             JOIN dataset d ON d.id = ss.dataset_id
+             WHERE c.project_id = ?1 AND d.name = 'primary' AND ss.seq_name = 'primary1'",
+            params![initialized.project_id],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    assert_eq!(anchor, -205_687);
+}
+
+#[test]
 fn display_contract_project_view_maps_segments_to_project_ctgs_or_disables_chromosome() {
     let temp = tempdir().unwrap();
     let bundle_root = temp.path().join("gpm_server");

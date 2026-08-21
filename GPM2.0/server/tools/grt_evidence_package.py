@@ -620,10 +620,25 @@ def execute(args: argparse.Namespace) -> None:
         server_dir / "metadata/chr_assignments.tsv", CHR_ASSIGNMENT_FIELDS
     )
     assignments: dict[tuple[str, str], set[str]] = defaultdict(set)
-    for row in assignment_rows:
-        assignments[(row["dataset_name"], row["seq_name"])].add(
-            row["assigned_chr_name"]
-        )
+    assignment_baselines: dict[tuple[str, str, str], tuple[str, int]] = {}
+    for row_number, row in enumerate(assignment_rows, start=2):
+        source_key = (row["dataset_name"], row["seq_name"])
+        chromosome = row["assigned_chr_name"]
+        baseline_key = (*source_key, chromosome)
+        if baseline_key in assignment_baselines:
+            fail(
+                f"duplicate chr assignment for {source_key[0]}:{source_key[1]}:"
+                f"{chromosome} at row {row_number}"
+            )
+        try:
+            anchor_start = int(row["anchor_start"])
+        except ValueError:
+            fail(
+                f"invalid chr assignment anchor_start at row {row_number}: "
+                f"{row['anchor_start']!r}"
+            )
+        assignments[source_key].add(chromosome)
+        assignment_baselines[baseline_key] = (row["source_orientation"], anchor_start)
     sources = source_catalog(server_dir)
     events = read_events(server_dir / "metadata/grt_events.jsonl")
     final_path = json.loads(
@@ -647,7 +662,7 @@ def execute(args: argparse.Namespace) -> None:
     for card in cards:
         source_key = (str(card["dataset_name"]), str(card["contig_name"]))
         source_sequence = sources[source_key]
-        ref_row, ref_status, anchor = build_ref_evidence(
+        ref_row, ref_status, evidence_anchor = build_ref_evidence(
             server_dir,
             card,
             source_sequence,
@@ -656,10 +671,24 @@ def execute(args: argparse.Namespace) -> None:
         )
         evidence_rows.append(ref_row)
         if card["placement_mode"] == "normal":
+            baseline = assignment_baselines.get(
+                (*source_key, str(card["target_chr"]))
+            )
+            if baseline is None:
+                fail(
+                    f"normal used source {card['source_card_key']} lacks an assignment baseline"
+                )
+            baseline_orientation, anchor = baseline
+            if card["orientation"] != baseline_orientation:
+                fail(
+                    f"normal used source {card['source_card_key']} orientation "
+                    "disagrees with chr_assignments.tsv"
+                )
             pairwise_rows = existing_display_evidence(
                 server_dir, card, source_sequence, dataset_rows
             )
         else:
+            anchor = evidence_anchor
             assert minimap is not None
             pairwise_rows = supplemental_display_evidence(
                 server_dir,

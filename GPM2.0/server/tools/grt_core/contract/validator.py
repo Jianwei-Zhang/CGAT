@@ -843,7 +843,11 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                 fail("INVALID_VALUE", f"used contig {source_card_key} has invalid {field}")
         if not row["target_chr"]:
             fail("INVALID_VALUE", f"used contig {source_card_key} has empty target_chr")
-        parse_int(row["anchor_start"], f"used contig {source_card_key}.anchor_start", 1)
+        anchor_start = parse_int(
+            row["anchor_start"],
+            f"used contig {source_card_key}.anchor_start",
+            None if row["placement_mode"] == "normal" else 1,
+        )
         expected_card_key = (
             f"{row['dataset_name']}:{row['contig_name']}:{row['target_chr']}:"
             f"{row['placement_mode']}"
@@ -883,7 +887,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                     "BROKEN_REFERENCE",
                     f"normal used contig {source_card_key} orientation disagrees with chr_assignments.tsv",
                 )
-            if int(row["anchor_start"]) != baseline["anchor_start"]:
+            if anchor_start != baseline["anchor_start"]:
                 fail(
                     "BROKEN_REFERENCE",
                     f"normal used contig {source_card_key} anchor disagrees with chr_assignments.tsv",

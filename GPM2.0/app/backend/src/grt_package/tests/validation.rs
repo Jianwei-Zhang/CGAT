@@ -128,6 +128,86 @@ fn validates_shared_grt_v2_fixture() {
 }
 
 #[test]
+fn app_source_cards_accept_signed_normal_anchor_and_require_positive_grt_anchor() {
+    let normal_card = "support:multi:Chr04:normal";
+    let normal_row = BTreeMap::from([
+        ("source_card_key".to_string(), normal_card.to_string()),
+        ("dataset_name".to_string(), "support".to_string()),
+        ("contig_name".to_string(), "multi".to_string()),
+        ("original_assignment".to_string(), "assigned".to_string()),
+        ("target_chr".to_string(), "Chr04".to_string()),
+        ("placement_mode".to_string(), "normal".to_string()),
+        ("ref_alignment_status".to_string(), "multi_hit".to_string()),
+        ("anchor_start".to_string(), "-205687".to_string()),
+        ("orientation".to_string(), "+".to_string()),
+        ("ref_evidence_ids_json".to_string(), "[]".to_string()),
+        ("accepted_event_ids_json".to_string(), "[]".to_string()),
+        ("final_path_segment_ids_json".to_string(), "[]".to_string()),
+        ("pairwise_evidence_ids_json".to_string(), "[]".to_string()),
+    ]);
+    let sources = HashMap::from([(("support".to_string(), "multi".to_string()), 633_129)]);
+    let baselines = HashMap::from([
+        (
+            (
+                "support".to_string(),
+                "multi".to_string(),
+                "Chr02".to_string(),
+            ),
+            ("+".to_string(), -172_703),
+        ),
+        (
+            (
+                "support".to_string(),
+                "multi".to_string(),
+                "Chr04".to_string(),
+            ),
+            ("+".to_string(), -205_687),
+        ),
+    ]);
+    let references = BTreeMap::from([
+        ("Chr02".to_string(), 1_000_000),
+        ("Chr04".to_string(), 1_000_000),
+    ]);
+
+    validate_app_source_cards(
+        &TsvTable {
+            rows: vec![normal_row],
+        },
+        &sources,
+        &baselines,
+        &references,
+    )
+    .unwrap();
+
+    let promoted_card = "support:multi:Chr04:grt_promoted";
+    let promoted_row = BTreeMap::from([
+        ("source_card_key".to_string(), promoted_card.to_string()),
+        ("dataset_name".to_string(), "support".to_string()),
+        ("contig_name".to_string(), "multi".to_string()),
+        ("original_assignment".to_string(), "unplaced".to_string()),
+        ("target_chr".to_string(), "Chr04".to_string()),
+        ("placement_mode".to_string(), "grt_promoted".to_string()),
+        ("ref_alignment_status".to_string(), "no_hit".to_string()),
+        ("anchor_start".to_string(), "0".to_string()),
+        ("orientation".to_string(), "+".to_string()),
+        ("ref_evidence_ids_json".to_string(), "[]".to_string()),
+        ("accepted_event_ids_json".to_string(), "[]".to_string()),
+        ("final_path_segment_ids_json".to_string(), "[]".to_string()),
+        ("pairwise_evidence_ids_json".to_string(), "[]".to_string()),
+    ]);
+    let error = validate_app_source_cards(
+        &TsvTable {
+            rows: vec![promoted_row],
+        },
+        &sources,
+        &baselines,
+        &references,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("GRT_IMPORT_INVALID_COORDINATE"));
+}
+
+#[test]
 fn reports_grt_validation_stages_in_execution_order() {
     let mut stages = Vec::new();
     let package = validate_grt_package_with_progress(&fixture_root(), &mut |stage, _detail| {

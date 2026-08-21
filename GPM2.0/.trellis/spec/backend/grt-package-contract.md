@@ -165,18 +165,19 @@ Server workdir -> App projector allowlist -> imported App workspace
                                         -> validate App-consumed files only
 ```
 
-## Scenario: Authoritative Assignment Source Orientation
+## Scenario: Authoritative Assignment Orientation and Signed Anchor
 
 ### 1. Scope / Trigger
 
 - Applies whenever ds-vs-ref assignment metadata, q0 mappings, normal source cards, imported assignment rows, or locked-project bootstrap behavior changes.
-- The Server assignment row is the immutable baseline. q0 and the App must consume it; neither layer may independently recompute initial source orientation.
+- The Server assignment row is the immutable orientation and anchor baseline. q0, used-card packaging, and the App must consume it; no downstream layer may independently recompute or clamp a normal placement.
 
 ### 2. Signatures
 
 - `metadata/chr_assignments.tsv` columns, in order:
   `dataset_name, seq_name, seq_length_bp, assigned_chr_name, source_orientation, orientation_source, support_bp, support_percent, anchor_start`.
 - `source_orientation` is `+` or `-`; `orientation_source` is exactly `ref_alignment`.
+- `anchor_start` is the signed upper weighted-median placement estimate for that exact `(dataset_name, seq_name, assigned_chr_name)` row. Zero and negative values are valid.
 - SQLite `imported_chr_assignment` persists `source_orientation TEXT NOT NULL` and `orientation_source TEXT NOT NULL` beside the source/chromosome/anchor baseline.
 - The bootstrap projection is `imported_chr_assignment.source_orientation -> assembly_seq.orient` for exactly one normal main-view card per assignment row.
 
@@ -185,8 +186,10 @@ Server workdir -> App projector allowlist -> imported App workspace
 - `+` means the projected sequence follows the original Dataset FASTA source interval; `-` means its reverse complement.
 - Source coordinates remain 1-based closed and increasing for both orientations. Raw PAF coordinates remain 0-based half-open.
 - Server assignment generation sums qualified ds-vs-ref PAF block length by strand for each dataset/contig/chromosome candidate. `-` wins only when its total is strictly greater; ties resolve to `+`.
+- Server assignment generation computes `anchor_start` from all qualified target-chromosome blocks using the shared weighted-anchor contract. A later best-hit ref profile may describe one evidence interval but must not replace this baseline.
 - q0 source segments must use the assignment baseline orientation and canonical `<dataset>:<contig>:<chr>:normal` card key.
-- A `placement_mode=normal` used card must match the assignment baseline orientation and anchor. Promoted/cross-chromosome cards retain their accepted GRT orientation and anchor instead.
+- A `placement_mode=normal` used card must copy the exact target-chromosome assignment orientation and signed anchor. Multi-chromosome assignments are keyed by target chromosome and never collapse to a contig-only baseline.
+- `grt_promoted` and `cross_chr_grt_usage` cards retain their accepted GRT orientation and use a positive (`>=1`) Final Path-derived placement anchor instead.
 - Locked-project initialization validates all normal main-view projections before setting `auto_pipeline_done=true`. Any mismatch deletes the incomplete project.
 - Project-level manual flips may change `assembly_seq.orient`; they never rewrite `imported_chr_assignment`.
 - Packages or projects that predate these required fields are not migrated or accepted.
@@ -200,21 +203,27 @@ Server workdir -> App projector allowlist -> imported App workspace
 | `orientation_source != ref_alignment` | `INVALID_VALUE` / `GRT_IMPORT_INVALID_VALUE` |
 | q0 orientation differs from assignment | `BROKEN_REFERENCE` / `GRT_IMPORT_BROKEN_REFERENCE` |
 | Normal used-card orientation or anchor differs | `BROKEN_REFERENCE` / `GRT_IMPORT_BROKEN_REFERENCE` |
+| Promoted/cross-chromosome used-card anchor is zero or negative | `INVALID_COORDINATE` / `GRT_IMPORT_INVALID_COORDINATE` |
 | Existing normal main-view card differs during initialization | Initialization fails and deletes the project |
 | Assignment projection count is not exactly one | Initialization fails and deletes the project |
 
 ### 5. Good/Base/Bad Cases
 
+- Good: a multi-chromosome source has target-specific signed anchors `-172703` and `-205687`; its Chr4 normal card, imported baseline, and main-view placement all preserve `-205687` even if the single best Chr4 PAF hit has another anchor.
 - Good: negative PAF block length exceeds positive; assignment, q0, imported baseline, and first main-view render all use `-` with increasing source coordinates.
 - Base: strand totals tie; the deterministic baseline is `+` everywhere.
+- Bad: evidence finalization selects one best PAF hit, clamps its anchor to `1`, and overwrites a normal card's signed weighted baseline.
 - Bad: bootstrap inserts `+`, q0 uses `-`, then marks the automatic pipeline complete. This is a contract violation even if the frontend faithfully renders the stored `+`.
 
 ### 6. Tests Required
 
 - Server preparation test proves q0 consumes `source_orientation` without recomputing PAF strand.
+- Server evidence-package regression uses a multi-chromosome source with a negative target baseline and a different best-hit anchor, then asserts the emitted normal card preserves the exact target baseline and passes the full contract.
 - Shared invalid fixtures cover illegal orientation/provenance, q0 mismatch, and normal used-card mismatch in both Python and Rust validators.
+- Shared invalid fixtures and App-card unit coverage reject non-positive promoted/cross anchors while accepting a signed normal anchor.
 - Importer round-trip asserts orientation/provenance/support/anchor persistence.
-- Project bootstrap test inserts a negative baseline and asserts `assembly_seq.orient='-'`.
+- Project bootstrap test inserts a negative anchor baseline and asserts `assembly_ctg.anchor_start` preserves it.
+- Project bootstrap test inserts a negative orientation baseline and asserts `assembly_seq.orient='-'`.
 - Locked initialization test corrupts the projection, asserts failure, and proves the incomplete project was deleted before `auto_pipeline_done` could become true.
 
 ### 7. Wrong vs Correct
@@ -228,10 +237,10 @@ bootstrap assigned contig as '+' -> skip initial auto-orient -> auto_pipeline_do
 #### Correct
 
 ```text
-qualified ds-vs-ref PAF -> chr_assignments source_orientation
-  -> q0 and normal used-card validation
+qualified ds-vs-ref PAF -> chr_assignments source_orientation + signed anchor_start
+  -> q0 and target-specific normal used-card packaging/validation
   -> imported_chr_assignment baseline
-  -> assembly_seq.orient bootstrap
+  -> assembly_seq.orient + assembly_ctg.anchor_start bootstrap
   -> full projection verification
   -> auto_pipeline_done=true
 ```
