@@ -47,6 +47,8 @@ shell_tests=(
   tests/gpm_server/env_test.sh
   tests/gpm_server/package_templates_test.sh
   tests/gpm_server/prepare_metadata_test.sh
+  tests/gpm_server/prepare_full_test.sh
+  tests/gpm_server/final_path_test.sh
   tests/gpm_server/add_dataset_test.sh
   tests/gpm_server/add_ctg_test.sh
 )

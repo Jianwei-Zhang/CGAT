@@ -607,37 +607,99 @@ quotes expansions, validates commands before work, and uses LF line endings.
 
 ### Bash 4.2 Nounset Compatibility for Optional Arrays
 
-`server/prepare.sh` supports GNU Bash 4.2 and newer. Bash 3.x is outside the
-support boundary because the Server scripts use Bash 4 features such as
-associative arrays and `mapfile`.
+#### 1. Scope / Trigger
 
-Under Bash 4.2, expanding a declared-but-empty indexed array as
-`"${values[@]}"` can fail with `unbound variable` when `set -u` is active.
-Whenever an optional array is forwarded to a function or command, branch on
-its length and expand it only in the non-empty branch. The empty branch must
-omit the optional arguments entirely; do not add an empty-string sentinel and
-do not disable nounset.
+The complete Server shell toolkit supports GNU Bash 4.2 and newer while using
+`set -u`. Bash 3.x is outside the boundary because Server scripts use Bash 4
+features such as associative arrays and `mapfile`. Apply this contract to every
+indexed or associative array that can be empty, including parsed metadata,
+optional CLI arguments, generated-script inputs, and test doubles.
+
+#### 2. Signatures
+
+- Product entrypoints keep their documented CLI signatures; an absent optional
+  repeated flag contributes zero array elements.
+- Focused compatibility tests accept `GPM_TEST_BASH=<executable>` and default
+  to the `bash` resolved from `PATH`; nested Bash dispatch in the test must use
+  that same executable.
+- The canonical command remains `bash scripts/quality-gate-server.sh` and owns
+  the tracked tests in `tests/gpm_server/`.
+
+#### 3. Contracts
+
+- Declare arrays before testing or expanding them.
+- Under Bash 4.2, a declared-but-empty `"${values[@]}"` expansion can raise
+  `unbound variable`; a safe length check is `[[ "${#values[@]}" -gt 0 ]]`.
+- Optional arrays are expanded or iterated only inside a non-empty branch. The
+  empty branch omits the optional arguments; it does not add an empty-string
+  sentinel or disable nounset.
+- Required arrays are length-validated before their first expansion. Parsing an
+  empty TSV header, catalog, or FASTA must therefore yield a domain error.
+- On Bash 4.2, compute command-substitution results before using them as
+  associative-array subscripts; do not nest a quoted function call directly in
+  an assignment subscript.
+
+#### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Optional array is empty | Skip the loop or call the zero-argument form |
+| Required TSV header array is empty | Fail with the metadata filename and `header is empty` |
+| Effective dataset array is empty without filters | Fail with `contains no usable dataset rows` |
+| Requested dataset filters match no rows | Fail with the requested-filter domain error |
+| Reference chromosome array is empty | Fail with `Reference FASTA contains no sequence records` |
+
+None of these failures may contain Bash's `unbound variable` diagnostic.
+
+#### 5. Good / Base / Bad Cases
+
+- Good: multiple `--ds` or `--reads` values preserve order and are all passed.
+- Base: one value behaves exactly as before.
+- Base-empty: omitted optional values produce a valid zero-item call or loop.
+- Bad: blank required metadata and empty reference sequence catalogs fail before
+  any array expansion.
+
+#### 6. Tests Required
+
+- Cover empty, one-item, and multi-item optional arrays on a real Bash 4.2
+  executable, not only a newer Bash compatibility mode.
+- Assert final-path export both without `--ds` and with multiple `--ds` values.
+- Assert malformed metadata and empty reference inputs produce their domain
+  error and do not contain `unbound variable`.
+- Keep `tests/gpm_server/final_path_test.sh` and
+  `tests/gpm_server/prepare_full_test.sh` in the canonical Server gate, and keep
+  fake command implementations compatible with an empty optional array.
+
+#### 7. Wrong vs Correct
 
 Wrong:
 
 ```bash
+for value in "${optional_values[@]}"; do
+  consume "$value"
+done
 write_command "$output" "${optional_inputs[@]}"
+lookup["$(make_key "$group" "$name")"]="$value"
 ```
 
 Correct:
 
 ```bash
+if [[ "${#optional_values[@]}" -gt 0 ]]; then
+  for value in "${optional_values[@]}"; do
+    consume "$value"
+  done
+fi
+
 if [[ "${#optional_inputs[@]}" -gt 0 ]]; then
   write_command "$output" "${optional_inputs[@]}"
 else
   write_command "$output"
 fi
-```
 
-Regression tests must cover empty, one-item, and multi-item inputs. A focused
-Server test that needs to validate a specific Bash runtime should accept an
-explicit executable through `GPM_TEST_BASH`; its default remains the Bash on
-`PATH` so the canonical quality gate has no undeclared runtime dependency.
+key="$(make_key "$group" "$name")"
+lookup["$key"]="$value"
+```
 
 ---
 

@@ -1015,12 +1015,14 @@ for i in "${!DATASET_NAMES[@]}"; do
   SEEN_DATASET_NAMES["${DATASET_NAMES[$i]}"]=1
 done
 
-for i in "${!READS_SRCS[@]}"; do
-  ensure_readable_file "${READS_SRCS[$i]}"
-  if [[ "${READS_SRCS[$i]}" != /* ]]; then
-    READS_SRCS[$i]="$(cd "$(dirname "${READS_SRCS[$i]}")" && pwd)/$(basename "${READS_SRCS[$i]}")"
-  fi
-done
+if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
+  for i in "${!READS_SRCS[@]}"; do
+    ensure_readable_file "${READS_SRCS[$i]}"
+    if [[ "${READS_SRCS[$i]}" != /* ]]; then
+      READS_SRCS[$i]="$(cd "$(dirname "${READS_SRCS[$i]}")" && pwd)/$(basename "${READS_SRCS[$i]}")"
+    fi
+  done
+fi
 
 mkdir -p \
   "${WORK_ROOT}/metadata" \
@@ -1121,6 +1123,8 @@ printf 'unit_id\tcommand_relpath\tdetail_log_relpath\n' > "$RUN_ALL_PLAN"
 
 DATASET_COUNT=${#DATASET_NAMES[@]}
 mapfile -t REFERENCE_CHR_NAMES < <(collect_reference_chr_names "$REF_DST")
+[[ "${#REFERENCE_CHR_NAMES[@]}" -gt 0 ]] \
+  || die "Reference FASTA contains no sequence records: $REF_DST"
 
 TOTAL_COMMANDS=$(( DATASET_COUNT + 8 + ${#REFERENCE_CHR_NAMES[@]} ))
 COMMAND_INDEX=1

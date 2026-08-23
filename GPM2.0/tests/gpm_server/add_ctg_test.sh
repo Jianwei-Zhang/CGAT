@@ -229,22 +229,26 @@ done
 [[ -n "$out" ]] || exit 1
 mkdir -p "$(dirname "$out")"
 : > "$out"
-for root in "${roots[@]}"; do
-  [[ -e "$root" ]] || continue
-  while IFS= read -r path; do
-    skip=false
-    for pattern in "${excludes[@]}"; do
-      if [[ "$path" == $pattern ]]; then
-        skip=true
-        break
+if [[ "${#roots[@]}" -gt 0 ]]; then
+  for root in "${roots[@]}"; do
+    [[ -e "$root" ]] || continue
+    while IFS= read -r path; do
+      skip=false
+      if [[ "${#excludes[@]}" -gt 0 ]]; then
+        for pattern in "${excludes[@]}"; do
+          if [[ "$path" == $pattern ]]; then
+            skip=true
+            break
+          fi
+        done
       fi
-    done
-    "$skip" && continue
-    printf '%s\n' "--- $path" >> "$out"
-    cat "$path" >> "$out"
-    printf '\n' >> "$out"
-  done < <(find "$root" -type f | LC_ALL=C sort)
-done
+      "$skip" && continue
+      printf '%s\n' "--- $path" >> "$out"
+      cat "$path" >> "$out"
+      printf '\n' >> "$out"
+    done < <(find "$root" -type f | LC_ALL=C sort)
+  done
+fi
 EOF
 
 chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/makeblastdb" "${FAKE_BIN}/blastn" "${FAKE_BIN}/zip" \

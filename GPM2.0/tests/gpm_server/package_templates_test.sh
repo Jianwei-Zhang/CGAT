@@ -50,19 +50,23 @@ if [[ "${FAKE_ZIP_FAIL:-false}" == "true" ]]; then
   exit 23
 fi
 
-for root in "${roots[@]}"; do
-  while IFS= read -r path; do
-    skip=false
-    for pattern in "${excludes[@]}"; do
-      if [[ "$path" == $pattern ]]; then
-        skip=true
-        break
+if [[ "${#roots[@]}" -gt 0 ]]; then
+  for root in "${roots[@]}"; do
+    while IFS= read -r path; do
+      skip=false
+      if [[ "${#excludes[@]}" -gt 0 ]]; then
+        for pattern in "${excludes[@]}"; do
+          if [[ "$path" == $pattern ]]; then
+            skip=true
+            break
+          fi
+        done
       fi
-    done
-    "$skip" && continue
-    printf '%s\n' "--- $path" >> "$archive"
-  done < <(find "$root" -type f | LC_ALL=C sort)
-done
+      "$skip" && continue
+      printf '%s\n' "--- $path" >> "$archive"
+    done < <(find "$root" -type f | LC_ALL=C sort)
+  done
+fi
 EOF
 chmod +x "${FAKE_BIN}/zip"
 

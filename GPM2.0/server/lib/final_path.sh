@@ -158,17 +158,21 @@ make_source_seq_key() {
   printf '%s\t%s\n' "$1" "$2"
 }
 
-for ds_name in "${REQUESTED_DS[@]}"; do
-  REQUESTED_SET["$ds_name"]=1
-done
+if [[ "${#REQUESTED_DS[@]}" -gt 0 ]]; then
+  for ds_name in "${REQUESTED_DS[@]}"; do
+    REQUESTED_SET["$ds_name"]=1
+  done
+fi
 
 IFS=$'\t' read -r -a dataset_header < "$DATASETS_TSV" || die "metadata/datasets.tsv is empty"
+[[ "${#dataset_header[@]}" -gt 0 ]] || die "metadata/datasets.tsv header is empty"
 dataset_name_col="$(column_index "dataset_name" "${dataset_header[@]}")"
 fasta_relpath_col="$(column_index "fasta_relpath" "${dataset_header[@]}")"
 
 if [[ -f "$SOURCE_SEQ_LOCATOR_TSV" ]]; then
   HAS_SOURCE_SEQ_LOCATORS=true
   IFS=$'\t' read -r -a source_locator_header < "$SOURCE_SEQ_LOCATOR_TSV" || die "metadata/source_seq_locator.tsv is empty"
+  [[ "${#source_locator_header[@]}" -gt 0 ]] || die "metadata/source_seq_locator.tsv header is empty"
   source_locator_dataset_name_col="$(column_index "dataset_name" "${source_locator_header[@]}")"
   source_locator_seq_name_col="$(column_index "seq_name" "${source_locator_header[@]}")"
   source_locator_fasta_relpath_col="$(column_index "fasta_relpath" "${source_locator_header[@]}")"
@@ -183,7 +187,8 @@ if [[ -f "$SOURCE_SEQ_LOCATOR_TSV" ]]; then
     fi
     fasta_path="$(resolve_path_under_server "$GPM_SERVER_DIR" "$fasta_relpath")"
     [[ -f "$fasta_path" ]] || die "Locator FASTA for dataset '${ds_name}' seq '${seq_name}' not found: ${fasta_path}"
-    SOURCE_SEQ_FASTA["$(make_source_seq_key "$ds_name" "$seq_name")"]="$fasta_path"
+    source_seq_key="$(make_source_seq_key "$ds_name" "$seq_name")"
+    SOURCE_SEQ_FASTA["$source_seq_key"]="$fasta_path"
   done < <(tail -n +2 "$SOURCE_SEQ_LOCATOR_TSV")
 fi
 
@@ -203,16 +208,21 @@ while IFS= read -r line; do
   DATASET_NAMES+=("$ds_name")
 done < <(tail -n +2 "$DATASETS_TSV")
 
-if [[ "${#REQUESTED_DS[@]}" -gt 0 && "${#DATASET_NAMES[@]}" -eq 0 ]]; then
-  die "No dataset FASTA files matched the requested --ds filters"
+if [[ "${#DATASET_NAMES[@]}" -eq 0 ]]; then
+  if [[ "${#REQUESTED_DS[@]}" -gt 0 ]]; then
+    die "No dataset FASTA files matched the requested --ds filters"
+  fi
+  die "metadata/datasets.tsv contains no usable dataset rows"
 fi
 
 IFS=$'\t' read -r -a reference_header < "$REFERENCE_TSV" || die "metadata/reference.tsv is empty"
+[[ "${#reference_header[@]}" -gt 0 ]] || die "metadata/reference.tsv header is empty"
 reference_fasta_relpath_col="$(column_index "fasta_relpath" "${reference_header[@]}")"
 REFERENCE_FASTA=""
 if [[ -f "$REFERENCE_CHR_LOCATOR_TSV" ]]; then
   HAS_REFERENCE_CHR_LOCATORS=true
   IFS=$'\t' read -r -a reference_locator_header < "$REFERENCE_CHR_LOCATOR_TSV" || die "metadata/reference_chr_locator.tsv is empty"
+  [[ "${#reference_locator_header[@]}" -gt 0 ]] || die "metadata/reference_chr_locator.tsv header is empty"
   reference_locator_chr_name_col="$(column_index "reference_chr_name" "${reference_locator_header[@]}")"
   reference_locator_fasta_relpath_col="$(column_index "fasta_relpath" "${reference_locator_header[@]}")"
   while IFS= read -r line; do
