@@ -911,9 +911,10 @@ export function buildAssemblyContextMenuItems({
         .filter(Boolean);
       if (ctgTrackRole === "primary") {
         phasedTargets.forEach((phasedTarget) => {
-          const { haplotypeKey } = phasedTarget;
           items.push({
-            label: tAssembly(state, "contextMenu.addToPhasedTrack", { key: haplotypeKey }),
+            label: tAssembly(state, "contextMenu.addToPhasedTrack", {
+              key: phasedTarget.label,
+            }),
             run: async () => {
               await addTrackContigToPhasedTrack(host, store, {
                 ...phasedTarget,

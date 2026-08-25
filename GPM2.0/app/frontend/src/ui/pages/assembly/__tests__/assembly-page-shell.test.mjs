@@ -338,6 +338,20 @@ test("assembly main view inserts phased rows after primary and before mirror row
   assert.ok(mirrorIndex > phasedBIndex, "expected mirror after phased rows");
   assert.match(html, /class="track-ctg[^"]*is-phased-track/);
   assert.match(html, /该分型轨道暂无 contig/);
+
+  const emptyTrackLabelTop = html.match(
+    /<div class="assembly-track-label-row[^"]*is-phased-track[^"]*" style="top:([\d.]+)px"[^>]*title="主分型 Chr01B"/,
+  );
+  const emptyTrackMessageY = html.match(
+    /<text class="track-row-empty-label" x="12" y="([\d.]+)">该分型轨道暂无 contig。<\/text>/,
+  );
+  assert.ok(emptyTrackLabelTop, "expected empty phased-track label geometry");
+  assert.ok(emptyTrackMessageY, "expected empty phased-track message geometry");
+  assert.equal(
+    Number(emptyTrackMessageY[1]) - Number(emptyTrackLabelTop[1]),
+    13,
+    "expected empty message baseline to align with the phased-track label",
+  );
 });
 
 test("assembly main view keeps compact phased spacing without mirror rows", () => {

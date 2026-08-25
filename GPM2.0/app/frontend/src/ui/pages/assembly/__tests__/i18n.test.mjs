@@ -23,6 +23,7 @@ test("getAssemblyI18n returns english page copy when locale is en", () => {
   assert.equal(i18n.page.finalPathDegapControls, "DEGAP graph controls");
   assert.equal(i18n.degap.jobsTitle, "Jobs");
   assert.equal(i18n.degap.validation.jobOutRequired, "Job --out is required.");
+  assert.equal(i18n.contextMenu.addToPhasedTrack, "Add to track {key}");
   assert.equal(i18n.runtime.addSeqTargetMissing, undefined);
   assert.equal(i18n.memberEditor, undefined);
 });
@@ -36,6 +37,7 @@ test("i18n module centralizes zh error and status labels", () => {
   assert.equal(assemblyLabelsZh.page.phasedTrackGrtNoticeConfirm, "我知道了");
   assert.equal(assemblyLabelsZh.trackControls.alignmentLengthBp, "比对长度(bp)");
   assert.equal(assemblyLabelsZh.trackControls.mapq, "MAPQ");
+  assert.equal(assemblyLabelsZh.contextMenu.addToPhasedTrack, "添加至轨道 {key}");
 });
 
 test("phased-track GRT notice has complete English copy", () => {

@@ -22,8 +22,14 @@ export function createSubviewSelectionController({
   buildInitialSubviewPairwiseEvidence,
   getCurrentProject,
   loadSubviewPairwiseEvidence,
+  rerenderAssemblyMainTab,
   rerenderSubviewPanel,
 }) {
+  function rerenderSubviewSelectionRegions(host, store) {
+    rerenderAssemblyMainTab(host, store);
+    rerenderSubviewPanel(host, store);
+  }
+
   function inheritSubviewTrackViewFromMainTrack(assembly) {
     const mainTrackPrefs = resolveTrackPrefs(assembly?.trackView);
     return {
@@ -81,7 +87,7 @@ export function createSubviewSelectionController({
       enterSubviewFromCandidates(host, store);
       return;
     }
-    rerenderSubviewPanel(host, store);
+    rerenderSubviewSelectionRegions(host, store);
   }
 
   function handleTrackSubviewTrackSelection(host, store, {
@@ -138,7 +144,7 @@ export function createSubviewSelectionController({
         subviewTrackDragOffsets: [],
       },
     });
-    rerenderSubviewPanel(host, store);
+    rerenderSubviewSelectionRegions(host, store);
     startPairwiseLoadIfNeeded(host, store, pairwiseEvidence, nextSubview.summary);
   }
 
@@ -166,7 +172,7 @@ export function createSubviewSelectionController({
         subviewTrackDragOffsets: [],
       },
     });
-    rerenderSubviewPanel(host, store);
+    rerenderSubviewSelectionRegions(host, store);
   }
 
   function handleSubviewTrackSelectionRemoval(
@@ -190,7 +196,7 @@ export function createSubviewSelectionController({
         subviewTrackDragOffsets: [],
       },
     });
-    rerenderSubviewPanel(host, store);
+    rerenderSubviewSelectionRegions(host, store);
   }
 
   function handleSubviewSwapTrackOrder(host, store) {
@@ -262,7 +268,7 @@ export function createSubviewSelectionController({
           subviewTrackDragOffsets: [],
         },
       });
-      rerenderSubviewPanel(host, store);
+      rerenderSubviewSelectionRegions(host, store);
       return;
     }
     const nextSubviewTrackView = inheritSubviewTrackViewFromMainTrack(state.assembly);
@@ -302,7 +308,7 @@ export function createSubviewSelectionController({
         subviewTrackDragOffsets: [],
       },
     });
-    rerenderSubviewPanel(host, store);
+    rerenderSubviewSelectionRegions(host, store);
     startPairwiseLoadIfNeeded(host, store, pairwiseEvidence, result.value);
   }
 
@@ -327,7 +333,7 @@ export function createSubviewSelectionController({
           subviewTrackDragOffsets: [],
         },
       });
-      rerenderSubviewPanel(host, store);
+      rerenderSubviewSelectionRegions(host, store);
       return;
     }
     const nextSubviewTrackView = inheritSubviewTrackViewFromMainTrack(state.assembly);
@@ -365,7 +371,7 @@ export function createSubviewSelectionController({
         subviewTrackDragOffsets: [],
       },
     });
-    rerenderSubviewPanel(host, store);
+    rerenderSubviewSelectionRegions(host, store);
     startPairwiseLoadIfNeeded(host, store, pairwiseEvidence, result.value);
   }
 

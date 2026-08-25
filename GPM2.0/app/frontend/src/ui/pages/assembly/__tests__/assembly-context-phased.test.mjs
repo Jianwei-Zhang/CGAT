@@ -311,12 +311,12 @@ test("phased mode primary contig context menu offers per-haplotype add and appen
   const labels = items.map((item) => item.label);
 
   assert.deepEqual(
-    labels.filter((label) => label.startsWith("添加到 ") || label.startsWith("追加到路径 ")),
-    ["添加到 A", "添加到 B", "追加到路径 A", "追加到路径 B"],
+    labels.filter((label) => label.startsWith("添加至轨道 ") || label.startsWith("追加到路径 ")),
+    ["添加至轨道 Chr01A", "添加至轨道 Chr01B", "追加到路径 A", "追加到路径 B"],
   );
   assert.equal(labels.includes("追加到路径"), false);
 
-  await items.find((item) => item.label === "添加到 B").run();
+  await items.find((item) => item.label === "添加至轨道 Chr01B").run();
   await items.find((item) => item.label === "追加到路径 B").run();
 
   assert.deepEqual(calls, [

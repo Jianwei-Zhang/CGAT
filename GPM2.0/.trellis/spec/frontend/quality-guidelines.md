@@ -241,6 +241,7 @@ deleteWithFiles = importer.deleteWithFiles === true;
 - A Final Path mutation that starts and ends with GRT unavailable must not refresh the main track or Subview. Do not widen every Final Path edit into a three-region refresh.
 - A main-track-only mutation must replace only the chromosome/member strip and `.assembly-track-unified`. The main-track refresh renderer must skip Subview and Final Path generation.
 - A Subview-only mutation must replace only `[data-subview-panel='1']`.
+- A Subview selection mutation is not Subview-only when the main track derives selected contig or selected track-label styling from `assembly.subview`. After selecting, deselecting, removing, or replacing those selections, commit state first, then refresh the main track and Subview together. A Subview track-order swap may remain panel-only because it does not change selection identity.
 - Partial bindings must pass an explicit `main`, `subview`, or `final-path` scope. They must not run route initialization, register route-level resize/hotkey listeners, or clear persisted scroll state for absent sibling regions.
 - Scroll synchronization remains active for the replaced region, and unchanged sibling DOM and scroll positions remain intact.
 - A persisted main-track viewport key identifies the coordinate space (project, chromosome, support dataset, and track preferences). It must not include transient selection such as `selectedCtgId`; explicit member/search navigation uses the pending focus command instead.
@@ -259,13 +260,14 @@ deleteWithFiles = importer.deleteWithFiles === true;
 - Assembly feature suites under `app/frontend/src/ui/pages/assembly/__tests__/`
   - Keep page-shell, main-track, Subview, Final Path, coordinate, and phased-track rendering regressions green after renderer extraction.
   - Assert main-track scroll survives a selected-contig change across temporary loading markup, while explicit focus navigation still targets the requested contig.
+  - Assert Subview selection removal refreshes both the main-track and Subview regions so selection-derived styling cannot remain stale.
 
 #### 4. Wrong vs Correct
 #### Wrong
-Calling the route-level `rerender` after a local Final Path edit or Subview drag, which recreates unrelated large SVG trees; or always refreshing main/Subview for every Final Path edit without checking the GRT availability transition.
+Calling the route-level `rerender` after a local Final Path edit or Subview drag, which recreates unrelated large SVG trees; always refreshing main/Subview for every Final Path edit without checking the GRT availability transition; or refreshing only Subview after clearing a selection whose highlight is also rendered in the main track.
 
 #### Correct
-Persist the authoritative state, replace only the affected region, and leave sibling DOM untouched unless a documented derived-state transition changes a sibling consumer. For GRT availability, refresh main and Subview only when the before/after boolean differs.
+Persist the authoritative state, replace only the affected region, and leave sibling DOM untouched unless a documented derived-state transition changes a sibling consumer. For GRT availability, refresh main and Subview only when the before/after boolean differs. For Subview selection identity, refresh both regions whenever the selected contig or selected track set changes.
 
 ### Subview Ruler Virtualization
 
@@ -467,6 +469,7 @@ Canonicalize or alias order-encoded evidence keys at the active-state boundary, 
 #### 3. Contracts
 - A phased item instance is identified by `phasedTrackItemId` for removal and by `phasedTrackId` plus `phasedHaplotypeKey` for track-level selection. Do not use only `assemblyCtgId` when the action targets a phased item instance because the same contig can appear in multiple phased tracks.
 - Phased item context menus must offer append-to-matching-haplotype final path, persisted flip, and remove-from-current-phased-track actions. Removing an item deletes only that phased track item, not the source contig and not matching items in other phased tracks.
+- A primary-contig action that adds to a phased track must display the full target track label in the menu (for example, `Chr01A`), not only the haplotype key (`A`). Localize the action phrase while preserving the target label verbatim.
 - Phased item append actions must target the corresponding haplotype final path (`A`, `B`, `C`, ...), using the phased track label when available.
 - Phased item removal and main-track persisted flips should refresh the main assembly card locally. They must not reload the whole route or show the full chromosome loading curtain.
 - Phased item bars must reuse the corresponding primary-track base layout rectangle. Do not recalculate a phased item as a standalone one-contig row, because primary-track min-gap compression or shifting must remain visible-identical for the same `assemblyCtgId`.

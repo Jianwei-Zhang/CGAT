@@ -392,6 +392,7 @@ const {
   buildInitialSubviewPairwiseEvidence,
   getCurrentProject: (state) => getCurrentProject(state),
   loadSubviewPairwiseEvidence,
+  rerenderAssemblyMainTab: (host, store) => rerenderAssemblyMainTab(host, store),
   rerenderSubviewPanel: (host, store) => rerenderSubviewPanel(host, store),
 });
 const {

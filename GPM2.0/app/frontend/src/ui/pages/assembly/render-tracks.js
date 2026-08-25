@@ -1355,7 +1355,6 @@ function renderAssemblyTracks({
   const TRACK_LABEL_OFFSET_Y = 2 * TRACK_HEIGHT_SCALE;
   const TRACK_EDGE_LABEL_PADDING = 8 * TRACK_HEIGHT_SCALE;
   const TRACK_TEXT_OFFSET_Y = 11;
-  const TRACK_EMPTY_TEXT_OFFSET_Y = 12 * TRACK_HEIGHT_SCALE;
   const TRACK_MIN_ADJACENT_GAP_PX = 20;
   const TRACK_LABEL_ROW_HEIGHT = 18;
   const TRACK_LABEL_ALIGN_OFFSET = Math.max(
@@ -2158,7 +2157,7 @@ function renderAssemblyTracks({
     .map((layout) => {
       const rowBgClass = layout.className ? ` ${layout.className}` : "";
       if (!layout.trackModel.ctgs.length) {
-        return `<text class="track-row-empty-label" x="12" y="${(layout.laneTop + TRACK_EMPTY_TEXT_OFFSET_Y).toFixed(2)}">${escapeHtml(
+        return `<text class="track-row-empty-label" x="12" y="${(layout.laneTop + TRACK_TEXT_OFFSET_Y).toFixed(2)}">${escapeHtml(
             layout.emptyMessage,
           )}</text>`;
       }
