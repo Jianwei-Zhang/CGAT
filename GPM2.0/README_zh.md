@@ -56,14 +56,14 @@ bash server/prepare.sh \
   -t 10
 ```
 
-第一个 `--ds` 固定为 primary dataset，后续初始 `--ds` 为 support dataset。支持普通或 gzip 压缩的 `.fa`、`.fasta`、`.fna` 输入。
+准备工作目录时，第一个 `--ds` 作为主 ds，其余 `--ds` 作为辅 ds；这些角色用于本次 GRT 计算并保持不变。支持普通或 gzip 压缩的 `.fa`、`.fasta`、`.fna` 输入。
 
 #### 通用参数
 
 | 参数 | 必填 / 默认值 | 说明 |
 | --- | --- | --- |
 | `--ref <名称> <fasta>` | 必填，一次 | 参考基因组名称与 FASTA。 |
-| `--ds <名称> <fasta>` | 必填，可重复 | 组装 dataset；第一个为 primary，后续为 support。 |
+| `--ds <名称> <fasta>` | 必填，可重复 | 初次输入的组装数据集；第一个为主 ds，其余为辅 ds。 |
 | `-o, --out <目录>` | `./gpm_server` | 服务端工作目录及生成脚本的位置。 |
 | `-s, --score <0-100>` | `60` | 染色体分配的最小覆盖率百分比。 |
 | `--aligner <引擎>` | `minimap2` | 主比对引擎：`minimap2`、`blastn` 或 `winnowmap`。 |
@@ -121,7 +121,7 @@ bash ./gpm_server/add_dataset.sh \
   -o ./gpm_server/add_ds4_name.zip
 ```
 
-新 dataset 会合并进服务端工作目录，但不会加入已经锁定的 GRT recipe，也不会改写预计算 Final Path；其 contig 仍可在 App 中手工编辑。
+新数据集会合并进服务端工作目录，但不参与已经完成的 GRT 计算，也不会改写预计算的 Final Path；其 contig 仍可在 App 中手工编辑。
 
 初次 `run_all.sh` 已自动生成两种交付包。仅在后续执行 `add_dataset.sh`、`add_ctg.sh` 等操作后按需重新打包：
 
@@ -138,7 +138,7 @@ bash ./gpm_server/package_light_no_fasta_zip.sh
 
 从 [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases) 下载与客户端架构匹配的安装包，然后导入任一服务端交付包。
 
-交付包固定 primary/support recipe，并直接载入服务端预计算的 Final Path。项目级路径仍可编辑，并可继续进入 DEGAP 或导出流程。当前仅支持 v2 GRT 交付契约；v1 与非 GRT 包需要使用当前服务端脚本重新生成。
+交付包保留 GRT 计算时确定的主 ds 与辅 ds 角色，并直接载入服务端预计算的 Final Path。项目级路径仍可编辑，并可继续进入 DEGAP 或导出流程。
 
 ### 从无 FASTA 包导出 Final Path FASTA
 

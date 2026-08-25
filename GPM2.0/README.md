@@ -56,14 +56,14 @@ bash server/prepare.sh \
   -t 10
 ```
 
-The first `--ds` is the locked primary dataset; later initial `--ds` entries are support datasets. Plain or gzip-compressed `.fa`, `.fasta`, and `.fna` inputs are accepted.
+When preparing the workspace, the first `--ds` becomes the primary dataset and the remaining entries become support datasets; these roles remain fixed throughout GRT processing. Plain or gzip-compressed `.fa`, `.fasta`, and `.fna` inputs are accepted.
 
 #### Common options
 
 | Option | Required / default | Description |
 | --- | --- | --- |
 | `--ref <name> <fasta>` | Required once | Reference name and FASTA. |
-| `--ds <name> <fasta>` | Required, repeatable | Assembly dataset. The first is primary; the rest are support datasets. |
+| `--ds <name> <fasta>` | Required, repeatable | Initial assembly dataset. The first is the primary dataset; the rest are support datasets. |
 | `-o, --out <dir>` | `./gpm_server` | Server workspace and generated scripts. |
 | `-s, --score <0-100>` | `60` | Minimum chromosome-assignment coverage percentage. |
 | `--aligner <engine>` | `minimap2` | Main alignment engine: `minimap2`, `blastn`, or `winnowmap`. |
@@ -121,7 +121,7 @@ bash ./gpm_server/add_dataset.sh \
   -o ./gpm_server/add_ds4_name.zip
 ```
 
-The new dataset is merged into the server workspace but does not join the locked GRT recipe or rewrite the precomputed Final Path. Its contigs remain available for manual editing in the App.
+The new dataset is merged into the server workspace but is not included in the completed GRT processing and does not rewrite the precomputed Final Path. Its contigs remain available for manual editing in the App.
 
 The initial `run_all.sh` already builds both delivery archives. Re-run the standalone packagers only after later changes such as `add_dataset.sh` or `add_ctg.sh`:
 
@@ -138,7 +138,7 @@ Use a rebuilt full package for a new desktop workspace or a complete re-import. 
 
 Download the installer for the client architecture from [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases), then import either delivery archive.
 
-The package fixes the primary/support recipe and loads the Server-precomputed Final Path. Project-level paths remain editable and can continue into DEGAP or export. Only the current v2 GRT delivery contract is supported; regenerate v1 or non-GRT packages with the current Server scripts.
+The package preserves the primary and support dataset roles established during GRT processing and loads the Server-precomputed Final Path. Project-level paths remain editable and can continue into DEGAP or export.
 
 ### Export Final Path FASTA from a no-FASTA package
 
