@@ -343,6 +343,12 @@ Package scripts write to a temporary archive and atomically replace the final ar
 - Every eligible correction edit contains its entire associated q2 gap. If widening would consume another gap object, the candidate is rejected by the existing multi-gap guard.
 - An overlap-driven automatic edit larger than 1 Mb is rejected when it exceeds ten times the observed query/reference overlap evidence.
 - Corrected-q2 refill objects project once to the origin q2 object and interval; adjacent N-runs must not create an untraceable merged object.
+- Rejected Step2 MUMmer anchor pairs remain auditable, but every populated
+  public source interval they emit is still 1-based, closed, increasing, and
+  source-bounded. When the derived patch interval is reversed or empty, the
+  rejected record uses the donor-local span covering both raw anchors as a
+  non-executable diagnostic interval; its raw MUMmer coordinates and rejection
+  reason remain unchanged.
 - Changing Step2/3 executable bytes changes `engine_sha256` and forces a cache miss even if a developer forgets to change another parameter. Semantic releases also increment `engine_version`.
 
 ### 4. Validation & Error Matrix
@@ -359,6 +365,7 @@ Package scripts write to a temporary archive and atomically replace the final ar
 | Overlap-driven edit is >1 Mb and >10x overlap evidence | Reject as `automatic_edit_exceeds_overlap_evidence` |
 | Runtime Step2/3 script bytes differ from the checkpoint fingerprint | Recompute Step2/3; never report cache hit |
 | Corrected gap cannot resolve one exact origin | Fail rather than fabricate q2 coordinates |
+| Rejected Step2 anchor pair derives a reversed or empty patch interval | Preserve the rejection and raw anchors; serialize their increasing diagnostic source span |
 
 ### 5. Good/Base/Bad Cases
 
@@ -373,6 +380,9 @@ Package scripts write to a temporary archive and atomically replace the final ar
 - Golden classifier coverage proves small and large same-record overlaps are Type5 and query-overlap-only evidence remains the Type4 fixture.
 - A real-shape Chr05 regression asserts `27328071-27338457`, Type5, and an edit shorter than 20 kb.
 - Unit coverage proves origin-gap containment, second-gap rejection, and large overlap/edit-ratio rejection.
+- Unit coverage proves invalid negative-strand Step2 anchor ordering remains
+  rejected while its candidate and MUMmer evidence source intervals remain
+  increasing; a valid negative-strand pair retains its executable interval.
 - Unit coverage proves exact suffix-prefix matching, flush keep-left precedence, bounded shifted-left fallback, reverse-orientation source-coordinate slicing, zero-length replay, and primary-only output.
 - Cache tests prove `engine_version`/`engine_sha256` changes invalidate Step2/3 while unchanged second runs hit both checkpoints.
 - Real Server validation must reconstruct q4, pass the complete contract, and produce both delivery archives.

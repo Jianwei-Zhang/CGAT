@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).parents[2]
 from server.tests import test_grt_prepare_inputs as prepare_fixture
 from server.tests import test_grt_step1 as step1_fixture
 from server.tools.grt_prepare_inputs import read_fasta, reverse_complement
+from server.tools.grt_core.contract.cross_reference import validate_interval
 from server.tools.grt_step23 import (
     _longest_exact_suffix_prefix,
     _step3_classify_features,
@@ -22,7 +23,9 @@ from server.tools.grt_step23 import (
     arbitrate,
     build_correction_candidates,
     build_correction_events,
+    build_step2_candidates,
     build_step2_fallback_candidates,
+    evidence_row,
     parse_mummer_coords,
     promote_direct_primary_overlap_merges,
     project_interval_after_refills,
@@ -163,6 +166,131 @@ class GrtStep23Tests(unittest.TestCase):
         self.assertEqual(candidates[0]["action"], "patch")
         self.assertEqual(candidates[0]["fill_sequence"], sources[("d0", "d1")][100:500])
         self.assertEqual(candidates[0]["fallback_strategy"], "correctrefill_source_retry")
+
+    def test_rejected_negative_step2_anchor_order_emits_increasing_evidence_interval(self):
+        member = {
+            "member_id": "m-d1",
+            "dataset_name": "support",
+            "contig_name": "d1",
+            "orientation": "+",
+            "source_start": "1",
+            "source_end": "1000000",
+        }
+
+        def alignment(line, query_min, query_max, ref_min, ref_max):
+            return {
+                "chr": "Chr21",
+                "line_number": line,
+                "ref_record": "d1",
+                "ref_min": ref_min,
+                "ref_max": ref_max,
+                "query_min": query_min,
+                "query_max": query_max,
+                "query_aligned": query_max - query_min + 1,
+                "identity": 0.99,
+                "orientation": "-",
+            }
+
+        candidates, rejections = build_step2_candidates(
+            [{"chr": "Chr21", "object_id": "gap-1", "start0": 149, "end0": 250}],
+            [
+                alignment(1, 100, 140, 100000, 200000),
+                alignment(2, 160, 200, 800000, 900000),
+            ],
+            {"d1": member},
+            {"d1": "A" * 1000000},
+        )
+
+        self.assertEqual(len(candidates), 1)
+        candidate = candidates[0]
+        self.assertEqual(candidate["outcome"], "rejected")
+        self.assertEqual(candidate["reason"], "mummer_anchor_order_or_overlap_invalid")
+        self.assertEqual(rejections[0]["reason"], candidate["reason"])
+        self.assertEqual((candidate["patch_start"], candidate["patch_end"]), (100000, 900000))
+        self.assertEqual((candidate["source_start"], candidate["source_end"]), (100000, 900000))
+        self.assertEqual(
+            (
+                candidate["left_alignment"]["ref_min"],
+                candidate["left_alignment"]["ref_max"],
+                candidate["right_alignment"]["ref_min"],
+                candidate["right_alignment"]["ref_max"],
+            ),
+            (100000, 200000, 800000, 900000),
+        )
+
+        evidence = evidence_row(
+            evidence_id="ev-step2-mummer-regression",
+            stage="step2",
+            evidence_type="mummer_gap_anchor_pair",
+            status="rejected",
+            q_version="q1",
+            q_source_sha256="0" * 64,
+            query_relpath="grt/q/q1.fa",
+            query_sha256="1" * 64,
+            donor_set_id="donor-1",
+            target_relpath="grt/donor/d0.fa",
+            target_sha256="2" * 64,
+            candidate=candidate,
+            tool="nucmer/delta-filter/show-coords",
+            tool_version="test",
+            preset="test",
+            parameters={},
+            raw_relpath="grt/evidence/step2/coords.tsv",
+            raw_sha256="3" * 64,
+            coordinate_system="mummer_1_based_closed",
+        )
+        self.assertEqual((evidence["source_start"], evidence["source_end"]), (100000, 900000))
+        self.assertEqual(
+            validate_interval(
+                evidence["source_start"],
+                evidence["source_end"],
+                f"evidence {evidence['evidence_id']}.source",
+            ),
+            (100000, 900000),
+        )
+        self.assertLessEqual(evidence["source_end"], 1000000)
+
+    def test_valid_negative_step2_anchor_order_keeps_executable_patch_interval(self):
+        member = {
+            "member_id": "m-d1",
+            "dataset_name": "support",
+            "contig_name": "d1",
+            "orientation": "+",
+            "source_start": "1",
+            "source_end": "1000000",
+        }
+
+        def alignment(line, query_min, query_max, ref_min, ref_max):
+            return {
+                "chr": "Chr21",
+                "line_number": line,
+                "ref_record": "d1",
+                "ref_min": ref_min,
+                "ref_max": ref_max,
+                "query_min": query_min,
+                "query_max": query_max,
+                "query_aligned": query_max - query_min + 1,
+                "identity": 0.99,
+                "orientation": "-",
+            }
+
+        candidates, rejections = build_step2_candidates(
+            [{"chr": "Chr21", "object_id": "gap-1", "start0": 149, "end0": 250}],
+            [
+                alignment(1, 100, 140, 800000, 900000),
+                alignment(2, 160, 200, 100000, 200000),
+            ],
+            {"d1": member},
+            {"d1": "A" * 1000000},
+        )
+
+        self.assertEqual(rejections, [])
+        self.assertEqual(len(candidates), 1)
+        candidate = candidates[0]
+        self.assertEqual(candidate["outcome"], "candidate")
+        self.assertEqual(candidate["reason"], "")
+        self.assertEqual((candidate["patch_start"], candidate["patch_end"]), (190001, 809999))
+        self.assertEqual((candidate["source_start"], candidate["source_end"]), (190001, 809999))
 
     def test_step3_classifies_realizable_anchor_pairs_with_type5_overlap_override(self):
         members = {

@@ -48,6 +48,9 @@ For each boundary:
 - If coordinates or ranges cross the boundary, identify whether they are raw source coordinates or already-projected display coordinates.
 - Which layer performs the one allowed conversion into the canonical model?
 - Is compatibility preserved, explicitly versioned, or intentionally rejected?
+- Does the pipeline persist rejected, conflicted, or superseded rows for audit?
+  Status does not exempt those rows from the structural contract consumed by
+  later layers.
 
 ---
 
@@ -88,6 +91,8 @@ After implementation:
 - [ ] Verified error handling at each boundary
 - [ ] Checked data survives round-trip
 - [ ] Verified coordinates are transformed exactly once across backend and frontend; no layer repeats a projection already performed upstream
+- [ ] Verified accepted, rejected, conflicted, and superseded records all
+  satisfy the serialized contract before reaching the final validator
 - [ ] Verified Tauri, dev bridge, mocks, persistence, and UI agree on field names and error codes
 
 ---

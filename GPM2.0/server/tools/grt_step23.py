@@ -32,7 +32,7 @@ except ModuleNotFoundError:  # Imported as server.tools.grt_step23.
     from .grt_core.mummer import command_identity, mummer_parameters, parse_mummer_coords, run_logged
 
 
-ENGINE_VERSION = 5
+ENGINE_VERSION = 6
 MUMMER_MIN_CLUSTER = 1_000
 MUMMER_MIN_MATCH = 100
 MUMMER_MIN_ALIGNMENT = 10_000
@@ -502,8 +502,15 @@ def build_step2_candidates(
                         reason = "mummer_anchor_order_or_overlap_invalid"
                     patch_start = max(1, donor_left - PATCH_FLANK + 1)
                     patch_end = min(len(donor_records[ref_record]), donor_right + PATCH_FLANK - 1)
-                    if not reason and patch_start >= patch_end:
-                        reason = "empty_patch_interval"
+                    if patch_start >= patch_end:
+                        if not reason:
+                            reason = "empty_patch_interval"
+                        # Rejected pairs remain in the evidence registry. Give
+                        # them the increasing donor-local span covered by both
+                        # raw anchors instead of serializing the non-executable
+                        # reversed patch interval into the public contract.
+                        patch_start = min(int(left["ref_min"]), int(right["ref_min"]))
+                        patch_end = max(int(left["ref_max"]), int(right["ref_max"]))
                     member = members_by_record[ref_record]
                     source_start, source_end = member_source_interval(member, patch_start, patch_end)
                     payload = {
