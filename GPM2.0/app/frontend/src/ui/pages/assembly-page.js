@@ -300,6 +300,7 @@ function renderAssemblyMainTrackSections(state) {
 const {
   renderAssemblyConfirmModal,
   requestAssemblyConfirm,
+  requestAssemblyNotice,
   requestAssemblyPrompt,
   requestAssemblyAnchorOffsetPrompt,
   resolveAssemblyConfirmDialog,
@@ -309,6 +310,7 @@ const {
   escapeHtml,
   getAssemblyI18n,
   rerender,
+  rerenderDialog: rerenderAssemblyConfirmModal,
   tAssembly,
 });
 const {
@@ -408,6 +410,7 @@ const {
   persistMainTrackViewState: (host, store) => persistMainTrackViewState(host, store),
   persistTrackDragOffsets: (host, store) => persistTrackDragOffsets(host, store),
   removePhasedChrTrackItem: removePhasedChrTrackItemApi,
+  requestAssemblyNotice,
   rerenderAssemblyMainTab: (host, store) => rerenderAssemblyMainTab(host, store),
   setAssemblyActionFeedbackInMainTab: (host, store, feedback) =>
     setAssemblyActionFeedbackInMainTab(host, store, feedback),
@@ -1399,6 +1402,36 @@ function rerender(host, store) {
   }
   routeHost.innerHTML = renderAssemblyPage(store.getState());
   bindAssemblyPage(routeHost, store);
+}
+
+function rerenderAssemblyConfirmModal(host, store) {
+  const routeHost = resolveCurrentRouteHost(host);
+  if (!routeHost) {
+    return;
+  }
+  const currentOverlay = routeHost.querySelector?.("[data-assembly-confirm-overlay='true']") || null;
+  const nextHtml = renderAssemblyConfirmModal(store.getState());
+  if (!nextHtml) {
+    currentOverlay?.remove?.();
+    return;
+  }
+  const doc = routeHost.ownerDocument || host?.ownerDocument || globalThis.document;
+  if (!doc?.createElement) {
+    rerender(host, store);
+    return;
+  }
+  const template = doc.createElement("template");
+  template.innerHTML = nextHtml;
+  const nextOverlay = template.content.firstElementChild;
+  if (!nextOverlay) {
+    return;
+  }
+  if (currentOverlay) {
+    currentOverlay.replaceWith(nextOverlay);
+  } else {
+    (routeHost.querySelector?.(".page") || routeHost).appendChild(nextOverlay);
+  }
+  bindAssemblyPage(nextOverlay, store, { scope: "main" });
 }
 
 function rerenderAssemblyMainTab(host, store) {

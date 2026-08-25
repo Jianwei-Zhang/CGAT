@@ -329,7 +329,7 @@ test("assembly main view inserts phased rows after primary and before mirror row
   const primaryIndex = trackLabels.findIndex((label) => label === "主 ds 轨道" || label.startsWith("主("));
   const phasedAIndex = trackLabels.indexOf("主分型 Chr01A");
   const phasedBIndex = trackLabels.indexOf("主分型 Chr01B");
-  const mirrorIndex = trackLabels.indexOf("flye-mirror");
+  const mirrorIndex = trackLabels.indexOf("flye-镜像轨道");
 
   assert.ok(supportIndex >= 0, "expected support row label");
   assert.ok(primaryIndex > supportIndex, "expected primary after support");
@@ -493,6 +493,29 @@ test("assembly page renders an app-level confirmation dialog for destructive act
   assert.match(html, /确认删除已框选的 2 个 contig 吗？/);
   assert.match(html, /data-assembly-confirm-action="confirm"/);
   assert.match(html, /data-assembly-confirm-action="cancel"/);
+});
+
+test("assembly page renders a localized non-danger notice with one action", () => {
+  const html = renderAssemblyPage(
+    createState({
+      assembly: {
+        confirmDialog: {
+          open: true,
+          id: "phased-grt-notice",
+          mode: "notice",
+          title: "GRT 结果暂不可用",
+          message: "分型轨道暂不支持显示 GRT 预计算结果。关闭所有分型轨道后，即可恢复 GRT 结果。",
+          confirmLabel: "我知道了",
+        },
+      },
+    }),
+  );
+
+  assert.match(html, /data-assembly-confirm-mode="notice"/);
+  assert.match(html, /aria-label="GRT 结果暂不可用"/);
+  assert.match(html, />我知道了<\/button>/);
+  assert.doesNotMatch(html, /assembly-confirm-title is-danger/);
+  assert.doesNotMatch(html, /data-assembly-confirm-action="cancel"/);
 });
 
 test("assembly page can render support ds rules unsaved-close confirmation internally", () => {
@@ -1096,7 +1119,7 @@ test("hidden primary contig updates card tag and shifts only its own track bar u
 
   assert.match(
     hiddenHtml,
-    /<button class="ctg-chip[^"]*is-hidden-contig[^"]*" data-assembly-ctg-id="2"[\s\S]*?<span class="ctg-chip-hidden-tag">\s*\(hidden\)<\/span>/,
+    /<button class="ctg-chip[^"]*is-hidden-contig[^"]*" data-assembly-ctg-id="2"[\s\S]*?<span class="ctg-chip-hidden-tag">\s*（已隐藏）<\/span>/,
   );
   assert.match(
     hiddenHtml,

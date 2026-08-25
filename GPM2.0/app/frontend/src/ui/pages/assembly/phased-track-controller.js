@@ -55,6 +55,7 @@ export function createPhasedTrackController({
   persistMainTrackViewState,
   persistTrackDragOffsets,
   removePhasedChrTrackItem,
+  requestAssemblyNotice = () => Promise.resolve(true),
   rerenderAssemblyMainTab,
   setAssemblyActionFeedbackInMainTab,
 }) {
@@ -190,17 +191,26 @@ export function createPhasedTrackController({
     if (!workspaceRoot || !projectId || !parentChrName) {
       return;
     }
+    const hadPhasedTracks = Array.isArray(state.assembly?.phasedChrTracks)
+      && state.assembly.phasedChrTracks.length > 0;
     try {
       await createPhasedChrTrackApi({
         workspaceRoot,
         projectId,
         parentChrName,
       });
-      await refreshPhasedTracksForCurrentChr(host, store);
+      const phasedChrTracks = await refreshPhasedTracksForCurrentChr(host, store);
       setAssemblyActionFeedbackInMainTab(host, store, {
         actionError: "",
         actionStatus: tAssembly(store.getState(), "runtime.phasedTrackCreated"),
       });
+      if (!hadPhasedTracks && phasedChrTracks.length > 0) {
+        void requestAssemblyNotice(host, store, {
+          title: tAssembly(store.getState(), "page.phasedTrackGrtNoticeTitle"),
+          message: tAssembly(store.getState(), "page.phasedTrackGrtNoticeMessage"),
+          confirmLabel: tAssembly(store.getState(), "page.phasedTrackGrtNoticeConfirm"),
+        });
+      }
     } catch (error) {
       const mappedError = mapAssemblyError({ error, stateOrLocale: store.getState() });
       setAssemblyActionFeedbackInMainTab(host, store, {

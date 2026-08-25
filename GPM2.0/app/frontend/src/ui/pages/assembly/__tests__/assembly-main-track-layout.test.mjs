@@ -743,14 +743,14 @@ test("support mirror tracks keep filled bars, share drag offset, and reserve equ
     buildState([{ trackRole: "support", assemblyCtgId: 30, offsetPx: 80 }]),
   );
 
-  assert.match(baseHtml, /flye-mirror/);
-  assert.match(baseHtml, /wtdbg2-mirror/);
+  assert.match(baseHtml, /flye-镜像轨道/);
+  assert.match(baseHtml, /wtdbg2-镜像轨道/);
   assert.match(baseHtml, /class="track-ctg [^"]*is-mirror[^"]*is-companion[^"]*"/);
   assert.match(baseHtml, /data-track-is-mirror="1"/);
   assert.doesNotMatch(baseHtml, /data-band-track-role="support"[^>]*data-band-contig-id="330"/);
   const primaryLabelIndex = baseHtml.indexOf("主(hifiasm)");
-  const firstMirrorLabelIndex = baseHtml.indexOf("wtdbg2-mirror");
-  const secondMirrorLabelIndex = baseHtml.indexOf("flye-mirror");
+  const firstMirrorLabelIndex = baseHtml.indexOf("wtdbg2-镜像轨道");
+  const secondMirrorLabelIndex = baseHtml.indexOf("flye-镜像轨道");
   assert.ok(primaryLabelIndex >= 0 && firstMirrorLabelIndex >= 0 && secondMirrorLabelIndex >= 0);
   assert.ok(primaryLabelIndex < firstMirrorLabelIndex);
   assert.ok(firstMirrorLabelIndex < secondMirrorLabelIndex);
@@ -850,7 +850,7 @@ test("mirror track label is selectable and support mother selection does not aut
   const html = renderAssemblyPage(createState(baseState));
   assert.match(
     html,
-    /<div class="assembly-track-label-row[^"]*is-mirror-track[^"]*"[^>]*data-track-label-role="support"[^>]*data-track-label-selectable="1"[^>]*>[\s\S]*flye-mirror/,
+    /<div class="assembly-track-label-row[^"]*is-mirror-track[^"]*"[^>]*data-track-label-role="support"[^>]*data-track-label-selectable="1"[^>]*>[\s\S]*flye-镜像轨道/,
   );
 
   const selectedHtml = renderAssemblyPage(
@@ -871,7 +871,7 @@ test("mirror track label is selectable and support mother selection does not aut
   );
   assert.doesNotMatch(
     selectedHtml,
-    /<div class="assembly-track-label-row[^"]*is-mirror-track[^"]*is-subview-track-selected[^"]*"[^>]*>[\s\S]*flye-mirror/,
+    /<div class="assembly-track-label-row[^"]*is-mirror-track[^"]*is-subview-track-selected[^"]*"[^>]*>[\s\S]*flye-镜像轨道/,
   );
 });
 

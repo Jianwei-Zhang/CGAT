@@ -270,9 +270,9 @@ test("support track context menu exposes mirror toggle and mirror bar keeps only
 
   assert.ok(supportItems.includes("翻转 contig"));
   assert.ok(supportItems.includes("重命名 contig..."));
-  assert.ok(supportItems.includes("Append to path"));
+  assert.ok(supportItems.includes("追加到路径"));
   assert.ok(supportItems.includes("撤销镜像 contig"));
-  assert.deepEqual(mirrorItems, ["Append to path", "撤销镜像 contig"]);
+  assert.deepEqual(mirrorItems, ["追加到路径", "撤销镜像 contig"]);
 });
 
 test("phased mode primary contig context menu offers per-haplotype add and append actions", async () => {
@@ -311,13 +311,13 @@ test("phased mode primary contig context menu offers per-haplotype add and appen
   const labels = items.map((item) => item.label);
 
   assert.deepEqual(
-    labels.filter((label) => label.startsWith("add to ") || label.startsWith("append to path ")),
-    ["add to A", "add to B", "append to path A", "append to path B"],
+    labels.filter((label) => label.startsWith("添加到 ") || label.startsWith("追加到路径 ")),
+    ["添加到 A", "添加到 B", "追加到路径 A", "追加到路径 B"],
   );
-  assert.equal(labels.includes("Append to path"), false);
+  assert.equal(labels.includes("追加到路径"), false);
 
-  await items.find((item) => item.label === "add to B").run();
-  await items.find((item) => item.label === "append to path B").run();
+  await items.find((item) => item.label === "添加到 B").run();
+  await items.find((item) => item.label === "追加到路径 B").run();
 
   assert.deepEqual(calls, [
     {
@@ -376,13 +376,13 @@ test("phased mode support contig context menu offers grouped per-haplotype appen
   const labels = items.map((item) => item.label);
 
   assert.deepEqual(
-    labels.filter((label) => label.startsWith("append to path ")),
-    ["append to path A", "append to path B"],
+    labels.filter((label) => label.startsWith("追加到路径 ")),
+    ["追加到路径 A", "追加到路径 B"],
   );
-  assert.equal(labels.some((label) => label.startsWith("add to ")), false);
-  assert.equal(labels.includes("Append to path"), false);
+  assert.equal(labels.some((label) => label.startsWith("添加到 ")), false);
+  assert.equal(labels.includes("追加到路径"), false);
 
-  await items.find((item) => item.label === "append to path B").run();
+  await items.find((item) => item.label === "追加到路径 B").run();
 
   assert.deepEqual(calls, [
     {
@@ -540,7 +540,7 @@ test("phased track item context menu appends, flips, and removes only that phase
     },
   });
 
-  assert.deepEqual(items.map((item) => item.label), ["append to path A", "append to path B", "翻转 contig", "从该分型组删除"]);
+  assert.deepEqual(items.map((item) => item.label), ["追加到路径 A", "追加到路径 B", "翻转 contig", "从该分型组删除"]);
   await items[1].run();
   await items[2].run();
   await items[3].run();
@@ -864,8 +864,8 @@ test("primary and phased track labels expose single-active hits toggles", async 
     actions,
   });
 
-  assert.equal(primaryItems[0].label, "隐藏 hits 线");
-  assert.equal(phasedItems[0].label, "显示 hits 线");
+  assert.equal(primaryItems[0].label, "隐藏比对线");
+  assert.equal(phasedItems[0].label, "显示比对线");
 
   await primaryItems[0].run();
   await phasedItems[0].run();
@@ -921,8 +921,8 @@ test("ds-backed track label context menu exposes add new ctg with clicked target
     },
   });
 
-  const primaryAdd = primaryItems.find((item) => item.label === "Add new ctg...");
-  const supportAdd = supportItems.find((item) => item.label === "Add new ctg...");
+  const primaryAdd = primaryItems.find((item) => item.label === "添加新 ctg...");
+  const supportAdd = supportItems.find((item) => item.label === "添加新 ctg...");
   assert.ok(primaryAdd, "expected primary add new ctg menu item");
   assert.ok(supportAdd, "expected support add new ctg menu item");
   await primaryAdd.run();
@@ -974,8 +974,8 @@ test("phased and mirror track labels do not expose direct add new ctg", () => {
     store,
     host,
   });
-  assert.equal(phasedItems.some((item) => item.label === "Add new ctg..."), false);
-  assert.equal(mirrorItems.some((item) => item.label === "Add new ctg..."), false);
+  assert.equal(phasedItems.some((item) => item.label === "添加新 ctg..."), false);
+  assert.equal(mirrorItems.some((item) => item.label === "添加新 ctg..."), false);
 });
 
 test("phased track label context menu exposes delete track action", async () => {

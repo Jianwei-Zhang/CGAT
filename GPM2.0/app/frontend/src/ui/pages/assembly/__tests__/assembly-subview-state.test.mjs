@@ -880,7 +880,7 @@ test("context menu shows enter-subview action when exactly two candidates are se
     store,
     host,
   });
-  assert.ok(items.every((item) => item.label !== "进入Subview-ctg"));
+  assert.ok(items.every((item) => item.label !== "进入 Subview ctg 模式"));
 });
 
 test("context menu shows local subview delete action in track-pair mode", () => {
@@ -919,7 +919,7 @@ test("context menu shows local subview delete action in track-pair mode", () => 
     store,
     host,
   });
-  assert.ok(items.some((item) => item.label === "在Subview中删除 contig（仅当前视图）"));
+  assert.ok(items.some((item) => item.label === "在 Subview 中删除 contig（仅当前视图）"));
 });
 
 test("context menu shows flip action for phased ctg in subview track-pair mode", () => {

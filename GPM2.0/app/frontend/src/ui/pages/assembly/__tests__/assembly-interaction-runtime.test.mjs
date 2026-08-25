@@ -333,8 +333,8 @@ test("context menu on a subview hit exposes left and right anchor toggles for th
     preventDefault() {},
   });
 
-  assert.match(menuState.innerHTML, /left anchor on/);
-  assert.match(menuState.innerHTML, /right anchor off/);
+  assert.match(menuState.innerHTML, /启用左侧锚点/);
+  assert.match(menuState.innerHTML, /关闭右侧锚点/);
 });
 
 test("Ctrl/Cmd + right click toggles deleted ctg selection without opening context menu", () => {
@@ -957,13 +957,13 @@ test("context menu on member row exposes retained sequence actions only", () => 
   });
 
   assert.ok(menuState.innerHTML.indexOf("对齐详情（当前版本未接入）") < menuState.innerHTML.indexOf("定位 Seq 101"));
-  assert.ok(menuState.innerHTML.indexOf("定位 Seq 101") < menuState.innerHTML.indexOf("翻转 sequence"));
-  assert.ok(menuState.innerHTML.indexOf("翻转 sequence") < menuState.innerHTML.indexOf("隐藏 sequence"));
+  assert.ok(menuState.innerHTML.indexOf("定位 Seq 101") < menuState.innerHTML.indexOf("翻转序列"));
+  assert.ok(menuState.innerHTML.indexOf("翻转序列") < menuState.innerHTML.indexOf("隐藏序列"));
   assert.match(menuState.innerHTML, /定位 Seq 101/);
   assert.match(menuState.innerHTML, /对齐详情（当前版本未接入）/);
   assert.match(menuState.innerHTML, /锚点联动（当前版本未接入）/);
-  assert.match(menuState.innerHTML, /翻转 sequence/);
-  assert.match(menuState.innerHTML, /隐藏 sequence/);
+  assert.match(menuState.innerHTML, /翻转序列/);
+  assert.match(menuState.innerHTML, /隐藏序列/);
   assert.doesNotMatch(menuState.innerHTML, /设置区间/);
   assert.doesNotMatch(menuState.innerHTML, /从当前 contig 移除/);
   assert.doesNotMatch(menuState.innerHTML, /在此 member 后拆分/);

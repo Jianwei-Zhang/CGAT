@@ -476,7 +476,7 @@ test("buildAssemblyContextMenuItems passes ref fragment metadata through append-
     actions: createContextMenuActionsCapture(calls),
   });
 
-  const item = items.find((entry) => entry.label === "Append to path");
+  const item = items.find((entry) => entry.label === "追加到路径");
   assert.ok(item);
   await item.run();
   assert.deepEqual(calls.at(-1), {
@@ -722,9 +722,9 @@ test("buildAssemblyContextMenuItems exposes track-pair flip and delete actions w
   });
 
   assert.ok(items.some((item) => item.label === "翻转 contig"));
-  assert.ok(items.some((item) => item.label === "在Subview中删除 contig（仅当前视图）"));
+  assert.ok(items.some((item) => item.label === "在 Subview 中删除 contig（仅当前视图）"));
   const flipItem = items.find((item) => item.label === "翻转 contig");
-  const deleteItem = items.find((item) => item.label === "在Subview中删除 contig（仅当前视图）");
+  const deleteItem = items.find((item) => item.label === "在 Subview 中删除 contig（仅当前视图）");
   await flipItem.run();
   assert.deepEqual(calls.at(-1), {
     name: "toggleSubviewContigFlip",
@@ -793,7 +793,7 @@ test("buildAssemblyContextMenuItems does not show enter-subview-ctg when two con
     actions: createContextMenuActionsCapture(),
   });
 
-  assert.ok(items.every((item) => item.label !== "进入Subview-ctg"));
+  assert.ok(items.every((item) => item.label !== "进入 Subview ctg 模式"));
 });
 
 test("buildAssemblyContextMenuItems does not show track-mode Subview entry in main-view context menu", () => {
@@ -819,7 +819,7 @@ test("buildAssemblyContextMenuItems does not show track-mode Subview entry in ma
     actions: createContextMenuActionsCapture(),
   });
 
-  assert.ok(items.every((item) => item.label !== "进入Subview-轨道"));
+  assert.ok(items.every((item) => item.label !== "进入 Subview 轨道模式"));
 });
 
 test("buildAssemblyContextMenuItems exposes anchor-on when a subview edge is inactive", async () => {
@@ -843,7 +843,7 @@ test("buildAssemblyContextMenuItems exposes anchor-on when a subview edge is ina
     actions: createContextMenuActionsCapture(calls),
   });
 
-  assert.deepEqual(items.map((item) => item.label), ["anchor on"]);
+  assert.deepEqual(items.map((item) => item.label), ["启用锚点"]);
   await items[0].run();
   assert.deepEqual(calls.at(-1), {
     name: "toggleSubviewAnchorEdge",
@@ -869,7 +869,7 @@ test("buildAssemblyContextMenuItems exposes anchor-off when a subview edge is ac
     actions: createContextMenuActionsCapture(),
   });
 
-  assert.deepEqual(items.map((item) => item.label), ["anchor off", "复制偏移锚点"]);
+  assert.deepEqual(items.map((item) => item.label), ["关闭锚点", "复制偏移锚点"]);
 });
 
 test("buildAssemblyContextMenuItems exposes fragment append and direct flip actions in 2-contig mode", async () => {
@@ -901,7 +901,7 @@ test("buildAssemblyContextMenuItems exposes fragment append and direct flip acti
     actions: createContextMenuActionsCapture(calls),
   });
 
-  assert.deepEqual(items.map((item) => item.label), ["Append to path", "翻转 contig"]);
+  assert.deepEqual(items.map((item) => item.label), ["追加到路径", "翻转 contig"]);
 
   await items[0].run();
   assert.deepEqual(calls.at(-1), {
@@ -969,12 +969,12 @@ test("buildAssemblyContextMenuItems offers phased append targets for subview-ctg
   });
 
   assert.deepEqual(
-    items.map((item) => item.label).filter((label) => label.startsWith("append to path ")),
-    ["append to path A", "append to path B"],
+    items.map((item) => item.label).filter((label) => label.startsWith("追加到路径 ")),
+    ["追加到路径 A", "追加到路径 B"],
   );
-  assert.equal(items.some((item) => item.label === "Append to path"), false);
+  assert.equal(items.some((item) => item.label === "追加到路径"), false);
 
-  await items.find((item) => item.label === "append to path B").run();
+  await items.find((item) => item.label === "追加到路径 B").run();
   assert.deepEqual(calls.at(-1), {
     name: "appendTrackContigToFinalPath",
     args: [
@@ -1042,11 +1042,11 @@ test("buildAssemblyContextMenuItems offers all phased append targets for phased 
   });
 
   assert.deepEqual(
-    items.map((item) => item.label).filter((label) => label.startsWith("append to path ")),
-    ["append to path A", "append to path B"],
+    items.map((item) => item.label).filter((label) => label.startsWith("追加到路径 ")),
+    ["追加到路径 A", "追加到路径 B"],
   );
 
-  await items.find((item) => item.label === "append to path B").run();
+  await items.find((item) => item.label === "追加到路径 B").run();
   assert.equal(calls.at(-1).name, "appendTrackContigToFinalPath");
   assert.equal(calls.at(-1).args[2].phasedHaplotypeKey, "A");
   assert.deepEqual(calls.at(-1).args[3], {
@@ -1097,11 +1097,11 @@ test("buildAssemblyContextMenuItems offers all phased append targets in subview-
   });
 
   assert.deepEqual(
-    items.map((item) => item.label).filter((label) => label.startsWith("append to path ")),
-    ["append to path A", "append to path B"],
+    items.map((item) => item.label).filter((label) => label.startsWith("追加到路径 ")),
+    ["追加到路径 A", "追加到路径 B"],
   );
 
-  await items.find((item) => item.label === "append to path B").run();
+  await items.find((item) => item.label === "追加到路径 B").run();
   assert.deepEqual(calls.at(-1), {
     name: "appendTrackContigToFinalPath",
     args: [
@@ -1164,9 +1164,9 @@ test("buildAssemblyContextMenuItems exposes fragment-local subview actions in tr
   });
 
   assert.deepEqual(items.map((item) => item.label), [
-    "Append to path",
+    "追加到路径",
     "翻转 contig",
-    "在Subview中删除 contig（仅当前视图）",
+    "在 Subview 中删除 contig（仅当前视图）",
   ]);
 
   await items[1].run();
@@ -1207,10 +1207,10 @@ test("buildAssemblyContextMenuItems exposes final-path graph ctg actions", async
 
   assert.deepEqual(
     items.map((item) => item.label),
-    ["删除", "翻转", "Add Gap", "Add Ctg"],
+    ["删除", "翻转", "添加 Gap", "添加 Ctg"],
   );
-  assert.deepEqual(items[2].children.map((item) => item.label), ["左侧 add gap", "右侧 add gap"]);
-  assert.deepEqual(items[3].children.map((item) => item.label), ["左侧 add ctg", "右侧 add ctg"]);
+  assert.deepEqual(items[2].children.map((item) => item.label), ["左侧添加 Gap", "右侧添加 Gap"]);
+  assert.deepEqual(items[3].children.map((item) => item.label), ["左侧添加 ctg", "右侧添加 ctg"]);
 
   await items[2].children[0].run();
   assert.deepEqual(calls.at(-1), {
@@ -1260,9 +1260,9 @@ test("buildAssemblyContextMenuItems exposes precise GapFiller actions and settin
 
   assert.deepEqual(items.map((item) => item.label), ["删除", "DEGAP"]);
   assert.deepEqual(items[1].children.map((item) => item.label), [
-    "GapFiller Left",
-    "GapFiller Right",
-    "GapFiller All",
+    "GapFiller 左端",
+    "GapFiller 右端",
+    "GapFiller 全部",
     "设置",
   ]);
   await items[0].run();
@@ -1327,7 +1327,7 @@ test("buildAssemblyContextMenuItems exposes TelSeeker only for terminal contigs"
   });
 
   const leftItems = buildItems("left");
-  assert.deepEqual(leftItems.map((item) => item.label), ["删除", "翻转", "Add Gap", "Add Ctg", "DEGAP"]);
+  assert.deepEqual(leftItems.map((item) => item.label), ["删除", "翻转", "添加 Gap", "添加 Ctg", "DEGAP"]);
   assert.deepEqual(leftItems.at(-1).children.map((item) => item.label), ["TelSeeker", "设置"]);
   await leftItems.at(-1).children[0].run();
   assert.deepEqual(calls.at(-1), {
@@ -1370,9 +1370,9 @@ test("buildAssemblyContextMenuItems lets a single-contig path choose the TelSeek
 
   assert.equal(degapItem.label, "DEGAP");
   assert.deepEqual(degapItem.children.map((item) => item.label), [
-    "TelSeeker Left",
-    "TelSeeker Right",
-    "TelSeeker All",
+    "TelSeeker 左端",
+    "TelSeeker 右端",
+    "TelSeeker 全部",
     "设置",
   ]);
   await degapItem.children[1].run();
@@ -1395,7 +1395,7 @@ test("buildAssemblyContextMenuItems lets a single-contig path choose the TelSeek
   });
 });
 
-test("buildAssemblyContextMenuItems exposes Append to path for any main-view ctg container", async () => {
+test("buildAssemblyContextMenuItems exposes append-to-path for any main-view ctg container", async () => {
   const calls = [];
   const host = {};
   const store = createStore({
@@ -1418,7 +1418,7 @@ test("buildAssemblyContextMenuItems exposes Append to path for any main-view ctg
     actions: createContextMenuActionsCapture(calls),
   });
 
-  const item = items.find((entry) => entry.label === "Append to path");
+  const item = items.find((entry) => entry.label === "追加到路径");
   assert.ok(item);
   await item.run();
   assert.deepEqual(calls.at(-1), {
@@ -1469,7 +1469,7 @@ test("buildAssemblyContextMenuItems routes main-view flip through local editor r
   });
 });
 
-test("buildAssemblyContextMenuItems exposes Append to path for subview ctg containers", async () => {
+test("buildAssemblyContextMenuItems exposes append-to-path for subview ctg containers", async () => {
   const calls = [];
   const host = {};
   const store = createStore({
@@ -1501,7 +1501,7 @@ test("buildAssemblyContextMenuItems exposes Append to path for subview ctg conta
     actions: createContextMenuActionsCapture(calls),
   });
 
-  const item = items.find((entry) => entry.label === "Append to path");
+  const item = items.find((entry) => entry.label === "追加到路径");
   assert.ok(item);
   await item.run();
   assert.deepEqual(calls.at(-1), {

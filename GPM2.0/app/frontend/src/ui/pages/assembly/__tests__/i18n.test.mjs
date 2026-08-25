@@ -29,9 +29,21 @@ test("getAssemblyI18n returns english page copy when locale is en", () => {
 
 test("i18n module centralizes zh error and status labels", () => {
   assert.match(assemblyLabelsZh.errors.invalidParams, /参数/);
-  assert.match(assemblyLabelsZh.status.loadingChromosomes, /加载 chromosome/);
+  assert.match(assemblyLabelsZh.status.loadingChromosomes, /加载染色体/);
   assert.equal(assemblyLabelsZh.degap.jobsTitle, "任务");
   assert.match(assemblyLabelsZh.degap.settingsSummary, /至少填写一个/);
+  assert.equal(assemblyLabelsZh.page.phasedTrackGrtNoticeTitle, "GRT 结果暂不可用");
+  assert.equal(assemblyLabelsZh.page.phasedTrackGrtNoticeConfirm, "我知道了");
+  assert.equal(assemblyLabelsZh.trackControls.alignmentLengthBp, "比对长度(bp)");
+  assert.equal(assemblyLabelsZh.trackControls.mapq, "MAPQ");
+});
+
+test("phased-track GRT notice has complete English copy", () => {
+  const i18n = getAssemblyI18n({ locale: "en" });
+
+  assert.equal(i18n.page.phasedTrackGrtNoticeTitle, "GRT results are temporarily unavailable");
+  assert.match(i18n.page.phasedTrackGrtNoticeMessage, /Close all phased tracks/);
+  assert.equal(i18n.page.phasedTrackGrtNoticeConfirm, "Got it");
 });
 
 test("mapAssemblyError returns english assembly messages when locale is en", () => {

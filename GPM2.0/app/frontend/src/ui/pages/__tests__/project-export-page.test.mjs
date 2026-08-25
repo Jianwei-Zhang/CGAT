@@ -78,7 +78,7 @@ test("project export page renders assignment bars before placed statistics with 
   assert.match(html, /<div class="project-export-title-row">[\s\S]*<h3>项目导出<\/h3>[\s\S]*项目: p1 · 主 ds: hifiasm/);
   assert.doesNotMatch(html, /card project-export-card/);
   assert.doesNotMatch(html, /data-project-export-refresh/);
-  assert.match(html, /class="button ghost tiny final-path-export-toggle"[\s\S]*data-project-export-toggle="true"[\s\S]*>Export<\/button>/);
+  assert.match(html, /class="button ghost tiny final-path-export-toggle"[\s\S]*data-project-export-toggle="true"[\s\S]*>导出<\/button>/);
   assert.match(html, /class="final-path-export-menu is-hidden" data-project-export-menu/);
   assert.match(html, /data-project-export-action="png"/);
   assert.match(html, /data-project-export-action="tsv"/);
@@ -89,13 +89,13 @@ test("project export page renders assignment bars before placed statistics with 
   assert.match(html, />表\(.tsv\)<\/button>/);
   assert.match(html, />日志\(.log\)<\/button>/);
   assert.match(html, />序列\(.fasta\)<\/button>/);
-  assert.match(html, />All<\/button>/);
+  assert.match(html, />全部<\/button>/);
   assert.doesNotMatch(html, /导出图|导出表|导出日志|导出序列|一键导出/);
   assert.doesNotMatch(html, /final path chr/i);
   assert.doesNotMatch(html, /project-export-summary-line/);
-  assert.ok(html.indexOf(">主 ds 分配统计<") < html.indexOf(">placed统计<"));
-  assert.match(html, />placed统计</);
-  assert.match(html, /used_主ds_ctg数目/);
+  assert.ok(html.indexOf(">主 ds 分配统计<") < html.indexOf(">已放置统计<"));
+  assert.match(html, />已放置统计</);
+  assert.match(html, /已使用主 ds ctg 数量/);
   assert.match(html, /final-path-log-ratio-segment is-appended/);
   assert.match(html, /1\/1/);
   assert.match(html, /主 ds 分配统计/);
@@ -104,11 +104,11 @@ test("project export page renders assignment bars before placed statistics with 
   assert.equal((html.match(/class="project-export-assignment-bar"/g) || []).length, 2);
   assert.match(html, /project-export-assignment-segment is-placed/);
   assert.match(html, /project-export-assignment-segment is-unassigned/);
-  assert.match(html, />placed</);
-  assert.match(html, /unplaced/);
+  assert.match(html, />已放置</);
+  assert.match(html, /未分配/);
   assert.doesNotMatch(html, /project-export-assignment-value-part is-/);
-  assert.match(html, /实际 append/);
-  assert.match(html, /主图 hidden/);
+  assert.match(html, /实际追加/);
+  assert.match(html, /主图已隐藏/);
   assert.match(html, /<div class="project-export-used-metrics">[\s\S]*class="project-export-used-row"[\s\S]*class="project-export-used-row"/);
   assert.match(html, /class="project-export-final-path-list"/);
   assert.match(html, /class="project-export-final-path-row"[\s\S]*data-project-export-jump-chr="Chr01"/);
@@ -567,8 +567,8 @@ test("project export page renders export progress as a final-path style modal", 
 
   assert.match(html, /data-project-export-modal="true"/);
   assert.match(html, /data-project-export-overlay="true"/);
-  assert.match(html, /正在导出 final path/);
-  assert.match(html, /p1 · All/);
+  assert.match(html, /正在导出 Final Path/);
+  assert.match(html, /p1 · 全部/);
   assert.match(html, /data-project-export-step-status="running"/);
   assert.match(html, /class="pipeline-spinner"/);
   assert.match(html, /data-project-export-close="true"/);
@@ -609,8 +609,8 @@ test("project export page hides log action and stats when any final path contain
   assert.match(html, /data-project-export-action="all"/);
   assert.doesNotMatch(html, /data-project-export-action="log"/);
   assert.match(html, /<div class="project-export-summary-line"><span>ref: <strong>Chr01<\/strong><\/span><\/div>/);
-  assert.match(html, /项目统计和 log 导出已关闭/);
-  assert.doesNotMatch(html, /used_主ds_ctg数目/);
+  assert.match(html, /项目统计和日志导出已关闭/);
+  assert.doesNotMatch(html, /已使用主 ds ctg 数量/);
 });
 
 test("project export assignment values show placed over total instead of placed over unplaced", () => {
@@ -625,14 +625,14 @@ test("project export assignment values show placed over total instead of placed 
 
   assert.match(
     html,
-    /<div class="project-export-assignment-row">[\s\S]*?>数目<[\s\S]*title="placed: 1">1<\/span>[\s\S]*title="placed \+ unplaced: 4">4<\/span>/,
+    /<div class="project-export-assignment-row">[\s\S]*?>数目<[\s\S]*title="已放置: 1">1<\/span>[\s\S]*title="已放置 \+ 未分配: 4">4<\/span>/,
   );
   assert.match(
     html,
-    /<div class="project-export-assignment-row">[\s\S]*?>长度<[\s\S]*title="placed: 1,000 bp">1,000<\/span>[\s\S]*title="placed \+ unplaced: 1,250 bp">1,250<\/span>/,
+    /<div class="project-export-assignment-row">[\s\S]*?>长度<[\s\S]*title="已放置: 1,000 bp">1,000<\/span>[\s\S]*title="已放置 \+ 未分配: 1,250 bp">1,250<\/span>/,
   );
-  assert.doesNotMatch(html, /title="unplaced: 3">3<\/span>/);
-  assert.doesNotMatch(html, /title="unplaced: 250 bp">250<\/span>/);
+  assert.doesNotMatch(html, /title="未分配: 3">3<\/span>/);
+  assert.doesNotMatch(html, /title="未分配: 250 bp">250<\/span>/);
 });
 
 test("project export page counts current main-track hidden primary contigs", () => {
@@ -664,10 +664,10 @@ test("project export page counts current main-track hidden primary contigs", () 
     },
   }));
 
-  assert.match(html, /role="img" aria-label="实际 append: 1\/2; 主图 hidden: 1\/2"/);
-  assert.match(html, /title="主图 hidden: 2,000\/3,000 bp"/);
-  assert.match(html, /used_主ds_ctg数目[\s\S]*<strong>2\/2<\/strong>/);
-  assert.match(html, /used_主ds_ctg长度[\s\S]*<strong>3,000\/3,000<\/strong>/);
+  assert.match(html, /role="img" aria-label="实际追加: 1\/2; 主图已隐藏: 1\/2"/);
+  assert.match(html, /title="主图已隐藏: 2,000\/3,000 bp"/);
+  assert.match(html, /已使用主 ds ctg 数量[\s\S]*<strong>2\/2<\/strong>/);
+  assert.match(html, /已使用主 ds ctg 长度[\s\S]*<strong>3,000\/3,000<\/strong>/);
 });
 
 test("project export stat rows share parent grids so bar ends align within each panel", () => {
@@ -813,8 +813,8 @@ test("project export detail table is unwrapped, hides ctg, and supports header f
   assert.doesNotMatch(html, />明细</);
   assert.doesNotMatch(html, /<th>ctg<\/th>/);
   assert.doesNotMatch(html, /<select data-project-export-detail-filter=/);
-  assert.match(html, /辅助 ds_ctg使用情况/);
-  assert.match(html, /重复主ds_ctg使用情况/);
+  assert.match(html, /辅 ds ctg 使用情况/);
+  assert.match(html, /重复主 ds ctg 使用情况/);
   assert.match(html, /class="project-export-detail-filter/);
   assert.match(html, /data-project-export-detail-filter-menu="type"/);
   assert.match(html, /data-project-export-detail-filter="type"/);

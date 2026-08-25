@@ -52,7 +52,7 @@ function renderActiveAssemblyTab(state, deps) {
           <table class="records-table assembly-tab-table">
             <thead>
               <tr>
-                <th>contig ID</th>
+                <th>${i18n.contigIdCol}</th>
                 <th>${i18n.sequenceNameCol}</th>
                 <th>${i18n.chromosomeCol}</th>
                 <th>${i18n.memberCountCol}</th>

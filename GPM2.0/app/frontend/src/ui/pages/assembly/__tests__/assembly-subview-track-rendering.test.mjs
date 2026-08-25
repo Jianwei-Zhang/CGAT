@@ -55,7 +55,7 @@ test("subview panel renders chart sub-card with parameter labels after entering"
   assert.match(html, /data-subview-remove-contig-id="30"/);
   assert.match(html, /最小刻度单位\(kb\)/);
   assert.match(html, /最多可展示数/);
-  assert.match(html, /Alignment Length\(bp\)/);
+  assert.match(html, /比对长度\(bp\)/);
   assert.match(html, /MAPQ/);
   assert.match(html, /id="subview-track-min-tick-unit-kb"/);
   assert.match(html, /id="subview-track-max-tick-count"/);
@@ -1079,7 +1079,7 @@ test("context menu on blank area exposes batch subview delete for box-selected t
   });
 
   assert.ok(
-    items.some((item) => item.label === "在Subview中删除已框选 contig（2，仅当前视图）"),
+    items.some((item) => item.label === "在 Subview 中删除已框选 contig（2，仅当前视图）"),
   );
 });
 

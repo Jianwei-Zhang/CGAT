@@ -165,7 +165,7 @@ test("buildSubviewSummaryFromCandidates rejects same-dataset contigs when self a
   });
 
   assert.equal(result.ok, false);
-  assert.equal(result.error, "该 dataset 未包含 self 比对，不能在同 ds ctg 间进入 Subview。");
+  assert.equal(result.error, "该数据集未包含自比对，不能在同一 ds 的 ctg 间进入 Subview。");
 });
 
 test("buildSubviewSummaryFromCandidates allows ref plus ds candidates", () => {

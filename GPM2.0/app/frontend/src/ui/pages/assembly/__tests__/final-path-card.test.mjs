@@ -31,13 +31,13 @@ function createI18n() {
       finalPathDegap: "DEGAP",
       finalPathDegapControls: "DEGAP 图控件",
       finalPathLog: "日志",
-      finalPathExport: "Export",
+      finalPathExport: "导出",
       finalPathExportPng: "图(.png)",
       finalPathExportTsv: "表(.tsv)",
       finalPathExportLog: "日志(.log)",
       finalPathExportFasta: "序列(.fasta)",
       finalPathExportDegapJobs: "DEGAP-JOBS",
-      finalPathExportAll: "All",
+      finalPathExportAll: "全部",
       finalPathIndexCol: "#",
       finalPathCtgCol: "Ctg",
       finalPathOriginIdCol: "Origin ID",
@@ -47,12 +47,12 @@ function createI18n() {
       finalPathCtgEndCol: "Ctg_end",
       finalPathChrStartCol: "Chr_start",
       finalPathChrEndCol: "Chr_end",
-      finalPathLogPrimaryCount: "used_主ds_ctg数目",
-      finalPathLogPrimaryLength: "used_主ds_ctg长度",
-      finalPathLogAppended: "实际 append",
-      finalPathLogHidden: "主图 hidden",
-      finalPathLogSupportTitle: "辅助 ds_ctg使用情况",
-      finalPathLogOtherChrTitle: "重复主ds_ctg使用情况",
+      finalPathLogPrimaryCount: "已使用主 ds ctg 数量",
+      finalPathLogPrimaryLength: "已使用主 ds ctg 长度",
+      finalPathLogAppended: "实际追加",
+      finalPathLogHidden: "主图已隐藏",
+      finalPathLogSupportTitle: "辅 ds ctg 使用情况",
+      finalPathLogOtherChrTitle: "重复主 ds ctg 使用情况",
       finalPathLogNoRows: "暂无记录",
       finalPathRestoreGrtBaseline: "↺ 恢复 GRT 基线",
       finalPathRestoreGrtBaselineCurrent: "当前已是 GRT 基线",
@@ -65,7 +65,7 @@ function createI18n() {
     degap: {
       settingsTitle: "DEGAP 设置",
       close: "关闭",
-      settingsSummary: "配置服务器端 DEGAP gapfiller 路径；HiFi Reads PATH 或 ONT Reads PATH 至少填写一个。",
+      settingsSummary: "配置服务器端 DEGAP GapFiller 路径；HiFi Reads PATH 或 ONT Reads PATH 至少填写一个。",
       requiredPaths: "必填路径",
       degapPath: "DEGAP PATH",
       hifiReadsPath: "HiFi Reads PATH",
@@ -75,10 +75,10 @@ function createI18n() {
       jobOut: "Job --out",
       readsHelp: "READS path 为服务器端原始测序数据；HiFi 或 ONT 至少填写一个。",
       recommendedParameters: "推荐参数",
-      otherGapfillerDefaults: "其他 gapfiller 默认参数",
-      addLeftJob: "添加 Left-job",
-      addRightJob: "添加 Right-job",
-      addAllJob: "添加 All-job",
+      otherGapfillerDefaults: "其他 GapFiller 默认参数",
+      addLeftJob: "添加左端任务",
+      addRightJob: "添加右端任务",
+      addAllJob: "添加全部任务",
       jobsTitle: "任务",
       expandJobsCard: "展开 DEGAP 任务卡片",
       collapseJobsCard: "收起 DEGAP 任务卡片",
@@ -147,7 +147,7 @@ test("renderFinalPathCard migrates the legacy DEGAP view to Graph and embeds DEG
   assert.match(html, /data-degap-settings-modal/);
   assert.match(html, /data-final-path-graph-viewport[\s\S]*data-degap-job-card/);
   assert.match(html, /data-degap-settings-open/);
-  assert.doesNotMatch(html, /配置服务器端 DEGAP gapfiller 路径；HiFi Reads PATH 或 ONT Reads PATH 至少填写一个。/);
+  assert.doesNotMatch(html, /配置服务器端 DEGAP GapFiller 路径；HiFi Reads PATH 或 ONT Reads PATH 至少填写一个。/);
   assert.doesNotMatch(html, /DEGAP PATH 为必填项。/);
   assert.match(html, /<input type="text" data-degap-setting-field="hifiReads" value="" placeholder="\/server\/reads\/hifi.fastq.gz">/);
   assert.match(html, /<input type="text" data-degap-setting-field="ontReads" value="" placeholder="\/server\/reads\/ont.fastq.gz">/);
@@ -155,7 +155,7 @@ test("renderFinalPathCard migrates the legacy DEGAP view to Graph and embeds DEG
   assert.match(html, /<p class="helper-hint degap-form-help">READS path 为服务器端原始测序数据；HiFi 或 ONT 至少填写一个。<\/p>/);
   assert.match(html, /DEGAP-JOBS/);
   assert.match(html, /data-final-path-export-action="all"[\s\S]*final-path-export-divider[\s\S]*data-final-path-export-action="degap-jobs"/);
-  assert.match(html, /class="final-path-card-head-controls"[\s\S]*最小刻度单位\(kb\)[\s\S]*data-track-combo-field="minTickUnitKb"[\s\S]*value="500"[\s\S]*最多可展示数[\s\S]*data-track-combo-field="maxTickCount"[\s\S]*value="15"[\s\S]*Export/);
+  assert.match(html, /class="final-path-card-head-controls"[\s\S]*最小刻度单位\(kb\)[\s\S]*data-track-combo-field="minTickUnitKb"[\s\S]*value="500"[\s\S]*最多可展示数[\s\S]*data-track-combo-field="maxTickCount"[\s\S]*value="15"[\s\S]*导出/);
   assert.doesNotMatch(html, /data-degap-scale-(?:combo-)?field/);
   assert.doesNotMatch(html, /degap-graph-toolbar/);
   assert.doesNotMatch(html, /DEGAP-gapfiller-config/);
@@ -691,27 +691,27 @@ test("renderFinalPathCard shows log tab and renders compact log metrics when fin
   assert.match(html, /final-path-log-ratio-segment is-appended/);
   assert.match(html, /final-path-log-ratio-segment is-log-hidden/);
   assert.match(html, /final-path-log-swatch is-log-hidden/);
-  assert.match(html, /role="img" aria-label="实际 append: 1\/3; 主图 hidden: 1\/3"/);
-  assert.match(html, /title="实际 append: 1,200\/5,000 bp"/);
-  assert.match(html, /title="主图 hidden: 900\/5,000 bp"/);
-  assert.match(html, /<span class="final-path-log-stat-label">used_主ds_ctg数目<\/span>\s*<span class="final-path-log-ratio-bar"[\s\S]*?<\/span>\s*<strong class="final-path-log-stat-value">2\/3<\/strong>/);
-  assert.match(html, /used_主ds_ctg数目/);
+  assert.match(html, /role="img" aria-label="实际追加: 1\/3; 主图已隐藏: 1\/3"/);
+  assert.match(html, /title="实际追加: 1,200\/5,000 bp"/);
+  assert.match(html, /title="主图已隐藏: 900\/5,000 bp"/);
+  assert.match(html, /<span class="final-path-log-stat-label">已使用主 ds ctg 数量<\/span>\s*<span class="final-path-log-ratio-bar"[\s\S]*?<\/span>\s*<strong class="final-path-log-stat-value">2\/3<\/strong>/);
+  assert.match(html, /已使用主 ds ctg 数量/);
   assert.match(html, /2\/3/);
-  assert.match(html, /used_主ds_ctg长度/);
+  assert.match(html, /已使用主 ds ctg 长度/);
   assert.match(html, /2,100\/5,000/);
-  assert.match(html, /实际 append/);
-  assert.match(html, /主图 hidden/);
+  assert.match(html, /实际追加/);
+  assert.match(html, /主图已隐藏/);
   assert.match(html, /<th>Type<\/th>/);
   assert.doesNotMatch(html, /<th>ctg<\/th>/);
   assert.match(html, /<th>used_by_chr<\/th>/);
-  assert.match(html, /<td class="final-path-log-type-cell" rowspan="2">辅助 ds_ctg使用情况<\/td>\s*<td>flye<\/td>/);
+  assert.match(html, /<td class="final-path-log-type-cell" rowspan="2">辅 ds ctg 使用情况<\/td>\s*<td>flye<\/td>/);
   assert.doesNotMatch(html, /<td>Ctg10<\/td>/);
   assert.doesNotMatch(html, /<td>Ctg11<\/td>/);
   assert.match(html, /<td>contig_98<\/td>[\s\S]*?<td>Chr01<\/td>/);
   assert.match(html, /<td>contig_99<\/td>[\s\S]*?<td>Chr01<\/td>/);
-  assert.match(html, /<td class="final-path-log-type-cell" rowspan="1">重复主ds_ctg使用情况<\/td>\s*<td>hifiasm<\/td>/);
-  assert.doesNotMatch(html, /<h5>辅助 ds_ctg使用情况<\/h5>/);
-  assert.doesNotMatch(html, /<h5>重复主ds_ctg使用情况<\/h5>/);
+  assert.match(html, /<td class="final-path-log-type-cell" rowspan="1">重复主 ds ctg 使用情况<\/td>\s*<td>hifiasm<\/td>/);
+  assert.doesNotMatch(html, /<h5>辅 ds ctg 使用情况<\/h5>/);
+  assert.doesNotMatch(html, /<h5>重复主 ds ctg 使用情况<\/h5>/);
   assert.match(html, /flye/);
   assert.match(html, /Chr02/);
 });
@@ -751,9 +751,9 @@ test("renderFinalPathCard hides empty log detail sections", () => {
     },
   );
 
-  assert.match(html, /used_主ds_ctg数目/);
-  assert.doesNotMatch(html, /辅助 ds_ctg使用情况/);
-  assert.doesNotMatch(html, /重复主ds_ctg使用情况/);
+  assert.match(html, /已使用主 ds ctg 数量/);
+  assert.doesNotMatch(html, /辅 ds ctg 使用情况/);
+  assert.doesNotMatch(html, /重复主 ds ctg 使用情况/);
   assert.doesNotMatch(html, /暂无记录/);
 });
 

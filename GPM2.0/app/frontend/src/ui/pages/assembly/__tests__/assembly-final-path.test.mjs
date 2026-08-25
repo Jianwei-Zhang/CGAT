@@ -627,7 +627,7 @@ test("assembly page renders a blocking final-path export modal when export job i
 
   assert.match(html, /data-final-path-export-modal="true"/);
   assert.match(html, /data-final-path-export-overlay="true"/);
-  assert.match(html, /正在导出 final path/);
+  assert.match(html, /正在导出 Final Path/);
   assert.match(html, /Chr01/);
   assert.match(html, /data-final-path-export-step-status="running"/);
   assert.match(html, /class="pipeline-spinner"/);

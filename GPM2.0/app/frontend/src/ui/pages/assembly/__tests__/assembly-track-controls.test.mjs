@@ -27,13 +27,13 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   assert.match(html, /辅ds_ctg_len\(bp\)/);
   assert.match(html, /最小刻度单位\(kb\)/);
   assert.match(html, /最多可展示数/);
-  assert.match(html, /Alignment Length\(bp\)/);
+  assert.match(html, /比对长度\(bp\)/);
   assert.match(html, /MAPQ/);
   assert.ok(html.indexOf("辅 ds") < html.indexOf("辅ds_ctg_len"));
   assert.ok(html.indexOf("辅ds_ctg_len") < html.indexOf("最小刻度单位"));
   assert.ok(html.indexOf("最小刻度单位") < html.indexOf("最多可展示数"));
-  assert.ok(html.indexOf("最多可展示数") < html.indexOf("Alignment Length"));
-  assert.ok(html.indexOf("Alignment Length") < html.indexOf("MAPQ"));
+  assert.ok(html.indexOf("最多可展示数") < html.indexOf("比对长度"));
+  assert.ok(html.indexOf("比对长度") < html.indexOf("MAPQ"));
 
   assert.match(
     html,
@@ -93,7 +93,7 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   );
   assert.match(
     html,
-    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开Alignment Length\(bp\)候选值" aria-expanded="false" aria-controls="assembly-track-alignment-length-menu">/,
+    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开比对长度\(bp\)候选值" aria-expanded="false" aria-controls="assembly-track-alignment-length-menu">/,
   );
   assert.match(html, /<div id="assembly-track-alignment-length-menu" class="assembly-track-combo-menu is-hidden" role="listbox">/);
   assert.match(html, /data-track-combo-value="1000"/);

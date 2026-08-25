@@ -16,6 +16,7 @@ export function createAssemblyConfirmController(deps = {}) {
     escapeHtml,
     getAssemblyI18n,
     rerender,
+    rerenderDialog = rerender,
     tAssembly,
   } = deps;
   if (
@@ -38,12 +39,14 @@ function renderAssemblyConfirmModal(state) {
   const promptsI18n = getAssemblyI18n(state).prompts || {};
   const id = String(dialog.id || "");
   const rawMode = String(dialog.mode || "").trim();
-  const mode = rawMode === "prompt" || rawMode === "anchor-offset" ? rawMode : "confirm";
+  const mode = ["prompt", "anchor-offset", "notice"].includes(rawMode) ? rawMode : "confirm";
   const title = mode === "anchor-offset"
     ? (promptsI18n.anchorOffsetTitle || pageI18n.confirmDialogTitle || "确认操作")
-    : (pageI18n.confirmDialogTitle || "确认操作");
+    : (String(dialog.title || "").trim() || pageI18n.confirmDialogTitle || "确认操作");
   const message = String(dialog.message || "");
-  const confirmLabel = pageI18n.confirmDialogConfirm || "确定";
+  const confirmLabel = String(dialog.confirmLabel || "").trim()
+    || pageI18n.confirmDialogConfirm
+    || "确定";
   const cancelLabel = pageI18n.confirmDialogCancel || "取消";
   const dangerClass = dialog.danger === true || mode === "confirm" ? " is-danger" : "";
   const promptInput = mode === "prompt"
@@ -141,12 +144,14 @@ function renderAssemblyConfirmModal(state) {
             data-assembly-confirm-id="${escapeAttr(id)}"
             ${mode === "anchor-offset" && !anchorOffsetResult?.ok ? "disabled" : ""}
           >${escapeHtml(confirmLabel)}</button>
-          <button
-            type="button"
-            class="button ghost"
-            data-assembly-confirm-action="cancel"
-            data-assembly-confirm-id="${escapeAttr(id)}"
-          >${escapeHtml(cancelLabel)}</button>
+          ${mode === "notice" ? "" : `
+            <button
+              type="button"
+              class="button ghost"
+              data-assembly-confirm-action="cancel"
+              data-assembly-confirm-id="${escapeAttr(id)}"
+            >${escapeHtml(cancelLabel)}</button>
+          `}
         </div>
       </article>
     </div>
@@ -180,6 +185,39 @@ function requestAssemblyConfirm(host, store, message) {
       },
     });
     rerender(host, store);
+  });
+}
+
+function requestAssemblyNotice(host, store, { title, message, confirmLabel } = {}) {
+  if (!host || !store) {
+    globalThis.window?.alert?.(String(message || ""));
+    return Promise.resolve(true);
+  }
+  const state = store.getState();
+  const id = `assembly-confirm-${assemblyPageSession.assemblyConfirmDialogSeq += 1}`;
+  const previousId = String(state.assembly?.confirmDialog?.id || "");
+  const previousResolve = assemblyPageSession.pendingAssemblyConfirmResolvers.get(previousId);
+  if (previousResolve) {
+    assemblyPageSession.pendingAssemblyConfirmResolvers.delete(previousId);
+    previousResolve(false);
+  }
+  return new Promise((resolve) => {
+    assemblyPageSession.pendingAssemblyConfirmResolvers.set(id, resolve);
+    store.setState({
+      assembly: {
+        ...state.assembly,
+        confirmDialog: {
+          open: true,
+          id,
+          mode: "notice",
+          danger: false,
+          title: String(title || ""),
+          message: String(message || ""),
+          confirmLabel: String(confirmLabel || ""),
+        },
+      },
+    });
+    rerenderDialog(host, store);
   });
 }
 
@@ -275,7 +313,7 @@ function resolveAssemblyConfirmDialog(host, store, { id, confirmed, value }) {
   const dialogId = String(id || state.assembly?.confirmDialog?.id || "");
   const resolve = assemblyPageSession.pendingAssemblyConfirmResolvers.get(dialogId);
   const rawMode = String(state.assembly?.confirmDialog?.mode || "").trim();
-  const mode = rawMode === "prompt" || rawMode === "anchor-offset" ? rawMode : "confirm";
+  const mode = ["prompt", "anchor-offset", "notice"].includes(rawMode) ? rawMode : "confirm";
   assemblyPageSession.pendingAssemblyConfirmResolvers.delete(dialogId);
   store.setState({
     assembly: {
@@ -283,7 +321,11 @@ function resolveAssemblyConfirmDialog(host, store, { id, confirmed, value }) {
       confirmDialog: null,
     },
   });
-  rerender(host, store);
+  if (mode === "notice") {
+    rerenderDialog(host, store);
+  } else {
+    rerender(host, store);
+  }
   if (resolve) {
     if (mode === "anchor-offset") {
       resolve(confirmed && value && typeof value === "object" ? value : null);
@@ -298,6 +340,7 @@ function resolveAssemblyConfirmDialog(host, store, { id, confirmed, value }) {
   return {
     renderAssemblyConfirmModal,
     requestAssemblyConfirm,
+    requestAssemblyNotice,
     requestAssemblyPrompt,
     requestAssemblyAnchorOffsetPrompt,
     resolveAssemblyConfirmDialog,
