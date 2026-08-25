@@ -243,6 +243,8 @@ deleteWithFiles = importer.deleteWithFiles === true;
 - A Subview-only mutation must replace only `[data-subview-panel='1']`.
 - Partial bindings must pass an explicit `main`, `subview`, or `final-path` scope. They must not run route initialization, register route-level resize/hotkey listeners, or clear persisted scroll state for absent sibling regions.
 - Scroll synchronization remains active for the replaced region, and unchanged sibling DOM and scroll positions remain intact.
+- A persisted main-track viewport key identifies the coordinate space (project, chromosome, support dataset, and track preferences). It must not include transient selection such as `selectedCtgId`; explicit member/search navigation uses the pending focus command instead.
+- A full-route bind must treat missing track DOM during `assembly.loading` as temporary. Preserve main, Subview, and Final Path scroll state until stable non-loading markup is bound; only a stable route without a region may clear that region's state.
 - Final Path status/error feedback must patch the shared assembly toast without replacing the main or Subview DOM.
 - Full-route rendering remains valid for route/tab/chromosome transitions and route-level modals.
 
@@ -256,6 +258,7 @@ deleteWithFiles = importer.deleteWithFiles === true;
   - Assert another edit while availability remains false does not refresh either GRT consumer region.
 - Assembly feature suites under `app/frontend/src/ui/pages/assembly/__tests__/`
   - Keep page-shell, main-track, Subview, Final Path, coordinate, and phased-track rendering regressions green after renderer extraction.
+  - Assert main-track scroll survives a selected-contig change across temporary loading markup, while explicit focus navigation still targets the requested contig.
 
 #### 4. Wrong vs Correct
 #### Wrong

@@ -216,7 +216,8 @@ export function createAssemblyViewportController({
     const shouldBindMain = scope === "all" || scope === "main";
     const shouldBindSubview = scope === "all" || scope === "subview";
     const shouldBindFinalPath = scope === "all" || scope === "final-path";
-    const shouldClearMissing = scope === "all";
+    const hasTemporaryLoadingMarkup = Boolean(store.getState().assembly?.loading);
+    const shouldClearMissing = scope === "all" && !hasTemporaryLoadingMarkup;
     let viewportChanged = false;
     const nextMeasuredTrackViewportWidths = resolveMeasuredTrackViewportWidths(
       readAssemblyTrackViewportWidths(host),

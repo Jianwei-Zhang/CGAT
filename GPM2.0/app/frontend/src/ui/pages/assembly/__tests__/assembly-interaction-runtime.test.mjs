@@ -2076,7 +2076,7 @@ test("track scroll sync restores and persists project-scoped main and subview sc
           mapq: 0,
         },
         trackScrollState: {
-          viewportKey: "7:Chr01:8:22:10000:250:10:1000:0",
+          viewportKey: "7:Chr01:22:10000:250:10:1000:0",
           scrollLeft: 320,
         },
         subview: {
@@ -2119,7 +2119,7 @@ test("track scroll sync restores and persists project-scoped main and subview sc
   mainScroll.scrollLeft = 460;
   mainListeners.get("scroll")?.();
   assert.deepEqual(store.getState().assembly.trackScrollState, {
-    viewportKey: "7:Chr01:8:22:10000:250:10:1000:0",
+    viewportKey: "7:Chr01:22:10000:250:10:1000:0",
     scrollLeft: 460,
   });
 
@@ -2132,7 +2132,7 @@ test("track scroll sync restores and persists project-scoped main and subview sc
   assert.deepEqual(persisted.slice(-2), [
     {
       trackScrollState: {
-        viewportKey: "7:Chr01:8:22:10000:250:10:1000:0",
+        viewportKey: "7:Chr01:22:10000:250:10:1000:0",
         scrollLeft: 460,
       },
       subviewTrackScrollState: {
@@ -2142,7 +2142,7 @@ test("track scroll sync restores and persists project-scoped main and subview sc
     },
     {
       trackScrollState: {
-        viewportKey: "7:Chr01:8:22:10000:250:10:1000:0",
+        viewportKey: "7:Chr01:22:10000:250:10:1000:0",
         scrollLeft: 460,
       },
       subviewTrackScrollState: {
@@ -2151,6 +2151,107 @@ test("track scroll sync restores and persists project-scoped main and subview sc
       },
     },
   ]);
+  __testResetMeasuredTrackViewportWidths();
+});
+
+test("main-track scroll position survives contig selection and temporary loading markup", () => {
+  __testResetMeasuredTrackViewportWidths();
+  const listeners = new Map();
+  let mainScroll = {
+    dataset: {
+      trackRole: "primary",
+      trackViewboxMinX: "0",
+      focusCenter: "120",
+      focusStart: "40",
+    },
+    clientWidth: 1200,
+    scrollLeft: 0,
+    addEventListener(type, handler) {
+      listeners.set(type, handler);
+    },
+  };
+  const host = {
+    querySelector(selector) {
+      if (selector === ".assembly-track-scroll[data-track-role='primary']") {
+        return mainScroll;
+      }
+      return null;
+    },
+    querySelectorAll(selector) {
+      if (selector === ".assembly-track-scroll[data-track-role]") {
+        return mainScroll ? [mainScroll] : [];
+      }
+      return [];
+    },
+  };
+  const store = createStore(createState({
+    session: { projectId: 7 },
+    assembly: {
+      selectedChrName: "Chr01",
+      selectedCtgId: 8,
+      supportDatasetId: 22,
+      trackView: {
+        supportDsCtgLen: 10000,
+        minTickUnitKb: 250,
+        maxTickCount: 10,
+        alignmentLength: 1000,
+        mapq: 0,
+      },
+      trackScrollState: {
+        viewportKey: "7:Chr01:22:10000:250:10:1000:0",
+        scrollLeft: 760,
+      },
+    },
+  }));
+
+  __testBindTrackScrollSync(host, store);
+  assert.equal(mainScroll.scrollLeft, 760);
+
+  mainScroll.scrollLeft = 840;
+  listeners.get("scroll")?.();
+  const stateBeforeLoading = store.getState();
+  store.setState({
+    ...stateBeforeLoading,
+    assembly: {
+      ...stateBeforeLoading.assembly,
+      loading: true,
+      selectedCtgId: 30,
+    },
+  });
+  mainScroll = null;
+
+  __testBindTrackScrollSync(host, store);
+  assert.deepEqual(store.getState().assembly.trackScrollState, {
+    viewportKey: "7:Chr01:22:10000:250:10:1000:0",
+    scrollLeft: 840,
+  });
+
+  const loadingState = store.getState();
+  store.setState({
+    ...loadingState,
+    assembly: {
+      ...loadingState.assembly,
+      loading: false,
+    },
+  });
+  mainScroll = {
+    dataset: {
+      trackRole: "primary",
+      trackViewboxMinX: "0",
+      focusCenter: "120",
+      focusStart: "40",
+    },
+    clientWidth: 1200,
+    scrollLeft: 0,
+    addEventListener() {},
+  };
+
+  __testBindTrackScrollSync(host, store);
+  assert.equal(mainScroll.scrollLeft, 840);
+  assert.deepEqual(store.getState().assembly.trackScrollState, {
+    viewportKey: "7:Chr01:22:10000:250:10:1000:0",
+    scrollLeft: 840,
+  });
   __testResetMeasuredTrackViewportWidths();
 });
 

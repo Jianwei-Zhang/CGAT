@@ -20,10 +20,10 @@ export function areViewportScrollStatesEqual(left, right) {
 
 export function buildMainTrackViewportKey(state) {
   const prefs = resolveTrackPrefs(state?.assembly?.trackView);
+  // Contig selection is transient; explicit focus commands own intentional viewport moves.
   return [
     state?.session?.projectId || "",
     state?.assembly?.selectedChrName || "",
-    state?.assembly?.selectedCtgId || "",
     normalizeSupportDatasetId(state?.assembly?.supportDatasetId) || "",
     prefs.supportDsCtgLen,
     prefs.minTickUnitKb,
