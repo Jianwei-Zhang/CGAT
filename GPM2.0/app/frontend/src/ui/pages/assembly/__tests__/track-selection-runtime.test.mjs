@@ -48,7 +48,7 @@ function createStore(initialState) {
   };
 }
 
-test("bindTrackBoxSelection collects primary-track box selections and clears the box on pointerup", () => {
+test("bindTrackBoxSelection paints in scroll coordinates and hit-tests in shifted SVG coordinates", () => {
   const originalWindow = globalThis.window;
   const windowStub = createWindowStub();
   globalThis.window = windowStub;
@@ -60,18 +60,18 @@ test("bindTrackBoxSelection collects primary-track box selections and clears the
         const attrs = {
           "data-track-role": "primary",
           "data-track-contig-id": "5",
-          "data-track-rect-x": "10",
+          "data-track-rect-x": "430",
           "data-track-rect-y": "12",
-          "data-track-rect-width": "50",
+          "data-track-rect-width": "20",
           "data-track-rect-height": "20",
         };
         return attrs[name] ?? null;
       },
     };
     const scrollEl = {
-      scrollLeft: 0,
+      scrollLeft: 400,
       scrollTop: 0,
-      dataset: { trackViewboxMinX: "0" },
+      dataset: { trackViewboxMinX: "-200" },
       getAttribute(name) {
         return name === "data-track-role" ? "primary" : null;
       },
@@ -83,7 +83,7 @@ test("bindTrackBoxSelection collects primary-track box selections and clears the
       },
       appendChild() {},
       getBoundingClientRect() {
-        return { left: 0, top: 0 };
+        return { left: 100, top: 50 };
       },
     };
     const hostListeners = new Map();
@@ -110,8 +110,8 @@ test("bindTrackBoxSelection collects primary-track box selections and clears the
 
     hostListeners.get("pointerdown")?.({
       button: 0,
-      clientX: 10,
-      clientY: 10,
+      clientX: 320,
+      clientY: 62,
       preventDefault() {
         calls.push(["prevent"]);
       },
@@ -125,7 +125,11 @@ test("bindTrackBoxSelection collects primary-track box selections and clears the
       },
     });
 
-    windowStub.listeners.get("pointermove")?.({ clientX: 40, clientY: 32 });
+    windowStub.listeners.get("pointermove")?.({ clientX: 370, clientY: 82 });
+    assert.equal(boxEl.style.left, "620px");
+    assert.equal(boxEl.style.top, "12px");
+    assert.equal(boxEl.style.width, "50px");
+    assert.equal(boxEl.style.height, "20px");
     windowStub.listeners.get("pointerup")?.();
 
     assert.deepEqual(calls, [

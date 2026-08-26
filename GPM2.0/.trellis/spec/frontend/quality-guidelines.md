@@ -376,6 +376,29 @@ Recomputing main-track hit display positions in the frontend from `orient` or `r
 #### Correct
 Treat `list_chr_view_ctgs` hit coordinates as the display contract for main tracks; use `hit.strand` only to choose band point order, and only transform coordinates for explicitly local, unsaved subview state.
 
+### Assembly Pointer Overlay Coordinate Contracts
+
+#### 1. Scope / Trigger
+- Applies when a pointer interaction combines HTML overlays inside `.assembly-track-scroll` with SVG geometry or hit-testing.
+- Trigger: box selection, drag previews, hover overlays, or any interaction rendered in scroll-layer CSS coordinates while consuming SVG user coordinates.
+
+#### 2. Contracts
+- Scroll-layer overlay coordinates are `client - scrollRect + scrollOffset`. Use them for absolute-positioned HTML `left` / `top` geometry; do not add the SVG `viewBoxMinX`.
+- SVG user coordinates are the scroll-layer coordinates plus the active main-track or Subview `viewBoxMinX`. Use them for contig/band geometry and hit-testing.
+- Keep the two conversions as separately named functions in the viewport owner. A pointer interaction that paints HTML and tests SVG geometry must retain both points rather than reuse one coordinate for both consumers.
+- Zero scroll or zero `viewBoxMinX` is not sufficient regression coverage because it makes the two coordinate systems appear identical.
+
+#### 3. Tests Required
+- `track-viewport.test.mjs` asserts one pointer resolves to distinct scroll-layer and SVG points when `viewBoxMinX` is non-zero.
+- `track-selection-runtime.test.mjs` combines non-zero horizontal scroll with a negative `viewBoxMinX`, then asserts both the visible box position and selected contig identity.
+
+#### 4. Wrong vs Correct
+#### Wrong
+Position an absolute HTML selection box with the SVG hit-test point, causing the box to shift by `viewBoxMinX` while selection still targets the pointer area.
+
+#### Correct
+Paint the box with scroll-layer coordinates and independently hit-test contigs with SVG user coordinates derived by the shared viewport module.
+
 ### Assembly Drag Preview Overlay Synchronization
 
 #### 1. Scope / Trigger

@@ -15,16 +15,24 @@ export function resolveActiveTrackScrollElement(host, trackRole, fallbackEl = nu
   return fallbackEl;
 }
 
-export function resolveTrackPointerContentPoint(event, scrollEl) {
+export function resolveTrackPointerScrollPoint(event, scrollEl) {
   const rect = scrollEl.getBoundingClientRect();
+  return {
+    x: event.clientX - rect.left + scrollEl.scrollLeft,
+    y: event.clientY - rect.top + scrollEl.scrollTop,
+  };
+}
+
+export function resolveTrackPointerContentPoint(event, scrollEl) {
+  const scrollPoint = resolveTrackPointerScrollPoint(event, scrollEl);
   const viewBoxMinX = Number(
     scrollEl?.dataset?.trackViewboxMinX
     ?? scrollEl?.dataset?.subviewViewboxMinX
     ?? 0,
   );
   return {
-    x: event.clientX - rect.left + scrollEl.scrollLeft + viewBoxMinX,
-    y: event.clientY - rect.top + scrollEl.scrollTop,
+    x: scrollPoint.x + viewBoxMinX,
+    y: scrollPoint.y,
   };
 }
 

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   resolveActiveTrackScrollElement,
   resolveTrackPointerContentPoint,
+  resolveTrackPointerScrollPoint,
   resolveScrollLeftForViewportAnchorBp,
   resolveScrollLeftForViewboxMinXShift,
   resolveTrackScrollLeftForViewboxShift,
@@ -76,7 +77,7 @@ test("track viewport resolves the current live scroll element instead of a stale
   assert.notEqual(resolved, staleScrollEl);
 });
 
-test("track viewport resolves pointer content point using scroll offsets and viewBox min-x", () => {
+test("track viewport keeps scroll-layer and SVG pointer coordinates distinct", () => {
   const scrollEl = {
     scrollLeft: 120,
     scrollTop: 35,
@@ -90,13 +91,13 @@ test("track viewport resolves pointer content point using scroll offsets and vie
       };
     },
   };
-  const point = resolveTrackPointerContentPoint(
-    {
-      clientX: 210,
-      clientY: 180,
-    },
-    scrollEl,
-  );
+  const event = {
+    clientX: 210,
+    clientY: 180,
+  };
+  const scrollPoint = resolveTrackPointerScrollPoint(event, scrollEl);
+  const contentPoint = resolveTrackPointerContentPoint(event, scrollEl);
 
-  assert.deepEqual(point, { x: 280, y: 195 });
+  assert.deepEqual(scrollPoint, { x: 320, y: 195 });
+  assert.deepEqual(contentPoint, { x: 280, y: 195 });
 });

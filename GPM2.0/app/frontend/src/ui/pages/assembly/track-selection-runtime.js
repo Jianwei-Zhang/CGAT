@@ -4,7 +4,10 @@ import {
   normalizeTrackSelectionCtgIds,
 } from "./selection-state.js";
 import { normalizeSubviewTrackPairSelectionCtgs } from "./subview-state.js";
-import { resolveTrackPointerContentPoint } from "./track-viewport.js";
+import {
+  resolveTrackPointerContentPoint,
+  resolveTrackPointerScrollPoint,
+} from "./track-viewport.js";
 
 const ASSEMBLY_TRACK_BOX_SELECT_BOUND = Symbol("assemblyTrackBoxSelectBound");
 const REQUIRED_TRACK_SELECTION_DEPS = [
@@ -149,14 +152,16 @@ export function bindTrackBoxSelection(host, store, deps) {
     event.preventDefault();
     const boxEl = ensureTrackSelectionBox(scrollEl);
     const startPoint = resolveTrackPointerContentPoint(event, scrollEl);
+    const startBoxPoint = resolveTrackPointerScrollPoint(event, scrollEl);
     let currentPoint = startPoint;
+    let currentBoxPoint = startBoxPoint;
     let dragging = false;
 
     const updateSelectionBox = () => {
-      const left = Math.min(startPoint.x, currentPoint.x);
-      const top = Math.min(startPoint.y, currentPoint.y);
-      const width = Math.abs(currentPoint.x - startPoint.x);
-      const height = Math.abs(currentPoint.y - startPoint.y);
+      const left = Math.min(startBoxPoint.x, currentBoxPoint.x);
+      const top = Math.min(startBoxPoint.y, currentBoxPoint.y);
+      const width = Math.abs(currentBoxPoint.x - startBoxPoint.x);
+      const height = Math.abs(currentBoxPoint.y - startBoxPoint.y);
       boxEl.style.left = `${left}px`;
       boxEl.style.top = `${top}px`;
       boxEl.style.width = `${width}px`;
@@ -166,7 +171,8 @@ export function bindTrackBoxSelection(host, store, deps) {
 
     const onPointerMove = (moveEvent) => {
       currentPoint = resolveTrackPointerContentPoint(moveEvent, scrollEl);
-      if (!dragging && hasTrackSelectionDragMoved(startPoint, currentPoint)) {
+      currentBoxPoint = resolveTrackPointerScrollPoint(moveEvent, scrollEl);
+      if (!dragging && hasTrackSelectionDragMoved(startBoxPoint, currentBoxPoint)) {
         dragging = true;
       }
       if (dragging) {
