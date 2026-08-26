@@ -27,13 +27,16 @@ Usage:
 
 Behavior:
   - Reads the final path TSV exported by GPM2.0.
+  - Accepts both single-chromosome TSVs beginning with # and project TSVs
+    beginning with Chr.
   - Reads metadata/datasets.tsv and metadata/reference.tsv under --gpm_server.
   - If locator manifests exist, resolves source/reference FASTA paths from
     metadata/source_seq_locator.tsv and metadata/reference_chr_locator.tsv.
   - Otherwise falls back to the monolithic dataset/reference FASTA paths.
   - Uses the TSV Origin ID column as the FASTA sequence id.
   - Infers dataset names from the TSV Ctg column prefix when multiple datasets exist.
-  - Writes one FASTA record, with Gap rows emitted as N bases.
+  - Writes one FASTA record for a single-chromosome TSV, or one record per
+    chromosome for a project TSV, with Gap rows emitted as N bases.
   - When this script is inside a prepared gpm_server directory, --gpm_server
     is optional and defaults to that directory.
 
@@ -87,6 +90,28 @@ column_index() {
   die "metadata/datasets.tsv missing required column: ${expected}"
 }
 
+declare -a FINAL_PATH_TSV_FIELDS=()
+
+split_final_path_tsv_row() {
+  local line="$1"
+  local expected_columns="$2"
+  local line_number="$3"
+  local separator=$'\034'
+  local sentinel="__GPM_FINAL_PATH_TSV_END__"
+  local encoded="${line//$'\t'/$separator}${separator}${sentinel}"
+
+  FINAL_PATH_TSV_FIELDS=()
+  IFS="$separator" read -r -a FINAL_PATH_TSV_FIELDS <<< "$encoded"
+  local parsed_count="${#FINAL_PATH_TSV_FIELDS[@]}"
+  [[ "$parsed_count" -gt 0 ]] || die "Line ${line_number}: could not parse TSV row"
+  local sentinel_index=$((parsed_count - 1))
+  [[ "${FINAL_PATH_TSV_FIELDS[$sentinel_index]}" == "$sentinel" ]] \
+    || die "Line ${line_number}: could not parse TSV row"
+  local actual_columns=$sentinel_index
+  [[ "$actual_columns" -eq "$expected_columns" ]] \
+    || die "Line ${line_number}: expected ${expected_columns} TSV columns, found ${actual_columns}"
+}
+
 TSV_PATH=""
 GPM_SERVER_INPUT=""
 OUTPUT_PATH=""
@@ -137,6 +162,26 @@ fi
 [[ -n "$OUTPUT_PATH" ]] || die "Missing -o"
 [[ -f "$TSV_PATH" ]] || die "TSV file not found: $TSV_PATH"
 [[ -r "$TSV_PATH" ]] || die "TSV file is not readable: $TSV_PATH"
+
+FINAL_PATH_SINGLE_HEADER=$'#\tCtg\tOrigin ID\toverall_len\torient\tCtg_start\tCtg_end\tChr_start\tChr_end'
+FINAL_PATH_PROJECT_HEADER=$'Chr\t#\tCtg\tOrigin ID\toverall_len\torient\tCtg_start\tCtg_end\tChr_start\tChr_end'
+FINAL_PATH_TSV_MODE=""
+FINAL_PATH_EXPECTED_COLUMNS=0
+IFS= read -r final_path_header < "$TSV_PATH" || die "Final path TSV is empty: $TSV_PATH"
+final_path_header="${final_path_header%$'\r'}"
+case "$final_path_header" in
+  "$FINAL_PATH_SINGLE_HEADER")
+    FINAL_PATH_TSV_MODE="single"
+    FINAL_PATH_EXPECTED_COLUMNS=9
+    ;;
+  "$FINAL_PATH_PROJECT_HEADER")
+    FINAL_PATH_TSV_MODE="project"
+    FINAL_PATH_EXPECTED_COLUMNS=10
+    ;;
+  *)
+    die "Unsupported final path TSV header: expected '#\\tCtg...' or 'Chr\\t#\\tCtg...'"
+    ;;
+esac
 
 require_cmd samtools
 
@@ -331,26 +376,70 @@ append_reference_segment_region() {
 
 OUTPUT_DIR="$(dirname "$OUTPUT_PATH")"
 mkdir -p "$OUTPUT_DIR"
-RAW_SEQUENCE_TMP="$(mktemp)"
 OUTPUT_TMP="$(mktemp)"
-trap 'rm -f "$RAW_SEQUENCE_TMP" "$OUTPUT_TMP"' EXIT
+declare -A FINAL_PATH_SEQUENCE_TMP_BY_RECORD=()
+declare -a FINAL_PATH_RECORD_NAMES=()
+declare -a FINAL_PATH_SEQUENCE_TMP_FILES=()
+
+cleanup_final_path_export() {
+  rm -f "$OUTPUT_TMP"
+  if [[ "${#FINAL_PATH_SEQUENCE_TMP_FILES[@]}" -gt 0 ]]; then
+    rm -f "${FINAL_PATH_SEQUENCE_TMP_FILES[@]}"
+  fi
+}
+trap cleanup_final_path_export EXIT
 
 record_name="$(basename "$OUTPUT_PATH")"
 record_name="${record_name%.fasta}"
 record_name="${record_name%.fa}"
 [[ -n "$record_name" ]] || record_name="final_path"
 
+ensure_final_path_record_tmp() {
+  local record_key="$1"
+  RAW_SEQUENCE_TMP="${FINAL_PATH_SEQUENCE_TMP_BY_RECORD[$record_key]:-}"
+  if [[ -n "$RAW_SEQUENCE_TMP" ]]; then
+    return
+  fi
+  RAW_SEQUENCE_TMP="$(mktemp)"
+  FINAL_PATH_SEQUENCE_TMP_BY_RECORD["$record_key"]="$RAW_SEQUENCE_TMP"
+  FINAL_PATH_RECORD_NAMES+=("$record_key")
+  FINAL_PATH_SEQUENCE_TMP_FILES+=("$RAW_SEQUENCE_TMP")
+}
+
 line_number=0
-while IFS=$'\t' read -r row_index ctg origin_id overall_len orient ctg_start ctg_end chr_start chr_end extra; do
+while IFS= read -r final_path_line || [[ -n "$final_path_line" ]]; do
   line_number=$((line_number + 1))
-  if [[ "$line_number" -eq 1 && "$row_index" == "#" ]]; then
+  if [[ "$line_number" -eq 1 ]]; then
     continue
   fi
+  final_path_line="${final_path_line%$'\r'}"
+  [[ -n "$final_path_line" ]] || continue
+  split_final_path_tsv_row "$final_path_line" "$FINAL_PATH_EXPECTED_COLUMNS" "$line_number"
+
+  field_offset=0
+  if [[ "$FINAL_PATH_TSV_MODE" == "project" ]]; then
+    record_key="${FINAL_PATH_TSV_FIELDS[0]}"
+    field_offset=1
+    [[ -n "$record_key" ]] || die "Line ${line_number}: missing Chr"
+  else
+    record_key="$record_name"
+  fi
+  row_index="${FINAL_PATH_TSV_FIELDS[$field_offset]}"
+  ctg="${FINAL_PATH_TSV_FIELDS[$((field_offset + 1))]}"
+  origin_id="${FINAL_PATH_TSV_FIELDS[$((field_offset + 2))]}"
+  overall_len="${FINAL_PATH_TSV_FIELDS[$((field_offset + 3))]}"
+  orient="${FINAL_PATH_TSV_FIELDS[$((field_offset + 4))]}"
+  ctg_start="${FINAL_PATH_TSV_FIELDS[$((field_offset + 5))]}"
+  ctg_end="${FINAL_PATH_TSV_FIELDS[$((field_offset + 6))]}"
+  chr_start="${FINAL_PATH_TSV_FIELDS[$((field_offset + 7))]}"
+  chr_end="${FINAL_PATH_TSV_FIELDS[$((field_offset + 8))]}"
+
   [[ -n "${row_index}${ctg}${origin_id}${orient}${ctg_start}${ctg_end}${chr_start}${chr_end}" ]] || continue
   [[ -n "$ctg" ]] || die "Line ${line_number}: missing Ctg"
   [[ -n "$chr_start" && -n "$chr_end" ]] || die "Line ${line_number}: missing Chr_start/Chr_end"
   validate_positive_int "Chr_start on line ${line_number}" "$chr_start"
   validate_positive_int "Chr_end on line ${line_number}" "$chr_end"
+  ensure_final_path_record_tmp "$record_key"
 
   if [[ "$ctg" == "Gap" || "$origin_id" == "NA" ]]; then
     gap_len=$((chr_end - chr_start + 1))
@@ -377,12 +466,19 @@ while IFS=$'\t' read -r row_index ctg origin_id overall_len orient ctg_start ctg
   append_fasta_region "$fasta_path" "$origin_id" "$ctg_start" "$ctg_end" "$orient"
 done < "$TSV_PATH"
 
-[[ -s "$RAW_SEQUENCE_TMP" ]] || die "No sequence was generated from TSV: $TSV_PATH"
+[[ "${#FINAL_PATH_RECORD_NAMES[@]}" -gt 0 ]] || die "No sequence was generated from TSV: $TSV_PATH"
 
-{
-  printf '>%s\n' "$record_name"
-  fold -w 80 "$RAW_SEQUENCE_TMP"
-} > "$OUTPUT_TMP"
+: > "$OUTPUT_TMP"
+for record_key in "${FINAL_PATH_RECORD_NAMES[@]}"; do
+  RAW_SEQUENCE_TMP="${FINAL_PATH_SEQUENCE_TMP_BY_RECORD[$record_key]:-}"
+  [[ -n "$RAW_SEQUENCE_TMP" && -s "$RAW_SEQUENCE_TMP" ]] \
+    || die "No sequence was generated for FASTA record: $record_key"
+  {
+    printf '>%s\n' "$record_key"
+    fold -w 80 "$RAW_SEQUENCE_TMP"
+    printf '\n'
+  } >> "$OUTPUT_TMP"
+done
 
 mv "$OUTPUT_TMP" "$OUTPUT_PATH"
 echo "Wrote final path FASTA: $OUTPUT_PATH"

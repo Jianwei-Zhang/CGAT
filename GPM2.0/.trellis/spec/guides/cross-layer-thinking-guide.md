@@ -85,6 +85,9 @@ Before implementation:
 - [ ] Decided where validation happens
 - [ ] Named the single conversion/normalization owner
 - [ ] Chosen and documented a compatibility strategy
+- [ ] For file handoffs, copied the producer's exact header, column order, and
+  row-width rules into the consumer contract; do not infer a schema from a
+  single sample or ask users to preprocess a producer-owned format
 
 After implementation:
 - [ ] Tested with edge cases (null, empty, invalid)
@@ -94,6 +97,8 @@ After implementation:
 - [ ] Verified accepted, rejected, conflicted, and superseded records all
   satisfy the serialized contract before reaching the final validator
 - [ ] Verified Tauri, dev bridge, mocks, persistence, and UI agree on field names and error codes
+- [ ] Tested every supported producer variant end to end, including headers,
+  empty fields, multiple logical records, and exact output boundaries
 
 ---
 

@@ -69,3 +69,51 @@ let slice = &source_sequence[(start_min - 1)..start_max];
 ```
 
 Then apply only the final path row direction: forward for `start <= end`, reverse complement for `start > end`.
+
+## Scenario: server final path TSV to FASTA
+
+### 1. Scope / Trigger
+
+- Trigger: `server/export_final_path_fasta.sh` or a generated
+  `gpm_server/export_final_path_fasta.sh` consumes a TSV exported by the
+  desktop App.
+- The shell exporter accepts both the single-chromosome table and the project
+  table. Users must not need to remove the header or first column manually.
+
+### 2. Input Contracts
+
+- Single-chromosome TSV header (9 columns):
+  `#\tCtg\tOrigin ID\toverall_len\torient\tCtg_start\tCtg_end\tChr_start\tChr_end`.
+- Project TSV header (10 columns):
+  `Chr\t#\tCtg\tOrigin ID\toverall_len\torient\tCtg_start\tCtg_end\tChr_start\tChr_end`.
+- Header matching is exact after tolerating a final CR from CRLF input.
+- Every data row must contain exactly the same number of tab-separated fields
+  as its recognized header. Empty fields must not shift later fields.
+- Existing coordinate, orientation, source-resolution, and `--ds` contracts
+  apply independently to every row.
+
+### 3. Output Contracts
+
+- A single-chromosome TSV emits one FASTA record. Its record name is derived
+  from the output filename, preserving the existing behavior.
+- A project TSV emits one FASTA record per distinct `Chr` value, in first-seen
+  chromosome order. Rows for each chromosome are concatenated in input order.
+- Every FASTA record ends with a newline; adjacent records must never merge.
+
+### 4. Validation & Error Matrix
+
+| Condition | Expected behavior |
+|-----------|-------------------|
+| Header is neither the exact 9-column nor exact 10-column contract | Fail before reading data rows and report the unsupported header. |
+| A row width differs from its recognized header | Fail with the line number and expected/actual column counts. |
+| Project row has an empty `Chr` | Fail rather than emitting an unnamed record. |
+| Any row violates the existing coordinate/orientation/source contract | Fail without publishing a partial final output. |
+
+### 5. Tests Required
+
+- Keep a single-chromosome TSV regression for backward compatibility.
+- Add a project TSV regression with at least two chromosome values and assert
+  the exact multi-record FASTA text.
+- Cover an unsupported header and an inconsistent-width project row.
+- Run the shell regression with GNU Bash 4.2 because generated Server helpers
+  support that baseline.

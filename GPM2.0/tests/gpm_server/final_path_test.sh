@@ -193,6 +193,15 @@ write_multi_dataset_final_path_tsv() {
 EOF
 }
 
+write_project_final_path_tsv() {
+  local path="$1"
+  cat > "$path" <<'EOF'
+Chr	#	Ctg	Origin ID	overall_len	orient	Ctg_start	Ctg_end	Chr_start	Chr_end
+Chr01	1	ds_tigA	tigA		+	1	4	1	4
+Chr02	1	ds_tigA	tigA	8	-	5	2	1	4
+EOF
+}
+
 test_exports_ref_segments_and_dataset_segments_from_same_tsv() {
   local server_root="${TMP_DIR}/gpm_server"
   local tsv_path="${TMP_DIR}/final_path.tsv"
@@ -257,6 +266,65 @@ test_exports_with_multiple_dataset_filters() {
     echo "unexpected multi-dataset exported sequence: $sequence" >&2
     exit 1
   }
+}
+
+test_exports_project_tsv_as_one_fasta_record_per_chromosome() {
+  local server_root="${TMP_DIR}/gpm_server_project"
+  local tsv_path="${TMP_DIR}/project_final_path.tsv"
+  local output_path="${TMP_DIR}/project_final_path.fa"
+  write_server_bundle "$server_root"
+  write_project_final_path_tsv "$tsv_path"
+
+  PATH="${FAKE_BIN}:$PATH" "$EXPORT_BASH" "$SCRIPT" \
+    --tsv "$tsv_path" \
+    --gpm_server "$server_root" \
+    -o "$output_path" >/dev/null
+
+  assert_file "$output_path"
+  local expected_path="${TMP_DIR}/project_final_path.expected.fa"
+  cat > "$expected_path" <<'EOF'
+>Chr01
+ACGT
+>Chr02
+TACG
+EOF
+  if ! cmp -s "$expected_path" "$output_path"; then
+    echo "unexpected project final-path FASTA" >&2
+    diff -u "$expected_path" "$output_path" >&2 || exit 1
+    exit 1
+  fi
+}
+
+test_rejects_unknown_final_path_tsv_header() {
+  local server_root="${TMP_DIR}/gpm_server_unknown_header"
+  local tsv_path="${TMP_DIR}/unknown_header.tsv"
+  write_server_bundle "$server_root"
+  cat > "$tsv_path" <<'EOF'
+Chromosome	#	Ctg	Origin ID	overall_len	orient	Ctg_start	Ctg_end	Chr_start	Chr_end
+Chr01	1	ds_tigA	tigA	8	+	1	4	1	4
+EOF
+
+  assert_export_error \
+    "$server_root" \
+    "$tsv_path" \
+    "Unsupported final path TSV header" \
+    "${TMP_DIR}/unknown_header.err"
+}
+
+test_rejects_project_tsv_rows_with_wrong_column_count() {
+  local server_root="${TMP_DIR}/gpm_server_wrong_width"
+  local tsv_path="${TMP_DIR}/wrong_width.tsv"
+  write_server_bundle "$server_root"
+  cat > "$tsv_path" <<'EOF'
+Chr	#	Ctg	Origin ID	overall_len	orient	Ctg_start	Ctg_end	Chr_start	Chr_end
+Chr01	1	ds_tigA	tigA	8	+	1	4	1
+EOF
+
+  assert_export_error \
+    "$server_root" \
+    "$tsv_path" \
+    "Line 2: expected 10 TSV columns, found 9" \
+    "${TMP_DIR}/wrong_width.err"
 }
 
 test_generated_server_script_defaults_to_own_gpm_server_dir() {
@@ -345,6 +413,12 @@ test_exports_ref_segments_and_dataset_segments_from_same_tsv
 test_exports_partitioned_fast_bundle_via_locator_manifests
 
 test_exports_with_multiple_dataset_filters
+
+test_exports_project_tsv_as_one_fasta_record_per_chromosome
+
+test_rejects_unknown_final_path_tsv_header
+
+test_rejects_project_tsv_rows_with_wrong_column_count
 
 test_generated_server_script_defaults_to_own_gpm_server_dir
 
