@@ -243,6 +243,8 @@ deleteWithFiles = importer.deleteWithFiles === true;
 - A Subview-only mutation must replace only `[data-subview-panel='1']`.
 - A Subview selection mutation is not Subview-only when the main track derives selected contig or selected track-label styling from `assembly.subview`. After selecting, deselecting, removing, or replacing those selections, commit state first, then refresh the main track and Subview together. A Subview track-order swap may remain panel-only because it does not change selection identity.
 - Partial bindings must pass an explicit `main`, `subview`, or `final-path` scope. They must not run route initialization, register route-level resize/hotkey listeners, or clear persisted scroll state for absent sibling regions.
+- A delegated runtime already bound on an ancestor route host remains the event owner after a local card replacement. A partial binding on the replacement card must detect that bound ancestor and skip installing a nested copy; otherwise one bubbling click can open and immediately close the same menu.
+- Floating Final Path menus must close immediately on pointer-down outside their export root and keep `aria-expanded` synchronized. Delayed pointer-leave close remains a secondary hover convenience, not the only dismissal path.
 - Scroll synchronization remains active for the replaced region, and unchanged sibling DOM and scroll positions remain intact.
 - A persisted main-track viewport key identifies the coordinate space (project, chromosome, support dataset, and track preferences). It must not include transient selection such as `selectedCtgId`; explicit member/search navigation uses the pending focus command instead.
 - A full-route bind must treat missing track DOM during `assembly.loading` as temporary. Preserve main, Subview, and Final Path scroll state until stable non-loading markup is bound; only a stable route without a region may clear that region's state.
@@ -253,6 +255,9 @@ deleteWithFiles = importer.deleteWithFiles === true;
 - `app/frontend/src/ui/pages/assembly/__tests__/bindings.test.mjs`
   - Assert Final Path view switching and graph drag receive the Final Path card refresh callback, not the full-route callback.
   - Assert partial Final Path binding skips unrelated lifecycle hooks and passes the `final-path` scroll scope.
+- `app/frontend/src/ui/pages/assembly/__tests__/final-path-export-menu-runtime.test.mjs`
+  - Assert a locally replaced Final Path card reuses the route-level delegated export owner, so one Export click is handled exactly once.
+  - Assert pointer-down outside the Final Path export root immediately closes the menu and sets `aria-expanded=false`.
 - `app/frontend/src/ui/pages/assembly/__tests__/final-path-runtime.test.mjs`
   - Assert a baseline edit transitions GRT availability from true to false, clears both display states, and refreshes both GRT consumer regions.
   - Assert restoring the baseline transitions availability from false to true, refreshes both consumers, and keeps both recreated switches disabled by default.

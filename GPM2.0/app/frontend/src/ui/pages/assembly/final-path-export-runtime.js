@@ -20,7 +20,10 @@ import {
 } from "../../../services/workflow-api.js";
 import { buildDegapExportPayload } from "./degap-runtime.js";
 import { normalizeDegapRuntimeState } from "./degap-state.js";
-import { bindDelegatedDelayedFloatingClose } from "../floating-menu-runtime.js";
+import {
+  bindDelegatedDelayedFloatingClose,
+  cancelDelayedFloatingClose,
+} from "../floating-menu-runtime.js";
 
 const FINAL_PATH_EXPORT_BOUND = Symbol("finalPathExportBound");
 const FINAL_PATH_EXPORT_CLOSE_TIMER = "__finalPathExportCloseTimer";
@@ -45,6 +48,17 @@ const FINAL_PATH_EXPORT_SVG_STYLE_TEXT = [
   ".final-path-gap-marker{fill:#ffffff;stroke:#1b1b1b;stroke-width:1;}",
   ".final-path-gap-label{fill:#1b1b1b;font-size:10px;font-weight:700;}",
 ].join("");
+
+function hasBoundFinalPathExportAncestor(host) {
+  let ancestor = host?.parentElement || host?.parentNode || null;
+  while (ancestor) {
+    if (ancestor[FINAL_PATH_EXPORT_BOUND]) {
+      return true;
+    }
+    ancestor = ancestor.parentElement || ancestor.parentNode || null;
+  }
+  return false;
+}
 
 function normalizeString(value) {
   return String(value || "").trim();
@@ -985,7 +999,7 @@ export function bindFinalPathExport(host, store, deps = {}) {
   if (typeof host?.addEventListener !== "function") {
     return;
   }
-  if (host?.[FINAL_PATH_EXPORT_BOUND]) {
+  if (host?.[FINAL_PATH_EXPORT_BOUND] || hasBoundFinalPathExportAncestor(host)) {
     return;
   }
   const setExportMenuOpen = (exportRoot, shouldOpen) => {
@@ -999,9 +1013,24 @@ export function bindFinalPathExport(host, store, deps = {}) {
       toggleNode.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
     }
   };
+  const closeAllExportMenus = () => {
+    cancelDelayedFloatingClose(host, FINAL_PATH_EXPORT_CLOSE_TIMER);
+    const exportRoots = host.querySelectorAll?.("[data-final-path-export]") || [];
+    exportRoots.forEach((exportRoot) => setExportMenuOpen(exportRoot, false));
+  };
   const exportAction = typeof deps.exportFinalPathArtifacts === "function"
     ? deps.exportFinalPathArtifacts
     : async () => {};
+  host.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (event.target?.closest?.("[data-final-path-export]")) {
+        return;
+      }
+      closeAllExportMenus();
+    },
+    true,
+  );
   host.addEventListener("click", async (event) => {
     const closeNode = event.target?.closest?.("[data-final-path-export-close]");
     if (closeNode) {
