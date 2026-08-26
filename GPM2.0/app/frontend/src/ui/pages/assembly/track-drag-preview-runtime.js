@@ -11,6 +11,12 @@ const PREVIEW_BAND_ATTR = "data-drag-preview-band";
 const PREVIEW_STICKY_LABEL_ATTR = "data-drag-preview-sticky-label";
 const PREVIEW_JUNCTION_LINE_ATTR = "data-drag-preview-junction-line";
 const PREVIEW_JUNCTION_LABEL_ATTR = "data-drag-preview-junction-label";
+const PREVIEW_ENVELOPE_ATTR = "data-drag-preview-envelope";
+const ORIGINAL_WIDTH_ATTR = "data-drag-preview-original-width";
+const ORIGINAL_VIEW_BOX_ATTR = "data-drag-preview-original-view-box";
+const ORIGINAL_STYLE_WIDTH_ATTR = "data-drag-preview-original-style-width";
+const ORIGINAL_SUBVIEW_VIEWBOX_MIN_X_ATTR = "data-drag-preview-original-subview-viewbox-min-x";
+const MISSING_ATTRIBUTE_VALUE = "__gpm_missing_attribute__";
 
 function parsePolygonPoints(pointsText) {
   return String(pointsText || "")
@@ -163,8 +169,167 @@ function isLabelInsideGroup(labelNode, groupNode) {
   return groupNode.contains(labelNode);
 }
 
+function parseSvgViewBox(value) {
+  const parts = String(value || "")
+    .trim()
+    .split(/\s+/)
+    .map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) {
+    return null;
+  }
+  return parts;
+}
+
+function formatPreviewMetric(value) {
+  return String(Math.round(Number(value || 0) * 100) / 100);
+}
+
+function rememberPreviewAttribute(node, originalAttributeName, targetAttributeName) {
+  if (!node || node.hasAttribute?.(originalAttributeName)) {
+    return;
+  }
+  const currentValue = node.getAttribute?.(targetAttributeName);
+  node.setAttribute?.(
+    originalAttributeName,
+    currentValue === null ? MISSING_ATTRIBUTE_VALUE : currentValue,
+  );
+}
+
+function restorePreviewAttribute(node, originalAttributeName, targetAttributeName) {
+  if (!node?.hasAttribute?.(originalAttributeName)) {
+    return;
+  }
+  const originalValue = node.getAttribute?.(originalAttributeName);
+  if (originalValue === MISSING_ATTRIBUTE_VALUE) {
+    node.removeAttribute?.(targetAttributeName);
+  } else {
+    node.setAttribute?.(targetAttributeName, originalValue || "");
+  }
+  node.removeAttribute?.(originalAttributeName);
+}
+
+function restoreSubviewPreviewEnvelope(host) {
+  const envelopeNodes = host?.querySelectorAll?.(`[${PREVIEW_ENVELOPE_ATTR}='1']`) || [];
+  envelopeNodes.forEach((node) => {
+    restorePreviewAttribute(node, ORIGINAL_WIDTH_ATTR, "width");
+    restorePreviewAttribute(node, ORIGINAL_VIEW_BOX_ATTR, "viewBox");
+    restorePreviewAttribute(
+      node,
+      ORIGINAL_SUBVIEW_VIEWBOX_MIN_X_ATTR,
+      "data-subview-viewbox-min-x",
+    );
+    if (node.hasAttribute?.(ORIGINAL_STYLE_WIDTH_ATTR)) {
+      node.style.width = node.getAttribute?.(ORIGINAL_STYLE_WIDTH_ATTR) || "";
+      node.removeAttribute?.(ORIGINAL_STYLE_WIDTH_ATTR);
+    }
+    node.removeAttribute?.(PREVIEW_ENVELOPE_ATTR);
+  });
+}
+
+function applySubviewPreviewEnvelope(groupNodes, offsetPx) {
+  const normalizedOffset = Number(offsetPx || 0);
+  if (!Number.isFinite(normalizedOffset)) {
+    return undefined;
+  }
+  const groupsByScroll = new Map();
+  groupNodes.forEach((groupNode) => {
+    const scrollNode = groupNode.closest?.(
+      ".assembly-track-scroll[data-track-role='subview']",
+    );
+    if (!scrollNode) {
+      return;
+    }
+    const groups = groupsByScroll.get(scrollNode) || [];
+    groups.push(groupNode);
+    groupsByScroll.set(scrollNode, groups);
+  });
+  let previewState;
+  groupsByScroll.forEach((groups, scrollNode) => {
+    const canvasLayer = Array.from(
+      scrollNode.querySelectorAll?.(
+        "[data-track-band-canvas-scene-kind='subview-ctg']",
+      ) || [],
+    )[0] || null;
+    const svgNode = Array.from(
+      scrollNode.querySelectorAll?.(".subview-track-svg") || [],
+    )[0] || null;
+    if (!canvasLayer || !svgNode) {
+      return;
+    }
+    rememberPreviewAttribute(svgNode, ORIGINAL_WIDTH_ATTR, "width");
+    rememberPreviewAttribute(svgNode, ORIGINAL_VIEW_BOX_ATTR, "viewBox");
+    rememberPreviewAttribute(
+      scrollNode,
+      ORIGINAL_SUBVIEW_VIEWBOX_MIN_X_ATTR,
+      "data-subview-viewbox-min-x",
+    );
+    if (!canvasLayer.hasAttribute?.(ORIGINAL_STYLE_WIDTH_ATTR)) {
+      canvasLayer.setAttribute?.(ORIGINAL_STYLE_WIDTH_ATTR, String(canvasLayer.style?.width || ""));
+    }
+    const originalViewBox = parseSvgViewBox(
+      svgNode.getAttribute?.(ORIGINAL_VIEW_BOX_ATTR)
+      || svgNode.getAttribute?.("viewBox"),
+    );
+    if (!originalViewBox) {
+      return;
+    }
+    const [baseMinX, baseMinY, baseWidth, baseHeight] = originalViewBox;
+    const previewBounds = groups
+      .map((groupNode) => {
+        const x = Number(groupNode.getAttribute?.("data-subview-rect-x"));
+        const width = Number(groupNode.getAttribute?.("data-subview-rect-width"));
+        if (!Number.isFinite(x) || !Number.isFinite(width) || width < 0) {
+          return null;
+        }
+        return {
+          left: x + normalizedOffset,
+          right: x + width + normalizedOffset,
+        };
+      })
+      .filter(Boolean);
+    if (!previewBounds.length) {
+      return;
+    }
+    const previewLeft = Math.min(...previewBounds.map((bounds) => bounds.left));
+    const previewRight = Math.max(...previewBounds.map((bounds) => bounds.right));
+    const baseMaxX = baseMinX + baseWidth;
+    const nextMinX = Math.floor(Math.min(baseMinX, previewLeft));
+    const nextMaxX = Math.ceil(Math.max(baseMaxX, previewRight));
+    const nextWidth = Math.max(baseWidth, nextMaxX - nextMinX);
+    const formattedWidth = formatPreviewMetric(nextWidth);
+    const formattedMinX = formatPreviewMetric(nextMinX);
+    svgNode.setAttribute?.("width", formattedWidth);
+    svgNode.setAttribute?.(
+      "viewBox",
+      `${formattedMinX} ${formatPreviewMetric(baseMinY)} ${formattedWidth} ${formatPreviewMetric(baseHeight)}`,
+    );
+    canvasLayer.style.width = `${formattedWidth}px`;
+    scrollNode.setAttribute?.("data-subview-viewbox-min-x", formattedMinX);
+    svgNode.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
+    canvasLayer.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
+    scrollNode.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
+
+    const viewportWidth = Math.max(0, Number(scrollNode.clientWidth || 0));
+    const currentScrollLeft = Math.max(0, Number(scrollNode.scrollLeft || 0));
+    let nextScrollLeft = currentScrollLeft;
+    if (viewportWidth > 0) {
+      const previewContentLeft = previewLeft - nextMinX;
+      const previewContentRight = previewRight - nextMinX;
+      if (previewContentLeft < currentScrollLeft) {
+        nextScrollLeft = Math.max(0, Math.floor(previewContentLeft));
+      } else if (previewContentRight > currentScrollLeft + viewportWidth) {
+        nextScrollLeft = Math.max(0, Math.ceil(previewContentRight - viewportWidth));
+      }
+    }
+    scrollNode.scrollLeft = nextScrollLeft;
+    previewState = { scrollLeft: nextScrollLeft };
+  });
+  return previewState;
+}
+
 function clearPreviewNodes(host, previewClassName) {
   host?.classList?.remove?.(previewClassName);
+  restoreSubviewPreviewEnvelope(host);
   const previewGroups = host?.querySelectorAll?.(`[${PREVIEW_GROUP_ATTR}='1']`) || [];
   previewGroups.forEach((groupNode) => {
     const originalTransform = groupNode.getAttribute?.(ORIGINAL_TRANSFORM_ATTR) || "";
@@ -317,6 +482,7 @@ export function previewSubviewTrackContigDrag(host, { slot, contigId, offsetPx }
     : `[data-subview-bottom-contig-id="${contigId}"]`;
   const bandNodes = host.querySelectorAll?.(bandSelector) || [];
   bandNodes.forEach((bandNode) => applyBandPreview(bandNode, edgeIndexes, offsetPx));
+  return applySubviewPreviewEnvelope(groupNodes, offsetPx);
 }
 
 export function clearSubviewTrackDragPreview(host) {

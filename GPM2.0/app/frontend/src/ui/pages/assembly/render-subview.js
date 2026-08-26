@@ -1346,7 +1346,7 @@ function renderSubviewAlignmentCard(
     resolveSubviewCtgLengthBp(topCtg, resolvedTopHits),
     resolveSubviewCtgLengthBp(bottomCtg, resolvedBottomHits),
   );
-  const subviewRenderInnerWidth = resolveTrackInnerWidthFromScale({
+  const subviewBaseInnerWidth = resolveTrackInnerWidthFromScale({
     domainSpanBp: subviewDomainSpanBp,
     minTickUnitKb: resolvedTrackPrefs.minTickUnitKb,
     maxTickCount: resolvedTrackPrefs.maxTickCount,
@@ -1376,7 +1376,7 @@ function renderSubviewAlignmentCard(
       topSelection.contigId,
       {
         domainSpanBp: subviewDomainSpanBp,
-        innerWidth: subviewRenderInnerWidth,
+        innerWidth: subviewBaseInnerWidth,
       },
     ),
     bottomManualOffsetPx: resolveSubviewTrackDragOffsetPx(
@@ -1385,7 +1385,7 @@ function renderSubviewAlignmentCard(
       bottomSelection.contigId,
       {
         domainSpanBp: subviewDomainSpanBp,
-        innerWidth: subviewRenderInnerWidth,
+        innerWidth: subviewBaseInnerWidth,
       },
     ),
   });
@@ -1407,8 +1407,8 @@ function renderSubviewAlignmentCard(
     barHeight: svgModel.barHeight,
     inlineTextOffsetY: svgModel.textOffsetY,
     hideOutsideLabel: true,
-    minVisibleX: 0,
-    maxVisibleX: svgModel.renderInnerWidth,
+    minVisibleX: svgModel.renderViewBoxMinX,
+    maxVisibleX: svgModel.renderViewBoxMinX + svgModel.renderInnerWidth,
   });
   const bottomLabelPlacement = resolveBoundedTrackCtgLabelPlacement({
     ctgName: bottomLabelText,
@@ -1422,8 +1422,8 @@ function renderSubviewAlignmentCard(
     barHeight: svgModel.barHeight,
     inlineTextOffsetY: svgModel.textOffsetY,
     hideOutsideLabel: true,
-    minVisibleX: 0,
-    maxVisibleX: svgModel.renderInnerWidth,
+    minVisibleX: svgModel.renderViewBoxMinX,
+    maxVisibleX: svgModel.renderViewBoxMinX + svgModel.renderInnerWidth,
   });
   const trackOrderButtonTopPx = ((Number(svgModel.topLabelTop) + Number(svgModel.bottomLabelTop)) / 2).toFixed(2);
   const activeAnchorKeys = buildSubviewActiveAnchorKeySet(subview?.activeAnchors);
@@ -1559,12 +1559,14 @@ function renderSubviewAlignmentCard(
           class="assembly-track-scroll subview-track-scroll"
           data-track-role="subview"
           data-subview-domain-span-bp="${svgModel.domainSpanBp}"
-          data-subview-inner-width="${svgModel.renderInnerWidth}"
+          data-subview-inner-width="${svgModel.baseInnerWidth}"
+          data-subview-viewbox-min-x="${svgModel.renderViewBoxMinX}"
         >
           ${renderTrackBandCanvasLayer({
             sceneKind: "subview-ctg",
             width: svgModel.renderInnerWidth,
             height: svgModel.contentBottom,
+            viewBoxMinX: svgModel.renderViewBoxMinX,
             bands: svgModel.collinearityBands.map((band) => ({
               ...band,
               tone: bandTone,
@@ -1575,13 +1577,13 @@ function renderSubviewAlignmentCard(
             data-subview-band-tooltip-delay-ms="${SUBVIEW_BAND_TOOLTIP_HOVER_DELAY_MS}"
             aria-hidden="true"
           ></div>
-          <svg class="assembly-track-svg subview-track-svg" width="${svgModel.renderInnerWidth}" height="${svgModel.contentBottom}" viewBox="0 0 ${svgModel.renderInnerWidth} ${svgModel.contentBottom}" preserveAspectRatio="xMinYMin meet">
-            <line class="track-ruler-line" x1="0" y1="${svgModel.rulerTop}" x2="${svgModel.renderInnerWidth}" y2="${svgModel.rulerTop}" />
+          <svg class="assembly-track-svg subview-track-svg" width="${svgModel.renderInnerWidth}" height="${svgModel.contentBottom}" viewBox="${svgModel.renderViewBoxMinX} 0 ${svgModel.renderInnerWidth} ${svgModel.contentBottom}" preserveAspectRatio="xMinYMin meet">
+            <line class="track-ruler-line" x1="0" y1="${svgModel.rulerTop}" x2="${svgModel.baseInnerWidth}" y2="${svgModel.rulerTop}" />
             ${renderSubviewVirtualRuler({
               windowStart: 0,
               windowEnd: svgModel.domainSpanBp,
               tickBp: svgModel.tickBp,
-              innerWidth: svgModel.renderInnerWidth,
+              innerWidth: svgModel.baseInnerWidth,
               domainSpanBp: svgModel.domainSpanBp,
               tickY1: svgModel.tickY1,
               tickY2: svgModel.tickY2,
@@ -2817,7 +2819,6 @@ function buildSubviewAlignmentSvgModel({
   const TRACK_LABEL_OFFSET_Y = 2 * TRACK_HEIGHT_SCALE;
   const TRACK_EDGE_LABEL_PADDING = 8 * TRACK_HEIGHT_SCALE;
   const TRACK_TEXT_OFFSET_Y = 11;
-  const TRACK_MIN_DRAG_VISIBLE_PX = 24;
   const LABEL_COLUMN_WIDTH_PX = 136;
 
   const rulerTop = 24 * TRACK_HEIGHT_SCALE;
@@ -2838,7 +2839,7 @@ function buildSubviewAlignmentSvgModel({
   const domainStart = 0;
   const domainEnd = Math.max(topLengthBp, bottomLengthBp);
   const domainSpan = Math.max(1, domainEnd - domainStart);
-  const renderInnerWidth = resolveTrackInnerWidthFromScale({
+  const baseInnerWidth = resolveTrackInnerWidthFromScale({
     domainSpanBp: domainSpan,
     minTickUnitKb: safeMinTickUnitKb,
     maxTickCount: safeMaxTickCount,
@@ -2852,7 +2853,7 @@ function buildSubviewAlignmentSvgModel({
     fallbackTickBp: safeMinTickUnitKb * 1000,
   });
   const toX = (bpValue) =>
-    (Math.max(0, Math.min(domainEnd, Number(bpValue) || 0)) / domainSpan) * Math.max(1, renderInnerWidth);
+    (Math.max(0, Math.min(domainEnd, Number(bpValue) || 0)) / domainSpan) * Math.max(1, baseInnerWidth);
   const topBarWidth = toX(topLengthBp);
   const bottomBarWidth = toX(bottomLengthBp);
   const toSegments = (hits, trackOffsetBp = 0) =>
@@ -2892,28 +2893,24 @@ function buildSubviewAlignmentSvgModel({
   });
   const topBarBaseX = toX(topOffsetBp);
   const bottomBarBaseX = toX(bottomOffsetBp);
-  const resolveClampedManualOffsetPx = (requestedOffsetPx, barBaseX, barWidth) => {
+  const resolveManualOffsetPx = (requestedOffsetPx) => {
     const numeric = Number(requestedOffsetPx || 0);
     if (!Number.isFinite(numeric)) {
       return 0;
     }
-    const minOffset = -barBaseX;
-    const maxOffset = Math.max(0, renderInnerWidth - (barBaseX + barWidth));
-    if (maxOffset - minOffset > 0.01) {
-      return roundTrackMetric(Math.min(Math.max(numeric, minOffset), maxOffset));
-    }
-    const minVisiblePx = Math.min(Math.max(3, Number(barWidth) || 0), TRACK_MIN_DRAG_VISIBLE_PX);
-    const relaxedMinOffset = minVisiblePx - (barBaseX + barWidth);
-    const relaxedMaxOffset = renderInnerWidth - minVisiblePx - barBaseX;
-    if (relaxedMaxOffset < relaxedMinOffset) {
-      return 0;
-    }
-    return roundTrackMetric(Math.min(Math.max(numeric, relaxedMinOffset), relaxedMaxOffset));
+    return roundTrackMetric(numeric);
   };
-  const resolvedTopManualOffsetPx = resolveClampedManualOffsetPx(topManualOffsetPx, topBarBaseX, topBarWidth);
-  const resolvedBottomManualOffsetPx = resolveClampedManualOffsetPx(bottomManualOffsetPx, bottomBarBaseX, bottomBarWidth);
+  const resolvedTopManualOffsetPx = resolveManualOffsetPx(topManualOffsetPx);
+  const resolvedBottomManualOffsetPx = resolveManualOffsetPx(bottomManualOffsetPx);
   const topBarX = roundTrackMetric(topBarBaseX + resolvedTopManualOffsetPx);
   const bottomBarX = roundTrackMetric(bottomBarBaseX + resolvedBottomManualOffsetPx);
+  const renderViewBoxMinX = Math.floor(Math.min(0, topBarX, bottomBarX));
+  const renderMaxX = Math.ceil(Math.max(
+    baseInnerWidth,
+    topBarX + topBarWidth,
+    bottomBarX + bottomBarWidth,
+  ));
+  const renderInnerWidth = Math.max(baseInnerWidth, renderMaxX - renderViewBoxMinX);
   const topSegments = toSegments(topHits, topOffsetBp).sort((left, right) => left.refMid - right.refMid);
   const bottomSegments = toSegments(bottomHits, bottomOffsetBp).sort(
     (left, right) => left.refMid - right.refMid,
@@ -3001,9 +2998,11 @@ function buildSubviewAlignmentSvgModel({
   });
   return {
     labelColumnWidth: LABEL_COLUMN_WIDTH_PX,
+    baseInnerWidth,
     contentBottom,
     domainSpanBp: domainSpan,
     renderInnerWidth,
+    renderViewBoxMinX,
     rulerTop,
     tickY1: rulerTop + TRACK_LABEL_OFFSET_Y,
     tickY2: contentBottom - 3 * TRACK_HEIGHT_SCALE,

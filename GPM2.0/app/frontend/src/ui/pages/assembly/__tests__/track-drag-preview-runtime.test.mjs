@@ -344,3 +344,62 @@ test("previewSubviewTrackContigDrag shifts external subview-ctg labels with the 
   assert.equal(groupNode.getAttribute("transform"), null);
   assert.equal(externalLabelNode.style.transform, "");
 });
+
+test("previewSubviewTrackContigDrag expands and restores the live subview-ctg scroll envelope", () => {
+  const svgNode = createNode({
+    width: "100",
+    viewBox: "0 0 100 80",
+  });
+  const canvasLayerNode = createNode({
+    "data-track-band-canvas-scene-kind": "subview-ctg",
+  });
+  canvasLayerNode.style.width = "100px";
+  const scrollNode = createNode({
+    "data-subview-viewbox-min-x": "0",
+  }, {
+    ".subview-track-svg": [svgNode],
+    "[data-track-band-canvas-scene-kind='subview-ctg']": [canvasLayerNode],
+  });
+  scrollNode.clientWidth = 100;
+  scrollNode.scrollLeft = 0;
+  const groupNode = createNode({
+    "data-subview-track-slot": "top",
+    "data-subview-track-role": "support",
+    "data-subview-contig-id": "12",
+    "data-subview-rect-x": "80",
+    "data-subview-rect-width": "20",
+  });
+  groupNode.closest = (selector) => (
+    selector === ".assembly-track-scroll[data-track-role='subview']" ? scrollNode : null
+  );
+  const host = createHost({
+    '[data-subview-track-slot="top"][data-subview-contig-id="12"]': [groupNode],
+    '[data-subview-top-contig-id="12"]': [],
+    '[data-sticky-label-key="subview:top:support:12"]': [],
+    '[data-subview-label-slot="top"][data-subview-label-role="support"][data-subview-label-contig-id="12"]': [],
+    "[data-drag-preview-group='1']": [groupNode],
+    "[data-drag-preview-band='1']": [],
+    "[data-drag-preview-sticky-label='1']": [],
+    "[data-drag-preview-envelope='1']": [svgNode, canvasLayerNode, scrollNode],
+  });
+
+  const previewState = previewSubviewTrackContigDrag(host, {
+    slot: "top",
+    contigId: 12,
+    offsetPx: 40,
+  });
+
+  assert.equal(groupNode.getAttribute("transform"), "translate(40.00 0)");
+  assert.equal(svgNode.getAttribute("width"), "140");
+  assert.equal(svgNode.getAttribute("viewBox"), "0 0 140 80");
+  assert.equal(canvasLayerNode.style.width, "140px");
+  assert.equal(scrollNode.scrollLeft, 40);
+  assert.deepEqual(previewState, { scrollLeft: 40 });
+
+  clearSubviewTrackDragPreview(host);
+
+  assert.equal(svgNode.getAttribute("width"), "100");
+  assert.equal(svgNode.getAttribute("viewBox"), "0 0 100 80");
+  assert.equal(canvasLayerNode.style.width, "100px");
+  assert.equal(scrollNode.getAttribute("data-subview-viewbox-min-x"), "0");
+});

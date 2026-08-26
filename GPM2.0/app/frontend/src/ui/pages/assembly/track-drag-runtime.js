@@ -262,23 +262,31 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     );
     let dragging = false;
     let pendingOffsetBp = baseOffsetBp;
+    let previewAutoScrollDeltaPx = 0;
+    let pendingPreviewScrollLeft = null;
 
     const scheduler = createFrameScheduler(() => {
       const offsetPx = deps.roundTrackMetric(
         deltaOffsetBpToPx(pendingOffsetBp - baseOffsetBp, deps, scaleContext),
       );
-      deps.previewSubviewTrackContigDrag(host, {
+      const previewResult = deps.previewSubviewTrackContigDrag(host, {
         slot,
         contigId,
         offsetPx,
       });
+      const nextScrollLeft = Number(previewResult?.scrollLeft);
+      if (Number.isFinite(nextScrollLeft)) {
+        pendingPreviewScrollLeft = Math.max(0, nextScrollLeft);
+        previewAutoScrollDeltaPx = pendingPreviewScrollLeft - startScrollLeft;
+      }
     });
 
     const onPointerMove = (moveEvent) => {
       const currentClientX = Number(moveEvent.clientX || 0);
       const currentScrollEl = deps.resolveActiveTrackScrollElement(host, "subview", scrollEl);
       const currentScrollLeft = Number(currentScrollEl?.scrollLeft || 0);
-      const deltaX = deps.roundTrackMetric((currentClientX - startClientX) + (currentScrollLeft - startScrollLeft));
+      const scrollDeltaX = (currentScrollLeft - startScrollLeft) - previewAutoScrollDeltaPx;
+      const deltaX = deps.roundTrackMetric((currentClientX - startClientX) + scrollDeltaX);
       if (!dragging && Math.abs(deltaX) < 2) {
         return;
       }
@@ -301,6 +309,12 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
           contigId,
           offsetBp: pendingOffsetBp,
         });
+        if (Number.isFinite(pendingPreviewScrollLeft)) {
+          const activeScrollEl = deps.resolveActiveTrackScrollElement(host, "subview", scrollEl);
+          if (activeScrollEl) {
+            activeScrollEl.scrollLeft = pendingPreviewScrollLeft;
+          }
+        }
         void deps.persistSubviewTrackDragOffsets(host, store);
       }
     };

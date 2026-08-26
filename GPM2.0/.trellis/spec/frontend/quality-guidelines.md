@@ -446,6 +446,42 @@ Apply drag transforms only to the contig group and ordinary PAF polygons.
 #### Correct
 Resolve dependent junctions by stable entry identity, update every geometry consumer during preview, and restore their original attributes during cleanup.
 
+### Subview Contig Drag Overflow Envelope
+
+#### 1. Scope / Trigger
+- Applies to horizontal contig dragging in two-contig `subview-ctg` mode.
+- Trigger: either contig crosses the left or right edge of the original bp domain during preview or after its offset is persisted.
+- `subview-track` keeps its existing track-pair layout unless that mode receives a separate, explicit overflow requirement.
+
+#### 2. Contracts
+- `data-subview-inner-width` and the ruler width represent the base bp scale. Persisted drag offsets are converted between px and bp with this base width; an expanded render width must never change that conversion.
+- Manual Subview offsets are user-owned positions and must not be clamped back into the base domain. Derive `renderViewBoxMinX` from the leftmost contig edge and derive render width from the union of the base domain and both contig bounds.
+- SVG, band canvas, labels, anchors, and GRT overlays must use the same derived overflow envelope. Expanding the envelope changes only scrollable presentation geometry, not contig lengths, hit coordinates, ruler endpoints, or persisted offsets.
+- Live drag preview must temporarily expand the `subview-ctg` SVG/canvas envelope before auto-scrolling toward the exposed edge, then restore all temporary dimensions and attributes during cleanup.
+- Preview-driven auto-scroll is presentation state, not pointer movement. Exclude that programmatic scroll delta when calculating the next drag offset; after synchronous rerender, restore the preview scroll position on the current live Subview scroll element.
+
+#### 3. Validation & Error Matrix
+| Case | Expected behavior |
+|------|-------------------|
+| Short contig starts aligned at the right edge and is dragged right | The render width expands and the full contig remains reachable by horizontal scroll. |
+| Full-width contig is dragged left | `renderViewBoxMinX` becomes negative and the base bp scale/ruler stays unchanged. |
+| Preview exposes a new right edge | The temporary envelope expands, follows the contig, and cleanup restores original SVG/canvas attributes. |
+| Preview auto-scrolls while the pointer is stationary | The persisted offset remains unchanged; auto-scroll is not added to the drag delta. |
+| `subview-track` is rendered | No `subview-ctg` preview-envelope mutation is applied. |
+
+#### 4. Tests Required
+- `subview-drag-overflow.test.mjs` covers persisted right and left overflow while asserting that the base bp width remains stable.
+- `track-drag-preview-runtime.test.mjs` covers temporary envelope expansion, auto-scroll, and complete restoration.
+- `track-drag-runtime.test.mjs` covers exclusion of preview-driven auto-scroll from the persisted drag delta.
+- Keep Subview anchor, pairwise-band, ruler, main-track layout, full frontend test, and production build checks green.
+
+#### 5. Wrong vs Correct
+#### Wrong
+Clamp manual offsets to the original SVG width, or reuse the expanded render width as the bp conversion scale. The former blocks edge crossing; the latter changes saved positions when scale controls change.
+
+#### Correct
+Keep one immutable base bp width, derive a separate overflow render envelope, and treat preview auto-scroll as transient viewport movement.
+
 ### Subview Anchor Identity Contracts
 
 #### 1. Scope / Trigger

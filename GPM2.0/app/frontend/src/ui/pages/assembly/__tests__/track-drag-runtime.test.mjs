@@ -343,3 +343,91 @@ test("bindSubviewTrackContigDrag previews during move and applies pending subvie
     globalThis.window = originalWindow;
   }
 });
+
+test("bindSubviewTrackContigDrag excludes preview auto-scroll from the persisted drag delta", () => {
+  const originalWindow = globalThis.window;
+  const windowStub = createWindowStub();
+  globalThis.window = windowStub;
+
+  try {
+    const host = createHost();
+    const store = createStore({
+      assembly: {
+        activeTab: "assembly",
+        subviewTrackDragOffsets: [],
+      },
+    });
+    const scrollEl = {
+      scrollLeft: 3,
+      dataset: {
+        subviewDomainSpanBp: "100",
+        subviewInnerWidth: "100",
+      },
+    };
+    const trackNode = {
+      getAttribute(name) {
+        if (name === "data-subview-track-slot") return "top";
+        if (name === "data-subview-contig-id") return "12";
+        return null;
+      },
+      closest(selector) {
+        return selector === ".assembly-track-scroll[data-track-role='subview']"
+          ? scrollEl
+          : null;
+      },
+    };
+    const target = {
+      closest(selector) {
+        return selector === "[data-subview-contig-id][data-subview-track-slot]"
+          ? trackNode
+          : null;
+      },
+    };
+    const previews = [];
+    let appliedOffsetBp = null;
+    bindSubviewTrackContigDrag(host, store, {
+      clearSubviewTrackDragPreview() {},
+      applySubviewTrackDragOffset(_host, _store, payload) {
+        appliedOffsetBp = payload.offsetBp;
+      },
+      convertTrackOffsetPxToBp(value) {
+        return value;
+      },
+      previewSubviewTrackContigDrag(_host, payload) {
+        previews.push(payload.offsetPx);
+        scrollEl.scrollLeft = 43;
+        return { scrollLeft: 43 };
+      },
+      resolveActiveTrackScrollElement() {
+        return scrollEl;
+      },
+      resolveSubviewTrackDragOffsetBp() {
+        return 7;
+      },
+      roundTrackMetric(value) {
+        return value;
+      },
+      persistSubviewTrackDragOffsets() {},
+    });
+
+    host.listeners.get("pointerdown")?.({
+      button: 0,
+      clientX: 5,
+      ctrlKey: false,
+      metaKey: false,
+      preventDefault() {},
+      target,
+    });
+    windowStub.listeners.get("pointermove")?.({ clientX: 17 });
+    windowStub.flushAnimationFrame();
+    windowStub.listeners.get("pointermove")?.({ clientX: 17 });
+    windowStub.flushAnimationFrame();
+    windowStub.listeners.get("pointerup")?.();
+
+    assert.deepEqual(previews, [12, 12]);
+    assert.equal(appliedOffsetBp, 19);
+    assert.equal(scrollEl.scrollLeft, 43);
+  } finally {
+    globalThis.window = originalWindow;
+  }
+});
