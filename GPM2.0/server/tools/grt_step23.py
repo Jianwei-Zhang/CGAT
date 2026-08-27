@@ -32,7 +32,7 @@ except ModuleNotFoundError:  # Imported as server.tools.grt_step23.
     from .grt_core.mummer import command_identity, mummer_parameters, parse_mummer_coords, run_logged
 
 
-ENGINE_VERSION = 6
+ENGINE_VERSION = 7
 MUMMER_MIN_CLUSTER = 1_000
 MUMMER_MIN_MATCH = 100
 MUMMER_MIN_ALIGNMENT = 10_000
@@ -2132,12 +2132,19 @@ def build_correction_candidates(
             eligible, repair_reason = _step3_repair_decision(
                 error_type, confidence_score, left, right, start, end, repair_mode
             )
+            anchor_pair_executable = right is None or (
+                bool(features["ref_contig_match"])
+                and bool(features["direction_match"])
+            )
             edit_scope_safe, edit_scope_reason = _step3_edit_scope_decision(
                 error_type, features, start, end
             )
             if not edit_scope_safe:
                 eligible = False
                 repair_reason = edit_scope_reason
+            if not anchor_pair_executable:
+                eligible = False
+                repair_reason = "anchor_pair_source_or_orientation_conflict"
             ref_start = int(left["ref_min"])
             ref_end = int(left["ref_max"])
             if right is not None and str(left["ref_record"]) == str(right["ref_record"]):
@@ -2192,7 +2199,7 @@ def build_correction_candidates(
                     "mapq": 0,
                     "left_line": left["line_number"],
                     "right_line": "" if right is None else right["line_number"],
-                    "validation_passed": True,
+                    "validation_passed": anchor_pair_executable,
                     "outcome": "candidate" if eligible else "rejected",
                     "reason": reason if eligible else repair_reason,
                     "classification_reason": reason,
@@ -2223,10 +2230,10 @@ def build_step2_fallback_candidates(
     """Turn CorrectRefill structural evidence into an auditable Step2 retry.
 
     The original GRT controller runs a fixer and then re-runs the patcher.  In
-    Server mode the donor source and coordinates are already explicit, so the
-    equivalent retry can use the validated source interval directly.  This
-    avoids reconstructing implicit assemblies while still reusing the same
-    Type1--Type6 boundary decision and donor provenance.
+    Server mode only an executable Type1 replacement may reuse its explicit
+    donor interval as that retry.  Type4/Type5 overlap evidence belongs to the
+    Step3 structural-correction path, while conflicting Type2/Type3/Type6
+    anchor pairs remain diagnostic-only evidence.
     """
     structural = build_correction_candidates(
         gaps, alignments, members_by_record, repair_mode=repair_mode
@@ -2234,6 +2241,12 @@ def build_step2_fallback_candidates(
     fallback: list[dict[str, object]] = []
     for correction in structural:
         if not correction.get("eligible", True):
+            continue
+        if (
+            correction.get("validation_passed") is not True
+            or correction.get("error_type") != "type1"
+            or correction.get("action") != "replace"
+        ):
             continue
         source_key = (str(correction["source_dataset"]), str(correction["source_contig"]))
         source_sequence = sources.get(source_key, "")

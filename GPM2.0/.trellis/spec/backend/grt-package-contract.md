@@ -325,12 +325,15 @@ Package scripts write to a temporary archive and atomically replace the final ar
 
 - Classifier: `_step3_classify_features(features) -> (error_type, subtype, feature_names, confidence_score)`.
 - Edit guard: `_step3_edit_scope_decision(error_type, features, start, end) -> (safe, reason)`.
+- Step2 structural retry: `build_step2_fallback_candidates(gaps, alignments, members_by_record, sources, repair_mode) -> candidates`.
 - Step2/3 fingerprint fields include `engine_version`, exact `engine_sha256`, q/donor/tool identities, parameters, and consumed-interval identity.
 - Public correction/event coordinates remain 1-based closed; internal gap keys remain 0-based half-open.
 
 ### 3. Contracts
 
 - A crossing alignment remains Type1.
+- A two-anchor correction is executable only when both anchors use the same frozen D0 record and the same orientation. The global nearest left/right pair may still be classified for diagnostics, but a mixed-record or mixed-orientation pair has `validation_passed=false`, `eligible=false`, `outcome=rejected`, and reason `anchor_pair_source_or_orientation_conflict`.
+- Step2 structural fallback accepts only an executable Type1 `replace` candidate. Type2/Type3/Type6 conflicts remain diagnostic-only; Type4/Type5 overlap candidates proceed through Step3 structural correction and corrected-gap refill instead of being converted into donor-source patches.
 - Any positive reference overlap between anchors on the same frozen D0 record is Type5, regardless of overlap ratio. Small reference overlap must never fall through to Type4.
 - Type5 subtype thresholds match current GRT: `<10 kb` small, `<50 kb` medium, otherwise large. Confidence is `min(0.9 + overlap_bp / 1,000,000, 0.99)`.
 - Type5 projects the overlap through the right anchor, adds the configured correction margin, then widens the edit only enough to cover the complete origin q2 gap.
@@ -355,6 +358,8 @@ Package scripts write to a temporary archive and atomically replace the final ar
 
 | Condition | Required result |
 |---|---|
+| Nearest left/right anchors use different D0 records or orientations | Preserve Type2/Type3/Type6 classification evidence, but reject execution as `anchor_pair_source_or_orientation_conflict` |
+| Step2 structural fallback candidate is not an executable Type1 `replace` | Do not emit a fallback patch; defer Type4/Type5 to Step3 and keep conflicts diagnostic-only |
 | Same-record reference overlap is positive | Classify as Type5 and use overlap-plus-margin coordinates |
 | Type5 has a >=10 kb flush exact overlap between adjacent primary q2 sources | Keep the complete left source, remove the gap and duplicated right prefix, and insert no support sequence |
 | Flush and shifted-cut overlap candidates both exist | Select the flush `trim_left=0` candidate |
@@ -370,14 +375,19 @@ Package scripts write to a temporary archive and atomically replace the final ar
 ### 5. Good/Base/Bad Cases
 
 - Good: a 10,187 bp same-record overlap next to a 100 bp q2 gap becomes Type5 and edits about 10.4 kb, not the complete 2.89 Mb anchor.
+- Good: same-record forward anchors around a gap classify as Type5 while a closer reverse anchor from another donor is retained as rejected Type6 evidence; Step2 emits no patch from that decoy.
+- Base: a crossing Type1 alignment with a bounded explicit donor interval remains eligible for Step2 structural retry.
 - Good: Type5 donor evidence accompanies a 19,542 bp exact primary suffix-prefix overlap; Step3 keeps the left primary contig intact, trims 19,542 bp from the right primary prefix, removes 100N, and inserts zero donor bases.
 - Base: a Type5 edit begins on one side of the gap; widening includes the full gap and still produces one normalized 100 bp corrected gap.
+- Bad: choose the globally closest left anchor from one donor and the right anchor from another donor, then slice only the left donor and present it as a validated Step2 patch.
 - Bad: classify a 1% same-record overlap as Type4 and replace the entire shorter multi-megabase alignment.
 - Bad: reuse a successful Step3 checkpoint after the runtime script changed because only q/donor hashes were checked.
 
 ### 6. Tests Required
 
 - Golden classifier coverage proves small and large same-record overlaps are Type5 and query-overlap-only evidence remains the Type4 fixture.
+- A Chr3 real-topology regression uses the contig_62 forward overlap pair plus the closer contig_137 reverse decoy, asserts the decoy is rejected with `validation_passed=false`, and asserts Step2 emits no fallback patch from either Type5 or Type6.
+- Unit coverage preserves the crossing-Type1 fallback path and proves Type2/Type3/Type6 classifications remain auditable but non-executable.
 - A real-shape Chr05 regression asserts `27328071-27338457`, Type5, and an edit shorter than 20 kb.
 - Unit coverage proves origin-gap containment, second-gap rejection, and large overlap/edit-ratio rejection.
 - Unit coverage proves invalid negative-strand Step2 anchor ordering remains
@@ -392,12 +402,18 @@ Package scripts write to a temporary archive and atomically replace the final ar
 #### Wrong
 
 ```text
+nearest-left contig_137(-) + nearest-right contig_62(+)
+-> Type6 -> slice contig_137 -> validated Step2 patch
+
 10,187 bp same-record overlap -> Type4 -> replace 2,891,900 bp -> 100 N
 ```
 
 #### Correct
 
 ```text
+contig_62(+)/contig_62(+) -> Type5 -> Step3 structural correction
+contig_137(-)/contig_62(+) -> rejected diagnostic Type6 -> no Step2 patch
+
 10,187 bp same-record overlap -> Type5 -> project overlap + 100 bp margin
 -> widen to contain the origin q2 gap -> replace about 10.4 kb -> 100 N
 ```

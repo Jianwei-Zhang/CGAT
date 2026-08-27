@@ -167,6 +167,82 @@ class GrtStep23Tests(unittest.TestCase):
         self.assertEqual(candidates[0]["fill_sequence"], sources[("d0", "d1")][100:500])
         self.assertEqual(candidates[0]["fallback_strategy"], "correctrefill_source_retry")
 
+    def test_step2_fallback_rejects_mixed_donor_decoy_and_defers_type5(self):
+        members = {
+            "contig_62": {
+                "member_id": "m-contig-62",
+                "dataset_name": "flye",
+                "contig_name": "contig_62",
+                "orientation": "+",
+                "source_start": "1",
+                "source_end": "1177131",
+            },
+            "contig_137": {
+                "member_id": "m-contig-137",
+                "dataset_name": "flye",
+                "contig_name": "contig_137",
+                "orientation": "+",
+                "source_start": "1",
+                "source_end": "401698",
+            },
+        }
+
+        def row(
+            line,
+            record,
+            query_min,
+            query_max,
+            ref_min,
+            ref_max,
+            orientation,
+        ):
+            return {
+                "chr": "Chr3",
+                "line_number": line,
+                "ref_record": record,
+                "ref_min": ref_min,
+                "ref_max": ref_max,
+                "query_min": query_min,
+                "query_max": query_max,
+                "query_length": 3947119,
+                "query_aligned": query_max - query_min + 1,
+                "ref_length": int(members[record]["source_end"]),
+                "ref_aligned": ref_max - ref_min + 1,
+                "identity": 0.99,
+                "orientation": orientation,
+            }
+
+        gap = {
+            "chr": "Chr3",
+            "object_id": "chr3-gap-3314786",
+            "start0": 3314785,
+            "end0": 3314885,
+        }
+        alignments = [
+            row(8, "contig_62", 2418268, 3300256, 23674, 905746, "+"),
+            row(9, "contig_62", 3314886, 3616989, 874998, 1177131, "+"),
+            row(12, "contig_137", 3297605, 3314785, 384499, 401698, "-"),
+        ]
+
+        structural = build_correction_candidates([gap], alignments, members)
+        type5 = next(row for row in structural if row["error_type"] == "type5")
+        decoy = next(row for row in structural if row["error_type"] == "type6")
+        self.assertEqual(type5["source_contig"], "contig_62")
+        self.assertTrue(type5["eligible"])
+        self.assertEqual(type5["outcome"], "candidate")
+        self.assertEqual(decoy["source_contig"], "contig_137")
+        self.assertFalse(decoy["eligible"])
+        self.assertFalse(decoy["validation_passed"])
+        self.assertEqual(decoy["outcome"], "rejected")
+        self.assertEqual(
+            decoy["reason"], "anchor_pair_source_or_orientation_conflict"
+        )
+
+        fallback = build_step2_fallback_candidates(
+            [gap], alignments, members, sources={}
+        )
+        self.assertEqual(fallback, [])
+
     def test_rejected_negative_step2_anchor_order_emits_increasing_evidence_interval(self):
         member = {
             "member_id": "m-d1",
@@ -350,8 +426,7 @@ class GrtStep23Tests(unittest.TestCase):
         candidates = build_correction_candidates(gaps, alignments, members)
         by_gap = {}
         for candidate in candidates:
-            if candidate["outcome"] != "rejected":
-                by_gap.setdefault(str(candidate["object_id"]), []).append(candidate)
+            by_gap.setdefault(str(candidate["object_id"]), []).append(candidate)
         self.assertEqual(
             {row["error_type"] for rows in by_gap.values() for row in rows},
             {"type1", "type2", "type3", "type5", "type6"},
@@ -362,6 +437,22 @@ class GrtStep23Tests(unittest.TestCase):
         self.assertTrue(any(row["error_type"] == "type5" for row in by_gap["gap-4"]))
         self.assertTrue(any(row["error_type"] == "type5" for row in by_gap["gap-5"]))
         self.assertTrue(any(row["error_subtype"] == "complex_conflict" for row in by_gap["gap-6"]))
+        for object_id in ("gap-2", "gap-3", "gap-6"):
+            conflicts = [
+                row
+                for row in by_gap[object_id]
+                if row["error_type"] in {"type2", "type3", "type6"}
+            ]
+            self.assertTrue(conflicts)
+            self.assertTrue(all(row["outcome"] == "rejected" for row in conflicts))
+            self.assertTrue(all(not row["validation_passed"] for row in conflicts))
+            self.assertTrue(all(not row["eligible"] for row in conflicts))
+            self.assertTrue(
+                all(
+                    row["reason"] == "anchor_pair_source_or_orientation_conflict"
+                    for row in conflicts
+                )
+            )
         self.assertTrue(all(row["repair_mode"] == "aggressive" for rows in by_gap.values() for row in rows))
 
     def test_step3_small_reference_overlap_uses_type5_and_covers_origin_gap(self):
