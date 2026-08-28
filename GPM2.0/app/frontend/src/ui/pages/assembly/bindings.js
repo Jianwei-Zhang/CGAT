@@ -20,6 +20,7 @@ import {
   setGrtResultDisplayEnabled,
 } from "./grt-result-state.js";
 import { assemblyPageSession } from "./page-session.js";
+import { bindMainTrackControlLayout } from "./main-track-control-layout-runtime.js";
 
 const ASSEMBLY_TRACK_COMBO_BOUND = Symbol("assemblyTrackComboBound");
 const ASSEMBLY_DROPDOWN_CLOSE_DELAY_MS = 400;
@@ -412,6 +413,7 @@ function getCreateEmptyFinalPathRow(deps) {
 
 export function bindAssemblyPage(host, store, deps, options = {}) {
   assertAssemblyBindingDeps(deps);
+  bindMainTrackControlLayout(host);
   const requestedScope = String(options?.scope || "all").trim().toLowerCase();
   const bindingScope = ["main", "subview", "final-path"].includes(requestedScope)
     ? requestedScope

@@ -1188,7 +1188,7 @@ function renderAssemblyTrackInlineControls({
     i18n,
   });
   return `
-    <div class="assembly-track-inline-controls" role="group" aria-label="${escapeAttr(i18n.page.primaryAlignmentViewControlsAria)}">
+    <div class="assembly-track-inline-controls" data-main-track-inline-controls role="group" aria-label="${escapeAttr(i18n.page.primaryAlignmentViewControlsAria)}">
       <label class="assembly-track-inline-field">
         <span>${escapeHtml(i18n.trackControls.supportDataset)}</span>
         ${
@@ -2416,11 +2416,10 @@ function renderAssemblyTracks({
     : "";
   return `
     <div class="assembly-track-unified assembly-track-panel">
-      <div class="assembly-track-panel-head" data-grt-result-card="main" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
-        <strong>${escapeHtml(i18n.page.primaryAlignmentViewSingleCardTitle)}</strong>
-        <div class="assembly-track-panel-actions">
-          ${grtResultSwitch}
-          ${createPhasedTrackButton}
+      <div class="assembly-track-panel-head" data-main-track-control-layout="auto" data-grt-result-card="main" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
+        <strong data-main-track-control-title>${escapeHtml(i18n.page.primaryAlignmentViewSingleCardTitle)}</strong>
+        <div class="assembly-track-panel-actions" data-main-track-control-actions>
+          <div class="assembly-track-panel-quick-actions" data-main-track-quick-actions>${grtResultSwitch}${createPhasedTrackButton}</div>
           ${inlineControls}
         </div>
       </div>

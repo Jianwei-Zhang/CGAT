@@ -238,11 +238,98 @@
   flex-wrap: wrap;
 }
 
+.assembly-track-panel-head[data-main-track-control-layout] {
+  min-width: 0;
+}
+
+.assembly-track-panel-head[data-main-track-control-layout] > strong {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .assembly-track-panel-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.assembly-track-panel-head[data-main-track-control-layout] .assembly-track-panel-actions {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.assembly-track-panel-quick-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.assembly-track-panel-quick-actions:empty {
+  display: none;
+}
+
+.assembly-track-panel-head[data-main-track-control-layout="single"] {
+  flex-wrap: nowrap;
+}
+
+.assembly-track-panel-head[data-main-track-control-layout="single"] .assembly-track-panel-actions {
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+}
+
+.assembly-track-panel-head[data-main-track-control-layout="single"] .assembly-track-inline-controls {
+  flex-wrap: nowrap;
+}
+
+.assembly-track-panel-head[data-main-track-control-layout="split"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.assembly-track-panel-head[data-main-track-control-layout="split"] > strong {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.assembly-track-panel-head[data-main-track-control-layout="split"] .assembly-track-panel-actions {
+  display: contents;
+}
+
+.assembly-track-panel-head[data-main-track-control-layout="split"] .assembly-track-panel-quick-actions {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+}
+
+.assembly-track-panel-head[data-main-track-control-layout="split"] .assembly-track-inline-controls {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-content: flex-start;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.assembly-track-panel-head[data-main-track-control-layout="stacked"] {
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+}
+
+.assembly-track-panel-head[data-main-track-control-layout="stacked"] .assembly-track-panel-actions {
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.assembly-track-panel-head[data-main-track-control-layout="stacked"] .assembly-track-panel-quick-actions,
+.assembly-track-panel-head[data-main-track-control-layout="stacked"] .assembly-track-inline-controls {
+  justify-content: flex-start;
+  width: 100%;
   flex-wrap: wrap;
 }
 
@@ -1614,34 +1701,6 @@
   .assembly-track-topline {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .assembly-track-inline-controls {
-    justify-content: flex-start;
-    width: 100%;
-  }
-
-  .assembly-track-inline-field {
-    min-width: 0;
-    width: calc(50% - 6px);
-  }
-
-  .assembly-track-inline-field select,
-  .assembly-track-inline-field .assembly-track-select-shell,
-  .assembly-track-inline-field .assembly-track-combo,
-  .assembly-track-inline-field .assembly-track-combo-input {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .assembly-track-inline-field .assembly-track-select-shell.is-support,
-  .assembly-track-inline-field [data-track-combo-field="supportDsCtgLen"],
-  .assembly-track-inline-field [data-track-combo-field="minTickUnitKb"],
-  .assembly-track-inline-field [data-track-combo-field="maxTickCount"],
-  .assembly-track-inline-field [data-track-combo-field="alignmentLength"],
-  .assembly-track-inline-field [data-track-combo-field="mapq"] {
-    width: 100%;
-    min-width: 0;
   }
 
   .assembly-status-toast-wrap {
