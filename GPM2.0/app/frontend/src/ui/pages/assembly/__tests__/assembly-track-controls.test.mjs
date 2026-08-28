@@ -9,6 +9,11 @@ import {
   createStore,
   createSupportDsStorageMock,
 } from "./tabs-semantics-harness.mjs";
+import {
+  activateSubviewHistory,
+  commitSubviewHistoryOperation,
+  rollbackSubviewHistory,
+} from "../subview-history-state.js";
 
 test("assembly main view renders v1-style collapsible menus with selectable presets and numeric track inputs", () => {
   const html = renderAssemblyPage(createState());
@@ -278,6 +283,51 @@ test("subview selection panel exposes a stable local refresh anchor", () => {
   const html = renderAssemblyPage(createState());
 
   assert.match(html, /<article class="card subview-selection-panel" data-subview-panel="1">/);
+  assert.match(html, /data-subview-action="history-rollback"[^>]*disabled[^>]*>←<\/button>/);
+  assert.doesNotMatch(html, /data-subview-action="history-restore-rollback"/);
+  assert.match(html, /data-subview-action="history-reset"[^>]*disabled[^>]*>重置<\/button>/);
+});
+
+test("subview history controls show the right arrow only after a rollback", () => {
+  let state = createState({
+    assembly: {
+      subviewAnchorStateByKey: {},
+      subviewHistoryByKey: {},
+      subview: {
+        mode: "2-contig",
+        activeAnchors: [],
+        manualAnchors: [],
+        flippedCtgs: [],
+        trackPairHiddenCtgs: [],
+        trackPairSelectedCtgs: [],
+        summary: {
+          mode: "2-contig",
+          top: { role: "primary", contigId: 2 },
+          bottom: { role: "primary", contigId: 5 },
+        },
+      },
+    },
+  });
+  let assembly = activateSubviewHistory(state.assembly, { now: 0 }).assembly;
+  assembly = commitSubviewHistoryOperation(assembly, {
+    nextSubview: {
+      ...assembly.subview,
+      flippedCtgs: [{ slot: "top", contigId: 2 }],
+    },
+    operation: { kind: "flip-contig" },
+    now: 1,
+  }).assembly;
+  assembly = rollbackSubviewHistory(assembly, { now: 2 }).assembly;
+  state = { ...state, assembly };
+
+  const html = renderAssemblyPage(state);
+  const leftIndex = html.indexOf('data-subview-action="history-rollback"');
+  const rightIndex = html.indexOf('data-subview-action="history-restore-rollback"');
+  const separatorIndex = html.indexOf("subview-history-separator");
+  const resetIndex = html.indexOf('data-subview-action="history-reset"');
+  assert.ok(leftIndex >= 0 && rightIndex > leftIndex);
+  assert.ok(separatorIndex > rightIndex && resetIndex > separatorIndex);
+  assert.match(html, /撤销最近一次回退：恢复“翻转 ctg”后的状态/);
 });
 
 test("subview band tooltip keeps each contig interval on its own unwrapped line", () => {
@@ -1286,6 +1336,7 @@ test("support dataset selection persists project-scoped main track view state", 
       trackDragOffsets: [],
       subviewTrackDragOffsets: [],
       subviewAnchorStateByKey: {},
+      subviewHistoryByKey: {},
       trackScrollState: store.getState().assembly.trackScrollState,
       subviewTrackScrollState: store.getState().assembly.subviewTrackScrollState,
       finalPathTrackScrollState: store.getState().assembly.finalPathTrackScrollState,

@@ -177,6 +177,7 @@ const store = createStore({
     trackDragOffsets: [],
     subviewTrackDragOffsets: [],
     subviewAnchorStateByKey: {},
+    subviewHistoryByKey: {},
     trackScrollState: {
       viewportKey: "",
       scrollLeft: 0,

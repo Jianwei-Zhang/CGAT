@@ -124,6 +124,8 @@ pub struct UpdateProjectAssemblyViewStateCommandRequest {
     track_drag_offsets: Value,
     subview_track_drag_offsets: Value,
     subview_anchor_state_by_key: Value,
+    #[serde(default)]
+    subview_history_by_key: Value,
     final_path_view_mode: String,
     final_path_by_chr: Value,
     degap_project_state: Value,
@@ -794,6 +796,7 @@ mod tests {
                 "trackDragOffsets": [],
                 "subviewTrackDragOffsets": [],
                 "subviewAnchorStateByKey": {},
+                "subviewHistoryByKey": {},
                 "finalPathViewMode": "table",
                 "finalPathByChr": {},
                 "degapProjectState": {},

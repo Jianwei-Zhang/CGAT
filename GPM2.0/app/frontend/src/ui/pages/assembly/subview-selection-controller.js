@@ -6,6 +6,14 @@ import {
 import { resolveTrackPrefs } from "./track-prefs.js";
 import { resolveSubviewAnchorStateForSummary } from "./subview-anchor-state.js";
 import {
+  activateSubviewHistory,
+  commitSubviewHistoryOperation,
+  isSubviewHistoryRecordCompatible,
+  resetSubviewHistory,
+  restoreSubviewHistoryRollback,
+  rollbackSubviewHistory,
+} from "./subview-history-state.js";
+import {
   buildSubviewSummaryFromCandidates,
   buildSubviewSummaryFromTrackSelections,
   buildSubviewTrackPairPoolsFromAssembly,
@@ -22,6 +30,7 @@ export function createSubviewSelectionController({
   buildInitialSubviewPairwiseEvidence,
   getCurrentProject,
   loadSubviewPairwiseEvidence,
+  persistProjectAssemblyViewStateFromStore = async () => {},
   rerenderAssemblyMainTab,
   rerenderSubviewPanel,
 }) {
@@ -48,6 +57,32 @@ export function createSubviewSelectionController({
     if (pairwiseEvidence && String(pairwiseEvidence.status || "") === "loading") {
       loadSubviewPairwiseEvidence(host, store, summary);
     }
+  }
+
+  function activateEnteredSubviewHistory(state, subview, subviewTrackDragOffsets = []) {
+    const assembly = {
+      ...state.assembly,
+      subview,
+      subviewTrackDragOffsets,
+    };
+    const pools = buildSubviewTrackPairPoolsFromAssembly(assembly);
+    return activateSubviewHistory(
+      assembly,
+      {
+        stateOrLocale: state,
+        validateRecord: (record) => isSubviewHistoryRecordCompatible(record, {
+          summary: subview.summary,
+          pools,
+        }),
+      },
+    );
+  }
+
+  function persistActivatedSubviewHistoryIfNeeded(host, store, activation) {
+    if (!activation?.created && !activation?.invalidated) {
+      return;
+    }
+    void persistProjectAssemblyViewStateFromStore(host, store);
   }
 
   function handleTrackSubviewCandidateSelection(host, store, {
@@ -113,14 +148,6 @@ export function createSubviewSelectionController({
     const nextSubviewTrackView = hasEnteredTrackSubview
       ? inheritSubviewTrackViewFromMainTrack(state.assembly)
       : state.assembly.subviewTrackView;
-    const pairwiseEvidence = hasEnteredTrackSubview
-      ? buildInitialSubviewPairwiseEvidence(
-          nextSubview.summary,
-          nextSubviewTrackView,
-          state.assembly.subview?.pairwiseEvidence,
-          state,
-        )
-      : null;
     const persistedAnchorState = hasEnteredTrackSubview
       ? resolveSubviewAnchorStateForSummary(
           state.assembly.subviewAnchorStateByKey,
@@ -128,24 +155,49 @@ export function createSubviewSelectionController({
           state.assembly.selectedChrName,
         )
       : { activeAnchors: [], manualAnchors: [] };
+    const enteredSubview = hasEnteredTrackSubview
+      ? {
+          ...nextSubview,
+          activeAnchors: persistedAnchorState.activeAnchors,
+          manualAnchors: persistedAnchorState.manualAnchors,
+          flippedCtgs: [],
+        }
+      : nextSubview;
+    const activation = hasEnteredTrackSubview
+      ? activateEnteredSubviewHistory(state, enteredSubview)
+      : null;
+    const activatedSubview = activation?.assembly?.subview || enteredSubview;
+    const pairwiseEvidence = hasEnteredTrackSubview
+      ? buildInitialSubviewPairwiseEvidence(
+          activatedSubview.summary,
+          nextSubviewTrackView,
+          state.assembly.subview?.pairwiseEvidence,
+          state,
+        )
+      : null;
     store.setState({
-      assembly: {
-        ...state.assembly,
-        subviewTrackView: nextSubviewTrackView,
-        subview: hasEnteredTrackSubview
-          ? {
-            ...nextSubview,
-            activeAnchors: persistedAnchorState.activeAnchors,
-            manualAnchors: persistedAnchorState.manualAnchors,
-            flippedCtgs: [],
-            pairwiseEvidence,
+      assembly: hasEnteredTrackSubview
+        ? {
+            ...activation.assembly,
+            subviewTrackView: nextSubviewTrackView,
+            subview: {
+              ...activatedSubview,
+              pairwiseEvidence,
+              ...(activation.invalidated
+                ? { message: tAssembly(state, "subview.historyInvalidCleared") }
+                : {}),
+            },
           }
-          : nextSubview,
-        subviewTrackDragOffsets: [],
-      },
+        : {
+            ...state.assembly,
+            subviewTrackView: nextSubviewTrackView,
+            subview: enteredSubview,
+            subviewTrackDragOffsets: [],
+          },
     });
     rerenderSubviewSelectionRegions(host, store);
-    startPairwiseLoadIfNeeded(host, store, pairwiseEvidence, nextSubview.summary);
+    persistActivatedSubviewHistoryIfNeeded(host, store, activation);
+    startPairwiseLoadIfNeeded(host, store, pairwiseEvidence, activatedSubview.summary);
   }
 
   function handleSubviewCandidateRemoval(host, store, {
@@ -219,21 +271,25 @@ export function createSubviewSelectionController({
       nextSubview.summary,
       state.assembly.selectedChrName,
     );
-    store.setState({
-      assembly: {
-        ...state.assembly,
-        subview: {
-          ...nextSubview,
-          activeAnchors: persistedAnchorState.activeAnchors,
-          manualAnchors: persistedAnchorState.manualAnchors,
-          pairwiseEvidence,
-        },
-        subviewTrackDragOffsets: swapSubviewTrackDragOffsetsForSummarySwap(
-          state.assembly.subviewTrackDragOffsets,
-        ),
+    const committed = commitSubviewHistoryOperation(state.assembly, {
+      nextSubview: {
+        ...nextSubview,
+        activeAnchors: persistedAnchorState.activeAnchors,
+        manualAnchors: persistedAnchorState.manualAnchors,
+        pairwiseEvidence,
       },
+      nextSubviewTrackDragOffsets: swapSubviewTrackDragOffsetsForSummarySwap(
+        state.assembly.subviewTrackDragOffsets,
+      ),
+      operation: { kind: "swap-track-order" },
+      stateOrLocale: state,
     });
+    if (!committed.changed) {
+      return;
+    }
+    store.setState({ assembly: committed.assembly });
     rerenderSubviewPanel(host, store);
+    void persistProjectAssemblyViewStateFromStore(host, store);
     startPairwiseLoadIfNeeded(host, store, pairwiseEvidence, nextSubview.summary);
   }
 
@@ -272,44 +328,52 @@ export function createSubviewSelectionController({
       return;
     }
     const nextSubviewTrackView = inheritSubviewTrackViewFromMainTrack(state.assembly);
-    const pairwiseEvidence = buildInitialSubviewPairwiseEvidence(
-      result.value,
-      nextSubviewTrackView,
-      currentSubview.pairwiseEvidence,
-      state,
-    );
     const persistedAnchorState = resolveSubviewAnchorStateForSummary(
       state.assembly.subviewAnchorStateByKey,
       result.value,
       state.assembly.selectedChrName,
     );
+    const enteredSubview = {
+      ...currentSubview,
+      activeAnchors: persistedAnchorState.activeAnchors,
+      manualAnchors: persistedAnchorState.manualAnchors,
+      flippedCtgs: [],
+      selectedTrackSelections: [],
+      selectedTrackARole: "",
+      selectedTrackBRole: "",
+      selectedTrackBSource: "",
+      selectedTrackBDatasetId: null,
+      selectedTrackBIsMirror: false,
+      trackPairHiddenCtgs: [],
+      trackPairSelectedCtgs: [],
+      summary: result.value,
+      error: "",
+      message: tAssembly(state, "subview.entered"),
+    };
+    const activation = activateEnteredSubviewHistory(state, enteredSubview);
+    const activatedSubview = activation.assembly.subview;
+    const pairwiseEvidence = buildInitialSubviewPairwiseEvidence(
+      activatedSubview.summary,
+      nextSubviewTrackView,
+      currentSubview.pairwiseEvidence,
+      state,
+    );
     store.setState({
       assembly: {
-        ...state.assembly,
+        ...activation.assembly,
         subviewTrackView: nextSubviewTrackView,
         subview: {
-          ...currentSubview,
-          activeAnchors: persistedAnchorState.activeAnchors,
-          manualAnchors: persistedAnchorState.manualAnchors,
-          flippedCtgs: [],
-          selectedTrackSelections: [],
-          selectedTrackARole: "",
-          selectedTrackBRole: "",
-          selectedTrackBSource: "",
-          selectedTrackBDatasetId: null,
-          selectedTrackBIsMirror: false,
-          trackPairHiddenCtgs: [],
-          trackPairSelectedCtgs: [],
-          summary: result.value,
+          ...activatedSubview,
           pairwiseEvidence,
-          error: "",
-          message: tAssembly(state, "subview.entered"),
+          ...(activation.invalidated
+            ? { message: tAssembly(state, "subview.historyInvalidCleared") }
+            : {}),
         },
-        subviewTrackDragOffsets: [],
       },
     });
     rerenderSubviewSelectionRegions(host, store);
-    startPairwiseLoadIfNeeded(host, store, pairwiseEvidence, result.value);
+    persistActivatedSubviewHistoryIfNeeded(host, store, activation);
+    startPairwiseLoadIfNeeded(host, store, pairwiseEvidence, activatedSubview.summary);
   }
 
   function enterSubviewFromTrackSelections(host, store) {
@@ -337,48 +401,110 @@ export function createSubviewSelectionController({
       return;
     }
     const nextSubviewTrackView = inheritSubviewTrackViewFromMainTrack(state.assembly);
-    const pairwiseEvidence = buildInitialSubviewPairwiseEvidence(
-      result.value,
-      nextSubviewTrackView,
-      currentSubview.pairwiseEvidence,
-      state,
-    );
     const persistedAnchorState = resolveSubviewAnchorStateForSummary(
       state.assembly.subviewAnchorStateByKey,
       result.value,
       state.assembly.selectedChrName,
     );
+    const enteredSubview = {
+      ...currentSubview,
+      activeAnchors: persistedAnchorState.activeAnchors,
+      manualAnchors: persistedAnchorState.manualAnchors,
+      flippedCtgs: [],
+      selectedAContigId: null,
+      selectedARole: "",
+      selectedBContigId: null,
+      selectedBRole: "",
+      summary: result.value,
+      trackPairHiddenCtgs: [],
+      trackPairSelectedCtgs: [],
+      error: "",
+      message: tAssembly(state, "subview.enteredTrackMode"),
+    };
+    const activation = activateEnteredSubviewHistory(state, enteredSubview);
+    const activatedSubview = activation.assembly.subview;
+    const pairwiseEvidence = buildInitialSubviewPairwiseEvidence(
+      activatedSubview.summary,
+      nextSubviewTrackView,
+      currentSubview.pairwiseEvidence,
+      state,
+    );
     store.setState({
       assembly: {
-        ...state.assembly,
+        ...activation.assembly,
         subviewTrackView: nextSubviewTrackView,
         subview: {
-          ...currentSubview,
-          activeAnchors: persistedAnchorState.activeAnchors,
-          manualAnchors: persistedAnchorState.manualAnchors,
-          flippedCtgs: [],
-          selectedAContigId: null,
-          selectedARole: "",
-          selectedBContigId: null,
-          selectedBRole: "",
-          summary: result.value,
+          ...activatedSubview,
           pairwiseEvidence,
-          trackPairHiddenCtgs: [],
-          trackPairSelectedCtgs: [],
-          error: "",
-          message: tAssembly(state, "subview.enteredTrackMode"),
+          ...(activation.invalidated
+            ? { message: tAssembly(state, "subview.historyInvalidCleared") }
+            : {}),
         },
-        subviewTrackDragOffsets: [],
       },
     });
     rerenderSubviewSelectionRegions(host, store);
-    startPairwiseLoadIfNeeded(host, store, pairwiseEvidence, result.value);
+    persistActivatedSubviewHistoryIfNeeded(host, store, activation);
+    startPairwiseLoadIfNeeded(host, store, pairwiseEvidence, activatedSubview.summary);
+  }
+
+  function applySubviewHistoryTransition(host, store, transition) {
+    const state = store.getState();
+    const result = transition(state.assembly, { stateOrLocale: state });
+    if (!result.changed) {
+      if (result.invalidated) {
+        store.setState({
+          assembly: {
+            ...result.assembly,
+            subview: {
+              ...result.assembly.subview,
+              message: tAssembly(state, "subview.historyInvalidCleared"),
+            },
+          },
+        });
+        rerenderSubviewPanel(host, store);
+        void persistProjectAssemblyViewStateFromStore(host, store);
+      }
+      return;
+    }
+    const pairwiseEvidence = buildInitialSubviewPairwiseEvidence(
+      result.assembly.subview.summary,
+      result.assembly.subviewTrackView || result.assembly.trackView,
+      state.assembly.subview?.pairwiseEvidence,
+      state,
+    );
+    store.setState({
+      assembly: {
+        ...result.assembly,
+        subview: {
+          ...result.assembly.subview,
+          pairwiseEvidence,
+        },
+      },
+    });
+    rerenderSubviewPanel(host, store);
+    void persistProjectAssemblyViewStateFromStore(host, store);
+    startPairwiseLoadIfNeeded(host, store, pairwiseEvidence, result.assembly.subview.summary);
+  }
+
+  function handleSubviewHistoryRollback(host, store) {
+    applySubviewHistoryTransition(host, store, rollbackSubviewHistory);
+  }
+
+  function handleSubviewHistoryRestoreRollback(host, store) {
+    applySubviewHistoryTransition(host, store, restoreSubviewHistoryRollback);
+  }
+
+  function handleSubviewHistoryReset(host, store) {
+    applySubviewHistoryTransition(host, store, resetSubviewHistory);
   }
 
   return {
     enterSubviewFromCandidates,
     enterSubviewFromTrackSelections,
     handleSubviewCandidateRemoval,
+    handleSubviewHistoryReset,
+    handleSubviewHistoryRestoreRollback,
+    handleSubviewHistoryRollback,
     handleSubviewSwapTrackOrder,
     handleSubviewTrackSelectionRemoval,
     handleTrackSubviewCandidateSelection,

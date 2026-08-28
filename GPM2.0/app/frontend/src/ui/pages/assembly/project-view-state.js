@@ -20,6 +20,7 @@ import {
 import {
   normalizeSubviewAnchorStateByKey,
 } from "./subview-anchor-state.js";
+import { normalizeSubviewHistoryByKey } from "./subview-history-state.js";
 
 function normalizeFinalPathViewMode(value) {
   return normalizeFinalPathViewModeState(value);
@@ -56,6 +57,7 @@ export async function loadProjectAssemblyViewState({ workspaceRoot, projectId },
       trackDragOffsets: [],
       subviewTrackDragOffsets: [],
       subviewAnchorStateByKey: {},
+      subviewHistoryByKey: {},
       trackScrollState: normalizeTrackScrollState({}),
       subviewTrackScrollState: normalizeTrackScrollState({}),
       finalPathTrackScrollState: normalizeTrackScrollState({}),
@@ -76,6 +78,7 @@ export async function loadProjectAssemblyViewState({ workspaceRoot, projectId },
     trackDragOffsets: normalizeTrackOffsets(result?.trackDragOffsets),
     subviewTrackDragOffsets: normalizeSubviewOffsets(result?.subviewTrackDragOffsets),
     subviewAnchorStateByKey: normalizeSubviewAnchorStateByKey(result?.subviewAnchorStateByKey),
+    subviewHistoryByKey: normalizeSubviewHistoryByKey(result?.subviewHistoryByKey),
     trackScrollState: normalizeTrackScrollState(result?.trackScrollState),
     subviewTrackScrollState: normalizeTrackScrollState(result?.subviewTrackScrollState),
     finalPathTrackScrollState: normalizeTrackScrollState(result?.finalPathTrackScrollState),
@@ -99,6 +102,7 @@ export async function persistProjectAssemblyViewState(
     trackDragOffsets = [],
     subviewTrackDragOffsets = [],
     subviewAnchorStateByKey = {},
+    subviewHistoryByKey = {},
     trackScrollState = {},
     subviewTrackScrollState = {},
     finalPathTrackScrollState = {},
@@ -134,6 +138,7 @@ export async function persistProjectAssemblyViewState(
   const normalizedTrackOffsets = normalizeTrackOffsets(trackDragOffsets);
   const normalizedSubviewOffsets = normalizeSubviewOffsets(subviewTrackDragOffsets);
   const normalizedSubviewAnchorStateByKey = normalizeSubviewAnchorStateByKey(subviewAnchorStateByKey);
+  const normalizedSubviewHistoryByKey = normalizeSubviewHistoryByKey(subviewHistoryByKey);
   const normalizedTrackScrollState = normalizeTrackScrollState(trackScrollState);
   const normalizedSubviewTrackScrollState = normalizeTrackScrollState(subviewTrackScrollState);
   const normalizedFinalPathTrackScrollState = normalizeTrackScrollState(finalPathTrackScrollState);
@@ -152,6 +157,7 @@ export async function persistProjectAssemblyViewState(
       trackDragOffsets: normalizedTrackOffsets,
       subviewTrackDragOffsets: normalizedSubviewOffsets,
       subviewAnchorStateByKey: normalizedSubviewAnchorStateByKey,
+      subviewHistoryByKey: normalizedSubviewHistoryByKey,
       trackScrollState: normalizedTrackScrollState,
       subviewTrackScrollState: normalizedSubviewTrackScrollState,
       finalPathTrackScrollState: normalizedFinalPathTrackScrollState,
@@ -173,6 +179,7 @@ export async function persistProjectAssemblyViewState(
     trackDragOffsets: normalizedTrackOffsets,
     subviewTrackDragOffsets: normalizedSubviewOffsets,
     subviewAnchorStateByKey: normalizedSubviewAnchorStateByKey,
+    subviewHistoryByKey: normalizedSubviewHistoryByKey,
     trackScrollState: normalizedTrackScrollState,
     subviewTrackScrollState: normalizedSubviewTrackScrollState,
     finalPathTrackScrollState: normalizedFinalPathTrackScrollState,
@@ -198,6 +205,9 @@ export async function persistProjectAssemblyViewState(
     ),
     subviewAnchorStateByKey: normalizeSubviewAnchorStateByKey(
       result?.subviewAnchorStateByKey ?? normalizedSubviewAnchorStateByKey,
+    ),
+    subviewHistoryByKey: normalizeSubviewHistoryByKey(
+      result?.subviewHistoryByKey ?? normalizedSubviewHistoryByKey,
     ),
     trackScrollState: normalizeTrackScrollState(
       result?.trackScrollState ?? normalizedTrackScrollState,

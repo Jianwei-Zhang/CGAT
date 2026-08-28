@@ -48,6 +48,9 @@ import {
   createSubviewSelectionController,
 } from "./assembly/subview-selection-controller.js";
 import {
+  commitSubviewHistoryOperation,
+} from "./assembly/subview-history-state.js";
+import {
   compactFinalPathByDeletedPhasedTrack,
   createPhasedTrackController,
 } from "./assembly/phased-track-controller.js";
@@ -384,6 +387,9 @@ const {
   enterSubviewFromCandidates,
   enterSubviewFromTrackSelections,
   handleSubviewCandidateRemoval,
+  handleSubviewHistoryReset,
+  handleSubviewHistoryRestoreRollback,
+  handleSubviewHistoryRollback,
   handleSubviewSwapTrackOrder,
   handleSubviewTrackSelectionRemoval,
   handleTrackSubviewCandidateSelection,
@@ -392,6 +398,8 @@ const {
   buildInitialSubviewPairwiseEvidence,
   getCurrentProject: (state) => getCurrentProject(state),
   loadSubviewPairwiseEvidence,
+  persistProjectAssemblyViewStateFromStore: (host, store) =>
+    persistProjectAssemblyViewStateFromStore(host, store),
   rerenderAssemblyMainTab: (host, store) => rerenderAssemblyMainTab(host, store),
   rerenderSubviewPanel: (host, store) => rerenderSubviewPanel(host, store),
 });
@@ -792,6 +800,9 @@ function createAssemblyPageBindingDeps(options = {}) {
     createPhasedChrTrack,
     handleNewSequenceRowAction,
     handleSubviewCandidateRemoval,
+    handleSubviewHistoryReset,
+    handleSubviewHistoryRestoreRollback,
+    handleSubviewHistoryRollback,
     handleSubviewSwapTrackOrder,
     handleSubviewTrackSelectionRemoval,
     handleTrackSubviewCandidateSelection,
@@ -960,6 +971,8 @@ const editorActionsRuntimeDeps = {
   loadAssemblyView,
   loadAssemblyViewForLocalAssemblyRefresh,
   mapAssemblyError,
+  persistProjectAssemblyViewStateFromStore: (host, store) =>
+    persistProjectAssemblyViewStateFromStore(host, store),
   rebaseTrackDragOffsetsAfterRestore,
   refreshPhasedTracksForCurrentChr,
   refreshAfterBatchDelete,
@@ -1858,12 +1871,16 @@ function applySubviewTrackDragOffset(host, store, nextOffset) {
   if (areSubviewTrackDragOffsetsEqual(normalizedCurrent, normalizedNext)) {
     return;
   }
-  store.setState({
-    assembly: {
-      ...state.assembly,
-      subviewTrackDragOffsets: normalizedNext,
-    },
+  const committed = commitSubviewHistoryOperation(state.assembly, {
+    nextSubview: state.assembly.subview,
+    nextSubviewTrackDragOffsets: normalizedNext,
+    operation: { kind: "drag-contig" },
+    stateOrLocale: state,
   });
+  if (!committed.changed) {
+    return;
+  }
+  store.setState({ assembly: committed.assembly });
   rerenderSubviewPanel(host, store);
 }
 
@@ -1941,6 +1958,12 @@ async function persistProjectAssemblyViewStateFromStore(
         && typeof state.assembly.subviewAnchorStateByKey === "object"
         && !Array.isArray(state.assembly.subviewAnchorStateByKey)
           ? state.assembly.subviewAnchorStateByKey
+          : {},
+      subviewHistoryByKey:
+        state.assembly.subviewHistoryByKey
+        && typeof state.assembly.subviewHistoryByKey === "object"
+        && !Array.isArray(state.assembly.subviewHistoryByKey)
+          ? state.assembly.subviewHistoryByKey
           : {},
       trackScrollState: normalizeViewportScrollState(state.assembly.trackScrollState),
       subviewTrackScrollState: normalizeViewportScrollState(state.assembly.subviewTrackScrollState),

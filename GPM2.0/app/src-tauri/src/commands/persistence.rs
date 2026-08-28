@@ -114,6 +114,8 @@ pub fn get_project_assembly_view_state(
                 .unwrap_or_else(|_| json!([])),
             "subviewAnchorStateByKey": serde_json::from_str::<Value>(&state.subview_anchor_state_by_key_json)
                 .unwrap_or_else(|_| json!({})),
+            "subviewHistoryByKey": serde_json::from_str::<Value>(&state.subview_history_by_key_json)
+                .unwrap_or_else(|_| json!({})),
             "finalPathViewMode": state.final_path_view_mode,
             "finalPathByChr": final_path_by_chr,
             "degapProjectState": serde_json::from_str::<Value>(&state.degap_project_state_json)
@@ -143,6 +145,7 @@ pub fn update_project_assembly_view_state(
         track_drag_offsets,
         subview_track_drag_offsets,
         subview_anchor_state_by_key,
+        subview_history_by_key,
         final_path_view_mode,
         final_path_by_chr,
         degap_project_state,
@@ -199,6 +202,11 @@ pub fn update_project_assembly_view_state(
         } else {
             json!({})
         };
+        let normalized_subview_history_by_key = if subview_history_by_key.is_object() {
+            subview_history_by_key
+        } else {
+            json!({})
+        };
         let normalized_final_path_by_chr = if final_path_by_chr.is_object() {
             final_path_by_chr
         } else {
@@ -244,6 +252,9 @@ pub fn update_project_assembly_view_state(
                 subview_anchor_state_by_key_json: serde_json::to_string(
                     &normalized_subview_anchor_state_by_key,
                 )?,
+                subview_history_by_key_json: serde_json::to_string(
+                    &normalized_subview_history_by_key,
+                )?,
                 final_path_view_mode: normalized_final_path_view_mode,
                 final_path_by_chr_json: serde_json::to_string(&normalized_final_path_by_chr)?,
                 degap_project_state_json: serde_json::to_string(&normalized_degap_project_state)?,
@@ -275,6 +286,8 @@ pub fn update_project_assembly_view_state(
             "subviewTrackDragOffsets": serde_json::from_str::<Value>(&state.subview_track_drag_offsets_json)
                 .unwrap_or_else(|_| json!([])),
             "subviewAnchorStateByKey": serde_json::from_str::<Value>(&state.subview_anchor_state_by_key_json)
+                .unwrap_or_else(|_| json!({})),
+            "subviewHistoryByKey": serde_json::from_str::<Value>(&state.subview_history_by_key_json)
                 .unwrap_or_else(|_| json!({})),
             "finalPathViewMode": state.final_path_view_mode,
             "finalPathByChr": final_path_by_chr,

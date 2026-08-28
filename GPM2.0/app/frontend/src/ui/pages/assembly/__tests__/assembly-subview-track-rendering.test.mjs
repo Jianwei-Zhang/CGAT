@@ -412,7 +412,7 @@ test("subview local contig flips only affect subview labels and leave main-view 
   assert.match(html, /data-subview-label-slot="bottom"[^>]*>primary-track \(-\)<\/text>/);
 });
 
-test("subview local contig flip refreshes only the subview panel", () => {
+test("subview local contig flip refreshes only the subview panel", async () => {
   const store = createStore(
     createState({
       assembly: {
@@ -430,11 +430,12 @@ test("subview local contig flip refreshes only the subview panel", () => {
   );
   const calls = [];
 
-  __testToggleSubviewContigFlip(
+  await __testToggleSubviewContigFlip(
     {},
     store,
     { slot: "top", assemblyCtgId: 30 },
     {
+      async persistProjectAssemblyViewStateFromStore() {},
       rerenderSubviewPanel(_host, currentStore) {
         calls.push(currentStore.getState().assembly.subview.flippedCtgs);
       },

@@ -24,11 +24,18 @@ struct LegacyColumn {
     definition: &'static str,
 }
 
-const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "baseline_unversioned_workspace",
-    apply: migrate_unversioned_workspace_to_v1,
-}];
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "baseline_unversioned_workspace",
+        apply: migrate_unversioned_workspace_to_v1,
+    },
+    Migration {
+        version: 2,
+        name: "add_project_subview_history",
+        apply: migrate_project_subview_history_to_v2,
+    },
+];
 
 const LEGACY_COLUMNS: &[LegacyColumn] = &[
     LegacyColumn {
@@ -302,6 +309,23 @@ fn migrate_unversioned_workspace_to_v1(conn: &Connection) -> Result<()> {
         },
     )?;
     backfill_phased_track_item_orient(conn, orient_added)
+}
+
+fn migrate_project_subview_history_to_v2(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS project_subview_history (
+             project_id INTEGER NOT NULL,
+             pair_key TEXT NOT NULL,
+             state_json TEXT NOT NULL,
+             updated_at TEXT NOT NULL,
+             PRIMARY KEY(project_id, pair_key),
+             FOREIGN KEY(project_id) REFERENCES project(id) ON DELETE CASCADE
+         );
+         CREATE INDEX IF NOT EXISTS idx_project_subview_history_updated
+             ON project_subview_history(project_id, updated_at);",
+    )
+    .context("failed to create project subview history storage")?;
+    Ok(())
 }
 
 fn backfill_imported_assignment_orientation(conn: &Connection) -> Result<()> {

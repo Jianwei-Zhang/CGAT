@@ -67,6 +67,9 @@ function createBindingDeps(overrides = {}) {
     "bindTrackViewportResize",
     "handleNewSequenceRowAction",
     "handleSubviewCandidateRemoval",
+    "handleSubviewHistoryReset",
+    "handleSubviewHistoryRestoreRollback",
+    "handleSubviewHistoryRollback",
     "handleSubviewSwapTrackOrder",
     "handleSubviewTrackSelectionRemoval",
     "handleTrackSubviewCandidateSelection",
@@ -98,6 +101,43 @@ function createBindingDeps(overrides = {}) {
     ...overrides,
   };
 }
+
+test("bindings dispatch Subview rollback, rollback restore, and reset actions", () => {
+  const listeners = new Map();
+  const actions = ["history-rollback", "history-restore-rollback", "history-reset"];
+  const targets = actions.map((action) => ({
+    dataset: { subviewAction: action },
+    addEventListener(type, handler) {
+      listeners.set(action, { type, handler });
+    },
+  }));
+  const host = {
+    querySelector() {
+      return null;
+    },
+    querySelectorAll(selector) {
+      return selector === "[data-subview-action]" ? targets : [];
+    },
+    addEventListener() {},
+  };
+  const calls = [];
+  const deps = createBindingDeps({
+    handleSubviewHistoryRollback() {
+      calls.push("rollback");
+    },
+    handleSubviewHistoryRestoreRollback() {
+      calls.push("restore-rollback");
+    },
+    handleSubviewHistoryReset() {
+      calls.push("reset");
+    },
+  });
+
+  bindAssemblyPageImpl(host, createStore(createState()), deps);
+  actions.forEach((action) => listeners.get(action)?.handler({ preventDefault() {} }));
+
+  assert.deepEqual(calls, ["rollback", "restore-rollback", "reset"]);
+});
 
 test("bindings create phased track from the main track toolbar", async () => {
   let clickHandler = null;

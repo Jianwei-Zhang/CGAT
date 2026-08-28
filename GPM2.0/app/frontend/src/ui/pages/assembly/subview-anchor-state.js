@@ -150,32 +150,40 @@ function buildSubviewTrackAnchorKey(track) {
   return parts.join(":");
 }
 
+export function buildSubviewSummaryOrderKeys(summary) {
+  const mode = String(summary?.mode || "").trim();
+  if (mode === "2-contig") {
+    return {
+      topKey: buildSubviewAnchorEndpointKey({
+        ...(summary?.top || {}),
+        role: summary?.top?.role,
+        contigId: summary?.top?.contigId,
+      }),
+      bottomKey: buildSubviewAnchorEndpointKey({
+        ...(summary?.bottom || {}),
+        role: summary?.bottom?.role,
+        contigId: summary?.bottom?.contigId,
+      }),
+    };
+  }
+  if (mode === "track-pair") {
+    return {
+      topKey: buildSubviewTrackAnchorKey(summary?.topTrack),
+      bottomKey: buildSubviewTrackAnchorKey(summary?.bottomTrack),
+    };
+  }
+  return { topKey: "", bottomKey: "" };
+}
+
 export function buildSubviewAnchorStateKey(summary, chrName = "") {
   const mode = String(summary?.mode || "").trim();
   const chrPart = `chr:${normalizeIdPart(chrName)}`;
-  if (mode === "2-contig") {
-    const topKey = buildSubviewAnchorEndpointKey({
-      ...(summary?.top || {}),
-      role: summary?.top?.role,
-      contigId: summary?.top?.contigId,
-    });
-    const bottomKey = buildSubviewAnchorEndpointKey({
-      ...(summary?.bottom || {}),
-      role: summary?.bottom?.role,
-      contigId: summary?.bottom?.contigId,
-    });
+  if (mode === "2-contig" || mode === "track-pair") {
+    const { topKey, bottomKey } = buildSubviewSummaryOrderKeys(summary);
     if (!topKey || !bottomKey) {
       return "";
     }
-    return ["2-contig", chrPart, ...[topKey, bottomKey].sort()].join("|");
-  }
-  if (mode === "track-pair") {
-    const topKey = buildSubviewTrackAnchorKey(summary?.topTrack);
-    const bottomKey = buildSubviewTrackAnchorKey(summary?.bottomTrack);
-    if (!topKey || !bottomKey) {
-      return "";
-    }
-    return ["track-pair", chrPart, ...[topKey, bottomKey].sort()].join("|");
+    return [mode, chrPart, ...[topKey, bottomKey].sort()].join("|");
   }
   return "";
 }

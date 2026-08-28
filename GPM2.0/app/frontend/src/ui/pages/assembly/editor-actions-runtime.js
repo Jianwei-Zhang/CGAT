@@ -8,6 +8,7 @@ import {
   normalizeSubviewTrackPairSelectionCtgs,
   resolveFilteredSubviewTrackPairSelectionsFromAssembly,
 } from "./subview-state.js";
+import { commitSubviewHistoryOperation } from "./subview-history-state.js";
 
 function normalizeBoolean(value) {
   if (value === true || value === "true") {
@@ -216,6 +217,7 @@ export async function deleteSelectedTrackCtgs(host, store, selectedIds, deps, ov
 
 export async function deleteSelectedSubviewTrackPairCtgs(host, store, selectedEntries, deps, overrides = {}) {
   assertRuntimeDeps("delete subview track-pair ctgs", deps, [
+    "persistProjectAssemblyViewStateFromStore",
     "rerender",
   ]);
   const state = store.getState();
@@ -248,19 +250,27 @@ export async function deleteSelectedSubviewTrackPairCtgs(host, store, selectedEn
     ...normalizeHidden(currentSubview.trackPairHiddenCtgs),
     ...normalized,
   ]);
+  const committed = commitSubviewHistoryOperation(state.assembly, {
+    nextSubview: {
+      ...currentSubview,
+      trackPairHiddenCtgs: hiddenNext,
+      trackPairSelectedCtgs: [],
+    },
+    operation: { kind: "hide-contigs", count: normalized.length },
+    stateOrLocale: state,
+  });
+  if (!committed.changed) {
+    return;
+  }
   store.setState({
     assembly: {
-      ...state.assembly,
-      subview: {
-        ...currentSubview,
-        trackPairHiddenCtgs: hiddenNext,
-        trackPairSelectedCtgs: [],
-      },
+      ...committed.assembly,
       actionStatus: tAssembly(state, "runtime.subviewDeletedStatus", { count: normalized.length }),
       actionError: "",
     },
   });
   deps.rerender(host, store);
+  await deps.persistProjectAssemblyViewStateFromStore(host, store);
 }
 
 export async function restoreSelectedDeletedCtgs(host, store, selectedRecordIds, deps, overrides = {}) {

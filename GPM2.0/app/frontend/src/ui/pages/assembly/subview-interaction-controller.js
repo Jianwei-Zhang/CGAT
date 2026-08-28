@@ -3,7 +3,6 @@ import {
   createOffsetSubviewManualAnchor,
   deriveSubviewAnchorOffsetSuggestion,
   removeSubviewManualAnchor,
-  setSubviewAnchorStateForSummary,
   toggleSubviewAnchorEdge as toggleSubviewAnchorEdgeState,
   upsertSubviewManualAnchor,
 } from "./subview-anchor-state.js";
@@ -18,6 +17,7 @@ import {
   normalizeSubviewTrackPairHiddenCtgs,
   normalizeSubviewTrackPairSelectionCtgs,
 } from "./subview-state.js";
+import { commitSubviewHistoryOperation } from "./subview-history-state.js";
 
 export function createSubviewInteractionController({
   persistProjectAssemblyViewStateFromStore,
@@ -26,7 +26,30 @@ export function createSubviewInteractionController({
   setAssemblyActionFeedback,
   tAssembly,
 }) {
-  function setSubviewTrackPairCtgHidden(host, store, { trackRole, contigId, hidden = true }) {
+  async function commitSubviewEdit(host, store, {
+    nextSubview,
+    operation,
+    persist = persistProjectAssemblyViewStateFromStore,
+    rerender = rerenderSubviewPanel,
+  }) {
+    const state = store.getState();
+    const result = commitSubviewHistoryOperation(state.assembly, {
+      nextSubview,
+      operation,
+      stateOrLocale: state,
+    });
+    if (!result.changed) {
+      return false;
+    }
+    store.setState({
+      assembly: result.assembly,
+    });
+    rerender(host, store);
+    await persist(host, store);
+    return true;
+  }
+
+  async function setSubviewTrackPairCtgHidden(host, store, { trackRole, contigId, hidden = true }) {
     const normalizedTrackRole = normalizeTrackRole(trackRole);
     const normalizedContigId = normalizeSupportDatasetId(contigId);
     if (!normalizedTrackRole || !normalizedContigId) {
@@ -59,46 +82,21 @@ export function createSubviewInteractionController({
             === buildSubviewTrackPairHiddenCtgKey(entry.trackRole, entry.contigId),
       ),
     );
-    store.setState({
-      assembly: {
-        ...state.assembly,
-        subview: {
-          ...currentSubview,
-          trackPairHiddenCtgs: next,
-          trackPairSelectedCtgs: nextSelections,
-        },
+    await commitSubviewEdit(host, store, {
+      nextSubview: {
+        ...currentSubview,
+        trackPairHiddenCtgs: next,
+        trackPairSelectedCtgs: nextSelections,
+      },
+      operation: {
+        kind: hidden ? "hide-contig" : "restore-hidden-contigs",
+        count: 1,
       },
     });
-    rerenderSubviewPanel(host, store);
   }
 
-  function buildSubviewAnchorStateByKeyForCurrentSubview(assembly, subview) {
-    return setSubviewAnchorStateForSummary(
-      assembly?.subviewAnchorStateByKey,
-      subview?.summary,
-      assembly?.selectedChrName,
-      {
-        activeAnchors: subview?.activeAnchors || [],
-        manualAnchors: subview?.manualAnchors || [],
-      },
-    );
-  }
-
-  async function commitSubviewAnchorState(host, store, nextSubview) {
-    const state = store.getState();
-    const nextSubviewAnchorStateByKey = buildSubviewAnchorStateByKeyForCurrentSubview(
-      state.assembly,
-      nextSubview,
-    );
-    store.setState({
-      assembly: {
-        ...state.assembly,
-        subview: nextSubview,
-        subviewAnchorStateByKey: nextSubviewAnchorStateByKey,
-      },
-    });
-    rerenderSubviewPanel(host, store);
-    await persistProjectAssemblyViewStateFromStore(host, store);
+  async function commitSubviewAnchorState(host, store, nextSubview, operation) {
+    await commitSubviewEdit(host, store, { nextSubview, operation });
   }
 
   async function toggleSubviewAnchorEdge(host, store, { hitKey, edge }) {
@@ -116,10 +114,15 @@ export function createSubviewInteractionController({
     ) {
       return;
     }
-    await commitSubviewAnchorState(host, store, {
-      ...currentSubview,
-      activeAnchors: nextActiveAnchors,
-    });
+    await commitSubviewAnchorState(
+      host,
+      store,
+      {
+        ...currentSubview,
+        activeAnchors: nextActiveAnchors,
+      },
+      { kind: "toggle-anchor" },
+    );
   }
 
   async function copySubviewAnchorWithOffset(host, store, sourceEdge) {
@@ -148,10 +151,15 @@ export function createSubviewInteractionController({
     }
     const currentState = store.getState();
     const currentSubview = getSubviewState(currentState.assembly);
-    await commitSubviewAnchorState(host, store, {
-      ...currentSubview,
-      manualAnchors: upsertSubviewManualAnchor(currentSubview.manualAnchors, result.anchor),
-    });
+    await commitSubviewAnchorState(
+      host,
+      store,
+      {
+        ...currentSubview,
+        manualAnchors: upsertSubviewManualAnchor(currentSubview.manualAnchors, result.anchor),
+      },
+      { kind: "create-offset-anchor" },
+    );
     setAssemblyActionFeedback(host, store, {
       actionStatus: tAssembly(store.getState(), "runtime.subviewAnchorOffsetCreated"),
       actionError: "",
@@ -168,17 +176,22 @@ export function createSubviewInteractionController({
     if (nextManualAnchors.length === currentSubview.manualAnchors.length) {
       return;
     }
-    await commitSubviewAnchorState(host, store, {
-      ...currentSubview,
-      manualAnchors: nextManualAnchors,
-    });
+    await commitSubviewAnchorState(
+      host,
+      store,
+      {
+        ...currentSubview,
+        manualAnchors: nextManualAnchors,
+      },
+      { kind: "delete-offset-anchor" },
+    );
     setAssemblyActionFeedback(host, store, {
       actionStatus: tAssembly(store.getState(), "runtime.subviewManualAnchorDeleted"),
       actionError: "",
     });
   }
 
-  function toggleSubviewContigFlip(host, store, { slot, assemblyCtgId }, options = {}) {
+  async function toggleSubviewContigFlip(host, store, { slot, assemblyCtgId }, options = {}) {
     const normalizedSlot = String(slot || "").trim().toLowerCase();
     const normalizedContigId = normalizeSupportDatasetId(assemblyCtgId);
     if ((normalizedSlot !== "top" && normalizedSlot !== "bottom") || !normalizedContigId) {
@@ -197,37 +210,36 @@ export function createSubviewInteractionController({
         (entry) => !(entry.slot === normalizedSlot && entry.contigId === normalizedContigId),
       )
       : [...current, { slot: normalizedSlot, contigId: normalizedContigId }];
-    store.setState({
-      assembly: {
-        ...state.assembly,
-        subview: {
-          ...currentSubview,
-          flippedCtgs: next,
-        },
-      },
-    });
     const rerenderSubview = typeof options.rerenderSubviewPanel === "function"
       ? options.rerenderSubviewPanel
       : rerenderSubviewPanel;
-    rerenderSubview(host, store);
+    await commitSubviewEdit(host, store, {
+      nextSubview: {
+        ...currentSubview,
+        flippedCtgs: next,
+      },
+      operation: { kind: "flip-contig" },
+      persist: typeof options.persistProjectAssemblyViewStateFromStore === "function"
+        ? options.persistProjectAssemblyViewStateFromStore
+        : persistProjectAssemblyViewStateFromStore,
+      rerender: rerenderSubview,
+    });
   }
 
-  function clearSubviewTrackPairHiddenCtgs(host, store) {
+  async function clearSubviewTrackPairHiddenCtgs(host, store) {
     const state = store.getState();
     const currentSubview = getSubviewState(state.assembly);
     if (!normalizeSubviewTrackPairHiddenCtgs(currentSubview.trackPairHiddenCtgs).length) {
       return;
     }
-    store.setState({
-      assembly: {
-        ...state.assembly,
-        subview: {
-          ...currentSubview,
-          trackPairHiddenCtgs: [],
-        },
+    const count = normalizeSubviewTrackPairHiddenCtgs(currentSubview.trackPairHiddenCtgs).length;
+    await commitSubviewEdit(host, store, {
+      nextSubview: {
+        ...currentSubview,
+        trackPairHiddenCtgs: [],
       },
+      operation: { kind: "restore-hidden-contigs", count },
     });
-    rerenderSubviewPanel(host, store);
   }
 
   return {

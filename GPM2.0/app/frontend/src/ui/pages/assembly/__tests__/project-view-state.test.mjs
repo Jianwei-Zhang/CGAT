@@ -36,6 +36,17 @@ test("loadProjectAssemblyViewState normalizes segment-based finalPathByChr, fina
             },
             "": { activeAnchors: [{ hitKey: "bad", edge: "left" }] },
           },
+          subviewHistoryByKey: {
+            "2-contig|chr:Chr01|a|b": {
+              version: 1,
+              pairKey: "2-contig|chr:Chr01|a|b",
+              current: { topKey: "a" },
+              default: { topKey: "a" },
+              past: [],
+              forward: [],
+              updatedAt: "2026-08-28T00:00:00.000Z",
+            },
+          },
           trackScrollState: {},
           subviewTrackScrollState: {},
           finalPathTrackScrollState: {
@@ -129,6 +140,10 @@ test("loadProjectAssemblyViewState normalizes segment-based finalPathByChr, fina
       }],
     },
   });
+  assert.equal(
+    result.subviewHistoryByKey["2-contig|chr:Chr01|a|b"].current.topKey,
+    "a",
+  );
 });
 
 test("persistProjectAssemblyViewState sends and returns normalized segment-based finalPathByChr and membersCardCollapsed", async () => {
@@ -155,6 +170,17 @@ test("persistProjectAssemblyViewState sends and returns normalized segment-based
             endpointA: { endpointKey: "b", contigId: 10, cutBp: 200 },
             endpointB: { endpointKey: "a", contigId: 9, cutBp: 100 },
           }],
+        },
+      },
+      subviewHistoryByKey: {
+        "2-contig|chr:Chr01|a|b": {
+          version: 1,
+          pairKey: "2-contig|chr:Chr01|a|b",
+          current: { topKey: "a" },
+          default: { topKey: "a" },
+          past: [],
+          forward: [],
+          updatedAt: "2026-08-28T00:00:00.000Z",
         },
       },
       trackScrollState: {},
@@ -251,6 +277,7 @@ test("persistProjectAssemblyViewState sends and returns normalized segment-based
     },
   });
   assert.deepEqual(result.subviewAnchorStateByKey, sent[0].subviewAnchorStateByKey);
+  assert.deepEqual(result.subviewHistoryByKey, sent[0].subviewHistoryByKey);
   assert.equal(sent[0].membersCardCollapsed, false);
   assert.equal(result.membersCardCollapsed, false);
   assert.deepEqual(sent[0].finalPathTrackScrollState, {

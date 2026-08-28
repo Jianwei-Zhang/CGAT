@@ -13,10 +13,18 @@ test("deleteSelectedSubviewTrackPairCtgs hides normalized subview selections and
   const host = {};
   let state = {
     assembly: {
+      selectedChrName: "Chr01",
+      subviewAnchorStateByKey: {},
+      subviewHistoryByKey: {},
+      subviewTrackDragOffsets: [],
       subview: {
-        summary: { mode: "track-pair" },
-        trackPairHiddenCtgs: [{ trackRole: "top", contigId: 3 }],
-        trackPairSelectedCtgs: [{ trackRole: "bottom", contigId: 9 }],
+        summary: {
+          mode: "track-pair",
+          topTrack: { role: "primary", source: "mother", datasetId: 11 },
+          bottomTrack: { role: "support", source: "support", datasetId: 22 },
+        },
+        trackPairHiddenCtgs: [{ trackRole: "primary", contigId: 3 }],
+        trackPairSelectedCtgs: [{ trackRole: "support", contigId: 9 }],
       },
       actionStatus: "",
       actionError: "old",
@@ -35,12 +43,16 @@ test("deleteSelectedSubviewTrackPairCtgs hides normalized subview selections and
   };
   const rerenders = [];
   const confirms = [];
+  const persists = [];
 
   await deleteSelectedSubviewTrackPairCtgs(
     host,
     store,
-    [{ trackRole: "top", contigId: 7 }],
+    [{ trackRole: "primary", contigId: 7 }],
     {
+      async persistProjectAssemblyViewStateFromStore(_host, currentStore) {
+        persists.push(currentStore.getState().assembly.subviewHistoryByKey);
+      },
       rerender(_host, currentStore) {
         rerenders.push(currentStore.getState().assembly.subview.trackPairHiddenCtgs);
       },
@@ -60,20 +72,22 @@ test("deleteSelectedSubviewTrackPairCtgs hides normalized subview selections and
         return entries;
       },
       resolveFilteredSubviewTrackPairSelectionsFromAssembly() {
-        return [{ trackRole: "top", contigId: 7 }];
+        return [{ trackRole: "primary", contigId: 7 }];
       },
     },
   );
 
   assert.deepEqual(confirms, ["确认在 Subview 中临时删除已框选的 1 个 contig 吗？"]);
   assert.deepEqual(state.assembly.subview.trackPairHiddenCtgs, [
-    { trackRole: "top", contigId: 3 },
-    { trackRole: "top", contigId: 7 },
+    { trackRole: "primary", contigId: 3 },
+    { trackRole: "primary", contigId: 7 },
   ]);
   assert.deepEqual(state.assembly.subview.trackPairSelectedCtgs, []);
   assert.equal(state.assembly.actionStatus, "Subview 轨道模式已临时删除 1 个 contig。");
   assert.equal(state.assembly.actionError, "");
   assert.equal(rerenders.length, 1);
+  assert.equal(persists.length, 1);
+  assert.equal(Object.keys(persists[0]).length, 1);
 });
 
 test("deleteSelectedTrackCtgs waits for async confirmation before deleting", async () => {

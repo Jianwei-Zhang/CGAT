@@ -43,6 +43,9 @@ const REQUIRED_BINDING_DEPS = [
   "bindTrackViewportResize",
   "handleNewSequenceRowAction",
   "handleSubviewCandidateRemoval",
+  "handleSubviewHistoryReset",
+  "handleSubviewHistoryRestoreRollback",
+  "handleSubviewHistoryRollback",
   "handleSubviewSwapTrackOrder",
   "handleSubviewTrackSelectionRemoval",
   "handleTrackSubviewCandidateSelection",
@@ -436,6 +439,9 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     createPhasedChrTrack = async () => {},
     handleNewSequenceRowAction,
     handleSubviewCandidateRemoval,
+    handleSubviewHistoryReset,
+    handleSubviewHistoryRestoreRollback,
+    handleSubviewHistoryRollback,
     handleSubviewSwapTrackOrder,
     handleSubviewTrackSelectionRemoval,
     handleTrackSubviewCandidateSelection,
@@ -1277,6 +1283,18 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
       const action = String(target.dataset.subviewAction || "").trim();
       if (action === "swap-track-order") {
         handleSubviewSwapTrackOrder(host, store);
+        return;
+      }
+      if (action === "history-rollback") {
+        handleSubviewHistoryRollback(host, store);
+        return;
+      }
+      if (action === "history-restore-rollback") {
+        handleSubviewHistoryRestoreRollback(host, store);
+        return;
+      }
+      if (action === "history-reset") {
+        handleSubviewHistoryReset(host, store);
       }
     });
   });

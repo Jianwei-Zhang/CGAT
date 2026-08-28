@@ -562,6 +562,12 @@ export async function loadAssemblyView(host, store, options, deps) {
       && !Array.isArray(projectAssemblyViewState.subviewAnchorStateByKey)
         ? projectAssemblyViewState.subviewAnchorStateByKey
         : {};
+    const persistedSubviewHistoryByKey =
+      projectAssemblyViewState?.subviewHistoryByKey
+      && typeof projectAssemblyViewState.subviewHistoryByKey === "object"
+      && !Array.isArray(projectAssemblyViewState.subviewHistoryByKey)
+        ? projectAssemblyViewState.subviewHistoryByKey
+        : {};
     const deletedCtgs = selectedChrName
       ? await deps.loadDeletedCtgsForChr(
           state.session.workspacePath,
@@ -669,6 +675,7 @@ export async function loadAssemblyView(host, store, options, deps) {
         trackDragOffsets: filteredTrackDragOffsets,
         subviewTrackDragOffsets: filteredSubviewTrackDragOffsets,
         subviewAnchorStateByKey: persistedSubviewAnchorStateByKey,
+        subviewHistoryByKey: persistedSubviewHistoryByKey,
         trackScrollState: persistedTrackScrollState,
         subviewTrackScrollState: persistedSubviewTrackScrollState,
         finalPathTrackScrollState: persistedFinalPathTrackScrollState,

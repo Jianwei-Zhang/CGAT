@@ -550,6 +550,7 @@ test("setProjectAssemblyViewState tauri wraps the complete request payload", asy
           trackDragOffsets: [],
           subviewTrackDragOffsets: [],
           subviewAnchorStateByKey: {},
+          subviewHistoryByKey: {},
           trackScrollState: {},
           subviewTrackScrollState: {},
           finalPathTrackScrollState: {},

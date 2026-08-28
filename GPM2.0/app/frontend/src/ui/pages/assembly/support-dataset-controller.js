@@ -181,6 +181,12 @@ export function createSupportDatasetController({
         && !Array.isArray(nextAssemblyState.subviewAnchorStateByKey)
           ? nextAssemblyState.subviewAnchorStateByKey
           : {},
+      subviewHistoryByKey:
+        nextAssemblyState.subviewHistoryByKey
+        && typeof nextAssemblyState.subviewHistoryByKey === "object"
+        && !Array.isArray(nextAssemblyState.subviewHistoryByKey)
+          ? nextAssemblyState.subviewHistoryByKey
+          : {},
       trackScrollState: normalizeViewportScrollState(nextAssemblyState.trackScrollState),
       subviewTrackScrollState: normalizeViewportScrollState(
         nextAssemblyState.subviewTrackScrollState,

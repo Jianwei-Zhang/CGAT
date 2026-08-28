@@ -36,6 +36,10 @@ import {
   deriveSubviewContigFragments,
 } from "./subview-anchor-state.js";
 import { resolveSubviewAutoTrackOffsets } from "./subview-offset-state.js";
+import {
+  formatSubviewHistoryActionLabel,
+  resolveCurrentSubviewHistory,
+} from "./subview-history-state.js";
 import { assemblyPageSession } from "./page-session.js";
 import { buildGrtResultPlan, resolveGrtResultContext } from "./grt-result-state.js";
 import { buildGrtResultScene } from "./grt-result-render.js";
@@ -708,11 +712,35 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
     && assembly?.grtResultToast?.chrName === grtResultContext.chrName
     ? `<div class="grt-result-toast" role="status">${escapeHtml(i18n.grtResult.noSubviewLinks)}</div>`
     : "";
+  const history = resolveCurrentSubviewHistory(assembly);
+  const rollbackLabel = history.canRollback
+    ? formatSubviewHistoryActionLabel(
+        i18n.subview.historyRollbackActionLabel,
+        history.rollbackOperation,
+        i18n,
+      )
+    : i18n.subview.historyRollbackUnavailableLabel;
+  const restoreRollbackLabel = history.canRestoreRollback
+    ? formatSubviewHistoryActionLabel(
+        i18n.subview.historyRestoreRollbackActionLabel,
+        history.restoreRollbackOperation,
+        i18n,
+      )
+    : "";
+  const historyControls = `
+    <div class="subview-history-controls" role="group" aria-label="${escapeAttr(i18n.subview.historyControlsAria)}">
+      <button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-rollback" aria-label="${escapeAttr(rollbackLabel)}" title="${escapeAttr(rollbackLabel)}" ${history.canRollback ? "" : "disabled"}>←</button>
+      ${history.canRestoreRollback ? `<button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-restore-rollback" aria-label="${escapeAttr(restoreRollbackLabel)}" title="${escapeAttr(restoreRollbackLabel)}">→</button>` : ""}
+      <span class="subview-history-separator" aria-hidden="true">|</span>
+      <button type="button" class="button ghost tiny subview-history-reset" data-subview-action="history-reset" aria-label="${escapeAttr(i18n.subview.historyResetAria)}" title="${escapeAttr(i18n.subview.historyResetAria)}" ${history.canReset ? "" : "disabled"}>${escapeHtml(i18n.subview.historyResetLabel)}</button>
+    </div>
+  `;
   return `
     <article class="card subview-selection-panel" data-subview-panel="1">
       <div class="subview-panel-head">
         <div class="subview-panel-title-row" data-grt-result-card="subview">
           <h4>${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
+          ${historyControls}
         </div>
         <div class="subview-panel-guide-inline">
           <p class="muted">${escapeHtml(i18n.subview.guide)}</p>

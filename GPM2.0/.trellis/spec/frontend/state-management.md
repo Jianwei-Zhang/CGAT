@@ -285,3 +285,125 @@ Return early from selected-project handlers whenever `selectedProject.isProcesse
 
 #### Correct
 Gate each control by field semantics: keep unsafe fields locked, but allow project name, support append, and phased enablement to flow through the normal save path.
+
+## Scenario: Subview Pair History
+
+### 1. Scope / Trigger
+
+- Applies when changing Subview-local deletion, anchors, flips, drag offsets,
+  top/bottom ordering, reset behavior, project view-state transport, or SQLite
+  persistence for Subview edits.
+- Subview history protects local exploratory edits only. It must never roll back
+  Final Path, phased-track membership, project-level contig data, imports, or
+  jobs.
+
+### 2. Signatures
+
+```js
+assembly.subviewHistoryByKey[pairKey] = {
+  version: 1,
+  pairKey,
+  current: editableSnapshot,
+  default: editableSnapshot,
+  past: [{ operation, snapshot }],
+  forward: [{ operation, snapshot }],
+  updatedAt: "ISO-8601",
+};
+```
+
+- `editableSnapshot` contains only `topKey`, `trackPairHiddenCtgs`,
+  `flippedCtgs`, `activeAnchors`, `manualAnchors`, and `dragOffsets`.
+- Transport uses `subviewHistoryByKey` on both the update request and project
+  assembly view-state response.
+- SQLite stores one `state_json` record per `(project_id, pair_key)` in
+  `project_subview_history`, with project deletion cascading to history rows.
+
+### 3. Contracts
+
+- Create history only after two contigs or two tracks successfully enter
+  Subview. Candidate selection alone does not create a record.
+- The database scopes history to a project. `pairKey` contains Subview mode,
+  chromosome, and both full endpoint identities. Normalize endpoint order so
+  swapping top/bottom keeps the same pair.
+- Keep every valid pair and at most 50 logical steps per pair. `past` and
+  `forward` share the limit; moving backward or forward adds no step.
+- A new edit after rollback clears `forward`. One batch deletion and one
+  completed pointer drag each count as one step.
+- Record local hide/restore, original-anchor toggle, offset-anchor
+  create/delete, local flip, drag, top/bottom swap, and reset.
+- Do not record selection, hover, scroll, zoom, filters, evidence loading,
+  loading/error state, or DOM state.
+- Reset clears local hidden contigs, flips, original/offset anchors, and drag
+  offsets, restores first-entered ordering, preserves browsing state, and is
+  itself rollback-able.
+- Persist Subview history and related assembly view state in one backend
+  transaction.
+- On pair re-entry, restore `current`, `past`, and `forward` after validating
+  contig/track references against current project data.
+- If one pair is malformed or stale, replace only that pair with a clean
+  default, keep all other valid records, and show localized feedback.
+- UI terminology is fixed: `←` means “回退上一步操作”; `→` means
+  “撤销最近一次回退操作”. The right arrow restores exactly one rollback.
+- Normal layout is `← | 重置`. Render `← → | 重置` only while `forward` is
+  non-empty. Keep `←` and reset visible but disabled when unavailable.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| No successful Subview pair | Do not create history; disable rollback/reset |
+| `past` empty | Keep `←` visible and disabled |
+| `forward` empty | Do not render `→` |
+| One rollback | Move one snapshot from `past` to `forward`; render `→` |
+| One rollback restore | Move one snapshot from `forward` to `past` |
+| New edit after rollback | Clear `forward`; hide `→` |
+| `past + forward` reaches 51 | Drop only the oldest step for that pair |
+| Pair key/version/snapshot invalid | Reset only that pair and persist its replacement |
+| Snapshot references removed contig/track | Treat only the current pair as stale |
+| Persistence fails | Roll back assembly view-state and history-row writes together |
+
+### 5. Good/Base/Bad Cases
+
+- Good: delete two Subview contigs, add an offset anchor, click `←` twice, then
+  click `→` once; only the latest rollback is restored and state survives a
+  project reopen.
+- Base: enter a pair for the first time; `←` and reset are disabled and no `→`
+  button exists.
+- Bad: key history by current top/bottom order, keep an unbounded global stack,
+  include pairwise evidence in snapshots, or use `→` to restore all rollbacks.
+
+### 6. Tests Required
+
+- State-machine tests cover unordered identity, one-step backward/forward,
+  forward clearing, reset rollback, the 50-step limit, and pair-only
+  invalidation.
+- UI/binding tests cover exact `← [→] | 重置` rendering, disabled states,
+  localized tooltip semantics, and dispatch of all three actions.
+- Transport and persistence tests cover exact camelCase payloads, fresh and
+  upgraded database schemas, per-project round trips, and atomic updates.
+- Run the complete Windows quality gate before commit.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```js
+history = [...history, wholeAssemblyState];
+redoButton.onclick = () => restoreAllForwardStates();
+```
+
+This mixes unrelated browse/cross-domain state, grows without a pair boundary,
+and gives `→` the wrong product meaning.
+
+#### Correct
+
+```js
+const result = commitSubviewHistoryOperation(assembly, {
+  nextSubview,
+  operation: { kind: "toggle-anchor" },
+});
+const restored = restoreSubviewHistoryRollback(result.assembly);
+```
+
+The shared state machine records one editable snapshot for one normalized pair
+and moves one step per click.

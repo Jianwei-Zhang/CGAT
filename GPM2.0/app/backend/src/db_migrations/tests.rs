@@ -20,6 +20,26 @@ fn fresh_database_initializes_at_current_version() -> Result<()> {
         "project_assembly_view_state",
         "subview_anchor_state_by_key_json"
     )?);
+    assert!(table_exists(&conn, "project_subview_history")?);
+    Ok(())
+}
+
+#[test]
+fn version_one_database_adds_project_subview_history_table() -> Result<()> {
+    let conn = Connection::open_in_memory()?;
+    conn.execute_batch(
+        "PRAGMA foreign_keys = ON;
+         CREATE TABLE project (
+             id INTEGER PRIMARY KEY,
+             name TEXT NOT NULL
+         );
+         PRAGMA user_version = 1;",
+    )?;
+
+    super::migrate_workspace_schema(&conn)?;
+
+    assert_eq!(user_version(&conn)?, CURRENT_SCHEMA_VERSION);
+    assert!(table_exists(&conn, "project_subview_history")?);
     Ok(())
 }
 

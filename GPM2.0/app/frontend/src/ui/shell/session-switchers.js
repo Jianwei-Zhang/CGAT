@@ -104,6 +104,7 @@ function buildEmptyAssemblyViewState(stateOrLocale) {
     trackDragOffsets: [],
     subviewTrackDragOffsets: [],
     subviewAnchorStateByKey: {},
+    subviewHistoryByKey: {},
     trackScrollState: {
       viewportKey: "",
       scrollLeft: 0,

@@ -3,6 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, OptionalExtension, params};
+use serde_json::{Map, Value};
 
 use crate::db::open_workspace_db;
 
@@ -31,6 +32,7 @@ pub struct ProjectAssemblyViewState {
     pub track_drag_offsets_json: String,
     pub subview_track_drag_offsets_json: String,
     pub subview_anchor_state_by_key_json: String,
+    pub subview_history_by_key_json: String,
     pub final_path_view_mode: String,
     pub final_path_by_chr_json: String,
     pub degap_project_state_json: String,
@@ -51,6 +53,7 @@ pub struct UpdateProjectAssemblyViewStateParams {
     pub track_drag_offsets_json: String,
     pub subview_track_drag_offsets_json: String,
     pub subview_anchor_state_by_key_json: String,
+    pub subview_history_by_key_json: String,
     pub final_path_view_mode: String,
     pub final_path_by_chr_json: String,
     pub degap_project_state_json: String,
@@ -171,7 +174,7 @@ fn get_project_assembly_view_state_with_connection(
 ) -> Result<ProjectAssemblyViewState> {
     ensure_project_exists(conn, project_id)?;
     ensure_project_assembly_view_state_row(conn, project_id)?;
-    let row = conn
+    let mut row = conn
         .query_row(
             "SELECT project_id,
                     support_dataset_id,
@@ -206,6 +209,7 @@ fn get_project_assembly_view_state_with_connection(
                     track_drag_offsets_json: row.get(9)?,
                     subview_track_drag_offsets_json: row.get(10)?,
                     subview_anchor_state_by_key_json: row.get(11)?,
+                    subview_history_by_key_json: "{}".to_string(),
                     final_path_view_mode: row.get(12)?,
                     final_path_by_chr_json: row.get(13)?,
                     degap_project_state_json: row.get(14)?,
@@ -214,7 +218,40 @@ fn get_project_assembly_view_state_with_connection(
             },
         )
         .context("failed to load project assembly view state row")?;
+    row.subview_history_by_key_json = load_project_subview_history_by_key_json(conn, project_id)?;
     Ok(row)
+}
+
+fn load_project_subview_history_by_key_json(conn: &Connection, project_id: i64) -> Result<String> {
+    let mut statement = conn
+        .prepare(
+            "SELECT pair_key, state_json
+             FROM project_subview_history
+             WHERE project_id = ?1
+             ORDER BY pair_key ASC",
+        )
+        .context("failed to prepare project subview history query")?;
+    let rows = statement
+        .query_map(params![project_id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .context("failed to query project subview history")?;
+    let mut histories = Map::new();
+    for row in rows {
+        let (pair_key, state_json) = row.context("failed to decode project subview history row")?;
+        let pair_key = pair_key.trim();
+        if pair_key.is_empty() {
+            continue;
+        }
+        let Ok(state) = serde_json::from_str::<Value>(&state_json) else {
+            continue;
+        };
+        if state.is_object() {
+            histories.insert(pair_key.to_string(), state);
+        }
+    }
+    serde_json::to_string(&Value::Object(histories))
+        .context("failed to encode project subview history map")
 }
 
 fn normalize_project_assembly_view_state_json(value: &str) -> &str {
@@ -259,47 +296,100 @@ fn update_project_assembly_view_state_with_connection(
     params: &UpdateProjectAssemblyViewStateParams,
 ) -> Result<ProjectAssemblyViewState> {
     ensure_project_exists(conn, params.project_id)?;
-    ensure_project_assembly_view_state_row(conn, params.project_id)?;
     let updated_at = now_timestamp_string();
-    conn.execute(
-        "UPDATE project_assembly_view_state
-         SET support_dataset_id = ?2,
-             track_view_json = ?3,
-             support_ds_ctg_len_rules_by_chr_json = ?4,
-             track_scroll_state_json = ?5,
-             subview_track_scroll_state_json = ?6,
-             support_mirrored_ctgs_json = ?7,
-             hidden_primary_ctg_ids_json = ?8,
-             hidden_primary_ctg_ids_by_chr_json = ?9,
-             track_drag_offsets_json = ?10,
-             subview_track_drag_offsets_json = ?11,
-             subview_anchor_state_by_key_json = ?12,
-             final_path_view_mode = ?13,
-             final_path_by_chr_json = ?14,
-             degap_project_state_json = ?15,
-             updated_at = ?16
-         WHERE project_id = ?1",
-        params![
-            params.project_id,
-            params.support_dataset_id,
-            normalize_project_assembly_track_view_json(&params.track_view_json),
-            normalize_project_assembly_map_json(&params.support_ds_ctg_len_rules_by_chr_json),
-            normalize_project_assembly_scroll_state_json(&params.track_scroll_state_json),
-            normalize_project_assembly_scroll_state_json(&params.subview_track_scroll_state_json),
-            normalize_project_assembly_view_state_json(&params.support_mirrored_ctgs_json),
-            normalize_project_assembly_view_state_json(&params.hidden_primary_ctg_ids_json),
-            normalize_project_assembly_map_json(&params.hidden_primary_ctg_ids_by_chr_json),
-            normalize_project_assembly_view_state_json(&params.track_drag_offsets_json),
-            normalize_project_assembly_view_state_json(&params.subview_track_drag_offsets_json),
-            normalize_project_assembly_map_json(&params.subview_anchor_state_by_key_json),
-            normalize_project_assembly_view_mode(&params.final_path_view_mode),
-            normalize_project_assembly_map_json(&params.final_path_by_chr_json),
-            normalize_project_assembly_map_json(&params.degap_project_state_json),
-            updated_at,
-        ],
-    )
-    .context("failed to update project assembly view state")?;
+    let transaction = conn
+        .transaction()
+        .context("failed to begin project assembly view state transaction")?;
+    ensure_project_assembly_view_state_row(&transaction, params.project_id)?;
+    transaction
+        .execute(
+            "UPDATE project_assembly_view_state
+             SET support_dataset_id = ?2,
+                 track_view_json = ?3,
+                 support_ds_ctg_len_rules_by_chr_json = ?4,
+                 track_scroll_state_json = ?5,
+                 subview_track_scroll_state_json = ?6,
+                 support_mirrored_ctgs_json = ?7,
+                 hidden_primary_ctg_ids_json = ?8,
+                 hidden_primary_ctg_ids_by_chr_json = ?9,
+                 track_drag_offsets_json = ?10,
+                 subview_track_drag_offsets_json = ?11,
+                 subview_anchor_state_by_key_json = ?12,
+                 final_path_view_mode = ?13,
+                 final_path_by_chr_json = ?14,
+                 degap_project_state_json = ?15,
+                 updated_at = ?16
+             WHERE project_id = ?1",
+            params![
+                params.project_id,
+                params.support_dataset_id,
+                normalize_project_assembly_track_view_json(&params.track_view_json),
+                normalize_project_assembly_map_json(&params.support_ds_ctg_len_rules_by_chr_json),
+                normalize_project_assembly_scroll_state_json(&params.track_scroll_state_json),
+                normalize_project_assembly_scroll_state_json(
+                    &params.subview_track_scroll_state_json
+                ),
+                normalize_project_assembly_view_state_json(&params.support_mirrored_ctgs_json),
+                normalize_project_assembly_view_state_json(&params.hidden_primary_ctg_ids_json),
+                normalize_project_assembly_map_json(&params.hidden_primary_ctg_ids_by_chr_json),
+                normalize_project_assembly_view_state_json(&params.track_drag_offsets_json),
+                normalize_project_assembly_view_state_json(&params.subview_track_drag_offsets_json),
+                normalize_project_assembly_map_json(&params.subview_anchor_state_by_key_json),
+                normalize_project_assembly_view_mode(&params.final_path_view_mode),
+                normalize_project_assembly_map_json(&params.final_path_by_chr_json),
+                normalize_project_assembly_map_json(&params.degap_project_state_json),
+                updated_at,
+            ],
+        )
+        .context("failed to update project assembly view state")?;
+    replace_project_subview_histories(
+        &transaction,
+        params.project_id,
+        &params.subview_history_by_key_json,
+        &updated_at,
+    )?;
+    transaction
+        .commit()
+        .context("failed to commit project assembly view state transaction")?;
     get_project_assembly_view_state_with_connection(conn, params.project_id)
+}
+
+fn replace_project_subview_histories(
+    conn: &Connection,
+    project_id: i64,
+    history_by_key_json: &str,
+    updated_at: &str,
+) -> Result<()> {
+    let normalized = normalize_project_assembly_map_json(history_by_key_json);
+    let parsed = serde_json::from_str::<Value>(normalized)
+        .context("failed to decode project subview history map")?;
+    let histories = parsed
+        .as_object()
+        .context("project subview history map must be a JSON object")?;
+    conn.execute(
+        "DELETE FROM project_subview_history WHERE project_id = ?1",
+        params![project_id],
+    )
+    .context("failed to clear project subview histories")?;
+    let mut statement = conn
+        .prepare(
+            "INSERT INTO project_subview_history (
+                 project_id, pair_key, state_json, updated_at
+             ) VALUES (?1, ?2, ?3, ?4)",
+        )
+        .context("failed to prepare project subview history insert")?;
+    for (pair_key, state) in histories {
+        let pair_key = pair_key.trim();
+        if pair_key.is_empty() || !state.is_object() {
+            bail!("project subview history entries require a non-empty pair key and object state");
+        }
+        let state_json = serde_json::to_string(state)
+            .context("failed to encode project subview history entry")?;
+        statement
+            .execute(params![project_id, pair_key, state_json, updated_at])
+            .with_context(|| format!("failed to persist project subview history {pair_key}"))?;
+    }
+    Ok(())
 }
 
 fn append_edit_audit_log_with_connection(
@@ -589,6 +679,7 @@ mod tests {
         assert_eq!(initial.track_drag_offsets_json, "[]");
         assert_eq!(initial.subview_track_drag_offsets_json, "[]");
         assert_eq!(initial.subview_anchor_state_by_key_json, "{}");
+        assert_eq!(initial.subview_history_by_key_json, "{}");
         assert_eq!(initial.support_ds_ctg_len_rules_by_chr_json, "{}");
         assert_eq!(initial.final_path_view_mode, "graph");
         assert_eq!(initial.final_path_by_chr_json, "{}");
@@ -620,6 +711,9 @@ mod tests {
                     r#"[{"slot":"top","contigId":1909,"offsetBp":80}]"#.to_string(),
                 subview_anchor_state_by_key_json:
                     r#"{"2-contig|chr:Chr01|a|b":{"activeAnchors":[{"hitKey":"h1","edge":"left"}],"manualAnchors":[]}}"#
+                        .to_string(),
+                subview_history_by_key_json:
+                    r#"{"2-contig|chr:Chr01|a|b":{"version":1,"pairKey":"2-contig|chr:Chr01|a|b","current":{"topKey":"a"},"default":{"topKey":"a"},"past":[],"forward":[],"updatedAt":"2026-08-28T00:00:00.000Z"}}"#
                         .to_string(),
                 final_path_view_mode: "degap".to_string(),
                 final_path_by_chr_json: "{}".to_string(),
@@ -669,6 +763,10 @@ mod tests {
             updated.subview_anchor_state_by_key_json,
             r#"{"2-contig|chr:Chr01|a|b":{"activeAnchors":[{"hitKey":"h1","edge":"left"}],"manualAnchors":[]}}"#,
         );
+        assert_eq!(
+            updated.subview_history_by_key_json,
+            r#"{"2-contig|chr:Chr01|a|b":{"current":{"topKey":"a"},"default":{"topKey":"a"},"forward":[],"pairKey":"2-contig|chr:Chr01|a|b","past":[],"updatedAt":"2026-08-28T00:00:00.000Z","version":1}}"#,
+        );
         assert_eq!(updated.final_path_view_mode, "degap");
         assert_eq!(updated.final_path_by_chr_json, "{}");
 
@@ -710,6 +808,10 @@ mod tests {
             reloaded_project_one.subview_anchor_state_by_key_json,
             r#"{"2-contig|chr:Chr01|a|b":{"activeAnchors":[{"hitKey":"h1","edge":"left"}],"manualAnchors":[]}}"#,
         );
+        assert_eq!(
+            reloaded_project_one.subview_history_by_key_json,
+            updated.subview_history_by_key_json
+        );
         assert_eq!(reloaded_project_one.final_path_view_mode, "degap");
         assert_eq!(reloaded_project_one.final_path_by_chr_json, "{}");
 
@@ -728,6 +830,7 @@ mod tests {
         assert_eq!(untouched_project_two.track_drag_offsets_json, "[]");
         assert_eq!(untouched_project_two.subview_track_drag_offsets_json, "[]");
         assert_eq!(untouched_project_two.subview_anchor_state_by_key_json, "{}");
+        assert_eq!(untouched_project_two.subview_history_by_key_json, "{}");
         assert_eq!(untouched_project_two.final_path_view_mode, "graph");
         assert_eq!(untouched_project_two.final_path_by_chr_json, "{}");
         Ok(())
@@ -755,6 +858,7 @@ mod tests {
                 track_drag_offsets_json: "[]".to_string(),
                 subview_track_drag_offsets_json: "[]".to_string(),
                 subview_anchor_state_by_key_json: "{}".to_string(),
+                subview_history_by_key_json: "{}".to_string(),
                 final_path_view_mode: "log".to_string(),
                 final_path_by_chr_json: r#"{"Chr01":{"mode":"direct-ctg","chrName":"Chr01","assemblyCtgId":19,"ctgName":"flye_ctg19","totalLength":1800,"updatedAt":"1"}}"#.to_string(),
                 degap_project_state_json: "{}".to_string(),

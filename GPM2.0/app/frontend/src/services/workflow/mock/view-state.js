@@ -15,6 +15,7 @@ async function getProjectAssemblyViewStateMock({ projectId }) {
     trackDragOffsets: [],
     subviewTrackDragOffsets: [],
     subviewAnchorStateByKey: {},
+    subviewHistoryByKey: {},
     trackScrollState: {},
     subviewTrackScrollState: {},
     finalPathTrackScrollState: {},
@@ -35,6 +36,7 @@ async function setProjectAssemblyViewStateMock({
   trackDragOffsets = [],
   subviewTrackDragOffsets = [],
   subviewAnchorStateByKey = {},
+  subviewHistoryByKey = {},
   trackScrollState = {},
   subviewTrackScrollState = {},
   finalPathTrackScrollState = {},
@@ -71,6 +73,12 @@ async function setProjectAssemblyViewStateMock({
       && typeof subviewAnchorStateByKey === "object"
       && !Array.isArray(subviewAnchorStateByKey)
         ? subviewAnchorStateByKey
+        : {},
+    subviewHistoryByKey:
+      subviewHistoryByKey
+      && typeof subviewHistoryByKey === "object"
+      && !Array.isArray(subviewHistoryByKey)
+        ? subviewHistoryByKey
         : {},
     trackScrollState:
       trackScrollState && typeof trackScrollState === "object" && !Array.isArray(trackScrollState)

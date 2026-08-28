@@ -52,6 +52,27 @@
   margin: 0;
 }
 
+.subview-history-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.subview-history-arrow {
+  min-width: 30px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.subview-history-separator {
+  color: var(--muted, #777);
+  padding: 0 2px;
+}
+
+.subview-history-reset {
+  min-width: 48px;
+}
+
 .subview-panel-guide-inline {
   display: flex;
   align-items: center;
