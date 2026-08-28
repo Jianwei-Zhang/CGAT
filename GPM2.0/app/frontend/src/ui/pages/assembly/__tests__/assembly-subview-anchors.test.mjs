@@ -66,7 +66,7 @@ test("subview track controls render independently from main track controls", () 
   assert.match(html, /data-subview-action="swap-track-order"/);
   assert.match(
     html,
-    /Ctrl\/Cmd 选中任意两个ctg进入subview-ctg；也支持点击任意两个轨道名进入subview-track。<\/p>\s*<div class="subview-candidate-row">/,
+    /<div class="subview-panel-title-row"[^>]*>\s*<h4>Subview<\/h4>\s*<p class="muted subview-panel-guide">Ctrl\/Cmd 选中任意两个ctg进入subview-ctg；也支持点击任意两个轨道名进入subview-track。<\/p>\s*<\/div>\s*<div class="subview-candidate-row">/,
   );
   assert.doesNotMatch(html, /已选 \d\/2 个ctg；右键选择“进入Subview-ctg”。/);
   assert.doesNotMatch(html, /已选 \d\/2 条ds轨道。/);

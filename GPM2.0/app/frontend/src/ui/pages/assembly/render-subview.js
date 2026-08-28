@@ -700,6 +700,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
   const grtResultPlan = grtResultContext.available
     ? buildGrtResultPlan(grtResultContext.baselineEntry)
     : null;
+  const history = resolveCurrentSubviewHistory(assembly);
   const alignmentCard = renderSubviewAlignmentCard(
     subview,
     supportContext,
@@ -707,49 +708,20 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
     assembly?.subviewTrackDragOffsets,
     i18n,
     { context: grtResultContext, plan: grtResultPlan },
+    history,
   );
   const grtResultToast = assembly?.grtResultToast?.scope === "subview"
     && assembly?.grtResultToast?.chrName === grtResultContext.chrName
     ? `<div class="grt-result-toast" role="status">${escapeHtml(i18n.grtResult.noSubviewLinks)}</div>`
     : "";
-  const history = resolveCurrentSubviewHistory(assembly);
-  const rollbackLabel = history.canRollback
-    ? formatSubviewHistoryActionLabel(
-        i18n.subview.historyRollbackActionLabel,
-        history.rollbackOperation,
-        i18n,
-      )
-    : i18n.subview.historyRollbackUnavailableLabel;
-  const restoreRollbackLabel = history.canRestoreRollback
-    ? formatSubviewHistoryActionLabel(
-        i18n.subview.historyRestoreRollbackActionLabel,
-        history.restoreRollbackOperation,
-        i18n,
-      )
-    : "";
-  const historyControls = `
-    <div class="subview-history-controls" role="group" aria-label="${escapeAttr(i18n.subview.historyControlsAria)}">
-      <button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-rollback" aria-label="${escapeAttr(rollbackLabel)}" title="${escapeAttr(rollbackLabel)}" ${history.canRollback ? "" : "disabled"}>←</button>
-      ${history.canRestoreRollback ? `<button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-restore-rollback" aria-label="${escapeAttr(restoreRollbackLabel)}" title="${escapeAttr(restoreRollbackLabel)}">→</button>` : ""}
-      <span class="subview-history-separator" aria-hidden="true">|</span>
-      <button type="button" class="button ghost tiny subview-history-reset" data-subview-action="history-reset" aria-label="${escapeAttr(i18n.subview.historyResetAria)}" title="${escapeAttr(i18n.subview.historyResetAria)}" ${history.canReset ? "" : "disabled"}>${escapeHtml(i18n.subview.historyResetLabel)}</button>
-    </div>
-  `;
   return `
     <article class="card subview-selection-panel" data-subview-panel="1">
       <div class="subview-panel-head">
         <div class="subview-panel-title-row" data-grt-result-card="subview">
           <h4>${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
-          ${historyControls}
+          <p class="muted subview-panel-guide">${escapeHtml(i18n.subview.guide)}</p>
         </div>
-        <div class="subview-panel-guide-inline">
-          <p class="muted">${escapeHtml(i18n.subview.guide)}</p>
-          ${
-            allBadges
-              ? `<div class="subview-candidate-row">${allBadges}</div>`
-              : ""
-          }
-        </div>
+        ${allBadges ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}
       </div>
       ${grtResultToast}
       ${subview.error ? `<p class="error-text">${escapeHtml(subview.error)}</p>` : ""}
@@ -758,7 +730,33 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
   `;
 }
 
-function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = null) {
+function renderSubviewHistoryControls(history, i18n) {
+  const resolvedHistory = history || {};
+  const rollbackLabel = resolvedHistory.canRollback
+    ? formatSubviewHistoryActionLabel(
+        i18n.subview.historyRollbackActionLabel,
+        resolvedHistory.rollbackOperation,
+        i18n,
+      )
+    : i18n.subview.historyRollbackUnavailableLabel;
+  const restoreRollbackLabel = resolvedHistory.canRestoreRollback
+    ? formatSubviewHistoryActionLabel(
+        i18n.subview.historyRestoreRollbackActionLabel,
+        resolvedHistory.restoreRollbackOperation,
+        i18n,
+      )
+    : "";
+  return `
+    <div class="subview-history-controls" role="group" aria-label="${escapeAttr(i18n.subview.historyControlsAria)}">
+      <button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-rollback" aria-label="${escapeAttr(rollbackLabel)}" title="${escapeAttr(rollbackLabel)}" ${resolvedHistory.canRollback ? "" : "disabled"}>←</button>
+      ${resolvedHistory.canRestoreRollback ? `<button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-restore-rollback" aria-label="${escapeAttr(restoreRollbackLabel)}" title="${escapeAttr(restoreRollbackLabel)}">→</button>` : ""}
+      <span class="subview-history-separator" aria-hidden="true"></span>
+      <button type="button" class="button ghost tiny subview-history-reset" data-subview-action="history-reset" aria-label="${escapeAttr(i18n.subview.historyResetAria)}" title="${escapeAttr(i18n.subview.historyResetAria)}" ${resolvedHistory.canReset ? "" : "disabled"}><span aria-hidden="true">↺</span></button>
+    </div>
+  `;
+}
+
+function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = null, history = null) {
   const grtResultSwitch = grtResultContext?.available
     ? `<label class="grt-result-switch">
         <input type="checkbox" data-grt-result-toggle="subview" ${grtResultContext.subviewEnabled ? "checked" : ""} />
@@ -817,6 +815,7 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
         <span>${escapeHtml(i18n.trackControls.mapq)}</span>
         ${mapqInput}
       </label>
+      ${renderSubviewHistoryControls(history, i18n)}
     </div>
   `;
 }
@@ -1280,6 +1279,7 @@ function renderSubviewAlignmentCard(
   subviewTrackDragOffsets = [],
   i18n,
   grtResult = {},
+  history = null,
 ) {
   const summary = subview?.summary || null;
   if (!summary) {
@@ -1293,6 +1293,7 @@ function renderSubviewAlignmentCard(
       subviewTrackDragOffsets,
       i18n,
       grtResult,
+      history,
     );
   }
   const topSelection = normalizeSubviewSummarySelection(summary.top);
@@ -1571,7 +1572,7 @@ function renderSubviewAlignmentCard(
     <article class="assembly-track-panel subview-alignment-card" data-grt-result-scene-visible="${grtResultScene.hasVisibleJunction ? "1" : "0"}">
       <div class="assembly-track-panel-head">
         <strong>${escapeHtml(`${topVisibleCtgName} vs ${bottomVisibleCtgName}`)}</strong>
-        ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context)}
+        ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context, history)}
       </div>
       <div class="assembly-track-layout subview-track-layout">
         <div class="assembly-track-label-column subview-track-label-column" style="width:${svgModel.labelColumnWidth}px;height:${svgModel.contentBottom}px">
@@ -1752,6 +1753,7 @@ function renderSubviewTrackPairAlignmentCard(
   subviewTrackDragOffsets = [],
   i18n,
   grtResult = {},
+  history = null,
 ) {
   const summary = subview?.summary || null;
   const topTrack = normalizeSubviewTrackSummary(summary?.topTrack);
@@ -2700,7 +2702,7 @@ function renderSubviewTrackPairAlignmentCard(
     <article class="assembly-track-panel subview-alignment-card" data-grt-result-scene-visible="${grtResultScene.hasVisibleJunction ? "1" : "0"}">
       <div class="assembly-track-panel-head">
         <strong>${escapeHtml(`${topTrackLabel} vs ${bottomTrackLabel}`)}</strong>
-        ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context)}
+        ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context, history)}
       </div>
       <div class="assembly-track-layout subview-track-layout">
         <div class="assembly-track-label-column subview-track-label-column" style="width:${LABEL_COLUMN_WIDTH_PX}px;height:${contentBottom}px">

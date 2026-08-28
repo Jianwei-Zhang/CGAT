@@ -270,25 +270,28 @@ test("track tick label css does not force middle anchor", () => {
   assert.doesNotMatch(css, /\.track-tick-label\s*\{[^}]*text-anchor:\s*middle;/);
 });
 
-test("subview candidate row uses left flow for inline placement next to guide text", () => {
+test("subview title and guide share a responsive row while candidates keep left flow", () => {
   const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
 
+  assert.match(css, /\.subview-panel-title-row\s*\{[^}]*justify-content:\s*flex-start;/);
+  assert.match(css, /\.subview-panel-guide\s*\{[^}]*flex:\s*1 1 560px;/);
+  assert.match(css, /@media \(max-width:\s*900px\)[\s\S]*\.subview-panel-guide\s*\{[^}]*flex-basis:\s*100%;/);
   assert.match(css, /\.subview-candidate-row\s*\{[^}]*justify-content:\s*flex-start;/);
 });
 
-test("subview selection panel exposes a stable local refresh anchor", () => {
+test("subview selection panel hides history controls before a pair enters", () => {
   const html = renderAssemblyPage(createState());
 
   assert.match(html, /<article class="card subview-selection-panel" data-subview-panel="1">/);
-  assert.match(html, /data-subview-action="history-rollback"[^>]*disabled[^>]*>←<\/button>/);
+  assert.doesNotMatch(html, /data-subview-action="history-rollback"/);
   assert.doesNotMatch(html, /data-subview-action="history-restore-rollback"/);
-  assert.match(html, /data-subview-action="history-reset"[^>]*disabled[^>]*>重置<\/button>/);
+  assert.doesNotMatch(html, /data-subview-action="history-reset"/);
 });
 
-test("subview history controls show the right arrow only after a rollback", () => {
+test("subview history controls follow MAPQ as one icon group and show the right arrow only after a rollback", () => {
   let state = createState({
     assembly: {
       subviewAnchorStateByKey: {},
@@ -309,6 +312,18 @@ test("subview history controls show the right arrow only after a rollback", () =
     },
   });
   let assembly = activateSubviewHistory(state.assembly, { now: 0 }).assembly;
+  let html = renderAssemblyPage({ ...state, assembly });
+  const initialMapqIndex = html.indexOf('id="subview-track-mapq"');
+  const initialHistoryIndex = html.indexOf('class="subview-history-controls"');
+  assert.ok(initialMapqIndex >= 0 && initialHistoryIndex > initialMapqIndex);
+  assert.match(html, /data-subview-action="history-rollback"[^>]*disabled[^>]*>←<\/button>/);
+  assert.doesNotMatch(html, /data-subview-action="history-restore-rollback"/);
+  assert.match(
+    html,
+    /data-subview-action="history-reset"[^>]*aria-label="重置当前 Subview 为系统默认状态"[^>]*disabled[^>]*><span aria-hidden="true">↺<\/span><\/button>/,
+  );
+  assert.doesNotMatch(html, />重置<\/button>/);
+
   assembly = commitSubviewHistoryOperation(assembly, {
     nextSubview: {
       ...assembly.subview,
@@ -320,13 +335,15 @@ test("subview history controls show the right arrow only after a rollback", () =
   assembly = rollbackSubviewHistory(assembly, { now: 2 }).assembly;
   state = { ...state, assembly };
 
-  const html = renderAssemblyPage(state);
+  html = renderAssemblyPage(state);
   const leftIndex = html.indexOf('data-subview-action="history-rollback"');
   const rightIndex = html.indexOf('data-subview-action="history-restore-rollback"');
   const separatorIndex = html.indexOf("subview-history-separator");
   const resetIndex = html.indexOf('data-subview-action="history-reset"');
   assert.ok(leftIndex >= 0 && rightIndex > leftIndex);
   assert.ok(separatorIndex > rightIndex && resetIndex > separatorIndex);
+  assert.match(html, /class="subview-history-separator" aria-hidden="true"><\/span>/);
+  assert.match(html, /data-subview-action="history-reset"[^>]*><span aria-hidden="true">↺<\/span><\/button>/);
   assert.match(html, /撤销最近一次回退：恢复“翻转 ctg”后的状态/);
 });
 

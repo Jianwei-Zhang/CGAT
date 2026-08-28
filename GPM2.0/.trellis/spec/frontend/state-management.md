@@ -344,14 +344,20 @@ assembly.subviewHistoryByKey[pairKey] = {
   default, keep all other valid records, and show localized feedback.
 - UI terminology is fixed: `←` means “回退上一步操作”; `→` means
   “撤销最近一次回退操作”. The right arrow restores exactly one rollback.
-- Normal layout is `← | 重置`. Render `← → | 重置` only while `forward` is
-  non-empty. Keep `←` and reset visible but disabled when unavailable.
+- Do not render the history control group before a pair successfully enters
+  Subview. After entry, place one indivisible group immediately after MAPQ.
+- Normal layout is `← | ↺`. Render `← → | ↺` only while `forward` is
+  non-empty. Keep `←` and reset visible but disabled when unavailable. The
+  reset glyph keeps a localized tooltip and accessible name.
+- On wide layouts, render the `Subview` title and entry guide on one responsive
+  row. On narrow layouts, wrap the guide below the title and keep candidate
+  badges on their own row.
 
 ### 4. Validation & Error Matrix
 
 | Condition | Required behavior |
 | --- | --- |
-| No successful Subview pair | Do not create history; disable rollback/reset |
+| No successful Subview pair | Do not create history or render the history group |
 | `past` empty | Keep `←` visible and disabled |
 | `forward` empty | Do not render `→` |
 | One rollback | Move one snapshot from `past` to `forward`; render `→` |
@@ -377,8 +383,9 @@ assembly.subviewHistoryByKey[pairKey] = {
 - State-machine tests cover unordered identity, one-step backward/forward,
   forward clearing, reset rollback, the 50-step limit, and pair-only
   invalidation.
-- UI/binding tests cover exact `← [→] | 重置` rendering, disabled states,
-  localized tooltip semantics, and dispatch of all three actions.
+- UI/binding tests cover exact `← [→] | ↺` rendering after MAPQ, pre-entry
+  hiding, disabled states, responsive title/guide structure, localized tooltip
+  semantics, and dispatch of all three actions.
 - Transport and persistence tests cover exact camelCase payloads, fresh and
   upgraded database schemas, per-project round trips, and atomic updates.
 - Run the complete Windows quality gate before commit.

@@ -43,19 +43,36 @@
 .subview-panel-title-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 8px 12px;
   flex-wrap: wrap;
 }
 
 .subview-panel-title-row h4 {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.subview-panel-guide {
+  flex: 1 1 560px;
+  min-width: 260px;
   margin: 0;
 }
 
 .subview-history-controls {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  flex: 0 0 auto;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #b9b9b9;
+  background: #fff;
+  white-space: nowrap;
+}
+
+.subview-history-controls .button {
+  min-height: 30px;
+  border: 0;
 }
 
 .subview-history-arrow {
@@ -65,23 +82,16 @@
 }
 
 .subview-history-separator {
-  color: var(--muted, #777);
-  padding: 0 2px;
+  align-self: stretch;
+  width: 1px;
+  margin: 3px 0;
+  background: #c8c8c8;
 }
 
 .subview-history-reset {
-  min-width: 48px;
-}
-
-.subview-panel-guide-inline {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.subview-panel-guide-inline > .muted {
-  margin: 0;
+  min-width: 30px;
+  font-size: 17px;
+  line-height: 1;
 }
 
 .subview-candidate-row {
@@ -401,4 +411,11 @@
     min-width: 0;
   }
 
+}
+
+@media (max-width: 900px) {
+  .subview-panel-guide {
+    flex-basis: 100%;
+    min-width: 0;
+  }
 }
