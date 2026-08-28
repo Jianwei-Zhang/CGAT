@@ -321,23 +321,28 @@
 
 .assembly-track-panel-head[data-main-track-control-layout="stacked"] .assembly-track-panel-actions {
   width: 100%;
-  flex-direction: column;
-  align-items: stretch;
+  flex-direction: row;
+  align-items: center;
   justify-content: flex-start;
+  flex-wrap: wrap;
 }
 
 .assembly-track-panel-head[data-main-track-control-layout="stacked"] .assembly-track-panel-quick-actions,
 .assembly-track-panel-head[data-main-track-control-layout="stacked"] .assembly-track-inline-controls {
-  justify-content: flex-start;
-  width: 100%;
-  flex-wrap: wrap;
+  display: contents;
+}
+
+.assembly-track-panel-quick-actions > [data-create-phased-track] {
+  height: 30px;
+  min-height: 30px;
 }
 
 .grt-result-switch {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 28px;
+  height: 30px;
+  min-height: 30px;
   padding: 2px 8px;
   border: 1px solid #aeb9b0;
   background: #f8fbf8;

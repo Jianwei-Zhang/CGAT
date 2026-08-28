@@ -212,6 +212,22 @@ test("main-track markup and CSS expose content-driven layouts without header med
   assert.match(css, /data-main-track-control-layout="single"/);
   assert.match(css, /data-main-track-control-layout="split"/);
   assert.match(css, /data-main-track-control-layout="stacked"/);
+  assert.match(
+    css,
+    /data-main-track-control-layout="stacked"[^}]*\.assembly-track-panel-actions\s*\{[^}]*flex-direction:\s*row;[^}]*flex-wrap:\s*wrap;/,
+  );
+  assert.match(
+    css,
+    /data-main-track-control-layout="stacked"[^}]*\.assembly-track-panel-quick-actions,[^{]*data-main-track-control-layout="stacked"[^}]*\.assembly-track-inline-controls\s*\{[^}]*display:\s*contents;/,
+  );
+  assert.match(
+    css,
+    /\.assembly-track-panel-quick-actions\s*>\s*\[data-create-phased-track\]\s*\{[^}]*height:\s*30px;[^}]*min-height:\s*30px;/,
+  );
+  assert.match(
+    css,
+    /\.grt-result-switch\s*\{[^}]*height:\s*30px;[^}]*min-height:\s*30px;/,
+  );
   const fixedViewportRules = assemblyCss.slice(assemblyCss.indexOf("@media (max-width: 1200px)"));
   assert.doesNotMatch(fixedViewportRules, /\.assembly-track-inline-controls\s*\{/);
 });
