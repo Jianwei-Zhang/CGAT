@@ -140,6 +140,74 @@ async function runCtgEditorActionTauri({ workspaceRoot, projectId, action, args 
   });
 }
 
+function buildMainViewHistoryRequest({ workspaceRoot, projectId, chrName }) {
+  return {
+    request: { workspaceRoot, projectId, chrName },
+  };
+}
+
+async function getMainViewHistoryStatusTauri({ workspaceRoot, projectId, chrName }) {
+  return invokeCommand(
+    "get_main_view_history_status",
+    buildMainViewHistoryRequest({ workspaceRoot, projectId, chrName }),
+  );
+}
+
+async function inspectMainViewDeleteTauri({
+  workspaceRoot,
+  projectId,
+  chrName,
+  assemblyCtgIds,
+}) {
+  return invokeCommand("inspect_main_view_delete", {
+    request: { workspaceRoot, projectId, chrName, assemblyCtgIds },
+  });
+}
+
+async function runMainViewEditorActionTauri({
+  workspaceRoot,
+  projectId,
+  chrName,
+  action,
+  args,
+}) {
+  return invokeCommand("run_main_view_editor_action", {
+    request: { workspaceRoot, projectId, chrName, action, args },
+  });
+}
+
+async function runMainViewBatchDeleteTauri({
+  workspaceRoot,
+  projectId,
+  chrName,
+  assemblyCtgIds,
+}) {
+  return invokeCommand("run_main_view_batch_delete", {
+    request: { workspaceRoot, projectId, chrName, assemblyCtgIds },
+  });
+}
+
+async function executeMainViewHistoryActionTauri({
+  workspaceRoot,
+  projectId,
+  chrName,
+  action,
+}) {
+  const commands = {
+    undo: "undo_main_view_history",
+    redo: "redo_main_view_history",
+    reset: "reset_main_view_history",
+  };
+  const command = commands[String(action || "").trim().toLowerCase()];
+  if (!command) {
+    throw new Error(`unsupported main-view history action: ${action || "<empty>"}`);
+  }
+  return invokeCommand(
+    command,
+    buildMainViewHistoryRequest({ workspaceRoot, projectId, chrName }),
+  );
+}
+
 async function getJunctionInspectionTauri({
   workspaceRoot,
   projectId,
@@ -200,6 +268,11 @@ async function appendEditAuditLogTauri({ workspaceRoot, projectId, category, act
     getCtgDetail: getCtgDetailTauri,
     listCtgEditCandidates: listCtgEditCandidatesTauri,
     runCtgEditorAction: runCtgEditorActionTauri,
+    getMainViewHistoryStatus: getMainViewHistoryStatusTauri,
+    inspectMainViewDelete: inspectMainViewDeleteTauri,
+    runMainViewEditorAction: runMainViewEditorActionTauri,
+    runMainViewBatchDelete: runMainViewBatchDeleteTauri,
+    executeMainViewHistoryAction: executeMainViewHistoryActionTauri,
     getJunctionInspection: getJunctionInspectionTauri,
     getTrackPairwiseEvidence: getTrackPairwiseEvidenceTauri,
     appendEditAuditLog: appendEditAuditLogTauri,

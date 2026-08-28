@@ -10,20 +10,81 @@ import {
   exportDegapJobs,
   exportFinalPathFasta,
   exportProjectFinalPathFasta,
+  executeMainViewHistoryAction,
+  getMainViewHistoryStatus,
   getGrtProjectView,
   initializeProject,
   listPhasedChrTracks,
   listProjectInitializerOptions,
   openWorkspace,
+  inspectMainViewDelete,
   removePhasedChrTrackItem,
   reorderPhasedChrTrackItems,
   runCtgEditorAction,
+  runMainViewBatchDelete,
+  runMainViewEditorAction,
   setProjectAssemblyViewState,
   setProjectAutoPipelineDone,
   updateProject,
   writeFinalPathExportBinaryFile,
   writeFinalPathExportTextFile,
 } from "../workflow-api.js";
+
+test("main-view history services preserve nested Tauri request payloads", async () => {
+  const previousWindow = globalThis.window;
+  const calls = [];
+  try {
+    globalThis.window = {
+      __TAURI__: {
+        core: {
+          invoke: async (command, args) => {
+            calls.push({ command, args });
+            return { ok: true };
+          },
+        },
+      },
+    };
+    const target = {
+      workspaceRoot: "D:\\Desktop\\GPM\\ws1",
+      projectId: 7,
+      chrName: "Chr01",
+    };
+    await getMainViewHistoryStatus(target);
+    await inspectMainViewDelete({ ...target, assemblyCtgIds: [11, 12] });
+    await runMainViewEditorAction({
+      ...target,
+      action: "rename-ctg",
+      args: { assemblyCtgId: 11, newName: "ctg-renamed" },
+    });
+    await runMainViewBatchDelete({ ...target, assemblyCtgIds: [11, 12] });
+    await executeMainViewHistoryAction({ ...target, action: "redo" });
+
+    assert.deepEqual(calls, [
+      { command: "get_main_view_history_status", args: { request: target } },
+      {
+        command: "inspect_main_view_delete",
+        args: { request: { ...target, assemblyCtgIds: [11, 12] } },
+      },
+      {
+        command: "run_main_view_editor_action",
+        args: {
+          request: {
+            ...target,
+            action: "rename-ctg",
+            args: { assemblyCtgId: 11, newName: "ctg-renamed" },
+          },
+        },
+      },
+      {
+        command: "run_main_view_batch_delete",
+        args: { request: { ...target, assemblyCtgIds: [11, 12] } },
+      },
+      { command: "redo_main_view_history", args: { request: target } },
+    ]);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
 
 test("preserves semantics for plain object throws", () => {
   const normalized = __testNormalizeWorkflowError(

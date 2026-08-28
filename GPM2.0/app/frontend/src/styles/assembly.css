@@ -168,6 +168,13 @@
   border-style: dashed;
 }
 
+.ctg-chip.is-history-highlighted {
+  border-color: #2f6fad;
+  background: #e8f2fc;
+  box-shadow: 0 0 0 2px rgba(47, 111, 173, 0.2);
+  animation: main-view-history-chip-pulse 700ms ease-out 2;
+}
+
 .ctg-chip strong {
   display: inline-flex;
   align-items: center;
@@ -691,6 +698,87 @@
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.main-view-history-controls {
+  display: inline-flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+  gap: 0;
+  box-sizing: border-box;
+  height: 30px;
+  overflow: hidden;
+  border: 1px solid #aeb7c2;
+  border-radius: 4px;
+  background: #f5f7f9;
+  box-shadow: 0 1px 1px rgba(26, 39, 52, 0.08);
+  white-space: nowrap;
+}
+
+.main-view-history-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 30px;
+  min-width: 30px;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(#fff, #eef1f4);
+  color: #344354;
+  cursor: pointer;
+  transition: background-color 100ms ease, color 100ms ease, box-shadow 100ms ease;
+}
+
+.main-view-history-button:not(:disabled):hover {
+  background: #e7edf3;
+  color: #162b40;
+}
+
+.main-view-history-button:not(:disabled):active {
+  background: #dbe4ed;
+  box-shadow: inset 0 1px 2px rgba(30, 48, 66, 0.18);
+}
+
+.main-view-history-button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid #4f82b5;
+  outline-offset: -2px;
+}
+
+.main-view-history-button:disabled {
+  background: #f3f4f5;
+  color: #a5abb2;
+  cursor: default;
+  opacity: 1;
+}
+
+.main-view-history-button svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.main-view-history-button.is-reset svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2;
+}
+
+.main-view-history-separator {
+  align-self: stretch;
+  width: 1px;
+  margin: 4px 0;
+  background: #b9c0c8;
 }
 
 .assembly-track-inline-field {
@@ -1274,6 +1362,33 @@
 .track-ctg-group.is-active .track-ctg-label {
   fill: #1f3248;
   font-weight: 700;
+}
+
+.track-ctg-group.is-history-highlighted .track-ctg {
+  stroke: #2f6fad;
+  stroke-width: 3px;
+  filter: drop-shadow(0 0 3px rgba(47, 111, 173, 0.65));
+  animation: main-view-history-track-pulse 700ms ease-out 2;
+}
+
+@keyframes main-view-history-chip-pulse {
+  50% {
+    box-shadow: 0 0 0 4px rgba(47, 111, 173, 0.22);
+  }
+}
+
+@keyframes main-view-history-track-pulse {
+  50% {
+    stroke-width: 5px;
+    filter: drop-shadow(0 0 5px rgba(47, 111, 173, 0.75));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctg-chip.is-history-highlighted,
+  .track-ctg-group.is-history-highlighted .track-ctg {
+    animation: none;
+  }
 }
 
 .track-ctg-group.is-active .track-ctg-label.is-ref {

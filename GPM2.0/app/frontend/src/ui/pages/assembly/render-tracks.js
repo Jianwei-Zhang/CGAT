@@ -763,12 +763,16 @@ function createRenderTracksRenderer(deps = {}) {
   const selectedPrimaryTrackCtgIdSet = new Set(
     filterPrimaryTrackSelectionCtgIds(assembly.trackSelectedCtgIds, assembly),
   );
+  const historyHighlightCtgId = normalizeSupportDatasetId(assembly.historyHighlightCtgId);
   const ctgChips = assembly.chrCtgs.length
     ? assembly.chrCtgs
         .map((ctg) => {
           const active = ctg.assemblyCtgId === assembly.selectedCtgId ? "is-active" : "";
           const selectedClass = selectedPrimaryTrackCtgIdSet.has(Number(ctg.assemblyCtgId)) ? " is-multi-selected" : "";
           const hiddenClass = hiddenPrimaryCtgIdSet.has(Number(ctg.assemblyCtgId)) ? " is-hidden-contig" : "";
+          const historyHighlightClass = historyHighlightCtgId === Number(ctg.assemblyCtgId)
+            ? " is-history-highlighted"
+            : "";
           const hiddenTag = hiddenClass
             ? ` <span class="ctg-chip-hidden-tag">${escapeHtml(i18n.page.deletedHiddenTag)}</span>`
             : "";
@@ -788,13 +792,13 @@ function createRenderTracksRenderer(deps = {}) {
             : "";
           if (coAssignedTooltip) {
             const nameTitle = `${escapeAttr(fullName)}&#10;${escapeAttr(coAssignedTooltip)}`;
-            return `<button class="ctg-chip ${active}${selectedClass}${hiddenClass}" data-assembly-ctg-id="${ctg.assemblyCtgId}" data-track-focus-mode="start">
+            return `<button class="ctg-chip ${active}${selectedClass}${hiddenClass}${historyHighlightClass}" data-assembly-ctg-id="${ctg.assemblyCtgId}" data-track-focus-mode="start">
               <strong><span class="ctg-chip-name is-coassigned" title="${nameTitle}">${escapeHtml(visibleName)}</span>${sourceTagMarkup}${grtStatusMarkup}${hiddenTag}</strong>
               <span class="ctg-chip-meta">${formatBp(ctg.totalLength)}</span>
             </button>`;
           }
           const nameTitle = escapeAttr(fullName);
-          return `<button class="ctg-chip ${active}${selectedClass}${hiddenClass}" data-assembly-ctg-id="${ctg.assemblyCtgId}" data-track-focus-mode="start" title="${nameTitle}">
+          return `<button class="ctg-chip ${active}${selectedClass}${hiddenClass}${historyHighlightClass}" data-assembly-ctg-id="${ctg.assemblyCtgId}" data-track-focus-mode="start" title="${nameTitle}">
             <strong>${escapeHtml(visibleName)}${sourceTagMarkup}${grtStatusMarkup}${hiddenTag}</strong>
             <span class="ctg-chip-meta">${formatBp(ctg.totalLength)}</span>
           </button>`;
@@ -908,6 +912,8 @@ function createRenderTracksRenderer(deps = {}) {
             grtResultContext,
             grtResultPlan,
             grtResultToast: assembly.grtResultToast,
+            mainViewHistory: assembly.mainViewHistory,
+            historyHighlightCtgId,
             i18n,
           })}
           ${subviewPanel}
@@ -1113,6 +1119,8 @@ function renderAssemblyTrackInlineControls({
   chrLength = null,
   supportDatasetOptions,
   supportDatasetId,
+  selectedChrName,
+  mainViewHistory,
   i18n,
 }) {
   const supportOptions = supportDatasetOptions.length
@@ -1174,6 +1182,11 @@ function renderAssemblyTrackInlineControls({
     options: MAPQ_OPTIONS,
     allowZero: true,
   });
+  const mainViewHistoryControls = renderMainViewHistoryControls({
+    selectedChrName,
+    history: mainViewHistory,
+    i18n,
+  });
   return `
     <div class="assembly-track-inline-controls" role="group" aria-label="${escapeAttr(i18n.page.primaryAlignmentViewControlsAria)}">
       <label class="assembly-track-inline-field">
@@ -1204,6 +1217,68 @@ function renderAssemblyTrackInlineControls({
         <span>${escapeHtml(i18n.trackControls.mapq)}</span>
         ${mapqInput}
       </label>
+      ${mainViewHistoryControls}
+    </div>
+  `;
+}
+
+function replaceMainHistoryTokens(template, values = {}) {
+  return Object.entries(values).reduce(
+    (text, [key, value]) => String(text).replaceAll(`{${key}}`, String(value ?? "")),
+    String(template || ""),
+  );
+}
+
+function describeMainViewHistoryOperation(operation, i18n) {
+  const kind = String(operation?.kind || "").trim().toLowerCase();
+  const targetCount = Math.max(0, Math.trunc(Number(operation?.targetCount || 0)));
+  const targetName = String(operation?.targetName || "").trim()
+    || i18n.mainHistory.targetFallback;
+  const template = i18n.mainHistory.operations?.[kind]
+    || i18n.mainHistory.operationFallback;
+  return replaceMainHistoryTokens(template, {
+    count: targetCount,
+    target: targetName,
+  });
+}
+
+function renderMainViewHistoryControls({ selectedChrName, history, i18n }) {
+  const chrName = String(selectedChrName || "").trim();
+  if (!chrName || chrName.toLowerCase() === "unplaced") {
+    return "";
+  }
+  const inFlight = history?.inFlight === true;
+  const undoDisabled = inFlight || history?.canUndo !== true;
+  const redoDisabled = inFlight || history?.canRedo !== true;
+  const resetDisabled = inFlight || history?.canReset !== true;
+  const undoTitle = undoDisabled
+    ? i18n.mainHistory.undoUnavailable
+    : replaceMainHistoryTokens(i18n.mainHistory.undoAction, {
+      operation: describeMainViewHistoryOperation(history.undoOperation, i18n),
+    });
+  const redoTitle = redoDisabled
+    ? i18n.mainHistory.redoUnavailable
+    : replaceMainHistoryTokens(i18n.mainHistory.redoAction, {
+      operation: describeMainViewHistoryOperation(history.redoOperation, i18n),
+    });
+  const resetTitle = resetDisabled
+    ? i18n.mainHistory.resetUnavailable
+    : replaceMainHistoryTokens(i18n.mainHistory.resetAction, {
+      chrName,
+      count: Math.max(0, Math.trunc(Number(history?.appliedOperationCount || 0))),
+    });
+  return `
+    <div class="main-view-history-controls" role="group" aria-label="${escapeAttr(i18n.mainHistory.controlsAria)}">
+      <button type="button" class="main-view-history-button" data-main-history-action="undo" aria-label="${escapeAttr(undoTitle)}" title="${escapeAttr(undoTitle)}" ${undoDisabled ? "disabled" : ""}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 6.3 3.5 12l5.7 5.7M4 12h9.2a6.8 6.8 0 0 1 6.8 6.8" /></svg>
+      </button>
+      <button type="button" class="main-view-history-button" data-main-history-action="redo" aria-label="${escapeAttr(redoTitle)}" title="${escapeAttr(redoTitle)}" ${redoDisabled ? "disabled" : ""}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.8 6.3 5.7 5.7-5.7 5.7M20 12h-9.2A6.8 6.8 0 0 0 4 18.8" /></svg>
+      </button>
+      <span class="main-view-history-separator" aria-hidden="true"></span>
+      <button type="button" class="main-view-history-button is-reset" data-main-history-action="reset" aria-label="${escapeAttr(resetTitle)}" title="${escapeAttr(resetTitle)}" ${resetDisabled ? "disabled" : ""}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.6 8.2V3.8m0 4.4H9M5 8a8 8 0 1 1-1 6.2" /></svg>
+      </button>
     </div>
   `;
 }
@@ -1341,6 +1416,8 @@ function renderAssemblyTracks({
   grtResultContext = null,
   grtResultPlan = null,
   grtResultToast = null,
+  mainViewHistory = null,
+  historyHighlightCtgId = null,
   i18n,
 }) {
   const TRACK_HEIGHT_SCALE = 2;
@@ -2194,7 +2271,11 @@ function renderAssemblyTracks({
           const multiSelectedClass = selectedTrackCtgIds.has(Number(ctg.assemblyCtgId)) ? " is-multi-selected" : "";
           const hiddenClass = ctgVerticalOffset < 0 ? " is-hidden-contig" : "";
           const mirrorClass = layout.isMirror ? " is-mirror" : "";
-          const groupClass = `track-ctg-group${activeClass}${slotClass}${multiSelectedClass}${hiddenClass}${mirrorClass}${rowBgClass}`;
+          const historyHighlightClass = layout.role === "primary"
+            && Number(historyHighlightCtgId) === Number(ctg.assemblyCtgId)
+            ? " is-history-highlighted"
+            : "";
+          const groupClass = `track-ctg-group${activeClass}${slotClass}${multiSelectedClass}${hiddenClass}${mirrorClass}${rowBgClass}${historyHighlightClass}`;
           const rectMetricsAttrs = `data-track-rect-x="${rect.x.toFixed(2)}" data-track-rect-y="${y.toFixed(2)}" data-track-rect-width="${rect.width.toFixed(2)}" data-track-rect-height="${TRACK_BAR_HEIGHT}"`;
           const phasedTrackId = normalizeSupportDatasetId(layout.phasedTrackId);
           const phasedTrackItemId = normalizeSupportDatasetId(ctg.phasedTrackItemId);
@@ -2306,6 +2387,8 @@ function renderAssemblyTracks({
     chrLength,
     supportDatasetOptions,
     supportDatasetId,
+    selectedChrName,
+    mainViewHistory,
     i18n,
   });
   const createPhasedTrackButton = renderCreatePhasedTrackButton({

@@ -685,9 +685,9 @@ test("batch deleting selected track ctgs uses local refresh instead of reloading
       store,
       [2, 8, 30],
       {
-        runAction: async (payload) => {
+        runBatchDelete: async (payload) => {
           actionCalls.push(payload);
-          return { changed: true };
+          return { changed: true, status: {} };
         },
         reloadView: async (_host, _store, options) => {
           reloadCalls.push(options);
@@ -705,7 +705,7 @@ test("batch deleting selected track ctgs uses local refresh instead of reloading
     }
   }
 
-  assert.deepEqual(actionCalls.map((item) => item.args.assemblyCtgId), [2, 8]);
+  assert.deepEqual(actionCalls.map((item) => item.assemblyCtgIds), [[2, 8]]);
   assert.equal(reloadCalls.length, 0);
   assert.equal(localRefreshCalls.length, 1);
   assert.deepEqual(localRefreshCalls[0].deletedAssemblyCtgIds, [2, 8]);
@@ -751,9 +751,9 @@ test("batch restoring selected deleted ctgs reloads view once after all actions"
       store,
       [9101, 9102],
       {
-        runAction: async (payload) => {
+        runMainAction: async (payload) => {
           actionCalls.push(payload);
-          return { restored: true };
+          return { changed: true, status: {} };
         },
         reloadView: async (_host, _store, options) => {
           reloadCalls.push(options);
@@ -804,9 +804,9 @@ test("restoring selected deleted ctgs does not require confirm dialog", async ()
   };
   try {
     await __testRestoreSelectedDeletedCtgs(host, store, [9101], {
-      runAction: async (payload) => {
+      runMainAction: async (payload) => {
         actionCalls.push(payload);
-        return { restored: true };
+        return { changed: true, status: {} };
       },
       reloadView: async (_host, _store, options) => {
         reloadCalls.push(options);

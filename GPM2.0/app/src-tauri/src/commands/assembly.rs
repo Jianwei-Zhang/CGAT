@@ -591,6 +591,149 @@ pub fn run_ctg_editor_action(
 }
 
 #[tauri::command]
+pub fn get_main_view_history_status(
+    request: MainViewHistoryTargetCommandRequest,
+) -> CommandResult<Value> {
+    (|| {
+        let status = backend_get_main_view_history_status(
+            &project_db_path(&request.workspace_root),
+            &MainViewHistoryTargetParams {
+                project_id: request.project_id,
+                chr_name: request.chr_name,
+            },
+        )?;
+        Ok(map_main_view_history_status(&status))
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+pub fn inspect_main_view_delete(
+    request: MainViewBatchDeleteCommandRequest,
+) -> CommandResult<Value> {
+    (|| {
+        let impact = backend_inspect_main_view_delete(
+            &project_db_path(&request.workspace_root),
+            &RunMainViewBatchDeleteParams {
+                project_id: request.project_id,
+                chr_name: request.chr_name,
+                assembly_ctg_ids: request.assembly_ctg_ids,
+            },
+        )?;
+        Ok(json!({
+            "ctgCount": impact.ctg_count,
+            "phasedItemCount": impact.phased_item_count,
+            "exportRecordCount": impact.export_record_count,
+            "finalPathReferenceCount": impact.final_path_reference_count,
+            "degapReferenceCount": impact.degap_reference_count,
+        }))
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+pub fn run_main_view_editor_action(
+    request: RunMainViewEditorActionCommandRequest,
+) -> CommandResult<Value> {
+    (|| {
+        let summary = backend_run_main_view_editor_action(
+            &project_db_path(&request.workspace_root),
+            &RunMainViewEditorActionParams {
+                project_id: request.project_id,
+                chr_name: request.chr_name,
+                action: request.action,
+                args: request.args,
+            },
+        )?;
+        Ok(map_main_view_history_mutation(&summary))
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+pub fn run_main_view_batch_delete(
+    request: MainViewBatchDeleteCommandRequest,
+) -> CommandResult<Value> {
+    (|| {
+        let summary = backend_run_main_view_batch_delete(
+            &project_db_path(&request.workspace_root),
+            &RunMainViewBatchDeleteParams {
+                project_id: request.project_id,
+                chr_name: request.chr_name,
+                assembly_ctg_ids: request.assembly_ctg_ids,
+            },
+        )?;
+        Ok(map_main_view_history_mutation(&summary))
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+pub fn undo_main_view_history(
+    request: MainViewHistoryTargetCommandRequest,
+) -> CommandResult<Value> {
+    run_main_view_history_target_command(request, backend_undo_main_view_history)
+}
+
+#[tauri::command]
+pub fn redo_main_view_history(
+    request: MainViewHistoryTargetCommandRequest,
+) -> CommandResult<Value> {
+    run_main_view_history_target_command(request, backend_redo_main_view_history)
+}
+
+#[tauri::command]
+pub fn reset_main_view_history(
+    request: MainViewHistoryTargetCommandRequest,
+) -> CommandResult<Value> {
+    run_main_view_history_target_command(request, backend_reset_main_view_history)
+}
+
+fn run_main_view_history_target_command(
+    request: MainViewHistoryTargetCommandRequest,
+    run: fn(&Path, &MainViewHistoryTargetParams) -> anyhow::Result<MainViewHistoryMutationSummary>,
+) -> CommandResult<Value> {
+    (|| {
+        let summary = run(
+            &project_db_path(&request.workspace_root),
+            &MainViewHistoryTargetParams {
+                project_id: request.project_id,
+                chr_name: request.chr_name,
+            },
+        )?;
+        Ok(map_main_view_history_mutation(&summary))
+    })()
+    .map_err(format_error)
+}
+
+fn map_main_view_history_mutation(summary: &MainViewHistoryMutationSummary) -> Value {
+    json!({
+        "changed": summary.changed,
+        "invalidated": summary.invalidated,
+        "affectedCtgIds": summary.affected_ctg_ids,
+        "affectedSeqIds": summary.affected_seq_ids,
+        "operation": summary.descriptor,
+        "status": map_main_view_history_status(&summary.status),
+    })
+}
+
+fn map_main_view_history_status(status: &MainViewHistoryStatus) -> Value {
+    json!({
+        "projectId": status.project_id,
+        "referenceChrId": status.reference_chr_id,
+        "chrName": status.chr_name,
+        "canUndo": status.can_undo,
+        "canRedo": status.can_redo,
+        "canReset": status.can_reset,
+        "undoOperation": status.undo_operation,
+        "redoOperation": status.redo_operation,
+        "appliedOperationCount": status.applied_operation_count,
+        "retainedOperationCount": status.retained_operation_count,
+        "invalidated": status.invalidated,
+    })
+}
+
+#[tauri::command]
 #[allow(non_snake_case)]
 pub async fn get_junction_inspection(
     workspaceRoot: String,

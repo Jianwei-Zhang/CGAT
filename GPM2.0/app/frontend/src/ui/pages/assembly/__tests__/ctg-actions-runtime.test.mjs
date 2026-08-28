@@ -45,11 +45,15 @@ test("bindCtgActions routes retained rename flip and delete actions through inje
     },
   };
   const calls = [];
+  const deleteCalls = [];
   const confirms = [];
 
   bindCtgActions(host, store, {
     async applyEditorAction(_host, _store, payload) {
       calls.push(payload);
+    },
+    async deleteSelectedTrackCtgs(_host, _store, selectedIds, options) {
+      deleteCalls.push({ selectedIds, confirmMessage: options.confirmMessage });
     },
     confirm(message) {
       confirms.push(message);
@@ -77,13 +81,12 @@ test("bindCtgActions routes retained rename flip and delete actions through inje
       keepCurrentCtg: true,
       localRefresh: true,
     },
-    {
-      action: "delete-ctg",
-      args: { assemblyCtgId: 7 },
-      keepCurrentCtg: false,
-    },
   ]);
-  assert.deepEqual(confirms, ["确认删除 Ctg7 吗？"]);
+  assert.deepEqual(deleteCalls, [{
+    selectedIds: [7],
+    confirmMessage: "确认删除 Ctg7 吗？",
+  }]);
+  assert.deepEqual(confirms, []);
   assert.equal(appendButton.hasListener("click"), false);
 });
 
@@ -107,11 +110,17 @@ test("bindCtgActions waits for async delete confirmation", async () => {
     },
   };
   const calls = [];
+  const deleteCalls = [];
   let resolveConfirm = null;
 
   bindCtgActions(host, store, {
     async applyEditorAction(_host, _store, payload) {
       calls.push(payload);
+    },
+    async deleteSelectedTrackCtgs(_host, _store, selectedIds, options) {
+      if (await options.confirm("dependency confirmation")) {
+        deleteCalls.push(selectedIds);
+      }
     },
     confirm() {
       return new Promise((resolve) => {
@@ -127,4 +136,5 @@ test("bindCtgActions waits for async delete confirmation", async () => {
   resolveConfirm(false);
   await pending;
   assert.deepEqual(calls, []);
+  assert.deepEqual(deleteCalls, []);
 });

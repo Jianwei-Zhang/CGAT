@@ -93,7 +93,9 @@ test("deleteSelectedSubviewTrackPairCtgs hides normalized subview selections and
 test("deleteSelectedTrackCtgs waits for async confirmation before deleting", async () => {
   const host = {};
   let state = {
+    session: { workspacePath: "/tmp/workspace", projectId: 7 },
     assembly: {
+      selectedChrName: "Chr01",
       chrCtgs: [{ assemblyCtgId: 2 }],
       hiddenPrimaryCtgIds: [],
       trackSelectedCtgIds: [2],
@@ -111,18 +113,35 @@ test("deleteSelectedTrackCtgs waits for async confirmation before deleting", asy
     },
   };
   const calls = [];
+  const inspectionCalls = [];
+  const confirmMessages = [];
   let resolveConfirm = null;
   const pending = deleteSelectedTrackCtgs(
     host,
     store,
     [2],
     {
+      async inspectMainViewDelete(payload) {
+        inspectionCalls.push(payload);
+        return {
+          ctgCount: 1,
+          phasedItemCount: 2,
+          exportRecordCount: 1,
+          finalPathReferenceCount: 3,
+          degapReferenceCount: 4,
+        };
+      },
+      mapAssemblyError({ error }) {
+        return { userMessage: String(error?.message || error) };
+      },
+      rerender() {},
       async runBatchDeleteTrackCtgs(_host, _store, selectedIds) {
         calls.push(selectedIds);
       },
     },
     {
-      confirm() {
+      confirm(message) {
+        confirmMessages.push(message);
         return new Promise((resolve) => {
           resolveConfirm = resolve;
         });
@@ -131,11 +150,21 @@ test("deleteSelectedTrackCtgs waits for async confirmation before deleting", asy
   );
 
   await Promise.resolve();
+  await Promise.resolve();
   assert.deepEqual(calls, []);
 
   resolveConfirm(false);
   await pending;
   assert.deepEqual(calls, []);
+  assert.deepEqual(inspectionCalls, [{
+    workspaceRoot: "/tmp/workspace",
+    projectId: 7,
+    chrName: "Chr01",
+    assemblyCtgIds: [2],
+  }]);
+  assert.match(confirmMessages[0], /分型轨道项 2/);
+  assert.match(confirmMessages[0], /Final Path 引用 3/);
+  assert.match(confirmMessages[0], /失败时不会删除任何 ctg/);
 });
 
 test("applyEditorAction local refresh avoids the loading curtain and uses the local view loader", async () => {
@@ -292,6 +321,89 @@ test("applyEditorAction phased-only refresh avoids reloading primary track data"
   assert.equal(state.assembly.actionStatus, "flip-ctg 完成（changed=true）。");
 });
 
+test("applyEditorAction routes eligible formal-chromosome edits through persistent history", async () => {
+  const host = {};
+  let state = {
+    session: { workspacePath: "/tmp/workspace", projectId: 7 },
+    assembly: {
+      selectedChrName: "Chr01",
+      loading: false,
+      actionStatus: "",
+      actionError: "",
+      summary: "",
+      mainViewHistory: {
+        chrName: "Chr01",
+        canUndo: false,
+        canRedo: true,
+        redoOperation: { kind: "flip-ctg", targetCount: 1 },
+        appliedOperationCount: 0,
+      },
+    },
+  };
+  const store = {
+    getState() {
+      return state;
+    },
+    setState(nextState) {
+      state = { ...state, ...nextState };
+    },
+  };
+  const calls = [];
+  let clientAuditCount = 0;
+  await applyEditorAction(host, store, {
+    action: "rename-ctg",
+    args: { assemblyCtgId: 2, newName: "renamed" },
+    keepCurrentCtg: true,
+  }, {
+    appendAuditLog() {
+      clientAuditCount += 1;
+    },
+    buildActionAuditDetail() {
+      return {};
+    },
+    async loadAssemblyView(_host, _store, options) {
+      calls.push({ reload: options });
+    },
+    mapAssemblyError({ error }) {
+      return { userMessage: String(error?.message || error) };
+    },
+    rerender() {},
+    async runAction() {
+      throw new Error("legacy editor command must not run");
+    },
+    async runMainAction(payload) {
+      calls.push(payload);
+      assert.equal(store.getState().assembly.mainViewHistory.inFlight, true);
+      return {
+        changed: true,
+        status: {
+          chrName: "Chr01",
+          canUndo: true,
+          canRedo: false,
+          canReset: true,
+          undoOperation: { kind: "rename-ctg", targetCount: 1, targetName: "renamed" },
+          appliedOperationCount: 1,
+          retainedOperationCount: 1,
+        },
+      };
+    },
+  });
+
+  assert.deepEqual(calls, [
+    {
+      workspaceRoot: "/tmp/workspace",
+      projectId: 7,
+      chrName: "Chr01",
+      action: "rename-ctg",
+      args: { assemblyCtgId: 2, newName: "renamed" },
+    },
+    { reload: { keepCurrentChr: true, keepCurrentCtg: true, renderLoading: true } },
+  ]);
+  assert.equal(clientAuditCount, 0);
+  assert.equal(state.assembly.mainViewHistory.canUndo, true);
+  assert.equal(state.assembly.mainViewHistory.canRedo, false);
+});
+
 test("runBatchDeleteTrackCtgs local refresh avoids loading rerender", async () => {
   const host = {};
   let state = {
@@ -344,8 +456,8 @@ test("runBatchDeleteTrackCtgs local refresh avoids loading rerender", async () =
     rerender(_host, currentStore) {
       rerenderLoadingStates.push(currentStore.getState().assembly.loading);
     },
-    async runAction() {
-      return { changed: true };
+    async runBatchDelete() {
+      return { changed: true, status: {} };
     },
   });
 
@@ -413,8 +525,8 @@ test("runBatchDeleteTrackCtgs local refresh uses lightweight delete refresh when
     rerender() {
       rerenderCount += 1;
     },
-    async runAction() {
-      return { changed: true };
+    async runBatchDelete() {
+      return { changed: true, status: {} };
     },
   });
 
@@ -426,7 +538,7 @@ test("runBatchDeleteTrackCtgs local refresh uses lightweight delete refresh when
   assert.deepEqual(state.assembly.trackSelectedCtgIds, []);
 });
 
-test("runBatchDeleteTrackCtgs reports per-contig progress while deleting", async () => {
+test("runBatchDeleteTrackCtgs reports one atomic failure for the whole selection", async () => {
   const host = {};
   let state = {
     session: {
@@ -475,26 +587,23 @@ test("runBatchDeleteTrackCtgs reports per-contig progress while deleting", async
       const progress = currentStore.getState().assembly.batchDeleteProgress;
       progressSnapshots.push(progress ? JSON.parse(JSON.stringify(progress)) : null);
     },
-    async runAction({ args }) {
-      if (Number(args?.assemblyCtgId) === 5) {
-        throw new Error("delete failed");
-      }
-      return { changed: true };
+    async runBatchDelete() {
+      throw new Error("delete failed");
     },
   });
 
-  assert.deepEqual(result, { deletedCount: 1, failedCount: 1 });
+  assert.deepEqual(result, { deletedCount: 0, failedCount: 2 });
   assert.deepEqual(
     progressSnapshots.map((progress) => progress && progress.items.map((item) => `${item.assemblyCtgId}:${item.status}`)),
     [
       ["2:running", "5:pending"],
-      ["2:success", "5:running"],
-      ["2:success", "5:error"],
+      ["2:error", "5:error"],
       null,
     ],
   );
   assert.equal(progressSnapshots[0].items[0].label, "ctg-alpha");
-  assert.equal(progressSnapshots[2].items[1].error, "delete failed");
+  assert.equal(progressSnapshots[1].items[1].error, "delete failed");
+  assert.match(state.assembly.actionError, /未删除任何 ctg/);
 });
 
 test("runBatchDeleteTrackCtgs clears progress when lightweight refresh fails", async () => {
@@ -546,8 +655,8 @@ test("runBatchDeleteTrackCtgs clears progress when lightweight refresh fails", a
         const progress = currentStore.getState().assembly.batchDeleteProgress;
         progressSnapshots.push(progress ? JSON.parse(JSON.stringify(progress)) : null);
       },
-      async runAction() {
-        return { changed: true };
+      async runBatchDelete() {
+        return { changed: true, status: {} };
       },
     }),
     /refresh failed/,

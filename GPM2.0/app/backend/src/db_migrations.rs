@@ -35,6 +35,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "add_project_subview_history",
         apply: migrate_project_subview_history_to_v2,
     },
+    Migration {
+        version: 3,
+        name: "add_project_main_view_history",
+        apply: migrate_project_main_view_history_to_v3,
+    },
 ];
 
 const LEGACY_COLUMNS: &[LegacyColumn] = &[
@@ -325,6 +330,24 @@ fn migrate_project_subview_history_to_v2(conn: &Connection) -> Result<()> {
              ON project_subview_history(project_id, updated_at);",
     )
     .context("failed to create project subview history storage")?;
+    Ok(())
+}
+
+fn migrate_project_main_view_history_to_v3(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS project_main_view_history (
+             project_id INTEGER NOT NULL,
+             reference_chr_id INTEGER NOT NULL,
+             state_json TEXT NOT NULL,
+             updated_at TEXT NOT NULL,
+             PRIMARY KEY(project_id, reference_chr_id),
+             FOREIGN KEY(project_id) REFERENCES project(id) ON DELETE CASCADE,
+             FOREIGN KEY(reference_chr_id) REFERENCES reference_chr(id) ON DELETE CASCADE
+         );
+         CREATE INDEX IF NOT EXISTS idx_project_main_view_history_updated
+             ON project_main_view_history(project_id, updated_at);",
+    )
+    .context("failed to create project main view history storage")?;
     Ok(())
 }
 

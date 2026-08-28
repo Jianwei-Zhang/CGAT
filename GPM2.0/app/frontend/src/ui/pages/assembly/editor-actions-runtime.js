@@ -81,18 +81,6 @@ function updateBatchDeleteProgressItem(progress, assemblyCtgId, updates) {
   };
 }
 
-function startNextBatchDeleteProgressItem(progress, assemblyCtgId) {
-  const numericId = Number(assemblyCtgId);
-  return {
-    ...progress,
-    items: (Array.isArray(progress?.items) ? progress.items : []).map((item) => (
-      Number(item?.assemblyCtgId) === numericId && item.status === "pending"
-        ? { ...item, status: "running" }
-        : { ...item }
-    )),
-  };
-}
-
 function setBatchDeleteProgress(host, store, deps, progress) {
   const latestState = store.getState();
   store.setState({
@@ -129,6 +117,14 @@ export async function applyEditorAction(host, store, payload, deps, overrides = 
     return;
   }
   const useLocalRefresh = payload?.localRefresh === true || deps.localRefresh === true;
+  const useMainHistory = Boolean(
+    state.assembly?.selectedChrName
+    && typeof (overrides.runMainAction || deps.runMainAction) === "function"
+    && isMainViewHistoryEligibleAction(action, args),
+  );
+  if (useMainHistory && state.assembly?.mainViewHistory?.inFlight === true) {
+    return;
+  }
   const rerenderForMode = useLocalRefresh && typeof deps.rerenderAssemblyMainTab === "function"
     ? deps.rerenderAssemblyMainTab
     : deps.rerender;
@@ -139,13 +135,23 @@ export async function applyEditorAction(host, store, payload, deps, overrides = 
       actionError: "",
       actionStatus: tAssembly(state, "runtime.actionRunningStatus", { action }),
       summary: tAssembly(state, "runtime.actionRunningSummary", { action }),
+      mainViewHistory: useMainHistory
+        ? {
+            ...normalizeMainViewHistoryStatus(state.assembly.mainViewHistory, {
+              chrName: state.assembly.selectedChrName,
+            }),
+            inFlight: true,
+          }
+        : state.assembly.mainViewHistory,
     },
   });
   if (!useLocalRefresh) {
     rerenderForMode(host, store);
   }
 
-  const runAction = overrides.runAction || deps.runAction;
+  const runAction = useMainHistory
+    ? (overrides.runMainAction || deps.runMainAction)
+    : (overrides.runAction || deps.runAction);
   const reloadView = overrides.reloadView
     || (useLocalRefresh && typeof deps.loadAssemblyViewForLocalAssemblyRefresh === "function"
       ? deps.loadAssemblyViewForLocalAssemblyRefresh
@@ -155,6 +161,7 @@ export async function applyEditorAction(host, store, payload, deps, overrides = 
     const result = await runAction({
       workspaceRoot: state.session.workspacePath,
       projectId: state.session.projectId,
+      ...(useMainHistory ? { chrName: state.assembly.selectedChrName } : {}),
       action,
       args,
     });
@@ -172,11 +179,22 @@ export async function applyEditorAction(host, store, payload, deps, overrides = 
             }),
       },
     });
-    deps.appendAuditLog(store, {
-      category: "editor",
-      action,
-      detail,
-    });
+    if (!useMainHistory) {
+      deps.appendAuditLog(store, {
+        category: "editor",
+        action,
+        detail,
+      });
+    } else {
+      store.setState({
+        assembly: {
+          ...store.getState().assembly,
+          mainViewHistory: normalizeMainViewHistoryStatus(result?.status, {
+            chrName: state.assembly.selectedChrName,
+          }),
+        },
+      });
+    }
     if (payload?.phasedOnlyRefresh === true && typeof deps.refreshPhasedTracksForCurrentChr === "function") {
       await deps.refreshPhasedTracksForCurrentChr(host, store);
     } else {
@@ -194,6 +212,14 @@ export async function applyEditorAction(host, store, payload, deps, overrides = 
         loading: false,
         actionError: mappedError.userMessage,
         actionStatus: tAssembly(store.getState(), "runtime.actionFailed", { action }),
+        mainViewHistory: useMainHistory
+          ? {
+              ...normalizeMainViewHistoryStatus(store.getState().assembly.mainViewHistory, {
+                chrName: state.assembly.selectedChrName,
+              }),
+              inFlight: false,
+            }
+          : store.getState().assembly.mainViewHistory,
       },
     });
     rerenderForMode(host, store);
@@ -202,14 +228,47 @@ export async function applyEditorAction(host, store, payload, deps, overrides = 
 
 export async function deleteSelectedTrackCtgs(host, store, selectedIds, deps, overrides = {}) {
   assertRuntimeDeps("delete track ctgs", deps, [
+    "inspectMainViewDelete",
+    "mapAssemblyError",
+    "rerender",
     "runBatchDeleteTrackCtgs",
   ]);
-  const normalized = filterPrimaryTrackSelectionCtgIds(selectedIds, store.getState().assembly);
-  if (!normalized.length) {
+  const state = store.getState();
+  const normalized = filterPrimaryTrackSelectionCtgIds(selectedIds, state.assembly);
+  if (!normalized.length || state.assembly?.mainViewHistory?.inFlight === true) {
     return;
   }
+  let impact;
+  try {
+    impact = await deps.inspectMainViewDelete({
+      workspaceRoot: state.session.workspacePath,
+      projectId: state.session.projectId,
+      chrName: state.assembly.selectedChrName,
+      assemblyCtgIds: normalized,
+    });
+  } catch (error) {
+    const latest = store.getState();
+    const mapped = deps.mapAssemblyError({ error, stateOrLocale: latest });
+    store.setState({
+      assembly: {
+        ...latest.assembly,
+        actionStatus: tAssembly(latest, "runtime.deleteImpactInspectionFailed"),
+        actionError: mapped.userMessage,
+      },
+    });
+    deps.rerender(host, store);
+    return;
+  }
+  const baseConfirmMessage = String(overrides.confirmMessage || "").trim()
+    || tAssembly(store.getState(), "runtime.batchDeleteConfirm", { count: normalized.length });
+  const impactMessage = tAssembly(store.getState(), "runtime.deleteDependencyImpact", {
+    phasedCount: Math.max(0, Number(impact?.phasedItemCount || 0)),
+    exportCount: Math.max(0, Number(impact?.exportRecordCount || 0)),
+    finalPathCount: Math.max(0, Number(impact?.finalPathReferenceCount || 0)),
+    degapCount: Math.max(0, Number(impact?.degapReferenceCount || 0)),
+  });
   const confirm = getConfirm(overrides, deps);
-  if (!(await confirm(tAssembly(store.getState(), "runtime.batchDeleteConfirm", { count: normalized.length })))) {
+  if (!(await confirm(`${baseConfirmMessage}\n\n${impactMessage}`, { host, store }))) {
     return;
   }
   await deps.runBatchDeleteTrackCtgs(host, store, normalized, overrides);
@@ -286,12 +345,9 @@ export async function restoreSelectedDeletedCtgs(host, store, selectedRecordIds,
 
 export async function runBatchDeleteTrackCtgs(host, store, selectedIds, deps, overrides = {}) {
   assertRuntimeDeps("batch delete track ctgs", deps, [
-    "appendAuditLog",
-    "buildActionAuditDetail",
     "loadAssemblyView",
     "mapAssemblyError",
     "rerender",
-    "runAction",
   ]);
   const normalized = filterPrimaryTrackSelectionCtgIds(selectedIds, store.getState().assembly);
   if (!normalized.length) {
@@ -301,6 +357,9 @@ export async function runBatchDeleteTrackCtgs(host, store, selectedIds, deps, ov
   const state = store.getState();
   if (!state.session.workspacePath || !state.session.projectId) {
     return { deletedCount: 0, failedCount: normalized.length };
+  }
+  if (state.assembly?.mainViewHistory?.inFlight === true) {
+    return { deletedCount: 0, failedCount: 0 };
   }
   const useLocalRefresh = deps.localRefresh === true || overrides.localRefresh === true;
 
@@ -317,7 +376,10 @@ export async function runBatchDeleteTrackCtgs(host, store, selectedIds, deps, ov
     deps.rerender(host, store);
   }
 
-  const runAction = overrides.runAction || deps.runAction;
+  const runBatchDelete = overrides.runBatchDelete || deps.runBatchDelete;
+  if (typeof runBatchDelete !== "function") {
+    throw new TypeError("Missing batch delete track ctgs runtime deps: runBatchDelete");
+  }
   const reloadView = overrides.reloadView || deps.loadAssemblyView;
   const refreshAfterBatchDelete = overrides.refreshAfterBatchDelete || deps.refreshAfterBatchDelete;
   let deletedCount = 0;
@@ -325,58 +387,81 @@ export async function runBatchDeleteTrackCtgs(host, store, selectedIds, deps, ov
   const failed = [];
   let progress = buildBatchDeleteProgress(state.assembly, normalized);
   setBatchDeleteProgress(host, store, deps, progress);
-  for (const [index, assemblyCtgId] of normalized.entries()) {
-    try {
-      const result = await runAction({
-        workspaceRoot: state.session.workspacePath,
-        projectId: state.session.projectId,
-        action: "delete-ctg",
-        args: { assemblyCtgId },
-      });
-      const changed = normalizeBoolean(result?.changed);
-      if (changed !== false) {
-        deletedCount += 1;
-        deletedAssemblyCtgIds.push(assemblyCtgId);
-      }
-      deps.appendAuditLog(store, {
-        category: "editor",
-        action: "delete-ctg",
-          detail: deps.buildActionAuditDetail("delete-ctg", { assemblyCtgId }, changed),
-      });
-      progress = updateBatchDeleteProgressItem(progress, assemblyCtgId, {
-        status: "success",
-        error: "",
-      });
-    } catch (error) {
-      failed.push({ assemblyCtgId, error });
-      progress = updateBatchDeleteProgressItem(progress, assemblyCtgId, {
+  store.setState({
+    assembly: {
+      ...store.getState().assembly,
+      mainViewHistory: {
+        ...normalizeMainViewHistoryStatus(state.assembly.mainViewHistory, {
+          chrName: state.assembly.selectedChrName,
+        }),
+        inFlight: true,
+      },
+    },
+  });
+  try {
+    const result = await runBatchDelete({
+      workspaceRoot: state.session.workspacePath,
+      projectId: state.session.projectId,
+      chrName: state.assembly.selectedChrName,
+      assemblyCtgIds: normalized,
+    });
+    deletedCount = result?.changed === false ? 0 : normalized.length;
+    deletedAssemblyCtgIds.push(...(deletedCount ? normalized : []));
+    progress = {
+      ...progress,
+      current: normalized.length,
+      items: progress.items.map((item) => ({ ...item, status: "success", error: "" })),
+    };
+    store.setState({
+      assembly: {
+        ...store.getState().assembly,
+        mainViewHistory: normalizeMainViewHistoryStatus(result?.status, {
+          chrName: state.assembly.selectedChrName,
+        }),
+      },
+    });
+  } catch (error) {
+    failed.push(...normalized.map((assemblyCtgId) => ({ assemblyCtgId, error })));
+    progress = {
+      ...progress,
+      current: normalized.length,
+      items: progress.items.map((item) => ({
+        ...item,
         status: "error",
         error: getBatchDeleteErrorMessage(error),
-      });
-    }
-    const nextAssemblyCtgId = normalized[index + 1];
-    if (nextAssemblyCtgId !== undefined) {
-      progress = startNextBatchDeleteProgressItem(progress, nextAssemblyCtgId);
-    }
-    setBatchDeleteProgress(host, store, deps, progress);
+      })),
+    };
+    store.setState({
+      assembly: {
+        ...store.getState().assembly,
+        mainViewHistory: {
+          ...normalizeMainViewHistoryStatus(store.getState().assembly.mainViewHistory, {
+            chrName: state.assembly.selectedChrName,
+          }),
+          inFlight: false,
+        },
+      },
+    });
   }
+  setBatchDeleteProgress(host, store, deps, progress);
 
   const applyFinalFeedback = () => {
     const latestState = store.getState();
     const firstError = failed[0]?.error || null;
     const mappedError = firstError ? deps.mapAssemblyError({ error: firstError, stateOrLocale: latestState }) : null;
-    const failedSuffix = buildBatchFailedSuffix(latestState, failed.length);
     store.setState({
       assembly: {
         ...latestState.assembly,
         trackSelectedCtgIds: [],
-        actionStatus: tAssembly(latestState, "runtime.batchDeleteDone", {
-          deletedCount,
-          total: normalized.length,
-          failedSuffix,
-        }),
+        actionStatus: mappedError
+          ? tAssembly(latestState, "runtime.batchDeleteFailedStatus", { total: normalized.length })
+          : tAssembly(latestState, "runtime.batchDeleteDone", {
+            deletedCount,
+            total: normalized.length,
+            failedSuffix: "",
+          }),
         actionError: mappedError
-          ? tAssembly(latestState, "runtime.batchDeletePartialError", { message: mappedError.userMessage })
+          ? tAssembly(latestState, "runtime.batchDeleteAtomicError", { message: mappedError.userMessage })
           : "",
       },
     });
@@ -433,6 +518,9 @@ export async function runBatchRestoreDeletedCtgs(host, store, selectedRecordIds,
   if (!state.session.workspacePath || !state.session.projectId) {
     return { restoredCount: 0, failedCount: normalized.length };
   }
+  if (state.assembly?.mainViewHistory?.inFlight === true) {
+    return { restoredCount: 0, failedCount: 0 };
+  }
   const useLocalRefresh = deps.localRefresh === true || overrides.localRefresh === true;
 
   store.setState({
@@ -448,27 +536,72 @@ export async function runBatchRestoreDeletedCtgs(host, store, selectedRecordIds,
     deps.rerender(host, store);
   }
 
-  const runAction = overrides.runAction || deps.runAction;
+  const useMainHistory = Boolean(
+    state.assembly?.selectedChrName
+    && typeof (overrides.runMainAction || deps.runMainAction) === "function",
+  );
+  const runAction = useMainHistory
+    ? (overrides.runMainAction || deps.runMainAction)
+    : (overrides.runAction || deps.runAction);
   const reloadView = overrides.reloadView || deps.loadAssemblyView;
   let restoredCount = 0;
   const failed = [];
+  if (useMainHistory) {
+    store.setState({
+      assembly: {
+        ...store.getState().assembly,
+        mainViewHistory: {
+          ...normalizeMainViewHistoryStatus(state.assembly.mainViewHistory, {
+            chrName: state.assembly.selectedChrName,
+          }),
+          inFlight: true,
+        },
+      },
+    });
+  }
   for (const deletedCtgRecordId of normalized) {
     try {
-      await runAction({
+      const result = await runAction({
         workspaceRoot: state.session.workspacePath,
         projectId: state.session.projectId,
+        ...(useMainHistory ? { chrName: state.assembly.selectedChrName } : {}),
         action: "restore-deleted-ctg",
         args: { deletedCtgRecordId },
       });
       restoredCount += 1;
-      deps.appendAuditLog(store, {
-        category: "editor",
-        action: "restore-deleted-ctg",
-        detail: deps.buildActionAuditDetail("restore-deleted-ctg", { deletedCtgRecordId }, true),
-      });
+      if (useMainHistory) {
+        store.setState({
+          assembly: {
+            ...store.getState().assembly,
+            mainViewHistory: normalizeMainViewHistoryStatus(result?.status, {
+              chrName: state.assembly.selectedChrName,
+            }),
+          },
+        });
+      } else {
+        deps.appendAuditLog(store, {
+          category: "editor",
+          action: "restore-deleted-ctg",
+          detail: deps.buildActionAuditDetail("restore-deleted-ctg", { deletedCtgRecordId }, true),
+        });
+      }
     } catch (error) {
       failed.push({ deletedCtgRecordId, error });
     }
+  }
+
+  if (useMainHistory && failed.length) {
+    store.setState({
+      assembly: {
+        ...store.getState().assembly,
+        mainViewHistory: {
+          ...normalizeMainViewHistoryStatus(store.getState().assembly.mainViewHistory, {
+            chrName: state.assembly.selectedChrName,
+          }),
+          inFlight: false,
+        },
+      },
+    });
   }
 
   await reloadView(host, store, {
@@ -506,3 +639,7 @@ export async function runBatchRestoreDeletedCtgs(host, store, selectedRecordIds,
   };
 }
 import { tAssembly } from "./i18n.js";
+import {
+  isMainViewHistoryEligibleAction,
+  normalizeMainViewHistoryStatus,
+} from "./main-view-history-state.js";

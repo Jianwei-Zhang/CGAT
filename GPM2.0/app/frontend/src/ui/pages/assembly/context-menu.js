@@ -28,7 +28,6 @@ const REQUIRED_ACTION_NAMES = [
   "clearSubviewTrackPairHiddenCtgs",
   "setSelectedPrimaryTrackCtgsHidden",
   "deleteSelectedTrackCtgs",
-  "runBatchDeleteTrackCtgs",
   "restoreSelectedDeletedCtgs",
   "canEditTrackCtg",
   "addFinalPathContigRelativeToSegment",
@@ -459,7 +458,6 @@ export function buildAssemblyContextMenuItems({
     clearSubviewTrackPairHiddenCtgs,
     setSelectedPrimaryTrackCtgsHidden,
     deleteSelectedTrackCtgs,
-    runBatchDeleteTrackCtgs,
     restoreSelectedDeletedCtgs,
     canEditTrackCtg,
     addFinalPathContigRelativeToSegment,
@@ -1062,13 +1060,12 @@ export function buildAssemblyContextMenuItems({
           });
           return;
         }
-        if (!(await confirm(tAssembly(state, "contextMenu.deleteShorterThanContigsConfirm", {
-          count: targetIds.length,
-          threshold: thresholdBp,
-        }), { host, store }))) {
-          return;
-        }
-        await runBatchDeleteTrackCtgs(host, store, targetIds);
+        await deleteSelectedTrackCtgs(host, store, targetIds, {
+          confirmMessage: tAssembly(state, "contextMenu.deleteShorterThanContigsConfirm", {
+            count: targetIds.length,
+            threshold: thresholdBp,
+          }),
+        });
       },
     });
   }
@@ -1231,13 +1228,10 @@ export function buildAssemblyContextMenuItems({
         items.push({
           label: i18n.contextMenu.deleteContig,
           run: async () => {
-            if (!(await confirm(tAssembly(state, "contextMenu.deleteContigConfirm", { assemblyCtgId: ctgId }), { host, store }))) {
-              return;
-            }
-            await applyEditorAction(host, store, {
-              action: "delete-ctg",
-              args: { assemblyCtgId: ctgId },
-              keepCurrentCtg: false,
+            await deleteSelectedTrackCtgs(host, store, [ctgId], {
+              confirmMessage: tAssembly(state, "contextMenu.deleteContigConfirm", {
+                assemblyCtgId: ctgId,
+              }),
             });
           },
         });

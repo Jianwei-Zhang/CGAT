@@ -32,6 +32,11 @@ const ROUTE_GROUPS = Object.freeze({
     ["/restore-deleted-ctg", "restoreDeletedCtg"],
     ["/list-ctg-edit-candidates", "listCtgEditCandidates"],
     ["/ctg-editor-action", "runCtgEditorAction"],
+    ["/main-view-history-status", "getMainViewHistoryStatus"],
+    ["/inspect-main-view-delete", "inspectMainViewDelete"],
+    ["/main-view-editor-action", "runMainViewEditorAction"],
+    ["/main-view-batch-delete", "runMainViewBatchDelete"],
+    ["/main-view-history-action", "executeMainViewHistoryAction"],
     ["/get-junction-inspection", "getJunctionInspection"],
   ],
   audit: [

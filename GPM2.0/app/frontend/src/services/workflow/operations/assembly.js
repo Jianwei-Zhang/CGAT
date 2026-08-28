@@ -16,6 +16,11 @@ const {
   getCtgDetail: getCtgDetailMock,
   listCtgEditCandidates: listCtgEditCandidatesMock,
   runCtgEditorAction: runCtgEditorActionMock,
+  getMainViewHistoryStatus: getMainViewHistoryStatusMock,
+  inspectMainViewDelete: inspectMainViewDeleteMock,
+  runMainViewEditorAction: runMainViewEditorActionMock,
+  runMainViewBatchDelete: runMainViewBatchDeleteMock,
+  executeMainViewHistoryAction: executeMainViewHistoryActionMock,
   getJunctionInspection: getJunctionInspectionMock,
   getTrackPairwiseEvidence: getTrackPairwiseEvidenceMock,
   appendEditAuditLog: appendEditAuditLogMock,
@@ -34,6 +39,11 @@ const {
   getCtgDetail: getCtgDetailTauri,
   listCtgEditCandidates: listCtgEditCandidatesTauri,
   runCtgEditorAction: runCtgEditorActionTauri,
+  getMainViewHistoryStatus: getMainViewHistoryStatusTauri,
+  inspectMainViewDelete: inspectMainViewDeleteTauri,
+  runMainViewEditorAction: runMainViewEditorActionTauri,
+  runMainViewBatchDelete: runMainViewBatchDeleteTauri,
+  executeMainViewHistoryAction: executeMainViewHistoryActionTauri,
   getJunctionInspection: getJunctionInspectionTauri,
   getTrackPairwiseEvidence: getTrackPairwiseEvidenceTauri,
   appendEditAuditLog: appendEditAuditLogTauri,
@@ -266,6 +276,108 @@ export async function runCtgEditorAction({ workspaceRoot, projectId, action, arg
     // fallback to mock flow
   }
   return runCtgEditorActionMock({ workspaceRoot, projectId, action: normalizedAction, args });
+}
+
+async function callMainViewBridgeOrMock(path, payload, mockOperation) {
+  try {
+    return await callDevBridge(path, payload);
+  } catch (error) {
+    if (error?.source === "dev-bridge") {
+      throw error;
+    }
+  }
+  return mockOperation(payload);
+}
+
+export async function getMainViewHistoryStatus({ workspaceRoot, projectId, chrName }) {
+  const payload = { workspaceRoot, projectId, chrName };
+  if (isTauriRuntime()) {
+    return getMainViewHistoryStatusTauri(payload);
+  }
+  return callMainViewBridgeOrMock(
+    "/api/main-view-history-status",
+    payload,
+    getMainViewHistoryStatusMock,
+  );
+}
+
+export async function inspectMainViewDelete({
+  workspaceRoot,
+  projectId,
+  chrName,
+  assemblyCtgIds,
+}) {
+  const payload = { workspaceRoot, projectId, chrName, assemblyCtgIds };
+  if (isTauriRuntime()) {
+    return inspectMainViewDeleteTauri(payload);
+  }
+  return callMainViewBridgeOrMock(
+    "/api/inspect-main-view-delete",
+    payload,
+    inspectMainViewDeleteMock,
+  );
+}
+
+export async function runMainViewEditorAction({
+  workspaceRoot,
+  projectId,
+  chrName,
+  action,
+  args,
+}) {
+  const payload = {
+    workspaceRoot,
+    projectId,
+    chrName,
+    action: normalizeSupportedCtgEditorAction(action),
+    args,
+  };
+  if (isTauriRuntime()) {
+    return runMainViewEditorActionTauri(payload);
+  }
+  return callMainViewBridgeOrMock(
+    "/api/main-view-editor-action",
+    payload,
+    runMainViewEditorActionMock,
+  );
+}
+
+export async function runMainViewBatchDelete({
+  workspaceRoot,
+  projectId,
+  chrName,
+  assemblyCtgIds,
+}) {
+  const payload = { workspaceRoot, projectId, chrName, assemblyCtgIds };
+  if (isTauriRuntime()) {
+    return runMainViewBatchDeleteTauri(payload);
+  }
+  return callMainViewBridgeOrMock(
+    "/api/main-view-batch-delete",
+    payload,
+    runMainViewBatchDeleteMock,
+  );
+}
+
+export async function executeMainViewHistoryAction({
+  workspaceRoot,
+  projectId,
+  chrName,
+  action,
+}) {
+  const normalizedAction = String(action || "").trim().toLowerCase();
+  if (!new Set(["undo", "redo", "reset"]).has(normalizedAction)) {
+    throw new Error(`unsupported main-view history action: ${normalizedAction || "<empty>"}`);
+  }
+  const payload = { workspaceRoot, projectId, chrName, action: normalizedAction };
+  if (isTauriRuntime()) {
+    return executeMainViewHistoryActionTauri(payload);
+  }
+  return callMainViewBridgeOrMock(
+    "/api/main-view-history-action",
+    payload,
+    executeMainViewHistoryActionMock,
+  );
 }
 
 export async function getJunctionInspection({

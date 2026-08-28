@@ -1,6 +1,33 @@
 import { sleep } from "../contracts.js";
 
 export function createMockAssemblyOperations(mockStore) {
+const mainHistoryByKey = new Map();
+
+function resolveMainHistory(projectId, chrName) {
+  const key = `${Number(projectId)}:${String(chrName || "").trim()}`;
+  if (!mainHistoryByKey.has(key)) {
+    mainHistoryByKey.set(key, { past: [], future: [], activeCount: 0 });
+  }
+  return mainHistoryByKey.get(key);
+}
+
+function buildMainHistoryStatus(projectId, chrName) {
+  const history = resolveMainHistory(projectId, chrName);
+  return {
+    projectId: Number(projectId),
+    referenceChrId: String(chrName || "") === "Chr02" ? 2 : 1,
+    chrName,
+    canUndo: history.past.length > 0,
+    canRedo: history.future.length > 0,
+    canReset: history.activeCount > 0,
+    undoOperation: history.past.at(-1)?.operation || null,
+    redoOperation: history.future.at(-1)?.operation || null,
+    appliedOperationCount: history.activeCount,
+    retainedOperationCount: history.past.length + history.future.length,
+    invalidated: false,
+  };
+}
+
 async function listChrViewCtgsMock({ chrName, datasetId = null }) {
   await sleep(150);
   const samples = {
@@ -415,6 +442,97 @@ async function runCtgEditorActionMock({ projectId, action, args = {} }) {
   };
 }
 
+async function getMainViewHistoryStatusMock({ projectId, chrName }) {
+  await sleep(40);
+  return buildMainHistoryStatus(projectId, chrName);
+}
+
+async function inspectMainViewDeleteMock({ assemblyCtgIds }) {
+  await sleep(40);
+  return {
+    ctgCount: Array.isArray(assemblyCtgIds) ? assemblyCtgIds.length : 0,
+    phasedItemCount: 0,
+    exportRecordCount: 0,
+    finalPathReferenceCount: 0,
+    degapReferenceCount: 0,
+  };
+}
+
+function buildMockHistoryMutation(projectId, chrName, operation, affectedCtgIds = []) {
+  return {
+    changed: true,
+    invalidated: false,
+    affectedCtgIds,
+    affectedSeqIds: [],
+    operation,
+    status: buildMainHistoryStatus(projectId, chrName),
+  };
+}
+
+async function runMainViewEditorActionMock({ projectId, chrName, action, args = {} }) {
+  await sleep(60);
+  const history = resolveMainHistory(projectId, chrName);
+  const affectedCtgId = Number(args.assemblyCtgId || 0);
+  const operation = {
+    kind: action,
+    targetCount: 1,
+    targetName: affectedCtgId > 0 ? `Ctg${affectedCtgId}` : null,
+  };
+  history.past.push({ operation, beforeActiveCount: history.activeCount });
+  history.future = [];
+  history.activeCount += 1;
+  return buildMockHistoryMutation(
+    projectId,
+    chrName,
+    operation,
+    affectedCtgId > 0 ? [affectedCtgId] : [],
+  );
+}
+
+async function runMainViewBatchDeleteMock({ projectId, chrName, assemblyCtgIds }) {
+  await sleep(60);
+  const ids = Array.isArray(assemblyCtgIds) ? assemblyCtgIds.map(Number) : [];
+  const history = resolveMainHistory(projectId, chrName);
+  const operation = { kind: "delete-ctg", targetCount: ids.length, targetName: null };
+  history.past.push({ operation, beforeActiveCount: history.activeCount });
+  history.future = [];
+  history.activeCount += 1;
+  return buildMockHistoryMutation(projectId, chrName, operation, ids);
+}
+
+async function executeMainViewHistoryActionMock({ projectId, chrName, action }) {
+  await sleep(60);
+  const history = resolveMainHistory(projectId, chrName);
+  let entry = null;
+  if (action === "undo" && history.past.length) {
+    entry = history.past.pop();
+    history.future.push(entry);
+    history.activeCount = entry.beforeActiveCount;
+  } else if (action === "redo" && history.future.length) {
+    entry = history.future.pop();
+    entry.beforeActiveCount = history.activeCount;
+    history.past.push(entry);
+    history.activeCount += entry.operation.kind === "reset" ? -history.activeCount : 1;
+  } else if (action === "reset" && history.activeCount > 0) {
+    entry = {
+      operation: { kind: "reset", targetCount: history.activeCount, targetName: chrName },
+      beforeActiveCount: history.activeCount,
+    };
+    history.past.push(entry);
+    history.future = [];
+    history.activeCount = 0;
+  }
+  const operation = entry?.operation || null;
+  return {
+    changed: Boolean(entry),
+    invalidated: false,
+    affectedCtgIds: [],
+    affectedSeqIds: [],
+    operation,
+    status: buildMainHistoryStatus(projectId, chrName),
+  };
+}
+
 async function getJunctionInspectionMock({
   projectId,
   leftAssemblyCtgId,
@@ -534,6 +652,11 @@ async function appendEditAuditLogMock({ projectId, category, action, detail }) {
     getCtgDetail: getCtgDetailMock,
     listCtgEditCandidates: listCtgEditCandidatesMock,
     runCtgEditorAction: runCtgEditorActionMock,
+    getMainViewHistoryStatus: getMainViewHistoryStatusMock,
+    inspectMainViewDelete: inspectMainViewDeleteMock,
+    runMainViewEditorAction: runMainViewEditorActionMock,
+    runMainViewBatchDelete: runMainViewBatchDeleteMock,
+    executeMainViewHistoryAction: executeMainViewHistoryActionMock,
     getJunctionInspection: getJunctionInspectionMock,
     getTrackPairwiseEvidence: getTrackPairwiseEvidenceMock,
     appendEditAuditLog: appendEditAuditLogMock,

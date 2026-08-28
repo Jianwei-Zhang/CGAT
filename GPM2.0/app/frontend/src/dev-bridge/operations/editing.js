@@ -214,6 +214,110 @@ async function runCtgEditorAction(payload) {
   };
 }
 
+function parseResultJson(output) {
+  const record = parseKeyValueLines(output.stdout);
+  const raw = String(record.result_json || "").trim();
+  if (!raw) {
+    throw new Error("missing main-view history result_json");
+  }
+  return JSON.parse(raw);
+}
+
+async function getMainViewHistoryStatus(payload) {
+  const { workspaceRoot, projectId, chrName } = payload || {};
+  requireString("workspaceRoot", workspaceRoot);
+  requireNumber("projectId", projectId);
+  requireString("chrName", chrName);
+  return parseResultJson(await runBackend([
+    "main-view-history-status",
+    workspaceRoot,
+    String(projectId),
+    chrName,
+  ]));
+}
+
+async function inspectMainViewDelete(payload) {
+  const { workspaceRoot, projectId, chrName, assemblyCtgIds } = payload || {};
+  requireString("workspaceRoot", workspaceRoot);
+  requireNumber("projectId", projectId);
+  requireString("chrName", chrName);
+  const ids = normalizePositiveIdList("assemblyCtgIds", assemblyCtgIds);
+  return parseResultJson(await runBackend([
+    "inspect-main-view-delete",
+    workspaceRoot,
+    String(projectId),
+    chrName,
+    ids.join(","),
+  ]));
+}
+
+async function runMainViewEditorAction(payload) {
+  const { workspaceRoot, projectId, chrName, action, args = {} } = payload || {};
+  requireString("workspaceRoot", workspaceRoot);
+  requireNumber("projectId", projectId);
+  requireString("chrName", chrName);
+  requireString("action", action);
+  return parseResultJson(await runBackend([
+    "run-main-view-editor-action",
+    workspaceRoot,
+    String(projectId),
+    chrName,
+    action,
+    JSON.stringify(args),
+  ]));
+}
+
+async function runMainViewBatchDelete(payload) {
+  const { workspaceRoot, projectId, chrName, assemblyCtgIds } = payload || {};
+  requireString("workspaceRoot", workspaceRoot);
+  requireNumber("projectId", projectId);
+  requireString("chrName", chrName);
+  const ids = normalizePositiveIdList("assemblyCtgIds", assemblyCtgIds);
+  return parseResultJson(await runBackend([
+    "run-main-view-batch-delete",
+    workspaceRoot,
+    String(projectId),
+    chrName,
+    ids.join(","),
+  ]));
+}
+
+async function executeMainViewHistoryAction(payload) {
+  const { workspaceRoot, projectId, chrName, action } = payload || {};
+  requireString("workspaceRoot", workspaceRoot);
+  requireNumber("projectId", projectId);
+  requireString("chrName", chrName);
+  const commands = {
+    undo: "undo-main-view-history",
+    redo: "redo-main-view-history",
+    reset: "reset-main-view-history",
+  };
+  const command = commands[String(action || "").trim().toLowerCase()];
+  if (!command) {
+    throw new Error(`unsupported main-view history action: ${action || "<empty>"}`);
+  }
+  return parseResultJson(await runBackend([
+    command,
+    workspaceRoot,
+    String(projectId),
+    chrName,
+  ]));
+}
+
+function normalizePositiveIdList(name, values) {
+  if (!Array.isArray(values) || !values.length) {
+    throw new Error(`${name} must be a non-empty array`);
+  }
+  return values.map((value) => {
+    requireNumber(name, value);
+    const normalized = Math.trunc(Number(value));
+    if (normalized <= 0) {
+      throw new Error(`${name} must contain positive integers`);
+    }
+    return normalized;
+  });
+}
+
 function buildCtgEditorCommandArgs(action, workspaceRoot, projectId, args) {
   const base = [workspaceRoot, String(projectId)];
   switch (action) {
@@ -345,5 +449,10 @@ function buildCtgEditorCommandArgs(action, workspaceRoot, projectId, args) {
     listCtgEditCandidates,
     restoreDeletedCtg,
     runCtgEditorAction,
+    getMainViewHistoryStatus,
+    inspectMainViewDelete,
+    runMainViewEditorAction,
+    runMainViewBatchDelete,
+    executeMainViewHistoryAction,
   };
 }

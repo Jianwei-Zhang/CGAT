@@ -12,6 +12,7 @@ import {
   exportFinalPathFasta,
   getCtgDetail,
   getGrtProjectView,
+  getMainViewHistoryStatus,
   importAddCtgPackage,
   listChrViewCtgs,
   listCtgEditCandidates,
@@ -22,6 +23,10 @@ import {
   listReferenceTrackMembers,
   removePhasedChrTrackItem as removePhasedChrTrackItemApi,
   runCtgEditorAction,
+  runMainViewBatchDelete,
+  runMainViewEditorAction,
+  executeMainViewHistoryAction,
+  inspectMainViewDelete,
   writeFinalPathExportBinaryFile,
   writeFinalPathExportTextFile,
 } from "../../services/workflow-api.js";
@@ -50,6 +55,9 @@ import {
 import {
   commitSubviewHistoryOperation,
 } from "./assembly/subview-history-state.js";
+import {
+  runMainViewHistoryControlAction as runMainViewHistoryControlActionImpl,
+} from "./assembly/main-view-history-runtime.js";
 import {
   compactFinalPathByDeletedPhasedTrack,
   createPhasedTrackController,
@@ -804,6 +812,8 @@ function createAssemblyPageBindingDeps(options = {}) {
     handleSubviewHistoryRestoreRollback,
     handleSubviewHistoryRollback,
     handleSubviewSwapTrackOrder,
+    runMainViewHistoryControlAction: (host, store, action) =>
+      runMainViewHistoryControlActionImpl(host, store, action, mainViewHistoryRuntimeDeps),
     handleSubviewTrackSelectionRemoval,
     handleTrackSubviewCandidateSelection,
     handleTrackSubviewTrackSelection,
@@ -890,13 +900,14 @@ function createEditorActionRuntimeAdapters(editorRuntimeDeps, impls = {}) {
         confirm: (message) => editorRuntimeDeps.confirm(message, { host, store }),
       },
     ),
-    deleteSelectedTrackCtgs: (host, store, selectedIds) => deleteSelectedTrackCtgs(
+    deleteSelectedTrackCtgs: (host, store, selectedIds, options = {}) => deleteSelectedTrackCtgs(
       host,
       store,
       selectedIds,
       batchDeleteRuntimeDeps,
       {
         confirm: (message) => batchDeleteRuntimeDeps.confirm(message, { host, store }),
+        ...options,
       },
     ),
     restoreSelectedDeletedCtgs: (host, store, selectedRecordIds, options = {}) => restoreSelectedDeletedCtgs(
@@ -931,6 +942,7 @@ const assemblyDataRuntimeDeps = {
   filterTrackDragOffsets,
   getCurrentProject,
   getGrtProjectView,
+  getMainViewHistoryStatus,
   getProjectAssemblyViewState: (args) => loadProjectAssemblyViewStateImpl(args),
   getSupportDatasetOptions,
   listChrViewCtgs,
@@ -980,10 +992,39 @@ const editorActionsRuntimeDeps = {
   rerenderAssemblyMainTab,
   rerenderBatchDeleteProgress,
   runAction: runCtgEditorAction,
+  runMainAction: runMainViewEditorAction,
+  runBatchDelete: runMainViewBatchDelete,
+  inspectMainViewDelete,
   confirm: (message, context = {}) => requestAssemblyConfirm(context.host, context.store, message),
 };
 
 const editorActionRuntimeAdapters = createEditorActionRuntimeAdapters(editorActionsRuntimeDeps);
+
+const mainViewHistoryRuntimeDeps = {
+  executeMainViewHistoryAction,
+  loadAssemblyView,
+  mapAssemblyError,
+  rerender: rerenderAssemblyMainTab,
+  setPendingTrackAutoFocusMode: (mode) => {
+    assemblyPageSession.pendingTrackAutoFocusMode = mode;
+  },
+  confirm: (message, context = {}) => requestAssemblyConfirm(context.host, context.store, message),
+  scheduleHighlightClear: (host, store, assemblyCtgId) => {
+    globalThis.setTimeout(() => {
+      const state = store.getState();
+      if (Number(state.assembly?.historyHighlightCtgId) !== Number(assemblyCtgId)) {
+        return;
+      }
+      store.setState({
+        assembly: {
+          ...state.assembly,
+          historyHighlightCtgId: null,
+        },
+      });
+      rerenderAssemblyMainTab(host, store);
+    }, 1400);
+  },
+};
 
 const degapRuntimeDeps = {
   rerender,
@@ -1087,6 +1128,7 @@ const trackHotkeyBindingDeps = {
 
 const ctgActionsRuntimeDeps = {
   applyEditorAction: editorActionRuntimeAdapters.applyEditorAction,
+  deleteSelectedTrackCtgs: editorActionRuntimeAdapters.deleteSelectedTrackCtgs,
 };
 
 const seqActionsRuntimeDeps = {

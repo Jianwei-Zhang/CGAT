@@ -30,6 +30,12 @@ use gpm_next_backend::main_view::{
     get_ctg_detail, list_chr_view_ctgs, list_ctg_edit_candidates, list_project_chromosomes,
     list_project_new_sequences, list_reference_track_members,
 };
+use gpm_next_backend::main_view_history::{
+    MainViewHistoryMutationSummary, MainViewHistoryStatus, MainViewHistoryTargetParams,
+    RunMainViewBatchDeleteParams, RunMainViewEditorActionParams, get_main_view_history_status,
+    inspect_main_view_delete, redo_main_view_history, reset_main_view_history,
+    run_main_view_batch_delete, run_main_view_editor_action, undo_main_view_history,
+};
 use gpm_next_backend::phased_assembly::{
     add_ctg_to_phased_chr_track, create_phased_chr_track, delete_phased_chr_track,
     list_phased_chr_tracks, remove_phased_chr_track_item, reorder_phased_chr_track_items,
@@ -259,6 +265,45 @@ enum Commands {
         workspace_root: PathBuf,
         project_id: i64,
         deleted_ctg_record_id: i64,
+    },
+    MainViewHistoryStatus {
+        workspace_root: PathBuf,
+        project_id: i64,
+        chr_name: String,
+    },
+    InspectMainViewDelete {
+        workspace_root: PathBuf,
+        project_id: i64,
+        chr_name: String,
+        assembly_ctg_ids: String,
+    },
+    RunMainViewEditorAction {
+        workspace_root: PathBuf,
+        project_id: i64,
+        chr_name: String,
+        action: String,
+        args_json: String,
+    },
+    RunMainViewBatchDelete {
+        workspace_root: PathBuf,
+        project_id: i64,
+        chr_name: String,
+        assembly_ctg_ids: String,
+    },
+    UndoMainViewHistory {
+        workspace_root: PathBuf,
+        project_id: i64,
+        chr_name: String,
+    },
+    RedoMainViewHistory {
+        workspace_root: PathBuf,
+        project_id: i64,
+        chr_name: String,
+    },
+    ResetMainViewHistory {
+        workspace_root: PathBuf,
+        project_id: i64,
+        chr_name: String,
     },
     ExportCtgFasta {
         workspace_root: PathBuf,

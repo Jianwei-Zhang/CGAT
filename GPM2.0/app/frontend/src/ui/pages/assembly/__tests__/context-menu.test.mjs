@@ -571,12 +571,10 @@ test("buildAssemblyContextMenuItems deletes primary track ctgs shorter than prom
 
   assert.deepEqual(calls, [
     {
-      name: "confirm",
-      args: ["将删除当前 chr 中 2 个小于 100000 bp 的主 ds contig，是否继续？"],
-    },
-    {
-      name: "runBatchDeleteTrackCtgs",
-      args: [host, store, [2, 13]],
+      name: "deleteSelectedTrackCtgs",
+      args: [host, store, [2, 13], {
+        confirmMessage: "将删除当前 chr 中 2 个小于 100000 bp 的主 ds contig，是否继续？",
+      }],
     },
   ]);
 });
@@ -627,12 +625,10 @@ test("buildAssemblyContextMenuItems waits for async shorter-than threshold input
   await pending;
   assert.deepEqual(calls, [
     {
-      name: "confirm",
-      args: ["将删除当前 chr 中 2 个小于 100000 bp 的主 ds contig，是否继续？"],
-    },
-    {
-      name: "runBatchDeleteTrackCtgs",
-      args: [host, store, [2, 13]],
+      name: "deleteSelectedTrackCtgs",
+      args: [host, store, [2, 13], {
+        confirmMessage: "将删除当前 chr 中 2 个小于 100000 bp 的主 ds contig，是否继续？",
+      }],
     },
   ]);
 });

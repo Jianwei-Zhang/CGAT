@@ -483,6 +483,13 @@ export async function loadAssemblyView(host, store, options, deps) {
       state.assembly.selectedChrName,
       keepCurrentChr,
     );
+    const mainViewHistory = selectedChrName && typeof deps.getMainViewHistoryStatus === "function"
+      ? normalizeMainViewHistoryStatus(await deps.getMainViewHistoryStatus({
+          workspaceRoot: state.session.workspacePath,
+          projectId: state.session.projectId,
+          chrName: selectedChrName,
+        }), { chrName: selectedChrName })
+      : createEmptyMainViewHistoryStatus(selectedChrName);
 
     const chrCtgResult = selectedChrName
       ? await deps.listChrViewCtgs({
@@ -643,6 +650,7 @@ export async function loadAssemblyView(host, store, options, deps) {
         chromosomes: chromosomeResult.items,
         chrPickerOpen: false,
         selectedChrName,
+        mainViewHistory,
         chrCtgs: annotatedPrimaryCtgs,
         phasedChrTracks,
         isChrPhased,
@@ -740,6 +748,8 @@ export async function selectChromosome(host, store, chrName, deps) {
       loading: true,
       chrPickerOpen: false,
       selectedChrName: chrName,
+      mainViewHistory: createEmptyMainViewHistoryStatus(chrName),
+      historyHighlightCtgId: null,
       chrCtgs: [],
       refTrackMembers: [],
       phasedChrTracks: [],
@@ -773,6 +783,13 @@ export async function selectChromosome(host, store, chrName, deps) {
       chrName,
       datasetId: primaryDatasetId,
     });
+    const mainViewHistory = typeof deps.getMainViewHistoryStatus === "function"
+      ? normalizeMainViewHistoryStatus(await deps.getMainViewHistoryStatus({
+          workspaceRoot: state.session.workspacePath,
+          projectId: state.session.projectId,
+          chrName,
+        }), { chrName })
+      : createEmptyMainViewHistoryStatus(chrName);
     const phasedChrTracks = await loadPhasedChrTracksForAssembly(deps, {
       state,
       currentProject,
@@ -838,6 +855,7 @@ export async function selectChromosome(host, store, chrName, deps) {
       {
         ...state.assembly,
         chrCtgs: annotatedPrimaryCtgs,
+        mainViewHistory,
       },
     );
     const sideData = await deps.loadSideDataForCtg(
@@ -1096,3 +1114,7 @@ import {
 import { normalizeDegapProjectState } from "./degap-state.js";
 import { tAssembly } from "./i18n.js";
 import { normalizeHiddenPrimaryCtgIdsByChr } from "./selection-state.js";
+import {
+  createEmptyMainViewHistoryStatus,
+  normalizeMainViewHistoryStatus,
+} from "./main-view-history-state.js";

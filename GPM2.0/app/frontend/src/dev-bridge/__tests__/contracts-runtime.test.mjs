@@ -129,7 +129,7 @@ test("operation factory exposes every registered operation and maps exact CLI co
     },
   });
 
-  assert.equal(Object.keys(handlers).length, 36);
+  assert.equal(Object.keys(handlers).length, 41);
   const sequences = await handlers.listNewSequences({
     workspaceRoot: "D:/workspace",
     projectId: 7,
@@ -155,4 +155,39 @@ test("operation factory exposes every registered operation and maps exact CLI co
     degapWorkspaceSettings: { threads: 8 },
     source: "workspace_db",
   });
+});
+
+test("main-view history dev operations map exact CLI contracts", async () => {
+  const calls = [];
+  const handlers = createBackendOperations({
+    async runBackend(args) {
+      calls.push(args);
+      return { stdout: 'result_json={"changed":true}', stderr: "" };
+    },
+  });
+  const target = { workspaceRoot: "D:/workspace", projectId: 7, chrName: "Chr01" };
+  await handlers.getMainViewHistoryStatus(target);
+  await handlers.inspectMainViewDelete({ ...target, assemblyCtgIds: [11, 12] });
+  await handlers.runMainViewEditorAction({
+    ...target,
+    action: "rename-ctg",
+    args: { assemblyCtgId: 11, newName: "renamed" },
+  });
+  await handlers.runMainViewBatchDelete({ ...target, assemblyCtgIds: [11, 12] });
+  await handlers.executeMainViewHistoryAction({ ...target, action: "redo" });
+
+  assert.deepEqual(calls, [
+    ["main-view-history-status", "D:/workspace", "7", "Chr01"],
+    ["inspect-main-view-delete", "D:/workspace", "7", "Chr01", "11,12"],
+    [
+      "run-main-view-editor-action",
+      "D:/workspace",
+      "7",
+      "Chr01",
+      "rename-ctg",
+      '{"assemblyCtgId":11,"newName":"renamed"}',
+    ],
+    ["run-main-view-batch-delete", "D:/workspace", "7", "Chr01", "11,12"],
+    ["redo-main-view-history", "D:/workspace", "7", "Chr01"],
+  ]);
 });

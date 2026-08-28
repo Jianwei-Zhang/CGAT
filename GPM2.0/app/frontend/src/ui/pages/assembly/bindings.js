@@ -443,6 +443,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     handleSubviewHistoryRestoreRollback,
     handleSubviewHistoryRollback,
     handleSubviewSwapTrackOrder,
+    runMainViewHistoryControlAction = async () => false,
     handleSubviewTrackSelectionRemoval,
     handleTrackSubviewCandidateSelection,
     handleTrackSubviewTrackSelection,
@@ -509,6 +510,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   const trackLabelTargets = queryHostAll("[data-track-label-role][data-track-label-selectable='1']");
   const subviewRemoveTargets = queryHostAll("[data-subview-remove-type][data-subview-remove-role]");
   const subviewActionTargets = queryHostAll("[data-subview-action]");
+  const mainHistoryActionTargets = queryHostAll("[data-main-history-action]");
   const newSequenceActionButtons = queryHostAll(
     "[data-new-seq-action][data-assembly-seq-id]",
   );
@@ -1296,6 +1298,19 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
       if (action === "history-reset") {
         handleSubviewHistoryReset(host, store);
       }
+    });
+  });
+  mainHistoryActionTargets.forEach((target) => {
+    target.addEventListener("click", async (event) => {
+      event.preventDefault();
+      if (target.disabled) {
+        return;
+      }
+      await runMainViewHistoryControlAction(
+        host,
+        store,
+        String(target.dataset.mainHistoryAction || "").trim(),
+      );
     });
   });
   subviewPairwiseCancelButtons.forEach((button) => {

@@ -527,7 +527,169 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             println!("restored_member_count={}", summary.restored_member_count);
             println!("refreshed_chr_count={}", summary.refreshed_chr_count);
         }
+        Commands::MainViewHistoryStatus {
+            workspace_root,
+            project_id,
+            chr_name,
+        } => {
+            let status = get_main_view_history_status(
+                &workspace_root.join("project.sqlite"),
+                &MainViewHistoryTargetParams {
+                    project_id,
+                    chr_name,
+                },
+            )?;
+            print_main_view_history_status(&status);
+        }
+        Commands::InspectMainViewDelete {
+            workspace_root,
+            project_id,
+            chr_name,
+            assembly_ctg_ids,
+        } => {
+            let impact = inspect_main_view_delete(
+                &workspace_root.join("project.sqlite"),
+                &RunMainViewBatchDeleteParams {
+                    project_id,
+                    chr_name,
+                    assembly_ctg_ids: parse_positive_id_csv(&assembly_ctg_ids)?,
+                },
+            )?;
+            println!(
+                "result_json={}",
+                serde_json::json!({
+                    "ctgCount": impact.ctg_count,
+                    "phasedItemCount": impact.phased_item_count,
+                    "exportRecordCount": impact.export_record_count,
+                    "finalPathReferenceCount": impact.final_path_reference_count,
+                    "degapReferenceCount": impact.degap_reference_count,
+                })
+            );
+        }
+        Commands::RunMainViewEditorAction {
+            workspace_root,
+            project_id,
+            chr_name,
+            action,
+            args_json,
+        } => {
+            let summary = run_main_view_editor_action(
+                &workspace_root.join("project.sqlite"),
+                &RunMainViewEditorActionParams {
+                    project_id,
+                    chr_name,
+                    action,
+                    args: serde_json::from_str(&args_json)?,
+                },
+            )?;
+            print_main_view_history_mutation(&summary);
+        }
+        Commands::RunMainViewBatchDelete {
+            workspace_root,
+            project_id,
+            chr_name,
+            assembly_ctg_ids,
+        } => {
+            let summary = run_main_view_batch_delete(
+                &workspace_root.join("project.sqlite"),
+                &RunMainViewBatchDeleteParams {
+                    project_id,
+                    chr_name,
+                    assembly_ctg_ids: parse_positive_id_csv(&assembly_ctg_ids)?,
+                },
+            )?;
+            print_main_view_history_mutation(&summary);
+        }
+        Commands::UndoMainViewHistory {
+            workspace_root,
+            project_id,
+            chr_name,
+        } => {
+            let summary = undo_main_view_history(
+                &workspace_root.join("project.sqlite"),
+                &MainViewHistoryTargetParams {
+                    project_id,
+                    chr_name,
+                },
+            )?;
+            print_main_view_history_mutation(&summary);
+        }
+        Commands::RedoMainViewHistory {
+            workspace_root,
+            project_id,
+            chr_name,
+        } => {
+            let summary = redo_main_view_history(
+                &workspace_root.join("project.sqlite"),
+                &MainViewHistoryTargetParams {
+                    project_id,
+                    chr_name,
+                },
+            )?;
+            print_main_view_history_mutation(&summary);
+        }
+        Commands::ResetMainViewHistory {
+            workspace_root,
+            project_id,
+            chr_name,
+        } => {
+            let summary = reset_main_view_history(
+                &workspace_root.join("project.sqlite"),
+                &MainViewHistoryTargetParams {
+                    project_id,
+                    chr_name,
+                },
+            )?;
+            print_main_view_history_mutation(&summary);
+        }
         command => return Ok(Some(command)),
     }
     Ok(None)
+}
+
+fn parse_positive_id_csv(value: &str) -> Result<Vec<i64>> {
+    let ids = value
+        .split(',')
+        .map(str::trim)
+        .filter(|segment| !segment.is_empty())
+        .map(|segment| segment.parse::<i64>().map_err(anyhow::Error::from))
+        .collect::<Result<Vec<_>>>()?;
+    if ids.is_empty() || ids.iter().any(|id| *id <= 0) {
+        anyhow::bail!("assembly_ctg_ids must contain positive integers");
+    }
+    Ok(ids)
+}
+
+fn print_main_view_history_status(status: &MainViewHistoryStatus) {
+    println!("result_json={}", main_view_history_status_json(status));
+}
+
+fn print_main_view_history_mutation(summary: &MainViewHistoryMutationSummary) {
+    println!(
+        "result_json={}",
+        serde_json::json!({
+            "changed": summary.changed,
+            "invalidated": summary.invalidated,
+            "affectedCtgIds": summary.affected_ctg_ids,
+            "affectedSeqIds": summary.affected_seq_ids,
+            "operation": summary.descriptor,
+            "status": main_view_history_status_json(&summary.status),
+        })
+    );
+}
+
+fn main_view_history_status_json(status: &MainViewHistoryStatus) -> serde_json::Value {
+    serde_json::json!({
+        "projectId": status.project_id,
+        "referenceChrId": status.reference_chr_id,
+        "chrName": status.chr_name,
+        "canUndo": status.can_undo,
+        "canRedo": status.can_redo,
+        "canReset": status.can_reset,
+        "undoOperation": status.undo_operation,
+        "redoOperation": status.redo_operation,
+        "appliedOperationCount": status.applied_operation_count,
+        "retainedOperationCount": status.retained_operation_count,
+        "invalidated": status.invalidated,
+    })
 }

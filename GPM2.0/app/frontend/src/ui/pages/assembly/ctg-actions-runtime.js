@@ -1,5 +1,6 @@
 const REQUIRED_CTG_ACTION_RUNTIME_DEPS = [
   "applyEditorAction",
+  "deleteSelectedTrackCtgs",
 ];
 
 function assertCtgActionRuntimeDeps(deps) {
@@ -63,13 +64,11 @@ export function bindCtgActions(host, store, deps) {
     if (!assemblyCtgId) {
       return;
     }
-    if (!(await confirm(tAssembly(store.getState(), "contextMenu.deleteContigConfirm", { assemblyCtgId })))) {
-      return;
-    }
-    await deps.applyEditorAction(host, store, {
-      action: "delete-ctg",
-      args: { assemblyCtgId },
-      keepCurrentCtg: false,
+    await deps.deleteSelectedTrackCtgs(host, store, [assemblyCtgId], {
+      confirm: (message) => confirm(message),
+      confirmMessage: tAssembly(store.getState(), "contextMenu.deleteContigConfirm", {
+        assemblyCtgId,
+      }),
     });
   });
 

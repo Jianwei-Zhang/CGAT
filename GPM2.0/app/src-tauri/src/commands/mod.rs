@@ -50,6 +50,17 @@ use gpm_next_backend::main_view::{
     list_project_new_sequences as backend_list_project_new_sequences,
     list_reference_track_members as backend_list_reference_track_members,
 };
+use gpm_next_backend::main_view_history::{
+    MainViewHistoryMutationSummary, MainViewHistoryStatus, MainViewHistoryTargetParams,
+    RunMainViewBatchDeleteParams, RunMainViewEditorActionParams,
+    get_main_view_history_status as backend_get_main_view_history_status,
+    inspect_main_view_delete as backend_inspect_main_view_delete,
+    redo_main_view_history as backend_redo_main_view_history,
+    reset_main_view_history as backend_reset_main_view_history,
+    run_main_view_batch_delete as backend_run_main_view_batch_delete,
+    run_main_view_editor_action as backend_run_main_view_editor_action,
+    undo_main_view_history as backend_undo_main_view_history,
+};
 use gpm_next_backend::phased_assembly::{
     PhasedChrTrack, PhasedChrTrackItem,
     add_ctg_to_phased_chr_track as backend_add_ctg_to_phased_chr_track,
@@ -129,6 +140,33 @@ pub struct UpdateProjectAssemblyViewStateCommandRequest {
     final_path_view_mode: String,
     final_path_by_chr: Value,
     degap_project_state: Value,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MainViewHistoryTargetCommandRequest {
+    workspace_root: String,
+    project_id: i64,
+    chr_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunMainViewEditorActionCommandRequest {
+    workspace_root: String,
+    project_id: i64,
+    chr_name: String,
+    action: String,
+    args: Value,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MainViewBatchDeleteCommandRequest {
+    workspace_root: String,
+    project_id: i64,
+    chr_name: String,
+    assembly_ctg_ids: Vec<i64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -805,6 +843,38 @@ mod tests {
         assert_eq!(view_state_request.project_id, 9);
         assert_eq!(view_state_request.final_path_view_mode, "table");
         assert!(view_state_request.track_view.is_object());
+
+        let history_target_request: MainViewHistoryTargetCommandRequest =
+            serde_json::from_value(json!({
+                "workspaceRoot": "D:\\Desktop\\GPM\\ws1",
+                "projectId": 9,
+                "chrName": "Chr01",
+            }))
+            .expect("decode main-view history target request");
+        assert_eq!(history_target_request.project_id, 9);
+        assert_eq!(history_target_request.chr_name, "Chr01");
+
+        let history_editor_request: RunMainViewEditorActionCommandRequest =
+            serde_json::from_value(json!({
+                "workspaceRoot": "D:\\Desktop\\GPM\\ws1",
+                "projectId": 9,
+                "chrName": "Chr01",
+                "action": "rename-ctg",
+                "args": { "assemblyCtgId": 17, "newName": "ctg-renamed" },
+            }))
+            .expect("decode main-view editor action request");
+        assert_eq!(history_editor_request.action, "rename-ctg");
+        assert_eq!(history_editor_request.args["assemblyCtgId"], 17);
+
+        let history_batch_request: MainViewBatchDeleteCommandRequest =
+            serde_json::from_value(json!({
+                "workspaceRoot": "D:\\Desktop\\GPM\\ws1",
+                "projectId": 9,
+                "chrName": "Chr01",
+                "assemblyCtgIds": [17, 18],
+            }))
+            .expect("decode main-view batch delete request");
+        assert_eq!(history_batch_request.assembly_ctg_ids, vec![17, 18]);
     }
 
     #[test]

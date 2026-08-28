@@ -54,7 +54,12 @@ test("component stylesheet tree keeps unique animation owners", () => {
   const stylesheet = readStylesheetTree(entryUrl);
   const keyframes = [...stylesheet.matchAll(/@keyframes\s+([\w-]+)/g)].map((match) => match[1]);
 
-  assert.deepEqual(keyframes.sort(), ["pipeline-spin", "subview-pairwise-spin"]);
+  assert.deepEqual(keyframes.sort(), [
+    "main-view-history-chip-pulse",
+    "main-view-history-track-pulse",
+    "pipeline-spin",
+    "subview-pairwise-spin",
+  ]);
   assert.equal(new Set(keyframes).size, keyframes.length);
 });
 

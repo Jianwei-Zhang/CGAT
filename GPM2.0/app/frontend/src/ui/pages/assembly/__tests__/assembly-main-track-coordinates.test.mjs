@@ -72,7 +72,7 @@ test("assembly main view renders chr-length reference span, all guides, sparse r
     }),
   );
 
-  const mainTrackSvg = html.match(/<svg[\s\S]*?<\/svg>/)?.[0] || "";
+  const mainTrackSvg = html.match(/<svg class="assembly-track-svg"[\s\S]*?<\/svg>/)?.[0] || "";
   const tickGuideCount = (mainTrackSvg.match(/track-tick-guide/g) || []).length;
   const tickLabelCount = (mainTrackSvg.match(/track-tick-label/g) || []).length;
   const bandCount = (html.match(/track-collinearity-band/g) || []).length;
@@ -91,6 +91,46 @@ test("assembly main view renders chr-length reference span, all guides, sparse r
   assert.doesNotMatch(html, /<text class="track-tick-label"[^>]*>50k<\/text>/);
   assert.doesNotMatch(html, /<text class="track-tick-label"[^>]*>100k<\/text>/);
   assert.equal(bandCount, 1);
+});
+
+test("main-view history controls stay grouped after MAPQ and expose independent disabled states", () => {
+  const html = renderAssemblyPage(
+    createState({
+      assembly: {
+        chrCtgs: [{
+          assemblyCtgId: 2,
+          name: "ctg-alpha",
+          assignedChrName: "Chr01",
+          memberCount: 1,
+          totalLength: 900,
+          anchorStart: 100,
+        }],
+        chromosomes: [{ chrName: "Chr01", chrOrder: 1, ctgCount: 1, placedBp: 900 }],
+        membersCardCollapsed: false,
+        historyHighlightCtgId: 2,
+        mainViewHistory: {
+          chrName: "Chr01",
+          canUndo: true,
+          canRedo: false,
+          canReset: true,
+          undoOperation: { kind: "delete-ctg", targetCount: 3, targetName: "Chr01" },
+          redoOperation: null,
+          appliedOperationCount: 4,
+          retainedOperationCount: 4,
+          inFlight: false,
+        },
+      },
+    }),
+  );
+
+  const mapqIndex = html.indexOf("assembly-track-mapq");
+  const historyIndex = html.indexOf("main-view-history-controls");
+  assert.ok(mapqIndex >= 0 && historyIndex > mapqIndex);
+  assert.match(html, /data-main-history-action="undo"[^>]*title="回退：删除 3 个 ctg"/);
+  assert.match(html, /data-main-history-action="redo"[^>]*disabled/);
+  assert.match(html, /data-main-history-action="reset"[^>]*title="重置：撤销 Chr01 当前 4 项可逆编辑"/);
+  assert.equal((html.match(/data-main-history-action=/g) || []).length, 3);
+  assert.ok((html.match(/is-history-highlighted/g) || []).length >= 2);
 });
 
 test("full-chr ruler ticks stop at ref_chr end even when ctg extends beyond chr length", () => {

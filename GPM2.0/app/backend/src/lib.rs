@@ -9,6 +9,7 @@ pub mod grt_package;
 pub mod importer;
 pub mod junction_inspection;
 pub mod main_view;
+pub mod main_view_history;
 pub mod phased_assembly;
 pub mod project_initializer;
 pub mod reference_segments;
