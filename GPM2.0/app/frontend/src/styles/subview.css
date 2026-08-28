@@ -143,6 +143,9 @@
   display: flex;
   justify-content: flex-start;
   align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
   gap: 8px;
   flex-wrap: wrap;
 }
@@ -462,5 +465,9 @@
   .subview-panel-guide {
     flex-basis: 100%;
     min-width: 0;
+  }
+
+  .subview-candidate-row {
+    flex-basis: 100%;
   }
 }

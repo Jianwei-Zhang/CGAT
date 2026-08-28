@@ -270,7 +270,7 @@ test("track tick label css does not force middle anchor", () => {
   assert.doesNotMatch(css, /\.track-tick-label\s*\{[^}]*text-anchor:\s*middle;/);
 });
 
-test("subview title and guide share a responsive row while candidates keep left flow", () => {
+test("subview title guide and candidates share one responsive first row", () => {
   const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
@@ -279,7 +279,8 @@ test("subview title and guide share a responsive row while candidates keep left 
   assert.match(css, /\.subview-panel-title-row\s*\{[^}]*justify-content:\s*flex-start;/);
   assert.match(css, /\.subview-panel-guide\s*\{[^}]*flex:\s*1 1 560px;/);
   assert.match(css, /@media \(max-width:\s*900px\)[\s\S]*\.subview-panel-guide\s*\{[^}]*flex-basis:\s*100%;/);
-  assert.match(css, /\.subview-candidate-row\s*\{[^}]*justify-content:\s*flex-start;/);
+  assert.match(css, /\.subview-candidate-row\s*\{[^}]*justify-content:\s*flex-start;[^}]*flex:\s*0 1 auto;[^}]*min-width:\s*0;/);
+  assert.match(css, /@media \(max-width:\s*900px\)[\s\S]*\.subview-candidate-row\s*\{[^}]*flex-basis:\s*100%;/);
 });
 
 test("subview selection panel hides history controls before a pair enters", () => {

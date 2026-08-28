@@ -350,9 +350,9 @@ assembly.subviewHistoryByKey[pairKey] = {
   unavailable action visible but disabled; an empty `forward` stack disables
   `→` instead of removing it. All three actions use consistent decorative SVG
   icons, localized tooltips, and accessible names.
-- On wide layouts, render the `Subview` title and entry guide on one responsive
-  row. On narrow layouts, wrap the guide below the title and keep candidate
-  badges on their own row.
+- On wide layouts, render the `Subview` title, entry guide, and selected-object
+  badges in one responsive row. On narrow layouts, wrap the guide below the
+  title and give the candidate badge group its own full-width line.
 
 ### 4. Validation & Error Matrix
 
