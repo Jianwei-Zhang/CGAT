@@ -61,9 +61,11 @@
 
 .subview-history-controls {
   display: inline-flex;
-  align-items: center;
+  align-items: stretch;
   flex: 0 0 auto;
   gap: 0;
+  box-sizing: border-box;
+  height: 30px;
   overflow: hidden;
   border: 1px solid #b9b9b9;
   background: #fff;
@@ -71,7 +73,12 @@
 }
 
 .subview-history-controls .button {
-  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
   border: 0;
 }
 
@@ -89,9 +96,18 @@
 }
 
 .subview-history-reset {
-  min-width: 30px;
-  font-size: 17px;
-  line-height: 1;
+  min-width: 34px;
+  padding: 0 6px;
+}
+
+.subview-history-reset-icon {
+  display: block;
+  width: 19px;
+  height: 19px;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .subview-candidate-row {

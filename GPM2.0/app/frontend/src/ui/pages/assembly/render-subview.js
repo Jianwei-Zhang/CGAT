@@ -751,7 +751,7 @@ function renderSubviewHistoryControls(history, i18n) {
       <button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-rollback" aria-label="${escapeAttr(rollbackLabel)}" title="${escapeAttr(rollbackLabel)}" ${resolvedHistory.canRollback ? "" : "disabled"}>←</button>
       ${resolvedHistory.canRestoreRollback ? `<button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-restore-rollback" aria-label="${escapeAttr(restoreRollbackLabel)}" title="${escapeAttr(restoreRollbackLabel)}">→</button>` : ""}
       <span class="subview-history-separator" aria-hidden="true"></span>
-      <button type="button" class="button ghost tiny subview-history-reset" data-subview-action="history-reset" aria-label="${escapeAttr(i18n.subview.historyResetAria)}" title="${escapeAttr(i18n.subview.historyResetAria)}" ${resolvedHistory.canReset ? "" : "disabled"}><span aria-hidden="true">↺</span></button>
+      <button type="button" class="button ghost tiny subview-history-reset" data-subview-action="history-reset" aria-label="${escapeAttr(i18n.subview.historyResetAria)}" title="${escapeAttr(i18n.subview.historyResetAria)}" ${resolvedHistory.canReset ? "" : "disabled"}><svg class="subview-history-reset-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M4 12a8 8 0 1 0 2.3-5.7L4 8"></path><path d="M4 4v4h4"></path></svg></button>
     </div>
   `;
 }
