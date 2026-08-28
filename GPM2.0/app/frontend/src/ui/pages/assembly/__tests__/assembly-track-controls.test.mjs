@@ -291,7 +291,7 @@ test("subview selection panel hides history controls before a pair enters", () =
   assert.doesNotMatch(html, /data-subview-action="history-reset"/);
 });
 
-test("subview history controls follow MAPQ as one icon group and show the right arrow only after a rollback", () => {
+test("subview history controls follow MAPQ as one icon group and disable unavailable actions", () => {
   const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
@@ -319,18 +319,24 @@ test("subview history controls follow MAPQ as one icon group and show the right 
   let html = renderAssemblyPage({ ...state, assembly });
   const initialMapqIndex = html.indexOf('id="subview-track-mapq"');
   const initialHistoryIndex = html.indexOf('class="subview-history-controls"');
+  const initialLeftIndex = html.indexOf('data-subview-action="history-rollback"');
+  const initialRightIndex = html.indexOf('data-subview-action="history-restore-rollback"');
+  const initialResetIndex = html.indexOf('data-subview-action="history-reset"');
   assert.ok(initialMapqIndex >= 0 && initialHistoryIndex > initialMapqIndex);
-  assert.match(html, /data-subview-action="history-rollback"[^>]*disabled[^>]*>←<\/button>/);
-  assert.doesNotMatch(html, /data-subview-action="history-restore-rollback"/);
+  assert.ok(initialLeftIndex >= 0 && initialRightIndex > initialLeftIndex && initialResetIndex > initialRightIndex);
+  assert.match(html, /data-subview-action="history-rollback"[^>]*disabled[^>]*><svg class="subview-history-icon subview-history-arrow-icon"[^>]*>[\s\S]*<\/svg><\/button>/);
+  assert.match(html, /data-subview-action="history-restore-rollback"[^>]*aria-label="暂无可撤销的回退操作"[^>]*disabled[^>]*><svg class="subview-history-icon subview-history-arrow-icon"[^>]*>[\s\S]*<\/svg><\/button>/);
   assert.match(
     html,
-    /data-subview-action="history-reset"[^>]*aria-label="重置当前 Subview 为系统默认状态"[^>]*disabled[^>]*><svg class="subview-history-reset-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">[\s\S]*<\/svg><\/button>/,
+    /data-subview-action="history-reset"[^>]*aria-label="重置当前 Subview 为系统默认状态"[^>]*disabled[^>]*><svg class="subview-history-icon subview-history-reset-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false">[\s\S]*<\/svg><\/button>/,
   );
   assert.doesNotMatch(html, />重置<\/button>/);
-  assert.doesNotMatch(html, />↺<\/span>/);
+  assert.doesNotMatch(html, />[←→↺]<\/button>/);
   assert.match(css, /\.subview-history-controls\s*\{[^}]*box-sizing:\s*border-box;[^}]*height:\s*30px;/);
-  assert.match(css, /\.subview-history-controls \.button\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;/);
-  assert.match(css, /\.subview-history-reset-icon\s*\{[^}]*width:\s*19px;[^}]*height:\s*19px;[^}]*stroke-width:\s*2\.4;/);
+  assert.match(css, /\.subview-history-controls \.button\s*\{[^}]*height:\s*100%;[^}]*width:\s*30px;[^}]*min-width:\s*30px;/);
+  assert.match(css, /\.subview-history-icon\s*\{[^}]*width:\s*16px;[^}]*height:\s*16px;/);
+  assert.match(css, /\.subview-history-reset-icon\s*\{[^}]*stroke-width:\s*2;/);
+  assert.match(css, /\.subview-history-controls \.button:disabled\s*\{[^}]*color:\s*#a5abb2;[^}]*cursor:\s*default;/);
 
   assembly = commitSubviewHistoryOperation(assembly, {
     nextSubview: {
@@ -350,8 +356,10 @@ test("subview history controls follow MAPQ as one icon group and show the right 
   const resetIndex = html.indexOf('data-subview-action="history-reset"');
   assert.ok(leftIndex >= 0 && rightIndex > leftIndex);
   assert.ok(separatorIndex > rightIndex && resetIndex > separatorIndex);
+  const restoreButton = html.match(/<button[^>]*data-subview-action="history-restore-rollback"[^>]*>/)?.[0] || "";
+  assert.doesNotMatch(restoreButton, /\bdisabled\b/);
   assert.match(html, /class="subview-history-separator" aria-hidden="true"><\/span>/);
-  assert.match(html, /data-subview-action="history-reset"[^>]*><svg class="subview-history-reset-icon"[^>]*>[\s\S]*<\/svg><\/button>/);
+  assert.match(html, /data-subview-action="history-reset"[^>]*><svg class="subview-history-icon subview-history-reset-icon"[^>]*>[\s\S]*<\/svg><\/button>/);
   assert.match(html, /撤销最近一次回退：恢复“翻转 ctg”后的状态/);
 });
 

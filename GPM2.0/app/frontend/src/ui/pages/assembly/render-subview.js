@@ -745,13 +745,13 @@ function renderSubviewHistoryControls(history, i18n) {
         resolvedHistory.restoreRollbackOperation,
         i18n,
       )
-    : "";
+    : i18n.subview.historyRestoreRollbackUnavailableLabel;
   return `
     <div class="subview-history-controls" role="group" aria-label="${escapeAttr(i18n.subview.historyControlsAria)}">
-      <button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-rollback" aria-label="${escapeAttr(rollbackLabel)}" title="${escapeAttr(rollbackLabel)}" ${resolvedHistory.canRollback ? "" : "disabled"}>←</button>
-      ${resolvedHistory.canRestoreRollback ? `<button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-restore-rollback" aria-label="${escapeAttr(restoreRollbackLabel)}" title="${escapeAttr(restoreRollbackLabel)}">→</button>` : ""}
+      <button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-rollback" aria-label="${escapeAttr(rollbackLabel)}" title="${escapeAttr(rollbackLabel)}" ${resolvedHistory.canRollback ? "" : "disabled"}><svg class="subview-history-icon subview-history-arrow-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path d="M8 5 3 10l5 5"></path><path d="M3 10h14"></path></svg></button>
+      <button type="button" class="button ghost tiny subview-history-arrow" data-subview-action="history-restore-rollback" aria-label="${escapeAttr(restoreRollbackLabel)}" title="${escapeAttr(restoreRollbackLabel)}" ${resolvedHistory.canRestoreRollback ? "" : "disabled"}><svg class="subview-history-icon subview-history-arrow-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path d="m12 5 5 5-5 5"></path><path d="M3 10h14"></path></svg></button>
       <span class="subview-history-separator" aria-hidden="true"></span>
-      <button type="button" class="button ghost tiny subview-history-reset" data-subview-action="history-reset" aria-label="${escapeAttr(i18n.subview.historyResetAria)}" title="${escapeAttr(i18n.subview.historyResetAria)}" ${resolvedHistory.canReset ? "" : "disabled"}><svg class="subview-history-reset-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M4 12a8 8 0 1 0 2.3-5.7L4 8"></path><path d="M4 4v4h4"></path></svg></button>
+      <button type="button" class="button ghost tiny subview-history-reset" data-subview-action="history-reset" aria-label="${escapeAttr(i18n.subview.historyResetAria)}" title="${escapeAttr(i18n.subview.historyResetAria)}" ${resolvedHistory.canReset ? "" : "disabled"}><svg class="subview-history-icon subview-history-reset-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path d="M3.5 10a6.5 6.5 0 1 0 1.9-4.6L3.5 7.3"></path><path d="M3.5 3.5v3.8h3.8"></path></svg></button>
     </div>
   `;
 }
