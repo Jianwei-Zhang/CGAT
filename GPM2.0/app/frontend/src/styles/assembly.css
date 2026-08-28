@@ -234,36 +234,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-  flex-wrap: nowrap;
-}
-
-.assembly-track-panel-head > strong {
-  flex: 0 0 auto;
-  white-space: nowrap;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .assembly-track-panel-actions {
   display: flex;
-  flex: 1 1 auto;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  min-width: 0;
-  flex-wrap: nowrap;
-}
-
-.assembly-track-panel-quick-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-.assembly-track-panel-quick-actions:empty {
-  display: none;
+  flex-wrap: wrap;
 }
 
 .grt-result-switch {
@@ -717,8 +697,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  min-width: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .main-view-history-controls {
@@ -1584,39 +1563,6 @@
   background: #ececec;
 }
 
-@media (max-width: 2020px) and (min-width: 1201px) {
-  .assembly-track-panel-head {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    column-gap: 12px;
-    row-gap: 8px;
-  }
-
-  .assembly-track-panel-head > strong {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .assembly-track-panel-actions {
-    display: contents;
-  }
-
-  .assembly-track-panel-quick-actions {
-    grid-column: 2;
-    grid-row: 1;
-    justify-self: end;
-  }
-
-  .assembly-track-inline-controls {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-content: flex-start;
-    width: 100%;
-    flex-wrap: wrap;
-  }
-}
-
 @media (max-width: 1200px) {
   .assembly-toolbar,
   .assembly-toolbar-left,
@@ -1670,26 +1616,9 @@
     align-items: stretch;
   }
 
-  .assembly-track-panel-head {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .assembly-track-panel-actions {
-    width: 100%;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .assembly-track-panel-quick-actions {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
   .assembly-track-inline-controls {
     justify-content: flex-start;
     width: 100%;
-    flex-wrap: wrap;
   }
 
   .assembly-track-inline-field {
