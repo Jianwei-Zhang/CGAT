@@ -16,7 +16,6 @@ import {
   normalizeSubviewTrackPairHiddenCtgs,
   normalizeSubviewTrackPairSelectionCtgs,
   normalizeSubviewTrackSummary,
-  resolveSubviewTrackSummaryCtgs,
   swapSubviewSummaryOrder,
 } from "./subview-state.js";
 
@@ -138,15 +137,7 @@ export function normalizeSubviewHistoryByKey(value) {
   );
 }
 
-function buildAssemblyCtgIdSet(values) {
-  return new Set(
-    (Array.isArray(values) ? values : [])
-      .map((value) => normalizeSupportDatasetId(value?.assemblyCtgId ?? value?.contigId))
-      .filter(Boolean),
-  );
-}
-
-function resolveSnapshotTrackContext(summary, pools, topKey) {
+function resolveSnapshotPairContext(summary, topKey) {
   const orderKeys = buildSubviewSummaryOrderKeys(summary);
   if (!topKey || (topKey !== orderKeys.topKey && topKey !== orderKeys.bottomKey)) {
     return null;
@@ -160,8 +151,8 @@ function resolveSnapshotTrackContext(summary, pools, topKey) {
     const currentTopIds = new Set([topId]);
     const currentBottomIds = new Set([bottomId]);
     return topKey === orderKeys.topKey
-      ? { topIds: currentTopIds, bottomIds: currentBottomIds, trackRoleIds: new Map() }
-      : { topIds: currentBottomIds, bottomIds: currentTopIds, trackRoleIds: new Map() };
+      ? { topIds: currentTopIds, bottomIds: currentBottomIds }
+      : { topIds: currentBottomIds, bottomIds: currentTopIds };
   }
   if (String(summary?.mode || "") !== "track-pair") {
     return null;
@@ -171,29 +162,16 @@ function resolveSnapshotTrackContext(summary, pools, topKey) {
   if (!currentTopTrack || !currentBottomTrack) {
     return null;
   }
-  const currentTopIds = buildAssemblyCtgIdSet(
-    resolveSubviewTrackSummaryCtgs(currentTopTrack, pools),
-  );
-  const currentBottomIds = buildAssemblyCtgIdSet(
-    resolveSubviewTrackSummaryCtgs(currentBottomTrack, pools),
-  );
-  const trackRoleIds = new Map();
-  [
-    [currentTopTrack.role, currentTopIds],
-    [currentBottomTrack.role, currentBottomIds],
-  ].forEach(([role, ids]) => {
-    const current = trackRoleIds.get(role) || new Set();
-    ids.forEach((id) => current.add(id));
-    trackRoleIds.set(role, current);
-  });
-  return topKey === orderKeys.topKey
-    ? { topIds: currentTopIds, bottomIds: currentBottomIds, trackRoleIds }
-    : { topIds: currentBottomIds, bottomIds: currentTopIds, trackRoleIds };
+  // Resolved members are applicability state, not pair identity. A member can
+  // disappear under current filters and later return with the same stable ID.
+  return {
+    trackRoles: new Set([currentTopTrack.role, currentBottomTrack.role]),
+  };
 }
 
-function isSubviewEditableSnapshotCompatible(snapshot, summary, pools) {
+function isSubviewEditableSnapshotCompatible(snapshot, summary) {
   const normalized = normalizeSubviewEditableSnapshot(snapshot);
-  const context = resolveSnapshotTrackContext(summary, pools, normalized.topKey);
+  const context = resolveSnapshotPairContext(summary, normalized.topKey);
   if (!context) {
     return false;
   }
@@ -201,10 +179,10 @@ function isSubviewEditableSnapshotCompatible(snapshot, summary, pools) {
   if (!isTrackPair && normalized.trackPairHiddenCtgs.length) {
     return false;
   }
-  if (isTrackPair && normalized.trackPairHiddenCtgs.some((entry) =>
-    !context.trackRoleIds.get(entry.trackRole)?.has(entry.contigId)
-  )) {
-    return false;
+  if (isTrackPair) {
+    return normalized.trackPairHiddenCtgs.every((entry) =>
+      context.trackRoles.has(entry.trackRole)
+    );
   }
   const allowedBySlot = {
     top: context.topIds,
@@ -226,7 +204,7 @@ function isSubviewEditableSnapshotCompatible(snapshot, summary, pools) {
   );
 }
 
-export function isSubviewHistoryRecordCompatible(record, { summary, pools = {} } = {}) {
+export function isSubviewHistoryRecordCompatible(record, { summary } = {}) {
   const normalized = normalizeSubviewHistoryRecord(record, record?.pairKey);
   if (!normalized || !summary) {
     return false;
@@ -238,7 +216,7 @@ export function isSubviewHistoryRecordCompatible(record, { summary, pools = {} }
     ...normalized.forward.map((entry) => entry.snapshot),
   ];
   return snapshots.every((snapshot) =>
-    isSubviewEditableSnapshotCompatible(snapshot, summary, pools)
+    isSubviewEditableSnapshotCompatible(snapshot, summary)
   );
 }
 

@@ -65,14 +65,12 @@ export function createSubviewSelectionController({
       subview,
       subviewTrackDragOffsets,
     };
-    const pools = buildSubviewTrackPairPoolsFromAssembly(assembly);
     return activateSubviewHistory(
       assembly,
       {
         stateOrLocale: state,
         validateRecord: (record) => isSubviewHistoryRecordCompatible(record, {
           summary: subview.summary,
-          pools,
         }),
       },
     );

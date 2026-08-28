@@ -334,14 +334,29 @@ assembly.subviewHistoryByKey[pairKey] = {
 - Do not record selection, hover, scroll, zoom, filters, evidence loading,
   loading/error state, or DOM state.
 - Reset clears local hidden contigs, flips, original/offset anchors, and drag
-  offsets, restores first-entered ordering, preserves browsing state, and is
-  itself rollback-able.
+  offsets, including edits that are currently dormant because a track member is
+  filtered out; restores first-entered ordering, preserves browsing state, and
+  is itself rollback-able.
 - Persist Subview history and related assembly view state in one backend
   transaction.
 - On pair re-entry, restore `current`, `past`, and `forward` after validating
-  contig/track references against current project data.
-- If one pair is malformed or stale, replace only that pair with a clean
-  default, keep all other valid records, and show localized feedback.
+  the record shape and the normalized pair identity.
+- For `track-pair`, current main-view filters and resolved T1/T2 membership are
+  applicability inputs, not history identity or validity inputs. Keep one
+  continuous record for the same project, chromosome, and unordered track pair
+  when filter changes add or temporarily remove ctgs.
+- Newly resolved track-pair ctgs enter without local edits. Keep edits for
+  temporarily absent ctgs dormant in every snapshot and reactivate them when
+  the same stable identities return; back, forward, and reset continue to move
+  the complete snapshots while some entries are dormant.
+- Do not add current filter values or a resolved-member signature to `pairKey`,
+  and do not invalidate a track-pair record merely because one saved ctg is
+  absent from the current filtered pool.
+- If one pair has a malformed key/version/snapshot, references a track role
+  outside that pair, or no longer matches the selected track identities,
+  replace only that pair with a clean default, keep all other valid records,
+  and show localized feedback. Two-contig histories still require their exact
+  endpoint identities.
 - UI terminology is fixed: `←` means “回退上一步操作”; `→` means
   “撤销最近一次回退操作”. The right arrow restores exactly one rollback.
 - Do not render the history control group before a pair successfully enters
@@ -371,7 +386,10 @@ assembly.subviewHistoryByKey[pairKey] = {
 | New edit after rollback | Clear `forward`; disable `→` |
 | `past + forward` reaches 51 | Drop only the oldest step for that pair |
 | Pair key/version/snapshot invalid | Reset only that pair and persist its replacement |
-| Snapshot references removed contig/track | Treat only the current pair as stale |
+| Same T1/T2 resolves additional ctgs | Keep history; additional ctgs start unedited |
+| Saved track-pair ctg is absent from the current filtered pool | Keep its edits dormant without invalidating history |
+| Dormant ctg returns with the same identity | Reactivate its saved edits and history |
+| Saved hidden state references a track role outside T1/T2 | Treat only the current pair as stale |
 | Persistence fails | Roll back assembly view-state and history-row writes together |
 
 ### 5. Good/Base/Bad Cases
@@ -380,15 +398,19 @@ assembly.subviewHistoryByKey[pairKey] = {
   click `→` once; only the latest rollback is restored and state survives a
   project reopen.
 - Base: enter a pair for the first time; all three actions are visible and
-  disabled.
+  disabled. Re-enter the same T1/T2 after a filter adds ctgs; existing edits are
+  restored and the new ctgs are unedited.
 - Bad: key history by current top/bottom order, keep an unbounded global stack,
-  include pairwise evidence in snapshots, or use `→` to restore all rollbacks.
+  include pairwise evidence or resolved membership in snapshots, invalidate a
+  pair because a filter temporarily removes one member, or use `→` to restore
+  all rollbacks.
 
 ### 6. Tests Required
 
 - State-machine tests cover unordered identity, one-step backward/forward,
-  forward clearing, reset rollback, the 50-step limit, and pair-only
-  invalidation.
+  forward clearing, reset rollback, the 50-step limit, pair-only invalidation,
+  track-pair member expansion, dormant-member preservation/reactivation, and
+  back/forward/reset while dormant edits exist.
 - UI/binding tests cover the fixed `← → | ↺` action order after MAPQ, pre-entry
   group hiding, per-action disabled states, responsive title/guide structure,
   localized tooltip semantics, and dispatch of all three actions.
