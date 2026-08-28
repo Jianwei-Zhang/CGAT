@@ -151,42 +151,106 @@
 }
 
 .subview-candidate-badge {
-  border: 1px solid #c2c2c2;
-  background: #f1f1f1;
-  color: #333;
-  font-size: 12px;
-  padding: 4px 8px;
   display: inline-flex;
   align-items: center;
+  box-sizing: border-box;
+  height: 30px;
+  max-width: min(320px, 100%);
+  overflow: hidden;
+  border: 1px solid #b8c2cc;
+  border-radius: 4px;
+  background: linear-gradient(#fff, #f1f4f6);
+  box-shadow: 0 1px 1px rgba(34, 48, 61, 0.06);
+  color: #293540;
+  font-size: 12px;
+  padding: 0 2px 0 8px;
   gap: 6px;
+  white-space: nowrap;
+  transition: border-color 100ms ease, background-color 100ms ease, box-shadow 100ms ease;
 }
 
-.subview-candidate-badge strong {
-  display: inline-grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  border: 1px solid #8f8f8f;
-  background: #fff;
+.subview-candidate-badge:hover {
+  border-color: #91a4b6;
+  background: #f6f9fc;
+  box-shadow: 0 1px 2px rgba(34, 48, 61, 0.1);
+}
+
+.subview-candidate-slot {
+  flex: 0 0 auto;
+  min-width: 20px;
+  border: 0;
+  background: transparent;
+  color: #51677b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+
+.subview-candidate-content {
+  display: inline-flex;
+  align-items: baseline;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.subview-candidate-name {
+  min-width: 0;
+  overflow: hidden;
+  color: #293540;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subview-candidate-meta {
+  flex: 0 0 auto;
+  color: #6f7a84;
+  font-size: 11px;
+  font-weight: 400;
 }
 
 .subview-candidate-remove {
-  width: 18px;
-  height: 18px;
-  border: 1px solid #b8b8b8;
-  background: #fff;
-  color: #555;
-  display: inline-grid;
-  place-items: center;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 26px;
+  align-self: stretch;
+  width: 26px;
+  min-width: 26px;
+  margin-left: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: #717c86;
   cursor: pointer;
   padding: 0;
 }
 
 .subview-candidate-remove:hover {
-  background: #f2f5f8;
-  color: #1f3855;
-  border-color: #95abc2;
+  background: #f7e8e8;
+  color: #8f2f2f;
+}
+
+.subview-candidate-remove:active {
+  background: #eed4d4;
+  color: #792323;
+}
+
+.subview-candidate-remove:focus-visible {
+  outline: 2px solid #4f82b5;
+  outline-offset: -3px;
+}
+
+.subview-candidate-remove-icon {
+  display: block;
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 
 .subview-alignment-card {

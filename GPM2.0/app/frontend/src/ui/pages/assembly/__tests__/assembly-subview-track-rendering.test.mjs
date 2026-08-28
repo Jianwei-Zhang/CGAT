@@ -121,6 +121,9 @@ test("subview track-pair mode renders only mirror support ctg containers when su
 
   assert.match(html, /data-subview-track-pair-role="support"[^>]*data-subview-track-pair-contig-id="330"/);
   assert.doesNotMatch(html, /data-subview-track-pair-role="support"[^>]*data-subview-track-pair-contig-id="30"/);
+  assert.match(html, /class="subview-candidate-badge"[^>]*><strong class="subview-candidate-slot">T1<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">/);
+  assert.match(html, /class="subview-candidate-badge"[^>]*><strong class="subview-candidate-slot">T2<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">/);
+  assert.match(html, /data-subview-remove-type="track"[^>]*><svg class="subview-candidate-remove-icon"[^>]*>/);
 });
 
 test("subview track-pair mother support does not include mirror ctgs from other datasets", () => {

@@ -281,6 +281,11 @@ test("subview title guide and candidates share one responsive first row", () => 
   assert.match(css, /@media \(max-width:\s*900px\)[\s\S]*\.subview-panel-guide\s*\{[^}]*flex-basis:\s*100%;/);
   assert.match(css, /\.subview-candidate-row\s*\{[^}]*justify-content:\s*flex-start;[^}]*flex:\s*0 1 auto;[^}]*min-width:\s*0;/);
   assert.match(css, /@media \(max-width:\s*900px\)[\s\S]*\.subview-candidate-row\s*\{[^}]*flex-basis:\s*100%;/);
+  assert.match(css, /\.subview-candidate-badge\s*\{[^}]*height:\s*30px;[^}]*overflow:\s*hidden;[^}]*border:\s*1px solid #b8c2cc;[^}]*border-radius:\s*4px;/);
+  assert.match(css, /\.subview-candidate-slot\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/);
+  assert.match(css, /\.subview-candidate-remove\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/);
+  assert.match(css, /\.subview-candidate-remove:hover\s*\{[^}]*background:\s*#f7e8e8;[^}]*color:\s*#8f2f2f;/);
+  assert.match(css, /\.subview-candidate-remove:focus-visible\s*\{[^}]*outline:\s*2px solid #4f82b5;/);
 });
 
 test("subview selection panel hides history controls before a pair enters", () => {
@@ -846,14 +851,15 @@ test("assembly visible ctg labels strip chr suffix while hover titles keep full 
   assert.match(html, />Ctg1617 \(-\)<\/text>/);
   assert.match(html, /<strong>ptg000009l<\/strong>/);
   assert.match(html, /title="ptg000009l@Chr22"/);
-  assert.match(html, /class="subview-candidate-badge" title="ptg000009l@Chr22"><strong>A<\/strong>ptg000009l/);
-  assert.match(html, /class="subview-candidate-badge" title="Ctg1617@Chr22"><strong>B<\/strong>Ctg1617/);
+  assert.match(html, /class="subview-candidate-badge" title="ptg000009l@Chr22"><strong class="subview-candidate-slot">A<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">ptg000009l<\/span><span class="subview-candidate-meta">/);
+  assert.match(html, /class="subview-candidate-badge" title="Ctg1617@Chr22"><strong class="subview-candidate-slot">B<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">Ctg1617<\/span><span class="subview-candidate-meta">/);
+  assert.match(html, /class="subview-candidate-remove"[^>]*aria-label="移除该候选"[^>]*><svg class="subview-candidate-remove-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">/);
   assert.match(html, /<title>ptg000009l@Chr22 \| start=/);
   assert.match(html, /<title>Ctg1617@Chr22 \| start=/);
   assert.doesNotMatch(html, />ptg000009l@Chr22 \(\+\)<\/text>/);
   assert.doesNotMatch(html, />Ctg1617@Chr22 \(-\)<\/text>/);
   assert.doesNotMatch(html, /<strong>ptg000009l@Chr22<\/strong>/);
-  assert.doesNotMatch(html, /<strong>A<\/strong>ptg000009l@Chr22/);
+  assert.doesNotMatch(html, /class="subview-candidate-name">ptg000009l@Chr22<\/span>/);
 });
 
 test("main track hides labels that do not fit inside bars and keeps hover titles", () => {

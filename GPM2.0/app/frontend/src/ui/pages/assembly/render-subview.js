@@ -683,15 +683,14 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
       const phasedRemoveAttrs = selection.role === "phased"
         ? ` data-subview-remove-phased-track-id="${Number(selection.phasedTrackId || 0)}" data-subview-remove-phased-track-item-id="${Number(selection.phasedTrackItemId || 0)}" data-subview-remove-phased-haplotype-key="${escapeAttr(selection.phasedHaplotypeKey || "")}"`
         : "";
-      return `<span class="subview-candidate-badge" title="${escapeAttr(ctgName)}"><strong>${slot}</strong>${escapeHtml(visibleCtgName)} · ${escapeHtml(roleLabel)}<button type="button" class="subview-candidate-remove" data-subview-remove-type="candidate" data-subview-remove-role="${escapeAttr(selection.role)}" data-subview-remove-contig-id="${selection.contigId}"${phasedRemoveAttrs} aria-label="${escapeAttr(i18n.subview.removeCandidateAria)}" title="${escapeAttr(i18n.subview.removeCandidateAria)}">&times;</button></span>`;
+      return `<span class="subview-candidate-badge" title="${escapeAttr(ctgName)}"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(visibleCtgName)}</span><span class="subview-candidate-meta"> · ${escapeHtml(roleLabel)}</span></span><button type="button" class="subview-candidate-remove" data-subview-remove-type="candidate" data-subview-remove-role="${escapeAttr(selection.role)}" data-subview-remove-contig-id="${selection.contigId}"${phasedRemoveAttrs} aria-label="${escapeAttr(i18n.subview.removeCandidateAria)}" title="${escapeAttr(i18n.subview.removeCandidateAria)}"><svg class="subview-candidate-remove-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false"><path d="m4 4 8 8"></path><path d="m12 4-8 8"></path></svg></button></span>`;
     })
     .join("");
   const trackBadges = trackSelections
     .map((selection, index) => {
       const slot = index === 0 ? "T1" : "T2";
-      return `<span class="subview-candidate-badge"><strong>${slot}</strong>${escapeHtml(
-        resolveSubviewTrackSelectionLabel(selection, supportContext, i18n),
-      )}<button type="button" class="subview-candidate-remove" data-subview-remove-type="track" data-subview-remove-role="${escapeAttr(selection.role)}" data-subview-remove-source="${escapeAttr(selection.source || "mother")}" data-subview-remove-dataset-id="${Number(selection.datasetId || 0)}" data-subview-remove-is-mirror="${selection.isMirror ? "1" : "0"}" aria-label="${escapeAttr(i18n.subview.removeTrackCandidateAria)}" title="${escapeAttr(i18n.subview.removeTrackCandidateAria)}">&times;</button></span>`;
+      const trackLabel = resolveSubviewTrackSelectionLabel(selection, supportContext, i18n);
+      return `<span class="subview-candidate-badge" title="${escapeAttr(trackLabel)}"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(trackLabel)}</span></span><button type="button" class="subview-candidate-remove" data-subview-remove-type="track" data-subview-remove-role="${escapeAttr(selection.role)}" data-subview-remove-source="${escapeAttr(selection.source || "mother")}" data-subview-remove-dataset-id="${Number(selection.datasetId || 0)}" data-subview-remove-is-mirror="${selection.isMirror ? "1" : "0"}" aria-label="${escapeAttr(i18n.subview.removeTrackCandidateAria)}" title="${escapeAttr(i18n.subview.removeTrackCandidateAria)}"><svg class="subview-candidate-remove-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false"><path d="m4 4 8 8"></path><path d="m12 4-8 8"></path></svg></button></span>`;
     })
     .join("");
   const allBadges = `${candidateBadges}${trackBadges}`;

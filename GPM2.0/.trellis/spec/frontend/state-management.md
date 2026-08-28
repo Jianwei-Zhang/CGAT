@@ -353,6 +353,11 @@ assembly.subviewHistoryByKey[pairKey] = {
 - On wide layouts, render the `Subview` title, entry guide, and selected-object
   badges in one responsive row. On narrow layouts, wrap the guide below the
   title and give the candidate badge group its own full-width line.
+- Render each selected object as one integrated removable tag surface. The slot
+  marker and trailing remove affordance must not draw nested borders or solid
+  button surfaces; only the remove control is interactive, and long primary
+  labels may truncate while their full contig name remains available by
+  tooltip.
 
 ### 4. Validation & Error Matrix
 
