@@ -39,6 +39,10 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   assert.ok(html.indexOf("最小刻度单位") < html.indexOf("最多可展示数"));
   assert.ok(html.indexOf("最多可展示数") < html.indexOf("比对长度"));
   assert.ok(html.indexOf("比对长度") < html.indexOf("MAPQ"));
+  const titleIndex = html.indexOf("主比对视图");
+  const quickActionsIndex = html.indexOf("assembly-track-panel-quick-actions");
+  const inlineControlsIndex = html.indexOf("assembly-track-inline-controls");
+  assert.ok(titleIndex >= 0 && quickActionsIndex > titleIndex && inlineControlsIndex > quickActionsIndex);
 
   assert.match(
     html,
@@ -126,6 +130,25 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   assert.doesNotMatch(html, /<datalist id="assembly-track-alignment-length-options">/);
   assert.doesNotMatch(html, /<datalist id="assembly-track-mapq-options">/);
   assert.doesNotMatch(html, /<datalist id="assembly-track-support-ds-ctg-len-options">/);
+});
+
+test("main-view controls use explicit wide, medium, and narrow header layouts", () => {
+  const css = readStylesheetTree(
+    new URL("../../../../styles/components.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(css, /\.assembly-track-panel-head\s*\{[^}]*flex-wrap:\s*nowrap;/);
+  assert.match(css, /\.assembly-track-panel-actions\s*\{[^}]*flex:\s*1 1 auto;[^}]*flex-wrap:\s*nowrap;/);
+  assert.match(css, /\.assembly-track-panel-quick-actions\s*\{[^}]*display:\s*inline-flex;[^}]*white-space:\s*nowrap;/);
+  assert.match(
+    css,
+    /@media \(max-width:\s*2020px\) and \(min-width:\s*1201px\)[\s\S]*\.assembly-track-panel-head\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;[\s\S]*\.assembly-track-inline-controls\s*\{[^}]*grid-column:\s*1 \/ -1;[^}]*justify-content:\s*flex-start;[^}]*flex-wrap:\s*wrap;/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width:\s*1200px\)[\s\S]*\.assembly-track-panel-actions\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*stretch;[\s\S]*\.assembly-track-panel-quick-actions\s*\{[^}]*justify-content:\s*flex-start;[^}]*flex-wrap:\s*wrap;/,
+  );
 });
 
 test("support ds ctg len rules dialog renders close in header and actions in footer", () => {

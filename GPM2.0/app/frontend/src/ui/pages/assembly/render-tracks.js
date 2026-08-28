@@ -2419,8 +2419,7 @@ function renderAssemblyTracks({
       <div class="assembly-track-panel-head" data-grt-result-card="main" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
         <strong>${escapeHtml(i18n.page.primaryAlignmentViewSingleCardTitle)}</strong>
         <div class="assembly-track-panel-actions">
-          ${grtResultSwitch}
-          ${createPhasedTrackButton}
+          <div class="assembly-track-panel-quick-actions">${grtResultSwitch}${createPhasedTrackButton}</div>
           ${inlineControls}
         </div>
       </div>
