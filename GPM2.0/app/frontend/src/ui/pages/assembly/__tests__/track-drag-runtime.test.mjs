@@ -329,12 +329,22 @@ test("bindSubviewTrackContigDrag previews during move and applies pending subvie
 
     windowStub.listeners.get("pointermove")?.({ clientX: 17 });
     windowStub.flushAnimationFrame();
-    assert.deepEqual(calls[1], ["preview", { slot: "top", contigId: 12, offsetPx: 12 }]);
+    assert.deepEqual(calls[1], ["preview", {
+      slot: "top",
+      contigId: 12,
+      offsetPx: 12,
+      pointerClientX: 17,
+    }]);
     windowStub.listeners.get("pointerup")?.();
 
     assert.deepEqual(calls, [
       ["prevent"],
-      ["preview", { slot: "top", contigId: 12, offsetPx: 12 }],
+      ["preview", {
+        slot: "top",
+        contigId: 12,
+        offsetPx: 12,
+        pointerClientX: 17,
+      }],
       ["clear-preview"],
       ["apply", { slot: "top", contigId: 12, offsetBp: 19 }],
       ["persist"],
@@ -394,7 +404,7 @@ test("bindSubviewTrackContigDrag excludes preview auto-scroll from the persisted
         return value;
       },
       previewSubviewTrackContigDrag(_host, payload) {
-        previews.push(payload.offsetPx);
+        previews.push(payload);
         scrollEl.scrollLeft = 43;
         return { scrollLeft: 43 };
       },
@@ -424,9 +434,110 @@ test("bindSubviewTrackContigDrag excludes preview auto-scroll from the persisted
     windowStub.flushAnimationFrame();
     windowStub.listeners.get("pointerup")?.();
 
-    assert.deepEqual(previews, [12, 12]);
+    assert.deepEqual(previews, [
+      { slot: "top", contigId: 12, offsetPx: 12, pointerClientX: 17 },
+      { slot: "top", contigId: 12, offsetPx: 12, pointerClientX: 17 },
+    ]);
     assert.equal(appliedOffsetBp, 19);
     assert.equal(scrollEl.scrollLeft, 43);
+  } finally {
+    globalThis.window = originalWindow;
+  }
+});
+
+test("bindSubviewTrackContigDrag preserves the preview world viewport after rerender", () => {
+  const originalWindow = globalThis.window;
+  const windowStub = createWindowStub();
+  globalThis.window = windowStub;
+
+  try {
+    const host = createHost();
+    const store = createStore({
+      assembly: {
+        activeTab: "assembly",
+        subviewTrackDragOffsets: [],
+      },
+    });
+    const initialScrollEl = {
+      scrollLeft: 0,
+      dataset: {
+        subviewDomainSpanBp: "100",
+        subviewInnerWidth: "100",
+        subviewViewboxMinX: "0",
+      },
+    };
+    let liveScrollEl = initialScrollEl;
+    const trackNode = {
+      getAttribute(name) {
+        if (name === "data-subview-track-slot") return "top";
+        if (name === "data-subview-contig-id") return "12";
+        return null;
+      },
+      closest(selector) {
+        return selector === ".assembly-track-scroll[data-track-role='subview']"
+          ? initialScrollEl
+          : null;
+      },
+    };
+    const target = {
+      closest(selector) {
+        return selector === "[data-subview-contig-id][data-subview-track-slot]"
+          ? trackNode
+          : null;
+      },
+    };
+    let appliedOffsetBp = null;
+    bindSubviewTrackContigDrag(host, store, {
+      clearSubviewTrackDragPreview() {},
+      applySubviewTrackDragOffset(_host, _store, payload) {
+        appliedOffsetBp = payload.offsetBp;
+        liveScrollEl = {
+          scrollLeft: 0,
+          dataset: {
+            subviewDomainSpanBp: "100",
+            subviewInnerWidth: "100",
+            subviewViewboxMinX: "-30",
+          },
+        };
+      },
+      convertTrackOffsetPxToBp(value) {
+        return value;
+      },
+      previewSubviewTrackContigDrag(_host, payload) {
+        assert.equal(payload.pointerClientX, 17);
+        initialScrollEl.scrollLeft = 20;
+        return {
+          scrollLeft: 20,
+          viewboxMinX: -20,
+          viewportLeftX: 0,
+        };
+      },
+      resolveActiveTrackScrollElement() {
+        return liveScrollEl;
+      },
+      resolveSubviewTrackDragOffsetBp() {
+        return 7;
+      },
+      roundTrackMetric(value) {
+        return value;
+      },
+      persistSubviewTrackDragOffsets() {},
+    });
+
+    host.listeners.get("pointerdown")?.({
+      button: 0,
+      clientX: 5,
+      ctrlKey: false,
+      metaKey: false,
+      preventDefault() {},
+      target,
+    });
+    windowStub.listeners.get("pointermove")?.({ clientX: 17 });
+    windowStub.flushAnimationFrame();
+    windowStub.listeners.get("pointerup")?.();
+
+    assert.equal(appliedOffsetBp, 19);
+    assert.equal(liveScrollEl.scrollLeft, 30);
   } finally {
     globalThis.window = originalWindow;
   }

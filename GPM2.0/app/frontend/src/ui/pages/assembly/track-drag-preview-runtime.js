@@ -1,3 +1,5 @@
+import { resolveTrackScrollLeftForViewboxShift } from "./track-viewport.js";
+
 const MAIN_TRACK_PREVIEW_CLASS = "is-track-drag-preview";
 const SUBVIEW_TRACK_PREVIEW_CLASS = "is-subview-track-drag-preview";
 const ORIGINAL_POINTS_ATTR = "data-drag-preview-original-points";
@@ -16,6 +18,8 @@ const ORIGINAL_WIDTH_ATTR = "data-drag-preview-original-width";
 const ORIGINAL_VIEW_BOX_ATTR = "data-drag-preview-original-view-box";
 const ORIGINAL_STYLE_WIDTH_ATTR = "data-drag-preview-original-style-width";
 const ORIGINAL_SUBVIEW_VIEWBOX_MIN_X_ATTR = "data-drag-preview-original-subview-viewbox-min-x";
+const PREVIEW_ENVELOPE_MIN_X_ATTR = "data-drag-preview-envelope-min-x";
+const PREVIEW_ENVELOPE_MAX_X_ATTR = "data-drag-preview-envelope-max-x";
 const MISSING_ATTRIBUTE_VALUE = "__gpm_missing_attribute__";
 
 function parsePolygonPoints(pointsText) {
@@ -213,6 +217,7 @@ function restoreSubviewPreviewEnvelope(host) {
   envelopeNodes.forEach((node) => {
     restorePreviewAttribute(node, ORIGINAL_WIDTH_ATTR, "width");
     restorePreviewAttribute(node, ORIGINAL_VIEW_BOX_ATTR, "viewBox");
+    restorePreviewAttribute(node, ORIGINAL_X_ATTR, "x");
     restorePreviewAttribute(
       node,
       ORIGINAL_SUBVIEW_VIEWBOX_MIN_X_ATTR,
@@ -222,11 +227,13 @@ function restoreSubviewPreviewEnvelope(host) {
       node.style.width = node.getAttribute?.(ORIGINAL_STYLE_WIDTH_ATTR) || "";
       node.removeAttribute?.(ORIGINAL_STYLE_WIDTH_ATTR);
     }
+    node.removeAttribute?.(PREVIEW_ENVELOPE_MIN_X_ATTR);
+    node.removeAttribute?.(PREVIEW_ENVELOPE_MAX_X_ATTR);
     node.removeAttribute?.(PREVIEW_ENVELOPE_ATTR);
   });
 }
 
-function applySubviewPreviewEnvelope(groupNodes, offsetPx) {
+function applySubviewPreviewEnvelope(groupNodes, offsetPx, { pointerClientX = null } = {}) {
   const normalizedOffset = Number(offsetPx || 0);
   if (!Number.isFinite(normalizedOffset)) {
     return undefined;
@@ -249,10 +256,17 @@ function applySubviewPreviewEnvelope(groupNodes, offsetPx) {
       scrollNode.querySelectorAll?.(
         "[data-track-band-canvas-scene-kind='subview-ctg']",
       ) || [],
+    )[0] || Array.from(
+      scrollNode.querySelectorAll?.(
+        "[data-track-band-canvas-scene-kind='subview-track-pair']",
+      ) || [],
     )[0] || null;
     const svgNode = Array.from(
       scrollNode.querySelectorAll?.(".subview-track-svg") || [],
     )[0] || null;
+    const clipRectNodes = Array.from(
+      scrollNode.querySelectorAll?.("[data-subview-band-clip-rect='1']") || [],
+    );
     if (!canvasLayer || !svgNode) {
       return;
     }
@@ -274,6 +288,21 @@ function applySubviewPreviewEnvelope(groupNodes, offsetPx) {
       return;
     }
     const [baseMinX, baseMinY, baseWidth, baseHeight] = originalViewBox;
+    const baseMaxX = baseMinX + baseWidth;
+    const storedEnvelopeMinXAttr = scrollNode.getAttribute?.(PREVIEW_ENVELOPE_MIN_X_ATTR);
+    const storedEnvelopeMaxXAttr = scrollNode.getAttribute?.(PREVIEW_ENVELOPE_MAX_X_ATTR);
+    const storedEnvelopeMinX = storedEnvelopeMinXAttr === null
+      ? Number.NaN
+      : Number(storedEnvelopeMinXAttr);
+    const storedEnvelopeMaxX = storedEnvelopeMaxXAttr === null
+      ? Number.NaN
+      : Number(storedEnvelopeMaxXAttr);
+    const previousMinX = Number.isFinite(storedEnvelopeMinX)
+      ? storedEnvelopeMinX
+      : baseMinX;
+    const previousMaxX = Number.isFinite(storedEnvelopeMaxX)
+      ? storedEnvelopeMaxX
+      : baseMaxX;
     const previewBounds = groups
       .map((groupNode) => {
         const x = Number(groupNode.getAttribute?.("data-subview-rect-x"));
@@ -292,9 +321,8 @@ function applySubviewPreviewEnvelope(groupNodes, offsetPx) {
     }
     const previewLeft = Math.min(...previewBounds.map((bounds) => bounds.left));
     const previewRight = Math.max(...previewBounds.map((bounds) => bounds.right));
-    const baseMaxX = baseMinX + baseWidth;
-    const nextMinX = Math.floor(Math.min(baseMinX, previewLeft));
-    const nextMaxX = Math.ceil(Math.max(baseMaxX, previewRight));
+    const nextMinX = Math.floor(Math.min(previousMinX, baseMinX, previewLeft));
+    const nextMaxX = Math.ceil(Math.max(previousMaxX, baseMaxX, previewRight));
     const nextWidth = Math.max(baseWidth, nextMaxX - nextMinX);
     const formattedWidth = formatPreviewMetric(nextWidth);
     const formattedMinX = formatPreviewMetric(nextMinX);
@@ -304,25 +332,53 @@ function applySubviewPreviewEnvelope(groupNodes, offsetPx) {
       `${formattedMinX} ${formatPreviewMetric(baseMinY)} ${formattedWidth} ${formatPreviewMetric(baseHeight)}`,
     );
     canvasLayer.style.width = `${formattedWidth}px`;
+    clipRectNodes.forEach((clipRectNode) => {
+      rememberPreviewAttribute(clipRectNode, ORIGINAL_X_ATTR, "x");
+      rememberPreviewAttribute(clipRectNode, ORIGINAL_WIDTH_ATTR, "width");
+      clipRectNode.setAttribute?.("x", formattedMinX);
+      clipRectNode.setAttribute?.("width", formattedWidth);
+      clipRectNode.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
+    });
     scrollNode.setAttribute?.("data-subview-viewbox-min-x", formattedMinX);
+    scrollNode.setAttribute?.(PREVIEW_ENVELOPE_MIN_X_ATTR, formattedMinX);
+    scrollNode.setAttribute?.(PREVIEW_ENVELOPE_MAX_X_ATTR, formatPreviewMetric(nextMaxX));
     svgNode.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
     canvasLayer.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
     scrollNode.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
 
     const viewportWidth = Math.max(0, Number(scrollNode.clientWidth || 0));
     const currentScrollLeft = Math.max(0, Number(scrollNode.scrollLeft || 0));
-    let nextScrollLeft = currentScrollLeft;
-    if (viewportWidth > 0) {
-      const previewContentLeft = previewLeft - nextMinX;
-      const previewContentRight = previewRight - nextMinX;
-      if (previewContentLeft < currentScrollLeft) {
-        nextScrollLeft = Math.max(0, Math.floor(previewContentLeft));
-      } else if (previewContentRight > currentScrollLeft + viewportWidth) {
-        nextScrollLeft = Math.max(0, Math.ceil(previewContentRight - viewportWidth));
+    let nextScrollLeft = resolveTrackScrollLeftForViewboxShift(
+      currentScrollLeft,
+      previousMinX,
+      nextMinX,
+    );
+    if (
+      viewportWidth > 0
+      && pointerClientX !== null
+      && pointerClientX !== ""
+      && Number.isFinite(Number(pointerClientX))
+    ) {
+      const viewportRect = scrollNode.getBoundingClientRect?.();
+      const viewportLeft = Number(viewportRect?.left);
+      const viewportRight = Number(viewportRect?.right);
+      const pointerX = Number(pointerClientX);
+      if (Number.isFinite(viewportLeft) && Number.isFinite(viewportRight)) {
+        if (pointerX < viewportLeft) {
+          nextScrollLeft -= viewportLeft - pointerX;
+        } else if (pointerX > viewportRight) {
+          nextScrollLeft += pointerX - viewportRight;
+        }
       }
     }
+    const maxScrollLeft = Math.max(0, nextWidth - viewportWidth);
+    nextScrollLeft = Math.max(0, Math.min(maxScrollLeft, Math.round(nextScrollLeft)));
     scrollNode.scrollLeft = nextScrollLeft;
-    previewState = { scrollLeft: nextScrollLeft };
+    previewState = {
+      scrollLeft: nextScrollLeft,
+      viewboxMinX: nextMinX,
+      viewportLeftX: nextMinX + nextScrollLeft,
+    };
   });
   return previewState;
 }
@@ -447,7 +503,10 @@ export function clearTrackDragPreview(host) {
   clearPreviewNodes(host, MAIN_TRACK_PREVIEW_CLASS);
 }
 
-export function previewSubviewTrackContigDrag(host, { slot, contigId, offsetPx }) {
+export function previewSubviewTrackContigDrag(
+  host,
+  { slot, contigId, offsetPx, pointerClientX = null },
+) {
   if (!host) {
     return;
   }
@@ -482,7 +541,7 @@ export function previewSubviewTrackContigDrag(host, { slot, contigId, offsetPx }
     : `[data-subview-bottom-contig-id="${contigId}"]`;
   const bandNodes = host.querySelectorAll?.(bandSelector) || [];
   bandNodes.forEach((bandNode) => applyBandPreview(bandNode, edgeIndexes, offsetPx));
-  return applySubviewPreviewEnvelope(groupNodes, offsetPx);
+  return applySubviewPreviewEnvelope(groupNodes, offsetPx, { pointerClientX });
 }
 
 export function clearSubviewTrackDragPreview(host) {

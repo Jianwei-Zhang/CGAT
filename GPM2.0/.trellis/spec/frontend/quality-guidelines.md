@@ -454,38 +454,43 @@ Resolve dependent junctions by stable entry identity, update every geometry cons
 ### Subview Contig Drag Overflow Envelope
 
 #### 1. Scope / Trigger
-- Applies to horizontal contig dragging in two-contig `subview-ctg` mode.
+- Applies to horizontal contig dragging in both two-contig `subview-ctg` mode and track-pair `subview-track` mode.
 - Trigger: either contig crosses the left or right edge of the original bp domain during preview or after its offset is persisted.
-- `subview-track` keeps its existing track-pair layout unless that mode receives a separate, explicit overflow requirement.
 
 #### 2. Contracts
 - `data-subview-inner-width` and the ruler width represent the base bp scale. Persisted drag offsets are converted between px and bp with this base width; an expanded render width must never change that conversion.
 - Manual Subview offsets are user-owned positions and must not be clamped back into the base domain. Derive `renderViewBoxMinX` from the leftmost contig edge and derive render width from the union of the base domain and both contig bounds.
 - SVG, band canvas, labels, anchors, and GRT overlays must use the same derived overflow envelope. Expanding the envelope changes only scrollable presentation geometry, not contig lengths, hit coordinates, ruler endpoints, or persisted offsets.
-- Live drag preview must temporarily expand the `subview-ctg` SVG/canvas envelope before auto-scrolling toward the exposed edge, then restore all temporary dimensions and attributes during cleanup.
-- Preview-driven auto-scroll is presentation state, not pointer movement. Exclude that programmatic scroll delta when calculating the next drag offset; after synchronous rerender, restore the preview scroll position on the current live Subview scroll element.
+- Live drag preview must temporarily expand the active `subview-ctg` or `subview-track-pair` SVG/canvas envelope. Within one pointer gesture, the temporary minimum and maximum extents are monotonic: they may expand but must not shrink when drag direction reverses.
+- When the preview envelope expands left, compensate `scrollLeft` by the viewBox minimum shift so the visible world coordinate remains stable. Apply additional edge-follow scrolling only when the pointer is outside the scroll viewport, not merely because the envelope grew.
+- Preview-driven scrolling is presentation state, not pointer movement. Exclude that programmatic scroll delta when calculating the next drag offset; after synchronous rerender, restore the preview world viewport against the current live Subview viewBox, then remove all temporary dimensions and attributes during cleanup.
+- In `subview-track`, the SVG, band canvas, and band clip rect must expand and restore together so pairwise evidence is neither clipped nor desynchronized during preview.
 
 #### 3. Validation & Error Matrix
 | Case | Expected behavior |
 |------|-------------------|
 | Short contig starts aligned at the right edge and is dragged right | The render width expands and the full contig remains reachable by horizontal scroll. |
 | Full-width contig is dragged left | `renderViewBoxMinX` becomes negative and the base bp scale/ruler stays unchanged. |
-| Preview exposes a new right edge | The temporary envelope expands, follows the contig, and cleanup restores original SVG/canvas attributes. |
+| Preview exposes a new right edge in either Subview mode | The temporary envelope expands, follows the contig, and cleanup restores original SVG/canvas/clip attributes. |
+| Drag direction reverses within one gesture | The temporary envelope does not contract, so the horizontal scrollbar size and position do not oscillate. |
+| A new drag starts from an already-negative persisted viewBox | Initialize the transient envelope from the existing viewBox; do not treat a missing transient attribute as zero or add a duplicate scroll compensation. |
+| Preview envelope expands left while the pointer remains inside the viewport | `scrollLeft` compensates only for the viewBox shift; visible world coordinates stay fixed and no edge-follow scroll is added. |
+| Pointer crosses outside a viewport edge | Edge-follow scrolling is added only by the pointer overshoot and remains clamped to the temporary scroll range. |
 | Preview auto-scrolls while the pointer is stationary | The persisted offset remains unchanged; auto-scroll is not added to the drag delta. |
-| `subview-track` is rendered | No `subview-ctg` preview-envelope mutation is applied. |
+| Persisted rerender derives a different viewBox minimum | The live scroll element is repositioned to preserve the preview world viewport rather than copying a stale raw `scrollLeft`. |
 
 #### 4. Tests Required
-- `subview-drag-overflow.test.mjs` covers persisted right and left overflow while asserting that the base bp width remains stable.
-- `track-drag-preview-runtime.test.mjs` covers temporary envelope expansion, auto-scroll, and complete restoration.
-- `track-drag-runtime.test.mjs` covers exclusion of preview-driven auto-scroll from the persisted drag delta.
+- `subview-drag-overflow.test.mjs` covers persisted right and left overflow in both Subview modes while asserting that the base bp width remains stable.
+- `track-drag-preview-runtime.test.mjs` covers both scene kinds, monotonic direction reversal, viewBox-shift compensation, pointer-edge following, and complete restoration.
+- `track-drag-runtime.test.mjs` covers exclusion of preview-driven auto-scroll from the persisted drag delta and preservation of the preview world viewport after rerender.
 - Keep Subview anchor, pairwise-band, ruler, main-track layout, full frontend test, and production build checks green.
 
 #### 5. Wrong vs Correct
 #### Wrong
-Clamp manual offsets to the original SVG width, or reuse the expanded render width as the bp conversion scale. The former blocks edge crossing; the latter changes saved positions when scale controls change.
+Clamp manual offsets to the original SVG width, reuse the expanded render width as the bp conversion scale, or recalculate a shrinking preview envelope from only the current pointer offset. These respectively block edge crossing, change saved positions when scale controls change, or make the scrollbar jump when drag direction reverses.
 
 #### Correct
-Keep one immutable base bp width, derive a separate overflow render envelope, and treat preview auto-scroll as transient viewport movement.
+Keep one immutable base bp width, derive a separate monotonic drag-session render envelope for both Subview modes, preserve world viewport coordinates across viewBox changes, and treat preview scrolling as transient viewport movement.
 
 ### Subview Anchor Identity Contracts
 

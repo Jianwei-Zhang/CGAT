@@ -62,6 +62,84 @@ function createHost(queryMap = {}) {
   };
 }
 
+function createSubviewEnvelopeFixture({
+  sceneKind = "subview-ctg",
+  rectX = 80,
+  rectWidth = 20,
+  viewBoxMinX = 0,
+  renderWidth = 100,
+  clientWidth = 100,
+  scrollLeft = 0,
+  viewportLeft = 0,
+} = {}) {
+  const svgNode = createNode({
+    width: String(renderWidth),
+    viewBox: `${viewBoxMinX} 0 ${renderWidth} 80`,
+  });
+  const canvasLayerNode = createNode({
+    "data-track-band-canvas-scene-kind": sceneKind,
+  });
+  canvasLayerNode.style.width = `${renderWidth}px`;
+  const clipRectNode = createNode({
+    "data-subview-band-clip-rect": "1",
+    x: String(viewBoxMinX),
+    width: String(renderWidth),
+  });
+  const scrollNode = createNode({
+    "data-subview-viewbox-min-x": String(viewBoxMinX),
+  }, {
+    ".subview-track-svg": [svgNode],
+    "[data-track-band-canvas-scene-kind='subview-ctg']": sceneKind === "subview-ctg"
+      ? [canvasLayerNode]
+      : [],
+    "[data-track-band-canvas-scene-kind='subview-track-pair']": sceneKind === "subview-track-pair"
+      ? [canvasLayerNode]
+      : [],
+    "[data-subview-band-clip-rect='1']": sceneKind === "subview-track-pair"
+      ? [clipRectNode]
+      : [],
+  });
+  scrollNode.clientWidth = clientWidth;
+  scrollNode.scrollLeft = scrollLeft;
+  scrollNode.getBoundingClientRect = () => ({
+    left: viewportLeft,
+    right: viewportLeft + clientWidth,
+    width: clientWidth,
+  });
+  const groupNode = createNode({
+    "data-subview-track-slot": "top",
+    "data-subview-track-role": "support",
+    "data-subview-contig-id": "12",
+    "data-subview-rect-x": String(rectX),
+    "data-subview-rect-width": String(rectWidth),
+  });
+  groupNode.closest = (selector) => (
+    selector === ".assembly-track-scroll[data-track-role='subview']" ? scrollNode : null
+  );
+  const envelopeNodes = [svgNode, canvasLayerNode, scrollNode];
+  if (sceneKind === "subview-track-pair") {
+    envelopeNodes.push(clipRectNode);
+  }
+  const host = createHost({
+    '[data-subview-track-slot="top"][data-subview-contig-id="12"]': [groupNode],
+    '[data-subview-top-contig-id="12"]': [],
+    '[data-sticky-label-key="subview:top:support:12"]': [],
+    '[data-subview-label-slot="top"][data-subview-label-role="support"][data-subview-label-contig-id="12"]': [],
+    "[data-drag-preview-group='1']": [groupNode],
+    "[data-drag-preview-band='1']": [],
+    "[data-drag-preview-sticky-label='1']": [],
+    "[data-drag-preview-envelope='1']": envelopeNodes,
+  });
+  return {
+    canvasLayerNode,
+    clipRectNode,
+    groupNode,
+    host,
+    scrollNode,
+    svgNode,
+  };
+}
+
 test("previewTrackContigDrag limits duplicate phased bands by phased item id", () => {
   const groupNode = createNode({
     "data-track-contig-id": "8",
@@ -346,47 +424,19 @@ test("previewSubviewTrackContigDrag shifts external subview-ctg labels with the 
 });
 
 test("previewSubviewTrackContigDrag expands and restores the live subview-ctg scroll envelope", () => {
-  const svgNode = createNode({
-    width: "100",
-    viewBox: "0 0 100 80",
-  });
-  const canvasLayerNode = createNode({
-    "data-track-band-canvas-scene-kind": "subview-ctg",
-  });
-  canvasLayerNode.style.width = "100px";
-  const scrollNode = createNode({
-    "data-subview-viewbox-min-x": "0",
-  }, {
-    ".subview-track-svg": [svgNode],
-    "[data-track-band-canvas-scene-kind='subview-ctg']": [canvasLayerNode],
-  });
-  scrollNode.clientWidth = 100;
-  scrollNode.scrollLeft = 0;
-  const groupNode = createNode({
-    "data-subview-track-slot": "top",
-    "data-subview-track-role": "support",
-    "data-subview-contig-id": "12",
-    "data-subview-rect-x": "80",
-    "data-subview-rect-width": "20",
-  });
-  groupNode.closest = (selector) => (
-    selector === ".assembly-track-scroll[data-track-role='subview']" ? scrollNode : null
-  );
-  const host = createHost({
-    '[data-subview-track-slot="top"][data-subview-contig-id="12"]': [groupNode],
-    '[data-subview-top-contig-id="12"]': [],
-    '[data-sticky-label-key="subview:top:support:12"]': [],
-    '[data-subview-label-slot="top"][data-subview-label-role="support"][data-subview-label-contig-id="12"]': [],
-    "[data-drag-preview-group='1']": [groupNode],
-    "[data-drag-preview-band='1']": [],
-    "[data-drag-preview-sticky-label='1']": [],
-    "[data-drag-preview-envelope='1']": [svgNode, canvasLayerNode, scrollNode],
-  });
+  const {
+    canvasLayerNode,
+    groupNode,
+    host,
+    scrollNode,
+    svgNode,
+  } = createSubviewEnvelopeFixture();
 
   const previewState = previewSubviewTrackContigDrag(host, {
     slot: "top",
     contigId: 12,
     offsetPx: 40,
+    pointerClientX: 140,
   });
 
   assert.equal(groupNode.getAttribute("transform"), "translate(40.00 0)");
@@ -394,7 +444,11 @@ test("previewSubviewTrackContigDrag expands and restores the live subview-ctg sc
   assert.equal(svgNode.getAttribute("viewBox"), "0 0 140 80");
   assert.equal(canvasLayerNode.style.width, "140px");
   assert.equal(scrollNode.scrollLeft, 40);
-  assert.deepEqual(previewState, { scrollLeft: 40 });
+  assert.deepEqual(previewState, {
+    scrollLeft: 40,
+    viewboxMinX: 0,
+    viewportLeftX: 40,
+  });
 
   clearSubviewTrackDragPreview(host);
 
@@ -402,4 +456,139 @@ test("previewSubviewTrackContigDrag expands and restores the live subview-ctg sc
   assert.equal(svgNode.getAttribute("viewBox"), "0 0 100 80");
   assert.equal(canvasLayerNode.style.width, "100px");
   assert.equal(scrollNode.getAttribute("data-subview-viewbox-min-x"), "0");
+});
+
+test("previewSubviewTrackContigDrag keeps one monotonic envelope while drag direction reverses", () => {
+  const {
+    host,
+    scrollNode,
+    svgNode,
+  } = createSubviewEnvelopeFixture({ rectX: 0, rectWidth: 100 });
+
+  const leftPreview = previewSubviewTrackContigDrag(host, {
+    slot: "top",
+    contigId: 12,
+    offsetPx: -20,
+    pointerClientX: 40,
+  });
+  assert.equal(svgNode.getAttribute("viewBox"), "-20 0 120 80");
+  assert.equal(scrollNode.scrollLeft, 20);
+  assert.deepEqual(leftPreview, {
+    scrollLeft: 20,
+    viewboxMinX: -20,
+    viewportLeftX: 0,
+  });
+
+  const rightPreview = previewSubviewTrackContigDrag(host, {
+    slot: "top",
+    contigId: 12,
+    offsetPx: 20,
+    pointerClientX: 60,
+  });
+  assert.equal(svgNode.getAttribute("viewBox"), "-20 0 140 80");
+  assert.equal(scrollNode.scrollLeft, 20);
+  assert.deepEqual(rightPreview, {
+    scrollLeft: 20,
+    viewboxMinX: -20,
+    viewportLeftX: 0,
+  });
+
+  previewSubviewTrackContigDrag(host, {
+    slot: "top",
+    contigId: 12,
+    offsetPx: 0,
+    pointerClientX: 50,
+  });
+  assert.equal(svgNode.getAttribute("viewBox"), "-20 0 140 80");
+  assert.equal(scrollNode.scrollLeft, 20);
+});
+
+test("previewSubviewTrackContigDrag preserves a persisted negative viewBox on first preview", () => {
+  const {
+    host,
+    scrollNode,
+    svgNode,
+  } = createSubviewEnvelopeFixture({
+    rectX: -30,
+    rectWidth: 100,
+    viewBoxMinX: -30,
+    renderWidth: 130,
+    clientWidth: 80,
+    scrollLeft: 30,
+  });
+
+  const previewState = previewSubviewTrackContigDrag(host, {
+    slot: "top",
+    contigId: 12,
+    offsetPx: 10,
+    pointerClientX: 50,
+  });
+
+  assert.equal(svgNode.getAttribute("viewBox"), "-30 0 130 80");
+  assert.equal(scrollNode.scrollLeft, 30);
+  assert.deepEqual(previewState, {
+    scrollLeft: 30,
+    viewboxMinX: -30,
+    viewportLeftX: 0,
+  });
+});
+
+test("previewSubviewTrackContigDrag does not edge-follow without a pointer coordinate", () => {
+  const {
+    host,
+    scrollNode,
+  } = createSubviewEnvelopeFixture({
+    renderWidth: 200,
+    clientWidth: 100,
+    scrollLeft: 50,
+    viewportLeft: 100,
+  });
+
+  const previewState = previewSubviewTrackContigDrag(host, {
+    slot: "top",
+    contigId: 12,
+    offsetPx: 0,
+  });
+
+  assert.equal(scrollNode.scrollLeft, 50);
+  assert.deepEqual(previewState, {
+    scrollLeft: 50,
+    viewboxMinX: 0,
+    viewportLeftX: 50,
+  });
+});
+
+test("previewSubviewTrackContigDrag applies the stable envelope to subview-track", () => {
+  const {
+    canvasLayerNode,
+    clipRectNode,
+    host,
+    scrollNode,
+    svgNode,
+  } = createSubviewEnvelopeFixture({ sceneKind: "subview-track-pair" });
+
+  const previewState = previewSubviewTrackContigDrag(host, {
+    slot: "top",
+    contigId: 12,
+    offsetPx: 40,
+    pointerClientX: 140,
+  });
+
+  assert.equal(svgNode.getAttribute("viewBox"), "0 0 140 80");
+  assert.equal(canvasLayerNode.style.width, "140px");
+  assert.equal(clipRectNode.getAttribute("x"), "0");
+  assert.equal(clipRectNode.getAttribute("width"), "140");
+  assert.equal(scrollNode.scrollLeft, 40);
+  assert.deepEqual(previewState, {
+    scrollLeft: 40,
+    viewboxMinX: 0,
+    viewportLeftX: 40,
+  });
+
+  clearSubviewTrackDragPreview(host);
+
+  assert.equal(svgNode.getAttribute("viewBox"), "0 0 100 80");
+  assert.equal(canvasLayerNode.style.width, "100px");
+  assert.equal(clipRectNode.getAttribute("x"), "0");
+  assert.equal(clipRectNode.getAttribute("width"), "100");
 });

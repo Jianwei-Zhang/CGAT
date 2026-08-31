@@ -264,6 +264,8 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     let pendingOffsetBp = baseOffsetBp;
     let previewAutoScrollDeltaPx = 0;
     let pendingPreviewScrollLeft = null;
+    let pendingPreviewViewportLeftX = null;
+    let pendingPointerClientX = startClientX;
 
     const scheduler = createFrameScheduler(() => {
       const offsetPx = deps.roundTrackMetric(
@@ -273,16 +275,22 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
         slot,
         contigId,
         offsetPx,
+        pointerClientX: pendingPointerClientX,
       });
       const nextScrollLeft = Number(previewResult?.scrollLeft);
       if (Number.isFinite(nextScrollLeft)) {
         pendingPreviewScrollLeft = Math.max(0, nextScrollLeft);
         previewAutoScrollDeltaPx = pendingPreviewScrollLeft - startScrollLeft;
       }
+      const nextViewportLeftX = Number(previewResult?.viewportLeftX);
+      if (Number.isFinite(nextViewportLeftX)) {
+        pendingPreviewViewportLeftX = nextViewportLeftX;
+      }
     });
 
     const onPointerMove = (moveEvent) => {
       const currentClientX = Number(moveEvent.clientX || 0);
+      pendingPointerClientX = currentClientX;
       const currentScrollEl = deps.resolveActiveTrackScrollElement(host, "subview", scrollEl);
       const currentScrollLeft = Number(currentScrollEl?.scrollLeft || 0);
       const scrollDeltaX = (currentScrollLeft - startScrollLeft) - previewAutoScrollDeltaPx;
@@ -309,10 +317,18 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
           contigId,
           offsetBp: pendingOffsetBp,
         });
-        if (Number.isFinite(pendingPreviewScrollLeft)) {
+        if (
+          Number.isFinite(pendingPreviewScrollLeft)
+          || Number.isFinite(pendingPreviewViewportLeftX)
+        ) {
           const activeScrollEl = deps.resolveActiveTrackScrollElement(host, "subview", scrollEl);
           if (activeScrollEl) {
-            activeScrollEl.scrollLeft = pendingPreviewScrollLeft;
+            const activeViewboxMinX = Number(activeScrollEl.dataset?.subviewViewboxMinX || 0);
+            const nextScrollLeft = Number.isFinite(pendingPreviewViewportLeftX)
+              && Number.isFinite(activeViewboxMinX)
+              ? pendingPreviewViewportLeftX - activeViewboxMinX
+              : pendingPreviewScrollLeft;
+            activeScrollEl.scrollLeft = Math.max(0, Number(nextScrollLeft) || 0);
           }
         }
         void deps.persistSubviewTrackDragOffsets(host, store);

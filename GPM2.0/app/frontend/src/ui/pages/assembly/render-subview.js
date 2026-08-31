@@ -2734,7 +2734,7 @@ function renderSubviewTrackPairAlignmentCard(
           <svg class="assembly-track-svg subview-track-svg" width="${renderInnerWidth}" height="${contentBottom}" viewBox="${renderViewBoxMinX} 0 ${renderInnerWidth} ${contentBottom}" preserveAspectRatio="xMinYMin meet">
             <defs>
               <clipPath id="${bandClipId}" clipPathUnits="userSpaceOnUse">
-                <rect x="${renderViewBoxMinX.toFixed(2)}" y="${bandClipTop.toFixed(2)}" width="${renderInnerWidth.toFixed(2)}" height="${bandClipHeight.toFixed(2)}" />
+                <rect data-subview-band-clip-rect="1" x="${renderViewBoxMinX.toFixed(2)}" y="${bandClipTop.toFixed(2)}" width="${renderInnerWidth.toFixed(2)}" height="${bandClipHeight.toFixed(2)}" />
               </clipPath>
             </defs>
             <line class="track-ruler-line" x1="0" y1="${rulerTop}" x2="${baseInnerWidth}" y2="${rulerTop}" />

@@ -83,6 +83,81 @@ function buildSubviewCtgOverflowHtml(subviewTrackDragOffsets = []) {
   );
 }
 
+function buildSubviewTrackOverflowHtml(subviewTrackDragOffsets = []) {
+  return renderAssemblyPage(
+    createState({
+      assembly: {
+        supportDatasetId: 22,
+        supportChrCtgs: [
+          {
+            assemblyCtgId: 401,
+            name: "support-track-ctg",
+            assignedChrName: "Chr01",
+            memberCount: 1,
+            totalLength: 20_000,
+            anchorStart: 320,
+            hits: [
+              {
+                refStart: 5_000,
+                refEnd: 8_000,
+                ctgStart: 1_000,
+                ctgEnd: 4_000,
+                blockLength: 3_000,
+                mapq: 60,
+              },
+            ],
+          },
+        ],
+        chrCtgs: [
+          {
+            assemblyCtgId: 201,
+            name: "primary-track-ctg",
+            assignedChrName: "Chr01",
+            memberCount: 1,
+            totalLength: 30_000,
+            anchorStart: 100,
+            hits: [
+              {
+                refStart: 5_000,
+                refEnd: 8_000,
+                ctgStart: 26_000,
+                ctgEnd: 29_000,
+                blockLength: 3_000,
+                mapq: 60,
+              },
+            ],
+          },
+        ],
+        subviewTrackView: {
+          minTickUnitKb: 10_000,
+          maxTickCount: 10,
+          alignmentLength: 1_000,
+          mapq: 0,
+        },
+        subview: {
+          selectedTrackARole: "primary",
+          selectedTrackBRole: "support",
+          summary: {
+            mode: "track-pair",
+            topTrack: { role: "support" },
+            bottomTrack: { role: "primary" },
+          },
+        },
+        subviewTrackDragOffsets,
+      },
+      initializer: {
+        datasets: [
+          { datasetId: 11, name: "hifiasm", label: "hifiasm" },
+          { datasetId: 22, name: "flye", label: "flye" },
+        ],
+        existingProjects: [
+          { projectId: 7, primaryDatasetId: 11, supportDatasetIds: [22] },
+        ],
+      },
+    }),
+  );
+}
+
 function extractSubviewGeometry(html, slot) {
   const scrollTagMatch = html.match(
     /<div[^>]*class="assembly-track-scroll subview-track-scroll"[^>]*>/,
@@ -144,5 +219,42 @@ test("subview-ctg expands the left viewBox without changing its bp scale", () =>
   assert.equal(shifted.baseInnerWidth, base.baseInnerWidth);
   assert.equal(shifted.viewBoxMinX, -120);
   assert.equal(shifted.svgWidth, shifted.baseInnerWidth + 120);
+  assert.equal(shifted.svgWidth, shifted.viewBoxWidth);
+});
+
+test("subview-track expands the right render extent without changing its bp scale", () => {
+  const base = extractSubviewGeometry(buildSubviewTrackOverflowHtml(), "top");
+  const requestedOffsetPx = base.baseInnerWidth + 120;
+  const shifted = extractSubviewGeometry(
+    buildSubviewTrackOverflowHtml([
+      { slot: "top", contigId: 401, offsetPx: requestedOffsetPx },
+    ]),
+    "top",
+  );
+
+  assert.ok(
+    Math.abs((shifted.barX - base.barX) - requestedOffsetPx) < 0.1,
+    `expected top track contig to shift by ${requestedOffsetPx}px`,
+  );
+  assert.equal(shifted.baseInnerWidth, base.baseInnerWidth);
+  assert.equal(shifted.viewBoxMinX, 0);
+  assert.ok(shifted.svgWidth > shifted.baseInnerWidth);
+  assert.equal(shifted.svgWidth, shifted.viewBoxWidth);
+});
+
+test("subview-track expands the left viewBox without changing its bp scale", () => {
+  const base = extractSubviewGeometry(buildSubviewTrackOverflowHtml(), "bottom");
+  const requestedOffsetPx = -(base.barX + 120);
+  const shifted = extractSubviewGeometry(
+    buildSubviewTrackOverflowHtml([
+      { slot: "bottom", contigId: 201, offsetPx: requestedOffsetPx },
+    ]),
+    "bottom",
+  );
+
+  assert.ok(Math.abs(shifted.barX + 120) < 0.1, `expected bar x -120, got ${shifted.barX}`);
+  assert.equal(shifted.baseInnerWidth, base.baseInnerWidth);
+  assert.equal(shifted.viewBoxMinX, -120);
+  assert.ok(shifted.svgWidth > shifted.baseInnerWidth);
   assert.equal(shifted.svgWidth, shifted.viewBoxWidth);
 });
