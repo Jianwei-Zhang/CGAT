@@ -26,6 +26,251 @@ def round_artifact_relpath(stage: str) -> str:
     return "grt/evidence/step1/round1" if stage == "step1_round1" else "grt/evidence/step1/round2"
 
 
+def run_external_contig_identity_stage(
+    server_dir: Path,
+    run_id: str,
+    stage: str,
+    q_input_version: str,
+    q_output_version: str,
+    chromosome_order: list[str],
+    input_paths: dict[str, list[dict[str, object]]],
+    input_records: dict[str, str],
+    input_q_rows: list[dict[str, object]],
+    donor_set_id: str,
+) -> tuple[dict[str, object], bool]:
+    """Materialize an auditable no-op for upstream's external-contig Stage1.
+
+    Upstream AssembleFill changes the draft in Stage1 only after assembling
+    reads.  GPM's frozen D0 is an external-contig input, so its first actual
+    optimized fill belongs after structural correction.  The public q-version
+    chain remains explicit even though these three compatibility stages are
+    sequence identities.
+    """
+    if stage not in {"step1_round1", "step1_filter", "step1_round2"}:
+        fail(f"unsupported external-contig Step1 identity stage: {stage}")
+    q_input_path = server_dir / f"grt/q/{q_input_version}.fa"
+    q_input_sha256 = sha256_file(q_input_path)
+    fingerprint_payload = {
+        "workflow": WORKFLOW,
+        "engine_version": ENGINE_VERSION,
+        "stage": stage,
+        "q_version": q_input_version,
+        "q_source_sha256": q_input_sha256,
+        "q_segments_sha256": json_hash(input_q_rows),
+        "donor_set_id": donor_set_id,
+        "execution_mode": "upstream_external_contigs_stage1_identity",
+    }
+    fingerprint = json_hash(fingerprint_payload)
+    cached = checkpoint_result(server_dir, stage, fingerprint)
+    if cached is not None:
+        print(f"GRT {stage} cache hit: {fingerprint}")
+        return cached, True
+    invalidate_step1_from(server_dir, stage)
+
+    artifact_relpath = (
+        "grt/evidence/step1/filter"
+        if stage == "step1_filter"
+        else round_artifact_relpath(stage)
+    )
+    artifact_dir = server_dir / artifact_relpath
+    artifact_dir.parent.mkdir(parents=True, exist_ok=True)
+    temporary = Path(tempfile.mkdtemp(prefix=f".{stage}.", dir=artifact_dir.parent))
+    q_output_temporary = server_dir / f"grt/q/.{q_output_version}.fa.tmp.{os.getpid()}"
+    try:
+        output_paths = {
+            chromosome: [dict(segment) for segment in input_paths[chromosome]]
+            for chromosome in chromosome_order
+        }
+        output_records = dict(input_records)
+        write_fasta(
+            q_output_temporary,
+            [(chromosome, output_records[chromosome]) for chromosome in chromosome_order],
+        )
+        q_output_sha256 = sha256_file(q_output_temporary)
+        q_rows = q_rows_for_paths(q_output_version, chromosome_order, output_paths)
+        events: list[dict[str, object]] = []
+        attempts: list[dict[str, object]] = []
+        if stage == "step1_filter":
+            for chromosome in chromosome_order:
+                object_id = stable_id(
+                    "component-filter",
+                    [run_id, stage, chromosome, "deferred"],
+                    22,
+                )
+                events.append(
+                    {
+                        "run_id": run_id,
+                        "event_id": stable_id("event", [run_id, stage, object_id], 24),
+                        "stage": stage,
+                        "chr": chromosome,
+                        "object_id": object_id,
+                        "action": "filter_component",
+                        "status": "unresolved",
+                        "reason": "deferred_to_post_correction_optimized_fill",
+                        "q_before": {
+                            "version": q_input_version,
+                            "start": 1,
+                            "end": len(input_records[chromosome]),
+                            "sha256": q_input_sha256,
+                        },
+                        "q_after": {
+                            "version": q_output_version,
+                            "start": 1,
+                            "end": len(output_records[chromosome]),
+                            "sha256": q_output_sha256,
+                        },
+                        "source": None,
+                        "evidence_ids": [],
+                        "usage_ids": [],
+                        "source_card_key": "",
+                        "final_path_segment_id": "",
+                        "edit": {
+                            "operation": "retain_components",
+                            "kept_intervals": [[1, len(input_records[chromosome])]],
+                            "removed_intervals": [],
+                            "min_component_length": MIN_COMPONENT_LENGTH,
+                            "connector_length": FILTER_CONNECTOR_LENGTH,
+                        },
+                    }
+                )
+        else:
+            for chromosome in chromosome_order:
+                for gap in gap_objects(chromosome, q_input_version, input_records[chromosome]):
+                    object_id = str(gap["object_id"])
+                    event_id = stable_id("event", [run_id, stage, object_id], 24)
+                    events.append(
+                        {
+                            "run_id": run_id,
+                            "event_id": event_id,
+                            "stage": stage,
+                            "chr": chromosome,
+                            "object_id": object_id,
+                            "action": "fill",
+                            "status": "unresolved",
+                            "reason": "upstream_external_contigs_stage1_noop",
+                            "q_before": {
+                                "version": q_input_version,
+                                "start": int(gap["start0"]) + 1,
+                                "end": int(gap["end0"]),
+                                "sha256": q_input_sha256,
+                            },
+                            "q_after": {
+                                "version": q_output_version,
+                                "start": int(gap["start0"]) + 1,
+                                "end": int(gap["end0"]),
+                                "sha256": q_output_sha256,
+                            },
+                            "source": None,
+                            "evidence_ids": [],
+                            "usage_ids": [],
+                            "source_card_key": "",
+                            "final_path_segment_id": "",
+                        }
+                    )
+                    attempts.append(
+                        {
+                            "attempt_id": stable_id("attempt", [run_id, stage, object_id], 22),
+                            "chr": chromosome,
+                            "object_id": object_id,
+                            "stage": stage,
+                            "status": "unresolved",
+                            "reason": "upstream_external_contigs_stage1_noop",
+                            "candidate_count": 0,
+                            "accepted_event_id": "",
+                        }
+                    )
+
+        write_tsv(temporary / "q_segments.tsv", Q_SEGMENT_FIELDS, q_rows)
+        write_jsonl(temporary / "events.jsonl", events)
+        write_tsv(temporary / "gap_attempts.tsv", ATTEMPT_FIELDS, attempts)
+        if stage == "step1_filter":
+            write_tsv(
+                temporary / "components.tsv",
+                ["chr", "status", "reason", "kept_intervals_json", "removed_intervals_json"],
+                [
+                    {
+                        "chr": event["chr"],
+                        "status": event["status"],
+                        "reason": event["reason"],
+                        "kept_intervals_json": canonical_json(event["edit"]["kept_intervals"]),
+                        "removed_intervals_json": "[]",
+                    }
+                    for event in events
+                ],
+            )
+        else:
+            write_tsv(temporary / "candidates.tsv", CANDIDATE_FIELDS, [])
+            write_tsv(temporary / "rejections.tsv", REJECTION_FIELDS, [])
+            write_tsv(temporary / "arbitration.tsv", ARBITRATION_FIELDS, [])
+            write_tsv(temporary / "evidence.tsv", EVIDENCE_FIELDS, [])
+            write_tsv(temporary / "usage.tsv", USAGE_FIELDS, [])
+            (temporary / "flanks.fa").write_bytes(b"")
+            (temporary / "result.paf").write_bytes(b"")
+            write_tsv(
+                temporary / "chromosome_tasks.tsv",
+                [
+                    "chr",
+                    "chromosome_key",
+                    "cache_key",
+                    "query_relpath",
+                    "query_sha256",
+                    "raw_relpath",
+                    "raw_sha256",
+                ],
+                [],
+            )
+        result: dict[str, object] = {
+            "workflow": WORKFLOW,
+            "engine_version": ENGINE_VERSION,
+            "stage": stage,
+            "input_fingerprint": fingerprint,
+            "q_input_version": q_input_version,
+            "q_input_sha256": q_input_sha256,
+            "q_output_version": q_output_version,
+            "q_output_sha256": q_output_sha256,
+            "donor_set_id": donor_set_id,
+            "q_rows": q_rows,
+            "evidence_rows": [],
+            "usage_rows": [],
+            "events": events,
+            "attempts": attempts,
+            "accepted_intervals": [],
+        }
+        (temporary / "result.json").write_text(
+            json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+            newline="",
+        )
+        commit_stage_directory(temporary, artifact_dir)
+        (server_dir / "grt/q").mkdir(parents=True, exist_ok=True)
+        os.replace(q_output_temporary, server_dir / f"grt/q/{q_output_version}.fa")
+        output_relpaths = [
+            path.relative_to(server_dir).as_posix()
+            for path in artifact_dir.rglob("*")
+            if path.is_file()
+        ] + [f"grt/q/{q_output_version}.fa"]
+        write_checkpoint(
+            server_dir,
+            stage,
+            fingerprint,
+            fingerprint_payload,
+            f"{artifact_relpath}/result.json",
+            output_relpaths,
+        )
+        print(f"GRT {stage} complete: external-contig compatibility identity")
+        return result, False
+    except BaseException:
+        q_output_temporary.unlink(missing_ok=True)
+        if temporary.exists():
+            failed_root = server_dir / "grt/failed"
+            failed_root.mkdir(parents=True, exist_ok=True)
+            failed_dir = failed_root / f"{stage}-{os.getpid()}"
+            if failed_dir.exists():
+                shutil.rmtree(failed_dir)
+            os.replace(temporary, failed_dir)
+        raise
+
+
 def run_round_stage(
     server_dir: Path,
     run_id: str,
@@ -548,7 +793,7 @@ def execute(args: argparse.Namespace) -> None:
         24,
     )
     results: list[dict[str, object]] = []
-    round1, _round1_cached = run_round_stage(
+    round1, _round1_cached = run_external_contig_identity_stage(
         server_dir,
         run_id,
         "step1_round1",
@@ -558,13 +803,7 @@ def execute(args: argparse.Namespace) -> None:
         q0_paths,
         q0_records,
         base_q_rows,
-        donor_set,
-        donor_members,
-        assignments,
-        sources,
-        [],
-        minimap,
-        args.threads,
+        donor_set["donor_set_id"],
     )
     results.append(round1)
     publish_step1_metadata(
@@ -579,14 +818,16 @@ def execute(args: argparse.Namespace) -> None:
     _, q0r1_paths, q0r1_records = load_q_paths(
         server_dir, "q0r1", round1["q_rows"], sources
     )
-    filter_result, _filter_cached = run_filter_stage(
+    filter_result, _filter_cached = run_external_contig_identity_stage(
         server_dir,
         run_id,
+        "step1_filter",
+        "q0r1",
+        "q0f",
         chromosome_order,
         q0r1_paths,
         q0r1_records,
         round1["q_rows"],
-        sources,
         donor_set["donor_set_id"],
     )
     reconcile_filtered_round1_events(round1, filter_result)
@@ -603,7 +844,7 @@ def execute(args: argparse.Namespace) -> None:
     _, q0f_paths, q0f_records = load_q_paths(
         server_dir, "q0f", filter_result["q_rows"], sources
     )
-    round2, _round2_cached = run_round_stage(
+    round2, _round2_cached = run_external_contig_identity_stage(
         server_dir,
         run_id,
         "step1_round2",
@@ -613,13 +854,7 @@ def execute(args: argparse.Namespace) -> None:
         q0f_paths,
         q0f_records,
         filter_result["q_rows"],
-        donor_set,
-        donor_members,
-        assignments,
-        sources,
-        round1["accepted_intervals"],
-        minimap,
-        args.threads,
+        donor_set["donor_set_id"],
     )
     results.append(round2)
     publish_step1_metadata(

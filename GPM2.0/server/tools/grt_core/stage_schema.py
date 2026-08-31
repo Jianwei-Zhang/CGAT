@@ -13,7 +13,7 @@ from typing import Iterable
 
 from .common import *
 
-ENGINE_VERSION = 2
+ENGINE_VERSION = 3
 
 MIN_GAP_LENGTH = 100
 

@@ -394,9 +394,6 @@ validate_mummer4_capabilities() {
     "$nucmer_path" --help '^[[:space:]]*-t([|,[:space:]]|$)' -t/--threads \
     "$nucmer_guidance"
   require_mummer_help_option \
-    "$delta_filter_path" -h '^[[:space:]]*-r([|,[:space:]]|$)' -r \
-    "$utility_guidance"
-  require_mummer_help_option \
     "$delta_filter_path" -h '^[[:space:]]*-l([|,[:space:]]|$)' -l \
     "$utility_guidance"
   require_mummer_help_option \

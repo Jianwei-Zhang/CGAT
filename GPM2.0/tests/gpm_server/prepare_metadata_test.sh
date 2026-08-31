@@ -446,6 +446,22 @@ for capability_index in "${!capability_commands[@]}"; do
   }
 done
 
+delta_l_only_bin="${TMP_DIR}/delta-l-only-bin"
+delta_l_only_output="${TMP_DIR}/delta-l-only-output"
+make_restricted_path "$delta_l_only_bin" ""
+rm -f "${delta_l_only_bin}/delta-filter"
+cp "$capability_stub" "${delta_l_only_bin}/delta-filter"
+GPM_TEST_MUMMER_HELP=$'-l    sequence-length option' \
+  PATH="$delta_l_only_bin" "$PREPARE_BASH" "$SCRIPT" \
+  --ref ref_delta_l_only "$ref" \
+  --ds ds_delta_l_only "$ds" \
+  -o "$delta_l_only_output" \
+  >/dev/null
+[[ -f "${delta_l_only_output}/metadata/package.tsv" ]] || {
+  echo "delta-filter with required -l but no unused -r did not pass preflight" >&2
+  exit 1
+}
+
 for missing_command in meryl merqury.sh craq; do
   no_reads_bin="${TMP_DIR}/no-reads-missing-${missing_command}-bin"
   make_restricted_path "$no_reads_bin" "$missing_command"

@@ -12,6 +12,7 @@ from server.tests import test_grt_prepare_inputs as prepare_fixture
 from server.tools.grt_step1 import (
     apply_filter,
     arbitrate_candidates,
+    filter_paths,
     reconcile_filtered_round1_events,
     replay_filter_records,
 )
@@ -271,14 +272,14 @@ with open(out, 'w', encoding='utf-8', newline='') as handle:
             env=env,
         )
 
-    def test_two_round_cache_global_interval_ledger_and_resume(self):
+    def test_external_contig_stage1_is_auditable_identity_and_resumes(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
             server = self.make_server(root)
             minimap, log = self.make_minimap(root)
             completed = self.run_step1(server, minimap, log)
             self.assertEqual(completed.returncode, 0, completed.stderr)
-            self.assertEqual(log.read_text(encoding="utf-8").splitlines(), ["call", "call"])
+            self.assertFalse(log.exists())
 
             recipe = prepare_fixture.read_tsv(server / "metadata/grt_recipe.tsv")[0]
             stages = prepare_fixture.read_tsv(server / "metadata/grt_stage_status.tsv")
@@ -291,51 +292,14 @@ with open(out, 'w', encoding='utf-8', newline='') as handle:
             self.assertEqual(stages[3]["q_input_version"], "q0f")
             self.assertEqual(stages[3]["q_output_version"], "q1")
             self.assertTrue(all(row["donor_set_id"] == recipe["donor_set_id"] for row in stages))
-
-            usage = prepare_fixture.read_tsv(server / "metadata/grt_donor_usage.tsv")
-            consumed = [row for row in usage if row["status"] == "consumed"]
-            conflicted = [row for row in usage if row["status"] == "conflicted"]
-            self.assertEqual(len(consumed), 2)
-            self.assertFalse(conflicted)
-            first = (int(consumed[0]["source_start"]), int(consumed[0]["source_end"]))
-            second = (int(consumed[1]["source_start"]), int(consumed[1]["source_end"]))
-            self.assertLessEqual(max(first[0], second[0]), min(first[1], second[1]))
-            self.assertTrue(
-                any("accepted_with_donor_reuse_of:" in row["reason"] for row in consumed)
-            )
-            round_candidates = prepare_fixture.read_tsv(
-                server / "grt/evidence/step1/round1/candidates.tsv"
-            )
-            self.assertTrue(all(row["fragment_id"] for row in round_candidates))
-            evidence = prepare_fixture.read_tsv(server / "metadata/grt_evidence_registry.tsv")
-            round_evidence = [row for row in evidence if row["stage"].startswith("step1_")]
-            donor_hash = next(
-                row["fasta_sha256"]
-                for row in prepare_fixture.read_tsv(server / "metadata/grt_donor_sets.tsv")
-                if row["donor_set_id"] == recipe["donor_set_id"]
-            )
+            q_hashes = {
+                prepare_fixture.sha256(server / f"grt/q/{version}.fa")
+                for version in ("q0", "q0r1", "q0f", "q1")
+            }
+            self.assertEqual(len(q_hashes), 1)
             self.assertEqual(
-                {row["target_sha256"] for row in round_evidence}, {donor_hash}
-            )
-            self.assertEqual(
-                {row["q_version"] for row in round_evidence}, {"q0", "q0f"}
-            )
-            for row in round_evidence:
-                self.assertEqual(
-                    row["q_source_sha256"],
-                    prepare_fixture.sha256(server / f"grt/q/{row['q_version']}.fa"),
-                )
-                self.assertEqual(
-                    row["query_sha256"],
-                    prepare_fixture.sha256(server / row["query_artifact_relpath"]),
-                )
-                self.assertEqual(
-                    row["raw_artifact_sha256"],
-                    prepare_fixture.sha256(server / row["raw_artifact_relpath"]),
-                )
-            self.assertNotEqual(
-                prepare_fixture.sha256(server / "grt/evidence/step1/round1/flanks.fa"),
-                prepare_fixture.sha256(server / "grt/evidence/step1/round2/flanks.fa"),
+                prepare_fixture.read_tsv(server / "metadata/grt_donor_usage.tsv"),
+                [],
             )
             events = [
                 json.loads(line)
@@ -344,9 +308,14 @@ with open(out, 'w', encoding='utf-8', newline='') as handle:
                 ).splitlines()
             ]
             self.assertTrue(
+                all(event["status"] == "unresolved" for event in events)
+            )
+            self.assertTrue(
+                any(event["reason"] == "upstream_external_contigs_stage1_noop" for event in events)
+            )
+            self.assertTrue(
                 any(
-                    event["stage"] == "step1_round1"
-                    and event["status"] == "unresolved"
+                    event["reason"] == "deferred_to_post_correction_optimized_fill"
                     for event in events
                 )
             )
@@ -354,7 +323,8 @@ with open(out, 'w', encoding='utf-8', newline='') as handle:
             q1_before = prepare_fixture.sha256(server / "grt/q/q1.fa")
             repeated = self.run_step1(server, minimap, log)
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
-            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 2)
+            self.assertFalse(log.exists())
+            self.assertEqual(repeated.stdout.count("cache hit:"), 3)
             self.assertEqual(q1_before, prepare_fixture.sha256(server / "grt/q/q1.fa"))
 
             donor_resume = subprocess.run(
@@ -367,44 +337,13 @@ with open(out, 'w', encoding='utf-8', newline='') as handle:
             self.assertIn("are current", donor_resume.stdout)
             after_donor_resume = self.run_step1(server, minimap, log)
             self.assertEqual(after_donor_resume.returncode, 0, after_donor_resume.stderr)
-            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 2)
+            self.assertFalse(log.exists())
             self.assertEqual(q1_before, prepare_fixture.sha256(server / "grt/q/q1.fa"))
 
             (server / "grt/checkpoints/step1_round2.json").unlink()
             resumed = self.run_step1(server, minimap, log)
             self.assertEqual(resumed.returncode, 0, resumed.stderr)
-            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 2)
-
-            round2_cache_paf = next(
-                path
-                for path in (server / "grt/cache/step1/step1_round2").glob(
-                    "*/*/result.paf"
-                )
-                if path.stat().st_size > 0
-            )
-            with round2_cache_paf.open("a", encoding="utf-8", newline="") as handle:
-                handle.write("non-exact chromosome cache\n")
-            (server / "grt/checkpoints/step1_round2.json").unlink()
-            chromosome_rebuilt = self.run_step1(server, minimap, log)
-            self.assertEqual(chromosome_rebuilt.returncode, 0, chromosome_rebuilt.stderr)
-            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 3)
-
-            with (server / "grt/evidence/step1/round1/result.paf").open(
-                "a", encoding="utf-8", newline=""
-            ) as handle:
-                handle.write("non-exact historical PAF\n")
-            round1_cache_paf = next(
-                path
-                for path in (server / "grt/cache/step1/step1_round1").glob(
-                    "*/*/result.paf"
-                )
-                if path.stat().st_size > 0
-            )
-            with round1_cache_paf.open("a", encoding="utf-8", newline="") as handle:
-                handle.write("non-exact chromosome cache\n")
-            invalidated = self.run_step1(server, minimap, log)
-            self.assertEqual(invalidated.returncode, 0, invalidated.stderr)
-            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 4)
+            self.assertFalse(log.exists())
             self.assertEqual(q1_before, prepare_fixture.sha256(server / "grt/q/q1.fa"))
 
     def test_filter_removes_only_isolated_components_below_threshold(self):
@@ -451,6 +390,66 @@ with open(out, 'w', encoding='utf-8', newline='') as handle:
         self.assertEqual(events[0]["edit"]["removed_intervals"], [[100101, 200099]])
         self.assertEqual(replay_filter_records(records, events), output_records)
         self.assertEqual(len(output_paths["Chr01"]), 3)
+
+    def test_post_fill_filter_connector_preserves_collapsed_gap_origins(self):
+        sources = {
+            ("primary", "left"): "A" * 100_000,
+            ("primary", "small"): "C" * 20_000,
+            ("primary", "right"): "G" * 100_000,
+        }
+
+        def source(name):
+            return {
+                "segment_kind": "source",
+                "length": len(sources[("primary", name)]),
+                "dataset_name": "primary",
+                "contig_name": name,
+                "source_start": 1,
+                "source_end": len(sources[("primary", name)]),
+                "orientation": "+",
+                "source_card_key": f"primary:{name}:Chr01:normal",
+                "evidence_ids": [],
+            }
+
+        def gap(object_id):
+            return {
+                "segment_kind": "gap",
+                "length": 100,
+                "dataset_name": "",
+                "contig_name": "",
+                "source_start": None,
+                "source_end": None,
+                "orientation": "",
+                "source_card_key": "",
+                "evidence_ids": [],
+                "origin_object_ids": [object_id],
+            }
+
+        path = [
+            source("left"),
+            gap("gap-1"),
+            source("small"),
+            gap("gap-2"),
+            source("right"),
+        ]
+        records = {
+            "Chr01": "A" * 100_000
+            + "N" * 100
+            + "C" * 20_000
+            + "N" * 100
+            + "G" * 100_000
+        }
+        output_paths, output_records, prototypes = filter_paths(
+            ["Chr01"], {"Chr01": path}, records, sources
+        )
+        connector = next(
+            segment
+            for segment in output_paths["Chr01"]
+            if segment["segment_kind"] == "gap"
+        )
+        self.assertEqual(connector["origin_object_ids"], ["gap-1", "gap-2"])
+        self.assertEqual(len(output_records["Chr01"]), 200_100)
+        self.assertEqual(prototypes[0]["status"], "accepted")
 
     def test_filter_marks_removed_accepted_donor_trace_as_superseded(self):
         round1 = {

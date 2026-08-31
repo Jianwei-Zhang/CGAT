@@ -21,17 +21,23 @@ from server.tools.grt_step23 import (
     _step3_edit_scope_decision,
     apply_corrections,
     arbitrate,
+    arbitrate_structural_candidates,
     build_correction_candidates,
     build_correction_events,
+    build_dominated_terminal_component_candidates,
     build_step2_candidates,
     build_step2_fallback_candidates,
     evidence_row,
+    grt_mummer_parameters,
     parse_mummer_coords,
+    partition_mummer_targets,
     promote_direct_primary_overlap_merges,
     project_interval_after_refills,
+    reject_ambiguous_reference_anchors,
     reject_candidates_spanning_other_gaps,
     replay_step3,
     step2_strategy,
+    step2_strategy_applied,
 )
 
 
@@ -41,6 +47,42 @@ STEP23_TOOL = REPO_ROOT / "server/tools/grt_step23.py"
 
 
 class GrtStep23Tests(unittest.TestCase):
+    def test_mummer_filter_retains_upstream_repeat_hits(self):
+        parameters = grt_mummer_parameters(8)
+        self.assertFalse(parameters["delta_filter"]["reference_best"])
+        self.assertEqual(parameters["delta_filter"]["min_alignment"], 10_000)
+
+    def test_step2_structural_controller_is_reported_as_fixer_only(self):
+        self.assertEqual(step2_strategy_applied("no_gaps"), "patcher_result")
+        self.assertEqual(
+            step2_strategy_applied("partial_success_no_fixer"),
+            "patcher_result",
+        )
+        self.assertEqual(step2_strategy_applied("no_patch_fixer"), "fixer_only")
+        self.assertEqual(
+            step2_strategy_applied("full_fixer_reuse_patches"),
+            "fixer_only",
+        )
+
+    def test_mummer_targets_match_upstream_large_and_small_partitioning(self):
+        records = {
+            "large-a": "A" * 1_000_000,
+            "large-b": "A" * 1_200_000,
+            **{f"small-{index:02d}": "C" * 900_000 for index in range(12)},
+        }
+
+        partitions = partition_mummer_targets(records)
+
+        self.assertEqual(
+            [[name for name, _sequence in partition] for partition in partitions],
+            [
+                ["large-a"],
+                ["large-b"],
+                [f"small-{index:02d}" for index in range(11)],
+                ["small-11"],
+            ],
+        )
+
     @staticmethod
     def source_segment(
         dataset: str,
@@ -127,10 +169,103 @@ class GrtStep23Tests(unittest.TestCase):
         self.assertEqual([row["outcome"] for row in rows], ["accepted", "accepted"])
         self.assertEqual(next(row for row in rows if row.get("donor_reuse"))["donor_reuse_of"], "c1")
 
+    def test_step2_direct_patch_prefers_nearest_validated_flanks(self):
+        def candidate(candidate_id, input_end, identity):
+            return {
+                "candidate_id": candidate_id,
+                "object_id": "gap-1",
+                "chr": "Chr01",
+                "source_dataset": "support",
+                "source_contig": "donor",
+                "source_start": 1001,
+                "source_end": 2000,
+                "orientation": "+",
+                "target_start": 5001,
+                "target_end": 5100,
+                "input_start": 4901,
+                "input_end": input_end,
+                "identity": identity,
+                "aligned_length": 20_000,
+                "mapq": 60,
+                "validation_passed": True,
+                "direct_patch_anchor_pair": True,
+                "outcome": "candidate",
+                "reason": "",
+            }
+
+        rows = arbitrate(
+            [
+                candidate("near", 5200, 0.98),
+                candidate("far", 25_000, 0.999),
+            ],
+            [],
+        )
+        self.assertEqual(next(row for row in rows if row["outcome"] == "accepted")["candidate_id"], "near")
+
     def test_step2_controller_selects_all_three_grt_branches(self):
         self.assertEqual(step2_strategy(3, 0, 0), "no_patch_fixer")
         self.assertEqual(step2_strategy(3, 4, 0), "full_fixer_reuse_patches")
         self.assertEqual(step2_strategy(3, 4, 2), "partial_success_no_fixer")
+
+    def test_step2_structural_fixer_coalesces_overlapping_gap_edits(self):
+        gaps = [
+            {"chr": "Chr02", "object_id": "gap-1", "start0": 999, "end0": 1099},
+            {"chr": "Chr02", "object_id": "gap-2", "start0": 1499, "end0": 1599},
+        ]
+
+        def candidate(candidate_id, object_id, start, end, identity):
+            return {
+                "candidate_id": candidate_id,
+                "chr": "Chr02",
+                "object_id": object_id,
+                "target_start": 1000 if object_id == "gap-1" else 1500,
+                "input_start": start,
+                "input_end": end,
+                "identity": identity,
+                "aligned_length": 20_000,
+                "outcome": "candidate",
+            }
+
+        rows = arbitrate_structural_candidates(
+            [
+                candidate("candidate-wide", "gap-1", 1000, 1700, 0.99),
+                candidate("candidate-second", "gap-2", 1500, 1800, 0.999),
+            ],
+            gaps,
+        )
+
+        accepted = next(row for row in rows if row["outcome"] == "accepted")
+        absorbed = next(row for row in rows if row["candidate_id"] == "candidate-second")
+        self.assertEqual(accepted["candidate_id"], "candidate-wide")
+        self.assertEqual(accepted["covered_object_ids"], ["gap-1", "gap-2"])
+        self.assertEqual(absorbed["outcome"], "conflicted")
+        self.assertFalse(accepted["source_consumable"])
+
+    def test_structural_fixer_prefers_largest_type5_overlap(self):
+        gap = {"chr": "Chr03", "object_id": "gap-1", "start0": 999, "end0": 1099}
+
+        def candidate(candidate_id, overlap, identity):
+            return {
+                "candidate_id": candidate_id,
+                "chr": "Chr03",
+                "object_id": "gap-1",
+                "target_start": 1000,
+                "input_start": 1000,
+                "input_end": 1200,
+                "identity": identity,
+                "aligned_length": 20_000,
+                "error_features": [f"ref_overlap_{overlap}"],
+                "outcome": "candidate",
+            }
+
+        rows = arbitrate_structural_candidates(
+            [candidate("largest-overlap", 30_749, 0.98), candidate("highest-identity", 18_988, 0.999)],
+            [gap],
+        )
+        self.assertEqual(
+            next(row for row in rows if row["outcome"] == "accepted")["candidate_id"],
+            "largest-overlap",
+        )
 
     def test_step2_fallback_reuses_explicit_donor_source(self):
         member = {
@@ -167,7 +302,7 @@ class GrtStep23Tests(unittest.TestCase):
         self.assertEqual(candidates[0]["fill_sequence"], sources[("d0", "d1")][100:500])
         self.assertEqual(candidates[0]["fallback_strategy"], "correctrefill_source_retry")
 
-    def test_step2_fallback_rejects_mixed_donor_decoy_and_defers_type5(self):
+    def test_step2_fallback_ignores_mixed_donor_decoy_and_uses_type5(self):
         members = {
             "contig_62": {
                 "member_id": "m-contig-62",
@@ -226,17 +361,10 @@ class GrtStep23Tests(unittest.TestCase):
 
         structural = build_correction_candidates([gap], alignments, members)
         type5 = next(row for row in structural if row["error_type"] == "type5")
-        decoy = next(row for row in structural if row["error_type"] == "type6")
+        self.assertEqual(len(structural), 1)
         self.assertEqual(type5["source_contig"], "contig_62")
         self.assertTrue(type5["eligible"])
         self.assertEqual(type5["outcome"], "candidate")
-        self.assertEqual(decoy["source_contig"], "contig_137")
-        self.assertFalse(decoy["eligible"])
-        self.assertFalse(decoy["validation_passed"])
-        self.assertEqual(decoy["outcome"], "rejected")
-        self.assertEqual(
-            decoy["reason"], "anchor_pair_source_or_orientation_conflict"
-        )
 
         fallback = build_step2_fallback_candidates(
             [gap], alignments, members, sources={}
@@ -429,15 +557,15 @@ class GrtStep23Tests(unittest.TestCase):
             by_gap.setdefault(str(candidate["object_id"]), []).append(candidate)
         self.assertEqual(
             {row["error_type"] for rows in by_gap.values() for row in rows},
-            {"type1", "type2", "type3", "type5", "type6"},
+            {"type1", "type2", "type5"},
         )
         self.assertEqual(by_gap["gap-1"][0]["error_subtype"], "crossing_alignment")
         self.assertTrue(any(row["error_subtype"] == "direction_conflict" for row in by_gap["gap-2"]))
-        self.assertTrue(any(row["error_subtype"] == "simple_translocation" for row in by_gap["gap-3"]))
+        self.assertTrue(any(row["error_type"] == "type1" for row in by_gap["gap-3"]))
         self.assertTrue(any(row["error_type"] == "type5" for row in by_gap["gap-4"]))
         self.assertTrue(any(row["error_type"] == "type5" for row in by_gap["gap-5"]))
-        self.assertTrue(any(row["error_subtype"] == "complex_conflict" for row in by_gap["gap-6"]))
-        for object_id in ("gap-2", "gap-3", "gap-6"):
+        self.assertTrue(any(row["error_type"] == "type2" for row in by_gap["gap-6"]))
+        for object_id in ("gap-2", "gap-6"):
             conflicts = [
                 row
                 for row in by_gap[object_id]
@@ -454,6 +582,84 @@ class GrtStep23Tests(unittest.TestCase):
                 )
             )
         self.assertTrue(all(row["repair_mode"] == "aggressive" for rows in by_gap.values() for row in rows))
+
+    def test_reference_repeat_anchor_is_audited_but_not_executable(self):
+        def row(line, record, query_start, query_end, ref_start, ref_end):
+            return {
+                "chr": "Chr04",
+                "line_number": line,
+                "ref_record": record,
+                "query_min": query_start,
+                "query_max": query_end,
+                "query_aligned": query_end - query_start + 1,
+                "ref_min": ref_start,
+                "ref_max": ref_end,
+                "identity": 0.99,
+            }
+
+        alignments = [
+            row(1, "Chr04", 1, 20_000, 1, 20_000),
+            row(2, "Chr04", 20_101, 40_000, 15_000, 34_899),
+            row(3, "Chr02", 1, 20_000, 100_001, 120_000),
+        ]
+        candidate = {
+            "chr": "Chr04",
+            "left_line": 1,
+            "right_line": 2,
+            "structural_target": "reference",
+            "outcome": "candidate",
+            "eligible": True,
+            "validation_passed": True,
+            "error_features": ["ref_overlap"],
+        }
+        reject_ambiguous_reference_anchors([candidate], alignments)
+        self.assertEqual(candidate["outcome"], "rejected")
+        self.assertEqual(candidate["reason"], "non_unique_reference_anchor:Chr02:3")
+        self.assertIn("non_unique_reference_anchor", candidate["error_features"])
+
+    def test_ambiguous_terminal_repeat_can_be_dropped_only_with_full_backbone(self):
+        def row(line, record, query_start, query_end, ref_start, ref_end):
+            return {
+                "chr": "Chr04",
+                "line_number": line,
+                "ref_record": record,
+                "query_min": query_start,
+                "query_max": query_end,
+                "query_aligned": query_end - query_start + 1,
+                "ref_min": ref_start,
+                "ref_max": ref_end,
+                "identity": 0.99,
+                "orientation": "+",
+            }
+
+        gap = {"chr": "Chr04", "object_id": "gap-1", "start0": 50_000, "end0": 50_100}
+        alignments = [
+            row(1, "Chr04", 1, 50_000, 1, 50_000),
+            row(2, "Chr02", 1, 50_000, 200_001, 250_000),
+            row(3, "Chr04", 50_101, 950_100, 50_001, 950_000),
+        ]
+        candidates = build_dominated_terminal_component_candidates(
+            [gap],
+            alignments,
+            {"Chr04": 1_000_000, "Chr02": 1_000_000},
+            {"Chr04": "A" * 50_000 + "N" * 100 + "C" * 900_000},
+        )
+        self.assertEqual(len(candidates), 1)
+        candidate = candidates[0]
+        self.assertEqual(candidate["junction_policy"], "drop_dominated_terminal_component")
+        self.assertEqual((candidate["input_start"], candidate["input_end"]), (1, 50_100))
+        self.assertEqual(candidate["fill_length"], 0)
+        self.assertFalse(candidate["source_consumable"])
+
+        self.assertEqual(
+            build_dominated_terminal_component_candidates(
+                [gap],
+                [alignments[0], alignments[2]],
+                {"Chr04": 1_000_000},
+                {"Chr04": "A" * 50_000 + "N" * 100 + "C" * 900_000},
+            ),
+            [],
+        )
 
     def test_step3_small_reference_overlap_uses_type5_and_covers_origin_gap(self):
         member = {
@@ -497,7 +703,7 @@ class GrtStep23Tests(unittest.TestCase):
         self.assertEqual(candidate["error_type"], "type5")
         self.assertEqual(candidate["classification_reason"], "reference_overlap_with_margin")
         self.assertEqual(candidate["input_start"], 1001)
-        self.assertEqual(candidate["input_end"], 1208)
+        self.assertEqual(candidate["input_end"], 1207)
         self.assertLessEqual(candidate["input_start"], candidate["target_start"])
         self.assertGreaterEqual(candidate["input_end"], candidate["target_end"])
 
@@ -547,7 +753,7 @@ class GrtStep23Tests(unittest.TestCase):
         candidate = candidates[0]
         self.assertEqual(candidate["error_type"], "type5")
         self.assertEqual(candidate["input_start"], 27328071)
-        self.assertEqual(candidate["input_end"], 27338457)
+        self.assertEqual(candidate["input_end"], 27338456)
         self.assertLess(candidate["input_end"] - candidate["input_start"] + 1, 20_000)
 
     def test_step3_direct_primary_overlap_keeps_left_and_trims_right(self):
@@ -852,6 +1058,18 @@ class GrtStep23Tests(unittest.TestCase):
         self.assertTrue(safe)
         self.assertEqual(reason, "")
 
+        safe, reason = _step3_edit_scope_decision(
+            "type5",
+            {
+                "query_overlap_length": 0,
+                "ref_overlap_length": 10_576,
+            },
+            371_491,
+            472_872,
+        )
+        self.assertFalse(safe)
+        self.assertEqual(reason, "automatic_edit_exceeds_overlap_evidence")
+
     def test_apply_corrections_rejects_edit_that_does_not_cover_origin_gap(self):
         gap_segment = {
             "segment_kind": "gap",
@@ -883,9 +1101,44 @@ class GrtStep23Tests(unittest.TestCase):
                 {},
             )
 
+    def test_apply_corrections_keeps_evidence_on_event_not_gap_segment(self):
+        sources = {
+            ("primary", "left"): "A" * 1_000,
+            ("primary", "right"): "C" * 1_000,
+        }
+        input_path = [
+            self.source_segment("primary", "left", 1_000, "+"),
+            self.gap_segment(),
+            self.source_segment("primary", "right", 1_000, "+"),
+        ]
+        gap = {"chr": "Chr01", "object_id": "gap-1", "start0": 1_000, "end0": 1_100}
+        candidate = {
+            "candidate_id": "candidate-1",
+            "chr": "Chr01",
+            "object_id": "gap-1",
+            "input_start": 1_001,
+            "input_end": 1_100,
+            "outcome": "accepted",
+            "evidence_ids": ["evidence-1"],
+        }
+
+        output_paths, _records, prototypes, _origins = apply_corrections(
+            ["Chr01"],
+            {"Chr01": input_path},
+            {"Chr01": "A" * 1_000 + "N" * 100 + "C" * 1_000},
+            [gap],
+            [candidate],
+            sources,
+        )
+
+        replacement = output_paths["Chr01"][1]
+        self.assertEqual(replacement["segment_kind"], "gap")
+        self.assertEqual(replacement["evidence_ids"], [])
+        self.assertEqual(prototypes[0]["candidate"]["evidence_ids"], ["evidence-1"])
+
     def make_server(self, root: Path) -> Path:
         server = step1_fixture.GrtStep1Tests(
-            "test_two_round_cache_global_interval_ledger_and_resume"
+            "test_external_contig_stage1_is_auditable_identity_and_resumes"
         ).make_server(root)
         support_path = server / "data/datasets/support.fa"
         prepare_fixture.write_fasta(
@@ -1073,10 +1326,14 @@ gap = re.search(r'N{100,}', query_sequence)
 if not gap:
     raise SystemExit(0)
 manifest = Path(reference).with_suffix('.manifest.tsv')
-with manifest.open(encoding='utf-8', newline='') as handle:
-    rows = list(csv.DictReader(handle, delimiter='\t'))
-ref_name = next(row['fasta_record_name'] for row in rows if row['contig_name'] == 's_unplaced')
-ref_length = len(dict(fasta(reference))[ref_name])
+reference_records = dict(fasta(reference))
+if manifest.exists():
+    with manifest.open(encoding='utf-8', newline='') as handle:
+        rows = list(csv.DictReader(handle, delimiter='\t'))
+    ref_name = next(row['fasta_record_name'] for row in rows if row['contig_name'] == 's_unplaced')
+else:
+    ref_name = query_name if query_name in reference_records else next(iter(reference_records))
+ref_length = len(reference_records[ref_name])
 query_length = len(query_sequence)
 print(f'{reference} {query}')
 print('NUCMER')
@@ -1213,11 +1470,26 @@ else:
 
             step1 = self.run_step1(server, tools, env)
             self.assertEqual(step1.returncode, 0, step1.stderr)
-            self.assertNotIn("step2_validation", minimap_log.read_text(encoding="utf-8"))
+            self.assertFalse(minimap_log.exists())
             self.assertEqual(len(re.findall(r"N{100,}", dict(read_fasta(server / "grt/q/q1.fa"))["Chr01"])), 2)
 
             completed = self.run_step23(server, tools, env)
             self.assertEqual(completed.returncode, 0, completed.stderr)
+            filter_commands = list(
+                (server / "grt/cache/step23").glob(
+                    "*/mummer/*/*/delta_filter.command.txt"
+                )
+            )
+            self.assertTrue(filter_commands)
+            active_filter_commands = [
+                command_file.read_text(encoding="utf-8")
+                for command_file in filter_commands
+                if not command_file.read_text(encoding="utf-8").startswith("skipped:")
+            ]
+            self.assertTrue(active_filter_commands)
+            for command_text in active_filter_commands:
+                self.assertIn(" -l 10000 ", command_text)
+                self.assertNotIn(" -r ", command_text)
             self.assertEqual(
                 [line.split("\t")[0] for line in mummer_log.read_text(encoding="utf-8").splitlines()],
                 ["step2", "step3"],
@@ -1266,10 +1538,29 @@ else:
             mummer_evidence = [
                 row
                 for row in evidence
-                if row["evidence_type"] in {"mummer_gap_anchor_pair", "mummer_structural_correction"}
+                if row["evidence_type"]
+                in {
+                    "mummer_gap_anchor_pair",
+                    "mummer_structural_correction",
+                }
             ]
             self.assertEqual({row["q_version"] for row in mummer_evidence}, {"q1", "q2"})
-            self.assertEqual({row["target_sha256"] for row in mummer_evidence}, {donor_hash})
+            self.assertEqual(
+                {
+                    row["target_sha256"]
+                    for row in mummer_evidence
+                    if row["q_version"] == "q1"
+                },
+                {donor_hash},
+            )
+            self.assertEqual(
+                {
+                    row["target_sha256"]
+                    for row in mummer_evidence
+                    if row["q_version"] == "q2"
+                },
+                {donor_hash},
+            )
             self.assertTrue(all(row["coordinate_system"] == "mummer_1_based_closed" for row in mummer_evidence))
 
             events = [

@@ -249,21 +249,24 @@ qualified ds-vs-ref PAF -> chr_assignments source_orientation + signed anchor_st
 
 - Step1/2/3 rows reference one frozen ordinary `donor_set_id` and FASTA hash.
 - Step4 references the independent telomere donor set.
-- q mappings are explicit in `metadata/grt_q_segments.tsv`: `segment_kind=source` carries the original source identity/evidence, while `segment_kind=gap` carries no fabricated source and reconstructs its interval as `N`; together the ordered rows must reconstruct q exactly.
+- q mappings are explicit in `metadata/grt_q_segments.tsv`: `segment_kind=source` carries the original source identity/evidence, while `segment_kind=gap` carries no source **and no evidence IDs** and reconstructs its interval as `N`; correction evidence belongs to the linked event, not the gap segment. Together the ordered rows must reconstruct q exactly.
 - `metadata/chr_assignments.tsv` is a required contract input. Every q0 source segment must be assigned to its target chromosome, match its `source_orientation`, use the canonical normal card key, and point to assignment-stage evidence over that dataset's original ds-vs-ref PAF. Multi-chromosome assignments are represented as a set rather than collapsed by last-row overwrite.
 - `grt_contig_roles.tsv` covers exactly the primary plus locked initial support datasets. Datasets or derived contigs appended after precompute remain in the complete GPM source domain but do not acquire retroactive GRT eligibility rows.
 - Donor member registries, per-set manifests, donor FASTA records, source intervals, and source slice hashes must agree exactly.
 - `metadata/grt_donor_fragments.tsv` is a Server-only derived index over the frozen ordinary D0. Long `N{100,}` runs are boundaries; every indexed fragment retains its D0 member/local coordinates and sequence hash. Creating the index never changes D0 FASTA bytes, `donor_set_id`, or q0.
 - A donor interval may be reused for a different gap object only with the same source orientation. Reuse is not physical consumption: target overlap and same-object arbitration still reject conflicts, while accepted reuse records the prior candidate ID and policy in the event lineage.
 - q stage rows form the fixed q0 -> q0r1 -> q0f -> q1 -> q2 -> q3 -> q4 transition order.
-- Step2 and Step3 MUMmer use `nucmer -c 1000 -l 100 --batch=500000000`, `delta-filter -r -l 10000`, and `show-coords -r -l`; a malformed bare `delta-filter -i` is not part of the contract.
+- With external contigs and no reads, Step1 is an auditable identity chain: q0=q0r1=q0f=q1, and every gap/component still gets an explicit unresolved Stage1 event. It must not substitute GPM-native fill/filter behavior for the upstream no-reads branch.
+- Step2 and Step3 MUMmer use `nucmer -c 1000 -l 100 --batch=500000000`, effective `delta-filter -l 10000` semantics, and `show-coords -r -l`. Upstream's observed `delta-filter -i -r -l 10000` consumes `-r` as the `-i` argument and therefore does **not** apply reference-best filtering; GPM expresses the effective behavior unambiguously and retains every alignment of at least 10 kb.
+- Before MUMmer alignment, every target record of at least 1 Mb is its own partition. Smaller records are sorted by descending length and packed into partitions of at most 10 Mb. Partition membership is part of the cache fingerprint.
 - `server/prepare.sh` resolves the MUMmer tools from PATH and, before creating
   the output workspace, verifies that their help output advertises every
   option consumed by the locked recipe: nucmer `--batch` plus `-t/--threads`,
-  delta-filter `-r` plus `-l`, and show-coords `-r` plus `-l`. Command
+  delta-filter `-l`, and show-coords `-r` plus `-l`. Command
   existence alone is insufficient because legacy nucmer builds may use the
   same executable name while lacking threaded batch mode.
-- `metadata/grt_step2_strategies.tsv` is required and records exactly one controller branch per chromosome: `no_patch_fixer`, `full_fixer_reuse_patches`, `partial_success_no_fixer`, or `no_gaps`, together with patch/fallback counts and the applied result.
+- `metadata/grt_step2_strategies.tsv` is required and records exactly one controller branch per chromosome: `no_patch_fixer`, `full_fixer_reuse_patches`, `partial_success_no_fixer`, or `no_gaps`, together with patch/fallback counts and the applied result. The whole-chromosome PatchRepair structural fallback is `strategy_applied=fixer_only` even when it accepts boundary edits, because those edits do not insert source patches; `structural_fixer` is not a contract enum.
+- Stage2 follows the upstream PatchRepair controller boundary: if the first gap has no accepted direct patch, reject chromosome-local patcher acceptances and run the whole-chromosome structural fixer. Stage3 then uses ordinary frozen D0, not the biological reference, and executes structural correction -> refill round1 -> isolated-component filter -> refill round2.
 - `metadata/grt_step3_classifications.tsv` is required and records each Type1-Type6 candidate, subtype, JSON features, confidence, `conservative|aggressive` repair mode, outcome, fragment and reuse lineage, and the linked Step3 event. When there are no candidates it remains an explicit header-only table. The same classification is carried by the event/evidence trace.
 - Step4 searches only q3 terminals lacking the configured telomere signal. It uses the independent frozen Dtel, preserves assigned/unplaced/cross-chr source identity, records one terminal result for both ends of every chromosome, and emits explicit unresolved results when no candidate survives.
 - Step4 MUMmer anchors require identity >= 99% and aligned length >= 15 kb. Candidate merges require forward minimap2 `asm5` overlap identity >= 99%, overlap >= 3 kb, and MAPQ >= 20. Raw per-terminal coords, per-candidate PAF, exact query/target hashes, ranking, and arbitration outcomes are retained.
@@ -314,26 +317,33 @@ Normal assigned cards reuse existing target-chromosome main-view pairwise PAF. O
 
 Package scripts write to a temporary archive and atomically replace the final archive only after zip succeeds. Re-running a packager must rebuild from the current Server workspace rather than update an older archive in place; failed validation or zip creation must leave an existing successful archive unchanged.
 
-## Scenario: Step3 Overlap Correction and Cache Identity
+## Scenario: Upstream-Compatible Step2/3 Correction and Cache Identity
 
 ### 1. Scope / Trigger
 
-- Applies when changing Step3 Type1-Type6 classification, correction edit coordinates, corrected-q2 origin projection, or Step2/3 cache fingerprints.
+- Applies when changing MUMmer partition/filter semantics, the PatchRepair controller branch, Step3 Type1-Type6 classification, correction edit coordinates, corrected-q2 origin projection, refill/filter order, or Step2/3 cache fingerprints.
 - Trigger: any change to `server/tools/grt_step23.py`, its generated runtime copy, correction constants, or the interpretation of MUMmer reference overlap.
 
 ### 2. Signatures
 
 - Classifier: `_step3_classify_features(features) -> (error_type, subtype, feature_names, confidence_score)`.
 - Edit guard: `_step3_edit_scope_decision(error_type, features, start, end) -> (safe, reason)`.
-- Step2 structural retry: `build_step2_fallback_candidates(gaps, alignments, members_by_record, sources, repair_mode) -> candidates`.
+- Target partitioner: `partition_mummer_targets(records) -> partitions`.
+- Effective filter contract: `grt_mummer_parameters(threads)["delta_filter"]["reference_best"] == false`.
+- Step2 structural fixer: `build_step2_structural_fallback_candidates(gaps, alignments, members_by_record, repair_mode) -> candidates`.
+- Controller reporting: `step2_strategy_applied(strategy) -> "patcher_result" | "fixer_only"`.
 - Step2/3 fingerprint fields include `engine_version`, exact `engine_sha256`, q/donor/tool identities, parameters, and consumed-interval identity.
 - Public correction/event coordinates remain 1-based closed; internal gap keys remain 0-based half-open.
 
 ### 3. Contracts
 
+- MUMmer retains every alignment of at least 10 kb; it must not apply reference-best filtering. Records at least 1 Mb align independently, while smaller records are descending-length chunks of at most 10 Mb.
+- The PatchRepair direct patch branch ranks validated candidates by the shortest target edit span before identity/aligned-length tie-breaks. If the first gap has no accepted patch, the whole chromosome uses the structural fixer and any prior patcher acceptance on that chromosome is rejected.
 - A crossing alignment remains Type1.
 - A two-anchor correction is executable only when both anchors use the same frozen D0 record and the same orientation. The global nearest left/right pair may still be classified for diagnostics, but a mixed-record or mixed-orientation pair has `validation_passed=false`, `eligible=false`, `outcome=rejected`, and reason `anchor_pair_source_or_orientation_conflict`.
-- Step2 structural fallback accepts only an executable Type1 `replace` candidate. Type2/Type3/Type6 conflicts remain diagnostic-only; Type4/Type5 overlap candidates proceed through Step3 structural correction and corrected-gap refill instead of being converted into donor-source patches.
+- The structural analyzer searches around the gap midpoint in 100 kb increments up to 500 kb. Executable left/right anchors are paired only within one D0 record; record insertion order and nearest boundaries reproduce upstream's first supporting record behavior.
+- Step2 structural fallback applies the whole-chromosome structural candidates before any Stage3 refill. Its accepted edits are non-source-consumable boundary operations and are reported as `strategy_applied=fixer_only`, not as donor patches.
+- Stage3 repeats structural analysis against ordinary frozen D0 and runs exactly: correction, refill round1, isolated-component filter, refill round2. Structural correction segments are not eligible as future donor source intervals.
 - Any positive reference overlap between anchors on the same frozen D0 record is Type5, regardless of overlap ratio. Small reference overlap must never fall through to Type4.
 - Type5 subtype thresholds match current GRT: `<10 kb` small, `<50 kb` medium, otherwise large. Confidence is `min(0.9 + overlap_bp / 1,000,000, 0.99)`.
 - Type5 projects the overlap through the right anchor, adds the configured correction margin, then widens the edit only enough to cover the complete origin q2 gap.
@@ -344,7 +354,8 @@ Package scripts write to a temporary archive and atomically replace the final ar
 - A zero-length direct edit reports `q_after` as the first retained right-side base so public event coordinates remain valid 1-based closed intervals. Deterministic replay deletes the input interval and inserts no sequence.
 - If the exact primary overlap is absent or unsafe, Type5 retains the existing overlap-plus-margin normalized-gap correction and corrected-gap refill behavior.
 - Every eligible correction edit contains its entire associated q2 gap. If widening would consume another gap object, the candidate is rejected by the existing multi-gap guard.
-- An overlap-driven automatic edit larger than 1 Mb is rejected when it exceeds ten times the observed query/reference overlap evidence.
+- An overlap-driven automatic edit larger than 100 kb is rejected when it exceeds five times the observed query/reference overlap evidence.
+- A normalized q gap segment has `evidence_ids=[]`; the accepted/rejected correction event carries the structural evidence. Assigning evidence directly to the gap placeholder violates the q-segment contract.
 - Corrected-q2 refill objects project once to the origin q2 object and interval; adjacent N-runs must not create an untraceable merged object.
 - Rejected Step2 MUMmer anchor pairs remain auditable, but every populated
   public source interval they emit is still 1-based, closed, increasing, and
@@ -359,7 +370,8 @@ Package scripts write to a temporary archive and atomically replace the final ar
 | Condition | Required result |
 |---|---|
 | Nearest left/right anchors use different D0 records or orientations | Preserve Type2/Type3/Type6 classification evidence, but reject execution as `anchor_pair_source_or_orientation_conflict` |
-| Step2 structural fallback candidate is not an executable Type1 `replace` | Do not emit a fallback patch; defer Type4/Type5 to Step3 and keep conflicts diagnostic-only |
+| First gap has no accepted direct patch | Reject chromosome-local patcher acceptances, run the whole-chromosome structural fixer, and report `strategy_applied=fixer_only` |
+| Step2 writes `strategy_applied=structural_fixer` | Contract failure; map the structural-only execution to `fixer_only` |
 | Same-record reference overlap is positive | Classify as Type5 and use overlap-plus-margin coordinates |
 | Type5 has a >=10 kb flush exact overlap between adjacent primary q2 sources | Keep the complete left source, remove the gap and duplicated right prefix, and insert no support sequence |
 | Flush and shifted-cut overlap candidates both exist | Select the flush `trim_left=0` candidate |
@@ -367,7 +379,8 @@ Package scripts write to a temporary archive and atomically replace the final ar
 | Direct overlap would consume the complete right source | Reject direct merge and retain the existing Type5 correction/refill path |
 | Correction edit omits any part of its associated q2 gap | Fail before applying the edit with `does not cover associated q2 gap` |
 | Widened edit intersects a different q2 gap | Reject as `target_interval_spans_other_gap:<object_id>` |
-| Overlap-driven edit is >1 Mb and >10x overlap evidence | Reject as `automatic_edit_exceeds_overlap_evidence` |
+| Overlap-driven edit is >100 kb and >5x overlap evidence | Reject as `automatic_edit_exceeds_overlap_evidence` |
+| Gap q segment carries source/evidence | Contract failure; keep evidence on the linked correction event |
 | Runtime Step2/3 script bytes differ from the checkpoint fingerprint | Recompute Step2/3; never report cache hit |
 | Corrected gap cannot resolve one exact origin | Fail rather than fabricate q2 coordinates |
 | Rejected Step2 anchor pair derives a reversed or empty patch interval | Preserve the rejection and raw anchors; serialize their increasing diagnostic source span |
@@ -375,6 +388,8 @@ Package scripts write to a temporary archive and atomically replace the final ar
 ### 5. Good/Base/Bad Cases
 
 - Good: a 10,187 bp same-record overlap next to a 100 bp q2 gap becomes Type5 and edits about 10.4 kb, not the complete 2.89 Mb anchor.
+- Good: upstream's malformed `delta-filter -i -r -l 10000` behavior is represented as explicit `delta-filter -l 10000`; repeat hits survive and gs1 converges to the same final sequences.
+- Good: a 10,576 bp Type5 overlap proposes a 101,382 bp edit; GPM records the classification/evidence but rejects the edit because it exceeds both the 100 kb and 5x limits.
 - Good: same-record forward anchors around a gap classify as Type5 while a closer reverse anchor from another donor is retained as rejected Type6 evidence; Step2 emits no patch from that decoy.
 - Base: a crossing Type1 alignment with a bounded explicit donor interval remains eligible for Step2 structural retry.
 - Good: Type5 donor evidence accompanies a 19,542 bp exact primary suffix-prefix overlap; Step3 keeps the left primary contig intact, trims 19,542 bp from the right primary prefix, removes 100N, and inserts zero donor bases.
@@ -389,7 +404,9 @@ Package scripts write to a temporary archive and atomically replace the final ar
 - A Chr3 real-topology regression uses the contig_62 forward overlap pair plus the closer contig_137 reverse decoy, asserts the decoy is rejected with `validation_passed=false`, and asserts Step2 emits no fallback patch from either Type5 or Type6.
 - Unit coverage preserves the crossing-Type1 fallback path and proves Type2/Type3/Type6 classifications remain auditable but non-executable.
 - A real-shape Chr05 regression asserts `27328071-27338457`, Type5, and an edit shorter than 20 kb.
-- Unit coverage proves origin-gap containment, second-gap rejection, and large overlap/edit-ratio rejection.
+- Unit coverage proves target partition boundaries, absence of `-r` from Step2/3 delta-filter commands, and preservation of repeat hits. Prepare preflight accepts delta-filter help that advertises required `-l` without the unused `-r`.
+- Unit coverage proves the first-gap controller branch, `fixer_only` reporting, origin-gap containment, second-gap rejection, and the 100 kb / 5x overlap-edit rejection.
+- Unit coverage proves replacement q gap segments never carry evidence IDs while their correction candidate/event retains the evidence link.
 - Unit coverage proves invalid negative-strand Step2 anchor ordering remains
   rejected while its candidate and MUMmer evidence source intervals remain
   increasing; a valid negative-strand pair retains its executable interval.
@@ -402,20 +419,27 @@ Package scripts write to a temporary archive and atomically replace the final ar
 #### Wrong
 
 ```text
+delta-filter -r -l 10000 -> drops upstream-retained repeat hits
 nearest-left contig_137(-) + nearest-right contig_62(+)
 -> Type6 -> slice contig_137 -> validated Step2 patch
 
 10,187 bp same-record overlap -> Type4 -> replace 2,891,900 bp -> 100 N
+
+10,576 bp overlap -> automatically delete 101,382 bp
 ```
 
 #### Correct
 
 ```text
-contig_62(+)/contig_62(+) -> Type5 -> Step3 structural correction
+delta-filter -l 10000 -> preserve the effective upstream hit set
+same-D0-record contig_62(+)/contig_62(+) -> Type5 -> structural correction
 contig_137(-)/contig_62(+) -> rejected diagnostic Type6 -> no Step2 patch
 
 10,187 bp same-record overlap -> Type5 -> project overlap + 100 bp margin
 -> widen to contain the origin q2 gap -> replace about 10.4 kb -> 100 N
+
+10,576 bp overlap + 101,382 bp proposed edit
+-> reject automatic_edit_exceeds_overlap_evidence -> preserve q2
 ```
 
 When the adjacent primary sources themselves have a safe exact overlap, the

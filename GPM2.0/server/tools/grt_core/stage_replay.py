@@ -359,12 +359,10 @@ def replay_filter_records(
         )
     return output
 
-def apply_filter(
-    run_id: str,
+def filter_paths(
     chromosome_order: list[str],
     input_paths: dict[str, list[dict[str, object]]],
     input_records: dict[str, str],
-    q_input_sha256: str,
     sources: dict[tuple[str, str], str],
 ) -> tuple[dict[str, list[dict[str, object]]], dict[str, str], list[dict[str, object]]]:
     output_paths: dict[str, list[dict[str, object]]] = {}
@@ -425,19 +423,31 @@ def apply_filter(
         filtered_path: list[dict[str, object]] = []
         for index, (start, end) in enumerate(kept0):
             if index:
-                filtered_path.append(
+                collapsed_start = kept0[index - 1][1]
+                collapsed_segments = slice_path(
+                    input_paths[chromosome], collapsed_start, start
+                )
+                origin_object_ids = sorted(
                     {
-                        "segment_kind": "gap",
-                        "length": FILTER_CONNECTOR_LENGTH,
-                        "dataset_name": "",
-                        "contig_name": "",
-                        "source_start": None,
-                        "source_end": None,
-                        "orientation": "",
-                        "source_card_key": "",
-                        "evidence_ids": [],
+                        str(object_id)
+                        for segment in collapsed_segments
+                        for object_id in segment.get("origin_object_ids", [])
                     }
                 )
+                connector = {
+                    "segment_kind": "gap",
+                    "length": FILTER_CONNECTOR_LENGTH,
+                    "dataset_name": "",
+                    "contig_name": "",
+                    "source_start": None,
+                    "source_end": None,
+                    "orientation": "",
+                    "source_card_key": "",
+                    "evidence_ids": [],
+                }
+                if origin_object_ids:
+                    connector["origin_object_ids"] = origin_object_ids
+                filtered_path.append(connector)
             filtered_path.extend(slice_path(input_paths[chromosome], start, end))
         output_paths[chromosome] = filtered_path
         output_records[chromosome] = path_sequence(filtered_path, sources)
@@ -450,6 +460,27 @@ def apply_filter(
                 "removed": [[start + 1, end] for start, end in removed0],
             }
         )
+    return output_paths, output_records, prototypes
+
+
+def apply_filter(
+    run_id: str,
+    chromosome_order: list[str],
+    input_paths: dict[str, list[dict[str, object]]],
+    input_records: dict[str, str],
+    q_input_sha256: str,
+    sources: dict[tuple[str, str], str],
+    *,
+    stage: str = "step1_filter",
+    q_input_version: str = "q0r1",
+    q_output_version: str = "q0f",
+) -> tuple[dict[str, list[dict[str, object]]], dict[str, str], list[dict[str, object]]]:
+    output_paths, output_records, prototypes = filter_paths(
+        chromosome_order,
+        input_paths,
+        input_records,
+        sources,
+    )
     q_output_bytes = bytearray()
     for chromosome in chromosome_order:
         q_output_bytes.extend(f">{chromosome}\n".encode("utf-8"))
@@ -467,21 +498,21 @@ def apply_filter(
         events.append(
             {
                 "run_id": run_id,
-                "event_id": stable_id("event", [run_id, "step1_filter", object_id], 24),
-                "stage": "step1_filter",
+                "event_id": stable_id("event", [run_id, stage, object_id], 24),
+                "stage": stage,
                 "chr": chromosome,
                 "object_id": object_id,
                 "action": "filter_component",
                 "status": prototype["status"],
                 "reason": prototype["reason"],
                 "q_before": {
-                    "version": "q0r1",
+                    "version": q_input_version,
                     "start": 1,
                     "end": len(input_records[chromosome]),
                     "sha256": q_input_sha256,
                 },
                 "q_after": {
-                    "version": "q0f",
+                    "version": q_output_version,
                     "start": 1,
                     "end": len(output_records[chromosome]),
                     "sha256": q_output_sha256,
@@ -501,7 +532,7 @@ def apply_filter(
             }
         )
     if replay_filter_records(input_records, events) != output_records:
-        fail("step1_filter events do not deterministically reconstruct q0f")
+        fail(f"{stage} filter events do not deterministically reconstruct {q_output_version}")
     return output_paths, output_records, events
 
 def reconcile_filtered_round1_events(
