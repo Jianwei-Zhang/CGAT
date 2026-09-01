@@ -1117,7 +1117,7 @@ test("opening an existing workspace does not rerender importer content after swi
   }
 });
 
-test("import progress modal is the only import summary and shows per-row status icons", () => {
+test("import progress modal uses a compact hierarchy and text-only row statuses", () => {
   const previousWindow = globalThis.window;
   try {
     globalThis.window = {
@@ -1155,7 +1155,7 @@ test("import progress modal is the only import summary and shows per-row status 
             progressTotal: 620,
           },
         ],
-        summary: "正在导入",
+        summary: zh.runtime.importZipSummary,
       },
     });
 
@@ -1174,8 +1174,15 @@ test("import progress modal is the only import summary and shows per-row status 
     assert.doesNotMatch(html, /当前阶段/);
     assert.doesNotMatch(html, /import-progress-actions/);
     assert.match(html, /class="importer-import-progress-current-stage"/);
-    assert.match(html, /class="pipeline-done"/);
-    assert.match(html, /class="pipeline-spinner"/);
+    assert.match(
+      html,
+      /<p id="import-progress-dialog-summary" class="importer-import-progress-summary" aria-live="polite">正在导入 zip 交付包。<\/p>/,
+    );
+    assert.match(html, /已完成/);
+    assert.match(html, /进行中/);
+    assert.doesNotMatch(html, /pipeline-step-icon/);
+    assert.doesNotMatch(html, /class="pipeline-done"/);
+    assert.doesNotMatch(html, /class="pipeline-spinner"/);
     assert.match(html, /validate_input：zip_path=a\.zip \(1\/621\)/);
     assert.match(html, /extract_entry：gpm_server\/runs\/chr_Chr06\/result\.paf \(132\/621\)/);
     assert.match(html, /index_pairwise_paf：chr_Chr06\/flye_vs_self\/result\.paf \(551\/621\)/);
@@ -1294,7 +1301,7 @@ test("import progress uses phase metadata and labels GRT validation instead of a
   }
 });
 
-test("import progress css keeps labels in the wide column and icons pinned right", () => {
+test("import progress css uses a compact unified surface and simple status rows", () => {
   const css = readStylesheetTree(
     new URL("../../../styles/components.css", import.meta.url),
     "utf8",
@@ -1302,28 +1309,36 @@ test("import progress css keeps labels in the wide column and icons pinned right
 
   assert.match(
     css,
-    /\.importer-import-progress-dialog \.pipeline-step-row\.import-progress-step\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto\s+18px;/,
+    /\.importer-import-progress-dialog \.pipeline-step-row\.import-progress-step\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto;[^}]*border-bottom:\s*1px\s+solid\s+#edf1f5;/,
   );
   assert.match(
     css,
     /\.importer-import-progress-dialog \.import-progress-step\s+\.pipeline-step-label\s*\{[^}]*grid-column:\s*1\s*\/\s*2;/,
   );
-  assert.match(
+  assert.doesNotMatch(
     css,
-    /\.importer-import-progress-dialog \.import-progress-step\s+\.pipeline-step-icon\s*\{[^}]*grid-column:\s*3\s*\/\s*4;/,
+    /\.importer-import-progress-dialog \.import-progress-step\s+\.pipeline-step-icon/,
   );
   assert.match(css, /\.importer-import-progress-overlay\s*\{/);
   assert.match(
     css,
-    /\.importer-import-progress-dialog\s*\{[^}]*border-radius:\s*8px;/,
+    /\.importer-import-progress-dialog\s*\{[^}]*width:\s*min\(680px,[^}]*max-height:\s*min\(660px,[^}]*border-radius:\s*8px;/,
   );
   assert.match(
     css,
-    /\.importer-import-progress-dialog \.import-progress-close\s*\{[^}]*position:\s*absolute;[^}]*top:\s*16px;[^}]*right:\s*20px;/,
+    /\.importer-import-progress-dialog \.import-progress-close\s*\{[^}]*position:\s*absolute;[^}]*top:\s*14px;[^}]*right:\s*18px;/,
   );
   assert.match(
     css,
-    /\.importer-import-progress-overview\s*\{[^}]*padding:\s*22px\s+76px\s+22px\s+28px;/,
+    /\.importer-import-progress-overview\s*\{[^}]*padding:\s*22px\s+28px\s+16px;[^}]*background:\s*#ffffff;/,
+  );
+  assert.match(
+    css,
+    /\.importer-import-progress-summary\s*\{[^}]*position:\s*absolute;[^}]*width:\s*1px;[^}]*clip-path:\s*inset\(50%\);/,
+  );
+  assert.match(
+    css,
+    /\.importer-import-progress-dialog \.import-progress-list\s*\{[^}]*max-height:\s*min\(34vh,\s*280px\);[^}]*border:\s*0;[^}]*background:\s*transparent;/,
   );
   assert.match(
     css,

@@ -1244,7 +1244,6 @@ function renderImportProgressOverlay(importer, messages) {
           return `<li class="pipeline-step-row import-progress-step importer-import-progress-step ${escapeAttr(status)}" data-import-progress-step-status="${escapeAttr(status)}"${currentAttribute}>
             <span class="pipeline-step-label">${escapeHtml(formatImportProgressStage(stage, absoluteIndex, progressMeta, messages))}</span>
             <span class="importer-import-progress-step-status">${escapeHtml(statusLabelForRow)}</span>
-            <span class="pipeline-step-icon">${renderImportProgressStepIcon(status)}</span>
           </li>`;
         })
         .join("")
@@ -1253,7 +1252,6 @@ function renderImportProgressOverlay(importer, messages) {
         <span class="importer-import-progress-step-status">${escapeHtml(isCancelling
           ? messages.runtime.importProgressCancellingStatus
           : messages.runtime.importProgressRunningStatus)}</span>
-        <span class="pipeline-step-icon">${renderImportProgressStepIcon(isCancelling ? "cancelling" : "running")}</span>
       </li>`;
   return `
     <div class="modal-overlay import-progress-overlay importer-import-progress-overlay">
@@ -1699,13 +1697,6 @@ function clampImportProgressScrollTop(scrollTop, progressList) {
     return 0;
   }
   return Math.min(scrollTop, bottom);
-}
-
-function renderImportProgressStepIcon(status) {
-  if (status === "running" || status === "cancelling") {
-    return `<span class="pipeline-spinner" aria-hidden="true"></span>`;
-  }
-  return `<span class="pipeline-done" aria-hidden="true">&#10003;</span>`;
 }
 
 async function cancelCurrentImport(host, store) {
