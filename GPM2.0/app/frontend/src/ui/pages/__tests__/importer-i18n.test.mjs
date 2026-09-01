@@ -1150,7 +1150,7 @@ test("import progress modal truncates the active label and uses icon-only row st
             progressTotal: 620,
           },
           {
-            label: "index_pairwise_paf：chr_Chr06/flye_vs_self/result.paf (550/620)",
+            label: "index_pairwise_paf：my_hifiasm_vs_self (runs/chr_Chr06/my_hifiasm_vs_self/result.paf) (550/620)",
             progressIndex: 550,
             progressTotal: 620,
           },
@@ -1175,8 +1175,9 @@ test("import progress modal truncates the active label and uses icon-only row st
     assert.doesNotMatch(html, /import-progress-actions/);
     assert.match(
       html,
-      /<strong class="importer-import-progress-current-stage" title="index_pairwise_paf：chr_Chr06\/flye_vs_self\/result\.paf">index_pairwise_paf：chr_Chr06\/flye_vs_self\/result\.paf<\/strong>/,
+      /<strong class="importer-import-progress-current-stage">index_pairwise_paf：my_hifiasm_vs_self<\/strong>/,
     );
+    assert.doesNotMatch(html, /importer-import-progress-current-stage" title=/);
     assert.match(
       html,
       /<p id="import-progress-dialog-summary" class="importer-import-progress-summary" aria-live="polite">正在导入 zip 交付包。<\/p>/,
@@ -1200,7 +1201,7 @@ test("import progress modal truncates the active label and uses icon-only row st
     assert.doesNotMatch(html, /已记录 \d+ 项/);
     assert.match(html, /validate_input：zip_path=a\.zip \(1\/621\)/);
     assert.match(html, /extract_entry：gpm_server\/runs\/chr_Chr06\/result\.paf \(132\/621\)/);
-    assert.match(html, /index_pairwise_paf：chr_Chr06\/flye_vs_self\/result\.paf \(551\/621\)/);
+    assert.match(html, /index_pairwise_paf：my_hifiasm_vs_self \(runs\/chr_Chr06\/my_hifiasm_vs_self\/result\.paf\) \(551\/621\)/);
     assert.match(html, /class="import-progress-meter"/);
     assert.match(html, /data-progress-mode="step"/);
     assert.match(html, /aria-valuenow="551"/);
@@ -1342,15 +1343,15 @@ test("import progress css keeps the active label on one line and uses status ico
   assert.match(css, /\.importer-import-progress-overlay\s*\{/);
   assert.match(
     css,
-    /\.importer-import-progress-dialog\s*\{[^}]*width:\s*min\(680px,[^}]*max-height:\s*min\(660px,[^}]*border-radius:\s*8px;/,
+    /\.importer-import-progress-dialog\s*\{[^}]*width:\s*min\(900px,[^}]*max-height:\s*min\(760px,[^}]*border-radius:\s*8px;/,
   );
   assert.match(
     css,
-    /\.importer-import-progress-dialog \.import-progress-close\s*\{[^}]*position:\s*absolute;[^}]*top:\s*14px;[^}]*right:\s*18px;/,
+    /\.importer-import-progress-dialog \.import-progress-close\s*\{[^}]*position:\s*absolute;[^}]*top:\s*16px;[^}]*right:\s*20px;/,
   );
   assert.match(
     css,
-    /\.importer-import-progress-overview\s*\{[^}]*padding:\s*22px\s+28px\s+16px;[^}]*background:\s*#ffffff;/,
+    /\.importer-import-progress-overview\s*\{[^}]*padding:\s*24px\s+32px\s+18px;[^}]*background:\s*#ffffff;/,
   );
   assert.match(
     css,
@@ -1362,7 +1363,7 @@ test("import progress css keeps the active label on one line and uses status ico
   );
   assert.match(
     css,
-    /\.importer-import-progress-dialog \.import-progress-list\s*\{[^}]*max-height:\s*min\(34vh,\s*280px\);[^}]*border:\s*0;[^}]*background:\s*transparent;/,
+    /\.importer-import-progress-dialog \.import-progress-list\s*\{[^}]*min-height:\s*180px;[^}]*max-height:\s*min\(46vh,\s*420px\);[^}]*border:\s*0;[^}]*background:\s*transparent;/,
   );
   assert.match(
     css,
@@ -1543,6 +1544,7 @@ test("import progress cancellation keeps the dialog until the import settles", a
     assert.equal(store.getState().importer.importRunId, runId);
     assert.equal(store.getState().importer.importCancelling, true);
     assert.match(host.innerHTML, /disabled aria-disabled="true"/);
+    assert.match(host.innerHTML, /importer-import-progress-cancel-spinner/);
 
     const duplicateCancelRun = cancelButton.click();
     await duplicateCancelRun;

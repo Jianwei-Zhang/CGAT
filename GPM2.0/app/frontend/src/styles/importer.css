@@ -38,8 +38,8 @@
 
 .importer-import-progress-dialog {
   position: relative;
-  width: min(680px, calc(100vw - 24px));
-  max-height: min(660px, calc(100vh - 24px));
+  width: min(900px, calc(100vw - 64px));
+  max-height: min(760px, calc(100vh - 64px));
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -54,13 +54,13 @@
 
 .importer-import-progress-dialog .import-progress-close {
   position: absolute;
-  top: 14px;
-  right: 18px;
+  top: 16px;
+  right: 20px;
   z-index: 1;
-  width: 32px;
-  min-width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
   display: inline-grid;
   place-items: center;
   padding: 0;
@@ -83,17 +83,25 @@
 
 .importer-import-progress-dialog .import-progress-close:disabled {
   cursor: default;
-  opacity: 0.55;
+  color: #a45a16;
+  opacity: 1;
 }
 
 .importer-import-progress-dialog .import-progress-close svg {
   display: block;
 }
 
+.importer-import-progress-dialog .importer-import-progress-cancel-spinner {
+  width: 14px;
+  height: 14px;
+  border-color: #ecd5b3;
+  border-top-color: currentColor;
+}
+
 .importer-import-progress-overview {
   display: grid;
   gap: 12px;
-  padding: 22px 28px 16px;
+  padding: 24px 32px 18px;
   background: #ffffff;
 }
 
@@ -101,7 +109,7 @@
   min-width: 0;
   display: block;
   max-width: 100%;
-  padding-right: 44px;
+  padding-right: 48px;
   overflow: hidden;
   color: #25364a;
   font-size: 14px;
@@ -177,13 +185,13 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 12px 28px 22px;
+  padding: 14px 32px 26px;
   border-top: 1px solid #edf1f5;
 }
 
 .importer-import-progress-dialog .import-progress-list {
-  min-height: 112px;
-  max-height: min(34vh, 280px);
+  min-height: 180px;
+  max-height: min(46vh, 420px);
   display: block;
   overflow-y: auto;
   overflow-x: hidden;
@@ -328,7 +336,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .importer-import-progress-dialog .import-progress-meter-fill,
-  .importer-import-progress-dialog .importer-import-progress-step-icon .pipeline-spinner {
+  .importer-import-progress-dialog .importer-import-progress-step-icon .pipeline-spinner,
+  .importer-import-progress-dialog .importer-import-progress-cancel-spinner {
     animation: none;
   }
 

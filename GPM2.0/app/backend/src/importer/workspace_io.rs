@@ -47,6 +47,26 @@ pub(super) fn check_import_cancel(should_cancel: &mut impl FnMut() -> bool) -> R
     Ok(())
 }
 
+const IMPORT_COPY_BUFFER_BYTES: usize = 64 * 1024;
+
+fn copy_with_import_cancel(
+    reader: &mut impl io::Read,
+    writer: &mut impl Write,
+    should_cancel: &mut impl FnMut() -> bool,
+) -> Result<u64> {
+    let mut buffer = [0_u8; IMPORT_COPY_BUFFER_BYTES];
+    let mut bytes_written = 0_u64;
+    loop {
+        check_import_cancel(should_cancel)?;
+        let bytes_read = reader.read(&mut buffer)?;
+        if bytes_read == 0 {
+            return Ok(bytes_written);
+        }
+        writer.write_all(&buffer[..bytes_read])?;
+        bytes_written += bytes_read as u64;
+    }
+}
+
 pub(super) fn validate_zip_path(zip_path: &Path) -> Result<()> {
     if !zip_path.exists() {
         bail!("zip file does not exist: {}", zip_path.display());
@@ -146,7 +166,7 @@ pub(super) fn unzip_delivery_to_root(
         let mut output = File::create(&output_path).with_context(|| {
             format!("failed to create extracted file {}", output_path.display())
         })?;
-        io::copy(&mut entry, &mut output).with_context(|| {
+        copy_with_import_cancel(&mut entry, &mut output, should_cancel).with_context(|| {
             format!(
                 "failed to extract zip entry {} to {}",
                 entry.name(),
@@ -241,4 +261,41 @@ pub(super) fn initialize_workspace_layout(workspace_root: &Path) -> Result<PathB
     }
 
     Ok(project_db_path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn cancellable_copy_stops_between_chunks() {
+        let input = vec![7_u8; IMPORT_COPY_BUFFER_BYTES * 3];
+        let mut reader = Cursor::new(input);
+        let mut output = Vec::new();
+        let mut checks = 0;
+
+        let error = copy_with_import_cancel(&mut reader, &mut output, &mut || {
+            checks += 1;
+            checks > 1
+        })
+        .expect_err("the second chunk check should cancel the copy");
+
+        assert_eq!(error.to_string(), "import cancelled");
+        assert_eq!(checks, 2);
+        assert_eq!(output.len(), IMPORT_COPY_BUFFER_BYTES);
+    }
+
+    #[test]
+    fn cancellable_copy_preserves_complete_output_without_a_request() {
+        let input = vec![3_u8; IMPORT_COPY_BUFFER_BYTES + 17];
+        let mut reader = Cursor::new(input.clone());
+        let mut output = Vec::new();
+
+        let copied = copy_with_import_cancel(&mut reader, &mut output, &mut || false)
+            .expect("copy should complete");
+
+        assert_eq!(copied, input.len() as u64);
+        assert_eq!(output, input);
+    }
 }

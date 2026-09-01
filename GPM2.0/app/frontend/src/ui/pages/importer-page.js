@@ -1218,12 +1218,17 @@ function renderImportProgressOverlay(importer, messages) {
   const summary = isCancelling
     ? messages.runtime.importCancellingSummary
     : String(importer.summary || messages.runtime.importProgressIndeterminate);
-  const currentStage = stripImportProgressSuffix(recentStages.length
+  const currentStage = stripImportCurrentStageSuffix(recentStages.length
     ? getImportStageLabel(recentStages[recentStages.length - 1], messages)
     : messages.runtime.notStarted);
   const cancelLabel = isCancelling
     ? messages.buttons.cancelImportPending
     : messages.buttons.cancelImport;
+  const cancelIcon = isCancelling
+    ? `<span class="pipeline-spinner importer-import-progress-cancel-spinner" aria-hidden="true"></span>`
+    : `<svg viewBox="0 0 20 20" width="16" height="16" focusable="false" aria-hidden="true">
+        <path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+      </svg>`;
   const stageItems = recentStages.length
     ? recentStages
         .map((stage, index) => {
@@ -1270,12 +1275,10 @@ function renderImportProgressOverlay(importer, messages) {
           title="${escapeAttr(cancelLabel)}"
           ${isCancelling ? 'disabled aria-disabled="true"' : ""}
         >
-          <svg viewBox="0 0 20 20" width="16" height="16" focusable="false" aria-hidden="true">
-            <path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-          </svg>
+          ${cancelIcon}
         </button>
         <section class="importer-import-progress-overview">
-          <strong class="importer-import-progress-current-stage" title="${escapeAttr(currentStage)}">${escapeHtml(currentStage)}</strong>
+          <strong class="importer-import-progress-current-stage">${escapeHtml(currentStage)}</strong>
           ${renderImportProgressMeter(progressMeta, messages)}
           <p id="import-progress-dialog-summary" class="importer-import-progress-summary" aria-live="polite">${escapeHtml(summary)}</p>
           ${importer.importCancelError
@@ -1616,6 +1619,12 @@ function getStagePhaseTotal(stage) {
 
 function stripImportProgressSuffix(value) {
   return String(value || "").replace(/\s*(?:\(\d+\/\d+\)|（\d+\/\d+）)\s*$/, "");
+}
+
+function stripImportCurrentStageSuffix(value) {
+  return stripImportProgressSuffix(value)
+    .replace(/\s*(?:\([^()]*\)|（[^（）]*）)\s*$/, "")
+    .trimEnd();
 }
 
 function renderImportProgressMeter(progressMeta, messages) {

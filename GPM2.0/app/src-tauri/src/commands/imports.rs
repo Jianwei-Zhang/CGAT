@@ -11,9 +11,7 @@ pub async fn import_zip(
     let zip_path = zipPath;
     let workspace_root = workspaceRoot;
     let run_id = normalize_optional_run_id(runId);
-    if let Some(run_id) = run_id.as_deref() {
-        let _ = import_cancel::clear_cancel(run_id);
-    }
+    // Preserve a request submitted after the dialog opens but before this worker starts.
     tauri::async_runtime::spawn_blocking(move || {
         let progress_run_id = run_id.clone();
         let app_for_progress = app.clone();
@@ -62,9 +60,7 @@ pub async fn import_extracted(
 ) -> CommandResult<Value> {
     let extracted_path = extractedPath;
     let run_id = normalize_optional_run_id(runId);
-    if let Some(run_id) = run_id.as_deref() {
-        let _ = import_cancel::clear_cancel(run_id);
-    }
+    // Preserve a request submitted after the dialog opens but before this worker starts.
     tauri::async_runtime::spawn_blocking(move || {
         let progress_run_id = run_id.clone();
         let app_for_progress = app.clone();
@@ -114,9 +110,7 @@ pub async fn import_add_dataset_package(
     let workspace_root = workspaceRoot;
     let zip_path = zipPath;
     let run_id = normalize_optional_run_id(runId);
-    if let Some(run_id) = run_id.as_deref() {
-        let _ = import_cancel::clear_cancel(run_id);
-    }
+    // Preserve a request submitted after the dialog opens but before this worker starts.
     tauri::async_runtime::spawn_blocking(move || {
         let progress_run_id = run_id.clone();
         let app_for_progress = app.clone();
@@ -187,9 +181,7 @@ pub async fn import_add_ctg_package(
         target_track: expectedTargetTrack.unwrap_or_default(),
     };
     let run_id = normalize_optional_run_id(runId);
-    if let Some(run_id) = run_id.as_deref() {
-        let _ = import_cancel::clear_cancel(run_id);
-    }
+    // Preserve a request submitted after the dialog opens but before this worker starts.
     tauri::async_runtime::spawn_blocking(move || {
         let progress_run_id = run_id.clone();
         let app_for_progress = app.clone();

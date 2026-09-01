@@ -38,3 +38,19 @@ pub fn clear_cancel(run_id: &str) -> bool {
         .expect("cancelled import registry mutex poisoned")
         .remove(normalized)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cancellation_remains_registered_until_the_worker_clears_it() {
+        let run_id = "cancel-before-worker-start";
+        let _ = clear_cancel(run_id);
+
+        assert!(request_cancel(run_id));
+        assert!(is_cancelled(run_id));
+        assert!(clear_cancel(run_id));
+        assert!(!is_cancelled(run_id));
+    }
+}
