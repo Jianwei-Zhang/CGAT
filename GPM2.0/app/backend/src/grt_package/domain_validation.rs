@@ -321,13 +321,13 @@ pub(super) fn validate_app_display_evidence(
                 )
             })?;
         let _ = identity;
-        if let Some(mapq) = item.get("mapq").filter(|value| !value.is_null()) {
-            if mapq.as_u64().is_none_or(|value| value > 255) {
-                return grt_err(
-                    "INVALID_VALUE",
-                    format!("App display evidence {evidence_id}.mapq is invalid"),
-                );
-            }
+        if let Some(mapq) = item.get("mapq").filter(|value| !value.is_null())
+            && mapq.as_u64().is_none_or(|value| value > 255)
+        {
+            return grt_err(
+                "INVALID_VALUE",
+                format!("App display evidence {evidence_id}.mapq is invalid"),
+            );
         }
         validate_app_display_evidence_endpoint(
             item.get("source").unwrap_or(&Value::Null),
