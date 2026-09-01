@@ -243,9 +243,12 @@ pub async fn import_add_ctg_package(
 #[tauri::command]
 #[allow(non_snake_case)]
 pub fn request_import_cancel(runId: String) -> CommandResult<Value> {
-    let registered = import_cancel::request_cancel(&runId);
+    let run_id = runId.trim().to_string();
+    let cancel_requested = !run_id.is_empty();
+    let newly_registered = import_cancel::request_cancel(&run_id);
     Ok(json!({
-        "runId": runId,
-        "cancelRequested": registered
+        "runId": run_id,
+        "cancelRequested": cancel_requested,
+        "newlyRegistered": newly_registered
     }))
 }

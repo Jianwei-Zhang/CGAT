@@ -334,6 +334,12 @@ export function bindImporterPage(host, store) {
   });
 
   cancelImportButtons.forEach((button) => {
+    button.addEventListener("pointerdown", async (event) => {
+      if (event.isPrimary === false || Number(event.button) !== 0) {
+        return;
+      }
+      await cancelCurrentImport(host, store);
+    });
     button.addEventListener("click", async () => {
       await cancelCurrentImport(host, store);
     });
@@ -1465,10 +1471,8 @@ function formatImportFailureSummary(error, stateOrLocale) {
   });
 }
 
-function formatImportEndedAfterCancelSummary(error, stateOrLocale) {
-  return i18nT(stateOrLocale, "importer.runtime.importCancelFinishedSummary", {
-    message: getImportErrorFirstLine(error),
-  });
+function formatImportEndedAfterCancelSummary(stateOrLocale) {
+  return i18nT(stateOrLocale, "importer.runtime.importCancelFinishedSummary");
 }
 
 function formatImportCancelRequestError(error, stateOrLocale) {
@@ -1493,7 +1497,7 @@ function buildImportCompletionErrorPatch(
       ? i18nT(stateOrLocale, "importer.runtime.importCancelFinishedStatus")
       : i18nT(stateOrLocale, "importer.runtime.importFailedStatus"),
     summary: cancellationWasRequested
-      ? formatImportEndedAfterCancelSummary(error, stateOrLocale)
+      ? formatImportEndedAfterCancelSummary(stateOrLocale)
       : formatImportFailureSummary(error, stateOrLocale),
   };
 }

@@ -39,6 +39,18 @@ function createButton() {
       }
       return undefined;
     },
+    pointerdown({ button = 0, isPrimary = true } = {}) {
+      const handler = listeners.get("pointerdown");
+      if (handler) {
+        return handler({
+          currentTarget: this,
+          target: this,
+          button,
+          isPrimary,
+        });
+      }
+      return undefined;
+    },
     contextmenu({ clientX = 0, clientY = 0 } = {}) {
       const handler = listeners.get("contextmenu");
       if (handler) {
@@ -174,6 +186,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.runtime.importProgressIndeterminate, "正在处理导入任务...");
   assert.equal(zh.runtime.importCancelRequestFailedSummary, "终止请求失败：{message}");
   assert.equal(zh.runtime.importCancelFinishedStatus, "终止请求已提交");
+  assert.equal(zh.runtime.importCancelFinishedSummary, "导入流程已结束。");
   assert.equal(zh.runtime.tauriImportAddPackageStage, "调用后端 import_add_dataset_package");
   assert.equal(zh.progressStages.validate_grt_source_fastas, "校验 reference/dataset FASTA 与 FAI");
   assert.equal(zh.progressStages.validate_grt_app_required_files, "检查 App 交付包必需文件");
@@ -195,6 +208,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.runtime.importProgressIndeterminate, "Processing the import...");
   assert.equal(en.runtime.importCancelRequestFailedSummary, "Cancellation request failed: {message}");
   assert.equal(en.runtime.importCancelFinishedStatus, "Cancellation requested");
+  assert.equal(en.runtime.importCancelFinishedSummary, "The import has ended.");
   assert.equal(en.runtime.tauriImportAddPackageStage, "Invoke backend import_add_dataset_package");
   assert.equal(en.progressStages.validate_grt_source_fastas, "Validate reference/dataset FASTA and FAI");
   assert.equal(en.progressStages.validate_grt_app_required_files, "Check required App delivery files");
@@ -1476,7 +1490,7 @@ test("import progress uses an indeterminate meter when no reliable total exists"
   }
 });
 
-test("import progress cancellation keeps the dialog until the import settles", async () => {
+test("import progress cancellation starts on pointerdown and keeps the dialog until the import settles", async () => {
   const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;
   const previousSetTimeout = globalThis.setTimeout;
@@ -1539,7 +1553,7 @@ test("import progress cancellation keeps the dialog until the import settles", a
     const runId = store.getState().importer.importRunId;
     assert.equal(store.getState().importer.inFlight, true);
 
-    const cancelRun = cancelButton.click();
+    const cancelRun = cancelButton.pointerdown();
     assert.equal(store.getState().importer.inFlight, true);
     assert.equal(store.getState().importer.importRunId, runId);
     assert.equal(store.getState().importer.importCancelling, true);
@@ -1564,7 +1578,8 @@ test("import progress cancellation keeps the dialog until the import settles", a
     assert.equal(store.getState().importer.importRunId, null);
     assert.equal(store.getState().importer.importCancelling, false);
     assert.equal(store.getState().importer.status, zh.runtime.importCancelFinishedStatus);
-    assert.match(store.getState().importer.summary, /import cancelled by backend/);
+    assert.equal(store.getState().importer.summary, zh.runtime.importCancelFinishedSummary);
+    assert.doesNotMatch(store.getState().importer.summary, /import cancelled by backend/);
   } finally {
     globalThis.document = previousDocument;
     globalThis.window = previousWindow;

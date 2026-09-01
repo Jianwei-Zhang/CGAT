@@ -752,6 +752,29 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_import_cancel_requests_remain_accepted() {
+        let run_id = format!(
+            "cancel-request-test-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock before unix epoch")
+                .as_nanos()
+        );
+
+        let first = request_import_cancel(run_id.clone()).expect("request import cancellation");
+        let duplicate =
+            request_import_cancel(run_id.clone()).expect("repeat import cancellation request");
+
+        assert_eq!(first["cancelRequested"].as_bool(), Some(true));
+        assert_eq!(first["newlyRegistered"].as_bool(), Some(true));
+        assert_eq!(duplicate["cancelRequested"].as_bool(), Some(true));
+        assert_eq!(duplicate["newlyRegistered"].as_bool(), Some(false));
+        assert!(import_cancel::is_cancelled(&run_id));
+        assert!(import_cancel::clear_cancel(&run_id));
+    }
+
+    #[test]
     fn validate_workspace_integrity_accepts_app_delivery_without_server_scripts() {
         let workspace_root = create_test_workspace_root();
         fs::create_dir_all(workspace_root.join("metadata")).expect("create metadata directory");
