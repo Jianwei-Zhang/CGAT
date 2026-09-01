@@ -22,7 +22,6 @@ export const zh = {
     importSummary: "导入摘要",
     importProgressTitle: "导入进度",
     importProgressDetailsTitle: "详细过程",
-    importProgressCurrentStage: "当前阶段",
     statusLabel: "状态：",
   },
   buttons: {
@@ -199,7 +198,6 @@ export const en = {
     importSummary: "Import summary",
     importProgressTitle: "Import progress",
     importProgressDetailsTitle: "Activity log",
-    importProgressCurrentStage: "Current stage",
     statusLabel: "Status:",
   },
   buttons: {

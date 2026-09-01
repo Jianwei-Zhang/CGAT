@@ -46,78 +46,17 @@
   gap: 0;
   padding: 0;
   border: 1px solid #d9e2ec;
-  border-radius: 18px;
+  border-radius: 8px;
   background: #ffffff;
   color: #1f2937;
   box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28);
 }
 
-.importer-import-progress-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 24px 28px 20px;
-  border-bottom: 1px solid #e5eaf0;
-}
-
-.importer-import-progress-title-group {
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.importer-import-progress-status-mark {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 50%;
-  background: #eaf2ff;
-  color: #2f6da6;
-}
-
-.importer-import-progress-status-mark.is-cancelling {
-  background: #fff3df;
-  color: #a45a16;
-}
-
-.importer-import-progress-dialog .importer-import-progress-status-mark .pipeline-spinner {
-  border-color: #b9d0ea;
-  border-top-color: #2f6da6;
-}
-
-.importer-import-progress-dialog .importer-import-progress-status-mark.is-cancelling .pipeline-spinner {
-  border-color: #f0d2a9;
-  border-top-color: #a45a16;
-}
-
-.importer-import-progress-title-block {
-  min-width: 0;
-  display: grid;
-  gap: 3px;
-}
-
-.importer-import-progress-eyebrow,
-.importer-import-progress-section-label {
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.importer-import-progress-title-block h4 {
-  margin: 0;
-  color: #172033;
-  font-size: 20px;
-  line-height: 1.25;
-}
-
 .importer-import-progress-dialog .import-progress-close {
-  position: static;
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  z-index: 1;
   width: 36px;
   min-width: 36px;
   height: 36px;
@@ -154,25 +93,13 @@
 .importer-import-progress-overview {
   display: grid;
   gap: 14px;
-  padding: 20px 28px 22px;
+  padding: 22px 76px 22px 28px;
   background: #f8fafc;
   border-bottom: 1px solid #e5eaf0;
 }
 
-.importer-import-progress-overview-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 .importer-import-progress-current-stage {
   min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.importer-import-progress-current-stage strong {
   display: block;
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -367,29 +294,20 @@
   .importer-import-progress-dialog {
     width: 100%;
     max-height: calc(100vh - 20px);
-    border-radius: 14px;
+    border-radius: 8px;
   }
 
-  .importer-import-progress-header,
-  .importer-import-progress-overview,
-  .importer-import-progress-log {
-    padding-right: 18px;
-    padding-left: 18px;
-  }
-
-  .importer-import-progress-header {
-    padding-top: 18px;
-    padding-bottom: 16px;
+  .importer-import-progress-dialog .import-progress-close {
+    top: 12px;
+    right: 14px;
   }
 
   .importer-import-progress-overview {
-    padding-top: 16px;
-    padding-bottom: 18px;
+    padding: 18px 66px 18px 18px;
   }
 
   .importer-import-progress-log {
-    padding-top: 15px;
-    padding-bottom: 18px;
+    padding: 15px 18px 18px;
   }
 
   .importer-import-progress-dialog .import-progress-meter {

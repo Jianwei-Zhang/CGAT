@@ -1160,9 +1160,20 @@ test("import progress modal is the only import summary and shows per-row status 
     });
 
     assert.match(html, /class="modal-overlay import-progress-overlay importer-import-progress-overlay"/);
-    assert.match(html, /aria-labelledby="import-progress-dialog-title"/);
+    assert.match(html, /role="dialog"/);
+    assert.match(html, /aria-label="导入进度"/);
     assert.match(html, /aria-describedby="import-progress-dialog-summary"/);
+    assert.match(html, /data-import-cancel="1"/);
+    assert.match(html, /aria-label="终止导入"/);
+    assert.doesNotMatch(html, /aria-labelledby="import-progress-dialog-title"/);
+    assert.doesNotMatch(html, /importer-import-progress-header/);
+    assert.doesNotMatch(html, /importer-import-progress-status-mark/);
+    assert.doesNotMatch(html, /importer-import-progress-overview-head/);
+    assert.doesNotMatch(html, />导入进度</);
+    assert.doesNotMatch(html, /导入进行中/);
+    assert.doesNotMatch(html, /当前阶段/);
     assert.doesNotMatch(html, /import-progress-actions/);
+    assert.match(html, /class="importer-import-progress-current-stage"/);
     assert.match(html, /class="pipeline-done"/);
     assert.match(html, /class="pipeline-spinner"/);
     assert.match(html, /validate_input：zip_path=a\.zip \(1\/621\)/);
@@ -1173,6 +1184,45 @@ test("import progress modal is the only import summary and shows per-row status 
     assert.match(html, /aria-valuenow="551"/);
     assert.match(html, /551\/621/);
     assert.doesNotMatch(html, /导入摘要/);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test("import progress renders only the most recent 60 log entries", () => {
+  const previousWindow = globalThis.window;
+  try {
+    globalThis.window = {
+      localStorage: {
+        getItem() {
+          return null;
+        },
+      },
+    };
+    const stages = Array.from(
+      { length: 65 },
+      (_, index) => `event-${String(index + 1).padStart(2, "0")}`,
+    );
+    const html = renderImporterPage({
+      locale: "en",
+      importer: {
+        ...createImporterScrollState().importer,
+        importRunId: "import-log-window-test",
+        stages,
+        summary: "Processing",
+      },
+    });
+
+    const renderedRows = html.match(
+      /class="pipeline-step-row import-progress-step importer-import-progress-step/g,
+    ) || [];
+    assert.equal(renderedRows.length, 60);
+    for (const omittedStage of stages.slice(0, 5)) {
+      assert.equal(html.includes(omittedStage), false);
+    }
+    assert.match(html, /event-06/);
+    assert.match(html, /event-65/);
+    assert.match(html, /Events recorded: 65/);
   } finally {
     globalThis.window = previousWindow;
   }
@@ -1263,6 +1313,26 @@ test("import progress css keeps labels in the wide column and icons pinned right
     /\.importer-import-progress-dialog \.import-progress-step\s+\.pipeline-step-icon\s*\{[^}]*grid-column:\s*3\s*\/\s*4;/,
   );
   assert.match(css, /\.importer-import-progress-overlay\s*\{/);
+  assert.match(
+    css,
+    /\.importer-import-progress-dialog\s*\{[^}]*border-radius:\s*8px;/,
+  );
+  assert.match(
+    css,
+    /\.importer-import-progress-dialog \.import-progress-close\s*\{[^}]*position:\s*absolute;[^}]*top:\s*16px;[^}]*right:\s*20px;/,
+  );
+  assert.match(
+    css,
+    /\.importer-import-progress-overview\s*\{[^}]*padding:\s*22px\s+76px\s+22px\s+28px;/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.importer-import-progress-dialog\s*\{[^}]*border-radius:\s*8px;/,
+  );
+  assert.doesNotMatch(
+    css,
+    /\.importer-import-progress-(?:header|title-group|status-mark|title-block|eyebrow|section-label|overview-head)/,
+  );
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(
     css,
@@ -1355,6 +1425,8 @@ test("import progress uses an indeterminate meter when no reliable total exists"
       },
     });
 
+    assert.match(html, /aria-label="Import progress"/);
+    assert.doesNotMatch(html, /Current stage/);
     assert.match(html, /data-progress-mode="indeterminate"/);
     assert.match(html, /aria-valuetext="Processing the import\.\.\."/);
     assert.doesNotMatch(html, /aria-valuenow=/);

@@ -1215,9 +1215,6 @@ function renderImportProgressOverlay(importer, messages) {
   const recentOffset = Math.max(0, allStages.length - 60);
   const recentStages = allStages.slice(recentOffset);
   const isCancelling = importer.importCancelling === true;
-  const statusLabel = isCancelling
-    ? messages.runtime.importCancellingStatus
-    : messages.runtime.importInProgressStatus;
   const summary = isCancelling
     ? messages.runtime.importCancellingSummary
     : String(importer.summary || messages.runtime.importProgressIndeterminate);
@@ -1264,39 +1261,23 @@ function renderImportProgressOverlay(importer, messages) {
         class="card modal-dialog import-progress-dialog importer-import-progress-dialog"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="import-progress-dialog-title"
+        aria-label="${escapeAttr(messages.page.importProgressTitle)}"
         aria-describedby="import-progress-dialog-summary"
       >
-        <header class="importer-import-progress-header">
-          <div class="importer-import-progress-title-group">
-            <span class="importer-import-progress-status-mark ${isCancelling ? "is-cancelling" : ""}" aria-hidden="true">
-              <span class="pipeline-spinner"></span>
-            </span>
-            <div class="importer-import-progress-title-block">
-              <span class="importer-import-progress-eyebrow">${escapeHtml(statusLabel)}</span>
-              <h4 id="import-progress-dialog-title">${escapeHtml(messages.page.importProgressTitle)}</h4>
-            </div>
-          </div>
-          <button
-            type="button"
-            class="button ghost import-progress-close importer-import-progress-close"
-            data-import-cancel="1"
-            aria-label="${escapeAttr(cancelLabel)}"
-            title="${escapeAttr(cancelLabel)}"
-            ${isCancelling ? 'disabled aria-disabled="true"' : ""}
-          >
-            <svg viewBox="0 0 20 20" width="16" height="16" focusable="false" aria-hidden="true">
-              <path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-            </svg>
-          </button>
-        </header>
-        <section class="importer-import-progress-overview" aria-labelledby="import-progress-current-stage-label">
-          <div class="importer-import-progress-overview-head">
-            <div class="importer-import-progress-current-stage">
-              <span id="import-progress-current-stage-label" class="importer-import-progress-section-label">${escapeHtml(messages.page.importProgressCurrentStage)}</span>
-              <strong>${escapeHtml(currentStage)}</strong>
-            </div>
-          </div>
+        <button
+          type="button"
+          class="button ghost import-progress-close importer-import-progress-close"
+          data-import-cancel="1"
+          aria-label="${escapeAttr(cancelLabel)}"
+          title="${escapeAttr(cancelLabel)}"
+          ${isCancelling ? 'disabled aria-disabled="true"' : ""}
+        >
+          <svg viewBox="0 0 20 20" width="16" height="16" focusable="false" aria-hidden="true">
+            <path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </button>
+        <section class="importer-import-progress-overview">
+          <strong class="importer-import-progress-current-stage">${escapeHtml(currentStage)}</strong>
           ${renderImportProgressMeter(progressMeta, messages)}
           <p id="import-progress-dialog-summary" class="importer-import-progress-summary" aria-live="polite">${escapeHtml(summary)}</p>
           ${importer.importCancelError
