@@ -102,11 +102,13 @@
   display: block;
   max-width: 100%;
   padding-right: 44px;
-  overflow-wrap: anywhere;
+  overflow: hidden;
   color: #25364a;
   font-size: 14px;
   font-weight: 600;
   line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .importer-import-progress-dialog .import-progress-meter {
@@ -174,30 +176,9 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px 28px 22px;
+  gap: 0;
+  padding: 12px 28px 22px;
   border-top: 1px solid #edf1f5;
-}
-
-.importer-import-progress-log-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.importer-import-progress-log-head h5 {
-  margin: 0;
-  color: #334155;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.importer-import-progress-log-count {
-  flex: 0 0 auto;
-  color: #718096;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
 }
 
 .importer-import-progress-dialog .import-progress-list {
@@ -270,21 +251,29 @@
   overflow-wrap: anywhere;
 }
 
-.importer-import-progress-step-status {
+.importer-import-progress-step-icon {
   grid-column: 2 / 3;
-  color: #718096;
-  font-size: 11px;
-  white-space: nowrap;
+  width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+  justify-self: end;
+  color: #5b7f6b;
 }
 
-.importer-import-progress-dialog .import-progress-step.running .importer-import-progress-step-status {
+.importer-import-progress-step-icon.is-running {
   color: #2f6da6;
-  font-weight: 700;
 }
 
-.importer-import-progress-dialog .import-progress-step.cancelling .importer-import-progress-step-status {
+.importer-import-progress-step-icon.is-cancelling {
   color: #a45a16;
-  font-weight: 700;
+}
+
+.importer-import-progress-step-icon .pipeline-spinner {
+  width: 12px;
+  height: 12px;
+  border-color: #c6d5e4;
+  border-top-color: currentColor;
 }
 
 @keyframes importer-import-progress-indeterminate {
@@ -338,8 +327,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .importer-import-progress-dialog .import-progress-meter-fill {
+  .importer-import-progress-dialog .import-progress-meter-fill,
+  .importer-import-progress-dialog .importer-import-progress-step-icon .pipeline-spinner {
     animation: none;
+  }
+
+  .importer-import-progress-dialog .import-progress-meter-fill {
     transition: none;
   }
 }

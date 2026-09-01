@@ -1218,15 +1218,12 @@ function renderImportProgressOverlay(importer, messages) {
   const summary = isCancelling
     ? messages.runtime.importCancellingSummary
     : String(importer.summary || messages.runtime.importProgressIndeterminate);
-  const currentStage = recentStages.length
+  const currentStage = stripImportProgressSuffix(recentStages.length
     ? getImportStageLabel(recentStages[recentStages.length - 1], messages)
-    : messages.runtime.notStarted;
+    : messages.runtime.notStarted);
   const cancelLabel = isCancelling
     ? messages.buttons.cancelImportPending
     : messages.buttons.cancelImport;
-  const logCount = formatImporterMessage(messages.runtime.importProgressLogCount, {
-    count: allStages.length,
-  });
   const stageItems = recentStages.length
     ? recentStages
         .map((stage, index) => {
@@ -1243,15 +1240,18 @@ function renderImportProgressOverlay(importer, messages) {
           const currentAttribute = isLatest ? ' aria-current="step"' : "";
           return `<li class="pipeline-step-row import-progress-step importer-import-progress-step ${escapeAttr(status)}" data-import-progress-step-status="${escapeAttr(status)}"${currentAttribute}>
             <span class="pipeline-step-label">${escapeHtml(formatImportProgressStage(stage, absoluteIndex, progressMeta, messages))}</span>
-            <span class="importer-import-progress-step-status">${escapeHtml(statusLabelForRow)}</span>
+            ${renderImportProgressStatusIcon(status, statusLabelForRow)}
           </li>`;
         })
         .join("")
     : `<li class="pipeline-step-row import-progress-step importer-import-progress-step ${isCancelling ? "cancelling" : "running"}" data-import-progress-step-status="${isCancelling ? "cancelling" : "running"}" aria-current="step">
         <span class="pipeline-step-label">${escapeHtml(messages.runtime.notStarted)}</span>
-        <span class="importer-import-progress-step-status">${escapeHtml(isCancelling
-          ? messages.runtime.importProgressCancellingStatus
-          : messages.runtime.importProgressRunningStatus)}</span>
+        ${renderImportProgressStatusIcon(
+          isCancelling ? "cancelling" : "running",
+          isCancelling
+            ? messages.runtime.importProgressCancellingStatus
+            : messages.runtime.importProgressRunningStatus,
+        )}
       </li>`;
   return `
     <div class="modal-overlay import-progress-overlay importer-import-progress-overlay">
@@ -1275,23 +1275,33 @@ function renderImportProgressOverlay(importer, messages) {
           </svg>
         </button>
         <section class="importer-import-progress-overview">
-          <strong class="importer-import-progress-current-stage">${escapeHtml(currentStage)}</strong>
+          <strong class="importer-import-progress-current-stage" title="${escapeAttr(currentStage)}">${escapeHtml(currentStage)}</strong>
           ${renderImportProgressMeter(progressMeta, messages)}
           <p id="import-progress-dialog-summary" class="importer-import-progress-summary" aria-live="polite">${escapeHtml(summary)}</p>
           ${importer.importCancelError
             ? `<p class="importer-import-progress-error" role="alert">${escapeHtml(String(importer.importCancelError))}</p>`
             : ""}
         </section>
-        <section class="importer-import-progress-log" aria-labelledby="import-progress-details-title">
-          <div class="importer-import-progress-log-head">
-            <h5 id="import-progress-details-title">${escapeHtml(messages.page.importProgressDetailsTitle)}</h5>
-            <span class="importer-import-progress-log-count">${escapeHtml(logCount)}</span>
-          </div>
+        <section class="importer-import-progress-log" aria-label="${escapeAttr(messages.page.importProgressDetailsTitle)}">
           <ul class="status-list import-progress-list importer-import-progress-list" data-import-progress-list="1">${stageItems}</ul>
         </section>
       </article>
     </div>
   `;
+}
+
+function renderImportProgressStatusIcon(status, label) {
+  const stateClass = status === "done"
+    ? "is-done"
+    : status === "cancelling"
+      ? "is-cancelling"
+      : "is-running";
+  const icon = status === "done"
+    ? `<svg viewBox="0 0 16 16" width="14" height="14" focusable="false" aria-hidden="true">
+        <path d="M3 8.25 6.25 11.5 13 4.75" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>`
+    : `<span class="pipeline-spinner" aria-hidden="true"></span>`;
+  return `<span class="importer-import-progress-step-icon ${stateClass}" role="img" aria-label="${escapeAttr(label)}">${icon}</span>`;
 }
 
 function renderImporterStatusToast(importer, messages) {
@@ -1605,7 +1615,7 @@ function getStagePhaseTotal(stage) {
 }
 
 function stripImportProgressSuffix(value) {
-  return String(value || "").replace(/\s+\(\d+\/\d+\)\s*$/, "");
+  return String(value || "").replace(/\s*(?:\(\d+\/\d+\)|（\d+\/\d+）)\s*$/, "");
 }
 
 function renderImportProgressMeter(progressMeta, messages) {

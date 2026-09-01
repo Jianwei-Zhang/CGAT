@@ -1117,7 +1117,7 @@ test("opening an existing workspace does not rerender importer content after swi
   }
 });
 
-test("import progress modal uses a compact hierarchy and text-only row statuses", () => {
+test("import progress modal truncates the active label and uses icon-only row statuses", () => {
   const previousWindow = globalThis.window;
   try {
     globalThis.window = {
@@ -1150,7 +1150,7 @@ test("import progress modal uses a compact hierarchy and text-only row statuses"
             progressTotal: 620,
           },
           {
-            label: "index_pairwise_paf：chr_Chr06/flye_vs_self/result.paf",
+            label: "index_pairwise_paf：chr_Chr06/flye_vs_self/result.paf (550/620)",
             progressIndex: 550,
             progressTotal: 620,
           },
@@ -1173,16 +1173,31 @@ test("import progress modal uses a compact hierarchy and text-only row statuses"
     assert.doesNotMatch(html, /导入进行中/);
     assert.doesNotMatch(html, /当前阶段/);
     assert.doesNotMatch(html, /import-progress-actions/);
-    assert.match(html, /class="importer-import-progress-current-stage"/);
+    assert.match(
+      html,
+      /<strong class="importer-import-progress-current-stage" title="index_pairwise_paf：chr_Chr06\/flye_vs_self\/result\.paf">index_pairwise_paf：chr_Chr06\/flye_vs_self\/result\.paf<\/strong>/,
+    );
     assert.match(
       html,
       /<p id="import-progress-dialog-summary" class="importer-import-progress-summary" aria-live="polite">正在导入 zip 交付包。<\/p>/,
     );
-    assert.match(html, /已完成/);
-    assert.match(html, /进行中/);
-    assert.doesNotMatch(html, /pipeline-step-icon/);
+    assert.match(
+      html,
+      /class="importer-import-progress-step-icon is-done" role="img" aria-label="已完成"/,
+    );
+    assert.match(
+      html,
+      /class="importer-import-progress-step-icon is-running" role="img" aria-label="进行中"/,
+    );
+    assert.doesNotMatch(html, />已完成</);
+    assert.doesNotMatch(html, />进行中</);
+    assert.doesNotMatch(html, /importer-import-progress-step-status/);
     assert.doesNotMatch(html, /class="pipeline-done"/);
-    assert.doesNotMatch(html, /class="pipeline-spinner"/);
+    assert.match(html, /class="pipeline-spinner"/);
+    assert.doesNotMatch(html, /importer-import-progress-log-head/);
+    assert.doesNotMatch(html, /importer-import-progress-log-count/);
+    assert.doesNotMatch(html, />详细过程</);
+    assert.doesNotMatch(html, /已记录 \d+ 项/);
     assert.match(html, /validate_input：zip_path=a\.zip \(1\/621\)/);
     assert.match(html, /extract_entry：gpm_server\/runs\/chr_Chr06\/result\.paf \(132\/621\)/);
     assert.match(html, /index_pairwise_paf：chr_Chr06\/flye_vs_self\/result\.paf \(551\/621\)/);
@@ -1229,7 +1244,7 @@ test("import progress renders only the most recent 60 log entries", () => {
     }
     assert.match(html, /event-06/);
     assert.match(html, /event-65/);
-    assert.match(html, /Events recorded: 65/);
+    assert.doesNotMatch(html, /Events recorded:/);
   } finally {
     globalThis.window = previousWindow;
   }
@@ -1301,7 +1316,7 @@ test("import progress uses phase metadata and labels GRT validation instead of a
   }
 });
 
-test("import progress css uses a compact unified surface and simple status rows", () => {
+test("import progress css keeps the active label on one line and uses status icons", () => {
   const css = readStylesheetTree(
     new URL("../../../styles/components.css", import.meta.url),
     "utf8",
@@ -1315,9 +1330,14 @@ test("import progress css uses a compact unified surface and simple status rows"
     css,
     /\.importer-import-progress-dialog \.import-progress-step\s+\.pipeline-step-label\s*\{[^}]*grid-column:\s*1\s*\/\s*2;/,
   );
+  assert.match(
+    css,
+    /\.importer-import-progress-step-icon\s*\{[^}]*grid-column:\s*2\s*\/\s*3;[^}]*display:\s*inline-grid;/,
+  );
+  assert.doesNotMatch(css, /\.importer-import-progress-step-status\s*\{/);
   assert.doesNotMatch(
     css,
-    /\.importer-import-progress-dialog \.import-progress-step\s+\.pipeline-step-icon/,
+    /\.importer-import-progress-log-(?:head|count)\s*\{/,
   );
   assert.match(css, /\.importer-import-progress-overlay\s*\{/);
   assert.match(
@@ -1331,6 +1351,10 @@ test("import progress css uses a compact unified surface and simple status rows"
   assert.match(
     css,
     /\.importer-import-progress-overview\s*\{[^}]*padding:\s*22px\s+28px\s+16px;[^}]*background:\s*#ffffff;/,
+  );
+  assert.match(
+    css,
+    /\.importer-import-progress-current-stage\s*\{[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/,
   );
   assert.match(
     css,
@@ -1445,7 +1469,7 @@ test("import progress uses an indeterminate meter when no reliable total exists"
     assert.match(html, /data-progress-mode="indeterminate"/);
     assert.match(html, /aria-valuetext="Processing the import\.\.\."/);
     assert.doesNotMatch(html, /aria-valuenow=/);
-    assert.match(html, /Events recorded: 1/);
+    assert.doesNotMatch(html, /Events recorded:/);
   } finally {
     globalThis.window = previousWindow;
   }
