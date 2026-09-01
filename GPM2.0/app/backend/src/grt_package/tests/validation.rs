@@ -1,4 +1,5 @@
 use super::test_support::*;
+use crate::grt_package::delivery_validator::validate_app_final_path_manifest_hash;
 
 #[test]
 fn project_view_uses_authoritative_source_lengths_for_repeated_and_split_segments() {
@@ -125,6 +126,121 @@ fn validates_shared_grt_v2_fixture() {
     let package = validate_grt_package(&fixture_root()).unwrap();
     assert_eq!(package.final_path["workflow"].as_str(), Some(GRT_WORKFLOW));
     assert_eq!(package.events.len(), 1);
+}
+
+#[test]
+fn validates_app_final_path_manifest_canonical_hash() {
+    let final_path = serde_json::json!({"b": 2, "a": 1});
+    let manifest = serde_json::json!({
+        "final_path_sha256": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777"
+    });
+
+    validate_app_final_path_manifest_hash(&final_path, manifest.as_object().unwrap()).unwrap();
+
+    let mut tampered_manifest = manifest;
+    tampered_manifest["final_path_sha256"] = serde_json::json!("0".repeat(64));
+    let error =
+        validate_app_final_path_manifest_hash(&final_path, tampered_manifest.as_object().unwrap())
+            .unwrap_err();
+    assert!(error.to_string().contains("GRT_IMPORT_HASH_MISMATCH"));
+}
+
+#[test]
+fn validates_schema_three_display_evidence_links_coordinates_and_enums() {
+    let base = serde_json::json!({
+        "display_evidence": [{
+            "evidence_id": "grt-display-local-1",
+            "event_id": "event-1",
+            "final_path_segment_id": "patch-1",
+            "stage": "step3",
+            "action": "refill",
+            "association": "supporting_precursor",
+            "supporting_event_id": "event-precursor",
+            "tool": "mummer",
+            "preset": "nucmer-profile",
+            "role": "left_anchor",
+            "aligned_length": 801,
+            "identity": 0.998,
+            "mapq": null,
+            "source": {
+                "dataset": "support",
+                "contig": "donor1",
+                "start": 100,
+                "end": 900,
+                "orientation": "+"
+            },
+            "target": {
+                "dataset": "primary",
+                "contig": "primary1",
+                "start": 200,
+                "end": 1000,
+                "orientation": "+"
+            }
+        }]
+    });
+    let sources = HashMap::from([
+        (("support".to_string(), "donor1".to_string()), 2_000),
+        (("primary".to_string(), "primary1".to_string()), 2_000),
+    ]);
+    let cards = HashSet::from([
+        (
+            "support".to_string(),
+            "donor1".to_string(),
+            "Chr01".to_string(),
+        ),
+        (
+            "primary".to_string(),
+            "primary1".to_string(),
+            "Chr01".to_string(),
+        ),
+    ]);
+    let segment_events = HashMap::from([("patch-1".to_string(), "event-1".to_string())]);
+
+    validate_app_display_evidence(
+        base.as_object().unwrap(),
+        "Chr01",
+        &segment_events,
+        &mut HashSet::new(),
+        &sources,
+        &cards,
+    )
+    .unwrap();
+
+    for (field, value, expected) in [
+        ("tool", serde_json::json!("blast"), "INVALID_VALUE"),
+        ("role", serde_json::json!("middle_anchor"), "INVALID_VALUE"),
+        (
+            "event_id",
+            serde_json::json!("missing-event"),
+            "BROKEN_REFERENCE",
+        ),
+    ] {
+        let mut invalid = base.clone();
+        invalid["display_evidence"][0][field] = value;
+        let error = validate_app_display_evidence(
+            invalid.as_object().unwrap(),
+            "Chr01",
+            &segment_events,
+            &mut HashSet::new(),
+            &sources,
+            &cards,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains(expected), "{field}: {error}");
+    }
+
+    let mut out_of_range = base.clone();
+    out_of_range["display_evidence"][0]["source"]["end"] = serde_json::json!(2_001);
+    let error = validate_app_display_evidence(
+        out_of_range.as_object().unwrap(),
+        "Chr01",
+        &segment_events,
+        &mut HashSet::new(),
+        &sources,
+        &cards,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("INVALID_COORDINATE"));
 }
 
 #[test]

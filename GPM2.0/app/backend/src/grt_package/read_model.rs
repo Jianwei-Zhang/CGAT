@@ -85,7 +85,7 @@ pub fn load_grt_final_path_by_chr_for_project(
         .optional()
         .context("failed to query GRT Final Path schema version")?
         .ok_or_else(|| anyhow!("GRT package recipe is not available"))?;
-    let placements = if final_path_schema_version == GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION {
+    let placements = if is_display_app_final_path_schema(&final_path_schema_version) {
         Some(load_grt_assembly_source_placements(&conn, project_id)?)
     } else {
         None
@@ -131,6 +131,69 @@ struct GrtAssemblySourcePlacement {
 
 type GrtAssemblySourceKey = (String, String, String);
 type GrtAssemblySourcePlacements = HashMap<GrtAssemblySourceKey, Vec<GrtAssemblySourcePlacement>>;
+
+fn project_grt_display_evidence_item(
+    evidence: &mut Value,
+    chr_name: &str,
+    placements: &GrtAssemblySourcePlacements,
+) -> Result<bool> {
+    let evidence = evidence
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("persisted GRT display evidence JSON is invalid"))?;
+    for endpoint_name in ["source", "target"] {
+        let endpoint = evidence
+            .get_mut(endpoint_name)
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| anyhow!("persisted GRT display evidence endpoint is invalid"))?;
+        let dataset_name = endpoint
+            .get("dataset")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| anyhow!("persisted GRT display evidence dataset is invalid"))?;
+        let contig_name = endpoint
+            .get("contig")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| anyhow!("persisted GRT display evidence contig is invalid"))?;
+        let start = endpoint
+            .get("start")
+            .and_then(Value::as_i64)
+            .filter(|value| *value > 0)
+            .ok_or_else(|| anyhow!("persisted GRT display evidence start is invalid"))?;
+        let end = endpoint
+            .get("end")
+            .and_then(Value::as_i64)
+            .filter(|value| *value >= start)
+            .ok_or_else(|| anyhow!("persisted GRT display evidence end is invalid"))?;
+        let candidates = placements
+            .get(&(
+                dataset_name.to_string(),
+                contig_name.to_string(),
+                chr_name.to_string(),
+            ))
+            .into_iter()
+            .flatten()
+            .filter(|placement| placement.source_start <= start && placement.source_end >= end)
+            .collect::<Vec<_>>();
+        if candidates.len() != 1 {
+            return Ok(false);
+        }
+        let placement = candidates[0];
+        endpoint.insert(
+            "assembly_ctg_id".to_string(),
+            Value::from(placement.assembly_ctg_id),
+        );
+        endpoint.insert(
+            "assembly_source_start".to_string(),
+            Value::from(placement.source_start),
+        );
+        endpoint.insert(
+            "assembly_source_end".to_string(),
+            Value::from(placement.source_end),
+        );
+    }
+    Ok(true)
+}
 
 fn load_grt_assembly_source_placements(
     conn: &Connection,
@@ -257,6 +320,18 @@ fn project_grt_display_placements(
                 segment.remove("assembly_source_end");
             }
         }
+    }
+    if let Some(evidence) = object
+        .get_mut("display_evidence")
+        .and_then(Value::as_array_mut)
+    {
+        let mut projected = Vec::with_capacity(evidence.len());
+        for mut item in std::mem::take(evidence) {
+            if project_grt_display_evidence_item(&mut item, chr_name, placements)? {
+                projected.push(item);
+            }
+        }
+        *evidence = projected;
     }
     object.insert(
         "grt_display_available".to_string(),

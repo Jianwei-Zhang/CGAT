@@ -250,3 +250,52 @@ test("schema 2 keeps App-owned display mappings separate from the editable path"
   assert.equal(editableSegment.assemblySourceStart, undefined);
   assert.equal(editableSegment.assemblySourceEnd, undefined);
 });
+
+test("schema 3 normalizes project-mapped local GRT evidence", () => {
+  const raw = buildRawView();
+  raw.recipe.final_path_schema_version = "3";
+  raw.final_path_by_chr.Chr01.grt_display_available = true;
+  raw.final_path_by_chr.Chr01.display_evidence = [{
+    evidence_id: "grt-display-local-1",
+    event_id: "evt-step1",
+    final_path_segment_id: "seg-patch",
+    stage: "step3",
+    action: "refill",
+    association: "accepted",
+    tool: "minimap2",
+    preset: "asm5",
+    role: "left_anchor",
+    aligned_length: 4,
+    identity: 0.998,
+    mapq: 60,
+    source: {
+      dataset: "support",
+      contig: "donor1",
+      start: 1,
+      end: 4,
+      orientation: "+",
+      assembly_ctg_id: 202,
+      assembly_source_start: 1,
+      assembly_source_end: 12,
+    },
+    target: {
+      dataset: "primary",
+      contig: "primary1",
+      start: 1,
+      end: 4,
+      orientation: "+",
+      assembly_ctg_id: 101,
+      assembly_source_start: 1,
+      assembly_source_end: 10,
+    },
+  }];
+
+  const evidence = normalizeGrtProjectView(raw)
+    .baselineFinalPathByChr.Chr01.displayEvidence[0];
+
+  assert.equal(evidence.evidenceId, "grt-display-local-1");
+  assert.equal(evidence.tool, "minimap2");
+  assert.equal(evidence.source.assemblyCtgId, 202);
+  assert.equal(evidence.target.assemblyCtgId, 101);
+  assert.equal(evidence.mapq, 60);
+});

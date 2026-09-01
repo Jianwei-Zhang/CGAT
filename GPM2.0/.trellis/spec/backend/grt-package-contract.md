@@ -21,9 +21,10 @@ The executable sources of truth are:
 
 - Server workdir workflow: `gpm_grt_precomputed_v2`.
 - App delivery workflow: `gpm_grt_app_precomputed_v2`.
-- Package schema version: `2`; the Server workdir Final Path schema remains `1`, while newly projected App deliveries use Final Path display schema `2`.
+- Package schema version: `2`; the Server workdir Final Path schema remains `1`, while newly projected App deliveries use Final Path display-evidence schema `3`.
 - Development builds reject v1 workflows/package schemas rather than upgrading or inferring them.
 - App workflow/schema v2 packages with legacy Final Path schema `1` remain importable, but GRT result-display controls stay hidden because they do not carry the display mapping contract.
+- App workflow/schema v2 packages with Final Path schema `2` remain importable and retain the result-display mapping behavior without supplemental local evidence.
 - No legacy workflow/package-schema or project migration is implemented.
 - Unknown workflow/schema values must fail with `UNSUPPORTED_SCHEMA`; never fall back to an empty or legacy Final Path.
 
@@ -72,7 +73,7 @@ The executable sources of truth are:
 | Server Final Path source is missing from FAI or range/length is invalid | Projector fails; no App package is emitted |
 | Non-gap source lacks an assignment/used-contig display card for the target chromosome | Projector fails; no App package is emitted |
 | App package/JSON Final Path schema values disagree | Import fails with `GRT_IMPORT_UNSUPPORTED_SCHEMA` |
-| App Final Path schema is neither `1` nor `2` | Import fails with `GRT_IMPORT_UNSUPPORTED_SCHEMA` |
+| App Final Path schema is neither `1`, `2`, nor `3` | Import fails with `GRT_IMPORT_UNSUPPORTED_SCHEMA` |
 | Schema-2 source has no unique visible project ctg mapping | Import/project creation remains valid; chromosome read model sets `grt_display_available=false` |
 | Current Final Path differs semantically or chromosome is phased | Hide both controls and clear any active display state |
 | Current main tracks / Subview combination contain no display interval/link | Do not fabricate a mapping; show the scoped three-second empty-result toast only on off-to-on |
@@ -106,6 +107,86 @@ Server validates source/card completeness
   -> project-aware backend resolves one exact assembly_ctg mapping per segment
   -> whole chromosome available or unavailable
   -> frontend only renders the supplied IDs and 1-based closed intervals
+```
+
+## Scenario: App Final Path Display Evidence Schema 3
+
+### 1. Scope / Trigger
+
+- Applies when changing accepted Step2/Step3 candidate selection, App delivery projection, Final Path import validation, project-aware evidence mapping, or Subview GRT rendering.
+- Trigger: the immutable accepted GRT result relies on MUMmer or local flank minimap2 evidence that is more specific than the ordinary chromosome-level `runs/**/result.paf` layer.
+
+### 2. Signatures
+
+- Server input: `gpm_grt_precomputed_v2`, package schema `2`, Final Path schema `1`, including the Server-only events, evidence registry, selected MUMmer coords, selected local PAF rows, q mappings, and donor-member mappings.
+- App output: `gpm_grt_app_precomputed_v2`, package schema `2`, `final_path_schema_version=3` in `metadata/package.tsv`, and `schema_version="3"` in `metadata/grt_final_path.json`.
+- Each chromosome contains `display_evidence: array`, including an empty array when no accepted local evidence exists.
+- Each evidence row contains:
+  - identities/links: `evidence_id`, `event_id`, `final_path_segment_id`, and optional `supporting_event_id`;
+  - classification: `stage=step2|step3`, `action=patch|replace|delete|correct_boundary|refill`, `association=accepted|supporting_precursor`, `tool=mummer|minimap2`, `role=left_anchor|right_anchor|spanning_anchor`, and non-empty `preset`;
+  - measures: positive `aligned_length`, `identity` in `[0,1]`, and nullable integer `mapq` in `[0,255]`;
+  - `source` and `target`: `{ dataset, contig, start, end, orientation }` in original Dataset 1-based closed coordinates.
+- Schema-3 non-gap segments retain `event_id` only inside the imported package so validation can prove the evidence-to-segment link. The project read model strips segment event IDs before returning the Final Path to the frontend.
+- Project-view evidence endpoints add derived `assembly_ctg_id`, `assembly_source_start`, and `assembly_source_end` after unique current-project mapping.
+
+### 3. Contracts
+
+- `server/tools/grt_display_evidence.py` is the single projection owner. It may emit only the exact `left_line`/`right_line` selected by a current accepted Final Path operation and the accepted structural event superseded by a Step3 refill. Rejected candidates and unrelated accepted events are omitted.
+- Synthetic `flank__...`, q-record, and donor-member identities are resolved to original Dataset/contig coordinates before the App boundary. Rust and frontend code must not parse those internal identities or repeat this conversion.
+- Raw MUMmer coords, local PAF, q FASTA, cache, checkpoint, command, and log files remain Server-only. The App package carries only the compact `display_evidence` rows.
+- Full and no-FASTA delivery modes must contain byte-semantically identical Final Path/display-evidence JSON and the same canonical `final_path_sha256`; only sequence payload availability differs.
+- Every endpoint must exist in the source locator/FAI domain, fit within the authoritative source length, and have a display source card for the evidence chromosome.
+- `evidence_id` is globally unique. `event_id` must match the retained event ID on `final_path_segment_id`. A `supporting_precursor` requires a non-empty `supporting_event_id`; an `accepted` row must not carry one.
+- During project reads, each endpoint must map to exactly one visible current-project assembly ctg whose source window contains the complete evidence interval. Failure filters that evidence row only; it does not disable a valid chromosome-level Final Path overlay.
+- The existing chromosome-local `Show GRT results` switch controls both the Final Path result and supplemental evidence. Evidence is passive SVG geometry: MUMmer and local minimap2 use distinct styles, structural precursors use the precursor modifier, and tool/role/identity/MAPQ are exposed in the tooltip.
+- The shared result scene renderer is authoritative for both two-contig and two-track Subview modes. Evidence never changes anchor state, history, Final Path, or ordinary PAF geometry.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| Schema 3 chromosome omits `display_evidence` or it is not an array | Import fails with `GRT_IMPORT_INVALID_JSON` |
+| Duplicate/empty evidence identity or invalid stage/action/association/tool/role/measure | Import fails with the matching `GRT_IMPORT_DUPLICATE_ID`, `GRT_IMPORT_INVALID_VALUE`, or `GRT_IMPORT_INVALID_COORDINATE` code |
+| Evidence event does not match its Final Path segment event | Import fails with `GRT_IMPORT_BROKEN_REFERENCE` |
+| Endpoint source is unknown, out of FAI bounds, or lacks a chromosome display card | Projection/import fails; no accepted row is guessed |
+| Manifest `final_path_sha256` does not match canonical Final Path JSON | Import fails with `GRT_IMPORT_HASH_MISMATCH` |
+| One endpoint has zero or multiple visible project-ctg mappings | Filter that evidence row from the project view; retain other evidence and the base GRT result |
+| Selected Subview pair contains neither endpoint or only one endpoint | Render no supplemental band for that row |
+| Final Path differs semantically, chromosome is phased, or switch is off | Hide the complete GRT result scene, including supplemental evidence |
+| Valid schema 1 or 2 package | Preserve existing compatibility behavior; never synthesize schema-3 evidence |
+
+### 5. Good/Base/Bad Cases
+
+- Good: a Step3 refill emits the exact accepted left/right local minimap2 anchors and its accepted MUMmer structural precursor, all projected to original source coordinates and rendered in either Subview mode.
+- Base: a schema-3 chromosome has no accepted Step2/Step3 event and carries `display_evidence: []`; import and ordinary result display remain valid.
+- Base: a schema-2 package imports and renders its Final Path overlay with no supplemental bands.
+- Bad: copy every MUMmer/PAF row into the App package, match rows by overlapping names in JavaScript, or draw an alignment merely because a donor contig participated elsewhere in the chromosome.
+
+### 6. Tests Required
+
+- Python projector tests assert that only selected MUMmer/local PAF rows are emitted, synthetic coordinates are projected once, invalid source intervals/cards fail, and schema 3 is written.
+- Real-package verification asserts GS1 contains the accepted Chr3 `contig_62` left/right evidence, full/no-FASTA evidence metadata is identical, and a project with no accepted events emits an empty evidence array.
+- Rust validation tests reject malformed enums, coordinates, identities, event/segment links, precursor rules, and hash mismatches; persistence tests assert schema-3 round-trip and project-aware endpoint mapping/filtering.
+- Frontend state/renderer tests assert schema 2/3 availability, tool-specific passive bands, switch-off behavior, and both contig-pair and track-pair Subview rendering.
+- Server-to-App E2E asserts schema 3 import while keeping legacy schema 1/2 compatibility and verifies that no raw Server scripts/evidence files enter the App payload.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```text
+ship raw MUMmer/PAF trees -> frontend parses synthetic record names
+  -> guesses source coordinates -> paints every nearby hit
+```
+
+#### Correct
+
+```text
+accepted Final Path event + exact selected candidate rows
+  -> Server projects once to original 1-based source coordinates
+  -> schema 3 validates identities, links, bounds, cards, and canonical hash
+  -> project read model adds one exact visible assembly_ctg mapping per endpoint
+  -> shared Subview renderer paints only the selected visible pair
 ```
 
 ## Scenario: App Workspace History Integrity Validation

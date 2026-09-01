@@ -394,6 +394,33 @@
   stroke-dasharray: 7 5;
 }
 
+.grt-display-evidence-band {
+  vector-effect: non-scaling-stroke;
+  cursor: help;
+  transition: fill 100ms ease, stroke 100ms ease;
+}
+
+.grt-display-evidence-band.is-mummer {
+  fill: rgba(122, 86, 168, 0.24);
+  stroke: rgba(91, 57, 137, 0.78);
+  stroke-width: 1.25;
+}
+
+.grt-display-evidence-band.is-minimap2 {
+  fill: rgba(0, 137, 123, 0.22);
+  stroke: rgba(0, 105, 92, 0.78);
+  stroke-width: 1.25;
+}
+
+.grt-display-evidence-band.is-supporting-precursor {
+  stroke-dasharray: 5 3;
+}
+
+.grt-display-evidence-band:hover {
+  fill-opacity: 0.72;
+  stroke-width: 1.8;
+}
+
 .grt-result-gap-label,
 .grt-result-repeat-count {
   fill: #285f37;

@@ -106,6 +106,53 @@ function renderJunction(junction, entries, escapeHtml, gapLabel) {
   </g>`;
 }
 
+function renderDisplayEvidence(evidence, entries, escapeHtml) {
+  const source = evidence?.source;
+  const target = evidence?.target;
+  if (!source || !target) return "";
+  const sourceFirstPosition = source.orientation === "-" ? source.end : source.start;
+  const sourceSecondPosition = source.orientation === "-" ? source.start : source.end;
+  const targetFirstPosition = target.orientation === "-" ? target.end : target.start;
+  const targetSecondPosition = target.orientation === "-" ? target.start : target.end;
+  const sourceFirst = buildEndpoint(source, sourceFirstPosition, entries);
+  const sourceSecond = buildEndpoint(source, sourceSecondPosition, entries);
+  const targetFirst = buildEndpoint(target, targetFirstPosition, entries);
+  const targetSecond = buildEndpoint(target, targetSecondPosition, entries);
+  if (!sourceFirst || !sourceSecond || !targetFirst || !targetSecond) return "";
+  if (sourceFirst.entry === targetFirst.entry) return "";
+  const sourceAbove = sourceFirst.entry.y <= targetFirst.entry.y;
+  const sourceY = sourceAbove
+    ? sourceFirst.entry.y + sourceFirst.entry.height
+    : sourceFirst.entry.y;
+  const targetY = sourceAbove
+    ? targetFirst.entry.y
+    : targetFirst.entry.y + targetFirst.entry.height;
+  const tool = String(evidence.tool || "").toLowerCase();
+  const association = String(evidence.association || "").toLowerCase();
+  const roleLabel = String(evidence.role || "").replaceAll("_", " ");
+  const identity = Number(evidence.identity);
+  const identityText = Number.isFinite(identity) ? `${(identity * 100).toFixed(2)}%` : "—";
+  const mapqText = evidence.mapq === null || evidence.mapq === undefined
+    ? ""
+    : ` · MAPQ ${Number(evidence.mapq)}`;
+  const associationText = association === "supporting_precursor"
+    ? " · structural precursor"
+    : "";
+  const title = `GRT local evidence · ${tool === "mummer" ? "MUMmer" : "minimap2"} · ${roleLabel} · identity ${identityText}${mapqText}${associationText}`;
+  const points = [
+    `${sourceFirst.x.toFixed(2)},${sourceY.toFixed(2)}`,
+    `${sourceSecond.x.toFixed(2)},${sourceY.toFixed(2)}`,
+    `${targetSecond.x.toFixed(2)},${targetY.toFixed(2)}`,
+    `${targetFirst.x.toFixed(2)},${targetY.toFixed(2)}`,
+  ].join(" ");
+  const classNames = [
+    "grt-display-evidence-band",
+    tool === "mummer" ? "is-mummer" : "is-minimap2",
+    association === "supporting_precursor" ? "is-supporting-precursor" : "",
+  ].filter(Boolean).join(" ");
+  return `<polygon class="${classNames}" points="${points}" pointer-events="visibleFill" data-grt-display-evidence="${escapeHtml(evidence.evidenceId || "")}"><title>${escapeHtml(title)}</title></polygon>`;
+}
+
 export function buildGrtResultScene({
   plan,
   entries = [],
@@ -113,10 +160,14 @@ export function buildGrtResultScene({
   escapeHtml = escapeFallback,
   gapLabel = "GRT gap",
 } = {}) {
-  const visibleEntries = (Array.isArray(entries) ? entries : []).filter(
+  const allEntries = Array.isArray(entries) ? entries : [];
+  const visibleEntries = allEntries.filter(
     (entry) => intervalsForEntry(plan, entry).length > 0,
   );
-  if (!visibleEntries.length) {
+  const evidenceMarkup = (Array.isArray(plan?.displayEvidence) ? plan.displayEvidence : [])
+    .map((evidence) => renderDisplayEvidence(evidence, allEntries, escapeHtml))
+    .join("");
+  if (!visibleEntries.length && !evidenceMarkup) {
     return {
       hasVisibleResult: false,
       hasVisibleJunction: false,
@@ -134,9 +185,9 @@ export function buildGrtResultScene({
       .join("");
     overlaysByKey.set(entry.key, `${maskMarkup}${intervalsMarkup}`);
   });
-  const junctionMarkup = (Array.isArray(plan?.junctions) ? plan.junctions : [])
+  const junctionMarkup = `${evidenceMarkup}${(Array.isArray(plan?.junctions) ? plan.junctions : [])
     .map((junction) => renderJunction(junction, visibleEntries, escapeHtml, gapLabel))
-    .join("");
+    .join("")}`;
   return {
     hasVisibleResult: true,
     hasVisibleJunction: Boolean(junctionMarkup),

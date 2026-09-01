@@ -2,9 +2,10 @@
 """Build the minimal App delivery payload from a validated Server workdir.
 
 The Server workdir is the audit/validation boundary.  This tool deliberately
-projects only the files consumed by the App importer and chromosome views;
-intermediate GRT FASTA, evidence, cache, checkpoint, and Server tooling files
-never cross that boundary.
+projects only the files consumed by the App importer and chromosome views.
+Raw GRT FASTA, aligner evidence, cache, checkpoint, and Server tooling files
+never cross that boundary; accepted alignments are reduced to compact display
+evidence in the Final Path document.
 """
 
 from __future__ import annotations
@@ -16,11 +17,13 @@ import json
 import shutil
 from pathlib import Path
 
+from grt_display_evidence import build_display_evidence
+
 
 APP_WORKFLOW = "gpm_grt_app_precomputed_v2"
 APP_SCHEMA_VERSION = "2"
 SERVER_FINAL_PATH_SCHEMA_VERSION = "1"
-FINAL_PATH_SCHEMA_VERSION = "2"
+FINAL_PATH_SCHEMA_VERSION = "3"
 FASTA_SUFFIXES = {".fa", ".fasta"}
 
 REQUIRED_METADATA = (
@@ -273,6 +276,7 @@ def validate_display_final_path(
 
 
 def project_final_path(
+    source_root: Path,
     source: Path,
     target: Path,
     source_lengths: dict[tuple[str, str], int],
@@ -282,13 +286,27 @@ def project_final_path(
     if not isinstance(payload, dict):
         raise ValueError("metadata/grt_final_path.json has an invalid shape")
     q4_lengths = validate_display_final_path(payload, source_lengths, display_source_cards)
+    display_evidence_by_chr = build_display_evidence(
+        source_root,
+        payload,
+        source_lengths,
+        display_source_cards,
+    )
     payload["workflow"] = APP_WORKFLOW
     payload["schema_version"] = FINAL_PATH_SCHEMA_VERSION
     payload["q4_relpath"] = "grt/q/q4.fa"
     for chromosome in payload["chromosomes"]:
+        chromosome["display_evidence"] = display_evidence_by_chr.get(
+            str(chromosome.get("chr", "")),
+            [],
+        )
         for segment in chromosome.get("segments", []):
             if isinstance(segment, dict):
-                for key in ("event_id", "eventId", "evidence_ids", "evidenceIds", "source_card_key", "sourceCardKey"):
+                # Schema 3 retains the accepted event identity solely so the
+                # App importer can reject dangling display-evidence links. The
+                # project read model still strips this trace field before the
+                # Final Path reaches the frontend.
+                for key in ("eventId", "evidence_ids", "evidenceIds", "source_card_key", "sourceCardKey"):
                     segment.pop(key, None)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -350,6 +368,7 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
         else:
             copy_file(source_root, staging_root, f"metadata/{filename}")
     final_path, q4_lengths = project_final_path(
+        source_root,
         source_root / "metadata/grt_final_path.json",
         staging_root / "metadata/grt_final_path.json",
         source_lengths,

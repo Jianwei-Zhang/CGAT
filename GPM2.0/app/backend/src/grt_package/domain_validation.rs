@@ -186,6 +186,167 @@ fn source_card_anchor(row: &TsvRow, card: &str, placement: &str) -> Result<i64> 
     }
 }
 
+fn validate_app_display_evidence_endpoint(
+    endpoint: &Value,
+    label: &str,
+    chr_name: &str,
+    sources: &HashMap<(String, String), usize>,
+    display_source_cards: &HashSet<(String, String, String)>,
+) -> Result<()> {
+    let endpoint = endpoint
+        .as_object()
+        .ok_or_else(|| grt_anyhow("INVALID_JSON", format!("{label} must be an object")))?;
+    let dataset = json_nonempty_str(endpoint, "dataset", label)?;
+    let contig = json_nonempty_str(endpoint, "contig", label)?;
+    let start = json_positive_i64(endpoint, "start", label)?;
+    let end = json_positive_i64(endpoint, "end", label)?;
+    orientation(json_str(endpoint, "orientation", label)?, label)?;
+    let source_length = sources
+        .get(&(dataset.to_string(), contig.to_string()))
+        .copied()
+        .ok_or_else(|| {
+            grt_anyhow(
+                "BROKEN_REFERENCE",
+                format!("{label} references unknown source {dataset}:{contig}"),
+            )
+        })?;
+    if end < start || end as usize > source_length {
+        return grt_err(
+            "INVALID_COORDINATE",
+            format!("{label} has an invalid source interval"),
+        );
+    }
+    if !display_source_cards.contains(&(
+        dataset.to_string(),
+        contig.to_string(),
+        chr_name.to_string(),
+    )) {
+        return grt_err(
+            "BROKEN_REFERENCE",
+            format!("{label} has no display source card for {dataset}:{contig}:{chr_name}"),
+        );
+    }
+    Ok(())
+}
+
+pub(super) fn validate_app_display_evidence(
+    chr: &Map<String, Value>,
+    chr_name: &str,
+    segment_events: &HashMap<String, String>,
+    evidence_ids: &mut HashSet<String>,
+    sources: &HashMap<(String, String), usize>,
+    display_source_cards: &HashSet<(String, String, String)>,
+) -> Result<()> {
+    let evidence = chr
+        .get("display_evidence")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            grt_anyhow(
+                "INVALID_JSON",
+                format!("App Final Path {chr_name}.display_evidence must be an array"),
+            )
+        })?;
+    for item in evidence {
+        let item = item
+            .as_object()
+            .ok_or_else(|| grt_anyhow("INVALID_JSON", "App display evidence must be an object"))?;
+        let evidence_id = json_nonempty_str(item, "evidence_id", "App display evidence")?;
+        if !evidence_ids.insert(evidence_id.to_string()) {
+            return grt_err(
+                "DUPLICATE_ID",
+                format!("duplicate App display evidence {evidence_id}"),
+            );
+        }
+        let event_id = json_nonempty_str(item, "event_id", evidence_id)?;
+        let segment_id = json_nonempty_str(item, "final_path_segment_id", evidence_id)?;
+        if segment_events.get(segment_id).map(String::as_str) != Some(event_id) {
+            return grt_err(
+                "BROKEN_REFERENCE",
+                format!("App display evidence {evidence_id} has a dangling event/segment link"),
+            );
+        }
+        enum_value(
+            json_str(item, "stage", evidence_id)?,
+            &["step2", "step3"],
+            &format!("App display evidence {evidence_id}.stage"),
+        )?;
+        enum_value(
+            json_str(item, "action", evidence_id)?,
+            &["patch", "replace", "delete", "correct_boundary", "refill"],
+            &format!("App display evidence {evidence_id}.action"),
+        )?;
+        let association = json_str(item, "association", evidence_id)?;
+        enum_value(
+            association,
+            &["accepted", "supporting_precursor"],
+            &format!("App display evidence {evidence_id}.association"),
+        )?;
+        match (association, item.get("supporting_event_id")) {
+            ("supporting_precursor", Some(value))
+                if value.as_str().is_some_and(|text| !text.trim().is_empty()) => {}
+            ("supporting_precursor", _) => {
+                return grt_err(
+                    "BROKEN_REFERENCE",
+                    format!("App display evidence {evidence_id} lacks its precursor event"),
+                );
+            }
+            ("accepted", Some(value)) if !value.is_null() => {
+                return grt_err(
+                    "INVALID_VALUE",
+                    format!("App display evidence {evidence_id} has an unexpected precursor event"),
+                );
+            }
+            _ => {}
+        }
+        enum_value(
+            json_str(item, "tool", evidence_id)?,
+            &["mummer", "minimap2"],
+            &format!("App display evidence {evidence_id}.tool"),
+        )?;
+        enum_value(
+            json_str(item, "role", evidence_id)?,
+            &["left_anchor", "right_anchor", "spanning_anchor"],
+            &format!("App display evidence {evidence_id}.role"),
+        )?;
+        let _ = json_str(item, "preset", evidence_id)?;
+        json_positive_i64(item, "aligned_length", evidence_id)?;
+        let identity = item
+            .get("identity")
+            .and_then(Value::as_f64)
+            .filter(|value| value.is_finite() && (0.0..=1.0).contains(value))
+            .ok_or_else(|| {
+                grt_anyhow(
+                    "INVALID_VALUE",
+                    format!("App display evidence {evidence_id}.identity is invalid"),
+                )
+            })?;
+        let _ = identity;
+        if let Some(mapq) = item.get("mapq").filter(|value| !value.is_null()) {
+            if mapq.as_u64().is_none_or(|value| value > 255) {
+                return grt_err(
+                    "INVALID_VALUE",
+                    format!("App display evidence {evidence_id}.mapq is invalid"),
+                );
+            }
+        }
+        validate_app_display_evidence_endpoint(
+            item.get("source").unwrap_or(&Value::Null),
+            &format!("App display evidence {evidence_id}.source"),
+            chr_name,
+            sources,
+            display_source_cards,
+        )?;
+        validate_app_display_evidence_endpoint(
+            item.get("target").unwrap_or(&Value::Null),
+            &format!("App display evidence {evidence_id}.target"),
+            chr_name,
+            sources,
+            display_source_cards,
+        )?;
+    }
+    Ok(())
+}
+
 pub(super) fn validate_app_final_path(
     bundle_root: &Path,
     final_path: &Value,
@@ -225,6 +386,7 @@ pub(super) fn validate_app_final_path(
         })?;
     let mut final_lengths = BTreeMap::new();
     let mut segment_ids = HashSet::new();
+    let mut display_evidence_ids = HashSet::new();
     for chromosome in chromosomes {
         let chr = chromosome.as_object().ok_or_else(|| {
             grt_anyhow(
@@ -266,6 +428,7 @@ pub(super) fn validate_app_final_path(
                 )
             })?;
         let mut segment_total = 0_usize;
+        let mut segment_events = HashMap::new();
         for segment in segments {
             let segment = segment.as_object().ok_or_else(|| {
                 grt_anyhow("INVALID_JSON", "App Final Path segment must be an object")
@@ -276,6 +439,20 @@ pub(super) fn validate_app_final_path(
                     "DUPLICATE_ID",
                     format!("duplicate App Final Path segment {id}"),
                 );
+            }
+            if expected_schema_version == GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION {
+                match segment.get("event_id") {
+                    None | Some(Value::Null) => {}
+                    Some(Value::String(event_id)) if !event_id.trim().is_empty() => {
+                        segment_events.insert(id.to_string(), event_id.to_string());
+                    }
+                    _ => {
+                        return grt_err(
+                            "INVALID_VALUE",
+                            format!("App segment {id}.event_id is invalid"),
+                        );
+                    }
+                }
             }
             let length = json_positive_i64(segment, "length", id)? as usize;
             segment_total = segment_total.checked_add(length).ok_or_else(|| {
@@ -335,7 +512,7 @@ pub(super) fn validate_app_final_path(
                     format!("App segment {id} orientation differs from source"),
                 );
             }
-            if expected_schema_version == GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION
+            if is_display_app_final_path_schema(expected_schema_version)
                 && !display_source_cards.contains(&(
                     source_key.0.clone(),
                     source_key.1.clone(),
@@ -356,6 +533,16 @@ pub(super) fn validate_app_final_path(
                 "FINAL_PATH_MISMATCH",
                 format!("App Final Path segment lengths differ for {chr_name}"),
             );
+        }
+        if expected_schema_version == GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION {
+            validate_app_display_evidence(
+                chr,
+                chr_name,
+                &segment_events,
+                &mut display_evidence_ids,
+                sources,
+                display_source_cards,
+            )?;
         }
     }
     if final_lengths.keys().collect::<HashSet<_>>()

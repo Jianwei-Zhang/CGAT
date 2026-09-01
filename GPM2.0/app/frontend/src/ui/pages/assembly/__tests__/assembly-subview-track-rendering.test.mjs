@@ -70,6 +70,130 @@ test("subview panel renders chart sub-card with parameter labels after entering"
   assert.match(html, /ctg-alpha/);
 });
 
+test("schema 3 renders local GRT evidence in contig-pair and track-pair Subviews", () => {
+  const supportSegment = {
+    segmentId: "support-segment",
+    type: "ctg",
+    assemblyCtgId: 30,
+    assemblySourceStart: 1,
+    assemblySourceEnd: 300,
+    datasetName: "flye",
+    ctgName: "support-ctg",
+    overallLen: 300,
+    orient: "+",
+    start: 1,
+    end: 300,
+    source: { dataset: "flye", contig: "support-ctg", start: 1, end: 300, orientation: "+" },
+  };
+  const primarySegment = {
+    segmentId: "primary-segment",
+    type: "ctg",
+    assemblyCtgId: 2,
+    assemblySourceStart: 1,
+    assemblySourceEnd: 1200,
+    datasetName: "hifiasm",
+    ctgName: "ctg-alpha",
+    overallLen: 1200,
+    orient: "+",
+    start: 1,
+    end: 1200,
+    source: { dataset: "hifiasm", contig: "ctg-alpha", start: 1, end: 1200, orientation: "+" },
+  };
+  const baseline = {
+    mode: "segments",
+    chrName: "Chr01",
+    grtDisplayAvailable: true,
+    segments: [supportSegment, primarySegment],
+    displayEvidence: [{
+      evidenceId: "grt-display-local-integration",
+      tool: "mummer",
+      role: "left_anchor",
+      association: "supporting_precursor",
+      alignedLength: 100,
+      identity: 0.999,
+      mapq: null,
+      source: {
+        assemblyCtgId: 30,
+        assemblySourceStart: 1,
+        assemblySourceEnd: 300,
+        start: 101,
+        end: 200,
+        orientation: "+",
+      },
+      target: {
+        assemblyCtgId: 2,
+        assemblySourceStart: 1,
+        assemblySourceEnd: 1200,
+        start: 401,
+        end: 500,
+        orientation: "+",
+      },
+    }],
+  };
+  const commonAssembly = {
+    isChrPhased: false,
+    supportDatasetId: 22,
+    supportChrCtgs: [
+      { assemblyCtgId: 30, name: "support-ctg", assignedChrName: "Chr01", memberCount: 1, totalLength: 300, anchorStart: 320 },
+    ],
+    finalPathByChr: { Chr01: structuredClone(baseline) },
+    grtProjectView: {
+      recipe: { finalPathSchemaVersion: "3" },
+      baselineFinalPathByChr: { Chr01: baseline },
+      sourceCards: [],
+      verification: {},
+    },
+    grtResultDisplayByChr: { Chr01: { main: false, subview: true } },
+  };
+  const initializer = {
+    datasets: [
+      { datasetId: 11, name: "hifiasm", label: "hifiasm" },
+      { datasetId: 22, name: "flye", label: "flye" },
+    ],
+    existingProjects: [
+      { projectId: 7, primaryDatasetId: 11, supportDatasetIds: [22] },
+    ],
+  };
+  const contigPairHtml = renderAssemblyPage(createState({
+    assembly: {
+      ...commonAssembly,
+      subview: {
+        mode: "2-contig",
+        selectedAContigId: 2,
+        selectedARole: "primary",
+        selectedBContigId: 30,
+        selectedBRole: "support",
+        summary: {
+          mode: "2-contig",
+          top: { contigId: 30, role: "support", contigName: "support-ctg" },
+          bottom: { contigId: 2, role: "primary", contigName: "ctg-alpha" },
+        },
+      },
+    },
+    initializer,
+  }));
+  const trackPairHtml = renderAssemblyPage(createState({
+    assembly: {
+      ...commonAssembly,
+      subview: {
+        selectedTrackARole: "primary",
+        selectedTrackBRole: "support",
+        summary: {
+          mode: "track-pair",
+          topTrack: { role: "support" },
+          bottomTrack: { role: "primary" },
+        },
+        trackPairHiddenCtgs: [],
+      },
+    },
+    initializer,
+  }));
+
+  assert.match(contigPairHtml, /data-grt-display-evidence="grt-display-local-integration"/);
+  assert.match(trackPairHtml, /data-grt-display-evidence="grt-display-local-integration"/);
+  assert.match(trackPairHtml, /grt-display-evidence-band is-mummer is-supporting-precursor/);
+});
+
 test("subview track-pair mode renders only mirror support ctg containers when support track source is mirror", () => {
   const html = renderAssemblyPage(
     createState({

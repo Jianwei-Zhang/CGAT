@@ -140,6 +140,68 @@ function normalizeGrtSegment(segment, index, chrName) {
   };
 }
 
+function normalizeGrtEvidenceEndpoint(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const start = normalizePositiveInteger(source.start);
+  const end = normalizePositiveInteger(source.end);
+  const assemblyCtgId = normalizePositiveInteger(
+    firstDefined(source, "assemblyCtgId", "assembly_ctg_id"),
+  );
+  const assemblySourceStart = normalizePositiveInteger(
+    firstDefined(source, "assemblySourceStart", "assembly_source_start"),
+  );
+  const assemblySourceEnd = normalizePositiveInteger(
+    firstDefined(source, "assemblySourceEnd", "assembly_source_end"),
+  );
+  if (!start || !end || !assemblyCtgId || !assemblySourceStart || !assemblySourceEnd) {
+    return null;
+  }
+  return {
+    datasetName: normalizeString(source.dataset),
+    contigName: normalizeString(source.contig),
+    start: Math.min(start, end),
+    end: Math.max(start, end),
+    orientation: normalizeString(source.orientation) === "-" ? "-" : "+",
+    assemblyCtgId,
+    assemblySourceStart,
+    assemblySourceEnd,
+  };
+}
+
+function normalizeGrtDisplayEvidence(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const sourceEndpoint = normalizeGrtEvidenceEndpoint(source.source);
+  const targetEndpoint = normalizeGrtEvidenceEndpoint(source.target);
+  const alignedLength = normalizePositiveInteger(
+    firstDefined(source, "alignedLength", "aligned_length"),
+  );
+  const identity = Number(source.identity);
+  if (!sourceEndpoint || !targetEndpoint || !alignedLength || !Number.isFinite(identity)) {
+    return null;
+  }
+  return {
+    evidenceId: normalizeString(firstDefined(source, "evidenceId", "evidence_id")),
+    eventId: normalizeString(firstDefined(source, "eventId", "event_id")),
+    finalPathSegmentId: normalizeString(
+      firstDefined(source, "finalPathSegmentId", "final_path_segment_id"),
+    ),
+    supportingEventId: normalizeString(
+      firstDefined(source, "supportingEventId", "supporting_event_id"),
+    ),
+    stage: normalizeString(source.stage),
+    action: normalizeString(source.action),
+    association: normalizeString(source.association),
+    tool: normalizeString(source.tool),
+    preset: normalizeString(source.preset),
+    role: normalizeString(source.role),
+    alignedLength,
+    identity,
+    mapq: source.mapq === null || source.mapq === undefined ? null : Number(source.mapq),
+    source: sourceEndpoint,
+    target: targetEndpoint,
+  };
+}
+
 export function normalizeGrtFinalPathByChr(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const result = {};
@@ -151,6 +213,13 @@ export function normalizeGrtFinalPathByChr(value) {
     }
     const segments = (Array.isArray(entry.segments) ? entry.segments : [])
       .map((segment, index) => normalizeGrtSegment(segment, index, chrName));
+    const displayEvidence = (
+      Array.isArray(firstDefined(entry, "displayEvidence", "display_evidence"))
+        ? firstDefined(entry, "displayEvidence", "display_evidence")
+        : []
+    )
+      .map(normalizeGrtDisplayEvidence)
+      .filter(Boolean);
     result[chrName] = {
       mode: "segments",
       chrName,
@@ -167,6 +236,7 @@ export function normalizeGrtFinalPathByChr(value) {
         "grtDisplayAvailable",
         "grt_display_available",
       ) === true,
+      displayEvidence,
       serverBaseline: true,
     };
   });

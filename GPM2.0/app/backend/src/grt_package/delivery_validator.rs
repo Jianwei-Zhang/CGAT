@@ -107,7 +107,7 @@ where
     {
         return grt_err(
             "UNSUPPORTED_SCHEMA",
-            "expected gpm_grt_app_precomputed_v2 schema 2 / Final Path schema 1 or 2",
+            "expected gpm_grt_app_precomputed_v2 schema 2 / Final Path schema 1, 2, or 3",
         );
     }
     if !parse_bool(
@@ -372,6 +372,7 @@ where
         None
     };
     let final_path = read_json(bundle_root, "metadata/grt_final_path.json")?;
+    validate_app_final_path_manifest_hash(&final_path, manifest_object)?;
     let (q4_lengths, _q4_records) = validate_app_final_path(
         bundle_root,
         &final_path,
@@ -426,4 +427,21 @@ where
         q0_artifact_sha256: String::new(),
         q4_artifact_sha256: q4_artifact_sha256.to_string(),
     })
+}
+
+pub(super) fn validate_app_final_path_manifest_hash(
+    final_path: &Value,
+    manifest_object: &Map<String, Value>,
+) -> Result<()> {
+    let canonical_final_path = serde_json::to_vec(final_path)
+        .context("failed to canonicalize App Final Path for integrity validation")?;
+    let final_path_sha256 = format!("{:x}", Sha256::digest(&canonical_final_path));
+    if final_path_sha256 != json_nonempty_str(manifest_object, "final_path_sha256", "App manifest")?
+    {
+        return grt_err(
+            "HASH_MISMATCH",
+            "App manifest Final Path hash does not match metadata/grt_final_path.json",
+        );
+    }
+    Ok(())
 }

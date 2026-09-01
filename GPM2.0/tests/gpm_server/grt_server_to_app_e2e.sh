@@ -150,10 +150,11 @@ assert_contains "${no_fasta_zip_options}" 'fasta_available=false'
 "${backend_exe}" initialize-project "${no_fasta_zip_workspace}" no-fasta-project >/dev/null
 "${backend_exe}" initialize-project "${legacy_final_path_workspace}" final-path-v1-project >/dev/null
 full_zip_view="$("${backend_exe}" get-grt-project-view "${full_zip_workspace}" 1)"
-assert_contains "${full_zip_view}" '"final_path_schema_version":"2"'
+assert_contains "${full_zip_view}" '"final_path_schema_version":"3"'
 assert_contains "${full_zip_view}" '"grt_display_available":true'
 assert_contains "${full_zip_view}" '"assembly_ctg_id":'
 assert_contains "${full_zip_view}" '"assembly_source_start":1'
+assert_contains "${full_zip_view}" '"display_evidence":[]'
 "${backend_exe}" get-grt-project-view "${no_fasta_zip_workspace}" 1 >/dev/null
 legacy_final_path_view="$("${backend_exe}" get-grt-project-view "${legacy_final_path_workspace}" 1)"
 assert_contains "${legacy_final_path_view}" '"final_path_schema_version":"1"'
@@ -229,6 +230,7 @@ node --test \
   app/frontend/src/services/__tests__/workflow-api.test.mjs \
   app/frontend/src/ui/pages/__tests__/workspace-i18n.test.mjs \
   app/frontend/src/ui/pages/assembly/__tests__/grt-state.test.mjs \
+  app/frontend/src/ui/pages/assembly/__tests__/grt-result-state.test.mjs \
   app/frontend/src/ui/pages/assembly/__tests__/grt-visualization.test.mjs >/dev/null
 
 echo "GRT Server-to-App E2E passed"

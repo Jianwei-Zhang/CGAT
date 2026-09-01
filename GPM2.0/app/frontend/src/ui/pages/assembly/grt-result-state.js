@@ -187,7 +187,9 @@ export function resolveGrtResultContext(assembly) {
     || { main: false, subview: false };
   const available = Boolean(
     chrName
-    && normalizeString(assembly?.grtProjectView?.recipe?.finalPathSchemaVersion) === "2"
+    && ["2", "3"].includes(
+      normalizeString(assembly?.grtProjectView?.recipe?.finalPathSchemaVersion),
+    )
     && baselineEntry?.grtDisplayAvailable === true
     && assembly?.isChrPhased !== true
     && areFinalPathEntriesSemanticallyEqual(currentEntry, baselineEntry),
@@ -240,6 +242,7 @@ export function buildGrtResultPlan(entry) {
     intervals,
     visualIntervals,
     junctions: junctions.filter((junction) => junction.kind !== "continuous"),
+    displayEvidence: Array.isArray(entry?.displayEvidence) ? entry.displayEvidence : [],
   };
 }
 

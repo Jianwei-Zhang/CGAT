@@ -211,9 +211,50 @@ fn display_contract_project_view_maps_segments_to_project_ctgs_or_disables_chrom
     let (outcome, _) = crate::importer::import_from_extracted_bundle(&bundle_root).unwrap();
     let initialized = initialize_grt_project(&outcome.project_db_path, "display-project").unwrap();
     let conn = open_workspace_db(&outcome.project_db_path).unwrap();
+    let chromosome_json: String = conn
+        .query_row(
+            "SELECT chromosome_json FROM grt_final_path_chr WHERE chr = 'Chr01'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    let mut chromosome: Value = serde_json::from_str(&chromosome_json).unwrap();
+    chromosome["display_evidence"] = serde_json::json!([{
+        "evidence_id": "grt-display-local-test",
+        "event_id": "evt-step1-round1",
+        "final_path_segment_id": "seg-patch-1",
+        "stage": "step3",
+        "action": "refill",
+        "association": "accepted",
+        "tool": "minimap2",
+        "preset": "asm5",
+        "role": "left_anchor",
+        "aligned_length": 4,
+        "identity": 1.0,
+        "mapq": 60,
+        "source": {
+            "dataset": "support",
+            "contig": "donor1",
+            "start": 1,
+            "end": 4,
+            "orientation": "+"
+        },
+        "target": {
+            "dataset": "primary",
+            "contig": "primary1",
+            "start": 1,
+            "end": 4,
+            "orientation": "+"
+        }
+    }]);
+    conn.execute(
+        "UPDATE grt_final_path_chr SET chromosome_json = ?1 WHERE chr = 'Chr01'",
+        params![serde_json::to_string(&chromosome).unwrap()],
+    )
+    .unwrap();
     conn.execute(
         "UPDATE grt_package SET final_path_schema_version = ?1 WHERE id = 1",
-        params![GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION],
+        params![GRT_APP_LOCAL_EVIDENCE_FINAL_PATH_SCHEMA_VERSION],
     )
     .unwrap();
     drop(conn);
@@ -227,6 +268,11 @@ fn display_contract_project_view_maps_segments_to_project_ctgs_or_disables_chrom
         assert_eq!(segment["assembly_source_start"], 1);
         assert_eq!(segment["assembly_source_end"], 4);
     }
+    let evidence = &chr["display_evidence"][0];
+    assert!(evidence["source"]["assembly_ctg_id"].as_i64().unwrap() > 0);
+    assert!(evidence["target"]["assembly_ctg_id"].as_i64().unwrap() > 0);
+    assert_eq!(evidence["source"]["assembly_source_start"], 1);
+    assert_eq!(evidence["target"]["assembly_source_end"], 4);
 
     let conn = open_workspace_db(&outcome.project_db_path).unwrap();
     conn.execute(
@@ -247,6 +293,7 @@ fn display_contract_project_view_maps_segments_to_project_ctgs_or_disables_chrom
         .unwrap();
     let chr = &view.final_path_by_chr["Chr01"];
     assert_eq!(chr["grt_display_available"], false);
+    assert!(chr["display_evidence"].as_array().unwrap().is_empty());
     assert!(chr["segments"][0].get("assembly_ctg_id").is_none());
     assert!(chr["segments"][1].get("assembly_ctg_id").is_none());
 }
