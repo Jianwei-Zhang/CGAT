@@ -853,7 +853,7 @@ test("project export detail table is unwrapped, hides ctg, and supports header f
   assert.ok(sortedHtml.indexOf("700") < sortedHtml.indexOf("300"));
 });
 
-test("project export final path rows sort by chromosome order and skip empty paths", () => {
+test("project export final path rows sort numeric chromosomes naturally and skip empty paths", () => {
   const state = createState({
     projectExport: {
       ...createState().projectExport,
@@ -899,8 +899,83 @@ test("project export final path rows sort by chromosome order and skip empty pat
 
   const entries = __test.getFinalPathPreviewEntries(state);
 
-  assert.deepEqual(entries.map((entry) => entry.chrName), ["Chr02", "Chr01"]);
-  assert.deepEqual(entries.map((entry) => entry.lengthBp), [200, 100]);
+  assert.deepEqual(entries.map((entry) => entry.chrName), ["Chr01", "Chr02"]);
+  assert.deepEqual(entries.map((entry) => entry.lengthBp), [100, 200]);
+});
+
+test("project export final path rows use natural order before project export chromosomes load", () => {
+  const baseState = createState();
+  const makePath = (chrName) => ({
+    chrName,
+    segments: [{
+      segmentId: `gap-${chrName}`,
+      type: "gap",
+      gapSizeBp: 100,
+    }],
+  });
+  const state = createState({
+    assembly: {
+      finalPathTrackView: {},
+      chromosomes: [
+        { chrName: "Chr1" },
+        { chrName: "Chr10" },
+        { chrName: "Chr2" },
+        { chrName: "Chr3" },
+      ],
+      finalPathByChr: {
+        Chr1: makePath("Chr1"),
+        Chr10: makePath("Chr10"),
+        Chr2: makePath("Chr2"),
+        Chr3: makePath("Chr3"),
+      },
+    },
+    projectExport: {
+      ...baseState.projectExport,
+      chromosomes: [],
+      finalPathByChr: {},
+    },
+  });
+
+  const entries = __test.getFinalPathPreviewEntries(state);
+  const expectedNames = ["Chr1", "Chr2", "Chr3", "Chr10"];
+  assert.deepEqual(entries.map((entry) => entry.chrName), expectedNames);
+
+  const htmlNames = [...renderProjectExportPage(state).matchAll(/data-project-export-jump-chr="([^"]+)"/g)]
+    .map(([, chrName]) => chrName);
+  assert.deepEqual(htmlNames, expectedNames);
+
+  const tsvNames = __test.buildProjectFinalPathTsvText(entries)
+    .trimEnd()
+    .split("\n")
+    .slice(1)
+    .map((row) => row.split("\t")[0]);
+  assert.deepEqual(tsvNames, expectedNames);
+
+  const svgMarkup = __test.buildProjectFinalPathSvgSnapshot({
+    entries,
+    projectName: "p1",
+    primaryDatasetName: "hifiasm",
+  }).svgMarkup;
+  expectedNames.slice(0, -1).forEach((chrName, index) => {
+    assert.ok(svgMarkup.indexOf(`>${chrName}</text>`) < svgMarkup.indexOf(`>${expectedNames[index + 1]}</text>`));
+  });
+});
+
+test("project export final path rows preserve nonnumeric chromosome source slots", () => {
+  const names = ["Chr10", "ChrX", "Chr2", "ChrM", "Chr1"];
+  const finalPathByChr = Object.fromEntries(names.map((chrName) => [chrName, {
+    chrName,
+    segments: [{ segmentId: `gap-${chrName}`, type: "gap", gapSizeBp: 100 }],
+  }]));
+  const entries = __test.getFinalPathPreviewEntries(createState({
+    projectExport: {
+      ...createState().projectExport,
+      chromosomes: names.map((chrName) => ({ chrName })),
+      finalPathByChr,
+    },
+  }));
+
+  assert.deepEqual(entries.map((entry) => entry.chrName), ["Chr1", "ChrX", "Chr2", "ChrM", "Chr10"]);
 });
 
 test("project export final path rows merge the latest assembly final paths", () => {

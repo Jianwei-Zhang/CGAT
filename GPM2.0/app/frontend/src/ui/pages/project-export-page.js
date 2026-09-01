@@ -43,6 +43,48 @@ function normalizeString(value) {
   return String(value || "").trim();
 }
 
+function getNumericChromosomeNumber(name) {
+  const match = normalizeString(name).match(/^(?:chr)?0*(\d+)$/i);
+  if (!match) {
+    return null;
+  }
+  const numeric = Number(match[1]);
+  return Number.isSafeInteger(numeric) && numeric > 0 ? numeric : null;
+}
+
+function buildProjectExportChromosomeOrder(names) {
+  const normalizedNames = [];
+  const seenNames = new Set();
+  (Array.isArray(names) ? names : []).forEach((name) => {
+    const normalizedName = normalizeString(name);
+    if (!normalizedName || seenNames.has(normalizedName)) {
+      return;
+    }
+    seenNames.add(normalizedName);
+    normalizedNames.push(normalizedName);
+  });
+
+  // Keep nonnumeric source slots stable and sort only numeric names so the
+  // ordering remains total even when the two name kinds are mixed.
+  const numericPositions = [];
+  const numericNames = [];
+  normalizedNames.forEach((name, index) => {
+    const numeric = getNumericChromosomeNumber(name);
+    if (numeric === null) {
+      return;
+    }
+    numericPositions.push(index);
+    numericNames.push({ name, numeric, sourceIndex: index });
+  });
+  numericNames.sort((left, right) => left.numeric - right.numeric || left.sourceIndex - right.sourceIndex);
+
+  const orderedNames = [...normalizedNames];
+  numericPositions.forEach((position, index) => {
+    orderedNames[position] = numericNames[index].name;
+  });
+  return new Map(orderedNames.map((name, index) => [name, index]));
+}
+
 function hasOwn(object, key) {
   return Object.prototype.hasOwnProperty.call(object, key);
 }
@@ -1137,12 +1179,52 @@ function renderStats(model, labels, detailTableState = normalizeDetailTableState
 
 function getFinalPathPreviewEntries(state) {
   const finalPathByChr = getProjectExportFinalPathByChr(state);
-  const chromosomeOrder = new Map(
-    (Array.isArray(state.projectExport?.chromosomes) ? state.projectExport.chromosomes : [])
-      .map((chr, index) => [normalizeString(chr?.chrName), index]),
-  );
+  const rawEntries = Object.entries(finalPathByChr)
+    .map(([key, entry], sourceIndex) => ({
+      chrName: normalizeString(entry?.chrName || key),
+      parentChrName: normalizeString(entry?.chrName || key),
+      phasedTrackKey: "",
+      entry,
+      lengthBp: Math.max(0, Number(resolveFinalPathTotalLengthBp(entry)) || 0),
+      sourceIndex,
+    }))
+    .filter(({ chrName, entry }) => chrName && Array.isArray(entry?.segments) && entry.segments.length > 0);
+  const phasedTracksByChr = getProjectExportPhasedChrTracksByChr(state);
+  const phasedLabels = new Set();
+  Object.values(phasedTracksByChr).forEach((tracks) => {
+    (Array.isArray(tracks) ? tracks : []).forEach((track) => {
+      const label = normalizeString(track?.label);
+      if (label) {
+        phasedLabels.add(label);
+      }
+    });
+  });
+  const chromosomeNames = [];
+  const seenChromosomeNames = new Set();
+  const addChromosomeName = (name) => {
+    const normalizedName = normalizeString(name);
+    if (!normalizedName || seenChromosomeNames.has(normalizedName)) {
+      return;
+    }
+    seenChromosomeNames.add(normalizedName);
+    chromosomeNames.push(normalizedName);
+  };
+  const sourceChromosomes = Array.isArray(state?.projectExport?.chromosomes)
+    && state.projectExport.chromosomes.length
+    ? state.projectExport.chromosomes
+    : Array.isArray(state?.assembly?.chromosomes)
+      ? state.assembly.chromosomes
+      : [];
+  sourceChromosomes.forEach((chr) => addChromosomeName(chr?.chrName));
+  Object.keys(phasedTracksByChr).forEach(addChromosomeName);
+  rawEntries.forEach((row) => {
+    if (!phasedLabels.has(row.chrName)) {
+      addChromosomeName(row.chrName);
+    }
+  });
+  const chromosomeOrder = buildProjectExportChromosomeOrder(chromosomeNames);
   const phasedSort = new Map();
-  Object.entries(getProjectExportPhasedChrTracksByChr(state)).forEach(([parentChrName, tracks]) => {
+  Object.entries(phasedTracksByChr).forEach(([parentChrName, tracks]) => {
     const parentOrder = chromosomeOrder.has(parentChrName)
       ? chromosomeOrder.get(parentChrName)
       : Number.MAX_SAFE_INTEGER;
@@ -1155,15 +1237,7 @@ function getFinalPathPreviewEntries(state) {
       });
     });
   });
-  return Object.entries(finalPathByChr)
-    .map(([key, entry]) => ({
-      chrName: normalizeString(entry?.chrName || key),
-      parentChrName: normalizeString(entry?.chrName || key),
-      phasedTrackKey: "",
-      entry,
-      lengthBp: Math.max(0, Number(resolveFinalPathTotalLengthBp(entry)) || 0),
-    }))
-    .filter(({ chrName, entry }) => chrName && Array.isArray(entry?.segments) && entry.segments.length > 0)
+  return rawEntries
     .sort((left, right) => {
       const leftPhased = phasedSort.get(left.chrName);
       const rightPhased = phasedSort.get(right.chrName);
@@ -1173,9 +1247,11 @@ function getFinalPathPreviewEntries(state) {
         ?? (chromosomeOrder.has(right.chrName) ? chromosomeOrder.get(right.chrName) : Number.MAX_SAFE_INTEGER);
       const leftHaplotypeOrder = leftPhased?.haplotypeOrder ?? 0;
       const rightHaplotypeOrder = rightPhased?.haplotypeOrder ?? 0;
-      return leftOrder - rightOrder || leftHaplotypeOrder - rightHaplotypeOrder || left.chrName.localeCompare(right.chrName);
+      return leftOrder - rightOrder
+        || leftHaplotypeOrder - rightHaplotypeOrder
+        || left.sourceIndex - right.sourceIndex;
     })
-    .map((row) => {
+    .map(({ sourceIndex, ...row }) => {
       const phasedInfo = phasedSort.get(row.chrName);
       if (!phasedInfo) {
         return row;

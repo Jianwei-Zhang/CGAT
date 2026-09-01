@@ -654,6 +654,8 @@ Apply canonicalization and dedupe only to the hits whose resolved top and bottom
 - Single-format exports choose one save path and write exactly one file for that format; if the chosen file name has no trailing `_YYYYMMDDHHMMSS` timestamp, the frontend appends one before writing.
 - `all` chooses one directory and writes at most one `.png`, one `.tsv`, one `.log`, and one `.fasta` using one shared timestamped base name.
 - Project TSV must include a `Chr` column and rows for every non-empty final path chr in chromosome order.
+- Project Final Path rows must order ordinary numeric chromosome names by their numeric component (`Chr1`, `Chr2`, `Chr10`), even when the source FAI/order list is lexical. Preserve source positions for nonnumeric names and equal numeric keys, and keep phased rows grouped by parent and existing haplotype/display order.
+- During the initial project-export render, when `projectExport.chromosomes` is empty but `assembly.finalPathByChr` already has rows, use the available assembly chromosome list as the ordering source and still apply the same numeric ordering.
 - Project TSV `Origin ID` values for non-gap, non-ref rows must come from stored segment `originId` or reliable `assemblyCtgId -> originId/source_seq.seq_name` data loaded from the project. Do not infer them from display `ctgName` prefixes/suffixes.
 - Project FASTA must pass a `finalPathByChr` object to `export_project_final_path_fasta`; backend writes one FASTA record per chr.
 - Project PNG must render a whole-project final-path overview snapshot, not the current assembly chr card.
@@ -673,6 +675,8 @@ Apply canonicalization and dedupe only to the hits whose resolved top and bottom
 | Non-gap, non-ref TSV row lacks `originId` and no loaded ctg row can resolve it | Export fails in the progress dialog; no TSV file is written and no origin ID is guessed from `ctgName`. |
 | Project FASTA has duplicate or blank chr names | Backend command rejects the payload. |
 | Current chr has primary track hidden IDs outside the final path segments | Project statistics count those hidden primary contigs and their full lengths for that chr. |
+| First project-export render has Final Path rows but no `projectExport.chromosomes` yet | Use `assembly.chromosomes` as the temporary order source and render numeric chromosome names naturally. |
+| Source chromosome list is `Chr1`, `Chr10`, `Chr2` | Preview and all project export artifacts use `Chr1`, `Chr2`, `Chr10`. |
 
 #### 5. Good/Base/Bad Cases
 ```js
@@ -694,6 +698,7 @@ for (const [chrName, finalPathEntry] of Object.entries(finalPathByChr)) {
   - Assert TSV export fills a missing segment `originId` from loaded ctg data by `assemblyCtgId`.
   - Assert TSV export fails without writing when `originId` is missing and cannot be resolved; the test must prove it does not guess from `ctgName`.
   - Assert TSV and `all` export output paths include one sortable timestamp.
+  - Assert first-load Final Path rows use the assembly chromosome fallback and natural numeric order, and that TSV/PNG/all entry order matches the visible preview.
   - Assert `all` export writes one merged artifact per enabled export type and passes merged `finalPathByChr` to FASTA.
 - `app/frontend/src/ui/pages/__tests__/project-export-state.test.mjs`
   - Assert `buildProjectExportStatsModel` accepts per-chr hidden primary IDs outside `finalPathByChr` and counts them as used hidden primary ctgs.
@@ -710,7 +715,7 @@ for (const [chrName, finalPathEntry] of Object.entries(finalPathByChr)) {
 Treating project export as a batch wrapper around single-chr final path export.
 
 #### Correct
-Treat project export as its own merged-output contract and only reuse single-chr helpers when their output format is explicitly adapted to include the chr dimension.
+Treat project export as its own merged-output contract and only reuse single-chr helpers when their output format is explicitly adapted to include the chr dimension. Build one stable chromosome rank map that natural-sorts numeric slots without using a non-transitive mixed-name comparator, then share it with the preview and merged export entry collection.
 
 ### Importer Add Dataset Package UI Contract
 
