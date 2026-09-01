@@ -1264,7 +1264,6 @@ function renderImportProgressOverlay(importer, messages) {
         class="card modal-dialog import-progress-dialog importer-import-progress-dialog"
         role="dialog"
         aria-modal="true"
-        aria-busy="${isCancelling ? "true" : "false"}"
         aria-labelledby="import-progress-dialog-title"
         aria-describedby="import-progress-dialog-summary"
       >
