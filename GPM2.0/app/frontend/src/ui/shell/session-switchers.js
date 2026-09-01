@@ -223,6 +223,9 @@ export async function switchWorkspaceFromShell(store, workspaceRoot, { openWorks
     importer: {
       ...current.importer,
       inFlight: false,
+      importRunId: null,
+      importCancelling: false,
+      importCancelError: "",
       workspaceRoot: normalizedPath,
       openWorkspacePath: normalizedPath,
       historyValidation: {},

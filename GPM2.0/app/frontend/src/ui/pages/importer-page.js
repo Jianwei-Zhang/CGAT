@@ -428,6 +428,7 @@ async function runImportZipFlow(host, store) {
     inFlight: true,
     importRunId: runId,
     importCancelling: false,
+    importCancelError: "",
     importProgressAutoScroll: true,
     importProgressScrollTop: 0,
     status: i18nT(snapshot, "importer.runtime.importInProgressStatus"),
@@ -439,6 +440,7 @@ async function runImportZipFlow(host, store) {
   });
   rerender(host, store);
 
+  let importOperationCompleted = false;
   try {
     const result = await importZipBundle({
       zipPath: importer.zipPath,
@@ -456,6 +458,7 @@ async function runImportZipFlow(host, store) {
         rerender(host, store);
       },
     });
+    importOperationCompleted = true;
     if (String(store.getState().importer.importRunId || "") !== runId) {
       return;
     }
@@ -470,13 +473,15 @@ async function runImportZipFlow(host, store) {
     if (String(store.getState().importer.importRunId || "") !== runId) {
       return;
     }
-    updateImporterState(store, {
-      inFlight: false,
-      importRunId: null,
-      importCancelling: false,
-      status: i18nT(snapshot, "importer.runtime.importFailedStatus"),
-      summary: formatImportFailureSummary(error, snapshot),
-    });
+    updateImporterState(
+      store,
+      buildImportCompletionErrorPatch(
+        error,
+        snapshot,
+        store.getState().importer,
+        importOperationCompleted,
+      ),
+    );
   }
 
   rerender(host, store);
@@ -499,6 +504,7 @@ async function runImportExtractedFlow(host, store) {
     inFlight: true,
     importRunId: runId,
     importCancelling: false,
+    importCancelError: "",
     importProgressAutoScroll: true,
     importProgressScrollTop: 0,
     status: i18nT(snapshot, "importer.runtime.importInProgressStatus"),
@@ -507,6 +513,7 @@ async function runImportExtractedFlow(host, store) {
   });
   rerender(host, store);
 
+  let importOperationCompleted = false;
   try {
     const result = await importExtractedBundle({
       extractedPath: importer.extractedPath,
@@ -523,6 +530,7 @@ async function runImportExtractedFlow(host, store) {
         rerender(host, store);
       },
     });
+    importOperationCompleted = true;
     if (String(store.getState().importer.importRunId || "") !== runId) {
       return;
     }
@@ -537,13 +545,15 @@ async function runImportExtractedFlow(host, store) {
     if (String(store.getState().importer.importRunId || "") !== runId) {
       return;
     }
-    updateImporterState(store, {
-      inFlight: false,
-      importRunId: null,
-      importCancelling: false,
-      status: i18nT(snapshot, "importer.runtime.importFailedStatus"),
-      summary: formatImportFailureSummary(error, snapshot),
-    });
+    updateImporterState(
+      store,
+      buildImportCompletionErrorPatch(
+        error,
+        snapshot,
+        store.getState().importer,
+        importOperationCompleted,
+      ),
+    );
   }
 
   rerender(host, store);
@@ -575,6 +585,7 @@ async function runImportAddPackageFlow(host, store, workspaceRoot) {
     inFlight: true,
     importRunId: runId,
     importCancelling: false,
+    importCancelError: "",
     importProgressAutoScroll: true,
     importProgressScrollTop: 0,
     workspaceRoot: normalizedWorkspaceRoot,
@@ -585,6 +596,7 @@ async function runImportAddPackageFlow(host, store, workspaceRoot) {
   });
   rerender(host, store);
 
+  let importOperationCompleted = false;
   try {
     const result = await importAddDatasetPackage({
       workspaceRoot: normalizedWorkspaceRoot,
@@ -602,6 +614,7 @@ async function runImportAddPackageFlow(host, store, workspaceRoot) {
         rerender(host, store);
       },
     });
+    importOperationCompleted = true;
     if (String(store.getState().importer.importRunId || "") !== runId) {
       return;
     }
@@ -620,13 +633,15 @@ async function runImportAddPackageFlow(host, store, workspaceRoot) {
     if (String(store.getState().importer.importRunId || "") !== runId) {
       return;
     }
-    updateImporterState(store, {
-      inFlight: false,
-      importRunId: null,
-      importCancelling: false,
-      status: i18nT(snapshot, "importer.runtime.importFailedStatus"),
-      summary: formatImportFailureSummary(error, snapshot),
-    });
+    updateImporterState(
+      store,
+      buildImportCompletionErrorPatch(
+        error,
+        snapshot,
+        store.getState().importer,
+        importOperationCompleted,
+      ),
+    );
   }
 
   rerender(host, store);
@@ -647,6 +662,9 @@ async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
 
   updateImporterState(store, {
     inFlight: true,
+    importRunId: null,
+    importCancelling: false,
+    importCancelError: "",
     status: i18nT(snapshot, "importer.runtime.openInProgressStatus"),
     summary: i18nT(snapshot, "importer.runtime.openSummary"),
     openWorkspacePath: workspaceRoot,
@@ -675,6 +693,9 @@ async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
   } catch (error) {
     updateImporterState(store, {
       inFlight: false,
+      importRunId: null,
+      importCancelling: false,
+      importCancelError: "",
       status: i18nT(snapshot, "importer.runtime.openFailedStatus"),
       summary: String(error.message || error),
     });
@@ -942,6 +963,7 @@ function applyWorkspaceLoadedState(store, payload) {
       inFlight: false,
       importRunId: null,
       importCancelling: false,
+      importCancelError: "",
       workspaceRoot,
       openWorkspacePath: workspaceRoot,
       historyValidation: {},
@@ -1055,6 +1077,7 @@ function applyAddPackageImportedState(store, payload) {
       inFlight: false,
       importRunId: null,
       importCancelling: false,
+      importCancelError: "",
       workspaceRoot,
       openWorkspacePath: workspaceRoot,
       status: i18nT(current, "importer.runtime.importDoneStatus"),
@@ -1191,37 +1214,103 @@ function renderImportProgressOverlay(importer, messages) {
   const progressMeta = buildImportProgressMeta(allStages);
   const recentOffset = Math.max(0, allStages.length - 60);
   const recentStages = allStages.slice(recentOffset);
+  const isCancelling = importer.importCancelling === true;
+  const statusLabel = isCancelling
+    ? messages.runtime.importCancellingStatus
+    : messages.runtime.importInProgressStatus;
+  const summary = isCancelling
+    ? messages.runtime.importCancellingSummary
+    : String(importer.summary || messages.runtime.importProgressIndeterminate);
+  const currentStage = recentStages.length
+    ? getImportStageLabel(recentStages[recentStages.length - 1], messages)
+    : messages.runtime.notStarted;
+  const cancelLabel = isCancelling
+    ? messages.buttons.cancelImportPending
+    : messages.buttons.cancelImport;
+  const logCount = formatImporterMessage(messages.runtime.importProgressLogCount, {
+    count: allStages.length,
+  });
   const stageItems = recentStages.length
     ? recentStages
         .map((stage, index) => {
           const absoluteIndex = recentOffset + index;
-          const isRunning = !importer.importCancelling && index === recentStages.length - 1;
-          const status = isRunning ? "running" : "done";
-          return `<li class="pipeline-step-row import-progress-step ${status}">
+          const isLatest = index === recentStages.length - 1;
+          const status = isLatest
+            ? isCancelling ? "cancelling" : "running"
+            : "done";
+          const statusLabelForRow = status === "cancelling"
+            ? messages.runtime.importProgressCancellingStatus
+            : status === "running"
+              ? messages.runtime.importProgressRunningStatus
+              : messages.runtime.importProgressDoneStatus;
+          const currentAttribute = isLatest ? ' aria-current="step"' : "";
+          return `<li class="pipeline-step-row import-progress-step importer-import-progress-step ${escapeAttr(status)}" data-import-progress-step-status="${escapeAttr(status)}"${currentAttribute}>
             <span class="pipeline-step-label">${escapeHtml(formatImportProgressStage(stage, absoluteIndex, progressMeta, messages))}</span>
+            <span class="importer-import-progress-step-status">${escapeHtml(statusLabelForRow)}</span>
             <span class="pipeline-step-icon">${renderImportProgressStepIcon(status)}</span>
           </li>`;
         })
         .join("")
-    : `<li class="pipeline-step-row import-progress-step running">
+    : `<li class="pipeline-step-row import-progress-step importer-import-progress-step ${isCancelling ? "cancelling" : "running"}" data-import-progress-step-status="${isCancelling ? "cancelling" : "running"}" aria-current="step">
         <span class="pipeline-step-label">${escapeHtml(messages.runtime.notStarted)}</span>
-        <span class="pipeline-step-icon">${renderImportProgressStepIcon("running")}</span>
+        <span class="importer-import-progress-step-status">${escapeHtml(isCancelling
+          ? messages.runtime.importProgressCancellingStatus
+          : messages.runtime.importProgressRunningStatus)}</span>
+        <span class="pipeline-step-icon">${renderImportProgressStepIcon(isCancelling ? "cancelling" : "running")}</span>
       </li>`;
   return `
-    <div class="modal-overlay import-progress-overlay">
-      <article class="card modal-dialog import-progress-dialog" role="dialog" aria-modal="true" aria-label="${escapeAttr(messages.page.importProgressTitle)}">
-        <button type="button" class="button ghost import-progress-close" data-import-cancel="1" title="${escapeAttr(messages.buttons.cancelImport)}">&times;</button>
-        <div class="import-progress-heading">
-          <span class="pipeline-spinner" aria-hidden="true"></span>
-          <div>
-            <div class="import-progress-title-row">
-              <h4>${escapeHtml(messages.page.importProgressTitle)}</h4>
-              ${renderImportProgressMeter(progressMeta, messages)}
+    <div class="modal-overlay import-progress-overlay importer-import-progress-overlay">
+      <article
+        class="card modal-dialog import-progress-dialog importer-import-progress-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-busy="${isCancelling ? "true" : "false"}"
+        aria-labelledby="import-progress-dialog-title"
+        aria-describedby="import-progress-dialog-summary"
+      >
+        <header class="importer-import-progress-header">
+          <div class="importer-import-progress-title-group">
+            <span class="importer-import-progress-status-mark ${isCancelling ? "is-cancelling" : ""}" aria-hidden="true">
+              <span class="pipeline-spinner"></span>
+            </span>
+            <div class="importer-import-progress-title-block">
+              <span class="importer-import-progress-eyebrow">${escapeHtml(statusLabel)}</span>
+              <h4 id="import-progress-dialog-title">${escapeHtml(messages.page.importProgressTitle)}</h4>
             </div>
-            <p class="muted">${escapeHtml(importer.importCancelling ? messages.runtime.importCancellingSummary : importer.summary)}</p>
           </div>
-        </div>
-        <ul class="status-list import-progress-list" data-import-progress-list="1">${stageItems}</ul>
+          <button
+            type="button"
+            class="button ghost import-progress-close importer-import-progress-close"
+            data-import-cancel="1"
+            aria-label="${escapeAttr(cancelLabel)}"
+            title="${escapeAttr(cancelLabel)}"
+            ${isCancelling ? 'disabled aria-disabled="true"' : ""}
+          >
+            <svg viewBox="0 0 20 20" width="16" height="16" focusable="false" aria-hidden="true">
+              <path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+          </button>
+        </header>
+        <section class="importer-import-progress-overview" aria-labelledby="import-progress-current-stage-label">
+          <div class="importer-import-progress-overview-head">
+            <div class="importer-import-progress-current-stage">
+              <span id="import-progress-current-stage-label" class="importer-import-progress-section-label">${escapeHtml(messages.page.importProgressCurrentStage)}</span>
+              <strong>${escapeHtml(currentStage)}</strong>
+            </div>
+          </div>
+          ${renderImportProgressMeter(progressMeta, messages)}
+          <p id="import-progress-dialog-summary" class="importer-import-progress-summary" aria-live="polite">${escapeHtml(summary)}</p>
+          ${importer.importCancelError
+            ? `<p class="importer-import-progress-error" role="alert">${escapeHtml(String(importer.importCancelError))}</p>`
+            : ""}
+        </section>
+        <section class="importer-import-progress-log" aria-labelledby="import-progress-details-title">
+          <div class="importer-import-progress-log-head">
+            <h5 id="import-progress-details-title">${escapeHtml(messages.page.importProgressDetailsTitle)}</h5>
+            <span class="importer-import-progress-log-count">${escapeHtml(logCount)}</span>
+          </div>
+          <ul class="status-list import-progress-list importer-import-progress-list" data-import-progress-list="1">${stageItems}</ul>
+        </section>
       </article>
     </div>
   `;
@@ -1366,10 +1455,56 @@ function createImporterStatusToastDismissCoordinator({
   };
 }
 
-function formatImportFailureSummary(error, stateOrLocale) {
+function formatImporterMessage(template, replacements = {}) {
+  let message = String(template || "");
+  for (const [key, value] of Object.entries(replacements)) {
+    message = message.replaceAll(`{${key}}`, String(value ?? ""));
+  }
+  return message;
+}
+
+function getImportErrorFirstLine(error) {
   const raw = String(error?.message || error || "").trim();
-  const firstLine = raw.split(/\r?\n/).map((line) => line.trim()).find(Boolean) || "-";
-  return i18nT(stateOrLocale, "importer.runtime.importFailedSummary", { message: firstLine });
+  return raw.split(/\r?\n/).map((line) => line.trim()).find(Boolean) || "-";
+}
+
+function formatImportFailureSummary(error, stateOrLocale) {
+  return i18nT(stateOrLocale, "importer.runtime.importFailedSummary", {
+    message: getImportErrorFirstLine(error),
+  });
+}
+
+function formatImportEndedAfterCancelSummary(error, stateOrLocale) {
+  return i18nT(stateOrLocale, "importer.runtime.importCancelFinishedSummary", {
+    message: getImportErrorFirstLine(error),
+  });
+}
+
+function formatImportCancelRequestError(error, stateOrLocale) {
+  return i18nT(stateOrLocale, "importer.runtime.importCancelRequestFailedSummary", {
+    message: getImportErrorFirstLine(error),
+  });
+}
+
+function buildImportCompletionErrorPatch(
+  error,
+  stateOrLocale,
+  importer,
+  importOperationCompleted,
+) {
+  const cancellationWasRequested = !importOperationCompleted && importer?.importCancelling === true;
+  return {
+    inFlight: false,
+    importRunId: null,
+    importCancelling: false,
+    importCancelError: "",
+    status: cancellationWasRequested
+      ? i18nT(stateOrLocale, "importer.runtime.importCancelFinishedStatus")
+      : i18nT(stateOrLocale, "importer.runtime.importFailedStatus"),
+    summary: cancellationWasRequested
+      ? formatImportEndedAfterCancelSummary(error, stateOrLocale)
+      : formatImportFailureSummary(error, stateOrLocale),
+  };
 }
 
 function buildImportProgressMeta(stages) {
@@ -1407,15 +1542,24 @@ function buildImportProgressMeta(stages) {
       latestProgressTotal = progressTotal;
     }
   }
-  const current = latestProgressIndex > 0
-    ? offset + latestProgressIndex
-    : stages.length;
-  const total = Math.max(stages.length, latestProgressTotal > 0 ? offset + latestProgressTotal : stages.length);
+  if (latestProgressTotal > 0) {
+    const current = latestProgressIndex > 0
+      ? offset + latestProgressIndex
+      : stages.length;
+    const total = Math.max(stages.length, offset + latestProgressTotal);
+    return {
+      mode: "step",
+      offset,
+      current: Math.min(current, total),
+      total,
+    };
+  }
+
   return {
-    mode: "step",
+    mode: "indeterminate",
     offset,
-    current: Math.min(current, total),
-    total,
+    current: latestProgressIndex > 0 ? offset + latestProgressIndex : stages.length,
+    total: 0,
   };
 }
 
@@ -1487,20 +1631,37 @@ function stripImportProgressSuffix(value) {
 }
 
 function renderImportProgressMeter(progressMeta, messages) {
-  if (!progressMeta.total) {
-    return "";
-  }
-  const percent = Math.max(0, Math.min(100, (progressMeta.current / progressMeta.total) * 100));
-  const meterText = progressMeta.mode === "phase"
-    ? String(messages.runtime.importPhaseProgress || "Phase {current}/{total}")
-        .replaceAll("{current}", String(progressMeta.current))
-        .replaceAll("{total}", String(progressMeta.total))
-    : String(messages.runtime.importStepProgress || "Steps {current}/{total}")
-        .replaceAll("{current}", String(progressMeta.current))
-        .replaceAll("{total}", String(progressMeta.total));
-  return `<div class="import-progress-meter" aria-label="import progress">
+  const isDeterminate = progressMeta.mode !== "indeterminate" && progressMeta.total > 0;
+  const mode = isDeterminate ? progressMeta.mode : "indeterminate";
+  const meterText = mode === "phase"
+    ? formatImporterMessage(messages.runtime.importPhaseProgress, {
+      current: progressMeta.current,
+      total: progressMeta.total,
+    })
+    : mode === "step"
+      ? formatImporterMessage(messages.runtime.importStepProgress, {
+        current: progressMeta.current,
+        total: progressMeta.total,
+      })
+      : messages.runtime.importProgressIndeterminate;
+  const percent = isDeterminate
+    ? Math.max(0, Math.min(100, (progressMeta.current / progressMeta.total) * 100))
+    : 0;
+  const ariaValues = isDeterminate
+    ? ` aria-valuemin="0" aria-valuemax="${escapeAttr(progressMeta.total)}" aria-valuenow="${escapeAttr(progressMeta.current)}"`
+    : "";
+  const fillStyle = isDeterminate
+    ? ` style="width: ${escapeAttr(percent.toFixed(1))}%;"`
+    : "";
+  return `<div
+    class="import-progress-meter"
+    data-progress-mode="${escapeAttr(mode)}"
+    role="progressbar"
+    aria-label="${escapeAttr(meterText)}"
+    aria-valuetext="${escapeAttr(meterText)}"${ariaValues}
+  >
     <div class="import-progress-meter-track">
-      <div class="import-progress-meter-fill" style="width: ${percent.toFixed(1)}%;"></div>
+      <div class="import-progress-meter-fill"${fillStyle}></div>
     </div>
     <span class="import-progress-meter-text">${escapeHtml(meterText)}</span>
   </div>`;
@@ -1561,7 +1722,7 @@ function clampImportProgressScrollTop(scrollTop, progressList) {
 }
 
 function renderImportProgressStepIcon(status) {
-  if (status === "running") {
+  if (status === "running" || status === "cancelling") {
     return `<span class="pipeline-spinner" aria-hidden="true"></span>`;
   }
   return `<span class="pipeline-done" aria-hidden="true">&#10003;</span>`;
@@ -1569,29 +1730,55 @@ function renderImportProgressStepIcon(status) {
 
 async function cancelCurrentImport(host, store) {
   const snapshot = store.getState();
-  const runId = String(snapshot.importer.importRunId || "").trim();
-  if (!runId) {
+  const importer = snapshot.importer || {};
+  const runId = String(importer.importRunId || "").trim();
+  if (!runId || !importer.inFlight || importer.importCancelling) {
     return;
   }
   updateImporterState(store, {
-    inFlight: false,
-    importRunId: null,
-    importCancelling: false,
+    importCancelling: true,
+    importCancelError: "",
     summary: i18nT(snapshot, "importer.runtime.importCancellingSummary"),
-    stages: [
-      ...snapshot.importer.stages,
-      i18nT(snapshot, "importer.runtime.importCancelRequestedStage"),
-    ],
   });
   rerender(host, store);
+
   try {
-    await requestImportCancel({ runId, stateOrLocale: snapshot });
-  } catch (error) {
+    const result = await requestImportCancel({ runId, stateOrLocale: snapshot });
+    const currentImporter = store.getState().importer || {};
+    if (
+      String(currentImporter.importRunId || "") !== runId
+      || !currentImporter.inFlight
+    ) {
+      return;
+    }
+    if (result === false || result?.cancelRequested === false) {
+      throw new Error(i18nT(snapshot, "importer.runtime.importCancelRequestNotAccepted"));
+    }
+    const currentStages = Array.isArray(currentImporter.stages)
+      ? currentImporter.stages
+      : [];
     updateImporterState(store, {
-      summary: String(error?.message || error || ""),
+      stages: [
+        ...currentStages,
+        i18nT(snapshot, "importer.runtime.importCancelRequestedStage"),
+      ],
     });
+    rerender(host, store);
+  } catch (error) {
+    const currentImporter = store.getState().importer || {};
+    if (
+      String(currentImporter.importRunId || "") !== runId
+      || !currentImporter.inFlight
+    ) {
+      return;
+    }
+    updateImporterState(store, {
+      importCancelling: false,
+      importCancelError: formatImportCancelRequestError(error, snapshot),
+      summary: importer.summary,
+    });
+    rerender(host, store);
   }
-  rerender(host, store);
 }
 
 function createImportRunId(prefix) {

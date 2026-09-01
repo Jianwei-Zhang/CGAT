@@ -96,6 +96,16 @@ function createScrollList({ scrollHeight = 1000, clientHeight = 200, scrollTop =
   };
 }
 
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
+
 function createHost(buttons = {}) {
   const nodeMap = new Map(Object.entries(buttons));
   return {
@@ -137,6 +147,7 @@ function createImporterScrollState(overrides = {}) {
       inFlight: true,
       importRunId: "import-test",
       importCancelling: false,
+      importCancelError: "",
       status: "导入中",
       stages: ["stage-1", "stage-2"],
       summary: "正在导入",
@@ -159,6 +170,10 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.runtime.importAddPackageDoneStage, "数据集追加包导入完成并刷新候选项");
   assert.equal(zh.runtime.addPackageHint, "（added {datasetName}）");
   assert.equal(zh.runtime.importFailedSummary, "导入失败：{message}");
+  assert.equal(zh.runtime.importCancellingStatus, "终止请求中");
+  assert.equal(zh.runtime.importProgressIndeterminate, "正在处理导入任务...");
+  assert.equal(zh.runtime.importCancelRequestFailedSummary, "终止请求失败：{message}");
+  assert.equal(zh.runtime.importCancelFinishedStatus, "终止请求已提交");
   assert.equal(zh.runtime.tauriImportAddPackageStage, "调用后端 import_add_dataset_package");
   assert.equal(zh.progressStages.validate_grt_source_fastas, "校验 reference/dataset FASTA 与 FAI");
   assert.equal(zh.progressStages.validate_grt_app_required_files, "检查 App 交付包必需文件");
@@ -176,6 +191,10 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.runtime.importAddPackageDoneStage, "Dataset add package imported and options refreshed");
   assert.equal(en.runtime.addPackageHint, "(added {datasetName})");
   assert.equal(en.runtime.importFailedSummary, "Import failed: {message}");
+  assert.equal(en.runtime.importCancellingStatus, "Cancellation requested");
+  assert.equal(en.runtime.importProgressIndeterminate, "Processing the import...");
+  assert.equal(en.runtime.importCancelRequestFailedSummary, "Cancellation request failed: {message}");
+  assert.equal(en.runtime.importCancelFinishedStatus, "Cancellation requested");
   assert.equal(en.runtime.tauriImportAddPackageStage, "Invoke backend import_add_dataset_package");
   assert.equal(en.progressStages.validate_grt_source_fastas, "Validate reference/dataset FASTA and FAI");
   assert.equal(en.progressStages.validate_grt_app_required_files, "Check required App delivery files");
@@ -1140,7 +1159,9 @@ test("import progress modal is the only import summary and shows per-row status 
       },
     });
 
-    assert.match(html, /class="modal-overlay import-progress-overlay"/);
+    assert.match(html, /class="modal-overlay import-progress-overlay importer-import-progress-overlay"/);
+    assert.match(html, /aria-labelledby="import-progress-dialog-title"/);
+    assert.match(html, /aria-describedby="import-progress-dialog-summary"/);
     assert.doesNotMatch(html, /import-progress-actions/);
     assert.match(html, /class="pipeline-done"/);
     assert.match(html, /class="pipeline-spinner"/);
@@ -1148,6 +1169,8 @@ test("import progress modal is the only import summary and shows per-row status 
     assert.match(html, /extract_entry：gpm_server\/runs\/chr_Chr06\/result\.paf \(132\/621\)/);
     assert.match(html, /index_pairwise_paf：chr_Chr06\/flye_vs_self\/result\.paf \(551\/621\)/);
     assert.match(html, /class="import-progress-meter"/);
+    assert.match(html, /data-progress-mode="step"/);
+    assert.match(html, /aria-valuenow="551"/);
     assert.match(html, /551\/621/);
     assert.doesNotMatch(html, /导入摘要/);
   } finally {
@@ -1229,16 +1252,18 @@ test("import progress css keeps labels in the wide column and icons pinned right
 
   assert.match(
     css,
-    /\.pipeline-step-row\.import-progress-step\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+20px;/,
+    /\.importer-import-progress-dialog \.pipeline-step-row\.import-progress-step\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto\s+18px;/,
   );
   assert.match(
     css,
-    /\.import-progress-step\s+\.pipeline-step-label\s*\{[^}]*grid-column:\s*1\s*\/\s*2;/,
+    /\.importer-import-progress-dialog \.import-progress-step\s+\.pipeline-step-label\s*\{[^}]*grid-column:\s*1\s*\/\s*2;/,
   );
   assert.match(
     css,
-    /\.import-progress-step\s+\.pipeline-step-icon\s*\{[^}]*grid-column:\s*2\s*\/\s*3;/,
+    /\.importer-import-progress-dialog \.import-progress-step\s+\.pipeline-step-icon\s*\{[^}]*grid-column:\s*3\s*\/\s*4;/,
   );
+  assert.match(css, /\.importer-import-progress-overlay\s*\{/);
+  assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(
     css,
     /\.importer-option-card\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;/,
@@ -1308,4 +1333,306 @@ test("import progress list preserves manual scroll until the user returns near b
   }), store);
 
   assert.equal(latestList.scrollTop, 1280);
+});
+
+test("import progress uses an indeterminate meter when no reliable total exists", () => {
+  const previousWindow = globalThis.window;
+  try {
+    globalThis.window = {
+      localStorage: {
+        getItem() {
+          return null;
+        },
+      },
+    };
+    const html = renderImporterPage({
+      locale: "en",
+      importer: {
+        ...createImporterScrollState().importer,
+        importRunId: "import-indeterminate-test",
+        stages: ["Preparing import"],
+        summary: "Processing",
+      },
+    });
+
+    assert.match(html, /data-progress-mode="indeterminate"/);
+    assert.match(html, /aria-valuetext="Processing the import\.\.\."/);
+    assert.doesNotMatch(html, /aria-valuenow=/);
+    assert.match(html, /Events recorded: 1/);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test("import progress cancellation keeps the dialog until the import settles", async () => {
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  const previousSetTimeout = globalThis.setTimeout;
+  const previousClearTimeout = globalThis.clearTimeout;
+  try {
+    globalThis.document = {
+      querySelector() {
+        return null;
+      },
+    };
+    const importDeferred = createDeferred();
+    const cancelDeferred = createDeferred();
+    const calls = [];
+    globalThis.window = {
+      __TAURI__: {
+        core: {
+          invoke(command, args) {
+            calls.push({ command, args });
+            if (command === "import_zip") {
+              return importDeferred.promise;
+            }
+            if (command === "request_import_cancel") {
+              return cancelDeferred.promise;
+            }
+            throw new Error(`unexpected command: ${command}`);
+          },
+        },
+      },
+      dispatchEvent() {},
+      localStorage: {
+        getItem() {
+          return null;
+        },
+        setItem() {},
+        removeItem() {},
+      },
+    };
+    globalThis.setTimeout = () => ({ cancelled: false });
+    globalThis.clearTimeout = () => {};
+
+    const importZipStartButton = createButton();
+    const cancelButton = createButton();
+    const host = createHost({
+      "#import-zip-start-button": importZipStartButton,
+      "[data-import-cancel]": cancelButton,
+      "[data-import-progress-list='1']": createScrollList(),
+    });
+    const store = createStore(createImporterScrollState({
+      zipPath: "bundle.zip",
+      workspaceRoot: "D:/empty",
+      inFlight: false,
+      importRunId: null,
+      status: "",
+      stages: [],
+      summary: "",
+    }));
+
+    bindImporterPage(host, store);
+    const importRun = importZipStartButton.click();
+    const runId = store.getState().importer.importRunId;
+    assert.equal(store.getState().importer.inFlight, true);
+
+    const cancelRun = cancelButton.click();
+    assert.equal(store.getState().importer.inFlight, true);
+    assert.equal(store.getState().importer.importRunId, runId);
+    assert.equal(store.getState().importer.importCancelling, true);
+    assert.match(host.innerHTML, /disabled aria-disabled="true"/);
+
+    const duplicateCancelRun = cancelButton.click();
+    await duplicateCancelRun;
+    assert.equal(
+      calls.filter(({ command }) => command === "request_import_cancel").length,
+      1,
+    );
+
+    cancelDeferred.resolve({ runId, cancelRequested: true });
+    await cancelRun;
+    assert.equal(store.getState().importer.importCancelling, true);
+    assert.match(host.innerHTML, /已请求终止导入/);
+
+    importDeferred.reject(new Error("import cancelled by backend"));
+    await importRun;
+    assert.equal(store.getState().importer.inFlight, false);
+    assert.equal(store.getState().importer.importRunId, null);
+    assert.equal(store.getState().importer.importCancelling, false);
+    assert.equal(store.getState().importer.status, zh.runtime.importCancelFinishedStatus);
+    assert.match(store.getState().importer.summary, /import cancelled by backend/);
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+    globalThis.setTimeout = previousSetTimeout;
+    globalThis.clearTimeout = previousClearTimeout;
+  }
+});
+
+test("normal import success wins over a pending cancellation response", async () => {
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  const previousSetTimeout = globalThis.setTimeout;
+  const previousClearTimeout = globalThis.clearTimeout;
+  try {
+    globalThis.document = {
+      querySelector() {
+        return null;
+      },
+    };
+    const importDeferred = createDeferred();
+    const cancelDeferred = createDeferred();
+    globalThis.window = {
+      __TAURI__: {
+        core: {
+          invoke(command) {
+            if (command === "import_zip") {
+              return importDeferred.promise;
+            }
+            if (command === "request_import_cancel") {
+              return cancelDeferred.promise;
+            }
+            if (command === "list_project_initializer_options") {
+              return Promise.resolve({
+                packageMetadata: {},
+                grtRecipe: null,
+                references: [{ referenceGenomeId: 1 }],
+                datasets: [{ datasetId: 2 }],
+                existingProjects: [],
+              });
+            }
+            throw new Error(`unexpected command: ${command}`);
+          },
+        },
+      },
+      dispatchEvent() {},
+      localStorage: {
+        getItem() {
+          return null;
+        },
+        setItem() {},
+        removeItem() {},
+      },
+    };
+    globalThis.setTimeout = () => ({ cancelled: false });
+    globalThis.clearTimeout = () => {};
+
+    const importZipStartButton = createButton();
+    const cancelButton = createButton();
+    const host = createHost({
+      "#import-zip-start-button": importZipStartButton,
+      "[data-import-cancel]": cancelButton,
+      "[data-import-progress-list='1']": createScrollList(),
+    });
+    const store = createStore(createImporterScrollState({
+      zipPath: "bundle.zip",
+      workspaceRoot: "D:/empty",
+      inFlight: false,
+      importRunId: null,
+      status: "",
+      stages: [],
+      summary: "",
+    }));
+
+    bindImporterPage(host, store);
+    const importRun = importZipStartButton.click();
+    const runId = store.getState().importer.importRunId;
+    const cancelRun = cancelButton.click();
+    importDeferred.resolve({
+      workspaceRoot: "D:/empty",
+      message: "Import finished normally",
+    });
+    await importRun;
+
+    assert.equal(store.getState().activeRoute, "workspace");
+    assert.equal(store.getState().importer.importRunId, null);
+    assert.equal(store.getState().importer.importCancelling, false);
+    assert.equal(store.getState().importer.status, zh.runtime.importDoneStatus);
+    assert.equal(store.getState().importer.summary, "Import finished normally");
+
+    cancelDeferred.reject(new Error(`late cancellation for ${runId}`));
+    await cancelRun;
+    assert.equal(store.getState().importer.status, zh.runtime.importDoneStatus);
+    assert.equal(store.getState().importer.summary, "Import finished normally");
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+    globalThis.setTimeout = previousSetTimeout;
+    globalThis.clearTimeout = previousClearTimeout;
+  }
+});
+
+test("import cancellation request failures restore the running dialog", async () => {
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  const previousSetTimeout = globalThis.setTimeout;
+  const previousClearTimeout = globalThis.clearTimeout;
+  try {
+    globalThis.document = {
+      querySelector() {
+        return null;
+      },
+    };
+    const importDeferred = createDeferred();
+    const cancelDeferred = createDeferred();
+    globalThis.window = {
+      __TAURI__: {
+        core: {
+          invoke(command) {
+            if (command === "import_zip") {
+              return importDeferred.promise;
+            }
+            if (command === "request_import_cancel") {
+              return cancelDeferred.promise;
+            }
+            throw new Error(`unexpected command: ${command}`);
+          },
+        },
+      },
+      dispatchEvent() {},
+      localStorage: {
+        getItem() {
+          return null;
+        },
+        setItem() {},
+        removeItem() {},
+      },
+    };
+    globalThis.setTimeout = () => ({ cancelled: false });
+    globalThis.clearTimeout = () => {};
+
+    const importZipStartButton = createButton();
+    const cancelButton = createButton();
+    const host = createHost({
+      "#import-zip-start-button": importZipStartButton,
+      "[data-import-cancel]": cancelButton,
+      "[data-import-progress-list='1']": createScrollList(),
+    });
+    const store = createStore(createImporterScrollState({
+      zipPath: "bundle.zip",
+      workspaceRoot: "D:/empty",
+      inFlight: false,
+      importRunId: null,
+      status: "",
+      stages: [],
+      summary: "",
+    }));
+
+    bindImporterPage(host, store);
+    const importRun = importZipStartButton.click();
+    const runId = store.getState().importer.importRunId;
+    const cancelRun = cancelButton.click();
+    cancelDeferred.reject(new Error("cancel service unavailable"));
+    await cancelRun;
+
+    const currentImporter = store.getState().importer;
+    assert.equal(currentImporter.inFlight, true);
+    assert.equal(currentImporter.importRunId, runId);
+    assert.equal(currentImporter.importCancelling, false);
+    assert.equal(currentImporter.summary, zh.runtime.importZipSummary);
+    assert.equal(
+      currentImporter.importCancelError,
+      "终止请求失败：cancel service unavailable",
+    );
+    assert.doesNotMatch(host.innerHTML, /disabled aria-disabled="true"/);
+
+    importDeferred.reject(new Error("stop test"));
+    await importRun;
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+    globalThis.setTimeout = previousSetTimeout;
+    globalThis.clearTimeout = previousClearTimeout;
+  }
 });
