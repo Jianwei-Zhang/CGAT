@@ -41,6 +41,236 @@ fn rename_round_trips_through_persistent_undo_and_redo() -> Result<()> {
 }
 
 #[test]
+fn layout_drags_share_the_database_timeline_and_reset_atomically() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let db_path = temp_dir.path().join("project.sqlite");
+    seed_workspace(&db_path)?;
+    let conn = Connection::open(&db_path)?;
+    conn.execute(
+        "INSERT INTO phased_chr_track
+         (id, project_id, parent_chr_name, haplotype_key, label, display_order, created_at)
+         VALUES (410, 1, 'Chr01', 'A', 'Chr01A', 1, '1')",
+        [],
+    )?;
+    conn.execute(
+        "INSERT INTO phased_chr_track_item
+         (id, phased_track_id, assembly_ctg_id, display_order, gap_before_px, orient, created_at)
+         VALUES (510, 410, 301, 1, 0, '+', '1')",
+        [],
+    )?;
+    drop(conn);
+
+    for (track_role, ctg_id, offset_bp, extra) in [
+        ("primary", 301, 120.0, json!({})),
+        ("support", 305, -40.5, json!({ "datasetId": 2 })),
+        (
+            "phased",
+            301,
+            55.0,
+            json!({ "phasedTrackId": 410, "phasedTrackItemId": 510 }),
+        ),
+    ] {
+        let mut args = json!({
+            "trackRole": track_role,
+            "assemblyCtgId": ctg_id,
+            "offsetBp": offset_bp,
+        });
+        args.as_object_mut()
+            .expect("layout args object")
+            .extend(extra.as_object().expect("layout extra object").clone());
+        assert!(
+            run_main_view_layout_action(
+                &db_path,
+                &RunMainViewLayoutActionParams {
+                    project_id: 1,
+                    chr_name: "Chr01".to_string(),
+                    action: "drag-ctg".to_string(),
+                    args,
+                },
+            )?
+            .changed
+        );
+    }
+    run_main_view_editor_action(
+        &db_path,
+        &RunMainViewEditorActionParams {
+            project_id: 1,
+            chr_name: "Chr01".to_string(),
+            action: "rename-ctg".to_string(),
+            args: json!({ "assemblyCtgId": 301, "newName": "mixed-name" }),
+        },
+    )?;
+    assert_eq!(load_track_offsets(&db_path)?.len(), 3);
+    assert_eq!(load_ctg_name(&db_path, 301)?, "mixed-name");
+
+    undo_main_view_history(&db_path, &target("Chr01"))?;
+    assert_eq!(load_ctg_name(&db_path, 301)?, "Ctg1");
+    undo_main_view_history(&db_path, &target("Chr01"))?;
+    assert_eq!(load_track_offsets(&db_path)?.len(), 2);
+    redo_main_view_history(&db_path, &target("Chr01"))?;
+    assert_eq!(load_track_offsets(&db_path)?.len(), 3);
+    redo_main_view_history(&db_path, &target("Chr01"))?;
+    assert_eq!(load_ctg_name(&db_path, 301)?, "mixed-name");
+
+    let reset = reset_main_view_history(&db_path, &target("Chr01"))?;
+    assert!(reset.changed);
+    assert!(load_track_offsets(&db_path)?.is_empty());
+    assert_eq!(load_ctg_name(&db_path, 301)?, "Ctg1");
+    undo_main_view_history(&db_path, &target("Chr01"))?;
+    assert_eq!(load_track_offsets(&db_path)?.len(), 3);
+    assert_eq!(load_ctg_name(&db_path, 301)?, "mixed-name");
+    Ok(())
+}
+
+#[test]
+fn mirror_create_delete_history_uses_the_source_orientation() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let db_path = temp_dir.path().join("project.sqlite");
+    seed_workspace(&db_path)?;
+    let request = |action: &str, args: serde_json::Value| RunMainViewLayoutActionParams {
+        project_id: 1,
+        chr_name: "Chr01".to_string(),
+        action: action.to_string(),
+        args,
+    };
+    run_main_view_layout_action(
+        &db_path,
+        &request(
+            "create-mirror",
+            json!({
+                "datasetId": 2,
+                "assemblyCtgId": 305,
+                "mirrorEntry": {
+                    "datasetId": 2,
+                    "assemblyCtgId": 305,
+                    "chrName": "Chr01",
+                    "name": "Support1",
+                    "orient": "+"
+                }
+            }),
+        ),
+    )?;
+    let mirrors = load_support_mirrors(&db_path)?;
+    assert_eq!(mirrors.len(), 1);
+    assert_eq!(
+        mirrors[0].get("orient").and_then(|value| value.as_str()),
+        Some("-")
+    );
+
+    run_main_view_layout_action(
+        &db_path,
+        &request(
+            "delete-mirror",
+            json!({ "datasetId": 2, "assemblyCtgId": 305 }),
+        ),
+    )?;
+    assert!(load_support_mirrors(&db_path)?.is_empty());
+    undo_main_view_history(&db_path, &target("Chr01"))?;
+    assert_eq!(load_support_mirrors(&db_path)?.len(), 1);
+    undo_main_view_history(&db_path, &target("Chr01"))?;
+    assert!(load_support_mirrors(&db_path)?.is_empty());
+    redo_main_view_history(&db_path, &target("Chr01"))?;
+    assert_eq!(load_support_mirrors(&db_path)?.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn layout_history_ignores_unrelated_view_writes_but_detects_target_conflicts() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let db_path = temp_dir.path().join("project.sqlite");
+    seed_workspace(&db_path)?;
+    let drag = RunMainViewLayoutActionParams {
+        project_id: 1,
+        chr_name: "Chr01".to_string(),
+        action: "drag-ctg".to_string(),
+        args: json!({
+            "trackRole": "primary",
+            "assemblyCtgId": 301,
+            "offsetBp": 75,
+        }),
+    };
+    run_main_view_layout_action(&db_path, &drag)?;
+    Connection::open(&db_path)?.execute(
+        "UPDATE project_assembly_view_state
+         SET track_scroll_state_json = '{\"main\":12}', note = 'scroll-write'
+         WHERE project_id = 1",
+        [],
+    )?;
+    let undone = undo_main_view_history(&db_path, &target("Chr01"))?;
+    assert!(undone.changed);
+    assert!(!undone.invalidated);
+    redo_main_view_history(&db_path, &target("Chr01"))?;
+    Connection::open(&db_path)?.execute(
+        "UPDATE project_assembly_view_state
+         SET track_drag_offsets_json = '[{\"trackRole\":\"primary\",\"assemblyCtgId\":301,\"offsetBp\":999}]'
+         WHERE project_id = 1",
+        [],
+    )?;
+    let conflicted = undo_main_view_history(&db_path, &target("Chr01"))?;
+    assert!(!conflicted.changed);
+    assert!(conflicted.invalidated);
+    assert_eq!(
+        load_track_offsets(&db_path)?[0]
+            .get("offsetBp")
+            .and_then(|value| value.as_i64()),
+        Some(999)
+    );
+    Ok(())
+}
+
+#[test]
+fn older_history_json_without_layout_fields_still_loads() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let db_path = temp_dir.path().join("project.sqlite");
+    seed_workspace(&db_path)?;
+    run_main_view_editor_action(
+        &db_path,
+        &RunMainViewEditorActionParams {
+            project_id: 1,
+            chr_name: "Chr01".to_string(),
+            action: "rename-ctg".to_string(),
+            args: json!({ "assemblyCtgId": 301, "newName": "legacy-json" }),
+        },
+    )?;
+    let conn = Connection::open(&db_path)?;
+    let raw: String = conn.query_row(
+        "SELECT state_json FROM project_main_view_history
+         WHERE project_id = 1 AND reference_chr_id = 1",
+        [],
+        |row| row.get(0),
+    )?;
+    let mut value: serde_json::Value = serde_json::from_str(&raw)?;
+    for branch in ["past", "future"] {
+        for operation in value
+            .get_mut(branch)
+            .and_then(serde_json::Value::as_array_mut)
+            .into_iter()
+            .flatten()
+        {
+            for snapshot in ["before", "after"] {
+                if let Some(object) = operation
+                    .get_mut(snapshot)
+                    .and_then(serde_json::Value::as_object_mut)
+                {
+                    object.remove("layout_scope");
+                    object.remove("layout_state");
+                }
+            }
+        }
+    }
+    conn.execute(
+        "UPDATE project_main_view_history SET state_json = ?1
+         WHERE project_id = 1 AND reference_chr_id = 1",
+        params![serde_json::to_string(&value)?],
+    )?;
+    drop(conn);
+    let status = get_main_view_history_status(&db_path, &target("Chr01"))?;
+    assert!(status.can_undo);
+    assert!(!status.invalidated);
+    Ok(())
+}
+
+#[test]
 fn no_op_does_not_create_history_or_clear_forward() -> Result<()> {
     let temp_dir = tempfile::tempdir()?;
     let db_path = temp_dir.path().join("project.sqlite");
@@ -539,13 +769,15 @@ fn seed_workspace(db_path: &std::path::Path) -> Result<()> {
     )?;
     conn.execute(
         "INSERT INTO dataset (id, name, assembler, fasta_path, fai_path)
-         VALUES (1, 'ds1', 'asm', 'ds.fa', 'ds.fa.fai')",
+         VALUES (1, 'ds1', 'asm', 'ds.fa', 'ds.fa.fai'),
+                (2, 'support', 'asm', 'support.fa', 'support.fa.fai')",
         [],
     )?;
     conn.execute(
         "INSERT INTO source_seq (id, dataset_id, seq_name, seq_order, length)
          VALUES (101, 1, 'tig1', 1, 1000),
-                (102, 1, 'tig2', 2, 900)",
+                (102, 1, 'tig2', 2, 900),
+                (103, 2, 'support1', 1, 800)",
         [],
     )?;
     conn.execute(
@@ -555,12 +787,19 @@ fn seed_workspace(db_path: &std::path::Path) -> Result<()> {
         [],
     )?;
     conn.execute(
+        "INSERT INTO project_dataset
+         (project_id, dataset_id, dataset_role, display_order)
+         VALUES (1, 1, 'primary', 1), (1, 2, 'support', 2)",
+        [],
+    )?;
+    conn.execute(
         "INSERT INTO assembly_seq
          (id, project_id, source_seq_id, instance_key, orient, source_start,
           source_end, left_end_type, right_end_type, hidden, created_at)
          VALUES (201, 1, 101, 'chr:1', '+', 1, 1000, 'normal', 'gap', 0, '1'),
                 (202, 1, 102, 'chr:1', '-', 1, 900, 'telomere', 'normal', 0, '1'),
-                (203, 1, 101, 'chr:2', '+', 1, 1000, 'normal', 'normal', 0, '1')",
+                (203, 1, 101, 'chr:2', '+', 1, 1000, 'normal', 'normal', 0, '1'),
+                (205, 1, 103, 'chr:1', '-', 1, 800, 'normal', 'normal', 0, '1')",
         [],
     )?;
     conn.execute(
@@ -569,7 +808,8 @@ fn seed_workspace(db_path: &std::path::Path) -> Result<()> {
           anchor_start, ref_orient, placement_mode, created_at)
          VALUES (301, 1, 201, 'Ctg1', 'Chr01', 1, 100, '+', 'auto', '1'),
                 (302, 1, 202, 'Ctg2', 'Chr01', 2, 200, '-', 'auto', '1'),
-                (303, 1, 203, 'Ctg3', 'Chr02', 1, 100, '+', 'auto', '1')",
+                (303, 1, 203, 'Ctg3', 'Chr02', 1, 100, '+', 'auto', '1'),
+                (305, 1, 205, 'Support1', 'Chr01', 3, 300, '-', 'auto', '1')",
         [],
     )?;
     Ok(())
@@ -589,6 +829,31 @@ fn load_seq_hidden(db_path: &std::path::Path, seq_id: i64) -> Result<i64> {
         params![seq_id],
         |row| row.get(0),
     )?)
+}
+
+fn load_track_offsets(db_path: &std::path::Path) -> Result<Vec<serde_json::Value>> {
+    load_project_view_array(db_path, "track_drag_offsets_json")
+}
+
+fn load_support_mirrors(db_path: &std::path::Path) -> Result<Vec<serde_json::Value>> {
+    load_project_view_array(db_path, "support_mirrored_ctgs_json")
+}
+
+fn load_project_view_array(
+    db_path: &std::path::Path,
+    column: &str,
+) -> Result<Vec<serde_json::Value>> {
+    let query = match column {
+        "track_drag_offsets_json" => {
+            "SELECT track_drag_offsets_json FROM project_assembly_view_state WHERE project_id = 1"
+        }
+        "support_mirrored_ctgs_json" => {
+            "SELECT support_mirrored_ctgs_json FROM project_assembly_view_state WHERE project_id = 1"
+        }
+        _ => unreachable!("test helper only accepts project-view layout columns"),
+    };
+    let raw: String = Connection::open(db_path)?.query_row(query, [], |row| row.get(0))?;
+    Ok(serde_json::from_str(&raw)?)
 }
 
 fn count(conn: &Connection, table: &str, predicate: &str) -> Result<i64> {

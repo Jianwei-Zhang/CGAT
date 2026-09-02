@@ -41,6 +41,7 @@ const DEFINITIONS = {
     ["getMainViewHistoryStatus", "bridge"],
     ["inspectMainViewDelete", "bridge"],
     ["runMainViewEditorAction", "bridge"],
+    ["runMainViewLayoutAction", "bridge"],
     ["runMainViewBatchDelete", "bridge"],
     ["executeMainViewHistoryAction", "bridge"],
     ["getJunctionInspection", "bridge"],

@@ -102,8 +102,8 @@ test("bindTrackContigDrag previews during move and applies pending primary-track
       clearTrackDragPreview() {
         calls.push(["clear-preview"]);
       },
-      applyTrackDragOffset(_host, _store, payload) {
-        calls.push(["apply", payload]);
+      commitTrackDragOffset(_host, _store, payload) {
+        calls.push(["commit", payload]);
       },
       convertTrackOffsetPxToBp(value) {
         return value;
@@ -119,9 +119,6 @@ test("bindTrackContigDrag previews during move and applies pending primary-track
       },
       roundTrackMetric(value) {
         return value;
-      },
-      persistTrackDragOffsets() {
-        calls.push(["persist"]);
       },
       setTrackContigDragActive(value) {
         calls.push(["drag-active", value]);
@@ -150,11 +147,10 @@ test("bindTrackContigDrag previews during move and applies pending primary-track
     assert.deepEqual(calls[0], ["prevent"]);
     assert.deepEqual(calls[1], ["drag-active", true]);
     assert.deepEqual(calls[3], ["clear-preview"]);
-    assert.deepEqual(calls[4], ["apply", { trackRole: "primary", assemblyCtgId: 8, offsetBp: 20 }]);
-    assert.deepEqual(calls[5], ["persist"]);
-    assert.equal(calls[6][0], "suppress");
-    assert.equal(typeof calls[6][1], "number");
-    assert.deepEqual(calls[7], ["drag-active", false]);
+    assert.deepEqual(calls[4], ["commit", { trackRole: "primary", assemblyCtgId: 8, offsetBp: 20 }]);
+    assert.equal(calls[5][0], "suppress");
+    assert.equal(typeof calls[5][1], "number");
+    assert.deepEqual(calls[6], ["drag-active", false]);
   } finally {
     globalThis.window = originalWindow;
   }
@@ -198,8 +194,8 @@ test("bindTrackContigDrag ignores ref-track members", () => {
       clearTrackDragPreview() {
         calls.push(["clear-preview"]);
       },
-      applyTrackDragOffset(_host, _store, payload) {
-        calls.push(["apply", payload]);
+      commitTrackDragOffset(_host, _store, payload) {
+        calls.push(["commit", payload]);
       },
       convertTrackOffsetPxToBp(value) {
         return value;
@@ -215,9 +211,6 @@ test("bindTrackContigDrag ignores ref-track members", () => {
       },
       roundTrackMetric(value) {
         return value;
-      },
-      persistTrackDragOffsets() {
-        calls.push(["persist"]);
       },
       setTrackContigDragActive(value) {
         calls.push(["drag-active", value]);

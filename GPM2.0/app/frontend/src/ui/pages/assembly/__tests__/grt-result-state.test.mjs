@@ -6,6 +6,7 @@ import {
   projectGrtSourcePositionToCtg,
   resolveGrtResultContext,
   setGrtResultDisplayEnabled,
+  setGrtResultLayerEnabled,
 } from "../grt-result-state.js";
 import { buildGrtResultScene } from "../grt-result-render.js";
 
@@ -40,9 +41,47 @@ test("keeps independent per-chromosome main and Subview switches", () => {
   const otherChr = setGrtResultDisplayEnabled(bothOn, "Chr02", "main", true);
 
   assert.deepEqual(otherChr, {
-    Chr01: { main: true, subview: true },
-    Chr02: { main: true, subview: false },
+    Chr01: {
+      main: true,
+      subview: true,
+      mainLayers: { resultPath: true, alignmentEvidence: true },
+      subviewLayers: { resultPath: true, alignmentEvidence: true },
+    },
+    Chr02: {
+      main: true,
+      subview: false,
+      mainLayers: { resultPath: true, alignmentEvidence: true },
+      subviewLayers: { resultPath: true, alignmentEvidence: true },
+    },
   });
+});
+
+test("keeps main and Subview layer selections independent and defaults legacy state on", () => {
+  const mainEvidenceOff = setGrtResultLayerEnabled(
+    { Chr01: { main: true, subview: true } },
+    "Chr01",
+    "main",
+    "alignmentEvidence",
+    false,
+  );
+  const subviewPathOff = setGrtResultLayerEnabled(
+    mainEvidenceOff,
+    "Chr01",
+    "subview",
+    "resultPath",
+    false,
+  );
+
+  assert.deepEqual(subviewPathOff.Chr01.mainLayers, {
+    resultPath: true,
+    alignmentEvidence: false,
+  });
+  assert.deepEqual(subviewPathOff.Chr01.subviewLayers, {
+    resultPath: false,
+    alignmentEvidence: true,
+  });
+  assert.equal(subviewPathOff.Chr01.main, true);
+  assert.equal(subviewPathOff.Chr01.subview, true);
 });
 
 test("only exposes display schemas, unphased, semantically unchanged GRT results", () => {
@@ -65,6 +104,8 @@ test("only exposes display schemas, unphased, semantically unchanged GRT results
     available: true,
     mainEnabled: true,
     subviewEnabled: true,
+    mainLayers: { resultPath: true, alignmentEvidence: true },
+    subviewLayers: { resultPath: true, alignmentEvidence: true },
   });
 
   assembly.grtProjectView.recipe.finalPathSchemaVersion = "3";
@@ -147,8 +188,32 @@ test("renders accepted MUMmer and local minimap2 evidence as distinct passive ba
   assert.equal(scene.hasVisibleJunction, true);
   assert.match(scene.junctionMarkup, /class="grt-display-evidence-band is-mummer is-supporting-precursor"/);
   assert.match(scene.junctionMarkup, /data-grt-display-evidence="mummer-left"/);
+  assert.match(scene.junctionMarkup, /data-grt-display-evidence-source-entry-key="top"/);
+  assert.match(scene.junctionMarkup, /data-grt-display-evidence-target-entry-key="bottom"/);
   assert.match(scene.junctionMarkup, /class="grt-display-evidence-band is-minimap2"/);
   assert.match(scene.junctionMarkup, /MAPQ 60/);
+
+  const pathOnlyScene = buildGrtResultScene({
+    plan: buildGrtResultPlan(baseline),
+    entries: [
+      { key: "top", ctg: { assemblyCtgId: 11, lengthBp: 10_000, orient: "+" }, rect: { x: 0, width: 1000 }, y: 20, height: 14 },
+      { key: "bottom", ctg: { assemblyCtgId: 22, lengthBp: 10_000, orient: "+" }, rect: { x: 0, width: 1000 }, y: 100, height: 14 },
+    ],
+    layers: { resultPath: true, alignmentEvidence: false },
+  });
+  assert.doesNotMatch(pathOnlyScene.junctionMarkup, /data-grt-display-evidence=/);
+  assert.equal(pathOnlyScene.overlaysByKey.size, 2);
+
+  const evidenceOnlyScene = buildGrtResultScene({
+    plan: buildGrtResultPlan(baseline),
+    entries: [
+      { key: "top", ctg: { assemblyCtgId: 11, lengthBp: 10_000, orient: "+" }, rect: { x: 0, width: 1000 }, y: 20, height: 14 },
+      { key: "bottom", ctg: { assemblyCtgId: 22, lengthBp: 10_000, orient: "+" }, rect: { x: 0, width: 1000 }, y: 100, height: 14 },
+    ],
+    layers: { resultPath: false, alignmentEvidence: true },
+  });
+  assert.match(evidenceOnlyScene.junctionMarkup, /data-grt-display-evidence=/);
+  assert.equal(evidenceOnlyScene.overlaysByKey.size, 0);
 });
 
 test("merges true continuity but keeps noncontiguous source regions and link endpoints", () => {

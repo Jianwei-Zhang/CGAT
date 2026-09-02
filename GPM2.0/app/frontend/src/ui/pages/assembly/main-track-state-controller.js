@@ -25,6 +25,7 @@ export function createMainTrackStateController({
   getDatasetNameById,
   patchPrimaryHiddenCtgDom,
   persistProjectAssemblyViewStateFromStore,
+  runMainViewLayoutAction,
   refreshFinalPathLogAfterPrimaryHiddenPatch,
   rerender,
   rerenderAssemblyMainTab,
@@ -354,7 +355,7 @@ export function createMainTrackStateController({
     const hasTarget = currentMirrors.some(
       (entry) => buildSupportMirrorKey(entry.datasetId, entry.assemblyCtgId) === targetKey,
     );
-    let nextMirrors = currentMirrors;
+    let mirrorEntry = null;
     if (shouldMirror) {
       if (hasTarget) {
         return;
@@ -377,31 +378,24 @@ export function createMainTrackStateController({
         rerender(host, store);
         return;
       }
-      nextMirrors = normalizeSupportMirroredCtgs([...currentMirrors, nextEntry]);
+      mirrorEntry = nextEntry;
     } else {
       if (!hasTarget) {
         return;
       }
-      nextMirrors = currentMirrors.filter(
-        (entry) => buildSupportMirrorKey(entry.datasetId, entry.assemblyCtgId) !== targetKey,
-      );
     }
-    store.setState({
-      assembly: {
-        ...state.assembly,
-        supportMirroredCtgs: nextMirrors,
-        actionStatus: shouldMirror
-          ? tAssembly(state, "runtime.mirrorDone", {
-            assemblyCtgId: normalizedAssemblyCtgId,
-          })
-          : tAssembly(state, "runtime.unmirrorDone", {
-            assemblyCtgId: normalizedAssemblyCtgId,
-          }),
-        actionError: "",
+    const runLayoutAction = overrides.runMainViewLayoutAction || runMainViewLayoutAction;
+    if (typeof runLayoutAction !== "function") {
+      throw new TypeError("Missing main-view layout history action dependency");
+    }
+    await runLayoutAction(host, store, {
+      action: shouldMirror ? "create-mirror" : "delete-mirror",
+      args: {
+        datasetId: normalizedDatasetId,
+        assemblyCtgId: normalizedAssemblyCtgId,
+        ...(mirrorEntry ? { mirrorEntry } : {}),
       },
     });
-    rerender(host, store);
-    await persistProjectAssemblyViewStateFromStore(host, store, overrides);
   }
 
   return {

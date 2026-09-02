@@ -12,7 +12,9 @@ use serde_json::json;
 
 use crate::db::open_workspace_db;
 
-use self::mutations::{inspect_delete_impact, prepare_batch_delete, prepare_editor_mutation};
+use self::mutations::{
+    inspect_delete_impact, prepare_batch_delete, prepare_editor_mutation, prepare_layout_mutation,
+};
 use self::snapshot::{
     apply_snapshot, capture_snapshot, is_history_conflict, merge_snapshot_scopes, validate_snapshot,
 };
@@ -23,7 +25,7 @@ use self::types::{
 pub use self::types::{
     MainViewDeleteImpact, MainViewHistoryMutationSummary, MainViewHistoryOperationDescriptor,
     MainViewHistoryStatus, MainViewHistoryTargetParams, RunMainViewBatchDeleteParams,
-    RunMainViewEditorActionParams,
+    RunMainViewEditorActionParams, RunMainViewLayoutActionParams,
 };
 
 const HISTORY_STATE_INVALID_CODE: &str = "MAIN_VIEW_HISTORY_STATE_INVALID";
@@ -78,6 +80,28 @@ pub fn run_main_view_editor_action(
         &params.chr_name,
         |conn| {
             prepare_editor_mutation(
+                conn,
+                params.project_id,
+                &params.chr_name,
+                &action,
+                &params.args,
+            )
+        },
+    )
+}
+
+pub fn run_main_view_layout_action(
+    project_db_path: &Path,
+    params: &RunMainViewLayoutActionParams,
+) -> Result<MainViewHistoryMutationSummary> {
+    validate_target_params(params.project_id, &params.chr_name)?;
+    let action = params.action.trim().to_ascii_lowercase();
+    run_new_mutation(
+        project_db_path,
+        params.project_id,
+        &params.chr_name,
+        |conn| {
+            prepare_layout_mutation(
                 conn,
                 params.project_id,
                 &params.chr_name,

@@ -66,7 +66,7 @@ test("route registry exposes all dev bridge operations by functional domain", ()
   const routes = createBackendBridgeRoutes(createHandlers());
 
   assert.deepEqual(Object.keys(groups), ["imports", "workspace", "assembly", "audit", "runtime"]);
-  assert.equal(routes.size, 41);
+  assert.equal(routes.size, 42);
   assert.deepEqual(groups.imports, [
     "/import-zip",
     "/import-extracted",
@@ -75,6 +75,7 @@ test("route registry exposes all dev bridge operations by functional domain", ()
   assert.ok(groups.assembly.includes("/ctg-editor-action"));
   assert.ok(groups.assembly.includes("/main-view-history-status"));
   assert.ok(groups.assembly.includes("/main-view-history-action"));
+  assert.ok(groups.assembly.includes("/main-view-layout-action"));
   assert.equal(routes.get("POST /export-degap-jobs").group, "runtime");
 });
 

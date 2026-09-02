@@ -43,6 +43,7 @@ import {
 import { assemblyPageSession } from "./page-session.js";
 import { buildGrtResultPlan, resolveGrtResultContext } from "./grt-result-state.js";
 import { buildGrtResultScene } from "./grt-result-render.js";
+import { renderGrtResultControls } from "./grt-result-controls.js";
 import {
   buildTrackCtgHoverTitle,
   resolveBoundedTrackCtgLabelPlacement,
@@ -756,12 +757,13 @@ function renderSubviewHistoryControls(history, i18n) {
 }
 
 function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = null, history = null) {
-  const grtResultSwitch = grtResultContext?.available
-    ? `<label class="grt-result-switch">
-        <input type="checkbox" data-grt-result-toggle="subview" ${grtResultContext.subviewEnabled ? "checked" : ""} />
-        <span>${escapeHtml(i18n.grtResult.showResult)}</span>
-      </label>`
-    : "";
+  const grtResultControls = renderGrtResultControls({
+    scope: "subview",
+    context: grtResultContext,
+    i18n,
+    escapeHtml,
+    escapeAttr,
+  });
   const minTickUnitInput = renderTrackNumberInput({
     field: "minTickUnitKb",
     id: "subview-track-min-tick-unit-kb",
@@ -797,7 +799,7 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
   });
   return `
     <div class="assembly-track-inline-controls subview-track-inline-controls" role="group" aria-label="${escapeAttr(i18n.subview.trackControlsAria)}">
-      ${grtResultSwitch}
+      ${grtResultControls}
       <label class="assembly-track-inline-field">
         <span>${escapeHtml(i18n.trackControls.minTickUnitKb)}</span>
         ${minTickUnitInput}
@@ -1529,6 +1531,7 @@ function renderSubviewAlignmentCard(
           height: svgModel.barHeight,
         },
       ],
+      layers: grtResult.context.subviewLayers,
       escapeHtml,
       gapLabel: i18n.grtResult.gapLabel,
     })
@@ -1568,7 +1571,7 @@ function renderSubviewAlignmentCard(
     lengthBp: svgModel.bottomLengthBp,
   });
   return `
-    <article class="assembly-track-panel subview-alignment-card" data-grt-result-scene-visible="${grtResultScene.hasVisibleJunction ? "1" : "0"}">
+    <article class="assembly-track-panel subview-alignment-card" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
       <div class="assembly-track-panel-head">
         <strong>${escapeHtml(`${topVisibleCtgName} vs ${bottomVisibleCtgName}`)}</strong>
         ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context, history)}
@@ -2563,6 +2566,7 @@ function renderSubviewTrackPairAlignmentCard(
     ? buildGrtResultScene({
       plan: grtResult.plan,
       entries: grtResultEntries,
+      layers: grtResult.context.subviewLayers,
       escapeHtml,
       gapLabel: i18n.grtResult.gapLabel,
     })
@@ -2698,7 +2702,7 @@ function renderSubviewTrackPairAlignmentCard(
       .join("");
   };
   return `
-    <article class="assembly-track-panel subview-alignment-card" data-grt-result-scene-visible="${grtResultScene.hasVisibleJunction ? "1" : "0"}">
+    <article class="assembly-track-panel subview-alignment-card" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
       <div class="assembly-track-panel-head">
         <strong>${escapeHtml(`${topTrackLabel} vs ${bottomTrackLabel}`)}</strong>
         ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context, history)}

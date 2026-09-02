@@ -1,11 +1,9 @@
 import { normalizeFinalPathViewMode, sleep } from "../contracts.js";
 
-export function createMockViewStateOperations() {
-async function getProjectAssemblyViewStateMock({ projectId }) {
-  await sleep(80);
+function buildDefaultProjectAssemblyViewState(projectId) {
   return {
     source: "mock",
-    projectId,
+    projectId: Number(projectId),
     supportDatasetId: null,
     trackView: {},
     supportDsCtgLenRulesByChr: {},
@@ -23,6 +21,20 @@ async function getProjectAssemblyViewStateMock({ projectId }) {
     finalPathByChr: {},
     degapProjectState: {},
   };
+}
+
+function cloneProjectAssemblyViewState(value) {
+  return structuredClone(value);
+}
+
+export function createMockViewStateOperations(mockStore) {
+async function getProjectAssemblyViewStateMock({ projectId }) {
+  await sleep(80);
+  const normalizedProjectId = Number(projectId);
+  const current = mockStore.projectAssemblyViewStateByProject.get(normalizedProjectId)
+    || buildDefaultProjectAssemblyViewState(normalizedProjectId);
+  mockStore.projectAssemblyViewStateByProject.set(normalizedProjectId, current);
+  return cloneProjectAssemblyViewState(current);
 }
 
 async function setProjectAssemblyViewStateMock({
@@ -45,9 +57,9 @@ async function setProjectAssemblyViewStateMock({
   degapProjectState = {},
 }) {
   await sleep(80);
-  return {
+  const next = {
     source: "mock",
-    projectId,
+    projectId: Number(projectId),
     supportDatasetId: Number.isFinite(Number(supportDatasetId)) && Number(supportDatasetId) > 0
       ? Math.trunc(Number(supportDatasetId))
       : null,
@@ -106,6 +118,8 @@ async function setProjectAssemblyViewStateMock({
         ? degapProjectState
         : {},
   };
+  mockStore.projectAssemblyViewStateByProject.set(Number(projectId), cloneProjectAssemblyViewState(next));
+  return cloneProjectAssemblyViewState(next);
 }
 
   return {

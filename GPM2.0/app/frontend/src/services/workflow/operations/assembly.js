@@ -19,6 +19,7 @@ const {
   getMainViewHistoryStatus: getMainViewHistoryStatusMock,
   inspectMainViewDelete: inspectMainViewDeleteMock,
   runMainViewEditorAction: runMainViewEditorActionMock,
+  runMainViewLayoutAction: runMainViewLayoutActionMock,
   runMainViewBatchDelete: runMainViewBatchDeleteMock,
   executeMainViewHistoryAction: executeMainViewHistoryActionMock,
   getJunctionInspection: getJunctionInspectionMock,
@@ -42,6 +43,7 @@ const {
   getMainViewHistoryStatus: getMainViewHistoryStatusTauri,
   inspectMainViewDelete: inspectMainViewDeleteTauri,
   runMainViewEditorAction: runMainViewEditorActionTauri,
+  runMainViewLayoutAction: runMainViewLayoutActionTauri,
   runMainViewBatchDelete: runMainViewBatchDeleteTauri,
   executeMainViewHistoryAction: executeMainViewHistoryActionTauri,
   getJunctionInspection: getJunctionInspectionTauri,
@@ -339,6 +341,34 @@ export async function runMainViewEditorAction({
     "/api/main-view-editor-action",
     payload,
     runMainViewEditorActionMock,
+  );
+}
+
+export async function runMainViewLayoutAction({
+  workspaceRoot,
+  projectId,
+  chrName,
+  action,
+  args,
+}) {
+  const normalizedAction = String(action || "").trim().toLowerCase();
+  if (!new Set(["drag-ctg", "create-mirror", "delete-mirror"]).has(normalizedAction)) {
+    throw new Error(`unsupported main-view layout action: ${normalizedAction || "<empty>"}`);
+  }
+  const payload = {
+    workspaceRoot,
+    projectId,
+    chrName,
+    action: normalizedAction,
+    args,
+  };
+  if (isTauriRuntime()) {
+    return runMainViewLayoutActionTauri(payload);
+  }
+  return callMainViewBridgeOrMock(
+    "/api/main-view-layout-action",
+    payload,
+    runMainViewLayoutActionMock,
   );
 }
 

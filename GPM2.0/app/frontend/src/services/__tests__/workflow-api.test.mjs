@@ -23,6 +23,7 @@ import {
   runCtgEditorAction,
   runMainViewBatchDelete,
   runMainViewEditorAction,
+  runMainViewLayoutAction,
   setProjectAssemblyViewState,
   setProjectAutoPipelineDone,
   updateProject,
@@ -56,6 +57,11 @@ test("main-view history services preserve nested Tauri request payloads", async 
       action: "rename-ctg",
       args: { assemblyCtgId: 11, newName: "ctg-renamed" },
     });
+    await runMainViewLayoutAction({
+      ...target,
+      action: "drag-ctg",
+      args: { trackRole: "support", datasetId: 22, assemblyCtgId: 11, offsetBp: -120.5 },
+    });
     await runMainViewBatchDelete({ ...target, assemblyCtgIds: [11, 12] });
     await executeMainViewHistoryAction({ ...target, action: "redo" });
 
@@ -72,6 +78,21 @@ test("main-view history services preserve nested Tauri request payloads", async 
             ...target,
             action: "rename-ctg",
             args: { assemblyCtgId: 11, newName: "ctg-renamed" },
+          },
+        },
+      },
+      {
+        command: "run_main_view_layout_action",
+        args: {
+          request: {
+            ...target,
+            action: "drag-ctg",
+            args: {
+              trackRole: "support",
+              datasetId: 22,
+              assemblyCtgId: 11,
+              offsetBp: -120.5,
+            },
           },
         },
       },

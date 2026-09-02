@@ -143,3 +143,51 @@ test("mock backend factories isolate mutable preview state", async () => {
   assert.equal(firstOptions.existingProjects.length, 1);
   assert.equal(secondOptions.existingProjects.length, 0);
 });
+
+test("mock backend applies layout history to the authoritative project view", async () => {
+  const backend = createWorkflowMockBackend();
+  const projectId = 7;
+  const chrName = "Chr01";
+
+  await backend.setProjectAssemblyViewState({ projectId });
+  await backend.runMainViewLayoutAction({
+    projectId,
+    chrName,
+    action: "drag-ctg",
+    args: { trackRole: "support", datasetId: 2, assemblyCtgId: 22, offsetBp: 120 },
+  });
+  await backend.runMainViewLayoutAction({
+    projectId,
+    chrName,
+    action: "create-mirror",
+    args: {
+      datasetId: 2,
+      assemblyCtgId: 22,
+      mirrorEntry: { datasetId: 2, assemblyCtgId: 22, chrName, orient: "-" },
+    },
+  });
+  await backend.runMainViewLayoutAction({
+    projectId,
+    chrName,
+    action: "delete-mirror",
+    args: { datasetId: 2, assemblyCtgId: 22 },
+  });
+
+  let view = await backend.getProjectAssemblyViewState({ projectId });
+  assert.equal(view.trackDragOffsets[0].offsetBp, 120);
+  assert.deepEqual(view.supportMirroredCtgs, []);
+
+  await backend.executeMainViewHistoryAction({ projectId, chrName, action: "undo" });
+  view = await backend.getProjectAssemblyViewState({ projectId });
+  assert.equal(view.supportMirroredCtgs[0].orient, "-");
+
+  await backend.executeMainViewHistoryAction({ projectId, chrName, action: "reset" });
+  view = await backend.getProjectAssemblyViewState({ projectId });
+  assert.deepEqual(view.trackDragOffsets, []);
+  assert.deepEqual(view.supportMirroredCtgs, []);
+
+  await backend.executeMainViewHistoryAction({ projectId, chrName, action: "undo" });
+  view = await backend.getProjectAssemblyViewState({ projectId });
+  assert.equal(view.trackDragOffsets[0].offsetBp, 120);
+  assert.equal(view.supportMirroredCtgs[0].orient, "-");
+});

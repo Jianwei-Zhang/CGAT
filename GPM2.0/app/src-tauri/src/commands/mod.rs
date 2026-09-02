@@ -52,13 +52,14 @@ use gpm_next_backend::main_view::{
 };
 use gpm_next_backend::main_view_history::{
     MainViewHistoryMutationSummary, MainViewHistoryStatus, MainViewHistoryTargetParams,
-    RunMainViewBatchDeleteParams, RunMainViewEditorActionParams,
+    RunMainViewBatchDeleteParams, RunMainViewEditorActionParams, RunMainViewLayoutActionParams,
     get_main_view_history_status as backend_get_main_view_history_status,
     inspect_main_view_delete as backend_inspect_main_view_delete,
     redo_main_view_history as backend_redo_main_view_history,
     reset_main_view_history as backend_reset_main_view_history,
     run_main_view_batch_delete as backend_run_main_view_batch_delete,
     run_main_view_editor_action as backend_run_main_view_editor_action,
+    run_main_view_layout_action as backend_run_main_view_layout_action,
     undo_main_view_history as backend_undo_main_view_history,
 };
 use gpm_next_backend::phased_assembly::{
@@ -153,6 +154,16 @@ pub struct MainViewHistoryTargetCommandRequest {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunMainViewEditorActionCommandRequest {
+    workspace_root: String,
+    project_id: i64,
+    chr_name: String,
+    action: String,
+    args: Value,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunMainViewLayoutActionCommandRequest {
     workspace_root: String,
     project_id: i64,
     chr_name: String,
@@ -888,6 +899,23 @@ mod tests {
             .expect("decode main-view editor action request");
         assert_eq!(history_editor_request.action, "rename-ctg");
         assert_eq!(history_editor_request.args["assemblyCtgId"], 17);
+
+        let history_layout_request: RunMainViewLayoutActionCommandRequest =
+            serde_json::from_value(json!({
+                "workspaceRoot": "D:\\Desktop\\GPM\\ws1",
+                "projectId": 9,
+                "chrName": "Chr01",
+                "action": "drag-ctg",
+                "args": {
+                    "trackRole": "support",
+                    "datasetId": 22,
+                    "assemblyCtgId": 17,
+                    "offsetBp": -120.5
+                },
+            }))
+            .expect("decode main-view layout action request");
+        assert_eq!(history_layout_request.action, "drag-ctg");
+        assert_eq!(history_layout_request.args["datasetId"], 22);
 
         let history_batch_request: MainViewBatchDeleteCommandRequest =
             serde_json::from_value(json!({

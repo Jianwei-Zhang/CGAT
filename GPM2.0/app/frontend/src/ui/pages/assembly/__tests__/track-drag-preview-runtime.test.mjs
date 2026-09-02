@@ -282,6 +282,44 @@ test("previewTrackContigDrag translates a same-ctg GRT junction arc", () => {
   assert.equal(junctionNode.getAttribute("transform"), null);
 });
 
+test("previewTrackContigDrag shifts both GRT evidence edges when their ctg moves", () => {
+  const draggedGroup = createNode({
+    "data-track-contig-id": "22",
+    "data-track-role": "support",
+    "data-track-is-mirror": "0",
+    "data-grt-result-entry-key": "support:22:0",
+  });
+  const evidenceNode = createNode({
+    points: "10,20 30,20 40,80 20,80",
+    "data-grt-display-evidence": "same-ctg-hit",
+    "data-grt-display-evidence-source-entry-key": "support:22:0",
+    "data-grt-display-evidence-target-entry-key": "support:22:0",
+  });
+  const host = createHost({
+    '[data-track-contig-id="22"][data-track-role="support"]': [draggedGroup],
+    '[data-sticky-label-key="track:support:22:0"]': [],
+    '[data-band-track-role="support"][data-band-contig-id="22"]': [],
+    "[data-grt-result-junction]": [],
+    "[data-grt-display-evidence]": [evidenceNode],
+    "[data-drag-preview-group='1']": [draggedGroup],
+    "[data-drag-preview-band='1']": [evidenceNode],
+    "[data-drag-preview-sticky-label='1']": [],
+    "[data-drag-preview-junction-line='1']": [],
+    "[data-drag-preview-junction-label='1']": [],
+  });
+
+  previewTrackContigDrag(host, {
+    trackRole: "support",
+    assemblyCtgId: 22,
+    offsetPx: 7,
+  });
+
+  assert.equal(evidenceNode.getAttribute("points"), "17.00,20.00 37.00,20.00 47.00,80.00 27.00,80.00");
+
+  clearTrackDragPreview(host);
+  assert.equal(evidenceNode.getAttribute("points"), "10,20 30,20 40,80 20,80");
+});
+
 test("previewTrackContigDrag shifts matching phased sticky labels by phased item id", () => {
   const groupNode = createNode({
     "data-track-contig-id": "8",
@@ -389,6 +427,42 @@ test("previewSubviewTrackContigDrag shifts the matching GRT junction endpoint", 
   clearSubviewTrackDragPreview(host);
   assert.equal(visibleLine.getAttribute("x1"), "5");
   assert.equal(visibleLine.getAttribute("x2"), "25");
+});
+
+test("previewSubviewTrackContigDrag shifts and restores the matching GRT evidence edge", () => {
+  const groupNode = createNode({
+    "data-subview-track-slot": "top",
+    "data-subview-track-role": "support",
+    "data-subview-contig-id": "12",
+    "data-grt-result-entry-key": "top",
+  });
+  const evidenceNode = createNode({
+    points: "10,20 30,20 40,80 20,80",
+    "data-grt-display-evidence": "local-hit",
+    "data-grt-display-evidence-source-entry-key": "top",
+    "data-grt-display-evidence-target-entry-key": "bottom",
+  });
+  const host = createHost({
+    '[data-subview-track-slot="top"][data-subview-contig-id="12"]': [groupNode],
+    '[data-subview-top-contig-id="12"]': [],
+    '[data-sticky-label-key="subview:top:support:12"]': [],
+    '[data-subview-label-slot="top"][data-subview-label-role="support"][data-subview-label-contig-id="12"]': [],
+    "[data-grt-result-junction]": [],
+    "[data-grt-display-evidence]": [evidenceNode],
+    "[data-drag-preview-group='1']": [groupNode],
+    "[data-drag-preview-band='1']": [evidenceNode],
+    "[data-drag-preview-sticky-label='1']": [],
+    "[data-drag-preview-junction-line='1']": [],
+    "[data-drag-preview-junction-label='1']": [],
+  });
+
+  previewSubviewTrackContigDrag(host, { slot: "top", contigId: 12, offsetPx: 9 });
+
+  assert.equal(evidenceNode.getAttribute("points"), "19.00,20.00 39.00,20.00 40.00,80.00 20.00,80.00");
+
+  clearSubviewTrackDragPreview(host);
+  assert.equal(evidenceNode.getAttribute("points"), "10,20 30,20 40,80 20,80");
+  assert.equal(evidenceNode.getAttribute("data-drag-preview-original-points"), null);
 });
 
 test("previewSubviewTrackContigDrag shifts external subview-ctg labels with the dragged contig", () => {

@@ -207,11 +207,22 @@ test("bindings dispatch current Final Path GRT baseline restore", async () => {
 
 test("GRT result bindings toggle only the selected main-view scope", () => {
   const listeners = new Map();
+  const layerListeners = new Map();
   const toggle = {
     checked: true,
     dataset: { grtResultToggle: "main" },
     addEventListener(type, handler) {
       listeners.set(type, handler);
+    },
+  };
+  const layerToggle = {
+    checked: false,
+    dataset: {
+      grtResultLayer: "alignmentEvidence",
+      grtResultLayerScope: "main",
+    },
+    addEventListener(type, handler) {
+      layerListeners.set(type, handler);
     },
   };
   const resultCard = { dataset: { grtResultSceneVisible: "1" } };
@@ -220,7 +231,9 @@ test("GRT result bindings toggle only the selected main-view scope", () => {
       return selector === '[data-grt-result-card="main"]' ? resultCard : null;
     },
     querySelectorAll(selector) {
-      return selector === "[data-grt-result-toggle]" ? [toggle] : [];
+      if (selector === "[data-grt-result-toggle]") return [toggle];
+      if (selector === "[data-grt-result-layer]") return [layerToggle];
+      return [];
     },
     addEventListener() {},
   };
@@ -259,10 +272,26 @@ test("GRT result bindings toggle only the selected main-view scope", () => {
 
   assert.deepEqual(
     store.getState().assembly.grtResultDisplayByChr.Chr01,
-    { main: true, subview: false },
+    {
+      main: true,
+      subview: false,
+      mainLayers: { resultPath: true, alignmentEvidence: true },
+      subviewLayers: { resultPath: true, alignmentEvidence: true },
+    },
   );
   assert.equal(store.getState().assembly.grtResultToast, null);
   assert.equal(rerenders, 1);
+
+  layerListeners.get("change")?.();
+  assert.deepEqual(
+    store.getState().assembly.grtResultDisplayByChr.Chr01.mainLayers,
+    { resultPath: true, alignmentEvidence: false },
+  );
+  assert.deepEqual(
+    store.getState().assembly.grtResultDisplayByChr.Chr01.subviewLayers,
+    { resultPath: true, alignmentEvidence: true },
+  );
+  assert.equal(rerenders, 2);
 });
 
 test("Subview GRT result binding shows each empty-result toast for exactly three seconds", () => {

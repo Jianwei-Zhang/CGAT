@@ -230,6 +230,10 @@ test("schema 2 renders independent GRT result switches and exact main-track over
 
   assert.match(html, /data-grt-result-toggle="main" checked/);
   assert.match(html, /data-grt-result-toggle="subview"/);
+  assert.match(html, /data-grt-result-layer="resultPath" data-grt-result-layer-scope="main" checked/);
+  assert.match(html, /data-grt-result-layer="alignmentEvidence" data-grt-result-layer-scope="subview" checked/);
+  assert.match(html, /Result path/);
+  assert.match(html, /Alignment evidence/);
   const subviewToggleIndex = html.indexOf('data-grt-result-toggle="subview"');
   const subviewMinTickIndex = html.indexOf('id="subview-track-min-tick-unit-kb"');
   assert.ok(subviewToggleIndex >= 0 && subviewToggleIndex < subviewMinTickIndex);

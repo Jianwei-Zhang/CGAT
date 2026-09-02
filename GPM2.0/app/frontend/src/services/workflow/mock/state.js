@@ -34,5 +34,6 @@ return {
   phasedChrTracks: [],
   nextPhasedTrackId: 1,
   nextPhasedTrackItemId: 1,
+  projectAssemblyViewStateByProject: new Map(),
 };
 }

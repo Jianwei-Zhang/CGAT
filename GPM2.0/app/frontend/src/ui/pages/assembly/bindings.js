@@ -18,6 +18,7 @@ import { createOffsetSubviewManualAnchor } from "./subview-anchor-state.js";
 import {
   resolveGrtResultContext,
   setGrtResultDisplayEnabled,
+  setGrtResultLayerEnabled,
 } from "./grt-result-state.js";
 import { assemblyPageSession } from "./page-session.js";
 import { bindMainTrackControlLayout } from "./main-track-control-layout-runtime.js";
@@ -547,6 +548,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   const finalPathEmptyCellInputs = queryHostAll("[data-final-path-empty-cell]");
   const finalPathRestoreGrtBaselineButtons = queryHostAll("[data-final-path-restore-grt-baseline]");
   const grtResultToggles = queryHostAll("[data-grt-result-toggle]");
+  const grtResultLayerToggles = queryHostAll("[data-grt-result-layer]");
   const subviewPairwiseCancelButtons = queryHostAll("[data-subview-pairwise-cancel='1']");
 
   finalPathRestoreGrtBaselineButtons.forEach((button) => {
@@ -591,6 +593,10 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
       if (!enabled) {
         return;
       }
+      const selectedLayers = scope === "main" ? context.mainLayers : context.subviewLayers;
+      if (!selectedLayers?.resultPath && !selectedLayers?.alignmentEvidence) {
+        return;
+      }
       const resultCard = host.querySelector?.(`[data-grt-result-card="${scope}"]`);
       const resultRoot = scope === "subview"
         ? resultCard?.closest?.("[data-subview-panel]") || resultCard
@@ -620,6 +626,36 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
         assemblyPageSession.grtResultToastTimer = null;
         deps.rerender(host, store);
       }, 3000) ?? null;
+    });
+  });
+
+  grtResultLayerToggles.forEach((toggle) => {
+    toggle.addEventListener("change", () => {
+      const state = store.getState();
+      const context = resolveGrtResultContext(state.assembly);
+      const scope = String(toggle.dataset.grtResultLayerScope || "").trim();
+      const layerKey = String(toggle.dataset.grtResultLayer || "").trim();
+      if (
+        !context.available
+        || !["main", "subview"].includes(scope)
+        || !["resultPath", "alignmentEvidence"].includes(layerKey)
+      ) {
+        return;
+      }
+      store.setState({
+        assembly: {
+          ...state.assembly,
+          grtResultDisplayByChr: setGrtResultLayerEnabled(
+            state.assembly.grtResultDisplayByChr,
+            context.chrName,
+            scope,
+            layerKey,
+            toggle.checked === true,
+          ),
+          grtResultToast: null,
+        },
+      });
+      deps.rerender(host, store);
     });
   });
 

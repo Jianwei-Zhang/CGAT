@@ -584,6 +584,24 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             )?;
             print_main_view_history_mutation(&summary);
         }
+        Commands::RunMainViewLayoutAction {
+            workspace_root,
+            project_id,
+            chr_name,
+            action,
+            args_json,
+        } => {
+            let summary = run_main_view_layout_action(
+                &workspace_root.join("project.sqlite"),
+                &RunMainViewLayoutActionParams {
+                    project_id,
+                    chr_name,
+                    action,
+                    args: serde_json::from_str(&args_json)?,
+                },
+            )?;
+            print_main_view_history_mutation(&summary);
+        }
         Commands::RunMainViewBatchDelete {
             workspace_root,
             project_id,

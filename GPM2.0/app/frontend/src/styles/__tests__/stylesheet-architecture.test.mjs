@@ -74,3 +74,17 @@ test("assembly combo menus keep their feature-owned hidden display override", ()
   assert.ok(hiddenMenuRule, "the Assembly owner should override the shared hidden utility");
   assert.match(hiddenMenuRule[1], /display:\s*none;/);
 });
+
+test("assembly status toast stays above desktop controls and returns to flow on narrow screens", () => {
+  const assemblyCss = readFileSync(new URL("./assembly.css", entryUrl), "utf8");
+  const desktopRule = assemblyCss.match(/\.assembly-status-toast-wrap\s*\{([^}]*)\}/);
+  const responsiveCss = assemblyCss.slice(assemblyCss.indexOf("@media (max-width: 1200px)"));
+  const narrowRule = responsiveCss.match(/\.assembly-status-toast-wrap\s*\{([^}]*)\}/);
+
+  assert.ok(desktopRule);
+  assert.match(desktopRule[1], /top:\s*-34px;/);
+  assert.match(desktopRule[1], /max-width:\s*min\(560px,\s*62vw\);/);
+  assert.ok(narrowRule);
+  assert.match(narrowRule[1], /position:\s*static;/);
+  assert.match(narrowRule[1], /max-width:\s*none;/);
+});

@@ -32,9 +32,10 @@ use gpm_next_backend::main_view::{
 };
 use gpm_next_backend::main_view_history::{
     MainViewHistoryMutationSummary, MainViewHistoryStatus, MainViewHistoryTargetParams,
-    RunMainViewBatchDeleteParams, RunMainViewEditorActionParams, get_main_view_history_status,
-    inspect_main_view_delete, redo_main_view_history, reset_main_view_history,
-    run_main_view_batch_delete, run_main_view_editor_action, undo_main_view_history,
+    RunMainViewBatchDeleteParams, RunMainViewEditorActionParams, RunMainViewLayoutActionParams,
+    get_main_view_history_status, inspect_main_view_delete, redo_main_view_history,
+    reset_main_view_history, run_main_view_batch_delete, run_main_view_editor_action,
+    run_main_view_layout_action, undo_main_view_history,
 };
 use gpm_next_backend::phased_assembly::{
     add_ctg_to_phased_chr_track, create_phased_chr_track, delete_phased_chr_track,
@@ -278,6 +279,13 @@ enum Commands {
         assembly_ctg_ids: String,
     },
     RunMainViewEditorAction {
+        workspace_root: PathBuf,
+        project_id: i64,
+        chr_name: String,
+        action: String,
+        args_json: String,
+    },
+    RunMainViewLayoutAction {
         workspace_root: PathBuf,
         project_id: i64,
         chr_name: String,

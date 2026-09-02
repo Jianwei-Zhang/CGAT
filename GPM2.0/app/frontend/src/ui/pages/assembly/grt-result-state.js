@@ -1,6 +1,22 @@
 import { areFinalPathEntriesSemanticallyEqual } from "./final-path-state.js";
 
 const DISPLAY_SCOPES = new Set(["main", "subview"]);
+const DISPLAY_LAYER_KEYS = new Set(["resultPath", "alignmentEvidence"]);
+
+function defaultDisplayLayers() {
+  return {
+    resultPath: true,
+    alignmentEvidence: true,
+  };
+}
+
+function normalizeDisplayLayers(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return {
+    resultPath: source.resultPath !== false,
+    alignmentEvidence: source.alignmentEvidence !== false,
+  };
+}
 
 function normalizeString(value) {
   return String(value ?? "").trim();
@@ -157,6 +173,8 @@ export function normalizeGrtResultDisplayByChr(value) {
     result[chrName] = {
       main: state.main === true,
       subview: state.subview === true,
+      mainLayers: normalizeDisplayLayers(state.mainLayers),
+      subviewLayers: normalizeDisplayLayers(state.subviewLayers),
     };
   });
   return result;
@@ -174,7 +192,40 @@ export function setGrtResultDisplayEnabled(value, chrName, scope, enabled) {
     [normalizedChrName]: {
       main: current[normalizedChrName]?.main === true,
       subview: current[normalizedChrName]?.subview === true,
+      mainLayers: normalizeDisplayLayers(current[normalizedChrName]?.mainLayers),
+      subviewLayers: normalizeDisplayLayers(current[normalizedChrName]?.subviewLayers),
       [normalizedScope]: enabled === true,
+    },
+  };
+}
+
+export function setGrtResultLayerEnabled(value, chrName, scope, layerKey, enabled) {
+  const normalizedChrName = normalizeString(chrName);
+  const normalizedScope = normalizeString(scope);
+  const normalizedLayerKey = normalizeString(layerKey);
+  const current = normalizeGrtResultDisplayByChr(value);
+  if (
+    !normalizedChrName
+    || !DISPLAY_SCOPES.has(normalizedScope)
+    || !DISPLAY_LAYER_KEYS.has(normalizedLayerKey)
+  ) {
+    return current;
+  }
+  const currentState = current[normalizedChrName] || {
+    main: false,
+    subview: false,
+    mainLayers: defaultDisplayLayers(),
+    subviewLayers: defaultDisplayLayers(),
+  };
+  const layerStateKey = `${normalizedScope}Layers`;
+  return {
+    ...current,
+    [normalizedChrName]: {
+      ...currentState,
+      [layerStateKey]: {
+        ...normalizeDisplayLayers(currentState[layerStateKey]),
+        [normalizedLayerKey]: enabled === true,
+      },
     },
   };
 }
@@ -184,7 +235,12 @@ export function resolveGrtResultContext(assembly) {
   const baselineEntry = assembly?.grtProjectView?.baselineFinalPathByChr?.[chrName] || null;
   const currentEntry = assembly?.finalPathByChr?.[chrName] || null;
   const displayState = normalizeGrtResultDisplayByChr(assembly?.grtResultDisplayByChr)[chrName]
-    || { main: false, subview: false };
+    || {
+      main: false,
+      subview: false,
+      mainLayers: defaultDisplayLayers(),
+      subviewLayers: defaultDisplayLayers(),
+    };
   const available = Boolean(
     chrName
     && ["2", "3"].includes(
@@ -201,6 +257,8 @@ export function resolveGrtResultContext(assembly) {
     available,
     mainEnabled: available && displayState.main,
     subviewEnabled: available && displayState.subview,
+    mainLayers: normalizeDisplayLayers(displayState.mainLayers),
+    subviewLayers: normalizeDisplayLayers(displayState.subviewLayers),
   };
 }
 

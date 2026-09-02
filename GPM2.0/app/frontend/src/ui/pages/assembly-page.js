@@ -25,6 +25,7 @@ import {
   runCtgEditorAction,
   runMainViewBatchDelete,
   runMainViewEditorAction,
+  runMainViewLayoutAction as runMainViewLayoutActionApi,
   executeMainViewHistoryAction,
   inspectMainViewDelete,
   writeFinalPathExportBinaryFile,
@@ -58,6 +59,9 @@ import {
 import {
   runMainViewHistoryControlAction as runMainViewHistoryControlActionImpl,
 } from "./assembly/main-view-history-runtime.js";
+import {
+  runMainViewLayoutAction as runMainViewLayoutActionImpl,
+} from "./assembly/main-view-layout-runtime.js";
 import {
   compactFinalPathByDeletedPhasedTrack,
   createPhasedTrackController,
@@ -461,6 +465,8 @@ const {
         ? overrides
         : projectAssemblyViewStateRuntimeDeps,
     ),
+  runMainViewLayoutAction: (host, store, payload) =>
+    runMainViewLayoutActionImpl(host, store, payload, mainViewLayoutRuntimeDeps),
   refreshFinalPathLogAfterPrimaryHiddenPatch,
   rerender: (host, store) => rerender(host, store),
   rerenderAssemblyMainTab: (host, store) => rerenderAssemblyMainTab(host, store),
@@ -978,6 +984,15 @@ const projectAssemblyViewStateRuntimeDeps = {
   persistProjectAssemblyViewState: (args) => persistProjectAssemblyViewStateImpl(args),
 };
 
+const mainViewLayoutRuntimeDeps = {
+  loadProjectAssemblyViewState: (args) => loadProjectAssemblyViewStateImpl(args),
+  mapAssemblyError,
+  rerender: rerenderAssemblyMainTab,
+  runMainViewLayoutAction: runMainViewLayoutActionApi,
+  runSerializedProjectViewMutation: (store, task) =>
+    runSerializedProjectViewMutation(store, task),
+};
+
 const editorActionsRuntimeDeps = {
   appendAuditLog,
   buildActionAuditDetail,
@@ -1005,6 +1020,8 @@ const mainViewHistoryRuntimeDeps = {
   executeMainViewHistoryAction,
   loadAssemblyView,
   mapAssemblyError,
+  runSerializedProjectViewMutation: (store, task) =>
+    runSerializedProjectViewMutation(store, task),
   rerender: rerenderAssemblyMainTab,
   setPendingTrackAutoFocusMode: (mode) => {
     assemblyPageSession.pendingTrackAutoFocusMode = mode;
@@ -1083,12 +1100,11 @@ const contextMenuRuntimeDeps = {
 
 const trackDragRuntimeDeps = {
   applySubviewTrackDragOffset,
-  applyTrackDragOffset,
   clearSubviewTrackDragPreview,
   clearTrackDragPreview,
+  commitTrackDragOffset,
   convertTrackOffsetPxToBp,
   persistSubviewTrackDragOffsets,
-  persistTrackDragOffsets,
   previewSubviewTrackContigDrag,
   previewTrackContigDrag,
   resolveActiveTrackScrollElement,
@@ -1860,21 +1876,20 @@ function shouldSuppressTrackContigClick() {
   return Date.now() <= assemblyPageSession.suppressTrackContigClickUntil;
 }
 
-function applyTrackDragOffset(host, store, nextOffset) {
+function commitTrackDragOffset(host, store, nextOffset) {
   const state = store.getState();
-  const normalizedCurrent = normalizeTrackDragOffsets(state.assembly.trackDragOffsets);
+  const normalizedCurrent = normalizeTrackDragOffsets(state.assembly?.trackDragOffsets);
   const normalizedNext = setTrackDragOffset(normalizedCurrent, nextOffset);
   if (areTrackDragOffsetsEqual(normalizedCurrent, normalizedNext)) {
-    return;
+    return Promise.resolve(false);
   }
   assemblyPageSession.suppressNextTrackAutoFocus = true;
-  store.setState({
-    assembly: {
-      ...state.assembly,
-      trackDragOffsets: normalizedNext,
-    },
-  });
-  rerenderAssemblyMainTab(host, store);
+  return runMainViewLayoutActionImpl(
+    host,
+    store,
+    { action: "drag-ctg", args: nextOffset },
+    mainViewLayoutRuntimeDeps,
+  );
 }
 
 async function rebaseTrackDragOffsetsAfterRestore(
@@ -1932,8 +1947,60 @@ async function persistProjectAssemblyViewStateFromStore(
   store,
   deps = projectAssemblyViewStateRuntimeDeps,
 ) {
+  const requestedIdentity = captureProjectViewIdentity(store.getState());
+  if (!requestedIdentity) {
+    return;
+  }
+  return assemblyPageSession.projectViewMutationCoordinator.enqueue(async (isCurrent) => {
+    if (!isCurrent() || !matchesProjectViewIdentity(store.getState(), requestedIdentity)) {
+      return;
+    }
+    return persistProjectAssemblyViewStateFromStoreNow(host, store, deps, requestedIdentity);
+  });
+}
+
+function captureProjectViewIdentity(state) {
+  const workspaceRoot = String(state?.session?.workspacePath || "").trim();
+  const projectId = Number(state?.session?.projectId || 0);
+  if (!workspaceRoot || !Number.isFinite(projectId) || projectId <= 0) {
+    return null;
+  }
+  return { workspaceRoot, projectId: Math.trunc(projectId) };
+}
+
+function matchesProjectViewIdentity(state, identity) {
+  const current = captureProjectViewIdentity(state);
+  return Boolean(
+    current
+    && identity
+    && current.workspaceRoot === identity.workspaceRoot
+    && current.projectId === identity.projectId,
+  );
+}
+
+function runSerializedProjectViewMutation(store, task) {
+  const requestedIdentity = captureProjectViewIdentity(store?.getState?.());
+  if (!requestedIdentity || typeof task !== "function") {
+    return Promise.resolve(false);
+  }
+  return assemblyPageSession.projectViewMutationCoordinator.enqueue((isCoordinatorCurrent) => {
+    const isCurrent = () =>
+      isCoordinatorCurrent() && matchesProjectViewIdentity(store.getState(), requestedIdentity);
+    if (!isCurrent()) {
+      return false;
+    }
+    return task(isCurrent);
+  });
+}
+
+async function persistProjectAssemblyViewStateFromStoreNow(
+  host,
+  store,
+  deps,
+  requestedIdentity,
+) {
   const state = store.getState();
-  if (!state.session.workspacePath || !state.session.projectId) {
+  if (!matchesProjectViewIdentity(state, requestedIdentity)) {
     return;
   }
   try {
@@ -1975,8 +2042,8 @@ async function persistProjectAssemblyViewStateFromStore(
       };
     })();
     await deps.persistProjectAssemblyViewState({
-      workspaceRoot: state.session.workspacePath,
-      projectId: state.session.projectId,
+      workspaceRoot: requestedIdentity.workspaceRoot,
+      projectId: requestedIdentity.projectId,
       supportDatasetId: normalizeSupportDatasetId(state.assembly.supportDatasetId),
       trackView: state.assembly.trackView,
       supportDsCtgLenRulesByChr:
@@ -2022,6 +2089,9 @@ async function persistProjectAssemblyViewStateFromStore(
           : {},
     });
   } catch (error) {
+    if (!matchesProjectViewIdentity(store.getState(), requestedIdentity)) {
+      return;
+    }
     const mappedError = mapAssemblyError({ error, stateOrLocale: store.getState() });
     store.setState({
       assembly: {
@@ -2072,9 +2142,7 @@ export async function __testToggleSupportTrackCtgMirror(host, store, payload, op
     store,
     payload,
     {
-      persistProjectAssemblyViewState:
-        options.persistProjectAssemblyViewState
-        || projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState,
+      runMainViewLayoutAction: options.runMainViewLayoutAction,
     },
   );
 }

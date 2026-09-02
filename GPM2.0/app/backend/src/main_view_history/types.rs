@@ -12,6 +12,14 @@ pub struct RunMainViewEditorActionParams {
     pub args: Value,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct RunMainViewLayoutActionParams {
+    pub project_id: i64,
+    pub chr_name: String,
+    pub action: String,
+    pub args: Value,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunMainViewBatchDeleteParams {
     pub project_id: i64,
@@ -158,6 +166,37 @@ pub(super) struct ProjectViewDependencyRow {
     pub degap_project_state_json: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProjectViewTrackOffsetKey {
+    pub track_role: String,
+    pub assembly_ctg_id: i64,
+    pub dataset_id: Option<i64>,
+    pub phased_track_id: Option<i64>,
+    pub phased_track_item_id: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProjectViewMirrorKey {
+    pub dataset_id: i64,
+    pub assembly_ctg_id: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProjectViewLayoutScope {
+    pub track_offset_keys: Vec<ProjectViewTrackOffsetKey>,
+    pub mirror_keys: Vec<ProjectViewMirrorKey>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProjectViewLayoutSnapshot {
+    pub scoped_track_drag_offsets: Vec<Value>,
+    pub scoped_support_mirrors: Vec<Value>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub(super) struct DatabaseSnapshot {
     pub ctg_ids: Vec<i64>,
@@ -174,6 +213,10 @@ pub(super) struct DatabaseSnapshot {
     pub export_records: Vec<ExportRecordRow>,
     pub include_view_state: bool,
     pub view_state: Option<ProjectViewDependencyRow>,
+    #[serde(default)]
+    pub layout_scope: ProjectViewLayoutScope,
+    #[serde(default)]
+    pub layout_state: ProjectViewLayoutSnapshot,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -185,6 +228,7 @@ pub(super) struct SnapshotScope {
     pub phased_track_ids: Vec<i64>,
     pub export_record_ids: Vec<i64>,
     pub include_view_state: bool,
+    pub layout_scope: ProjectViewLayoutScope,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -28,6 +28,65 @@ function buildMainHistoryStatus(projectId, chrName) {
   };
 }
 
+function getMockProjectViewState(projectId) {
+  const normalizedProjectId = Number(projectId);
+  const current = mockStore.projectAssemblyViewStateByProject.get(normalizedProjectId) || {
+    source: "mock",
+    projectId: normalizedProjectId,
+    supportMirroredCtgs: [],
+    trackDragOffsets: [],
+  };
+  mockStore.projectAssemblyViewStateByProject.set(normalizedProjectId, current);
+  return current;
+}
+
+function setMockProjectViewState(projectId, value) {
+  mockStore.projectAssemblyViewStateByProject.set(Number(projectId), structuredClone(value));
+}
+
+function buildMockTrackOffsetKey(value) {
+  const role = String(value?.trackRole || "").trim().toLowerCase();
+  const datasetId = role === "support" ? Number(value?.datasetId || 0) : 0;
+  const phasedTrackId = role === "phased" ? Number(value?.phasedTrackId || 0) : 0;
+  const phasedTrackItemId = role === "phased" ? Number(value?.phasedTrackItemId || 0) : 0;
+  return `${role}:${datasetId}:${Number(value?.assemblyCtgId || 0)}:${phasedTrackId}:${phasedTrackItemId}`;
+}
+
+function applyMockLayoutAction(viewState, action, args) {
+  const next = structuredClone(viewState);
+  next.trackDragOffsets = Array.isArray(next.trackDragOffsets) ? next.trackDragOffsets : [];
+  next.supportMirroredCtgs = Array.isArray(next.supportMirroredCtgs)
+    ? next.supportMirroredCtgs
+    : [];
+  if (action === "drag-ctg") {
+    const targetKey = buildMockTrackOffsetKey(args);
+    const offsets = next.trackDragOffsets.filter(
+      (entry) => buildMockTrackOffsetKey(entry) !== targetKey,
+    );
+    const offset = Number.isFinite(Number(args.offsetBp))
+      ? Number(args.offsetBp)
+      : Number(args.offsetPx);
+    if (Number.isFinite(offset) && Math.abs(offset) >= 0.01) {
+      offsets.push(structuredClone(args));
+    }
+    next.trackDragOffsets = offsets;
+  } else {
+    const datasetId = Number(args.datasetId || 0);
+    const assemblyCtgId = Number(args.assemblyCtgId || 0);
+    next.supportMirroredCtgs = next.supportMirroredCtgs.filter(
+      (entry) => Number(entry.datasetId) !== datasetId
+        || Number(entry.assemblyCtgId) !== assemblyCtgId,
+    );
+    if (action === "create-mirror") {
+      next.supportMirroredCtgs.push(structuredClone(args.mirrorEntry || {
+        datasetId,
+        assemblyCtgId,
+      }));
+    }
+  }
+  return next;
+}
+
 async function listChrViewCtgsMock({ chrName, datasetId = null }) {
   await sleep(150);
   const samples = {
@@ -489,6 +548,44 @@ async function runMainViewEditorActionMock({ projectId, chrName, action, args = 
   );
 }
 
+async function runMainViewLayoutActionMock({ projectId, chrName, action, args = {} }) {
+  await sleep(60);
+  const normalizedAction = String(action || "").trim().toLowerCase();
+  if (!new Set(["drag-ctg", "create-mirror", "delete-mirror"]).has(normalizedAction)) {
+    throw new Error(`unsupported main-view layout action: ${normalizedAction || "<empty>"}`);
+  }
+  const history = resolveMainHistory(projectId, chrName);
+  const beforeViewState = structuredClone(getMockProjectViewState(projectId));
+  const afterViewState = applyMockLayoutAction(beforeViewState, normalizedAction, args);
+  const affectedCtgId = Number(args.assemblyCtgId || 0);
+  const operation = {
+    kind: normalizedAction,
+    targetCount: 1,
+    targetName: affectedCtgId > 0 ? `Ctg${affectedCtgId}` : null,
+  };
+  if (JSON.stringify(beforeViewState) === JSON.stringify(afterViewState)) {
+    return {
+      ...buildMockHistoryMutation(projectId, chrName, operation, []),
+      changed: false,
+    };
+  }
+  setMockProjectViewState(projectId, afterViewState);
+  history.past.push({
+    operation,
+    beforeActiveCount: history.activeCount,
+    beforeViewState,
+    afterViewState,
+  });
+  history.future = [];
+  history.activeCount += 1;
+  return buildMockHistoryMutation(
+    projectId,
+    chrName,
+    operation,
+    affectedCtgId > 0 ? [affectedCtgId] : [],
+  );
+}
+
 async function runMainViewBatchDeleteMock({ projectId, chrName, assemblyCtgIds }) {
   await sleep(60);
   const ids = Array.isArray(assemblyCtgIds) ? assemblyCtgIds.map(Number) : [];
@@ -508,16 +605,34 @@ async function executeMainViewHistoryActionMock({ projectId, chrName, action }) 
     entry = history.past.pop();
     history.future.push(entry);
     history.activeCount = entry.beforeActiveCount;
+    if (entry.beforeViewState) {
+      setMockProjectViewState(projectId, entry.beforeViewState);
+    }
   } else if (action === "redo" && history.future.length) {
     entry = history.future.pop();
     entry.beforeActiveCount = history.activeCount;
     history.past.push(entry);
     history.activeCount += entry.operation.kind === "reset" ? -history.activeCount : 1;
+    if (entry.afterViewState) {
+      setMockProjectViewState(projectId, entry.afterViewState);
+    }
   } else if (action === "reset" && history.activeCount > 0) {
+    const beforeViewState = structuredClone(getMockProjectViewState(projectId));
+    const baselineViewState = history.past.find((candidate) => candidate.beforeViewState)
+      ?.beforeViewState;
     entry = {
       operation: { kind: "reset", targetCount: history.activeCount, targetName: chrName },
       beforeActiveCount: history.activeCount,
+      ...(baselineViewState
+        ? {
+            beforeViewState,
+            afterViewState: structuredClone(baselineViewState),
+          }
+        : {}),
     };
+    if (baselineViewState) {
+      setMockProjectViewState(projectId, baselineViewState);
+    }
     history.past.push(entry);
     history.future = [];
     history.activeCount = 0;
@@ -655,6 +770,7 @@ async function appendEditAuditLogMock({ projectId, category, action, detail }) {
     getMainViewHistoryStatus: getMainViewHistoryStatusMock,
     inspectMainViewDelete: inspectMainViewDeleteMock,
     runMainViewEditorAction: runMainViewEditorActionMock,
+    runMainViewLayoutAction: runMainViewLayoutActionMock,
     runMainViewBatchDelete: runMainViewBatchDeleteMock,
     executeMainViewHistoryAction: executeMainViewHistoryActionMock,
     getJunctionInspection: getJunctionInspectionMock,

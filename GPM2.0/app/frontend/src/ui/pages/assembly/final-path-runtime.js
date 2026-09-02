@@ -398,7 +398,11 @@ async function persistCurrentFinalPathByChr(host, store, nextFinalPathByChr, dep
       currentState.assembly.finalPathByChr?.[chrName],
       normalizedPersistedFinalPathByChr?.[chrName],
     )) {
-      nextGrtResultDisplayByChr[chrName] = { main: false, subview: false };
+      nextGrtResultDisplayByChr[chrName] = {
+        ...(nextGrtResultDisplayByChr[chrName] || {}),
+        main: false,
+        subview: false,
+      };
     }
   });
   const nextAssembly = {

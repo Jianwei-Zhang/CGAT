@@ -2,11 +2,13 @@ use std::collections::BTreeSet;
 
 use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, OptionalExtension, params};
+use serde_json::Value;
 
 use super::now_timestamp_string;
 use super::types::{
     AssemblyCtgRow, AssemblySeqRow, DatabaseSnapshot, DeletedAssemblyCtgRow, ExportRecordRow,
-    PhasedTrackItemRow, PhasedTrackRow, ProjectViewDependencyRow, SnapshotScope,
+    PhasedTrackItemRow, PhasedTrackRow, ProjectViewDependencyRow, ProjectViewLayoutScope,
+    ProjectViewLayoutSnapshot, ProjectViewMirrorKey, ProjectViewTrackOffsetKey, SnapshotScope,
 };
 
 pub(super) const HISTORY_CONFLICT_CODE: &str = "MAIN_VIEW_HISTORY_CONFLICT";
@@ -24,6 +26,7 @@ pub(super) fn snapshot_scope(snapshot: &DatabaseSnapshot) -> SnapshotScope {
         phased_track_ids: snapshot.phased_track_ids.clone(),
         export_record_ids: snapshot.export_record_ids.clone(),
         include_view_state: snapshot.include_view_state,
+        layout_scope: snapshot.layout_scope.clone(),
     }
 }
 
@@ -47,6 +50,14 @@ pub(super) fn merge_snapshot_scopes<'a>(
             .export_record_ids
             .extend(snapshot.export_record_ids.iter().copied());
         scope.include_view_state |= snapshot.include_view_state;
+        scope
+            .layout_scope
+            .track_offset_keys
+            .extend(snapshot.layout_scope.track_offset_keys.iter().cloned());
+        scope
+            .layout_scope
+            .mirror_keys
+            .extend(snapshot.layout_scope.mirror_keys.iter().cloned());
     }
     normalize_scope(&mut scope);
     scope
@@ -103,6 +114,7 @@ pub(super) fn capture_snapshot(
     } else {
         None
     };
+    let layout_state = capture_project_view_layout(conn, project_id, &resolved_scope.layout_scope)?;
 
     Ok(DatabaseSnapshot {
         ctg_ids: resolved_scope.ctg_ids,
@@ -119,6 +131,8 @@ pub(super) fn capture_snapshot(
         export_records,
         include_view_state: resolved_scope.include_view_state,
         view_state,
+        layout_scope: resolved_scope.layout_scope,
+        layout_state,
     })
 }
 
@@ -334,6 +348,16 @@ pub(super) fn apply_snapshot(
     if desired.include_view_state {
         reconcile_project_view_dependency(conn, project_id, desired.view_state.as_ref())?;
     }
+    if !desired.layout_scope.track_offset_keys.is_empty()
+        || !desired.layout_scope.mirror_keys.is_empty()
+    {
+        reconcile_project_view_layout(
+            conn,
+            project_id,
+            &desired.layout_scope,
+            &desired.layout_state,
+        )?;
+    }
     Ok(())
 }
 
@@ -344,6 +368,10 @@ fn normalize_scope(scope: &mut SnapshotScope) {
     normalize_ids(&mut scope.dependency_ctg_ids);
     normalize_ids(&mut scope.phased_track_ids);
     normalize_ids(&mut scope.export_record_ids);
+    scope.layout_scope.track_offset_keys.sort();
+    scope.layout_scope.track_offset_keys.dedup();
+    scope.layout_scope.mirror_keys.sort();
+    scope.layout_scope.mirror_keys.dedup();
 }
 
 fn normalize_ids(ids: &mut Vec<i64>) {
@@ -565,6 +593,151 @@ fn load_project_view_dependency(
     )
     .optional()
     .context("failed to capture project view dependency history state")
+}
+
+fn capture_project_view_layout(
+    conn: &Connection,
+    project_id: i64,
+    scope: &ProjectViewLayoutScope,
+) -> Result<ProjectViewLayoutSnapshot> {
+    if scope.track_offset_keys.is_empty() && scope.mirror_keys.is_empty() {
+        return Ok(ProjectViewLayoutSnapshot::default());
+    }
+    let row = conn
+        .query_row(
+            "SELECT track_drag_offsets_json, support_mirrored_ctgs_json
+             FROM project_assembly_view_state WHERE project_id = ?1",
+            params![project_id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        )
+        .optional()
+        .context("failed to capture project view layout history state")?;
+    let Some((track_offsets_json, mirrors_json)) = row else {
+        return Ok(ProjectViewLayoutSnapshot::default());
+    };
+    let track_offsets = parse_layout_array(&track_offsets_json, "track_drag_offsets_json")?;
+    let mirrors = parse_layout_array(&mirrors_json, "support_mirrored_ctgs_json")?;
+    Ok(ProjectViewLayoutSnapshot {
+        scoped_track_drag_offsets: track_offsets
+            .into_iter()
+            .filter(|entry| {
+                scope
+                    .track_offset_keys
+                    .iter()
+                    .any(|key| track_offset_matches_key(entry, key))
+            })
+            .collect(),
+        scoped_support_mirrors: mirrors
+            .into_iter()
+            .filter(|entry| {
+                scope
+                    .mirror_keys
+                    .iter()
+                    .any(|key| mirror_matches_key(entry, key))
+            })
+            .collect(),
+    })
+}
+
+pub(super) fn reconcile_project_view_layout(
+    conn: &Connection,
+    project_id: i64,
+    scope: &ProjectViewLayoutScope,
+    desired: &ProjectViewLayoutSnapshot,
+) -> Result<()> {
+    if desired.scoped_track_drag_offsets.iter().any(|entry| {
+        !scope
+            .track_offset_keys
+            .iter()
+            .any(|key| track_offset_matches_key(entry, key))
+    }) || desired.scoped_support_mirrors.iter().any(|entry| {
+        !scope
+            .mirror_keys
+            .iter()
+            .any(|key| mirror_matches_key(entry, key))
+    }) {
+        bail!("{HISTORY_CONFLICT_CODE}: recorded layout state is outside its target scope");
+    }
+    conn.execute(
+        "INSERT INTO project_assembly_view_state (project_id, updated_at)
+         VALUES (?1, ?2)
+         ON CONFLICT(project_id) DO NOTHING",
+        params![project_id, now_timestamp_string()],
+    )?;
+    let (track_offsets_json, mirrors_json): (String, String) = conn.query_row(
+        "SELECT track_drag_offsets_json, support_mirrored_ctgs_json
+         FROM project_assembly_view_state WHERE project_id = ?1",
+        params![project_id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    let mut track_offsets = parse_layout_array(&track_offsets_json, "track_drag_offsets_json")?;
+    let mut mirrors = parse_layout_array(&mirrors_json, "support_mirrored_ctgs_json")?;
+    track_offsets.retain(|entry| {
+        !scope
+            .track_offset_keys
+            .iter()
+            .any(|key| track_offset_matches_key(entry, key))
+    });
+    mirrors.retain(|entry| {
+        !scope
+            .mirror_keys
+            .iter()
+            .any(|key| mirror_matches_key(entry, key))
+    });
+    track_offsets.extend(desired.scoped_track_drag_offsets.iter().cloned());
+    mirrors.extend(desired.scoped_support_mirrors.iter().cloned());
+    let updated = conn.execute(
+        "UPDATE project_assembly_view_state
+         SET track_drag_offsets_json = ?1,
+             support_mirrored_ctgs_json = ?2,
+             updated_at = ?3
+         WHERE project_id = ?4",
+        params![
+            serde_json::to_string(&track_offsets)?,
+            serde_json::to_string(&mirrors)?,
+            now_timestamp_string(),
+            project_id,
+        ],
+    )?;
+    if updated != 1 {
+        bail!("{HISTORY_CONFLICT_CODE}: project view layout row is missing");
+    }
+    Ok(())
+}
+
+fn parse_layout_array(raw: &str, column: &str) -> Result<Vec<Value>> {
+    let value: Value = serde_json::from_str(raw)
+        .with_context(|| format!("MAIN_VIEW_HISTORY_LAYOUT_INVALID: invalid persisted {column}"))?;
+    value.as_array().cloned().ok_or_else(|| {
+        anyhow::anyhow!("MAIN_VIEW_HISTORY_LAYOUT_INVALID: persisted {column} must be a JSON array")
+    })
+}
+
+fn track_offset_matches_key(entry: &Value, key: &ProjectViewTrackOffsetKey) -> bool {
+    let role = entry.get("trackRole").and_then(Value::as_str);
+    let ctg_id = entry.get("assemblyCtgId").and_then(Value::as_i64);
+    if role != Some(key.track_role.as_str()) || ctg_id != Some(key.assembly_ctg_id) {
+        return false;
+    }
+    match key.track_role.as_str() {
+        "support" => entry
+            .get("datasetId")
+            .and_then(Value::as_i64)
+            .is_none_or(|dataset_id| Some(dataset_id) == key.dataset_id),
+        "phased" => {
+            if let Some(item_id) = key.phased_track_item_id {
+                entry.get("phasedTrackItemId").and_then(Value::as_i64) == Some(item_id)
+            } else {
+                entry.get("phasedTrackId").and_then(Value::as_i64) == key.phased_track_id
+            }
+        }
+        _ => true,
+    }
+}
+
+fn mirror_matches_key(entry: &Value, key: &ProjectViewMirrorKey) -> bool {
+    entry.get("datasetId").and_then(Value::as_i64) == Some(key.dataset_id)
+        && entry.get("assemblyCtgId").and_then(Value::as_i64) == Some(key.assembly_ctg_id)
 }
 
 fn validate_desired_names(

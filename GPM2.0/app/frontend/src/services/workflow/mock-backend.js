@@ -8,7 +8,7 @@ export function createWorkflowMockBackend() {
   return {
     ...createMockWorkspaceOperations(store),
     ...createMockAssemblyOperations(store),
-    ...createMockViewStateOperations(),
+    ...createMockViewStateOperations(store),
     getPackageMetadata() {
       return store.packageMetadata;
     },

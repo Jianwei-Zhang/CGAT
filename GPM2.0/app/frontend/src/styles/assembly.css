@@ -337,6 +337,13 @@
   min-height: 30px;
 }
 
+.grt-result-controls {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+}
+
 .grt-result-switch {
   display: inline-flex;
   align-items: center;
@@ -354,6 +361,62 @@
 }
 
 .grt-result-switch input {
+  accent-color: #2f9e44;
+}
+
+.grt-result-layer-menu {
+  position: relative;
+  height: 30px;
+}
+
+.grt-result-layer-trigger {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 30px;
+  border: 1px solid #aeb9b0;
+  border-left: 0;
+  background: #f8fbf8;
+  color: #245f35;
+  cursor: pointer;
+  list-style: none;
+}
+
+.grt-result-layer-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.grt-result-layer-menu[open] .grt-result-layer-trigger {
+  background: #e9f5ec;
+}
+
+.grt-result-layer-options {
+  position: absolute;
+  z-index: 20;
+  top: 34px;
+  right: 0;
+  display: grid;
+  gap: 7px;
+  min-width: 150px;
+  padding: 9px 10px;
+  border: 1px solid #aeb9b0;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.16);
+  color: #303a32;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.grt-result-layer-options label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.grt-result-layer-options input {
   accent-color: #2f9e44;
 }
 
@@ -740,7 +803,7 @@
 
 .assembly-status-toast-wrap {
   position: absolute;
-  top: 8px;
+  top: -34px;
   right: 8px;
   z-index: 3;
   display: grid;

@@ -47,6 +47,7 @@ export function createAssemblyPageSession() {
     subviewRenderCache: createSubviewRenderCache(),
     finalPathGraphPreviewState: null,
     grtResultToastTimer: null,
+    projectViewMutationCoordinator: createProjectViewMutationCoordinator(),
   };
 }
 
@@ -63,6 +64,7 @@ export function resetAssemblyPageSession(nextWidths = null, { timerApi = globalT
   assemblyPageSession.deferredRerenderCoordinator?.cancel?.();
   assemblyPageSession.pendingAssemblyConfirmResolvers.forEach((resolve) => resolve(false));
   assemblyPageSession.pendingAssemblyConfirmResolvers.clear();
+  assemblyPageSession.projectViewMutationCoordinator?.invalidate?.();
 
   Object.assign(assemblyPageSession, createAssemblyPageSession(), {
     measuredTrackViewportPxByRole: normalizeViewportWidths(nextWidths),
@@ -73,3 +75,4 @@ export function resetAssemblyPageSession(nextWidths = null, { timerApi = globalT
 export function destroyAssemblyPageSession(options = {}) {
   resetAssemblyPageSession(null, options);
 }
+import { createProjectViewMutationCoordinator } from "./project-view-mutation-coordinator.js";

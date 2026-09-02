@@ -1115,7 +1115,7 @@ test("toggling support mirror persists project-scoped mirrored ctgs", async () =
       };
     },
   };
-  const persisted = [];
+  const layoutActions = [];
 
   await __testToggleSupportTrackCtgMirror(
     host,
@@ -1126,37 +1126,26 @@ test("toggling support mirror persists project-scoped mirrored ctgs", async () =
       shouldMirror: true,
     },
     {
-      async persistProjectAssemblyViewState(payload) {
-        persisted.push(payload);
+      async runMainViewLayoutAction(_host, currentStore, payload) {
+        layoutActions.push(payload);
+        const current = currentStore.getState();
+        currentStore.setState({
+          assembly: {
+            ...current.assembly,
+            supportMirroredCtgs: [payload.args.mirrorEntry],
+          },
+        });
       },
     },
   );
 
   assert.equal(store.getState().assembly.supportMirroredCtgs.length, 1);
   assert.equal(store.getState().assembly.supportMirroredCtgs[0].orient, "-");
-  assert.deepEqual(persisted, [
-    {
-      workspaceRoot: "/tmp/ws",
-      projectId: 7,
-      supportDatasetId: 22,
-      trackView: store.getState().assembly.trackView,
-      supportDsCtgLenRulesByChr: {},
-      supportMirroredCtgs: store.getState().assembly.supportMirroredCtgs,
-      hiddenPrimaryCtgIds: [],
-      hiddenPrimaryCtgIdsByChr: {},
-      trackDragOffsets: [],
-      subviewTrackDragOffsets: [],
-      subviewAnchorStateByKey: {},
-      subviewHistoryByKey: {},
-      trackScrollState: store.getState().assembly.trackScrollState,
-      subviewTrackScrollState: store.getState().assembly.subviewTrackScrollState,
-      finalPathTrackScrollState: store.getState().assembly.finalPathTrackScrollState,
-      membersCardCollapsed: true,
-      finalPathViewMode: "graph",
-      finalPathByChr: store.getState().assembly.finalPathByChr,
-      degapProjectState: {},
-    },
-  ]);
+  assert.equal(layoutActions.length, 1);
+  assert.equal(layoutActions[0].action, "create-mirror");
+  assert.equal(layoutActions[0].args.datasetId, 22);
+  assert.equal(layoutActions[0].args.assemblyCtgId, 30);
+  assert.equal(layoutActions[0].args.mirrorEntry.orient, "-");
 });
 
 test("batch hide and unhide force selected primary contigs to target hidden state", async () => {

@@ -166,6 +166,38 @@ function applyGrtJunctionPreview(host, groupNodes, offsetPx) {
   });
 }
 
+function applyGrtDisplayEvidencePreview(host, groupNodes, offsetPx) {
+  const entryKeys = new Set();
+  groupNodes.forEach((groupNode) => {
+    const entryKey = String(groupNode.getAttribute?.("data-grt-result-entry-key") || "").trim();
+    if (entryKey) {
+      entryKeys.add(entryKey);
+    }
+  });
+  if (!entryKeys.size) {
+    return;
+  }
+  const evidenceNodes = host?.querySelectorAll?.("[data-grt-display-evidence]") || [];
+  evidenceNodes.forEach((evidenceNode) => {
+    const sourceEntryKey = String(
+      evidenceNode.getAttribute?.("data-grt-display-evidence-source-entry-key") || "",
+    ).trim();
+    const targetEntryKey = String(
+      evidenceNode.getAttribute?.("data-grt-display-evidence-target-entry-key") || "",
+    ).trim();
+    const edgeIndexes = [];
+    if (entryKeys.has(sourceEntryKey)) {
+      edgeIndexes.push(0, 1);
+    }
+    if (entryKeys.has(targetEntryKey)) {
+      edgeIndexes.push(2, 3);
+    }
+    if (edgeIndexes.length) {
+      applyBandPreview(evidenceNode, edgeIndexes, offsetPx);
+    }
+  });
+}
+
 function isLabelInsideGroup(labelNode, groupNode) {
   if (!labelNode || !groupNode || typeof groupNode.contains !== "function") {
     return false;
@@ -491,6 +523,7 @@ export function previewTrackContigDrag(host, {
     stickyLabelNodes.forEach((labelNode) => applyStickyLabelPreview(labelNode, offsetPx));
   });
   applyGrtJunctionPreview(host, groupNodes, offsetPx);
+  applyGrtDisplayEvidencePreview(host, groupNodes, offsetPx);
 
   const edgeIndexes = String(trackRole || "").trim() === "support" ? [0, 1] : [2, 3];
   const bandNodes = host.querySelectorAll?.(
@@ -534,6 +567,7 @@ export function previewSubviewTrackContigDrag(
     });
   });
   applyGrtJunctionPreview(host, groupNodes, offsetPx);
+  applyGrtDisplayEvidencePreview(host, groupNodes, offsetPx);
 
   const edgeIndexes = String(slot || "").trim() === "top" ? [0, 1] : [2, 3];
   const bandSelector = String(slot || "").trim() === "top"

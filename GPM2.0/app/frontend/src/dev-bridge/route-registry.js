@@ -35,6 +35,7 @@ const ROUTE_GROUPS = Object.freeze({
     ["/main-view-history-status", "getMainViewHistoryStatus"],
     ["/inspect-main-view-delete", "inspectMainViewDelete"],
     ["/main-view-editor-action", "runMainViewEditorAction"],
+    ["/main-view-layout-action", "runMainViewLayoutAction"],
     ["/main-view-batch-delete", "runMainViewBatchDelete"],
     ["/main-view-history-action", "executeMainViewHistoryAction"],
     ["/get-junction-inspection", "getJunctionInspection"],

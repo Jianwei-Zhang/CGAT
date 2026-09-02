@@ -72,6 +72,7 @@ import {
 } from "./render-subview.js";
 import { buildGrtResultPlan, resolveGrtResultContext } from "./grt-result-state.js";
 import { buildGrtResultScene } from "./grt-result-render.js";
+import { renderGrtResultControls } from "./grt-result-controls.js";
 
 export {
   SUBVIEW_BAND_TOOLTIP_HOVER_DELAY_MS,
@@ -2073,6 +2074,7 @@ function renderAssemblyTracks({
       plan: grtResultPlan,
       entries: grtResultEntries,
       maskVisibleCtgs: true,
+      layers: grtResultContext.mainLayers,
       escapeHtml,
       gapLabel: i18n.grtResult.gapLabel,
     })
@@ -2396,12 +2398,13 @@ function renderAssemblyTracks({
     phasedTrackCount: phasedChrTracks.length,
     i18n,
   });
-  const grtResultSwitch = grtResultContext?.available
-    ? `<label class="grt-result-switch">
-        <input type="checkbox" data-grt-result-toggle="main" ${grtResultContext.mainEnabled ? "checked" : ""} />
-        <span>${escapeHtml(i18n.grtResult.showResult)}</span>
-      </label>`
-    : "";
+  const grtResultControls = renderGrtResultControls({
+    scope: "main",
+    context: grtResultContext,
+    i18n,
+    escapeHtml,
+    escapeAttr,
+  });
   const grtResultToastMarkup = grtResultToast?.scope === "main"
     && grtResultToast?.chrName === selectedChrName
     ? `<div class="grt-result-toast" role="status">${escapeHtml(i18n.grtResult.noMainIntervals)}</div>`
@@ -2419,7 +2422,7 @@ function renderAssemblyTracks({
       <div class="assembly-track-panel-head" data-main-track-control-layout="auto" data-grt-result-card="main" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
         <strong data-main-track-control-title>${escapeHtml(i18n.page.primaryAlignmentViewSingleCardTitle)}</strong>
         <div class="assembly-track-panel-actions" data-main-track-control-actions>
-          <div class="assembly-track-panel-quick-actions" data-main-track-quick-actions>${grtResultSwitch}${createPhasedTrackButton}</div>
+          <div class="assembly-track-panel-quick-actions" data-main-track-quick-actions>${grtResultControls}${createPhasedTrackButton}</div>
           ${inlineControls}
         </div>
       </div>

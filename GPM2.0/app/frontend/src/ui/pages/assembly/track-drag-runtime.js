@@ -5,14 +5,13 @@ const ASSEMBLY_SUBVIEW_TRACK_CONTIG_DRAG_BOUND = Symbol("assemblySubviewTrackCon
 const TRACK_CONTIG_CLICK_SUPPRESS_MS = 250;
 
 const REQUIRED_TRACK_DRAG_DEPS = [
-  "applyTrackDragOffset",
   "clearTrackDragPreview",
+  "commitTrackDragOffset",
   "convertTrackOffsetPxToBp",
   "resolveActiveTrackScrollElement",
   "previewTrackContigDrag",
   "resolveTrackDragOffsetBp",
   "roundTrackMetric",
-  "persistTrackDragOffsets",
   "setTrackContigDragActive",
   "setSuppressTrackContigClickUntil",
 ];
@@ -107,7 +106,7 @@ export function bindTrackContigDrag(host, store, deps) {
       return;
     }
     const state = store.getState();
-    if (state.assembly.activeTab !== "assembly") {
+    if (state.assembly.activeTab !== "assembly" || state.assembly.mainViewHistory?.inFlight === true) {
       return;
     }
     const trackNode = event.target?.closest?.("[data-track-contig-id][data-track-role]");
@@ -190,7 +189,7 @@ export function bindTrackContigDrag(host, store, deps) {
         scheduler.flushNow();
         deps.clearTrackDragPreview(host);
         if (dragging) {
-          deps.applyTrackDragOffset(host, store, {
+          void deps.commitTrackDragOffset(host, store, {
             trackRole,
             assemblyCtgId,
             ...(datasetId ? { datasetId } : {}),
@@ -198,7 +197,6 @@ export function bindTrackContigDrag(host, store, deps) {
             ...(phasedTrackItemId ? { phasedTrackItemId } : {}),
             offsetBp: pendingOffsetBp,
           });
-          void deps.persistTrackDragOffsets(host, store);
         }
         if (dragging) {
           deps.setSuppressTrackContigClickUntil(Date.now() + TRACK_CONTIG_CLICK_SUPPRESS_MS);

@@ -150,24 +150,31 @@ function renderDisplayEvidence(evidence, entries, escapeHtml) {
     tool === "mummer" ? "is-mummer" : "is-minimap2",
     association === "supporting_precursor" ? "is-supporting-precursor" : "",
   ].filter(Boolean).join(" ");
-  return `<polygon class="${classNames}" points="${points}" pointer-events="visibleFill" data-grt-display-evidence="${escapeHtml(evidence.evidenceId || "")}"><title>${escapeHtml(title)}</title></polygon>`;
+  const sourceEntryKey = String(sourceFirst.entry?.key || "");
+  const targetEntryKey = String(targetFirst.entry?.key || "");
+  return `<polygon class="${classNames}" points="${points}" pointer-events="visibleFill" data-grt-display-evidence="${escapeHtml(evidence.evidenceId || "")}" data-grt-display-evidence-source-entry-key="${escapeHtml(sourceEntryKey)}" data-grt-display-evidence-target-entry-key="${escapeHtml(targetEntryKey)}"><title>${escapeHtml(title)}</title></polygon>`;
 }
 
 export function buildGrtResultScene({
   plan,
   entries = [],
   maskVisibleCtgs = false,
+  layers = {},
   escapeHtml = escapeFallback,
   gapLabel = "GRT gap",
 } = {}) {
   const allEntries = Array.isArray(entries) ? entries : [];
+  const resultPathVisible = layers?.resultPath !== false;
+  const alignmentEvidenceVisible = layers?.alignmentEvidence !== false;
   const visibleEntries = allEntries.filter(
     (entry) => intervalsForEntry(plan, entry).length > 0,
   );
-  const evidenceMarkup = (Array.isArray(plan?.displayEvidence) ? plan.displayEvidence : [])
-    .map((evidence) => renderDisplayEvidence(evidence, allEntries, escapeHtml))
-    .join("");
-  if (!visibleEntries.length && !evidenceMarkup) {
+  const evidenceMarkup = alignmentEvidenceVisible
+    ? (Array.isArray(plan?.displayEvidence) ? plan.displayEvidence : [])
+      .map((evidence) => renderDisplayEvidence(evidence, allEntries, escapeHtml))
+      .join("")
+    : "";
+  if ((!resultPathVisible || !visibleEntries.length) && !evidenceMarkup) {
     return {
       hasVisibleResult: false,
       hasVisibleJunction: false,
@@ -176,18 +183,23 @@ export function buildGrtResultScene({
     };
   }
   const overlaysByKey = new Map();
-  visibleEntries.forEach((entry) => {
-    const maskMarkup = maskVisibleCtgs
-      ? `<rect class="grt-result-mask" x="${entry.rect.x.toFixed(2)}" y="${entry.y.toFixed(2)}" width="${entry.rect.width.toFixed(2)}" height="${entry.height.toFixed(2)}" rx="3" ry="3" pointer-events="none" />`
-      : "";
-    const intervalsMarkup = intervalsForEntry(plan, entry)
-      .map((interval) => renderIntervalOverlay(interval, entry, escapeHtml))
-      .join("");
-    overlaysByKey.set(entry.key, `${maskMarkup}${intervalsMarkup}`);
-  });
-  const junctionMarkup = `${evidenceMarkup}${(Array.isArray(plan?.junctions) ? plan.junctions : [])
-    .map((junction) => renderJunction(junction, visibleEntries, escapeHtml, gapLabel))
-    .join("")}`;
+  if (resultPathVisible) {
+    visibleEntries.forEach((entry) => {
+      const maskMarkup = maskVisibleCtgs
+        ? `<rect class="grt-result-mask" x="${entry.rect.x.toFixed(2)}" y="${entry.y.toFixed(2)}" width="${entry.rect.width.toFixed(2)}" height="${entry.height.toFixed(2)}" rx="3" ry="3" pointer-events="none" />`
+        : "";
+      const intervalsMarkup = intervalsForEntry(plan, entry)
+        .map((interval) => renderIntervalOverlay(interval, entry, escapeHtml))
+        .join("");
+      overlaysByKey.set(entry.key, `${maskMarkup}${intervalsMarkup}`);
+    });
+  }
+  const pathJunctionMarkup = resultPathVisible
+    ? (Array.isArray(plan?.junctions) ? plan.junctions : [])
+      .map((junction) => renderJunction(junction, visibleEntries, escapeHtml, gapLabel))
+      .join("")
+    : "";
+  const junctionMarkup = `${evidenceMarkup}${pathJunctionMarkup}`;
   return {
     hasVisibleResult: true,
     hasVisibleJunction: Boolean(junctionMarkup),

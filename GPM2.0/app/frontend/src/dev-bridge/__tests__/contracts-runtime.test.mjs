@@ -129,7 +129,7 @@ test("operation factory exposes every registered operation and maps exact CLI co
     },
   });
 
-  assert.equal(Object.keys(handlers).length, 41);
+  assert.equal(Object.keys(handlers).length, 42);
   const sequences = await handlers.listNewSequences({
     workspaceRoot: "D:/workspace",
     projectId: 7,
@@ -173,6 +173,11 @@ test("main-view history dev operations map exact CLI contracts", async () => {
     action: "rename-ctg",
     args: { assemblyCtgId: 11, newName: "renamed" },
   });
+  await handlers.runMainViewLayoutAction({
+    ...target,
+    action: "create-mirror",
+    args: { datasetId: 22, assemblyCtgId: 11, mirrorEntry: { datasetId: 22, assemblyCtgId: 11 } },
+  });
   await handlers.runMainViewBatchDelete({ ...target, assemblyCtgIds: [11, 12] });
   await handlers.executeMainViewHistoryAction({ ...target, action: "redo" });
 
@@ -186,6 +191,14 @@ test("main-view history dev operations map exact CLI contracts", async () => {
       "Chr01",
       "rename-ctg",
       '{"assemblyCtgId":11,"newName":"renamed"}',
+    ],
+    [
+      "run-main-view-layout-action",
+      "D:/workspace",
+      "7",
+      "Chr01",
+      "create-mirror",
+      '{"datasetId":22,"assemblyCtgId":11,"mirrorEntry":{"datasetId":22,"assemblyCtgId":11}}',
     ],
     ["run-main-view-batch-delete", "D:/workspace", "7", "Chr01", "11,12"],
     ["redo-main-view-history", "D:/workspace", "7", "Chr01"],

@@ -176,6 +176,18 @@ async function runMainViewEditorActionTauri({
   });
 }
 
+async function runMainViewLayoutActionTauri({
+  workspaceRoot,
+  projectId,
+  chrName,
+  action,
+  args,
+}) {
+  return invokeCommand("run_main_view_layout_action", {
+    request: { workspaceRoot, projectId, chrName, action, args },
+  });
+}
+
 async function runMainViewBatchDeleteTauri({
   workspaceRoot,
   projectId,
@@ -271,6 +283,7 @@ async function appendEditAuditLogTauri({ workspaceRoot, projectId, category, act
     getMainViewHistoryStatus: getMainViewHistoryStatusTauri,
     inspectMainViewDelete: inspectMainViewDeleteTauri,
     runMainViewEditorAction: runMainViewEditorActionTauri,
+    runMainViewLayoutAction: runMainViewLayoutActionTauri,
     runMainViewBatchDelete: runMainViewBatchDeleteTauri,
     executeMainViewHistoryAction: executeMainViewHistoryActionTauri,
     getJunctionInspection: getJunctionInspectionTauri,

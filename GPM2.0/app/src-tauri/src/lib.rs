@@ -42,6 +42,7 @@ pub fn run() {
             commands::get_main_view_history_status,
             commands::inspect_main_view_delete,
             commands::run_main_view_editor_action,
+            commands::run_main_view_layout_action,
             commands::run_main_view_batch_delete,
             commands::undo_main_view_history,
             commands::redo_main_view_history,

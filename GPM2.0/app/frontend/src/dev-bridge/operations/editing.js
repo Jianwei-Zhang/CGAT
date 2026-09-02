@@ -267,6 +267,22 @@ async function runMainViewEditorAction(payload) {
   ]));
 }
 
+async function runMainViewLayoutAction(payload) {
+  const { workspaceRoot, projectId, chrName, action, args = {} } = payload || {};
+  requireString("workspaceRoot", workspaceRoot);
+  requireNumber("projectId", projectId);
+  requireString("chrName", chrName);
+  requireString("action", action);
+  return parseResultJson(await runBackend([
+    "run-main-view-layout-action",
+    workspaceRoot,
+    String(projectId),
+    chrName,
+    action,
+    JSON.stringify(args),
+  ]));
+}
+
 async function runMainViewBatchDelete(payload) {
   const { workspaceRoot, projectId, chrName, assemblyCtgIds } = payload || {};
   requireString("workspaceRoot", workspaceRoot);
@@ -452,6 +468,7 @@ function buildCtgEditorCommandArgs(action, workspaceRoot, projectId, args) {
     getMainViewHistoryStatus,
     inspectMainViewDelete,
     runMainViewEditorAction,
+    runMainViewLayoutAction,
     runMainViewBatchDelete,
     executeMainViewHistoryAction,
   };

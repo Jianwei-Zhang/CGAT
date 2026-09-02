@@ -651,6 +651,25 @@ pub fn run_main_view_editor_action(
 }
 
 #[tauri::command]
+pub fn run_main_view_layout_action(
+    request: RunMainViewLayoutActionCommandRequest,
+) -> CommandResult<Value> {
+    (|| {
+        let summary = backend_run_main_view_layout_action(
+            &project_db_path(&request.workspace_root),
+            &RunMainViewLayoutActionParams {
+                project_id: request.project_id,
+                chr_name: request.chr_name,
+                action: request.action,
+                args: request.args,
+            },
+        )?;
+        Ok(map_main_view_history_mutation(&summary))
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
 pub fn run_main_view_batch_delete(
     request: MainViewBatchDeleteCommandRequest,
 ) -> CommandResult<Value> {

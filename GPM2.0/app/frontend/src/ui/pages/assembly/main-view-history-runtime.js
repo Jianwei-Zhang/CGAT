@@ -70,80 +70,98 @@ export async function runMainViewHistoryControlAction(host, store, action, deps,
     },
   });
   deps.rerender(host, store);
-  try {
-    const result = await deps.executeMainViewHistoryAction({
-      workspaceRoot: state.session.workspacePath,
-      projectId: state.session.projectId,
-      chrName,
-      action: normalizedAction,
-    });
-    const status = normalizeMainViewHistoryStatus(result?.status, { chrName });
-    const affectedCtgIds = Array.isArray(result?.affectedCtgIds)
-      ? result.affectedCtgIds.map(Number).filter((id) => id > 0)
-      : [];
-    const operationKind = String(result?.operation?.kind || "").trim();
-    const operationSummary = describeHistoryOperation(store.getState(), result?.operation);
-    const isSingleTarget = affectedCtgIds.length === 1;
-    await deps.loadAssemblyView(host, store, {
-      keepCurrentChr: true,
-      keepCurrentCtg: true,
-      renderLoading: false,
-    });
-    const latest = store.getState();
-    const targetStillExists = isSingleTarget
-      && latest.assembly.chrCtgs.some(
-        (ctg) => Number(ctg?.assemblyCtgId) === Number(affectedCtgIds[0]),
-      );
-    const shouldLocate = targetStillExists && operationKind !== "reset";
-    const previousSelectionStillExists = previousSelectedCtgId > 0
-      && latest.assembly.chrCtgs.some(
-        (ctg) => Number(ctg?.assemblyCtgId) === previousSelectedCtgId,
-      );
-    const selectedCtgId = shouldLocate
-      ? affectedCtgIds[0]
-      : (previousSelectionStillExists ? previousSelectedCtgId : null);
-    const invalidated = result?.invalidated === true || status.invalidated;
-    store.setState({
-      assembly: {
-        ...latest.assembly,
-        mainViewHistory: status,
-        selectedCtgId,
-        historyHighlightCtgId: shouldLocate ? affectedCtgIds[0] : null,
-        trackSelectedCtgIds: [],
-        actionError: invalidated ? tAssembly(latest, "mainHistory.invalidated") : "",
-        actionStatus: invalidated
-          ? tAssembly(latest, "mainHistory.invalidated")
-          : tAssembly(latest, "mainHistory.done", {
-            action: tAssembly(latest, `mainHistory.actions.${normalizedAction}`),
-            operation: operationSummary,
-          }),
-      },
-    });
-    if (shouldLocate && typeof deps.setPendingTrackAutoFocusMode === "function") {
-      deps.setPendingTrackAutoFocusMode("start");
+  const run = async (isCurrent = () => true) => {
+    if (!isCurrent()) {
+      return false;
     }
-    deps.rerender(host, store);
-    if (shouldLocate && typeof deps.scheduleHighlightClear === "function") {
-      deps.scheduleHighlightClear(host, store, affectedCtgIds[0]);
-    }
-    return result?.changed === true;
-  } catch (error) {
-    const latest = store.getState();
-    const mapped = deps.mapAssemblyError({ error, stateOrLocale: latest });
-    store.setState({
-      assembly: {
-        ...latest.assembly,
-        mainViewHistory: {
-          ...normalizeMainViewHistoryStatus(latest.assembly.mainViewHistory, { chrName }),
-          inFlight: false,
+    try {
+      const result = await deps.executeMainViewHistoryAction({
+        workspaceRoot: state.session.workspacePath,
+        projectId: state.session.projectId,
+        chrName,
+        action: normalizedAction,
+      });
+      if (!isCurrent()) {
+        return false;
+      }
+      const status = normalizeMainViewHistoryStatus(result?.status, { chrName });
+      const affectedCtgIds = Array.isArray(result?.affectedCtgIds)
+        ? result.affectedCtgIds.map(Number).filter((id) => id > 0)
+        : [];
+      const operationKind = String(result?.operation?.kind || "").trim();
+      const operationSummary = describeHistoryOperation(store.getState(), result?.operation);
+      const isSingleTarget = affectedCtgIds.length === 1;
+      await deps.loadAssemblyView(host, store, {
+        keepCurrentChr: true,
+        keepCurrentCtg: true,
+        renderLoading: false,
+      });
+      if (!isCurrent()) {
+        return false;
+      }
+      const latest = store.getState();
+      const targetStillExists = isSingleTarget
+        && latest.assembly.chrCtgs.some(
+          (ctg) => Number(ctg?.assemblyCtgId) === Number(affectedCtgIds[0]),
+        );
+      const shouldLocate = targetStillExists && operationKind !== "reset";
+      const previousSelectionStillExists = previousSelectedCtgId > 0
+        && latest.assembly.chrCtgs.some(
+          (ctg) => Number(ctg?.assemblyCtgId) === previousSelectedCtgId,
+        );
+      const selectedCtgId = shouldLocate
+        ? affectedCtgIds[0]
+        : (previousSelectionStillExists ? previousSelectedCtgId : null);
+      const invalidated = result?.invalidated === true || status.invalidated;
+      store.setState({
+        assembly: {
+          ...latest.assembly,
+          mainViewHistory: status,
+          selectedCtgId,
+          historyHighlightCtgId: shouldLocate ? affectedCtgIds[0] : null,
+          trackSelectedCtgIds: [],
+          actionError: invalidated ? tAssembly(latest, "mainHistory.invalidated") : "",
+          actionStatus: invalidated
+            ? tAssembly(latest, "mainHistory.invalidated")
+            : tAssembly(latest, "mainHistory.done", {
+              action: tAssembly(latest, `mainHistory.actions.${normalizedAction}`),
+              operation: operationSummary,
+            }),
         },
-        actionError: mapped.userMessage,
-        actionStatus: tAssembly(latest, "mainHistory.failed"),
-      },
-    });
-    deps.rerender(host, store);
-    return false;
+      });
+      if (shouldLocate && typeof deps.setPendingTrackAutoFocusMode === "function") {
+        deps.setPendingTrackAutoFocusMode("start");
+      }
+      deps.rerender(host, store);
+      if (shouldLocate && typeof deps.scheduleHighlightClear === "function") {
+        deps.scheduleHighlightClear(host, store, affectedCtgIds[0]);
+      }
+      return result?.changed === true;
+    } catch (error) {
+      if (!isCurrent()) {
+        return false;
+      }
+      const latest = store.getState();
+      const mapped = deps.mapAssemblyError({ error, stateOrLocale: latest });
+      store.setState({
+        assembly: {
+          ...latest.assembly,
+          mainViewHistory: {
+            ...normalizeMainViewHistoryStatus(latest.assembly.mainViewHistory, { chrName }),
+            inFlight: false,
+          },
+          actionError: mapped.userMessage,
+          actionStatus: tAssembly(latest, "mainHistory.failed"),
+        },
+      });
+      deps.rerender(host, store);
+      return false;
+    }
+  };
+  if (typeof deps.runSerializedProjectViewMutation === "function") {
+    return deps.runSerializedProjectViewMutation(store, run);
   }
+  return run();
 }
 
 export function clearMainViewHistoryForUnavailableChr(assembly) {
