@@ -96,7 +96,7 @@ test("selectCtg preserves the current viewport when requested by track clicks", 
   assert.equal(rerenderCount, 2);
 });
 
-test("selectChromosome clears stale member and track data while loading a new chromosome", async () => {
+test("selectChromosome clears stale data while loading and restores target history", async () => {
   const host = {};
   let state = {
     session: {
@@ -121,6 +121,14 @@ test("selectChromosome clears stale member and track data while loading a new ch
       selectedMemberSeqId: 88,
       ctgDetail: { members: [{ assemblySeqId: 88 }] },
       editCandidates: { moveTargetCtgs: [{ assemblyCtgId: 199 }], addSeqCandidates: [] },
+      mainViewHistory: {
+        chrName: "Chr09",
+        canUndo: true,
+        canRedo: false,
+        canReset: true,
+        undoOperation: { kind: "rename-ctg", targetCount: 1, targetName: "old" },
+        appliedOperationCount: 1,
+      },
       subview: { summary: { mode: "ctg" }, trackPairHiddenCtgs: [], trackPairSelectedCtgs: [] },
     },
   };
@@ -145,6 +153,24 @@ test("selectChromosome clears stale member and track data while loading a new ch
     },
     getCurrentProject(currentState) {
       return currentState.initializer.existingProjects[0];
+    },
+    async getMainViewHistoryStatus(payload) {
+      assert.deepEqual(payload, {
+        workspaceRoot: "/tmp/ws",
+        projectId: 9,
+        chrName: "Chr10",
+      });
+      return {
+        projectId: 9,
+        referenceChrId: 10,
+        chrName: "Chr10",
+        canUndo: true,
+        canRedo: false,
+        canReset: true,
+        undoOperation: { kind: "flip-ctg", targetCount: 1, targetName: "Ctg8" },
+        appliedOperationCount: 1,
+        retainedOperationCount: 1,
+      };
     },
     async listChrViewCtgs() {
       return pending;
@@ -173,10 +199,25 @@ test("selectChromosome clears stale member and track data while loading a new ch
   assert.deepEqual(state.assembly.deletedCtgs, []);
   assert.equal(state.assembly.selectedCtgId, null);
   assert.equal(state.assembly.ctgDetail, null);
+  assert.equal(state.assembly.mainViewHistory.canUndo, false);
 
   resolveChrCtgs({ items: [{ assemblyCtgId: 8, name: "ptg000008l@Chr10" }] });
   await loadPromise;
   assert.deepEqual(state.assembly.chrCtgs, [{ assemblyCtgId: 8, name: "ptg000008l@Chr10" }]);
+  assert.deepEqual(state.assembly.mainViewHistory, {
+    projectId: 9,
+    referenceChrId: 10,
+    chrName: "Chr10",
+    canUndo: true,
+    canRedo: false,
+    canReset: true,
+    undoOperation: { kind: "flip-ctg", targetCount: 1, targetName: "Ctg8" },
+    redoOperation: null,
+    appliedOperationCount: 1,
+    retainedOperationCount: 1,
+    invalidated: false,
+    inFlight: false,
+  });
 });
 
 test("selectChromosome ignores stale chromosome responses after a newer selection", async () => {

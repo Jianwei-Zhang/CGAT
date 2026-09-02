@@ -871,6 +871,7 @@ export async function selectChromosome(host, store, chrName, deps) {
       assembly: {
         ...store.getState().assembly,
         loading: false,
+        mainViewHistory,
         chrCtgs: annotatedPrimaryCtgs,
         phasedChrTracks,
         isChrPhased,
