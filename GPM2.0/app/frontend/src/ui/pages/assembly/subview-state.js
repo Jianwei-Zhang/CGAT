@@ -145,6 +145,7 @@ function buildSupportMirrorCtgPool({
             ?? (startBp + lengthBp - 1),
         ),
         laneIndex: Math.max(0, normalizeNonNegativeInt(source?.laneIndex) ?? entry.laneIndex ?? 0),
+        orient: resolveSubviewCtgOrientValue(source),
         hits: liveCtg && Array.isArray(liveCtg?.hits) ? cloneHits(liveCtg.hits) : cloneHits(entry.hits),
         subviewSource: "mirror",
       };

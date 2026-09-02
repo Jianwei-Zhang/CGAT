@@ -231,6 +231,102 @@ fn batch_delete_and_dependencies_round_trip_atomically() -> Result<()> {
 }
 
 #[test]
+fn project_view_metadata_changes_do_not_invalidate_delete_history() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let db_path = temp_dir.path().join("project.sqlite");
+    seed_workspace(&db_path)?;
+    Connection::open(&db_path)?.execute(
+        "INSERT INTO project_assembly_view_state
+         (project_id, final_path_by_chr_json, degap_project_state_json, updated_at)
+         VALUES (1, ?1, '{}', 'initial')",
+        params![json!({"Chr01":{"segments":[{"assemblyCtgId":301}]}}).to_string()],
+    )?;
+    let request = RunMainViewBatchDeleteParams {
+        project_id: 1,
+        chr_name: "Chr01".to_string(),
+        assembly_ctg_ids: vec![301],
+    };
+
+    run_main_view_batch_delete(&db_path, &request)?;
+    Connection::open(&db_path)?.execute(
+        "UPDATE project_assembly_view_state
+         SET updated_at = 'viewport-write-1', note = 'scroll-1'
+         WHERE project_id = 1",
+        [],
+    )?;
+    let undone = undo_main_view_history(&db_path, &target("Chr01"))?;
+    assert!(undone.changed);
+    assert!(!undone.invalidated);
+
+    Connection::open(&db_path)?.execute(
+        "UPDATE project_assembly_view_state
+         SET updated_at = 'viewport-write-2', note = 'scroll-2'
+         WHERE project_id = 1",
+        [],
+    )?;
+    let redone = redo_main_view_history(&db_path, &target("Chr01"))?;
+    assert!(redone.changed);
+    assert!(!redone.invalidated);
+
+    Connection::open(&db_path)?.execute(
+        "UPDATE project_assembly_view_state
+         SET updated_at = 'viewport-write-3', note = 'scroll-3'
+         WHERE project_id = 1",
+        [],
+    )?;
+    let reset = reset_main_view_history(&db_path, &target("Chr01"))?;
+    assert!(reset.changed);
+    assert!(!reset.invalidated);
+
+    let conn = Connection::open(&db_path)?;
+    assert_eq!(count(&conn, "assembly_ctg", "id = 301")?, 1);
+    let metadata: (String, Option<String>) = conn.query_row(
+        "SELECT updated_at, note FROM project_assembly_view_state WHERE project_id = 1",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    assert_ne!(metadata.0, "viewport-write-3");
+    assert_eq!(metadata.1.as_deref(), Some("scroll-3"));
+    Ok(())
+}
+
+#[test]
+fn project_view_business_change_still_invalidates_delete_history() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let db_path = temp_dir.path().join("project.sqlite");
+    seed_workspace(&db_path)?;
+    Connection::open(&db_path)?.execute(
+        "INSERT INTO project_assembly_view_state
+         (project_id, final_path_by_chr_json, degap_project_state_json, updated_at)
+         VALUES (1, ?1, '{}', 'initial')",
+        params![json!({"Chr01":{"segments":[{"assemblyCtgId":301}]}}).to_string()],
+    )?;
+    run_main_view_batch_delete(
+        &db_path,
+        &RunMainViewBatchDeleteParams {
+            project_id: 1,
+            chr_name: "Chr01".to_string(),
+            assembly_ctg_ids: vec![301],
+        },
+    )?;
+    Connection::open(&db_path)?.execute(
+        "UPDATE project_assembly_view_state
+         SET final_path_by_chr_json = '{\"external\":true}'
+         WHERE project_id = 1",
+        [],
+    )?;
+
+    let undo = undo_main_view_history(&db_path, &target("Chr01"))?;
+    assert!(!undo.changed);
+    assert!(undo.invalidated);
+    assert_eq!(
+        count(&Connection::open(&db_path)?, "assembly_ctg", "id = 301")?,
+        0
+    );
+    Ok(())
+}
+
+#[test]
 fn external_change_invalidates_only_target_chromosome_history() -> Result<()> {
     let temp_dir = tempfile::tempdir()?;
     let db_path = temp_dir.path().join("project.sqlite");

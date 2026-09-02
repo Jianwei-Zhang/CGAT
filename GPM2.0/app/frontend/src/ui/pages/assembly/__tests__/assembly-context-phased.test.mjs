@@ -1092,7 +1092,7 @@ test("toggling support mirror persists project-scoped mirrored ctgs", async () =
         { assemblyCtgId: 8, name: "ctg-primary", totalLength: 500, anchorStart: 0, startBp: 0, endBp: 499 },
       ],
       supportChrCtgs: [
-        { assemblyCtgId: 30, name: "ctg-mirror", totalLength: 300, anchorStart: 320, startBp: 0, endBp: 299, laneIndex: 0 },
+        { assemblyCtgId: 30, name: "ctg-mirror", totalLength: 300, anchorStart: 320, startBp: 0, endBp: 299, laneIndex: 0, orient: "-" },
       ],
       supportMirroredCtgs: [],
     },
@@ -1133,6 +1133,7 @@ test("toggling support mirror persists project-scoped mirrored ctgs", async () =
   );
 
   assert.equal(store.getState().assembly.supportMirroredCtgs.length, 1);
+  assert.equal(store.getState().assembly.supportMirroredCtgs[0].orient, "-");
   assert.deepEqual(persisted, [
     {
       workspaceRoot: "/tmp/ws",

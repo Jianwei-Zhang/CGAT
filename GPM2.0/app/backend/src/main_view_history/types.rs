@@ -156,8 +156,6 @@ pub(super) struct ProjectViewDependencyRow {
     pub project_id: i64,
     pub final_path_by_chr_json: String,
     pub degap_project_state_json: String,
-    pub updated_at: String,
-    pub note: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]

@@ -2669,6 +2669,7 @@ function buildSupportMirroredCtgsForRender({
           normalizePositiveInt(liveCtg?.endBp) ?? (liveStart + liveLength - 1),
         ),
         laneIndex: Math.max(0, normalizeNonNegativeInt(liveCtg?.laneIndex ?? entry.laneIndex) ?? entry.laneIndex),
+        orient: resolveTrackCtgOrientValue(liveCtg),
         hits: Array.isArray(liveCtg?.hits)
           ? liveCtg.hits.map((hit) => ({ ...hit }))
         : (Array.isArray(entry?.hits) ? entry.hits.map((hit) => ({ ...hit })) : []),

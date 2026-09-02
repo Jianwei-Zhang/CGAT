@@ -120,6 +120,7 @@ test("track drag offsets also shift support-track ctg bars and their hit bands",
             memberCount: 1,
             totalLength: 1_000_000,
             anchorStart: 110,
+            orient: "-",
             hits: [
               {
                 refStart: 12_000,
@@ -706,6 +707,7 @@ test("support mirror tracks keep filled bars, share drag offset, and reserve equ
             memberCount: 1,
             totalLength: 1_000_000,
             anchorStart: 110,
+            orient: "-",
           },
         ],
         supportMirroredCtgs: [
@@ -734,6 +736,7 @@ test("support mirror tracks keep filled bars, share drag offset, and reserve equ
             startBp: 0,
             endBp: 999_999,
             laneIndex: 0,
+            orient: "+",
           },
         ],
       },
@@ -747,6 +750,10 @@ test("support mirror tracks keep filled bars, share drag offset, and reserve equ
   assert.match(baseHtml, /wtdbg2-镜像轨道/);
   assert.match(baseHtml, /class="track-ctg [^"]*is-mirror[^"]*is-companion[^"]*"/);
   assert.match(baseHtml, /data-track-is-mirror="1"/);
+  assert.match(
+    baseHtml,
+    /data-track-contig-id="30" data-track-role="support"[^>]*data-track-is-mirror="1"[^>]*data-track-ref-orient="-"/,
+  );
   assert.doesNotMatch(baseHtml, /data-band-track-role="support"[^>]*data-band-contig-id="330"/);
   const primaryLabelIndex = baseHtml.indexOf("主(hifiasm)");
   const firstMirrorLabelIndex = baseHtml.indexOf("wtdbg2-镜像轨道");

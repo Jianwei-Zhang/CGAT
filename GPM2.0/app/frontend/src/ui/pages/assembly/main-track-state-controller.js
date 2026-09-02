@@ -332,6 +332,7 @@ export function createMainTrackStateController({
             - 1),
       ),
       laneIndex: Math.max(0, normalizeNonNegativeInt(liveCtg?.laneIndex) ?? 0),
+      orient: liveCtg?.orient ?? liveCtg?.refOrient ?? liveCtg?.ref_orient,
       hits: Array.isArray(liveCtg?.hits) ? liveCtg.hits.map((hit) => ({ ...hit })) : [],
     });
   }

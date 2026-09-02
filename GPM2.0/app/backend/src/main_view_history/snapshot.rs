@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, OptionalExtension, params};
 
+use super::now_timestamp_string;
 use super::types::{
     AssemblyCtgRow, AssemblySeqRow, DatabaseSnapshot, DeletedAssemblyCtgRow, ExportRecordRow,
     PhasedTrackItemRow, PhasedTrackRow, ProjectViewDependencyRow, SnapshotScope,
@@ -551,8 +552,7 @@ fn load_project_view_dependency(
     project_id: i64,
 ) -> Result<Option<ProjectViewDependencyRow>> {
     conn.query_row(
-        "SELECT project_id, final_path_by_chr_json, degap_project_state_json,
-                updated_at, note
+        "SELECT project_id, final_path_by_chr_json, degap_project_state_json
          FROM project_assembly_view_state WHERE project_id = ?1",
         params![project_id],
         |row| {
@@ -560,8 +560,6 @@ fn load_project_view_dependency(
                 project_id: row.get(0)?,
                 final_path_by_chr_json: row.get(1)?,
                 degap_project_state_json: row.get(2)?,
-                updated_at: row.get(3)?,
-                note: row.get(4)?,
             })
         },
     )
@@ -634,14 +632,12 @@ fn reconcile_project_view_dependency(
                 "UPDATE project_assembly_view_state
                  SET final_path_by_chr_json = ?1,
                      degap_project_state_json = ?2,
-                     updated_at = ?3,
-                     note = ?4
-                 WHERE project_id = ?5",
+                     updated_at = ?3
+                 WHERE project_id = ?4",
                 params![
                     row.final_path_by_chr_json,
                     row.degap_project_state_json,
-                    row.updated_at,
-                    row.note,
+                    now_timestamp_string(),
                     project_id,
                 ],
             )?;

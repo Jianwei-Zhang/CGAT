@@ -487,6 +487,7 @@ const {
   getCurrentProject,
   loadDeletedCtgsForChr: (workspaceRoot, projectId, chrName, datasetId) =>
     loadDeletedCtgsForChr(workspaceRoot, projectId, chrName, datasetId),
+  loadProjectAssemblyViewState: (args) => loadProjectAssemblyViewStateImpl(args),
   patchAssemblyStatusToast,
   patchDeletedPrimaryTrackCtgsDom,
   replaceRenderedAssemblySection,

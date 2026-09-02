@@ -349,6 +349,7 @@ test("buildSubviewTrackPairPoolsFromAssembly backfills mirror hits from the acti
         name: "live-support",
         totalLength: 12000,
         anchorStart: 320,
+        orient: "-",
         hits: [
           { refStart: 1000, refEnd: 2400, ctgStart: 200, ctgEnd: 1600, blockLength: 1400, mapq: 60 },
         ],
@@ -365,6 +366,7 @@ test("buildSubviewTrackPairPoolsFromAssembly backfills mirror hits from the acti
         startBp: 0,
         endBp: 11999,
         anchorStart: 960,
+        orient: "+",
         hits: [],
       },
     ],
@@ -378,6 +380,7 @@ test("buildSubviewTrackPairPoolsFromAssembly backfills mirror hits from the acti
   );
 
   assert.equal(pools.supportMirrorCtgs.length, 1);
+  assert.equal(pools.supportMirrorCtgs[0].orient, "-");
   assert.deepEqual(pools.supportMirrorCtgs[0].hits, [
     { refStart: 1000, refEnd: 2400, ctgStart: 200, ctgEnd: 1600, blockLength: 1400, mapq: 60 },
   ]);

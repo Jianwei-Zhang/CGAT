@@ -95,6 +95,9 @@ export function normalizeSupportMirrorEntry(entry) {
   const startBp = Math.max(0, normalizeNonNegativeInt(entry?.startBp) ?? 0);
   const resolvedEndBp = Math.max(1, normalizePositiveInt(entry?.endBp) ?? (startBp + lengthBp - 1));
   const laneIndex = Math.max(0, normalizeNonNegativeInt(entry?.laneIndex) ?? 0);
+  const orient = String(
+    (entry?.orient ?? entry?.refOrient ?? entry?.ref_orient) || "",
+  ).trim() === "-" ? "-" : "+";
   const hits = Array.isArray(entry?.hits)
     ? entry.hits
       .filter((hit) => hit && typeof hit === "object")
@@ -113,6 +116,7 @@ export function normalizeSupportMirrorEntry(entry) {
     startBp,
     endBp: resolvedEndBp,
     laneIndex,
+    orient,
     hits,
     isSelected: Boolean(entry?.isSelected),
   };

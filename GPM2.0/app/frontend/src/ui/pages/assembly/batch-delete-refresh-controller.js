@@ -40,6 +40,7 @@ export function createBatchDeleteRefreshController({
   createRenderedAssemblyMainTabContent,
   getCurrentProject,
   loadDeletedCtgsForChr,
+  loadProjectAssemblyViewState,
   patchAssemblyStatusToast,
   patchDeletedPrimaryTrackCtgsDom,
   replaceRenderedAssemblySection,
@@ -53,8 +54,33 @@ export function createBatchDeleteRefreshController({
       state.assembly,
     );
     const deletedIdSet = new Set(deletedIds);
-    const currentChrCtgs = Array.isArray(state.assembly?.chrCtgs)
-      ? state.assembly.chrCtgs
+    const currentProject = getCurrentProject(state);
+    const primaryDatasetId = normalizeSupportDatasetId(currentProject?.primaryDatasetId);
+    const requestWorkspacePath = state.session.workspacePath;
+    const requestProjectId = state.session.projectId;
+    const requestChrName = state.assembly.selectedChrName;
+    const [deletedCtgs, persistedViewState] = await Promise.all([
+      loadDeletedCtgsForChr(
+        requestWorkspacePath,
+        requestProjectId,
+        requestChrName,
+        primaryDatasetId,
+      ),
+      loadProjectAssemblyViewState({
+        workspaceRoot: requestWorkspacePath,
+        projectId: requestProjectId,
+      }),
+    ]);
+    const latestState = store.getState();
+    if (
+      latestState.session.workspacePath !== requestWorkspacePath
+      || latestState.session.projectId !== requestProjectId
+      || latestState.assembly.selectedChrName !== requestChrName
+    ) {
+      return;
+    }
+    const currentChrCtgs = Array.isArray(latestState.assembly?.chrCtgs)
+      ? latestState.assembly.chrCtgs
       : [];
     const removedCtgs = currentChrCtgs.filter(
       (ctg) => deletedIdSet.has(Number(ctg?.assemblyCtgId || 0)),
@@ -62,54 +88,48 @@ export function createBatchDeleteRefreshController({
     const nextChrCtgs = currentChrCtgs.filter(
       (ctg) => !deletedIdSet.has(Number(ctg?.assemblyCtgId || 0)),
     );
-    const currentProject = getCurrentProject(state);
-    const primaryDatasetId = normalizeSupportDatasetId(currentProject?.primaryDatasetId);
-    const deletedCtgs = await loadDeletedCtgsForChr(
-      state.session.workspacePath,
-      state.session.projectId,
-      state.assembly.selectedChrName,
-      primaryDatasetId,
-    );
     const selectedCtgWasDeleted = deletedIdSet.has(
-      Number(state.assembly?.selectedCtgId || 0),
+      Number(latestState.assembly?.selectedCtgId || 0),
     );
     const nextAssemblyBase = {
-      ...state.assembly,
+      ...latestState.assembly,
       chromosomes: updateChromosomeSummariesAfterLocalDelete(
-        state.assembly?.chromosomes,
-        state.assembly?.selectedChrName,
+        latestState.assembly?.chromosomes,
+        latestState.assembly?.selectedChrName,
         removedCtgs,
       ),
       chrCtgs: nextChrCtgs,
       deletedCtgs,
+      finalPathByChr: persistedViewState.finalPathByChr,
+      degapProjectState: persistedViewState.degapProjectState,
       selectedDeletedCtgRecordIds: [],
       trackSelectedCtgIds: [],
       hiddenPrimaryCtgIds: filterPrimaryTrackSelectionCtgIds(
-        state.assembly?.hiddenPrimaryCtgIds,
-        { ...state.assembly, chrCtgs: nextChrCtgs },
+        latestState.assembly?.hiddenPrimaryCtgIds,
+        { ...latestState.assembly, chrCtgs: nextChrCtgs },
       ),
-      selectedCtgId: selectedCtgWasDeleted ? null : state.assembly?.selectedCtgId,
-      selectedMemberSeqId: selectedCtgWasDeleted ? null : state.assembly?.selectedMemberSeqId,
-      ctgDetail: selectedCtgWasDeleted ? null : state.assembly?.ctgDetail,
+      selectedCtgId: selectedCtgWasDeleted ? null : latestState.assembly?.selectedCtgId,
+      selectedMemberSeqId: selectedCtgWasDeleted ? null : latestState.assembly?.selectedMemberSeqId,
+      ctgDetail: selectedCtgWasDeleted ? null : latestState.assembly?.ctgDetail,
       editCandidates: selectedCtgWasDeleted
         ? { moveTargetCtgs: [], addSeqCandidates: [] }
-        : state.assembly?.editCandidates,
+        : latestState.assembly?.editCandidates,
       subview: deletedIds.length
-        ? buildClearedSubviewState(state.assembly)
-        : state.assembly?.subview,
+        ? buildClearedSubviewState(latestState.assembly)
+        : latestState.assembly?.subview,
       subviewTrackDragOffsets: deletedIds.length
         ? []
-        : state.assembly?.subviewTrackDragOffsets,
+        : latestState.assembly?.subviewTrackDragOffsets,
     };
     const nextAssembly = {
       ...nextAssemblyBase,
       trackDragOffsets: filterTrackDragOffsets(
-        state.assembly?.trackDragOffsets,
+        latestState.assembly?.trackDragOffsets,
         nextAssemblyBase,
       ),
     };
     store.setState({
-      ...state,
+      ...latestState,
       assembly: nextAssembly,
     });
 
