@@ -11,6 +11,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $FrontendRoot = Join-Path $ProjectRoot "app/frontend"
 $BackendRoot = Join-Path $ProjectRoot "app/backend"
 $TauriRoot = Join-Path $ProjectRoot "app/src-tauri"
+$IconVerifier = Join-Path $ProjectRoot "scripts/verify-windows-icon.ps1"
 
 function Invoke-Checked {
     param(
@@ -57,5 +58,18 @@ Invoke-Checked "Tauri clippy" $TauriRoot "cargo" @(
 Invoke-Checked "Tauri tests" $TauriRoot "cargo" @(
     "test", "--locked", "--no-default-features"
 )
+Invoke-Checked "Tauri app build" $TauriRoot "cargo" @(
+    "build", "--locked", "--no-default-features"
+)
+
+Write-Host "::group::Windows application icon"
+try {
+    & $IconVerifier `
+        -ExpectedIcon (Join-Path $TauriRoot "icons/icon.ico") `
+        -ExecutablePath (Join-Path $TauriRoot "target/debug/gpm_next_desktop.exe")
+}
+finally {
+    Write-Host "::endgroup::"
+}
 
 Write-Host "GPM2.0 Windows quality gate passed."

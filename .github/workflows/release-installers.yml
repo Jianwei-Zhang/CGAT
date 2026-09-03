@@ -168,6 +168,35 @@ jobs:
           if errorlevel 1 exit /b %errorlevel%
           tauri build --bundles nsis --target ${{ matrix.target }}
 
+      - name: Verify Windows icons
+        env:
+          TARGET: ${{ matrix.target }}
+          TAURI_ARCH: ${{ matrix.tauri_arch }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $appExecutable = "GPM2.0/app/src-tauri/target/${env:TARGET}/release/gpm_next_desktop.exe"
+          $installers = @(
+            Get-ChildItem -Path "GPM2.0/app/src-tauri/target" -Recurse -Filter "*.exe" |
+              Where-Object {
+                $_.FullName -like "*\bundle\nsis\*" -and
+                $_.Name -like "*_${env:TAURI_ARCH}-setup.exe"
+              } |
+              Sort-Object FullName
+          )
+
+          if ($installers.Count -ne 1) {
+            Write-Error "Expected exactly one Windows installer for $env:TAURI_ARCH, found $($installers.Count): $($installers.FullName -join ', ')"
+          }
+
+          & "GPM2.0/scripts/verify-windows-icon.ps1" `
+            -ExpectedIcon "GPM2.0/app/src-tauri/icons/icon.ico" `
+            -ExecutablePath @($appExecutable, $installers[0].FullName)
+
+          "WINDOWS_INSTALLER_PATH=$($installers[0].FullName)" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Upload Windows installer
         env:
           GH_TOKEN: ${{ github.token }}
@@ -175,24 +204,17 @@ jobs:
           VERSION: ${{ needs.prepare-release.outputs.version }}
           BUILD_TIMESTAMP: ${{ needs.prepare-release.outputs.build_timestamp }}
           ASSET_PLATFORM: ${{ matrix.asset_platform }}
-          TAURI_ARCH: ${{ matrix.tauri_arch }}
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
 
-          $installers = Get-ChildItem -Path "GPM2.0/app/src-tauri/target" -Recurse -Filter "*.exe" |
-            Where-Object {
-              $_.FullName -like "*\bundle\nsis\*" -and
-              $_.Name -like "*_${env:TAURI_ARCH}-setup.exe"
-            } |
-            Sort-Object FullName
-
-          if ($installers.Count -ne 1) {
-            Write-Error "Expected exactly one Windows installer for $env:TAURI_ARCH, found $($installers.Count): $($installers.FullName -join ', ')"
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_INSTALLER_PATH) -or
+              -not (Test-Path -LiteralPath $env:WINDOWS_INSTALLER_PATH -PathType Leaf)) {
+            Write-Error "Verified Windows installer path is missing: $env:WINDOWS_INSTALLER_PATH"
           }
 
           $asset = "GPM_${env:VERSION}_${env:BUILD_TIMESTAMP}_${env:ASSET_PLATFORM}_setup.exe"
-          Copy-Item -LiteralPath $installers[0].FullName -Destination $asset -Force
+          Copy-Item -LiteralPath $env:WINDOWS_INSTALLER_PATH -Destination $asset -Force
           gh release upload $env:TAG_NAME $asset --clobber
 
   build-macos:

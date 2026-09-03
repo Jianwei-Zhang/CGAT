@@ -38,6 +38,11 @@
       "icons/icon.ico",
       "icons/icon.png"
     ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico"
+      }
+    },
     "macOS": {
       "signingIdentity": "-"
     }
