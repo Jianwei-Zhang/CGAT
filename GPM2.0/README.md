@@ -138,6 +138,12 @@ Use a rebuilt full package for a new desktop workspace or a complete re-import. 
 
 Download the installer for the client architecture from [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases), then import either delivery archive.
 
+The macOS app is ad-hoc signed and is not Apple-notarized. Drag `GPM2.0.app` to `/Applications` before opening it. If macOS blocks the first launch, open **System Settings -> Privacy & Security** and choose **Open Anyway**. If that control is unavailable, run the following command only for an app downloaded from this project's official GitHub Release:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/GPM2.0.app
+```
+
 The package preserves the primary and support dataset roles established during GRT processing and loads the Server-precomputed Final Path. Project-level paths remain editable and can continue into DEGAP or export.
 
 ### Export Final Path FASTA from a no-FASTA package

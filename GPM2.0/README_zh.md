@@ -138,6 +138,12 @@ bash ./gpm_server/package_light_no_fasta_zip.sh
 
 从 [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases) 下载与客户端架构匹配的安装包，然后导入任一服务端交付包。
 
+macOS App 使用 ad-hoc 签名，未经 Apple 公证。请先将 `GPM2.0.app` 拖入 `/Applications` 再打开。如果 macOS 阻止首次启动，请进入 **系统设置 -> 隐私与安全性** 并选择 **仍要打开**。如果该控件不可用，仅对从本项目官方 GitHub Release 下载的 App 执行：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/GPM2.0.app
+```
+
 交付包保留 GRT 计算时确定的主 ds 与辅 ds 角色，并直接载入服务端预计算的 Final Path。项目级路径仍可编辑，并可继续进入 DEGAP 或导出流程。
 
 ### 从无 FASTA 包导出 Final Path FASTA

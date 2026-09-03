@@ -206,9 +206,11 @@ jobs:
           - runner: macos-15-intel
             target: x86_64-apple-darwin
             asset_platform: mac-x86
-          - runner: macos-latest
+            expected_arch: x86_64
+          - runner: macos-15
             target: aarch64-apple-darwin
             asset_platform: mac-arm64
+            expected_arch: arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -241,6 +243,81 @@ jobs:
         working-directory: GPM2.0/app/src-tauri
         run: tauri build --bundles dmg --target ${{ matrix.target }}
 
+      - name: Verify macOS installer
+        env:
+          EXPECTED_ARCH: ${{ matrix.expected_arch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dmg_count=0
+          dmg=""
+          while IFS= read -r candidate; do
+            [[ -n "$candidate" ]] || continue
+            dmg_count=$((dmg_count + 1))
+            dmg="$candidate"
+          done < <(find GPM2.0/app/src-tauri/target -path "*/release/bundle/dmg/*.dmg" -type f | sort)
+          if (( dmg_count != 1 )); then
+            printf 'Expected exactly one DMG, found %s:\n' "$dmg_count" >&2
+            find GPM2.0/app/src-tauri/target -path "*/release/bundle/dmg/*.dmg" -type f | sort >&2
+            exit 1
+          fi
+
+          hdiutil verify "$dmg"
+
+          mount_dir="$(mktemp -d)"
+          mounted=false
+          cleanup_mount() {
+            if [[ "$mounted" == "true" ]]; then
+              hdiutil detach "$mount_dir"
+            fi
+            rmdir "$mount_dir"
+          }
+          trap cleanup_mount EXIT
+
+          hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$mount_dir"
+          mounted=true
+
+          app_count=0
+          app=""
+          for candidate in "$mount_dir"/*.app; do
+            if [[ -d "$candidate" ]]; then
+              app_count=$((app_count + 1))
+              app="$candidate"
+            fi
+          done
+          if (( app_count != 1 )); then
+            printf 'Expected exactly one top-level app bundle, found %s.\n' "$app_count" >&2
+            exit 1
+          fi
+
+          codesign --verify --deep --strict --verbose=2 "$app"
+          signature_details="$(codesign -d --verbose=4 "$app" 2>&1)"
+          printf '%s\n' "$signature_details"
+          if ! grep -Fxq 'Signature=adhoc' <<< "$signature_details"; then
+            printf 'Expected an ad-hoc app signature.\n' >&2
+            exit 1
+          fi
+
+          executable="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")"
+          executable_path="$app/Contents/MacOS/$executable"
+          if [[ ! -f "$executable_path" ]]; then
+            printf 'Bundle executable not found: %s\n' "$executable_path" >&2
+            exit 1
+          fi
+
+          actual_arch="$(lipo -archs "$executable_path")"
+          if [[ "$actual_arch" != "$EXPECTED_ARCH" ]]; then
+            printf 'Expected executable architecture %s, found %s.\n' "$EXPECTED_ARCH" "$actual_arch" >&2
+            exit 1
+          fi
+
+          hdiutil detach "$mount_dir"
+          mounted=false
+          rmdir "$mount_dir"
+          trap - EXIT
+          printf 'DMG_PATH=%s\n' "$dmg" >> "$GITHUB_ENV"
+
       - name: Upload macOS installer
         env:
           GH_TOKEN: ${{ github.token }}
@@ -252,16 +329,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          dmgs=()
-          while IFS= read -r dmg; do
-            dmgs+=("$dmg")
-          done < <(find GPM2.0/app/src-tauri/target -path "*/release/bundle/dmg/*.dmg" -type f | sort)
-          if (( ${#dmgs[@]} != 1 )); then
-            printf 'Expected exactly one DMG, found %s:\n' "${#dmgs[@]}" >&2
-            printf '%s\n' "${dmgs[@]}" >&2
+          if [[ -z "${DMG_PATH:-}" || ! -f "$DMG_PATH" ]]; then
+            printf 'Verified DMG path is missing: %s\n' "${DMG_PATH:-<unset>}" >&2
             exit 1
           fi
 
           asset="GPM_${VERSION}_${BUILD_TIMESTAMP}_${ASSET_PLATFORM}_installer.dmg"
-          cp "${dmgs[0]}" "$asset"
+          cp "$DMG_PATH" "$asset"
           gh release upload "$TAG_NAME" "$asset" --clobber
+
+          download_dir="$(mktemp -d)"
+          cleanup_download() {
+            rm -rf "$download_dir"
+          }
+          trap cleanup_download EXIT
+          gh release download "$TAG_NAME" --pattern "$asset" --dir "$download_dir"
+          cmp "$asset" "$download_dir/$asset"
