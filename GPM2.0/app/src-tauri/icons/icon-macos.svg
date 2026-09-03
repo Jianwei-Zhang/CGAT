@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="background" x1="144" y1="96" x2="880" y2="928" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F3F7FA"/>
+      <stop offset="1" stop-color="#D6E3EC"/>
+    </linearGradient>
+    <radialGradient id="highlight" cx="0" cy="0" r="1" gradientTransform="translate(316 226) rotate(44) scale(668 610)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="mark-shadow" x="-20%" y="-20%" width="140%" height="150%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0.225" stdDeviation="0.2" flood-color="#294759" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#background)"/>
+  <rect width="1024" height="1024" fill="url(#highlight)"/>
+
+  <g filter="url(#mark-shadow)" transform="translate(192 192) scale(80)">
+    <path fill="#003366" d="M4 0 5 1 4 2 3 1Z"/>
+    <path fill="#cc0033" d="M0 2h2l1 1 1-1 1 1 1-1h2L5 5 4 4 3 5Z"/>
+    <path fill="#003366" d="M3 5 4 6 3 7 2 6Zm2 0 1 1-1 1-1-1ZM3 7l1 1H2Zm2 0 1 1H4Z"/>
+  </g>
+</svg>

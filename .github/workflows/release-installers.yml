@@ -291,6 +291,23 @@ jobs:
             exit 1
           fi
 
+          expected_icon="GPM2.0/app/src-tauri/icons/icon-macos.icns"
+          expected_icon_name="$(basename "$expected_icon")"
+          bundled_icon_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$app/Contents/Info.plist")"
+          if [[ "$bundled_icon_name" != "$expected_icon_name" ]]; then
+            printf 'Expected CFBundleIconFile %s, found %s.\n' "$expected_icon_name" "$bundled_icon_name" >&2
+            exit 1
+          fi
+          bundled_icon="$app/Contents/Resources/$bundled_icon_name"
+          if [[ ! -f "$bundled_icon" ]]; then
+            printf 'Bundled macOS icon not found: %s\n' "$bundled_icon" >&2
+            exit 1
+          fi
+          if ! cmp "$expected_icon" "$bundled_icon"; then
+            printf 'Bundled macOS icon does not match %s.\n' "$expected_icon" >&2
+            exit 1
+          fi
+
           codesign --verify --deep --strict --verbose=2 "$app"
           signature_details="$(codesign -d --verbose=4 "$app" 2>&1)"
           printf '%s\n' "$signature_details"

@@ -7,6 +7,7 @@
 *.jpeg binary
 *.gif binary
 *.ico binary
+*.icns binary
 *.webp binary
 *.pdf binary
 *.zip binary

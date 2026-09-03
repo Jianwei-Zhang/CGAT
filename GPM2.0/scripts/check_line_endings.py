@@ -12,6 +12,7 @@ BINARY_SUFFIXES = {
     ".docx",
     ".gif",
     ".ico",
+    ".icns",
     ".jpeg",
     ".jpg",
     ".pdf",
