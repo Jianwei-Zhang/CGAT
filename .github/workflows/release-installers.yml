@@ -166,7 +166,14 @@ jobs:
           )
           call "%VSINSTALL%\VC\Auxiliary\Build\vcvarsall.bat" ${{ matrix.vcvars_arg }}
           if errorlevel 1 exit /b %errorlevel%
-          tauri build --bundles nsis --target ${{ matrix.target }}
+          for /l %%A in (1,1,3) do (
+            echo Tauri NSIS build attempt %%A of 3.
+            tauri build --bundles nsis --target ${{ matrix.target }}
+            if not errorlevel 1 goto :tauri_build_succeeded
+            if %%A equ 3 exit /b 1
+            powershell.exe -NoLogo -NoProfile -Command "Start-Sleep -Seconds 15"
+          )
+          :tauri_build_succeeded
 
       - name: Verify Windows icons
         env:
