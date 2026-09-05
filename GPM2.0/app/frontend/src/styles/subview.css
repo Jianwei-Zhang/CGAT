@@ -59,6 +59,135 @@
   margin: 0;
 }
 
+.subview-tools-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.subview-tools-toggle svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 1.3;
+}
+
+.subview-tools-window {
+  position: fixed;
+  z-index: 29;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid #aeb7c2;
+  border-radius: 5px;
+  background: #f5f7f9;
+  color: #344354;
+  box-shadow: 0 4px 16px rgba(26, 39, 52, 0.18);
+  font-size: 12px;
+}
+
+.subview-tools-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+.subview-tools-header strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subview-tools-header button {
+  flex: 0 0 auto;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.subview-tools-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  border-bottom: 1px solid #cdd3db;
+}
+
+.subview-tools-tabs button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 7px 4px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.subview-tools-tabs [aria-selected="true"] {
+  border-bottom-color: #517398;
+  background: #e9eef4;
+  font-weight: 600;
+}
+
+.subview-tools-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 8px 8px 18px;
+  background: #fafbfc;
+}
+
+.subview-tools-empty {
+  margin: 8px 0;
+}
+
+.subview-tools-window :focus-visible {
+  outline: 2px solid #517398;
+  outline-offset: -2px;
+}
+
+.subview-tools-resize,
+.subview-tools-resize-edge {
+  position: absolute;
+  touch-action: none;
+}
+
+.subview-tools-resize {
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  padding: 0;
+  background: #f5f7f9;
+  color: #617489;
+  cursor: nwse-resize;
+}
+
+.subview-tools-resize-edge.is-right {
+  top: 40px;
+  right: 0;
+  bottom: 18px;
+  width: 5px;
+  cursor: ew-resize;
+}
+
+.subview-tools-resize-edge.is-bottom {
+  bottom: 0;
+  left: 0;
+  right: 18px;
+  height: 5px;
+  cursor: ns-resize;
+}
+
 .subview-history-controls {
   display: inline-flex;
   align-items: stretch;

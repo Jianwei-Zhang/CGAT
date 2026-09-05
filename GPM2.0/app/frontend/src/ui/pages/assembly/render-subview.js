@@ -44,6 +44,7 @@ import { assemblyPageSession } from "./page-session.js";
 import { buildGrtResultPlan, resolveGrtResultContext } from "./grt-result-state.js";
 import { buildGrtResultScene } from "./grt-result-render.js";
 import { renderGrtResultControls } from "./grt-result-controls.js";
+import { renderSubviewToolsToggle } from "./render-subview-tools.js";
 import {
   buildTrackCtgHoverTitle,
   resolveBoundedTrackCtgLabelPlacement,
@@ -719,6 +720,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
       <div class="subview-panel-head">
         <div class="subview-panel-title-row" data-grt-result-card="subview">
           <h4>${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
+          ${renderSubviewToolsToggle(i18n.subview.tools, { escapeHtml, escapeAttr })}
           <p class="muted subview-panel-guide">${escapeHtml(i18n.subview.guide)}</p>
           ${allBadges ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}
         </div>

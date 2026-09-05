@@ -79,6 +79,9 @@ export function shouldHandleTrackDeleteHotkey(event, state) {
     return false;
   }
   const target = event?.target;
+  if (target?.closest?.("[data-subview-tools-host]")) {
+    return false;
+  }
   const tagName = String(target?.tagName || "").toUpperCase();
   if (tagName === "INPUT" || tagName === "TEXTAREA") {
     return false;

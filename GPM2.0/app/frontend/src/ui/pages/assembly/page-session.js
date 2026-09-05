@@ -45,6 +45,7 @@ export function createAssemblyPageSession() {
     assemblyConfirmDialogSeq: 0,
     pendingAssemblyConfirmResolvers: new Map(),
     subviewRenderCache: createSubviewRenderCache(),
+    subviewTools: null,
     finalPathGraphPreviewState: null,
     grtResultToastTimer: null,
     projectViewMutationCoordinator: createProjectViewMutationCoordinator(),
@@ -54,6 +55,7 @@ export function createAssemblyPageSession() {
 export const assemblyPageSession = createAssemblyPageSession();
 
 export function resetAssemblyPageSession(nextWidths = null, { timerApi = globalThis } = {}) {
+  assemblyPageSession.subviewTools?.destroy();
   if (assemblyPageSession.pendingAssemblyScrollStatePersistTimer !== null) {
     timerApi?.clearTimeout?.(assemblyPageSession.pendingAssemblyScrollStatePersistTimer);
   }

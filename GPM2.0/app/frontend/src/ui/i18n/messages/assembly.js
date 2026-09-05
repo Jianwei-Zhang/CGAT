@@ -296,6 +296,16 @@ export const zh = {
   },
   subview: {
     panelTitle: "Subview",
+    tools: {
+      toggle: "侧栏",
+      title: "Subview 侧栏",
+      close: "关闭侧栏",
+      anchors: "锚点",
+      composition: "轨道组合",
+      anchorsHint: "当前 Subview 的锚点对象",
+      compositionHint: "当前 Subview 的上下轨道",
+      resize: "调整侧栏大小（方向键调整 10 像素，Shift 加方向键调整 1 像素）",
+    },
     guide: "Ctrl/Cmd 选中任意两个ctg进入subview-ctg；也支持点击任意两个轨道名进入subview-track。",
     removeCandidateAria: "移除该候选",
     removeTrackCandidateAria: "移除该轨道候选",
@@ -803,6 +813,16 @@ export const en = {
   },
   subview: {
     panelTitle: "Subview",
+    tools: {
+      toggle: "Sidebar",
+      title: "Subview sidebar",
+      close: "Close sidebar",
+      anchors: "Anchors",
+      composition: "Track composition",
+      anchorsHint: "Anchor objects in the current Subview",
+      compositionHint: "Upper and lower tracks in the current Subview",
+      resize: "Resize sidebar (arrow keys: 10 pixels; Shift + arrow keys: 1 pixel)",
+    },
     guide: "Select any two contigs with Ctrl/Cmd to enter contig subview, or click any two track labels to enter track subview.",
     removeCandidateAria: "Remove this candidate",
     removeTrackCandidateAria: "Remove this track candidate",

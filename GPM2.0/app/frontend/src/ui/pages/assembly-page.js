@@ -35,6 +35,7 @@ import {
   assemblyPageSession,
   resetAssemblyPageSession,
 } from "./assembly/page-session.js";
+import { bindSubviewTools } from "./assembly/subview-tools-runtime.js";
 import {
   createAssemblyConfirmController,
 } from "./assembly/confirm-controller.js";
@@ -724,7 +725,17 @@ export function bindAssemblyPage(host, store, options = {}) {
   if (!options.scope) {
     scrollAssemblyToBottomIfRequested(host, store);
   }
+  syncAssemblySubviewTools(host, store);
   return result;
+}
+
+export function syncAssemblySubviewTools(host, store) {
+  return bindSubviewTools(resolveCurrentRouteHost(host) || host, store, {
+    session: assemblyPageSession,
+    getLabels: (state) => getAssemblyI18n(state).subview.tools,
+    escapeHtml,
+    escapeAttr,
+  });
 }
 
 function scrollAssemblyToBottomIfRequested(host, store) {
