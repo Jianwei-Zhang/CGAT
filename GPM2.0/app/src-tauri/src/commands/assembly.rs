@@ -890,6 +890,24 @@ pub async fn get_track_pairwise_evidence(
                 })
             })
             .collect::<Vec<_>>();
+        let coverage = report
+            .coverage
+            .into_iter()
+            .map(|scope| {
+                json!({
+                    "topAssemblyCtgIds": scope.top_assembly_ctg_ids,
+                    "bottomAssemblyCtgIds": scope.bottom_assembly_ctg_ids,
+                    "topSourceSeqIds": scope.top_source_seq_ids,
+                    "bottomSourceSeqIds": scope.bottom_source_seq_ids,
+                    "queryDatasetId": scope.query_dataset_id,
+                    "targetDatasetId": scope.target_dataset_id,
+                    "evidenceSource": scope.evidence_source,
+                    "status": scope.status,
+                    "hitCount": scope.hit_count,
+                    "reasonCode": scope.reason_code
+                })
+            })
+            .collect::<Vec<_>>();
         Ok(json!({
             "projectId": report.project_id,
             "assignedChrName": report.assigned_chr_name,
@@ -898,6 +916,7 @@ pub async fn get_track_pairwise_evidence(
             "evidenceHitCount": report.evidence_hit_count,
             "topAssemblyCtgIds": report.top_assembly_ctg_ids,
             "bottomAssemblyCtgIds": report.bottom_assembly_ctg_ids,
+            "coverage": coverage,
             "hits": hits
         }))
     })

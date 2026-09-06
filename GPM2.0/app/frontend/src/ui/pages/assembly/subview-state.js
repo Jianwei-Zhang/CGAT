@@ -17,6 +17,12 @@ import {
   getSupportDsCtgLenRulesForChr,
 } from "./support-ds-ctg-len-rules.js";
 import { tAssembly } from "./i18n.js";
+import {
+  SUBVIEW_COMPOSITION_MODE,
+  applySubviewComposition,
+  getSubviewComposition,
+  swapSubviewCompositionLanes,
+} from "./subview-composition-state.js";
 
 function tSubview(stateOrLocale, path, vars = {}) {
   return tAssembly(stateOrLocale, `subview.${path}`, vars);
@@ -297,7 +303,11 @@ export function buildSubviewFlippedCtgKey(slot, contigId) {
 }
 
 function normalizeSubviewMode(mode) {
-  return String(mode || "").trim() === "track-pair" ? "track-pair" : "2-contig";
+  const normalized = String(mode || "").trim();
+  if (normalized === "track-pair" || normalized === SUBVIEW_COMPOSITION_MODE) {
+    return normalized;
+  }
+  return "2-contig";
 }
 
 export function normalizeSubviewRole(role) {
@@ -595,6 +605,10 @@ export function getSubviewState(assembly) {
     error: String(subview.error || ""),
     summary: subview.summary || null,
   };
+  const historyKey = String(subview.historyKey || "").trim();
+  if (historyKey) {
+    normalized.historyKey = historyKey;
+  }
   if (subview.pairwiseEvidence) {
     normalized.pairwiseEvidence = subview.pairwiseEvidence;
   }
@@ -1286,6 +1300,16 @@ export function swapSubviewSummaryOrder({ subview, stateOrLocale = "zh" }) {
   const summary = currentSubview.summary;
   if (!summary || typeof summary !== "object") {
     return currentSubview;
+  }
+  if (String(summary.mode || "") === SUBVIEW_COMPOSITION_MODE) {
+    const composition = getSubviewComposition(currentSubview);
+    const swapped = swapSubviewCompositionLanes(composition);
+    return swapped.changed
+      ? applySubviewComposition(currentSubview, swapped.composition, {
+          historyKey: currentSubview.historyKey,
+          message: tSubview(stateOrLocale, "swappedTrackOrder"),
+        })
+      : currentSubview;
   }
   if (String(summary.mode || "") === "track-pair") {
     const topTrack = summary.topTrack;

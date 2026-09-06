@@ -248,6 +248,7 @@ export function buildAssemblyContextMenuActions(actionDeps, overrides = {}) {
     ? overrides.confirm
     : (message) => globalThis.window?.confirm?.(message) ?? false;
   return {
+    addContextCtgToComposition: resolveAction("addContextCtgToComposition") || (() => false),
     enterSubviewFromTrackSelections: resolveAction("enterSubviewFromTrackSelections"),
     enterSubviewFromCandidates: resolveAction("enterSubviewFromCandidates"),
     setSubviewTrackPairCtgHidden: resolveAction("setSubviewTrackPairCtgHidden"),

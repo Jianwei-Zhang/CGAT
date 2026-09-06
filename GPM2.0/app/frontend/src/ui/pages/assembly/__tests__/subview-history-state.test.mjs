@@ -10,7 +10,11 @@ import {
   resolveCurrentSubviewHistory,
   restoreSubviewHistoryRollback,
   rollbackSubviewHistory,
+  commitSubviewCompositionHistoryOperation,
+  buildSubviewCompositionHistoryKey,
+  updateSubviewCompositionViewport,
 } from "../subview-history-state.js";
+import { applySubviewComposition, normalizeSubviewComposition } from "../subview-composition-state.js";
 import { swapSubviewSummaryOrder } from "../subview-state.js";
 import { deleteSubviewAnchorObjects } from "../subview-anchor-objects.js";
 
@@ -95,6 +99,91 @@ test("Subview history activation creates one order-insensitive pair record", () 
   assert.equal(second.pairKey, first.pairKey);
   assert.equal(second.created, false);
   assert.equal(second.assembly.subview.summary.top.contigId, 1);
+});
+
+test("composition history v2 uses one chromosome key and accepts empty lanes", () => {
+  const legacy = buildAssembly();
+  const composition = normalizeSubviewComposition({
+    members: [{
+      assemblyCtgId: 2,
+      source: { role: "support", datasetId: 22, sourceType: "mother" },
+      label: "ctg2",
+      lengthBp: 100,
+      lane: "top",
+      xBp: 500,
+    }],
+  });
+  const nextSubview = applySubviewComposition(legacy.subview, composition);
+  const committed = commitSubviewCompositionHistoryOperation(legacy, {
+    nextSubview,
+    operation: { kind: "replace-composition" },
+    viewport: { bpPerPx: 100, leftBp: 250, topPx: 3 },
+    now: 1,
+  });
+  const key = buildSubviewCompositionHistoryKey("Chr01");
+  assert.equal(committed.changed, true);
+  assert.equal(committed.pairKey, key);
+  assert.equal(committed.assembly.subviewHistoryByKey[key].version, 2);
+  assert.equal(committed.assembly.subviewHistoryByKey[key].past[0].snapshot.kind, "legacy");
+  assert.equal(committed.assembly.subviewHistoryByKey[key].current.kind, "composition");
+  assert.deepEqual(committed.assembly.subviewHistoryByKey[key].viewport,
+    { bpPerPx: 100, leftBp: 250, topPx: 3 });
+});
+
+test("composition history rollback crosses the legacy conversion and redo restores members", () => {
+  const legacy = buildAssembly();
+  const nextSubview = applySubviewComposition(legacy.subview, {
+    members: [{
+      assemblyCtgId: 1,
+      source: { role: "primary", datasetId: 11, sourceType: "mother" },
+      label: "ctg1",
+      lengthBp: 100,
+      lane: "bottom",
+      xBp: -10,
+    }],
+  });
+  const committed = commitSubviewCompositionHistoryOperation(legacy, {
+    nextSubview,
+    operation: { kind: "replace-composition" },
+    now: 1,
+  });
+  const undone = rollbackSubviewHistory(committed.assembly, { now: 2 });
+  assert.equal(undone.assembly.subview.summary.mode, "2-contig");
+  assert.match(undone.assembly.subview.historyKey, /^composition:/);
+  const redone = restoreSubviewHistoryRollback(undone.assembly, { now: 3 });
+  assert.equal(redone.assembly.subview.summary.mode, "composition");
+  assert.equal(redone.assembly.subview.summary.members[0].xBp, -10);
+});
+
+test("composition viewport updates persist outside undo snapshots", () => {
+  const composition = normalizeSubviewComposition({
+    members: [{
+      assemblyCtgId: 1,
+      source: { role: "primary", datasetId: 1 },
+      label: "ctg1",
+      lengthBp: 1000,
+      lane: "top",
+      xBp: 0,
+    }],
+  });
+  const assembly = commitSubviewCompositionHistoryOperation(buildAssembly(), {
+    nextSubview: applySubviewComposition(buildAssembly().subview, composition),
+    operation: { kind: "replace-composition" },
+    viewport: { bpPerPx: 10, leftBp: 100 },
+    now: 1,
+  }).assembly;
+  const before = assembly.subviewHistoryByKey[assembly.subview.historyKey];
+  const updated = updateSubviewCompositionViewport(assembly, {
+    bpPerPx: 20,
+    leftBp: 500,
+    topPx: 4,
+  }, 2);
+  const after = updated.subviewHistoryByKey[updated.subview.historyKey];
+
+  assert.deepEqual(after.viewport, { bpPerPx: 20, leftBp: 500, topPx: 4 });
+  assert.deepEqual(after.current, before.current);
+  assert.deepEqual(after.past, before.past);
+  assert.deepEqual(after.forward, before.forward);
 });
 
 test("Subview history rolls back and restores one operation at a time", () => {

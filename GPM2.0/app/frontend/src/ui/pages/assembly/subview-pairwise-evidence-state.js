@@ -8,6 +8,7 @@ import {
   normalizeSubviewSummarySelection,
   normalizeSubviewTrackSummary,
 } from "./subview-state.js";
+import { normalizeSubviewCompositionMembers } from "./subview-composition-state.js";
 
 function normalizeAssemblyCtgIdList(values) {
   return Array.from(
@@ -60,6 +61,16 @@ function resolveCoverageThresholds(evidence = {}) {
 
 export function buildSubviewPairwiseEvidenceKey(summary, scope = {}) {
   const mode = String(summary?.mode || "").trim();
+  if (mode === "composition") {
+    const members = normalizeSubviewCompositionMembers(summary?.members);
+    const topToken = members.filter((member) => member.lane === "top"
+      && member.source?.role !== "ref" && member.assemblyCtgId)
+      .map((member) => `${member.entityKey}@${member.sourceKey}`).sort().join(",");
+    const bottomToken = members.filter((member) => member.lane === "bottom"
+      && member.source?.role !== "ref" && member.assemblyCtgId)
+      .map((member) => `${member.entityKey}@${member.sourceKey}`).sort().join(",");
+    return topToken && bottomToken ? `composition:${topToken}|${bottomToken}` : "";
+  }
   if (mode === "track-pair") {
     const topTrack = normalizeSubviewTrackSummary(summary?.topTrack);
     const bottomTrack = normalizeSubviewTrackSummary(summary?.bottomTrack);
@@ -86,6 +97,13 @@ export function buildSubviewPairwiseEvidenceKey(summary, scope = {}) {
 
 export function shouldLoadSubviewPairwiseEvidence(summary) {
   const mode = String(summary?.mode || "").trim();
+  if (mode === "composition") {
+    const members = normalizeSubviewCompositionMembers(summary?.members);
+    return members.some((member) => member.lane === "top"
+      && member.source?.role !== "ref" && member.assemblyCtgId)
+      && members.some((member) => member.lane === "bottom"
+        && member.source?.role !== "ref" && member.assemblyCtgId);
+  }
   if (mode === "track-pair") {
     const topTrack = normalizeSubviewTrackSummary(summary?.topTrack);
     const bottomTrack = normalizeSubviewTrackSummary(summary?.bottomTrack);

@@ -53,7 +53,22 @@ pub struct TrackPairwiseEvidenceReport {
     pub evidence_hit_count: i64,
     pub top_assembly_ctg_ids: Vec<i64>,
     pub bottom_assembly_ctg_ids: Vec<i64>,
+    pub coverage: Vec<TrackPairwiseEvidenceCoverage>,
     pub hits: Vec<JunctionEvidenceHit>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TrackPairwiseEvidenceCoverage {
+    pub top_assembly_ctg_ids: Vec<i64>,
+    pub bottom_assembly_ctg_ids: Vec<i64>,
+    pub top_source_seq_ids: Vec<i64>,
+    pub bottom_source_seq_ids: Vec<i64>,
+    pub query_dataset_id: i64,
+    pub target_dataset_id: i64,
+    pub evidence_source: String,
+    pub status: String,
+    pub hit_count: i64,
+    pub reason_code: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -415,6 +430,17 @@ fn source_ids_from_evidence_name_map(
         .collect()
 }
 
+fn assembly_ids_from_evidence_name_map(
+    name_map: &HashMap<String, Vec<EvidenceNameMapping>>,
+) -> Vec<i64> {
+    name_map
+        .values()
+        .flat_map(|items| items.iter().map(|item| item.assembly_ctg_id))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
 fn source_id_mapping_from_evidence_name_map(
     name_map: &HashMap<String, Vec<EvidenceNameMapping>>,
 ) -> HashMap<i64, Vec<EvidenceNameMapping>> {
@@ -557,10 +583,13 @@ fn get_track_pairwise_evidence_with_connection(
     let min_align_length = params.min_align_length.unwrap_or(0).max(0);
     let min_mapq = params.min_mapq.unwrap_or(0).max(0);
 
-    let (evidence_source, mut hits) = if same_dataset {
-        let dataset_id = *top_dataset_ids.iter().next().ok_or_else(|| {
-            anyhow::anyhow!("failed to infer dataset for track-pair self evidence")
-        })?;
+    let dataset_ids = top_name_map_by_dataset
+        .keys()
+        .chain(bottom_name_map_by_dataset.keys())
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let mut dataset_run_info_by_id = HashMap::<i64, DatasetRunInfo>::new();
+    for dataset_id in dataset_ids {
         let (dataset_name, dataset_fasta_path) = conn
             .query_row(
                 "SELECT name, fasta_path FROM dataset WHERE id = ?1",
@@ -568,7 +597,6 @@ fn get_track_pairwise_evidence_with_connection(
                 |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
             )
             .with_context(|| format!("dataset_id {} does not exist", dataset_id))?;
-        let run_name = format!("{}_vs_self", dataset_name);
         let bundle_root = derive_bundle_root_from_dataset_fasta(Path::new(&dataset_fasta_path))
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -576,147 +604,145 @@ fn get_track_pairwise_evidence_with_connection(
                     dataset_fasta_path
                 )
             })?;
-        let run_dir = bundle_root
-            .join("runs")
-            .join(format!("chr_{}", assigned_chr_name))
-            .join(&run_name);
-        let paf_path = run_dir.join("result.paf");
-        if !paf_path.exists() {
-            bail!("self evidence file does not exist: {}", paf_path.display());
-        }
-        let top_name_map = top_name_map_by_dataset
-            .get(&dataset_id)
-            .cloned()
-            .unwrap_or_default();
-        let bottom_name_map = bottom_name_map_by_dataset
-            .get(&dataset_id)
-            .cloned()
-            .unwrap_or_default();
-        let top_source_seq_ids = source_ids_from_evidence_name_map(&top_name_map);
-        let bottom_source_seq_ids = source_ids_from_evidence_name_map(&bottom_name_map);
-        let run_cache = ensure_pairwise_alignment_run_cache(
-            conn, dataset_id, dataset_id, &run_name, &paf_path,
-        )?;
-        let cached_hits = query_pairwise_cached_hits(
-            conn,
-            run_cache.id,
-            &top_source_seq_ids,
-            &bottom_source_seq_ids,
-            min_align_length,
-            min_mapq,
-            "self_paf",
-        )?;
-        let top_source_map = source_id_mapping_from_evidence_name_map(&top_name_map);
-        let bottom_source_map = source_id_mapping_from_evidence_name_map(&bottom_name_map);
-        (
-            "self_paf".to_string(),
-            assign_cached_pairwise_hit_assembly_ids(
-                cached_hits,
-                &top_source_map,
-                &bottom_source_map,
-            ),
-        )
-    } else {
-        let dataset_ids = top_name_map_by_dataset
-            .keys()
-            .chain(bottom_name_map_by_dataset.keys())
-            .copied()
-            .collect::<BTreeSet<_>>();
-        let mut dataset_run_info_by_id = HashMap::<i64, DatasetRunInfo>::new();
-        for dataset_id in dataset_ids {
-            let (dataset_name, dataset_fasta_path) = conn
-                .query_row(
-                    "SELECT name, fasta_path FROM dataset WHERE id = ?1",
-                    params![dataset_id],
-                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
-                )
-                .with_context(|| format!("dataset_id {} does not exist", dataset_id))?;
-            let bundle_root = derive_bundle_root_from_dataset_fasta(Path::new(&dataset_fasta_path))
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "failed to derive bundle root from dataset fasta path {}",
-                        dataset_fasta_path
-                    )
-                })?;
-            dataset_run_info_by_id.insert(
-                dataset_id,
-                DatasetRunInfo {
-                    dataset_name,
-                    bundle_root,
-                },
-            );
-        }
+        dataset_run_info_by_id.insert(
+            dataset_id,
+            DatasetRunInfo {
+                dataset_name,
+                bundle_root,
+            },
+        );
+    }
 
-        let mut hits = Vec::<JunctionEvidenceHit>::new();
-        let mut missing_pairs = Vec::<String>::new();
-        for (top_dataset_id, top_name_map) in &top_name_map_by_dataset {
-            for (bottom_dataset_id, bottom_name_map) in &bottom_name_map_by_dataset {
-                let top_info = dataset_run_info_by_id.get(top_dataset_id).ok_or_else(|| {
-                    anyhow::anyhow!("missing dataset info for id {}", top_dataset_id)
+    let mut hits = Vec::<JunctionEvidenceHit>::new();
+    let mut coverage = Vec::<TrackPairwiseEvidenceCoverage>::new();
+    let mut evidence_sources = BTreeSet::<String>::new();
+    for (top_dataset_id, top_name_map) in &top_name_map_by_dataset {
+        for (bottom_dataset_id, bottom_name_map) in &bottom_name_map_by_dataset {
+            let top_info = dataset_run_info_by_id
+                .get(top_dataset_id)
+                .ok_or_else(|| anyhow::anyhow!("missing dataset info for id {}", top_dataset_id))?;
+            let bottom_info = dataset_run_info_by_id
+                .get(bottom_dataset_id)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("missing dataset info for id {}", bottom_dataset_id)
                 })?;
-                let bottom_info =
-                    dataset_run_info_by_id
-                        .get(bottom_dataset_id)
-                        .ok_or_else(|| {
-                            anyhow::anyhow!("missing dataset info for id {}", bottom_dataset_id)
-                        })?;
-                let run_paths = resolve_cross_dataset_pair_run_paths(
-                    &assigned_chr_name,
-                    *top_dataset_id,
-                    top_info,
-                    top_name_map,
-                    *bottom_dataset_id,
-                    bottom_info,
-                    bottom_name_map,
-                );
-                if run_paths.is_empty() {
-                    missing_pairs.push(format!(
-                        "{}_vs_{}",
-                        top_info.dataset_name, bottom_info.dataset_name
-                    ));
-                    continue;
+            let top_source_seq_ids = source_ids_from_evidence_name_map(top_name_map);
+            let bottom_source_seq_ids = source_ids_from_evidence_name_map(bottom_name_map);
+            let top_assembly_ctg_ids = assembly_ids_from_evidence_name_map(top_name_map);
+            let bottom_assembly_ctg_ids = assembly_ids_from_evidence_name_map(bottom_name_map);
+            let evidence_source = if top_dataset_id == bottom_dataset_id {
+                "self_paf"
+            } else {
+                "ds_ds_paf"
+            };
+            let run_paths = resolve_track_dataset_pair_run_paths(
+                &assigned_chr_name,
+                *top_dataset_id,
+                top_info,
+                top_name_map,
+                *bottom_dataset_id,
+                bottom_info,
+                bottom_name_map,
+            );
+            if run_paths.is_empty() {
+                coverage.push(TrackPairwiseEvidenceCoverage {
+                    top_assembly_ctg_ids,
+                    bottom_assembly_ctg_ids,
+                    top_source_seq_ids,
+                    bottom_source_seq_ids,
+                    query_dataset_id: *top_dataset_id,
+                    target_dataset_id: *bottom_dataset_id,
+                    evidence_source: evidence_source.to_string(),
+                    status: "missing".to_string(),
+                    hit_count: 0,
+                    reason_code: Some("evidence-missing".to_string()),
+                });
+                continue;
+            }
+            let top_source_map = source_id_mapping_from_evidence_name_map(top_name_map);
+            let bottom_source_map = source_id_mapping_from_evidence_name_map(bottom_name_map);
+            let mut scope_hits = Vec::<JunctionEvidenceHit>::new();
+            let mut failure_reason = None::<String>;
+            let mut loaded_run_count = 0_usize;
+            let mut resolved_query_dataset_id = *top_dataset_id;
+            let mut resolved_target_dataset_id = *bottom_dataset_id;
+            for run_path in run_paths {
+                resolved_query_dataset_id = run_path.query_dataset_id;
+                resolved_target_dataset_id = run_path.target_dataset_id;
+                let run_cache = match ensure_pairwise_alignment_run_cache(
+                    conn,
+                    run_path.query_dataset_id,
+                    run_path.target_dataset_id,
+                    &run_path.run_name,
+                    &run_path.paf_path,
+                ) {
+                    Ok(cache) => cache,
+                    Err(error) => {
+                        let message = error.to_string().to_ascii_lowercase();
+                        failure_reason = Some(
+                            if message.contains("parse") || message.contains("invalid paf") {
+                                "evidence-parse-failed".to_string()
+                            } else {
+                                "evidence-read-failed".to_string()
+                            },
+                        );
+                        continue;
+                    }
                 };
-                let top_source_seq_ids = source_ids_from_evidence_name_map(top_name_map);
-                let bottom_source_seq_ids = source_ids_from_evidence_name_map(bottom_name_map);
-                let top_source_map = source_id_mapping_from_evidence_name_map(top_name_map);
-                let bottom_source_map = source_id_mapping_from_evidence_name_map(bottom_name_map);
-                for run_path in run_paths {
-                    let run_cache = ensure_pairwise_alignment_run_cache(
-                        conn,
-                        run_path.query_dataset_id,
-                        run_path.target_dataset_id,
-                        &run_path.run_name,
-                        &run_path.paf_path,
-                    )
-                    .with_context(|| {
-                        format!("failed to cache pair paf {}", run_path.paf_path.display())
-                    })?;
-                    let cached_hits = query_pairwise_cached_hits(
-                        conn,
-                        run_cache.id,
-                        &top_source_seq_ids,
-                        &bottom_source_seq_ids,
-                        min_align_length,
-                        min_mapq,
-                        "ds_ds_paf",
-                    )?;
-                    hits.extend(assign_cached_pairwise_hit_assembly_ids(
-                        cached_hits,
-                        &top_source_map,
-                        &bottom_source_map,
-                    ));
-                }
+                loaded_run_count += 1;
+                let cached_hits = query_pairwise_cached_hits(
+                    conn,
+                    run_cache.id,
+                    &top_source_seq_ids,
+                    &bottom_source_seq_ids,
+                    min_align_length,
+                    min_mapq,
+                    evidence_source,
+                )?;
+                scope_hits.extend(assign_cached_pairwise_hit_assembly_ids(
+                    cached_hits,
+                    &top_source_map,
+                    &bottom_source_map,
+                ));
+            }
+            let scope_hit_count = scope_hits.len() as i64;
+            if loaded_run_count > 0 {
+                evidence_sources.insert(evidence_source.to_string());
+                hits.extend(scope_hits);
+                coverage.push(TrackPairwiseEvidenceCoverage {
+                    top_assembly_ctg_ids,
+                    bottom_assembly_ctg_ids,
+                    top_source_seq_ids,
+                    bottom_source_seq_ids,
+                    query_dataset_id: resolved_query_dataset_id,
+                    target_dataset_id: resolved_target_dataset_id,
+                    evidence_source: evidence_source.to_string(),
+                    status: "ready".to_string(),
+                    hit_count: scope_hit_count,
+                    reason_code: None,
+                });
+            } else {
+                coverage.push(TrackPairwiseEvidenceCoverage {
+                    top_assembly_ctg_ids,
+                    bottom_assembly_ctg_ids,
+                    top_source_seq_ids,
+                    bottom_source_seq_ids,
+                    query_dataset_id: resolved_query_dataset_id,
+                    target_dataset_id: resolved_target_dataset_id,
+                    evidence_source: evidence_source.to_string(),
+                    status: "failed".to_string(),
+                    hit_count: 0,
+                    reason_code: failure_reason,
+                });
             }
         }
-        if hits.is_empty() && !missing_pairs.is_empty() {
-            missing_pairs.sort();
-            missing_pairs.dedup();
-            bail!(
-                "cross-dataset evidence file does not exist for required dataset pair(s): {}",
-                missing_pairs.join(", ")
-            );
-        }
-        ("ds_ds_paf".to_string(), hits)
+    }
+    let evidence_source = if evidence_sources.len() == 1 {
+        evidence_sources.into_iter().next().unwrap_or_default()
+    } else if evidence_sources.is_empty() {
+        String::new()
+    } else {
+        "mixed_paf".to_string()
     };
 
     hits.sort_by(|a, b| {
@@ -737,6 +763,7 @@ fn get_track_pairwise_evidence_with_connection(
         evidence_hit_count: hits.len() as i64,
         top_assembly_ctg_ids: normalize_requested_ctg_ids(&params.top_assembly_ctg_ids),
         bottom_assembly_ctg_ids: normalize_requested_ctg_ids(&params.bottom_assembly_ctg_ids),
+        coverage,
         hits,
     })
 }
@@ -1615,6 +1642,48 @@ fn resolve_cross_dataset_pair_run_paths(
     paths
 }
 
+fn resolve_track_dataset_pair_run_paths(
+    assigned_chr_name: &str,
+    top_dataset_id: i64,
+    top: &DatasetRunInfo,
+    top_name_map: &HashMap<String, Vec<EvidenceNameMapping>>,
+    bottom_dataset_id: i64,
+    bottom: &DatasetRunInfo,
+    bottom_name_map: &HashMap<String, Vec<EvidenceNameMapping>>,
+) -> Vec<PairwiseRunPath> {
+    if top_dataset_id != bottom_dataset_id {
+        return resolve_cross_dataset_pair_run_paths(
+            assigned_chr_name,
+            top_dataset_id,
+            top,
+            top_name_map,
+            bottom_dataset_id,
+            bottom,
+            bottom_name_map,
+        );
+    }
+    let run_name = format!("{}_vs_self", top.dataset_name);
+    let mut roots = vec![top.bundle_root.clone()];
+    if bottom.bundle_root != top.bundle_root {
+        roots.push(bottom.bundle_root.clone());
+    }
+    roots
+        .into_iter()
+        .map(|root| PairwiseRunPath {
+            paf_path: root
+                .join("runs")
+                .join(format!("chr_{}", assigned_chr_name))
+                .join(&run_name)
+                .join("result.paf"),
+            run_name: run_name.clone(),
+            query_dataset_id: top_dataset_id,
+            target_dataset_id: bottom_dataset_id,
+        })
+        .filter(|path| path.paf_path.exists())
+        .take(1)
+        .collect()
+}
+
 #[allow(clippy::too_many_arguments)]
 fn extend_add_ctg_pair_run_paths(
     paths: &mut Vec<PairwiseRunPath>,
@@ -1901,6 +1970,10 @@ mod tests {
         assert_eq!(track_report.evidence_hit_count, 1);
         assert_eq!(track_report.top_assembly_ctg_ids, vec![301]);
         assert_eq!(track_report.bottom_assembly_ctg_ids, vec![302]);
+        assert_eq!(track_report.coverage.len(), 1);
+        assert_eq!(track_report.coverage[0].status, "ready");
+        assert_eq!(track_report.coverage[0].evidence_source, "self_paf");
+        assert_eq!(track_report.coverage[0].hit_count, 1);
         assert_eq!(track_report.hits[0].query_assembly_ctg_id, 301);
         assert_eq!(track_report.hits[0].subject_assembly_ctg_id, 302);
         assert_eq!(track_report.hits[0].query_start, 1);
@@ -2085,6 +2158,9 @@ mod tests {
         .unwrap();
         assert_eq!(track_report.evidence_source, "ds_ds_paf");
         assert_eq!(track_report.evidence_hit_count, 1);
+        assert_eq!(track_report.coverage.len(), 1);
+        assert_eq!(track_report.coverage[0].status, "ready");
+        assert_eq!(track_report.coverage[0].evidence_source, "ds_ds_paf");
         assert_eq!(track_report.hits[0].query_assembly_ctg_id, 401);
         assert_eq!(track_report.hits[0].query_source_seq_name, "tigA");
         assert_eq!(track_report.hits[0].subject_assembly_ctg_id, 402);
@@ -2093,6 +2169,171 @@ mod tests {
         assert_eq!(track_report.hits[0].query_end, 300);
         assert_eq!(track_report.hits[0].subject_start, 1);
         assert_eq!(track_report.hits[0].subject_end, 200);
+    }
+
+    #[test]
+    fn track_pairwise_reports_mixed_dataset_coverage_without_discarding_ready_hits() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().join("workspace");
+        fs::create_dir_all(workspace_root.join("data/datasets")).unwrap();
+        fs::create_dir_all(workspace_root.join("data/reference")).unwrap();
+        fs::create_dir_all(workspace_root.join("runs/chr_Chr01/ds1_vs_self")).unwrap();
+        fs::create_dir_all(workspace_root.join("runs/chr_Chr01/ds2_vs_ds1")).unwrap();
+        fs::write(
+            workspace_root.join("data/datasets/ds1.fa"),
+            ">tigA\nACGT\n>tigB\nACGT\n",
+        )
+        .unwrap();
+        fs::write(workspace_root.join("data/datasets/ds1.fa.fai"), "").unwrap();
+        fs::write(
+            workspace_root.join("data/datasets/ds2.fa"),
+            ">tigC\nACGT\n>tigD\nACGT\n",
+        )
+        .unwrap();
+        fs::write(workspace_root.join("data/datasets/ds2.fa.fai"), "").unwrap();
+        fs::write(
+            workspace_root.join("data/reference/ref.fa"),
+            ">Chr01\nACGT\n",
+        )
+        .unwrap();
+        fs::write(workspace_root.join("data/reference/ref.fa.fai"), "").unwrap();
+        fs::write(
+            workspace_root.join("runs/chr_Chr01/ds1_vs_self/result.paf"),
+            "tigA\t1000\t0\t200\t+\ttigB\t1000\t100\t300\t180\t200\t60\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace_root.join("runs/chr_Chr01/ds2_vs_ds1/result.paf"),
+            "tigA\t1000\t0\t200\t+\ttigD\t1000\t100\t300\t180\t200\t60\n\
+             tigB\t1000\t10\t210\t+\ttigC\t1000\t120\t320\t180\t200\t60\n",
+        )
+        .unwrap();
+
+        let db_path = workspace_root.join("project.sqlite");
+        let conn = Connection::open(&db_path).unwrap();
+        init_workspace_schema(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO reference_genome (id, name, species_name, assembly_label, fasta_path, fai_path)
+             VALUES (1, 'ref', 'sp', 'v1', ?1, ?2)",
+            params![
+                workspace_root.join("data/reference/ref.fa").to_string_lossy(),
+                workspace_root.join("data/reference/ref.fa.fai").to_string_lossy()
+            ],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO reference_chr (id, reference_genome_id, chr_name, chr_order, length)
+             VALUES (1, 1, 'Chr01', 1, 100000)",
+            [],
+        )
+        .unwrap();
+        for (id, name) in [(1_i64, "ds1"), (2_i64, "ds2")] {
+            conn.execute(
+                "INSERT INTO dataset (id, name, assembler, assembler_version, fasta_path, fai_path)
+                 VALUES (?1, ?2, 'asm', NULL, ?3, ?4)",
+                params![
+                    id,
+                    name,
+                    workspace_root
+                        .join(format!("data/datasets/{name}.fa"))
+                        .to_string_lossy(),
+                    workspace_root
+                        .join(format!("data/datasets/{name}.fa.fai"))
+                        .to_string_lossy()
+                ],
+            )
+            .unwrap();
+        }
+        conn.execute_batch(
+            "INSERT INTO source_seq (id, dataset_id, seq_name, seq_order, length) VALUES
+               (101, 1, 'tigA', 1, 1000), (102, 1, 'tigB', 2, 1000),
+               (201, 2, 'tigC', 1, 1000), (202, 2, 'tigD', 2, 1000);
+             INSERT INTO project (id, name, version, reference_genome_id, primary_dataset_id, auto_check_new_seq, description, created_at, note)
+               VALUES (1, 'p1', 1, 1, 1, 0, NULL, '1', NULL);
+             INSERT INTO project_dataset (project_id, dataset_id, dataset_role, display_order) VALUES
+               (1, 1, 'primary', 1), (1, 2, 'support', 2);
+             INSERT INTO assembly_seq (id, project_id, source_seq_id, orient, source_start, source_end, left_end_type, right_end_type, hidden, created_at, note) VALUES
+               (401, 1, 101, '+', 1, 1000, 'normal', 'normal', 0, '1', NULL),
+               (402, 1, 102, '+', 1, 1000, 'normal', 'normal', 0, '1', NULL),
+               (403, 1, 201, '+', 1, 1000, 'normal', 'normal', 0, '1', NULL),
+               (404, 1, 202, '+', 1, 1000, 'normal', 'normal', 0, '1', NULL);
+             INSERT INTO assembly_ctg (id, project_id, assembly_seq_id, name, assigned_chr_name, chr_order, anchor_start, ref_orient, placement_mode, created_at, note) VALUES
+               (301, 1, 401, 'CtgA', 'Chr01', 1, 100, '+', 'auto', '1', NULL),
+               (302, 1, 402, 'CtgB', 'Chr01', 2, 1200, '+', 'auto', '1', NULL),
+               (303, 1, 403, 'CtgC', 'Chr01', 3, 2300, '+', 'auto', '1', NULL),
+               (304, 1, 404, 'CtgD', 'Chr01', 4, 3400, '+', 'auto', '1', NULL);",
+        )
+        .unwrap();
+        drop(conn);
+
+        let report = get_track_pairwise_evidence(
+            &db_path,
+            &GetTrackPairwiseEvidenceParams {
+                project_id: 1,
+                top_assembly_ctg_ids: vec![301, 303],
+                bottom_assembly_ctg_ids: vec![302, 304],
+                min_align_length: None,
+                min_mapq: None,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(report.evidence_source, "mixed_paf");
+        assert_eq!(report.evidence_hit_count, 3);
+        assert_eq!(report.coverage.len(), 4);
+        assert_eq!(
+            report
+                .coverage
+                .iter()
+                .filter(|scope| scope.status == "ready")
+                .count(),
+            3
+        );
+        let missing = report
+            .coverage
+            .iter()
+            .find(|scope| scope.status == "missing")
+            .unwrap();
+        assert_eq!(missing.query_dataset_id, 2);
+        assert_eq!(missing.target_dataset_id, 2);
+        assert_eq!(missing.reason_code.as_deref(), Some("evidence-missing"));
+        assert!(
+            report.hits.iter().any(|hit| {
+                hit.query_assembly_ctg_id == 301 && hit.subject_assembly_ctg_id == 302
+            })
+        );
+        assert!(
+            report.hits.iter().any(|hit| {
+                hit.query_assembly_ctg_id == 301 && hit.subject_assembly_ctg_id == 304
+            })
+        );
+        assert!(
+            report.hits.iter().any(|hit| {
+                hit.query_assembly_ctg_id == 303 && hit.subject_assembly_ctg_id == 302
+            })
+        );
+
+        fs::create_dir_all(workspace_root.join("runs/chr_Chr01/ds2_vs_self/result.paf")).unwrap();
+        let partial_failure = get_track_pairwise_evidence(
+            &db_path,
+            &GetTrackPairwiseEvidenceParams {
+                project_id: 1,
+                top_assembly_ctg_ids: vec![301, 303],
+                bottom_assembly_ctg_ids: vec![302, 304],
+                min_align_length: None,
+                min_mapq: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(partial_failure.evidence_hit_count, 3);
+        let failed = partial_failure
+            .coverage
+            .iter()
+            .find(|scope| scope.status == "failed")
+            .unwrap();
+        assert_eq!(failed.query_dataset_id, 2);
+        assert_eq!(failed.target_dataset_id, 2);
+        assert_eq!(failed.reason_code.as_deref(), Some("evidence-read-failed"));
     }
 
     #[test]

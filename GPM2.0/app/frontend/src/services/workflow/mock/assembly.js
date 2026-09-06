@@ -713,6 +713,18 @@ async function getTrackPairwiseEvidenceMock({
     evidenceHitCount: topAssemblyCtgId > 0 && bottomAssemblyCtgId > 0 ? 1 : 0,
     topAssemblyCtgIds,
     bottomAssemblyCtgIds,
+    coverage: topAssemblyCtgId > 0 && bottomAssemblyCtgId > 0 ? [{
+      topAssemblyCtgIds: [topAssemblyCtgId],
+      bottomAssemblyCtgIds: [bottomAssemblyCtgId],
+      topSourceSeqIds: [4503],
+      bottomSourceSeqIds: [1959],
+      queryDatasetId: 1,
+      targetDatasetId: 1,
+      evidenceSource: "self_paf",
+      status: "ready",
+      hitCount: 1,
+      reasonCode: null,
+    }] : [],
     hits: topAssemblyCtgId > 0 && bottomAssemblyCtgId > 0
       ? [
           {

@@ -13,6 +13,7 @@ import {
   resolveTrackScrollLeftForViewboxShift,
   resolveViewportAnchorBp,
 } from "./track-viewport.js";
+import { updateSubviewCompositionViewport } from "./subview-history-state.js";
 
 const ASSEMBLY_TRACK_RESIZE_BOUND = Symbol("assemblyTrackResizeBound");
 
@@ -182,6 +183,37 @@ export function createAssemblyViewportController({
     return true;
   }
 
+  function setSubviewCompositionViewportFromScroll(store, element, scrollLeft) {
+    const state = store.getState();
+    if (String(state.assembly?.subview?.summary?.mode || "").trim() !== "composition") {
+      return false;
+    }
+    const savedViewport = state.assembly?.subviewCompositionViewport || {};
+    const domainSpanBp = Number(element?.dataset?.subviewDomainSpanBp);
+    const innerWidth = Number(element?.dataset?.subviewInnerWidth);
+    const measuredBpPerPx = Number.isFinite(domainSpanBp) && domainSpanBp > 0
+      && Number.isFinite(innerWidth) && innerWidth > 0
+      ? domainSpanBp / innerWidth
+      : null;
+    const bpPerPx = Number(savedViewport.bpPerPx) > 0
+      ? Number(savedViewport.bpPerPx)
+      : measuredBpPerPx;
+    if (!Number.isFinite(bpPerPx) || bpPerPx <= 0) return false;
+    const viewboxMinX = Number(element?.dataset?.subviewViewboxMinX || 0);
+    const leftBp = (Math.max(0, Number(scrollLeft || 0))
+      + (Number.isFinite(viewboxMinX) ? viewboxMinX : 0)) * bpPerPx;
+    if (Math.abs(Number(savedViewport.leftBp || 0) - leftBp) < 0.5) return false;
+    store.setState({
+      ...state,
+      assembly: updateSubviewCompositionViewport(state.assembly, {
+        ...savedViewport,
+        bpPerPx,
+        leftBp,
+      }),
+    });
+    return true;
+  }
+
   function schedulePersistAssemblyScrollState(
     host,
     store,
@@ -337,15 +369,28 @@ export function createAssemblyViewportController({
       }
     } else if (shouldBindSubview && subviewTrackScrollEls.length) {
       const state = store.getState();
+      const primarySubviewScroll = subviewTrackScrollEls[0] || null;
       const nextSubviewViewportKey = buildSubviewTrackViewportKey(state);
       if (nextSubviewViewportKey !== session.lastSubviewViewportKey) {
         session.lastSubviewViewportKey = nextSubviewViewportKey;
-        session.lastSubviewScrollLeft = resolvePersistedViewportScrollLeft(
+        const persistedScrollLeft = resolvePersistedViewportScrollLeft(
           state.assembly.subviewTrackScrollState,
           nextSubviewViewportKey,
-        ) ?? 0;
+        );
+        if (persistedScrollLeft !== null) {
+          session.lastSubviewScrollLeft = persistedScrollLeft;
+        } else if (String(state.assembly?.subview?.summary?.mode || "").trim() === "composition") {
+          const viewport = state.assembly?.subviewCompositionViewport || {};
+          const bpPerPx = Number(viewport.bpPerPx);
+          const viewboxMinX = Number(primarySubviewScroll?.dataset?.subviewViewboxMinX || 0);
+          session.lastSubviewScrollLeft = Number.isFinite(bpPerPx) && bpPerPx > 0
+            ? Math.max(0, Number(viewport.leftBp || 0) / bpPerPx
+              - (Number.isFinite(viewboxMinX) ? viewboxMinX : 0))
+            : 0;
+        } else {
+          session.lastSubviewScrollLeft = 0;
+        }
       }
-      const primarySubviewScroll = subviewTrackScrollEls[0] || null;
       if (session.pendingSubviewViewportAnchorBp !== null) {
         const anchoredScrollLeft = resolveScrollLeftForViewportAnchorBp(
           session.pendingSubviewViewportAnchorBp,
@@ -373,6 +418,7 @@ export function createAssemblyViewportController({
           subviewSyncing = true;
           session.lastSubviewScrollLeft = element.scrollLeft;
           applyTrackScrollLeft(subviewTrackScrollEls, session.lastSubviewScrollLeft, element);
+          setSubviewCompositionViewportFromScroll(store, element, session.lastSubviewScrollLeft);
           if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {
             viewportKey: session.lastSubviewViewportKey,
             scrollLeft: session.lastSubviewScrollLeft,

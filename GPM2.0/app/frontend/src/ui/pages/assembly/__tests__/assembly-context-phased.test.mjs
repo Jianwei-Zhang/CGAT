@@ -272,7 +272,12 @@ test("support track context menu exposes mirror toggle and mirror bar keeps only
   assert.ok(supportItems.includes("重命名 contig..."));
   assert.ok(supportItems.includes("追加到路径"));
   assert.ok(supportItems.includes("撤销镜像 contig"));
-  assert.deepEqual(mirrorItems, ["追加到路径", "撤销镜像 contig"]);
+  assert.deepEqual(mirrorItems, [
+    "加入 Subview 上轨",
+    "加入 Subview 下轨",
+    "追加到路径",
+    "撤销镜像 contig",
+  ]);
 });
 
 test("phased mode primary contig context menu offers per-haplotype add and append actions", async () => {
@@ -540,10 +545,17 @@ test("phased track item context menu appends, flips, and removes only that phase
     },
   });
 
-  assert.deepEqual(items.map((item) => item.label), ["追加到路径 A", "追加到路径 B", "翻转 contig", "从该分型组删除"]);
-  await items[1].run();
-  await items[2].run();
-  await items[3].run();
+  assert.deepEqual(items.map((item) => item.label), [
+    "加入 Subview 上轨",
+    "加入 Subview 下轨",
+    "追加到路径 A",
+    "追加到路径 B",
+    "翻转 contig",
+    "从该分型组删除",
+  ]);
+  await items.find((item) => item.label === "追加到路径 B").run();
+  await items.find((item) => item.label === "翻转 contig").run();
+  await items.find((item) => item.label === "从该分型组删除").run();
   assert.deepEqual(calls, [
     {
       type: "append",

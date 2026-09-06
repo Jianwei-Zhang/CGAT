@@ -7,12 +7,16 @@ import { resolveTrackPrefs } from "./track-prefs.js";
 import { resolveSubviewAnchorStateForSummary } from "./subview-anchor-state.js";
 import {
   activateSubviewHistory,
+  buildSubviewCompositionHistoryKey,
+  commitSubviewCompositionHistoryOperation,
   commitSubviewHistoryOperation,
   isSubviewHistoryRecordCompatible,
   resetSubviewHistory,
   restoreSubviewHistoryRollback,
   rollbackSubviewHistory,
 } from "./subview-history-state.js";
+import { applySubviewComposition } from "./subview-composition-state.js";
+import { projectCurrentSubviewToComposition } from "./subview-composition-controller.js";
 import {
   buildSubviewSummaryFromCandidates,
   buildSubviewSummaryFromTrackSelections,
@@ -74,6 +78,22 @@ export function createSubviewSelectionController({
         }),
       },
     );
+  }
+
+  function replaceActiveComposition(state, host, enteredSubview) {
+    const compositionKey = buildSubviewCompositionHistoryKey(state.assembly?.selectedChrName);
+    const hasComposition = String(state.assembly?.subview?.historyKey || "") === compositionKey
+      || Boolean(state.assembly?.subviewHistoryByKey?.[compositionKey]);
+    if (!hasComposition) return null;
+    const composition = projectCurrentSubviewToComposition({
+      ...state,
+      assembly: { ...state.assembly, subview: enteredSubview },
+    }, host);
+    return commitSubviewCompositionHistoryOperation(state.assembly, {
+      nextSubview: applySubviewComposition(enteredSubview, composition),
+      operation: { kind: "replace-composition" },
+      stateOrLocale: state,
+    });
   }
 
   function persistActivatedSubviewHistoryIfNeeded(host, store, activation) {
@@ -348,7 +368,10 @@ export function createSubviewSelectionController({
       error: "",
       message: tAssembly(state, "subview.entered"),
     };
-    const activation = activateEnteredSubviewHistory(state, enteredSubview);
+    const replacement = replaceActiveComposition(state, host, enteredSubview);
+    const activation = replacement?.changed
+      ? { assembly: replacement.assembly, created: false, invalidated: false }
+      : activateEnteredSubviewHistory(state, enteredSubview);
     const activatedSubview = activation.assembly.subview;
     const pairwiseEvidence = buildInitialSubviewPairwiseEvidence(
       activatedSubview.summary,
@@ -419,7 +442,10 @@ export function createSubviewSelectionController({
       error: "",
       message: tAssembly(state, "subview.enteredTrackMode"),
     };
-    const activation = activateEnteredSubviewHistory(state, enteredSubview);
+    const replacement = replaceActiveComposition(state, host, enteredSubview);
+    const activation = replacement?.changed
+      ? { assembly: replacement.assembly, created: false, invalidated: false }
+      : activateEnteredSubviewHistory(state, enteredSubview);
     const activatedSubview = activation.assembly.subview;
     const pairwiseEvidence = buildInitialSubviewPairwiseEvidence(
       activatedSubview.summary,

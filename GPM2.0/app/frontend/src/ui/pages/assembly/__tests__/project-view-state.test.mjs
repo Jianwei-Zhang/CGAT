@@ -209,6 +209,31 @@ test("persistProjectAssemblyViewState sends and returns normalized segment-based
           forward: [],
           updatedAt: "2026-08-28T00:00:00.000Z",
         },
+        "composition:Chr02": {
+          version: 2,
+          pairKey: "composition:Chr02",
+          current: {
+            kind: "composition",
+            composition: {
+              members: [{
+                assemblyCtgId: 11,
+                source: { role: "primary", datasetId: 1 },
+                label: "ctg11",
+                lengthBp: 1000,
+                lane: "top",
+                xBp: -250,
+              }],
+            },
+          },
+          default: {
+            kind: "composition",
+            composition: { members: [] },
+          },
+          past: [],
+          forward: [],
+          viewport: { bpPerPx: 25, leftBp: 500, topPx: 0 },
+          updatedAt: "2026-09-05T00:00:00.000Z",
+        },
       },
       trackScrollState: {},
       subviewTrackScrollState: {},
@@ -305,6 +330,11 @@ test("persistProjectAssemblyViewState sends and returns normalized segment-based
   });
   assert.deepEqual(result.subviewAnchorStateByKey, sent[0].subviewAnchorStateByKey);
   assert.deepEqual(result.subviewHistoryByKey, sent[0].subviewHistoryByKey);
+  assert.deepEqual(sent[0].subviewHistoryByKey["composition:Chr02"].viewport, {
+    bpPerPx: 25,
+    leftBp: 500,
+    topPx: 0,
+  });
   assert.equal(sent[0].membersCardCollapsed, false);
   assert.equal(result.membersCardCollapsed, false);
   assert.deepEqual(sent[0].finalPathTrackScrollState, {

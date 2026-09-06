@@ -684,6 +684,8 @@ export async function loadAssemblyView(host, store, options, deps) {
         subviewTrackDragOffsets: filteredSubviewTrackDragOffsets,
         subviewAnchorStateByKey: persistedSubviewAnchorStateByKey,
         subviewHistoryByKey: persistedSubviewHistoryByKey,
+        subviewCompositionCandidates: [],
+        subviewCompositionCandidatesLoaded: false,
         trackScrollState: persistedTrackScrollState,
         subviewTrackScrollState: persistedSubviewTrackScrollState,
         finalPathTrackScrollState: persistedFinalPathTrackScrollState,
@@ -701,6 +703,14 @@ export async function loadAssemblyView(host, store, options, deps) {
         }),
       },
     });
+    const loadedAssembly = store.getState().assembly;
+    const compositionKey = deps.buildSubviewCompositionHistoryKey?.(selectedChrName) || "";
+    if (compositionKey && loadedAssembly.subviewHistoryByKey?.[compositionKey]) {
+      const activated = deps.activateSubviewCompositionHistory?.(loadedAssembly, {
+        stateOrLocale: store.getState(),
+      });
+      if (activated?.assembly) store.setState({ assembly: activated.assembly });
+    }
   } catch (error) {
     const mappedError = deps.mapAssemblyError({ error, stateOrLocale: store.getState() });
     store.setState({
@@ -763,6 +773,8 @@ export async function selectChromosome(host, store, chrName, deps) {
       hiddenPrimaryCtgIds: hiddenPrimaryCtgIdsByChr[chrName] || [],
       trackDragOffsets: [],
       subviewTrackDragOffsets: [],
+      subviewCompositionCandidates: [],
+      subviewCompositionCandidatesLoaded: false,
       selectedCtgId: null,
       selectedMemberSeqId: null,
       ctgDetail: null,
@@ -895,6 +907,14 @@ export async function selectChromosome(host, store, chrName, deps) {
         summary: tAssembly(store.getState(), "runtime.chrLoadedSummary", { chrName }),
       },
     });
+    const loadedAssembly = store.getState().assembly;
+    const compositionKey = deps.buildSubviewCompositionHistoryKey?.(chrName) || "";
+    if (compositionKey && loadedAssembly.subviewHistoryByKey?.[compositionKey]) {
+      const activated = deps.activateSubviewCompositionHistory?.(loadedAssembly, {
+        stateOrLocale: store.getState(),
+      });
+      if (activated?.assembly) store.setState({ assembly: activated.assembly });
+    }
   } catch (error) {
     if (store.getState().assembly.selectedChrName !== chrName) {
       return;

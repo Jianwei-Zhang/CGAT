@@ -26,6 +26,11 @@ import {
   enrichSubviewAnchorObjectDescriptors,
   findSubviewAnchorDescriptor,
 } from "./subview-anchor-objects.js";
+import {
+  applySubviewComposition,
+  getSubviewComposition,
+  toggleSubviewCompositionMemberFlip,
+} from "./subview-composition-state.js";
 
 export function createSubviewInteractionController({
   persistProjectAssemblyViewStateFromStore,
@@ -230,14 +235,24 @@ export function createSubviewInteractionController({
     );
     if (!enriched.changed) return false;
     const nextSubview = { ...currentSubview, activeAnchors: enriched.activeAnchors };
-    const pairKey = buildSubviewAnchorStateKey(nextSubview.summary, state.assembly.selectedChrName);
+    const pairKey = String(nextSubview.historyKey || "").startsWith("composition:")
+      ? String(nextSubview.historyKey)
+      : buildSubviewAnchorStateKey(nextSubview.summary, state.assembly.selectedChrName);
     const currentRecord = state.assembly.subviewHistoryByKey?.[pairKey];
     const subviewHistoryByKey = currentRecord
       ? {
           ...state.assembly.subviewHistoryByKey,
           [pairKey]: {
             ...currentRecord,
-            current: { ...currentRecord.current, activeAnchors: enriched.activeAnchors },
+            current: currentRecord.version === 2 && currentRecord.current?.kind === "composition"
+              ? {
+                  ...currentRecord.current,
+                  composition: {
+                    ...currentRecord.current.composition,
+                    activeAnchors: enriched.activeAnchors,
+                  },
+                }
+              : { ...currentRecord.current, activeAnchors: enriched.activeAnchors },
           },
         }
       : state.assembly.subviewHistoryByKey;
@@ -267,6 +282,26 @@ export function createSubviewInteractionController({
     const state = store.getState();
     const currentSubview = getSubviewState(state.assembly);
     if (!currentSubview.summary) {
+      return;
+    }
+    if (String(currentSubview.summary.mode || "") === "composition") {
+      const composition = getSubviewComposition(currentSubview);
+      const member = composition?.members.find(
+        (entry) => entry.assemblyCtgId === normalizedContigId && entry.lane === normalizedSlot,
+      );
+      if (!member) return;
+      const toggled = toggleSubviewCompositionMemberFlip(composition, member.entityKey);
+      if (!toggled.changed) return;
+      await commitSubviewEdit(host, store, {
+        nextSubview: applySubviewComposition(currentSubview, toggled.composition),
+        operation: { kind: "flip-contig" },
+        persist: typeof options.persistProjectAssemblyViewStateFromStore === "function"
+          ? options.persistProjectAssemblyViewStateFromStore
+          : persistProjectAssemblyViewStateFromStore,
+        rerender: typeof options.rerenderSubviewPanel === "function"
+          ? options.rerenderSubviewPanel
+          : rerenderSubviewPanel,
+      });
       return;
     }
     const current = normalizeSubviewFlippedCtgs(currentSubview.flippedCtgs);

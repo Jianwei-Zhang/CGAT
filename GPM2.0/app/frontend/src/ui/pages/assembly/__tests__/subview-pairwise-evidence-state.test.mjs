@@ -79,3 +79,25 @@ test("lowering subview thresholds below the cached floor requires a refetch", ()
     true,
   );
 });
+
+test("composition evidence keys include assembly members and leave reference projection local", () => {
+  const summary = {
+    mode: "composition",
+    members: [
+      { assemblyCtgId: 30, source: { role: "support", datasetId: 2 }, lane: "top" },
+      { assemblyCtgId: 31, source: { role: "ref" }, reference: {
+        chrName: "Chr01", startBp: 1, endBp: 1000,
+      }, lane: "top" },
+      { assemblyCtgId: 2, source: { role: "primary", datasetId: 1 }, lane: "bottom" },
+    ],
+  };
+  assert.equal(shouldLoadSubviewPairwiseEvidence(summary), true);
+  assert.equal(
+    buildSubviewPairwiseEvidenceKey(summary),
+    "composition:assembly:30@support:2:mother:0:0:|assembly:2@primary:1:mother:0:0:",
+  );
+  assert.equal(shouldLoadSubviewPairwiseEvidence({
+    mode: "composition",
+    members: [summary.members[1], summary.members[2]],
+  }), false);
+});

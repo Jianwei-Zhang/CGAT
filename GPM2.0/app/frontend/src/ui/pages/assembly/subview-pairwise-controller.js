@@ -21,6 +21,7 @@ import {
   shouldLoadSubviewPairwiseEvidence,
   shouldRefetchSubviewPairwiseEvidence,
 } from "./subview-pairwise-evidence-state.js";
+import { normalizeSubviewCompositionMembers } from "./subview-composition-state.js";
 
 export function createSubviewPairwiseController({
   session,
@@ -41,6 +42,21 @@ export function createSubviewPairwiseController({
       return null;
     }
     const mode = String(summary?.mode || "").trim();
+    if (mode === "composition") {
+      const members = normalizeSubviewCompositionMembers(summary?.members);
+      const topAssemblyCtgIds = members
+        .filter((member) => member.lane === "top" && member.source?.role !== "ref")
+        .map((member) => member.assemblyCtgId).filter(Boolean);
+      const bottomAssemblyCtgIds = members
+        .filter((member) => member.lane === "bottom" && member.source?.role !== "ref")
+        .map((member) => member.assemblyCtgId).filter(Boolean);
+      return {
+        mode: "composition",
+        topAssemblyCtgIds,
+        bottomAssemblyCtgIds,
+        key: buildSubviewPairwiseEvidenceKey(summary, { topAssemblyCtgIds, bottomAssemblyCtgIds }),
+      };
+    }
     if (mode === "track-pair") {
       const topTrack = normalizeSubviewTrackSummary(summary?.topTrack);
       const bottomTrack = normalizeSubviewTrackSummary(summary?.bottomTrack);
@@ -120,6 +136,7 @@ export function createSubviewPairwiseController({
       hits: Array.isArray(previousForKey?.hits) ? previousForKey.hits : [],
       evidenceSource: String(previousForKey?.evidenceSource || ""),
       evidenceHitCount: Number(previousForKey?.evidenceHitCount || 0),
+      coverage: Array.isArray(previousForKey?.coverage) ? previousForKey.coverage : [],
       error: shouldRefetch ? "" : String(previousForKey?.error || ""),
     };
   }
@@ -153,7 +170,7 @@ export function createSubviewPairwiseController({
         normalizeNonNegativeInt(evidence?.requestedMinMapq ?? prefs.mapq) ?? 0,
       ),
     };
-    if (scope.mode === "track-pair") {
+    if (scope.mode === "track-pair" || scope.mode === "composition") {
       if (!scope.topAssemblyCtgIds?.length || !scope.bottomAssemblyCtgIds?.length) {
         return null;
       }
@@ -196,7 +213,7 @@ export function createSubviewPairwiseController({
       return;
     }
     try {
-      const report = params.mode === "track-pair"
+      const report = params.mode === "track-pair" || params.mode === "composition"
         ? await getTrackPairwiseEvidence(params)
         : await getJunctionInspection(params);
       const currentState = store.getState();
@@ -221,6 +238,7 @@ export function createSubviewPairwiseController({
               hits: Array.isArray(report?.hits) ? report.hits : [],
               evidenceSource: String(report?.evidenceSource || ""),
               evidenceHitCount: Number(report?.evidenceHitCount || 0),
+              coverage: Array.isArray(report?.coverage) ? report.coverage : [],
               error: "",
             },
           },
@@ -263,6 +281,9 @@ export function createSubviewPairwiseController({
               minMapq: params.minMapq,
               status: "error",
               hits: Array.isArray(currentEvidence?.hits) ? currentEvidence.hits : [],
+              evidenceSource: String(currentEvidence?.evidenceSource || ""),
+              evidenceHitCount: Number(currentEvidence?.evidenceHitCount || 0),
+              coverage: Array.isArray(currentEvidence?.coverage) ? currentEvidence.coverage : [],
               error: mapAssemblyError({ error, stateOrLocale: currentState }),
             },
           },
@@ -282,6 +303,15 @@ export function createSubviewPairwiseController({
       state,
     );
     if (!pairwiseEvidence) {
+      if (state.assembly?.subview?.pairwiseEvidence) {
+        store.setState({
+          assembly: {
+            ...state.assembly,
+            subview: { ...getSubviewState(state.assembly), pairwiseEvidence: null },
+          },
+        });
+        rerenderSubviewPanel(host, store);
+      }
       return;
     }
     const currentEvidence = state.assembly?.subview?.pairwiseEvidence || null;

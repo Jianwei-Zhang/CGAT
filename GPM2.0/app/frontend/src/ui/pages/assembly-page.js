@@ -37,6 +37,7 @@ import {
 } from "./assembly/page-session.js";
 import { bindSubviewTools } from "./assembly/subview-tools-runtime.js";
 import { createSubviewAnchorManagerController } from "./assembly/subview-anchor-manager-controller.js";
+import { createSubviewCompositionController } from "./assembly/subview-composition-controller.js";
 import {
   createAssemblyConfirmController,
 } from "./assembly/confirm-controller.js";
@@ -56,6 +57,13 @@ import {
   createSubviewSelectionController,
 } from "./assembly/subview-selection-controller.js";
 import {
+  applySubviewComposition,
+  getSubviewComposition,
+  setSubviewCompositionMemberPosition,
+} from "./assembly/subview-composition-state.js";
+import {
+  activateSubviewCompositionHistory,
+  buildSubviewCompositionHistoryKey,
   commitSubviewHistoryOperation,
 } from "./assembly/subview-history-state.js";
 import {
@@ -404,6 +412,16 @@ const {
   scheduleDeferredSubviewPanelRerender: (host, store) =>
     scheduleDeferredSubviewPanelRerender(host, store),
 });
+const subviewToolsContentController = createSubviewCompositionController({
+  session: assemblyPageSession,
+  listChrViewCtgs,
+  persistProjectAssemblyViewStateFromStore: (host, store) =>
+    persistProjectAssemblyViewStateFromStore(host, store),
+  rerenderSubviewPanel: (host, store) => rerenderSubviewPanel(host, store),
+  refreshSubviewPairwiseEvidence,
+  anchorController: subviewAnchorManagerController,
+});
+const { addContextCtgToComposition } = subviewToolsContentController;
 const {
   enterSubviewFromCandidates,
   enterSubviewFromTrackSelections,
@@ -743,7 +761,7 @@ export function syncAssemblySubviewTools(host, store) {
     getLabels: (state) => getAssemblyI18n(state).subview.tools,
     escapeHtml,
     escapeAttr,
-    ...subviewAnchorManagerController,
+    ...subviewToolsContentController,
   });
 }
 
@@ -851,6 +869,8 @@ function createAssemblyPageBindingDeps(options = {}) {
       assemblyPageSession.suppressNextTrackAutoFocus = true;
     },
     persistMainTrackViewState,
+    persistProjectAssemblyViewStateFromStore: (host, store) =>
+      persistProjectAssemblyViewStateFromStore(host, store),
     requestAssemblyConfirm,
     requestAssemblyAnchorOffsetPrompt,
     rerenderAssemblyMainTab: rerenderAssemblyMainTabImpl,
@@ -958,8 +978,10 @@ const assemblyDataLoaderDeps = {
 };
 
 const assemblyDataRuntimeDeps = {
+  activateSubviewCompositionHistory,
   applyEditorAction: (host, store, payload) => editorActionRuntimeAdapters.applyEditorAction(host, store, payload),
   buildClearedSubviewState,
+  buildSubviewCompositionHistoryKey,
   buildSubviewTrackPairHiddenCtgKey,
   buildSubviewTrackPairPoolsFromAssembly,
   filterPrimaryTrackSelectionCtgIds,
@@ -1073,6 +1095,7 @@ const degapRuntimeDeps = {
 };
 
 const contextMenuRuntimeDeps = {
+  addContextCtgToComposition,
   addFinalPathContigRelativeToSegment,
   addFinalPathGapRelativeToSegment,
   applyEditorAction: editorActionRuntimeAdapters.applyEditorAction,
@@ -1944,6 +1967,30 @@ async function rebaseTrackDragOffsetsAfterRestore(
 
 function applySubviewTrackDragOffset(host, store, nextOffset) {
   const state = store.getState();
+  if (String(state.assembly?.subview?.summary?.mode || "") === "composition"
+    && String(nextOffset?.compositionEntityKey || "").trim()) {
+    const composition = getSubviewComposition(state.assembly.subview);
+    const member = composition?.members.find(
+      (entry) => entry.entityKey === String(nextOffset.compositionEntityKey),
+    );
+    if (!member) return;
+    const positioned = setSubviewCompositionMemberPosition(
+      composition,
+      member.entityKey,
+      member.xBp + Number(nextOffset.offsetBp || 0),
+    );
+    if (!positioned.changed) return;
+    const nextSubview = applySubviewComposition(state.assembly.subview, positioned.composition);
+    const committedComposition = commitSubviewHistoryOperation(state.assembly, {
+      nextSubview,
+      operation: { kind: "drag-contig" },
+      stateOrLocale: state,
+    });
+    if (!committedComposition.changed) return;
+    store.setState({ assembly: committedComposition.assembly });
+    rerenderSubviewPanel(host, store);
+    return;
+  }
   const normalizedCurrent = normalizeSubviewTrackDragOffsets(state.assembly.subviewTrackDragOffsets);
   const normalizedNext = setSubviewTrackDragOffset(normalizedCurrent, nextOffset);
   if (areSubviewTrackDragOffsetsEqual(normalizedCurrent, normalizedNext)) {

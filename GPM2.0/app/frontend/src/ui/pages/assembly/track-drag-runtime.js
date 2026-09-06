@@ -241,6 +241,9 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     }
     const slot = normalizeSubviewTrackSlot(trackNode.getAttribute("data-subview-track-slot"));
     const contigId = normalizeSupportDatasetId(trackNode.getAttribute("data-subview-contig-id"));
+    const compositionEntityKey = String(
+      trackNode.getAttribute("data-subview-composition-entity-key") || "",
+    ).trim();
     if (!slot || !contigId) {
       return;
     }
@@ -252,7 +255,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       domainSpanBp: Number(scrollEl.dataset.subviewDomainSpanBp || 0),
       innerWidth: Number(scrollEl.dataset.subviewInnerWidth || 0),
     };
-    const baseOffsetBp = deps.resolveSubviewTrackDragOffsetBp(
+    const baseOffsetBp = compositionEntityKey ? 0 : deps.resolveSubviewTrackDragOffsetBp(
       state.assembly.subviewTrackDragOffsets,
       slot,
       contigId,
@@ -313,6 +316,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
         deps.applySubviewTrackDragOffset(host, store, {
           slot,
           contigId,
+          ...(compositionEntityKey ? { compositionEntityKey } : {}),
           offsetBp: pendingOffsetBp,
         });
         if (

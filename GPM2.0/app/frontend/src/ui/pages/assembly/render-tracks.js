@@ -739,6 +739,9 @@ function createRenderTracksRenderer(deps = {}) {
           phasedChrTracks: assembly.phasedChrTracks || [],
           refCtgs: refSubviewCtgs,
           refTrackLabel: resolveReferenceTrackLabel(assembly.selectedChrName),
+          compositionCandidates: assembly.subviewCompositionCandidates || [],
+          compositionCandidatesLoaded: assembly.subviewCompositionCandidatesLoaded === true,
+          compositionViewport: assembly.subviewCompositionViewport || {},
         },
         subviewTrackPrefs,
         i18n,
@@ -1009,6 +1012,9 @@ function createRenderTracksRenderer(deps = {}) {
         },
       }),
       refTrackLabel: resolveReferenceTrackLabel(assembly.selectedChrName),
+      compositionCandidates: assembly.subviewCompositionCandidates || [],
+      compositionCandidatesLoaded: assembly.subviewCompositionCandidatesLoaded === true,
+      compositionViewport: assembly.subviewCompositionViewport || {},
     };
     return renderSubviewSelectionPanel(assembly, supportContext, subviewTrackPrefs, i18n);
   }

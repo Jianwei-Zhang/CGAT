@@ -48,6 +48,10 @@ function createSubviewToolsRuntime(host, store, deps) {
       "subviewAnchorCheck",
       "subviewAnchorListRow",
       "subviewAnchorDelete",
+      "subviewCompositionSearch",
+      "subviewCompositionCandidate",
+      "subviewCompositionMember",
+      "subviewCompositionFocus",
     ];
     const key = keys.find((candidate) => Object.hasOwn(active?.dataset || {}, candidate));
     if (!key) return null;
@@ -155,6 +159,10 @@ function createSubviewToolsRuntime(host, store, deps) {
       overlay.addEventListener("dblclick", onDoubleClick);
       overlay.addEventListener("keydown", onKeyDown);
       overlay.addEventListener("pointerdown", onPointerDown);
+      overlay.addEventListener("dragstart", onDragStart);
+      overlay.addEventListener("dragover", onDragOver);
+      overlay.addEventListener("drop", onDrop);
+      overlay.addEventListener("dragend", onDragEnd);
       doc.body.appendChild(overlay);
       bindViewport(true);
     }
@@ -264,6 +272,22 @@ function createSubviewToolsRuntime(host, store, deps) {
     win?.addEventListener("pointermove", onPointerMove);
     win?.addEventListener("pointerup", onPointerEnd);
     win?.addEventListener("pointercancel", onPointerEnd);
+  }
+
+  function onDragStart(event) {
+    deps.onDragStart?.(event, { host, store, scopeKey, sync });
+  }
+
+  function onDragOver(event) {
+    deps.onDragOver?.(event, { host, store, scopeKey, sync });
+  }
+
+  function onDrop(event) {
+    deps.onDrop?.(event, { host, store, scopeKey, sync });
+  }
+
+  function onDragEnd(event) {
+    deps.onDragEnd?.(event, { host, store, scopeKey, sync });
   }
 
   function onPointerMove(event) {

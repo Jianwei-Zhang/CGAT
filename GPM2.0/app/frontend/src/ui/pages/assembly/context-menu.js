@@ -460,6 +460,7 @@ export function buildAssemblyContextMenuItems({
     );
 
   const {
+    addContextCtgToComposition,
     enterSubviewFromTrackSelections,
     enterSubviewFromCandidates,
     setSubviewTrackPairCtgHidden,
@@ -876,6 +877,16 @@ export function buildAssemblyContextMenuItems({
   }
 
   if (ctgContext && !deletedCtgContext && !memberNode && !subviewTrackPairContext) {
+    if (typeof addContextCtgToComposition === "function") {
+      items.push({
+        label: i18n.contextMenu.addToSubviewTop,
+        run: async () => addContextCtgToComposition(host, store, ctgContext, "top"),
+      });
+      items.push({
+        label: i18n.contextMenu.addToSubviewBottom,
+        run: async () => addContextCtgToComposition(host, store, ctgContext, "bottom"),
+      });
+    }
     if (isPhasedCtgContext) {
       const phasedTrackItemId = normalizeSupportDatasetId(ctgContext.phasedTrackItemId);
       pushAppendTrackContigItems(ctgContext, { allowAnyPhasedTarget: true });

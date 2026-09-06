@@ -286,6 +286,130 @@
   font-size: 11px;
 }
 
+.subview-composition-manager,
+.subview-composition-picker {
+  display: grid;
+  gap: 8px;
+}
+
+.subview-composition-lane {
+  display: grid;
+  gap: 5px;
+  min-height: 64px;
+  padding: 6px;
+  border: 1px solid #d6dce3;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.subview-composition-lane > header,
+.subview-composition-picker > header,
+.subview-composition-picker-filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.subview-composition-lane ul,
+.subview-composition-candidate-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.subview-composition-member {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px 26px;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: grab;
+}
+
+.subview-composition-member:hover,
+.subview-composition-member:focus-visible,
+.subview-composition-member[aria-pressed="true"] {
+  border-color: #9fb2c7;
+  background: #edf2f7;
+}
+
+.subview-composition-member-main {
+  display: grid;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.subview-composition-member-main strong,
+.subview-composition-member-main span,
+.subview-composition-member-main code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subview-composition-member-main span,
+.subview-composition-member-main code,
+.subview-composition-candidate-list small {
+  color: #667585;
+  font-size: 11px;
+}
+
+.subview-composition-member-main .inline-error {
+  color: var(--danger, #b42318);
+}
+
+.subview-composition-swap {
+  justify-self: center;
+}
+
+.subview-composition-picker-filters input,
+.subview-composition-picker-filters select {
+  box-sizing: border-box;
+  min-width: 0;
+  height: 28px;
+}
+
+.subview-composition-picker-filters input {
+  flex: 1 1 auto;
+}
+
+.subview-composition-candidate-list {
+  max-height: 280px;
+  overflow: auto;
+}
+
+.subview-composition-candidate-list label {
+  display: flex;
+  align-items: start;
+  gap: 6px;
+  padding: 5px 3px;
+  border-top: 1px solid #e1e5ea;
+}
+
+.subview-composition-candidate-list span {
+  display: grid;
+  min-width: 0;
+}
+
+.track-ctg-group.is-composition-focused {
+  filter: drop-shadow(0 0 3px rgba(211, 51, 51, 0.9));
+}
+
+.track-ctg-group.is-composition-focused .track-ctg {
+  stroke: #d33333;
+  stroke-width: 3px;
+}
+
 .subview-anchor-delete {
   width: 24px;
   min-width: 24px;

@@ -22,6 +22,7 @@ import {
 } from "./grt-result-state.js";
 import { assemblyPageSession } from "./page-session.js";
 import { bindMainTrackControlLayout } from "./main-track-control-layout-runtime.js";
+import { updateSubviewCompositionViewport } from "./subview-history-state.js";
 
 const ASSEMBLY_TRACK_COMBO_BOUND = Symbol("assemblyTrackComboBound");
 const ASSEMBLY_DROPDOWN_CLOSE_DELAY_MS = 400;
@@ -454,6 +455,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     loadNewSequencesTab,
     markNextTrackAutoFocusSuppressed,
     persistMainTrackViewState,
+    persistProjectAssemblyViewStateFromStore = async () => {},
     refreshSubviewPairwiseEvidence = () => {},
     rememberTrackViewportAnchor,
     requestAssemblyConfirm = async () => true,
@@ -1413,26 +1415,46 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
       rememberTrackViewportAnchor(host, viewKey);
       markNextTrackAutoFocusSuppressed();
     }
+    let nextAssembly = {
+      ...current,
+      [viewKey]: nextPrefs,
+      finalPathTrackScrollState:
+        viewKey === "finalPathTrackView"
+          ? captureFinalPathTrackScrollState(host, {
+            ...state,
+            assembly: {
+              ...current,
+              [viewKey]: nextPrefs,
+            },
+          })
+          : current.finalPathTrackScrollState,
+      trackSelectedCtgIds:
+        viewKey === "trackView" && field === "supportDsCtgLen"
+          ? []
+          : current.trackSelectedCtgIds,
+    };
+    const compositionScaleChanged = viewKey === "subviewTrackView"
+      && String(current?.subview?.summary?.mode || "").trim() === "composition"
+      && (field === "minTickUnitKb" || field === "maxTickCount");
+    if (compositionScaleChanged) {
+      const viewport = current.subviewCompositionViewport || {};
+      const currentScale = Math.max(1e-6, Number(viewport.bpPerPx) || 1_000);
+      const ratio = field === "minTickUnitKb"
+        ? nextValue / Math.max(1e-6, previousValue)
+        : previousValue / Math.max(1e-6, nextValue);
+      const nextScale = Math.max(1e-6, currentScale * ratio);
+      const viewportWidth = Math.max(0,
+        Number(host?.querySelector?.(".subview-track-scroll")?.clientWidth || 0));
+      const centerBp = Number(viewport.leftBp || 0) + viewportWidth * currentScale / 2;
+      nextAssembly = updateSubviewCompositionViewport(nextAssembly, {
+        ...viewport,
+        bpPerPx: nextScale,
+        leftBp: centerBp - viewportWidth * nextScale / 2,
+      });
+    }
     store.setState({
       ...state,
-      assembly: {
-        ...current,
-        [viewKey]: nextPrefs,
-        finalPathTrackScrollState:
-          viewKey === "finalPathTrackView"
-            ? captureFinalPathTrackScrollState(host, {
-              ...state,
-              assembly: {
-                ...current,
-                [viewKey]: nextPrefs,
-              },
-            })
-            : current.finalPathTrackScrollState,
-        trackSelectedCtgIds:
-          viewKey === "trackView" && field === "supportDsCtgLen"
-            ? []
-            : current.trackSelectedCtgIds,
-      },
+      assembly: nextAssembly,
     });
     if (viewKey === "finalPathTrackView") {
       rerenderFinalPathCard(host, store);
@@ -1443,6 +1465,9 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     }
     if (viewKey === "trackView") {
       void persistMainTrackViewState(host, store);
+    }
+    if (compositionScaleChanged) {
+      void persistProjectAssemblyViewStateFromStore(host, store);
     }
     if (
       viewKey === "subviewTrackView"

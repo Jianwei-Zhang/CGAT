@@ -2169,6 +2169,104 @@ test("track scroll sync restores and persists project-scoped main and subview sc
   __testResetMeasuredTrackViewportWidths();
 });
 
+test("composition scroll restores and updates the history-owned world viewport", () => {
+  __testResetMeasuredTrackViewportWidths();
+  const listeners = new Map();
+  const scroll = {
+    dataset: {
+      trackRole: "subview",
+      subviewViewboxMinX: "-20",
+      subviewDomainSpanBp: "12000",
+      subviewInnerWidth: "1200",
+    },
+    clientWidth: 360,
+    scrollLeft: 0,
+    addEventListener(type, handler) {
+      listeners.set(type, handler);
+    },
+  };
+  const host = {
+    querySelector(selector) {
+      return selector === ".assembly-track-scroll.subview-track-scroll" ? scroll : null;
+    },
+    querySelectorAll(selector) {
+      return selector === ".assembly-track-scroll[data-track-role]" ? [scroll] : [];
+    },
+  };
+  const composition = {
+    members: [{
+      entityKey: "assembly:8",
+      sourceKey: "primary:1:mother:0:0:",
+      assemblyCtgId: 8,
+      source: { role: "primary", datasetId: 1 },
+      label: "ctg8",
+      lengthBp: 1000,
+      lane: "top",
+      xBp: 0,
+      flipped: false,
+      order: 0,
+    }],
+    layoutGapBp: 200,
+    activeAnchors: [],
+    manualAnchors: [],
+  };
+  const pairKey = "composition:Chr01";
+  const snapshot = { kind: "composition", composition };
+  const store = createStore(createState({
+    assembly: {
+      subview: {
+        mode: "composition",
+        historyKey: pairKey,
+        activeAnchors: [],
+        manualAnchors: [],
+        summary: { mode: "composition", members: composition.members, layoutGapBp: 200 },
+      },
+      subviewCompositionViewport: { bpPerPx: 10, leftBp: 500, topPx: 0 },
+      subviewHistoryByKey: {
+        [pairKey]: {
+          version: 2,
+          pairKey,
+          current: snapshot,
+          default: snapshot,
+          past: [],
+          forward: [],
+          viewport: { bpPerPx: 10, leftBp: 500, topPx: 0 },
+          updatedAt: "1",
+        },
+      },
+      subviewTrackScrollState: {},
+    },
+  }));
+
+  __testBindTrackScrollSync(host, store, {
+    schedulePersistAssemblyScrollState() {},
+  });
+  assert.equal(scroll.scrollLeft, 70);
+  const currentBeforeScroll = store.getState().assembly.subviewHistoryByKey[pairKey].current;
+
+  scroll.scrollLeft = 90;
+  listeners.get("scroll")?.();
+  assert.equal(store.getState().assembly.subviewCompositionViewport.leftBp, 700);
+  assert.equal(store.getState().assembly.subviewHistoryByKey[pairKey].viewport.leftBp, 700);
+  const currentAfterScroll = store.getState().assembly.subviewHistoryByKey[pairKey].current;
+  assert.equal(currentAfterScroll.kind, currentBeforeScroll.kind);
+  assert.deepEqual(
+    currentAfterScroll.composition.members.map((member) => ({
+      entityKey: member.entityKey,
+      lane: member.lane,
+      xBp: member.xBp,
+      flipped: member.flipped,
+    })),
+    currentBeforeScroll.composition.members.map((member) => ({
+      entityKey: member.entityKey,
+      lane: member.lane,
+      xBp: member.xBp,
+      flipped: member.flipped,
+    })),
+  );
+  __testResetMeasuredTrackViewportWidths();
+});
+
 test("main-track scroll position survives contig selection and temporary loading markup", () => {
   __testResetMeasuredTrackViewportWidths();
   const listeners = new Map();

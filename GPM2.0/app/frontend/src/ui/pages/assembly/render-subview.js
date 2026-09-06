@@ -46,6 +46,7 @@ import { buildGrtResultScene } from "./grt-result-render.js";
 import { renderGrtResultControls } from "./grt-result-controls.js";
 import { renderSubviewToolsToggle } from "./render-subview-tools.js";
 import { buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
+import { renderSubviewCompositionAlignmentCard } from "./render-subview-composition-canvas.js";
 import {
   buildTrackCtgHoverTitle,
   resolveBoundedTrackCtgLabelPlacement,
@@ -1357,6 +1358,24 @@ function renderSubviewAlignmentCard(
   const summary = subview?.summary || null;
   if (!summary) {
     return "";
+  }
+  if (String(summary.mode || "") === "composition") {
+    const resolvedTrackPrefs = resolveTrackPrefs(trackPrefs || {});
+    return renderSubviewCompositionAlignmentCard({
+      subview,
+      supportContext,
+      i18n,
+      historyControls: renderSubviewTrackInlineControls(
+        resolvedTrackPrefs,
+        i18n,
+        grtResult.context,
+        history,
+      ),
+      viewportWidthPx: getMeasuredTrackViewportPx("subview"),
+      resolveTrackToneClass,
+      escapeHtml,
+      escapeAttr,
+    });
   }
   if (String(summary.mode || "") === "track-pair") {
     return renderSubviewTrackPairAlignmentCard(
