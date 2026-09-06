@@ -45,6 +45,7 @@ import { buildGrtResultPlan, resolveGrtResultContext } from "./grt-result-state.
 import { buildGrtResultScene } from "./grt-result-render.js";
 import { renderGrtResultControls } from "./grt-result-controls.js";
 import { renderSubviewToolsToggle } from "./render-subview-tools.js";
+import { buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
 import {
   buildTrackCtgHoverTitle,
   resolveBoundedTrackCtgLabelPlacement,
@@ -662,6 +663,48 @@ export function createAssemblySubviewRenderer(deps = {}) {
     throw new Error("render-subview.js missing required render dependencies");
   }
 
+function resolveSubviewAnchorSourceDescriptor(selection, ctg, supportContext) {
+  const role = normalizeSubviewRole(selection?.role);
+  const datasetId = normalizeSupportDatasetId(selection?.datasetId ?? ctg?.datasetId);
+  const sourceKind = role === "support"
+    ? (String(selection?.source || ctg?.subviewSource || "mother").trim() === "mirror" ? "mirror" : "mother")
+    : "";
+  let sourceName = String(ctg?.datasetName || ctg?.datasetLabel || "").trim();
+  if (!sourceName && role === "primary") {
+    sourceName = String(supportContext?.primaryDatasetName || "").trim();
+  } else if (!sourceName && role === "support") {
+    const selectedId = normalizeSupportDatasetId(supportContext?.supportDatasetId);
+    if (datasetId !== null && datasetId === selectedId) {
+      sourceName = String(supportContext?.supportDatasetName || "").trim();
+    }
+    if (!sourceName) {
+      sourceName = String((Array.isArray(supportContext?.supportDatasetOptions)
+        ? supportContext.supportDatasetOptions : [])
+        .find((item) => normalizeSupportDatasetId(item?.datasetId) === datasetId)?.label || "").trim();
+    }
+    if (!sourceName) {
+      sourceName = String((Array.isArray(supportContext?.supportMirrorCtgs)
+        ? supportContext.supportMirrorCtgs : [])
+        .find((item) => normalizeSupportDatasetId(item?.datasetId) === datasetId)?.datasetName || "").trim();
+    }
+    if (!sourceName) sourceName = String(supportContext?.supportDatasetName || "").trim();
+    if (!sourceName && datasetId !== null) sourceName = `ds-${datasetId}`;
+  } else if (!sourceName && role === "ref") {
+    sourceName = String(supportContext?.refTrackLabel || "ref").trim();
+  } else if (!sourceName && role === "phased") {
+    const phasedTrackId = normalizeSupportDatasetId(selection?.phasedTrackId);
+    const track = (Array.isArray(supportContext?.phasedChrTracks) ? supportContext.phasedChrTracks : [])
+      .find((item) => normalizeSupportDatasetId(item?.phasedTrackId) === phasedTrackId);
+    sourceName = String(track?.label || selection?.haplotypeKey
+      || selection?.phasedHaplotypeKey || phasedTrackId || "").trim();
+  }
+  return {
+    ...(role ? { sourceRole: role } : {}),
+    ...(sourceKind ? { sourceKind } : {}),
+    ...(sourceName ? { sourceName } : {}),
+  };
+}
+
 function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n) {
   const subview = getSubviewStateImpl(assembly);
   const candidates = getSubviewSelections(subview);
@@ -1032,6 +1075,16 @@ function buildSubviewManualAnchorEdges(manualAnchors, { topEndpoint, bottomEndpo
       bottomCutBp,
       topLengthBp: topEndpoint.lengthBp,
       bottomLengthBp: bottomEndpoint.lengthBp,
+      topName: topEndpoint.name,
+      bottomName: bottomEndpoint.name,
+      topSourceLabel: topEndpoint.sourceLabel,
+      bottomSourceLabel: bottomEndpoint.sourceLabel,
+      topSourceRole: topEndpoint.sourceRole,
+      bottomSourceRole: bottomEndpoint.sourceRole,
+      topSourceKind: topEndpoint.sourceKind,
+      bottomSourceKind: bottomEndpoint.sourceKind,
+      topSourceName: topEndpoint.sourceName,
+      bottomSourceName: bottomEndpoint.sourceName,
     }];
   }).filter((edge) => edge.manualAnchorId);
 }
@@ -1149,6 +1202,11 @@ function renderSubviewAnchorLines(anchorEdges, { topY, bottomY, hitTopY, hitBott
       (edge) => {
         const anchorKind = edge.manualAnchorId ? "manual" : "evidence";
         const anchorEdge = edge.manualAnchorId ? "manual" : String(edge.edge || "");
+        const objectId = buildSubviewAnchorObjectId(
+          anchorKind,
+          edge.manualAnchorId || edge.hitKey,
+          anchorEdge,
+        );
         return `<line
                   class="subview-anchor-line${edge.active ? " is-active" : ""}"
                   x1="${Number(edge.topX || 0).toFixed(2)}"
@@ -1158,6 +1216,7 @@ function renderSubviewAnchorLines(anchorEdges, { topY, bottomY, hitTopY, hitBott
                   stroke="${edge.active ? "red" : "transparent"}"
                   stroke-width="3"
                   pointer-events="none"
+                  data-subview-anchor-object-id="${escapeAttr(objectId)}"
                 />
                 <line
                   class="subview-anchor-hit-zone${edge.active ? " is-active" : ""}"
@@ -1169,6 +1228,7 @@ function renderSubviewAnchorLines(anchorEdges, { topY, bottomY, hitTopY, hitBott
                   stroke-width="3"
                   pointer-events="stroke"
                   data-subview-anchor-kind="${anchorKind}"
+                  data-subview-anchor-object-id="${escapeAttr(objectId)}"
                   data-subview-anchor-hit-key="${escapeAttr(edge.hitKey)}"
                   data-subview-anchor-edge="${escapeAttr(anchorEdge)}"
                   data-subview-anchor-active="${edge.active ? "1" : "0"}"
@@ -1181,6 +1241,16 @@ function renderSubviewAnchorLines(anchorEdges, { topY, bottomY, hitTopY, hitBott
                   data-subview-anchor-bottom-cut-bp="${Number(edge.bottomCutBp || 0)}"
                   data-subview-anchor-top-length-bp="${Number(edge.topLengthBp || 0)}"
                   data-subview-anchor-bottom-length-bp="${Number(edge.bottomLengthBp || 0)}"
+                  data-subview-anchor-top-name="${escapeAttr(edge.topName || "")}"
+                  data-subview-anchor-bottom-name="${escapeAttr(edge.bottomName || "")}"
+                  data-subview-anchor-top-source-label="${escapeAttr(edge.topSourceLabel || "")}"
+                  data-subview-anchor-bottom-source-label="${escapeAttr(edge.bottomSourceLabel || "")}"
+                  data-subview-anchor-top-source-role="${escapeAttr(edge.topSourceRole || "")}"
+                  data-subview-anchor-bottom-source-role="${escapeAttr(edge.bottomSourceRole || "")}"
+                  data-subview-anchor-top-source-kind="${escapeAttr(edge.topSourceKind || "")}"
+                  data-subview-anchor-bottom-source-kind="${escapeAttr(edge.bottomSourceKind || "")}"
+                  data-subview-anchor-top-source-name="${escapeAttr(edge.topSourceName || "")}"
+                  data-subview-anchor-bottom-source-name="${escapeAttr(edge.bottomSourceName || "")}"
                   data-subview-anchor-top-x="${Number(edge.topX || 0).toFixed(4)}"
                   data-subview-anchor-bottom-x="${Number(edge.bottomX || 0).toFixed(4)}"
                 />`;
@@ -1427,6 +1497,14 @@ function renderSubviewAlignmentCard(
   const bandTone = topSelection.role === "support" ? "companion" : "primary";
   const topLabelText = resolveTrackCtgLabelText(topCtg, topSelection.contigId);
   const bottomLabelText = resolveTrackCtgLabelText(bottomCtg, bottomSelection.contigId);
+  const topSourceLabel = resolveSubviewTrackSelectionLabel(
+    { ...topSelection, datasetId: topCtg?.datasetId }, supportContext, i18n,
+  );
+  const bottomSourceLabel = resolveSubviewTrackSelectionLabel(
+    { ...bottomSelection, datasetId: bottomCtg?.datasetId }, supportContext, i18n,
+  );
+  const topSourceDescriptor = resolveSubviewAnchorSourceDescriptor(topSelection, topCtg, supportContext);
+  const bottomSourceDescriptor = resolveSubviewAnchorSourceDescriptor(bottomSelection, bottomCtg, supportContext);
   const topLabelPlacement = resolveBoundedTrackCtgLabelPlacement({
     ctgName: topLabelText,
     role: topSelection.role,
@@ -1481,6 +1559,16 @@ function renderSubviewAlignmentCard(
     bottomEndpointKey,
     topLengthBp: svgModel.topLengthBp,
     bottomLengthBp: svgModel.bottomLengthBp,
+    topName: topLabelText,
+    bottomName: bottomLabelText,
+    topSourceLabel,
+    bottomSourceLabel,
+    topSourceRole: topSourceDescriptor.sourceRole,
+    bottomSourceRole: bottomSourceDescriptor.sourceRole,
+    topSourceKind: topSourceDescriptor.sourceKind,
+    bottomSourceKind: bottomSourceDescriptor.sourceKind,
+    topSourceName: topSourceDescriptor.sourceName,
+    bottomSourceName: bottomSourceDescriptor.sourceName,
     active: activeAnchorKeys.has(`${String(edge.hitKey || "").trim()}:${String(edge.edge || "").trim()}`),
   }));
   const manualAnchorEdges = buildSubviewManualAnchorEdges(subview?.manualAnchors, {
@@ -1488,6 +1576,9 @@ function renderSubviewAlignmentCard(
       endpointKey: topEndpointKey,
       contigId: topSelection.contigId,
       lengthBp: svgModel.topLengthBp,
+      name: topLabelText,
+      sourceLabel: topSourceLabel,
+      ...topSourceDescriptor,
       topY: svgModel.topBarY,
       bottomY: svgModel.topBarY + svgModel.barHeight,
       hitY: svgModel.topBarY + svgModel.barHeight,
@@ -1502,6 +1593,9 @@ function renderSubviewAlignmentCard(
       endpointKey: bottomEndpointKey,
       contigId: bottomSelection.contigId,
       lengthBp: svgModel.bottomLengthBp,
+      name: bottomLabelText,
+      sourceLabel: bottomSourceLabel,
+      ...bottomSourceDescriptor,
       topY: svgModel.bottomBarY,
       bottomY: svgModel.bottomBarY + svgModel.barHeight,
       hitY: svgModel.bottomBarY,
@@ -1845,6 +1939,10 @@ function renderSubviewTrackPairAlignmentCard(
     className: resolveTrackToneClass(bottomTrack.role).trim(),
     emptyMessage: i18n.trackControls.bottomTrackEmpty,
   };
+  const topTrackLabel = resolveSubviewTrackSelectionLabel(topTrack, supportContext, i18n);
+  const bottomTrackLabel = resolveSubviewTrackSelectionLabel(bottomTrack, supportContext, i18n);
+  const topSourceDescriptor = resolveSubviewAnchorSourceDescriptor(topTrack, null, supportContext);
+  const bottomSourceDescriptor = resolveSubviewAnchorSourceDescriptor(bottomTrack, null, supportContext);
   const rowLayouts = [topLayout, bottomLayout].map((layout) => ({
     ...layout,
     laneCount: Math.max(1, Number(layout.trackModel?.laneCount || 1)),
@@ -2451,6 +2549,16 @@ function renderSubviewTrackPairAlignmentCard(
           bottomCutBp: reversed ? bottomRightCutBp : bottomLeftCutBp,
           topLengthBp: topSegment.ctgLengthBp,
           bottomLengthBp: bottomSegment.ctgLengthBp,
+          topName: topSegment.ctgName,
+          bottomName: bottomSegment.ctgName,
+          topSourceLabel: topTrackLabel,
+          bottomSourceLabel: bottomTrackLabel,
+          topSourceRole: topSourceDescriptor.sourceRole,
+          bottomSourceRole: bottomSourceDescriptor.sourceRole,
+          topSourceKind: topSourceDescriptor.sourceKind,
+          bottomSourceKind: bottomSourceDescriptor.sourceKind,
+          topSourceName: topSourceDescriptor.sourceName,
+          bottomSourceName: bottomSourceDescriptor.sourceName,
         },
         {
           hitKey,
@@ -2469,6 +2577,16 @@ function renderSubviewTrackPairAlignmentCard(
           bottomCutBp: reversed ? bottomLeftCutBp : bottomRightCutBp,
           topLengthBp: topSegment.ctgLengthBp,
           bottomLengthBp: bottomSegment.ctgLengthBp,
+          topName: topSegment.ctgName,
+          bottomName: bottomSegment.ctgName,
+          topSourceLabel: topTrackLabel,
+          bottomSourceLabel: bottomTrackLabel,
+          topSourceRole: topSourceDescriptor.sourceRole,
+          bottomSourceRole: bottomSourceDescriptor.sourceRole,
+          topSourceKind: topSourceDescriptor.sourceKind,
+          bottomSourceKind: bottomSourceDescriptor.sourceKind,
+          topSourceName: topSourceDescriptor.sourceName,
+          bottomSourceName: bottomSourceDescriptor.sourceName,
         },
       ];
     })
@@ -2504,6 +2622,9 @@ function renderSubviewTrackPairAlignmentCard(
             endpointKey,
             contigId,
             lengthBp,
+            name: resolveTrackCtgLabelText(ctg, contigId),
+            sourceLabel: layout.id === "top" ? topTrackLabel : bottomTrackLabel,
+            ...(layout.id === "top" ? topSourceDescriptor : bottomSourceDescriptor),
             topY: laneTop,
             bottomY: laneTop + TRACK_BAR_HEIGHT,
             hitY: layout.id === "top" ? laneTop + TRACK_BAR_HEIGHT : laneTop,
@@ -2528,8 +2649,6 @@ function renderSubviewTrackPairAlignmentCard(
       buildSubviewTrackPairHiddenCtgKey(entry.trackRole, entry.contigId),
     ),
   );
-  const topTrackLabel = resolveSubviewTrackSelectionLabel(topTrack, supportContext, i18n);
-  const bottomTrackLabel = resolveSubviewTrackSelectionLabel(bottomTrack, supportContext, i18n);
   const topRoleClass = resolveTrackToneClass(topTrack.role);
   const bottomRoleClass = resolveTrackToneClass(bottomTrack.role);
   const trackOrderButtonTopPx = (

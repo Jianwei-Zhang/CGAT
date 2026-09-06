@@ -1,8 +1,10 @@
 import { resolveAnchorOffsetErrorKey } from "./confirm-controller.js";
 import {
+  buildSubviewAnchorStateKey,
   createOffsetSubviewManualAnchor,
   deriveSubviewAnchorOffsetSuggestion,
   removeSubviewManualAnchor,
+  setSubviewAnchorStateForSummary,
   toggleSubviewAnchorEdge as toggleSubviewAnchorEdgeState,
   upsertSubviewManualAnchor,
 } from "./subview-anchor-state.js";
@@ -18,6 +20,12 @@ import {
   normalizeSubviewTrackPairSelectionCtgs,
 } from "./subview-state.js";
 import { commitSubviewHistoryOperation } from "./subview-history-state.js";
+import {
+  collectSubviewAnchorScene,
+  deleteSubviewAnchorObjects,
+  enrichSubviewAnchorObjectDescriptors,
+  findSubviewAnchorDescriptor,
+} from "./subview-anchor-objects.js";
 
 export function createSubviewInteractionController({
   persistProjectAssemblyViewStateFromStore,
@@ -104,7 +112,7 @@ export function createSubviewInteractionController({
     const currentSubview = getSubviewState(state.assembly);
     const nextActiveAnchors = toggleSubviewAnchorEdgeState(
       currentSubview.activeAnchors,
-      { hitKey, edge },
+      { hitKey, edge, descriptor: findSubviewAnchorDescriptor(host, hitKey, edge) },
     );
     if (
       nextActiveAnchors.length === currentSubview.activeAnchors.length
@@ -191,6 +199,65 @@ export function createSubviewInteractionController({
     });
   }
 
+  async function deleteSubviewAnchors(host, store, objectIds) {
+    const state = store.getState();
+    const currentSubview = getSubviewState(state.assembly);
+    const result = deleteSubviewAnchorObjects(currentSubview, objectIds);
+    if (!result.changed) return false;
+    await commitSubviewAnchorState(
+      host,
+      store,
+      {
+        ...currentSubview,
+        activeAnchors: result.activeAnchors,
+        manualAnchors: result.manualAnchors,
+      },
+      { kind: "delete-anchors", count: result.count },
+    );
+    setAssemblyActionFeedback(host, store, {
+      actionStatus: tAssembly(store.getState(), "runtime.subviewAnchorsDeleted", { count: result.count }),
+      actionError: "",
+    });
+    return true;
+  }
+
+  async function enrichSubviewAnchorDescriptors(host, store) {
+    const state = store.getState();
+    const currentSubview = getSubviewState(state.assembly);
+    const enriched = enrichSubviewAnchorObjectDescriptors(
+      currentSubview,
+      collectSubviewAnchorScene(host),
+    );
+    if (!enriched.changed) return false;
+    const nextSubview = { ...currentSubview, activeAnchors: enriched.activeAnchors };
+    const pairKey = buildSubviewAnchorStateKey(nextSubview.summary, state.assembly.selectedChrName);
+    const currentRecord = state.assembly.subviewHistoryByKey?.[pairKey];
+    const subviewHistoryByKey = currentRecord
+      ? {
+          ...state.assembly.subviewHistoryByKey,
+          [pairKey]: {
+            ...currentRecord,
+            current: { ...currentRecord.current, activeAnchors: enriched.activeAnchors },
+          },
+        }
+      : state.assembly.subviewHistoryByKey;
+    store.setState({
+      assembly: {
+        ...state.assembly,
+        subview: nextSubview,
+        subviewAnchorStateByKey: setSubviewAnchorStateForSummary(
+          state.assembly.subviewAnchorStateByKey,
+          nextSubview.summary,
+          state.assembly.selectedChrName,
+          nextSubview,
+        ),
+        subviewHistoryByKey,
+      },
+    });
+    await persistProjectAssemblyViewStateFromStore(host, store);
+    return true;
+  }
+
   async function toggleSubviewContigFlip(host, store, { slot, assemblyCtgId }, options = {}) {
     const normalizedSlot = String(slot || "").trim().toLowerCase();
     const normalizedContigId = normalizeSupportDatasetId(assemblyCtgId);
@@ -245,6 +312,8 @@ export function createSubviewInteractionController({
   return {
     clearSubviewTrackPairHiddenCtgs,
     copySubviewAnchorWithOffset,
+    deleteSubviewAnchors,
+    enrichSubviewAnchorDescriptors,
     deleteSubviewManualAnchor,
     setSubviewTrackPairCtgHidden,
     toggleSubviewAnchorEdge,

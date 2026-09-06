@@ -42,6 +42,13 @@ function normalizeEndpoint(endpoint) {
   const contigId = normalizePositiveInt(endpoint?.contigId);
   const cutBp = normalizePositiveInt(endpoint?.cutBp);
   const lengthBp = normalizePositiveInt(endpoint?.lengthBp);
+  const sourceRole = ["primary", "support", "ref", "phased", "grt"]
+    .includes(String(endpoint?.sourceRole || "").trim().toLowerCase())
+    ? String(endpoint.sourceRole).trim().toLowerCase()
+    : "";
+  const sourceKind = String(endpoint?.sourceKind || "").trim().toLowerCase();
+  const sourceName = String(endpoint?.sourceName || "").trim();
+  const sourceLabel = String(endpoint?.sourceLabel || "").trim();
   if (!endpointKey || !contigId || !cutBp) {
     return null;
   }
@@ -50,7 +57,18 @@ function normalizeEndpoint(endpoint) {
     contigId,
     cutBp,
     ...(lengthBp ? { lengthBp } : {}),
+    ...(String(endpoint?.name || "").trim() ? { name: String(endpoint.name).trim() } : {}),
+    ...(sourceRole ? { sourceRole } : {}),
+    ...(sourceKind ? { sourceKind } : {}),
+    ...(sourceName ? { sourceName } : {}),
+    ...(!sourceRole && sourceLabel ? { sourceLabel } : {}),
   };
+}
+
+function normalizeAnchorDescriptor(value) {
+  const top = normalizeEndpoint(value?.top);
+  const bottom = normalizeEndpoint(value?.bottom);
+  return top && bottom ? { top, bottom } : null;
 }
 
 function sortEndpoints(left, right) {
@@ -79,7 +97,14 @@ export function normalizeSubviewActiveAnchors(values) {
       return;
     }
     const edge = normalizeEdge(entry?.edge);
-    normalized.set(`${hitKey}:${edge}`, { hitKey, edge });
+    const descriptor = normalizeAnchorDescriptor(entry?.descriptor);
+    const key = `${hitKey}:${edge}`;
+    const retainedDescriptor = descriptor || normalized.get(key)?.descriptor || null;
+    normalized.set(key, {
+      hitKey,
+      edge,
+      ...(retainedDescriptor ? { descriptor: retainedDescriptor } : {}),
+    });
   });
   return Array.from(normalized.values()).sort((left, right) =>
     `${left.hitKey}:${left.edge}`.localeCompare(`${right.hitKey}:${right.edge}`),
@@ -261,7 +286,7 @@ export function setSubviewAnchorStateForSummary(anchorStateByKey, summary, chrNa
   };
 }
 
-export function toggleSubviewAnchorEdge(activeAnchors, { hitKey, edge }) {
+export function toggleSubviewAnchorEdge(activeAnchors, { hitKey, edge, descriptor = null }) {
   const normalizedHitKey = normalizeHitKey(hitKey);
   if (!normalizedHitKey) {
     return normalizeSubviewActiveAnchors(activeAnchors);
@@ -275,9 +300,11 @@ export function toggleSubviewAnchorEdge(activeAnchors, { hitKey, edge }) {
     normalized.splice(existingIndex, 1);
     return normalized;
   }
+  const normalizedDescriptor = normalizeAnchorDescriptor(descriptor);
   normalized.push({
     hitKey: normalizedHitKey,
     edge: normalizedEdge,
+    ...(normalizedDescriptor ? { descriptor: normalizedDescriptor } : {}),
   });
   return normalizeSubviewActiveAnchors(normalized);
 }
@@ -327,12 +354,40 @@ export function createOffsetSubviewManualAnchor(sourceEdge, { direction, offsetB
     contigId: topContigId,
     cutBp: nextTopCutBp,
     ...(topLengthBp ? { lengthBp: topLengthBp } : {}),
+    ...(String(sourceEdge?.topName || "").trim() ? { name: String(sourceEdge.topName).trim() } : {}),
+    ...(String(sourceEdge?.topSourceLabel || "").trim()
+      ? { sourceLabel: String(sourceEdge.topSourceLabel).trim() }
+      : {}),
+    ...(String(sourceEdge?.topSourceRole || "").trim()
+      ? { sourceRole: String(sourceEdge.topSourceRole).trim() }
+      : {}),
+    ...(String(sourceEdge?.topSourceKind || "").trim()
+      ? { sourceKind: String(sourceEdge.topSourceKind).trim() }
+      : {}),
+    ...(String(sourceEdge?.topSourceName || "").trim()
+      ? { sourceName: String(sourceEdge.topSourceName).trim() }
+      : {}),
   };
   const endpointB = {
     endpointKey: bottomEndpointKey,
     contigId: bottomContigId,
     cutBp: nextBottomCutBp,
     ...(bottomLengthBp ? { lengthBp: bottomLengthBp } : {}),
+    ...(String(sourceEdge?.bottomName || "").trim()
+      ? { name: String(sourceEdge.bottomName).trim() }
+      : {}),
+    ...(String(sourceEdge?.bottomSourceLabel || "").trim()
+      ? { sourceLabel: String(sourceEdge.bottomSourceLabel).trim() }
+      : {}),
+    ...(String(sourceEdge?.bottomSourceRole || "").trim()
+      ? { sourceRole: String(sourceEdge.bottomSourceRole).trim() }
+      : {}),
+    ...(String(sourceEdge?.bottomSourceKind || "").trim()
+      ? { sourceKind: String(sourceEdge.bottomSourceKind).trim() }
+      : {}),
+    ...(String(sourceEdge?.bottomSourceName || "").trim()
+      ? { sourceName: String(sourceEdge.bottomSourceName).trim() }
+      : {}),
   };
   const [firstEndpoint, secondEndpoint] = [endpointA, endpointB].sort(sortEndpoints);
   const manualAnchorId = normalizeManualAnchorId("", firstEndpoint, secondEndpoint);

@@ -12,6 +12,7 @@ import {
   rollbackSubviewHistory,
 } from "../subview-history-state.js";
 import { swapSubviewSummaryOrder } from "../subview-state.js";
+import { deleteSubviewAnchorObjects } from "../subview-anchor-objects.js";
 
 function buildAssembly() {
   return {
@@ -145,6 +146,47 @@ test("A new Subview edit after rollback clears forward history", () => {
     now: 3,
   }).assembly;
   assert.equal(resolveCurrentSubviewHistory(assembly).canRestoreRollback, false);
+});
+
+test("mixed anchor batch deletion is one history operation and rollback restores every object", () => {
+  let assembly = activateSubviewHistory(buildAssembly(), { now: 0 }).assembly;
+  assembly = commitSubviewHistoryOperation(assembly, {
+    nextSubview: {
+      ...assembly.subview,
+      activeAnchors: [{ hitKey: "hit-1", edge: "left" }],
+      manualAnchors: [{
+        manualAnchorId: "manual-1",
+        endpointA: { endpointKey: "top-1", contigId: 1, cutBp: 100 },
+        endpointB: { endpointKey: "bottom-2", contigId: 2, cutBp: 200 },
+      }],
+    },
+    operation: { kind: "create-offset-anchor" },
+    now: 1,
+  }).assembly;
+  const deleted = deleteSubviewAnchorObjects(assembly.subview, [
+    "edge:hit-1:left",
+    "manual:manual-1",
+  ]);
+  const committed = commitSubviewHistoryOperation(assembly, {
+    nextSubview: {
+      ...assembly.subview,
+      activeAnchors: deleted.activeAnchors,
+      manualAnchors: deleted.manualAnchors,
+    },
+    operation: { kind: "delete-anchors", count: deleted.count },
+    now: 2,
+  });
+
+  assert.equal(committed.changed, true);
+  assert.equal(committed.operation.kind, "delete-anchors");
+  assert.equal(committed.operation.count, 2);
+  assert.deepEqual(committed.assembly.subview.activeAnchors, []);
+  assert.deepEqual(committed.assembly.subview.manualAnchors, []);
+  assert.equal(resolveCurrentSubviewHistory(committed.assembly).record.past.length, 2);
+
+  const rollback = rollbackSubviewHistory(committed.assembly, { now: 3 });
+  assert.equal(rollback.assembly.subview.activeAnchors.length, 1);
+  assert.equal(rollback.assembly.subview.manualAnchors.length, 1);
 });
 
 test("Subview reset restores the first-entered default and is itself rollback-able", () => {

@@ -30,6 +30,7 @@ function fixture(saved = null) {
         }) ? this : null;
       },
       focus() { doc.activeElement = this; },
+      setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; },
       remove() { this.isConnected = false; nodes.splice(nodes.indexOf(this), 1); },
       setPointerCapture(id) { this.pointer = id; },
       hasPointerCapture(id) { return this.pointer === id; },
@@ -61,8 +62,12 @@ function fixture(saved = null) {
           node({ subviewToolsTab: "anchors" }), node({ subviewToolsTab: "composition" }),
           node({ subviewToolsClose: "1" }), node({ subviewToolsDrag: "1" }),
           node({ subviewToolsResize: "both" })];
+        if (markup.includes("data-subview-anchor-search")) {
+          overlay.controls.push(node({ subviewAnchorSearch: "1" }));
+        }
       } });
       overlay.querySelector = (s) => overlay.controls?.find((n) => n.closest(s)) || null;
+      overlay.querySelectorAll = (s) => overlay.controls?.filter((n) => n.closest(s)) || [];
       return overlay;
     },
   };
@@ -153,4 +158,29 @@ test("popup controls cannot trigger the window capture Delete hotkey", () => {
     f.store.getState()), false);
   assert.equal(shouldHandleTrackDeleteHotkey({ key: "Delete", target: { tagName: "DIV", closest: () => null } },
     f.store.getState()), true);
+});
+
+test("content rerender restores search focus and selection", () => {
+  const f = fixture();
+  let query = "";
+  f.deps.renderContent = () => `<input data-subview-anchor-search="1" value="${query}">`;
+  f.deps.onInput = (event, { sync }) => {
+    query = event.target.value;
+    sync();
+  };
+  const runtime = bindSubviewTools(f.host, f.store, f.deps);
+  f.open();
+  const originalSearch = f.nodes[0].querySelector("[data-subview-anchor-search]");
+  originalSearch.value = "ctg";
+  originalSearch.focus();
+  originalSearch.setSelectionRange(2, 2);
+
+  f.nodes[0].emit("input", { target: originalSearch });
+
+  const rerenderedSearch = f.nodes[0].querySelector("[data-subview-anchor-search]");
+  assert.notEqual(rerenderedSearch, originalSearch);
+  assert.equal(f.doc.activeElement, rerenderedSearch);
+  assert.equal(rerenderedSearch.selectionStart, 2);
+  assert.equal(rerenderedSearch.selectionEnd, 2);
+  runtime.destroy();
 });

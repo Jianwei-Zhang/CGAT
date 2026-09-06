@@ -271,6 +271,15 @@ test("active subview anchors render on the same gap-edge geometry as their hit z
     html,
     /class="subview-anchor-hit-zone is-active"[^>]*data-subview-anchor-hit-key="hit-1"[^>]*data-subview-anchor-edge="left"/,
   );
+  assert.match(html, /data-subview-anchor-object-id="edge:hit-1:left"/);
+  assert.match(html, /data-subview-anchor-top-name="[^"]+"/);
+  assert.match(html, /data-subview-anchor-bottom-name="[^"]+"/);
+  assert.match(html, /data-subview-anchor-top-source-label="[^"]+"/);
+  assert.match(html, /data-subview-anchor-bottom-source-label="[^"]+"/);
+  assert.match(html, /data-subview-anchor-top-source-role="support"/);
+  assert.match(html, /data-subview-anchor-bottom-source-role="primary"/);
+  assert.match(html, /data-subview-anchor-top-source-name="flye"/);
+  assert.match(html, /data-subview-anchor-bottom-source-name="hifiasm"/);
   assert.match(
     html,
     /class="subview-anchor-hit-zone is-active"[^>]*data-subview-anchor-top-x="[0-9.]+"[^>]*data-subview-anchor-bottom-x="[0-9.]+"/,
@@ -771,6 +780,15 @@ test("subview track-pair mode also renders active anchors and fragment hit zones
     html,
     new RegExp(`class="subview-anchor-hit-zone is-active"[^>]*data-subview-anchor-hit-key="${stablePairHitKey}"[^>]*data-subview-anchor-edge="left"`),
   );
+  assert.match(html, new RegExp(`data-subview-anchor-object-id="edge:${stablePairHitKey}:left"`));
+  assert.match(html, /data-subview-anchor-top-name="[^"]+"/);
+  assert.match(html, /data-subview-anchor-bottom-name="[^"]+"/);
+  assert.match(html, /data-subview-anchor-top-source-label="[^"]+"/);
+  assert.match(html, /data-subview-anchor-bottom-source-label="[^"]+"/);
+  assert.match(html, /data-subview-anchor-top-source-role="support"/);
+  assert.match(html, /data-subview-anchor-bottom-source-role="primary"/);
+  assert.match(html, /data-subview-anchor-top-source-name="flye"/);
+  assert.match(html, /data-subview-anchor-bottom-source-name="hifiasm"/);
   assert.match(
     html,
     /data-subview-fragment-contig-id="30"[\s\S]*data-subview-fragment-contig-id="2"/,

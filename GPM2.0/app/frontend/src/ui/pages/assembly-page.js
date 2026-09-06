@@ -36,6 +36,7 @@ import {
   resetAssemblyPageSession,
 } from "./assembly/page-session.js";
 import { bindSubviewTools } from "./assembly/subview-tools-runtime.js";
+import { createSubviewAnchorManagerController } from "./assembly/subview-anchor-manager-controller.js";
 import {
   createAssemblyConfirmController,
 } from "./assembly/confirm-controller.js";
@@ -370,6 +371,8 @@ const {
 const {
   clearSubviewTrackPairHiddenCtgs,
   copySubviewAnchorWithOffset,
+  deleteSubviewAnchors,
+  enrichSubviewAnchorDescriptors,
   deleteSubviewManualAnchor,
   setSubviewTrackPairCtgHidden,
   toggleSubviewAnchorEdge,
@@ -382,6 +385,11 @@ const {
   setAssemblyActionFeedback: (host, store, feedback) =>
     setAssemblyActionFeedback(host, store, feedback),
   tAssembly,
+});
+const subviewAnchorManagerController = createSubviewAnchorManagerController({
+  session: assemblyPageSession,
+  deleteSubviewAnchors,
+  enrichSubviewAnchorDescriptors,
 });
 const {
   buildInitialSubviewPairwiseEvidence,
@@ -735,6 +743,7 @@ export function syncAssemblySubviewTools(host, store) {
     getLabels: (state) => getAssemblyI18n(state).subview.tools,
     escapeHtml,
     escapeAttr,
+    ...subviewAnchorManagerController,
   });
 }
 

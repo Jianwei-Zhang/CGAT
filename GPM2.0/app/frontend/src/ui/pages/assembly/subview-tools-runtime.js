@@ -41,6 +41,36 @@ function createSubviewToolsRuntime(host, store, deps) {
   let viewportBound = false;
   const tabScroll = new Map();
 
+  function captureContentFocus() {
+    const active = doc.activeElement;
+    const keys = [
+      "subviewAnchorSearch",
+      "subviewAnchorCheck",
+      "subviewAnchorListRow",
+      "subviewAnchorDelete",
+    ];
+    const key = keys.find((candidate) => Object.hasOwn(active?.dataset || {}, candidate));
+    if (!key) return null;
+    return {
+      key,
+      value: active.dataset[key],
+      selectionStart: Number.isInteger(active.selectionStart) ? active.selectionStart : null,
+      selectionEnd: Number.isInteger(active.selectionEnd) ? active.selectionEnd : null,
+    };
+  }
+
+  function restoreContentFocus(snapshot) {
+    if (!snapshot || !overlay?.querySelectorAll) return;
+    const attribute = snapshot.key.replace(/[A-Z]/g, (character) => `-${character.toLowerCase()}`);
+    const target = Array.from(overlay.querySelectorAll(`[data-${attribute}]`))
+      .find((node) => node.dataset?.[snapshot.key] === snapshot.value);
+    if (!target) return;
+    target.focus?.({ preventScroll: true });
+    if (snapshot.selectionStart !== null && typeof target.setSelectionRange === "function") {
+      target.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
+    }
+  }
+
   function viewport() {
     return {
       left: win?.visualViewport?.offsetLeft ?? 0,
@@ -121,21 +151,30 @@ function createSubviewToolsRuntime(host, store, deps) {
       overlay = doc.createElement("div");
       overlay.dataset.subviewToolsHost = "1";
       overlay.addEventListener("click", onClick);
+      overlay.addEventListener("input", onInput);
+      overlay.addEventListener("dblclick", onDoubleClick);
       overlay.addEventListener("keydown", onKeyDown);
       overlay.addEventListener("pointerdown", onPointerDown);
       doc.body.appendChild(overlay);
       bindViewport(true);
     }
-    const content = deps.renderContent?.({ state, tab: preferences.tab, scopeKey }) || "";
-    const markup = renderSubviewTools(preferences, deps.getLabels(state), { ...deps, content });
+    const labels = deps.getLabels(state);
+    const content = deps.renderContent?.({
+      host, state, tab: preferences.tab, scopeKey, labels,
+      escapeHtml: deps.escapeHtml, escapeAttr: deps.escapeAttr,
+    }) || "";
+    const markup = renderSubviewTools(preferences, labels, { ...deps, content });
     if (markup !== lastMarkup && !gesture) {
       const oldContent = overlay.querySelector("[data-subview-tools-content]");
       const scrollTop = oldContent?.scrollTop ?? tabScroll.get(preferences.tab) ?? 0;
+      const focusSnapshot = captureContentFocus();
       overlay.innerHTML = markup;
       overlay.querySelector("[data-subview-tools-content]").scrollTop = scrollTop;
+      restoreContentFocus(focusSnapshot);
       lastMarkup = markup;
     }
     keepOnScreen();
+    deps.afterRender?.({ host, overlay, store, state, tab: preferences.tab, scopeKey });
   }
 
   function close() {
@@ -170,11 +209,23 @@ function createSubviewToolsRuntime(host, store, deps) {
     if (event.target.closest("[data-subview-tools-close]")) return close();
     const tab = event.target.closest("[data-subview-tools-tab]")?.dataset.subviewToolsTab;
     if (tab) return selectTab(tab);
-    deps.onAction?.(event, { store, scopeKey, sync });
+    deps.onAction?.(event, { host, store, scopeKey, sync });
+  }
+
+  function onInput(event) {
+    event.stopPropagation();
+    deps.onInput?.(event, { host, store, scopeKey, sync });
+  }
+
+  function onDoubleClick(event) {
+    event.stopPropagation();
+    deps.onDoubleClick?.(event, { host, store, scopeKey, sync });
   }
 
   function onKeyDown(event) {
     event.stopPropagation();
+    deps.onContentKeyDown?.(event, { host, store, scopeKey, sync });
+    if (event.defaultPrevented) return;
     if (event.key === "Escape") {
       event.preventDefault();
       if (!deps.closeContent?.()) close();

@@ -27,7 +27,21 @@ test("loadProjectAssemblyViewState normalizes segment-based finalPathByChr, fina
           subviewTrackDragOffsets: [],
           subviewAnchorStateByKey: {
             "2-contig|chr:Chr01|a|b": {
-              activeAnchors: [{ hitKey: "hit-1", edge: "left" }],
+              activeAnchors: [{
+                hitKey: "hit-1",
+                edge: "left",
+                descriptor: {
+                  top: {
+                    endpointKey: "a", contigId: 9, cutBp: 100, name: "ctg_a",
+                    sourceRole: "primary", sourceKind: "mother", sourceName: "hifiasm",
+                    sourceLabel: "localized text must be dropped",
+                  },
+                  bottom: {
+                    endpointKey: "b", contigId: 10, cutBp: 200, name: "ctg_b",
+                    sourceRole: "support", sourceKind: "mother", sourceName: "flye",
+                  },
+                },
+              }],
               manualAnchors: [{
                 manualAnchorId: "m1",
                 endpointA: { endpointKey: "a", contigId: 9, cutBp: 100 },
@@ -128,7 +142,20 @@ test("loadProjectAssemblyViewState normalizes segment-based finalPathByChr, fina
   assert.equal(result.degapProjectState.jobs[0].jobId, "CtgA_vs_CtgB_Left-job");
   assert.deepEqual(result.subviewAnchorStateByKey, {
     "2-contig|chr:Chr01|a|b": {
-      activeAnchors: [{ hitKey: "hit-1", edge: "left" }],
+      activeAnchors: [{
+        hitKey: "hit-1",
+        edge: "left",
+        descriptor: {
+          top: {
+            endpointKey: "a", contigId: 9, cutBp: 100, name: "ctg_a",
+            sourceRole: "primary", sourceKind: "mother", sourceName: "hifiasm",
+          },
+          bottom: {
+            endpointKey: "b", contigId: 10, cutBp: 200, name: "ctg_b",
+            sourceRole: "support", sourceKind: "mother", sourceName: "flye",
+          },
+        },
+      }],
       manualAnchors: [{
         manualAnchorId: "m1",
         sourceHitKey: "",

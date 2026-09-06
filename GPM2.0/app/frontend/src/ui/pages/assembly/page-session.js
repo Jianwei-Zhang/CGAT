@@ -46,6 +46,12 @@ export function createAssemblyPageSession() {
     pendingAssemblyConfirmResolvers: new Map(),
     subviewRenderCache: createSubviewRenderCache(),
     subviewTools: null,
+    subviewAnchorToolsState: {
+      scopeKey: "",
+      focusedObjectId: "",
+      checkedObjectIds: [],
+      query: "",
+    },
     finalPathGraphPreviewState: null,
     grtResultToastTimer: null,
     projectViewMutationCoordinator: createProjectViewMutationCoordinator(),

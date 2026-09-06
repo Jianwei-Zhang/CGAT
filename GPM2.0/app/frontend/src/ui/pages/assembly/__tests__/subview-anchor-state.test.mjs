@@ -41,6 +41,23 @@ test("normalizeSubviewActiveAnchors removes invalid and duplicate edge entries",
   );
 });
 
+test("active evidence anchors preserve a normalized endpoint descriptor for unavailable evidence", () => {
+  const descriptor = {
+    top: {
+      endpointKey: "top-1", contigId: 1, cutBp: 100, lengthBp: 1000,
+      name: "ctg_alpha", sourceRole: "primary", sourceKind: "mother", sourceName: "hifiasm",
+    },
+    bottom: {
+      endpointKey: "bottom-2", contigId: 2, cutBp: 200,
+      name: "ctg_beta", sourceRole: "support", sourceKind: "mother", sourceName: "flye",
+    },
+  };
+  const anchors = toggleSubviewAnchorEdge([], { hitKey: "hit-1", edge: "left", descriptor });
+
+  assert.deepEqual(anchors, [{ hitKey: "hit-1", edge: "left", descriptor }]);
+  assert.deepEqual(normalizeSubviewActiveAnchors([...anchors, { hitKey: "hit-1", edge: "left" }]), anchors);
+});
+
 test("deriveSubviewContigFragments splits one contig by multiple anchor positions and drops zero-length intervals", () => {
   const fragments = deriveSubviewContigFragments({
     contig: { assemblyCtgId: 8, role: "primary", lengthBp: 1000, orient: "+" },
@@ -134,6 +151,16 @@ test("createOffsetSubviewManualAnchor shifts both endpoints and rejects out-of-r
     bottomCutBp: 200,
     topLengthBp: 1000,
     bottomLengthBp: 500,
+    topName: "ctg_top",
+    bottomName: "ctg_bottom",
+    topSourceLabel: "GRT · primary",
+    bottomSourceLabel: "User track",
+    topSourceRole: "primary",
+    bottomSourceRole: "support",
+    topSourceKind: "mother",
+    bottomSourceKind: "mother",
+    topSourceName: "hifiasm",
+    bottomSourceName: "flye",
   };
 
   const created = createOffsetSubviewManualAnchor(sourceEdge, {
@@ -148,6 +175,17 @@ test("createOffsetSubviewManualAnchor shifts both endpoints and rejects out-of-r
       anchor.endpointB.cutBp,
     ]),
     [[200 + 50, 100 + 50]],
+  );
+  assert.deepEqual(
+    normalizeSubviewManualAnchors([created.anchor]).map((anchor) => [
+      anchor.endpointA.name,
+      anchor.endpointA.sourceRole,
+      anchor.endpointA.sourceName,
+      anchor.endpointB.name,
+      anchor.endpointB.sourceRole,
+      anchor.endpointB.sourceName,
+    ]),
+    [["ctg_bottom", "support", "flye", "ctg_top", "primary", "hifiasm"]],
   );
 
   const rejected = createOffsetSubviewManualAnchor(sourceEdge, {

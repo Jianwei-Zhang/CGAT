@@ -29,6 +29,7 @@ const SUBVIEW_HISTORY_OPERATION_KINDS = new Set([
   "toggle-anchor",
   "create-offset-anchor",
   "delete-offset-anchor",
+  "delete-anchors",
   "flip-contig",
   "drag-contig",
   "swap-track-order",

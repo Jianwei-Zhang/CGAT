@@ -188,6 +188,136 @@
   cursor: ns-resize;
 }
 
+.subview-anchor-manager {
+  display: grid;
+  gap: 8px;
+}
+
+.subview-anchor-manager-actions {
+  display: flex;
+  align-items: end;
+  gap: 6px;
+}
+
+.subview-anchor-search {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 3px;
+}
+
+.subview-anchor-search input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 28px;
+}
+
+.subview-anchor-object-list {
+  display: grid;
+  gap: 1px;
+}
+
+.subview-anchor-object {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 26px;
+  align-items: start;
+  gap: 5px;
+  padding: 6px 3px;
+  border-top: 1px solid #e1e5ea;
+  cursor: default;
+}
+
+.subview-anchor-object:hover,
+.subview-anchor-object:focus-visible,
+.subview-anchor-object.is-focused {
+  background: #e9eef4;
+}
+
+.subview-anchor-object.is-focused {
+  box-shadow: inset 3px 0 #d33333;
+}
+
+.subview-anchor-object input {
+  margin: 3px 0 0 2px;
+}
+
+.subview-anchor-object-main,
+.subview-anchor-endpoints,
+.subview-anchor-endpoint {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.subview-anchor-object-main {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.subview-anchor-object-type {
+  font-weight: 600;
+}
+
+.subview-anchor-endpoints {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+}
+
+.subview-anchor-endpoint strong,
+.subview-anchor-endpoint span,
+.subview-anchor-endpoint code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subview-anchor-endpoint span,
+.subview-anchor-endpoint code {
+  color: #667585;
+  font-size: 11px;
+}
+
+.subview-anchor-object-reason {
+  color: #8a6500;
+  font-size: 11px;
+}
+
+.subview-anchor-delete {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  opacity: 0.35;
+}
+
+.subview-anchor-object:hover .subview-anchor-delete,
+.subview-anchor-object:focus-within .subview-anchor-delete,
+.subview-anchor-object.is-focused .subview-anchor-delete {
+  opacity: 1;
+}
+
+.subview-anchor-line.is-focused {
+  stroke: #7a1fff;
+  stroke-width: 6;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.95));
+}
+
+@media (max-width: 360px) {
+  .subview-anchor-manager-actions,
+  .subview-anchor-endpoints {
+    grid-template-columns: 1fr;
+  }
+
+  .subview-anchor-manager-actions {
+    display: grid;
+  }
+}
+
 .subview-history-controls {
   display: inline-flex;
   align-items: stretch;

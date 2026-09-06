@@ -234,6 +234,16 @@ test("resolveSubviewAnchorEdgeContextTarget parses anchor edge metadata", () => 
     bottomCutBp: null,
     topLengthBp: null,
     bottomLengthBp: null,
+    topName: "",
+    bottomName: "",
+    topSourceLabel: "",
+    bottomSourceLabel: "",
+    topSourceRole: "",
+    bottomSourceRole: "",
+    topSourceKind: "",
+    bottomSourceKind: "",
+    topSourceName: "",
+    bottomSourceName: "",
     topX: null,
     bottomX: null,
     activeOriginalEdges: [],
@@ -263,6 +273,16 @@ test("resolveSubviewAnchorEdgeContextTarget collects active original edges from 
     "data-subview-anchor-bottom-cut-bp": "500",
     "data-subview-anchor-top-length-bp": "1000",
     "data-subview-anchor-bottom-length-bp": "900",
+    "data-subview-anchor-top-name": "ctg_top",
+    "data-subview-anchor-bottom-name": "ctg_bottom",
+    "data-subview-anchor-top-source-label": "GRT · primary",
+    "data-subview-anchor-bottom-source-label": "User track",
+    "data-subview-anchor-top-source-role": "primary",
+    "data-subview-anchor-bottom-source-role": "support",
+    "data-subview-anchor-top-source-kind": "mother",
+    "data-subview-anchor-bottom-source-kind": "mirror",
+    "data-subview-anchor-top-source-name": "hifiasm",
+    "data-subview-anchor-bottom-source-name": "flye",
     "data-subview-anchor-top-x": "60.5",
     "data-subview-anchor-bottom-x": "20.25",
   });
@@ -298,6 +318,11 @@ test("resolveSubviewAnchorEdgeContextTarget collects active original edges from 
   const context = resolveSubviewAnchorEdgeContextTarget(target);
   assert.equal(context.topX, 60.5);
   assert.equal(context.bottomX, 20.25);
+  assert.equal(context.topName, "ctg_top");
+  assert.equal(context.bottomSourceLabel, "User track");
+  assert.equal(context.topSourceRole, "primary");
+  assert.equal(context.bottomSourceKind, "mirror");
+  assert.equal(context.bottomSourceName, "flye");
   assert.deepEqual(
     context.activeOriginalEdges.map((edge) => [edge.hitKey, edge.edge, edge.topX, edge.bottomX]),
     [
