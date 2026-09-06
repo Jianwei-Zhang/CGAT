@@ -379,6 +379,7 @@ const {
 const {
   clearSubviewTrackPairHiddenCtgs,
   copySubviewAnchorWithOffset,
+  copySubviewGrtAnchor,
   deleteSubviewAnchors,
   enrichSubviewAnchorDescriptors,
   deleteSubviewManualAnchor,
@@ -397,6 +398,7 @@ const {
 const subviewAnchorManagerController = createSubviewAnchorManagerController({
   session: assemblyPageSession,
   deleteSubviewAnchors,
+  copySubviewGrtAnchor,
   enrichSubviewAnchorDescriptors,
 });
 const {

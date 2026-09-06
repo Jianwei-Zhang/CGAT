@@ -1,5 +1,9 @@
-import { buildSubviewAnchorEndpointKey } from "./subview-anchor-state.js";
+import {
+  buildSubviewAnchorEndpointKey,
+  deriveSubviewContigFragments,
+} from "./subview-anchor-state.js";
 import { buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
+import { buildSubviewGrtAnchorScene } from "./subview-grt-anchor-state.js";
 import { resolveSubviewCompositionCandidate } from "./subview-composition-candidates.js";
 import { buildSubviewCompositionLayout } from "./subview-composition-layout.js";
 import { getSubviewComposition } from "./subview-composition-state.js";
@@ -229,7 +233,74 @@ function renderManualAnchors(layout, anchors, escapeAttr) {
   }).join("");
 }
 
-function renderMember(member, candidate, candidatesLoaded, y, labels, {
+function buildAnchorCutsByEndpoint(layout, bands, activeAnchors, manualAnchors) {
+  const cuts = new Map(layout.members.map((member) => [endpointKey(member), []]));
+  const add = (key, cut) => {
+    const numeric = Number(cut);
+    if (!cuts.has(key) || !Number.isInteger(numeric) || numeric <= 0) return;
+    cuts.get(key).push(numeric);
+  };
+  const active = new Set((Array.isArray(activeAnchors) ? activeAnchors : [])
+    .map((anchor) => `${anchor.hitKey}:${anchor.edge}`));
+  bands.forEach((band) => {
+    ["left", "right"].forEach((side) => {
+      if (!active.has(`${band.hitKey}:${side}`)) return;
+      const edge = edgeDescriptor(band, side);
+      add(endpointKey(band.top), edge.topCut);
+      add(endpointKey(band.bottom), edge.bottomCut);
+    });
+  });
+  (Array.isArray(manualAnchors) ? manualAnchors : []).forEach((anchor) => {
+    add(anchor?.endpointA?.endpointKey, anchor?.endpointA?.cutBp);
+    add(anchor?.endpointB?.endpointKey, anchor?.endpointB?.cutBp);
+  });
+  return cuts;
+}
+
+function renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr }) {
+  const fragments = deriveSubviewContigFragments({
+    contig: {
+      assemblyCtgId: member.assemblyCtgId,
+      role: member.source?.role,
+      lengthBp: member.lengthBp,
+    },
+    anchorCuts: cuts,
+  });
+  if (!fragments.length) return "";
+  const orientation = member.flipped
+    ? (member.baseOrientation === "-" ? "+" : "-")
+    : member.baseOrientation;
+  return fragments.map((fragment) => {
+    const range = rangeX(member, fragment.start, fragment.end);
+    const width = Math.max(1, range.right - range.left);
+    const title = `${member.label}:${fragment.start.toLocaleString()}-${fragment.end.toLocaleString()}`;
+    return `<rect class="subview-fragment-hit-zone" x="${range.left.toFixed(2)}" y="${y}"
+        width="${width.toFixed(2)}" height="${BAR_HEIGHT}" fill="transparent"
+        data-subview-fragment-key="${escapeAttr(fragment.fragmentKey)}"
+        data-subview-fragment-slot="${member.lane}"
+        data-subview-fragment-role="${escapeAttr(member.source?.role || "support")}"
+        data-subview-fragment-contig-id="${member.assemblyCtgId || 0}"
+        data-subview-fragment-start="${fragment.start}" data-subview-fragment-end="${fragment.end}"
+        data-subview-fragment-ctg-name="${escapeAttr(member.label)}"
+        data-subview-fragment-dataset-id="${member.source?.datasetId || 0}"
+        data-subview-fragment-is-mirror="${member.source?.mirrored ? "1" : "0"}"
+        data-subview-fragment-ref-orient="${escapeAttr(orientation)}"
+        data-subview-fragment-source-kind="${escapeAttr(member.source?.sourceType || "assembly_ctg")}"
+        data-subview-fragment-reference-chr-id="0"
+        data-subview-fragment-reference-chr-name="${escapeAttr(member.reference?.chrName || "")}"
+        data-subview-fragment-segment-start-bp="${Number(member.reference?.startBp || 0)}"
+        data-subview-fragment-segment-end-bp="${Number(member.reference?.endBp || 0)}"
+        data-subview-fragment-phased-track-id="${member.source?.phasedTrackId || 0}"
+        data-subview-fragment-phased-track-item-id="${member.source?.phasedItemId || 0}"
+        data-subview-fragment-phased-haplotype-key="${escapeAttr(member.source?.hap || "")}">
+        <title>${escapeHtml(title)}</title></rect>
+      <rect class="subview-fragment-outline" x="${range.left.toFixed(2)}" y="${y}"
+        width="${width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4"
+        fill="none" stroke="transparent" stroke-width="2.5" pointer-events="none" />`;
+  }).join("");
+}
+
+function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
   escapeHtml,
   escapeAttr,
   resolveTrackToneClass,
@@ -255,6 +326,7 @@ function renderMember(member, candidate, candidatesLoaded, y, labels, {
     <title>${escapeHtml(title)}</title>
     <rect class="track-ctg subview-track-ctg${tone}" x="${member.x.toFixed(2)}" y="${y}"
       width="${member.width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4" pointer-events="all" />
+    ${renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr })}
     <text class="track-ctg-label${tone}" x="${(member.x + 3).toFixed(2)}" y="${y + 11}">${escapeHtml(member.label)}</text>
   </g>`;
 }
@@ -276,6 +348,8 @@ export function renderSubviewCompositionAlignmentCard({
   i18n,
   historyControls,
   viewportWidthPx,
+  chrName,
+  grtAnchorPlan,
   resolveTrackToneClass,
   escapeHtml,
   escapeAttr,
@@ -290,6 +364,32 @@ export function renderSubviewCompositionAlignmentCard({
   });
   const candidates = supportContext?.compositionCandidates || [];
   const candidatesLoaded = supportContext?.compositionCandidatesLoaded === true;
+  const grtAnchorScene = buildSubviewGrtAnchorScene({
+    chrName,
+    plan: grtAnchorPlan,
+    entries: layout.members.map((member) => ({
+      key: member.entityKey,
+      ctg: {
+        assemblyCtgId: member.assemblyCtgId,
+        lengthBp: member.lengthBp,
+        orient: member.flipped
+          ? (member.baseOrientation === "-" ? "+" : "-")
+          : member.baseOrientation,
+      },
+      endpointKey: endpointKey(member),
+      lane: member.lane,
+      baseOrientation: member.baseOrientation,
+      locallyFlipped: member.flipped,
+      name: member.label,
+      sourceRole: member.source?.role,
+      sourceKind: member.source?.sourceType,
+      sourceName: member.source?.datasetName || member.source?.hap || "",
+      rect: { x: member.x, width: member.width },
+      y: member.lane === "top" ? TOP_Y : BOTTOM_Y,
+      height: BAR_HEIGHT,
+    })),
+    escapeAttr,
+  });
   const bands = [
     ...buildEvidenceBands(layout, subview?.pairwiseEvidence),
     ...buildReferenceBands(layout, candidates),
@@ -308,10 +408,17 @@ export function renderSubviewCompositionAlignmentCard({
       data-subview-top-contig-id="${band.top.assemblyCtgId || 0}"
       data-subview-bottom-contig-id="${band.bottom.assemblyCtgId || 0}" />`;
   }).join("");
+  const anchorCutsByEndpoint = buildAnchorCutsByEndpoint(
+    layout,
+    bands,
+    composition.activeAnchors,
+    composition.manualAnchors,
+  );
   const memberMarkup = layout.members.map((member) => renderMember(
     member,
     resolveSubviewCompositionCandidate(candidates, member),
     candidatesLoaded,
+    anchorCutsByEndpoint.get(endpointKey(member)) || [],
     member.lane === "top" ? TOP_Y : BOTTOM_Y,
     i18n,
     { escapeHtml, escapeAttr, resolveTrackToneClass },
@@ -340,6 +447,7 @@ export function renderSubviewCompositionAlignmentCard({
           ${bandMarkup}${emptyTop}${emptyBottom}${memberMarkup}
           ${renderEvidenceAnchors(bands, composition.activeAnchors, escapeAttr)}
           ${renderManualAnchors(layout, composition.manualAnchors, escapeAttr)}
+          ${grtAnchorScene.markup}
         </svg>
       </div>
     </div>

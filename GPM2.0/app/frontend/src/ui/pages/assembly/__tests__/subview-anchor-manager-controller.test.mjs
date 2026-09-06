@@ -7,6 +7,10 @@ const labels = {
   anchorManager: {
     search: "Search", searchPlaceholder: "name or source", deleteSelected: "Delete ({count})",
     empty: "No anchors", noMatches: "No matches", leftEdge: "Left edge", rightEdge: "Right edge",
+    userGroup: "User anchors", grtGroup: "GRT anchors", userEmpty: "No user anchors",
+    grtEmpty: "No GRT anchors", grtCopyType: "Copied from GRT", grtLinkType: "GRT link",
+    grtGapType: "GRT gap {size} bp", grtEndpointUnavailable: "Unavailable",
+    grtSameLane: "Same lane", grtReadOnly: "Read only", copy: "Copy", copyGrt: "Copy GRT",
     manualType: "Manual {direction} {offset} bp", left: "left", right: "right", contig: "ctg",
     sourcePrimary: "Primary", sourceSupport: "Support", sourceMirror: "Mirror",
     sourceRef: "Reference", sourcePhased: "Phased", sourceGrt: "GRT",

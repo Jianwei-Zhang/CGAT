@@ -9,10 +9,12 @@ import {
   applySubviewComposition,
   normalizeSubviewComposition,
 } from "../subview-composition-state.js";
+import { buildSubviewAnchorEndpointKey } from "../subview-anchor-state.js";
 
-function compositionState(composition, candidates, pairwiseEvidence = null) {
+function compositionState(composition, candidates, pairwiseEvidence = null, assemblyPatch = {}) {
   return createState({
     assembly: {
+      ...assemblyPatch,
       subview: {
         ...applySubviewComposition({}, composition),
         pairwiseEvidence,
@@ -118,4 +120,73 @@ test("saved members become unavailable only after candidate loading has complete
 
   assert.match(loadedHtml, /class="track-ctg-group[^"]* is-unavailable"/);
   assert.doesNotMatch(loadingHtml, /class="track-ctg-group[^"]* is-unavailable"/);
+});
+
+test("composition canvas keeps baseline GRT anchors when result display is off and Final Path diverges", () => {
+  const candidates = buildSubviewCompositionCandidates({
+    primaryDatasetId: 1,
+    allChrCtgs: [
+      { assemblyCtgId: 1, datasetId: 1, name: "ctg1", lengthBp: 1000 },
+      { assemblyCtgId: 2, datasetId: 2, name: "ctg2", lengthBp: 1000 },
+    ],
+  });
+  const composition = normalizeSubviewComposition({
+    members: [
+      { ...candidates[0], lane: "top", xBp: 0 },
+      { ...candidates[1], lane: "bottom", xBp: 0 },
+    ],
+    manualAnchors: [{
+      manualAnchorId: "grt-copy:origin",
+      coordinateSpace: "assembly",
+      origin: { kind: "grt", originId: "origin", baselineKey: "base", chrName: "Chr01", connectionKind: "link" },
+      endpointA: {
+        endpointKey: buildSubviewAnchorEndpointKey({
+          role: candidates[0].source.role,
+          contigId: candidates[0].assemblyCtgId,
+          datasetId: candidates[0].source.datasetId,
+          source: candidates[0].source.sourceType,
+        }),
+        contigId: 1, cutBp: 100, lengthBp: 1000,
+      },
+      endpointB: {
+        endpointKey: buildSubviewAnchorEndpointKey({
+          role: candidates[1].source.role,
+          contigId: candidates[1].assemblyCtgId,
+          datasetId: candidates[1].source.datasetId,
+          source: candidates[1].source.sourceType,
+        }),
+        contigId: 2, cutBp: 200, lengthBp: 1000,
+      },
+    }],
+  });
+  const baseline = {
+    mode: "segments",
+    chrName: "Chr01",
+    grtDisplayAvailable: true,
+    segments: [
+      {
+        segmentId: "left", type: "ctg", assemblyCtgId: 1,
+        assemblySourceStart: 1, assemblySourceEnd: 1000, start: 1, end: 100,
+        source: { dataset: "primary", contig: "ctg1", start: 1, end: 100, orientation: "+" },
+      },
+      {
+        segmentId: "right", type: "ctg", assemblyCtgId: 2,
+        assemblySourceStart: 1, assemblySourceEnd: 1000, start: 200, end: 300,
+        source: { dataset: "support", contig: "ctg2", start: 200, end: 300, orientation: "+" },
+      },
+    ],
+  };
+  const html = renderAssemblyPage(compositionState(composition, candidates, null, {
+    selectedChrName: "Chr01",
+    finalPathByChr: { Chr01: { mode: "segments", chrName: "Chr01", segments: [] } },
+    grtProjectView: { baselineFinalPathByChr: { Chr01: baseline } },
+    grtResultDisplayByChr: { Chr01: { main: false, subview: false } },
+  }));
+
+  assert.match(html, /data-subview-composition-scene="1"/);
+  assert.match(html, /data-subview-anchor-kind="grt"/);
+  assert.match(html, /data-subview-anchor-top-contig-id="1"/);
+  assert.match(html, /data-subview-anchor-bottom-contig-id="2"/);
+  assert.match(html, /data-subview-fragment-contig-id="1"/);
+  assert.match(html, /data-subview-fragment-contig-id="2"/);
 });

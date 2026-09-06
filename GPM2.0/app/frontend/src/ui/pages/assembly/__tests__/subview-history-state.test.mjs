@@ -130,6 +130,39 @@ test("composition history v2 uses one chromosome key and accepts empty lanes", (
     { bpPerPx: 100, leftBp: 250, topPx: 3 });
 });
 
+test("composition history v2 preserves GRT copy origin through rollback and redo", () => {
+  const legacy = buildAssembly();
+  const anchor = {
+    manualAnchorId: "grt-copy:origin",
+    coordinateSpace: "assembly",
+    origin: {
+      kind: "grt", originId: "origin", baselineKey: "base", chrName: "Chr01",
+      connectionKind: "link", endpointSources: [],
+    },
+    endpointA: { endpointKey: "top", contigId: 1, cutBp: 100, lengthBp: 1000 },
+    endpointB: { endpointKey: "bottom", contigId: 2, cutBp: 200, lengthBp: 1000 },
+  };
+  const composition = normalizeSubviewComposition({
+    members: [
+      { assemblyCtgId: 1, source: { role: "primary", datasetId: 11 }, label: "ctg1", lengthBp: 1000, lane: "top" },
+      { assemblyCtgId: 2, source: { role: "support", datasetId: 22 }, label: "ctg2", lengthBp: 1000, lane: "bottom" },
+    ],
+    manualAnchors: [anchor],
+  });
+  const committed = commitSubviewCompositionHistoryOperation(legacy, {
+    nextSubview: applySubviewComposition(legacy.subview, composition),
+    operation: { kind: "create-grt-anchor" },
+    now: 1,
+  });
+  const undone = rollbackSubviewHistory(committed.assembly, { now: 2 });
+  const redone = restoreSubviewHistoryRollback(undone.assembly, { now: 3 });
+
+  assert.equal(committed.assembly.subview.manualAnchors[0].origin.originId, "origin");
+  assert.equal(undone.assembly.subview.manualAnchors.length, 0);
+  assert.equal(redone.assembly.subview.manualAnchors[0].coordinateSpace, "assembly");
+  assert.equal(redone.assembly.subview.manualAnchors[0].origin.originId, "origin");
+});
+
 test("composition history rollback crosses the legacy conversion and redo restores members", () => {
   const legacy = buildAssembly();
   const nextSubview = applySubviewComposition(legacy.subview, {

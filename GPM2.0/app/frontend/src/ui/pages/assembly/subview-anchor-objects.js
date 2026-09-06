@@ -20,6 +20,10 @@ function readEndpoint(node, side) {
   const sourceRole = String(node.getAttribute(`${prefix}source-role`) || "").trim();
   const sourceKind = String(node.getAttribute(`${prefix}source-kind`) || "").trim();
   const sourceName = String(node.getAttribute(`${prefix}source-name`) || "").trim();
+  const baseCutBp = positiveInt(node.getAttribute(`${prefix}base-cut-bp`));
+  const sourcePosition = positiveInt(node.getAttribute(`${prefix}source-position`));
+  const lane = String(node.getAttribute(`${prefix}lane`) || "").trim();
+  const baseOrientation = String(node.getAttribute(`${prefix}base-orientation`) || "").trim();
   return {
     endpointKey,
     contigId,
@@ -30,14 +34,18 @@ function readEndpoint(node, side) {
     ...(sourceKind ? { sourceKind } : {}),
     ...(sourceName ? { sourceName } : {}),
     ...(sourceLabel ? { sourceLabel } : {}),
+    ...(baseCutBp ? { baseCutBp } : {}),
+    ...(sourcePosition ? { sourcePosition } : {}),
+    ...(lane === "top" || lane === "bottom" ? { lane } : {}),
+    ...(baseOrientation === "+" || baseOrientation === "-" ? { baseOrientation } : {}),
   };
 }
 
 export function buildSubviewAnchorObjectId(kind, identity, edge = "") {
-  const prefix = kind === "manual" ? "manual" : "edge";
+  const prefix = kind === "manual" ? "manual" : kind === "grt" ? "grt" : "edge";
   const normalizedIdentity = String(identity || "").trim();
   if (!normalizedIdentity) return "";
-  return prefix === "manual"
+  return prefix === "manual" || prefix === "grt"
     ? `${prefix}:${normalizedIdentity}`
     : `${prefix}:${normalizedIdentity}:${String(edge || "left").trim().toLowerCase()}`;
 }
@@ -46,7 +54,8 @@ export function collectSubviewAnchorScene(host) {
   return Array.from(host?.querySelectorAll?.(
     "[data-subview-anchor-kind][data-subview-anchor-object-id]",
   ) || []).map((node) => {
-    const kind = node.getAttribute("data-subview-anchor-kind") === "manual" ? "manual" : "evidence";
+    const rawKind = node.getAttribute("data-subview-anchor-kind");
+    const kind = rawKind === "manual" ? "manual" : rawKind === "grt" ? "grt" : "evidence";
     const objectId = String(node.getAttribute("data-subview-anchor-object-id") || "").trim();
     const top = readEndpoint(node, "top");
     const bottom = readEndpoint(node, "bottom");
@@ -56,6 +65,7 @@ export function collectSubviewAnchorScene(host) {
     return {
       objectId,
       kind,
+      grtOriginId: String(node.getAttribute("data-subview-anchor-grt-origin-id") || "").trim(),
       descriptor: top && bottom ? { top, bottom } : null,
       topX: Number.isFinite(topX) ? topX : null,
       bottomX: Number.isFinite(bottomX) ? bottomX : null,
@@ -116,6 +126,9 @@ export function buildSubviewAnchorObjects(subview, sceneEntries = []) {
       manualAnchorId: anchor.manualAnchorId,
       direction: anchor.direction,
       offsetBp: anchor.offsetBp,
+      coordinateSpace: anchor.coordinateSpace,
+      origin: anchor.origin || null,
+      fromGrt: anchor.origin?.kind === "grt",
       descriptor: scene?.descriptor || null,
       endpoints,
       active: true,
@@ -128,7 +141,7 @@ export function buildSubviewAnchorObjects(subview, sceneEntries = []) {
   });
   return [...evidence, ...manual].map((object) => ({
     ...object,
-    searchText: [object.kind, object.edge, object.direction, object.offsetBp,
+    searchText: [object.kind, object.fromGrt ? "grt" : "", object.edge, object.direction, object.offsetBp,
       ...object.endpoints.flatMap((endpoint) => [endpointLabel(endpoint), endpoint?.cutBp])]
       .filter(Boolean).join(" ").toLocaleLowerCase(),
   }));

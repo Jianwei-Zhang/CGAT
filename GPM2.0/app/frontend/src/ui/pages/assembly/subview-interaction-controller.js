@@ -27,6 +27,11 @@ import {
   findSubviewAnchorDescriptor,
 } from "./subview-anchor-objects.js";
 import {
+  createSubviewManualAnchorFromGrt,
+  findSubviewGrtAnchorReference,
+  findSubviewManualAnchorByGrtOrigin,
+} from "./subview-grt-anchor-state.js";
+import {
   applySubviewComposition,
   getSubviewComposition,
   toggleSubviewCompositionMemberFlip,
@@ -177,6 +182,49 @@ export function createSubviewInteractionController({
       actionStatus: tAssembly(store.getState(), "runtime.subviewAnchorOffsetCreated"),
       actionError: "",
     });
+  }
+
+  async function copySubviewGrtAnchor(host, store, { originId }) {
+    const state = store.getState();
+    const currentSubview = getSubviewState(state.assembly);
+    const existing = findSubviewManualAnchorByGrtOrigin(currentSubview.manualAnchors, originId);
+    if (existing) {
+      setAssemblyActionFeedback(host, store, {
+        actionStatus: tAssembly(state, "runtime.subviewGrtAnchorAlreadyCopied"),
+        actionError: "",
+      });
+      return { status: "existing", objectId: `manual:${existing.manualAnchorId}` };
+    }
+    const reference = findSubviewGrtAnchorReference(
+      state.assembly,
+      collectSubviewAnchorScene(host),
+      originId,
+    );
+    const created = createSubviewManualAnchorFromGrt(reference);
+    if (!created.ok) {
+      const errorKey = created.reason === "grtSameLane"
+        ? "runtime.subviewGrtAnchorSameLane"
+        : "runtime.subviewGrtAnchorUnavailable";
+      setAssemblyActionFeedback(host, store, {
+        actionStatus: "",
+        actionError: tAssembly(state, errorKey),
+      });
+      return { status: "unavailable", objectId: "" };
+    }
+    await commitSubviewAnchorState(
+      host,
+      store,
+      {
+        ...currentSubview,
+        manualAnchors: upsertSubviewManualAnchor(currentSubview.manualAnchors, created.anchor),
+      },
+      { kind: "create-grt-anchor" },
+    );
+    setAssemblyActionFeedback(host, store, {
+      actionStatus: tAssembly(store.getState(), "runtime.subviewGrtAnchorCreated"),
+      actionError: "",
+    });
+    return { status: "created", objectId: `manual:${created.anchor.manualAnchorId}` };
   }
 
   async function deleteSubviewManualAnchor(host, store, { manualAnchorId }) {
@@ -347,6 +395,7 @@ export function createSubviewInteractionController({
   return {
     clearSubviewTrackPairHiddenCtgs,
     copySubviewAnchorWithOffset,
+    copySubviewGrtAnchor,
     deleteSubviewAnchors,
     enrichSubviewAnchorDescriptors,
     deleteSubviewManualAnchor,

@@ -34,6 +34,7 @@ import {
 import {
   buildSubviewAnchorEndpointKey,
   deriveSubviewContigFragments,
+  resolveSubviewManualAnchorDisplayCut,
 } from "./subview-anchor-state.js";
 import { resolveSubviewAutoTrackOffsets } from "./subview-offset-state.js";
 import {
@@ -46,6 +47,7 @@ import { buildGrtResultScene } from "./grt-result-render.js";
 import { renderGrtResultControls } from "./grt-result-controls.js";
 import { renderSubviewToolsToggle } from "./render-subview-tools.js";
 import { buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
+import { buildSubviewGrtAnchorScene } from "./subview-grt-anchor-state.js";
 import { renderSubviewCompositionAlignmentCard } from "./render-subview-composition-canvas.js";
 import {
   buildTrackCtgHoverTitle,
@@ -378,6 +380,12 @@ function resolvePairwiseHitDisplayReversedWithLocalFlip(hit, topFlipped, bottomF
 
 function isSubviewRenderableContigLocallyFlipped(ctg) {
   return ctg?.subviewLocallyFlipped === true;
+}
+
+function resolveSubviewCtgBaseOrientation(ctg) {
+  const displayOrientation = resolveTrackCtgOrient(ctg);
+  if (!isSubviewRenderableContigLocallyFlipped(ctg)) return displayOrientation;
+  return displayOrientation === "-" ? "+" : "-";
 }
 
 function isSubviewPairwiseRangeMirrored(ctg) {
@@ -742,9 +750,8 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
   const allBadges = `${candidateBadges}${trackBadges}`;
   const sameContigWarning = resolveSubviewPanelSameContigWarningText(subview, supportContext, i18n);
   const grtResultContext = resolveGrtResultContext(assembly);
-  const grtResultPlan = grtResultContext.available
-    ? buildGrtResultPlan(grtResultContext.baselineEntry)
-    : null;
+  const grtAnchorPlan = buildGrtResultPlan(grtResultContext.baselineEntry);
+  const grtResultPlan = grtResultContext.available ? grtAnchorPlan : null;
   const history = resolveCurrentSubviewHistory(assembly);
   const alignmentCard = renderSubviewAlignmentCard(
     subview,
@@ -752,7 +759,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
     trackPrefs,
     assembly?.subviewTrackDragOffsets,
     i18n,
-    { context: grtResultContext, plan: grtResultPlan },
+    { context: grtResultContext, plan: grtResultPlan, anchorPlan: grtAnchorPlan },
     history,
   );
   const grtResultToast = assembly?.grtResultToast?.scope === "subview"
@@ -1052,8 +1059,8 @@ function buildSubviewManualAnchorEdges(manualAnchors, { topEndpoint, bottomEndpo
       : endpointB?.endpointKey === bottomEndpoint.endpointKey
         ? endpointB
         : null;
-    const topCutBp = normalizePositiveInt(topManualEndpoint?.cutBp);
-    const bottomCutBp = normalizePositiveInt(bottomManualEndpoint?.cutBp);
+    const topCutBp = resolveSubviewManualAnchorDisplayCut(anchor, topManualEndpoint, topEndpoint);
+    const bottomCutBp = resolveSubviewManualAnchorDisplayCut(anchor, bottomManualEndpoint, bottomEndpoint);
     if (!topManualEndpoint || !bottomManualEndpoint || !topCutBp || !bottomCutBp) {
       return [];
     }
@@ -1372,6 +1379,8 @@ function renderSubviewAlignmentCard(
         history,
       ),
       viewportWidthPx: getMeasuredTrackViewportPx("subview"),
+      chrName: grtResult.context?.chrName,
+      grtAnchorPlan: grtResult.anchorPlan,
       resolveTrackToneClass,
       escapeHtml,
       escapeAttr,
@@ -1595,6 +1604,7 @@ function renderSubviewAlignmentCard(
       endpointKey: topEndpointKey,
       contigId: topSelection.contigId,
       lengthBp: svgModel.topLengthBp,
+      locallyFlipped: isSubviewRenderableContigLocallyFlipped(topCtg),
       name: topLabelText,
       sourceLabel: topSourceLabel,
       ...topSourceDescriptor,
@@ -1612,6 +1622,7 @@ function renderSubviewAlignmentCard(
       endpointKey: bottomEndpointKey,
       contigId: bottomSelection.contigId,
       lengthBp: svgModel.bottomLengthBp,
+      locallyFlipped: isSubviewRenderableContigLocallyFlipped(bottomCtg),
       name: bottomLabelText,
       sourceLabel: bottomSourceLabel,
       ...bottomSourceDescriptor,
@@ -1627,25 +1638,44 @@ function renderSubviewAlignmentCard(
     },
   });
   const anchorEdges = [...evidenceAnchorEdges, ...manualAnchorEdges];
+  const grtResultEntries = [
+    {
+      key: "top",
+      ctg: { ...topCtg, orient: resolveTrackCtgOrient(topCtg) },
+      endpointKey: topEndpointKey,
+      lane: "top",
+      baseOrientation: resolveSubviewCtgBaseOrientation(topCtg),
+      locallyFlipped: isSubviewRenderableContigLocallyFlipped(topCtg),
+      name: topLabelText,
+      ...topSourceDescriptor,
+      rect: { x: svgModel.topBarX, width: svgModel.topBarWidth },
+      y: svgModel.topBarY,
+      height: svgModel.barHeight,
+    },
+    {
+      key: "bottom",
+      ctg: { ...bottomCtg, orient: resolveTrackCtgOrient(bottomCtg) },
+      endpointKey: bottomEndpointKey,
+      lane: "bottom",
+      baseOrientation: resolveSubviewCtgBaseOrientation(bottomCtg),
+      locallyFlipped: isSubviewRenderableContigLocallyFlipped(bottomCtg),
+      name: bottomLabelText,
+      ...bottomSourceDescriptor,
+      rect: { x: svgModel.bottomBarX, width: svgModel.bottomBarWidth },
+      y: svgModel.bottomBarY,
+      height: svgModel.barHeight,
+    },
+  ];
+  const grtAnchorScene = buildSubviewGrtAnchorScene({
+    chrName: grtResult.context?.chrName,
+    plan: grtResult.anchorPlan,
+    entries: grtResultEntries,
+    escapeAttr,
+  });
   const grtResultScene = grtResult.context?.available
     ? buildGrtResultScene({
       plan: grtResult.plan,
-      entries: [
-        {
-          key: "top",
-          ctg: { ...topCtg, orient: resolveTrackCtgOrient(topCtg) },
-          rect: { x: svgModel.topBarX, width: svgModel.topBarWidth },
-          y: svgModel.topBarY,
-          height: svgModel.barHeight,
-        },
-        {
-          key: "bottom",
-          ctg: { ...bottomCtg, orient: resolveTrackCtgOrient(bottomCtg) },
-          rect: { x: svgModel.bottomBarX, width: svgModel.bottomBarWidth },
-          y: svgModel.bottomBarY,
-          height: svgModel.barHeight,
-        },
-      ],
+      entries: grtResultEntries,
       layers: grtResult.context.subviewLayers,
       escapeHtml,
       gapLabel: i18n.grtResult.gapLabel,
@@ -1745,6 +1775,7 @@ function renderSubviewAlignmentCard(
               )
               .join("")}
             ${grtResult.context?.subviewEnabled ? grtResultScene.junctionMarkup : ""}
+            ${grtAnchorScene.markup}
             <g
               class="subview-track-ctg-group${topRowClass}"
               data-subview-track-pair-role="${escapeAttr(topSelection.role)}"
@@ -2647,6 +2678,7 @@ function renderSubviewTrackPairAlignmentCard(
             topY: laneTop,
             bottomY: laneTop + TRACK_BAR_HEIGHT,
             hitY: layout.id === "top" ? laneTop + TRACK_BAR_HEIGHT : laneTop,
+            locallyFlipped: isSubviewRenderableContigLocallyFlipped(ctg),
             xForCut: (cutBp) => resolveSubviewAnchorEndpointX({
               barX: rect.x,
               barWidth: rect.width,
@@ -2692,9 +2724,26 @@ function renderSubviewTrackPairAlignmentCard(
   const grtResultEntries = rowLayouts.flatMap((layout) =>
     (layout.trackModel?.ctgs || []).map((ctg, index) => {
       const rect = resolveTrackPairDisplayRect(layout, ctg, index);
+      const contigId = normalizeSupportDatasetId(ctg?.assemblyCtgId);
+      const descriptor = layout.id === "top" ? topSourceDescriptor : bottomSourceDescriptor;
       return {
         key: `${layout.id}:${ctg.assemblyCtgId}:${index}`,
         ctg: { ...ctg, orient: resolveTrackCtgOrient(ctg) },
+        endpointKey: buildSubviewAnchorEndpointKey({
+          role: layout.role,
+          contigId,
+          datasetId: layout.datasetId,
+          source: layout.source,
+          isMirror: layout.isMirror === true,
+          phasedTrackId: ctg?.phasedTrackId ?? layout.phasedTrackId,
+          phasedTrackItemId: ctg?.phasedTrackItemId ?? ctg?.itemId,
+          phasedHaplotypeKey: ctg?.phasedHaplotypeKey ?? layout.haplotypeKey,
+        }),
+        lane: layout.id === "bottom" ? "bottom" : "top",
+        baseOrientation: resolveSubviewCtgBaseOrientation(ctg),
+        locallyFlipped: isSubviewRenderableContigLocallyFlipped(ctg),
+        name: resolveTrackCtgLabelText(ctg, contigId),
+        ...descriptor,
         rect,
         y: layout.laneTop + Math.max(0, Number(ctg?.laneIndex || 0)) * TRACK_LANE_HEIGHT,
         height: TRACK_BAR_HEIGHT,
@@ -2702,6 +2751,12 @@ function renderSubviewTrackPairAlignmentCard(
       };
     }),
   );
+  const grtAnchorScene = buildSubviewGrtAnchorScene({
+    chrName: grtResult.context?.chrName,
+    plan: grtResult.anchorPlan,
+    entries: grtResultEntries,
+    escapeAttr,
+  });
   const grtResultScene = grtResult.context?.available
     ? buildGrtResultScene({
       plan: grtResult.plan,
@@ -2902,6 +2957,7 @@ function renderSubviewTrackPairAlignmentCard(
                 .join("")}
             </g>
             ${grtResult.context?.subviewEnabled ? grtResultScene.junctionMarkup : ""}
+            ${grtAnchorScene.markup}
             ${renderTrackCtgs(resolvedTopLayout, topRoleClass)}
             ${renderTrackCtgs(resolvedBottomLayout, bottomRoleClass)}
             ${renderSubviewAnchorLines(allAnchorEdges, {

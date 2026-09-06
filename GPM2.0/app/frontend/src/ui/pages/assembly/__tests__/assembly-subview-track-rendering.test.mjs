@@ -192,6 +192,31 @@ test("schema 3 renders local GRT evidence in contig-pair and track-pair Subviews
   assert.match(contigPairHtml, /data-grt-display-evidence="grt-display-local-integration"/);
   assert.match(trackPairHtml, /data-grt-display-evidence="grt-display-local-integration"/);
   assert.match(trackPairHtml, /grt-display-evidence-band is-mummer is-supporting-precursor/);
+  assert.match(contigPairHtml, /data-subview-anchor-kind="grt"/);
+  assert.match(trackPairHtml, /data-subview-anchor-kind="grt"/);
+
+  const anchorOnlyHtml = renderAssemblyPage(createState({
+    assembly: {
+      ...commonAssembly,
+      finalPathByChr: { Chr01: { mode: "segments", chrName: "Chr01", segments: [] } },
+      grtResultDisplayByChr: { Chr01: { main: false, subview: false } },
+      subview: {
+        mode: "2-contig",
+        selectedAContigId: 2,
+        selectedARole: "primary",
+        selectedBContigId: 30,
+        selectedBRole: "support",
+        summary: {
+          mode: "2-contig",
+          top: { contigId: 30, role: "support", contigName: "support-ctg" },
+          bottom: { contigId: 2, role: "primary", contigName: "ctg-alpha" },
+        },
+      },
+    },
+    initializer,
+  }));
+  assert.doesNotMatch(anchorOnlyHtml, /data-grt-display-evidence=/);
+  assert.match(anchorOnlyHtml, /data-subview-anchor-kind="grt"/);
 });
 
 test("subview track-pair mode renders only mirror support ctg containers when support track source is mirror", () => {

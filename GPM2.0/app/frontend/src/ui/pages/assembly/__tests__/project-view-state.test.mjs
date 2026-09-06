@@ -369,3 +369,47 @@ test("loadProjectAssemblyViewState defaults membersCardCollapsed to true", async
 
   assert.equal(result.membersCardCollapsed, true);
 });
+
+test("project view round-trip preserves GRT anchor origin and assembly coordinates", async () => {
+  let payload;
+  const result = await persistProjectAssemblyViewState({
+    workspaceRoot: "/tmp/ws",
+    projectId: 7,
+    subviewAnchorStateByKey: {
+      pair: {
+        manualAnchors: [{
+          manualAnchorId: "grt-copy:origin",
+          coordinateSpace: "assembly",
+          origin: {
+            kind: "grt",
+            originId: "origin",
+            baselineKey: "baseline",
+            chrName: "Chr01",
+            connectionKind: "gap",
+            endpointSources: [
+              { assemblyCtgId: 1, sourcePosition: 100, segmentId: "left", pathOrder: 0 },
+              { assemblyCtgId: 2, sourcePosition: 200, segmentId: "right", pathOrder: 2 },
+            ],
+          },
+          endpointA: {
+            endpointKey: "top", contigId: 1, cutBp: 901, lengthBp: 1000, baseOrientation: "-",
+          },
+          endpointB: {
+            endpointKey: "bottom", contigId: 2, cutBp: 200, lengthBp: 1000, baseOrientation: "+",
+          },
+        }],
+      },
+    },
+  }, {
+    async setProjectAssemblyViewState(value) { payload = value; return value; },
+  });
+
+  const sent = payload.subviewAnchorStateByKey.pair.manualAnchors[0];
+  const returned = result.subviewAnchorStateByKey.pair.manualAnchors[0];
+  assert.equal(sent.coordinateSpace, "assembly");
+  assert.equal(sent.origin.originId, "origin");
+  assert.equal(sent.origin.connectionKind, "gap");
+  assert.equal(sent.endpointA.baseOrientation, "+");
+  assert.equal(sent.endpointB.baseOrientation, "-");
+  assert.deepEqual(returned, sent);
+});

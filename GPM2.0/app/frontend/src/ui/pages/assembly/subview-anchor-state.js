@@ -37,6 +37,52 @@ function normalizeDirection(value) {
   return "";
 }
 
+function normalizeOrientation(value) {
+  return String(value || "").trim() === "-" ? "-" : "+";
+}
+
+function normalizeNonNegativeInt(value) {
+  const numeric = Number(value);
+  return Number.isInteger(numeric) && numeric >= 0 ? numeric : null;
+}
+
+function normalizeGrtEndpointSource(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const assemblyCtgId = normalizePositiveInt(value.assemblyCtgId ?? value.contigId);
+  const sourcePosition = normalizePositiveInt(value.sourcePosition);
+  if (!assemblyCtgId || !sourcePosition) return null;
+  const pathOrder = normalizeNonNegativeInt(value.pathOrder);
+  return {
+    assemblyCtgId,
+    sourcePosition,
+    segmentId: String(value.segmentId || "").trim(),
+    datasetName: String(value.datasetName || "").trim(),
+    contigName: String(value.contigName || "").trim(),
+    assemblySourceStart: normalizePositiveInt(value.assemblySourceStart),
+    assemblySourceEnd: normalizePositiveInt(value.assemblySourceEnd),
+    sourceStart: normalizePositiveInt(value.sourceStart),
+    sourceEnd: normalizePositiveInt(value.sourceEnd),
+    orientation: normalizeOrientation(value.orientation),
+    ...(pathOrder !== null ? { pathOrder } : {}),
+  };
+}
+
+function normalizeManualAnchorOrigin(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const originId = String(value.originId || "").trim();
+  if (String(value.kind || "").trim() !== "grt" || !originId) return null;
+  const endpointSources = (Array.isArray(value.endpointSources) ? value.endpointSources : [])
+    .map(normalizeGrtEndpointSource).filter(Boolean);
+  return {
+    kind: "grt",
+    originId,
+    baselineKey: String(value.baselineKey || "").trim(),
+    chrName: String(value.chrName || "").trim(),
+    connectionKind: String(value.connectionKind || "").trim() === "gap" ? "gap" : "link",
+    endpointSources,
+  };
+}
+
 function normalizeEndpoint(endpoint) {
   const endpointKey = String(endpoint?.endpointKey || endpoint?.key || "").trim();
   const contigId = normalizePositiveInt(endpoint?.contigId);
@@ -49,6 +95,8 @@ function normalizeEndpoint(endpoint) {
   const sourceKind = String(endpoint?.sourceKind || "").trim().toLowerCase();
   const sourceName = String(endpoint?.sourceName || "").trim();
   const sourceLabel = String(endpoint?.sourceLabel || "").trim();
+  const rawBaseOrientation = String(endpoint?.baseOrientation || "").trim();
+  const baseOrientation = normalizeOrientation(rawBaseOrientation);
   if (!endpointKey || !contigId || !cutBp) {
     return null;
   }
@@ -61,6 +109,7 @@ function normalizeEndpoint(endpoint) {
     ...(sourceRole ? { sourceRole } : {}),
     ...(sourceKind ? { sourceKind } : {}),
     ...(sourceName ? { sourceName } : {}),
+    ...(rawBaseOrientation === "+" || rawBaseOrientation === "-" ? { baseOrientation } : {}),
     ...(!sourceRole && sourceLabel ? { sourceLabel } : {}),
   };
 }
@@ -227,6 +276,10 @@ export function normalizeSubviewManualAnchors(values) {
       firstEndpoint,
       secondEndpoint,
     );
+    const coordinateSpace = String(entry?.coordinateSpace || "").trim() === "assembly"
+      ? "assembly"
+      : "display";
+    const origin = normalizeManualAnchorOrigin(entry?.origin);
     normalized.set(manualAnchorId, {
       manualAnchorId,
       sourceHitKey: normalizeHitKey(entry?.sourceHitKey),
@@ -235,11 +288,21 @@ export function normalizeSubviewManualAnchors(values) {
       offsetBp: normalizePositiveInt(entry?.offsetBp) || null,
       endpointA: firstEndpoint,
       endpointB: secondEndpoint,
+      ...(coordinateSpace === "assembly" ? { coordinateSpace } : {}),
+      ...(origin ? { origin } : {}),
     });
   });
   return Array.from(normalized.values()).sort((left, right) =>
     String(left.manualAnchorId).localeCompare(String(right.manualAnchorId)),
   );
+}
+
+export function resolveSubviewManualAnchorDisplayCut(anchor, storedEndpoint, displayEndpoint) {
+  const cutBp = normalizePositiveInt(storedEndpoint?.cutBp);
+  const lengthBp = normalizePositiveInt(displayEndpoint?.lengthBp ?? storedEndpoint?.lengthBp);
+  if (!cutBp || !lengthBp || cutBp > lengthBp) return null;
+  if (String(anchor?.coordinateSpace || "").trim() !== "assembly") return cutBp;
+  return displayEndpoint?.locallyFlipped === true ? lengthBp - cutBp + 1 : cutBp;
 }
 
 export function normalizeSubviewAnchorState(value) {

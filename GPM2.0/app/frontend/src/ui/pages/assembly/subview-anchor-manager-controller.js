@@ -6,6 +6,7 @@ import {
   normalizeSubviewAnchorToolsUi,
 } from "./subview-anchor-objects.js";
 import { renderSubviewAnchorList } from "./render-subview-anchor-list.js";
+import { buildSubviewGrtAnchorReferences } from "./subview-grt-anchor-state.js";
 
 function resolveRouteHost(node, fallback) {
   return node?.closest?.("#route-host") || fallback;
@@ -14,6 +15,7 @@ function resolveRouteHost(node, fallback) {
 export function createSubviewAnchorManagerController({
   session,
   deleteSubviewAnchors,
+  copySubviewGrtAnchor,
   enrichSubviewAnchorDescriptors = async () => false,
 }) {
   function getUi(objects, scopeKey) {
@@ -24,7 +26,11 @@ export function createSubviewAnchorManagerController({
   }
 
   function getObjects(host, state) {
-    return buildSubviewAnchorObjects(state?.assembly?.subview, collectSubviewAnchorScene(host));
+    const scene = collectSubviewAnchorScene(host);
+    return [
+      ...buildSubviewAnchorObjects(state?.assembly?.subview, scene),
+      ...buildSubviewGrtAnchorReferences(state?.assembly, scene),
+    ];
   }
 
   function renderContent({ host, state, tab, scopeKey, labels, escapeHtml, escapeAttr }) {
@@ -60,10 +66,13 @@ export function createSubviewAnchorManagerController({
   }
 
   async function remove(host, objectIds, context) {
-    if (!objectIds.length) return;
-    const changed = await deleteSubviewAnchors(host, context.store, objectIds);
+    const deletable = new Set(getObjects(host, context.store.getState())
+      .filter((object) => object.canDelete).map((object) => object.objectId));
+    const targets = objectIds.filter((objectId) => deletable.has(objectId));
+    if (!targets.length) return;
+    const changed = await deleteSubviewAnchors(host, context.store, targets);
     if (!changed) return;
-    const removed = new Set(objectIds);
+    const removed = new Set(targets);
     updateUi({
       focusedObjectId: removed.has(session.subviewAnchorToolsState.focusedObjectId)
         ? "" : session.subviewAnchorToolsState.focusedObjectId,
@@ -71,8 +80,18 @@ export function createSubviewAnchorManagerController({
     }, context.sync);
   }
 
+  async function copyGrt(host, originId, context) {
+    const result = await copySubviewGrtAnchor(host, context.store, { originId });
+    if (!result?.objectId) return;
+    updateUi({ focusedObjectId: result.objectId }, context.sync);
+    applySubviewAnchorFocus(host, result.objectId);
+  }
+
   function onAction(event, context) {
     const host = resolveRouteHost(event.target, context.host);
+    const copyOriginId = event.target.closest("[data-subview-anchor-copy-grt]")
+      ?.dataset.subviewAnchorCopyGrt;
+    if (copyOriginId) return void copyGrt(host, copyOriginId, context);
     const deleteId = event.target.closest("[data-subview-anchor-delete]")?.dataset.subviewAnchorDelete;
     if (deleteId) return void remove(host, [deleteId], context);
     if (event.target.closest("[data-subview-anchor-delete-checked]")) {
@@ -98,13 +117,15 @@ export function createSubviewAnchorManagerController({
 
   function onDoubleClick(event, context) {
     const objectId = event.target.closest("[data-subview-anchor-list-row]")?.dataset.subviewAnchorListRow;
-    if (!objectId || event.target.closest("[data-subview-anchor-check],[data-subview-anchor-delete]")) return;
+    if (!objectId || event.target.closest(
+      "[data-subview-anchor-check],[data-subview-anchor-delete],[data-subview-anchor-copy-grt]",
+    )) return;
     locateSubviewAnchorObject(resolveRouteHost(event.target, context.host), objectId);
   }
 
   function onContentKeyDown(event, context) {
     const objectId = event.target.closest("[data-subview-anchor-list-row]")?.dataset.subviewAnchorListRow;
-    if (objectId && event.key === "Enter") {
+    if (objectId && event.key === "Enter" && !event.target.closest("[data-subview-anchor-copy-grt]")) {
       event.preventDefault();
       locateSubviewAnchorObject(resolveRouteHost(event.target, context.host), objectId);
     }

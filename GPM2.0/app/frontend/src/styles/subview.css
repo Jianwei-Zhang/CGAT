@@ -214,7 +214,23 @@
 
 .subview-anchor-object-list {
   display: grid;
+  gap: 8px;
+}
+
+.subview-anchor-object-group {
+  display: grid;
   gap: 1px;
+}
+
+.subview-anchor-object-group > h4 {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: 4px 3px;
+  color: #51606f;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .subview-anchor-object {
@@ -225,6 +241,21 @@
   padding: 6px 3px;
   border-top: 1px solid #e1e5ea;
   cursor: default;
+}
+
+.subview-anchor-readonly {
+  margin: 3px 0 0 2px;
+  color: #7b6a98;
+  font-size: 12px;
+}
+
+.subview-anchor-copy-grt {
+  min-width: 40px;
+  padding-inline: 5px;
+}
+
+.subview-anchor-object.is-readonly {
+  grid-template-columns: 20px minmax(0, 1fr) 44px;
 }
 
 .subview-anchor-object:hover,
@@ -429,6 +460,14 @@
   stroke: #7a1fff;
   stroke-width: 6;
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.95));
+}
+
+.subview-grt-anchor-reference:not(.is-focused) {
+  stroke: transparent;
+}
+
+.subview-grt-anchor-reference.is-focused {
+  stroke-dasharray: 7 4;
 }
 
 @media (max-width: 360px) {

@@ -48,6 +48,7 @@ function createSubviewToolsRuntime(host, store, deps) {
       "subviewAnchorCheck",
       "subviewAnchorListRow",
       "subviewAnchorDelete",
+      "subviewAnchorCopyGrt",
       "subviewCompositionSearch",
       "subviewCompositionCandidate",
       "subviewCompositionMember",

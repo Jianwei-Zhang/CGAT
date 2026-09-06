@@ -10,6 +10,7 @@ import {
   normalizeSubviewManualAnchors,
   normalizeSubviewActiveAnchors,
   resolveSubviewAnchorStateForSummary,
+  resolveSubviewManualAnchorDisplayCut,
   setSubviewAnchorStateForSummary,
   toggleSubviewAnchorEdge,
 } from "../subview-anchor-state.js";
@@ -194,6 +195,40 @@ test("createOffsetSubviewManualAnchor shifts both endpoints and rejects out-of-r
   });
   assert.equal(rejected.ok, false);
   assert.equal(rejected.reason, "out-of-range");
+});
+
+test("assembly-space manual anchors preserve their GRT origin and convert local flip once", () => {
+  const [anchor] = normalizeSubviewManualAnchors([{
+    manualAnchorId: "grt-copy:one",
+    coordinateSpace: "assembly",
+    origin: {
+      kind: "grt",
+      originId: "one",
+      baselineKey: "baseline",
+      chrName: "Chr01",
+      connectionKind: "gap",
+      endpointSources: [{ assemblyCtgId: 1, sourcePosition: 300, pathOrder: 0 }],
+    },
+    endpointA: { endpointKey: "top", contigId: 1, cutBp: 901, lengthBp: 1000, baseOrientation: "-" },
+    endpointB: { endpointKey: "bottom", contigId: 2, cutBp: 200, lengthBp: 1000, baseOrientation: "+" },
+  }]);
+
+  assert.equal(anchor.coordinateSpace, "assembly");
+  assert.equal(anchor.origin.originId, "one");
+  assert.equal(anchor.origin.connectionKind, "gap");
+  const reversedEndpoint = [anchor.endpointA, anchor.endpointB]
+    .find((endpoint) => endpoint.endpointKey === "top");
+  assert.equal(reversedEndpoint.baseOrientation, "-");
+  assert.equal(resolveSubviewManualAnchorDisplayCut(anchor, reversedEndpoint, {
+    lengthBp: 1000, locallyFlipped: true,
+  }), 100);
+  assert.equal(resolveSubviewManualAnchorDisplayCut(anchor, reversedEndpoint, {
+    lengthBp: 1000, locallyFlipped: false,
+  }), 901);
+  assert.equal(resolveSubviewManualAnchorDisplayCut(
+    { ...anchor, coordinateSpace: "display" }, reversedEndpoint,
+    { lengthBp: 1000, locallyFlipped: true },
+  ), 901);
 });
 
 function createCrossedActiveAnchorPair() {

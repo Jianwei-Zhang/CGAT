@@ -35,6 +35,7 @@ const SUBVIEW_HISTORY_OPERATION_KINDS = new Set([
   "restore-hidden-contigs",
   "toggle-anchor",
   "create-offset-anchor",
+  "create-grt-anchor",
   "delete-offset-anchor",
   "delete-anchors",
   "flip-contig",
