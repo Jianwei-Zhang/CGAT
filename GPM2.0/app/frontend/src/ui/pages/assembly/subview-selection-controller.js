@@ -7,16 +7,12 @@ import { resolveTrackPrefs } from "./track-prefs.js";
 import { resolveSubviewAnchorStateForSummary } from "./subview-anchor-state.js";
 import {
   activateSubviewHistory,
-  buildSubviewCompositionHistoryKey,
-  commitSubviewCompositionHistoryOperation,
   commitSubviewHistoryOperation,
   isSubviewHistoryRecordCompatible,
   resetSubviewHistory,
   restoreSubviewHistoryRollback,
   rollbackSubviewHistory,
 } from "./subview-history-state.js";
-import { applySubviewComposition } from "./subview-composition-state.js";
-import { projectCurrentSubviewToComposition } from "./subview-composition-controller.js";
 import {
   buildSubviewSummaryFromCandidates,
   buildSubviewSummaryFromTrackSelections,
@@ -63,37 +59,30 @@ export function createSubviewSelectionController({
     }
   }
 
+  function clearSubviewActiveHistory(subview) {
+    const nextSubview = { ...(subview || {}) };
+    delete nextSubview.historyKey;
+    delete nextSubview.pairwiseEvidence;
+    return nextSubview;
+  }
+
   function activateEnteredSubviewHistory(state, subview, subviewTrackDragOffsets = []) {
+    const enteredSubview = clearSubviewActiveHistory(subview);
     const assembly = {
       ...state.assembly,
-      subview,
+      subview: enteredSubview,
       subviewTrackDragOffsets,
+      subviewCompositionViewport: {},
     };
     return activateSubviewHistory(
       assembly,
       {
         stateOrLocale: state,
         validateRecord: (record) => isSubviewHistoryRecordCompatible(record, {
-          summary: subview.summary,
+          summary: enteredSubview.summary,
         }),
       },
     );
-  }
-
-  function replaceActiveComposition(state, host, enteredSubview) {
-    const compositionKey = buildSubviewCompositionHistoryKey(state.assembly?.selectedChrName);
-    const hasComposition = String(state.assembly?.subview?.historyKey || "") === compositionKey
-      || Boolean(state.assembly?.subviewHistoryByKey?.[compositionKey]);
-    if (!hasComposition) return null;
-    const composition = projectCurrentSubviewToComposition({
-      ...state,
-      assembly: { ...state.assembly, subview: enteredSubview },
-    }, host);
-    return commitSubviewCompositionHistoryOperation(state.assembly, {
-      nextSubview: applySubviewComposition(enteredSubview, composition),
-      operation: { kind: "replace-composition" },
-      stateOrLocale: state,
-    });
   }
 
   function persistActivatedSubviewHistoryIfNeeded(host, store, activation) {
@@ -113,8 +102,8 @@ export function createSubviewSelectionController({
     const state = store.getState();
     const currentProject = getCurrentProject(state);
     const pools = buildSubviewTrackPairPoolsFromAssembly(state.assembly);
-    const nextSubview = selectSubviewCandidate({
-      mode: getSubviewState(state.assembly).mode,
+    const nextSubview = clearSubviewActiveHistory(selectSubviewCandidate({
+      mode: "2-contig",
       primaryDatasetId: normalizeSupportDatasetId(currentProject?.primaryDatasetId),
       supportDatasetId: normalizeSupportDatasetId(state.assembly.supportDatasetId),
       primaryCtgs: pools.primaryCtgs,
@@ -127,13 +116,14 @@ export function createSubviewSelectionController({
       phasedTrackItemId,
       phasedHaplotypeKey,
       stateOrLocale: state,
-    });
+    }));
 
     store.setState({
       assembly: {
         ...state.assembly,
         subview: nextSubview,
         subviewTrackDragOffsets: [],
+        subviewCompositionViewport: {},
       },
     });
     if (getSubviewSelections(nextSubview).length === 2) {
@@ -152,8 +142,8 @@ export function createSubviewSelectionController({
     haplotypeKey = "",
   }) {
     const state = store.getState();
-    const nextSubview = selectSubviewTrack({
-      subview: state.assembly.subview,
+    const nextSubview = clearSubviewActiveHistory(selectSubviewTrack({
+      subview: { ...state.assembly.subview, mode: "track-pair" },
       trackRole,
       source,
       datasetId,
@@ -161,7 +151,7 @@ export function createSubviewSelectionController({
       phasedTrackId,
       haplotypeKey,
       stateOrLocale: state,
-    });
+    }));
     const hasEnteredTrackSubview = Boolean(nextSubview.summary);
     const nextSubviewTrackView = hasEnteredTrackSubview
       ? inheritSubviewTrackViewFromMainTrack(state.assembly)
@@ -211,6 +201,7 @@ export function createSubviewSelectionController({
             subviewTrackView: nextSubviewTrackView,
             subview: enteredSubview,
             subviewTrackDragOffsets: [],
+            subviewCompositionViewport: {},
           },
     });
     rerenderSubviewSelectionRegions(host, store);
@@ -226,7 +217,7 @@ export function createSubviewSelectionController({
     phasedHaplotypeKey = "",
   }) {
     const state = store.getState();
-    const nextSubview = removeSubviewCandidate({
+    const nextSubview = clearSubviewActiveHistory(removeSubviewCandidate({
       subview: state.assembly.subview,
       trackRole,
       contigId,
@@ -234,12 +225,13 @@ export function createSubviewSelectionController({
       phasedTrackItemId,
       phasedHaplotypeKey,
       stateOrLocale: state,
-    });
+    }));
     store.setState({
       assembly: {
         ...state.assembly,
         subview: nextSubview,
         subviewTrackDragOffsets: [],
+        subviewCompositionViewport: {},
       },
     });
     rerenderSubviewSelectionRegions(host, store);
@@ -251,19 +243,20 @@ export function createSubviewSelectionController({
     { trackRole, source, datasetId, isMirror },
   ) {
     const state = store.getState();
-    const nextSubview = removeSubviewTrackSelection({
+    const nextSubview = clearSubviewActiveHistory(removeSubviewTrackSelection({
       subview: state.assembly.subview,
       trackRole,
       source,
       datasetId,
       isMirror,
       stateOrLocale: state,
-    });
+    }));
     store.setState({
       assembly: {
         ...state.assembly,
         subview: nextSubview,
         subviewTrackDragOffsets: [],
+        subviewCompositionViewport: {},
       },
     });
     rerenderSubviewSelectionRegions(host, store);
@@ -331,15 +324,16 @@ export function createSubviewSelectionController({
       store.setState({
         assembly: {
           ...state.assembly,
-          subview: {
+          subview: clearSubviewActiveHistory({
             ...currentSubview,
             activeAnchors: [],
             manualAnchors: [],
             flippedCtgs: [],
             error: result.error,
             summary: null,
-          },
+          }),
           subviewTrackDragOffsets: [],
+          subviewCompositionViewport: {},
         },
       });
       rerenderSubviewSelectionRegions(host, store);
@@ -368,10 +362,7 @@ export function createSubviewSelectionController({
       error: "",
       message: tAssembly(state, "subview.entered"),
     };
-    const replacement = replaceActiveComposition(state, host, enteredSubview);
-    const activation = replacement?.changed
-      ? { assembly: replacement.assembly, created: false, invalidated: false }
-      : activateEnteredSubviewHistory(state, enteredSubview);
+    const activation = activateEnteredSubviewHistory(state, enteredSubview);
     const activatedSubview = activation.assembly.subview;
     const pairwiseEvidence = buildInitialSubviewPairwiseEvidence(
       activatedSubview.summary,
@@ -408,14 +399,15 @@ export function createSubviewSelectionController({
       store.setState({
         assembly: {
           ...state.assembly,
-          subview: {
+          subview: clearSubviewActiveHistory({
             ...currentSubview,
             activeAnchors: [],
             flippedCtgs: [],
             error: result.error,
             summary: null,
-          },
+          }),
           subviewTrackDragOffsets: [],
+          subviewCompositionViewport: {},
         },
       });
       rerenderSubviewSelectionRegions(host, store);
@@ -442,10 +434,7 @@ export function createSubviewSelectionController({
       error: "",
       message: tAssembly(state, "subview.enteredTrackMode"),
     };
-    const replacement = replaceActiveComposition(state, host, enteredSubview);
-    const activation = replacement?.changed
-      ? { assembly: replacement.assembly, created: false, invalidated: false }
-      : activateEnteredSubviewHistory(state, enteredSubview);
+    const activation = activateEnteredSubviewHistory(state, enteredSubview);
     const activatedSubview = activation.assembly.subview;
     const pairwiseEvidence = buildInitialSubviewPairwiseEvidence(
       activatedSubview.summary,
