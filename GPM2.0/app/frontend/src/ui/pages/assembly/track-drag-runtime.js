@@ -89,7 +89,36 @@ function createFrameScheduler(flush) {
       flush();
       return true;
     },
+    cancel() {
+      if (frameToken === null) {
+        return false;
+      }
+      const windowObject = getWindowObject();
+      if (typeof windowObject?.cancelAnimationFrame === "function") {
+        windowObject.cancelAnimationFrame(frameToken);
+      } else {
+        clearTimeout(frameToken);
+      }
+      frameToken = null;
+      return true;
+    },
   };
+}
+
+function resolveSubviewPointerWorldX(scrollEl, clientX) {
+  const pointerX = Number(clientX);
+  const viewportLeft = Number(scrollEl?.getBoundingClientRect?.()?.left);
+  const viewBoxMinX = Number(scrollEl?.dataset?.subviewViewboxMinX || 0);
+  const scrollLeft = Number(scrollEl?.scrollLeft || 0);
+  if (
+    !Number.isFinite(pointerX)
+    || !Number.isFinite(viewportLeft)
+    || !Number.isFinite(viewBoxMinX)
+    || !Number.isFinite(scrollLeft)
+  ) {
+    return null;
+  }
+  return viewBoxMinX + scrollLeft + pointerX - viewportLeft;
 }
 
 export function bindTrackContigDrag(host, store, deps) {
@@ -251,6 +280,9 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     event.preventDefault();
     const startClientX = Number(event.clientX || 0);
     const startScrollLeft = Number(scrollEl.scrollLeft || 0);
+    const startCompositionPointerWorldX = compositionEntityKey
+      ? resolveSubviewPointerWorldX(scrollEl, startClientX)
+      : null;
     const scaleContext = {
       domainSpanBp: Number(scrollEl.dataset.subviewDomainSpanBp || 0),
       innerWidth: Number(scrollEl.dataset.subviewInnerWidth || 0),
@@ -295,7 +327,16 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       const currentScrollEl = deps.resolveActiveTrackScrollElement(host, "subview", scrollEl);
       const currentScrollLeft = Number(currentScrollEl?.scrollLeft || 0);
       const scrollDeltaX = (currentScrollLeft - startScrollLeft) - previewAutoScrollDeltaPx;
-      const deltaX = deps.roundTrackMetric((currentClientX - startClientX) + scrollDeltaX);
+      const currentCompositionPointerWorldX = compositionEntityKey
+        ? resolveSubviewPointerWorldX(currentScrollEl, currentClientX)
+        : null;
+      const deltaX = deps.roundTrackMetric(
+        compositionEntityKey
+          && startCompositionPointerWorldX !== null
+          && currentCompositionPointerWorldX !== null
+          ? currentCompositionPointerWorldX - startCompositionPointerWorldX
+          : (currentClientX - startClientX) + scrollDeltaX,
+      );
       if (!dragging && Math.abs(deltaX) < 2) {
         return;
       }
@@ -306,18 +347,26 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       scheduler.schedule();
     };
 
-    const onPointerUp = () => {
+    const finish = (shouldCommit) => {
       const windowObject = getWindowObject();
       windowObject?.removeEventListener?.("pointermove", onPointerMove, true);
       windowObject?.removeEventListener?.("pointerup", onPointerUp, true);
-      scheduler.flushNow();
+      windowObject?.removeEventListener?.("pointercancel", onPointerCancel, true);
+      if (shouldCommit) {
+        scheduler.flushNow();
+      } else {
+        scheduler.cancel();
+      }
       deps.clearSubviewTrackDragPreview(host);
-      if (dragging) {
+      const hasEffectiveMovement = dragging
+        && Math.abs(pendingOffsetBp - baseOffsetBp) >= 0.000001;
+      if (shouldCommit && hasEffectiveMovement) {
         deps.applySubviewTrackDragOffset(host, store, {
           slot,
           contigId,
-          ...(compositionEntityKey ? { compositionEntityKey } : {}),
-          offsetBp: pendingOffsetBp,
+          ...(compositionEntityKey
+            ? { compositionEntityKey, dragDeltaBp: pendingOffsetBp }
+            : { offsetBp: pendingOffsetBp }),
         });
         if (
           Number.isFinite(pendingPreviewScrollLeft)
@@ -337,9 +386,13 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       }
     };
 
+    const onPointerUp = () => finish(true);
+    const onPointerCancel = () => finish(false);
+
     const windowObject = getWindowObject();
     windowObject?.addEventListener?.("pointermove", onPointerMove, true);
     windowObject?.addEventListener?.("pointerup", onPointerUp, true);
+    windowObject?.addEventListener?.("pointercancel", onPointerCancel, true);
   });
 
   host[ASSEMBLY_SUBVIEW_TRACK_CONTIG_DRAG_BOUND] = true;

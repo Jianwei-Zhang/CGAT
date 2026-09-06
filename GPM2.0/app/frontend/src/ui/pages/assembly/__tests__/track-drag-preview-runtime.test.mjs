@@ -72,6 +72,7 @@ function createSubviewEnvelopeFixture({
   scrollLeft = 0,
   viewportLeft = 0,
 } = {}) {
+  const hasCanvasLayer = sceneKind !== "composition";
   const svgNode = createNode({
     width: String(renderWidth),
     viewBox: `${viewBoxMinX} 0 ${renderWidth} 80`,
@@ -116,7 +117,10 @@ function createSubviewEnvelopeFixture({
   groupNode.closest = (selector) => (
     selector === ".assembly-track-scroll[data-track-role='subview']" ? scrollNode : null
   );
-  const envelopeNodes = [svgNode, canvasLayerNode, scrollNode];
+  const envelopeNodes = [svgNode, scrollNode];
+  if (hasCanvasLayer) {
+    envelopeNodes.push(canvasLayerNode);
+  }
   if (sceneKind === "subview-track-pair") {
     envelopeNodes.push(clipRectNode);
   }
@@ -529,6 +533,44 @@ test("previewSubviewTrackContigDrag expands and restores the live subview-ctg sc
   assert.equal(svgNode.getAttribute("width"), "100");
   assert.equal(svgNode.getAttribute("viewBox"), "0 0 100 80");
   assert.equal(canvasLayerNode.style.width, "100px");
+  assert.equal(scrollNode.getAttribute("data-subview-viewbox-min-x"), "0");
+});
+
+test("previewSubviewTrackContigDrag expands a composition SVG without a band canvas", () => {
+  const {
+    canvasLayerNode,
+    groupNode,
+    host,
+    scrollNode,
+    svgNode,
+  } = createSubviewEnvelopeFixture({
+    sceneKind: "composition",
+    rectX: 10,
+    rectWidth: 20,
+  });
+
+  const previewState = previewSubviewTrackContigDrag(host, {
+    slot: "top",
+    contigId: 12,
+    offsetPx: -30,
+    pointerClientX: 50,
+  });
+
+  assert.equal(groupNode.getAttribute("transform"), "translate(-30.00 0)");
+  assert.equal(svgNode.getAttribute("width"), "120");
+  assert.equal(svgNode.getAttribute("viewBox"), "-20 0 120 80");
+  assert.equal(scrollNode.scrollLeft, 20);
+  assert.equal(canvasLayerNode.style.width, "100px");
+  assert.deepEqual(previewState, {
+    scrollLeft: 20,
+    viewboxMinX: -20,
+    viewportLeftX: 0,
+  });
+
+  clearSubviewTrackDragPreview(host);
+
+  assert.equal(svgNode.getAttribute("width"), "100");
+  assert.equal(svgNode.getAttribute("viewBox"), "0 0 100 80");
   assert.equal(scrollNode.getAttribute("data-subview-viewbox-min-x"), "0");
 });
 

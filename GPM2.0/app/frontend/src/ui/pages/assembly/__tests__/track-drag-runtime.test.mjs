@@ -347,6 +347,204 @@ test("bindSubviewTrackContigDrag previews during move and applies pending subvie
   }
 });
 
+test("bindSubviewTrackContigDrag commits a composition world delta without a release jump", () => {
+  const originalWindow = globalThis.window;
+  const windowStub = createWindowStub();
+  globalThis.window = windowStub;
+
+  try {
+    const host = createHost();
+    const store = createStore({
+      assembly: {
+        activeTab: "assembly",
+        subviewTrackDragOffsets: [],
+      },
+    });
+    const initialScrollEl = {
+      clientWidth: 100,
+      scrollLeft: 30,
+      dataset: {
+        subviewDomainSpanBp: "100",
+        subviewInnerWidth: "100",
+        subviewViewboxMinX: "-10",
+      },
+      getBoundingClientRect() {
+        return { left: 200, right: 300, width: 100 };
+      },
+    };
+    let liveScrollEl = initialScrollEl;
+    const trackNode = {
+      getAttribute(name) {
+        if (name === "data-subview-track-slot") return "top";
+        if (name === "data-subview-contig-id") return "12";
+        if (name === "data-subview-composition-entity-key") return "assembly:12";
+        return null;
+      },
+      closest(selector) {
+        return selector === ".assembly-track-scroll[data-track-role='subview']"
+          ? initialScrollEl
+          : null;
+      },
+    };
+    const target = {
+      closest(selector) {
+        return selector === "[data-subview-contig-id][data-subview-track-slot]"
+          ? trackNode
+          : null;
+      },
+    };
+    const previews = [];
+    let appliedPayload = null;
+    bindSubviewTrackContigDrag(host, store, {
+      clearSubviewTrackDragPreview() {},
+      applySubviewTrackDragOffset(_host, _store, payload) {
+        appliedPayload = payload;
+        liveScrollEl = {
+          scrollLeft: 0,
+          dataset: { subviewViewboxMinX: "-40" },
+        };
+      },
+      convertTrackOffsetPxToBp(value) {
+        return value;
+      },
+      previewSubviewTrackContigDrag(_host, payload) {
+        previews.push(payload);
+        initialScrollEl.scrollLeft = 50;
+        initialScrollEl.dataset.subviewViewboxMinX = "-20";
+        return { scrollLeft: 50, viewboxMinX: -20, viewportLeftX: 30 };
+      },
+      resolveActiveTrackScrollElement() {
+        return liveScrollEl;
+      },
+      resolveSubviewTrackDragOffsetBp() {
+        throw new Error("composition drag must not read standard offsets");
+      },
+      roundTrackMetric(value) {
+        return value;
+      },
+      persistSubviewTrackDragOffsets() {},
+    });
+
+    host.listeners.get("pointerdown")?.({
+      button: 0,
+      clientX: 250,
+      ctrlKey: false,
+      metaKey: false,
+      preventDefault() {},
+      target,
+    });
+    windowStub.listeners.get("pointermove")?.({ clientX: 260 });
+    windowStub.flushAnimationFrame();
+    windowStub.listeners.get("pointermove")?.({ clientX: 260 });
+    windowStub.flushAnimationFrame();
+    windowStub.listeners.get("pointerup")?.();
+
+    assert.deepEqual(previews.map((entry) => entry.offsetPx), [10, 20]);
+    assert.deepEqual(appliedPayload, {
+      slot: "top",
+      contigId: 12,
+      compositionEntityKey: "assembly:12",
+      dragDeltaBp: 20,
+    });
+    assert.equal(liveScrollEl.scrollLeft, 70);
+  } finally {
+    globalThis.window = originalWindow;
+  }
+});
+
+test("bindSubviewTrackContigDrag cancels a pending composition drag without committing", () => {
+  const originalWindow = globalThis.window;
+  const windowStub = createWindowStub();
+  globalThis.window = windowStub;
+
+  try {
+    const host = createHost();
+    const store = createStore({
+      assembly: {
+        activeTab: "assembly",
+        subviewTrackDragOffsets: [],
+      },
+    });
+    const scrollEl = {
+      scrollLeft: 0,
+      dataset: {
+        subviewDomainSpanBp: "100",
+        subviewInnerWidth: "100",
+        subviewViewboxMinX: "0",
+      },
+      getBoundingClientRect() {
+        return { left: 100, right: 200, width: 100 };
+      },
+    };
+    const trackNode = {
+      getAttribute(name) {
+        if (name === "data-subview-track-slot") return "top";
+        if (name === "data-subview-contig-id") return "12";
+        if (name === "data-subview-composition-entity-key") return "assembly:12";
+        return null;
+      },
+      closest(selector) {
+        return selector === ".assembly-track-scroll[data-track-role='subview']"
+          ? scrollEl
+          : null;
+      },
+    };
+    const target = {
+      closest(selector) {
+        return selector === "[data-subview-contig-id][data-subview-track-slot]"
+          ? trackNode
+          : null;
+      },
+    };
+    const calls = [];
+    bindSubviewTrackContigDrag(host, store, {
+      clearSubviewTrackDragPreview() {
+        calls.push("clear");
+      },
+      applySubviewTrackDragOffset() {
+        calls.push("apply");
+      },
+      convertTrackOffsetPxToBp(value) {
+        return value;
+      },
+      previewSubviewTrackContigDrag() {
+        calls.push("preview");
+      },
+      resolveActiveTrackScrollElement() {
+        return scrollEl;
+      },
+      resolveSubviewTrackDragOffsetBp() {
+        throw new Error("composition drag must not read standard offsets");
+      },
+      roundTrackMetric(value) {
+        return value;
+      },
+      persistSubviewTrackDragOffsets() {
+        calls.push("persist");
+      },
+    });
+
+    host.listeners.get("pointerdown")?.({
+      button: 0,
+      clientX: 150,
+      ctrlKey: false,
+      metaKey: false,
+      preventDefault() {},
+      target,
+    });
+    windowStub.listeners.get("pointermove")?.({ clientX: 170 });
+    windowStub.listeners.get("pointercancel")?.();
+    windowStub.flushAnimationFrame();
+
+    assert.deepEqual(calls, ["clear"]);
+    assert.equal(windowStub.listeners.has("pointermove"), false);
+    assert.equal(windowStub.listeners.has("pointerup"), false);
+    assert.equal(windowStub.listeners.has("pointercancel"), false);
+  } finally {
+    globalThis.window = originalWindow;
+  }
+});
+
 test("bindSubviewTrackContigDrag excludes preview auto-scroll from the persisted drag delta", () => {
   const originalWindow = globalThis.window;
   const windowStub = createWindowStub();

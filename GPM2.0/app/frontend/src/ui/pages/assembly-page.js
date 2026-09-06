@@ -1976,10 +1976,12 @@ function applySubviewTrackDragOffset(host, store, nextOffset) {
       (entry) => entry.entityKey === String(nextOffset.compositionEntityKey),
     );
     if (!member) return;
+    const dragDeltaBp = Number(nextOffset.dragDeltaBp);
+    if (!Number.isFinite(dragDeltaBp)) return;
     const positioned = setSubviewCompositionMemberPosition(
       composition,
       member.entityKey,
-      member.xBp + Number(nextOffset.offsetBp || 0),
+      member.xBp + dragDeltaBp,
     );
     if (!positioned.changed) return;
     const nextSubview = applySubviewComposition(state.assembly.subview, positioned.composition);

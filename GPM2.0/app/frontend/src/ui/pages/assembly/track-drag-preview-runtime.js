@@ -299,7 +299,7 @@ function applySubviewPreviewEnvelope(groupNodes, offsetPx, { pointerClientX = nu
     const clipRectNodes = Array.from(
       scrollNode.querySelectorAll?.("[data-subview-band-clip-rect='1']") || [],
     );
-    if (!canvasLayer || !svgNode) {
+    if (!svgNode) {
       return;
     }
     rememberPreviewAttribute(svgNode, ORIGINAL_WIDTH_ATTR, "width");
@@ -309,7 +309,7 @@ function applySubviewPreviewEnvelope(groupNodes, offsetPx, { pointerClientX = nu
       ORIGINAL_SUBVIEW_VIEWBOX_MIN_X_ATTR,
       "data-subview-viewbox-min-x",
     );
-    if (!canvasLayer.hasAttribute?.(ORIGINAL_STYLE_WIDTH_ATTR)) {
+    if (canvasLayer && !canvasLayer.hasAttribute?.(ORIGINAL_STYLE_WIDTH_ATTR)) {
       canvasLayer.setAttribute?.(ORIGINAL_STYLE_WIDTH_ATTR, String(canvasLayer.style?.width || ""));
     }
     const originalViewBox = parseSvgViewBox(
@@ -363,7 +363,9 @@ function applySubviewPreviewEnvelope(groupNodes, offsetPx, { pointerClientX = nu
       "viewBox",
       `${formattedMinX} ${formatPreviewMetric(baseMinY)} ${formattedWidth} ${formatPreviewMetric(baseHeight)}`,
     );
-    canvasLayer.style.width = `${formattedWidth}px`;
+    if (canvasLayer) {
+      canvasLayer.style.width = `${formattedWidth}px`;
+    }
     clipRectNodes.forEach((clipRectNode) => {
       rememberPreviewAttribute(clipRectNode, ORIGINAL_X_ATTR, "x");
       rememberPreviewAttribute(clipRectNode, ORIGINAL_WIDTH_ATTR, "width");
@@ -375,7 +377,7 @@ function applySubviewPreviewEnvelope(groupNodes, offsetPx, { pointerClientX = nu
     scrollNode.setAttribute?.(PREVIEW_ENVELOPE_MIN_X_ATTR, formattedMinX);
     scrollNode.setAttribute?.(PREVIEW_ENVELOPE_MAX_X_ATTR, formatPreviewMetric(nextMaxX));
     svgNode.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
-    canvasLayer.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
+    canvasLayer?.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
     scrollNode.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
 
     const viewportWidth = Math.max(0, Number(scrollNode.clientWidth || 0));
