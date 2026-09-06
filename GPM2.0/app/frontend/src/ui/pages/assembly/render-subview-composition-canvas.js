@@ -8,6 +8,10 @@ import { resolveSubviewCompositionCandidate } from "./subview-composition-candid
 import { buildSubviewCompositionLayout } from "./subview-composition-layout.js";
 import { getSubviewComposition } from "./subview-composition-state.js";
 import { normalizeSupportDatasetId } from "./selection-state.js";
+import {
+  formatTrackCtgOrientationLabel,
+  resolveTrackCtgEffectiveOrientation,
+} from "./track-label-geometry.js";
 
 const TOP_Y = 82;
 const BOTTOM_Y = 190;
@@ -31,6 +35,14 @@ function sourceName(member, labels) {
   return member.source?.datasetName || member.source?.hap
     || labels?.tools?.compositionManager?.sources?.[member.source?.role]
     || member.source?.role || "";
+}
+
+function memberOrientation(member) {
+  return resolveTrackCtgEffectiveOrientation(member?.baseOrientation, member?.flipped);
+}
+
+function memberDisplayLabel(member) {
+  return formatTrackCtgOrientationLabel(member?.label, memberOrientation(member));
 }
 
 function endpointKey(member) {
@@ -267,13 +279,11 @@ function renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr }) {
     anchorCuts: cuts,
   });
   if (!fragments.length) return "";
-  const orientation = member.flipped
-    ? (member.baseOrientation === "-" ? "+" : "-")
-    : member.baseOrientation;
+  const orientation = memberOrientation(member);
   return fragments.map((fragment) => {
     const range = rangeX(member, fragment.start, fragment.end);
     const width = Math.max(1, range.right - range.left);
-    const title = `${member.label}:${fragment.start.toLocaleString()}-${fragment.end.toLocaleString()}`;
+    const title = `${memberDisplayLabel(member)}:${fragment.start.toLocaleString()}-${fragment.end.toLocaleString()}`;
     return `<rect class="subview-fragment-hit-zone" x="${range.left.toFixed(2)}" y="${y}"
         width="${width.toFixed(2)}" height="${BAR_HEIGHT}" fill="transparent"
         data-subview-fragment-key="${escapeAttr(fragment.fragmentKey)}"
@@ -308,11 +318,10 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
   const role = member.source?.role || "support";
   const tone = resolveTrackToneClass(role);
   const source = sourceName(member, labels);
-  const title = `${member.label} · ${source} · ${member.lengthBp.toLocaleString()} bp`;
+  const label = memberDisplayLabel(member);
+  const title = `${label} · ${source} · ${member.lengthBp.toLocaleString()} bp`;
   const unavailable = candidate || !candidatesLoaded ? "" : " is-unavailable";
-  const orient = member.flipped
-    ? (member.baseOrientation === "-" ? "+" : "-")
-    : member.baseOrientation;
+  const orient = memberOrientation(member);
   return `<g class="track-ctg-group${tone}${unavailable}" data-subview-composition-entity-key="${escapeAttr(member.entityKey)}"
       data-subview-track-pair-role="${escapeAttr(role)}" data-subview-track-pair-contig-id="${member.assemblyCtgId || 0}"
       data-subview-track-pair-dataset-id="${member.source?.datasetId || 0}" data-subview-track-pair-is-mirror="${member.source?.mirrored ? "1" : "0"}"
@@ -327,7 +336,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
     <rect class="track-ctg subview-track-ctg${tone}" x="${member.x.toFixed(2)}" y="${y}"
       width="${member.width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4" pointer-events="all" />
     ${renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr })}
-    <text class="track-ctg-label${tone}" x="${(member.x + 3).toFixed(2)}" y="${y + 11}">${escapeHtml(member.label)}</text>
+    <text class="track-ctg-label${tone}" x="${(member.x + 3).toFixed(2)}" y="${y + 11}">${escapeHtml(label)}</text>
   </g>`;
 }
 

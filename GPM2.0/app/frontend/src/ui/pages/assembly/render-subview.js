@@ -51,10 +51,10 @@ import { buildSubviewGrtAnchorScene } from "./subview-grt-anchor-state.js";
 import { renderSubviewCompositionAlignmentCard } from "./render-subview-composition-canvas.js";
 import {
   buildTrackCtgHoverTitle,
+  formatTrackCtgOrientationLabel,
   resolveBoundedTrackCtgLabelPlacement,
   resolveTrackCtgDisplayName,
   resolveTrackCtgLabelLeftBoundary,
-  resolveTrackCtgLabelText,
   resolveTrackCtgLabelRightBoundary,
   resolveTrackCtgOrient,
   resolveTrackCtgVisibleName,
@@ -380,6 +380,13 @@ function resolvePairwiseHitDisplayReversedWithLocalFlip(hit, topFlipped, bottomF
 
 function isSubviewRenderableContigLocallyFlipped(ctg) {
   return ctg?.subviewLocallyFlipped === true;
+}
+
+function resolveSubviewCtgLabelText(ctg, fallbackId) {
+  return formatTrackCtgOrientationLabel(
+    resolveTrackCtgVisibleName(ctg, fallbackId),
+    resolveTrackCtgOrient(ctg),
+  );
 }
 
 function resolveSubviewCtgBaseOrientation(ctg) {
@@ -718,12 +725,37 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
   const subview = getSubviewStateImpl(assembly);
   const candidates = getSubviewSelections(subview);
   const trackSelections = getSubviewTrackSelections(subview);
+  const flippedKeySet = buildSubviewFlippedCtgKeySet(subview?.flippedCtgs);
+  const summarySelections = [
+    { slot: "top", selection: normalizeSubviewSummarySelection(subview?.summary?.top) },
+    { slot: "bottom", selection: normalizeSubviewSummarySelection(subview?.summary?.bottom) },
+  ].map((entry) => ({
+    ...entry,
+    key: buildSubviewCandidateSelectionKey(entry.selection),
+    used: false,
+  }));
   const candidateBadges = candidates
     .map((selection, index) => {
       const slot = index === 0 ? "A" : "B";
-      const resolvedCtg = resolveSubviewSelectionCtg(selection, supportContext);
-      const ctgName = resolveTrackCtgDisplayName(resolvedCtg, selection.contigId);
-      const visibleCtgName = resolveTrackCtgVisibleName(resolvedCtg, selection.contigId);
+      const selectionKey = buildSubviewCandidateSelectionKey(selection);
+      const summarySelection = summarySelections.find(
+        (entry) => !entry.used && entry.key && entry.key === selectionKey,
+      );
+      if (summarySelection) summarySelection.used = true;
+      const resolvedCtg = resolveSubviewRenderableContig(
+        resolveSubviewSelectionCtg(selection, supportContext),
+        flippedKeySet,
+        summarySelection?.slot || "",
+      );
+      const orientation = resolveTrackCtgOrient(resolvedCtg);
+      const ctgName = formatTrackCtgOrientationLabel(
+        resolveTrackCtgDisplayName(resolvedCtg, selection.contigId),
+        orientation,
+      );
+      const visibleCtgName = formatTrackCtgOrientationLabel(
+        resolveTrackCtgVisibleName(resolvedCtg, selection.contigId),
+        orientation,
+      );
       const roleLabel = selection.role === "support"
         ? i18n.trackControls.supportDataset
         : selection.role === "ref"
@@ -1132,6 +1164,7 @@ function buildSubviewFragmentRects({
   barHeight,
   ctgLengthBp,
   ctgName,
+  ctgDisplayName = ctgName,
   contigId,
   datasetId,
   isMirror,
@@ -1150,7 +1183,7 @@ function buildSubviewFragmentRects({
     const fragmentStart = normalizePositiveInt(fragment.start) || 1;
     const fragmentEnd = normalizePositiveInt(fragment.end) || fragmentStart;
     const fragmentLengthBp = Math.max(0, fragmentEnd - fragmentStart + 1);
-    const hoverTitle = buildTrackCtgHoverTitle(ctgName, {
+    const hoverTitle = buildTrackCtgHoverTitle(ctgDisplayName, {
       startBp: fragmentStart,
       lengthBp: fragmentLengthBp,
     });
@@ -1469,8 +1502,16 @@ function renderSubviewAlignmentCard(
       : bottomHits;
   const topCtgName = resolveTrackCtgDisplayName(topCtg, topSelection.contigId);
   const bottomCtgName = resolveTrackCtgDisplayName(bottomCtg, bottomSelection.contigId);
-  const topVisibleCtgName = resolveTrackCtgVisibleName(topCtg, topSelection.contigId);
-  const bottomVisibleCtgName = resolveTrackCtgVisibleName(bottomCtg, bottomSelection.contigId);
+  const topVisibleCtgName = resolveSubviewCtgLabelText(topCtg, topSelection.contigId);
+  const bottomVisibleCtgName = resolveSubviewCtgLabelText(bottomCtg, bottomSelection.contigId);
+  const topDisplayCtgName = formatTrackCtgOrientationLabel(
+    topCtgName,
+    resolveTrackCtgOrient(topCtg),
+  );
+  const bottomDisplayCtgName = formatTrackCtgOrientationLabel(
+    bottomCtgName,
+    resolveTrackCtgOrient(bottomCtg),
+  );
   const subviewDomainSpanBp = Math.max(
     1,
     resolveSubviewCtgLengthBp(topCtg, resolvedTopHits),
@@ -1523,8 +1564,8 @@ function renderSubviewAlignmentCard(
   const bottomRowClass = resolveTrackToneClass(bottomSelection.role);
   const connectorClass = topSelection.role === "support" ? " is-companion" : "";
   const bandTone = topSelection.role === "support" ? "companion" : "primary";
-  const topLabelText = resolveTrackCtgLabelText(topCtg, topSelection.contigId);
-  const bottomLabelText = resolveTrackCtgLabelText(bottomCtg, bottomSelection.contigId);
+  const topLabelText = resolveSubviewCtgLabelText(topCtg, topSelection.contigId);
+  const bottomLabelText = resolveSubviewCtgLabelText(bottomCtg, bottomSelection.contigId);
   const topSourceLabel = resolveSubviewTrackSelectionLabel(
     { ...topSelection, datasetId: topCtg?.datasetId }, supportContext, i18n,
   );
@@ -1707,11 +1748,11 @@ function renderSubviewAlignmentCard(
         </div>
       </div>`
     : "";
-  const topCtgTitle = buildTrackCtgHoverTitle(topCtgName, {
+  const topCtgTitle = buildTrackCtgHoverTitle(topDisplayCtgName, {
     startBp: 0,
     lengthBp: svgModel.topLengthBp,
   });
-  const bottomCtgTitle = buildTrackCtgHoverTitle(bottomCtgName, {
+  const bottomCtgTitle = buildTrackCtgHoverTitle(bottomDisplayCtgName, {
     startBp: 0,
     lengthBp: svgModel.bottomLengthBp,
   });
@@ -1723,13 +1764,13 @@ function renderSubviewAlignmentCard(
       </div>
       <div class="assembly-track-layout subview-track-layout">
         <div class="assembly-track-label-column subview-track-label-column" style="width:${svgModel.labelColumnWidth}px;height:${svgModel.contentBottom}px">
-          <div class="assembly-track-label-row${topRowClass}" style="top:${svgModel.topLabelTop}px" title="${escapeAttr(topCtgName)}">${escapeHtml(topVisibleCtgName)}</div>
+          <div class="assembly-track-label-row${topRowClass}" style="top:${svgModel.topLabelTop}px" title="${escapeAttr(topDisplayCtgName)}">${escapeHtml(topVisibleCtgName)}</div>
           ${renderSubviewTrackOrderToggleButton({
             className: "is-in-label-column",
             style: `top:${trackOrderButtonTopPx}px`,
             swapTrackOrderLabel: i18n.subview.swapTrackOrderAria,
           })}
-          <div class="assembly-track-label-row${bottomRowClass}" style="top:${svgModel.bottomLabelTop}px" title="${escapeAttr(bottomCtgName)}">${escapeHtml(bottomVisibleCtgName)}</div>
+          <div class="assembly-track-label-row${bottomRowClass}" style="top:${svgModel.bottomLabelTop}px" title="${escapeAttr(bottomDisplayCtgName)}">${escapeHtml(bottomVisibleCtgName)}</div>
         </div>
         <div
           class="assembly-track-scroll subview-track-scroll"
@@ -1811,6 +1852,7 @@ function renderSubviewAlignmentCard(
                     barHeight: svgModel.barHeight,
                     ctgLengthBp: svgModel.topLengthBp,
                     ctgName: topCtgName,
+                    ctgDisplayName: topDisplayCtgName,
                     contigId: topSelection.contigId,
                     datasetId: topCtg?.datasetId,
                     isMirror: String(topCtg?.subviewSource || "") === "mirror",
@@ -1861,6 +1903,7 @@ function renderSubviewAlignmentCard(
                     barHeight: svgModel.barHeight,
                     ctgLengthBp: svgModel.bottomLengthBp,
                     ctgName: bottomCtgName,
+                    ctgDisplayName: bottomDisplayCtgName,
                     contigId: bottomSelection.contigId,
                     datasetId: bottomCtg?.datasetId,
                     isMirror: String(bottomCtg?.subviewSource || "") === "mirror",
@@ -2075,7 +2118,7 @@ function renderSubviewTrackPairAlignmentCard(
     return (layout.trackModel?.ctgs || []).reduce((ctgMax, ctg, index) => {
       const rect = resolveTrackPairDisplayRect(layout, ctg, index);
       const barY = layout.laneTop + ctg.laneIndex * TRACK_LANE_HEIGHT;
-      const labelText = resolveTrackCtgLabelText(ctg, ctg.assemblyCtgId);
+      const labelText = resolveSubviewCtgLabelText(ctg, ctg.assemblyCtgId);
       const placement = resolveBoundedTrackCtgLabelPlacement({
         ctgName: labelText,
         role: layout.role,
@@ -2103,7 +2146,7 @@ function renderSubviewTrackPairAlignmentCard(
     return (layout.trackModel?.ctgs || []).reduce((ctgMin, ctg, index) => {
       const rect = resolveTrackPairDisplayRect(layout, ctg, index);
       const barY = layout.laneTop + ctg.laneIndex * TRACK_LANE_HEIGHT;
-      const labelText = resolveTrackCtgLabelText(ctg, ctg.assemblyCtgId);
+      const labelText = resolveSubviewCtgLabelText(ctg, ctg.assemblyCtgId);
       const placement = resolveBoundedTrackCtgLabelPlacement({
         ctgName: labelText,
         role: layout.role,
@@ -2672,7 +2715,7 @@ function renderSubviewTrackPairAlignmentCard(
             endpointKey,
             contigId,
             lengthBp,
-            name: resolveTrackCtgLabelText(ctg, contigId),
+            name: resolveSubviewCtgLabelText(ctg, contigId),
             sourceLabel: layout.id === "top" ? topTrackLabel : bottomTrackLabel,
             ...(layout.id === "top" ? topSourceDescriptor : bottomSourceDescriptor),
             topY: laneTop,
@@ -2742,7 +2785,7 @@ function renderSubviewTrackPairAlignmentCard(
         lane: layout.id === "bottom" ? "bottom" : "top",
         baseOrientation: resolveSubviewCtgBaseOrientation(ctg),
         locallyFlipped: isSubviewRenderableContigLocallyFlipped(ctg),
-        name: resolveTrackCtgLabelText(ctg, contigId),
+        name: resolveSubviewCtgLabelText(ctg, contigId),
         ...descriptor,
         rect,
         y: layout.laneTop + Math.max(0, Number(ctg?.laneIndex || 0)) * TRACK_LANE_HEIGHT,
@@ -2780,7 +2823,11 @@ function renderSubviewTrackPairAlignmentCard(
         const rect = resolveTrackPairDisplayRect(layout, ctg, index);
         const y = layout.laneTop + Math.max(0, Number(ctg?.laneIndex || 0)) * TRACK_LANE_HEIGHT;
         const displayName = resolveTrackCtgDisplayName(ctg, contigId);
-        const labelText = resolveTrackCtgLabelText(ctg, contigId);
+        const labelText = resolveSubviewCtgLabelText(ctg, contigId);
+        const displayNameWithOrientation = formatTrackCtgOrientationLabel(
+          displayName,
+          resolveTrackCtgOrient(ctg),
+        );
         const placement = resolveBoundedTrackCtgLabelPlacement({
           ctgName: labelText,
           role: layout.role,
@@ -2801,7 +2848,7 @@ function renderSubviewTrackPairAlignmentCard(
           1,
           normalizePositiveInt(ctg?.lengthBp ?? ctg?.totalLength) ?? 1,
         );
-        const ctgTitle = buildTrackCtgHoverTitle(displayName, {
+        const ctgTitle = buildTrackCtgHoverTitle(displayNameWithOrientation, {
           startBp: ctg?.startBp,
           lengthBp: ctg?.lengthBp ?? ctg?.totalLength,
         });
@@ -2872,6 +2919,7 @@ function renderSubviewTrackPairAlignmentCard(
                     barHeight: TRACK_BAR_HEIGHT,
                     ctgLengthBp,
                     ctgName: displayName,
+                    ctgDisplayName: displayNameWithOrientation,
                     contigId,
                     datasetId: trackPairDatasetId,
                     isMirror: layout.isMirror,
@@ -2881,7 +2929,6 @@ function renderSubviewTrackPairAlignmentCard(
                     referenceChrName: ctg?.referenceChrName,
                     segmentStartBp: ctg?.segmentStartBp,
                     segmentEndBp: ctg?.segmentEndBp,
-                    ctgTitle,
                     phasedTrackId,
                     phasedTrackItemId,
                     phasedHaplotypeKey,

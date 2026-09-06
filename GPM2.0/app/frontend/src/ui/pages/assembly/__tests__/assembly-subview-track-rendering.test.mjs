@@ -49,7 +49,7 @@ test("subview panel renders chart sub-card with parameter labels after entering"
     html,
     /Ctrl\/Cmd 选中任意两个ctg进入subview-ctg；也支持点击任意两个轨道名进入subview-track。/,
   );
-  assert.match(html, /support-ctg vs ctg-alpha/);
+  assert.match(html, /support-ctg \(\+\) vs ctg-alpha \(\+\)/);
   assert.match(html, /data-subview-remove-type="candidate"/);
   assert.match(html, /data-subview-remove-role="support"/);
   assert.match(html, /data-subview-remove-contig-id="30"/);
@@ -521,8 +521,8 @@ test("subview track-pair strips chr suffix in labels and keeps full hover titles
 
   assert.match(html, /data-subview-label-slot="top"[^>]*data-subview-label-role="support"[^>]*data-subview-label-contig-id="30"[^>]*>Ctg1617 \(-\)<\/text>/);
   assert.match(html, /data-subview-label-slot="bottom"[^>]*data-subview-label-role="primary"[^>]*data-subview-label-contig-id="2"[^>]*>ptg000009l \(\+\)<\/text>/);
-  assert.match(html, /<title>Ctg1617@Chr22 \| start=/);
-  assert.match(html, /<title>ptg000009l@Chr22 \| start=/);
+  assert.match(html, /<title>Ctg1617@Chr22 \(-\) \| start=/);
+  assert.match(html, /<title>ptg000009l@Chr22 \(\+\) \| start=/);
   assert.doesNotMatch(html, /data-subview-label-slot="top"[^>]*>Ctg1617@Chr22 \(-\)<\/text>/);
   assert.doesNotMatch(html, /data-subview-label-slot="bottom"[^>]*>ptg000009l@Chr22 \(\+\)<\/text>/);
 });
@@ -560,6 +560,9 @@ test("subview local contig flips only affect subview labels and leave main-view 
   );
 
   assert.match(html, /data-track-role="primary"[^>]*>[\s\S]*?primary-track \(\+\)<\/text>/);
+  assert.match(html, /<strong>primary-track \(\+\) vs primary-track \(-\)<\/strong>/);
+  assert.match(html, /class="subview-candidate-badge" title="primary-track \(\+\)"[\s\S]*?class="subview-candidate-slot">A<\/strong>[\s\S]*?class="subview-candidate-name">primary-track \(\+\)<\/span>/);
+  assert.match(html, /class="subview-candidate-badge" title="primary-track \(-\)"[\s\S]*?class="subview-candidate-slot">B<\/strong>[\s\S]*?class="subview-candidate-name">primary-track \(-\)<\/span>/);
   assert.match(html, /data-subview-label-slot="top"[^>]*>primary-track \(\+\)<\/text>/);
   assert.match(html, /data-subview-label-slot="bottom"[^>]*>primary-track \(-\)<\/text>/);
 });

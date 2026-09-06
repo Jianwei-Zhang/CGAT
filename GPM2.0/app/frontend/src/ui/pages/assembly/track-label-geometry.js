@@ -32,6 +32,20 @@ export function resolveTrackCtgOrient(ctg) {
   return orient === "-" ? "-" : "+";
 }
 
+export function resolveTrackCtgEffectiveOrientation(baseOrientation, flipped = false) {
+  const normalized = String(baseOrientation || "").trim() === "-" ? "-" : "+";
+  return flipped === true ? (normalized === "-" ? "+" : "-") : normalized;
+}
+
+export function formatTrackCtgOrientationLabel(name, orientation) {
+  const text = String(name || "").trim();
+  if (!text) {
+    return "";
+  }
+  const normalizedName = text.replace(/(?:\s*\([+-]\))+\s*$/, "").trim();
+  return `${normalizedName} (${resolveTrackCtgEffectiveOrientation(orientation)})`;
+}
+
 export function resolveTrackCtgLabelText(ctg, fallbackId) {
   const displayName = resolveTrackCtgVisibleName(ctg, fallbackId);
   if (!displayName) {

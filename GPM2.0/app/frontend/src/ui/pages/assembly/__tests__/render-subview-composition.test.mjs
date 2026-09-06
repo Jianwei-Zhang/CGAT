@@ -39,14 +39,20 @@ function member(id, lane, sourceRole = "support") {
     source: { role: sourceRole, datasetId: id, datasetName: `ds${id}` },
     label: `ctg${id}`,
     lengthBp: 100,
+    baseOrientation: "+",
     lane,
     xBp: id * 100,
   };
 }
 
 test("composition manager renders both lane counts and the focused member", () => {
+  const flipped = {
+    ...member(3, "bottom"),
+    label: "ctg3 (+)",
+    flipped: true,
+  };
   const html = renderSubviewCompositionPanel({
-    composition: { members: [member(2, "top"), member(1, "bottom"), member(3, "bottom")] },
+    composition: { members: [member(2, "top"), member(1, "bottom"), flipped] },
     candidates: [],
     candidatesLoaded: false,
     ui: { view: "members", focusedEntityKey: "assembly:3" },
@@ -56,6 +62,8 @@ test("composition manager renders both lane counts and the focused member", () =
   assert.match(html, /Top \(1\)/);
   assert.match(html, /Bottom \(2\)/);
   assert.match(html, /data-subview-composition-member="assembly:3"[\s\S]*aria-pressed="true"/);
+  assert.match(html, /data-subview-composition-member="assembly:3"[\s\S]*title="ctg3 \(-\)"[\s\S]*<strong>ctg3 \(-\)<\/strong>/);
+  assert.doesNotMatch(html, /ctg3 \(\+\) \(-\)/);
   assert.match(html, /data-subview-composition-add="top"/);
   assert.match(html, /data-subview-composition-add="bottom"/);
 });
@@ -85,6 +93,7 @@ test("composition picker makes a cross-lane add explicit and supports checked ba
   }, helpers);
 
   assert.match(html, /Move from bottom/);
+  assert.match(html, /<strong title="ctg1 \(\+\)">ctg1 \(\+\)<\/strong>/);
   assert.match(html, /data-subview-composition-candidate="assembly:1\|primary:1:mother:0:0:"[\s\S]*checked/);
   assert.match(html, />Add \(1\)<\/button>/);
 });

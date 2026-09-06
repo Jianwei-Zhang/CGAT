@@ -516,7 +516,7 @@ test("anchor-enabled ctgs expose fragment hit zones instead of only whole-contig
   );
   assert.match(
     html,
-    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-key="8:1-500"[\s\S]*?<title>primary-bottom \| start=1 \| len=500<\/title>[\s\S]*?<\/rect>/,
+    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-key="8:1-500"[\s\S]*?<title>primary-bottom \(\+\) \| start=1 \| len=500<\/title>[\s\S]*?<\/rect>/,
   );
   assert.doesNotMatch(
     html,
@@ -617,7 +617,7 @@ test("subview-ctg phased anchor fragments expose hoverable phased hit zones", ()
   assert.match(html, /data-subview-fragment-phased-track-item-id="9001"/);
   assert.match(
     html,
-    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-role="support"[\s\S]*?data-subview-fragment-contig-id="30"[\s\S]*?data-subview-fragment-start="1"[\s\S]*?data-subview-fragment-end="100"[\s\S]*?<title>support-bottom \| start=1 \| len=100<\/title>[\s\S]*?<\/rect>/,
+    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-role="support"[\s\S]*?data-subview-fragment-contig-id="30"[\s\S]*?data-subview-fragment-start="1"[\s\S]*?data-subview-fragment-end="100"[\s\S]*?<title>support-bottom \(\+\) \| start=1 \| len=100<\/title>[\s\S]*?<\/rect>/,
   );
 });
 
@@ -709,7 +709,7 @@ test("subview-track phased anchor fragments expose hoverable phased hit zones", 
   assert.match(html, /data-subview-fragment-phased-track-item-id="9001"/);
   assert.match(
     html,
-    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-role="support"[\s\S]*?data-subview-fragment-contig-id="30"[\s\S]*?data-subview-fragment-start="1"[\s\S]*?data-subview-fragment-end="5000"[\s\S]*?<title>support-bottom \| start=1 \| len=5000<\/title>[\s\S]*?<\/rect>/,
+    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-role="support"[\s\S]*?data-subview-fragment-contig-id="30"[\s\S]*?data-subview-fragment-start="1"[\s\S]*?data-subview-fragment-end="5000"[\s\S]*?<title>support-bottom \(\+\) \| start=1 \| len=5000<\/title>[\s\S]*?<\/rect>/,
   );
 });
 

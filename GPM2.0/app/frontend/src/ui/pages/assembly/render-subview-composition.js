@@ -3,6 +3,10 @@ import {
   resolveSubviewCompositionCandidate,
 } from "./subview-composition-candidates.js";
 import { normalizeSubviewComposition } from "./subview-composition-state.js";
+import {
+  formatTrackCtgOrientationLabel,
+  resolveTrackCtgEffectiveOrientation,
+} from "./track-label-geometry.js";
 
 function sourceLabel(source, labels) {
   const role = labels.sources?.[source?.role] || source?.role || labels.unknownSource;
@@ -10,15 +14,23 @@ function sourceLabel(source, labels) {
   return detail ? `${role} · ${detail}` : role;
 }
 
+function displayLabel(member) {
+  return formatTrackCtgOrientationLabel(
+    member?.label,
+    resolveTrackCtgEffectiveOrientation(member?.baseOrientation, member?.flipped),
+  );
+}
+
 function renderMember(member, focusedEntityKey, isUnavailable, labels, escapeHtml, escapeAttr) {
   const opposite = member.lane === "top" ? "bottom" : "top";
   const focused = member.entityKey === focusedEntityKey;
+  const label = displayLabel(member);
   return `<li class="subview-composition-member${focused ? " is-composition-focused" : ""}" draggable="true"
       data-subview-composition-member="${escapeAttr(member.entityKey)}"
       data-subview-composition-lane="${member.lane}" tabindex="0" aria-pressed="${focused ? "true" : "false"}">
     <button type="button" class="subview-composition-member-main"
-      data-subview-composition-focus="${escapeAttr(member.entityKey)}">
-      <strong>${escapeHtml(member.label)}</strong>
+      data-subview-composition-focus="${escapeAttr(member.entityKey)}" title="${escapeAttr(label)}">
+      <strong>${escapeHtml(label)}</strong>
       <span>${escapeHtml(sourceLabel(member.source, labels))}</span>
       ${isUnavailable ? `<span class="inline-error">${escapeHtml(labels.sourceUnavailable)}</span>` : ""}
       <code>${Math.round(member.xBp).toLocaleString()} bp${member.flipped ? ` · ${escapeHtml(labels.flipped)}` : ""}</code>
@@ -81,14 +93,16 @@ function renderPicker(candidates, composition, ui, labels, escapeHtml, escapeAtt
     <ul class="subview-composition-candidate-list">
       ${filtered.map((candidate) => {
         const existing = membersByKey.get(candidate.entityKey);
+        const displayedCandidate = existing || candidate;
         const moveNote = existing && existing.lane !== ui.targetLane
           ? labels.willMove[existing.lane]
           : existing ? labels.alreadyAdded : "";
         const checked = ui.checkedKeys.includes(candidate.candidateKey);
+        const label = displayLabel(displayedCandidate);
         return `<li><label>
           <input type="checkbox" data-subview-composition-candidate="${escapeAttr(candidate.candidateKey)}"
             ${checked ? "checked" : ""}>
-          <span><strong>${escapeHtml(candidate.label)}</strong>
+          <span><strong title="${escapeAttr(label)}">${escapeHtml(label)}</strong>
             <small>${escapeHtml(sourceLabel(candidate.source, labels))}${moveNote ? ` · ${escapeHtml(moveNote)}` : ""}</small></span>
         </label></li>`;
       }).join("") || (ui.loading ? "" : `<li class="muted">${escapeHtml(labels.noMatches)}</li>`)}

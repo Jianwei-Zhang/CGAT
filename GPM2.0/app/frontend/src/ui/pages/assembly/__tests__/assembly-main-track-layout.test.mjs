@@ -1013,7 +1013,7 @@ test("subview 2-contig keeps ref bars and labels on the ref gray palette", () =>
     }),
   );
 
-  assert.match(html, /<div class="assembly-track-label-row is-ref"[^>]*>ref_Chr01:1-5000<\/div>/);
+  assert.match(html, /<div class="assembly-track-label-row is-ref"[^>]*title="ref_Chr01:1-5000 \(\+\)"[^>]*>ref_Chr01:1-5000 \(\+\)<\/div>/);
   assert.match(html, /data-subview-track-slot="top"[\s\S]*class="track-ctg subview-track-ctg is-ref"/);
   assert.match(html, /<text class="track-ctg-label[^"]*is-ref[^"]*"[^>]*data-subview-label-slot="top"/);
   const subviewSvg = html.match(/<svg class="assembly-track-svg subview-track-svg"[\s\S]*?<\/svg>/)?.[0] || "";
