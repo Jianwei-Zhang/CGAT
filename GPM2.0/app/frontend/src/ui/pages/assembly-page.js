@@ -428,6 +428,7 @@ const {
   enterSubviewFromCandidates,
   enterSubviewFromTrackSelections,
   handleSubviewCandidateRemoval,
+  handleSubviewCloseClear,
   handleSubviewHistoryReset,
   handleSubviewHistoryRestoreRollback,
   handleSubviewHistoryRollback,
@@ -437,12 +438,22 @@ const {
   handleTrackSubviewTrackSelection,
 } = createSubviewSelectionController({
   buildInitialSubviewPairwiseEvidence,
+  closeSubviewTools: () => assemblyPageSession.subviewTools?.close?.({ focusToggle: false }),
   getCurrentProject: (state) => getCurrentProject(state),
+  invalidateSubviewPairwiseEvidence: () => {
+    assemblyPageSession.subviewPairwiseEvidenceRequestSeq += 1;
+  },
   loadSubviewPairwiseEvidence,
   persistProjectAssemblyViewStateFromStore: (host, store) =>
     persistProjectAssemblyViewStateFromStore(host, store),
   rerenderAssemblyMainTab: (host, store) => rerenderAssemblyMainTab(host, store),
   rerenderSubviewPanel: (host, store) => rerenderSubviewPanel(host, store),
+  resetSubviewTransientState: () => {
+    assemblyPageSession.lastSubviewViewportKey = "";
+    assemblyPageSession.lastSubviewScrollLeft = 0;
+    assemblyPageSession.pendingSubviewViewportAnchorBp = null;
+    subviewToolsContentController.resetScope("");
+  },
 });
 const {
   addTrackContigToPhasedTrack,
@@ -855,6 +866,7 @@ function createAssemblyPageBindingDeps(options = {}) {
     createPhasedChrTrack,
     handleNewSequenceRowAction,
     handleSubviewCandidateRemoval,
+    handleSubviewCloseClear,
     handleSubviewHistoryReset,
     handleSubviewHistoryRestoreRollback,
     handleSubviewHistoryRollback,

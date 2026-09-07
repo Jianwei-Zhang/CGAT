@@ -1,4 +1,5 @@
 import { tAssembly } from "./i18n.js";
+import { buildSubviewClearProjection } from "./subview-clear-state.js";
 import {
   normalizeSupportDatasetId,
   swapSubviewTrackDragOffsetsForSummarySwap,
@@ -28,11 +29,14 @@ import {
 
 export function createSubviewSelectionController({
   buildInitialSubviewPairwiseEvidence,
+  closeSubviewTools = () => {},
   getCurrentProject,
+  invalidateSubviewPairwiseEvidence = () => {},
   loadSubviewPairwiseEvidence,
   persistProjectAssemblyViewStateFromStore = async () => {},
   rerenderAssemblyMainTab,
   rerenderSubviewPanel,
+  resetSubviewTransientState = () => {},
 }) {
   function rerenderSubviewSelectionRegions(host, store) {
     rerenderAssemblyMainTab(host, store);
@@ -511,10 +515,28 @@ export function createSubviewSelectionController({
     applySubviewHistoryTransition(host, store, resetSubviewHistory);
   }
 
+  function handleSubviewCloseClear(host, store) {
+    const state = store.getState();
+    const cleared = buildSubviewClearProjection(state.assembly);
+    if (!cleared.changed) {
+      return false;
+    }
+    const focusHost = host?.closest?.("#route-host") || host;
+    invalidateSubviewPairwiseEvidence();
+    resetSubviewTransientState();
+    store.setState({ assembly: cleared.assembly });
+    closeSubviewTools();
+    rerenderSubviewSelectionRegions(host, store);
+    focusHost?.querySelector?.("[data-subview-tools-toggle]")?.focus?.({ preventScroll: true });
+    void persistProjectAssemblyViewStateFromStore(host, store);
+    return true;
+  }
+
   return {
     enterSubviewFromCandidates,
     enterSubviewFromTrackSelections,
     handleSubviewCandidateRemoval,
+    handleSubviewCloseClear,
     handleSubviewHistoryReset,
     handleSubviewHistoryRestoreRollback,
     handleSubviewHistoryRollback,

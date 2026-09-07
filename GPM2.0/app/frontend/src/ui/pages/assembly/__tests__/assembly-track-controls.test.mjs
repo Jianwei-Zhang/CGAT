@@ -292,9 +292,39 @@ test("subview selection panel hides history controls before a pair enters", () =
   const html = renderAssemblyPage(createState());
 
   assert.match(html, /<article class="card subview-selection-panel" data-subview-panel="1">/);
+  assert.match(
+    html,
+    /data-subview-action="close-clear"[^>]*aria-label="关闭并清空 Subview"[^>]*disabled/,
+  );
   assert.doesNotMatch(html, /data-subview-action="history-rollback"/);
   assert.doesNotMatch(html, /data-subview-action="history-restore-rollback"/);
   assert.doesNotMatch(html, /data-subview-action="history-reset"/);
+});
+
+test("subview close-clear control is compact, bilingual, and enabled for pending work", () => {
+  const css = readStylesheetTree(
+    new URL("../../../../styles/components.css", import.meta.url),
+    "utf8",
+  );
+  const html = renderAssemblyPage(createState({
+    locale: "en",
+    assembly: {
+      subview: {
+        mode: "2-contig",
+        selectedAContigId: 2,
+        selectedARole: "primary",
+        message: "Selected 1/2 contigs.",
+        summary: null,
+      },
+    },
+  }));
+  const button = html.match(/<button[^>]*data-subview-action="close-clear"[^>]*>/)?.[0] || "";
+
+  assert.match(button, /aria-label="Close and clear Subview"/);
+  assert.doesNotMatch(button, /disabled/);
+  assert.match(button, /class="button ghost tiny subview-close-clear"/);
+  assert.match(css, /\.subview-close-clear\s*\{[^}]*flex:\s*0 0 auto;/);
+  assert.match(css, /\.subview-close-clear-icon\s*\{[^}]*width:\s*16px;[^}]*height:\s*16px;/);
 });
 
 test("subview history controls follow MAPQ as one icon group and disable unavailable actions", () => {

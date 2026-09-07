@@ -73,6 +73,22 @@
   stroke-width: 1.3;
 }
 
+.subview-close-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding-inline: 5px;
+}
+
+.subview-close-clear-icon {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
 .subview-tools-window {
   position: fixed;
   z-index: 29;

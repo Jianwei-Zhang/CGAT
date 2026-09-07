@@ -41,6 +41,7 @@ import {
   formatSubviewHistoryActionLabel,
   resolveCurrentSubviewHistory,
 } from "./subview-history-state.js";
+import { canClearSubviewState } from "./subview-clear-state.js";
 import { assemblyPageSession } from "./page-session.js";
 import { buildGrtResultPlan, resolveGrtResultContext } from "./grt-result-state.js";
 import { buildGrtResultScene } from "./grt-result-render.js";
@@ -785,6 +786,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
   const grtAnchorPlan = buildGrtResultPlan(grtResultContext.baselineEntry);
   const grtResultPlan = grtResultContext.available ? grtAnchorPlan : null;
   const history = resolveCurrentSubviewHistory(assembly);
+  const canClear = canClearSubviewState(assembly);
   const alignmentCard = renderSubviewAlignmentCard(
     subview,
     supportContext,
@@ -804,6 +806,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
         <div class="subview-panel-title-row" data-grt-result-card="subview">
           <h4>${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
           ${renderSubviewToolsToggle(i18n.subview.tools, { escapeHtml, escapeAttr })}
+          <button type="button" class="button ghost tiny subview-close-clear" data-subview-action="close-clear" aria-label="${escapeAttr(i18n.subview.closeClearAria)}" title="${escapeAttr(i18n.subview.closeClearAria)}" ${canClear ? "" : "disabled"}><svg class="subview-close-clear-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false"><path d="m4 4 8 8"></path><path d="m12 4-8 8"></path></svg></button>
           <p class="muted subview-panel-guide">${escapeHtml(i18n.subview.guide)}</p>
           ${allBadges ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}
         </div>

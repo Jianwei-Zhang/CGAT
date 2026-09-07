@@ -311,3 +311,66 @@ test("two-track quick entry leaves an active composition and activates only the 
   assert.deepEqual(harness.pairwiseLoads.map((summary) => summary.mode), ["track-pair"]);
   assert.equal(harness.persisted.length, 1);
 });
+
+test("close-clear invalidates requests, closes tools, persists once, and ignores repeat clicks", () => {
+  const calls = [];
+  const store = createStore(createCompositionBackedState());
+  const host = {
+    querySelector(selector) {
+      return selector === "[data-subview-tools-toggle]"
+        ? { focus() { calls.push("focus"); } }
+        : null;
+    },
+  };
+  const controller = createSubviewSelectionController({
+    buildInitialSubviewPairwiseEvidence() {
+      return null;
+    },
+    closeSubviewTools() {
+      calls.push("close-tools");
+    },
+    getCurrentProject() {
+      return { primaryDatasetId: 11 };
+    },
+    invalidateSubviewPairwiseEvidence() {
+      calls.push("invalidate-request");
+    },
+    loadSubviewPairwiseEvidence() {},
+    persistProjectAssemblyViewStateFromStore() {
+      calls.push("persist");
+    },
+    rerenderAssemblyMainTab() {
+      calls.push("render-main");
+    },
+    rerenderSubviewPanel() {
+      calls.push("render-subview");
+    },
+    resetSubviewTransientState() {
+      calls.push("reset-transient");
+    },
+  });
+
+  assert.equal(controller.handleSubviewCloseClear(host, store), true);
+  assert.deepEqual(calls, [
+    "invalidate-request",
+    "reset-transient",
+    "close-tools",
+    "render-main",
+    "render-subview",
+    "focus",
+    "persist",
+  ]);
+  assert.equal(store.getState().assembly.subview.summary, null);
+  assert.equal(store.getState().assembly.subviewHistoryByKey["composition:Chr01"], undefined);
+
+  assert.equal(controller.handleSubviewCloseClear(host, store), false);
+  assert.equal(calls.filter((call) => call === "persist").length, 1);
+
+  controller.handleTrackSubviewCandidateSelection(host, store, {
+    trackRole: "primary",
+    contigId: 2,
+  });
+  assert.equal(store.getState().assembly.subview.mode, "2-contig");
+  assert.equal(store.getState().assembly.subview.selectedAContigId, 2);
+  assert.equal(store.getState().assembly.subview.summary, null);
+});
