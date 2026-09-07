@@ -1423,7 +1423,9 @@ test("composition scale controls increase the visible bp span while retaining th
     const state = createState();
     state.assembly.subviewTrackView.minTickUnitKb = 1;
     state.assembly.subviewTrackView[field] = before;
-    state.assembly.subview = { summary: { mode: "composition", members: [] } };
+    const members = [{ assemblyCtgId: 1, source: { role: "primary", datasetId: 11 },
+      lengthBp: 100_000, lane: "top", xBp: -50_000 }];
+    state.assembly.subview = { summary: { mode: "composition", members } };
     state.assembly.subviewCompositionViewport = { bpPerPx: 2, leftBp: 100, topPx: 0 };
     const store = createStore(state);
     let persisted = 0;
@@ -1436,7 +1438,20 @@ test("composition scale controls increase the visible bp span while retaining th
     assert.equal(viewport.bpPerPx * 600, 20_000, field);
     assert.equal(viewport.leftBp + 600 * viewport.bpPerPx / 2, 700, field);
     assert.equal(persisted, 1);
-    assert.deepEqual(store.getState().assembly.subview.summary.members, []);
+    assert.deepEqual(store.getState().assembly.subview.summary.members, members);
+    // The same control must stop zooming out once all content fits. An
+    // inherited viewport can disagree with the toolbar before this edit.
+    const shortMembers = [{ ...members[0], lengthBp: 1200, xBp: 0 }];
+    const current = store.getState().assembly;
+    store.setState({ assembly: { ...current,
+      subview: { summary: { mode: "composition", members: shortMembers } },
+    } });
+    input.value = String(after * 2);
+    listeners.get("change")();
+    const fittedViewport = store.getState().assembly.subviewCompositionViewport;
+    assert.equal(fittedViewport.bpPerPx * 600, 1200, field);
+    assert.equal(fittedViewport.leftBp, 0, field);
+    assert.deepEqual(store.getState().assembly.subview.summary.members, shortMembers);
   }
 });
 

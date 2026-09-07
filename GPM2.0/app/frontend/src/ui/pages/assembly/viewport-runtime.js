@@ -371,7 +371,20 @@ export function createAssemblyViewportController({
       const state = store.getState();
       const primarySubviewScroll = subviewTrackScrollEls[0] || null;
       const nextSubviewViewportKey = buildSubviewTrackViewportKey(state);
-      if (nextSubviewViewportKey !== session.lastSubviewViewportKey) {
+      const isComposition = String(state.assembly?.subview?.summary?.mode || "").trim() === "composition";
+      if (isComposition) {
+        // Composition owns its world viewport. Old pixel offsets and the pair
+        // anchor path cannot restore a changed scale or a negative world center.
+        session.lastSubviewViewportKey = nextSubviewViewportKey;
+        const viewport = state.assembly?.subviewCompositionViewport || {};
+        const bpPerPx = Number(viewport.bpPerPx);
+        const viewboxMinX = Number(primarySubviewScroll?.dataset?.subviewViewboxMinX || 0);
+        session.lastSubviewScrollLeft = Number.isFinite(bpPerPx) && bpPerPx > 0
+          ? Math.max(0, Number(viewport.leftBp || 0) / bpPerPx
+            - (Number.isFinite(viewboxMinX) ? viewboxMinX : 0))
+          : 0;
+        session.pendingSubviewViewportAnchorBp = null;
+      } else if (nextSubviewViewportKey !== session.lastSubviewViewportKey) {
         session.lastSubviewViewportKey = nextSubviewViewportKey;
         const persistedScrollLeft = resolvePersistedViewportScrollLeft(
           state.assembly.subviewTrackScrollState,
@@ -379,14 +392,6 @@ export function createAssemblyViewportController({
         );
         if (persistedScrollLeft !== null) {
           session.lastSubviewScrollLeft = persistedScrollLeft;
-        } else if (String(state.assembly?.subview?.summary?.mode || "").trim() === "composition") {
-          const viewport = state.assembly?.subviewCompositionViewport || {};
-          const bpPerPx = Number(viewport.bpPerPx);
-          const viewboxMinX = Number(primarySubviewScroll?.dataset?.subviewViewboxMinX || 0);
-          session.lastSubviewScrollLeft = Number.isFinite(bpPerPx) && bpPerPx > 0
-            ? Math.max(0, Number(viewport.leftBp || 0) / bpPerPx
-              - (Number.isFinite(viewboxMinX) ? viewboxMinX : 0))
-            : 0;
         } else {
           session.lastSubviewScrollLeft = 0;
         }

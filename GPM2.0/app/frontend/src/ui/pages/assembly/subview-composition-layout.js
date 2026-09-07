@@ -1,4 +1,31 @@
 import { normalizeSubviewComposition } from "./subview-composition-state.js";
+import { normalizePositiveInt, resolveTrackInnerWidthFromScale, resolveTrackPrefs } from "./track-prefs.js";
+
+export function resolveSubviewCompositionScaleViewport(composition, {
+  trackPrefs,
+  viewportWidthPx = 1_200,
+  centerBp,
+  topPx = 0,
+} = {}) {
+  const { members } = normalizeSubviewComposition(composition);
+  const windowStart = Math.min(0, ...members.map((member) => member.xBp));
+  const windowEnd = Math.max(0, ...members.map((member) => member.xBp + member.lengthBp));
+  const domainSpanBp = Math.max(1, windowEnd - windowStart);
+  const viewportWidth = normalizePositiveInt(viewportWidthPx) ?? 1_200;
+  const innerWidth = resolveTrackInnerWidthFromScale({
+    ...resolveTrackPrefs(trackPrefs),
+    domainSpanBp,
+    baseViewportPx: viewportWidth,
+  });
+  const bpPerPx = domainSpanBp / innerWidth;
+  const visibleSpanBp = viewportWidth * bpPerPx;
+  const requestedLeft = Number.isFinite(centerBp) ? centerBp - visibleSpanBp / 2 : windowStart;
+  return {
+    bpPerPx,
+    leftBp: Math.max(windowStart, Math.min(windowEnd - visibleSpanBp, requestedLeft)),
+    topPx,
+  };
+}
 
 export function buildSubviewCompositionLayout(composition, {
   bpPerPx = 1_000,

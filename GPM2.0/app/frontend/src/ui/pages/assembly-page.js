@@ -415,6 +415,7 @@ const {
     scheduleDeferredSubviewPanelRerender(host, store),
 });
 const subviewToolsContentController = createSubviewCompositionController({
+  getMeasuredTrackViewportPx: (role) => getMeasuredTrackViewportPx(role),
   session: assemblyPageSession,
   listChrViewCtgs,
   persistProjectAssemblyViewStateFromStore: (host, store) =>

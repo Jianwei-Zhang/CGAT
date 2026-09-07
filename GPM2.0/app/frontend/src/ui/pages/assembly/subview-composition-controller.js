@@ -21,6 +21,7 @@ import {
 } from "./subview-state.js";
 import { normalizeSupportDatasetId } from "./selection-state.js";
 import { renderSubviewCompositionPanel } from "./render-subview-composition.js";
+import { resolveSubviewCompositionScaleViewport } from "./subview-composition-layout.js";
 
 function defaultUi(scopeKey = "") {
   return {
@@ -215,6 +216,7 @@ function locateCompositionMember(host, entityKey) {
 
 export function createSubviewCompositionController({
   session,
+  getMeasuredTrackViewportPx,
   listChrViewCtgs,
   persistProjectAssemblyViewStateFromStore,
   rerenderSubviewPanel,
@@ -305,7 +307,12 @@ export function createSubviewCompositionController({
 
   async function commit(host, store, composition, operation, sync) {
     const state = store.getState();
-    const viewport = resolveCurrentSubviewCompositionViewport(state, host);
+    const viewport = host?.querySelector?.(".subview-track-scroll")
+      ? resolveCurrentSubviewCompositionViewport(state, host)
+      : resolveSubviewCompositionScaleViewport(composition, {
+        trackPrefs: state.assembly?.subviewTrackView,
+        viewportWidthPx: getMeasuredTrackViewportPx?.("subview"),
+      });
     const nextSubview = applySubviewComposition(getSubviewState(state.assembly), composition);
     const result = commitSubviewCompositionHistoryOperation(state.assembly, {
       nextSubview,

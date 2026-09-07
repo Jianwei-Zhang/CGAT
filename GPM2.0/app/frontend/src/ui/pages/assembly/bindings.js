@@ -23,6 +23,8 @@ import {
 import { assemblyPageSession } from "./page-session.js";
 import { bindMainTrackControlLayout } from "./main-track-control-layout-runtime.js";
 import { updateSubviewCompositionViewport } from "./subview-history-state.js";
+import { resolveSubviewCompositionScaleViewport } from "./subview-composition-layout.js";
+import { getSubviewComposition } from "./subview-composition-state.js";
 
 const ASSEMBLY_TRACK_COMBO_BOUND = Symbol("assemblyTrackComboBound");
 const ASSEMBLY_DROPDOWN_CLOSE_DELAY_MS = 400;
@@ -1411,8 +1413,11 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     if (nextValue === previousValue) {
       return;
     }
+    const compositionScaleChanged = viewKey === "subviewTrackView"
+      && String(current?.subview?.summary?.mode || "").trim() === "composition"
+      && (field === "minTickUnitKb" || field === "maxTickCount");
     if (viewKey === "trackView" || viewKey === "subviewTrackView") {
-      rememberTrackViewportAnchor(host, viewKey);
+      if (!compositionScaleChanged) rememberTrackViewportAnchor(host, viewKey);
       markNextTrackAutoFocusSuppressed();
     }
     let nextAssembly = {
@@ -1433,23 +1438,19 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
           ? []
           : current.trackSelectedCtgIds,
     };
-    const compositionScaleChanged = viewKey === "subviewTrackView"
-      && String(current?.subview?.summary?.mode || "").trim() === "composition"
-      && (field === "minTickUnitKb" || field === "maxTickCount");
     if (compositionScaleChanged) {
       const viewport = current.subviewCompositionViewport || {};
       const currentScale = Math.max(1e-6, Number(viewport.bpPerPx) || 1_000);
       const viewportWidth = Math.max(1,
         Number(host?.querySelector?.(".subview-track-scroll")?.clientWidth || 1200));
-      // Inherited world geometry can have a different scale from the toolbar.
-      // An explicit edit makes the visible span match unit × count, as in pairs.
-      const nextScale = nextPrefs.minTickUnitKb * 1000 * nextPrefs.maxTickCount / viewportWidth;
       const centerBp = Number(viewport.leftBp || 0) + viewportWidth * currentScale / 2;
-      nextAssembly = updateSubviewCompositionViewport(nextAssembly, {
-        ...viewport,
-        bpPerPx: nextScale,
-        leftBp: centerBp - viewportWidth * nextScale / 2,
-      });
+      nextAssembly = updateSubviewCompositionViewport(nextAssembly,
+        resolveSubviewCompositionScaleViewport(getSubviewComposition(current.subview), {
+          trackPrefs: nextPrefs,
+          viewportWidthPx: viewportWidth,
+          centerBp,
+          topPx: viewport.topPx,
+        }));
     }
     store.setState({
       ...state,

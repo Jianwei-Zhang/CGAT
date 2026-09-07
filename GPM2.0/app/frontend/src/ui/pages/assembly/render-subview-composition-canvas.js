@@ -8,7 +8,7 @@ import { buildGrtResultScene } from "./grt-result-render.js";
 import { renderSubviewVirtualRuler, resolveHitMapq, sortTrackEntriesForRender } from "./track-render-geometry.js";
 import { normalizePositiveInt, resolveTrackPrefs } from "./track-prefs.js";
 import { resolveSubviewCompositionCandidate } from "./subview-composition-candidates.js";
-import { buildSubviewCompositionLayout } from "./subview-composition-layout.js";
+import { buildSubviewCompositionLayout, resolveSubviewCompositionScaleViewport } from "./subview-composition-layout.js";
 import { getSubviewComposition } from "./subview-composition-state.js";
 import { normalizeSupportDatasetId } from "./selection-state.js";
 import {
@@ -404,9 +404,11 @@ export function renderSubviewCompositionAlignmentCard({
   escapeAttr,
 }) {
   const composition = getSubviewComposition(subview);
-  if (!composition) return "";
+  if (!composition?.members.length) return "";
   const prefs = resolveTrackPrefs(trackPrefs);
-  const viewport = supportContext?.compositionViewport || {};
+  const savedViewport = supportContext?.compositionViewport;
+  const viewport = Number(savedViewport?.bpPerPx) > 0 ? savedViewport
+    : resolveSubviewCompositionScaleViewport(composition, { trackPrefs: prefs, viewportWidthPx });
   const layout = buildSubviewCompositionLayout(composition, {
     bpPerPx: viewport.bpPerPx,
     viewportWidthPx,

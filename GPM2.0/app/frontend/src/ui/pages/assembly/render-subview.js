@@ -1448,6 +1448,7 @@ function renderSubviewAlignmentCard(
     flippedKeySet,
     "bottom",
   );
+  if (!topCtg && !bottomCtg) return "";
   if (!topCtg || !bottomCtg) {
     return `<article class="assembly-track-panel subview-alignment-card"><p class="muted">${escapeHtml(i18n.subview.invalidCandidate)}</p></article>`;
   }
@@ -1979,6 +1980,7 @@ function renderSubviewTrackPairAlignmentCard(
       !hiddenKeySet.has(buildSubviewTrackPairHiddenCtgKey(bottomTrack.role, ctg?.assemblyCtgId)),
     )
     .map((ctg) => resolveSubviewRenderableContig(ctg, flippedKeySet, "bottom"));
+  if (!topCtgs.length && !bottomCtgs.length) return "";
   const resolvedTrackPrefs = resolveTrackPrefs(trackPrefs || {});
   const pairModel = buildDualTrackModel({
     primaryCtgs: bottomCtgs,

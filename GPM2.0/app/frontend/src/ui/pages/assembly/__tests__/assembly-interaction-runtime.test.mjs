@@ -2248,6 +2248,15 @@ test("composition scroll restores and updates the history-owned world viewport",
   listeners.get("scroll")?.();
   assert.equal(store.getState().assembly.subviewCompositionViewport.leftBp, 700);
   assert.equal(store.getState().assembly.subviewHistoryByKey[pairKey].viewport.leftBp, 700);
+  // A scale change keeps the same composition identity but invalidates pixel
+  // offsets. Its signed world viewport wins over a saved scroll position.
+  store.setState({ assembly: { ...store.getState().assembly,
+    subviewCompositionViewport: { bpPerPx: 20, leftBp: -1000, topPx: 0 },
+  } });
+  scroll.dataset.subviewViewboxMinX = "-100";
+  scroll.dataset.subviewDomainSpanBp = "24000";
+  __testBindTrackScrollSync(host, store, { schedulePersistAssemblyScrollState() {} });
+  assert.equal(scroll.scrollLeft, 50);
   const currentAfterScroll = store.getState().assembly.subviewHistoryByKey[pairKey].current;
   assert.equal(currentAfterScroll.kind, currentBeforeScroll.kind);
   assert.deepEqual(
