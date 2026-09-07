@@ -394,6 +394,27 @@ test("previewSubviewTrackContigDrag shifts matching sticky labels together with 
   assert.equal(stickyLabelNode.style.transform, "");
 });
 
+test("composition drag moves and clears its entity-keyed sticky label", () => {
+  const groupNode = createNode({
+    "data-subview-track-slot": "top", "data-subview-track-role": "support",
+    "data-subview-contig-id": "12", "data-subview-composition-entity-key": "assembly:12",
+  });
+  const stickyLabelNode = createNode({ "data-sticky-label-key": "subview:composition:assembly:12" });
+  const host = createHost({
+    '[data-subview-track-slot="top"][data-subview-contig-id="12"]': [groupNode],
+    '[data-sticky-label-key="subview:composition:assembly:12"]': [stickyLabelNode],
+    "[data-drag-preview-group='1']": [groupNode],
+    "[data-drag-preview-sticky-label='1']": [stickyLabelNode],
+  });
+  for (const offsetPx of [18, -22]) {
+    previewSubviewTrackContigDrag(host, { slot: "top", contigId: 12, offsetPx });
+    assert.equal(stickyLabelNode.style.transform, `translateX(${offsetPx}px)`);
+    clearSubviewTrackDragPreview(host);
+    assert.equal(groupNode.getAttribute("transform"), null);
+    assert.equal(stickyLabelNode.style.transform, "");
+  }
+});
+
 test("previewSubviewTrackContigDrag shifts the matching GRT junction endpoint", () => {
   const groupNode = createNode({
     "data-subview-track-slot": "top",

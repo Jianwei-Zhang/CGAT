@@ -123,6 +123,15 @@ function buildMainTrackTarget(groupNode, scrollEl) {
   };
 }
 
+export function resolveSubviewStickyLabelKey(groupNode) {
+  const entityKey = readTrimmedAttribute(groupNode, "data-subview-composition-entity-key");
+  if (entityKey) return `subview:composition:${entityKey}`;
+  const slot = readTrimmedAttribute(groupNode, "data-subview-track-slot");
+  const role = readTrimmedAttribute(groupNode, "data-subview-track-role");
+  const contigId = readTrimmedAttribute(groupNode, "data-subview-contig-id");
+  return `subview:${slot}:${role}:${contigId}`;
+}
+
 function buildSubviewTrackTarget(groupNode, scrollEl) {
   const slot = String(groupNode?.getAttribute?.("data-subview-track-slot") || "").trim();
   const role = String(groupNode?.getAttribute?.("data-subview-track-role") || "").trim();
@@ -130,11 +139,15 @@ function buildSubviewTrackTarget(groupNode, scrollEl) {
   if (!slot || !role || !contigId) {
     return null;
   }
-  const originalLabelNode = scrollEl?.querySelector?.(
-    `[data-subview-label-slot="${slot}"][data-subview-label-role="${role}"][data-subview-label-contig-id="${contigId}"]`,
-  );
+  const isComposition = Boolean(readTrimmedAttribute(groupNode, "data-subview-composition-entity-key"));
+  const originalLabelNode = isComposition
+    ? groupNode?.querySelector?.(".track-ctg-label")
+    : scrollEl?.querySelector?.(
+      `[data-subview-label-slot="${slot}"][data-subview-label-role="${role}"][data-subview-label-contig-id="${contigId}"]`,
+    );
+  if (isComposition && !originalLabelNode) return null;
   return {
-    key: `subview:${slot}:${role}:${contigId}`,
+    key: resolveSubviewStickyLabelKey(groupNode),
     rectX: Number(groupNode?.getAttribute?.("data-subview-rect-x")),
     rectY: Number(groupNode?.getAttribute?.("data-subview-rect-y")),
     rectWidth: Number(groupNode?.getAttribute?.("data-subview-rect-width")),

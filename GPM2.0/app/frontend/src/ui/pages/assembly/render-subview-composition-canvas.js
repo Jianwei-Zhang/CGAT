@@ -5,7 +5,7 @@ import {
 import { buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
 import { buildSubviewGrtAnchorScene } from "./subview-grt-anchor-state.js";
 import { buildGrtResultScene } from "./grt-result-render.js";
-import { renderSubviewVirtualRuler, resolveHitMapq } from "./track-render-geometry.js";
+import { renderSubviewVirtualRuler, resolveHitMapq, sortTrackEntriesForRender } from "./track-render-geometry.js";
 import { normalizePositiveInt, resolveTrackPrefs } from "./track-prefs.js";
 import { resolveSubviewCompositionCandidate } from "./subview-composition-candidates.js";
 import { buildSubviewCompositionLayout } from "./subview-composition-layout.js";
@@ -13,6 +13,7 @@ import { getSubviewComposition } from "./subview-composition-state.js";
 import { normalizeSupportDatasetId } from "./selection-state.js";
 import {
   formatTrackCtgOrientationLabel,
+  resolveBoundedTrackCtgLabelPlacement,
   resolveTrackCtgEffectiveOrientation,
   resolveTrackCtgVisibleName,
 } from "./track-label-geometry.js";
@@ -331,6 +332,8 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
   escapeAttr,
   resolveTrackToneClass,
   grtOverlay = "",
+  minVisibleX,
+  maxVisibleX,
 }) {
   const role = member.source?.role || "support";
   const tone = resolveTrackToneClass(role);
@@ -339,6 +342,22 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
   const title = `${memberFullDisplayLabel(member)} · ${source} · ${member.lengthBp.toLocaleString()} bp`;
   const unavailable = candidate || !candidatesLoaded ? "" : " is-unavailable";
   const orient = memberOrientation(member);
+  const placement = resolveBoundedTrackCtgLabelPlacement({
+    ctgName: label,
+    role,
+    rect: member,
+    barY: y,
+    barHeight: BAR_HEIGHT,
+    inlineTextOffsetY: 11,
+    outsideLabelAnchor: "bar-middle",
+    hideOutsideLabel: true,
+    minVisibleX,
+    maxVisibleX,
+  });
+  const labelMarkup = placement.hidden ? ""
+    : `<text class="track-ctg-label${tone}${placement.classSuffix}" x="${placement.x.toFixed(2)}" y="${placement.y.toFixed(2)}"${placement.transformAttr} text-anchor="${placement.textAnchor}"
+        data-subview-label-slot="${member.lane}" data-subview-label-role="${escapeAttr(role)}"
+        data-subview-label-contig-id="${member.assemblyCtgId || 0}">${escapeHtml(label)}</text>`;
   return `<g class="track-ctg-group${tone}${unavailable}" data-subview-composition-entity-key="${escapeAttr(member.entityKey)}"
       data-grt-result-entry-key="${escapeAttr(member.entityKey)}"
       data-subview-track-pair-role="${escapeAttr(role)}" data-subview-track-pair-contig-id="${member.assemblyCtgId || 0}"
@@ -355,7 +374,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
       width="${member.width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4" pointer-events="all" />
     ${grtOverlay}
     ${renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr })}
-    <text class="track-ctg-label${tone}" x="${(member.x + 3).toFixed(2)}" y="${y + 11}">${escapeHtml(label)}</text>
+    ${labelMarkup}
   </g>`;
 }
 
@@ -453,18 +472,29 @@ export function renderSubviewCompositionAlignmentCard({
     composition.activeAnchors,
     composition.manualAnchors,
   );
-  const memberMarkup = layout.members.map((member) => renderMember(
-    member,
-    resolveSubviewCompositionCandidate(candidates, member),
-    candidatesLoaded,
-    anchorCutsByEndpoint.get(endpointKey(member)) || [],
-    member.lane === "top" ? TOP_Y : BOTTOM_Y,
-    i18n,
-    {
-      escapeHtml, escapeAttr, resolveTrackToneClass,
-      grtOverlay: grtResult.context?.subviewEnabled ? grtScene.overlaysByKey.get(member.entityKey) : "",
+  const memberEntries = layout.members.map((member) => ({
+    ctg: {
+      assemblyCtgId: member.assemblyCtgId,
+      lengthBp: member.lengthBp,
+      laneIndex: member.lane === "top" ? 0 : 1,
     },
-  )).join("");
+    rect: member,
+    markup: renderMember(
+      member,
+      resolveSubviewCompositionCandidate(candidates, member),
+      candidatesLoaded,
+      anchorCutsByEndpoint.get(endpointKey(member)) || [],
+      member.lane === "top" ? TOP_Y : BOTTOM_Y,
+      i18n,
+      {
+        escapeHtml, escapeAttr, resolveTrackToneClass,
+        grtOverlay: grtResult.context?.subviewEnabled ? grtScene.overlaysByKey.get(member.entityKey) : "",
+        minVisibleX: layout.viewBoxMinX,
+        maxVisibleX: layout.viewBoxMinX + layout.width,
+      },
+    ),
+  }));
+  const memberMarkup = sortTrackEntriesForRender(memberEntries).map((entry) => entry.markup).join("");
   const topCount = layout.top.length;
   const bottomCount = layout.bottom.length;
   const emptyTop = topCount ? "" : `<text class="track-row-empty-label" x="12" y="${TOP_Y + 12}">${escapeHtml(i18n.trackControls.topTrackEmpty)}</text>`;

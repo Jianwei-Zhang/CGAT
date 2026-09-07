@@ -326,6 +326,38 @@ test("left-clipped visible ctg uses sticky mode when label fits visible width", 
   );
 });
 
+test("composition sticky labels use member identity and never replace hidden names with numeric ids", () => {
+  const { host, scrollEl, originalLabel } = createSubviewRuntimeFixture({
+    role: "ref", contigId: "0", scrollLeft: 20, rectX: -20, rectWidth: 200,
+    labelText: "Chr01 (+)",
+  });
+  const group = scrollEl.children[0];
+  group.setAttribute("data-subview-composition-entity-key", "ref:Chr01:1-2000");
+  scrollEl.removeChild(originalLabel);
+  group.appendChild(originalLabel);
+  const secondGroup = createElement("g", { attributes: {
+    "data-subview-composition-entity-key": "ref:Chr01:2001-4000",
+    "data-subview-track-slot": "top", "data-subview-track-role": "ref", "data-subview-contig-id": "0",
+    "data-subview-rect-x": "-10", "data-subview-rect-y": "36",
+    "data-subview-rect-width": "200", "data-subview-rect-height": "14",
+  } });
+  secondGroup.appendChild(createElement("text", {
+    classNames: ["track-ctg-label"], textContent: "Chr02 (-)",
+  }));
+  scrollEl.appendChild(secondGroup);
+  const document = createRuntimeDocument();
+  bindStickyCtgLabels(host, { document });
+  const sticky = scrollEl.querySelectorAll(".track-sticky-label");
+  assert.deepEqual(sticky.map((node) => node.textContent), ["Chr01 (+)", "Chr02 (-)"]);
+  assert.deepEqual(sticky.map((node) => node.getAttribute("data-sticky-label-key")), [
+    "subview:composition:ref:Chr01:1-2000", "subview:composition:ref:Chr01:2001-4000",
+  ]);
+  assert.equal(originalLabel.classList.contains("is-sticky-hidden"), true);
+  originalLabel.remove(); // A renderer-hidden label must not create a numeric fallback.
+  bindStickyCtgLabels(host, { document });
+  assert.deepEqual(scrollEl.querySelectorAll(".track-sticky-label").map((node) => node.textContent), ["Chr02 (-)"]);
+});
+
 test("left-clipped ctg suppresses sticky label when text would exceed visible right edge", () => {
   const result = resolveStickyLabelDisplay({
     rectX: 100,

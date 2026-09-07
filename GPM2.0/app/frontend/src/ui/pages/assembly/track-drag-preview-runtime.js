@@ -1,4 +1,5 @@
 import { resolveTrackScrollLeftForViewboxShift } from "./track-viewport.js";
+import { resolveSubviewStickyLabelKey } from "./sticky-ctg-label-runtime.js";
 
 const MAIN_TRACK_PREVIEW_CLASS = "is-track-drag-preview";
 const SUBVIEW_TRACK_PREVIEW_CLASS = "is-subview-track-drag-preview";
@@ -556,7 +557,7 @@ export function previewSubviewTrackContigDrag(
       return;
     }
     const stickyLabelNodes = host.querySelectorAll?.(
-      `[data-sticky-label-key="subview:${slot}:${trackRole}:${contigId}"]`,
+      `[data-sticky-label-key="${resolveSubviewStickyLabelKey(groupNode)}"]`,
     ) || [];
     stickyLabelNodes.forEach((labelNode) => applyStickyLabelPreview(labelNode, offsetPx));
     const labelNodes = host.querySelectorAll?.(
