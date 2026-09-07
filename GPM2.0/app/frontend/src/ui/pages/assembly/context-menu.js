@@ -24,7 +24,8 @@ const REQUIRED_ACTION_NAMES = [
   "enterSubviewFromCandidates",
   "setSubviewTrackPairCtgHidden",
   "toggleSubviewContigFlip",
-  "moveContextCompositionMemberToOtherLane",
+  "moveContextSubviewMemberToOtherLane",
+  "removeContextSubviewMember",
   "deleteSelectedSubviewTrackPairCtgs",
   "clearSubviewTrackPairHiddenCtgs",
   "setSelectedPrimaryTrackCtgsHidden",
@@ -470,7 +471,8 @@ export function buildAssemblyContextMenuItems({
     enterSubviewFromCandidates,
     setSubviewTrackPairCtgHidden,
     toggleSubviewContigFlip,
-    moveContextCompositionMemberToOtherLane,
+    moveContextSubviewMemberToOtherLane,
+    removeContextSubviewMember,
     deleteSelectedSubviewTrackPairCtgs,
     clearSubviewTrackPairHiddenCtgs,
     setSelectedPrimaryTrackCtgsHidden,
@@ -621,30 +623,35 @@ export function buildAssemblyContextMenuItems({
     const normalizedTrackRole = normalizeTrackRole(targetContext?.trackRole);
     const assemblyCtgId = normalizeSupportDatasetId(targetContext?.assemblyCtgId);
     const compositionEntityKey = String(targetContext?.compositionEntityKey || "").trim();
-    if (String(normalizedSubview.summary?.mode || "") === "composition" && compositionEntityKey) {
-      items.push({
-        label: i18n.contextMenu.moveSubviewCtgToOtherTrack,
-        run: async () => moveContextCompositionMemberToOtherLane(host, store, {
-          entityKey: compositionEntityKey,
-        }),
-      });
-    }
-    if (!normalizedTrackRole || !assemblyCtgId) {
+    if ((!normalizedTrackRole || !assemblyCtgId) && !compositionEntityKey) {
       return;
     }
-    const subviewCtgContext = {
-      assemblyCtgId,
+    const memberContext = {
+      ...(compositionEntityKey ? { entityKey: compositionEntityKey } : {}),
+      ...(assemblyCtgId ? { assemblyCtgId } : {}),
       slot: String(targetContext?.slot || "").trim().toLowerCase(),
-      trackRole: normalizedTrackRole,
+      trackRole: normalizedTrackRole || "",
       datasetId: normalizeSupportDatasetId(targetContext?.datasetId),
+      phasedTrackId: normalizeSupportDatasetId(targetContext?.phasedTrackId),
+      phasedTrackItemId: normalizeSupportDatasetId(targetContext?.phasedTrackItemId),
+    };
+    const subviewCtgContext = normalizedTrackRole && assemblyCtgId ? {
+      assemblyCtgId,
+      slot: memberContext.slot,
+      trackRole: normalizedTrackRole,
+      datasetId: memberContext.datasetId,
       isMirror: targetContext?.isMirror === true,
       refOrient: String(targetContext?.refOrient || "").trim(),
-    };
-    attachPhasedSubviewIdentity(subviewCtgContext, targetContext);
-    if (includeAppend) {
+    } : null;
+    if (subviewCtgContext) attachPhasedSubviewIdentity(subviewCtgContext, targetContext);
+    if (includeAppend && subviewCtgContext) {
       pushAppendTrackContigItems(subviewCtgContext, { allowAnyPhasedTarget: true });
     }
-    if (canEditTrackCtg(subviewCtgContext, state.assembly)) {
+    items.push({
+      label: i18n.contextMenu.moveSubviewCtgToOtherTrack,
+      run: async () => moveContextSubviewMemberToOtherLane(host, store, memberContext),
+    });
+    if (subviewCtgContext && canEditTrackCtg(subviewCtgContext, state.assembly)) {
       items.push({
         label: i18n.contextMenu.flipContig,
         run: async () => {
@@ -655,18 +662,20 @@ export function buildAssemblyContextMenuItems({
         },
       });
     }
-    if (String(normalizedSubview.summary?.mode || "") === "track-pair") {
-      items.push({
-        label: i18n.contextMenu.deleteLocalSubviewContig,
-        run: async () => {
-          setSubviewTrackPairCtgHidden(host, store, {
+    items.push({
+      label: i18n.contextMenu.deleteLocalSubviewContig,
+      run: async () => {
+        if (String(normalizedSubview.summary?.mode || "") === "track-pair"
+          && normalizedTrackRole && assemblyCtgId) {
+          return setSubviewTrackPairCtgHidden(host, store, {
             trackRole: normalizedTrackRole,
             contigId: assemblyCtgId,
             hidden: true,
           });
-        },
-      });
-    }
+        }
+        return removeContextSubviewMember(host, store, memberContext);
+      },
+    });
   };
 
   if (subviewAnchorEdgeContext) {

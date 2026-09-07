@@ -137,6 +137,136 @@ test("projecting a default Subview preserves logical bp positions instead of dis
   assert.equal(bottom.xBp, 3700);
 });
 
+test("projecting a track-pair excludes contigs already removed from the current Subview", () => {
+  const state = createState({ assembly: {
+    supportDatasetId: 22,
+    supportChrCtgs: [
+      { assemblyCtgId: 30, datasetId: 22, name: "support-30", assignedChrName: "Chr01", totalLength: 700 },
+      { assemblyCtgId: 31, datasetId: 22, name: "support-31", assignedChrName: "Chr01", totalLength: 900 },
+    ],
+    subview: {
+      mode: "track-pair",
+      summary: {
+        mode: "track-pair",
+        topTrack: { role: "primary", source: "mother" },
+        bottomTrack: { role: "support", source: "mother", datasetId: 22 },
+      },
+      trackPairHiddenCtgs: [
+        { trackRole: "primary", contigId: 8 },
+        { trackRole: "support", contigId: 30 },
+      ],
+    },
+  } });
+  const composition = projectCurrentSubviewToComposition(state, {
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  });
+  const ids = composition.members.map((entry) => entry.assemblyCtgId);
+  assert.equal(ids.includes(8), false);
+  assert.equal(ids.includes(30), false);
+  assert.equal(ids.includes(2), true);
+  assert.equal(ids.includes(31), true);
+});
+
+test("context-menu lane move projects a 2-contig Subview and commits once", async () => {
+  const state = createState({ assembly: {
+    subview: {
+      mode: "2-contig",
+      summary: {
+        mode: "2-contig",
+        top: { contigId: 2, role: "primary" },
+        bottom: { contigId: 5, role: "primary" },
+      },
+      flippedCtgs: [{ slot: "top", contigId: 2 }],
+    },
+  } });
+  const scroll = { dataset: {
+    subviewDomainSpanBp: "10000",
+    subviewInnerWidth: "1000",
+    subviewWindowStartBp: "2500",
+  }, scrollLeft: 0 };
+  const attrsById = {
+    2: { "data-subview-track-slot": "top", "data-subview-contig-id": "2", "data-subview-world-start-bp": "-1250" },
+    5: { "data-subview-track-slot": "bottom", "data-subview-contig-id": "5", "data-subview-world-start-bp": "3700" },
+  };
+  const host = {
+    querySelector: (selector) => selector === ".subview-track-scroll" ? scroll : null,
+    querySelectorAll: () => Object.values(attrsById).map((attrs) => ({
+      getAttribute: (name) => Object.hasOwn(attrs, name) ? attrs[name] : null,
+    })),
+  };
+  const store = createStore(state);
+  let rerendered = 0;
+  let refreshed = 0;
+  let persisted = 0;
+  const controller = createSubviewCompositionController({
+    session: {}, getMeasuredTrackViewportPx: () => 600,
+    listChrViewCtgs: async () => ({ items: [] }),
+    persistProjectAssemblyViewStateFromStore: async () => { persisted += 1; },
+    rerenderSubviewPanel() { rerendered += 1; },
+    refreshSubviewPairwiseEvidence() { refreshed += 1; },
+    anchorController: { resetScope() {} },
+  });
+
+  const changed = await controller.moveContextSubviewMemberToOtherLane(
+    host,
+    store,
+    { assemblyCtgId: 2, slot: "top", trackRole: "primary" },
+  );
+
+  assert.equal(changed, true);
+  const assembly = store.getState().assembly;
+  assert.equal(assembly.subview.summary.mode, "composition");
+  const moved = assembly.subview.summary.members.find((entry) => entry.assemblyCtgId === 2);
+  assert.equal(moved.lane, "bottom");
+  assert.equal(moved.xBp, -1250);
+  assert.equal(moved.flipped, true);
+  const history = assembly.subviewHistoryByKey[assembly.subview.historyKey];
+  assert.equal(history.past.length, 1);
+  assert.equal(history.past[0].operation.kind, "move-members");
+  assert.equal(rerendered, 1);
+  assert.equal(refreshed, 1);
+  assert.equal(persisted, 1);
+});
+
+test("context-menu remove projects a 2-contig Subview and keeps the other member", async () => {
+  const store = createStore(createState({ assembly: {
+    subview: {
+      mode: "2-contig",
+      summary: {
+        mode: "2-contig",
+        top: { contigId: 2, role: "primary" },
+        bottom: { contigId: 5, role: "primary" },
+      },
+    },
+  } }));
+  const host = { querySelector: () => null, querySelectorAll: () => [] };
+  let persisted = 0;
+  const controller = createSubviewCompositionController({
+    session: {}, getMeasuredTrackViewportPx: () => 600,
+    listChrViewCtgs: async () => ({ items: [] }),
+    persistProjectAssemblyViewStateFromStore: async () => { persisted += 1; },
+    rerenderSubviewPanel() {}, refreshSubviewPairwiseEvidence() {},
+    anchorController: { resetScope() {} },
+  });
+
+  const changed = await controller.removeContextSubviewMember(
+    host,
+    store,
+    { assemblyCtgId: 2, slot: "top", trackRole: "primary" },
+  );
+
+  assert.equal(changed, true);
+  const assembly = store.getState().assembly;
+  assert.equal(assembly.subview.summary.mode, "composition");
+  assert.deepEqual(assembly.subview.summary.members.map((entry) => entry.assemblyCtgId), [5]);
+  const history = assembly.subviewHistoryByKey[assembly.subview.historyKey];
+  assert.equal(history.past.length, 1);
+  assert.equal(history.past[0].operation.kind, "remove-members");
+  assert.equal(history.past[0].operation.count, 1);
+  assert.equal(persisted, 1);
+});
+
 test("context-menu lane move preserves xBp and records one composition history step", async () => {
   const original = {
     ...member(1200, -3456),
@@ -162,7 +292,7 @@ test("context-menu lane move preserves xBp and records one composition history s
     anchorController: { resetScope() {} },
   });
 
-  const changed = await controller.moveContextCompositionMemberToOtherLane(
+  const changed = await controller.moveContextSubviewMemberToOtherLane(
     { querySelector: () => null },
     store,
     { entityKey: "assembly:1" },
@@ -188,6 +318,45 @@ test("context-menu lane move preserves xBp and records one composition history s
   assert.equal(restored.changed, true);
   assert.equal(restored.assembly.subview.summary.members[0].lane, "bottom");
   assert.equal(restored.assembly.subview.summary.members[0].xBp, before.xBp);
+  assert.equal(rerendered, 1);
+  assert.equal(refreshed, 1);
+  assert.equal(persisted, 1);
+});
+
+test("context-menu remove deletes one composition member and records one history step", async () => {
+  const keep = { ...member(900, 2200), entityKey: "assembly:2", assemblyCtgId: 2, lane: "bottom" };
+  const remove = { ...member(1200, -3456), entityKey: "assembly:1", assemblyCtgId: 1 };
+  const store = createStore(createState({ assembly: {
+    subview: applySubviewComposition({}, { members: [remove, keep] }),
+    subviewCompositionViewport: { bpPerPx: 4, leftBp: -5000, topPx: 0 },
+  } }));
+  let rerendered = 0;
+  let refreshed = 0;
+  let persisted = 0;
+  const controller = createSubviewCompositionController({
+    session: {}, getMeasuredTrackViewportPx: () => 600,
+    listChrViewCtgs: async () => ({ items: [] }),
+    persistProjectAssemblyViewStateFromStore: async () => { persisted += 1; },
+    rerenderSubviewPanel() { rerendered += 1; },
+    refreshSubviewPairwiseEvidence() { refreshed += 1; },
+    anchorController: { resetScope() {} },
+  });
+
+  const changed = await controller.removeContextSubviewMember(
+    { querySelector: () => null },
+    store,
+    { entityKey: "assembly:1" },
+  );
+
+  assert.equal(changed, true);
+  const assembly = store.getState().assembly;
+  assert.deepEqual(assembly.subview.summary.members.map((entry) => entry.entityKey), ["assembly:2"]);
+  assert.equal(assembly.subview.summary.members[0].xBp, keep.xBp);
+  assert.equal(assembly.subview.summary.members[0].lane, keep.lane);
+  const history = assembly.subviewHistoryByKey[assembly.subview.historyKey];
+  assert.equal(history.past.length, 1);
+  assert.equal(history.past[0].operation.kind, "remove-members");
+  assert.equal(history.past[0].operation.count, 1);
   assert.equal(rerendered, 1);
   assert.equal(refreshed, 1);
   assert.equal(persisted, 1);

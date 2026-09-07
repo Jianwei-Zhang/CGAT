@@ -49,7 +49,8 @@ function createContextMenuActionsCapture(calls = []) {
     enterSubviewFromCandidates: capture("enterSubviewFromCandidates"),
     setSubviewTrackPairCtgHidden: capture("setSubviewTrackPairCtgHidden"),
     toggleSubviewContigFlip: capture("toggleSubviewContigFlip"),
-    moveContextCompositionMemberToOtherLane: capture("moveContextCompositionMemberToOtherLane"),
+    moveContextSubviewMemberToOtherLane: capture("moveContextSubviewMemberToOtherLane"),
+    removeContextSubviewMember: capture("removeContextSubviewMember"),
     deleteSelectedSubviewTrackPairCtgs: capture("deleteSelectedSubviewTrackPairCtgs"),
     clearSubviewTrackPairHiddenCtgs: capture("clearSubviewTrackPairHiddenCtgs"),
     setSelectedPrimaryTrackCtgsHidden: capture("setSelectedPrimaryTrackCtgsHidden"),
@@ -207,56 +208,42 @@ test("resolveSubviewTrackPairContextTarget parses dataset and mirror metadata", 
   });
 });
 
-test("buildAssemblyContextMenuItems moves only composition members to the other track", async () => {
-  const calls = [];
+test("buildAssemblyContextMenuItems exposes move and remove for every Subview mode", async () => {
   const host = {};
-  const store = createStore({
-    subview: {
-      summary: {
-        mode: "composition",
-        members: [{
-          entityKey: "assembly:30",
-          assemblyCtgId: 30,
-          source: { role: "support", datasetId: 22 },
-          lane: "top",
-          xBp: 1234,
-          lengthBp: 5000,
-        }],
-      },
-      trackPairHiddenCtgs: [],
-      trackPairSelectedCtgs: [],
-    },
-  });
-  const actions = createContextMenuActionsCapture(calls);
-  const context = {
+  const baseContext = {
     assemblyCtgId: 30,
     slot: "top",
     trackRole: "support",
     datasetId: 22,
-    compositionEntityKey: "assembly:30",
   };
-  const items = buildAssemblyContextMenuItems({
-    subviewTrackPairContext: context,
-    store,
-    host,
-    actions,
-  });
-
-  const moveItem = items.find((item) => item.label === "移至另一轨");
-  assert.ok(moveItem);
-  await moveItem.run();
-  assert.deepEqual(calls.at(-1), {
-    name: "moveContextCompositionMemberToOtherLane",
-    args: [host, store, { entityKey: "assembly:30" }],
-  });
-
-  const defaultItems = buildAssemblyContextMenuItems({
-    subviewTrackPairContext: context,
-    store: createStore({ subview: { summary: { mode: "track-pair" } } }),
-    host,
-    actions: createContextMenuActionsCapture([]),
-  });
-  assert.equal(defaultItems.some((item) => item.label === "移至另一轨"), false);
+  for (const mode of ["2-contig", "track-pair", "composition"]) {
+    const calls = [];
+    const store = createStore({ subview: { summary: { mode } } });
+    const items = buildAssemblyContextMenuItems({
+      subviewTrackPairContext: {
+        ...baseContext,
+        ...(mode === "composition" ? { compositionEntityKey: "assembly:30" } : {}),
+      },
+      store,
+      host,
+      actions: createContextMenuActionsCapture(calls),
+    });
+    assert.deepEqual(items.map((item) => item.label), [
+      "追加到路径",
+      "移至另一轨",
+      "翻转 contig",
+      "移出 Subview",
+    ]);
+    await items[1].run();
+    assert.equal(calls.at(-1).name, "moveContextSubviewMemberToOtherLane");
+    assert.equal(calls.at(-1).args[2].assemblyCtgId, 30);
+    assert.equal(calls.at(-1).args[2].entityKey || "", mode === "composition" ? "assembly:30" : "");
+    await items[3].run();
+    assert.equal(
+      calls.at(-1).name,
+      mode === "track-pair" ? "setSubviewTrackPairCtgHidden" : "removeContextSubviewMember",
+    );
+  }
 });
 
 test("resolveSubviewAnchorEdgeContextTarget parses anchor edge metadata", () => {
@@ -759,7 +746,7 @@ test("buildAssemblyContextMenuItems reports when no primary ctgs are shorter tha
   ]);
 });
 
-test("buildAssemblyContextMenuItems exposes track-pair flip and delete actions when summary.mode is track-pair", async () => {
+test("buildAssemblyContextMenuItems exposes track-pair move, flip, and remove actions", async () => {
   const store = createStore({
     subview: {
       summary: {
@@ -797,10 +784,11 @@ test("buildAssemblyContextMenuItems exposes track-pair flip and delete actions w
     actions: createContextMenuActionsCapture(calls),
   });
 
+  assert.ok(items.some((item) => item.label === "移至另一轨"));
   assert.ok(items.some((item) => item.label === "翻转 contig"));
-  assert.ok(items.some((item) => item.label === "在 Subview 中删除 contig（仅当前视图）"));
+  assert.ok(items.some((item) => item.label === "移出 Subview"));
   const flipItem = items.find((item) => item.label === "翻转 contig");
-  const deleteItem = items.find((item) => item.label === "在 Subview 中删除 contig（仅当前视图）");
+  const removeItem = items.find((item) => item.label === "移出 Subview");
   await flipItem.run();
   assert.deepEqual(calls.at(-1), {
     name: "toggleSubviewContigFlip",
@@ -809,7 +797,7 @@ test("buildAssemblyContextMenuItems exposes track-pair flip and delete actions w
       assemblyCtgId: 30,
     }],
   });
-  await deleteItem.run();
+  await removeItem.run();
   assert.deepEqual(calls.at(-1), {
     name: "setSubviewTrackPairCtgHidden",
     args: [host, store, { trackRole: "support", contigId: 30, hidden: true }],
@@ -948,7 +936,7 @@ test("buildAssemblyContextMenuItems exposes anchor-off when a subview edge is ac
   assert.deepEqual(items.map((item) => item.label), ["关闭锚点", "复制偏移锚点"]);
 });
 
-test("buildAssemblyContextMenuItems exposes fragment append and direct flip actions in 2-contig mode", async () => {
+test("buildAssemblyContextMenuItems exposes unified fragment actions in 2-contig mode", async () => {
   const calls = [];
   const host = {};
   const store = createStore();
@@ -977,7 +965,12 @@ test("buildAssemblyContextMenuItems exposes fragment append and direct flip acti
     actions: createContextMenuActionsCapture(calls),
   });
 
-  assert.deepEqual(items.map((item) => item.label), ["追加到路径", "翻转 contig"]);
+  assert.deepEqual(items.map((item) => item.label), [
+    "追加到路径",
+    "移至另一轨",
+    "翻转 contig",
+    "移出 Subview",
+  ]);
 
   await items[0].run();
   assert.deepEqual(calls.at(-1), {
@@ -999,7 +992,7 @@ test("buildAssemblyContextMenuItems exposes fragment append and direct flip acti
     }],
   });
 
-  await items[1].run();
+  await items[2].run();
   assert.deepEqual(calls.at(-1), {
     name: "toggleSubviewContigFlip",
     args: [host, store, {
@@ -1241,11 +1234,12 @@ test("buildAssemblyContextMenuItems exposes fragment-local subview actions in tr
 
   assert.deepEqual(items.map((item) => item.label), [
     "追加到路径",
+    "移至另一轨",
     "翻转 contig",
-    "在 Subview 中删除 contig（仅当前视图）",
+    "移出 Subview",
   ]);
 
-  await items[1].run();
+  await items[2].run();
   assert.deepEqual(calls.at(-1), {
     name: "toggleSubviewContigFlip",
     args: [host, store, {
@@ -1254,7 +1248,7 @@ test("buildAssemblyContextMenuItems exposes fragment-local subview actions in tr
     }],
   });
 
-  await items[2].run();
+  await items[3].run();
   assert.deepEqual(calls.at(-1), {
     name: "setSubviewTrackPairCtgHidden",
     args: [host, store, { trackRole: "support", contigId: 30, hidden: true }],
@@ -1622,4 +1616,30 @@ test("buildAssemblyContextMenuItems renders english labels when locale is en", (
   assert.ok(items.some((item) => item.label === "Hide Selected Contigs (2)"));
   assert.ok(items.some((item) => item.label === "Show Selected Contigs (2)"));
   assert.ok(items.some((item) => item.label === "Delete Selected Contigs (2)"));
+
+  const subviewItems = buildAssemblyContextMenuItems({
+    subviewTrackPairContext: {
+      assemblyCtgId: 30,
+      slot: "top",
+      trackRole: "support",
+      datasetId: 22,
+      compositionEntityKey: "assembly:30",
+    },
+    store: {
+      getState() {
+        return {
+          ...store.getState(),
+          locale: "en",
+          assembly: {
+            ...store.getState().assembly,
+            subview: { summary: { mode: "composition" } },
+          },
+        };
+      },
+    },
+    host: {},
+    actions: createContextMenuActionsCapture([]),
+  });
+  assert.ok(subviewItems.some((item) => item.label === "Move to Other Track"));
+  assert.ok(subviewItems.some((item) => item.label === "Remove from Subview"));
 });

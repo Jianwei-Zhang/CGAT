@@ -12,8 +12,10 @@ import {
 } from "./subview-composition-state.js";
 import { commitSubviewCompositionHistoryOperation } from "./subview-history-state.js";
 import {
+  buildSubviewTrackPairHiddenCtgKey,
   buildSubviewTrackPairPoolsFromAssembly,
   getSubviewState,
+  normalizeSubviewTrackPairHiddenCtgs,
   normalizeSubviewSummarySelection,
   normalizeSubviewTrackSummary,
   resolveSubviewSelectionCtg,
@@ -149,12 +151,21 @@ export function projectCurrentSubviewToComposition(state, host) {
   const layoutGapBp = Math.max(0, 20 * bpPerPx);
   const flippedKeys = new Set((currentSubview.flippedCtgs || [])
     .map((entry) => `${entry.slot}:${entry.contigId}`));
+  const hiddenTrackPairKeys = new Set(
+    normalizeSubviewTrackPairHiddenCtgs(currentSubview.trackPairHiddenCtgs).map((entry) =>
+      buildSubviewTrackPairHiddenCtgKey(entry.trackRole, entry.contigId),
+    ),
+  );
   const cursorByLane = { top: 0, bottom: 0 };
   const entries = [];
   if (String(summary.mode || "") === "track-pair") {
     for (const [lane, track] of [["top", summary.topTrack], ["bottom", summary.bottomTrack]]) {
       const selection = normalizeSubviewTrackSummary(track);
-      resolveSubviewTrackSummaryCtgs(selection, pools).forEach((ctg) => entries.push({ lane, selection, ctg }));
+      resolveSubviewTrackSummaryCtgs(selection, pools)
+        .filter((ctg) => !hiddenTrackPairKeys.has(
+          buildSubviewTrackPairHiddenCtgKey(selection?.role, ctg?.assemblyCtgId),
+        ))
+        .forEach((ctg) => entries.push({ lane, selection, ctg }));
     }
   } else {
     for (const [lane, selected] of [["top", summary.top], ["bottom", summary.bottom]]) {
@@ -222,6 +233,34 @@ function locateCompositionMember(host, entityKey) {
   scroll.scrollTo?.({ left, behavior: "smooth" });
   if (typeof scroll.scrollTo !== "function") scroll.scrollLeft = left;
   return true;
+}
+
+function resolveContextCompositionMember(composition, memberContext) {
+  const members = Array.isArray(composition?.members) ? composition.members : [];
+  const entityKey = String(
+    memberContext?.entityKey || memberContext?.compositionEntityKey || "",
+  ).trim();
+  if (entityKey) {
+    return members.find((entry) => entry.entityKey === entityKey) || null;
+  }
+  const assemblyCtgId = normalizeSupportDatasetId(memberContext?.assemblyCtgId);
+  if (!assemblyCtgId) return null;
+  const lane = String(memberContext?.slot || memberContext?.lane || "").trim().toLowerCase();
+  const role = String(memberContext?.trackRole || memberContext?.role || "").trim();
+  const datasetId = normalizeSupportDatasetId(memberContext?.datasetId);
+  const phasedTrackId = normalizeSupportDatasetId(memberContext?.phasedTrackId);
+  const phasedItemId = normalizeSupportDatasetId(
+    memberContext?.phasedTrackItemId ?? memberContext?.phasedItemId,
+  );
+  const candidates = members.filter((entry) => entry.assemblyCtgId === assemblyCtgId);
+  return candidates.find((entry) => {
+    if (lane && entry.lane !== lane) return false;
+    if (role && entry.source?.role !== role) return false;
+    if (datasetId && entry.source?.datasetId !== datasetId) return false;
+    if (phasedTrackId && entry.source?.phasedTrackId !== phasedTrackId) return false;
+    if (phasedItemId && entry.source?.phasedItemId !== phasedItemId) return false;
+    return true;
+  }) || (candidates.length === 1 ? candidates[0] : null);
 }
 
 export function createSubviewCompositionController({
@@ -544,16 +583,14 @@ export function createSubviewCompositionController({
     });
   }
 
-  async function moveContextCompositionMemberToOtherLane(host, store, memberContext) {
+  async function moveContextSubviewMemberToOtherLane(host, store, memberContext) {
     const state = store.getState();
-    if (String(state.assembly?.subview?.summary?.mode || "") !== "composition") return false;
-    const entityKey = String(memberContext?.entityKey || "").trim();
-    const composition = getSubviewComposition(state.assembly.subview);
-    const member = composition?.members.find((entry) => entry.entityKey === entityKey);
+    const composition = projectCurrentSubviewToComposition(state, host);
+    const member = resolveContextCompositionMember(composition, memberContext);
     if (!member) return false;
     const result = moveSubviewCompositionMembers(
       composition,
-      [entityKey],
+      [member.entityKey],
       member.lane === "top" ? "bottom" : "top",
     );
     if (!result.changed) return false;
@@ -563,9 +600,23 @@ export function createSubviewCompositionController({
     });
   }
 
+  async function removeContextSubviewMember(host, store, memberContext) {
+    const state = store.getState();
+    const composition = projectCurrentSubviewToComposition(state, host);
+    const member = resolveContextCompositionMember(composition, memberContext);
+    if (!member) return false;
+    const result = removeSubviewCompositionMembers(composition, [member.entityKey]);
+    if (!result.changed) return false;
+    return commit(host, store, result.composition, {
+      kind: "remove-members",
+      count: result.removedCount,
+    });
+  }
+
   return {
     addContextCtgToComposition,
-    moveContextCompositionMemberToOtherLane,
+    moveContextSubviewMemberToOtherLane,
+    removeContextSubviewMember,
     renderContent,
     resetScope,
     onAction,

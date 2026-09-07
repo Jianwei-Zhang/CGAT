@@ -15,7 +15,8 @@ function createStubActions() {
     enterSubviewFromCandidates() {},
     setSubviewTrackPairCtgHidden() {},
     toggleSubviewContigFlip() {},
-    moveContextCompositionMemberToOtherLane() {},
+    moveContextSubviewMemberToOtherLane() {},
+    removeContextSubviewMember() {},
     deleteSelectedSubviewTrackPairCtgs() {},
     clearSubviewTrackPairHiddenCtgs() {},
     setSelectedPrimaryTrackCtgsHidden() {},
@@ -666,6 +667,6 @@ test("bindAssemblyContextMenu renders track-pair fragment local actions", () => 
 
   assert.match(menuState.innerHTML, /追加到路径/);
   assert.match(menuState.innerHTML, /翻转 contig/);
-  assert.match(menuState.innerHTML, /在 Subview 中删除 contig（仅当前视图）/);
+  assert.match(menuState.innerHTML, /移出 Subview/);
   assert.doesNotMatch(menuState.innerHTML, /进入 Ctg30 菜单/);
 });

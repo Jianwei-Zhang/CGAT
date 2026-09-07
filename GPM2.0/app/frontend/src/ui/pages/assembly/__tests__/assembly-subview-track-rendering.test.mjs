@@ -1235,7 +1235,7 @@ test("context menu on blank area exposes batch subview delete for box-selected t
   });
 
   assert.ok(
-    items.some((item) => item.label === "在 Subview 中删除已框选 contig（2，仅当前视图）"),
+    items.some((item) => item.label === "移出 Subview（已选 2）"),
   );
 });
 
