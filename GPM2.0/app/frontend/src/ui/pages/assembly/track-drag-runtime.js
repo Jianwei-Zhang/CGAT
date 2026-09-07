@@ -55,6 +55,17 @@ function getWindowObject() {
   return globalThis.window;
 }
 
+function hasBoundTrackDragHost(host, bindingKey) {
+  // A partial panel replacement still bubbles to the bound route host.
+  // Per-element guards alone would install a second owner for every gesture.
+  let current = host;
+  while (current) {
+    if (current[bindingKey]) return true;
+    current = current.parentElement || current.parentNode || null;
+  }
+  return false;
+}
+
 function createFrameScheduler(flush) {
   let frameToken = null;
   return {
@@ -126,7 +137,7 @@ export function bindTrackContigDrag(host, store, deps) {
   if (typeof host?.addEventListener !== "function") {
     return;
   }
-  if (host[ASSEMBLY_TRACK_CONTIG_DRAG_BOUND]) {
+  if (hasBoundTrackDragHost(host, ASSEMBLY_TRACK_CONTIG_DRAG_BOUND)) {
     return;
   }
 
@@ -248,7 +259,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
   if (typeof host?.addEventListener !== "function") {
     return;
   }
-  if (host[ASSEMBLY_SUBVIEW_TRACK_CONTIG_DRAG_BOUND]) {
+  if (hasBoundTrackDragHost(host, ASSEMBLY_SUBVIEW_TRACK_CONTIG_DRAG_BOUND)) {
     return;
   }
 
