@@ -18,10 +18,10 @@ function formatRulerTickLabel(value) {
   if (!Number.isFinite(numeric)) {
     return "0";
   }
-  if (numeric >= 1_000_000 && numeric % 1_000_000 === 0) {
+  if (Math.abs(numeric) >= 1_000_000 && numeric % 1_000_000 === 0) {
     return `${(numeric / 1_000_000).toLocaleString("en-US")}M`;
   }
-  if (numeric >= 1_000) {
+  if (Math.abs(numeric) >= 1_000) {
     const kbValue = Math.round((numeric / 1_000) * 10) / 10;
     return `${kbValue.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}k`;
   }
@@ -55,6 +55,7 @@ function resolveVisibleRulerRange({
   viewportLeft,
   viewportWidth,
   viewBoxMinX,
+  originX,
 }) {
   const safeStart = Math.min(windowStart, windowEnd);
   const safeEnd = Math.max(windowStart, windowEnd);
@@ -66,11 +67,11 @@ function resolveVisibleRulerRange({
   const contentLeft = readFiniteNumber(viewportLeft, 0) + readFiniteNumber(viewBoxMinX, 0);
   const contentWidth = Math.max(1, readFiniteNumber(viewportWidth, DEFAULT_VIEWPORT_WIDTH_PX));
   const contentRight = contentLeft + contentWidth;
-  const xToBp = (x) => safeStart + (x / safeWidth) * safeSpan;
+  const xToBp = (x) => safeStart + ((x - originX) / safeWidth) * safeSpan;
   return {
     minBp: Math.max(safeStart, xToBp(contentLeft - overscanPx)),
     maxBp: Math.min(safeEnd, xToBp(contentRight + overscanPx)),
-    firstTick: Math.max(0, Math.ceil(Math.max(0, safeStart) / tickBp) * tickBp),
+    firstTick: Math.ceil(safeStart / tickBp) * tickBp,
     safeStart,
     safeEnd,
   };
@@ -82,6 +83,7 @@ export function buildVisibleSubviewRulerTicks(options = {}) {
   const tickBp = Math.max(1, readFiniteNumber(options.tickBp, 1));
   const innerWidth = Math.max(1, readFiniteNumber(options.innerWidth, 1));
   const domainSpanBp = Math.max(1, readFiniteNumber(options.domainSpanBp, windowEnd - windowStart));
+  const originX = readFiniteNumber(options.originX, 0);
   const range = resolveVisibleRulerRange({
     windowStart,
     windowEnd,
@@ -91,6 +93,7 @@ export function buildVisibleSubviewRulerTicks(options = {}) {
     viewportLeft: options.viewportLeft,
     viewportWidth: options.viewportWidth,
     viewBoxMinX: options.viewBoxMinX,
+    originX,
   });
   const firstIndex = Math.max(
     0,
@@ -107,10 +110,10 @@ export function buildVisibleSubviewRulerTicks(options = {}) {
   const ticks = [];
   for (let index = firstIndex; index <= boundedLastIndex; index += indexStep) {
     const bp = range.firstTick + index * tickBp;
-    const x = ((bp - windowStart) / domainSpanBp) * innerWidth;
+    const x = originX + ((bp - windowStart) / domainSpanBp) * innerWidth;
     ticks.push({ bp, x });
   }
-  const endX = ((windowEnd - windowStart) / domainSpanBp) * innerWidth;
+  const endX = originX + ((windowEnd - windowStart) / domainSpanBp) * innerWidth;
   if (
     ticks.length === 0
     || Number(ticks[ticks.length - 1].bp) !== Number(windowEnd)
@@ -133,9 +136,9 @@ export function buildVisibleSubviewRulerTicks(options = {}) {
     const labelX = isSingle
       ? tick.x
       : isFirst
-        ? Math.min(innerWidth, tick.x + edgePadding)
+        ? Math.min(originX + innerWidth, tick.x + edgePadding)
         : isLast
-          ? Math.max(0, tick.x - edgePadding)
+          ? Math.max(originX, tick.x - edgePadding)
           : tick.x;
     return {
       ...tick,
@@ -170,6 +173,7 @@ function readRulerOptions(layer, scrollNode) {
     innerWidth: Math.max(1, readRulerNumber(layer, "subviewRulerInnerWidth", 1)),
     domainSpanBp: Math.max(1, readRulerNumber(layer, "subviewRulerDomainSpanBp", 1)),
     edgeLabelPadding: readRulerNumber(layer, "subviewRulerEdgeLabelPadding", 16),
+    originX: readRulerNumber(layer, "subviewRulerOriginX"),
     tickY1: readRulerNumber(layer, "subviewRulerTickY1"),
     tickY2: readRulerNumber(layer, "subviewRulerTickY2"),
     tickLabelY: readRulerNumber(layer, "subviewRulerTickLabelY"),

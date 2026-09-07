@@ -1404,6 +1404,8 @@ function renderSubviewAlignmentCard(
     return renderSubviewCompositionAlignmentCard({
       subview,
       supportContext,
+      trackPrefs: resolvedTrackPrefs,
+      grtResult,
       i18n,
       historyControls: renderSubviewTrackInlineControls(
         resolvedTrackPrefs,

@@ -1439,12 +1439,11 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     if (compositionScaleChanged) {
       const viewport = current.subviewCompositionViewport || {};
       const currentScale = Math.max(1e-6, Number(viewport.bpPerPx) || 1_000);
-      const ratio = field === "minTickUnitKb"
-        ? nextValue / Math.max(1e-6, previousValue)
-        : previousValue / Math.max(1e-6, nextValue);
-      const nextScale = Math.max(1e-6, currentScale * ratio);
-      const viewportWidth = Math.max(0,
-        Number(host?.querySelector?.(".subview-track-scroll")?.clientWidth || 0));
+      const viewportWidth = Math.max(1,
+        Number(host?.querySelector?.(".subview-track-scroll")?.clientWidth || 1200));
+      // Inherited world geometry can have a different scale from the toolbar.
+      // An explicit edit makes the visible span match unit × count, as in pairs.
+      const nextScale = nextPrefs.minTickUnitKb * 1000 * nextPrefs.maxTickCount / viewportWidth;
       const centerBp = Number(viewport.leftBp || 0) + viewportWidth * currentScale / 2;
       nextAssembly = updateSubviewCompositionViewport(nextAssembly, {
         ...viewport,

@@ -1405,6 +1405,41 @@ test("bindings route phased track labels into subview-track selection with phase
   ]);
 });
 
+test("composition scale controls increase the visible bp span while retaining the viewport center", () => {
+  for (const [field, selector, before, after] of [
+    ["minTickUnitKb", "#subview-track-min-tick-unit-kb", 1, 2],
+    ["maxTickCount", "#subview-track-max-tick-count", 10, 20],
+  ]) {
+    const listeners = new Map();
+    const input = {
+      value: String(after), closest: () => null, setAttribute() {},
+      addEventListener: (type, handler) => listeners.set(type, handler),
+    };
+    const host = {
+      querySelector: (query) => query === selector ? input
+        : query === ".subview-track-scroll" ? { clientWidth: 600 } : null,
+      querySelectorAll: () => [], addEventListener() {},
+    };
+    const state = createState();
+    state.assembly.subviewTrackView.minTickUnitKb = 1;
+    state.assembly.subviewTrackView[field] = before;
+    state.assembly.subview = { summary: { mode: "composition", members: [] } };
+    state.assembly.subviewCompositionViewport = { bpPerPx: 2, leftBp: 100, topPx: 0 };
+    const store = createStore(state);
+    let persisted = 0;
+    const deps = createBindingDeps({
+      persistProjectAssemblyViewStateFromStore() { persisted += 1; },
+    });
+    bindAssemblyPageImpl(host, store, deps, { scope: "subview" });
+    listeners.get("change")();
+    const viewport = store.getState().assembly.subviewCompositionViewport;
+    assert.equal(viewport.bpPerPx * 600, 20_000, field);
+    assert.equal(viewport.leftBp + 600 * viewport.bpPerPx / 2, 700, field);
+    assert.equal(persisted, 1);
+    assert.deepEqual(store.getState().assembly.subview.summary.members, []);
+  }
+});
+
 test("raising subview alignment length within cached pairwise coverage does not request a reload", async () => {
   const inputListeners = new Map();
   const subviewAlignmentInput = {

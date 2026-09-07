@@ -4,6 +4,9 @@ import {
 } from "./subview-anchor-state.js";
 import { buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
 import { buildSubviewGrtAnchorScene } from "./subview-grt-anchor-state.js";
+import { buildGrtResultScene } from "./grt-result-render.js";
+import { renderSubviewVirtualRuler, resolveHitMapq } from "./track-render-geometry.js";
+import { normalizePositiveInt, resolveTrackPrefs } from "./track-prefs.js";
 import { resolveSubviewCompositionCandidate } from "./subview-composition-candidates.js";
 import { buildSubviewCompositionLayout } from "./subview-composition-layout.js";
 import { getSubviewComposition } from "./subview-composition-state.js";
@@ -87,12 +90,14 @@ function rangeCuts(member, start, end) {
   };
 }
 
-function buildEvidenceBands(layout, evidence) {
+function buildEvidenceBands(layout, evidence, prefs) {
   const topById = new Map(layout.top.filter((member) => member.assemblyCtgId)
     .map((member) => [member.assemblyCtgId, member]));
   const bottomById = new Map(layout.bottom.filter((member) => member.assemblyCtgId)
     .map((member) => [member.assemblyCtgId, member]));
   return (Array.isArray(evidence?.hits) ? evidence.hits : []).map((hit, index) => {
+    const length = normalizePositiveInt(hit?.alignLength ?? hit?.align_length) ?? 0;
+    if (length < prefs.alignmentLength || resolveHitMapq(hit) < prefs.mapq) return null;
     const queryId = normalizeSupportDatasetId(hit?.queryAssemblyCtgId ?? hit?.query_assembly_ctg_id);
     const subjectId = normalizeSupportDatasetId(hit?.subjectAssemblyCtgId ?? hit?.subject_assembly_ctg_id);
     let top = topById.get(queryId);
@@ -129,7 +134,7 @@ function buildEvidenceBands(layout, evidence) {
   }).filter(Boolean);
 }
 
-function buildReferenceBands(layout, candidates) {
+function buildReferenceBands(layout, candidates, prefs) {
   const bands = [];
   for (const top of layout.top) {
     for (const bottom of layout.bottom) {
@@ -143,6 +148,8 @@ function buildReferenceBands(layout, candidates) {
       const referenceEnd = Number(ref.reference?.endBp);
       if (!candidate || !Number.isFinite(referenceStart) || !Number.isFinite(referenceEnd)) continue;
       for (const [index, hit] of (Array.isArray(candidate.ctg?.hits) ? candidate.ctg.hits : []).entries()) {
+        const length = normalizePositiveInt(hit?.blockLength ?? hit?.block_length) ?? 0;
+        if (length < prefs.alignmentLength || resolveHitMapq(hit) < prefs.mapq) continue;
         const rawRefStart = hitField(hit, "refStart", "ref_start");
         const rawRefEnd = hitField(hit, "refEnd", "ref_end");
         const ctgStart = hitField(hit, "ctgStart", "ctg_start");
@@ -323,6 +330,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
   escapeHtml,
   escapeAttr,
   resolveTrackToneClass,
+  grtOverlay = "",
 }) {
   const role = member.source?.role || "support";
   const tone = resolveTrackToneClass(role);
@@ -332,6 +340,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
   const unavailable = candidate || !candidatesLoaded ? "" : " is-unavailable";
   const orient = memberOrientation(member);
   return `<g class="track-ctg-group${tone}${unavailable}" data-subview-composition-entity-key="${escapeAttr(member.entityKey)}"
+      data-grt-result-entry-key="${escapeAttr(member.entityKey)}"
       data-subview-track-pair-role="${escapeAttr(role)}" data-subview-track-pair-contig-id="${member.assemblyCtgId || 0}"
       data-subview-track-pair-dataset-id="${member.source?.datasetId || 0}" data-subview-track-pair-is-mirror="${member.source?.mirrored ? "1" : "0"}"
       data-subview-track-pair-phased-track-id="${member.source?.phasedTrackId || 0}"
@@ -344,6 +353,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
     <title>${escapeHtml(title)}</title>
     <rect class="track-ctg subview-track-ctg${tone}" x="${member.x.toFixed(2)}" y="${y}"
       width="${member.width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4" pointer-events="all" />
+    ${grtOverlay}
     ${renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr })}
     <text class="track-ctg-label${tone}" x="${(member.x + 3).toFixed(2)}" y="${y + 11}">${escapeHtml(label)}</text>
   </g>`;
@@ -363,6 +373,8 @@ function evidenceStatus(evidence, labels, escapeHtml) {
 export function renderSubviewCompositionAlignmentCard({
   subview,
   supportContext,
+  trackPrefs,
+  grtResult = {},
   i18n,
   historyControls,
   viewportWidthPx,
@@ -374,6 +386,7 @@ export function renderSubviewCompositionAlignmentCard({
 }) {
   const composition = getSubviewComposition(subview);
   if (!composition) return "";
+  const prefs = resolveTrackPrefs(trackPrefs);
   const viewport = supportContext?.compositionViewport || {};
   const layout = buildSubviewCompositionLayout(composition, {
     bpPerPx: viewport.bpPerPx,
@@ -382,35 +395,43 @@ export function renderSubviewCompositionAlignmentCard({
   });
   const candidates = supportContext?.compositionCandidates || [];
   const candidatesLoaded = supportContext?.compositionCandidatesLoaded === true;
+  const grtEntries = layout.members.map((member) => ({
+    key: member.entityKey,
+    ctg: {
+      assemblyCtgId: member.assemblyCtgId,
+      lengthBp: member.lengthBp,
+      orient: member.flipped
+        ? (member.baseOrientation === "-" ? "+" : "-")
+        : member.baseOrientation,
+    },
+    endpointKey: endpointKey(member),
+    lane: member.lane,
+    baseOrientation: member.baseOrientation,
+    locallyFlipped: member.flipped,
+    name: member.label,
+    sourceRole: member.source?.role,
+    sourceKind: member.source?.sourceType,
+    sourceName: member.source?.datasetName || member.source?.hap || "",
+    rect: { x: member.x, width: member.width },
+    y: member.lane === "top" ? TOP_Y : BOTTOM_Y,
+    height: BAR_HEIGHT,
+  }));
   const grtAnchorScene = buildSubviewGrtAnchorScene({
     chrName,
     plan: grtAnchorPlan,
-    entries: layout.members.map((member) => ({
-      key: member.entityKey,
-      ctg: {
-        assemblyCtgId: member.assemblyCtgId,
-        lengthBp: member.lengthBp,
-        orient: member.flipped
-          ? (member.baseOrientation === "-" ? "+" : "-")
-          : member.baseOrientation,
-      },
-      endpointKey: endpointKey(member),
-      lane: member.lane,
-      baseOrientation: member.baseOrientation,
-      locallyFlipped: member.flipped,
-      name: member.label,
-      sourceRole: member.source?.role,
-      sourceKind: member.source?.sourceType,
-      sourceName: member.source?.datasetName || member.source?.hap || "",
-      rect: { x: member.x, width: member.width },
-      y: member.lane === "top" ? TOP_Y : BOTTOM_Y,
-      height: BAR_HEIGHT,
-    })),
+    entries: grtEntries,
     escapeAttr,
   });
+  const grtScene = buildGrtResultScene({
+    plan: grtResult.context?.available ? grtResult.plan : null,
+    entries: grtEntries,
+    layers: grtResult.context?.subviewLayers,
+    escapeHtml,
+    gapLabel: i18n.grtResult.gapLabel,
+  });
   const bands = [
-    ...buildEvidenceBands(layout, subview?.pairwiseEvidence),
-    ...buildReferenceBands(layout, candidates),
+    ...buildEvidenceBands(layout, subview?.pairwiseEvidence, prefs),
+    ...buildReferenceBands(layout, candidates, prefs),
   ];
   const bandMarkup = bands.map((band) => {
     const bottomLeft = band.reversed ? band.bottomRange.right : band.bottomRange.left;
@@ -439,13 +460,17 @@ export function renderSubviewCompositionAlignmentCard({
     anchorCutsByEndpoint.get(endpointKey(member)) || [],
     member.lane === "top" ? TOP_Y : BOTTOM_Y,
     i18n,
-    { escapeHtml, escapeAttr, resolveTrackToneClass },
+    {
+      escapeHtml, escapeAttr, resolveTrackToneClass,
+      grtOverlay: grtResult.context?.subviewEnabled ? grtScene.overlaysByKey.get(member.entityKey) : "",
+    },
   )).join("");
   const topCount = layout.top.length;
   const bottomCount = layout.bottom.length;
   const emptyTop = topCount ? "" : `<text class="track-row-empty-label" x="12" y="${TOP_Y + 12}">${escapeHtml(i18n.trackControls.topTrackEmpty)}</text>`;
   const emptyBottom = bottomCount ? "" : `<text class="track-row-empty-label" x="12" y="${BOTTOM_Y + 12}">${escapeHtml(i18n.trackControls.bottomTrackEmpty)}</text>`;
-  return `<article class="assembly-track-panel subview-alignment-card" data-subview-composition-scene="1">
+  return `<article class="assembly-track-panel subview-alignment-card" data-subview-composition-scene="1"
+    data-grt-result-scene-visible="${grtScene.hasVisibleResult ? "1" : "0"}">
     <div class="assembly-track-panel-head"><strong>${escapeHtml(i18n.subview.compositionTitle
       .replace("{top}", topCount).replace("{bottom}", bottomCount))}</strong>${historyControls}
       ${topCount && bottomCount
@@ -462,7 +487,20 @@ export function renderSubviewCompositionAlignmentCard({
         <svg class="assembly-track-svg subview-track-svg" width="${layout.width}" height="${CONTENT_HEIGHT}"
           viewBox="${layout.viewBoxMinX} 0 ${layout.width} ${CONTENT_HEIGHT}" preserveAspectRatio="xMinYMin meet">
           <line class="track-ruler-line" x1="${layout.viewBoxMinX}" y1="48" x2="${layout.viewBoxMinX + layout.width}" y2="48" />
-          ${bandMarkup}${emptyTop}${emptyBottom}${memberMarkup}
+          ${renderSubviewVirtualRuler({
+            windowStart: layout.viewBoxMinX * layout.bpPerPx,
+            windowEnd: (layout.viewBoxMinX + layout.width) * layout.bpPerPx,
+            originX: layout.viewBoxMinX,
+            tickBp: prefs.minTickUnitKb * 1000,
+            innerWidth: layout.width,
+            domainSpanBp: layout.width * layout.bpPerPx,
+            tickY1: 48,
+            tickY2: CONTENT_HEIGHT - 20,
+            tickLabelY: 42,
+          })}
+          ${bandMarkup}${emptyTop}${emptyBottom}
+          ${grtResult.context?.subviewEnabled ? grtScene.junctionMarkup : ""}
+          ${memberMarkup}
           ${renderEvidenceAnchors(bands, composition.activeAnchors, escapeAttr)}
           ${renderManualAnchors(layout, composition.manualAnchors, escapeAttr)}
           ${grtAnchorScene.markup}

@@ -43,6 +43,7 @@ export function renderSubviewVirtualRuler({
   tickY2,
   tickLabelY,
   edgeLabelPadding = 16,
+  originX = 0,
 }) {
   const attributes = [
     ["data-subview-virtual-ruler", "1"],
@@ -55,6 +56,7 @@ export function renderSubviewVirtualRuler({
     ["data-subview-ruler-tick-y2", tickY2],
     ["data-subview-ruler-tick-label-y", tickLabelY],
     ["data-subview-ruler-edge-label-padding", edgeLabelPadding],
+    ["data-subview-ruler-origin-x", originX],
   ]
     .map(([name, value]) => `${name}="${name === "data-subview-virtual-ruler" ? value : Number(value || 0).toFixed(4)}"`)
     .join(" ");

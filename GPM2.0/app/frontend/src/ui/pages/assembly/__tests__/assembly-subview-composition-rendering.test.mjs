@@ -14,6 +14,7 @@ import { buildSubviewAnchorEndpointKey } from "../subview-anchor-state.js";
 function compositionState(composition, candidates, pairwiseEvidence = null, assemblyPatch = {}) {
   return createState({
     assembly: {
+      subviewTrackView: { alignmentLength: 1, mapq: 0 },
       ...assemblyPatch,
       subview: {
         ...applySubviewComposition({}, composition),
@@ -43,7 +44,7 @@ test("composition canvas keeps world positions and exposes evidence cuts from re
   const html = renderAssemblyPage(compositionState(composition, candidates, {
     status: "loaded",
     hits: [{
-      hitKey: "mixed-1",
+      hitKey: "mixed-1", alignLength: 150, mapq: 60,
       queryAssemblyCtgId: 1,
       subjectAssemblyCtgId: 2,
       queryStart: 100,
@@ -98,7 +99,7 @@ test("composition canvas projects each reference member against the paired conti
       name: "ctg1",
       lengthBp: 1000,
       hits: [{
-        hitKey: "ref-hit-1",
+        hitKey: "ref-hit-1", blockLength: 100, mapq: 60,
         refStart: 1000,
         refEnd: 1100,
         ctgStart: 200,

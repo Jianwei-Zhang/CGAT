@@ -76,6 +76,22 @@ test("visible Subview ruler includes the endpoint when the viewport reaches the 
   assert.match(ticks.at(-1).labelText, /43,726,252 bp/);
 });
 
+test("composition ruler keeps negative and positive world coordinates aligned while scrolling", () => {
+  const options = {
+    windowStart: -5000, windowEnd: 100000, tickBp: 1000,
+    innerWidth: 10500, domainSpanBp: 105000, originX: -500,
+    viewBoxMinX: -500, viewportLeft: 0, viewportWidth: 1200,
+  };
+  const ticks = buildVisibleSubviewRulerTicks(options);
+  assert.ok(ticks.some((tick) => tick.bp === -5000 && tick.x === -500 && tick.labelText === "-5k"));
+  assert.ok(ticks.some((tick) => tick.bp === 0 && tick.x === 0));
+  assert.ok(ticks.length < 30);
+  const scrolled = buildVisibleSubviewRulerTicks({ ...options, viewportLeft: 4000 });
+  assert.ok(scrolled[0].bp > 0);
+  for (const tick of scrolled) assert.ok(Math.abs(tick.x - tick.bp / 10) < 1e-6);
+  assert.ok(scrolled.length < 30);
+});
+
 test("Subview ruler runtime updates only the bounded layer while scrolling", () => {
   const fixture = createRulerFixture();
   const queuedFrames = [];
