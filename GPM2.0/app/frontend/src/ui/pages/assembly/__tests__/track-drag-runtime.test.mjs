@@ -55,7 +55,7 @@ function createWindowStub() {
   };
 }
 
-test("bindTrackContigDrag previews during move and applies pending primary-track drag offset on release", () => {
+test("bindTrackContigDrag previews during move and applies pending primary-track drag offset on release", async () => {
   const originalWindow = globalThis.window;
   const windowStub = createWindowStub();
   globalThis.window = windowStub;
@@ -146,11 +146,12 @@ test("bindTrackContigDrag previews during move and applies pending primary-track
 
     assert.deepEqual(calls[0], ["prevent"]);
     assert.deepEqual(calls[1], ["drag-active", true]);
-    assert.deepEqual(calls[3], ["clear-preview"]);
+    assert.equal(calls[3][0], "suppress");
+    assert.equal(typeof calls[3][1], "number");
     assert.deepEqual(calls[4], ["commit", { trackRole: "primary", assemblyCtgId: 8, offsetBp: 20 }]);
-    assert.equal(calls[5][0], "suppress");
-    assert.equal(typeof calls[5][1], "number");
-    assert.deepEqual(calls[6], ["drag-active", false]);
+    assert.deepEqual(calls[5], ["drag-active", false]);
+    await Promise.resolve();
+    assert.deepEqual(calls[6], ["clear-preview"]);
   } finally {
     globalThis.window = originalWindow;
   }

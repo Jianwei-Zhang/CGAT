@@ -51,7 +51,7 @@ export async function runMainViewLayoutAction(host, store, payload, deps) {
       actionStatus: tAssembly(state, "mainHistory.running"),
     },
   });
-  deps.rerender(host, store);
+  deps.rerender(host, store, { preserveTrackGeometry: action === "drag-ctg" });
 
   const run = async (isCurrent = () => true) => {
     try {

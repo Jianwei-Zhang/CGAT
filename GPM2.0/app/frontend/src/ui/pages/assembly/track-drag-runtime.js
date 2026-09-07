@@ -196,7 +196,7 @@ export function bindTrackContigDrag(host, store, deps) {
       const offsetPx = deps.roundTrackMetric(
         deltaOffsetBpToPx(pendingOffsetBp - baseOffsetBp, deps, scaleContext),
       );
-      deps.previewTrackContigDrag(host, {
+      deps.previewTrackContigDrag(scrollEl, {
         trackRole,
         assemblyCtgId,
         ...(datasetId ? { datasetId } : {}),
@@ -206,7 +206,8 @@ export function bindTrackContigDrag(host, store, deps) {
       });
     });
 
-    const onPointerMove = (moveEvent) => {
+    const updatePendingOffset = (moveEvent) => {
+      if (!Number.isFinite(Number(moveEvent?.clientX))) return;
       const currentClientX = Number(moveEvent.clientX || 0);
       const currentScrollEl = deps.resolveActiveTrackScrollElement(host, "primary", scrollEl);
       const currentScrollLeft = Number(currentScrollEl?.scrollLeft || 0);
@@ -221,15 +222,22 @@ export function bindTrackContigDrag(host, store, deps) {
       scheduler.schedule();
     };
 
-    const onPointerUp = () => {
+    const onPointerMove = (moveEvent) => updatePendingOffset(moveEvent);
+    const detachListeners = () => {
       const windowObject = getWindowObject();
       windowObject?.removeEventListener?.("pointermove", onPointerMove, true);
       windowObject?.removeEventListener?.("pointerup", onPointerUp, true);
+      windowObject?.removeEventListener?.("pointercancel", onPointerCancel, true);
+    };
+    const clearPreview = () => deps.clearTrackDragPreview(scrollEl);
+    const onPointerUp = (upEvent) => {
+      detachListeners();
       try {
+        updatePendingOffset(upEvent);
         scheduler.flushNow();
-        deps.clearTrackDragPreview(host);
         if (dragging) {
-          void deps.commitTrackDragOffset(host, store, {
+          deps.setSuppressTrackContigClickUntil(Date.now() + TRACK_CONTIG_CLICK_SUPPRESS_MS);
+          const committed = deps.commitTrackDragOffset(host, store, {
             trackRole,
             assemblyCtgId,
             ...(datasetId ? { datasetId } : {}),
@@ -237,18 +245,30 @@ export function bindTrackContigDrag(host, store, deps) {
             ...(phasedTrackItemId ? { phasedTrackItemId } : {}),
             offsetBp: pendingOffsetBp,
           });
+          // Keep the released geometry until the authoritative refresh. Scope
+          // cleanup to the old scroll node so it cannot erase a newer preview.
+          void Promise.resolve(committed).then(clearPreview, clearPreview);
+        } else {
+          clearPreview();
         }
-        if (dragging) {
-          deps.setSuppressTrackContigClickUntil(Date.now() + TRACK_CONTIG_CLICK_SUPPRESS_MS);
-        }
+      } catch (error) {
+        clearPreview();
+        throw error;
       } finally {
         deps.setTrackContigDragActive(false);
       }
+    };
+    const onPointerCancel = () => {
+      detachListeners();
+      scheduler.cancel();
+      clearPreview();
+      deps.setTrackContigDragActive(false);
     };
 
     const windowObject = getWindowObject();
     windowObject?.addEventListener?.("pointermove", onPointerMove, true);
     windowObject?.addEventListener?.("pointerup", onPointerUp, true);
+    windowObject?.addEventListener?.("pointercancel", onPointerCancel, true);
   });
 
   host[ASSEMBLY_TRACK_CONTIG_DRAG_BOUND] = true;

@@ -76,7 +76,10 @@ test("main-view layout action reloads authoritative offsets and history in one s
       mapAssemblyError({ error }) {
         return { userMessage: String(error?.message || error) };
       },
-      rerender() {
+      rerender(_host, _store, options) {
+        assert.equal(options?.preserveTrackGeometry === true,
+          store.getState().assembly.mainViewHistory.inFlight,
+          "only the pending drag refresh retains preview geometry");
         calls.push("render");
       },
     },
@@ -95,6 +98,26 @@ test("main-view layout action reloads authoritative offsets and history in one s
   ]);
   assert.equal(store.getState().assembly.mainViewHistory.canUndo, true);
   assert.equal(store.getState().assembly.mainViewHistory.inFlight, false);
+});
+
+test("failed drag preserves pending geometry then refreshes unchanged authoritative offsets with error feedback", async () => {
+  const store = createStore();
+  const refreshes = [];
+  const changed = await runMainViewLayoutAction({}, store, {
+    action: "drag-ctg", args: { trackRole: "primary", assemblyCtgId: 11, offsetBp: 120 },
+  }, {
+    async runMainViewLayoutAction() { throw new Error("save failed"); },
+    async loadProjectAssemblyViewState() { assert.fail("a failed mutation must not reload state"); },
+    mapAssemblyError({ error }) { return { userMessage: error.message }; },
+    rerender(_host, _store, options) {
+      refreshes.push({ retained: options?.preserveTrackGeometry === true,
+        inFlight: store.getState().assembly.mainViewHistory.inFlight });
+    },
+  });
+  assert.equal(changed, false);
+  assert.deepEqual(refreshes, [{ retained: true, inFlight: true }, { retained: false, inFlight: false }]);
+  assert.deepEqual(store.getState().assembly.trackDragOffsets, []);
+  assert.equal(store.getState().assembly.actionError, "save failed");
 });
 
 test("main-view layout action ignores an obsolete project response", async () => {

@@ -1561,27 +1561,29 @@ function rerenderAssemblyConfirmModal(host, store) {
   bindAssemblyPage(nextOverlay, store, { scope: "main" });
 }
 
-function rerenderAssemblyMainTab(host, store) {
+function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false } = {}) {
   cancelDeferredRerender();
   const routeHost = resolveCurrentRouteHost(host);
   if (!routeHost) {
-    rerender(host, store);
+    if (!preserveTrackGeometry) rerender(host, store);
     return;
   }
   const doc = routeHost.ownerDocument || globalThis.document;
   if (!doc?.createElement) {
-    rerender(host, store);
+    if (!preserveTrackGeometry) rerender(host, store);
     return;
   }
   const template = doc.createElement("template");
   template.innerHTML = renderAssemblyMainTrackSections(store.getState());
   const nextContent = template.content;
-  const replacedNodes = [
-    replaceRenderedAssemblySection(routeHost, nextContent, ".chr-strip.has-members-panel"),
-    replaceRenderedAssemblySection(routeHost, nextContent, ".assembly-track-unified"),
-  ].filter(Boolean);
+  const selectors = preserveTrackGeometry
+    ? [".main-view-history-controls"]
+    : [".chr-strip.has-members-panel", ".assembly-track-unified"];
+  const replacedNodes = selectors.map((selector) =>
+    replaceRenderedAssemblySection(routeHost, nextContent, selector),
+  ).filter(Boolean);
   if (!replacedNodes.length) {
-    rerender(host, store);
+    if (!preserveTrackGeometry) rerender(host, store);
     return;
   }
   patchAssemblyStatusToast(routeHost, nextContent);
@@ -2264,8 +2266,8 @@ export function __testResolveAppendToPathFocusPatch(assembly, activePhasedTrackK
   return resolveAppendToPathFocusPatch(assembly, activePhasedTrackKey);
 }
 
-export function __testRerenderAssemblyMainTab(host, store) {
-  return rerenderAssemblyMainTab(host, store);
+export function __testRerenderAssemblyMainTab(host, store, options) {
+  return rerenderAssemblyMainTab(host, store, options);
 }
 
 export function __testRenderAssemblyMainTrackSections(state) {
@@ -2534,7 +2536,8 @@ function appendAuditLog(store, { category, action, detail }) {
 }
 
 function bindAssemblyActionFeedbackDismiss(host, store, options = {}) {
-  const binding = ensureAssemblyActionFeedbackDismissBinding(host, options);
+  // Local section replacements share one timer owner with the route host.
+  const binding = ensureAssemblyActionFeedbackDismissBinding(resolveCurrentRouteHost(host) || host, options);
   binding.store = store;
   const signature = getAssemblyActionFeedbackSignature(store.getState().assembly);
   binding.coordinator.onFeedbackChange(signature);
@@ -2558,11 +2561,11 @@ function ensureAssemblyActionFeedbackDismissBinding(host, options = {}) {
     clearTimeoutFn: timerApi.clearTimeout.bind(timerApi),
     autoDismissMs: ACTION_FEEDBACK_AUTO_DISMISS_MS,
     pointerDismissMs: ACTION_FEEDBACK_POINTER_DISMISS_MS,
-    onDismiss: () => {
+    onDismiss: (signature) => {
       if (!binding.store) {
         return;
       }
-      clearAssemblyActionFeedback(host, binding.store, binding.rerender);
+      clearAssemblyActionFeedback(host, binding.store, binding.rerender, signature);
     },
   });
   if (typeof host?.addEventListener !== "function") {
@@ -2598,8 +2601,11 @@ function resolveTimerApi() {
   return globalThis;
 }
 
-function clearAssemblyActionFeedback(host, store, rerenderImpl = rerender) {
+function clearAssemblyActionFeedback(host, store, rerenderImpl = rerender, expectedSignature = "") {
   const currentAssembly = store.getState().assembly;
+  if (expectedSignature && getAssemblyActionFeedbackSignature(currentAssembly) !== expectedSignature) {
+    return;
+  }
   if (!currentAssembly.actionStatus && !currentAssembly.actionError) {
     return;
   }
@@ -2610,7 +2616,13 @@ function clearAssemblyActionFeedback(host, store, rerenderImpl = rerender) {
       actionError: "",
     },
   });
-  rerenderImpl(host, store);
+  const toast = resolveCurrentRouteHost(host)?.querySelector?.(".assembly-status-toast-wrap");
+  if (toast?.remove) {
+    // Dismissing feedback must not replace a graph with an in-flight preview.
+    toast.remove();
+  } else {
+    rerenderImpl(host, store);
+  }
 }
 
 function createActionFeedbackDismissCoordinator({
@@ -2649,9 +2661,10 @@ function createActionFeedbackDismissCoordinator({
     clearPointerDismissTimer();
   };
   const dismiss = () => {
+    const dismissedSignature = currentSignature;
     currentSignature = "";
     clearTimers();
-    onDismiss?.();
+    onDismiss?.(dismissedSignature);
   };
 
   return {
@@ -2808,6 +2821,10 @@ function setAssemblyActionFeedbackInMainTab(host, store, { actionStatus = "", ac
 
 export function __testCreateActionFeedbackDismissCoordinator(options) {
   return createActionFeedbackDismissCoordinator(options);
+}
+
+export function __testClearAssemblyActionFeedback(host, store, rerenderImpl, signature) {
+  return clearAssemblyActionFeedback(host, store, rerenderImpl, signature);
 }
 
 export function __testCreateTrackViewportResizeCoordinator(options) {
