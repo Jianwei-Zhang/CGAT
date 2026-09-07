@@ -840,12 +840,14 @@
   visibility: hidden;
 }
 
+.assembly-track-scroll.is-track-drag-preview.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"],
 .is-track-drag-preview .assembly-track-scroll.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"],
 .is-track-drag-preview [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"] {
   fill: rgba(97, 129, 170, 0.24);
   stroke: rgba(97, 129, 170, 0.38);
 }
 
+.assembly-track-scroll.is-track-drag-preview.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band.is-companion[data-track-band-proxy="1"],
 .is-track-drag-preview .assembly-track-scroll.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band.is-companion[data-track-band-proxy="1"],
 .is-track-drag-preview [data-track-band-svg-overlay="1"] .track-collinearity-band.is-companion[data-track-band-proxy="1"] {
   fill: rgba(154, 126, 78, 0.22);
