@@ -233,7 +233,7 @@ export function buildSubviewGrtAnchorReferences(assembly, sceneEntries = []) {
           endpoint.datasetName, endpoint.contigName, endpoint.sourcePosition,
         ])].filter(Boolean).join(" ").toLocaleLowerCase(),
     };
-  });
+  }).filter((reference) => Boolean(reference.scene));
 }
 
 export function findSubviewGrtAnchorReference(assembly, sceneEntries, originId) {

@@ -3,8 +3,11 @@ import assert from "node:assert/strict";
 
 import { buildGrtResultPlan } from "../grt-result-state.js";
 import {
+  buildSubviewGrtAnchorObjectId,
+  buildSubviewGrtAnchorOriginId,
   buildSubviewGrtAnchorReferences,
   buildSubviewGrtAnchorScene,
+  buildSubviewGrtBaselineKey,
   createSubviewManualAnchorFromGrt,
   findSubviewManualAnchorByGrtOrigin,
 } from "../subview-grt-anchor-state.js";
@@ -52,6 +55,13 @@ function assemblyWithBaseline(entry) {
   };
 }
 
+function referenceIdentity(entry) {
+  const plan = buildGrtResultPlan(entry);
+  const baselineKey = buildSubviewGrtBaselineKey("Chr01", plan);
+  const originId = buildSubviewGrtAnchorOriginId("Chr01", baselineKey, plan.junctions[0]);
+  return { baselineKey, originId, objectId: buildSubviewGrtAnchorObjectId(originId) };
+}
+
 function descriptor(reference, { sameLane = false } = {}) {
   return {
     top: {
@@ -79,18 +89,28 @@ function descriptor(reference, { sameLane = false } = {}) {
   };
 }
 
-test("GRT references come from the immutable baseline even after Final Path diverges", () => {
+test("GRT references come from the immutable baseline only when present in the scene", () => {
   const entry = baseline("gap");
   entry.displayEvidence = [{ evidenceId: "must-not-be-an-anchor" }];
-  const references = buildSubviewGrtAnchorReferences(assemblyWithBaseline(entry));
+  const assembly = assemblyWithBaseline(entry);
+  const identity = referenceIdentity(entry);
 
+  assert.deepEqual(buildSubviewGrtAnchorReferences(assembly), []);
+
+  const references = buildSubviewGrtAnchorReferences(assembly, [{
+    objectId: identity.objectId,
+    kind: "grt",
+    descriptor: descriptor(),
+    topX: 10,
+    bottomX: 20,
+  }]);
   assert.equal(references.length, 1);
   assert.equal(references[0].connectionKind, "gap");
   assert.equal(references[0].gapSizeBp, 250);
   assert.equal(references[0].readOnly, true);
   assert.equal(references[0].canDelete, false);
-  assert.equal(references[0].canCopy, false);
-  assert.equal(references[0].applicability, "endpoint-unavailable");
+  assert.equal(references[0].canCopy, true);
+  assert.equal(references[0].applicability, "applied");
 });
 
 test("scene projection resolves exact IDs and applies base orientation plus local flip once", () => {
@@ -144,8 +164,9 @@ test("scene projection resolves exact IDs and applies base orientation plus loca
 });
 
 test("cross-lane GRT objects copy once into persistent assembly-space user anchors", () => {
-  const assembly = assemblyWithBaseline(baseline());
-  const raw = buildSubviewGrtAnchorReferences(assembly)[0];
+  const entry = baseline();
+  const assembly = assemblyWithBaseline(entry);
+  const raw = referenceIdentity(entry);
   const applied = buildSubviewGrtAnchorReferences(assembly, [{
     objectId: raw.objectId,
     kind: "grt",
@@ -177,9 +198,10 @@ test("cross-lane GRT objects copy once into persistent assembly-space user ancho
   assert.equal(sameLane.reason, "grtSameLane");
   assert.equal(createSubviewManualAnchorFromGrt(sameLane).ok, false);
 
-  const gapAssembly = assemblyWithBaseline(baseline("gap"));
+  const gapEntry = baseline("gap");
+  const gapAssembly = assemblyWithBaseline(gapEntry);
   const before = structuredClone(gapAssembly);
-  const rawGap = buildSubviewGrtAnchorReferences(gapAssembly)[0];
+  const rawGap = referenceIdentity(gapEntry);
   const appliedGap = buildSubviewGrtAnchorReferences(gapAssembly, [{
     objectId: rawGap.objectId,
     kind: "grt",

@@ -104,28 +104,6 @@ test("toggle is local, binding is idempotent, canvas clicks keep the floating wi
   runtime.destroy();
 });
 
-test("programmatic close hides the tools window while preserving its geometry and tab", () => {
-  const saved = {
-    version: 1,
-    open: true,
-    tab: "composition",
-    rect: { left: 700, top: 210, width: 360, height: 460 },
-  };
-  const f = fixture(saved);
-  const runtime = bindSubviewTools(f.host, f.store, f.deps);
-
-  assert.equal(f.nodes.length, 1);
-  runtime.close({ focusToggle: false });
-
-  const persisted = JSON.parse(f.storage.get(SUBVIEW_TOOLS_STORAGE_KEY));
-  assert.equal(f.nodes.length, 0);
-  assert.equal(persisted.open, false);
-  assert.equal(persisted.tab, "composition");
-  assert.deepEqual(persisted.rect, saved.rect);
-  assert.notEqual(f.doc.activeElement, f.toggle);
-  runtime.destroy();
-});
-
 test("drag and keyboard resize persist on completion and clean up cancelled gestures", () => {
   const f = fixture();
   const runtime = bindSubviewTools(f.host, f.store, f.deps);

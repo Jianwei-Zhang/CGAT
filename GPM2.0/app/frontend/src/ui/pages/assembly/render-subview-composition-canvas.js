@@ -11,6 +11,7 @@ import { normalizeSupportDatasetId } from "./selection-state.js";
 import {
   formatTrackCtgOrientationLabel,
   resolveTrackCtgEffectiveOrientation,
+  resolveTrackCtgVisibleName,
 } from "./track-label-geometry.js";
 
 const TOP_Y = 82;
@@ -42,6 +43,14 @@ function memberOrientation(member) {
 }
 
 function memberDisplayLabel(member) {
+  const baseLabel = String(member?.label || "").replace(/(?:\s*\([+-]\))+\s*$/, "").trim();
+  return formatTrackCtgOrientationLabel(
+    resolveTrackCtgVisibleName({ name: baseLabel }, member?.assemblyCtgId),
+    memberOrientation(member),
+  );
+}
+
+function memberFullDisplayLabel(member) {
   return formatTrackCtgOrientationLabel(member?.label, memberOrientation(member));
 }
 
@@ -283,7 +292,7 @@ function renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr }) {
   return fragments.map((fragment) => {
     const range = rangeX(member, fragment.start, fragment.end);
     const width = Math.max(1, range.right - range.left);
-    const title = `${memberDisplayLabel(member)}:${fragment.start.toLocaleString()}-${fragment.end.toLocaleString()}`;
+    const title = `${memberFullDisplayLabel(member)}:${fragment.start.toLocaleString()}-${fragment.end.toLocaleString()}`;
     return `<rect class="subview-fragment-hit-zone" x="${range.left.toFixed(2)}" y="${y}"
         width="${width.toFixed(2)}" height="${BAR_HEIGHT}" fill="transparent"
         data-subview-fragment-key="${escapeAttr(fragment.fragmentKey)}"
@@ -319,7 +328,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
   const tone = resolveTrackToneClass(role);
   const source = sourceName(member, labels);
   const label = memberDisplayLabel(member);
-  const title = `${label} · ${source} · ${member.lengthBp.toLocaleString()} bp`;
+  const title = `${memberFullDisplayLabel(member)} · ${source} · ${member.lengthBp.toLocaleString()} bp`;
   const unavailable = candidate || !candidatesLoaded ? "" : " is-unavailable";
   const orient = memberOrientation(member);
   return `<g class="track-ctg-group${tone}${unavailable}" data-subview-composition-entity-key="${escapeAttr(member.entityKey)}"

@@ -186,13 +186,11 @@ function createSubviewToolsRuntime(host, store, deps) {
     deps.afterRender?.({ host, overlay, store, state, tab: preferences.tab, scopeKey });
   }
 
-  function close({ focusToggle = true } = {}) {
+  function close() {
     preferences = { ...preferences, open: false };
     save();
     sync();
-    if (focusToggle) {
-      host.querySelector("[data-subview-tools-toggle]")?.focus({ preventScroll: true });
-    }
+    host.querySelector("[data-subview-tools-toggle]")?.focus({ preventScroll: true });
   }
 
   function selectTab(tab) {
@@ -331,7 +329,7 @@ function createSubviewToolsRuntime(host, store, deps) {
   host.addEventListener("click", onToggle);
   const unsubscribe = store.subscribe?.(sync);
   return {
-    host, store, sync, close,
+    host, store, sync,
     destroy() {
       destroyed = true;
       unmount();

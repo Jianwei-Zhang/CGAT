@@ -67,8 +67,8 @@ test("composition canvas renders each effective direction once in labels and hov
   const candidates = buildSubviewCompositionCandidates({
     primaryDatasetId: 1,
     allChrCtgs: [
-      { assemblyCtgId: 1, datasetId: 1, name: "ctg1 (+)", lengthBp: 1000, orient: "-" },
-      { assemblyCtgId: 2, datasetId: 2, name: "ctg2 (-)", lengthBp: 1000, orient: "-" },
+      { assemblyCtgId: 1, datasetId: 1, name: "ctg1@Chr01 (+)", lengthBp: 1000, orient: "-" },
+      { assemblyCtgId: 2, datasetId: 2, name: "ctg2@Chr01 (-)", lengthBp: 1000, orient: "-" },
     ],
   });
   const composition = normalizeSubviewComposition({
@@ -79,13 +79,14 @@ test("composition canvas renders each effective direction once in labels and hov
   });
   const html = renderAssemblyPage(compositionState(composition, candidates));
 
-  assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*?<title>ctg1 \(-\) ·/);
+  assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*?<title>ctg1@Chr01 \(-\) ·/);
   assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*?>ctg1 \(-\)<\/text>/);
-  assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*?<title>ctg2 \(\+\) ·/);
+  assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*?<title>ctg2@Chr01 \(\+\) ·/);
   assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*?>ctg2 \(\+\)<\/text>/);
-  assert.doesNotMatch(html, /ctg1 \(\+\) \(-\)|ctg2 \(-\) \(\+\)/);
-  assert.equal(composition.members[0].label, "ctg1 (+)");
-  assert.equal(composition.members[1].label, "ctg2 (-)");
+  assert.doesNotMatch(html, />ctg1@Chr01 \(-\)<\/text>|>ctg2@Chr01 \(\+\)<\/text>/);
+  assert.doesNotMatch(html, /ctg1@Chr01 \(\+\) \(-\)|ctg2@Chr01 \(-\) \(\+\)/);
+  assert.equal(composition.members[0].label, "ctg1@Chr01 (+)");
+  assert.equal(composition.members[1].label, "ctg2@Chr01 (-)");
 });
 
 test("composition canvas projects each reference member against the paired contig only", () => {

@@ -1300,7 +1300,7 @@ test("track label selection keeps cross-dataset support-phased pairs available w
   assert.equal(afterPhased.error, "");
 });
 
-test("track-driven subview selection re-enters Subview-ctg when Ctrl/Cmd adjusts an already-complete pair", () => {
+test("track-driven Subview selection replaces a complete pair after two new Ctrl/Cmd picks", () => {
   const host = {
     closest() {
       return null;
@@ -1345,8 +1345,8 @@ test("track-driven subview selection re-enters Subview-ctg when Ctrl/Cmd adjusts
 
   const subview = store.getState().assembly.subview;
   assert.equal(subview.summary?.mode, "2-contig");
-  assert.equal(subview.summary?.top?.contigId, 31);
-  assert.equal(subview.summary?.bottom?.contigId, 8);
+  assert.equal(subview.summary?.top?.contigId, 30);
+  assert.equal(subview.summary?.bottom?.contigId, 31);
   assert.equal(subview.message, "Subview 已进入。");
   assert.equal(subview.error, "");
 });

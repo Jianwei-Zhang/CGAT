@@ -1,5 +1,8 @@
 import { tAssembly } from "./i18n.js";
-import { buildSubviewClearProjection } from "./subview-clear-state.js";
+import {
+  buildSubviewClearProjection,
+  clearSubviewRecordsForSummary,
+} from "./subview-clear-state.js";
 import {
   normalizeSupportDatasetId,
   swapSubviewTrackDragOffsetsForSummarySwap,
@@ -29,7 +32,6 @@ import {
 
 export function createSubviewSelectionController({
   buildInitialSubviewPairwiseEvidence,
-  closeSubviewTools = () => {},
   getCurrentProject,
   invalidateSubviewPairwiseEvidence = () => {},
   loadSubviewPairwiseEvidence,
@@ -70,10 +72,15 @@ export function createSubviewSelectionController({
     return nextSubview;
   }
 
-  function activateEnteredSubviewHistory(state, subview, subviewTrackDragOffsets = []) {
+  function activateEnteredSubviewHistory(
+    state,
+    sourceAssembly,
+    subview,
+    subviewTrackDragOffsets = [],
+  ) {
     const enteredSubview = clearSubviewActiveHistory(subview);
     const assembly = {
-      ...state.assembly,
+      ...sourceAssembly,
       subview: enteredSubview,
       subviewTrackDragOffsets,
       subviewCompositionViewport: {},
@@ -96,6 +103,24 @@ export function createSubviewSelectionController({
     void persistProjectAssemblyViewStateFromStore(host, store);
   }
 
+  function prepareSubviewQuickEntry(state, mode) {
+    const currentSubview = getSubviewState(state.assembly);
+    const shouldReset = currentSubview.mode !== mode || Boolean(currentSubview.summary);
+    if (!shouldReset) {
+      return { assembly: state.assembly, cleared: false };
+    }
+    const cleared = buildSubviewClearProjection(state.assembly);
+    invalidateSubviewPairwiseEvidence();
+    resetSubviewTransientState();
+    return {
+      assembly: {
+        ...cleared.assembly,
+        subview: getSubviewState({ subview: { mode } }),
+      },
+      cleared: cleared.changed,
+    };
+  }
+
   function handleTrackSubviewCandidateSelection(host, store, {
     trackRole,
     contigId,
@@ -104,16 +129,17 @@ export function createSubviewSelectionController({
     phasedHaplotypeKey = "",
   }) {
     const state = store.getState();
+    const entry = prepareSubviewQuickEntry(state, "2-contig");
     const currentProject = getCurrentProject(state);
-    const pools = buildSubviewTrackPairPoolsFromAssembly(state.assembly);
+    const pools = buildSubviewTrackPairPoolsFromAssembly(entry.assembly);
     const nextSubview = clearSubviewActiveHistory(selectSubviewCandidate({
       mode: "2-contig",
       primaryDatasetId: normalizeSupportDatasetId(currentProject?.primaryDatasetId),
-      supportDatasetId: normalizeSupportDatasetId(state.assembly.supportDatasetId),
+      supportDatasetId: normalizeSupportDatasetId(entry.assembly.supportDatasetId),
       primaryCtgs: pools.primaryCtgs,
       supportCtgs: pools.supportCtgs,
       refCtgs: pools.refCtgs,
-      subview: state.assembly.subview,
+      subview: entry.assembly.subview,
       trackRole,
       contigId,
       phasedTrackId,
@@ -124,7 +150,7 @@ export function createSubviewSelectionController({
 
     store.setState({
       assembly: {
-        ...state.assembly,
+        ...entry.assembly,
         subview: nextSubview,
         subviewTrackDragOffsets: [],
         subviewCompositionViewport: {},
@@ -135,6 +161,9 @@ export function createSubviewSelectionController({
       return;
     }
     rerenderSubviewSelectionRegions(host, store);
+    if (entry.cleared) {
+      void persistProjectAssemblyViewStateFromStore(host, store);
+    }
   }
 
   function handleTrackSubviewTrackSelection(host, store, {
@@ -146,8 +175,9 @@ export function createSubviewSelectionController({
     haplotypeKey = "",
   }) {
     const state = store.getState();
+    const entry = prepareSubviewQuickEntry(state, "track-pair");
     const nextSubview = clearSubviewActiveHistory(selectSubviewTrack({
-      subview: { ...state.assembly.subview, mode: "track-pair" },
+      subview: entry.assembly.subview,
       trackRole,
       source,
       datasetId,
@@ -158,32 +188,28 @@ export function createSubviewSelectionController({
     }));
     const hasEnteredTrackSubview = Boolean(nextSubview.summary);
     const nextSubviewTrackView = hasEnteredTrackSubview
-      ? inheritSubviewTrackViewFromMainTrack(state.assembly)
-      : state.assembly.subviewTrackView;
-    const persistedAnchorState = hasEnteredTrackSubview
-      ? resolveSubviewAnchorStateForSummary(
-          state.assembly.subviewAnchorStateByKey,
-          nextSubview.summary,
-          state.assembly.selectedChrName,
-        )
-      : { activeAnchors: [], manualAnchors: [] };
+      ? inheritSubviewTrackViewFromMainTrack(entry.assembly)
+      : entry.assembly.subviewTrackView;
     const enteredSubview = hasEnteredTrackSubview
       ? {
           ...nextSubview,
-          activeAnchors: persistedAnchorState.activeAnchors,
-          manualAnchors: persistedAnchorState.manualAnchors,
+          activeAnchors: [],
+          manualAnchors: [],
           flippedCtgs: [],
         }
       : nextSubview;
+    const freshAssembly = hasEnteredTrackSubview
+      ? clearSubviewRecordsForSummary(entry.assembly, nextSubview.summary)
+      : entry.assembly;
     const activation = hasEnteredTrackSubview
-      ? activateEnteredSubviewHistory(state, enteredSubview)
+      ? activateEnteredSubviewHistory(state, freshAssembly, enteredSubview)
       : null;
     const activatedSubview = activation?.assembly?.subview || enteredSubview;
     const pairwiseEvidence = hasEnteredTrackSubview
       ? buildInitialSubviewPairwiseEvidence(
           activatedSubview.summary,
           nextSubviewTrackView,
-          state.assembly.subview?.pairwiseEvidence,
+          undefined,
           state,
         )
       : null;
@@ -201,7 +227,7 @@ export function createSubviewSelectionController({
             },
           }
         : {
-            ...state.assembly,
+            ...entry.assembly,
             subviewTrackView: nextSubviewTrackView,
             subview: enteredSubview,
             subviewTrackDragOffsets: [],
@@ -210,6 +236,9 @@ export function createSubviewSelectionController({
     });
     rerenderSubviewSelectionRegions(host, store);
     persistActivatedSubviewHistoryIfNeeded(host, store, activation);
+    if (!activation && entry.cleared) {
+      void persistProjectAssemblyViewStateFromStore(host, store);
+    }
     startPairwiseLoadIfNeeded(host, store, pairwiseEvidence, activatedSubview.summary);
   }
 
@@ -344,15 +373,10 @@ export function createSubviewSelectionController({
       return;
     }
     const nextSubviewTrackView = inheritSubviewTrackViewFromMainTrack(state.assembly);
-    const persistedAnchorState = resolveSubviewAnchorStateForSummary(
-      state.assembly.subviewAnchorStateByKey,
-      result.value,
-      state.assembly.selectedChrName,
-    );
     const enteredSubview = {
       ...currentSubview,
-      activeAnchors: persistedAnchorState.activeAnchors,
-      manualAnchors: persistedAnchorState.manualAnchors,
+      activeAnchors: [],
+      manualAnchors: [],
       flippedCtgs: [],
       selectedTrackSelections: [],
       selectedTrackARole: "",
@@ -366,12 +390,13 @@ export function createSubviewSelectionController({
       error: "",
       message: tAssembly(state, "subview.entered"),
     };
-    const activation = activateEnteredSubviewHistory(state, enteredSubview);
+    const freshAssembly = clearSubviewRecordsForSummary(state.assembly, result.value);
+    const activation = activateEnteredSubviewHistory(state, freshAssembly, enteredSubview);
     const activatedSubview = activation.assembly.subview;
     const pairwiseEvidence = buildInitialSubviewPairwiseEvidence(
       activatedSubview.summary,
       nextSubviewTrackView,
-      currentSubview.pairwiseEvidence,
+      undefined,
       state,
     );
     store.setState({
@@ -418,15 +443,10 @@ export function createSubviewSelectionController({
       return;
     }
     const nextSubviewTrackView = inheritSubviewTrackViewFromMainTrack(state.assembly);
-    const persistedAnchorState = resolveSubviewAnchorStateForSummary(
-      state.assembly.subviewAnchorStateByKey,
-      result.value,
-      state.assembly.selectedChrName,
-    );
     const enteredSubview = {
       ...currentSubview,
-      activeAnchors: persistedAnchorState.activeAnchors,
-      manualAnchors: persistedAnchorState.manualAnchors,
+      activeAnchors: [],
+      manualAnchors: [],
       flippedCtgs: [],
       selectedAContigId: null,
       selectedARole: "",
@@ -438,12 +458,13 @@ export function createSubviewSelectionController({
       error: "",
       message: tAssembly(state, "subview.enteredTrackMode"),
     };
-    const activation = activateEnteredSubviewHistory(state, enteredSubview);
+    const freshAssembly = clearSubviewRecordsForSummary(state.assembly, result.value);
+    const activation = activateEnteredSubviewHistory(state, freshAssembly, enteredSubview);
     const activatedSubview = activation.assembly.subview;
     const pairwiseEvidence = buildInitialSubviewPairwiseEvidence(
       activatedSubview.summary,
       nextSubviewTrackView,
-      currentSubview.pairwiseEvidence,
+      undefined,
       state,
     );
     store.setState({
@@ -515,28 +536,10 @@ export function createSubviewSelectionController({
     applySubviewHistoryTransition(host, store, resetSubviewHistory);
   }
 
-  function handleSubviewCloseClear(host, store) {
-    const state = store.getState();
-    const cleared = buildSubviewClearProjection(state.assembly);
-    if (!cleared.changed) {
-      return false;
-    }
-    const focusHost = host?.closest?.("#route-host") || host;
-    invalidateSubviewPairwiseEvidence();
-    resetSubviewTransientState();
-    store.setState({ assembly: cleared.assembly });
-    closeSubviewTools();
-    rerenderSubviewSelectionRegions(host, store);
-    focusHost?.querySelector?.("[data-subview-tools-toggle]")?.focus?.({ preventScroll: true });
-    void persistProjectAssemblyViewStateFromStore(host, store);
-    return true;
-  }
-
   return {
     enterSubviewFromCandidates,
     enterSubviewFromTrackSelections,
     handleSubviewCandidateRemoval,
-    handleSubviewCloseClear,
     handleSubviewHistoryReset,
     handleSubviewHistoryRestoreRollback,
     handleSubviewHistoryRollback,

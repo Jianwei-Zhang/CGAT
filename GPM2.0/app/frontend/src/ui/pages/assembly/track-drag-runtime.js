@@ -321,8 +321,11 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       }
     });
 
-    const onPointerMove = (moveEvent) => {
-      const currentClientX = Number(moveEvent.clientX || 0);
+    const updatePendingPointerPosition = (pointerEvent) => {
+      const currentClientX = Number(pointerEvent?.clientX);
+      if (!Number.isFinite(currentClientX)) {
+        return;
+      }
       pendingPointerClientX = currentClientX;
       const currentScrollEl = deps.resolveActiveTrackScrollElement(host, "subview", scrollEl);
       const currentScrollLeft = Number(currentScrollEl?.scrollLeft || 0);
@@ -345,6 +348,10 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
         baseOffsetBp + deps.convertTrackOffsetPxToBp(deltaX, scaleContext),
       );
       scheduler.schedule();
+    };
+
+    const onPointerMove = (moveEvent) => {
+      updatePendingPointerPosition(moveEvent);
     };
 
     const finish = (shouldCommit) => {
@@ -386,7 +393,10 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       }
     };
 
-    const onPointerUp = () => finish(true);
+    const onPointerUp = (upEvent) => {
+      updatePendingPointerPosition(upEvent);
+      finish(true);
+    };
     const onPointerCancel = () => finish(false);
 
     const windowObject = getWindowObject();

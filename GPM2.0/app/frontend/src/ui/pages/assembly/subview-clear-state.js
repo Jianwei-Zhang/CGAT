@@ -47,7 +47,7 @@ function hasSubviewContent(subview) {
   );
 }
 
-export function canClearSubviewState(assembly) {
+function canClearSubviewState(assembly) {
   const subview = getSubviewState(assembly);
   const keys = resolveSubviewClearKeys(assembly);
   const viewport = assembly?.subviewCompositionViewport;
@@ -59,6 +59,18 @@ export function canClearSubviewState(assembly) {
     || Boolean(String(scroll?.viewportKey || "").trim() || Number(scroll?.scrollLeft) > 0)
     || keys.historyKeys.some((key) => own(assembly?.subviewHistoryByKey, key))
     || keys.anchorKeys.some((key) => own(assembly?.subviewAnchorStateByKey, key));
+}
+
+export function clearSubviewRecordsForSummary(assembly, summary) {
+  const key = buildSubviewAnchorStateKey(summary, assembly?.selectedChrName);
+  if (!key) {
+    return assembly;
+  }
+  return {
+    ...assembly,
+    subviewHistoryByKey: withoutKeys(assembly?.subviewHistoryByKey, [key]),
+    subviewAnchorStateByKey: withoutKeys(assembly?.subviewAnchorStateByKey, [key]),
+  };
 }
 
 export function buildSubviewClearProjection(assembly) {

@@ -46,7 +46,6 @@ const REQUIRED_BINDING_DEPS = [
   "bindTrackViewportResize",
   "handleNewSequenceRowAction",
   "handleSubviewCandidateRemoval",
-  "handleSubviewCloseClear",
   "handleSubviewHistoryReset",
   "handleSubviewHistoryRestoreRollback",
   "handleSubviewHistoryRollback",
@@ -444,7 +443,6 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     createPhasedChrTrack = async () => {},
     handleNewSequenceRowAction,
     handleSubviewCandidateRemoval,
-    handleSubviewCloseClear,
     handleSubviewHistoryReset,
     handleSubviewHistoryRestoreRollback,
     handleSubviewHistoryRollback,
@@ -1325,10 +1323,6 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     target.addEventListener("click", (event) => {
       event.preventDefault();
       const action = String(target.dataset.subviewAction || "").trim();
-      if (action === "close-clear") {
-        handleSubviewCloseClear(host, store);
-        return;
-      }
       if (action === "swap-track-order") {
         handleSubviewSwapTrackOrder(host, store);
         return;

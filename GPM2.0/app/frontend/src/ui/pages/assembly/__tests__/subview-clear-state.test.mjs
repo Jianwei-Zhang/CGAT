@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildSubviewClearProjection,
-  canClearSubviewState,
+  clearSubviewRecordsForSummary,
 } from "../subview-clear-state.js";
 import { buildSubviewAnchorStateKey } from "../subview-anchor-state.js";
 import { buildSubviewCompositionHistoryKey } from "../subview-history-state.js";
@@ -91,7 +91,6 @@ for (const mode of Object.keys(summaries)) {
       grtResultByChr: assembly.grtResultByChr,
     };
 
-    assert.equal(canClearSubviewState(assembly), true);
     const result = buildSubviewClearProjection(assembly);
     const clearedSubview = getSubviewState(result.assembly);
 
@@ -136,10 +135,38 @@ for (const mode of Object.keys(summaries)) {
       finalPathByChr: result.assembly.finalPathByChr,
       grtResultByChr: result.assembly.grtResultByChr,
     }, mainState);
-    assert.equal(canClearSubviewState(result.assembly), false);
 
     const repeated = buildSubviewClearProjection(result.assembly);
     assert.equal(repeated.changed, false);
     assert.equal(repeated.assembly, result.assembly);
   });
 }
+
+
+test("clearing a selected summary removes only that pair history and anchors", () => {
+  const selected = summaries["2-contig"];
+  const selectedKey = buildSubviewAnchorStateKey(selected, "Chr01");
+  const unrelatedKey = "track-pair|chr:Chr01|other";
+  const assembly = {
+    selectedChrName: "Chr01",
+    subviewHistoryByKey: {
+      [selectedKey]: { marker: "selected-history" },
+      [unrelatedKey]: { marker: "unrelated-history" },
+      "composition:Chr02": { marker: "other-chromosome" },
+    },
+    subviewAnchorStateByKey: {
+      [selectedKey]: { marker: "selected-anchors" },
+      [unrelatedKey]: { marker: "unrelated-anchors" },
+    },
+  };
+
+  const result = clearSubviewRecordsForSummary(assembly, selected);
+
+  assert.equal(result.subviewHistoryByKey[selectedKey], undefined);
+  assert.equal(result.subviewAnchorStateByKey[selectedKey], undefined);
+  assert.deepEqual(result.subviewHistoryByKey[unrelatedKey], { marker: "unrelated-history" });
+  assert.deepEqual(result.subviewAnchorStateByKey[unrelatedKey], { marker: "unrelated-anchors" });
+  assert.deepEqual(result.subviewHistoryByKey["composition:Chr02"], {
+    marker: "other-chromosome",
+  });
+});

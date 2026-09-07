@@ -168,3 +168,46 @@ test("search input and Enter location are handled without changing the saved sel
   assert.equal(prevented, true);
   assert.deepEqual(f.scroll.options, { left: 200, behavior: "smooth" });
 });
+
+
+test("anchor manager hides GRT baseline anchors absent from the current scene", () => {
+  const controller = createSubviewAnchorManagerController({ session: {} });
+  const host = { querySelectorAll: () => [] };
+  const state = {
+    assembly: {
+      selectedChrName: "Chr01",
+      subview: { activeAnchors: [], manualAnchors: [] },
+      grtProjectView: {
+        baselineFinalPathByChr: {
+          Chr01: {
+            mode: "segments",
+            chrName: "Chr01",
+            grtDisplayAvailable: true,
+            segments: [
+              {
+                segmentId: "left", type: "ctg", assemblyCtgId: 1,
+                assemblySourceStart: 1, assemblySourceEnd: 1000,
+                start: 1, end: 100,
+                source: { dataset: "primary", contig: "ctg1", start: 1, end: 100, orientation: "+" },
+              },
+              {
+                segmentId: "right", type: "ctg", assemblyCtgId: 2,
+                assemblySourceStart: 1, assemblySourceEnd: 1000,
+                start: 200, end: 300,
+                source: { dataset: "support", contig: "ctg2", start: 200, end: 300, orientation: "+" },
+              },
+            ],
+          },
+        },
+      },
+    },
+  };
+
+  const html = controller.renderContent({
+    host, state, tab: "anchors", scopeKey: "scope", labels, escapeHtml: String, escapeAttr: String,
+  });
+
+  assert.match(html, /No anchors/);
+  assert.doesNotMatch(html, /GRT link/);
+  assert.doesNotMatch(html, /data-subview-anchor-copy-grt/);
+});

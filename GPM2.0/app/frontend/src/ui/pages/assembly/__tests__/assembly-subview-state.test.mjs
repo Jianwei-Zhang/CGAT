@@ -222,7 +222,7 @@ test("enterSubviewFromTrackSelections copies main-track scale prefs into subview
   });
 });
 
-test("enterSubviewFromTrackSelections restores persisted subview anchors for track pairs", () => {
+test("enterSubviewFromTrackSelections replaces persisted pair anchors with a fresh default", () => {
   const host = {
     closest() {
       return null;
@@ -276,17 +276,9 @@ test("enterSubviewFromTrackSelections restores persisted subview anchors for tra
 
   __testEnterSubviewFromTrackSelections(host, store);
 
-  assert.deepEqual(store.getState().assembly.subview.activeAnchors, storedAnchorState.activeAnchors);
-  assert.equal(store.getState().assembly.subview.manualAnchors[0]?.manualAnchorId, storedAnchorState.manualAnchors[0].manualAnchorId);
-  assert.deepEqual(
-    store.getState().assembly.subview.manualAnchors[0]
-      ? [
-        store.getState().assembly.subview.manualAnchors[0].endpointA.cutBp,
-        store.getState().assembly.subview.manualAnchors[0].endpointB.cutBp,
-      ]
-      : [],
-    [220, 120],
-  );
+  assert.deepEqual(store.getState().assembly.subview.activeAnchors, []);
+  assert.deepEqual(store.getState().assembly.subview.manualAnchors, []);
+  assert.deepEqual(store.getState().assembly.subviewAnchorStateByKey, {});
 });
 
 test("enterSubviewFromTrackSelections starts pairwise evidence loading for ds track pairs", () => {
@@ -440,6 +432,7 @@ test("track label selection inherits main-track scale prefs when entering subvie
         mapq: 0,
       },
       subview: {
+        mode: "track-pair",
         selectedTrackSelections: [
           { role: "support", source: "mother", datasetId: 22, isMirror: false },
         ],

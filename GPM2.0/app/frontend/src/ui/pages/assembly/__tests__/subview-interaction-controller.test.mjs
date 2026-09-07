@@ -2,9 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createStore } from "../../../../state/store.js";
+import { buildGrtResultPlan } from "../grt-result-state.js";
 import { createSubviewInteractionController } from "../subview-interaction-controller.js";
 import { activateSubviewHistory, resolveCurrentSubviewHistory } from "../subview-history-state.js";
-import { buildSubviewGrtAnchorReferences } from "../subview-grt-anchor-state.js";
+import {
+  buildSubviewGrtAnchorObjectId,
+  buildSubviewGrtAnchorOriginId,
+  buildSubviewGrtBaselineKey,
+} from "../subview-grt-anchor-state.js";
 
 function anchorNode() {
   const attributes = {
@@ -116,7 +121,10 @@ test("copying a GRT object creates one undoable user anchor and reuses it on dup
       selectedBContigId: 2, selectedBRole: "support",
     },
   }, { now: 0 }).assembly;
-  const reference = buildSubviewGrtAnchorReferences(initial)[0];
+  const plan = buildGrtResultPlan(baseline);
+  const baselineKey = buildSubviewGrtBaselineKey("Chr01", plan);
+  const originId = buildSubviewGrtAnchorOriginId("Chr01", baselineKey, plan.junctions[0]);
+  const reference = { originId, objectId: buildSubviewGrtAnchorObjectId(originId) };
   const attributes = {
     "data-subview-anchor-kind": "grt",
     "data-subview-anchor-object-id": reference.objectId,
