@@ -21,6 +21,16 @@ export const TRACK_PREF_OPTIONS = Object.freeze({
   mapq: MAPQ_OPTIONS,
 });
 
+// Manual input is stricter than legacy persisted preference normalization.
+export function normalizeTrackPrefInputValue(field, rawValue) {
+  const text = String(rawValue ?? "");
+  if (!/^[0-9]+$/.test(text)) return null;
+  const value = Number(text);
+  const minimum = field === "mapq" || field === "supportDsCtgLen" ? 0 : 1;
+  const maximum = field === "mapq" ? 255 : Number.MAX_SAFE_INTEGER;
+  return Number.isSafeInteger(value) && value >= minimum && value <= maximum ? value : null;
+}
+
 export function resolveTrackPrefs(trackView) {
   const minTickUnitKb = resolvePositiveTrackPref(
     trackView,

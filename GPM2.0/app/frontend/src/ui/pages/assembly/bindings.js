@@ -1,4 +1,5 @@
-import { normalizeNonNegativeInt, normalizePositiveInt, resolveTrackPrefs } from "./track-prefs.js";
+import { normalizeNonNegativeInt, normalizePositiveInt, normalizeTrackPrefInputValue, resolveTrackPrefs } from "./track-prefs.js";
+import { bindTrackNumberInput as bindTrackNumberInputRuntime } from "./track-number-input-runtime.js";
 import { normalizeDeletedCtgRecordIds, normalizeSupportDatasetId } from "./selection-state.js";
 import {
   isSingleFullChrSupportDsCtgLenRule,
@@ -14,7 +15,7 @@ import {
   normalizeViewportScrollState,
 } from "./scroll-position-state.js";
 import { shouldRefetchSubviewPairwiseEvidence } from "./subview-pairwise-evidence-state.js";
-import { createOffsetSubviewManualAnchor } from "./subview-anchor-state.js";
+import { buildSubviewAnchorStateKey, createOffsetSubviewManualAnchor } from "./subview-anchor-state.js";
 import {
   resolveGrtResultContext,
   setGrtResultDisplayEnabled,
@@ -313,13 +314,6 @@ function resolveTrackPrefValue(trackPrefs, field) {
     return trackPrefs.mapq;
   }
   return trackPrefs.alignmentLength;
-}
-
-function normalizeTrackPrefInputValue(field, rawValue) {
-  if (field === "mapq" || field === "supportDsCtgLen") {
-    return normalizeNonNegativeInt(rawValue);
-  }
-  return normalizePositiveInt(rawValue);
 }
 
 function getCurrentChrLength(assembly) {
@@ -1501,70 +1495,31 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   };
 
   const bindTrackNumberInput = (field, inputElement, viewKey = "trackView") => {
-    if (!inputElement) {
-      return;
-    }
-    if (inputElement.readOnly) {
-      return;
-    }
-    const comboNode = inputElement.closest("[data-track-combo-field]");
-    const toggleButton = comboNode?.querySelector("[data-track-combo-toggle]");
-    const optionButtons = comboNode?.querySelectorAll("[data-track-combo-option]") || [];
-    const commit = () => {
-      commitTrackComboInput(field, inputElement, viewKey);
+    const registry = assemblyPageSession.trackNumberInputBindings;
+    const getScope = () => {
+      const state = store.getState();
+      return JSON.stringify([
+        state.session?.workspacePath, state.session?.projectId, state.assembly.selectedChrName,
+        viewKey === "subviewTrackView"
+          ? [state.assembly.subview?.summary?.mode, buildSubviewAnchorStateKey(
+            state.assembly.subview?.summary, state.assembly.selectedChrName,
+          )] : null,
+      ]);
     };
-    inputElement.addEventListener("change", commit);
-    inputElement.addEventListener("focus", () => {
-      closeTrackComboMenus(host, comboNode);
-      setTrackComboOpenState(comboNode, true);
-    });
-    inputElement.addEventListener("blur", () => {
-      window.setTimeout(() => {
-        if (comboNode?.contains(document.activeElement)) {
-          return;
-        }
-        commit();
-        setTrackComboOpenState(comboNode, false);
-      }, 0);
-    });
-    inputElement.addEventListener("keydown", (event) => {
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        closeTrackComboMenus(host, comboNode);
-        setTrackComboOpenState(comboNode, true);
-        return;
-      }
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setTrackComboOpenState(comboNode, false);
-        return;
-      }
-      if (event.key !== "Enter") {
-        return;
-      }
-      event.preventDefault();
-      commit();
-      setTrackComboOpenState(comboNode, false);
-    });
-    toggleButton?.addEventListener("pointerdown", (event) => {
-      event.preventDefault();
-    });
-    toggleButton?.addEventListener("click", (event) => {
-      event.preventDefault();
-      const isOpen = comboNode?.classList.contains("is-open");
-      closeTrackComboMenus(host, isOpen ? null : comboNode);
-      setTrackComboOpenState(comboNode, !isOpen);
-      inputElement.focus();
-    });
-    optionButtons.forEach((optionButton) => {
-      optionButton.addEventListener("pointerdown", (event) => {
-        event.preventDefault();
-        const nextValue = optionButton.dataset.trackComboValue || "";
-        inputElement.value = nextValue;
-        commit();
-        setTrackComboOpenState(comboNode, false);
-        inputElement.focus();
-      });
+    const scope = getScope();
+    bindTrackNumberInputRuntime({
+      input: inputElement, field, key: `${viewKey}:${field}`, registry,
+      isCurrentScope: () => registry === assemblyPageSession.trackNumberInputBindings && scope === getScope(),
+      readValue: () => resolveTrackPrefValue(resolveTrackPrefs(store.getState().assembly[viewKey]), field),
+      commitValue(value, target) {
+        target.value = String(value);
+        commitTrackComboInput(field, target, viewKey);
+      },
+      setMenuOpen: (open, target) => setTrackComboOpenState(target.closest("[data-track-combo-field]"), open),
+      closeOtherMenus: target => closeTrackComboMenus(
+        target.closest("#route-host") || host, target.closest("[data-track-combo-field]"),
+      ),
+      isMenuOpen: target => target.closest("[data-track-combo-field]")?.classList.contains("is-open"),
     });
   };
 

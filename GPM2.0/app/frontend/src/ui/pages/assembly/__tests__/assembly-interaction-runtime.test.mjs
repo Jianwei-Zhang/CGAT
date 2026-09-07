@@ -1327,7 +1327,7 @@ test("bindings binder rejects missing required deps at the boundary", () => {
   );
 });
 
-test("bindings persist main-track view changes after committing a main control input", () => {
+test("bindings persist main-track view changes after committing a main control input", async () => {
   const listenerMap = new Map();
   const input = {
     value: "500",
@@ -1420,6 +1420,7 @@ test("bindings persist main-track view changes after committing a main control i
 
   bindAssemblyPageImpl(host, store, deps);
   listenerMap.get("change")?.();
+  await new Promise(resolve => setTimeout(resolve, 0));
 
   assert.deepEqual(store.getState().assembly.trackView, {
     supportDsCtgLen: 0,
@@ -1874,7 +1875,7 @@ test("bindings open track combo upward when the dropdown would overflow the wind
   assert.equal(menuNode.style.bottom, "calc(100% + 2px)");
 });
 
-test("bindings update final-path track prefs without persisting main-track view state", () => {
+test("bindings update final-path track prefs without persisting main-track view state", async () => {
   const listenerMap = new Map();
   const input = {
     value: "500",
@@ -1999,6 +2000,7 @@ test("bindings update final-path track prefs without persisting main-track view 
 
   bindAssemblyPageImpl(host, store, deps);
   listenerMap.get("change")?.();
+  await new Promise(resolve => setTimeout(resolve, 0));
 
   assert.deepEqual(store.getState().assembly.finalPathTrackView, {
     supportDsCtgLen: 0,

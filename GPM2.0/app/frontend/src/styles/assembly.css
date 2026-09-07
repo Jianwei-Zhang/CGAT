@@ -1019,6 +1019,10 @@
   white-space: nowrap;
 }
 
+.assembly-track-combo-input[aria-invalid="true"] {
+  box-shadow: inset 0 0 0 1px #b91c1c;
+}
+
 .assembly-track-fixed-select::-ms-expand {
   display: none;
 }

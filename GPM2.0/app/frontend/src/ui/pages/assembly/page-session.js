@@ -33,6 +33,7 @@ export function createAssemblyPageSession() {
     lastFinalPathViewportKey: "",
     lastFinalPathScrollLeft: 0,
     pendingAssemblyScrollStatePersistTimer: null,
+    trackNumberInputBindings: new Map(),
     measuredTrackViewportPxByRole: normalizeViewportWidths(),
     suppressNextTrackAutoFocus: false,
     subviewPairwiseEvidenceRequestSeq: 0,
@@ -74,6 +75,7 @@ export function createAssemblyPageSession() {
 export const assemblyPageSession = createAssemblyPageSession();
 
 export function resetAssemblyPageSession(nextWidths = null, { timerApi = globalThis } = {}) {
+  assemblyPageSession.trackNumberInputBindings.forEach(binding => binding.destroy());
   assemblyPageSession.subviewTools?.destroy();
   if (assemblyPageSession.pendingAssemblyScrollStatePersistTimer !== null) {
     timerApi?.clearTimeout?.(assemblyPageSession.pendingAssemblyScrollStatePersistTimer);

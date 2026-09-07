@@ -4,8 +4,22 @@ import {
   MIN_TICK_UNIT_KB_OPTIONS,
   normalizeNonNegativeInt,
   normalizePositiveInt,
+  normalizeTrackPrefInputValue,
   resolveTrackPrefs,
 } from "../track-prefs.js";
+
+test("manual track inputs accept only safe decimal integers within the field range", () => {
+  for (const field of ["minTickUnitKb", "maxTickCount", "alignmentLength", "supportDsCtgLen", "mapq"]) {
+    for (const invalid of ["", " ", " 1", "1 ", "-1", "+1", "1.5", "1e2", "0x10", "12bp", "１２", "9007199254740992"]) {
+      assert.equal(normalizeTrackPrefInputValue(field, invalid), null, `${field}: ${invalid}`);
+    }
+    assert.equal(normalizeTrackPrefInputValue(field, "0012"), 12);
+    assert.equal(normalizeTrackPrefInputValue(field, "0"), ["supportDsCtgLen", "mapq"].includes(field) ? 0 : null);
+  }
+  assert.equal(normalizeTrackPrefInputValue("mapq", "255"), 255);
+  assert.equal(normalizeTrackPrefInputValue("mapq", "256"), null);
+  assert.equal(normalizeTrackPrefInputValue("alignmentLength", String(Number.MAX_SAFE_INTEGER)), Number.MAX_SAFE_INTEGER);
+});
 
 test("resolveTrackPrefs returns v1 discrete defaults", () => {
   assert.deepEqual(resolveTrackPrefs({}), {

@@ -13,15 +13,20 @@ test("assembly page sessions start with independent runtime state", () => {
 
   first.pendingAssemblyConfirmResolvers.set("dialog-1", () => {});
   first.measuredTrackViewportPxByRole.primary = 640;
+  first.trackNumberInputBindings.set("main:mapq", {});
 
   assert.equal(second.pendingAssemblyConfirmResolvers.size, 0);
   assert.equal(second.measuredTrackViewportPxByRole.primary, 1200);
+  assert.equal(second.trackNumberInputBindings.size, 0);
 });
 
 test("resetAssemblyPageSession clears disposable state and restores defaults", () => {
   const clearedTimers = [];
   const resolved = [];
   const coordinatorCalls = [];
+  const inputCalls = [];
+  const previousInputBindings = assemblyPageSession.trackNumberInputBindings;
+  previousInputBindings.set("main:mapq", { destroy() { inputCalls.push("destroy"); } });
   assemblyPageSession.pendingAssemblyScrollStatePersistTimer = 91;
   assemblyPageSession.deferredRerenderCoordinator = {
     destroy() {
@@ -44,6 +49,9 @@ test("resetAssemblyPageSession clears disposable state and restores defaults", (
   );
 
   assert.deepEqual(clearedTimers, [91]);
+  assert.deepEqual(inputCalls, ["destroy"]);
+  assert.notEqual(assemblyPageSession.trackNumberInputBindings, previousInputBindings);
+  assert.equal(assemblyPageSession.trackNumberInputBindings.size, 0);
   assert.deepEqual(coordinatorCalls, ["destroy", "cancel"]);
   assert.deepEqual(resolved, [false]);
   assert.equal(assemblyPageSession.pendingAssemblyConfirmResolvers.size, 0);
