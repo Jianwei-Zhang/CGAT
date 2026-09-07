@@ -1,6 +1,5 @@
 import {
   filterPrimaryTrackSelectionCtgIds,
-  filterTrackDragOffsets,
   normalizeSupportDatasetId,
 } from "./selection-state.js";
 import { normalizeNonNegativeInt } from "./track-prefs.js";
@@ -123,10 +122,7 @@ export function createBatchDeleteRefreshController({
     };
     const nextAssembly = {
       ...nextAssemblyBase,
-      trackDragOffsets: filterTrackDragOffsets(
-        latestState.assembly?.trackDragOffsets,
-        nextAssemblyBase,
-      ),
+      trackDragOffsets: persistedViewState.trackDragOffsets ?? [],
     };
     store.setState({
       ...latestState,

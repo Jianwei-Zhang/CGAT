@@ -146,3 +146,18 @@ test("main-view layout action ignores an obsolete project response", async () =>
   );
   assert.equal(changed, false);
 });
+
+test("main-view layout invalidation reports one error without a duplicate status toast", async () => {
+  const store = createStore();
+  await runMainViewLayoutAction({}, store, {
+    action: "drag-ctg", args: { trackRole: "primary", assemblyCtgId: 11, offsetBp: 120 },
+  }, {
+    async runMainViewLayoutAction() { return { changed: true, invalidated: true }; },
+    async loadProjectAssemblyViewState() { return { trackDragOffsets: [], supportMirroredCtgs: [] }; },
+    mapAssemblyError({ error }) { return { userMessage: error.message }; },
+    rerender() {},
+  });
+  assert.match(store.getState().assembly.actionError, /历史.*不一致/);
+  assert.equal(store.getState().assembly.actionStatus, "");
+  assert.equal(store.getState().assembly.mainViewHistory.inFlight, false);
+});

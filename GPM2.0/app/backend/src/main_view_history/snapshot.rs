@@ -141,13 +141,49 @@ pub(super) fn validate_snapshot(
     project_id: i64,
     expected: &DatabaseSnapshot,
 ) -> Result<()> {
-    let actual = capture_snapshot(conn, project_id, &snapshot_scope(expected))?;
-    if actual != *expected {
+    let mut actual = capture_snapshot(conn, project_id, &snapshot_scope(expected))?;
+    let mut expected = expected.clone();
+    normalize_layout_offsets_for_comparison(&mut actual.layout_state);
+    normalize_layout_offsets_for_comparison(&mut expected.layout_state);
+    if actual != expected {
         bail!(
             "{HISTORY_CONFLICT_CODE}: current database state no longer matches the recorded history precondition"
         );
     }
     Ok(())
+}
+
+fn normalize_layout_offsets_for_comparison(layout: &mut ProjectViewLayoutSnapshot) {
+    // Ordinary frontend JSON saves turn 200.0 into 200. Compare coordinates
+    // numerically, while retaining exact identity and all other snapshot fields.
+    for entry in &mut layout.scoped_track_drag_offsets {
+        for field in ["offsetBp", "offsetPx"] {
+            if let Some(value) = entry.get_mut(field)
+                && let Some(offset) = value.as_f64()
+            {
+                *value = Value::from(offset);
+            }
+        }
+    }
+    // Offsets are keyed records. A reset snapshot can contain several keys
+    // whose frontend save order differs from backend mutation append order.
+    layout
+        .scoped_track_drag_offsets
+        .sort_by_cached_key(|entry| {
+            (
+                entry
+                    .get("trackRole")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned),
+                [
+                    "assemblyCtgId",
+                    "datasetId",
+                    "phasedTrackId",
+                    "phasedTrackItemId",
+                ]
+                .map(|field| entry.get(field).and_then(Value::as_i64)),
+            )
+        });
 }
 
 pub(super) fn apply_snapshot(

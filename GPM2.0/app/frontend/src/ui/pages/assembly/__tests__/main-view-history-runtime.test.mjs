@@ -161,3 +161,17 @@ test("main-view history state preserves an active in-flight lock and excludes ph
   assert.equal(isMainViewHistoryEligibleAction("flip-ctg", { assemblyCtgId: 2 }), true);
   assert.equal(isMainViewHistoryEligibleAction("flip-ctg", { phasedTrackItemId: 99 }), false);
 });
+
+test("main-view history invalidation reports one error without a duplicate status toast", async () => {
+  const store = createStore();
+  const changed = await runMainViewHistoryControlAction({}, store, "undo", {
+    async executeMainViewHistoryAction() { return { changed: false, invalidated: true }; },
+    async loadAssemblyView() {},
+    mapAssemblyError({ error }) { return { userMessage: error.message }; },
+    rerender() {},
+  });
+  assert.equal(changed, false);
+  assert.match(store.getState().assembly.actionError, /历史.*不一致/);
+  assert.equal(store.getState().assembly.actionStatus, "");
+  assert.equal(store.getState().assembly.mainViewHistory.inFlight, false);
+});

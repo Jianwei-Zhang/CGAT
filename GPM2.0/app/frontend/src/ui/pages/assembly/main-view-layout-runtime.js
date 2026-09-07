@@ -83,7 +83,7 @@ export async function runMainViewLayoutAction(host, store, payload, deps) {
           mainViewHistory: status,
           actionError: invalidated ? tAssembly(latest, "mainHistory.invalidated") : "",
           actionStatus: invalidated
-            ? tAssembly(latest, "mainHistory.invalidated")
+            ? ""
             : tAssembly(latest, "mainHistory.layoutDone", {
               operation: describeLayoutAction(latest, result?.operation, action),
             }),

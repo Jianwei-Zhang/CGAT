@@ -6,6 +6,7 @@ import {
 } from "../track-drag-offset-rebase.js";
 
 test("rebaseTrackDragOffsetsForStableCtgPositions keeps a dragged ctg stable after another ctg is restored", () => {
+  const otherChrOffset = { trackRole: "primary", assemblyCtgId: 90, offsetBp: 120 };
   const result = rebaseTrackDragOffsetsForStableCtgPositions({
     trackRole: "primary",
     previousCtgs: [
@@ -17,11 +18,13 @@ test("rebaseTrackDragOffsetsForStableCtgPositions keeps a dragged ctg stable aft
     ],
     trackDragOffsets: [
       { trackRole: "primary", assemblyCtgId: 2, offsetBp: 125 },
+      otherChrOffset,
     ],
   });
 
   assert.deepEqual(result, [
     { trackRole: "primary", assemblyCtgId: 2, offsetBp: 25 },
+    otherChrOffset,
   ]);
 });
 

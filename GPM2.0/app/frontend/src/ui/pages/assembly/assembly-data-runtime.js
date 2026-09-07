@@ -358,7 +358,6 @@ export async function loadAssemblyView(host, store, options, deps) {
       "filterSubviewTrackDragOffsetsBySummary",
       "filterSubviewTrackPairHiddenCtgs",
       "filterSubviewTrackPairSelectionCtgs",
-      "filterTrackDragOffsets",
       "getCurrentProject",
       "getProjectAssemblyViewState",
       "getSupportDatasetOptions",
@@ -548,16 +547,9 @@ export async function loadAssemblyView(host, store, options, deps) {
       annotatedPrimaryCtgs,
       annotatedSupportCtgs,
     );
-    const persistedTrackDragOffsets = deps.filterTrackDragOffsets(
+    // These offsets belong to the whole project, including unloaded chromosomes.
+    const persistedTrackDragOffsets = normalizeTrackDragOffsets(
       projectAssemblyViewState?.trackDragOffsets,
-      {
-        ...state.assembly,
-        chrCtgs: annotatedPrimaryCtgs,
-        phasedChrTracks,
-        refTrackMembers: refTrackMemberResult.items,
-        supportChrCtgs: annotatedSupportCtgs,
-      },
-      { preserveUnmatchedSupportOffsets: true },
     );
     const persistedSubviewTrackDragOffsets = deps.filterSubviewTrackDragOffsetsBySummary(
       projectAssemblyViewState?.subviewTrackDragOffsets,
@@ -610,7 +602,6 @@ export async function loadAssemblyView(host, store, options, deps) {
         chrCtgs: annotatedPrimaryCtgs,
       },
     );
-    const filteredTrackDragOffsets = persistedTrackDragOffsets;
     const filteredSubviewTrackDragOffsets = persistedSubviewTrackDragOffsets;
     const subviewTrackPairPools = deps.buildSubviewTrackPairPoolsFromAssembly({
       ...state.assembly,
@@ -680,7 +671,7 @@ export async function loadAssemblyView(host, store, options, deps) {
         membersCardCollapsed: persistedMembersCardCollapsed,
         hiddenPrimaryCtgIds: persistedHiddenPrimaryCtgIds,
         hiddenPrimaryCtgIdsByChr: persistedHiddenPrimaryCtgIdsByChr,
-        trackDragOffsets: filteredTrackDragOffsets,
+        trackDragOffsets: persistedTrackDragOffsets,
         subviewTrackDragOffsets: filteredSubviewTrackDragOffsets,
         subviewAnchorStateByKey: persistedSubviewAnchorStateByKey,
         subviewHistoryByKey: persistedSubviewHistoryByKey,
@@ -771,7 +762,6 @@ export async function selectChromosome(host, store, chrName, deps) {
       selectedDeletedCtgRecordIds: [],
       trackSelectedCtgIds: [],
       hiddenPrimaryCtgIds: hiddenPrimaryCtgIdsByChr[chrName] || [],
-      trackDragOffsets: [],
       subviewTrackDragOffsets: [],
       subviewCompositionCandidates: [],
       subviewCompositionCandidatesLoaded: false,
@@ -897,7 +887,6 @@ export async function selectChromosome(host, store, chrName, deps) {
         trackSelectedCtgIds: [],
         hiddenPrimaryCtgIds: filteredHiddenPrimaryCtgIds,
         hiddenPrimaryCtgIdsByChr,
-        trackDragOffsets: [],
         subviewTrackDragOffsets: [],
         selectedCtgId,
         ctgDetail: sideData.detail,
@@ -1134,7 +1123,7 @@ import {
 } from "./final-path-state.js";
 import { normalizeDegapProjectState } from "./degap-state.js";
 import { tAssembly } from "./i18n.js";
-import { normalizeHiddenPrimaryCtgIdsByChr } from "./selection-state.js";
+import { normalizeHiddenPrimaryCtgIdsByChr, normalizeTrackDragOffsets } from "./selection-state.js";
 import {
   createEmptyMainViewHistoryStatus,
   normalizeMainViewHistoryStatus,

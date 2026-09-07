@@ -205,7 +205,6 @@ import {
   buildTrackDragOffsetKey,
   filterPrimaryTrackSelectionCtgIds,
   filterSubviewTrackDragOffsetsBySummary,
-  filterTrackDragOffsets,
   normalizeDeletedCtgRecordIds,
   normalizeHiddenPrimaryCtgIdsByChr,
   normalizeSupportMirroredCtgs,
@@ -1000,7 +999,6 @@ const assemblyDataRuntimeDeps = {
   filterSubviewTrackDragOffsetsBySummary,
   filterSubviewTrackPairHiddenCtgs,
   filterSubviewTrackPairSelectionCtgs,
-  filterTrackDragOffsets,
   getCurrentProject,
   getGrtProjectView,
   getMainViewHistoryStatus,
@@ -1957,15 +1955,12 @@ async function rebaseTrackDragOffsetsAfterRestore(
 ) {
   const state = store.getState();
   const currentOffsets = normalizeTrackDragOffsets(state.assembly?.trackDragOffsets);
-  const nextOffsets = filterTrackDragOffsets(
-    rebaseTrackDragOffsetsForStableCtgPositions({
-      trackRole: "primary",
-      previousCtgs: previousAssembly?.chrCtgs,
-      nextCtgs: state.assembly?.chrCtgs,
-      trackDragOffsets: currentOffsets,
-    }),
-    state.assembly,
-  );
+  const nextOffsets = rebaseTrackDragOffsetsForStableCtgPositions({
+    trackRole: "primary",
+    previousCtgs: previousAssembly?.chrCtgs,
+    nextCtgs: state.assembly?.chrCtgs,
+    trackDragOffsets: currentOffsets,
+  });
   if (areTrackDragOffsetsEqual(currentOffsets, nextOffsets)) {
     return;
   }

@@ -219,6 +219,94 @@ fn layout_history_ignores_unrelated_view_writes_but_detects_target_conflicts() -
 }
 
 #[test]
+fn layout_history_survives_frontend_integer_offset_serialization() -> Result<()> {
+    for offset in [120_i64, -120] {
+        let temp_dir = tempfile::tempdir()?;
+        let db_path = temp_dir.path().join("project.sqlite");
+        seed_workspace(&db_path)?;
+        let drag = |offset_bp: f64| RunMainViewLayoutActionParams {
+            project_id: 1,
+            chr_name: "Chr01".to_string(),
+            action: "drag-ctg".to_string(),
+            args: json!({
+                "trackRole": "primary", "assemblyCtgId": 301, "offsetBp": offset_bp,
+            }),
+        };
+        run_main_view_layout_action(&db_path, &drag(offset as f64))?;
+        let save_frontend_offset = |offset_bp: serde_json::Value| -> Result<()> {
+            // JSON.stringify removes the .0 in backend-produced offsets.
+            Connection::open(&db_path)?.execute(
+                "UPDATE project_assembly_view_state SET track_drag_offsets_json = ?1
+                 WHERE project_id = 1",
+                params![
+                    json!([{
+                        "trackRole": "primary", "assemblyCtgId": 301, "offsetBp": offset_bp,
+                    }])
+                    .to_string()
+                ],
+            )?;
+            Ok(())
+        };
+        save_frontend_offset(json!(offset))?;
+        let next_drag = run_main_view_layout_action(&db_path, &drag(offset as f64 + 10.0))?;
+        assert!(next_drag.changed);
+        assert!(!next_drag.invalidated);
+        assert_eq!(next_drag.status.retained_operation_count, 2);
+
+        save_frontend_offset(json!(offset + 10))?;
+        let undone = undo_main_view_history(&db_path, &target("Chr01"))?;
+        assert!(undone.changed);
+        assert!(!undone.invalidated);
+        save_frontend_offset(json!(offset as f64))?;
+        let redone = redo_main_view_history(&db_path, &target("Chr01"))?;
+        assert!(redone.changed);
+        assert!(!redone.invalidated);
+
+        // Even a small real coordinate change must still protect the database.
+        save_frontend_offset(json!(offset as f64 + 10.01))?;
+        let conflicted = undo_main_view_history(&db_path, &target("Chr01"))?;
+        assert!(conflicted.invalidated);
+        assert!(!conflicted.changed);
+    }
+    Ok(())
+}
+
+#[test]
+fn reset_history_survives_frontend_offset_ordering() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let db_path = temp_dir.path().join("project.sqlite");
+    seed_workspace(&db_path)?;
+    // Backend mutations append addressed keys; the frontend sorts by identity.
+    for ctg_id in [302, 301] {
+        run_main_view_layout_action(
+            &db_path,
+            &RunMainViewLayoutActionParams {
+                project_id: 1,
+                chr_name: "Chr01".to_string(),
+                action: "drag-ctg".to_string(),
+                args: json!({
+                    "trackRole": "primary", "assemblyCtgId": ctg_id, "offsetBp": 120.0,
+                }),
+            },
+        )?;
+    }
+    assert!(reset_main_view_history(&db_path, &target("Chr01"))?.changed);
+    assert!(undo_main_view_history(&db_path, &target("Chr01"))?.changed);
+    let mut offsets = load_track_offsets(&db_path)?;
+    offsets.sort_by_key(|entry| entry["assemblyCtgId"].as_i64());
+    Connection::open(&db_path)?.execute(
+        "UPDATE project_assembly_view_state SET track_drag_offsets_json = ?1
+         WHERE project_id = 1",
+        params![serde_json::to_string(&offsets)?],
+    )?;
+    let redone = redo_main_view_history(&db_path, &target("Chr01"))?;
+    assert!(!redone.invalidated);
+    assert!(redone.changed);
+    assert!(load_track_offsets(&db_path)?.is_empty());
+    Ok(())
+}
+
+#[test]
 fn older_history_json_without_layout_fields_still_loads() -> Result<()> {
     let temp_dir = tempfile::tempdir()?;
     let db_path = temp_dir.path().join("project.sqlite");

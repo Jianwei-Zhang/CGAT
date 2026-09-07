@@ -122,7 +122,7 @@ export async function runMainViewHistoryControlAction(host, store, action, deps,
           trackSelectedCtgIds: [],
           actionError: invalidated ? tAssembly(latest, "mainHistory.invalidated") : "",
           actionStatus: invalidated
-            ? tAssembly(latest, "mainHistory.invalidated")
+            ? ""
             : tAssembly(latest, "mainHistory.done", {
               action: tAssembly(latest, `mainHistory.actions.${normalizedAction}`),
               operation: operationSummary,

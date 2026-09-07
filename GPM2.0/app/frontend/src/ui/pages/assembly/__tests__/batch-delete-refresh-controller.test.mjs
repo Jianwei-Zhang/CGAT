@@ -4,6 +4,10 @@ import assert from "node:assert/strict";
 import { createBatchDeleteRefreshController } from "../batch-delete-refresh-controller.js";
 
 test("local batch delete refresh adopts backend-owned Final Path and DEGAP state", async () => {
+  const backendTrackDragOffsets = [
+    { trackRole: "primary", assemblyCtgId: 90, offsetBp: 120 },
+    { trackRole: "phased", assemblyCtgId: 91, phasedTrackId: 9, phasedTrackItemId: 99, offsetBp: -40 },
+  ];
   const backendFinalPathByChr = {
     Chr01: {
       chrName: "Chr01",
@@ -27,7 +31,7 @@ test("local batch delete refresh adopts backend-owned Final Path and DEGAP state
       degapProjectState: { jobs: [{ endpoint: { assemblyCtgId: 2 } }] },
       supportMirroredCtgs: [{ datasetId: 22, assemblyCtgId: 30 }],
       hiddenPrimaryCtgIds: [],
-      trackDragOffsets: [],
+      trackDragOffsets: [{ trackRole: "primary", assemblyCtgId: 90, offsetBp: 100 }],
       subviewTrackDragOffsets: [],
       trackSelectedCtgIds: [2],
       selectedDeletedCtgRecordIds: [],
@@ -63,6 +67,7 @@ test("local batch delete refresh adopts backend-owned Final Path and DEGAP state
       return {
         finalPathByChr: backendFinalPathByChr,
         degapProjectState: backendDegapProjectState,
+        trackDragOffsets: backendTrackDragOffsets,
       };
     },
     patchAssemblyStatusToast() {},
@@ -85,6 +90,7 @@ test("local batch delete refresh adopts backend-owned Final Path and DEGAP state
   assert.deepEqual(state.assembly.chrCtgs, [{ assemblyCtgId: 5, totalLength: 200 }]);
   assert.deepEqual(state.assembly.finalPathByChr, backendFinalPathByChr);
   assert.deepEqual(state.assembly.degapProjectState, backendDegapProjectState);
+  assert.deepEqual(state.assembly.trackDragOffsets, backendTrackDragOffsets);
   assert.deepEqual(state.assembly.supportMirroredCtgs, [{ datasetId: 22, assemblyCtgId: 30 }]);
   assert.equal(rerenderCount, 1);
 });

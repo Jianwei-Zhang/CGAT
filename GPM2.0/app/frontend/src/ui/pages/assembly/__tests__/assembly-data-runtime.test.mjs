@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 
 import { handleNewSequenceRowAction, loadAssemblyView, selectChromosome, selectCtg } from "../assembly-data-runtime.js";
 import { normalizeFinalPathByChr } from "../final-path-state.js";
-import { filterTrackDragOffsets as filterAssemblyTrackDragOffsets } from "../selection-state.js";
 
 test("handleNewSequenceRowAction ignores removed add-seq-to-ctg action", async () => {
   const store = {
@@ -200,9 +199,19 @@ test("selectChromosome clears stale data while loading and restores target histo
   assert.equal(state.assembly.selectedCtgId, null);
   assert.equal(state.assembly.ctgDetail, null);
   assert.equal(state.assembly.mainViewHistory.canUndo, false);
+  assert.deepEqual(state.assembly.trackDragOffsets, [
+    { trackRole: "primary", assemblyCtgId: 199, offsetBp: 10 },
+  ]);
+  // A queued authoritative refresh may finish while the next chr is loading.
+  const latestOffsets = [
+    ...state.assembly.trackDragOffsets,
+    { trackRole: "primary", assemblyCtgId: 8, offsetBp: -25 },
+  ];
+  store.setState({ assembly: { ...state.assembly, trackDragOffsets: latestOffsets } });
 
   resolveChrCtgs({ items: [{ assemblyCtgId: 8, name: "ptg000008l@Chr10" }] });
   await loadPromise;
+  assert.deepEqual(state.assembly.trackDragOffsets, latestOffsets);
   assert.deepEqual(state.assembly.chrCtgs, [{ assemblyCtgId: 8, name: "ptg000008l@Chr10" }]);
   assert.deepEqual(state.assembly.mainViewHistory, {
     projectId: 9,
@@ -853,8 +862,13 @@ test("loadAssemblyView maps phased track items to current chromosome ctgs", asyn
   ]);
 });
 
-test("loadAssemblyView restores persisted drag offsets for duplicate phased items", async () => {
+test("loadAssemblyView restores all project offsets including unloaded chromosomes and duplicate phased items", async () => {
   const host = {};
+  const otherChrOffsets = [
+    { trackRole: "primary", assemblyCtgId: 90, offsetBp: -10 },
+    { trackRole: "support", datasetId: 3, assemblyCtgId: 91, offsetBp: 40 },
+    { trackRole: "phased", assemblyCtgId: 90, phasedTrackId: 9, phasedTrackItemId: 99, offsetBp: 20 },
+  ];
   let state = {
     session: {
       workspacePath: "/tmp/ws",
@@ -917,13 +931,13 @@ test("loadAssemblyView restores persisted drag offsets for duplicate phased item
     filterSubviewTrackPairSelectionCtgs(values) {
       return values;
     },
-    filterTrackDragOffsets: filterAssemblyTrackDragOffsets,
     getCurrentProject(currentState) {
       return currentState.initializer.existingProjects[0];
     },
     async getProjectAssemblyViewState() {
       return {
         trackDragOffsets: [
+          ...otherChrOffsets,
           {
             trackRole: "phased",
             assemblyCtgId: 7,
@@ -1006,6 +1020,7 @@ test("loadAssemblyView restores persisted drag offsets for duplicate phased item
 
   assert.deepEqual(
     state.assembly.trackDragOffsets
+      .filter((entry) => entry.assemblyCtgId === 7)
       .slice()
       .sort((left, right) => left.phasedTrackItemId - right.phasedTrackItemId),
     [
@@ -1024,6 +1039,11 @@ test("loadAssemblyView restores persisted drag offsets for duplicate phased item
         offsetBp: 260,
       },
     ],
+  );
+  assert.deepEqual(
+    state.assembly.trackDragOffsets.filter((entry) => entry.assemblyCtgId !== 7)
+      .sort((left, right) => left.offsetBp - right.offsetBp),
+    otherChrOffsets.slice().sort((left, right) => left.offsetBp - right.offsetBp),
   );
 });
 

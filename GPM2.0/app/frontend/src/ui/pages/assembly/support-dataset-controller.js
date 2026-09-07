@@ -5,7 +5,6 @@ import {
   saveSupportDsState,
 } from "./support-ds-session.js";
 import {
-  filterTrackDragOffsets,
   normalizeSupportDatasetId,
 } from "./selection-state.js";
 import { normalizeFinalPathViewMode } from "./final-path-state.js";
@@ -121,11 +120,6 @@ export function createSupportDatasetController({
       ...nextSupportDatasetClearedAssembly,
       supportDatasetId,
       trackSelectedCtgIds: [],
-      trackDragOffsets: filterTrackDragOffsets(
-        nextSupportDatasetClearedAssembly.trackDragOffsets,
-        nextSupportDatasetClearedAssembly,
-        { preserveUnmatchedSupportOffsets: true },
-      ),
       subviewTrackDragOffsets: [],
       selectedDeletedCtgRecordIds: [],
       subview: buildClearedSubviewState(assembly),
