@@ -487,7 +487,9 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   bindTrackComboDismiss(host);
   bindAssemblyActionFeedbackDismiss(host, store);
   const initialState = store.getState();
-  if (isFullPageBinding) {
+  // Initial load resolves saved support selection and the complete project view.
+  // Auto-selecting before hydration would persist empty offsets/history defaults.
+  if (isFullPageBinding && initialState.assembly.chromosomes.length > 0 && !initialState.assembly.loading) {
     const supportDatasetSync = syncSupportDatasetSelection(store);
     if (supportDatasetSync.changed) {
       void applySupportDatasetSelection(host, store, supportDatasetSync.supportDatasetId);

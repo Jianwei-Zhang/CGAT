@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { bindAssemblyPage as bindAssemblyPageImpl } from "../bindings.js";
+import { createSupportDatasetController } from "../support-dataset-controller.js";
 
 function createState() {
   return {
@@ -636,6 +637,85 @@ test("bindings keep project export jump chromosome when loading an empty assembl
   assert.deepEqual(calls, [
     { keepCurrentChr: true, keepCurrentCtg: false },
   ]);
+});
+
+test("automatic support reconciliation waits for project hydration and skips loading rebinds", () => {
+  for (const [chromosomes, loading, error = ""] of [
+    [[], false], [[], true], [[], false, "load failed"],
+    [[{ chrName: "Chr01" }], true], [[{ chrName: "Chr01" }], false],
+  ]) {
+    const state = createState();
+    state.assembly = { ...state.assembly, chromosomes, loading, error };
+    const store = createStore(state);
+    let syncCalls = 0;
+    let selectionCalls = 0;
+    let loads = 0;
+    bindAssemblyPageImpl({ querySelector: () => null, querySelectorAll: () => [], addEventListener() {} },
+      store, createBindingDeps({
+        syncSupportDatasetSelection() {
+          syncCalls += 1;
+          return { changed: true, supportDatasetId: 2 };
+        },
+        applySupportDatasetSelection() { selectionCalls += 1; },
+        loadAssemblyView() { loads += 1; },
+      }));
+    const hydrated = chromosomes.length > 0 && !loading;
+    assert.equal(syncCalls, hydrated ? 1 : 0);
+    assert.equal(selectionCalls, hydrated ? 1 : 0);
+    assert.equal(loads, chromosomes.length === 0 && !loading ? 1 : 0);
+  }
+});
+
+test("cold project entry loads saved support and offsets before any support-selection persistence", async () => {
+  const persistedOffsets = [{ trackRole: "primary", assemblyCtgId: 9, offsetBp: -123.45 }];
+  const persisted = { supportDatasetId: 3, trackDragOffsets: persistedOffsets };
+  const state = createState();
+  state.assembly = { ...state.assembly, supportDatasetId: null, trackDragOffsets: [] };
+  const store = createStore(state);
+  const host = { querySelector: () => null, querySelectorAll: () => [], addEventListener() {} };
+  const writes = [];
+  const pending = [];
+  let loads = 0;
+  let deps;
+  const controller = createSupportDatasetController({
+    session: {},
+    getSupportDatasetOptions: () => [{ datasetId: 2 }, { datasetId: 3 }],
+    buildClearedSubviewState: () => ({ summary: null }),
+    rerender: () => bindAssemblyPageImpl(host, store, deps),
+    async loadSupportChrCtgs() { return []; },
+    async persistProjectAssemblyViewState(payload) {
+      writes.push(payload);
+      Object.assign(persisted, payload);
+    },
+  });
+  deps = createBindingDeps({
+    ...controller,
+    applySupportDatasetSelection(...args) {
+      const result = controller.applySupportDatasetSelection(...args);
+      pending.push(result);
+      return result;
+    },
+    loadAssemblyView() {
+      loads += 1;
+      const current = store.getState();
+      store.setState({ ...current, assembly: {
+        ...current.assembly, ...persisted, chromosomes: [{ chrName: "Chr01" }],
+        selectedChrName: "Chr01", loading: false,
+      } });
+      bindAssemblyPageImpl(host, store, deps);
+    },
+  });
+  bindAssemblyPageImpl(host, store, deps);
+  await Promise.all(pending);
+  assert.equal(loads, 1);
+  assert.equal(writes.length, 0, "entering a project must not overwrite it with empty view defaults");
+  assert.equal(store.getState().assembly.supportDatasetId, 3);
+  assert.deepEqual(persisted.trackDragOffsets, persistedOffsets);
+
+  await controller.applySupportDatasetSelection(host, store, 2);
+  assert.equal(writes.length, 1, "explicit support changes still persist after loading");
+  assert.equal(persisted.supportDatasetId, 2);
+  assert.deepEqual(persisted.trackDragOffsets, persistedOffsets);
 });
 
 test("bindings close the chromosome picker after pointer leaves the picker area", () => {
