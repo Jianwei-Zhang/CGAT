@@ -15,6 +15,7 @@ function createStubActions() {
     enterSubviewFromCandidates() {},
     setSubviewTrackPairCtgHidden() {},
     toggleSubviewContigFlip() {},
+    moveContextCompositionMemberToOtherLane() {},
     deleteSelectedSubviewTrackPairCtgs() {},
     clearSubviewTrackPairHiddenCtgs() {},
     setSelectedPrimaryTrackCtgsHidden() {},

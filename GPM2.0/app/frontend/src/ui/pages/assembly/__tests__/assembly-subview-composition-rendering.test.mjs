@@ -58,7 +58,9 @@ test("composition canvas keeps world positions and exposes evidence cuts from re
 
   assert.match(html, /data-subview-composition-scene="1"/);
   assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*data-subview-rect-x="-50\.00"/);
+  assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*data-subview-world-start-bp="-500"/);
   assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*data-subview-rect-x="200\.00"/);
+  assert.match(html, /data-subview-ruler-window-start="0\.0000"/);
   assert.match(html, /data-subview-hit-key="mixed-1"/);
   assert.match(html, /data-subview-anchor-hit-key="mixed-1"[\s\S]*data-subview-anchor-top-cut-bp="100"[\s\S]*data-subview-anchor-bottom-cut-bp="300"/);
   assert.match(html, /data-subview-anchor-hit-key="mixed-1"[\s\S]*data-subview-anchor-top-cut-bp="200"[\s\S]*data-subview-anchor-bottom-cut-bp="450"/);
@@ -80,9 +82,9 @@ test("composition canvas renders each effective direction once in labels and hov
   });
   const html = renderAssemblyPage(compositionState(composition, candidates));
 
-  assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*?<title>ctg1@Chr01 \(-\) ·/);
+  assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*?<title>ctg1@Chr01 \(-\) \| start=0 \| len=1000 \|/);
   assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*?>ctg1 \(-\)<\/text>/);
-  assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*?<title>ctg2@Chr01 \(\+\) ·/);
+  assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*?<title>ctg2@Chr01 \(\+\) \| start=0 \| len=1000 \|/);
   assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*?>ctg2 \(\+\)<\/text>/);
   assert.doesNotMatch(html, />ctg1@Chr01 \(-\)<\/text>|>ctg2@Chr01 \(\+\)<\/text>/);
   assert.doesNotMatch(html, /ctg1@Chr01 \(\+\) \(-\)|ctg2@Chr01 \(-\) \(\+\)/);

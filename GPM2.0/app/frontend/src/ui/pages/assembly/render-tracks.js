@@ -184,6 +184,7 @@ function createRenderTracksRenderer(deps = {}) {
     formatBpInterval,
     getMeasuredTrackViewportPx,
     renderTrackNumberInput,
+    resolveSubviewTrackDragOffsetBp,
     resolveSubviewTrackDragOffsetPx,
     resolveSubviewTrackSelectionLabel,
     resolveTrackToneClass,

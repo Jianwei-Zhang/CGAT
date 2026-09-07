@@ -5,7 +5,13 @@ import {
 import { buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
 import { buildSubviewGrtAnchorScene } from "./subview-grt-anchor-state.js";
 import { buildGrtResultScene } from "./grt-result-render.js";
-import { renderSubviewVirtualRuler, resolveHitMapq, sortTrackEntriesForRender } from "./track-render-geometry.js";
+import {
+  renderSubviewVirtualRuler,
+  resolveHitMapq,
+  resolveSubviewRulerGeometry,
+  resolveSubviewWorldStartBp,
+  sortTrackEntriesForRender,
+} from "./track-render-geometry.js";
 import { normalizePositiveInt, resolveTrackPrefs } from "./track-prefs.js";
 import { resolveSubviewCompositionCandidate } from "./subview-composition-candidates.js";
 import { buildSubviewCompositionLayout, resolveSubviewCompositionScaleViewport } from "./subview-composition-layout.js";
@@ -13,6 +19,7 @@ import { getSubviewComposition } from "./subview-composition-state.js";
 import { normalizeSupportDatasetId } from "./selection-state.js";
 import {
   formatTrackCtgOrientationLabel,
+  buildTrackCtgHoverTitle,
   resolveBoundedTrackCtgLabelPlacement,
   resolveTrackCtgEffectiveOrientation,
   resolveTrackCtgVisibleName,
@@ -339,7 +346,11 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
   const tone = resolveTrackToneClass(role);
   const source = sourceName(member, labels);
   const label = memberDisplayLabel(member);
-  const title = `${memberFullDisplayLabel(member)} · ${source} · ${member.lengthBp.toLocaleString()} bp`;
+  const worldStartBp = resolveSubviewWorldStartBp({ startBp: member.xBp });
+  const title = `${buildTrackCtgHoverTitle(memberFullDisplayLabel(member), {
+    startBp: worldStartBp,
+    lengthBp: member.lengthBp,
+  })}${source ? ` | ${source}` : ""}`;
   const unavailable = candidate || !candidatesLoaded ? "" : " is-unavailable";
   const orient = memberOrientation(member);
   const placement = resolveBoundedTrackCtgLabelPlacement({
@@ -368,7 +379,8 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
       data-subview-track-slot="${member.lane}" data-subview-track-role="${escapeAttr(role)}"
       data-subview-contig-id="${member.assemblyCtgId || 0}" data-subview-track-ref-orient="${orient}"
       data-subview-rect-x="${member.x.toFixed(2)}" data-subview-rect-y="${y}"
-      data-subview-rect-width="${member.width.toFixed(2)}" data-subview-rect-height="${BAR_HEIGHT}">
+      data-subview-rect-width="${member.width.toFixed(2)}" data-subview-rect-height="${BAR_HEIGHT}"
+      data-subview-world-start-bp="${worldStartBp}">
     <title>${escapeHtml(title)}</title>
     <rect class="track-ctg subview-track-ctg${tone}" x="${member.x.toFixed(2)}" y="${y}"
       width="${member.width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4" pointer-events="all" />
@@ -499,6 +511,19 @@ export function renderSubviewCompositionAlignmentCard({
   const memberMarkup = sortTrackEntriesForRender(memberEntries).map((entry) => entry.markup).join("");
   const topCount = layout.top.length;
   const bottomCount = layout.bottom.length;
+  const rulerEndBp = Math.max(
+    0,
+    ...composition.members.map((member) => member.xBp + member.lengthBp),
+  );
+  const rulerWidth = Math.max(1, rulerEndBp / layout.bpPerPx);
+  const rulerGeometry = resolveSubviewRulerGeometry({
+    windowStart: 0,
+    windowEnd: rulerEndBp,
+    tickBp: prefs.minTickUnitKb * 1000,
+    innerWidth: rulerWidth,
+    domainSpanBp: Math.max(1, rulerEndBp),
+    originX: 0,
+  });
   const emptyTop = topCount ? "" : `<text class="track-row-empty-label" x="12" y="${TOP_Y + 12}">${escapeHtml(i18n.trackControls.topTrackEmpty)}</text>`;
   const emptyBottom = bottomCount ? "" : `<text class="track-row-empty-label" x="12" y="${BOTTOM_Y + 12}">${escapeHtml(i18n.trackControls.bottomTrackEmpty)}</text>`;
   return `<article class="assembly-track-panel subview-alignment-card" data-subview-composition-scene="1"
@@ -515,17 +540,12 @@ export function renderSubviewCompositionAlignmentCard({
       </div>
       <div class="assembly-track-scroll subview-track-scroll" data-track-role="subview"
         data-subview-domain-span-bp="${Math.round(layout.width * layout.bpPerPx)}" data-subview-inner-width="${layout.width}"
-        data-subview-viewbox-min-x="${layout.viewBoxMinX}">
+        data-subview-viewbox-min-x="${layout.viewBoxMinX}" data-subview-window-start-bp="0">
         <svg class="assembly-track-svg subview-track-svg" width="${layout.width}" height="${CONTENT_HEIGHT}"
           viewBox="${layout.viewBoxMinX} 0 ${layout.width} ${CONTENT_HEIGHT}" preserveAspectRatio="xMinYMin meet">
-          <line class="track-ruler-line" x1="${layout.viewBoxMinX}" y1="48" x2="${layout.viewBoxMinX + layout.width}" y2="48" />
+          <line class="track-ruler-line" x1="0" y1="48" x2="${rulerWidth}" y2="48" />
           ${renderSubviewVirtualRuler({
-            windowStart: layout.viewBoxMinX * layout.bpPerPx,
-            windowEnd: (layout.viewBoxMinX + layout.width) * layout.bpPerPx,
-            originX: layout.viewBoxMinX,
-            tickBp: prefs.minTickUnitKb * 1000,
-            innerWidth: layout.width,
-            domainSpanBp: layout.width * layout.bpPerPx,
+            ...rulerGeometry,
             tickY1: 48,
             tickY2: CONTENT_HEIGHT - 20,
             tickLabelY: 42,

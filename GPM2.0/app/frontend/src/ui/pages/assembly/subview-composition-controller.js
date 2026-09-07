@@ -56,6 +56,7 @@ function readCurrentRectPositions(host, fallbackGapBp) {
   const scroll = host?.querySelector?.(".subview-track-scroll");
   const domainSpanBp = Number(scroll?.dataset?.subviewDomainSpanBp);
   const innerWidth = Number(scroll?.dataset?.subviewInnerWidth);
+  const windowStartBp = Number(scroll?.dataset?.subviewWindowStartBp);
   const bpPerPx = Number.isFinite(domainSpanBp) && domainSpanBp > 0
     && Number.isFinite(innerWidth) && innerWidth > 0
     ? domainSpanBp / innerWidth
@@ -67,7 +68,16 @@ function readCurrentRectPositions(host, fallbackGapBp) {
     const slot = String(node.getAttribute("data-subview-track-slot") || "").trim();
     const contigId = normalizeSupportDatasetId(node.getAttribute("data-subview-contig-id"));
     const x = Number(node.getAttribute("data-subview-rect-x"));
-    if (contigId && Number.isFinite(x)) positions.set(`${slot}:${contigId}`, x * bpPerPx);
+    const rawWorldStartBp = node.getAttribute("data-subview-world-start-bp");
+    const worldStartBp = rawWorldStartBp === null ? Number.NaN : Number(rawWorldStartBp);
+    if (contigId && Number.isFinite(worldStartBp)) {
+      positions.set(`${slot}:${contigId}`, worldStartBp);
+    } else if (contigId && Number.isFinite(x)) {
+      positions.set(
+        `${slot}:${contigId}`,
+        (Number.isFinite(windowStartBp) ? windowStartBp : 0) + x * bpPerPx,
+      );
+    }
   }
   return { positions, bpPerPx };
 }
@@ -534,8 +544,28 @@ export function createSubviewCompositionController({
     });
   }
 
+  async function moveContextCompositionMemberToOtherLane(host, store, memberContext) {
+    const state = store.getState();
+    if (String(state.assembly?.subview?.summary?.mode || "") !== "composition") return false;
+    const entityKey = String(memberContext?.entityKey || "").trim();
+    const composition = getSubviewComposition(state.assembly.subview);
+    const member = composition?.members.find((entry) => entry.entityKey === entityKey);
+    if (!member) return false;
+    const result = moveSubviewCompositionMembers(
+      composition,
+      [entityKey],
+      member.lane === "top" ? "bottom" : "top",
+    );
+    if (!result.changed) return false;
+    return commit(host, store, result.composition, {
+      kind: "move-members",
+      count: result.movedCount,
+    });
+  }
+
   return {
     addContextCtgToComposition,
+    moveContextCompositionMemberToOtherLane,
     renderContent,
     resetScope,
     onAction,

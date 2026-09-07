@@ -24,6 +24,7 @@ const REQUIRED_ACTION_NAMES = [
   "enterSubviewFromCandidates",
   "setSubviewTrackPairCtgHidden",
   "toggleSubviewContigFlip",
+  "moveContextCompositionMemberToOtherLane",
   "deleteSelectedSubviewTrackPairCtgs",
   "clearSubviewTrackPairHiddenCtgs",
   "setSelectedPrimaryTrackCtgsHidden",
@@ -191,12 +192,16 @@ export function resolveSubviewTrackPairContextTarget(target) {
   const assemblyCtgId = normalizeSupportDatasetId(
     trackNode.getAttribute("data-subview-track-pair-contig-id"),
   );
-  if (!trackRole || !assemblyCtgId) {
+  const compositionEntityKey = String(
+    trackNode.getAttribute("data-subview-composition-entity-key") || "",
+  ).trim();
+  if (!trackRole || (!assemblyCtgId && !compositionEntityKey)) {
     return null;
   }
   return {
     trackRole,
     assemblyCtgId,
+    ...(compositionEntityKey ? { compositionEntityKey } : {}),
     datasetId: normalizeSupportDatasetId(
       trackNode.getAttribute("data-subview-track-pair-dataset-id"),
     ),
@@ -465,6 +470,7 @@ export function buildAssemblyContextMenuItems({
     enterSubviewFromCandidates,
     setSubviewTrackPairCtgHidden,
     toggleSubviewContigFlip,
+    moveContextCompositionMemberToOtherLane,
     deleteSelectedSubviewTrackPairCtgs,
     clearSubviewTrackPairHiddenCtgs,
     setSelectedPrimaryTrackCtgsHidden,
@@ -614,6 +620,15 @@ export function buildAssemblyContextMenuItems({
   const addSubviewTrackPairActions = (targetContext, { includeAppend = true } = {}) => {
     const normalizedTrackRole = normalizeTrackRole(targetContext?.trackRole);
     const assemblyCtgId = normalizeSupportDatasetId(targetContext?.assemblyCtgId);
+    const compositionEntityKey = String(targetContext?.compositionEntityKey || "").trim();
+    if (String(normalizedSubview.summary?.mode || "") === "composition" && compositionEntityKey) {
+      items.push({
+        label: i18n.contextMenu.moveSubviewCtgToOtherTrack,
+        run: async () => moveContextCompositionMemberToOtherLane(host, store, {
+          entityKey: compositionEntityKey,
+        }),
+      });
+    }
     if (!normalizedTrackRole || !assemblyCtgId) {
       return;
     }
@@ -722,6 +737,7 @@ export function buildAssemblyContextMenuItems({
         phasedTrackId: subviewFragmentContext.phasedTrackId,
         phasedTrackItemId: subviewFragmentContext.phasedTrackItemId,
         phasedHaplotypeKey: subviewFragmentContext.phasedHaplotypeKey,
+        compositionEntityKey: subviewTrackPairContext?.compositionEntityKey,
       },
       { includeAppend: false },
     );

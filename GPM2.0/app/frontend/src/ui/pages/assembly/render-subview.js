@@ -73,6 +73,8 @@ import {
   renderSubviewVirtualRuler,
   resolveHitMapq,
   resolveMaxTrackEndBp,
+  resolveSubviewRulerGeometry,
+  resolveSubviewWorldStartBp,
   roundTrackMetric,
   sortTrackEntriesForRender,
 } from "./track-render-geometry.js";
@@ -662,6 +664,7 @@ export function createAssemblySubviewRenderer(deps = {}) {
     formatBpInterval,
     getMeasuredTrackViewportPx,
     renderTrackNumberInput,
+    resolveSubviewTrackDragOffsetBp,
     resolveSubviewTrackDragOffsetPx,
     resolveSubviewTrackSelectionLabel,
     resolveTrackToneClass,
@@ -672,6 +675,7 @@ export function createAssemblySubviewRenderer(deps = {}) {
     || typeof formatBpInterval !== "function"
     || typeof getMeasuredTrackViewportPx !== "function"
     || typeof renderTrackNumberInput !== "function"
+    || typeof resolveSubviewTrackDragOffsetBp !== "function"
     || typeof resolveSubviewTrackDragOffsetPx !== "function"
     || typeof resolveSubviewTrackSelectionLabel !== "function"
     || typeof resolveTrackToneClass !== "function"
@@ -1553,7 +1557,25 @@ function renderSubviewAlignmentCard(
         innerWidth: subviewBaseInnerWidth,
       },
     ),
+    topManualOffsetBp: resolveSubviewTrackDragOffsetBp(
+      subviewTrackDragOffsets,
+      "top",
+      topSelection.contigId,
+      {
+        domainSpanBp: subviewDomainSpanBp,
+        innerWidth: subviewBaseInnerWidth,
+      },
+    ),
     bottomManualOffsetPx: resolveSubviewTrackDragOffsetPx(
+      subviewTrackDragOffsets,
+      "bottom",
+      bottomSelection.contigId,
+      {
+        domainSpanBp: subviewDomainSpanBp,
+        innerWidth: subviewBaseInnerWidth,
+      },
+    ),
+    bottomManualOffsetBp: resolveSubviewTrackDragOffsetBp(
       subviewTrackDragOffsets,
       "bottom",
       bottomSelection.contigId,
@@ -1752,11 +1774,11 @@ function renderSubviewAlignmentCard(
       </div>`
     : "";
   const topCtgTitle = buildTrackCtgHoverTitle(topDisplayCtgName, {
-    startBp: 0,
+    startBp: svgModel.topWorldStartBp,
     lengthBp: svgModel.topLengthBp,
   });
   const bottomCtgTitle = buildTrackCtgHoverTitle(bottomDisplayCtgName, {
-    startBp: 0,
+    startBp: svgModel.bottomWorldStartBp,
     lengthBp: svgModel.bottomLengthBp,
   });
   return `
@@ -1781,6 +1803,7 @@ function renderSubviewAlignmentCard(
           data-subview-domain-span-bp="${svgModel.domainSpanBp}"
           data-subview-inner-width="${svgModel.baseInnerWidth}"
           data-subview-viewbox-min-x="${svgModel.renderViewBoxMinX}"
+          data-subview-window-start-bp="0"
         >
           ${renderTrackBandCanvasLayer({
             sceneKind: "subview-ctg",
@@ -1800,11 +1823,13 @@ function renderSubviewAlignmentCard(
           <svg class="assembly-track-svg subview-track-svg" width="${svgModel.renderInnerWidth}" height="${svgModel.contentBottom}" viewBox="${svgModel.renderViewBoxMinX} 0 ${svgModel.renderInnerWidth} ${svgModel.contentBottom}" preserveAspectRatio="xMinYMin meet">
             <line class="track-ruler-line" x1="0" y1="${svgModel.rulerTop}" x2="${svgModel.baseInnerWidth}" y2="${svgModel.rulerTop}" />
             ${renderSubviewVirtualRuler({
-              windowStart: 0,
-              windowEnd: svgModel.domainSpanBp,
-              tickBp: svgModel.tickBp,
-              innerWidth: svgModel.baseInnerWidth,
-              domainSpanBp: svgModel.domainSpanBp,
+              ...resolveSubviewRulerGeometry({
+                windowStart: 0,
+                windowEnd: svgModel.domainSpanBp,
+                tickBp: svgModel.tickBp,
+                innerWidth: svgModel.baseInnerWidth,
+                domainSpanBp: svgModel.domainSpanBp,
+              }),
               tickY1: svgModel.tickY1,
               tickY2: svgModel.tickY2,
               tickLabelY: svgModel.tickLabelY,
@@ -1838,6 +1863,7 @@ function renderSubviewAlignmentCard(
               data-subview-rect-y="${svgModel.topBarY.toFixed(2)}"
               data-subview-rect-width="${svgModel.topBarWidth.toFixed(2)}"
               data-subview-rect-height="${svgModel.barHeight}"
+              data-subview-world-start-bp="${svgModel.topWorldStartBp}"
             >
               <title>${escapeHtml(topCtgTitle)}</title>
               <rect class="track-ctg subview-track-ctg${topRowClass}" x="${svgModel.topBarX.toFixed(2)}" y="${svgModel.topBarY.toFixed(2)}" width="${svgModel.topBarWidth.toFixed(2)}" height="${svgModel.barHeight}" rx="4" ry="4" pointer-events="all">
@@ -1889,6 +1915,7 @@ function renderSubviewAlignmentCard(
               data-subview-rect-y="${svgModel.bottomBarY.toFixed(2)}"
               data-subview-rect-width="${svgModel.bottomBarWidth.toFixed(2)}"
               data-subview-rect-height="${svgModel.barHeight}"
+              data-subview-world-start-bp="${svgModel.bottomWorldStartBp}"
             >
               <title>${escapeHtml(bottomCtgTitle)}</title>
               <rect class="track-ctg subview-track-ctg${bottomRowClass}" x="${svgModel.bottomBarX.toFixed(2)}" y="${svgModel.bottomBarY.toFixed(2)}" width="${svgModel.bottomBarWidth.toFixed(2)}" height="${svgModel.barHeight}" rx="4" ry="4" pointer-events="all">
@@ -2099,6 +2126,17 @@ function renderSubviewTrackPairAlignmentCard(
       centerX: roundTrackMetric(baseRect.centerX + offsetPx),
     };
   };
+  const resolveTrackPairWorldStartBp = (layout, ctg) => roundTrackMetric(
+    resolveSubviewWorldStartBp({
+      startBp: ctg?.startBp,
+      dragOffsetBp: resolveSubviewTrackDragOffsetBp(
+        subviewTrackDragOffsets,
+        resolveLayoutSlot(layout.id),
+        ctg?.assemblyCtgId,
+        { domainSpanBp, innerWidth: baseInnerWidth },
+      ),
+    }),
+  );
   const maxRectRight = Math.max(
     baseInnerWidth,
     ...rowLayouts
@@ -2853,7 +2891,7 @@ function renderSubviewTrackPairAlignmentCard(
           normalizePositiveInt(ctg?.lengthBp ?? ctg?.totalLength) ?? 1,
         );
         const ctgTitle = buildTrackCtgHoverTitle(displayNameWithOrientation, {
-          startBp: ctg?.startBp,
+          startBp: resolveTrackPairWorldStartBp(layout, ctg),
           lengthBp: ctg?.lengthBp ?? ctg?.totalLength,
         });
         const fragments = deriveSubviewContigFragments({
@@ -2897,6 +2935,7 @@ function renderSubviewTrackPairAlignmentCard(
               data-subview-rect-y="${y.toFixed(2)}"
               data-subview-rect-width="${rect.width.toFixed(2)}"
               data-subview-rect-height="${TRACK_BAR_HEIGHT}"
+              data-subview-world-start-bp="${resolveTrackPairWorldStartBp(layout, ctg)}"
             >
               <title>${escapeHtml(ctgTitle)}</title>
               <rect
@@ -2963,7 +3002,7 @@ function renderSubviewTrackPairAlignmentCard(
           })}
           <div class="assembly-track-label-row${bottomRoleClass}" style="top:${resolvedBottomLayout.labelTop}px">${escapeHtml(bottomTrackLabel)}</div>
         </div>
-        <div class="assembly-track-scroll subview-track-scroll" data-track-role="subview" data-subview-domain-span-bp="${domainSpanBp}" data-subview-inner-width="${baseInnerWidth}" data-subview-viewbox-min-x="${renderViewBoxMinX}">
+        <div class="assembly-track-scroll subview-track-scroll" data-track-role="subview" data-subview-domain-span-bp="${domainSpanBp}" data-subview-inner-width="${baseInnerWidth}" data-subview-viewbox-min-x="${renderViewBoxMinX}" data-subview-window-start-bp="${domainStart}">
           ${renderTrackBandCanvasLayer({
             sceneKind: "subview-track-pair",
             width: renderInnerWidth,
@@ -2989,11 +3028,13 @@ function renderSubviewTrackPairAlignmentCard(
             </defs>
             <line class="track-ruler-line" x1="0" y1="${rulerTop}" x2="${baseInnerWidth}" y2="${rulerTop}" />
             ${renderSubviewVirtualRuler({
-              windowStart: domainStart,
-              windowEnd: domainEnd,
-              tickBp,
-              innerWidth: baseInnerWidth,
-              domainSpanBp,
+              ...resolveSubviewRulerGeometry({
+                windowStart: domainStart,
+                windowEnd: domainEnd,
+                tickBp,
+                innerWidth: baseInnerWidth,
+                domainSpanBp,
+              }),
               tickY1: rulerTop + TRACK_LABEL_OFFSET_Y,
               tickY2: contentBottom - 3 * TRACK_HEIGHT_SCALE,
               tickLabelY: rulerTop - TRACK_LABEL_OFFSET_Y,
@@ -3088,6 +3129,8 @@ function buildSubviewAlignmentSvgModel({
   maxTickCount,
   topManualOffsetPx = 0,
   bottomManualOffsetPx = 0,
+  topManualOffsetBp = 0,
+  bottomManualOffsetBp = 0,
 }) {
   const TRACK_HEIGHT_SCALE = 2;
   const TRACK_LANE_HEIGHT = 18 * TRACK_HEIGHT_SCALE;
@@ -3184,6 +3227,14 @@ function buildSubviewAlignmentSvgModel({
   const resolvedBottomManualOffsetPx = resolveManualOffsetPx(bottomManualOffsetPx);
   const topBarX = roundTrackMetric(topBarBaseX + resolvedTopManualOffsetPx);
   const bottomBarX = roundTrackMetric(bottomBarBaseX + resolvedBottomManualOffsetPx);
+  const topWorldStartBp = roundTrackMetric(resolveSubviewWorldStartBp({
+    alignmentOffsetBp: topOffsetBp,
+    dragOffsetBp: topManualOffsetBp,
+  }));
+  const bottomWorldStartBp = roundTrackMetric(resolveSubviewWorldStartBp({
+    alignmentOffsetBp: bottomOffsetBp,
+    dragOffsetBp: bottomManualOffsetBp,
+  }));
   const renderViewBoxMinX = Math.floor(Math.min(0, topBarX, bottomBarX));
   const renderMaxX = Math.ceil(Math.max(
     baseInnerWidth,
@@ -3292,6 +3343,8 @@ function buildSubviewAlignmentSvgModel({
     bottomBarY,
     topBarX,
     bottomBarX,
+    topWorldStartBp,
+    bottomWorldStartBp,
     topBarWidth,
     bottomBarWidth,
     topLabelTop,

@@ -92,12 +92,12 @@ test("composition reference projections use block length and MAPQ before creatin
   assert.doesNotMatch(renderAssemblyPage(state), /data-subview-anchor-hit-key="[^"]*\|(?:short|low)"/);
 });
 
-test("composition emits signed world ruler metadata using the current minimum tick unit", () => {
+test("composition emits main-view-aligned non-negative ruler metadata using the current minimum tick unit", () => {
   const state = controlState();
   let html = renderAssemblyPage(state);
   assert.match(html, /data-subview-virtual-ruler="1"/);
-  assert.match(html, /data-subview-ruler-origin-x="-250.0000"/);
-  assert.match(html, /data-subview-ruler-window-start="-5000.0000"/);
+  assert.match(html, /data-subview-ruler-origin-x="0.0000"/);
+  assert.match(html, /data-subview-ruler-window-start="0.0000"/);
   assert.match(html, /data-subview-ruler-tick-bp="1000.0000"/);
   state.assembly.subviewTrackView.minTickUnitKb = 2;
   html = renderAssemblyPage(state);

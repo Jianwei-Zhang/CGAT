@@ -5,6 +5,10 @@ import {
   buildVisibleSubviewRulerMarkup,
   buildVisibleSubviewRulerTicks,
 } from "../subview-ruler-runtime.js";
+import {
+  resolveSubviewRulerGeometry,
+  resolveSubviewWorldStartBp,
+} from "../track-render-geometry.js";
 
 function createRulerFixture({ scrollLeft = 0, clientWidth = 1200 } = {}) {
   const listeners = new Map();
@@ -76,20 +80,43 @@ test("visible Subview ruler includes the endpoint when the viewport reaches the 
   assert.match(ticks.at(-1).labelText, /43,726,252 bp/);
 });
 
-test("composition ruler keeps negative and positive world coordinates aligned while scrolling", () => {
+test("composition ruler keeps world coordinates aligned without exposing negative ticks", () => {
   const options = {
     windowStart: -5000, windowEnd: 100000, tickBp: 1000,
     innerWidth: 10500, domainSpanBp: 105000, originX: -500,
     viewBoxMinX: -500, viewportLeft: 0, viewportWidth: 1200,
   };
   const ticks = buildVisibleSubviewRulerTicks(options);
-  assert.ok(ticks.some((tick) => tick.bp === -5000 && tick.x === -500 && tick.labelText === "-5k"));
+  assert.equal(ticks.some((tick) => tick.bp < 0), false);
   assert.ok(ticks.some((tick) => tick.bp === 0 && tick.x === 0));
   assert.ok(ticks.length < 30);
   const scrolled = buildVisibleSubviewRulerTicks({ ...options, viewportLeft: 4000 });
   assert.ok(scrolled[0].bp > 0);
   for (const tick of scrolled) assert.ok(Math.abs(tick.x - tick.bp / 10) < 1e-6);
   assert.ok(scrolled.length < 30);
+});
+
+test("shared Subview coordinate helpers keep bp state separate from non-negative ruler geometry", () => {
+  assert.equal(resolveSubviewWorldStartBp({
+    startBp: 12_000,
+    alignmentOffsetBp: -500,
+    dragOffsetBp: 250.5,
+  }), 11_750.5);
+  assert.deepEqual(resolveSubviewRulerGeometry({
+    windowStart: -5_000,
+    windowEnd: 40_000,
+    tickBp: 1_000,
+    innerWidth: 800,
+    domainSpanBp: 40_000,
+    originX: 0,
+  }), {
+    windowStart: 0,
+    windowEnd: 40_000,
+    tickBp: 1_000,
+    innerWidth: 800,
+    domainSpanBp: 40_000,
+    originX: 0,
+  });
 });
 
 test("Subview ruler runtime updates only the bounded layer while scrolling", () => {

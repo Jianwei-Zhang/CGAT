@@ -165,6 +165,10 @@ function extractSubviewGeometry(html, slot) {
   assert.ok(scrollTagMatch, "expected subview scroll geometry metadata");
   const innerWidthMatch = scrollTagMatch[0].match(/data-subview-inner-width="([^"]+)"/);
   assert.ok(innerWidthMatch, "expected subview base inner width");
+  const domainSpanMatch = scrollTagMatch[0].match(/data-subview-domain-span-bp="([^"]+)"/);
+  assert.ok(domainSpanMatch, "expected subview domain span");
+  const windowStartMatch = scrollTagMatch[0].match(/data-subview-window-start-bp="([^"]+)"/);
+  assert.ok(windowStartMatch, "expected subview logical window start");
   const viewBoxMinXMatch = scrollTagMatch[0].match(/data-subview-viewbox-min-x="([^"]+)"/);
   const svgMatch = html.match(
     /<svg class="assembly-track-svg subview-track-svg" width="([^"]+)"[^>]*viewBox="([^"]+)"/,
@@ -176,9 +180,18 @@ function extractSubviewGeometry(html, slot) {
     ),
   );
   assert.ok(groupMatch, `expected ${slot} subview contig geometry`);
+  const worldStartMatch = html.match(
+    new RegExp(
+      `<g[^>]*data-subview-track-slot="${slot}"[^>]*data-subview-world-start-bp="([^"]+)"`,
+    ),
+  );
+  assert.ok(worldStartMatch, `expected ${slot} logical bp position`);
   const viewBox = svgMatch[2].trim().split(/\s+/).map(Number);
   return {
     baseInnerWidth: Number(innerWidthMatch[1]),
+    domainSpanBp: Number(domainSpanMatch[1]),
+    windowStartBp: Number(windowStartMatch[1]),
+    worldStartBp: Number(worldStartMatch[1]),
     viewBoxMinX: Number(viewBoxMinXMatch?.[1] || 0),
     svgWidth: Number(svgMatch[1]),
     viewBoxWidth: viewBox[2],
@@ -203,6 +216,11 @@ test("subview-ctg expands right render extent for a short contig already aligned
   assert.ok(shifted.svgWidth > shifted.baseInnerWidth);
   assert.equal(shifted.svgWidth, shifted.viewBoxWidth);
   assert.ok(shifted.barX + shifted.barWidth <= shifted.viewBoxMinX + shifted.svgWidth);
+  assert.equal(base.windowStartBp, 0);
+  assert.ok(Math.abs(
+    (shifted.worldStartBp - base.worldStartBp)
+      - 120 * base.domainSpanBp / base.baseInnerWidth,
+  ) < 0.1);
 });
 
 test("subview-ctg expands the left viewBox without changing its bp scale", () => {
@@ -220,6 +238,10 @@ test("subview-ctg expands the left viewBox without changing its bp scale", () =>
   assert.equal(shifted.viewBoxMinX, -120);
   assert.equal(shifted.svgWidth, shifted.baseInnerWidth + 120);
   assert.equal(shifted.svgWidth, shifted.viewBoxWidth);
+  assert.ok(Math.abs(
+    (shifted.worldStartBp - base.worldStartBp)
+      + 120 * base.domainSpanBp / base.baseInnerWidth,
+  ) < 0.1);
 });
 
 test("subview-track expands the right render extent without changing its bp scale", () => {
@@ -240,6 +262,10 @@ test("subview-track expands the right render extent without changing its bp scal
   assert.equal(shifted.viewBoxMinX, 0);
   assert.ok(shifted.svgWidth > shifted.baseInnerWidth);
   assert.equal(shifted.svgWidth, shifted.viewBoxWidth);
+  assert.ok(Math.abs(
+    (shifted.worldStartBp - base.worldStartBp)
+      - requestedOffsetPx * base.domainSpanBp / base.baseInnerWidth,
+  ) < 0.1);
 });
 
 test("subview-track expands the left viewBox without changing its bp scale", () => {
@@ -257,4 +283,8 @@ test("subview-track expands the left viewBox without changing its bp scale", () 
   assert.equal(shifted.viewBoxMinX, -120);
   assert.ok(shifted.svgWidth > shifted.baseInnerWidth);
   assert.equal(shifted.svgWidth, shifted.viewBoxWidth);
+  assert.ok(Math.abs(
+    (shifted.worldStartBp - base.worldStartBp)
+      - requestedOffsetPx * base.domainSpanBp / base.baseInnerWidth,
+  ) < 0.1);
 });

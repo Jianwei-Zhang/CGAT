@@ -49,6 +49,7 @@ function createContextMenuActionsCapture(calls = []) {
     enterSubviewFromCandidates: capture("enterSubviewFromCandidates"),
     setSubviewTrackPairCtgHidden: capture("setSubviewTrackPairCtgHidden"),
     toggleSubviewContigFlip: capture("toggleSubviewContigFlip"),
+    moveContextCompositionMemberToOtherLane: capture("moveContextCompositionMemberToOtherLane"),
     deleteSelectedSubviewTrackPairCtgs: capture("deleteSelectedSubviewTrackPairCtgs"),
     clearSubviewTrackPairHiddenCtgs: capture("clearSubviewTrackPairHiddenCtgs"),
     setSelectedPrimaryTrackCtgsHidden: capture("setSelectedPrimaryTrackCtgsHidden"),
@@ -185,6 +186,7 @@ test("resolveSubviewTrackPairContextTarget parses dataset and mirror metadata", 
           if (name === "data-subview-track-pair-phased-track-id") return "101";
           if (name === "data-subview-track-pair-phased-track-item-id") return "9001";
           if (name === "data-subview-track-pair-phased-haplotype-key") return "A";
+          if (name === "data-subview-composition-entity-key") return "assembly:30";
           return null;
         },
       };
@@ -201,7 +203,60 @@ test("resolveSubviewTrackPairContextTarget parses dataset and mirror metadata", 
     phasedTrackId: 101,
     phasedTrackItemId: 9001,
     phasedHaplotypeKey: "A",
+    compositionEntityKey: "assembly:30",
   });
+});
+
+test("buildAssemblyContextMenuItems moves only composition members to the other track", async () => {
+  const calls = [];
+  const host = {};
+  const store = createStore({
+    subview: {
+      summary: {
+        mode: "composition",
+        members: [{
+          entityKey: "assembly:30",
+          assemblyCtgId: 30,
+          source: { role: "support", datasetId: 22 },
+          lane: "top",
+          xBp: 1234,
+          lengthBp: 5000,
+        }],
+      },
+      trackPairHiddenCtgs: [],
+      trackPairSelectedCtgs: [],
+    },
+  });
+  const actions = createContextMenuActionsCapture(calls);
+  const context = {
+    assemblyCtgId: 30,
+    slot: "top",
+    trackRole: "support",
+    datasetId: 22,
+    compositionEntityKey: "assembly:30",
+  };
+  const items = buildAssemblyContextMenuItems({
+    subviewTrackPairContext: context,
+    store,
+    host,
+    actions,
+  });
+
+  const moveItem = items.find((item) => item.label === "移至另一轨");
+  assert.ok(moveItem);
+  await moveItem.run();
+  assert.deepEqual(calls.at(-1), {
+    name: "moveContextCompositionMemberToOtherLane",
+    args: [host, store, { entityKey: "assembly:30" }],
+  });
+
+  const defaultItems = buildAssemblyContextMenuItems({
+    subviewTrackPairContext: context,
+    store: createStore({ subview: { summary: { mode: "track-pair" } } }),
+    host,
+    actions: createContextMenuActionsCapture([]),
+  });
+  assert.equal(defaultItems.some((item) => item.label === "移至另一轨"), false);
 });
 
 test("resolveSubviewAnchorEdgeContextTarget parses anchor edge metadata", () => {

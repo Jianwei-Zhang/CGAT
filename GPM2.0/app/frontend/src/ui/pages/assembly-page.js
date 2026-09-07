@@ -423,7 +423,10 @@ const subviewToolsContentController = createSubviewCompositionController({
   refreshSubviewPairwiseEvidence,
   anchorController: subviewAnchorManagerController,
 });
-const { addContextCtgToComposition } = subviewToolsContentController;
+const {
+  addContextCtgToComposition,
+  moveContextCompositionMemberToOtherLane,
+} = subviewToolsContentController;
 const {
   enterSubviewFromCandidates,
   enterSubviewFromTrackSelections,
@@ -1106,6 +1109,7 @@ const degapRuntimeDeps = {
 
 const contextMenuRuntimeDeps = {
   addContextCtgToComposition,
+  moveContextCompositionMemberToOtherLane,
   addFinalPathContigRelativeToSegment,
   addFinalPathGapRelativeToSegment,
   applyEditorAction: editorActionRuntimeAdapters.applyEditorAction,

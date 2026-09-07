@@ -71,7 +71,7 @@ function resolveVisibleRulerRange({
   return {
     minBp: Math.max(safeStart, xToBp(contentLeft - overscanPx)),
     maxBp: Math.min(safeEnd, xToBp(contentRight + overscanPx)),
-    firstTick: Math.ceil(safeStart / tickBp) * tickBp,
+    firstTick: Math.max(0, Math.ceil(safeStart / tickBp) * tickBp),
     safeStart,
     safeEnd,
   };

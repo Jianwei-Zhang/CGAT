@@ -5,6 +5,40 @@ export function roundTrackMetric(value) {
   return Math.round(Number(value || 0) * 100) / 100;
 }
 
+function finiteTrackMetric(value, fallback = 0) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+export function resolveSubviewWorldStartBp({
+  startBp = 0,
+  alignmentOffsetBp = 0,
+  dragOffsetBp = 0,
+} = {}) {
+  return finiteTrackMetric(startBp)
+    + finiteTrackMetric(alignmentOffsetBp)
+    + finiteTrackMetric(dragOffsetBp);
+}
+
+export function resolveSubviewRulerGeometry({
+  windowStart = 0,
+  windowEnd = 0,
+  tickBp = 1,
+  innerWidth = 1,
+  domainSpanBp = 1,
+  originX = 0,
+} = {}) {
+  const logicalStart = Math.max(0, finiteTrackMetric(windowStart));
+  return {
+    windowStart: logicalStart,
+    windowEnd: Math.max(logicalStart, finiteTrackMetric(windowEnd, logicalStart)),
+    tickBp: Math.max(1, finiteTrackMetric(tickBp, 1)),
+    innerWidth: Math.max(1, finiteTrackMetric(innerWidth, 1)),
+    domainSpanBp: Math.max(1, finiteTrackMetric(domainSpanBp, 1)),
+    originX: finiteTrackMetric(originX),
+  };
+}
+
 export function buildEmptyTrackModelLike() {
   return {
     windowStart: 0,
