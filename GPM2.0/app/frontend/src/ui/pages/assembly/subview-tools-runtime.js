@@ -329,7 +329,7 @@ function createSubviewToolsRuntime(host, store, deps) {
   host.addEventListener("click", onToggle);
   const unsubscribe = store.subscribe?.(sync);
   return {
-    host, store, sync,
+    host, store, sync, close,
     destroy() {
       destroyed = true;
       unmount();

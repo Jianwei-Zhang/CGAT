@@ -23,7 +23,6 @@ const labels = {
   willMove: { top: "Move from top", bottom: "Move from bottom" },
   moveTo: { top: "Move top", bottom: "Move bottom" },
   remove: "Remove",
-  swap: "Swap",
   compact: "Compact",
   flipped: "flipped",
   sourceUnavailable: "Unavailable",
@@ -66,6 +65,8 @@ test("composition manager renders both lane counts and the focused member", () =
   assert.doesNotMatch(html, /ctg3 \(\+\) \(-\)/);
   assert.match(html, /data-subview-composition-add="top"/);
   assert.match(html, /data-subview-composition-add="bottom"/);
+  assert.doesNotMatch(html, /data-subview-composition-swap/);
+  assert.match(html, /data-subview-composition-compact="1">Compact<\/button>/);
 });
 
 test("composition picker makes a cross-lane add explicit and supports checked batches", () => {

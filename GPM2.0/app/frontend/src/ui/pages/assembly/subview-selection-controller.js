@@ -32,6 +32,7 @@ import {
 
 export function createSubviewSelectionController({
   buildInitialSubviewPairwiseEvidence,
+  closeSubviewTools = () => {},
   getCurrentProject,
   invalidateSubviewPairwiseEvidence = () => {},
   loadSubviewPairwiseEvidence,
@@ -295,6 +296,21 @@ export function createSubviewSelectionController({
     rerenderSubviewSelectionRegions(host, store);
   }
 
+  function handleSubviewClear(host, store) {
+    const state = store.getState();
+    const cleared = buildSubviewClearProjection(state.assembly);
+    if (!cleared.changed) {
+      return false;
+    }
+    invalidateSubviewPairwiseEvidence();
+    resetSubviewTransientState();
+    store.setState({ assembly: cleared.assembly });
+    rerenderSubviewSelectionRegions(host, store);
+    closeSubviewTools();
+    void persistProjectAssemblyViewStateFromStore(host, store);
+    return true;
+  }
+
   function handleSubviewSwapTrackOrder(host, store) {
     const state = store.getState();
     const nextSubview = swapSubviewSummaryOrder({
@@ -540,6 +556,7 @@ export function createSubviewSelectionController({
     enterSubviewFromCandidates,
     enterSubviewFromTrackSelections,
     handleSubviewCandidateRemoval,
+    handleSubviewClear,
     handleSubviewHistoryReset,
     handleSubviewHistoryRestoreRollback,
     handleSubviewHistoryRollback,

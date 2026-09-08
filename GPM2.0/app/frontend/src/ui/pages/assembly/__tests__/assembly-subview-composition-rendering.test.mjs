@@ -57,6 +57,16 @@ test("composition canvas keeps world positions and exposes evidence cuts from re
   }));
 
   assert.match(html, /data-subview-composition-scene="1"/);
+  assert.match(
+    html,
+    /class="subview-candidate-badge" title="自由组合 · 上轨 1 \/ 下轨 1"><strong class="subview-candidate-slot">C<\/strong>[\s\S]*?class="subview-candidate-name">组合<\/span><span class="subview-candidate-meta"> · 上1\/下1<\/span>[\s\S]*?data-subview-action="clear-composition"/,
+  );
+  assert.equal((html.match(/data-subview-action="swap-track-order"/g) || []).length, 1);
+  assert.match(
+    html,
+    /class="assembly-track-label-row" style="top:78px">上轨<\/div>[\s\S]*?data-subview-action="swap-track-order"[\s\S]*?class="assembly-track-label-row" style="top:186px">下轨<\/div>/,
+  );
+  assert.doesNotMatch(html, /data-subview-composition-swap/);
   assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*data-subview-rect-x="-50\.00"/);
   assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*data-subview-world-start-bp="-500"/);
   assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*data-subview-rect-x="200\.00"/);

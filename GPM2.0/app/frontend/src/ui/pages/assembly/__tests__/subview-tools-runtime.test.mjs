@@ -99,6 +99,10 @@ test("toggle is local, binding is idempotent, canvas clicks keep the floating wi
   f.nodes[0].emit("click", { target: f.control("close") });
   assert.equal(f.nodes.length, 0);
   assert.equal(f.doc.activeElement, f.toggle);
+  f.open();
+  runtime.close();
+  assert.equal(f.nodes.length, 0);
+  assert.equal(f.doc.activeElement, f.toggle);
   assert.deepEqual(f.store.getState(), original);
   assert.deepEqual(f.panel.canvas, canvas);
   runtime.destroy();

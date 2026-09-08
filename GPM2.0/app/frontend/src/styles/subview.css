@@ -399,10 +399,6 @@
   color: var(--danger, #b42318);
 }
 
-.subview-composition-swap {
-  justify-self: center;
-}
-
 .subview-composition-picker-filters input,
 .subview-composition-picker-filters select {
   box-sizing: border-box;

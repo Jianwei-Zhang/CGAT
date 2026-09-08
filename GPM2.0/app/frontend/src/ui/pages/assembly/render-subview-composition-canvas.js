@@ -411,6 +411,7 @@ export function renderSubviewCompositionAlignmentCard({
   viewportWidthPx,
   chrName,
   grtAnchorPlan,
+  renderTrackOrderToggleButton = () => "",
   resolveTrackToneClass,
   escapeHtml,
   escapeAttr,
@@ -526,6 +527,7 @@ export function renderSubviewCompositionAlignmentCard({
   });
   const emptyTop = topCount ? "" : `<text class="track-row-empty-label" x="12" y="${TOP_Y + 12}">${escapeHtml(i18n.trackControls.topTrackEmpty)}</text>`;
   const emptyBottom = bottomCount ? "" : `<text class="track-row-empty-label" x="12" y="${BOTTOM_Y + 12}">${escapeHtml(i18n.trackControls.bottomTrackEmpty)}</text>`;
+  const trackOrderButtonTopPx = ((TOP_Y + BOTTOM_Y) / 2 - 4).toFixed(2);
   return `<article class="assembly-track-panel subview-alignment-card" data-subview-composition-scene="1"
     data-grt-result-scene-visible="${grtScene.hasVisibleResult ? "1" : "0"}">
     <div class="assembly-track-panel-head"><strong>${escapeHtml(i18n.subview.compositionTitle
@@ -536,6 +538,11 @@ export function renderSubviewCompositionAlignmentCard({
     <div class="assembly-track-layout subview-track-layout">
       <div class="assembly-track-label-column subview-track-label-column" style="width:136px;height:${CONTENT_HEIGHT}px">
         <div class="assembly-track-label-row" style="top:${TOP_Y - 4}px">${escapeHtml(i18n.subview.tools.compositionManager.lanes.top)}</div>
+        ${renderTrackOrderToggleButton({
+          className: "is-in-label-column",
+          style: `top:${trackOrderButtonTopPx}px`,
+          swapTrackOrderLabel: i18n.subview.swapTrackOrderAria,
+        })}
         <div class="assembly-track-label-row" style="top:${BOTTOM_Y - 4}px">${escapeHtml(i18n.subview.tools.compositionManager.lanes.bottom)}</div>
       </div>
       <div class="assembly-track-scroll subview-track-scroll" data-track-role="subview"

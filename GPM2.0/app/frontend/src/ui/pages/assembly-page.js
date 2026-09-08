@@ -432,6 +432,7 @@ const {
   enterSubviewFromCandidates,
   enterSubviewFromTrackSelections,
   handleSubviewCandidateRemoval,
+  handleSubviewClear,
   handleSubviewHistoryReset,
   handleSubviewHistoryRestoreRollback,
   handleSubviewHistoryRollback,
@@ -441,6 +442,7 @@ const {
   handleTrackSubviewTrackSelection,
 } = createSubviewSelectionController({
   buildInitialSubviewPairwiseEvidence,
+  closeSubviewTools: () => assemblyPageSession.subviewTools?.close?.(),
   getCurrentProject: (state) => getCurrentProject(state),
   invalidateSubviewPairwiseEvidence: () => {
     assemblyPageSession.subviewPairwiseEvidenceRequestSeq += 1;
@@ -868,6 +870,7 @@ function createAssemblyPageBindingDeps(options = {}) {
     createPhasedChrTrack,
     handleNewSequenceRowAction,
     handleSubviewCandidateRemoval,
+    handleSubviewClear,
     handleSubviewHistoryReset,
     handleSubviewHistoryRestoreRollback,
     handleSubviewHistoryRollback,

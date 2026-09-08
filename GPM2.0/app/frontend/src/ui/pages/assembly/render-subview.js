@@ -49,6 +49,7 @@ import { renderSubviewToolsToggle } from "./render-subview-tools.js";
 import { buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
 import { buildSubviewGrtAnchorScene } from "./subview-grt-anchor-state.js";
 import { renderSubviewCompositionAlignmentCard } from "./render-subview-composition-canvas.js";
+import { getSubviewComposition } from "./subview-composition-state.js";
 import {
   buildTrackCtgHoverTitle,
   formatTrackCtgOrientationLabel,
@@ -773,17 +774,43 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
       const phasedRemoveAttrs = selection.role === "phased"
         ? ` data-subview-remove-phased-track-id="${Number(selection.phasedTrackId || 0)}" data-subview-remove-phased-track-item-id="${Number(selection.phasedTrackItemId || 0)}" data-subview-remove-phased-haplotype-key="${escapeAttr(selection.phasedHaplotypeKey || "")}"`
         : "";
-      return `<span class="subview-candidate-badge" title="${escapeAttr(ctgName)}"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(visibleCtgName)}</span><span class="subview-candidate-meta"> · ${escapeHtml(roleLabel)}</span></span><button type="button" class="subview-candidate-remove" data-subview-remove-type="candidate" data-subview-remove-role="${escapeAttr(selection.role)}" data-subview-remove-contig-id="${selection.contigId}"${phasedRemoveAttrs} aria-label="${escapeAttr(i18n.subview.removeCandidateAria)}" title="${escapeAttr(i18n.subview.removeCandidateAria)}"><svg class="subview-candidate-remove-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false"><path d="m4 4 8 8"></path><path d="m12 4-8 8"></path></svg></button></span>`;
+      const removeButton = renderSubviewBadgeRemoveButton(
+        `data-subview-remove-type="candidate" data-subview-remove-role="${escapeAttr(selection.role)}" data-subview-remove-contig-id="${selection.contigId}"${phasedRemoveAttrs}`,
+        i18n.subview.removeCandidateAria,
+      );
+      return `<span class="subview-candidate-badge" title="${escapeAttr(ctgName)}"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(visibleCtgName)}</span><span class="subview-candidate-meta"> · ${escapeHtml(roleLabel)}</span></span>${removeButton}</span>`;
     })
     .join("");
   const trackBadges = trackSelections
     .map((selection, index) => {
       const slot = index === 0 ? "T1" : "T2";
       const trackLabel = resolveSubviewTrackSelectionLabel(selection, supportContext, i18n);
-      return `<span class="subview-candidate-badge" title="${escapeAttr(trackLabel)}"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(trackLabel)}</span></span><button type="button" class="subview-candidate-remove" data-subview-remove-type="track" data-subview-remove-role="${escapeAttr(selection.role)}" data-subview-remove-source="${escapeAttr(selection.source || "mother")}" data-subview-remove-dataset-id="${Number(selection.datasetId || 0)}" data-subview-remove-is-mirror="${selection.isMirror ? "1" : "0"}" aria-label="${escapeAttr(i18n.subview.removeTrackCandidateAria)}" title="${escapeAttr(i18n.subview.removeTrackCandidateAria)}"><svg class="subview-candidate-remove-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false"><path d="m4 4 8 8"></path><path d="m12 4-8 8"></path></svg></button></span>`;
+      const removeButton = renderSubviewBadgeRemoveButton(
+        `data-subview-remove-type="track" data-subview-remove-role="${escapeAttr(selection.role)}" data-subview-remove-source="${escapeAttr(selection.source || "mother")}" data-subview-remove-dataset-id="${Number(selection.datasetId || 0)}" data-subview-remove-is-mirror="${selection.isMirror ? "1" : "0"}"`,
+        i18n.subview.removeTrackCandidateAria,
+      );
+      return `<span class="subview-candidate-badge" title="${escapeAttr(trackLabel)}"><strong class="subview-candidate-slot">${slot}</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(trackLabel)}</span></span>${removeButton}</span>`;
     })
     .join("");
-  const allBadges = `${candidateBadges}${trackBadges}`;
+  const composition = String(subview?.summary?.mode || "") === "composition"
+    ? getSubviewComposition(subview)
+    : null;
+  const compositionBadge = composition
+    ? (() => {
+        const topCount = composition.members.filter((member) => member.lane === "top").length;
+        const bottomCount = composition.members.length - topCount;
+        const title = i18n.subview.compositionTitle
+          .replace("{top}", topCount).replace("{bottom}", bottomCount);
+        const count = i18n.subview.compositionBadgeCount
+          .replace("{top}", topCount).replace("{bottom}", bottomCount);
+        const closeButton = renderSubviewBadgeRemoveButton(
+          'data-subview-action="clear-composition"',
+          i18n.subview.closeCompositionAria,
+        );
+        return `<span class="subview-candidate-badge" title="${escapeAttr(title)}"><strong class="subview-candidate-slot">C</strong><span class="subview-candidate-content"><span class="subview-candidate-name">${escapeHtml(i18n.subview.compositionBadgeName)}</span><span class="subview-candidate-meta"> · ${escapeHtml(count)}</span></span>${closeButton}</span>`;
+      })()
+    : "";
+  const allBadges = `${candidateBadges}${trackBadges}${compositionBadge}`;
   const sameContigWarning = resolveSubviewPanelSameContigWarningText(subview, supportContext, i18n);
   const grtResultContext = resolveGrtResultContext(assembly);
   const grtAnchorPlan = buildGrtResultPlan(grtResultContext.baselineEntry);
@@ -923,6 +950,10 @@ function renderSubviewTrackOrderToggleButton({ className = "", style = "", swapT
       ${resolvedStyle ? `style="${escapeAttr(resolvedStyle)}"` : ""}
     >⇅</button>
   `;
+}
+
+function renderSubviewBadgeRemoveButton(attributes, ariaLabel) {
+  return `<button type="button" class="subview-candidate-remove" ${attributes} aria-label="${escapeAttr(ariaLabel)}" title="${escapeAttr(ariaLabel)}"><svg class="subview-candidate-remove-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false"><path d="m4 4 8 8"></path><path d="m12 4-8 8"></path></svg></button>`;
 }
 
 function buildSubviewActiveAnchorKeySet(activeAnchors) {
@@ -1420,6 +1451,7 @@ function renderSubviewAlignmentCard(
       viewportWidthPx: getMeasuredTrackViewportPx("subview"),
       chrName: grtResult.context?.chrName,
       grtAnchorPlan: grtResult.anchorPlan,
+      renderTrackOrderToggleButton: renderSubviewTrackOrderToggleButton,
       resolveTrackToneClass,
       escapeHtml,
       escapeAttr,

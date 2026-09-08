@@ -129,7 +129,6 @@ export function renderSubviewCompositionPanel({
   return `<section class="subview-composition-manager" data-subview-composition-manager="1">
     ${renderLane(normalized, "top", ui.focusedEntityKey, candidates, candidatesLoaded,
       labels, escapeHtml, escapeAttr)}
-    <button type="button" class="button ghost subview-composition-swap" data-subview-composition-swap="1">⇅ ${escapeHtml(labels.swap)}</button>
     ${renderLane(normalized, "bottom", ui.focusedEntityKey, candidates, candidatesLoaded,
       labels, escapeHtml, escapeAttr)}
     <button type="button" class="button secondary" data-subview-composition-compact="1">${escapeHtml(labels.compact)}</button>

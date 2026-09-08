@@ -8,7 +8,6 @@ import {
   normalizeSubviewComposition,
   normalizeSubviewCompositionMember,
   removeSubviewCompositionMembers,
-  swapSubviewCompositionLanes,
 } from "./subview-composition-state.js";
 import { commitSubviewCompositionHistoryOperation } from "./subview-history-state.js";
 import {
@@ -446,14 +445,6 @@ export function createSubviewCompositionController({
       );
       void commit(host, context.store, result.composition,
         { kind: "move-members", count: result.movedCount }, context.sync);
-      return;
-    }
-    if (event.target.closest?.("[data-subview-composition-swap]")) {
-      const result = swapSubviewCompositionLanes(
-        projectCurrentSubviewToComposition(context.store.getState(), host),
-      );
-      void commit(host, context.store, result.composition,
-        { kind: "swap-track-order" }, context.sync);
       return;
     }
     if (event.target.closest?.("[data-subview-composition-compact]")) {

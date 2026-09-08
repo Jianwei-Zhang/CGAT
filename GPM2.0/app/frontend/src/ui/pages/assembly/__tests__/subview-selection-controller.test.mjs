@@ -105,6 +105,8 @@ function createEntryHarness(initialState) {
   const persisted = [];
   const invalidations = [];
   const transientResets = [];
+  const toolsCloses = [];
+  const renderCalls = [];
   const store = createStore(initialState);
   const controller = createSubviewSelectionController({
     buildInitialSubviewPairwiseEvidence(summary, trackView, previousEvidence) {
@@ -118,6 +120,9 @@ function createEntryHarness(initialState) {
     getCurrentProject() {
       return { primaryDatasetId: 11 };
     },
+    closeSubviewTools() {
+      toolsCloses.push("close");
+    },
     invalidateSubviewPairwiseEvidence() {
       invalidations.push("invalidate");
     },
@@ -127,8 +132,12 @@ function createEntryHarness(initialState) {
     persistProjectAssemblyViewStateFromStore() {
       persisted.push(store.getState().assembly.subview.historyKey);
     },
-    rerenderAssemblyMainTab() {},
-    rerenderSubviewPanel() {},
+    rerenderAssemblyMainTab() {
+      renderCalls.push("main");
+    },
+    rerenderSubviewPanel() {
+      renderCalls.push("subview");
+    },
     resetSubviewTransientState() {
       transientResets.push("reset");
     },
@@ -139,7 +148,9 @@ function createEntryHarness(initialState) {
     pairwiseBuilds,
     pairwiseLoads,
     persisted,
+    renderCalls,
     store,
+    toolsCloses,
     transientResets,
   };
 }
@@ -229,6 +240,48 @@ test("removing a Subview track selection refreshes main-track and Subview select
   assert.equal(assembly.subview.summary, null);
   assert.deepEqual(assembly.subviewTrackDragOffsets, []);
   assert.deepEqual(renderCalls, ["main", "subview"]);
+});
+
+test("clearing a custom composition resets the active Subview once and closes its tools", () => {
+  const harness = createEntryHarness(createCompositionBackedState());
+
+  assert.equal(harness.controller.handleSubviewClear({}, harness.store), true);
+
+  const assembly = harness.store.getState().assembly;
+  assert.equal(assembly.subview.mode, "2-contig");
+  assert.equal(assembly.subview.summary, null);
+  assert.equal(assembly.subview.pairwiseEvidence, undefined);
+  assert.deepEqual(assembly.subviewCompositionViewport, {});
+  assert.deepEqual(assembly.subviewTrackDragOffsets, []);
+  assert.equal(assembly.subviewHistoryByKey["composition:Chr01"], undefined);
+  assert.deepEqual(harness.invalidations, ["invalidate"]);
+  assert.deepEqual(harness.transientResets, ["reset"]);
+  assert.deepEqual(harness.toolsCloses, ["close"]);
+  assert.deepEqual(harness.renderCalls, ["main", "subview"]);
+  assert.equal(harness.persisted.length, 1);
+
+  assert.equal(harness.controller.handleSubviewClear({}, harness.store), false);
+  assert.deepEqual(harness.invalidations, ["invalidate"]);
+  assert.deepEqual(harness.toolsCloses, ["close"]);
+  assert.equal(harness.persisted.length, 1);
+});
+
+test("the shared track-order action swaps a composition in one undoable step", () => {
+  const harness = createEntryHarness(createCompositionBackedState());
+
+  harness.controller.handleSubviewSwapTrackOrder({}, harness.store);
+
+  let assembly = harness.store.getState().assembly;
+  assert.equal(assembly.subview.summary.members[0].lane, "bottom");
+  assert.equal(assembly.subview.summary.members[0].xBp, 0);
+  assert.equal(assembly.subview.summary.members[0].flipped, false);
+  assert.equal(assembly.subviewHistoryByKey["composition:Chr01"].past.length, 1);
+
+  harness.controller.handleSubviewHistoryRollback({}, harness.store);
+  assembly = harness.store.getState().assembly;
+  assert.equal(assembly.subview.summary.members[0].lane, "top");
+  assert.equal(assembly.subview.summary.members[0].xBp, 0);
+  assert.equal(assembly.subview.summary.members[0].flipped, false);
 });
 
 test("two-contig quick entry clears the active graph and creates a fresh default pair", () => {
