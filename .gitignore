@@ -33,3 +33,7 @@
 **/*.zip
 **/imported/
 **/exports/
+# Local Comet/CodeGraph agent management
+/.comet/
+/.codegraph/
+/AGENTS.md
