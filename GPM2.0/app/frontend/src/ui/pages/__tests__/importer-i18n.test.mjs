@@ -510,6 +510,55 @@ test("failed file deletion retains the current project and reports a persistent 
   }
 });
 
+test("deleting the active project record closes its card when disk deletion is unchecked", async () => {
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  const previousSetTimeout = globalThis.setTimeout;
+  const previousClearTimeout = globalThis.clearTimeout;
+  let history = [{ path: "D:/active", lastUsedAt: 1 }];
+  try {
+    globalThis.document = { querySelector: () => null };
+    globalThis.setTimeout = () => 0;
+    globalThis.clearTimeout = () => {};
+    globalThis.window = {
+      dispatchEvent() {},
+      localStorage: {
+        getItem: () => JSON.stringify(history),
+        setItem: (_key, value) => { history = JSON.parse(value); },
+      },
+    };
+    const initial = createImporterScrollState({
+      inFlight: false,
+      importRunId: null,
+      deleteConfirmOpen: true,
+      deleteSelectionMode: "project",
+      deleteWithFiles: false,
+      deleteTargets: ["D:/active"],
+      openWorkspacePath: "D:/active",
+    });
+    initial.session = { workspacePath: "D:/active", projectId: 1, projectName: "Active" };
+    const store = createStore(initial);
+    const confirm = createButton();
+    bindImporterPage(createHost({ "#confirm-delete-selected-button": confirm }), store);
+
+    await confirm.click();
+
+    assert.deepEqual(history, []);
+    assert.deepEqual(store.getState().session, {
+      workspacePath: "",
+      projectId: null,
+      projectName: "",
+    });
+    assert.equal(store.getState().importer.openWorkspacePath, "");
+    assert.doesNotMatch(renderImporterPage(store.getState()), /class="project-current"/);
+  } finally {
+    globalThis.window = previousWindow;
+    globalThis.document = previousDocument;
+    globalThis.setTimeout = previousSetTimeout;
+    globalThis.clearTimeout = previousClearTimeout;
+  }
+});
+
 test("removing the active recent record does not close its project", () => {
   const previousWindow = globalThis.window;
   let history = [{ path: "/active", lastUsedAt: 1 }];

@@ -23,6 +23,7 @@ const IMPORT_PROGRESS_BOTTOM_THRESHOLD_PX = 24;
 const IMPORTER_STATUS_TOAST_AUTO_DISMISS_MS = 1000;
 const IMPORTER_STATUS_TOAST_DISMISS = Symbol("importerStatusToastDismiss");
 const DELETE_SELECTION_MODE_FAILED_HISTORY = "failed-history";
+const DELETE_SELECTION_MODE_PROJECT = "project";
 const PROJECT_MENU_BINDING = Symbol("projectMenuBinding");
 
 export function renderImporterPage(state) {
@@ -433,7 +434,7 @@ function bindProjectEntryControls(host, store) {
   }));
   host.querySelectorAll("[data-project-delete-files]").forEach(button => button.addEventListener("click", () => {
     if (busy()) return;
-    openDeleteSelectionConfirm(host, store, [button.dataset.projectDeleteFiles]);
+    openDeleteSelectionConfirm(host, store, [button.dataset.projectDeleteFiles], DELETE_SELECTION_MODE_PROJECT);
     updateImporterState(store, { deleteWithFiles: true });
     rerender(host, store);
   }));
@@ -852,6 +853,7 @@ async function runDeleteSelectedFlow(host, store) {
   const snapshot = store.getState();
   const importer = snapshot.importer;
   const deleteFailedHistoryOnly = importer.deleteSelectionMode === DELETE_SELECTION_MODE_FAILED_HISTORY;
+  const deleteProjectRecord = importer.deleteSelectionMode === DELETE_SELECTION_MODE_PROJECT;
   const requestedPaths = normalizePathList(importer.deleteTargets);
   const failedHistoryPaths = deleteFailedHistoryOnly
     ? new Set(getFailedHistoryPaths(readWorkspaceHistory(), importer.historyValidation))
@@ -922,7 +924,8 @@ async function runDeleteSelectedFlow(host, store) {
   removeWorkspaceHistoryPaths(completedPaths);
 
   const nextSession = { ...store.getState().session };
-  if (deleteWithFiles && workspacePathListIncludes(removedPaths, nextSession.workspacePath)) {
+  const closedWorkspacePaths = deleteProjectRecord ? completedPaths : removedPaths;
+  if (workspacePathListIncludes(closedWorkspacePaths, nextSession.workspacePath)) {
     closeProjectSession(store);
     nextSession.workspacePath = "";
     nextSession.projectId = null;
@@ -944,8 +947,7 @@ async function runDeleteSelectedFlow(host, store) {
       deleteWithFiles: false,
       deleteTargets: [],
       historyValidation: nextValidation,
-      openWorkspacePath: deleteWithFiles
-        && workspacePathListIncludes(removedPaths, currentImporter.openWorkspacePath)
+      openWorkspacePath: workspacePathListIncludes(closedWorkspacePaths, currentImporter.openWorkspacePath)
         ? ""
         : currentImporter.openWorkspacePath,
       projectError: failures.join("\n"),
