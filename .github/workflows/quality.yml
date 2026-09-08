@@ -69,6 +69,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: GPM2.0/app/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: GPM2.0/app/frontend
+        run: >-
+          npm ci
+          --registry=https://registry.npmjs.org
+          --fetch-retries=5
+          --fetch-retry-factor=2
+          --fetch-retry-mintimeout=1000
+          --fetch-retry-maxtimeout=60000
 
       - name: Setup Python
         uses: actions/setup-python@v5
