@@ -238,8 +238,10 @@
   grid-template-columns: 20px minmax(0, 1fr) 26px;
   align-items: start;
   gap: 5px;
-  padding: 6px 3px;
-  border-top: 1px solid #e1e5ea;
+  padding: 6px;
+  border: 1px solid #e1e5ea;
+  border-radius: 6px;
+  background: #fff;
   cursor: default;
 }
 
@@ -261,11 +263,12 @@
 .subview-anchor-object:hover,
 .subview-anchor-object:focus-visible,
 .subview-anchor-object.is-focused {
-  background: #e9eef4;
+  border-color: #cfc0ff;
+  background: #f5f1ff;
 }
 
 .subview-anchor-object.is-focused {
-  box-shadow: inset 3px 0 #d33333;
+  box-shadow: inset 3px 0 #7a1fff;
 }
 
 .subview-anchor-object input {
@@ -287,6 +290,7 @@
   color: inherit;
   font: inherit;
   text-align: left;
+  cursor: default;
 }
 
 .subview-anchor-object-type {
@@ -294,8 +298,15 @@
 }
 
 .subview-anchor-endpoints {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(min(112px, 100%), 1fr));
+  gap: 4px;
+}
+
+.subview-anchor-endpoint {
+  padding: 4px 6px;
+  border-left: 2px solid #ccd5df;
+  border-radius: 4px;
+  background: #f8fafc;
 }
 
 .subview-anchor-endpoint strong,
@@ -467,8 +478,7 @@
 }
 
 @media (max-width: 360px) {
-  .subview-anchor-manager-actions,
-  .subview-anchor-endpoints {
+  .subview-anchor-manager-actions {
     grid-template-columns: 1fr;
   }
 

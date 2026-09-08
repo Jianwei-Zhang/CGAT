@@ -202,10 +202,14 @@ function edgeDescriptor(band, edge) {
   return { topX, bottomX, topCut, bottomCut };
 }
 
+function anchorObjectId(edge, kind, identity) {
+  return buildSubviewAnchorObjectId(kind, identity, kind === "manual" ? "manual" : edge.edge);
+}
+
 function anchorAttrs(edge, kind, identity, active, escapeAttr) {
   const topSource = edge.top.source || {};
   const bottomSource = edge.bottom.source || {};
-  const objectId = buildSubviewAnchorObjectId(kind, identity, kind === "manual" ? "manual" : edge.edge);
+  const objectId = anchorObjectId(edge, kind, identity);
   return `data-subview-anchor-kind="${kind}" data-subview-anchor-object-id="${escapeAttr(objectId)}"
     data-subview-anchor-hit-key="${escapeAttr(edge.hitKey || "")}" data-subview-anchor-edge="${escapeAttr(edge.edge || "manual")}"
     data-subview-anchor-active="${active ? "1" : "0"}" data-subview-manual-anchor-id="${escapeAttr(edge.manualAnchorId || "")}"
@@ -228,9 +232,11 @@ function renderEvidenceAnchors(bands, activeAnchors, escapeAttr) {
     const edge = { ...band, ...points, edge: side };
     const isActive = active.has(`${band.hitKey}:${side}`);
     const attrs = anchorAttrs(edge, "evidence", band.hitKey, isActive, escapeAttr);
+    const objectId = anchorObjectId(edge, "evidence", band.hitKey);
     return `<line class="subview-anchor-line${isActive ? " is-active" : ""}" x1="${points.topX.toFixed(2)}"
       y1="${TOP_Y + BAR_HEIGHT}" x2="${points.bottomX.toFixed(2)}" y2="${BOTTOM_Y}"
-      stroke="${isActive ? "red" : "transparent"}" stroke-width="3" pointer-events="none" />
+      stroke="${isActive ? "red" : "transparent"}" stroke-width="3" pointer-events="none"
+      data-subview-anchor-object-id="${escapeAttr(objectId)}" />
       <line class="subview-anchor-hit-zone${isActive ? " is-active" : ""}" x1="${points.topX.toFixed(2)}"
       y1="${TOP_Y + BAR_HEIGHT}" x2="${points.bottomX.toFixed(2)}" y2="${BOTTOM_Y}"
       stroke="transparent" stroke-width="4" pointer-events="stroke" ${attrs} />`;
@@ -261,8 +267,10 @@ function renderManualAnchors(layout, anchors, escapeAttr) {
       manualAnchorId: anchor.manualAnchorId,
       edge: "manual",
     };
+    const objectId = anchorObjectId(edge, "manual", anchor.manualAnchorId);
     return `<line class="subview-anchor-line is-active" x1="${edge.topX.toFixed(2)}" y1="${TOP_Y + BAR_HEIGHT}"
-      x2="${edge.bottomX.toFixed(2)}" y2="${BOTTOM_Y}" stroke="red" stroke-width="3" pointer-events="none" />
+      x2="${edge.bottomX.toFixed(2)}" y2="${BOTTOM_Y}" stroke="red" stroke-width="3" pointer-events="none"
+      data-subview-anchor-object-id="${escapeAttr(objectId)}" />
       <line class="subview-anchor-hit-zone is-active" x1="${edge.topX.toFixed(2)}" y1="${TOP_Y + BAR_HEIGHT}"
       x2="${edge.bottomX.toFixed(2)}" y2="${BOTTOM_Y}" stroke="transparent" stroke-width="4"
       pointer-events="stroke" ${anchorAttrs(edge, "manual", anchor.manualAnchorId, true, escapeAttr)} />`;

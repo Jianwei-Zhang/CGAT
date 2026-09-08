@@ -288,6 +288,16 @@ test("subview title guide and candidates share one responsive first row", () => 
   assert.match(css, /\.subview-candidate-remove:focus-visible\s*\{[^}]*outline:\s*2px solid #4f82b5;/);
 });
 
+test("subview anchor endpoints share a row and wrap with the tools window", () => {
+  const css = readStylesheetTree(
+    new URL("../../../../styles/components.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(css, /\.subview-anchor-endpoints\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(112px,\s*100%\),\s*1fr\)\);/);
+  assert.doesNotMatch(css, /@media \(max-width:\s*360px\)[\s\S]*?\.subview-anchor-endpoints\s*\{/);
+});
+
 test("subview selection panel hides history controls before a pair enters", () => {
   const html = renderAssemblyPage(createState());
 

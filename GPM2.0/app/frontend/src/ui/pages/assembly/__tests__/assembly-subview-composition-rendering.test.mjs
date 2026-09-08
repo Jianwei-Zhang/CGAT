@@ -72,6 +72,7 @@ test("composition canvas keeps world positions and exposes evidence cuts from re
   assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*data-subview-rect-x="200\.00"/);
   assert.match(html, /data-subview-ruler-window-start="0\.0000"/);
   assert.match(html, /data-subview-hit-key="mixed-1"/);
+  assert.match(html, /class="subview-anchor-line"[\s\S]*data-subview-anchor-object-id="edge:mixed-1:left"/);
   assert.match(html, /data-subview-anchor-hit-key="mixed-1"[\s\S]*data-subview-anchor-top-cut-bp="100"[\s\S]*data-subview-anchor-bottom-cut-bp="300"/);
   assert.match(html, /data-subview-anchor-hit-key="mixed-1"[\s\S]*data-subview-anchor-top-cut-bp="200"[\s\S]*data-subview-anchor-bottom-cut-bp="450"/);
 });
@@ -224,6 +225,7 @@ test("composition canvas keeps baseline GRT anchors when result display is off a
 
   assert.match(html, /data-subview-composition-scene="1"/);
   assert.match(html, /data-subview-anchor-kind="grt"/);
+  assert.match(html, /class="subview-anchor-line is-active"[\s\S]*data-subview-anchor-object-id="manual:grt-copy:origin"/);
   assert.match(html, /data-subview-anchor-top-contig-id="1"/);
   assert.match(html, /data-subview-anchor-bottom-contig-id="2"/);
   assert.match(html, /data-subview-fragment-contig-id="1"/);

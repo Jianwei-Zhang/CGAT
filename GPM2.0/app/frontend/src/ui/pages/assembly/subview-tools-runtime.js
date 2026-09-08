@@ -159,6 +159,8 @@ function createSubviewToolsRuntime(host, store, deps) {
       overlay.addEventListener("input", onInput);
       overlay.addEventListener("dblclick", onDoubleClick);
       overlay.addEventListener("keydown", onKeyDown);
+      overlay.addEventListener("pointerover", onPointerOver);
+      overlay.addEventListener("pointerout", onPointerOut);
       overlay.addEventListener("pointerdown", onPointerDown);
       overlay.addEventListener("dragstart", onDragStart);
       overlay.addEventListener("dragover", onDragOver);
@@ -229,6 +231,16 @@ function createSubviewToolsRuntime(host, store, deps) {
   function onDoubleClick(event) {
     event.stopPropagation();
     deps.onDoubleClick?.(event, { host, store, scopeKey, sync });
+  }
+
+  function onPointerOver(event) {
+    event.stopPropagation();
+    deps.onPointerOver?.(event, { host, store, scopeKey, sync });
+  }
+
+  function onPointerOut(event) {
+    event.stopPropagation();
+    deps.onPointerOut?.(event, { host, store, scopeKey, sync });
   }
 
   function onKeyDown(event) {

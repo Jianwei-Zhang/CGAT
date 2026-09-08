@@ -188,3 +188,31 @@ test("content rerender restores search focus and selection", () => {
   assert.equal(rerenderedSearch.selectionEnd, 2);
   runtime.destroy();
 });
+
+test("content pointer hover events are delegated", () => {
+  const f = fixture();
+  const seen = [];
+  const row = {
+    dataset: { subviewAnchorListRow: "manual:1" },
+    closest(selector) {
+      return selector === "[data-subview-anchor-list-row]" ? this : null;
+    },
+  };
+  f.deps.onPointerOver = (event, context) => {
+    seen.push(["over", event.target.dataset.subviewAnchorListRow, Boolean(context.sync)]);
+  };
+  f.deps.onPointerOut = (event, context) => {
+    seen.push(["out", event.target.dataset.subviewAnchorListRow, Boolean(context.sync)]);
+  };
+  const runtime = bindSubviewTools(f.host, f.store, f.deps);
+  f.open();
+
+  f.nodes[0].emit("pointerover", { target: row });
+  f.nodes[0].emit("pointerout", { target: row, relatedTarget: null });
+
+  assert.deepEqual(seen, [
+    ["over", "manual:1", true],
+    ["out", "manual:1", true],
+  ]);
+  runtime.destroy();
+});

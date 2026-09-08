@@ -476,6 +476,14 @@ export function createSubviewCompositionController({
     anchorController.onInput(event, context);
   }
 
+  function onPointerOver(event, context) {
+    anchorController.onPointerOver?.(event, context);
+  }
+
+  function onPointerOut(event, context) {
+    anchorController.onPointerOut?.(event, context);
+  }
+
   function onDoubleClick(event, context) {
     const key = event.target.closest?.("[data-subview-composition-member]")
       ?.dataset.subviewCompositionMember;
@@ -612,6 +620,8 @@ export function createSubviewCompositionController({
     resetScope,
     onAction,
     onInput,
+    onPointerOver,
+    onPointerOut,
     onDoubleClick,
     onContentKeyDown,
     onDragStart,

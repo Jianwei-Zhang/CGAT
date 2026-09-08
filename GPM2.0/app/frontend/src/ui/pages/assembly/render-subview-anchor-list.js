@@ -24,12 +24,40 @@ function formatEndpoint(endpoint, labels, escapeHtml, escapeAttr) {
   </span>`;
 }
 
+function anchorDisplayPosition(object) {
+  const xs = [object?.scene?.topX, object?.scene?.bottomX]
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+  if (!xs.length) {
+    return { left: Number.POSITIVE_INFINITY, center: Number.POSITIVE_INFINITY };
+  }
+  return {
+    left: Math.min(...xs),
+    center: xs.reduce((total, value) => total + value, 0) / xs.length,
+  };
+}
+
+function sortAnchorsByDisplayPosition(objects) {
+  return objects.map((object, index) => ({ object, index }))
+    .sort((left, right) => {
+      const leftPosition = anchorDisplayPosition(left.object);
+      const rightPosition = anchorDisplayPosition(right.object);
+      if (Number.isFinite(leftPosition.left) || Number.isFinite(rightPosition.left)) {
+        if (leftPosition.left !== rightPosition.left) return leftPosition.left - rightPosition.left;
+        if (leftPosition.center !== rightPosition.center) return leftPosition.center - rightPosition.center;
+      }
+      return left.index - right.index;
+    })
+    .map((entry) => entry.object);
+}
+
 export function renderSubviewAnchorList(objects, ui, labels, { escapeHtml, escapeAttr }) {
   const visible = filterSubviewAnchorObjects(objects, ui.query);
   const checked = new Set(ui.checkedObjectIds);
-  const userObjects = visible.filter((object) => object.kind !== "grt");
+  const userObjects = sortAnchorsByDisplayPosition(visible.filter((object) => object.kind !== "grt"));
   const grtObjects = visible.filter((object) => object.kind === "grt");
   const row = (object) => {
+    const focused = ui.focusedObjectId === object.objectId;
     const type = object.kind === "manual" && object.fromGrt
       ? labels.grtCopyType
       : object.kind === "manual"
@@ -53,18 +81,17 @@ export function renderSubviewAnchorList(objects, ui, labels, { escapeHtml, escap
       : `<button type="button" class="button ghost tiny subview-anchor-delete"
           data-subview-anchor-delete="${escapeAttr(object.objectId)}"
           aria-label="${escapeAttr(labels.deleteObject)}" title="${escapeAttr(labels.deleteObject)}">×</button>`;
-    return `<div class="subview-anchor-object${object.kind === "grt" ? " is-readonly" : ""}${ui.focusedObjectId === object.objectId ? " is-focused" : ""}">
+    return `<div class="subview-anchor-object${object.kind === "grt" ? " is-readonly" : ""}${focused ? " is-focused" : ""}"
+        data-subview-anchor-list-row="${escapeAttr(object.objectId)}" tabindex="0" aria-current="${focused ? "true" : "false"}">
       ${select}
-      <button type="button" class="subview-anchor-object-main"
-        data-subview-anchor-list-row="${escapeAttr(object.objectId)}"
-        aria-pressed="${ui.focusedObjectId === object.objectId}">
+      <div class="subview-anchor-object-main">
         <span class="subview-anchor-object-type">${escapeHtml(type)}</span>
         <span class="subview-anchor-endpoints">
           ${object.endpoints.map((endpoint) => formatEndpoint(endpoint, labels, escapeHtml, escapeAttr)).join("")
             || `<span class="muted">${escapeHtml(labels.endpointDetailsUnavailable)}</span>`}
         </span>
         ${reason ? `<span class="subview-anchor-object-reason">${escapeHtml(reason)}</span>` : ""}
-      </button>
+      </div>
       ${action}
     </div>`;
   };

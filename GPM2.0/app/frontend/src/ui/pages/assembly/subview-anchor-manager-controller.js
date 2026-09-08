@@ -51,16 +51,18 @@ export function createSubviewAnchorManagerController({
     sync();
   }
 
-  function focus(host, target, objectId) {
+  function focus(host, target, objectId = "") {
+    const normalizedObjectId = String(objectId || "").trim();
     session.subviewAnchorToolsState = {
       ...session.subviewAnchorToolsState,
-      focusedObjectId: objectId,
+      focusedObjectId: normalizedObjectId,
     };
-    applySubviewAnchorFocus(host, objectId);
+    applySubviewAnchorFocus(host, normalizedObjectId);
     const manager = target?.closest?.("[data-subview-anchor-manager]");
     for (const row of manager?.querySelectorAll?.("[data-subview-anchor-list-row]") || []) {
-      const selected = row.dataset.subviewAnchorListRow === objectId;
-      row.setAttribute("aria-pressed", String(selected));
+      const selected = row.dataset.subviewAnchorListRow === normalizedObjectId;
+      row.setAttribute("aria-current", String(selected));
+      row.classList?.toggle("is-focused", selected);
       row.closest?.(".subview-anchor-object")?.classList.toggle("is-focused", selected);
     }
   }
@@ -105,14 +107,27 @@ export function createSubviewAnchorManagerController({
       updateUi({ checkedObjectIds: [...checked] }, context.sync);
       return;
     }
-    const objectId = event.target.closest("[data-subview-anchor-list-row]")?.dataset.subviewAnchorListRow;
-    if (objectId) focus(host, event.target, objectId);
   }
 
   function onInput(event, context) {
     if (event.target.matches?.("[data-subview-anchor-search]")) {
       updateUi({ query: event.target.value }, context.sync);
     }
+  }
+
+  function onPointerOver(event, context) {
+    const row = event.target.closest?.("[data-subview-anchor-list-row]");
+    const objectId = row?.dataset.subviewAnchorListRow;
+    if (!objectId) return;
+    focus(resolveRouteHost(event.target, context.host), row, objectId);
+  }
+
+  function onPointerOut(event, context) {
+    const row = event.target.closest?.("[data-subview-anchor-list-row]");
+    const objectId = row?.dataset.subviewAnchorListRow;
+    if (!objectId || row.contains?.(event.relatedTarget)) return;
+    if (session.subviewAnchorToolsState?.focusedObjectId !== objectId) return;
+    focus(resolveRouteHost(event.target, context.host), row, "");
   }
 
   function onDoubleClick(event, context) {
@@ -136,5 +151,15 @@ export function createSubviewAnchorManagerController({
     if (tab === "anchors") void enrichSubviewAnchorDescriptors(host, store);
   }
 
-  return { renderContent, resetScope, onAction, onInput, onDoubleClick, onContentKeyDown, afterRender };
+  return {
+    renderContent,
+    resetScope,
+    onAction,
+    onInput,
+    onPointerOver,
+    onPointerOut,
+    onDoubleClick,
+    onContentKeyDown,
+    afterRender,
+  };
 }

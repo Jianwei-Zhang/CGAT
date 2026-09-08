@@ -40,6 +40,7 @@ function target(dataset = {}, relationships = {}) {
       if (selector === "#route-host") return null;
       return null;
     },
+    contains(node) { return node === this || (relationships.contains || []).includes(node); },
     setAttribute(name, value) { this[name] = value; },
   };
 }
@@ -113,7 +114,7 @@ test("anchor manager renders active anchors and resets transient state per scope
   });
 });
 
-test("row focus updates in place so double click can locate without rerendering", () => {
+test("row hover updates focus in place and click does not pin the highlight", () => {
   const f = fixture();
   const wrapper = { focused: false, classList: { toggle(_name, value) { wrapper.focused = value; } } };
   const manager = { querySelectorAll: () => [row] };
@@ -122,14 +123,25 @@ test("row focus updates in place so double click can locate without rerendering"
   const context = { host: f.host, store: f.store, sync: () => { syncCount += 1; } };
 
   f.controller.onAction({ target: row }, context);
+  assert.equal(f.session.subviewAnchorToolsState.focusedObjectId, "");
+  assert.equal(f.anchorNode.focused, false);
+  assert.equal(wrapper.focused, false);
+
+  f.controller.onPointerOver({ target: row }, context);
   assert.equal(f.session.subviewAnchorToolsState.focusedObjectId, f.objectId);
   assert.equal(f.anchorNode.focused, true);
   assert.equal(wrapper.focused, true);
-  assert.equal(row["aria-pressed"], "true");
+  assert.equal(row["aria-current"], "true");
   assert.equal(syncCount, 0);
 
   f.controller.onDoubleClick({ target: row }, context);
   assert.deepEqual(f.scroll.options, { left: 200, behavior: "smooth" });
+
+  f.controller.onPointerOut({ target: row, relatedTarget: null }, context);
+  assert.equal(f.session.subviewAnchorToolsState.focusedObjectId, "");
+  assert.equal(f.anchorNode.focused, false);
+  assert.equal(wrapper.focused, false);
+  assert.equal(row["aria-current"], "false");
 });
 
 test("checkbox selection stays separate and batch deletion delegates once", async () => {

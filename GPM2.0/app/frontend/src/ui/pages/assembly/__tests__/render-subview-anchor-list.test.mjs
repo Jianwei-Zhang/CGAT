@@ -85,3 +85,43 @@ test("anchor list separates user and read-only GRT objects and disables same-lan
   assert.doesNotMatch(filtered, /data-subview-anchor-check="manual:user"/);
   assert.match(filtered, /Delete \(1\)/);
 });
+
+test("anchor list orders user anchors from left to right and renders passive cards", () => {
+  const html = renderSubviewAnchorList([
+    {
+      objectId: "manual:right",
+      kind: "manual",
+      direction: "right",
+      offsetBp: 10,
+      canDelete: true,
+      scene: { topX: 420, bottomX: 460 },
+      endpoints: [
+        { name: "right_top", cutBp: 20, sourceRole: "primary", sourceName: "hifiasm" },
+        { name: "right_bottom", cutBp: 30, sourceRole: "support", sourceName: "flye" },
+      ],
+      searchText: "right",
+    },
+    {
+      objectId: "edge:left:left",
+      kind: "evidence",
+      edge: "left",
+      canDelete: true,
+      scene: { topX: 120, bottomX: 160 },
+      endpoints: [
+        { name: "left_top", cutBp: 20, sourceRole: "primary", sourceName: "hifiasm" },
+        { name: "left_bottom", cutBp: 30, sourceRole: "support", sourceName: "flye" },
+      ],
+      searchText: "left",
+    },
+  ], {
+    query: "",
+    focusedObjectId: "edge:left:left",
+    checkedObjectIds: [],
+  }, labels, { escapeHtml: String, escapeAttr: String });
+
+  assert.ok(html.indexOf('data-subview-anchor-list-row="edge:left:left"')
+    < html.indexOf('data-subview-anchor-list-row="manual:right"'));
+  assert.match(html, /class="subview-anchor-object is-focused"[\s\S]*aria-current="true"/);
+  assert.match(html, /<div class="subview-anchor-object-main">/);
+  assert.doesNotMatch(html, /<button type="button" class="subview-anchor-object-main"/);
+});
