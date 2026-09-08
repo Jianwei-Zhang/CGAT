@@ -922,7 +922,7 @@ async function runDeleteSelectedFlow(host, store) {
   removeWorkspaceHistoryPaths(completedPaths);
 
   const nextSession = { ...store.getState().session };
-  if (deleteWithFiles && removedPaths.includes(nextSession.workspacePath)) {
+  if (deleteWithFiles && workspacePathListIncludes(removedPaths, nextSession.workspacePath)) {
     closeProjectSession(store);
     nextSession.workspacePath = "";
     nextSession.projectId = null;
@@ -945,7 +945,7 @@ async function runDeleteSelectedFlow(host, store) {
       deleteTargets: [],
       historyValidation: nextValidation,
       openWorkspacePath: deleteWithFiles
-        && removedPaths.includes(currentImporter.openWorkspacePath)
+        && workspacePathListIncludes(removedPaths, currentImporter.openWorkspacePath)
         ? ""
         : currentImporter.openWorkspacePath,
       projectError: failures.join("\n"),
@@ -1873,6 +1873,18 @@ function normalizePathList(paths) {
     }
   }
   return Array.from(deduped);
+}
+
+function workspacePathListIncludes(paths, candidatePath) {
+  const candidateIdentity = normalizeWorkspacePathIdentity(candidatePath);
+  return Boolean(candidateIdentity) && paths.some(
+    (path) => normalizeWorkspacePathIdentity(path) === candidateIdentity,
+  );
+}
+
+function normalizeWorkspacePathIdentity(value) {
+  const normalized = String(value || "").trim().replace(/\\/g, "/").replace(/\/+$/, "");
+  return /^(?:[a-z]:\/|\/\/)/i.test(normalized) ? normalized.toLowerCase() : normalized;
 }
 
 function formatTime(timestamp, locale = "zh") {

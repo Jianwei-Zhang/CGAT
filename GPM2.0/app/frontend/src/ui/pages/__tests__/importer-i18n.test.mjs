@@ -354,7 +354,7 @@ test("importer bulk delete removes only current failed history records", async (
   }
 });
 
-test("importer bulk delete optionally removes only failed workspace directories", async () => {
+test("deleting the active Windows workspace closes its project despite path spelling differences", async () => {
   const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;
   const previousSetTimeout = globalThis.setTimeout;
@@ -421,7 +421,7 @@ test("importer bulk delete optionally removes only failed workspace directories"
       summary: "",
     });
     state.session = {
-      workspacePath: "D:/ws-failed",
+      workspacePath: "d:\\WS-FAILED\\",
       projectName: "active-project",
       projectId: 42,
     };
@@ -458,6 +458,7 @@ test("importer bulk delete optionally removes only failed workspace directories"
       projectName: "",
       projectId: null,
     });
+    assert.doesNotMatch(renderImporterPage(store.getState()), /class="project-current"/);
     assert.equal(store.getState().importer.summary, "已删除 1 条记录，其中目录删除 1 条。");
     assert.match(store.getState().importer.stages[0], /已删除目录：D:\/ws-failed/);
   } finally {
