@@ -3,7 +3,7 @@ import { projectIcon } from "./project-icons.js";
 
 export function projectLabels(state) {
   return state.locale === "en" ? {
-    title: "Projects", import: "Import project", open: "Open project", recent: "Recent projects",
+    import: "Import project", open: "Open project", recent: "Recent projects",
     empty: "No projects yet", emptyHint: "Import a delivery bundle or open an existing project directory.",
     name: "Project name (optional)", nameDefault: "Use directory name", location: "Project directory",
     zip: "ZIP bundle", extracted: "Extracted directory", source: "Source", browse: "Browse",
@@ -16,7 +16,7 @@ export function projectLabels(state) {
     noOpen: "No project open", opened: "Open", rename: "Rename project", saved: "Save name",
     recentActions: "Recent project actions", lastOpened: "Last opened", created: "Created",
   } : {
-    title: "项目", import: "导入项目", open: "打开项目", recent: "最近项目",
+    import: "导入项目", open: "打开项目", recent: "最近项目",
     empty: "尚未添加项目", emptyHint: "导入交付包，或打开已有项目目录。",
     name: "项目名称（可选）", nameDefault: "使用目录名称", location: "项目目录",
     zip: "ZIP 交付包", extracted: "已解压目录", source: "来源", browse: "选择",
@@ -102,7 +102,7 @@ export function renderProjectsBody(state, { records, messages, formatTime, summa
       ${error?.ok === false ? `<p class="error-text project-recent-error">${html(error.message || error.missing?.join(", ") || messages.runtime.invalid)}</p>` : ""}
     </div>`;
   }).join("");
-  return `<header class="project-page-header"><h3>${labels.title}</h3>${empty ? "" : actions}</header>
+  return `${empty ? "" : `<header class="project-page-header">${actions}</header>`}
   ${importer.inFlight && !importer.importRunId ? `<p role="status">${html(importer.status || labels.loading)}</p>` : ""}
   ${importer.projectError && !importer.importDialogOpen ? `<p class="error-text" role="alert">${html(importer.projectError)}</p>` : ""}
   ${importer.pendingProjectPath ? `<section class="project-pending">

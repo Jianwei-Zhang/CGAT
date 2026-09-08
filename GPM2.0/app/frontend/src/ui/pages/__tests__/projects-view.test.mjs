@@ -15,7 +15,7 @@ test("empty project page places its only entry actions inside the centered empty
   assert.match(html, /<section class="project-empty"[\s\S]*id="project-import-button"[\s\S]*id="project-open-button"/);
   assert.equal((html.match(/id="project-import-button"/g) || []).length, 1);
   assert.doesNotMatch(html, /class="project-browser|class="project-recents/);
-  assert.doesNotMatch(html.split("</header>")[0], /project-import-button/);
+  assert.doesNotMatch(html, /class="project-page-header"/);
 });
 
 test("recent projects and current detail share the browser layout without duplicate entry actions", () => {
