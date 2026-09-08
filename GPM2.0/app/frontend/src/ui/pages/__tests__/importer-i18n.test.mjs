@@ -554,7 +554,7 @@ test("importer disables bulk delete when validation has no failed records", () =
     });
 
     const html = renderImporterPage(state);
-    assert.match(html, /id="delete-failed-history-button" class="button danger" disabled/);
+    assert.match(html, /id="delete-failed-history-button" class="danger" disabled/);
     assert.match(html, /一键删除失败记录（0）/);
   } finally {
     globalThis.window = previousWindow;

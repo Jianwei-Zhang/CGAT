@@ -286,7 +286,27 @@ test("Chinese project summary uses project terminology", () => {
   assert.doesNotMatch(html, /项目区|创建新项目/);
 });
 
-test("selected GRT project renders immutable recipe fields and an editable name only", () => {
+test("rename editor is tied to the exact directory and project and cancel discards its draft", async () => {
+  const project = { projectId: 7, projectName: "Original", referenceGenomeId: 1, primaryDatasetId: 11 };
+  const store = createStore(createState({
+    session: { projectId: 7 },
+    initializer: { existingProjects: [project] },
+  }));
+  const rename = createButton();
+  const cancel = createButton();
+  const host = createHost({ "#selected-project-rename-button": rename, "#selected-project-rename-cancel": cancel });
+  bindWorkspacePage(host, store);
+  await rename.click();
+  assert.match(renderWorkspacePage(store.getState()), /id="selected-project-name-input"/);
+  const otherDirectory = { ...store.getState(), session: { ...store.getState().session, workspacePath: "D:/other" } };
+  assert.doesNotMatch(renderWorkspacePage(otherDirectory), /id="selected-project-name-input"/);
+  store.setState({ initializer: { ...store.getState().initializer, editProjectNameInput: "Discarded" } });
+  await cancel.click();
+  assert.equal(store.getState().initializer.editProjectNameInput, "Original");
+  assert.doesNotMatch(renderWorkspacePage(store.getState()), /id="selected-project-name-input"/);
+});
+
+test("selected GRT project shows read-only metadata and offers on-demand renaming", () => {
   const html = renderWorkspacePage(createState({
     session: {
       projectId: 7,
@@ -315,14 +335,9 @@ test("selected GRT project renders immutable recipe fields and an editable name 
     },
   }));
 
-  assert.match(
-    html,
-    /<input\s+id="selected-project-name-input"[\s\S]*?value="project_locked"[\s\S]*?\/>/,
-  );
-  assert.doesNotMatch(
-    html.match(/<input\s+id="selected-project-name-input"[\s\S]*?\/>/)?.[0] || "",
-    /disabled/,
-  );
+  assert.match(html, /<h2>project_locked<\/h2>/);
+  assert.match(html, /id="selected-project-rename-button"/);
+  assert.doesNotMatch(html, /id="selected-project-name-input"|id="selected-project-save-button"/);
   assert.match(html, /class="workspace-recipe-summary"/);
   assert.match(html, /class="workspace-recipe-label">Reference Genome<\/span>/);
   assert.match(html, /class="workspace-recipe-value">ref_a<\/span>/);

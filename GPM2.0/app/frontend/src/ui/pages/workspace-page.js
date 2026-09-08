@@ -12,6 +12,8 @@ import { formatDateTime, formatNumber, getMessages, t as i18nT } from "../i18n/i
 import { buildEmptyProjectExportState } from "../shell/session-switchers.js";
 import { normalizeFinalPathByChr } from "./assembly/final-path-state.js";
 import { projectLabels } from "./projects-view.js";
+import { projectIcon } from "./project-icons.js";
+import { defaultProjectName } from "../../services/project-session.js";
 
 function buildEmptyAssemblyViewState(stateOrLocale) {
   return {
@@ -116,20 +118,31 @@ export function renderWorkspacePage(state) {
   const selectedProject = findProjectById(initializer.existingProjects, state.session.projectId);
   const editDraft = getEffectiveEditDraft(initializer, selectedProject);
   const editDirty = selectedProject ? isEditDirty(initializer, selectedProject, editDraft) : false;
+  const busy = state.importer?.inFlight || initializer.autoPipelineRunning || initializer.updating;
+  const renameOpen = initializer.renameProjectKey === `${state.session.workspacePath}:${selectedProject?.projectId}`;
   return `<section class="project-current">
-    <header class="page-header"><h4>${labels.details}</h4>
-      <div class="inline-input">
-        <button id="initializer-enter-assembly-button" class="button" ${!selectedProject || state.importer?.inFlight ? "disabled" : ""}>${messages.buttons.enterAssembly}</button>
-        <button id="project-close-button" class="button ghost" ${state.importer?.inFlight || initializer.autoPipelineRunning ? "disabled" : ""}>${labels.close}</button>
-      </div>
+    <header class="project-detail-header">
+      <span class="project-detail-label">${labels.details}</span>
+      <button id="project-close-button" class="button project-icon-button" title="${labels.close}" aria-label="${labels.close}" ${busy ? "disabled" : ""}>${projectIcon("close")}</button>
     </header>
-    <p class="project-path muted">${escapeHtml(state.session.workspacePath)}</p>
+    <div class="project-title-row"><h2>${escapeHtml(selectedProject?.projectName || defaultProjectName(state.session.workspacePath))}</h2>
+      ${selectedProject && !renameOpen ? `<button id="selected-project-rename-button" class="button project-icon-button" title="${labels.rename}" aria-label="${labels.rename}" ${busy ? "disabled" : ""}>${projectIcon("rename")}</button>` : ""}
+    </div>
+    <p class="project-path project-detail-path" title="${escapeAttr(state.session.workspacePath)}">${escapeHtml(state.session.workspacePath)}</p>
+    ${selectedProject && renameOpen ? `<form class="project-rename-form" data-project-rename-form>
+      <label for="selected-project-name-input">${messages.cards.projectName}</label>
+      <div class="project-rename-controls"><input id="selected-project-name-input" type="text" value="${escapeAttr(editDraft.projectName)}" ${busy ? "disabled" : ""} />
+        <button type="submit" id="selected-project-save-button" class="button project-icon-button project-primary" title="${labels.saved}" aria-label="${labels.saved}" ${busy || !editDirty ? "disabled" : ""}>${projectIcon("check")}</button>
+        <button type="button" id="selected-project-rename-cancel" class="button project-icon-button" title="${labels.cancel}" aria-label="${labels.cancel}" ${busy ? "disabled" : ""}>${projectIcon("close")}</button>
+      </div>
+    </form>` : ""}
     ${initializer.existingProjects.length > 1 ? `<label class="project-legacy-picker">${labels.legacy}
-      <select id="legacy-project-select"><option value="">${labels.legacyProjects}</option>
+      <select id="legacy-project-select" ${busy ? "disabled" : ""}><option value="">${labels.legacyProjects}</option>
         ${initializer.existingProjects.map(project => `<option value="${project.projectId}" ${selectedProject?.projectId === project.projectId ? "selected" : ""}>${escapeHtml(project.projectName)}</option>`).join("")}
       </select></label>` : ""}
-    ${selectedProject ? renderSelectedProjectCard({ initializer, selectedProject, editDraft, editDirty, locale: state.locale, messages }) : ""}
+    ${selectedProject ? renderSelectedProjectCard({ initializer, selectedProject, locale: state.locale, messages }) : ""}
     ${initializer.optionsError ? `<p class="error-text" role="alert">${escapeHtml(initializer.optionsError)}</p>` : ""}
+    <footer class="project-detail-footer"><button id="initializer-enter-assembly-button" class="button project-primary" ${!selectedProject || busy ? "disabled" : ""}>${messages.buttons.enterAssembly}${projectIcon("arrow")}</button></footer>
   </section>
   ${initializer.autoPipelineModalOpen ? renderAutoPipelineModal(initializer, messages) : ""}`;
 }
@@ -144,6 +157,34 @@ export function bindWorkspacePage(host, store) {
 
   const editProjectNameInput = host.querySelector("#selected-project-name-input");
   const saveSelectedProjectButton = host.querySelector("#selected-project-save-button");
+  const renameButton = host.querySelector("#selected-project-rename-button");
+  const cancelRenameButton = host.querySelector("#selected-project-rename-cancel");
+  const renameForm = host.querySelector("[data-project-rename-form]");
+  const renameBusy = () => store.getState().importer?.inFlight || store.getState().initializer.updating || store.getState().initializer.autoPipelineRunning;
+  renameButton?.addEventListener("click", () => {
+    if (!selectedProject || renameBusy()) return;
+    store.setState({ initializer: { ...store.getState().initializer,
+      renameProjectKey: `${state.session.workspacePath}:${selectedProject.projectId}`,
+      editProjectId: selectedProject.projectId, editProjectNameInput: selectedProject.projectName,
+    } });
+    rerender(host, store);
+    host.querySelector("#selected-project-name-input")?.focus?.();
+    host.querySelector("#selected-project-name-input")?.select?.();
+  });
+  const cancelRename = () => {
+    if (renameBusy()) return;
+    store.setState({ initializer: { ...store.getState().initializer, renameProjectKey: "", editProjectNameInput: selectedProject?.projectName || "" } });
+    rerender(host, store);
+    host.querySelector("#selected-project-rename-button")?.focus?.();
+  };
+  cancelRenameButton?.addEventListener("click", cancelRename);
+  renameForm?.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (!renameBusy()) await saveSelectedProject(host, store);
+  });
+  renameForm?.addEventListener("keydown", event => {
+    if (event.key === "Escape") { event.preventDefault(); cancelRename(); }
+  });
 
   autoPipelineCloseButton?.addEventListener("click", async () => {
     const current = store.getState().initializer;
@@ -204,7 +245,9 @@ export function bindWorkspacePage(host, store) {
     syncSelectedProjectSaveButton(saveSelectedProjectButton, nextInitializer, selectedProject);
   });
 
-  saveSelectedProjectButton?.addEventListener("click", async () => {
+  saveSelectedProjectButton?.addEventListener("click", async event => {
+    event.preventDefault?.();
+    if (renameBusy()) return;
     await saveSelectedProject(host, store);
   });
 }
@@ -291,7 +334,7 @@ function renderPipelineStepIcon(status) {
   return `<span class="pipeline-pending" aria-hidden="true">&#9675;</span>`;
 }
 
-function renderSelectedProjectCard({ initializer, selectedProject, editDraft, editDirty, locale, messages }) {
+function renderSelectedProjectCard({ initializer, selectedProject, locale, messages }) {
   const recipe = initializer.grtRecipe || {};
   const referenceName = selectedProject.referenceName
     || initializer.references.find(
@@ -300,24 +343,7 @@ function renderSelectedProjectCard({ initializer, selectedProject, editDraft, ed
     || "-";
 
   return `
-    <section class="workspace-selected-card">
-      <header class="workspace-card-header">
-        <div>
-          <h4>${escapeHtml(i18nT(locale, "workspace.cards.selectedProject", { projectName: selectedProject.projectName }))}</h4>
-          <p class="muted">${messages.page.createdAt}${escapeHtml(formatCreatedAt(selectedProject.createdAt, locale))}</p>
-        </div>
-        <button id="selected-project-save-button" class="button" ${
-          initializer.updating || !editDirty ? "disabled" : ""
-        }>${messages.buttons.save}</button>
-      </header>
-      <div class="workspace-project-name-field">
-        <label for="selected-project-name-input">${messages.cards.projectName}</label>
-        <input
-          id="selected-project-name-input"
-          type="text"
-          value="${escapeAttr(editDraft.projectName)}"
-        />
-      </div>
+    <div class="project-metadata">
       ${renderWorkspaceRecipeSummary({
         recipe: {
           ...recipe,
@@ -326,7 +352,8 @@ function renderSelectedProjectCard({ initializer, selectedProject, editDraft, ed
         messages,
         referenceName,
       })}
-    </section>
+      <p class="project-created muted">${projectLabels({ locale }).created}<span>${escapeHtml(formatCreatedAt(selectedProject.createdAt, locale))}</span></p>
+    </div>
   `;
 }
 
@@ -408,6 +435,7 @@ async function saveSelectedProject(host, store) {
       initializer: {
         ...store.getState().initializer,
         updating: false,
+        renameProjectKey: "",
         existingProjects: nextExistingProjects,
         summary: i18nT(store.getState(), "workspace.runtime.projectSaved", {
           projectName: nextProject.projectName || draft.projectName,
@@ -1190,6 +1218,8 @@ function formatCreatedAt(value, locale = "zh") {
       return formatDateTime(locale, date);
     }
   }
+  const date = new Date(raw);
+  if (!Number.isNaN(date.getTime())) return formatDateTime(locale, date);
   return raw;
 }
 

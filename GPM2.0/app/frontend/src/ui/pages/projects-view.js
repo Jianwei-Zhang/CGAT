@@ -1,4 +1,5 @@
 import { defaultProjectName } from "../../services/project-session.js";
+import { projectIcon } from "./project-icons.js";
 
 export function projectLabels(state) {
   return state.locale === "en" ? {
@@ -12,6 +13,8 @@ export function projectLabels(state) {
     remove: "Remove from recent", delete: "Delete project files", more: "Project actions",
     selectFirst: "Open a project first", loading: "Opening project...", deleteFailed: "Deletion failed",
     relocate: "Locate directory", sourceLocation: "Project location", legacyProjects: "Legacy projects",
+    noOpen: "No project open", opened: "Open", rename: "Rename project", saved: "Save name",
+    recentActions: "Recent project actions", lastOpened: "Last opened", created: "Created",
   } : {
     title: "项目", import: "导入项目", open: "打开项目", recent: "最近项目",
     empty: "尚未添加项目", emptyHint: "导入交付包，或打开已有项目目录。",
@@ -23,6 +26,8 @@ export function projectLabels(state) {
     remove: "移除最近记录", delete: "删除项目文件", more: "项目操作",
     selectFirst: "请先打开项目", loading: "正在打开项目...", deleteFailed: "删除失败",
     relocate: "重新定位目录", sourceLocation: "项目位置", legacyProjects: "旧版项目",
+    noOpen: "尚未打开项目", opened: "已打开", rename: "重命名项目", saved: "保存名称",
+    recentActions: "最近项目操作", lastOpened: "上次打开", created: "创建时间",
   };
 }
 
@@ -47,18 +52,18 @@ export function renderProjectImportDialog(state, messages) {
       <label for="${extracted ? "extracted-path-input" : "zip-path-input"}">${extracted ? labels.extracted : labels.zip}</label>
       <div class="inline-input">
         <input id="${extracted ? "extracted-path-input" : "zip-path-input"}" value="${html(source)}" required />
-        <button type="button" id="${extracted ? "pick-extracted-button" : "pick-zip-button"}" class="button ghost">${labels.browse}</button>
+        <button type="button" id="${extracted ? "pick-extracted-button" : "pick-zip-button"}" class="button ghost" title="${labels.browse}" aria-label="${labels.browse}">${projectIcon("open")}</button>
       </div>
       ${extracted ? `<p class="project-path muted">${messages.page.importExtractedRule}</p>` : `
         <label for="zip-workspace-root-input">${messages.page.workspaceDir}</label>
         <div class="inline-input"><input id="zip-workspace-root-input" value="${html(directory)}" required />
-          <button type="button" id="pick-zip-workspace-button" class="button ghost">${labels.browse}</button></div>`}
+          <button type="button" id="pick-zip-workspace-button" class="button ghost" title="${labels.browse}" aria-label="${labels.browse}">${projectIcon("open")}</button></div>`}
       <label for="import-project-name">${labels.name}</label>
       <input id="import-project-name" value="${html(importer.projectNameInput)}" placeholder="${html(directory ? defaultProjectName(directory) : labels.nameDefault)}" />
       ${importer.projectError ? `<p class="error-text" role="alert">${html(importer.projectError)}</p>` : ""}
       <footer class="project-dialog-actions">
         <button type="button" data-project-import-close class="button ghost">${labels.cancel}</button>
-        <button type="submit" id="${extracted ? "import-extracted-start-button" : "import-zip-start-button"}" class="button" ${ready ? "" : "disabled"}>${labels.submit}</button>
+        <button type="submit" id="${extracted ? "import-extracted-start-button" : "import-zip-start-button"}" class="button project-primary" ${ready ? "" : "disabled"}>${labels.submit}</button>
       </footer>
     </form>
   </div>`;
@@ -69,16 +74,24 @@ export function renderProjectsBody(state, { records, messages, formatTime, summa
   const importer = state.importer;
   const busy = importer.inFlight || state.initializer?.autoPipelineRunning;
   const disabled = busy ? "disabled" : "";
+  const empty = !records.length && !state.session?.workspacePath;
+  const actions = `<div class="project-entry-actions">
+    <button id="project-import-button" class="button ${empty ? "project-primary" : "ghost"}" ${disabled}>${projectIcon("import")}${labels.import}</button>
+    <button id="project-open-button" class="button ghost" ${disabled}>${projectIcon("open")}${labels.open}</button>
+  </div>`;
+  const failed = records.filter(record => importer.historyValidation?.[record.path]?.ok === false).length;
   const rows = records.map((record, index) => {
     const active = state.session?.workspacePath === record.path;
     const error = importer.historyValidation?.[record.path];
     const name = (active && state.session?.projectName) || record.projectName || defaultProjectName(record.path);
     return `<div class="project-recent-row ${active ? "is-active" : ""}" data-workspace-history-row-path="${html(record.path)}">
-      <button class="project-recent-open" data-recent-index="${index}" data-recent-path="${html(record.path)}" ${disabled}>
-        <strong>${html(name)}</strong>${renderAddPackageHint(state, importer.addPackageHintsByWorkspacePath?.[record.path])}<span class="project-path muted">${html(record.path)}</span>
+      <button class="project-recent-open" data-recent-index="${index}" data-recent-path="${html(record.path)}" aria-current="${active ? "true" : "false"}" title="${html(record.path)}" ${disabled}>
+        <span class="project-recent-name">${projectIcon("folder")}<strong>${html(name)}</strong></span>
+        <span class="project-path muted">${html(record.path)}</span>
+        <span class="project-recent-time muted">${active ? `<span class="project-open-status">${labels.opened}</span>` : ""}${html(formatTime(record.lastUsedAt, state.locale))}</span>
+        ${renderAddPackageHint(state, importer.addPackageHintsByWorkspacePath?.[record.path])}
       </button>
-      <span class="project-recent-time muted">${html(formatTime(record.lastUsedAt, state.locale))}</span>
-      <details class="project-row-menu"><summary aria-label="${labels.more}" title="${labels.more}">&#8942;</summary>
+      <details class="project-row-menu"><summary aria-label="${labels.more}" title="${labels.more}">${projectIcon("more")}</summary>
         <div class="project-row-menu-items">
           <button data-project-relocate="${html(record.path)}" ${disabled}>${labels.relocate}</button>
           <button data-workspace-import-add-package-path="${html(record.path)}" ${disabled}>${messages.buttons.importAddPackage}</button>
@@ -89,22 +102,27 @@ export function renderProjectsBody(state, { records, messages, formatTime, summa
       ${error?.ok === false ? `<p class="error-text project-recent-error">${html(error.message || error.missing?.join(", ") || messages.runtime.invalid)}</p>` : ""}
     </div>`;
   }).join("");
-  return `<header class="page-header project-page-header">
-    <h3>${labels.title}</h3><div class="inline-input">
-      <button id="project-import-button" class="button" ${disabled}>${labels.import}</button>
-      <button id="project-open-button" class="button ghost" ${disabled}>${labels.open}</button>
-    </div>
-  </header>
+  return `<header class="project-page-header"><h3>${labels.title}</h3>${empty ? "" : actions}</header>
   ${importer.inFlight && !importer.importRunId ? `<p role="status">${html(importer.status || labels.loading)}</p>` : ""}
   ${importer.projectError && !importer.importDialogOpen ? `<p class="error-text" role="alert">${html(importer.projectError)}</p>` : ""}
   ${importer.pendingProjectPath ? `<section class="project-pending">
     <strong>${labels.pending}</strong><span class="project-path">${html(importer.pendingProjectPath)}</span>
     <button id="project-retry-button" class="button" ${disabled}>${labels.retry}</button></section>` : ""}
-  ${summaryHtml}
-  ${records.length ? `<section class="project-recents"><header class="page-header">
-    <h4>${labels.recent}</h4><button id="validate-history-button" class="button ghost tiny" ${disabled}>${messages.buttons.validateHistory}</button>
-    ${records.some(record => importer.historyValidation?.[record.path]) ? `<button id="delete-failed-history-button" class="button danger" ${busy || !records.some(record => importer.historyValidation?.[record.path]?.ok === false) ? "disabled" : ""}>${messages.buttons.deleteFailedRecords.replace("{count}", records.filter(record => importer.historyValidation?.[record.path]?.ok === false).length)}</button>` : ""}
-    </header><div class="project-recent-list">${rows}</div></section>`
-    : !state.session?.workspacePath ? `<section class="project-empty"><h4>${labels.empty}</h4><p class="muted">${labels.emptyHint}</p></section>` : ""}
+  ${empty ? `<section class="project-empty" aria-labelledby="project-empty-title">
+    <span class="project-empty-symbol">${projectIcon("folder")}</span>
+    <h4 id="project-empty-title">${labels.empty}</h4>${actions}
+  </section>` : `<div class="project-browser ${records.length ? "" : "without-recents"}">
+    ${records.length ? `<section class="project-recents" aria-labelledby="project-recents-title">
+      <header class="project-recents-header"><h4 id="project-recents-title">${labels.recent}<span class="project-count">${records.length}</span></h4>
+        <details class="project-row-menu"><summary aria-label="${labels.recentActions}" title="${labels.recentActions}">${projectIcon("more")}</summary>
+          <div class="project-row-menu-items">
+            <button id="validate-history-button" ${disabled}>${messages.buttons.validateHistory}</button>
+            ${records.some(record => importer.historyValidation?.[record.path]) ? `<button id="delete-failed-history-button" class="danger" ${busy || !failed ? "disabled" : ""}>${messages.buttons.deleteFailedRecords.replace("{count}", failed)}</button>` : ""}
+          </div>
+        </details>
+      </header><div class="project-recent-list">${rows}</div>
+    </section>` : ""}
+    ${summaryHtml || `<section class="project-empty project-no-selection"><span class="project-empty-symbol">${projectIcon("open")}</span><h4>${labels.noOpen}</h4></section>`}
+  </div>`}
   ${renderProjectImportDialog(state, messages)}`;
 }
