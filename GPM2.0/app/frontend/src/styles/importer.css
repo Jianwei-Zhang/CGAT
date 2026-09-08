@@ -345,3 +345,45 @@
     transition: none;
   }
 }
+.projects-page { max-width: 1100px; margin-inline: auto; gap: 24px; }
+.project-page-header, .project-recents > header, .project-current > header { flex-wrap: wrap; gap: 12px; }
+.project-page-header h3, .project-current h4, .project-recents h4 { margin: 0; }
+.project-current, .project-recents { min-width: 0; padding-block: 16px; border-top: 1px solid #d7dee3; }
+.project-current .workspace-selected-card { display: grid; gap: 12px; padding: 0; background: transparent; border: 0; box-shadow: none; }
+.project-path, .project-current .workspace-recipe-value { overflow-wrap: anywhere; }
+.project-recent-list { margin-top: 12px; }
+.project-recent-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto 32px; gap: 8px 16px; align-items: center; padding: 12px 8px; border-bottom: 1px solid #e1e6e9; }
+.project-recent-row.is-active { background: #edf5f3; }
+.project-recent-open { display: grid; min-width: 0; gap: 5px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.project-recent-error { grid-column: 1 / -1; margin: 0; overflow-wrap: anywhere; }
+.project-row-menu > summary { display: grid; place-items: center; width: 30px; height: 30px; list-style: none; cursor: pointer; font-size: 20px; }
+.project-row-menu > summary::-webkit-details-marker { display: none; }
+.project-row-menu[open] { z-index: 5; }
+.project-row-menu-items { position: absolute; right: 8px; z-index: 5; display: grid; width: 190px; padding: 4px; border: 1px solid #cbd5dc; border-radius: 4px; background: white; box-shadow: 0 4px 12px #0002; }
+.project-row-menu-items button { padding: 9px 12px; border: 0; background: transparent; text-align: left; font: inherit; cursor: pointer; }
+.project-row-menu-items button:hover { background: #edf2f5; }
+.project-empty { display: grid; justify-items: center; align-content: center; min-height: 260px; padding: 24px; text-align: center; }
+.project-empty h4 { margin-bottom: 0; font-size: 18px; }
+.project-import-dialog { display: grid; box-sizing: border-box; gap: 10px; width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; border-radius: 6px; background: white; }
+.project-import-dialog h3 { margin: 0 0 8px; font-size: 18px; }
+.project-import-dialog input:not([type="radio"]) { min-width: 0; box-sizing: border-box; width: 100%; }
+.project-import-dialog .inline-input { flex-wrap: nowrap; min-width: 0; }
+.project-import-dialog .inline-input > input { flex: 1 1 0; }
+.project-import-dialog .inline-input > button { flex: 0 0 auto; }
+.project-import-dialog label { font-size: 13px; }
+.project-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.project-source-switch { display: flex; flex-wrap: wrap; gap: 16px; margin: 0 0 8px; padding: 0; border: 0; }
+.project-source-switch legend { margin-bottom: 8px; font-size: 13px; }
+.project-source-switch label { display: flex; gap: 6px; align-items: center; }
+.project-legacy-picker, .project-pending { display: grid; gap: 8px; margin-block: 16px; }
+.project-legacy-picker select { max-width: 100%; }
+.project-pending { border-left: 3px solid #bd8c2d; padding-left: 12px; }
+.project-pending .button { justify-self: start; }
+.importer-import-progress-log > summary { cursor: pointer; padding: 8px 0; }
+@media (max-width: 600px) {
+  .project-recent-row { grid-template-columns: minmax(0, 1fr) 32px; }
+  .project-recent-time { grid-column: 1; grid-row: 2; padding-left: 6px; font-size: 12px; }
+  .project-row-menu { grid-column: 2; grid-row: 1; }
+  .project-import-dialog { padding: 16px; }
+  .project-current .workspace-recipe-grid { grid-template-columns: minmax(0, 1fr); }
+}

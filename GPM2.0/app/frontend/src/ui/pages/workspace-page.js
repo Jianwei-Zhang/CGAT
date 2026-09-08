@@ -3,21 +3,15 @@ import {
   autoOrientContigs,
   autoOrientContigsForDataset,
   bootstrapProjectAssembly,
-  deleteProject,
-  initializeProject,
   listProjectInitializerOptions,
   requestAutoPipelineCancel,
   setProjectAutoPipelineDone,
   updateProject,
 } from "../../services/workflow-api.js";
 import { formatDateTime, formatNumber, getMessages, t as i18nT } from "../i18n/index.js";
-import {
-  rememberAssemblyState,
-  restoreAssemblyState,
-} from "../shell/assembly-session-cache.js";
 import { buildEmptyProjectExportState } from "../shell/session-switchers.js";
 import { normalizeFinalPathByChr } from "./assembly/final-path-state.js";
-import { normalizeGrtProjectView } from "./assembly/grt-state.js";
+import { projectLabels } from "./projects-view.js";
 
 function buildEmptyAssemblyViewState(stateOrLocale) {
   return {
@@ -118,70 +112,26 @@ const AUTO_PIPELINE_CANCEL_ERROR = "__AUTO_PIPELINE_CANCELLED__";
 export function renderWorkspacePage(state) {
   const initializer = state.initializer;
   const messages = getMessages(state, "workspace");
+  const labels = projectLabels(state);
   const selectedProject = findProjectById(initializer.existingProjects, state.session.projectId);
-  const canEnterAssembly = Boolean(selectedProject?.projectId);
   const editDraft = getEffectiveEditDraft(initializer, selectedProject);
   const editDirty = selectedProject ? isEditDirty(initializer, selectedProject, editDraft) : false;
-
-  const existingProjectList = initializer.existingProjects.length
-    ? initializer.existingProjects
-        .map(
-          (project) =>
-            `<div class="project-list-row">
-              <button class="list-item-button project-select-button ${
-                state.session.projectId === project.projectId ? "is-active" : ""
-              }" data-project-select-id="${project.projectId}" data-project-name="${escapeAttr(
-                project.projectName,
-              )}">
-                ${escapeHtml(project.projectName)}
-                <span class="muted">${messages.page.createdAt}${escapeHtml(formatCreatedAt(project.createdAt, state.locale))}</span>
-              </button>
-              <button class="button tiny icon-button danger" title="${escapeAttr(messages.buttons.deleteProject)}" data-project-delete-id="${project.projectId}" data-project-name="${escapeAttr(project.projectName)}">&#128465;</button>
-            </div>`,
-        )
-        .join("")
-    : messages.runtime.emptyProjects;
-
-  return `
-    <section class="page">
-      <header class="page-header">
-        <div>
-          <p class="kicker">${messages.page.kicker}</p>
-          <h3>${messages.page.title}</h3>
-        </div>
-        <div class="inline-input">
-          <button id="initializer-open-create-modal-button" class="button">${messages.buttons.createProject}</button>
-          <button id="initializer-enter-assembly-button" class="button ghost" ${
-            canEnterAssembly ? "" : "disabled"
-          }>${messages.buttons.enterAssembly}</button>
-        </div>
-      </header>
-
-      <div class="card-grid two">
-        <article class="card workspace-existing-card">
-          <h4>${messages.cards.existingProjects}</h4>
-          <div class="list ${initializer.existingProjects.length ? "" : "muted"}">${existingProjectList}</div>
-        </article>
-        ${
-          selectedProject
-            ? renderSelectedProjectCard({
-                initializer,
-                selectedProject,
-                editDraft,
-                editDirty,
-                locale: state.locale,
-                messages,
-              })
-            : ""
-        }
+  return `<section class="project-current">
+    <header class="page-header"><h4>${labels.details}</h4>
+      <div class="inline-input">
+        <button id="initializer-enter-assembly-button" class="button" ${!selectedProject || state.importer?.inFlight ? "disabled" : ""}>${messages.buttons.enterAssembly}</button>
+        <button id="project-close-button" class="button ghost" ${state.importer?.inFlight || initializer.autoPipelineRunning ? "disabled" : ""}>${labels.close}</button>
       </div>
-
-      <p class="muted">${escapeHtml(initializer.summary)}</p>
-      ${initializer.optionsError ? `<p class="error-text">${escapeHtml(initializer.optionsError)}</p>` : ""}
-    </section>
-    ${initializer.createModalOpen ? renderCreateProjectModal(initializer, messages) : ""}
-    ${initializer.autoPipelineModalOpen ? renderAutoPipelineModal(initializer, messages) : ""}
-  `;
+    </header>
+    <p class="project-path muted">${escapeHtml(state.session.workspacePath)}</p>
+    ${initializer.existingProjects.length > 1 ? `<label class="project-legacy-picker">${labels.legacy}
+      <select id="legacy-project-select"><option value="">${labels.legacyProjects}</option>
+        ${initializer.existingProjects.map(project => `<option value="${project.projectId}" ${selectedProject?.projectId === project.projectId ? "selected" : ""}>${escapeHtml(project.projectName)}</option>`).join("")}
+      </select></label>` : ""}
+    ${selectedProject ? renderSelectedProjectCard({ initializer, selectedProject, editDraft, editDirty, locale: state.locale, messages }) : ""}
+    ${initializer.optionsError ? `<p class="error-text" role="alert">${escapeHtml(initializer.optionsError)}</p>` : ""}
+  </section>
+  ${initializer.autoPipelineModalOpen ? renderAutoPipelineModal(initializer, messages) : ""}`;
 }
 
 export function bindWorkspacePage(host, store) {
@@ -189,47 +139,11 @@ export function bindWorkspacePage(host, store) {
   const initializer = state.initializer;
   const selectedProject = findProjectById(initializer.existingProjects, state.session.projectId);
 
-  const openCreateModalButton = host.querySelector("#initializer-open-create-modal-button");
-  const createModalCloseButton = host.querySelector("#initializer-create-modal-close-button");
-  const createModalCancelButton = host.querySelector("#initializer-create-modal-cancel-button");
-  const createProjectConfirmButton = host.querySelector("#initializer-create-project-confirm-button");
   const autoPipelineCloseButton = host.querySelector("#initializer-auto-pipeline-close-button");
   const enterAssemblyButton = host.querySelector("#initializer-enter-assembly-button");
 
-  const createProjectNameInput = host.querySelector("#initializer-project-name-input");
-  const createPhasedAssemblyCheckbox = host.querySelector(
-    "#initializer-phased-assembly-enabled-input",
-  );
-
-  const projectSelectButtons = host.querySelectorAll("[data-project-select-id]");
-  const projectDeleteButtons = host.querySelectorAll("[data-project-delete-id]");
-
   const editProjectNameInput = host.querySelector("#selected-project-name-input");
   const saveSelectedProjectButton = host.querySelector("#selected-project-save-button");
-
-  openCreateModalButton?.addEventListener("click", () => {
-    const current = store.getState().initializer;
-    store.setState({
-      initializer: {
-        ...current,
-        createModalOpen: true,
-        optionsError: "",
-        phasedAssemblyEnabledInput: false,
-      },
-    });
-    rerender(host, store);
-  });
-
-  createModalCloseButton?.addEventListener("click", () => {
-    closeCreateModal(host, store);
-  });
-  createModalCancelButton?.addEventListener("click", () => {
-    closeCreateModal(host, store);
-  });
-
-  createProjectConfirmButton?.addEventListener("click", async () => {
-    await createProject(host, store);
-  });
 
   autoPipelineCloseButton?.addEventListener("click", async () => {
     const current = store.getState().initializer;
@@ -274,99 +188,7 @@ export function bindWorkspacePage(host, store) {
       return;
     }
     store.setState({ activeRoute: "assembly" });
-    window.dispatchEvent(new Event("gpm-next:route-refresh"));
-  });
-
-  createProjectNameInput?.addEventListener("input", (event) => {
-    const current = store.getState().initializer;
-    store.setState({
-      initializer: {
-        ...current,
-        projectNameInput: String(event.target.value || "").trim(),
-      },
-    });
-  });
-
-  createPhasedAssemblyCheckbox?.addEventListener("change", (event) => {
-    const current = store.getState().initializer;
-    store.setState({
-      initializer: {
-        ...current,
-        phasedAssemblyEnabledInput: Boolean(event.target.checked),
-      },
-    });
-  });
-
-  projectSelectButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      const projectId = Number(button.dataset.projectSelectId || 0);
-      const selected = findProjectById(store.getState().initializer.existingProjects, projectId);
-      if (!selected) {
-        return;
-      }
-      const currentState = store.getState();
-      rememberAssemblyState(currentState);
-      const nextDraft = buildEditDraftFromProject(selected);
-      const nextSession = {
-        ...currentState.session,
-        projectId: selected.projectId,
-        projectName: selected.projectName || "",
-      };
-      const fallbackAssembly = {
-        ...currentState.assembly,
-        ...buildEmptyAssemblyViewState(currentState),
-      };
-      const nextAssembly = restoreAssemblyState(
-        {
-          ...currentState,
-          session: nextSession,
-        },
-        fallbackAssembly,
-      );
-      store.setState({
-        session: nextSession,
-        initializer: {
-          ...currentState.initializer,
-          summary: i18nT(currentState, "workspace.runtime.selectedProjectSummary", {
-            projectName: selected.projectName,
-            createdAt: formatCreatedAt(selected.createdAt, currentState.locale),
-          }),
-          optionsError: "",
-          editProjectId: selected.projectId,
-          editProjectNameInput: nextDraft.projectName,
-          editReferenceId: String(nextDraft.referenceGenomeId),
-          editPrimaryDatasetId: String(nextDraft.primaryDatasetId),
-          editSupportDatasetIds: [...nextDraft.supportDatasetIds],
-          editChrAssignmentMinCoveragePercentInput: String(
-            nextDraft.chrAssignmentMinCoveragePercent,
-          ),
-          editPhasedAssemblyEnabledInput: nextDraft.phasedAssemblyEnabled,
-        },
-        assembly: nextAssembly,
-      });
-      rerender(host, store);
-    });
-  });
-
-  projectDeleteButtons.forEach((button) => {
-    button.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      const projectId = Number(button.dataset.projectDeleteId || 0);
-      const projectName = String(button.dataset.projectName || "");
-      if (!projectId) {
-        return;
-      }
-      const confirmed = window.confirm(
-        i18nT(store.getState(), "workspace.prompts.deleteProjectConfirm", {
-          projectName: projectName || projectId,
-          projectId,
-        }),
-      );
-      if (!confirmed) {
-        return;
-      }
-      await runDeleteProject(host, store, projectId, projectName);
-    });
+    globalThis.window?.dispatchEvent?.(new Event("gpm-next:route-refresh"));
   });
 
   editProjectNameInput?.addEventListener("input", (event) => {
@@ -385,54 +207,6 @@ export function bindWorkspacePage(host, store) {
   saveSelectedProjectButton?.addEventListener("click", async () => {
     await saveSelectedProject(host, store);
   });
-}
-
-function closeCreateModal(host, store) {
-  const current = store.getState().initializer;
-  store.setState({
-    initializer: {
-      ...current,
-      createModalOpen: false,
-    },
-  });
-  rerender(host, store);
-}
-
-function renderCreateProjectModal(initializer, messages) {
-  const recipe = initializer.grtRecipe || {};
-  return `
-    <div class="modal-overlay">
-      <article class="card modal-dialog workspace-create-dialog">
-        <header class="workspace-card-header">
-          <h4>${messages.cards.createNewProject}</h4>
-          <button id="initializer-create-modal-close-button" class="button ghost" type="button">${messages.buttons.close}</button>
-        </header>
-        <div class="workspace-project-name-field">
-          <label for="initializer-project-name-input">${messages.cards.projectName}</label>
-          <input id="initializer-project-name-input" type="text" placeholder="${escapeAttr(messages.page.projectNamePlaceholder)}" value="${escapeAttr(initializer.projectNameInput)}" />
-        </div>
-        ${renderWorkspaceRecipeSummary({ recipe, messages })}
-        <label class="workspace-create-option">
-          <span class="workspace-create-option-copy">
-            <span class="workspace-create-option-title">${messages.cards.phasedAssemblyEnabled}</span>
-            <span class="muted">${messages.cards.phasedAssemblyEnabledHint}</span>
-          </span>
-          <input
-            id="initializer-phased-assembly-enabled-input"
-            type="checkbox"
-            role="switch"
-            ${initializer.phasedAssemblyEnabledInput ? "checked" : ""}
-          />
-        </label>
-        <footer class="workspace-card-actions">
-          <button id="initializer-create-modal-cancel-button" class="button ghost" type="button">${messages.buttons.cancel}</button>
-          <button id="initializer-create-project-confirm-button" class="button" ${
-            initializer.creating ? "disabled" : ""
-          } type="button">${messages.buttons.createProject}</button>
-        </footer>
-      </article>
-    </div>
-  `;
 }
 
 function renderWorkspaceRecipeSummary({ recipe = {}, messages, referenceName = "" }) {
@@ -526,7 +300,7 @@ function renderSelectedProjectCard({ initializer, selectedProject, editDraft, ed
     || "-";
 
   return `
-    <article class="card workspace-selected-card">
+    <section class="workspace-selected-card">
       <header class="workspace-card-header">
         <div>
           <h4>${escapeHtml(i18nT(locale, "workspace.cards.selectedProject", { projectName: selectedProject.projectName }))}</h4>
@@ -552,99 +326,8 @@ function renderSelectedProjectCard({ initializer, selectedProject, editDraft, ed
         messages,
         referenceName,
       })}
-    </article>
+    </section>
   `;
-}
-
-async function createProject(host, store) {
-  const state = store.getState();
-  const workspaceRoot = state.session.workspacePath;
-  const initializer = state.initializer;
-
-  if (!workspaceRoot) {
-    store.setState({
-      initializer: {
-        ...initializer,
-        optionsError: i18nT(state, "workspace.runtime.workspaceRequired"),
-      },
-    });
-    rerender(host, store);
-    return;
-  }
-
-  if (!initializer.projectNameInput) {
-    store.setState({
-      initializer: {
-        ...initializer,
-        optionsError: i18nT(state, "workspace.runtime.requiredFields"),
-      },
-    });
-    rerender(host, store);
-    return;
-  }
-
-  store.setState({
-    initializer: {
-      ...initializer,
-      creating: true,
-      optionsError: "",
-      summary: i18nT(state, "workspace.runtime.creatingProject"),
-    },
-  });
-  rerender(host, store);
-
-  try {
-    const result = await initializeProject({
-      workspaceRoot,
-      projectName: initializer.projectNameInput,
-      phasedAssemblyEnabled: Boolean(initializer.phasedAssemblyEnabledInput),
-    });
-    const selectedProject = findProjectById(result.existingProjects || [], result.projectId);
-    const nextDraft = buildEditDraftFromProject(selectedProject);
-    const grtProjectView = normalizeGrtProjectView(result.grtProjectView);
-
-    store.setState({
-      session: {
-        ...state.session,
-        projectId: result.projectId,
-        projectName: result.projectName,
-      },
-      initializer: {
-        ...store.getState().initializer,
-        creating: false,
-        createModalOpen: false,
-        existingProjects: result.existingProjects,
-        summary: i18nT(store.getState(), "workspace.runtime.projectCreated", {
-          projectName: result.projectName,
-        }),
-        editProjectId: selectedProject?.projectId ?? null,
-        editProjectNameInput: nextDraft.projectName,
-        editReferenceId: String(nextDraft.referenceGenomeId),
-        editPrimaryDatasetId: String(nextDraft.primaryDatasetId),
-        editSupportDatasetIds: [...nextDraft.supportDatasetIds],
-        editChrAssignmentMinCoveragePercentInput: String(nextDraft.chrAssignmentMinCoveragePercent),
-        editPhasedAssemblyEnabledInput: nextDraft.phasedAssemblyEnabled,
-      },
-      assembly: {
-        ...store.getState().assembly,
-        ...buildEmptyAssemblyViewState(store.getState()),
-        finalPathByChr: normalizeFinalPathByChr(grtProjectView.baselineFinalPathByChr),
-        grtProjectView,
-      },
-      projectExport: buildEmptyProjectExportState(),
-    });
-  } catch (error) {
-    store.setState({
-      initializer: {
-        ...store.getState().initializer,
-        creating: false,
-        optionsError: String(error.message || error),
-        summary: i18nT(store.getState(), "workspace.runtime.projectCreateFailed"),
-      },
-    });
-  }
-
-  rerender(host, store);
 }
 
 async function saveSelectedProject(host, store) {
@@ -1200,7 +883,7 @@ async function runAutoPipelineBeforeAssembly(host, store, project) {
       },
       activeRoute: "assembly",
     });
-    window.dispatchEvent(new Event("gpm-next:route-refresh"));
+    globalThis.window?.dispatchEvent?.(new Event("gpm-next:route-refresh"));
   } catch (error) {
     const failedMessage = String(error.message || error);
     const normalizedMessage = failedMessage.toLowerCase();
@@ -1256,86 +939,6 @@ async function runAutoPipelineBeforeAssembly(host, store, project) {
     return;
   }
 
-  rerender(host, store);
-}
-
-async function runDeleteProject(host, store, projectId, projectName) {
-  const state = store.getState();
-  const workspaceRoot = state.session.workspacePath;
-  if (!workspaceRoot) {
-    store.setState({
-      initializer: {
-        ...state.initializer,
-        optionsError: i18nT(state, "workspace.runtime.workspaceRequired"),
-      },
-    });
-    rerender(host, store);
-    return;
-  }
-
-  store.setState({
-    initializer: {
-      ...state.initializer,
-      optionsError: "",
-      summary: i18nT(state, "workspace.runtime.deletingProject", {
-        projectName: projectName || projectId,
-      }),
-    },
-  });
-  rerender(host, store);
-
-  try {
-    const result = await deleteProject({ workspaceRoot, projectId });
-    const latestState = store.getState();
-    const isDeletedCurrent = Number(latestState.session.projectId) === Number(projectId);
-    const existingProjects = Array.isArray(result.existingProjects)
-      ? result.existingProjects
-      : latestState.initializer.existingProjects.filter(
-          (project) => Number(project.projectId) !== Number(projectId),
-        );
-    store.setState({
-      session: isDeletedCurrent
-        ? {
-            ...latestState.session,
-            projectId: null,
-            projectName: "",
-          }
-        : latestState.session,
-      initializer: {
-        ...latestState.initializer,
-        existingProjects,
-        summary: i18nT(store.getState(), "workspace.runtime.projectDeleted", {
-          projectName: projectName || projectId,
-        }),
-        editProjectId: isDeletedCurrent ? null : latestState.initializer.editProjectId,
-        editProjectNameInput: isDeletedCurrent ? "" : latestState.initializer.editProjectNameInput,
-        editReferenceId: isDeletedCurrent ? "" : latestState.initializer.editReferenceId,
-        editPrimaryDatasetId: isDeletedCurrent ? "" : latestState.initializer.editPrimaryDatasetId,
-        editSupportDatasetIds: isDeletedCurrent ? [] : latestState.initializer.editSupportDatasetIds,
-        editChrAssignmentMinCoveragePercentInput: isDeletedCurrent
-          ? "60"
-          : latestState.initializer.editChrAssignmentMinCoveragePercentInput,
-        editPhasedAssemblyEnabledInput: isDeletedCurrent
-          ? false
-          : latestState.initializer.editPhasedAssemblyEnabledInput,
-      },
-      assembly: {
-        ...latestState.assembly,
-        ...(isDeletedCurrent ? buildEmptyAssemblyViewState(latestState) : {}),
-      },
-      projectExport: Number(latestState.projectExport?.projectId || 0) === Number(projectId)
-        ? buildEmptyProjectExportState()
-        : latestState.projectExport,
-    });
-  } catch (error) {
-    store.setState({
-      initializer: {
-        ...store.getState().initializer,
-        optionsError: String(error.message || error),
-        summary: i18nT(store.getState(), "workspace.runtime.projectDeleteFailed"),
-      },
-    });
-  }
   rerender(host, store);
 }
 
@@ -1595,8 +1198,7 @@ function rerender(host, store) {
   if (!routeHost) {
     return;
   }
-  routeHost.innerHTML = renderWorkspacePage(store.getState());
-  bindWorkspacePage(routeHost, store);
+  globalThis.window?.dispatchEvent?.(new Event("gpm-next:route-refresh"));
   syncSessionHeader(store);
 }
 

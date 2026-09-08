@@ -61,8 +61,9 @@ export async function openWorkspace({ workspaceRoot }) {
     return await callDevBridge("/api/open-workspace", {
       workspaceRoot,
     });
-  } catch {
-    // fallback to existing behavior in browser preview
+  } catch (error) {
+    if (error?.source === "dev-bridge") throw error;
+    // Offline browser preview has no bridge.
   }
   return listProjectInitializerOptionsMock({ workspaceRoot });
 }
@@ -89,8 +90,9 @@ export async function deleteWorkspaceDirectory({ workspaceRoot }) {
     return await callDevBridge("/api/delete-workspace-directory", {
       workspaceRoot,
     });
-  } catch {
-    // fallback to mock flow
+  } catch (error) {
+    if (error?.source === "dev-bridge") throw error;
+    // Offline browser preview has no bridge.
   }
   return deleteWorkspaceDirectoryMock({ workspaceRoot });
 }
@@ -113,8 +115,9 @@ export async function initializeProject({
       projectName,
       phasedAssemblyEnabled,
     });
-  } catch {
-    // fallback to mock flow
+  } catch (error) {
+    if (error?.source === "dev-bridge") throw error;
+    // Offline browser preview has no bridge.
   }
   return initializeProjectMock({
     workspaceRoot,

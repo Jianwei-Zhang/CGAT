@@ -237,29 +237,16 @@ function createRouteHost(nodeMap = {}) {
   };
 }
 
-test("workspace page renders english labels for page shell and empty project state", () => {
+test("project summary has no nested creation step", () => {
   const html = renderWorkspacePage(createState());
-
-  assert.match(html, />Project Area</);
-  assert.match(html, />Project Initialization</);
-  assert.match(html, />Create Project</);
+  assert.match(html, />Current project</);
   assert.match(html, />Enter Assembly</);
-  assert.match(html, />Existing Projects</);
-  assert.match(html, />No projects loaded\./);
+  assert.doesNotMatch(html, /Create Project|Existing Projects|Project Initialization/);
 });
 
-test("create-project modal renders the phased assembly switch", () => {
-  const html = renderWorkspacePage(createState({
-    initializer: {
-      createModalOpen: true,
-      phasedAssemblyEnabledInput: true,
-    },
-  }));
-
-  assert.match(html, /id="initializer-phased-assembly-enabled-input"/);
-  assert.match(html, /id="initializer-phased-assembly-enabled-input"[^>]*checked/);
-  assert.match(html, />Enable phased assembly</);
-  assert.match(html, /enables the capability only/);
+test("legacy creation state cannot expose a phased capability switch", () => {
+  const html = renderWorkspacePage(createState({ initializer: { createModalOpen: true } }));
+  assert.doesNotMatch(html, /initializer-phased-assembly-enabled-input|Create New Project/);
 });
 
 test("workspace project rows do not expose add-package context menu", () => {
@@ -283,49 +270,20 @@ test("workspace project rows do not expose add-package context menu", () => {
   assert.doesNotMatch(html, /Import add package/);
 });
 
-test("workspace page renders english create-project modal labels", () => {
-  const html = renderWorkspacePage(createState({
-    initializer: {
-      createModalOpen: true,
-    },
-  }));
-
-  assert.match(html, />Create New Project</);
-  assert.match(html, />Close</);
-  assert.match(html, />Project Name</);
-  assert.match(html, />Primary Dataset</);
-  assert.match(html, />Support Dataset</);
-  assert.match(html, />Reads QC</);
-  assert.match(html, /class="workspace-recipe-summary"/);
-  assert.match(html, /class="workspace-recipe-grid"/);
-  assert.match(html, /class="workspace-recipe-label">Primary Dataset<\/span>/);
-  assert.match(html, /class="workspace-recipe-value">hifiasm<\/span>/);
-  assert.match(html, /class="workspace-recipe-value">flye, canu<\/span>/);
-  assert.match(html, /class="workspace-recipe-value is-disabled">Disabled<\/span>/);
-  assert.doesNotMatch(html, /recipe-test/);
-  assert.doesNotMatch(html, /Primary\/support datasets, the reads-QC branch/);
-  assert.match(html, />Cancel</);
-  assert.doesNotMatch(html, /id="initializer-reference-select"/);
-  assert.doesNotMatch(html, /id="initializer-primary-dataset-select"/);
-  assert.doesNotMatch(html, /id="initializer-support-dataset-list"/);
-  assert.doesNotMatch(html, /id="initializer-chr-assignment-threshold-input"/);
-  assert.match(html, /id="initializer-phased-assembly-enabled-input"/);
+test("legacy directories offer every project without choosing one implicitly", () => {
+  const html = renderWorkspacePage(createState({ initializer: { existingProjects: [
+    { projectId: 7, projectName: "First" }, { projectId: 9, projectName: "Second" },
+  ] } }));
+  assert.match(html, /legacy-project-select/);
+  assert.match(html, /value="7"[^>]*>First/);
+  assert.match(html, /value="9"[^>]*>Second/);
+  assert.match(html, /initializer-enter-assembly-button[^>]*disabled/);
 });
 
-test("workspace create-project summary removes legacy lock copy in Chinese", () => {
-  const html = renderWorkspacePage(createState({
-    locale: "zh",
-    initializer: {
-      createModalOpen: true,
-    },
-  }));
-
-  assert.match(html, />创建新项目</);
-  assert.match(html, /class="workspace-recipe-label">主 Dataset<\/span>/);
-  assert.match(html, /class="workspace-recipe-label">辅助 Dataset<\/span>/);
-  assert.match(html, /class="workspace-recipe-value is-disabled">未启用<\/span>/);
-  assert.doesNotMatch(html, /GRT 固定 recipe/);
-  assert.doesNotMatch(html, /primary\/support、reads QC 分支和 donor set/);
+test("Chinese project summary uses project terminology", () => {
+  const html = renderWorkspacePage(createState({ locale: "zh" }));
+  assert.match(html, /当前项目/);
+  assert.doesNotMatch(html, /项目区|创建新项目/);
 });
 
 test("selected GRT project renders immutable recipe fields and an editable name only", () => {
@@ -853,248 +811,8 @@ test("workspace auto pipeline marks local chr assignment as skipped for server p
   );
 });
 
-test("create project preserves the phased choice while using the locked GRT recipe", async () => {
-  const previousWindow = globalThis.window;
-  try {
-    globalThis.window = {};
 
-    const createProjectConfirmButton = createButton();
-    const phasedAssemblyCheckbox = createCheckbox(false);
-    const host = createHost({
-      "#initializer-create-project-confirm-button": createProjectConfirmButton,
-      "#initializer-phased-assembly-enabled-input": phasedAssemblyCheckbox,
-    });
-    const store = createStore(createState({
-      initializer: {
-        optionsLoaded: true,
-        createModalOpen: true,
-        projectNameInput: "project_custom_threshold",
-        selectedReferenceId: "1",
-        selectedPrimaryDatasetId: "11",
-        selectedSupportDatasetIds: [12],
-        chrAssignmentMinCoveragePercentInput: "72.5",
-        phasedAssemblyEnabledInput: true,
-        packageMetadata: {
-          packageMode: "fast",
-          sequenceLayout: "partitioned",
-          preassignedChr: true,
-          chrAssignmentMinCoveragePercent: 60,
-          selfAlignmentScope: "chr_partition",
-          crossAlignmentScope: "chr_partition",
-        },
-        references: [{ referenceGenomeId: 1, name: "ref_a" }],
-        datasets: [
-          { datasetId: 11, name: "hifiasm", contigCount: 10, totalLengthBp: 1000 },
-          { datasetId: 12, name: "flye", contigCount: 11, totalLengthBp: 2000 },
-        ],
-      },
-    }));
 
-    bindWorkspacePage(host, store);
-    await phasedAssemblyCheckbox.change(true);
-    await createProjectConfirmButton.click();
-
-    const createdProject = store.getState().initializer.existingProjects.find(
-      (project) => project.projectName === "project_custom_threshold",
-    );
-    assert.ok(createdProject, "expected project to be created");
-    assert.equal(createdProject.referenceGenomeId, 1);
-    assert.equal(createdProject.primaryDatasetId, 1);
-    assert.deepEqual(createdProject.supportDatasetIds, [2, 3]);
-    assert.equal(createdProject.chrAssignmentMinCoveragePercent, 60);
-    assert.equal(createdProject.phasedAssemblyEnabled, true);
-    assert.equal(createdProject.isProcessed, true);
-    assert.equal(createdProject.autoPipelineDone, true);
-    assert.equal(store.getState().initializer.editChrAssignmentMinCoveragePercentInput, "60");
-    assert.equal(store.getState().initializer.editPhasedAssemblyEnabledInput, true);
-    assert.equal(store.getState().assembly.grtProjectView.recipe.recipeId, "mock-grt-recipe");
-  } finally {
-    globalThis.window = previousWindow;
-  }
-});
-
-test("workspace project card selection restores cached assembly state when returning to an opened project", async () => {
-  clearAssemblySessionCache();
-  const previousDocument = globalThis.document;
-  try {
-    globalThis.document = {
-      querySelector() {
-        return null;
-      },
-    };
-
-    const projectAButton = createProjectSelectButton(7);
-    const projectBButton = createProjectSelectButton(8);
-    const host = createRouteHost({});
-    host.querySelectorAll = (selector) => {
-      if (selector === "[data-project-select-id]") {
-        return [projectAButton, projectBButton];
-      }
-      return [];
-    };
-    const store = createStore(createState({
-      session: {
-        projectId: 7,
-        projectName: "project-a",
-      },
-      initializer: {
-        packageMetadata: {
-          packageMode: "fast",
-          sequenceLayout: "partitioned",
-          preassignedChr: true,
-          chrAssignmentMinCoveragePercent: 60,
-          selfAlignmentScope: "chr_partition",
-          crossAlignmentScope: "chr_partition",
-        },
-        existingProjects: [
-          {
-            projectId: 7,
-            projectName: "project-a",
-            createdAt: "1710000000",
-            referenceGenomeId: 1,
-            primaryDatasetId: 11,
-            supportDatasetIds: [12],
-            chrAssignmentMinCoveragePercent: 60,
-          },
-          {
-            projectId: 8,
-            projectName: "project-b",
-            createdAt: "1710000100",
-            referenceGenomeId: 2,
-            primaryDatasetId: 21,
-            supportDatasetIds: [22],
-            chrAssignmentMinCoveragePercent: 70,
-          },
-        ],
-      },
-      assembly: {
-        selectedChrName: "Chr07",
-        chrCtgs: [{ assemblyCtgId: 700 }],
-        finalPathByChr: { Chr07: { segments: [{ segmentId: "a" }] } },
-      },
-    }));
-
-    bindWorkspacePage(host, store);
-    await projectBButton.click();
-    assert.equal(store.getState().assembly.selectedChrName, "");
-
-    store.setState({
-      ...store.getState(),
-      assembly: {
-        ...store.getState().assembly,
-        selectedChrName: "Chr08",
-        chrCtgs: [{ assemblyCtgId: 800 }],
-        finalPathByChr: { Chr08: { segments: [{ segmentId: "b" }] } },
-      },
-    });
-
-    await projectAButton.click();
-    assert.equal(store.getState().assembly.selectedChrName, "Chr07");
-    assert.deepEqual(store.getState().assembly.chrCtgs, [{ assemblyCtgId: 700 }]);
-    assert.deepEqual(store.getState().assembly.finalPathByChr, {
-      Chr07: { segments: [{ segmentId: "a" }] },
-    });
-  } finally {
-    globalThis.document = previousDocument;
-  }
-});
-
-test("delete project removes only the deleted card when backend omits refreshed project list", async () => {
-  const previousWindow = globalThis.window;
-  const previousDocument = globalThis.document;
-  try {
-    globalThis.document = {
-      querySelector() {
-        return null;
-      },
-    };
-    globalThis.window = {
-      confirm: () => true,
-      __TAURI__: {
-        core: {
-          invoke: async (command, args) => {
-            assert.equal(command, "delete_project");
-            assert.equal(args.projectId, 8);
-            return {
-              projectId: 8,
-              deleted: true,
-            };
-          },
-        },
-      },
-    };
-
-    const deleteProjectBButton = createButton();
-    deleteProjectBButton.dataset.projectDeleteId = "8";
-    deleteProjectBButton.dataset.projectName = "project-b";
-    const host = createRouteHost({});
-    host.querySelectorAll = (selector) => {
-      if (selector === "[data-project-delete-id]") {
-        return [deleteProjectBButton];
-      }
-      return [];
-    };
-    const store = createStore({
-      ...createState({
-      session: {
-        projectId: 7,
-        projectName: "project-a",
-      },
-      initializer: {
-        existingProjects: [
-          {
-            projectId: 7,
-            projectName: "project-a",
-            createdAt: "1710000000",
-            referenceGenomeId: 1,
-            primaryDatasetId: 11,
-            supportDatasetIds: [12],
-            chrAssignmentMinCoveragePercent: 60,
-          },
-          {
-            projectId: 8,
-            projectName: "project-b",
-            createdAt: "1710000100",
-            referenceGenomeId: 2,
-            primaryDatasetId: 21,
-            supportDatasetIds: [22],
-            chrAssignmentMinCoveragePercent: 70,
-          },
-        ],
-      },
-      }),
-      projectExport: {
-        loading: false,
-        loaded: true,
-        error: "",
-        projectId: 8,
-        chromosomes: [{ chrName: "ChrOld" }],
-        finalPathByChr: {
-          ChrOld: { segments: [{ segmentId: "old" }] },
-        },
-        primaryCtgsByChr: {
-          ChrOld: [{ assemblyCtgId: 8 }],
-        },
-      },
-    });
-
-    bindWorkspacePage(host, store);
-    await deleteProjectBButton.click();
-
-    assert.deepEqual(
-      store.getState().initializer.existingProjects.map((project) => project.projectId),
-      [7],
-    );
-    assert.equal(store.getState().session.projectId, 7);
-    assert.equal(store.getState().session.projectName, "project-a");
-    assert.equal(store.getState().projectExport.projectId, null);
-    assert.deepEqual(store.getState().projectExport.finalPathByChr, {});
-    assert.deepEqual(store.getState().projectExport.chromosomes, []);
-  } finally {
-    globalThis.window = previousWindow;
-    globalThis.document = previousDocument;
-  }
-});
 
 test("server-owned selected-project chr threshold input ignores typing", async () => {
   const previousDocument = globalThis.document;

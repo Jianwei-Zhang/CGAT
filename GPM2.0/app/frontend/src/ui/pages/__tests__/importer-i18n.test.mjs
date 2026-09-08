@@ -177,7 +177,7 @@ function createImporterScrollState(overrides = {}) {
 test("importer add-package labels and errors are translated in Chinese and English", () => {
   assert.equal(zh.buttons.importAddPackage, "导入追加包");
   assert.equal(zh.runtime.importAddPackageSummary, "正在导入数据集追加包。");
-  assert.equal(zh.runtime.incompleteAddPackageWorkspaceSummary, "请先加载已有项目区。");
+  assert.equal(zh.runtime.incompleteAddPackageWorkspaceSummary, "请先加载已有项目。");
   assert.equal(zh.runtime.incompleteAddPackageZipSummary, "请先选择数据集追加包 zip。");
   assert.equal(zh.runtime.importAddPackageDoneStage, "数据集追加包导入完成并刷新候选项");
   assert.equal(zh.runtime.addPackageHint, "（added {datasetName}）");
@@ -199,7 +199,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
 
   assert.equal(en.buttons.importAddPackage, "Import add package");
   assert.equal(en.runtime.importAddPackageSummary, "Importing the dataset add package.");
-  assert.equal(en.runtime.incompleteAddPackageWorkspaceSummary, "Open an existing project area first.");
+  assert.equal(en.runtime.incompleteAddPackageWorkspaceSummary, "Open an existing project first.");
   assert.equal(en.runtime.incompleteAddPackageZipSummary, "Select a dataset add-package ZIP first.");
   assert.equal(en.runtime.importAddPackageDoneStage, "Dataset add package imported and options refreshed");
   assert.equal(en.runtime.addPackageHint, "(added {datasetName})");
@@ -468,6 +468,71 @@ test("importer bulk delete optionally removes only failed workspace directories"
   }
 });
 
+test("failed file deletion retains the current project and reports a persistent error", async () => {
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  const previousSetTimeout = globalThis.setTimeout;
+  const previousClearTimeout = globalThis.clearTimeout;
+  const record = { path: "/active", lastUsedAt: 1 };
+  let history = [record];
+  try {
+    globalThis.document = { querySelector: () => null };
+    globalThis.setTimeout = () => 0;
+    globalThis.clearTimeout = () => {};
+    globalThis.window = {
+      __TAURI__: { core: { invoke: async () => { throw new Error("Permission denied"); } } },
+      dispatchEvent() {},
+      localStorage: {
+        getItem: () => JSON.stringify(history),
+        setItem: (_key, value) => { history = JSON.parse(value); },
+      },
+    };
+    const initial = createImporterScrollState({
+      inFlight: false, importRunId: null, deleteWithFiles: true,
+      deleteConfirmOpen: true, deleteTargets: ["/active"],
+    });
+    initial.session = { workspacePath: "/active", projectId: 1, projectName: "Active" };
+    const store = createStore(initial);
+    const confirm = createButton();
+    bindImporterPage(createHost({ "#confirm-delete-selected-button": confirm }), store);
+    await confirm.click();
+    assert.deepEqual(history, [record]);
+    assert.deepEqual(store.getState().session, initial.session);
+    assert.match(store.getState().importer.projectError, /Permission denied/);
+    assert.match(store.getState().importer.summary, /已删除 0 条记录/);
+    assert.equal(store.getState().importer.inFlight, false);
+  } finally {
+    globalThis.window = previousWindow;
+    globalThis.document = previousDocument;
+    globalThis.setTimeout = previousSetTimeout;
+    globalThis.clearTimeout = previousClearTimeout;
+  }
+});
+
+test("removing the active recent record does not close its project", () => {
+  const previousWindow = globalThis.window;
+  let history = [{ path: "/active", lastUsedAt: 1 }];
+  try {
+    globalThis.window = {
+      localStorage: {
+        getItem: () => JSON.stringify(history),
+        setItem: (_key, value) => { history = JSON.parse(value); },
+      },
+    };
+    const initial = createImporterScrollState({ inFlight: false, importRunId: null, status: "" });
+    initial.session = { workspacePath: "/active", projectId: 1, projectName: "Active" };
+    const store = createStore(initial);
+    const remove = createButton();
+    remove.dataset.projectRemove = "/active";
+    bindImporterPage(createHost({ "[data-project-remove]": [remove] }), store);
+    remove.click();
+    assert.deepEqual(history, []);
+    assert.deepEqual(store.getState().session, initial.session);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
 test("importer disables bulk delete when validation has no failed records", () => {
   const previousWindow = globalThis.window;
   try {
@@ -537,7 +602,7 @@ test("importer renders concise failed import feedback while keeping open-workspa
     assert.match(html, /data-importer-status-toast="1"/);
     assert.match(html, /data-importer-status-banner="1" role="alert"/);
     assert.match(html, /导入失败：failed to resolve source_seq for locator gpm:contig_6792/);
-    assert.match(html, /2\. 从已有项目区加载/);
+    assert.match(html, /打开项目/);
     assert.doesNotMatch(html, /modal-overlay import-progress-overlay/);
   } finally {
     globalThis.window = previousWindow;
@@ -980,7 +1045,7 @@ test("importer english missing-parameter feedback stays translated after binding
 
     const nextImporter = store.getState().importer;
     assert.equal(nextImporter.status, "Incomplete parameters");
-    assert.equal(nextImporter.summary, "Fill in both the ZIP path and project area directory.");
+    assert.equal(nextImporter.summary, "Fill in both the ZIP path and project directory.");
     assert.equal(timers.at(-1)?.delay, 1000);
     timers.at(-1).callback();
     assert.equal(store.getState().importer.status, "");
@@ -992,7 +1057,7 @@ test("importer english missing-parameter feedback stays translated after binding
   }
 });
 
-test("opening an existing workspace does not rerender importer content after switching to workspace route", async () => {
+test("opening an existing workspace stays on the unified projects page", async () => {
   const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;
   try {
@@ -1119,12 +1184,10 @@ test("opening an existing workspace does not rerender importer content after swi
     });
 
     bindImporterPage(host, store);
-    openWorkspaceButton.click();
-    host.innerHTML = "";
-    await new Promise((resolve) => setTimeout(resolve, 260));
+    await openWorkspaceButton.click();
 
-    assert.equal(store.getState().activeRoute, "workspace");
-    assert.equal(host.innerHTML, "");
+    assert.equal(store.getState().activeRoute, "importer");
+    assert.match(host.innerHTML, /projects-page/);
   } finally {
     globalThis.document = previousDocument;
     globalThis.window = previousWindow;
@@ -1211,7 +1274,7 @@ test("import progress modal truncates the active label and uses icon-only row st
     assert.match(html, /class="pipeline-spinner"/);
     assert.doesNotMatch(html, /importer-import-progress-log-head/);
     assert.doesNotMatch(html, /importer-import-progress-log-count/);
-    assert.doesNotMatch(html, />详细过程</);
+    assert.match(html, /<details class="importer-import-progress-log"[^>]*><summary>详细过程<\/summary>/);
     assert.doesNotMatch(html, /已记录 \d+ 项/);
     assert.match(html, /validate_input：zip_path=a\.zip \(1\/621\)/);
     assert.match(html, /extract_entry：gpm_server\/runs\/chr_Chr06\/result\.paf \(132\/621\)/);
@@ -1321,7 +1384,7 @@ test("import progress uses phase metadata and labels GRT validation instead of a
       },
     });
 
-    assert.match(html, /整理项目区目录/);
+    assert.match(html, /整理项目目录/);
     assert.match(html, /校验 reference\/dataset FASTA 与 FAI/);
     assert.match(html, /阶段 4\/7/);
     assert.doesNotMatch(html, /673\/674/);
@@ -1515,6 +1578,7 @@ test("import progress cancellation starts on pointerdown and keeps the dialog un
             if (command === "request_import_cancel") {
               return cancelDeferred.promise;
             }
+            if (command === "initialize_project") return Promise.resolve({ projectId: 1, projectName: "empty", existingProjects: [{ projectId: 1, projectName: "empty", phasedAssemblyEnabled: true }] });
             throw new Error(`unexpected command: ${command}`);
           },
         },
@@ -1611,7 +1675,7 @@ test("normal import success wins over a pending cancellation response", async ()
             if (command === "request_import_cancel") {
               return cancelDeferred.promise;
             }
-            if (command === "list_project_initializer_options") {
+            if (command === "list_project_initializer_options" || command === "open_workspace") {
               return Promise.resolve({
                 packageMetadata: {},
                 grtRecipe: null,
@@ -1620,6 +1684,7 @@ test("normal import success wins over a pending cancellation response", async ()
                 existingProjects: [],
               });
             }
+            if (command === "initialize_project") return Promise.resolve({ projectId: 1, projectName: "empty", existingProjects: [{ projectId: 1, projectName: "empty", phasedAssemblyEnabled: true }] });
             throw new Error(`unexpected command: ${command}`);
           },
         },
@@ -1663,7 +1728,7 @@ test("normal import success wins over a pending cancellation response", async ()
     });
     await importRun;
 
-    assert.equal(store.getState().activeRoute, "workspace");
+    assert.equal(store.getState().activeRoute, "importer");
     assert.equal(store.getState().importer.importRunId, null);
     assert.equal(store.getState().importer.importCancelling, false);
     assert.equal(store.getState().importer.status, zh.runtime.importDoneStatus);

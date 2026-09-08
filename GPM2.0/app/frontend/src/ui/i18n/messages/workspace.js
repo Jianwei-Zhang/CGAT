@@ -1,6 +1,6 @@
 export const zh = {
   page: {
-    kicker: "项目区",
+    kicker: "项目",
     title: "项目初始化",
     createdAt: "创建时间：",
     noReference: "暂无 reference",
@@ -48,7 +48,7 @@ export const zh = {
     assemblySummary: "请选择项目后加载装配主视图。",
     selectedProjectSummary: "已选择项目：{projectName}（创建时间：{createdAt}）",
     cancelAutoPipeline: "正在请求中止自动化流程...",
-    workspaceRequired: "未检测到项目区，请先完成导入。",
+    workspaceRequired: "未检测到项目，请先完成导入。",
     requiredFields: "请输入项目名。",
     creatingProject: "正在创建项目...",
     projectCreated: "项目创建完成：{projectName}",
@@ -66,7 +66,7 @@ export const zh = {
     processedProjectHint: "该项目已进入装配流程：可修改项目名、追加辅 dataset、开启分型组装；reference、主 dataset、chr 分配及格线仍锁定。",
     editableProjectHint: "未处理项目可修改项目名、reference、主/辅 dataset、chr 分配及格线与分型组装开关。",
     restoredProjectSummary: "已恢复项目：{projectName}（ID {projectId}）",
-    restoredWorkspaceSummary: "已恢复项目区，请选择或创建项目。",
+    restoredWorkspaceSummary: "已恢复项目，请选择或创建项目。",
     updateProcessedLocked: "该项目已进入装配流程，仅允许修改项目名、追加辅 dataset、开启分型组装。",
     grtProjectLocked: "Server recipe 已锁定；这里只允许修改项目名，Final Path 的项目级编辑不会改写 Server 预计算基线。",
   },
@@ -100,7 +100,7 @@ export const zh = {
 
 export const en = {
   page: {
-    kicker: "Project Area",
+    kicker: "Project",
     title: "Project Initialization",
     createdAt: "Created at:",
     noReference: "No reference options",
@@ -148,7 +148,7 @@ export const en = {
     assemblySummary: "Select a project to load the assembly main view.",
     selectedProjectSummary: "Selected project: {projectName} (created at: {createdAt})",
     cancelAutoPipeline: "Requesting auto-pipeline cancellation...",
-    workspaceRequired: "Project Area was not detected. Import or open one first.",
+    workspaceRequired: "Project was not detected. Import or open one first.",
     requiredFields: "Project name is required.",
     creatingProject: "Creating project...",
     projectCreated: "Project created: {projectName}",
@@ -166,7 +166,7 @@ export const en = {
     processedProjectHint: "This project has entered assembly: you can rename it, append support datasets, and enable phased assembly; reference, primary dataset, and chr assignment threshold stay locked.",
     editableProjectHint: "Unprocessed projects can still change the project name, reference, datasets, chr assignment threshold, and phased assembly switch.",
     restoredProjectSummary: "Restored project: {projectName} (ID {projectId})",
-    restoredWorkspaceSummary: "Project Area restored. Select or create a project.",
+    restoredWorkspaceSummary: "Project restored. Select or create a project.",
     updateProcessedLocked: "This project has entered assembly; only renaming, appending support datasets, and enabling phased assembly are allowed.",
     grtProjectLocked: "The Server recipe is locked. Only the project name can be changed here; project-level Final Path edits never rewrite the Server baseline.",
   },

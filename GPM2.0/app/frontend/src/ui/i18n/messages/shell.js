@@ -1,11 +1,11 @@
 export const zh = {
   title: "装配工作台",
-  workspace: "项目区",
+  workspace: "项目",
   project: "项目",
   workspacePlaceholder: "未打开",
   projectPlaceholder: "未选择项目",
   importer: "导入",
-  workspaceRoute: "项目区",
+  workspaceRoute: "项目",
   assembly: "装配",
   projectExport: "项目导出",
   language: "语言",
@@ -21,12 +21,12 @@ export const zh = {
 
 export const en = {
   title: "Assembly Workbench",
-  workspace: "Project Area",
+  workspace: "Project",
   project: "Project",
   workspacePlaceholder: "Not opened",
   projectPlaceholder: "No project selected",
   importer: "Import",
-  workspaceRoute: "Project Area",
+  workspaceRoute: "Project",
   assembly: "Assembly",
   projectExport: "Project Export",
   language: "Language",

@@ -1,3 +1,4 @@
+import { defaultProjectName } from "../../services/project-session.js";
 import { t as i18nT } from "../i18n/index.js";
 import {
   clearAssemblySessionCache,
@@ -59,7 +60,7 @@ function buildEditDraftFromProject(project) {
   };
 }
 
-function buildEmptyAssemblyViewState(stateOrLocale) {
+export function buildEmptyAssemblyViewState(stateOrLocale) {
   return {
     loading: false,
     bootstrapping: false,
@@ -96,6 +97,8 @@ function buildEmptyAssemblyViewState(stateOrLocale) {
     supportDsCtgLenRulesByChr: {},
     supportDsCtgLenRulesDialogOpen: false,
     finalPathByChr: {},
+    grtProjectView: { recipe: {}, baselineFinalPathByChr: {}, sourceCards: [], verification: {} },
+    degapProjectState: {},
     grtResultDisplayByChr: {},
     grtResultToast: null,
     trackSelectedCtgIds: [],
@@ -162,7 +165,7 @@ export function buildWorkspaceSwitchItems({ state, historyRecords = [], labels }
     });
   }
   const candidates = [
-    currentPath ? { path: currentPath } : null,
+    currentPath ? { path: currentPath, projectName: state.session.projectName } : null,
     ...historyRecords,
   ];
   for (const record of candidates) {
@@ -173,7 +176,7 @@ export function buildWorkspaceSwitchItems({ state, historyRecords = [], labels }
     seen.add(path);
     items.push({
       value: path,
-      label: path,
+      label: `${record.projectName || defaultProjectName(path)} (${path})`,
       selected: path === currentPath,
     });
   }
@@ -212,13 +215,14 @@ export async function switchWorkspaceFromShell(store, workspaceRoot, { openWorks
   const datasets = Array.isArray(options?.datasets) ? options.datasets : [];
   const existingProjects = Array.isArray(options?.existingProjects) ? options.existingProjects : [];
   const packageMetadata = options?.packageMetadata || current.initializer.packageMetadata;
+  const selected = existingProjects.length === 1 ? existingProjects[0] : null;
   store.setState({
-    activeRoute: "workspace",
+    activeRoute: "importer",
     session: {
       ...current.session,
       workspacePath: normalizedPath,
-      projectId: null,
-      projectName: "",
+      projectId: selected?.projectId || null,
+      projectName: selected?.projectName || "",
     },
     importer: {
       ...current.importer,
@@ -226,6 +230,8 @@ export async function switchWorkspaceFromShell(store, workspaceRoot, { openWorks
       importRunId: null,
       importCancelling: false,
       importCancelError: "",
+      projectError: "",
+      pendingProjectPath: "",
       workspaceRoot: normalizedPath,
       openWorkspacePath: normalizedPath,
       historyValidation: {},
@@ -241,6 +247,7 @@ export async function switchWorkspaceFromShell(store, workspaceRoot, { openWorks
       optionsLoaded: true,
       optionsError: "",
       packageMetadata,
+      grtRecipe: options.grtRecipe || null,
       references,
       datasets,
       existingProjects,
@@ -326,4 +333,18 @@ export function switchProjectFromShell(store, projectId) {
     projectExport: buildEmptyProjectExportState(),
   });
   return true;
+}
+
+export function closeProjectSession(store) {
+  const current = store.getState();
+  rememberAssemblyState(current);
+  resetAssemblyPageSession();
+  clearAssemblySessionCache();
+  store.setState({
+    activeRoute: "importer",
+    session: { ...current.session, workspacePath: "", projectId: null, projectName: "" },
+    initializer: { ...current.initializer, existingProjects: [], optionsLoaded: false, optionsError: "", autoPipelineModalOpen: false },
+    assembly: { ...current.assembly, ...buildEmptyAssemblyViewState(current) },
+    projectExport: buildEmptyProjectExportState(),
+  });
 }

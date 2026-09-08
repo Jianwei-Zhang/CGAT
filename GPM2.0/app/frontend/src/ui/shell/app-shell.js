@@ -20,12 +20,6 @@ export function renderAppShell(state) {
               <option value="">${labels.workspacePlaceholder}</option>
             </select>
           </div>
-          <div class="meta-item">
-            <span>${labels.project}</span>
-            <select id="session-project-select" aria-label="${labels.project}">
-              <option value="">${labels.projectPlaceholder}</option>
-            </select>
-          </div>
           <div class="meta-item meta-item-language">
             <span>${labels.language}</span>
             <select id="app-language-select">
@@ -37,8 +31,7 @@ export function renderAppShell(state) {
       </header>
       <nav class="panel app-nav">
         <nav class="route-nav">
-          <button class="route-button" data-route="importer">${labels.importer}</button>
-          <button class="route-button" data-route="workspace">${labels.workspaceRoute}</button>
+          <button class="route-button" data-route="importer">${labels.project}</button>
           <button class="route-button" data-route="assembly">${labels.assembly}</button>
           <button class="route-button" data-route="projectExport">${labels.projectExport}</button>
         </nav>

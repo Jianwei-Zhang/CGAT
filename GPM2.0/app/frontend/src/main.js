@@ -1,11 +1,10 @@
 import { createStore } from "./state/store.js";
-import { openWorkspace } from "./services/workflow-api.js";
+import { flushAssemblyProjectState } from "./ui/pages/assembly-page.js";
+import { openProjectWorkspace as openWorkspace } from "./services/project-session.js";
 import { renderAppShell } from "./ui/shell/app-shell.js";
 import { registerRoutes, renderCurrentRoute } from "./ui/shell/router.js";
 import {
-  buildProjectSwitchItems,
   buildWorkspaceSwitchItems,
-  switchProjectFromShell,
   switchWorkspaceFromShell,
 } from "./ui/shell/session-switchers.js";
 import { getMessages, t } from "./ui/i18n/index.js";
@@ -32,6 +31,11 @@ const store = createStore({
     projectId: null,
   },
   importer: {
+    importDialogOpen: false,
+    importSource: "zip",
+    projectNameInput: "",
+    projectError: "",
+    pendingProjectPath: "",
     zipPath: "",
     workspaceRoot: "",
     extractedPath: "",
@@ -244,6 +248,7 @@ restoreLastWorkspace(store);
 
 let lastRoute = store.getState().activeRoute;
 let lastSessionWorkspacePath = normalizeWorkspacePath(store.getState().session.workspacePath);
+let lastSessionProjectName = store.getState().session.projectName;
 store.subscribe((nextState) => {
   if (nextState.activeRoute !== lastRoute) {
     lastRoute = nextState.activeRoute;
@@ -251,8 +256,13 @@ store.subscribe((nextState) => {
   }
   const nextWorkspacePath = normalizeWorkspacePath(nextState.session.workspacePath);
   if (nextWorkspacePath && nextWorkspacePath !== lastSessionWorkspacePath) {
-    appendWorkspaceHistory(nextWorkspacePath);
+    appendWorkspaceHistory(nextWorkspacePath, nextState.session.projectName);
   }
+  if (nextWorkspacePath && nextState.session.projectName !== lastSessionProjectName) {
+    const records = readWorkspaceHistory();
+    writeWorkspaceHistory(records.map(record => record.path === nextWorkspacePath ? { ...record, projectName: nextState.session.projectName } : record));
+  }
+  lastSessionProjectName = nextState.session.projectName;
   lastSessionWorkspacePath = nextWorkspacePath;
   syncSessionHeader(nextState);
   syncLanguageSwitch(nextState);
@@ -266,8 +276,14 @@ window.addEventListener("gpm-next:route-refresh", () => {
 
 function syncSessionHeader(state) {
   const workspaceSelect = document.querySelector("#session-workspace-select");
-  const projectSelect = document.querySelector("#session-project-select");
   const labels = getMessages(state, "shell");
+  document.querySelectorAll(".route-button").forEach(button => {
+    const needsProject = ["assembly", "projectExport"].includes(button.dataset.route);
+    button.disabled = (needsProject && (!state.session.workspacePath || !state.session.projectId))
+      || state.importer.inFlight || state.initializer.autoPipelineRunning;
+    button.title = needsProject && !state.session.projectId
+      ? (state.locale === "en" ? "Open a project first" : "请先打开项目") : "";
+  });
   if (workspaceSelect) {
     const workspaceItems = buildWorkspaceSwitchItems({
       state,
@@ -275,12 +291,7 @@ function syncSessionHeader(state) {
       labels,
     });
     replaceSelectOptions(workspaceSelect, workspaceItems);
-    workspaceSelect.disabled = workspaceItems.length === 1 && !workspaceItems[0]?.value;
-  }
-  if (projectSelect) {
-    const projectItems = buildProjectSwitchItems({ state, labels });
-    replaceSelectOptions(projectSelect, projectItems);
-    projectSelect.disabled = projectItems.length <= 1;
+    workspaceSelect.disabled = state.importer.inFlight || state.initializer.autoPipelineRunning || (workspaceItems.length === 1 && !workspaceItems[0]?.value);
   }
 }
 
@@ -380,7 +391,6 @@ function bindGlobalLanguageSwitch(root, storeRef) {
 
 function bindGlobalSessionSwitchers(root, storeRef) {
   const workspaceSelect = root.querySelector("#session-workspace-select");
-  const projectSelect = root.querySelector("#session-project-select");
 
   workspaceSelect?.addEventListener("change", async () => {
     const nextWorkspacePath = normalizeWorkspacePath(workspaceSelect.value);
@@ -390,6 +400,9 @@ function bindGlobalSessionSwitchers(root, storeRef) {
       return;
     }
     try {
+      const before = storeRef.getState();
+      storeRef.setState({ importer: { ...before.importer, inFlight: true, projectError: "" } });
+      await flushAssemblyProjectState(document.querySelector("#route-host"), storeRef);
       await switchWorkspaceFromShell(storeRef, nextWorkspacePath, { openWorkspace });
       window.dispatchEvent(new Event("gpm-next:route-refresh"));
     } catch (error) {
@@ -401,22 +414,18 @@ function bindGlobalSessionSwitchers(root, storeRef) {
           importRunId: null,
           importCancelling: false,
           importCancelError: "",
+          projectError: String(error?.message || error),
+          pendingProjectPath: error.pendingProjectPath || "",
           status: t(current, "importer.runtime.openFailedStatus"),
           summary: String(error?.message || error || ""),
         },
+        activeRoute: "importer",
       });
+      window.dispatchEvent(new Event("gpm-next:route-refresh"));
     }
     syncSessionHeader(storeRef.getState());
   });
 
-  projectSelect?.addEventListener("change", () => {
-    const nextProjectId = Number(projectSelect.value || 0);
-    const changed = switchProjectFromShell(storeRef, nextProjectId);
-    syncSessionHeader(storeRef.getState());
-    if (changed) {
-      window.dispatchEvent(new Event("gpm-next:route-refresh"));
-    }
-  });
 }
 
 async function restoreLastWorkspace(storeRef) {
@@ -441,9 +450,8 @@ async function restoreLastWorkspace(storeRef) {
     const options = await openWorkspace({ workspaceRoot: snapshot.workspacePath });
     const defaultReferenceId = options.references[0]?.referenceGenomeId || "";
     const defaultPrimaryDatasetId = options.datasets[0]?.datasetId || "";
-    const matchedProject = options.existingProjects.find(
-      (item) => Number(item.projectId) === Number(snapshot.projectId),
-    );
+    if (storeRef.getState().session.workspacePath || storeRef.getState().importer.inFlight || storeRef.getState().importer.importDialogOpen) return;
+    const matchedProject = options.existingProjects.length === 1 ? options.existingProjects[0] : null;
 
     storeRef.setState({
       session: {
@@ -504,10 +512,11 @@ async function restoreLastWorkspace(storeRef) {
           })
           : t(storeRef.getState(), "workspace.runtime.restoredWorkspaceSummary"),
       },
-      activeRoute: matchedProject ? "assembly" : "workspace",
+      activeRoute: "importer",
     });
     window.dispatchEvent(new Event("gpm-next:route-refresh"));
-  } catch {
+  } catch (error) {
+    if (storeRef.getState().session.workspacePath || storeRef.getState().importer.inFlight || storeRef.getState().importer.importDialogOpen) return;
     clearLastWorkspace();
     storeRef.setState({
       importer: {
@@ -516,6 +525,8 @@ async function restoreLastWorkspace(storeRef) {
         importRunId: null,
         importCancelling: false,
         importCancelError: "",
+        projectError: String(error?.message || error),
+        pendingProjectPath: error.pendingProjectPath || "",
         status: t(storeRef.getState(), "importer.runtime.sessionRestoreFailedStatus"),
         summary: t(storeRef.getState(), "importer.runtime.sessionRestoreFailedSummary"),
         stages: [],
@@ -555,6 +566,7 @@ function readWorkspaceHistory() {
         }
         return {
           path,
+          projectName: String(item.projectName || ""),
           lastUsedAt: Number.isFinite(Number(item.lastUsedAt))
             ? Number(item.lastUsedAt)
             : Date.now(),
@@ -574,7 +586,7 @@ function writeWorkspaceHistory(records) {
   }
 }
 
-function appendWorkspaceHistory(workspacePath) {
+function appendWorkspaceHistory(workspacePath, projectName = "") {
   const path = normalizeWorkspacePath(workspacePath);
   if (!path) {
     return;
@@ -582,7 +594,7 @@ function appendWorkspaceHistory(workspacePath) {
   const now = Date.now();
   const existing = readWorkspaceHistory();
   const deduped = [
-    { path, lastUsedAt: now },
+    { path, projectName, lastUsedAt: now },
     ...existing.filter((item) => normalizeWorkspacePath(item.path) !== path),
   ]
     .slice(0, 20)

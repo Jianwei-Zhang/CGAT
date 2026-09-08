@@ -19,11 +19,16 @@ test("project-view mutation coordinator serializes writes and survives one failu
     events.push("second");
     return 2;
   });
+  let idle = false;
+  const drained = coordinator.whenIdle().then(() => { idle = true; });
   await Promise.resolve();
   assert.deepEqual(events, ["first-start"]);
+  assert.equal(idle, false);
   releaseFirst();
   await assert.rejects(first, /expected test failure/);
   assert.equal(await second, 2);
+  await drained;
+  assert.equal(idle, true);
   assert.deepEqual(events, ["first-start", "first-end", "second"]);
 });
 

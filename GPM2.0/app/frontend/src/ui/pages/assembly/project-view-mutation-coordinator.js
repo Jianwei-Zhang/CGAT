@@ -23,6 +23,9 @@ export function createProjectViewMutationCoordinator() {
       generation += 1;
       tail = Promise.resolve();
     },
+    whenIdle() {
+      return tail;
+    },
     get generation() {
       return generation;
     },

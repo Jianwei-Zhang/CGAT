@@ -9,7 +9,7 @@ test("app shell session cards do not render runtime card", () => {
   });
 
   assert.doesNotMatch(html, />运行时</);
-  assert.match(html, />项目区</);
+  assert.match(html, />项目</);
   assert.match(html, />项目</);
   assert.match(html, />项目导出</);
 });
@@ -23,7 +23,7 @@ test("app shell renders language switch as session meta card at right side", () 
   assert.match(html, /id="app-language-select"/);
   assert.match(
     html,
-    /<div class="session-meta">[\s\S]*id="session-workspace-select"[\s\S]*id="session-project-select"[\s\S]*id="app-language-select"/,
+    /<div class="session-meta">[\s\S]*id="session-workspace-select"[\s\S]*id="app-language-select"/,
   );
 });
 
@@ -34,8 +34,8 @@ test("app shell renders english labels when locale is en", () => {
   });
 
   assert.match(html, />Assembly Workbench</);
-  assert.match(html, />Import</);
-  assert.match(html, />Project Area</);
+  assert.doesNotMatch(html, /data-route="workspace"/);
+  assert.match(html, />Project</);
   assert.match(html, />Assembly</);
   assert.match(html, />Project Export</);
   assert.doesNotMatch(html, />Records</);

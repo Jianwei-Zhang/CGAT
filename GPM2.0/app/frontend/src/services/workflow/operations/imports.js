@@ -30,8 +30,9 @@ export async function importZipBundle({ zipPath, workspaceRoot, onStage, runId =
       workspaceRoot: response.workspaceRoot,
       message: response.message,
     };
-  } catch {
-    // fallback to mock flow
+  } catch (error) {
+    if (error?.source === "dev-bridge") throw error;
+    // Offline browser preview has no bridge.
   }
   return importZipBundleMock({ zipPath, workspaceRoot, onStage, stateOrLocale });
 }
@@ -51,8 +52,9 @@ export async function importExtractedBundle({ extractedPath, onStage, runId = ""
       workspaceRoot: response.workspaceRoot,
       message: response.message,
     };
-  } catch {
-    // fallback to mock flow
+  } catch (error) {
+    if (error?.source === "dev-bridge") throw error;
+    // Offline browser preview has no bridge.
   }
   return importExtractedBundleMock({ extractedPath, onStage, stateOrLocale });
 }
@@ -91,8 +93,9 @@ export async function importAddDatasetPackage({
       datasetName: response.datasetName,
       message: response.message,
     };
-  } catch {
-    // fallback to mock flow
+  } catch (error) {
+    if (error?.source === "dev-bridge") throw error;
+    // Offline browser preview has no bridge.
   }
   return importAddDatasetPackageMock({
     workspaceRoot,

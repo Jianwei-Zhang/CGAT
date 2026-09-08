@@ -2191,6 +2191,27 @@ async function persistProjectAssemblyViewStateFromStoreNow(
   }
 }
 
+export async function flushAssemblyProjectState(host, store) {
+  await assemblyPageSession.projectViewMutationCoordinator.whenIdle();
+  const state = store.getState();
+  if (!state.session?.projectId || !state.assembly?.selectedChrName || state.assembly.loading) return;
+  const requestedIdentity = captureProjectViewIdentity(state);
+  if (!requestedIdentity) return;
+  let failure;
+  await persistProjectAssemblyViewStateFromStoreNow(host, store, {
+    ...projectAssemblyViewStateRuntimeDeps,
+    async persistProjectAssemblyViewState(args) {
+      try {
+        return await projectAssemblyViewStateRuntimeDeps.persistProjectAssemblyViewState(args);
+      } catch (error) {
+        failure = error;
+        throw error;
+      }
+    },
+  }, requestedIdentity);
+  if (failure) throw failure;
+}
+
 async function persistTrackDragOffsets(host, store, deps = projectAssemblyViewStateRuntimeDeps) {
   return persistProjectAssemblyViewStateFromStore(host, store, deps);
 }

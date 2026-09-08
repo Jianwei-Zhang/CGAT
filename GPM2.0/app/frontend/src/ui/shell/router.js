@@ -1,9 +1,7 @@
 import { renderImporterPage } from "../pages/importer-page.js";
-import { renderWorkspacePage } from "../pages/workspace-page.js";
 import { bindAssemblyPage, renderAssemblyPage, syncAssemblySubviewTools } from "../pages/assembly-page.js";
 import { bindImporterPage } from "../pages/importer-page.js";
 import { bindProjectExportPage, renderProjectExportPage } from "../pages/project-export-page.js";
-import { bindWorkspacePage } from "../pages/workspace-page.js";
 import { getMessages, t } from "../i18n/index.js";
 import {
   buildAssemblyDomCacheKey,
@@ -13,14 +11,14 @@ import {
 
 const routeRenderers = {
   importer: renderImporterPage,
-  workspace: renderWorkspacePage,
+  workspace: renderImporterPage,
   assembly: renderAssemblyPage,
   projectExport: renderProjectExportPage,
 };
 
 const routeBinders = {
   importer: bindImporterPage,
-  workspace: bindWorkspacePage,
+  workspace: bindImporterPage,
   assembly: bindAssemblyPage,
   projectExport: bindProjectExportPage,
 };
@@ -37,7 +35,12 @@ export function registerRoutes(root, store, onRouteChanged) {
 }
 
 export function renderCurrentRoute(root, store) {
-  const state = store.getState();
+  let state = store.getState();
+  const requiresProject = ["assembly", "projectExport"].includes(state.activeRoute);
+  if (state.activeRoute === "workspace" || (requiresProject && (!state.session?.workspacePath || !state.session?.projectId))) {
+    store.setState({ activeRoute: "importer" });
+    state = store.getState();
+  }
   const host = root.querySelector("#route-host");
   const previousRoute = String(host?.dataset?.route || "");
   const previousAssemblyDomCacheKey = String(host?.dataset?.assemblyDomCacheKey || "");
@@ -84,6 +87,9 @@ export function renderCurrentRoute(root, store) {
     setRouteHostDataset(host, state.activeRoute, "");
   }
   root.querySelectorAll(".route-button").forEach((button) => {
+    const requiresProject = ["assembly", "projectExport"].includes(button.dataset.route);
+    button.disabled = requiresProject && (!state.session?.workspacePath || !state.session?.projectId);
+    button.title = button.disabled ? (state.locale === "en" ? "Open a project first" : "请先打开项目") : "";
     const active = button.dataset.route === state.activeRoute;
     button.classList.toggle("is-active", active);
   });

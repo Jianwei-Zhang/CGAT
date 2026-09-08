@@ -4,11 +4,54 @@ import assert from "node:assert/strict";
 import {
   buildProjectSwitchItems,
   buildWorkspaceSwitchItems,
+  closeProjectSession,
   switchProjectFromShell,
   switchWorkspaceFromShell,
 } from "../session-switchers.js";
 import { clearAssemblySessionCache } from "../assembly-session-cache.js";
 import { assemblyPageSession } from "../../pages/assembly/page-session.js";
+
+test("failed directory open preserves the active session and assembly runtime", async () => {
+  const initial = {
+    session: { workspacePath: "/existing", projectId: 1 },
+    assembly: { selectedChrName: "Chr01" },
+  };
+  const store = createStore(initial);
+  const cache = assemblyPageSession.subviewRenderCache;
+  await assert.rejects(switchWorkspaceFromShell(store, "/missing", {
+    openWorkspace: async () => { throw new Error("Missing directory"); },
+  }), /Missing directory/);
+  assert.equal(store.getState(), initial);
+  assert.equal(assemblyPageSession.subviewRenderCache, cache);
+});
+
+test("legacy directory requires selection and preserves every project", async () => {
+  const projects = [{ projectId: 1, projectName: "A" }, { projectId: 2, projectName: "B" }];
+  const store = createStore({ locale: "en", session: {}, initializer: {}, importer: {}, assembly: {} });
+  await switchWorkspaceFromShell(store, "/legacy", {
+    openWorkspace: async () => ({ existingProjects: projects, references: [], datasets: [] }),
+  });
+  assert.equal(store.getState().session.projectId, null);
+  assert.deepEqual(store.getState().initializer.existingProjects, projects);
+  assert.equal(switchProjectFromShell(store, 2), true);
+  assert.equal(store.getState().session.projectName, "B");
+});
+
+test("closing a project clears assembly and export data without mutating recent history", () => {
+  const store = createStore({
+    locale: "en",
+    session: { workspacePath: "/existing", projectId: 1, projectName: "A" },
+    initializer: { existingProjects: [{ projectId: 1 }] },
+    assembly: { selectedChrName: "Chr01", chrCtgs: [{ assemblyCtgId: 1 }] },
+    projectExport: { loaded: true, projectId: 1 },
+  });
+  closeProjectSession(store);
+  assert.deepEqual(store.getState().session, { workspacePath: "", projectId: null, projectName: "" });
+  assert.deepEqual(store.getState().assembly.chrCtgs, []);
+  assert.deepEqual(store.getState().initializer.existingProjects, []);
+  assert.equal(store.getState().projectExport.loaded, false);
+  assert.equal(store.getState().activeRoute, "importer");
+});
 
 function createStore(initialState) {
   let state = initialState;
@@ -73,7 +116,7 @@ test("buildProjectSwitchItems returns placeholder when no project is selected", 
   assert.equal(items[2].label, "project-b");
 });
 
-test("switchWorkspaceFromShell opens a new workspace and clears the current project selection", async () => {
+test("switchWorkspaceFromShell opens a directory and selects its sole project", async () => {
   const previousSubviewRenderCache = assemblyPageSession.subviewRenderCache;
   assemblyPageSession.subviewRenderCache.segmentPairs.set("old-workspace", [{ id: 1 }]);
   const store = createStore({
@@ -112,10 +155,10 @@ test("switchWorkspaceFromShell opens a new workspace and clears the current proj
   });
 
   const next = store.getState();
-  assert.equal(next.activeRoute, "workspace");
+  assert.equal(next.activeRoute, "importer");
   assert.equal(next.session.workspacePath, "/tmp/new");
-  assert.equal(next.session.projectId, null);
-  assert.equal(next.session.projectName, "");
+  assert.equal(next.session.projectId, 22);
+  assert.equal(next.session.projectName, "new-project");
   assert.deepEqual(next.initializer.existingProjects, [{ projectId: 22, projectName: "new-project" }]);
   assert.equal(next.assembly.selectedChrName, "");
   assert.deepEqual(next.assembly.chrCtgs, []);

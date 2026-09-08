@@ -22,11 +22,10 @@ test("importer page renders english labels when locale is en", () => {
     },
   });
 
-  assert.match(html, />Import and Open Project Area</);
-  assert.match(html, />1A\. Import ZIP bundle</);
-  assert.match(html, />2\. Open existing project area</);
-  assert.match(html, />Validate history</);
-  assert.match(html, />No history yet\.</);
+  assert.match(html, />Projects</);
+  assert.match(html, />Import project</);
+  assert.match(html, />Open project</);
+  assert.match(html, />No projects yet</);
 });
 
 test("workspace page renders english labels when locale is en", () => {
@@ -72,10 +71,9 @@ test("workspace page renders english labels when locale is en", () => {
   };
   const html = renderWorkspacePage(state);
 
-  assert.match(html, />Project Initialization</);
-  assert.match(html, />Project Area</);
-  assert.match(html, />Existing Projects</);
-  assert.match(html, />Create Project</);
+  assert.match(html, />Current project</);
+  assert.match(html, />Close project</);
   assert.match(html, />Enter Assembly</);
+  assert.doesNotMatch(html, /Create Project/);
   assert.equal(state.assembly.subviewTrackView?.alignmentLength, 10000);
 });

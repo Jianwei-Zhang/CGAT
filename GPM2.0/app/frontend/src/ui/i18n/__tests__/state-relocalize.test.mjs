@@ -31,10 +31,10 @@ test("relocalizeAppState rewrites restored workspace feedback into the target lo
   const next = relocalizeAppState(state, "en");
 
   assert.equal(next.locale, "en");
-  assert.equal(next.importer.status, "Project Area restored");
-  assert.equal(next.importer.summary, "Restored the last project area automatically.");
+  assert.equal(next.importer.status, "Project restored");
+  assert.equal(next.importer.summary, "Restored the last project automatically.");
   assert.deepEqual(next.importer.stages, [
-    "Startup: restore project area",
+    "Startup: restore project",
     "Restore succeeded",
   ]);
   assert.equal(next.initializer.summary, "Restored project: p2 (ID 2)");

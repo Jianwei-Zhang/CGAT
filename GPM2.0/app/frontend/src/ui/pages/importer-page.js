@@ -4,10 +4,17 @@ import {
   importExtractedBundle,
   importZipBundle,
   listProjectInitializerOptions,
-  openWorkspace,
   requestImportCancel,
   validateWorkspaceIntegrity,
 } from "../../services/workflow-api.js";
+import { flushAssemblyProjectState } from "./assembly-page.js";
+import { defaultProjectName } from "../../services/project-session.js";
+import { openProjectWorkspace as openWorkspace } from "../../services/project-session.js";
+import { renderProjectsBody, projectLabels } from "./projects-view.js";
+import { renderWorkspacePage, bindWorkspacePage } from "./workspace-page.js";
+import { switchProjectFromShell, closeProjectSession, buildEmptyAssemblyViewState, buildEmptyProjectExportState } from "../shell/session-switchers.js";
+import { clearAssemblySessionCache } from "../shell/assembly-session-cache.js";
+import { resetAssemblyPageSession } from "./assembly/page-session.js";
 import { pickDirectoryPath, pickZipFilePath } from "../../services/backend-api.js";
 import { formatDateTime, getMessages, t as i18nT } from "../i18n/index.js";
 
@@ -25,127 +32,14 @@ export function renderImporterPage(state) {
     : "";
   const statusToast = renderImporterStatusToast(importer, messages);
   const recentRecords = readWorkspaceHistory();
-  const validationMap = importer.historyValidation && typeof importer.historyValidation === "object"
-    ? importer.historyValidation
-    : {};
-  const failedHistoryPaths = getFailedHistoryPaths(recentRecords, validationMap);
-  const hasHistoryValidation = recentRecords.some((item) => (
-    Object.prototype.hasOwnProperty.call(validationMap, item.path)
-  ));
-  const addPackageHints = importer.addPackageHintsByWorkspacePath || {};
   const workspaceContextMenu = importer.workspaceContextMenu || {};
   const deleteTargets = normalizePathList(importer.deleteTargets);
   const deleteFailedHistoryOnly = importer.deleteSelectionMode === DELETE_SELECTION_MODE_FAILED_HISTORY;
-  const recentList = recentRecords.length
-    ? recentRecords
-        .map((item, index) => {
-          const active = importer.openWorkspacePath === item.path ? "is-active" : "";
-          const validation = validationMap[item.path];
-          const validationHint = validation && validation.ok === false
-            ? `<span class="error-text path-error-suffix">(${escapeHtml(messages.runtime.invalid)}: ${escapeHtml(validation.message || "-")})</span>`
-            : "";
-          const addPackageHint = renderAddPackageHint(state, addPackageHints[item.path]);
-          return `
-            <div class="list-item" data-workspace-history-row-path="${escapeAttr(item.path)}">
-              <div class="list-item-head">
-                <button class="list-item-button ${active}" data-recent-index="${index}" data-recent-path="${escapeAttr(item.path)}">
-                  ${escapeHtml(item.path)}
-                  ${addPackageHint}
-                </button>
-                ${validationHint}
-                <button class="button tiny icon-button danger" title="${escapeAttr(messages.buttons.deleteRecord)}" data-delete-history-path="${escapeAttr(item.path)}" ${
-                  importer.inFlight ? "disabled" : ""
-                }>&#128465;</button>
-              </div>
-              <div class="muted">${messages.runtime.lastUsed}${escapeHtml(formatTime(item.lastUsedAt, state.locale))}</div>
-            </div>
-          `;
-        })
-        .join("")
-    : `<div class="muted">${escapeHtml(messages.runtime.noHistory)}</div>`;
-
   return `
-    <section class="page">
-      <header class="page-header">
-        <div>
-          <p class="kicker">${messages.page.kicker}</p>
-          <h3>${messages.page.title}</h3>
-        </div>
-      </header>
-
+    <section class="page projects-page">
+      ${renderProjectsBody(state, { records: recentRecords, messages, formatTime, renderAddPackageHint,
+        summaryHtml: state.session?.workspacePath ? renderWorkspacePage(state) : "" })}
       ${statusToast}
-
-      <article class="card">
-        <h4>${messages.page.importStep}</h4>
-        <div class="card-grid two">
-          <section class="card importer-option-card">
-            <h4>${messages.page.importZipTitle}</h4>
-            <label>${messages.page.zipPath}</label>
-            <div class="inline-input">
-              <input id="zip-path-input" type="text" placeholder="${escapeAttr(messages.page.zipPath)}" value="${escapeAttr(importer.zipPath)}" />
-              <button id="pick-zip-button" class="button ghost" ${
-                importer.inFlight ? "disabled" : ""
-              }>${messages.buttons.pickZip}</button>
-            </div>
-            <label>${messages.page.workspaceDir}</label>
-            <div class="inline-input">
-              <input id="zip-workspace-root-input" type="text" placeholder="${escapeAttr(messages.page.workspaceDir)}" value="${escapeAttr(importer.workspaceRoot)}" />
-              <button id="pick-zip-workspace-button" class="button ghost" ${
-                importer.inFlight ? "disabled" : ""
-              }>${messages.buttons.pickDirectory}</button>
-            </div>
-            <p class="muted">${escapeHtml(messages.page.importZipRule)}</p>
-            <button id="import-zip-start-button" class="button importer-start-button" ${
-              importer.inFlight ? "disabled" : ""
-            }>${messages.buttons.importZip}</button>
-          </section>
-
-          <section class="card importer-option-card">
-            <h4>${messages.page.importExtractedTitle}</h4>
-            <label>${messages.page.extractedPath}</label>
-            <div class="inline-input">
-              <input id="extracted-path-input" type="text" placeholder="${escapeAttr(messages.page.extractedPath)}" value="${escapeAttr(importer.extractedPath || "")}" />
-              <button id="pick-extracted-button" class="button ghost" ${
-                importer.inFlight ? "disabled" : ""
-              }>${messages.buttons.pickDirectory}</button>
-            </div>
-            <p class="muted">${escapeHtml(messages.page.importExtractedRule)}</p>
-            <button id="import-extracted-start-button" class="button importer-start-button" ${
-              importer.inFlight ? "disabled" : ""
-            }>${messages.buttons.importExtracted}</button>
-          </section>
-        </div>
-      </article>
-
-      <article class="card">
-        <h4>${messages.page.openTitle}</h4>
-        <label>${messages.page.openWorkspacePath}</label>
-        <div class="inline-input">
-          <input id="open-workspace-path-input" type="text" placeholder="${escapeAttr(messages.page.openWorkspacePath)}" value="${escapeAttr(importer.openWorkspacePath || "")}" />
-          <button id="pick-open-workspace-button" class="button ghost" ${
-            importer.inFlight ? "disabled" : ""
-          }>${messages.buttons.pickDirectory}</button>
-          <button id="open-workspace-button" class="button" ${
-            importer.inFlight ? "disabled" : ""
-          }>${messages.buttons.openWorkspace}</button>
-          <button id="validate-history-button" class="button ghost" ${
-            importer.inFlight ? "disabled" : ""
-          }>${messages.buttons.validateHistory}</button>
-          ${
-            hasHistoryValidation
-              ? `<button id="delete-failed-history-button" class="button danger" ${
-                importer.inFlight || failedHistoryPaths.length === 0 ? "disabled" : ""
-              }>${escapeHtml(i18nT(state, "importer.buttons.deleteFailedRecords", {
-                count: failedHistoryPaths.length,
-              }))}</button>`
-              : ""
-          }
-        </div>
-        <div class="list">
-          ${recentList}
-        </div>
-      </article>
-
       ${
         importer.deleteConfirmOpen
           ? `
@@ -185,6 +79,8 @@ export function renderImporterPage(state) {
 }
 
 export function bindImporterPage(host, store) {
+  if (store.getState().initializer) bindWorkspacePage(host, store);
+  bindProjectEntryControls(host, store);
   const zipPathInput = host.querySelector("#zip-path-input");
   const zipWorkspaceRootInput = host.querySelector("#zip-workspace-root-input");
   const extractedPathInput = host.querySelector("#extracted-path-input");
@@ -209,8 +105,11 @@ export function bindImporterPage(host, store) {
   const workspaceHistoryRows = host.querySelectorAll("[data-workspace-history-row-path]");
   const historyDeleteButtons = host.querySelectorAll("[data-delete-history-path]");
   const workspaceContextMenu = host.querySelector("[data-workspace-history-context-menu='1']");
-  const importAddPackageMenuButton = host.querySelector("[data-workspace-import-add-package-path]");
+  const importAddPackageMenuButtons = host.querySelectorAll("[data-workspace-import-add-package-path]");
 
+  host.querySelector("details.importer-import-progress-log")?.addEventListener("toggle", event => {
+    updateImporterState(store, { progressDetailsOpen: event.target.open });
+  });
   bindImportProgressScroll(importProgressList, store);
   bindImporterStatusToastDismiss(host, store);
 
@@ -274,11 +173,13 @@ export function bindImporterPage(host, store) {
     rerender(host, store);
   });
 
-  importZipStartButton?.addEventListener("click", async () => {
+  importZipStartButton?.addEventListener("click", async (event) => {
+    event.preventDefault?.();
     await runImportZipFlow(host, store);
   });
 
-  importExtractedStartButton?.addEventListener("click", async () => {
+  importExtractedStartButton?.addEventListener("click", async (event) => {
+    event.preventDefault?.();
     await runImportExtractedFlow(host, store);
   });
 
@@ -346,13 +247,13 @@ export function bindImporterPage(host, store) {
   });
 
   recentPickButtons.forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
+      if (store.getState().importer.inFlight) return;
       const workspacePath = String(button.dataset.recentPath || "").trim();
       if (!workspacePath) {
         return;
       }
-      updateImporterState(store, { openWorkspacePath: workspacePath });
-      rerender(host, store);
+      await runOpenWorkspaceFlow(host, store, workspacePath);
     });
     button.addEventListener("contextmenu", (event) => {
       event.preventDefault?.();
@@ -409,12 +310,109 @@ export function bindImporterPage(host, store) {
     );
   });
 
-  importAddPackageMenuButton?.addEventListener("click", async (event) => {
+  importAddPackageMenuButtons.forEach((importAddPackageMenuButton) => importAddPackageMenuButton.addEventListener("click", async (event) => {
     event.stopPropagation?.();
     const workspacePath = String(importAddPackageMenuButton.dataset.workspaceImportAddPackagePath || "").trim();
     closeWorkspaceContextMenu(host, store, workspacePath);
     await runImportAddPackageFlow(host, store, workspacePath);
+  }));
+}
+
+function bindProjectEntryControls(host, store) {
+  const busy = () => store.getState().importer.inFlight || store.getState().initializer?.autoPipelineRunning;
+  const openDirectory = async (oldPath = "") => {
+    if (busy()) return;
+    const path = await pickDirectoryPath(store.getState());
+    if (!path) return;
+    const opened = await runOpenWorkspaceFlow(host, store, path);
+    if (opened && oldPath && oldPath !== path) removeWorkspaceHistoryPaths([oldPath]);
+    rerender(host, store);
+  };
+  host.querySelector("#project-import-button")?.addEventListener("click", () => {
+    if (busy()) return;
+    updateImporterState(store, { importDialogOpen: true, projectError: "", pendingProjectPath: "" });
+    rerender(host, store);
+    host.querySelector("#zip-path-input, #extracted-path-input")?.focus();
   });
+  host.querySelector("#project-open-button")?.addEventListener("click", () => openDirectory());
+  host.querySelectorAll("[data-project-relocate]").forEach(button => button.addEventListener("click", () => openDirectory(button.dataset.projectRelocate)));
+  const closeImport = () => {
+    if (busy()) return;
+    updateImporterState(store, { importDialogOpen: false });
+    rerender(host, store);
+    host.querySelector("#project-import-button")?.focus();
+  };
+  host.querySelector("[data-project-import-close]")?.addEventListener("click", closeImport);
+  host.querySelector("[data-project-import-overlay]")?.addEventListener("click", event => {
+    if (event.target === event.currentTarget) closeImport();
+  });
+  const dialog = host.querySelector(".project-import-dialog");
+  dialog?.addEventListener("keydown", event => {
+    if (event.key === "Escape") { event.preventDefault?.(); closeImport(); }
+    if (event.key === "Tab") {
+      const controls = [...dialog.querySelectorAll("input,button")].filter(node => !node.disabled);
+      const next = event.shiftKey ? controls.at(-1) : controls[0];
+      if (event.target === (event.shiftKey ? controls[0] : controls.at(-1))) {
+        event.preventDefault?.(); next?.focus();
+      }
+    }
+  });
+  dialog?.addEventListener("input", () => {
+    const extracted = store.getState().importer.importSource === "extracted";
+    const source = host.querySelector(extracted ? "#extracted-path-input" : "#zip-path-input")?.value.trim();
+    const directory = extracted ? source : host.querySelector("#zip-workspace-root-input")?.value.trim();
+    dialog.querySelector('[type="submit"]').disabled = !source || !directory;
+    dialog.querySelector("#import-project-name").placeholder = directory ? defaultProjectName(directory) : projectLabels(store.getState()).nameDefault;
+  });
+  host.querySelectorAll('[name="project-source"]').forEach(input => input.addEventListener("change", () => {
+    updateImporterState(store, { importSource: input.value, projectError: "" });
+    rerender(host, store);
+    host.querySelector(`[name="project-source"][value="${input.value}"]`)?.focus();
+  }));
+  host.querySelector("#import-project-name")?.addEventListener("input", event => {
+    updateImporterState(store, { projectNameInput: event.target.value });
+  });
+  host.querySelector("#project-retry-button")?.addEventListener("click", async () => {
+    if (busy()) return;
+    await runOpenWorkspaceFlow(host, store, store.getState().importer.pendingProjectPath);
+  });
+  host.querySelector("#legacy-project-select")?.addEventListener("change", async event => {
+    if (busy() || !event.target.value) return;
+    const projectId = Number(event.target.value);
+    updateImporterState(store, { inFlight: true, projectError: "" });
+    try {
+      await flushAssemblyProjectState(host, store);
+      switchProjectFromShell(store, projectId);
+    } catch (error) {
+      updateImporterState(store, { projectError: String(error.message || error) });
+    } finally {
+      updateImporterState(store, { inFlight: false });
+      rerender(host, store);
+    }
+  });
+  host.querySelector("#project-close-button")?.addEventListener("click", async () => {
+    if (busy()) return;
+    updateImporterState(store, { inFlight: true, projectError: "" });
+    try { await flushAssemblyProjectState(host, store); } catch (error) {
+      updateImporterState(store, { inFlight: false, projectError: String(error.message || error) });
+      rerender(host, store);
+      return;
+    }
+    closeProjectSession(store);
+    updateImporterState(store, { inFlight: false });
+    rerender(host, store);
+  });
+  host.querySelectorAll("[data-project-remove]").forEach(button => button.addEventListener("click", () => {
+    if (busy()) return;
+    removeWorkspaceHistoryPaths([button.dataset.projectRemove]);
+    rerender(host, store);
+  }));
+  host.querySelectorAll("[data-project-delete-files]").forEach(button => button.addEventListener("click", () => {
+    if (busy()) return;
+    openDeleteSelectionConfirm(host, store, [button.dataset.projectDeleteFiles]);
+    updateImporterState(store, { deleteWithFiles: true });
+    rerender(host, store);
+  }));
 }
 
 async function runImportZipFlow(host, store) {
@@ -429,6 +427,7 @@ async function runImportZipFlow(host, store) {
     return;
   }
 
+  if (importer.inFlight) return;
   const runId = createImportRunId("zip");
   updateImporterState(store, {
     inFlight: true,
@@ -465,6 +464,7 @@ async function runImportZipFlow(host, store) {
       },
     });
     importOperationCompleted = true;
+    updateImporterState(store, { pendingProjectPath: result.workspaceRoot });
     if (String(store.getState().importer.importRunId || "") !== runId) {
       return;
     }
@@ -505,6 +505,7 @@ async function runImportExtractedFlow(host, store) {
     return;
   }
 
+  if (importer.inFlight) return;
   const runId = createImportRunId("extracted");
   updateImporterState(store, {
     inFlight: true,
@@ -537,6 +538,7 @@ async function runImportExtractedFlow(host, store) {
       },
     });
     importOperationCompleted = true;
+    updateImporterState(store, { pendingProjectPath: result.workspaceRoot });
     if (String(store.getState().importer.importRunId || "") !== runId) {
       return;
     }
@@ -621,9 +623,11 @@ async function runImportAddPackageFlow(host, store, workspaceRoot) {
       },
     });
     importOperationCompleted = true;
+    updateImporterState(store, { pendingProjectPath: result.workspaceRoot });
     if (String(store.getState().importer.importRunId || "") !== runId) {
       return;
     }
+    updateImporterState(store, { pendingProjectPath: "" });
     applyAddPackageImportedState(store, {
       workspaceRoot: result.workspaceRoot || normalizedWorkspaceRoot,
       packageMetadata: result.packageMetadata,
@@ -656,6 +660,7 @@ async function runImportAddPackageFlow(host, store, workspaceRoot) {
 async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
   const snapshot = store.getState();
   const importer = snapshot.importer;
+  if (importer.inFlight) return false;
   const workspaceRoot = String(forcedWorkspacePath || importer.openWorkspacePath || "").trim();
   if (!workspaceRoot) {
     updateImporterState(store, {
@@ -679,7 +684,8 @@ async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
   rerender(host, store);
 
   try {
-    const options = await openWorkspace({ workspaceRoot });
+    await flushAssemblyProjectState(host, store);
+    const options = await openWorkspace({ workspaceRoot, projectName: importer.pendingProjectPath === workspaceRoot ? importer.projectNameInput : "" });
     const defaultReferenceId = options.references[0]?.referenceGenomeId || "";
     const defaultPrimaryDatasetId = options.datasets[0]?.datasetId || "";
     applyWorkspaceLoadedState(store, {
@@ -696,8 +702,13 @@ async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
       appendStage: i18nT(snapshot, "importer.runtime.workspaceLoadedStage"),
     });
     window.dispatchEvent(new Event("gpm-next:route-refresh"));
+    rerender(host, store);
+    return true;
   } catch (error) {
     updateImporterState(store, {
+      projectError: String(error.message || error),
+      pendingProjectPath: error.pendingProjectPath || "",
+      historyValidation: { ...store.getState().importer.historyValidation, [workspaceRoot]: { ok: false, message: String(error.message || error) } },
       inFlight: false,
       importRunId: null,
       importCancelling: false,
@@ -824,6 +835,7 @@ async function runDeleteSelectedFlow(host, store) {
   const selectedPaths = failedHistoryPaths
     ? requestedPaths.filter((path) => failedHistoryPaths.has(path))
     : requestedPaths;
+  if (importer.inFlight) return;
   const deleteWithFiles = importer.deleteWithFiles === true;
   if (selectedPaths.length === 0) {
     updateImporterState(store, {
@@ -852,10 +864,16 @@ async function runDeleteSelectedFlow(host, store) {
 
   const stages = [];
   let deletedDirCount = 0;
+  const removedPaths = [];
+  const failures = [];
   if (deleteWithFiles) {
     for (const workspaceRoot of selectedPaths) {
       try {
         const result = await deleteWorkspaceDirectory({ workspaceRoot });
+        if (!result.deleted && result.reason !== "not_found") {
+          throw new Error(result.reason || projectLabels(store.getState()).deleteFailed);
+        }
+        removedPaths.push(workspaceRoot);
         if (result.deleted) {
           deletedDirCount += 1;
           stages.push(i18nT(store.getState(), "importer.runtime.deleteDirRemovedStage", {
@@ -867,6 +885,7 @@ async function runDeleteSelectedFlow(host, store) {
           }));
         }
       } catch (error) {
+        failures.push(`${workspaceRoot}: ${String(error.message || error)}`);
         stages.push(i18nT(store.getState(), "importer.runtime.deleteDirFailedStage", {
           workspaceRoot,
           message: String(error.message || error),
@@ -875,10 +894,12 @@ async function runDeleteSelectedFlow(host, store) {
     }
   }
 
-  removeWorkspaceHistoryPaths(selectedPaths);
+  const completedPaths = deleteWithFiles ? removedPaths : selectedPaths;
+  removeWorkspaceHistoryPaths(completedPaths);
 
   const nextSession = { ...store.getState().session };
-  if ((!deleteFailedHistoryOnly || deleteWithFiles) && selectedPaths.includes(nextSession.workspacePath)) {
+  if (deleteWithFiles && removedPaths.includes(nextSession.workspacePath)) {
+    closeProjectSession(store);
     nextSession.workspacePath = "";
     nextSession.projectId = null;
     nextSession.projectName = "";
@@ -887,7 +908,7 @@ async function runDeleteSelectedFlow(host, store) {
   const currentImporter = store.getState().importer;
   const nextValidation = { ...(currentImporter.historyValidation || {}) };
   for (const path of selectedPaths) {
-    delete nextValidation[path];
+    if (completedPaths.includes(path)) delete nextValidation[path];
   }
   store.setState({
     session: nextSession,
@@ -899,14 +920,15 @@ async function runDeleteSelectedFlow(host, store) {
       deleteWithFiles: false,
       deleteTargets: [],
       historyValidation: nextValidation,
-      openWorkspacePath: (!deleteFailedHistoryOnly || deleteWithFiles)
-        && selectedPaths.includes(currentImporter.openWorkspacePath)
+      openWorkspacePath: deleteWithFiles
+        && removedPaths.includes(currentImporter.openWorkspacePath)
         ? ""
         : currentImporter.openWorkspacePath,
-      status: i18nT(store.getState(), "importer.runtime.deleteDoneStatus"),
+      projectError: failures.join("\n"),
+      status: failures.length ? projectLabels(store.getState()).deleteFailed : i18nT(store.getState(), "importer.runtime.deleteDoneStatus"),
       summary: deleteWithFiles
         ? i18nT(store.getState(), "importer.runtime.deleteDoneWithFilesSummary", {
-          count: selectedPaths.length,
+          count: completedPaths.length,
           deletedDirCount,
         })
         : i18nT(store.getState(), deleteFailedHistoryOnly
@@ -924,7 +946,9 @@ async function runDeleteSelectedFlow(host, store) {
 
 async function enterWorkspaceAfterImport(store, payload) {
   const { workspaceRoot, importerStatus, importerSummary, appendStage } = payload;
-  const options = await listProjectInitializerOptions({ workspaceRoot });
+  await flushAssemblyProjectState(globalThis.document?.querySelector("#route-host"), store);
+  updateImporterState(store, { stages: [...store.getState().importer.stages, projectLabels(store.getState()).pending] });
+  const options = await openWorkspace({ workspaceRoot, projectName: store.getState().importer.projectNameInput });
   const defaultReferenceId = options.references[0]?.referenceGenomeId || "";
   const defaultPrimaryDatasetId = options.datasets[0]?.datasetId || "";
   applyWorkspaceLoadedState(store, {
@@ -957,12 +981,15 @@ function applyWorkspaceLoadedState(store, payload) {
     appendStage,
   } = payload;
   const current = store.getState();
+  const selectedProject = existingProjects.length === 1 ? existingProjects[0] : null;
+  resetAssemblyPageSession();
+  clearAssemblySessionCache();
   store.setState({
     session: {
       ...current.session,
       workspacePath: workspaceRoot,
-      projectName: "",
-      projectId: null,
+      projectName: selectedProject?.projectName || "",
+      projectId: selectedProject?.projectId || null,
     },
     importer: {
       ...current.importer,
@@ -973,6 +1000,10 @@ function applyWorkspaceLoadedState(store, payload) {
       workspaceRoot,
       openWorkspacePath: workspaceRoot,
       historyValidation: {},
+      importDialogOpen: false,
+      pendingProjectPath: "",
+      projectError: "",
+      projectNameInput: "",
       deleteConfirmOpen: false,
       deleteSelectionMode: "",
       deleteWithFiles: false,
@@ -1017,44 +1048,9 @@ function applyWorkspaceLoadedState(store, payload) {
       editPhasedAssemblyEnabledInput: false,
       summary: i18nT(current, "importer.runtime.optionsLoadedSummary"),
     },
-    assembly: {
-      ...current.assembly,
-      loading: false,
-      bootstrapping: false,
-      summary: i18nT(current, "workspace.runtime.assemblySummary"),
-      chromosomes: [],
-      selectedChrName: "",
-      chrCtgs: [],
-      refTrackMembers: [],
-      phasedChrTracks: [],
-      isChrPhased: false,
-      activePhasedTrackKey: "",
-      activeHitsTrackKey: "primary",
-      activePhasedTrackKeyByChr: {},
-      activeHitsTrackKeyByChr: {},
-      deletedCtgs: [],
-      selectedDeletedCtgRecordIds: [],
-      selectedCtgId: null,
-      supportMirroredCtgs: [],
-      hiddenPrimaryCtgIds: [],
-      hiddenPrimaryCtgIdsByChr: {},
-      trackDragOffsets: [],
-      subviewTrackDragOffsets: [],
-      ctgDetail: null,
-      editCandidates: {
-        moveTargetCtgs: [],
-        addSeqCandidates: [],
-      },
-      selectedMemberSeqId: null,
-      actionStatus: "",
-      actionError: "",
-      junctionLoading: false,
-      junctionStatus: "",
-      junctionError: "",
-      junctionReport: null,
-      error: "",
-    },
-    activeRoute: "workspace",
+    assembly: { ...current.assembly, ...buildEmptyAssemblyViewState(current) },
+    projectExport: buildEmptyProjectExportState(),
+    activeRoute: "importer",
   });
 }
 
@@ -1291,9 +1287,9 @@ function renderImportProgressOverlay(importer, messages) {
             ? `<p class="importer-import-progress-error" role="alert">${escapeHtml(String(importer.importCancelError))}</p>`
             : ""}
         </section>
-        <section class="importer-import-progress-log" aria-label="${escapeAttr(messages.page.importProgressDetailsTitle)}">
+        <details class="importer-import-progress-log" ${importer.progressDetailsOpen ? "open" : ""}><summary>${escapeHtml(messages.page.importProgressDetailsTitle)}</summary>
           <ul class="status-list import-progress-list importer-import-progress-list" data-import-progress-list="1">${stageItems}</ul>
-        </section>
+        </details>
       </article>
     </div>
   `;
@@ -1319,7 +1315,7 @@ function renderImporterStatusToast(importer, messages) {
   }
   const status = String(importer.status || "").trim();
   const summary = String(importer.summary || "").trim();
-  if (!status && !summary) {
+  if ((!status && !summary) || status === messages.runtime.notStarted) {
     return "";
   }
   const isError = status === messages.runtime.importFailedStatus || status === messages.runtime.openFailedStatus;
@@ -1489,6 +1485,9 @@ function buildImportCompletionErrorPatch(
 ) {
   const cancellationWasRequested = !importOperationCompleted && importer?.importCancelling === true;
   return {
+    projectError: cancellationWasRequested ? "" : String(error?.message || error),
+    importDialogOpen: !importOperationCompleted,
+    pendingProjectPath: importOperationCompleted ? importer.pendingProjectPath : "",
     inFlight: false,
     importRunId: null,
     importCancelling: false,
@@ -1801,6 +1800,7 @@ function readWorkspaceHistory() {
         }
         return {
           path,
+          ...(item.projectName ? { projectName: String(item.projectName) } : {}),
           lastUsedAt: Number.isFinite(Number(item.lastUsedAt))
             ? Number(item.lastUsedAt)
             : Date.now(),
@@ -1889,6 +1889,7 @@ function escapeAttr(value) {
 }
 
 function syncSessionHeader(store) {
+  if (!globalThis.document) return;
   const state = store.getState();
   const workspace = document.querySelector("#session-workspace");
   const title = document.querySelector("#session-title");
