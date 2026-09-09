@@ -438,11 +438,11 @@
 .project-recents .project-entry-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 20px; }
 .project-recents .project-entry-actions .button { min-width: 0; min-height: 40px; padding: 10px; }
 .project-recents-header { position: relative; margin-bottom: 12px; }
-.project-recent-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: center; min-width: 0; min-height: 44px; padding: 5px 6px 5px 10px; border: 1px solid #dedede; border-radius: 5px; background: #fff; }
+.project-recent-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: center; min-width: 0; min-height: 44px; padding: 5px; border: 1px solid #dedede; border-radius: 5px; background: #fff; }
 .project-recent-row + .project-recent-row { margin-top: 8px; }
 .project-recent-row:hover { background: #f7f7f7; border-color: #b8b8b8; }
 .project-recent-row.is-active { background: #efefef; border-color: #888; box-shadow: inset 2px 0 #555; }
-.project-recent-open { display: flex; min-width: 0; align-items: center; min-height: 32px; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.project-recent-open { display: flex; min-width: 0; align-items: center; min-height: 32px; padding: 0 5px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
 .project-recent-name { display: flex; min-width: 0; align-items: center; gap: 8px; }
 .project-recent-name > .project-icon { width: 16px; height: 16px; color: #808080; }
 .project-recent-name strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
