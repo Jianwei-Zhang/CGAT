@@ -1664,7 +1664,7 @@ test("import progress css keeps the active label on one line and uses status ico
   );
   assert.match(
     css,
-    /\.importer-import-progress-dialog \.import-progress-close\s*\{[^}]*position:\s*absolute;[^}]*top:\s*16px;[^}]*right:\s*20px;/,
+    /\.projects-page \.importer-import-progress-dialog \.import-progress-close\s*\{[^}]*position:\s*absolute;[^}]*top:\s*12px;[^}]*right:\s*12px;/,
   );
   assert.match(
     css,

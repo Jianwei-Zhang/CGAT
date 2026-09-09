@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   buildProjectSwitchItems,
   buildWorkspaceSwitchItems,
+  migrateWorkspaceHistoryToArrivalOrder,
   closeProjectSession,
   switchProjectFromShell,
   switchWorkspaceFromShell,
@@ -95,7 +96,19 @@ test("buildWorkspaceSwitchItems includes current workspace and history records w
   assert.deepEqual(items.map(item => item.label), ["History A", "Current", "History B"]);
 });
 
-test("updateWorkspaceHistory keeps existing projects in place and prepends only new projects", () => {
+test("existing newest-first libraries migrate once without using last-opened timestamps", () => {
+  const key = "gpm_next:workspace_history";
+  const data = new Map([[key, JSON.stringify([
+    { path: "/new", lastUsedAt: 1 }, { path: "/old", lastUsedAt: 10 },
+  ])]]);
+  const storage = { getItem: key => data.get(key), setItem: (key, value) => data.set(key, value) };
+  migrateWorkspaceHistoryToArrivalOrder(storage);
+  assert.deepEqual(JSON.parse(data.get(key)).map(record => record.path), ["/old", "/new"]);
+  migrateWorkspaceHistoryToArrivalOrder(storage);
+  assert.deepEqual(JSON.parse(data.get(key)).map(record => record.path), ["/old", "/new"]);
+});
+
+test("updateWorkspaceHistory keeps existing projects in place and appends new projects in arrival order", () => {
   const records = [
     { path: "/tmp/a", projectName: "A", lastUsedAt: 1 },
     { path: "/tmp/b", projectName: "B", lastUsedAt: 2 },
@@ -105,9 +118,14 @@ test("updateWorkspaceHistory keeps existing projects in place and prepends only 
     { path: "/tmp/b", projectName: "B renamed", lastUsedAt: 3 },
   ]);
   assert.deepEqual(updateWorkspaceHistory(records, "/tmp/c", "C", 4), [
-    { path: "/tmp/c", projectName: "C", lastUsedAt: 4 },
     ...records,
+    { path: "/tmp/c", projectName: "C", lastUsedAt: 4 },
   ]);
+  const full = Array.from({ length: 20 }, (_, index) => ({ path: `/tmp/${index}` }));
+  const appended = updateWorkspaceHistory(full, "/tmp/new", "New", 5);
+  assert.equal(appended.length, 20);
+  assert.equal(appended[0].path, "/tmp/1");
+  assert.equal(appended.at(-1).path, "/tmp/new");
 });
 
 test("buildProjectSwitchItems returns placeholder when no project is selected", () => {

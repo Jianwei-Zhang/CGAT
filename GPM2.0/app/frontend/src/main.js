@@ -5,6 +5,7 @@ import { renderAppShell } from "./ui/shell/app-shell.js";
 import { registerRoutes, renderCurrentRoute } from "./ui/shell/router.js";
 import {
   buildWorkspaceSwitchItems,
+  migrateWorkspaceHistoryToArrivalOrder,
   switchWorkspaceFromShell,
   updateWorkspaceHistory,
 } from "./ui/shell/session-switchers.js";
@@ -237,6 +238,7 @@ const store = createStore({
   },
 });
 
+migrateWorkspaceHistoryToArrivalOrder(window.localStorage);
 app.innerHTML = renderAppShell(store.getState());
 bindGlobalLanguageSwitch(app, store);
 bindGlobalSessionSwitchers(app, store);

@@ -31,6 +31,9 @@
 /* Main import progress dialog. Keep these selectors under the importer modifier so shared overlays stay unchanged. */
 .importer-import-progress-overlay {
   z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: clamp(12px, 4vw, 32px);
   background: rgba(15, 23, 42, 0.46);
   backdrop-filter: blur(2px);
@@ -39,8 +42,10 @@
 .importer-import-progress-dialog {
   position: relative;
   width: min(900px, calc(100vw - 64px));
-  max-height: min(760px, calc(100vh - 64px));
-  overflow: hidden;
+  max-height: min(760px, calc(100dvh - 64px));
+  margin: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -52,39 +57,38 @@
   box-shadow: 0 18px 50px rgba(15, 23, 42, 0.22);
 }
 
-.importer-import-progress-dialog .import-progress-close {
+.projects-page .importer-import-progress-dialog .import-progress-close {
   position: absolute;
-  top: 16px;
-  right: 20px;
+  top: 12px;
+  right: 12px;
   z-index: 1;
-  width: 36px;
-  min-width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  height: 32px;
   display: inline-grid;
   place-items: center;
   padding: 0;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  border: 0;
+  border-radius: 4px;
   background: transparent;
-  color: #64748b;
+  color: #777;
 }
 
-.importer-import-progress-dialog .import-progress-close:hover {
-  border-color: #d7e0ea;
-  background: #f4f7fa;
-  color: #1f2937;
+.projects-page .importer-import-progress-dialog .import-progress-close:hover:not(:disabled) {
+  background: #f0f0f0;
+  color: #222;
 }
 
-.importer-import-progress-dialog .import-progress-close:focus-visible {
-  outline: 2px solid #4f82b5;
+.projects-page .importer-import-progress-dialog .import-progress-close:focus-visible {
+  outline: 2px solid #555;
   outline-offset: 2px;
 }
 
-.importer-import-progress-dialog .import-progress-close:disabled {
+.projects-page .importer-import-progress-dialog .import-progress-close:disabled {
   cursor: default;
-  color: #a45a16;
-  opacity: 1;
+  color: #777;
+  opacity: 0.6;
 }
 
 .importer-import-progress-dialog .import-progress-close svg {
@@ -99,6 +103,7 @@
 }
 
 .importer-import-progress-overview {
+  flex-shrink: 0;
   display: grid;
   gap: 12px;
   padding: 24px 32px 18px;
@@ -182,6 +187,7 @@
 
 .importer-import-progress-log {
   min-height: 0;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -296,19 +302,13 @@
 
 @media (max-width: 640px) {
   .importer-import-progress-overlay {
-    place-items: end center;
     padding: 10px;
   }
 
   .importer-import-progress-dialog {
     width: 100%;
-    max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
     border-radius: 8px;
-  }
-
-  .importer-import-progress-dialog .import-progress-close {
-    top: 10px;
-    right: 12px;
   }
 
   .importer-import-progress-overview {

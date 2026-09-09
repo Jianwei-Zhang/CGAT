@@ -183,12 +183,27 @@ export function buildWorkspaceSwitchItems({ state, historyRecords = [], labels }
   return items;
 }
 
+export function migrateWorkspaceHistoryToArrivalOrder(storage) {
+  const historyKey = "gpm_next:workspace_history";
+  const orderKey = "gpm_next:workspace_history_order";
+  try {
+    if (storage.getItem(orderKey) === "arrival-asc") return;
+    const records = JSON.parse(storage.getItem(historyKey) || "[]");
+    if (!Array.isArray(records)) return;
+    // The previous library inserted new projects at the front; reverse that order once.
+    storage.setItem(historyKey, JSON.stringify(records.reverse()));
+    storage.setItem(orderKey, "arrival-asc");
+  } catch {
+    // A storage failure must not prevent opening the application.
+  }
+}
+
 export function updateWorkspaceHistory(records = [], workspacePath, projectName = "", lastUsedAt = Date.now()) {
   const path = normalizeWorkspacePath(workspacePath);
   if (!path) return records.slice(0, 20);
   const existingIndex = records.findIndex(record => normalizeWorkspacePath(record?.path) === path);
   if (existingIndex < 0) {
-    return [{ path, projectName: String(projectName || ""), lastUsedAt }, ...records].slice(0, 20);
+    return [...records, { path, projectName: String(projectName || ""), lastUsedAt }].slice(-20);
   }
   return records.map((record, index) => index === existingIndex ? {
     ...record,
