@@ -469,7 +469,27 @@
 .project-title-row h2 { min-width: 0; margin: 0; font: inherit; overflow-wrap: anywhere; }
 .project-title-row .project-icon-button { margin-top: 1px; }
 .project-detail-path { margin-top: 8px; color: #707070; font-size: 12px; overflow-wrap: anywhere; }
-.projects-page .project-enter-assembly { min-width: 152px; min-height: 44px; }
+.projects-page .button.project-enter-assembly {
+  min-width: 152px;
+  min-height: 44px;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-color: #b8b8b8;
+  background: #f1f1f1;
+  color: #222;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.projects-page .button.project-enter-assembly:hover:not(:disabled) {
+  border-color: #929292;
+  background: #e7e7e7;
+}
+
+.projects-page .button.project-enter-assembly:active:not(:disabled) {
+  background: #dedede;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+}
 .project-metadata { margin-top: 8px; }
 .project-current .workspace-recipe-summary { margin: 0; border: 0; border-radius: 0; background: none; overflow: visible; }
 .project-current .workspace-recipe-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 48px; background: transparent; }
