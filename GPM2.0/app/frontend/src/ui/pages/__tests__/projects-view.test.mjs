@@ -24,7 +24,7 @@ test("recent projects and current detail share the browser layout without duplic
     records: [{ path: "/rice", projectName: "Rice" }, { path: '/other/"<name>', projectName: "Other" }],
     summaryHtml: '<section class="project-current">Rice detail</section>',
   });
-  assert.match(html, /class="project-browser[\s\S]*class="project-recents"[\s\S]*class="project-current"/);
+  assert.match(html, /class="project-browser"[\s\S]*class="project-recents"[\s\S]*id="project-import-button"[\s\S]*id="project-open-button"[\s\S]*class="project-recents-header"[\s\S]*class="project-current"/);
   assert.match(html, /data-recent-path="\/rice" aria-current="true"/);
   assert.match(html, /&quot;&lt;name&gt;/);
   assert.doesNotMatch(html, /No projects yet|No project open/);
@@ -38,11 +38,12 @@ test("recent-only state is distinct from no projects", () => {
   assert.doesNotMatch(html, /No projects yet/);
 });
 
-test("active project remains visible after its recent record is removed", () => {
+test("active project keeps the sidebar entry actions when its recent record is removed", () => {
   const html = render({ session: { workspacePath: "/rice" }, summaryHtml: "Rice detail" });
-  assert.match(html, /project-browser without-recents/);
+  assert.match(html, /class="project-recents"[\s\S]*id="project-import-button"[\s\S]*id="project-open-button"/);
+  assert.match(html, /class="project-count">0<\/span>/);
   assert.match(html, /Rice detail/);
-  assert.doesNotMatch(html, /No projects yet|project-no-selection/);
+  assert.doesNotMatch(html, /No projects yet|project-no-selection|id="validate-history-button"/);
 });
 
 test("project actions remain disabled during import and errors retain their text", () => {

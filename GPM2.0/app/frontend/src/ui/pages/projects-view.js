@@ -102,8 +102,7 @@ export function renderProjectsBody(state, { records, messages, formatTime, summa
       ${error?.ok === false ? `<p class="error-text project-recent-error">${html(error.message || error.missing?.join(", ") || messages.runtime.invalid)}</p>` : ""}
     </div>`;
   }).join("");
-  return `${empty ? "" : `<header class="project-page-header">${actions}</header>`}
-  ${importer.inFlight && !importer.importRunId ? `<p role="status">${html(importer.status || labels.loading)}</p>` : ""}
+  return `${importer.inFlight && !importer.importRunId ? `<p role="status">${html(importer.status || labels.loading)}</p>` : ""}
   ${importer.projectError && !importer.importDialogOpen ? `<p class="error-text" role="alert">${html(importer.projectError)}</p>` : ""}
   ${importer.pendingProjectPath ? `<section class="project-pending">
     <strong>${labels.pending}</strong><span class="project-path">${html(importer.pendingProjectPath)}</span>
@@ -111,17 +110,18 @@ export function renderProjectsBody(state, { records, messages, formatTime, summa
   ${empty ? `<section class="project-empty" aria-labelledby="project-empty-title">
     <span class="project-empty-symbol">${projectIcon("folder")}</span>
     <h4 id="project-empty-title">${labels.empty}</h4>${actions}
-  </section>` : `<div class="project-browser ${records.length ? "" : "without-recents"}">
-    ${records.length ? `<section class="project-recents" aria-labelledby="project-recents-title">
+  </section>` : `<div class="project-browser">
+    <section class="project-recents" aria-labelledby="project-recents-title">
+      ${actions}
       <header class="project-recents-header"><h4 id="project-recents-title">${labels.recent}<span class="project-count">${records.length}</span></h4>
-        <details class="project-row-menu"><summary aria-label="${labels.recentActions}" title="${labels.recentActions}">${projectIcon("more")}</summary>
+        ${records.length ? `<details class="project-row-menu"><summary aria-label="${labels.recentActions}" title="${labels.recentActions}">${projectIcon("more")}</summary>
           <div class="project-row-menu-items">
             <button id="validate-history-button" ${disabled}>${messages.buttons.validateHistory}</button>
             ${records.some(record => importer.historyValidation?.[record.path]) ? `<button id="delete-failed-history-button" class="danger" ${busy || !failed ? "disabled" : ""}>${messages.buttons.deleteFailedRecords.replace("{count}", failed)}</button>` : ""}
           </div>
-        </details>
+        </details>` : ""}
       </header><div class="project-recent-list">${rows}</div>
-    </section>` : ""}
+    </section>
     ${summaryHtml || `<section class="project-empty project-no-selection"><span class="project-empty-symbol">${projectIcon("open")}</span><h4>${labels.noOpen}</h4></section>`}
   </div>`}
   ${renderProjectImportDialog(state, messages)}`;

@@ -125,10 +125,15 @@ export function renderWorkspacePage(state) {
       <span class="project-detail-label">${labels.details}</span>
       <button id="project-close-button" class="button project-icon-button" title="${labels.close}" aria-label="${labels.close}" ${busy ? "disabled" : ""}>${projectIcon("close")}</button>
     </header>
-    <div class="project-title-row"><h2>${escapeHtml(selectedProject?.projectName || defaultProjectName(state.session.workspacePath))}</h2>
-      ${selectedProject && !renameOpen ? `<button id="selected-project-rename-button" class="button project-icon-button" title="${labels.rename}" aria-label="${labels.rename}" ${busy ? "disabled" : ""}>${projectIcon("rename")}</button>` : ""}
+    <div class="project-detail-overview">
+      <div class="project-identity">
+        <div class="project-title-row"><h2>${escapeHtml(selectedProject?.projectName || defaultProjectName(state.session.workspacePath))}</h2>
+          ${selectedProject && !renameOpen ? `<button id="selected-project-rename-button" class="button project-icon-button" title="${labels.rename}" aria-label="${labels.rename}" ${busy ? "disabled" : ""}>${projectIcon("rename")}</button>` : ""}
+        </div>
+        <p class="project-path project-detail-path" title="${escapeAttr(state.session.workspacePath)}">${escapeHtml(state.session.workspacePath)}</p>
+      </div>
+      <button id="initializer-enter-assembly-button" class="button project-primary project-enter-assembly" ${!selectedProject || busy ? "disabled" : ""}>${messages.buttons.enterAssembly}${projectIcon("arrow")}</button>
     </div>
-    <p class="project-path project-detail-path" title="${escapeAttr(state.session.workspacePath)}">${escapeHtml(state.session.workspacePath)}</p>
     ${selectedProject && renameOpen ? `<form class="project-rename-form" data-project-rename-form>
       <label for="selected-project-name-input">${messages.cards.projectName}</label>
       <div class="project-rename-controls"><input id="selected-project-name-input" type="text" value="${escapeAttr(editDraft.projectName)}" ${busy ? "disabled" : ""} />
@@ -142,7 +147,6 @@ export function renderWorkspacePage(state) {
       </select></label>` : ""}
     ${selectedProject ? renderSelectedProjectCard({ initializer, selectedProject, locale: state.locale, messages }) : ""}
     ${initializer.optionsError ? `<p class="error-text" role="alert">${escapeHtml(initializer.optionsError)}</p>` : ""}
-    <footer class="project-detail-footer"><button id="initializer-enter-assembly-button" class="button project-primary" ${!selectedProject || busy ? "disabled" : ""}>${messages.buttons.enterAssembly}${projectIcon("arrow")}</button></footer>
   </section>
   ${initializer.autoPipelineModalOpen ? renderAutoPipelineModal(initializer, messages) : ""}`;
 }
