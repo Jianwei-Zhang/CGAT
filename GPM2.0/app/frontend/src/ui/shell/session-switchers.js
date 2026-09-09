@@ -165,8 +165,8 @@ export function buildWorkspaceSwitchItems({ state, historyRecords = [], labels }
     });
   }
   const candidates = [
-    currentPath ? { path: currentPath, projectName: state.session.projectName } : null,
     ...historyRecords,
+    currentPath ? { path: currentPath, projectName: state.session.projectName } : null,
   ];
   for (const record of candidates) {
     const path = normalizeWorkspacePath(record?.path);
@@ -176,11 +176,26 @@ export function buildWorkspaceSwitchItems({ state, historyRecords = [], labels }
     seen.add(path);
     items.push({
       value: path,
-      label: `${record.projectName || defaultProjectName(path)} (${path})`,
+      label: (path === currentPath && state.session.projectName) || record.projectName || defaultProjectName(path),
       selected: path === currentPath,
     });
   }
   return items;
+}
+
+export function updateWorkspaceHistory(records = [], workspacePath, projectName = "", lastUsedAt = Date.now()) {
+  const path = normalizeWorkspacePath(workspacePath);
+  if (!path) return records.slice(0, 20);
+  const existingIndex = records.findIndex(record => normalizeWorkspacePath(record?.path) === path);
+  if (existingIndex < 0) {
+    return [{ path, projectName: String(projectName || ""), lastUsedAt }, ...records].slice(0, 20);
+  }
+  return records.map((record, index) => index === existingIndex ? {
+    ...record,
+    path,
+    projectName: String(projectName || record.projectName || ""),
+    lastUsedAt,
+  } : record).slice(0, 20);
 }
 
 export function buildProjectSwitchItems({ state, labels }) {

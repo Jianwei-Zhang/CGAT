@@ -632,10 +632,8 @@ test("project validation updates in place and preserves the rename draft across 
     assert.match(page.toastHtml, /importer-status-toast.*[\s\S]*校验完成：通过 1 个，失败 2 个。/);
     assert.deepEqual(store.getState().importer.historyValidatedPaths, paths);
     assert.doesNotMatch(renderImporterPage(store.getState()), /project-validation-summary/);
-    assert.equal(errors[0].hidden, true);
-    assert.equal(errors[1].textContent, "project.sqlite");
-    assert.equal(errors[2].hidden, false);
-    assert.match(errors[2].textContent, /Path <unavailable>/);
+    assert.ok(errors.every(node => node.hidden && node.textContent === ""));
+    assert.doesNotMatch(renderImporterPage(store.getState()), /data-project-validation-path/);
 
     repaired = true;
     const retry = validate.click();
@@ -720,7 +718,9 @@ test("selecting a project preserves the library and replaces only detail after a
   const setState = store.setState;
   store.setState = patch => {
     if (patch.session && patch.session.workspacePath !== store.getState().session.workspacePath) {
-      history = [{ path: patch.session.workspacePath, projectName: patch.session.projectName, lastUsedAt: 3 }, ...history.filter(record => record.path !== patch.session.workspacePath)];
+      history = history.map(record => record.path === patch.session.workspacePath
+        ? { ...record, projectName: patch.session.projectName, lastUsedAt: 3 }
+        : record);
     }
     setState(patch);
   };
@@ -755,8 +755,8 @@ test("selecting a project preserves the library and replaces only detail after a
     assert.equal(store.getState().session.workspacePath, "D:/new");
     assert.equal(detailWrites, 1);
     assert.match(detailHtml, /<h2>New<\/h2>/);
-    assert.equal(list.children[0], rows[1]);
-    assert.equal(list.children[1], rows[0]);
+    assert.equal(list.children[0], rows[0]);
+    assert.equal(list.children[1], rows[1]);
     assert.equal(rows[0].button["aria-current"], "false");
     assert.equal(rows[1].button["aria-current"], "true");
     assert.equal(rows[1].button.disabled, false);
@@ -768,7 +768,6 @@ test("selecting a project preserves the library and replaces only detail after a
     assert.equal(detailWrites, 1);
     assert.equal(host.innerHTML, "Mounted project page");
     assert.match(page.toastHtml, /Cannot open old project/);
-    assert.match(rows[0].error.textContent, /Cannot open old project/);
     assert.equal(remove.hidden, true);
     await enter.click();
     assert.equal(store.getState().activeRoute, "assembly");
@@ -892,7 +891,7 @@ test("importer does not render loaded-project add-package actions", () => {
   assert.doesNotMatch(html, /<h4>Loaded projects<\/h4>/);
 });
 
-test("importer workspace history row imports add package without project id and shows added hint", async () => {
+test("importer workspace history row imports add packages without expanding the compact project card", async () => {
   const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;
   const previousFetch = globalThis.fetch;
@@ -1033,21 +1032,17 @@ test("importer workspace history row imports add package without project id and 
     });
     assert.deepEqual(store.getState().initializer.existingProjects[0].supportDatasetIds, [22]);
     assert.equal(store.getState().initializer.datasets.some((dataset) => dataset.name === "new_ds"), true);
-    assert.match(renderImporterPage(store.getState()), /class="add-package-hint">\(<strong>added<\/strong> new_ds\)<\/span>/);
+    assert.deepEqual(store.getState().importer.addPackageHintsByWorkspacePath["D:/ws"], ["new_ds"]);
+    assert.doesNotMatch(renderImporterPage(store.getState()), /class="add-package-hint"/);
 
     await importAddPackageButton.click();
 
     assert.equal(store.getState().initializer.datasets.some((dataset) => dataset.name === "new_ds2"), true);
-    assert.match(
-      renderImporterPage(store.getState()),
-      /class="add-package-hint">\(<strong>added<\/strong> new_ds,new_ds2\)<\/span>/,
-    );
+    assert.deepEqual(store.getState().importer.addPackageHintsByWorkspacePath["D:/ws"], ["new_ds", "new_ds2"]);
+    assert.doesNotMatch(renderImporterPage(store.getState()), /class="add-package-hint"/);
 
     store.setState({ locale: "zh" });
-    assert.match(
-      renderImporterPage(store.getState()),
-      /class="add-package-hint">（<strong>added<\/strong> new_ds,new_ds2）<\/span>/,
-    );
+    assert.doesNotMatch(renderImporterPage(store.getState()), /class="add-package-hint"/);
   } finally {
     globalThis.document = previousDocument;
     globalThis.window = previousWindow;

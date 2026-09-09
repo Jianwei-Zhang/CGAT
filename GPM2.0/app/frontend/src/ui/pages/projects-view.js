@@ -48,10 +48,6 @@ function projectValidationView(state, records) {
   };
 }
 
-function projectValidationError(result, messages) {
-  return result?.ok === false ? result.message || result.missing?.join(", ") || messages.runtime.invalid : "";
-}
-
 export function syncProjectValidation(host, state, records) {
   const view = projectValidationView(state, records);
   const validate = host.querySelector("#validate-history-button");
@@ -65,12 +61,6 @@ export function syncProjectValidation(host, state, records) {
     remove.hidden = !view.failed;
     remove.disabled = view.disabled || !view.failed;
   }
-  const messages = getMessages(state, "importer");
-  host.querySelectorAll("[data-project-validation-path]").forEach(node => {
-    const error = projectValidationError(state.importer.historyValidation?.[node.dataset.projectValidationPath], messages);
-    node.textContent = error;
-    node.hidden = !error;
-  });
 }
 
 export function renderProjectImportDialog(state, messages) {
@@ -108,7 +98,7 @@ export function renderProjectImportDialog(state, messages) {
   </div>`;
 }
 
-export function renderProjectsBody(state, { records, messages, formatTime, summaryHtml, renderAddPackageHint = () => "" }) {
+export function renderProjectsBody(state, { records, messages, summaryHtml }) {
   const labels = projectLabels(state);
   const importer = state.importer;
   const busy = importer.inFlight || state.initializer?.autoPipelineRunning;
@@ -121,14 +111,10 @@ export function renderProjectsBody(state, { records, messages, formatTime, summa
   const validation = projectValidationView(state, records);
   const rows = records.map((record, index) => {
     const active = state.session?.workspacePath === record.path;
-    const error = projectValidationError(importer.historyValidation?.[record.path], messages);
     const name = (active && state.session?.projectName) || record.projectName || defaultProjectName(record.path);
     return `<div class="project-recent-row ${active ? "is-active" : ""}" data-workspace-history-row-path="${html(record.path)}">
       <button class="project-recent-open" data-recent-index="${index}" data-recent-path="${html(record.path)}" aria-current="${active ? "true" : "false"}" title="${html(record.path)}" ${disabled}>
         <span class="project-recent-name">${projectIcon("folder")}<strong>${html(name)}</strong></span>
-        <span class="project-path muted">${html(record.path)}</span>
-        <span class="project-recent-time muted"><span class="project-open-status" ${active ? "" : "hidden"}>${labels.opened}</span><time>${html(formatTime(record.lastUsedAt, state.locale))}</time></span>
-        ${renderAddPackageHint(state, importer.addPackageHintsByWorkspacePath?.[record.path])}
       </button>
       <details class="project-row-menu"><summary aria-label="${labels.more}" title="${labels.more}">${projectIcon("more")}</summary>
         <div class="project-row-menu-items">
@@ -137,7 +123,6 @@ export function renderProjectsBody(state, { records, messages, formatTime, summa
           <button data-project-delete-files="${html(record.path)}" class="danger" ${disabled}>${labels.delete}</button>
         </div>
       </details>
-      <p class="error-text project-recent-error" data-project-validation-path="${html(record.path)}" ${error ? "" : "hidden"}>${html(error)}</p>
     </div>`;
   }).join("");
   return `${importer.inFlight && !importer.importRunId ? `<p role="status">${html(importer.status || labels.loading)}</p>` : ""}

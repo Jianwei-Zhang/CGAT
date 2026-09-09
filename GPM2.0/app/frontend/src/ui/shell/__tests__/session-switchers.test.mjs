@@ -7,6 +7,7 @@ import {
   closeProjectSession,
   switchProjectFromShell,
   switchWorkspaceFromShell,
+  updateWorkspaceHistory,
 } from "../session-switchers.js";
 import { clearAssemblySessionCache } from "../assembly-session-cache.js";
 import { assemblyPageSession } from "../../pages/assembly/page-session.js";
@@ -70,12 +71,13 @@ test("buildWorkspaceSwitchItems includes current workspace and history records w
     state: {
       session: {
         workspacePath: "/tmp/current",
+        projectName: "Current",
       },
     },
     historyRecords: [
-      { path: "/tmp/history-a" },
-      { path: "/tmp/current" },
-      { path: "/tmp/history-b" },
+      { path: "/tmp/history-a", projectName: "History A" },
+      { path: "/tmp/current", projectName: "Stale current name" },
+      { path: "/tmp/history-b", projectName: "History B" },
     ],
     labels: {
       notOpened: "未打开",
@@ -85,11 +87,27 @@ test("buildWorkspaceSwitchItems includes current workspace and history records w
   assert.deepEqual(
     items.map((item) => ({ value: item.value, selected: item.selected })),
     [
-      { value: "/tmp/current", selected: true },
       { value: "/tmp/history-a", selected: false },
+      { value: "/tmp/current", selected: true },
       { value: "/tmp/history-b", selected: false },
     ],
   );
+  assert.deepEqual(items.map(item => item.label), ["History A", "Current", "History B"]);
+});
+
+test("updateWorkspaceHistory keeps existing projects in place and prepends only new projects", () => {
+  const records = [
+    { path: "/tmp/a", projectName: "A", lastUsedAt: 1 },
+    { path: "/tmp/b", projectName: "B", lastUsedAt: 2 },
+  ];
+  assert.deepEqual(updateWorkspaceHistory(records, "/tmp/b", "B renamed", 3), [
+    records[0],
+    { path: "/tmp/b", projectName: "B renamed", lastUsedAt: 3 },
+  ]);
+  assert.deepEqual(updateWorkspaceHistory(records, "/tmp/c", "C", 4), [
+    { path: "/tmp/c", projectName: "C", lastUsedAt: 4 },
+    ...records,
+  ]);
 });
 
 test("buildProjectSwitchItems returns placeholder when no project is selected", () => {

@@ -6,6 +6,7 @@ import { registerRoutes, renderCurrentRoute } from "./ui/shell/router.js";
 import {
   buildWorkspaceSwitchItems,
   switchWorkspaceFromShell,
+  updateWorkspaceHistory,
 } from "./ui/shell/session-switchers.js";
 import { getMessages, t } from "./ui/i18n/index.js";
 import { relocalizeAppState } from "./ui/i18n/state-relocalize.js";
@@ -591,15 +592,7 @@ function appendWorkspaceHistory(workspacePath, projectName = "") {
   if (!path) {
     return;
   }
-  const now = Date.now();
-  const existing = readWorkspaceHistory();
-  const deduped = [
-    { path, projectName, lastUsedAt: now },
-    ...existing.filter((item) => normalizeWorkspacePath(item.path) !== path),
-  ]
-    .slice(0, 20)
-    .sort((a, b) => b.lastUsedAt - a.lastUsedAt);
-  writeWorkspaceHistory(deduped);
+  writeWorkspaceHistory(updateWorkspaceHistory(readWorkspaceHistory(), path, projectName));
 }
 
 function replaceSelectOptions(select, items) {

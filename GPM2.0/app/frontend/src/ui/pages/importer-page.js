@@ -16,7 +16,7 @@ import { switchProjectFromShell, closeProjectSession, buildEmptyAssemblyViewStat
 import { clearAssemblySessionCache } from "../shell/assembly-session-cache.js";
 import { resetAssemblyPageSession } from "./assembly/page-session.js";
 import { pickDirectoryPath, pickZipFilePath } from "../../services/backend-api.js";
-import { formatDateTime, getMessages, t as i18nT } from "../i18n/index.js";
+import { getMessages, t as i18nT } from "../i18n/index.js";
 
 const WORKSPACE_HISTORY_KEY = "gpm_next:workspace_history";
 const IMPORT_PROGRESS_BOTTOM_THRESHOLD_PX = 24;
@@ -39,7 +39,7 @@ export function renderImporterPage(state) {
   const deleteFailedHistoryOnly = importer.deleteSelectionMode === DELETE_SELECTION_MODE_FAILED_HISTORY;
   return `
     <section class="page projects-page">
-      ${renderProjectsBody(state, { records: recentRecords, messages, formatTime, renderAddPackageHint,
+      ${renderProjectsBody(state, { records: recentRecords, messages,
         summaryHtml: state.session?.workspacePath ? renderWorkspacePage(state) : "" })}
       ${statusToast}
       ${
@@ -747,7 +747,6 @@ function syncProjectSelection(host, store, { openingPath = "", replaceDetail = f
   const records = readWorkspaceHistory();
   const rowByPath = new Map(rows.map(row => [row.dataset.workspaceHistoryRowPath, row]));
   if (!detail || !list || rows.length !== records.length || records.some(record => !rowByPath.has(record.path))) return false;
-  const labels = projectLabels(state);
   records.forEach((record, index) => {
     const row = rowByPath.get(record.path);
     const active = workspacePathListIncludes([state.session.workspacePath], record.path);
@@ -761,13 +760,6 @@ function syncProjectSelection(host, store, { openingPath = "", replaceDetail = f
     const name = row.querySelector(".project-recent-name strong");
     const projectName = (active && state.session.projectName) || record.projectName || defaultProjectName(record.path);
     if (name.textContent !== projectName) name.textContent = projectName;
-    const status = row.querySelector(".project-open-status");
-    status.hidden = !active && !opening;
-    status.textContent = opening ? labels.loading : labels.opened;
-    const time = row.querySelector(".project-recent-time time");
-    const formattedTime = formatTime(record.lastUsedAt, state.locale);
-    if (time.textContent !== formattedTime) time.textContent = formattedTime;
-    if (list.children[index] !== row) list.insertBefore(row, list.children[index] || null);
   });
   if (!state.importer.projectError) routeHost.querySelector("[data-project-page-error]")?.remove();
   if (!state.importer.pendingProjectPath) routeHost.querySelector(".project-pending")?.remove();
@@ -1174,32 +1166,6 @@ function normalizeAddPackageHintNames(value) {
   return rawNames
     .map((name) => String(name || "").trim())
     .filter(Boolean);
-}
-
-function renderAddPackageHint(state, hintValue) {
-  const datasetNames = normalizeAddPackageHintNames(hintValue);
-  if (!datasetNames.length) {
-    return "";
-  }
-  const placeholder = "__ADD_PACKAGE_DATASET_NAMES__";
-  const template = i18nT(state, "importer.runtime.addPackageHint", {
-    datasetName: placeholder,
-  });
-  const placeholderIndex = template.indexOf(placeholder);
-  if (placeholderIndex === -1) {
-    return `<span class="add-package-hint">${escapeHtml(template)}</span>`;
-  }
-  const beforeNames = template.slice(0, placeholderIndex);
-  const afterNames = template.slice(placeholderIndex + placeholder.length);
-  const addedLabel = "added";
-  const addedIndex = beforeNames.indexOf(addedLabel);
-  const escapedNames = datasetNames.map((name) => escapeHtml(name)).join(",");
-  if (addedIndex === -1) {
-    return `<span class="add-package-hint">${escapeHtml(beforeNames)}${escapedNames}${escapeHtml(afterNames)}</span>`;
-  }
-  return `<span class="add-package-hint">${escapeHtml(beforeNames.slice(0, addedIndex))}<strong>${addedLabel}</strong>${escapeHtml(
-    beforeNames.slice(addedIndex + addedLabel.length),
-  )}${escapedNames}${escapeHtml(afterNames)}</span>`;
 }
 
 let workspaceContextMenuCloseTimer = null;
@@ -1855,8 +1821,7 @@ function readWorkspaceHistory() {
             : Date.now(),
         };
       })
-      .filter(Boolean)
-      .sort((a, b) => b.lastUsedAt - a.lastUsedAt);
+      .filter(Boolean);
   } catch {
     return [];
   }
@@ -1911,18 +1876,6 @@ function workspacePathListIncludes(paths, candidatePath) {
 function normalizeWorkspacePathIdentity(value) {
   const normalized = String(value || "").trim().replace(/\\/g, "/").replace(/\/+$/, "");
   return /^(?:[a-z]:\/|\/\/)/i.test(normalized) ? normalized.toLowerCase() : normalized;
-}
-
-function formatTime(timestamp, locale = "zh") {
-  const value = Number(timestamp);
-  if (!Number.isFinite(value) || value <= 0) {
-    return getMessages(locale, "importer").runtime.unknownTime;
-  }
-  try {
-    return formatDateTime(locale, new Date(value));
-  } catch {
-    return String(value);
-  }
 }
 
 function rerender(host, store) {
