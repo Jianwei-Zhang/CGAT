@@ -740,7 +740,8 @@ function syncProjectSelection(host, store, { openingPath = "", replaceDetail = f
     bindWorkspacePage(nextDetail, store);
     bindProjectEntryControls(nextDetail, store);
   }
-  syncProjectValidation(routeHost, state, records);
+  // Project opening has its own click guard. Keep library-level validation controls visually stable.
+  if (!openingPath) syncProjectValidation(routeHost, state, records);
   syncImporterStatusToast(routeHost, store);
   syncSessionHeader(store);
   return true;

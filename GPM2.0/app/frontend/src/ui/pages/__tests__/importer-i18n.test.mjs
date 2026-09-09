@@ -697,6 +697,7 @@ test("selecting a project preserves the library and replaces only detail after a
   const detail = { set outerHTML(html) { detailWrites += 1; detailHtml = html; } };
   const page = { toastHtml: "", insertAdjacentHTML(_where, html) { this.toastHtml = html; } };
   const remove = createButton();
+  const validate = createButton();
   const host = createHost({
     ".projects-page": page,
     ".project-current, .project-no-selection": detail,
@@ -705,7 +706,7 @@ test("selecting a project preserves the library and replaces only detail after a
     "[data-workspace-history-row-path]": rows,
     "[data-recent-index]": rows.map(row => row.button),
     "[data-project-validation-path]": rows.map(row => row.error),
-    "#validate-history-button": createButton(),
+    "#validate-history-button": validate,
     "#delete-failed-history-button": remove,
   });
   host.innerHTML = "Mounted project page";
@@ -748,6 +749,7 @@ test("selecting a project preserves the library and replaces only detail after a
     await rows[0].button.click();
     assert.deepEqual(calls, ["D:/new"]);
     assert.equal(rows[1].button["aria-busy"], "true");
+    assert.equal(validate.disabled, false);
     assert.equal(detailWrites, 0);
     assert.equal(host.innerHTML, "Mounted project page");
     opened.resolve({ existingProjects: [{ projectId: 2, projectName: "New", autoPipelineDone: true }], references: [], datasets: [] });
