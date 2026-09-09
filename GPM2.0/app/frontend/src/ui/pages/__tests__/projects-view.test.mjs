@@ -55,3 +55,17 @@ test("project actions remain disabled during import and errors retain their text
   assert.match(html, /id="project-open-button"[^>]*disabled/);
   assert.match(html, /role="alert">Permission &lt;denied&gt;/);
 });
+
+test("bulk deletion is exposed only after explicit validation completes with current failed projects", () => {
+  const records = [{ path: "/rice" }];
+  const importer = { historyValidation: { "/rice": { ok: false, message: "Open failed" } } };
+  assert.match(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);
+  importer.historyValidatedPaths = ["/rice"];
+  assert.doesNotMatch(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);
+  importer.historyValidating = true;
+  assert.match(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);
+  importer.historyValidating = false;
+  importer.historyValidation["/rice"] = { ok: true };
+  assert.match(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);
+  assert.doesNotMatch(render({ records, importer }), /project-validation-summary/);
+});

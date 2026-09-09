@@ -386,7 +386,6 @@
 .project-count { color: #777; font-variant-numeric: tabular-nums; }
 .project-library-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 .projects-page .project-library-actions [hidden], .project-recent-error[hidden] { display: none; }
-.project-validation-summary { min-height: 18px; margin: 0 0 12px; color: #707070; font-size: 11px; line-height: 18px; }
 .project-entry-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .project-icon { flex: 0 0 auto; vertical-align: middle; }
 

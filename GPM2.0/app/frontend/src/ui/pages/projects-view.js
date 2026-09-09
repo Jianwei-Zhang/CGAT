@@ -1,6 +1,6 @@
 import { defaultProjectName } from "../../services/project-session.js";
 import { projectIcon } from "./project-icons.js";
-import { getMessages, t as i18nT } from "../i18n/index.js";
+import { getMessages } from "../i18n/index.js";
 
 export function projectLabels(state) {
   return state.locale === "en" ? {
@@ -38,15 +38,13 @@ const html = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll(
 function projectValidationView(state, records) {
   const messages = getMessages(state, "importer");
   const importer = state.importer;
-  const failed = records.filter(record => importer.historyValidation?.[record.path]?.ok === false).length;
-  const passed = records.filter(record => importer.historyValidation?.[record.path]?.ok === true).length;
+  const validatedPaths = new Set(importer.historyValidatedPaths || []);
+  const failed = !importer.historyValidating && records.some(record =>
+    validatedPaths.has(record.path) && importer.historyValidation?.[record.path]?.ok === false);
   return {
     failed,
     disabled: Boolean(importer.inFlight || importer.historyValidating || state.initializer?.autoPipelineRunning),
     label: importer.historyValidating ? messages.buttons.validatingProjects : messages.buttons.validateHistory,
-    summary: importer.historyValidating
-      ? i18nT(state, "importer.runtime.validateInProgressSummary", { count: records.length })
-      : passed + failed ? i18nT(state, "importer.runtime.validateDoneSummary", { okCount: passed, failCount: failed }) : "",
   };
 }
 
@@ -67,8 +65,6 @@ export function syncProjectValidation(host, state, records) {
     remove.hidden = !view.failed;
     remove.disabled = view.disabled || !view.failed;
   }
-  const summary = host.querySelector("[data-project-validation-summary]");
-  if (summary) summary.textContent = view.summary;
   const messages = getMessages(state, "importer");
   host.querySelectorAll("[data-project-validation-path]").forEach(node => {
     const error = projectValidationError(state.importer.historyValidation?.[node.dataset.projectValidationPath], messages);
@@ -131,7 +127,7 @@ export function renderProjectsBody(state, { records, messages, formatTime, summa
       <button class="project-recent-open" data-recent-index="${index}" data-recent-path="${html(record.path)}" aria-current="${active ? "true" : "false"}" title="${html(record.path)}" ${disabled}>
         <span class="project-recent-name">${projectIcon("folder")}<strong>${html(name)}</strong></span>
         <span class="project-path muted">${html(record.path)}</span>
-        <span class="project-recent-time muted">${active ? `<span class="project-open-status">${labels.opened}</span>` : ""}${html(formatTime(record.lastUsedAt, state.locale))}</span>
+        <span class="project-recent-time muted"><span class="project-open-status" ${active ? "" : "hidden"}>${labels.opened}</span><time>${html(formatTime(record.lastUsedAt, state.locale))}</time></span>
         ${renderAddPackageHint(state, importer.addPackageHintsByWorkspacePath?.[record.path])}
       </button>
       <details class="project-row-menu"><summary aria-label="${labels.more}" title="${labels.more}">${projectIcon("more")}</summary>
@@ -145,7 +141,7 @@ export function renderProjectsBody(state, { records, messages, formatTime, summa
     </div>`;
   }).join("");
   return `${importer.inFlight && !importer.importRunId ? `<p role="status">${html(importer.status || labels.loading)}</p>` : ""}
-  ${importer.projectError && !importer.importDialogOpen ? `<p class="error-text" role="alert">${html(importer.projectError)}</p>` : ""}
+  ${importer.projectError && !importer.importDialogOpen ? `<p class="error-text" data-project-page-error role="alert">${html(importer.projectError)}</p>` : ""}
   ${importer.pendingProjectPath ? `<section class="project-pending">
     <strong>${labels.pending}</strong><span class="project-path">${html(importer.pendingProjectPath)}</span>
     <button id="project-retry-button" class="button" ${disabled}>${labels.retry}</button></section>` : ""}
@@ -161,7 +157,6 @@ export function renderProjectsBody(state, { records, messages, formatTime, summa
           <button id="delete-failed-history-button" class="button ghost project-history-action" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button>
         </div>` : ""}
       </header>
-      <p class="project-validation-summary" data-project-validation-summary role="status" aria-live="polite">${html(validation.summary)}</p>
       <div class="project-recent-list">${rows}</div>
     </section>
     ${summaryHtml || `<section class="project-empty project-no-selection"><span class="project-empty-symbol">${projectIcon("open")}</span><h4>${labels.noOpen}</h4></section>`}

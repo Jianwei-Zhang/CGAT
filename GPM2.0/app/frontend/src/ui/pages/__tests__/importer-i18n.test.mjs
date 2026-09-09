@@ -29,6 +29,7 @@ function createButton() {
   return {
     dataset: {},
     disabled: false,
+    setAttribute(name, value) { this[name] = value; },
     addEventListener(type, handler) {
       listeners.set(type, handler);
     },
@@ -272,6 +273,7 @@ test("importer bulk delete removes only current failed history records", async (
     const state = createImporterScrollState({
       zipPath: "D:/source-package.zip",
       openWorkspacePath: "D:/ws-failed-a",
+      historyValidatedPaths: ["D:/ws-valid", "D:/ws-failed-a", "D:/ws-failed-b"],
       historyValidation: {
         "D:/ws-valid": { ok: true, message: "" },
         "D:/ws-failed-a": { ok: false, message: "missing project.sqlite" },
@@ -409,6 +411,7 @@ test("deleting the active Windows workspace closes its project despite path spel
     const state = createImporterScrollState({
       zipPath: "D:/source-package.zip",
       openWorkspacePath: "D:/ws-failed",
+      historyValidatedPaths: ["D:/ws-valid", "D:/ws-failed"],
       historyValidation: {
         "D:/ws-valid": { ok: true, message: "" },
         "D:/ws-failed": { ok: false, message: "missing project.sqlite" },
@@ -588,14 +591,14 @@ test("project validation updates in place and preserves the rename draft across 
     });
     const remove = Object.assign(createButton(), { hidden: true });
     const input = Object.assign(createButton(), { value: "Unsaved name" });
-    const summary = { textContent: "" };
+    const page = { toastHtml: "", insertAdjacentHTML(_position, html) { this.toastHtml = html; } };
     const errors = paths.map(path => ({ dataset: { projectValidationPath: path }, hidden: true, textContent: "" }));
     const toast = { removed: false, remove() { this.removed = true; } };
     const host = createHost({
       "#validate-history-button": validate,
       "#delete-failed-history-button": remove,
       "#selected-project-name-input": input,
-      "[data-project-validation-summary]": summary,
+      ".projects-page": page,
       "[data-project-validation-path]": errors,
       '[data-importer-status-toast="1"]': toast,
     });
@@ -614,7 +617,7 @@ test("project validation updates in place and preserves the rename draft across 
     assert.equal(store.getState().importer.deleteConfirmOpen, false);
     assert.equal(validate.disabled, true);
     assert.equal(validate.textContent, "校验中…");
-    assert.equal(summary.textContent, "正在校验 3 个项目。");
+    assert.equal(remove.hidden, true);
     timers[0]();
     assert.equal(toast.removed, true);
     assert.equal(host.innerHTML, "Existing project detail and focused rename input");
@@ -626,15 +629,19 @@ test("project validation updates in place and preserves the rename draft across 
     assert.equal(validate.textContent, "校验项目");
     assert.equal(remove.hidden, false);
     assert.equal(remove.disabled, false);
-    assert.equal(summary.textContent, "校验完成：通过 1 个，失败 2 个。");
+    assert.match(page.toastHtml, /importer-status-toast.*[\s\S]*校验完成：通过 1 个，失败 2 个。/);
+    assert.deepEqual(store.getState().importer.historyValidatedPaths, paths);
+    assert.doesNotMatch(renderImporterPage(store.getState()), /project-validation-summary/);
     assert.equal(errors[0].hidden, true);
     assert.equal(errors[1].textContent, "project.sqlite");
     assert.equal(errors[2].hidden, false);
     assert.match(errors[2].textContent, /Path <unavailable>/);
 
     repaired = true;
-    await validate.click();
-    assert.equal(summary.textContent, "校验完成：通过 3 个，失败 0 个。");
+    const retry = validate.click();
+    assert.equal(remove.hidden, true);
+    await retry;
+    assert.match(page.toastHtml, /校验完成：通过 3 个，失败 0 个。/);
     assert.equal(remove.hidden, true);
     assert.equal(remove.disabled, true);
     assert.ok(errors.every(node => node.hidden && node.textContent === ""));
@@ -643,9 +650,131 @@ test("project validation updates in place and preserves the rename draft across 
     assert.equal(input.value, "Unsaved name");
     assert.equal(store.getState().initializer.editProjectNameInput, "Unsaved name");
     assert.equal(store.getState().session, state.session);
-    assert.equal(timers.length, 1);
+    assert.equal(timers.length, 3);
+    timers.at(-1)();
+    assert.equal(store.getState().importer.status, "");
+    assert.equal(host.innerHTML, "Existing project detail and focused rename input");
   } finally {
     globalThis.window = previousWindow;
+  }
+});
+
+test("selecting a project preserves the library and replaces only detail after a successful open", async () => {
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  const opened = createDeferred();
+  const started = createDeferred();
+  let history = [{ path: "D:/old", projectName: "Old", lastUsedAt: 2 }, { path: "D:/new", projectName: "New", lastUsedAt: 1 }];
+  const calls = [];
+  const events = [];
+  const makeRow = record => {
+    const button = createButton();
+    button.dataset.recentPath = record.path;
+    const status = { textContent: "", hidden: true };
+    const error = { dataset: { projectValidationPath: record.path }, textContent: "", hidden: true };
+    const nodes = {
+      "[data-recent-path]": button,
+      ".project-recent-name strong": { textContent: record.projectName },
+      ".project-open-status": status,
+      ".project-recent-time time": { textContent: "" },
+    };
+    return Object.assign(createButton(), {
+      dataset: { workspaceHistoryRowPath: record.path }, button, error,
+      classList: { toggle(_name, active) { this.active = active; } },
+      querySelector: selector => nodes[selector] || null,
+    });
+  };
+  const rows = history.map(makeRow);
+  const list = {
+    children: [...rows],
+    insertBefore(row, target) {
+      this.children.splice(this.children.indexOf(row), 1);
+      this.children.splice(target ? this.children.indexOf(target) : this.children.length, 0, row);
+    },
+  };
+  const enter = createButton();
+  const nextDetail = createHost({ "#initializer-enter-assembly-button": enter });
+  let detailWrites = 0;
+  let detailHtml = "Old detail";
+  const detail = { set outerHTML(html) { detailWrites += 1; detailHtml = html; } };
+  const page = { toastHtml: "", insertAdjacentHTML(_where, html) { this.toastHtml = html; } };
+  const remove = createButton();
+  const host = createHost({
+    ".projects-page": page,
+    ".project-current, .project-no-selection": detail,
+    ".project-current": nextDetail,
+    ".project-recent-list": list,
+    "[data-workspace-history-row-path]": rows,
+    "[data-recent-index]": rows.map(row => row.button),
+    "[data-project-validation-path]": rows.map(row => row.error),
+    "#validate-history-button": createButton(),
+    "#delete-failed-history-button": remove,
+  });
+  host.innerHTML = "Mounted project page";
+  const initial = createImporterScrollState({ inFlight: false, importRunId: null, status: "", summary: "",
+    historyValidatedPaths: ["D:/old"], historyValidation: { "D:/old": { ok: false, message: "Previous check" } },
+  });
+  initial.session = { workspacePath: "D:/old", projectId: 1, projectName: "Old" };
+  initial.initializer.editProjectNameInput = "Unsaved draft";
+  const store = createStore(initial);
+  const setState = store.setState;
+  store.setState = patch => {
+    if (patch.session && patch.session.workspacePath !== store.getState().session.workspacePath) {
+      history = [{ path: patch.session.workspacePath, projectName: patch.session.projectName, lastUsedAt: 3 }, ...history.filter(record => record.path !== patch.session.workspacePath)];
+    }
+    setState(patch);
+  };
+  try {
+    globalThis.document = { querySelector: () => null };
+    globalThis.window = {
+      localStorage: { getItem: () => JSON.stringify(history) },
+      dispatchEvent: event => events.push(event.type),
+      setTimeout: () => 1, clearTimeout() {},
+      __TAURI__: { core: { invoke: async (command, { workspaceRoot }) => {
+        assert.equal(command, "open_workspace");
+        calls.push(workspaceRoot);
+        if (workspaceRoot === "D:/old") throw new Error("Cannot open old project");
+        started.resolve();
+        return opened.promise;
+      } } },
+    };
+    bindImporterPage(host, store);
+    await rows[0].button.click();
+    assert.deepEqual(calls, []);
+    assert.equal(store.getState().initializer.editProjectNameInput, "Unsaved draft");
+
+    const pending = rows[1].button.click();
+    await started.promise;
+    await rows[0].button.click();
+    assert.deepEqual(calls, ["D:/new"]);
+    assert.equal(rows[1].button["aria-busy"], "true");
+    assert.equal(detailWrites, 0);
+    assert.equal(host.innerHTML, "Mounted project page");
+    opened.resolve({ existingProjects: [{ projectId: 2, projectName: "New", autoPipelineDone: true }], references: [], datasets: [] });
+    await pending;
+    assert.equal(store.getState().session.workspacePath, "D:/new");
+    assert.equal(detailWrites, 1);
+    assert.match(detailHtml, /<h2>New<\/h2>/);
+    assert.equal(list.children[0], rows[1]);
+    assert.equal(list.children[1], rows[0]);
+    assert.equal(rows[0].button["aria-current"], "false");
+    assert.equal(rows[1].button["aria-current"], "true");
+    assert.equal(rows[1].button.disabled, false);
+    assert.equal(remove.hidden, false);
+    assert.deepEqual(events, []);
+
+    await rows[0].button.click();
+    assert.equal(store.getState().session.workspacePath, "D:/new");
+    assert.equal(detailWrites, 1);
+    assert.equal(host.innerHTML, "Mounted project page");
+    assert.match(page.toastHtml, /Cannot open old project/);
+    assert.match(rows[0].error.textContent, /Cannot open old project/);
+    assert.equal(remove.hidden, true);
+    await enter.click();
+    assert.equal(store.getState().activeRoute, "assembly");
+  } finally {
+    globalThis.window = previousWindow;
+    globalThis.document = previousDocument;
   }
 });
 

@@ -222,6 +222,7 @@ export function bindImporterPage(host, store) {
     const failedPaths = getFailedHistoryPaths(
       readWorkspaceHistory(),
       snapshot.importer.historyValidation,
+      snapshot.importer.historyValidatedPaths,
     );
     openDeleteSelectionConfirm(host, store, failedPaths, DELETE_SELECTION_MODE_FAILED_HISTORY);
   });
@@ -274,11 +275,13 @@ export function bindImporterPage(host, store) {
 
   recentPickButtons.forEach((button) => {
     button.addEventListener("click", async () => {
-      if (store.getState().importer.inFlight) return;
+      const state = store.getState();
+      if (state.importer.inFlight || state.initializer?.autoPipelineRunning || state.initializer?.updating) return;
       const workspacePath = String(button.dataset.recentPath || "").trim();
       if (!workspacePath) {
         return;
       }
+      if (state.session.projectId && workspacePathListIncludes([state.session.workspacePath], workspacePath)) return;
       await runOpenWorkspaceFlow(host, store, workspacePath);
     });
     button.addEventListener("contextmenu", (event) => {
@@ -351,8 +354,10 @@ function bindProjectEntryControls(host, store) {
     const path = await pickDirectoryPath(store.getState());
     if (!path) return;
     const opened = await runOpenWorkspaceFlow(host, store, path);
-    if (opened && oldPath && oldPath !== path) removeWorkspaceHistoryPaths([oldPath]);
-    rerender(host, store);
+    if (opened && oldPath && oldPath !== path) {
+      removeWorkspaceHistoryPaths([oldPath]);
+      rerender(host, store);
+    }
   };
   host.querySelector("#project-import-button")?.addEventListener("click", () => {
     if (busy()) return;
@@ -669,7 +674,7 @@ async function runImportAddPackageFlow(host, store, workspaceRoot) {
 async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
   const snapshot = store.getState();
   const importer = snapshot.importer;
-  if (importer.inFlight) return false;
+  if (importer.inFlight || snapshot.initializer?.autoPipelineRunning || snapshot.initializer?.updating) return false;
   const workspaceRoot = String(forcedWorkspacePath || importer.openWorkspacePath || "").trim();
   if (!workspaceRoot) {
     updateImporterState(store, {
@@ -682,6 +687,7 @@ async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
 
   updateImporterState(store, {
     inFlight: true,
+    projectError: "",
     importRunId: null,
     importCancelling: false,
     importCancelError: "",
@@ -690,7 +696,7 @@ async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
     openWorkspacePath: workspaceRoot,
     stages: [i18nT(snapshot, "importer.runtime.openStageValidateWorkspace"), `workspace_root=${workspaceRoot}`],
   });
-  rerender(host, store);
+  if (!syncProjectSelection(host, store, { openingPath: workspaceRoot })) rerender(host, store);
 
   try {
     await flushAssemblyProjectState(host, store);
@@ -710,14 +716,14 @@ async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
       importerSummary: i18nT(snapshot, "importer.runtime.workspaceLoadedSummary"),
       appendStage: i18nT(snapshot, "importer.runtime.workspaceLoadedStage"),
     });
-    window.dispatchEvent(new Event("gpm-next:route-refresh"));
-    rerender(host, store);
+    if (!syncProjectSelection(host, store, { replaceDetail: true })) rerender(host, store);
     return true;
   } catch (error) {
     updateImporterState(store, {
       projectError: String(error.message || error),
       pendingProjectPath: error.pendingProjectPath || "",
       historyValidation: { ...store.getState().importer.historyValidation, [workspaceRoot]: { ok: false, message: String(error.message || error) } },
+      historyValidatedPaths: (store.getState().importer.historyValidatedPaths || []).filter(path => path !== workspaceRoot),
       inFlight: false,
       importRunId: null,
       importCancelling: false,
@@ -727,7 +733,54 @@ async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
     });
   }
 
-  rerender(host, store);
+  if (store.getState().importer.pendingProjectPath || !syncProjectSelection(host, store)) rerender(host, store);
+}
+
+// Keep the project library mounted while opening a project; replace only the detail after success.
+function syncProjectSelection(host, store, { openingPath = "", replaceDetail = false } = {}) {
+  const state = store.getState();
+  if (state.activeRoute !== "importer") return false;
+  const routeHost = host.closest("#route-host") || host;
+  const detail = routeHost.querySelector(".project-current, .project-no-selection");
+  const list = routeHost.querySelector(".project-recent-list");
+  const rows = [...routeHost.querySelectorAll("[data-workspace-history-row-path]")];
+  const records = readWorkspaceHistory();
+  const rowByPath = new Map(rows.map(row => [row.dataset.workspaceHistoryRowPath, row]));
+  if (!detail || !list || rows.length !== records.length || records.some(record => !rowByPath.has(record.path))) return false;
+  const labels = projectLabels(state);
+  records.forEach((record, index) => {
+    const row = rowByPath.get(record.path);
+    const active = workspacePathListIncludes([state.session.workspacePath], record.path);
+    const opening = record.path === openingPath;
+    row.classList.toggle("is-active", active);
+    const button = row.querySelector("[data-recent-path]");
+    button.disabled = opening;
+    button.setAttribute("aria-current", String(active));
+    button.setAttribute("aria-busy", String(opening));
+    button.dataset.recentIndex = String(index);
+    const name = row.querySelector(".project-recent-name strong");
+    const projectName = (active && state.session.projectName) || record.projectName || defaultProjectName(record.path);
+    if (name.textContent !== projectName) name.textContent = projectName;
+    const status = row.querySelector(".project-open-status");
+    status.hidden = !active && !opening;
+    status.textContent = opening ? labels.loading : labels.opened;
+    const time = row.querySelector(".project-recent-time time");
+    const formattedTime = formatTime(record.lastUsedAt, state.locale);
+    if (time.textContent !== formattedTime) time.textContent = formattedTime;
+    if (list.children[index] !== row) list.insertBefore(row, list.children[index] || null);
+  });
+  if (!state.importer.projectError) routeHost.querySelector("[data-project-page-error]")?.remove();
+  if (!state.importer.pendingProjectPath) routeHost.querySelector(".project-pending")?.remove();
+  if (replaceDetail) {
+    detail.outerHTML = renderWorkspacePage(state);
+    const nextDetail = routeHost.querySelector(".project-current");
+    bindWorkspacePage(nextDetail, store);
+    bindProjectEntryControls(nextDetail, store);
+  }
+  syncProjectValidation(routeHost, state, records);
+  syncImporterStatusToast(routeHost, store);
+  syncSessionHeader(store);
+  return true;
 }
 
 async function runValidateHistoryFlow(host, store) {
@@ -769,11 +822,19 @@ async function runValidateHistoryFlow(host, store) {
   const previousValidation = store.getState().importer.historyValidation || {};
   updateImporterState(store, {
     historyValidating: false,
+    historyValidatedPaths: currentRecords.filter(record => historyValidation[record.path]).map(record => record.path),
     historyValidation: Object.fromEntries(currentRecords
       .filter(record => historyValidation[record.path] || previousValidation[record.path])
       .map(record => [record.path, historyValidation[record.path] || previousValidation[record.path]])),
   });
   syncProjectValidation(host, store.getState(), currentRecords);
+  const results = currentRecords.map(record => historyValidation[record.path]).filter(Boolean);
+  const failCount = results.filter(result => result.ok === false).length;
+  updateImporterState(store, {
+    status: i18nT(store.getState(), failCount ? "importer.runtime.validateDoneStatus" : "importer.runtime.validateOkStatus"),
+    summary: i18nT(store.getState(), "importer.runtime.validateDoneSummary", { okCount: results.length - failCount, failCount }),
+  });
+  syncImporterStatusToast(host, store);
 }
 
 function openDeleteSelectionConfirm(host, store, deleteTargets, deleteSelectionMode = "") {
@@ -806,7 +867,7 @@ async function runDeleteSelectedFlow(host, store) {
   const deleteProjectRecord = importer.deleteSelectionMode === DELETE_SELECTION_MODE_PROJECT;
   const requestedPaths = normalizePathList(importer.deleteTargets);
   const failedHistoryPaths = deleteFailedHistoryOnly
-    ? new Set(getFailedHistoryPaths(readWorkspaceHistory(), importer.historyValidation))
+    ? new Set(getFailedHistoryPaths(readWorkspaceHistory(), importer.historyValidation, importer.historyValidatedPaths))
     : null;
   const selectedPaths = failedHistoryPaths
     ? requestedPaths.filter((path) => failedHistoryPaths.has(path))
@@ -975,7 +1036,8 @@ function applyWorkspaceLoadedState(store, payload) {
       importCancelError: "",
       workspaceRoot,
       openWorkspacePath: workspaceRoot,
-      historyValidation: {},
+      historyValidation: Object.fromEntries(Object.entries(current.importer.historyValidation || {}).filter(([path]) => path !== workspaceRoot)),
+      historyValidatedPaths: (current.importer.historyValidatedPaths || []).filter(path => path !== workspaceRoot),
       importDialogOpen: false,
       pendingProjectPath: "",
       projectError: "",
@@ -1310,6 +1372,17 @@ function bindImporterStatusToastDismiss(host, store) {
   binding.store = store;
   const signature = getImporterStatusToastSignature(store.getState().importer);
   binding.coordinator.onFeedbackChange(signature);
+}
+
+function syncImporterStatusToast(host, store) {
+  const state = store.getState();
+  if (state.activeRoute !== "importer") return;
+  const page = host.querySelector(".projects-page");
+  host.querySelector('[data-importer-status-toast="1"]')?.remove();
+  if (page) page.insertAdjacentHTML("beforeend", renderImporterStatusToast(state.importer, getMessages(state, "importer")));
+  const binding = ensureImporterStatusToastDismissBinding(host);
+  binding.coordinator.onFeedbackChange("");
+  bindImporterStatusToastDismiss(host, store);
 }
 
 function ensureImporterStatusToastDismissBinding(host) {
@@ -1806,11 +1879,12 @@ function removeWorkspaceHistoryPaths(paths) {
   writeWorkspaceHistory(nextRecords);
 }
 
-function getFailedHistoryPaths(historyRecords, validationMap) {
+function getFailedHistoryPaths(historyRecords, validationMap, validatedPaths = []) {
+  const validated = new Set(validatedPaths);
   const validation = validationMap && typeof validationMap === "object" ? validationMap : {};
   return historyRecords
     .map((item) => item.path)
-    .filter((path) => validation[path]?.ok === false);
+    .filter((path) => validated.has(path) && validation[path]?.ok === false);
 }
 
 function normalizePathList(paths) {
