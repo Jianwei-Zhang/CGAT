@@ -297,6 +297,7 @@ test("rename editor is tied to the exact directory and project and cancel discar
   await rename.click();
   const editingHtml = renderWorkspacePage(store.getState());
   assert.match(editingHtml, /class="project-identity">\s*<form class="project-title-row project-rename-form"[\s\S]*id="selected-project-name-input"[\s\S]*<\/form>\s*<p class="project-path project-detail-path"/);
+  assert.match(editingHtml, /id="selected-project-name-input"[^>]*size="9"/);
   assert.doesNotMatch(editingHtml, /<h2>|id="selected-project-rename-button"/);
   const otherDirectory = { ...store.getState(), session: { ...store.getState().session, workspacePath: "D:/other" } };
   assert.doesNotMatch(renderWorkspacePage(otherDirectory), /id="selected-project-name-input"/);
@@ -394,6 +395,7 @@ test("processed selected-project name input mutates the edit draft", async () =>
     await projectNameInput.input("renamed");
 
     assert.equal(store.getState().initializer.editProjectNameInput, "renamed");
+    assert.equal(projectNameInput.size, 8);
     assert.equal(host.renderCount, 0);
     assert.equal(saveButton.disabled, false);
   } finally {

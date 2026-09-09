@@ -111,6 +111,17 @@ function buildEmptyAssemblyViewState(stateOrLocale) {
 
 const AUTO_PIPELINE_CANCEL_ERROR = "__AUTO_PIPELINE_CANCELLED__";
 
+function projectNameInputSize(value) {
+  const displayColumns = Array.from(String(value || "")).reduce((columns, character) => (
+    columns + (character.codePointAt(0) > 0xff ? 2 : 1)
+  ), 0);
+  return Math.max(4, Math.min(32, displayColumns + 1));
+}
+
+function syncProjectNameInputSize(input) {
+  if (input) input.size = projectNameInputSize(input.value);
+}
+
 export function renderWorkspacePage(state) {
   const initializer = state.initializer;
   const messages = getMessages(state, "workspace");
@@ -124,7 +135,7 @@ export function renderWorkspacePage(state) {
     <div class="project-detail-overview">
       <div class="project-identity">
         ${selectedProject && renameOpen ? `<form class="project-title-row project-rename-form" data-project-rename-form>
-          <input id="selected-project-name-input" type="text" aria-label="${messages.cards.projectName}" value="${escapeAttr(editDraft.projectName)}" ${busy ? "disabled" : ""} />
+          <input id="selected-project-name-input" type="text" aria-label="${messages.cards.projectName}" value="${escapeAttr(editDraft.projectName)}" size="${projectNameInputSize(editDraft.projectName)}" ${busy ? "disabled" : ""} />
           <button type="submit" id="selected-project-save-button" class="button project-icon-button project-primary" title="${labels.saved}" aria-label="${labels.saved}" ${busy || !editDirty ? "disabled" : ""}>${projectIcon("check")}</button>
           <button type="button" id="selected-project-rename-cancel" class="button project-icon-button" title="${labels.cancel}" aria-label="${labels.cancel}" ${busy ? "disabled" : ""}>${projectIcon("close")}</button>
         </form>` : `<div class="project-title-row"><h2>${escapeHtml(selectedProject?.projectName || defaultProjectName(state.session.workspacePath))}</h2>
@@ -230,6 +241,7 @@ export function bindWorkspacePage(host, store) {
   });
 
   editProjectNameInput?.addEventListener("input", (event) => {
+    syncProjectNameInputSize(event.target);
     const current = store.getState().initializer;
     const nextInitializer = {
       ...current,
