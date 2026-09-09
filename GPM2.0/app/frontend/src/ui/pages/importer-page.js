@@ -24,7 +24,6 @@ const IMPORTER_STATUS_TOAST_AUTO_DISMISS_MS = 1000;
 const IMPORTER_STATUS_TOAST_DISMISS = Symbol("importerStatusToastDismiss");
 const DELETE_SELECTION_MODE_FAILED_HISTORY = "failed-history";
 const DELETE_SELECTION_MODE_PROJECT = "project";
-const PROJECT_MENU_BINDING = Symbol("projectMenuBinding");
 
 export function renderImporterPage(state) {
   const importer = state.importer;
@@ -81,29 +80,6 @@ export function renderImporterPage(state) {
 }
 
 export function bindImporterPage(host, store) {
-  host[PROJECT_MENU_BINDING]?.();
-  const dismissMenus = event => {
-    host.querySelectorAll("details.project-row-menu[open]").forEach(menu => {
-      if (event.type === "keydown" && event.key !== "Escape") return;
-      if (event.type === "pointerdown" && menu.contains(event.target)) return;
-      menu.open = false;
-      if (event.type === "keydown") menu.querySelector("summary")?.focus();
-    });
-  };
-  host.addEventListener?.("pointerdown", dismissMenus);
-  host.addEventListener?.("keydown", dismissMenus);
-  host[PROJECT_MENU_BINDING] = () => {
-    host.removeEventListener?.("pointerdown", dismissMenus);
-    host.removeEventListener?.("keydown", dismissMenus);
-  };
-  host.querySelectorAll("details.project-row-menu").forEach(menu => {
-    menu.addEventListener("toggle", () => {
-      if (!menu.open) return;
-      host.querySelectorAll("details.project-row-menu[open]").forEach(other => {
-        if (other !== menu) other.open = false;
-      });
-    });
-  });
   if (store.getState().initializer) bindWorkspacePage(host, store);
   bindProjectEntryControls(host, store);
   const zipPathInput = host.querySelector("#zip-path-input");

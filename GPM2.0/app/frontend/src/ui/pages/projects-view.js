@@ -11,7 +11,7 @@ export function projectLabels(state) {
     cancel: "Cancel", submit: "Import",
     legacy: "This directory contains multiple legacy projects. Select one to continue.",
     pending: "Project initialization incomplete", retry: "Retry initialization",
-    delete: "Delete project files", more: "Project actions",
+    delete: "Delete project files",
     selectFirst: "Open a project first", loading: "Opening project...", deleteFailed: "Deletion failed",
     sourceLocation: "Project location", legacyProjects: "Legacy projects",
     noOpen: "No project open", opened: "Open", rename: "Rename project", saved: "Save name",
@@ -24,7 +24,7 @@ export function projectLabels(state) {
     cancel: "取消", submit: "导入",
     legacy: "此目录包含多个旧版项目，请选择要打开的项目。",
     pending: "项目待初始化", retry: "重试初始化",
-    delete: "删除项目文件", more: "项目操作",
+    delete: "删除项目文件",
     selectFirst: "请先打开项目", loading: "正在打开项目...", deleteFailed: "删除失败",
     sourceLocation: "项目位置", legacyProjects: "旧版项目",
     noOpen: "尚未打开项目", opened: "已打开", rename: "重命名项目", saved: "保存名称",
@@ -116,12 +116,10 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
       <button class="project-recent-open" data-recent-index="${index}" data-recent-path="${html(record.path)}" aria-current="${active ? "true" : "false"}" title="${html(record.path)}" ${disabled}>
         <span class="project-recent-name">${projectIcon("folder")}<strong>${html(name)}</strong></span>
       </button>
-      <details class="project-row-menu"><summary aria-label="${labels.more}" title="${labels.more}">${projectIcon("more")}</summary>
-        <div class="project-row-menu-items">
-          <button data-workspace-import-add-package-path="${html(record.path)}" ${disabled}>${messages.buttons.importAddPackage}</button>
-          <button data-project-delete-files="${html(record.path)}" class="danger" ${disabled}>${labels.delete}</button>
-        </div>
-      </details>
+      <div class="project-row-actions">
+        <button class="button project-icon-button" data-workspace-import-add-package-path="${html(record.path)}" title="${html(messages.buttons.importAddPackage)}" aria-label="${html(messages.buttons.importAddPackage)}" ${disabled}>${projectIcon("addPackage")}</button>
+        <button class="button project-icon-button" data-project-delete-files="${html(record.path)}" title="${labels.delete}" aria-label="${labels.delete}" ${disabled}>${projectIcon("delete")}</button>
+      </div>
     </div>`;
   }).join("");
   return `${importer.inFlight && !importer.importRunId ? `<p role="status">${html(importer.status || labels.loading)}</p>` : ""}
