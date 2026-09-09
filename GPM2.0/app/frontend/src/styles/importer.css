@@ -463,8 +463,8 @@
 .project-current { min-width: 0; align-self: start; padding: 24px 32px 32px; }
 .project-detail-overview { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 24px; padding-bottom: 28px; border-bottom: 1px solid #e6e6e6; }
 .project-identity { min-width: 0; }
-.project-title-row { display: flex; align-items: start; gap: 8px; min-width: 0; }
-.project-title-row h2 { min-width: 0; margin: 0; font-size: 28px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.project-title-row { display: flex; align-items: start; gap: 8px; min-width: 0; font-size: 28px; font-weight: 600; line-height: 1.35; }
+.project-title-row h2 { min-width: 0; margin: 0; font: inherit; overflow-wrap: anywhere; }
 .project-title-row .project-icon-button { margin-top: 1px; }
 .project-detail-path { margin-top: 8px; color: #707070; font-size: 12px; overflow-wrap: anywhere; }
 .projects-page .project-enter-assembly { min-width: 152px; min-height: 44px; }
@@ -478,10 +478,8 @@
 .project-current .workspace-recipe-value.is-enabled { color: #222; }
 .project-current .workspace-recipe-value.is-disabled { color: #737373; }
 .project-created { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 24px; font-size: 12px; color: #737373; }
-.project-rename-form { display: grid; gap: 8px; margin-top: 20px; }
-.project-rename-form label { font-size: 12px; font-weight: 400; color: #707070; }
-.project-rename-controls { display: flex; align-items: center; gap: 6px; }
-.project-rename-controls input { width: 100%; min-width: 0; min-height: 36px; border-color: #b3b3b3; border-radius: 4px; }
+.project-rename-form { max-width: 520px; margin: 0; }
+.project-rename-form input { flex: 1; width: 100%; min-width: 0; padding: 0; border: 0; border-bottom: 1px solid #b3b3b3; border-radius: 0; background: transparent; color: inherit; font: inherit; }
 .project-legacy-picker, .project-pending { display: grid; gap: 10px; margin-top: 20px; font-size: 12px; font-weight: 400; }
 .project-legacy-picker select { min-width: 0; max-width: 100%; border-radius: 4px; }
 .project-pending { border-left: 3px solid #777; padding-left: 12px; }
@@ -511,7 +509,7 @@
   .project-recents .project-entry-actions { gap: 8px; }
   .project-recents .project-entry-actions .button { gap: 6px; padding: 10px 8px; font-size: 12px; }
   .project-current { padding: 20px 24px 28px; }
-  .project-title-row h2 { font-size: 24px; }
+  .project-title-row { font-size: 24px; }
   .project-detail-overview { gap: 16px; }
   .project-current .workspace-recipe-grid { column-gap: 24px; }
 }

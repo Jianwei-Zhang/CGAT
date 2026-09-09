@@ -295,7 +295,9 @@ test("rename editor is tied to the exact directory and project and cancel discar
   const host = createHost({ "#selected-project-rename-button": rename, "#selected-project-rename-cancel": cancel });
   bindWorkspacePage(host, store);
   await rename.click();
-  assert.match(renderWorkspacePage(store.getState()), /id="selected-project-name-input"/);
+  const editingHtml = renderWorkspacePage(store.getState());
+  assert.match(editingHtml, /class="project-identity">\s*<form class="project-title-row project-rename-form"[\s\S]*id="selected-project-name-input"[\s\S]*<\/form>\s*<p class="project-path project-detail-path"/);
+  assert.doesNotMatch(editingHtml, /<h2>|id="selected-project-rename-button"/);
   const otherDirectory = { ...store.getState(), session: { ...store.getState().session, workspacePath: "D:/other" } };
   assert.doesNotMatch(renderWorkspacePage(otherDirectory), /id="selected-project-name-input"/);
   store.setState({ initializer: { ...store.getState().initializer, editProjectNameInput: "Discarded" } });

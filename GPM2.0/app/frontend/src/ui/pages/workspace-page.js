@@ -123,20 +123,17 @@ export function renderWorkspacePage(state) {
   return `<section class="project-current">
     <div class="project-detail-overview">
       <div class="project-identity">
-        <div class="project-title-row"><h2>${escapeHtml(selectedProject?.projectName || defaultProjectName(state.session.workspacePath))}</h2>
-          ${selectedProject && !renameOpen ? `<button id="selected-project-rename-button" class="button project-icon-button" title="${labels.rename}" aria-label="${labels.rename}" ${busy ? "disabled" : ""}>${projectIcon("rename")}</button>` : ""}
-        </div>
+        ${selectedProject && renameOpen ? `<form class="project-title-row project-rename-form" data-project-rename-form>
+          <input id="selected-project-name-input" type="text" aria-label="${messages.cards.projectName}" value="${escapeAttr(editDraft.projectName)}" ${busy ? "disabled" : ""} />
+          <button type="submit" id="selected-project-save-button" class="button project-icon-button project-primary" title="${labels.saved}" aria-label="${labels.saved}" ${busy || !editDirty ? "disabled" : ""}>${projectIcon("check")}</button>
+          <button type="button" id="selected-project-rename-cancel" class="button project-icon-button" title="${labels.cancel}" aria-label="${labels.cancel}" ${busy ? "disabled" : ""}>${projectIcon("close")}</button>
+        </form>` : `<div class="project-title-row"><h2>${escapeHtml(selectedProject?.projectName || defaultProjectName(state.session.workspacePath))}</h2>
+          ${selectedProject ? `<button id="selected-project-rename-button" class="button project-icon-button" title="${labels.rename}" aria-label="${labels.rename}" ${busy ? "disabled" : ""}>${projectIcon("rename")}</button>` : ""}
+        </div>`}
         <p class="project-path project-detail-path" title="${escapeAttr(state.session.workspacePath)}">${escapeHtml(state.session.workspacePath)}</p>
       </div>
       <button id="initializer-enter-assembly-button" class="button project-primary project-enter-assembly" ${!selectedProject || busy ? "disabled" : ""}>${messages.buttons.enterAssembly}${projectIcon("arrow")}</button>
     </div>
-    ${selectedProject && renameOpen ? `<form class="project-rename-form" data-project-rename-form>
-      <label for="selected-project-name-input">${messages.cards.projectName}</label>
-      <div class="project-rename-controls"><input id="selected-project-name-input" type="text" value="${escapeAttr(editDraft.projectName)}" ${busy ? "disabled" : ""} />
-        <button type="submit" id="selected-project-save-button" class="button project-icon-button project-primary" title="${labels.saved}" aria-label="${labels.saved}" ${busy || !editDirty ? "disabled" : ""}>${projectIcon("check")}</button>
-        <button type="button" id="selected-project-rename-cancel" class="button project-icon-button" title="${labels.cancel}" aria-label="${labels.cancel}" ${busy ? "disabled" : ""}>${projectIcon("close")}</button>
-      </div>
-    </form>` : ""}
     ${initializer.existingProjects.length > 1 ? `<label class="project-legacy-picker">${labels.legacy}
       <select id="legacy-project-select" ${busy ? "disabled" : ""}><option value="">${labels.legacyProjects}</option>
         ${initializer.existingProjects.map(project => `<option value="${project.projectId}" ${selectedProject?.projectId === project.projectId ? "selected" : ""}>${escapeHtml(project.projectName)}</option>`).join("")}
