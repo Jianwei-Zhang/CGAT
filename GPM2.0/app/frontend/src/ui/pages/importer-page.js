@@ -349,15 +349,11 @@ export function bindImporterPage(host, store) {
 
 function bindProjectEntryControls(host, store) {
   const busy = () => store.getState().importer.inFlight || store.getState().initializer?.autoPipelineRunning;
-  const openDirectory = async (oldPath = "") => {
+  const openDirectory = async () => {
     if (busy()) return;
     const path = await pickDirectoryPath(store.getState());
     if (!path) return;
-    const opened = await runOpenWorkspaceFlow(host, store, path);
-    if (opened && oldPath && oldPath !== path) {
-      removeWorkspaceHistoryPaths([oldPath]);
-      rerender(host, store);
-    }
+    await runOpenWorkspaceFlow(host, store, path);
   };
   host.querySelector("#project-import-button")?.addEventListener("click", () => {
     if (busy()) return;
@@ -366,7 +362,6 @@ function bindProjectEntryControls(host, store) {
     host.querySelector("#zip-path-input, #extracted-path-input")?.focus();
   });
   host.querySelector("#project-open-button")?.addEventListener("click", () => openDirectory());
-  host.querySelectorAll("[data-project-relocate]").forEach(button => button.addEventListener("click", () => openDirectory(button.dataset.projectRelocate)));
   const closeImport = () => {
     if (busy()) return;
     updateImporterState(store, { importDialogOpen: false });

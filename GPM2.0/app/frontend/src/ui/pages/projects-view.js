@@ -13,7 +13,7 @@ export function projectLabels(state) {
     pending: "Project initialization incomplete", retry: "Retry initialization",
     delete: "Delete project files", more: "Project actions",
     selectFirst: "Open a project first", loading: "Opening project...", deleteFailed: "Deletion failed",
-    relocate: "Locate directory", sourceLocation: "Project location", legacyProjects: "Legacy projects",
+    sourceLocation: "Project location", legacyProjects: "Legacy projects",
     noOpen: "No project open", opened: "Open", rename: "Rename project", saved: "Save name",
     lastOpened: "Last opened", created: "Created",
   } : {
@@ -26,7 +26,7 @@ export function projectLabels(state) {
     pending: "项目待初始化", retry: "重试初始化",
     delete: "删除项目文件", more: "项目操作",
     selectFirst: "请先打开项目", loading: "正在打开项目...", deleteFailed: "删除失败",
-    relocate: "重新定位目录", sourceLocation: "项目位置", legacyProjects: "旧版项目",
+    sourceLocation: "项目位置", legacyProjects: "旧版项目",
     noOpen: "尚未打开项目", opened: "已打开", rename: "重命名项目", saved: "保存名称",
     lastOpened: "上次打开", created: "创建时间",
   };
@@ -118,7 +118,6 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
       </button>
       <details class="project-row-menu"><summary aria-label="${labels.more}" title="${labels.more}">${projectIcon("more")}</summary>
         <div class="project-row-menu-items">
-          <button data-project-relocate="${html(record.path)}" ${disabled}>${labels.relocate}</button>
           <button data-workspace-import-add-package-path="${html(record.path)}" ${disabled}>${messages.buttons.importAddPackage}</button>
           <button data-project-delete-files="${html(record.path)}" class="danger" ${disabled}>${labels.delete}</button>
         </div>

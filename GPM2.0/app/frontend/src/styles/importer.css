@@ -438,10 +438,10 @@
 .project-recents .project-entry-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 20px; }
 .project-recents .project-entry-actions .button { min-width: 0; min-height: 40px; padding: 10px; }
 .project-recents-header { position: relative; margin-bottom: 12px; }
-.project-recent-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 32px; align-items: center; min-height: 42px; padding: 5px 6px 5px 10px; border-left: 2px solid transparent; }
-.project-recent-row + .project-recent-row { margin-top: 4px; }
-.project-recent-row:hover { background: #f7f7f7; }
-.project-recent-row.is-active { background: #efefef; border-left-color: #555; }
+.project-recent-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 32px; align-items: center; min-height: 44px; padding: 5px 6px 5px 10px; border: 1px solid #dedede; border-radius: 5px; background: #fff; }
+.project-recent-row + .project-recent-row { margin-top: 8px; }
+.project-recent-row:hover { background: #f7f7f7; border-color: #b8b8b8; }
+.project-recent-row.is-active { background: #efefef; border-color: #888; box-shadow: inset 2px 0 #555; }
 .project-recent-open { display: flex; min-width: 0; align-items: center; min-height: 32px; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
 .project-recent-name { display: flex; min-width: 0; align-items: center; gap: 8px; }
 .project-recent-name > .project-icon { width: 16px; height: 16px; color: #808080; }
@@ -458,7 +458,7 @@
 .project-row-menu-items button.danger { color: #333; }
 
 .project-current { min-width: 0; align-self: start; padding: 24px 32px 32px; }
-.project-detail-overview { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 24px; padding-bottom: 28px; border-bottom: 1px solid #e6e6e6; }
+.project-detail-overview { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 24px; padding-bottom: 20px; border-bottom: 1px solid #e6e6e6; }
 .project-identity { min-width: 0; }
 .project-title-row { display: flex; align-items: start; gap: 8px; min-width: 0; font-size: 28px; font-weight: 600; line-height: 1.35; }
 .project-title-row h2 { min-width: 0; margin: 0; font: inherit; overflow-wrap: anywhere; }
@@ -485,16 +485,16 @@
   background: #dedede;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
 }
-.project-metadata { margin-top: 8px; }
+.project-metadata { margin-top: 20px; }
 .project-current .workspace-recipe-summary { margin: 0; border: 0; border-radius: 0; background: none; overflow: visible; }
-.project-current .workspace-recipe-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 48px; background: transparent; }
-.project-current .workspace-recipe-field { display: grid; align-content: start; gap: 10px; padding: 24px 0; border-bottom: 1px solid #eee; background: transparent; }
+.project-current .workspace-recipe-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; background: transparent; }
+.project-current .workspace-recipe-field { display: grid; min-width: 0; align-content: start; gap: 8px; padding: 16px; border: 1px solid #e6e6e6; border-radius: 5px; background: #fafafa; }
 .project-current .workspace-recipe-label { color: #6b6b6b; font-size: 12px; font-weight: 400; line-height: 1.5; }
-.project-current .workspace-recipe-value { color: #333; font-size: 14px; }
+.project-current .workspace-recipe-value { color: #333; font-size: 14px; overflow-wrap: anywhere; }
 .project-current .workspace-recipe-value:is(.is-enabled, .is-disabled) { padding: 0; border: 0; border-radius: 0; background: transparent; font-weight: 400; }
 .project-current .workspace-recipe-value.is-enabled { color: #222; }
 .project-current .workspace-recipe-value.is-disabled { color: #737373; }
-.project-created { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 24px; font-size: 12px; color: #737373; }
+.project-created { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 18px; font-size: 12px; color: #737373; }
 .project-rename-form { max-width: 520px; margin: 0; }
 .project-rename-form input { flex: 1; width: 100%; min-width: 0; padding: 0; border: 0; border-bottom: 1px solid #b3b3b3; border-radius: 0; background: transparent; color: inherit; font: inherit; }
 .project-legacy-picker, .project-pending { display: grid; gap: 10px; margin-top: 20px; font-size: 12px; font-weight: 400; }
@@ -520,6 +520,10 @@
 .project-source-switch input { accent-color: #222; }
 .importer-import-progress-log > summary { cursor: pointer; padding: 8px 0; }
 
+@media (max-width: 1200px) {
+  .project-current .workspace-recipe-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 1000px) {
   .project-browser { grid-template-columns: 260px minmax(0, 1fr); }
   .project-recents { padding: 18px; }
@@ -528,7 +532,6 @@
   .project-current { padding: 20px 24px 28px; }
   .project-title-row { font-size: 24px; }
   .project-detail-overview { gap: 16px; }
-  .project-current .workspace-recipe-grid { column-gap: 24px; }
 }
 
 @media (max-width: 760px) {
@@ -543,9 +546,9 @@
   .project-empty { min-height: max(340px, calc(100dvh - 320px)); padding: 30px 16px 60px; }
   .project-empty .button { min-width: 136px; padding: 12px; font-size: 13px; }
   .project-empty .project-entry-actions { gap: 10px; }
-  .project-detail-overview { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-bottom: 24px; }
+  .project-detail-overview { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-bottom: 20px; }
   .project-enter-assembly { justify-self: start; }
   .project-current .workspace-recipe-grid { grid-template-columns: minmax(0, 1fr); }
-  .project-current .workspace-recipe-field { padding: 20px 0; }
+  .project-current .workspace-recipe-field { padding: 14px; }
   .project-import-dialog { padding: 20px; }
 }
