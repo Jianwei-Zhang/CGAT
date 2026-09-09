@@ -10,7 +10,7 @@ import {
 import { flushAssemblyProjectState } from "./assembly-page.js";
 import { defaultProjectName } from "../../services/project-session.js";
 import { openProjectWorkspace as openWorkspace } from "../../services/project-session.js";
-import { renderProjectsBody, projectLabels } from "./projects-view.js";
+import { renderProjectsBody, projectLabels, syncProjectValidation } from "./projects-view.js";
 import { renderWorkspacePage, bindWorkspacePage } from "./workspace-page.js";
 import { switchProjectFromShell, closeProjectSession, buildEmptyAssemblyViewState, buildEmptyProjectExportState } from "../shell/session-switchers.js";
 import { clearAssemblySessionCache } from "../shell/assembly-session-cache.js";
@@ -218,6 +218,7 @@ export function bindImporterPage(host, store) {
 
   deleteFailedHistoryButton?.addEventListener("click", () => {
     const snapshot = store.getState();
+    if (snapshot.importer.inFlight || snapshot.importer.historyValidating || snapshot.initializer?.autoPipelineRunning) return;
     const failedPaths = getFailedHistoryPaths(
       readWorkspaceHistory(),
       snapshot.importer.historyValidation,
@@ -730,83 +731,49 @@ async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
 }
 
 async function runValidateHistoryFlow(host, store) {
+  const snapshot = store.getState();
+  if (snapshot.importer.inFlight || snapshot.importer.historyValidating || snapshot.initializer?.autoPipelineRunning) return;
   const historyRecords = readWorkspaceHistory();
   const workspacePaths = historyRecords.map((item) => item.path);
-  if (workspacePaths.length === 0) {
-    updateImporterState(store, {
-      status: i18nT(store.getState(), "importer.runtime.noHistoryToValidateStatus"),
-      summary: i18nT(store.getState(), "importer.runtime.noHistoryToValidateSummary"),
-    });
-    rerender(host, store);
-    return;
-  }
+  if (workspacePaths.length === 0) return;
 
-  updateImporterState(store, {
-    inFlight: true,
-    status: i18nT(store.getState(), "importer.runtime.validateInProgressStatus"),
-    summary: i18nT(store.getState(), "importer.runtime.validateInProgressSummary", {
-      count: workspacePaths.length,
-    }),
-    stages: [],
-  });
-  rerender(host, store);
+  updateImporterState(store, { historyValidating: true });
+  syncProjectValidation(host, store.getState(), historyRecords);
 
   const historyValidation = {};
-  const resultStages = [];
-  let okCount = 0;
-  let failCount = 0;
   for (const workspaceRoot of workspacePaths) {
     try {
       const result = await validateWorkspaceIntegrity({ workspaceRoot });
       if (result.ok) {
-        okCount += 1;
         historyValidation[workspaceRoot] = {
           ok: true,
           message: "",
         };
-        resultStages.push(i18nT(store.getState(), "importer.runtime.validateHistoryOkStage", {
-          workspaceRoot,
-          resultPafCount: result.resultPafCount,
-        }));
       } else {
-        failCount += 1;
         const missing = Array.isArray(result.missing) ? result.missing.join(", ") : i18nT(store.getState(), "importer.runtime.unknownMissing");
         historyValidation[workspaceRoot] = {
           ok: false,
           message: missing,
         };
-        resultStages.push(i18nT(store.getState(), "importer.runtime.validateHistoryMissingStage", {
-          workspaceRoot,
-          missing,
-        }));
       }
     } catch (error) {
-      failCount += 1;
       const message = String(error.message || error);
       historyValidation[workspaceRoot] = {
         ok: false,
         message,
       };
-      resultStages.push(i18nT(store.getState(), "importer.runtime.validateHistoryFailedStage", {
-        workspaceRoot,
-        message,
-      }));
     }
   }
 
+  const currentRecords = readWorkspaceHistory();
+  const previousValidation = store.getState().importer.historyValidation || {};
   updateImporterState(store, {
-    inFlight: false,
-    historyValidation,
-    status: failCount === 0
-      ? i18nT(store.getState(), "importer.runtime.validateOkStatus")
-      : i18nT(store.getState(), "importer.runtime.validateDoneStatus"),
-    summary: i18nT(store.getState(), "importer.runtime.validateDoneSummary", {
-      okCount,
-      failCount,
-    }),
-    stages: resultStages,
+    historyValidating: false,
+    historyValidation: Object.fromEntries(currentRecords
+      .filter(record => historyValidation[record.path] || previousValidation[record.path])
+      .map(record => [record.path, historyValidation[record.path] || previousValidation[record.path]])),
   });
-  rerender(host, store);
+  syncProjectValidation(host, store.getState(), currentRecords);
 }
 
 function openDeleteSelectionConfirm(host, store, deleteTargets, deleteSelectionMode = "") {
@@ -1390,7 +1357,7 @@ function clearImporterStatusToast(host, store) {
     status: "",
     summary: "",
   });
-  rerender(host, store);
+  host.querySelector('[data-importer-status-toast="1"]')?.remove();
 }
 
 function resolveImporterTimerApi() {

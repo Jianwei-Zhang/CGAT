@@ -375,6 +375,7 @@
 
 .project-recents-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -383,8 +384,9 @@
 
 .project-recents-header h4 { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; color: #666; }
 .project-count { color: #777; font-variant-numeric: tabular-nums; }
-.project-library-actions { display: flex; align-items: center; gap: 4px; }
-.projects-page .project-history-action { min-height: 30px; padding: 5px 8px; font-size: 11px; }
+.project-library-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.projects-page .project-library-actions [hidden], .project-recent-error[hidden] { display: none; }
+.project-validation-summary { min-height: 18px; margin: 0 0 12px; color: #707070; font-size: 11px; line-height: 18px; }
 .project-entry-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .project-icon { flex: 0 0 auto; vertical-align: middle; }
 
@@ -410,6 +412,7 @@
 .projects-page :is(button, summary, input, select):focus-visible { outline: 2px solid #555; outline-offset: 3px; }
 .projects-page .project-icon-button { width: 32px; min-height: 32px; height: 32px; padding: 0; border-color: transparent; flex: 0 0 auto; }
 .projects-page .project-icon-button:not(.project-primary) { color: #707070; }
+.projects-page .project-history-action { min-height: 30px; padding: 5px 8px; font-size: 11px; }
 
 .project-empty {
   flex: 1;

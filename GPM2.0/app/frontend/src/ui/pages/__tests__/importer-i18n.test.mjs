@@ -192,10 +192,11 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.progressStages.validate_grt_app_required_files, "检查 App 交付包必需文件");
   assert.equal(zh.progressStages.validate_grt_app_fai, "校验来源与 reference 的 FAI 长度");
   assert.equal(zh.runtime.importPhaseProgress, "阶段 {current}/{total}");
-  assert.equal(zh.buttons.deleteFailedRecords, "一键删除失败记录（{count}）");
-  assert.equal(zh.page.deleteFailedConfirmTitle, "删除失败记录");
+  assert.equal(zh.buttons.validateHistory, "校验项目");
+  assert.equal(zh.buttons.deleteFailedRecords, "删除失败项目");
+  assert.equal(zh.page.deleteFailedConfirmTitle, "删除失败项目");
   assert.equal(zh.page.deleteWithFiles, "是否同步删除对应文件（此操作不可逆，请谨慎操作）");
-  assert.equal(zh.runtime.deleteDoneFailedHistorySummary, "已删除 {count} 条校验失败记录。");
+  assert.equal(zh.runtime.deleteDoneFailedHistorySummary, "已从项目库删除 {count} 个校验失败项目。");
 
   assert.equal(en.buttons.importAddPackage, "Import add package");
   assert.equal(en.runtime.importAddPackageSummary, "Importing the dataset add package.");
@@ -214,10 +215,11 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.progressStages.validate_grt_app_required_files, "Check required App delivery files");
   assert.equal(en.progressStages.validate_grt_app_fai, "Validate source and reference FAI lengths");
   assert.equal(en.runtime.importPhaseProgress, "Phase {current}/{total}");
-  assert.equal(en.buttons.deleteFailedRecords, "Delete failed records ({count})");
-  assert.equal(en.page.deleteFailedConfirmTitle, "Delete failed records");
+  assert.equal(en.buttons.validateHistory, "Validate projects");
+  assert.equal(en.buttons.deleteFailedRecords, "Delete failed projects");
+  assert.equal(en.page.deleteFailedConfirmTitle, "Delete failed projects");
   assert.equal(en.page.deleteWithFiles, "Also delete files on disk (irreversible).");
-  assert.equal(en.runtime.deleteDoneFailedHistorySummary, "Deleted {count} failed validation records.");
+  assert.equal(en.runtime.deleteDoneFailedHistorySummary, "Removed {count} projects that failed validation from the library.");
 });
 
 test("importer bulk delete removes only current failed history records", async () => {
@@ -293,7 +295,8 @@ test("importer bulk delete removes only current failed history records", async (
     const store = createStore(state);
 
     const initialHtml = renderImporterPage(store.getState());
-    assert.match(initialHtml, /一键删除失败记录（2）/);
+    assert.match(initialHtml, /id="validate-history-button"[^>]*>校验项目<\/button>\s*<button id="delete-failed-history-button"[^>]*>删除失败项目<\/button>/);
+    assert.doesNotMatch(initialHtml, /id="delete-failed-history-button"[^>]*hidden/);
 
     bindImporterPage(host, store);
     deleteFailedButton.click();
@@ -303,7 +306,7 @@ test("importer bulk delete removes only current failed history records", async (
     assert.deepEqual(store.getState().importer.deleteTargets, ["D:/ws-failed-b", "D:/ws-failed-a"]);
 
     const confirmHtml = renderImporterPage(store.getState());
-    assert.match(confirmHtml, /删除失败记录/);
+    assert.match(confirmHtml, /删除失败项目/);
     assert.match(confirmHtml, /D:\/ws-failed-a/);
     assert.match(confirmHtml, /D:\/ws-failed-b/);
     assert.match(confirmHtml, /id="delete-with-files-checkbox" type="checkbox"/);
@@ -342,7 +345,7 @@ test("importer bulk delete removes only current failed history records", async (
       projectName: "active-project",
       projectId: 42,
     });
-    assert.equal(store.getState().importer.summary, "已删除 2 条校验失败记录。");
+    assert.equal(store.getState().importer.summary, "已从项目库删除 2 个校验失败项目。");
     assert.equal(store.getState().importer.deleteSelectionMode, "");
     assert.equal(deleteRequestCount, 0);
   } finally {
@@ -559,7 +562,94 @@ test("deleting the active project record closes its card when disk deletion is u
   }
 });
 
-test("importer disables bulk delete when validation has no failed records", () => {
+test("project validation updates in place and preserves the rename draft across retries and toast dismissal", async () => {
+  const previousWindow = globalThis.window;
+  const firstResult = createDeferred();
+  const calls = [];
+  const timers = [];
+  let repaired = false;
+  const paths = ["D:/good", "D:/missing", "D:/unavailable"];
+  try {
+    globalThis.window = {
+      localStorage: { getItem: () => JSON.stringify(paths.map(path => ({ path }))) },
+      setTimeout(callback) { timers.push(callback); return timers.length; },
+      clearTimeout() {},
+      __TAURI__: { core: { invoke: async (command, { workspaceRoot }) => {
+        assert.equal(command, "validate_workspace_integrity");
+        calls.push(workspaceRoot);
+        if (repaired) return { ok: true };
+        if (workspaceRoot === "D:/good") return firstResult.promise;
+        if (workspaceRoot === "D:/missing") return { ok: false, missing: ["project.sqlite"] };
+        throw new Error("Path <unavailable>");
+      } } },
+    };
+    const validate = Object.assign(createButton(), {
+      setAttribute(name, value) { this[name] = value; },
+    });
+    const remove = Object.assign(createButton(), { hidden: true });
+    const input = Object.assign(createButton(), { value: "Unsaved name" });
+    const summary = { textContent: "" };
+    const errors = paths.map(path => ({ dataset: { projectValidationPath: path }, hidden: true, textContent: "" }));
+    const toast = { removed: false, remove() { this.removed = true; } };
+    const host = createHost({
+      "#validate-history-button": validate,
+      "#delete-failed-history-button": remove,
+      "#selected-project-name-input": input,
+      "[data-project-validation-summary]": summary,
+      "[data-project-validation-path]": errors,
+      '[data-importer-status-toast="1"]': toast,
+    });
+    host.innerHTML = "Existing project detail and focused rename input";
+    const state = createImporterScrollState({ inFlight: false, importRunId: null, status: "Previous operation", summary: "Finished" });
+    state.session = { workspacePath: paths[0], projectId: 1, projectName: "Original" };
+    state.initializer = { ...state.initializer, renameProjectKey: `${paths[0]}:1`, editProjectNameInput: input.value };
+    const store = createStore(state);
+    bindImporterPage(host, store);
+    const pending = validate.click();
+    await validate.click();
+    remove.click();
+    assert.deepEqual(calls, [paths[0]]);
+    assert.equal(store.getState().importer.historyValidating, true);
+    assert.equal(store.getState().importer.inFlight, false);
+    assert.equal(store.getState().importer.deleteConfirmOpen, false);
+    assert.equal(validate.disabled, true);
+    assert.equal(validate.textContent, "校验中…");
+    assert.equal(summary.textContent, "正在校验 3 个项目。");
+    timers[0]();
+    assert.equal(toast.removed, true);
+    assert.equal(host.innerHTML, "Existing project detail and focused rename input");
+
+    firstResult.resolve({ ok: true });
+    await pending;
+    assert.equal(store.getState().importer.historyValidating, false);
+    assert.equal(validate.disabled, false);
+    assert.equal(validate.textContent, "校验项目");
+    assert.equal(remove.hidden, false);
+    assert.equal(remove.disabled, false);
+    assert.equal(summary.textContent, "校验完成：通过 1 个，失败 2 个。");
+    assert.equal(errors[0].hidden, true);
+    assert.equal(errors[1].textContent, "project.sqlite");
+    assert.equal(errors[2].hidden, false);
+    assert.match(errors[2].textContent, /Path <unavailable>/);
+
+    repaired = true;
+    await validate.click();
+    assert.equal(summary.textContent, "校验完成：通过 3 个，失败 0 个。");
+    assert.equal(remove.hidden, true);
+    assert.equal(remove.disabled, true);
+    assert.ok(errors.every(node => node.hidden && node.textContent === ""));
+    assert.equal(host.innerHTML, "Existing project detail and focused rename input");
+    assert.equal(host.querySelector("#selected-project-name-input"), input);
+    assert.equal(input.value, "Unsaved name");
+    assert.equal(store.getState().initializer.editProjectNameInput, "Unsaved name");
+    assert.equal(store.getState().session, state.session);
+    assert.equal(timers.length, 1);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test("importer hides bulk delete when validation has no failed projects", () => {
   const previousWindow = globalThis.window;
   try {
     globalThis.window = {
@@ -580,8 +670,8 @@ test("importer disables bulk delete when validation has no failed records", () =
     });
 
     const html = renderImporterPage(state);
-    assert.match(html, /id="delete-failed-history-button" class="danger" disabled/);
-    assert.match(html, /一键删除失败记录（0）/);
+    assert.match(html, /id="delete-failed-history-button"[^>]*disabled[^>]*hidden/);
+    assert.doesNotMatch(html, /项目库操作|一键删除失败记录/);
   } finally {
     globalThis.window = previousWindow;
   }
