@@ -121,10 +121,6 @@ export function renderWorkspacePage(state) {
   const busy = state.importer?.inFlight || initializer.autoPipelineRunning || initializer.updating;
   const renameOpen = initializer.renameProjectKey === `${state.session.workspacePath}:${selectedProject?.projectId}`;
   return `<section class="project-current">
-    <header class="project-detail-header">
-      <span class="project-detail-label">${labels.details}</span>
-      <button id="project-close-button" class="button project-icon-button" title="${labels.close}" aria-label="${labels.close}" ${busy ? "disabled" : ""}>${projectIcon("close")}</button>
-    </header>
     <div class="project-detail-overview">
       <div class="project-identity">
         <div class="project-title-row"><h2>${escapeHtml(selectedProject?.projectName || defaultProjectName(state.session.workspacePath))}</h2>

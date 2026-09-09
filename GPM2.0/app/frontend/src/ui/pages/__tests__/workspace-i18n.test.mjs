@@ -237,11 +237,10 @@ function createRouteHost(nodeMap = {}) {
   };
 }
 
-test("project summary has no nested creation step", () => {
+test("project summary leads directly with the selected project", () => {
   const html = renderWorkspacePage(createState());
-  assert.match(html, />Current project</);
   assert.match(html, />Enter Assembly</);
-  assert.doesNotMatch(html, /Create Project|Existing Projects|Project Initialization/);
+  assert.doesNotMatch(html, /Current project|Close project|project-close-button|Create Project|Existing Projects|Project Initialization/);
 });
 
 test("legacy creation state cannot expose a phased capability switch", () => {
@@ -280,10 +279,9 @@ test("legacy directories offer every project without choosing one implicitly", (
   assert.match(html, /initializer-enter-assembly-button[^>]*disabled/);
 });
 
-test("Chinese project summary uses project terminology", () => {
+test("Chinese project summary omits the redundant current-project header", () => {
   const html = renderWorkspacePage(createState({ locale: "zh" }));
-  assert.match(html, /当前项目/);
-  assert.doesNotMatch(html, /项目区|创建新项目/);
+  assert.doesNotMatch(html, /当前项目|关闭项目|project-close-button|项目区|创建新项目/);
 });
 
 test("rename editor is tied to the exact directory and project and cancel discards its draft", async () => {

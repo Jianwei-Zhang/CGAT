@@ -71,9 +71,7 @@ test("workspace page renders english labels when locale is en", () => {
   };
   const html = renderWorkspacePage(state);
 
-  assert.match(html, />Current project</);
-  assert.match(html, /aria-label="Close project"/);
   assert.match(html, />Enter Assembly</);
-  assert.doesNotMatch(html, /Create Project/);
+  assert.doesNotMatch(html, /Current project|Close project|project-close-button|Create Project/);
   assert.equal(state.assembly.subviewTrackView?.alignmentLength, 10000);
 });

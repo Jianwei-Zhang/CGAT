@@ -415,23 +415,6 @@ function bindProjectEntryControls(host, store) {
       rerender(host, store);
     }
   });
-  host.querySelector("#project-close-button")?.addEventListener("click", async () => {
-    if (busy()) return;
-    updateImporterState(store, { inFlight: true, projectError: "" });
-    try { await flushAssemblyProjectState(host, store); } catch (error) {
-      updateImporterState(store, { inFlight: false, projectError: String(error.message || error) });
-      rerender(host, store);
-      return;
-    }
-    closeProjectSession(store);
-    updateImporterState(store, { inFlight: false });
-    rerender(host, store);
-  });
-  host.querySelectorAll("[data-project-remove]").forEach(button => button.addEventListener("click", () => {
-    if (busy()) return;
-    removeWorkspaceHistoryPaths([button.dataset.projectRemove]);
-    rerender(host, store);
-  }));
   host.querySelectorAll("[data-project-delete-files]").forEach(button => button.addEventListener("click", () => {
     if (busy()) return;
     openDeleteSelectionConfirm(host, store, [button.dataset.projectDeleteFiles], DELETE_SELECTION_MODE_PROJECT);

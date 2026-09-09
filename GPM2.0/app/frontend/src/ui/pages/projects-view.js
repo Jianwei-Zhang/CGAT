@@ -3,31 +3,31 @@ import { projectIcon } from "./project-icons.js";
 
 export function projectLabels(state) {
   return state.locale === "en" ? {
-    import: "Import project", open: "Open project", recent: "Recent projects",
+    import: "Import project", open: "Open project", recent: "Project library",
     empty: "No projects yet", emptyHint: "Import a delivery bundle or open an existing project directory.",
     name: "Project name (optional)", nameDefault: "Use directory name", location: "Project directory",
     zip: "ZIP bundle", extracted: "Extracted directory", source: "Source", browse: "Browse",
-    cancel: "Cancel", submit: "Import", close: "Close project", details: "Current project",
+    cancel: "Cancel", submit: "Import",
     legacy: "This directory contains multiple legacy projects. Select one to continue.",
     pending: "Project initialization incomplete", retry: "Retry initialization",
-    remove: "Remove from recent", delete: "Delete project files", more: "Project actions",
+    delete: "Delete project files", more: "Project actions",
     selectFirst: "Open a project first", loading: "Opening project...", deleteFailed: "Deletion failed",
     relocate: "Locate directory", sourceLocation: "Project location", legacyProjects: "Legacy projects",
     noOpen: "No project open", opened: "Open", rename: "Rename project", saved: "Save name",
-    recentActions: "Recent project actions", lastOpened: "Last opened", created: "Created",
+    recentActions: "Project library actions", lastOpened: "Last opened", created: "Created",
   } : {
-    import: "导入项目", open: "打开项目", recent: "最近项目",
+    import: "导入项目", open: "打开项目", recent: "项目库",
     empty: "尚未添加项目", emptyHint: "导入交付包，或打开已有项目目录。",
     name: "项目名称（可选）", nameDefault: "使用目录名称", location: "项目目录",
     zip: "ZIP 交付包", extracted: "已解压目录", source: "来源", browse: "选择",
-    cancel: "取消", submit: "导入", close: "关闭项目", details: "当前项目",
+    cancel: "取消", submit: "导入",
     legacy: "此目录包含多个旧版项目，请选择要打开的项目。",
     pending: "项目待初始化", retry: "重试初始化",
-    remove: "移除最近记录", delete: "删除项目文件", more: "项目操作",
+    delete: "删除项目文件", more: "项目操作",
     selectFirst: "请先打开项目", loading: "正在打开项目...", deleteFailed: "删除失败",
     relocate: "重新定位目录", sourceLocation: "项目位置", legacyProjects: "旧版项目",
     noOpen: "尚未打开项目", opened: "已打开", rename: "重命名项目", saved: "保存名称",
-    recentActions: "最近项目操作", lastOpened: "上次打开", created: "创建时间",
+    recentActions: "项目库操作", lastOpened: "上次打开", created: "创建时间",
   };
 }
 
@@ -95,7 +95,6 @@ export function renderProjectsBody(state, { records, messages, formatTime, summa
         <div class="project-row-menu-items">
           <button data-project-relocate="${html(record.path)}" ${disabled}>${labels.relocate}</button>
           <button data-workspace-import-add-package-path="${html(record.path)}" ${disabled}>${messages.buttons.importAddPackage}</button>
-          <button data-project-remove="${html(record.path)}" ${disabled}>${labels.remove}</button>
           <button data-project-delete-files="${html(record.path)}" class="danger" ${disabled}>${labels.delete}</button>
         </div>
       </details>
@@ -114,12 +113,12 @@ export function renderProjectsBody(state, { records, messages, formatTime, summa
     <section class="project-recents" aria-labelledby="project-recents-title">
       ${actions}
       <header class="project-recents-header"><h4 id="project-recents-title">${labels.recent}<span class="project-count">${records.length}</span></h4>
-        ${records.length ? `<details class="project-row-menu"><summary aria-label="${labels.recentActions}" title="${labels.recentActions}">${projectIcon("more")}</summary>
-          <div class="project-row-menu-items">
-            <button id="validate-history-button" ${disabled}>${messages.buttons.validateHistory}</button>
-            ${records.some(record => importer.historyValidation?.[record.path]) ? `<button id="delete-failed-history-button" class="danger" ${busy || !failed ? "disabled" : ""}>${messages.buttons.deleteFailedRecords.replace("{count}", failed)}</button>` : ""}
-          </div>
-        </details>` : ""}
+        ${records.length ? `<div class="project-library-actions">
+          <button id="validate-history-button" class="button ghost project-history-action" ${disabled}>${messages.buttons.validateHistory}</button>
+          ${records.some(record => importer.historyValidation?.[record.path]) ? `<details class="project-row-menu"><summary aria-label="${labels.recentActions}" title="${labels.recentActions}">${projectIcon("more")}</summary>
+            <div class="project-row-menu-items"><button id="delete-failed-history-button" class="danger" ${busy || !failed ? "disabled" : ""}>${messages.buttons.deleteFailedRecords.replace("{count}", failed)}</button></div>
+          </details>` : ""}
+        </div>` : ""}
       </header><div class="project-recent-list">${rows}</div>
     </section>
     ${summaryHtml || `<section class="project-empty project-no-selection"><span class="project-empty-symbol">${projectIcon("open")}</span><h4>${labels.noOpen}</h4></section>`}

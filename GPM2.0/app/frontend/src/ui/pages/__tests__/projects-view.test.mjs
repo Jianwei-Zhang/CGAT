@@ -27,6 +27,9 @@ test("recent projects and current detail share the browser layout without duplic
   assert.match(html, /class="project-browser"[\s\S]*class="project-recents"[\s\S]*id="project-import-button"[\s\S]*id="project-open-button"[\s\S]*class="project-recents-header"[\s\S]*class="project-current"/);
   assert.match(html, /data-recent-path="\/rice" aria-current="true"/);
   assert.match(html, /&quot;&lt;name&gt;/);
+  assert.match(html, />Project library<span class="project-count">2<\/span>/);
+  assert.match(html, /project-recents-header[\s\S]*id="validate-history-button"[\s\S]*project-recent-list/);
+  assert.doesNotMatch(html, /data-project-remove|Remove from recent/);
   assert.doesNotMatch(html, /No projects yet|No project open/);
   assert.equal((html.match(/id="project-open-button"/g) || []).length, 1);
 });

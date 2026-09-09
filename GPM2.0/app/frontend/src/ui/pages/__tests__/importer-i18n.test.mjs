@@ -559,30 +559,6 @@ test("deleting the active project record closes its card when disk deletion is u
   }
 });
 
-test("removing the active recent record does not close its project", () => {
-  const previousWindow = globalThis.window;
-  let history = [{ path: "/active", lastUsedAt: 1 }];
-  try {
-    globalThis.window = {
-      localStorage: {
-        getItem: () => JSON.stringify(history),
-        setItem: (_key, value) => { history = JSON.parse(value); },
-      },
-    };
-    const initial = createImporterScrollState({ inFlight: false, importRunId: null, status: "" });
-    initial.session = { workspacePath: "/active", projectId: 1, projectName: "Active" };
-    const store = createStore(initial);
-    const remove = createButton();
-    remove.dataset.projectRemove = "/active";
-    bindImporterPage(createHost({ "[data-project-remove]": [remove] }), store);
-    remove.click();
-    assert.deepEqual(history, []);
-    assert.deepEqual(store.getState().session, initial.session);
-  } finally {
-    globalThis.window = previousWindow;
-  }
-});
-
 test("importer disables bulk delete when validation has no failed records", () => {
   const previousWindow = globalThis.window;
   try {

@@ -13,7 +13,7 @@ export const zh = {
     openTitle: "2. 从已有项目加载",
     openWorkspacePath: "项目目录（应包含 project.sqlite）",
     existingProjectsTitle: "已加载项目",
-    recentTitle: "最近项目",
+    recentTitle: "项目库",
     deleteConfirmTitle: "删除确认",
     deleteConfirmMessage: "您将删除：",
     deleteFailedConfirmTitle: "删除失败记录",
@@ -38,7 +38,6 @@ export const zh = {
     cancel: "取消",
     cancelImport: "终止导入",
     cancelImportPending: "正在终止...",
-    deleteRecord: "移除最近记录",
   },
   progressStages: {
     validate_input: "校验导入输入",
@@ -188,7 +187,7 @@ export const en = {
     openTitle: "2. Open existing project",
     openWorkspacePath: "Project directory (contains project.sqlite)",
     existingProjectsTitle: "Loaded projects",
-    recentTitle: "Recent projects",
+    recentTitle: "Project library",
     deleteConfirmTitle: "Delete confirmation",
     deleteConfirmMessage: "You will delete:",
     deleteFailedConfirmTitle: "Delete failed records",
@@ -213,7 +212,6 @@ export const en = {
     cancel: "Cancel",
     cancelImport: "Cancel import",
     cancelImportPending: "Cancelling...",
-    deleteRecord: "Remove from recent",
   },
   progressStages: {
     validate_input: "Validate import input",

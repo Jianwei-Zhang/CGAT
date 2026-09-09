@@ -373,8 +373,7 @@
   letter-spacing: 0;
 }
 
-.project-recents-header,
-.project-detail-header {
+.project-recents-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -384,6 +383,8 @@
 
 .project-recents-header h4 { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; color: #666; }
 .project-count { color: #777; font-variant-numeric: tabular-nums; }
+.project-library-actions { display: flex; align-items: center; gap: 4px; }
+.projects-page .project-history-action { min-height: 30px; padding: 5px 8px; font-size: 11px; }
 .project-entry-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .project-icon { flex: 0 0 auto; vertical-align: middle; }
 
@@ -460,8 +461,6 @@
 .project-row-menu-items button.danger { color: #333; }
 
 .project-current { min-width: 0; align-self: start; padding: 24px 32px 32px; }
-.project-detail-header { margin-bottom: 24px; }
-.project-detail-label { font-size: 12px; color: #707070; }
 .project-detail-overview { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 24px; padding-bottom: 28px; border-bottom: 1px solid #e6e6e6; }
 .project-identity { min-width: 0; }
 .project-title-row { display: flex; align-items: start; gap: 8px; min-width: 0; }
