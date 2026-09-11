@@ -32,19 +32,22 @@ function harness(state) {
   const reset = element();
   const cancel = element();
   const retry = element();
+  const copy = element();
+  const reveal = element({ catalogReveal: "0" });
   const host = {
     querySelector(selector) {
       if (selector === "#project-data-catalog") return {};
       if (selector === "[data-catalog-retry]") return retry;
       if (selector === "[data-catalog-reset]") return reset;
       if (selector === "[data-catalog-cancel]") return cancel;
+      if (selector === "[data-catalog-copy]") return copy;
       if (selector === "[data-catalog-form]" && current.initializer.projectCatalog?.editor) return form;
       return null;
     },
-    querySelectorAll(selector) { return selector === "[data-catalog-edit]" ? [edit] : []; },
+    querySelectorAll(selector) { return selector === "[data-catalog-edit]" ? [edit] : selector === "[data-catalog-reveal]" ? [reveal] : []; },
   };
   const bind = deps => bindProjectCatalog(host, store, () => {}, deps);
-  return { store, host, edit, form, reset, cancel, retry, bind };
+  return { store, host, edit, form, reset, cancel, retry, copy, reveal, bind };
 }
 
 test("catalog uses one table with data type first and reference first, escaping names and notes", () => {
@@ -111,6 +114,32 @@ test("save persists current name and note, keeps canonical name and updates disp
   assert.equal(h.store.getState().initializer.datasets[0].name, "original");
   assert.equal(h.store.getState().initializer.datasets[0].displayName, "new name");
   assert.equal(h.store.getState().initializer.projectCatalog.editor, null);
+});
+
+test("local position displays and copies grouped directories and reveals the same entry", async () => {
+  const { state, row } = fixture();
+  row.locations = ["D:\\one\\data\\partitions\\chr", "D:\\one\\data\\partitions\\unplaced"];
+  row.availableFileCount = 12;
+  row.fastaAvailable = true;
+  const h = harness(state);
+  let copied;
+  let revealed;
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  Object.defineProperty(globalThis, "navigator", { configurable: true, value: { clipboard: { writeText: async text => { copied = text; } } } });
+  try {
+    const deps = { revealCatalogLocation: async request => { revealed = request; } };
+    h.bind(deps); h.edit.fire("click"); h.bind(deps);
+    const html = renderProjectCatalog(h.store.getState());
+    assert.ok(html.includes(`<code>${row.locations[0]}</code>`));
+    assert.equal((html.match(/<code>/g) || []).length, 2);
+    await h.copy.fire("click");
+    assert.equal(copied, row.locations.join("\n"));
+    await h.reveal.fire("click");
+    assert.deepEqual(revealed, { workspaceRoot: "D:/one", projectId: 1, objectType: "dataset", objectId: 1, locationIndex: 0 });
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, "navigator", descriptor);
+    else delete globalThis.navigator;
+  }
 });
 
 test("failed save retains the editable draft and displays the error", async () => {

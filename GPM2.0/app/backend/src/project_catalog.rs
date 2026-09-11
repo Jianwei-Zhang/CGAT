@@ -1,5 +1,5 @@
 //! User-facing catalog metadata. Canonical names remain package identifiers.
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
 use rusqlite::{Connection, params};
@@ -58,6 +58,7 @@ pub struct CatalogEntry {
     pub role: String,
     pub derived: bool,
     pub statistics: SequenceStatistics,
+    /// Existing local directories, grouped at the chromosome partition root.
     pub locations: Vec<String>,
     pub available_file_count: usize,
     pub fasta_available: bool,
@@ -93,6 +94,41 @@ fn open_existing(path: &Path) -> Result<Connection> {
 
 pub fn list_project_catalog(path: &Path, project_id: i64) -> Result<ProjectCatalog> {
     list_with_connection(&open_existing(path)?, project_id)
+}
+
+pub fn resolve_catalog_directory(
+    path: &Path,
+    project_id: i64,
+    object_type: &str,
+    object_id: i64,
+    location_index: usize,
+) -> Result<PathBuf> {
+    let catalog = list_project_catalog(path, project_id)?;
+    let entry = catalog
+        .datasets
+        .iter()
+        .chain(catalog.references.iter())
+        .find(|entry| entry.object_type == object_type && entry.object_id == object_id)
+        .ok_or_else(|| anyhow::anyhow!("catalog object does not belong to this project"))?;
+    let location = entry
+        .locations
+        .get(location_index)
+        .ok_or_else(|| anyhow::anyhow!("location no longer available"))?;
+    let directory = Path::new(location).canonicalize()?;
+    if !directory.is_dir() {
+        bail!("location is not a directory");
+    }
+    Ok(directory)
+}
+
+fn containing_catalog_directory(file: &Path) -> Option<&Path> {
+    // Standard packages split one dataset into chr/<chromosome>/<dataset>.fa.
+    // Keep unplaced and other storage roots separate instead of broadening to
+    // a shared workspace ancestor that also contains unrelated objects.
+    file.ancestors()
+        .skip(1)
+        .find(|directory| directory.ends_with("data/partitions/chr"))
+        .or_else(|| file.parent())
 }
 
 fn list_with_connection(conn: &Connection, project_id: i64) -> Result<ProjectCatalog> {
@@ -178,6 +214,13 @@ fn read_entry(conn: &Connection, kind: &str, id: i64, role: String) -> Result<Ca
         .count();
     let fasta_available = all_located && available_file_count == locations.len();
     locations.retain(|path| Path::new(path).is_file());
+    locations = locations
+        .iter()
+        .filter_map(|path| containing_catalog_directory(Path::new(path)))
+        .map(|directory| directory.to_string_lossy().into_owned())
+        .collect();
+    locations.sort();
+    locations.dedup();
     let derived = !reference && conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM derived_ctg d JOIN source_seq s ON s.id = d.source_seq_id WHERE s.dataset_id = ?1)",
         [id], |row| row.get(0),

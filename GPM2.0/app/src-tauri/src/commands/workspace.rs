@@ -10,24 +10,13 @@ pub fn reveal_catalog_location(
     locationIndex: usize,
 ) -> CommandResult<()> {
     (|| {
-        let catalog = gpm_next_backend::project_catalog::list_project_catalog(
+        let directory = gpm_next_backend::project_catalog::resolve_catalog_directory(
             &project_db_path(&workspaceRoot),
             projectId,
+            &objectType,
+            objectId,
+            locationIndex,
         )?;
-        let entry = catalog
-            .datasets
-            .iter()
-            .chain(catalog.references.iter())
-            .find(|entry| entry.object_type == objectType && entry.object_id == objectId)
-            .ok_or_else(|| anyhow!("catalog object does not belong to this project"))?;
-        let location = entry
-            .locations
-            .get(locationIndex)
-            .ok_or_else(|| anyhow!("location no longer available"))?;
-        let directory = Path::new(location)
-            .parent()
-            .ok_or_else(|| anyhow!("location has no parent directory"))?
-            .canonicalize()?;
         #[cfg(target_os = "windows")]
         let mut command = std::process::Command::new("explorer.exe");
         #[cfg(target_os = "macos")]

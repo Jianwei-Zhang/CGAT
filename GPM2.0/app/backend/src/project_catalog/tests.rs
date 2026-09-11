@@ -111,7 +111,11 @@ fn locations_check_actual_files_and_statistics_follow_dataset_contents() {
     }
     let catalog = list_project_catalog(&path, 1).unwrap();
     assert!(catalog.datasets[0].fasta_available);
-    assert_eq!(catalog.datasets[0].locations.len(), 1);
+    assert_eq!(
+        catalog.datasets[0].locations,
+        vec![dir.path().to_string_lossy()]
+    );
+    assert_eq!(catalog.datasets[0].available_file_count, 1);
     conn.execute(
         "INSERT INTO source_seq(dataset_id,seq_name,seq_order,length) VALUES(1,'new',4,100)",
         [],
@@ -120,6 +124,93 @@ fn locations_check_actual_files_and_statistics_follow_dataset_contents() {
     let catalog = list_project_catalog(&path, 1).unwrap();
     assert_eq!(catalog.datasets[0].statistics.n50, Some(100));
     assert!(!catalog.datasets[0].fasta_available);
+}
+
+#[test]
+fn chromosome_paths_group_at_partition_root_and_reveal_that_exact_directory() {
+    let (dir, path) = fixture();
+    let conn = open_workspace_db(&path).unwrap();
+    let chr_root = dir.path().join("data/partitions/chr");
+    for id in 1..=3 {
+        let fasta = chr_root.join(format!("Chr{id}/original.fa"));
+        std::fs::create_dir_all(fasta.parent().unwrap()).unwrap();
+        std::fs::write(&fasta, ">a\nA\n").unwrap();
+        conn.execute(
+            "INSERT INTO source_seq_locator(source_seq_id,fasta_path) VALUES(?1,?2)",
+            params![id, fasta.to_str().unwrap()],
+        )
+        .unwrap();
+    }
+    let catalog = list_project_catalog(&path, 1).unwrap();
+    let entry = &catalog.datasets[0];
+    assert_eq!(entry.locations, vec![chr_root.to_string_lossy()]);
+    assert_eq!(entry.available_file_count, 3);
+    assert!(entry.fasta_available);
+    assert_eq!(
+        resolve_catalog_directory(&path, 1, "dataset", 1, 0).unwrap(),
+        chr_root.canonicalize().unwrap()
+    );
+    assert!(resolve_catalog_directory(&path, 1, "dataset", 1, 1).is_err());
+    assert!(resolve_catalog_directory(&path, 1, "dataset", 2, 0).is_err());
+
+    // A single remaining chromosome still resolves to chr, not Chr1.
+    std::fs::remove_file(chr_root.join("Chr2/original.fa")).unwrap();
+    std::fs::remove_file(chr_root.join("Chr3/original.fa")).unwrap();
+    let catalog = list_project_catalog(&path, 1).unwrap();
+    assert_eq!(
+        catalog.datasets[0].locations,
+        vec![chr_root.to_string_lossy()]
+    );
+    assert_eq!(catalog.datasets[0].available_file_count, 1);
+    assert!(!catalog.datasets[0].fasta_available);
+    std::fs::remove_file(chr_root.join("Chr1/original.fa")).unwrap();
+    assert!(
+        list_project_catalog(&path, 1).unwrap().datasets[0]
+            .locations
+            .is_empty()
+    );
+    assert!(resolve_catalog_directory(&path, 1, "dataset", 1, 0).is_err());
+}
+
+#[test]
+fn reference_and_non_chromosome_directories_are_preserved_without_file_paths() {
+    let (dir, path) = fixture();
+    let conn = open_workspace_db(&path).unwrap();
+    for (id, relative) in [
+        (1, "data/partitions/chr/Chr1/original.fa"),
+        (2, "data/partitions/unplaced/original.fa"),
+        (3, "derived/patch.fa"),
+    ] {
+        let fasta = dir.path().join(relative);
+        std::fs::create_dir_all(fasta.parent().unwrap()).unwrap();
+        std::fs::write(&fasta, ">a\nA\n").unwrap();
+        conn.execute(
+            "INSERT INTO source_seq_locator(source_seq_id,fasta_path) VALUES(?1,?2)",
+            params![id, fasta.to_str().unwrap()],
+        )
+        .unwrap();
+    }
+    let ref_root = dir.path().join("data/reference/chrs");
+    std::fs::create_dir_all(&ref_root).unwrap();
+    let ref_file = ref_root.join("Chr1.fa");
+    std::fs::write(&ref_file, ">Chr1\nA\n").unwrap();
+    conn.execute(
+        "INSERT INTO reference_chr_locator(reference_chr_id,fasta_path) VALUES(1,?1)",
+        [ref_file.to_str().unwrap()],
+    )
+    .unwrap();
+    let catalog = list_project_catalog(&path, 1).unwrap();
+    let expected = ["data/partitions/chr", "data/partitions/unplaced", "derived"]
+        .map(|relative| dir.path().join(relative).to_string_lossy().into_owned());
+    assert_eq!(catalog.datasets[0].locations, expected);
+    assert_eq!(
+        catalog.references[0].locations,
+        vec![ref_root.to_string_lossy()]
+    );
+    assert_eq!(
+        resolve_catalog_directory(&path, 1, "reference", 1, 0).unwrap(),
+        ref_root.canonicalize().unwrap()
+    );
 }
 
 #[test]
