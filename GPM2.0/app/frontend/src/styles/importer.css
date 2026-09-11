@@ -458,6 +458,11 @@
 .project-current { min-width: 0; align-self: start; padding: 24px 32px 32px; }
 .project-detail-overview { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 24px; padding-bottom: 20px; border-bottom: 1px solid #e6e6e6; }
 .project-identity { min-width: 0; }
+.project-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; }
+.project-heading-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; font-size: 11px; font-weight: 400; }
+.project-qc-tag { padding: 3px 7px; border: 1px solid #ddd; border-radius: 4px; color: #737373; white-space: nowrap; background: #fafafa; }
+.project-qc-tag.is-enabled { color: #335e47; border-color: #d2e1d8; background: #f3f8f5; }
+.project-heading-created { color: #737373; }
 .project-title-row { display: flex; align-items: start; gap: 8px; min-width: 0; font-size: 28px; font-weight: 600; line-height: 1.35; }
 .project-title-row h2 { min-width: 0; margin: 0; font: inherit; overflow-wrap: anywhere; }
 .project-title-row .project-icon-button { margin-top: 1px; }
@@ -536,9 +541,19 @@
 .project-dataset-note { display: block; width: 140px; padding: 4px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; background: none; color: #666; text-align: left; cursor: pointer; font: inherit; }
 .project-dataset-note:hover { color: #111; text-decoration: underline; }
 .project-dataset-note:disabled { cursor: default; opacity: .55; }
-.project-dataset-detail { background: #fafafa; padding: 20px; border: 1px solid #e5e5e5; border-radius: 6px; margin-top: 8px; font-size: 12px; }
+.project-catalog-dialog { width: min(540px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 24px; overflow-y: auto; border: 1px solid #e5e5e5; border-radius: 8px; background: #fff; color: #222; font-size: 12px; box-shadow: 0 16px 60px #0002; }
+.project-catalog-dialog::backdrop { background: rgb(0 0 0 / 30%); }
+.project-catalog-dialog-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.project-catalog-dialog-head h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.project-catalog-dialog-head > button { margin-left: auto; }
+.project-dataset-field-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.projects-page .project-dataset-field-heading .button { min-height: 24px; padding: 2px 0; border: 0; background: none; font-size: 11px; }
+.project-catalog-more { margin-top: 2px; }
+.project-catalog-more > summary { padding: 8px 0; cursor: pointer; color: #666; }
+.project-catalog-more .project-dataset-facts { margin-top: 10px; }
+.project-catalog-more .project-dataset-basis { margin-top: 12px; }
 .project-dataset-editor { display: grid; gap: 10px; }
-.project-dataset-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.project-dataset-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .project-dataset-facts > div { display: grid; gap: 6px; min-width: 0; }
 .project-dataset-facts span, .project-dataset-location > span { color: #777; }
 .project-dataset-facts strong { font-weight: 500; overflow-wrap: anywhere; }
@@ -546,11 +561,10 @@
 .project-dataset-location { padding: 12px 0; border-top: 1px solid #e8e8e8; border-bottom: 1px solid #e8e8e8; }
 .project-dataset-paths { max-height: 140px; overflow: auto; margin: 8px 0; }
 .project-dataset-paths code { display: block; overflow-wrap: anywhere; font-size: 11px; }
-.project-dataset-name-edit { display: flex; align-items: center; gap: 10px; }
-.project-dataset-name-edit input { flex: 1; min-width: 0; }
 .project-dataset-editor input, .project-dataset-editor textarea { width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; padding: 8px 10px; font: inherit; background: white; }
 .project-dataset-editor textarea { resize: vertical; min-height: 76px; }
 .project-dataset-editor-actions, .project-catalog-footer { display: flex; justify-content: flex-end; gap: 8px; }
+.project-dataset-editor-actions { padding-top: 14px; border-top: 1px solid #eee; }
 .project-catalog-footer { margin-top: 10px; }
 .project-dataset-editor .button, .project-catalog-footer .button { font-size: 12px; }
 
@@ -578,9 +592,7 @@
 
 @media (max-width: 600px) {
   .project-dataset-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .project-dataset-detail { padding: 14px; }
-  .project-dataset-name-edit { flex-wrap: wrap; }
-  .project-dataset-name-edit input { flex-basis: 100%; }
+  .project-catalog-dialog { padding: 18px; }
   .project-empty { min-height: max(340px, calc(100dvh - 320px)); padding: 30px 16px 60px; }
   .project-empty .button { min-width: 136px; padding: 12px; font-size: 13px; }
   .project-empty .project-entry-actions { gap: 10px; }

@@ -4,9 +4,9 @@ import { clearAssemblySessionCache } from "../shell/assembly-session-cache.js";
 
 const messages = {
   zh: {
-    datasets: "组装数据集", references: "参考基因组", name: "名称", role: "角色", count: "序列数",
+    datasets: "数据集", name: "名称", role: "数据类型", count: "序列数", details: "数据详情", more: "更多信息", close: "关闭",
     total: "总长度", note: "备注", actions: "操作", primary: "主组装", support: "辅助组装", derived: "派生数据", includesDerived: "含派生序列",
-    reference: "参考", edit: "查看详情、编辑名称与备注", emptyNote: "添加备注", original: "初始名称",
+    reference: "参考基因组", edit: "查看详情、编辑名称与备注", emptyNote: "添加备注", original: "初始名称",
     reset: "恢复初始名称", longest: "最长序列", location: "本地位置", missing: "序列文件未包含或不可用",
     partial: "部分序列文件可用", copy: "复制路径", copied: "已复制", open: "打开所在目录", self: "自比对", available: "可用", unavailable: "未提供",
     basis: "按当前数据集全部序列记录统计，不过滤短序列、不按 N 拆分；视图移动或隐藏不影响统计。",
@@ -14,9 +14,9 @@ const messages = {
     failure: "读取数据集失败", saveFailure: "保存失败", empty: "没有数据集", bp: "bp", pending: "正在保存…",
   },
   en: {
-    datasets: "Assembly datasets", references: "Reference genome", name: "Name", role: "Role", count: "Sequences",
+    datasets: "Datasets", name: "Name", role: "Data type", count: "Sequences", details: "Dataset details", more: "More information", close: "Close",
     total: "Total length", note: "Note", actions: "Actions", primary: "Primary", support: "Support", derived: "Derived", includesDerived: "Includes derived sequences",
-    reference: "Reference", edit: "View details and edit name or note", emptyNote: "Add note", original: "Initial name",
+    reference: "Reference genome", edit: "View details and edit name or note", emptyNote: "Add note", original: "Initial name",
     reset: "Restore initial name", longest: "Longest sequence", location: "Local location", missing: "Sequence files not included or unavailable",
     partial: "Some sequence files are available", copy: "Copy paths", copied: "Copied", open: "Open containing folder", self: "Self-alignment", available: "Available", unavailable: "Not provided",
     basis: "All records in the current dataset; no minimum length filter or splitting at Ns. Moving or hiding a view does not change these statistics.",
@@ -58,8 +58,17 @@ function renderDetails(row, catalog, state) {
   const busy = catalog.saving || state.importer?.inFlight || state.initializer?.autoPipelineRunning ? "disabled" : "";
   const stats = row.statistics || {};
   const paths = row.locations || [];
-  return `<div class="project-dataset-detail">
+  return `<dialog class="project-catalog-dialog" data-catalog-dialog aria-labelledby="catalog-dialog-title" aria-modal="true" tabindex="-1">
+    <header class="project-catalog-dialog-head"><h3 id="catalog-dialog-title">${l.details}</h3>
+      <span class="project-dataset-role">${l[row.role] || escape(row.role)}</span>
+      <button type="button" data-catalog-close class="button project-icon-button" aria-label="${l.close}" ${busy}>${projectIcon("close")}</button></header>
     <form data-catalog-form class="project-dataset-editor">
+      <div class="project-dataset-field-heading"><label for="catalog-display-name">${l.name}</label>
+        <button type="button" data-catalog-reset class="button ghost" title="${escape(row.originalName)}" ${busy} ${editor.displayName === row.originalName ? "disabled" : ""}>${l.reset}</button></div>
+      <input id="catalog-display-name" name="displayName" maxlength="200" required value="${escape(editor.displayName)}" ${busy} />
+      <label for="catalog-note">${l.note}</label>
+      <textarea id="catalog-note" name="note" rows="3" maxlength="10000" ${busy}>${escape(editor.note)}</textarea>
+      <details class="project-catalog-more" ${editor.moreOpen ? "open" : ""}><summary>${l.more}</summary>
       <div class="project-dataset-facts">
         <div><span>${l.original}</span><strong>${escape(row.originalName)}</strong></div>
         <div><span>${l.longest}</span><strong>${length(stats.longest, state)}</strong></div>
@@ -72,50 +81,46 @@ function renderDetails(row, catalog, state) {
         ${row.availableFileCount ? `<div class="project-dataset-paths">${paths.map((path, index) => `<div><code>${escape(path)}</code>${globalThis.window?.__TAURI__?.core?.invoke ? `<button type="button" class="button ghost" data-catalog-reveal="${index}" ${busy}>${l.open}</button>` : ""}</div>`).join("")}</div>
         <button type="button" class="button ghost" data-catalog-copy ${busy}>${editor.copied ? l.copied : l.copy}</button>` : ""}
       </div>
-      <label for="catalog-display-name">${l.name}</label>
-      <div class="project-dataset-name-edit"><input id="catalog-display-name" name="displayName" maxlength="200" required value="${escape(editor.displayName)}" ${busy} />
-        <button type="button" data-catalog-reset class="button ghost" ${busy} ${editor.displayName === row.originalName ? "disabled" : ""}>${l.reset}</button></div>
-      <label for="catalog-note">${l.note}</label>
-      <textarea id="catalog-note" name="note" rows="3" maxlength="10000" ${busy}>${escape(editor.note)}</textarea>
+      </details>
       ${catalog.error ? `<p class="error-text" role="alert">${escape(catalog.error)}</p>` : ""}
       <div class="project-dataset-editor-actions"><button type="button" data-catalog-cancel class="button ghost" ${busy}>${l.cancel}</button>
         <button type="submit" class="button project-primary" ${busy}>${catalog.saving ? l.pending : l.save}</button></div>
     </form>
-  </div>`;
+  </dialog>`;
 }
 
 function renderTable(rows, title, catalog, state) {
   const l = labels(state);
-  const selected = rows.find(row => objectKey(row) === catalog.editor?.key);
   return `<div class="project-dataset-section"><h3>${title}<span class="muted">${rows.length}</span></h3>
     <div class="project-dataset-scroll" tabindex="0" role="region" aria-label="${title}"><table class="project-dataset-table" aria-label="${title}">
-      <thead><tr>${[l.name, l.role, l.count, l.total, "N50", "N90", l.note, l.actions].map(label => `<th scope="col">${label}</th>`).join("")}</tr></thead>
+      <thead><tr>${[l.role, l.name, l.count, l.total, "N50", "N90", l.note, l.actions].map(label => `<th scope="col">${label}</th>`).join("")}</tr></thead>
       <tbody>${rows.map(row => {
         const key = objectKey(row);
         const editing = catalog.editor?.key === key;
         const disabled = catalog.saving || state.importer?.inFlight || state.initializer?.autoPipelineRunning || (catalog.editor && !editing) ? "disabled" : "";
         const stats = row.statistics || {};
         return `<tr data-catalog-object="${escape(key)}">
-          <th scope="row"><span class="project-dataset-name" title="${escape(row.displayName)}">${escape(row.displayName)}</span>${row.derived && row.role !== "derived" ? `<small class="muted">${l.includesDerived}</small>` : ""}</th>
           <td><span class="project-dataset-role ${row.role === "primary" ? "is-primary" : ""}">${l[row.role] || escape(row.role)}</span></td>
+          <th scope="row"><span class="project-dataset-name" title="${escape(row.displayName)}">${escape(row.displayName)}</span>${row.derived && row.role !== "derived" ? `<small class="muted">${l.includesDerived}</small>` : ""}</th>
           <td class="numeric">${number(stats.sequenceCount, state)}</td><td class="numeric">${length(stats.totalLengthBp, state)}</td>
           <td class="numeric">${length(stats.n50, state)}</td><td class="numeric">${length(stats.n90, state)}</td>
           <td><button type="button" class="project-dataset-note" data-catalog-edit="${escape(key)}" data-catalog-focus="note" title="${escape(row.note || l.emptyNote)}" ${disabled}>${escape(row.note || l.emptyNote)}</button></td>
           <td><button type="button" class="button project-icon-button" data-catalog-edit="${escape(key)}" title="${l.edit}" aria-label="${l.edit}: ${escape(row.displayName)}" aria-expanded="${editing}" ${disabled}>${projectIcon("rename")}</button></td>
         </tr>`;
       }).join("") || `<tr><td colspan="8" class="muted">${l.empty}</td></tr>`}</tbody></table></div>
-      ${selected ? renderDetails(selected, catalog, state) : ""}</div>`;
+      </div>`;
 }
 
 export function renderProjectCatalog(state) {
   const catalog = currentCatalog(state);
   const l = labels(state);
+  const rows = [...(catalog.data?.references || []), ...(catalog.data?.datasets || [])];
+  const selected = rows.find(row => objectKey(row) === catalog.editor?.key);
   return `<section id="project-data-catalog" aria-label="${l.datasets}" aria-busy="${Boolean(catalog.loading)}">
-    ${catalog.data ? `${renderTable(catalog.data.datasets || [], l.datasets, catalog, state)}
-      ${renderTable(catalog.data.references || [], l.references, catalog, state)}` : `<p role="status" class="muted">${catalog.error ? l.failure : l.loading}</p>`}
+    ${catalog.data ? renderTable(rows, l.datasets, catalog, state) : `<p role="status" class="muted">${catalog.error ? l.failure : l.loading}</p>`}
     ${catalog.error && !catalog.editor ? `<p class="error-text" role="alert">${escape(catalog.error)}</p>` : ""}
     <div class="project-catalog-footer"><button type="button" class="button ghost" data-catalog-refresh ${catalog.loading || catalog.editor || state.importer?.inFlight || state.initializer?.autoPipelineRunning ? "disabled" : ""}>${catalog.error ? l.retry : l.refresh}</button></div>
-  </section>`;
+  </section>${selected ? renderDetails(selected, catalog, state) : ""}`;
 }
 
 export function bindProjectCatalog(host, store, rerender, deps = {}) {
@@ -156,13 +161,37 @@ export function bindProjectCatalog(host, store, rerender, deps = {}) {
     const latest = currentCatalog(store.getState());
     const row = [...(latest.data?.datasets || []), ...(latest.data?.references || [])].find(item => objectKey(item) === button.dataset.catalogEdit);
     if (!row || latest.saving || store.getState().importer?.inFlight || store.getState().initializer?.autoPipelineRunning) return;
-    if (latest.editor?.key !== objectKey(row)) set({ editor: { key: objectKey(row), displayName: row.displayName, note: row.note }, error: "" });
+    if (latest.editor?.key !== objectKey(row)) set({ editor: { key: objectKey(row), displayName: row.displayName, note: row.note, focusField: button.dataset.catalogFocus === "note" ? "note" : "displayName" }, error: "" });
     refresh();
     host.querySelector(button.dataset.catalogFocus === "note" ? "#catalog-note" : "#catalog-display-name")?.focus();
   }));
   const form = host.querySelector("[data-catalog-form]");
   if (!form) return;
   const draft = () => currentCatalog(store.getState()).editor;
+  const restoreFocus = editor => {
+    if (live() && editor) host.querySelector(`[data-catalog-edit="${editor.key}"]${editor.focusField === "note" ? '[data-catalog-focus="note"]' : '.project-icon-button'}`)?.focus();
+  };
+  const dialog = host.querySelector("[data-catalog-dialog]");
+  if (dialog && !dialog.open) {
+    dialog.showModal();
+    form.elements[draft()?.focusField || "displayName"]?.focus();
+  }
+  dialog?.addEventListener("keydown", event => {
+    if (event.key !== "Tab") return;
+    const controls = [...dialog.querySelectorAll('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), summary, [tabindex="0"]')]
+      .filter(element => element.getClientRects().length > 0);
+    const first = controls[0];
+    const last = controls.at(-1);
+    const active = dialog.ownerDocument.activeElement;
+    if (!first || (event.shiftKey ? active === first || active === dialog : active === last || active === dialog)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first)?.focus();
+    }
+  });
+  const more = host.querySelector(".project-catalog-more");
+  more?.addEventListener("toggle", () => {
+    if (more.isConnected && draft()) set({ editor: { ...draft(), moreOpen: more.open } });
+  });
   form.addEventListener("input", () => {
     set({ editor: { ...draft(), displayName: form.elements.displayName.value, note: form.elements.note.value } });
     const row = [...catalog.data.datasets, ...catalog.data.references].find(item => objectKey(item) === draft().key);
@@ -170,10 +199,14 @@ export function bindProjectCatalog(host, store, rerender, deps = {}) {
     if (reset) reset.disabled = form.elements.displayName.value === row.originalName;
   });
   const cancel = () => {
-    if (currentCatalog(store.getState()).saving) return;
+    if (!live() || !draft() || currentCatalog(store.getState()).saving) return;
+    const editor = draft();
     set({ editor: null, error: "" }); refresh();
+    restoreFocus(editor);
   };
   host.querySelector("[data-catalog-cancel]")?.addEventListener("click", cancel);
+  host.querySelector("[data-catalog-close]")?.addEventListener("click", cancel);
+  dialog?.addEventListener("cancel", event => { event.preventDefault(); cancel(); });
   form.addEventListener("keydown", event => { if (event.key === "Escape") { event.preventDefault(); cancel(); } });
   host.querySelector("[data-catalog-reset]")?.addEventListener("click", () => {
     const row = [...catalog.data.datasets, ...catalog.data.references].find(item => objectKey(item) === draft().key);
@@ -207,5 +240,6 @@ export function bindProjectCatalog(host, store, rerender, deps = {}) {
       if (currentCatalog(store.getState()).requestId === requestId) set({ data, saving: false, editor: null });
     } catch (error) { if (currentCatalog(store.getState()).requestId === requestId) set({ saving: false, error: `${labels(store.getState()).saveFailure}: ${String(error?.message || error)}` }); }
     refresh();
+    if (!draft()) restoreFocus(editor);
   });
 }

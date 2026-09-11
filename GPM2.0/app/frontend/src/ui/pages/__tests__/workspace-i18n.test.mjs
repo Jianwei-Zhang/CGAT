@@ -296,7 +296,7 @@ test("rename editor is tied to the exact directory and project and cancel discar
   bindWorkspacePage(host, store);
   await rename.click();
   const editingHtml = renderWorkspacePage(store.getState());
-  assert.match(editingHtml, /class="project-identity">\s*<form class="project-title-row project-rename-form"[\s\S]*id="selected-project-name-input"[\s\S]*<\/form>\s*<p class="project-path project-detail-path"/);
+  assert.match(editingHtml, /class="project-heading">\s*<form class="project-title-row project-rename-form"[\s\S]*id="selected-project-name-input"[\s\S]*<\/form>\s*<div class="project-heading-meta">/);
   assert.match(editingHtml, /id="selected-project-name-input"[^>]*size="9"/);
   assert.doesNotMatch(editingHtml, /<h2>|id="selected-project-rename-button"/);
   const otherDirectory = { ...store.getState(), session: { ...store.getState().session, workspacePath: "D:/other" } };
@@ -339,12 +339,11 @@ test("selected GRT project shows read-only metadata and offers on-demand renamin
   assert.match(html, /<h2>project_locked<\/h2>/);
   assert.match(html, /id="selected-project-rename-button"/);
   assert.doesNotMatch(html, /id="selected-project-name-input"|id="selected-project-save-button"/);
-  assert.match(html, /class="workspace-recipe-summary"/);
-  assert.match(html, /class="workspace-recipe-label">Reference Genome<\/span>/);
-  assert.match(html, /class="workspace-recipe-value">ref_a<\/span>/);
-  assert.match(html, /class="workspace-recipe-value">hifiasm<\/span>/);
-  assert.match(html, /class="workspace-recipe-value">flye, canu<\/span>/);
-  assert.match(html, /class="workspace-recipe-value is-disabled">Disabled<\/span>/);
+  assert.match(html, /class="project-heading-meta"/);
+  assert.match(html, /class="project-qc-tag ">Reads QC · Disabled<\/span>/);
+  assert.match(html, /class="project-heading-created">/);
+  assert.ok(html.indexOf('class="project-heading-created"') < html.indexOf('class="project-path project-detail-path"'));
+  assert.doesNotMatch(html, /workspace-recipe-summary|class="project-metadata"|class="project-created/);
   assert.doesNotMatch(html, /recipe-test/);
   assert.doesNotMatch(html, /Only the project name can be changed here/);
   assert.doesNotMatch(html, /id="selected-project-reference-select"/);

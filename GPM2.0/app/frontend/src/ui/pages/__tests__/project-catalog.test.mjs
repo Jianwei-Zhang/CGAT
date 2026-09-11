@@ -47,23 +47,28 @@ function harness(state) {
   return { store, host, edit, form, reset, cancel, refresh, bind };
 }
 
-test("catalog separates datasets and reference, escapes names and multiline notes, and renders statistics", () => {
+test("catalog uses one table with data type first and reference first, escaping names and notes", () => {
   const { state } = fixture();
   const html = renderProjectCatalog(state);
-  assert.match(html, /Assembly datasets/);
+  assert.match(html, /Datasets/);
   assert.match(html, /Reference genome/);
+  assert.equal((html.match(/<table /g) || []).length, 1);
+  assert.match(html, /<thead><tr><th scope="col">Data type<\/th><th scope="col">Name/);
+  assert.ok(html.indexOf('data-catalog-object="reference:1"') < html.indexOf('data-catalog-object="dataset:1"'));
   assert.match(html, /current &lt;name&gt;/);
   assert.doesNotMatch(html, /<script>/);
   assert.match(html, /60 bp/);
   assert.match(html, /30 bp/);
   state.locale = "zh";
-  assert.match(renderProjectCatalog(state), /组装数据集/);
+  assert.match(renderProjectCatalog(state), /数据类型/);
 });
 
 test("light package details do not invent a usable location and reset preserves the note until saved", () => {
   const { state, row } = fixture();
   const h = harness(state);
   h.bind(); h.edit.fire("click"); h.bind();
+  assert.match(renderProjectCatalog(h.store.getState()), /<dialog[^>]*aria-modal="true"/);
+  assert.match(renderProjectCatalog(h.store.getState()), /<details class="project-catalog-more" >/);
   assert.match(renderProjectCatalog(h.store.getState()), /Sequence files not included or unavailable/);
   assert.doesNotMatch(renderProjectCatalog(h.store.getState()), /data-catalog-copy/);
   h.form.fire("input");

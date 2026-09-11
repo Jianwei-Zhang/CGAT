@@ -135,6 +135,7 @@ export function renderWorkspacePage(state) {
   return `<section class="project-current">
     <div class="project-detail-overview">
       <div class="project-identity">
+        <div class="project-heading">
         ${selectedProject && renameOpen ? `<form class="project-title-row project-rename-form" data-project-rename-form>
           <input id="selected-project-name-input" type="text" aria-label="${messages.cards.projectName}" value="${escapeAttr(editDraft.projectName)}" size="${projectNameInputSize(editDraft.projectName)}" ${busy ? "disabled" : ""} />
           <button type="submit" id="selected-project-save-button" class="button project-icon-button project-primary" title="${labels.saved}" aria-label="${labels.saved}" ${busy || !editDirty ? "disabled" : ""}>${projectIcon("check")}</button>
@@ -142,6 +143,8 @@ export function renderWorkspacePage(state) {
         </form>` : `<div class="project-title-row"><h2>${escapeHtml(selectedProject?.projectName || defaultProjectName(state.session.workspacePath))}</h2>
           ${selectedProject ? `<button id="selected-project-rename-button" class="button project-icon-button" title="${labels.rename}" aria-label="${labels.rename}" ${busy ? "disabled" : ""}>${projectIcon("rename")}</button>` : ""}
         </div>`}
+        ${selectedProject ? renderProjectHeaderMetadata(initializer, selectedProject, state) : ""}
+        </div>
         <p class="project-path project-detail-path" title="${escapeAttr(state.session.workspacePath)}">${escapeHtml(state.session.workspacePath)}</p>
       </div>
       <button id="initializer-enter-assembly-button" class="button project-primary project-enter-assembly" ${!selectedProject || busy ? "disabled" : ""}>${messages.buttons.enterAssembly}${projectIcon("arrow")}</button>
@@ -150,7 +153,6 @@ export function renderWorkspacePage(state) {
       <select id="legacy-project-select" ${busy ? "disabled" : ""}><option value="">${labels.legacyProjects}</option>
         ${initializer.existingProjects.map(project => `<option value="${project.projectId}" ${selectedProject?.projectId === project.projectId ? "selected" : ""}>${escapeHtml(project.projectName)}</option>`).join("")}
       </select></label>` : ""}
-    ${selectedProject ? renderSelectedProjectCard({ initializer, selectedProject, locale: state.locale, messages }) : ""}
     ${selectedProject ? renderProjectCatalog(state) : ""}
     ${initializer.optionsError ? `<p class="error-text" role="alert">${escapeHtml(initializer.optionsError)}</p>` : ""}
   </section>
@@ -264,41 +266,13 @@ export function bindWorkspacePage(host, store) {
   });
 }
 
-function renderWorkspaceRecipeSummary({ recipe = {}, messages, referenceName = "", catalogVisible = false }) {
-  const supportDatasets = Array.isArray(recipe.supportDatasets)
-    ? recipe.supportDatasets.filter((value) => String(value || "").trim())
-    : [];
-  const fields = [];
-  if (referenceName && !catalogVisible) {
-    fields.push({ label: messages.cards.referenceGenome, value: referenceName });
-  }
-  if (!catalogVisible) fields.push(
-    { label: messages.cards.primaryDataset, value: recipe.primaryDataset || "-" },
-    { label: messages.cards.supportDataset, value: supportDatasets.join(", ") || "-" },
-  );
-  fields.push(
-    {
-      label: messages.cards.readsQc,
-      value: recipe.readsQcEnabled ? messages.cards.enabled : messages.cards.disabled,
-      valueClass: recipe.readsQcEnabled ? "is-enabled" : "is-disabled",
-    },
-  );
-  return `
-    <div class="workspace-recipe-summary" data-grt-recipe-summary="true">
-      <div class="workspace-recipe-grid">
-        ${fields
-          .map(
-            ({ label, value, valueClass = "" }) => `
-              <div class="workspace-recipe-field">
-                <span class="workspace-recipe-label">${label}</span>
-                <span class="workspace-recipe-value${valueClass ? ` ${valueClass}` : ""}">${escapeHtml(value)}</span>
-              </div>
-            `,
-          )
-          .join("")}
-      </div>
-    </div>
-  `;
+function renderProjectHeaderMetadata(initializer, project, state) {
+  const messages = getMessages(state, "workspace");
+  const enabled = initializer.grtRecipe?.readsQcEnabled === true;
+  return `<div class="project-heading-meta">
+    <span class="project-qc-tag ${enabled ? "is-enabled" : ""}">${messages.cards.readsQc} · ${enabled ? messages.cards.enabled : messages.cards.disabled}</span>
+    <span class="project-heading-created">${projectLabels(state).created} ${escapeHtml(formatCreatedAt(project.createdAt, state.locale))}</span>
+  </div>`;
 }
 
 function renderAutoPipelineModal(initializer, messages) {
@@ -346,30 +320,6 @@ function renderPipelineStepIcon(status) {
     return `<span class="pipeline-skipped" aria-hidden="true">-</span>`;
   }
   return `<span class="pipeline-pending" aria-hidden="true">&#9675;</span>`;
-}
-
-function renderSelectedProjectCard({ initializer, selectedProject, locale, messages }) {
-  const recipe = initializer.grtRecipe || {};
-  const referenceName = selectedProject.referenceName
-    || initializer.references.find(
-      (reference) => Number(reference.referenceGenomeId) === Number(selectedProject.referenceGenomeId),
-    )?.name
-    || "-";
-
-  return `
-    <div class="project-metadata">
-      ${renderWorkspaceRecipeSummary({
-        recipe: {
-          ...recipe,
-          primaryDataset: recipe.primaryDataset || selectedProject.primaryDatasetName || "-",
-        },
-        messages,
-        referenceName,
-        catalogVisible: initializer.projectCatalog?.data?.projectId === selectedProject.projectId,
-      })}
-      <p class="project-created muted">${projectLabels({ locale }).created}<span>${escapeHtml(formatCreatedAt(selectedProject.createdAt, locale))}</span></p>
-    </div>
-  `;
 }
 
 async function saveSelectedProject(host, store) {
