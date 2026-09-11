@@ -14,6 +14,7 @@ import { normalizeFinalPathByChr } from "./assembly/final-path-state.js";
 import { projectLabels } from "./projects-view.js";
 import { projectIcon } from "./project-icons.js";
 import { defaultProjectName } from "../../services/project-session.js";
+import { renderProjectCatalog, bindProjectCatalog } from "./project-catalog-view.js";
 
 function buildEmptyAssemblyViewState(stateOrLocale) {
   return {
@@ -150,12 +151,14 @@ export function renderWorkspacePage(state) {
         ${initializer.existingProjects.map(project => `<option value="${project.projectId}" ${selectedProject?.projectId === project.projectId ? "selected" : ""}>${escapeHtml(project.projectName)}</option>`).join("")}
       </select></label>` : ""}
     ${selectedProject ? renderSelectedProjectCard({ initializer, selectedProject, locale: state.locale, messages }) : ""}
+    ${selectedProject ? renderProjectCatalog(state) : ""}
     ${initializer.optionsError ? `<p class="error-text" role="alert">${escapeHtml(initializer.optionsError)}</p>` : ""}
   </section>
   ${initializer.autoPipelineModalOpen ? renderAutoPipelineModal(initializer, messages) : ""}`;
 }
 
 export function bindWorkspacePage(host, store) {
+  bindProjectCatalog(host, store, rerender);
   const state = store.getState();
   const initializer = state.initializer;
   const selectedProject = findProjectById(initializer.existingProjects, state.session.projectId);
@@ -261,17 +264,19 @@ export function bindWorkspacePage(host, store) {
   });
 }
 
-function renderWorkspaceRecipeSummary({ recipe = {}, messages, referenceName = "" }) {
+function renderWorkspaceRecipeSummary({ recipe = {}, messages, referenceName = "", catalogVisible = false }) {
   const supportDatasets = Array.isArray(recipe.supportDatasets)
     ? recipe.supportDatasets.filter((value) => String(value || "").trim())
     : [];
   const fields = [];
-  if (referenceName) {
+  if (referenceName && !catalogVisible) {
     fields.push({ label: messages.cards.referenceGenome, value: referenceName });
   }
-  fields.push(
+  if (!catalogVisible) fields.push(
     { label: messages.cards.primaryDataset, value: recipe.primaryDataset || "-" },
     { label: messages.cards.supportDataset, value: supportDatasets.join(", ") || "-" },
+  );
+  fields.push(
     {
       label: messages.cards.readsQc,
       value: recipe.readsQcEnabled ? messages.cards.enabled : messages.cards.disabled,
@@ -360,6 +365,7 @@ function renderSelectedProjectCard({ initializer, selectedProject, locale, messa
         },
         messages,
         referenceName,
+        catalogVisible: initializer.projectCatalog?.data?.projectId === selectedProject.projectId,
       })}
       <p class="project-created muted">${projectLabels({ locale }).created}<span>${escapeHtml(formatCreatedAt(selectedProject.createdAt, locale))}</span></p>
     </div>
@@ -1197,7 +1203,7 @@ function sameNumberArray(left, right) {
 }
 
 function formatDatasetOptionLabel(messages, stateOrLocale, dataset) {
-  const name = String(dataset?.name || dataset?.label || "").trim();
+  const name = String(dataset?.displayName || dataset?.name || dataset?.label || "").trim();
   const contigCount = normalizeNonNegativeInt(dataset?.contigCount);
   const totalLengthBp = normalizeNonNegativeInt(dataset?.totalLengthBp);
   return i18nT(stateOrLocale, "workspace.page.datasetOptionLabel", {

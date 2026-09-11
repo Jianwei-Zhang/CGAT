@@ -79,6 +79,14 @@ enum Commands {
     ListProjectInitializerOptions {
         workspace_root: PathBuf,
     },
+    ListProjectCatalog {
+        workspace_root: PathBuf,
+        project_id: i64,
+    },
+    UpdateProjectCatalog {
+        workspace_root: PathBuf,
+        request_json: String,
+    },
     InitializeProject {
         workspace_root: PathBuf,
         project_name: String,

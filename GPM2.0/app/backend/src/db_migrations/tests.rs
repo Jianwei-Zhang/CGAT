@@ -34,6 +34,8 @@ fn version_one_database_adds_project_subview_history_table() -> Result<()> {
              id INTEGER PRIMARY KEY,
              name TEXT NOT NULL
          );
+         CREATE TABLE dataset (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+         CREATE TABLE reference_genome (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
          PRAGMA user_version = 1;",
     )?;
 
@@ -52,6 +54,8 @@ fn version_two_database_adds_project_main_view_history_table() -> Result<()> {
         "PRAGMA foreign_keys = ON;
          CREATE TABLE project (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
          CREATE TABLE reference_chr (id INTEGER PRIMARY KEY, chr_name TEXT NOT NULL);
+         CREATE TABLE dataset (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+         CREATE TABLE reference_genome (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
          PRAGMA user_version = 2;",
     )?;
 

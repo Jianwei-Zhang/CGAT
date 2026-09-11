@@ -29,6 +29,7 @@ pub struct PackageMetadataOption {
 pub struct ReferenceOption {
     pub id: i64,
     pub name: String,
+    pub display_name: String,
     pub species_name: String,
     pub assembly_label: String,
 }
@@ -37,6 +38,7 @@ pub struct ReferenceOption {
 pub struct DatasetOption {
     pub id: i64,
     pub name: String,
+    pub display_name: String,
     pub assembler: String,
     pub assembler_version: Option<String>,
     pub contig_count: i64,
@@ -1117,7 +1119,7 @@ fn insert_bootstrap_auto_seed(
 fn list_reference_options(conn: &Connection) -> Result<Vec<ReferenceOption>> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, name, species_name, assembly_label
+            "SELECT id, name, species_name, assembly_label, COALESCE(display_name, name)
              FROM reference_genome
              ORDER BY id",
         )
@@ -1129,6 +1131,7 @@ fn list_reference_options(conn: &Connection) -> Result<Vec<ReferenceOption>> {
                 name: row.get(1)?,
                 species_name: row.get(2)?,
                 assembly_label: row.get(3)?,
+                display_name: row.get(4)?,
             })
         })
         .context("failed to query reference options")?;
@@ -1140,7 +1143,7 @@ fn list_reference_options(conn: &Connection) -> Result<Vec<ReferenceOption>> {
 fn list_dataset_options(conn: &Connection) -> Result<Vec<DatasetOption>> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, name, assembler, assembler_version, contig_count, total_length_bp, self_alignment_available
+            "SELECT id, name, assembler, assembler_version, contig_count, total_length_bp, self_alignment_available, COALESCE(display_name, name)
              FROM dataset
              ORDER BY id",
         )
@@ -1156,6 +1159,7 @@ fn list_dataset_options(conn: &Connection) -> Result<Vec<DatasetOption>> {
                 total_length_bp: row.get(5)?,
                 fasta_available: dataset_fasta_available(conn, row.get(0)?)?,
                 self_alignment_available: row.get::<_, i64>(6)? > 0,
+                display_name: row.get(7)?,
             })
         })
         .context("failed to query dataset options")?;

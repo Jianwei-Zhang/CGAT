@@ -2,6 +2,80 @@ use super::*;
 
 #[tauri::command]
 #[allow(non_snake_case)]
+pub fn reveal_catalog_location(
+    workspaceRoot: String,
+    projectId: i64,
+    objectType: String,
+    objectId: i64,
+    locationIndex: usize,
+) -> CommandResult<()> {
+    (|| {
+        let catalog = gpm_next_backend::project_catalog::list_project_catalog(
+            &project_db_path(&workspaceRoot),
+            projectId,
+        )?;
+        let entry = catalog
+            .datasets
+            .iter()
+            .chain(catalog.references.iter())
+            .find(|entry| entry.object_type == objectType && entry.object_id == objectId)
+            .ok_or_else(|| anyhow!("catalog object does not belong to this project"))?;
+        let location = entry
+            .locations
+            .get(locationIndex)
+            .ok_or_else(|| anyhow!("location no longer available"))?;
+        let directory = Path::new(location)
+            .parent()
+            .ok_or_else(|| anyhow!("location has no parent directory"))?
+            .canonicalize()?;
+        #[cfg(target_os = "windows")]
+        let mut command = std::process::Command::new("explorer.exe");
+        #[cfg(target_os = "macos")]
+        let mut command = std::process::Command::new("open");
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        let mut command = std::process::Command::new("xdg-open");
+        command
+            .arg(directory)
+            .spawn()
+            .context("failed to open dataset directory")?;
+        Ok(())
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn list_project_catalog(workspaceRoot: String, projectId: i64) -> CommandResult<Value> {
+    (|| {
+        Ok(serde_json::to_value(
+            gpm_next_backend::project_catalog::list_project_catalog(
+                &project_db_path(&workspaceRoot),
+                projectId,
+            )?,
+        )?)
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn update_project_catalog(
+    workspaceRoot: String,
+    request: gpm_next_backend::project_catalog::CatalogUpdate,
+) -> CommandResult<Value> {
+    (|| {
+        Ok(serde_json::to_value(
+            gpm_next_backend::project_catalog::update_project_catalog(
+                &project_db_path(&workspaceRoot),
+                &request,
+            )?,
+        )?)
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
 pub fn list_project_initializer_options(workspaceRoot: String) -> CommandResult<Value> {
     read_initializer_options(&workspaceRoot, false).map_err(format_error)
 }

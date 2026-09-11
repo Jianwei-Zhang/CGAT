@@ -895,7 +895,7 @@ function createRenderTracksRenderer(deps = {}) {
             model: trackModel,
             hasPrimaryData: assembly.chrCtgs.length > 0,
             hasSupportTrack: supportDatasetId !== null,
-            primaryDatasetName,
+            primaryDatasetName: state.initializer?.datasets?.find(item => Number(item.datasetId) === Number(currentProject?.primaryDatasetId))?.displayName || primaryDatasetName,
             supportDatasetName: selectedSupportDataset?.label || "",
             supportDatasetOptions,
             supportDatasetId,

@@ -129,7 +129,9 @@ test("operation factory exposes every registered operation and maps exact CLI co
     },
   });
 
-  assert.equal(Object.keys(handlers).length, 42);
+  assert.equal(Object.keys(handlers).length, 44);
+  assert.equal(typeof handlers.listProjectCatalog, "function");
+  assert.equal(typeof handlers.updateProjectCatalog, "function");
   const sequences = await handlers.listNewSequences({
     workspaceRoot: "D:/workspace",
     projectId: 7,

@@ -6,7 +6,7 @@ use rusqlite::Connection;
 #[path = "db_migrations.rs"]
 mod migrations;
 
-pub const CURRENT_SCHEMA_VERSION: i64 = 3;
+pub const CURRENT_SCHEMA_VERSION: i64 = 4;
 
 pub fn open_workspace_db(project_db_path: &Path) -> Result<Connection> {
     let mut conn = Connection::open(project_db_path).with_context(|| {
@@ -42,6 +42,8 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
         CREATE TABLE IF NOT EXISTS reference_genome (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
+            display_name TEXT,
+            note TEXT NOT NULL DEFAULT '',
             species_name TEXT NOT NULL,
             assembly_label TEXT NOT NULL,
             fasta_path TEXT NOT NULL,
@@ -61,6 +63,8 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
         CREATE TABLE IF NOT EXISTS dataset (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
+            display_name TEXT,
+            note TEXT NOT NULL DEFAULT '',
             assembler TEXT NOT NULL,
             assembler_version TEXT,
             fasta_path TEXT NOT NULL,

@@ -11,6 +11,7 @@ pub mod junction_inspection;
 pub mod main_view;
 pub mod main_view_history;
 pub mod phased_assembly;
+pub mod project_catalog;
 pub mod project_initializer;
 pub mod reference_segments;
 pub mod runtime_persistence;

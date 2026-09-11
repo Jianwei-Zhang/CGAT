@@ -146,6 +146,12 @@ xattr -dr com.apple.quarantine /Applications/GPM2.0.app
 
 The package preserves the primary and support dataset roles established during GRT processing and loads the Server-precomputed Final Path. Project-level paths remain editable and can continue into DEGAP or export.
 
+### Project dataset tables
+
+After import or opening a project, the project page lists primary, support, and project-linked derived datasets, with the reference genome in a separate table. Rows show sequence count, total length, N50, and N90; details include longest sequence, L50, self-alignment availability, and local locations. Statistics use all sequence lengths in the current dataset, without a minimum length filter or splitting at Ns. Moving or hiding assembly views does not change them. These statistics also work with no-FASTA packages and require no additional Server quality-control step.
+
+Use the row's edit button or note summary to edit its display name and note. “Restore initial name” fills in the initial name; click “Save” to persist it. Names and notes are stored in the workspace SQLite database and survive reopening. Original package identifiers, filenames, and sequence names stay stable for incremental imports, computation, and export provenance. Notes apply to table objects, not individual contig placements. Available local sequence files support copying paths and opening their containing folders in the desktop App; missing or omitted FASTA files are marked unavailable. Existing workspace databases upgrade automatically on first open.
+
 ### Export Final Path FASTA from a no-FASTA package
 
 Export Final Path TSV from the App, copy it back to the server that retains the original FASTA files, and run:

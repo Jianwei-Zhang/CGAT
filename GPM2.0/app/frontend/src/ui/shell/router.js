@@ -43,6 +43,10 @@ export function renderCurrentRoute(root, store) {
   }
   const host = root.querySelector("#route-host");
   const previousRoute = String(host?.dataset?.route || "");
+  if (state.activeRoute === "importer" && previousRoute && previousRoute !== "importer" && state.initializer?.projectCatalog) {
+    store.setState({ initializer: { ...state.initializer, projectCatalog: null } });
+    state = store.getState();
+  }
   const previousAssemblyDomCacheKey = String(host?.dataset?.assemblyDomCacheKey || "");
   if (previousRoute === "assembly") {
     rememberAssemblyDom(host, state);

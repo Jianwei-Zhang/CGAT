@@ -1321,7 +1321,8 @@ function getSupportDatasetOptions(state, currentProject = getCurrentProject(stat
     .filter((datasetId) => datasetId !== null)
     .map((datasetId) => ({
       datasetId,
-      label: getDatasetNameById(state.initializer?.datasets || [], datasetId),
+      label: state.initializer?.datasets?.find(item => Number(item.datasetId) === datasetId)?.displayName
+        || getDatasetNameById(state.initializer?.datasets || [], datasetId),
     }));
 }
 

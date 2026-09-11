@@ -40,7 +40,34 @@ const MIGRATIONS: &[Migration] = &[
         name: "add_project_main_view_history",
         apply: migrate_project_main_view_history_to_v3,
     },
+    Migration {
+        version: 4,
+        name: "add_catalog_display_names_and_notes",
+        apply: migrate_catalog_to_v4,
+    },
 ];
+
+fn migrate_catalog_to_v4(conn: &Connection) -> Result<()> {
+    for table in ["dataset", "reference_genome"] {
+        ensure_column_exists(
+            conn,
+            LegacyColumn {
+                table,
+                name: "display_name",
+                definition: "TEXT",
+            },
+        )?;
+        ensure_column_exists(
+            conn,
+            LegacyColumn {
+                table,
+                name: "note",
+                definition: "TEXT NOT NULL DEFAULT ''",
+            },
+        )?;
+    }
+    Ok(())
+}
 
 const LEGACY_COLUMNS: &[LegacyColumn] = &[
     LegacyColumn {

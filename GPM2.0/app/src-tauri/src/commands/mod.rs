@@ -360,9 +360,10 @@ fn read_initializer_options(workspace_root: &str, strict_existing: bool) -> Resu
             json!({
                 "referenceGenomeId": reference.id,
                 "name": reference.name,
+                "displayName": reference.display_name,
                 "speciesName": reference.species_name,
                 "assemblyLabel": reference.assembly_label,
-                "label": reference.name
+                "label": reference.display_name
             })
         })
         .collect::<Vec<_>>();
@@ -373,13 +374,14 @@ fn read_initializer_options(workspace_root: &str, strict_existing: bool) -> Resu
             json!({
                 "datasetId": dataset.id,
                 "name": dataset.name,
+                "displayName": dataset.display_name,
                 "assembler": dataset.assembler,
                 "assemblerVersion": dataset.assembler_version,
                 "contigCount": dataset.contig_count,
                 "totalLengthBp": dataset.total_length_bp,
                 "fastaAvailable": dataset.fasta_available,
                 "selfAlignmentAvailable": dataset.self_alignment_available,
-                "label": dataset.name
+                "label": dataset.display_name
             })
         })
         .collect::<Vec<_>>();
@@ -760,6 +762,39 @@ mod tests {
         assert_eq!(payload["progressTotal"], 674);
         assert_eq!(payload["phaseIndex"], 4);
         assert_eq!(payload["phaseTotal"], 7);
+    }
+
+    #[test]
+    fn catalog_commands_preserve_identity_and_notes_across_name_reset() {
+        let root = create_test_workspace_root();
+        let conn = open_workspace_db(&root.join("project.sqlite")).unwrap();
+        conn.execute_batch("INSERT INTO reference_genome(id,name,species_name,assembly_label,fasta_path,fai_path)
+            VALUES(1,'ref','species','v1','missing.fa','ref.fai');
+            INSERT INTO dataset(id,name,assembler,fasta_path,fai_path) VALUES(1,'original','asm','missing.fa','ds.fai');
+            INSERT INTO source_seq(dataset_id,seq_name,seq_order,length) VALUES(1,'a',1,60),(1,'b',2,40);
+            INSERT INTO project(id,name,version,reference_genome_id,primary_dataset_id,created_at) VALUES(1,'project',1,1,1,'0');
+            INSERT INTO project_dataset(project_id,dataset_id,dataset_role,display_order) VALUES(1,1,'primary',1);").unwrap();
+        drop(conn);
+        let workspace = root.to_string_lossy().to_string();
+        let request =
+            serde_json::from_value(json!({"projectId":1,"objectType":"dataset","objectId":1,
+            "displayName":"显示名称","note":"first\nsecond"}))
+            .unwrap();
+        let result = update_project_catalog(workspace.clone(), request).unwrap();
+        assert_eq!(result["datasets"][0]["displayName"], "显示名称");
+        assert_eq!(result["datasets"][0]["originalName"], "original");
+        assert_eq!(result["datasets"][0]["statistics"]["n50"], 60);
+        assert_eq!(result["datasets"][0]["fastaAvailable"], false);
+        let reset = serde_json::from_value(
+            json!({"projectId":1,"objectType":"dataset","objectId":1,"resetName":true}),
+        )
+        .unwrap();
+        update_project_catalog(workspace.clone(), reset).unwrap();
+        let reopened = list_project_catalog(workspace.clone(), 1).unwrap();
+        assert_eq!(reopened["datasets"][0]["displayName"], "original");
+        assert_eq!(reopened["datasets"][0]["note"], "first\nsecond");
+        assert!(reveal_catalog_location(workspace, 1, "dataset".into(), 1, 0).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

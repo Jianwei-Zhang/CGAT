@@ -5,6 +5,8 @@ const ROUTE_GROUPS = Object.freeze({
     ["/import-add-dataset-package", "importAddDatasetPackage"],
   ],
   workspace: [
+    ["/list-project-catalog", "listProjectCatalog"],
+    ["/update-project-catalog", "updateProjectCatalog"],
     ["/open-workspace", "openWorkspace"],
     ["/list-project-initializer-options", "listProjectInitializerOptions"],
     ["/initialize-project", "initializeProject"],

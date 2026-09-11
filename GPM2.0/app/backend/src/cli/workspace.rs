@@ -2,9 +2,37 @@ use super::*;
 
 pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
     match command {
+        Commands::ListProjectCatalog {
+            workspace_root,
+            project_id,
+        } => {
+            let catalog = gpm_next_backend::project_catalog::list_project_catalog(
+                &workspace_root.join("project.sqlite"),
+                project_id,
+            )?;
+            println!("{}", serde_json::to_string(&catalog)?);
+        }
+        Commands::UpdateProjectCatalog {
+            workspace_root,
+            request_json,
+        } => {
+            let request = serde_json::from_str(&request_json)?;
+            let catalog = gpm_next_backend::project_catalog::update_project_catalog(
+                &workspace_root.join("project.sqlite"),
+                &request,
+            )?;
+            println!("{}", serde_json::to_string(&catalog)?);
+        }
         Commands::ListProjectInitializerOptions { workspace_root } => {
             let project_db_path = workspace_root.join("project.sqlite");
             let options = list_initializer_options(&project_db_path)?;
+            println!(
+                "catalog_names_json={}",
+                serde_json::json!({
+                    "datasets": options.datasets.iter().map(|d| serde_json::json!({"id": d.id, "displayName": d.display_name})).collect::<Vec<_>>(),
+                    "references": options.references.iter().map(|r| serde_json::json!({"id": r.id, "displayName": r.display_name})).collect::<Vec<_>>()
+                })
+            );
             let recipe = load_grt_locked_recipe(&project_db_path)?;
             println!("grt_recipe_json={}", serde_json::to_string(&recipe)?);
             println!(

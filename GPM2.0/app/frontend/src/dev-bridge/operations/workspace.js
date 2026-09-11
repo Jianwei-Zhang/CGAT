@@ -15,6 +15,19 @@ import {
 export function createWorkspaceOperations(runtime) {
   const { runBackend } = runtime;
 
+async function listProjectCatalog({ workspaceRoot, projectId }) {
+  requireString("workspaceRoot", workspaceRoot);
+  requireNumber("projectId", projectId);
+  const output = await runBackend(["list-project-catalog", workspaceRoot, String(projectId)]);
+  return JSON.parse(output.stdout.trim());
+}
+
+async function updateProjectCatalog({ workspaceRoot, ...request }) {
+  requireString("workspaceRoot", workspaceRoot);
+  const output = await runBackend(["update-project-catalog", workspaceRoot, JSON.stringify(request)]);
+  return JSON.parse(output.stdout.trim());
+}
+
 async function openWorkspace(payload) {
   const { workspaceRoot } = payload || {};
   requireString("workspaceRoot", workspaceRoot);
@@ -107,6 +120,13 @@ async function listProjectInitializerOptions(payload) {
     }
   }
 
+  const names = output.stdout.includes("catalog_names_json=") ? parseJsonLine(output.stdout, "catalog_names_json") : {};
+  for (const [rows, entries, idKey] of [[datasets, names.datasets, "datasetId"], [references, names.references, "referenceGenomeId"]]) {
+    for (const row of rows) {
+      row.displayName = entries?.find(entry => entry.id === row[idKey])?.displayName || row.name;
+      row.label = row.displayName;
+    }
+  }
   return {
     workspaceRoot,
     packageMetadata: parseJsonLine(output.stdout, "package_metadata_json"),
@@ -378,6 +398,8 @@ async function listNewSequences(payload) {
 
   return {
     openWorkspace,
+    listProjectCatalog,
+    updateProjectCatalog,
     listProjectInitializerOptions,
     initializeProject,
     getGrtProjectView,
