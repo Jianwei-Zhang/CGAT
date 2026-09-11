@@ -32,7 +32,6 @@ function harness(state) {
   const reset = element();
   const cancel = element();
   const retry = element();
-  const copy = element();
   const reveal = element({ catalogReveal: "0" });
   const host = {
     querySelector(selector) {
@@ -40,14 +39,13 @@ function harness(state) {
       if (selector === "[data-catalog-retry]") return retry;
       if (selector === "[data-catalog-reset]") return reset;
       if (selector === "[data-catalog-cancel]") return cancel;
-      if (selector === "[data-catalog-copy]") return copy;
       if (selector === "[data-catalog-form]" && current.initializer.projectCatalog?.editor) return form;
       return null;
     },
     querySelectorAll(selector) { return selector === "[data-catalog-edit]" ? [edit] : selector === "[data-catalog-reveal]" ? [reveal] : []; },
   };
   const bind = deps => bindProjectCatalog(host, store, () => {}, deps);
-  return { store, host, edit, form, reset, cancel, retry, copy, reveal, bind };
+  return { store, host, edit, form, reset, cancel, retry, reveal, bind };
 }
 
 test("catalog uses one table with data type first and reference first, escaping names and notes", () => {
@@ -89,6 +87,9 @@ test("light package details do not invent a usable location and reset preserves 
   h.bind(); h.edit.fire("click"); h.bind();
   assert.match(renderProjectCatalog(h.store.getState()), /<dialog[^>]*aria-modal="true"/);
   assert.match(renderProjectCatalog(h.store.getState()), /<details class="project-catalog-more" >/);
+  const details = renderProjectCatalog(h.store.getState());
+  assert.match(details, /<h4 id="catalog-location-title">Local location<\/h4>/);
+  assert.doesNotMatch(details, /catalog-basic-title|catalog-statistics-title|project-dataset-facts|project-dataset-basis|Longest sequence|Self-alignment|L50/);
   assert.match(renderProjectCatalog(h.store.getState()), /Sequence files not included or unavailable/);
   assert.doesNotMatch(renderProjectCatalog(h.store.getState()), /data-catalog-copy/);
   h.form.fire("input");
@@ -116,29 +117,30 @@ test("save persists current name and note, keeps canonical name and updates disp
   assert.equal(h.store.getState().initializer.projectCatalog.editor, null);
 });
 
-test("local position displays and copies grouped directories and reveals the same entry", async () => {
+test("local position keeps directories and open-folder actions without a copy button", async () => {
   const { state, row } = fixture();
   row.locations = ["D:\\one\\data\\partitions\\chr", "D:\\one\\data\\partitions\\unplaced"];
   row.availableFileCount = 12;
   row.fastaAvailable = true;
   const h = harness(state);
-  let copied;
   let revealed;
-  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
-  Object.defineProperty(globalThis, "navigator", { configurable: true, value: { clipboard: { writeText: async text => { copied = text; } } } });
+  const previousWindow = globalThis.window;
+  globalThis.window = { __TAURI__: { core: { invoke() {} } } };
   try {
     const deps = { revealCatalogLocation: async request => { revealed = request; } };
     h.bind(deps); h.edit.fire("click"); h.bind(deps);
-    const html = renderProjectCatalog(h.store.getState());
-    assert.ok(html.includes(`<code>${row.locations[0]}</code>`));
-    assert.equal((html.match(/<code>/g) || []).length, 2);
-    await h.copy.fire("click");
-    assert.equal(copied, row.locations.join("\n"));
+    for (const locale of ["en", "zh"]) {
+      h.store.setState({ locale });
+      const html = renderProjectCatalog(h.store.getState());
+      assert.ok(html.includes(`<code>${row.locations[0]}</code>`));
+      assert.equal((html.match(/<code>/g) || []).length, 2);
+      assert.equal((html.match(/data-catalog-reveal=/g) || []).length, 2);
+      assert.doesNotMatch(html, /data-catalog-copy|Copy paths|复制路径|已复制/);
+    }
     await h.reveal.fire("click");
     assert.deepEqual(revealed, { workspaceRoot: "D:/one", projectId: 1, objectType: "dataset", objectId: 1, locationIndex: 0 });
   } finally {
-    if (descriptor) Object.defineProperty(globalThis, "navigator", descriptor);
-    else delete globalThis.navigator;
+    globalThis.window = previousWindow;
   }
 });
 

@@ -6,20 +6,18 @@ const messages = {
   zh: {
     datasets: "数据集", name: "名称", role: "数据类型", count: "序列数", details: "数据详情", more: "更多信息", close: "关闭",
     total: "总长度", note: "备注", actions: "操作", primary: "主组装", support: "辅助组装", derived: "派生数据", includesDerived: "含派生序列",
-    reference: "参考基因组", edit: "查看详情、编辑名称与备注", emptyNote: "添加备注", original: "初始名称",
-    reset: "恢复初始名称", longest: "最长序列", location: "本地位置", missing: "序列文件未包含或不可用",
-    partial: "部分序列文件可用", copy: "复制路径", copied: "已复制", open: "打开目录", self: "自比对", available: "可用", unavailable: "未提供",
-    basis: "按当前数据集全部序列记录统计，不过滤短序列、不按 N 拆分；视图移动或隐藏不影响统计。",
+    reference: "参考基因组", edit: "查看详情、编辑名称与备注", emptyNote: "添加备注",
+    reset: "恢复初始名称", location: "本地位置", missing: "序列文件未包含或不可用",
+    partial: "部分序列文件可用", open: "打开目录",
     save: "保存", cancel: "取消", loading: "正在读取数据集…", retry: "重试",
     failure: "读取数据集失败", saveFailure: "保存失败", empty: "没有数据集", bp: "bp", pending: "正在保存…",
   },
   en: {
     datasets: "Datasets", name: "Name", role: "Data type", count: "Sequences", details: "Dataset details", more: "More information", close: "Close",
     total: "Total length", note: "Note", actions: "Actions", primary: "Primary", support: "Support", derived: "Derived", includesDerived: "Includes derived sequences",
-    reference: "Reference genome", edit: "View details and edit name or note", emptyNote: "Add note", original: "Initial name",
-    reset: "Restore initial name", longest: "Longest sequence", location: "Local location", missing: "Sequence files not included or unavailable",
-    partial: "Some sequence files are available", copy: "Copy paths", copied: "Copied", open: "Open folder", self: "Self-alignment", available: "Available", unavailable: "Not provided",
-    basis: "All records in the current dataset; no minimum length filter or splitting at Ns. Moving or hiding a view does not change these statistics.",
+    reference: "Reference genome", edit: "View details and edit name or note", emptyNote: "Add note",
+    reset: "Restore initial name", location: "Local location", missing: "Sequence files not included or unavailable",
+    partial: "Some sequence files are available", open: "Open folder",
     save: "Save", cancel: "Cancel", loading: "Loading datasets…", retry: "Retry",
     failure: "Could not load datasets", saveFailure: "Could not save", empty: "No datasets", bp: "bp", pending: "Saving…",
   },
@@ -56,33 +54,27 @@ function renderDetails(row, catalog, state) {
   const l = labels(state);
   const editor = catalog.editor;
   const busy = catalog.saving || state.importer?.inFlight || state.initializer?.autoPipelineRunning ? "disabled" : "";
-  const stats = row.statistics || {};
   const paths = row.locations || [];
   return `<dialog class="project-catalog-dialog" data-catalog-dialog aria-labelledby="catalog-dialog-title" aria-modal="true" tabindex="-1">
     <header class="project-catalog-dialog-head"><h3 id="catalog-dialog-title">${l.details}</h3>
       <span class="project-dataset-role">${l[row.role] || escape(row.role)}</span>
       <button type="button" data-catalog-close class="button project-icon-button" aria-label="${l.close}" ${busy}>${projectIcon("close")}</button></header>
     <form data-catalog-form class="project-dataset-editor">
+      <div class="project-dataset-editor-body">
       <div class="project-dataset-field-heading"><label for="catalog-display-name">${l.name}</label>
         <button type="button" data-catalog-reset class="button ghost" title="${escape(row.originalName)}" ${busy} ${editor.displayName === row.originalName ? "disabled" : ""}>${l.reset}</button></div>
       <input id="catalog-display-name" name="displayName" maxlength="200" required value="${escape(editor.displayName)}" ${busy} />
       <label for="catalog-note">${l.note}</label>
       <textarea id="catalog-note" name="note" rows="3" maxlength="10000" ${busy}>${escape(editor.note)}</textarea>
       <details class="project-catalog-more" ${editor.moreOpen ? "open" : ""}><summary>${l.more}</summary>
-      <div class="project-dataset-facts">
-        <div><span>${l.original}</span><strong>${escape(row.originalName)}</strong></div>
-        <div><span>${l.longest}</span><strong>${length(stats.longest, state)}</strong></div>
-        <div><span>L50</span><strong>${number(stats.l50, state)}</strong></div>
-        ${row.objectType === "dataset" ? `<div><span>${l.self}</span><strong>${row.selfAlignmentAvailable ? l.available : l.unavailable}</strong></div>` : ""}
-      </div>
-      <p class="muted project-dataset-basis">${l.basis}</p>
-      <div class="project-dataset-location"><span>${l.location}</span>
+      <section class="project-dataset-location" aria-labelledby="catalog-location-title">
+        <h4 id="catalog-location-title">${l.location}</h4>
         ${!row.fastaAvailable ? `<p class="muted">${row.availableFileCount ? l.partial : l.missing}</p>` : ""}
-        ${row.availableFileCount ? `<div class="project-dataset-paths">${paths.map((path, index) => `<div><code>${escape(path)}</code>${globalThis.window?.__TAURI__?.core?.invoke ? `<button type="button" class="button ghost" data-catalog-reveal="${index}" ${busy}>${l.open}</button>` : ""}</div>`).join("")}</div>
-        <button type="button" class="button ghost" data-catalog-copy ${busy}>${editor.copied ? l.copied : l.copy}</button>` : ""}
-      </div>
+        ${row.availableFileCount ? `<div class="project-dataset-paths">${paths.map((path, index) => `<div class="project-dataset-path"><code>${escape(path)}</code>${globalThis.window?.__TAURI__?.core?.invoke ? `<button type="button" class="button ghost" data-catalog-reveal="${index}" ${busy}>${l.open}</button>` : ""}</div>`).join("")}</div>` : ""}
+      </section>
       </details>
       ${catalog.error ? `<p class="error-text" role="alert">${escape(catalog.error)}</p>` : ""}
+      </div>
       <div class="project-dataset-editor-actions"><button type="button" data-catalog-cancel class="button ghost" ${busy}>${l.cancel}</button>
         <button type="submit" class="button project-primary" ${busy}>${catalog.saving ? l.pending : l.save}</button></div>
     </form>
@@ -212,15 +204,6 @@ export function bindProjectCatalog(host, store, rerender, deps = {}) {
   host.querySelector("[data-catalog-reset]")?.addEventListener("click", () => {
     const row = [...catalog.data.datasets, ...catalog.data.references].find(item => objectKey(item) === draft().key);
     set({ editor: { ...draft(), displayName: row.originalName } }); refresh();
-  });
-  host.querySelector("[data-catalog-copy]")?.addEventListener("click", async () => {
-    const editor = draft();
-    const row = [...catalog.data.datasets, ...catalog.data.references].find(item => objectKey(item) === editor.key);
-    try {
-      await navigator.clipboard.writeText(row.locations.join("\n"));
-      if (draft()?.key === editor.key) set({ editor: { ...draft(), copied: true } });
-    } catch (error) { set({ error: String(error?.message || error) }); }
-    refresh();
   });
   host.querySelectorAll("[data-catalog-reveal]").forEach(button => button.addEventListener("click", async () => {
     const [objectType, id] = draft().key.split(":");
