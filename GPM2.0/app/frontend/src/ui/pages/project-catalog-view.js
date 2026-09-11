@@ -10,7 +10,7 @@ const messages = {
     reset: "恢复初始名称", longest: "最长序列", location: "本地位置", missing: "序列文件未包含或不可用",
     partial: "部分序列文件可用", copy: "复制路径", copied: "已复制", open: "打开所在目录", self: "自比对", available: "可用", unavailable: "未提供",
     basis: "按当前数据集全部序列记录统计，不过滤短序列、不按 N 拆分；视图移动或隐藏不影响统计。",
-    save: "保存", cancel: "取消", loading: "正在读取数据集…", retry: "重试", refresh: "刷新数据集",
+    save: "保存", cancel: "取消", loading: "正在读取数据集…", retry: "重试",
     failure: "读取数据集失败", saveFailure: "保存失败", empty: "没有数据集", bp: "bp", pending: "正在保存…",
   },
   en: {
@@ -20,7 +20,7 @@ const messages = {
     reset: "Restore initial name", longest: "Longest sequence", location: "Local location", missing: "Sequence files not included or unavailable",
     partial: "Some sequence files are available", copy: "Copy paths", copied: "Copied", open: "Open containing folder", self: "Self-alignment", available: "Available", unavailable: "Not provided",
     basis: "All records in the current dataset; no minimum length filter or splitting at Ns. Moving or hiding a view does not change these statistics.",
-    save: "Save", cancel: "Cancel", loading: "Loading datasets…", retry: "Retry", refresh: "Refresh datasets",
+    save: "Save", cancel: "Cancel", loading: "Loading datasets…", retry: "Retry",
     failure: "Could not load datasets", saveFailure: "Could not save", empty: "No datasets", bp: "bp", pending: "Saving…",
   },
 };
@@ -91,8 +91,9 @@ function renderDetails(row, catalog, state) {
 
 function renderTable(rows, title, catalog, state) {
   const l = labels(state);
-  return `<div class="project-dataset-section"><h3>${title}<span class="muted">${rows.length}</span></h3>
+  return `<div class="project-dataset-section">
     <div class="project-dataset-scroll" tabindex="0" role="region" aria-label="${title}"><table class="project-dataset-table" aria-label="${title}">
+      <colgroup><col span="7"><col class="project-dataset-actions-column"></colgroup>
       <thead><tr>${[l.role, l.name, l.count, l.total, "N50", "N90", l.note, l.actions].map(label => `<th scope="col">${label}</th>`).join("")}</tr></thead>
       <tbody>${rows.map(row => {
         const key = objectKey(row);
@@ -100,7 +101,7 @@ function renderTable(rows, title, catalog, state) {
         const disabled = catalog.saving || state.importer?.inFlight || state.initializer?.autoPipelineRunning || (catalog.editor && !editing) ? "disabled" : "";
         const stats = row.statistics || {};
         return `<tr data-catalog-object="${escape(key)}">
-          <td><span class="project-dataset-role ${row.role === "primary" ? "is-primary" : ""}">${l[row.role] || escape(row.role)}</span></td>
+          <td><span class="project-dataset-role">${l[row.role] || escape(row.role)}</span></td>
           <th scope="row"><span class="project-dataset-name" title="${escape(row.displayName)}">${escape(row.displayName)}</span>${row.derived && row.role !== "derived" ? `<small class="muted">${l.includesDerived}</small>` : ""}</th>
           <td class="numeric">${number(stats.sequenceCount, state)}</td><td class="numeric">${length(stats.totalLengthBp, state)}</td>
           <td class="numeric">${length(stats.n50, state)}</td><td class="numeric">${length(stats.n90, state)}</td>
@@ -119,7 +120,7 @@ export function renderProjectCatalog(state) {
   return `<section id="project-data-catalog" aria-label="${l.datasets}" aria-busy="${Boolean(catalog.loading)}">
     ${catalog.data ? renderTable(rows, l.datasets, catalog, state) : `<p role="status" class="muted">${catalog.error ? l.failure : l.loading}</p>`}
     ${catalog.error && !catalog.editor ? `<p class="error-text" role="alert">${escape(catalog.error)}</p>` : ""}
-    <div class="project-catalog-footer"><button type="button" class="button ghost" data-catalog-refresh ${catalog.loading || catalog.editor || state.importer?.inFlight || state.initializer?.autoPipelineRunning ? "disabled" : ""}>${catalog.error ? l.retry : l.refresh}</button></div>
+    ${catalog.error && !catalog.editor ? `<button type="button" class="button ghost" data-catalog-retry ${catalog.loading || state.importer?.inFlight || state.initializer?.autoPipelineRunning ? "disabled" : ""}>${l.retry}</button>` : ""}
   </section>${selected ? renderDetails(selected, catalog, state) : ""}`;
 }
 
@@ -156,7 +157,7 @@ export function bindProjectCatalog(host, store, rerender, deps = {}) {
   };
   const catalog = currentCatalog(store.getState());
   if (!catalog.loading && !catalog.data && !catalog.error) void load();
-  host.querySelector("[data-catalog-refresh]")?.addEventListener("click", () => { void load(); refresh(); });
+  host.querySelector("[data-catalog-retry]")?.addEventListener("click", () => { void load(); refresh(); });
   host.querySelectorAll("[data-catalog-edit]").forEach(button => button.addEventListener("click", () => {
     const latest = currentCatalog(store.getState());
     const row = [...(latest.data?.datasets || []), ...(latest.data?.references || [])].find(item => objectKey(item) === button.dataset.catalogEdit);

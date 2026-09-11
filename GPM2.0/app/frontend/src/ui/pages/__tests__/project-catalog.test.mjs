@@ -31,11 +31,11 @@ function harness(state) {
   form.elements = { displayName: { value: "new name" }, note: { value: "new note" } };
   const reset = element();
   const cancel = element();
-  const refresh = element();
+  const retry = element();
   const host = {
     querySelector(selector) {
       if (selector === "#project-data-catalog") return {};
-      if (selector === "[data-catalog-refresh]") return refresh;
+      if (selector === "[data-catalog-retry]") return retry;
       if (selector === "[data-catalog-reset]") return reset;
       if (selector === "[data-catalog-cancel]") return cancel;
       if (selector === "[data-catalog-form]" && current.initializer.projectCatalog?.editor) return form;
@@ -44,7 +44,7 @@ function harness(state) {
     querySelectorAll(selector) { return selector === "[data-catalog-edit]" ? [edit] : []; },
   };
   const bind = deps => bindProjectCatalog(host, store, () => {}, deps);
-  return { store, host, edit, form, reset, cancel, refresh, bind };
+  return { store, host, edit, form, reset, cancel, retry, bind };
 }
 
 test("catalog uses one table with data type first and reference first, escaping names and notes", () => {
@@ -53,6 +53,8 @@ test("catalog uses one table with data type first and reference first, escaping 
   assert.match(html, /Datasets/);
   assert.match(html, /Reference genome/);
   assert.equal((html.match(/<table /g) || []).length, 1);
+  assert.doesNotMatch(html, /<h3>|data-catalog-refresh|data-catalog-retry|Refresh datasets|is-primary/);
+  assert.match(html, /<colgroup><col span="7"><col class="project-dataset-actions-column"><\/colgroup>/);
   assert.match(html, /<thead><tr><th scope="col">Data type<\/th><th scope="col">Name/);
   assert.ok(html.indexOf('data-catalog-object="reference:1"') < html.indexOf('data-catalog-object="dataset:1"'));
   assert.match(html, /current &lt;name&gt;/);
@@ -61,6 +63,21 @@ test("catalog uses one table with data type first and reference first, escaping 
   assert.match(html, /30 bp/);
   state.locale = "zh";
   assert.match(renderProjectCatalog(state), /数据类型/);
+  assert.doesNotMatch(renderProjectCatalog(state), /<h3>|刷新数据集|is-primary/);
+});
+
+test("failed loading offers retry without a permanent refresh button", async () => {
+  const { state, data } = fixture();
+  state.initializer.projectCatalog = null;
+  const h = harness(state);
+  h.bind({ listProjectCatalog: async () => { throw new Error("offline"); } });
+  await new Promise(done => setImmediate(done));
+  assert.match(renderProjectCatalog(h.store.getState()), /data-catalog-retry[^>]*>Retry<\/button>/);
+  h.bind({ listProjectCatalog: async () => data });
+  h.retry.fire("click");
+  await new Promise(done => setImmediate(done));
+  assert.equal(h.store.getState().initializer.projectCatalog.data, data);
+  assert.doesNotMatch(renderProjectCatalog(h.store.getState()), /data-catalog-retry|data-catalog-refresh/);
 });
 
 test("light package details do not invent a usable location and reset preserves the note until saved", () => {

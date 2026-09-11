@@ -341,8 +341,9 @@ test("selected GRT project shows read-only metadata and offers on-demand renamin
   assert.doesNotMatch(html, /id="selected-project-name-input"|id="selected-project-save-button"/);
   assert.match(html, /class="project-heading-meta"/);
   assert.match(html, /class="project-qc-tag ">Reads QC · Disabled<\/span>/);
-  assert.match(html, /class="project-heading-created">/);
-  assert.ok(html.indexOf('class="project-heading-created"') < html.indexOf('class="project-path project-detail-path"'));
+  assert.match(html, /class="project-catalog-created">Created /);
+  assert.ok(html.indexOf('class="project-catalog-created"') > html.indexOf('id="project-data-catalog"'));
+  assert.doesNotMatch(html, /project-heading-created/);
   assert.doesNotMatch(html, /workspace-recipe-summary|class="project-metadata"|class="project-created/);
   assert.doesNotMatch(html, /recipe-test/);
   assert.doesNotMatch(html, /Only the project name can be changed here/);

@@ -143,7 +143,7 @@ export function renderWorkspacePage(state) {
         </form>` : `<div class="project-title-row"><h2>${escapeHtml(selectedProject?.projectName || defaultProjectName(state.session.workspacePath))}</h2>
           ${selectedProject ? `<button id="selected-project-rename-button" class="button project-icon-button" title="${labels.rename}" aria-label="${labels.rename}" ${busy ? "disabled" : ""}>${projectIcon("rename")}</button>` : ""}
         </div>`}
-        ${selectedProject ? renderProjectHeaderMetadata(initializer, selectedProject, state) : ""}
+        ${selectedProject ? renderProjectHeaderMetadata(initializer, state) : ""}
         </div>
         <p class="project-path project-detail-path" title="${escapeAttr(state.session.workspacePath)}">${escapeHtml(state.session.workspacePath)}</p>
       </div>
@@ -153,7 +153,8 @@ export function renderWorkspacePage(state) {
       <select id="legacy-project-select" ${busy ? "disabled" : ""}><option value="">${labels.legacyProjects}</option>
         ${initializer.existingProjects.map(project => `<option value="${project.projectId}" ${selectedProject?.projectId === project.projectId ? "selected" : ""}>${escapeHtml(project.projectName)}</option>`).join("")}
       </select></label>` : ""}
-    ${selectedProject ? renderProjectCatalog(state) : ""}
+    ${selectedProject ? `${renderProjectCatalog(state)}
+      <p class="project-catalog-created">${labels.created} ${escapeHtml(formatCreatedAt(selectedProject.createdAt, state.locale))}</p>` : ""}
     ${initializer.optionsError ? `<p class="error-text" role="alert">${escapeHtml(initializer.optionsError)}</p>` : ""}
   </section>
   ${initializer.autoPipelineModalOpen ? renderAutoPipelineModal(initializer, messages) : ""}`;
@@ -266,12 +267,11 @@ export function bindWorkspacePage(host, store) {
   });
 }
 
-function renderProjectHeaderMetadata(initializer, project, state) {
+function renderProjectHeaderMetadata(initializer, state) {
   const messages = getMessages(state, "workspace");
   const enabled = initializer.grtRecipe?.readsQcEnabled === true;
   return `<div class="project-heading-meta">
     <span class="project-qc-tag ${enabled ? "is-enabled" : ""}">${messages.cards.readsQc} · ${enabled ? messages.cards.enabled : messages.cards.disabled}</span>
-    <span class="project-heading-created">${projectLabels(state).created} ${escapeHtml(formatCreatedAt(project.createdAt, state.locale))}</span>
   </div>`;
 }
 
