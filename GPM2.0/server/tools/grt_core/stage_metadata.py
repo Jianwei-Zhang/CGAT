@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -14,6 +15,9 @@ def stage_status_row(server_dir: Path, result: dict[str, object]) -> dict[str, o
     checkpoint_path = server_dir / checkpoint_relpath
     if not checkpoint_path.is_file():
         fail(f"stage checkpoint is missing: {checkpoint_path}")
+    if os.environ.get("GPM_REPORT_RUN_ID"):
+        from server_report import record_grt_result
+        record_grt_result(server_dir, result)
     return {
         "stage": stage,
         "q_input_version": result["q_input_version"],

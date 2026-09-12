@@ -22,6 +22,7 @@ from pathlib import Path
 
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
 from run_orchestration import OrchestrationContractError, atomic_write_json
+from server_report import ReportSession
 
 
 PLAN_FIELDS = ["unit_id", "command_relpath", "detail_log_relpath"]
@@ -297,6 +298,7 @@ class Runner:
         self.received_signal: int | None = None
         self.outer_checkpoints = OuterCheckpointManager(server_dir)
         self.child_cache_markers: set[str] = set()
+        self.report: ReportSession | None = None
 
     def _event(self, event: str, unit: PlanUnit | None, message: str) -> None:
         if unit is None:
@@ -317,11 +319,16 @@ class Runner:
         self.log_handle.write(line + "\n")
         self.log_handle.flush()
 
+        if self.report is not None:
+            self.report.event(event, unit, message, self._row(unit) if unit else None)
+
     def _stream_child(self, unit: PlanUnit, child: subprocess.Popen[str]) -> None:
         assert child.stdout is not None
         assert self.log_handle is not None
         for raw_line in child.stdout:
             line = raw_line.rstrip("\r\n")
+            if self.report is not None:
+                self.report.child_output(line)
             for marker in GRT_CACHE_MARKERS.get(unit.unit_id, ()):
                 if line.startswith(marker):
                     self.child_cache_markers.add(marker)
@@ -360,6 +367,7 @@ class Runner:
         self.status_rows, abandoned = initial_status_rows(self.units, prior)
         atomic_write_status(self.status_path, self.status_rows)
         mode = "resume" if prior or self.log_path.exists() else "fresh"
+        self.report = ReportSession(self.server_dir, self.units, self.run_id)
         threads = "unknown"
         options_path = self.server_dir / "metadata/prepare_options.tsv"
         if options_path.is_file():
@@ -483,6 +491,8 @@ class Runner:
                         errors="replace",
                         bufsize=1,
                         start_new_session=True,
+                        env={**os.environ, "GPM_REPORT_RUN_ID": self.run_id,
+                             "GPM_REPORT_UNIT_ID": unit.unit_id},
                     )
                     self.active_child = child
                     if self.received_signal is not None and child.poll() is None:
@@ -574,10 +584,13 @@ class Runner:
                 self._event("SUCCESS", None, "pipeline completed")
                 return 0
             finally:
+                error = sys.exc_info()[1]
                 self.active_child = None
                 for signal_number, handler in previous_handlers.items():
                     signal.signal(signal_number, handler)
                 self.log_handle = None
+                self.report.finish(str(error) if error else None)
+                print(f"Server report: {self.server_dir / 'report/report.html'}", flush=True)
 
 
 def new_run_id() -> str:
@@ -603,7 +616,7 @@ def main() -> int:
         units = load_plan(server_dir)
         lock.acquire()
         return Runner(server_dir, units, run_id).run()
-    except (OSError, RunnerError, OrchestrationContractError) as exc:
+    except (OSError, ValueError, RunnerError, OrchestrationContractError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     finally:

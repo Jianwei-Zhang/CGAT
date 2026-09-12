@@ -102,6 +102,18 @@ The runner executes the generated plan serially, stops at the first error, valid
 | --- | --- |
 | `gpm_server.zip` | Full App package with source/reference FASTA and authoritative q4 FASTA. Supports client-side FASTA export. |
 | `gpm_server.no_fasta.zip` | No-FASTA App package with `.fai`, metadata, Final Path, source-card state, and PAF views. Supports import, inspection, and PNG/TSV export. |
+| `gpm_server.report.html` | A standalone offline report covering inputs, processing, final results, and delivery archive checksums. |
+| `gpm_server.report.zip` | A portable report directory containing stage JSON and a Python standard-library HTML renderer. |
+
+The report is also available at `gpm_server/report/report.html`. Recording starts during input preparation; `run_all.sh` updates the report at stage boundaries, including failures, interruptions, and unexecuted stages. First-published GRT events are preserved separately from their reconciled final state, and cache reuse is explicit. Previous reports are archived under the workspace's `.report_history/` directory.
+
+After copying or extracting the entire `report/` directory, regenerate without access to the original workspace or network:
+
+```bash
+python3 /path/to/report/render_report.py
+```
+
+The renderer reads only report-local records and does not rerun alignments or repairs. Reports contain no raw FASTA/reads; unmeasured quality metrics remain unavailable. Gap counts use consecutive runs of at least 100 Ns; explicit connector segments and total N bases are recorded separately. Automatic reporting currently covers `prepare.sh` and `run_all.sh`; standalone incremental or packaging commands do not update an earlier run's report. See [report format and scope](server/REPORT.md).
 
 Resume without extra options by running the same `run_all.sh` command. The prepared thread count remains fixed; runtime `--threads`, `--from`, `--until`, and `--stage` overrides are not supported.
 

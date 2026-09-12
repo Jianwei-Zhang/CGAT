@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+PREPARE_REPORT_ARGS=("$@")
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMMON_LIB="${SCRIPT_DIR}/lib/incremental_common.sh"
 [[ -f "$COMMON_LIB" ]] || {
@@ -105,6 +107,9 @@ Behavior:
   - run_all.sh executes the generated plan serially and stops on the first failed command
   - run_all.sh writes live progress to <work_root>/logs/run_all.log and current state to logs/status.tsv
   - run_all.sh holds an exclusive workspace lock while active
+  - Records input and stage JSON in report/ and generates an offline report/report.html
+  - Writes <work_root>.report.html and <work_root>.report.zip beside the delivery archives
+  - report/render_report.py regenerates HTML using only report/ and Python's standard library
   - Generates package_full_zip.sh, package_light_no_fasta_zip.sh, and export_final_path_fasta.sh
   - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> GRT Step2/3 -> GRT telomere/q4 finalization -> per-chr commands -> GRT evidence/package validation -> full zip -> light zip
   - A successful run_all.sh creates both delivery archives in the parent directory of the work root
@@ -1026,6 +1031,19 @@ mkdir -p \
   "${WORK_ROOT}/data/reference" \
   "${WORK_ROOT}/data/datasets" \
   "${WORK_ROOT}/runs"
+
+python3 "${SCRIPT_DIR}/tools/server_report.py" prepare-start --server-dir "$WORK_ROOT" -- "${PREPARE_REPORT_ARGS[@]}"
+finish_prepare_report() {
+  local prepare_exit_code=$?
+  trap - EXIT
+  if ! python3 "${SCRIPT_DIR}/tools/server_report.py" prepare-finish \
+    --server-dir "$WORK_ROOT" --exit-code "$prepare_exit_code"; then
+    echo "ERROR: Could not finish the server preparation report" >&2
+    [[ "$prepare_exit_code" -ne 0 ]] || prepare_exit_code=1
+  fi
+  exit "$prepare_exit_code"
+}
+trap finish_prepare_report EXIT
 
 if [[ "${#TEL_RULE_ARGS[@]}" -gt 0 ]]; then
   mkdir -p "${WORK_ROOT}/tel"

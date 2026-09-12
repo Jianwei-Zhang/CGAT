@@ -102,6 +102,18 @@ bash ./gpm_server/run_all.sh
 | --- | --- |
 | `gpm_server.zip` | 完整 App 包，包含 source/reference FASTA 与权威 q4 FASTA，可在客户端导出 FASTA。 |
 | `gpm_server.no_fasta.zip` | 无 FASTA App 包，保留 `.fai`、metadata、Final Path、source-card 状态和 PAF 视图，可导入、浏览并导出 PNG/TSV。 |
+| `gpm_server.report.html` | 可单独发送、离线打开的全流程报告，覆盖输入、阶段处理、最终结果和交付包校验值。 |
+| `gpm_server.report.zip` | 独立报告目录，包含阶段 JSON 和仅依赖 Python 标准库的 HTML 生成器。 |
+
+报告同时位于 `gpm_server/report/report.html`。`prepare.sh` 从输入准备阶段开始记录，`run_all.sh` 在阶段结束时更新报告；失败或中断也保留报告及尚未执行的阶段。GRT 首次发布的阶段事件与最终协调后的状态分别保留，缓存复用明确标注。重跑前一份报告保存在工作目录的 `.report_history/` 下。
+
+复制或解压整个 `report/` 后，可在原工作目录不可访问、网络断开的情况下重新生成：
+
+```bash
+python3 /path/to/report/render_report.py
+```
+
+生成器只读取报告目录内的记录，不重新计算比对或修复。报告不携带原始 FASTA/reads；未测量的质量指标不显示为零。报告中的 gap 统计指连续至少 100 个 N，显式连接 gap 与 N 碱基总数分别记录。当前自动报告覆盖 `prepare.sh` 和 `run_all.sh`；单独执行增量脚本或打包脚本不会更新此前的运行报告。详见 [报告格式与边界](server/REPORT.md)。
 
 恢复时无需附加参数，重新执行同一条 `run_all.sh` 即可。线程数固定为准备阶段的值；不支持运行时 `--threads`、`--from`、`--until` 或 `--stage` 覆盖。
 
