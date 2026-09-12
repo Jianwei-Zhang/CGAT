@@ -39,6 +39,7 @@ LABELS = {
     "q_version": "序列版本", "qv": "输入 QV", "craq": "输入 CRAQ", "reads_qc_pass": "Reads QC 通过",
     "candidate_count": "候选数", "outcome": "处理结果", "file": "文件", "size_bytes": "大小 / bytes",
     "fill": "填补", "filter_component": "片段过滤", "extend_telomere": "端粒延伸",
+    "source": "主路径来源", "gap": "Gap", "patch": "补丁 / 替换",
     "upstream_external_contigs_stage1_noop": "外部 contig 模式：本阶段保留原序列",
     "deferred_to_post_correction_optimized_fill": "延后至结构修正后的优化填补",
     "no_assignment_passing_filters_and_coverage_threshold": "无通过过滤及覆盖率阈值的归属",
@@ -110,8 +111,186 @@ def notes(values: list) -> str:
     return "".join(f'<p class="note">{esc(value)}</p>' for value in values)
 
 
+def compact_number(value) -> str:
+    if not isinstance(value, (int, float)):
+        return display(value)
+    absolute = abs(value)
+    if absolute >= 1_000_000_000:
+        return f"{value / 1_000_000_000:.2f} Gb"
+    if absolute >= 1_000_000:
+        return f"{value / 1_000_000:.2f} Mb"
+    if absolute >= 1_000:
+        return f"{value / 1_000:.1f} kb"
+    return f"{value:,}"
+
+
+def sequence_snapshot(version: str, stats: dict | None) -> str:
+    if not stats:
+        return f'<strong>{esc(version)}</strong><span class="muted">统计尚不可用</span>'
+    return (f'<strong>{esc(version)}</strong><span>{esc(compact_number(stats.get("length_bp")))} · '
+            f'{esc(display(stats.get("sequence_count")))} 条序列</span>'
+            f'<span>{esc(display(stats.get("gap_count")))} Gap · N50 {esc(compact_number(stats.get("n50_bp")))}</span>')
+
+
+def stage_io_html(record: dict) -> str:
+    facts = record.get("facts", {})
+    result = facts.get("result", {})
+    versions = facts.get("sequence_versions", {})
+    stage_id = record.get("stage_id", "")
+    input_version = result.get("q_input_version")
+    output_version = result.get("q_output_version")
+    if input_version:
+        input_body = sequence_snapshot(input_version, versions.get(input_version))
+    elif stage_id.startswith("ref:"):
+        input_body = f'<strong>{esc(stage_id.split(":", 1)[1])} FASTA</strong><span>参考染色体 FASTA</span>'
+    elif stage_id == "assign":
+        input_body = '<strong>参考比对 PAF</strong><span>全部数据集的过滤后比对</span>'
+    elif stage_id == "grt_prepare":
+        input_body = '<strong>归属与排列结果</strong><span>主组装、辅助组装及可选 QC 数据</span>'
+    elif stage_id.startswith("chr:"):
+        input_body = f'<strong>q4 · {esc(stage_id.split(":", 1)[1])}</strong><span>最终染色体与路径证据</span>'
+    elif stage_id == "finalize_evidence":
+        input_body = '<strong>q4 + Final Path</strong><span>阶段事件、供体使用和比对证据</span>'
+    elif stage_id.startswith("package_"):
+        input_body = '<strong>已验证工作目录</strong><span>结果、元数据和交付脚本</span>'
+    else:
+        input_body = '<strong>上一阶段结果</strong><span>详见参数与溯源记录</span>'
+
+    outputs = facts.get("outputs", [])
+    if output_version:
+        output_body = sequence_snapshot(output_version, versions.get(output_version))
+    elif stage_id.startswith("ref:"):
+        summary = facts.get("summary", {})
+        output_body = (f'<strong>参考比对结果 PAF</strong><span>{esc(display(summary.get("alignment_count")))} 条比对</span>'
+                       f'<span>{esc(display(summary.get("aligned_query_count")))} 条 contig 有比对</span>')
+    elif stage_id == "assign":
+        summary = facts.get("summary", {})
+        output_body = (f'<strong>染色体归属与顺序</strong><span>{esc(display(summary.get("assigned_unique_contigs")))} 条 contig 已分配</span>'
+                       f'<span>{esc(display(summary.get("unassigned_contigs")))} 条未分配</span>')
+    elif stage_id == "grt_prepare":
+        output_body = sequence_snapshot("q0", versions.get("q0"))
+    elif stage_id.startswith("chr:"):
+        output_body = '<strong>染色体级证据</strong><span>路径片段、事件与来源坐标</span>'
+    elif stage_id == "finalize_evidence":
+        summary = facts.get("summary", {})
+        output_body = (f'<strong>可追溯 GRT 结果</strong><span>{esc(display(summary.get("events")))} 个事件 · '
+                       f'{esc(display(summary.get("evidence")))} 条证据</span>')
+    elif outputs:
+        output_body = (f'<strong>{esc(outputs[0].get("file", "交付文件"))}</strong>'
+                       f'<span>{esc(compact_number(outputs[0].get("size_bytes")))} · SHA-256 已记录</span>')
+    else:
+        output_body = '<strong>阶段输出</strong><span>尚未生成或未记录</span>'
+
+    method = METHODS.get(stage_id, record.get("title", "执行阶段"))
+    return (f'<div class="io-flow"><div class="io-card input"><small>INPUT</small>{input_body}</div>'
+            f'<div class="io-arrow" aria-hidden="true">→</div><div class="io-card process"><small>PROCESS</small>'
+            f'<strong>{esc(record.get("title", stage_id))}</strong><span>{esc(method)}</span></div>'
+            f'<div class="io-arrow" aria-hidden="true">→</div><div class="io-card output"><small>OUTPUT</small>{output_body}</div></div>')
+
+
+def pipeline_map_html(records: list[dict], input_facts: dict, final: dict) -> str:
+    datasets = input_facts.get("datasets", [])
+    refs = [row for row in records if row.get("stage_id", "").startswith("ref:")]
+    assignment = next((row for row in records if row.get("stage_id") == "assign"), {})
+    grt_prepare = next((row for row in records if row.get("stage_id") == "grt_prepare"), {})
+    q0 = grt_prepare.get("facts", {}).get("sequence_versions", {}).get("q0", {})
+    q4 = final.get("sequence_versions", {}).get("q4", {})
+    assigned = assignment.get("facts", {}).get("summary", {}).get("assigned_unique_contigs")
+    stages = [
+        ("01", "原始输入", f"{len(datasets)} 组 FASTA", "参考、主组装与辅助组装"),
+        ("02", "参考比对", f"{len(refs)} 个比对任务", "生成覆盖与定位证据"),
+        ("03", "染色体归属", f"{display(assigned)} 条 contig", "按覆盖、方向和锚点排序"),
+        ("04", "构建 q0 与供体", f"{compact_number(q0.get('length_bp'))}", f"{display(q0.get('gap_count'))} 个初始 Gap"),
+        ("05", "GRT 修复", "q0 → q1 → q2 → q3 → q4", "填补、结构修正与端粒处理"),
+        ("06", "最终结果", f"{compact_number(q4.get('length_bp'))}", f"{display(q4.get('sequence_count'))} 条染色体 · {display(q4.get('gap_count'))} 个 Gap"),
+        ("07", "证据与交付", f"{display(final.get('process_summary', {}).get('event_count'))} 个事件", "HTML、JSON 与 Server ZIP"),
+    ]
+    cards = []
+    for index, (number, title, metric, description) in enumerate(stages):
+        cards.append(f'<div class="pipeline-node"><span class="pipeline-number">{number}</span><strong>{esc(title)}</strong>'
+                     f'<b>{esc(metric)}</b><small>{esc(description)}</small></div>')
+        if index < len(stages) - 1:
+            cards.append('<div class="pipeline-arrow" aria-hidden="true">→</div>')
+    return '<div class="pipeline-map">' + "".join(cards) + '</div>'
+
+
+def grt_flow_html(grt: list[dict], final: dict) -> str:
+    stats_by_version = {}
+    stage_by_output = {}
+    for record in grt:
+        facts = record.get("facts", {})
+        stats_by_version.update(facts.get("sequence_versions", {}))
+        output = facts.get("result", {}).get("q_output_version")
+        if output:
+            stage_by_output[output] = record
+    stats_by_version.update(final.get("sequence_versions", {}))
+    order = [version for version in ("q0", "q0r1", "q0f", "q1", "q2", "q3", "q4") if version in stats_by_version]
+    nodes = []
+    for index, version in enumerate(order):
+        record = stage_by_output.get(version, {})
+        summary = record.get("facts", {}).get("summary", {})
+        status = summary.get("by_status", {})
+        stats = stats_by_version[version]
+        nodes.append(f'<div class="grt-node"><strong>{esc(version)}</strong><b>{esc(compact_number(stats.get("length_bp")))}</b>'
+                     f'<span>{esc(display(stats.get("gap_count")))} Gap · N50 {esc(compact_number(stats.get("n50_bp")))}</span>'
+                     f'<small>{esc(display(summary.get("event_count")))} 事件 · {esc(display(status.get("accepted", 0)))} 接受</small></div>')
+        if index < len(order) - 1:
+            nodes.append('<div class="grt-arrow" aria-hidden="true">→</div>')
+    return '<div class="grt-flow" id="grt-flow">' + "".join(nodes) + '</div>' if nodes else '<p class="note">GRT 序列版本尚不可用。</p>'
+
+
+def final_path_visual_html(final: dict) -> str:
+    chromosomes = final.get("final_path", {}).get("chromosomes", [])
+    if not chromosomes:
+        return '<p class="warn">本次运行尚无可绘制的 Final Path。</p>'
+    contributions = final.get("source_contribution_bp", {})
+    total_contribution = sum(value for value in contributions.values() if isinstance(value, (int, float))) or 1
+    contribution_parts = []
+    for index, (dataset, value) in enumerate(contributions.items()):
+        percentage = 100 * value / total_contribution
+        contribution_parts.append(f'<i class="source-{index % 5}" style="width:{percentage:.6f}%" title="{esc(dataset)}: {esc(display(value))} bp"></i>')
+    contribution_legend = "".join(
+        f'<span><i class="legend-dot source-{index % 5}"></i>{esc(dataset)} · {esc(compact_number(value))}</span>'
+        for index, (dataset, value) in enumerate(contributions.items()))
+
+    tracks = []
+    for chromosome in chromosomes:
+        segments = chromosome.get("segments", [])
+        total = chromosome.get("q4_length") or sum(max(0, segment.get("length", 0)) for segment in segments) or 1
+        pieces = []
+        segment_rows = []
+        for segment in segments:
+            length = max(0, segment.get("length", 0) or 0)
+            kind = segment.get("kind", "source")
+            source = segment.get("source") or {}
+            dataset = source.get("dataset", "")
+            contig = source.get("contig", "")
+            orientation = source.get("orientation", segment.get("orientation", ""))
+            title = (f'{chromosome.get("chr")} · {label(kind)} · {dataset}:{contig} · {display(length)} bp'
+                     f' · {orientation or "方向未记录"} · event {segment.get("event_id") or "无"}')
+            class_name = "gap" if kind == "gap" else ("patch" if kind == "patch" else "source")
+            text = "GAP" if kind == "gap" else (contig if 100 * length / total >= 8 else "")
+            pieces.append(f'<i class="path-segment {class_name}" style="flex-grow:{max(1, length)}" title="{esc(title)}"><span>{esc(text)}</span></i>')
+            segment_rows.append({"kind": label(kind), "dataset": dataset, "contig": contig,
+                                 "length_bp": length, "orientation": orientation,
+                                 "source_range": f'{source.get("start", "-")}–{source.get("end", "-")}',
+                                 "event_id": segment.get("event_id")})
+        details = "".join(
+            f'<li><span class="segment-chip {"gap" if row["kind"] == label("gap") else ("patch" if row["kind"] == label("patch") else "source")}">{esc(row["kind"])}</span>'
+            f'<strong>{esc(row["dataset"] or "连接片段")} {esc(row["contig"])}</strong><span>{esc(compact_number(row["length_bp"]))} · '
+            f'{esc(row["orientation"] or "-")} · {esc(row["source_range"])}</span></li>' for row in segment_rows)
+        tracks.append(f'<details class="path-row"><summary><b>{esc(chromosome.get("chr"))}</b><div class="path-bar">{"".join(pieces)}</div>'
+                      f'<span class="path-length">{esc(compact_number(total))}</span></summary><ul class="segment-list">{details}</ul></details>')
+    return (f'<div class="source-summary"><div><h3>最终序列来源贡献</h3><div class="source-bar">{"".join(contribution_parts)}</div>'
+            f'<div class="legend">{contribution_legend}</div></div></div>'
+            '<div class="legend path-legend"><span><i class="legend-dot source"></i>主路径来源</span>'
+            '<span><i class="legend-dot patch"></i>GRT 补丁 / 替换</span><span><i class="legend-dot gap"></i>仍保留的 Gap</span></div>'
+            f'<div class="path-map" id="grt-final-path">{"".join(tracks)}</div>'
+            '<p class="note">每行是一条最终染色体。色块宽度按片段长度缩放；点击染色体可查看各片段来源，悬停可查看关联事件和来源坐标。</p>')
+
+
 CSS = """
-:root{color-scheme:light;--ink:#172b38;--muted:#536774;--line:#dbe5e9;--accent:#087f8c}
+:root{color-scheme:light;--ink:#172b38;--muted:#536774;--line:#dbe5e9;--accent:#087f8c;--source:#2d718e;--patch:#e98c36;--gap:#d14d5b;--process:#7458a6}
 *{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f3f7f8;font:15px/1.65 system-ui,-apple-system,'Segoe UI',sans-serif}
 header{background:#113849;color:white;padding:38px max(24px,calc((100vw - 1240px)/2)) 30px}header p{color:#bfdae4;margin:5px 0}
 h1{font-size:32px;margin:4px 0 12px;letter-spacing:-.5px}h2{font-size:22px;margin:0 0 16px}h3{font-size:17px;margin:20px 0 10px}
@@ -122,7 +301,12 @@ nav{display:flex;flex-wrap:wrap;gap:18px;margin:18px 0 0}a{color:var(--accent)}h
 details>summary{cursor:pointer;font-weight:600;overflow-wrap:anywhere}details{margin-top:12px}details.block{border:1px solid var(--line);border-radius:7px;padding:12px}details.block>summary{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.stage>summary{font-size:19px}.stage-body{padding-top:12px}
 .scroll{overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:6px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}th{background:#edf4f6;position:sticky;top:0;z-index:1;white-space:nowrap}td{max-width:480px;min-width:100px;overflow-wrap:anywhere}tbody tr:hover{background:#f2fafa}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:#f3f6f7;padding:12px;max-height:420px;overflow:auto}
 .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}.toolbar input{flex:1;min-width:160px;padding:8px;border:1px solid #a9bcc4;border-radius:6px;font:inherit}.timeline{list-style:none;padding:0;margin:0}.timeline li{display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid #edf1f3;flex-wrap:wrap}.timeline a{flex:1;min-width:220px}.bar{height:6px;background:#dfeeee;border-radius:3px;overflow:hidden;margin-top:5px}.bar i{display:block;height:100%;background:var(--accent)}.metric{font-variant-numeric:tabular-nums}.tagline{font-size:12px;letter-spacing:2px}.footer{color:var(--muted);font-size:12px;margin:20px 0;text-align:center}
-@media(max-width:650px){main{padding:12px}section,.stage{padding:16px}h1{font-size:25px}.facts{grid-template-columns:1fr 1fr}.facts dd{font-size:14px}}
+.pipeline-map{display:flex;align-items:stretch;gap:8px;overflow:auto;padding:6px 2px 16px}.pipeline-node{flex:1 0 148px;min-height:150px;border:1px solid #cbdde3;border-top:4px solid var(--accent);border-radius:10px;padding:14px;background:linear-gradient(180deg,#f8fcfd,#fff);display:flex;flex-direction:column;gap:5px}.pipeline-node strong{font-size:16px}.pipeline-node b{font-size:18px;margin-top:auto}.pipeline-node small{color:var(--muted)}.pipeline-number{font:700 12px/1 monospace;color:var(--accent);letter-spacing:1px}.pipeline-arrow,.io-arrow,.grt-arrow{display:flex;align-items:center;justify-content:center;color:#78909b;font-size:24px;font-weight:300}.workflow-copy{max-width:820px;color:var(--muted)}
+.io-flow{display:grid;grid-template-columns:minmax(0,1fr) 28px minmax(0,1.15fr) 28px minmax(0,1fr);align-items:stretch;gap:7px;margin:16px 0}.io-card{border:1px solid var(--line);border-radius:9px;padding:13px;display:flex;flex-direction:column;gap:3px;min-width:0}.io-card small{font:bold 11px/1.2 monospace;letter-spacing:1.2px;color:var(--muted)}.io-card strong{overflow-wrap:anywhere}.io-card span{font-size:13px;color:var(--muted)}.io-card.input{border-top:3px solid var(--source)}.io-card.process{border-top:3px solid var(--process);background:#faf9fd}.io-card.output{border-top:3px solid var(--accent)}
+.grt-flow{display:flex;align-items:stretch;overflow:auto;padding:6px 2px 16px;gap:7px}.grt-node{flex:1 0 145px;border:1px solid #cadde3;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:4px;background:white}.grt-node strong{color:var(--accent);font:800 18px/1 monospace}.grt-node b{font-size:17px;margin-top:5px}.grt-node span,.grt-node small{color:var(--muted);font-size:12px}.grt-node:last-of-type{border-color:#72bfa8;background:#f1fbf7}
+.source-summary{background:#f6fafb;border:1px solid var(--line);border-radius:10px;padding:16px;margin:12px 0}.source-summary h3{margin:0 0 10px}.source-bar{display:flex;height:20px;overflow:hidden;border-radius:6px;background:#e1e9ec}.source-bar i{display:block;min-width:2px}.source-0{background:#2d718e}.source-1{background:#e98c36}.source-2{background:#6f9e70}.source-3{background:#7458a6}.source-4{background:#c0678d}.legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:9px;color:var(--muted);font-size:13px}.legend-dot{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}.legend-dot.source{background:var(--source)}.legend-dot.patch{background:var(--patch)}.legend-dot.gap{background:var(--gap)}.path-legend{margin:18px 0 9px}.path-map{border:1px solid var(--line);border-radius:10px;overflow:hidden}.path-row{margin:0;border-bottom:1px solid #edf2f4}.path-row:last-child{border:0}.path-row>summary{display:grid;grid-template-columns:54px minmax(260px,1fr) 82px;gap:12px;align-items:center;padding:9px 12px;list-style:none}.path-row>summary::-webkit-details-marker{display:none}.path-row>summary:hover{background:#f3fafa}.path-bar{display:flex;align-items:stretch;height:24px;border-radius:4px;overflow:hidden;background:#edf2f4}.path-segment{display:block;min-width:2px;border-right:1px solid rgba(255,255,255,.75);overflow:hidden;font-style:normal}.path-segment.source{background:var(--source)}.path-segment.patch{background:var(--patch);min-width:5px}.path-segment.gap{background:repeating-linear-gradient(45deg,var(--gap),var(--gap) 3px,#fff 3px,#fff 5px);min-width:5px}.path-segment span{display:block;color:white;font-size:10px;line-height:24px;padding:0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.path-length{text-align:right;color:var(--muted);font-size:12px}.segment-list{list-style:none;margin:0;padding:8px 12px 14px 78px;background:#f8fbfc}.segment-list li{display:grid;grid-template-columns:105px minmax(150px,1fr) minmax(160px,1fr);gap:10px;padding:6px 0;border-bottom:1px solid #e5edef;font-size:13px}.segment-chip{display:inline-block;border-radius:12px;padding:1px 8px;width:max-content;color:white}.segment-chip.source{background:var(--source)}.segment-chip.patch{background:var(--patch)}.segment-chip.gap{background:var(--gap)}
+.audit-box{background:transparent;border:0;padding:0;margin:0}.audit-box>summary{background:white;border:1px solid var(--line);border-radius:10px;padding:16px 20px;font-size:17px;margin-bottom:18px}.audit-box[open]>summary{border-color:#aacbd3}
+@media(max-width:760px){main{padding:12px}section,.stage{padding:16px}h1{font-size:25px}.facts{grid-template-columns:1fr 1fr}.facts dd{font-size:14px}.pipeline-map{scroll-snap-type:x proximity}.pipeline-node{scroll-snap-align:start;flex-basis:75vw}.io-flow{grid-template-columns:1fr}.io-arrow{transform:rotate(90deg);height:22px}.path-row>summary{grid-template-columns:45px minmax(170px,1fr)}.path-length{display:none}.segment-list{padding-left:12px}.segment-list li{grid-template-columns:95px 1fr}.segment-list li span:last-child{grid-column:2}.grt-node{flex-basis:58vw}}
 @media print{body{background:white}header{background:white;color:#172b38;padding:12px}header p,header a{color:#536774}main{padding:0}button,.toolbar,nav{display:none}section,.stage{break-inside:avoid;border-radius:0}.scroll{max-height:none}details:not([open])>summary:after{content:'（明细见电子版）';font-size:12px}}
 """
 
@@ -193,7 +377,7 @@ def render(root: Path) -> Path:
         runtime = record.get("runtime", {})
         state = record.get("status", "pending")
         body = f'<details class="stage" id="{element_id}"><summary>{esc(record["title"])} <span class="badge {esc(state)}">{esc(label(state))}</span></summary><div class="stage-body">'
-        body += f'<p>{esc(METHODS.get(record["stage_id"], ""))}</p>'
+        body += stage_io_html(record)
         body += key_values({"执行方式": label(record.get("execution", "unknown")),
                             "开始时间": runtime.get("started_at"), "耗时 / s": runtime.get("elapsed_seconds"),
                             "退出码": runtime.get("exit_code")})
@@ -220,18 +404,21 @@ def render(root: Path) -> Path:
         return body
 
     state = manifest["status"]
-    body = f'<header><div class="tagline">CGAT · SERVER REPORT</div><h1>从输入到最终结果</h1><p>{esc(manifest["workspace_name"])} · {esc(manifest["run_id"])}</p><span class="badge {esc(state)}">{esc(label(state))}</span><nav><a href="#overview">任务概览</a><a href="#inputs">原始输入</a><a href="#process">处理过程</a><a href="#results">最终结果</a><a href="#delivery">交付文件</a></nav></header><main>'
+    body = f'<header><div class="tagline">CGAT · SERVER REPORT</div><h1>从输入到最终结果</h1><p>{esc(manifest["workspace_name"])} · {esc(manifest["run_id"])}</p><span class="badge {esc(state)}">{esc(label(state))}</span><nav><a href="#workflow">流程图</a><a href="#overview">任务概览</a><a href="#inputs">原始输入</a><a href="#process">逐步输入输出</a><a href="#results">GRT 结果图解</a><a href="#delivery">交付文件</a></nav></header><main>'
+    input_facts = input_record.get("facts", {})
+    body += ('<section id="workflow"><h2>端到端流程</h2><p class="workflow-copy">从原始 FASTA 开始，依次经过参考比对、染色体归属、'
+             'q0 与供体构建、GRT 修复和证据固化，最终形成 q4、Final Path 与可复现交付包。</p>'
+             + pipeline_map_html(records, input_facts, final) + '</section>')
     body += '<section id="overview"><h2>任务概览</h2>' + key_values({"开始": manifest.get("started_at"), "结束": manifest.get("ended_at"),
               "完成阶段": f'{sum(r.get("status")=="success" for r in records)} / {len(records)}',
               "复用缓存阶段": sum(r.get("execution")=="cache_reused" for r in records)})
     body += notes(manifest.get("errors", []))
     if state != "success":
         body += '<p class="warn">任务尚未全部完成。未执行阶段和未测量指标均明确保留，不作为成功结果。</p>'
-    body += '<ol class="timeline">'
+    body += f'<details class="audit-box"><summary>查看完整执行清单 · {len(records)} 个阶段</summary><ol class="timeline">'
     for index, record in enumerate(records):
         body += f'<li><span class="badge {esc(record["status"])}">{esc(label(record["status"]))}</span><a href="#stage-{index}">{esc(record["title"])}</a><span class="muted">{esc(label(record.get("execution", "")))}</span></li>'
-    body += '</ol></section><section id="inputs"><h2>原始输入与运行参数</h2>'
-    input_facts = input_record.get("facts", {})
+    body += '</ol></details></section><section id="inputs"><h2>原始输入与运行参数</h2>'
     body += key_values({"准备状态": label(input_record["status"]) if input_record.get("status") else None, "准备开始": input_record.get("started_at"),
                         "准备结束": input_record.get("ended_at")})
     body += notes(input_record.get("notes", []))
@@ -239,13 +426,17 @@ def render(root: Path) -> Path:
     input_versions = {f'{d["name"]} · {label(d["role"])}': d.get("stats") for d in input_facts.get("datasets", [])}
     body += stats_table("输入序列统计", input_versions)
     body += data_table("实际准备参数", [{"参数": k, "值": v} for k, v in input_facts.get("parameters", {}).items()])
-    body += '<details class="block"><summary>准备命令参数</summary><pre>' + esc(json.dumps(input_record.get("argv"), ensure_ascii=False, indent=2)) + '</pre></details></section><div id="process"><h2>处理过程</h2>'
+    body += ('<details class="block"><summary>准备命令参数</summary><pre>' + esc(json.dumps(input_record.get("argv"), ensure_ascii=False, indent=2))
+             + '</pre></details></section><section id="process"><h2>逐步输入、处理与输出</h2>'
+             '<p class="workflow-copy">每个阶段都明确标出实际输入、执行动作和产物；展开后可继续查看统计、事件、命令和原始 JSON。</p>'
+             f'<details class="audit-box"><summary>展开全部阶段的 Input → Process → Output · {len(records)} 个执行单元</summary>')
     for index, record in enumerate(records):
         body += stage_html(record, f"stage-{index}")
         for sub in grt:
             if sub.get("parent_unit") == record["stage_id"]:
                 body += stage_html(sub, "grt-" + sub["stage_id"])
-    body += '</div><section id="results"><h2>最终结果与仍待解决的问题</h2>'
+    body += '</details></section><section id="results"><h2>GRT 结果图解</h2><h3>q0 → q4 序列演化</h3>'
+    body += grt_flow_html(grt, final)
     versions = {}
     primary = next((d for d in input_facts.get("datasets", []) if d["role"] == "primary"), {})
     versions["原始主组装"] = primary.get("stats")
@@ -259,6 +450,8 @@ def render(root: Path) -> Path:
     else:
         body += key_values({"最终来源贡献 / bp": final.get("source_contribution_bp"),
                             "显式连接 gap 片段数": final.get("explicit_connector_segments")})
+        body += '<h3>22 条染色体 Final Path</h3>' + final_path_visual_html(final)
+    body += '<h3>事件与审计明细</h3>'
     body += data_table("event_reconciliation", final.get("event_reconciliation", []))
     remaining = [e for e in final.get("events", []) if e.get("status") in {"unresolved", "rejected"}]
     body += '<p class="note">历史未接受事件可能已由后续阶段解决；最终剩余 gap 以 q4 的序列统计为准。</p>'

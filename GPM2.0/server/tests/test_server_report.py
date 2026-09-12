@@ -234,6 +234,12 @@ class GrtReportIntegrationTests(unittest.TestCase):
             self.assertIn("primary", final["source_contribution_bp"])
             self.assertTrue(any(row["final_path_segment_ids"] for row in final["event_reconciliation"]))
             html = (report / "report.html").read_text()
+            self.assertIn('id="workflow"', html)
+            self.assertIn('class="pipeline-map"', html)
+            self.assertIn('class="io-flow"', html)
+            self.assertIn('id="grt-flow"', html)
+            self.assertIn('id="grt-final-path"', html)
+            self.assertIn('class="path-segment', html)
             self.assertLess(html.index('id="grt-step1_round1"'), html.index('id="grt-step1_filter"'))
             self.assertLess(html.index('id="grt-step1_filter"'), html.index('id="grt-step1_round2"'))
             with zipfile.ZipFile(root / f"{server.name}.report.zip") as archive:
