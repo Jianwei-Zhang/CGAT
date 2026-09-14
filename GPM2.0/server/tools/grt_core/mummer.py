@@ -32,6 +32,42 @@ def mummer_parameters(
         "show_coords": {"reference_sorted": True, "include_lengths": True},
     }
 
+
+def is_header_only_mummer_delta(path: Path) -> bool:
+    """Return whether *path* is a valid MUMmer header with no alignments.
+
+    MUMmer 4.0.1 ``delta-filter`` rejects this valid zero-hit result because it
+    requires the byte after the two-line header to be ``>`` instead of also
+    accepting EOF.  Only recognize the exact zero-hit shape here; malformed
+    non-empty bodies must still reach ``delta-filter`` and fail closed.
+    """
+    with path.open("rb") as handle:
+        source_header = handle.readline().strip()
+        format_header = handle.readline().strip()
+        body_has_content = any(line.strip() for line in handle)
+    return (
+        bool(source_header)
+        and format_header in {b"NUCMER", b"PROMER"}
+        and not body_has_content
+    )
+
+
+def write_skipped_command_logs(
+    command: list[str],
+    command_path: Path,
+    stdout_path: Path,
+    stderr_path: Path,
+    reason: str,
+) -> None:
+    command_path.write_text(
+        f"skipped: {reason}\nwould run: {shlex.join(command)}\n",
+        encoding="utf-8",
+        newline="",
+    )
+    stdout_path.write_text(f"skipped: {reason}\n", encoding="utf-8", newline="")
+    stderr_path.write_text("", encoding="utf-8", newline="")
+
+
 def run_logged(
     command: list[str],
     cwd: Path,
@@ -62,9 +98,16 @@ def run_logged(
                     check=False,
                 )
     if completed.returncode != 0:
+        try:
+            stderr_tail = stderr_path.read_text(
+                encoding="utf-8", errors="replace"
+            ).strip()[-2000:]
+        except OSError:
+            stderr_tail = ""
+        stderr_detail = f"; stderr_tail={stderr_tail!r}" if stderr_tail else ""
         fail(
             f"command failed with exit code {completed.returncode}; "
-            f"command={command_path}, stderr={stderr_path}"
+            f"command={command_path}, stderr={stderr_path}{stderr_detail}"
         )
 
 def parse_mummer_coords(

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import random
@@ -15,6 +16,7 @@ from server.tests import test_grt_prepare_inputs as prepare_fixture
 from server.tests import test_grt_step1 as step1_fixture
 from server.tools.grt_prepare_inputs import read_fasta, reverse_complement
 from server.tools.grt_core.contract.cross_reference import validate_interval
+from server.tools.grt_core.mummer import run_logged
 from server.tools.grt_step23 import (
     _longest_exact_suffix_prefix,
     _step3_classify_features,
@@ -27,6 +29,7 @@ from server.tools.grt_step23 import (
     build_dominated_terminal_component_candidates,
     build_step2_candidates,
     build_step2_fallback_candidates,
+    cached_mummer_chromosome,
     evidence_row,
     grt_mummer_parameters,
     parse_mummer_coords,
@@ -51,6 +54,30 @@ class GrtStep23Tests(unittest.TestCase):
         parameters = grt_mummer_parameters(8)
         self.assertFalse(parameters["delta_filter"]["reference_best"])
         self.assertEqual(parameters["delta_filter"]["min_alignment"], 10_000)
+
+    def test_logged_command_failure_surfaces_stderr_tail(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+            command = self.write_executable(
+                root / "fail.py",
+                "#!/usr/bin/env python3\n"
+                "import sys\n"
+                "print('specific delta failure', file=sys.stderr)\n"
+                "raise SystemExit(7)\n",
+            )
+
+            with self.assertRaises(SystemExit) as raised:
+                run_logged(
+                    [str(command)],
+                    root,
+                    root / "command.txt",
+                    root / "stdout.log",
+                    root / "stderr.log",
+                )
+
+            message = str(raised.exception)
+            self.assertIn("exit code 7", message)
+            self.assertIn("stderr_tail='specific delta failure'", message)
 
     def test_step2_structural_controller_is_reported_as_fixer_only(self):
         self.assertEqual(step2_strategy_applied("no_gaps"), "patcher_result")
@@ -82,6 +109,162 @@ class GrtStep23Tests(unittest.TestCase):
                 ["small-11"],
             ],
         )
+
+    def test_header_only_mummer_delta_is_a_valid_zero_hit_partition(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+            server = root / "gpm_server"
+            donor_path = server / "grt/donor/d0.fa"
+            donor_path.parent.mkdir(parents=True)
+            (server / "metadata").mkdir(parents=True)
+            prepare_fixture.write_fasta(donor_path, [("donor-1", "A" * 20_000)])
+            (server / "metadata/grt_donor_fragments.tsv").write_text(
+                "fixture\n", encoding="utf-8", newline=""
+            )
+            execution_log = root / "mummer-execution.log"
+            nucmer = self.write_executable(
+                root / "nucmer.py",
+                rf'''#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+prefix = args[args.index('-p') + 1]
+reference = args[-2]
+query = args[-1]
+Path(prefix + '.delta').write_text(
+    f'{{reference}} {{query}}\nNUCMER\n', encoding='utf-8', newline=''
+)
+with Path({str(execution_log)!r}).open('a', encoding='utf-8') as handle:
+    handle.write('nucmer\n')
+''',
+            )
+            blocked_tool = self.write_executable(
+                root / "must_not_run.py",
+                rf'''#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+with Path({str(execution_log)!r}).open('a', encoding='utf-8') as handle:
+    handle.write('unexpected postprocessor\n')
+print('unexpected postprocessor', file=sys.stderr)
+raise SystemExit(91)
+''',
+            )
+
+            def identity(path: Path) -> dict[str, str]:
+                return {
+                    "resolved": str(path),
+                    "sha256": prepare_fixture.sha256(path),
+                    "version": "fixture",
+                }
+
+            tools = {
+                "nucmer": identity(nucmer),
+                "delta-filter": identity(blocked_tool),
+                "show-coords": identity(blocked_tool),
+            }
+            member = {
+                "donor_set_id": "d0-fixture",
+                "member_id": "member-1",
+                "dataset_name": "support",
+                "contig_name": "donor-1",
+                "source_start": "1",
+                "source_end": "20000",
+                "orientation": "+",
+                "fasta_record_name": "donor-1",
+                "sequence_sha256": hashlib.sha256(b"A" * 20_000).hexdigest(),
+            }
+            donor_set = {
+                "donor_set_id": "d0-fixture",
+                "fasta_relpath": "grt/donor/d0.fa",
+                "fasta_sha256": prepare_fixture.sha256(donor_path),
+            }
+
+            cache_dir, cache_hit, _chromosome_key = cached_mummer_chromosome(
+                server,
+                "step2",
+                "Chr01",
+                "0" * 64,
+                "C" * 20_000,
+                [],
+                donor_set,
+                {"donor-1": member},
+                {"donor-1": 20_000},
+                tools,
+                4,
+                True,
+            )
+
+            self.assertFalse(cache_hit)
+            self.assertEqual(execution_log.read_text(encoding="utf-8"), "nucmer\n")
+            self.assertEqual((cache_dir / "result.coords").read_bytes(), b"")
+            self.assertIn(
+                "skipped: nucmer produced no alignments",
+                (cache_dir / "delta_filter.command.txt").read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                "skipped: nucmer produced no alignments",
+                (cache_dir / "show_coords.command.txt").read_text(encoding="utf-8"),
+            )
+
+            reused_dir, reused, _chromosome_key = cached_mummer_chromosome(
+                server,
+                "step2",
+                "Chr01",
+                "0" * 64,
+                "C" * 20_000,
+                [],
+                donor_set,
+                {"donor-1": member},
+                {"donor-1": 20_000},
+                tools,
+                4,
+                True,
+            )
+            self.assertTrue(reused)
+            self.assertEqual(reused_dir, cache_dir)
+            self.assertEqual(execution_log.read_text(encoding="utf-8"), "nucmer\n")
+
+            malformed_nucmer = self.write_executable(
+                root / "malformed_nucmer.py",
+                r'''#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+prefix = args[args.index('-p') + 1]
+reference = args[-2]
+query = args[-1]
+Path(prefix + '.delta').write_text(
+    f'{reference} {query}\nNUCMER\n-1\n', encoding='utf-8', newline=''
+)
+''',
+            )
+            malformed_tools = {
+                **tools,
+                "nucmer": identity(malformed_nucmer),
+            }
+            with self.assertRaises(SystemExit) as raised:
+                cached_mummer_chromosome(
+                    server,
+                    "step2",
+                    "Chr02",
+                    "0" * 64,
+                    "C" * 20_000,
+                    [],
+                    donor_set,
+                    {"donor-1": member},
+                    {"donor-1": 20_000},
+                    malformed_tools,
+                    4,
+                    True,
+                )
+            failure = str(raised.exception)
+            self.assertIn("stderr_tail='unexpected postprocessor'", failure)
+            self.assertIn("failed_artifacts=", failure)
+            self.assertIn("/grt/failed/step2-mummer-", failure)
+            self.assertNotIn("/grt/cache/step23/step2/mummer/", failure)
 
     @staticmethod
     def source_segment(

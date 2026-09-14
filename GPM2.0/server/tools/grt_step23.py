@@ -18,6 +18,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 from collections import defaultdict
 from pathlib import Path
@@ -25,14 +26,28 @@ from pathlib import Path
 try:
     from grt_core import *
     from grt_core.common import *
-    from grt_core.mummer import command_identity, mummer_parameters, parse_mummer_coords, run_logged
+    from grt_core.mummer import (
+        command_identity,
+        is_header_only_mummer_delta,
+        mummer_parameters,
+        parse_mummer_coords,
+        run_logged,
+        write_skipped_command_logs,
+    )
 except ModuleNotFoundError:  # Imported as server.tools.grt_step23.
     from .grt_core import *
     from .grt_core.common import *
-    from .grt_core.mummer import command_identity, mummer_parameters, parse_mummer_coords, run_logged
+    from .grt_core.mummer import (
+        command_identity,
+        is_header_only_mummer_delta,
+        mummer_parameters,
+        parse_mummer_coords,
+        run_logged,
+        write_skipped_command_logs,
+    )
 
 
-ENGINE_VERSION = 9
+ENGINE_VERSION = 10
 MUMMER_MIN_CLUSTER = 1_000
 MUMMER_MIN_MATCH = 100
 MUMMER_MIN_ALIGNMENT = 10_000
@@ -387,6 +402,7 @@ def cached_mummer_chromosome(
                     "-l",
                     str(filtered),
                 ]
+                header_only_delta = False
                 for tool_name, command, output in (
                     ("nucmer", nucmer_command, None),
                     ("delta_filter", filter_command, filtered),
@@ -395,14 +411,35 @@ def cached_mummer_chromosome(
                     command_path = temporary / f".{label}.{tool_name}.command.txt"
                     stdout_path = temporary / f".{label}.{tool_name}.stdout.log"
                     stderr_path = temporary / f".{label}.{tool_name}.stderr.log"
-                    run_logged(
-                        command,
-                        temporary,
-                        command_path,
-                        stdout_path,
-                        stderr_path,
-                        output,
-                    )
+                    if tool_name == "delta_filter":
+                        if not delta.is_file() or delta.stat().st_size == 0:
+                            fail(
+                                "nucmer did not create a non-empty delta for "
+                                f"{stage}:{chromosome}:{label}"
+                            )
+                        header_only_delta = is_header_only_mummer_delta(delta)
+                    if tool_name != "nucmer" and header_only_delta:
+                        reason = "nucmer produced no alignments"
+                        if tool_name == "delta_filter":
+                            filtered.write_bytes(delta.read_bytes())
+                        else:
+                            part_coords.write_bytes(b"")
+                        write_skipped_command_logs(
+                            command,
+                            command_path,
+                            stdout_path,
+                            stderr_path,
+                            reason,
+                        )
+                    else:
+                        run_logged(
+                            command,
+                            temporary,
+                            command_path,
+                            stdout_path,
+                            stderr_path,
+                            output,
+                        )
                     marker = f"# {label}\n".encode("utf-8")
                     aggregate[f"{tool_name}.command.txt"].extend(
                         [marker, command_path.read_bytes()]
@@ -412,11 +449,6 @@ def cached_mummer_chromosome(
                     )
                     aggregate[f"{tool_name}.stderr.log"].extend(
                         [marker, stderr_path.read_bytes()]
-                    )
-                if not delta.is_file() or delta.stat().st_size == 0:
-                    fail(
-                        "nucmer did not create a non-empty delta for "
-                        f"{stage}:{chromosome}:{label}"
                     )
                 if not filtered.is_file() or not part_coords.is_file():
                     fail(
@@ -467,7 +499,7 @@ def cached_mummer_chromosome(
             shutil.rmtree(cache_dir)
         os.replace(temporary, cache_dir)
         return cache_dir, False, chromosome_key
-    except BaseException:
+    except BaseException as error:
         if temporary.exists():
             failed_root = server_dir / "grt/failed"
             failed_root.mkdir(parents=True, exist_ok=True)
@@ -475,6 +507,17 @@ def cached_mummer_chromosome(
             if failed_dir.exists():
                 shutil.rmtree(failed_dir)
             os.replace(temporary, failed_dir)
+            if isinstance(error, SystemExit) and isinstance(error.code, str):
+                relocated = error.code.replace(str(temporary), str(failed_dir))
+                relocated = f"{relocated}; failed_artifacts={failed_dir}"
+                error.code = relocated
+                error.args = (relocated,)
+            else:
+                print(
+                    f"ERROR: failed MUMmer artifacts preserved at {failed_dir}",
+                    file=sys.stderr,
+                    flush=True,
+                )
         raise
 
 
