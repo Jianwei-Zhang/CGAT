@@ -13,7 +13,7 @@ test("assembly page sessions start with independent runtime state", () => {
 
   first.pendingAssemblyConfirmResolvers.set("dialog-1", () => {});
   first.measuredTrackViewportPxByRole.primary = 640;
-  first.trackNumberInputBindings.set("main:mapq", {});
+  first.trackNumberInputBindings.set("main:minIdentityPct", {});
 
   assert.equal(second.pendingAssemblyConfirmResolvers.size, 0);
   assert.equal(second.measuredTrackViewportPxByRole.primary, 1200);
@@ -26,7 +26,7 @@ test("resetAssemblyPageSession clears disposable state and restores defaults", (
   const coordinatorCalls = [];
   const inputCalls = [];
   const previousInputBindings = assemblyPageSession.trackNumberInputBindings;
-  previousInputBindings.set("main:mapq", { destroy() { inputCalls.push("destroy"); } });
+  previousInputBindings.set("main:minIdentityPct", { destroy() { inputCalls.push("destroy"); } });
   assemblyPageSession.pendingAssemblyScrollStatePersistTimer = 91;
   assemblyPageSession.deferredRerenderCoordinator = {
     destroy() {

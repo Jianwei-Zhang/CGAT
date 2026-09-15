@@ -232,7 +232,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             left_assembly_ctg_id,
             right_assembly_ctg_id,
             min_align_length,
-            min_mapq,
+            min_identity_pct,
         } => {
             let project_db_path = workspace_root.join("project.sqlite");
             let report = get_junction_inspection(
@@ -242,7 +242,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
                     left_assembly_ctg_id,
                     right_assembly_ctg_id,
                     min_align_length,
-                    min_mapq,
+                    min_identity_pct,
                 },
             )?;
             println!("project_id={}", report.project_id);

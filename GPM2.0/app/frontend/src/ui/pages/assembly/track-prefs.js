@@ -3,7 +3,7 @@ export const TICK_LENGTH_OPTIONS = Object.freeze([10000, 100000]);
 export const MIN_TICK_UNIT_KB_OPTIONS = Object.freeze([250, 500, 750, 1000, 10000, 100000]);
 export const MAX_TICK_COUNT_OPTIONS = Object.freeze([5, 10, 15, 20]);
 export const ALIGNMENT_LENGTH_OPTIONS = Object.freeze([1000, 10000, 100000]);
-export const MAPQ_OPTIONS = Object.freeze([0, 30, 60, 90]);
+export const IDENTITY_PCT_OPTIONS = Object.freeze([0, 90, 95, 99]);
 export const SUPPORT_DS_CTG_LEN_BP_OPTIONS = Object.freeze([0, 1000, 10000, 100000]);
 
 export const DEFAULT_VIEW_SPAN_KB = VIEW_SPAN_KB_OPTIONS[0];
@@ -11,14 +11,14 @@ export const DEFAULT_TICK_LENGTH = TICK_LENGTH_OPTIONS[0];
 export const DEFAULT_MIN_TICK_UNIT_KB = 10000;
 export const DEFAULT_MAX_TICK_COUNT = MAX_TICK_COUNT_OPTIONS[1];
 export const DEFAULT_ALIGNMENT_LENGTH = ALIGNMENT_LENGTH_OPTIONS[1];
-export const DEFAULT_MAPQ = MAPQ_OPTIONS[0];
+export const DEFAULT_MIN_IDENTITY_PCT = IDENTITY_PCT_OPTIONS[0];
 export const DEFAULT_SUPPORT_DS_CTG_LEN_BP = SUPPORT_DS_CTG_LEN_BP_OPTIONS[0];
 export const TRACK_PREF_OPTIONS = Object.freeze({
   supportDsCtgLen: SUPPORT_DS_CTG_LEN_BP_OPTIONS,
   minTickUnitKb: MIN_TICK_UNIT_KB_OPTIONS,
   maxTickCount: MAX_TICK_COUNT_OPTIONS,
   alignmentLength: ALIGNMENT_LENGTH_OPTIONS,
-  mapq: MAPQ_OPTIONS,
+  minIdentityPct: IDENTITY_PCT_OPTIONS,
 });
 
 // Manual input is stricter than legacy persisted preference normalization.
@@ -26,8 +26,8 @@ export function normalizeTrackPrefInputValue(field, rawValue) {
   const text = String(rawValue ?? "");
   if (!/^[0-9]+$/.test(text)) return null;
   const value = Number(text);
-  const minimum = field === "mapq" || field === "supportDsCtgLen" ? 0 : 1;
-  const maximum = field === "mapq" ? 255 : Number.MAX_SAFE_INTEGER;
+  const minimum = field === "minIdentityPct" || field === "supportDsCtgLen" ? 0 : 1;
+  const maximum = field === "minIdentityPct" ? 100 : Number.MAX_SAFE_INTEGER;
   return Number.isSafeInteger(value) && value >= minimum && value <= maximum ? value : null;
 }
 
@@ -57,14 +57,21 @@ export function resolveTrackPrefs(trackView) {
     ["alignmentLength", "block_length"],
     DEFAULT_ALIGNMENT_LENGTH,
   );
-  const mapq = resolveAllowedTrackPref(
+  const minIdentityPct = resolveAllowedTrackPref(
     trackView,
-    ["mapq", "mapQ", "minMapq"],
-    MAPQ_OPTIONS,
-    DEFAULT_MAPQ,
+    ["minIdentityPct", "identityPct"],
+    IDENTITY_PCT_OPTIONS,
+    DEFAULT_MIN_IDENTITY_PCT,
     normalizeNonNegativeInt,
   );
-  const resolvedMapq = resolveNonNegativeTrackPref(trackView, ["mapq", "mapQ", "minMapq"], mapq);
+  const resolvedMinIdentityPct = Math.min(
+    100,
+    resolveNonNegativeTrackPref(
+      trackView,
+      ["minIdentityPct", "identityPct"],
+      minIdentityPct,
+    ),
+  );
   const supportDsCtgLen = resolveNonNegativeTrackPref(
     trackView,
     ["supportDsCtgLen", "supportDsCtgLenBp"],
@@ -83,7 +90,7 @@ export function resolveTrackPrefs(trackView) {
     tickBp: tickLength,
     alignmentLength,
     block_length: alignmentLength,
-    mapq: resolvedMapq,
+    minIdentityPct: resolvedMinIdentityPct,
   };
 }
 

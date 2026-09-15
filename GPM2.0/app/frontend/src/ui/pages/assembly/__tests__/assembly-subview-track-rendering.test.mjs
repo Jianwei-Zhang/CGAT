@@ -56,11 +56,11 @@ test("subview panel renders chart sub-card with parameter labels after entering"
   assert.match(html, /最小刻度单位\(kb\)/);
   assert.match(html, /最多可展示数/);
   assert.match(html, /比对长度\(bp\)/);
-  assert.match(html, /MAPQ/);
+  assert.match(html, /一致性\(%\)/);
   assert.match(html, /id="subview-track-min-tick-unit-kb"/);
   assert.match(html, /id="subview-track-max-tick-count"/);
   assert.match(html, /id="subview-track-alignment-length"/);
-  assert.match(html, /id="subview-track-mapq"/);
+  assert.match(html, /id="subview-track-identity-pct"/);
   assert.match(html, /class="assembly-track-layout subview-track-layout"/);
   assert.doesNotMatch(html, /规则：/);
   assert.doesNotMatch(html, /上轨：/);

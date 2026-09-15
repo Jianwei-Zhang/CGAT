@@ -37,7 +37,7 @@ test("i18n module centralizes zh error and status labels", () => {
   assert.equal(assemblyLabelsZh.page.phasedTrackGrtNoticeTitle, "GRT 结果暂不可用");
   assert.equal(assemblyLabelsZh.page.phasedTrackGrtNoticeConfirm, "我知道了");
   assert.equal(assemblyLabelsZh.trackControls.alignmentLengthBp, "比对长度(bp)");
-  assert.equal(assemblyLabelsZh.trackControls.mapq, "MAPQ");
+  assert.equal(assemblyLabelsZh.trackControls.identityPct, "一致性(%)");
   assert.equal(assemblyLabelsZh.contextMenu.addToPhasedTrack, "添加至轨道 {key}");
   assert.equal(assemblyLabelsZh.subview.historyRestoreRollbackUnavailableLabel, "暂无可撤销的回退操作");
 });

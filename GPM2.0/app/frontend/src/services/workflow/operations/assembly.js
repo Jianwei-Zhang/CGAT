@@ -416,7 +416,7 @@ export async function getJunctionInspection({
   leftAssemblyCtgId,
   rightAssemblyCtgId,
   minAlignmentLength = null,
-  minMapq = null,
+  minIdentityPct = null,
 }) {
   if (isTauriRuntime()) {
     return getJunctionInspectionTauri({
@@ -425,7 +425,7 @@ export async function getJunctionInspection({
       leftAssemblyCtgId,
       rightAssemblyCtgId,
       minAlignmentLength,
-      minMapq,
+      minIdentityPct,
     });
   }
   try {
@@ -435,7 +435,7 @@ export async function getJunctionInspection({
       leftAssemblyCtgId,
       rightAssemblyCtgId,
       minAlignmentLength,
-      minMapq,
+      minIdentityPct,
     });
   } catch {
     // fallback to mock flow
@@ -446,7 +446,7 @@ export async function getJunctionInspection({
     leftAssemblyCtgId,
     rightAssemblyCtgId,
     minAlignmentLength,
-    minMapq,
+    minIdentityPct,
   });
 }
 
@@ -456,7 +456,7 @@ export async function getTrackPairwiseEvidence({
   topAssemblyCtgIds,
   bottomAssemblyCtgIds,
   minAlignmentLength = null,
-  minMapq = null,
+  minIdentityPct = null,
 }) {
   if (isTauriRuntime()) {
     return getTrackPairwiseEvidenceTauri({
@@ -465,7 +465,7 @@ export async function getTrackPairwiseEvidence({
       topAssemblyCtgIds,
       bottomAssemblyCtgIds,
       minAlignmentLength,
-      minMapq,
+      minIdentityPct,
     });
   }
   try {
@@ -475,7 +475,7 @@ export async function getTrackPairwiseEvidence({
       topAssemblyCtgIds,
       bottomAssemblyCtgIds,
       minAlignmentLength,
-      minMapq,
+      minIdentityPct,
     });
   } catch {
     // fallback to mock flow
@@ -486,7 +486,7 @@ export async function getTrackPairwiseEvidence({
     topAssemblyCtgIds,
     bottomAssemblyCtgIds,
     minAlignmentLength,
-    minMapq,
+    minIdentityPct,
   });
 }
 

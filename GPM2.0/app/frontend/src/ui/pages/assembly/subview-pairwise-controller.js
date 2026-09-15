@@ -103,17 +103,21 @@ export function createSubviewPairwiseController({
       1,
       normalizePositiveInt(prefs.alignmentLength) ?? 1,
     );
-    const requestedMinMapq = Math.max(0, normalizeNonNegativeInt(prefs.mapq) ?? 0);
+    const requestedMinIdentityPct = Math.max(
+      0,
+      normalizeNonNegativeInt(prefs.minIdentityPct) ?? 0,
+    );
     const loadedMinAlignmentLength = Math.max(
       1,
       normalizePositiveInt(
         previousForKey?.loadedMinAlignmentLength ?? previousForKey?.minAlignmentLength,
       ) ?? requestedMinAlignmentLength,
     );
-    const loadedMinMapq = Math.max(
+    const loadedMinIdentityPct = Math.max(
       0,
-      normalizeNonNegativeInt(previousForKey?.loadedMinMapq ?? previousForKey?.minMapq)
-        ?? requestedMinMapq,
+      normalizeNonNegativeInt(
+        previousForKey?.loadedMinIdentityPct ?? previousForKey?.minIdentityPct,
+      ) ?? requestedMinIdentityPct,
     );
     const shouldRefetch = shouldRefetchSubviewPairwiseEvidence({
       summary,
@@ -127,11 +131,11 @@ export function createSubviewPairwiseController({
         ? issueSubviewPairwiseEvidenceRequestKey(summary, scope)
         : String(previousForKey?.requestKey || ""),
       requestedMinAlignmentLength,
-      requestedMinMapq,
+      requestedMinIdentityPct,
       loadedMinAlignmentLength,
-      loadedMinMapq,
+      loadedMinIdentityPct,
       minAlignmentLength: requestedMinAlignmentLength,
-      minMapq: requestedMinMapq,
+      minIdentityPct: requestedMinIdentityPct,
       status: shouldRefetch ? "loading" : String(previousForKey?.status || "loaded"),
       hits: Array.isArray(previousForKey?.hits) ? previousForKey.hits : [],
       evidenceSource: String(previousForKey?.evidenceSource || ""),
@@ -165,9 +169,11 @@ export function createSubviewPairwiseController({
         1,
         normalizePositiveInt(evidence?.requestedMinAlignmentLength ?? prefs.alignmentLength) ?? 1,
       ),
-      minMapq: Math.max(
+      minIdentityPct: Math.max(
         0,
-        normalizeNonNegativeInt(evidence?.requestedMinMapq ?? prefs.mapq) ?? 0,
+        normalizeNonNegativeInt(
+          evidence?.requestedMinIdentityPct ?? prefs.minIdentityPct,
+        ) ?? 0,
       ),
     };
     if (scope.mode === "track-pair" || scope.mode === "composition") {
@@ -229,11 +235,11 @@ export function createSubviewPairwiseController({
               key: params.key,
               requestKey: params.requestKey,
               requestedMinAlignmentLength: params.minAlignmentLength,
-              requestedMinMapq: params.minMapq,
+              requestedMinIdentityPct: params.minIdentityPct,
               loadedMinAlignmentLength: params.minAlignmentLength,
-              loadedMinMapq: params.minMapq,
+              loadedMinIdentityPct: params.minIdentityPct,
               minAlignmentLength: params.minAlignmentLength,
-              minMapq: params.minMapq,
+              minIdentityPct: params.minIdentityPct,
               status: "loaded",
               hits: Array.isArray(report?.hits) ? report.hits : [],
               evidenceSource: String(report?.evidenceSource || ""),
@@ -260,7 +266,7 @@ export function createSubviewPairwiseController({
               key: params.key,
               requestKey: params.requestKey,
               requestedMinAlignmentLength: params.minAlignmentLength,
-              requestedMinMapq: params.minMapq,
+              requestedMinIdentityPct: params.minIdentityPct,
               loadedMinAlignmentLength: Math.max(
                 1,
                 normalizePositiveInt(
@@ -269,16 +275,16 @@ export function createSubviewPairwiseController({
                     ?? params.minAlignmentLength,
                 ) ?? params.minAlignmentLength,
               ),
-              loadedMinMapq: Math.max(
+              loadedMinIdentityPct: Math.max(
                 0,
                 normalizeNonNegativeInt(
-                  currentEvidence?.loadedMinMapq
-                    ?? currentEvidence?.minMapq
-                    ?? params.minMapq,
-                ) ?? params.minMapq,
+                  currentEvidence?.loadedMinIdentityPct
+                    ?? currentEvidence?.minIdentityPct
+                    ?? params.minIdentityPct,
+                ) ?? params.minIdentityPct,
               ),
               minAlignmentLength: params.minAlignmentLength,
-              minMapq: params.minMapq,
+              minIdentityPct: params.minIdentityPct,
               status: "error",
               hits: Array.isArray(currentEvidence?.hits) ? currentEvidence.hits : [],
               evidenceSource: String(currentEvidence?.evidenceSource || ""),
@@ -358,12 +364,12 @@ export function createSubviewPairwiseController({
           ?? state.assembly?.subviewTrackView?.alignmentLength,
       ) ?? 1,
     );
-    const nextMapq = Math.max(
+    const nextIdentityPct = Math.max(
       0,
       normalizeNonNegativeInt(
-        evidence?.loadedMinMapq
-          ?? evidence?.minMapq
-          ?? state.assembly?.subviewTrackView?.mapq,
+        evidence?.loadedMinIdentityPct
+          ?? evidence?.minIdentityPct
+          ?? state.assembly?.subviewTrackView?.minIdentityPct,
       ) ?? 0,
     );
     const hasCachedHits = Array.isArray(evidence?.hits) && evidence.hits.length > 0;
@@ -373,7 +379,7 @@ export function createSubviewPairwiseController({
         subviewTrackView: {
           ...resolveTrackPrefs(state.assembly?.subviewTrackView || state.assembly?.trackView || {}),
           alignmentLength: nextAlignmentLength,
-          mapq: nextMapq,
+          minIdentityPct: nextIdentityPct,
         },
         subview: {
           ...currentSubview,
@@ -381,11 +387,11 @@ export function createSubviewPairwiseController({
             ...evidence,
             requestKey: "",
             requestedMinAlignmentLength: nextAlignmentLength,
-            requestedMinMapq: nextMapq,
+            requestedMinIdentityPct: nextIdentityPct,
             loadedMinAlignmentLength: nextAlignmentLength,
-            loadedMinMapq: nextMapq,
+            loadedMinIdentityPct: nextIdentityPct,
             minAlignmentLength: nextAlignmentLength,
-            minMapq: nextMapq,
+            minIdentityPct: nextIdentityPct,
             status: hasCachedHits ? "loaded" : "cancelled",
             error: "",
           },

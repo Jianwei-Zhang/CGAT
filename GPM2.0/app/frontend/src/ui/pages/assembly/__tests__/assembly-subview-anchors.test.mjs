@@ -15,13 +15,13 @@ test("subview track controls render independently from main track controls", () 
           minTickUnitKb: 250,
           maxTickCount: 20,
           alignmentLength: 10000,
-          mapq: 30,
+          minIdentityPct: 95,
         },
         subviewTrackView: {
           minTickUnitKb: 10000,
           maxTickCount: 5,
           alignmentLength: 1000,
-          mapq: 0,
+          minIdentityPct: 0,
         },
         supportDatasetId: 22,
         supportChrCtgs: [
@@ -55,12 +55,12 @@ test("subview track controls render independently from main track controls", () 
   assert.match(html, /id="assembly-track-min-tick-unit-kb"[^>]*value="250"/);
   assert.match(html, /id="assembly-track-max-tick-count"[^>]*value="20"/);
   assert.match(html, /id="assembly-track-alignment-length"[^>]*value="10000"/);
-  assert.match(html, /id="assembly-track-mapq"[^>]*value="30"/);
+  assert.match(html, /id="assembly-track-identity-pct"[^>]*value="95"/);
 
   assert.match(html, /id="subview-track-min-tick-unit-kb"[^>]*value="10000"/);
   assert.match(html, /id="subview-track-max-tick-count"[^>]*value="5"/);
   assert.match(html, /id="subview-track-alignment-length"[^>]*value="1000"/);
-  assert.match(html, /id="subview-track-mapq"[^>]*value="0"/);
+  assert.match(html, /id="subview-track-identity-pct"[^>]*value="0"/);
   assert.match(html, /id="assembly-track-min-tick-unit-kb-menu"[\s\S]*data-track-combo-value="100000"/);
   assert.match(html, /id="subview-track-min-tick-unit-kb-menu"[\s\S]*data-track-combo-value="100000"/);
   assert.match(html, /data-subview-action="swap-track-order"/);
@@ -1710,7 +1710,7 @@ test("cancelSubviewPairwiseEvidence reverts subview filters to the loaded cache 
         minTickUnitKb: 10000,
         maxTickCount: 10,
         alignmentLength: 5000,
-        mapq: 0,
+        minIdentityPct: 0,
       },
       subview: {
         mode: "2-contig",
@@ -1724,9 +1724,9 @@ test("cancelSubviewPairwiseEvidence reverts subview filters to the loaded cache 
           requestKey: "2-contig:support:30:primary:2|req:9",
           status: "loading",
           requestedMinAlignmentLength: 5000,
-          requestedMinMapq: 0,
+          requestedMinIdentityPct: 0,
           loadedMinAlignmentLength: 10000,
-          loadedMinMapq: 0,
+          loadedMinIdentityPct: 0,
           hits: [
             {
               queryAssemblyCtgId: 30,
@@ -1761,7 +1761,7 @@ test("cancelSubviewPairwiseEvidence reverts subview filters to the loaded cache 
 
   assert.equal(cancelled, true);
   assert.equal(store.getState().assembly.subviewTrackView.alignmentLength, 10000);
-  assert.equal(store.getState().assembly.subviewTrackView.mapq, 0);
+  assert.equal(store.getState().assembly.subviewTrackView.minIdentityPct, 0);
   assert.equal(store.getState().assembly.subview.pairwiseEvidence.status, "loaded");
   assert.equal(store.getState().assembly.subview.pairwiseEvidence.requestKey, "");
   assert.equal(rerenders, 1);

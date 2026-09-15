@@ -1044,14 +1044,14 @@ test("enterSubviewFromCandidates copies main-track scale prefs into subviewTrack
         minTickUnitKb: 750,
         maxTickCount: 18,
         alignmentLength: 12345,
-        mapq: 31,
+        minIdentityPct: 97,
       },
       subviewTrackView: {
         supportDsCtgLen: 0,
         minTickUnitKb: 10000,
         maxTickCount: 10,
         alignmentLength: 1000,
-        mapq: 0,
+        minIdentityPct: 0,
       },
       chrCtgs: [
         { assemblyCtgId: 2, name: "ctg-alpha", anchorStart: 100 },
@@ -1091,7 +1091,7 @@ test("enterSubviewFromCandidates copies main-track scale prefs into subviewTrack
     maxTickCount: 18,
     alignmentLength: 12345,
     block_length: 12345,
-    mapq: 31,
+    minIdentityPct: 97,
   });
 });
 

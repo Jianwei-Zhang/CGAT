@@ -175,14 +175,14 @@ test("enterSubviewFromTrackSelections copies main-track scale prefs into subview
         minTickUnitKb: 500,
         maxTickCount: 15,
         alignmentLength: 22222,
-        mapq: 44,
+        minIdentityPct: 94,
       },
       subviewTrackView: {
         supportDsCtgLen: 0,
         minTickUnitKb: 10000,
         maxTickCount: 10,
         alignmentLength: 1000,
-        mapq: 0,
+        minIdentityPct: 0,
       },
       subview: {
         selectedTrackSelections: [
@@ -218,7 +218,7 @@ test("enterSubviewFromTrackSelections copies main-track scale prefs into subview
     maxTickCount: 15,
     alignmentLength: 22222,
     block_length: 22222,
-    mapq: 44,
+    minIdentityPct: 94,
   });
 });
 
@@ -305,7 +305,7 @@ test("enterSubviewFromTrackSelections starts pairwise evidence loading for ds tr
         minTickUnitKb: 500,
         maxTickCount: 15,
         alignmentLength: 10000,
-        mapq: 0,
+        minIdentityPct: 0,
       },
       chrCtgs: [{ assemblyCtgId: 2, name: "primary-bottom", datasetId: 11, totalLength: 5000 }],
       supportChrCtgs: [{ assemblyCtgId: 30, name: "support-top", datasetId: 22, totalLength: 4000 }],
@@ -422,14 +422,14 @@ test("track label selection inherits main-track scale prefs when entering subvie
         minTickUnitKb: 500,
         maxTickCount: 15,
         alignmentLength: 100000,
-        mapq: 44,
+        minIdentityPct: 94,
       },
       subviewTrackView: {
         supportDsCtgLen: 0,
         minTickUnitKb: 10000,
         maxTickCount: 10,
         alignmentLength: 10000,
-        mapq: 0,
+        minIdentityPct: 0,
       },
       subview: {
         mode: "track-pair",
@@ -471,7 +471,7 @@ test("track label selection inherits main-track scale prefs when entering subvie
     maxTickCount: 15,
     alignmentLength: 100000,
     block_length: 100000,
-    mapq: 44,
+    minIdentityPct: 94,
   });
 });
 

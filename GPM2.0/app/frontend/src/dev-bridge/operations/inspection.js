@@ -15,7 +15,7 @@ async function getJunctionInspection(payload) {
     leftAssemblyCtgId,
     rightAssemblyCtgId,
     minAlignmentLength,
-    minMapq,
+    minIdentityPct,
   } = payload || {};
   requireString("workspaceRoot", workspaceRoot);
   requireNumber("projectId", projectId);
@@ -32,8 +32,8 @@ async function getJunctionInspection(payload) {
   if (Number.isFinite(Number(minAlignmentLength)) && Number(minAlignmentLength) > 0) {
     args.push("--min-align-length", String(Math.trunc(Number(minAlignmentLength))));
   }
-  if (Number.isFinite(Number(minMapq)) && Number(minMapq) > 0) {
-    args.push("--min-mapq", String(Math.trunc(Number(minMapq))));
+  if (Number.isFinite(Number(minIdentityPct)) && Number(minIdentityPct) > 0) {
+    args.push("--min-identity-pct", String(Number(minIdentityPct)));
   }
   const output = await runBackend(args);
   return parseJunctionInspection(output.stdout);

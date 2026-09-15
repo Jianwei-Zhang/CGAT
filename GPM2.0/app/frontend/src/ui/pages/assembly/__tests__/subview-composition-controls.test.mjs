@@ -18,12 +18,12 @@ function controlState() {
       subview: {
         ...applySubviewComposition({}, composition),
         pairwiseEvidence: {
-          status: "loaded", loadedMinAlignmentLength: 1, loadedMinMapq: 0,
+          status: "loaded", loadedMinAlignmentLength: 1, loadedMinIdentityPct: 0,
           hits: [
-            { hitKey: "short", alignLength: 100, mapq: 60 },
-            { hitKey: "low-mapq", alignLength: 1000, mapq: 10 },
-            { hitKey: "pass", alignLength: 1000, mapq: 60 },
-            { hitKey: "missing-mapq", alignLength: 1000 },
+            { hitKey: "short", alignLength: 100, identityPct: 99, mapq: 60 },
+            { hitKey: "low-identity", alignLength: 1000, identityPct: 80, mapq: 60 },
+            { hitKey: "pass", alignLength: 1000, identityPct: 95, mapq: 10 },
+            { hitKey: "missing-identity", alignLength: 1000, mapq: 60 },
           ].map((hit) => ({ ...hit, queryAssemblyCtgId: 1, subjectAssemblyCtgId: 2,
             queryStart: 1, queryEnd: 100, subjectStart: 200, subjectEnd: 300, strand: "+" })),
         },
@@ -31,7 +31,7 @@ function controlState() {
       subviewCompositionCandidates: candidates,
       subviewCompositionCandidatesLoaded: true,
       subviewCompositionViewport: { bpPerPx: 20, leftBp: -5000, topPx: 0 },
-      subviewTrackView: { minTickUnitKb: 1, maxTickCount: 10, alignmentLength: 1, mapq: 0 },
+      subviewTrackView: { minTickUnitKb: 1, maxTickCount: 10, alignmentLength: 1, minIdentityPct: 0 },
     },
   });
 }
@@ -44,16 +44,16 @@ function hitKeys(state) {
 test("composition applies both thresholds to cached pairwise hits without mutating evidence or positions", () => {
   const state = controlState();
   const originalSubview = structuredClone(state.assembly.subview);
-  assert.deepEqual(hitKeys(state), ["short", "low-mapq", "pass", "missing-mapq"]);
+  assert.deepEqual(hitKeys(state), ["short", "low-identity", "pass", "missing-identity"]);
   state.assembly.subviewTrackView.alignmentLength = 1000;
-  assert.deepEqual(hitKeys(state), ["low-mapq", "pass", "missing-mapq"]);
-  state.assembly.subviewTrackView.mapq = 60;
+  assert.deepEqual(hitKeys(state), ["low-identity", "pass", "missing-identity"]);
+  state.assembly.subviewTrackView.minIdentityPct = 90;
   assert.deepEqual(hitKeys(state), ["pass"]);
-  state.assembly.subviewTrackView.mapq = 61;
+  state.assembly.subviewTrackView.minIdentityPct = 96;
   assert.deepEqual(hitKeys(state), []);
-  state.assembly.subviewTrackView.mapq = 0;
+  state.assembly.subviewTrackView.minIdentityPct = 0;
   state.assembly.subviewTrackView.alignmentLength = 1;
-  assert.deepEqual(hitKeys(state), ["short", "low-mapq", "pass", "missing-mapq"]);
+  assert.deepEqual(hitKeys(state), ["short", "low-identity", "pass", "missing-identity"]);
   assert.deepEqual(state.assembly.subview, originalSubview);
 });
 
@@ -63,20 +63,20 @@ test("composition filtering keeps raw fallback hit identities and handles revers
   hits.forEach((hit) => { delete hit.hitKey; });
   Object.assign(hits[2], { queryAssemblyCtgId: 2, subjectAssemblyCtgId: 1 });
   state.assembly.subviewTrackView.alignmentLength = 500;
-  state.assembly.subviewTrackView.mapq = 30;
+  state.assembly.subviewTrackView.minIdentityPct = 90;
   assert.deepEqual(hitKeys(state), ["composition-pairwise-3"]);
   assert.match(renderAssemblyPage(state), /data-subview-anchor-hit-key="composition-pairwise-3"/);
 });
 
-test("composition reference projections use block length and MAPQ before creating bands and hit zones", () => {
+test("composition reference projections use block length and identity before creating bands and hit zones", () => {
   const state = controlState();
   const candidates = buildSubviewCompositionCandidates({
     primaryDatasetId: 1,
     allChrCtgs: [{ assemblyCtgId: 1, datasetId: 1, name: "ctg1", lengthBp: 30_000,
       hits: [
-        { hitKey: "short", blockLength: 100, mapq: 60 },
-        { hitKey: "low", blockLength: 1000, mapq: 0 },
-        { hitKey: "pass", block_length: 1000, mapQ: 60 },
+        { hitKey: "short", blockLength: 100, identityPct: 99, mapq: 60 },
+        { hitKey: "low", blockLength: 1000, identityPct: 80, mapq: 60 },
+        { hitKey: "pass", block_length: 1000, identityPct: 95, mapQ: 0 },
       ].map((hit) => ({ ...hit, refStart: 100, refEnd: 1100, ctgStart: 1, ctgEnd: 1001 })),
     }],
     refCtgs: [{ assemblyCtgId: 9, name: "Chr01:1-30000", referenceChrName: "Chr01",
@@ -87,7 +87,7 @@ test("composition reference projections use block length and MAPQ before creatin
   });
   state.assembly.subviewCompositionCandidates = candidates;
   assert.equal(hitKeys(state).length, 3);
-  Object.assign(state.assembly.subviewTrackView, { alignmentLength: 1000, mapq: 60 });
+  Object.assign(state.assembly.subviewTrackView, { alignmentLength: 1000, minIdentityPct: 90 });
   assert.deepEqual(hitKeys(state), ["reference:assembly:1|ref:Chr01:1-30000|pass"]);
   assert.doesNotMatch(renderAssemblyPage(state), /data-subview-anchor-hit-key="[^"]*\|(?:short|low)"/);
 });

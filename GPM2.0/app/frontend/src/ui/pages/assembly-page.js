@@ -191,7 +191,6 @@ import {
 } from "./assembly/track-drag-offset-rebase.js";
 import {
   ALIGNMENT_LENGTH_OPTIONS,
-  MAPQ_OPTIONS,
   MAX_TICK_COUNT_OPTIONS,
   MIN_TICK_UNIT_KB_OPTIONS,
   SUPPORT_DS_CTG_LEN_BP_OPTIONS,

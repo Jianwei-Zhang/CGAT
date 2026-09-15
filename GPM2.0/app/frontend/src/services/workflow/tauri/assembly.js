@@ -226,7 +226,7 @@ async function getJunctionInspectionTauri({
   leftAssemblyCtgId,
   rightAssemblyCtgId,
   minAlignmentLength = null,
-  minMapq = null,
+  minIdentityPct = null,
 }) {
   return invokeCommand("get_junction_inspection", {
     workspaceRoot,
@@ -234,7 +234,7 @@ async function getJunctionInspectionTauri({
     leftAssemblyCtgId,
     rightAssemblyCtgId,
     minAlignmentLength,
-    minMapq,
+    minIdentityPct,
   });
 }
 
@@ -244,7 +244,7 @@ async function getTrackPairwiseEvidenceTauri({
   topAssemblyCtgIds,
   bottomAssemblyCtgIds,
   minAlignmentLength = null,
-  minMapq = null,
+  minIdentityPct = null,
 }) {
   return invokeCommand("get_track_pairwise_evidence", {
     workspaceRoot,
@@ -252,7 +252,7 @@ async function getTrackPairwiseEvidenceTauri({
     topAssemblyCtgIds,
     bottomAssemblyCtgIds,
     minAlignmentLength,
-    minMapq,
+    minIdentityPct,
   });
 }
 

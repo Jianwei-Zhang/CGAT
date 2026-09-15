@@ -48,15 +48,16 @@ export function createSubviewSelectionController({
 
   function inheritSubviewTrackViewFromMainTrack(assembly) {
     const mainTrackPrefs = resolveTrackPrefs(assembly?.trackView);
+    const { mapq: _legacyMapq, ...previousSubviewTrackView } = assembly?.subviewTrackView || {};
     return {
-      ...(assembly?.subviewTrackView || {}),
+      ...previousSubviewTrackView,
       supportDsCtgLen: mainTrackPrefs.supportDsCtgLen,
       minTickUnitKb: mainTrackPrefs.minTickUnitKb,
       minTickKb: mainTrackPrefs.minTickUnitKb,
       maxTickCount: mainTrackPrefs.maxTickCount,
       alignmentLength: mainTrackPrefs.alignmentLength,
       block_length: mainTrackPrefs.alignmentLength,
-      mapq: mainTrackPrefs.mapq,
+      minIdentityPct: mainTrackPrefs.minIdentityPct,
     };
   }
 

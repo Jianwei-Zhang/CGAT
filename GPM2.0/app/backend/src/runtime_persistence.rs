@@ -690,12 +690,12 @@ mod tests {
             &UpdateProjectAssemblyViewStateParams {
                 project_id: 1,
                 support_dataset_id: Some(22),
-                track_view_json: r#"{"supportDsCtgLen":10000,"minTickUnitKb":250,"maxTickCount":15,"alignmentLength":10000,"mapq":30}"#.to_string(),
+                track_view_json: r#"{"supportDsCtgLen":10000,"minTickUnitKb":250,"maxTickCount":15,"alignmentLength":10000,"minIdentityPct":95}"#.to_string(),
                 support_ds_ctg_len_rules_by_chr_json:
                     r#"{"Chr01":[{"startBp":1,"endBp":5000000,"supportDsCtgLen":100000}]}"#
                         .to_string(),
                 track_scroll_state_json:
-                    r#"{"viewportKey":"1:chr1:1909:22:10000:250:15:10000:30","scrollLeft":320}"#
+                    r#"{"viewportKey":"1:chr1:1909:22:10000:250:15:10000:95","scrollLeft":320}"#
                         .to_string(),
                 subview_track_scroll_state_json:
                     r#"{"viewportKey":"1:chr1:primary:1909:support:1910","scrollLeft":180}"#
@@ -724,7 +724,7 @@ mod tests {
         assert_eq!(updated.support_dataset_id, Some(22));
         assert_eq!(
             updated.track_view_json,
-            r#"{"supportDsCtgLen":10000,"minTickUnitKb":250,"maxTickCount":15,"alignmentLength":10000,"mapq":30}"#,
+            r#"{"supportDsCtgLen":10000,"minTickUnitKb":250,"maxTickCount":15,"alignmentLength":10000,"minIdentityPct":95}"#,
         );
         assert_eq!(
             updated.support_ds_ctg_len_rules_by_chr_json,
@@ -732,7 +732,7 @@ mod tests {
         );
         assert_eq!(
             updated.track_scroll_state_json,
-            r#"{"viewportKey":"1:chr1:1909:22:10000:250:15:10000:30","scrollLeft":320}"#,
+            r#"{"viewportKey":"1:chr1:1909:22:10000:250:15:10000:95","scrollLeft":320}"#,
         );
         assert_eq!(
             updated.subview_track_scroll_state_json,
@@ -774,11 +774,11 @@ mod tests {
         assert_eq!(reloaded_project_one.support_dataset_id, Some(22));
         assert_eq!(
             reloaded_project_one.track_view_json,
-            r#"{"supportDsCtgLen":10000,"minTickUnitKb":250,"maxTickCount":15,"alignmentLength":10000,"mapq":30}"#,
+            r#"{"supportDsCtgLen":10000,"minTickUnitKb":250,"maxTickCount":15,"alignmentLength":10000,"minIdentityPct":95}"#,
         );
         assert_eq!(
             reloaded_project_one.track_scroll_state_json,
-            r#"{"viewportKey":"1:chr1:1909:22:10000:250:15:10000:30","scrollLeft":320}"#,
+            r#"{"viewportKey":"1:chr1:1909:22:10000:250:15:10000:95","scrollLeft":320}"#,
         );
         assert_eq!(
             reloaded_project_one.subview_track_scroll_state_json,

@@ -1435,7 +1435,7 @@ test("bindings persist main-track view changes after committing a main control i
     tickBp: 10000,
     alignmentLength: 1000,
     block_length: 1000,
-    mapq: 0,
+    minIdentityPct: 0,
   });
   assert.deepEqual(persisted, [
     {
@@ -1450,7 +1450,7 @@ test("bindings persist main-track view changes after committing a main control i
       tickBp: 10000,
       alignmentLength: 1000,
       block_length: 1000,
-      mapq: 0,
+      minIdentityPct: 0,
     },
   ]);
 });
@@ -2019,7 +2019,7 @@ test("bindings update final-path track prefs without persisting main-track view 
     tickBp: 10000,
     alignmentLength: 10000,
     block_length: 10000,
-    mapq: 0,
+    minIdentityPct: 0,
   });
   assert.deepEqual(store.getState().assembly.finalPathTrackScrollState, {
     viewportKey: "7:Chr01:graph:500:10",

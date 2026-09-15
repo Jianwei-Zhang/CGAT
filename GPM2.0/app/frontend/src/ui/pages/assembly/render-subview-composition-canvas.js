@@ -7,7 +7,7 @@ import { buildSubviewGrtAnchorScene } from "./subview-grt-anchor-state.js";
 import { buildGrtResultScene } from "./grt-result-render.js";
 import {
   renderSubviewVirtualRuler,
-  resolveHitMapq,
+  resolveHitIdentityPct,
   resolveSubviewRulerGeometry,
   resolveSubviewWorldStartBp,
   sortTrackEntriesForRender,
@@ -105,7 +105,10 @@ function buildEvidenceBands(layout, evidence, prefs) {
     .map((member) => [member.assemblyCtgId, member]));
   return (Array.isArray(evidence?.hits) ? evidence.hits : []).map((hit, index) => {
     const length = normalizePositiveInt(hit?.alignLength ?? hit?.align_length) ?? 0;
-    if (length < prefs.alignmentLength || resolveHitMapq(hit) < prefs.mapq) return null;
+    if (
+      length < prefs.alignmentLength
+      || resolveHitIdentityPct(hit) < prefs.minIdentityPct
+    ) return null;
     const queryId = normalizeSupportDatasetId(hit?.queryAssemblyCtgId ?? hit?.query_assembly_ctg_id);
     const subjectId = normalizeSupportDatasetId(hit?.subjectAssemblyCtgId ?? hit?.subject_assembly_ctg_id);
     let top = topById.get(queryId);
@@ -157,7 +160,10 @@ function buildReferenceBands(layout, candidates, prefs) {
       if (!candidate || !Number.isFinite(referenceStart) || !Number.isFinite(referenceEnd)) continue;
       for (const [index, hit] of (Array.isArray(candidate.ctg?.hits) ? candidate.ctg.hits : []).entries()) {
         const length = normalizePositiveInt(hit?.blockLength ?? hit?.block_length) ?? 0;
-        if (length < prefs.alignmentLength || resolveHitMapq(hit) < prefs.mapq) continue;
+        if (
+          length < prefs.alignmentLength
+          || resolveHitIdentityPct(hit) < prefs.minIdentityPct
+        ) continue;
         const rawRefStart = hitField(hit, "refStart", "ref_start");
         const rawRefEnd = hitField(hit, "refEnd", "ref_end");
         const ctgStart = hitField(hit, "ctgStart", "ctg_start");

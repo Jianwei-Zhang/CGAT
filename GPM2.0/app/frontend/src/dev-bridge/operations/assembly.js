@@ -91,7 +91,7 @@ async function listReferenceTrackMembers(payload) {
     }
 
     const hitMatch = line.match(
-      /^hit member_order=(\d+) hit_id=(\d+) dataset_id=(\d+) source_seq_id=(\d+) strand=(\S+) query_start=(\d+) query_end=(\d+) ref_start=(\d+) ref_end=(\d+) block_length=(\d+) mapq=(\d+) ctg_start=(\d+) ctg_end=(\d+)$/,
+      /^hit member_order=(\d+) hit_id=(\d+) dataset_id=(\d+) source_seq_id=(\d+) strand=(\S+) query_start=(\d+) query_end=(\d+) ref_start=(\d+) ref_end=(\d+) block_length=(\d+) identity_pct=([0-9.]+) mapq=(\d+) ctg_start=(\d+) ctg_end=(\d+)$/,
     );
     if (!hitMatch) {
       continue;
@@ -110,9 +110,10 @@ async function listReferenceTrackMembers(payload) {
       refStart: Number(hitMatch[8]),
       refEnd: Number(hitMatch[9]),
       blockLength: Number(hitMatch[10]),
-      mapq: Number(hitMatch[11]),
-      ctgStart: Number(hitMatch[12]),
-      ctgEnd: Number(hitMatch[13]),
+      identityPct: Number(hitMatch[11]),
+      mapq: Number(hitMatch[12]),
+      ctgStart: Number(hitMatch[13]),
+      ctgEnd: Number(hitMatch[14]),
     });
   }
 

@@ -29,7 +29,7 @@ export function buildMainTrackViewportKey(state) {
     prefs.minTickUnitKb,
     prefs.maxTickCount,
     prefs.alignmentLength,
-    prefs.mapq,
+    prefs.minIdentityPct,
   ].join(":");
 }
 

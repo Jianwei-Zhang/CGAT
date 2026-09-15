@@ -9,15 +9,15 @@ import {
 } from "../track-prefs.js";
 
 test("manual track inputs accept only safe decimal integers within the field range", () => {
-  for (const field of ["minTickUnitKb", "maxTickCount", "alignmentLength", "supportDsCtgLen", "mapq"]) {
+  for (const field of ["minTickUnitKb", "maxTickCount", "alignmentLength", "supportDsCtgLen", "minIdentityPct"]) {
     for (const invalid of ["", " ", " 1", "1 ", "-1", "+1", "1.5", "1e2", "0x10", "12bp", "１２", "9007199254740992"]) {
       assert.equal(normalizeTrackPrefInputValue(field, invalid), null, `${field}: ${invalid}`);
     }
     assert.equal(normalizeTrackPrefInputValue(field, "0012"), 12);
-    assert.equal(normalizeTrackPrefInputValue(field, "0"), ["supportDsCtgLen", "mapq"].includes(field) ? 0 : null);
+    assert.equal(normalizeTrackPrefInputValue(field, "0"), ["supportDsCtgLen", "minIdentityPct"].includes(field) ? 0 : null);
   }
-  assert.equal(normalizeTrackPrefInputValue("mapq", "255"), 255);
-  assert.equal(normalizeTrackPrefInputValue("mapq", "256"), null);
+  assert.equal(normalizeTrackPrefInputValue("minIdentityPct", "100"), 100);
+  assert.equal(normalizeTrackPrefInputValue("minIdentityPct", "101"), null);
   assert.equal(normalizeTrackPrefInputValue("alignmentLength", String(Number.MAX_SAFE_INTEGER)), Number.MAX_SAFE_INTEGER);
 });
 
@@ -34,7 +34,7 @@ test("resolveTrackPrefs returns v1 discrete defaults", () => {
     tickBp: 10000,
     alignmentLength: 10000,
     block_length: 10000,
-    mapq: 0,
+    minIdentityPct: 0,
   });
 });
 
@@ -66,7 +66,7 @@ test("resolveTrackPrefs keeps positive integers for new v1 track fields", () => 
       tickBp: 100000,
       alignmentLength: 6500,
       block_length: 6500,
-      mapq: 0,
+      minIdentityPct: 0,
     },
   );
 });
@@ -112,16 +112,18 @@ test("resolveTrackPrefs falls back to defaults for invalid and non-positive valu
       tickBp: 10000,
       alignmentLength: 10000,
       block_length: 10000,
-      mapq: 0,
+      minIdentityPct: 0,
     },
   );
 });
 
-test("resolveTrackPrefs keeps free non-negative MAPQ input with default 0", () => {
-  assert.equal(resolveTrackPrefs({ mapq: 0 }).mapq, 0);
-  assert.equal(resolveTrackPrefs({ mapq: 31 }).mapq, 31);
-  assert.equal(resolveTrackPrefs({ mapq: 77 }).mapq, 77);
-  assert.equal(resolveTrackPrefs({ mapq: -5 }).mapq, 0);
+test("resolveTrackPrefs keeps identity percent within 0..100 and ignores legacy MAPQ", () => {
+  assert.equal(resolveTrackPrefs({ minIdentityPct: 0 }).minIdentityPct, 0);
+  assert.equal(resolveTrackPrefs({ minIdentityPct: 95 }).minIdentityPct, 95);
+  assert.equal(resolveTrackPrefs({ minIdentityPct: 97 }).minIdentityPct, 97);
+  assert.equal(resolveTrackPrefs({ minIdentityPct: 101 }).minIdentityPct, 100);
+  assert.equal(resolveTrackPrefs({ minIdentityPct: -5 }).minIdentityPct, 0);
+  assert.equal(resolveTrackPrefs({ mapq: 77 }).minIdentityPct, 0);
 });
 
 test("resolveTrackPrefs keeps free non-negative support ds ctg length input with default 0", () => {

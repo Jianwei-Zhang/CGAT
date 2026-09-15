@@ -187,7 +187,7 @@ test("reject invalid typing and paste as whole tokens, including fallback input 
 });
 
 test("empty, unsafe and range-invalid drafts stay uncommitted and restore on explicit submission", () => {
-  for (const [field, invalid] of [["alignmentLength", ""], ["maxTickCount", "0"], ["mapq", "256"], ["minTickUnitKb", "9007199254740992"]]) {
+  for (const [field, invalid] of [["alignmentLength", ""], ["maxTickCount", "0"], ["minIdentityPct", "101"], ["minTickUnitKb", "9007199254740992"]]) {
     const h = setup({ field, initial: 10 }); h.input.focus(); h.edit(invalid);
     h.clock.tick(2000); assert.deepEqual(h.commits, []);
     assert.equal(h.input.attributes["aria-invalid"], "true");

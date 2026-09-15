@@ -58,7 +58,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
                 );
                 for hit in item.hits {
                     println!(
-                        "hit member_order={} hit_id={} dataset_id={} source_seq_id={} strand={} query_start={} query_end={} ref_start={} ref_end={} block_length={} mapq={} ctg_start={} ctg_end={}",
+                        "hit member_order={} hit_id={} dataset_id={} source_seq_id={} strand={} query_start={} query_end={} ref_start={} ref_end={} block_length={} identity_pct={:.6} mapq={} ctg_start={} ctg_end={}",
                         item.segment_order,
                         hit.hit_id,
                         hit.dataset_id,
@@ -69,6 +69,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
                         hit.ref_start,
                         hit.ref_end,
                         hit.block_length,
+                        hit.identity_pct,
                         hit.mapq,
                         hit.ctg_start,
                         hit.ctg_end

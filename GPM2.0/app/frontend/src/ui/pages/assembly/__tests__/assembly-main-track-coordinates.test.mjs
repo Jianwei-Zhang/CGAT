@@ -93,7 +93,7 @@ test("assembly main view renders chr-length reference span, all guides, sparse r
   assert.equal(bandCount, 1);
 });
 
-test("main-view history controls stay grouped after MAPQ and expose independent disabled states", () => {
+test("main-view history controls stay grouped after Identity and expose independent disabled states", () => {
   const html = renderAssemblyPage(
     createState({
       assembly: {
@@ -123,9 +123,9 @@ test("main-view history controls stay grouped after MAPQ and expose independent 
     }),
   );
 
-  const mapqIndex = html.indexOf("assembly-track-mapq");
+  const identityIndex = html.indexOf("assembly-track-identity-pct");
   const historyIndex = html.indexOf("main-view-history-controls");
-  assert.ok(mapqIndex >= 0 && historyIndex > mapqIndex);
+  assert.ok(identityIndex >= 0 && historyIndex > identityIndex);
   assert.match(html, /data-main-history-action="undo"[^>]*title="回退：删除 3 个 ctg"/);
   assert.match(html, /data-main-history-action="redo"[^>]*disabled/);
   assert.match(html, /data-main-history-action="reset"[^>]*title="重置：撤销 Chr01 当前 4 项可逆编辑"/);

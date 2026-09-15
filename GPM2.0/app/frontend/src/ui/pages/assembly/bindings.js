@@ -311,8 +311,8 @@ function resolveTrackPrefValue(trackPrefs, field) {
   if (field === "maxTickCount") {
     return trackPrefs.maxTickCount;
   }
-  if (field === "mapq") {
-    return trackPrefs.mapq;
+  if (field === "minIdentityPct") {
+    return trackPrefs.minIdentityPct;
   }
   return trackPrefs.alignmentLength;
 }
@@ -525,12 +525,12 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   const trackSupportDsCtgLenInput = queryHost("#assembly-track-support-ds-ctg-len");
   const trackMaxTickCountInput = queryHost("#assembly-track-max-tick-count");
   const trackAlignmentLengthInput = queryHost("#assembly-track-alignment-length");
-  const trackMapqInput = queryHost("#assembly-track-mapq");
+  const trackIdentityInput = queryHost("#assembly-track-identity-pct");
   const createPhasedTrackButton = queryHost("[data-create-phased-track='1']");
   const subviewTrackMinTickUnitKbInput = queryHost("#subview-track-min-tick-unit-kb");
   const subviewTrackMaxTickCountInput = queryHost("#subview-track-max-tick-count");
   const subviewTrackAlignmentLengthInput = queryHost("#subview-track-alignment-length");
-  const subviewTrackMapqInput = queryHost("#subview-track-mapq");
+  const subviewTrackIdentityInput = queryHost("#subview-track-identity-pct");
   const finalPathTrackMinTickUnitKbInput = queryHost("#final-path-track-min-tick-unit-kb");
   const finalPathTrackMaxTickCountInput = queryHost("#final-path-track-max-tick-count");
   const membersCardToggleButton = queryHost("[data-members-card-toggle='1']");
@@ -1473,7 +1473,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     }
     if (
       viewKey === "subviewTrackView"
-      && (field === "alignmentLength" || field === "mapq")
+      && (field === "alignmentLength" || field === "minIdentityPct")
       && shouldRefetchSubviewPairwiseEvidence({
         summary: current?.subview?.summary,
         trackPrefs: nextPrefs,
@@ -1497,7 +1497,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     commitTrackComboInput("minTickUnitKb", trackMinTickUnitKbInput, "trackView");
     commitTrackComboInput("maxTickCount", trackMaxTickCountInput, "trackView");
     commitTrackComboInput("alignmentLength", trackAlignmentLengthInput, "trackView");
-    commitTrackComboInput("mapq", trackMapqInput, "trackView");
+    commitTrackComboInput("minIdentityPct", trackIdentityInput, "trackView");
   };
 
   const bindTrackNumberInput = (field, inputElement, viewKey = "trackView") => {
@@ -1533,11 +1533,11 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   bindTrackNumberInput("minTickUnitKb", trackMinTickUnitKbInput, "trackView");
   bindTrackNumberInput("maxTickCount", trackMaxTickCountInput, "trackView");
   bindTrackNumberInput("alignmentLength", trackAlignmentLengthInput, "trackView");
-  bindTrackNumberInput("mapq", trackMapqInput, "trackView");
+  bindTrackNumberInput("minIdentityPct", trackIdentityInput, "trackView");
   bindTrackNumberInput("minTickUnitKb", subviewTrackMinTickUnitKbInput, "subviewTrackView");
   bindTrackNumberInput("maxTickCount", subviewTrackMaxTickCountInput, "subviewTrackView");
   bindTrackNumberInput("alignmentLength", subviewTrackAlignmentLengthInput, "subviewTrackView");
-  bindTrackNumberInput("mapq", subviewTrackMapqInput, "subviewTrackView");
+  bindTrackNumberInput("minIdentityPct", subviewTrackIdentityInput, "subviewTrackView");
   bindTrackNumberInput("minTickUnitKb", finalPathTrackMinTickUnitKbInput, "finalPathTrackView");
   bindTrackNumberInput("maxTickCount", finalPathTrackMaxTickCountInput, "finalPathTrackView");
   supportDatasetSelect?.addEventListener("change", async () => {

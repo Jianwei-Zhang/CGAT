@@ -33,12 +33,12 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   assert.match(html, /最小刻度单位\(kb\)/);
   assert.match(html, /最多可展示数/);
   assert.match(html, /比对长度\(bp\)/);
-  assert.match(html, /MAPQ/);
+  assert.match(html, /一致性\(%\)/);
   assert.ok(html.indexOf("辅 ds") < html.indexOf("辅ds_ctg_len"));
   assert.ok(html.indexOf("辅ds_ctg_len") < html.indexOf("最小刻度单位"));
   assert.ok(html.indexOf("最小刻度单位") < html.indexOf("最多可展示数"));
   assert.ok(html.indexOf("最多可展示数") < html.indexOf("比对长度"));
-  assert.ok(html.indexOf("比对长度") < html.indexOf("MAPQ"));
+  assert.ok(html.indexOf("比对长度") < html.indexOf("一致性"));
 
   assert.match(
     html,
@@ -106,25 +106,25 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   assert.match(html, /data-track-combo-value="100000"/);
   assert.match(
     html,
-    /<div class="assembly-track-combo" data-track-combo-field="mapq">/,
+    /<div class="assembly-track-combo" data-track-combo-field="minIdentityPct">/,
   );
   assert.match(
     html,
-    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开MAPQ候选值" aria-expanded="false" aria-controls="assembly-track-mapq-menu">/,
+    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开一致性\(%\)候选值" aria-expanded="false" aria-controls="assembly-track-identity-pct-menu">/,
   );
-  assert.match(html, /<div id="assembly-track-mapq-menu" class="assembly-track-combo-menu is-hidden" role="listbox">/);
+  assert.match(html, /<div id="assembly-track-identity-pct-menu" class="assembly-track-combo-menu is-hidden" role="listbox">/);
   assert.match(
     html,
-    /<input\s+id="assembly-track-mapq"\s+class="assembly-track-combo-input"\s+type="text"\s+inputmode="numeric"\s+pattern="\[0-9\]\*"\s+value="0"\s+autocomplete="off"[^>]*>/,
+    /<input\s+id="assembly-track-identity-pct"\s+class="assembly-track-combo-input"\s+type="text"\s+inputmode="numeric"\s+pattern="\[0-9\]\*"\s+value="0"\s+autocomplete="off"[^>]*>/,
   );
   assert.match(html, /data-track-combo-value="0"/);
-  assert.match(html, /data-track-combo-value="30"/);
-  assert.match(html, /data-track-combo-value="60"/);
   assert.match(html, /data-track-combo-value="90"/);
+  assert.match(html, /data-track-combo-value="95"/);
+  assert.match(html, /data-track-combo-value="99"/);
   assert.doesNotMatch(html, /<datalist id="assembly-track-min-tick-unit-kb-options">/);
   assert.doesNotMatch(html, /<datalist id="assembly-track-max-tick-count-options">/);
   assert.doesNotMatch(html, /<datalist id="assembly-track-alignment-length-options">/);
-  assert.doesNotMatch(html, /<datalist id="assembly-track-mapq-options">/);
+  assert.doesNotMatch(html, /<datalist id="assembly-track-identity-pct-options">/);
   assert.doesNotMatch(html, /<datalist id="assembly-track-support-ds-ctg-len-options">/);
 });
 
@@ -143,7 +143,7 @@ test("support ds ctg len rules dialog renders close in header and actions in foo
           minTickUnitKb: 10000,
           maxTickCount: 10,
           alignmentLength: 1000,
-          mapq: 0,
+          minIdentityPct: 0,
           supportDsCtgLen: 0,
         },
       },
@@ -308,7 +308,7 @@ test("subview selection panel hides history controls before a pair enters", () =
   assert.doesNotMatch(html, /data-subview-action="history-reset"/);
 });
 
-test("subview history controls follow MAPQ as one icon group and disable unavailable actions", () => {
+test("subview history controls follow Identity as one icon group and disable unavailable actions", () => {
   const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
@@ -334,12 +334,12 @@ test("subview history controls follow MAPQ as one icon group and disable unavail
   });
   let assembly = activateSubviewHistory(state.assembly, { now: 0 }).assembly;
   let html = renderAssemblyPage({ ...state, assembly });
-  const initialMapqIndex = html.indexOf('id="subview-track-mapq"');
+  const initialIdentityIndex = html.indexOf('id="subview-track-identity-pct"');
   const initialHistoryIndex = html.indexOf('class="subview-history-controls"');
   const initialLeftIndex = html.indexOf('data-subview-action="history-rollback"');
   const initialRightIndex = html.indexOf('data-subview-action="history-restore-rollback"');
   const initialResetIndex = html.indexOf('data-subview-action="history-reset"');
-  assert.ok(initialMapqIndex >= 0 && initialHistoryIndex > initialMapqIndex);
+  assert.ok(initialIdentityIndex >= 0 && initialHistoryIndex > initialIdentityIndex);
   assert.ok(initialLeftIndex >= 0 && initialRightIndex > initialLeftIndex && initialResetIndex > initialRightIndex);
   assert.match(html, /data-subview-action="history-rollback"[^>]*disabled[^>]*><svg class="subview-history-icon subview-history-arrow-icon"[^>]*>[\s\S]*<\/svg><\/button>/);
   assert.match(html, /data-subview-action="history-restore-rollback"[^>]*aria-label="暂无可撤销的回退操作"[^>]*disabled[^>]*><svg class="subview-history-icon subview-history-arrow-icon"[^>]*>[\s\S]*<\/svg><\/button>/);
@@ -1041,7 +1041,7 @@ test("max-scale main track keeps svg width equal to inner width even with a righ
           minTickUnitKb: 10_000,
           maxTickCount: 10,
           alignmentLength: 1000,
-          mapq: 0,
+          minIdentityPct: 0,
         },
         chrCtgs: [
           {
@@ -1158,7 +1158,7 @@ test("companion collinearity band ctg edge stays within the rendered ctg bar aft
   );
 });
 
-test("mapq threshold filters out low-quality collinearity hits", () => {
+test("identity threshold filters out low-identity collinearity hits", () => {
   const html = renderAssemblyPage(
     createState({
       assembly: {
@@ -1166,7 +1166,7 @@ test("mapq threshold filters out low-quality collinearity hits", () => {
           minTickUnitKb: 500,
           maxTickCount: 10,
           alignmentLength: 1000,
-          mapq: 60,
+          minIdentityPct: 90,
         },
         chrCtgs: [
           {
@@ -1183,7 +1183,7 @@ test("mapq threshold filters out low-quality collinearity hits", () => {
         supportChrCtgs: [
           {
             assemblyCtgId: 30,
-            name: "support-mapq",
+            name: "support-identity",
             assignedChrName: "Chr01",
             memberCount: 1,
             totalLength: 2000,
@@ -1195,7 +1195,8 @@ test("mapq threshold filters out low-quality collinearity hits", () => {
                 refStart: 100,
                 refEnd: 900,
                 blockLength: 1200,
-                mapq: 30,
+                mapq: 60,
+                identityPct: 89,
               },
               {
                 ctgStart: 900,
@@ -1203,7 +1204,8 @@ test("mapq threshold filters out low-quality collinearity hits", () => {
                 refStart: 1000,
                 refEnd: 1900,
                 blockLength: 1200,
-                mapq: 60,
+                mapq: 30,
+                identityPct: 95,
               },
             ],
           },
@@ -1229,7 +1231,7 @@ test("mapq threshold filters out low-quality collinearity hits", () => {
   assert.equal(scene.bands.length, 1);
 });
 
-test("mapq input displays manual non-negative value without snapping to presets", () => {
+test("identity input displays manual percent value without snapping to presets", () => {
   const html = renderAssemblyPage(
     createState({
       assembly: {
@@ -1237,14 +1239,14 @@ test("mapq input displays manual non-negative value without snapping to presets"
           minTickUnitKb: 500,
           maxTickCount: 10,
           alignmentLength: 1000,
-          mapq: 77,
+          minIdentityPct: 97,
         },
       },
     }),
   );
   assert.match(
     html,
-    /<input\s+id="assembly-track-mapq"\s+class="assembly-track-combo-input"\s+type="text"\s+inputmode="numeric"\s+pattern="\[0-9\]\*"\s+value="77"\s+autocomplete="off"[^>]*>/,
+    /<input\s+id="assembly-track-identity-pct"\s+class="assembly-track-combo-input"\s+type="text"\s+inputmode="numeric"\s+pattern="\[0-9\]\*"\s+value="97"\s+autocomplete="off"[^>]*>/,
   );
 });
 
@@ -1353,7 +1355,7 @@ test("support dataset selection persists project-scoped main track view state", 
           minTickUnitKb: 250,
           maxTickCount: 15,
           alignmentLength: 10000,
-          mapq: 30,
+          minIdentityPct: 95,
         },
       },
     }),
@@ -1379,7 +1381,7 @@ test("support dataset selection persists project-scoped main track view state", 
         minTickUnitKb: 250,
         maxTickCount: 15,
         alignmentLength: 10000,
-        mapq: 30,
+        minIdentityPct: 95,
       },
       supportMirroredCtgs: [],
       hiddenPrimaryCtgIds: [],

@@ -1,7 +1,7 @@
 import { buildDualTrackModel } from "./track-layout.js";
 import {
   ALIGNMENT_LENGTH_OPTIONS,
-  MAPQ_OPTIONS,
+  IDENTITY_PCT_OPTIONS,
   MAX_TICK_COUNT_OPTIONS,
   MIN_TICK_UNIT_KB_OPTIONS,
   normalizeNonNegativeInt,
@@ -72,7 +72,7 @@ import {
   buildTrackTickItems,
   isTrackTickLabelOverlap,
   renderSubviewVirtualRuler,
-  resolveHitMapq,
+  resolveHitIdentityPct,
   resolveMaxTrackEndBp,
   resolveSubviewRulerGeometry,
   resolveSubviewWorldStartBp,
@@ -440,7 +440,7 @@ function buildSubviewPairwiseRenderableHits({
   topCtg,
   bottomCtg,
   blockLength,
-  minMapq,
+  minIdentityPct,
 }) {
   if (normalizeSupportDatasetId(topSelection?.contigId) === normalizeSupportDatasetId(bottomSelection?.contigId)) {
     return { topHits: [], bottomHits: [] };
@@ -452,8 +452,8 @@ function buildSubviewPairwiseRenderableHits({
   const hits = Array.isArray(evidence?.hits) ? evidence.hits : [];
   hits.forEach((hit, index) => {
     const alignLength = normalizePositiveInt(hit?.alignLength ?? hit?.align_length) ?? 0;
-    const mapq = Math.max(0, normalizeNonNegativeInt(hit?.mapq ?? hit?.mapQ) ?? 0);
-    if (alignLength < blockLength || mapq < minMapq) {
+    const identityPct = resolveHitIdentityPct(hit);
+    if (alignLength < blockLength || identityPct < minIdentityPct) {
       return;
     }
     const ranges = resolvePairwiseHitTrackRanges(hit, topSelection, bottomSelection);
@@ -904,13 +904,13 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
     value: trackPrefs?.alignmentLength,
     options: ALIGNMENT_LENGTH_OPTIONS,
   });
-  const mapqInput = renderTrackNumberInput({
-    field: "mapq",
-    id: "subview-track-mapq",
-    label: i18n.trackControls.mapq,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.mapq),
-    value: trackPrefs?.mapq,
-    options: MAPQ_OPTIONS,
+  const identityInput = renderTrackNumberInput({
+    field: "minIdentityPct",
+    id: "subview-track-identity-pct",
+    label: i18n.trackControls.identityPct,
+    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.identityPct),
+    value: trackPrefs?.minIdentityPct,
+    options: IDENTITY_PCT_OPTIONS,
     allowZero: true,
   });
   return `
@@ -929,8 +929,8 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
         ${alignmentInput}
       </label>
       <label class="assembly-track-inline-field">
-        <span>${escapeHtml(i18n.trackControls.mapq)}</span>
-        ${mapqInput}
+        <span>${escapeHtml(i18n.trackControls.identityPct)}</span>
+        ${identityInput}
       </label>
       ${renderSubviewHistoryControls(history, i18n)}
     </div>
@@ -1490,7 +1490,10 @@ function renderSubviewAlignmentCard(
   }
   const resolvedTrackPrefs = resolveTrackPrefs(trackPrefs || {});
   const blockLength = Math.max(1, normalizePositiveInt(resolvedTrackPrefs.alignmentLength) ?? 1);
-  const minMapq = Math.max(0, normalizeNonNegativeInt(resolvedTrackPrefs.mapq) ?? 0);
+  const minIdentityPct = Math.max(
+    0,
+    Math.min(100, normalizeNonNegativeInt(resolvedTrackPrefs.minIdentityPct) ?? 0),
+  );
   const activeAnchorHitKeys = new Set(
     (Array.isArray(subview?.activeAnchors) ? subview.activeAnchors : [])
       .map((entry) => String(entry?.hitKey || "").trim())
@@ -1498,12 +1501,12 @@ function renderSubviewAlignmentCard(
   );
   const topHits = collectSubviewRenderableHits(topCtg, {
     blockLength,
-    minMapq,
+    minIdentityPct,
     preserveHitKeys: activeAnchorHitKeys,
   });
   const bottomHits = collectSubviewRenderableHits(bottomCtg, {
     blockLength,
-    minMapq,
+    minIdentityPct,
     preserveHitKeys: activeAnchorHitKeys,
   });
   const usesRefProjection =
@@ -1522,7 +1525,7 @@ function renderSubviewAlignmentCard(
       topCtg,
       bottomCtg,
       blockLength,
-      minMapq,
+      minIdentityPct,
     })
     : null;
   const resolvedTopHits = pairwiseEvidenceState.enabled
@@ -1567,7 +1570,7 @@ function renderSubviewAlignmentCard(
     buildSubviewRefCacheSelectionKey(summary),
     normalizeSupportDatasetId(resolveSubviewRefDatasetId(subview, supportContext)) || 0,
     normalizePositiveInt(resolvedTrackPrefs.alignmentLength) || 0,
-    normalizeNonNegativeInt(resolvedTrackPrefs.mapq) || 0,
+    normalizeNonNegativeInt(resolvedTrackPrefs.minIdentityPct) || 0,
   ].join("|");
   const svgModel = buildSubviewAlignmentSvgModel({
     topCtg,
@@ -2248,12 +2251,15 @@ function renderSubviewTrackPairAlignmentCard(
   const renderMaxX = Math.ceil(Math.max(baseInnerWidth, maxRectRight, maxLabelRight));
   const renderInnerWidth = Math.max(baseInnerWidth, renderMaxX - renderViewBoxMinX);
   const blockLength = Math.max(1, normalizePositiveInt(resolvedTrackPrefs.alignmentLength) ?? 1);
-  const minMapq = Math.max(0, normalizeNonNegativeInt(resolvedTrackPrefs.mapq) ?? 0);
+  const minIdentityPct = Math.max(
+    0,
+    Math.min(100, normalizeNonNegativeInt(resolvedTrackPrefs.minIdentityPct) ?? 0),
+  );
   const refPairCacheKey = [
     buildSubviewRefCacheSelectionKey(summary),
     normalizeSupportDatasetId(resolveSubviewRefDatasetId(subview, supportContext)) || 0,
     normalizePositiveInt(resolvedTrackPrefs.alignmentLength) || 0,
-    normalizeNonNegativeInt(resolvedTrackPrefs.mapq) || 0,
+    normalizeNonNegativeInt(resolvedTrackPrefs.minIdentityPct) || 0,
   ].join("|");
   const buildSegmentsForLayout = (layout) =>
     (layout.trackModel?.ctgs || []).flatMap((ctg, index) => {
@@ -2270,7 +2276,7 @@ function renderSubviewTrackPairAlignmentCard(
         phasedTrackItemId: ctg?.phasedTrackItemId ?? ctg?.itemId,
         phasedHaplotypeKey: ctg?.phasedHaplotypeKey ?? layout.haplotypeKey,
       });
-      return collectSubviewRenderableHits(ctg, { blockLength, minMapq }).map((hit) => {
+      return collectSubviewRenderableHits(ctg, { blockLength, minIdentityPct }).map((hit) => {
         const hitRect = buildTrackHitRectWithinCtgDisplay({
           ctgRect: rect,
           ctgLengthBp: ctg.lengthBp,
@@ -2419,8 +2425,8 @@ function renderSubviewTrackPairAlignmentCard(
     };
     hits.forEach((hit, index) => {
       const alignLength = normalizePositiveInt(hit?.alignLength ?? hit?.align_length) ?? 0;
-      const mapq = Math.max(0, normalizeNonNegativeInt(hit?.mapq ?? hit?.mapQ) ?? 0);
-      if (alignLength < blockLength || mapq < minMapq) {
+      const identityPct = resolveHitIdentityPct(hit);
+      if (alignLength < blockLength || identityPct < minIdentityPct) {
         return;
       }
       const queryAssemblyCtgId = normalizeSupportDatasetId(
@@ -3096,13 +3102,13 @@ function renderSubviewTrackPairAlignmentCard(
   `;
 }
 
-function collectSubviewRenderableHits(ctg, { blockLength, minMapq, preserveHitKeys = null }) {
+function collectSubviewRenderableHits(ctg, { blockLength, minIdentityPct, preserveHitKeys = null }) {
   const hits = Array.isArray(ctg?.hits) ? ctg.hits : [];
   const preserved = preserveHitKeys instanceof Set ? preserveHitKeys : new Set(preserveHitKeys || []);
   return hits
     .map((hit, index) => {
       const hitBlockLength = normalizePositiveInt(hit?.blockLength ?? hit?.block_length) ?? 0;
-      const hitMapq = resolveHitMapq(hit);
+      const hitIdentityPct = resolveHitIdentityPct(hit);
       const refStart = Number(hit?.refStart ?? hit?.ref_start);
       const refEnd = Number(hit?.refEnd ?? hit?.ref_end);
       const ctgStart = Number(
@@ -3123,7 +3129,7 @@ function collectSubviewRenderableHits(ctg, { blockLength, minMapq, preserveHitKe
       );
       if (
         (!preserved.has(`hit-${index + 1}`) && hitBlockLength < blockLength) ||
-        (!preserved.has(`hit-${index + 1}`) && hitMapq < minMapq)
+        (!preserved.has(`hit-${index + 1}`) && hitIdentityPct < minIdentityPct)
       ) {
         return null;
       }

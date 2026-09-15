@@ -191,7 +191,7 @@ test("renders accepted MUMmer and local minimap2 evidence as distinct passive ba
   assert.match(scene.junctionMarkup, /data-grt-display-evidence-source-entry-key="top"/);
   assert.match(scene.junctionMarkup, /data-grt-display-evidence-target-entry-key="bottom"/);
   assert.match(scene.junctionMarkup, /class="grt-display-evidence-band is-minimap2"/);
-  assert.match(scene.junctionMarkup, /MAPQ 60/);
+  assert.doesNotMatch(scene.junctionMarkup, /MAPQ/);
 
   const pathOnlyScene = buildGrtResultScene({
     plan: buildGrtResultPlan(baseline),

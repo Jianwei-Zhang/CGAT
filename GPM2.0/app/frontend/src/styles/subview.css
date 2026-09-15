@@ -774,7 +774,7 @@
 .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="alignmentLength"],
 .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="minTickUnitKb"],
 .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="maxTickCount"],
-.subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="mapq"] {
+.subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="minIdentityPct"] {
   width: 86px;
   min-width: 86px;
 }
@@ -948,7 +948,7 @@
   .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="minTickUnitKb"],
   .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="maxTickCount"],
   .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="alignmentLength"],
-  .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="mapq"] {
+  .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="minIdentityPct"] {
     width: 100%;
     min-width: 0;
   }

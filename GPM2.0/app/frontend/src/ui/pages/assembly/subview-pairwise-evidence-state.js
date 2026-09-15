@@ -34,7 +34,7 @@ function resolveRequestedThresholds(trackPrefs = {}) {
   const prefs = resolveTrackPrefs(trackPrefs || {});
   return {
     minAlignmentLength: Math.max(1, normalizePositiveInt(prefs.alignmentLength) ?? 1),
-    minMapq: Math.max(0, normalizeNonNegativeInt(prefs.mapq) ?? 0),
+    minIdentityPct: Math.max(0, normalizeNonNegativeInt(prefs.minIdentityPct) ?? 0),
   };
 }
 
@@ -44,17 +44,21 @@ function resolveCoverageThresholds(evidence = {}) {
       1,
       normalizePositiveInt(evidence?.loadedMinAlignmentLength ?? evidence?.minAlignmentLength) ?? Number.MAX_SAFE_INTEGER,
     ),
-    loadedMinMapq: Math.max(
+    loadedMinIdentityPct: Math.max(
       0,
-      normalizeNonNegativeInt(evidence?.loadedMinMapq ?? evidence?.minMapq) ?? Number.MAX_SAFE_INTEGER,
+      normalizeNonNegativeInt(
+        evidence?.loadedMinIdentityPct ?? evidence?.minIdentityPct,
+      ) ?? Number.MAX_SAFE_INTEGER,
     ),
     requestedMinAlignmentLength: Math.max(
       1,
       normalizePositiveInt(evidence?.requestedMinAlignmentLength ?? evidence?.minAlignmentLength) ?? Number.MAX_SAFE_INTEGER,
     ),
-    requestedMinMapq: Math.max(
+    requestedMinIdentityPct: Math.max(
       0,
-      normalizeNonNegativeInt(evidence?.requestedMinMapq ?? evidence?.minMapq) ?? Number.MAX_SAFE_INTEGER,
+      normalizeNonNegativeInt(
+        evidence?.requestedMinIdentityPct ?? evidence?.minIdentityPct,
+      ) ?? Number.MAX_SAFE_INTEGER,
     ),
   };
 }
@@ -133,7 +137,7 @@ export function shouldRefetchSubviewPairwiseEvidence({ summary, trackPrefs = {},
   if (String(evidence?.status || "") === "loading") {
     return (
       requested.minAlignmentLength < coverage.requestedMinAlignmentLength
-      || requested.minMapq < coverage.requestedMinMapq
+      || requested.minIdentityPct < coverage.requestedMinIdentityPct
     );
   }
   if (String(evidence?.status || "") !== "loaded") {
@@ -141,7 +145,7 @@ export function shouldRefetchSubviewPairwiseEvidence({ summary, trackPrefs = {},
   }
   return (
     requested.minAlignmentLength < coverage.loadedMinAlignmentLength
-    || requested.minMapq < coverage.loadedMinMapq
+    || requested.minIdentityPct < coverage.loadedMinIdentityPct
     || !Array.isArray(evidence?.hits)
   );
 }

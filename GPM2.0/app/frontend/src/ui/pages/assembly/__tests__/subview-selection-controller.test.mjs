@@ -56,8 +56,8 @@ function createCompositionBackedState() {
     assembly: {
       selectedChrName: "Chr01",
       supportDatasetId: 22,
-      trackView: { alignmentLength: 1_000, mapq: 0 },
-      subviewTrackView: { alignmentLength: 500, mapq: 10 },
+      trackView: { alignmentLength: 1_000, minIdentityPct: 0 },
+      subviewTrackView: { alignmentLength: 500, minIdentityPct: 90 },
       chrCtgs: [
         { assemblyCtgId: 2, name: "primary-2", assignedChrName: "Chr01", totalLength: 2_000 },
       ],

@@ -17,7 +17,7 @@ pub struct GetJunctionInspectionParams {
     pub left_assembly_ctg_id: i64,
     pub right_assembly_ctg_id: i64,
     pub min_align_length: Option<i64>,
-    pub min_mapq: Option<i64>,
+    pub min_identity_pct: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,7 +26,15 @@ pub struct GetTrackPairwiseEvidenceParams {
     pub top_assembly_ctg_ids: Vec<i64>,
     pub bottom_assembly_ctg_ids: Vec<i64>,
     pub min_align_length: Option<i64>,
-    pub min_mapq: Option<i64>,
+    pub min_identity_pct: Option<f64>,
+}
+
+fn resolve_min_identity_pct(value: Option<f64>) -> Result<f64> {
+    let value = value.unwrap_or(0.0);
+    if !value.is_finite() || !(0.0..=100.0).contains(&value) {
+        bail!("min_identity_pct must be between 0 and 100");
+    }
+    Ok(value)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -206,7 +214,7 @@ fn get_junction_inspection_with_connection(
         && right_dataset_ids.len() == 1
         && left_dataset_ids == right_dataset_ids;
     let min_align_length = params.min_align_length.unwrap_or(0).max(0);
-    let min_mapq = params.min_mapq.unwrap_or(0).max(0);
+    let min_identity_pct = resolve_min_identity_pct(params.min_identity_pct)?;
 
     let (evidence_source, hits) = if same_dataset {
         let dataset_id = *left_dataset_ids
@@ -250,7 +258,7 @@ fn get_junction_inspection_with_connection(
             &left_source_seq_ids,
             &right_source_seq_ids,
             min_align_length,
-            min_mapq,
+            min_identity_pct,
             "self_paf",
         )?;
         let left_source_map = source_id_mapping_from_evidence_name_map(&left_name_map);
@@ -278,7 +286,7 @@ fn get_junction_inspection_with_connection(
             right.assembly_ctg_id,
             &right_visible,
             min_align_length,
-            min_mapq,
+            min_identity_pct,
         )?;
         hits.sort_by(|a, b| {
             b.align_length
@@ -581,7 +589,7 @@ fn get_track_pairwise_evidence_with_connection(
         && bottom_dataset_ids.len() == 1
         && top_dataset_ids == bottom_dataset_ids;
     let min_align_length = params.min_align_length.unwrap_or(0).max(0);
-    let min_mapq = params.min_mapq.unwrap_or(0).max(0);
+    let min_identity_pct = resolve_min_identity_pct(params.min_identity_pct)?;
 
     let dataset_ids = top_name_map_by_dataset
         .keys()
@@ -696,7 +704,7 @@ fn get_track_pairwise_evidence_with_connection(
                     &top_source_seq_ids,
                     &bottom_source_seq_ids,
                     min_align_length,
-                    min_mapq,
+                    min_identity_pct,
                     evidence_source,
                 )?;
                 scope_hits.extend(assign_cached_pairwise_hit_assembly_ids(
@@ -1217,7 +1225,7 @@ fn query_pairwise_cached_hits(
     query_source_seq_ids: &[i64],
     target_source_seq_ids: &[i64],
     min_align_length: i64,
-    min_mapq: i64,
+    min_identity_pct: f64,
     evidence_origin: &str,
 ) -> Result<Vec<JunctionEvidenceHit>> {
     if query_source_seq_ids.is_empty() || target_source_seq_ids.is_empty() {
@@ -1229,7 +1237,7 @@ fn query_pairwise_cached_hits(
         query_source_seq_ids,
         target_source_seq_ids,
         min_align_length,
-        min_mapq,
+        min_identity_pct,
         evidence_origin,
         false,
     )?;
@@ -1239,7 +1247,7 @@ fn query_pairwise_cached_hits(
         query_source_seq_ids,
         target_source_seq_ids,
         min_align_length,
-        min_mapq,
+        min_identity_pct,
         evidence_origin,
         true,
     )?);
@@ -1253,7 +1261,7 @@ fn query_pairwise_cached_hits_direction(
     query_source_seq_ids: &[i64],
     target_source_seq_ids: &[i64],
     min_align_length: i64,
-    min_mapq: i64,
+    min_identity_pct: f64,
     evidence_origin: &str,
     swapped: bool,
 ) -> Result<Vec<JunctionEvidenceHit>> {
@@ -1287,14 +1295,14 @@ fn query_pairwise_cached_hits_direction(
          JOIN source_seq target_seq ON target_seq.id = h.target_source_seq_id
          WHERE h.run_id = ?1
            AND h.align_length >= ?2
-           AND h.mapq >= ?3
+           AND h.identity_pct >= ?3
            AND {query_filter_column} IN ({query_placeholders})
            AND {target_filter_column} IN ({target_placeholders})"
     );
     let mut values = vec![
         Value::Integer(run_id),
         Value::Integer(min_align_length),
-        Value::Integer(min_mapq),
+        Value::Real(min_identity_pct),
     ];
     values.extend(query_source_seq_ids.iter().copied().map(Value::Integer));
     values.extend(target_source_seq_ids.iter().copied().map(Value::Integer));
@@ -1444,7 +1452,7 @@ fn read_cross_dataset_server_hits(
     right_assembly_ctg_id: i64,
     right_members: &[JunctionCtgMember],
     min_align_length: i64,
-    min_mapq: i64,
+    min_identity_pct: f64,
 ) -> Result<Vec<JunctionEvidenceHit>> {
     let left_name_map_by_dataset =
         evidence_name_map_by_dataset(&[(left_assembly_ctg_id, left_members.to_vec())]);
@@ -1530,7 +1538,7 @@ fn read_cross_dataset_server_hits(
                     &left_source_seq_ids,
                     &right_source_seq_ids,
                     min_align_length,
-                    min_mapq,
+                    min_identity_pct,
                     "ds_ds_paf",
                 )?;
                 hits.extend(assign_cached_pairwise_hit_assembly_ids(
@@ -1925,7 +1933,7 @@ mod tests {
                 left_assembly_ctg_id: 301,
                 right_assembly_ctg_id: 302,
                 min_align_length: Some(300),
-                min_mapq: None,
+                min_identity_pct: None,
             },
         )
         .unwrap();
@@ -1960,7 +1968,7 @@ mod tests {
                 top_assembly_ctg_ids: vec![301],
                 bottom_assembly_ctg_ids: vec![302],
                 min_align_length: Some(300),
-                min_mapq: None,
+                min_identity_pct: None,
             },
         )
         .unwrap();
@@ -2115,7 +2123,7 @@ mod tests {
                 left_assembly_ctg_id: 401,
                 right_assembly_ctg_id: 402,
                 min_align_length: None,
-                min_mapq: None,
+                min_identity_pct: None,
             },
         )
         .unwrap();
@@ -2152,7 +2160,7 @@ mod tests {
                 top_assembly_ctg_ids: vec![401],
                 bottom_assembly_ctg_ids: vec![402],
                 min_align_length: None,
-                min_mapq: None,
+                min_identity_pct: None,
             },
         )
         .unwrap();
@@ -2273,7 +2281,7 @@ mod tests {
                 top_assembly_ctg_ids: vec![301, 303],
                 bottom_assembly_ctg_ids: vec![302, 304],
                 min_align_length: None,
-                min_mapq: None,
+                min_identity_pct: None,
             },
         )
         .unwrap();
@@ -2321,7 +2329,7 @@ mod tests {
                 top_assembly_ctg_ids: vec![301, 303],
                 bottom_assembly_ctg_ids: vec![302, 304],
                 min_align_length: None,
-                min_mapq: None,
+                min_identity_pct: None,
             },
         )
         .unwrap();
@@ -2472,7 +2480,7 @@ mod tests {
                 left_assembly_ctg_id: 401,
                 right_assembly_ctg_id: 402,
                 min_align_length: None,
-                min_mapq: None,
+                min_identity_pct: None,
             },
         )
         .unwrap();
@@ -2497,7 +2505,7 @@ mod tests {
                 top_assembly_ctg_ids: vec![401],
                 bottom_assembly_ctg_ids: vec![402],
                 min_align_length: None,
-                min_mapq: None,
+                min_identity_pct: None,
             },
         )
         .unwrap();
@@ -2515,7 +2523,7 @@ mod tests {
                 top_assembly_ctg_ids: vec![402],
                 bottom_assembly_ctg_ids: vec![401],
                 min_align_length: None,
-                min_mapq: None,
+                min_identity_pct: None,
             },
         )
         .unwrap();
@@ -2665,7 +2673,7 @@ mod tests {
                 left_assembly_ctg_id: 401,
                 right_assembly_ctg_id: 402,
                 min_align_length: None,
-                min_mapq: None,
+                min_identity_pct: None,
             },
         )
         .unwrap();
@@ -2685,7 +2693,7 @@ mod tests {
                 top_assembly_ctg_ids: vec![401],
                 bottom_assembly_ctg_ids: vec![402],
                 min_align_length: None,
-                min_mapq: None,
+                min_identity_pct: None,
             },
         )
         .unwrap();
@@ -2743,9 +2751,13 @@ mod tests {
         let run =
             ensure_pairwise_alignment_run_cache(&mut conn, 1, 2, "ds1_vs_ds2", &paf_path).unwrap();
         let hits =
-            query_pairwise_cached_hits(&conn, run.id, &[20], &[10], 100, 0, "ds_ds_paf").unwrap();
+            query_pairwise_cached_hits(&conn, run.id, &[20], &[10], 100, 0.0, "ds_ds_paf").unwrap();
+        let strict_hits =
+            query_pairwise_cached_hits(&conn, run.id, &[20], &[10], 100, 97.0, "ds_ds_paf")
+                .unwrap();
 
         assert_eq!(hits.len(), 1);
+        assert!(strict_hits.is_empty());
         assert_eq!(hits[0].query_source_seq_id, 20);
         assert_eq!(hits[0].query_source_seq_name, "ds2_b");
         assert_eq!(hits[0].query_start, 10);
@@ -2754,5 +2766,7 @@ mod tests {
         assert_eq!(hits[0].subject_source_seq_name, "ds1_a");
         assert_eq!(hits[0].subject_start, 100);
         assert_eq!(hits[0].subject_end, 399);
+        assert_eq!(hits[0].mapq, 60);
+        assert!((hits[0].identity_pct - (290.0 * 100.0 / 300.0)).abs() < 1e-9);
     }
 }

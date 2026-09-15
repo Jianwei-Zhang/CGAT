@@ -1165,7 +1165,7 @@
   min-width: 86px;
 }
 
-.assembly-track-inline-field [data-track-combo-field="mapq"] {
+.assembly-track-inline-field [data-track-combo-field="minIdentityPct"] {
   width: 86px;
   min-width: 86px;
 }

@@ -34,6 +34,7 @@ pub fn list_chr_view_ctgs(
                             "refEnd": hit.ref_end,
                             "matchLength": hit.match_length,
                             "blockLength": hit.block_length,
+                            "identityPct": hit.identity_pct,
                             "mapq": hit.mapq,
                             "ctgStart": hit.ctg_start,
                             "ctgEnd": hit.ctg_end
@@ -188,6 +189,7 @@ pub fn list_reference_track_members(
                             "refEnd": hit.ref_end,
                             "matchLength": hit.match_length,
                             "blockLength": hit.block_length,
+                            "identityPct": hit.identity_pct,
                             "mapq": hit.mapq,
                             "ctgStart": hit.ctg_start,
                             "ctgEnd": hit.ctg_end
@@ -760,7 +762,7 @@ pub async fn get_junction_inspection(
     leftAssemblyCtgId: i64,
     rightAssemblyCtgId: i64,
     minAlignmentLength: Option<i64>,
-    minMapq: Option<i64>,
+    minIdentityPct: Option<f64>,
 ) -> CommandResult<Value> {
     let workspace_root = workspaceRoot;
     tauri::async_runtime::spawn_blocking(move || {
@@ -769,7 +771,7 @@ pub async fn get_junction_inspection(
             left_assembly_ctg_id: leftAssemblyCtgId,
             right_assembly_ctg_id: rightAssemblyCtgId,
             min_align_length: minAlignmentLength,
-            min_mapq: minMapq,
+            min_identity_pct: minIdentityPct,
         };
         let report = backend_get_junction_inspection(&project_db_path(&workspace_root), &params)?;
         let hits = report
@@ -850,7 +852,7 @@ pub async fn get_track_pairwise_evidence(
     topAssemblyCtgIds: Vec<i64>,
     bottomAssemblyCtgIds: Vec<i64>,
     minAlignmentLength: Option<i64>,
-    minMapq: Option<i64>,
+    minIdentityPct: Option<f64>,
 ) -> CommandResult<Value> {
     let workspace_root = workspaceRoot;
     tauri::async_runtime::spawn_blocking(move || {
@@ -859,7 +861,7 @@ pub async fn get_track_pairwise_evidence(
             top_assembly_ctg_ids: topAssemblyCtgIds,
             bottom_assembly_ctg_ids: bottomAssemblyCtgIds,
             min_align_length: minAlignmentLength,
-            min_mapq: minMapq,
+            min_identity_pct: minIdentityPct,
         };
         let report =
             backend_get_track_pairwise_evidence(&project_db_path(&workspace_root), &params)?;

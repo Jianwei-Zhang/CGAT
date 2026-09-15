@@ -400,7 +400,7 @@ enum Commands {
         #[arg(long)]
         min_align_length: Option<i64>,
         #[arg(long)]
-        min_mapq: Option<i64>,
+        min_identity_pct: Option<f64>,
     },
 }
 

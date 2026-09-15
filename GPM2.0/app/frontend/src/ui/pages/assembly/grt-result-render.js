@@ -132,13 +132,10 @@ function renderDisplayEvidence(evidence, entries, escapeHtml) {
   const roleLabel = String(evidence.role || "").replaceAll("_", " ");
   const identity = Number(evidence.identity);
   const identityText = Number.isFinite(identity) ? `${(identity * 100).toFixed(2)}%` : "—";
-  const mapqText = evidence.mapq === null || evidence.mapq === undefined
-    ? ""
-    : ` · MAPQ ${Number(evidence.mapq)}`;
   const associationText = association === "supporting_precursor"
     ? " · structural precursor"
     : "";
-  const title = `GRT local evidence · ${tool === "mummer" ? "MUMmer" : "minimap2"} · ${roleLabel} · identity ${identityText}${mapqText}${associationText}`;
+  const title = `GRT local evidence · ${tool === "mummer" ? "MUMmer" : "minimap2"} · ${roleLabel} · identity ${identityText}${associationText}`;
   const points = [
     `${sourceFirst.x.toFixed(2)},${sourceY.toFixed(2)}`,
     `${sourceSecond.x.toFixed(2)},${sourceY.toFixed(2)}`,

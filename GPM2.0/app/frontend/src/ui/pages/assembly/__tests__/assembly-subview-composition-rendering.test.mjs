@@ -14,7 +14,7 @@ import { buildSubviewAnchorEndpointKey } from "../subview-anchor-state.js";
 function compositionState(composition, candidates, pairwiseEvidence = null, assemblyPatch = {}) {
   return createState({
     assembly: {
-      subviewTrackView: { alignmentLength: 1, mapq: 0 },
+      subviewTrackView: { alignmentLength: 1, minIdentityPct: 0 },
       ...assemblyPatch,
       subview: {
         ...applySubviewComposition({}, composition),

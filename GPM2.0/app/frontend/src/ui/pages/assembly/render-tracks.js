@@ -1,7 +1,7 @@
 import { buildDualTrackModel } from "./track-layout.js";
 import {
   ALIGNMENT_LENGTH_OPTIONS,
-  MAPQ_OPTIONS,
+  IDENTITY_PCT_OPTIONS,
   MAX_TICK_COUNT_OPTIONS,
   MIN_TICK_UNIT_KB_OPTIONS,
   SUPPORT_DS_CTG_LEN_BP_OPTIONS,
@@ -60,7 +60,7 @@ import {
   buildTrackReferenceWidth,
   buildTrackTickItems,
   isTrackTickLabelOverlap,
-  resolveHitMapq,
+  resolveHitIdentityPct,
   resolveMaxTrackEndBp,
   roundTrackMetric,
   sortTrackEntriesForRender,
@@ -1078,13 +1078,13 @@ function renderAssemblyTrackControls({
     value: trackPrefs.alignmentLength,
     options: ALIGNMENT_LENGTH_OPTIONS,
   });
-  const mapqInput = renderTrackNumberInput({
-    field: "mapq",
-    id: "assembly-track-mapq",
-    label: i18n.trackControls.mapq,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.mapq),
-    value: trackPrefs.mapq,
-    options: MAPQ_OPTIONS,
+  const identityInput = renderTrackNumberInput({
+    field: "minIdentityPct",
+    id: "assembly-track-identity-pct",
+    label: i18n.trackControls.identityPct,
+    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.identityPct),
+    value: trackPrefs.minIdentityPct,
+    options: IDENTITY_PCT_OPTIONS,
     allowZero: true,
   });
   return `
@@ -1114,8 +1114,8 @@ function renderAssemblyTrackControls({
         ${alignmentInput}
       </div>
       <div class="assembly-v1-control-item">
-        <label>${escapeHtml(i18n.trackControls.mapq)}</label>
-        ${mapqInput}
+        <label>${escapeHtml(i18n.trackControls.identityPct)}</label>
+        ${identityInput}
       </div>
     </div>
   `;
@@ -1181,13 +1181,13 @@ function renderAssemblyTrackInlineControls({
     value: trackPrefs.alignmentLength,
     options: ALIGNMENT_LENGTH_OPTIONS,
   });
-  const mapqInput = renderTrackNumberInput({
-    field: "mapq",
-    id: "assembly-track-mapq",
-    label: i18n.trackControls.mapq,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.mapq),
-    value: trackPrefs.mapq,
-    options: MAPQ_OPTIONS,
+  const identityInput = renderTrackNumberInput({
+    field: "minIdentityPct",
+    id: "assembly-track-identity-pct",
+    label: i18n.trackControls.identityPct,
+    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.identityPct),
+    value: trackPrefs.minIdentityPct,
+    options: IDENTITY_PCT_OPTIONS,
     allowZero: true,
   });
   const mainViewHistoryControls = renderMainViewHistoryControls({
@@ -1222,8 +1222,8 @@ function renderAssemblyTrackInlineControls({
         ${alignmentInput}
       </label>
       <label class="assembly-track-inline-field">
-        <span>${escapeHtml(i18n.trackControls.mapq)}</span>
-        ${mapqInput}
+        <span>${escapeHtml(i18n.trackControls.identityPct)}</span>
+        ${identityInput}
       </label>
       ${mainViewHistoryControls}
     </div>
@@ -1448,7 +1448,10 @@ function renderAssemblyTracks({
   );
   const LABEL_COLUMN_WIDTH_PX = 136;
   const blockLength = Math.max(1, normalizePositiveInt(trackPrefs?.alignmentLength) ?? 1);
-  const minMapq = Math.max(0, normalizeNonNegativeInt(trackPrefs?.mapq) ?? 0);
+  const minIdentityPct = Math.max(
+    0,
+    Math.min(100, normalizeNonNegativeInt(trackPrefs?.minIdentityPct) ?? 0),
+  );
   const resolvedChrLength = normalizePositiveInt(chrLength);
   const hasResolvedChrLength = resolvedChrLength !== null;
   const maxPrimaryEndBp = resolveMaxTrackEndBp(model?.primary?.ctgs || []);
@@ -2168,8 +2171,8 @@ function renderAssemblyTracks({
           if (hitBlockLength < blockLength) {
             return [];
           }
-          const hitMapq = resolveHitMapq(hit);
-          if (hitMapq < minMapq) {
+          const hitIdentityPct = resolveHitIdentityPct(hit);
+          if (hitIdentityPct < minIdentityPct) {
             return [];
           }
           const hitStartOffset = Number(hit?.ctgStart ?? hit?.ctg_start);

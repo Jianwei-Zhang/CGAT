@@ -36,8 +36,8 @@ test("cached pairwise evidence covers stricter subview thresholds without refetc
     key: "2-contig:support:30:primary:2",
     status: "loaded",
     loadedMinAlignmentLength: 10000,
-    loadedMinMapq: 0,
-    hits: [{ alignLength: 12000, mapq: 40 }],
+    loadedMinIdentityPct: 0,
+    hits: [{ alignLength: 12000, identityPct: 94, mapq: 40 }],
   };
 
   assert.equal(
@@ -45,7 +45,7 @@ test("cached pairwise evidence covers stricter subview thresholds without refetc
       summary,
       trackPrefs: {
         alignmentLength: 20000,
-        mapq: 10,
+        minIdentityPct: 90,
       },
       evidence,
     }),
@@ -63,8 +63,8 @@ test("lowering subview thresholds below the cached floor requires a refetch", ()
     key: "2-contig:support:30:primary:2",
     status: "loaded",
     loadedMinAlignmentLength: 10000,
-    loadedMinMapq: 20,
-    hits: [{ alignLength: 12000, mapq: 40 }],
+    loadedMinIdentityPct: 95,
+    hits: [{ alignLength: 12000, identityPct: 99, mapq: 40 }],
   };
 
   assert.equal(
@@ -72,7 +72,7 @@ test("lowering subview thresholds below the cached floor requires a refetch", ()
       summary,
       trackPrefs: {
         alignmentLength: 5000,
-        mapq: 0,
+        minIdentityPct: 90,
       },
       evidence,
     }),

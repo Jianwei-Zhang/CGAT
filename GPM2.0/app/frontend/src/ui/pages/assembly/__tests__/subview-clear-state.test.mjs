@@ -36,7 +36,7 @@ function createAssembly(mode) {
   return {
     selectedChrName: "Chr01",
     chrCtgs: [{ assemblyCtgId: 2, name: "primary-2" }],
-    trackView: { alignmentLength: 1_000, mapq: 0 },
+    trackView: { alignmentLength: 1_000, minIdentityPct: 0 },
     finalPathByChr: { Chr01: [{ segmentId: "path-1" }] },
     grtResultByChr: { Chr01: { baselineKey: "grt-1" } },
     subviewTrackDragOffsets: [{ slot: "top", contigId: 30, offsetBp: 40 }],

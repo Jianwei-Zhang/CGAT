@@ -206,3 +206,51 @@ test("main-view history dev operations map exact CLI contracts", async () => {
     ["redo-main-view-history", "D:/workspace", "7", "Chr01"],
   ]);
 });
+
+test("alignment operations pass identity thresholds and preserve raw MAPQ in parsed hits", async () => {
+  const calls = [];
+  const handlers = createBackendOperations({
+    async runBackend(args) {
+      calls.push(args);
+      if (args[0] === "get-junction-inspection") {
+        return {
+          stdout: [
+            "project_id=7 evidence_hit_count=1",
+            "hit query_ctg_id=11 query_id=101 query_name=q subject_ctg_id=22 subject_id=202 subject_name=s strand=+ q=1..100 s=2..101 mapq=60 identity_pct=96.5 align_length=100 mismatch_count=3 gap_open_count=0 evalue=0 bit_score=180 origin=ds_ds_paf",
+          ].join("\n"),
+          stderr: "",
+        };
+      }
+      return {
+        stdout: [
+          "member order=1 ref_chr_id=3 name=ref_Chr01:1-100 chr=Chr01 start=1 end=100 anchor_start=1 ref_orient=+ bp=100 hits=1",
+          "hit member_order=1 hit_id=9 dataset_id=2 source_seq_id=4 strand=+ query_start=1 query_end=100 ref_start=1 ref_end=100 block_length=100 identity_pct=98.75 mapq=40 ctg_start=1 ctg_end=100",
+        ].join("\n"),
+        stderr: "",
+      };
+    },
+  });
+
+  const inspection = await handlers.getJunctionInspection({
+    workspaceRoot: "D:/workspace",
+    projectId: 7,
+    leftAssemblyCtgId: 11,
+    rightAssemblyCtgId: 22,
+    minAlignmentLength: 1000,
+    minIdentityPct: 95.5,
+  });
+  const reference = await handlers.listReferenceTrackMembers({
+    workspaceRoot: "D:/workspace",
+    projectId: 7,
+    chrName: "Chr01",
+  });
+
+  assert.deepEqual(calls, [
+    ["get-junction-inspection", "D:/workspace", "7", "11", "22", "--min-align-length", "1000", "--min-identity-pct", "95.5"],
+    ["list-reference-track-members", "D:/workspace", "7", "Chr01"],
+  ]);
+  assert.equal(inspection.hits[0].identityPct, 96.5);
+  assert.equal(inspection.hits[0].mapq, 60);
+  assert.equal(reference.items[0].hits[0].identityPct, 98.75);
+  assert.equal(reference.items[0].hits[0].mapq, 40);
+});

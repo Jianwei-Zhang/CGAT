@@ -94,7 +94,7 @@ pub struct ChrViewCentromereMarkItem {
     pub ctg_end: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ChrViewHitItem {
     pub hit_id: i64,
     pub assembly_ctg_member_id: i64,
@@ -107,12 +107,13 @@ pub struct ChrViewHitItem {
     pub ref_end: i64,
     pub match_length: i64,
     pub block_length: i64,
+    pub identity_pct: f64,
     pub mapq: i64,
     pub ctg_start: i64,
     pub ctg_end: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ReferenceTrackMemberItem {
     pub source_kind: String,
     pub reference_chr_id: i64,
@@ -127,7 +128,7 @@ pub struct ReferenceTrackMemberItem {
     pub hits: Vec<ReferenceTrackHitItem>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ReferenceTrackHitItem {
     pub hit_id: i64,
     pub dataset_id: i64,
@@ -139,9 +140,17 @@ pub struct ReferenceTrackHitItem {
     pub ref_end: i64,
     pub match_length: i64,
     pub block_length: i64,
+    pub identity_pct: f64,
     pub mapq: i64,
     pub ctg_start: i64,
     pub ctg_end: i64,
+}
+
+fn alignment_identity_pct(match_length: i64, block_length: i64) -> f64 {
+    if block_length <= 0 {
+        return 0.0;
+    }
+    ((match_length as f64) * 100.0 / (block_length as f64)).clamp(0.0, 100.0)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1056,6 +1065,7 @@ fn list_chr_view_hits_with_connection(
                 ref_end: segment.ref_end,
                 match_length: row.match_length.min(segment_length),
                 block_length: row.block_length.min(segment_length),
+                identity_pct: alignment_identity_pct(row.match_length, row.block_length),
                 mapq: row.mapq,
                 ctg_start,
                 ctg_end,
@@ -1515,6 +1525,7 @@ fn list_reference_track_members_with_workspace_root(
                     ref_end: block.ref_end_bp,
                     match_length: effective_match_length,
                     block_length: effective_block_length,
+                    identity_pct: alignment_identity_pct(row.match_length, row.block_length),
                     mapq: row.mapq,
                     ctg_start: block.ref_start_bp - segment_start_bp + 1,
                     ctg_end: block.ref_end_bp - segment_start_bp + 1,
@@ -2512,6 +2523,11 @@ mod tests {
         );
         assert_eq!(items[0].hits.len(), 1);
         assert_eq!(items[1].hits.len(), 1);
+        let expected_identity_pct = 10000.0 * 100.0 / 10100.0;
+        assert!((items[0].hits[0].identity_pct - expected_identity_pct).abs() < 1e-9);
+        assert!((items[1].hits[0].identity_pct - expected_identity_pct).abs() < 1e-9);
+        assert_eq!(items[0].hits[0].mapq, 60);
+        assert_eq!(items[1].hits[0].mapq, 60);
         assert_eq!(
             (
                 items[0].hits[0].ctg_start,
