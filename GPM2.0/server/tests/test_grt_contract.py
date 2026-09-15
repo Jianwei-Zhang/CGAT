@@ -5,7 +5,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).parents[2]
@@ -166,6 +168,34 @@ class GrtContractTests(unittest.TestCase):
         self.assertEqual(summary["donor_sets"], 2)
         self.assertEqual(summary["events"], 1)
         self.assertEqual(summary["segments"], 2)
+
+    def test_repeated_artifact_and_q_references_are_read_once(self):
+        hash_reads = Counter()
+        fasta_reads = Counter()
+        validator_globals = GRT_CONTRACT.validate_contract.__globals__
+        original_sha256_file = validator_globals["sha256_file"]
+        original_read_fasta = validator_globals["read_fasta"]
+
+        def counted_sha256_file(path):
+            hash_reads[Path(path).resolve()] += 1
+            return original_sha256_file(path)
+
+        def counted_read_fasta(path, label, allow_empty=False):
+            fasta_reads[(Path(path).resolve(), allow_empty)] += 1
+            return original_read_fasta(path, label, allow_empty=allow_empty)
+
+        with mock.patch.dict(
+            validator_globals,
+            {
+                "sha256_file": counted_sha256_file,
+                "read_fasta": counted_read_fasta,
+            },
+        ):
+            summary = GRT_CONTRACT.validate_contract(VALID_BUNDLE, SCHEMA_PATH)
+
+        self.assertEqual(summary["events"], 1)
+        self.assertEqual(max(hash_reads.values()), 1)
+        self.assertEqual(max(fasta_reads.values()), 1)
 
     def test_invalid_fixture_cases_return_stable_error_codes(self):
         cases = json.loads((FIXTURE_ROOT / "invalid_cases.json").read_text(encoding="utf-8"))

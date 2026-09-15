@@ -12,6 +12,41 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     bundle_root = Path(bundle_root).resolve()
     if not bundle_root.is_dir():
         fail("MISSING_BUNDLE", f"bundle directory does not exist: {bundle_root}")
+
+    artifact_hash_cache = {}
+    fasta_records_cache = {}
+
+    def cache_key(path):
+        resolved = Path(path).resolve()
+        stat = resolved.stat()
+        return resolved, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns
+
+    def cached_sha256_file(path):
+        key = cache_key(path)
+        if key not in artifact_hash_cache:
+            artifact_hash_cache[key] = sha256_file(key[0])
+        return artifact_hash_cache[key]
+
+    def cached_read_fasta(path, label, allow_empty=False):
+        key = (*cache_key(path), allow_empty)
+        if key not in fasta_records_cache:
+            fasta_records_cache[key] = read_fasta(
+                key[0],
+                label,
+                allow_empty=allow_empty,
+            )
+        return fasta_records_cache[key]
+
+    def cached_validate_artifact(relpath, expected_sha, label):
+        validate_sha256(expected_sha, f"{label}.sha256")
+        path = bundle_path(bundle_root, relpath, label)
+        actual = cached_sha256_file(path)
+        if actual != expected_sha:
+            fail(
+                "CHECKSUM_MISMATCH",
+                f"{label} expected {expected_sha}, got {actual}",
+            )
+        return path
     try:
         with Path(schema_path).open("r", encoding="utf-8") as handle:
             schema = json.load(handle)
@@ -64,7 +99,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     reference = tables["metadata/reference.tsv"][0]
     reference_path = bundle_path(bundle_root, reference["fasta_relpath"], "reference FASTA")
     bundle_path(bundle_root, reference["fai_relpath"], "reference FAI")
-    reference_records = read_fasta(reference_path, "reference FASTA")
+    reference_records = cached_read_fasta(reference_path, "reference FASTA")
     sources = source_catalog(bundle_root, tables["metadata/source_seq_locator.tsv"])
 
     assignment_chromosomes = defaultdict(set)
@@ -223,7 +258,9 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     for (q_version, chr_name), segments in q_segments_by_record.items():
         q_path = bundle_path(bundle_root, f"grt/q/{q_version}.fa", f"q segment version {q_version}")
         if q_version not in q_fasta_cache:
-            q_fasta_cache[q_version] = read_fasta(q_path, f"grt/q/{q_version}.fa")
+            q_fasta_cache[q_version] = cached_read_fasta(
+                q_path, f"grt/q/{q_version}.fa"
+            )
         if chr_name not in q_fasta_cache[q_version]:
             fail("BROKEN_REFERENCE", f"q segments reference missing {q_version}:{chr_name}")
         segments.sort(key=lambda value: value[0])
@@ -236,7 +273,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             rebuilt.append(sequence)
         if "".join(rebuilt) != q_fasta_cache[q_version][chr_name]:
             fail("FINAL_PATH_MISMATCH", f"q segments do not reconstruct {q_version}:{chr_name}")
-    q0_records = read_fasta(q0_path, recipe["q0_relpath"])
+    q0_records = cached_read_fasta(q0_path, recipe["q0_relpath"])
     q0_segment_records = {chr_name for q_version, chr_name in q_segments_by_record if q_version == "q0"}
     if q0_segment_records != set(q0_records):
         fail("BROKEN_REFERENCE", "q0 segment mapping does not cover every q0 record")
@@ -250,13 +287,12 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             fail("INVALID_VALUE", f"unknown donor_kind={donor_kind}")
         donor_kinds[donor_kind] += 1
         parse_int(row["member_count"], f"donor set {donor_set_id}.member_count", 0)
-        donor_fasta_path = validate_artifact(
-            bundle_root,
+        donor_fasta_path = cached_validate_artifact(
             row["fasta_relpath"],
             row["fasta_sha256"],
             f"donor set {donor_set_id} FASTA",
         )
-        donor_fasta_records[donor_set_id] = read_fasta(
+        donor_fasta_records[donor_set_id] = cached_read_fasta(
             donor_fasta_path, f"donor set {donor_set_id} FASTA", allow_empty=True
         )
         bundle_path(bundle_root, row["manifest_relpath"], f"donor set {donor_set_id} manifest")
@@ -387,14 +423,12 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             if row[path_field] or row[hash_field]:
                 if not row[path_field] or not row[hash_field]:
                     fail("INVALID_VALUE", f"evidence {evidence_id} has partial artifact identity")
-                validate_artifact(
-                    bundle_root,
+                cached_validate_artifact(
                     row[path_field],
                     row[hash_field],
                     f"evidence {evidence_id}.{path_field}",
                 )
-        validate_artifact(
-            bundle_root,
+        cached_validate_artifact(
             row["raw_artifact_relpath"],
             row["raw_artifact_sha256"],
             f"evidence {evidence_id}.raw_artifact",
@@ -406,7 +440,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                 f"evidence {evidence_id} q source",
             )
             validate_sha256(row["q_source_sha256"], f"evidence {evidence_id}.q_source_sha256")
-            if sha256_file(q_path) != row["q_source_sha256"]:
+            if cached_sha256_file(q_path) != row["q_source_sha256"]:
                 fail("CHECKSUM_MISMATCH", f"evidence {evidence_id} q source hash mismatch")
         elif row["q_source_sha256"]:
             fail("INVALID_VALUE", f"evidence {evidence_id} has q hash without q_version")
@@ -626,9 +660,11 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                 f"grt/q/{q_value['version']}.fa",
                 f"event {event_id}.{q_field} q artifact",
             )
-            if sha256_file(q_path) != q_value["sha256"]:
+            if cached_sha256_file(q_path) != q_value["sha256"]:
                 fail("CHECKSUM_MISMATCH", f"event {event_id}.{q_field} q hash mismatch")
-            q_records = read_fasta(q_path, f"event {event_id}.{q_field} q artifact")
+            q_records = cached_read_fasta(
+                q_path, f"event {event_id}.{q_field} q artifact"
+            )
             if event["chr"] not in q_records or int(q_value["end"]) > len(q_records[event["chr"]]):
                 fail("INVALID_COORDINATE", f"event {event_id}.{q_field} exceeds q chromosome")
         source = event["source"]
@@ -711,7 +747,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
     chromosomes = final_path.get("chromosomes")
     if not isinstance(chromosomes, list) or not chromosomes:
         fail("INVALID_JSON", "grt_final_path chromosomes must be a non-empty array")
-    q4_records = read_fasta(q4_path, recipe["final_q_relpath"])
+    q4_records = cached_read_fasta(q4_path, recipe["final_q_relpath"])
     segment_ids = set()
     segment_event = {}
     segments_by_id = {}
@@ -987,7 +1023,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                     if source_role == "query"
                     else "target_artifact_relpath"
                 )
-                source_records = read_fasta(
+                source_records = cached_read_fasta(
                     bundle_path(
                         bundle_root,
                         pairwise[artifact_field],
@@ -1005,7 +1041,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                 fail("BROKEN_REFERENCE", f"promoted/cross used contig {source_card_key} requires supplemental PAF")
             for evidence_id in pairwise_ids:
                 pairwise = evidence[evidence_id]
-                query_records = read_fasta(
+                query_records = cached_read_fasta(
                     bundle_path(
                         bundle_root,
                         pairwise["query_artifact_relpath"],
@@ -1018,7 +1054,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
                         "BROKEN_REFERENCE",
                         f"supplemental evidence {evidence_id} query is not the full original source",
                     )
-                read_fasta(
+                cached_read_fasta(
                     bundle_path(
                         bundle_root,
                         pairwise["target_artifact_relpath"],
@@ -1201,7 +1237,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             ("output", q_output_path, row["q_output_sha256"]),
         ):
             validate_sha256(value, f"stage {stage} q {label} SHA-256")
-            if sha256_file(path) != value:
+            if cached_sha256_file(path) != value:
                 fail("CHECKSUM_MISMATCH", f"stage {stage} q {label} hash mismatch")
         if stage == "step4_telomere":
             expected_donor = recipe["tel_donor_set_id"]
@@ -1211,8 +1247,7 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             expected_donor = recipe["donor_set_id"]
         if row["donor_set_id"] != expected_donor:
             fail("BROKEN_REFERENCE", f"stage {stage} uses unexpected donor set")
-        validate_artifact(
-            bundle_root,
+        cached_validate_artifact(
             row["checkpoint_relpath"],
             row["checkpoint_sha256"],
             f"stage {stage} checkpoint",
@@ -1227,6 +1262,6 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
         "evidence": len(evidence),
         "events": len(events),
         "segments": len(segment_ids),
-        "q0_sha256": sha256_file(q0_path),
-        "q4_sha256": sha256_file(q4_path),
+        "q0_sha256": cached_sha256_file(q0_path),
+        "q4_sha256": cached_sha256_file(q4_path),
     }
