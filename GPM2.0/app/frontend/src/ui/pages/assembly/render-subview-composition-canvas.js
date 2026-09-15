@@ -560,8 +560,8 @@ export function renderSubviewCompositionAlignmentCard({
       ${topCount && bottomCount
         ? evidenceStatus(subview?.pairwiseEvidence, i18n.subview, escapeHtml)
         : `<span class="muted">${escapeHtml(i18n.subview.compositionEvidenceNeedsBothLanes)}</span>`}</div>
-    ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
     <div class="assembly-track-layout subview-track-layout">
+      ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
       <div class="assembly-track-label-column subview-track-label-column" style="width:136px;height:${CONTENT_HEIGHT}px">
         <div class="assembly-track-label-row" style="top:${TOP_Y - 4}px">${escapeHtml(i18n.subview.tools.compositionManager.lanes.top)}</div>
         ${renderTrackOrderToggleButton({

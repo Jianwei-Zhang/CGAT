@@ -25,6 +25,14 @@ for (const mode of ["2-contig", "track-pair", "composition"]) {
     assert.match(html, /Identity: Unknown/);
     assert.match(html, /Identity: 0.00%/);
     assert.match(html, /alignment-identity-legend/);
+    const legends = [...html.matchAll(/<div class="alignment-identity-legend"[\s\S]*?<\/div>/g)];
+    assert.equal(legends.length, 2, "one legend in the main chart and one in Subview");
+    legends.forEach(([legend]) => assert.doesNotMatch(legend, /未知|Unknown|unknown/));
+    assert.equal(
+      [...html.matchAll(/<div class="assembly-track-layout(?: subview-track-layout)?">\s*<div class="alignment-identity-legend"/g)].length,
+      2,
+      "legends belong inside the chart layouts, not in standalone card rows",
+    );
     if (mode !== "composition") {
       const scenes = [...html.matchAll(/<script type="application\/json" data-track-band-canvas-scene>(.*?)<\/script>/gs)]
         .map((match) => JSON.parse(match[1].replaceAll("&quot;", '"').replaceAll("&amp;", "&")));

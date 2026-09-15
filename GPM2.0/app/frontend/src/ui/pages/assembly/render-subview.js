@@ -1833,8 +1833,8 @@ function renderSubviewAlignmentCard(
         <strong>${escapeHtml(`${topVisibleCtgName} vs ${bottomVisibleCtgName}`)}</strong>
         ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context, history)}
       </div>
-      ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
       <div class="assembly-track-layout subview-track-layout">
+        ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
         <div class="assembly-track-label-column subview-track-label-column" style="width:${svgModel.labelColumnWidth}px;height:${svgModel.contentBottom}px">
           <div class="assembly-track-label-row${topRowClass}" style="top:${svgModel.topLabelTop}px" title="${escapeAttr(topDisplayCtgName)}">${escapeHtml(topVisibleCtgName)}</div>
           ${renderSubviewTrackOrderToggleButton({
@@ -3056,8 +3056,8 @@ function renderSubviewTrackPairAlignmentCard(
         <strong>${escapeHtml(`${topTrackLabel} vs ${bottomTrackLabel}`)}</strong>
         ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context, history)}
       </div>
-      ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
       <div class="assembly-track-layout subview-track-layout">
+        ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
         <div class="assembly-track-label-column subview-track-label-column" style="width:${LABEL_COLUMN_WIDTH_PX}px;height:${contentBottom}px">
           <div class="assembly-track-label-row${topRoleClass}" style="top:${resolvedTopLayout.labelTop}px">${escapeHtml(topTrackLabel)}</div>
           ${renderSubviewTrackOrderToggleButton({

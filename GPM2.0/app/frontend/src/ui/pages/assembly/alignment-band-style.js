@@ -42,11 +42,10 @@ export function alignmentBandTooltipMetrics(hit) {
 
 export function renderAlignmentIdentityLegend(labels, escapeAttr) {
   const gradient = (tone) => `linear-gradient(to right, ${resolveAlignmentBandStyle(tone, 80).fill}, ${resolveAlignmentBandStyle(tone, 100).fill})`;
-  const unknown = labels?.identityUnknown || "Unknown";
-  const hint = labels?.identityLegendHint || "Darker means higher Identity. Fixed scale; ≤80% uses the lightest shade. Gray: unknown.";
+  const hint = labels?.identityLegendHint || "Darker means higher Identity. Fixed scale; ≤80% uses the lightest shade.";
   return `<div class="alignment-identity-legend" title="${escapeAttr(hint)}" aria-label="${escapeAttr(hint)}">
     <span>Identity</span><span>≤80%</span><span class="alignment-identity-scale" aria-hidden="true">
       <i style="background:${gradient("primary")}"></i><i style="background:${gradient("companion")}"></i>
-    </span><span>100%</span><span class="alignment-identity-unknown"><i aria-hidden="true" style="background:${resolveAlignmentBandStyle("primary", null).fill}"></i>${escapeAttr(unknown)}</span>
+    </span><span>100%</span>
   </div>`;
 }

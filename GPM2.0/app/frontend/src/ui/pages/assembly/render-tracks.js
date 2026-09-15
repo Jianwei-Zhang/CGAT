@@ -2443,8 +2443,8 @@ function renderAssemblyTracks({
         </div>
       </div>
       ${grtResultToastMarkup}
-      ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
       <div class="assembly-track-layout">
+        ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
         <div class="assembly-track-label-column" style="width:${LABEL_COLUMN_WIDTH_PX}px;height:${contentBottom}px">
           ${labelRows}
         </div>
