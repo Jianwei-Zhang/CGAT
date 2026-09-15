@@ -1,3 +1,5 @@
+import { resolveAlignmentBandStyle, sortAlignmentBands } from "./alignment-band-style.js";
+
 const TRACK_BAND_CANVAS_BOUND = Symbol("trackBandCanvasBound");
 const TRACK_BAND_CANVAS_READY_CLASS = "is-track-band-canvas-ready";
 const MAX_CANVAS_BITMAP_DIMENSION = 32767;
@@ -23,18 +25,6 @@ function readTrackBandCanvasScene(layer) {
   } catch {
     return null;
   }
-}
-
-function resolveBandToneStyle(tone) {
-  return String(tone || "").trim() === "companion"
-    ? {
-        fill: "rgba(154, 126, 78, 0.22)",
-        stroke: "rgba(154, 126, 78, 0.34)",
-      }
-    : {
-        fill: "rgba(97, 129, 170, 0.24)",
-        stroke: "rgba(97, 129, 170, 0.38)",
-      };
 }
 
 function canAllocateCanvasBitmap(width, height, dpr) {
@@ -131,12 +121,12 @@ function drawTrackBandCanvasLayer(layer, scene) {
     context.clip();
   }
 
-  (Array.isArray(scene.bands) ? scene.bands : []).forEach((band) => {
+  sortAlignmentBands(Array.isArray(scene.bands) ? scene.bands : []).forEach((band) => {
     drawPolygon(
       context,
       band?.points,
       offsetX,
-      resolveBandToneStyle(band?.tone),
+      resolveAlignmentBandStyle(band?.tone, band?.identityPct),
     );
   });
 

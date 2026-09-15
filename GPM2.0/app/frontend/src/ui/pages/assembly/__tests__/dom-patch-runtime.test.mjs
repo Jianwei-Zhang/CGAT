@@ -180,3 +180,29 @@ test("assembly DOM patch controller removes only matching deleted primary nodes"
   assert.equal(groupRemoved, true);
   assert.equal(bandRemoved, true);
 });
+
+test("hiding a contig preserves remaining identity values in the rebuilt Canvas scene", () => {
+  const bands = ["93.27", "0", ""].map((bandIdentityPct, index) => ({
+    dataset: { bandContigId: String(index + 2), bandTrackRole: "primary", bandIdentityPct },
+    style: {}, getAttribute: () => "0,0 50,0 50,50 0,50",
+  }));
+  const sceneNode = { textContent: JSON.stringify({ bands: [] }) };
+  const layer = { querySelector: () => sceneNode };
+  const scroll = {
+    querySelector: () => ({ querySelectorAll: () => bands }),
+    querySelectorAll: () => [layer],
+  };
+  const routeHost = {
+    querySelectorAll(selector) {
+      if (selector === ".assembly-track-scroll[data-track-role='primary']") return [scroll];
+      if (selector === "[data-band-track-role='primary'][data-band-contig-id]") return bands;
+      return [];
+    },
+  };
+  let redraws = 0;
+  const { patchPrimaryHiddenCtgDom } = createController({ bindBandCanvasRuntime: () => { redraws++; } });
+  const host = { closest: () => routeHost };
+  assert.equal(patchPrimaryHiddenCtgDom(host, { getState: () => ({ assembly: {} }) }, [4], { changedIds: [4] }), true);
+  assert.deepEqual(JSON.parse(sceneNode.textContent).bands.map((band) => band.identityPct), ["93.27", "0"]);
+  assert.equal(redraws, 1);
+});

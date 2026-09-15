@@ -1,3 +1,4 @@
+import { readHitIdentityPct } from "./alignment-band-style.js";
 import { normalizeNonNegativeInt, normalizePositiveInt } from "./track-prefs.js";
 import { normalizeSupportDatasetId } from "./selection-state.js";
 
@@ -331,18 +332,7 @@ export function buildTrackHitRectWithinCtgDisplay({
 }
 
 export function resolveHitIdentityPct(hit) {
-  const explicit = Number(hit?.identityPct ?? hit?.identity_pct);
-  if (Number.isFinite(explicit)) {
-    return Math.max(0, Math.min(100, explicit));
-  }
-  const matches = Number(hit?.matchLength ?? hit?.match_length ?? hit?.matches);
-  const blockLength = Number(
-    hit?.blockLength ?? hit?.block_length ?? hit?.alignLength ?? hit?.align_length,
-  );
-  if (!Number.isFinite(matches) || !Number.isFinite(blockLength) || blockLength <= 0) {
-    return 0;
-  }
-  return Math.max(0, Math.min(100, (matches * 100) / blockLength));
+  return readHitIdentityPct(hit) ?? 0;
 }
 
 export function buildTrackBpX({ bp, windowStart, domainSpanBp, innerWidth }) {

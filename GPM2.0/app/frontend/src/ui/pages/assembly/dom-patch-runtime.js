@@ -130,6 +130,7 @@ export function createAssemblyDomPatchController({
           }
           return {
             hitKey: "",
+            identityPct: band?.dataset?.bandIdentityPct ?? null,
             tone: band?.dataset?.bandTrackRole === "support" ? "companion" : "primary",
             points,
           };

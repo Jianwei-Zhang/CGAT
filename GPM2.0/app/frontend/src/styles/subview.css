@@ -15,14 +15,14 @@
 }
 
 .subview-track-svg .track-collinearity-band {
-  fill: rgba(97, 129, 170, 0.24);
-  stroke: rgba(97, 129, 170, 0.38);
+  fill: var(--alignment-band-fill, rgb(222, 224, 227));
+  stroke: var(--alignment-band-stroke, rgb(194, 198, 204));
   cursor: crosshair;
 }
 
 .subview-track-svg .track-collinearity-band.is-companion {
-  fill: rgba(154, 126, 78, 0.22);
-  stroke: rgba(154, 126, 78, 0.34);
+  fill: var(--alignment-band-fill, rgb(222, 224, 227));
+  stroke: var(--alignment-band-stroke, rgb(194, 198, 204));
 }
 
 .subview-track-ctg,
@@ -849,15 +849,15 @@
 .assembly-track-scroll.is-track-drag-preview.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"],
 .is-track-drag-preview .assembly-track-scroll.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"],
 .is-track-drag-preview [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"] {
-  fill: rgba(97, 129, 170, 0.24);
-  stroke: rgba(97, 129, 170, 0.38);
+  fill: var(--alignment-band-fill, rgb(222, 224, 227));
+  stroke: var(--alignment-band-stroke, rgb(194, 198, 204));
 }
 
 .assembly-track-scroll.is-track-drag-preview.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band.is-companion[data-track-band-proxy="1"],
 .is-track-drag-preview .assembly-track-scroll.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band.is-companion[data-track-band-proxy="1"],
 .is-track-drag-preview [data-track-band-svg-overlay="1"] .track-collinearity-band.is-companion[data-track-band-proxy="1"] {
-  fill: rgba(154, 126, 78, 0.22);
-  stroke: rgba(154, 126, 78, 0.34);
+  fill: var(--alignment-band-fill, rgb(222, 224, 227));
+  stroke: var(--alignment-band-stroke, rgb(194, 198, 204));
 }
 
 .is-subview-track-drag-preview [data-track-band-canvas-scene-kind="subview-ctg"],
@@ -867,14 +867,14 @@
 
 .is-subview-track-drag-preview .assembly-track-scroll.is-track-band-canvas-ready .subview-track-svg .track-collinearity-band[data-track-band-proxy="1"],
 .is-subview-track-drag-preview .subview-track-svg .track-collinearity-band[data-track-band-proxy="1"] {
-  fill: rgba(97, 129, 170, 0.24);
-  stroke: rgba(97, 129, 170, 0.38);
+  fill: var(--alignment-band-fill, rgb(222, 224, 227));
+  stroke: var(--alignment-band-stroke, rgb(194, 198, 204));
 }
 
 .is-subview-track-drag-preview .assembly-track-scroll.is-track-band-canvas-ready .subview-track-svg .track-collinearity-band.is-companion[data-track-band-proxy="1"],
 .is-subview-track-drag-preview .subview-track-svg .track-collinearity-band.is-companion[data-track-band-proxy="1"] {
-  fill: rgba(154, 126, 78, 0.22);
-  stroke: rgba(154, 126, 78, 0.34);
+  fill: var(--alignment-band-fill, rgb(222, 224, 227));
+  stroke: var(--alignment-band-stroke, rgb(194, 198, 204));
 }
 
 .is-subview-track-drag-preview .subview-anchor-line,
@@ -884,17 +884,23 @@
   pointer-events: none;
 }
 
+.assembly-track-scroll.is-track-band-canvas-ready .subview-track-svg .track-collinearity-band[data-track-band-proxy="1"]:hover,
+.assembly-track-scroll.is-track-band-canvas-ready .subview-track-svg .track-collinearity-band[data-track-band-proxy="1"].is-menu-active,
+.assembly-track-scroll.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"]:hover,
+[data-track-band-svg-overlay="1"] .track-collinearity-band:hover,
 .subview-track-svg .track-collinearity-band[data-subview-hit-key]:hover,
 .subview-track-svg .track-collinearity-band[data-subview-hit-key].is-menu-active {
   stroke: rgba(46, 86, 127, 0.88);
-  fill: rgba(97, 129, 170, 0.3);
   stroke-width: 2;
 }
 
+.assembly-track-scroll.is-track-band-canvas-ready .subview-track-svg .track-collinearity-band.is-companion[data-track-band-proxy="1"]:hover,
+.assembly-track-scroll.is-track-band-canvas-ready .subview-track-svg .track-collinearity-band.is-companion[data-track-band-proxy="1"].is-menu-active,
+.assembly-track-scroll.is-track-band-canvas-ready [data-track-band-svg-overlay="1"] .track-collinearity-band.is-companion[data-track-band-proxy="1"]:hover,
+[data-track-band-svg-overlay="1"] .track-collinearity-band.is-companion:hover,
 .subview-track-svg .track-collinearity-band.is-companion[data-subview-hit-key]:hover,
 .subview-track-svg .track-collinearity-band.is-companion[data-subview-hit-key].is-menu-active {
   stroke: rgba(124, 100, 64, 0.88);
-  fill: rgba(154, 126, 78, 0.28);
   stroke-width: 2;
 }
 

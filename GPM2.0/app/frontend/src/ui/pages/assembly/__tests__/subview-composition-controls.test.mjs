@@ -44,16 +44,16 @@ function hitKeys(state) {
 test("composition applies both thresholds to cached pairwise hits without mutating evidence or positions", () => {
   const state = controlState();
   const originalSubview = structuredClone(state.assembly.subview);
-  assert.deepEqual(hitKeys(state), ["short", "low-identity", "pass", "missing-identity"]);
+  assert.deepEqual(hitKeys(state), ["missing-identity", "low-identity", "pass", "short"]);
   state.assembly.subviewTrackView.alignmentLength = 1000;
-  assert.deepEqual(hitKeys(state), ["low-identity", "pass", "missing-identity"]);
+  assert.deepEqual(hitKeys(state), ["missing-identity", "low-identity", "pass"]);
   state.assembly.subviewTrackView.minIdentityPct = 90;
   assert.deepEqual(hitKeys(state), ["pass"]);
   state.assembly.subviewTrackView.minIdentityPct = 96;
   assert.deepEqual(hitKeys(state), []);
   state.assembly.subviewTrackView.minIdentityPct = 0;
   state.assembly.subviewTrackView.alignmentLength = 1;
-  assert.deepEqual(hitKeys(state), ["short", "low-identity", "pass", "missing-identity"]);
+  assert.deepEqual(hitKeys(state), ["missing-identity", "low-identity", "pass", "short"]);
   assert.deepEqual(state.assembly.subview, originalSubview);
 });
 

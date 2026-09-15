@@ -1,3 +1,7 @@
+import {
+  readHitIdentityPct, alignmentBandSvgAttrs, alignmentBandTooltipMetrics,
+  sortAlignmentBands, renderAlignmentIdentityLegend,
+} from "./alignment-band-style.js";
 import { buildDualTrackModel } from "./track-layout.js";
 import {
   ALIGNMENT_LENGTH_OPTIONS,
@@ -484,6 +488,8 @@ function buildSubviewPairwiseRenderableHits({
     topHits.push({
       hitKey,
       pairKey,
+      identityPct: readHitIdentityPct(hit),
+      alignLength,
       reversed,
       ctgStart: Math.min(topRange.start, topRange.end),
       ctgEnd: Math.max(topRange.start, topRange.end),
@@ -494,6 +500,8 @@ function buildSubviewPairwiseRenderableHits({
     bottomHits.push({
       hitKey,
       pairKey,
+      identityPct: readHitIdentityPct(hit),
+      alignLength,
       reversed,
       ctgStart: Math.min(bottomRange.start, bottomRange.end),
       ctgEnd: Math.max(bottomRange.start, bottomRange.end),
@@ -599,6 +607,8 @@ function buildSubviewSegmentSignature(segments) {
       Number(segment?.ctgEnd || 0),
       Number(segment?.x || 0),
       Number(segment?.width || 0),
+      readHitIdentityPct(segment) ?? "unknown",
+      Number(segment?.alignLength || 0),
     ].join(":"))
     .join("|");
 }
@@ -1377,7 +1387,7 @@ function renderTrackBandCanvasLayer({
           height: roundTrackMetric(clipRect.height),
         }
       : null,
-    bands: (Array.isArray(bands) ? bands : [])
+    bands: sortAlignmentBands(Array.isArray(bands) ? bands : [])
       .map((band) => {
         const points = parseTrackBandPoints(band?.points);
         if (points.length < 4) {
@@ -1386,6 +1396,7 @@ function renderTrackBandCanvasLayer({
         return {
           hitKey: String(band?.hitKey || ""),
           tone: String(band?.tone || "").trim() || "primary",
+          identityPct: readHitIdentityPct(band),
           points,
         };
       })
@@ -1822,6 +1833,7 @@ function renderSubviewAlignmentCard(
         <strong>${escapeHtml(`${topVisibleCtgName} vs ${bottomVisibleCtgName}`)}</strong>
         ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context, history)}
       </div>
+      ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
       <div class="assembly-track-layout subview-track-layout">
         <div class="assembly-track-label-column subview-track-label-column" style="width:${svgModel.labelColumnWidth}px;height:${svgModel.contentBottom}px">
           <div class="assembly-track-label-row${topRowClass}" style="top:${svgModel.topLabelTop}px" title="${escapeAttr(topDisplayCtgName)}">${escapeHtml(topVisibleCtgName)}</div>
@@ -1874,7 +1886,7 @@ function renderSubviewAlignmentCard(
               .map(
                 (band) => {
                   const hitKey = String(band.hitKey || "");
-                  return `<polygon class="track-collinearity-band${connectorClass}" points="${band.points}" pointer-events="visibleFill" data-track-band-proxy="1" data-subview-top-contig-id="${topSelection.contigId}" data-subview-bottom-contig-id="${bottomSelection.contigId}" data-subview-band-tooltip="${escapeAttr(band.tooltipText)}" data-subview-hit-key="${escapeAttr(hitKey)}" data-subview-hit-left-active="${activeAnchorKeys.has(`${hitKey}:left`) ? "1" : "0"}" data-subview-hit-right-active="${activeAnchorKeys.has(`${hitKey}:right`) ? "1" : "0"}" />`;
+                  return `<polygon class="track-collinearity-band${connectorClass}" points="${band.points}" ${alignmentBandSvgAttrs(band, bandTone)} pointer-events="visibleFill" data-track-band-proxy="1" data-subview-top-contig-id="${topSelection.contigId}" data-subview-bottom-contig-id="${bottomSelection.contigId}" data-subview-band-tooltip="${escapeAttr(band.tooltipText)}" data-subview-hit-key="${escapeAttr(hitKey)}" data-subview-hit-left-active="${activeAnchorKeys.has(`${hitKey}:left`) ? "1" : "0"}" data-subview-hit-right-active="${activeAnchorKeys.has(`${hitKey}:right`) ? "1" : "0"}" />`;
                 },
               )
               .join("")}
@@ -2291,6 +2303,8 @@ function renderSubviewTrackPairAlignmentCard(
             normalizePositiveInt(ctg?.lengthBp ?? ctg?.totalLength) ?? 1,
           ),
           hitKey: String(hit?.hitKey || ""),
+          identityPct: readHitIdentityPct(hit),
+          alignLength: hit.alignLength,
           pairKey: String(hit?.pairKey || hit?.hitKey || ""),
           ctgStart: hit.ctgStart,
           ctgEnd: hit.ctgEnd,
@@ -2350,6 +2364,8 @@ function renderSubviewTrackPairAlignmentCard(
         hitKey,
         pairKey,
         reversed,
+        identityPct,
+        alignLength,
         ordinal,
       } = pairRecord;
       const refStart = ordinal + 1;
@@ -2381,6 +2397,8 @@ function renderSubviewTrackPairAlignmentCard(
         ),
         hitKey,
         pairKey,
+        identityPct,
+        alignLength,
         reversed,
         ctgStart: Math.min(topRange.start, topRange.end),
         ctgEnd: Math.max(topRange.start, topRange.end),
@@ -2406,6 +2424,8 @@ function renderSubviewTrackPairAlignmentCard(
         ),
         hitKey,
         pairKey,
+        identityPct,
+        alignLength,
         reversed,
         ctgStart: Math.min(bottomRange.start, bottomRange.end),
         ctgEnd: Math.max(bottomRange.start, bottomRange.end),
@@ -2494,6 +2514,8 @@ function renderSubviewTrackPairAlignmentCard(
         hitKey,
         pairKey,
         reversed,
+        identityPct: readHitIdentityPct(hit),
+        alignLength,
         index,
       });
     });
@@ -2566,6 +2588,8 @@ function renderSubviewTrackPairAlignmentCard(
             normalizePositiveInt(refEntry.ctg?.lengthBp ?? refEntry.ctg?.totalLength) ?? 1,
           ),
           hitKey: String(segment?.hitKey || ""),
+          identityPct: readHitIdentityPct(segment),
+          alignLength: segment.alignLength,
           pairKey: String(segment?.pairKey || segment?.hitKey || ""),
           ctgStart: projectedRange.ctgStart,
           ctgEnd: projectedRange.ctgEnd,
@@ -2642,7 +2666,7 @@ function renderSubviewTrackPairAlignmentCard(
     trackMode: "track-pair",
     pairingMode: (usesRefProjection || pairwiseTrackSegments) ? "projection-key" : "reference-overlap",
   });
-  const collinearityBands = pairedTrackSegments
+  const collinearityBands = sortAlignmentBands(pairedTrackSegments
     .map(({ topSegment, bottomSegment }, index) => {
       const overlapStart = Math.max(Number(topSegment.refStart || 0), Number(bottomSegment.refStart || 0));
       const overlapEnd = Math.min(Number(topSegment.refEnd || 0), Number(bottomSegment.refEnd || 0));
@@ -2659,11 +2683,13 @@ function renderSubviewTrackPairAlignmentCard(
       const bottomRightX = bottomOverlapRect.x + bottomOverlapRect.width;
       return {
         hitKey,
+        identityPct: (usesRefProjection || pairwiseTrackSegments) ? readHitIdentityPct(topSegment) : null,
         topContigId: topSegment.ctgId,
         bottomContigId: bottomSegment.ctgId,
         leftActive: activeAnchorKeys.has(`${hitKey}:left`),
         rightActive: activeAnchorKeys.has(`${hitKey}:right`),
         tooltipText: buildSubviewBandTooltipText({
+          isDirectAlignment: Boolean(usesRefProjection || pairwiseTrackSegments),
           topName: topSegment.ctgName,
           bottomName: bottomSegment.ctgName,
           topSegment,
@@ -2684,7 +2710,7 @@ function renderSubviewTrackPairAlignmentCard(
             ]).join(" "),
       };
     })
-    .filter(Boolean);
+    .filter(Boolean));
   const anchorEdges = pairedTrackSegments
     .flatMap(({ topSegment, bottomSegment }, index) => {
       const overlapStart = Math.max(Number(topSegment.refStart || 0), Number(bottomSegment.refStart || 0));
@@ -3030,6 +3056,7 @@ function renderSubviewTrackPairAlignmentCard(
         <strong>${escapeHtml(`${topTrackLabel} vs ${bottomTrackLabel}`)}</strong>
         ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context, history)}
       </div>
+      ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
       <div class="assembly-track-layout subview-track-layout">
         <div class="assembly-track-label-column subview-track-label-column" style="width:${LABEL_COLUMN_WIDTH_PX}px;height:${contentBottom}px">
           <div class="assembly-track-label-row${topRoleClass}" style="top:${resolvedTopLayout.labelTop}px">${escapeHtml(topTrackLabel)}</div>
@@ -3082,7 +3109,7 @@ function renderSubviewTrackPairAlignmentCard(
               ${collinearityBands
                 .map(
                   (band) =>
-                  `<polygon class="track-collinearity-band${topRoleClass}" points="${band.points}" pointer-events="visibleFill" data-track-band-proxy="1" data-subview-top-contig-id="${band.topContigId}" data-subview-bottom-contig-id="${band.bottomContigId}" data-subview-band-tooltip="${escapeAttr(band.tooltipText)}" data-subview-hit-key="${escapeAttr(band.hitKey)}" data-subview-hit-left-active="${band.leftActive ? "1" : "0"}" data-subview-hit-right-active="${band.rightActive ? "1" : "0"}" />`,
+                  `<polygon class="track-collinearity-band${topRoleClass}" points="${band.points}" ${alignmentBandSvgAttrs(band, topTrack.role === "support" ? "companion" : "primary")} pointer-events="visibleFill" data-track-band-proxy="1" data-subview-top-contig-id="${band.topContigId}" data-subview-bottom-contig-id="${band.bottomContigId}" data-subview-band-tooltip="${escapeAttr(band.tooltipText)}" data-subview-hit-key="${escapeAttr(band.hitKey)}" data-subview-hit-left-active="${band.leftActive ? "1" : "0"}" data-subview-hit-right-active="${band.rightActive ? "1" : "0"}" />`,
                 )
                 .join("")}
             </g>
@@ -3145,6 +3172,8 @@ function collectSubviewRenderableHits(ctg, { blockLength, minIdentityPct, preser
       const normalizedRefEnd = Math.max(refStart, refEnd);
       return {
         hitKey: `hit-${index + 1}`,
+        identityPct: readHitIdentityPct(hit),
+        alignLength: hitBlockLength,
         pairKey: String(hit?.pairKey || `hit-${index + 1}`),
         ctgStart: Math.min(ctgStart, ctgEnd),
         ctgEnd: Math.max(ctgStart, ctgEnd),
@@ -3223,6 +3252,8 @@ function buildSubviewAlignmentSvgModel({
       const x2 = toX((Number(hit.ctgEnd) || 0) + trackOffsetBp);
       return {
         hitKey: String(hit?.hitKey || ""),
+        identityPct: readHitIdentityPct(hit),
+        alignLength: hit.alignLength,
         pairKey: String(hit?.pairKey || hit?.hitKey || ""),
         reversed: hit?.reversed === true,
         ctgStart: Math.min(Number(hit.ctgStart) || 0, Number(hit.ctgEnd) || 0),
@@ -3301,7 +3332,7 @@ function buildSubviewAlignmentSvgModel({
     trackMode: "2-contig",
     pairingMode,
   });
-  const collinearityBands = segmentPairs.map(({ topSegment, bottomSegment }) => {
+  const collinearityBands = sortAlignmentBands(segmentPairs.map(({ topSegment, bottomSegment }) => {
     const topStartX = topSegment.x;
     const topEndX = topSegment.x + topSegment.width;
     const bottomStartX = bottomSegment.x;
@@ -3310,7 +3341,9 @@ function buildSubviewAlignmentSvgModel({
     const reversed = topSegment.reversed === true || bottomSegment.reversed === true;
     return {
       hitKey,
+      identityPct: pairingMode === "projection-key" ? readHitIdentityPct(topSegment) : null,
       tooltipText: buildSubviewBandTooltipText({
+        isDirectAlignment: pairingMode === "projection-key",
         topName: String(topCtg?.name || ""),
         bottomName: String(bottomCtg?.name || ""),
         topSegment,
@@ -3330,7 +3363,7 @@ function buildSubviewAlignmentSvgModel({
             `${bottomStartX.toFixed(2)},${bottomBarY.toFixed(2)}`,
           ]).join(" "),
     };
-  });
+  }));
   const anchorEdges = segmentPairs.flatMap(({ topSegment, bottomSegment }, index) => {
     const hitKey = String(topSegment?.hitKey || bottomSegment?.hitKey || `hit-${index + 1}`);
     const reversed = topSegment.reversed === true || bottomSegment.reversed === true;
@@ -3396,12 +3429,14 @@ function buildSubviewAlignmentSvgModel({
   };
 }
 
-function buildSubviewBandTooltipText({ topName, bottomName, topSegment, bottomSegment }) {
+function buildSubviewBandTooltipText({ topName, bottomName, topSegment, bottomSegment, isDirectAlignment }) {
   const resolvedTopName = String(topName || "Top");
   const resolvedBottomName = String(bottomName || "Bottom");
   return [
     `${resolvedTopName}: ${formatBpInterval(topSegment?.ctgStart, topSegment?.ctgEnd)}`,
     `${resolvedBottomName}: ${formatBpInterval(bottomSegment?.ctgStart, bottomSegment?.ctgEnd)}`,
+    isDirectAlignment ? alignmentBandTooltipMetrics(topSegment)
+      : "Identity: Unknown (reference overlap; not a direct alignment)",
   ].join(" | ");
 }
 

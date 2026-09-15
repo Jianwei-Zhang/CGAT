@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { bindBandCanvasRuntime } from "../band-canvas-runtime.js";
+import { resolveAlignmentBandStyle } from "../alignment-band-style.js";
 
 function createClassList() {
   const values = new Set();
@@ -100,6 +101,38 @@ function createContextRecorder() {
     },
   };
 }
+
+test("canvas draws opaque identity fills low-to-high with stable equal-quality ties", () => {
+  const originalRequest = globalThis.requestAnimationFrame;
+  const originalCancel = globalThis.cancelAnimationFrame;
+  globalThis.requestAnimationFrame = (callback) => { callback(0); return 1; };
+  globalThis.cancelAnimationFrame = () => {};
+  try {
+    const paints = [];
+    const context = createContextRecorder();
+    context.fill = function () { paints.push(this.fillStyle); };
+    const points = [[10, 20], [60, 20], [70, 60], [20, 60]];
+    const { host } = createCanvasLayer({ context, sceneOverrides: { bands: [
+      { identityPct: 100, tone: "primary", points },
+      { identityPct: 85, tone: "primary", points },
+      { identityPct: null, tone: "primary", points },
+      { identityPct: 85, tone: "companion", points },
+      { identityPct: 0, tone: "primary", points },
+    ] } });
+    bindBandCanvasRuntime(host);
+    assert.deepEqual(paints, [
+      resolveAlignmentBandStyle("primary", null).fill,
+      resolveAlignmentBandStyle("primary", 0).fill,
+      resolveAlignmentBandStyle("primary", 85).fill,
+      resolveAlignmentBandStyle("companion", 85).fill,
+      resolveAlignmentBandStyle("primary", 100).fill,
+    ]);
+    paints.forEach((fill) => assert.ok(fill.startsWith("rgb("), "no alpha blending"));
+  } finally {
+    globalThis.requestAnimationFrame = originalRequest;
+    globalThis.cancelAnimationFrame = originalCancel;
+  }
+});
 
 test("band canvas marks the track scroll ready only after a successful draw", () => {
   const originalRequestAnimationFrame = globalThis.requestAnimationFrame;

@@ -390,7 +390,7 @@ test("subview band tooltip keeps each contig interval on its own unwrapped line"
   assert.doesNotMatch(css, /\.subview-band-tooltip\s*\{[^}]*white-space:\s*pre-line;/);
 });
 
-test("subview hit bands follow top-track color", () => {
+test("subview hit bands use their per-hit opaque identity colors", () => {
   const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
@@ -398,11 +398,11 @@ test("subview hit bands follow top-track color", () => {
 
   assert.match(
     css,
-    /\.subview-track-svg\s+\.track-collinearity-band\s*\{[^}]*fill:\s*rgba\(97,\s*129,\s*170,\s*0\.24\);[^}]*stroke:\s*rgba\(97,\s*129,\s*170,\s*0\.38\);/,
+    /\.subview-track-svg\s+\.track-collinearity-band\s*\{[^}]*fill:\s*var\(--alignment-band-fill,[^;]+;[^}]*stroke:\s*var\(--alignment-band-stroke,[^;]+;/,
   );
   assert.match(
     css,
-    /\.subview-track-svg\s+\.track-collinearity-band\.is-companion\s*\{[^}]*fill:\s*rgba\(154,\s*126,\s*78,\s*0\.22\);[^}]*stroke:\s*rgba\(154,\s*126,\s*78,\s*0\.34\);/,
+    /\.subview-track-svg\s+\.track-collinearity-band\.is-companion\s*\{[^}]*fill:\s*var\(--alignment-band-fill,[^;]+;[^}]*stroke:\s*var\(--alignment-band-stroke,[^;]+;/,
   );
 });
 

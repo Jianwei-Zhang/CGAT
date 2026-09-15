@@ -1,4 +1,8 @@
 import {
+  readHitIdentityPct, alignmentBandSvgAttrs, alignmentBandTooltipMetrics,
+  sortAlignmentBands, renderAlignmentIdentityLegend,
+} from "./alignment-band-style.js";
+import {
   buildSubviewAnchorEndpointKey,
   deriveSubviewContigFragments,
 } from "./subview-anchor-state.js";
@@ -134,6 +138,8 @@ function buildEvidenceBands(layout, evidence, prefs) {
     const reversed = ((strand === "-") !== Boolean(top.flipped)) !== Boolean(bottom.flipped);
     return {
       hitKey: String(hit?.hitKey || `composition-pairwise-${index + 1}`),
+      identityPct: readHitIdentityPct(hit),
+      alignLength: length,
       top,
       bottom,
       topRange,
@@ -181,6 +187,8 @@ function buildReferenceBands(layout, candidates, prefs) {
         const strand = String(hit?.strand || hit?.orient || "+").trim();
         bands.push({
           hitKey: `reference:${top.entityKey}|${bottom.entityKey}|${String(hit?.hitKey || index + 1)}`,
+          identityPct: readHitIdentityPct(hit),
+          alignLength: length,
           top,
           bottom,
           topRange: rangeX(top, topStart, topEnd),
@@ -477,10 +485,10 @@ export function renderSubviewCompositionAlignmentCard({
     escapeHtml,
     gapLabel: i18n.grtResult.gapLabel,
   });
-  const bands = [
+  const bands = sortAlignmentBands([
     ...buildEvidenceBands(layout, subview?.pairwiseEvidence, prefs),
     ...buildReferenceBands(layout, candidates, prefs),
-  ];
+  ]);
   const bandMarkup = bands.map((band) => {
     const bottomLeft = band.reversed ? band.bottomRange.right : band.bottomRange.left;
     const bottomRight = band.reversed ? band.bottomRange.left : band.bottomRange.right;
@@ -490,7 +498,10 @@ export function renderSubviewCompositionAlignmentCard({
       `${bottomRight.toFixed(2)},${BOTTOM_Y}`,
       `${bottomLeft.toFixed(2)},${BOTTOM_Y}`,
     ].join(" ");
-    return `<polygon class="track-collinearity-band" points="${points}" pointer-events="visibleFill"
+    const tone = band.top.source?.role === "support" ? "companion" : "primary";
+    const tooltip = `${band.top.label}: ${band.topCuts.left}–${band.topCuts.right} | ${band.bottom.label}: ${band.bottomCuts.left}–${band.bottomCuts.right} | ${alignmentBandTooltipMetrics(band)}`;
+    return `<polygon class="track-collinearity-band${tone === "companion" ? " is-companion" : ""}" points="${points}" ${alignmentBandSvgAttrs(band, tone)} pointer-events="visibleFill"
+      data-subview-band-tooltip="${escapeAttr(tooltip)}"
       data-track-band-proxy="1" data-subview-hit-key="${escapeAttr(band.hitKey)}"
       data-subview-top-contig-id="${band.top.assemblyCtgId || 0}"
       data-subview-bottom-contig-id="${band.bottom.assemblyCtgId || 0}" />`;
@@ -549,6 +560,7 @@ export function renderSubviewCompositionAlignmentCard({
       ${topCount && bottomCount
         ? evidenceStatus(subview?.pairwiseEvidence, i18n.subview, escapeHtml)
         : `<span class="muted">${escapeHtml(i18n.subview.compositionEvidenceNeedsBothLanes)}</span>`}</div>
+    ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
     <div class="assembly-track-layout subview-track-layout">
       <div class="assembly-track-label-column subview-track-label-column" style="width:136px;height:${CONTENT_HEIGHT}px">
         <div class="assembly-track-label-row" style="top:${TOP_Y - 4}px">${escapeHtml(i18n.subview.tools.compositionManager.lanes.top)}</div>
@@ -562,6 +574,7 @@ export function renderSubviewCompositionAlignmentCard({
       <div class="assembly-track-scroll subview-track-scroll" data-track-role="subview"
         data-subview-domain-span-bp="${Math.round(layout.width * layout.bpPerPx)}" data-subview-inner-width="${layout.width}"
         data-subview-viewbox-min-x="${layout.viewBoxMinX}" data-subview-window-start-bp="0">
+        <div class="subview-band-tooltip is-hidden" data-subview-band-tooltip-delay-ms="500" aria-hidden="true"></div>
         <svg class="assembly-track-svg subview-track-svg" width="${layout.width}" height="${CONTENT_HEIGHT}"
           viewBox="${layout.viewBoxMinX} 0 ${layout.width} ${CONTENT_HEIGHT}" preserveAspectRatio="xMinYMin meet">
           <line class="track-ruler-line" x1="0" y1="48" x2="${rulerWidth}" y2="48" />

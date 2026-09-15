@@ -1,3 +1,7 @@
+import {
+  readHitIdentityPct, alignmentBandSvgAttrs, alignmentBandTooltipMetrics,
+  sortAlignmentBands, renderAlignmentIdentityLegend,
+} from "./alignment-band-style.js";
 import { buildDualTrackModel } from "./track-layout.js";
 import {
   ALIGNMENT_LENGTH_OPTIONS,
@@ -2216,6 +2220,8 @@ function renderAssemblyTracks({
             ? normalizeSupportDatasetId(ctg.phasedTrackItemId)
             : null;
           return {
+            identityPct: readHitIdentityPct(hit),
+            tooltipText: `${ctg.name || ctg.assemblyCtgId}: ${hitStartOffset}–${hitEndOffset} | ${selectedChrName}: ${refStartBp}–${refEndBp} | ${alignmentBandTooltipMetrics({ identityPct: readHitIdentityPct(hit), alignLength: hitBlockLength })}`,
             className: layout.className ? ` ${layout.className}` : "",
             tone: trackRole === "support" ? "companion" : "primary",
             trackRole,
@@ -2231,14 +2237,14 @@ function renderAssemblyTracks({
       });
     })
     .filter(Boolean);
-  const collinearityBands = collinearityBandItems
+  const collinearityBands = sortAlignmentBands(collinearityBandItems)
     .map((band) => {
       const phasedBandAttrs = band.trackRole === "phased"
         ? ` data-band-phased-track-id="${band.phasedTrackId || 0}" data-band-phased-track-item-id="${band.phasedTrackItemId || 0}" data-band-phased-haplotype-key="${escapeAttr(band.phasedHaplotypeKey || "")}"`
         : "";
       return `<polygon class="track-collinearity-band${band.className}" data-band-track-role="${escapeAttr(
           band.trackRole,
-        )}" data-band-contig-id="${band.contigId}"${phasedBandAttrs} data-track-band-proxy="1" points="${band.points}" />`;
+        )}" data-band-contig-id="${band.contigId}"${phasedBandAttrs} data-track-band-proxy="1" points="${band.points}" ${alignmentBandSvgAttrs(band)}><title>${escapeHtml(band.tooltipText)}</title></polygon>`;
     })
     .join("");
 
@@ -2437,6 +2443,7 @@ function renderAssemblyTracks({
         </div>
       </div>
       ${grtResultToastMarkup}
+      ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
       <div class="assembly-track-layout">
         <div class="assembly-track-label-column" style="width:${LABEL_COLUMN_WIDTH_PX}px;height:${contentBottom}px">
           ${labelRows}
