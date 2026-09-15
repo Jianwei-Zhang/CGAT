@@ -3,7 +3,7 @@ export const TICK_LENGTH_OPTIONS = Object.freeze([10000, 100000]);
 export const MIN_TICK_UNIT_KB_OPTIONS = Object.freeze([250, 500, 750, 1000, 10000, 100000]);
 export const MAX_TICK_COUNT_OPTIONS = Object.freeze([5, 10, 15, 20]);
 export const ALIGNMENT_LENGTH_OPTIONS = Object.freeze([1000, 10000, 100000]);
-export const IDENTITY_PCT_OPTIONS = Object.freeze([0, 90, 95, 99]);
+export const IDENTITY_PCT_OPTIONS = Object.freeze([0, 85, 90, 95]);
 export const SUPPORT_DS_CTG_LEN_BP_OPTIONS = Object.freeze([0, 1000, 10000, 100000]);
 
 export const DEFAULT_VIEW_SPAN_KB = VIEW_SPAN_KB_OPTIONS[0];

@@ -118,9 +118,9 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
     /<input\s+id="assembly-track-identity-pct"\s+class="assembly-track-combo-input"\s+type="text"\s+inputmode="numeric"\s+pattern="\[0-9\]\*"\s+value="0"\s+autocomplete="off"[^>]*>/,
   );
   assert.match(html, /data-track-combo-value="0"/);
+  assert.match(html, /data-track-combo-value="85"/);
   assert.match(html, /data-track-combo-value="90"/);
   assert.match(html, /data-track-combo-value="95"/);
-  assert.match(html, /data-track-combo-value="99"/);
   assert.doesNotMatch(html, /<datalist id="assembly-track-min-tick-unit-kb-options">/);
   assert.doesNotMatch(html, /<datalist id="assembly-track-max-tick-count-options">/);
   assert.doesNotMatch(html, /<datalist id="assembly-track-alignment-length-options">/);
