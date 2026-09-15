@@ -20,8 +20,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from threading import Event
 
 try:
     from grt_core import *
@@ -47,7 +50,7 @@ except ModuleNotFoundError:  # Imported as server.tools.grt_step23.
     )
 
 
-ENGINE_VERSION = 10
+ENGINE_VERSION = 11
 MUMMER_MIN_CLUSTER = 1_000
 MUMMER_MIN_MATCH = 100
 MUMMER_MIN_ALIGNMENT = 10_000
@@ -193,7 +196,14 @@ def grt_mummer_parameters(threads: int) -> dict[str, object]:
     filtering. Express the resulting semantics unambiguously instead of
     copying that malformed command line.
     """
-    parameters = mummer_parameters(threads)
+    # Each task has one query record. Spend the CPU budget on independent
+    # target partitions; nucmer query workers cannot split that one record.
+    parameters = mummer_parameters(
+        1,
+        min_cluster=MUMMER_MIN_CLUSTER,
+        min_match=MUMMER_MIN_MATCH,
+        min_alignment=MUMMER_MIN_ALIGNMENT,
+    )
     parameters["delta_filter"]["reference_best"] = False
     return parameters
 
@@ -236,6 +246,168 @@ def partition_mummer_targets(
     if current:
         chunks.append(current)
     return [*large, *chunks]
+
+
+MUMMER_LOG_NAMES = [
+    f"{tool}.{suffix}"
+    for tool in ("nucmer", "delta_filter", "show_coords")
+    for suffix in ("command.txt", "stdout.log", "stderr.log")
+]
+
+
+def mummer_available_memory() -> int:
+    """Available bytes, also respecting the current Linux cgroup limit."""
+    available = None
+    try:
+        values = dict(
+            line.split(":", 1)
+            for line in Path("/proc/meminfo").read_text().splitlines()
+        )
+        available = int(values["MemAvailable"].split()[0]) * 1024
+    except (OSError, KeyError, ValueError):
+        pass
+    try:
+        # The visible root covers containers; the relative group covers hosts
+        # with nested systemd limits. Include every visible ancestor limit.
+        relative = next(
+            line.split(":", 2)[2]
+            for line in Path("/proc/self/cgroup").read_text().splitlines()
+            if line.startswith("0::")
+        )
+        root = Path("/sys/fs/cgroup")
+        group = root / relative.lstrip("/")
+        groups = [root, *[p for p in [group, *group.parents] if root in p.parents]]
+        for path in groups:
+            try:
+                limit = int((path / "memory.max").read_text().strip())
+                current = int((path / "memory.current").read_text().strip())
+                remaining = max(0, limit - current)
+                available = min(available, remaining) if available is not None else remaining
+            except (OSError, ValueError):
+                continue
+    except (OSError, StopIteration):
+        pass
+    return available if available is not None else 0
+
+
+def mummer_partition_workers(
+    threads: int, partition_sizes: list[int], query_size: int,
+    *, available_memory: int | None = None,
+) -> int:
+    if not partition_sizes:
+        return 1
+    cpu_count = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
+    available = mummer_available_memory() if available_memory is None else available_memory
+    # Conservative admission estimate, not a hard RSS guarantee. Keep 30% of
+    # current headroom for Python, other pipeline processes and the OS.
+    per_job = max(512 * 1024**2, 32 * max(partition_sizes) + 4 * query_size)
+    memory_workers = max(1, int(available * 0.7) // per_job) if available else 1
+    return max(1, min(threads, cpu_count, len(partition_sizes), memory_workers))
+
+
+def valid_mummer_cache(directory: Path, fingerprint: str, names: list[str]) -> bool:
+    try:
+        checkpoint = json.loads((directory / "cache.json").read_text(encoding="utf-8"))
+        if not isinstance(checkpoint, dict):
+            return False
+        hashes = checkpoint.get("output_hashes", {})
+        return (
+            isinstance(hashes, dict)
+            and checkpoint.get("status") == "success"
+            and checkpoint.get("input_fingerprint") == fingerprint
+            and set(hashes) == set(names)
+            and all((directory / name).is_file() and sha256_file(directory / name) == expected
+                    for name, expected in hashes.items())
+        )
+    except (OSError, TypeError, ValueError):
+        return False
+
+
+def cached_mummer_partition(
+    server_dir: Path, temporary: Path, stage: str, chromosome: str,
+    index: int, total: int, partition: list[tuple[str, str]],
+    query_sha256: str, query_length: int, target_kind: str,
+    members_by_record: dict[str, dict[str, str]], donor_lengths: dict[str, int],
+    tools: dict[str, dict[str, str]], cancel_event: Event,
+) -> tuple[Path, bool, float]:
+    """Cache numerical alignments independently of repair stage/provenance."""
+    started = time.monotonic()
+    label = f"part-{index:04d}"
+    target_payload = fasta_bytes(partition)
+    payload = {
+        "raw_alignment_version": 1,
+        "query_sha256": query_sha256,
+        "target_sha256": sha256_bytes(target_payload),
+        "tools": {name: command_identity(value) for name, value in tools.items()},
+        "parameters": grt_mummer_parameters(1),
+    }
+    fingerprint = json_hash(payload)
+    cache_parent = server_dir / "grt/cache/step23/raw_mummer/v1"
+    cache_dir = cache_parent / fingerprint
+    names = ["result.coords", *MUMMER_LOG_NAMES]
+    if cancel_event.is_set():
+        fail("MUMmer partition cancelled")
+    if valid_mummer_cache(cache_dir, fingerprint, names):
+        parse_mummer_coords(cache_dir / "result.coords", stage, chromosome,
+                            query_length, members_by_record, donor_lengths)
+        elapsed = time.monotonic() - started
+        print(f"GRT {stage} MUMmer {chromosome} {index}/{total}: CACHE_HIT ({elapsed:.2f}s)", flush=True)
+        return cache_dir, True, elapsed
+    work = temporary / label
+    work.mkdir()
+    target_path = work / "target.fa"
+    target_path.write_bytes(target_payload)
+    del target_payload
+    if target_kind == "ordinary_donor":
+        write_tsv(target_path.with_suffix(".manifest.tsv"), DONOR_MEMBER_FIELDS,
+                  [members_by_record[name] for name, _sequence in partition])
+    delta = work / "result.delta"
+    filtered = work / "filtered.delta"
+    coords = work / "result.coords"
+    nucmer_parameters = payload["parameters"]["nucmer"]
+    commands = [
+        ("nucmer", [tools["nucmer"]["resolved"], "-c", str(nucmer_parameters["min_cluster"]),
+                    "-l", str(nucmer_parameters["min_match"]),
+                    f"--batch={nucmer_parameters['batch']}", "-t", str(nucmer_parameters["threads"]),
+                    "-p", str(work / "result"), str(target_path), str(temporary / "query.fa")], None),
+        ("delta_filter", [tools["delta-filter"]["resolved"], "-l",
+                          str(payload["parameters"]["delta_filter"]["min_alignment"]), str(delta)], filtered),
+        ("show_coords", [tools["show-coords"]["resolved"], "-r", "-l", str(filtered)], coords),
+    ]
+    print(f"GRT {stage} MUMmer {chromosome} {index}/{total}: START", flush=True)
+    header_only_delta = False
+    for tool_name, command, output in commands:
+        logs = [work / f"{tool_name}.{suffix}" for suffix in ("command.txt", "stdout.log", "stderr.log")]
+        if tool_name == "delta_filter":
+            if not delta.is_file() or delta.stat().st_size == 0:
+                fail(f"nucmer did not create a non-empty delta for {stage}:{chromosome}:{label}")
+            header_only_delta = is_header_only_mummer_delta(delta)
+        if tool_name != "nucmer" and header_only_delta:
+            output.write_bytes(delta.read_bytes() if tool_name == "delta_filter" else b"")
+            write_skipped_command_logs(command, *logs, "nucmer produced no alignments")
+        else:
+            run_logged(command, work, *logs, output, cancel_event=cancel_event)
+    if not filtered.is_file() or not coords.is_file():
+        fail(f"partitioned MUMmer did not create filtered coordinates for {stage}:{chromosome}:{label}")
+    parse_mummer_coords(coords, stage, chromosome, query_length, members_by_record, donor_lengths)
+    elapsed = time.monotonic() - started
+    checkpoint = {
+        "status": "success", "input_fingerprint": fingerprint,
+        "fingerprint_payload": payload, "elapsed_seconds": elapsed,
+        "output_hashes": {name: sha256_file(work / name) for name in names},
+    }
+    # Publish only a fully validated partition. A failed neighbour never
+    # removes this checkpoint; partial work remains in the stage diagnostics.
+    for path in work.iterdir():
+        if path.name not in names:
+            path.unlink()
+    (work / "cache.json").write_text(json.dumps(checkpoint, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    cache_parent.mkdir(parents=True, exist_ok=True)
+    if cache_dir.exists():
+        shutil.rmtree(cache_dir)
+    os.replace(work, cache_dir)
+    print(f"GRT {stage} MUMmer {chromosome} {index}/{total}: SUCCESS ({elapsed:.2f}s)", flush=True)
+    return cache_dir, False, elapsed
 
 
 def cached_mummer_chromosome(
@@ -361,104 +533,46 @@ def cached_mummer_chromosome(
                 for tool_name in ("nucmer", "delta_filter", "show_coords")
                 for suffix in ("command.txt", "stdout.log", "stderr.log")
             }
-            coordinate_parts: list[bytes] = []
-            for index, partition in enumerate(target_partitions, start=1):
-                label = f"part-{index:04d}"
-                target_path = temporary / f".{label}.target.fa"
-                target_path.write_bytes(fasta_bytes(partition))
-                if target_kind == "ordinary_donor":
-                    write_tsv(
-                        target_path.with_suffix(".manifest.tsv"),
-                        DONOR_MEMBER_FIELDS,
-                        [members_by_record[name] for name, _sequence in partition],
-                    )
-                prefix = temporary / f".{label}"
-                delta = temporary / f".{label}.delta"
-                filtered = temporary / f".{label}.filtered.delta"
-                part_coords = temporary / f".{label}.coords"
-                nucmer_command = [
-                    tools["nucmer"]["resolved"],
-                    "-c",
-                    str(MUMMER_MIN_CLUSTER),
-                    "-l",
-                    str(MUMMER_MIN_MATCH),
-                    "--batch=500000000",
-                    "-t",
-                    str(max(1, min(threads, 4))),
-                    "-p",
-                    str(prefix),
-                    str(target_path),
-                    str(temporary / "query.fa"),
-                ]
-                filter_command = [
-                    tools["delta-filter"]["resolved"],
-                    "-l",
-                    str(MUMMER_MIN_ALIGNMENT),
-                    str(delta),
-                ]
-                coords_command = [
-                    tools["show-coords"]["resolved"],
-                    "-r",
-                    "-l",
-                    str(filtered),
-                ]
-                header_only_delta = False
-                for tool_name, command, output in (
-                    ("nucmer", nucmer_command, None),
-                    ("delta_filter", filter_command, filtered),
-                    ("show_coords", coords_command, part_coords),
-                ):
-                    command_path = temporary / f".{label}.{tool_name}.command.txt"
-                    stdout_path = temporary / f".{label}.{tool_name}.stdout.log"
-                    stderr_path = temporary / f".{label}.{tool_name}.stderr.log"
-                    if tool_name == "delta_filter":
-                        if not delta.is_file() or delta.stat().st_size == 0:
-                            fail(
-                                "nucmer did not create a non-empty delta for "
-                                f"{stage}:{chromosome}:{label}"
-                            )
-                        header_only_delta = is_header_only_mummer_delta(delta)
-                    if tool_name != "nucmer" and header_only_delta:
-                        reason = "nucmer produced no alignments"
-                        if tool_name == "delta_filter":
-                            filtered.write_bytes(delta.read_bytes())
-                        else:
-                            part_coords.write_bytes(b"")
-                        write_skipped_command_logs(
-                            command,
-                            command_path,
-                            stdout_path,
-                            stderr_path,
-                            reason,
-                        )
-                    else:
-                        run_logged(
-                            command,
-                            temporary,
-                            command_path,
-                            stdout_path,
-                            stderr_path,
-                            output,
-                        )
-                    marker = f"# {label}\n".encode("utf-8")
-                    aggregate[f"{tool_name}.command.txt"].extend(
-                        [marker, command_path.read_bytes()]
-                    )
-                    aggregate[f"{tool_name}.stdout.log"].extend(
-                        [marker, stdout_path.read_bytes()]
-                    )
-                    aggregate[f"{tool_name}.stderr.log"].extend(
-                        [marker, stderr_path.read_bytes()]
-                    )
-                if not filtered.is_file() or not part_coords.is_file():
-                    fail(
-                        "partitioned MUMmer did not create filtered coordinates for "
-                        f"{stage}:{chromosome}:{label}"
-                    )
-                coordinate_parts.append(part_coords.read_bytes())
-                for path in temporary.glob(f".{label}*"):
-                    path.unlink()
-            coords.write_bytes(b"".join(coordinate_parts))
+            workers = mummer_partition_workers(
+                threads, [sum(len(seq) for _name, seq in part) for part in target_partitions],
+                len(q_sequence),
+            )
+            print(f"GRT {stage} MUMmer {chromosome}: {len(target_partitions)} partitions, "
+                  f"workers={workers}, nucmer_threads=1, thread_budget={threads}", flush=True)
+            cancel_event = Event()
+            results: dict[int, tuple[Path, bool, float]] = {}
+            pool = ThreadPoolExecutor(max_workers=workers)
+            futures = {}
+            query_sha256 = sha256_bytes(query_payload)
+            try:
+                futures = {
+                    pool.submit(
+                        cached_mummer_partition, server_dir, temporary, stage, chromosome,
+                        index, len(target_partitions), partition, query_sha256,
+                        len(q_sequence), target_kind, members_by_record, donor_lengths,
+                        tools, cancel_event,
+                    ): index
+                    for index, partition in enumerate(target_partitions, start=1)
+                }
+                for future in as_completed(futures):
+                    results[futures[future]] = future.result()
+            except BaseException:
+                cancel_event.set()
+                for future in futures:
+                    future.cancel()
+                raise
+            finally:
+                pool.shutdown(wait=True, cancel_futures=True)
+            # Completion order must never change coordinate line numbers or
+            # candidate tie breaking. Aggregate in the original partition order.
+            with coords.open("wb") as handle:
+                for index in range(1, len(target_partitions) + 1):
+                    part_dir, _hit, _elapsed = results[index]
+                    with (part_dir / "result.coords").open("rb") as part_handle:
+                        shutil.copyfileobj(part_handle, handle)
+                    marker = f"# part-{index:04d}\n".encode("utf-8")
+                    for name in aggregate:
+                        aggregate[name].extend([marker, (part_dir / name).read_bytes()])
             for name, parts in aggregate.items():
                 (temporary / name).write_bytes(b"".join(parts))
         else:

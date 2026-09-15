@@ -1631,7 +1631,10 @@ else:
             )
             changed = self.run_step23(server, tools, env, step23_tool=runtime_tool)
             self.assertEqual(changed.returncode, 0, changed.stderr)
-            self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 4)
+            self.assertIn("GRT step2 complete", changed.stdout)
+            # Recompute repair decisions after engine changes, retaining
+            # independently fingerprinted numerical alignments.
+            self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 2)
             checkpoint = json.loads(
                 (server / "grt/checkpoints/step3.json").read_text(encoding="utf-8")
             )
@@ -1818,7 +1821,8 @@ else:
 
             parameter_invalidated = self.run_step23(server, tools, env, threads=3)
             self.assertEqual(parameter_invalidated.returncode, 0, parameter_invalidated.stderr)
-            self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 4)
+            # The scheduling budget does not change nucmer's effective -t 1.
+            self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 2)
             self.assertEqual(prepare_fixture.sha256(server / "grt/q/q3.fa"), q3_hash)
 
             nucmer_path = tools["nucmer"]
@@ -1833,7 +1837,7 @@ else:
             )
             tool_invalidated = self.run_step23(server, tools, env, threads=3)
             self.assertEqual(tool_invalidated.returncode, 0, tool_invalidated.stderr)
-            self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 6)
+            self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 4)
             self.assertEqual(prepare_fixture.sha256(server / "grt/q/q3.fa"), q3_hash)
 
     def test_coords_parser_uses_real_show_coords_columns(self):

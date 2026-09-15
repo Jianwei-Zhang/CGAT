@@ -3,6 +3,7 @@ from __future__ import annotations
 import shlex
 import subprocess
 from pathlib import Path
+from threading import Event
 
 from .common import fail
 
@@ -75,29 +76,36 @@ def run_logged(
     stdout_path: Path,
     stderr_path: Path,
     stdout_redirect: Path | None = None,
+    cancel_event: Event | None = None,
 ) -> None:
+    def execute(stdout_handle, stderr_handle) -> int:
+        if cancel_event is not None and cancel_event.is_set():
+            fail("MUMmer partition cancelled")
+        process = subprocess.Popen(
+            command, cwd=cwd, stdout=stdout_handle, stderr=stderr_handle
+        )
+        try:
+            while True:
+                try:
+                    return process.wait(timeout=0.2)
+                except subprocess.TimeoutExpired:
+                    if cancel_event is not None and cancel_event.is_set():
+                        fail("MUMmer partition cancelled")
+        except BaseException:
+            process.kill()
+            process.wait()
+            raise
+
     command_path.write_text(shlex.join(command) + "\n", encoding="utf-8", newline="")
     with stderr_path.open("w", encoding="utf-8", newline="") as stderr_handle:
         if stdout_redirect is None:
             with stdout_path.open("w", encoding="utf-8", newline="") as stdout_handle:
-                completed = subprocess.run(
-                    command,
-                    cwd=cwd,
-                    stdout=stdout_handle,
-                    stderr=stderr_handle,
-                    check=False,
-                )
+                returncode = execute(stdout_handle, stderr_handle)
         else:
             stdout_path.write_text("redirected to " + stdout_redirect.name + "\n", encoding="utf-8")
             with stdout_redirect.open("w", encoding="utf-8", newline="") as output_handle:
-                completed = subprocess.run(
-                    command,
-                    cwd=cwd,
-                    stdout=output_handle,
-                    stderr=stderr_handle,
-                    check=False,
-                )
-    if completed.returncode != 0:
+                returncode = execute(output_handle, stderr_handle)
+    if returncode != 0:
         try:
             stderr_tail = stderr_path.read_text(
                 encoding="utf-8", errors="replace"
@@ -106,7 +114,7 @@ def run_logged(
             stderr_tail = ""
         stderr_detail = f"; stderr_tail={stderr_tail!r}" if stderr_tail else ""
         fail(
-            f"command failed with exit code {completed.returncode}; "
+            f"command failed with exit code {returncode}; "
             f"command={command_path}, stderr={stderr_path}{stderr_detail}"
         )
 
