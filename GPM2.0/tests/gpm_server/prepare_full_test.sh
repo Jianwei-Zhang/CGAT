@@ -260,8 +260,8 @@ test_minimap_options_set_preset_and_threads() {
     --threads 12 \
     -o "$output_root" >/dev/null
 
-  grep -F "minimap2 -x asm5 -t 12 -o result.paf" "${output_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
-    echo "expected ds-vs-ref command to use asm5 and 12 threads" >&2
+  grep -F "minimap2 -c -x asm5 -t 12 -o result.paf" "${output_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
+    echo "expected ds-vs-ref command to emit CIGAR (-c), use asm5 and 12 threads" >&2
     cat "${output_root}/runs/ds_a_vs_ref/command.sh" >&2
     exit 1
   }
@@ -275,13 +275,13 @@ EOF
 
   PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
 
-  grep -F "minimap2 -x asm5 -X -t 12 -o result.paf" "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >/dev/null || {
-    echo "expected chr-local self command to use asm5, -X, and 12 threads" >&2
+  grep -F "minimap2 -c -x asm5 -X -t 12 -o result.paf" "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >/dev/null || {
+    echo "expected chr-local self command to emit CIGAR (-c), use asm5, -X, and 12 threads" >&2
     cat "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >&2
     exit 1
   }
-  grep -F "minimap2 -x asm5 -t 12 -o result.paf" "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b/command.sh" >/dev/null || {
-    echo "expected chr-local pair command to use asm5 and 12 threads" >&2
+  grep -F "minimap2 -c -x asm5 -t 12 -o result.paf" "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b/command.sh" >/dev/null || {
+    echo "expected chr-local pair command to emit CIGAR (-c), use asm5 and 12 threads" >&2
     cat "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b/command.sh" >&2
     exit 1
   }
@@ -300,8 +300,8 @@ test_alignment_engine_defaults_and_validation() {
     --ref ref_aligner "$ref" \
     --ds ds_a "$ds" \
     -o "$default_root" >/dev/null
-  grep -F "minimap2 -x asm10 -t 10 -o result.paf" "${default_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
-    echo "expected default minimap2 command to use 10 threads" >&2
+  grep -F "minimap2 -c -x asm10 -t 10 -o result.paf" "${default_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
+    echo "expected default minimap2 command to emit CIGAR (-c) and use 10 threads" >&2
     cat "${default_root}/runs/ds_a_vs_ref/command.sh" >&2
     exit 1
   }
@@ -340,8 +340,8 @@ test_alignment_engine_defaults_and_validation() {
     cat "${winnowmap_root}/runs/ds_a_vs_ref/command.sh" >&2
     exit 1
   }
-  grep -F "winnowmap -W repetitive_19_result.txt -x asm20 -t 10" "${winnowmap_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
-    echo "expected winnowmap command to use default preset and threads" >&2
+  grep -F "winnowmap -c -W repetitive_19_result.txt -x asm20 -t 10" "${winnowmap_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
+    echo "expected winnowmap command to emit CIGAR (-c) and use default preset and threads" >&2
     cat "${winnowmap_root}/runs/ds_a_vs_ref/command.sh" >&2
     exit 1
   }

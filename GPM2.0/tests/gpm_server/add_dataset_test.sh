@@ -26,10 +26,15 @@ cat > "${FAKE_BIN}/minimap2" <<'EOF'
 set -euo pipefail
 
 preset=""
+emit_cigar=false
 output=""
 declare -a positional=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    -c)
+      emit_cigar=true
+      shift
+      ;;
     -x)
       preset="$2"
       shift 2
@@ -65,8 +70,12 @@ if [[ "$align_len" -gt "$target_len" ]]; then
 fi
 
 mkdir -p "$(dirname "$output")"
-printf '%s\t%s\t0\t%s\t+\t%s\t%s\t0\t%s\t%s\t%s\t60\n' \
+printf '%s\t%s\t0\t%s\t+\t%s\t%s\t0\t%s\t%s\t%s\t60' \
   "$query_name" "$query_len" "$align_len" "$target_name" "$target_len" "$align_len" "$align_len" "$align_len" > "$output"
+if [[ "$emit_cigar" == "true" ]]; then
+  printf '\tcg:Z:%sM' "$align_len" >> "$output"
+fi
+printf '\n' >> "$output"
 printf 'preset=%s target=%s query=%s output=%s\n' "$preset" "$target" "$query" "$output" >> "${GPM_TEST_MINIMAP_LOG:?}"
 EOF
 
