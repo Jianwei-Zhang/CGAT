@@ -361,9 +361,7 @@ const assemblyPageShellDeps = {
   renderNewSequenceRowActions,
 };
 const {
-  createRenderedAssemblyMainTabContent,
   patchAssemblyStatusToast,
-  patchDeletedPrimaryTrackCtgsDom,
   patchPrimaryHiddenCtgDom,
   replaceRenderedAssemblySection,
 } = createAssemblyDomPatchController({
@@ -530,16 +528,11 @@ const {
 const {
   refreshAfterBatchDelete,
 } = createBatchDeleteRefreshController({
-  bindAssemblyPage: (host, store) => bindAssemblyPage(host, store),
   buildClearedSubviewState,
-  createRenderedAssemblyMainTabContent,
   getCurrentProject,
   loadDeletedCtgsForChr: (workspaceRoot, projectId, chrName, datasetId) =>
     loadDeletedCtgsForChr(workspaceRoot, projectId, chrName, datasetId),
   loadProjectAssemblyViewState: (args) => loadProjectAssemblyViewStateImpl(args),
-  patchAssemblyStatusToast,
-  patchDeletedPrimaryTrackCtgsDom,
-  replaceRenderedAssemblySection,
   rerenderAssemblyMainTab: (host, store) => rerenderAssemblyMainTab(host, store),
   rerenderSubviewPanel: (host, store) => rerenderSubviewPanel(host, store),
 });

@@ -34,15 +34,10 @@ function updateChromosomeSummariesAfterLocalDelete(chromosomes, chrName, removed
 }
 
 export function createBatchDeleteRefreshController({
-  bindAssemblyPage,
   buildClearedSubviewState,
-  createRenderedAssemblyMainTabContent,
   getCurrentProject,
   loadDeletedCtgsForChr,
   loadProjectAssemblyViewState,
-  patchAssemblyStatusToast,
-  patchDeletedPrimaryTrackCtgsDom,
-  replaceRenderedAssemblySection,
   rerenderAssemblyMainTab,
   rerenderSubviewPanel,
 }) {
@@ -129,26 +124,9 @@ export function createBatchDeleteRefreshController({
       assembly: nextAssembly,
     });
 
-    const routeHost = host?.closest?.("#route-host") || null;
-    if (!routeHost) {
-      rerenderAssemblyMainTab(host, store);
-      return;
-    }
-    const nextContent = createRenderedAssemblyMainTabContent(routeHost, store.getState());
-    if (!nextContent) {
-      rerenderAssemblyMainTab(host, store);
-      return;
-    }
-    const replacedMembersPanel = replaceRenderedAssemblySection(
-      routeHost,
-      nextContent,
-      ".assembly-members-panel",
-    );
-    if (replacedMembersPanel) {
-      bindAssemblyPage(replacedMembersPanel, store);
-    }
-    patchAssemblyStatusToast(routeHost, nextContent);
-    patchDeletedPrimaryTrackCtgsDom(routeHost, deletedIds);
+    // Remaining contigs, track bounds and evidence bands share the new layout.
+    // Removing only deleted SVG nodes leaves their geometry stale until a drag.
+    rerenderAssemblyMainTab(host, store);
     if (deletedIds.length) {
       rerenderSubviewPanel(host, store);
     }
