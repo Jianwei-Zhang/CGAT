@@ -58,14 +58,14 @@ test("repeated menu opens and rebinding have one owner and preserve checkbox foc
   assert.equal(f.focusCount(), 0);
 });
 
-test("pointer departure closes after 400ms; returning or moving inside cancels dismissal", () => {
+test("pointer departure closes after 200ms; returning or moving inside cancels dismissal", () => {
   const f = fixture();
   f.fire("click");
   f.fire("pointerout", f.input, { relatedTarget: f.button });
   assert.equal(f.timers.size, 0);
   f.fire("pointerout", f.input, { relatedTarget: null });
   assert.equal(f.panel.hidden, false);
-  assert.equal([...f.timers.values()][0].delay, 400);
+  assert.equal([...f.timers.values()][0].delay, 200);
   f.fire("pointerover", f.button);
   f.flush();
   assert.equal(f.panel.hidden, false);

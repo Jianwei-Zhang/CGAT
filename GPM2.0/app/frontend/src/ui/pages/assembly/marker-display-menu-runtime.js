@@ -3,6 +3,7 @@ import { cancelDelayedFloatingClose, scheduleDelayedFloatingClose } from "../flo
 const BOUND = Symbol("markerDisplayMenuBound");
 const CLOSE_TIMER = "__markerDisplayCloseTimer";
 const ROOT = ".assembly-marker-display";
+const MARKER_DISPLAY_CLOSE_DELAY_MS = 200;
 
 export function bindMarkerDisplayMenus(host, options = {}) {
   if (!host?.addEventListener || host[BOUND]) return;
@@ -11,7 +12,8 @@ export function bindMarkerDisplayMenus(host, options = {}) {
   }
   if (!host.querySelectorAll?.(ROOT)?.length) return;
   host[BOUND] = true;
-  const cancel = (root) => cancelDelayedFloatingClose(root, CLOSE_TIMER, options);
+  const timerOptions = { ...options, delayMs: options.delayMs ?? MARKER_DISPLAY_CLOSE_DELAY_MS };
+  const cancel = (root) => cancelDelayedFloatingClose(root, CLOSE_TIMER, timerOptions);
   const setOpen = (root, open) => {
     const button = root?.querySelector?.("[data-marker-display-toggle]");
     const panel = root?.querySelector?.(".assembly-marker-display-menu");
@@ -20,7 +22,7 @@ export function bindMarkerDisplayMenus(host, options = {}) {
     panel.hidden = !open;
     button.setAttribute("aria-expanded", String(open));
   };
-  const schedule = (root) => scheduleDelayedFloatingClose(root, CLOSE_TIMER, () => setOpen(root, false), options);
+  const schedule = (root) => scheduleDelayedFloatingClose(root, CLOSE_TIMER, () => setOpen(root, false), timerOptions);
   host.addEventListener("click", (event) => {
     const button = event.target?.closest?.("[data-marker-display-toggle]");
     if (!button) return;

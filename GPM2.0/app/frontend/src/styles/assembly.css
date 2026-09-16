@@ -337,6 +337,11 @@
   min-height: 30px;
 }
 
+.assembly-marker-display > [data-marker-display-toggle] {
+  height: 30px;
+  min-height: 30px;
+}
+
 .grt-result-controls {
   position: relative;
   display: inline-flex;

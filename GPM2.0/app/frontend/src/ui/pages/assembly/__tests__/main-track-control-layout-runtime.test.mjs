@@ -228,6 +228,10 @@ test("main-track markup and CSS expose content-driven layouts without header med
     css,
     /\.grt-result-switch\s*\{[^}]*height:\s*30px;[^}]*min-height:\s*30px;/,
   );
+  assert.match(
+    css,
+    /\.assembly-marker-display\s*>\s*\[data-marker-display-toggle\]\s*\{[^}]*height:\s*30px;[^}]*min-height:\s*30px;/,
+  );
   const fixedViewportRules = assemblyCss.slice(assemblyCss.indexOf("@media (max-width: 1200px)"));
   assert.doesNotMatch(fixedViewportRules, /\.assembly-track-inline-controls\s*\{/);
 });
