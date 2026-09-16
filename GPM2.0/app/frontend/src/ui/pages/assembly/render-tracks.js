@@ -1672,6 +1672,7 @@ function renderAssemblyTracks({
           domainSpanBp: visualDomainSpanBp,
           innerWidth: resolvedInnerWidth,
           minGapPx: TRACK_MIN_ADJACENT_GAP_PX,
+          preserveWidths: true,
         }),
       ]),
     );
