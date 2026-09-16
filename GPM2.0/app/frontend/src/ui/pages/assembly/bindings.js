@@ -1269,8 +1269,8 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     });
   });
   trackCtgTargets.forEach((target) => {
-    target.addEventListener("click", async (event) => {
-      if (shouldSuppressTrackContigClick()) {
+    target.addEventListener("click", (event) => {
+      if (shouldSuppressTrackContigClick() || !(event.ctrlKey || event.metaKey)) {
         return;
       }
       const action = resolveTrackContigClickAction({
@@ -1291,14 +1291,6 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
           phasedTrackId: action.phasedTrackId,
           phasedTrackItemId: action.phasedTrackItemId,
           phasedHaplotypeKey: action.phasedHaplotypeKey,
-        });
-        return;
-      }
-      if (action.type === "select-ctg") {
-        event.preventDefault();
-        markNextTrackAutoFocusSuppressed();
-        await selectCtg(host, store, action.contigId, {
-          preserveViewport: true,
         });
         return;
       }

@@ -2397,13 +2397,7 @@ function resolveTrackContigClickAction({
     }
     return action;
   }
-  if (normalizedTrackRole === "ref") {
-    return { type: "noop" };
-  }
-  return {
-    type: "select-ctg",
-    contigId: normalizedContigId,
-  };
+  return { type: "noop" };
 }
 
 function promptForRenameCtg(host, store, assemblyCtgId) {

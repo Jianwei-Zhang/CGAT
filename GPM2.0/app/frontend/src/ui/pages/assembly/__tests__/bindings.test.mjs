@@ -1102,7 +1102,7 @@ test("bindings order band canvas, subview tooltip, and virtual ruler runtimes", 
   assert.equal(calls.at(-1), "ruler");
 });
 
-test("track contig clicks preserve the current viewport when selecting ctg details", async () => {
+test("ordinary track contig clicks do not load details, alter state or rerender", async () => {
   const listenerMap = new Map();
   const trackTarget = {
     dataset: {
@@ -1126,6 +1126,7 @@ test("track contig clicks preserve the current viewport when selecting ctg detai
     addEventListener() {},
   };
   const store = createStore(createState());
+  const stateBeforeClick = store.getState();
   const selectCalls = [];
   let suppressCount = 0;
   const deps = createBindingDeps({
@@ -1133,10 +1134,10 @@ test("track contig clicks preserve the current viewport when selecting ctg detai
       suppressCount += 1;
     },
     resolveTrackContigClickAction() {
-      return {
-        type: "select-ctg",
-        contigId: 30,
-      };
+      assert.fail("ordinary clicks must not dispatch selection actions");
+    },
+    rerender() {
+      assert.fail("ordinary clicks must not rerender");
     },
     async selectCtg(_host, _store, contigId, options) {
       selectCalls.push({ contigId, options });
@@ -1153,16 +1154,10 @@ test("track contig clicks preserve the current viewport when selecting ctg detai
     },
   });
 
-  assert.deepEqual(selectCalls, [
-    {
-      contigId: 30,
-      options: {
-        preserveViewport: true,
-      },
-    },
-  ]);
-  assert.equal(suppressCount, 1);
-  assert.equal(prevented.length, 1);
+  assert.deepEqual(selectCalls, []);
+  assert.equal(store.getState(), stateBeforeClick);
+  assert.equal(suppressCount, 0);
+  assert.equal(prevented.length, 0);
 });
 
 test("member chip clicks preserve the scrolled position of the members panel after rerender", async () => {

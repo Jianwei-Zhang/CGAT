@@ -19,15 +19,13 @@ import {
   createStore,
 } from "./tabs-semantics-harness.mjs";
 
-test("track click intent uses selectCtg by default and reserves Ctrl/Cmd for subview selection", () => {
-  assert.deepEqual(
-    __testResolveTrackContigClickAction({ trackRole: "primary", contigId: 8 }),
-    { type: "select-ctg", contigId: 8 },
-  );
-  assert.deepEqual(
-    __testResolveTrackContigClickAction({ trackRole: "support", contigId: 30 }),
-    { type: "select-ctg", contigId: 30 },
-  );
+test("ordinary track clicks do nothing and Ctrl/Cmd remains reserved for subview selection", () => {
+  for (const trackRole of ["primary", "support", "ref", "phased"]) {
+    assert.deepEqual(
+      __testResolveTrackContigClickAction({ trackRole, contigId: 8 }),
+      { type: "noop" },
+    );
+  }
   assert.deepEqual(
     __testResolveTrackContigClickAction({ trackRole: "primary", contigId: 8, ctrlKey: true }),
     { type: "select-subview-candidate", trackRole: "primary", contigId: 8 },

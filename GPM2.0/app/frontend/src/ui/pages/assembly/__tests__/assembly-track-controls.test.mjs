@@ -15,6 +15,13 @@ import {
   rollbackSubviewHistory,
 } from "../subview-history-state.js";
 
+test("main ctgs use hover-only outlines matching the Subview role colors", () => {
+  const css = readStylesheetTree(new URL("../../../../styles/components.css", import.meta.url), "utf8");
+  assert.match(css, /\.assembly-track-svg:not\(\.subview-track-svg\) \.track-ctg-group:hover > \.track-ctg\s*\{\s*stroke: #2e567f;\s*stroke-width: 2;\s*\}/);
+  assert.match(css, /\.assembly-track-svg:not\(\.subview-track-svg\) \.track-ctg-group:hover > \.track-ctg\.is-companion\s*\{\s*stroke: #7c6440;\s*\}/);
+  assert.match(css, /\.assembly-track-svg:not\(\.subview-track-svg\) \.track-ctg-group:hover > \.track-reference-member\s*\{\s*stroke: #8e8e8e;\s*stroke-width: 2;\s*\}/);
+});
+
 test("assembly main view renders v1-style collapsible menus with selectable presets and numeric track inputs", () => {
   const html = renderAssemblyPage(createState());
 

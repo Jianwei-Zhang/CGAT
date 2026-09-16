@@ -1426,6 +1426,20 @@
   stroke: #7c6440;
 }
 
+.assembly-track-svg:not(.subview-track-svg) .track-ctg-group:hover > .track-ctg {
+  stroke: #2e567f;
+  stroke-width: 2;
+}
+
+.assembly-track-svg:not(.subview-track-svg) .track-ctg-group:hover > .track-ctg.is-companion {
+  stroke: #7c6440;
+}
+
+.assembly-track-svg:not(.subview-track-svg) .track-ctg-group:hover > .track-reference-member {
+  stroke: #8e8e8e;
+  stroke-width: 2;
+}
+
 .track-ctg.is-hidden-contig,
 .track-ctg.is-hidden-contig.is-active,
 .track-ctg.is-hidden-contig.is-multi-selected {
