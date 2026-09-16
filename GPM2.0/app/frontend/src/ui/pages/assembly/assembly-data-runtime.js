@@ -723,6 +723,8 @@ export async function loadAssemblyView(host, store, options, deps) {
   deps.rerender(host, store);
 }
 
+const chromosomeRequests = new WeakMap();
+
 export async function selectChromosome(host, store, chrName, deps) {
   assertDataRuntimeDeps(deps, [
     "buildClearedSubviewState",
@@ -739,6 +741,15 @@ export async function selectChromosome(host, store, chrName, deps) {
   if (!state.session.workspacePath || !state.session.projectId) {
     return;
   }
+  const request = {};
+  chromosomeRequests.set(store, request);
+  const isCurrentRequest = () => {
+    const current = store.getState();
+    return chromosomeRequests.get(store) === request
+      && current.session.workspacePath === state.session.workspacePath
+      && current.session.projectId === state.session.projectId
+      && current.assembly.selectedChrName === chrName;
+  };
   const hiddenPrimaryCtgIdsByChr = normalizeHiddenPrimaryCtgIdsByChr(
     state.assembly.hiddenPrimaryCtgIdsByChr,
   );
@@ -747,6 +758,7 @@ export async function selectChromosome(host, store, chrName, deps) {
     assembly: {
       ...state.assembly,
       loading: true,
+      error: "",
       chrPickerOpen: false,
       selectedChrName: chrName,
       mainViewHistory: createEmptyMainViewHistoryStatus(chrName),
@@ -779,25 +791,51 @@ export async function selectChromosome(host, store, chrName, deps) {
     const currentProject = deps.getCurrentProject(state);
     const primaryDatasetId = deps.normalizeSupportDatasetId(currentProject?.primaryDatasetId);
     const supportDatasetId = deps.normalizeSupportDatasetId(state.assembly.supportDatasetId);
-    const chrCtgResult = await deps.listChrViewCtgs({
+    const args = {
       workspaceRoot: state.session.workspacePath,
       projectId: state.session.projectId,
       chrName,
+    };
+    // These reads are independent. Only phased-track normalization and ctg
+    // details need the primary contigs, so do not serialize every IPC call.
+    const primaryPromise = Promise.resolve().then(() => deps.listChrViewCtgs({
+      ...args,
       datasetId: primaryDatasetId,
-    });
-    const mainViewHistory = typeof deps.getMainViewHistoryStatus === "function"
-      ? normalizeMainViewHistoryStatus(await deps.getMainViewHistoryStatus({
-          workspaceRoot: state.session.workspacePath,
-          projectId: state.session.projectId,
-          chrName,
-        }), { chrName })
-      : createEmptyMainViewHistoryStatus(chrName);
-    const phasedChrTracks = await loadPhasedChrTracksForAssembly(deps, {
-      state,
-      currentProject,
-      selectedChrName: chrName,
-      chrCtgs: chrCtgResult.items,
-    });
+    }));
+    const phasedPromise = currentProject?.phasedAssemblyEnabled
+      && typeof deps.listPhasedChrTracks === "function"
+      ? Promise.resolve().then(() => deps.listPhasedChrTracks({
+          workspaceRoot: args.workspaceRoot,
+          projectId: args.projectId,
+          parentChrName: chrName,
+        }))
+      : Promise.resolve({ tracks: [] });
+    const [chrCtgResult, historyResult, phasedResult, refTrackMemberResult, supportChrCtgs,
+      deletedCtgs, sideData] = await Promise.all([
+      primaryPromise,
+      typeof deps.getMainViewHistoryStatus === "function"
+        ? Promise.resolve().then(() => deps.getMainViewHistoryStatus(args))
+        : createEmptyMainViewHistoryStatus(chrName),
+      phasedPromise,
+      listReferenceTrackMembersOrEmpty(deps, args),
+      supportDatasetId !== null
+        ? Promise.resolve().then(() => deps.loadDatasetChrCtgs(
+            args.workspaceRoot, args.projectId, chrName, supportDatasetId,
+          ))
+        : [],
+      Promise.resolve().then(() => deps.loadDeletedCtgsForChr(
+        args.workspaceRoot, args.projectId, chrName, primaryDatasetId,
+      )),
+      primaryPromise.then((result) => isCurrentRequest()
+        ? deps.loadSideDataForCtg(
+            args.workspaceRoot, args.projectId,
+            resolveSelectedCtgId(result.items, null, false),
+          )
+        : createEmptySideData()),
+    ]);
+    if (!isCurrentRequest()) return;
+    const mainViewHistory = normalizeMainViewHistoryStatus(historyResult, { chrName });
+    const phasedChrTracks = normalizePhasedChrTracks(phasedResult?.tracks, chrCtgResult.items);
     const isChrPhased = Boolean(currentProject?.phasedAssemblyEnabled && phasedChrTracks.length);
     const activePhasedTrackKey = resolveActivePhasedTrackKey(
       state.assembly.activePhasedTrackKeyByChr,
@@ -809,20 +847,6 @@ export async function selectChromosome(host, store, chrName, deps) {
       chrName,
       phasedChrTracks,
     );
-    const refTrackMemberResult = await listReferenceTrackMembersOrEmpty(deps, {
-      workspaceRoot: state.session.workspacePath,
-      projectId: state.session.projectId,
-      chrName,
-    });
-    const supportChrCtgs =
-      supportDatasetId !== null
-        ? await deps.loadDatasetChrCtgs(
-            state.session.workspacePath,
-            state.session.projectId,
-            chrName,
-            supportDatasetId,
-          )
-        : [];
     const grtSourceCards = state.assembly.grtProjectView?.sourceCards || [];
     const annotatedPrimaryCtgs = annotateGrtSourceCards(
       chrCtgResult.items,
@@ -840,12 +864,6 @@ export async function selectChromosome(host, store, chrName, deps) {
       annotatedPrimaryCtgs,
       annotatedSupportCtgs,
     );
-    const deletedCtgs = await deps.loadDeletedCtgsForChr(
-      state.session.workspacePath,
-      state.session.projectId,
-      chrName,
-      primaryDatasetId,
-    );
     const selectedCtgId = resolveSelectedCtgId(annotatedPrimaryCtgs, null, false);
     const filterPrimaryHiddenIds = typeof deps.filterPrimaryTrackSelectionCtgIds === "function"
       ? deps.filterPrimaryTrackSelectionCtgIds
@@ -860,14 +878,6 @@ export async function selectChromosome(host, store, chrName, deps) {
         mainViewHistory,
       },
     );
-    const sideData = await deps.loadSideDataForCtg(
-      state.session.workspacePath,
-      state.session.projectId,
-      selectedCtgId,
-    );
-    if (store.getState().assembly.selectedChrName !== chrName) {
-      return;
-    }
 
     store.setState({
       assembly: {
@@ -905,7 +915,7 @@ export async function selectChromosome(host, store, chrName, deps) {
       if (activated?.assembly) store.setState({ assembly: activated.assembly });
     }
   } catch (error) {
-    if (store.getState().assembly.selectedChrName !== chrName) {
+    if (!isCurrentRequest()) {
       return;
     }
     const mappedError = deps.mapAssemblyError({ error, stateOrLocale: store.getState() });

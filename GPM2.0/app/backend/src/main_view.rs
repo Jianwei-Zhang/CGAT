@@ -7,12 +7,12 @@ use anyhow::{Context, Result, anyhow, bail};
 use rusqlite::{Connection, OptionalExtension, ToSql, params, params_from_iter};
 
 use crate::db::open_workspace_db;
-use crate::exporter::load_named_sequences_from_fasta;
 use crate::reference_segments::{
     PafQueryIntervalMapping, ReferenceGapInterval, ReferenceSegment, SplitReferenceBlock,
-    detect_reference_gap_intervals, detect_reference_segments, map_paf_query_interval_to_ref_span,
-    split_paf_hit_by_reference_gaps,
+    map_paf_query_interval_to_ref_span, split_paf_hit_by_reference_gaps,
 };
+
+mod reference_cache;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectChromosomeItem {
@@ -1668,14 +1668,10 @@ fn resolve_reference_track_segments(
         return Ok((segments, gaps));
     }
 
-    let needed_names = HashSet::from([chr_name.to_string()]);
-    if let Ok(mut reference_sequences) =
-        load_named_sequences_from_fasta(Path::new(reference_fasta_path), &needed_names)
-        && let Some(reference_sequence) = reference_sequences.remove(chr_name)
+    if let Ok(geometry) =
+        reference_cache::load_reference_geometry(Path::new(reference_fasta_path), chr_name)
     {
-        let gaps = detect_reference_gap_intervals(&reference_sequence, 100);
-        let segments = detect_reference_segments(chr_name, &reference_sequence, 100);
-        return Ok((segments, gaps));
+        return Ok(geometry);
     }
 
     if chr_length < 1 {

@@ -1701,3 +1701,123 @@ test("loadAssemblyView canonicalizes persisted GRT overallLen and backfills orig
   });
   assert.equal(state.assembly.finalPathViewMode, "table");
 });
+
+function createChromosomeLoadHarness(overrides = {}) {
+  let state = {
+    session: { workspacePath: "/tmp/ws", projectId: 9 },
+    assembly: { selectedChrName: "Chr01", supportDatasetId: 2, error: "old error" },
+  };
+  const store = {
+    getState: () => state,
+    setState: (patch) => { state = { ...state, ...patch }; },
+  };
+  const deps = {
+    buildClearedSubviewState: () => ({ summary: null }),
+    getCurrentProject: () => ({ primaryDatasetId: 1, phasedAssemblyEnabled: true }),
+    normalizeSupportDatasetId: (id) => id == null ? null : Number(id),
+    listChrViewCtgs: async () => ({ items: [{ assemblyCtgId: 8 }] }),
+    getMainViewHistoryStatus: async () => ({ canUndo: true }),
+    listPhasedChrTracks: async () => ({ tracks: [] }),
+    listReferenceTrackMembers: async () => ({ items: [] }),
+    loadDatasetChrCtgs: async () => [],
+    loadDeletedCtgsForChr: async () => [],
+    loadSideDataForCtg: async () => ({ detail: { members: [] }, candidates: {} }),
+    mapAssemblyError: ({ error }) => ({ userMessage: error.message }),
+    rerender() {},
+    ...overrides,
+  };
+  return { store, deps, select: (chr) => selectChromosome({}, store, chr, deps) };
+}
+
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+test("chromosome reads overlap while ctg details wait only for primary ctgs", async () => {
+  const reads = new Map();
+  const start = (name) => {
+    const pending = deferred();
+    reads.set(name, pending);
+    return pending.promise;
+  };
+  const harness = createChromosomeLoadHarness({
+    listChrViewCtgs: () => start("primary"),
+    getMainViewHistoryStatus: () => start("history"),
+    listPhasedChrTracks: () => start("phased"),
+    listReferenceTrackMembers: () => start("reference"),
+    loadDatasetChrCtgs: () => start("support"),
+    loadDeletedCtgsForChr: () => start("deleted"),
+    loadSideDataForCtg: (_root, _project, id) => {
+      assert.equal(id, 8);
+      return start("details");
+    },
+  });
+  const pending = harness.select("Chr02");
+  await new Promise(setImmediate);
+  assert.deepEqual([...reads.keys()].sort(), ["deleted", "history", "phased", "primary", "reference", "support"]);
+  assert.equal(harness.store.getState().assembly.error, "");
+  reads.get("primary").resolve({ items: [{ assemblyCtgId: 8 }] });
+  await new Promise(setImmediate);
+  assert.ok(reads.has("details"));
+  reads.get("details").resolve({ detail: { members: [] }, candidates: {} });
+  reads.get("history").resolve({ canUndo: true, undoOperation: { kind: "flip-ctg", targetCount: 1 } });
+  reads.get("phased").resolve({ tracks: [{ phasedTrackId: 1, haplotypeKey: "A", items: [{ assemblyCtgId: 8 }] }] });
+  reads.get("reference").resolve({ items: [] });
+  reads.get("support").resolve([]);
+  reads.get("deleted").resolve([]);
+  await pending;
+  assert.equal(harness.store.getState().assembly.loading, false);
+  assert.equal(harness.store.getState().assembly.mainViewHistory.canUndo, true);
+  assert.equal(harness.store.getState().assembly.phasedChrTracks[0].items[0].sourceCtg.assemblyCtgId, 8);
+});
+
+for (const staleFails of [false, true]) {
+  test(`rapid A-B-A switching ignores stale ${staleFails ? "errors" : "results"}`, async () => {
+    const first = deferred();
+    let calls = 0;
+    const harness = createChromosomeLoadHarness({
+      listChrViewCtgs: async () => ++calls === 1 ? first.promise : { items: [{ assemblyCtgId: calls }] },
+    });
+    const oldLoad = harness.select("Chr01");
+    await new Promise(setImmediate);
+    await harness.select("Chr02");
+    await harness.select("Chr01");
+    if (staleFails) first.reject(new Error("stale failure"));
+    else first.resolve({ items: [{ assemblyCtgId: 100 }] });
+    await oldLoad;
+    assert.equal(harness.store.getState().assembly.chrCtgs[0].assemblyCtgId, 3);
+    assert.equal(harness.store.getState().assembly.error, "");
+    assert.equal(harness.store.getState().assembly.loading, false);
+  });
+}
+
+test("switching workspace discards pending chromosome data even when chr names match", async () => {
+  const first = deferred();
+  let detailCalls = 0;
+  const harness = createChromosomeLoadHarness({
+    listChrViewCtgs: () => first.promise,
+    loadSideDataForCtg: async () => { detailCalls++; return {}; },
+  });
+  const oldLoad = harness.select("Chr01");
+  harness.store.setState({ session: { workspacePath: "/tmp/new-workspace", projectId: 9 } });
+  first.resolve({ items: [{ assemblyCtgId: 100 }] });
+  await oldLoad;
+  assert.deepEqual(harness.store.getState().assembly.chrCtgs, []);
+  assert.equal(detailCalls, 0);
+});
+
+test("a current chromosome read failure ends loading and a retry recovers", async () => {
+  const harness = createChromosomeLoadHarness({
+    getMainViewHistoryStatus: async () => { throw new Error("history unavailable"); },
+  });
+  await harness.select("Chr02");
+  assert.equal(harness.store.getState().assembly.loading, false);
+  assert.equal(harness.store.getState().assembly.error, "history unavailable");
+  harness.deps.getMainViewHistoryStatus = async () => ({ canUndo: false });
+  await harness.select("Chr02");
+  assert.equal(harness.store.getState().assembly.loading, false);
+  assert.equal(harness.store.getState().assembly.error, "");
+  assert.equal(harness.store.getState().assembly.chrCtgs[0].assemblyCtgId, 8);
+});

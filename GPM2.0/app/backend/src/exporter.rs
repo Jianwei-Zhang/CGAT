@@ -451,7 +451,9 @@ fn build_final_path_fasta_records(
                     ..
                 } => {
                     let key = (dataset_name.clone(), contig_name.clone());
-                    if !source_id_by_name.contains_key(&key) {
+                    if let std::collections::hash_map::Entry::Vacant(entry) =
+                        source_id_by_name.entry(key)
+                    {
                         let source_id: i64 = conn.query_row(
                             "SELECT ss.id FROM source_seq ss
                              JOIN dataset d ON d.id = ss.dataset_id
@@ -462,7 +464,7 @@ fn build_final_path_fasta_records(
                         ).with_context(|| format!(
                             "final-path source {dataset_name}:{contig_name} not found in project {project_id}"
                         ))?;
-                        source_id_by_name.insert(key, source_id);
+                        entry.insert(source_id);
                     }
                 }
                 FinalPathExportSegment::Ctg {
