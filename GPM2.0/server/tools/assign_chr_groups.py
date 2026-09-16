@@ -112,7 +112,7 @@ def iter_n_regions(sequence):
 def write_run_command_script(path, run_dir, left_fa, right_fa, self_mode, threads, minimap_preset):
     lines = ["#!/usr/bin/env bash", "set -euo pipefail", f"cd {shlex.quote(str(run_dir))}"]
     if alignment_engine == "minimap2":
-        args = ["minimap2", "-x", minimap_preset]
+        args = ["minimap2", "-c", "-x", minimap_preset]
         if self_mode:
             args.append("-X")
         args.extend(["-t", threads, "-o", "result.paf", str(left_fa), str(right_fa)])
@@ -201,7 +201,7 @@ def write_run_command_script(path, run_dir, left_fa, right_fa, self_mode, thread
                 + f" > {shlex.quote('repetitive_' + winnowmap_kmer + '_result.txt')}",
             ]
         )
-        args = ["winnowmap", "-W", f"repetitive_{winnowmap_kmer}_result.txt", "-x", winnowmap_preset]
+        args = ["winnowmap", "-c", "-W", f"repetitive_{winnowmap_kmer}_result.txt", "-x", winnowmap_preset]
         if self_mode:
             args.append("-X")
         args.extend(["-t", threads, str(left_fa), str(right_fa)])

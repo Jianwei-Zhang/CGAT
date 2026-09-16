@@ -209,7 +209,7 @@ def _parse_nonnegative_integer(value: str, label: str, line_number: int) -> int:
     return parsed
 
 
-def validate_paf(path: Path) -> PafSummary:
+def validate_paf(path: Path, *, require_cigar: bool = False) -> PafSummary:
     if not path.is_file():
         raise OrchestrationContractError(f"PAF output is missing: {path}")
 
@@ -271,6 +271,15 @@ def validate_paf(path: Path) -> PafSummary:
                         f"PAF mapping quality exceeds 255 on line {line_number}"
                     )
                 record_count += 1
+                if require_cigar:
+                    cigar = next((tag[5:] for tag in fields[12:] if tag.startswith("cg:Z:")), "")
+                    ops = re.findall(r"([1-9][0-9]*)([MIDN=X])", cigar)
+                    if not ops or "".join(length + op for length, op in ops) != cigar:
+                        raise OrchestrationContractError(f"missing or invalid CIGAR on PAF line {line_number}: {path}")
+                    query_span = sum(int(length) for length, op in ops if op in "MI=X")
+                    target_span = sum(int(length) for length, op in ops if op in "MDN=X")
+                    if query_span != query_end - query_start or target_span != target_end - target_start:
+                        raise OrchestrationContractError(f"CIGAR span mismatch on PAF line {line_number}: {path}")
     except (OSError, UnicodeError) as exc:
         raise OrchestrationContractError(f"cannot read PAF output {path}: {exc}") from exc
     return PafSummary(record_count=record_count)

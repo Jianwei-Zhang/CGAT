@@ -690,7 +690,7 @@ mod tests {
             &UpdateProjectAssemblyViewStateParams {
                 project_id: 1,
                 support_dataset_id: Some(22),
-                track_view_json: r#"{"supportDsCtgLen":10000,"minTickUnitKb":250,"maxTickCount":15,"alignmentLength":10000,"minIdentityPct":95}"#.to_string(),
+                track_view_json: r#"{"supportDsCtgLen":10000,"minTickUnitKb":250,"maxTickCount":15,"alignmentLength":10000,"minIdentityPct":95,"showTelomeres":false,"showCentromeres":true}"#.to_string(),
                 support_ds_ctg_len_rules_by_chr_json:
                     r#"{"Chr01":[{"startBp":1,"endBp":5000000,"supportDsCtgLen":100000}]}"#
                         .to_string(),
@@ -724,7 +724,7 @@ mod tests {
         assert_eq!(updated.support_dataset_id, Some(22));
         assert_eq!(
             updated.track_view_json,
-            r#"{"supportDsCtgLen":10000,"minTickUnitKb":250,"maxTickCount":15,"alignmentLength":10000,"minIdentityPct":95}"#,
+            r#"{"supportDsCtgLen":10000,"minTickUnitKb":250,"maxTickCount":15,"alignmentLength":10000,"minIdentityPct":95,"showTelomeres":false,"showCentromeres":true}"#,
         );
         assert_eq!(
             updated.support_ds_ctg_len_rules_by_chr_json,
@@ -774,7 +774,7 @@ mod tests {
         assert_eq!(reloaded_project_one.support_dataset_id, Some(22));
         assert_eq!(
             reloaded_project_one.track_view_json,
-            r#"{"supportDsCtgLen":10000,"minTickUnitKb":250,"maxTickCount":15,"alignmentLength":10000,"minIdentityPct":95}"#,
+            r#"{"supportDsCtgLen":10000,"minTickUnitKb":250,"maxTickCount":15,"alignmentLength":10000,"minIdentityPct":95,"showTelomeres":false,"showCentromeres":true}"#,
         );
         assert_eq!(
             reloaded_project_one.track_scroll_state_json,

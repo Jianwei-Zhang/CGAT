@@ -14,9 +14,10 @@ from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 from server.tools.run_outer_checkpoints import OuterCheckpointManager
+from server.tools.run_orchestration import OrchestrationContractError, validate_paf
 
 
-PAF_LINE = "query\t10\t0\t10\t+\ttarget\t12\t1\t11\t10\t10\t60\n"
+PAF_LINE = "query\t10\t0\t10\t+\ttarget\t12\t1\t11\t10\t10\t60\tcg:Z:10M\n"
 
 
 def write(path: Path, text: str) -> None:
@@ -25,6 +26,16 @@ def write(path: Path, text: str) -> None:
 
 
 class OuterCheckpointTests(unittest.TestCase):
+    def test_precise_alignment_rejects_missing_or_inconsistent_cigar(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            paf = Path(temporary) / "result.paf"
+            for invalid in [PAF_LINE.replace("\tcg:Z:10M", ""), PAF_LINE.replace("10M", "9M"), PAF_LINE.replace("10M", "5M0I5M")]:
+                write(paf, invalid)
+                with self.assertRaises(OrchestrationContractError):
+                    validate_paf(paf, require_cigar=True)
+            write(paf, PAF_LINE)
+            self.assertEqual(validate_paf(paf, require_cigar=True).record_count, 1)
+
     def make_server(self, root: Path) -> tuple[Path, Path]:
         server = root / "gpm_server"
         fake_bin = root / "bin"

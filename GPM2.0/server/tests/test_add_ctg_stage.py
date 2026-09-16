@@ -13,6 +13,20 @@ SPEC.loader.exec_module(ADD_CTG_STAGE)
 
 
 class AddCtgStageTests(unittest.TestCase):
+    def test_generated_minimap_and_winnowmap_commands_request_cigar(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+            command = root / "command.sh"
+            for engine in ["minimap2", "winnowmap"]:
+                for self_mode in [False, True]:
+                    ADD_CTG_STAGE.write_alignment_command(
+                        command, root, root / "target.fa", root / "query.fa",
+                        {"alignment_engine": engine}, self_mode=self_mode,
+                    )
+                    line = next(line for line in command.read_text().splitlines() if line.startswith(engine + " "))
+                    self.assertIn(" -c ", line)
+                    self.assertEqual(" -X " in line, self_mode)
+
     def parse_assignment(self, paf_text):
         with tempfile.TemporaryDirectory() as temporary_dir:
             server_dir = Path(temporary_dir) / "gpm_server"

@@ -104,6 +104,37 @@ function createBindingDeps(overrides = {}) {
   };
 }
 
+test("marker toggles persist independently without replacing track geometry or scrolling", () => {
+  const state = createState();
+  state.assembly.chromosomes = [{ chrName: "Chr01" }];
+  const store = createStore(state);
+  const panel = { dataset: {}, scrollLeft: 317 };
+  const handlers = {};
+  const inputs = ["showTelomeres", "showCentromeres"].map((field) => ({
+    dataset: { trackMarkerVisibility: field }, checked: false,
+    closest: () => panel,
+    addEventListener: (_type, handler) => { handlers[field] = handler; },
+  }));
+  const saved = [];
+  bindAssemblyPageImpl({
+    querySelector: () => null,
+    querySelectorAll: (selector) => selector === "[data-track-marker-visibility]" ? inputs : [],
+    addEventListener() {},
+  }, store, createBindingDeps({
+    persistMainTrackViewState: () => { saved.push({ ...store.getState().assembly.trackView }); },
+    rerender: () => assert.fail("marker visibility must not redraw the track"),
+  }));
+  handlers.showTelomeres();
+  assert.equal(saved[0].showTelomeres, false);
+  assert.equal(saved[0].showCentromeres, true);
+  handlers.showCentromeres();
+  assert.equal(saved[1].showCentromeres, false);
+  assert.equal(saved[1].showTelomeres, false);
+  assert.equal(panel.dataset.showTelomeres, "false");
+  assert.equal(panel.dataset.showCentromeres, "false");
+  assert.equal(panel.scrollLeft, 317);
+});
+
 test("bindings dispatch Subview clear and history actions", () => {
   const listeners = new Map();
   const actions = [

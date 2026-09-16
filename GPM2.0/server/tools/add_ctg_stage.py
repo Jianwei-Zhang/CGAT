@@ -296,7 +296,7 @@ def write_alignment_command(path, run_dir, target_fa, query_fa, options, self_mo
 
     lines = ["#!/usr/bin/env bash", "set -euo pipefail", f"cd {shlex.quote(str(run_dir))}"]
     if alignment_engine == "minimap2":
-        args = ["minimap2", "-x", minimap_preset]
+        args = ["minimap2", "-c", "-x", minimap_preset]
         if self_mode:
             args.append("-X")
         args.extend(["-t", threads, "-o", "result.paf", str(target_fa), str(query_fa)])
@@ -355,7 +355,7 @@ def write_alignment_command(path, run_dir, target_fa, query_fa, options, self_mo
                 + f" > {shlex.quote('repetitive_' + winnowmap_kmer + '_result.txt')}",
             ]
         )
-        args = ["winnowmap", "-W", f"repetitive_{winnowmap_kmer}_result.txt", "-x", winnowmap_preset]
+        args = ["winnowmap", "-c", "-W", f"repetitive_{winnowmap_kmer}_result.txt", "-x", winnowmap_preset]
         if self_mode:
             args.append("-X")
         args.extend(["-t", threads, str(target_fa), str(query_fa)])

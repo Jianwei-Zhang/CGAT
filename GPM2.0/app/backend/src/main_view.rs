@@ -468,6 +468,7 @@ pub fn list_chr_view_ctgs_with_connection(
         )
         .with_context(|| format!("project_id {} does not exist", project_id))?;
 
+    let reference_gaps = load_main_view_reference_gaps(conn, reference_genome_id, chr_name)?;
     for ctg in &mut ctgs {
         let hit_dataset_filter = if dataset_param == Some(primary_dataset_id)
             || ctg.derived_target_dataset_id == dataset_param
@@ -483,6 +484,7 @@ pub fn list_chr_view_ctgs_with_connection(
             ctg.assembly_ctg_id,
             chr_name,
             hit_dataset_filter,
+            &reference_gaps,
         )?;
         ctg.n_regions =
             list_chr_view_n_regions_with_connection(conn, project_id, ctg.assembly_ctg_id)?;
@@ -672,6 +674,7 @@ struct ChrViewHitRow {
     block_length: i64,
     mapq: i64,
     cg_tag: Option<String>,
+    reference_chr_id: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -995,6 +998,7 @@ fn list_chr_view_hits_with_connection(
     assembly_ctg_id: i64,
     chr_name: Option<&str>,
     dataset_id: Option<i64>,
+    reference_gaps: &HashMap<i64, Vec<ReferenceGapInterval>>,
 ) -> Result<Vec<ChrViewHitItem>> {
     let member_layouts = load_chr_view_member_layouts(conn, project_id, assembly_ctg_id)?;
     if member_layouts.is_empty() {
@@ -1040,7 +1044,7 @@ fn list_chr_view_hits_with_connection(
             continue;
         }
 
-        let segments = split_hit_around_n_regions(
+        let source_segments = split_hit_around_n_regions(
             &row,
             clipped_start,
             clipped_end,
@@ -1049,6 +1053,14 @@ fn list_chr_view_hits_with_connection(
                 .map(Vec::as_slice)
                 .unwrap_or(&[]),
         );
+        let segments = split_main_hit_at_reference_gaps(
+            &row,
+            source_segments,
+            reference_gaps
+                .get(&row.reference_chr_id)
+                .map(Vec::as_slice)
+                .unwrap_or(&[]),
+        )?;
         for segment in segments {
             let (ctg_start, ctg_end) =
                 project_source_interval_to_ctg(layout, segment.query_start, segment.query_end);
@@ -1147,7 +1159,8 @@ fn load_chr_view_hit_rows(
             h.match_length,
             h.block_length,
             h.mapq,
-            h.cg_tag
+            h.cg_tag,
+            h.reference_chr_id
         FROM assembly_ctg c
         JOIN assembly_seq s ON s.id = c.assembly_seq_id
         JOIN source_seq ss ON ss.id = s.source_seq_id
@@ -1299,6 +1312,105 @@ fn load_n_regions_by_source_seq_id(
     Ok(result)
 }
 
+fn load_main_view_reference_gaps(
+    conn: &Connection,
+    reference_genome_id: i64,
+    chr_name: Option<&str>,
+) -> Result<HashMap<i64, Vec<ReferenceGapInterval>>> {
+    let mut stmt = conn.prepare(
+        "SELECT rc.id, rc.chr_name, rc.length, rg.fasta_path
+         FROM reference_chr rc JOIN reference_genome rg ON rg.id = rc.reference_genome_id
+         WHERE rg.id = ?1 AND (?2 IS NULL OR rc.chr_name = ?2)",
+    )?;
+    let chromosomes = stmt
+        .query_map(params![reference_genome_id, chr_name], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, String>(3)?,
+            ))
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let root = conn.path().and_then(|path| Path::new(path).parent());
+    let mut result = HashMap::new();
+    for (id, name, length, fasta) in chromosomes {
+        let (_, gaps) = resolve_reference_track_segments(root, &fasta, &name, length)?;
+        result.insert(id, gaps);
+    }
+    Ok(result)
+}
+
+fn split_main_hit_at_reference_gaps(
+    row: &ChrViewHitRow,
+    source_segments: Vec<ChrViewHitSegment>,
+    gaps: &[ReferenceGapInterval],
+) -> Result<Vec<ChrViewHitSegment>> {
+    if !gaps
+        .iter()
+        .any(|gap| gap.start_bp <= row.ref_end && gap.end_bp >= row.ref_start)
+    {
+        return Ok(source_segments);
+    }
+    let cigar = row.cg_tag.as_deref().unwrap_or("").trim();
+    if cigar.is_empty() {
+        // Legacy PAFs only have interval endpoints. The renderer clips these
+        // conservatively and labels them as approximate instead of inventing CIGAR.
+        return Ok(source_segments);
+    }
+    let blocks = split_paf_hit_by_reference_gaps(
+        row.query_start,
+        row.query_end,
+        row.ref_start,
+        row.ref_end,
+        &row.strand,
+        cigar,
+        gaps,
+    )
+    .with_context(|| format!("invalid CIGAR for main-view hit {}", row.hit_id))?;
+    let mut result = Vec::new();
+    for source in source_segments {
+        let mut parts: Vec<ChrViewHitSegment> = Vec::new();
+        for block in &blocks {
+            let start = source.query_start.max(block.query_start_bp);
+            let end = source.query_end.min(block.query_end_bp);
+            if start > end {
+                continue;
+            }
+            let (ref_start, ref_end) = if row.strand == "-" {
+                (
+                    block.ref_start_bp + block.query_end_bp - end,
+                    block.ref_start_bp + block.query_end_bp - start,
+                )
+            } else {
+                (
+                    block.ref_start_bp + start - block.query_start_bp,
+                    block.ref_start_bp + end - block.query_start_bp,
+                )
+            };
+            // Keep one band per gap-free reference span, not one per CIGAR op.
+            if let Some(last) = parts.last_mut()
+                && !gaps
+                    .iter()
+                    .any(|gap| gap.start_bp <= ref_start && gap.end_bp >= last.ref_end)
+            {
+                last.query_start = last.query_start.min(start);
+                last.query_end = last.query_end.max(end);
+                last.ref_end = ref_end;
+            } else {
+                parts.push(ChrViewHitSegment {
+                    query_start: start,
+                    query_end: end,
+                    ref_start,
+                    ref_end,
+                });
+            }
+        }
+        result.extend(parts);
+    }
+    Ok(result)
+}
+
 fn split_hit_around_n_regions(
     row: &ChrViewHitRow,
     clipped_start: i64,
@@ -1408,6 +1520,7 @@ fn decode_chr_view_hit_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ChrViewH
         block_length: row.get(10)?,
         mapq: row.get(11)?,
         cg_tag: row.get(12)?,
+        reference_chr_id: row.get(13)?,
     })
 }
 
@@ -2394,6 +2507,37 @@ mod tests {
             (31, 40)
         );
         assert_eq!((ctg_a.hits[1].ref_start, ctg_a.hits[1].ref_end), (121, 130));
+    }
+
+    #[test]
+    fn chr_view_splits_reference_gaps_with_indels_and_query_n_regions_on_both_strands() {
+        for strand in ["+", "-"] {
+            let temp = tempdir().unwrap();
+            let conn = Connection::open(temp.path().join("project.sqlite")).unwrap();
+            init_workspace_schema(&conn).unwrap();
+            seed_basic_data(&conn);
+            std::fs::create_dir(temp.path().join("metadata")).unwrap();
+            std::fs::write(temp.path().join("metadata/reference_segments.tsv"),
+                "reference_chr_name\tsegment_order\tsegment_start_bp\tsegment_end_bp\nchr1\t1\t1\t111\nchr1\t2\t118\t100000\n").unwrap();
+            conn.execute("UPDATE ref_alignment_hit SET strand=?1, ref_end=129, cg_tag='10M3I5M2D13M' WHERE id=1", params![strand]).unwrap();
+            conn.execute("INSERT INTO source_seq_n_region (source_seq_id,start_bp,end_bp,length_bp) VALUES (1,25,30,6)", []).unwrap();
+            let ctgs = list_chr_view_ctgs_with_connection(&conn, 1, Some("chr1"), Some(1)).unwrap();
+            let ctg = ctgs.iter().find(|ctg| ctg.name == "ctg_A").unwrap();
+            let mut ranges = ctg
+                .hits
+                .iter()
+                .map(|hit| (hit.ref_start, hit.ref_end, hit.query_start, hit.query_end))
+                .collect::<Vec<_>>();
+            ranges.sort();
+            assert_eq!(
+                ranges,
+                if strand == "+" {
+                    vec![(100, 111, 10, 24), (120, 129, 31, 40)]
+                } else {
+                    vec![(100, 109, 31, 40), (118, 129, 10, 21)]
+                }
+            );
+        }
     }
 
     #[test]

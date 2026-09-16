@@ -187,7 +187,7 @@ class RunAllRunnerTests(unittest.TestCase):
                         "ref:ds",
                         "printf 'run\\n' >> run-count.txt\n"
                         "mkdir -p runs/ds_vs_ref\n"
-                        "printf 'query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\n' "
+                        "printf 'query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\tcg:Z:10M\\n' "
                         "> runs/ds_vs_ref/result.paf\n"
                         "printf 'fixture\\n' > runs/ds_vs_ref/tool_version.txt",
                     )
@@ -224,7 +224,7 @@ class RunAllRunnerTests(unittest.TestCase):
             allow = root / "ds2.continue"
             completed = root / "completed"
             paf = (
-                "printf 'query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\n'"
+                "printf 'query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\tcg:Z:10M\\n'"
             )
             server = self.make_workspace(
                 root,
@@ -397,7 +397,7 @@ write_status(stages)
             allow = root / "chr2.continue"
             completed = root / "completed"
             paf = (
-                "printf 'query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\n'"
+                "printf 'query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\tcg:Z:10M\\n'"
             )
             server = self.make_workspace(
                 root,

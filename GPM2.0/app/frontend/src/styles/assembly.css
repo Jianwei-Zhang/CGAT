@@ -1436,6 +1436,24 @@
   stroke-width: 1.2;
 }
 
+.assembly-marker-display { position: relative; }
+.assembly-marker-display > summary { cursor: pointer; list-style: none; }
+.assembly-marker-display > summary::-webkit-details-marker { display: none; }
+.assembly-marker-display-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  min-width: 125px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 3px 10px #0002;
+}
+.assembly-marker-display-menu label { display: flex; align-items: center; gap: 6px; padding: 4px; white-space: nowrap; cursor: pointer; }
+.assembly-track-unified[data-show-telomeres="false"] .track-telomere-marker,
+.assembly-track-unified[data-show-centromeres="false"] .track-centromere-marker { display: none; }
+
 .track-telomere-marker {
   fill: #b33f4a;
   stroke: #ffffff;

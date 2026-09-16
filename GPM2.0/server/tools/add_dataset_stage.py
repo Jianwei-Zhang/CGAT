@@ -102,7 +102,7 @@ command_path = run_dir / "command.sh"
 dataset_fa = stage_dir / f"data/datasets/{dataset_name}.fa"
 lines = ["#!/usr/bin/env bash", "set -euo pipefail", f"cd {shlex.quote(str(run_dir))}"]
 if alignment_engine == "minimap2":
-    args = ["minimap2", "-x", minimap_preset, "-t", threads, "-o", "result.paf", str(reference_fa), str(dataset_fa)]
+    args = ["minimap2", "-c", "-x", minimap_preset, "-t", threads, "-o", "result.paf", str(reference_fa), str(dataset_fa)]
     lines.append(" ".join(shlex.quote(part) for part in args) + " > stdout.log 2> stderr.log")
 elif alignment_engine == "blastn":
     outfmt = "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen nident gaps"
@@ -160,6 +160,7 @@ elif alignment_engine == "winnowmap":
                 shlex.quote(part)
                 for part in [
                     "winnowmap",
+                    "-c",
                     "-W",
                     f"repetitive_{winnowmap_kmer}_result.txt",
                     "-x",

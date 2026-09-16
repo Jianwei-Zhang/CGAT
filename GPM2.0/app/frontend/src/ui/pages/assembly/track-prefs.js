@@ -79,6 +79,8 @@ export function resolveTrackPrefs(trackView) {
   );
 
   return {
+    showTelomeres: trackView?.showTelomeres !== false,
+    showCentromeres: trackView?.showCentromeres !== false,
     supportDsCtgLen,
     supportDsCtgLenBp: supportDsCtgLen,
     minTickUnitKb,

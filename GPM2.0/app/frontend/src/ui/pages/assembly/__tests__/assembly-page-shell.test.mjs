@@ -477,7 +477,7 @@ test("assembly tab keeps the main view card and subview card but removes their s
   assert.match(html, /<section class="assembly-track-content-stack">/);
   assert.match(html, /<section class="assembly-main-view">/);
   assert.doesNotMatch(html, /<section class="card assembly-main-view">/);
-  assert.match(html, /<div class="assembly-track-unified assembly-track-panel">/);
+  assert.match(html, /<div class="assembly-track-unified assembly-track-panel"\s+data-show-telomeres="true"\s+data-show-centromeres="true">/);
   assert.match(html, /<article class="card subview-selection-panel"[^>]*>/);
   assert.match(html, /<article class="card final-path-card"/);
 });

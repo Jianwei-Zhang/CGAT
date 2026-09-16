@@ -62,7 +62,7 @@ class ServerReportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             server = helper.make_workspace(root, [("ref:ds", "mkdir -p runs/ds_vs_ref\n"
-                "printf 'query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\n' > runs/ds_vs_ref/result.paf\n"
+                "printf 'query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\tcg:Z:10M\\n' > runs/ds_vs_ref/result.paf\n"
                 "echo fixture > runs/ds_vs_ref/tool_version.txt")])
             environment = helper.configure_reference_inputs(server, root, ["ds"])
             self.assertEqual(helper.run_runner(server, env=environment).returncode, 0)

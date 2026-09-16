@@ -83,6 +83,7 @@ class OuterCheckpointManager:
             "execution_engine_version": EXECUTION_ENGINE_VERSION,
             "unit_id": unit_id,
             "kind": kind,
+            "alignment_geometry_version": 2,
             **inputs,
         }
         digest = fingerprint(unit_id)
@@ -484,7 +485,7 @@ class OuterCheckpointManager:
             raise OrchestrationContractError(f"unsupported checkpoint kind: {prepared.kind}")
         for path in paths:
             if path.suffix.lower() == ".paf":
-                validate_paf(path)
+                validate_paf(path, require_cigar=self._read_options()["alignment_engine"] in {"minimap2", "winnowmap"})
         return self._identities(paths)
 
     def _assignment_output_paths(self) -> list[Path]:

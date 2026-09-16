@@ -3,6 +3,7 @@ import {
   sortAlignmentBands, renderAlignmentIdentityLegend,
 } from "./alignment-band-style.js";
 import { buildDualTrackModel } from "./track-layout.js";
+import { splitReferenceBandHit } from "./reference-band-segments.js";
 import {
   ALIGNMENT_LENGTH_OPTIONS,
   IDENTITY_PCT_OPTIONS,
@@ -1213,6 +1214,13 @@ function renderAssemblyTrackInlineControls({
   });
   return `
     <div class="assembly-track-inline-controls" data-main-track-inline-controls role="group" aria-label="${escapeAttr(i18n.page.primaryAlignmentViewControlsAria)}">
+      <details class="assembly-marker-display">
+        <summary class="button ghost tiny">${escapeHtml(i18n.trackControls.display)}</summary>
+        <div class="assembly-marker-display-menu">
+          <label><input type="checkbox" data-track-marker-visibility="showTelomeres" ${trackPrefs.showTelomeres ? "checked" : ""}>${escapeHtml(i18n.trackControls.telomereMarkers)}</label>
+          <label><input type="checkbox" data-track-marker-visibility="showCentromeres" ${trackPrefs.showCentromeres ? "checked" : ""}>${escapeHtml(i18n.trackControls.centromereMarkers)}</label>
+        </div>
+      </details>
       <label class="assembly-track-inline-field">
         <span>${escapeHtml(i18n.trackControls.supportDataset)}</span>
         ${
@@ -1852,12 +1860,16 @@ function renderAssemblyTracks({
     if (containingMember) {
       const containingRect = refMemberRectByCtgId.get(containingMember.assemblyCtgId);
       if (containingRect) {
-        return buildTrackHitRectWithinCtgDisplay({
-          ctgRect: containingRect,
-          ctgLengthBp: containingMember.totalLength,
-          ctgStartOffset: hitStartBp - containingMember.segmentStartBp + 1,
-          ctgEndOffset: hitEndBp - containingMember.segmentStartBp + 1,
-        });
+        return {
+          ...buildTrackHitRectWithinCtgDisplay({
+            ctgRect: containingRect,
+            ctgLengthBp: containingMember.totalLength,
+            ctgStartOffset: hitStartBp - containingMember.segmentStartBp + 1,
+            ctgEndOffset: hitEndBp - containingMember.segmentStartBp + 1,
+          }),
+          leftClamp: containingRect.x,
+          rightClamp: containingRect.x + containingRect.width,
+        };
       }
     }
     return buildTrackHitRect({
@@ -2203,48 +2215,59 @@ function renderAssemblyTracks({
           ) {
             return [];
           }
-          const ctgRect = buildTrackHitRectWithinCtgDisplay({
-            ctgRect: ctgDisplayRect,
-            ctgLengthBp: ctg.lengthBp,
-            ctgStartOffset: hitStartOffset,
-            ctgEndOffset: hitEndOffset,
+          return splitReferenceBandHit(hit, resolvedRefTrackMembers, resolveTrackHitDisplayReversed(ctg, hit)).map((part) => {
+            const hitStartOffset = Number(part.ctgStart ?? part.ctg_start);
+            const hitEndOffset = Number(part.ctgEnd ?? part.ctg_end);
+            const refStartBp = Number(part.refStart ?? part.ref_start);
+            const refEndBp = Number(part.refEnd ?? part.ref_end);
+            const ctgRect = buildTrackHitRectWithinCtgDisplay({
+              ctgRect: ctgDisplayRect,
+              ctgLengthBp: ctg.lengthBp,
+              ctgStartOffset: hitStartOffset,
+              ctgEndOffset: hitEndOffset,
+            });
+            const refRect = resolveReferenceTrackHitRect(refStartBp, refEndBp);
+            const ctgVerticalOffset = resolveTrackCtgVerticalOffset(layout.role, ctg.assemblyCtgId);
+            const ctgLaneTop = layout.laneTop + ctg.laneIndex * TRACK_LANE_HEIGHT + ctgVerticalOffset;
+            const bandPoints = buildCollinearityBandPoints({
+              ctgRect,
+              refRect,
+              // Reference fragments can extend past the nominal ruler after
+              // minimum visual gaps are inserted. Keep their exact endpoints.
+              refLeftClamp: refRect.leftClamp ?? refTrackX,
+              refRightClamp: refRect.rightClamp ?? refTrackX + refTrackWidth,
+              refTop: refRowLayout.barY,
+              refBottom: refRowLayout.barY + TRACK_BAR_HEIGHT,
+              ctgTop: ctgLaneTop,
+              ctgBottom: ctgLaneTop + TRACK_BAR_HEIGHT,
+              direction: layout.connectorDirection,
+              reversed: resolveTrackHitDisplayReversed(ctg, hit),
+            });
+            const trackRole = layout.interactiveRole || layout.role;
+            const phasedTrackId = trackRole === "phased"
+              ? normalizeSupportDatasetId(layout.phasedTrackId ?? ctg.phasedTrackId)
+              : null;
+            const phasedTrackItemId = trackRole === "phased"
+              ? normalizeSupportDatasetId(ctg.phasedTrackItemId)
+              : null;
+            return {
+              identityPct: readHitIdentityPct(hit),
+              tooltipText: `${ctg.name || ctg.assemblyCtgId}: ${Math.round(hitStartOffset)}–${Math.round(hitEndOffset)} | ${selectedChrName}: ${refStartBp}–${refEndBp} | ${alignmentBandTooltipMetrics({ identityPct: readHitIdentityPct(hit), alignLength: hitBlockLength })}${part.referenceProjectionApproximate ? ` | ${i18n.trackControls.approximateReferenceProjection}` : ""}`,
+              refStartBp,
+              refEndBp,
+              approximate: Boolean(part.referenceProjectionApproximate),
+              className: layout.className ? ` ${layout.className}` : "",
+              tone: trackRole === "support" ? "companion" : "primary",
+              trackRole,
+              contigId: ctg.assemblyCtgId,
+              phasedTrackId,
+              phasedTrackItemId,
+              phasedHaplotypeKey: trackRole === "phased"
+                ? String(layout.phasedHaplotypeKey || ctg.phasedHaplotypeKey || "").trim()
+                : "",
+              points: bandPoints,
+            };
           });
-          const refRect = resolveReferenceTrackHitRect(refStartBp, refEndBp);
-          const ctgVerticalOffset = resolveTrackCtgVerticalOffset(layout.role, ctg.assemblyCtgId);
-          const ctgLaneTop = layout.laneTop + ctg.laneIndex * TRACK_LANE_HEIGHT + ctgVerticalOffset;
-          const bandPoints = buildCollinearityBandPoints({
-            ctgRect,
-            refRect,
-            refLeftClamp: refTrackX,
-            refRightClamp: refTrackX + refTrackWidth,
-            refTop: refRowLayout.barY,
-            refBottom: refRowLayout.barY + TRACK_BAR_HEIGHT,
-            ctgTop: ctgLaneTop,
-            ctgBottom: ctgLaneTop + TRACK_BAR_HEIGHT,
-            direction: layout.connectorDirection,
-            reversed: resolveTrackHitDisplayReversed(ctg, hit),
-          });
-          const trackRole = layout.interactiveRole || layout.role;
-          const phasedTrackId = trackRole === "phased"
-            ? normalizeSupportDatasetId(layout.phasedTrackId ?? ctg.phasedTrackId)
-            : null;
-          const phasedTrackItemId = trackRole === "phased"
-            ? normalizeSupportDatasetId(ctg.phasedTrackItemId)
-            : null;
-          return {
-            identityPct: readHitIdentityPct(hit),
-            tooltipText: `${ctg.name || ctg.assemblyCtgId}: ${hitStartOffset}–${hitEndOffset} | ${selectedChrName}: ${refStartBp}–${refEndBp} | ${alignmentBandTooltipMetrics({ identityPct: readHitIdentityPct(hit), alignLength: hitBlockLength })}`,
-            className: layout.className ? ` ${layout.className}` : "",
-            tone: trackRole === "support" ? "companion" : "primary",
-            trackRole,
-            contigId: ctg.assemblyCtgId,
-            phasedTrackId,
-            phasedTrackItemId,
-            phasedHaplotypeKey: trackRole === "phased"
-              ? String(layout.phasedHaplotypeKey || ctg.phasedHaplotypeKey || "").trim()
-              : "",
-            points: bandPoints,
-          };
         });
       });
     })
@@ -2256,7 +2279,7 @@ function renderAssemblyTracks({
         : "";
       return `<polygon class="track-collinearity-band${band.className}" data-band-track-role="${escapeAttr(
           band.trackRole,
-        )}" data-band-contig-id="${band.contigId}"${phasedBandAttrs} data-track-band-proxy="1" points="${band.points}" ${alignmentBandSvgAttrs(band)}><title>${escapeHtml(band.tooltipText)}</title></polygon>`;
+        )}" data-band-contig-id="${band.contigId}"${phasedBandAttrs} data-band-ref-start="${band.refStartBp}" data-band-ref-end="${band.refEndBp}" data-band-approximate="${band.approximate ? "1" : "0"}" data-track-band-proxy="1" points="${band.points}" ${alignmentBandSvgAttrs(band)}><title>${escapeHtml(band.tooltipText)}</title></polygon>`;
     })
     .join("");
 
@@ -2446,7 +2469,7 @@ function renderAssemblyTracks({
     })
     : "";
   return `
-    <div class="assembly-track-unified assembly-track-panel">
+    <div class="assembly-track-unified assembly-track-panel" data-show-telomeres="${trackPrefs.showTelomeres ? "true" : "false"}" data-show-centromeres="${trackPrefs.showCentromeres ? "true" : "false"}">
       <div class="assembly-track-panel-head" data-main-track-control-layout="auto" data-grt-result-card="main" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
         <strong data-main-track-control-title>${escapeHtml(i18n.page.primaryAlignmentViewSingleCardTitle)}</strong>
         <div class="assembly-track-panel-actions" data-main-track-control-actions>

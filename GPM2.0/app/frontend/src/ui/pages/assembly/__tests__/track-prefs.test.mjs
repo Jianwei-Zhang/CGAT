@@ -23,6 +23,8 @@ test("manual track inputs accept only safe decimal integers within the field ran
 
 test("resolveTrackPrefs returns v1 discrete defaults", () => {
   assert.deepEqual(resolveTrackPrefs({}), {
+    showTelomeres: true,
+    showCentromeres: true,
     supportDsCtgLen: 0,
     supportDsCtgLenBp: 0,
     minTickUnitKb: 10000,
@@ -66,6 +68,8 @@ test("resolveTrackPrefs keeps positive integers for new v1 track fields", () => 
       tickBp: 100000,
       alignmentLength: 6500,
       block_length: 6500,
+      showTelomeres: true,
+      showCentromeres: true,
       minIdentityPct: 0,
     },
   );
@@ -112,6 +116,8 @@ test("resolveTrackPrefs falls back to defaults for invalid and non-positive valu
       tickBp: 10000,
       alignmentLength: 10000,
       block_length: 10000,
+      showTelomeres: true,
+      showCentromeres: true,
       minIdentityPct: 0,
     },
   );

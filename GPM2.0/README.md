@@ -158,6 +158,12 @@ xattr -dr com.apple.quarantine /Applications/GPM2.0.app
 
 The package preserves the primary and support dataset roles established during GRT processing and loads the Server-precomputed Final Path. Project-level paths remain editable and can continue into DEGAP or export.
 
+### Main-view gaps and marker visibility
+
+Main-view alignment bands stop at reference gaps and follow the displayed reference fragments. New Server minimap2/winnowmap alignments retain CIGAR so the client can locate the corresponding coordinates on either side. Legacy or other alignments without CIGAR use approximate clipping, explicitly labelled in the tooltip; they are not base-level correspondence evidence. New workflows validate CIGAR. Regenerate old workflows with the updated `prepare.sh` in a new output directory; reopening an old project cannot recover missing alignment detail.
+
+The main-view **Display** menu independently toggles Tel and Cen markers and saves the preferences per project. These switches affect only main-view marker visibility, not annotations, assembly edits, GRT, or exported sequences.
+
 ### Project dataset tables
 
 After import or opening a project, the project page lists the reference genome first, followed by primary, support, and project-linked derived datasets in one table. The first column is Data type. Reads QC status appears beside the project title; creation time sits below the table on the right. Rows show sequence count, total length, N50, and N90. The edit button opens a dialog for the name and note; More information only shows local directories and open-folder actions. Chromosome partitions are grouped at the chr directory, with other locations kept separately. Statistics use all sequence lengths in the current dataset, without a minimum length filter or splitting at Ns. Moving or hiding assembly views does not change them. These statistics also work with no-FASTA packages and require no additional Server quality-control step.

@@ -499,6 +499,29 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   const queryHostAll = typeof host.querySelectorAll === "function"
     ? host.querySelectorAll.bind(host)
     : () => [];
+  queryHostAll("[data-track-marker-visibility]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const field = input.dataset.trackMarkerVisibility;
+      if (field !== "showTelomeres" && field !== "showCentromeres") return;
+      const current = store.getState();
+      const nextPrefs = resolveTrackPrefs({ ...current.assembly.trackView, [field]: input.checked });
+      store.setState({ ...current, assembly: { ...current.assembly, trackView: nextPrefs } });
+      const panel = input.closest?.(".assembly-track-unified");
+      if (panel?.dataset) panel.dataset[field] = String(input.checked);
+      void persistMainTrackViewState(host, store);
+    });
+  });
+  queryHostAll(".assembly-marker-display").forEach((menu) => {
+    menu.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      menu.open = false;
+      menu.querySelector?.("summary")?.focus?.();
+      event.stopPropagation();
+    });
+    menu.addEventListener("focusout", (event) => {
+      if (!menu.contains(event.relatedTarget)) menu.open = false;
+    });
+  });
   const searchButton = queryHost("#assembly-search-button");
   const searchInput = queryHost("#assembly-search-seq-input");
   const loadRetryButton = queryHost("[data-assembly-load-retry='1']");

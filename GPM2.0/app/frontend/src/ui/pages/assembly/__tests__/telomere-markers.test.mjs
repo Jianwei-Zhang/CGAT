@@ -200,6 +200,16 @@ test("assembly main track renders telomere markers only on primary ctg bars", ()
   assert.doesNotMatch(html, /data-telomere-contig-id="202"/);
 });
 
+test("marker visibility has independent project preferences and leaves marker data available", () => {
+  const state = createState();
+  state.assembly.trackView.showTelomeres = false;
+  const html = renderAssemblyPage(state);
+  assert.match(html, /data-show-telomeres="false" data-show-centromeres="true"/);
+  assert.match(html, /data-track-marker-visibility="showTelomeres"\s*>/);
+  assert.match(html, /data-track-marker-visibility="showCentromeres" checked/);
+  assert.match(html, /data-n-region-marker="1"/);
+});
+
 test("assembly telomere markers keep an inspectable width at the ctg edge", () => {
   const html = renderAssemblyPage(createState());
   const markerMatch = html.match(/data-telomere-rule-id="tel2"[\s\S]*?width="([0-9.]+)"/);

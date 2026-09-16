@@ -6,6 +6,25 @@ import {
   persistProjectAssemblyViewState,
 } from "../project-view-state.js";
 
+test("marker visibility persists independently and survives project reload", async () => {
+  let saved;
+  const request = { workspaceRoot: "/tmp/ws", projectId: 7 };
+  for (const trackView of [
+    { showTelomeres: false, showCentromeres: true },
+    { showTelomeres: true, showCentromeres: false },
+    { showTelomeres: false, showCentromeres: false },
+  ]) {
+    await persistProjectAssemblyViewState({ ...request, trackView }, {
+      async setProjectAssemblyViewState(value) { saved = structuredClone(value); return saved; },
+    });
+    const reloaded = await loadProjectAssemblyViewState(request, {
+      async getProjectAssemblyViewState() { return saved; },
+    });
+    assert.equal(reloaded.trackView.showTelomeres, trackView.showTelomeres);
+    assert.equal(reloaded.trackView.showCentromeres, trackView.showCentromeres);
+  }
+});
+
 test("loadProjectAssemblyViewState normalizes segment-based finalPathByChr, finalPathViewMode, and membersCardCollapsed", async () => {
   const result = await loadProjectAssemblyViewState(
     {

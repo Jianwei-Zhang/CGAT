@@ -292,7 +292,7 @@ write_alignment_command_script() {
     case "$ALIGNER" in
       minimap2)
         printf '(minimap2 --version > tool_version.txt 2>&1 || printf %s > tool_version.txt)\n' "$(shell_quote $'unknown\n')"
-        printf 'minimap2 -x %s ' "$(shell_quote "$MINIMAP_PRESET")"
+        printf 'minimap2 -c -x %s ' "$(shell_quote "$MINIMAP_PRESET")"
         if [[ "$self_mode" == "true" ]]; then
           printf -- '-X '
         fi
@@ -334,7 +334,7 @@ write_alignment_command_script() {
           "$(shell_quote "$WINNOWMAP_REPEAT_FRACTION")" \
           "$(shell_quote "$repetitive_db_dir")" \
           "$(shell_quote "$repetitive_txt")"
-        printf 'winnowmap -W %s -x %s ' \
+        printf 'winnowmap -c -W %s -x %s ' \
           "$(shell_quote "$repetitive_txt")" \
           "$(shell_quote "$WINNOWMAP_PRESET")"
         if [[ "$self_mode" == "true" ]]; then
