@@ -6,6 +6,7 @@ import {
   __testSetSelectedPrimaryTrackCtgsHidden,
   __testRenderAssemblyFinalPathCard,
   __testRenderAssemblyMainTrackSections,
+  __testRerenderAssemblyPage,
   __testTogglePrimaryTrackCtgHidden,
   renderAssemblyPage,
   createState,
@@ -35,6 +36,15 @@ test("assembly rerender host resolution falls back from detached route host to c
   };
 
   assert.equal(__testResolveCurrentRouteHost(staleRouteHost), currentRouteHost);
+});
+
+test("late assembly work cannot redraw a different active route", () => {
+  const host = { innerHTML: "project export stays mounted" };
+  const state = { ...createState(), activeRoute: "projectExport" };
+
+  __testRerenderAssemblyPage(host, createStore(state));
+
+  assert.equal(host.innerHTML, "project export stays mounted");
 });
 
 
@@ -486,6 +496,24 @@ test("assembly tab renders a loading curtain over assembly content while data is
   assert.match(loadingHtml, /data-assembly-loading-curtain="1"/);
   assert.doesNotMatch(loadingHtml, /data-track-contig-id="/);
   assert.doesNotMatch(loadedHtml, /data-assembly-loading-curtain="1"/);
+});
+
+test("assembly tab replaces a failed cold load with an error and explicit retry", () => {
+  const html = renderAssemblyPage(
+    createState({
+      assembly: {
+        chromosomes: [],
+        loading: false,
+        error: "workspace missing project.sqlite",
+      },
+    }),
+  );
+
+  assert.doesNotMatch(html, /data-assembly-loading-curtain="1"/);
+  assert.match(html, /role="alert"/);
+  assert.match(html, /主视图加载失败/);
+  assert.match(html, /workspace missing project\.sqlite/);
+  assert.match(html, /data-assembly-load-retry="1"[^>]*>重试<\/button>/);
 });
 
 test("assembly page renders an app-level confirmation dialog for destructive actions", () => {

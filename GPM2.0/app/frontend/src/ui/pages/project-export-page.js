@@ -1595,7 +1595,12 @@ export function renderProjectExportPage(state) {
         })}
       </div>
       ${exportState.loading ? `<p class="muted">${escapeHtml(labels.loading)}</p>` : ""}
-      ${exportState.error ? `<p class="error-text">${escapeHtml(labels.loadFailed)} ${escapeHtml(exportState.error)}</p>` : ""}
+      ${exportState.error ? `
+        <div class="project-export-load-error" role="alert">
+          <p class="error-text">${escapeHtml(labels.loadFailed)} ${escapeHtml(exportState.error)}</p>
+          <button type="button" class="button ghost tiny" data-project-export-refresh="1">${escapeHtml(labels.refresh)}</button>
+        </div>
+      ` : ""}
       ${summaryLine}
       ${renderProjectExportJobModal(exportState.job, labels)}
       ${renderStats(model, labels, normalizeDetailTableState(state))}
@@ -1663,7 +1668,11 @@ function jumpToAssemblyChr(store, target) {
 }
 
 function rerender(host, store) {
-  host.innerHTML = renderProjectExportPage(store.getState());
+  const state = store.getState();
+  if (state.activeRoute && state.activeRoute !== "projectExport") {
+    return;
+  }
+  host.innerHTML = renderProjectExportPage(state);
   bindProjectExportPage(host, store);
   syncProjectExportDetailFilterControls(host);
   syncProjectExportPreviewLabels(host);
@@ -2357,6 +2366,7 @@ export const __test = {
   resolveProjectExportTarget,
   jumpToAssemblyChr,
   loadProjectExportData,
+  rerender,
   runProjectExport,
   syncProjectExportDetailFilterControls,
   syncProjectExportPreviewLabels,

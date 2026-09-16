@@ -671,8 +671,47 @@ test("automatic support reconciliation waits for project hydration and skips loa
     const hydrated = chromosomes.length > 0 && !loading;
     assert.equal(syncCalls, hydrated ? 1 : 0);
     assert.equal(selectionCalls, hydrated ? 1 : 0);
-    assert.equal(loads, chromosomes.length === 0 && !loading ? 1 : 0);
+    assert.equal(loads, chromosomes.length === 0 && !loading && !error ? 1 : 0);
   }
+});
+
+test("failed initial assembly load waits for an explicit retry", async () => {
+  const listeners = new Map();
+  const retryButton = {
+    addEventListener(type, handler) {
+      listeners.set(type, handler);
+    },
+  };
+  const host = {
+    querySelector(selector) {
+      return selector === "[data-assembly-load-retry='1']" ? retryButton : null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+    addEventListener() {},
+  };
+  const state = createState();
+  state.assembly = {
+    ...state.assembly,
+    chromosomes: [],
+    loading: false,
+    error: "workspace missing project.sqlite",
+  };
+  const store = createStore(state);
+  const calls = [];
+
+  bindAssemblyPageImpl(host, store, createBindingDeps({
+    async loadAssemblyView(_host, _store, options) {
+      calls.push(options);
+    },
+  }));
+
+  assert.deepEqual(calls, []);
+  let prevented = false;
+  await listeners.get("click")?.({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.deepEqual(calls, [{ keepCurrentChr: false, keepCurrentCtg: false }]);
 });
 
 test("cold project entry loads saved support and offsets before any support-selection persistence", async () => {

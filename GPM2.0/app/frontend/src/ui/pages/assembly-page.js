@@ -1531,11 +1531,15 @@ function hideSubviewBandTooltip(tooltipNode) {
 
 function rerender(host, store) {
   cancelDeferredRerender();
+  const state = store.getState();
+  if (state.activeRoute && state.activeRoute !== "assembly") {
+    return;
+  }
   const routeHost = resolveCurrentRouteHost(host);
   if (!routeHost) {
     return;
   }
-  routeHost.innerHTML = renderAssemblyPage(store.getState());
+  routeHost.innerHTML = renderAssemblyPage(state);
   bindAssemblyPage(routeHost, store);
 }
 
@@ -2294,6 +2298,10 @@ export function __testResolveAppendToPathFocusPatch(assembly, activePhasedTrackK
 
 export function __testRerenderAssemblyMainTab(host, store, options) {
   return rerenderAssemblyMainTab(host, store, options);
+}
+
+export function __testRerenderAssemblyPage(host, store) {
+  return rerender(host, store);
 }
 
 export function __testRenderAssemblyMainTrackSections(state) {

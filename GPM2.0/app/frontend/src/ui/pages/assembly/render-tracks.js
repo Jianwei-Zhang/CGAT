@@ -470,6 +470,9 @@ function createRenderTracksRenderer(deps = {}) {
     if (assembly?.actionError) {
       parts.push(`<p class="error-text">${escapeHtml(assembly.actionError)}</p>`);
     }
+    if (assembly?.error) {
+      parts.push(`<p class="error-text">${escapeHtml(assembly.error)}</p>`);
+    }
     if (!parts.length) {
       return "";
     }
@@ -650,6 +653,15 @@ function createRenderTracksRenderer(deps = {}) {
         </section>
         ${renderAssemblyLoadingCurtain(assembly, i18n)}
       </section>
+    `;
+  }
+  if (assembly.error && !(Array.isArray(assembly.chromosomes) && assembly.chromosomes.length)) {
+    return `
+      <article class="card assembly-load-error" role="alert">
+        <h4>${escapeHtml(i18n.status.assemblyLoadFailed)}</h4>
+        <p class="error-text">${escapeHtml(assembly.error)}</p>
+        <button type="button" class="button ghost tiny" data-assembly-load-retry="1">${escapeHtml(i18n.status.retryAssemblyLoad)}</button>
+      </article>
     `;
   }
   const currentProject = getCurrentProject(state);

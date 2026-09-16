@@ -355,6 +355,56 @@ test("loadProjectExportData clears previous project results before loading curre
   assert.equal(await loading, true);
 });
 
+test("project export load failure settles with an error and explicit refresh", async () => {
+  let state = createState({
+    activeRoute: "projectExport",
+    projectExport: {},
+  });
+  const store = {
+    getState() {
+      return state;
+    },
+    setState(nextState) {
+      state = nextState;
+    },
+  };
+  const host = {
+    innerHTML: "",
+    addEventListener() {},
+    querySelectorAll() {
+      return [];
+    },
+  };
+
+  const loaded = await __test.loadProjectExportData(host, store, {
+    listProjectChromosomes: async () => {
+      throw new Error("workspace missing project.sqlite");
+    },
+  });
+
+  assert.equal(loaded, false);
+  assert.equal(state.projectExport.loading, false);
+  assert.equal(state.projectExport.loaded, false);
+  assert.equal(state.projectExport.error, "workspace missing project.sqlite");
+  assert.doesNotMatch(host.innerHTML, /正在加载项目导出数据/);
+  assert.match(host.innerHTML, /项目导出数据加载失败/);
+  assert.match(host.innerHTML, /data-project-export-refresh="1"[^>]*>刷新<\/button>/);
+});
+
+test("late project export work cannot redraw a different active route", () => {
+  const host = { innerHTML: "assembly stays mounted" };
+  const state = createState({ activeRoute: "assembly" });
+  const store = {
+    getState() {
+      return state;
+    },
+  };
+
+  __test.rerender(host, store);
+
+  assert.equal(host.innerHTML, "assembly stays mounted");
+});
+
 test("project export loading canonicalizes persisted GRT overallLen from the project view", async () => {
   let state = createState({
     projectExport: {

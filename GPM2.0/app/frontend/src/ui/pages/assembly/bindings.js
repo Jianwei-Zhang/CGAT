@@ -501,6 +501,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     : () => [];
   const searchButton = queryHost("#assembly-search-button");
   const searchInput = queryHost("#assembly-search-seq-input");
+  const loadRetryButton = queryHost("[data-assembly-load-retry='1']");
   const tabButtons = queryHostAll(".tab[data-tab]");
   const printViewButton = queryHost("#assembly-print-view-button");
   const exportChrCtgPmoButton = queryHost("#assembly-export-chr-ctg-pmolecule-button");
@@ -781,6 +782,13 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
 
   searchButton?.addEventListener("click", async () => {
     await runCtgSearch(host, store, searchInput?.value || "");
+  });
+  loadRetryButton?.addEventListener("click", async (event) => {
+    event.preventDefault();
+    await loadAssemblyView(host, store, {
+      keepCurrentChr: false,
+      keepCurrentCtg: false,
+    });
   });
   const resolveAnchorOffsetDraft = (id) => {
     const input = Array.from(assemblyConfirmInputs).find(
@@ -1575,7 +1583,8 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     state.session?.workspacePath &&
     state.session?.projectId &&
     state.assembly.chromosomes.length === 0 &&
-    !state.assembly.loading
+    !state.assembly.loading &&
+    !state.assembly.error
   ) {
     void loadAssemblyView(host, store, {
       keepCurrentChr: Boolean(state.assembly?.projectExportScrollToBottom),
