@@ -643,6 +643,19 @@ fn normalize_final_path_export_segments(
                     end,
                 });
             }
+            // Server baselines use absolute source coordinates and deliberately have no
+            // assembly ID. Prefer their stable locator even if an old ID was persisted.
+            if segment.get("serverBaseline").and_then(Value::as_bool) == Some(true) {
+                let source = segment
+                    .get("source")
+                    .ok_or_else(|| anyhow!("finalPathEntry.segments[{index}] missing source"))?;
+                return Ok(FinalPathExportSegment::Source {
+                    dataset_name: get_required_string(source, "dataset")?,
+                    contig_name: get_required_string(source, "contig")?,
+                    start,
+                    end,
+                });
+            }
             let assembly_ctg_id = segment
                 .get("assemblyCtgId")
                 .ok_or_else(|| anyhow!("finalPathEntry.segments[{index}] missing assemblyCtgId"))
@@ -1128,6 +1141,50 @@ mod tests {
 
         drop(conn);
         fs::remove_dir_all(workspace_root).expect("remove temp workspace root");
+    }
+
+    #[test]
+    fn normalize_final_path_export_segments_accepts_server_sources_and_current_ranges() {
+        for assembly_id in [Value::Null, json!(301)] {
+            let entry = json!({"segments": [{
+                "type": "ctg", "serverBaseline": true, "assemblyCtgId": assembly_id,
+                "start": 17649990, "end": 17646767,
+                "source": {"dataset": "hifiasm", "contig": "ptg000002l",
+                    "start": 17646766, "end": 17649991, "orientation": "-"}
+            }]});
+            let expected = vec![FinalPathExportSegment::Source {
+                dataset_name: "hifiasm".to_string(),
+                contig_name: "ptg000002l".to_string(),
+                start: 17649990,
+                end: 17646767,
+            }];
+            assert_eq!(
+                normalize_final_path_export_segments(&entry).unwrap(),
+                expected
+            );
+            let records =
+                normalize_project_final_path_fasta_records(&json!({"Chr4_RagTag": entry})).unwrap();
+            assert_eq!(records[0].final_path_segments, expected);
+        }
+        for source in [
+            Value::Null,
+            json!({"dataset": "hifiasm"}),
+            json!({"dataset": "", "contig": "ptg000002l"}),
+        ] {
+            assert!(
+                normalize_final_path_export_segments(&json!({"segments": [{
+                    "type": "ctg", "serverBaseline": true, "assemblyCtgId": 301,
+                    "start": 1, "end": 5, "source": source,
+                }]}))
+                .is_err()
+            );
+        }
+        assert!(
+            normalize_final_path_export_segments(&json!({"segments": [{
+                "type": "ctg", "assemblyCtgId": null, "start": 1, "end": 5,
+            }]}))
+            .is_err()
+        );
     }
 
     #[test]

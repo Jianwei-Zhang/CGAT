@@ -43,6 +43,12 @@ pub struct ListExportRecordsParams {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FinalPathExportSegment {
+    Source {
+        dataset_name: String,
+        contig_name: String,
+        start: i64,
+        end: i64,
+    },
     Ctg {
         assembly_ctg_id: i64,
         start: i64,
@@ -435,9 +441,30 @@ fn build_final_path_fasta_records(
 ) -> Result<Vec<(String, String)>> {
     let mut required_ctg_ids = BTreeSet::<i64>::new();
     let mut required_reference_chr_names = BTreeSet::<String>::new();
+    let mut source_id_by_name = HashMap::<(String, String), i64>::new();
     for record in records {
         for segment in &record.final_path_segments {
             match segment {
+                FinalPathExportSegment::Source {
+                    dataset_name,
+                    contig_name,
+                    ..
+                } => {
+                    let key = (dataset_name.clone(), contig_name.clone());
+                    if !source_id_by_name.contains_key(&key) {
+                        let source_id: i64 = conn.query_row(
+                            "SELECT ss.id FROM source_seq ss
+                             JOIN dataset d ON d.id = ss.dataset_id
+                             JOIN project_dataset pd ON pd.dataset_id = d.id
+                             WHERE pd.project_id = ?1 AND d.name = ?2 AND ss.seq_name = ?3",
+                            params![project_id, dataset_name, contig_name],
+                            |row| row.get(0),
+                        ).with_context(|| format!(
+                            "final-path source {dataset_name}:{contig_name} not found in project {project_id}"
+                        ))?;
+                        source_id_by_name.insert(key, source_id);
+                    }
+                }
                 FinalPathExportSegment::Ctg {
                     assembly_ctg_id, ..
                 } if *assembly_ctg_id > 0 => {
@@ -462,7 +489,15 @@ fn build_final_path_fasta_records(
         .iter()
         .map(|ctg| (ctg.id, ctg.clone()))
         .collect::<HashMap<_, _>>();
-    let source_sequences = load_required_source_sequences(conn, &required_ctgs)?;
+    let mut required_source_ids = source_id_by_name.values().copied().collect::<BTreeSet<_>>();
+    required_source_ids.extend(
+        required_ctgs
+            .iter()
+            .flat_map(|ctg| &ctg.members)
+            .filter(|member| !member.hidden)
+            .map(|member| member.source_seq_id),
+    );
+    let source_sequences = load_source_sequences_by_ids(conn, &required_source_ids)?;
     let reference_sequences =
         load_required_reference_sequences(conn, project_id, &required_reference_chr_names)?;
 
@@ -476,6 +511,7 @@ fn build_final_path_fasta_records(
                     &ctg_by_id,
                     &source_sequences,
                     &reference_sequences,
+                    &source_id_by_name,
                 )?,
             ))
         })
@@ -487,10 +523,40 @@ fn build_final_path_sequence(
     ctg_by_id: &HashMap<i64, CtgExportModel>,
     source_sequences: &HashMap<i64, String>,
     reference_sequences: &HashMap<String, String>,
+    source_id_by_name: &HashMap<(String, String), i64>,
 ) -> Result<String> {
     let mut final_sequence = String::new();
     for segment in segments {
         match segment {
+            FinalPathExportSegment::Source {
+                dataset_name,
+                contig_name,
+                start,
+                end,
+            } => {
+                let sequence = source_id_by_name
+                    .get(&(dataset_name.clone(), contig_name.clone()))
+                    .and_then(|id| source_sequences.get(id))
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "final-path source sequence {dataset_name}:{contig_name} not found"
+                        )
+                    })?;
+                let first = (*start).min(*end);
+                let last = (*start).max(*end);
+                if first <= 0 || last as usize > sequence.len() {
+                    bail!(
+                        "final-path source range {start}..{end} exceeds source {dataset_name}:{contig_name} length {}",
+                        sequence.len()
+                    );
+                }
+                let slice = &sequence[(first as usize - 1)..last as usize];
+                if start <= end {
+                    final_sequence.push_str(slice);
+                } else {
+                    final_sequence.push_str(&reverse_complement(slice));
+                }
+            }
             FinalPathExportSegment::Gap { gap_size_bp } => {
                 if *gap_size_bp > 0 {
                     final_sequence.push_str(&"N".repeat(*gap_size_bp as usize));
@@ -991,9 +1057,14 @@ fn load_required_source_sequences(
         .flat_map(|ctg| ctg.members.iter())
         .filter(|member| !member.hidden)
         .map(|member| member.source_seq_id)
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>();
+        .collect::<BTreeSet<_>>();
+    load_source_sequences_by_ids(conn, &needed_source_ids)
+}
+
+fn load_source_sequences_by_ids(
+    conn: &Connection,
+    needed_source_ids: &BTreeSet<i64>,
+) -> Result<HashMap<i64, String>> {
     if needed_source_ids.is_empty() {
         return Ok(HashMap::new());
     }
@@ -2057,6 +2128,7 @@ mod tests {
             &ctg_by_id,
             &source_sequences,
             &reference_sequences,
+            &HashMap::new(),
         )
         .unwrap();
         let canonicalized_anchor_split = build_final_path_sequence(
@@ -2080,6 +2152,7 @@ mod tests {
             &ctg_by_id,
             &source_sequences,
             &reference_sequences,
+            &HashMap::new(),
         )
         .unwrap();
 
@@ -2337,6 +2410,90 @@ mod tests {
             .filter(|line| !line.starts_with('>'))
             .collect::<String>();
         assert_eq!(sequence, "TGGAANNCCCG");
+
+        // Server source coordinates remain absolute even when the main-view
+        // assembly member is clipped, reversed, renamed, or hidden.
+        conn.execute(
+            "UPDATE assembly_seq SET orient = '-', hidden = 1 WHERE id = 201",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE assembly_ctg SET name = 'renamed' WHERE id = 301",
+            [],
+        )
+        .unwrap();
+        let source_segments = vec![
+            FinalPathExportSegment::Source {
+                dataset_name: "ds".into(),
+                contig_name: "tigA".into(),
+                start: 1,
+                end: 4,
+            },
+            FinalPathExportSegment::Gap { gap_size_bp: 2 },
+            FinalPathExportSegment::Source {
+                dataset_name: "ds".into(),
+                contig_name: "tigA".into(),
+                start: 8,
+                end: 5,
+            },
+        ];
+        let source_params = ExportFinalPathFastaParams {
+            chr_name: "Chr01".into(),
+            output_path: output_path.clone(),
+            final_path_segments: source_segments.clone(),
+        };
+        export_final_path_fasta_with_connection(&mut conn, &db_path, 1, &source_params).unwrap();
+        assert_eq!(
+            fs::read_to_string(&output_path).unwrap(),
+            ">Chr01\nTTGGNNGGTT\n"
+        );
+        export_project_final_path_fasta_with_connection(
+            &mut conn,
+            &db_path,
+            1,
+            &ExportProjectFinalPathFastaParams {
+                output_path: output_path.clone(),
+                records: vec![FinalPathFastaRecord {
+                    chr_name: "Chr01".into(),
+                    final_path_segments: source_segments,
+                }],
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read_to_string(&output_path).unwrap(),
+            ">Chr01\nTTGGNNGGTT\n"
+        );
+        for (dataset, contig, start, end) in [
+            ("ds", "tigA", 0, 4),
+            ("ds", "tigA", 1, 9),
+            ("ds", "missing", 1, 4),
+            ("other", "tigA", 1, 4),
+        ] {
+            let invalid = ExportFinalPathFastaParams {
+                final_path_segments: vec![FinalPathExportSegment::Source {
+                    dataset_name: dataset.into(),
+                    contig_name: contig.into(),
+                    start,
+                    end,
+                }],
+                ..source_params.clone()
+            };
+            assert!(
+                export_final_path_fasta_with_connection(&mut conn, &db_path, 1, &invalid).is_err()
+            );
+            assert_eq!(
+                fs::read_to_string(&output_path).unwrap(),
+                ">Chr01\nTTGGNNGGTT\n"
+            );
+        }
+        conn.execute("DELETE FROM project_dataset WHERE project_id = 1", [])
+            .unwrap();
+        assert!(
+            export_final_path_fasta_with_connection(&mut conn, &db_path, 1, &source_params)
+                .is_err()
+        );
     }
 
     #[test]
