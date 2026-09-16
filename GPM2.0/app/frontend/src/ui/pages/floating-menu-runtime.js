@@ -2,8 +2,8 @@ export const FLOATING_MENU_CLOSE_DELAY_MS = 400;
 
 function resolveTimerApi(options = {}) {
   return {
-    setTimeout: options.setTimeout || globalThis.setTimeout,
-    clearTimeout: options.clearTimeout || globalThis.clearTimeout,
+    setTimeout: options.setTimeout || globalThis.setTimeout.bind(globalThis),
+    clearTimeout: options.clearTimeout || globalThis.clearTimeout.bind(globalThis),
   };
 }
 

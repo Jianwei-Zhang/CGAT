@@ -1,12 +1,43 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { splitReferenceBandHit } from "../reference-band-segments.js";
+import { buildTrackRectsWithMinGap } from "../track-render-geometry.js";
 import { renderAssemblyPage, createState } from "./tabs-semantics-harness.mjs";
 
 const members = [
   { segmentStartBp: 1, segmentEndBp: 1000 },
   { segmentStartBp: 1101, segmentEndBp: 2100 },
 ];
+
+test("reference visual gaps translate fragments without shrinking their base-length scale", () => {
+  const ctgs = [
+    { startBp: 1, lengthBp: 440000, laneIndex: 0 },
+    { startBp: 440101, lengthBp: 160000, laneIndex: 0 },
+    { startBp: 600201, lengthBp: 7800000, laneIndex: 0 },
+  ];
+  const scale = { windowStart: 0, domainSpanBp: 30000000, innerWidth: 1800 };
+  const natural = buildTrackRectsWithMinGap(ctgs, scale);
+  const displayed = buildTrackRectsWithMinGap(ctgs, { ...scale, minGapPx: 15, preserveWidths: true });
+  displayed.forEach((rect, index) => {
+    assert.equal(rect.width, natural[index].width);
+    if (index) assert.ok(rect.x - displayed[index - 1].x - displayed[index - 1].width >= 15 - 1e-8);
+  });
+});
+
+test("crowded reference names are hidden but the full fragment hover title remains", () => {
+  const fragments = [
+    { segmentStartBp: 1, segmentEndBp: 100, name: "reference-first-long-name" },
+    { segmentStartBp: 201, segmentEndBp: 300, name: "reference-second-long-name" },
+    { segmentStartBp: 401, segmentEndBp: 30000000, name: "reference-last" },
+  ];
+  const html = renderAssemblyPage(createState({ assembly: {
+    selectedChrName: "Chr01", chromosomes: [{ chrName: "Chr01", chrLength: 30000000 }],
+    refTrackMembers: fragments,
+  } }));
+  assert.equal([...html.matchAll(/track-reference-member-label is-ref is-collision-hidden/g)].length, 2);
+  assert.match(html, /<title>reference-first-long-name \| start=1 \| end=100<\/title>/);
+  assert.match(html, /track-reference-member-label is-ref"/);
+});
 test("legacy bands skip reference gaps and preserve orientation without claiming exact mapping", () => {
   const hit = { refStart: 1, refEnd: 2100, ctgStart: 1, ctgEnd: 2100 };
   for (const reversed of [false, true]) {

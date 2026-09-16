@@ -1437,8 +1437,7 @@
 }
 
 .assembly-marker-display { position: relative; }
-.assembly-marker-display > summary { cursor: pointer; list-style: none; }
-.assembly-marker-display > summary::-webkit-details-marker { display: none; }
+.track-reference-member-label.is-collision-hidden { visibility: hidden; }
 .assembly-marker-display-menu {
   position: absolute;
   top: calc(100% + 4px);
@@ -1451,6 +1450,7 @@
   box-shadow: 0 3px 10px #0002;
 }
 .assembly-marker-display-menu label { display: flex; align-items: center; gap: 6px; padding: 4px; white-space: nowrap; cursor: pointer; }
+.assembly-marker-display-menu[hidden] { display: none; }
 .assembly-track-unified[data-show-telomeres="false"] .track-telomere-marker,
 .assembly-track-unified[data-show-centromeres="false"] .track-centromere-marker { display: none; }
 

@@ -110,20 +110,25 @@ test("marker toggles persist independently without replacing track geometry or s
   const store = createStore(state);
   const panel = { dataset: {}, scrollLeft: 317 };
   const handlers = {};
+  let listenerCount = 0;
   const inputs = ["showTelomeres", "showCentromeres"].map((field) => ({
     dataset: { trackMarkerVisibility: field }, checked: false,
     closest: () => panel,
-    addEventListener: (_type, handler) => { handlers[field] = handler; },
+    addEventListener: (_type, handler) => { handlers[field] = handler; listenerCount += 1; },
   }));
   const saved = [];
-  bindAssemblyPageImpl({
+  const host = {
     querySelector: () => null,
     querySelectorAll: (selector) => selector === "[data-track-marker-visibility]" ? inputs : [],
     addEventListener() {},
-  }, store, createBindingDeps({
+  };
+  const deps = createBindingDeps({
     persistMainTrackViewState: () => { saved.push({ ...store.getState().assembly.trackView }); },
     rerender: () => assert.fail("marker visibility must not redraw the track"),
-  }));
+  });
+  bindAssemblyPageImpl(host, store, deps);
+  bindAssemblyPageImpl(host, store, deps);
+  assert.equal(listenerCount, 2);
   handlers.showTelomeres();
   assert.equal(saved[0].showTelomeres, false);
   assert.equal(saved[0].showCentromeres, true);

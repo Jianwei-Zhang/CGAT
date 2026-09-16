@@ -230,7 +230,7 @@ export function sortTrackEntriesForRender(entries) {
 
 export function buildTrackRectsWithMinGap(
   ctgs,
-  { windowStart, domainSpanBp, innerWidth, minGapPx = 0 },
+  { windowStart, domainSpanBp, innerWidth, minGapPx = 0, preserveWidths = false },
 ) {
   const sourceCtgs = Array.isArray(ctgs) ? ctgs : [];
   const rects = sourceCtgs.map((ctg) => buildTrackRect(ctg, { windowStart, domainSpanBp, innerWidth }));
@@ -257,7 +257,7 @@ export function buildTrackRectsWithMinGap(
         continue;
       }
       let neededPx = resolvedMinGapPx - currentGap;
-      const maxReduciblePx = Math.max(0, current.width - 3);
+      const maxReduciblePx = preserveWidths ? 0 : Math.max(0, current.width - 3);
       const reducePx = Math.min(maxReduciblePx, neededPx);
       if (reducePx > 0) {
         current.width -= reducePx;

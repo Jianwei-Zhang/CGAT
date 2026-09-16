@@ -23,11 +23,13 @@ import {
 } from "./grt-result-state.js";
 import { assemblyPageSession } from "./page-session.js";
 import { bindMainTrackControlLayout } from "./main-track-control-layout-runtime.js";
+import { bindMarkerDisplayMenus } from "./marker-display-menu-runtime.js";
 import { updateSubviewCompositionViewport } from "./subview-history-state.js";
 import { resolveSubviewCompositionScaleViewport } from "./subview-composition-layout.js";
 import { getSubviewComposition } from "./subview-composition-state.js";
 
 const ASSEMBLY_TRACK_COMBO_BOUND = Symbol("assemblyTrackComboBound");
+const MARKER_VISIBILITY_BOUND = Symbol("markerVisibilityBound");
 const ASSEMBLY_DROPDOWN_CLOSE_DELAY_MS = 400;
 const REQUIRED_BINDING_DEPS = [
   "appendFinalPathRow",
@@ -500,7 +502,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     ? host.querySelectorAll.bind(host)
     : () => [];
   queryHostAll("[data-track-marker-visibility]").forEach((input) => {
-    input.addEventListener("change", () => {
+    const onChange = () => {
       const field = input.dataset.trackMarkerVisibility;
       if (field !== "showTelomeres" && field !== "showCentromeres") return;
       const current = store.getState();
@@ -509,19 +511,13 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
       const panel = input.closest?.(".assembly-track-unified");
       if (panel?.dataset) panel.dataset[field] = String(input.checked);
       void persistMainTrackViewState(host, store);
-    });
+    };
+    if (!input[MARKER_VISIBILITY_BOUND]) {
+      input.addEventListener("change", () => input[MARKER_VISIBILITY_BOUND]());
+    }
+    input[MARKER_VISIBILITY_BOUND] = onChange;
   });
-  queryHostAll(".assembly-marker-display").forEach((menu) => {
-    menu.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape") return;
-      menu.open = false;
-      menu.querySelector?.("summary")?.focus?.();
-      event.stopPropagation();
-    });
-    menu.addEventListener("focusout", (event) => {
-      if (!menu.contains(event.relatedTarget)) menu.open = false;
-    });
-  });
+  bindMarkerDisplayMenus(host);
   const searchButton = queryHost("#assembly-search-button");
   const searchInput = queryHost("#assembly-search-seq-input");
   const loadRetryButton = queryHost("[data-assembly-load-retry='1']");

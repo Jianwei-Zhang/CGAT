@@ -1214,13 +1214,13 @@ function renderAssemblyTrackInlineControls({
   });
   return `
     <div class="assembly-track-inline-controls" data-main-track-inline-controls role="group" aria-label="${escapeAttr(i18n.page.primaryAlignmentViewControlsAria)}">
-      <details class="assembly-marker-display">
-        <summary class="button ghost tiny">${escapeHtml(i18n.trackControls.display)}</summary>
-        <div class="assembly-marker-display-menu">
+      <div class="assembly-marker-display">
+        <button type="button" class="button ghost tiny" data-marker-display-toggle aria-expanded="false" aria-controls="assembly-marker-display-menu">${escapeHtml(i18n.trackControls.markerDisplay)}</button>
+        <div id="assembly-marker-display-menu" class="assembly-marker-display-menu" role="group" aria-label="${escapeAttr(i18n.trackControls.markerDisplay)}" hidden>
           <label><input type="checkbox" data-track-marker-visibility="showTelomeres" ${trackPrefs.showTelomeres ? "checked" : ""}>${escapeHtml(i18n.trackControls.telomereMarkers)}</label>
           <label><input type="checkbox" data-track-marker-visibility="showCentromeres" ${trackPrefs.showCentromeres ? "checked" : ""}>${escapeHtml(i18n.trackControls.centromereMarkers)}</label>
         </div>
-      </details>
+      </div>
       <label class="assembly-track-inline-field">
         <span>${escapeHtml(i18n.trackControls.supportDataset)}</span>
         ${
@@ -1778,7 +1778,7 @@ function renderAssemblyTracks({
     });
   const refMemberLayoutCtgs = resolvedRefTrackMembers.map((member) => ({
     ...member,
-    startBp: member.segmentStartBp,
+    startBp: member.segmentStartBp - 1,
     lengthBp: Math.max(1, member.segmentEndBp - member.segmentStartBp + 1),
     laneIndex: 0,
   }));
@@ -1787,12 +1787,13 @@ function renderAssemblyTracks({
     domainSpanBp: visualDomainSpanBp,
     innerWidth,
     minGapPx: 15,
+    preserveWidths: true,
   });
   const refMemberRectByCtgId = new Map(
     refMemberLayoutCtgs.map((member, index) => [member.assemblyCtgId, refMemberRects[index]]),
   );
   const refMemberBlocks = resolvedRefTrackMembers
-    .map((member) => {
+    .map((member, index) => {
       const rect = refMemberRectByCtgId.get(member.assemblyCtgId) || buildTrackHitRect({
         ctgStartBp: member.segmentStartBp,
         ctgEndBp: member.segmentEndBp,
@@ -1802,6 +1803,11 @@ function renderAssemblyTracks({
       });
       const refLabelX = rect.x + 4;
       const refLabelY = refRowLayout.barY + TRACK_TEXT_OFFSET_Y;
+      const labelText = `${member.name} (${member.refOrient})`;
+      const nextRect = refMemberRects[index + 1];
+      const labelFits = !nextRect || resolveTrackCtgLabelRightBoundary({
+        x: refLabelX, labelText,
+      }) + 4 <= nextRect.x + 4;
       const slotToken = getSubviewSlotToken(subview, "ref", member.assemblyCtgId);
       const slotClass = slotToken ? " is-subview-selected" : "";
       return `
@@ -1832,7 +1838,7 @@ function renderAssemblyTracks({
             <title>${escapeHtml(member.name)} | start=${member.segmentStartBp} | end=${member.segmentEndBp}</title>
           </rect>
           <text
-            class="track-ctg-label track-reference-member-label is-ref"
+            class="track-ctg-label track-reference-member-label is-ref${labelFits ? "" : " is-collision-hidden"}"
             x="${refLabelX.toFixed(2)}"
             y="${refLabelY.toFixed(2)}"
             text-anchor="start"
@@ -1840,7 +1846,7 @@ function renderAssemblyTracks({
             data-track-label-role="ref"
             data-track-label-is-mirror="0"
           >${escapeHtml(
-            `${member.name} (${member.refOrient})`,
+            labelText,
           )}</text>
           ${
             slotToken
@@ -1912,6 +1918,7 @@ function renderAssemblyTracks({
     );
   const maxRectRight = Math.max(
     innerWidth,
+    ...refMemberRects.map((rect) => rect.x + rect.width),
     ...rowLayouts
       .flatMap((layout) => layout.trackModel.ctgs.map((ctg, index) => ({ layout, ctg, index })))
       .map(({ layout, ctg, index }) => {

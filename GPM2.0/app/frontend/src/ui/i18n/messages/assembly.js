@@ -201,7 +201,7 @@ export const zh = {
     traceEmpty: "选择 Final Path 片段、来源卡片、事件或证据查看详情。",
   },
   trackControls: {
-    display: "显示",
+    markerDisplay: "标记显示",
     telomereMarkers: "Tel 标记",
     centromereMarkers: "Cen 标记",
     approximateReferenceProjection: "区间投影：缺少精确比对映射",
@@ -811,7 +811,7 @@ export const en = {
     traceEmpty: "Select a Final Path segment, source card, event, or evidence to inspect its trace.",
   },
   trackControls: {
-    display: "Display",
+    markerDisplay: "Markers",
     telomereMarkers: "Tel markers",
     centromereMarkers: "Cen markers",
     approximateReferenceProjection: "Interval projection: exact alignment mapping unavailable",
