@@ -1,5 +1,6 @@
 import csv
 import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -16,6 +17,7 @@ from server.tools.grt_prepare_inputs import (
     donor_fragment_rows,
     executable_identity,
 )
+from server.tools.run_outer_checkpoints import OuterCheckpointManager
 
 
 def write_fasta(path, records):
@@ -438,15 +440,19 @@ set -euo pipefail
 if [[ "${1:-}" == "--version" ]]; then echo 'craq fixture 1'; exit 0; fi
 printf 'craq\\n' >> "$FAKE_QC_LOG"
 genome=''
+reads=''
 out=''
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -g) genome="$2"; shift 2 ;;
+    -sms) reads="$2"; shift 2 ;;
     -o) out="$2"; shift 2 ;;
     *) shift ;;
   esac
 done
 mkdir -p "$(dirname "$out")/runAQI_out"
+mkdir -p "$out"
+ln -s "$reads" "$out/$(basename "$reads")"
 report="$(dirname "$out")/runAQI_out/out_final.Report"
 printf '#Chr\\tCovered.Rate\\tLow-confident.Rate\\tAvg.CRH\\tAvg.CSH\\tAvg.CRE(R-AQI)\\tAvg.CSE(S-AQI)\\n' > "$report"
 awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome" >> "$report"
@@ -483,6 +489,48 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
                 )
             )
             self.assertTrue(all(row["craq"] == "98.500000" for row in quality))
+            self.assertFalse(any(path.is_symlink() for path in (server / "grt/qc").rglob("*")))
+
+            legacy_link = server / "grt/qc/primary/craq_output/primary" / reads.name
+            legacy_link.parent.mkdir(parents=True, exist_ok=True)
+            legacy_link.symlink_to(reads)
+            checkpoint_path = server / "grt/checkpoints/donor_freeze.json"
+            checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+            legacy_relpath = legacy_link.relative_to(server).as_posix()
+            checkpoint["output_hashes"][legacy_relpath] = sha256(reads)
+            checkpoint_path.write_text(
+                json.dumps(checkpoint, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            stage_status_path = server / "metadata/grt_stage_status.tsv"
+            stage_status = read_tsv(stage_status_path)
+            stage_status[0]["checkpoint_sha256"] = sha256(checkpoint_path)
+            write_tsv(stage_status_path, list(stage_status[0]), stage_status)
+            valid, reason = OuterCheckpointManager(server).validate_grt_unit("grt_prepare")
+            self.assertFalse(valid)
+            self.assertIn("escapes the Server workspace", reason)
+            migrated = self.run_tool(
+                server,
+                "--reads",
+                reads,
+                "--meryl",
+                fake_bin / "meryl",
+                "--merqury",
+                fake_bin / "merqury.sh",
+                "--craq",
+                fake_bin / "craq",
+                env=env,
+            )
+            self.assertEqual(migrated.returncode, 0, migrated.stderr)
+            self.assertIn("Removed legacy external CRAQ input links", migrated.stdout)
+            self.assertIn("GRT prepare inputs are current", migrated.stdout)
+            self.assertFalse(legacy_link.exists())
+            migrated_checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+            self.assertNotIn(legacy_relpath, migrated_checkpoint["output_hashes"])
+            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 5)
+            valid, reason = OuterCheckpointManager(server).validate_grt_unit("grt_prepare")
+            self.assertTrue(valid, reason)
+
             next((server / "grt/qc").rglob("*.qv")).unlink()
             rebuilt = self.run_tool(
                 server,

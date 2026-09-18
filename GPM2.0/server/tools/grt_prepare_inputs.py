@@ -67,6 +67,69 @@ def parse_craq_report(path: Path) -> dict[str, float]:
     return scores
 
 
+GRT_STAGE_STATUS_FIELDS = [
+    "stage",
+    "q_input_version",
+    "q_input_sha256",
+    "q_output_version",
+    "q_output_sha256",
+    "donor_set_id",
+    "status",
+    "checkpoint_relpath",
+    "checkpoint_sha256",
+]
+
+
+def remove_external_qc_symlinks(qc_root: Path, workspace_root: Path) -> list[Path]:
+    """Remove tool-created links that point outside the staged or published workspace."""
+    if not qc_root.is_dir():
+        return []
+    allowed_root = workspace_root.resolve()
+    removed: list[Path] = []
+    for path in sorted(qc_root.rglob("*"), key=lambda value: value.as_posix()):
+        if not path.is_symlink():
+            continue
+        try:
+            path.resolve().relative_to(allowed_root)
+        except (OSError, RuntimeError, ValueError):
+            path.unlink()
+            removed.append(path)
+    return removed
+
+
+def migrate_legacy_qc_symlinks(
+    server_dir: Path, checkpoint_path: Path, checkpoint: dict[str, object]
+) -> dict[str, object]:
+    """Repair donor-freeze checkpoints that recorded CRAQ input symlinks as outputs."""
+    removed = remove_external_qc_symlinks(server_dir / "grt/qc", server_dir)
+    if not removed:
+        return checkpoint
+    output_hashes = checkpoint.get("output_hashes")
+    if not isinstance(output_hashes, dict):
+        return checkpoint
+    checkpoint["output_hashes"] = {
+        relpath: digest
+        for relpath, digest in output_hashes.items()
+        if (server_dir / relpath) not in removed
+    }
+    checkpoint_path.write_text(
+        json.dumps(checkpoint, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+        newline="",
+    )
+    status_path = server_dir / "metadata/grt_stage_status.tsv"
+    stage_rows = read_tsv(status_path, GRT_STAGE_STATUS_FIELDS)
+    for row in stage_rows:
+        if row["stage"] == "donor_freeze":
+            row["checkpoint_sha256"] = sha256_file(checkpoint_path)
+    write_tsv(status_path, GRT_STAGE_STATUS_FIELDS, stage_rows)
+    print(
+        "Removed legacy external CRAQ input links from the GRT checkpoint: "
+        + ", ".join(path.relative_to(server_dir).as_posix() for path in removed)
+    )
+    return checkpoint
+
+
 def run_reads_qc(
     stage_grt: Path,
     server_dir: Path,
@@ -152,6 +215,7 @@ def run_reads_qc(
         if not reports:
             fail(f"CRAQ produced no report for dataset {dataset_name}")
         parsed_craq = parse_craq_report(reports[0])
+        remove_external_qc_symlinks(craq_root, stage_grt)
 
         contig_names = [name for ds, name in sequences if ds == dataset_name]
         missing_qv = sorted(set(contig_names) - set(parsed_qv))
@@ -530,21 +594,20 @@ def prepare(args: argparse.Namespace) -> None:
     if checkpoint_path.is_file():
         try:
             checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+            if (
+                checkpoint.get("workflow") == WORKFLOW
+                and checkpoint.get("stage") == "donor_freeze"
+                and checkpoint.get("status") == "success"
+                and checkpoint.get("input_fingerprint") == fingerprint
+            ):
+                checkpoint = migrate_legacy_qc_symlinks(
+                    server_dir, checkpoint_path, checkpoint
+                )
             output_hashes = checkpoint.get("output_hashes", {})
             required_directories = checkpoint.get("required_directories", [])
             stage_rows = read_tsv(
                 metadata_dir / "grt_stage_status.tsv",
-                [
-                    "stage",
-                    "q_input_version",
-                    "q_input_sha256",
-                    "q_output_version",
-                    "q_output_sha256",
-                    "donor_set_id",
-                    "status",
-                    "checkpoint_relpath",
-                    "checkpoint_sha256",
-                ],
+                GRT_STAGE_STATUS_FIELDS,
             )
             stage_checkpoint_matches = (
                 len(stage_rows) >= 1
@@ -1146,17 +1209,7 @@ def prepare(args: argparse.Namespace) -> None:
         )
         write_tsv(
             stage_metadata / "grt_stage_status.tsv",
-            [
-                "stage",
-                "q_input_version",
-                "q_input_sha256",
-                "q_output_version",
-                "q_output_sha256",
-                "donor_set_id",
-                "status",
-                "checkpoint_relpath",
-                "checkpoint_sha256",
-            ],
+            GRT_STAGE_STATUS_FIELDS,
             [
                 {
                     "stage": "donor_freeze",
