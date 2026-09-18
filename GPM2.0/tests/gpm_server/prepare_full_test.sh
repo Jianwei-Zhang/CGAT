@@ -724,10 +724,17 @@ test_grt_tool_discovery_fails_fast_for_missing_commands() {
 
   local missing_qc_bin="${TMP_DIR}/missing-craq-bin"
   make_restricted_path "$missing_qc_bin" craq
-  if PATH="$missing_qc_bin" /bin/bash "$SCRIPT" \
+  PATH="$missing_qc_bin:/usr/bin:/bin" /bin/bash "$SCRIPT" \
+    --ref ref_standard_without_craq "$ref" \
+    --ds ds_standard_without_craq "$ds" \
+    --reads "$reads" \
+    -o "${TMP_DIR}/standard-without-craq-output" \
+    >/dev/null
+  if PATH="$missing_qc_bin:/usr/bin:/bin" /bin/bash "$SCRIPT" \
     --ref ref_missing_grt_qc "$ref" \
     --ds ds_missing_grt_qc "$ds" \
     --reads "$reads" \
+    --reads-qc full \
     -o "${TMP_DIR}/missing-craq-output" \
     >/dev/null 2>"${TMP_DIR}/missing-craq.err"; then
     echo "expected missing craq with reads to fail" >&2
@@ -959,16 +966,32 @@ test_reads_lock_qc_recipe_and_generated_command() {
   ' "${output_root}/metadata/package.tsv"
   assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_primary_dataset ds_a
   assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_reads_qc_enabled true
+  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_reads_qc_mode standard
   assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_meryl "${FAKE_BIN}/meryl"
   assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_merqury "${FAKE_BIN}/merqury.sh"
-  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_craq "${FAKE_BIN}/craq"
+  assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_craq ""
   assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_qc_memory_gb 96
   assert_prepare_option "${output_root}/metadata/prepare_options.tsv" grt_kmer_size 31
   grep -F -- "--reads ${reads_a}" "${output_root}/prepare_grt_inputs.sh" >/dev/null
   grep -F -- "--reads ${reads_b}" "${output_root}/prepare_grt_inputs.sh" >/dev/null
   grep -F -- "--memory-gb 96 --kmer-size 31" "${output_root}/prepare_grt_inputs.sh" >/dev/null
-  grep -F -- "--meryl ${FAKE_BIN}/meryl --merqury ${FAKE_BIN}/merqury.sh --craq ${FAKE_BIN}/craq" \
+  grep -F -- "--meryl ${FAKE_BIN}/meryl --merqury ${FAKE_BIN}/merqury.sh" \
     "${output_root}/prepare_grt_inputs.sh" >/dev/null
+  ! grep -F -- "--reads-qc" "${output_root}/prepare_grt_inputs.sh" >/dev/null
+  ! grep -F -- "--craq" "${output_root}/prepare_grt_inputs.sh" >/dev/null
+
+  local full_output_root="${TMP_DIR}/reads_full_gpm_server"
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+    --ref ref_grt_reads_full "$ref" \
+    --ds ds_a "$ds_a" \
+    --ds ds_b "$ds_b" \
+    --reads "$reads_a" \
+    --reads-qc full \
+    -o "$full_output_root" >/dev/null
+  assert_prepare_option "$full_output_root/metadata/prepare_options.tsv" grt_reads_qc_mode full
+  assert_prepare_option "$full_output_root/metadata/prepare_options.tsv" grt_craq "${FAKE_BIN}/craq"
+  grep -F -- "--reads-qc full --craq ${FAKE_BIN}/craq" \
+    "$full_output_root/prepare_grt_inputs.sh" >/dev/null
 }
 
 test_skip_self_omits_chr_local_self_runs() {

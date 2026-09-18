@@ -402,7 +402,7 @@ class GrtPrepareInputsTests(unittest.TestCase):
             reverse_q0 = next(row for row in q_rows if row["contig_name"] == "p_reverse")
             self.assertEqual(reverse_q0["orientation"], "+")
 
-    def test_reads_run_one_meryl_and_per_dataset_merqury_craq(self):
+    def test_reads_default_skips_craq_and_full_mode_runs_it(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
             server = self.make_server(root, reads_qc_enabled=True)
@@ -463,7 +463,7 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
                 executable.chmod(0o755)
             env = os.environ.copy()
             env["FAKE_QC_LOG"] = str(log)
-            completed = self.run_tool(
+            standard = self.run_tool(
                 server,
                 "--reads",
                 reads,
@@ -475,8 +475,42 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
                 fake_bin / "craq",
                 env=env,
             )
+            self.assertEqual(standard.returncode, 0, standard.stderr)
+            self.assertEqual(
+                log.read_text(encoding="utf-8").splitlines(),
+                ["meryl", "merqury", "merqury"],
+            )
+            standard_quality = read_tsv(server / "metadata/grt_contig_quality.tsv")
+            self.assertTrue(all(row["craq"] == "" for row in standard_quality))
+
+            completed = self.run_tool(
+                server,
+                "--reads",
+                reads,
+                "--reads-qc",
+                "full",
+                "--meryl",
+                fake_bin / "meryl",
+                "--merqury",
+                fake_bin / "merqury.sh",
+                "--craq",
+                fake_bin / "craq",
+                env=env,
+            )
             self.assertEqual(completed.returncode, 0, completed.stderr)
-            self.assertEqual(log.read_text(encoding="utf-8").splitlines(), ["meryl", "merqury", "craq", "merqury", "craq"])
+            self.assertEqual(
+                log.read_text(encoding="utf-8").splitlines(),
+                [
+                    "meryl",
+                    "merqury",
+                    "merqury",
+                    "meryl",
+                    "merqury",
+                    "craq",
+                    "merqury",
+                    "craq",
+                ],
+            )
             quality = read_tsv(server / "metadata/grt_contig_quality.tsv")
             quality_by_contig = {row["contig_name"]: row for row in quality}
             self.assertEqual(quality_by_contig["p_redundant"]["qv"], "20.000000")
@@ -513,6 +547,8 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
                 server,
                 "--reads",
                 reads,
+                "--reads-qc",
+                "full",
                 "--meryl",
                 fake_bin / "meryl",
                 "--merqury",
@@ -527,7 +563,7 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
             self.assertFalse(legacy_link.exists())
             migrated_checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
             self.assertNotIn(legacy_relpath, migrated_checkpoint["output_hashes"])
-            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 5)
+            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 8)
             valid, reason = OuterCheckpointManager(server).validate_grt_unit("grt_prepare")
             self.assertTrue(valid, reason)
 
@@ -536,6 +572,8 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
                 server,
                 "--reads",
                 reads,
+                "--reads-qc",
+                "full",
                 "--meryl",
                 fake_bin / "meryl",
                 "--merqury",
@@ -545,7 +583,7 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
                 env=env,
             )
             self.assertEqual(rebuilt.returncode, 0, rebuilt.stderr)
-            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 10)
+            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 13)
 
     def test_atomic_publish_restores_previous_outputs_when_metadata_install_fails(self):
         with tempfile.TemporaryDirectory() as temporary_dir:

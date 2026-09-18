@@ -140,6 +140,7 @@ def run_reads_qc(
     threads: int,
     memory_gb: int,
     kmer_size: int,
+    run_craq: bool,
 ) -> tuple[dict[tuple[str, str], float], dict[tuple[str, str], float]]:
     qc_root = stage_grt / "qc"
     qc_root.mkdir(parents=True, exist_ok=True)
@@ -191,35 +192,37 @@ def run_reads_qc(
         (merqury_root / "reads.meryl").unlink()
         (merqury_root / "contigs.fasta").unlink()
 
-        craq_root = dataset_root / "craq_output"
-        craq_root.mkdir(parents=True, exist_ok=True)
-        run_command(
-            [
-                tools["craq"]["resolved"],
-                "-g",
-                str(dataset_fasta),
-                "-sms",
-                reads_argument,
-                "-t",
-                str(threads),
-                "-o",
-                str(craq_root / dataset_name),
-            ],
-            dataset_root,
-            dataset_root / "craq",
-        )
-        reports = sorted(
-            craq_root.rglob("*.Report"),
-            key=lambda path: (0 if path.name == "out_final.Report" else 1, path.as_posix()),
-        )
-        if not reports:
-            fail(f"CRAQ produced no report for dataset {dataset_name}")
-        parsed_craq = parse_craq_report(reports[0])
-        remove_external_qc_symlinks(craq_root, stage_grt)
+        parsed_craq: dict[str, float] = {}
+        if run_craq:
+            craq_root = dataset_root / "craq_output"
+            craq_root.mkdir(parents=True, exist_ok=True)
+            run_command(
+                [
+                    tools["craq"]["resolved"],
+                    "-g",
+                    str(dataset_fasta),
+                    "-sms",
+                    reads_argument,
+                    "-t",
+                    str(threads),
+                    "-o",
+                    str(craq_root / dataset_name),
+                ],
+                dataset_root,
+                dataset_root / "craq",
+            )
+            reports = sorted(
+                craq_root.rglob("*.Report"),
+                key=lambda path: (0 if path.name == "out_final.Report" else 1, path.as_posix()),
+            )
+            if not reports:
+                fail(f"CRAQ produced no report for dataset {dataset_name}")
+            parsed_craq = parse_craq_report(reports[0])
+            remove_external_qc_symlinks(craq_root, stage_grt)
 
         contig_names = [name for ds, name in sequences if ds == dataset_name]
         missing_qv = sorted(set(contig_names) - set(parsed_qv))
-        missing_craq = sorted(set(contig_names) - set(parsed_craq))
+        missing_craq = sorted(set(contig_names) - set(parsed_craq)) if run_craq else []
         if missing_qv or missing_craq:
             fail(
                 f"incomplete reads QC for {dataset_name}: "
@@ -227,7 +230,8 @@ def run_reads_qc(
             )
         for contig_name in contig_names:
             qv_scores[(dataset_name, contig_name)] = parsed_qv[contig_name]
-            craq_scores[(dataset_name, contig_name)] = parsed_craq[contig_name]
+            if run_craq:
+                craq_scores[(dataset_name, contig_name)] = parsed_craq[contig_name]
     return qv_scores, craq_scores
 
 
@@ -352,7 +356,7 @@ def quality_rank(
     n_fraction = sequence.count("N") / max(len(sequence), 1)
     stable = source_rank[key]
     if reads_qc_enabled:
-        return (-qv_scores[key], -craq_scores[key], n_fraction, -len(sequence), *stable)
+        return (-qv_scores[key], -craq_scores.get(key, 0.0), n_fraction, -len(sequence), *stable)
     return (-len(sequence), n_fraction, *stable)
 
 
@@ -522,6 +526,9 @@ def prepare(args: argparse.Namespace) -> None:
         if not path.is_file() or not os.access(path, os.R_OK):
             fail(f"reads file is unavailable: {path}")
     reads_qc_enabled = bool(reads)
+    reads_qc_full = args.reads_qc == "full"
+    if reads_qc_full and not reads_qc_enabled:
+        fail("--reads-qc full requires at least one --reads input")
     if package["reads_qc_enabled"] != str(reads_qc_enabled).lower():
         fail(
             "package.tsv reads_qc_enabled disagrees with generated GRT prepare command: "
@@ -532,8 +539,9 @@ def prepare(args: argparse.Namespace) -> None:
         tools = {
             "meryl": executable_identity(args.meryl),
             "merqury": executable_identity(args.merqury),
-            "craq": executable_identity(args.craq),
         }
+        if reads_qc_full:
+            tools["craq"] = executable_identity(args.craq)
 
     paf_rows: dict[str, list[dict[str, object]]] = {}
     paf_paths: dict[str, Path] = {}
@@ -580,6 +588,7 @@ def prepare(args: argparse.Namespace) -> None:
         "builder_version": 2,
         "inputs": input_identity,
         "reads_qc_enabled": reads_qc_enabled,
+        "reads_qc_mode": args.reads_qc,
         "tools": tools,
         "threads": args.threads,
         "memory_gb": args.memory_gb,
@@ -652,6 +661,7 @@ def prepare(args: argparse.Namespace) -> None:
                 args.threads,
                 args.memory_gb,
                 args.kmer_size,
+                reads_qc_full,
             )
 
         telomere_rules = build_telomere_rules(server_dir)
@@ -973,7 +983,7 @@ def prepare(args: argparse.Namespace) -> None:
                     "length_bp": len(sequence),
                     "n_fraction": f"{sequence.count('N') / max(len(sequence), 1):.9f}",
                     "qv": "" if not reads_qc_enabled else f"{qv_scores[key]:.6f}",
-                    "craq": "" if not reads_qc_enabled else f"{craq_scores[key]:.6f}",
+                    "craq": "" if not reads_qc_full else f"{craq_scores[key]:.6f}",
                     "reads_qc_pass": "not_run" if not reads_qc_enabled else str(qc_pass[key]).lower(),
                 }
             )
@@ -1238,6 +1248,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--server-dir", required=True, type=Path)
     parser.add_argument("--reads", action="append", default=[], type=Path)
+    parser.add_argument(
+        "--reads-qc",
+        choices=("standard", "full"),
+        default="standard",
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument("--meryl", default="meryl")
     parser.add_argument("--merqury", default="merqury.sh")
     parser.add_argument("--craq", default="craq")

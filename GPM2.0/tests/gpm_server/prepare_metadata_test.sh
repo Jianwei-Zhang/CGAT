@@ -176,6 +176,7 @@ assert_prepare_option "$metadata_path" cen_enabled true
 assert_prepare_option "$metadata_path" cen_min_len 10000
 assert_prepare_option "$metadata_path" cen_min_identity 80
 assert_prepare_option "$metadata_path" grt_reads_qc_enabled false
+assert_prepare_option "$metadata_path" grt_reads_qc_mode standard
 ! grep -F -- " --reads " "${output_root}/prepare_grt_inputs.sh" >/dev/null || {
   echo "no-reads prepare generated an unexpected --reads argument" >&2
   exit 1
@@ -350,11 +351,14 @@ PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
   -o "$reads_output_root" >/dev/null
 reads_metadata_path="${reads_output_root}/metadata/prepare_options.tsv"
 assert_prepare_option "$reads_metadata_path" grt_reads_qc_enabled true
+assert_prepare_option "$reads_metadata_path" grt_reads_qc_mode standard
 assert_prepare_option "$reads_metadata_path" grt_meryl "${FAKE_BIN}/meryl"
 assert_prepare_option "$reads_metadata_path" grt_merqury "${FAKE_BIN}/merqury.sh"
-assert_prepare_option "$reads_metadata_path" grt_craq "${FAKE_BIN}/craq"
-grep -F -- "--meryl ${FAKE_BIN}/meryl --merqury ${FAKE_BIN}/merqury.sh --craq ${FAKE_BIN}/craq" \
+assert_prepare_option "$reads_metadata_path" grt_craq ""
+grep -F -- "--meryl ${FAKE_BIN}/meryl --merqury ${FAKE_BIN}/merqury.sh" \
   "${reads_output_root}/prepare_grt_inputs.sh" >/dev/null
+! grep -F -- "--reads-qc" "${reads_output_root}/prepare_grt_inputs.sh" >/dev/null
+! grep -F -- "--craq" "${reads_output_root}/prepare_grt_inputs.sh" >/dev/null
 grep -F -- " --reads ${reads}" "${reads_output_root}/prepare_grt_inputs.sh" >/dev/null
 [[ "$(grep -oF -- " --reads " "${reads_output_root}/prepare_grt_inputs.sh" | wc -l)" -eq 1 ]] || {
   echo "single-read prepare did not generate exactly one --reads argument" >&2
@@ -462,7 +466,7 @@ GPM_TEST_MUMMER_HELP=$'-l    sequence-length option' \
   exit 1
 }
 
-for missing_command in meryl merqury.sh craq; do
+for missing_command in meryl merqury.sh; do
   no_reads_bin="${TMP_DIR}/no-reads-missing-${missing_command}-bin"
   make_restricted_path "$no_reads_bin" "$missing_command"
   PATH="$no_reads_bin" "$PREPARE_BASH" "$SCRIPT" \
@@ -489,6 +493,27 @@ for missing_command in meryl merqury.sh craq; do
     exit 1
   }
 done
+
+missing_craq_bin="${TMP_DIR}/missing-craq-bin"
+make_restricted_path "$missing_craq_bin" craq
+PATH="$missing_craq_bin:/usr/bin:/bin" "$PREPARE_BASH" "$SCRIPT" \
+  --ref ref_standard_without_craq "$ref" \
+  --ds ds_standard_without_craq "$ds" \
+  --reads "$reads" \
+  -o "${TMP_DIR}/standard-without-craq-output" \
+  >/dev/null
+if PATH="$missing_craq_bin:/usr/bin:/bin" "$PREPARE_BASH" "$SCRIPT" \
+  --ref ref_full_missing_craq "$ref" \
+  --ds ds_full_missing_craq "$ds" \
+  --reads "$reads" \
+  --reads-qc full \
+  -o "${TMP_DIR}/full-missing-craq-output" \
+  >/dev/null 2>"${TMP_DIR}/full-missing-craq.err"; then
+  echo "expected --reads-qc full to require craq" >&2
+  exit 1
+fi
+grep -F 'Required command not found in PATH: craq' \
+  "${TMP_DIR}/full-missing-craq.err" >/dev/null
 
 grep -q $'^Chr01\t20\t' "${output_root}/data/reference/ref_add_options.fa.fai" || {
   echo "reference .fai was not regenerated from the current FASTA" >&2

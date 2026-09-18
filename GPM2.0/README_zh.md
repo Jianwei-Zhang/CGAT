@@ -38,7 +38,7 @@ micromamba activate cgat-server
 | 核心流程 | `python3`、`samtools`、`zip`、`gzip` |
 | GRT Final Path | `minimap2`、`nucmer`、`delta-filter`、`show-coords` |
 | 可选比对引擎 | `blastn` + `makeblastdb`，或 `winnowmap` + `meryl` |
-| 可选 reads 质控 | `meryl`、`merqury.sh`、`craq`；仅传入 `--reads` 时使用 |
+| 可选 reads 质控 | `meryl`、`merqury.sh`；仅传入 `--reads` 时使用 |
 
 执行 `prepare.sh` 和生成的 `run_all.sh` 时都应保持该环境已激活。
 
@@ -73,7 +73,7 @@ bash server/prepare.sh \
 | `--cen <fasta>` | 可选 | 参考着丝粒 FASTA；记录名必须以 `_centromere` 结尾，例如 `Chr01_centromere`。 |
 | `--cen-min-len <bp>` | `10000` | 着丝粒比对最小长度。 |
 | `--cen-min-identity <百分比>` | `80` | 着丝粒比对最小一致性百分比。 |
-| `--reads <fastq>` | 可选，可重复 | 启用共享 Meryl 数据及逐 dataset Merqury/CRAQ 质控。 |
+| `--reads <fastq>` | 可选，可重复 | 启用共享 Meryl 数据及逐 dataset Merqury QV 评估。 |
 | `--grt-qc-memory-gb <数量>` | `80` | 可选 reads 质控的内存上限。 |
 | `--grt-kmer-size <数量>` | `21` | 可选 reads 质控的 k-mer 大小。 |
 

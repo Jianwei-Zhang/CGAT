@@ -30,7 +30,8 @@ CEN_MIN_LEN="10000"
 CEN_MIN_IDENTITY="80"
 GRT_MERYL="meryl"
 GRT_MERQURY="merqury.sh"
-GRT_CRAQ="craq"
+GRT_CRAQ=""
+GRT_READS_QC_MODE="standard"
 GRT_MINIMAP2="minimap2"
 GRT_NUCMER="nucmer"
 GRT_DELTA_FILTER="delta-filter"
@@ -91,8 +92,8 @@ Behavior:
   - Supports --cen-min-len and --cen-min-identity to filter centromere alignments
   - The first --ds is the locked GRT primary dataset; later initial --ds inputs are support datasets
   - Discovers minimap2, nucmer, delta-filter, and show-coords from PATH and records their resolved paths
-  - Repeatable --reads enables one shared Meryl database plus Merqury/CRAQ for every initial dataset
-  - With --reads, also discovers meryl, merqury.sh, and craq from PATH
+  - Repeatable --reads enables one shared Meryl database plus Merqury QV for every initial dataset
+  - With --reads, also discovers meryl and merqury.sh from PATH
   - With no --reads, only reads-based QC is skipped; q0 and frozen D0/Dtel are still prepared
   - Generates staged chromosome-partitioned run commands
   - Supports --skip-self to omit dataset vs self alignments
@@ -564,6 +565,7 @@ write_prepare_options_metadata() {
     printf 'grt_workflow\t%s\n' "gpm_grt_precomputed_v2"
     printf 'grt_primary_dataset\t%s\n' "${DATASET_NAMES[0]}"
     printf 'grt_reads_qc_enabled\t%s\n' "$reads_qc_enabled"
+    printf 'grt_reads_qc_mode\t%s\n' "$GRT_READS_QC_MODE"
     printf 'grt_meryl\t%s\n' "$GRT_MERYL"
     printf 'grt_merqury\t%s\n' "$GRT_MERQURY"
     printf 'grt_craq\t%s\n' "$GRT_CRAQ"
@@ -650,15 +652,17 @@ write_grt_prepare_script() {
   {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
-    printf 'python3 %s --server-dir %s --threads %s --memory-gb %s --kmer-size %s --meryl %s --merqury %s --craq %s' \
+    printf 'python3 %s --server-dir %s --threads %s --memory-gb %s --kmer-size %s --meryl %s --merqury %s' \
       "$(shell_quote "${work_root}/.prepare_lib/tools/grt_prepare_inputs.py")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$GRT_QC_MEMORY_GB")" \
       "$(shell_quote "$GRT_KMER_SIZE")" \
       "$(shell_quote "$GRT_MERYL")" \
-      "$(shell_quote "$GRT_MERQURY")" \
-      "$(shell_quote "$GRT_CRAQ")"
+      "$(shell_quote "$GRT_MERQURY")"
+    if [[ "$GRT_READS_QC_MODE" == "full" ]]; then
+      printf ' --reads-qc full --craq %s' "$(shell_quote "$GRT_CRAQ")"
+    fi
     while [[ $# -gt 0 ]]; do
       printf ' --reads %s' "$(shell_quote "$1")"
       shift
@@ -945,6 +949,12 @@ while [[ $# -gt 0 ]]; do
       READS_SRCS+=("$2")
       shift 2
       ;;
+    --reads-qc)
+      [[ $# -ge 2 ]] || die "--reads-qc requires full"
+      [[ "$2" == "full" ]] || die "Invalid --reads-qc value '$2'. Use full."
+      GRT_READS_QC_MODE="full"
+      shift 2
+      ;;
     --grt-qc-memory-gb)
       [[ $# -ge 2 ]] || die "--grt-qc-memory-gb requires <memory_gb>"
       validate_positive_integer "--grt-qc-memory-gb" "$2"
@@ -970,6 +980,9 @@ done
 [[ -n "$REF_NAME" ]] || die "Missing --ref"
 [[ "${#DATASET_NAMES[@]}" -gt 0 ]] || die "At least one --ds is required"
 validate_engine_specific_options
+if [[ "$GRT_READS_QC_MODE" == "full" && "${#READS_SRCS[@]}" -eq 0 ]]; then
+  die "--reads-qc full requires at least one --reads input"
+fi
 
 require_cmd samtools
 require_cmd zip
@@ -984,6 +997,8 @@ validate_mummer4_capabilities \
 if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
   GRT_MERYL="$(resolve_required_command meryl)"
   GRT_MERQURY="$(resolve_required_command merqury.sh)"
+fi
+if [[ "$GRT_READS_QC_MODE" == "full" ]]; then
   GRT_CRAQ="$(resolve_required_command craq)"
 fi
 case "$ALIGNER" in
