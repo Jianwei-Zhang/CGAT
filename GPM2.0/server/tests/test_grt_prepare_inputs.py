@@ -480,6 +480,8 @@ printf 'craq-end:%s\\n' "$dataset" >> "$FAKE_QC_LOG"
                 executable.chmod(0o755)
             env = os.environ.copy()
             env["FAKE_QC_LOG"] = str(log)
+            _, thread_allocations, _ = reads_qc_thread_plan(10, 2)
+            dataset_threads = dict(zip(("primary", "support"), thread_allocations))
             standard = self.run_tool(
                 server,
                 "--reads",
@@ -497,7 +499,10 @@ printf 'craq-end:%s\\n' "$dataset" >> "$FAKE_QC_LOG"
             self.assertEqual(standard_log[0], "meryl")
             self.assertEqual(
                 set(standard_log[1:3]),
-                {"merqury-start:primary:5", "merqury-start:support:5"},
+                {
+                    f"merqury-start:{dataset}:{threads}"
+                    for dataset, threads in dataset_threads.items()
+                },
             )
             self.assertEqual(
                 set(standard_log[3:5]),
@@ -525,11 +530,17 @@ printf 'craq-end:%s\\n' "$dataset" >> "$FAKE_QC_LOG"
             self.assertEqual(full_log[0], "meryl")
             self.assertEqual(
                 {line for line in full_log if line.startswith("merqury-start:")},
-                {"merqury-start:primary:5", "merqury-start:support:5"},
+                {
+                    f"merqury-start:{dataset}:{threads}"
+                    for dataset, threads in dataset_threads.items()
+                },
             )
             self.assertEqual(
                 {line for line in full_log if line.startswith("craq-start:")},
-                {"craq-start:primary:5:5", "craq-start:support:5:5"},
+                {
+                    f"craq-start:{dataset}:{threads}:{threads}"
+                    for dataset, threads in dataset_threads.items()
+                },
             )
             craq_start_indexes = [
                 index for index, line in enumerate(full_log) if line.startswith("craq-start:")
