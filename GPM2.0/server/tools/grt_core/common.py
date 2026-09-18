@@ -313,16 +313,31 @@ def executable_identity(command: str) -> dict[str, str]:
         "version": version,
     }
 
-def run_command(command: list[str], cwd: Path, log_prefix: Path) -> None:
+def run_command(
+    command: list[str],
+    cwd: Path,
+    log_prefix: Path,
+    env_overrides: dict[str, str] | None = None,
+) -> None:
     log_prefix.parent.mkdir(parents=True, exist_ok=True)
+    command_text = shlex.join(command)
+    if env_overrides:
+        assignments = " ".join(
+            f"{key}={shlex.quote(value)}" for key, value in sorted(env_overrides.items())
+        )
+        command_text = f"{assignments} {command_text}"
     log_prefix.with_suffix(".command.txt").write_text(
-        shlex.join(command) + "\n", encoding="utf-8", newline=""
+        command_text + "\n", encoding="utf-8", newline=""
     )
     stdout_path = log_prefix.with_suffix(".stdout.log")
     stderr_path = log_prefix.with_suffix(".stderr.log")
     with stdout_path.open("w", encoding="utf-8") as stdout_handle, stderr_path.open(
         "w", encoding="utf-8"
     ) as stderr_handle:
+        command_env = None
+        if env_overrides:
+            command_env = os.environ.copy()
+            command_env.update(env_overrides)
         completed = subprocess.run(
             command,
             cwd=cwd,
@@ -330,6 +345,7 @@ def run_command(command: list[str], cwd: Path, log_prefix: Path) -> None:
             stdout=stdout_handle,
             stderr=stderr_handle,
             text=True,
+            env=command_env,
         )
     if completed.returncode != 0:
         fail(f"command failed ({completed.returncode}): {shlex.join(command)}")

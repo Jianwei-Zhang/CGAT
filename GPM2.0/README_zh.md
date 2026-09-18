@@ -73,7 +73,7 @@ bash server/prepare.sh \
 | `--cen <fasta>` | 可选 | 参考着丝粒 FASTA；记录名必须以 `_centromere` 结尾，例如 `Chr01_centromere`。 |
 | `--cen-min-len <bp>` | `10000` | 着丝粒比对最小长度。 |
 | `--cen-min-identity <百分比>` | `80` | 着丝粒比对最小一致性百分比。 |
-| `--reads <fastq>` | 可选，可重复 | 启用共享 Meryl 数据及逐 dataset Merqury QV 评估。 |
+| `--reads <fastq>` | 可选，可重复 | 启用共享 Meryl 数据及逐 dataset Merqury QV 评估；`--threads` 总预算会分配给各 dataset。 |
 | `--grt-qc-memory-gb <数量>` | `80` | 可选 reads 质控的内存上限。 |
 | `--grt-kmer-size <数量>` | `21` | 可选 reads 质控的 k-mer 大小。 |
 

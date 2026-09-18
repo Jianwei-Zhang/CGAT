@@ -16,6 +16,7 @@ from server.tools.grt_prepare_inputs import (
     commit_prepared_outputs,
     donor_fragment_rows,
     executable_identity,
+    reads_qc_thread_plan,
 )
 from server.tools.run_outer_checkpoints import OuterCheckpointManager
 
@@ -45,6 +46,14 @@ def sha256(path):
 
 
 class GrtPrepareInputsTests(unittest.TestCase):
+    def test_reads_qc_thread_plan_caps_and_distributes_total_budget(self):
+        with mock.patch.object(
+            os, "sched_getaffinity", return_value=set(range(12)), create=True
+        ):
+            self.assertEqual(reads_qc_thread_plan(10, 3), (3, [4, 3, 3], 10))
+            self.assertEqual(reads_qc_thread_plan(20, 2), (2, [6, 6], 12))
+            self.assertEqual(reads_qc_thread_plan(4, 6), (4, [1, 1, 1, 1, 1, 1], 4))
+
     def write_version_tool(self, root, name, body):
         path = root / name
         path.write_text("#!/bin/sh\n" + body, encoding="utf-8")
@@ -429,8 +438,11 @@ exit 1
                 """#!/usr/bin/env bash
 set -euo pipefail
 if [[ "${1:-}" == "--version" ]]; then echo 'merqury fixture 1'; exit 0; fi
-printf 'merqury\\n' >> "$FAKE_QC_LOG"
+dataset="$(basename "$(dirname "$PWD")")"
+printf 'merqury-start:%s:%s\\n' "$dataset" "${OMP_NUM_THREADS:-unset}" >> "$FAKE_QC_LOG"
+sleep 0.3
 awk '/^>/ { sub(/^>/, "", $1); qv = ($1 == "p_redundant" ? 20 : 35); print $1 " 0 0 " qv }' contigs.fasta > merqury_out.contigs.qv
+printf 'merqury-end:%s\\n' "$dataset" >> "$FAKE_QC_LOG"
 """,
                 encoding="utf-8",
             )
@@ -438,24 +450,29 @@ awk '/^>/ { sub(/^>/, "", $1); qv = ($1 == "p_redundant" ? 20 : 35); print $1 " 
                 """#!/usr/bin/env bash
 set -euo pipefail
 if [[ "${1:-}" == "--version" ]]; then echo 'craq fixture 1'; exit 0; fi
-printf 'craq\\n' >> "$FAKE_QC_LOG"
 genome=''
 reads=''
 out=''
+threads=''
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -g) genome="$2"; shift 2 ;;
     -sms) reads="$2"; shift 2 ;;
+    -t) threads="$2"; shift 2 ;;
     -o) out="$2"; shift 2 ;;
     *) shift ;;
   esac
 done
+dataset="$(basename "$out")"
+printf 'craq-start:%s:%s:%s\\n' "$dataset" "$threads" "${OMP_NUM_THREADS:-unset}" >> "$FAKE_QC_LOG"
+sleep 0.3
 mkdir -p "$(dirname "$out")/runAQI_out"
 mkdir -p "$out"
 ln -s "$reads" "$out/$(basename "$reads")"
 report="$(dirname "$out")/runAQI_out/out_final.Report"
 printf '#Chr\\tCovered.Rate\\tLow-confident.Rate\\tAvg.CRH\\tAvg.CSH\\tAvg.CRE(R-AQI)\\tAvg.CSE(S-AQI)\\n' > "$report"
 awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome" >> "$report"
+printf 'craq-end:%s\\n' "$dataset" >> "$FAKE_QC_LOG"
 """,
                 encoding="utf-8",
             )
@@ -476,9 +493,15 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
                 env=env,
             )
             self.assertEqual(standard.returncode, 0, standard.stderr)
+            standard_log = log.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(standard_log[0], "meryl")
             self.assertEqual(
-                log.read_text(encoding="utf-8").splitlines(),
-                ["meryl", "merqury", "merqury"],
+                set(standard_log[1:3]),
+                {"merqury-start:primary:5", "merqury-start:support:5"},
+            )
+            self.assertEqual(
+                set(standard_log[3:5]),
+                {"merqury-end:primary", "merqury-end:support"},
             )
             standard_quality = read_tsv(server / "metadata/grt_contig_quality.tsv")
             self.assertTrue(all(row["craq"] == "" for row in standard_quality))
@@ -498,19 +521,23 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
                 env=env,
             )
             self.assertEqual(completed.returncode, 0, completed.stderr)
+            full_log = log.read_text(encoding="utf-8").splitlines()[len(standard_log):]
+            self.assertEqual(full_log[0], "meryl")
             self.assertEqual(
-                log.read_text(encoding="utf-8").splitlines(),
-                [
-                    "meryl",
-                    "merqury",
-                    "merqury",
-                    "meryl",
-                    "merqury",
-                    "craq",
-                    "merqury",
-                    "craq",
-                ],
+                {line for line in full_log if line.startswith("merqury-start:")},
+                {"merqury-start:primary:5", "merqury-start:support:5"},
             )
+            self.assertEqual(
+                {line for line in full_log if line.startswith("craq-start:")},
+                {"craq-start:primary:5:5", "craq-start:support:5:5"},
+            )
+            craq_start_indexes = [
+                index for index, line in enumerate(full_log) if line.startswith("craq-start:")
+            ]
+            craq_end_indexes = [
+                index for index, line in enumerate(full_log) if line.startswith("craq-end:")
+            ]
+            self.assertLess(max(craq_start_indexes), min(craq_end_indexes))
             quality = read_tsv(server / "metadata/grt_contig_quality.tsv")
             quality_by_contig = {row["contig_name"]: row for row in quality}
             self.assertEqual(quality_by_contig["p_redundant"]["qv"], "20.000000")
@@ -563,9 +590,29 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
             self.assertFalse(legacy_link.exists())
             migrated_checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
             self.assertNotIn(legacy_relpath, migrated_checkpoint["output_hashes"])
-            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 8)
+            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 14)
             valid, reason = OuterCheckpointManager(server).validate_grt_unit("grt_prepare")
             self.assertTrue(valid, reason)
+
+            cached = self.run_tool(
+                server,
+                "--reads",
+                reads,
+                "--reads-qc",
+                "full",
+                "--threads",
+                "8",
+                "--meryl",
+                fake_bin / "meryl",
+                "--merqury",
+                fake_bin / "merqury.sh",
+                "--craq",
+                fake_bin / "craq",
+                env=env,
+            )
+            self.assertEqual(cached.returncode, 0, cached.stderr)
+            self.assertEqual(cached.stdout.count("CACHE_HIT"), 2)
+            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 14)
 
             next((server / "grt/qc").rglob("*.qv")).unlink()
             rebuilt = self.run_tool(
@@ -574,6 +621,8 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
                 reads,
                 "--reads-qc",
                 "full",
+                "--threads",
+                "8",
                 "--meryl",
                 fake_bin / "meryl",
                 "--merqury",
@@ -583,7 +632,8 @@ awk '/^>/ { sub(/^>/, "", $1); print $1 " 1 0 0 0 0.1(98.5) 0(100)" }' "$genome"
                 env=env,
             )
             self.assertEqual(rebuilt.returncode, 0, rebuilt.stderr)
-            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 13)
+            self.assertIn("CACHE_HIT", rebuilt.stdout)
+            self.assertEqual(len(log.read_text(encoding="utf-8").splitlines()), 19)
 
     def test_atomic_publish_restores_previous_outputs_when_metadata_install_fails(self):
         with tempfile.TemporaryDirectory() as temporary_dir:

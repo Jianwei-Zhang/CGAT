@@ -73,7 +73,7 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | `--cen <fasta>` | Optional | Reference centromere FASTA. Record names must end in `_centromere`, such as `Chr01_centromere`. |
 | `--cen-min-len <bp>` | `10000` | Minimum centromere alignment length. |
 | `--cen-min-identity <pct>` | `80` | Minimum centromere alignment identity percentage. |
-| `--reads <fastq>` | Optional, repeatable | Enable shared Meryl data plus per-dataset Merqury QV assessment. |
+| `--reads <fastq>` | Optional, repeatable | Enable shared Meryl data plus per-dataset Merqury QV assessment; the `--threads` budget is distributed across datasets. |
 | `--grt-qc-memory-gb <n>` | `80` | Memory limit for optional reads QC. |
 | `--grt-kmer-size <n>` | `21` | K-mer size for optional reads QC. |
 

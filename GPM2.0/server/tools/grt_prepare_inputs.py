@@ -15,8 +15,9 @@ import shutil
 import subprocess
 import tempfile
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
 
 try:
@@ -130,6 +131,133 @@ def migrate_legacy_qc_symlinks(
     return checkpoint
 
 
+def reads_qc_thread_plan(threads: int, dataset_count: int) -> tuple[int, list[int], int]:
+    cpu_count = (
+        len(os.sched_getaffinity(0))
+        if hasattr(os, "sched_getaffinity")
+        else (os.cpu_count() or 1)
+    )
+    thread_budget = max(1, min(threads, cpu_count))
+    workers = max(1, min(dataset_count, thread_budget))
+    base_threads, extra_threads = divmod(thread_budget, workers)
+    allocations = [
+        base_threads + (1 if index < extra_threads else 0)
+        for index in range(dataset_count)
+    ]
+    return workers, allocations, thread_budget
+
+
+def dataset_qc_scores(
+    dataset_root: Path,
+    dataset_name: str,
+    contig_names: list[str],
+    run_craq: bool,
+) -> tuple[dict[str, float], dict[str, float], Path, Path | None]:
+    merqury_root = dataset_root / "merqury"
+    expected_qv = merqury_root / "merqury_out.contigs.qv"
+    qv_candidates = sorted(merqury_root.rglob("*.qv"))
+    if expected_qv.is_file():
+        qv_path = expected_qv
+    elif len(qv_candidates) == 1:
+        qv_path = qv_candidates[0]
+    elif not qv_candidates:
+        fail(f"Merqury produced no QV file for dataset {dataset_name}")
+    else:
+        fail(f"Merqury produced ambiguous QV files for dataset {dataset_name}: {qv_candidates}")
+    parsed_qv = parse_merqury_qv(qv_path)
+
+    report_path: Path | None = None
+    parsed_craq: dict[str, float] = {}
+    if run_craq:
+        reports = sorted(
+            (dataset_root / "craq_output").rglob("*.Report"),
+            key=lambda path: (0 if path.name == "out_final.Report" else 1, path.as_posix()),
+        )
+        if not reports:
+            fail(f"CRAQ produced no report for dataset {dataset_name}")
+        report_path = reports[0]
+        parsed_craq = parse_craq_report(report_path)
+
+    missing_qv = sorted(set(contig_names) - set(parsed_qv))
+    missing_craq = sorted(set(contig_names) - set(parsed_craq)) if run_craq else []
+    if missing_qv or missing_craq:
+        fail(
+            f"incomplete reads QC for {dataset_name}: "
+            f"missing Merqury={missing_qv}, missing CRAQ={missing_craq}"
+        )
+    return parsed_qv, parsed_craq, qv_path, report_path
+
+
+def link_or_copy_file(source: str, target: str) -> str:
+    try:
+        os.link(source, target)
+        return target
+    except OSError:
+        return shutil.copy2(source, target)
+
+
+def reuse_dataset_qc_cache(
+    source_root: Path,
+    target_root: Path,
+    fingerprint: str,
+    dataset_name: str,
+    contig_names: list[str],
+    run_craq: bool,
+) -> tuple[dict[str, float], dict[str, float]] | None:
+    cache_path = source_root / "cache.json"
+    if not cache_path.is_file():
+        return None
+    try:
+        cache = json.loads(cache_path.read_text(encoding="utf-8"))
+        if cache.get("schema_version") != 1 or cache.get("fingerprint") != fingerprint:
+            return None
+        expected_hashes = cache.get("output_hashes")
+        if not isinstance(expected_hashes, dict) or not expected_hashes:
+            return None
+        source_resolved = source_root.resolve()
+        for relpath, expected_hash in expected_hashes.items():
+            if not isinstance(relpath, str) or not isinstance(expected_hash, str):
+                return None
+            path = (source_root / relpath).resolve()
+            path.relative_to(source_resolved)
+            if not path.is_file() or sha256_file(path) != expected_hash:
+                return None
+        shutil.copytree(
+            source_root,
+            target_root,
+            symlinks=True,
+            copy_function=link_or_copy_file,
+        )
+        parsed_qv, parsed_craq, _qv_path, _report_path = dataset_qc_scores(
+            target_root, dataset_name, contig_names, run_craq
+        )
+        return parsed_qv, parsed_craq
+    except (OSError, RuntimeError, TypeError, ValueError, SystemExit):
+        shutil.rmtree(target_root, ignore_errors=True)
+        return None
+
+
+def run_parallel_dataset_qc(
+    datasets: list[dict[str, str]],
+    workers: int,
+    job: Callable[[dict[str, str]], tuple[dict[str, float], dict[str, float]]],
+) -> dict[str, tuple[dict[str, float], dict[str, float]]]:
+    results: dict[str, tuple[dict[str, float], dict[str, float]]] = {}
+    pool = ThreadPoolExecutor(max_workers=workers)
+    futures = {}
+    try:
+        futures = {pool.submit(job, dataset): dataset["dataset_name"] for dataset in datasets}
+        for future in as_completed(futures):
+            results[futures[future]] = future.result()
+    except BaseException:
+        for future in futures:
+            future.cancel()
+        raise
+    finally:
+        pool.shutdown(wait=True, cancel_futures=True)
+    return results
+
+
 def run_reads_qc(
     stage_grt: Path,
     server_dir: Path,
@@ -141,34 +269,109 @@ def run_reads_qc(
     memory_gb: int,
     kmer_size: int,
     run_craq: bool,
+    input_sha256: dict[Path, str],
 ) -> tuple[dict[tuple[str, str], float], dict[tuple[str, str], float]]:
     qc_root = stage_grt / "qc"
     qc_root.mkdir(parents=True, exist_ok=True)
     meryl_db = qc_root / f"reads_{kmer_size}mer.meryl"
-    run_command(
-        [
-            tools["meryl"]["resolved"],
-            f"k={kmer_size}",
-            "count",
-            f"memory={memory_gb}G",
-            f"threads={threads}",
-            "output",
-            str(meryl_db),
-            *[str(path) for path in reads],
-        ],
-        qc_root,
-        qc_root / "meryl_count",
-    )
-    if not meryl_db.exists():
-        fail(f"Meryl completed without producing database: {meryl_db}")
-
     qv_scores: dict[tuple[str, str], float] = {}
     craq_scores: dict[tuple[str, str], float] = {}
     reads_argument = " ".join(str(path) for path in reads)
+    cache_fingerprint_by_name: dict[str, str] = {}
+    results: dict[str, tuple[dict[str, float], dict[str, float]]] = {}
+    pending_datasets: list[dict[str, str]] = []
+
     for dataset in datasets:
         dataset_name = dataset["dataset_name"]
         dataset_fasta = (server_dir / dataset["fasta_relpath"]).resolve()
+        contig_names = [name for ds, name in sequences if ds == dataset_name]
+        cache_payload = {
+            "schema_version": 1,
+            "dataset_name": dataset_name,
+            "dataset_fasta_sha256": input_sha256[dataset_fasta],
+            "reads": [
+                {"path": str(path), "sha256": input_sha256[path]} for path in reads
+            ],
+            "kmer_size": kmer_size,
+            "run_craq": run_craq,
+            "tools": tools,
+        }
+        cache_fingerprint = sha256_bytes(
+            canonical_json(cache_payload).encode("utf-8")
+        )
+        cache_fingerprint_by_name[dataset_name] = cache_fingerprint
+        cached = reuse_dataset_qc_cache(
+            server_dir / "grt/qc" / dataset_name,
+            qc_root / dataset_name,
+            cache_fingerprint,
+            dataset_name,
+            contig_names,
+            run_craq,
+        )
+        if cached is None:
+            pending_datasets.append(dataset)
+        else:
+            results[dataset_name] = cached
+            print(f"Reads QC {dataset_name}: CACHE_HIT", flush=True)
+
+    if not pending_datasets:
+        print(
+            f"Reads QC: datasets={len(datasets)}, cached={len(datasets)}, "
+            f"CRAQ={'enabled' if run_craq else 'disabled'}",
+            flush=True,
+        )
+    else:
+        workers, thread_allocations, thread_budget = reads_qc_thread_plan(
+            threads, len(pending_datasets)
+        )
+        run_command(
+            [
+                tools["meryl"]["resolved"],
+                f"k={kmer_size}",
+                "count",
+                f"memory={memory_gb}G",
+                f"threads={thread_budget}",
+                "output",
+                str(meryl_db),
+                *[str(path) for path in reads],
+            ],
+            qc_root,
+            qc_root / "meryl_count",
+        )
+        if not meryl_db.exists():
+            fail(f"Meryl completed without producing database: {meryl_db}")
+        print(
+            f"Reads QC: datasets={len(datasets)}, cached={len(results)}, "
+            f"workers={workers}, thread_budget={thread_budget}, "
+            f"threads_per_dataset={','.join(map(str, thread_allocations))}, "
+            f"CRAQ={'enabled' if run_craq else 'disabled'}",
+            flush=True,
+        )
+
+    dataset_threads_by_name = (
+        {
+            dataset["dataset_name"]: thread_allocations[index]
+            for index, dataset in enumerate(pending_datasets)
+        }
+        if pending_datasets
+        else {}
+    )
+
+    def run_dataset(
+        dataset: dict[str, str],
+    ) -> tuple[dict[str, float], dict[str, float]]:
+        dataset_name = dataset["dataset_name"]
+        dataset_threads = dataset_threads_by_name[dataset_name]
+        thread_env = {
+            "OMP_NUM_THREADS": str(dataset_threads),
+            "OMP_THREAD_LIMIT": str(dataset_threads),
+        }
+        dataset_fasta = (server_dir / dataset["fasta_relpath"]).resolve()
         dataset_root = qc_root / dataset_name
+        contig_names = [name for ds, name in sequences if ds == dataset_name]
+        print(
+            f"Reads QC {dataset_name}: START threads={dataset_threads}", flush=True
+        )
         merqury_root = dataset_root / "merqury"
         merqury_root.mkdir(parents=True, exist_ok=True)
         os.symlink(os.path.relpath(meryl_db, merqury_root), merqury_root / "reads.meryl")
@@ -177,22 +380,11 @@ def run_reads_qc(
             [tools["merqury"]["resolved"], "reads.meryl", "contigs.fasta", "merqury_out"],
             merqury_root,
             dataset_root / "merqury",
+            thread_env,
         )
-        expected_qv = merqury_root / "merqury_out.contigs.qv"
-        qv_candidates = sorted(merqury_root.rglob("*.qv"))
-        if expected_qv.is_file():
-            qv_path = expected_qv
-        elif len(qv_candidates) == 1:
-            qv_path = qv_candidates[0]
-        elif not qv_candidates:
-            fail(f"Merqury produced no QV file for dataset {dataset_name}")
-        else:
-            fail(f"Merqury produced ambiguous QV files for dataset {dataset_name}: {qv_candidates}")
-        parsed_qv = parse_merqury_qv(qv_path)
         (merqury_root / "reads.meryl").unlink()
         (merqury_root / "contigs.fasta").unlink()
 
-        parsed_craq: dict[str, float] = {}
         if run_craq:
             craq_root = dataset_root / "craq_output"
             craq_root.mkdir(parents=True, exist_ok=True)
@@ -204,30 +396,43 @@ def run_reads_qc(
                     "-sms",
                     reads_argument,
                     "-t",
-                    str(threads),
+                    str(dataset_threads),
                     "-o",
                     str(craq_root / dataset_name),
                 ],
                 dataset_root,
                 dataset_root / "craq",
+                thread_env,
             )
-            reports = sorted(
-                craq_root.rglob("*.Report"),
-                key=lambda path: (0 if path.name == "out_final.Report" else 1, path.as_posix()),
-            )
-            if not reports:
-                fail(f"CRAQ produced no report for dataset {dataset_name}")
-            parsed_craq = parse_craq_report(reports[0])
             remove_external_qc_symlinks(craq_root, stage_grt)
 
+        parsed_qv, parsed_craq, qv_path, report_path = dataset_qc_scores(
+            dataset_root, dataset_name, contig_names, run_craq
+        )
+        output_paths = [qv_path]
+        if report_path is not None:
+            output_paths.append(report_path)
+        cache = {
+            "schema_version": 1,
+            "fingerprint": cache_fingerprint_by_name[dataset_name],
+            "output_hashes": path_hashes(output_paths, dataset_root),
+        }
+        (dataset_root / "cache.json").write_text(
+            json.dumps(cache, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+            newline="",
+        )
+        print(f"Reads QC {dataset_name}: SUCCESS", flush=True)
+        return parsed_qv, parsed_craq
+
+    if pending_datasets:
+        results.update(
+            run_parallel_dataset_qc(pending_datasets, workers, run_dataset)
+        )
+    for dataset in datasets:
+        dataset_name = dataset["dataset_name"]
+        parsed_qv, parsed_craq = results[dataset_name]
         contig_names = [name for ds, name in sequences if ds == dataset_name]
-        missing_qv = sorted(set(contig_names) - set(parsed_qv))
-        missing_craq = sorted(set(contig_names) - set(parsed_craq)) if run_craq else []
-        if missing_qv or missing_craq:
-            fail(
-                f"incomplete reads QC for {dataset_name}: "
-                f"missing Merqury={missing_qv}, missing CRAQ={missing_craq}"
-            )
         for contig_name in contig_names:
             qv_scores[(dataset_name, contig_name)] = parsed_qv[contig_name]
             if run_craq:
@@ -580,12 +785,18 @@ def prepare(args: argparse.Namespace) -> None:
     if (server_dir / "tel" / "rules.tsv").is_file():
         input_files.append(server_dir / "tel" / "rules.tsv")
     input_identity = []
+    input_sha256: dict[Path, str] = {}
     for path in input_files:
+        resolved_path = path.resolve()
         label = path.relative_to(server_dir).as_posix() if path.is_relative_to(server_dir) else str(path)
-        input_identity.append({"path": label, "sha256": sha256_file(path)})
+        digest = input_sha256.get(resolved_path)
+        if digest is None:
+            digest = sha256_file(path)
+            input_sha256[resolved_path] = digest
+        input_identity.append({"path": label, "sha256": digest})
     fingerprint_payload = {
         "workflow": WORKFLOW,
-        "builder_version": 2,
+        "builder_version": 3,
         "inputs": input_identity,
         "reads_qc_enabled": reads_qc_enabled,
         "reads_qc_mode": args.reads_qc,
@@ -662,6 +873,7 @@ def prepare(args: argparse.Namespace) -> None:
                 args.memory_gb,
                 args.kmer_size,
                 reads_qc_full,
+                input_sha256,
             )
 
         telomere_rules = build_telomere_rules(server_dir)

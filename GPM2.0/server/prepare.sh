@@ -92,7 +92,8 @@ Behavior:
   - Supports --cen-min-len and --cen-min-identity to filter centromere alignments
   - The first --ds is the locked GRT primary dataset; later initial --ds inputs are support datasets
   - Discovers minimap2, nucmer, delta-filter, and show-coords from PATH and records their resolved paths
-  - Repeatable --reads enables one shared Meryl database plus Merqury QV for every initial dataset
+  - Repeatable --reads enables one shared Meryl database plus parallel Merqury QV for every initial dataset
+  - The --threads budget is divided across concurrent reads-QC dataset jobs
   - With --reads, also discovers meryl and merqury.sh from PATH
   - With no --reads, only reads-based QC is skipped; q0 and frozen D0/Dtel are still prepared
   - Generates staged chromosome-partitioned run commands
