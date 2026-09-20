@@ -49,8 +49,8 @@ usage() {
   cat <<'EOF'
 Usage:
   bash server/prepare.sh \
-    --ref <reference_name> <reference_fasta_path> \
-    --ds <dataset_name> <dataset_fasta_path> \
+    --ref [<reference_name>] <reference_fasta_path> \
+    --ds [<dataset_name>] <dataset_fasta_path> \
     [-o|--out <gpm_server_output_dir>] \
     [--score|-s <chr_assignment_min_coverage_percent>] \
     [--aligner minimap2|blastn|winnowmap] \
@@ -69,16 +69,18 @@ Usage:
     [--reads <reads_fastq_path> ...] \
     [--grt-qc-memory-gb <memory_gb>] \
     [--grt-kmer-size <kmer_size>] \
-    [--ds <dataset_name> <dataset_fasta_path> ...]
+    [--ds [<dataset_name>] <dataset_fasta_path> ...]
 
 Example:
   bash server/prepare.sh \
-    --ref rice_IRGSP_1_0 /path/to/ref.fa \
-    --ds hifi /path/to/hifi.fa \
-    --ds flye /path/to/flye.fa \
+    --ref /path/to/rice_IRGSP_1_0.fa \
+    --ds /path/to/hifi.fa \
+    --ds /path/to/flye.fa \
     --score 60
 
 Behavior:
+  - --ref and --ds accept either <name> <fasta> or just <fasta>
+  - When name is omitted, derives it from the FASTA basename, removes .gz and one .fa/.fasta/.fna suffix, and replaces runs outside A-Z, a-z, 0-9, dot, underscore, and hyphen with _
   - Uses default work root: ./gpm_server under the current working directory
   - Supports -o/--out to choose another work root
   - Supports --score/-s to set the chr assignment coverage threshold, default: 60
@@ -838,17 +840,29 @@ declare -a READS_SRCS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --ref)
-      [[ $# -ge 3 ]] || die "--ref requires <reference_name> <reference_fasta_path>"
+      [[ $# -ge 2 ]] || die "--ref requires <reference_fasta_path> or <reference_name> <reference_fasta_path>"
       [[ -z "$REF_NAME" ]] || die "--ref may only be provided once"
-      REF_NAME="$2"
-      REF_SRC="$3"
-      shift 3
+      if [[ $# -ge 3 && "$3" != -* ]]; then
+        REF_NAME="$2"
+        REF_SRC="$3"
+        shift 3
+      else
+        REF_SRC="$2"
+        REF_NAME="$(infer_fasta_name "$REF_SRC")"
+        shift 2
+      fi
       ;;
     --ds)
-      [[ $# -ge 3 ]] || die "--ds requires <dataset_name> <dataset_fasta_path>"
-      DATASET_NAMES+=("$2")
-      DATASET_SRCS+=("$3")
-      shift 3
+      [[ $# -ge 2 ]] || die "--ds requires <dataset_fasta_path> or <dataset_name> <dataset_fasta_path>"
+      if [[ $# -ge 3 && "$3" != -* ]]; then
+        DATASET_NAMES+=("$2")
+        DATASET_SRCS+=("$3")
+        shift 3
+      else
+        DATASET_SRCS+=("$2")
+        DATASET_NAMES+=("$(infer_fasta_name "$2")")
+        shift 2
+      fi
       ;;
     -o|--out|--output)
       [[ $# -ge 2 ]] || die "$1 requires <gpm_server_output_dir>"
@@ -1293,7 +1307,8 @@ echo "  4. Output archives:"
 echo "     - Full package: $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").zip"
 echo "     - Light package: $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").no_fasta.zip"
 echo "  5. To add a dataset later, run:"
-echo "     - bash ${WORK_ROOT}/add_dataset.sh --ds <dataset_name> /path/to/dataset.fa"
+echo "     - bash ${WORK_ROOT}/add_dataset.sh --ds /path/to/dataset.fa"
+echo "     - Or set an explicit name: bash ${WORK_ROOT}/add_dataset.sh --ds <dataset_name> /path/to/dataset.fa"
 echo "  6. To add a derived ctg later, run:"
 echo "     - bash ${WORK_ROOT}/add_ctg.sh --ctg <ctg_name> --chr <chr_name> --track <dataset_name> -i /path/to/final.fa"
 echo "  7. To export final path FASTA on the server, run:"

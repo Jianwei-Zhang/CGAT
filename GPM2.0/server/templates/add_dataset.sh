@@ -17,21 +17,30 @@ out_path=""
 usage() {
   cat <<'USAGE'
 Usage:
-  bash add_dataset.sh --ds <dataset_name> <dataset_fasta_path> [-o|--out <add_zip_path>]
+  bash add_dataset.sh --ds [<dataset_name>] <dataset_fasta_path> [-o|--out <add_zip_path>]
 
 Adds one dataset to this prepared gpm_server directory, updates the server state,
 and writes an add package zip. The default output is ./add_<dataset_name>.zip.
+When <dataset_name> is omitted, it is inferred from the FASTA basename: .gz and
+one .fa, .fasta, or .fna suffix are removed case-insensitively; runs outside
+A-Z, a-z, 0-9, dot, underscore, and hyphen are replaced with _.
 USAGE
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --ds)
-      [[ $# -ge 3 ]] || die "--ds requires <dataset_name> <dataset_fasta_path>"
+      [[ $# -ge 2 ]] || die "--ds requires <dataset_fasta_path> or <dataset_name> <dataset_fasta_path>"
       [[ -z "$dataset_name" ]] || die "--ds may only be provided once"
-      dataset_name="$2"
-      dataset_src="$3"
-      shift 3
+      if [[ $# -ge 3 && "$3" != -* ]]; then
+        dataset_name="$2"
+        dataset_src="$3"
+        shift 3
+      else
+        dataset_src="$2"
+        dataset_name="$(infer_fasta_name "$dataset_src")"
+        shift 2
+      fi
       ;;
     -o|--out|--output)
       [[ $# -ge 2 ]] || die "$1 requires <add_zip_path>"

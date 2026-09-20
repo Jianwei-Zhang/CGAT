@@ -16,6 +16,35 @@ validate_name() {
   [[ "$value" =~ ^[A-Za-z0-9._-]+$ ]] || die "Invalid name '$value'. Use only letters, numbers, dot, underscore, and hyphen."
 }
 
+infer_fasta_name() {
+  local path="$1"
+  local base
+  local lower
+
+  base="$(basename "$path")"
+  lower="${base,,}"
+  if [[ "$lower" == *.gz ]]; then
+    base="${base:0:$((${#base} - 3))}"
+    lower="${base,,}"
+  fi
+
+  case "$lower" in
+    *.fasta)
+      base="${base:0:$((${#base} - 6))}"
+      ;;
+    *.fna)
+      base="${base:0:$((${#base} - 4))}"
+      ;;
+    *.fa)
+      base="${base:0:$((${#base} - 3))}"
+      ;;
+  esac
+
+  base="$(printf '%s' "$base" | sed -E 's/[^A-Za-z0-9._-]+/_/g')"
+  [[ -n "$base" ]] || die "Could not infer a name from FASTA path: $path; provide an explicit name instead."
+  printf '%s\n' "$base"
+}
+
 ensure_readable_file() {
   local path="$1"
   [[ -f "$path" ]] || die "File not found: $path"

@@ -205,6 +205,11 @@ PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
   -o "$output_root" >/dev/null
 
 test -x "${output_root}/add_dataset.sh"
+add_dataset_help="$(bash "${output_root}/add_dataset.sh" --help)"
+grep -F -- '--ds [<dataset_name>] <dataset_fasta_path>' <<<"$add_dataset_help" >/dev/null
+grep -F -- 'FASTA basename: .gz and' <<<"$add_dataset_help" >/dev/null
+grep -F -- 'one .fa, .fasta, or .fna suffix are removed case-insensitively' <<<"$add_dataset_help" >/dev/null
+grep -F -- 'A-Z, a-z, 0-9, dot, underscore, and hyphen are replaced with _' <<<"$add_dataset_help" >/dev/null
 
 PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh"
 
@@ -234,7 +239,7 @@ awk -F '\t' 'BEGIN { OFS = "\t" } $1 == "chr_assignment_min_coverage_percent" { 
   "${output_root}/metadata/prepare_options.tsv" > "${output_root}/metadata/prepare_options.tsv.tmp"
 mv "${output_root}/metadata/prepare_options.tsv.tmp" "${output_root}/metadata/prepare_options.tsv"
 
-PATH="${FAKE_BIN}:$PATH" bash "${output_root}/add_dataset.sh" --ds ds4 "$ds4" >/dev/null
+PATH="${FAKE_BIN}:$PATH" bash "${output_root}/add_dataset.sh" --ds "$ds4" >/dev/null
 
 test -f "${output_root}/add_ds4.zip"
 grep -q '^gpm_grt_precomputed_v2' "${output_root}/metadata/package.tsv"
