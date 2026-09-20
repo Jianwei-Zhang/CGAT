@@ -13,12 +13,24 @@ mamba activate cgat-server
 
 # 3. 准备一个项目工作目录
 bash prepare.sh \
-  --ref reference /path/to/reference.fa \
-  --ds assembly /path/to/assembly.fa \
+  --ref /path/to/reference.fa \
+  --ds /path/to/assembly.fa \
   -o ./gpm_server
 
 # 4. 执行计算并生成交付包
 bash ./gpm_server/run_all.sh
+```
+
+`--ref` 和可重复使用的 `--ds` 都支持 `<名称> <fasta>` 与仅传 `<fasta>`
+两种写法。省略名称时，会从 FASTA 文件名自动推导：不区分大小写地移除
+`.gz` 及一个 `.fa`、`.fasta` 或 `.fna` 后缀；名称中除字母、数字、点、
+下划线和连字符以外的连续字符会替换为 `_`。需要自定义名称时仍可使用显式写法：
+
+```bash
+bash prepare.sh \
+  --ref reference /path/to/reference.fa \
+  --ds assembly /path/to/assembly.fa \
+  -o ./gpm_server
 ```
 
 安装成功时会明确显示 `GPM Server installation: READY`。以后可执行以下命令只检查、不修改环境：

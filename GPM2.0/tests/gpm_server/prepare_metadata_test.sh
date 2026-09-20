@@ -182,6 +182,74 @@ assert_prepare_option "$metadata_path" grt_reads_qc_mode standard
   exit 1
 }
 
+auto_ref_raw="${TMP_DIR}/reference-source.fa"
+auto_ref="${TMP_DIR}/Reference Sample.FASTA.GZ"
+auto_primary="${TMP_DIR}/primary assembly.fa"
+auto_explicit="${TMP_DIR}/explicit source.fna"
+auto_support="${TMP_DIR}/support-v1.FNA"
+auto_output_root="${TMP_DIR}/auto_names_gpm_server"
+write_multi_fasta "$auto_ref_raw" "Chr01" "AAAAAAAAAAAAAAAAAAAA"
+gzip -c "$auto_ref_raw" > "$auto_ref"
+write_multi_fasta "$auto_primary" "primary_ctg" "AAAAAAAAAAAAAAAAAAAA"
+write_multi_fasta "$auto_explicit" "explicit_ctg" "AAAAAAAAAAAAAAAAAAAA"
+write_multi_fasta "$auto_support" "support_ctg" "AAAAAAAAAAAAAAAAAAAA"
+
+PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
+  --ref "$auto_ref" \
+  --ds "$auto_primary" \
+  --ds manual.support "$auto_explicit" \
+  --ds "$auto_support" \
+  --skip-self \
+  -o "$auto_output_root" >/dev/null
+
+grep -q $'^Reference_Sample\t' "${auto_output_root}/metadata/reference.tsv" || {
+  echo "reference name was not inferred from the FASTA filename" >&2
+  exit 1
+}
+awk -F '\t' '
+  NR == 2 && $1 != "primary_assembly" { bad = 1 }
+  NR == 3 && $1 != "manual.support" { bad = 1 }
+  NR == 4 && $1 != "support-v1" { bad = 1 }
+  END { exit (!bad && NR == 4) ? 0 : 1 }
+' "${auto_output_root}/metadata/datasets.tsv" || {
+  echo "inferred and explicit dataset names did not preserve input order" >&2
+  cat "${auto_output_root}/metadata/datasets.tsv" >&2
+  exit 1
+}
+[[ -f "${auto_output_root}/data/reference/Reference_Sample.fa" ]] || {
+  echo "inferred reference name was not used for the packaged FASTA" >&2
+  exit 1
+}
+[[ -f "${auto_output_root}/data/datasets/primary_assembly.fa" ]] || {
+  echo "inferred primary dataset name was not used for the packaged FASTA" >&2
+  exit 1
+}
+
+duplicate_dir_a="${TMP_DIR}/duplicate-a"
+duplicate_dir_b="${TMP_DIR}/duplicate-b"
+duplicate_output_root="${TMP_DIR}/duplicate_names_gpm_server"
+mkdir -p "$duplicate_dir_a" "$duplicate_dir_b"
+write_multi_fasta "${duplicate_dir_a}/same.fa" "same_a" "AAAAAAAAAAAAAAAAAAAA"
+write_multi_fasta "${duplicate_dir_b}/same.fasta" "same_b" "AAAAAAAAAAAAAAAAAAAA"
+if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
+  --ref "$auto_ref" \
+  --ds "${duplicate_dir_a}/same.fa" \
+  --ds "${duplicate_dir_b}/same.fasta" \
+  -o "$duplicate_output_root" \
+  >/dev/null 2>"${TMP_DIR}/duplicate-inferred-name.err"; then
+  echo "duplicate inferred dataset names should fail" >&2
+  exit 1
+fi
+grep -F "Duplicate dataset name: same" "${TMP_DIR}/duplicate-inferred-name.err" >/dev/null || {
+  echo "expected duplicate inferred dataset name error" >&2
+  cat "${TMP_DIR}/duplicate-inferred-name.err" >&2
+  exit 1
+}
+[[ ! -e "$duplicate_output_root" ]] || {
+  echo "duplicate inferred dataset names created an output workspace" >&2
+  exit 1
+}
+
 plan_path="${output_root}/.run_all/plan.tsv"
 [[ -f "$plan_path" ]] || {
   echo "expected generated run_all plan: $plan_path" >&2
@@ -312,6 +380,8 @@ done < <(find "$no_chmod_output" -type f -name '*.sh' | LC_ALL=C sort)
 }
 
 help_output="$("$PREPARE_BASH" "$SCRIPT" --help)"
+grep -F -- '--ref [<reference_name>] <reference_fasta_path>' <<<"$help_output" >/dev/null
+grep -F -- '--ds [<dataset_name>] <dataset_fasta_path>' <<<"$help_output" >/dev/null
 for removed_option in \
   --grt-meryl \
   --grt-merqury \

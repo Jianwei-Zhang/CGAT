@@ -13,12 +13,25 @@ mamba activate cgat-server
 
 # 3. Prepare one project workspace
 bash prepare.sh \
-  --ref reference /path/to/reference.fa \
-  --ds assembly /path/to/assembly.fa \
+  --ref /path/to/reference.fa \
+  --ds /path/to/assembly.fa \
   -o ./gpm_server
 
 # 4. Run the workflow and create the delivery archives
 bash ./gpm_server/run_all.sh
+```
+
+`--ref` and repeatable `--ds` accept either `<name> <fasta>` or just `<fasta>`.
+When the name is omitted, it comes from the FASTA basename: `.gz` and one
+`.fa`, `.fasta`, or `.fna` suffix are removed case-insensitively. Runs outside
+letters, numbers, dot, underscore, and hyphen are replaced with `_`. Use the
+explicit form when you want another name:
+
+```bash
+bash prepare.sh \
+  --ref reference /path/to/reference.fa \
+  --ds assembly /path/to/assembly.fa \
+  -o ./gpm_server
 ```
 
 A successful installation ends with `GPM Server installation: READY`. Check it later without changing the environment:

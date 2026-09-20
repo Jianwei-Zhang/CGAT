@@ -54,22 +54,24 @@ bash server/install.sh --check
 
 ```bash
 bash server/prepare.sh \
-  --ref rice_IRGSP_1_0 /path/to/ref.fa \
-  --ds hifiasm /path/to/hifi.fa \
-  --ds flye /path/to/flye.fa \
-  --ds canu2 /path/to/canu2.fa \
+  --ref /path/to/rice_IRGSP_1_0.fa \
+  --ds /path/to/hifiasm.fa \
+  --ds /path/to/flye.fa \
+  --ds /path/to/canu2.fa \
   -o ./gpm_server \
   -t 10
 ```
 
-准备工作目录时，第一个 `--ds` 作为主 ds，其余 `--ds` 作为辅 ds；这些角色用于本次 GRT 计算并保持不变。支持普通或 gzip 压缩的 `.fa`、`.fasta`、`.fna` 输入。
+`--ref` 和 `--ds` 均支持 `<名称> <fasta>` 与仅传 `<fasta>` 两种写法。省略名称时，会从 FASTA 文件名自动推导：不区分大小写地移除 `.gz` 及一个 `.fa`、`.fasta` 或 `.fna` 后缀；名称中除字母、数字、点、下划线和连字符以外的连续字符会替换为 `_`。例如 `/data/primary assembly.fa.gz` 会得到名称 `primary_assembly`；需要其他名称时仍可使用原有显式写法。
+
+准备工作目录时，第一个 `--ds` 作为主 ds，其余 `--ds` 作为辅 ds；这些角色用于本次 GRT 计算并保持不变。支持普通或 gzip 压缩的 `.fa`、`.fasta`、`.fna` 输入。生成的 `add_dataset.sh` 同样支持名称可省略的 `--ds` 写法。
 
 #### 通用参数
 
 | 参数 | 必填 / 默认值 | 说明 |
 | --- | --- | --- |
-| `--ref <名称> <fasta>` | 必填，一次 | 参考基因组名称与 FASTA。 |
-| `--ds <名称> <fasta>` | 必填，可重复 | 初次输入的组装数据集；第一个为主 ds，其余为辅 ds。 |
+| `--ref [<名称>] <fasta>` | 必填，一次 | 参考基因组 FASTA；省略名称时从文件名自动推导。 |
+| `--ds [<名称>] <fasta>` | 必填，可重复 | 初次输入的组装数据集；省略名称时从文件名自动推导。第一个为主 ds，其余为辅 ds。 |
 | `-o, --out <目录>` | `./gpm_server` | 服务端工作目录及生成脚本的位置。 |
 | `-s, --score <0-100>` | `60` | 染色体分配的最小覆盖率百分比。 |
 | `--aligner <引擎>` | `minimap2` | 主比对引擎：`minimap2`、`blastn` 或 `winnowmap`。 |

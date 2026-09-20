@@ -54,22 +54,24 @@ Minimal example with an explicit output directory:
 
 ```bash
 bash server/prepare.sh \
-  --ref rice_IRGSP_1_0 /path/to/ref.fa \
-  --ds hifiasm /path/to/hifi.fa \
-  --ds flye /path/to/flye.fa \
-  --ds canu2 /path/to/canu2.fa \
+  --ref /path/to/rice_IRGSP_1_0.fa \
+  --ds /path/to/hifiasm.fa \
+  --ds /path/to/flye.fa \
+  --ds /path/to/canu2.fa \
   -o ./gpm_server \
   -t 10
 ```
 
-When preparing the workspace, the first `--ds` becomes the primary dataset and the remaining entries become support datasets; these roles remain fixed throughout GRT processing. Plain or gzip-compressed `.fa`, `.fasta`, and `.fna` inputs are accepted.
+`--ref` and `--ds` accept either `<name> <fasta>` or just `<fasta>`. When the name is omitted, it is inferred from the FASTA filename: `.gz` and one `.fa`, `.fasta`, or `.fna` suffix are removed case-insensitively, and runs outside letters, numbers, dot, underscore, and hyphen are replaced with `_`. For example, `/data/primary assembly.fa.gz` becomes `primary_assembly`. Use the explicit form whenever a different name is required.
+
+When preparing the workspace, the first `--ds` becomes the primary dataset and the remaining entries become support datasets; these roles remain fixed throughout GRT processing. Plain or gzip-compressed `.fa`, `.fasta`, and `.fna` inputs are accepted. The generated `add_dataset.sh` supports the same optional-name `--ds` forms.
 
 #### Common options
 
 | Option | Required / default | Description |
 | --- | --- | --- |
-| `--ref <name> <fasta>` | Required once | Reference name and FASTA. |
-| `--ds <name> <fasta>` | Required, repeatable | Initial assembly dataset. The first is the primary dataset; the rest are support datasets. |
+| `--ref [<name>] <fasta>` | Required once | Reference FASTA; omit the name to infer it from the filename. |
+| `--ds [<name>] <fasta>` | Required, repeatable | Initial assembly dataset; omit the name to infer it from the filename. The first is primary; the rest are support datasets. |
 | `-o, --out <dir>` | `./gpm_server` | Server workspace and generated scripts. |
 | `-s, --score <0-100>` | `60` | Minimum chromosome-assignment coverage percentage. |
 | `--aligner <engine>` | `minimap2` | Main alignment engine: `minimap2`, `blastn`, or `winnowmap`. |

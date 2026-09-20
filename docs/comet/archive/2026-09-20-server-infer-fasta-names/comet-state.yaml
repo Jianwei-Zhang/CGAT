@@ -1,0 +1,281 @@
+schema: comet.native.v4
+name: server-infer-fasta-names
+language: en
+phase: archive
+status: done
+state_version: 15
+brief: brief.md
+shape_confirmation_hash: 3f97d9fab3da37f7382cb233ba78f1a539bac306a54784ef5681f803eefc6bf7
+spec_changes:
+  - capability: server-fasta-arguments
+    operation: create
+    source: specs/server-fasta-arguments/spec.md
+workspace:
+  isolation: worktree
+  change_branch: comet/server-infer-fasta-names
+  target_branch: master
+  finish: pull-request
+loop:
+  stage: done
+  goal_cycle: 1
+  iteration: 2
+  attempt: 2
+  retry_epoch: 0
+  failed_iteration_count: 1
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: specs/server-fasta-arguments/spec.md
+    text: Infer reference and repeated dataset names during preparation Given quoted
+      readable FASTA paths whose basenames include supported suffixes and
+      spaces, when the user runs `prepare.sh` with one-value `--ref` and
+      repeated one-value `--ds` arguments, then the generated reference and
+      dataset metadata use the deterministic inferred names and preserve dataset
+      order.
+    result: passed
+    reason:
+      text: One-value --ref and repeated --ds use the shared deterministic inference
+        rule; real gzip, spaces, uppercase suffixes, metadata, packaged
+        filenames, and order are covered.
+      truncated: false
+  - id: A2
+    source: specs/server-fasta-arguments/spec.md
+    text: Preserve explicitly named preparation arguments Given valid explicit names
+      and readable FASTA paths, when the user uses the existing `--ref <name>
+      <fasta>` and `--ds <name> <fasta>` forms, then preparation records the
+      explicit names exactly as before.
+    result: passed
+    reason:
+      text: Explicit --ref <name> <fasta> and --ds <name> <fasta> branches remain and
+        continue through existing validation and passing regressions.
+      truncated: false
+  - id: A3
+    source: specs/server-fasta-arguments/spec.md
+    text: Mix explicit and inferred dataset names Given multiple readable dataset
+      FASTAs, when explicit and one-value `--ds` forms are mixed, then each
+      dataset receives the requested or inferred name and the first dataset
+      remains primary.
+    result: passed
+    reason:
+      text: Mixed inferred and explicit datasets are recorded in input order, and the
+        first dataset remains primary.
+      truncated: false
+  - id: A4
+    source: specs/server-fasta-arguments/spec.md
+    text: Reject duplicate inferred dataset names Given two dataset paths that infer
+      the same name, when preparation parses both, then it fails with the
+      existing duplicate dataset name error before producing a valid workspace.
+    result: passed
+    reason:
+      text: Two paths inferring the same name trigger the existing duplicate-name
+        error without creating a valid workspace.
+      truncated: false
+  - id: A5
+    source: specs/server-fasta-arguments/spec.md
+    text: Infer a name for an incremental dataset Given a completed generated Server
+      workspace and a readable dataset FASTA, when the user runs `add_dataset.sh
+      --ds <fasta>`, then the dataset name is inferred by the same rule, Server
+      metadata is updated, and the add package uses that name.
+    result: passed
+    reason:
+      text: Generated add_dataset.sh uses the shared helper; concise --ds updates
+        metadata and produces the correctly named add package.
+      truncated: false
+  - id: A6
+    source: specs/server-fasta-arguments/spec.md
+    text: Advertise both concise and explicit forms Given a user reads command help
+      or the English or Chinese Server instructions, then both accepted forms
+      and the inference rule are described without hiding the
+      backward-compatible explicit form.
+    result: passed
+    reason:
+      text: Prepare and generated add-dataset help plus top-level and Server-specific
+        bilingual READMEs show both forms and the complete inference rule.
+      truncated: false
+builder_handoff:
+  candidate_id: 537883fb-ea89-43fb-96ff-d5938a91c15e
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:3ab086bb-d784-4575-b460-e1a9ab71e6e9
+  iteration: 2
+  summary:
+    text: Repaired A6 by updating the independently deployable Server English and
+      Chinese READMEs, prepare help, top-level bilingual docs, and generated
+      add_dataset help. All now show concise and explicit forms and the full
+      basename, suffix removal, and allowed-character inference rule. Added
+      generated-help regression assertions for basename, .gz, FASTA suffixes,
+      and the allowed character set.
+    truncated: false
+  addressed_acceptance_ids:
+    - A6
+  checks:
+    - name:
+        text: Shell syntax
+        truncated: false
+      result: passed
+      note:
+        text: Changed shell and test scripts pass bash -n
+        truncated: false
+    - name:
+        text: prepare_metadata_test.sh
+        truncated: false
+      result: passed
+      note:
+        text: Prepare help and name inference regression passed
+        truncated: false
+    - name:
+        text: add_dataset_test.sh
+        truncated: false
+      result: passed
+      note:
+        text: Generated help content plus concise and explicit forms passed
+        truncated: false
+    - name:
+        text: package_templates_test.sh
+        truncated: false
+      result: passed
+      note:
+        text: Generated template packaging passed after the documentation repair
+        truncated: false
+    - name:
+        text: git diff --check
+        truncated: false
+      result: passed
+      note: null
+  checks_truncated: false
+  known_limits:
+    - text: A bare relative FASTA path beginning with '-' must use a prefix such as ./
+        to avoid option-boundary ambiguity.
+      truncated: false
+  known_limits_truncated: false
+  review:
+    status: passed
+    summary:
+      text: Final independent read-only review confirms all user-facing Server entry
+        points describe both forms and the complete inference rule, with
+        matching regression assertions.
+      truncated: false
+    reviewer_execution_ref: /root/review_server_names#final-a6
+  submitted_at: 2026-09-20T10:27:30.071Z
+blockers: []
+verification:
+  candidate_id: 537883fb-ea89-43fb-96ff-d5938a91c15e
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:66988af3-f5af-473d-8e0c-9ff774a188a1
+  iteration: 2
+  attempt: 2
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: shell-syntax-a6
+      name:
+        text: Changed shell syntax after A6 repair
+        truncated: false
+      argv_display:
+        - text: -n
+          truncated: false
+        - text: GPM2.0/server/prepare.sh
+          truncated: false
+        - text: GPM2.0/server/templates/add_dataset.sh
+          truncated: false
+        - text: GPM2.0/tests/gpm_server/add_dataset_test.sh
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 15
+    - id: prepare-metadata-a6
+      name:
+        text: Prepare help and metadata regression
+        truncated: false
+      argv_display:
+        - text: GPM2.0/tests/gpm_server/prepare_metadata_test.sh
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 11646
+    - id: add-dataset-a6
+      name:
+        text: Generated add-dataset help and behavior regression
+        truncated: false
+      argv_display:
+        - text: GPM2.0/tests/gpm_server/add_dataset_test.sh
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 3271
+    - id: diff-check-a6
+      name:
+        text: Git whitespace check
+        truncated: false
+      argv_display:
+        - text: diff
+          truncated: false
+        - text: --check
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 2830
+  summary:
+    text: The final candidate satisfies A1-A6; independent semantic review and all
+      runtime regressions found no blocking issue or behavior outside the agreed
+      scope.
+    truncated: false
+  risks: []
+  risks_truncated: false
+  completed_at: 2026-09-20T10:32:25.711Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: fail
+    unresolved_ids:
+      - A6
+    summary:
+      text: A1-A5 pass. A6 requires updating both Server-specific READMEs and making
+        generated add_dataset help state the complete inference rule.
+      truncated: false
+    completed_at: 2026-09-20T10:23:15.602Z
+  - goal_cycle: 1
+    iteration: 2
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Repair verification passed for A6; final full verification is required.
+      truncated: false
+    completed_at: 2026-09-20T10:29:18.801Z
+  - goal_cycle: 1
+    iteration: 2
+    attempt: 2
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: The final candidate satisfies A1-A6; independent semantic review and all
+        runtime regressions found no blocking issue or behavior outside the
+        agreed scope.
+      truncated: false
+    completed_at: 2026-09-20T10:32:25.711Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-09-20T04:48:37.540Z
