@@ -172,6 +172,7 @@ class RunAllRunnerTests(unittest.TestCase):
             self.assertFalse(any((server / "logs").glob(".status.tsv.tmp.*")))
             self.assertFalse((server / ".run_all/lock").exists())
 
+            (server / "metadata/prepare_options.tsv").unlink()
             repeat = self.run_runner(server)
             self.assertEqual(repeat.returncode, 0, repeat.stderr)
             repeat_log = (server / "logs/run_all.log").read_text(encoding="utf-8")

@@ -250,6 +250,11 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
         name = root.name + (".zip" if unit_id == "package_full" else ".no_fasta.zip")
         path = root.parent / name
         return {"summary": {"archive": name, "available": path.is_file()}, "outputs": [
-            {"file": name, "size_bytes": path.stat().st_size, "sha256": digest(path)}
+            {
+                "file": name,
+                "payload_archive_size_bytes": path.stat().st_size,
+                "payload_archive_sha256": digest(path),
+                "checksum_scope": "App payload before the finalized report is embedded",
+            }
         ] if path.is_file() else []}
     return {"summary": {}, "notes": ["执行情况见本阶段状态；GRT 子阶段记录单独列出。"]}

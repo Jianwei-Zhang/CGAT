@@ -112,7 +112,7 @@ Behavior:
   - run_all.sh writes live progress to <work_root>/logs/run_all.log and current state to logs/status.tsv
   - run_all.sh holds an exclusive workspace lock while active
   - Records input and stage JSON in report/ and generates an offline report/report.html
-  - Writes <work_root>.report.html and <work_root>.report.zip beside the delivery archives
+  - Embeds the finalized report/ directory in both delivery archives; no separate report ZIP is created
   - report/render_report.py regenerates HTML using only report/ and Python's standard library
   - Generates package_full_zip.sh, package_light_no_fasta_zip.sh, and export_final_path_fasta.sh
   - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> GRT Step2/3 -> GRT telomere/q4 finalization -> per-chr commands -> GRT evidence/package validation -> full zip -> light zip
@@ -1304,8 +1304,8 @@ if [[ "$SKIP_SELF" == "true" ]]; then
   echo "     - chr-local same-dataset self alignments remain skipped"
 fi
 echo "  4. Output archives:"
-echo "     - Full package: $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").zip"
-echo "     - Light package: $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").no_fasta.zip"
+echo "     - Full package (FASTA + report): $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").zip"
+echo "     - No-FASTA package (report included): $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").no_fasta.zip"
 echo "  5. To add a dataset later, run:"
 echo "     - bash ${WORK_ROOT}/add_dataset.sh --ds /path/to/dataset.fa"
 echo "     - Or set an explicit name: bash ${WORK_ROOT}/add_dataset.sh --ds <dataset_name> /path/to/dataset.fa"
@@ -1316,4 +1316,4 @@ echo "     - bash ${WORK_ROOT}/export_final_path_fasta.sh --tsv /path/to/final_p
 echo
 echo "Delivery reminder:"
 echo "  - gpm_next importer does not require metadata/alignments.tsv"
-echo "  - The zip should contain top-level gpm_server/{metadata,data,runs}"
+echo "  - Both zips contain top-level gpm_server/{metadata,data,runs,report}"

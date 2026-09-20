@@ -55,7 +55,9 @@ class ServerReportTests(unittest.TestCase):
             self.assertIn("specific failure", records[0]["output_tail"])
             html = (server / "report/report.html").read_text()
             self.assertNotIn("STALE", html)
-            self.assertTrue((root / "gpm_server.report.zip").is_file())
+            self.assertFalse((root / "gpm_server.report.zip").exists())
+            self.assertFalse((root / "gpm_server.report.html").exists())
+            self.assertIn("No delivery package is declared final for this run.", result.stdout)
 
     def test_outer_cache_and_independent_regeneration(self):
         helper = runner_fixture.RunAllRunnerTests()
@@ -121,11 +123,13 @@ class ServerReportTests(unittest.TestCase):
             self.assertEqual(snapshot["facts"], {})
             self.assertEqual(read_json(root / "report/manifest.json")["status"], "failed")
 
-    def test_delivery_archive_hashes_are_final_and_report_zip_is_portable(self):
+    def test_delivery_archives_embed_final_portable_report(self):
         helper = runner_fixture.RunAllRunnerTests()
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             server = helper.make_workspace(root, [("package_full", "true"), ("package_light", "true")])
+            (root / "gpm_server.report.zip").write_text("legacy report ZIP", encoding="utf-8")
+            (root / "gpm_server.report.html").write_text("legacy report HTML", encoding="utf-8")
             shutil.copytree(PROJECT / "tests/fixtures/grt_contract_v2/valid/gpm_server", server, dirs_exist_ok=True)
             shutil.copytree(TOOLS, server / ".prepare_lib/tools", ignore=shutil.ignore_patterns("__pycache__"))
             shutil.copytree(PROJECT / "server/contracts", server / ".prepare_lib/contracts")
@@ -138,17 +142,35 @@ class ServerReportTests(unittest.TestCase):
                 record = read_json(server / "report/steps" / filename)
                 artifact = record["facts"]["outputs"][0]
                 path = root / artifact["file"]
-                self.assertEqual(artifact["sha256"], digest(path))
-                self.assertEqual(artifact["size_bytes"], path.stat().st_size)
+                self.assertNotEqual(artifact["payload_archive_sha256"], digest(path))
+                self.assertLess(artifact["payload_archive_size_bytes"], path.stat().st_size)
+                self.assertIn("before the finalized report", artifact["checksum_scope"])
                 with zipfile.ZipFile(path) as archive:
                     self.assertIsNone(archive.testzip())
-                    self.assertFalse(any("/report/" in name for name in archive.namelist()))
+                    self.assertIn("gpm_server/report/manifest.json", archive.namelist())
+                    self.assertIn("gpm_server/report/report.html", archive.namelist())
+                    self.assertIn("gpm_server/report/render_report.py", archive.namelist())
+            self.assertFalse((root / "gpm_server.report.zip").exists())
+            self.assertFalse((root / "gpm_server.report.html").exists())
+            self.assertIn("Final delivery packages:", result.stdout)
+            self.assertIn("Full package (FASTA + report)", result.stdout)
+            self.assertIn("No-FASTA package (report included)", result.stdout)
+            self.assertIn("SHA-256:", result.stdout)
+            self.assertIn("Final delivery packages:", (server / "logs/run_all.log").read_text())
+            repeated = helper.run_runner(server)
+            self.assertEqual(repeated.returncode, 0, repeated.stdout + repeated.stderr)
+            for path in (root / "gpm_server.zip", root / "gpm_server.no_fasta.zip"):
+                with zipfile.ZipFile(path) as archive:
+                    self.assertEqual(archive.namelist().count("gpm_server/report/manifest.json"), 1)
             standalone = root / "unpacked"
-            with zipfile.ZipFile(root / "gpm_server.report.zip") as archive:
+            with zipfile.ZipFile(root / "gpm_server.zip") as archive:
                 archive.extractall(standalone)
             shutil.rmtree(server)
-            result = subprocess.run([sys.executable, "-I", str(standalone / "report/render_report.py")], capture_output=True, text=True)
+            embedded_report = standalone / "gpm_server/report"
+            (embedded_report / "report.html").unlink()
+            result = subprocess.run([sys.executable, "-I", str(embedded_report / "render_report.py")], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((embedded_report / "report.html").is_file())
 
     def test_process_event_is_immutable_and_final_state_is_separate(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -242,9 +264,8 @@ class GrtReportIntegrationTests(unittest.TestCase):
             self.assertIn('class="path-segment', html)
             self.assertLess(html.index('id="grt-step1_round1"'), html.index('id="grt-step1_filter"'))
             self.assertLess(html.index('id="grt-step1_filter"'), html.index('id="grt-step1_round2"'))
-            with zipfile.ZipFile(root / f"{server.name}.report.zip") as archive:
-                self.assertIsNone(archive.testzip())
-                self.assertIn("report/render_report.py", archive.namelist())
+            self.assertFalse((root / f"{server.name}.report.zip").exists())
+            self.assertFalse((root / f"{server.name}.report.html").exists())
             second = helper.run_runner(server, env=environment)
             self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
             records = [read_json(path) for path in (report / "steps").glob("[0-9]*.json")]

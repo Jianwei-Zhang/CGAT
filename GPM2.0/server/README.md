@@ -21,6 +21,12 @@ bash prepare.sh \
 bash ./gpm_server/run_all.sh
 ```
 
+A successful run ends with an explicit `Final delivery packages` summary. The only
+delivery files are `gpm_server.zip` (FASTA + report) and
+`gpm_server.no_fasta.zip` (no FASTA, report included). Both contain the complete
+`gpm_server/report/` directory; no separate report ZIP is created. The local report
+remains available at `gpm_server/report/report.html`.
+
 `--ref` and repeatable `--ds` accept either `<name> <fasta>` or just `<fasta>`.
 When the name is omitted, it comes from the FASTA basename: `.gz` and one
 `.fa`, `.fasta`, or `.fna` suffix are removed case-insensitively. Runs outside

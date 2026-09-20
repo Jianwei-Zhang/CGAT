@@ -2,15 +2,18 @@
 
 `prepare.sh` records input provenance after argument, input-access and tool preflight
 checks, before FASTA normalization. Errors before that point are terminal errors
-and do not create a report. `run_all.sh` records each execution unit and exports
-`<workspace>.report.html` and `<workspace>.report.zip`, including on a handled
-failure or SIGINT/SIGTERM. SIGKILL or host loss cannot run finalizers; the last
-atomic snapshot remains available and the next invocation archives it.
+and do not create a report. `run_all.sh` records each execution unit and maintains
+the complete report under `<workspace>/report/`, including on a handled failure or
+SIGINT/SIGTERM. SIGKILL or host loss cannot run finalizers; the last atomic snapshot
+remains available and the next invocation archives it.
 
-The two App archives keep their existing contract. Reports are separate sidecars,
-written after the archives, so they can contain the archives' actual sizes and
-SHA-256 values without a cyclic dependency. No report hash is embedded in itself.
-Standalone incremental/packaging commands are outside this invocation history.
+After a successful run, the finalized `report/` directory is embedded atomically in
+both App delivery archives. No separate report HTML or report ZIP is written beside
+them. The report records the App payload archive size and SHA-256 before `report/`
+is embedded, avoiding a checksum cycle. Final delivery ZIP sizes and SHA-256 values
+are printed to the terminal and `logs/run_all.log`. Standalone packaging commands
+embed the latest workspace report when available; standalone incremental commands
+remain outside the recorded invocation history.
 
 ## Directory contract: `cgat_server_report_v1`
 

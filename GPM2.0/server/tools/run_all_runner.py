@@ -22,7 +22,7 @@ from pathlib import Path
 
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
 from run_orchestration import OrchestrationContractError, atomic_write_json
-from server_report import ReportSession
+from server_report import ReportSession, embed_report_in_delivery_archives
 
 
 PLAN_FIELDS = ["unit_id", "command_relpath", "detail_log_relpath"]
@@ -361,6 +361,74 @@ class Runner:
             return self.outer_checkpoints.validate_package("light")
         return True, "no terminal validation required"
 
+    def _emit_summary(self, lines: list[str]) -> None:
+        assert self.log_handle is not None
+        for line in lines:
+            print(line, flush=True)
+            self.log_handle.write(line + "\n")
+        self.log_handle.flush()
+
+    @staticmethod
+    def _format_size(size_bytes: int) -> str:
+        size = float(size_bytes)
+        for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+            if size < 1024 or unit == "TiB":
+                return f"{int(size)} {unit}" if unit == "B" else f"{size:.1f} {unit}"
+            size /= 1024
+        raise AssertionError("unreachable")
+
+    def _delivery_archives(self) -> list[Path]:
+        unit_ids = {unit.unit_id for unit in self.units}
+        if not {"package_full", "package_light"}.issubset(unit_ids):
+            return []
+        parent = self.server_dir.parent
+        name = self.server_dir.name
+        return [parent / f"{name}.zip", parent / f"{name}.no_fasta.zip"]
+
+    def _emit_success_summary(self, artifacts: list[dict[str, object]]) -> None:
+        by_name = {str(artifact["file"]): artifact for artifact in artifacts}
+        full = by_name[f"{self.server_dir.name}.zip"]
+        light = by_name[f"{self.server_dir.name}.no_fasta.zip"]
+        self._emit_summary(
+            [
+                "",
+                "GPM Server workflow completed successfully.",
+                "",
+                "Final delivery packages:",
+                "  1. Full package (FASTA + report):",
+                f"     {full['path']}",
+                f"     Size: {self._format_size(int(full['size_bytes']))}",
+                f"     SHA-256: {full['sha256']}",
+                "     Use: complete App import and FASTA export.",
+                "",
+                "  2. No-FASTA package (report included):",
+                f"     {light['path']}",
+                f"     Size: {self._format_size(int(light['size_bytes']))}",
+                f"     SHA-256: {light['sha256']}",
+                "     Use: App import and browsing; FASTA export is unavailable.",
+                "",
+                "Local report:",
+                f"  {self.server_dir / 'report/report.html'}",
+            ]
+        )
+
+    def _emit_incomplete_summary(self) -> None:
+        failed = next(
+            (row["unit_id"] for row in self.status_rows if row["state"] in {"failed", "interrupted"}),
+            None,
+        )
+        lines = ["", "GPM Server workflow did not complete successfully."]
+        if failed:
+            lines.append(f"Failure stage: {failed}")
+        lines.extend(
+            [
+                f"Diagnostic report: {self.server_dir / 'report/report.html'}",
+                f"Rerun: bash {self.server_dir / 'run_all.sh'}",
+                "No delivery package is declared final for this run.",
+            ]
+        )
+        self._emit_summary(lines)
+
     def run(self) -> int:
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         prior = load_prior_status(self.status_path)
@@ -369,6 +437,7 @@ class Runner:
         mode = "resume" if prior or self.log_path.exists() else "fresh"
         self.report = ReportSession(self.server_dir, self.units, self.run_id)
         threads = "unknown"
+        completed = False
         options_path = self.server_dir / "metadata/prepare_options.tsv"
         if options_path.is_file():
             try:
@@ -582,15 +651,37 @@ class Runner:
                     atomic_write_status(self.status_path, self.status_rows)
                     self._event("SUCCESS", unit, f"elapsed={elapsed:.3f}s")
                 self._event("SUCCESS", None, "pipeline completed")
+                completed = True
                 return 0
             finally:
                 error = sys.exc_info()[1]
                 self.active_child = None
                 for signal_number, handler in previous_handlers.items():
                     signal.signal(signal_number, handler)
-                self.log_handle = None
                 self.report.finish(str(error) if error else None)
-                print(f"Server report: {self.server_dir / 'report/report.html'}", flush=True)
+                archives = self._delivery_archives()
+                if completed and archives:
+                    try:
+                        artifacts = embed_report_in_delivery_archives(self.server_dir, archives)
+                    except Exception as exc:
+                        message = f"failed to embed the final report in delivery archives: {exc}"
+                        self.report.delivery_failure(message)
+                        self._emit_incomplete_summary()
+                        self.log_handle = None
+                        raise RunnerError(message) from exc
+                    self._emit_success_summary(artifacts)
+                elif completed:
+                    self._emit_summary(
+                        [
+                            "",
+                            "GPM Server workflow completed successfully.",
+                            "No delivery package units are present in this execution plan.",
+                            f"Local report: {self.server_dir / 'report/report.html'}",
+                        ]
+                    )
+                else:
+                    self._emit_incomplete_summary()
+                self.log_handle = None
 
 
 def new_run_id() -> str:

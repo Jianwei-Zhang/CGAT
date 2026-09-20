@@ -108,12 +108,12 @@ bash ./gpm_server/run_all.sh
 
 | 交付包 | 内容与用途 |
 | --- | --- |
-| `gpm_server.zip` | 完整 App 包，包含 source/reference FASTA 与权威 q4 FASTA，可在客户端导出 FASTA。 |
-| `gpm_server.no_fasta.zip` | 无 FASTA App 包，保留 `.fai`、metadata、Final Path、source-card 状态和 PAF 视图，可导入、浏览并导出 PNG/TSV。 |
-| `gpm_server.report.html` | 可单独发送、离线打开的全流程报告，覆盖输入、阶段处理、最终结果和交付包校验值。 |
-| `gpm_server.report.zip` | 独立报告目录，包含阶段 JSON 和仅依赖 Python 标准库的 HTML 生成器。 |
+| `gpm_server.zip` | 完整 App 包，包含 source/reference FASTA、权威 q4 FASTA 和完整 `report/` 目录，可在客户端导出 FASTA。 |
+| `gpm_server.no_fasta.zip` | 无 FASTA App 包，保留 `.fai`、metadata、Final Path、source-card 状态、PAF 视图和完整 `report/` 目录，可导入、浏览并导出 PNG/TSV。 |
 
-报告同时位于 `gpm_server/report/report.html`。`prepare.sh` 从输入准备阶段开始记录，`run_all.sh` 在阶段结束时更新报告；失败或中断也保留报告及尚未执行的阶段。GRT 首次发布的阶段事件与最终协调后的状态分别保留，缓存复用明确标注。重跑前一份报告保存在工作目录的 `.report_history/` 下。
+这两个 ZIP 是仅有的最终交付文件，不再单独生成报告 ZIP。可直接打开服务端工作目录或任一解压后交付包中的 `gpm_server/report/report.html`。`prepare.sh` 从输入准备阶段开始记录，`run_all.sh` 在阶段结束时更新报告；失败或中断也保留报告及尚未执行的阶段。GRT 首次发布的阶段事件与最终协调后的状态分别保留，缓存复用明确标注。重跑前一份报告保存在工作目录的 `.report_history/` 下。
+
+为避免校验值引用包含自身的 ZIP，报告记录嵌入 `report/` 之前的 App 数据载荷校验值。两个最终 ZIP 完成后，`run_all.sh` 会明确打印其路径、大小、SHA-256、用途和本地报告路径；同一摘要也写入 `logs/run_all.log`。
 
 复制或解压整个 `report/` 后，可在原工作目录不可访问、网络断开的情况下重新生成：
 

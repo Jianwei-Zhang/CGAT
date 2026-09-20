@@ -14,7 +14,7 @@ from pathlib import Path
 from server_report_collect import (
     capture_final, collect_grt_result, collect_unit, final_summary, inputs,
 )
-from server_report_io import SCHEMA, local_path, now, read_json, write_json
+from server_report_io import SCHEMA, digest, local_path, now, read_json, write_json
 from render_server_report import render
 
 TITLES = {
@@ -22,7 +22,7 @@ TITLES = {
     "grt_prepare": "质量评估、q0 与供体构建", "grt_step1": "GRT Step1",
     "grt_step23": "GRT Step2 / Step3", "grt_telomere_finalize": "端粒处理与最终路径",
     "finalize_evidence": "证据整理与结果校验", "package_full": "完整包交付",
-    "package_light": "轻量包交付", "step1_round1": "Step1 · 第一阶段",
+    "package_light": "无 FASTA 包交付", "step1_round1": "Step1 · 第一阶段",
     "step1_filter": "Step1 · 过滤阶段", "step1_round2": "Step1 · 第二阶段",
     "step2": "Step2 · 补丁验证与处理分支", "step3": "Step3 · 结构修正与优化填补",
     "step4_telomere": "Step4 · 端粒处理",
@@ -184,22 +184,98 @@ class ReportSession:
                 write_json(self.report / filename, record)
         self.save()
         self.refresh()
-        # These sidecars are outside the data ZIPs so their recorded ZIP hashes
-        # are final and do not create a report/archive checksum cycle.
-        html_target = self.root.parent / f"{self.root.name}.report.html"
-        html_temporary = html_target.with_suffix(".html.tmp")
-        shutil.copyfile(self.report / "report.html", html_temporary)
-        os.replace(html_temporary, html_target)
-        zip_target = self.root.parent / f"{self.root.name}.report.zip"
-        temporary = zip_target.with_suffix(".zip.tmp")
-        try:
-            with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-                for path in sorted(self.report.rglob("*")):
-                    if path.is_file() and "__pycache__" not in path.parts:
-                        archive.write(path, "report/" + path.relative_to(self.report).as_posix())
-            os.replace(temporary, zip_target)
-        finally:
+        # Older releases wrote report sidecars beside the App delivery archives.
+        # The report now ships inside both delivery archives, so remove stale
+        # sidecars to leave only the two user-facing ZIPs.
+        for suffix in (".report.html", ".report.zip"):
+            (self.root.parent / f"{self.root.name}{suffix}").unlink(missing_ok=True)
+
+    def delivery_failure(self, error: str):
+        self.manifest["status"] = "failed"
+        self.manifest["errors"].append(error)
+        self.manifest["ended_at"] = now()
+        self.save()
+        self.refresh()
+
+
+def embed_report_in_delivery_archives(root: Path, archives: list[Path]) -> list[dict[str, object]]:
+    """Atomically attach the finalized report directory to delivery ZIPs."""
+    root = root.resolve()
+    report = root / "report"
+    required = (report / "manifest.json", report / "report.html", report / "render_report.py")
+    missing = next((path for path in required if not path.is_file()), None)
+    if missing is not None:
+        raise ValueError(f"final report artifact is missing: {missing}")
+    report_files = [
+        path for path in sorted(report.rglob("*"))
+        if path.is_file() and "__pycache__" not in path.parts
+    ]
+    prefix = f"{root.name}/report/"
+    prepared: list[tuple[Path, Path]] = []
+    backups: list[tuple[Path, Path]] = []
+    artifacts: list[dict[str, object]] = []
+    swap_complete = False
+    try:
+        for archive_path in archives:
+            archive_path = archive_path.resolve()
+            if not archive_path.is_file():
+                raise FileNotFoundError(f"delivery archive is missing: {archive_path}")
+            temporary = archive_path.with_name(
+                f".{archive_path.name}.with-report.{uuid.uuid4().hex}.tmp"
+            )
+            shutil.copyfile(archive_path, temporary)
+            try:
+                with zipfile.ZipFile(temporary, "a", compression=zipfile.ZIP_DEFLATED) as archive:
+                    if any(name.startswith(prefix) for name in archive.namelist()):
+                        raise ValueError(f"delivery archive already contains a report: {archive_path}")
+                    for path in report_files:
+                        relative = path.relative_to(report).as_posix()
+                        archive.write(path, prefix + relative)
+                with zipfile.ZipFile(temporary) as archive:
+                    corrupt = archive.testzip()
+                    if corrupt is not None:
+                        raise ValueError(f"delivery archive contains a corrupt member: {corrupt}")
+                    names = set(archive.namelist())
+                    for path in required:
+                        member = prefix + path.relative_to(report).as_posix()
+                        if member not in names:
+                            raise ValueError(f"delivery archive is missing embedded report member: {member}")
+            except Exception:
+                temporary.unlink(missing_ok=True)
+                raise
+            prepared.append((archive_path, temporary))
+
+        for archive_path, temporary in prepared:
+            backup = archive_path.with_name(
+                f".{archive_path.name}.before-report.{uuid.uuid4().hex}.bak"
+            )
+            os.replace(archive_path, backup)
+            backups.append((archive_path, backup))
+            os.replace(temporary, archive_path)
+        artifacts = [
+            {
+                "file": archive_path.name,
+                "path": str(archive_path),
+                "size_bytes": archive_path.stat().st_size,
+                "sha256": digest(archive_path),
+            }
+            for archive_path, _ in prepared
+        ]
+        swap_complete = True
+    except Exception:
+        for archive_path, backup in reversed(backups):
+            if backup.exists():
+                archive_path.unlink(missing_ok=True)
+                os.replace(backup, archive_path)
+        raise
+    finally:
+        for _, temporary in prepared:
             temporary.unlink(missing_ok=True)
+        if swap_complete:
+            for _, backup in backups:
+                backup.unlink(missing_ok=True)
+
+    return artifacts
 
 
 def prepare_start(root: Path, argv: list[str]):
@@ -249,9 +325,12 @@ def prepare_finish(root: Path, exit_code: int):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["prepare-start", "prepare-finish"])
+    parser.add_argument(
+        "action", choices=["prepare-start", "prepare-finish", "embed-delivery-report"]
+    )
     parser.add_argument("--server-dir", type=Path, required=True)
     parser.add_argument("--exit-code", type=int, default=0)
+    parser.add_argument("--archive", type=Path)
     # Preserve the exact prepare argv without interpreting its option names.
     raw = sys.argv[1:]
     split = raw.index("--") if "--" in raw else len(raw)
@@ -259,8 +338,12 @@ def main():
     root = args.server_dir.resolve()
     if args.action == "prepare-start":
         prepare_start(root, raw[split + 1:])
-    else:
+    elif args.action == "prepare-finish":
         prepare_finish(root, args.exit_code)
+    else:
+        if args.archive is None:
+            parser.error("embed-delivery-report requires --archive")
+        embed_report_in_delivery_archives(root, [args.archive])
 
 
 if __name__ == "__main__":

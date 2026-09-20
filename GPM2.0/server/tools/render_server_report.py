@@ -26,7 +26,9 @@ LABELS = {
     "reads_qc": "Reads 质量评估", "event_count": "事件数", "by_status": "事件状态",
     "by_action": "处理动作", "by_reason": "原因分布", "available": "记录可用",
     "alignment_task_count": "染色体比对任务数", "self_alignment": "自比对",
-    "archive": "交付文件", "sequence": "序列", "aligned_bp": "比对覆盖 / bp",
+    "archive": "交付文件", "payload_archive_size_bytes": "App 数据载荷大小 / bytes",
+    "payload_archive_sha256": "App 数据载荷 SHA-256", "checksum_scope": "校验范围",
+    "sequence": "序列", "aligned_bp": "比对覆盖 / bp",
     "coverage_percent": "覆盖率 / %", "dataset_name": "数据集", "contig_name": "Contig",
     "seq_name": "Contig", "assigned_chr_name": "归属染色体", "source_orientation": "方向",
     "support_bp": "支持长度 / bp", "support_percent": "支持覆盖率 / %",
@@ -461,8 +463,8 @@ def render(root: Path) -> Path:
     body += '</section><section id="delivery"><h2>交付文件</h2>'
     outputs = [output for record in records if record["stage_id"].startswith("package_")
                for output in record.get("facts", {}).get("outputs", [])]
-    body += data_table("交付文件与 SHA-256", outputs)
-    body += '<p class="note">文件名和路径用于说明来源。本 HTML 的阅读不依赖这些文件，离线即可打开；完整报告目录可用 Python 标准库重新生成。</p><button id="download" type="button">下载本报告完整 JSON</button></section><p class="footer">CGAT · 独立离线报告 · 坐标沿用各源记录定义；q/source 区间为 1-based inclusive，PAF 区间为 0-based half-open。</p></main>'
+    body += data_table("交付包 App 数据载荷", outputs)
+    body += '<p class="note">为避免报告对所在 ZIP 产生自引用，表中校验值只覆盖嵌入报告前的 App 数据载荷。最终 ZIP 的 SHA-256 会在流程结束时写入终端和 run_all.log。报告随两个交付包提供，也可在服务端工作目录中直接打开；完整报告目录可用 Python 标准库重新生成。</p><button id="download" type="button">下载本报告完整 JSON</button></section><p class="footer">CGAT · 独立离线报告 · 坐标沿用各源记录定义；q/source 区间为 1-based inclusive，PAF 区间为 0-based half-open。</p></main>'
     payload = {"manifest": manifest, "inputs": input_record, "steps": records, "grt_steps": grt, "final_summary": final}
     embedded = json.dumps({"labels": LABELS, "tables": tables, "payload": payload}, ensure_ascii=False, allow_nan=False).replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
     document = '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data:; connect-src \'none\'; base-uri \'none\'"><title>CGAT Server 报告</title><style>' + CSS + '</style></head><body>' + body + '<noscript>汇总可直接阅读。搜索、分页和 JSON 下载需要浏览器启用 JavaScript。</noscript><script id="report-data" type="application/json">' + embedded + '</script><script>' + JS + '</script></body></html>\n'

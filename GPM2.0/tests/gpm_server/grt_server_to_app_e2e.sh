@@ -41,6 +41,12 @@ python3 server/tools/grt_app_package.py \
   --source "${fixture_root}" \
   --staging "${app_no_fasta_stage}" \
   --no-fasta >/dev/null
+for app_stage in "$app_full_stage" "$app_no_fasta_stage"; do
+  mkdir -p "${app_stage}/report"
+  printf '%s\n' '<!doctype html><title>CGAT Server report</title>' > "${app_stage}/report/report.html"
+  printf '%s\n' '{"schema_version":"cgat_server_report_v1","status":"success"}' > "${app_stage}/report/manifest.json"
+  printf '%s\n' '#!/usr/bin/env python3' > "${app_stage}/report/render_report.py"
+done
 (cd "${task_tmp_dir}/app-full" && zip -qr "${task_tmp_dir}/gpm_server.zip" gpm_server)
 (cd "${task_tmp_dir}/app-no-fasta" && zip -qr "${task_tmp_dir}/gpm_server.no_fasta.zip" gpm_server)
 legacy_final_path_stage="${task_tmp_dir}/app-final-path-v1/gpm_server"
@@ -118,10 +124,16 @@ for archive_name in sys.argv[1:]:
         names = [name for name in archive.namelist() if not name.endswith('/')]
         assert not any('/.prepare_lib/' in name for name in names), archive_name
         assert not any('/logs/' in name or '/.run_all/' in name for name in names), archive_name
-        assert not any(name.endswith(('.sh', '.py')) for name in names), archive_name
+        assert not any(
+            name.endswith(('.sh', '.py')) and name != 'gpm_server/report/render_report.py'
+            for name in names
+        ), archive_name
         assert not any('/grt/cache/' in name or '/grt/checkpoints/' in name or '/grt/donors/' in name for name in names), archive_name
         assert not any('/grt/evidence/' in name for name in names), archive_name
         assert sum(name.lower().endswith(('.fa', '.fasta')) for name in names) == (4 if archive_name.endswith('gpm_server.zip') else 0), archive_name
+        assert 'gpm_server/report/report.html' in names, archive_name
+        assert 'gpm_server/report/manifest.json' in names, archive_name
+        assert 'gpm_server/report/render_report.py' in names, archive_name
         assert 'gpm_server/metadata/grt_app_manifest.json' in names, archive_name
         assert 'gpm_server/metadata/grt_final_path.json' in names, archive_name
         assert 'gpm_server/runs/primary_vs_ref/result.paf' in names, archive_name

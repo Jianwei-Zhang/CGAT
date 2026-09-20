@@ -26,4 +26,10 @@ python3 "$app_packager" \
   zip -rq "$temporary_archive" "$bundle_name"
 )
 mv -f -- "$temporary_archive" "$archive_path"
-echo "Light delivery bundle: $archive_path"
+if [[ -z "${GPM_REPORT_RUN_ID:-}" && -f "${server_dir}/report/report.html" ]]; then
+  python3 "${server_dir}/.prepare_lib/tools/server_report.py" \
+    embed-delivery-report \
+    --server-dir "$server_dir" \
+    --archive "$archive_path"
+fi
+echo "No-FASTA delivery bundle: $archive_path"

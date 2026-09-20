@@ -218,6 +218,25 @@ test -f "${TMP_DIR}/gpm_server.no_fasta.zip"
 assert_file_contains "${TMP_DIR}/gpm_server.zip" "--- gpm_server/data/datasets/ds1.fa"
 assert_file_not_contains "${TMP_DIR}/gpm_server.no_fasta.zip" '^--- gpm_server/data/datasets/ds1[.]fa$'
 assert_file_contains "${TMP_DIR}/gpm_server.no_fasta.zip" "--- gpm_server/data/datasets/ds1.fa.fai"
+python3 - "${TMP_DIR}/gpm_server.zip" "${TMP_DIR}/gpm_server.no_fasta.zip" <<'PY'
+import sys
+from zipfile import ZipFile
+
+required = {
+    "gpm_server/report/report.html",
+    "gpm_server/report/manifest.json",
+    "gpm_server/report/render_report.py",
+}
+for archive_path in sys.argv[1:]:
+    with ZipFile(archive_path) as archive:
+        assert archive.testzip() is None, archive_path
+        assert required.issubset(archive.namelist()), archive_path
+PY
+test ! -e "${TMP_DIR}/gpm_server.report.zip"
+test ! -e "${TMP_DIR}/gpm_server.report.html"
+grep -Fq 'Final delivery packages:' "${output_root}/logs/run_all.log"
+grep -Fq 'Full package (FASTA + report):' "${output_root}/logs/run_all.log"
+grep -Fq 'No-FASTA package (report included):' "${output_root}/logs/run_all.log"
 
 PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh" > "${TMP_DIR}/resume.out"
 grep -Fq '[SKIP_VALID] [ref:ds1]' "${TMP_DIR}/resume.out"
