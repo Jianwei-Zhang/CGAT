@@ -1,0 +1,151 @@
+schema: comet.native.v4
+name: cgat-suite-conda-package
+language: en
+phase: archive
+status: done
+state_version: 10
+brief: brief.md
+shape_confirmation_hash: d2f4c34441772de1b7351857e0f3013578e6e61af3275277922faf140df8fe25
+spec_changes:
+  - capability: conda-distribution
+    operation: create
+    source: specs/conda-distribution/spec.md
+workspace:
+  isolation: current
+  change_branch: master
+  target_branch: master
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 2
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: "A1: One tracked TODO at `docs/comet/todos/cgat-suite-conda-package.md`
+      records the future package boundary, proposed dependency baseline,
+      required DEGAP compatibility test, and the three prerequisite workflow
+      areas; the Native change can then be archived without implementing the
+      package."
+    result: passed
+    reason:
+      text: The sole TODO records the future GPM Server plus DEGAP v2 package
+        boundary, proposed Python 3.11/minimap2 2.31/samtools 1.23.1 baseline,
+        unverified DEGAP smoke-test requirement, and all three prerequisites.
+      truncated: false
+  - id: A2
+    source: specs/conda-distribution/spec.md
+    text: Preserve the deferred package as one TODO Given Conda packaging is
+      intentionally postponed, when this change is completed, then
+      `docs/comet/todos/cgat-suite-conda-package.md` is the single
+      backlog-facing record of the future work and no package, App, GPM Server,
+      or DEGAP runtime implementation is changed.
+    result: passed
+    reason:
+      text: It is the only file under docs/comet/todos, and the candidate changes only
+        this TODO plus Comet formal/state artifacts; no package, App, GPM
+        Server, or DEGAP runtime implementation changed.
+      truncated: false
+builder_handoff:
+  candidate_id: ede6c104-df7c-47e9-8540-587402b6248c
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:b81daecf-4d7a-4de3-9d53-d5a287cd160b
+  iteration: 1
+  summary:
+    text: Created one tracked-backlog candidate TODO preserving the deferred CGAT
+      Conda package boundary, dependency baseline, compatibility caveat, and
+      prerequisite workflows. No App, GPM Server, DEGAP, or packaging runtime
+      source was changed.
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+  checks:
+    - name:
+        text: git diff --check
+        truncated: false
+      result: passed
+      note:
+        text: Completed with no whitespace errors.
+        truncated: false
+    - name:
+        text: git status scope inspection
+        truncated: false
+      result: passed
+      note:
+        text: Only the TODO and Comet formal/state artifacts changed; no runtime source
+          files changed.
+        truncated: false
+  checks_truncated: false
+  known_limits: []
+  known_limits_truncated: false
+  review:
+    status: passed
+    summary:
+      text: Independent read-only review confirmed the TODO contains the exact
+        baseline, future package boundary, compatibility caveat, and three
+        prerequisites, with no runtime source changes.
+      truncated: false
+    reviewer_execution_ref: codex-subagent:/root/review_conda_todo@2026-09-20
+  submitted_at: 2026-09-20T04:56:59.659Z
+blockers: []
+verification:
+  candidate_id: ede6c104-df7c-47e9-8540-587402b6248c
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:8e9788db-1d8c-43cd-98a7-5dbbf211fa8a
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks: []
+  summary:
+    text: Independent inspection found one complete deferred-work TODO and no
+      runtime-source changes; A1 and A2 pass.
+    truncated: false
+  risks:
+    - text: The TODO remains an untracked candidate until Archive includes it in the
+        commit.
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-09-20T04:59:25.055Z
+history:
+  - goal_cycle: 1
+    iteration: 0
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native confirmed acceptance criteria changed
+      truncated: false
+    completed_at: 2026-09-20T04:53:10.902Z
+  - goal_cycle: 2
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: Independent inspection found one complete deferred-work TODO and no
+        runtime-source changes; A1 and A2 pass.
+      truncated: false
+    completed_at: 2026-09-20T04:59:25.055Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-09-20T04:39:50.395Z
