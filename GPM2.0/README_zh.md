@@ -22,16 +22,22 @@ GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流�
 首次在 Linux 服务端执行：
 
 ```bash
-bash server/env.sh
+bash server/install.sh
 ```
 
-脚本会复用 `mamba`、`micromamba` 或 `conda`；均不存在时，为当前用户无 sudo 安装 micromamba。随后按脚本打印的命令激活环境，例如：
+脚本会复用 `mamba`、`micromamba` 或 `conda`；均不存在时，为当前用户无 sudo 安装 micromamba。也可用 `--manager conda|mamba|micromamba` 明确选择。安装结束显示 `GPM Server installation: READY` 后，按脚本打印的命令激活环境，例如：
 
 ```bash
 micromamba activate cgat-server
 ```
 
-再次运行 `env.sh` 会校验托管环境，仅在依赖配置变化时更新。
+随时可以只检查、不修改环境：
+
+```bash
+bash server/install.sh --check
+```
+
+再次运行 `install.sh` 会校验托管环境，仅在依赖配置变化时更新；原 `env.sh` 入口继续兼容。只部署 `server/` 目录时，从其中的 [服务端快速入门](server/README_zh.md) 开始。
 
 | 用途 | 安装或要求的命令 |
 | --- | --- |

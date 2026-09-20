@@ -4,6 +4,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_SCRIPT="${REPO_ROOT}/server/env.sh"
+INSTALL_SCRIPT="${REPO_ROOT}/server/install.sh"
 SPEC_FILE="${REPO_ROOT}/server/cgat-server.conda-spec.txt"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -69,6 +70,7 @@ copy_installer() {
   local case_dir="$1"
   mkdir -p "${case_dir}/server"
   cp "$ENV_SCRIPT" "${case_dir}/server/env.sh"
+  cp "$INSTALL_SCRIPT" "${case_dir}/server/install.sh"
   cp "$SPEC_FILE" "${case_dir}/server/cgat-server.conda-spec.txt"
 }
 
@@ -94,7 +96,20 @@ run_installer() {
     FAKE_ENV_PREFIX="${case_dir}/environment" \
     FAKE_SHELL_INIT_STATE="${case_dir}/shell-init.called" \
     "$@" \
-    bash "${case_dir}/server/env.sh"
+    bash "${case_dir}/server/install.sh"
+}
+
+run_installer_with_args() {
+  local case_dir="$1"
+  local bin_dir="$2"
+  shift 2
+  PATH="${bin_dir}:/usr/bin:/bin" \
+    HOME="${case_dir}/home" \
+    FAKE_MANAGER_LOG="${case_dir}/manager.log" \
+    FAKE_ENV_STATE="${case_dir}/environment.exists" \
+    FAKE_ENV_PREFIX="${case_dir}/environment" \
+    FAKE_SHELL_INIT_STATE="${case_dir}/shell-init.called" \
+    bash "${case_dir}/server/install.sh" "$@"
 }
 
 assert_file() {
@@ -298,20 +313,86 @@ test_dependency_spec_and_verifier_cover_server_commands() {
     python samtools minimap2 nucmer delta-filter show-coords meryl merqury.sh \
     craq blastn makeblastdb winnowmap zip gzip
   do
-    grep -F "    ${command_name}" "$ENV_SCRIPT" >/dev/null
+    grep -Fx "  ${command_name}" "$ENV_SCRIPT" >/dev/null
   done
 }
 
-test_arguments_are_rejected() {
-  local case_dir="${TMP_DIR}/arguments-rejected"
+test_explicit_manager_selection() {
+  local case_dir="${TMP_DIR}/explicit-manager"
+  local bin_dir="${case_dir}/bin"
   copy_installer "$case_dir"
+  install_fake_managers "$bin_dir" mamba micromamba conda
   mkdir -p "${case_dir}/home"
-  if HOME="${case_dir}/home" bash "${case_dir}/server/env.sh" run \
-    > "${case_dir}/output" 2> "${case_dir}/error"; then
-    echo "expected env.sh arguments to be rejected" >&2
+
+  run_installer_with_args "$case_dir" "$bin_dir" --manager conda > "${case_dir}/output"
+  grep -F $'conda\tcreate -n cgat-server' "${case_dir}/manager.log" >/dev/null
+  if grep -E $'^(mamba|micromamba)\t(create|install) ' "${case_dir}/manager.log" >/dev/null; then
+    echo "explicit conda selection must not use another manager" >&2
     exit 1
   fi
-  grep -F "does not accept arguments; run it without arguments" "${case_dir}/error" >/dev/null
+  grep -F 'Manager:     conda (' "${case_dir}/output" >/dev/null
+}
+
+test_check_is_read_only_and_detects_stale_spec() {
+  local case_dir="${TMP_DIR}/check"
+  local bin_dir="${case_dir}/bin"
+  copy_installer "$case_dir"
+  install_fake_managers "$bin_dir" micromamba
+  mkdir -p "${case_dir}/home"
+
+  run_installer "$case_dir" "$bin_dir" > "${case_dir}/install.out"
+  : > "${case_dir}/manager.log"
+  run_installer_with_args "$case_dir" "$bin_dir" --check > "${case_dir}/check.out"
+  grep -F 'GPM Server environment check: READY' "${case_dir}/check.out" >/dev/null
+  grep -F 'Commands:    14/14 verified' "${case_dir}/check.out" >/dev/null
+  if grep -E $'\t(create|install|env remove) ' "${case_dir}/manager.log" >/dev/null; then
+    echo "--check must not change the environment" >&2
+    exit 1
+  fi
+
+  printf 'bc\n' >> "${case_dir}/server/cgat-server.conda-spec.txt"
+  if run_installer_with_args "$case_dir" "$bin_dir" --check \
+    > "${case_dir}/stale.out" 2> "${case_dir}/stale.error"; then
+    echo "expected --check to reject an outdated dependency specification" >&2
+    exit 1
+  fi
+  grep -F 'uses an outdated dependency specification' "${case_dir}/stale.error" >/dev/null
+}
+
+test_env_entry_remains_compatible() {
+  local case_dir="${TMP_DIR}/env-compatibility"
+  local bin_dir="${case_dir}/bin"
+  copy_installer "$case_dir"
+  install_fake_managers "$bin_dir" micromamba
+  mkdir -p "${case_dir}/home"
+
+  run_installer "$case_dir" "$bin_dir" > /dev/null
+  PATH="${bin_dir}:/usr/bin:/bin" \
+    HOME="${case_dir}/home" \
+    FAKE_MANAGER_LOG="${case_dir}/manager.log" \
+    FAKE_ENV_STATE="${case_dir}/environment.exists" \
+    FAKE_ENV_PREFIX="${case_dir}/environment" \
+    FAKE_SHELL_INIT_STATE="${case_dir}/shell-init.called" \
+    bash "${case_dir}/server/env.sh" --check --manager micromamba \
+    > "${case_dir}/output"
+  grep -F 'GPM Server environment check: READY' "${case_dir}/output" >/dev/null
+}
+
+test_help_and_unknown_arguments() {
+  local case_dir="${TMP_DIR}/arguments"
+  copy_installer "$case_dir"
+  mkdir -p "${case_dir}/home"
+
+  HOME="${case_dir}/home" bash "${case_dir}/server/install.sh" --help \
+    > "${case_dir}/help"
+  grep -F 'bash server/install.sh --check' "${case_dir}/help" >/dev/null
+
+  if HOME="${case_dir}/home" bash "${case_dir}/server/env.sh" run \
+    > "${case_dir}/output" 2> "${case_dir}/error"; then
+    echo "expected an unknown argument to be rejected" >&2
+    exit 1
+  fi
+  grep -F "unknown argument: run" "${case_dir}/error" >/dev/null
 }
 
 test_existing_manager_priority_create_reuse_and_update
@@ -320,6 +401,9 @@ test_unmanaged_environment_is_rejected
 test_verification_failure_has_no_ready_state_and_can_recover
 test_no_manager_bootstraps_micromamba_for_current_user
 test_dependency_spec_and_verifier_cover_server_commands
-test_arguments_are_rejected
+test_explicit_manager_selection
+test_check_is_read_only_and_detects_stale_spec
+test_env_entry_remains_compatible
+test_help_and_unknown_arguments
 
 echo "gpm_server_env_test.sh: ok"

@@ -15,6 +15,25 @@ ENV_MANAGER=""
 ENV_MANAGER_KIND=""
 AUTO_INSTALLED_MICROMAMBA="false"
 BOOTSTRAP_TMP_DIR=""
+REQUESTED_MANAGER=""
+MODE="install"
+INSTALL_ENTRYPOINT="${CGAT_SERVER_INSTALL_ENTRYPOINT:-${SCRIPT_DIR}/env.sh}"
+readonly -a REQUIRED_COMMANDS=(
+  python
+  samtools
+  minimap2
+  nucmer
+  delta-filter
+  show-coords
+  meryl
+  merqury.sh
+  craq
+  blastn
+  makeblastdb
+  winnowmap
+  zip
+  gzip
+)
 
 die() {
   echo "ERROR: $*" >&2
@@ -27,6 +46,50 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+
+usage() {
+  cat <<EOF
+Usage:
+  bash server/install.sh [--manager mamba|micromamba|conda]
+  bash server/install.sh --check [--manager mamba|micromamba|conda]
+
+Options:
+  --manager <name>  Use a specific installed environment manager.
+                    If omitted, the order is mamba, micromamba, then conda.
+  --check           Verify the existing managed environment without changing it.
+  -h, --help        Show this help message.
+
+Compatibility:
+  bash server/env.sh accepts the same options.
+EOF
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --manager)
+        [[ $# -ge 2 ]] || die "--manager requires mamba, micromamba, or conda"
+        REQUESTED_MANAGER="$2"
+        case "$REQUESTED_MANAGER" in
+          mamba|micromamba|conda) ;;
+          *) die "unsupported environment manager: $REQUESTED_MANAGER" ;;
+        esac
+        shift 2
+        ;;
+      --check)
+        MODE="check"
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        die "unknown argument: $1; run 'bash ${INSTALL_ENTRYPOINT} --help'"
+        ;;
+    esac
+  done
+}
 
 sha256_file() {
   local path="$1"
@@ -41,6 +104,14 @@ sha256_file() {
 
 detect_environment_manager() {
   local candidate
+  if [[ -n "$REQUESTED_MANAGER" ]]; then
+    if command -v "$REQUESTED_MANAGER" >/dev/null 2>&1; then
+      ENV_MANAGER="$(command -v "$REQUESTED_MANAGER")"
+      ENV_MANAGER_KIND="$REQUESTED_MANAGER"
+      return 0
+    fi
+    return 1
+  fi
   for candidate in mamba micromamba conda; do
     if command -v "$candidate" >/dev/null 2>&1; then
       ENV_MANAGER="$(command -v "$candidate")"
@@ -183,22 +254,6 @@ update_environment() {
 verify_environment() {
   local report_path="$1"
   local temporary_path="${report_path}.tmp.$$"
-  local -a required_commands=(
-    python
-    samtools
-    minimap2
-    nucmer
-    delta-filter
-    show-coords
-    meryl
-    merqury.sh
-    craq
-    blastn
-    makeblastdb
-    winnowmap
-    zip
-    gzip
-  )
   if ! "$ENV_MANAGER" run -n "$ENV_NAME" python -c '
 import shutil
 import sys
@@ -217,7 +272,7 @@ if missing:
 print("command\tresolved_path")
 for command, resolved in rows:
     print(f"{command}\t{resolved}")
-' "${required_commands[@]}" > "$temporary_path"; then
+' "${REQUIRED_COMMANDS[@]}" > "$temporary_path"; then
     rm -f "$temporary_path"
     return 1
   fi
@@ -241,24 +296,77 @@ write_state_marker() {
 }
 
 print_usage_summary() {
+  local action="$1"
   local manager_command="$ENV_MANAGER_KIND"
   echo ""
-  echo "Environment '$ENV_NAME' is ready."
+  if [[ "$action" == "check" ]]; then
+    echo "GPM Server environment check: READY"
+  else
+    echo "GPM Server installation: READY"
+  fi
+  echo "Environment: $ENV_NAME"
+  echo "Manager:     $ENV_MANAGER_KIND ($ENV_MANAGER)"
+  echo "Commands:    ${#REQUIRED_COMMANDS[@]}/${#REQUIRED_COMMANDS[@]} verified"
   if [[ "$AUTO_INSTALLED_MICROMAMBA" == "true" ]]; then
     echo "Micromamba was installed and initialized for Bash; open a new terminal before activation."
   fi
   echo "Activate:   $manager_command activate $ENV_NAME"
   echo "Deactivate: $manager_command deactivate"
+  echo "Recheck:    bash $INSTALL_ENTRYPOINT --check --manager $ENV_MANAGER_KIND"
+  echo "Next:       bash ${SCRIPT_DIR}/prepare.sh --help"
+}
+
+check_environment() {
+  environment_exists \
+    || die "environment '$ENV_NAME' does not exist for $ENV_MANAGER_KIND; run 'bash ${INSTALL_ENTRYPOINT}'"
+
+  local prefix
+  prefix="$(environment_prefix)"
+  [[ -n "$prefix" ]] || die "could not resolve prefix for environment '$ENV_NAME'"
+
+  local owner_marker="${prefix}/conda-meta/${OWNER_MARKER_NAME}"
+  local state_marker="${prefix}/conda-meta/${STATE_MARKER_NAME}"
+  validate_owner_marker "$owner_marker"
+  [[ -f "$state_marker" ]] \
+    || die "environment '$ENV_NAME' has no completed CGAT verification state; rerun the installer"
+
+  local expected_spec_sha256
+  expected_spec_sha256="$(sha256_file "$SPEC_FILE")"
+  [[ "$(read_marker_value "$state_marker" spec_sha256)" == "$expected_spec_sha256" ]] \
+    || die "environment '$ENV_NAME' uses an outdated dependency specification; rerun the installer"
+
+  local check_report
+  check_report="$(mktemp "${TMPDIR:-/tmp}/cgat-server-tools.XXXXXX")"
+  if ! verify_environment "$check_report"; then
+    rm -f "$check_report"
+    die "environment '$ENV_NAME' is missing one or more required commands"
+  fi
+  rm -f "$check_report"
+  print_usage_summary "check"
 }
 
 main() {
-  [[ $# -eq 0 ]] || die "env.sh does not accept arguments; run it without arguments"
+  parse_args "$@"
   [[ -s "$SPEC_FILE" ]] || die "dependency specification is missing or empty: $SPEC_FILE"
 
   if ! detect_environment_manager; then
-    bootstrap_micromamba
+    if [[ "$MODE" == "check" ]]; then
+      if [[ -n "$REQUESTED_MANAGER" ]]; then
+        die "requested environment manager is unavailable: $REQUESTED_MANAGER"
+      fi
+      die "no mamba, micromamba, or conda command is available"
+    elif [[ -z "$REQUESTED_MANAGER" || "$REQUESTED_MANAGER" == "micromamba" ]]; then
+      bootstrap_micromamba
+    else
+      die "requested environment manager is unavailable: $REQUESTED_MANAGER"
+    fi
   fi
   echo "Using environment manager: $ENV_MANAGER_KIND ($ENV_MANAGER)"
+
+  if [[ "$MODE" == "check" ]]; then
+    check_environment
+    return
+  fi
 
   local spec_sha256
   spec_sha256="$(sha256_file "$SPEC_FILE")"
@@ -300,7 +408,7 @@ main() {
     die "environment '$ENV_NAME' is missing one or more required commands"
   fi
   write_state_marker "$state_marker" "$spec_sha256"
-  print_usage_summary
+  print_usage_summary "install"
 }
 
 main "$@"

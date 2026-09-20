@@ -22,16 +22,22 @@ Installers for `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64` are published 
 Run once on the Linux server:
 
 ```bash
-bash server/env.sh
+bash server/install.sh
 ```
 
-The script reuses `mamba`, `micromamba`, or `conda`. If none is available, it installs micromamba for the current user without `sudo`. Activate the generated environment with the command printed by the script, for example:
+The script reuses `mamba`, `micromamba`, or `conda`. If none is available, it installs micromamba for the current user without `sudo`. Use `--manager conda|mamba|micromamba` to select one explicitly. After the installer prints `GPM Server installation: READY`, activate the environment with the command it provides, for example:
 
 ```bash
 micromamba activate cgat-server
 ```
 
-Re-running `env.sh` validates the managed environment and updates it only when the dependency specification changes.
+Check the installation later without changing it:
+
+```bash
+bash server/install.sh --check
+```
+
+Re-running `install.sh` validates the managed environment and updates it only when the dependency specification changes. The previous `env.sh` entry remains compatible. When only `server/` is deployed, start with its [server quick start](server/README.md).
 
 | Purpose | Commands installed or required |
 | --- | --- |
