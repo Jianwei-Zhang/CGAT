@@ -301,7 +301,7 @@ test("subview anchor endpoints share a row and wrap with the tools window", () =
     "utf8",
   );
 
-  assert.match(css, /\.subview-anchor-endpoints\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(112px,\s*100%\),\s*1fr\)\);/);
+  assert.match(css, /\.subview-anchor-endpoints\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
   assert.doesNotMatch(css, /@media \(max-width:\s*360px\)[\s\S]*?\.subview-anchor-endpoints\s*\{/);
 });
 
@@ -352,7 +352,7 @@ test("subview history controls follow Identity as one icon group and disable una
   assert.match(html, /data-subview-action="history-restore-rollback"[^>]*aria-label="暂无可撤销的回退操作"[^>]*disabled[^>]*><svg class="subview-history-icon subview-history-arrow-icon"[^>]*>[\s\S]*<\/svg><\/button>/);
   assert.match(
     html,
-    /data-subview-action="history-reset"[^>]*aria-label="重置当前 Subview 为系统默认状态"[^>]*disabled[^>]*><svg class="subview-history-icon subview-history-reset-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false">[\s\S]*<\/svg><\/button>/,
+    /data-subview-action="history-reset"[^>]*aria-label="将当前局部视图重置为系统默认状态"[^>]*disabled[^>]*><svg class="subview-history-icon subview-history-reset-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false">[\s\S]*<\/svg><\/button>/,
   );
   assert.doesNotMatch(html, />重置<\/button>/);
   assert.doesNotMatch(html, />[←→↺]<\/button>/);
@@ -507,7 +507,7 @@ test("assembly main view shows 3-track labels when support ds is available", () 
   assert.match(html, /辅\(flye\)/);
   assert.match(html, /ref_chr1/);
   assert.match(html, /主\(hifiasm\)/);
-  assert.match(html, /Ctrl\/Cmd 选中任意两个ctg进入subview-ctg/);
+  assert.match(html, /Ctrl\/Cmd 选择两个 ctg 进入局部视图/);
   assert.doesNotMatch(html, /Junction 检查/);
   assert.doesNotMatch(html, /subview2-a-ctg-id/);
   assert.doesNotMatch(html, /enter-subview-2/);

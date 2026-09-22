@@ -118,7 +118,7 @@ test("selectSubviewTrack creates a track-pair summary after primary and support 
     topTrack: { role: "support", source: "mirror", datasetId: 8, isMirror: true },
     bottomTrack: { role: "primary", source: "mother", datasetId: null, isMirror: false },
   });
-  assert.equal(afterSupport.message, "Subview 已进入轨道模式。");
+  assert.equal(afterSupport.message, "已进入局部视图轨道模式。");
   assert.equal(afterSupport.error, "");
 });
 
@@ -165,7 +165,7 @@ test("buildSubviewSummaryFromCandidates rejects same-dataset contigs when self a
   });
 
   assert.equal(result.ok, false);
-  assert.equal(result.error, "该数据集未包含自比对，不能在同一 ds 的 ctg 间进入 Subview。");
+  assert.equal(result.error, "该数据集未包含自比对，不能在同一 ds 的 ctg 间进入局部视图。");
 });
 
 test("buildSubviewSummaryFromCandidates allows ref plus ds candidates", () => {
@@ -227,7 +227,7 @@ test("buildSubviewSummaryFromCandidates rejects selecting the same ref member tw
   });
 
   assert.equal(result.ok, false);
-  assert.equal(result.error, "同一个 ref 片段不能同时作为 Subview 的两个成员。");
+  assert.equal(result.error, "同一个 ref 片段不能同时作为局部视图的两个成员。");
 });
 
 test("buildSubviewSummaryFromTrackSelections rejects fewer than two selections", () => {
@@ -650,7 +650,7 @@ test("swapSubviewSummaryOrder swaps track-pair summary tracks", () => {
     topTrack: { role: "support", source: "mirror", datasetId: 8, isMirror: true },
     bottomTrack: { role: "primary" },
   });
-  assert.equal(swapped.message, "Subview 已切换上下轨道顺序。");
+  assert.equal(swapped.message, "局部视图已切换上下轨道顺序。");
   assert.equal(swapped.error, "");
 });
 

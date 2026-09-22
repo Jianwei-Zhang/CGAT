@@ -235,9 +235,9 @@
 
 .subview-anchor-object {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 26px;
-  align-items: start;
-  gap: 5px;
+  grid-template-columns: 30px minmax(0, 1fr) 26px;
+  align-items: stretch;
+  gap: 6px;
   padding: 6px;
   border: 1px solid #e1e5ea;
   border-radius: 6px;
@@ -246,7 +246,6 @@
 }
 
 .subview-anchor-readonly {
-  margin: 3px 0 0 2px;
   color: #7b6a98;
   font-size: 12px;
 }
@@ -257,7 +256,7 @@
 }
 
 .subview-anchor-object.is-readonly {
-  grid-template-columns: 20px minmax(0, 1fr) 44px;
+  grid-template-columns: 30px minmax(0, 1fr) 44px;
 }
 
 .subview-anchor-object:hover,
@@ -271,8 +270,51 @@
   box-shadow: inset 3px 0 #7a1fff;
 }
 
-.subview-anchor-object input {
-  margin: 3px 0 0 2px;
+.subview-anchor-object-identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+.subview-anchor-object-identity input {
+  margin: 0;
+}
+
+.subview-anchor-object-name {
+  color: #536577;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1;
+}
+
+.subview-anchor-object-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+
+.subview-anchor-delete {
+  display: inline-grid;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0;
+  place-items: center;
+  border-color: transparent;
+  border-radius: 50%;
+  color: #758291;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.subview-anchor-delete:hover {
+  border-color: #efcaca;
+  background: #fff0f0;
+  color: #a72c2c;
 }
 
 .subview-anchor-object-main,
@@ -298,7 +340,7 @@
 }
 
 .subview-anchor-endpoints {
-  grid-template-columns: repeat(auto-fit, minmax(min(112px, 100%), 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
 }
 

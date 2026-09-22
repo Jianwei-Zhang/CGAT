@@ -19,8 +19,9 @@ export function renderGrtResultControls({
   const enabled = scope === "main" ? context.mainEnabled : context.subviewEnabled;
   const layers = scope === "main" ? context.mainLayers : context.subviewLayers;
   return `<div class="grt-result-controls" data-grt-result-controls="${escapeAttr(scope)}">
-    <label class="grt-result-switch">
-      <input type="checkbox" data-grt-result-toggle="${escapeAttr(scope)}" ${enabled ? "checked" : ""} />
+    <label class="grt-result-switch" title="${escapeAttr(i18n.grtResult.showResultHint || i18n.grtResult.showResult)}">
+      <input type="checkbox" aria-label="${escapeAttr(i18n.grtResult.showResultHint || i18n.grtResult.showResult)}"
+        data-grt-result-toggle="${escapeAttr(scope)}" ${enabled ? "checked" : ""} />
       <span>${escapeHtml(i18n.grtResult.showResult)}</span>
     </label>
     <details class="grt-result-layer-menu">

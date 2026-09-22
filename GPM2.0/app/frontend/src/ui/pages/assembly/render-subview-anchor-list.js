@@ -51,13 +51,25 @@ function sortAnchorsByDisplayPosition(objects) {
     .map((entry) => entry.object);
 }
 
+function anchorDisplayName(prefix, index) {
+  return `${prefix}${String(index + 1).padStart(2, "0")}`;
+}
+
 export function renderSubviewAnchorList(objects, ui, labels, { escapeHtml, escapeAttr }) {
   const visible = filterSubviewAnchorObjects(objects, ui.query);
+  const visibleIds = new Set(visible.map((object) => object.objectId));
   const checked = new Set(ui.checkedObjectIds);
-  const userObjects = sortAnchorsByDisplayPosition(visible.filter((object) => object.kind !== "grt"));
-  const grtObjects = visible.filter((object) => object.kind === "grt");
+  const allUserObjects = sortAnchorsByDisplayPosition(objects.filter((object) => object.kind !== "grt"));
+  const allGrtObjects = sortAnchorsByDisplayPosition(objects.filter((object) => object.kind === "grt"));
+  const displayNames = new Map([
+    ...allUserObjects.map((object, index) => [object.objectId, anchorDisplayName("A", index)]),
+    ...allGrtObjects.map((object, index) => [object.objectId, anchorDisplayName("P", index)]),
+  ]);
+  const userObjects = allUserObjects.filter((object) => visibleIds.has(object.objectId));
+  const grtObjects = allGrtObjects.filter((object) => visibleIds.has(object.objectId));
   const row = (object) => {
     const focused = ui.focusedObjectId === object.objectId;
+    const displayName = displayNames.get(object.objectId) || "";
     const type = object.kind === "manual" && object.fromGrt
       ? labels.grtCopyType
       : object.kind === "manual"
@@ -67,7 +79,7 @@ export function renderSubviewAnchorList(objects, ui, labels, { escapeHtml, escap
           ? (object.connectionKind === "gap"
               ? labels.grtGapType.replace("{size}", Number(object.gapSizeBp || 0).toLocaleString())
               : labels.grtLinkType)
-          : labels[`${object.edge}Edge`];
+          : "";
     const reason = object.reason ? labels[object.reason] : "";
     const select = object.canDelete
       ? `<input type="checkbox" data-subview-anchor-check="${escapeAttr(object.objectId)}"
@@ -83,16 +95,20 @@ export function renderSubviewAnchorList(objects, ui, labels, { escapeHtml, escap
           aria-label="${escapeAttr(labels.deleteObject)}" title="${escapeAttr(labels.deleteObject)}">×</button>`;
     return `<div class="subview-anchor-object${object.kind === "grt" ? " is-readonly" : ""}${focused ? " is-focused" : ""}"
         data-subview-anchor-list-row="${escapeAttr(object.objectId)}" tabindex="0" aria-current="${focused ? "true" : "false"}">
-      ${select}
+      <div class="subview-anchor-object-identity">
+        ${select}
+        <span class="subview-anchor-object-name"${object.kind === "grt"
+          ? ` title="${escapeAttr(labels.grtReadOnly)}"` : ""}>${escapeHtml(displayName)}</span>
+      </div>
       <div class="subview-anchor-object-main">
-        <span class="subview-anchor-object-type">${escapeHtml(type)}</span>
+        ${type ? `<span class="subview-anchor-object-type">${escapeHtml(type)}</span>` : ""}
         <span class="subview-anchor-endpoints">
           ${object.endpoints.map((endpoint) => formatEndpoint(endpoint, labels, escapeHtml, escapeAttr)).join("")
             || `<span class="muted">${escapeHtml(labels.endpointDetailsUnavailable)}</span>`}
         </span>
         ${reason ? `<span class="subview-anchor-object-reason">${escapeHtml(reason)}</span>` : ""}
       </div>
-      ${action}
+      <div class="subview-anchor-object-actions">${action}</div>
     </div>`;
   };
   const group = (title, entries, empty) => `<section class="subview-anchor-object-group">

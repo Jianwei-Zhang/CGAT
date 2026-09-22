@@ -232,7 +232,7 @@ test("buildAssemblyContextMenuItems exposes move and remove for every Subview mo
       "追加到路径",
       "移至另一轨",
       "翻转 contig",
-      "移出 Subview",
+      "移出局部视图",
     ]);
     await items[1].run();
     assert.equal(calls.at(-1).name, "moveContextSubviewMemberToOtherLane");
@@ -786,9 +786,9 @@ test("buildAssemblyContextMenuItems exposes track-pair move, flip, and remove ac
 
   assert.ok(items.some((item) => item.label === "移至另一轨"));
   assert.ok(items.some((item) => item.label === "翻转 contig"));
-  assert.ok(items.some((item) => item.label === "移出 Subview"));
+  assert.ok(items.some((item) => item.label === "移出局部视图"));
   const flipItem = items.find((item) => item.label === "翻转 contig");
-  const removeItem = items.find((item) => item.label === "移出 Subview");
+  const removeItem = items.find((item) => item.label === "移出局部视图");
   await flipItem.run();
   assert.deepEqual(calls.at(-1), {
     name: "toggleSubviewContigFlip",
@@ -857,7 +857,7 @@ test("buildAssemblyContextMenuItems does not show enter-subview-ctg when two con
     actions: createContextMenuActionsCapture(),
   });
 
-  assert.ok(items.every((item) => item.label !== "进入 Subview ctg 模式"));
+  assert.ok(items.every((item) => item.label !== "进入局部视图 · ctg"));
 });
 
 test("buildAssemblyContextMenuItems does not show track-mode Subview entry in main-view context menu", () => {
@@ -883,7 +883,7 @@ test("buildAssemblyContextMenuItems does not show track-mode Subview entry in ma
     actions: createContextMenuActionsCapture(),
   });
 
-  assert.ok(items.every((item) => item.label !== "进入 Subview 轨道模式"));
+  assert.ok(items.every((item) => item.label !== "进入局部视图 · 轨道"));
 });
 
 test("buildAssemblyContextMenuItems exposes anchor-on when a subview edge is inactive", async () => {
@@ -969,7 +969,7 @@ test("buildAssemblyContextMenuItems exposes unified fragment actions in 2-contig
     "追加到路径",
     "移至另一轨",
     "翻转 contig",
-    "移出 Subview",
+    "移出局部视图",
   ]);
 
   await items[0].run();
@@ -1236,7 +1236,7 @@ test("buildAssemblyContextMenuItems exposes fragment-local subview actions in tr
     "追加到路径",
     "移至另一轨",
     "翻转 contig",
-    "移出 Subview",
+    "移出局部视图",
   ]);
 
   await items[2].run();

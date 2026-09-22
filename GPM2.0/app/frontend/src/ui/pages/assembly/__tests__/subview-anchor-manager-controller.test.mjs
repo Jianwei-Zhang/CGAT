@@ -100,7 +100,8 @@ test("anchor manager renders active anchors and resets transient state per scope
     labels, escapeHtml: String, escapeAttr: String,
   });
   assert.match(html, /data-subview-anchor-list-row="edge:hit-1:left"/);
-  assert.match(html, /Left edge/);
+  assert.match(html, /class="subview-anchor-object-name">A01/);
+  assert.doesNotMatch(html, /Left edge|Right edge/);
   assert.match(html, /Primary \(hifiasm\)/);
   assert.match(html, /Support \(flye\)/);
   assert.equal(f.controller.renderContent({

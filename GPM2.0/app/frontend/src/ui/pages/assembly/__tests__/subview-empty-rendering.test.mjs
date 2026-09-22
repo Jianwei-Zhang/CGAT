@@ -4,7 +4,7 @@ import { applySubviewComposition, removeSubviewCompositionMembers } from "../sub
 function assertEmptyPanel(state) {
   const html = renderAssemblyPage(state);
   assert.match(html, /data-subview-panel="1"/);
-  assert.match(html, /<h4>Subview<\/h4>/);
+  assert.match(html, /<h4>局部视图<\/h4>/);
   assert.match(html, /subview-panel-guide/);
   assert.match(html, /data-subview-tools-toggle/);
   assert.doesNotMatch(html, /subview-alignment-card|subview-track-layout|subview-track-svg|subview-track-min-tick-unit-kb/);

@@ -1377,7 +1377,7 @@ export function buildSubviewSummaryFromCandidates({
     && selections[1].role === "ref"
     && Number(selections[0].contigId) === Number(selections[1].contigId)
   ) {
-    return { ok: false, error: "同一个 ref 片段不能同时作为 Subview 的两个成员。" };
+    return { ok: false, error: "同一个 ref 片段不能同时作为局部视图的两个成员。" };
   }
   const leftDatasetId = resolveSubviewCandidateDatasetId(selections[0], left, {
     primaryDatasetId,

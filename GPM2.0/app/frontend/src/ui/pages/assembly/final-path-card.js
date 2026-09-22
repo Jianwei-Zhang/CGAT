@@ -1752,15 +1752,18 @@ export function renderFinalPathCard(
     && grtBaselineRestore?.available === true
     && normalizeString(grtBaselineRestore?.targetChrName) === normalizeString(singleEntry.chrName);
   const restoreGrtBaselineDisabled = grtBaselineRestore?.current === true;
+  const restoreGrtBaselineHint = restoreGrtBaselineDisabled
+    ? (labels.finalPathRestoreGrtBaselineCurrent || "Already using the precomputed path")
+    : (labels.finalPathRestoreGrtBaselineHint || "Restore the path precomputed by the GRT algorithm");
   const restoreAction = canRestoreGrtBaseline
     ? `<button
         type="button"
         class="button ghost tiny final-path-restore-grt-baseline"
         data-final-path-restore-grt-baseline="${escapeAttr(singleEntry.chrName)}"
-        aria-label="${escapeAttr(restoreGrtBaselineDisabled ? (labels.finalPathRestoreGrtBaselineCurrent || "Already at GRT baseline") : (labels.finalPathRestoreGrtBaseline || "Restore GRT baseline"))}"
-        title="${escapeAttr(restoreGrtBaselineDisabled ? (labels.finalPathRestoreGrtBaselineCurrent || "Already at GRT baseline") : (labels.finalPathRestoreGrtBaseline || "Restore GRT baseline"))}"
+        aria-label="${escapeAttr(restoreGrtBaselineHint)}"
+        title="${escapeAttr(restoreGrtBaselineHint)}"
         ${restoreGrtBaselineDisabled ? "disabled" : ""}
-      >${escapeHtml(labels.finalPathRestoreGrtBaseline || "Restore GRT baseline")}</button>`
+      >${escapeHtml(labels.finalPathRestoreGrtBaseline || "↺ Precomputed path")}</button>`
     : "";
   const headControls = normalizedViewMode === "graph"
     ? renderFinalPathHeadControls({

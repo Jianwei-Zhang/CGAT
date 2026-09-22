@@ -44,10 +44,10 @@ test("subview panel renders chart sub-card with parameter labels after entering"
     }),
   );
 
-  assert.match(html, /<h4>Subview<\/h4>/);
+  assert.match(html, /<h4>局部视图<\/h4>/);
   assert.match(
     html,
-    /Ctrl\/Cmd 选中任意两个ctg进入subview-ctg；也支持点击任意两个轨道名进入subview-track。/,
+    /Ctrl\/Cmd 选择两个 ctg 进入局部视图；也可选择两个轨道进入轨道模式。/,
   );
   assert.match(html, /support-ctg \(\+\) vs ctg-alpha \(\+\)/);
   assert.match(html, /data-subview-remove-type="candidate"/);
@@ -1235,7 +1235,7 @@ test("context menu on blank area exposes batch subview delete for box-selected t
   });
 
   assert.ok(
-    items.some((item) => item.label === "移出 Subview（已选 2）"),
+    items.some((item) => item.label === "移出局部视图（已选 2）"),
   );
 });
 

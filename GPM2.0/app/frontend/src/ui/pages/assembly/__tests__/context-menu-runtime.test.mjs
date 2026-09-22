@@ -667,6 +667,6 @@ test("bindAssemblyContextMenu renders track-pair fragment local actions", () => 
 
   assert.match(menuState.innerHTML, /追加到路径/);
   assert.match(menuState.innerHTML, /翻转 contig/);
-  assert.match(menuState.innerHTML, /移出 Subview/);
+  assert.match(menuState.innerHTML, /移出局部视图/);
   assert.doesNotMatch(menuState.innerHTML, /进入 Ctg30 菜单/);
 });

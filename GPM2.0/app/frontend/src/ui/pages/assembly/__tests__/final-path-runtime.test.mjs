@@ -1620,7 +1620,7 @@ test("restoreFinalPathFromGrtBaseline replaces only the current chromosome and p
   assert.equal(confirms.length, 1);
   assert.match(confirms[0], /Chr01/);
   assert.equal(store.getState().assembly.actionError, "");
-  assert.match(store.getState().assembly.actionStatus, /GRT/);
+  assert.match(store.getState().assembly.actionStatus, /预计算路径/);
   assert.equal(result.q4Sha256, baselineEntry.q4Sha256);
   assert.deepEqual(
     store.getState().assembly.grtResultDisplayByChr.Chr01,

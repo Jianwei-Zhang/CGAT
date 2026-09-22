@@ -531,7 +531,7 @@ test("subview track-pair skips same-contig hits and shows the skipped hint", () 
     }),
   );
 
-  assert.match(html, /<h4>Subview <span class="subview-same-contig-warning">同一 ctg 的比对已跳过，因此没有比对结果<\/span><\/h4>/);
+  assert.match(html, /<h4>局部视图 <span class="subview-same-contig-warning">同一 ctg 的比对已跳过，因此没有比对结果<\/span><\/h4>/);
   const subviewSvgMatch = html.match(/<svg class="assembly-track-svg subview-track-svg"[\s\S]*?<\/svg>/);
   assert.ok(subviewSvgMatch, "expected subview track-pair svg");
   const bandMatches = subviewSvgMatch[0].match(/<polygon class="track-collinearity-band[^"]*" points="[^"]+"/g) || [];
@@ -1019,7 +1019,7 @@ test("track-driven subview selection enters Subview-ctg immediately after select
   assert.equal(subview.summary?.mode, "2-contig");
   assert.equal(subview.summary?.top?.contigId, 30);
   assert.equal(subview.summary?.bottom?.contigId, 8);
-  assert.equal(subview.message, "Subview 已进入。");
+  assert.equal(subview.message, "已进入局部视图。");
   assert.equal(subview.error, "");
 });
 
@@ -1134,7 +1134,7 @@ test("track-driven subview selection blocks same-ds contigs when self alignment 
 
   const subview = store.getState().assembly.subview;
   assert.equal(subview.summary, null);
-  assert.equal(subview.error, "该数据集未包含自比对，不能在同一 ds 的 ctg 间进入 Subview。");
+  assert.equal(subview.error, "该数据集未包含自比对，不能在同一 ds 的 ctg 间进入局部视图。");
 });
 
 test("track-driven subview selection blocks primary-phased and phased-phased same-ds contigs when self alignment is unavailable", () => {
@@ -1220,7 +1220,7 @@ test("track-driven subview selection blocks primary-phased and phased-phased sam
       expectedSelections,
     );
     assert.equal(subview.summary, null);
-    assert.equal(subview.error, "该数据集未包含自比对，不能在同一 ds 的 ctg 间进入 Subview。");
+    assert.equal(subview.error, "该数据集未包含自比对，不能在同一 ds 的 ctg 间进入局部视图。");
   }
 });
 
@@ -1254,7 +1254,7 @@ test("buildSubviewSummaryFromTrackSelections blocks same primary-dataset phased 
     });
 
     assert.equal(result.ok, false);
-    assert.equal(result.error, "该数据集未包含自比对，不能在同一 ds 的 ctg 间进入 Subview。");
+    assert.equal(result.error, "该数据集未包含自比对，不能在同一 ds 的 ctg 间进入局部视图。");
   }
 });
 
@@ -1347,7 +1347,7 @@ test("track-driven Subview selection replaces a complete pair after two new Ctrl
   assert.equal(subview.summary?.mode, "2-contig");
   assert.equal(subview.summary?.top?.contigId, 30);
   assert.equal(subview.summary?.bottom?.contigId, 31);
-  assert.equal(subview.message, "Subview 已进入。");
+  assert.equal(subview.message, "已进入局部视图。");
   assert.equal(subview.error, "");
 });
 

@@ -54,8 +54,9 @@ function createI18n() {
       finalPathLogSupportTitle: "辅 ds ctg 使用情况",
       finalPathLogOtherChrTitle: "重复主 ds ctg 使用情况",
       finalPathLogNoRows: "暂无记录",
-      finalPathRestoreGrtBaseline: "↺ 恢复 GRT 基线",
-      finalPathRestoreGrtBaselineCurrent: "当前已是 GRT 基线",
+      finalPathRestoreGrtBaseline: "↺ 预计算路径",
+      finalPathRestoreGrtBaselineHint: "恢复为 GRT 算法生成的预计算路径",
+      finalPathRestoreGrtBaselineCurrent: "当前已是 GRT 算法生成的预计算路径",
     },
     trackControls: {
       minTickUnitKb: "最小刻度单位(kb)",
@@ -382,14 +383,15 @@ test("renderFinalPathCard exposes GRT baseline restore only for the current sing
     { ...deps, i18n },
   );
   assert.match(availableHtml, /data-final-path-restore-grt-baseline="Chr01"/);
-  assert.match(availableHtml, /↺ 恢复 GRT 基线/);
+  assert.match(availableHtml, /↺ 预计算路径/);
+  assert.match(availableHtml, /title="恢复为 GRT 算法生成的预计算路径"/);
 
   const currentHtml = renderFinalPathCard(
     { ...base, grtBaselineRestore: { available: true, targetChrName: "Chr01", current: true } },
     { ...deps, i18n },
   );
   assert.match(currentHtml, /data-final-path-restore-grt-baseline="Chr01"[^>]*disabled/);
-  assert.match(currentHtml, /当前已是 GRT 基线/);
+  assert.match(currentHtml, /title="当前已是 GRT 算法生成的预计算路径"/);
 
   const allHtml = renderFinalPathCard(
     {
