@@ -149,7 +149,7 @@ where
         let tx = copied_conn
             .transaction()
             .context("failed to start copied project rename transaction")?;
-        rebase_workspace_paths(&tx, source_root, &target_root)?;
+        rebase_workspace_paths(&tx, source_root, target_root)?;
         for (index, (project_id, source_project_name)) in projects.iter().enumerate() {
             let copied_name = if index == 0 {
                 project_name.trim().to_string()
@@ -178,7 +178,7 @@ where
     })();
 
     if let Err(error) = copy_result {
-        let _ = fs::remove_dir_all(&target_root);
+        let _ = fs::remove_dir_all(target_root);
         return Err(error);
     }
 
