@@ -1641,5 +1641,5 @@ test("buildAssemblyContextMenuItems renders english labels when locale is en", (
     actions: createContextMenuActionsCapture([]),
   });
   assert.ok(subviewItems.some((item) => item.label === "Move to Other Track"));
-  assert.ok(subviewItems.some((item) => item.label === "Remove from Subview"));
+  assert.ok(subviewItems.some((item) => item.label === "Remove from Local View"));
 });

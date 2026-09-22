@@ -676,7 +676,7 @@ test("subview state helpers return english status copy when locale is en", () =>
     isMirror: true,
     stateOrLocale: "en",
   });
-  assert.equal(entered.message, "Entered track subview mode.");
+  assert.equal(entered.message, "Entered Local View track mode.");
 
   const swapped = swapSubviewSummaryOrder({
     subview: createSubview({
@@ -688,7 +688,7 @@ test("subview state helpers return english status copy when locale is en", () =>
     }),
     stateOrLocale: "en",
   });
-  assert.equal(swapped.message, "Swapped the subview track order.");
+  assert.equal(swapped.message, "Swapped the Local View track order.");
 });
 
 test("getSubviewState normalizes legacy track selection fields", () => {

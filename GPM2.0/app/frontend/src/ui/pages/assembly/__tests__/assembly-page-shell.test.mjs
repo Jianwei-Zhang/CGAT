@@ -141,8 +141,8 @@ test("assembly tab renders english labels when locale is en", () => {
   assert.doesNotMatch(html, /data-tab="about"/);
   assert.match(html, /Chromosome Chr01/);
   assert.doesNotMatch(html, />Download</);
-  assert.match(html, />Primary Alignment View/);
-  assert.match(html, /aria-label="Primary Alignment View Controls"/);
+  assert.match(html, /class="assembly-view-title" data-main-track-control-title>Main View</);
+  assert.match(html, /aria-label="Main View Controls"/);
   assert.match(html, />Support Dataset</);
   assert.match(html, />Min Tick Unit \(kb\)</);
   assert.match(html, />Max Visible Count</);

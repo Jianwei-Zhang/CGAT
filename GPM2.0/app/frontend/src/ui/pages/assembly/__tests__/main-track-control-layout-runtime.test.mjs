@@ -206,12 +206,14 @@ test("main-track markup and CSS expose content-driven layouts without header med
 
   assert.match(html, /data-main-track-control-layout="auto"/);
   assert.match(html, /data-main-track-control-title/);
+  assert.match(html, /class="assembly-view-title" data-main-track-control-title/);
   assert.match(html, /data-main-track-control-actions/);
   assert.match(html, /data-main-track-quick-actions/);
   assert.match(html, /data-main-track-inline-controls/);
   assert.match(css, /data-main-track-control-layout="single"/);
   assert.match(css, /data-main-track-control-layout="split"/);
   assert.match(css, /data-main-track-control-layout="stacked"/);
+  assert.match(css, /\.assembly-view-title\s*\{[^}]*font-size:\s*16px;[^}]*font-weight:\s*700;/);
   assert.match(
     css,
     /data-main-track-control-layout="stacked"[^}]*\.assembly-track-panel-actions\s*\{[^}]*flex-direction:\s*row;[^}]*flex-wrap:\s*wrap;/,

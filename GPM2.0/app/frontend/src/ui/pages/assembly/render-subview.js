@@ -843,7 +843,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
     <article class="card subview-selection-panel" data-subview-panel="1">
       <div class="subview-panel-head">
         <div class="subview-panel-title-row" data-grt-result-card="subview">
-          <h4>${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
+          <h4 class="assembly-view-title">${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
           ${renderSubviewToolsToggle(i18n.subview.tools, { escapeHtml, escapeAttr })}
           <p class="muted subview-panel-guide">${escapeHtml(i18n.subview.guide)}</p>
           ${allBadges ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}

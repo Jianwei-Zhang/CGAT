@@ -44,7 +44,7 @@ test("subview panel renders chart sub-card with parameter labels after entering"
     }),
   );
 
-  assert.match(html, /<h4>局部视图<\/h4>/);
+  assert.match(html, /<h4 class="assembly-view-title">局部视图<\/h4>/);
   assert.match(
     html,
     /Ctrl\/Cmd 选择两个 ctg 进入局部视图；也可选择两个轨道进入轨道模式。/,

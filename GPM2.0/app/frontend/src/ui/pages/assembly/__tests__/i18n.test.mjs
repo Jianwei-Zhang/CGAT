@@ -24,6 +24,10 @@ test("getAssemblyI18n returns english page copy when locale is en", () => {
   assert.equal(i18n.degap.jobsTitle, "Jobs");
   assert.equal(i18n.degap.validation.jobOutRequired, "Job --out is required.");
   assert.equal(i18n.contextMenu.addToPhasedTrack, "Add to track {key}");
+  assert.equal(i18n.page.primaryAlignmentViewSingleCardTitle, "Main View");
+  assert.equal(i18n.subview.panelTitle, "Local View");
+  assert.equal(i18n.subview.tools.title, "Local View Tools");
+  assert.equal(i18n.contextMenu.enterTrackSubview, "Enter Local View · Track");
   assert.equal(i18n.subview.historyRestoreRollbackUnavailableLabel, "No rollback to undo");
   assert.equal(i18n.runtime.addSeqTargetMissing, undefined);
   assert.equal(i18n.memberEditor, undefined);

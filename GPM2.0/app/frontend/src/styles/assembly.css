@@ -238,6 +238,14 @@
   flex-wrap: wrap;
 }
 
+.assembly-view-title {
+  margin: 0;
+  color: #222;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .assembly-track-panel-head[data-main-track-control-layout] {
   min-width: 0;
 }

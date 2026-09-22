@@ -531,7 +531,7 @@ test("subview track-pair skips same-contig hits and shows the skipped hint", () 
     }),
   );
 
-  assert.match(html, /<h4>局部视图 <span class="subview-same-contig-warning">同一 ctg 的比对已跳过，因此没有比对结果<\/span><\/h4>/);
+  assert.match(html, /<h4 class="assembly-view-title">局部视图 <span class="subview-same-contig-warning">同一 ctg 的比对已跳过，因此没有比对结果<\/span><\/h4>/);
   const subviewSvgMatch = html.match(/<svg class="assembly-track-svg subview-track-svg"[\s\S]*?<\/svg>/);
   assert.ok(subviewSvgMatch, "expected subview track-pair svg");
   const bandMatches = subviewSvgMatch[0].match(/<polygon class="track-collinearity-band[^"]*" points="[^"]+"/g) || [];

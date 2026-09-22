@@ -2479,7 +2479,7 @@ function renderAssemblyTracks({
   return `
     <div class="assembly-track-unified assembly-track-panel" data-show-telomeres="${trackPrefs.showTelomeres ? "true" : "false"}" data-show-centromeres="${trackPrefs.showCentromeres ? "true" : "false"}">
       <div class="assembly-track-panel-head" data-main-track-control-layout="auto" data-grt-result-card="main" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
-        <strong data-main-track-control-title>${escapeHtml(i18n.page.primaryAlignmentViewSingleCardTitle)}</strong>
+        <strong class="assembly-view-title" data-main-track-control-title>${escapeHtml(i18n.page.primaryAlignmentViewSingleCardTitle)}</strong>
         <div class="assembly-track-panel-actions" data-main-track-control-actions>
           <div class="assembly-track-panel-quick-actions" data-main-track-quick-actions>${grtResultControls}${createPhasedTrackButton}</div>
           ${inlineControls}
