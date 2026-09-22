@@ -48,16 +48,33 @@ async function deleteWorkspaceDirectoryMock({ workspaceRoot }) {
   };
 }
 
-async function copyProjectWorkspaceMock({ workspaceRoot }) {
-  await sleep(120);
+async function getProjectCopyDefaultsMock({ workspaceRoot, projectName = "" }) {
   const normalized = String(workspaceRoot || "").replace(/[\\/]+$/, "");
   const sourceName = normalized.split(/[\\/]+/).filter(Boolean).at(-1) || "Project";
   return {
-    workspaceRoot: `${normalized}-copy1`,
-    projectName: `${sourceName}-copy1`,
+    targetRoot: `${normalized}-copy1`,
+    projectName: `${String(projectName || sourceName)}-copy1`,
     copyIndex: 1,
+  };
+}
+
+async function copyProjectWorkspaceMock({ targetRoot, projectName, onProgress }) {
+  const totalBytes = 8 * 1024 * 1024;
+  onProgress?.({ stage: "scanning", completedBytes: 0, totalBytes: 0, completedFiles: 0, totalFiles: 0, cancellable: true });
+  await sleep(60);
+  onProgress?.({ stage: "copying", detail: "project.sqlite", completedBytes: totalBytes / 2, totalBytes, completedFiles: 1, totalFiles: 2, cancellable: true });
+  await sleep(60);
+  onProgress?.({ stage: "complete", completedBytes: totalBytes, totalBytes, completedFiles: 2, totalFiles: 2, cancellable: false });
+  return {
+    workspaceRoot: targetRoot,
+    projectName,
+    copyIndex: 0,
     projectCount: 1,
   };
+}
+
+async function requestProjectCopyCancelMock({ runId }) {
+  return { runId, cancelRequested: Boolean(String(runId || "").trim()) };
 }
 
 async function listProjectInitializerOptionsMock({ workspaceRoot }) {
@@ -447,7 +464,9 @@ async function listNewSequencesMock({ limit }) {
     importAddCtgPackage: importAddCtgPackageMock,
     validateWorkspaceIntegrity: validateWorkspaceIntegrityMock,
     deleteWorkspaceDirectory: deleteWorkspaceDirectoryMock,
+    getProjectCopyDefaults: getProjectCopyDefaultsMock,
     copyProjectWorkspace: copyProjectWorkspaceMock,
+    requestProjectCopyCancel: requestProjectCopyCancelMock,
     listProjectInitializerOptions: listProjectInitializerOptionsMock,
     initializeProject: initializeProjectMock,
     getGrtProjectView: buildMockGrtProjectView,

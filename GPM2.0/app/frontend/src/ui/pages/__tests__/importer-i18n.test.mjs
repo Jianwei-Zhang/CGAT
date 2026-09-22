@@ -223,10 +223,10 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.runtime.deleteDoneFailedHistorySummary, "Removed {count} projects that failed validation from the library.");
 });
 
-test("project copy action creates a sibling copy and appends it to the library", async () => {
+test("project copy action opens an editable dialog with backend defaults", async () => {
   const previousWindow = globalThis.window;
   const previousDocument = globalThis.document;
-  let history = [{ path: "D:/projects/rice", projectName: "Rice", lastUsedAt: 1 }];
+  const history = [{ path: "D:/projects/rice", projectName: "Rice", lastUsedAt: 1 }];
   const calls = [];
   const copyButton = createButton();
   copyButton.dataset.projectCopy = "D:/projects/rice";
@@ -245,7 +245,7 @@ test("project copy action creates a sibling copy and appends it to the library",
     globalThis.window = {
       localStorage: {
         getItem: () => JSON.stringify(history),
-        setItem(_key, value) { history = JSON.parse(value); },
+        setItem() {},
       },
       dispatchEvent() {},
       setTimeout: () => 1,
@@ -255,10 +255,9 @@ test("project copy action creates a sibling copy and appends it to the library",
           async invoke(command, args) {
             calls.push({ command, args });
             return {
-              workspaceRoot: "D:/projects/rice-copy1",
+              targetRoot: "D:/projects/rice-copy1",
               projectName: "Rice-copy1",
               copyIndex: 1,
-              projectCount: 1,
             };
           },
         },
@@ -269,16 +268,25 @@ test("project copy action creates a sibling copy and appends it to the library",
     await copyButton.click();
 
     assert.deepEqual(calls, [{
-      command: "copy_project_workspace",
+      command: "get_project_copy_defaults",
       args: { workspaceRoot: "D:/projects/rice" },
     }]);
-    assert.deepEqual(history.map(record => [record.path, record.projectName]), [
-      ["D:/projects/rice", "Rice"],
-      ["D:/projects/rice-copy1", "Rice-copy1"],
-    ]);
     assert.equal(store.getState().session.workspacePath, "D:/projects/rice");
-    assert.equal(store.getState().importer.status, "项目复制完成");
-    assert.match(store.getState().importer.summary, /Rice-copy1/);
+    assert.deepEqual(store.getState().importer.copyDialog, {
+      open: true,
+      loading: false,
+      phase: "configure",
+      requestId: store.getState().importer.copyDialog.requestId,
+      sourceRoot: "D:/projects/rice",
+      sourceName: "Rice",
+      projectName: "Rice-copy1",
+      targetRoot: "D:/projects/rice-copy1",
+      error: "",
+    });
+    const html = renderImporterPage(store.getState());
+    assert.match(html, /id="project-copy-name" value="Rice-copy1"/);
+    assert.match(html, /id="project-copy-path" value="D:\/projects\/rice-copy1"/);
+    assert.match(html, /开始复制/);
   } finally {
     globalThis.window = previousWindow;
     globalThis.document = previousDocument;

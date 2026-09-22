@@ -9,7 +9,9 @@ const {
   listProjectInitializerOptions: listProjectInitializerOptionsMock,
   validateWorkspaceIntegrity: validateWorkspaceIntegrityMock,
   deleteWorkspaceDirectory: deleteWorkspaceDirectoryMock,
+  getProjectCopyDefaults: getProjectCopyDefaultsMock,
   copyProjectWorkspace: copyProjectWorkspaceMock,
+  requestProjectCopyCancel: requestProjectCopyCancelMock,
   initializeProject: initializeProjectMock,
   getGrtProjectView: buildMockGrtProjectView,
   deleteProject: deleteProjectMock,
@@ -27,7 +29,9 @@ const {
   openWorkspace: openWorkspaceTauri,
   validateWorkspaceIntegrity: validateWorkspaceIntegrityTauri,
   deleteWorkspaceDirectory: deleteWorkspaceDirectoryTauri,
+  getProjectCopyDefaults: getProjectCopyDefaultsTauri,
   copyProjectWorkspace: copyProjectWorkspaceTauri,
+  requestProjectCopyCancel: requestProjectCopyCancelTauri,
   initializeProject: initializeProjectTauri,
   deleteProject: deleteProjectTauri,
   updateProject: updateProjectTauri,
@@ -99,19 +103,36 @@ export async function deleteWorkspaceDirectory({ workspaceRoot }) {
   return deleteWorkspaceDirectoryMock({ workspaceRoot });
 }
 
-export async function copyProjectWorkspace({ workspaceRoot }) {
+export async function getProjectCopyDefaults({ workspaceRoot, projectName = "" }) {
+  if (isTauriRuntime()) return getProjectCopyDefaultsTauri({ workspaceRoot });
+  try {
+    return await callDevBridge("/api/get-project-copy-defaults", { workspaceRoot });
+  } catch (error) {
+    if (error?.source === "dev-bridge") throw error;
+  }
+  return getProjectCopyDefaultsMock({ workspaceRoot, projectName });
+}
+
+export async function copyProjectWorkspace({ workspaceRoot, targetRoot, projectName, runId = "", onProgress }) {
   if (isTauriRuntime()) {
-    return copyProjectWorkspaceTauri({ workspaceRoot });
+    return copyProjectWorkspaceTauri({ workspaceRoot, targetRoot, projectName, runId, onProgress });
   }
   try {
     return await callDevBridge("/api/copy-project-workspace", {
       workspaceRoot,
+      targetRoot,
+      projectName,
     });
   } catch (error) {
     if (error?.source === "dev-bridge") throw error;
     // Offline browser preview has no bridge.
   }
-  return copyProjectWorkspaceMock({ workspaceRoot });
+  return copyProjectWorkspaceMock({ workspaceRoot, targetRoot, projectName, runId, onProgress });
+}
+
+export async function requestProjectCopyCancel({ runId }) {
+  if (isTauriRuntime()) return requestProjectCopyCancelTauri({ runId });
+  return requestProjectCopyCancelMock({ runId });
 }
 
 export async function initializeProject({

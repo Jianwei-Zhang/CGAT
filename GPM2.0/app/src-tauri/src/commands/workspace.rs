@@ -179,21 +179,93 @@ pub fn delete_workspace_directory(workspaceRoot: String) -> CommandResult<Value>
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub async fn copy_project_workspace(workspaceRoot: String) -> CommandResult<Value> {
+pub fn get_project_copy_defaults(workspaceRoot: String) -> CommandResult<Value> {
+    (|| {
+        let defaults = backend_get_project_copy_defaults(Path::new(&workspaceRoot))?;
+        Ok(json!({
+            "targetRoot": path_to_string(&defaults.target_root),
+            "projectName": defaults.project_name,
+            "copyIndex": defaults.copy_index
+        }))
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+pub async fn copy_project_workspace(
+    app: AppHandle,
+    request: CopyProjectWorkspaceCommandRequest,
+) -> CommandResult<Value> {
+    let CopyProjectWorkspaceCommandRequest {
+        workspace_root,
+        target_root,
+        project_name,
+        run_id,
+    } = request;
+    let run_id = normalize_optional_run_id(run_id);
     tauri::async_runtime::spawn_blocking(move || {
-        (|| {
-            let copied = backend_copy_project_workspace(Path::new(&workspaceRoot))?;
-            Ok(json!({
-                "workspaceRoot": path_to_string(&copied.workspace_root),
-                "projectName": copied.project_name,
-                "copyIndex": copied.copy_index,
-                "projectCount": copied.project_count
-            }))
-        })()
-        .map_err(format_error)
+        let progress_run_id = run_id.clone();
+        let app_for_progress = app.clone();
+        let cancel_run_id = run_id.clone();
+        let mut on_progress = move |progress: ProjectCopyProgress| {
+            let Some(run_id) = progress_run_id.as_deref() else {
+                return;
+            };
+            let _ = app_for_progress.emit(
+                "gpm-next://project-copy-progress",
+                json!({
+                    "runId": run_id,
+                    "stage": progress.stage,
+                    "detail": progress.detail,
+                    "completedBytes": progress.completed_bytes,
+                    "totalBytes": progress.total_bytes,
+                    "completedFiles": progress.completed_files,
+                    "totalFiles": progress.total_files,
+                    "cancellable": progress.cancellable
+                }),
+            );
+        };
+        let mut should_cancel = move || {
+            cancel_run_id
+                .as_deref()
+                .is_some_and(project_copy_cancel::is_cancelled)
+        };
+        let result = backend_copy_project_workspace(
+            Path::new(&workspace_root),
+            Path::new(&target_root),
+            &project_name,
+            &mut on_progress,
+            &mut should_cancel,
+        );
+        if let Some(run_id) = run_id.as_deref() {
+            let _ = project_copy_cancel::clear_cancel(run_id);
+        }
+        result
+            .map(|copied| {
+                json!({
+                    "workspaceRoot": path_to_string(&copied.workspace_root),
+                    "projectName": copied.project_name,
+                    "copyIndex": copied.copy_index,
+                    "projectCount": copied.project_count
+                })
+            })
+            .map_err(format_error)
     })
     .await
     .map_err(|error| format!("failed to join copy_project_workspace task: {error}"))?
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn request_project_copy_cancel(runId: String) -> CommandResult<Value> {
+    let run_id = runId.trim().to_string();
+    let cancel_requested = !run_id.is_empty();
+    let newly_registered = project_copy_cancel::request_cancel(&run_id);
+    Ok(json!({
+        "runId": run_id,
+        "cancelRequested": cancel_requested,
+        "newlyRegistered": newly_registered
+    }))
 }
 
 #[tauri::command]

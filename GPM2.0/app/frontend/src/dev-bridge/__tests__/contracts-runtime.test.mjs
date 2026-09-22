@@ -136,11 +136,21 @@ test("operation factory exposes every registered operation and maps exact CLI co
           stderr: "",
         };
       }
+      if (args[0] === "get-project-copy-defaults") {
+        return {
+          stdout: [
+            "workspace_root=D:/projects/rice-copy2",
+            "project_name=Rice-copy2",
+            "copy_index=2",
+          ].join("\n"),
+          stderr: "",
+        };
+      }
       throw new Error(`unexpected operation ${args[0]}`);
     },
   });
 
-  assert.equal(Object.keys(handlers).length, 45);
+  assert.equal(Object.keys(handlers).length, 46);
   assert.equal(typeof handlers.listProjectCatalog, "function");
   assert.equal(typeof handlers.updateProjectCatalog, "function");
   const sequences = await handlers.listNewSequences({
@@ -149,12 +159,25 @@ test("operation factory exposes every registered operation and maps exact CLI co
     limit: 1,
   });
   const settings = await handlers.getRuntimeSettings({ workspaceRoot: "D:/workspace" });
-  const copied = await handlers.copyProjectWorkspace({ workspaceRoot: "D:/projects/rice" });
+  const defaults = await handlers.getProjectCopyDefaults({ workspaceRoot: "D:/projects/rice" });
+  const copied = await handlers.copyProjectWorkspace({
+    workspaceRoot: "D:/projects/rice",
+    targetRoot: "D:/archives/rice-v2",
+    projectName: "Rice v2",
+  });
 
   assert.deepEqual(calls, [
     ["list-new-sequences", "D:/workspace", "7"],
     ["get-runtime-settings", "D:/workspace"],
-    ["copy-project-workspace", "D:/projects/rice"],
+    ["get-project-copy-defaults", "D:/projects/rice"],
+    [
+      "copy-project-workspace",
+      "D:/projects/rice",
+      "--target-root",
+      "D:/archives/rice-v2",
+      "--project-name",
+      "Rice v2",
+    ],
   ]);
   assert.deepEqual(sequences, {
     items: [{
@@ -169,6 +192,11 @@ test("operation factory exposes every registered operation and maps exact CLI co
     updatedAt: "2026-08-09T10:00:00Z",
     degapWorkspaceSettings: { threads: 8 },
     source: "workspace_db",
+  });
+  assert.deepEqual(defaults, {
+    targetRoot: "D:/projects/rice-copy2",
+    projectName: "Rice-copy2",
+    copyIndex: 2,
   });
   assert.deepEqual(copied, {
     workspaceRoot: "D:/projects/rice-copy2",

@@ -1,6 +1,6 @@
 use std::ffi::OsString;
-use std::fs;
-use std::io::ErrorKind;
+use std::fs::{self, File, OpenOptions};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
@@ -30,9 +30,186 @@ pub struct CopiedProjectWorkspace {
     pub project_count: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectCopyDefaults {
+    pub project_name: String,
+    pub target_root: PathBuf,
+    pub copy_index: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectCopyProgress {
+    pub stage: &'static str,
+    pub detail: String,
+    pub completed_bytes: u64,
+    pub total_bytes: u64,
+    pub completed_files: u64,
+    pub total_files: u64,
+    pub cancellable: bool,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+struct ProjectCopyStats {
+    bytes: u64,
+    files: u64,
+}
+
+const COPY_PROGRESS_BYTE_STEP: u64 = 8 * 1024 * 1024;
+
+pub fn get_project_copy_defaults(source_root: &Path) -> Result<ProjectCopyDefaults> {
+    validate_project_copy_source(source_root)?;
+    let projects = read_source_projects(source_root)?;
+    let (target_root, copy_index) = next_copy_target(source_root)?;
+    Ok(ProjectCopyDefaults {
+        project_name: format!("{}-copy{copy_index}", projects[0].1),
+        target_root,
+        copy_index,
+    })
+}
+
 /// Copy a complete project workspace beside its source as `<directory>-copyN`.
 /// Every project name in the copied database receives the same suffix.
 pub fn copy_project_workspace(source_root: &Path) -> Result<CopiedProjectWorkspace> {
+    let defaults = get_project_copy_defaults(source_root)?;
+    let mut copied = copy_project_workspace_to_with_hooks(
+        source_root,
+        &defaults.target_root,
+        &defaults.project_name,
+        &mut |_| {},
+        &mut || false,
+    )?;
+    copied.copy_index = defaults.copy_index;
+    Ok(copied)
+}
+
+pub fn copy_project_workspace_to_with_hooks<P, C>(
+    source_root: &Path,
+    target_root: &Path,
+    project_name: &str,
+    on_progress: &mut P,
+    should_cancel: &mut C,
+) -> Result<CopiedProjectWorkspace>
+where
+    P: FnMut(ProjectCopyProgress),
+    C: FnMut() -> bool,
+{
+    emit_copy_progress(
+        on_progress,
+        "validating",
+        "",
+        ProjectCopyStats::default(),
+        ProjectCopyStats::default(),
+        true,
+    );
+    validate_project_copy_source(source_root)?;
+    validate_project_copy_target(source_root, target_root, project_name)?;
+    ensure_copy_not_cancelled(should_cancel)?;
+
+    let source_db = source_root.join("project.sqlite");
+    let projects = read_source_projects(source_root)?;
+    let conn = open_workspace_db(&source_db)?;
+    conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+        .context("failed to checkpoint source project database")?;
+    drop(conn);
+
+    emit_copy_progress(
+        on_progress,
+        "scanning",
+        "",
+        ProjectCopyStats::default(),
+        ProjectCopyStats::default(),
+        true,
+    );
+    let totals = scan_directory_contents(source_root, should_cancel)?;
+    ensure_copy_not_cancelled(should_cancel)?;
+    fs::create_dir(target_root).with_context(|| {
+        format!(
+            "failed to create copied workspace {}",
+            target_root.display()
+        )
+    })?;
+    let copy_result = (|| {
+        let mut completed = ProjectCopyStats::default();
+        let mut last_reported_bytes = 0_u64;
+        copy_directory_contents_with_hooks(
+            source_root,
+            target_root,
+            source_root,
+            target_root,
+            totals,
+            &mut completed,
+            &mut last_reported_bytes,
+            on_progress,
+            should_cancel,
+        )?;
+        ensure_copy_not_cancelled(should_cancel)?;
+        emit_copy_progress(on_progress, "finalizing", "", completed, totals, false);
+        let target_db = target_root.join("project.sqlite");
+        let mut copied_conn = open_workspace_db(&target_db)?;
+        let tx = copied_conn
+            .transaction()
+            .context("failed to start copied project rename transaction")?;
+        rebase_workspace_paths(&tx, source_root, &target_root)?;
+        for (index, (project_id, source_project_name)) in projects.iter().enumerate() {
+            let copied_name = if index == 0 {
+                project_name.trim().to_string()
+            } else {
+                format!("{source_project_name}-copy")
+            };
+            let changed = tx.execute(
+                "UPDATE project SET name = ?1 WHERE id = ?2",
+                params![copied_name, project_id],
+            )?;
+            if changed != 1 {
+                bail!("failed to rename copied project id {project_id}");
+            }
+        }
+        tx.commit()
+            .context("failed to commit copied project names")?;
+        emit_copy_progress(on_progress, "verifying", "", completed, totals, false);
+        let verification = open_workspace_db(&target_db)?;
+        let copied_project_count: i64 =
+            verification.query_row("SELECT COUNT(*) FROM project", [], |row| row.get(0))?;
+        if copied_project_count != projects.len() as i64 {
+            bail!("copied project verification failed");
+        }
+        emit_copy_progress(on_progress, "complete", "", totals, totals, false);
+        Ok(())
+    })();
+
+    if let Err(error) = copy_result {
+        let _ = fs::remove_dir_all(&target_root);
+        return Err(error);
+    }
+
+    Ok(CopiedProjectWorkspace {
+        workspace_root: target_root.to_path_buf(),
+        project_name: project_name.trim().to_string(),
+        copy_index: 0,
+        project_count: projects.len(),
+    })
+}
+
+fn emit_copy_progress<P: FnMut(ProjectCopyProgress)>(
+    on_progress: &mut P,
+    stage: &'static str,
+    detail: &str,
+    completed: ProjectCopyStats,
+    totals: ProjectCopyStats,
+    cancellable: bool,
+) {
+    on_progress(ProjectCopyProgress {
+        stage,
+        detail: detail.to_string(),
+        completed_bytes: completed.bytes,
+        total_bytes: totals.bytes,
+        completed_files: completed.files,
+        total_files: totals.files,
+        cancellable,
+    });
+}
+
+fn validate_project_copy_source(source_root: &Path) -> Result<()> {
     if !source_root.exists() {
         bail!("workspace root does not exist: {}", source_root.display());
     }
@@ -46,64 +223,74 @@ pub fn copy_project_workspace(source_root: &Path) -> Result<CopiedProjectWorkspa
     if !source_db.is_file() {
         bail!("workspace missing project.sqlite: {}", source_db.display());
     }
+    Ok(())
+}
 
-    let conn = open_workspace_db(&source_db)?;
-    let projects = {
-        let mut statement = conn
-            .prepare("SELECT id, name FROM project ORDER BY id")
-            .context("failed to read source project names")?;
-        let rows = statement
-            .query_map([], |row| {
-                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
-            })?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-        if rows.is_empty() {
-            bail!(
-                "workspace has no project to copy: {}",
-                source_root.display()
-            );
-        }
-        rows
-    };
-    conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
-        .context("failed to checkpoint source project database")?;
-    drop(conn);
-
-    let (target_root, copy_index) = reserve_copy_directory(source_root)?;
-    let copy_result = (|| {
-        copy_directory_contents(source_root, &target_root)?;
-        let target_db = target_root.join("project.sqlite");
-        let mut copied_conn = open_workspace_db(&target_db)?;
-        let tx = copied_conn
-            .transaction()
-            .context("failed to start copied project rename transaction")?;
-        rebase_workspace_paths(&tx, source_root, &target_root)?;
-        for (project_id, project_name) in &projects {
-            let copied_name = format!("{project_name}-copy{copy_index}");
-            let changed = tx.execute(
-                "UPDATE project SET name = ?1 WHERE id = ?2",
-                params![copied_name, project_id],
-            )?;
-            if changed != 1 {
-                bail!("failed to rename copied project id {project_id}");
-            }
-        }
-        tx.commit()
-            .context("failed to commit copied project names")?;
-        Ok(())
-    })();
-
-    if let Err(error) = copy_result {
-        let _ = fs::remove_dir_all(&target_root);
-        return Err(error);
+fn validate_project_copy_target(
+    source_root: &Path,
+    target_root: &Path,
+    project_name: &str,
+) -> Result<()> {
+    if project_name.trim().is_empty() {
+        bail!("project name must not be empty");
     }
+    if target_root.as_os_str().is_empty() {
+        bail!("target workspace path must not be empty");
+    }
+    if target_root.exists() {
+        bail!("target workspace already exists: {}", target_root.display());
+    }
+    let parent = target_root.parent().ok_or_else(|| {
+        anyhow::anyhow!("target workspace has no parent: {}", target_root.display())
+    })?;
+    if !parent.is_dir() {
+        bail!(
+            "target parent directory does not exist: {}",
+            parent.display()
+        );
+    }
+    let canonical_source = source_root.canonicalize().with_context(|| {
+        format!(
+            "failed to resolve source workspace {}",
+            source_root.display()
+        )
+    })?;
+    let canonical_parent = parent
+        .canonicalize()
+        .with_context(|| format!("failed to resolve target parent {}", parent.display()))?;
+    let target_name = target_root.file_name().ok_or_else(|| {
+        anyhow::anyhow!(
+            "target workspace has no directory name: {}",
+            target_root.display()
+        )
+    })?;
+    let resolved_target = canonical_parent.join(target_name);
+    if resolved_target == canonical_source {
+        bail!("target workspace must differ from source workspace");
+    }
+    if resolved_target.starts_with(&canonical_source) {
+        bail!("target workspace must not be inside source workspace");
+    }
+    Ok(())
+}
 
-    Ok(CopiedProjectWorkspace {
-        workspace_root: target_root,
-        project_name: format!("{}-copy{copy_index}", projects[0].1),
-        copy_index,
-        project_count: projects.len(),
-    })
+fn read_source_projects(source_root: &Path) -> Result<Vec<(i64, String)>> {
+    let conn = open_workspace_db(&source_root.join("project.sqlite"))?;
+    let mut statement = conn
+        .prepare("SELECT id, name FROM project ORDER BY id")
+        .context("failed to read source project names")?;
+    let projects = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    if projects.is_empty() {
+        bail!(
+            "workspace has no project to copy: {}",
+            source_root.display()
+        );
+    }
+    Ok(projects)
 }
 
 fn rebase_workspace_paths(
@@ -150,7 +337,7 @@ fn rebase_workspace_paths(
     Ok(())
 }
 
-fn reserve_copy_directory(source_root: &Path) -> Result<(PathBuf, usize)> {
+fn next_copy_target(source_root: &Path) -> Result<(PathBuf, usize)> {
     let parent = source_root.parent().ok_or_else(|| {
         anyhow::anyhow!(
             "workspace root has no parent directory: {}",
@@ -167,32 +354,74 @@ fn reserve_copy_directory(source_root: &Path) -> Result<(PathBuf, usize)> {
         let mut target_name = OsString::from(source_name);
         target_name.push(format!("-copy{copy_index}"));
         let target_root = parent.join(target_name);
-        match fs::create_dir(&target_root) {
-            Ok(()) => return Ok((target_root, copy_index)),
-            Err(error) if error.kind() == ErrorKind::AlreadyExists => continue,
-            Err(error) => {
-                return Err(error).with_context(|| {
-                    format!(
-                        "failed to create copied workspace {}",
-                        target_root.display()
-                    )
-                });
-            }
+        if !target_root.exists() {
+            return Ok((target_root, copy_index));
         }
     }
     unreachable!("usize copy index space exhausted")
 }
 
-fn copy_directory_contents(source: &Path, target: &Path) -> Result<()> {
-    copy_directory_contents_rebased(source, target, source, target)
+fn ensure_copy_not_cancelled<C: FnMut() -> bool>(should_cancel: &mut C) -> Result<()> {
+    if should_cancel() {
+        bail!("PROJECT_COPY_CANCELLED");
+    }
+    Ok(())
 }
 
-fn copy_directory_contents_rebased(
+fn is_transient_sqlite_file(path: &Path) -> bool {
+    matches!(
+        path.file_name().and_then(|name| name.to_str()),
+        Some("project.sqlite-wal" | "project.sqlite-shm")
+    )
+}
+
+fn scan_directory_contents<C: FnMut() -> bool>(
+    source: &Path,
+    should_cancel: &mut C,
+) -> Result<ProjectCopyStats> {
+    ensure_copy_not_cancelled(should_cancel)?;
+    let mut stats = ProjectCopyStats::default();
+    for entry in fs::read_dir(source)
+        .with_context(|| format!("failed to read workspace directory {}", source.display()))?
+    {
+        ensure_copy_not_cancelled(should_cancel)?;
+        let entry = entry?;
+        let path = entry.path();
+        if is_transient_sqlite_file(&path) {
+            continue;
+        }
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            let nested = scan_directory_contents(&path, should_cancel)?;
+            stats.bytes = stats.bytes.saturating_add(nested.bytes);
+            stats.files = stats.files.saturating_add(nested.files);
+        } else if file_type.is_file() {
+            stats.bytes = stats.bytes.saturating_add(entry.metadata()?.len());
+            stats.files = stats.files.saturating_add(1);
+        } else if file_type.is_symlink() {
+            stats.files = stats.files.saturating_add(1);
+        }
+    }
+    Ok(stats)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn copy_directory_contents_with_hooks<P, C>(
     source: &Path,
     target: &Path,
     source_root: &Path,
     target_root: &Path,
-) -> Result<()> {
+    totals: ProjectCopyStats,
+    completed: &mut ProjectCopyStats,
+    last_reported_bytes: &mut u64,
+    on_progress: &mut P,
+    should_cancel: &mut C,
+) -> Result<()>
+where
+    P: FnMut(ProjectCopyProgress),
+    C: FnMut() -> bool,
+{
+    ensure_copy_not_cancelled(should_cancel)?;
     for entry in fs::read_dir(source)
         .with_context(|| format!("failed to read workspace directory {}", source.display()))?
     {
@@ -200,12 +429,10 @@ fn copy_directory_contents_rebased(
             entry.with_context(|| format!("failed to read an entry under {}", source.display()))?;
         let source_path = entry.path();
         let target_path = target.join(entry.file_name());
-        if matches!(
-            entry.file_name().to_str(),
-            Some("project.sqlite-wal" | "project.sqlite-shm")
-        ) {
+        if is_transient_sqlite_file(&source_path) {
             continue;
         }
+        ensure_copy_not_cancelled(should_cancel)?;
         let file_type = entry
             .file_type()
             .with_context(|| format!("failed to inspect {}", source_path.display()))?;
@@ -216,20 +443,100 @@ fn copy_directory_contents_rebased(
                     target_path.display()
                 )
             })?;
-            copy_directory_contents_rebased(&source_path, &target_path, source_root, target_root)?;
+            copy_directory_contents_with_hooks(
+                &source_path,
+                &target_path,
+                source_root,
+                target_root,
+                totals,
+                completed,
+                last_reported_bytes,
+                on_progress,
+                should_cancel,
+            )?;
         } else if file_type.is_symlink() {
             copy_symlink(&source_path, &target_path, source_root, target_root)?;
+            completed.files = completed.files.saturating_add(1);
+            emit_copy_progress(
+                on_progress,
+                "copying",
+                &relative_copy_detail(source_root, &source_path),
+                *completed,
+                totals,
+                true,
+            );
         } else if file_type.is_file() {
-            fs::copy(&source_path, &target_path).with_context(|| {
-                format!(
-                    "failed to copy {} to {}",
-                    source_path.display(),
-                    target_path.display()
-                )
-            })?;
+            copy_file_with_progress(
+                &source_path,
+                &target_path,
+                source_root,
+                totals,
+                completed,
+                last_reported_bytes,
+                on_progress,
+                should_cancel,
+            )?;
         }
     }
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn copy_file_with_progress<P, C>(
+    source: &Path,
+    target: &Path,
+    source_root: &Path,
+    totals: ProjectCopyStats,
+    completed: &mut ProjectCopyStats,
+    last_reported_bytes: &mut u64,
+    on_progress: &mut P,
+    should_cancel: &mut C,
+) -> Result<()>
+where
+    P: FnMut(ProjectCopyProgress),
+    C: FnMut() -> bool,
+{
+    let mut input = File::open(source)
+        .with_context(|| format!("failed to open source file {}", source.display()))?;
+    let mut output = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(target)
+        .with_context(|| format!("failed to create copied file {}", target.display()))?;
+    let detail = relative_copy_detail(source_root, source);
+    let mut buffer = vec![0_u8; 1024 * 1024];
+    loop {
+        ensure_copy_not_cancelled(should_cancel)?;
+        let read = input
+            .read(&mut buffer)
+            .with_context(|| format!("failed to read source file {}", source.display()))?;
+        if read == 0 {
+            break;
+        }
+        output
+            .write_all(&buffer[..read])
+            .with_context(|| format!("failed to write copied file {}", target.display()))?;
+        completed.bytes = completed.bytes.saturating_add(read as u64);
+        if completed.bytes.saturating_sub(*last_reported_bytes) >= COPY_PROGRESS_BYTE_STEP {
+            *last_reported_bytes = completed.bytes;
+            emit_copy_progress(on_progress, "copying", &detail, *completed, totals, true);
+        }
+    }
+    output
+        .flush()
+        .with_context(|| format!("failed to flush copied file {}", target.display()))?;
+    fs::set_permissions(target, fs::metadata(source)?.permissions())?;
+    completed.files = completed.files.saturating_add(1);
+    emit_copy_progress(on_progress, "copying", &detail, *completed, totals, true);
+    Ok(())
+}
+
+fn relative_copy_detail(source_root: &Path, source: &Path) -> String {
+    source
+        .strip_prefix(source_root)
+        .unwrap_or(source)
+        .to_string_lossy()
+        .to_string()
 }
 
 #[cfg(unix)]
@@ -318,6 +625,7 @@ pub fn resolve_extracted_bundle_workspace(input: &Path) -> Result<ExtractedBundl
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
     use std::fs;
 
     use rusqlite::{Connection, params};
@@ -408,6 +716,69 @@ mod tests {
         assert_eq!(copied.workspace_root, temp.path().join("wheat-copy2"));
         assert_eq!(copied.project_name, "Wheat-copy2");
         assert_eq!(copied.copy_index, 2);
+    }
+
+    #[test]
+    fn copies_workspace_to_custom_path_with_progress() {
+        let temp = tempdir().unwrap();
+        let source = temp.path().join("rice");
+        let archive = temp.path().join("archive");
+        let target = archive.join("rice-review");
+        create_project_workspace(&source, "Rice");
+        fs::create_dir(&archive).unwrap();
+        fs::write(source.join("notes.txt"), "copy me").unwrap();
+        let mut stages = Vec::new();
+
+        let copied = copy_project_workspace_to_with_hooks(
+            &source,
+            &target,
+            "Rice review",
+            &mut |progress: ProjectCopyProgress| stages.push(progress.stage),
+            &mut || false,
+        )
+        .unwrap();
+
+        assert_eq!(copied.workspace_root, target);
+        assert_eq!(copied.project_name, "Rice review");
+        assert_eq!(copied.copy_index, 0);
+        assert_eq!(
+            fs::read_to_string(target.join("notes.txt")).unwrap(),
+            "copy me"
+        );
+        assert_eq!(read_project_name(&target), "Rice review");
+        assert_workspace_paths_rebased(&source, &target);
+        assert!(stages.contains(&"scanning"));
+        assert!(stages.contains(&"copying"));
+        assert!(stages.contains(&"finalizing"));
+        assert!(stages.contains(&"verifying"));
+        assert_eq!(stages.last(), Some(&"complete"));
+    }
+
+    #[test]
+    fn cancellation_removes_partial_workspace_copy() {
+        let temp = tempdir().unwrap();
+        let source = temp.path().join("wheat");
+        let target = temp.path().join("wheat-cancelled");
+        create_project_workspace(&source, "Wheat");
+        fs::write(source.join("extra.bin"), vec![7_u8; 2 * 1024 * 1024]).unwrap();
+        let cancel = Cell::new(false);
+
+        let error = copy_project_workspace_to_with_hooks(
+            &source,
+            &target,
+            "Wheat cancelled",
+            &mut |progress: ProjectCopyProgress| {
+                if progress.stage == "copying" {
+                    cancel.set(true);
+                }
+            },
+            &mut || cancel.get(),
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("PROJECT_COPY_CANCELLED"));
+        assert!(!target.exists());
+        assert_eq!(read_project_name(&source), "Wheat");
     }
 
     fn create_bundle_root(bundle_root: &Path) {

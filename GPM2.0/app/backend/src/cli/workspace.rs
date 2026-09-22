@@ -101,8 +101,28 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
                 );
             }
         }
-        Commands::CopyProjectWorkspace { workspace_root } => {
-            let copied = copy_project_workspace(&workspace_root)?;
+        Commands::GetProjectCopyDefaults { workspace_root } => {
+            let defaults = get_project_copy_defaults(&workspace_root)?;
+            println!("workspace_root={}", defaults.target_root.display());
+            println!("project_name={}", defaults.project_name);
+            println!("copy_index={}", defaults.copy_index);
+        }
+        Commands::CopyProjectWorkspace {
+            workspace_root,
+            target_root,
+            project_name,
+        } => {
+            let copied = match (target_root, project_name) {
+                (Some(target_root), Some(project_name)) => copy_project_workspace_to_with_hooks(
+                    &workspace_root,
+                    &target_root,
+                    &project_name,
+                    &mut |_| {},
+                    &mut || false,
+                )?,
+                (None, None) => copy_project_workspace(&workspace_root)?,
+                _ => anyhow::bail!("--target-root and --project-name must be provided together"),
+            };
             println!("workspace_root={}", copied.workspace_root.display());
             println!("project_name={}", copied.project_name);
             println!("copy_index={}", copied.copy_index);

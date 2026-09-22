@@ -1,6 +1,6 @@
 import { applyListLimit } from "../contracts.js";
 
-export function createTauriWorkspaceOperations({ invokeCommand }) {
+export function createTauriWorkspaceOperations({ invokeCommand, listenBackendEvent }) {
 async function listProjectInitializerOptionsTauri({ workspaceRoot }) {
   const result = await invokeCommand("list_project_initializer_options", {
     workspaceRoot,
@@ -55,10 +55,29 @@ async function deleteWorkspaceDirectoryTauri({ workspaceRoot }) {
   });
 }
 
-async function copyProjectWorkspaceTauri({ workspaceRoot }) {
-  return invokeCommand("copy_project_workspace", {
-    workspaceRoot,
-  });
+async function getProjectCopyDefaultsTauri({ workspaceRoot }) {
+  return invokeCommand("get_project_copy_defaults", { workspaceRoot });
+}
+
+async function copyProjectWorkspaceTauri({ workspaceRoot, targetRoot, projectName, runId = "", onProgress }) {
+  let unlisten = () => {};
+  if (runId) {
+    unlisten = await listenBackendEvent("gpm-next://project-copy-progress", event => {
+      const payload = event?.payload || {};
+      if (String(payload.runId || "") === String(runId)) onProgress?.(payload);
+    });
+  }
+  try {
+    return await invokeCommand("copy_project_workspace", {
+      request: { workspaceRoot, targetRoot, projectName, runId },
+    });
+  } finally {
+    unlisten();
+  }
+}
+
+async function requestProjectCopyCancelTauri({ runId }) {
+  return invokeCommand("request_project_copy_cancel", { runId });
 }
 
 async function initializeProjectTauri({
@@ -263,7 +282,9 @@ async function listNewSequencesTauri({ workspaceRoot, projectId, limit }) {
     openWorkspace: openWorkspaceTauri,
     validateWorkspaceIntegrity: validateWorkspaceIntegrityTauri,
     deleteWorkspaceDirectory: deleteWorkspaceDirectoryTauri,
+    getProjectCopyDefaults: getProjectCopyDefaultsTauri,
     copyProjectWorkspace: copyProjectWorkspaceTauri,
+    requestProjectCopyCancel: requestProjectCopyCancelTauri,
     initializeProject: initializeProjectTauri,
     deleteProject: deleteProjectTauri,
     updateProject: updateProjectTauri,

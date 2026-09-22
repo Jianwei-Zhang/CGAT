@@ -91,7 +91,8 @@ use gpm_next_backend::runtime_persistence::{
     update_runtime_settings as backend_update_runtime_settings,
 };
 use gpm_next_backend::workspace::{
-    copy_project_workspace as backend_copy_project_workspace, looks_like_bundle_root,
+    ProjectCopyProgress, copy_project_workspace_to_with_hooks as backend_copy_project_workspace,
+    get_project_copy_defaults as backend_get_project_copy_defaults, looks_like_bundle_root,
 };
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -100,6 +101,7 @@ use tauri::{AppHandle, Emitter};
 
 use crate::auto_pipeline_cancel;
 use crate::import_cancel;
+use crate::project_copy_cancel;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -120,6 +122,15 @@ pub struct UpdateProjectCommandRequest {
     support_dataset_ids: Option<Vec<i64>>,
     chr_assignment_min_coverage_percent: Option<f64>,
     phased_assembly_enabled: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CopyProjectWorkspaceCommandRequest {
+    workspace_root: String,
+    target_root: String,
+    project_name: String,
+    run_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

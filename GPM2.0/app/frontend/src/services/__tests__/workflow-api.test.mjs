@@ -52,11 +52,23 @@ test("copyProjectWorkspace routes through the desktop command", async () => {
       },
     };
 
-    const result = await copyProjectWorkspace({ workspaceRoot: "D:/projects/rice" });
+    const result = await copyProjectWorkspace({
+      workspaceRoot: "D:/projects/rice",
+      targetRoot: "D:/archives/rice-v2",
+      projectName: "Rice v2",
+      runId: "copy-1",
+    });
 
     assert.deepEqual(calls, [{
       command: "copy_project_workspace",
-      args: { workspaceRoot: "D:/projects/rice" },
+      args: {
+        request: {
+          workspaceRoot: "D:/projects/rice",
+          targetRoot: "D:/archives/rice-v2",
+          projectName: "Rice v2",
+          runId: "copy-1",
+        },
+      },
     }]);
     assert.equal(result.projectName, "Rice-copy1");
   } finally {

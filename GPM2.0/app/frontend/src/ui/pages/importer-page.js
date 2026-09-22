@@ -1,11 +1,13 @@
 import {
   copyProjectWorkspace,
   deleteWorkspaceDirectory,
+  getProjectCopyDefaults,
   importAddDatasetPackage,
   importExtractedBundle,
   importZipBundle,
   listProjectInitializerOptions,
   requestImportCancel,
+  requestProjectCopyCancel,
   validateWorkspaceIntegrity,
 } from "../../services/workflow-api.js";
 import { flushAssemblyProjectState } from "./assembly-page.js";
@@ -18,6 +20,7 @@ import { clearAssemblySessionCache } from "../shell/assembly-session-cache.js";
 import { resetAssemblyPageSession } from "./assembly/page-session.js";
 import { pickDirectoryPath, pickZipFilePath } from "../../services/backend-api.js";
 import { getMessages, t as i18nT } from "../i18n/index.js";
+import { projectIcon } from "./project-icons.js";
 
 const WORKSPACE_HISTORY_KEY = "gpm_next:workspace_history";
 const IMPORT_PROGRESS_BOTTOM_THRESHOLD_PX = 24;
@@ -74,15 +77,96 @@ export function renderImporterPage(state) {
           : ""
       }
 
+      ${renderProjectCopyDialog(state, messages)}
+
       ${importProgressOverlay}
       ${workspaceContextMenu.open ? renderWorkspaceHistoryContextMenu(workspaceContextMenu, messages) : ""}
     </section>
   `;
 }
 
+function renderProjectCopyDialog(state, messages) {
+  const dialog = state.importer.copyDialog;
+  if (!dialog?.open) return "";
+  const phase = dialog.phase || "configure";
+  const loading = dialog.loading === true;
+  const progress = dialog.progress || {};
+  const totalBytes = Number(progress.totalBytes || 0);
+  const completedBytes = Math.min(Number(progress.completedBytes || 0), totalBytes || Number.MAX_SAFE_INTEGER);
+  const percent = totalBytes > 0 ? Math.min(100, Math.round((completedBytes / totalBytes) * 100)) : 0;
+  const stageLabel = projectCopyStageLabel(progress.stage, messages);
+  const canCancel = phase === "copying" && progress.cancellable !== false && !dialog.cancelRequested;
+  const form = `<form class="project-copy-form" data-project-copy-form>
+    <label for="project-copy-name">${escapeHtml(messages.page.copyName)}</label>
+    <input id="project-copy-name" value="${escapeAttr(dialog.projectName || "")}" ${loading ? "disabled" : ""} required />
+    <label for="project-copy-path">${escapeHtml(messages.page.copyPath)}</label>
+    <div class="inline-input">
+      <input id="project-copy-path" value="${escapeAttr(dialog.targetRoot || "")}" ${loading ? "disabled" : ""} required />
+      <button type="button" id="project-copy-pick-parent" class="button ghost" title="${escapeAttr(messages.buttons.pickCopyParent)}" aria-label="${escapeAttr(messages.buttons.pickCopyParent)}" ${loading ? "disabled" : ""}>${projectIcon("open")}</button>
+    </div>
+    <p class="project-path muted">${escapeHtml(messages.page.copyHint)}</p>
+    <p class="error-text" data-project-copy-error role="alert" ${dialog.error ? "" : "hidden"}>${escapeHtml(dialog.error || "")}</p>
+    <footer class="project-dialog-actions">
+      <button type="button" data-project-copy-close class="button ghost">${escapeHtml(messages.buttons.cancel)}</button>
+      <button type="submit" id="project-copy-start" class="button project-primary" ${loading || !String(dialog.projectName || "").trim() || !String(dialog.targetRoot || "").trim() ? "disabled" : ""}>${escapeHtml(dialog.failed ? messages.buttons.retryCopy : messages.buttons.startCopy)}</button>
+    </footer>
+  </form>`;
+  const copying = `<section class="project-copy-progress" aria-live="polite">
+    <strong>${escapeHtml(stageLabel)}</strong>
+    <div class="project-copy-meter" data-progress-mode="${totalBytes > 0 ? "determinate" : "indeterminate"}" role="progressbar" ${totalBytes > 0 ? `aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"` : ""}>
+      <span style="width:${totalBytes > 0 ? percent : 36}%"></span>
+    </div>
+    ${totalBytes > 0 ? `<div class="project-copy-progress-meta"><span>${escapeHtml(i18nT(state, "importer.runtime.copyBytesProgress", { completed: formatCopyBytes(completedBytes), total: formatCopyBytes(totalBytes) }))}</span><strong>${percent}%</strong></div>` : ""}
+    ${Number(progress.totalFiles || 0) > 0 ? `<p class="muted">${escapeHtml(i18nT(state, "importer.runtime.copyFilesProgress", { completed: Number(progress.completedFiles || 0), total: Number(progress.totalFiles || 0) }))}</p>` : ""}
+    ${progress.detail ? `<p class="project-path muted">${escapeHtml(progress.detail)}</p>` : ""}
+    ${dialog.cancelError ? `<p class="error-text" role="alert">${escapeHtml(dialog.cancelError)}</p>` : ""}
+    <footer class="project-dialog-actions"><button type="button" id="project-copy-cancel" class="button ghost" ${canCancel ? "" : "disabled"}>${escapeHtml(dialog.cancelRequested ? messages.buttons.copyCancelling : messages.buttons.cancelCopy)}</button></footer>
+  </section>`;
+  const success = `<section class="project-copy-success">
+    <strong>${escapeHtml(dialog.result?.projectName || dialog.projectName)}</strong>
+    <p class="project-path">${escapeHtml(dialog.result?.workspaceRoot || dialog.targetRoot)}</p>
+    <footer class="project-dialog-actions">
+      <button type="button" data-project-copy-close class="button ghost">${escapeHtml(messages.buttons.copyDone)}</button>
+      <button type="button" id="project-copy-open-result" class="button project-primary">${escapeHtml(messages.buttons.openCopiedProject)}</button>
+    </footer>
+  </section>`;
+  return `<div class="modal-overlay project-copy-overlay">
+    <article class="card modal-dialog project-copy-dialog" role="dialog" aria-modal="true" aria-labelledby="project-copy-title">
+      <h3 id="project-copy-title">${escapeHtml(phase === "success" ? messages.page.copySuccessTitle : phase === "copying" ? messages.page.copyProgressTitle : messages.page.copyTitle)}</h3>
+      ${loading ? `<p role="status">${escapeHtml(messages.runtime.copyLoadingDefaults)}</p>` : phase === "copying" ? copying : phase === "success" ? success : form}
+    </article>
+  </div>`;
+}
+
+function projectCopyStageLabel(stage, messages) {
+  const labels = {
+    validating: messages.runtime.copyStageValidating,
+    scanning: messages.runtime.copyStageScanning,
+    copying: messages.runtime.copyStageCopying,
+    finalizing: messages.runtime.copyStageFinalizing,
+    verifying: messages.runtime.copyStageVerifying,
+    complete: messages.runtime.copyStageComplete,
+  };
+  return labels[stage] || messages.runtime.copyStageValidating;
+}
+
+function formatCopyBytes(value) {
+  const bytes = Math.max(0, Number(value || 0));
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let amount = bytes / 1024;
+  let unit = units[0];
+  for (let index = 1; index < units.length && amount >= 1024; index += 1) {
+    amount /= 1024;
+    unit = units[index];
+  }
+  return `${amount >= 10 ? amount.toFixed(1) : amount.toFixed(2)} ${unit}`;
+}
+
 export function bindImporterPage(host, store) {
   if (store.getState().initializer) bindWorkspacePage(host, store);
   bindProjectEntryControls(host, store);
+  bindProjectCopyDialog(host, store);
   const zipPathInput = host.querySelector("#zip-path-input");
   const zipWorkspaceRootInput = host.querySelector("#zip-workspace-root-input");
   const extractedPathInput = host.querySelector("#extracted-path-input");
@@ -402,28 +486,200 @@ function bindProjectEntryControls(host, store) {
   host.querySelectorAll("[data-project-copy]").forEach(button => button.addEventListener("click", async event => {
     event.stopPropagation?.();
     if (busy()) return;
-    await runCopyProjectFlow(host, store, button.dataset.projectCopy);
+    await openProjectCopyDialog(host, store, button.dataset.projectCopy);
   }));
 }
 
-async function runCopyProjectFlow(host, store, workspaceRoot) {
+function bindProjectCopyDialog(host, store) {
+  const overlay = host.querySelector(".project-copy-overlay");
+  const dialogElement = host.querySelector(".project-copy-dialog");
+  const form = host.querySelector("[data-project-copy-form]");
+  const nameInput = host.querySelector("#project-copy-name");
+  const pathInput = host.querySelector("#project-copy-path");
+  const errorText = host.querySelector("[data-project-copy-error]");
+  const startButton = host.querySelector("#project-copy-start");
+  const close = () => {
+    if (store.getState().importer.copyDialog?.phase === "copying") return;
+    updateImporterState(store, { copyDialog: null });
+    rerender(host, store);
+  };
+  const syncForm = () => {
+    const current = store.getState().importer.copyDialog;
+    if (!current) return;
+    const next = {
+      ...current,
+      projectName: String(nameInput?.value || ""),
+      targetRoot: String(pathInput?.value || ""),
+      failed: false,
+    };
+    next.error = validateProjectCopyInput(store.getState(), next);
+    updateImporterState(store, { copyDialog: next });
+    if (errorText) {
+      errorText.textContent = next.error;
+      errorText.hidden = !next.error;
+    }
+    if (startButton) startButton.disabled = Boolean(next.error);
+  };
+
+  nameInput?.addEventListener("input", syncForm);
+  pathInput?.addEventListener("input", syncForm);
+  form?.addEventListener("submit", async event => {
+    event.preventDefault?.();
+    syncForm();
+    await runCopyProjectFlow(host, store);
+  });
+  host.querySelector("#project-copy-pick-parent")?.addEventListener("click", async () => {
+    const selectedParent = await pickDirectoryPath(store.getState());
+    if (!selectedParent) return;
+    const current = store.getState().importer.copyDialog;
+    if (!current || current.phase !== "configure") return;
+    const leaf = projectCopyPathLeaf(current.targetRoot) || String(current.projectName || "").trim();
+    const targetRoot = joinProjectCopyPath(selectedParent, leaf);
+    updateImporterState(store, {
+      copyDialog: {
+        ...current,
+        targetRoot,
+        error: validateProjectCopyInput(store.getState(), { ...current, targetRoot }),
+        failed: false,
+      },
+    });
+    rerender(host, store);
+    host.querySelector("#project-copy-path")?.focus();
+  });
+  host.querySelectorAll("[data-project-copy-close]").forEach(button => button.addEventListener("click", close));
+  overlay?.addEventListener("click", event => {
+    if (event.target === event.currentTarget) close();
+  });
+  dialogElement?.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+      event.preventDefault?.();
+      close();
+    }
+  });
+  host.querySelector("#project-copy-cancel")?.addEventListener("click", async () => {
+    const current = store.getState().importer.copyDialog;
+    if (!current?.runId || current.cancelRequested) return;
+    updateImporterState(store, { copyDialog: { ...current, cancelRequested: true, cancelError: "" } });
+    rerender(host, store);
+    try {
+      await requestProjectCopyCancel({ runId: current.runId });
+    } catch (error) {
+      const latest = store.getState().importer.copyDialog;
+      if (!latest || latest.runId !== current.runId) return;
+      updateImporterState(store, {
+        copyDialog: {
+          ...latest,
+          cancelRequested: false,
+          cancelError: i18nT(store.getState(), "importer.runtime.copyCancelFailed", {
+            message: String(error.message || error),
+          }),
+        },
+      });
+      rerender(host, store);
+    }
+  });
+  host.querySelector("#project-copy-open-result")?.addEventListener("click", async () => {
+    const workspaceRoot = store.getState().importer.copyDialog?.result?.workspaceRoot;
+    if (!workspaceRoot) return;
+    updateImporterState(store, { copyDialog: null });
+    rerender(host, store);
+    await runOpenWorkspaceFlow(host, store, workspaceRoot);
+  });
+}
+
+async function openProjectCopyDialog(host, store, workspaceRoot) {
   const snapshot = store.getState();
   const sourceRoot = String(workspaceRoot || "").trim();
   if (!sourceRoot || snapshot.importer.inFlight || snapshot.initializer?.autoPipelineRunning || snapshot.initializer?.updating) return;
   const sourceRecord = readWorkspaceHistory().find(record => record.path === sourceRoot);
   const sourceName = sourceRecord?.projectName || defaultProjectName(sourceRoot);
+  const requestId = createImportRunId("copy-defaults");
+  updateImporterState(store, {
+    copyDialog: {
+      open: true,
+      loading: true,
+      phase: "configure",
+      requestId,
+      sourceRoot,
+      sourceName,
+      projectName: `${sourceName}-copy1`,
+      targetRoot: `${sourceRoot}-copy1`,
+      error: "",
+    },
+  });
+  rerender(host, store);
+  try {
+    const defaults = await getProjectCopyDefaults({ workspaceRoot: sourceRoot, projectName: sourceName });
+    const current = store.getState().importer.copyDialog;
+    if (!current?.open || current.requestId !== requestId) return;
+    updateImporterState(store, {
+      copyDialog: {
+        ...current,
+        loading: false,
+        projectName: defaults.projectName,
+        targetRoot: defaults.targetRoot || defaults.workspaceRoot,
+      },
+    });
+  } catch (error) {
+    const current = store.getState().importer.copyDialog;
+    if (!current?.open || current.requestId !== requestId) return;
+    updateImporterState(store, {
+      copyDialog: { ...current, loading: false, error: String(error.message || error) },
+    });
+  }
+  rerender(host, store);
+  host.querySelector("#project-copy-name")?.focus();
+}
+
+async function runCopyProjectFlow(host, store) {
+  const snapshot = store.getState();
+  const dialog = snapshot.importer.copyDialog;
+  if (!dialog || dialog.phase !== "configure" || snapshot.importer.inFlight) return;
+  const validationError = validateProjectCopyInput(snapshot, dialog);
+  if (validationError) {
+    updateImporterState(store, { copyDialog: { ...dialog, error: validationError } });
+    rerender(host, store);
+    return;
+  }
+  const sourceRoot = String(dialog.sourceRoot).trim();
+  const projectName = String(dialog.projectName).trim();
+  const targetRoot = String(dialog.targetRoot).trim();
+  const runId = createImportRunId("project-copy");
   updateImporterState(store, {
     inFlight: true,
     projectError: "",
     status: i18nT(snapshot, "importer.runtime.copyInProgressStatus"),
-    summary: i18nT(snapshot, "importer.runtime.copySummary", { projectName: sourceName }),
+    summary: i18nT(snapshot, "importer.runtime.copySummary", { projectName }),
     stages: [],
+    copyDialog: {
+      ...dialog,
+      loading: false,
+      phase: "copying",
+      projectName,
+      targetRoot,
+      runId,
+      error: "",
+      cancelError: "",
+      cancelRequested: false,
+      progress: { stage: "validating", cancellable: true },
+    },
   });
   rerender(host, store);
 
   try {
     await flushAssemblyProjectState(host, store);
-    const copied = await copyProjectWorkspace({ workspaceRoot: sourceRoot });
+    const copied = await copyProjectWorkspace({
+      workspaceRoot: sourceRoot,
+      targetRoot,
+      projectName,
+      runId,
+      onProgress: progress => {
+        const current = store.getState().importer.copyDialog;
+        if (!current || current.runId !== runId || current.phase !== "copying") return;
+        updateImporterState(store, { copyDialog: { ...current, progress } });
+        rerender(host, store);
+      },
+    });
     appendWorkspaceHistoryRecord(copied.workspaceRoot, copied.projectName);
     const current = store.getState();
     updateImporterState(store, {
@@ -436,19 +692,56 @@ async function runCopyProjectFlow(host, store, workspaceRoot) {
       stages: [i18nT(current, "importer.runtime.copyDoneStage", {
         workspaceRoot: copied.workspaceRoot,
       })],
+      copyDialog: {
+        ...current.importer.copyDialog,
+        phase: "success",
+        progress: { ...current.importer.copyDialog?.progress, stage: "complete", cancellable: false },
+        result: copied,
+      },
     });
     window.dispatchEvent(new Event("gpm-next:route-refresh"));
   } catch (error) {
     const current = store.getState();
+    const message = String(error.message || error);
+    const cancelled = message.includes("PROJECT_COPY_CANCELLED");
     updateImporterState(store, {
       inFlight: false,
-      projectError: String(error.message || error),
-      status: i18nT(current, "importer.runtime.copyFailedStatus"),
-      summary: String(error.message || error),
+      projectError: cancelled ? "" : message,
+      status: i18nT(current, cancelled ? "importer.runtime.copyCancelledStatus" : "importer.runtime.copyFailedStatus"),
+      summary: cancelled ? i18nT(current, "importer.runtime.copyCancelledSummary") : message,
       stages: [],
+      copyDialog: {
+        ...current.importer.copyDialog,
+        phase: "configure",
+        failed: !cancelled,
+        error: cancelled ? "" : message,
+        cancelRequested: false,
+      },
     });
   }
   rerender(host, store);
+}
+
+function validateProjectCopyInput(state, dialog) {
+  const name = String(dialog.projectName || "").trim();
+  const target = normalizeWorkspacePathIdentity(dialog.targetRoot);
+  const source = normalizeWorkspacePathIdentity(dialog.sourceRoot);
+  if (!name) return i18nT(state, "importer.runtime.copyNameRequired");
+  if (!target) return i18nT(state, "importer.runtime.copyPathRequired");
+  if (target === source) return i18nT(state, "importer.runtime.copyPathSame");
+  if (source && target.startsWith(`${source}/`)) return i18nT(state, "importer.runtime.copyPathInsideSource");
+  return "";
+}
+
+function projectCopyPathLeaf(value) {
+  return String(value || "").trim().replace(/[\\/]+$/, "").split(/[\\/]/).at(-1) || "";
+}
+
+function joinProjectCopyPath(parent, leaf) {
+  const root = String(parent || "").trim().replace(/[\\/]+$/, "");
+  const name = String(leaf || "").trim().replace(/^[\\/]+/, "");
+  const separator = root.includes("\\") && !root.includes("/") ? "\\" : "/";
+  return name ? `${root}${separator}${name}` : root;
 }
 
 async function runImportZipFlow(host, store) {

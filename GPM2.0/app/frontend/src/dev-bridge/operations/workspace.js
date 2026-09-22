@@ -38,10 +38,31 @@ async function openWorkspace(payload) {
   return listProjectInitializerOptions({ workspaceRoot });
 }
 
-async function copyProjectWorkspace(payload) {
+async function getProjectCopyDefaults(payload) {
   const { workspaceRoot } = payload || {};
   requireString("workspaceRoot", workspaceRoot);
-  const output = await runBackend(["copy-project-workspace", workspaceRoot]);
+  const output = await runBackend(["get-project-copy-defaults", workspaceRoot]);
+  const record = parseKeyValueLines(output.stdout);
+  return {
+    targetRoot: record.workspace_root,
+    projectName: record.project_name,
+    copyIndex: Number(record.copy_index || 0),
+  };
+}
+
+async function copyProjectWorkspace(payload) {
+  const { workspaceRoot, targetRoot, projectName } = payload || {};
+  requireString("workspaceRoot", workspaceRoot);
+  requireString("targetRoot", targetRoot);
+  requireString("projectName", projectName);
+  const output = await runBackend([
+    "copy-project-workspace",
+    workspaceRoot,
+    "--target-root",
+    targetRoot,
+    "--project-name",
+    projectName,
+  ]);
   const record = parseKeyValueLines(output.stdout);
   return {
     workspaceRoot: record.workspace_root,
@@ -411,6 +432,7 @@ async function listNewSequences(payload) {
 
   return {
     openWorkspace,
+    getProjectCopyDefaults,
     copyProjectWorkspace,
     listProjectCatalog,
     updateProjectCatalog,

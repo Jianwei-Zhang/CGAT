@@ -1,6 +1,7 @@
 mod auto_pipeline_cancel;
 mod commands;
 mod import_cancel;
+mod project_copy_cancel;
 
 pub fn run() {
     tauri::Builder::default()
@@ -14,6 +15,8 @@ pub fn run() {
             commands::validate_workspace_integrity,
             commands::delete_workspace_directory,
             commands::copy_project_workspace,
+            commands::get_project_copy_defaults,
+            commands::request_project_copy_cancel,
             commands::list_project_initializer_options,
             commands::list_project_catalog,
             commands::update_project_catalog,
