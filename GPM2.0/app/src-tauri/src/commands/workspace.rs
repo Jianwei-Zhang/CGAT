@@ -178,6 +178,25 @@ pub fn delete_workspace_directory(workspaceRoot: String) -> CommandResult<Value>
 }
 
 #[tauri::command]
+#[allow(non_snake_case)]
+pub async fn copy_project_workspace(workspaceRoot: String) -> CommandResult<Value> {
+    tauri::async_runtime::spawn_blocking(move || {
+        (|| {
+            let copied = backend_copy_project_workspace(Path::new(&workspaceRoot))?;
+            Ok(json!({
+                "workspaceRoot": path_to_string(&copied.workspace_root),
+                "projectName": copied.project_name,
+                "copyIndex": copied.copy_index,
+                "projectCount": copied.project_count
+            }))
+        })()
+        .map_err(format_error)
+    })
+    .await
+    .map_err(|error| format!("failed to join copy_project_workspace task: {error}"))?
+}
+
+#[tauri::command]
 pub fn initialize_project(request: InitializeProjectCommandRequest) -> CommandResult<Value> {
     let InitializeProjectCommandRequest {
         workspace_root,

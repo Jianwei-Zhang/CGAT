@@ -38,6 +38,19 @@ async function openWorkspace(payload) {
   return listProjectInitializerOptions({ workspaceRoot });
 }
 
+async function copyProjectWorkspace(payload) {
+  const { workspaceRoot } = payload || {};
+  requireString("workspaceRoot", workspaceRoot);
+  const output = await runBackend(["copy-project-workspace", workspaceRoot]);
+  const record = parseKeyValueLines(output.stdout);
+  return {
+    workspaceRoot: record.workspace_root,
+    projectName: record.project_name,
+    copyIndex: Number(record.copy_index || 0),
+    projectCount: Number(record.project_count || 0),
+  };
+}
+
 async function listProjectInitializerOptions(payload) {
   const { workspaceRoot } = payload || {};
   requireString("workspaceRoot", workspaceRoot);
@@ -398,6 +411,7 @@ async function listNewSequences(payload) {
 
   return {
     openWorkspace,
+    copyProjectWorkspace,
     listProjectCatalog,
     updateProjectCatalog,
     listProjectInitializerOptions,

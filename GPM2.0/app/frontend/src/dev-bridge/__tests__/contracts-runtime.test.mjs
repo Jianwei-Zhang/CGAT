@@ -125,11 +125,22 @@ test("operation factory exposes every registered operation and maps exact CLI co
           stderr: "",
         };
       }
+      if (args[0] === "copy-project-workspace") {
+        return {
+          stdout: [
+            "workspace_root=D:/projects/rice-copy2",
+            "project_name=Rice-copy2",
+            "copy_index=2",
+            "project_count=1",
+          ].join("\n"),
+          stderr: "",
+        };
+      }
       throw new Error(`unexpected operation ${args[0]}`);
     },
   });
 
-  assert.equal(Object.keys(handlers).length, 44);
+  assert.equal(Object.keys(handlers).length, 45);
   assert.equal(typeof handlers.listProjectCatalog, "function");
   assert.equal(typeof handlers.updateProjectCatalog, "function");
   const sequences = await handlers.listNewSequences({
@@ -138,10 +149,12 @@ test("operation factory exposes every registered operation and maps exact CLI co
     limit: 1,
   });
   const settings = await handlers.getRuntimeSettings({ workspaceRoot: "D:/workspace" });
+  const copied = await handlers.copyProjectWorkspace({ workspaceRoot: "D:/projects/rice" });
 
   assert.deepEqual(calls, [
     ["list-new-sequences", "D:/workspace", "7"],
     ["get-runtime-settings", "D:/workspace"],
+    ["copy-project-workspace", "D:/projects/rice"],
   ]);
   assert.deepEqual(sequences, {
     items: [{
@@ -156,6 +169,12 @@ test("operation factory exposes every registered operation and maps exact CLI co
     updatedAt: "2026-08-09T10:00:00Z",
     degapWorkspaceSettings: { threads: 8 },
     source: "workspace_db",
+  });
+  assert.deepEqual(copied, {
+    workspaceRoot: "D:/projects/rice-copy2",
+    projectName: "Rice-copy2",
+    copyIndex: 2,
+    projectCount: 1,
   });
 });
 

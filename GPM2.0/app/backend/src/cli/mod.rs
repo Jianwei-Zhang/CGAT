@@ -50,7 +50,7 @@ use gpm_next_backend::runtime_persistence::{
     append_edit_audit_log, clear_edit_audit_logs, get_runtime_settings, list_edit_audit_logs,
     update_runtime_settings,
 };
-use gpm_next_backend::workspace::resolve_extracted_bundle_workspace;
+use gpm_next_backend::workspace::{copy_project_workspace, resolve_extracted_bundle_workspace};
 
 #[derive(Debug, Parser)]
 #[command(name = "gpm_next_backend")]
@@ -77,6 +77,9 @@ enum Commands {
         workspace_root: PathBuf,
     },
     ListProjectInitializerOptions {
+        workspace_root: PathBuf,
+    },
+    CopyProjectWorkspace {
         workspace_root: PathBuf,
     },
     ListProjectCatalog {

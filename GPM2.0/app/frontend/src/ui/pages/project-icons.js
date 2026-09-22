@@ -1,6 +1,6 @@
-import { ArrowRight, Check, Folder, FolderOpen, FolderInput, PackagePlus, Pencil, Trash2, X } from "lucide";
+import { ArrowRight, Check, Copy, Folder, FolderOpen, FolderInput, PackagePlus, Pencil, Trash2, X } from "lucide";
 
-const icons = { arrow: ArrowRight, check: Check, folder: Folder, open: FolderOpen, import: FolderInput, addPackage: PackagePlus, delete: Trash2, rename: Pencil, close: X };
+const icons = { arrow: ArrowRight, check: Check, copy: Copy, folder: Folder, open: FolderOpen, import: FolderInput, addPackage: PackagePlus, delete: Trash2, rename: Pencil, close: X };
 
 // Lucide's static icon nodes also render in the DOM-free page tests.
 export function projectIcon(name) {

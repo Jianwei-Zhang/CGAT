@@ -13,6 +13,7 @@ pub fn run() {
             commands::open_workspace,
             commands::validate_workspace_integrity,
             commands::delete_workspace_directory,
+            commands::copy_project_workspace,
             commands::list_project_initializer_options,
             commands::list_project_catalog,
             commands::update_project_catalog,

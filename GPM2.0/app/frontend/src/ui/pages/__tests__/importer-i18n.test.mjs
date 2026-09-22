@@ -223,6 +223,68 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.runtime.deleteDoneFailedHistorySummary, "Removed {count} projects that failed validation from the library.");
 });
 
+test("project copy action creates a sibling copy and appends it to the library", async () => {
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  let history = [{ path: "D:/projects/rice", projectName: "Rice", lastUsedAt: 1 }];
+  const calls = [];
+  const copyButton = createButton();
+  copyButton.dataset.projectCopy = "D:/projects/rice";
+  const host = createHost({ "[data-project-copy]": copyButton });
+  const state = createImporterScrollState({
+    inFlight: false,
+    importRunId: null,
+    status: "",
+    summary: "",
+  });
+  state.session = { workspacePath: "D:/projects/rice", projectId: null, projectName: "Rice" };
+  const store = createStore(state);
+
+  try {
+    globalThis.document = { querySelector: () => null };
+    globalThis.window = {
+      localStorage: {
+        getItem: () => JSON.stringify(history),
+        setItem(_key, value) { history = JSON.parse(value); },
+      },
+      dispatchEvent() {},
+      setTimeout: () => 1,
+      clearTimeout() {},
+      __TAURI__: {
+        core: {
+          async invoke(command, args) {
+            calls.push({ command, args });
+            return {
+              workspaceRoot: "D:/projects/rice-copy1",
+              projectName: "Rice-copy1",
+              copyIndex: 1,
+              projectCount: 1,
+            };
+          },
+        },
+      },
+    };
+
+    bindImporterPage(host, store);
+    await copyButton.click();
+
+    assert.deepEqual(calls, [{
+      command: "copy_project_workspace",
+      args: { workspaceRoot: "D:/projects/rice" },
+    }]);
+    assert.deepEqual(history.map(record => [record.path, record.projectName]), [
+      ["D:/projects/rice", "Rice"],
+      ["D:/projects/rice-copy1", "Rice-copy1"],
+    ]);
+    assert.equal(store.getState().session.workspacePath, "D:/projects/rice");
+    assert.equal(store.getState().importer.status, "项目复制完成");
+    assert.match(store.getState().importer.summary, /Rice-copy1/);
+  } finally {
+    globalThis.window = previousWindow;
+    globalThis.document = previousDocument;
+  }
+});
+
 test("importer bulk delete removes only current failed history records", async () => {
   const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;

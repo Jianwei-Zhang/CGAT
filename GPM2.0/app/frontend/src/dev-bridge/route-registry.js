@@ -8,6 +8,7 @@ const ROUTE_GROUPS = Object.freeze({
     ["/list-project-catalog", "listProjectCatalog"],
     ["/update-project-catalog", "updateProjectCatalog"],
     ["/open-workspace", "openWorkspace"],
+    ["/copy-project-workspace", "copyProjectWorkspace"],
     ["/list-project-initializer-options", "listProjectInitializerOptions"],
     ["/initialize-project", "initializeProject"],
     ["/get-grt-project-view", "getGrtProjectView"],

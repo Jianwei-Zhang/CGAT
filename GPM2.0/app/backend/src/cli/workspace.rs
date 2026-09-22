@@ -101,6 +101,13 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
                 );
             }
         }
+        Commands::CopyProjectWorkspace { workspace_root } => {
+            let copied = copy_project_workspace(&workspace_root)?;
+            println!("workspace_root={}", copied.workspace_root.display());
+            println!("project_name={}", copied.project_name);
+            println!("copy_index={}", copied.copy_index);
+            println!("project_count={}", copied.project_count);
+        }
         Commands::DeleteProject {
             workspace_root,
             project_id,

@@ -90,7 +90,9 @@ use gpm_next_backend::runtime_persistence::{
     update_project_assembly_view_state as backend_update_project_assembly_view_state,
     update_runtime_settings as backend_update_runtime_settings,
 };
-use gpm_next_backend::workspace::looks_like_bundle_root;
+use gpm_next_backend::workspace::{
+    copy_project_workspace as backend_copy_project_workspace, looks_like_bundle_root,
+};
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};

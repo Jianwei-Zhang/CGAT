@@ -11,6 +11,7 @@ const DEFINITIONS = {
     ["openWorkspace", "bridge"],
     ["validateWorkspaceIntegrity", "mock"],
     ["deleteWorkspaceDirectory", "mock"],
+    ["copyProjectWorkspace", "bridge"],
     ["initializeProject", "bridge"],
     ["getGrtProjectView", "bridge"],
     ["deleteProject", "bridge"],

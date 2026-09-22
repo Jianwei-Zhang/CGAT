@@ -5,6 +5,7 @@ import {
   __testNormalizeWorkflowError,
   addCtgToPhasedChrTrack,
   createPhasedChrTrack,
+  copyProjectWorkspace,
   deleteProject,
   deletePhasedChrTrack,
   exportDegapJobs,
@@ -30,6 +31,38 @@ import {
   writeFinalPathExportBinaryFile,
   writeFinalPathExportTextFile,
 } from "../workflow-api.js";
+
+test("copyProjectWorkspace routes through the desktop command", async () => {
+  const previousWindow = globalThis.window;
+  const calls = [];
+  try {
+    globalThis.window = {
+      __TAURI__: {
+        core: {
+          invoke: async (command, args) => {
+            calls.push({ command, args });
+            return {
+              workspaceRoot: "D:/projects/rice-copy1",
+              projectName: "Rice-copy1",
+              copyIndex: 1,
+              projectCount: 1,
+            };
+          },
+        },
+      },
+    };
+
+    const result = await copyProjectWorkspace({ workspaceRoot: "D:/projects/rice" });
+
+    assert.deepEqual(calls, [{
+      command: "copy_project_workspace",
+      args: { workspaceRoot: "D:/projects/rice" },
+    }]);
+    assert.equal(result.projectName, "Rice-copy1");
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
 
 test("main-view history services preserve nested Tauri request payloads", async () => {
   const previousWindow = globalThis.window;

@@ -1,4 +1,5 @@
 import {
+  copyProjectWorkspace,
   deleteWorkspaceDirectory,
   importAddDatasetPackage,
   importExtractedBundle,
@@ -398,6 +399,56 @@ function bindProjectEntryControls(host, store) {
     updateImporterState(store, { deleteWithFiles: true });
     rerender(host, store);
   }));
+  host.querySelectorAll("[data-project-copy]").forEach(button => button.addEventListener("click", async event => {
+    event.stopPropagation?.();
+    if (busy()) return;
+    await runCopyProjectFlow(host, store, button.dataset.projectCopy);
+  }));
+}
+
+async function runCopyProjectFlow(host, store, workspaceRoot) {
+  const snapshot = store.getState();
+  const sourceRoot = String(workspaceRoot || "").trim();
+  if (!sourceRoot || snapshot.importer.inFlight || snapshot.initializer?.autoPipelineRunning || snapshot.initializer?.updating) return;
+  const sourceRecord = readWorkspaceHistory().find(record => record.path === sourceRoot);
+  const sourceName = sourceRecord?.projectName || defaultProjectName(sourceRoot);
+  updateImporterState(store, {
+    inFlight: true,
+    projectError: "",
+    status: i18nT(snapshot, "importer.runtime.copyInProgressStatus"),
+    summary: i18nT(snapshot, "importer.runtime.copySummary", { projectName: sourceName }),
+    stages: [],
+  });
+  rerender(host, store);
+
+  try {
+    await flushAssemblyProjectState(host, store);
+    const copied = await copyProjectWorkspace({ workspaceRoot: sourceRoot });
+    appendWorkspaceHistoryRecord(copied.workspaceRoot, copied.projectName);
+    const current = store.getState();
+    updateImporterState(store, {
+      inFlight: false,
+      status: i18nT(current, "importer.runtime.copyDoneStatus"),
+      summary: i18nT(current, "importer.runtime.copyDoneSummary", {
+        projectName: copied.projectName,
+        workspaceRoot: copied.workspaceRoot,
+      }),
+      stages: [i18nT(current, "importer.runtime.copyDoneStage", {
+        workspaceRoot: copied.workspaceRoot,
+      })],
+    });
+    window.dispatchEvent(new Event("gpm-next:route-refresh"));
+  } catch (error) {
+    const current = store.getState();
+    updateImporterState(store, {
+      inFlight: false,
+      projectError: String(error.message || error),
+      status: i18nT(current, "importer.runtime.copyFailedStatus"),
+      summary: String(error.message || error),
+      stages: [],
+    });
+  }
+  rerender(host, store);
 }
 
 async function runImportZipFlow(host, store) {
@@ -1805,6 +1856,18 @@ function writeWorkspaceHistory(records) {
   } catch {
     // ignore localStorage failures
   }
+}
+
+function appendWorkspaceHistoryRecord(workspacePath, projectName) {
+  const path = String(workspacePath || "").trim();
+  if (!path) return;
+  const records = readWorkspaceHistory();
+  const existingIndex = records.findIndex(record => record.path === path);
+  const record = { path, projectName: String(projectName || ""), lastUsedAt: Date.now() };
+  const nextRecords = existingIndex < 0
+    ? [...records, record]
+    : records.map((item, index) => index === existingIndex ? record : item);
+  writeWorkspaceHistory(nextRecords.slice(-20));
 }
 
 function removeWorkspaceHistoryPaths(paths) {

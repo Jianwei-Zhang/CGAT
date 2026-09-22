@@ -48,6 +48,18 @@ async function deleteWorkspaceDirectoryMock({ workspaceRoot }) {
   };
 }
 
+async function copyProjectWorkspaceMock({ workspaceRoot }) {
+  await sleep(120);
+  const normalized = String(workspaceRoot || "").replace(/[\\/]+$/, "");
+  const sourceName = normalized.split(/[\\/]+/).filter(Boolean).at(-1) || "Project";
+  return {
+    workspaceRoot: `${normalized}-copy1`,
+    projectName: `${sourceName}-copy1`,
+    copyIndex: 1,
+    projectCount: 1,
+  };
+}
+
 async function listProjectInitializerOptionsMock({ workspaceRoot }) {
   await sleep(200);
   return {
@@ -435,6 +447,7 @@ async function listNewSequencesMock({ limit }) {
     importAddCtgPackage: importAddCtgPackageMock,
     validateWorkspaceIntegrity: validateWorkspaceIntegrityMock,
     deleteWorkspaceDirectory: deleteWorkspaceDirectoryMock,
+    copyProjectWorkspace: copyProjectWorkspaceMock,
     listProjectInitializerOptions: listProjectInitializerOptionsMock,
     initializeProject: initializeProjectMock,
     getGrtProjectView: buildMockGrtProjectView,

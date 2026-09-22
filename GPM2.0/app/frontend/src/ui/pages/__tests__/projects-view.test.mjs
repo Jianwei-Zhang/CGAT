@@ -35,6 +35,11 @@ test("recent projects and current detail share the browser layout without duplic
   assert.doesNotMatch(html, /data-project-remove|Remove from recent/);
   assert.doesNotMatch(html, /No projects yet|No project open/);
   assert.equal((html.match(/id="project-open-button"/g) || []).length, 1);
+  assert.match(
+    html,
+    /data-workspace-import-add-package-path="\/rice"[\s\S]*data-project-copy="\/rice"[\s\S]*data-project-delete-files="\/rice"/,
+  );
+  assert.match(html, /data-project-copy="\/rice"[^>]*aria-label="Copy project"/);
 });
 
 test("recent-only state is distinct from no projects", () => {

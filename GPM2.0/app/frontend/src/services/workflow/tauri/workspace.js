@@ -55,6 +55,12 @@ async function deleteWorkspaceDirectoryTauri({ workspaceRoot }) {
   });
 }
 
+async function copyProjectWorkspaceTauri({ workspaceRoot }) {
+  return invokeCommand("copy_project_workspace", {
+    workspaceRoot,
+  });
+}
+
 async function initializeProjectTauri({
   workspaceRoot,
   projectName,
@@ -257,6 +263,7 @@ async function listNewSequencesTauri({ workspaceRoot, projectId, limit }) {
     openWorkspace: openWorkspaceTauri,
     validateWorkspaceIntegrity: validateWorkspaceIntegrityTauri,
     deleteWorkspaceDirectory: deleteWorkspaceDirectoryTauri,
+    copyProjectWorkspace: copyProjectWorkspaceTauri,
     initializeProject: initializeProjectTauri,
     deleteProject: deleteProjectTauri,
     updateProject: updateProjectTauri,

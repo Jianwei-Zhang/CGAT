@@ -9,6 +9,7 @@ const {
   listProjectInitializerOptions: listProjectInitializerOptionsMock,
   validateWorkspaceIntegrity: validateWorkspaceIntegrityMock,
   deleteWorkspaceDirectory: deleteWorkspaceDirectoryMock,
+  copyProjectWorkspace: copyProjectWorkspaceMock,
   initializeProject: initializeProjectMock,
   getGrtProjectView: buildMockGrtProjectView,
   deleteProject: deleteProjectMock,
@@ -26,6 +27,7 @@ const {
   openWorkspace: openWorkspaceTauri,
   validateWorkspaceIntegrity: validateWorkspaceIntegrityTauri,
   deleteWorkspaceDirectory: deleteWorkspaceDirectoryTauri,
+  copyProjectWorkspace: copyProjectWorkspaceTauri,
   initializeProject: initializeProjectTauri,
   deleteProject: deleteProjectTauri,
   updateProject: updateProjectTauri,
@@ -95,6 +97,21 @@ export async function deleteWorkspaceDirectory({ workspaceRoot }) {
     // Offline browser preview has no bridge.
   }
   return deleteWorkspaceDirectoryMock({ workspaceRoot });
+}
+
+export async function copyProjectWorkspace({ workspaceRoot }) {
+  if (isTauriRuntime()) {
+    return copyProjectWorkspaceTauri({ workspaceRoot });
+  }
+  try {
+    return await callDevBridge("/api/copy-project-workspace", {
+      workspaceRoot,
+    });
+  } catch (error) {
+    if (error?.source === "dev-bridge") throw error;
+    // Offline browser preview has no bridge.
+  }
+  return copyProjectWorkspaceMock({ workspaceRoot });
 }
 
 export async function initializeProject({

@@ -118,6 +118,7 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
       </button>
       <div class="project-row-actions">
         <button class="button project-icon-button" data-workspace-import-add-package-path="${html(record.path)}" title="${html(messages.buttons.importAddPackage)}" aria-label="${html(messages.buttons.importAddPackage)}" ${disabled}>${projectIcon("addPackage")}</button>
+        <button class="button project-icon-button" data-project-copy="${html(record.path)}" title="${html(messages.buttons.copyProject)}" aria-label="${html(messages.buttons.copyProject)}" ${disabled}>${projectIcon("copy")}</button>
         <button class="button project-icon-button" data-project-delete-files="${html(record.path)}" title="${labels.delete}" aria-label="${labels.delete}" ${disabled}>${projectIcon("delete")}</button>
       </div>
     </div>`;
