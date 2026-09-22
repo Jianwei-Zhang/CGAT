@@ -57,11 +57,26 @@ test("active project keeps the sidebar entry actions when its recent record is r
   assert.doesNotMatch(html, /No projects yet|project-no-selection|id="validate-history-button"/);
 });
 
-test("project actions remain disabled during import and errors retain their text", () => {
-  const html = render({ importer: { inFlight: true, projectError: "Permission <denied>" } });
+test("project actions remain disabled without inserting global feedback above the project browser", () => {
+  const html = render({
+    records: [{ path: "/rice" }],
+    importer: { inFlight: true, projectError: "Permission <denied>", status: "Deleting projects" },
+  });
   assert.match(html, /id="project-import-button"[^>]*disabled/);
   assert.match(html, /id="project-open-button"[^>]*disabled/);
-  assert.match(html, /role="alert">Permission &lt;denied&gt;/);
+  assert.doesNotMatch(html, /data-project-page-error|Permission &lt;denied&gt;|Deleting projects/);
+});
+
+test("project import dialog keeps its contextual error feedback", () => {
+  const html = render({
+    importer: {
+      importDialogOpen: true,
+      importSource: "extracted",
+      extractedPath: "/broken",
+      projectError: "Permission <denied>",
+    },
+  });
+  assert.match(html, /project-import-dialog[\s\S]*role="alert">Permission &lt;denied&gt;/);
 });
 
 test("bulk deletion is exposed only after explicit validation completes with current failed projects", () => {

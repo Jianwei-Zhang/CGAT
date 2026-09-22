@@ -123,9 +123,7 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
       </div>
     </div>`;
   }).join("");
-  return `${importer.inFlight && !importer.importRunId ? `<p role="status">${html(importer.status || labels.loading)}</p>` : ""}
-  ${importer.projectError && !importer.importDialogOpen ? `<p class="error-text" data-project-page-error role="alert">${html(importer.projectError)}</p>` : ""}
-  ${importer.pendingProjectPath ? `<section class="project-pending">
+  return `${importer.pendingProjectPath ? `<section class="project-pending">
     <strong>${labels.pending}</strong><span class="project-path">${html(importer.pendingProjectPath)}</span>
     <button id="project-retry-button" class="button" ${disabled}>${labels.retry}</button></section>` : ""}
   ${empty ? `<section class="project-empty" aria-labelledby="project-empty-title">

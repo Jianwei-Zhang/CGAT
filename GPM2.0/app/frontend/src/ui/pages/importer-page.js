@@ -1076,7 +1076,6 @@ function syncProjectSelection(host, store, { openingPath = "", replaceDetail = f
     const projectName = (active && state.session.projectName) || record.projectName || defaultProjectName(record.path);
     if (name.textContent !== projectName) name.textContent = projectName;
   });
-  if (!state.importer.projectError) routeHost.querySelector("[data-project-page-error]")?.remove();
   if (!state.importer.pendingProjectPath) routeHost.querySelector(".project-pending")?.remove();
   if (replaceDetail) {
     detail.outerHTML = renderWorkspacePage(state);
