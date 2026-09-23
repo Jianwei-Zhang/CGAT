@@ -1,0 +1,266 @@
+schema: comet.native.v4
+name: light-package-label-and-build-policy
+language: en
+phase: archive
+status: done
+state_version: 11
+brief: brief.md
+shape_confirmation_hash: 901cddf9bc552e7c5d7ef2e7cdef5979e651dbfe6e4383d41f73eeff806ebdfc
+spec_changes:
+  - capability: server-light-delivery
+    operation: create
+    source: specs/server-light-delivery/spec.md
+  - capability: windows-frontend-build-verification
+    operation: create
+    source: specs/windows-frontend-build-verification/spec.md
+workspace:
+  isolation: current
+  change_branch: master
+  target_branch: master
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 1
+  iteration: 1
+  attempt: 2
+  retry_epoch: 1
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: "A1: A successful Server workflow produces `<workspace>.zip` and
+      `<workspace>.light.zip`, and its user-facing completion result identifies
+      the second artifact as the Light package without presenting `No-FASTA` as
+      the tier name."
+    result: passed
+    reason:
+      text: Server packaging, runner, checkpoint and report use <workspace>.light.zip
+        and Light completion text; report/package Runtime checks passed and
+        Server-to-App E2E passed.
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: "A2: The App and maintained user documentation describe the reduced tier
+      as Light while the package remains importable with
+      `package_mode=no_fasta`, including legacy `.no_fasta.zip` inputs."
+    result: passed
+    reason:
+      text: App packaging retains package_mode=no_fasta and omits FASTA; importer
+        accepts ZIP by content/contract independent of basename. Light and
+        renamed legacy .no_fasta.zip imports passed E2E; maintained docs and
+        i18n use Light.
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: "A3: Frontend production-build verification runs with Windows `npm.cmd`;
+      no WSL production build is run, and generated `dist/` output from
+      validation is absent when the change is handed off."
+    result: passed
+    reason:
+      text: Builder's recorded production build used Windows cmd.exe/npm.cmd
+        successfully; no WSL production build was run. Runtime no-wsl-dist check
+        and independent dist absence check passed.
+      truncated: false
+builder_handoff:
+  candidate_id: 8437935a-195b-4ea6-b6ea-21201f068797
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:5b794811-b7f2-4f7f-af59-85731c7101a6
+  iteration: 1
+  summary:
+    text: Renamed the reduced Server artifact and public result/report/App/doc
+      wording to Light; retained package_mode=no_fasta and verified legacy
+      .no_fasta.zip import. Recorded Windows-only frontend production build
+      policy in Comet and removed generated dist output.
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+  checks:
+    - name:
+        text: Server report and checkpoint unit tests
+        truncated: false
+      result: passed
+      note:
+        text: 14 tests passed after changes
+        truncated: false
+    - name:
+        text: Server package, prepare, and add-dataset shell tests
+        truncated: false
+      result: passed
+      note:
+        text: package_templates, prepare_metadata, prepare_full, add_dataset passed
+        truncated: false
+    - name:
+        text: Server-to-App delivery end-to-end
+        truncated: false
+      result: passed
+      note:
+        text: New .light.zip and legacy .no_fasta.zip imports passed
+        truncated: false
+    - name:
+        text: Frontend tests
+        truncated: false
+      result: passed
+      note:
+        text: 1119 of 1119 passed
+        truncated: false
+    - name:
+        text: Backend GRT package tests
+        truncated: false
+      result: passed
+      note:
+        text: 21 of 21 passed
+        truncated: false
+    - name:
+        text: Windows frontend production build
+        truncated: false
+      result: passed
+      note:
+        text: Executed with Windows cmd.exe and npm.cmd run build; Vite transformed 1962
+          modules
+        truncated: false
+    - name:
+        text: Generated-output cleanup and diff check
+        truncated: false
+      result: passed
+      note:
+        text: frontend/dist absent after moving it to trash; git diff --check passed
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: Standalone comet native check currently rejects the v4 change schema with
+        runtime protocol 3; workflow status/next remain functional.
+      truncated: false
+  known_limits_truncated: false
+  review:
+    status: passed
+    summary:
+      text: Fresh read-only review found no actionable issues across A1-A3 after two
+        public-string omissions were fixed.
+      truncated: false
+    reviewer_execution_ref: /root/light_final_review
+  submitted_at: 2026-09-23T06:49:52.741Z
+blockers: []
+verification:
+  candidate_id: 8437935a-195b-4ea6-b6ea-21201f068797
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:f3a11cfc-a883-484e-8105-1ca9e8fa8c1b
+  iteration: 1
+  attempt: 2
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: server-report
+      name:
+        text: Server report tests
+        truncated: false
+      argv_display:
+        - text: -m
+          truncated: false
+        - text: unittest
+          truncated: false
+        - text: discover
+          truncated: false
+        - text: -s
+          truncated: false
+        - text: server/tests
+          truncated: false
+        - text: -p
+          truncated: false
+        - text: "[REDACTED]"
+          truncated: false
+      argv_truncated: false
+      cwd_ref: GPM2.0
+      status: passed
+      exit_code: 0
+      duration_ms: 12694
+    - id: package-templates
+      name:
+        text: Server package template tests
+        truncated: false
+      argv_display:
+        - text: tests/gpm_server/package_templates_test.sh
+          truncated: false
+      argv_truncated: false
+      cwd_ref: GPM2.0
+      status: passed
+      exit_code: 0
+      duration_ms: 476
+    - id: no-wsl-dist
+      name:
+        text: No frontend dist left behind
+        truncated: false
+      argv_display:
+        - text: "!"
+          truncated: false
+        - text: -e
+          truncated: false
+        - text: app/frontend/dist
+          truncated: false
+      argv_truncated: false
+      cwd_ref: GPM2.0
+      status: passed
+      exit_code: 0
+      duration_ms: 6
+  summary:
+    text: All A1-A3 acceptance criteria pass. Formal Runtime checks passed;
+      independent source review and Server-to-App E2E confirmed package naming,
+      payload contract, and legacy ZIP import. Generated frontend dist is
+      absent.
+    truncated: false
+  risks:
+    - text: Windows build output was observed in the Builder session but is not
+        retained as a standalone log.
+      truncated: false
+    - text: Legacy suffix compatibility is tested with a Light archive renamed to
+        .no_fasta.zip, not an independently sourced historical ZIP.
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-09-23T07:01:15.953Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: blocked
+    unresolved_ids:
+      - A1
+      - A2
+      - A3
+    summary:
+      text: The user explicitly prohibited subagents for this task; no independent
+        verifier agent can be started under the applicable policy. All planned
+        Runtime checks passed, and the pre-policy read-only review already found
+        no actionable issues.
+      truncated: false
+    completed_at: 2026-09-23T06:52:44.948Z
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 2
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: All A1-A3 acceptance criteria pass. Formal Runtime checks passed;
+        independent source review and Server-to-App E2E confirmed package
+        naming, payload contract, and legacy ZIP import. Generated frontend dist
+        is absent.
+      truncated: false
+    completed_at: 2026-09-23T07:01:15.953Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-09-22T08:40:45.326Z
