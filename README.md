@@ -3,11 +3,11 @@
 
 Read [CGAT Docs](https://riceome.hzau.edu.cn/cgat/) to learn more about how to install and use this system.
 
-## How to use
+## How to use?
 
 Start with **[GPM2.0](GPM2.0/README.md)** ([中文指南](GPM2.0/README_zh.md)):
 
-1. Follow the [Linux Server quick start](GPM2.0/server/README.md) to generate `gpm_server.tar.gz` or `gpm_server.light.tar.gz` (ZIP remains available).
+1. Follow the [Linux Server quick start](GPM2.0/server/README.md) to generate `gpm_server.tar.gz` or `gpm_server.light.tar.gz`.
 2. Download the desktop App from [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases).
 3. Open the App and import either Server delivery package.
 
