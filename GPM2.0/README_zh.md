@@ -46,14 +46,14 @@ bash server/install.sh --check
 | 可选比对引擎 | `blastn` + `makeblastdb`，或 `winnowmap` + `meryl` |
 | 可选 reads 质控 | `meryl`、`merqury.sh`；仅传入 `--reads` 时使用 |
 
-执行 `prepare.sh` 和生成的 `run_all.sh` 时都应保持该环境已激活。
+执行 `run.sh` 时保持该环境已激活。
 
-### 2. 准备工作目录
+### 2. 运行完整流程
 
 显式指定输出目录的最简示例：
 
 ```bash
-bash server/prepare.sh \
+bash server/run.sh \
   --ref /path/to/rice_IRGSP_1_0.fa \
   --ds /path/to/hifiasm.fa \
   --ds /path/to/flye.fa \
@@ -84,6 +84,7 @@ bash server/prepare.sh \
 | `--reads <fastq>` | 可选，可重复 | 启用共享 Meryl 数据及逐 dataset Merqury QV 评估；`--threads` 总预算会分配给各 dataset。 |
 | `--grt-qc-memory-gb <数量>` | `80` | 可选 reads 质控的内存上限。 |
 | `--grt-kmer-size <数量>` | `21` | 可选 reads 质控的 k-mer 大小。 |
+| `--max-fill <bp>` | `1000000` | Step3 两轮优化补洞的长度上限；恢复时可修改。 |
 
 #### 比对引擎专属参数
 
@@ -98,10 +99,10 @@ bash server/prepare.sh \
 
 引擎专属参数只能与对应的 `--aligner` 一起使用。GRT 计算始终从 `PATH` 解析 `minimap2` 和 MUMmer4 命令。
 
-### 3. 运行、恢复与监控
+### 3. 恢复与监控
 
 ```bash
-bash ./gpm_server/run_all.sh
+bash server/run.sh -o ./gpm_server
 ```
 
 该命令串行执行生成的计划，遇到首个错误即停止，复用前会重新校验 checkpoint，并在 `gpm_server/` 同级目录生成两个交付包：
@@ -125,7 +126,7 @@ python3 /path/to/report/render_report.py
 
 生成器只读取报告目录内的记录，不重新计算比对或修复。报告不携带原始 FASTA/reads；未测量的质量指标不显示为零。报告中的 gap 统计指连续至少 100 个 N，显式连接 gap 与 N 碱基总数分别记录。当前自动报告覆盖 `prepare.sh` 和 `run_all.sh`；单独执行增量脚本或打包脚本不会更新此前的运行报告。详见 [报告格式与边界](server/REPORT.md)。
 
-恢复时无需附加参数，重新执行同一条 `run_all.sh` 即可。线程数固定为准备阶段的值；不支持运行时 `--threads`、`--from`、`--until` 或 `--stage` 覆盖。
+首次 `run.sh` 会自动准备并运行完整流程；恢复时重复原命令，或仅指定 `-o`。原有 `prepare.sh` 和生成的 `run_all.sh` 仍兼容。线程数固定为准备阶段的值；不支持运行时 `--threads`、`--from`、`--until` 或 `--stage` 覆盖。
 
 ```bash
 tail -F ./gpm_server/logs/run_all.log

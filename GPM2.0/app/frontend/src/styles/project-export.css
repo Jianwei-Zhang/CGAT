@@ -123,11 +123,34 @@
 }
 
 .project-export-detail-section .final-path-log-table-wrap {
-  overflow: visible;
+  max-height: min(52vh, 560px);
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.project-export-detail-section .final-path-log-table-wrap:has(details[open]) {
+  min-height: 280px;
+}
+
+.project-export-detail-table th:has(details[open]) {
+  z-index: 3;
+}
+
+.project-export-detail-table .final-path-log-type-cell {
+  vertical-align: top;
+}
+
+.project-export-detail-type-label {
+  position: sticky;
+  top: 42px;
+  display: block;
 }
 
 .project-export-detail-table th {
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  white-space: nowrap;
   background: #f3f3f3;
 }
 

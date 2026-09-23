@@ -46,14 +46,14 @@ Re-running `install.sh` validates the managed environment and updates it only wh
 | Alternative aligners | `blastn` + `makeblastdb`, or `winnowmap` + `meryl` |
 | Optional reads QC | `meryl`, `merqury.sh`; used only when `--reads` is supplied |
 
-Keep this environment active for both `prepare.sh` and the generated `run_all.sh`.
+Keep this environment active for `run.sh`.
 
-### 2. Prepare a workspace
+### 2. Run the full workflow
 
 Minimal example with an explicit output directory:
 
 ```bash
-bash server/prepare.sh \
+bash server/run.sh \
   --ref /path/to/rice_IRGSP_1_0.fa \
   --ds /path/to/hifiasm.fa \
   --ds /path/to/flye.fa \
@@ -84,6 +84,7 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | `--reads <fastq>` | Optional, repeatable | Enable shared Meryl data plus per-dataset Merqury QV assessment; the `--threads` budget is distributed across datasets. |
 | `--grt-qc-memory-gb <n>` | `80` | Memory limit for optional reads QC. |
 | `--grt-kmer-size <n>` | `21` | K-mer size for optional reads QC. |
+| `--max-fill <bp>` | `1000000` | Length limit for both Step3 optimized refill rounds; can be changed on resume. |
 
 #### Aligner-specific options
 
@@ -98,10 +99,10 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 
 An aligner-specific option is valid only with its matching `--aligner`. GRT processing always resolves `minimap2` and the MUMmer4 commands from `PATH`.
 
-### 3. Run, resume, and monitor
+### 3. Resume and monitor
 
 ```bash
-bash ./gpm_server/run_all.sh
+bash server/run.sh -o ./gpm_server
 ```
 
 The runner executes the generated plan serially, stops at the first error, validates checkpoints before reuse, and creates both archives beside `gpm_server/`:
@@ -125,7 +126,7 @@ python3 /path/to/report/render_report.py
 
 The renderer reads only report-local records and does not rerun alignments or repairs. Reports contain no raw FASTA/reads; unmeasured quality metrics remain unavailable. Gap counts use consecutive runs of at least 100 Ns; explicit connector segments and total N bases are recorded separately. Automatic reporting currently covers `prepare.sh` and `run_all.sh`; standalone incremental or packaging commands do not update an earlier run's report. See [report format and scope](server/REPORT.md).
 
-Resume without extra options by running the same `run_all.sh` command. The prepared thread count remains fixed; runtime `--threads`, `--from`, `--until`, and `--stage` overrides are not supported.
+The first `run.sh` invocation prepares and runs the full workflow automatically. Resume with the same command or just `-o`. The existing `prepare.sh` and generated `run_all.sh` remain compatible. The prepared thread count remains fixed; runtime `--threads`, `--from`, `--until`, and `--stage` overrides are not supported.
 
 ```bash
 tail -F ./gpm_server/logs/run_all.log

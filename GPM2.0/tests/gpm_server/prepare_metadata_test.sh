@@ -605,4 +605,44 @@ if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format unknown >
   exit 1
 fi
 
+assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" grt_refill_max_length 1000000
+PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
+  --ref refill_ref "$ref" --ds refill_ds "$ds" --max-fill 2000000 \
+  -o "${TMP_DIR}/refill-output" >/dev/null
+assert_prepare_option "${TMP_DIR}/refill-output/metadata/prepare_options.tsv" grt_refill_max_length 2000000
+grep -F -- "--max-fill 2000000" "${TMP_DIR}/refill-output/run_grt_step23.sh" >/dev/null
+for invalid_limit in 0 -1 1.5 nope; do
+  if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --max-fill "$invalid_limit" >/dev/null 2>&1; then
+    echo "expected invalid refill limit to fail: $invalid_limit" >&2
+    exit 1
+  fi
+done
+
+# Exercise the real preparation script under the single-command entry lock.
+PATH="${FAKE_BIN}:$PATH" PYTHONPATH="${REPO_ROOT}/server/tools" python3 - "$REPO_ROOT/server" "$ref" "$ds" "$TMP_DIR" <<'PYENTRY'
+import json
+import subprocess
+import sys
+from pathlib import Path
+from unittest.mock import patch
+import server_run
+source, ref, ds, temp = sys.argv[1:]
+root = Path(temp) / "entry-workspace"
+argv = ["--ref", "ref", ref, "--ds", "ds", ds, "-o", str(root)]
+def run_checked(runner):
+    assert (root / ".run_all/lock/owner.json").is_file()
+    assert json.loads((root / ".run_all/launch.json").read_text())["prepared"]
+    assert (root / "logs/prepare.log").stat().st_size > 0
+    rejected = subprocess.run(["bash", str(Path(source) / "prepare.sh"), *argv], capture_output=True)
+    assert rejected.returncode != 0 and b"workspace is locked" in rejected.stderr
+    return 7
+with patch.object(server_run.Runner, "run", run_checked):
+    assert server_run.execute(argv, Path(source)) == 7
+    manifest = (root / ".run_all/launch.json").read_bytes()
+    with patch.object(server_run, "prepare_workspace", side_effect=AssertionError("must resume")):
+        assert server_run.execute(argv, Path(source)) == 7
+    assert (root / ".run_all/launch.json").read_bytes() == manifest
+assert not (root / ".run_all/lock").exists()
+PYENTRY
+
 echo "gpm_server_prepare_metadata_test.sh: ok"

@@ -1714,3 +1714,30 @@ test("renderFinalPathCard table mode renders editable card rows and actions", ()
   assert.doesNotMatch(html, /<table\b/i);
   assert.doesNotMatch(html, /placeholder="-"/);
 });
+
+
+test("graph keeps tiny ctg and gap segments visible without changing source coordinates", () => {
+  const segments = [
+    { segmentId: "large", type: "ctg", assemblyCtgId: 1, datasetName: "pre", ctgName: "large", overallLen: 30000000, start: 1, end: 30000000 },
+    { segmentId: "tiny", type: "ctg", assemblyCtgId: 2, datasetName: "pre", ctgName: "tiny", overallLen: 1000, start: 101, end: 101 },
+    { segmentId: "gap", type: "gap", gapSizeBp: 100 },
+    { segmentId: "tiny-right", type: "ctg", assemblyCtgId: 3, datasetName: "pre", ctgName: "tiny-right", overallLen: 1000, start: 501, end: 502 },
+  ];
+  const before = structuredClone(segments);
+  const html = renderFinalPathCard({
+    projectName: "proj", chrName: "chr06", viewMode: "graph", trackViewportPx: 800,
+    finalPathEntry: { mode: "segments", chrName: "chr06", segments, totalLength: 30000103 },
+  }, { ...createDeps(), i18n: createI18n() });
+  let right = 0;
+  for (const id of ["large", "tiny", "gap", "tiny-right"]) {
+    const match = html.match(new RegExp(`data-final-path-segment-id="${id}"[\\s\\S]*?<rect[\\s\\S]*?x="([^\"]+)"[\\s\\S]*?width="([^\"]+)"`));
+    assert.ok(match, `missing segment ${id}`);
+    const x = Number(match[1]);
+    const width = Number(match[2]);
+    assert.ok(width >= 8, `${id} should have at least 8 pixels, got ${width}`);
+    assert.ok(Math.abs(x - right) <= 0.02, `segments must remain adjacent: ${id}`);
+    right = x + width;
+  }
+  assert.ok(Math.abs(right - 800) <= 0.02);
+  assert.deepEqual(segments, before);
+});

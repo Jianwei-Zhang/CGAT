@@ -11,14 +11,11 @@ bash install.sh
 # 2. 使用安装程序最后打印的命令激活环境，例如
 mamba activate cgat-server
 
-# 3. 准备一个项目工作目录
-bash prepare.sh \
+# 3. 准备、计算并生成交付包
+bash run.sh \
   --ref /path/to/reference.fa \
   --ds /path/to/assembly.fa \
   -o ./gpm_server
-
-# 4. 执行计算并生成交付包
-bash ./gpm_server/run_all.sh
 ```
 
 成功结束时会明确显示 `Final delivery packages` 摘要。最终只交付
@@ -34,7 +31,7 @@ bash ./gpm_server/run_all.sh
 下划线和连字符以外的连续字符会替换为 `_`。需要自定义名称时仍可使用显式写法：
 
 ```bash
-bash prepare.sh \
+bash run.sh \
   --ref reference /path/to/reference.fa \
   --ds assembly /path/to/assembly.fa \
   -o ./gpm_server
@@ -63,12 +60,12 @@ bash install.sh --manager conda
 并确保 Merqury 安装要求的 `MERQURY` 环境变量已设置。`command -v`
 能找到程序不代表程序能正常启动；`GLIBCXX_* not found` 表示 C++ 运行库
 不匹配，应加载匹配的 GCC runtime 或使用安装器创建的独立环境。
-执行 `prepare.sh` 和 `run_all.sh` 时使用同一套环境。
+执行 `run.sh` 时保持环境激活。
 
 外部 QC 命令失败时，Server 主日志会保留其 stdout/stderr 尾部，
 即使失败的临时 QC 目录随后被清理，也可查看底层报错。
 
-`prepare.sh -t 32` 设置总计算线程预算；新准备的工作区会在独立比对任务之间
+`run.sh -t 32` 设置总计算线程预算；新准备的工作区会在独立比对任务之间
 自动分配线程并行执行。
 
 ### Step3 gap 来源修复后的断点恢复
@@ -93,9 +90,12 @@ cp tools/grt_step23.py "$workspace/.prepare_lib/tools/grt_step23.py"
 | --- | --- | --- |
 | `install.sh` | 创建、更新并验证 `cgat-server` 环境 | 首次安装或依赖更新时 |
 | `env.sh` | `install.sh` 的兼容入口 | 仅供旧命令继续使用 |
-| `prepare.sh` | 检查输入和工具，生成一个项目的 `gpm_server/` 工作目录 | 每个新项目一次 |
+| `run.sh` | 自动准备并执行完整流程，已有工作目录按断点继续 | 首次运行或恢复 |
+| `prepare.sh` | 兼容原有的仅准备命令 | 需要单独生成脚本时 |
 | `export_final_path_fasta.sh` | 根据 App 导出的 Final Path TSV 重建 FASTA | 流程后期按需使用，不是安装步骤 |
 
-`prepare.sh` 只负责准备项目；真正的计算由其生成的 `gpm_server/run_all.sh` 执行。
+重复同一条 `run.sh` 命令，或执行 `bash run.sh -o ./gpm_server` 即可恢复；已通过校验的结果会复用。生成的 `run_all.sh` 仍可直接执行。
+
+`--max-fill <bp>` 设置 Step3 两轮优化补洞的长度上限，默认 `1000000`。已有工作目录可用 `bash run.sh -o ./gpm_server --max-fill 2000000` 调整；更换输入或其他准备参数时使用新的输出目录。
 
 完整参数和客户端说明见仓库上一级的 `README_zh.md`。

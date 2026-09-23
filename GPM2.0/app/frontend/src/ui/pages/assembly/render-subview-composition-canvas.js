@@ -1,3 +1,4 @@
+import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
   readHitIdentityPct, alignmentBandSvgAttrs, alignmentBandTooltipMetrics,
@@ -412,6 +413,12 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
     <rect class="track-ctg subview-track-ctg${tone}" x="${member.x.toFixed(2)}" y="${y}"
       width="${member.width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4" pointer-events="all" />
     ${grtOverlay}
+    ${renderNRegionMarkersForTrackCtg({
+      ctg: candidate?.ctg, rect: member, y, barHeight: BAR_HEIGHT,
+      isMirror: member.source?.mirrored,
+      flipped: Boolean(member.flipped) !== Boolean(candidate?.ctg?.subviewPhasedOrientFlipped),
+      escapeAttr, escapeHtml,
+    })}
     ${renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr })}
     ${labelMarkup}
   </g>`;

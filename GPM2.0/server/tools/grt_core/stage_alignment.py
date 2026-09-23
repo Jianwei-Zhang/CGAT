@@ -113,6 +113,8 @@ def build_candidates(
     members_by_record: dict[str, dict[str, str]],
     donor_records: dict[str, str],
     fragments_by_record: dict[str, list[dict[str, str]]] | None = None,
+    *,
+    max_fill_length: int = MAX_FILL_LENGTH,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     alignments: dict[tuple[str, str], list[dict[str, object]]] = defaultdict(list)
     rejections: list[dict[str, object]] = []
@@ -167,8 +169,8 @@ def build_candidates(
                     local_end = int(upper["tstart"])
                     if local_start > local_end:
                         rejection["reason"] = "empty_or_overlapping_donor_interval"
-                    elif local_end - local_start + 1 > MAX_FILL_LENGTH:
-                        rejection["reason"] = "fill_length_gt_1000000"
+                    elif local_end - local_start + 1 > max_fill_length:
+                        rejection["reason"] = f"fill_length_gt_{max_fill_length}"
                     else:
                         donor_sequence = donor_records[str(left["target"])][local_start - 1 : local_end]
                         fragment = next(

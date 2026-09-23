@@ -39,6 +39,7 @@ GRT_DELTA_FILTER="delta-filter"
 GRT_SHOW_COORDS="show-coords"
 GRT_QC_MEMORY_GB="80"
 GRT_KMER_SIZE="21"
+GRT_REFILL_MAX_LENGTH="1000000"
 MINIMAP_PRESET_SET=false
 BLASTN_TASK_SET=false
 BLASTN_EVALUE_SET=false
@@ -71,6 +72,7 @@ Usage:
     [--reads <reads_fastq_path> ...] \
     [--grt-qc-memory-gb <memory_gb>] \
     [--grt-kmer-size <kmer_size>] \
+    [--max-fill <bp>] \
     [--ds [<dataset_name>] <dataset_fasta_path> ...]
 
 Example:
@@ -97,6 +99,7 @@ Behavior:
   - Supports --cen <reference_centromere_fasta> to mark complete reference centromere regions
   - Supports --cen-min-len and --cen-min-identity to filter centromere alignments
   - The first --ds is the locked GRT primary dataset; later initial --ds inputs are support datasets
+  - --max-fill sets the Step3 optimized refill length limit in bp, default: 1000000
   - Discovers minimap2, nucmer, delta-filter, and show-coords from PATH and records their resolved paths
   - Repeatable --reads enables one shared Meryl database plus parallel Merqury QV for every initial dataset
   - The --threads budget is divided across concurrent reads-QC dataset jobs
@@ -580,6 +583,7 @@ write_prepare_options_metadata() {
     printf 'grt_meryl\t%s\n' "$GRT_MERYL"
     printf 'grt_merqury\t%s\n' "$GRT_MERQURY"
     printf 'grt_craq\t%s\n' "$GRT_CRAQ"
+    printf 'grt_refill_max_length\t%s\n' "$GRT_REFILL_MAX_LENGTH"
     printf 'grt_qc_memory_gb\t%s\n' "$GRT_QC_MEMORY_GB"
     printf 'grt_kmer_size\t%s\n' "$GRT_KMER_SIZE"
   } > "$output_path"
@@ -708,14 +712,15 @@ write_grt_step23_script() {
   {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
-    printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s\n' \
+    printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --max-fill %s\n' \
       "$(shell_quote "${work_root}/.prepare_lib/tools/grt_step23.py")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$GRT_MINIMAP2")" \
       "$(shell_quote "$GRT_NUCMER")" \
       "$(shell_quote "$GRT_DELTA_FILTER")" \
-      "$(shell_quote "$GRT_SHOW_COORDS")"
+      "$(shell_quote "$GRT_SHOW_COORDS")" \
+      "$(shell_quote "$GRT_REFILL_MAX_LENGTH")"
   } > "$output_path"
   make_executable_if_supported "$output_path"
 }
@@ -943,6 +948,12 @@ while [[ $# -gt 0 ]]; do
       WINNOWMAP_REPEAT_FRACTION_SET=true
       shift 2
       ;;
+    --max-fill|-m)
+      [[ $# -ge 2 ]] || die "--max-fill requires <bp>"
+      [[ "$2" =~ ^[1-9][0-9]*$ ]] || die "Invalid --max-fill '$2'. Use a positive integer."
+      GRT_REFILL_MAX_LENGTH="$2"
+      shift 2
+      ;;
     --threads|-t)
       [[ $# -ge 2 ]] || die "$1 requires <thread_budget>"
       validate_threads "$2"
@@ -1072,6 +1083,20 @@ if [[ "${#READS_SRCS[@]}" -gt 0 ]]; then
   done
 fi
 
+# A run.sh preparation inherits its parent's workspace lock. Standalone
+# preparation must not overwrite a workspace while a workflow is running.
+python3 - "$WORK_ROOT" "${GPM_SERVER_PREPARE_RUN_ID:-}" "$PPID" <<'PYLOCK'
+import json
+import sys
+from pathlib import Path
+root, run_id, parent = sys.argv[1:]
+lock = Path(root) / ".run_all/lock"
+if lock.exists() or run_id:
+    owner = json.loads((lock / "owner.json").read_text())
+    if not run_id or owner.get("run_id") != run_id or str(owner.get("pid")) != parent:
+        sys.exit("ERROR: workspace is locked; use run.sh to resume after the current run finishes")
+PYLOCK
+
 mkdir -p \
   "${WORK_ROOT}/metadata" \
   "${WORK_ROOT}/data/reference" \
@@ -1171,7 +1196,9 @@ write_prepare_options_metadata \
 RUN_ALL="${WORK_ROOT}/run_all.sh"
 RUN_ALL_STATE_DIR="${WORK_ROOT}/.run_all"
 RUN_ALL_PLAN="${RUN_ALL_STATE_DIR}/plan.tsv"
-rm -rf "$RUN_ALL_STATE_DIR" "${WORK_ROOT}/logs"
+if [[ -z "${GPM_SERVER_PREPARE_RUN_ID:-}" ]]; then
+  rm -rf "$RUN_ALL_STATE_DIR" "${WORK_ROOT}/logs"
+fi
 mkdir -p "$RUN_ALL_STATE_DIR"
 {
   printf '#!/usr/bin/env bash\n'

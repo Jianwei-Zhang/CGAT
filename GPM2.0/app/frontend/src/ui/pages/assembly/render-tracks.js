@@ -1,3 +1,4 @@
+import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
   readHitIdentityPct, alignmentBandSvgAttrs, alignmentBandTooltipMetrics,
@@ -350,52 +351,6 @@ function createRenderTracksRenderer(deps = {}) {
       .join("");
   }
 
-  function renderNRegionMarkersForTrackCtg({ ctg, rect, y, barHeight, isMirror }) {
-    if (isMirror || !Array.isArray(ctg?.nRegions) || ctg.nRegions.length === 0) {
-      return "";
-    }
-    return ctg.nRegions
-      .map((region) => {
-        const ctgStart = normalizePositiveInt(region?.ctgStart ?? region?.ctg_start ?? region?.startBp ?? region?.start_bp);
-        const ctgEnd = normalizePositiveInt(region?.ctgEnd ?? region?.ctg_end ?? region?.endBp ?? region?.end_bp);
-        const markerRect = buildTrackHitRectWithinCtgDisplay({
-          ctgRect: rect,
-          ctgLengthBp: ctg.lengthBp,
-          ctgStartOffset: Number(ctgStart),
-          ctgEndOffset: Number(ctgEnd),
-        });
-        if (!Number.isFinite(markerRect.x) || !Number.isFinite(markerRect.width) || markerRect.width <= 0) {
-          return "";
-        }
-        const visibleMarkerRect = resolveVisibleTelomereMarkerRect(markerRect, rect);
-        if (!visibleMarkerRect) {
-          return "";
-        }
-        const lengthValue = normalizePositiveInt(region?.lengthBp ?? region?.length_bp)
-          ?? (ctgStart && ctgEnd ? Math.abs(ctgEnd - ctgStart) + 1 : null);
-        const tooltip = [
-          "N",
-          ctgStart && ctgEnd ? `${ctgStart}-${ctgEnd}` : "",
-          lengthValue ? String(lengthValue) : "",
-        ].filter(Boolean).join("\t");
-        return `<rect
-              class="track-n-region-marker"
-              data-n-region-marker="1"
-              data-n-region-contig-id="${escapeAttr(String(ctg.assemblyCtgId))}"
-              data-n-region-ctg-start="${escapeAttr(String(ctgStart ?? ""))}"
-              data-n-region-ctg-end="${escapeAttr(String(ctgEnd ?? ""))}"
-              data-n-region-length="${escapeAttr(String(lengthValue ?? ""))}"
-              x="${visibleMarkerRect.x.toFixed(2)}"
-              y="${(y + 1).toFixed(2)}"
-              width="${visibleMarkerRect.width.toFixed(2)}"
-              height="${Math.max(1, barHeight - 2)}"
-              rx="1.5"
-              ry="1.5"
-            ><title>${escapeHtml(tooltip)}</title></rect>`;
-      })
-      .filter(Boolean)
-      .join("");
-  }
 
   function resolveReferenceTrackLabel(selectedChrName) {
     if (!selectedChrName) {
@@ -2378,6 +2333,7 @@ function renderAssemblyTracks({
             isMirror: layout.isMirror,
           });
           const nRegionMarkerMarkup = renderNRegionMarkersForTrackCtg({
+            escapeAttr, escapeHtml,
             ctg,
             rect,
             y,

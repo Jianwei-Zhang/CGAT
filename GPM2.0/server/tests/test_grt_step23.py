@@ -1570,6 +1570,7 @@ else:
         env: dict[str, str],
         threads: int = 2,
         step23_tool: Path = STEP23_TOOL,
+        refill_max_length: int = 1_000_000,
     ):
         return subprocess.run(
             [
@@ -1587,12 +1588,36 @@ else:
                 str(tools["show_coords"]),
                 "--threads",
                 str(threads),
+                "--max-fill",
+                str(refill_max_length),
             ],
             check=False,
             capture_output=True,
             text=True,
             env=env,
         )
+
+    def test_refill_limit_invalidates_step3_but_reuses_step2(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+            server = self.make_server(root)
+            tools = self.make_tools(root)
+            env = os.environ.copy()
+            env["FAKE_GRT_MINIMAP_LOG"] = str(root / "minimap.log")
+            env["FAKE_GRT_MUMMER_LOG"] = str(root / "mummer.log")
+            step1 = self.run_step1(server, tools, env)
+            self.assertEqual(step1.returncode, 0, step1.stderr)
+            first = self.run_step23(server, tools, env)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            changed = self.run_step23(server, tools, env, refill_max_length=2_000_000)
+            self.assertEqual(changed.returncode, 0, changed.stderr)
+            self.assertIn("GRT step2 cache hit:", changed.stdout)
+            self.assertNotIn("GRT step3 cache hit:", changed.stdout)
+            checkpoint = json.loads((server / "grt/checkpoints/step3.json").read_text())
+            self.assertEqual(checkpoint["fingerprint_payload"]["refill_parameters"]["max_fill_length"], 2_000_000)
+            repeated = self.run_step23(server, tools, env, refill_max_length=2_000_000)
+            self.assertEqual(repeated.returncode, 0, repeated.stderr)
+            self.assertIn("GRT step3 cache hit:", repeated.stdout)
 
     def test_step23_runtime_script_hash_invalidates_successful_checkpoints(self):
         with tempfile.TemporaryDirectory() as temporary_dir:

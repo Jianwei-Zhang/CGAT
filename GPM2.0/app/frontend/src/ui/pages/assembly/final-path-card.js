@@ -140,7 +140,7 @@ const FINAL_PATH_GRAPH_BAR_Y = 70;
 const FINAL_PATH_GRAPH_BAR_HEIGHT = 14;
 const FINAL_PATH_GRAPH_TEXT_OFFSET_Y = 11;
 const FINAL_PATH_GRAPH_BAR_RADIUS = 4;
-const FINAL_PATH_GAP_MARKER_MIN_WIDTH_PX = 8;
+const FINAL_PATH_SEGMENT_MIN_WIDTH_PX = 8;
 const FINAL_PATH_GAP_LABEL_TEXT = "GAP";
 const TRACK_EDGE_LABEL_PADDING = 16;
 
@@ -855,9 +855,13 @@ function resolveFinalPathVisualLayouts(items, innerWidth) {
       });
     }
   });
-  const ctgMinWidths = ctgItems.map(() => 1);
+  const minimumWidth = Math.min(
+    FINAL_PATH_SEGMENT_MIN_WIDTH_PX,
+    resolvedInnerWidth / Math.max(1, ctgItems.length + gapItems.length),
+  );
+  const ctgMinWidths = ctgItems.map(() => minimumWidth);
   const desiredGapWidths = gapItems.map(({ baseWidth }) =>
-    Math.max(FINAL_PATH_GAP_MARKER_MIN_WIDTH_PX, baseWidth),
+    Math.max(FINAL_PATH_SEGMENT_MIN_WIDTH_PX, baseWidth),
   );
   const maxGapBudget = Math.max(
     0,
@@ -869,7 +873,7 @@ function resolveFinalPathVisualLayouts(items, innerWidth) {
     : distributeWidthsWithMinimums(
       desiredGapWidths,
       maxGapBudget,
-      desiredGapWidths.map(() => 1),
+      desiredGapWidths.map(() => minimumWidth),
     );
   const ctgBudget = Math.max(0, resolvedInnerWidth - gapWidths.reduce((sum, width) => sum + width, 0));
   const ctgWidths = distributeWidthsWithMinimums(
@@ -894,7 +898,7 @@ function resolveFinalPathVisualLayouts(items, innerWidth) {
 }
 
 function resolveGapMarkerBaseLayout(item, innerWidth) {
-  const rawMarkerWidth = Math.max(FINAL_PATH_GAP_MARKER_MIN_WIDTH_PX, item?.width || 0);
+  const rawMarkerWidth = Math.max(FINAL_PATH_SEGMENT_MIN_WIDTH_PX, item?.width || 0);
   const markerWidth = Math.max(1, Math.min(innerWidth, rawMarkerWidth));
   const rawMarkerX = (item?.x || 0) + (item?.width || 0) / 2 - markerWidth / 2;
   return {

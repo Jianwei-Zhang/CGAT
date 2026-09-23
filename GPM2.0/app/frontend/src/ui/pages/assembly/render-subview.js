@@ -1,3 +1,4 @@
+import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
   readHitIdentityPct, alignmentBandSvgAttrs, alignmentBandTooltipMetrics,
@@ -1918,6 +1919,13 @@ function renderSubviewAlignmentCard(
                 <title>${escapeHtml(topCtgTitle)}</title>
               </rect>
               ${grtResult.context?.subviewEnabled ? grtResultScene.overlaysByKey.get("top") || "" : ""}
+              ${renderNRegionMarkersForTrackCtg({
+                ctg: topCtg,
+                rect: { x: svgModel.topBarX, width: svgModel.topBarWidth },
+                y: svgModel.topBarY, barHeight: svgModel.barHeight,
+                isMirror: String(topCtg?.subviewSource || "") === "mirror",
+                flipped: isSubviewPairwiseRangeMirrored(topCtg), escapeAttr, escapeHtml,
+              })}
               ${topFragments.length
                 ? buildSubviewFragmentRects({
                     fragments: topFragments,
@@ -1970,6 +1978,13 @@ function renderSubviewAlignmentCard(
                 <title>${escapeHtml(bottomCtgTitle)}</title>
               </rect>
               ${grtResult.context?.subviewEnabled ? grtResultScene.overlaysByKey.get("bottom") || "" : ""}
+              ${renderNRegionMarkersForTrackCtg({
+                ctg: bottomCtg,
+                rect: { x: svgModel.bottomBarX, width: svgModel.bottomBarWidth },
+                y: svgModel.bottomBarY, barHeight: svgModel.barHeight,
+                isMirror: String(bottomCtg?.subviewSource || "") === "mirror",
+                flipped: isSubviewPairwiseRangeMirrored(bottomCtg), escapeAttr, escapeHtml,
+              })}
               ${bottomFragments.length
                 ? buildSubviewFragmentRects({
                     fragments: bottomFragments,
@@ -3017,6 +3032,10 @@ function renderSubviewTrackPairAlignmentCard(
                 <title>${escapeHtml(ctgTitle)}</title>
               </rect>
               ${grtResult.context?.subviewEnabled ? grtResultScene.overlaysByKey.get(grtOverlayKey) || "" : ""}
+              ${renderNRegionMarkersForTrackCtg({
+                ctg, rect, y, barHeight: TRACK_BAR_HEIGHT, isMirror: layout.isMirror,
+                flipped: isSubviewPairwiseRangeMirrored(ctg), escapeAttr, escapeHtml,
+              })}
               ${fragments.length
                 ? buildSubviewFragmentRects({
                     fragments,

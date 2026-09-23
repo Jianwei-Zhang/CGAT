@@ -3599,6 +3599,7 @@ def run_refill_alignment(
     threads: int,
     *,
     round_name: str = "round1",
+    max_fill_length: int = REFILL_MAX_LENGTH,
 ) -> tuple[
     list[dict[str, object]],
     list[dict[str, object]],
@@ -3620,7 +3621,7 @@ def run_refill_alignment(
         "min_gap_length": NORMALIZED_GAP_LENGTH,
         "min_alignment_length": REFILL_MIN_ALIGNMENT,
         "min_identity": REFILL_MIN_IDENTITY,
-        "max_fill_length": REFILL_MAX_LENGTH,
+        "max_fill_length": max_fill_length,
         "q_source": working_q_version,
     }
     artifact_identities: dict[str, dict[str, str]] = {}
@@ -3679,7 +3680,10 @@ def run_refill_alignment(
     (temporary / "refill" / round_name / "result.paf").write_bytes(
         b"".join(paf_parts)
     )
-    candidates, rejections = build_candidates("step3", paf_rows, gaps, members_by_record, donor_records)
+    candidates, rejections = build_candidates(
+        "step3", paf_rows, gaps, members_by_record, donor_records,
+        max_fill_length=max_fill_length,
+    )
     for candidate in candidates:
         candidate.update(
             {
@@ -4211,8 +4215,11 @@ def run_step3(
     minimap: dict[str, str],
     threads: int,
     repair_mode: str = DEFAULT_REPAIR_MODE,
+    refill_max_length: int = REFILL_MAX_LENGTH,
 ) -> tuple[dict[str, object], bool]:
     stage = "step3"
+    if refill_max_length < 1:
+        fail("max-fill must be a positive integer")
     if repair_mode not in REPAIR_MODES:
         fail(f"unsupported Step3 repair mode: {repair_mode}")
     q_input_sha256 = sha256_file(server_dir / "grt/q/q2.fa")
@@ -4259,7 +4266,7 @@ def run_step3(
             "preset": MINIMAP_PRESET,
             "min_alignment": REFILL_MIN_ALIGNMENT,
             "min_identity": REFILL_MIN_IDENTITY,
-            "max_fill_length": REFILL_MAX_LENGTH,
+            "max_fill_length": refill_max_length,
             "rounds": 2,
             "post_round1_filter_min_component_length": MIN_COMPONENT_LENGTH,
             "post_round1_filter_connector_length": FILTER_CONNECTOR_LENGTH,
@@ -4400,6 +4407,7 @@ def run_step3(
             minimap,
             threads,
             round_name="round1",
+            max_fill_length=refill_max_length,
         )
         attach_gap_origins(corrected_gaps, gap_origins)
         annotate_gap_path_origins(corrected_paths, corrected_gaps)
@@ -4504,6 +4512,7 @@ def run_step3(
             minimap,
             threads,
             round_name="round2",
+            max_fill_length=refill_max_length,
         )
         attach_gap_origins_from_paths(
             filter_paths_result,
@@ -5127,6 +5136,7 @@ def execute(args: argparse.Namespace) -> None:
         minimap,
         args.threads,
         args.repair_mode,
+        refill_max_length=args.refill_max_length,
     )
     reconcile_step2_events_with_step3(step2, step3)
     publish_step23_metadata(server_dir, [step2, step3], tools, minimap)
@@ -5149,6 +5159,10 @@ def main() -> None:
     parser.add_argument("--minimap2", default="minimap2")
     parser.add_argument("--threads", type=int, default=10)
     parser.add_argument(
+        "--max-fill", "-m", dest="refill_max_length", type=int, default=REFILL_MAX_LENGTH,
+        help="Maximum Step3 optimized refill length in bp (default: 1000000)",
+    )
+    parser.add_argument(
         "--repair-mode",
         choices=sorted(REPAIR_MODES),
         default=DEFAULT_REPAIR_MODE,
@@ -5157,6 +5171,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.threads < 1:
         fail("threads must be a positive integer")
+    if args.refill_max_length < 1:
+        fail("max-fill must be a positive integer")
     execute(args)
 
 

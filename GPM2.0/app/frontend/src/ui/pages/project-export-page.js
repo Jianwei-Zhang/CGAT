@@ -1063,7 +1063,7 @@ function renderDetailRows(rows, labels) {
   return safeRows.map((row, index) => {
     const typeSpan = rowTypeSpans[index] || 0;
     const typeCell = typeSpan > 0
-      ? `<td class="final-path-log-type-cell" rowspan="${typeSpan}">${escapeHtml(row.typeLabel || "")}</td>`
+      ? `<td class="final-path-log-type-cell" rowspan="${typeSpan}"><span class="project-export-detail-type-label">${escapeHtml(row.typeLabel || "")}</span></td>`
       : "";
     return `
     <tr>
@@ -1089,7 +1089,7 @@ function renderDetailTable(model, labels, detailTableState) {
   const sortedRows = sortDetailRows(filterDetailRows(rows, filters), detailTableState.sort);
   return `
     <section class="project-export-detail-section">
-      <div class="final-path-log-table-wrap">
+      <div class="final-path-log-table-wrap" tabindex="0">
         <table class="final-path-log-table project-export-detail-table">
           <thead>
             <tr>
