@@ -171,9 +171,9 @@ The package preserves the primary and support dataset roles established during G
 
 ### Project dataset tables
 
-After import or opening a project, the project page lists the reference genome first, followed by primary, support, and project-linked derived datasets in one table. The first column is Data type. Reads QC status appears beside the project title; creation time sits below the table on the right. Rows show sequence count, total length, N50, and N90. The edit button opens a dialog for the name and note; More information only shows local directories and open-folder actions. Chromosome partitions are grouped at the chr directory, with other locations kept separately. Statistics use all sequence lengths in the current dataset, without a minimum length filter or splitting at Ns. Moving or hiding assembly views does not change them. These statistics also work with Light packages and require no additional Server quality-control step.
+The project page summarizes sequence count, total length, N50, and N90 for the reference, primary, support, and derived datasets. Statistics include all sequences without splitting at Ns and are unaffected by moving or hiding contigs in assembly views. Light packages support the same statistics.
 
-Use the row's edit button or note summary to edit its display name and note. “Restore initial name” fills in the initial name; click “Save” to persist it. Names and notes are stored in the workspace SQLite database and survive reopening. Original package identifiers, filenames, and sequence names stay stable for incremental imports, computation, and export provenance. Notes apply to table objects, not individual contig placements. Available local sequence files support copying paths and opening their containing folders in the desktop App; missing or omitted FASTA files are marked unavailable. Existing workspace databases upgrade automatically on first open.
+Display names and notes are editable; original identifiers, filenames, and sequence names remain unchanged.
 
 ### Export Final Path FASTA from a Light package
 
