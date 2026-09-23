@@ -452,11 +452,11 @@ test("mirror contig css preserves fill color while keeping interaction enabled",
 
   assert.match(
     css,
-    /\.track-ctg\.is-mirror,\s*\.track-ctg\.is-mirror\.is-active,\s*\.track-ctg\.is-mirror\.is-multi-selected,\s*\.track-ctg\.is-mirror\.is-subview-selected\s*\{[\s\S]*pointer-events:\s*all;/,
+    /\.track-ctg\.is-mirror,\s*\.track-ctg\.is-mirror\.is-active,\s*\.track-ctg\.is-mirror\.is-multi-selected,\s*\.track-ctg\.is-mirror\.is-subview-selected\s*\{[^}]*pointer-events:\s*all;/,
   );
   assert.doesNotMatch(
     css,
-    /\.track-ctg\.is-mirror,\s*\.track-ctg\.is-mirror\.is-active,\s*\.track-ctg\.is-mirror\.is-multi-selected,\s*\.track-ctg\.is-mirror\.is-subview-selected\s*\{[\s\S]*fill:\s*none;/,
+    /\.track-ctg\.is-mirror,\s*\.track-ctg\.is-mirror\.is-active,\s*\.track-ctg\.is-mirror\.is-multi-selected,\s*\.track-ctg\.is-mirror\.is-subview-selected\s*\{[^}]*fill:\s*none;/,
   );
   assert.doesNotMatch(css, /\.track-ctg\.is-mirror\.is-companion/);
 });

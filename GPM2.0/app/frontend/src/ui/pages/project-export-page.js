@@ -457,6 +457,10 @@ function getLabels(state) {
       unassigned: "unassigned",
       supportType: "Support ds_ctg usage",
       otherChrType: "Repeated primary ds_ctg usage",
+      detailTitle: "Project details",
+      detailCount: "{count} records",
+      collapse: "Collapse",
+      expand: "Expand",
       noRows: "No rows",
       exporting: "Exporting...",
       completed: "Export completed",
@@ -496,6 +500,10 @@ function getLabels(state) {
     unassigned: "未分配",
     supportType: "辅 ds ctg 使用情况",
     otherChrType: "重复主 ds ctg 使用情况",
+    detailTitle: "项目明细",
+    detailCount: "{count} 条记录",
+    collapse: "收起",
+    expand: "展开",
     noRows: "暂无记录",
     exporting: "正在导出...",
     completed: "已完成导出",
@@ -910,6 +918,7 @@ function normalizeDetailTableState(state) {
   const direction = normalizeString(rawSort.direction).toLowerCase();
   return {
     filters,
+    collapsed: state?.projectExport?.detailTableCollapsed === true,
     sort: {
       key: normalizeString(rawSort.key) === "length_bp" ? "length_bp" : "",
       direction: direction === "asc" || direction === "desc" ? direction : "",
@@ -1088,8 +1097,20 @@ function renderDetailTable(model, labels, detailTableState) {
   const filters = detailTableState.filters || {};
   const sortedRows = sortDetailRows(filterDetailRows(rows, filters), detailTableState.sort);
   return `
-    <section class="project-export-detail-section">
-      <div class="final-path-log-table-wrap" tabindex="0">
+    <section class="project-export-detail-section" aria-labelledby="project-export-detail-title">
+      <div class="project-export-detail-titlebar">
+        <div class="project-export-detail-heading">
+          <h4 id="project-export-detail-title">${escapeHtml(labels.detailTitle)}</h4>
+          <span class="project-export-detail-count">${escapeHtml(labels.detailCount.replace("{count}", sortedRows.length === rows.length ? formatNumber(rows.length) : `${formatNumber(sortedRows.length)} / ${formatNumber(rows.length)}`))}</span>
+        </div>
+        <button type="button" class="project-export-detail-toggle"
+          data-project-export-detail-toggle="true" aria-controls="project-export-detail-body"
+          aria-expanded="${detailTableState.collapsed ? "false" : "true"}">
+          ${escapeHtml(detailTableState.collapsed ? labels.expand : labels.collapse)}
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+        </button>
+      </div>
+      <div id="project-export-detail-body" class="final-path-log-table-wrap" tabindex="0"${detailTableState.collapsed ? " hidden" : ""}>
         <table class="final-path-log-table project-export-detail-table">
           <thead>
             <tr>
@@ -1849,6 +1870,7 @@ async function loadProjectExportData(host, store, deps = {}) {
       ...buildEmptyProjectExportState(),
       detailTableFilters: previousProjectExport.detailTableFilters,
       detailTableSort: previousProjectExport.detailTableSort,
+      detailTableCollapsed: previousProjectExport.detailTableCollapsed,
       loading: true,
       loaded: false,
       error: "",
@@ -2277,6 +2299,20 @@ export function bindProjectExportPage(host, store, deps = {}) {
         return;
       }
       setExportMenuOpen(exportNode, menuNode.classList.contains("is-hidden"));
+      return;
+    }
+    const detailToggle = event.target?.closest?.("[data-project-export-detail-toggle]");
+    if (detailToggle) {
+      const currentState = store.getState();
+      store.setState({
+        ...currentState,
+        projectExport: {
+          ...currentState.projectExport,
+          detailTableCollapsed: !normalizeDetailTableState(currentState).collapsed,
+        },
+      });
+      rerender(host, store);
+      host.querySelector?.("[data-project-export-detail-toggle]")?.focus();
       return;
     }
     const sortNode = event.target?.closest?.("[data-project-export-detail-sort]");

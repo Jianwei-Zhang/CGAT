@@ -117,15 +117,88 @@
 }
 
 .project-export-detail-section {
-  display: grid;
-  gap: 8px;
   min-width: 0;
+  border: 1px solid #cdd6e0;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(35 53 74 / 5%);
+}
+
+.project-export-detail-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.project-export-detail-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.project-export-detail-heading h4 {
+  margin: 0;
+  font-size: var(--font-section);
+}
+
+.project-export-detail-count {
+  color: #69788b;
+  font-size: var(--font-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.project-export-detail-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #52677f;
+  font: inherit;
+  font-size: var(--font-small);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.project-export-detail-toggle:hover {
+  background: #edf3f9;
+  color: #284f7c;
+}
+
+.project-export-detail-toggle:focus-visible {
+  outline: 2px solid #6f91b9;
+  outline-offset: 2px;
+}
+
+.project-export-detail-toggle svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.project-export-detail-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
 }
 
 .project-export-detail-section .final-path-log-table-wrap {
   max-height: min(52vh, 560px);
   overflow: auto;
   scrollbar-gutter: stable;
+  border-top: 1px solid #e0e6ed;
+  border-radius: 0 0 8px 8px;
+}
+
+.project-export-detail-section .final-path-log-table-wrap[hidden] {
+  display: none;
 }
 
 .project-export-detail-section .final-path-log-table-wrap:has(details[open]) {
@@ -142,7 +215,7 @@
 
 .project-export-detail-type-label {
   position: sticky;
-  top: 42px;
+  top: 48px;
   display: block;
 }
 
@@ -151,15 +224,51 @@
   top: 0;
   z-index: 2;
   white-space: nowrap;
-  background: #f3f3f3;
+  background: #f3f6fa;
+  color: #46566a;
+  box-shadow: 0 1px 0 #dce3eb;
 }
 
 .project-export-detail-table {
-  border: 1px solid #d1d1d1;
+  border: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.project-export-detail-table th,
+.project-export-detail-table td {
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid #e9edf2;
+  border-right: 1px solid #edf0f4;
 }
 
 .project-export-detail-table td {
   background: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.project-export-detail-table tr:nth-child(even) td {
+  background: #fafbfd;
+}
+
+.project-export-detail-table tr:hover td {
+  background: #f0f5fb;
+}
+
+.project-export-detail-table td.final-path-log-type-cell {
+  background: #f7f9fc;
+  color: #52677f;
+  max-width: 200px;
+}
+
+.project-export-detail-table th:last-child,
+.project-export-detail-table td:last-child {
+  border-right: 0;
+}
+
+.project-export-detail-table tbody tr:last-child td {
+  border-bottom: 0;
 }
 
 .project-export-detail-header {

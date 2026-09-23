@@ -1774,7 +1774,7 @@ test("project export final path row jump keeps clicked phased chr target instead
 test("project export final path preview css is clickable and hides graph label spacer", () => {
   assert.match(
     componentsCss,
-    /\.project-export-detail-table\s*\{[\s\S]*border:\s*1px solid #d1d1d1;/,
+    /\.project-export-detail-section\s*\{[\s\S]*border:\s*1px solid #cdd6e0;/,
   );
   assert.match(
     componentsCss,
@@ -1876,4 +1876,45 @@ test("project export detail filter syncs mixed all-checkbox state", () => {
   });
 
   assert.equal(allInput.indeterminate, true);
+});
+
+
+test("detail card collapses and expands while preserving filters, sorting and export data", async () => {
+  let state = createState();
+  state.projectExport.finalPathByChr.Chr01.segments.push({
+    segmentId: "support-1", type: "ctg", assemblyCtgId: 2, datasetName: "assembly",
+    ctgName: "contig_40", originId: "contig_40", overallLen: 1000, start: 1, end: 500,
+  });
+  state.projectExport.detailTableFilters = { chr: ["Chr01"] };
+  state.projectExport.detailTableSort = { key: "length_bp", direction: "desc" };
+  const before = structuredClone(state.projectExport);
+  const listeners = new Map();
+  let focused = 0;
+  const button = { focus() { focused += 1; } };
+  const host = {
+    innerHTML: renderProjectExportPage(state),
+    addEventListener(type, handler) { listeners.set(type, [...(listeners.get(type) || []), handler]); },
+    querySelectorAll() { return []; },
+    querySelector() { return button; },
+  };
+  const store = { getState: () => state, setState(next) { state = next; } };
+  bindProjectExportPage(host, store);
+  assert.match(host.innerHTML, /id="project-export-detail-title">项目明细/);
+  const click = async () => {
+    for (const handler of listeners.get("click")) await handler({ target: { closest(selector) {
+      return selector === "[data-project-export-detail-toggle]" ? button : null;
+    } } });
+  };
+  await click();
+  assert.equal(state.projectExport.detailTableCollapsed, true);
+  assert.match(host.innerHTML, /aria-expanded="false"[\s\S]*?展开/);
+  assert.match(host.innerHTML, /id="project-export-detail-body"[^>]* hidden/);
+  await click();
+  assert.equal(state.projectExport.detailTableCollapsed, false);
+  assert.doesNotMatch(host.innerHTML, /id="project-export-detail-body"[^>]* hidden/);
+  assert.match(host.innerHTML, /aria-expanded="true"[\s\S]*?收起/);
+  assert.equal(focused, 2);
+  assert.deepEqual(state.projectExport.detailTableFilters, before.detailTableFilters);
+  assert.deepEqual(state.projectExport.detailTableSort, before.detailTableSort);
+  assert.deepEqual(state.projectExport.finalPathByChr, before.finalPathByChr);
 });
