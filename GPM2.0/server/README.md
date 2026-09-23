@@ -70,6 +70,9 @@ for `prepare.sh` and `run_all.sh`.
 When an external QC command fails, the Server log includes bounded stdout/stderr
 tails so the underlying error remains available after temporary QC cleanup.
 
+`prepare.sh -t 32` sets the total compute-thread budget. Newly prepared workspaces
+automatically share it across independent alignment tasks.
+
 ### Resuming a workspace after the Step3 gap-origin fix
 
 The error `cannot map filtered Step3 gap back to q2` can occur when a run of

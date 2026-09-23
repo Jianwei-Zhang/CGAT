@@ -352,6 +352,9 @@ class OuterCheckpointManager:
         ]
         if self._read_options()["alignment_engine"] == "blastn":
             paths.append(self.server_dir / ".prepare_lib/tools/blast6_to_paf.py")
+        manifest = (self.server_dir / command_relpath).parent / "alignment_tasks.json"
+        if manifest.is_file():
+            paths.append(manifest)
         return {
             "parameters": self._alignment_options(),
             "tools": self._alignment_tools(),
@@ -381,6 +384,8 @@ class OuterCheckpointManager:
                 ]
             )
         for optional in [
+            self.server_dir / ".prepare_lib/tools/assign_chr_groups.py",
+            self.server_dir / ".prepare_lib/tools/alignment_tasks.py",
             self.server_dir / "tel/rules.tsv",
             self.server_dir / "cen/reference.tsv",
         ]:
@@ -423,6 +428,9 @@ class OuterCheckpointManager:
             self.server_dir / "metadata/track_member_orders.tsv",
         ]
         datasets_dir = run_dir / "datasets"
+        manifest = run_dir / "alignment_tasks.json"
+        if manifest.is_file():
+            paths.append(manifest)
         if datasets_dir.is_dir():
             paths.extend(path for path in datasets_dir.rglob("*") if path.is_file())
         for child in run_dir.iterdir():
@@ -511,6 +519,9 @@ class OuterCheckpointManager:
         for run_dir in chr_dirs:
             for required in [run_dir / "command.sh", run_dir / "generated_command.sh"]:
                 paths.append(required)
+            manifest = run_dir / "alignment_tasks.json"
+            if manifest.is_file():
+                paths.append(manifest)
             datasets_dir = run_dir / "datasets"
             if datasets_dir.is_dir():
                 paths.extend(path for path in datasets_dir.rglob("*") if path.is_file())

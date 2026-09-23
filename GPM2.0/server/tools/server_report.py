@@ -98,8 +98,9 @@ class ReportSession:
                          "started_at": now(), "ended_at": None, "status": "running",
                          "workspace_name": root.name, "steps": [], "errors": []}
         self.records = {}
-        self.output_tail = deque(maxlen=80)
-        self.cached_stages = set()
+        self.output_tails = {}
+        self.cached_stages_by_unit = {}
+        self.current_unit_id = None
         for index, unit in enumerate(units, 1):
             filename = f"steps/{index:03d}.json"
             record = step_record(run_id, unit.unit_id, order=index, status="pending",
@@ -129,8 +130,9 @@ class ReportSession:
             record["runtime"] = dict(row)
             record["status"] = row["state"]
         if event == "START":
-            self.output_tail.clear()
-            self.cached_stages.clear()
+            self.current_unit_id = unit.unit_id
+            self.output_tails[unit.unit_id] = deque(maxlen=80)
+            self.cached_stages_by_unit[unit.unit_id] = set()
             record["execution"] = "computed"
             script = local_path(self.root, unit.command_relpath)
             record["command_text"] = script.read_text(encoding="utf-8")
@@ -141,7 +143,8 @@ class ReportSession:
             for path in (self.report / "steps").glob("grt-*.json"):
                 substage = read_json(path)
                 if substage.get("parent_unit") == unit.unit_id:
-                    substage["execution"] = "cache_reused" if substage["stage_id"] in self.cached_stages else "computed"
+                    cached = self.cached_stages_by_unit.get(unit.unit_id, set())
+                    substage["execution"] = "cache_reused" if substage["stage_id"] in cached else "computed"
                     write_json(path, substage)
             if unit.unit_id == "grt_telomere_finalize":
                 write_json(self.report / "final_snapshot.json", {
@@ -150,17 +153,18 @@ class ReportSession:
         if event in {"FAILED", "INTERRUPTED"}:
             self.manifest["status"] = event.lower()
         if event in {"SUCCESS", "FAILED", "INTERRUPTED"}:
-            record["output_tail"] = list(self.output_tail)
+            record["output_tail"] = list(self.output_tails.get(unit.unit_id, ()))
         write_json(self.report / filename, record)
         self.save()
         if event in {"SUCCESS", "SKIP_VALID", "FAILED", "INTERRUPTED"}:
             self.refresh()
 
-    def child_output(self, line: str):
-        self.output_tail.append(line[:4000])
+    def child_output(self, line: str, unit_id: str | None = None):
+        unit_id = unit_id or self.current_unit_id
+        self.output_tails.setdefault(unit_id, deque(maxlen=80)).append(line[:4000])
         parts = line.split()
         if len(parts) >= 4 and parts[0] == "GRT" and parts[2:4] == ["cache", "hit:"]:
-            self.cached_stages.add(parts[1])
+            self.cached_stages_by_unit.setdefault(unit_id, set()).add(parts[1])
 
     def refresh(self):
         write_json(self.report / "final_summary.json", final_summary(self.root, self.report))

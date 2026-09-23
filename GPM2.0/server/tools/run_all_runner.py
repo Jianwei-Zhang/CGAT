@@ -15,6 +15,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -23,6 +24,7 @@ from pathlib import Path
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
 from run_orchestration import OrchestrationContractError, atomic_write_json
 from server_report import ReportSession, embed_report_in_delivery_archives
+from alignment_tasks import AlignmentTask, load_tasks, run_tasks
 
 
 PLAN_FIELDS = ["unit_id", "command_relpath", "detail_log_relpath"]
@@ -295,6 +297,7 @@ class Runner:
         self.status_rows: list[dict[str, str]] = []
         self.log_handle = None
         self.active_child: subprocess.Popen[str] | None = None
+        self.active_children: dict[int, subprocess.Popen] = {}
         self.received_signal: int | None = None
         self.outer_checkpoints = OuterCheckpointManager(server_dir)
         self.child_cache_markers: set[str] = set()
@@ -324,18 +327,20 @@ class Runner:
 
     def _stream_child(self, unit: PlanUnit, child: subprocess.Popen[str]) -> None:
         assert child.stdout is not None
-        assert self.log_handle is not None
         for raw_line in child.stdout:
-            line = raw_line.rstrip("\r\n")
-            if self.report is not None:
-                self.report.child_output(line)
-            for marker in GRT_CACHE_MARKERS.get(unit.unit_id, ()):
-                if line.startswith(marker):
-                    self.child_cache_markers.add(marker)
-            rendered = f"{timestamp()} [run={self.run_id}] [CHILD] [{unit.unit_id}] {line}"
-            print(rendered, flush=True)
-            self.log_handle.write(rendered + "\n")
-            self.log_handle.flush()
+            self._child_line(unit, raw_line.rstrip("\r\n"))
+
+    def _child_line(self, unit: PlanUnit, line: str) -> None:
+        assert self.log_handle is not None
+        if self.report is not None:
+            self.report.child_output(line, unit.unit_id)
+        for marker in GRT_CACHE_MARKERS.get(unit.unit_id, ()):
+            if line.startswith(marker):
+                self.child_cache_markers.add(marker)
+        rendered = f"{timestamp()} [run={self.run_id}] [CHILD] [{unit.unit_id}] {line}"
+        print(rendered, flush=True)
+        self.log_handle.write(rendered + "\n")
+        self.log_handle.flush()
 
     def _handle_signal(self, signal_number: int, _frame: object) -> None:
         if self.received_signal is None:
@@ -346,6 +351,99 @@ class Runner:
                 os.killpg(child.pid, signal_number)
             except ProcessLookupError:
                 pass
+        for child in list(self.active_children.values()):
+            try:
+                os.killpg(child.pid, signal_number)
+            except ProcessLookupError:
+                pass
+
+    def _run_alignment_group(self, units: list[PlanUnit], threads: int) -> int:
+        """Run independent leaf commands; publish checkpoints per original unit."""
+        cpu_count = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
+        budget = max(1, min(threads, cpu_count))
+        by_id = {unit.unit_id: unit for unit in units}
+        prepared = {}
+        remaining = {}
+        started = {}
+        tasks = []
+        for unit in units:
+            row = self._row(unit)
+            checkpoint = self.outer_checkpoints.prepare(unit.unit_id, unit.command_relpath)
+            assert checkpoint is not None
+            valid, reason = self.outer_checkpoints.validate(checkpoint)
+            if valid:
+                row.update(state="success", ended_at=timestamp(), elapsed_seconds="0.000", exit_code="0")
+                atomic_write_status(self.status_path, self.status_rows)
+                self._event("SKIP_VALID", unit, f"elapsed=0.000s checkpoint={checkpoint.path.relative_to(self.server_dir)} {reason}")
+                continue
+            if checkpoint.path.is_file():
+                row["state"] = "stale"
+                self._event("STALE", unit, f"{reason}; rerunning")
+            unit_tasks = load_tasks(self.server_dir, unit.unit_id, unit.command_relpath)
+            assert unit_tasks is not None
+            if not unit_tasks:
+                unit_tasks = [AlignmentTask(unit.unit_id, self.server_dir / unit.command_relpath, 1)]
+            prepared[unit.unit_id] = checkpoint
+            remaining[unit.unit_id] = len(unit_tasks)
+            tasks.extend(unit_tasks)
+        if not tasks:
+            return 0
+        self._event("PARALLEL", None, f"alignment_tasks={len(tasks)} thread_budget={budget}")
+
+        def start(task, allocation):
+            unit = by_id[task.unit_id]
+            row = self._row(unit)
+            if task.unit_id not in started:
+                started[task.unit_id] = time.monotonic()
+                row.update(state="running", attempt=str(int(row["attempt"] or "0") + 1),
+                           started_at=timestamp(), ended_at="", elapsed_seconds="", exit_code="")
+                atomic_write_status(self.status_path, self.status_rows)
+                self._event("START", unit, f"attempt={row['attempt']} command={unit.command_relpath}")
+            self._event("TASK_START", unit, f"threads={allocation} command={task.command.relative_to(self.server_dir)}")
+
+        def finish(task, code, cancelling):
+            unit = by_id[task.unit_id]
+            row = self._row(unit)
+            remaining[task.unit_id] -= 1
+            self._event("TASK_END", unit, f"exit_code={code} command={task.command.relative_to(self.server_dir)}")
+            if row["state"] in {"failed", "interrupted"}:
+                return
+            if code:
+                state = "interrupted" if cancelling or self.received_signal else "failed"
+                row.update(state=state, ended_at=timestamp(), exit_code=str(code),
+                           elapsed_seconds=f"{time.monotonic() - started[task.unit_id]:.3f}")
+                atomic_write_status(self.status_path, self.status_rows)
+                self._event(state.upper(), unit, f"exit_code={code} command={task.command.relative_to(self.server_dir)} detail={unit.detail_log_relpath}")
+            elif remaining[task.unit_id] == 0:
+                try:
+                    checkpoint = self.outer_checkpoints.commit(prepared[task.unit_id])
+                except (OSError, OrchestrationContractError) as exc:
+                    row.update(state="failed", ended_at=timestamp(), exit_code="2")
+                    atomic_write_status(self.status_path, self.status_rows)
+                    self._event("FAILED", unit, f"output validation/checkpoint failed: {exc}")
+                    raise
+                row.update(state="success", ended_at=timestamp(), exit_code="0",
+                           elapsed_seconds=f"{time.monotonic() - started[task.unit_id]:.3f}")
+                atomic_write_status(self.status_path, self.status_rows)
+                self._event("SUCCESS", unit, f"elapsed={row['elapsed_seconds']}s checkpoint={checkpoint.relative_to(self.server_dir)}")
+
+        code = 2
+        try:
+            code = run_tasks(
+                tasks, budget, self.active_children, lambda: self.received_signal,
+                start, lambda task, line: self._child_line(by_id[task.unit_id], line), finish,
+                {**os.environ, "GPM_REPORT_RUN_ID": self.run_id},
+            )
+        finally:
+            if code:
+                for unit in units:
+                    row = self._row(unit)
+                    if row["state"] == "running":
+                        row.update(state="interrupted", ended_at=timestamp(), exit_code=str(code),
+                                   elapsed_seconds=f"{time.monotonic() - started[unit.unit_id]:.3f}")
+                        atomic_write_status(self.status_path, self.status_rows)
+                        self._event("INTERRUPTED", unit, "alignment group stopped before all tasks completed")
+        return code
 
     def _row(self, unit: PlanUnit) -> dict[str, str]:
         return next(row for row in self.status_rows if row["unit_id"] == unit.unit_id)
@@ -471,7 +569,10 @@ class Runner:
             for signal_number in previous_handlers:
                 signal.signal(signal_number, self._handle_signal)
             try:
-                for unit in self.units:
+                handled: set[str] = set()
+                for unit_index, unit in enumerate(self.units):
+                    if unit.unit_id in handled:
+                        continue
                     if self.received_signal is not None:
                         self._event(
                             "INTERRUPTED",
@@ -479,6 +580,18 @@ class Runner:
                             f"received signal {self.received_signal} between units",
                         )
                         return 128 + self.received_signal
+                    kind = unit.unit_id.split(":", 1)[0]
+                    if kind in {"ref", "chr"} and load_tasks(self.server_dir, unit.unit_id, unit.command_relpath) is not None:
+                        group = []
+                        for candidate in self.units[unit_index:]:
+                            if candidate.unit_id.split(":", 1)[0] != kind or load_tasks(self.server_dir, candidate.unit_id, candidate.command_relpath) is None:
+                                break
+                            group.append(candidate)
+                        result = self._run_alignment_group(group, int(threads))
+                        handled.update(candidate.unit_id for candidate in group)
+                        if result:
+                            return result
+                        continue
                     row = self._row(unit)
                     prepared: PreparedOuterCheckpoint | None = None
                     try:

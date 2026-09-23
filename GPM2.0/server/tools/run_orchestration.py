@@ -27,6 +27,9 @@ RUN_STATES = (
 
 LOG_EVENTS = (
     "START",
+    "PARALLEL",
+    "TASK_START",
+    "TASK_END",
     "SKIP_VALID",
     "CACHE_HIT",
     "RESUME",

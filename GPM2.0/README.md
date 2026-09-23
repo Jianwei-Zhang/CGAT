@@ -75,7 +75,7 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | `-o, --out <dir>` | `./gpm_server` | Server workspace and generated scripts. |
 | `-s, --score <0-100>` | `60` | Minimum chromosome-assignment coverage percentage. |
 | `--aligner <engine>` | `minimap2` | Main alignment engine: `minimap2`, `blastn`, or `winnowmap`. |
-| `-t, --threads <n>` | `10` | Worker threads written into generated commands. |
+| `-t, --threads <n>` | `10` | Total compute-thread budget shared by independent alignment tasks and reads-QC jobs. |
 | `--skip-self` | Off | Skip same-dataset self alignment; same-dataset Subview becomes unavailable. |
 | `--tel <motif> <count>` | Optional, repeatable | Mark exact telomere-like repeats on both strands. Example: `--tel TTAGGG 20`. |
 | `--cen <fasta>` | Optional | Reference centromere FASTA. Record names must end in `_centromere`, such as `Chr01_centromere`. |

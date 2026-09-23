@@ -24,6 +24,109 @@ def read_status(path: Path) -> list[dict[str, str]]:
 
 
 class RunAllRunnerTests(unittest.TestCase):
+    def test_signal_stops_all_parallel_chromosomes_before_downstream(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            names = ["Chr1", "Chr2"]
+            server = self.make_workspace(root, [(f"chr:{name}", "exit 99") for name in names] + [("last", "touch should_not_run")])
+            environment = self.configure_chromosome_inputs(server, root, names)
+            rows = ["unit_id\tcommand_relpath\tdetail_log_relpath"]
+            for name in names:
+                command = server / f"runs/chr_{name}/ds_vs_self/command.sh"
+                command.write_text(f'touch "{server / (name + ".ready")}"\nexec sleep 30\n')
+                outer = command.parent.parent / "command.sh"
+                outer.write_text("exit 99\n")
+                (outer.parent / "alignment_tasks.json").write_text(json.dumps({"version": 1, "tasks": [{
+                    "command": command.relative_to(server).as_posix(), "max_threads": 1,
+                }]}))
+                rows.append(f"chr:{name}\t{outer.relative_to(server)}\tlogs/run_all.log")
+            rows.append("last\tcommands/last.sh\tlogs/run_all.log")
+            (server / ".run_all/plan.tsv").write_text("\n".join(rows) + "\n")
+            process = subprocess.Popen(["python3", str(RUNNER), "--server-dir", str(server)],
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=environment)
+            try:
+                for _ in range(500):
+                    if all((server / (name + ".ready")).exists() for name in names):
+                        break
+                    time.sleep(.01)
+                self.assertTrue(all((server / (name + ".ready")).exists() for name in names))
+                process.send_signal(signal.SIGTERM)
+                stdout, stderr = process.communicate(timeout=5)
+                self.assertEqual(process.returncode, 143, stdout + stderr)
+                self.assertEqual([r["state"] for r in read_status(server / "logs/status.tsv")],
+                                 ["interrupted", "interrupted", "pending"])
+                self.assertFalse((server / "should_not_run").exists())
+            finally:
+                if process.poll() is None:
+                    process.send_signal(signal.SIGTERM)
+                    process.communicate(timeout=5)
+
+    def test_parallel_chromosomes_share_budget_keep_reports_and_resume(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            names = ["Chr1", "Chr2"]
+            server = self.make_workspace(root, [(f"chr:{name}", "exit 99") for name in names])
+            environment = self.configure_chromosome_inputs(server, root, names)
+            options = server / "metadata/prepare_options.tsv"
+            options.write_text(options.read_text().replace("threads\t12", "threads\t2"))
+            worker = root / "alignment.py"
+            worker.write_text('''import os, time
+from pathlib import Path
+root = Path(os.environ['TEST_WORKSPACE'])
+name = os.environ['GPM_REPORT_UNIT_ID'].split(':')[1]
+assert os.environ['GPM_TASK_THREADS'] == '1'
+(root/(name+'.ready')).touch()
+deadline = time.monotonic()+10
+while not all((root/(n+'.ready')).exists() for n in ['Chr1','Chr2']):
+    if time.monotonic() > deadline: raise RuntimeError('chromosomes were serialized')
+    time.sleep(.01)
+with (root/(name+'.count')).open('a') as f: f.write('run\\n')
+print('only-output-'+name, flush=True)
+Path('result.paf').write_text('query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\tcg:Z:10M\\n')
+''')
+            environment["TEST_WORKSPACE"] = str(server)
+            for name in names:
+                command = server / f"runs/chr_{name}/ds_vs_self/command.sh"
+                command.write_text(f'python3 "{worker}"\n')
+                manifest = {"version": 1, "tasks": [{
+                    "command": command.relative_to(server).as_posix(), "max_threads": 1,
+                }]}
+                # The test's outer entry lives in commands/, so give each entry
+                # its own run directory just as prepare.sh does.
+                outer = server / f"runs/chr_{name}/command.sh"
+                outer.write_text("exit 99\n")
+                (outer.parent / "alignment_tasks.json").write_text(json.dumps(manifest))
+            (server / ".run_all/plan.tsv").write_text(
+                "unit_id\tcommand_relpath\tdetail_log_relpath\n" + "".join(
+                    f"chr:{name}\truns/chr_{name}/command.sh\tlogs/run_all.log\n" for name in names
+                )
+            )
+            result = self.run_runner(server, env=environment)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("alignment_tasks=2 thread_budget=2", result.stdout)
+            self.assertEqual([r["state"] for r in read_status(server / "logs/status.tsv")], ["success"] * 2)
+            for index, name in enumerate(names, 1):
+                record = json.loads((server / f"report/steps/{index:03d}.json").read_text())
+                self.assertEqual(record["output_tail"], ["only-output-" + name])
+            resumed = self.run_runner(server, env=environment)
+            self.assertEqual(resumed.returncode, 0, resumed.stdout + resumed.stderr)
+            self.assertEqual(resumed.stdout.count("[SKIP_VALID]"), 2)
+            for name in names:
+                self.assertEqual((server / f"{name}.count").read_text(), "run\n")
+            # A zero exit code with malformed output must cancel active peers
+            # and leave neither their status nor their checkpoint as success.
+            ready = server / "invalid-peer.ready"
+            (server / "runs/chr_Chr1/ds_vs_self/command.sh").write_text(
+                f'while [[ ! -f "{ready}" ]]; do sleep .01; done\nprintf "invalid\\n" > result.paf\n'
+            )
+            (server / "runs/chr_Chr2/ds_vs_self/command.sh").write_text(
+                f'touch "{ready}"\nexec sleep 30\n'
+            )
+            invalid = self.run_runner(server, env=environment, timeout=5)
+            self.assertEqual(invalid.returncode, 2, invalid.stdout + invalid.stderr)
+            self.assertEqual([r["state"] for r in read_status(server / "logs/status.tsv")],
+                             ["failed", "interrupted"])
+
     def make_workspace(
         self,
         root: Path,

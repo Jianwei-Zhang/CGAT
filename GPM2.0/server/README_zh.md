@@ -66,6 +66,9 @@ bash install.sh --manager conda
 外部 QC 命令失败时，Server 主日志会保留其 stdout/stderr 尾部，
 即使失败的临时 QC 目录随后被清理，也可查看底层报错。
 
+`prepare.sh -t 32` 设置总计算线程预算；新准备的工作区会在独立比对任务之间
+自动分配线程并行执行。
+
 ### Step3 gap 来源修复后的断点恢复
 
 当连续 N 位于原始 contig 内部，或跨越多个路径片段时，旧版可能报错

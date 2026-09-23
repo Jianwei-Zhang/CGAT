@@ -15,6 +15,20 @@ import shutil
 import sys
 from pathlib import Path
 
+from alignment_tasks import MANIFEST, query_threads, write_manifest
+
+
+THREAD_ARGUMENT = object()
+MERYL_THREAD_ARGUMENT = object()
+
+
+def quote_command_arg(value):
+    if value is THREAD_ARGUMENT:
+        return '"${GPM_TASK_THREADS:-' + threads + '}"'
+    if value is MERYL_THREAD_ARGUMENT:
+        return '"threads=${GPM_TASK_THREADS:-' + threads + '}"'
+    return shlex.quote(value)
+
 
 def fail(message):
     print(message, file=sys.stderr)
@@ -115,8 +129,8 @@ def write_run_command_script(path, run_dir, left_fa, right_fa, self_mode, thread
         args = ["minimap2", "-c", "-x", minimap_preset]
         if self_mode:
             args.append("-X")
-        args.extend(["-t", threads, "-o", "result.paf", str(left_fa), str(right_fa)])
-        lines.append(" ".join(shlex.quote(part) for part in args) + " > stdout.log 2> stderr.log")
+        args.extend(["-t", THREAD_ARGUMENT, "-o", "result.paf", str(left_fa), str(right_fa)])
+        lines.append(" ".join(quote_command_arg(part) for part in args) + " > stdout.log 2> stderr.log")
     elif alignment_engine == "blastn":
         outfmt = "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen nident gaps"
         lines.extend(
@@ -124,7 +138,7 @@ def write_run_command_script(path, run_dir, left_fa, right_fa, self_mode, thread
                 "rm -rf blastdb_result",
                 "mkdir -p blastdb_result",
                 " ".join(
-                    shlex.quote(part)
+                    quote_command_arg(part)
                     for part in [
                         "makeblastdb",
                         "-in",
@@ -137,7 +151,7 @@ def write_run_command_script(path, run_dir, left_fa, right_fa, self_mode, thread
                 )
                 + " > makeblastdb.stdout.log 2> makeblastdb.stderr.log",
                 " ".join(
-                    shlex.quote(part)
+                    quote_command_arg(part)
                     for part in [
                         "blastn",
                         "-task",
@@ -147,7 +161,7 @@ def write_run_command_script(path, run_dir, left_fa, right_fa, self_mode, thread
                         "-db",
                         "blastdb_result/target",
                         "-num_threads",
-                        threads,
+                        THREAD_ARGUMENT,
                         "-dust",
                         blastn_dust,
                         "-evalue",
@@ -160,7 +174,7 @@ def write_run_command_script(path, run_dir, left_fa, right_fa, self_mode, thread
                 )
                 + " > stdout.log 2> stderr.log",
                 " ".join(
-                    shlex.quote(part)
+                    quote_command_arg(part)
                     for part in [
                         "python3",
                         blast6_to_paf,
@@ -177,10 +191,11 @@ def write_run_command_script(path, run_dir, left_fa, right_fa, self_mode, thread
             [
                 "rm -rf merylDB_result",
                 " ".join(
-                    shlex.quote(part)
+                    quote_command_arg(part)
                     for part in [
                         "meryl",
                         "count",
+                        MERYL_THREAD_ARGUMENT,
                         f"k={winnowmap_kmer}",
                         "output",
                         "merylDB_result",
@@ -189,10 +204,11 @@ def write_run_command_script(path, run_dir, left_fa, right_fa, self_mode, thread
                 )
                 + " > meryl.stdout.log 2> meryl.stderr.log",
                 " ".join(
-                    shlex.quote(part)
+                    quote_command_arg(part)
                     for part in [
                         "meryl",
                         "print",
+                        MERYL_THREAD_ARGUMENT,
                         "greater-than",
                         f"distinct={winnowmap_repeat_fraction}",
                         "merylDB_result",
@@ -204,8 +220,8 @@ def write_run_command_script(path, run_dir, left_fa, right_fa, self_mode, thread
         args = ["winnowmap", "-c", "-W", f"repetitive_{winnowmap_kmer}_result.txt", "-x", winnowmap_preset]
         if self_mode:
             args.append("-X")
-        args.extend(["-t", threads, str(left_fa), str(right_fa)])
-        lines.append(" ".join(shlex.quote(part) for part in args) + " > result.paf 2> stderr.log")
+        args.extend(["-t", THREAD_ARGUMENT, str(left_fa), str(right_fa)])
+        lines.append(" ".join(quote_command_arg(part) for part in args) + " > result.paf 2> stderr.log")
         lines.append(": > stdout.log")
     else:
         fail(f"unsupported alignment engine: {alignment_engine}")
@@ -215,7 +231,7 @@ def write_run_command_script(path, run_dir, left_fa, right_fa, self_mode, thread
 def write_tel_scan_command_script(path, run_dir, work_root, chr_name, selected_dataset_fastas):
     args = [str(work_root), chr_name]
     args.extend(f"{dataset_name}={fasta_path}" for dataset_name, fasta_path in selected_dataset_fastas)
-    python_invocation = "python3 - " + " ".join(shlex.quote(part) for part in args) + " <<'PY'"
+    python_invocation = "python3 - " + " ".join(quote_command_arg(part) for part in args) + " <<'PY'"
     scanner = r'''import csv
 import sys
 from pathlib import Path
@@ -409,7 +425,7 @@ def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_d
                 "-x",
                 minimap_preset,
                 "-t",
-                threads,
+                THREAD_ARGUMENT,
                 "-c",
                 "--cs",
                 "-o",
@@ -417,7 +433,7 @@ def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_d
                 str(fasta_path),
                 str(cen_chr_fasta),
             ]
-            command = " ".join(shlex.quote(part) for part in args)
+            command = " ".join(quote_command_arg(part) for part in args)
             lines.append(f"{command} > stdout_{dataset_name}.log 2> stderr_{dataset_name}.log")
         elif alignment_engine == "blastn":
             blast6_name = result_name.replace(".paf", ".blast6")
@@ -428,7 +444,7 @@ def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_d
                     f"rm -rf {shlex.quote(db_dir)}",
                     f"mkdir -p {shlex.quote(db_dir)}",
                     " ".join(
-                        shlex.quote(part)
+                        quote_command_arg(part)
                         for part in [
                             "makeblastdb",
                             "-in",
@@ -441,7 +457,7 @@ def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_d
                     )
                     + f" > makeblastdb_{dataset_name}.stdout.log 2> makeblastdb_{dataset_name}.stderr.log",
                     " ".join(
-                        shlex.quote(part)
+                        quote_command_arg(part)
                         for part in [
                             "blastn",
                             "-task",
@@ -451,7 +467,7 @@ def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_d
                             "-db",
                             f"{db_dir}/target",
                             "-num_threads",
-                            threads,
+                            THREAD_ARGUMENT,
                             "-dust",
                             blastn_dust,
                             "-evalue",
@@ -464,7 +480,7 @@ def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_d
                     )
                     + f" > stdout_{dataset_name}.log 2> stderr_{dataset_name}.log",
                     " ".join(
-                        shlex.quote(part)
+                        quote_command_arg(part)
                         for part in [
                             "python3",
                             blast6_to_paf,
@@ -483,10 +499,11 @@ def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_d
                 [
                     f"rm -rf {shlex.quote(meryl_dir)}",
                     " ".join(
-                        shlex.quote(part)
+                        quote_command_arg(part)
                         for part in [
                             "meryl",
                             "count",
+                            MERYL_THREAD_ARGUMENT,
                             f"k={winnowmap_kmer}",
                             "output",
                             meryl_dir,
@@ -495,10 +512,11 @@ def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_d
                     )
                     + f" > meryl_{dataset_name}.stdout.log 2> meryl_{dataset_name}.stderr.log",
                     " ".join(
-                        shlex.quote(part)
+                        quote_command_arg(part)
                         for part in [
                             "meryl",
                             "print",
+                            MERYL_THREAD_ARGUMENT,
                             "greater-than",
                             f"distinct={winnowmap_repeat_fraction}",
                             meryl_dir,
@@ -506,7 +524,7 @@ def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_d
                     )
                     + f" > {shlex.quote(repetitive_txt)}",
                     " ".join(
-                        shlex.quote(part)
+                        quote_command_arg(part)
                         for part in [
                             "winnowmap",
                             "-W",
@@ -514,7 +532,7 @@ def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_d
                             "-x",
                             winnowmap_preset,
                             "-t",
-                            threads,
+                            THREAD_ARGUMENT,
                             str(fasta_path),
                             str(cen_chr_fasta),
                         ]
@@ -533,7 +551,7 @@ def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_d
         cen_row["min_identity"],
     ]
     args.extend(dataset_specs)
-    python_invocation = "python3 - " + " ".join(shlex.quote(part) for part in args) + " <<'PY'"
+    python_invocation = "python3 - " + " ".join(quote_command_arg(part) for part in args) + " <<'PY'"
     parser = r'''import csv
 import sys
 from pathlib import Path
@@ -959,6 +977,7 @@ for chr_name in reference_chr_names:
         selected_dataset_fastas.append((dataset_name, output_fasta))
 
     command_paths = []
+    task_caps = {}
     if not skip_self:
         for dataset_name, output_fasta in selected_dataset_fastas:
             run_dir = chr_run_dir / f"{dataset_name}_vs_self"
@@ -974,6 +993,7 @@ for chr_name in reference_chr_names:
                 minimap_preset=minimap_preset,
             )
             command_paths.append(command_path)
+            task_caps[command_path] = query_threads(output_fasta, alignment_engine, int(threads))
 
     for left_index, (left_name, left_fasta) in enumerate(selected_dataset_fastas):
         for right_name, right_fasta in selected_dataset_fastas[left_index + 1 :]:
@@ -990,6 +1010,7 @@ for chr_name in reference_chr_names:
                 minimap_preset=minimap_preset,
             )
             command_paths.append(command_path)
+            task_caps[command_path] = query_threads(right_fasta, alignment_engine, int(threads))
 
     tel_rules_path = work_root / "tel" / "rules.tsv"
     if tel_rules_path.exists() and selected_dataset_fastas:
@@ -1022,3 +1043,7 @@ for chr_name in reference_chr_names:
             command_paths.append(command_path)
 
     write_generated_command_script(chr_run_dir / "generated_command.sh", command_paths, chr_name)
+    write_manifest(chr_run_dir / MANIFEST, work_root, [
+        (command, task_caps.get(command, 1 if alignment_engine == "minimap2" else int(threads)))
+        for command in command_paths
+    ])

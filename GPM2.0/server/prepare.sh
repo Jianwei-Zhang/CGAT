@@ -60,7 +60,7 @@ Usage:
     [--winnowmap-preset asm20|asm10|asm5] \
     [--winnowmap-kmer <kmer_size>] \
     [--winnowmap-repeat-fraction <fraction>] \
-    [--threads|-t <alignment_threads>] \
+    [--threads|-t <thread_budget>] \
     [--skip-self] \
     [--tel <motif> <min_repeat>] \
     [--cen <reference_centromere_fasta>] \
@@ -88,7 +88,8 @@ Behavior:
   - Supports --minimap-preset for minimap2 only, default: asm10
   - Supports --blastn-task and --blastn-evalue for blastn only, defaults: blastn and 1e-10
   - Supports --winnowmap-preset, --winnowmap-kmer, and --winnowmap-repeat-fraction for winnowmap only, defaults: asm20, 19, and 0.9998
-  - Supports --threads/-t to choose alignment threads, default: 10
+  - Supports --threads/-t to choose the total compute-thread budget, default: 10
+  - Independent reference and chromosome-local alignments share this budget
   - Supports repeatable --tel <motif> <min_repeat> to mark telomere-like tandem repeats
   - Supports --cen <reference_centromere_fasta> to mark complete reference centromere regions
   - Supports --cen-min-len and --cen-min-identity to filter centromere alignments
@@ -286,6 +287,7 @@ write_alignment_command_script() {
   local target_db_prefix="${target_db_dir}/target"
   local repetitive_db_dir="merylDB_${result_name%.paf}"
   local repetitive_txt="repetitive_${WINNOWMAP_KMER}_${result_name%.paf}.txt"
+  local runtime_threads="\"\${GPM_TASK_THREADS:-${THREADS}}\""
   local tools_dir
   tools_dir="$(alignment_tools_dir)"
 
@@ -301,7 +303,7 @@ write_alignment_command_script() {
           printf -- '-X '
         fi
         printf -- '-t %s -o %s %s %s > stdout.log 2> stderr.log\n' \
-          "$(shell_quote "$THREADS")" \
+          "$runtime_threads" \
           "$(shell_quote "$result_name")" \
           "$(shell_quote "$target_fa")" \
           "$(shell_quote "$query_fa")"
@@ -317,7 +319,7 @@ write_alignment_command_script() {
           "$(shell_quote "$BLASTN_TASK")" \
           "$(shell_quote "$query_fa")" \
           "$(shell_quote "$target_db_prefix")" \
-          "$(shell_quote "$THREADS")" \
+          "$runtime_threads" \
           "$(shell_quote "$BLASTN_DUST")" \
           "$(shell_quote "$BLASTN_EVALUE")" \
           "$(shell_quote "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen nident gaps")" \
@@ -330,11 +332,13 @@ write_alignment_command_script() {
       winnowmap)
         printf '(winnowmap --version > tool_version.txt 2>&1 || printf %s > tool_version.txt)\n' "$(shell_quote $'unknown\n')"
         printf 'rm -rf %s\n' "$(shell_quote "$repetitive_db_dir")"
-        printf 'meryl count k=%s output %s %s > meryl.stdout.log 2> meryl.stderr.log\n' \
+        printf 'meryl count threads=%s k=%s output %s %s > meryl.stdout.log 2> meryl.stderr.log\n' \
+          "$runtime_threads" \
           "$(shell_quote "$WINNOWMAP_KMER")" \
           "$(shell_quote "$repetitive_db_dir")" \
           "$(shell_quote "$target_fa")"
-        printf 'meryl print greater-than distinct=%s %s > %s\n' \
+        printf 'meryl print threads=%s greater-than distinct=%s %s > %s\n' \
+          "$runtime_threads" \
           "$(shell_quote "$WINNOWMAP_REPEAT_FRACTION")" \
           "$(shell_quote "$repetitive_db_dir")" \
           "$(shell_quote "$repetitive_txt")"
@@ -345,7 +349,7 @@ write_alignment_command_script() {
           printf -- '-X '
         fi
         printf -- '-t %s %s %s > %s 2> stderr.log\n' \
-          "$(shell_quote "$THREADS")" \
+          "$runtime_threads" \
           "$(shell_quote "$target_fa")" \
           "$(shell_quote "$query_fa")" \
           "$(shell_quote "$result_name")"
@@ -609,6 +613,8 @@ write_ref_command_script() {
   local ds_fa="$3"
 
   write_alignment_command_script "${run_dir}/command.sh" "$run_dir" "$ref_fa" "$ds_fa" false
+  python3 "${SCRIPT_DIR}/tools/alignment_tasks.py" --root "$WORK_ROOT" \
+    --command "${run_dir}/command.sh" --query "$ds_fa" --engine "$ALIGNER" --threads "$THREADS"
 }
 
 write_assignment_script() {
@@ -929,7 +935,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --threads|-t)
-      [[ $# -ge 2 ]] || die "$1 requires <alignment_threads>"
+      [[ $# -ge 2 ]] || die "$1 requires <thread_budget>"
       validate_threads "$2"
       THREADS="$2"
       shift 2
