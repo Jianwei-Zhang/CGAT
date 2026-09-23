@@ -1,3 +1,4 @@
+import { requestAppConfirm } from "../../shell/app-dialog.js";
 import {
   buildDegapJobKey,
   buildDegapDefaultJobOutPath,
@@ -111,7 +112,7 @@ function getConfirm(deps = {}) {
   if (typeof deps.confirm === "function") {
     return deps.confirm;
   }
-  return (message) => globalThis.window?.confirm?.(message) ?? false;
+  return requestAppConfirm;
 }
 
 function scrollDegapJobsToBottom(host, chrName = "") {

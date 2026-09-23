@@ -8,14 +8,14 @@ import {
   pickZipFilePath,
 } from "../backend-api.js";
 
-test("backend-api preview prompts and errors use english copy when locale is en", async () => {
+test("backend-api preview fails closed without a DOM and keeps localized errors", async () => {
   const previousWindow = globalThis.window;
   const prompts = [];
   try {
     globalThis.window = {
       prompt(message) {
         prompts.push(message);
-        return "D:/tmp/input";
+        throw new Error("Browser native prompts must not be used");
       },
     };
 
@@ -25,19 +25,15 @@ test("backend-api preview prompts and errors use english copy when locale is en"
       assert.equal(error.operation, "import_zip");
       return true;
     });
-    assert.equal(await pickZipFilePath({ locale: "en" }), "D:/tmp/input");
-    assert.equal(await pickDirectoryPath({ locale: "en" }), "D:/tmp/input");
+    assert.equal(await pickZipFilePath({ locale: "en" }), "");
+    assert.equal(await pickDirectoryPath({ locale: "en" }), "");
     assert.equal(
       await pickSaveFilePath({
         defaultPath: "project1_Chr01_path.tsv",
       }, { locale: "en" }),
-      "D:/tmp/input",
+      "",
     );
-    assert.deepEqual(prompts, [
-      "Enter the ZIP file path",
-      "Enter the directory path",
-      "project1_Chr01_path.tsv",
-    ]);
+    assert.deepEqual(prompts, []);
   } finally {
     globalThis.window = previousWindow;
   }

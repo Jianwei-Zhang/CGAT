@@ -1,4 +1,5 @@
-import { t } from "../ui/i18n/index.js";
+import { requestAppPrompt } from "../ui/shell/app-dialog.js";
+import { getLocale, t } from "../ui/i18n/index.js";
 
 export function isTauriRuntime() {
   return Boolean(window.__TAURI__?.core?.invoke);
@@ -26,7 +27,7 @@ export async function listenBackendEvent(eventName, handler) {
 
 export async function pickZipFilePath(stateOrLocale = "zh") {
   if (!isTauriRuntime()) {
-    const fallback = window.prompt(t(stateOrLocale, "importer.runtime.promptZipPath"));
+    const fallback = await requestAppPrompt(t(stateOrLocale, "importer.runtime.promptZipPath"), "", { locale: getLocale(stateOrLocale) });
     return (fallback || "").trim();
   }
   const selected = await invokeCommand("pick_zip_file_path", {}, stateOrLocale);
@@ -43,7 +44,7 @@ export async function pickDirectoryPath(stateOrLocale = "zh") {
         return "";
       }
     }
-    const fallback = window.prompt(t(stateOrLocale, "importer.runtime.promptDirectoryPath"));
+    const fallback = await requestAppPrompt(t(stateOrLocale, "importer.runtime.promptDirectoryPath"), "", { locale: getLocale(stateOrLocale) });
     return (fallback || "").trim();
   }
   const selected = await invokeCommand("pick_directory_path", {}, stateOrLocale);
@@ -52,7 +53,7 @@ export async function pickDirectoryPath(stateOrLocale = "zh") {
 
 export async function pickSaveFilePath({ defaultPath = "", filters = [] } = {}, stateOrLocale = "zh") {
   if (!isTauriRuntime()) {
-    const fallback = window.prompt(String(defaultPath || "").trim());
+    const fallback = await requestAppPrompt(getLocale(stateOrLocale) === "en" ? "Save path" : "保存路径", String(defaultPath || "").trim(), { locale: getLocale(stateOrLocale) });
     return (fallback || "").trim();
   }
   const selected = await invokeCommand("pick_save_file_path", {

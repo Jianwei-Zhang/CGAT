@@ -1,3 +1,4 @@
+import { requestAppConfirm } from "./app-dialog.js";
 import { DEFAULT_APP_SETTINGS, getAppSettings, setAppSettings } from "../../services/app-settings.js";
 
 const copy = {
@@ -171,7 +172,7 @@ export function bindAppSettings(root, { getLocale, onTypographyChange, onLanguag
         status(labels().scope);
       }
     });
-    dialog.addEventListener("click", event => {
+    dialog.addEventListener("click", async event => {
       const option = event.target.closest("[data-history-option]");
       if (option) { chooseOption(option.dataset.historyOption); return; }
       if (event.target.closest("[data-history-toggle]")) {
@@ -189,7 +190,7 @@ export function bindAppSettings(root, { getLocale, onTypographyChange, onLanguag
       if (event.target.closest("[data-settings-close]")) dialog.close();
       if (event.target.closest("[data-settings-reset]")) {
         if ((getAppSettings().historyCapacity !== 0 && getAppSettings().historyCapacity <= 50)
-          || window.confirm(labels().restoreConfirm)) {
+          || await requestAppConfirm(labels().restoreConfirm, { locale: getLocale(), title: labels().reset, confirmLabel: labels().reset })) {
           if (save(DEFAULT_APP_SETTINGS)) { onLanguageChange("zh"); render(); }
         }
       }

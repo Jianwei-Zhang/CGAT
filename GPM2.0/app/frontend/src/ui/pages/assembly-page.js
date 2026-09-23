@@ -1,3 +1,4 @@
+import { requestAppPrompt } from "../shell/app-dialog.js";
 import {
   pickDirectoryPath,
   pickZipFilePath,
@@ -2401,15 +2402,12 @@ function resolveTrackContigClickAction({
 }
 
 function promptForRenameCtg(host, store, assemblyCtgId) {
-  if (typeof window === "undefined" || typeof window.prompt !== "function") {
-    return "";
-  }
   const state = store.getState();
   const currentCtg = (state.assembly.chrCtgs || []).find(
     (ctg) => Number(ctg.assemblyCtgId) === Number(assemblyCtgId),
   );
   const defaultName = String(currentCtg?.name || "").trim();
-  return window.prompt(tAssembly(state, "prompts.renameContig", { assemblyCtgId }), defaultName) ?? "";
+  return requestAppPrompt(tAssembly(state, "prompts.renameContig", { assemblyCtgId }), defaultName, { locale: state.locale });
 }
 
 function promptForDeleteShorterThanLength(host, store, defaultValue = 100000) {

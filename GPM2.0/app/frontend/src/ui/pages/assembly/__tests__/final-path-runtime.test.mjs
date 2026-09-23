@@ -1176,7 +1176,9 @@ test("addFinalPathContigRelativeToSegment inserts a prompted ctg with forward fu
     },
   });
 
-  await addFinalPathContigRelativeToSegment(
+  let resolvePrompt;
+  const pendingPrompt = new Promise(resolve => { resolvePrompt = resolve; });
+  const pending = addFinalPathContigRelativeToSegment(
     {},
     store,
     {
@@ -1185,10 +1187,14 @@ test("addFinalPathContigRelativeToSegment inserts a prompted ctg with forward fu
     },
     createDeps({
       prompt() {
-        return "30";
+        return pendingPrompt;
       },
     }),
   );
+
+  assert.equal(store.getState().assembly.finalPathByChr.Chr01.segments.length, 1);
+  resolvePrompt("30");
+  await pending;
 
   assert.deepEqual(store.getState().assembly.finalPathByChr.Chr01.segments, [
     {
@@ -1659,4 +1665,21 @@ test("restoreFinalPathFromGrtBaseline reports persistence errors without replaci
   assert.equal(store.getState().assembly.finalPathByChr.Chr01.q4Sha256, "edited-sha");
   assert.match(store.getState().assembly.actionError, /server unavailable/);
   assert.equal(rerenderCount, 1);
+});
+
+
+test("addFinalPathContigRelativeToSegment does not persist when async input is cancelled", async () => {
+  const store = createStore();
+  await appendTrackContigToFinalPath({}, store, { assemblyCtgId: 9, trackRole: "primary", datasetId: 11 }, createDeps());
+  const before = structuredClone(store.getState());
+  let persisted = false;
+  const result = await addFinalPathContigRelativeToSegment({}, store, {
+    segmentId: "seg-1", placement: "before",
+  }, createDeps({
+    async prompt() { return null; },
+    async persistProjectAssemblyViewState() { persisted = true; },
+  }));
+  assert.equal(result, null);
+  assert.equal(persisted, false);
+  assert.deepEqual(store.getState(), before);
 });

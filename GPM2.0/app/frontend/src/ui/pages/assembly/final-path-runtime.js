@@ -1,3 +1,4 @@
+import { requestAppPrompt } from "../../shell/app-dialog.js";
 import {
   FINAL_PATH_GAP_BP,
   buildFinalPathCtgSegment,
@@ -283,16 +284,7 @@ function getPrompt(overrides = {}) {
   if (typeof overrides.prompt === "function") {
     return overrides.prompt;
   }
-  return (message, defaultValue = "") => globalThis.window?.prompt?.(message, defaultValue) ?? null;
-}
-
-function getAlert(overrides = {}) {
-  if (typeof overrides.alert === "function") {
-    return overrides.alert;
-  }
-  return (message) => {
-    globalThis.window?.alert?.(message);
-  };
+  return requestAppPrompt;
 }
 
 function getPersistProjectAssemblyViewState(overrides = {}) {
@@ -1078,7 +1070,7 @@ export async function addFinalPathContigRelativeToSegment(host, store, payload, 
   if (sourceIndex < 0) {
     return null;
   }
-  const rawValue = getPrompt(deps)(tAssembly(state, "runtime.finalPathAddCtgPrompt"), "");
+  const rawValue = await getPrompt(deps)(tAssembly(state, "runtime.finalPathAddCtgPrompt"), "", { locale: state.locale });
   if (rawValue === null) {
     return null;
   }

@@ -1,3 +1,4 @@
+import { requestAppConfirm } from "../../shell/app-dialog.js";
 import {
   filterPrimaryTrackSelectionCtgIds,
   normalizeDeletedCtgRecordIds,
@@ -248,7 +249,7 @@ export function buildAssemblyContextMenuActions(actionDeps, overrides = {}) {
     typeof overrides?.[name] === "function" ? overrides[name] : actionDeps[name];
   const confirm = typeof overrides.confirm === "function"
     ? overrides.confirm
-    : (message) => globalThis.window?.confirm?.(message) ?? false;
+    : requestAppConfirm;
   return {
     addContextCtgToComposition: resolveAction("addContextCtgToComposition") || (() => false),
     enterSubviewFromTrackSelections: resolveAction("enterSubviewFromTrackSelections"),

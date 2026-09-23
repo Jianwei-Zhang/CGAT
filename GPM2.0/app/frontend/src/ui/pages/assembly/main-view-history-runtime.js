@@ -1,3 +1,4 @@
+import { requestAppConfirm } from "../../shell/app-dialog.js";
 import { tAssembly } from "./i18n.js";
 import {
   createEmptyMainViewHistoryStatus,
@@ -51,7 +52,7 @@ export async function runMainViewHistoryControlAction(host, store, action, deps,
     return false;
   }
   if (normalizedAction === "reset") {
-    const confirm = overrides.confirm || deps.confirm || ((message) => globalThis.window?.confirm?.(message));
+    const confirm = overrides.confirm || deps.confirm || requestAppConfirm;
     const message = tAssembly(state, "mainHistory.resetConfirm", {
       chrName,
       count: history.appliedOperationCount,

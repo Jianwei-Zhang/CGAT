@@ -1643,3 +1643,37 @@ test("buildAssemblyContextMenuItems renders english labels when locale is en", (
   assert.ok(subviewItems.some((item) => item.label === "Move to Other Track"));
   assert.ok(subviewItems.some((item) => item.label === "Remove from Local View"));
 });
+
+
+test("contig rename waits for app input and cancelling does not edit", async () => {
+  for (const value of ["new contig", null]) {
+    const calls = [];
+    let resolvePrompt;
+    let builtArgs = false;
+    const pendingPrompt = new Promise(resolve => { resolvePrompt = resolve; });
+    const items = buildAssemblyContextMenuItems({
+      ctgContext: { assemblyCtgId: 2, trackRole: "primary", isMirror: false },
+      store: createStore(),
+      host: {},
+      actions: {
+        ...createContextMenuActionsCapture(calls),
+        promptForRenameCtg: () => pendingPrompt,
+        buildRenameCtgActionArgs(id, name) {
+          builtArgs = true;
+          assert.equal(name, value);
+          return name ? { assemblyCtgId: id, name } : null;
+        },
+      },
+    });
+    const rename = items.find(item => /重命名/.test(item.label));
+    assert.ok(rename);
+    const pending = rename.run();
+    assert.equal(builtArgs, false);
+    assert.deepEqual(calls, []);
+    resolvePrompt(value);
+    await pending;
+    assert.equal(builtArgs, true);
+    assert.equal(calls.length, value === null ? 0 : 1);
+    if (value !== null) assert.equal(calls[0].args[2].action, "rename-ctg");
+  }
+});

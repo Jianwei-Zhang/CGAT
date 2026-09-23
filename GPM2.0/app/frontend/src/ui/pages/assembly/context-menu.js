@@ -1240,7 +1240,7 @@ export function buildAssemblyContextMenuItems({
       items.push({
         label: i18n.contextMenu.renameContig,
         run: async () => {
-          const nextName = promptForRenameCtg(host, store, ctgId);
+          const nextName = await promptForRenameCtg(host, store, ctgId);
           const actionArgs = buildRenameCtgActionArgs(ctgId, nextName);
           if (!actionArgs) {
             return;

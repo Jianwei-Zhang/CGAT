@@ -1,3 +1,4 @@
+import { requestAppConfirm } from "../../shell/app-dialog.js";
 const REQUIRED_CTG_ACTION_RUNTIME_DEPS = [
   "applyEditorAction",
   "deleteSelectedTrackCtgs",
@@ -15,7 +16,7 @@ function getConfirm(overrides = {}) {
   if (typeof overrides.confirm === "function") {
     return overrides.confirm;
   }
-  return (message) => globalThis.window?.confirm?.(message) ?? false;
+  return requestAppConfirm;
 }
 
 export function bindCtgActions(host, store, deps) {

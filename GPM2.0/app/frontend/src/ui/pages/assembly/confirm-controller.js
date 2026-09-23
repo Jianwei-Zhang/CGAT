@@ -1,3 +1,4 @@
+import { requestAppConfirm, requestAppNotice, requestAppPrompt } from "../../shell/app-dialog.js";
 import { assemblyPageSession } from "./page-session.js";
 
 export function resolveAnchorOffsetErrorKey(reason) {
@@ -160,7 +161,7 @@ function renderAssemblyConfirmModal(state) {
 
 function requestAssemblyConfirm(host, store, message) {
   if (!host || !store) {
-    return Promise.resolve(globalThis.window?.confirm?.(message) ?? false);
+    return requestAppConfirm(message, { store });
   }
   const state = store.getState();
   const id = `assembly-confirm-${assemblyPageSession.assemblyConfirmDialogSeq += 1}`;
@@ -190,8 +191,7 @@ function requestAssemblyConfirm(host, store, message) {
 
 function requestAssemblyNotice(host, store, { title, message, confirmLabel } = {}) {
   if (!host || !store) {
-    globalThis.window?.alert?.(String(message || ""));
-    return Promise.resolve(true);
+    return requestAppNotice(message, { title, confirmLabel, store });
   }
   const state = store.getState();
   const id = `assembly-confirm-${assemblyPageSession.assemblyConfirmDialogSeq += 1}`;
@@ -223,10 +223,7 @@ function requestAssemblyNotice(host, store, { title, message, confirmLabel } = {
 
 function requestAssemblyPrompt(host, store, message, defaultValue = "") {
   if (!host || !store) {
-    if (typeof globalThis.window?.prompt !== "function") {
-      return Promise.resolve("");
-    }
-    return Promise.resolve(globalThis.window.prompt(message, String(defaultValue)) ?? "");
+    return requestAppPrompt(message, defaultValue, { store }).then(value => value ?? "");
   }
   const state = store.getState();
   const id = `assembly-confirm-${assemblyPageSession.assemblyConfirmDialogSeq += 1}`;
@@ -270,13 +267,9 @@ function requestAssemblyAnchorOffsetPrompt(host, store, options = {}) {
     : null;
   const message = tAssembly(store?.getState?.() || "zh", "prompts.anchorOffsetMessage");
   if (!host || !store) {
-    if (typeof globalThis.window?.prompt !== "function") {
-      return Promise.resolve(null);
-    }
-    const offsetInput = globalThis.window.prompt(message, String(defaultValue)) ?? "";
-    return Promise.resolve({
+    return requestAppPrompt(message, defaultValue, { store }).then(value => value === null ? null : {
       direction: defaultDirection || "right",
-      offsetBp: offsetInput,
+      offsetBp: value,
     });
   }
   const state = store.getState();

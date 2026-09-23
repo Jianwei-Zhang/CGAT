@@ -968,7 +968,6 @@ test("importer does not render loaded-project add-package actions", () => {
 test("importer workspace history row imports add packages without expanding the compact project card", async () => {
   const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;
-  const previousFetch = globalThis.fetch;
   const previousSetTimeout = globalThis.setTimeout;
   const previousClearTimeout = globalThis.clearTimeout;
   try {
@@ -978,10 +977,7 @@ test("importer workspace history row imports add packages without expanding the 
       },
     };
     globalThis.window = {
-      __TAURI__: null,
-      prompt() {
-        return "D:/packages/add_new_ds.zip";
-      },
+      __TAURI__: { core: {} },
       dispatchEvent() {},
       localStorage: {
         getItem() {
@@ -999,46 +995,42 @@ test("importer workspace history row imports add packages without expanding the 
     let importPayload = null;
     const importDatasetNames = ["new_ds", "new_ds2"];
     let importCallIndex = 0;
-    globalThis.fetch = async (path, options) => {
-      assert.equal(path, "/api/import-add-dataset-package");
-      importPayload = JSON.parse(options.body);
+    globalThis.window.__TAURI__.core.invoke = async (command, args) => {
+      if (command === "pick_zip_file_path") return "D:/packages/add_new_ds.zip";
+      assert.equal(command, "import_add_dataset_package");
+      importPayload = { workspaceRoot: args.workspaceRoot, zipPath: args.zipPath };
       const importedDatasetName = importDatasetNames[importCallIndex] || "new_ds";
       importCallIndex += 1;
       return {
-        ok: true,
-        async json() {
-          return {
-            workspaceRoot: "D:/ws",
-            packageMetadata: {
-              packageMode: "fast",
-              sequenceLayout: "partitioned",
-              preassignedChr: true,
-              chrAssignmentMinCoveragePercent: 60,
-              selfAlignmentScope: "chr_partition",
-              crossAlignmentScope: "chr_partition",
-            },
-            references: [{ referenceGenomeId: 1, name: "Ref" }],
-            datasets: [
-              { datasetId: 11, name: "primary", label: "primary", contigCount: 1, totalLengthBp: 4 },
-              { datasetId: 22, name: "old_ds", label: "old_ds", contigCount: 1, totalLengthBp: 4 },
-              { datasetId: 33, name: importedDatasetName, label: importedDatasetName, contigCount: 1, totalLengthBp: 4 },
-            ],
-            existingProjects: [
-              {
-                projectId: 7,
-                projectName: "Project A",
-                referenceGenomeId: 1,
-                primaryDatasetId: 11,
-                supportDatasetIds: [22],
-                createdAt: "2026-05-25T01:02:03Z",
-              },
-            ],
-            datasetId: 33,
-            datasetName: importedDatasetName,
-            stages: ["validate_input", "complete"],
-            message: "done",
-          };
+        workspaceRoot: "D:/ws",
+        packageMetadata: {
+          packageMode: "fast",
+          sequenceLayout: "partitioned",
+          preassignedChr: true,
+          chrAssignmentMinCoveragePercent: 60,
+          selfAlignmentScope: "chr_partition",
+          crossAlignmentScope: "chr_partition",
         },
+        references: [{ referenceGenomeId: 1, name: "Ref" }],
+        datasets: [
+          { datasetId: 11, name: "primary", label: "primary", contigCount: 1, totalLengthBp: 4 },
+          { datasetId: 22, name: "old_ds", label: "old_ds", contigCount: 1, totalLengthBp: 4 },
+          { datasetId: 33, name: importedDatasetName, label: importedDatasetName, contigCount: 1, totalLengthBp: 4 },
+        ],
+        existingProjects: [
+          {
+            projectId: 7,
+            projectName: "Project A",
+            referenceGenomeId: 1,
+            primaryDatasetId: 11,
+            supportDatasetIds: [22],
+            createdAt: "2026-05-25T01:02:03Z",
+          },
+        ],
+        datasetId: 33,
+        datasetName: importedDatasetName,
+        stages: ["validate_input", "complete"],
+        message: "done",
       };
     };
 
@@ -1120,7 +1112,6 @@ test("importer workspace history row imports add packages without expanding the 
   } finally {
     globalThis.document = previousDocument;
     globalThis.window = previousWindow;
-    globalThis.fetch = previousFetch;
     globalThis.setTimeout = previousSetTimeout;
     globalThis.clearTimeout = previousClearTimeout;
   }
