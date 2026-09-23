@@ -71,7 +71,7 @@ copy_installer() {
   mkdir -p "${case_dir}/server"
   cp "$ENV_SCRIPT" "${case_dir}/server/env.sh"
   cp "$INSTALL_SCRIPT" "${case_dir}/server/install.sh"
-  cp "$SPEC_FILE" "${case_dir}/server/cgat-server.conda-spec.txt"
+  cp "${REPO_ROOT}/server/"*.conda-spec.txt "${case_dir}/server/"
 }
 
 install_fake_managers() {
@@ -158,7 +158,9 @@ test_existing_manager_priority_create_reuse_and_update() {
   [[ "$(grep -c $'mamba\tinstall ' "${case_dir}/manager.log" || true)" -eq 0 ]]
   grep -F "already matches the dependency specification" "${case_dir}/second.out" >/dev/null
 
-  printf 'bc\n' >> "${case_dir}/server/cgat-server.conda-spec.txt"
+  for spec in "${case_dir}/server/"*.conda-spec.txt; do
+    printf 'bc\n' >> "$spec"
+  done
   run_installer "$case_dir" "$bin_dir" > "${case_dir}/update.out"
   [[ "$(grep -c $'mamba\tinstall -n cgat-server' "${case_dir}/manager.log")" -eq 1 ]]
   local updated_hash
@@ -297,7 +299,7 @@ test_dependency_spec_and_verifier_cover_server_commands() {
     samtools=1.23.1 \
     minimap2=2.31 \
     mummer4=4.0.1 \
-    meryl=1.4.1 \
+    meryl=1.4.2 \
     merqury=1.4.1 \
     craq=1.10 \
     blast=2.17.0 \
@@ -350,7 +352,9 @@ test_check_is_read_only_and_detects_stale_spec() {
     exit 1
   fi
 
-  printf 'bc\n' >> "${case_dir}/server/cgat-server.conda-spec.txt"
+  for spec in "${case_dir}/server/"*.conda-spec.txt; do
+    printf 'bc\n' >> "$spec"
+  done
   if run_installer_with_args "$case_dir" "$bin_dir" --check \
     > "${case_dir}/stale.out" 2> "${case_dir}/stale.error"; then
     echo "expected --check to reject an outdated dependency specification" >&2
@@ -395,6 +399,38 @@ test_help_and_unknown_arguments() {
   grep -F "unknown argument: run" "${case_dir}/error" >/dev/null
 }
 
+test_platform_dependency_spec_selection() {
+  local architecture case_dir bin_dir expected
+  for architecture in x86_64 aarch64 arm64; do
+    case_dir="${TMP_DIR}/platform-${architecture}"
+    bin_dir="${case_dir}/bin"
+    copy_installer "$case_dir"
+    install_fake_managers "$bin_dir" micromamba
+    mkdir -p "${case_dir}/home"
+    cat > "${bin_dir}/uname" <<EOF
+#!/bin/sh
+case "\$1" in
+  -s) echo Linux ;;
+  -m) echo ${architecture} ;;
+  *) /usr/bin/uname "\$@" ;;
+esac
+EOF
+    chmod +x "${bin_dir}/uname"
+    expected=cgat-server.conda-spec.txt
+    if [[ "$architecture" != x86_64 ]]; then
+      expected=cgat-server.linux-aarch64.conda-spec.txt
+    fi
+    run_installer "$case_dir" "$bin_dir" > "${case_dir}/output"
+    grep -F -- "--file ${case_dir}/server/${expected}" "${case_dir}/manager.log" >/dev/null
+    local actual_hash expected_hash
+    actual_hash="$(awk -F '\t' '$1 == "spec_sha256" { print $2 }' "${case_dir}/environment/conda-meta/cgat-server-state.tsv")"
+    expected_hash="$(sha256sum "${case_dir}/server/${expected}" | awk '{print $1}')"
+    [[ "$actual_hash" == "$expected_hash" ]]
+    run_installer_with_args "$case_dir" "$bin_dir" --check > "${case_dir}/check.out"
+  done
+}
+
+test_platform_dependency_spec_selection
 test_existing_manager_priority_create_reuse_and_update
 test_conda_uses_strict_channel_priority
 test_unmanaged_environment_is_rejected

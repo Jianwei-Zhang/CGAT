@@ -5,6 +5,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_NAME="cgat-server"
 SPEC_FILE="${SCRIPT_DIR}/cgat-server.conda-spec.txt"
+case "$(uname -s):$(uname -m)" in
+  Linux:aarch64|Linux:arm64)
+    SPEC_FILE="${SCRIPT_DIR}/cgat-server.linux-aarch64.conda-spec.txt"
+    ;;
+esac
 OWNER_MARKER_NAME="cgat-server-owner.tsv"
 STATE_MARKER_NAME="cgat-server-state.tsv"
 TOOLS_REPORT_NAME="cgat-server-tools.tsv"

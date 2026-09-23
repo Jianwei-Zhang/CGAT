@@ -47,11 +47,12 @@ fi
 
 [[ "$(GPM_TEST_CONTROL_DIR="$control_dir" GPM_TEST_EMPTY_TOOL="fake-tool" "$FAKE_TOOL")" == "empty" ]]
 
+# The terminated shell can leave sleep holding output open on NFS.
 GPM_TEST_CONTROL_DIR="$control_dir" \
   GPM_TEST_DELAY_TOOL="fake-tool" \
   GPM_TEST_DELAY_ON_INVOCATION="5" \
   GPM_TEST_DELAY_SECONDS="30" \
-  "$FAKE_TOOL" delayed >"${TMP_DIR}/delayed.out" 2>"${TMP_DIR}/delayed.err" &
+  "$FAKE_TOOL" delayed >/dev/null 2>&1 &
 delayed_pid=$!
 
 for _ in $(seq 1 100); do

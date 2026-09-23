@@ -52,6 +52,24 @@ The installer searches for `mamba`, `micromamba`, then `conda`. Select one expli
 bash install.sh --manager conda
 ```
 
+### ARM64 and cluster environments
+
+On Linux ARM64 (`aarch64`/`arm64`), the installer selects a separate dependency
+specification with `blast=2.16.0` for package availability. Both Linux ARM64
+and x86_64 use `meryl=1.4.2`, avoiding a reproduced multithreaded Meryl 1.4.1
+crash on ARM64 while keeping the Meryl version consistent.
+Deploy the complete `server/` directory, including both specification files.
+
+When using cluster modules, load tools and runtime libraries for the execution
+node's architecture and set `MERQURY` as required by that Merqury installation.
+Finding a command on `PATH` does not prove it can run: `GLIBCXX_* not found`
+indicates an incompatible C++ runtime. Load the matching GCC runtime or use the
+isolated environment created by the installer. Keep the same environment active
+for `prepare.sh` and `run_all.sh`.
+
+When an external QC command fails, the Server log includes bounded stdout/stderr
+tails so the underlying error remains available after temporary QC cleanup.
+
 ## File roles
 
 | File | Purpose | When to run it |

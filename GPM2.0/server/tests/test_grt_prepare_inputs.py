@@ -17,6 +17,7 @@ from server.tools.grt_prepare_inputs import (
     donor_fragment_rows,
     executable_identity,
     reads_qc_thread_plan,
+    run_command,
 )
 from server.tools.run_outer_checkpoints import OuterCheckpointManager
 
@@ -46,6 +47,27 @@ def sha256(path):
 
 
 class GrtPrepareInputsTests(unittest.TestCase):
+    def test_failed_command_preserves_bounded_diagnostics_after_temp_cleanup(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+            with self.assertRaises(SystemExit) as raised:
+                run_command(
+                    [
+                        sys.executable,
+                        "-c",
+                        "import sys; print('probe stdout'); "
+                        "sys.stderr.write('old-output\\n' * 2000 + "
+                        "'GLIBCXX_3.4.29 not found\\n'); sys.exit(7)",
+                    ],
+                    root,
+                    root / "meryl_count",
+                )
+        message = str(raised.exception)
+        self.assertIn("command failed (7)", message)
+        self.assertIn("GLIBCXX_3.4.29 not found", message)
+        self.assertIn("probe stdout", message)
+        self.assertLess(message.count("old-output"), 25)
+
     def test_reads_qc_thread_plan_caps_and_distributes_total_budget(self):
         with mock.patch.object(
             os, "sched_getaffinity", return_value=set(range(12)), create=True

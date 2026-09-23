@@ -50,6 +50,22 @@ bash install.sh --check
 bash install.sh --manager conda
 ```
 
+### ARM64 与集群环境
+
+安装器在 Linux ARM64（`aarch64`/`arm64`）上使用独立依赖清单，固定
+`blast=2.16.0` 以解决包可用性。Linux ARM64 和 x86_64 统一使用
+`meryl=1.4.2`，避开 ARM64 上已复现的 1.4.1 多线程崩溃问题。
+部署时请复制完整 `server/` 目录。
+
+如果使用集群 module，需在作业脚本中加载匹配架构的工具及运行库，
+并确保 Merqury 安装要求的 `MERQURY` 环境变量已设置。`command -v`
+能找到程序不代表程序能正常启动；`GLIBCXX_* not found` 表示 C++ 运行库
+不匹配，应加载匹配的 GCC runtime 或使用安装器创建的独立环境。
+执行 `prepare.sh` 和 `run_all.sh` 时使用同一套环境。
+
+外部 QC 命令失败时，Server 主日志会保留其 stdout/stderr 尾部，
+即使失败的临时 QC 目录随后被清理，也可查看底层报错。
+
 ## 文件用途
 
 | 文件 | 用途 | 何时执行 |

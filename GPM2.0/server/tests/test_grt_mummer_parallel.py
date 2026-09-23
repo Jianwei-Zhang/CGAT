@@ -100,6 +100,28 @@ print(f'1 10000 | 1 10000 | 10000 10000 | 99.00 | {length} {qlength} | {name} {q
                                          len(self.query), self.members, self.lengths)
 
     def test_parallel_order_matches_serial_and_respects_budget(self):
+        # Synchronize the first two workers: shared HPC filesystems can take
+        # longer to launch a process than the fixture's short simulated work.
+        first_started = self.root / "first-started"
+        second_finished = self.root / "second-finished"
+        path = Path(self.tools["nucmer"]["resolved"])
+        source = path.read_text().replace(
+            "time.sleep(0.4 if index == 1 else 0.05)",
+            f"""if index in (1, 2):
+    if index == 1:
+        Path({str(first_started)!r}).touch()
+    marker = Path({str(second_finished)!r} if index == 1 else {str(first_started)!r})
+    deadline = time.monotonic() + 20
+    while not marker.exists():
+        if time.monotonic() >= deadline:
+            raise RuntimeError('parallel fixture synchronization timed out')
+        time.sleep(0.02)""",
+        ).replace(
+            "event('end')",
+            f"event('end')\nif index == 2:\n    Path({str(second_finished)!r}).touch()",
+        )
+        path.write_text(source)
+        self.tools["nucmer"] = self.identity(path)
         parallel, _hit, _key = self.run_alignment()
         rows = self.parsed(parallel)
         self.assertEqual([row["ref_record"] for row in rows], list(self.members))

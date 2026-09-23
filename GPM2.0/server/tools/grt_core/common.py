@@ -348,4 +348,15 @@ def run_command(
             env=command_env,
         )
     if completed.returncode != 0:
-        fail(f"command failed ({completed.returncode}): {shlex.join(command)}")
+        details = [f"command failed ({completed.returncode}): {shlex.join(command)}"]
+        # Preserve diagnostics in the outer log before temporary QC files disappear.
+        for label, path in (("stderr", stderr_path), ("stdout", stdout_path)):
+            with path.open("rb") as handle:
+                handle.seek(0, os.SEEK_END)
+                handle.seek(max(0, handle.tell() - 8192))
+                tail = handle.read().decode("utf-8", errors="replace").strip()
+            if tail:
+                details.append(
+                    f"{label} (last 20 lines):\n" + "\n".join(tail.splitlines()[-20:])
+                )
+        fail("\n".join(details))
