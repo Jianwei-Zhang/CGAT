@@ -38,6 +38,7 @@ readonly -a REQUIRED_COMMANDS=(
   winnowmap
   zip
   gzip
+  pigz
 )
 
 die() {

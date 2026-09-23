@@ -225,7 +225,7 @@ test_score_option_sets_chr_assignment_threshold() {
   write_fasta "$ref" ref_score
   write_fasta "$ds" ds_score
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_score "$ref" \
     --ds ds_score "$ds" \
     --score 72 \
@@ -234,7 +234,7 @@ test_score_option_sets_chr_assignment_threshold() {
   assert_package_metadata "${output_root}/metadata/package.tsv" "fast" "true" "chr_partition" "chr_partition" "partitioned" "72"
 
   local short_output_root="${TMP_DIR}/score_short_gpm_server"
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_score "$ref" \
     --ds ds_score "$ds" \
     -s 65 \
@@ -252,7 +252,7 @@ test_minimap_options_set_preset_and_threads() {
   write_multi_fasta "$ds_a" "tig_a" "AAAAAAAAAA"
   write_multi_fasta "$ds_b" "tig_b" "CCCCCCCCCC"
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_minimap "$ref" \
     --ds ds_a "$ds_a" \
     --ds ds_b "$ds_b" \
@@ -296,7 +296,7 @@ test_alignment_engine_defaults_and_validation() {
   write_multi_fasta "$ref" "Chr01" "AAAAAA"
   write_multi_fasta "$ds" "tig_a" "AAAAAAAAAA"
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_aligner "$ref" \
     --ds ds_a "$ds" \
     -o "$default_root" >/dev/null
@@ -308,7 +308,7 @@ test_alignment_engine_defaults_and_validation() {
   assert_prepare_option "${default_root}/metadata/prepare_options.tsv" alignment_engine minimap2
   assert_prepare_option "${default_root}/metadata/prepare_options.tsv" threads 10
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_aligner "$ref" \
     --ds ds_a "$ds" \
     --aligner blastn \
@@ -330,7 +330,7 @@ test_alignment_engine_defaults_and_validation() {
   }
   assert_prepare_option "${blastn_root}/metadata/prepare_options.tsv" alignment_engine blastn
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_aligner "$ref" \
     --ds ds_a "$ds" \
     --aligner winnowmap \
@@ -347,7 +347,7 @@ test_alignment_engine_defaults_and_validation() {
   }
   assert_prepare_option "${winnowmap_root}/metadata/prepare_options.tsv" alignment_engine winnowmap
 
-  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_aligner "$ref" \
     --ds ds_a "$ds" \
     --aligner blastn \
@@ -362,7 +362,7 @@ test_alignment_engine_defaults_and_validation() {
     exit 1
   }
 
-  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_aligner "$ref" \
     --ds ds_a "$ds" \
     --aligner minimap2 \
@@ -377,7 +377,7 @@ test_alignment_engine_defaults_and_validation() {
     exit 1
   }
 
-  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_aligner "$ref" \
     --ds ds_a "$ds" \
     --aligner blastn \
@@ -400,7 +400,7 @@ test_out_alias_sets_output_root() {
   write_fasta "$ref" ref_out
   write_fasta "$ds" ds_out
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_out "$ref" \
     --ds ds_out "$ds" \
     --out "$output_root" >/dev/null
@@ -582,7 +582,7 @@ test_custom_output_root() {
   write_fasta "$ds_a" ds_a
   write_fasta "$ds_b" ds_b
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref "$ref" \
     --ds ds_a "$ds_a" \
     --ds ds_b "$ds_b" \
@@ -620,7 +620,7 @@ test_removed_package_mode_flags_are_rejected() {
   write_fasta "$ref" ref_flags
   write_fasta "$ds" ds_flags
 
-  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_flags "$ref" \
     --ds ds_flags "$ds" \
     --global >/dev/null 2>"${TMP_DIR}/global.err"; then
@@ -633,7 +633,7 @@ test_removed_package_mode_flags_are_rejected() {
     exit 1
   }
 
-  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_flags "$ref" \
     --ds ds_flags "$ds" \
     --fast >/dev/null 2>"${TMP_DIR}/fast.err"; then
@@ -664,7 +664,7 @@ test_removed_grt_tool_path_flags_are_rejected() {
     --grt-show-coords
   do
     local error_path="${TMP_DIR}/${option#--}.err"
-    if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+    if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
       --ref ref_grt_tool_flags "$ref" \
       --ds ds_grt_tool_flags "$ds" \
       "$option" "${FAKE_BIN}/minimap2" \
@@ -707,7 +707,7 @@ test_grt_tool_discovery_fails_fast_for_missing_commands() {
 
   local missing_base_bin="${TMP_DIR}/missing-show-coords-bin"
   make_restricted_path "$missing_base_bin" show-coords
-  if PATH="$missing_base_bin" /bin/bash "$SCRIPT" \
+  if PATH="$missing_base_bin" /bin/bash "$SCRIPT" --archive-format zip \
     --ref ref_missing_grt_tools "$ref" \
     --ds ds_missing_grt_tools "$ds" \
     -o "${TMP_DIR}/missing-show-coords-output" \
@@ -724,13 +724,13 @@ test_grt_tool_discovery_fails_fast_for_missing_commands() {
 
   local missing_qc_bin="${TMP_DIR}/missing-craq-bin"
   make_restricted_path "$missing_qc_bin" craq
-  PATH="$missing_qc_bin:/usr/bin:/bin" /bin/bash "$SCRIPT" \
+  PATH="$missing_qc_bin:/usr/bin:/bin" /bin/bash "$SCRIPT" --archive-format zip \
     --ref ref_standard_without_craq "$ref" \
     --ds ds_standard_without_craq "$ds" \
     --reads "$reads" \
     -o "${TMP_DIR}/standard-without-craq-output" \
     >/dev/null
-  if PATH="$missing_qc_bin:/usr/bin:/bin" /bin/bash "$SCRIPT" \
+  if PATH="$missing_qc_bin:/usr/bin:/bin" /bin/bash "$SCRIPT" --archive-format zip \
     --ref ref_missing_grt_qc "$ref" \
     --ds ds_missing_grt_qc "$ds" \
     --reads "$reads" \
@@ -759,7 +759,7 @@ test_default_output_root_uses_current_working_directory() {
 
   (
     cd "$TMP_DIR"
-    PATH="${FAKE_BIN}:$PATH" bash "${upload_root}/server/prepare.sh" \
+    PATH="${FAKE_BIN}:$PATH" bash "${upload_root}/server/prepare.sh" --archive-format zip \
       --ref ref_default "$ref" \
       --ds ds_default "$ds" >/dev/null
   )
@@ -780,7 +780,7 @@ test_skip_self_option_omits_self_runs() {
   write_fasta "$ds_a" ds_skip_a
   write_fasta "$ds_b" ds_skip_b
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_skip "$ref" \
     --ds ds_a "$ds_a" \
     --ds ds_b "$ds_b" \
@@ -810,7 +810,7 @@ test_prepare_writes_package_metadata_and_stages_runs() {
   write_fasta "$ds_a" ds_a
   write_fasta "$ds_b" ds_b
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_partitioned "$ref" \
     --ds ds_a "$ds_a" \
     --ds ds_b "$ds_b" \
@@ -834,7 +834,7 @@ test_prepare_rejects_reference_without_sequences() {
   : > "$ref"
   write_fasta "$ds" ds_empty_ref
 
-  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_empty "$ref" \
     --ds ds_empty_ref "$ds" \
     -o "$output_root" >/dev/null 2>"${TMP_DIR}/empty_ref.err"; then
@@ -867,7 +867,7 @@ test_assignment_helper_generates_chr_assignments_and_chr_local_runs() {
     "tig_chr1" "CCNNCCCCCC" \
     "tig_unplaced" "TTNNNNTTTT"
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_partitioned_assign "$ref" \
     --ds ds_a "$ds_a" \
     --ds ds_b "$ds_b" \
@@ -950,7 +950,7 @@ test_reads_lock_qc_recipe_and_generated_command() {
   printf 'reads-a\n' > "$reads_a"
   printf 'reads-b\n' > "$reads_b"
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_grt_reads "$ref" \
     --ds ds_a "$ds_a" \
     --ds ds_b "$ds_b" \
@@ -981,7 +981,7 @@ test_reads_lock_qc_recipe_and_generated_command() {
   ! grep -F -- "--craq" "${output_root}/prepare_grt_inputs.sh" >/dev/null
 
   local full_output_root="${TMP_DIR}/reads_full_gpm_server"
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_grt_reads_full "$ref" \
     --ds ds_a "$ds_a" \
     --ds ds_b "$ds_b" \
@@ -1005,7 +1005,7 @@ test_skip_self_omits_chr_local_self_runs() {
   write_multi_fasta "$ds_a" "tig_multi" "AAAAAAAAAA"
   write_multi_fasta "$ds_b" "tig_chr1" "CCCCCCCCCC"
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_partitioned_skip "$ref" \
     --ds ds_a "$ds_a" \
     --ds ds_b "$ds_b" \
@@ -1044,7 +1044,7 @@ test_prepare_writes_reference_segments_metadata() {
   write_gap_ref_partitioneda "$ref"
   write_fasta "$ds" ds_gap
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_gap "$ref" \
     --ds ds_gap "$ds" \
     -o "$output_root" >/dev/null
@@ -1061,7 +1061,7 @@ test_prepare_normalizes_plain_fna_inputs_to_package_fa() {
   printf '%s' "$expected_ref" > "$ref"
   printf '%s' "$expected_ds" > "$ds"
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_from_fna "$ref" \
     --ds ds_from_fna "$ds" \
     -o "$output_root" >/dev/null
@@ -1083,7 +1083,7 @@ test_prepare_decompresses_gzip_inputs_to_package_fa() {
   gzip_copy "$ref_plain" "$ref_gz"
   gzip_copy "$ds_plain" "$ds_gz"
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_from_gz "$ref_gz" \
     --ds ds_from_gz "$ds_gz" \
     -o "$output_root" >/dev/null
@@ -1102,7 +1102,7 @@ print(">tig_tel")
 print("AA" + "TTAGGG" * 20 + "CC" + "CCCTAA" * 20 + "GG")
 PY
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_tel "$ref" \
     --ds ds_a "$ds" \
     --tel TTAGGG 20 \
@@ -1157,7 +1157,7 @@ test_cen_option_generates_chr_local_cen_marks() {
   write_multi_fasta "$cen" "Chr01_centromere" "AAAAAAAAAAAAAAAAAAAA"
   write_multi_fasta "$ds" "tig_cen" "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_cen "$ref" \
     --ds ds_a "$ds" \
     --cen "$cen" \
@@ -1211,7 +1211,7 @@ test_cen_rejects_duplicate_chr_headers() {
   write_multi_fasta "$cen" "Chr01_centromere" "AAAAAAAAAA" "Chr01_centromere" "CCCCCCCCCC"
   write_multi_fasta "$ds" "tig_cen" "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
-  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_cen_dup "$ref" \
     --ds ds_a "$ds" \
     --cen "$cen" \
@@ -1235,7 +1235,7 @@ test_cen_rejects_unknown_reference_chr() {
   write_multi_fasta "$cen" "Chr99_centromere" "AAAAAAAAAA"
   write_multi_fasta "$ds" "tig_cen" "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
-  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
     --ref ref_cen_missing "$ref" \
     --ds ds_a "$ds" \
     --cen "$cen" \

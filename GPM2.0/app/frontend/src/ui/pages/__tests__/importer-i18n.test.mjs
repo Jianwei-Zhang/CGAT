@@ -179,7 +179,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.buttons.importAddPackage, "导入追加包");
   assert.equal(zh.runtime.importAddPackageSummary, "正在导入数据集追加包。");
   assert.equal(zh.runtime.incompleteAddPackageWorkspaceSummary, "请先加载已有项目。");
-  assert.equal(zh.runtime.incompleteAddPackageZipSummary, "请先选择数据集追加包 zip。");
+  assert.equal(zh.runtime.incompleteAddPackageZipSummary, "请先选择数据集追加压缩包。");
   assert.equal(zh.runtime.importAddPackageDoneStage, "数据集追加包导入完成并刷新候选项");
   assert.equal(zh.runtime.addPackageHint, "（added {datasetName}）");
   assert.equal(zh.runtime.importFailedSummary, "导入失败：{message}");
@@ -203,7 +203,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.buttons.importAddPackage, "Import add package");
   assert.equal(en.runtime.importAddPackageSummary, "Importing the dataset add package.");
   assert.equal(en.runtime.incompleteAddPackageWorkspaceSummary, "Open an existing project first.");
-  assert.equal(en.runtime.incompleteAddPackageZipSummary, "Select a dataset add-package ZIP first.");
+  assert.equal(en.runtime.incompleteAddPackageZipSummary, "Select a dataset add-package archive first.");
   assert.equal(en.runtime.importAddPackageDoneStage, "Dataset add package imported and options refreshed");
   assert.equal(en.runtime.addPackageHint, "(added {datasetName})");
   assert.equal(en.runtime.importFailedSummary, "Import failed: {message}");
@@ -1350,7 +1350,7 @@ test("importer english missing-parameter feedback stays translated after binding
 
     const nextImporter = store.getState().importer;
     assert.equal(nextImporter.status, "Incomplete parameters");
-    assert.equal(nextImporter.summary, "Fill in both the ZIP path and project directory.");
+    assert.equal(nextImporter.summary, "Fill in both the archive path and project directory.");
     assert.equal(timers.at(-1)?.delay, 1000);
     timers.at(-1).callback();
     assert.equal(store.getState().importer.status, "");
@@ -1562,7 +1562,7 @@ test("import progress modal truncates the active label and uses icon-only row st
     assert.doesNotMatch(html, /importer-import-progress-current-stage" title=/);
     assert.match(
       html,
-      /<p id="import-progress-dialog-summary" class="importer-import-progress-summary" aria-live="polite">正在导入 zip 交付包。<\/p>/,
+      /<p id="import-progress-dialog-summary" class="importer-import-progress-summary" aria-live="polite">正在导入交付压缩包。<\/p>/,
     );
     assert.match(
       html,

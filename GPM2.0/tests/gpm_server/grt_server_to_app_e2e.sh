@@ -141,6 +141,26 @@ for archive_name in sys.argv[1:]:
 print('App delivery allowlist passed')
 PY
 
+# Exercise the same Server tar.gz writer and App importer for both payload modes.
+for kind in full light; do
+  python3 - "${task_tmp_dir}/app-${kind}/gpm_server" "${task_tmp_dir}/${kind}.tar.gz" <<'PYTAR'
+from pathlib import Path
+import sys
+sys.path.insert(0, 'server/tools')
+from delivery_archive import create_archive
+create_archive(Path(sys.argv[1]), Path(sys.argv[2]), 'tar.gz', 2)
+PYTAR
+  "${backend_exe}" import-zip "${task_tmp_dir}/${kind}.tar.gz" "${task_tmp_dir}/tar-${kind}" >/dev/null
+  options="$("${backend_exe}" list-project-initializer-options "${task_tmp_dir}/tar-${kind}")"
+  if [[ "$kind" == full ]]; then
+    assert_contains "$options" 'fasta_available=true'
+  else
+    assert_contains "$options" 'fasta_available=false'
+  fi
+  "${backend_exe}" initialize-project "${task_tmp_dir}/tar-${kind}" "tar-${kind}-project" >/dev/null
+  "${backend_exe}" get-grt-project-view "${task_tmp_dir}/tar-${kind}" 1 >/dev/null
+done
+
 full_zip_workspace="${task_tmp_dir}/zip-full"
 light_zip_workspace="${task_tmp_dir}/zip-light"
 legacy_no_fasta_zip_workspace="${task_tmp_dir}/zip-legacy-no-fasta"

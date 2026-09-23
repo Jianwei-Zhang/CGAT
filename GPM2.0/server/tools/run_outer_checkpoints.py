@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from delivery_archive import delivery_path
+
 import csv
 import json
 import shutil
@@ -237,8 +239,7 @@ class OuterCheckpointManager:
     def validate_package(self, package_kind: str) -> tuple[bool, str]:
         if package_kind not in {"full", "light"}:
             return False, f"unsupported delivery package kind: {package_kind}"
-        suffix = ".zip" if package_kind == "full" else ".light.zip"
-        archive = self.server_dir.parent / f"{self.server_dir.name}{suffix}"
+        archive = delivery_path(self.server_dir, package_kind)
         if not archive.is_file() or archive.stat().st_size < 1:
             return False, f"{package_kind} delivery archive is missing or empty: {archive}"
         return True, f"{package_kind} delivery archive is present: {archive.name}"

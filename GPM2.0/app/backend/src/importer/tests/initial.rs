@@ -521,14 +521,18 @@ fn imports_partitioned_alignment_pafs_into_global_hit_tables() {
 }
 
 #[test]
-fn rejects_non_zip_input_file() {
+fn rejects_unsupported_archive_input_file() {
     let temp = tempdir().unwrap();
     let bad_path = temp.path().join("delivery.txt");
     fs::write(&bad_path, "not zip").unwrap();
     let workspace_root = temp.path().join("workspaces").join("project_alpha");
 
     let error = import_from_zip(&bad_path, &workspace_root).unwrap_err();
-    assert!(error.to_string().contains("expected a .zip file"));
+    assert!(
+        error
+            .to_string()
+            .contains("expected a .zip, .tar.gz or .tgz file")
+    );
 }
 
 #[test]

@@ -108,12 +108,14 @@ The runner executes the generated plan serially, stops at the first error, valid
 
 | Archive | Contents and use |
 | --- | --- |
-| `gpm_server.zip` | Full App package with source/reference FASTA, authoritative q4 FASTA, and the complete `report/` directory. Supports client-side FASTA export. |
-| `gpm_server.light.zip` | Light App package with FASTA omitted; retains `.fai`, metadata, Final Path, source-card state, PAF views, and the complete `report/` directory. Supports import, inspection, and PNG/TSV export. |
+| `gpm_server.tar.gz` | Full App package with source/reference FASTA, authoritative q4 FASTA, and the complete `report/` directory. Supports client-side FASTA export. |
+| `gpm_server.light.tar.gz` | Light App package with FASTA omitted; retains `.fai`, metadata, Final Path, source-card state, PAF views, and the complete `report/` directory. Supports import, inspection, and PNG/TSV export. |
 
-These two ZIPs are the only final delivery files. A separate report ZIP is not created. Open `gpm_server/report/report.html` in the Server workspace or inside either extracted delivery package. Recording starts during input preparation; `run_all.sh` updates the report at stage boundaries, including failures, interruptions, and unexecuted stages. First-published GRT events are preserved separately from their reconciled final state, and cache reuse is explicit. Previous reports are archived under the workspace's `.report_history/` directory.
+The default is parallel `tar.gz` compression with pigz. Use `--archive-format zip` for ZIP; the App accepts both formats.
 
-To avoid a checksum referring to the ZIP that contains it, the report records the App payload checksum before `report/` is embedded. After both final ZIPs are complete, `run_all.sh` prints their final paths, sizes, SHA-256 values, intended uses, and the local report path; the same summary is written to `logs/run_all.log`.
+These two archives are the only final delivery files. A separate report ZIP is not created. Open `gpm_server/report/report.html` in the Server workspace or inside either extracted delivery package. Recording starts during input preparation; `run_all.sh` updates the report at stage boundaries, including failures, interruptions, and unexecuted stages. First-published GRT events are preserved separately from their reconciled final state, and cache reuse is explicit. Previous reports are archived under the workspace's `.report_history/` directory.
+
+To avoid a checksum referring to the archive that contains it, the report records the App payload checksum before `report/` is embedded. After both final archives are complete, `run_all.sh` prints their final paths, sizes, SHA-256 values, intended uses, and the local report path; the same summary is written to `logs/run_all.log`.
 
 After copying or extracting the entire `report/` directory, regenerate without access to the original workspace or network:
 

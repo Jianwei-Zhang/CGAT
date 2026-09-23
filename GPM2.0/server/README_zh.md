@@ -22,9 +22,11 @@ bash ./gpm_server/run_all.sh
 ```
 
 成功结束时会明确显示 `Final delivery packages` 摘要。最终只交付
-`gpm_server.zip`（Full，含 FASTA 和报告）与 `gpm_server.light.zip`（Light，不含 FASTA、
+`gpm_server.tar.gz`（Full，含 FASTA 和报告）与 `gpm_server.light.tar.gz`（Light，不含 FASTA、
 包含报告）两个文件；两者都内置完整的 `gpm_server/report/` 目录，不再单独生成
 报告 ZIP。本地报告仍可在 `gpm_server/report/report.html` 直接打开。
+
+默认使用 pigz 多线程压缩为 `tar.gz`；`--archive-format zip` 可保留 ZIP 格式，App 支持两者。
 
 `--ref` 和可重复使用的 `--ds` 都支持 `<名称> <fasta>` 与仅传 `<fasta>`
 两种写法。省略名称时，会从 FASTA 文件名自动推导：不区分大小写地移除

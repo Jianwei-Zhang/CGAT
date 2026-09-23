@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from delivery_archive import delivery_path
+
 import argparse
 import csv
 import errno
@@ -479,14 +481,12 @@ class Runner:
         unit_ids = {unit.unit_id for unit in self.units}
         if not {"package_full", "package_light"}.issubset(unit_ids):
             return []
-        parent = self.server_dir.parent
-        name = self.server_dir.name
-        return [parent / f"{name}.zip", parent / f"{name}.light.zip"]
+        return [delivery_path(self.server_dir, kind) for kind in ("full", "light")]
 
     def _emit_success_summary(self, artifacts: list[dict[str, object]]) -> None:
         by_name = {str(artifact["file"]): artifact for artifact in artifacts}
-        full = by_name[f"{self.server_dir.name}.zip"]
-        light = by_name[f"{self.server_dir.name}.light.zip"]
+        full = by_name[delivery_path(self.server_dir, "full").name]
+        light = by_name[delivery_path(self.server_dir, "light").name]
         self._emit_summary(
             [
                 "",

@@ -71,7 +71,7 @@ where
     C: FnMut() -> bool,
 {
     check_import_cancel(should_cancel)?;
-    validate_zip_path(zip_path)?;
+    validate_archive_path(zip_path)?;
     if !workspace_root.is_dir() {
         bail!(
             "workspace root does not exist for add package import: {}",
@@ -87,8 +87,9 @@ where
     }
 
     let mut recorder = ImportProgressWriter::new(on_progress);
-    let archive_entry_count = count_zip_entries(zip_path)?;
-    recorder.reserve_remaining(archive_entry_count + 8);
+    if let Some(archive_entry_count) = count_archive_entries(zip_path)? {
+        recorder.reserve_remaining(archive_entry_count + 8);
+    }
     recorder.enable_log(workspace_root)?;
     recorder.record(
         "validate_input",
@@ -111,7 +112,7 @@ where
             extract_root.display()
         )
     })?;
-    unzip_delivery_to_root(
+    extract_delivery_to_root(
         zip_path,
         &extract_root,
         &mut |step| recorder.record_step(step),
@@ -119,7 +120,7 @@ where
     )?;
     recorder.record(
         "extract_add_package",
-        format!("zip extracted to {}", extract_root.display()),
+        format!("archive extracted to {}", extract_root.display()),
     );
 
     let manifest = read_add_dataset_manifest(&extract_root)?;

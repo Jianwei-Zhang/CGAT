@@ -10,7 +10,7 @@ remains available and the next invocation archives it.
 After a successful run, the finalized `report/` directory is embedded atomically in
 both App delivery archives. No separate report HTML or report ZIP is written beside
 them. The report records the App payload archive size and SHA-256 before `report/`
-is embedded, avoiding a checksum cycle. Final delivery ZIP sizes and SHA-256 values
+is embedded, avoiding a checksum cycle. Final delivery archive sizes and SHA-256 values
 are printed to the terminal and `logs/run_all.log`. Standalone packaging commands
 embed the latest workspace report when available; standalone incremental commands
 remain outside the recorded invocation history.

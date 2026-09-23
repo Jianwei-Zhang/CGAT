@@ -2,6 +2,8 @@
 """Record and deliver a portable report for prepare.sh and run_all.sh."""
 from __future__ import annotations
 
+from delivery_archive import archive_options, attach_tar_report, validate_tar_archive
+
 import argparse
 import os
 import shutil
@@ -203,7 +205,7 @@ class ReportSession:
 
 
 def embed_report_in_delivery_archives(root: Path, archives: list[Path]) -> list[dict[str, object]]:
-    """Atomically attach the finalized report directory to delivery ZIPs."""
+    """Atomically attach the finalized report directory to delivery archives."""
     root = root.resolve()
     report = root / "report"
     required = (report / "manifest.json", report / "report.html", report / "render_report.py")
@@ -227,23 +229,30 @@ def embed_report_in_delivery_archives(root: Path, archives: list[Path]) -> list[
             temporary = archive_path.with_name(
                 f".{archive_path.name}.with-report.{uuid.uuid4().hex}.tmp"
             )
-            shutil.copyfile(archive_path, temporary)
             try:
-                with zipfile.ZipFile(temporary, "a", compression=zipfile.ZIP_DEFLATED) as archive:
-                    if any(name.startswith(prefix) for name in archive.namelist()):
-                        raise ValueError(f"delivery archive already contains a report: {archive_path}")
-                    for path in report_files:
-                        relative = path.relative_to(report).as_posix()
-                        archive.write(path, prefix + relative)
-                with zipfile.ZipFile(temporary) as archive:
-                    corrupt = archive.testzip()
-                    if corrupt is not None:
-                        raise ValueError(f"delivery archive contains a corrupt member: {corrupt}")
-                    names = set(archive.namelist())
-                    for path in required:
-                        member = prefix + path.relative_to(report).as_posix()
-                        if member not in names:
-                            raise ValueError(f"delivery archive is missing embedded report member: {member}")
+                if archive_path.name.endswith(".tar.gz"):
+                    _, threads = archive_options(root)
+                    attach_tar_report(archive_path, temporary, root, report_files, threads)
+                    validate_tar_archive(temporary, {
+                        prefix + path.relative_to(report).as_posix() for path in required
+                    })
+                else:
+                    shutil.copyfile(archive_path, temporary)
+                    with zipfile.ZipFile(temporary, "a", compression=zipfile.ZIP_DEFLATED) as archive:
+                        if any(name.startswith(prefix) for name in archive.namelist()):
+                            raise ValueError(f"delivery archive already contains a report: {archive_path}")
+                        for path in report_files:
+                            relative = path.relative_to(report).as_posix()
+                            archive.write(path, prefix + relative)
+                    with zipfile.ZipFile(temporary) as archive:
+                        corrupt = archive.testzip()
+                        if corrupt is not None:
+                            raise ValueError(f"delivery archive contains a corrupt member: {corrupt}")
+                        names = set(archive.namelist())
+                        for path in required:
+                            member = prefix + path.relative_to(report).as_posix()
+                            if member not in names:
+                                raise ValueError(f"delivery archive is missing embedded report member: {member}")
             except Exception:
                 temporary.unlink(missing_ok=True)
                 raise

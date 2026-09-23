@@ -3,7 +3,7 @@ use super::*;
 #[tauri::command]
 pub fn pick_zip_file_path() -> CommandResult<Option<String>> {
     let selected = FileDialog::new()
-        .add_filter("zip", &["zip"])
+        .add_filter("GPM archives (ZIP, tar.gz)", &["zip", "gz", "tgz"])
         .pick_file()
         .map(|path| path_to_string(&path));
     Ok(selected)

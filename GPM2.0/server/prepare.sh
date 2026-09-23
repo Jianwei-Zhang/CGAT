@@ -15,6 +15,7 @@ source "$COMMON_LIB"
 
 WORK_ROOT="$(pwd)/gpm_server"
 THREADS="10"
+ARCHIVE_FORMAT="tar.gz"
 ALIGNER="minimap2"
 MINIMAP_PRESET="asm10"
 BLASTN_TASK="blastn"
@@ -61,6 +62,7 @@ Usage:
     [--winnowmap-kmer <kmer_size>] \
     [--winnowmap-repeat-fraction <fraction>] \
     [--threads|-t <thread_budget>] \
+    [--archive-format tar.gz|zip] \
     [--skip-self] \
     [--tel <motif> <min_repeat>] \
     [--cen <reference_centromere_fasta>] \
@@ -90,6 +92,7 @@ Behavior:
   - Supports --winnowmap-preset, --winnowmap-kmer, and --winnowmap-repeat-fraction for winnowmap only, defaults: asm20, 19, and 0.9998
   - Supports --threads/-t to choose the total compute-thread budget, default: 10
   - Independent reference and chromosome-local alignments share this budget
+  - Default delivery: tar.gz compressed with pigz using the thread budget; --archive-format zip keeps ZIP output
   - Supports repeatable --tel <motif> <min_repeat> to mark telomere-like tandem repeats
   - Supports --cen <reference_centromere_fasta> to mark complete reference centromere regions
   - Supports --cen-min-len and --cen-min-identity to filter centromere alignments
@@ -116,7 +119,7 @@ Behavior:
   - Embeds the finalized report/ directory in both delivery archives; no separate report ZIP is created
   - report/render_report.py regenerates HTML using only report/ and Python's standard library
   - Generates package_full_zip.sh, package_light_zip.sh, and export_final_path_fasta.sh
-  - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> GRT Step2/3 -> GRT telomere/q4 finalization -> per-chr commands -> GRT evidence/package validation -> full zip -> light zip
+  - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> GRT Step2/3 -> GRT telomere/q4 finalization -> per-chr commands -> GRT evidence/package validation -> full archive -> light archive
   - A successful run_all.sh creates both delivery archives in the parent directory of the work root
   - With --skip-self, same-dataset self alignments are omitted and marked unavailable in metadata/datasets.tsv
   - Prints all generated staged commands to the terminal for manual copy/paste
@@ -562,6 +565,7 @@ write_prepare_options_metadata() {
     printf 'winnowmap_kmer\t%s\n' "$WINNOWMAP_KMER"
     printf 'winnowmap_repeat_fraction\t%s\n' "$WINNOWMAP_REPEAT_FRACTION"
     printf 'threads\t%s\n' "$THREADS"
+    printf 'archive_format\t%s\n' "$ARCHIVE_FORMAT"
     printf 'skip_self\t%s\n' "$SKIP_SELF"
     printf 'self_alignment_scope\t%s\n' "$self_alignment_scope"
     printf 'cross_alignment_scope\t%s\n' "$cross_alignment_scope"
@@ -888,6 +892,11 @@ while [[ $# -gt 0 ]]; do
       ALIGNER="$2"
       shift 2
       ;;
+    --archive-format)
+      [[ $# -ge 2 ]] || die "--archive-format requires tar.gz or zip"
+      case "$2" in tar.gz|zip) ARCHIVE_FORMAT="$2" ;; *) die "--archive-format requires tar.gz or zip" ;; esac
+      shift 2
+      ;;
     --skip-self)
       SKIP_SELF=true
       shift
@@ -1008,6 +1017,7 @@ fi
 require_cmd samtools
 require_cmd zip
 require_cmd gzip
+if [[ "$ARCHIVE_FORMAT" == "tar.gz" ]]; then require_cmd pigz; fi
 require_cmd python3
 GRT_MINIMAP2="$(resolve_required_command minimap2)"
 GRT_NUCMER="$(resolve_required_command nucmer)"
@@ -1310,8 +1320,8 @@ if [[ "$SKIP_SELF" == "true" ]]; then
   echo "     - chr-local same-dataset self alignments remain skipped"
 fi
 echo "  4. Output archives:"
-echo "     - Full package (FASTA + report): $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").zip"
-echo "     - Light package (report included, FASTA omitted): $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").light.zip"
+echo "     - Full package (FASTA + report): $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").${ARCHIVE_FORMAT}"
+echo "     - Light package (report included, FASTA omitted): $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").light.${ARCHIVE_FORMAT}"
 echo "  5. To add a dataset later, run:"
 echo "     - bash ${WORK_ROOT}/add_dataset.sh --ds /path/to/dataset.fa"
 echo "     - Or set an explicit name: bash ${WORK_ROOT}/add_dataset.sh --ds <dataset_name> /path/to/dataset.fa"
@@ -1322,4 +1332,4 @@ echo "     - bash ${WORK_ROOT}/export_final_path_fasta.sh --tsv /path/to/final_p
 echo
 echo "Delivery reminder:"
 echo "  - gpm_next importer does not require metadata/alignments.tsv"
-echo "  - Both zips contain top-level gpm_server/{metadata,data,runs,report}"
+echo "  - Both archives contain top-level gpm_server/{metadata,data,runs,report}"

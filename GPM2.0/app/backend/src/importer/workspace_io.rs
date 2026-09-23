@@ -32,12 +32,22 @@ pub(super) fn now_timestamp_string() -> String {
         .unwrap_or_else(|_| "0".to_string())
 }
 
-pub(super) fn count_zip_entries(zip_path: &Path) -> Result<usize> {
+fn is_tar_gz(path: &Path) -> bool {
+    let name = path.to_string_lossy().to_ascii_lowercase();
+    name.ends_with(".tar.gz") || name.ends_with(".tgz")
+}
+
+pub(super) fn count_archive_entries(zip_path: &Path) -> Result<Option<usize>> {
+    // A tar stream has no central directory. Do not decompress it twice just
+    // to count entries; extraction reports progress as entries arrive.
+    if is_tar_gz(zip_path) {
+        return Ok(None);
+    }
     let file = File::open(zip_path)
         .with_context(|| format!("failed to open zip: {}", zip_path.display()))?;
     let archive = ZipArchive::new(file)
         .with_context(|| format!("failed to read zip archive: {}", zip_path.display()))?;
-    Ok(archive.len())
+    Ok(Some(archive.len()))
 }
 
 pub(super) fn check_import_cancel(should_cancel: &mut impl FnMut() -> bool) -> Result<()> {
@@ -67,13 +77,13 @@ fn copy_with_import_cancel(
     }
 }
 
-pub(super) fn validate_zip_path(zip_path: &Path) -> Result<()> {
+pub(super) fn validate_archive_path(zip_path: &Path) -> Result<()> {
     if !zip_path.exists() {
-        bail!("zip file does not exist: {}", zip_path.display());
+        bail!("archive file does not exist: {}", zip_path.display());
     }
 
     if !zip_path.is_file() {
-        bail!("zip path is not a file: {}", zip_path.display());
+        bail!("archive path is not a file: {}", zip_path.display());
     }
 
     let extension = zip_path
@@ -81,8 +91,11 @@ pub(super) fn validate_zip_path(zip_path: &Path) -> Result<()> {
         .and_then(|value| value.to_str())
         .unwrap_or_default()
         .to_ascii_lowercase();
-    if extension != "zip" {
-        bail!("expected a .zip file, got: {}", zip_path.display());
+    if extension != "zip" && !is_tar_gz(zip_path) {
+        bail!(
+            "expected a .zip, .tar.gz or .tgz file, got: {}",
+            zip_path.display()
+        );
     }
 
     Ok(())
@@ -116,12 +129,15 @@ pub(super) fn ensure_workspace_root_can_be_created(workspace_root: &Path) -> Res
     Ok(())
 }
 
-pub(super) fn unzip_delivery_to_root(
+pub(super) fn extract_delivery_to_root(
     zip_path: &Path,
     extract_root: &Path,
     on_progress: &mut impl FnMut(ImportProgress),
     should_cancel: &mut impl FnMut() -> bool,
 ) -> Result<()> {
+    if is_tar_gz(zip_path) {
+        return extract_tar_gz_to_root(zip_path, extract_root, on_progress, should_cancel);
+    }
     let file = File::open(zip_path)
         .with_context(|| format!("failed to open zip: {}", zip_path.display()))?;
     let mut archive = ZipArchive::new(file)
@@ -178,6 +194,64 @@ pub(super) fn unzip_delivery_to_root(
     Ok(())
 }
 
+fn extract_tar_gz_to_root(
+    path: &Path,
+    extract_root: &Path,
+    on_progress: &mut impl FnMut(ImportProgress),
+    should_cancel: &mut impl FnMut() -> bool,
+) -> Result<()> {
+    let file =
+        File::open(path).with_context(|| format!("failed to open archive: {}", path.display()))?;
+    let mut archive = tar::Archive::new(flate2::read::MultiGzDecoder::new(file));
+    let mut seen = HashSet::new();
+    for entry in archive.entries()? {
+        check_import_cancel(should_cancel)?;
+        let mut entry = entry.context("failed to read tar entry")?;
+        let relative = entry.path()?.into_owned();
+        if relative.as_os_str().is_empty()
+            || relative.components().any(|component| match component {
+                Component::Normal(name) => {
+                    let name = name.to_string_lossy();
+                    name.contains('\\') || name.contains(':')
+                }
+                Component::CurDir => false,
+                _ => true,
+            })
+        {
+            bail!(
+                "tar entry contains unsafe path traversal: {}",
+                relative.display()
+            );
+        }
+        if !seen.insert(relative.clone()) {
+            bail!("duplicate tar entry: {}", relative.display());
+        }
+        let kind = entry.header().entry_type();
+        if !kind.is_dir() && !kind.is_file() {
+            bail!("unsupported tar entry type: {}", relative.display());
+        }
+        let output = extract_root.join(&relative);
+        on_progress(step(
+            "extract_entry",
+            relative.to_string_lossy().into_owned(),
+        ));
+        if kind.is_dir() {
+            fs::create_dir_all(&output)?;
+        } else {
+            if let Some(parent) = output.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            let mut writer = File::create(&output)?;
+            copy_with_import_cancel(&mut entry, &mut writer, should_cancel)?;
+        }
+    }
+    // Consume padding and the gzip trailer so truncation/CRC errors cannot
+    // produce an apparently successful imported workspace.
+    let mut stream = archive.into_inner();
+    copy_with_import_cancel(&mut stream, &mut io::sink(), should_cancel)?;
+    Ok(())
+}
+
 pub(super) fn promote_bundle_root_to_workspace_root(
     workspace_root: &Path,
     bundle_root: &Path,
@@ -188,7 +262,7 @@ pub(super) fn promote_bundle_root_to_workspace_root(
 
     if bundle_root.parent() != Some(workspace_root) {
         bail!(
-            "unsupported zip layout: bundle root {} is not a direct child of workspace root {}",
+            "unsupported archive layout: bundle root {} is not a direct child of workspace root {}",
             bundle_root.display(),
             workspace_root.display()
         );

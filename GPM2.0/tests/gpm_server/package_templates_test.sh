@@ -104,6 +104,7 @@ for source in args.source.rglob('*'):
     shutil.copy2(source, target)
 PY
 
+cp "${REPO_ROOT}/server/tools/delivery_archive.py" "${SERVER_DIR}/.prepare_lib/tools/"
 cp "${REPO_ROOT}/server/templates/package_full_zip.sh" "${SERVER_DIR}/package_full_zip.sh"
 cp "${REPO_ROOT}/server/templates/package_light_zip.sh" "${SERVER_DIR}/package_light_zip.sh"
 chmod +x "${SERVER_DIR}/package_full_zip.sh" "${SERVER_DIR}/package_light_zip.sh"

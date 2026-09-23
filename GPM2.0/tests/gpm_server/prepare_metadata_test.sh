@@ -142,7 +142,7 @@ printf 'stale_ds\t1\t0\t1\t2\n' > "${output_root}/data/datasets/ds_add.fa.fai"
 
 (
   cd "$TMP_DIR"
-  PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
+  PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
     --ref ref_add_options "$ref" \
     --ds ds_add "$ds" \
     --skip-self \
@@ -194,7 +194,7 @@ write_multi_fasta "$auto_primary" "primary_ctg" "AAAAAAAAAAAAAAAAAAAA"
 write_multi_fasta "$auto_explicit" "explicit_ctg" "AAAAAAAAAAAAAAAAAAAA"
 write_multi_fasta "$auto_support" "support_ctg" "AAAAAAAAAAAAAAAAAAAA"
 
-PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
+PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref "$auto_ref" \
   --ds "$auto_primary" \
   --ds manual.support "$auto_explicit" \
@@ -231,7 +231,7 @@ duplicate_output_root="${TMP_DIR}/duplicate_names_gpm_server"
 mkdir -p "$duplicate_dir_a" "$duplicate_dir_b"
 write_multi_fasta "${duplicate_dir_a}/same.fa" "same_a" "AAAAAAAAAAAAAAAAAAAA"
 write_multi_fasta "${duplicate_dir_b}/same.fasta" "same_b" "AAAAAAAAAAAAAAAAAAAA"
-if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
+if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref "$auto_ref" \
   --ds "${duplicate_dir_a}/same.fa" \
   --ds "${duplicate_dir_b}/same.fasta" \
@@ -352,7 +352,7 @@ EOF
 chmod +x "${no_chmod_bin}/chmod"
 
 GPM_TEST_CHMOD_LOG="$no_chmod_log" PATH="${no_chmod_bin}:${FAKE_BIN}:$PATH" \
-  "$PREPARE_BASH" "$SCRIPT" \
+  "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_no_chmod "$ref" \
   --ds ds_no_chmod "$ds" \
   --skip-self \
@@ -396,7 +396,7 @@ do
     exit 1
   fi
   error_path="${TMP_DIR}/${removed_option#--}.err"
-  if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
+  if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
     --ref ref_removed_grt_option "$ref" \
     --ds ds_removed_grt_option "$ds" \
     "$removed_option" "${FAKE_BIN}/minimap2" \
@@ -414,7 +414,7 @@ done
 reads="${TMP_DIR}/reads.fastq"
 reads_output_root="${TMP_DIR}/reads_gpm_server"
 printf 'reads\n' > "$reads"
-PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
+PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_reads_qc "$ref" \
   --ds ds_reads_qc "$ds" \
   --reads "$reads" \
@@ -438,7 +438,7 @@ grep -F -- " --reads ${reads}" "${reads_output_root}/prepare_grt_inputs.sh" >/de
 reads_second="${TMP_DIR}/reads-second.fastq"
 multiple_reads_output_root="${TMP_DIR}/multiple-reads-gpm-server"
 printf 'reads-second\n' > "$reads_second"
-PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
+PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_multiple_reads_qc "$ref" \
   --ds ds_multiple_reads_qc "$ds" \
   --reads "$reads" \
@@ -459,7 +459,7 @@ for missing_command in minimap2 nucmer delta-filter show-coords; do
   restricted_bin="${TMP_DIR}/missing-${missing_command}-bin"
   error_path="${TMP_DIR}/missing-${missing_command}.err"
   make_restricted_path "$restricted_bin" "$missing_command"
-  if PATH="$restricted_bin" "$PREPARE_BASH" "$SCRIPT" \
+  if PATH="$restricted_bin" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
     --ref ref_missing_grt_tool "$ref" \
     --ds ds_missing_grt_tool "$ds" \
     -o "${TMP_DIR}/missing-${missing_command}-output" \
@@ -500,7 +500,7 @@ for capability_index in "${!capability_commands[@]}"; do
   cp "$capability_stub" "${restricted_bin}/${capability_command}"
 
   if GPM_TEST_MUMMER_HELP="${capability_help[$capability_index]}" \
-    PATH="$restricted_bin" "$PREPARE_BASH" "$SCRIPT" \
+    PATH="$restricted_bin" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
     --ref ref_incompatible_mummer "$ref" \
     --ds ds_incompatible_mummer "$ds" \
     -o "$output_path" \
@@ -526,7 +526,7 @@ make_restricted_path "$delta_l_only_bin" ""
 rm -f "${delta_l_only_bin}/delta-filter"
 cp "$capability_stub" "${delta_l_only_bin}/delta-filter"
 GPM_TEST_MUMMER_HELP=$'-l    sequence-length option' \
-  PATH="$delta_l_only_bin" "$PREPARE_BASH" "$SCRIPT" \
+  PATH="$delta_l_only_bin" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_delta_l_only "$ref" \
   --ds ds_delta_l_only "$ds" \
   -o "$delta_l_only_output" \
@@ -539,7 +539,7 @@ GPM_TEST_MUMMER_HELP=$'-l    sequence-length option' \
 for missing_command in meryl merqury.sh; do
   no_reads_bin="${TMP_DIR}/no-reads-missing-${missing_command}-bin"
   make_restricted_path "$no_reads_bin" "$missing_command"
-  PATH="$no_reads_bin" "$PREPARE_BASH" "$SCRIPT" \
+  PATH="$no_reads_bin" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
     --ref ref_no_reads_qc_tool "$ref" \
     --ds ds_no_reads_qc_tool "$ds" \
     -o "${TMP_DIR}/no-reads-missing-${missing_command}-output" \
@@ -548,7 +548,7 @@ for missing_command in meryl merqury.sh; do
   restricted_bin="${TMP_DIR}/missing-${missing_command}-bin"
   error_path="${TMP_DIR}/missing-${missing_command}.err"
   make_restricted_path "$restricted_bin" "$missing_command"
-  if PATH="$restricted_bin" "$PREPARE_BASH" "$SCRIPT" \
+  if PATH="$restricted_bin" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
     --ref ref_missing_grt_qc "$ref" \
     --ds ds_missing_grt_qc "$ds" \
     --reads "$reads" \
@@ -566,13 +566,13 @@ done
 
 missing_craq_bin="${TMP_DIR}/missing-craq-bin"
 make_restricted_path "$missing_craq_bin" craq
-PATH="$missing_craq_bin:/usr/bin:/bin" "$PREPARE_BASH" "$SCRIPT" \
+PATH="$missing_craq_bin:/usr/bin:/bin" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_standard_without_craq "$ref" \
   --ds ds_standard_without_craq "$ds" \
   --reads "$reads" \
   -o "${TMP_DIR}/standard-without-craq-output" \
   >/dev/null
-if PATH="$missing_craq_bin:/usr/bin:/bin" "$PREPARE_BASH" "$SCRIPT" \
+if PATH="$missing_craq_bin:/usr/bin:/bin" "$PREPARE_BASH" "$SCRIPT" --archive-format zip \
   --ref ref_full_missing_craq "$ref" \
   --ds ds_full_missing_craq "$ds" \
   --reads "$reads" \
@@ -593,5 +593,16 @@ grep -q $'^tig_add\t20\t' "${output_root}/data/datasets/ds_add.fa.fai" || {
   echo "dataset .fai was not regenerated from the current FASTA" >&2
   exit 1
 }
+
+PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
+  --ref default_tar_ref "$ref" --ds default_tar_ds "$ds" \
+  -t 7 -o "${TMP_DIR}/default-tar-output" >"${TMP_DIR}/default-tar.stdout"
+assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" archive_format tar.gz
+assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" threads 7
+grep -F "${TMP_DIR}/default-tar-output.tar.gz" "${TMP_DIR}/default-tar.stdout" >/dev/null
+if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format unknown >/dev/null 2>&1; then
+  echo "expected invalid archive format to fail" >&2
+  exit 1
+fi
 
 echo "gpm_server_prepare_metadata_test.sh: ok"

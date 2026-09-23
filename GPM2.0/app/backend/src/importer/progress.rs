@@ -76,12 +76,9 @@ where
     pub(super) fn record_step(&mut self, mut item: ImportProgress) {
         self.emitted_count += 1;
         let progress_index = self.emitted_count;
-        let progress_total = self
-            .expected_total
-            .unwrap_or(progress_index)
-            .max(progress_index);
         item.progress_index = Some(progress_index);
-        item.progress_total = Some(progress_total);
+        // Streaming archives have no known entry count until extraction ends.
+        item.progress_total = self.expected_total.map(|total| total.max(progress_index));
         if item.phase_index.is_none() {
             item.phase_index = self.phase_index;
         }

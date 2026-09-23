@@ -22,10 +22,12 @@ bash ./gpm_server/run_all.sh
 ```
 
 A successful run ends with an explicit `Final delivery packages` summary. The only
-delivery files are `gpm_server.zip` (Full: FASTA + report) and
-`gpm_server.light.zip` (Light: FASTA omitted, report included). Both contain the complete
+delivery files are `gpm_server.tar.gz` (Full: FASTA + report) and
+`gpm_server.light.tar.gz` (Light: FASTA omitted, report included). Both contain the complete
 `gpm_server/report/` directory; no separate report ZIP is created. The local report
 remains available at `gpm_server/report/report.html`.
+
+The default is parallel `tar.gz` compression with pigz. Use `--archive-format zip` for ZIP; the App accepts both formats.
 
 `--ref` and repeatable `--ds` accept either `<name> <fasta>` or just `<fasta>`.
 When the name is omitted, it comes from the FASTA basename: `.gz` and one

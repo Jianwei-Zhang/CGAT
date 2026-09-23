@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from delivery_archive import delivery_path
+
 import hashlib
 from pathlib import Path
 
@@ -247,8 +249,8 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
                            "evidence": table(root, "metadata/grt_evidence_registry.tsv"),
                            "tools": table(root, "metadata/grt_tool_versions.tsv")}}
     if unit_id in {"package_full", "package_light"}:
-        name = root.name + (".zip" if unit_id == "package_full" else ".light.zip")
-        path = root.parent / name
+        path = delivery_path(root, "full" if unit_id == "package_full" else "light")
+        name = path.name
         return {"summary": {"archive": name, "available": path.is_file()}, "outputs": [
             {
                 "file": name,

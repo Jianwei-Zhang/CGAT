@@ -196,7 +196,7 @@ write_fasta "$ref" "Chr01" "$(repeat_base A 1500)"
 write_fasta "$ds1" "ds1_ctg" "$(repeat_base A 1200)"
 write_fasta "$ds4" "ds4_ctg" "$(repeat_base A 400)NNNN$(repeat_base A 796)"
 
-PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
+PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
   --ref ref_add_script "$ref" \
   --ds ds1 "$ds1" \
   --skip-self \

@@ -110,9 +110,10 @@ where
         ),
     );
 
-    validate_zip_path(zip_path)?;
-    let archive_entry_count = count_zip_entries(zip_path)?;
-    recorder.reserve_remaining(archive_entry_count + 5);
+    validate_archive_path(zip_path)?;
+    if let Some(archive_entry_count) = count_archive_entries(zip_path)? {
+        recorder.reserve_remaining(archive_entry_count + 5);
+    }
 
     recorder.set_phase(2, ZIP_IMPORT_PHASE_TOTAL);
     ensure_workspace_root_can_be_created(workspace_root)?;
@@ -131,7 +132,7 @@ where
         format!("workspace_root={}", workspace_root.display()),
     );
 
-    if let Err(error) = unzip_delivery_to_root(
+    if let Err(error) = extract_delivery_to_root(
         zip_path,
         workspace_root,
         &mut |step| recorder.record_step(step),
@@ -142,7 +143,7 @@ where
     }
     recorder.record(
         "extract_bundle",
-        format!("zip extracted to {}", workspace_root.display()),
+        format!("archive extracted to {}", workspace_root.display()),
     );
 
     recorder.set_phase(3, ZIP_IMPORT_PHASE_TOTAL);
