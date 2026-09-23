@@ -22,6 +22,8 @@ jobs:
   quality:
     name: Quality gate
     uses: ./.github/workflows/quality.yml
+    with:
+      full: true
 
   prepare-release:
     name: Prepare release

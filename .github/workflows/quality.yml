@@ -2,22 +2,30 @@ name: GPM2.0 Quality
 
 on:
   pull_request:
-    paths:
-      - "GPM2.0/**"
-      - ".github/workflows/quality.yml"
-      - ".github/workflows/release-installers.yml"
   push:
     branches:
       - master
-    paths:
-      - "GPM2.0/**"
-      - ".github/workflows/quality.yml"
-      - ".github/workflows/release-installers.yml"
   workflow_dispatch:
+    inputs:
+      full:
+        description: Run the full backend and Tauri quality gate
+        required: true
+        default: true
+        type: boolean
   workflow_call:
+    inputs:
+      full:
+        description: Run the full backend and Tauri quality gate
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
+
+concurrency:
+  group: gpm2-quality-${{ github.workflow }}-${{ inputs.full && github.run_id || github.ref }}
+  cancel-in-progress: ${{ !inputs.full && (github.event_name == 'push' || github.event_name == 'pull_request') }}
 
 jobs:
   windows-app:
@@ -50,13 +58,16 @@ jobs:
           --fetch-retry-maxtimeout=60000
 
       - name: Install Rust quality components
+        if: ${{ inputs.full }}
         working-directory: GPM2.0
         run: rustup component add rustfmt clippy
 
       - name: Run Windows quality gate
         working-directory: GPM2.0
         shell: pwsh
-        run: ./scripts/quality-gate-windows.ps1
+        env:
+          QUALITY_MODE: ${{ inputs.full && 'Full' || 'Light' }}
+        run: ./scripts/quality-gate-windows.ps1 -Mode $env:QUALITY_MODE
 
   linux-server:
     name: Linux server

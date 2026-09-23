@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param()
+param(
+    [ValidateSet("Light", "Full")]
+    [string]$Mode = "Full"
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -44,6 +47,11 @@ Invoke-Checked "Tracked LF line endings" $ProjectRoot "python" @(
 )
 Invoke-Checked "Frontend tests" $FrontendRoot "npm.cmd" @("test")
 Invoke-Checked "Frontend production build" $FrontendRoot "npm.cmd" @("run", "build")
+
+if ($Mode -eq "Light") {
+    Write-Host "GPM2.0 Windows light quality gate passed."
+    return
+}
 
 Invoke-Checked "Backend formatting" $BackendRoot "cargo" @("fmt", "--all", "--", "--check")
 Invoke-Checked "Backend clippy" $BackendRoot "cargo" @(
