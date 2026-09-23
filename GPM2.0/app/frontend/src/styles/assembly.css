@@ -92,7 +92,7 @@
 
 .chr-title {
   font-weight: 700;
-  font-size: 18px;
+  font-size: var(--font-heading);
 }
 
 .chr-title-wrap {
@@ -194,7 +194,7 @@
 .ctg-chip .ctg-chip-meta {
   display: block;
   color: #666;
-  font-size: 12px;
+  font-size: var(--font-body);
 }
 
 .canvas-placeholder {
@@ -241,7 +241,7 @@
 .assembly-view-title {
   margin: 0;
   color: #222;
-  font-size: 16px;
+  font-size: var(--font-title);
   font-weight: 700;
   line-height: 1.45;
 }
@@ -341,33 +341,33 @@
 }
 
 .assembly-track-panel-quick-actions > [data-create-phased-track] {
-  height: 30px;
-  min-height: 30px;
+  height: 2.1429rem;
+  min-height: 2.1429rem;
 }
 
 .assembly-marker-display > [data-marker-display-toggle] {
-  height: 30px;
-  min-height: 30px;
+  height: 2.1429rem;
+  min-height: 2.1429rem;
 }
 
 .grt-result-controls {
   position: relative;
   display: inline-flex;
   align-items: center;
-  height: 30px;
+  height: 2.1429rem;
 }
 
 .grt-result-switch {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 30px;
-  min-height: 30px;
+  height: 2.1429rem;
+  min-height: 2.1429rem;
   padding: 2px 8px;
   border: 1px solid #aeb9b0;
   background: #f8fbf8;
   color: #245f35;
-  font-size: 12px;
+  font-size: var(--font-body);
   font-weight: 700;
   cursor: pointer;
   user-select: none;
@@ -379,14 +379,14 @@
 
 .grt-result-layer-menu {
   position: relative;
-  height: 30px;
+  height: 2.1429rem;
 }
 
 .grt-result-layer-trigger {
   display: inline-grid;
   place-items: center;
   width: 28px;
-  height: 30px;
+  height: 2.1429rem;
   border: 1px solid #aeb9b0;
   border-left: 0;
   background: #f8fbf8;
@@ -417,7 +417,7 @@
   background: #fff;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.16);
   color: #303a32;
-  font-size: 12px;
+  font-size: var(--font-body);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -445,7 +445,7 @@
   background: rgba(255, 255, 255, 0.96);
   color: #364139;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
-  font-size: 12px;
+  font-size: var(--font-body);
   pointer-events: none;
 }
 
@@ -504,7 +504,7 @@
   stroke: rgba(255, 255, 255, 0.94);
   stroke-width: 3px;
   stroke-linejoin: round;
-  font-size: 11px;
+  font-size: var(--font-graph-label);
   font-weight: 700;
   pointer-events: none;
 }
@@ -526,7 +526,7 @@
 }
 
 .track-controls label {
-  font-size: 12px;
+  font-size: var(--font-body);
   font-weight: 700;
 }
 
@@ -573,11 +573,11 @@
   gap: 8px;
   padding: 6px 8px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-body);
   font-weight: 700;
   letter-spacing: 0.02em;
   color: #333;
-  min-height: 30px;
+  min-height: 2.1429rem;
   white-space: nowrap;
 }
 
@@ -587,7 +587,7 @@
 
 .assembly-v1-tool-menu-hint {
   color: #666;
-  font-size: 12px;
+  font-size: var(--font-body);
   font-weight: 600;
   transition: transform 0.12s ease;
 }
@@ -634,7 +634,7 @@
 }
 
 .assembly-v1-tool-card-title {
-  font-size: 12px;
+  font-size: var(--font-body);
   font-weight: 700;
   letter-spacing: 0.02em;
   color: #333;
@@ -644,7 +644,7 @@
   display: grid;
   gap: 4px;
   color: #444;
-  font-size: 12px;
+  font-size: var(--font-body);
 }
 
 .assembly-v1-tool-action-list {
@@ -676,7 +676,7 @@
 }
 
 .assembly-v1-summary-row strong {
-  font-size: 12px;
+  font-size: var(--font-body);
   font-weight: 700;
   color: #222;
 }
@@ -728,7 +728,7 @@
 
 .assembly-loading-spinner {
   width: 28px;
-  height: 28px;
+  height: 2.0000rem;
   border: 2px solid #d8d8d8;
   border-top-color: #5f81aa;
   border-radius: 999px;
@@ -737,7 +737,7 @@
 
 .assembly-loading-text {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--font-body);
   color: #444;
 }
 
@@ -855,7 +855,7 @@
 }
 
 .assembly-v1-control-item label {
-  font-size: 12px;
+  font-size: var(--font-body);
   font-weight: 700;
 }
 
@@ -866,7 +866,7 @@
 }
 
 .assembly-v1-control-note {
-  font-size: 11px;
+  font-size: var(--font-small);
   line-height: 1.4;
 }
 
@@ -874,7 +874,7 @@
   display: flex;
   gap: 10px;
   color: #666;
-  font-size: 11px;
+  font-size: var(--font-small);
   flex-wrap: wrap;
 }
 
@@ -901,7 +901,7 @@
   flex: 0 0 auto;
   gap: 0;
   box-sizing: border-box;
-  height: 30px;
+  height: 2.1429rem;
   overflow: hidden;
   border: 1px solid #aeb7c2;
   border-radius: 4px;
@@ -981,7 +981,7 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  font-size: 11px;
+  font-size: var(--font-small);
   font-weight: 700;
   color: #444;
 }
@@ -1069,7 +1069,7 @@
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  font-size: 11px;
+  font-size: var(--font-small);
   line-height: 1;
 }
 
@@ -1153,7 +1153,7 @@
   display: inline-grid;
   place-items: center;
   line-height: 1;
-  font-size: 11px;
+  font-size: var(--font-small);
   padding: 0;
 }
 
@@ -1210,7 +1210,7 @@
   align-items: center;
   justify-content: flex-end;
   text-align: right;
-  font-size: 11px;
+  font-size: var(--font-small);
   font-weight: 700;
   color: #4a4a4a;
   overflow: hidden;
@@ -1326,7 +1326,7 @@
 
 .track-tick-label {
   fill: #666;
-  font-size: 10px;
+  font-size: var(--font-graph-tick);
 }
 
 .track-reference-bar {
@@ -1343,7 +1343,7 @@
 
 .track-reference-member-label {
   fill: #4f4f4f;
-  font-size: 10px;
+  font-size: var(--font-graph-label);
   pointer-events: none;
 }
 
@@ -1365,7 +1365,7 @@
   background: #fff;
   border-radius: 3px;
   color: #626b76;
-  font-size: 11px;
+  font-size: var(--font-small);
   line-height: 1.3;
   white-space: nowrap;
   pointer-events: none;
@@ -1546,7 +1546,7 @@
 
 .track-ctg-label {
   fill: #243a54;
-  font-size: 10px;
+  font-size: var(--font-graph-label);
   pointer-events: none;
 }
 
@@ -1557,7 +1557,7 @@
 .track-sticky-label {
   position: absolute;
   white-space: nowrap;
-  font-size: 10px;
+  font-size: var(--font-graph-label);
   color: #243a54;
   pointer-events: none;
 }
@@ -1598,7 +1598,7 @@
 .ctg-chip-source-tag {
   margin-left: 4px;
   color: #a33f00;
-  font-size: 11px;
+  font-size: var(--font-small);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -1616,7 +1616,7 @@
 }
 
 .track-ctg-label.is-outside {
-  font-size: 9px;
+  font-size: var(--font-graph-small);
 }
 
 .track-ctg-group.is-active .track-ctg-label {
@@ -1674,7 +1674,7 @@
 
 .track-slot-badge {
   fill: #111;
-  font-size: 10px;
+  font-size: var(--font-graph-label);
   font-weight: 700;
   text-anchor: end;
   pointer-events: none;
@@ -1682,7 +1682,7 @@
 
 .track-row-empty-label {
   fill: #777;
-  font-size: 11px;
+  font-size: var(--font-graph-label);
 }
 
 .assembly-support-ds-len-rules-dialog {
@@ -1707,9 +1707,9 @@
 .assembly-support-ds-len-rules-close {
   min-width: 24px;
   width: 24px;
-  height: 24px;
+  height: 1.7143rem;
   padding: 0;
-  font-size: 16px;
+  font-size: var(--font-title);
   line-height: 1;
 }
 
@@ -1894,7 +1894,7 @@
   border: 1px solid #6686a8;
   background: #e8f2ff;
   color: #214e78;
-  font-size: 11px;
+  font-size: var(--font-small);
   font-weight: 700;
   line-height: 1.5;
   white-space: nowrap;

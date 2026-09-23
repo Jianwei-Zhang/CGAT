@@ -15,6 +15,7 @@ fn rename_round_trips_through_persistent_undo_and_redo() -> Result<()> {
     let mutation = run_main_view_editor_action(
         &db_path,
         &RunMainViewEditorActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             action: "rename-ctg".to_string(),
@@ -82,6 +83,7 @@ fn layout_drags_share_the_database_timeline_and_reset_atomically() -> Result<()>
             run_main_view_layout_action(
                 &db_path,
                 &RunMainViewLayoutActionParams {
+                    history_capacity: None,
                     project_id: 1,
                     chr_name: "Chr01".to_string(),
                     action: "drag-ctg".to_string(),
@@ -94,6 +96,7 @@ fn layout_drags_share_the_database_timeline_and_reset_atomically() -> Result<()>
     run_main_view_editor_action(
         &db_path,
         &RunMainViewEditorActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             action: "rename-ctg".to_string(),
@@ -128,6 +131,7 @@ fn mirror_create_delete_history_uses_the_source_orientation() -> Result<()> {
     let db_path = temp_dir.path().join("project.sqlite");
     seed_workspace(&db_path)?;
     let request = |action: &str, args: serde_json::Value| RunMainViewLayoutActionParams {
+        history_capacity: None,
         project_id: 1,
         chr_name: "Chr01".to_string(),
         action: action.to_string(),
@@ -180,6 +184,7 @@ fn layout_history_ignores_unrelated_view_writes_but_detects_target_conflicts() -
     let db_path = temp_dir.path().join("project.sqlite");
     seed_workspace(&db_path)?;
     let drag = RunMainViewLayoutActionParams {
+        history_capacity: None,
         project_id: 1,
         chr_name: "Chr01".to_string(),
         action: "drag-ctg".to_string(),
@@ -225,6 +230,7 @@ fn layout_history_survives_frontend_integer_offset_serialization() -> Result<()>
         let db_path = temp_dir.path().join("project.sqlite");
         seed_workspace(&db_path)?;
         let drag = |offset_bp: f64| RunMainViewLayoutActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             action: "drag-ctg".to_string(),
@@ -281,6 +287,7 @@ fn reset_history_survives_frontend_offset_ordering() -> Result<()> {
         run_main_view_layout_action(
             &db_path,
             &RunMainViewLayoutActionParams {
+                history_capacity: None,
                 project_id: 1,
                 chr_name: "Chr01".to_string(),
                 action: "drag-ctg".to_string(),
@@ -314,6 +321,7 @@ fn older_history_json_without_layout_fields_still_loads() -> Result<()> {
     run_main_view_editor_action(
         &db_path,
         &RunMainViewEditorActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             action: "rename-ctg".to_string(),
@@ -366,6 +374,7 @@ fn no_op_does_not_create_history_or_clear_forward() -> Result<()> {
     run_main_view_editor_action(
         &db_path,
         &RunMainViewEditorActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             action: "rename-ctg".to_string(),
@@ -377,6 +386,7 @@ fn no_op_does_not_create_history_or_clear_forward() -> Result<()> {
     let no_op = run_main_view_editor_action(
         &db_path,
         &RunMainViewEditorActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             action: "rename-ctg".to_string(),
@@ -397,6 +407,7 @@ fn chromosome_histories_are_independent() -> Result<()> {
     run_main_view_editor_action(
         &db_path,
         &RunMainViewEditorActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             action: "flip-ctg".to_string(),
@@ -406,6 +417,7 @@ fn chromosome_histories_are_independent() -> Result<()> {
     run_main_view_editor_action(
         &db_path,
         &RunMainViewEditorActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr02".to_string(),
             action: "rename-ctg".to_string(),
@@ -429,6 +441,7 @@ fn new_edit_clears_only_the_current_chromosome_forward_branch() -> Result<()> {
         run_main_view_editor_action(
             &db_path,
             &RunMainViewEditorActionParams {
+                history_capacity: None,
                 project_id: 1,
                 chr_name: chr_name.to_string(),
                 action: "rename-ctg".to_string(),
@@ -441,6 +454,7 @@ fn new_edit_clears_only_the_current_chromosome_forward_branch() -> Result<()> {
     run_main_view_editor_action(
         &db_path,
         &RunMainViewEditorActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             action: "rename-ctg".to_string(),
@@ -489,6 +503,7 @@ fn batch_delete_and_dependencies_round_trip_atomically() -> Result<()> {
     drop(conn);
 
     let request = RunMainViewBatchDeleteParams {
+        history_capacity: None,
         project_id: 1,
         chr_name: "Chr01".to_string(),
         assembly_ctg_ids: vec![301, 302],
@@ -560,6 +575,7 @@ fn project_view_metadata_changes_do_not_invalidate_delete_history() -> Result<()
         params![json!({"Chr01":{"segments":[{"assemblyCtgId":301}]}}).to_string()],
     )?;
     let request = RunMainViewBatchDeleteParams {
+        history_capacity: None,
         project_id: 1,
         chr_name: "Chr01".to_string(),
         assembly_ctg_ids: vec![301],
@@ -622,6 +638,7 @@ fn project_view_business_change_still_invalidates_delete_history() -> Result<()>
     run_main_view_batch_delete(
         &db_path,
         &RunMainViewBatchDeleteParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             assembly_ctg_ids: vec![301],
@@ -652,6 +669,7 @@ fn external_change_invalidates_only_target_chromosome_history() -> Result<()> {
     run_main_view_editor_action(
         &db_path,
         &RunMainViewEditorActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             action: "rename-ctg".to_string(),
@@ -661,6 +679,7 @@ fn external_change_invalidates_only_target_chromosome_history() -> Result<()> {
     run_main_view_editor_action(
         &db_path,
         &RunMainViewEditorActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr02".to_string(),
             action: "rename-ctg".to_string(),
@@ -689,6 +708,7 @@ fn reset_is_one_reversible_step() -> Result<()> {
     run_main_view_editor_action(
         &db_path,
         &RunMainViewEditorActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             action: "rename-ctg".to_string(),
@@ -698,6 +718,7 @@ fn reset_is_one_reversible_step() -> Result<()> {
     run_main_view_editor_action(
         &db_path,
         &RunMainViewEditorActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             action: "hide-seq".to_string(),
@@ -726,6 +747,7 @@ fn history_retains_only_fifty_combined_steps_per_chromosome() -> Result<()> {
         run_main_view_editor_action(
             &db_path,
             &RunMainViewEditorActionParams {
+                history_capacity: None,
                 project_id: 1,
                 chr_name: "Chr01".to_string(),
                 action: "rename-ctg".to_string(),
@@ -756,6 +778,7 @@ fn invalid_batch_target_rolls_back_the_complete_delete() -> Result<()> {
     let result = run_main_view_batch_delete(
         &db_path,
         &RunMainViewBatchDeleteParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             assembly_ctg_ids: vec![301, 999_999],
@@ -780,6 +803,7 @@ fn project_wide_name_conflict_invalidates_only_the_rename_history() -> Result<()
     run_main_view_editor_action(
         &db_path,
         &RunMainViewEditorActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             action: "rename-ctg".to_string(),
@@ -805,6 +829,7 @@ fn additive_new_ctg_survives_undo_of_an_older_operation() -> Result<()> {
     run_main_view_editor_action(
         &db_path,
         &RunMainViewEditorActionParams {
+            history_capacity: None,
             project_id: 1,
             chr_name: "Chr01".to_string(),
             action: "rename-ctg".to_string(),
@@ -836,6 +861,7 @@ fn additive_new_ctg_survives_undo_of_an_older_operation() -> Result<()> {
 
 fn target(chr_name: &str) -> MainViewHistoryTargetParams {
     MainViewHistoryTargetParams {
+        history_capacity: None,
         project_id: 1,
         chr_name: chr_name.to_string(),
     }
@@ -947,4 +973,55 @@ fn load_project_view_array(
 fn count(conn: &Connection, table: &str, predicate: &str) -> Result<i64> {
     let sql = format!("SELECT COUNT(*) FROM {table} WHERE {predicate}");
     Ok(conn.query_row(&sql, [], |row| row.get(0))?)
+}
+
+#[test]
+fn configurable_capacity_preserves_large_history_and_trims_only_on_new_edit() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let db_path = temp_dir.path().join("project.sqlite");
+    seed_workspace(&db_path)?;
+    for index in 1..=75 {
+        run_main_view_editor_action(
+            &db_path,
+            &RunMainViewEditorActionParams {
+                history_capacity: Some(0),
+                project_id: 1,
+                chr_name: "Chr01".into(),
+                action: "rename-ctg".into(),
+                args: json!({"assemblyCtgId":301,"newName":format!("unlimited-{index}")}),
+            },
+        )?;
+    }
+    // A new connection and the legacy default must still read all valid stored history.
+    assert_eq!(
+        get_main_view_history_status(&db_path, &target("Chr01"))?.retained_operation_count,
+        75
+    );
+    assert!(undo_main_view_history(&db_path, &target("Chr01"))?.changed);
+    assert!(redo_main_view_history(&db_path, &target("Chr01"))?.changed);
+    let summary = run_main_view_editor_action(
+        &db_path,
+        &RunMainViewEditorActionParams {
+            history_capacity: Some(3),
+            project_id: 1,
+            chr_name: "Chr01".into(),
+            action: "rename-ctg".into(),
+            args: json!({"assemblyCtgId":301,"newName":"bounded"}),
+        },
+    )?;
+    assert_eq!(summary.status.retained_operation_count, 3);
+    assert!(!summary.invalidated);
+    assert_eq!(load_ctg_name(&db_path, 301)?, "bounded");
+    // Reset still resolves only retained operation IDs, and is itself reversible.
+    let reset = reset_main_view_history(
+        &db_path,
+        &MainViewHistoryTargetParams {
+            history_capacity: Some(3),
+            ..target("Chr01")
+        },
+    )?;
+    assert!(reset.changed);
+    assert!(undo_main_view_history(&db_path, &target("Chr01"))?.changed);
+    assert_eq!(load_ctg_name(&db_path, 301)?, "bounded");
+    Ok(())
 }

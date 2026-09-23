@@ -1,3 +1,4 @@
+import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
   readHitIdentityPct, alignmentBandSvgAttrs, alignmentBandTooltipMetrics,
   sortAlignmentBands, renderAlignmentIdentityLegend,
@@ -1452,20 +1453,21 @@ function renderAssemblyTracks({
   historyHighlightCtgId = null,
   i18n,
 }) {
-  const TRACK_HEIGHT_SCALE = 2;
+  const graphTextScale = Math.max(1, getGraphFontSize() / 12);
+  const TRACK_HEIGHT_SCALE = 2 * graphTextScale;
   const TRACK_LANE_HEIGHT = 18 * TRACK_HEIGHT_SCALE;
   const TRACK_ROW_GAP = 18 * TRACK_HEIGHT_SCALE;
   const TRACK_MIRROR_ROW_GAP = 10;
-  const TRACK_BAR_HEIGHT = 14;
+  const TRACK_BAR_HEIGHT = 14 * graphTextScale;
   const TRACK_ROW_PADDING_TOP = 10 * TRACK_HEIGHT_SCALE;
   const TRACK_ROW_EXTRA_HEIGHT = 22 * TRACK_HEIGHT_SCALE;
   const REF_ROW_HEIGHT = 34 * TRACK_HEIGHT_SCALE;
   const TRACK_TAIL_PADDING = 10 * TRACK_HEIGHT_SCALE;
   const TRACK_LABEL_OFFSET_Y = 2 * TRACK_HEIGHT_SCALE;
   const TRACK_EDGE_LABEL_PADDING = 8 * TRACK_HEIGHT_SCALE;
-  const TRACK_TEXT_OFFSET_Y = 11;
+  const TRACK_TEXT_OFFSET_Y = 11 * graphTextScale;
   const TRACK_MIN_ADJACENT_GAP_PX = 20;
-  const TRACK_LABEL_ROW_HEIGHT = 18;
+  const TRACK_LABEL_ROW_HEIGHT = 18 * graphTextScale;
   const TRACK_LABEL_ALIGN_OFFSET = Math.max(
     0,
     Math.round((TRACK_LABEL_ROW_HEIGHT - TRACK_BAR_HEIGHT) / 2),

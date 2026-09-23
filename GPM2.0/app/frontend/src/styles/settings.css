@@ -1,0 +1,34 @@
+.app-settings-dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  border: 1px solid #c4cbd3;
+  border-radius: 12px;
+  padding: 24px;
+  background: #fff;
+  color: #222;
+  box-shadow: 0 16px 64px #17202c33;
+}
+.app-settings-dialog::backdrop { background: #17202c55; }
+.settings-heading, .settings-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.settings-heading h2 { font-size: var(--font-heading); }
+.settings-hint { font-size: var(--font-small); line-height: 1.6; color: #616975; }
+.app-settings-dialog > .settings-hint { margin-top: 8px; }
+.app-settings-dialog fieldset { min-width: 0; border: 0; border-top: 1px solid #e1e5ea; padding: 16px 0 0; margin: 24px 0 0; }
+.app-settings-dialog legend { padding: 0 12px 0 0; font-size: var(--font-section); font-weight: 600; }
+.settings-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 45%); gap: 16px; align-items: center; margin-bottom: 14px; font-weight: 500; }
+.settings-row select, .settings-custom input { width: 100%; min-width: 0; }
+.settings-preview { padding: 16px; border: 1px solid #e1e5ea; border-radius: 8px; background: #f8fafc; }
+.settings-preview h3 { font-size: var(--font-title); margin-bottom: 8px; }
+.settings-preview p { margin-bottom: 10px; }
+.settings-preview svg { display: block; width: 100%; max-width: 320px; margin-top: 8px; }
+.settings-custom { display: flex; gap: 12px; align-items: end; margin-bottom: 12px; }
+.settings-custom[hidden] { display: none; }
+.settings-custom label { min-width: 0; display: grid; gap: 6px; }
+.settings-status { min-height: 1.6em; margin: 12px 0; font-size: var(--font-small); }
+.settings-footer { padding-top: 12px; border-top: 1px solid #e1e5ea; }
+.app-nav { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.app-settings-button { margin-left: auto; white-space: nowrap; }
+@media (max-width: 480px) { .app-settings-dialog { padding: 16px; } .settings-row { grid-template-columns: 1fr; gap: 6px; } }
+
+.settings-preview-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

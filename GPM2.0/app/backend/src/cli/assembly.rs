@@ -529,6 +529,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             println!("refreshed_chr_count={}", summary.refreshed_chr_count);
         }
         Commands::MainViewHistoryStatus {
+            history_capacity,
             workspace_root,
             project_id,
             chr_name,
@@ -536,6 +537,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             let status = get_main_view_history_status(
                 &workspace_root.join("project.sqlite"),
                 &MainViewHistoryTargetParams {
+                    history_capacity,
                     project_id,
                     chr_name,
                 },
@@ -543,6 +545,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             print_main_view_history_status(&status);
         }
         Commands::InspectMainViewDelete {
+            history_capacity,
             workspace_root,
             project_id,
             chr_name,
@@ -551,6 +554,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             let impact = inspect_main_view_delete(
                 &workspace_root.join("project.sqlite"),
                 &RunMainViewBatchDeleteParams {
+                    history_capacity,
                     project_id,
                     chr_name,
                     assembly_ctg_ids: parse_positive_id_csv(&assembly_ctg_ids)?,
@@ -568,6 +572,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             );
         }
         Commands::RunMainViewEditorAction {
+            history_capacity,
             workspace_root,
             project_id,
             chr_name,
@@ -577,6 +582,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             let summary = run_main_view_editor_action(
                 &workspace_root.join("project.sqlite"),
                 &RunMainViewEditorActionParams {
+                    history_capacity,
                     project_id,
                     chr_name,
                     action,
@@ -586,6 +592,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             print_main_view_history_mutation(&summary);
         }
         Commands::RunMainViewLayoutAction {
+            history_capacity,
             workspace_root,
             project_id,
             chr_name,
@@ -595,6 +602,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             let summary = run_main_view_layout_action(
                 &workspace_root.join("project.sqlite"),
                 &RunMainViewLayoutActionParams {
+                    history_capacity,
                     project_id,
                     chr_name,
                     action,
@@ -604,6 +612,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             print_main_view_history_mutation(&summary);
         }
         Commands::RunMainViewBatchDelete {
+            history_capacity,
             workspace_root,
             project_id,
             chr_name,
@@ -612,6 +621,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             let summary = run_main_view_batch_delete(
                 &workspace_root.join("project.sqlite"),
                 &RunMainViewBatchDeleteParams {
+                    history_capacity,
                     project_id,
                     chr_name,
                     assembly_ctg_ids: parse_positive_id_csv(&assembly_ctg_ids)?,
@@ -620,6 +630,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             print_main_view_history_mutation(&summary);
         }
         Commands::UndoMainViewHistory {
+            history_capacity,
             workspace_root,
             project_id,
             chr_name,
@@ -627,6 +638,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             let summary = undo_main_view_history(
                 &workspace_root.join("project.sqlite"),
                 &MainViewHistoryTargetParams {
+                    history_capacity,
                     project_id,
                     chr_name,
                 },
@@ -634,6 +646,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             print_main_view_history_mutation(&summary);
         }
         Commands::RedoMainViewHistory {
+            history_capacity,
             workspace_root,
             project_id,
             chr_name,
@@ -641,6 +654,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             let summary = redo_main_view_history(
                 &workspace_root.join("project.sqlite"),
                 &MainViewHistoryTargetParams {
+                    history_capacity,
                     project_id,
                     chr_name,
                 },
@@ -648,6 +662,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             print_main_view_history_mutation(&summary);
         }
         Commands::ResetMainViewHistory {
+            history_capacity,
             workspace_root,
             project_id,
             chr_name,
@@ -655,6 +670,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             let summary = reset_main_view_history(
                 &workspace_root.join("project.sqlite"),
                 &MainViewHistoryTargetParams {
+                    history_capacity,
                     project_id,
                     chr_name,
                 },

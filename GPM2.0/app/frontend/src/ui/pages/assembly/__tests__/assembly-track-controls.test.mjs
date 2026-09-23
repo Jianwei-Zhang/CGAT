@@ -288,7 +288,7 @@ test("subview title guide and candidates share one responsive first row", () => 
   assert.match(css, /@media \(max-width:\s*900px\)[\s\S]*\.subview-panel-guide\s*\{[^}]*flex-basis:\s*100%;/);
   assert.match(css, /\.subview-candidate-row\s*\{[^}]*justify-content:\s*flex-start;[^}]*flex:\s*0 1 auto;[^}]*min-width:\s*0;/);
   assert.match(css, /@media \(max-width:\s*900px\)[\s\S]*\.subview-candidate-row\s*\{[^}]*flex-basis:\s*100%;/);
-  assert.match(css, /\.subview-candidate-badge\s*\{[^}]*height:\s*30px;[^}]*overflow:\s*hidden;[^}]*border:\s*1px solid #b8c2cc;[^}]*border-radius:\s*4px;/);
+  assert.match(css, /\.subview-candidate-badge\s*\{[^}]*height:\s*2\.1429rem;[^}]*overflow:\s*hidden;[^}]*border:\s*1px solid #b8c2cc;[^}]*border-radius:\s*4px;/);
   assert.match(css, /\.subview-candidate-slot\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/);
   assert.match(css, /\.subview-candidate-remove\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/);
   assert.match(css, /\.subview-candidate-remove:hover\s*\{[^}]*background:\s*#f7e8e8;[^}]*color:\s*#8f2f2f;/);
@@ -356,7 +356,7 @@ test("subview history controls follow Identity as one icon group and disable una
   );
   assert.doesNotMatch(html, />重置<\/button>/);
   assert.doesNotMatch(html, />[←→↺]<\/button>/);
-  assert.match(css, /\.subview-history-controls\s*\{[^}]*box-sizing:\s*border-box;[^}]*height:\s*30px;/);
+  assert.match(css, /\.subview-history-controls\s*\{[^}]*box-sizing:\s*border-box;[^}]*height:\s*2\.1429rem;/);
   assert.match(css, /\.subview-history-controls \.button\s*\{[^}]*height:\s*100%;[^}]*width:\s*30px;[^}]*min-width:\s*30px;/);
   assert.match(css, /\.subview-history-icon\s*\{[^}]*width:\s*16px;[^}]*height:\s*16px;/);
   assert.match(css, /\.subview-history-reset-icon\s*\{[^}]*stroke-width:\s*2;/);

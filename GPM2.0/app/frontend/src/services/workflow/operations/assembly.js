@@ -1,3 +1,4 @@
+import { getHistoryCapacity } from "../../app-settings.js";
 import { normalizeSupportedCtgEditorAction } from "../contracts.js";
 import { workflowRuntime } from "../runtime.js";
 
@@ -292,7 +293,7 @@ async function callMainViewBridgeOrMock(path, payload, mockOperation) {
 }
 
 export async function getMainViewHistoryStatus({ workspaceRoot, projectId, chrName }) {
-  const payload = { workspaceRoot, projectId, chrName };
+  const payload = { historyCapacity: getHistoryCapacity(), workspaceRoot, projectId, chrName };
   if (isTauriRuntime()) {
     return getMainViewHistoryStatusTauri(payload);
   }
@@ -309,7 +310,7 @@ export async function inspectMainViewDelete({
   chrName,
   assemblyCtgIds,
 }) {
-  const payload = { workspaceRoot, projectId, chrName, assemblyCtgIds };
+  const payload = { historyCapacity: getHistoryCapacity(), workspaceRoot, projectId, chrName, assemblyCtgIds };
   if (isTauriRuntime()) {
     return inspectMainViewDeleteTauri(payload);
   }
@@ -327,7 +328,7 @@ export async function runMainViewEditorAction({
   action,
   args,
 }) {
-  const payload = {
+  const payload = { historyCapacity: getHistoryCapacity(),
     workspaceRoot,
     projectId,
     chrName,
@@ -355,7 +356,7 @@ export async function runMainViewLayoutAction({
   if (!new Set(["drag-ctg", "create-mirror", "delete-mirror"]).has(normalizedAction)) {
     throw new Error(`unsupported main-view layout action: ${normalizedAction || "<empty>"}`);
   }
-  const payload = {
+  const payload = { historyCapacity: getHistoryCapacity(),
     workspaceRoot,
     projectId,
     chrName,
@@ -378,7 +379,7 @@ export async function runMainViewBatchDelete({
   chrName,
   assemblyCtgIds,
 }) {
-  const payload = { workspaceRoot, projectId, chrName, assemblyCtgIds };
+  const payload = { historyCapacity: getHistoryCapacity(), workspaceRoot, projectId, chrName, assemblyCtgIds };
   if (isTauriRuntime()) {
     return runMainViewBatchDeleteTauri(payload);
   }
@@ -399,7 +400,7 @@ export async function executeMainViewHistoryAction({
   if (!new Set(["undo", "redo", "reset"]).has(normalizedAction)) {
     throw new Error(`unsupported main-view history action: ${normalizedAction || "<empty>"}`);
   }
-  const payload = { workspaceRoot, projectId, chrName, action: normalizedAction };
+  const payload = { historyCapacity: getHistoryCapacity(), workspaceRoot, projectId, chrName, action: normalizedAction };
   if (isTauriRuntime()) {
     return executeMainViewHistoryActionTauri(payload);
   }

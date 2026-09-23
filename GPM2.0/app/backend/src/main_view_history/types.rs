@@ -6,6 +6,8 @@ pub(super) const HISTORY_CAPACITY: usize = 50;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RunMainViewEditorActionParams {
+    /// None keeps the default (50); Some(0) retains unlimited steps.
+    pub history_capacity: Option<usize>,
     pub project_id: i64,
     pub chr_name: String,
     pub action: String,
@@ -14,6 +16,8 @@ pub struct RunMainViewEditorActionParams {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RunMainViewLayoutActionParams {
+    /// None keeps the default (50); Some(0) retains unlimited steps.
+    pub history_capacity: Option<usize>,
     pub project_id: i64,
     pub chr_name: String,
     pub action: String,
@@ -22,6 +26,8 @@ pub struct RunMainViewLayoutActionParams {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunMainViewBatchDeleteParams {
+    /// None keeps the default (50); Some(0) retains unlimited steps.
+    pub history_capacity: Option<usize>,
     pub project_id: i64,
     pub chr_name: String,
     pub assembly_ctg_ids: Vec<i64>,
@@ -29,6 +35,8 @@ pub struct RunMainViewBatchDeleteParams {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MainViewHistoryTargetParams {
+    /// None keeps the default (50); Some(0) retains unlimited steps.
+    pub history_capacity: Option<usize>,
     pub project_id: i64,
     pub chr_name: String,
 }

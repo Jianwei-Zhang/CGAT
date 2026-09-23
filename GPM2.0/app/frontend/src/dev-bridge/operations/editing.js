@@ -233,6 +233,7 @@ async function getMainViewHistoryStatus(payload) {
     workspaceRoot,
     String(projectId),
     chrName,
+    ...historyCapacityArgs(payload),
   ]));
 }
 
@@ -248,6 +249,7 @@ async function inspectMainViewDelete(payload) {
     String(projectId),
     chrName,
     ids.join(","),
+    ...historyCapacityArgs(payload),
   ]));
 }
 
@@ -264,6 +266,7 @@ async function runMainViewEditorAction(payload) {
     chrName,
     action,
     JSON.stringify(args),
+    ...historyCapacityArgs(payload),
   ]));
 }
 
@@ -280,6 +283,7 @@ async function runMainViewLayoutAction(payload) {
     chrName,
     action,
     JSON.stringify(args),
+    ...historyCapacityArgs(payload),
   ]));
 }
 
@@ -295,6 +299,7 @@ async function runMainViewBatchDelete(payload) {
     String(projectId),
     chrName,
     ids.join(","),
+    ...historyCapacityArgs(payload),
   ]));
 }
 
@@ -317,7 +322,15 @@ async function executeMainViewHistoryAction(payload) {
     workspaceRoot,
     String(projectId),
     chrName,
+    ...historyCapacityArgs(payload),
   ]));
+}
+
+function historyCapacityArgs(payload) {
+  const capacity = payload?.historyCapacity;
+  if (capacity === undefined) return [];
+  if (!Number.isSafeInteger(capacity) || capacity < 0) throw new Error("Invalid history capacity");
+  return ["--history-capacity", String(capacity)];
 }
 
 function normalizePositiveIdList(name, values) {

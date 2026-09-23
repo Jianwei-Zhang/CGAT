@@ -78,6 +78,7 @@ pub fn run_main_view_editor_action(
         project_db_path,
         params.project_id,
         &params.chr_name,
+        params.history_capacity,
         |conn| {
             prepare_editor_mutation(
                 conn,
@@ -100,6 +101,7 @@ pub fn run_main_view_layout_action(
         project_db_path,
         params.project_id,
         &params.chr_name,
+        params.history_capacity,
         |conn| {
             prepare_layout_mutation(
                 conn,
@@ -121,6 +123,7 @@ pub fn run_main_view_batch_delete(
         project_db_path,
         params.project_id,
         &params.chr_name,
+        params.history_capacity,
         |conn| {
             prepare_batch_delete(
                 conn,
@@ -222,7 +225,7 @@ pub fn reset_main_view_history(
             affected_seq_ids: affected_seq_ids.clone(),
         });
         state.active_operation_ids.clear();
-        prune_history(&mut state);
+        prune_history(&mut state, params.history_capacity);
         save_history_state(&tx, params.project_id, reference_chr_id, &state)?;
         append_history_audit(
             &tx,
@@ -255,6 +258,7 @@ fn run_new_mutation<F>(
     project_db_path: &Path,
     project_id: i64,
     chr_name: &str,
+    history_capacity: Option<usize>,
     prepare: F,
 ) -> Result<MainViewHistoryMutationSummary>
 where
@@ -297,7 +301,7 @@ where
         affected_seq_ids: prepared.affected_seq_ids.clone(),
     });
     state.active_operation_ids = after_active_ids;
-    prune_history(&mut state);
+    prune_history(&mut state, history_capacity);
     save_history_state(&tx, project_id, reference_chr_id, &state)?;
     append_history_audit(
         &tx,
@@ -517,10 +521,7 @@ fn load_history_state(
 }
 
 fn is_valid_history_state(state: &HistoryState) -> bool {
-    if state.version != HISTORY_SCHEMA_VERSION
-        || state.next_logical_id == 0
-        || state.past.len() + state.future.len() > HISTORY_CAPACITY
-    {
+    if state.version != HISTORY_SCHEMA_VERSION || state.next_logical_id == 0 {
         return false;
     }
     let retained = state
@@ -595,15 +596,22 @@ fn take_next_logical_id(state: &mut HistoryState) -> Result<u64> {
     Ok(logical_id)
 }
 
-fn prune_history(state: &mut HistoryState) {
-    let mut removed_ids = BTreeSet::new();
-    while state.past.len() + state.future.len() > HISTORY_CAPACITY {
-        if !state.past.is_empty() {
-            removed_ids.insert(state.past.remove(0).logical_id);
-        } else if !state.future.is_empty() {
-            removed_ids.insert(state.future.remove(0).logical_id);
-        }
+fn prune_history(state: &mut HistoryState, capacity: Option<usize>) {
+    let capacity = capacity.unwrap_or(HISTORY_CAPACITY);
+    if capacity == 0 {
+        return;
     }
+    // A user can lower an unlimited history to a small limit. Drain once rather
+    // than repeatedly shifting the entire vector for every removed operation.
+    let excess = (state.past.len() + state.future.len()).saturating_sub(capacity);
+    let past_count = excess.min(state.past.len());
+    let future_count = excess - past_count;
+    let removed_ids: BTreeSet<_> = state
+        .past
+        .drain(..past_count)
+        .chain(state.future.drain(..future_count))
+        .map(|operation| operation.logical_id)
+        .collect();
     if removed_ids.is_empty() {
         return;
     }

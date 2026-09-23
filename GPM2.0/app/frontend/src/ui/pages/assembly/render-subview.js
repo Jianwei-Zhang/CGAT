@@ -1,3 +1,4 @@
+import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
   readHitIdentityPct, alignmentBandSvgAttrs, alignmentBandTooltipMetrics,
   sortAlignmentBands, renderAlignmentIdentityLegend,
@@ -2067,15 +2068,16 @@ function renderSubviewTrackPairAlignmentCard(
   const domainStart = Number(pairModel.windowStart || 0);
   const domainEnd = Math.max(domainStart, Number(pairModel.windowEnd || 0));
   const domainSpanBp = Math.max(1, domainEnd - domainStart + 1);
-  const TRACK_HEIGHT_SCALE = 2;
+  const graphTextScale = Math.max(1, getGraphFontSize() / 12);
+  const TRACK_HEIGHT_SCALE = 2 * graphTextScale;
   const TRACK_LANE_HEIGHT = 18 * TRACK_HEIGHT_SCALE;
   const TRACK_ROW_GAP = 18 * TRACK_HEIGHT_SCALE;
-  const TRACK_BAR_HEIGHT = 14;
+  const TRACK_BAR_HEIGHT = 14 * graphTextScale;
   const TRACK_ROW_PADDING_TOP = 10 * TRACK_HEIGHT_SCALE;
   const TRACK_ROW_EXTRA_HEIGHT = 22 * TRACK_HEIGHT_SCALE;
   const TRACK_LABEL_OFFSET_Y = 2 * TRACK_HEIGHT_SCALE;
   const TRACK_EDGE_LABEL_PADDING = 8 * TRACK_HEIGHT_SCALE;
-  const TRACK_TEXT_OFFSET_Y = 11;
+  const TRACK_TEXT_OFFSET_Y = 11 * graphTextScale;
   const TRACK_EMPTY_TEXT_OFFSET_Y = 12 * TRACK_HEIGHT_SCALE;
   const TRACK_MIN_ADJACENT_GAP_PX = 20;
   const LABEL_COLUMN_WIDTH_PX = 136;
@@ -3199,16 +3201,17 @@ function buildSubviewAlignmentSvgModel({
   topManualOffsetBp = 0,
   bottomManualOffsetBp = 0,
 }) {
-  const TRACK_HEIGHT_SCALE = 2;
+  const graphTextScale = Math.max(1, getGraphFontSize() / 12);
+  const TRACK_HEIGHT_SCALE = 2 * graphTextScale;
   const TRACK_LANE_HEIGHT = 18 * TRACK_HEIGHT_SCALE;
   const TRACK_ROW_GAP = 18 * TRACK_HEIGHT_SCALE;
-  const TRACK_BAR_HEIGHT = 14;
+  const TRACK_BAR_HEIGHT = 14 * graphTextScale;
   const TRACK_ROW_PADDING_TOP = 10 * TRACK_HEIGHT_SCALE;
   const TRACK_ROW_EXTRA_HEIGHT = 22 * TRACK_HEIGHT_SCALE;
   const TRACK_TAIL_PADDING = 10 * TRACK_HEIGHT_SCALE;
   const TRACK_LABEL_OFFSET_Y = 2 * TRACK_HEIGHT_SCALE;
   const TRACK_EDGE_LABEL_PADDING = 8 * TRACK_HEIGHT_SCALE;
-  const TRACK_TEXT_OFFSET_Y = 11;
+  const TRACK_TEXT_OFFSET_Y = 11 * graphTextScale;
   const LABEL_COLUMN_WIDTH_PX = 136;
 
   const rulerTop = 24 * TRACK_HEIGHT_SCALE;

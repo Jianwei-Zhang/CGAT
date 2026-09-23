@@ -289,17 +289,26 @@ enum Commands {
         deleted_ctg_record_id: i64,
     },
     MainViewHistoryStatus {
+        /// Retained history steps; 0 means unlimited.
+        #[arg(long)]
+        history_capacity: Option<usize>,
         workspace_root: PathBuf,
         project_id: i64,
         chr_name: String,
     },
     InspectMainViewDelete {
+        /// Retained history steps; 0 means unlimited.
+        #[arg(long)]
+        history_capacity: Option<usize>,
         workspace_root: PathBuf,
         project_id: i64,
         chr_name: String,
         assembly_ctg_ids: String,
     },
     RunMainViewEditorAction {
+        /// Retained history steps; 0 means unlimited.
+        #[arg(long)]
+        history_capacity: Option<usize>,
         workspace_root: PathBuf,
         project_id: i64,
         chr_name: String,
@@ -307,6 +316,9 @@ enum Commands {
         args_json: String,
     },
     RunMainViewLayoutAction {
+        /// Retained history steps; 0 means unlimited.
+        #[arg(long)]
+        history_capacity: Option<usize>,
         workspace_root: PathBuf,
         project_id: i64,
         chr_name: String,
@@ -314,22 +326,34 @@ enum Commands {
         args_json: String,
     },
     RunMainViewBatchDelete {
+        /// Retained history steps; 0 means unlimited.
+        #[arg(long)]
+        history_capacity: Option<usize>,
         workspace_root: PathBuf,
         project_id: i64,
         chr_name: String,
         assembly_ctg_ids: String,
     },
     UndoMainViewHistory {
+        /// Retained history steps; 0 means unlimited.
+        #[arg(long)]
+        history_capacity: Option<usize>,
         workspace_root: PathBuf,
         project_id: i64,
         chr_name: String,
     },
     RedoMainViewHistory {
+        /// Retained history steps; 0 means unlimited.
+        #[arg(long)]
+        history_capacity: Option<usize>,
         workspace_root: PathBuf,
         project_id: i64,
         chr_name: String,
     },
     ResetMainViewHistory {
+        /// Retained history steps; 0 means unlimited.
+        #[arg(long)]
+        history_capacity: Option<usize>,
         workspace_root: PathBuf,
         project_id: i64,
         chr_name: String,

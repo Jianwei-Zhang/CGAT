@@ -74,7 +74,7 @@
 
 .import-progress-meter-text {
   color: #333;
-  font-size: 12px;
+  font-size: var(--font-body);
   white-space: nowrap;
 }
 
@@ -178,7 +178,7 @@
 .pipeline-error,
 .pipeline-pending,
 .pipeline-skipped {
-  font-size: 14px;
+  font-size: var(--font-section);
   line-height: 1;
   font-weight: 700;
 }
@@ -302,7 +302,7 @@
 }
 
 .context-menu-submenu-indicator {
-  font-size: 15px;
+  font-size: var(--font-section);
   line-height: 1;
 }
 

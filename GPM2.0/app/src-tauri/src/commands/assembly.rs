@@ -600,6 +600,7 @@ pub fn get_main_view_history_status(
         let status = backend_get_main_view_history_status(
             &project_db_path(&request.workspace_root),
             &MainViewHistoryTargetParams {
+                history_capacity: request.history_capacity,
                 project_id: request.project_id,
                 chr_name: request.chr_name,
             },
@@ -617,6 +618,7 @@ pub fn inspect_main_view_delete(
         let impact = backend_inspect_main_view_delete(
             &project_db_path(&request.workspace_root),
             &RunMainViewBatchDeleteParams {
+                history_capacity: request.history_capacity,
                 project_id: request.project_id,
                 chr_name: request.chr_name,
                 assembly_ctg_ids: request.assembly_ctg_ids,
@@ -641,6 +643,7 @@ pub fn run_main_view_editor_action(
         let summary = backend_run_main_view_editor_action(
             &project_db_path(&request.workspace_root),
             &RunMainViewEditorActionParams {
+                history_capacity: request.history_capacity,
                 project_id: request.project_id,
                 chr_name: request.chr_name,
                 action: request.action,
@@ -660,6 +663,7 @@ pub fn run_main_view_layout_action(
         let summary = backend_run_main_view_layout_action(
             &project_db_path(&request.workspace_root),
             &RunMainViewLayoutActionParams {
+                history_capacity: request.history_capacity,
                 project_id: request.project_id,
                 chr_name: request.chr_name,
                 action: request.action,
@@ -679,6 +683,7 @@ pub fn run_main_view_batch_delete(
         let summary = backend_run_main_view_batch_delete(
             &project_db_path(&request.workspace_root),
             &RunMainViewBatchDeleteParams {
+                history_capacity: request.history_capacity,
                 project_id: request.project_id,
                 chr_name: request.chr_name,
                 assembly_ctg_ids: request.assembly_ctg_ids,
@@ -718,6 +723,7 @@ fn run_main_view_history_target_command(
         let summary = run(
             &project_db_path(&request.workspace_root),
             &MainViewHistoryTargetParams {
+                history_capacity: request.history_capacity,
                 project_id: request.project_id,
                 chr_name: request.chr_name,
             },

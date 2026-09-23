@@ -1,3 +1,4 @@
+import { estimateGraphTextWidth } from "../../../services/app-settings.js";
 const ASSEMBLY_STICKY_CTG_LABEL_BOUND = Symbol("assemblyStickyCtgLabelBound");
 
 function buildNoStickyDecision() {
@@ -13,7 +14,7 @@ function buildNoStickyDecision() {
 
 function estimateTrackCtgLabelWidth(labelText) {
   const text = String(labelText || "");
-  return Math.max(10, text.length * 6.2);
+  return estimateGraphTextWidth(text);
 }
 
 function readNodeClassName(node) {

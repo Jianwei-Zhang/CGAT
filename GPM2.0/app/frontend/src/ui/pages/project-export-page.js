@@ -1,3 +1,4 @@
+import { getGraphFontSize, estimateGraphTextWidth } from "../../services/app-settings.js";
 import { pickDirectoryPath, pickSaveFilePath } from "../../services/backend-api.js";
 import {
   exportProjectFinalPathFasta,
@@ -626,9 +627,9 @@ function buildProjectFinalPathTsvText(entries) {
 
 function buildProjectFinalPathSvgSnapshot({ entries, projectName, primaryDatasetName }) {
   const rows = Array.isArray(entries) ? entries : [];
-  const width = 1200;
-  const labelWidth = 132;
-  const rightPadding = 116;
+  const labelWidth = Math.max(132, ...rows.map(row => estimateGraphTextWidth(row.chrName, 7) * 1.1 + 16));
+  const rightPadding = Math.max(116, ...rows.map(row => estimateGraphTextWidth(`${formatNumber(row.lengthBp)} bp`, 7) + 24));
+  const width = Math.max(1200, labelWidth + rightPadding + 600);
   const trackX = labelWidth;
   const trackWidth = width - labelWidth - rightPadding;
   const rowHeight = 52;
@@ -662,17 +663,17 @@ function buildProjectFinalPathSvgSnapshot({ entries, projectName, primaryDataset
     }).join("");
     return `
       <g>
-        <text x="0" y="${(y + 28).toFixed(2)}" fill="#333" font-size="13" font-weight="700">${escapeHtml(chrName)}</text>
+        <text x="0" y="${(y + 28).toFixed(2)}" fill="#333" font-size="${getGraphFontSize() * 1.1}" font-weight="700">${escapeHtml(chrName)}</text>
         <line x1="${trackX}" y1="${(y + 24).toFixed(2)}" x2="${(trackX + trackWidth).toFixed(2)}" y2="${(y + 24).toFixed(2)}" stroke="#d7d7d7" stroke-width="1" />
         ${segmentMarkup}
-        <text x="${(trackX + trackWidth + 12).toFixed(2)}" y="${(y + 28).toFixed(2)}" fill="#666" font-size="11">${escapeHtml(`${formatNumber(lengthBp)} bp`)}</text>
+        <text x="${(trackX + trackWidth + 12).toFixed(2)}" y="${(y + 28).toFixed(2)}" fill="#666" font-size="${getGraphFontSize() * 0.917}">${escapeHtml(`${formatNumber(lengthBp)} bp`)}</text>
       </g>
     `;
   }).join("");
   const svgMarkup = `
-    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="system-ui, Segoe UI, Microsoft YaHei, sans-serif" xmlns="http://www.w3.org/2000/svg">
       <rect x="0" y="0" width="${width}" height="${height}" fill="#fff" />
-      <text x="0" y="18" fill="#333" font-size="14" font-weight="700">${escapeHtml(projectName || "project")}</text>
+      <text x="0" y="18" fill="#333" font-size="${getGraphFontSize() * 1.25}" font-weight="700">${escapeHtml(projectName || "project")}</text>
       ${rowMarkup}
     </svg>
   `;

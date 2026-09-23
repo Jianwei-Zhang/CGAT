@@ -1806,7 +1806,7 @@ test("project export final path preview css is clickable and hides graph label s
   );
   assert.match(
     componentsCss,
-    /\.project-export-final-path-preview-ctg\s*\{[\s\S]*font-size:\s*11px;/,
+    /\.project-export-final-path-preview-ctg\s*\{[\s\S]*font-size:\s*var\(--font-small\);/,
   );
   assert.match(
     componentsCss,

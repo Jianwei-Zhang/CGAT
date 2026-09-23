@@ -1,3 +1,4 @@
+import { retainHistoryEntries } from "../../../services/app-settings.js";
 import {
   buildSubviewAnchorStateKey,
   buildSubviewSummaryOrderKeys,
@@ -125,9 +126,6 @@ export function normalizeSubviewHistoryRecord(value, pairKey = "") {
   }
   const past = normalizeSubviewHistoryEntries(value.past);
   const forward = normalizeSubviewHistoryEntries(value.forward);
-  if (past.length + forward.length > SUBVIEW_HISTORY_LIMIT) {
-    return null;
-  }
   return {
     version: SUBVIEW_HISTORY_SCHEMA_VERSION,
     pairKey: normalizedPairKey,
@@ -232,7 +230,6 @@ export function normalizeSubviewCompositionHistoryRecord(value, pairKey = "") {
     .map(normalizeSubviewCompositionHistoryEntry).filter(Boolean);
   const forward = (Array.isArray(value.forward) ? value.forward : [])
     .map(normalizeSubviewCompositionHistoryEntry).filter(Boolean);
-  if (past.length + forward.length > SUBVIEW_HISTORY_LIMIT) return null;
   return {
     version: SUBVIEW_COMPOSITION_HISTORY_SCHEMA_VERSION,
     pairKey: normalizedPairKey,
@@ -509,8 +506,9 @@ export function commitSubviewCompositionHistoryOperation(assembly, {
   const nextRecord = {
     ...record,
     current: nextSnapshot,
-    past: [...record.past, { operation: normalizedOperation, snapshot: currentSnapshot }]
-      .slice(-SUBVIEW_HISTORY_LIMIT),
+    past: retainHistoryEntries([
+      ...record.past, { operation: normalizedOperation, snapshot: currentSnapshot },
+    ]),
     forward: [],
     viewport: normalizeSubviewCompositionViewport(viewport),
     updatedAt: nowTimestamp(now),
@@ -733,10 +731,10 @@ export function commitSubviewHistoryOperation(assembly, {
   if (areSubviewEditableSnapshotsEqual(currentSnapshot, nextSnapshot)) {
     return { assembly: currentAssembly, changed: false, pairKey };
   }
-  const nextPast = [
+  const nextPast = retainHistoryEntries([
     ...record.past,
     { operation: normalizedOperation, snapshot: currentSnapshot },
-  ].slice(-SUBVIEW_HISTORY_LIMIT);
+  ]);
   const nextRecord = {
     ...record,
     current: nextSnapshot,

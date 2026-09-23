@@ -35,6 +35,7 @@ export function renderAppShell(state) {
           <button class="route-button" data-route="assembly">${labels.assembly}</button>
           <button class="route-button" data-route="projectExport">${labels.projectExport}</button>
         </nav>
+        <button type="button" class="button app-settings-button" data-app-settings aria-haspopup="dialog">⚙ ${locale === "en" ? "Settings" : "设置"}</button>
       </nav>
       <main class="main-stage">
         <section class="panel stage-panel">

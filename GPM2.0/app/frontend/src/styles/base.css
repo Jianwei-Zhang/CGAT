@@ -1,7 +1,19 @@
 :root {
   color-scheme: light;
-  font-family: Tahoma, Verdana, Arial, sans-serif;
-  font-size: 12px;
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+  font-size: var(--app-font-size, 14px);
+  --font-micro: 0.786rem;
+  --font-caption: 0.857rem;
+  --font-small: 0.929rem;
+  --font-body: 1rem;
+  --font-section: 1.143rem;
+  --font-title: 1.286rem;
+  --font-heading: 1.429rem;
+  --font-page-title: 1.714rem;
+  --font-hero: 2rem;
+  --font-graph-label: var(--graph-font-size, 12px);
+  --font-graph-small: calc(var(--graph-font-size, 12px) * 0.917);
+  --font-graph-tick: calc(var(--graph-font-size, 12px) * 0.917);
   line-height: 1.45;
   background: #e6e6e6;
   color: #222;
@@ -33,3 +45,13 @@ button,
 textarea {
   font: inherit;
 }
+
+/* Text-bearing controls share the same readable baseline; compact actions use the small tier. */
+h1 { font-size: var(--font-page-title); }
+h2 { font-size: var(--font-heading); }
+h3, h4 { font-size: var(--font-title); }
+button, input, select, textarea { line-height: 1.45; }
+button { overflow-wrap: anywhere; }
+button, input:not([type="checkbox"]):not([type="radio"]), select { min-height: 2em; }
+label { line-height: 1.5; }
+code, pre { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }

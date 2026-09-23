@@ -213,7 +213,7 @@ test("main-track markup and CSS expose content-driven layouts without header med
   assert.match(css, /data-main-track-control-layout="single"/);
   assert.match(css, /data-main-track-control-layout="split"/);
   assert.match(css, /data-main-track-control-layout="stacked"/);
-  assert.match(css, /\.assembly-view-title\s*\{[^}]*font-size:\s*16px;[^}]*font-weight:\s*700;/);
+  assert.match(css, /\.assembly-view-title\s*\{[^}]*font-size:\s*var\(--font-title\);[^}]*font-weight:\s*700;/);
   assert.match(
     css,
     /data-main-track-control-layout="stacked"[^}]*\.assembly-track-panel-actions\s*\{[^}]*flex-direction:\s*row;[^}]*flex-wrap:\s*wrap;/,
@@ -224,15 +224,15 @@ test("main-track markup and CSS expose content-driven layouts without header med
   );
   assert.match(
     css,
-    /\.assembly-track-panel-quick-actions\s*>\s*\[data-create-phased-track\]\s*\{[^}]*height:\s*30px;[^}]*min-height:\s*30px;/,
+    /\.assembly-track-panel-quick-actions\s*>\s*\[data-create-phased-track\]\s*\{[^}]*height:\s*2\.1429rem;[^}]*min-height:\s*2\.1429rem;/,
   );
   assert.match(
     css,
-    /\.grt-result-switch\s*\{[^}]*height:\s*30px;[^}]*min-height:\s*30px;/,
+    /\.grt-result-switch\s*\{[^}]*height:\s*2\.1429rem;[^}]*min-height:\s*2\.1429rem;/,
   );
   assert.match(
     css,
-    /\.assembly-marker-display\s*>\s*\[data-marker-display-toggle\]\s*\{[^}]*height:\s*30px;[^}]*min-height:\s*30px;/,
+    /\.assembly-marker-display\s*>\s*\[data-marker-display-toggle\]\s*\{[^}]*height:\s*2\.1429rem;[^}]*min-height:\s*2\.1429rem;/,
   );
   const fixedViewportRules = assemblyCss.slice(assemblyCss.indexOf("@media (max-width: 1200px)"));
   assert.doesNotMatch(fixedViewportRules, /\.assembly-track-inline-controls\s*\{/);

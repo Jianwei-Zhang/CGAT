@@ -1,3 +1,4 @@
+import { estimateGraphTextWidth, getGraphFontSize } from "../../../services/app-settings.js";
 import {
   DEFAULT_MAX_TICK_COUNT,
   DEFAULT_MIN_TICK_UNIT_KB,
@@ -160,12 +161,12 @@ function formatRulerTickLabel(value) {
 
 function estimateTrackTickLabelWidth(labelText) {
   const text = String(labelText || "");
-  return Math.max(12, text.length * 7);
+  return estimateGraphTextWidth(text, 7);
 }
 
 function estimateTrackCtgLabelWidth(labelText) {
   const text = String(labelText || "");
-  return Math.max(10, text.length * 6.2);
+  return estimateGraphTextWidth(text);
 }
 
 function resolveFinalPathCtgLabelPlacement({ labelText, barX, barWidth, barY, textOffsetY }) {
@@ -1131,6 +1132,8 @@ export function renderFinalPathGraph({
       textOffsetY: FINAL_PATH_GRAPH_TEXT_OFFSET_Y,
       barRadius: FINAL_PATH_GRAPH_BAR_RADIUS,
     };
+  const graphScale = Math.max(1, getGraphFontSize() / 12);
+  for (const key of Object.keys(graphMetrics)) graphMetrics[key] *= graphScale;
   const tickBp = resolveTickBpFromScale({
     domainSpanBp,
     minTickUnitKb: resolvedTrackPrefs.minTickUnitKb,

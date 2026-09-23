@@ -8,7 +8,7 @@
 
 .kicker {
   color: #666;
-  font-size: 11px;
+  font-size: var(--font-small);
 }
 
 .muted {
@@ -21,7 +21,7 @@
   background: var(--helper-hint-bg);
   color: var(--helper-hint-text);
   padding: 5px 8px;
-  font-size: 12px;
+  font-size: var(--font-body);
   line-height: 1.35;
 }
 
@@ -34,7 +34,7 @@
 }
 
 .card h4 {
-  font-size: 16px;
+  font-size: var(--font-title);
 }
 
 label {
@@ -69,7 +69,7 @@ select {
 
 .button.tiny {
   padding: 2px 6px;
-  font-size: 11px;
+  font-size: var(--font-small);
 }
 
 .button.menu::after {
@@ -217,6 +217,6 @@ select {
 }
 
 .records-table code {
-  font-size: 11px;
+  font-size: var(--font-small);
   word-break: break-all;
 }

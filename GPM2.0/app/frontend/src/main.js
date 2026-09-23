@@ -1,3 +1,6 @@
+import { applyAppTypography } from "./services/app-settings.js";
+import { bindAppSettings } from "./ui/shell/app-settings-panel.js";
+import "./styles/settings.css";
 import { createStore } from "./state/store.js";
 import { flushAssemblyProjectState } from "./ui/pages/assembly-page.js";
 import { openProjectWorkspace as openWorkspace } from "./services/project-session.js";
@@ -240,7 +243,9 @@ const store = createStore({
 });
 
 migrateWorkspaceHistoryToArrivalOrder(window.localStorage);
+applyAppTypography();
 app.innerHTML = renderAppShell(store.getState());
+bindSettings(app, store);
 bindGlobalLanguageSwitch(app, store);
 bindGlobalSessionSwitchers(app, store);
 registerRoutes(app, store, () => {
@@ -382,6 +387,7 @@ function bindGlobalLanguageSwitch(root, storeRef) {
     const value = select.value === "en" ? "en" : "zh";
     storeRef.setState(relocalizeAppState(storeRef.getState(), value));
     root.innerHTML = renderAppShell(storeRef.getState());
+    bindSettings(root, storeRef);
     bindGlobalLanguageSwitch(root, storeRef);
     bindGlobalSessionSwitchers(root, storeRef);
     registerRoutes(root, storeRef, () => {
@@ -621,4 +627,15 @@ function escapeHtml(value) {
 
 function escapeAttr(value) {
   return escapeHtml(value).replaceAll('"', "&quot;");
+}
+
+function bindSettings(root, storeRef) {
+  bindAppSettings(root, {
+    getLocale: () => storeRef.getState().locale === "en" ? "en" : "zh",
+    onTypographyChange: () => window.dispatchEvent(new Event("gpm-next:route-refresh")),
+    onLanguageChange: locale => {
+      const select = root.querySelector("#app-language-select");
+      if (select) { select.value = locale; select.dispatchEvent(new Event("change")); }
+    },
+  });
 }

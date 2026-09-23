@@ -140,31 +140,33 @@ async function runCtgEditorActionTauri({ workspaceRoot, projectId, action, args 
   });
 }
 
-function buildMainViewHistoryRequest({ workspaceRoot, projectId, chrName }) {
+function buildMainViewHistoryRequest({ workspaceRoot, projectId, chrName, historyCapacity }) {
   return {
-    request: { workspaceRoot, projectId, chrName },
+    request: { workspaceRoot, projectId, chrName, historyCapacity },
   };
 }
 
-async function getMainViewHistoryStatusTauri({ workspaceRoot, projectId, chrName }) {
+async function getMainViewHistoryStatusTauri({ workspaceRoot, projectId, chrName, historyCapacity }) {
   return invokeCommand(
     "get_main_view_history_status",
-    buildMainViewHistoryRequest({ workspaceRoot, projectId, chrName }),
+    buildMainViewHistoryRequest({ workspaceRoot, projectId, chrName, historyCapacity }),
   );
 }
 
 async function inspectMainViewDeleteTauri({
+  historyCapacity,
   workspaceRoot,
   projectId,
   chrName,
   assemblyCtgIds,
 }) {
   return invokeCommand("inspect_main_view_delete", {
-    request: { workspaceRoot, projectId, chrName, assemblyCtgIds },
+    request: { historyCapacity, workspaceRoot, projectId, chrName, assemblyCtgIds },
   });
 }
 
 async function runMainViewEditorActionTauri({
+  historyCapacity,
   workspaceRoot,
   projectId,
   chrName,
@@ -172,11 +174,12 @@ async function runMainViewEditorActionTauri({
   args,
 }) {
   return invokeCommand("run_main_view_editor_action", {
-    request: { workspaceRoot, projectId, chrName, action, args },
+    request: { historyCapacity, workspaceRoot, projectId, chrName, action, args },
   });
 }
 
 async function runMainViewLayoutActionTauri({
+  historyCapacity,
   workspaceRoot,
   projectId,
   chrName,
@@ -184,22 +187,24 @@ async function runMainViewLayoutActionTauri({
   args,
 }) {
   return invokeCommand("run_main_view_layout_action", {
-    request: { workspaceRoot, projectId, chrName, action, args },
+    request: { historyCapacity, workspaceRoot, projectId, chrName, action, args },
   });
 }
 
 async function runMainViewBatchDeleteTauri({
+  historyCapacity,
   workspaceRoot,
   projectId,
   chrName,
   assemblyCtgIds,
 }) {
   return invokeCommand("run_main_view_batch_delete", {
-    request: { workspaceRoot, projectId, chrName, assemblyCtgIds },
+    request: { historyCapacity, workspaceRoot, projectId, chrName, assemblyCtgIds },
   });
 }
 
 async function executeMainViewHistoryActionTauri({
+  historyCapacity,
   workspaceRoot,
   projectId,
   chrName,
@@ -216,7 +221,7 @@ async function executeMainViewHistoryActionTauri({
   }
   return invokeCommand(
     command,
-    buildMainViewHistoryRequest({ workspaceRoot, projectId, chrName }),
+    buildMainViewHistoryRequest({ workspaceRoot, projectId, chrName, historyCapacity }),
   );
 }
 

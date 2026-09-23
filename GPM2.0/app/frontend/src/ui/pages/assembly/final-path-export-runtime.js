@@ -1,3 +1,4 @@
+import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
   getCurrentChrFinalPath,
   isFinalPathGapSegment,
@@ -29,25 +30,25 @@ const FINAL_PATH_EXPORT_BOUND = Symbol("finalPathExportBound");
 const FINAL_PATH_EXPORT_CLOSE_TIMER = "__finalPathExportCloseTimer";
 const FINAL_PATH_FALLBACK_CARD_CONTENT_INSET_PX = 22;
 const FINAL_PATH_FALLBACK_CARD_LAYOUT_OFFSET_PX = 138;
-const FINAL_PATH_EXPORT_SVG_STYLE_TEXT = [
-  ".assembly-track-svg{display:block;background:#fff;}",
+function finalPathExportSvgStyleText() { return [
+  ".assembly-track-svg{display:block;background:#fff;font-family:system-ui,Segoe UI,Microsoft YaHei,sans-serif;}",
   ".track-ruler-line{stroke:#5f5f5f;stroke-width:1;}",
   ".track-tick-guide{stroke-dasharray:3,3;stroke-width:1;stroke:#d7d7d7;}",
   ".track-tick-guide.is-major{stroke:#8d8d8d;}",
   ".track-tick-guide.is-minor{display:none;}",
-  ".track-tick-label{fill:#666;font-size:10px;}",
+  `.track-tick-label{fill:#666;font-size:${getGraphFontSize() * 0.917}px;}`,
   ".track-ctg{fill:#d2dfef;stroke:#6d85a1;stroke-width:1;}",
   ".track-ctg.is-active{fill:#b9d0ea;stroke:#38516c;}",
   ".track-ctg.is-ref,.track-ctg.is-ref.is-active{fill:#cfcfcf;stroke:#8e8e8e;}",
   ".track-ctg.is-companion{fill:#e7dec4;stroke:#8a7551;}",
   ".track-ctg.is-companion.is-active{fill:#dccba4;stroke:#725d39;}",
-  ".track-ctg-label{fill:#243a54;font-size:10px;}",
+  `.track-ctg-label{fill:#243a54;font-size:${getGraphFontSize()}px;}`,
   ".track-ctg-label.is-ref{fill:#4f4f4f;}",
   ".track-ctg-label.is-companion{fill:#5c492a;}",
-  ".track-ctg-label.is-outside{font-size:9px;}",
+  `.track-ctg-label.is-outside{font-size:${getGraphFontSize() * 0.917}px;}`,
   ".final-path-gap-marker{fill:#ffffff;stroke:#1b1b1b;stroke-width:1;}",
-  ".final-path-gap-label{fill:#1b1b1b;font-size:10px;font-weight:700;}",
-].join("");
+  `.final-path-gap-label{fill:#1b1b1b;font-size:${getGraphFontSize()}px;font-weight:700;}`,
+].join(""); }
 
 function hasBoundFinalPathExportAncestor(host) {
   let ancestor = host?.parentElement || host?.parentNode || null;
@@ -595,7 +596,7 @@ export function buildViewportScopedSvgMarkup(snapshot) {
   }
   scopedMarkup = scopedMarkup.replace(
     /(>)([\s\S]*)$/m,
-    `><style>${FINAL_PATH_EXPORT_SVG_STYLE_TEXT}</style><rect x="${scrollLeft}" y="${scrollTop}" width="${width}" height="${height}" fill="#fff" />$2`,
+    `><style>${finalPathExportSvgStyleText()}</style><rect x="${scrollLeft}" y="${scrollTop}" width="${width}" height="${height}" fill="#fff" />$2`,
   );
   return scopedMarkup;
 }

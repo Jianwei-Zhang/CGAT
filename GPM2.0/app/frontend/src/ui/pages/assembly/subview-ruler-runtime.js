@@ -1,3 +1,4 @@
+import { estimateGraphTextWidth } from "../../../services/app-settings.js";
 const SUBVIEW_RULER_BOUND = Symbol("subviewRulerBound");
 const DEFAULT_VIEWPORT_WIDTH_PX = 1200;
 const RULER_OVERSCAN_TICKS = 2;
@@ -33,7 +34,7 @@ function formatRulerEndLabel(value) {
 }
 
 function resolveRulerLabelBounds(tick) {
-  const width = Math.max(12, String(tick?.labelText || "").length * 7);
+  const width = estimateGraphTextWidth(tick?.labelText, 7);
   if (tick?.labelAnchor === "start") {
     return { left: tick.labelX, right: tick.labelX + width };
   }

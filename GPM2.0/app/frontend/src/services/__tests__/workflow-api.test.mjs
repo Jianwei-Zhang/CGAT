@@ -110,6 +110,7 @@ test("main-view history services preserve nested Tauri request payloads", async 
     await runMainViewBatchDelete({ ...target, assemblyCtgIds: [11, 12] });
     await executeMainViewHistoryAction({ ...target, action: "redo" });
 
+    target.historyCapacity = 50;
     assert.deepEqual(calls, [
       { command: "get_main_view_history_status", args: { request: target } },
       {

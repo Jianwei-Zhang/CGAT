@@ -159,6 +159,7 @@ pub struct UpdateProjectAssemblyViewStateCommandRequest {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MainViewHistoryTargetCommandRequest {
+    history_capacity: Option<usize>,
     workspace_root: String,
     project_id: i64,
     chr_name: String,
@@ -167,6 +168,7 @@ pub struct MainViewHistoryTargetCommandRequest {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunMainViewEditorActionCommandRequest {
+    history_capacity: Option<usize>,
     workspace_root: String,
     project_id: i64,
     chr_name: String,
@@ -177,6 +179,7 @@ pub struct RunMainViewEditorActionCommandRequest {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunMainViewLayoutActionCommandRequest {
+    history_capacity: Option<usize>,
     workspace_root: String,
     project_id: i64,
     chr_name: String,
@@ -187,6 +190,7 @@ pub struct RunMainViewLayoutActionCommandRequest {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MainViewBatchDeleteCommandRequest {
+    history_capacity: Option<usize>,
     workspace_root: String,
     project_id: i64,
     chr_name: String,
@@ -946,6 +950,7 @@ mod tests {
                 "chrName": "Chr01",
             }))
             .expect("decode main-view history target request");
+        assert_eq!(history_target_request.history_capacity, None);
         assert_eq!(history_target_request.project_id, 9);
         assert_eq!(history_target_request.chr_name, "Chr01");
 
@@ -955,9 +960,11 @@ mod tests {
                 "projectId": 9,
                 "chrName": "Chr01",
                 "action": "rename-ctg",
+                "historyCapacity": 0,
                 "args": { "assemblyCtgId": 17, "newName": "ctg-renamed" },
             }))
             .expect("decode main-view editor action request");
+        assert_eq!(history_editor_request.history_capacity, Some(0));
         assert_eq!(history_editor_request.action, "rename-ctg");
         assert_eq!(history_editor_request.args["assemblyCtgId"], 17);
 

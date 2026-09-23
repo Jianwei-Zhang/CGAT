@@ -1,3 +1,4 @@
+import { estimateGraphTextWidth } from "../../../services/app-settings.js";
 import { normalizePositiveInt } from "./track-prefs.js";
 import { normalizeSupportDatasetId } from "./selection-state.js";
 
@@ -177,7 +178,7 @@ export function resolveBoundedTrackCtgLabelPlacement({
 
 function estimateTrackCtgLabelWidth(labelText) {
   const text = String(labelText || "");
-  return Math.max(10, text.length * 6.2);
+  return estimateGraphTextWidth(text);
 }
 
 export function resolveTrackCtgLabelRightBoundary({

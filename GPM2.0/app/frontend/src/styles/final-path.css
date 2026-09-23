@@ -49,12 +49,12 @@
 .final-path-all-card-head {
   display: flex;
   align-items: center;
-  min-height: 24px;
+  min-height: 1.7143rem;
   margin-bottom: 8px;
 }
 
 .final-path-all-card-title {
-  font-size: 13px;
+  font-size: var(--font-body);
 }
 
 .final-path-card-table-body {
@@ -97,7 +97,7 @@
 .final-path-card-list-head {
   padding: 0 10px 6px;
   color: #424242;
-  font-size: 12px;
+  font-size: var(--font-body);
   font-weight: 700;
 }
 
@@ -282,7 +282,7 @@
   align-items: center;
   justify-content: flex-end;
   padding-right: 10px;
-  font-size: 13px;
+  font-size: var(--font-body);
 }
 
 .final-path-track-inline-controls {
@@ -326,7 +326,7 @@
   right: 12px;
   justify-content: flex-end;
   gap: 12px;
-  font-size: 11px;
+  font-size: var(--font-small);
   color: #555;
 }
 
@@ -356,7 +356,7 @@
 
 .final-path-log-stat {
   display: contents;
-  font-size: 13px;
+  font-size: var(--font-body);
 }
 
 .final-path-log-stat-label {
@@ -364,7 +364,7 @@
 }
 
 .final-path-log-stat-value {
-  font-size: 14px;
+  font-size: var(--font-section);
   white-space: nowrap;
   text-align: left;
 }
@@ -393,7 +393,7 @@
 
 .final-path-log-section h5 {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--font-body);
 }
 
 .final-path-log-table-wrap {
@@ -405,7 +405,7 @@
   width: 100%;
   min-width: 0;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--font-body);
 }
 
 .final-path-log-table th,
@@ -432,7 +432,7 @@
 
 .final-path-length-label {
   fill: #4f4f4f;
-  font-size: 10px;
+  font-size: var(--font-graph-tick);
   pointer-events: none;
 }
 
@@ -474,7 +474,7 @@
 .final-path-card-static-value {
   display: flex;
   align-items: center;
-  min-height: 31px;
+  min-height: 2.2143rem;
   border: 1px solid #d7d7d7;
   background: #fafafa;
   padding: 0 10px;
@@ -495,7 +495,7 @@
 
 .final-path-row-drag-handle {
   min-width: 28px;
-  height: 30px;
+  height: 2.1429rem;
   padding: 0 6px;
   cursor: grab;
 }
@@ -523,6 +523,6 @@
 
 .final-path-gap-label {
   fill: #1b1b1b;
-  font-size: 10px;
+  font-size: var(--font-graph-label);
   font-weight: 700;
 }

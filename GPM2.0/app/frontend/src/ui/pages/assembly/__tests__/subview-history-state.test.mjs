@@ -1,3 +1,4 @@
+import { setAppSettings, DEFAULT_APP_SETTINGS } from "../../../../services/app-settings.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -565,4 +566,57 @@ test("Subview rollback resets the current pair when its next history snapshot is
   assert.equal(rollback.invalidated, true);
   assert.deepEqual(rollback.assembly.subview.activeAnchors, []);
   assert.deepEqual(rollback.assembly.subviewHistoryByKey[status.pairKey].past, []);
+});
+
+test("capacity changes preserve saved subview history until a new edit", () => {
+  try {
+    setAppSettings({ historyCapacity: 0 }, { persist: false });
+    let assembly = activateSubviewHistory(buildAssembly(), { now: 0 }).assembly;
+    for (let index = 1; index <= 65; index++) {
+      assembly = commitSubviewHistoryOperation(assembly, {
+        nextSubview: assembly.subview,
+        nextSubviewTrackDragOffsets: [{ slot: "top", contigId: 1, offsetBp: index }],
+        operation: { kind: "drag-contig" }, now: index,
+      }).assembly;
+    }
+    setAppSettings({ historyCapacity: 3 }, { persist: false });
+    assert.equal(resolveCurrentSubviewHistory(structuredClone(assembly)).record.past.length, 65);
+    const undo = rollbackSubviewHistory(assembly).assembly;
+    assert.equal(resolveCurrentSubviewHistory(undo).record.forward.length, 1);
+    assembly = commitSubviewHistoryOperation(undo, {
+      nextSubview: undo.subview,
+      nextSubviewTrackDragOffsets: [{ slot: "top", contigId: 1, offsetBp: 99 }],
+      operation: { kind: "drag-contig" },
+    }).assembly;
+    assert.equal(resolveCurrentSubviewHistory(assembly).record.past.length, 3);
+    assert.equal(resolveCurrentSubviewHistory(assembly).record.forward.length, 0);
+    assert.equal(assembly.subviewTrackDragOffsets[0].offsetBp, 99);
+  } finally { setAppSettings(DEFAULT_APP_SETTINGS, { persist: false }); }
+});
+
+test("composition history retains more than 50 steps and safely applies a smaller capacity", () => {
+  try {
+    setAppSettings({historyCapacity:100}, {persist:false});
+    let assembly = buildAssembly();
+    for (let index=1; index<=65; index++) {
+      const composition = normalizeSubviewComposition({members:[{
+        assemblyCtgId:2, source:{role:"support",datasetId:22,sourceType:"mother"},
+        label:"ctg2",lengthBp:100,lane:"top",xBp:index*100,
+      }]});
+      assembly = commitSubviewCompositionHistoryOperation(assembly, {
+        nextSubview:applySubviewComposition(assembly.subview,composition), operation:{kind:"drag-contig"},
+      }).assembly;
+    }
+    const key=buildSubviewCompositionHistoryKey("Chr01");
+    assert.equal(resolveCurrentSubviewHistory(structuredClone(assembly)).record.past.length,65);
+    setAppSettings({historyCapacity:2},{persist:false});
+    const undo=rollbackSubviewHistory(assembly).assembly;
+    assert.equal(undo.subviewHistoryByKey[key].past.length,64);
+    const composition=normalizeSubviewComposition({members:[]});
+    const next=commitSubviewCompositionHistoryOperation(undo,{
+      nextSubview:applySubviewComposition(undo.subview,composition),operation:{kind:"replace-composition"},
+    }).assembly;
+    assert.equal(next.subviewHistoryByKey[key].past.length,2);
+    assert.equal(next.subviewHistoryByKey[key].forward.length,0);
+  } finally {setAppSettings(DEFAULT_APP_SETTINGS,{persist:false});}
 });

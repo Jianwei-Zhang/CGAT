@@ -1,3 +1,4 @@
+import { getGraphFontSize } from "../../services/app-settings.js";
 const DEFAULT_MAX_CACHE_ENTRIES = 3;
 
 const assemblyStateCache = new Map();
@@ -102,13 +103,13 @@ export function rememberAssemblyDom(host, state, options = {}) {
   if (!key || !nodes.length) {
     return false;
   }
-  return touchEntry(assemblyDomCache, key, { nodes }, options.maxEntries);
+  return touchEntry(assemblyDomCache, key, { nodes, graphFontSize: getGraphFontSize() }, options.maxEntries);
 }
 
 export function restoreAssemblyDom(host, state) {
   const key = buildAssemblyDomCacheKey(state);
   const cached = key ? assemblyDomCache.get(key) : null;
-  if (!host || !cached?.nodes?.length || typeof host.replaceChildren !== "function") {
+  if (!host || cached?.graphFontSize !== getGraphFontSize() || !cached?.nodes?.length || typeof host.replaceChildren !== "function") {
     return false;
   }
   host.replaceChildren(...cached.nodes);

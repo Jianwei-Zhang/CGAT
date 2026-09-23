@@ -228,7 +228,7 @@ test("main-view history dev operations map exact CLI contracts", async () => {
     args: { datasetId: 22, assemblyCtgId: 11, mirrorEntry: { datasetId: 22, assemblyCtgId: 11 } },
   });
   await handlers.runMainViewBatchDelete({ ...target, assemblyCtgIds: [11, 12] });
-  await handlers.executeMainViewHistoryAction({ ...target, action: "redo" });
+  await handlers.executeMainViewHistoryAction({ ...target, action: "redo", historyCapacity: 0 });
 
   assert.deepEqual(calls, [
     ["main-view-history-status", "D:/workspace", "7", "Chr01"],
@@ -250,7 +250,7 @@ test("main-view history dev operations map exact CLI contracts", async () => {
       '{"datasetId":22,"assemblyCtgId":11,"mirrorEntry":{"datasetId":22,"assemblyCtgId":11}}',
     ],
     ["run-main-view-batch-delete", "D:/workspace", "7", "Chr01", "11,12"],
-    ["redo-main-view-history", "D:/workspace", "7", "Chr01"],
+    ["redo-main-view-history", "D:/workspace", "7", "Chr01", "--history-capacity", "0"],
   ]);
 });
 

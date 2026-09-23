@@ -1,3 +1,4 @@
+import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
   readHitIdentityPct, alignmentBandSvgAttrs, alignmentBandTooltipMetrics,
   sortAlignmentBands, renderAlignmentIdentityLegend,
@@ -29,10 +30,10 @@ import {
   resolveTrackCtgVisibleName,
 } from "./track-label-geometry.js";
 
-const TOP_Y = 82;
-const BOTTOM_Y = 190;
-const BAR_HEIGHT = 14;
-const CONTENT_HEIGHT = 248;
+function getCompositionVerticalMetrics() {
+  const scale = Math.max(1, getGraphFontSize() / 12);
+  return { TOP_Y: 82 * scale, BOTTOM_Y: 190 * scale, BAR_HEIGHT: 14 * scale, CONTENT_HEIGHT: 248 * scale };
+}
 
 function number(value) {
   const numeric = Number(value);
@@ -239,6 +240,7 @@ function anchorAttrs(edge, kind, identity, active, escapeAttr) {
 }
 
 function renderEvidenceAnchors(bands, activeAnchors, escapeAttr) {
+  const { TOP_Y, BOTTOM_Y, BAR_HEIGHT } = getCompositionVerticalMetrics();
   const active = new Set((Array.isArray(activeAnchors) ? activeAnchors : [])
     .map((anchor) => `${anchor.hitKey}:${anchor.edge}`));
   return bands.flatMap((band) => ["left", "right"].map((side) => {
@@ -258,6 +260,7 @@ function renderEvidenceAnchors(bands, activeAnchors, escapeAttr) {
 }
 
 function renderManualAnchors(layout, anchors, escapeAttr) {
+  const { TOP_Y, BOTTOM_Y, BAR_HEIGHT } = getCompositionVerticalMetrics();
   const byEndpoint = new Map(layout.members.map((member) => [endpointKey(member), member]));
   return (Array.isArray(anchors) ? anchors : []).map((anchor) => {
     let top = byEndpoint.get(anchor?.endpointA?.endpointKey);
@@ -316,6 +319,7 @@ function buildAnchorCutsByEndpoint(layout, bands, activeAnchors, manualAnchors) 
 }
 
 function renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr }) {
+  const { BAR_HEIGHT } = getCompositionVerticalMetrics();
   const fragments = deriveSubviewContigFragments({
     contig: {
       assemblyCtgId: member.assemblyCtgId,
@@ -364,6 +368,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
   minVisibleX,
   maxVisibleX,
 }) {
+  const { BAR_HEIGHT } = getCompositionVerticalMetrics();
   const role = member.source?.role || "support";
   const tone = resolveTrackToneClass(role);
   const source = sourceName(member, labels);
@@ -381,7 +386,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
     rect: member,
     barY: y,
     barHeight: BAR_HEIGHT,
-    inlineTextOffsetY: 11,
+    inlineTextOffsetY: BAR_HEIGHT * 11 / 14,
     outsideLabelAnchor: "bar-middle",
     hideOutsideLabel: true,
     minVisibleX,
@@ -438,6 +443,7 @@ export function renderSubviewCompositionAlignmentCard({
   escapeHtml,
   escapeAttr,
 }) {
+  const { TOP_Y, BOTTOM_Y, BAR_HEIGHT, CONTENT_HEIGHT } = getCompositionVerticalMetrics();
   const composition = getSubviewComposition(subview);
   if (!composition?.members.length) return "";
   const prefs = resolveTrackPrefs(trackPrefs);
