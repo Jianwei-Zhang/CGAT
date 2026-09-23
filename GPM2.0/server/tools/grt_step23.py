@@ -3516,21 +3516,30 @@ def annotate_gap_path_origins(
     paths: dict[str, list[dict[str, object]]],
     gaps: list[dict[str, object]],
 ) -> None:
-    gaps_by_chr_interval = {
-        (str(gap["chr"]), int(gap["start0"]), int(gap["end0"])): gap
-        for gap in gaps
-    }
+    gaps_by_chr: dict[str, list[dict[str, object]]] = defaultdict(list)
+    for gap in gaps:
+        gaps_by_chr[str(gap["chr"])].append(gap)
     for chromosome, path in paths.items():
+        # Sequence gaps can lie inside a source contig or span several path
+        # segments. Split at the actual N-run boundaries without changing the
+        # source coordinates, sequence, or segment kind.
+        annotated: list[dict[str, object]] = []
         cursor = 0
-        for segment in path:
-            segment_end = cursor + int(segment["length"])
-            if segment["segment_kind"] == "gap":
-                gap = gaps_by_chr_interval.get((chromosome, cursor, segment_end))
-                if gap is not None and gap.get("origin"):
-                    segment["origin_object_ids"] = [
-                        str(gap["origin"]["object_id"])
-                    ]
-            cursor = segment_end
+        for gap in sorted(gaps_by_chr[chromosome], key=lambda row: int(row["start0"])):
+            start, end = int(gap["start0"]), int(gap["end0"])
+            annotated.extend(slice_path(path, cursor, start))
+            gap_segments = slice_path(path, start, end)
+            if gap.get("origin"):
+                origin_ids = [
+                    str(gap["origin"]["object_id"]),
+                    *map(str, gap["origin"].get("coalesced_object_ids", [])),
+                ]
+                for segment in gap_segments:
+                    segment["origin_object_ids"] = list(dict.fromkeys(origin_ids))
+            annotated.extend(gap_segments)
+            cursor = end
+        annotated.extend(slice_path(path, cursor, sum(int(segment["length"]) for segment in path)))
+        paths[chromosome] = annotated
 
 
 def attach_gap_origins_from_paths(
@@ -3539,21 +3548,18 @@ def attach_gap_origins_from_paths(
     original_gaps: list[dict[str, object]],
 ) -> None:
     originals = {str(gap["object_id"]): gap for gap in original_gaps}
-    path_origins: dict[tuple[str, int, int], list[str]] = {}
-    for chromosome, path in paths.items():
-        cursor = 0
-        for segment in path:
-            segment_end = cursor + int(segment["length"])
-            if segment["segment_kind"] == "gap":
-                path_origins[(chromosome, cursor, segment_end)] = [
-                    str(value) for value in segment.get("origin_object_ids", [])
-                ]
-            cursor = segment_end
     for gap in gaps:
         key = (str(gap["chr"]), int(gap["start0"]), int(gap["end0"]))
-        origin_ids = path_origins.get(key, [])
-        if not origin_ids:
+        segments = slice_path(paths[key[0]], key[1], key[2])
+        if not segments or any(not segment.get("origin_object_ids") for segment in segments):
             fail(f"cannot map filtered Step3 gap back to q2: {key}")
+        origin_ids = list(dict.fromkeys(
+            str(value)
+            for segment in segments
+            for value in segment["origin_object_ids"]
+        ))
+        if any(object_id not in originals for object_id in origin_ids):
+            fail(f"filtered Step3 gap references unknown q2 origins: {key}")
         primary = originals[origin_ids[0]]
         gap["origin"] = {
             "object_id": origin_ids[0],

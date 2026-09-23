@@ -66,6 +66,22 @@ bash install.sh --manager conda
 外部 QC 命令失败时，Server 主日志会保留其 stdout/stderr 尾部，
 即使失败的临时 QC 目录随后被清理，也可查看底层报错。
 
+### Step3 gap 来源修复后的断点恢复
+
+当连续 N 位于原始 contig 内部，或跨越多个路径片段时，旧版可能报错
+`cannot map filtered Step3 gap back to q2`。Step3 现在会在过滤过程中
+保留这些 gap 的来源，以及合并 gap 的全部原始来源。
+
+已生成的工作区带有独立运行库副本。更新 Server 代码后，在当前目录执行：
+
+```bash
+workspace=/path/to/gpm_server
+cp tools/grt_step23.py "$workspace/.prepare_lib/tools/grt_step23.py"
+```
+
+随后在原环境中重新运行或提交该工作区的 `run_all.sh`。保留原工作区和
+缓存，流程可复用兼容的 MUMmer 原始比对，并重新生成修复后的阶段结果。
+
 ## 文件用途
 
 | 文件 | 用途 | 何时执行 |

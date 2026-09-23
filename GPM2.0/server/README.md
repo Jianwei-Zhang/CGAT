@@ -70,6 +70,24 @@ for `prepare.sh` and `run_all.sh`.
 When an external QC command fails, the Server log includes bounded stdout/stderr
 tails so the underlying error remains available after temporary QC cleanup.
 
+### Resuming a workspace after the Step3 gap-origin fix
+
+The error `cannot map filtered Step3 gap back to q2` can occur when a run of
+`N` bases lies inside a source contig or spans multiple path segments. Step3 now
+preserves those gap origins through filtering, including merged gaps.
+
+A prepared workspace contains its own runtime copy. After updating this Server
+checkout, update the failed workspace from this directory:
+
+```bash
+workspace=/path/to/gpm_server
+cp tools/grt_step23.py "$workspace/.prepare_lib/tools/grt_step23.py"
+```
+
+Then rerun or resubmit that workspace's `run_all.sh` in the same environment.
+Keep the existing workspace and caches; compatible raw MUMmer alignments can be
+reused while the corrected stage outputs are regenerated.
+
 ## File roles
 
 | File | Purpose | When to run it |
