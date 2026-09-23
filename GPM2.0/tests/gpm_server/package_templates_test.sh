@@ -105,8 +105,8 @@ for source in args.source.rglob('*'):
 PY
 
 cp "${REPO_ROOT}/server/templates/package_full_zip.sh" "${SERVER_DIR}/package_full_zip.sh"
-cp "${REPO_ROOT}/server/templates/package_light_no_fasta_zip.sh" "${SERVER_DIR}/package_light_no_fasta_zip.sh"
-chmod +x "${SERVER_DIR}/package_full_zip.sh" "${SERVER_DIR}/package_light_no_fasta_zip.sh"
+cp "${REPO_ROOT}/server/templates/package_light_zip.sh" "${SERVER_DIR}/package_light_zip.sh"
+chmod +x "${SERVER_DIR}/package_full_zip.sh" "${SERVER_DIR}/package_light_zip.sh"
 
 printf '>example\nACGT\n' > "${SERVER_DIR}/data/datasets/example.fa"
 printf 'example\t4\t0\t4\t5\n' > "${SERVER_DIR}/data/datasets/example.fa.fai"
@@ -114,7 +114,7 @@ printf 'key\tvalue\n' > "${SERVER_DIR}/metadata/state.tsv"
 
 PATH="${FAKE_BIN}:$PATH" bash "${SERVER_DIR}/package_full_zip.sh" >/dev/null
 FULL_ARCHIVE="${TMP_DIR}/gpm_server.zip"
-LIGHT_ARCHIVE="${TMP_DIR}/gpm_server.no_fasta.zip"
+LIGHT_ARCHIVE="${TMP_DIR}/gpm_server.light.zip"
 [[ -f "$FULL_ARCHIVE" ]]
 grep -Fx -- '--- gpm_server/data/datasets/example.fa' "$FULL_ARCHIVE" >/dev/null
 
@@ -140,7 +140,7 @@ fi
 full_after_contract_failure="$(sha256sum "$FULL_ARCHIVE" | awk '{print $1}')"
 [[ "$full_after_contract_failure" == "$full_before_failure" ]]
 
-PATH="${FAKE_BIN}:$PATH" bash "${SERVER_DIR}/package_light_no_fasta_zip.sh" >/dev/null
+PATH="${FAKE_BIN}:$PATH" bash "${SERVER_DIR}/package_light_zip.sh" >/dev/null
 [[ -f "$LIGHT_ARCHIVE" ]]
 if grep -Fx -- '--- gpm_server/data/datasets/example.fa' "$LIGHT_ARCHIVE" >/dev/null; then
   echo "light archive contains a FASTA payload" >&2
@@ -149,7 +149,7 @@ fi
 grep -Fx -- '--- gpm_server/data/datasets/example.fa.fai' "$LIGHT_ARCHIVE" >/dev/null
 
 light_before_failure="$(sha256sum "$LIGHT_ARCHIVE" | awk '{print $1}')"
-if PATH="${FAKE_BIN}:$PATH" FAKE_ZIP_FAIL=true bash "${SERVER_DIR}/package_light_no_fasta_zip.sh" >/dev/null 2>&1; then
+if PATH="${FAKE_BIN}:$PATH" FAKE_ZIP_FAIL=true bash "${SERVER_DIR}/package_light_zip.sh" >/dev/null 2>&1; then
   echo "expected simulated light zip failure" >&2
   exit 1
 fi

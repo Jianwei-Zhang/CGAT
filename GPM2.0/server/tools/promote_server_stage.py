@@ -19,7 +19,7 @@ BASE_ENTRIES = (
     "assign_chr_groups.sh",
     "run_all.sh",
     "package_full_zip.sh",
-    "package_light_no_fasta_zip.sh",
+    "package_light_zip.sh",
     "export_final_path_fasta.sh",
     "add_dataset.sh",
 )

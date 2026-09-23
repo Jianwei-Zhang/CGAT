@@ -453,7 +453,7 @@ grt_telomere_finalize	run_grt_telomere_finalize.sh	logs/run_all.log
 chr:${chr_name}	runs/chr_${chr_name}/command.sh	logs/run_all.log
 finalize_evidence	finalize_grt_evidence.sh	logs/run_all.log
 package_full	package_full_zip.sh	logs/run_all.log
-package_light	package_light_no_fasta_zip.sh	logs/run_all.log
+package_light	package_light_zip.sh	logs/run_all.log
 EOF
 )"
   [[ "$(printf '%s\n' "${command_lines[@]:2}")" == "$expected_tail" ]] || {
@@ -608,7 +608,7 @@ test_custom_output_root() {
   assert_file "${output_root}/run_grt_telomere_finalize.sh"
   assert_file "${output_root}/finalize_grt_evidence.sh"
   assert_file "${output_root}/package_full_zip.sh"
-  assert_file "${output_root}/package_light_no_fasta_zip.sh"
+  assert_file "${output_root}/package_light_zip.sh"
   assert_chr_partition_run_all_staging "${output_root}/run_all.sh" "$output_root" "ref"
   assert_package_metadata "${output_root}/metadata/package.tsv" "fast" "true" "chr_partition" "chr_partition" "partitioned"
   assert_tsv_has_self_alignment_flag "${output_root}/metadata/datasets.tsv" "true"

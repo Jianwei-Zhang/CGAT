@@ -22,7 +22,7 @@ bash ./gpm_server/run_all.sh
 ```
 
 成功结束时会明确显示 `Final delivery packages` 摘要。最终只交付
-`gpm_server.zip`（含 FASTA 和报告）与 `gpm_server.no_fasta.zip`（不含 FASTA、
+`gpm_server.zip`（Full，含 FASTA 和报告）与 `gpm_server.light.zip`（Light，不含 FASTA、
 包含报告）两个文件；两者都内置完整的 `gpm_server/report/` 目录，不再单独生成
 报告 ZIP。本地报告仍可在 `gpm_server/report/report.html` 直接打开。
 

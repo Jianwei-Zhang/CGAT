@@ -22,8 +22,8 @@ bash ./gpm_server/run_all.sh
 ```
 
 A successful run ends with an explicit `Final delivery packages` summary. The only
-delivery files are `gpm_server.zip` (FASTA + report) and
-`gpm_server.no_fasta.zip` (no FASTA, report included). Both contain the complete
+delivery files are `gpm_server.zip` (Full: FASTA + report) and
+`gpm_server.light.zip` (Light: FASTA omitted, report included). Both contain the complete
 `gpm_server/report/` directory; no separate report ZIP is created. The local report
 remains available at `gpm_server/report/report.html`.
 

@@ -109,7 +109,7 @@ The runner executes the generated plan serially, stops at the first error, valid
 | Archive | Contents and use |
 | --- | --- |
 | `gpm_server.zip` | Full App package with source/reference FASTA, authoritative q4 FASTA, and the complete `report/` directory. Supports client-side FASTA export. |
-| `gpm_server.no_fasta.zip` | No-FASTA App package with `.fai`, metadata, Final Path, source-card state, PAF views, and the complete `report/` directory. Supports import, inspection, and PNG/TSV export. |
+| `gpm_server.light.zip` | Light App package with FASTA omitted; retains `.fai`, metadata, Final Path, source-card state, PAF views, and the complete `report/` directory. Supports import, inspection, and PNG/TSV export. |
 
 These two ZIPs are the only final delivery files. A separate report ZIP is not created. Open `gpm_server/report/report.html` in the Server workspace or inside either extracted delivery package. Recording starts during input preparation; `run_all.sh` updates the report at stage boundaries, including failures, interruptions, and unexecuted stages. First-published GRT events are preserved separately from their reconciled final state, and cache reuse is explicit. Previous reports are archived under the workspace's `.report_history/` directory.
 
@@ -147,7 +147,7 @@ The initial `run_all.sh` already builds both delivery archives. Re-run the stand
 
 ```bash
 bash ./gpm_server/package_full_zip.sh
-bash ./gpm_server/package_light_no_fasta_zip.sh
+bash ./gpm_server/package_light_zip.sh
 ```
 
 Use a rebuilt full package for a new desktop workspace or a complete re-import. Add packages are only for an existing workspace/project.
@@ -168,11 +168,11 @@ The package preserves the primary and support dataset roles established during G
 
 ### Project dataset tables
 
-After import or opening a project, the project page lists the reference genome first, followed by primary, support, and project-linked derived datasets in one table. The first column is Data type. Reads QC status appears beside the project title; creation time sits below the table on the right. Rows show sequence count, total length, N50, and N90. The edit button opens a dialog for the name and note; More information only shows local directories and open-folder actions. Chromosome partitions are grouped at the chr directory, with other locations kept separately. Statistics use all sequence lengths in the current dataset, without a minimum length filter or splitting at Ns. Moving or hiding assembly views does not change them. These statistics also work with no-FASTA packages and require no additional Server quality-control step.
+After import or opening a project, the project page lists the reference genome first, followed by primary, support, and project-linked derived datasets in one table. The first column is Data type. Reads QC status appears beside the project title; creation time sits below the table on the right. Rows show sequence count, total length, N50, and N90. The edit button opens a dialog for the name and note; More information only shows local directories and open-folder actions. Chromosome partitions are grouped at the chr directory, with other locations kept separately. Statistics use all sequence lengths in the current dataset, without a minimum length filter or splitting at Ns. Moving or hiding assembly views does not change them. These statistics also work with Light packages and require no additional Server quality-control step.
 
 Use the row's edit button or note summary to edit its display name and note. “Restore initial name” fills in the initial name; click “Save” to persist it. Names and notes are stored in the workspace SQLite database and survive reopening. Original package identifiers, filenames, and sequence names stay stable for incremental imports, computation, and export provenance. Notes apply to table objects, not individual contig placements. Available local sequence files support copying paths and opening their containing folders in the desktop App; missing or omitted FASTA files are marked unavailable. Existing workspace databases upgrade automatically on first open.
 
-### Export Final Path FASTA from a no-FASTA package
+### Export Final Path FASTA from a Light package
 
 Export Final Path TSV from the App, copy it back to the server that retains the original FASTA files, and run:
 

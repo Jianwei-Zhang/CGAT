@@ -133,7 +133,7 @@ class ServerReportTests(unittest.TestCase):
             shutil.copytree(PROJECT / "tests/fixtures/grt_contract_v2/valid/gpm_server", server, dirs_exist_ok=True)
             shutil.copytree(TOOLS, server / ".prepare_lib/tools", ignore=shutil.ignore_patterns("__pycache__"))
             shutil.copytree(PROJECT / "server/contracts", server / ".prepare_lib/contracts")
-            for unit, name in [("package_full", "package_full_zip.sh"), ("package_light", "package_light_no_fasta_zip.sh")]:
+            for unit, name in [("package_full", "package_full_zip.sh"), ("package_light", "package_light_zip.sh")]:
                 shutil.copyfile(PROJECT / "server/templates" / name, server / name)
                 (server / "commands" / (unit + ".sh")).write_text("#!/bin/bash\nexec bash " + shlex.quote(str(server / name)) + "\n")
             result = helper.run_runner(server)
@@ -154,12 +154,13 @@ class ServerReportTests(unittest.TestCase):
             self.assertFalse((root / "gpm_server.report.html").exists())
             self.assertIn("Final delivery packages:", result.stdout)
             self.assertIn("Full package (FASTA + report)", result.stdout)
-            self.assertIn("No-FASTA package (report included)", result.stdout)
+            self.assertIn("Light package (report included, FASTA omitted)", result.stdout)
+            self.assertIn("Light 轻量包交付", (server / "report/report.html").read_text())
             self.assertIn("SHA-256:", result.stdout)
             self.assertIn("Final delivery packages:", (server / "logs/run_all.log").read_text())
             repeated = helper.run_runner(server)
             self.assertEqual(repeated.returncode, 0, repeated.stdout + repeated.stderr)
-            for path in (root / "gpm_server.zip", root / "gpm_server.no_fasta.zip"):
+            for path in (root / "gpm_server.zip", root / "gpm_server.light.zip"):
                 with zipfile.ZipFile(path) as archive:
                     self.assertEqual(archive.namelist().count("gpm_server/report/manifest.json"), 1)
             standalone = root / "unpacked"

@@ -123,7 +123,10 @@ cleanup() {
 trap cleanup EXIT
 
 cp -a "${server_dir}/." "$stage_dir/"
-rm -f "${stage_dir}"/add_*.zip "${stage_dir}/$(basename "$server_dir").zip" "${stage_dir}/$(basename "$server_dir").no_fasta.zip"
+rm -f "${stage_dir}"/add_*.zip \
+  "${stage_dir}/$(basename "$server_dir").zip" \
+  "${stage_dir}/$(basename "$server_dir").light.zip" \
+  "${stage_dir}/$(basename "$server_dir").no_fasta.zip"
 
 stage_ds_fa="${stage_dir}/data/datasets/${dataset_name}.fa"
 mkdir -p "$(dirname "$stage_ds_fa")" "${stage_dir}/runs/${dataset_name}_vs_ref"

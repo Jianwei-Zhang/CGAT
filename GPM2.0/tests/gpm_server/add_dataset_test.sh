@@ -214,11 +214,11 @@ grep -F -- 'A-Z, a-z, 0-9, dot, underscore, and hyphen are replaced with _' <<<"
 PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh"
 
 test -f "${TMP_DIR}/gpm_server.zip"
-test -f "${TMP_DIR}/gpm_server.no_fasta.zip"
+test -f "${TMP_DIR}/gpm_server.light.zip"
 assert_file_contains "${TMP_DIR}/gpm_server.zip" "--- gpm_server/data/datasets/ds1.fa"
-assert_file_not_contains "${TMP_DIR}/gpm_server.no_fasta.zip" '^--- gpm_server/data/datasets/ds1[.]fa$'
-assert_file_contains "${TMP_DIR}/gpm_server.no_fasta.zip" "--- gpm_server/data/datasets/ds1.fa.fai"
-python3 - "${TMP_DIR}/gpm_server.zip" "${TMP_DIR}/gpm_server.no_fasta.zip" <<'PY'
+assert_file_not_contains "${TMP_DIR}/gpm_server.light.zip" '^--- gpm_server/data/datasets/ds1[.]fa$'
+assert_file_contains "${TMP_DIR}/gpm_server.light.zip" "--- gpm_server/data/datasets/ds1.fa.fai"
+python3 - "${TMP_DIR}/gpm_server.zip" "${TMP_DIR}/gpm_server.light.zip" <<'PY'
 import sys
 from zipfile import ZipFile
 
@@ -236,7 +236,7 @@ test ! -e "${TMP_DIR}/gpm_server.report.zip"
 test ! -e "${TMP_DIR}/gpm_server.report.html"
 grep -Fq 'Final delivery packages:' "${output_root}/logs/run_all.log"
 grep -Fq 'Full package (FASTA + report):' "${output_root}/logs/run_all.log"
-grep -Fq 'No-FASTA package (report included):' "${output_root}/logs/run_all.log"
+grep -Fq 'Light package (report included, FASTA omitted):' "${output_root}/logs/run_all.log"
 
 PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh" > "${TMP_DIR}/resume.out"
 grep -Fq '[SKIP_VALID] [ref:ds1]' "${TMP_DIR}/resume.out"

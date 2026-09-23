@@ -383,12 +383,12 @@ class Runner:
             return []
         parent = self.server_dir.parent
         name = self.server_dir.name
-        return [parent / f"{name}.zip", parent / f"{name}.no_fasta.zip"]
+        return [parent / f"{name}.zip", parent / f"{name}.light.zip"]
 
     def _emit_success_summary(self, artifacts: list[dict[str, object]]) -> None:
         by_name = {str(artifact["file"]): artifact for artifact in artifacts}
         full = by_name[f"{self.server_dir.name}.zip"]
-        light = by_name[f"{self.server_dir.name}.no_fasta.zip"]
+        light = by_name[f"{self.server_dir.name}.light.zip"]
         self._emit_summary(
             [
                 "",
@@ -401,7 +401,7 @@ class Runner:
                 f"     SHA-256: {full['sha256']}",
                 "     Use: complete App import and FASTA export.",
                 "",
-                "  2. No-FASTA package (report included):",
+                "  2. Light package (report included, FASTA omitted):",
                 f"     {light['path']}",
                 f"     Size: {self._format_size(int(light['size_bytes']))}",
                 f"     SHA-256: {light['sha256']}",

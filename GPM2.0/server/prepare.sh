@@ -114,7 +114,7 @@ Behavior:
   - Records input and stage JSON in report/ and generates an offline report/report.html
   - Embeds the finalized report/ directory in both delivery archives; no separate report ZIP is created
   - report/render_report.py regenerates HTML using only report/ and Python's standard library
-  - Generates package_full_zip.sh, package_light_no_fasta_zip.sh, and export_final_path_fasta.sh
+  - Generates package_full_zip.sh, package_light_zip.sh, and export_final_path_fasta.sh
   - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> GRT Step2/3 -> GRT telomere/q4 finalization -> per-chr commands -> GRT evidence/package validation -> full zip -> light zip
   - A successful run_all.sh creates both delivery archives in the parent directory of the work root
   - With --skip-self, same-dataset self alignments are omitted and marked unavailable in metadata/datasets.tsv
@@ -427,7 +427,7 @@ write_package_scripts() {
   local work_root="$1"
 
   copy_script_template "package_full_zip.sh" "${work_root}/package_full_zip.sh"
-  copy_script_template "package_light_no_fasta_zip.sh" "${work_root}/package_light_no_fasta_zip.sh"
+  copy_script_template "package_light_zip.sh" "${work_root}/package_light_zip.sh"
 }
 
 write_export_final_path_fasta_script() {
@@ -1257,10 +1257,10 @@ printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/package_full_zip.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-append_run_all_unit "package_light" "package_light_no_fasta_zip.sh" "logs/run_all.log"
-printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "package_light_no_fasta_zip"
+append_run_all_unit "package_light" "package_light_zip.sh" "logs/run_all.log"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "package_light_zip"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/package_light_no_fasta_zip.sh"
+printf 'bash %s\n\n' "${WORK_ROOT}/package_light_zip.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 make_executable_if_supported "$RUN_ALL"
@@ -1293,7 +1293,7 @@ echo "  - ${WORK_ROOT}/export_final_path_fasta.sh"
 echo "  - ${WORK_ROOT}/.prepare_lib/lib"
 echo "  - ${WORK_ROOT}/.prepare_lib/tools"
 echo "  - ${WORK_ROOT}/package_full_zip.sh"
-echo "  - ${WORK_ROOT}/package_light_no_fasta_zip.sh"
+echo "  - ${WORK_ROOT}/package_light_zip.sh"
 echo
 echo "Next:"
 echo "  1. Run: bash ${WORK_ROOT}/run_all.sh"
@@ -1305,7 +1305,7 @@ if [[ "$SKIP_SELF" == "true" ]]; then
 fi
 echo "  4. Output archives:"
 echo "     - Full package (FASTA + report): $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").zip"
-echo "     - No-FASTA package (report included): $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").no_fasta.zip"
+echo "     - Light package (report included, FASTA omitted): $(dirname "$WORK_ROOT")/$(basename "$WORK_ROOT").light.zip"
 echo "  5. To add a dataset later, run:"
 echo "     - bash ${WORK_ROOT}/add_dataset.sh --ds /path/to/dataset.fa"
 echo "     - Or set an explicit name: bash ${WORK_ROOT}/add_dataset.sh --ds <dataset_name> /path/to/dataset.fa"

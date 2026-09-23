@@ -109,7 +109,7 @@ bash ./gpm_server/run_all.sh
 | 交付包 | 内容与用途 |
 | --- | --- |
 | `gpm_server.zip` | 完整 App 包，包含 source/reference FASTA、权威 q4 FASTA 和完整 `report/` 目录，可在客户端导出 FASTA。 |
-| `gpm_server.no_fasta.zip` | 无 FASTA App 包，保留 `.fai`、metadata、Final Path、source-card 状态、PAF 视图和完整 `report/` 目录，可导入、浏览并导出 PNG/TSV。 |
+| `gpm_server.light.zip` | Light App 轻量包，不含 FASTA，保留 `.fai`、metadata、Final Path、source-card 状态、PAF 视图和完整 `report/` 目录，可导入、浏览并导出 PNG/TSV。 |
 
 这两个 ZIP 是仅有的最终交付文件，不再单独生成报告 ZIP。可直接打开服务端工作目录或任一解压后交付包中的 `gpm_server/report/report.html`。`prepare.sh` 从输入准备阶段开始记录，`run_all.sh` 在阶段结束时更新报告；失败或中断也保留报告及尚未执行的阶段。GRT 首次发布的阶段事件与最终协调后的状态分别保留，缓存复用明确标注。重跑前一份报告保存在工作目录的 `.report_history/` 下。
 
@@ -147,7 +147,7 @@ bash ./gpm_server/add_dataset.sh \
 
 ```bash
 bash ./gpm_server/package_full_zip.sh
-bash ./gpm_server/package_light_no_fasta_zip.sh
+bash ./gpm_server/package_light_zip.sh
 ```
 
 新建桌面端工作区或完整重新导入时使用重新生成的完整包；追加包只用于已有工作区/项目。
@@ -168,11 +168,11 @@ xattr -dr com.apple.quarantine /Applications/GPM2.0.app
 
 ### 项目数据集表格
 
-导入或打开项目后，项目页在同一张表中依次展示参考基因组、主组装、辅助组装及与当前项目关联的派生数据集，第一列为“数据类型”。Reads 质控状态显示在项目标题旁，创建时间位于表格下方右侧。表格展示序列数、总长度、N50、N90；编辑按钮打开名称与备注弹窗，“更多信息”仅保留本地目录及打开目录操作，分染色体文件合并显示为 chr 总目录，其他位置单独保留。统计使用当前数据集的全部序列长度，不过滤短序列、不按 N 拆分，也不随组装视图中的移动、隐藏而改变；无 FASTA 包同样支持这些统计，无需额外运行 Server 质控。
+导入或打开项目后，项目页在同一张表中依次展示参考基因组、主组装、辅助组装及与当前项目关联的派生数据集，第一列为“数据类型”。Reads 质控状态显示在项目标题旁，创建时间位于表格下方右侧。表格展示序列数、总长度、N50、N90；编辑按钮打开名称与备注弹窗，“更多信息”仅保留本地目录及打开目录操作，分染色体文件合并显示为 chr 总目录，其他位置单独保留。统计使用当前数据集的全部序列长度，不过滤短序列、不按 N 拆分，也不随组装视图中的移动、隐藏而改变；Light 轻量包同样支持这些统计，无需额外运行 Server 质控。
 
 点击行末编辑按钮或备注摘要，可修改显示名称及该行对象的备注；“恢复初始名称”填回初始名，点击“保存”后生效。名称与备注保存在项目工作区的 SQLite 数据库中，重新打开仍然保留。原始包标识、文件名和序列名保持稳定，供后续增量导入、计算和导出追溯使用。备注不扩展到单条 contig 的放置记录。完整包在文件实际存在时提供路径复制和打开所在目录；无 FASTA 或文件缺失时显示不可用。旧工作区首次打开时自动升级数据库结构。
 
-### 从无 FASTA 包导出 Final Path FASTA
+### 从 Light 轻量包导出 Final Path FASTA
 
 先在 App 中导出 Final Path TSV，再将 TSV 放回保留原始 FASTA 的服务器：
 

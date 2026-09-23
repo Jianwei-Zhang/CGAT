@@ -190,6 +190,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.runtime.importCancelFinishedSummary, "导入流程已结束。");
   assert.equal(zh.runtime.tauriImportAddPackageStage, "调用后端 import_add_dataset_package");
   assert.equal(zh.progressStages.validate_grt_source_fastas, "校验 reference/dataset FASTA 与 FAI");
+  assert.equal(zh.progressStages.validate_grt_contract_start, "开始验证交付契约（Full 完整包校验 FASTA；Light 轻量包校验 FAI、元数据和 Final Path）");
   assert.equal(zh.progressStages.validate_grt_app_required_files, "检查 App 交付包必需文件");
   assert.equal(zh.progressStages.validate_grt_app_fai, "校验来源与 reference 的 FAI 长度");
   assert.equal(zh.runtime.importPhaseProgress, "阶段 {current}/{total}");
@@ -213,6 +214,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.runtime.importCancelFinishedSummary, "The import has ended.");
   assert.equal(en.runtime.tauriImportAddPackageStage, "Invoke backend import_add_dataset_package");
   assert.equal(en.progressStages.validate_grt_source_fastas, "Validate reference/dataset FASTA and FAI");
+  assert.equal(en.progressStages.validate_grt_contract_start, "Start delivery contract validation (FASTA for Full; FAI, metadata, and Final Path for Light)");
   assert.equal(en.progressStages.validate_grt_app_required_files, "Check required App delivery files");
   assert.equal(en.progressStages.validate_grt_app_fai, "Validate source and reference FAI lengths");
   assert.equal(en.runtime.importPhaseProgress, "Phase {current}/{total}");

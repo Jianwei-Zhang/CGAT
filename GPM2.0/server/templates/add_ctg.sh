@@ -136,7 +136,10 @@ cleanup() {
 trap cleanup EXIT
 
 cp -a "${server_dir}/." "$stage_dir/"
-rm -f "${stage_dir}"/add_*.zip "${stage_dir}/$(basename "$server_dir").zip" "${stage_dir}/$(basename "$server_dir").no_fasta.zip"
+rm -f "${stage_dir}"/add_*.zip \
+  "${stage_dir}/$(basename "$server_dir").zip" \
+  "${stage_dir}/$(basename "$server_dir").light.zip" \
+  "${stage_dir}/$(basename "$server_dir").no_fasta.zip"
 
 python3 "${stage_dir}/.prepare_lib/tools/add_ctg_stage.py" prepare \
   --server-dir "$stage_dir" \

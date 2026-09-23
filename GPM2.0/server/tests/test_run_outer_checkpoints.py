@@ -287,7 +287,7 @@ class OuterCheckpointTests(unittest.TestCase):
             self.assertFalse(manager.validate_package("full")[0])
             write(server.parent / f"{server.name}.zip", "archive\n")
             self.assertTrue(manager.validate_package("full")[0])
-            write(server.parent / f"{server.name}.no_fasta.zip", "")
+            write(server.parent / f"{server.name}.light.zip", "")
             self.assertFalse(manager.validate_package("light")[0])
 
 

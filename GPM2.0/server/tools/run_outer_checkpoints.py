@@ -237,7 +237,7 @@ class OuterCheckpointManager:
     def validate_package(self, package_kind: str) -> tuple[bool, str]:
         if package_kind not in {"full", "light"}:
             return False, f"unsupported delivery package kind: {package_kind}"
-        suffix = ".zip" if package_kind == "full" else ".no_fasta.zip"
+        suffix = ".zip" if package_kind == "full" else ".light.zip"
         archive = self.server_dir.parent / f"{self.server_dir.name}{suffix}"
         if not archive.is_file() or archive.stat().st_size < 1:
             return False, f"{package_kind} delivery archive is missing or empty: {archive}"

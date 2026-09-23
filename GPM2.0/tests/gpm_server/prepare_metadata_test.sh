@@ -271,7 +271,7 @@ grt_telomere_finalize	run_grt_telomere_finalize.sh	logs/run_all.log
 chr:Chr01	runs/chr_Chr01/command.sh	logs/run_all.log
 finalize_evidence	finalize_grt_evidence.sh	logs/run_all.log
 package_full	package_full_zip.sh	logs/run_all.log
-package_light	package_light_no_fasta_zip.sh	logs/run_all.log
+package_light	package_light_zip.sh	logs/run_all.log
 EOF
 )"
 [[ "$(cat "$plan_path")" == "$expected_plan" ]] || {

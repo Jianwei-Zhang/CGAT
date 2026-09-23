@@ -626,7 +626,7 @@ pub(super) fn validate_app_final_path(
     } else if q4_path.exists() {
         return grt_err(
             "INVALID_VALUE",
-            "no_fasta App package must not contain grt/q/q4.fa",
+            "Light App package must not contain grt/q/q4.fa",
         );
     }
     Ok((final_lengths, q4_records))

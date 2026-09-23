@@ -32,23 +32,24 @@ CARGO_TARGET_DIR="${task_cargo_target}" cargo build \
 backend_exe="${task_cargo_target}/debug/gpm_next_backend"
 
 app_full_stage="${task_tmp_dir}/app-full/gpm_server"
-app_no_fasta_stage="${task_tmp_dir}/app-no-fasta/gpm_server"
+app_light_stage="${task_tmp_dir}/app-light/gpm_server"
 python3 server/tools/grt_app_package.py \
   --source "${fixture_root}" \
   --staging "${app_full_stage}" \
   --include-fasta >/dev/null
 python3 server/tools/grt_app_package.py \
   --source "${fixture_root}" \
-  --staging "${app_no_fasta_stage}" \
+  --staging "${app_light_stage}" \
   --no-fasta >/dev/null
-for app_stage in "$app_full_stage" "$app_no_fasta_stage"; do
+for app_stage in "$app_full_stage" "$app_light_stage"; do
   mkdir -p "${app_stage}/report"
   printf '%s\n' '<!doctype html><title>CGAT Server report</title>' > "${app_stage}/report/report.html"
   printf '%s\n' '{"schema_version":"cgat_server_report_v1","status":"success"}' > "${app_stage}/report/manifest.json"
   printf '%s\n' '#!/usr/bin/env python3' > "${app_stage}/report/render_report.py"
 done
 (cd "${task_tmp_dir}/app-full" && zip -qr "${task_tmp_dir}/gpm_server.zip" gpm_server)
-(cd "${task_tmp_dir}/app-no-fasta" && zip -qr "${task_tmp_dir}/gpm_server.no_fasta.zip" gpm_server)
+(cd "${task_tmp_dir}/app-light" && zip -qr "${task_tmp_dir}/gpm_server.light.zip" gpm_server)
+cp "${task_tmp_dir}/gpm_server.light.zip" "${task_tmp_dir}/gpm_server.no_fasta.zip"
 legacy_final_path_stage="${task_tmp_dir}/app-final-path-v1/gpm_server"
 mkdir -p "$(dirname "${legacy_final_path_stage}")"
 cp -a "${app_full_stage}" "${legacy_final_path_stage}"
@@ -114,7 +115,7 @@ for name in ("grt_app_manifest.json", "grt_final_path.json"):
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="")
 PY
 (cd "${task_tmp_dir}/app-v1" && zip -qr "${task_tmp_dir}/gpm_server.v1.zip" gpm_server)
-python3 - "${task_tmp_dir}/gpm_server.zip" "${task_tmp_dir}/gpm_server.no_fasta.zip" <<'PY'
+python3 - "${task_tmp_dir}/gpm_server.zip" "${task_tmp_dir}/gpm_server.light.zip" <<'PY'
 from pathlib import Path
 from zipfile import ZipFile
 import sys
@@ -141,10 +142,12 @@ print('App delivery allowlist passed')
 PY
 
 full_zip_workspace="${task_tmp_dir}/zip-full"
-no_fasta_zip_workspace="${task_tmp_dir}/zip-no-fasta"
+light_zip_workspace="${task_tmp_dir}/zip-light"
+legacy_no_fasta_zip_workspace="${task_tmp_dir}/zip-legacy-no-fasta"
 legacy_final_path_workspace="${task_tmp_dir}/zip-final-path-v1"
 "${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.zip" "${full_zip_workspace}" >/dev/null
-"${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.no_fasta.zip" "${no_fasta_zip_workspace}" >/dev/null
+"${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.light.zip" "${light_zip_workspace}" >/dev/null
+"${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.no_fasta.zip" "${legacy_no_fasta_zip_workspace}" >/dev/null
 "${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.final_path_v1.zip" "${legacy_final_path_workspace}" >/dev/null
 if "${backend_exe}" import-zip "${task_tmp_dir}/gpm_server.v1.zip" "${task_tmp_dir}/zip-v1" >/dev/null 2>&1; then
   echo "v1 App package unexpectedly imported" >&2
@@ -155,11 +158,14 @@ if [[ -e "${task_tmp_dir}/zip-v1/project.sqlite" ]]; then
   exit 1
 fi
 full_zip_options="$(${backend_exe} list-project-initializer-options "${full_zip_workspace}")"
-no_fasta_zip_options="$(${backend_exe} list-project-initializer-options "${no_fasta_zip_workspace}")"
+light_zip_options="$(${backend_exe} list-project-initializer-options "${light_zip_workspace}")"
+legacy_no_fasta_zip_options="$(${backend_exe} list-project-initializer-options "${legacy_no_fasta_zip_workspace}")"
 assert_contains "${full_zip_options}" 'fasta_available=true'
-assert_contains "${no_fasta_zip_options}" 'fasta_available=false'
+assert_contains "${light_zip_options}" 'fasta_available=false'
+assert_contains "${legacy_no_fasta_zip_options}" 'fasta_available=false'
 "${backend_exe}" initialize-project "${full_zip_workspace}" full-zip-project >/dev/null
-"${backend_exe}" initialize-project "${no_fasta_zip_workspace}" no-fasta-project >/dev/null
+"${backend_exe}" initialize-project "${light_zip_workspace}" light-zip-project >/dev/null
+"${backend_exe}" initialize-project "${legacy_no_fasta_zip_workspace}" legacy-no-fasta-project >/dev/null
 "${backend_exe}" initialize-project "${legacy_final_path_workspace}" final-path-v1-project >/dev/null
 full_zip_view="$("${backend_exe}" get-grt-project-view "${full_zip_workspace}" 1)"
 assert_contains "${full_zip_view}" '"final_path_schema_version":"3"'
@@ -167,7 +173,8 @@ assert_contains "${full_zip_view}" '"grt_display_available":true'
 assert_contains "${full_zip_view}" '"assembly_ctg_id":'
 assert_contains "${full_zip_view}" '"assembly_source_start":1'
 assert_contains "${full_zip_view}" '"display_evidence":[]'
-"${backend_exe}" get-grt-project-view "${no_fasta_zip_workspace}" 1 >/dev/null
+"${backend_exe}" get-grt-project-view "${light_zip_workspace}" 1 >/dev/null
+"${backend_exe}" get-grt-project-view "${legacy_no_fasta_zip_workspace}" 1 >/dev/null
 legacy_final_path_view="$("${backend_exe}" get-grt-project-view "${legacy_final_path_workspace}" 1)"
 assert_contains "${legacy_final_path_view}" '"final_path_schema_version":"1"'
 if [[ "${legacy_final_path_view}" == *'"grt_display_available":true'* ]]; then
