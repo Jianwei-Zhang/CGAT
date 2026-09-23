@@ -1821,3 +1821,73 @@ test("a current chromosome read failure ends loading and a retry recovers", asyn
   assert.equal(harness.store.getState().assembly.error, "");
   assert.equal(harness.store.getState().assembly.chrCtgs[0].assemblyCtgId, 8);
 });
+
+
+function createInitialLoadHarness(overrides = {}) {
+  const harness = createChromosomeLoadHarness({
+    getProjectAssemblyViewState: async () => ({}),
+    getGrtProjectView: async () => ({}),
+    listProjectChromosomes: async () => ({ items: [{ chrName: "Chr01" }] }),
+    getSupportDatasetOptions: () => [{ datasetId: 2 }],
+    buildSubviewTrackPairHiddenCtgKey: () => "",
+    buildSubviewTrackPairPoolsFromAssembly: () => ({}),
+    filterPrimaryTrackSelectionCtgIds: (v) => v || [],
+    filterSubviewTrackDragOffsetsBySummary: (v) => v || [],
+    filterSubviewTrackPairHiddenCtgs: (v) => v || [],
+    filterSubviewTrackPairSelectionCtgs: (v) => v || [],
+    normalizeDeletedCtgRecordIds: (v) => v || [],
+    normalizeSupportMirroredCtgs: (v) => v || [],
+    normalizeTrackSelectionCtgIds: (v) => v || [],
+    ...overrides,
+  });
+  harness.store.setState({ assembly: { ...harness.store.getState().assembly, subview: { summary: null } } });
+  harness.load = () => loadAssemblyView({}, harness.store, {}, harness.deps);
+  return harness;
+}
+
+test("initial assembly load overlaps project reads and independent chromosome reads", async () => {
+  const view = deferred();
+  const reference = deferred();
+  const primary = deferred();
+  const started = new Set();
+  const harness = createInitialLoadHarness({
+    getProjectAssemblyViewState: () => { started.add("view"); return view.promise; },
+    getGrtProjectView: async () => { started.add("grt"); return {}; },
+    listProjectChromosomes: async () => { started.add("chromosomes"); return { items: [{ chrName: "Chr01" }] }; },
+    listChrViewCtgs: () => { started.add("primary"); return primary.promise; },
+    listReferenceTrackMembers: () => { started.add("reference"); return reference.promise; },
+    loadDatasetChrCtgs: async () => { started.add("support"); return []; },
+    loadDeletedCtgsForChr: async () => { started.add("deleted"); return []; },
+    loadSideDataForCtg: async () => { started.add("details"); return { detail: { members: [] }, candidates: {} }; },
+  });
+  const pending = harness.load();
+  await new Promise(setImmediate);
+  assert.deepEqual([...started].sort(), ["chromosomes", "grt", "view"]);
+  view.resolve({});
+  await new Promise(setImmediate);
+  for (const name of ["primary", "reference", "support", "deleted"]) assert.ok(started.has(name), name);
+  primary.resolve({ items: [{ assemblyCtgId: 8 }] });
+  await new Promise(setImmediate);
+  assert.ok(started.has("details"));
+  reference.resolve({ items: [] });
+  await pending;
+  assert.equal(harness.store.getState().assembly.loading, false);
+  assert.equal(harness.store.getState().assembly.error, "");
+  assert.equal(harness.store.getState().assembly.chrCtgs[0].assemblyCtgId, 8);
+});
+
+for (const reject of [false, true]) {
+  test(`initial assembly load ignores stale ${reject ? "failure" : "success"} after chr selection`, async () => {
+    const first = deferred();
+    const harness = createInitialLoadHarness({ getProjectAssemblyViewState: () => first.promise });
+    const pending = harness.load();
+    await new Promise(setImmediate);
+    await harness.select("Chr02");
+    if (reject) first.reject(new Error("old load"));
+    else first.resolve({});
+    await pending;
+    assert.equal(harness.store.getState().assembly.selectedChrName, "Chr02");
+    assert.equal(harness.store.getState().assembly.loading, false);
+    assert.equal(harness.store.getState().assembly.error, "");
+  });
+}

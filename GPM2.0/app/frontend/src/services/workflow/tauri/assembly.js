@@ -1,3 +1,5 @@
+import { decodeReferenceTracks } from "../reference-transport.js";
+
 export function createTauriAssemblyOperations({ invokeCommand }) {
 async function listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId = null }) {
   const result = await invokeCommand("list_chr_view_ctgs", {
@@ -16,10 +18,9 @@ async function listReferenceTrackMembersTauri({ workspaceRoot, projectId, chrNam
     workspaceRoot,
     projectId,
     chrName,
+    compact: true,
   });
-  return {
-    items: result.items || [],
-  };
+  return decodeReferenceTracks(result);
 }
 
 async function listPhasedChrTracksTauri({ workspaceRoot, projectId, parentChrName }) {

@@ -381,6 +381,14 @@ export async function loadAssemblyView(host, store, options, deps) {
   if (!state.session.workspacePath || !state.session.projectId) {
     return;
   }
+  const request = {};
+  chromosomeRequests.set(store, request);
+  const isCurrentRequest = () => {
+    const current = store.getState();
+    return chromosomeRequests.get(store) === request
+      && current.session.workspacePath === state.session.workspacePath
+      && current.session.projectId === state.session.projectId;
+  };
   if (renderLoading) {
     store.setState({
       assembly: {
@@ -398,16 +406,15 @@ export async function loadAssemblyView(host, store, options, deps) {
     const currentProject = deps.getCurrentProject(state);
     const primaryDatasetId = deps.normalizeSupportDatasetId(currentProject?.primaryDatasetId);
     const supportDatasetOptions = deps.getSupportDatasetOptions(state, currentProject);
-    const projectAssemblyViewState = await deps.getProjectAssemblyViewState({
-      workspaceRoot: state.session.workspacePath,
-      projectId: state.session.projectId,
-    });
-    const rawGrtProjectView = typeof deps.getGrtProjectView === "function"
-      ? await deps.getGrtProjectView({
-          workspaceRoot: state.session.workspacePath,
-          projectId: state.session.projectId,
-        })
-      : state.assembly.grtProjectView || {};
+    const projectArgs = { workspaceRoot: state.session.workspacePath, projectId: state.session.projectId };
+    const [projectAssemblyViewState, rawGrtProjectView, chromosomeResult] = await Promise.all([
+      Promise.resolve().then(() => deps.getProjectAssemblyViewState(projectArgs)),
+      typeof deps.getGrtProjectView === "function"
+        ? Promise.resolve().then(() => deps.getGrtProjectView(projectArgs))
+        : state.assembly.grtProjectView || {},
+      Promise.resolve().then(() => deps.listProjectChromosomes(projectArgs)),
+    ]);
+    if (!isCurrentRequest()) return;
     const grtProjectView = typeof deps.normalizeGrtProjectView === "function"
       ? deps.normalizeGrtProjectView(rawGrtProjectView)
       : {
@@ -473,37 +480,42 @@ export async function loadAssemblyView(host, store, options, deps) {
       ? deps.buildClearedSubviewState(state.assembly)
       : state.assembly.subview;
 
-    const chromosomeResult = await deps.listProjectChromosomes({
-      workspaceRoot: state.session.workspacePath,
-      projectId: state.session.projectId,
-    });
     const selectedChrName = resolveSelectedChrName(
       chromosomeResult.items,
       state.assembly.selectedChrName,
       keepCurrentChr,
     );
-    const mainViewHistory = selectedChrName && typeof deps.getMainViewHistoryStatus === "function"
-      ? normalizeMainViewHistoryStatus(await deps.getMainViewHistoryStatus({
-          workspaceRoot: state.session.workspacePath,
-          projectId: state.session.projectId,
-          chrName: selectedChrName,
-        }), { chrName: selectedChrName })
-      : createEmptyMainViewHistoryStatus(selectedChrName);
-
-    const chrCtgResult = selectedChrName
-      ? await deps.listChrViewCtgs({
-          workspaceRoot: state.session.workspacePath,
-          projectId: state.session.projectId,
-          chrName: selectedChrName,
-          datasetId: primaryDatasetId,
-        })
-      : { items: [] };
-    const phasedChrTracks = await loadPhasedChrTracksForAssembly(deps, {
-      state,
-      currentProject,
-      selectedChrName,
-      chrCtgs: chrCtgResult.items,
-    });
+    const chrArgs = { ...projectArgs, chrName: selectedChrName };
+    const primaryPromise = selectedChrName
+      ? Promise.resolve().then(() => deps.listChrViewCtgs({ ...chrArgs, datasetId: primaryDatasetId }))
+      : Promise.resolve({ items: [] });
+    const [historyResult, chrCtgResult, phasedChrTracks, refTrackMemberResult, supportChrCtgs,
+      deletedCtgs, sideData] = await Promise.all([
+      selectedChrName && typeof deps.getMainViewHistoryStatus === "function"
+        ? Promise.resolve().then(() => deps.getMainViewHistoryStatus(chrArgs))
+        : createEmptyMainViewHistoryStatus(selectedChrName),
+      primaryPromise,
+      primaryPromise.then((result) => loadPhasedChrTracksForAssembly(deps, {
+        state, currentProject, selectedChrName, chrCtgs: result.items,
+      })),
+      selectedChrName ? listReferenceTrackMembersOrEmpty(deps, chrArgs) : { items: [] },
+      selectedChrName && supportDatasetId
+        ? Promise.resolve().then(() => deps.loadDatasetChrCtgs(
+            projectArgs.workspaceRoot, projectArgs.projectId, selectedChrName, supportDatasetId,
+          ))
+        : [],
+      selectedChrName
+        ? Promise.resolve().then(() => deps.loadDeletedCtgsForChr(
+            projectArgs.workspaceRoot, projectArgs.projectId, selectedChrName, primaryDatasetId,
+          ))
+        : [],
+      primaryPromise.then((result) => isCurrentRequest()
+        ? deps.loadSideDataForCtg(projectArgs.workspaceRoot, projectArgs.projectId,
+            resolveSelectedCtgId(result.items, state.assembly.selectedCtgId, keepCurrentCtg))
+        : createEmptySideData()),
+    ]);
+    if (!isCurrentRequest()) return;
+    const mainViewHistory = normalizeMainViewHistoryStatus(historyResult, { chrName: selectedChrName });
     const isChrPhased = Boolean(currentProject?.phasedAssemblyEnabled && phasedChrTracks.length);
     const activePhasedTrackKey = resolveActivePhasedTrackKey(
       state.assembly.activePhasedTrackKeyByChr,
@@ -515,22 +527,6 @@ export async function loadAssemblyView(host, store, options, deps) {
       selectedChrName,
       phasedChrTracks,
     );
-    const refTrackMemberResult = selectedChrName
-      ? await listReferenceTrackMembersOrEmpty(deps, {
-          workspaceRoot: state.session.workspacePath,
-          projectId: state.session.projectId,
-          chrName: selectedChrName,
-        })
-      : { items: [] };
-    const supportChrCtgs =
-      selectedChrName && supportDatasetId
-        ? await deps.loadDatasetChrCtgs(
-            state.session.workspacePath,
-            state.session.projectId,
-            selectedChrName,
-            supportDatasetId,
-          )
-        : [];
     const annotatedPrimaryCtgs = annotateGrtSourceCards(
       chrCtgResult.items,
       grtProjectView.sourceCards,
@@ -567,25 +563,12 @@ export async function loadAssemblyView(host, store, options, deps) {
       && !Array.isArray(projectAssemblyViewState.subviewHistoryByKey)
         ? projectAssemblyViewState.subviewHistoryByKey
         : {};
-    const deletedCtgs = selectedChrName
-      ? await deps.loadDeletedCtgsForChr(
-          state.session.workspacePath,
-          state.session.projectId,
-          selectedChrName,
-          primaryDatasetId,
-        )
-      : [];
     const selectedCtgId = resolveSelectedCtgId(
       annotatedPrimaryCtgs,
       state.assembly.selectedCtgId,
       keepCurrentCtg,
     );
 
-    const sideData = await deps.loadSideDataForCtg(
-      state.session.workspacePath,
-      state.session.projectId,
-      selectedCtgId,
-    );
     const selectedMemberSeqId = resolveSelectedMemberSeqId(
       sideData.detail,
       state.assembly.selectedMemberSeqId,
@@ -703,6 +686,7 @@ export async function loadAssemblyView(host, store, options, deps) {
       if (activated?.assembly) store.setState({ assembly: activated.assembly });
     }
   } catch (error) {
+    if (!isCurrentRequest()) return;
     const mappedError = deps.mapAssemblyError({ error, stateOrLocale: store.getState() });
     store.setState({
       assembly: {

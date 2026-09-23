@@ -13,6 +13,7 @@ use crate::reference_segments::{
 };
 
 mod reference_cache;
+pub mod reference_transport;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectChromosomeItem {

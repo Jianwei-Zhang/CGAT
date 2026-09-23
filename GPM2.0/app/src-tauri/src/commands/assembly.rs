@@ -158,19 +158,34 @@ pub fn list_deleted_ctgs(
     .map_err(format_error)
 }
 
+#[derive(serde::Serialize)]
+#[serde(untagged)]
+pub enum ReferenceTrackResponse {
+    Compact(gpm_next_backend::main_view::reference_transport::CompactReferenceTracks),
+    Legacy(Value),
+}
+
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn list_reference_track_members(
+pub async fn list_reference_track_members(
     workspaceRoot: String,
     projectId: i64,
     chrName: String,
-) -> CommandResult<Value> {
-    (|| {
+    compact: Option<bool>,
+) -> CommandResult<ReferenceTrackResponse> {
+    tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<ReferenceTrackResponse> {
         let items = backend_list_reference_track_members(
             &project_db_path(&workspaceRoot),
             projectId,
             &chrName,
         )?;
+        if compact.unwrap_or(false) {
+            return Ok(ReferenceTrackResponse::Compact(
+                gpm_next_backend::main_view::reference_transport::compact_reference_track_members(
+                    items,
+                ),
+            ));
+        }
         let mapped = items
             .into_iter()
             .map(|item| {
@@ -211,8 +226,10 @@ pub fn list_reference_track_members(
                 })
             })
             .collect::<Vec<_>>();
-        Ok(json!({ "items": mapped }))
-    })()
+        Ok(ReferenceTrackResponse::Legacy(json!({ "items": mapped })))
+    })
+    .await
+    .map_err(|join_error| format!("list_reference_track_members join error: {join_error}"))?
     .map_err(format_error)
 }
 

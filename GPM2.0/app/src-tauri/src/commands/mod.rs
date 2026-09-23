@@ -1139,12 +1139,14 @@ mod tests {
         )
         .expect("insert ref hit");
 
-        let result = list_reference_track_members(
+        let result = tauri::async_runtime::block_on(list_reference_track_members(
             workspace_root.to_string_lossy().into_owned(),
             7,
             "Chr01".to_string(),
-        )
+            None,
+        ))
         .expect("list reference track members");
+        let result = serde_json::to_value(result).unwrap();
 
         assert_eq!(result["items"].as_array().map(|items| items.len()), Some(2));
         assert_eq!(
@@ -1158,6 +1160,21 @@ mod tests {
         assert_eq!(result["items"][1]["segmentStartBp"].as_i64(), Some(5101));
         assert_eq!(result["items"][1]["hits"][0]["ctgStart"].as_i64(), Some(1));
         assert_eq!(result["items"][1]["hits"][0]["ctgEnd"].as_i64(), Some(5000));
+
+        let compact = tauri::async_runtime::block_on(list_reference_track_members(
+            workspace_root.to_string_lossy().into_owned(),
+            7,
+            "Chr01".to_string(),
+            Some(true),
+        ))
+        .expect("compact reference track members");
+        let compact = serde_json::to_value(compact).unwrap();
+        assert_eq!(compact["encoding"], "reference-hits-v1");
+        assert_eq!(compact["items"][1]["hitGroups"][0][0], 1);
+        assert_eq!(
+            compact["items"][1]["hitRows"][0],
+            json!([0, 5001, 10000, 5101, 10100, 5000, 5000, 1, 5000])
+        );
 
         drop(conn);
         fs::remove_dir_all(workspace_root).expect("remove temp workspace root");
