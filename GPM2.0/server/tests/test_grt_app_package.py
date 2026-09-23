@@ -55,7 +55,7 @@ class GrtAppPackageTests(unittest.TestCase):
         self.assertEqual(no_fasta_final_path, final_path)
         self.assertEqual(no_fasta_manifest["final_path_sha256"], manifest["final_path_sha256"])
 
-    def test_projects_only_selected_mummer_and_local_flank_rows(self) -> None:
+    def _write_display_evidence_fixture(self):
         root = self.root / "evidence-source"
         metadata = root / "metadata"
         mummer = root / "grt/evidence/step3/mummer"
@@ -180,7 +180,11 @@ class GrtAppPackageTests(unittest.TestCase):
             ("support", "donor1", "Chr01"),
         }
 
-        projected = build_display_evidence(root, final_path, source_lengths, cards)["Chr01"]
+        return root, final_path, source_lengths, cards
+
+    def test_projects_only_selected_mummer_and_local_flank_rows(self) -> None:
+        fixture = self._write_display_evidence_fixture()
+        projected = build_display_evidence(*fixture)["Chr01"]
 
         self.assertEqual(len(projected), 4)
         self.assertEqual({row["tool"] for row in projected}, {"mummer", "minimap2"})
@@ -201,6 +205,40 @@ class GrtAppPackageTests(unittest.TestCase):
         )
         self.assertEqual(mummer_left["association"], "supporting_precursor")
         self.assertEqual(mummer_left["target"]["start"], 221)
+
+    def test_display_evidence_selects_accepted_candidate_regardless_of_row_order(self) -> None:
+        fixture = self._write_display_evidence_fixture()
+        root = fixture[0]
+        expected = build_display_evidence(*fixture)
+        for filename in ("correction_candidates.tsv", "refill_candidates.tsv"):
+            path = root / "grt/evidence/step3" / filename
+            original = path.read_text(encoding="utf-8")
+            header, accepted = original.splitlines()
+            rejected = accepted.replace("\taccepted\t", "\trejected\t").replace(
+                "\tmember-1\t", "\tunknown-rejected-member\t"
+            )
+            for rows in ((accepted, rejected), (rejected, accepted), (rejected, accepted, rejected)):
+                with self.subTest(filename=filename, rows=rows):
+                    path.write_text("\n".join((header, *rows)) + "\n", encoding="utf-8")
+                    self.assertEqual(build_display_evidence(*fixture), expected)
+            path.write_text(original, encoding="utf-8")
+
+    def test_display_evidence_rejects_missing_or_ambiguous_accepted_candidate(self) -> None:
+        fixture = self._write_display_evidence_fixture()
+        root = fixture[0]
+        for filename in ("correction_candidates.tsv", "refill_candidates.tsv"):
+            path = root / "grt/evidence/step3" / filename
+            original = path.read_text(encoding="utf-8")
+            header, accepted = original.splitlines()
+            with self.subTest(filename=filename, case="rejected_only"):
+                path.write_text(original.replace("\taccepted\t", "\trejected\t"), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "lacks an accepted"):
+                    build_display_evidence(*fixture)
+            with self.subTest(filename=filename, case="ambiguous"):
+                path.write_text("\n".join((header, accepted, accepted)) + "\n", encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "multiple accepted candidates"):
+                    build_display_evidence(*fixture)
+            path.write_text(original, encoding="utf-8")
 
     def test_build_rejects_final_path_source_without_display_card(self) -> None:
         assignments = self.source / "metadata/chr_assignments.tsv"

@@ -516,6 +516,23 @@ def validate_display_evidence(
         )
 
 
+def _candidates_by_event(path: Path) -> dict[str, dict[str, str]]:
+    """Select the accepted candidate when an event has competing candidates."""
+    result: dict[str, dict[str, str]] = {}
+    for row in _read_tsv(path):
+        event_id = row.get("event_id", "")
+        if not event_id:
+            continue
+        previous = result.get(event_id)
+        if previous is None:
+            result[event_id] = row
+        elif row.get("outcome") == "accepted":
+            if previous.get("outcome") == "accepted":
+                raise ValueError(f"GRT event {event_id} has multiple accepted candidates in {path}")
+            result[event_id] = row
+    return result
+
+
 def build_display_evidence(
     source_root: Path,
     final_path: dict,
@@ -542,16 +559,10 @@ def build_display_evidence(
         ("step2", "grt/evidence/step2/candidates.tsv"),
         ("step3", "grt/evidence/step3/correction_candidates.tsv"),
     ):
-        candidates_by_stage[stage] = {
-            row["event_id"]: row
-            for row in _read_tsv(source_root / relpath)
-            if row.get("event_id")
-        }
-    refill_candidates = {
-        row["event_id"]: row
-        for row in _read_tsv(source_root / "grt/evidence/step3/refill_candidates.tsv")
-        if row.get("event_id")
-    }
+        candidates_by_stage[stage] = _candidates_by_event(source_root / relpath)
+    refill_candidates = _candidates_by_event(
+        source_root / "grt/evidence/step3/refill_candidates.tsv"
+    )
     alignments_by_stage: dict[str, dict[tuple[str, int], dict[str, str]]] = {}
     for stage in ("step2", "step3"):
         alignments_by_stage[stage] = {
