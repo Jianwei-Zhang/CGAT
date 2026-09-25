@@ -447,6 +447,62 @@ fn import_materializes_reference_segments_and_reads_them_without_the_fasta() {
 }
 
 #[test]
+fn packaged_reference_segments_are_preferred_over_the_fasta_scan() {
+    let temp = tempdir().unwrap();
+    let bundle_root = temp.path().join("gpm_server");
+    create_bundle_root(&bundle_root);
+    // The fixture reference is a single 2 bp contig with no long N run, so the
+    // FASTA scan yields one whole-chromosome span. A packaged description that
+    // splits it must win, and must work for packages without FASTA payloads.
+    fs::write(
+        bundle_root.join("metadata/reference_segments.tsv"),
+        "reference_chr_name\tsegment_order\tsegment_start_bp\tsegment_end_bp\nr\t1\t1\t1\nr\t2\t2\t2\n",
+    )
+    .unwrap();
+
+    let (outcome, _progress) = import_from_extracted_bundle(&bundle_root).unwrap();
+    let conn = Connection::open(&outcome.project_db_path).unwrap();
+    let stored = conn
+        .prepare("SELECT segment_order, start_bp, end_bp FROM reference_chr_segment ORDER BY segment_order")
+        .unwrap()
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
+        })
+        .unwrap()
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .unwrap();
+    assert_eq!(stored, vec![(1, 1, 1), (2, 2, 2)]);
+
+    let project_id = seed_project_row(&conn);
+    let chr_name: String = conn
+        .query_row(
+            "SELECT chr_name FROM reference_chr ORDER BY chr_order LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    drop(conn);
+    let members = crate::main_view::list_reference_track_members(
+        &outcome.project_db_path,
+        project_id,
+        &chr_name,
+    )
+    .unwrap();
+    assert_eq!(members.len(), 2);
+    assert_eq!(
+        members
+            .iter()
+            .map(|member| (member.segment_start_bp, member.segment_end_bp))
+            .collect::<Vec<_>>(),
+        vec![(1, 1), (2, 2)]
+    );
+}
+
+#[test]
 fn existing_projects_backfill_reference_segments_on_first_read() {
     let temp = tempdir().unwrap();
     let bundle_root = temp.path().join("gpm_server");

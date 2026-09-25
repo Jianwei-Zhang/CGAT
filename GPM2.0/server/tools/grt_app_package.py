@@ -351,6 +351,10 @@ def write_manifest(staging_root: Path, package_mode: str, include_fasta: bool, f
     target.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+# Derived by prepare.sh from the reference FASTA. Delivery keeps it so the App
+# can render reference N gaps without needing the FASTA payload.
+OPTIONAL_METADATA = ("reference_segments.tsv",)
+
 def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
     source_root = source_root.resolve()
     staging_root = staging_root.resolve()
@@ -366,6 +370,9 @@ def build(source_root: Path, staging_root: Path, include_fasta: bool) -> None:
         elif filename == "grt_used_contigs.tsv":
             project_used_contigs(source_root / "metadata/grt_used_contigs.tsv", staging_root / "metadata/grt_used_contigs.tsv")
         else:
+            copy_file(source_root, staging_root, f"metadata/{filename}")
+    for filename in OPTIONAL_METADATA:
+        if (source_root / "metadata" / filename).is_file():
             copy_file(source_root, staging_root, f"metadata/{filename}")
     final_path, q4_lengths = project_final_path(
         source_root,

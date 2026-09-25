@@ -1,6 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -1409,13 +1407,9 @@ fn load_main_view_reference_gaps(
     let root = conn.path().and_then(|path| Path::new(path).parent());
     let mut result = HashMap::new();
     for (id, name, length, fasta) in chromosomes {
-        if let Some(segments) =
-            crate::reference_geometry::ensure_reference_segments(conn, id, &name, &fasta)?
-        {
-            result.insert(id, derive_reference_gaps_from_segments(&segments, length));
-            continue;
-        }
-        let (_, gaps) = resolve_reference_track_segments(root, &fasta, &name, length)?;
+        let (_, gaps) = resolve_reference_track_segments_with_connection(
+            conn, id, root, &fasta, &name, length,
+        )?;
         result.insert(id, gaps);
     }
     Ok(result)
@@ -1629,7 +1623,16 @@ pub fn list_reference_track_members_with_connection(
     project_id: i64,
     chr_name: &str,
 ) -> Result<Vec<ReferenceTrackMemberItem>> {
-    list_reference_track_members_with_workspace_root(conn, None, project_id, chr_name)
+    let workspace_root = conn
+        .path()
+        .and_then(|path| Path::new(path).parent())
+        .map(Path::to_path_buf);
+    list_reference_track_members_with_workspace_root(
+        conn,
+        workspace_root.as_deref(),
+        project_id,
+        chr_name,
+    )
 }
 
 fn list_reference_track_members_with_workspace_root(
@@ -1664,23 +1667,14 @@ fn list_reference_track_members_with_workspace_root(
             )
         })?;
 
-    let (segments, reference_gaps) = match crate::reference_geometry::ensure_reference_segments(
+    let (segments, reference_gaps) = resolve_reference_track_segments_with_connection(
         conn,
         reference_chr_id,
-        normalized_chr_name,
+        workspace_root,
         &reference_fasta_path,
-    )? {
-        Some(segments) => {
-            let gaps = derive_reference_gaps_from_segments(&segments, reference_chr_length);
-            (segments, gaps)
-        }
-        None => resolve_reference_track_segments(
-            workspace_root,
-            &reference_fasta_path,
-            normalized_chr_name,
-            reference_chr_length,
-        )?,
-    };
+        normalized_chr_name,
+        reference_chr_length,
+    )?;
     let mut items = segments
         .iter()
         .map(|segment| ReferenceTrackMemberItem {
@@ -1746,6 +1740,38 @@ fn list_reference_track_members_with_workspace_root(
     Ok(items)
 }
 
+fn resolve_reference_track_segments_with_connection(
+    conn: &Connection,
+    reference_chr_id: i64,
+    workspace_root: Option<&Path>,
+    reference_fasta_path: &str,
+    chr_name: &str,
+    chr_length: i64,
+) -> Result<(Vec<ReferenceSegment>, Vec<ReferenceGapInterval>)> {
+    if let Some(segments) =
+        crate::reference_geometry::persisted_reference_segments(conn, reference_chr_id)?
+    {
+        let gaps = derive_reference_gaps_from_segments(&segments, chr_length);
+        return Ok((segments, gaps));
+    }
+    if let Some(root) = workspace_root
+        && let Some(segments) = read_reference_segments_metadata(root, chr_name)?
+    {
+        // Persist what the package already describes so later reads are pure
+        // database lookups and the FASTA is never scanned for this chromosome.
+        crate::reference_geometry::store_reference_segments(conn, reference_chr_id, &segments)?;
+        let gaps = derive_reference_gaps_from_segments(&segments, chr_length);
+        return Ok((segments, gaps));
+    }
+    if let Ok((segments, gaps)) =
+        reference_cache::load_reference_geometry(Path::new(reference_fasta_path), chr_name)
+    {
+        crate::reference_geometry::store_reference_segments(conn, reference_chr_id, &segments)?;
+        return Ok((segments, gaps));
+    }
+    resolve_reference_track_segments(workspace_root, reference_fasta_path, chr_name, chr_length)
+}
+
 fn resolve_reference_track_segments(
     workspace_root: Option<&Path>,
     reference_fasta_path: &str,
@@ -1788,95 +1814,12 @@ fn read_reference_segments_metadata(
     if !path.exists() {
         return Ok(None);
     }
-
-    let file = File::open(&path).with_context(|| format!("failed to open {}", path.display()))?;
-    let reader = BufReader::new(file);
-    let mut lines = reader.lines();
-    let header_line = lines
-        .next()
-        .transpose()
-        .with_context(|| format!("failed to read header from {}", path.display()))?
-        .ok_or_else(|| anyhow!("missing header in {}", path.display()))?;
-    let header: Vec<&str> = header_line.split('\t').collect();
-    let chr_name_col = find_tsv_column(&header, "reference_chr_name", &path)?;
-    let order_col = find_tsv_column(&header, "segment_order", &path)?;
-    let start_col = find_tsv_column(&header, "segment_start_bp", &path)?;
-    let end_col = find_tsv_column(&header, "segment_end_bp", &path)?;
-
-    let mut segments = Vec::new();
-    for (line_index, line) in lines.enumerate() {
-        let line = line.with_context(|| {
-            format!(
-                "failed to read line {} from {}",
-                line_index + 2,
-                path.display()
-            )
-        })?;
-        if line.trim().is_empty() {
-            continue;
-        }
-        let cols: Vec<&str> = line.split('\t').collect();
-        if cols.get(chr_name_col).copied().unwrap_or("").trim() != chr_name {
-            continue;
-        }
-        let segment_order = parse_reference_segment_int(
-            cols.get(order_col).copied().unwrap_or(""),
-            "segment_order",
-            &path,
-            line_index + 2,
-        )?;
-        let start_bp = parse_reference_segment_int(
-            cols.get(start_col).copied().unwrap_or(""),
-            "segment_start_bp",
-            &path,
-            line_index + 2,
-        )?;
-        let end_bp = parse_reference_segment_int(
-            cols.get(end_col).copied().unwrap_or(""),
-            "segment_end_bp",
-            &path,
-            line_index + 2,
-        )?;
-        if end_bp < start_bp {
-            bail!(
-                "{} line {} has segment_end_bp < segment_start_bp",
-                path.display(),
-                line_index + 2
-            );
-        }
-        segments.push(ReferenceSegment {
-            reference_chr_name: chr_name.to_string(),
-            segment_order,
-            start_bp,
-            end_bp,
-        });
-    }
-
-    segments.sort_by_key(|segment| (segment.segment_order, segment.start_bp, segment.end_bp));
-    Ok(Some(segments))
-}
-
-fn find_tsv_column(header: &[&str], expected: &str, path: &Path) -> Result<usize> {
-    header
-        .iter()
-        .position(|value| value.trim() == expected)
-        .ok_or_else(|| anyhow!("{} missing required column {}", path.display(), expected))
-}
-
-fn parse_reference_segment_int(
-    value: &str,
-    label: &str,
-    path: &Path,
-    line_number: usize,
-) -> Result<i64> {
-    value.trim().parse::<i64>().with_context(|| {
-        format!(
-            "failed to parse {} on line {} from {}",
-            label,
-            line_number,
-            path.display()
-        )
-    })
+    let mut described = crate::reference_geometry::read_reference_segments_tsv(&path)?;
+    // A chromosome missing from the file is not described by it; callers then
+    // fall back to the FASTA or to a single whole-chromosome segment.
+    Ok(described
+        .remove(chr_name)
+        .filter(|segments| !segments.is_empty()))
 }
 
 fn derive_reference_gaps_from_segments(

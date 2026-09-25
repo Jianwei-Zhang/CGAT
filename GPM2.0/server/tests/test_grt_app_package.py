@@ -182,6 +182,32 @@ class GrtAppPackageTests(unittest.TestCase):
 
         return root, final_path, source_lengths, cards
 
+    def test_delivery_carries_reference_segments_when_prepare_wrote_them(self) -> None:
+        staging = self.root / "staging"
+        no_fasta_staging = self.root / "staging-no-fasta"
+        segments = (
+            "reference_chr_name\tsegment_order\tsegment_start_bp\tsegment_end_bp\n"
+            "Chr1\t1\t1\t10\nChr1\t2\t21\t40\n"
+        )
+        for mode_root in (self.source,):
+            (mode_root / "metadata/reference_segments.tsv").write_text(segments, encoding="utf-8")
+
+        grt_app_package.build(self.source, staging, include_fasta=True)
+        grt_app_package.build(self.source, no_fasta_staging, include_fasta=False)
+
+        for target in (staging, no_fasta_staging):
+            shipped = target / "metadata/reference_segments.tsv"
+            self.assertTrue(shipped.is_file(), f"{target} must carry reference segments")
+            self.assertEqual(shipped.read_text(encoding="utf-8"), segments)
+
+    def test_delivery_stays_buildable_without_reference_segments(self) -> None:
+        staging = self.root / "staging"
+        (self.source / "metadata/reference_segments.tsv").unlink(missing_ok=True)
+
+        grt_app_package.build(self.source, staging, include_fasta=True)
+
+        self.assertFalse((staging / "metadata/reference_segments.tsv").exists())
+
     def test_projects_only_selected_mummer_and_local_flank_rows(self) -> None:
         fixture = self._write_display_evidence_fixture()
         projected = build_display_evidence(*fixture)["Chr01"]

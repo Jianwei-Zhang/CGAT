@@ -67,6 +67,7 @@ pub(super) fn sync_catalog_from_bundle(
             &tx,
             reference_id,
             &fasta_path_text,
+            Some(&bundle_root.join("metadata/reference_segments.tsv")),
         )
         .with_context(|| {
             format!(
