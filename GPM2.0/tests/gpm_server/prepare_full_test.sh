@@ -896,8 +896,8 @@ EOF
     cat "${output_root}/metadata/source_seq_n_regions.tsv" >&2
     exit 1
   }
-  ! grep -F $'ds_b\ttig_unplaced\t3\t6\t4' "${output_root}/metadata/source_seq_n_regions.tsv" >/dev/null || {
-    echo "expected unplaced tig_unplaced N region not to be scanned" >&2
+  grep -F $'ds_b\ttig_unplaced\t3\t6\t4' "${output_root}/metadata/source_seq_n_regions.tsv" >/dev/null || {
+    echo "expected unplaced tig_unplaced N region to be scanned" >&2
     cat "${output_root}/metadata/source_seq_n_regions.tsv" >&2
     exit 1
   }
