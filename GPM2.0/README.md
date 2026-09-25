@@ -171,8 +171,6 @@ The package preserves the primary and support dataset roles established during G
 
 ### Project dataset tables
 
-New projects split assembly sequences at every consecutive `N`/`n` run, including a single N. Editable contigs contain no Ns; source coordinates, orientation, original gap lengths, and sibling connections are retained. Gaps are displayed between fragments, and alignment endpoints follow the same fragment layout. Source FASTA and dataset statistics remain unchanged. Existing edited projects are not automatically split; create a new project to use this initialization. All-N sequences remain in the source catalog without creating empty contigs. Final Path source segments are projected onto the fragments while preserving the exported sequence; clipped evidence without a CIGAR is marked as approximate.
-
 The project page summarizes sequence count, total length, N50, and N90 for the reference, primary, support, and derived datasets. Statistics include all sequences without splitting at Ns and are unaffected by moving or hiding contigs in assembly views. Light packages support the same statistics.
 
 Display names and notes are editable; original identifiers, filenames, and sequence names remain unchanged.
