@@ -45,7 +45,24 @@ const MIGRATIONS: &[Migration] = &[
         name: "add_catalog_display_names_and_notes",
         apply: migrate_catalog_to_v4,
     },
+    Migration {
+        version: 5,
+        name: "retain_pairwise_alignment_paths",
+        apply: migrate_pairwise_paths_to_v5,
+    },
 ];
+
+fn migrate_pairwise_paths_to_v5(conn: &Connection) -> Result<()> {
+    ensure_column_exists(
+        conn,
+        LegacyColumn {
+            table: "pairwise_alignment_hit",
+            name: "cg_tag",
+            definition: "TEXT",
+        },
+    )?;
+    Ok(())
+}
 
 fn migrate_catalog_to_v4(conn: &Connection) -> Result<()> {
     for table in ["dataset", "reference_genome"] {

@@ -141,6 +141,7 @@ function buildEvidenceBands(layout, evidence, prefs) {
     return {
       hitKey: String(hit?.hitKey || `composition-pairwise-${index + 1}`),
       identityPct: readHitIdentityPct(hit),
+      projectionApproximate: Boolean(hit.projectionApproximate),
       alignLength: length,
       top,
       bottom,
@@ -512,7 +513,7 @@ export function renderSubviewCompositionAlignmentCard({
       `${bottomLeft.toFixed(2)},${BOTTOM_Y}`,
     ].join(" ");
     const tone = band.top.source?.role === "support" ? "companion" : "primary";
-    const tooltip = `${band.top.label}: ${band.topCuts.left}–${band.topCuts.right} | ${band.bottom.label}: ${band.bottomCuts.left}–${band.bottomCuts.right} | ${alignmentBandTooltipMetrics(band)}`;
+    const tooltip = `${band.top.label}: ${band.topCuts.left}–${band.topCuts.right} | ${band.bottom.label}: ${band.bottomCuts.left}–${band.bottomCuts.right} | ${alignmentBandTooltipMetrics(band)}${band.projectionApproximate ? " | Approximate projection" : ""}`;
     return `<polygon class="track-collinearity-band${tone === "companion" ? " is-companion" : ""}" points="${points}" ${alignmentBandSvgAttrs(band, tone)} pointer-events="visibleFill"
       data-subview-band-tooltip="${escapeAttr(tooltip)}"
       data-track-band-proxy="1" data-subview-hit-key="${escapeAttr(band.hitKey)}"

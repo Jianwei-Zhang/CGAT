@@ -701,7 +701,7 @@ pub(super) fn append_project_derived_ctg_assembly(
             })?;
         let is_new_member =
             order_row.member_dataset == "derived_ctg" && order_row.member_ctg == ctg_name;
-        if (is_new_member && updated != 1) || updated > 1 {
+        if is_new_member && updated != 1 {
             bail!(
                 "track member order snapshot member {}:{} resolved to {} assembly rows in project_id {}",
                 order_row.member_dataset,
@@ -710,6 +710,14 @@ pub(super) fn append_project_derived_ctg_assembly(
                 project_id
             );
         }
+    }
+    crate::source_fragments::split_new_source_instances(&tx, project_id, assembly_seq_id - 1)?;
+    if !tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM assembly_ctg WHERE id=?1)",
+        [assembly_ctg_id],
+        |r| r.get::<_, bool>(0),
+    )? {
+        bail!("derived contig contains only N bases and has no editable fragment");
     }
     tx.commit()
         .context("failed to commit derived_ctg assembly append transaction")?;

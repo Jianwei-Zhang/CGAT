@@ -37,7 +37,8 @@ pub fn list_chr_view_ctgs(
                             "identityPct": hit.identity_pct,
                             "mapq": hit.mapq,
                             "ctgStart": hit.ctg_start,
-                            "ctgEnd": hit.ctg_end
+                            "ctgEnd": hit.ctg_end,
+                            "referenceProjectionApproximate": hit.reference_projection_approximate
                         })
                     })
                     .collect::<Vec<_>>();
@@ -109,6 +110,7 @@ pub fn list_chr_view_ctgs(
                     "derivedTargetDatasetName": item.derived_target_dataset_name,
                     "hits": hits,
                     "nRegions": n_regions,
+                    "sourceFragment": item.source_fragment,
                     "telomereMarks": telomere_marks,
                     "centromereMarks": centromere_marks
                 })
@@ -820,6 +822,7 @@ pub async fn get_junction_inspection(
                     "gapOpenCount": hit.gap_open_count,
                     "evalue": hit.evalue,
                     "bitScore": hit.bit_score,
+                    "projectionApproximate": hit.projection_approximate,
                     "evidenceOrigin": hit.evidence_origin
                 })
             })
@@ -911,6 +914,7 @@ pub async fn get_track_pairwise_evidence(
                     "gapOpenCount": hit.gap_open_count,
                     "evalue": hit.evalue,
                     "bitScore": hit.bit_score,
+                    "projectionApproximate": hit.projection_approximate,
                     "evidenceOrigin": hit.evidence_origin
                 })
             })

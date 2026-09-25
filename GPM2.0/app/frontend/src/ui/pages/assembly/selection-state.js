@@ -110,6 +110,7 @@ export function normalizeSupportMirrorEntry(entry) {
     assemblyCtgId,
     name: String(entry?.name || `Ctg${assemblyCtgId}`),
     originId,
+    ...(entry?.sourceFragment ? { sourceFragment: { ...entry.sourceFragment } } : {}),
     totalLength,
     anchorStart: normalizeNonNegativeInt(entry?.anchorStart),
     lengthBp,

@@ -115,7 +115,15 @@ pub(super) fn materialize_grt_source_cards_with_connection(
         .unwrap_or_default()
         .as_secs()
         .to_string();
-    let mut inserted = 0_usize;
+    let after_seq_id: i64 =
+        tx.query_row("SELECT COALESCE(MAX(id),0) FROM assembly_seq", [], |r| {
+            r.get(0)
+        })?;
+    let before: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM assembly_ctg WHERE project_id=?1",
+        [project_id],
+        |r| r.get(0),
+    )?;
     for card in source_cards {
         let object = card
             .as_object()
@@ -157,9 +165,12 @@ pub(super) fn materialize_grt_source_cards_with_connection(
             })?;
         let already_visible: Option<(i64, String, Option<i64>, String)> = tx
             .query_row(
-                "SELECT c.id, s.orient, c.anchor_start, c.placement_mode
+                "SELECT c.id, s.orient,
+                   c.anchor_start - CASE WHEN s.orient='-' THEN ss.length-s.source_end ELSE s.source_start-1 END,
+                   c.placement_mode
                  FROM assembly_ctg c
                  JOIN assembly_seq s ON s.id = c.assembly_seq_id
+                 JOIN source_seq ss ON ss.id=s.source_seq_id
                  WHERE c.project_id = ?1 AND s.source_seq_id = ?2 AND c.assigned_chr_name = ?3
                  LIMIT 1",
                 params![project_id, source_seq_id, target_chr],
@@ -249,11 +260,16 @@ pub(super) fn materialize_grt_source_cards_with_connection(
             ],
         )
         .with_context(|| format!("failed to place GRT source card {source_card_key}"))?;
-        inserted += 1;
     }
+    crate::source_fragments::split_new_source_instances(&tx, project_id, after_seq_id)?;
+    let after: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM assembly_ctg WHERE project_id=?1",
+        [project_id],
+        |r| r.get(0),
+    )?;
     tx.commit()
         .context("failed to commit GRT source-card materialization")?;
-    Ok(inserted)
+    Ok((after - before).max(0) as usize)
 }
 
 pub(super) fn verify_project_assignment_orientation_projection(
@@ -294,9 +310,11 @@ pub(super) fn verify_project_assignment_orientation_projection(
         .collect::<std::result::Result<Vec<_>, _>>()?;
     let mut projected_stmt = conn
         .prepare(
-            "SELECT s.orient, c.anchor_start
+            "SELECT s.orient,
+                    c.anchor_start - CASE WHEN s.orient='-' THEN ss.length-s.source_end ELSE s.source_start-1 END
              FROM assembly_ctg c
              JOIN assembly_seq s ON s.id = c.assembly_seq_id
+             JOIN source_seq ss ON ss.id=s.source_seq_id
              WHERE c.project_id = ?1
                AND s.source_seq_id = ?2
                AND c.assigned_chr_name = ?3",
@@ -322,14 +340,23 @@ pub(super) fn verify_project_assignment_orientation_projection(
                 Ok((row.get::<_, String>(0)?, row.get::<_, Option<i64>>(1)?))
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
-        if projected.len() != 1 {
+        let length: i64 = conn.query_row(
+            "SELECT length FROM source_seq WHERE id=?1",
+            [source_seq_id],
+            |r| r.get(0),
+        )?;
+        let gaps = crate::source_fragments::source_gaps(conn, source_seq_id)?;
+        let expected = crate::source_fragments::non_n_intervals(1, length, &gaps).len();
+        if projected.len() != expected {
             bail!(
-                "assignment baseline {dataset_name}:{seq_name}:{chr_name} projected {} main-view cards, expected 1",
+                "assignment baseline {dataset_name}:{seq_name}:{chr_name} projected {} fragments, expected {expected}",
                 projected.len()
             );
         }
-        let (projected_orientation, projected_anchor) = &projected[0];
-        if projected_orientation != &source_orientation || *projected_anchor != Some(anchor_start) {
+        if projected
+            .iter()
+            .any(|(orient, anchor)| orient != &source_orientation || *anchor != Some(anchor_start))
+        {
             bail!(
                 "assignment baseline {dataset_name}:{seq_name}:{chr_name} disagrees with main-view source orientation or anchor"
             );

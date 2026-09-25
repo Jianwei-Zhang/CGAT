@@ -113,13 +113,77 @@ fn load_grt_final_path_by_chr_with_connection(
             let projected =
                 project_grt_final_path_chromosome(chromosome, &chr_name, source_lengths)?;
             let projected = if let Some(placements) = placements {
-                project_grt_display_placements(projected, &chr_name, placements)?
+                project_grt_display_placements(
+                    split_grt_source_gaps(conn, projected)?,
+                    &chr_name,
+                    placements,
+                )?
             } else {
                 projected
             };
             Ok((chr_name, projected))
         })
         .collect()
+}
+
+// Display partitioning keeps the immutable server document intact. Source
+// locators and original segment ids remain available for export and traceability.
+fn split_grt_source_gaps(conn: &Connection, mut chromosome: Value) -> Result<Value> {
+    let Some(segments) = chromosome.get_mut("segments").and_then(Value::as_array_mut) else {
+        return Ok(chromosome);
+    };
+    let mut output = Vec::new();
+    for segment in std::mem::take(segments) {
+        if segment["kind"] == "gap" {
+            output.push(segment);
+            continue;
+        }
+        let source = &segment["source"];
+        let dataset = source["dataset"].as_str().unwrap_or("");
+        let contig = source["contig"].as_str().unwrap_or("");
+        let start = source["start"].as_i64().unwrap_or(1);
+        let end = source["end"].as_i64().unwrap_or(start);
+        let source_id: i64 = conn.query_row(
+            "SELECT ss.id FROM source_seq ss JOIN dataset d ON d.id=ss.dataset_id WHERE d.name=?1 AND ss.seq_name=?2",
+            params![dataset, contig], |r| r.get(0))?;
+        let gaps = crate::source_fragments::source_gaps(conn, source_id)?;
+        let mut parts: Vec<(i64, i64, bool)> =
+            crate::source_fragments::non_n_intervals(start, end, &gaps)
+                .into_iter()
+                .map(|(a, b)| (a, b, false))
+                .collect();
+        for (a, b) in gaps {
+            if a <= end && b >= start {
+                parts.push((a.max(start), b.min(end), true));
+            }
+        }
+        if parts.len() == 1 && !parts[0].2 {
+            output.push(segment);
+            continue;
+        }
+        parts.sort_by_key(|p| p.0);
+        if source["orientation"] == "-" {
+            parts.reverse();
+        }
+        for (a, b, gap) in parts {
+            let mut part = segment.clone();
+            let id = segment["segment_id"].as_str().unwrap_or("source");
+            part["origin_segment_id"] = Value::from(id);
+            part["segment_id"] = Value::from(format!(
+                "{id}:{}:{a}-{b}",
+                if gap { "gap" } else { "fragment" }
+            ));
+            part["length"] = Value::from(b - a + 1);
+            part["source"]["start"] = Value::from(a);
+            part["source"]["end"] = Value::from(b);
+            if gap {
+                part["kind"] = Value::from("gap");
+            }
+            output.push(part);
+        }
+    }
+    *segments = output;
+    Ok(chromosome)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -193,6 +257,65 @@ fn project_grt_display_evidence_item(
         );
     }
     Ok(true)
+}
+
+fn split_grt_display_evidence(
+    mut item: Value,
+    chr: &str,
+    placements: &GrtAssemblySourcePlacements,
+) -> Result<Vec<Value>> {
+    if project_grt_display_evidence_item(&mut item, chr, placements)? {
+        return Ok(vec![item]);
+    }
+    let source = &item["source"];
+    let target = &item["target"];
+    let candidates = |endpoint: &Value| {
+        placements
+            .get(&(
+                endpoint["dataset"].as_str().unwrap_or("").into(),
+                endpoint["contig"].as_str().unwrap_or("").into(),
+                chr.into(),
+            ))
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+    };
+    let reversed = source["orientation"] != target["orientation"];
+    let mut output = Vec::new();
+    for q in candidates(source) {
+        for t in candidates(target) {
+            for part in crate::source_fragments::clip_alignment(
+                source["start"].as_i64().unwrap_or(0),
+                source["end"].as_i64().unwrap_or(0),
+                target["start"].as_i64().unwrap_or(0),
+                target["end"].as_i64().unwrap_or(0),
+                if reversed { "-" } else { "+" },
+                None,
+                (q.source_start, q.source_end),
+                (t.source_start, t.source_end),
+            )? {
+                let mut next = item.clone();
+                next["evidence_id"] = Value::from(format!(
+                    "{}:{}:{}",
+                    item["evidence_id"].as_str().unwrap_or("evidence"),
+                    q.assembly_ctg_id,
+                    t.assembly_ctg_id
+                ));
+                next["source"]["start"] = Value::from(part.query_start);
+                next["source"]["end"] = Value::from(part.query_end);
+                next["target"]["start"] = Value::from(part.target_start);
+                next["target"]["end"] = Value::from(part.target_end);
+                next["aligned_length"] = Value::from(
+                    (part.query_end - part.query_start + 1)
+                        .max(part.target_end - part.target_start + 1),
+                );
+                next["projection_approximate"] = Value::from(true);
+                if project_grt_display_evidence_item(&mut next, chr, placements)? {
+                    output.push(next);
+                }
+            }
+        }
+    }
+    Ok(output)
 }
 
 fn load_grt_assembly_source_placements(
@@ -326,10 +449,8 @@ fn project_grt_display_placements(
         .and_then(Value::as_array_mut)
     {
         let mut projected = Vec::with_capacity(evidence.len());
-        for mut item in std::mem::take(evidence) {
-            if project_grt_display_evidence_item(&mut item, chr_name, placements)? {
-                projected.push(item);
-            }
+        for item in std::mem::take(evidence) {
+            projected.extend(split_grt_display_evidence(item, chr_name, placements)?);
         }
         *evidence = projected;
     }
@@ -573,4 +694,58 @@ pub fn load_persisted_grt_final_path_verification(
             .context("persisted GRT segment count is invalid")?,
         q4_artifact_sha256,
     })
+}
+
+#[cfg(test)]
+mod fragment_tests {
+    use super::*;
+    #[test]
+    fn grt_source_projection_keeps_gap_lengths_and_every_non_n_fragment() {
+        for orient in ["+", "-"] {
+            let conn = Connection::open_in_memory().unwrap();
+            crate::source_fragments::tests::seed(&conn, "NACNTNNGGN", orient);
+            crate::source_fragments::split_new_source_instances(&conn, 1, 0).unwrap();
+            let chr = serde_json::json!({"segments":[{
+                "segment_id":"whole","kind":"source","length":10,"source_length":10,
+                "source":{"dataset":"primary","contig":"scaffold","start":1,"end":10,"orientation":orient}
+            }]});
+            let placements = load_grt_assembly_source_placements(&conn, 1).unwrap();
+            let split = project_grt_display_placements(
+                split_grt_source_gaps(&conn, chr).unwrap(),
+                "Chr01",
+                &placements,
+            )
+            .unwrap();
+            assert_eq!(split["grt_display_available"], true);
+            let segments = split["segments"].as_array().unwrap();
+            assert_eq!(
+                segments
+                    .iter()
+                    .map(|s| s["length"].as_i64().unwrap())
+                    .sum::<i64>(),
+                10
+            );
+            assert_eq!(segments.iter().filter(|s| s["kind"] == "gap").count(), 4);
+            assert_eq!(
+                segments
+                    .iter()
+                    .filter(|s| s["assembly_ctg_id"].as_i64().is_some())
+                    .count(),
+                3
+            );
+            let starts: Vec<_> = segments
+                .iter()
+                .filter(|s| s["kind"] != "gap")
+                .map(|s| s["source"]["start"].as_i64().unwrap())
+                .collect();
+            assert_eq!(
+                starts,
+                if orient == "+" {
+                    vec![2, 5, 8]
+                } else {
+                    vec![8, 5, 2]
+                }
+            );
+        }
+    }
 }

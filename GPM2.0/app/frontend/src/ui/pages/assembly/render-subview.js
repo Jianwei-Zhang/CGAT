@@ -1,3 +1,4 @@
+import { renderSourceGapConnections } from "./source-fragment-layout.js";
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
@@ -491,6 +492,7 @@ function buildSubviewPairwiseRenderableHits({
       hitKey,
       pairKey,
       identityPct: readHitIdentityPct(hit),
+      projectionApproximate: Boolean(hit.projectionApproximate),
       alignLength,
       reversed,
       ctgStart: Math.min(topRange.start, topRange.end),
@@ -503,6 +505,7 @@ function buildSubviewPairwiseRenderableHits({
       hitKey,
       pairKey,
       identityPct: readHitIdentityPct(hit),
+      projectionApproximate: Boolean(hit.projectionApproximate),
       alignLength,
       reversed,
       ctgStart: Math.min(bottomRange.start, bottomRange.end),
@@ -2321,6 +2324,7 @@ function renderSubviewTrackPairAlignmentCard(
           ),
           hitKey: String(hit?.hitKey || ""),
           identityPct: readHitIdentityPct(hit),
+          projectionApproximate: Boolean(hit.projectionApproximate),
           alignLength: hit.alignLength,
           pairKey: String(hit?.pairKey || hit?.hitKey || ""),
           ctgStart: hit.ctgStart,
@@ -2384,6 +2388,7 @@ function renderSubviewTrackPairAlignmentCard(
         identityPct,
         alignLength,
         ordinal,
+        projectionApproximate,
       } = pairRecord;
       const refStart = ordinal + 1;
       const refEnd = ordinal + 2;
@@ -2415,6 +2420,7 @@ function renderSubviewTrackPairAlignmentCard(
         hitKey,
         pairKey,
         identityPct,
+        projectionApproximate,
         alignLength,
         reversed,
         ctgStart: Math.min(topRange.start, topRange.end),
@@ -2442,6 +2448,7 @@ function renderSubviewTrackPairAlignmentCard(
         hitKey,
         pairKey,
         identityPct,
+        projectionApproximate,
         alignLength,
         reversed,
         ctgStart: Math.min(bottomRange.start, bottomRange.end),
@@ -2532,6 +2539,7 @@ function renderSubviewTrackPairAlignmentCard(
         pairKey,
         reversed,
         identityPct: readHitIdentityPct(hit),
+        projectionApproximate: Boolean(hit.projectionApproximate),
         alignLength,
         index,
       });
@@ -3067,9 +3075,9 @@ function renderSubviewTrackPairAlignmentCard(
         };
       })
       .filter((entry) => entry && entry.markup);
-    return sortTrackEntriesForRender(renderEntries)
-      .map((entry) => entry.markup)
-      .join("");
+    return renderSourceGapConnections(renderEntries.map((entry) => ({ ...entry,
+      y: layout.laneTop + Math.max(0, Number(entry.ctg?.laneIndex || 0)) * TRACK_LANE_HEIGHT + TRACK_BAR_HEIGHT / 2,
+    })), escapeHtml) + sortTrackEntriesForRender(renderEntries).map((entry) => entry.markup).join("");
   };
   return `
     <article class="assembly-track-panel subview-alignment-card" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
@@ -3275,6 +3283,7 @@ function buildSubviewAlignmentSvgModel({
       return {
         hitKey: String(hit?.hitKey || ""),
         identityPct: readHitIdentityPct(hit),
+        projectionApproximate: Boolean(hit.projectionApproximate),
         alignLength: hit.alignLength,
         pairKey: String(hit?.pairKey || hit?.hitKey || ""),
         reversed: hit?.reversed === true,
@@ -3459,7 +3468,8 @@ function buildSubviewBandTooltipText({ topName, bottomName, topSegment, bottomSe
     `${resolvedBottomName}: ${formatBpInterval(bottomSegment?.ctgStart, bottomSegment?.ctgEnd)}`,
     isDirectAlignment ? alignmentBandTooltipMetrics(topSegment)
       : "Identity: Unknown (reference overlap; not a direct alignment)",
-  ].join(" | ");
+    topSegment?.projectionApproximate || bottomSegment?.projectionApproximate ? "Approximate projection" : "",
+  ].filter(Boolean).join(" | ");
 }
 
 function buildSubviewTrackPairHitKey(topSegment, bottomSegment) {

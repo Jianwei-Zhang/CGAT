@@ -106,18 +106,27 @@ fn imports_add_ctg_package_into_target_track() {
             .iter()
             .map(|item| (item.name.as_str(), item.chr_order))
             .collect::<Vec<_>>(),
-        vec![("gap_filled", Some(1)), ("d@r", Some(2))]
+        vec![
+            ("gap_filled[1-1]", Some(1)),
+            ("gap_filled[3-4]", Some(1)),
+            ("d@r", Some(2))
+        ]
     );
     let derived_item = target_track_ctgs
         .iter()
-        .find(|item| item.name == "gap_filled")
+        .find(|item| item.name == "gap_filled[1-1]")
         .expect("derived ctg should appear in target track view");
     assert_eq!(derived_item.derived_source.as_deref(), Some("gapfiller"));
     assert_eq!(
         derived_item.derived_target_dataset_id,
         Some(target_dataset_id)
     );
-    assert_eq!(derived_item.hits.len(), 2);
+    assert_eq!(derived_item.hits.len(), 1);
+    assert!(
+        target_track_ctgs
+            .iter()
+            .all(|item| item.n_regions.is_empty())
+    );
     let workspace_orders = read_imported_track_member_order_rows(&outcome.workspace_root).unwrap();
     assert_eq!(
         workspace_orders

@@ -135,7 +135,7 @@ function renderDisplayEvidence(evidence, entries, escapeHtml) {
   const associationText = association === "supporting_precursor"
     ? " · structural precursor"
     : "";
-  const title = `GRT local evidence · ${tool === "mummer" ? "MUMmer" : "minimap2"} · ${roleLabel} · identity ${identityText}${associationText}`;
+  const title = `GRT local evidence · ${tool === "mummer" ? "MUMmer" : "minimap2"} · ${roleLabel} · identity ${identityText}${associationText}${evidence.projectionApproximate ? " · approximate projection" : ""}`;
   const points = [
     `${sourceFirst.x.toFixed(2)},${sourceY.toFixed(2)}`,
     `${sourceSecond.x.toFixed(2)},${sourceY.toFixed(2)}`,

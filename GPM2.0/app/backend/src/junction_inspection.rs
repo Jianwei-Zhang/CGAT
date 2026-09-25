@@ -133,6 +133,8 @@ pub struct JunctionEvidenceHit {
     pub evalue: Option<f64>,
     pub bit_score: Option<f64>,
     pub evidence_origin: String,
+    pub projection_approximate: bool,
+    pub(crate) cg_tag: Option<String>,
 }
 
 pub fn get_junction_inspection(
@@ -267,7 +269,7 @@ fn get_junction_inspection_with_connection(
             cached_hits,
             &left_source_map,
             &right_source_map,
-        );
+        )?;
         sorted_hits.sort_by(|a, b| {
             b.align_length
                 .cmp(&a.align_length)
@@ -468,49 +470,80 @@ fn assign_cached_pairwise_hit_assembly_ids(
     hits: Vec<JunctionEvidenceHit>,
     query_source_map: &HashMap<i64, Vec<EvidenceNameMapping>>,
     subject_source_map: &HashMap<i64, Vec<EvidenceNameMapping>>,
-) -> Vec<JunctionEvidenceHit> {
+) -> Result<Vec<JunctionEvidenceHit>> {
     let mut assigned = Vec::new();
     for hit in hits {
-        let Some(query_mappings) = query_source_map.get(&hit.query_source_seq_id) else {
+        let Some(queries) = query_source_map.get(&hit.query_source_seq_id) else {
             continue;
         };
-        let Some(subject_mappings) = subject_source_map.get(&hit.subject_source_seq_id) else {
+        let Some(subjects) = subject_source_map.get(&hit.subject_source_seq_id) else {
             continue;
         };
-        for query in query_mappings {
-            for subject in subject_mappings {
+        for query in queries {
+            for subject in subjects {
                 if query.assembly_ctg_id == subject.assembly_ctg_id {
                     continue;
                 }
-                let Some((query_start, query_end)) =
-                    transform_source_interval_to_ctg_display(query, hit.query_start, hit.query_end)
-                else {
-                    continue;
+                let clipped = query.source_start > hit.query_start
+                    || query.source_end < hit.query_end
+                    || subject.source_start > hit.subject_start
+                    || subject.source_end < hit.subject_end;
+                let slices = if clipped {
+                    crate::source_fragments::clip_alignment(
+                        hit.query_start,
+                        hit.query_end,
+                        hit.subject_start,
+                        hit.subject_end,
+                        &hit.strand,
+                        hit.cg_tag.as_deref(),
+                        (query.source_start, query.source_end),
+                        (subject.source_start, subject.source_end),
+                    )?
+                } else {
+                    vec![crate::source_fragments::AlignmentSlice {
+                        query_start: hit.query_start,
+                        query_end: hit.query_end,
+                        target_start: hit.subject_start,
+                        target_end: hit.subject_end,
+                    }]
                 };
-                let Some((subject_start, subject_end)) = transform_source_interval_to_ctg_display(
-                    subject,
-                    hit.subject_start,
-                    hit.subject_end,
-                ) else {
-                    continue;
-                };
-                let mut next = hit.clone();
-                next.query_assembly_ctg_id = query.assembly_ctg_id;
-                next.subject_assembly_ctg_id = subject.assembly_ctg_id;
-                next.query_start = query_start;
-                next.query_end = query_end;
-                next.subject_start = subject_start;
-                next.subject_end = subject_end;
-                next.strand = transform_pairwise_strand_to_ctg_display(
-                    &hit.strand,
-                    &query.orient,
-                    &subject.orient,
-                );
-                assigned.push(next);
+                for part in slices {
+                    let Some((qs, qe)) = transform_source_interval_to_ctg_display(
+                        query,
+                        part.query_start,
+                        part.query_end,
+                    ) else {
+                        continue;
+                    };
+                    let Some((ts, te)) = transform_source_interval_to_ctg_display(
+                        subject,
+                        part.target_start,
+                        part.target_end,
+                    ) else {
+                        continue;
+                    };
+                    let mut next = hit.clone();
+                    next.query_assembly_ctg_id = query.assembly_ctg_id;
+                    next.subject_assembly_ctg_id = subject.assembly_ctg_id;
+                    next.query_start = qs;
+                    next.query_end = qe;
+                    next.subject_start = ts;
+                    next.subject_end = te;
+                    next.projection_approximate = clipped && hit.cg_tag.is_none();
+                    if clipped {
+                        next.align_length = next.align_length.min((qe - qs + 1).max(te - ts + 1));
+                    }
+                    next.strand = transform_pairwise_strand_to_ctg_display(
+                        &hit.strand,
+                        &query.orient,
+                        &subject.orient,
+                    );
+                    assigned.push(next);
+                }
             }
         }
     }
-    assigned
+    Ok(assigned)
 }
 
 fn transform_source_interval_to_ctg_display(
@@ -711,7 +744,7 @@ fn get_track_pairwise_evidence_with_connection(
                     cached_hits,
                     &top_source_map,
                     &bottom_source_map,
-                ));
+                )?);
             }
             let scope_hit_count = scope_hits.len() as i64;
             if loaded_run_count > 0 {
@@ -962,6 +995,7 @@ struct ParsedSelfPafHit {
     mapq: i64,
     identity_pct: f64,
     align_length: i64,
+    cg_tag: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1045,6 +1079,7 @@ where
         if cached_mtime_ms == paf_mtime_ms
             && cached_size_bytes == paf_size_bytes
             && orientation_matches
+            && !conn.query_row("SELECT EXISTS(SELECT 1 FROM pairwise_alignment_hit WHERE run_id=?1 AND cg_tag IS NULL)", [id], |r| r.get::<_, bool>(0))?
         {
             let hit_count = conn
                 .query_row(
@@ -1174,9 +1209,9 @@ fn insert_pairwise_alignment_hits(
             "INSERT INTO pairwise_alignment_hit (
                 run_id, query_source_seq_id, target_source_seq_id, strand,
                 query_start, query_end, target_start, target_end,
-                match_length, align_length, mapq, identity_pct
+                match_length, align_length, mapq, identity_pct, cg_tag
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         )
         .context("failed to prepare pairwise hit insert")?;
     let mut inserted = 0_i64;
@@ -1212,6 +1247,7 @@ fn insert_pairwise_alignment_hits(
                 hit.align_length,
                 hit.mapq,
                 hit.identity_pct,
+                hit.cg_tag.unwrap_or_default(),
             ])
             .context("failed to insert pairwise alignment hit")?;
         inserted += 1;
@@ -1289,7 +1325,8 @@ fn query_pairwise_cached_hits_direction(
             h.target_end,
             h.mapq,
             h.identity_pct,
-            h.align_length
+            h.align_length,
+            h.cg_tag
          FROM pairwise_alignment_hit h
          JOIN source_seq query_seq ON query_seq.id = h.query_source_seq_id
          JOIN source_seq target_seq ON target_seq.id = h.target_source_seq_id
@@ -1323,6 +1360,14 @@ fn query_pairwise_cached_hits_direction(
             let mapq: i64 = row.get(9)?;
             let identity_pct: f64 = row.get(10)?;
             let align_length: i64 = row.get(11)?;
+            let cg_tag: Option<String> = row.get(12)?;
+            let cg_tag = cg_tag.filter(|s| !s.is_empty()).map(|cigar| {
+                if swapped {
+                    swap_cigar(&cigar, strand == "-")
+                } else {
+                    cigar
+                }
+            });
             let (
                 query_source_seq_id,
                 query_source_seq_name,
@@ -1375,6 +1420,8 @@ fn query_pairwise_cached_hits_direction(
                 evalue: None,
                 bit_score: None,
                 evidence_origin: evidence_origin.to_string(),
+                projection_approximate: false,
+                cg_tag,
             })
         })?
         .collect::<std::result::Result<Vec<_>, _>>()
@@ -1425,7 +1472,29 @@ fn parse_self_paf_line(line: &str) -> Option<ParsedSelfPafHit> {
         mapq,
         identity_pct,
         align_length,
+        cg_tag: fields.find_map(|field| field.strip_prefix("cg:Z:").map(str::to_owned)),
     })
+}
+
+fn swap_cigar(cigar: &str, reversed: bool) -> String {
+    let mut ops = Vec::new();
+    let mut start = 0;
+    for (index, ch) in cigar.char_indices() {
+        if ch.is_ascii_digit() {
+            continue;
+        }
+        let op = match ch {
+            'I' => 'D',
+            'D' | 'N' => 'I',
+            _ => ch,
+        };
+        ops.push(format!("{}{op}", &cigar[start..index]));
+        start = index + ch.len_utf8();
+    }
+    if reversed {
+        ops.reverse();
+    }
+    ops.concat()
 }
 
 #[derive(Debug, Clone)]
@@ -1545,7 +1614,7 @@ fn read_cross_dataset_server_hits(
                     pair_hits,
                     &left_source_map,
                     &right_source_map,
-                ));
+                )?);
             }
         }
     }

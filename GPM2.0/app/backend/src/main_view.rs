@@ -33,7 +33,8 @@ pub struct ProjectChromosomes {
     pub unplaced_bp: i64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChrViewCtgItem {
     pub assembly_ctg_id: i64,
     pub name: String,
@@ -55,11 +56,71 @@ pub struct ChrViewCtgItem {
     pub derived_target_dataset_name: Option<String>,
     pub hits: Vec<ChrViewHitItem>,
     pub n_regions: Vec<ChrViewNRegionItem>,
+    pub source_fragment: Option<SourceFragment>,
     pub telomere_marks: Vec<ChrViewTelomereMarkItem>,
     pub centromere_marks: Vec<ChrViewCentromereMarkItem>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceFragment {
+    pub source_seq_id: i64,
+    pub group_key: String,
+    pub source_start: i64,
+    pub source_end: i64,
+    pub source_length: i64,
+    pub gap_before_bp: i64,
+    pub gap_after_bp: i64,
+}
+
+fn load_source_fragment(conn: &Connection, ctg_id: i64) -> Result<Option<SourceFragment>> {
+    let row = conn
+        .query_row(
+            "SELECT s.source_seq_id,s.instance_key,s.source_start,s.source_end,ss.length
+         FROM assembly_ctg c JOIN assembly_seq s ON s.id=c.assembly_seq_id
+         JOIN source_seq ss ON ss.id=s.source_seq_id
+         WHERE c.id=?1 AND s.instance_key LIKE 'n-fragment:%'",
+            [ctg_id],
+            |r| {
+                Ok((
+                    r.get::<_, i64>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, i64>(2)?,
+                    r.get::<_, i64>(3)?,
+                    r.get::<_, i64>(4)?,
+                ))
+            },
+        )
+        .optional()?;
+    let Some((id, key, start, end, length)) = row else {
+        return Ok(None);
+    };
+    let gaps = crate::source_fragments::source_gaps(conn, id)?;
+    Ok(Some(SourceFragment {
+        source_seq_id: id,
+        group_key: key
+            .rsplit_once(':')
+            .map(|(group, _)| group)
+            .unwrap_or(&key)
+            .into(),
+        source_start: start,
+        source_end: end,
+        source_length: length,
+        gap_before_bp: gaps
+            .iter()
+            .find(|(_, right)| *right == start - 1)
+            .map(|(l, r)| r - l + 1)
+            .unwrap_or(0),
+        gap_after_bp: gaps
+            .iter()
+            .find(|(left, _)| *left == end + 1)
+            .map(|(l, r)| r - l + 1)
+            .unwrap_or(0),
+    }))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChrViewNRegionItem {
     pub start_bp: i64,
     pub end_bp: i64,
@@ -68,7 +129,8 @@ pub struct ChrViewNRegionItem {
     pub ctg_end: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChrViewTelomereMarkItem {
     pub rule_id: String,
     pub motif: String,
@@ -81,7 +143,8 @@ pub struct ChrViewTelomereMarkItem {
     pub ctg_end: i64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChrViewCentromereMarkItem {
     pub cen_id: String,
     pub query_name: String,
@@ -95,8 +158,10 @@ pub struct ChrViewCentromereMarkItem {
     pub ctg_end: i64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChrViewHitItem {
+    pub reference_projection_approximate: bool,
     pub hit_id: i64,
     pub assembly_ctg_member_id: i64,
     pub assembly_seq_id: i64,
@@ -443,7 +508,8 @@ pub fn list_chr_view_ctgs_with_connection(
          ORDER BY
             CASE WHEN c.assigned_chr_name IS NULL OR c.assigned_chr_name = '' THEN 1 ELSE 0 END,
             c.assigned_chr_name,
-            c.chr_order",
+            c.chr_order, c.anchor_start,
+            s.source_seq_id, CASE WHEN s.orient='-' THEN -s.source_end ELSE s.source_start END, c.id",
     );
     let mut stmt = conn
         .prepare(&sql)
@@ -460,6 +526,9 @@ pub fn list_chr_view_ctgs_with_connection(
     }
 
     populate_co_assigned_chr_names(conn, project_id, &mut ctgs)?;
+    for ctg in &mut ctgs {
+        ctg.source_fragment = load_source_fragment(conn, ctg.assembly_ctg_id)?;
+    }
 
     let reference_genome_id: i64 = conn
         .query_row(
@@ -574,6 +643,7 @@ fn decode_chr_view_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ChrViewCtgIt
         derived_target_dataset_name: row.get(16)?,
         hits: Vec::new(),
         n_regions: Vec::new(),
+        source_fragment: None,
         telomere_marks: Vec::new(),
         centromere_marks: Vec::new(),
     })
@@ -1067,6 +1137,9 @@ fn list_chr_view_hits_with_connection(
                 project_source_interval_to_ctg(layout, segment.query_start, segment.query_end);
             let segment_length = segment.query_end - segment.query_start + 1;
             hits.push(ChrViewHitItem {
+                reference_projection_approximate: row.cg_tag.as_deref().is_none_or(str::is_empty)
+                    && (segment.query_start != row.query_start
+                        || segment.query_end != row.query_end),
                 hit_id: row.hit_id,
                 assembly_ctg_member_id: row.assembly_ctg_member_id,
                 assembly_seq_id: row.assembly_seq_id,

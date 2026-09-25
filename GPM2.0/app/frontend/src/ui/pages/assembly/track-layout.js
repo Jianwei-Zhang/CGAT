@@ -1,3 +1,4 @@
+import { sourceGapBetween, sourceTerminalGap } from "./source-fragment-layout.js";
 import { resolveTrackPrefs } from "./track-prefs.js";
 
 const MIN_ADJACENT_GAP_PX = 20;
@@ -17,11 +18,13 @@ export function normalizeCtgs(ctgs, { preserveInputOrder = false } = {}) {
       .map(({ ctg }) => ctg);
 
   let layoutCursorBp = 0;
-  return sorted.map((ctg) => {
+  return sorted.map((ctg, index) => {
     const lengthBp = Math.max(1, normalizePositiveInt(ctg?.totalLength) ?? 1);
+    layoutCursorBp += sourceGapBetween(sorted[index - 1], ctg) ?? sourceTerminalGap(ctg, true);
     const startBp = layoutCursorBp;
     const endBp = startBp + lengthBp - 1;
     layoutCursorBp = endBp + 1;
+    if (sourceGapBetween(ctg, sorted[index + 1]) === null) layoutCursorBp += sourceTerminalGap(ctg, false);
     return {
       ...ctg,
       startBp,

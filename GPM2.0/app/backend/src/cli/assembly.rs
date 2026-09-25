@@ -17,6 +17,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             )?;
             println!("ctg_count={}", items.len());
             for item in items {
+                println!("ctg_json={}", serde_json::to_string(&item)?);
                 println!(
                     "ctg id={} name={} chr={} chr_order={} anchor_start={} ref_orient={} mode={} members={} bp={} dataset_id={} dataset={}",
                     item.assembly_ctg_id,

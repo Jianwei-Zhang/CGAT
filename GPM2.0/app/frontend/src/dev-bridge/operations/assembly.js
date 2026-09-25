@@ -26,6 +26,8 @@ async function listChrViewCtgs(payload) {
   }
   const output = await runBackend(args);
   const lines = output.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const jsonItems = lines.filter((line) => line.startsWith("ctg_json=")).map((line) => JSON.parse(line.slice(9)));
+  if (jsonItems.length) return { items: jsonItems };
   const items = [];
   for (const line of lines) {
     const match = line.match(

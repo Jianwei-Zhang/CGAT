@@ -882,9 +882,10 @@ where
     F: FnMut() -> bool,
 {
     let created_at = now_timestamp_string();
-    let mut assembly_seq_count = 0_i64;
-    let mut assembly_ctg_count = 0_i64;
-    let mut assembly_member_count = 0_i64;
+    let after_seq_id: i64 =
+        tx.query_row("SELECT COALESCE(MAX(id),0) FROM assembly_seq", [], |r| {
+            r.get(0)
+        })?;
     for source_seed in seeds {
         if should_cancel() {
             bail!("auto pipeline cancelled");
@@ -903,9 +904,6 @@ where
                     seed,
                     &created_at,
                 )?;
-                assembly_seq_count += 1;
-                assembly_ctg_count += 1;
-                assembly_member_count += 1;
             }
             continue;
         }
@@ -918,16 +916,23 @@ where
             &ctg_base_name,
             &created_at,
         )?;
-        assembly_seq_count += 1;
-        assembly_ctg_count += 1;
-        assembly_member_count += 1;
     }
 
+    crate::source_fragments::split_new_source_instances(tx, project_id, after_seq_id)?;
+    // Report the actual fragment counts, including datasets appended earlier.
+    let source_ids: HashSet<i64> = seeds.iter().map(|s| s.source_seq_id).collect();
+    let mut stmt = tx.prepare("SELECT s.source_seq_id FROM assembly_ctg c JOIN assembly_seq s ON s.id=c.assembly_seq_id WHERE c.project_id=?1")?;
+    let count = stmt
+        .query_map([project_id], |r| r.get::<_, i64>(0))?
+        .collect::<std::result::Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter(|id| source_ids.contains(id))
+        .count() as i64;
     Ok(AssemblyBootstrapSummary {
         project_id,
-        assembly_seq_count,
-        assembly_ctg_count,
-        assembly_member_count,
+        assembly_seq_count: count,
+        assembly_ctg_count: count,
+        assembly_member_count: count,
     })
 }
 

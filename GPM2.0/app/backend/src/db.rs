@@ -6,7 +6,7 @@ use rusqlite::Connection;
 #[path = "db_migrations.rs"]
 mod migrations;
 
-pub const CURRENT_SCHEMA_VERSION: i64 = 4;
+pub const CURRENT_SCHEMA_VERSION: i64 = 5;
 
 pub fn open_workspace_db(project_db_path: &Path) -> Result<Connection> {
     let mut conn = Connection::open(project_db_path).with_context(|| {
@@ -459,6 +459,7 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
             align_length INTEGER NOT NULL,
             mapq INTEGER NOT NULL,
             identity_pct REAL NOT NULL,
+            cg_tag TEXT,
             FOREIGN KEY(run_id) REFERENCES pairwise_alignment_run(id) ON DELETE CASCADE,
             FOREIGN KEY(query_source_seq_id) REFERENCES source_seq(id) ON DELETE CASCADE,
             FOREIGN KEY(target_source_seq_id) REFERENCES source_seq(id) ON DELETE CASCADE

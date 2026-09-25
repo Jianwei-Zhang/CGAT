@@ -1,3 +1,4 @@
+import { renderSourceGapConnections } from "./source-fragment-layout.js";
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
@@ -2248,6 +2249,12 @@ function renderAssemblyTracks({
     })
     .join("");
 
+  const sourceGapConnections = rowLayouts.map((layout) => renderSourceGapConnections(
+    layout.trackModel.ctgs.filter((ctg) => !(layout.role === "primary" && hiddenPrimaryCtgIdSet.has(Number(ctg.assemblyCtgId))))
+      .map((ctg) => ({ ctg, rect: resolveTrackCtgDisplayRect(layout, ctg, layout.trackModel.ctgs.indexOf(ctg)),
+        y: layout.laneTop + ctg.laneIndex * TRACK_LANE_HEIGHT + TRACK_BAR_HEIGHT / 2 })), escapeHtml,
+  )).join("");
+
   const rowBlocks = rowLayouts
     .map((layout) => {
       const rowBgClass = layout.className ? ` ${layout.className}` : "";
@@ -2471,6 +2478,7 @@ function renderAssemblyTracks({
             ${tickLines}
             ${collinearityBands}
             ${grtResultContext?.mainEnabled ? grtResultScene.junctionMarkup : ""}
+            ${sourceGapConnections}
             ${rowBlocks}
             ${refRow}
           </svg>

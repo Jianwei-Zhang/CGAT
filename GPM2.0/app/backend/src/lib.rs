@@ -15,4 +15,5 @@ pub mod project_catalog;
 pub mod project_initializer;
 pub mod reference_segments;
 pub mod runtime_persistence;
+mod source_fragments;
 pub mod workspace;

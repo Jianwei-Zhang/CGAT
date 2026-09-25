@@ -181,6 +181,7 @@ function normalizeGrtDisplayEvidence(value) {
   }
   return {
     evidenceId: normalizeString(firstDefined(source, "evidenceId", "evidence_id")),
+    projectionApproximate: Boolean(source.projectionApproximate ?? source.projection_approximate),
     eventId: normalizeString(firstDefined(source, "eventId", "event_id")),
     finalPathSegmentId: normalizeString(
       firstDefined(source, "finalPathSegmentId", "final_path_segment_id"),

@@ -127,6 +127,7 @@ struct CtgMemberModel {
     member_order: i64,
     source_seq_id: i64,
     source_seq_name: String,
+    instance_key: String,
     orient: String,
     source_start: i64,
     source_end: i64,
@@ -771,6 +772,35 @@ fn export_chr_agp_with_connection(
     match element {
         ChrAgpElement::Ctg => {
             for (chr_name, chr_ctgs) in chr_groups {
+                if chr_ctgs.iter().any(|ctg| fragment_member(ctg).is_some()) {
+                    let mut chunks = merge_ctg_chunks_for_chr(&chr_ctgs, &source_sequences)?;
+                    for chunk in &mut chunks {
+                        if let CtgChunk::Sequence {
+                            component_id,
+                            component_start,
+                            component_end,
+                            orient,
+                            sequence,
+                        } = chunk
+                            && let Some(ctg) = chr_ctgs.iter().find(|ctg| {
+                                ctg.members.iter().any(|m| {
+                                    m.source_seq_name == *component_id
+                                        && m.source_start == *component_start
+                                        && m.source_end == *component_end
+                                        && m.orient == *orient
+                                })
+                            })
+                        {
+                            *component_id = ctg.name.clone();
+                            *component_start = 1;
+                            *component_end = sequence.len() as i64;
+                            *orient = "+".into();
+                        }
+                    }
+                    lines.extend(chunks_to_agp_rows(&chr_name, &chunks));
+                    object_count += 1;
+                    continue;
+                }
                 let mut begin = 1_i64;
                 let mut part = 1_i64;
                 let mut has_component = false;
@@ -1009,7 +1039,8 @@ fn load_ctg_models(
             s.source_end,
             s.hidden,
             s.left_end_type,
-            s.right_end_type
+            s.right_end_type,
+            s.instance_key
          FROM assembly_ctg c
          JOIN assembly_seq s ON s.id = c.assembly_seq_id
          JOIN source_seq ss ON ss.id = s.source_seq_id
@@ -1029,6 +1060,7 @@ fn load_ctg_models(
                     hidden: row.get::<_, i64>(6)? > 0,
                     left_end_type: row.get(7)?,
                     right_end_type: row.get(8)?,
+                    instance_key: row.get(9)?,
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -1358,6 +1390,61 @@ fn sort_ctg_models(ctgs: &mut [CtgExportModel]) {
     });
 }
 
+fn fragment_member(ctg: &CtgExportModel) -> Option<&CtgMemberModel> {
+    let member = ctg.members.first()?;
+    (ctg.members.len() == 1 && !member.hidden && member.instance_key.starts_with("n-fragment:"))
+        .then_some(member)
+}
+
+fn original_gap_between(
+    left: &CtgExportModel,
+    right: &CtgExportModel,
+    sources: &HashMap<i64, String>,
+) -> Option<i64> {
+    let a = fragment_member(left)?;
+    let b = fragment_member(right)?;
+    if a.source_seq_id != b.source_seq_id
+        || a.orient != b.orient
+        || a.instance_key.rsplit_once(':')?.0 != b.instance_key.rsplit_once(':')?.0
+    {
+        return None;
+    }
+    let (start, end) = if a.orient == "-" {
+        (b.source_end + 1, a.source_start - 1)
+    } else {
+        (a.source_end + 1, b.source_start - 1)
+    };
+    if end < start {
+        return None;
+    }
+    let source = sources.get(&a.source_seq_id)?;
+    let gap = source.as_bytes().get((start - 1) as usize..end as usize)?;
+    gap.iter()
+        .all(|b| matches!(b, b'N' | b'n'))
+        .then_some(end - start + 1)
+}
+
+fn original_terminal_gap(
+    ctg: &CtgExportModel,
+    sources: &HashMap<i64, String>,
+    before: bool,
+) -> i64 {
+    let Some(m) = fragment_member(ctg) else {
+        return 0;
+    };
+    let Some(source) = sources.get(&m.source_seq_id) else {
+        return 0;
+    };
+    let gap = if before != (m.orient == "-") {
+        source.as_bytes().get(..(m.source_start - 1) as usize)
+    } else {
+        source.as_bytes().get(m.source_end as usize..)
+    };
+    gap.filter(|g| g.iter().all(|b| matches!(b, b'N' | b'n')))
+        .map(|g| g.len() as i64)
+        .unwrap_or(0)
+}
+
 fn merge_ctg_chunks_for_chr(
     chr_ctgs: &[CtgExportModel],
     source_sequences: &HashMap<i64, String>,
@@ -1365,14 +1452,17 @@ fn merge_ctg_chunks_for_chr(
     let mut merged = Vec::<CtgChunk>::new();
     let mut has_output = false;
     let mut last_component_is_gap = false;
-    for ctg in chr_ctgs {
+    for (index, ctg) in chr_ctgs.iter().enumerate() {
         let chunks = build_ctg_chunks(ctg, source_sequences)?;
         if chunks.is_empty() {
             continue;
         }
+        let original_gap = index
+            .checked_sub(1)
+            .and_then(|previous| original_gap_between(&chr_ctgs[previous], ctg, source_sequences));
         if has_output && !last_component_is_gap {
             merged.push(CtgChunk::Gap {
-                length: DEFAULT_CHR_GAP_BP,
+                length: original_gap.unwrap_or(DEFAULT_CHR_GAP_BP),
                 gap_type: "contig",
             });
             last_component_is_gap = true;
@@ -1385,9 +1475,32 @@ fn merge_ctg_chunks_for_chr(
         } else {
             0
         };
+        if original_gap.is_none() {
+            let length = original_terminal_gap(ctg, source_sequences, true);
+            if length > 0 {
+                merged.push(CtgChunk::Gap {
+                    length,
+                    gap_type: "scaffold",
+                });
+            }
+        }
         for chunk in chunks.into_iter().skip(start_index) {
             last_component_is_gap = matches!(chunk, CtgChunk::Gap { .. });
             merged.push(chunk);
+        }
+        if chr_ctgs
+            .get(index + 1)
+            .and_then(|next| original_gap_between(ctg, next, source_sequences))
+            .is_none()
+        {
+            let length = original_terminal_gap(ctg, source_sequences, false);
+            if length > 0 {
+                merged.push(CtgChunk::Gap {
+                    length,
+                    gap_type: "scaffold",
+                });
+                last_component_is_gap = true;
+            }
         }
         has_output = !merged.is_empty();
     }
@@ -1624,6 +1737,32 @@ mod tests {
         path::{Path, PathBuf},
     };
     use tempfile::tempdir;
+
+    #[test]
+    fn split_source_chromosome_export_restores_original_gaps_on_both_strands() {
+        for orient in ["+", "-"] {
+            let conn = Connection::open_in_memory().unwrap();
+            let sequence = "NACNTNNGGN";
+            crate::source_fragments::tests::seed(&conn, sequence, orient);
+            crate::source_fragments::split_new_source_instances(&conn, 1, 0).unwrap();
+            let ctgs = super::load_ctg_models(&conn, 1, Some("Chr01"), None, false).unwrap();
+            let sources = HashMap::from([(1, sequence.to_string())]);
+            let chunks = super::merge_ctg_chunks_for_chr(&ctgs, &sources).unwrap();
+            let expected = if orient == "+" {
+                sequence.into()
+            } else {
+                super::reverse_complement(sequence)
+            };
+            assert_eq!(super::chunks_to_sequence(&chunks), expected);
+            assert_eq!(super::chunks_total_length(&chunks), 10);
+            let rows = super::chunks_to_agp_rows("Chr01", &chunks);
+            assert_eq!(rows.last().unwrap().split('\t').nth(2), Some("10"));
+            assert!(
+                rows.iter()
+                    .any(|row| row.contains("\tN\t2\t") || row.contains("\tU\t2\t"))
+            );
+        }
+    }
 
     #[test]
     fn exports_fasta_agp_and_records_history() {
@@ -2089,6 +2228,7 @@ mod tests {
                 member_order: 1,
                 source_seq_id,
                 source_seq_name: source_seq_name.to_string(),
+                instance_key: String::new(),
                 orient: "+".to_string(),
                 source_start: 1,
                 source_end,
