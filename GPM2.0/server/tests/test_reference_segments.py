@@ -46,6 +46,7 @@ class ReferenceSegmentsTests(unittest.TestCase):
                 b"reference_chr_name\tsegment_order\tsegment_start_bp\tsegment_end_bp\n"
                 b"Chr01\t1\t1\t3\n"
                 b"Chr01\t2\t104\t105\n"
+                b"all_n\t0\t0\t0\n"
                 b"short_n\t1\t1\t3\n"
                 b"lower_n\t1\t1\t1\n"
                 b"lower_n\t2\t102\t102\n"

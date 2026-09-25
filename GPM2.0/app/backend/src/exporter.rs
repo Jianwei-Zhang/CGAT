@@ -1666,6 +1666,43 @@ fn now_timestamp_string() -> String {
     secs.to_string()
 }
 
+fn fai_entry_matches_record(file: &mut File, offset: u64, expected_name: &str) -> Result<bool> {
+    if offset == 0 || offset > file.metadata()?.len() {
+        return Ok(false);
+    }
+    // The offset points to sequence bases, immediately after the header line.
+    // Search only the preceding header, allowing descriptions and CRLF input.
+    const MAX_HEADER_BYTES: u64 = 64 * 1024;
+    let lower_bound = offset.saturating_sub(MAX_HEADER_BYTES);
+    let mut cursor = offset - 1;
+    let mut header_start = None;
+    while cursor > lower_bound {
+        let start = cursor.saturating_sub(4096).max(lower_bound);
+        let mut chunk = vec![0; (cursor - start) as usize];
+        file.seek(SeekFrom::Start(start))?;
+        file.read_exact(&mut chunk)?;
+        if let Some(index) = chunk.iter().rposition(|byte| *byte == b'\n') {
+            header_start = Some(start + index as u64 + 1);
+            break;
+        }
+        cursor = start;
+    }
+    let Some(header_start) = header_start.or((cursor == 0).then_some(0)) else {
+        return Ok(false);
+    };
+    let mut header = vec![0; (offset - header_start) as usize];
+    file.seek(SeekFrom::Start(header_start))?;
+    file.read_exact(&mut header)?;
+    if !header.starts_with(b">") || !header.ends_with(b"\n") {
+        return Ok(false);
+    }
+    let name = header[1..]
+        .split(|byte| byte.is_ascii_whitespace())
+        .next()
+        .unwrap_or_default();
+    Ok(name == expected_name.as_bytes())
+}
+
 /// Random-access FASTA read through a samtools-style index. Returns `None` when
 /// the index is absent, unparsable, stale, or does not cover every requested
 /// name so the caller can fall back to the streaming scan.
@@ -1698,6 +1735,9 @@ fn load_named_sequences_via_fai(
             return Ok(None);
         };
         if entry.offset == 0 || entry.line_width < entry.line_bases {
+            return Ok(None);
+        }
+        if !fai_entry_matches_record(&mut file, entry.offset, name)? {
             return Ok(None);
         }
         // A record must start right after a line break, otherwise the entry does
@@ -1871,15 +1911,15 @@ mod tests {
         let mut fasta = String::new();
         let mut index = String::new();
         for (name, sequence) in records {
+            fasta.push('>');
+            fasta.push_str(name);
+            fasta.push_str(newline);
             index.push_str(&format!(
                 "{name}\t{}\t{}\t{line_bases}\t{}\n",
                 sequence.len(),
                 fasta.len(),
                 line_bases + newline.len()
             ));
-            fasta.push('>');
-            fasta.push_str(name);
-            fasta.push_str(newline);
             for chunk in sequence.as_bytes().chunks(line_bases) {
                 fasta.push_str(std::str::from_utf8(chunk).unwrap());
                 fasta.push_str(newline);
@@ -1928,21 +1968,15 @@ mod tests {
         let temp = tempdir().unwrap();
         let path = temp.path().join("ref.fa");
         let sequence = "ACGT".repeat(40);
-        let mut fasta = String::new();
-        let mut index = String::new();
-        index.push_str(&format!("chr01\t{}\t0\t80\t81\n", sequence.len()));
-        fasta.push_str(&format!(">chr01\n{sequence}\n"));
+        let mut fasta = format!(">chr01\n{sequence}\n").into_bytes();
+        let mut index = format!("chr01\t{}\t7\t160\t161\n", sequence.len());
         // A later record that is not valid UTF-8 can only be reached by a scan.
-        index.push_str(&format!(
-            "chr02\t{}\t{}\t80\t81\n",
-            sequence.len(),
-            fasta.len()
-        ));
-        fasta.push_str(">chr02\n");
-        fasta.push_str(&"A".repeat(40));
-        fasta.push(0x80 as char);
-        fasta.push_str(&"A".repeat(39));
-        fasta.push('\n');
+        fasta.extend_from_slice(b">chr02\n");
+        index.push_str(&format!("chr02\t{}\t{}\t80\t81\n", 80, fasta.len()));
+        fasta.extend_from_slice(&[b'A'; 40]);
+        fasta.push(0x80);
+        fasta.extend_from_slice(&[b'A'; 39]);
+        fasta.push(b'\n');
         fs::write(&path, fasta).unwrap();
         fs::write(format!("{}.fai", path.display()), index).unwrap();
         let names = HashSet::from(["chr01".to_string()]);
@@ -1977,6 +2011,24 @@ mod tests {
         fs::write(format!("{}.fai", path.display()), "").unwrap();
         let missing = HashSet::from(["chr99".to_string()]);
         assert!(load_named_sequences_from_fasta(&path, &missing).is_err());
+    }
+
+    #[test]
+    fn reordered_same_length_records_do_not_trust_stale_fai_offsets() {
+        let temp = tempdir().unwrap();
+        let path = temp.path().join("ref.fa");
+        write_indexed_fasta(
+            &path,
+            &[("chr01", "AAAA".into()), ("chr02", "CCCC".into())],
+            4,
+            false,
+        );
+        fs::write(&path, ">chr02\nCCCC\n>chr01\nAAAA\n").unwrap();
+        let names = HashSet::from(["chr01".to_string()]);
+        assert_eq!(
+            load_named_sequences_from_fasta(&path, &names).unwrap()["chr01"],
+            "AAAA"
+        );
     }
 
     #[test]

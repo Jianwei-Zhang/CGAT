@@ -932,21 +932,14 @@ with source_locator_path.open("w", encoding="utf-8", newline="") as handle:
             writer.writerow([dataset_name, seq_name, relpath])
 
 n_region_path = metadata_dir / "source_seq_n_regions.tsv"
-assigned_by_dataset = {}
-for chr_datasets in selected_by_chr_dataset.values():
-    for dataset_name, selected_names in chr_datasets.items():
-        assigned_by_dataset.setdefault(dataset_name, set()).update(selected_names)
 with n_region_path.open("w", encoding="utf-8", newline="") as handle:
     writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
     writer.writerow(["dataset_name", "seq_name", "start_bp", "end_bp", "length_bp"])
     for dataset_name in dataset_order:
         dataset_info = dataset_infos[dataset_name]
         ordered_records = dataset_info["ordered_records"]
-        assigned_names = assigned_by_dataset.get(dataset_name, set())
         assert isinstance(ordered_records, list)
         for seq_name, sequence in ordered_records:
-            if seq_name not in assigned_names:
-                continue
             for start_bp, end_bp, length_bp in iter_n_regions(sequence):
                 writer.writerow([dataset_name, seq_name, start_bp, end_bp, length_bp])
 

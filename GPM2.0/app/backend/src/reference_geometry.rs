@@ -37,6 +37,9 @@ pub(crate) fn persisted_reference_segments(
     if rows.is_empty() {
         return Ok(None);
     }
+    if rows.len() == 1 && rows[0].0 == 0 && rows[0].1 == 0 && rows[0].2 == 0 {
+        return Ok(Some(Vec::new()));
+    }
     Ok(Some(
         rows.into_iter()
             .map(
@@ -77,7 +80,7 @@ pub(crate) fn materialize_reference_segments(
 }
 
 /// Parse a server `metadata/reference_segments.tsv` into per-chromosome spans.
-/// Chromosomes absent from the file are simply not described by it.
+/// A 0/0/0 row explicitly describes a chromosome with no non-N spans.
 pub(crate) fn read_reference_segments_tsv(
     path: &Path,
 ) -> Result<HashMap<String, Vec<ReferenceSegment>>> {
@@ -131,18 +134,33 @@ pub(crate) fn read_reference_segments_tsv(
             path,
             line_index + 2,
         )?;
-        if end_bp < start_bp {
-            bail_tsv(path, line_index + 2, "segment_end_bp < segment_start_bp")?;
+        if (segment_order, start_bp, end_bp) == (0, 0, 0) {
+            if result.contains_key(chr_name) {
+                bail_tsv(path, line_index + 2, "duplicate empty segment marker")?;
+            }
+            result.insert(chr_name.to_string(), Vec::new());
+            continue;
         }
-        result
-            .entry(chr_name.to_string())
-            .or_default()
-            .push(ReferenceSegment {
-                reference_chr_name: chr_name.to_string(),
-                segment_order,
-                start_bp,
-                end_bp,
-            });
+        if segment_order < 1 || start_bp < 1 || end_bp < start_bp {
+            bail_tsv(path, line_index + 2, "invalid segment coordinates")?;
+        }
+        let segment = ReferenceSegment {
+            reference_chr_name: chr_name.to_string(),
+            segment_order,
+            start_bp,
+            end_bp,
+        };
+        match result.entry(chr_name.to_string()) {
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(vec![segment]);
+            }
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                if entry.get().is_empty() {
+                    bail_tsv(path, line_index + 2, "segment after empty marker")?;
+                }
+                entry.get_mut().push(segment);
+            }
+        }
     }
     for segments in result.values_mut() {
         segments.sort_by_key(|segment| (segment.segment_order, segment.start_bp, segment.end_bp));
@@ -187,6 +205,11 @@ pub(crate) fn store_reference_segments(
              ) VALUES (?1, ?2, ?3, ?4)",
         )
         .context("failed to prepare reference segment insert")?;
+    if segments.is_empty() {
+        stmt.execute(params![reference_chr_id, 0, 0, 0])
+            .context("failed to mark an empty reference chromosome")?;
+        return Ok(());
+    }
     for segment in segments {
         stmt.execute(params![
             reference_chr_id,
@@ -231,9 +254,6 @@ pub(crate) fn materialize_reference_genome(
         // description and only fall back to scanning the FASTA when a
         // chromosome is not covered by it.
         if let Some(segments) = described.get(&chr_name) {
-            if segments.is_empty() {
-                continue;
-            }
             store_reference_segments(conn, chr_id, segments)?;
             stored += segments.len();
             continue;
@@ -314,6 +334,47 @@ mod tests {
             persisted_reference_segments(&conn, chr_id)
                 .unwrap()
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn all_n_chromosome_keeps_an_explicit_empty_geometry() {
+        let temp = tempfile::tempdir().unwrap();
+        let conn = Connection::open(temp.path().join("project.sqlite")).unwrap();
+        let chr_id = seed_reference(&conn, "chr1", 100);
+        let metadata = temp.path().join("reference_segments.tsv");
+        std::fs::write(
+            &metadata,
+            "reference_chr_name\tsegment_order\tsegment_start_bp\tsegment_end_bp\nchr1\t0\t0\t0\n",
+        )
+        .unwrap();
+        let missing_fasta = temp.path().join("missing.fa");
+        assert_eq!(
+            materialize_reference_genome(
+                &conn,
+                1,
+                &missing_fasta.to_string_lossy(),
+                Some(&metadata)
+            )
+            .unwrap(),
+            0
+        );
+        assert_eq!(
+            persisted_reference_segments(&conn, chr_id).unwrap(),
+            Some(Vec::new())
+        );
+        conn.execute("DELETE FROM reference_chr_segment", [])
+            .unwrap();
+        let fasta = temp.path().join("reference.fa");
+        std::fs::write(&fasta, format!(">chr1\n{}\n", "N".repeat(100))).unwrap();
+        assert_eq!(
+            materialize_reference_segments(&conn, chr_id, "chr1", &fasta.to_string_lossy())
+                .unwrap(),
+            Some(Vec::new())
+        );
+        assert_eq!(
+            persisted_reference_segments(&conn, chr_id).unwrap(),
+            Some(Vec::new())
         );
     }
 

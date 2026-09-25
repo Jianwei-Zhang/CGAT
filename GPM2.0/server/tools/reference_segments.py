@@ -98,6 +98,9 @@ class ReferenceSegmentScanner:
         if self.gap_run_length:
             self.close_gap_if_needed(self.sequence_bp + 1)
         self.emit_segment(self.sequence_bp)
+        if self.sequence_bp > 0 and self.segment_order == 0:
+            # An all-N chromosome is described by an explicit empty marker.
+            self.output_handle.write(f"{self.current_name}\t0\t0\t0\n")
         self.current_name = None
 
 

@@ -1800,9 +1800,7 @@ fn read_reference_segments_metadata(
     let mut described = crate::reference_geometry::read_reference_segments_tsv(&path)?;
     // A chromosome missing from the file is not described by it; callers then
     // fall back to the FASTA or to a single whole-chromosome segment.
-    Ok(described
-        .remove(chr_name)
-        .filter(|segments| !segments.is_empty()))
+    Ok(described.remove(chr_name))
 }
 
 fn derive_reference_gaps_from_segments(
@@ -2871,6 +2869,19 @@ mod tests {
         );
         assert_eq!(items[0].hits.len(), 1);
         assert_eq!(items[1].hits.len(), 1);
+
+        conn.execute("DELETE FROM reference_chr_segment", [])
+            .unwrap();
+        std::fs::write(
+            workspace_root.join("metadata/reference_segments.tsv"),
+            "reference_chr_name\tsegment_order\tsegment_start_bp\tsegment_end_bp\nChr01\t0\t0\t0\n",
+        )
+        .unwrap();
+        assert!(
+            list_reference_track_members(&db_path, 7, "Chr01")
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
