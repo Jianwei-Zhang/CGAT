@@ -10,7 +10,6 @@ use crate::reference_segments::{
     map_paf_query_interval_to_ref_span, split_paf_hit_by_reference_gaps,
 };
 
-mod reference_cache;
 pub mod reference_transport;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1759,42 +1758,26 @@ fn resolve_reference_track_segments_with_connection(
     {
         // Persist what the package already describes so later reads are pure
         // database lookups and the FASTA is never scanned for this chromosome.
-        crate::reference_geometry::store_reference_segments(conn, reference_chr_id, &segments)?;
+        // A workspace that cannot be written still renders from this answer.
+        let _ =
+            crate::reference_geometry::store_reference_segments(conn, reference_chr_id, &segments);
         let gaps = derive_reference_gaps_from_segments(&segments, chr_length);
         return Ok((segments, gaps));
     }
-    if let Ok((segments, gaps)) =
-        reference_cache::load_reference_geometry(Path::new(reference_fasta_path), chr_name)
-    {
-        crate::reference_geometry::store_reference_segments(conn, reference_chr_id, &segments)?;
-        return Ok((segments, gaps));
-    }
-    resolve_reference_track_segments(workspace_root, reference_fasta_path, chr_name, chr_length)
-}
-
-fn resolve_reference_track_segments(
-    workspace_root: Option<&Path>,
-    reference_fasta_path: &str,
-    chr_name: &str,
-    chr_length: i64,
-) -> Result<(Vec<ReferenceSegment>, Vec<ReferenceGapInterval>)> {
-    if let Some(root) = workspace_root
-        && let Some(segments) = read_reference_segments_metadata(root, chr_name)?
-    {
+    // Legacy packages without a packaged description: read the chromosome
+    // through the FASTA index once, then keep the spans in the database.
+    if let Some(segments) = crate::reference_geometry::materialize_reference_segments(
+        conn,
+        reference_chr_id,
+        chr_name,
+        reference_fasta_path,
+    )? {
         let gaps = derive_reference_gaps_from_segments(&segments, chr_length);
         return Ok((segments, gaps));
     }
-
-    if let Ok(geometry) =
-        reference_cache::load_reference_geometry(Path::new(reference_fasta_path), chr_name)
-    {
-        return Ok(geometry);
-    }
-
     if chr_length < 1 {
         return Ok((Vec::new(), Vec::new()));
     }
-
     Ok((
         vec![ReferenceSegment {
             reference_chr_name: chr_name.to_string(),
