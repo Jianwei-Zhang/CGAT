@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -120,6 +120,14 @@ struct CtgExportModel {
     anchor_start: Option<i64>,
     ref_orient: Option<String>,
     members: Vec<CtgMemberModel>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FaiEntry {
+    length: u64,
+    offset: u64,
+    line_bases: u64,
+    line_width: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1658,10 +1666,124 @@ fn now_timestamp_string() -> String {
     secs.to_string()
 }
 
+/// Random-access FASTA read through a samtools-style index. Returns `None` when
+/// the index is absent, unparsable, stale, or does not cover every requested
+/// name so the caller can fall back to the streaming scan.
+fn load_named_sequences_via_fai(
+    fasta_path: &Path,
+    needed_names: &HashSet<String>,
+) -> Result<Option<HashMap<String, String>>> {
+    if needed_names.is_empty() {
+        return Ok(Some(HashMap::new()));
+    }
+    let mut index_path = fasta_path.as_os_str().to_owned();
+    index_path.push(".fai");
+    let index_path = PathBuf::from(index_path);
+    if !index_path.is_file() {
+        return Ok(None);
+    }
+    let index = match std::fs::read_to_string(&index_path)
+        .ok()
+        .map(|text| parse_fai_index(&text))
+    {
+        Some(index) if !index.is_empty() => index,
+        _ => return Ok(None),
+    };
+    let mut file = File::open(fasta_path)
+        .with_context(|| format!("failed to open fasta {}", fasta_path.display()))?;
+    let mut found = HashMap::with_capacity(needed_names.len());
+    for name in needed_names {
+        let Some(entry) = index.get(name) else {
+            // Keep the historical full-scan behavior for unindexed names.
+            return Ok(None);
+        };
+        if entry.offset == 0 || entry.line_width < entry.line_bases {
+            return Ok(None);
+        }
+        // A record must start right after a line break, otherwise the entry does
+        // not describe this file and the scan below is authoritative.
+        let mut previous = [0_u8; 1];
+        file.seek(SeekFrom::Start(entry.offset - 1))?;
+        if file.read(&mut previous)? != 1 || !matches!(previous[0], b'\n' | b'\r') {
+            return Ok(None);
+        }
+        let terminator = entry.line_width - entry.line_bases;
+        let full_lines = entry.length / entry.line_bases;
+        let remainder = entry.length % entry.line_bases;
+        let bytes = if remainder == 0 {
+            full_lines * entry.line_width
+        } else {
+            full_lines * entry.line_width + remainder + terminator
+        };
+        file.seek(SeekFrom::Start(entry.offset))?;
+        let mut buffer = Vec::new();
+        Read::take(&mut file, bytes)
+            .read_to_end(&mut buffer)
+            .with_context(|| format!("failed to read {}", fasta_path.display()))?;
+        let mut next = [0_u8; 1];
+        let boundary = match file.read(&mut next) {
+            Ok(1) => Some(next[0]),
+            _ => None,
+        };
+        if !matches!(boundary, None | Some(b'>') | Some(b'\n') | Some(b'\r')) {
+            return Ok(None);
+        }
+        let Ok(text) = String::from_utf8(buffer) else {
+            return Ok(None);
+        };
+        let sequence: String = text.chars().filter(|ch| !ch.is_whitespace()).collect();
+        if sequence.len() as u64 != entry.length {
+            // The index does not describe this file; scan it instead.
+            return Ok(None);
+        }
+        found.insert(name.clone(), sequence);
+    }
+    Ok(Some(found))
+}
+
+fn parse_fai_index(text: &str) -> HashMap<String, FaiEntry> {
+    let mut index = HashMap::new();
+    for line in text.lines() {
+        let mut fields = line.trim_end().split('\t');
+        let Some(name) = fields.next().filter(|name| !name.is_empty()) else {
+            continue;
+        };
+        let (Some(length), Some(offset), Some(line_bases), Some(line_width)) =
+            (fields.next(), fields.next(), fields.next(), fields.next())
+        else {
+            continue;
+        };
+        let (Ok(length), Ok(offset), Ok(line_bases), Ok(line_width)) = (
+            length.parse::<u64>(),
+            offset.parse::<u64>(),
+            line_bases.parse::<u64>(),
+            line_width.parse::<u64>(),
+        ) else {
+            continue;
+        };
+        if line_bases == 0 || line_width < line_bases {
+            continue;
+        }
+        index.insert(
+            name.to_string(),
+            FaiEntry {
+                length,
+                offset,
+                line_bases,
+                line_width,
+            },
+        );
+    }
+    index
+}
+
 pub(crate) fn load_named_sequences_from_fasta(
     fasta_path: &Path,
     needed_names: &HashSet<String>,
 ) -> Result<HashMap<String, String>> {
+    if let Some(loaded) = load_named_sequences_via_fai(fasta_path, needed_names)? {
+        return Ok(loaded);
+    }
     let file = File::open(fasta_path)
         .with_context(|| format!("failed to open fasta {}", fasta_path.display()))?;
     let reader = BufReader::new(file);
@@ -1728,15 +1850,134 @@ mod tests {
         export_chr_fasta_with_connection, export_ctg_agp_with_connection,
         export_ctg_fasta_with_connection, export_final_path_fasta_with_connection,
         export_project_final_path_fasta_with_connection, list_export_records_with_connection,
+        load_named_sequences_from_fasta,
     };
     use crate::db::init_workspace_schema;
     use rusqlite::{Connection, params};
     use std::{
-        collections::HashMap,
+        collections::{HashMap, HashSet},
         fs,
         path::{Path, PathBuf},
     };
     use tempfile::tempdir;
+
+    fn write_indexed_fasta(
+        path: &Path,
+        records: &[(&str, String)],
+        line_bases: usize,
+        crlf: bool,
+    ) -> HashMap<String, String> {
+        let newline = if crlf { "\r\n" } else { "\n" };
+        let mut fasta = String::new();
+        let mut index = String::new();
+        for (name, sequence) in records {
+            index.push_str(&format!(
+                "{name}\t{}\t{}\t{line_bases}\t{}\n",
+                sequence.len(),
+                fasta.len(),
+                line_bases + newline.len()
+            ));
+            fasta.push('>');
+            fasta.push_str(name);
+            fasta.push_str(newline);
+            for chunk in sequence.as_bytes().chunks(line_bases) {
+                fasta.push_str(std::str::from_utf8(chunk).unwrap());
+                fasta.push_str(newline);
+            }
+        }
+        fs::write(path, fasta).unwrap();
+        fs::write(format!("{}.fai", path.display()), index).unwrap();
+        records
+            .iter()
+            .map(|(name, sequence)| (name.to_string(), sequence.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn indexed_fasta_read_matches_streaming_scan_for_wrapped_and_crlf_inputs() {
+        let temp = tempdir().unwrap();
+        for (line_bases, crlf) in [(60_usize, false), (60, true), (7, false), (11, true)] {
+            let path = temp.path().join(format!("ref-{line_bases}-{crlf}.fa"));
+            let records = vec![
+                ("chr01", "ACGTN".repeat(31)),
+                ("chr02", "NNNNACGTTT".repeat(9)),
+                ("chr03", "G".repeat(5)),
+            ];
+            let expected = write_indexed_fasta(&path, &records, line_bases, crlf);
+            for name in ["chr01", "chr02", "chr03"] {
+                let names = HashSet::from([name.to_string()]);
+                let loaded = load_named_sequences_from_fasta(&path, &names).unwrap();
+                assert_eq!(
+                    loaded[name], expected[name],
+                    "{name} line_bases={line_bases}"
+                );
+            }
+            let all = HashSet::from(["chr01".to_string(), "chr03".to_string()]);
+            assert_eq!(
+                load_named_sequences_from_fasta(&path, &all).unwrap(),
+                HashMap::from([
+                    ("chr01".to_string(), expected["chr01"].clone()),
+                    ("chr03".to_string(), expected["chr03"].clone()),
+                ])
+            );
+        }
+    }
+
+    #[test]
+    fn indexed_fasta_read_never_scans_unrequested_records() {
+        let temp = tempdir().unwrap();
+        let path = temp.path().join("ref.fa");
+        let sequence = "ACGT".repeat(40);
+        let mut fasta = String::new();
+        let mut index = String::new();
+        index.push_str(&format!("chr01\t{}\t0\t80\t81\n", sequence.len()));
+        fasta.push_str(&format!(">chr01\n{sequence}\n"));
+        // A later record that is not valid UTF-8 can only be reached by a scan.
+        index.push_str(&format!(
+            "chr02\t{}\t{}\t80\t81\n",
+            sequence.len(),
+            fasta.len()
+        ));
+        fasta.push_str(">chr02\n");
+        fasta.push_str(&"A".repeat(40));
+        fasta.push(0x80 as char);
+        fasta.push_str(&"A".repeat(39));
+        fasta.push('\n');
+        fs::write(&path, fasta).unwrap();
+        fs::write(format!("{}.fai", path.display()), index).unwrap();
+        let names = HashSet::from(["chr01".to_string()]);
+        let loaded = load_named_sequences_from_fasta(&path, &names).unwrap();
+        assert_eq!(loaded["chr01"], sequence);
+    }
+
+    #[test]
+    fn incomplete_or_stale_fasta_index_falls_back_to_the_scan() {
+        let temp = tempdir().unwrap();
+        let path = temp.path().join("ref.fa");
+        let sequence = "ACGTN".repeat(20);
+        let records = vec![("chr01", sequence.clone())];
+        write_indexed_fasta(&path, &records, 60, false);
+
+        // Entry missing from the index.
+        fs::write(format!("{}.fai", path.display()), "").unwrap();
+        let names = HashSet::from(["chr01".to_string()]);
+        assert_eq!(
+            load_named_sequences_from_fasta(&path, &names).unwrap()["chr01"],
+            sequence
+        );
+
+        // Stale offset/length must not produce a truncated or shifted sequence.
+        fs::write(format!("{}.fai", path.display()), "chr01\t10\t0\t60\t61\n").unwrap();
+        assert_eq!(
+            load_named_sequences_from_fasta(&path, &names).unwrap()["chr01"],
+            sequence
+        );
+
+        // Names absent from the file still report the historical error.
+        fs::write(format!("{}.fai", path.display()), "").unwrap();
+        let missing = HashSet::from(["chr99".to_string()]);
+        assert!(load_named_sequences_from_fasta(&path, &missing).is_err());
+    }
 
     #[test]
     fn split_source_chromosome_export_restores_original_gaps_on_both_strands() {
