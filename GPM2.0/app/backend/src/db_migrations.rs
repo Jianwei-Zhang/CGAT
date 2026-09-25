@@ -50,6 +50,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "retain_pairwise_alignment_paths",
         apply: migrate_pairwise_paths_to_v5,
     },
+    Migration {
+        version: 6,
+        name: "materialize_reference_segments",
+        apply: migrate_reference_segments_to_v6,
+    },
 ];
 
 fn migrate_pairwise_paths_to_v5(conn: &Connection) -> Result<()> {
@@ -61,6 +66,24 @@ fn migrate_pairwise_paths_to_v5(conn: &Connection) -> Result<()> {
             definition: "TEXT",
         },
     )?;
+    Ok(())
+}
+
+fn migrate_reference_segments_to_v6(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS reference_chr_segment (
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             reference_chr_id INTEGER NOT NULL,
+             segment_order INTEGER NOT NULL,
+             start_bp INTEGER NOT NULL,
+             end_bp INTEGER NOT NULL,
+             UNIQUE(reference_chr_id, segment_order),
+             FOREIGN KEY(reference_chr_id) REFERENCES reference_chr(id) ON DELETE CASCADE
+         );
+         CREATE INDEX IF NOT EXISTS idx_reference_chr_segment_chr
+             ON reference_chr_segment(reference_chr_id);",
+    )
+    .context("failed to create reference segment storage")?;
     Ok(())
 }
 

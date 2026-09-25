@@ -1,5 +1,8 @@
 use anyhow::{Result, bail};
 
+/// Minimum run of `N` bases that splits a reference chromosome into segments.
+pub const MIN_GAP_RUN_BP: usize = 100;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReferenceGapInterval {
     pub start_bp: i64,

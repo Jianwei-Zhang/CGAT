@@ -48,7 +48,11 @@ impl ReferenceCache {
         let sequence = sequences
             .remove(chr_name)
             .ok_or_else(|| anyhow!("missing {chr_name}"))?;
-        let segments = detect_reference_segments(chr_name, &sequence, 100);
+        let segments = detect_reference_segments(
+            chr_name,
+            &sequence,
+            crate::reference_segments::MIN_GAP_RUN_BP,
+        );
         let gaps = super::derive_reference_gaps_from_segments(&segments, sequence.len() as i64);
         let geometry = (segments, gaps);
         // Retain only coordinates, never chromosome sequences or mutable project data.

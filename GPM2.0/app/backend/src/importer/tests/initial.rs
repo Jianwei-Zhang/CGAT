@@ -386,6 +386,110 @@ fn imports_source_seq_n_regions() {
     assert_eq!(region_row, ("d".to_string(), 2, 2, 1));
 }
 
+fn seed_project_row(conn: &Connection) -> i64 {
+    conn.execute(
+        "INSERT INTO project (id, name, version, reference_genome_id, primary_dataset_id, created_at)
+         VALUES (1, 'test-project', 1,
+                 (SELECT id FROM reference_genome ORDER BY id LIMIT 1),
+                 (SELECT id FROM dataset ORDER BY id LIMIT 1), '0')",
+        [],
+    )
+    .unwrap();
+    1
+}
+
+#[test]
+fn import_materializes_reference_segments_and_reads_them_without_the_fasta() {
+    let temp = tempdir().unwrap();
+    let bundle_root = temp.path().join("gpm_server");
+    create_bundle_root(&bundle_root);
+
+    let (outcome, _progress) = import_from_extracted_bundle(&bundle_root).unwrap();
+    let conn = Connection::open(&outcome.project_db_path).unwrap();
+    let stored: i64 = conn
+        .query_row("SELECT COUNT(*) FROM reference_chr_segment", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert!(stored > 0, "import must persist reference segments");
+
+    let reference_fasta: String = conn
+        .query_row("SELECT fasta_path FROM reference_genome", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    let project_id = seed_project_row(&conn);
+    let chr_name: String = conn
+        .query_row(
+            "SELECT chr_name FROM reference_chr ORDER BY chr_order LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    drop(conn);
+    let before = crate::main_view::list_reference_track_members(
+        &outcome.project_db_path,
+        project_id,
+        &chr_name,
+    )
+    .unwrap();
+
+    // Simulate a package whose reference FASTA disappears afterwards: the
+    // chromosome page must keep working from the persisted geometry.
+    fs::remove_file(&reference_fasta).unwrap();
+    let after = crate::main_view::list_reference_track_members(
+        &outcome.project_db_path,
+        project_id,
+        &chr_name,
+    )
+    .unwrap();
+    assert_eq!(before, after);
+}
+
+#[test]
+fn existing_projects_backfill_reference_segments_on_first_read() {
+    let temp = tempdir().unwrap();
+    let bundle_root = temp.path().join("gpm_server");
+    create_bundle_root(&bundle_root);
+
+    let (outcome, _progress) = import_from_extracted_bundle(&bundle_root).unwrap();
+    let conn = Connection::open(&outcome.project_db_path).unwrap();
+    conn.execute("DELETE FROM reference_chr_segment", [])
+        .unwrap();
+    let project_id = seed_project_row(&conn);
+    let chr_name: String = conn
+        .query_row(
+            "SELECT chr_name FROM reference_chr ORDER BY chr_order LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    drop(conn);
+
+    let first = crate::main_view::list_reference_track_members(
+        &outcome.project_db_path,
+        project_id,
+        &chr_name,
+    )
+    .unwrap();
+    let conn = Connection::open(&outcome.project_db_path).unwrap();
+    let backfilled: i64 = conn
+        .query_row("SELECT COUNT(*) FROM reference_chr_segment", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert!(backfilled > 0, "first read must backfill the geometry");
+    drop(conn);
+
+    let second = crate::main_view::list_reference_track_members(
+        &outcome.project_db_path,
+        project_id,
+        &chr_name,
+    )
+    .unwrap();
+    assert_eq!(first, second);
+}
+
 #[test]
 fn rejects_non_partitioned_package_metadata() {
     let temp = tempdir().unwrap();

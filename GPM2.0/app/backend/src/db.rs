@@ -6,7 +6,7 @@ use rusqlite::Connection;
 #[path = "db_migrations.rs"]
 mod migrations;
 
-pub const CURRENT_SCHEMA_VERSION: i64 = 5;
+pub const CURRENT_SCHEMA_VERSION: i64 = 6;
 
 pub fn open_workspace_db(project_db_path: &Path) -> Result<Connection> {
     let mut conn = Connection::open(project_db_path).with_context(|| {
@@ -59,6 +59,19 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
             UNIQUE(reference_genome_id, chr_name),
             FOREIGN KEY(reference_genome_id) REFERENCES reference_genome(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS reference_chr_segment (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reference_chr_id INTEGER NOT NULL,
+            segment_order INTEGER NOT NULL,
+            start_bp INTEGER NOT NULL,
+            end_bp INTEGER NOT NULL,
+            UNIQUE(reference_chr_id, segment_order),
+            FOREIGN KEY(reference_chr_id) REFERENCES reference_chr(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_reference_chr_segment_chr
+            ON reference_chr_segment(reference_chr_id);
 
         CREATE TABLE IF NOT EXISTS dataset (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

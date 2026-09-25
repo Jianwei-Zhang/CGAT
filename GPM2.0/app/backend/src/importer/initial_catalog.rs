@@ -60,6 +60,20 @@ pub(super) fn sync_catalog_from_bundle(
             )
             .context("failed to resolve reference_genome id after upsert")?;
         sync_reference_chr_rows(&tx, reference_id, &fai_path)?;
+        // Precompute N-free spans once so chromosome pages never scan the FASTA.
+        // Light packages have no FASTA payload and keep the fallback path.
+        let fasta_path_text = path_to_string(&fasta_path)?;
+        crate::reference_geometry::materialize_reference_genome(
+            &tx,
+            reference_id,
+            &fasta_path_text,
+        )
+        .with_context(|| {
+            format!(
+                "failed to materialize reference segments for {}",
+                reference.name
+            )
+        })?;
     }
 
     for dataset in datasets {

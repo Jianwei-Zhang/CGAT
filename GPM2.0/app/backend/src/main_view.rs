@@ -1409,6 +1409,12 @@ fn load_main_view_reference_gaps(
     let root = conn.path().and_then(|path| Path::new(path).parent());
     let mut result = HashMap::new();
     for (id, name, length, fasta) in chromosomes {
+        if let Some(segments) =
+            crate::reference_geometry::ensure_reference_segments(conn, id, &name, &fasta)?
+        {
+            result.insert(id, derive_reference_gaps_from_segments(&segments, length));
+            continue;
+        }
         let (_, gaps) = resolve_reference_track_segments(root, &fasta, &name, length)?;
         result.insert(id, gaps);
     }
@@ -1658,12 +1664,23 @@ fn list_reference_track_members_with_workspace_root(
             )
         })?;
 
-    let (segments, reference_gaps) = resolve_reference_track_segments(
-        workspace_root,
-        &reference_fasta_path,
+    let (segments, reference_gaps) = match crate::reference_geometry::ensure_reference_segments(
+        conn,
+        reference_chr_id,
         normalized_chr_name,
-        reference_chr_length,
-    )?;
+        &reference_fasta_path,
+    )? {
+        Some(segments) => {
+            let gaps = derive_reference_gaps_from_segments(&segments, reference_chr_length);
+            (segments, gaps)
+        }
+        None => resolve_reference_track_segments(
+            workspace_root,
+            &reference_fasta_path,
+            normalized_chr_name,
+            reference_chr_length,
+        )?,
+    };
     let mut items = segments
         .iter()
         .map(|segment| ReferenceTrackMemberItem {
