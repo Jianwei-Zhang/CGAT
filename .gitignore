@@ -38,3 +38,13 @@
 /.comet/
 /.codegraph/
 /AGENTS.md
+/CLAUDE.md
+# The Comet managed block below re-includes .comet/config.yaml; .comet/.gitignore
+# keeps it local and is itself outside that block, so comet init/update cannot
+# re-expose it.
+
+# >>> Comet managed project state >>>
+!/.comet/
+/.comet/*
+!/.comet/config.yaml
+# <<< Comet managed project state <<<
