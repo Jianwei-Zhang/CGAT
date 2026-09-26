@@ -8,6 +8,7 @@
 **/.kiro/
 
 # Local presentation and manuscript materials
+/home/cgat-overview/
 /ppt/
 /paper/
 /Genome-Repair-Tools/
