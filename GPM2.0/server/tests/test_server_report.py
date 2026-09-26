@@ -191,6 +191,76 @@ class ServerReportTests(unittest.TestCase):
             row = summary["event_reconciliation"][0]
             self.assertEqual((row["process_status"], row["final_status"]), ("accepted", "superseded"))
 
+    def test_result_first_summary_and_final_path_annotations(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            write_json(root / "metadata/grt_final_path.json", {
+                "chromosomes": [{"chr": "Chr1", "q4_length": 1000, "segments": [{
+                    "segment_id": "s1", "kind": "source", "length": 1000,
+                    "source": {"dataset": "primary", "contig": "ctg1", "start": 1,
+                               "end": 1000, "orientation": "+"},
+                }]}],
+            })
+            (root / "metadata/grt_q_segments.tsv").write_text(
+                "q_version\tsegment_kind\tdataset_name\tq_start\tq_end\n", encoding="utf-8")
+            (root / "grt/q").mkdir(parents=True)
+            (root / "grt/q/q0.fa").write_text(">Chr1\n" + "A" * 450 + "N" * 100 + "C" * 450 + "\n")
+            (root / "grt/q/q4.fa").write_text(">Chr1\n" + "A" * 1000 + "\n")
+            (root / "tel").mkdir()
+            (root / "tel/rules.tsv").write_text(
+                "rule_id\tmotif\tmin_repeat\treverse_complement\nrule-1\tTTAGGG\t5\ttrue\n")
+            (root / "cen/chr_Chr1").mkdir(parents=True)
+            (root / "cen/reference.tsv").write_text("chr_name\nChr1\n")
+            (root / "cen/chr_Chr1/marks.tsv").write_text(
+                "cen_id\tchr_name\tquery_name\tdataset_name\tctg_name\tctg_start\tctg_end\tstrand\talign_length\tidentity\tmapq\n"
+                "cen\tChr1\tChr1_centromere\tprimary\tctg1\t400\t600\t+\t201\t99.5\t60\n")
+            write_json(root / "grt/evidence/step4_telomere/result.json", {
+                "terminal_rows": [
+                    {"chr": "Chr1", "terminal": "5prime", "final_status": "already_present"},
+                    {"chr": "Chr1", "terminal": "3prime", "final_status": "recovered"},
+                ],
+            })
+
+            captured = capture_final(root)
+            self.assertTrue(captured["annotations"]["telomere"]["configured"])
+            marker = captured["annotations"]["centromere"]["markers"][0]
+            self.assertEqual((marker["q4_start"], marker["q4_end"]), (400, 600))
+
+            report = root / "report"
+            write_json(report / "manifest.json", {
+                "schema_version": SCHEMA, "run_id": "run-summary", "workspace_name": "sample",
+                "status": "success", "started_at": "start", "ended_at": "end", "steps": [], "errors": [],
+            })
+            write_json(report / "inputs.json", {
+                "schema_version": SCHEMA, "run_id": "run-summary", "status": "success",
+                "facts": {"datasets": [], "parameters": {}},
+            })
+            write_json(report / "final_snapshot.json", {
+                "schema_version": SCHEMA, "run_id": "run-summary", **captured,
+            })
+            summary = final_summary(root, report)
+            write_json(report / "final_summary.json", summary)
+            self.assertEqual(summary["outcome_summary"]["closed_gap_count"], 1)
+            self.assertEqual(summary["outcome_summary"]["remaining_gap_count"], 0)
+            self.assertEqual(summary["outcome_summary"]["t2t_status"], "achieved")
+
+            with_unresolved_n = copy.deepcopy(captured)
+            with_unresolved_n["sequence_versions"]["q4"]["n_bp"] = 1
+            write_json(report / "final_snapshot.json", {
+                "schema_version": SCHEMA, "run_id": "run-summary", **with_unresolved_n,
+            })
+            self.assertEqual(final_summary(root, report)["outcome_summary"]["t2t_status"], "not_achieved")
+            write_json(report / "final_summary.json", summary)
+
+            render(report)
+            html = (report / "report.html").read_text()
+            self.assertLess(html.index('id="summary"'), html.index('id="results"'))
+            self.assertLess(html.index('id="results"'), html.index('id="workflow"'))
+            self.assertIn("关闭 Gap", html)
+            self.assertIn("已达到", html)
+            self.assertIn('path-marker telomere left complete', html)
+            self.assertIn('path-marker centromere', html)
+
 
 def make_grt_report_fixture(root: Path) -> tuple[Path, dict]:
     """Actual GRT implementations with deterministic external-tool fixtures."""

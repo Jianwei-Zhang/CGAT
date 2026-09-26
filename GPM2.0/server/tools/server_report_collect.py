@@ -182,6 +182,41 @@ def final_summary(root: Path, report_root: Path) -> dict:
             "final_reason": last.get("reason") if last else "final_state_not_available",
             "final_path_segment_ids": segments.get(event_id, []),
             "final_event": last})
+    q0 = sequence_stats(root, root / "grt/q/q0.fa")
+    if q0:
+        final.setdefault("sequence_versions", {})["q0"] = q0
+    q4 = final.get("sequence_versions", {}).get("q4") or {}
+    terminal_rows = final.get("annotations", {}).get("telomere", {}).get("terminal_rows", [])
+    complete_statuses = {"already_present", "recovered"}
+    complete_ends = sum(row.get("final_status") in complete_statuses for row in terminal_rows)
+    expected_ends = 2 * q4.get("sequence_count", 0) if q4 else 0
+    telomeres_complete = bool(expected_ends and len(terminal_rows) == expected_ends
+                               and complete_ends == expected_ends)
+    if not final.get("available") or not q4:
+        t2t_status = "unavailable"
+    elif len(terminal_rows) != expected_ends:
+        t2t_status = "unknown"
+    elif q4.get("gap_count") == 0 and q4.get("n_bp") == 0 and telomeres_complete:
+        t2t_status = "achieved"
+    else:
+        t2t_status = "not_achieved"
+    q0_gap_count = q0.get("gap_count") if q0 else None
+    q4_gap_count = q4.get("gap_count") if q4 else None
+    centromere_markers = final.get("annotations", {}).get("centromere", {}).get("markers", [])
+    final["outcome_summary"] = {
+        "total_length_bp": q4.get("length_bp") if q4 else None,
+        "chromosome_count": q4.get("sequence_count") if q4 else None,
+        "starting_gap_count": q0_gap_count,
+        "closed_gap_count": (max(0, q0_gap_count - q4_gap_count)
+                             if q0_gap_count is not None and q4_gap_count is not None else None),
+        "remaining_gap_count": q4_gap_count,
+        "telomere_ends_complete": complete_ends if terminal_rows else None,
+        "telomere_ends_total": expected_ends or None,
+        "telomeres_complete": telomeres_complete if terminal_rows else None,
+        "t2t_status": t2t_status,
+        "centromere_marker_count": len(centromere_markers),
+        "centromere_chromosome_count": len({row.get("chr") for row in centromere_markers}),
+    }
     final["event_reconciliation"] = reconciliation
     final["process_summary"] = event_summary(list(process.values()))
     final["final_event_summary"] = event_summary(final.get("events", [])) if final else None
@@ -189,6 +224,73 @@ def final_summary(root: Path, report_root: Path) -> dict:
                       "gap 定义为连续至少 100 个 N；N 碱基数单独统计。",
                       "原始主组装 → q0 表示初始构建；q0 → q4 表示 GRT 处理。N50 增加本身不证明质量改善。"]
     return final
+
+
+def _positive_int(value) -> int | None:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _project_centromere_markers(root: Path, final_path: dict) -> list[dict]:
+    """Project source-contig centromere hits onto final q4 chromosome coordinates."""
+    hits = defaultdict(list)
+    for path in sorted((root / "cen").glob("chr_*/marks.tsv")):
+        for row in read_tsv(path):
+            hits[(row.get("dataset_name"), row.get("ctg_name"))].append(row)
+    projected = []
+    for chromosome in final_path.get("chromosomes", []):
+        cursor = 1
+        for segment in chromosome.get("segments", []):
+            length = _positive_int(segment.get("length")) or 0
+            source = segment.get("source") or {}
+            source_start = _positive_int(source.get("start"))
+            source_end = _positive_int(source.get("end"))
+            if length and source_start and source_end:
+                source_low, source_high = sorted((source_start, source_end))
+                orientation = source.get("orientation") or segment.get("orientation") or "+"
+                for hit in hits.get((source.get("dataset"), source.get("contig")), []):
+                    hit_start = _positive_int(hit.get("ctg_start"))
+                    hit_end = _positive_int(hit.get("ctg_end"))
+                    if not hit_start or not hit_end:
+                        continue
+                    hit_low, hit_high = sorted((hit_start, hit_end))
+                    overlap_start = max(source_low, hit_low)
+                    overlap_end = min(source_high, hit_high)
+                    if overlap_start > overlap_end:
+                        continue
+                    if orientation == "-":
+                        q4_start = cursor + source_high - overlap_end
+                        q4_end = cursor + source_high - overlap_start
+                    else:
+                        q4_start = cursor + overlap_start - source_low
+                        q4_end = cursor + overlap_end - source_low
+                    projected.append({
+                        "chr": chromosome.get("chr"), "q4_start": q4_start, "q4_end": q4_end,
+                        "dataset_name": hit.get("dataset_name"), "ctg_name": hit.get("ctg_name"),
+                        "source_start": overlap_start, "source_end": overlap_end,
+                        "identity": hit.get("identity"), "align_length": hit.get("align_length"),
+                    })
+            cursor += length
+    return projected
+
+
+def final_annotations(root: Path, final_path: dict) -> dict:
+    step4 = read_json(root / "grt/evidence/step4_telomere/result.json", {})
+    telomere_rules = root / "tel/rules.tsv"
+    centromere_reference = root / "cen/reference.tsv"
+    return {
+        "telomere": {
+            "configured": telomere_rules.is_file(),
+            "terminal_rows": step4.get("terminal_rows", []),
+        },
+        "centromere": {
+            "configured": centromere_reference.is_file(),
+            "markers": _project_centromere_markers(root, final_path),
+        },
+    }
 
 
 def capture_final(root: Path) -> dict:
@@ -209,7 +311,8 @@ def capture_final(root: Path) -> dict:
             "events": read_events(root / "metadata/grt_events.jsonl"),
             "sequence_versions": {"q4": sequence_stats(root, root / "grt/q/q4.fa")},
             "source_contribution_bp": dict(contribution),
-            "explicit_connector_segments": dict(connectors)}
+            "explicit_connector_segments": dict(connectors),
+            "annotations": final_annotations(root, final_path)}
 
 
 def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
