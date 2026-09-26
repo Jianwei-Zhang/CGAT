@@ -918,7 +918,7 @@ function normalizeDetailTableState(state) {
   const direction = normalizeString(rawSort.direction).toLowerCase();
   return {
     filters,
-    collapsed: state?.projectExport?.detailTableCollapsed === true,
+    collapsed: state?.projectExport?.detailTableCollapsed !== false,
     sort: {
       key: normalizeString(rawSort.key) === "length_bp" ? "length_bp" : "",
       direction: direction === "asc" || direction === "desc" ? direction : "",

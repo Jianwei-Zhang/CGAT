@@ -643,7 +643,7 @@ function renderFinalPathLogRows({
   }).join("");
   return `
     <div class="final-path-log-table-wrap">
-      <table class="final-path-log-table">
+      <table class="final-path-log-table project-export-detail-table">
         <thead>
           <tr>
             <th>${escapeHtml("Type")}</th>

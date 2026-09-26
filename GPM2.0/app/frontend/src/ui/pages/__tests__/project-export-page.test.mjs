@@ -1879,7 +1879,7 @@ test("project export detail filter syncs mixed all-checkbox state", () => {
 });
 
 
-test("detail card collapses and expands while preserving filters, sorting and export data", async () => {
+test("detail card defaults collapsed and remembers expansion while preserving its data", async () => {
   let state = createState();
   state.projectExport.finalPathByChr.Chr01.segments.push({
     segmentId: "support-1", type: "ctg", assemblyCtgId: 2, datasetName: "assembly",
@@ -1900,19 +1900,21 @@ test("detail card collapses and expands while preserving filters, sorting and ex
   const store = { getState: () => state, setState(next) { state = next; } };
   bindProjectExportPage(host, store);
   assert.match(host.innerHTML, /id="project-export-detail-title">项目明细/);
+  assert.match(host.innerHTML, /aria-expanded="false"[\s\S]*?展开/);
+  assert.match(host.innerHTML, /id="project-export-detail-body"[^>]* hidden/);
   const click = async () => {
     for (const handler of listeners.get("click")) await handler({ target: { closest(selector) {
       return selector === "[data-project-export-detail-toggle]" ? button : null;
     } } });
   };
   await click();
-  assert.equal(state.projectExport.detailTableCollapsed, true);
-  assert.match(host.innerHTML, /aria-expanded="false"[\s\S]*?展开/);
-  assert.match(host.innerHTML, /id="project-export-detail-body"[^>]* hidden/);
-  await click();
   assert.equal(state.projectExport.detailTableCollapsed, false);
   assert.doesNotMatch(host.innerHTML, /id="project-export-detail-body"[^>]* hidden/);
   assert.match(host.innerHTML, /aria-expanded="true"[\s\S]*?收起/);
+  assert.doesNotMatch(renderProjectExportPage(state), /id="project-export-detail-body"[^>]* hidden/);
+  await click();
+  assert.equal(state.projectExport.detailTableCollapsed, true);
+  assert.match(host.innerHTML, /id="project-export-detail-body"[^>]* hidden/);
   assert.equal(focused, 2);
   assert.deepEqual(state.projectExport.detailTableFilters, before.detailTableFilters);
   assert.deepEqual(state.projectExport.detailTableSort, before.detailTableSort);

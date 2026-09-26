@@ -704,6 +704,7 @@ test("renderFinalPathCard shows log tab and renders compact log metrics when fin
   assert.match(html, /实际追加/);
   assert.match(html, /主图已隐藏/);
   assert.match(html, /<th>Type<\/th>/);
+  assert.match(html, /<table class="final-path-log-table project-export-detail-table">/);
   assert.doesNotMatch(html, /<th>ctg<\/th>/);
   assert.match(html, /<th>used_by_chr<\/th>/);
   assert.match(html, /<td class="final-path-log-type-cell" rowspan="2">辅 ds ctg 使用情况<\/td>\s*<td>flye<\/td>/);
