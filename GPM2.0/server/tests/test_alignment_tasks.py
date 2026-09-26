@@ -9,10 +9,17 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from alignment_tasks import AlignmentTask, allocate_threads, run_tasks
+from alignment_tasks import AlignmentTask, alignment_concurrency, allocate_threads, run_tasks
 
 
 class AlignmentTasksTests(unittest.TestCase):
+    def test_engine_concurrency_limits(self):
+        self.assertIsNone(alignment_concurrency("minimap2"))
+        self.assertEqual(alignment_concurrency("winnowmap"), 2)
+        self.assertEqual(alignment_concurrency("blastn", "blastn"), 1)
+        self.assertEqual(alignment_concurrency("blastn", "megablast"), 2)
+        self.assertEqual(alignment_concurrency("blastn", "dc-megablast"), 2)
+
     def test_allocation_returns_capacity_from_single_query_jobs(self):
         self.assertEqual(allocate_threads([1, 32, 1], 32), [1, 30, 1])
         self.assertEqual(allocate_threads([1] * 36, 32), [1] * 32)
@@ -83,6 +90,38 @@ update(-threads)
             self.assertNotEqual(dict(finished)["1"], 0)
             self.assertFalse((root / "should_not_start").exists())
             self.assertFalse((root / "should_not_finish").exists())
+
+    def test_concurrency_limit_gives_threads_to_largest_tasks_first(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            command = root / "command.sh"
+            command.write_text("sleep .05\n")
+            tasks = [
+                AlignmentTask(str(index), command, 8, priority, 2)
+                for index, priority in enumerate([1, 4, 3, 2])
+            ]
+            started = []
+            active = 0
+            peak = 0
+
+            def on_start(task, threads):
+                nonlocal active, peak
+                active += 1
+                peak = max(peak, active)
+                started.append((task.unit_id, threads))
+
+            def on_finish(*_):
+                nonlocal active
+                active -= 1
+
+            code = run_tasks(
+                tasks, 8, {}, lambda: None, on_start, lambda *_: None,
+                on_finish, os.environ.copy(),
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(peak, 2)
+            self.assertEqual(started[:2], [("1", 4), ("2", 4)])
+            self.assertTrue(all(threads == 4 for _, threads in started))
 
 
 if __name__ == "__main__":

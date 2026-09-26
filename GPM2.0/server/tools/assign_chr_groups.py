@@ -15,7 +15,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from alignment_tasks import MANIFEST, query_threads, write_manifest
+from alignment_tasks import MANIFEST, alignment_concurrency, query_threads, write_manifest
 
 
 THREAD_ARGUMENT = object()
@@ -971,6 +971,7 @@ for chr_name in reference_chr_names:
 
     command_paths = []
     task_caps = {}
+    task_priorities = {}
     if not skip_self:
         for dataset_name, output_fasta in selected_dataset_fastas:
             run_dir = chr_run_dir / f"{dataset_name}_vs_self"
@@ -987,6 +988,7 @@ for chr_name in reference_chr_names:
             )
             command_paths.append(command_path)
             task_caps[command_path] = query_threads(output_fasta, alignment_engine, int(threads))
+            task_priorities[command_path] = output_fasta.stat().st_size ** 2
 
     for left_index, (left_name, left_fasta) in enumerate(selected_dataset_fastas):
         for right_name, right_fasta in selected_dataset_fastas[left_index + 1 :]:
@@ -1004,6 +1006,7 @@ for chr_name in reference_chr_names:
             )
             command_paths.append(command_path)
             task_caps[command_path] = query_threads(right_fasta, alignment_engine, int(threads))
+            task_priorities[command_path] = left_fasta.stat().st_size * right_fasta.stat().st_size
 
     tel_rules_path = work_root / "tel" / "rules.tsv"
     if tel_rules_path.exists() and selected_dataset_fastas:
@@ -1037,6 +1040,10 @@ for chr_name in reference_chr_names:
 
     write_generated_command_script(chr_run_dir / "generated_command.sh", command_paths, chr_name)
     write_manifest(chr_run_dir / MANIFEST, work_root, [
-        (command, task_caps.get(command, 1 if alignment_engine == "minimap2" else int(threads)))
+        (
+            command,
+            task_caps.get(command, 1 if alignment_engine == "minimap2" else int(threads)),
+            task_priorities.get(command, 0),
+        )
         for command in command_paths
-    ])
+    ], alignment_concurrency(alignment_engine, blastn_task))

@@ -43,6 +43,7 @@ GRT_REFILL_MAX_LENGTH="1000000"
 MINIMAP_PRESET_SET=false
 BLASTN_TASK_SET=false
 BLASTN_EVALUE_SET=false
+BLASTN_DUST_SET=false
 WINNOWMAP_PRESET_SET=false
 WINNOWMAP_KMER_SET=false
 WINNOWMAP_REPEAT_FRACTION_SET=false
@@ -59,6 +60,7 @@ Usage:
     [--minimap-preset asm10|asm5] \
     [--blastn-task blastn|megablast|dc-megablast] \
     [--blastn-evalue <evalue>] \
+    [--blastn-dust yes|no] \
     [--winnowmap-preset asm20|asm10|asm5] \
     [--winnowmap-kmer <kmer_size>] \
     [--winnowmap-repeat-fraction <fraction>] \
@@ -90,7 +92,7 @@ Behavior:
   - Supports --score/-s to set the chr assignment coverage threshold, default: 60
   - Supports --aligner minimap2|blastn|winnowmap, default: minimap2
   - Supports --minimap-preset for minimap2 only, default: asm10
-  - Supports --blastn-task and --blastn-evalue for blastn only, defaults: blastn and 1e-10
+  - Supports --blastn-task, --blastn-evalue, and --blastn-dust for blastn only, defaults: blastn, 1e-10, and no
   - Supports --winnowmap-preset, --winnowmap-kmer, and --winnowmap-repeat-fraction for winnowmap only, defaults: asm20, 19, and 0.9998
   - Supports --threads/-t to choose the total compute-thread budget, default: 10
   - Independent reference and chromosome-local alignments share this budget
@@ -197,6 +199,17 @@ validate_blastn_task() {
   esac
 }
 
+validate_blastn_dust() {
+  local value="$1"
+  case "$value" in
+    yes|no)
+      ;;
+    *)
+      die "Invalid --blastn-dust '$value'. Use yes or no."
+      ;;
+  esac
+}
+
 validate_float_option() {
   local option_name="$1"
   local value="$2"
@@ -233,6 +246,7 @@ validate_engine_specific_options() {
     minimap2)
       [[ "$BLASTN_TASK_SET" == "false" ]] || die "--blastn-task is only valid with --aligner blastn; selected aligner: $ALIGNER"
       [[ "$BLASTN_EVALUE_SET" == "false" ]] || die "--blastn-evalue is only valid with --aligner blastn; selected aligner: $ALIGNER"
+      [[ "$BLASTN_DUST_SET" == "false" ]] || die "--blastn-dust is only valid with --aligner blastn; selected aligner: $ALIGNER"
       [[ "$WINNOWMAP_PRESET_SET" == "false" ]] || die "--winnowmap-preset is only valid with --aligner winnowmap; selected aligner: $ALIGNER"
       [[ "$WINNOWMAP_KMER_SET" == "false" ]] || die "--winnowmap-kmer is only valid with --aligner winnowmap; selected aligner: $ALIGNER"
       [[ "$WINNOWMAP_REPEAT_FRACTION_SET" == "false" ]] || die "--winnowmap-repeat-fraction is only valid with --aligner winnowmap; selected aligner: $ALIGNER"
@@ -247,6 +261,7 @@ validate_engine_specific_options() {
       [[ "$MINIMAP_PRESET_SET" == "false" ]] || die "--minimap-preset is only valid with --aligner minimap2; selected aligner: $ALIGNER"
       [[ "$BLASTN_TASK_SET" == "false" ]] || die "--blastn-task is only valid with --aligner blastn; selected aligner: $ALIGNER"
       [[ "$BLASTN_EVALUE_SET" == "false" ]] || die "--blastn-evalue is only valid with --aligner blastn; selected aligner: $ALIGNER"
+      [[ "$BLASTN_DUST_SET" == "false" ]] || die "--blastn-dust is only valid with --aligner blastn; selected aligner: $ALIGNER"
       ;;
   esac
 }
@@ -622,7 +637,8 @@ write_ref_command_script() {
 
   write_alignment_command_script "${run_dir}/command.sh" "$run_dir" "$ref_fa" "$ds_fa" false
   python3 "${SCRIPT_DIR}/tools/alignment_tasks.py" --root "$WORK_ROOT" \
-    --command "${run_dir}/command.sh" --query "$ds_fa" --engine "$ALIGNER" --threads "$THREADS"
+    --command "${run_dir}/command.sh" --query "$ds_fa" --engine "$ALIGNER" \
+    --blastn-task "$BLASTN_TASK" --threads "$THREADS"
 }
 
 write_assignment_script() {
@@ -925,6 +941,13 @@ while [[ $# -gt 0 ]]; do
       validate_float_option "--blastn-evalue" "$2"
       BLASTN_EVALUE="$2"
       BLASTN_EVALUE_SET=true
+      shift 2
+      ;;
+    --blastn-dust)
+      [[ $# -ge 2 ]] || die "--blastn-dust requires yes or no"
+      validate_blastn_dust "$2"
+      BLASTN_DUST="$2"
+      BLASTN_DUST_SET=true
       shift 2
       ;;
     --winnowmap-preset)

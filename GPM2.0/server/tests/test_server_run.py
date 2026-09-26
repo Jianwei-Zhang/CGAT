@@ -101,3 +101,9 @@ class ServerRunTests(unittest.TestCase):
                 server_run.parse_options(["--max-fill", value], Path.cwd())
         with self.assertRaises(server_run.RunnerError):
             server_run.parse_options(["--unknown", "value"], Path.cwd())
+
+    def test_blastn_dust_option_is_forwarded(self):
+        self.assertEqual(
+            server_run.parse_options(["--blastn-dust", "yes"], Path.cwd()),
+            {"--blastn-dust": [["yes"]]},
+        )

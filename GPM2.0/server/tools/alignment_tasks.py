@@ -22,6 +22,8 @@ class AlignmentTask:
     unit_id: str
     command: Path
     max_threads: int
+    priority: int = 0
+    max_concurrent: int | None = None
 
 
 def query_threads(fasta: Path, engine: str, budget: int) -> int:
@@ -33,11 +35,32 @@ def query_threads(fasta: Path, engine: str, budget: int) -> int:
     return max(1, min(budget, count))
 
 
-def write_manifest(path: Path, root: Path, tasks: list[tuple[Path, int]]) -> None:
-    path.write_text(json.dumps({"version": 1, "tasks": [
-        {"command": command.relative_to(root).as_posix(), "max_threads": cap}
-        for command, cap in tasks
-    ]}, indent=2) + "\n", encoding="utf-8")
+def alignment_concurrency(engine: str, blastn_task: str = "blastn") -> int | None:
+    """Return a conservative leaf-process limit for multithreaded aligners."""
+    if engine == "winnowmap":
+        return 2
+    if engine == "blastn":
+        return 1 if blastn_task == "blastn" else 2
+    return None
+
+
+def write_manifest(
+    path: Path,
+    root: Path,
+    tasks: list[tuple[Path, int, int]],
+    max_concurrent: int | None = None,
+) -> None:
+    payload = {"version": 2, "tasks": [
+        {
+            "command": command.relative_to(root).as_posix(),
+            "max_threads": cap,
+            "priority": priority,
+        }
+        for command, cap, priority in tasks
+    ]}
+    if max_concurrent is not None:
+        payload["max_concurrent"] = max_concurrent
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 def load_tasks(root: Path, unit_id: str, command: str) -> list[AlignmentTask] | None:
@@ -45,8 +68,11 @@ def load_tasks(root: Path, unit_id: str, command: str) -> list[AlignmentTask] | 
     if not manifest.is_file():
         return None  # Older prepared workspaces retain their sequential contract.
     payload = json.loads(manifest.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict) or payload.get("version") != 1:
+    if not isinstance(payload, dict) or payload.get("version") not in {1, 2}:
         raise ValueError(f"invalid alignment task manifest: {manifest}")
+    max_concurrent = payload.get("max_concurrent")
+    if max_concurrent is not None and (type(max_concurrent) is not int or max_concurrent < 1):
+        raise ValueError(f"invalid alignment concurrency: {manifest}")
     rows = payload.get("tasks")
     if not isinstance(rows, list):
         raise ValueError(f"invalid alignment task list: {manifest}")
@@ -56,14 +82,16 @@ def load_tasks(root: Path, unit_id: str, command: str) -> list[AlignmentTask] | 
         if not isinstance(row, dict):
             raise ValueError(f"invalid alignment task: {manifest}")
         relative, cap = row.get("command"), row.get("max_threads")
+        priority = row.get("priority", 0)
         if not isinstance(relative, str) or not relative or Path(relative).is_absolute():
             raise ValueError(f"invalid alignment task command: {manifest}")
         path = (root / relative).resolve()
         path.relative_to(root.resolve())
-        if not path.is_file() or path in seen or type(cap) is not int or cap < 1:
+        if (not path.is_file() or path in seen or type(cap) is not int or cap < 1
+                or type(priority) is not int or priority < 0):
             raise ValueError(f"invalid or duplicate alignment task: {manifest}")
         seen.add(path)
-        tasks.append(AlignmentTask(unit_id, path, cap))
+        tasks.append(AlignmentTask(unit_id, path, cap, priority, max_concurrent))
     return tasks
 
 
@@ -84,7 +112,9 @@ def allocate_threads(caps: list[int], budget: int) -> list[int]:
 
 def run_tasks(tasks, budget, children, cancel_signal, on_start, on_line, on_finish, environment):
     """All callbacks run on the caller thread; each command owns a process group."""
-    pending = list(tasks)
+    pending = sorted(tasks, key=lambda task: task.priority, reverse=True)
+    limits = [task.max_concurrent for task in tasks if task.max_concurrent is not None]
+    max_concurrent = min(limits) if limits else None
     active = {}
     selector = selectors.DefaultSelector()
     failure = 0
@@ -110,7 +140,12 @@ def run_tasks(tasks, budget, children, cancel_signal, on_start, on_line, on_fini
                 stop_all(signal.SIGKILL)
             if not failure:
                 available = budget - sum(item["threads"] for item in active.values())
-                allocations = allocate_threads([task.max_threads for task in pending], available)
+                slots = len(pending)
+                if max_concurrent is not None:
+                    slots = max(0, max_concurrent - len(active))
+                allocations = allocate_threads(
+                    [task.max_threads for task in pending[:slots]], available
+                )
                 for threads in allocations:
                     task = pending.pop(0)
                     on_start(task, threads)
@@ -182,10 +217,15 @@ def main():
     parser.add_argument("--command", required=True, type=Path)
     parser.add_argument("--query", required=True, type=Path)
     parser.add_argument("--engine", required=True)
+    parser.add_argument("--blastn-task", default="blastn")
     parser.add_argument("--threads", required=True, type=int)
     args = parser.parse_args()
-    write_manifest(args.command.parent / MANIFEST, args.root,
-                   [(args.command, query_threads(args.query, args.engine, args.threads))])
+    write_manifest(
+        args.command.parent / MANIFEST,
+        args.root,
+        [(args.command, query_threads(args.query, args.engine, args.threads), args.query.stat().st_size)],
+        alignment_concurrency(args.engine, args.blastn_task),
+    )
 
 
 if __name__ == "__main__":
