@@ -42,7 +42,6 @@ run_group "Python server tests" \
   python3 -m unittest discover -s server/tests -p 'test_*.py'
 
 shell_tests=(
-  tests/gpm_server/blast6_to_paf_test.sh
   tests/gpm_server/fake_command_control_test.sh
   tests/gpm_server/env_test.sh
   tests/gpm_server/package_templates_test.sh

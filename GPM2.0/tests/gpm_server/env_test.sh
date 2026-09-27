@@ -302,8 +302,6 @@ test_dependency_spec_and_verifier_cover_server_commands() {
     meryl=1.4.2 \
     merqury=1.4.1 \
     craq=1.10 \
-    blast=2.17.0 \
-    winnowmap=2.03 \
     zip \
     gzip \
     pigz=2.8
@@ -314,7 +312,7 @@ test_dependency_spec_and_verifier_cover_server_commands() {
   local command_name
   for command_name in \
     python samtools minimap2 nucmer delta-filter show-coords meryl merqury.sh \
-    craq blastn makeblastdb winnowmap zip gzip pigz
+    craq zip gzip pigz
   do
     grep -Fx "  ${command_name}" "$ENV_SCRIPT" >/dev/null
   done
@@ -347,7 +345,7 @@ test_check_is_read_only_and_detects_stale_spec() {
   : > "${case_dir}/manager.log"
   run_installer_with_args "$case_dir" "$bin_dir" --check > "${case_dir}/check.out"
   grep -F 'GPM Server environment check: READY' "${case_dir}/check.out" >/dev/null
-  grep -F 'Commands:    15/15 verified' "${case_dir}/check.out" >/dev/null
+  grep -F 'Commands:    12/12 verified' "${case_dir}/check.out" >/dev/null
   if grep -E $'\t(create|install|env remove) ' "${case_dir}/manager.log" >/dev/null; then
     echo "--check must not change the environment" >&2
     exit 1

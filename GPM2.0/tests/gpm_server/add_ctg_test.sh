@@ -120,91 +120,6 @@ exit 0
 EOF
 done
 
-cat > "${FAKE_BIN}/makeblastdb" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-input=""
-output=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -in)
-      input="$2"
-      shift 2
-      ;;
-    -out)
-      output="$2"
-      shift 2
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
-
-[[ -n "$input" && -n "$output" ]] || exit 1
-mkdir -p "$(dirname "$output")"
-printf '%s\n' "$input" > "${output}.source"
-EOF
-
-cat > "${FAKE_BIN}/blastn" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-task=""
-query=""
-db=""
-output=""
-db_count=0
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -task)
-      task="$2"
-      shift 2
-      ;;
-    -query)
-      query="$2"
-      shift 2
-      ;;
-    -db)
-      db="$2"
-      db_count=$((db_count + 1))
-      shift 2
-      ;;
-    -out)
-      output="$2"
-      shift 2
-      ;;
-    -*)
-      shift 2
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
-
-[[ "$db_count" -eq 1 ]] || {
-  echo "expected exactly one -db argument, saw $db_count" >&2
-  exit 1
-}
-[[ -n "$query" && -n "$db" && -n "$output" ]] || exit 1
-target="$(cat "${db}.source")"
-target_name="$(awk '/^>/ { sub(/^>/, "", $1); print $1; exit }' "$target")"
-target_len="$(awk 'BEGIN { n=0 } !/^>/ { gsub(/[[:space:]]/, ""); n += length($0) } END { print n }' "$target")"
-query_name="$(awk '/^>/ { sub(/^>/, "", $1); print $1; exit }' "$query")"
-query_len="$(awk 'BEGIN { n=0 } !/^>/ { gsub(/[[:space:]]/, ""); n += length($0) } END { print n }' "$query")"
-align_len="$query_len"
-if [[ "$align_len" -gt "$target_len" ]]; then
-  align_len="$target_len"
-fi
-
-mkdir -p "$(dirname "$output")"
-printf '%s\t%s\t99.0\t%s\t0\t0\t1\t%s\t1\t%s\t1e-20\t500\t%s\t%s\t%s\t0\n' \
-  "$query_name" "$target_name" "$align_len" "$align_len" "$align_len" "$query_len" "$target_len" "$align_len" > "$output"
-printf 'task=%s db_count=%s target=%s query=%s output=%s\n' "$task" "$db_count" "$target" "$query" "$output" >> "${GPM_TEST_BLASTN_LOG:?}"
-EOF
-
 cat > "${FAKE_BIN}/zip" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -260,7 +175,7 @@ if [[ "${#roots[@]}" -gt 0 ]]; then
 fi
 EOF
 
-chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/makeblastdb" "${FAKE_BIN}/blastn" "${FAKE_BIN}/zip" \
+chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/zip" \
   "${FAKE_BIN}/nucmer" "${FAKE_BIN}/delta-filter" "${FAKE_BIN}/show-coords"
 
 repeat_base() {
@@ -291,7 +206,6 @@ ds2="${TMP_DIR}/ds2.fa"
 final_fa="${TMP_DIR}/gap.final.fa"
 output_root="${TMP_DIR}/gpm_server"
 export GPM_TEST_MINIMAP_LOG="${TMP_DIR}/minimap2.log"
-export GPM_TEST_BLASTN_LOG="${TMP_DIR}/blastn.log"
 
 write_fasta "$ref" "Chr01" "$(repeat_base A 2000)"
 write_fasta "$ds1" "ds1_ctg" "$(repeat_base A 1200)"
@@ -359,26 +273,6 @@ fi
 assert_file_contains "${TMP_DIR}/duplicate.out" "ctg name already exists: Chr01_gap3_filled"
 assert_file_contains "${TMP_DIR}/duplicate.out" "Please choose a different --ctg name"
 
-blast_output_root="${TMP_DIR}/gpm_server_blast"
-PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" \
-  --ref ref_add_ctg_blast "$ref" \
-  --ds hifiasm "$ds1" \
-  --score 60 \
-  --aligner blastn \
-  --blastn-task megablast \
-  -o "$blast_output_root" >/dev/null
-
-PATH="${FAKE_BIN}:$PATH" bash "${blast_output_root}/run_all.sh"
-PATH="${FAKE_BIN}:$PATH" bash "${blast_output_root}/add_ctg.sh" \
-  --ctg Chr01_gap4_filled \
-  --chr Chr01 \
-  --track hifiasm \
-  -i "$final_fa" >/dev/null
-
-test -f "${blast_output_root}/runs/add_ctg/Chr01_gap4_filled_vs_ref/result.paf"
-test -f "${blast_output_root}/runs/chr_Chr01/add_ctg/hifiasm_vs_Chr01_gap4_filled/result.paf"
-grep -q 'task=megablast db_count=1' "$GPM_TEST_BLASTN_LOG"
-assert_file_contains "${blast_output_root}/add_Chr01_gap4_filled.zip" $'alignment_engine\tblastn'
-assert_file_contains "${blast_output_root}/add_Chr01_gap4_filled.zip" $'blastn_task\tmegablast'
+assert_file_contains "$add_zip" $'alignment_engine\tminimap2'
 
 echo "gpm_server_add_ctg_test.sh: ok"

@@ -45,22 +45,7 @@ exit 0
 EOF
 done
 
-cat > "${FAKE_BIN}/makeblastdb" <<'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-
-cat > "${FAKE_BIN}/blastn" <<'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-
 cat > "${FAKE_BIN}/meryl" <<'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-
-cat > "${FAKE_BIN}/winnowmap" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
@@ -70,7 +55,7 @@ cat > "${FAKE_BIN}/zip" <<'EOF'
 exit 0
 EOF
 
-chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/makeblastdb" "${FAKE_BIN}/blastn" "${FAKE_BIN}/meryl" "${FAKE_BIN}/winnowmap" "${FAKE_BIN}/zip" \
+chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/meryl" "${FAKE_BIN}/zip" \
   "${FAKE_BIN}/nucmer" "${FAKE_BIN}/delta-filter" "${FAKE_BIN}/show-coords" "${FAKE_BIN}/merqury.sh" "${FAKE_BIN}/craq"
 
 write_multi_fasta() {
@@ -161,13 +146,11 @@ metadata_path="${output_root}/metadata/prepare_options.tsv"
 
 assert_prepare_option "$metadata_path" chr_assignment_min_coverage_percent 71
 assert_prepare_option "$metadata_path" alignment_engine minimap2
+if grep -Eq '^(blastn_|winnowmap_)' "$metadata_path"; then
+  echo "removed aligner options must not appear in prepare metadata" >&2
+  exit 1
+fi
 assert_prepare_option "$metadata_path" minimap_preset asm5
-assert_prepare_option "$metadata_path" blastn_task blastn
-assert_prepare_option "$metadata_path" blastn_evalue 1e-10
-assert_prepare_option "$metadata_path" blastn_dust no
-assert_prepare_option "$metadata_path" winnowmap_preset asm20
-assert_prepare_option "$metadata_path" winnowmap_kmer 19
-assert_prepare_option "$metadata_path" winnowmap_repeat_fraction 0.9998
 assert_prepare_option "$metadata_path" threads 10
 assert_prepare_option "$metadata_path" skip_self true
 assert_prepare_option "$metadata_path" self_alignment_scope none

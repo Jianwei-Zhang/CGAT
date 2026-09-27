@@ -41,22 +41,7 @@ exit 0
 EOF
 done
 
-cat > "${FAKE_BIN}/makeblastdb" <<'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-
-cat > "${FAKE_BIN}/blastn" <<'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-
 cat > "${FAKE_BIN}/meryl" <<'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-
-cat > "${FAKE_BIN}/winnowmap" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
@@ -70,7 +55,7 @@ fi
 exit 0
 EOF
 
-chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/makeblastdb" "${FAKE_BIN}/blastn" "${FAKE_BIN}/meryl" "${FAKE_BIN}/winnowmap" "${FAKE_BIN}/zip" \
+chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/meryl" "${FAKE_BIN}/zip" \
   "${FAKE_BIN}/nucmer" "${FAKE_BIN}/delta-filter" "${FAKE_BIN}/show-coords" "${FAKE_BIN}/merqury.sh" "${FAKE_BIN}/craq"
 
 write_fasta() {
@@ -291,8 +276,6 @@ test_alignment_engine_defaults_and_validation() {
   local ref="${TMP_DIR}/ref-aligner.fa"
   local ds="${TMP_DIR}/ds-aligner.fa"
   local default_root="${TMP_DIR}/aligner_default_gpm_server"
-  local blastn_root="${TMP_DIR}/aligner_blastn_gpm_server"
-  local winnowmap_root="${TMP_DIR}/aligner_winnowmap_gpm_server"
   write_multi_fasta "$ref" "Chr01" "AAAAAA"
   write_multi_fasta "$ds" "tig_a" "AAAAAAAAAA"
 
@@ -308,89 +291,21 @@ test_alignment_engine_defaults_and_validation() {
   assert_prepare_option "${default_root}/metadata/prepare_options.tsv" alignment_engine minimap2
   assert_prepare_option "${default_root}/metadata/prepare_options.tsv" threads 10
 
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
-    --ref ref_aligner "$ref" \
-    --ds ds_a "$ds" \
-    --aligner blastn \
-    -o "$blastn_root" >/dev/null
-  grep -F "makeblastdb -in" "${blastn_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
-    echo "expected blastn command to build a BLAST database" >&2
-    cat "${blastn_root}/runs/ds_a_vs_ref/command.sh" >&2
-    exit 1
-  }
-  grep -F "blastn -task blastn" "${blastn_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
-    echo "expected blastn command to use default blastn task" >&2
-    cat "${blastn_root}/runs/ds_a_vs_ref/command.sh" >&2
-    exit 1
-  }
-  grep -F "blast6_to_paf.py" "${blastn_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
-    echo "expected blastn command to convert blast6 to PAF" >&2
-    cat "${blastn_root}/runs/ds_a_vs_ref/command.sh" >&2
-    exit 1
-  }
-  assert_prepare_option "${blastn_root}/metadata/prepare_options.tsv" alignment_engine blastn
-
-  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
-    --ref ref_aligner "$ref" \
-    --ds ds_a "$ds" \
-    --aligner winnowmap \
-    -o "$winnowmap_root" >/dev/null
-  grep -F 'meryl count threads="${GPM_TASK_THREADS:-10}" k=19' "${winnowmap_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
-    echo "expected winnowmap command to compute repetitive kmers" >&2
-    cat "${winnowmap_root}/runs/ds_a_vs_ref/command.sh" >&2
-    exit 1
-  }
-  grep -F 'winnowmap -c -W repetitive_19_result.txt -x asm20 -t "${GPM_TASK_THREADS:-10}"' "${winnowmap_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
-    echo "expected winnowmap command to emit CIGAR (-c) and use default preset and threads" >&2
-    cat "${winnowmap_root}/runs/ds_a_vs_ref/command.sh" >&2
-    exit 1
-  }
-  assert_prepare_option "${winnowmap_root}/metadata/prepare_options.tsv" alignment_engine winnowmap
-
-  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
-    --ref ref_aligner "$ref" \
-    --ds ds_a "$ds" \
-    --aligner blastn \
-    --minimap-preset asm5 \
-    -o "${TMP_DIR}/invalid_blastn_gpm_server" >/dev/null 2>"${TMP_DIR}/invalid_blastn.err"; then
-    echo "expected minimap option with blastn to fail" >&2
-    exit 1
-  fi
-  grep -F -- "--minimap-preset is only valid with --aligner minimap2; selected aligner: blastn" "${TMP_DIR}/invalid_blastn.err" >/dev/null || {
-    echo "expected invalid blastn option error" >&2
-    cat "${TMP_DIR}/invalid_blastn.err" >&2
-    exit 1
-  }
-
-  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
-    --ref ref_aligner "$ref" \
-    --ds ds_a "$ds" \
-    --aligner minimap2 \
-    --blastn-evalue 1e-20 \
-    -o "${TMP_DIR}/invalid_minimap_gpm_server" >/dev/null 2>"${TMP_DIR}/invalid_minimap.err"; then
-    echo "expected blastn option with minimap2 to fail" >&2
-    exit 1
-  fi
-  grep -F -- "--blastn-evalue is only valid with --aligner blastn; selected aligner: minimap2" "${TMP_DIR}/invalid_minimap.err" >/dev/null || {
-    echo "expected invalid minimap option error" >&2
-    cat "${TMP_DIR}/invalid_minimap.err" >&2
-    exit 1
-  }
-
-  if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
-    --ref ref_aligner "$ref" \
-    --ds ds_a "$ds" \
-    --aligner blastn \
-    --winnowmap-kmer 21 \
-    -o "${TMP_DIR}/invalid_winnowmap_gpm_server" >/dev/null 2>"${TMP_DIR}/invalid_winnowmap.err"; then
-    echo "expected winnowmap option with blastn to fail" >&2
-    exit 1
-  fi
-  grep -F -- "--winnowmap-kmer is only valid with --aligner winnowmap; selected aligner: blastn" "${TMP_DIR}/invalid_winnowmap.err" >/dev/null || {
-    echo "expected invalid winnowmap option error" >&2
-    cat "${TMP_DIR}/invalid_winnowmap.err" >&2
-    exit 1
-  }
+  local option value
+  for option in --aligner --blastn-task --blastn-evalue --winnowmap-kmer; do
+    value=unused
+    [[ "$option" != --aligner ]] || value=minimap2
+    if PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
+      --ref ref_aligner "$ref" \
+      --ds ds_a "$ds" \
+      "$option" "$value" \
+      -o "${TMP_DIR}/removed_option_gpm_server" > /dev/null 2>"${TMP_DIR}/removed_option.err"; then
+      echo "expected removed option to fail: $option" >&2
+      exit 1
+    fi
+    grep -F -- "Unknown argument: $option" "${TMP_DIR}/removed_option.err" >/dev/null
+    [[ ! -e "${TMP_DIR}/removed_option_gpm_server" ]]
+  done
 }
 
 test_out_alias_sets_output_root() {
