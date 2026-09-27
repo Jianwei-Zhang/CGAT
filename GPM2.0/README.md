@@ -99,6 +99,8 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 
 An aligner-specific option is valid only with its matching `--aligner`. GRT processing always resolves `minimap2` and the MUMmer4 commands from `PATH`.
 
+Performance note: Winnowmap is supported end to end, but a chromosome FASTA often contains only one query record. `--threads` is a total budget rather than guaranteed utilization, so a single-record Winnowmap alignment may use only one or a few cores and can be substantially slower than Minimap2. Prefer Minimap2 for routine throughput; choose Winnowmap when repeat-aware mapping is worth the additional runtime.
+
 ### 3. Resume and monitor
 
 ```bash

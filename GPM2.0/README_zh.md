@@ -99,6 +99,8 @@ bash server/run.sh \
 
 引擎专属参数只能与对应的 `--aligner` 一起使用。GRT 计算始终从 `PATH` 解析 `minimap2` 和 MUMmer4 命令。
 
+性能说明：Winnowmap 已支持完整流程，但染色体 FASTA 通常只有一条 query 记录。`--threads` 表示总线程预算，不保证单条任务能够全部利用；单记录的 Winnowmap 比对可能只使用一个或少数几个核心，并且会明显慢于 Minimap2。常规高吞吐任务建议优先使用 Minimap2；只有在重复区感知值得额外运行时间时再选择 Winnowmap。
+
 ### 3. 恢复与监控
 
 ```bash
