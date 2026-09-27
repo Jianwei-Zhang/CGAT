@@ -63,29 +63,20 @@ def write_filtered_tsv_allow_empty(src, dst, predicate):
 
 
 def main(argv):
-    if len(argv) != 16:
+    if len(argv) != 9:
         raise SystemExit(
             "usage: add_dataset_package.py <server_dir> <package_dir> <dataset_name> "
-            "<chr_score> <alignment_engine> <minimap_preset> <blastn_task> <blastn_evalue> "
-            "<blastn_dust> <winnowmap_preset> <winnowmap_kmer> <winnowmap_repeat_fraction> "
-            "<skip_self> <tel_enabled> <cen_enabled>"
+            "<chr_score> <minimap_preset> <skip_self> <tel_enabled> <cen_enabled>"
         )
 
     server_dir = Path(argv[1])
     package_dir = Path(argv[2])
     dataset_name = argv[3]
     chr_score = argv[4]
-    alignment_engine = argv[5]
-    minimap_preset = argv[6]
-    blastn_task = argv[7]
-    blastn_evalue = argv[8]
-    blastn_dust = argv[9]
-    winnowmap_preset = argv[10]
-    winnowmap_kmer = argv[11]
-    winnowmap_repeat_fraction = argv[12]
-    skip_self = argv[13].lower()
-    tel_enabled = argv[14].lower()
-    cen_enabled = argv[15].lower()
+    minimap_preset = argv[5]
+    skip_self = argv[6].lower()
+    tel_enabled = argv[7].lower()
+    cen_enabled = argv[8].lower()
     reference = read_one_tsv(server_dir / "metadata" / "reference.tsv")
     self_alignment_available = "false" if skip_self == "true" else "true"
 
@@ -96,14 +87,8 @@ def main(argv):
         ("sequence_layout", "partitioned"),
         ("preassigned_chr", "true"),
         ("chr_assignment_min_coverage_percent", chr_score),
-        ("alignment_engine", alignment_engine),
+        ("alignment_engine", "minimap2"),
         ("minimap_preset", minimap_preset),
-        ("blastn_task", blastn_task),
-        ("blastn_evalue", blastn_evalue),
-        ("blastn_dust", blastn_dust),
-        ("winnowmap_preset", winnowmap_preset),
-        ("winnowmap_kmer", winnowmap_kmer),
-        ("winnowmap_repeat_fraction", winnowmap_repeat_fraction),
         ("skip_self", skip_self),
         ("self_alignment_available", self_alignment_available),
         ("tel_enabled", tel_enabled),

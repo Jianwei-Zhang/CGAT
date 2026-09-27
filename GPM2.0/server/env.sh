@@ -33,9 +33,6 @@ readonly -a REQUIRED_COMMANDS=(
   meryl
   merqury.sh
   craq
-  blastn
-  makeblastdb
-  winnowmap
   zip
   gzip
   pigz

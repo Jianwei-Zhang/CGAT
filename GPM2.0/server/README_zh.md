@@ -51,9 +51,8 @@ bash install.sh --manager conda
 
 ### ARM64 与集群环境
 
-安装器在 Linux ARM64（`aarch64`/`arm64`）上使用独立依赖清单，固定
-`blast=2.16.0` 以解决包可用性。Linux ARM64 和 x86_64 统一使用
-`meryl=1.4.2`，避开 ARM64 上已复现的 1.4.1 多线程崩溃问题。
+安装器在 Linux ARM64（`aarch64`/`arm64`）上使用独立依赖清单。Linux ARM64
+和 x86_64 统一使用 `meryl=1.4.2`，避开 ARM64 上已复现的 1.4.1 多线程崩溃问题。
 部署时请复制完整 `server/` 目录。
 
 如果使用集群 module，需在作业脚本中加载匹配架构的工具及运行库，

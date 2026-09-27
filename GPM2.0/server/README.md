@@ -54,8 +54,7 @@ bash install.sh --manager conda
 ### ARM64 and cluster environments
 
 On Linux ARM64 (`aarch64`/`arm64`), the installer selects a separate dependency
-specification with `blast=2.16.0` for package availability. Both Linux ARM64
-and x86_64 use `meryl=1.4.2`, avoiding a reproduced multithreaded Meryl 1.4.1
+specification. Both Linux ARM64 and x86_64 use `meryl=1.4.2`, avoiding a reproduced multithreaded Meryl 1.4.1
 crash on ARM64 while keeping the Meryl version consistent.
 Deploy the complete `server/` directory, including both specification files.
 

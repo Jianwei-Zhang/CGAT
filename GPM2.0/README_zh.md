@@ -43,7 +43,6 @@ bash server/install.sh --check
 | --- | --- |
 | 核心流程 | `python3`、`samtools`、`zip`、`gzip` |
 | GRT Final Path | `minimap2`、`nucmer`、`delta-filter`、`show-coords` |
-| 可选比对引擎 | `blastn` + `makeblastdb`，或 `winnowmap` + `meryl` |
 | 可选 reads 质控 | `meryl`、`merqury.sh`；仅传入 `--reads` 时使用 |
 
 执行 `run.sh` 时保持该环境已激活。
@@ -74,7 +73,7 @@ bash server/run.sh \
 | `--ds [<名称>] <fasta>` | 必填，可重复 | 初次输入的组装数据集；省略名称时从文件名自动推导。第一个为主 ds，其余为辅 ds。 |
 | `-o, --out <目录>` | `./gpm_server` | 服务端工作目录及生成脚本的位置。 |
 | `-s, --score <0-100>` | `60` | 染色体分配的最小覆盖率百分比。 |
-| `--aligner <引擎>` | `minimap2` | 主比对引擎：`minimap2`、`blastn` 或 `winnowmap`。 |
+| `--aligner <引擎>` | `minimap2` | 兼容参数；仅支持 `minimap2`。 |
 | `-t, --threads <数量>` | `10` | 总计算线程预算，在独立比对任务及 reads QC 任务之间分配。 |
 | `--skip-self` | 关闭 | 跳过同 dataset 自比对；同 dataset Subview 将不可用。 |
 | `--tel <motif> <次数>` | 可选，可重复 | 标记双链上的精确端粒样重复。例如 `--tel TTAGGG 20`。 |
@@ -91,15 +90,8 @@ bash server/run.sh \
 | 引擎 | 参数 | 可选值 / 默认值 |
 | --- | --- | --- |
 | `minimap2` | `--minimap-preset` | `asm10` 或 `asm5`；默认 `asm10` |
-| `blastn` | `--blastn-task` | `blastn`、`megablast` 或 `dc-megablast`；默认 `blastn` |
-| `blastn` | `--blastn-evalue` | 正数；默认 `1e-10` |
-| `winnowmap` | `--winnowmap-preset` | `asm20`、`asm10` 或 `asm5`；默认 `asm20` |
-| `winnowmap` | `--winnowmap-kmer` | 正整数；默认 `19` |
-| `winnowmap` | `--winnowmap-repeat-fraction` | `(0, 1)`；默认 `0.9998` |
 
-引擎专属参数只能与对应的 `--aligner` 一起使用。GRT 计算始终从 `PATH` 解析 `minimap2` 和 MUMmer4 命令。
-
-性能说明：Winnowmap 已支持完整流程，但染色体 FASTA 通常只有一条 query 记录。`--threads` 表示总线程预算，不保证单条任务能够全部利用；单记录的 Winnowmap 比对可能只使用一个或少数几个核心，并且会明显慢于 Minimap2。常规高吞吐任务建议优先使用 Minimap2；只有在重复区感知值得额外运行时间时再选择 Winnowmap。
+GPM Server 仅支持 Minimap2。BLASTN 与 Winnowmap 的全基因组运行无法满足当前流程的时间和内存要求，因此新工作目录不再接受这两个引擎。GRT 计算始终从 `PATH` 解析 `minimap2` 和 MUMmer4 命令。
 
 ### 3. 恢复与监控
 

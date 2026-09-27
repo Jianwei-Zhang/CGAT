@@ -78,35 +78,15 @@ fi
 
 alignment_engine="$(read_prepare_option alignment_engine || printf 'minimap2')"
 minimap_preset="$(read_prepare_option minimap_preset || printf 'asm10')"
-blastn_task="$(read_prepare_option blastn_task || printf 'blastn')"
-blastn_evalue="$(read_prepare_option blastn_evalue || printf '1e-10')"
-blastn_dust="$(read_prepare_option blastn_dust || printf 'no')"
-winnowmap_preset="$(read_prepare_option winnowmap_preset || printf 'asm20')"
-winnowmap_kmer="$(read_prepare_option winnowmap_kmer || printf '19')"
-winnowmap_repeat_fraction="$(read_prepare_option winnowmap_repeat_fraction || printf '0.9998')"
 threads="$(read_prepare_option threads)"
 chr_score="$(read_prepare_option chr_assignment_min_coverage_percent)"
 skip_self="$(read_prepare_option skip_self)"
 tel_enabled="$(read_prepare_option tel_enabled || printf 'false')"
 cen_enabled="$(read_prepare_option cen_enabled || printf 'false')"
 
-case "$alignment_engine" in
-  minimap2)
-    require_cmd minimap2
-    ;;
-  blastn)
-    require_cmd makeblastdb
-    require_cmd blastn
-    [[ -f "${server_dir}/.prepare_lib/tools/blast6_to_paf.py" ]] || die "Missing .prepare_lib/tools/blast6_to_paf.py"
-    ;;
-  winnowmap)
-    require_cmd meryl
-    require_cmd winnowmap
-    ;;
-  *)
-    die "Unsupported alignment_engine in metadata/prepare_options.tsv: ${alignment_engine}"
-    ;;
-esac
+[[ "$alignment_engine" == "minimap2" ]] \
+  || die "Unsupported alignment_engine in metadata/prepare_options.tsv: ${alignment_engine}. Only minimap2 is supported."
+require_cmd minimap2
 
 if [[ -z "$out_path" ]]; then
   out_path="${server_dir}/add_${dataset_name}.zip"
@@ -135,17 +115,8 @@ ensure_fai "$stage_ds_fa"
 
 python3 "${stage_dir}/.prepare_lib/tools/add_dataset_stage.py" \
   "$stage_dir" \
-  "$server_dir" \
   "$dataset_name" \
-  "$chr_score" \
-  "$alignment_engine" \
   "$minimap_preset" \
-  "$blastn_task" \
-  "$blastn_evalue" \
-  "$blastn_dust" \
-  "$winnowmap_preset" \
-  "$winnowmap_kmer" \
-  "$winnowmap_repeat_fraction" \
   "$threads" \
   "$skip_self"
 
@@ -170,14 +141,7 @@ python3 "${server_dir}/.prepare_lib/tools/add_dataset_package.py" \
   "$package_dir" \
   "$dataset_name" \
   "$chr_score" \
-  "$alignment_engine" \
   "$minimap_preset" \
-  "$blastn_task" \
-  "$blastn_evalue" \
-  "$blastn_dust" \
-  "$winnowmap_preset" \
-  "$winnowmap_kmer" \
-  "$winnowmap_repeat_fraction" \
   "$skip_self" \
   "$tel_enabled" \
   "$cen_enabled"

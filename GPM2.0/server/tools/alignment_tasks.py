@@ -35,15 +35,6 @@ def query_threads(fasta: Path, engine: str, budget: int) -> int:
     return max(1, min(budget, count))
 
 
-def alignment_concurrency(engine: str, blastn_task: str = "blastn") -> int | None:
-    """Return a conservative leaf-process limit for multithreaded aligners."""
-    if engine == "winnowmap":
-        return 2
-    if engine == "blastn":
-        return 1 if blastn_task == "blastn" else 2
-    return None
-
-
 def write_manifest(
     path: Path,
     root: Path,
@@ -217,14 +208,12 @@ def main():
     parser.add_argument("--command", required=True, type=Path)
     parser.add_argument("--query", required=True, type=Path)
     parser.add_argument("--engine", required=True)
-    parser.add_argument("--blastn-task", default="blastn")
     parser.add_argument("--threads", required=True, type=int)
     args = parser.parse_args()
     write_manifest(
         args.command.parent / MANIFEST,
         args.root,
         [(args.command, query_threads(args.query, args.engine, args.threads), args.query.stat().st_size)],
-        alignment_concurrency(args.engine, args.blastn_task),
     )
 
 

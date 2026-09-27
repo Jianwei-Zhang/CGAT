@@ -18,12 +18,6 @@ THREADS="10"
 ARCHIVE_FORMAT="tar.gz"
 ALIGNER="minimap2"
 MINIMAP_PRESET="asm10"
-BLASTN_TASK="blastn"
-BLASTN_EVALUE="1e-10"
-BLASTN_DUST="no"
-WINNOWMAP_PRESET="asm20"
-WINNOWMAP_KMER="19"
-WINNOWMAP_REPEAT_FRACTION="0.9998"
 SKIP_SELF=false
 CHR_ASSIGNMENT_MIN_COVERAGE_PERCENT="60"
 CEN_SRC=""
@@ -40,13 +34,6 @@ GRT_SHOW_COORDS="show-coords"
 GRT_QC_MEMORY_GB="80"
 GRT_KMER_SIZE="21"
 GRT_REFILL_MAX_LENGTH="1000000"
-MINIMAP_PRESET_SET=false
-BLASTN_TASK_SET=false
-BLASTN_EVALUE_SET=false
-BLASTN_DUST_SET=false
-WINNOWMAP_PRESET_SET=false
-WINNOWMAP_KMER_SET=false
-WINNOWMAP_REPEAT_FRACTION_SET=false
 
 usage() {
   cat <<'EOF'
@@ -56,14 +43,8 @@ Usage:
     --ds [<dataset_name>] <dataset_fasta_path> \
     [-o|--out <gpm_server_output_dir>] \
     [--score|-s <chr_assignment_min_coverage_percent>] \
-    [--aligner minimap2|blastn|winnowmap] \
+    [--aligner minimap2] \
     [--minimap-preset asm10|asm5] \
-    [--blastn-task blastn|megablast|dc-megablast] \
-    [--blastn-evalue <evalue>] \
-    [--blastn-dust yes|no] \
-    [--winnowmap-preset asm20|asm10|asm5] \
-    [--winnowmap-kmer <kmer_size>] \
-    [--winnowmap-repeat-fraction <fraction>] \
     [--threads|-t <thread_budget>] \
     [--archive-format tar.gz|zip] \
     [--skip-self] \
@@ -90,10 +71,9 @@ Behavior:
   - Uses default work root: ./gpm_server under the current working directory
   - Supports -o/--out to choose another work root
   - Supports --score/-s to set the chr assignment coverage threshold, default: 60
-  - Supports --aligner minimap2|blastn|winnowmap, default: minimap2
-  - Supports --minimap-preset for minimap2 only, default: asm10
-  - Supports --blastn-task, --blastn-evalue, and --blastn-dust for blastn only, defaults: blastn, 1e-10, and no
-  - Supports --winnowmap-preset, --winnowmap-kmer, and --winnowmap-repeat-fraction for winnowmap only, defaults: asm20, 19, and 0.9998
+  - Uses Minimap2 for all reference and chromosome-local alignments
+  - Accepts --aligner minimap2 as a compatibility option; other aligners are unsupported
+  - Supports --minimap-preset, default: asm10
   - Supports --threads/-t to choose the total compute-thread budget, default: 10
   - Independent reference and chromosome-local alignments share this budget
   - Default delivery: tar.gz compressed with pigz using the thread budget; --archive-format zip keeps ZIP output
@@ -179,91 +159,8 @@ validate_minimap_preset() {
 
 validate_aligner() {
   local value="$1"
-  case "$value" in
-    minimap2|blastn|winnowmap)
-      ;;
-    *)
-      die "Invalid --aligner '$value'. Use minimap2, blastn, or winnowmap."
-      ;;
-  esac
-}
-
-validate_blastn_task() {
-  local value="$1"
-  case "$value" in
-    blastn|megablast|dc-megablast)
-      ;;
-    *)
-      die "Invalid --blastn-task '$value'. Use blastn, megablast, or dc-megablast."
-      ;;
-  esac
-}
-
-validate_blastn_dust() {
-  local value="$1"
-  case "$value" in
-    yes|no)
-      ;;
-    *)
-      die "Invalid --blastn-dust '$value'. Use yes or no."
-      ;;
-  esac
-}
-
-validate_float_option() {
-  local option_name="$1"
-  local value="$2"
-  [[ "$value" =~ ^[0-9]+([.][0-9]+)?([eE][-+]?[0-9]+)?$ ]] || die "Invalid ${option_name} '$value'. Use a positive number."
-  awk -v value="$value" 'BEGIN { exit (value > 0 ? 0 : 1) }' \
-    || die "Invalid ${option_name} '$value'. Use a positive number."
-}
-
-validate_winnowmap_preset() {
-  local value="$1"
-  case "$value" in
-    asm20|asm10|asm5)
-      ;;
-    *)
-      die "Invalid --winnowmap-preset '$value'. Use asm20, asm10, or asm5."
-      ;;
-  esac
-}
-
-validate_winnowmap_kmer() {
-  local value="$1"
-  [[ "$value" =~ ^[1-9][0-9]*$ ]] || die "Invalid --winnowmap-kmer '$value'. Use a positive integer."
-}
-
-validate_winnowmap_repeat_fraction() {
-  local value="$1"
-  validate_float_option "--winnowmap-repeat-fraction" "$value"
-  awk -v value="$value" 'BEGIN { exit (value > 0 && value < 1 ? 0 : 1) }' \
-    || die "Invalid --winnowmap-repeat-fraction '$value'. Use a number greater than 0 and less than 1."
-}
-
-validate_engine_specific_options() {
-  case "$ALIGNER" in
-    minimap2)
-      [[ "$BLASTN_TASK_SET" == "false" ]] || die "--blastn-task is only valid with --aligner blastn; selected aligner: $ALIGNER"
-      [[ "$BLASTN_EVALUE_SET" == "false" ]] || die "--blastn-evalue is only valid with --aligner blastn; selected aligner: $ALIGNER"
-      [[ "$BLASTN_DUST_SET" == "false" ]] || die "--blastn-dust is only valid with --aligner blastn; selected aligner: $ALIGNER"
-      [[ "$WINNOWMAP_PRESET_SET" == "false" ]] || die "--winnowmap-preset is only valid with --aligner winnowmap; selected aligner: $ALIGNER"
-      [[ "$WINNOWMAP_KMER_SET" == "false" ]] || die "--winnowmap-kmer is only valid with --aligner winnowmap; selected aligner: $ALIGNER"
-      [[ "$WINNOWMAP_REPEAT_FRACTION_SET" == "false" ]] || die "--winnowmap-repeat-fraction is only valid with --aligner winnowmap; selected aligner: $ALIGNER"
-      ;;
-    blastn)
-      [[ "$MINIMAP_PRESET_SET" == "false" ]] || die "--minimap-preset is only valid with --aligner minimap2; selected aligner: $ALIGNER"
-      [[ "$WINNOWMAP_PRESET_SET" == "false" ]] || die "--winnowmap-preset is only valid with --aligner winnowmap; selected aligner: $ALIGNER"
-      [[ "$WINNOWMAP_KMER_SET" == "false" ]] || die "--winnowmap-kmer is only valid with --aligner winnowmap; selected aligner: $ALIGNER"
-      [[ "$WINNOWMAP_REPEAT_FRACTION_SET" == "false" ]] || die "--winnowmap-repeat-fraction is only valid with --aligner winnowmap; selected aligner: $ALIGNER"
-      ;;
-    winnowmap)
-      [[ "$MINIMAP_PRESET_SET" == "false" ]] || die "--minimap-preset is only valid with --aligner minimap2; selected aligner: $ALIGNER"
-      [[ "$BLASTN_TASK_SET" == "false" ]] || die "--blastn-task is only valid with --aligner blastn; selected aligner: $ALIGNER"
-      [[ "$BLASTN_EVALUE_SET" == "false" ]] || die "--blastn-evalue is only valid with --aligner blastn; selected aligner: $ALIGNER"
-      [[ "$BLASTN_DUST_SET" == "false" ]] || die "--blastn-dust is only valid with --aligner blastn; selected aligner: $ALIGNER"
-      ;;
-  esac
+  [[ "$value" == "minimap2" ]] \
+    || die "Unsupported --aligner '$value'. Only minimap2 is supported."
 }
 
 validate_threads() {
@@ -292,10 +189,6 @@ shell_quote() {
   printf '%q' "$1"
 }
 
-alignment_tools_dir() {
-  printf '%s/.prepare_lib/tools\n' "$WORK_ROOT"
-}
-
 write_alignment_command_script() {
   local output_path="$1"
   local run_dir="$2"
@@ -303,80 +196,22 @@ write_alignment_command_script() {
   local query_fa="$4"
   local self_mode="$5"
   local result_name="${6:-result.paf}"
-  local blast6_name="${result_name%.paf}.blast6"
-  local target_db_dir="blastdb_${result_name%.paf}"
-  local target_db_prefix="${target_db_dir}/target"
-  local repetitive_db_dir="merylDB_${result_name%.paf}"
-  local repetitive_txt="repetitive_${WINNOWMAP_KMER}_${result_name%.paf}.txt"
   local runtime_threads="\"\${GPM_TASK_THREADS:-${THREADS}}\""
-  local tools_dir
-  tools_dir="$(alignment_tools_dir)"
 
   {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'cd %s\n' "$(shell_quote "$run_dir")"
-    case "$ALIGNER" in
-      minimap2)
-        printf '(minimap2 --version > tool_version.txt 2>&1 || printf %s > tool_version.txt)\n' "$(shell_quote $'unknown\n')"
-        printf 'minimap2 -c -x %s ' "$(shell_quote "$MINIMAP_PRESET")"
-        if [[ "$self_mode" == "true" ]]; then
-          printf -- '-X '
-        fi
-        printf -- '-t %s -o %s %s %s > stdout.log 2> stderr.log\n' \
-          "$runtime_threads" \
-          "$(shell_quote "$result_name")" \
-          "$(shell_quote "$target_fa")" \
-          "$(shell_quote "$query_fa")"
-        ;;
-      blastn)
-        printf '(blastn -version > tool_version.txt 2>&1 || printf %s > tool_version.txt)\n' "$(shell_quote $'unknown\n')"
-        printf 'rm -rf %s\n' "$(shell_quote "$target_db_dir")"
-        printf 'mkdir -p %s\n' "$(shell_quote "$target_db_dir")"
-        printf 'makeblastdb -in %s -dbtype nucl -out %s > makeblastdb.stdout.log 2> makeblastdb.stderr.log\n' \
-          "$(shell_quote "$target_fa")" \
-          "$(shell_quote "$target_db_prefix")"
-        printf 'blastn -task %s -query %s -db %s -num_threads %s -dust %s -evalue %s -outfmt %s -out %s > stdout.log 2> stderr.log\n' \
-          "$(shell_quote "$BLASTN_TASK")" \
-          "$(shell_quote "$query_fa")" \
-          "$(shell_quote "$target_db_prefix")" \
-          "$runtime_threads" \
-          "$(shell_quote "$BLASTN_DUST")" \
-          "$(shell_quote "$BLASTN_EVALUE")" \
-          "$(shell_quote "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen nident gaps")" \
-          "$(shell_quote "$blast6_name")"
-        printf 'python3 %s --input %s --output %s\n' \
-          "$(shell_quote "${tools_dir}/blast6_to_paf.py")" \
-          "$(shell_quote "$blast6_name")" \
-          "$(shell_quote "$result_name")"
-        ;;
-      winnowmap)
-        printf '(winnowmap --version > tool_version.txt 2>&1 || printf %s > tool_version.txt)\n' "$(shell_quote $'unknown\n')"
-        printf 'rm -rf %s\n' "$(shell_quote "$repetitive_db_dir")"
-        printf 'meryl count threads=%s k=%s output %s %s > meryl.stdout.log 2> meryl.stderr.log\n' \
-          "$runtime_threads" \
-          "$(shell_quote "$WINNOWMAP_KMER")" \
-          "$(shell_quote "$repetitive_db_dir")" \
-          "$(shell_quote "$target_fa")"
-        printf 'meryl print threads=%s greater-than distinct=%s %s > %s\n' \
-          "$runtime_threads" \
-          "$(shell_quote "$WINNOWMAP_REPEAT_FRACTION")" \
-          "$(shell_quote "$repetitive_db_dir")" \
-          "$(shell_quote "$repetitive_txt")"
-        printf 'winnowmap -c -W %s -x %s ' \
-          "$(shell_quote "$repetitive_txt")" \
-          "$(shell_quote "$WINNOWMAP_PRESET")"
-        if [[ "$self_mode" == "true" ]]; then
-          printf -- '-X '
-        fi
-        printf -- '-t %s %s %s > %s 2> stderr.log\n' \
-          "$runtime_threads" \
-          "$(shell_quote "$target_fa")" \
-          "$(shell_quote "$query_fa")" \
-          "$(shell_quote "$result_name")"
-        printf ': > stdout.log\n'
-        ;;
-    esac
+    printf '(minimap2 --version > tool_version.txt 2>&1 || printf %s > tool_version.txt)\n' "$(shell_quote $'unknown\n')"
+    printf 'minimap2 -c -x %s ' "$(shell_quote "$MINIMAP_PRESET")"
+    if [[ "$self_mode" == "true" ]]; then
+      printf -- '-X '
+    fi
+    printf -- '-t %s -o %s %s %s > stdout.log 2> stderr.log\n' \
+      "$runtime_threads" \
+      "$(shell_quote "$result_name")" \
+      "$(shell_quote "$target_fa")" \
+      "$(shell_quote "$query_fa")"
   } > "$output_path"
   make_executable_if_supported "$output_path"
 }
@@ -576,12 +411,6 @@ write_prepare_options_metadata() {
     printf 'chr_assignment_min_coverage_percent\t%s\n' "$CHR_ASSIGNMENT_MIN_COVERAGE_PERCENT"
     printf 'alignment_engine\t%s\n' "$ALIGNER"
     printf 'minimap_preset\t%s\n' "$MINIMAP_PRESET"
-    printf 'blastn_task\t%s\n' "$BLASTN_TASK"
-    printf 'blastn_evalue\t%s\n' "$BLASTN_EVALUE"
-    printf 'blastn_dust\t%s\n' "$BLASTN_DUST"
-    printf 'winnowmap_preset\t%s\n' "$WINNOWMAP_PRESET"
-    printf 'winnowmap_kmer\t%s\n' "$WINNOWMAP_KMER"
-    printf 'winnowmap_repeat_fraction\t%s\n' "$WINNOWMAP_REPEAT_FRACTION"
     printf 'threads\t%s\n' "$THREADS"
     printf 'archive_format\t%s\n' "$ARCHIVE_FORMAT"
     printf 'skip_self\t%s\n' "$SKIP_SELF"
@@ -637,8 +466,8 @@ write_ref_command_script() {
 
   write_alignment_command_script "${run_dir}/command.sh" "$run_dir" "$ref_fa" "$ds_fa" false
   python3 "${SCRIPT_DIR}/tools/alignment_tasks.py" --root "$WORK_ROOT" \
-    --command "${run_dir}/command.sh" --query "$ds_fa" --engine "$ALIGNER" \
-    --blastn-task "$BLASTN_TASK" --threads "$THREADS"
+    --command "${run_dir}/command.sh" --query "$ds_fa" --engine minimap2 \
+    --threads "$THREADS"
 }
 
 write_assignment_script() {
@@ -654,26 +483,10 @@ write_assignment_script() {
     --output "$output_path" \
     --allow GPM_FAST_WORK_ROOT \
     --allow GPM_FAST_THREADS \
-    --allow GPM_FAST_ALIGNMENT_ENGINE \
     --allow GPM_FAST_MINIMAP_PRESET \
-    --allow GPM_FAST_BLASTN_TASK \
-    --allow GPM_FAST_BLASTN_EVALUE \
-    --allow GPM_FAST_BLASTN_DUST \
-    --allow GPM_FAST_WINNOWMAP_PRESET \
-    --allow GPM_FAST_WINNOWMAP_KMER \
-    --allow GPM_FAST_WINNOWMAP_REPEAT_FRACTION \
-    --allow GPM_FAST_BLAST6_TO_PAF \
     --shell-var GPM_FAST_WORK_ROOT "$work_root" \
     --shell-var GPM_FAST_THREADS "$THREADS" \
-    --shell-var GPM_FAST_ALIGNMENT_ENGINE "$ALIGNER" \
-    --shell-var GPM_FAST_MINIMAP_PRESET "$MINIMAP_PRESET" \
-    --shell-var GPM_FAST_BLASTN_TASK "$BLASTN_TASK" \
-    --shell-var GPM_FAST_BLASTN_EVALUE "$BLASTN_EVALUE" \
-    --shell-var GPM_FAST_BLASTN_DUST "$BLASTN_DUST" \
-    --shell-var GPM_FAST_WINNOWMAP_PRESET "$WINNOWMAP_PRESET" \
-    --shell-var GPM_FAST_WINNOWMAP_KMER "$WINNOWMAP_KMER" \
-    --shell-var GPM_FAST_WINNOWMAP_REPEAT_FRACTION "$WINNOWMAP_REPEAT_FRACTION" \
-    --shell-var GPM_FAST_BLAST6_TO_PAF "${work_root}/.prepare_lib/tools/blast6_to_paf.py"
+    --shell-var GPM_FAST_MINIMAP_PRESET "$MINIMAP_PRESET"
   make_executable_if_supported "$output_path"
 }
 
@@ -908,7 +721,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --aligner)
-      [[ $# -ge 2 ]] || die "--aligner requires minimap2, blastn, or winnowmap"
+      [[ $# -ge 2 ]] || die "--aligner requires minimap2"
       validate_aligner "$2"
       ALIGNER="$2"
       shift 2
@@ -926,49 +739,6 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || die "--minimap-preset requires asm10 or asm5"
       validate_minimap_preset "$2"
       MINIMAP_PRESET="$2"
-      MINIMAP_PRESET_SET=true
-      shift 2
-      ;;
-    --blastn-task)
-      [[ $# -ge 2 ]] || die "--blastn-task requires blastn, megablast, or dc-megablast"
-      validate_blastn_task "$2"
-      BLASTN_TASK="$2"
-      BLASTN_TASK_SET=true
-      shift 2
-      ;;
-    --blastn-evalue)
-      [[ $# -ge 2 ]] || die "--blastn-evalue requires <evalue>"
-      validate_float_option "--blastn-evalue" "$2"
-      BLASTN_EVALUE="$2"
-      BLASTN_EVALUE_SET=true
-      shift 2
-      ;;
-    --blastn-dust)
-      [[ $# -ge 2 ]] || die "--blastn-dust requires yes or no"
-      validate_blastn_dust "$2"
-      BLASTN_DUST="$2"
-      BLASTN_DUST_SET=true
-      shift 2
-      ;;
-    --winnowmap-preset)
-      [[ $# -ge 2 ]] || die "--winnowmap-preset requires asm20, asm10, or asm5"
-      validate_winnowmap_preset "$2"
-      WINNOWMAP_PRESET="$2"
-      WINNOWMAP_PRESET_SET=true
-      shift 2
-      ;;
-    --winnowmap-kmer)
-      [[ $# -ge 2 ]] || die "--winnowmap-kmer requires <kmer_size>"
-      validate_winnowmap_kmer "$2"
-      WINNOWMAP_KMER="$2"
-      WINNOWMAP_KMER_SET=true
-      shift 2
-      ;;
-    --winnowmap-repeat-fraction)
-      [[ $# -ge 2 ]] || die "--winnowmap-repeat-fraction requires <fraction>"
-      validate_winnowmap_repeat_fraction "$2"
-      WINNOWMAP_REPEAT_FRACTION="$2"
-      WINNOWMAP_REPEAT_FRACTION_SET=true
       shift 2
       ;;
     --max-fill|-m)
@@ -1043,7 +813,6 @@ done
 
 [[ -n "$REF_NAME" ]] || die "Missing --ref"
 [[ "${#DATASET_NAMES[@]}" -gt 0 ]] || die "At least one --ds is required"
-validate_engine_specific_options
 if [[ "$GRT_READS_QC_MODE" == "full" && "${#READS_SRCS[@]}" -eq 0 ]]; then
   die "--reads-qc full requires at least one --reads input"
 fi
@@ -1066,19 +835,7 @@ fi
 if [[ "$GRT_READS_QC_MODE" == "full" ]]; then
   GRT_CRAQ="$(resolve_required_command craq)"
 fi
-case "$ALIGNER" in
-  minimap2)
-    require_cmd minimap2
-    ;;
-  blastn)
-    require_cmd makeblastdb
-    require_cmd blastn
-    ;;
-  winnowmap)
-    require_cmd meryl
-    require_cmd winnowmap
-    ;;
-esac
+require_cmd minimap2
 
 validate_name "$REF_NAME"
 ensure_readable_file "$REF_SRC"

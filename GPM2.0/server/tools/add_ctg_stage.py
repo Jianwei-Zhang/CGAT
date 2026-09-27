@@ -283,100 +283,18 @@ def ensure_target_track(server_dir, target_track):
 
 
 def write_alignment_command(path, run_dir, target_fa, query_fa, options, self_mode=False):
-    alignment_engine = options.get("alignment_engine", "minimap2")
     threads = options.get("threads", "10")
     minimap_preset = options.get("minimap_preset", "asm10")
-    blastn_task = options.get("blastn_task", "blastn")
-    blastn_evalue = options.get("blastn_evalue", "1e-10")
-    blastn_dust = options.get("blastn_dust", "no")
-    winnowmap_preset = options.get("winnowmap_preset", "asm20")
-    winnowmap_kmer = options.get("winnowmap_kmer", "19")
-    winnowmap_repeat_fraction = options.get("winnowmap_repeat_fraction", "0.9998")
-    blast6_to_paf = server_tool_path(run_dir, "blast6_to_paf.py")
 
     lines = ["#!/usr/bin/env bash", "set -euo pipefail", f"cd {shlex.quote(str(run_dir))}"]
-    if alignment_engine == "minimap2":
-        args = ["minimap2", "-c", "-x", minimap_preset]
-        if self_mode:
-            args.append("-X")
-        args.extend(["-t", threads, "-o", "result.paf", str(target_fa), str(query_fa)])
-        lines.append(" ".join(shlex.quote(part) for part in args) + " > stdout.log 2> stderr.log")
-    elif alignment_engine == "blastn":
-        outfmt = "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen nident gaps"
-        lines.extend(
-            [
-                "rm -rf blastdb_result",
-                "mkdir -p blastdb_result",
-                " ".join(shlex.quote(part) for part in ["makeblastdb", "-in", str(target_fa), "-dbtype", "nucl", "-out", "blastdb_result/target"])
-                + " > makeblastdb.stdout.log 2> makeblastdb.stderr.log",
-                " ".join(
-                    shlex.quote(part)
-                    for part in [
-                        "blastn",
-                        "-task",
-                        blastn_task,
-                        "-query",
-                        str(query_fa),
-                        "-db",
-                        "blastdb_result/target",
-                        "-num_threads",
-                        threads,
-                        "-dust",
-                        blastn_dust,
-                        "-evalue",
-                        blastn_evalue,
-                        "-outfmt",
-                        outfmt,
-                        "-out",
-                        "result.blast6",
-                    ]
-                )
-                + " > stdout.log 2> stderr.log",
-                " ".join(
-                    shlex.quote(part)
-                    for part in [
-                        "python3",
-                        str(blast6_to_paf),
-                        "--input",
-                        "result.blast6",
-                        "--output",
-                        "result.paf",
-                    ]
-                ),
-            ]
-        )
-    elif alignment_engine == "winnowmap":
-        lines.extend(
-            [
-                "rm -rf merylDB_result",
-                " ".join(shlex.quote(part) for part in ["meryl", "count", f"k={winnowmap_kmer}", "output", "merylDB_result", str(target_fa)])
-                + " > meryl.stdout.log 2> meryl.stderr.log",
-                " ".join(shlex.quote(part) for part in ["meryl", "print", "greater-than", f"distinct={winnowmap_repeat_fraction}", "merylDB_result"])
-                + f" > {shlex.quote('repetitive_' + winnowmap_kmer + '_result.txt')}",
-            ]
-        )
-        args = ["winnowmap", "-c", "-W", f"repetitive_{winnowmap_kmer}_result.txt", "-x", winnowmap_preset]
-        if self_mode:
-            args.append("-X")
-        args.extend(["-t", threads, str(target_fa), str(query_fa)])
-        lines.append(" ".join(shlex.quote(part) for part in args) + " > result.paf 2> stderr.log")
-        lines.append(": > stdout.log")
-    else:
-        fail(f"unsupported alignment engine: {alignment_engine}")
+    args = ["minimap2", "-c", "-x", minimap_preset]
+    if self_mode:
+        args.append("-X")
+    args.extend(["-t", threads, "-o", "result.paf", str(target_fa), str(query_fa)])
+    lines.append(" ".join(shlex.quote(part) for part in args) + " > stdout.log 2> stderr.log")
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
-def server_tool_path(run_dir, tool_name):
-    current = Path(run_dir)
-    while current != current.parent:
-        candidate = current / ".prepare_lib" / "tools" / tool_name
-        if candidate.exists():
-            return candidate
-        current = current.parent
-    return Path(tool_name)
-
 
 def parse_ref_paf_assignment(server_dir, ctg_name, chr_name, sequence):
     paf_path = server_dir / "runs" / "add_ctg" / f"{ctg_name}_vs_ref" / "result.paf"
@@ -451,12 +369,6 @@ def write_manifest(server_dir, ctg_name, chr_name, target_track, source, created
         ("reference_name", reference.get("reference_name", "")),
         ("alignment_engine", options.get("alignment_engine", "minimap2")),
         ("minimap_preset", options.get("minimap_preset", "asm10")),
-        ("blastn_task", options.get("blastn_task", "blastn")),
-        ("blastn_evalue", options.get("blastn_evalue", "1e-10")),
-        ("blastn_dust", options.get("blastn_dust", "no")),
-        ("winnowmap_preset", options.get("winnowmap_preset", "asm20")),
-        ("winnowmap_kmer", options.get("winnowmap_kmer", "19")),
-        ("winnowmap_repeat_fraction", options.get("winnowmap_repeat_fraction", "0.9998")),
         ("skip_self", options.get("skip_self", "false")),
         ("self_alignment_scope", options.get("self_alignment_scope", "")),
         ("cross_alignment_scope", options.get("cross_alignment_scope", "")),

@@ -310,14 +310,11 @@ class OuterCheckpointManager:
 
     def _alignment_tools(self) -> list[dict[str, object]]:
         engine = self._read_options()["alignment_engine"]
-        commands = {
-            "minimap2": ["minimap2"],
-            "blastn": ["makeblastdb", "blastn", "python3"],
-            "winnowmap": ["meryl", "winnowmap"],
-        }.get(engine)
-        if commands is None:
-            raise OrchestrationContractError(f"unsupported alignment engine: {engine}")
-        return [self._tool_identity(command) for command in commands]
+        if engine != "minimap2":
+            raise OrchestrationContractError(
+                f"unsupported alignment engine: {engine}; only minimap2 is supported"
+            )
+        return [self._tool_identity("minimap2")]
 
     def _alignment_options(self) -> dict[str, str]:
         return self._selected_options(
@@ -325,12 +322,6 @@ class OuterCheckpointManager:
                 "alignment_engine",
                 "threads",
                 "minimap_preset",
-                "blastn_task",
-                "blastn_evalue",
-                "blastn_dust",
-                "winnowmap_preset",
-                "winnowmap_kmer",
-                "winnowmap_repeat_fraction",
             ]
         )
 
@@ -351,8 +342,6 @@ class OuterCheckpointManager:
             self.server_dir / dataset["fasta_relpath"],
             self.server_dir / dataset["fai_relpath"],
         ]
-        if self._read_options()["alignment_engine"] == "blastn":
-            paths.append(self.server_dir / ".prepare_lib/tools/blast6_to_paf.py")
         manifest = (self.server_dir / command_relpath).parent / "alignment_tasks.json"
         if manifest.is_file():
             paths.append(manifest)
@@ -402,12 +391,6 @@ class OuterCheckpointManager:
                     "alignment_engine",
                     "threads",
                     "minimap_preset",
-                    "blastn_task",
-                    "blastn_evalue",
-                    "blastn_dust",
-                    "winnowmap_preset",
-                    "winnowmap_kmer",
-                    "winnowmap_repeat_fraction",
                     "skip_self",
                     "tel_enabled",
                     "cen_enabled",
@@ -459,12 +442,6 @@ class OuterCheckpointManager:
                     "alignment_engine",
                     "threads",
                     "minimap_preset",
-                    "blastn_task",
-                    "blastn_evalue",
-                    "blastn_dust",
-                    "winnowmap_preset",
-                    "winnowmap_kmer",
-                    "winnowmap_repeat_fraction",
                     "skip_self",
                     "tel_enabled",
                     "cen_enabled",
@@ -494,7 +471,7 @@ class OuterCheckpointManager:
             raise OrchestrationContractError(f"unsupported checkpoint kind: {prepared.kind}")
         for path in paths:
             if path.suffix.lower() == ".paf":
-                validate_paf(path, require_cigar=self._read_options()["alignment_engine"] in {"minimap2", "winnowmap"})
+                validate_paf(path, require_cigar=True)
         return self._identities(paths)
 
     def _assignment_output_paths(self) -> list[Path]:

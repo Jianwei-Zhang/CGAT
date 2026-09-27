@@ -43,7 +43,6 @@ Re-running `install.sh` validates the managed environment and updates it only wh
 | --- | --- |
 | Core workflow | `python3`, `samtools`, `zip`, `gzip` |
 | GRT Final Path | `minimap2`, `nucmer`, `delta-filter`, `show-coords` |
-| Alternative aligners | `blastn` + `makeblastdb`, or `winnowmap` + `meryl` |
 | Optional reads QC | `meryl`, `merqury.sh`; used only when `--reads` is supplied |
 
 Keep this environment active for `run.sh`.
@@ -74,7 +73,7 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | `--ds [<name>] <fasta>` | Required, repeatable | Initial assembly dataset; omit the name to infer it from the filename. The first is primary; the rest are support datasets. |
 | `-o, --out <dir>` | `./gpm_server` | Server workspace and generated scripts. |
 | `-s, --score <0-100>` | `60` | Minimum chromosome-assignment coverage percentage. |
-| `--aligner <engine>` | `minimap2` | Main alignment engine: `minimap2`, `blastn`, or `winnowmap`. |
+| `--aligner <engine>` | `minimap2` | Compatibility option; only `minimap2` is supported. |
 | `-t, --threads <n>` | `10` | Total compute-thread budget shared by independent alignment tasks and reads-QC jobs. |
 | `--skip-self` | Off | Skip same-dataset self alignment; same-dataset Subview becomes unavailable. |
 | `--tel <motif> <count>` | Optional, repeatable | Mark exact telomere-like repeats on both strands. Example: `--tel TTAGGG 20`. |
@@ -91,15 +90,8 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | Aligner | Option | Allowed values / default |
 | --- | --- | --- |
 | `minimap2` | `--minimap-preset` | `asm10` or `asm5`; default `asm10` |
-| `blastn` | `--blastn-task` | `blastn`, `megablast`, or `dc-megablast`; default `blastn` |
-| `blastn` | `--blastn-evalue` | Positive number; default `1e-10` |
-| `winnowmap` | `--winnowmap-preset` | `asm20`, `asm10`, or `asm5`; default `asm20` |
-| `winnowmap` | `--winnowmap-kmer` | Positive integer; default `19` |
-| `winnowmap` | `--winnowmap-repeat-fraction` | Number in `(0, 1)`; default `0.9998` |
 
-An aligner-specific option is valid only with its matching `--aligner`. GRT processing always resolves `minimap2` and the MUMmer4 commands from `PATH`.
-
-Performance note: Winnowmap is supported end to end, but a chromosome FASTA often contains only one query record. `--threads` is a total budget rather than guaranteed utilization, so a single-record Winnowmap alignment may use only one or a few cores and can be substantially slower than Minimap2. Prefer Minimap2 for routine throughput; choose Winnowmap when repeat-aware mapping is worth the additional runtime.
+GPM Server supports Minimap2 only. BLASTN and Winnowmap are not accepted for new workspaces because whole-genome runs could not meet the workflow's runtime and memory requirements. GRT processing resolves `minimap2` and the MUMmer4 commands from `PATH`.
 
 ### 3. Resume and monitor
 

@@ -9,17 +9,10 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from alignment_tasks import AlignmentTask, alignment_concurrency, allocate_threads, run_tasks
+from alignment_tasks import AlignmentTask, allocate_threads, run_tasks
 
 
 class AlignmentTasksTests(unittest.TestCase):
-    def test_engine_concurrency_limits(self):
-        self.assertIsNone(alignment_concurrency("minimap2"))
-        self.assertEqual(alignment_concurrency("winnowmap"), 2)
-        self.assertEqual(alignment_concurrency("blastn", "blastn"), 1)
-        self.assertEqual(alignment_concurrency("blastn", "megablast"), 2)
-        self.assertEqual(alignment_concurrency("blastn", "dc-megablast"), 2)
-
     def test_allocation_returns_capacity_from_single_query_jobs(self):
         self.assertEqual(allocate_threads([1, 32, 1], 32), [1, 30, 1])
         self.assertEqual(allocate_threads([1] * 36, 32), [1] * 32)

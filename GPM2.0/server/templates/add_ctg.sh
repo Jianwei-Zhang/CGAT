@@ -103,23 +103,9 @@ require_cmd python3
 
 alignment_engine="$(read_prepare_option alignment_engine || printf 'minimap2')"
 skip_self="$(read_prepare_option skip_self)"
-case "$alignment_engine" in
-  minimap2)
-    require_cmd minimap2
-    ;;
-  blastn)
-    require_cmd makeblastdb
-    require_cmd blastn
-    [[ -f "${server_dir}/.prepare_lib/tools/blast6_to_paf.py" ]] || die "Missing .prepare_lib/tools/blast6_to_paf.py"
-    ;;
-  winnowmap)
-    require_cmd meryl
-    require_cmd winnowmap
-    ;;
-  *)
-    die "Unsupported alignment_engine in metadata/prepare_options.tsv: ${alignment_engine}"
-    ;;
-esac
+[[ "$alignment_engine" == "minimap2" ]] \
+  || die "Unsupported alignment_engine in metadata/prepare_options.tsv: ${alignment_engine}. Only minimap2 is supported."
+require_cmd minimap2
 
 if [[ -z "$out_path" ]]; then
   out_path="${server_dir}/add_${ctg_name}.zip"

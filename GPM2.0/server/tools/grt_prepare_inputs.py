@@ -566,12 +566,7 @@ def quality_rank(
 
 
 def assignment_preset(options: dict[str, str]) -> str:
-    engine = options.get("alignment_engine", "minimap2")
-    if engine == "minimap2":
-        return options.get("minimap_preset", "asm10")
-    if engine == "winnowmap":
-        return options.get("winnowmap_preset", "asm20")
-    return options.get("blastn_task", "blastn")
+    return options.get("minimap_preset", "asm10")
 
 
 def commit_prepared_outputs(stage_grt: Path, stage_metadata: Path, server_dir: Path) -> None:
@@ -1107,16 +1102,10 @@ def prepare(args: argparse.Namespace) -> None:
                         "parameters_json": canonical_json(
                             {
                                 "alignment_engine": assignment_engine,
-                                "blastn_dust": options.get("blastn_dust", "no"),
-                                "blastn_evalue": options.get("blastn_evalue", "1e-10"),
-                                "blastn_task": options.get("blastn_task", "blastn"),
                                 "chr_assignment_min_coverage_percent": options.get("chr_assignment_min_coverage_percent", "60"),
                                 "minimap_preset": options.get("minimap_preset", "asm10"),
                                 "source": "existing_global_ds_vs_ref_paf",
                                 "threads": options.get("threads", "10"),
-                                "winnowmap_kmer": options.get("winnowmap_kmer", "19"),
-                                "winnowmap_preset": options.get("winnowmap_preset", "asm20"),
-                                "winnowmap_repeat_fraction": options.get("winnowmap_repeat_fraction", "0.9998"),
                             }
                         ),
                         "raw_artifact_relpath": paf_rel,

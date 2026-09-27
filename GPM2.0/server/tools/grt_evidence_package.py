@@ -224,14 +224,9 @@ def alignment_profile(server_dir: Path, dataset_name: str) -> tuple[str, str, st
         for row in read_tsv(server_dir / "metadata/prepare_options.tsv", ["key", "value"])
     }
     tool = options.get("alignment_engine", "unknown")
-    preset_key = {
-        "minimap2": "minimap_preset",
-        "blastn": "blastn_task",
-        "winnowmap": "winnowmap_preset",
-    }.get(tool, "")
     version_path = server_dir / f"runs/{dataset_name}_vs_ref/tool_version.txt"
     version = version_path.read_text(encoding="utf-8").strip() if version_path.is_file() else "unknown"
-    return tool, version[:200], options.get(preset_key, "")
+    return tool, version[:200], options.get("minimap_preset", "")
 
 
 def build_ref_evidence(

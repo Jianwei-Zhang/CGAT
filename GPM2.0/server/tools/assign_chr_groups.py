@@ -5,7 +5,7 @@
 This remains one assignment compiler because weighted placement, partitioned
 FASTA output, and the chr-local command graph form one atomic generated result.
 The shell entrypoint only supplies a locked environment and then delegates here;
-focused Server integration tests exercise minimap2, BLAST, and winnowmap output.
+focused Server integration tests exercise Minimap2 output.
 """
 
 import csv
@@ -15,18 +15,15 @@ import shutil
 import sys
 from pathlib import Path
 
-from alignment_tasks import MANIFEST, alignment_concurrency, query_threads, write_manifest
+from alignment_tasks import MANIFEST, query_threads, write_manifest
 
 
 THREAD_ARGUMENT = object()
-MERYL_THREAD_ARGUMENT = object()
 
 
 def quote_command_arg(value):
     if value is THREAD_ARGUMENT:
         return '"${GPM_TASK_THREADS:-' + threads + '}"'
-    if value is MERYL_THREAD_ARGUMENT:
-        return '"threads=${GPM_TASK_THREADS:-' + threads + '}"'
     return shlex.quote(value)
 
 
@@ -125,106 +122,11 @@ def iter_n_regions(sequence):
 
 def write_run_command_script(path, run_dir, left_fa, right_fa, self_mode, threads, minimap_preset):
     lines = ["#!/usr/bin/env bash", "set -euo pipefail", f"cd {shlex.quote(str(run_dir))}"]
-    if alignment_engine == "minimap2":
-        args = ["minimap2", "-c", "-x", minimap_preset]
-        if self_mode:
-            args.append("-X")
-        args.extend(["-t", THREAD_ARGUMENT, "-o", "result.paf", str(left_fa), str(right_fa)])
-        lines.append(" ".join(quote_command_arg(part) for part in args) + " > stdout.log 2> stderr.log")
-    elif alignment_engine == "blastn":
-        outfmt = "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen nident gaps"
-        lines.extend(
-            [
-                "rm -rf blastdb_result",
-                "mkdir -p blastdb_result",
-                " ".join(
-                    quote_command_arg(part)
-                    for part in [
-                        "makeblastdb",
-                        "-in",
-                        str(left_fa),
-                        "-dbtype",
-                        "nucl",
-                        "-out",
-                        "blastdb_result/target",
-                    ]
-                )
-                + " > makeblastdb.stdout.log 2> makeblastdb.stderr.log",
-                " ".join(
-                    quote_command_arg(part)
-                    for part in [
-                        "blastn",
-                        "-task",
-                        blastn_task,
-                        "-query",
-                        str(right_fa),
-                        "-db",
-                        "blastdb_result/target",
-                        "-num_threads",
-                        THREAD_ARGUMENT,
-                        "-dust",
-                        blastn_dust,
-                        "-evalue",
-                        blastn_evalue,
-                        "-outfmt",
-                        outfmt,
-                        "-out",
-                        "result.blast6",
-                    ]
-                )
-                + " > stdout.log 2> stderr.log",
-                " ".join(
-                    quote_command_arg(part)
-                    for part in [
-                        "python3",
-                        blast6_to_paf,
-                        "--input",
-                        "result.blast6",
-                        "--output",
-                        "result.paf",
-                    ]
-                ),
-            ]
-        )
-    elif alignment_engine == "winnowmap":
-        lines.extend(
-            [
-                "rm -rf merylDB_result",
-                " ".join(
-                    quote_command_arg(part)
-                    for part in [
-                        "meryl",
-                        "count",
-                        MERYL_THREAD_ARGUMENT,
-                        f"k={winnowmap_kmer}",
-                        "output",
-                        "merylDB_result",
-                        str(left_fa),
-                    ]
-                )
-                + " > meryl.stdout.log 2> meryl.stderr.log",
-                " ".join(
-                    quote_command_arg(part)
-                    for part in [
-                        "meryl",
-                        "print",
-                        MERYL_THREAD_ARGUMENT,
-                        "greater-than",
-                        f"distinct={winnowmap_repeat_fraction}",
-                        "merylDB_result",
-                    ]
-                )
-                + f" > {shlex.quote('repetitive_' + winnowmap_kmer + '_result.txt')}",
-            ]
-        )
-        args = ["winnowmap", "-c", "-W", f"repetitive_{winnowmap_kmer}_result.txt", "-x", winnowmap_preset]
-        if self_mode:
-            args.append("-X")
-        args.extend(["-t", THREAD_ARGUMENT, str(left_fa), str(right_fa)])
-        lines.append(" ".join(quote_command_arg(part) for part in args) + " > result.paf 2> stderr.log")
-        lines.append(": > stdout.log")
-    else:
-        fail(f"unsupported alignment engine: {alignment_engine}")
+    args = ["minimap2", "-c", "-x", minimap_preset]
+    if self_mode:
+        args.append("-X")
+    args.extend(["-t", THREAD_ARGUMENT, "-o", "result.paf", str(left_fa), str(right_fa)])
+    lines.append(" ".join(quote_command_arg(part) for part in args) + " > stdout.log 2> stderr.log")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -419,130 +321,21 @@ def write_cen_scan_command_script(path, run_dir, work_root, chr_name, selected_d
         result_name = "result.paf" if len(selected_dataset_fastas) == 1 else f"result_{dataset_name}.paf"
         result_path = run_dir / result_name
         dataset_specs.append(f"{dataset_name}={result_path}")
-        if alignment_engine == "minimap2":
-            args = [
-                "minimap2",
-                "-x",
-                minimap_preset,
-                "-t",
-                THREAD_ARGUMENT,
-                "-c",
-                "--cs",
-                "-o",
-                result_name,
-                str(fasta_path),
-                str(cen_chr_fasta),
-            ]
-            command = " ".join(quote_command_arg(part) for part in args)
-            lines.append(f"{command} > stdout_{dataset_name}.log 2> stderr_{dataset_name}.log")
-        elif alignment_engine == "blastn":
-            blast6_name = result_name.replace(".paf", ".blast6")
-            db_dir = f"blastdb_{dataset_name}"
-            outfmt = "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen nident gaps"
-            lines.extend(
-                [
-                    f"rm -rf {shlex.quote(db_dir)}",
-                    f"mkdir -p {shlex.quote(db_dir)}",
-                    " ".join(
-                        quote_command_arg(part)
-                        for part in [
-                            "makeblastdb",
-                            "-in",
-                            str(fasta_path),
-                            "-dbtype",
-                            "nucl",
-                            "-out",
-                            f"{db_dir}/target",
-                        ]
-                    )
-                    + f" > makeblastdb_{dataset_name}.stdout.log 2> makeblastdb_{dataset_name}.stderr.log",
-                    " ".join(
-                        quote_command_arg(part)
-                        for part in [
-                            "blastn",
-                            "-task",
-                            blastn_task,
-                            "-query",
-                            str(cen_chr_fasta),
-                            "-db",
-                            f"{db_dir}/target",
-                            "-num_threads",
-                            THREAD_ARGUMENT,
-                            "-dust",
-                            blastn_dust,
-                            "-evalue",
-                            blastn_evalue,
-                            "-outfmt",
-                            outfmt,
-                            "-out",
-                            blast6_name,
-                        ]
-                    )
-                    + f" > stdout_{dataset_name}.log 2> stderr_{dataset_name}.log",
-                    " ".join(
-                        quote_command_arg(part)
-                        for part in [
-                            "python3",
-                            blast6_to_paf,
-                            "--input",
-                            blast6_name,
-                            "--output",
-                            result_name,
-                        ]
-                    ),
-                ]
-            )
-        elif alignment_engine == "winnowmap":
-            meryl_dir = f"merylDB_{dataset_name}"
-            repetitive_txt = f"repetitive_{winnowmap_kmer}_{dataset_name}.txt"
-            lines.extend(
-                [
-                    f"rm -rf {shlex.quote(meryl_dir)}",
-                    " ".join(
-                        quote_command_arg(part)
-                        for part in [
-                            "meryl",
-                            "count",
-                            MERYL_THREAD_ARGUMENT,
-                            f"k={winnowmap_kmer}",
-                            "output",
-                            meryl_dir,
-                            str(fasta_path),
-                        ]
-                    )
-                    + f" > meryl_{dataset_name}.stdout.log 2> meryl_{dataset_name}.stderr.log",
-                    " ".join(
-                        quote_command_arg(part)
-                        for part in [
-                            "meryl",
-                            "print",
-                            MERYL_THREAD_ARGUMENT,
-                            "greater-than",
-                            f"distinct={winnowmap_repeat_fraction}",
-                            meryl_dir,
-                        ]
-                    )
-                    + f" > {shlex.quote(repetitive_txt)}",
-                    " ".join(
-                        quote_command_arg(part)
-                        for part in [
-                            "winnowmap",
-                            "-W",
-                            repetitive_txt,
-                            "-x",
-                            winnowmap_preset,
-                            "-t",
-                            THREAD_ARGUMENT,
-                            str(fasta_path),
-                            str(cen_chr_fasta),
-                        ]
-                    )
-                    + f" > {shlex.quote(result_name)} 2> stderr_{dataset_name}.log",
-                    f": > stdout_{dataset_name}.log",
-                ]
-            )
-        else:
-            fail(f"unsupported alignment engine: {alignment_engine}")
+        args = [
+            "minimap2",
+            "-x",
+            minimap_preset,
+            "-t",
+            THREAD_ARGUMENT,
+            "-c",
+            "--cs",
+            "-o",
+            result_name,
+            str(fasta_path),
+            str(cen_chr_fasta),
+        ]
+        command = " ".join(quote_command_arg(part) for part in args)
+        lines.append(f"{command} > stdout_{dataset_name}.log 2> stderr_{dataset_name}.log")
     args = [
         str(work_root),
         chr_name,
@@ -683,18 +476,7 @@ def write_generated_command_script(path, command_paths, chr_name):
 
 work_root = Path(os.environ["GPM_FAST_WORK_ROOT"])
 threads = os.environ["GPM_FAST_THREADS"]
-alignment_engine = os.environ.get("GPM_FAST_ALIGNMENT_ENGINE", "minimap2")
 minimap_preset = os.environ["GPM_FAST_MINIMAP_PRESET"]
-blastn_task = os.environ.get("GPM_FAST_BLASTN_TASK", "blastn")
-blastn_evalue = os.environ.get("GPM_FAST_BLASTN_EVALUE", "1e-10")
-blastn_dust = os.environ.get("GPM_FAST_BLASTN_DUST", "no")
-winnowmap_preset = os.environ.get("GPM_FAST_WINNOWMAP_PRESET", "asm20")
-winnowmap_kmer = os.environ.get("GPM_FAST_WINNOWMAP_KMER", "19")
-winnowmap_repeat_fraction = os.environ.get("GPM_FAST_WINNOWMAP_REPEAT_FRACTION", "0.9998")
-blast6_to_paf = os.environ.get(
-    "GPM_FAST_BLAST6_TO_PAF",
-    str(work_root / ".prepare_lib" / "tools" / "blast6_to_paf.py"),
-)
 metadata_dir = work_root / "metadata"
 runs_dir = work_root / "runs"
 package = read_single_tsv_row(metadata_dir / "package.tsv")
@@ -987,7 +769,7 @@ for chr_name in reference_chr_names:
                 minimap_preset=minimap_preset,
             )
             command_paths.append(command_path)
-            task_caps[command_path] = query_threads(output_fasta, alignment_engine, int(threads))
+            task_caps[command_path] = query_threads(output_fasta, "minimap2", int(threads))
             task_priorities[command_path] = output_fasta.stat().st_size ** 2
 
     for left_index, (left_name, left_fasta) in enumerate(selected_dataset_fastas):
@@ -1005,7 +787,7 @@ for chr_name in reference_chr_names:
                 minimap_preset=minimap_preset,
             )
             command_paths.append(command_path)
-            task_caps[command_path] = query_threads(right_fasta, alignment_engine, int(threads))
+            task_caps[command_path] = query_threads(right_fasta, "minimap2", int(threads))
             task_priorities[command_path] = left_fasta.stat().st_size * right_fasta.stat().st_size
 
     tel_rules_path = work_root / "tel" / "rules.tsv"
@@ -1042,8 +824,8 @@ for chr_name in reference_chr_names:
     write_manifest(chr_run_dir / MANIFEST, work_root, [
         (
             command,
-            task_caps.get(command, 1 if alignment_engine == "minimap2" else int(threads)),
+            task_caps.get(command, 1),
             task_priorities.get(command, 0),
         )
         for command in command_paths
-    ], alignment_concurrency(alignment_engine, blastn_task))
+    ])
