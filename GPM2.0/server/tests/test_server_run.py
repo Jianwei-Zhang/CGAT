@@ -107,9 +107,11 @@ class ServerRunTests(unittest.TestCase):
         with self.assertRaises(server_run.RunnerError):
             server_run.parse_options(["--blastn-dust", "yes"], Path.cwd())
 
-    def test_prepare_rejects_removed_aligners(self):
+    def test_aligner_option_is_removed(self):
         prepare = Path(__file__).resolve().parents[1] / "prepare.sh"
-        for engine in ["blastn", "winnowmap"]:
+        for engine in ["minimap2", "blastn", "winnowmap"]:
+            with self.assertRaises(server_run.RunnerError):
+                server_run.parse_options(["--aligner", engine], Path.cwd())
             completed = subprocess.run(
                 ["bash", str(prepare), "--aligner", engine],
                 capture_output=True,
@@ -117,4 +119,4 @@ class ServerRunTests(unittest.TestCase):
                 check=False,
             )
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("Only minimap2 is supported", completed.stderr)
+            self.assertIn("Unknown argument: --aligner", completed.stderr)

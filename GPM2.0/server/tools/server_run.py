@@ -16,7 +16,7 @@ from run_orchestration import OrchestrationContractError, atomic_write_json
 
 ALIASES = {"-o": "--out", "--output": "--out", "-t": "--threads", "-s": "--score", "-m": "--max-fill"}
 SINGLE_OPTIONS = {
-    "--out", "--threads", "--score", "--aligner", "--archive-format",
+    "--out", "--threads", "--score", "--archive-format",
     "--minimap-preset", "--cen", "--cen-min-len",
     "--cen-min-identity", "--reads", "--reads-qc", "--grt-qc-memory-gb",
     "--grt-kmer-size", "--max-fill",

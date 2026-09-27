@@ -16,7 +16,6 @@ source "$COMMON_LIB"
 WORK_ROOT="$(pwd)/gpm_server"
 THREADS="10"
 ARCHIVE_FORMAT="tar.gz"
-ALIGNER="minimap2"
 MINIMAP_PRESET="asm10"
 SKIP_SELF=false
 CHR_ASSIGNMENT_MIN_COVERAGE_PERCENT="60"
@@ -43,7 +42,6 @@ Usage:
     --ds [<dataset_name>] <dataset_fasta_path> \
     [-o|--out <gpm_server_output_dir>] \
     [--score|-s <chr_assignment_min_coverage_percent>] \
-    [--aligner minimap2] \
     [--minimap-preset asm10|asm5] \
     [--threads|-t <thread_budget>] \
     [--archive-format tar.gz|zip] \
@@ -72,7 +70,6 @@ Behavior:
   - Supports -o/--out to choose another work root
   - Supports --score/-s to set the chr assignment coverage threshold, default: 60
   - Uses Minimap2 for all reference and chromosome-local alignments
-  - Accepts --aligner minimap2 as a compatibility option; other aligners are unsupported
   - Supports --minimap-preset, default: asm10
   - Supports --threads/-t to choose the total compute-thread budget, default: 10
   - Independent reference and chromosome-local alignments share this budget
@@ -155,12 +152,6 @@ validate_minimap_preset() {
       die "Invalid --minimap-preset '$value'. Use asm10 or asm5."
       ;;
   esac
-}
-
-validate_aligner() {
-  local value="$1"
-  [[ "$value" == "minimap2" ]] \
-    || die "Unsupported --aligner '$value'. Only minimap2 is supported."
 }
 
 validate_threads() {
@@ -409,7 +400,7 @@ write_prepare_options_metadata() {
     printf 'sequence_layout\t%s\n' "$sequence_layout"
     printf 'preassigned_chr\t%s\n' "$preassigned_chr"
     printf 'chr_assignment_min_coverage_percent\t%s\n' "$CHR_ASSIGNMENT_MIN_COVERAGE_PERCENT"
-    printf 'alignment_engine\t%s\n' "$ALIGNER"
+    printf 'alignment_engine\t%s\n' "minimap2"
     printf 'minimap_preset\t%s\n' "$MINIMAP_PRESET"
     printf 'threads\t%s\n' "$THREADS"
     printf 'archive_format\t%s\n' "$ARCHIVE_FORMAT"
@@ -718,12 +709,6 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || die "$1 requires <chr_assignment_min_coverage_percent>"
       validate_score "$2"
       CHR_ASSIGNMENT_MIN_COVERAGE_PERCENT="$2"
-      shift 2
-      ;;
-    --aligner)
-      [[ $# -ge 2 ]] || die "--aligner requires minimap2"
-      validate_aligner "$2"
-      ALIGNER="$2"
       shift 2
       ;;
     --archive-format)

@@ -73,7 +73,6 @@ bash server/run.sh \
 | `--ds [<名称>] <fasta>` | 必填，可重复 | 初次输入的组装数据集；省略名称时从文件名自动推导。第一个为主 ds，其余为辅 ds。 |
 | `-o, --out <目录>` | `./gpm_server` | 服务端工作目录及生成脚本的位置。 |
 | `-s, --score <0-100>` | `60` | 染色体分配的最小覆盖率百分比。 |
-| `--aligner <引擎>` | `minimap2` | 兼容参数；仅支持 `minimap2`。 |
 | `-t, --threads <数量>` | `10` | 总计算线程预算，在独立比对任务及 reads QC 任务之间分配。 |
 | `--skip-self` | 关闭 | 跳过同 dataset 自比对；同 dataset Subview 将不可用。 |
 | `--tel <motif> <次数>` | 可选，可重复 | 标记双链上的精确端粒样重复。例如 `--tel TTAGGG 20`。 |
@@ -91,7 +90,7 @@ bash server/run.sh \
 | --- | --- | --- |
 | `minimap2` | `--minimap-preset` | `asm10` 或 `asm5`；默认 `asm10` |
 
-GPM Server 仅支持 Minimap2。BLASTN 与 Winnowmap 的全基因组运行无法满足当前流程的时间和内存要求，因此新工作目录不再接受这两个引擎。GRT 计算始终从 `PATH` 解析 `minimap2` 和 MUMmer4 命令。
+GPM Server 固定使用 Minimap2。BLASTN 与 Winnowmap 的全基因组运行无法满足当前流程的时间和内存要求，因此不再提供这两个引擎。GRT 计算始终从 `PATH` 解析 `minimap2` 和 MUMmer4 命令。
 
 ### 3. 恢复与监控
 

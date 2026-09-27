@@ -73,7 +73,6 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | `--ds [<name>] <fasta>` | Required, repeatable | Initial assembly dataset; omit the name to infer it from the filename. The first is primary; the rest are support datasets. |
 | `-o, --out <dir>` | `./gpm_server` | Server workspace and generated scripts. |
 | `-s, --score <0-100>` | `60` | Minimum chromosome-assignment coverage percentage. |
-| `--aligner <engine>` | `minimap2` | Compatibility option; only `minimap2` is supported. |
 | `-t, --threads <n>` | `10` | Total compute-thread budget shared by independent alignment tasks and reads-QC jobs. |
 | `--skip-self` | Off | Skip same-dataset self alignment; same-dataset Subview becomes unavailable. |
 | `--tel <motif> <count>` | Optional, repeatable | Mark exact telomere-like repeats on both strands. Example: `--tel TTAGGG 20`. |
@@ -91,7 +90,7 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | --- | --- | --- |
 | `minimap2` | `--minimap-preset` | `asm10` or `asm5`; default `asm10` |
 
-GPM Server supports Minimap2 only. BLASTN and Winnowmap are not accepted for new workspaces because whole-genome runs could not meet the workflow's runtime and memory requirements. GRT processing resolves `minimap2` and the MUMmer4 commands from `PATH`.
+GPM Server always uses Minimap2. BLASTN and Winnowmap are not available because whole-genome runs could not meet the workflow's runtime and memory requirements. GRT processing resolves `minimap2` and the MUMmer4 commands from `PATH`.
 
 ### 3. Resume and monitor
 
