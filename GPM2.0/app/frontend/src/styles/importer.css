@@ -124,6 +124,32 @@
   white-space: nowrap;
 }
 
+.importer-pairwise-progress {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #dbe4ee;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.importer-pairwise-progress-path {
+  overflow: hidden;
+  color: #475569;
+  font-family: var(--font-mono);
+  font-size: var(--font-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.importer-pairwise-progress-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: #52657a;
+  font-size: var(--font-small);
+}
+
 .importer-import-progress-dialog .import-progress-meter {
   min-width: 0;
   display: grid;

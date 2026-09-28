@@ -34,8 +34,8 @@ use gpm_next_backend::grt_package::{
     load_grt_project_view_for_project as backend_load_grt_project_view,
 };
 use gpm_next_backend::importer::{
-    AddCtgImportTarget, ImportProgress, import_add_ctg_package_with_hooks,
-    import_from_extracted_bundle_with_hooks, import_from_zip_with_hooks,
+    AddCtgImportTarget, ImportOptions, ImportProgress, import_add_ctg_package_with_hooks,
+    import_from_extracted_bundle_with_options_and_hooks, import_from_zip_with_options_and_hooks,
     import_workspace_add_dataset_package_with_hooks,
 };
 use gpm_next_backend::junction_inspection::{
@@ -782,6 +782,27 @@ mod tests {
         let path = std::env::temp_dir().join(unique);
         fs::create_dir_all(&path).expect("create temp workspace root");
         path
+    }
+
+    #[test]
+    fn initial_import_parallelism_is_validated_at_the_tauri_boundary() {
+        assert_eq!(
+            initial_import_options(Some("4".to_string())).pairwise_parser_workers,
+            Some(4)
+        );
+        assert_eq!(
+            initial_import_options(Some("8".to_string())).pairwise_parser_workers,
+            Some(8)
+        );
+        assert_eq!(
+            initial_import_options(Some("3".to_string())).pairwise_parser_workers,
+            None
+        );
+        assert_eq!(
+            initial_import_options(Some("auto".to_string())).pairwise_parser_workers,
+            None
+        );
+        assert_eq!(initial_import_options(None).pairwise_parser_workers, None);
     }
 
     #[test]

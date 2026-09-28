@@ -21,6 +21,7 @@ import { resetAssemblyPageSession } from "./assembly/page-session.js";
 import { pickDirectoryPath, pickZipFilePath } from "../../services/backend-api.js";
 import { getMessages, t as i18nT } from "../i18n/index.js";
 import { projectIcon } from "./project-icons.js";
+import { getAppSettings } from "../../services/app-settings.js";
 
 const WORKSPACE_HISTORY_KEY = "gpm_next:workspace_history";
 const IMPORT_PROGRESS_BOTTOM_THRESHOLD_PX = 24;
@@ -781,13 +782,14 @@ async function runImportZipFlow(host, store) {
       workspaceRoot: importer.workspaceRoot,
       runId,
       stateOrLocale: snapshot,
+      importParallelism: getAppSettings().importParallelism,
       onStage: (stageText) => {
         if (String(store.getState().importer.importRunId || "") !== runId) {
           return;
         }
         const current = store.getState().importer;
         updateImporterState(store, {
-          stages: [...current.stages, stageText],
+          stages: mergeImportProgressStage(current.stages, stageText),
         });
         rerender(host, store);
       },
@@ -855,13 +857,14 @@ async function runImportExtractedFlow(host, store) {
       extractedPath: importer.extractedPath,
       runId,
       stateOrLocale: snapshot,
+      importParallelism: getAppSettings().importParallelism,
       onStage: (stageText) => {
         if (String(store.getState().importer.importRunId || "") !== runId) {
           return;
         }
         const current = store.getState().importer;
         updateImporterState(store, {
-          stages: [...current.stages, stageText],
+          stages: mergeImportProgressStage(current.stages, stageText),
         });
         rerender(host, store);
       },
@@ -1452,6 +1455,19 @@ function applyAddPackageImportedState(store, payload) {
   });
 }
 
+export function mergeImportProgressStage(stages, incoming) {
+  const current = Array.isArray(stages) ? stages : [];
+  if (!incoming || typeof incoming !== "object" || incoming.stageCode !== "index_pairwise_paf_progress") {
+    return [...current, incoming];
+  }
+  const index = current.findLastIndex(stage => stage && typeof stage === "object"
+    && stage.stageCode === "index_pairwise_paf_progress");
+  if (index < 0) return [...current, incoming];
+  const next = [...current];
+  next[index] = incoming;
+  return next;
+}
+
 function updateImporterState(store, patch) {
   store.setState({
     importer: {
@@ -1542,6 +1558,7 @@ function renderImportProgressOverlay(importer, messages) {
   const currentStage = stripImportCurrentStageSuffix(recentStages.length
     ? getImportStageLabel(recentStages[recentStages.length - 1], messages)
     : messages.runtime.notStarted);
+  const activePairwise = [...recentStages].reverse().find(stage => stage?.pairwise)?.pairwise || null;
   const cancelLabel = isCancelling
     ? messages.buttons.cancelImportPending
     : messages.buttons.cancelImport;
@@ -1600,6 +1617,7 @@ function renderImportProgressOverlay(importer, messages) {
         </button>
         <section class="importer-import-progress-overview">
           <strong class="importer-import-progress-current-stage">${escapeHtml(currentStage)}</strong>
+          ${activePairwise ? renderPairwiseImportProgress(activePairwise, messages) : ""}
           ${renderImportProgressMeter(progressMeta, messages)}
           <p id="import-progress-dialog-summary" class="importer-import-progress-summary" aria-live="polite">${escapeHtml(summary)}</p>
           ${importer.importCancelError
@@ -1908,6 +1926,7 @@ function formatImportProgressStage(stage, absoluteIndex, progressMeta, messages)
 
 function getImportStageLabel(stage, messages) {
   if (stage && typeof stage === "object") {
+    if (stage.pairwise) return formatPairwiseImportProgressLabel(stage.pairwise, messages);
     const stageCode = String(stage.stageCode || "").trim();
     const template = messages?.progressStages?.[stageCode];
     if (template) {
@@ -1916,6 +1935,39 @@ function getImportStageLabel(stage, messages) {
     return String(stage.label || stage.text || "");
   }
   return String(stage || "");
+}
+
+function formatPairwiseImportProgressLabel(progress, messages) {
+  const filePercent = progress.totalBytes > 0 ? Math.min(100, progress.currentBytes * 100 / progress.totalBytes) : 0;
+  const overallPercent = progress.overallTotalBytes > 0 ? Math.min(100, progress.overallBytes * 100 / progress.overallTotalBytes) : 0;
+  return `${progress.activeRun || "pairwise"} · ${messages.runtime.pairwiseFile} ${progress.fileIndex}/${progress.fileTotal} ${filePercent.toFixed(1)}% · ${messages.runtime.pairwiseOverall} ${overallPercent.toFixed(1)}% · ${messages.runtime.pairwiseRows} ${formatCount(progress.parsedRows)} · ${messages.runtime.pairwiseHits} ${formatCount(progress.writtenHits)}`;
+}
+
+function renderPairwiseImportProgress(progress, messages) {
+  const filePercent = progress.totalBytes > 0 ? Math.min(100, progress.currentBytes * 100 / progress.totalBytes) : 0;
+  const overallPercent = progress.overallTotalBytes > 0 ? Math.min(100, progress.overallBytes * 100 / progress.overallTotalBytes) : 0;
+  return `<div class="importer-pairwise-progress" data-pairwise-progress="1">
+    <div class="importer-pairwise-progress-path">${escapeHtml(progress.activePath || progress.activeRun || "pairwise")}</div>
+    <div class="importer-pairwise-progress-metrics">
+      <span>${escapeHtml(messages.runtime.pairwiseFile)} ${progress.fileIndex}/${progress.fileTotal} · ${filePercent.toFixed(1)}%</span>
+      <span>${escapeHtml(messages.runtime.pairwiseOverall)} · ${overallPercent.toFixed(1)}%</span>
+      <span>${escapeHtml(messages.runtime.pairwiseBytes)} ${escapeHtml(formatBytes(progress.currentBytes))}</span>
+      <span>${escapeHtml(messages.runtime.pairwiseRows)} ${escapeHtml(formatCount(progress.parsedRows))}</span>
+      <span>${escapeHtml(messages.runtime.pairwiseHits)} ${escapeHtml(formatCount(progress.writtenHits))}</span>
+    </div>
+  </div>`;
+}
+
+function formatCount(value) {
+  return Math.max(0, Number(value) || 0).toLocaleString("en-US");
+}
+
+function formatBytes(value) {
+  const bytes = Math.max(0, Number(value) || 0);
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KiB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MiB`;
+  return `${(bytes / 1024 ** 3).toFixed(2)} GiB`;
 }
 
 function getStageProgressIndex(stage) {
