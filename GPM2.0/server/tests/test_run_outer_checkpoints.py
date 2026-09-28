@@ -104,6 +104,13 @@ class OuterCheckpointTests(unittest.TestCase):
         )
         write(server / "runs/chr_Chr1/datasets/ds.fa", ">query\nAAAAAAAAAA\n")
         write(server / "runs/chr_Chr1/ds_vs_self/command.sh", "#!/usr/bin/env bash\n# self\n")
+        write(server / "runs/chr_Chr1/ds_vs_self/self_target.fa", ">gpm_pair_000000001a\nAAAAAAAAAA\n")
+        write(server / "runs/chr_Chr1/ds_vs_self/self_query.fa", ">gpm_pair_000000001b\nAAAAAAAAAA\n")
+        write(
+            server / "runs/chr_Chr1/ds_vs_self/self_name_map.tsv",
+            "gpm_pair_000000001a\tquery\ngpm_pair_000000001b\tquery\n",
+        )
+        write(server / "runs/chr_Chr1/ds_vs_self/restore_self_paf.py", "# restore fixture\n")
         write(server / "runs/chr_Chr1/ds_vs_self/result.paf", PAF_LINE)
         return server, fake_bin
 
@@ -214,6 +221,13 @@ class OuterCheckpointTests(unittest.TestCase):
                 assignment = manager.prepare("assign", "assign_chr_groups.sh")
                 assert assignment is not None
                 manager.commit(assignment)
+                self.assertTrue(manager.validate(assignment)[0])
+
+                self_map = server / "runs/chr_Chr1/ds_vs_self/self_name_map.tsv"
+                original_map = self_map.read_text(encoding="utf-8")
+                self_map.write_text(original_map + "changed\tchanged\n", encoding="utf-8")
+                self.assertFalse(manager.validate(assignment)[0])
+                self_map.write_text(original_map, encoding="utf-8")
                 self.assertTrue(manager.validate(assignment)[0])
 
                 assignment_output = server / "metadata/track_member_orders.tsv"
