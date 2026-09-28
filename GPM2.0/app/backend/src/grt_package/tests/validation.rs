@@ -146,6 +146,67 @@ fn validates_app_final_path_manifest_canonical_hash() {
 }
 
 #[test]
+fn app_final_path_accepts_reference_subset_and_rejects_unknown_chromosome() {
+    let temp = tempdir().unwrap();
+    let references = BTreeMap::from([("Chr06".to_string(), 10), ("Chr09".to_string(), 10)]);
+    let sources = HashMap::new();
+    let manifest = serde_json::Map::new();
+    let display_source_cards = HashSet::new();
+    let final_path = serde_json::json!({
+        "workflow": GRT_APP_WORKFLOW,
+        "schema_version": GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION,
+        "q4_relpath": "grt/q/q4.fa",
+        "chromosomes": [{
+            "chr": "Chr06",
+            "q4_length": 10,
+            "q4_sha256": "0".repeat(64),
+            "segments": [{
+                "segment_id": "gap-1",
+                "kind": "gap",
+                "length": 10
+            }]
+        }]
+    });
+
+    let (lengths, q4_records) = validate_app_final_path(
+        temp.path(),
+        &final_path,
+        AppFinalPathValidationContext {
+            reference_records: &references,
+            sources: &sources,
+            manifest: &manifest,
+            fasta_available: false,
+            source_sequences: None,
+            expected_schema_version: GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION,
+            display_source_cards: &display_source_cards,
+        },
+    )
+    .unwrap();
+    assert_eq!(lengths, BTreeMap::from([("Chr06".to_string(), 10)]));
+    assert!(q4_records.is_none());
+
+    let mut unknown = final_path;
+    unknown["chromosomes"][0]["chr"] = serde_json::json!("Chr10");
+    let error = validate_app_final_path(
+        temp.path(),
+        &unknown,
+        AppFinalPathValidationContext {
+            reference_records: &references,
+            sources: &sources,
+            manifest: &manifest,
+            fasta_available: false,
+            source_sequences: None,
+            expected_schema_version: GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION,
+            display_source_cards: &display_source_cards,
+        },
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains(
+        "GRT_IMPORT_BROKEN_REFERENCE: App Final Path references unknown chromosome Chr10"
+    ));
+}
+
+#[test]
 fn validates_schema_three_display_evidence_links_coordinates_and_enums() {
     let base = serde_json::json!({
         "display_evidence": [{

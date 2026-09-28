@@ -545,14 +545,10 @@ pub(super) fn validate_app_final_path(
             )?;
         }
     }
-    if final_lengths.keys().collect::<HashSet<_>>()
-        != reference_records.keys().collect::<HashSet<_>>()
-    {
-        return grt_err(
-            "FINAL_PATH_MISMATCH",
-            "App Final Path chromosome set differs from reference FAI",
-        );
-    }
+    // A project may intentionally process only a subset of the reference
+    // chromosomes. Each Final Path chromosome was checked against the
+    // reference FAI above; reference-only chromosomes do not invalidate the
+    // projected App package.
     let mut q4_records = None;
     let q4_path = bundle_root.join("grt/q/q4.fa");
     if fasta_available {
