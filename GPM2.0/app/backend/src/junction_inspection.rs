@@ -1255,7 +1255,7 @@ fn insert_pairwise_alignment_hits(
     Ok(inserted)
 }
 
-fn query_pairwise_cached_hits(
+pub(crate) fn query_pairwise_cached_hits(
     conn: &Connection,
     run_id: i64,
     query_source_seq_ids: &[i64],

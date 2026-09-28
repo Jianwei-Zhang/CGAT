@@ -92,6 +92,22 @@ where
         self.progress.push(item);
     }
 
+    /// Emits an in-place progress update without growing the durable step list.
+    /// Repeated updates share the next progress index so the desktop can replace
+    /// one live row instead of appending a row for every parser batch.
+    pub(super) fn emit_transient(&mut self, mut item: ImportProgress) {
+        let progress_index = self.emitted_count + 1;
+        item.progress_index = Some(progress_index);
+        item.progress_total = self.expected_total.map(|total| total.max(progress_index));
+        if item.phase_index.is_none() {
+            item.phase_index = self.phase_index;
+        }
+        if item.phase_total.is_none() {
+            item.phase_total = self.phase_total;
+        }
+        (self.on_progress)(item);
+    }
+
     pub(super) fn into_progress(mut self) -> Vec<ImportProgress> {
         let final_total = self
             .expected_total
