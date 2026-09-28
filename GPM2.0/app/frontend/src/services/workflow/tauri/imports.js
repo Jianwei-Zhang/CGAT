@@ -37,6 +37,21 @@ async function withImportProgressListener(runId, onStage, operation) {
       if (Number.isFinite(phaseTotal) && phaseTotal > 0) {
         stage.phaseTotal = phaseTotal;
       }
+      const pairwise = payload.pairwise;
+      if (pairwise && typeof pairwise === "object") {
+        stage.pairwise = {
+          activeRun: String(pairwise.activeRun || ""),
+          activePath: String(pairwise.activePath || ""),
+          currentBytes: Number(pairwise.currentBytes) || 0,
+          totalBytes: Number(pairwise.totalBytes) || 0,
+          parsedRows: Number(pairwise.parsedRows) || 0,
+          writtenHits: Number(pairwise.writtenHits) || 0,
+          fileIndex: Number(pairwise.fileIndex) || 0,
+          fileTotal: Number(pairwise.fileTotal) || 0,
+          overallBytes: Number(pairwise.overallBytes) || 0,
+          overallTotalBytes: Number(pairwise.overallTotalBytes) || 0,
+        };
+      }
       onStage?.(stage);
     });
   }
@@ -47,12 +62,13 @@ async function withImportProgressListener(runId, onStage, operation) {
   }
 }
 
-async function importZipBundleTauri({ zipPath, workspaceRoot, onStage, runId = "", stateOrLocale = "zh" }) {
+async function importZipBundleTauri({ zipPath, workspaceRoot, onStage, runId = "", importParallelism = "auto", stateOrLocale = "zh" }) {
   onStage?.(t(stateOrLocale, "importer.runtime.tauriImportZipStage"));
   const result = await withImportProgressListener(runId, onStage, () => invokeCommand("import_zip", {
     zipPath,
     workspaceRoot,
     runId,
+    importParallelism,
   }, stateOrLocale));
   return {
     workspaceRoot: result.workspaceRoot || workspaceRoot,
@@ -60,11 +76,12 @@ async function importZipBundleTauri({ zipPath, workspaceRoot, onStage, runId = "
   };
 }
 
-async function importExtractedBundleTauri({ extractedPath, onStage, runId = "", stateOrLocale = "zh" }) {
+async function importExtractedBundleTauri({ extractedPath, onStage, runId = "", importParallelism = "auto", stateOrLocale = "zh" }) {
   onStage?.(t(stateOrLocale, "importer.runtime.tauriImportExtractedStage"));
   const result = await withImportProgressListener(runId, onStage, () => invokeCommand("import_extracted", {
     extractedPath,
     runId,
+    importParallelism,
   }, stateOrLocale));
   return {
     workspaceRoot: result.workspaceRoot,

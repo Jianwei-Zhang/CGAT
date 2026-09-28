@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   __testCreateImporterStatusToastDismissCoordinator,
   bindImporterPage,
+  mergeImportProgressStage,
   renderImporterPage,
 } from "../importer-page.js";
 import { en, zh } from "../../i18n/messages/importer.js";
@@ -1592,6 +1593,21 @@ test("import progress modal truncates the active label and uses icon-only row st
   } finally {
     globalThis.window = previousWindow;
   }
+});
+
+test("pairwise progress replaces its live row and renders structured metrics", () => {
+  const first = { stageCode: "index_pairwise_paf_progress", pairwise: { activeRun: "assembly_vs_self", activePath: "runs/chr_Chr02/assembly_vs_self/result.paf", currentBytes: 512, totalBytes: 1024, parsedRows: 100, writtenHits: 75, fileIndex: 2, fileTotal: 34, overallBytes: 4096, overallTotalBytes: 8192 } };
+  const second = { ...first, pairwise: { ...first.pairwise, currentBytes: 1024, parsedRows: 200, writtenHits: 150 } };
+  const stages = mergeImportProgressStage(mergeImportProgressStage(["start"], first), second);
+  assert.equal(stages.length, 2);
+  assert.equal(stages[1].pairwise.writtenHits, 150);
+  const html = renderImporterPage({ locale: "en", importer: { ...createImporterScrollState().importer, importRunId: "pairwise-live", stages, summary: "Importing" } });
+  assert.match(html, /data-pairwise-progress="1"/);
+  assert.match(html, /runs\/chr_Chr02\/assembly_vs_self\/result\.paf/);
+  assert.match(html, /File 2\/34/);
+  assert.match(html, /Overall · 50\.0%/);
+  assert.match(html, /Parsed rows 200/);
+  assert.match(html, /Written hits 150/);
 });
 
 test("import progress renders only the most recent 60 log entries", () => {

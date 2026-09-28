@@ -13,6 +13,8 @@ const copy = {
     invalid: "请输入 1–1000000 的整数，或选择不限步数。", failed: "保存失败，请检查本机存储。",
     restoreConfirm: "恢复默认设置？回溯容量将恢复为 50 步，下一次新增编辑时可能裁剪旧记录。",
     scope: "本机设置 · 自动保存", applied: "已保存", choose: "选择回溯容量",
+    importing: "导入", importThreads: "PAF 解析线程", auto: "自动（推荐）",
+    importThreadsHint: "控制初始导入时并行解析 PAF 的线程数。SQLite 始终只使用一个写入线程。",
   },
   en: {
     title: "App settings", close: "Close", display: "Appearance", size: "Interface text", graph: "Graph text",
@@ -25,6 +27,8 @@ const copy = {
     invalid: "Enter a whole number from 1 to 1000000, or choose Unlimited.", failed: "Could not save. Check local storage.",
     restoreConfirm: "Restore defaults? History capacity will return to 50 steps; old entries may be trimmed on the next new edit.",
     scope: "This computer · Auto-save", applied: "Saved", choose: "Choose history capacity",
+    importing: "Import", importThreads: "PAF parser workers", auto: "Auto (recommended)",
+    importThreadsHint: "Controls parallel PAF parsing during initial imports. SQLite always uses exactly one writer.",
   },
 };
 
@@ -49,6 +53,11 @@ export function renderSettingsContent(locale, settings = getAppSettings()) {
         <div class="settings-combobox"><div class="settings-combobox-field"><input id="settings-history-input" name="historyCapacity" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="settings-history-options" aria-describedby="settings-history-help settings-status" placeholder="${c.enterSteps}" value="${capacity === 0 ? c.unlimited : capacity}"><span class="settings-unit" ${capacity === 0 ? "hidden" : ""}>${c.steps}</span><button type="button" class="settings-combobox-toggle" data-history-toggle aria-label="${c.choose}" tabindex="-1"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></button></div>
           <div id="settings-history-options" class="settings-options" role="listbox" aria-label="${c.capacity}" hidden>${[50, 100, 200, 0, "custom"].map(value => `<div id="settings-history-option-${value}" role="option" aria-selected="${value === capacity}" data-history-option="${value}">${value === "custom" ? c.custom : value === 0 ? c.unlimited : `${value} ${c.steps}`}</div>`).join("")}</div>
         </div>
+      </div>
+    </section>
+    <section class="settings-section" aria-labelledby="settings-import-title"><h3 id="settings-import-title">${c.importing}</h3>
+      <div class="settings-row"><div class="settings-field-label"><label for="settings-import-parallelism">${c.importThreads}</label>${help("settings-import-parallelism-help", c.importThreads, c.importThreadsHint, true)}</div>
+        <select id="settings-import-parallelism" name="importParallelism" aria-describedby="settings-import-parallelism-help"><option value="auto" ${settings.importParallelism === "auto" ? "selected" : ""}>${c.auto}</option>${[1, 2, 4, 8].map(value => `<option value="${value}" ${settings.importParallelism === String(value) ? "selected" : ""}>${value}</option>`).join("")}</select>
       </div>
     </section>
     <footer class="settings-footer"><p id="settings-status" class="settings-status" role="status" aria-live="polite">${c.scope}</p><button type="button" class="settings-reset" data-settings-reset>${c.reset}</button></footer>`;
@@ -148,6 +157,7 @@ export function bindAppSettings(root, { getLocale, onTypographyChange, onLanguag
       const { name, value } = event.target;
       if (name === "fontSize") save({ fontSize: Number(value) });
       if (name === "graphFontSize") save({ graphFontSize: value === "" ? null : Number(value) });
+      if (name === "importParallelism") save({ importParallelism: value });
       if (name === "language") { onLanguageChange(value); render(); }
     });
     // Keep the editable field focused while clicking its list or arrow.

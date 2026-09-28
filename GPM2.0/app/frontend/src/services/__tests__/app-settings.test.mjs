@@ -7,6 +7,8 @@ test("invalid or older stored settings migrate to readable defaults", () => {
   assert.deepEqual(normalizeAppSettings({fontSize:999, graphFontSize:-1, historyCapacity:-1}), DEFAULT_APP_SETTINGS);
   assert.equal(normalizeAppSettings({historyCapacity:0}).historyCapacity, 0);
   assert.equal(normalizeAppSettings({historyCapacity:123}).historyCapacity, 123);
+  assert.equal(normalizeAppSettings({importParallelism:"4"}).importParallelism, "4");
+  assert.equal(normalizeAppSettings({importParallelism:"3"}).importParallelism, "auto");
 });
 
 test("graph text follows interface unless explicitly sized, with CJK width accounted for", () => {
@@ -27,9 +29,10 @@ test("persistence failure leaves previously applied settings intact", () => {
   let saved;
   try {
     Object.defineProperty(globalThis,"localStorage",{configurable:true,value:{setItem:(key,value)=>{saved={key,value};}}});
-    setAppSettings({fontSize:16,historyCapacity:0});
+    setAppSettings({fontSize:16,historyCapacity:0,importParallelism:"8"});
     assert.equal(saved.key, APP_SETTINGS_KEY);
     assert.equal(JSON.parse(saved.value).historyCapacity, 0);
+    assert.equal(JSON.parse(saved.value).importParallelism, "8");
     Object.defineProperty(globalThis,"localStorage",{configurable:true,value:{setItem:()=>{throw Error("quota");}}});
     assert.throws(()=>setAppSettings(DEFAULT_APP_SETTINGS), /quota/);
     assert.equal(getAppSettings().fontSize,16);
