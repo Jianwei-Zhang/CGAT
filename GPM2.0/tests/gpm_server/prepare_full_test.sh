@@ -234,7 +234,9 @@ test_minimap_options_set_preset_and_threads() {
   local ds_b="${TMP_DIR}/ds-minimap-b.fa"
   local output_root="${TMP_DIR}/minimap_options_gpm_server"
   write_multi_fasta "$ref" "Chr01" "AAAAAA"
-  write_multi_fasta "$ds_a" "tig_a" "AAAAAAAAAA"
+  write_multi_fasta "$ds_a" \
+    "tig_a1" "AAAAAAAAAA" \
+    "tig_a2" "AAAAACCCCC"
   write_multi_fasta "$ds_b" "tig_b" "CCCCCCCCCC"
 
   PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
@@ -252,7 +254,8 @@ test_minimap_options_set_preset_and_threads() {
   }
 
   cat > "${output_root}/runs/ds_a_vs_ref/result.paf" <<'EOF'
-tig_a	10	0	6	+	Chr01	6	0	6	6	6	60
+tig_a1	10	0	6	+	Chr01	6	0	6	6	6	60
+tig_a2	10	0	6	+	Chr01	6	0	6	6	6	60
 EOF
   cat > "${output_root}/runs/ds_b_vs_ref/result.paf" <<'EOF'
 tig_b	10	0	6	+	Chr01	6	0	6	6	6	60
@@ -260,14 +263,114 @@ EOF
 
   PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
 
-  grep -F 'minimap2 -c -x asm5 -X -t "${GPM_TASK_THREADS:-12}" -o result.paf' "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >/dev/null || {
-    echo "expected chr-local self command to emit CIGAR (-c), use asm5, -X, and 12 threads" >&2
+  grep -F 'minimap2 -c -x asm5 -X --no-hash-name -t "${GPM_TASK_THREADS:-12}"' "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >/dev/null || {
+    echo "expected chr-local self command to use canonical pair aliases, asm5, -X, --no-hash-name, and 12 threads" >&2
     cat "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >&2
+    exit 1
+  }
+  grep -F 'restore_self_paf.py' "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >/dev/null || {
+    echo "expected chr-local self command to restore canonical contig names" >&2
+    cat "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >&2
+    exit 1
+  }
+  [[ ! -d "${output_root}/runs/chr_Chr01/ds_b_vs_self" ]] || {
+    echo "expected the one-contig ds_b track not to schedule a self run" >&2
     exit 1
   }
   grep -F 'minimap2 -c -x asm5 -t "${GPM_TASK_THREADS:-12}" -o result.paf' "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b/command.sh" >/dev/null || {
     echo "expected chr-local pair command to emit CIGAR (-c), use asm5 and 12 threads" >&2
     cat "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b/command.sh" >&2
+    exit 1
+  }
+}
+
+test_self_alignment_restores_unique_cross_contig_pairs() {
+  local ref="${TMP_DIR}/ref-self-pairs.fa"
+  local ds="${TMP_DIR}/ds-self-pairs.fa"
+  local output_root="${TMP_DIR}/self_pairs_gpm_server"
+  local pair_bin="${TMP_DIR}/pair-bin"
+  write_multi_fasta "$ref" "Chr01" "AAAAAAAAAA"
+  write_multi_fasta "$ds" \
+    "tig_z" "AAAAAAAAAA" \
+    "tig_a" "CCCCCCCCCC" \
+    "tig_m" "GGGGGGGGGG"
+
+  PATH="${FAKE_BIN}:$PATH" bash "$SCRIPT" --archive-format zip \
+    --ref ref_self_pairs "$ref" \
+    --ds assembly "$ds" \
+    -o "$output_root" >/dev/null
+
+  cat > "${output_root}/runs/assembly_vs_ref/result.paf" <<'EOF'
+tig_z	10	0	10	+	Chr01	10	0	10	10	10	60
+tig_a	10	0	10	+	Chr01	10	0	10	10	10	60
+tig_m	10	0	10	+	Chr01	10	0	10	10	10	60
+EOF
+  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
+
+  mkdir -p "$pair_bin"
+  cat > "${pair_bin}/minimap2" <<'PYFAKE'
+#!/usr/bin/env python3
+import sys
+
+
+def fasta(path):
+    records = []
+    name = None
+    parts = []
+    with open(path, encoding="utf-8") as handle:
+        for raw in handle:
+            line = raw.strip()
+            if line.startswith(">"):
+                if name is not None:
+                    records.append((name, "".join(parts)))
+                name = line[1:].split()[0]
+                parts = []
+            elif line:
+                parts.append(line)
+    if name is not None:
+        records.append((name, "".join(parts)))
+    return records
+
+
+targets = fasta(sys.argv[-2])
+queries = fasta(sys.argv[-1])
+for query_name, query in queries:
+    for target_name, target in targets:
+        if query_name > target_name:
+            continue
+        length = min(len(query), len(target))
+        print(
+            f"{query_name}\t{len(query)}\t0\t{length}\t+\t{target_name}\t{len(target)}"
+            f"\t0\t{length}\t{length}\t{length}\t60\tcg:Z:{length}M"
+        )
+PYFAKE
+  chmod +x "${pair_bin}/minimap2"
+
+  PATH="${pair_bin}:${FAKE_BIN}:$PATH" bash \
+    "${output_root}/runs/chr_Chr01/assembly_vs_self/command.sh"
+
+  local result="${output_root}/runs/chr_Chr01/assembly_vs_self/result.paf"
+  assert_file "$result"
+  [[ "$(wc -l < "$result")" -eq 3 ]] || {
+    echo "expected exactly three unordered cross-contig pairs" >&2
+    cat "$result" >&2
+    exit 1
+  }
+  awk -F '\t' '$1 == $6 { exit 1 }' "$result" || {
+    echo "same-contig self alignment survived canonical restoration" >&2
+    cat "$result" >&2
+    exit 1
+  }
+  cut -f1,6 "$result" | sort > "${TMP_DIR}/self-pairs.actual"
+  cat > "${TMP_DIR}/self-pairs.expected" <<'EOF'
+tig_a	tig_m
+tig_a	tig_z
+tig_m	tig_z
+EOF
+  cmp "${TMP_DIR}/self-pairs.expected" "${TMP_DIR}/self-pairs.actual"
+  ! grep -q 'gpm_pair_' "$result" || {
+    echo "temporary pair aliases leaked into the canonical PAF" >&2
+    cat "$result" >&2
     exit 1
   }
 }
@@ -830,11 +933,20 @@ EOF
     exit 1
   }
   assert_file "${output_root}/runs/chr_Chr01/generated_command.sh"
-  assert_file "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh"
-  assert_file "${output_root}/runs/chr_Chr01/ds_b_vs_self/command.sh"
+  [[ ! -d "${output_root}/runs/chr_Chr01/ds_a_vs_self" ]] || {
+    echo "expected one-contig chr_Chr01/ds_a track not to schedule a self run" >&2
+    exit 1
+  }
+  [[ ! -d "${output_root}/runs/chr_Chr01/ds_b_vs_self" ]] || {
+    echo "expected one-contig chr_Chr01/ds_b track not to schedule a self run" >&2
+    exit 1
+  }
   assert_file "${output_root}/runs/chr_Chr01/ds_a_vs_ds_b/command.sh"
   assert_file "${output_root}/runs/chr_Chr02/generated_command.sh"
-  assert_file "${output_root}/runs/chr_Chr02/ds_a_vs_self/command.sh"
+  [[ ! -d "${output_root}/runs/chr_Chr02/ds_a_vs_self" ]] || {
+    echo "expected one-contig chr_Chr02/ds_a track not to schedule a self run" >&2
+    exit 1
+  }
   [[ ! -d "${output_root}/runs/chr_Chr02/ds_a_vs_ds_b" ]] || {
     echo "expected chr_Chr02 not to include cross-dataset run" >&2
     exit 1
@@ -1172,6 +1284,7 @@ test_removed_grt_tool_path_flags_are_rejected
 test_grt_tool_discovery_fails_fast_for_missing_commands
 test_score_option_sets_chr_assignment_threshold
 test_minimap_options_set_preset_and_threads
+test_self_alignment_restores_unique_cross_contig_pairs
 test_alignment_engine_defaults_and_validation
 test_out_alias_sets_output_root
 test_skip_self_option_omits_self_runs

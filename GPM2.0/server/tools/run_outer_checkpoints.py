@@ -424,6 +424,14 @@ class OuterCheckpointManager:
             if command.is_file():
                 paths.append(command)
             paths.extend(path for path in child.glob("*.fa") if path.is_file())
+
+            for support_name in ("self_name_map.tsv", "restore_self_paf.py"):
+
+                support_path = child / support_name
+
+                if support_path.is_file():
+
+                    paths.append(support_path)
         for optional in [
             self.server_dir / "tel/rules.tsv",
             self.server_dir / "cen/reference.tsv",
@@ -434,7 +442,11 @@ class OuterCheckpointManager:
         if centromere_dir.is_dir():
             paths.extend(path for path in centromere_dir.rglob("*") if path.is_file())
         tools = self._alignment_tools()
-        if any((run_dir / name).is_dir() for name in ("tel_scan", "cen_scan")):
+        uses_python = any((run_dir / name).is_dir() for name in ("tel_scan", "cen_scan")) or any(
+            child.is_dir() and (child / "restore_self_paf.py").is_file()
+            for child in run_dir.iterdir()
+        )
+        if uses_python:
             tools = [*tools, self._tool_identity("python3")]
         return {
             "parameters": self._selected_options(
@@ -510,6 +522,14 @@ class OuterCheckpointManager:
                 if command.is_file():
                     paths.append(command)
                 paths.extend(path for path in child.glob("*.fa") if path.is_file())
+
+                for support_name in ("self_name_map.tsv", "restore_self_paf.py"):
+
+                    support_path = child / support_name
+
+                    if support_path.is_file():
+
+                        paths.append(support_path)
         return paths
 
     def _read_tsv(self, relpath: str) -> list[dict[str, str]]:
