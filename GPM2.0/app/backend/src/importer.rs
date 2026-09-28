@@ -56,12 +56,15 @@ pub use add_dataset::{
     import_workspace_add_dataset_package, import_workspace_add_dataset_package_with_hooks,
 };
 pub use initial::{
-    import_from_extracted_bundle, import_from_extracted_bundle_with_hooks, import_from_zip,
-    import_from_zip_with_hooks,
+    import_from_extracted_bundle, import_from_extracted_bundle_with_hooks,
+    import_from_extracted_bundle_with_options, import_from_extracted_bundle_with_options_and_hooks,
+    import_from_zip, import_from_zip_with_hooks, import_from_zip_with_options,
+    import_from_zip_with_options_and_hooks,
 };
 pub use types::{
     AddCtgImportOutcome, AddCtgImportTarget, AddDatasetImportOutcome, CACHE_DIR, EXPORTS_DIR,
-    ImportMode, ImportOutcome, ImportProgress, PROJECT_DB_NAME,
+    ImportMode, ImportOptions, ImportOutcome, ImportProgress, PROJECT_DB_NAME,
+    PairwiseImportProgress,
 };
 
 use add_catalog::*;

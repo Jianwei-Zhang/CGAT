@@ -15,6 +15,7 @@ pub(super) fn step(stage: &'static str, detail: String) -> ImportProgress {
         progress_total: None,
         phase_index: None,
         phase_total: None,
+        pairwise: None,
     }
 }
 
