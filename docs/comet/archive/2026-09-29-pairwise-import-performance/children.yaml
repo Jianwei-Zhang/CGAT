@@ -1,0 +1,36 @@
+schema: comet.native.children.v2
+acceptance_index:
+  A1:
+    source: brief.md
+    text: "A1: A chromosome-partitioned dataset track with zero or one contig schedules no `*_vs_self` alignment task and produces no required pairwise run for that track."
+  A2:
+    source: brief.md
+    text: "A2: A chromosome-partitioned dataset track with two or more contigs produces alignments for every required different-contig unordered pair exactly once, with no same-contig pair and no duplicate reverse-direction pair."
+  A3:
+    source: brief.md
+    text: "A3: The final Server PAF uses original contig names and preserves downstream coordinates, strand, MAPQ, alignment metrics, CIGAR semantics, hashes, checkpoints, reports, Full delivery, and Light delivery contracts."
+  A4:
+    source: brief.md
+    text: "A4: Desktop import persists the same usable cross-contig pairwise evidence as the canonical Server PAF and existing pairwise queries return equivalent results after the optimized load."
+  A5:
+    source: brief.md
+    text: "A5: Initial pairwise import uses bounded batches and a single SQLite writer, avoids maintaining the two pairwise-hit lookup indexes per inserted row, creates those indexes after loading, and retains cancellation and rollback safety."
+  A6:
+    source: brief.md
+    text: "A6: The Settings panel offers persisted `Auto`, `1`, `2`, `4`, and `8` import-parallelism choices, defaults to `Auto`, and applies the selected value to parser workers without creating concurrent SQLite writers."
+  A7:
+    source: brief.md
+    text: "A7: Import progress reports the active PAF, bytes processed, rows parsed, hits written, per-file progress, and overall pairwise progress often enough that a large file does not appear stalled."
+  A8:
+    source: brief.md
+    text: "A8: On the same Windows host and clean destination, the optimized candidate reduces the pairwise-index phase wall time for `zyr-test9.light.tar.gz` by at least 30 percent versus the recorded baseline, with matching usable hit results and no required verification regression."
+children:
+  - name: server-pairwise-generation
+    depends_on: []
+    covers: [A1, A2, A3]
+  - name: pairwise-import-engine
+    depends_on: []
+    covers: [A4, A5, A8]
+  - name: import-performance-controls
+    depends_on: [pairwise-import-engine]
+    covers: [A6, A7]
