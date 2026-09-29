@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "GPM2.0",
+  "productName": "GPM",
   "version": "2.0.8",
   "identifier": "com.gpm.next",
   "build": {
@@ -20,7 +20,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "GPM2.0",
+        "title": "GPM",
         "width": 1360,
         "height": 860,
         "resizable": true
