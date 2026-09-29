@@ -1,6 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" role="img" aria-labelledby="title">
-  <title id="title">GPM2.0</title>
+  <title id="title">GPM 2.0</title>
   <path fill="#003366" d="M4 0 5 1 4 2 3 1Z"/>
   <path fill="#cc0033" d="M0 2h2l1 1 1-1 1 1 1-1h2L5 5 4 4 3 5Z"/>
   <path fill="#003366" d="M3 5 4 6 3 7 2 6Zm2 0 1 1-1 1-1-1ZM3 7l1 1H2Zm2 0 1 1H4Z"/>
+  <g id="version-badge" aria-label="2.0">
+    <rect x="5.34" y="5.63" width="1.66" height="1.03" rx="0.52" fill="#D80034"/>
+    <rect x="5.27" y="5.61" width="1.64" height="0.97" rx="0.48" fill="#003366"/>
+    <text x="6.09" y="6.31" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="0.63" font-weight="700" text-anchor="middle">2.0</text>
+  </g>
 </svg>

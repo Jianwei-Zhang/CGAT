@@ -32,4 +32,9 @@
     <path fill="#cc0033" d="M0 2h2l1 1 1-1 1 1 1-1h2L5 5 4 4 3 5Z"/>
     <path fill="#003366" d="M3 5 4 6 3 7 2 6Zm2 0 1 1-1 1-1-1ZM3 7l1 1H2Zm2 0 1 1H4Z"/>
   </g>
+  <g id="version-badge" aria-label="2.0">
+    <rect x="684" y="720" width="212" height="132" rx="66" fill="#D80034"/>
+    <rect x="674" y="718" width="210" height="124" rx="62" fill="#003366"/>
+    <text x="779" y="807" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="80" font-weight="700" text-anchor="middle">2.0</text>
+  </g>
 </svg>
