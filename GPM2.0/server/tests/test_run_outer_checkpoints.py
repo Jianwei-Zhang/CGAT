@@ -299,9 +299,13 @@ class OuterCheckpointTests(unittest.TestCase):
                 self.assertFalse(manager.validate_evidence()[0])
 
             self.assertFalse(manager.validate_package("full")[0])
-            write(server.parent / f"{server.name}.zip", "archive\n")
+            full_staging = server.parent / f".{server.name}.delivery-staging/full/{server.name}"
+            write(full_staging / "metadata/package.tsv", "key\tvalue\n")
             self.assertTrue(manager.validate_package("full")[0])
-            write(server.parent / f"{server.name}.light.zip", "")
+            (full_staging / "report").mkdir()
+            self.assertFalse(manager.validate_package("full")[0])
+            light_staging = server.parent / f".{server.name}.delivery-staging/light/{server.name}"
+            light_staging.mkdir(parents=True)
             self.assertFalse(manager.validate_package("light")[0])
 
 

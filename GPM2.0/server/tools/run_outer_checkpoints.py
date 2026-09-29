@@ -4,8 +4,6 @@
 
 from __future__ import annotations
 
-from delivery_archive import delivery_path
-
 import csv
 import json
 import shutil
@@ -14,6 +12,7 @@ from pathlib import Path
 from typing import Iterable
 
 try:
+    from delivery_archive import validate_delivery_staging
     from grt_contract import ContractError, validate_contract
     from run_orchestration import (
         CHECKPOINT_SCHEMA_VERSION,
@@ -26,6 +25,7 @@ try:
         validate_paf,
     )
 except ModuleNotFoundError:  # Imported as server.tools.run_outer_checkpoints.
+    from .delivery_archive import validate_delivery_staging
     from .grt_contract import ContractError, validate_contract
     from .run_orchestration import (
         CHECKPOINT_SCHEMA_VERSION,
@@ -239,10 +239,7 @@ class OuterCheckpointManager:
     def validate_package(self, package_kind: str) -> tuple[bool, str]:
         if package_kind not in {"full", "light"}:
             return False, f"unsupported delivery package kind: {package_kind}"
-        archive = delivery_path(self.server_dir, package_kind)
-        if not archive.is_file() or archive.stat().st_size < 1:
-            return False, f"{package_kind} delivery archive is missing or empty: {archive}"
-        return True, f"{package_kind} delivery archive is present: {archive.name}"
+        return validate_delivery_staging(self.server_dir, package_kind)
 
     def _read_options(self) -> dict[str, str]:
         if self._options is not None:

@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from delivery_archive import delivery_path
+from delivery_archive import delivery_path, delivery_staging_path
 
 import argparse
 import csv
@@ -25,7 +25,7 @@ from pathlib import Path
 
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
 from run_orchestration import OrchestrationContractError, atomic_write_json
-from server_report import ReportSession, embed_report_in_delivery_archives
+from server_report import ReportSession, finalize_delivery_archives_from_staging
 from alignment_tasks import AlignmentTask, load_tasks, run_tasks
 
 
@@ -477,11 +477,14 @@ class Runner:
             size /= 1024
         raise AssertionError("unreachable")
 
-    def _delivery_archives(self) -> list[Path]:
+    def _delivery_stagings(self) -> list[tuple[Path, Path]]:
         unit_ids = {unit.unit_id for unit in self.units}
         if not {"package_full", "package_light"}.issubset(unit_ids):
             return []
-        return [delivery_path(self.server_dir, kind) for kind in ("full", "light")]
+        return [
+            (delivery_path(self.server_dir, kind), delivery_staging_path(self.server_dir, kind))
+            for kind in ("full", "light")
+        ]
 
     def _emit_success_summary(self, artifacts: list[dict[str, object]]) -> None:
         by_name = {str(artifact["file"]): artifact for artifact in artifacts}
@@ -772,12 +775,14 @@ class Runner:
                 for signal_number, handler in previous_handlers.items():
                     signal.signal(signal_number, handler)
                 self.report.finish(str(error) if error else None)
-                archives = self._delivery_archives()
-                if completed and archives:
+                deliveries = self._delivery_stagings()
+                if completed and deliveries:
                     try:
-                        artifacts = embed_report_in_delivery_archives(self.server_dir, archives)
+                        artifacts = finalize_delivery_archives_from_staging(
+                            self.server_dir, deliveries
+                        )
                     except Exception as exc:
-                        message = f"failed to embed the final report in delivery archives: {exc}"
+                        message = f"failed to build final delivery archives: {exc}"
                         self.report.delivery_failure(message)
                         self._emit_incomplete_summary()
                         self.log_handle = None

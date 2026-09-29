@@ -30,6 +30,53 @@ def archive_options(root: Path) -> tuple[str, int]:
     return format_name, min(threads, available)
 
 
+def delivery_staging_root(root: Path) -> Path:
+    return root.parent / f".{root.name}.delivery-staging"
+
+
+def delivery_staging_path(root: Path, kind: str) -> Path:
+    if kind not in {"full", "light"}:
+        raise ValueError(f"unsupported delivery kind: {kind}")
+    return delivery_staging_root(root) / kind / root.name
+
+
+
+def publish_delivery_staging(root: Path, kind: str, prepared: Path) -> Path:
+    root = root.resolve()
+    prepared = prepared.resolve()
+    target = delivery_staging_path(root, kind)
+    if prepared.name != root.name or not prepared.is_dir():
+        raise ValueError(f"prepared delivery staging is invalid: {prepared}")
+    staging_root = delivery_staging_root(root)
+    staging_root.mkdir(parents=True, exist_ok=True)
+    target_parent = target.parent
+    backup = staging_root / f".{kind}.before-publish"
+    if backup.exists():
+        shutil.rmtree(backup)
+    try:
+        if target_parent.exists():
+            os.replace(target_parent, backup)
+        os.replace(prepared.parent, target_parent)
+    except Exception:
+        if backup.exists():
+            if target_parent.exists():
+                shutil.rmtree(target_parent)
+            os.replace(backup, target_parent)
+        raise
+    shutil.rmtree(backup, ignore_errors=True)
+    return target
+
+
+def validate_delivery_staging(root: Path, kind: str) -> tuple[bool, str]:
+    staging = delivery_staging_path(root, kind)
+    if not staging.is_dir():
+        return False, f"{kind} delivery staging is missing: {staging}"
+    if not any(path.is_file() for path in staging.rglob("*")):
+        return False, f"{kind} delivery staging is empty: {staging}"
+    if (staging / "report").exists():
+        return False, f"{kind} delivery staging unexpectedly contains a report: {staging}"
+    return True, f"{kind} delivery staging is ready: {staging.name}"
+
 def delivery_path(root: Path, kind: str) -> Path:
     format_name, _ = archive_options(root)
     suffix = "" if kind == "full" else ".light"
@@ -118,7 +165,9 @@ def validate_tar_archive(path: Path, required: set[str]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=["path", "create"])
+    parser.add_argument(
+        "action", choices=["path", "staging-path", "publish-staging", "create"]
+    )
     parser.add_argument("--server-dir", type=Path, required=True)
     parser.add_argument("--kind", choices=["full", "light"], required=True)
     parser.add_argument("--staging", type=Path)
@@ -126,6 +175,12 @@ def main() -> None:
     args = parser.parse_args()
     if args.action == "path":
         print(delivery_path(args.server_dir, args.kind))
+    elif args.action == "staging-path":
+        print(delivery_staging_path(args.server_dir, args.kind))
+    elif args.action == "publish-staging":
+        if args.staging is None:
+            parser.error("publish-staging requires --staging")
+        print(publish_delivery_staging(args.server_dir, args.kind, args.staging))
     else:
         if args.staging is None or args.output is None:
             parser.error("create requires --staging and --output")

@@ -157,8 +157,14 @@ fi
 light_after_failure="$(sha256sum "$LIGHT_ARCHIVE" | awk '{print $1}')"
 [[ "$light_after_failure" == "$light_before_failure" ]]
 
-if find "$TMP_DIR" -maxdepth 1 -type d -name '.gpm_server.package-*' -print -quit | grep -q .; then
+if find "$TMP_DIR" -maxdepth 1 -type d \
+    \( -name '.gpm_server.package-*' -o -name '.gpm_server.archive-*' \) \
+    -print -quit | grep -q .; then
   echo "package script left a temporary directory behind" >&2
+  exit 1
+fi
+if [[ -d "${TMP_DIR}/.gpm_server.delivery-staging" ]]; then
+  echo "standalone package script left delivery staging behind" >&2
   exit 1
 fi
 

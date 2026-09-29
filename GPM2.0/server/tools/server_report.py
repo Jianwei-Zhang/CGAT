@@ -2,9 +2,12 @@
 """Record and deliver a portable report for prepare.sh and run_all.sh."""
 from __future__ import annotations
 
-from delivery_archive import archive_options, attach_tar_report, validate_tar_archive
+from delivery_archive import (
+    archive_options, attach_tar_report, create_archive, validate_tar_archive,
+)
 
 import argparse
+import contextlib
 import os
 import shutil
 import sys
@@ -204,18 +207,132 @@ class ReportSession:
         self.refresh()
 
 
-def embed_report_in_delivery_archives(root: Path, archives: list[Path]) -> list[dict[str, object]]:
-    """Atomically attach the finalized report directory to delivery archives."""
-    root = root.resolve()
+def _final_report_files(root: Path) -> tuple[Path, list[Path], tuple[Path, ...]]:
     report = root / "report"
     required = (report / "manifest.json", report / "report.html", report / "render_report.py")
     missing = next((path for path in required if not path.is_file()), None)
     if missing is not None:
         raise ValueError(f"final report artifact is missing: {missing}")
-    report_files = [
+    files = [
         path for path in sorted(report.rglob("*"))
         if path.is_file() and "__pycache__" not in path.parts
     ]
+    return report, files, required
+
+
+def _stage_final_report(root: Path, staging: Path, report: Path, report_files: list[Path]) -> None:
+    if staging.name != root.name or not staging.is_dir():
+        raise ValueError(f"delivery staging directory is invalid: {staging}")
+    target = staging / "report"
+    if target.exists():
+        raise ValueError(f"delivery staging already contains a report: {staging}")
+    target.mkdir(parents=True)
+    for path in report_files:
+        destination = target / path.relative_to(report)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, destination)
+
+
+def _validate_delivery_archive(
+    path: Path, required_members: set[str], format_name: str
+) -> None:
+    if format_name == "tar.gz":
+        validate_tar_archive(path, required_members)
+        return
+    with zipfile.ZipFile(path) as archive:
+        corrupt = archive.testzip()
+        if corrupt is not None:
+            raise ValueError(f"delivery archive contains a corrupt member: {corrupt}")
+        names = set(archive.namelist())
+        missing = required_members - names
+        if missing:
+            raise ValueError(f"delivery archive is missing embedded report members: {missing}")
+
+
+def finalize_delivery_archives_from_staging(
+    root: Path, deliveries: list[tuple[Path, Path]],
+) -> list[dict[str, object]]:
+    """Build complete delivery archives once, then publish all of them atomically."""
+    root = root.resolve()
+    report, report_files, required = _final_report_files(root)
+    format_name, threads = archive_options(root)
+    prefix = f"{root.name}/report/"
+    required_members = {prefix + path.relative_to(report).as_posix() for path in required}
+    prepared: list[tuple[Path, Path]] = []
+    backups: list[tuple[Path, Path | None]] = []
+    staged_reports: list[Path] = []
+    artifacts: list[dict[str, object]] = []
+    swap_complete = False
+    try:
+        for archive_path, staging in deliveries:
+            archive_path = archive_path.resolve()
+            staging = staging.resolve()
+            _stage_final_report(root, staging, report, report_files)
+            staged_reports.append(staging / "report")
+            temporary = archive_path.with_name(
+                f".{archive_path.name}.complete.{uuid.uuid4().hex}.tmp"
+            )
+            try:
+                print(
+                    f"Compressing {format_name}: "
+                    f"threads={threads if format_name == 'tar.gz' else 1}",
+                    flush=True,
+                )
+                create_archive(staging, temporary, format_name, threads)
+                _validate_delivery_archive(temporary, required_members, format_name)
+            except Exception:
+                temporary.unlink(missing_ok=True)
+                raise
+            prepared.append((archive_path, temporary))
+
+        for archive_path, temporary in prepared:
+            backup = None
+            if archive_path.exists():
+                backup = archive_path.with_name(
+                    f".{archive_path.name}.before-complete.{uuid.uuid4().hex}.bak"
+                )
+                os.replace(archive_path, backup)
+            backups.append((archive_path, backup))
+            os.replace(temporary, archive_path)
+        artifacts = [
+            {
+                "file": archive_path.name,
+                "path": str(archive_path),
+                "size_bytes": archive_path.stat().st_size,
+                "sha256": digest(archive_path),
+            }
+            for archive_path, _ in prepared
+        ]
+        swap_complete = True
+    except Exception:
+        for archive_path, backup in reversed(backups):
+            archive_path.unlink(missing_ok=True)
+            if backup is not None and backup.exists():
+                os.replace(backup, archive_path)
+        raise
+    finally:
+        for _, temporary in prepared:
+            temporary.unlink(missing_ok=True)
+        for staged_report in staged_reports:
+            shutil.rmtree(staged_report, ignore_errors=True)
+        if swap_complete:
+            for _, backup in backups:
+                if backup is not None:
+                    backup.unlink(missing_ok=True)
+            staging_roots = set()
+            for _, staging in deliveries:
+                shutil.rmtree(staging.parent, ignore_errors=True)
+                staging_roots.add(staging.parent.parent)
+            for staging_root in staging_roots:
+                with contextlib.suppress(OSError):
+                    staging_root.rmdir()
+    return artifacts
+
+
+def embed_report_in_delivery_archives(root: Path, archives: list[Path]) -> list[dict[str, object]]:
+    """Atomically attach the finalized report directory to delivery archives."""
+    root = root.resolve()
+    report, report_files, required = _final_report_files(root)
     prefix = f"{root.name}/report/"
     prepared: list[tuple[Path, Path]] = []
     backups: list[tuple[Path, Path]] = []
@@ -339,11 +456,14 @@ def prepare_finish(root: Path, exit_code: int):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=["prepare-start", "prepare-finish", "embed-delivery-report"]
+        "action", choices=[
+            "prepare-start", "prepare-finish", "embed-delivery-report", "finalize-delivery"
+        ]
     )
     parser.add_argument("--server-dir", type=Path, required=True)
     parser.add_argument("--exit-code", type=int, default=0)
     parser.add_argument("--archive", type=Path)
+    parser.add_argument("--kind", choices=["full", "light"])
     # Preserve the exact prepare argv without interpreting its option names.
     raw = sys.argv[1:]
     split = raw.index("--") if "--" in raw else len(raw)
@@ -353,10 +473,17 @@ def main():
         prepare_start(root, raw[split + 1:])
     elif args.action == "prepare-finish":
         prepare_finish(root, args.exit_code)
-    else:
+    elif args.action == "embed-delivery-report":
         if args.archive is None:
             parser.error("embed-delivery-report requires --archive")
         embed_report_in_delivery_archives(root, [args.archive])
+    else:
+        if args.kind is None:
+            parser.error("finalize-delivery requires --kind")
+        from delivery_archive import delivery_path, delivery_staging_path
+        finalize_delivery_archives_from_staging(
+            root, [(delivery_path(root, args.kind), delivery_staging_path(root, args.kind))]
+        )
 
 
 if __name__ == "__main__":

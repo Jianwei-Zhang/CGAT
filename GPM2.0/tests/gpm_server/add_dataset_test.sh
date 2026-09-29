@@ -97,60 +97,53 @@ exit 0
 EOF
 done
 
-cat > "${FAKE_BIN}/zip" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
+cat > "${FAKE_BIN}/zip" <<'PYZIP'
+#!/usr/bin/env python3
+import fnmatch
+import os
+from pathlib import Path
+import sys
+import zipfile
 
-declare -a roots=()
-declare -a excludes=()
-out=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -r)
-      shift
-      ;;
-    -x)
-      excludes+=("$2")
-      shift 2
-      ;;
-    -*)
-      shift
-      ;;
-    *)
-      if [[ -z "$out" ]]; then
-        out="$1"
-      else
-        roots+=("$1")
-      fi
-      shift
-      ;;
-  esac
-done
-
-[[ -n "$out" ]] || exit 1
-mkdir -p "$(dirname "$out")"
-: > "$out"
-if [[ "${#roots[@]}" -gt 0 ]]; then
-  for root in "${roots[@]}"; do
-    [[ -e "$root" ]] || continue
-    while IFS= read -r path; do
-      skip=false
-      if [[ "${#excludes[@]}" -gt 0 ]]; then
-        for pattern in "${excludes[@]}"; do
-          if [[ "$path" == $pattern ]]; then
-            skip=true
-            break
-          fi
-        done
-      fi
-      "$skip" && continue
-      printf '%s\n' "--- $path" >> "$out"
-      cat "$path" >> "$out"
-      printf '\n' >> "$out"
-    done < <(find "$root" -type f | LC_ALL=C sort)
-  done
-fi
-EOF
+arguments = sys.argv[1:]
+roots = []
+excludes = []
+output = None
+index = 0
+while index < len(arguments):
+    value = arguments[index]
+    if value == "-r":
+        index += 1
+    elif value == "-x":
+        excludes.append(arguments[index + 1])
+        index += 2
+    elif value.startswith("-"):
+        index += 1
+    elif output is None:
+        output = Path(value).resolve()
+        index += 1
+    else:
+        roots.append(Path(value))
+        index += 1
+if output is None:
+    raise SystemExit(1)
+output.parent.mkdir(parents=True, exist_ok=True)
+listing = bytearray()
+with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
+    for root in roots:
+        if not root.exists():
+            continue
+        paths = [root] if root.is_file() else sorted(path for path in root.rglob("*") if path.is_file())
+        for path in paths:
+            arcname = path.as_posix()
+            if any(fnmatch.fnmatch(arcname, pattern) for pattern in excludes):
+                continue
+            archive.write(path, arcname)
+            listing.extend(f"--- {arcname}\n".encode())
+            listing.extend(path.read_bytes())
+            listing.extend(b"\n")
+    archive.writestr("__fake_zip_listing__.txt", listing)
+PYZIP
 
 chmod +x "${FAKE_BIN}/samtools" "${FAKE_BIN}/minimap2" "${FAKE_BIN}/zip" \
   "${FAKE_BIN}/nucmer" "${FAKE_BIN}/delta-filter" "${FAKE_BIN}/show-coords"

@@ -15,7 +15,9 @@ PROJECT = Path(__file__).resolve().parents[2]
 TOOLS = PROJECT / 'server/tools'
 sys.path.insert(0, str(TOOLS))
 from delivery_archive import archive_options, create_archive, delivery_path, validate_tar_archive
-from server_report import embed_report_in_delivery_archives
+from server_report import (
+    embed_report_in_delivery_archives, finalize_delivery_archives_from_staging,
+)
 import test_run_all_runner as runner_fixture
 
 
@@ -50,6 +52,45 @@ class DeliveryArchiveTests(unittest.TestCase):
             with self.assertRaises(gzip.BadGzipFile):
                 validate_tar_archive(output, {'gpm_server/payload'})
 
+    def test_single_pass_finalization_keeps_old_archives_on_second_build_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            server = root / 'gpm_server'
+            (server / 'metadata').mkdir(parents=True)
+            (server / 'metadata/prepare_options.tsv').write_text(
+                'key\tvalue\narchive_format\tzip\nthreads\t2\n'
+            )
+            report = server / 'report'
+            report.mkdir()
+            for name in ('manifest.json', 'report.html', 'render_report.py'):
+                (report / name).write_text(name, encoding='utf-8')
+            deliveries = []
+            for kind, suffix in [('full', ''), ('light', '.light')]:
+                staging = root / f'.gpm_server.delivery-staging/{kind}/gpm_server'
+                staging.mkdir(parents=True)
+                (staging / 'payload.txt').write_text(kind, encoding='utf-8')
+                archive = root / f'gpm_server{suffix}.zip'
+                archive.write_bytes((kind + '-old').encode())
+                deliveries.append((archive, staging))
+            before = [path.read_bytes() for path, _ in deliveries]
+            calls = []
+
+            def fail_second(staging, output, format_name, threads):
+                calls.append(staging)
+                if len(calls) == 2:
+                    raise RuntimeError('second archive failed')
+                create_archive(staging, output, format_name, threads)
+
+            with patch('server_report.create_archive', side_effect=fail_second):
+                with self.assertRaisesRegex(RuntimeError, 'second archive failed'):
+                    finalize_delivery_archives_from_staging(server, deliveries)
+            self.assertEqual(len(calls), 2)
+            self.assertEqual([path.read_bytes() for path, _ in deliveries], before)
+            for _, staging in deliveries:
+                self.assertTrue(staging.is_dir())
+                self.assertFalse((staging / 'report').exists())
+            self.assertFalse(list(root.glob('.*.complete.*.tmp')))
+
     def test_tar_pipeline_embeds_final_report_and_rebuilds_without_duplicates(self):
         helper = runner_fixture.RunAllRunnerTests()
         with tempfile.TemporaryDirectory() as temporary:
@@ -66,6 +107,7 @@ class DeliveryArchiveTests(unittest.TestCase):
                 result = helper.run_runner(server)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertIn('gpm_server.light.tar.gz', result.stdout)
+                self.assertEqual(result.stdout.count('Compressing tar.gz:'), 2)
                 for kind in ['full', 'light']:
                     path = delivery_path(server, kind)
                     required = {'gpm_server/report/' + name for name in ['manifest.json', 'report.html', 'render_report.py']}

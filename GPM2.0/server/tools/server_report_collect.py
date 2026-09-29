@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from delivery_archive import delivery_path
-
 import hashlib
 from pathlib import Path
 
-from server_report_io import SCHEMA, digest, fasta_stats, local_path, read_events, read_json, read_tsv, write_json
+try:
+    from delivery_archive import delivery_path, delivery_staging_path
+    from server_report_io import SCHEMA, digest, fasta_stats, local_path, read_events, read_json, read_tsv, write_json
+except ModuleNotFoundError:  # Imported as server.tools.server_report_collect.
+    from .delivery_archive import delivery_path, delivery_staging_path
+    from .server_report_io import SCHEMA, digest, fasta_stats, local_path, read_events, read_json, read_tsv, write_json
 
 GRT_STAGES = {
     "step1_round1": "grt/evidence/step1/round1",
@@ -352,14 +355,19 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
                            "evidence": table(root, "metadata/grt_evidence_registry.tsv"),
                            "tools": table(root, "metadata/grt_tool_versions.tsv")}}
     if unit_id in {"package_full", "package_light"}:
-        path = delivery_path(root, "full" if unit_id == "package_full" else "light")
-        name = path.name
-        return {"summary": {"archive": name, "available": path.is_file()}, "outputs": [
-            {
-                "file": name,
-                "payload_archive_size_bytes": path.stat().st_size,
-                "payload_archive_sha256": digest(path),
-                "checksum_scope": "App payload before the finalized report is embedded",
-            }
-        ] if path.is_file() else []}
+        kind = "full" if unit_id == "package_full" else "light"
+        path = delivery_path(root, kind)
+        staging = delivery_staging_path(root, kind)
+        files = [item for item in staging.rglob("*") if item.is_file()] if staging.is_dir() else []
+        return {
+            "summary": {
+                "archive": path.name,
+                "staging_ready": staging.is_dir(),
+                "payload_file_count": len(files),
+                "payload_size_bytes": sum(item.stat().st_size for item in files),
+            },
+            "notes": [
+                "App payload staged; the finalized report and payload are compressed together once after pipeline success."
+            ],
+        }
     return {"summary": {}, "notes": ["执行情况见本阶段状态；GRT 子阶段记录单独列出。"]}

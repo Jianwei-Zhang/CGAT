@@ -138,13 +138,17 @@ class ServerReportTests(unittest.TestCase):
                 (server / "commands" / (unit + ".sh")).write_text("#!/bin/bash\nexec bash " + shlex.quote(str(server / name)) + "\n")
             result = helper.run_runner(server)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            for filename in ("001.json", "002.json"):
+            for filename, archive_name in (
+                ("001.json", "gpm_server.zip"),
+                ("002.json", "gpm_server.light.zip"),
+            ):
                 record = read_json(server / "report/steps" / filename)
-                artifact = record["facts"]["outputs"][0]
-                path = root / artifact["file"]
-                self.assertNotEqual(artifact["payload_archive_sha256"], digest(path))
-                self.assertLess(artifact["payload_archive_size_bytes"], path.stat().st_size)
-                self.assertIn("before the finalized report", artifact["checksum_scope"])
+                facts = record["facts"]
+                self.assertTrue(facts["summary"]["staging_ready"])
+                self.assertGreater(facts["summary"]["payload_file_count"], 0)
+                self.assertGreater(facts["summary"]["payload_size_bytes"], 0)
+                self.assertIn("compressed together once", facts["notes"][0])
+                path = root / archive_name
                 with zipfile.ZipFile(path) as archive:
                     self.assertIsNone(archive.testzip())
                     self.assertIn("gpm_server/report/manifest.json", archive.namelist())
