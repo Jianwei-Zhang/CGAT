@@ -1,6 +1,6 @@
 .desktop-shell {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 100vh;
   gap: 6px;
   padding: 8px;
@@ -12,21 +12,9 @@
   gap: 6px;
 }
 
-.topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.session-meta {
-  display: flex;
-  gap: 6px;
-}
 
 .stage-panel {
-  min-height: calc(100vh - 140px);
+  min-height: calc(100vh - 70px);
 }
 
 .page {
@@ -74,25 +62,16 @@
     grid-template-columns: 1fr;
   }
 
-  .topbar,
   .page-header {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .session-meta {
-    width: 100%;
-    flex-wrap: nowrap;
+  .app-nav {
+    align-items: flex-start;
   }
 
-  .session-meta .meta-item {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-
-  .session-meta .meta-item select {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .nav-session-controls {
+    flex-wrap: wrap;
   }
 }

@@ -238,22 +238,33 @@ export async function switchWorkspaceFromShell(store, workspaceRoot, { openWorks
     return false;
   }
   const options = await openWorkspace({ workspaceRoot: normalizedPath });
-  resetAssemblyPageSession();
-  clearAssemblySessionCache();
   const current = store.getState();
+  rememberAssemblyState(current);
+  resetAssemblyPageSession();
   const references = Array.isArray(options?.references) ? options.references : [];
   const datasets = Array.isArray(options?.datasets) ? options.datasets : [];
   const existingProjects = Array.isArray(options?.existingProjects) ? options.existingProjects : [];
   const packageMetadata = options?.packageMetadata || current.initializer.packageMetadata;
   const selected = existingProjects.length === 1 ? existingProjects[0] : null;
+  const nextSession = {
+    ...current.session,
+    workspacePath: normalizedPath,
+    projectId: selected?.projectId || null,
+    projectName: selected?.projectName || "",
+  };
+  const fallbackAssembly = {
+    ...current.assembly,
+    ...buildEmptyAssemblyViewState(current),
+  };
+  const nextAssembly = selected
+    ? restoreAssemblyState({ ...current, session: nextSession }, fallbackAssembly)
+    : fallbackAssembly;
+  const nextActiveRoute = selected
+    ? current.activeRoute
+    : "importer";
   store.setState({
-    activeRoute: "importer",
-    session: {
-      ...current.session,
-      workspacePath: normalizedPath,
-      projectId: selected?.projectId || null,
-      projectName: selected?.projectName || "",
-    },
+    activeRoute: nextActiveRoute,
+    session: nextSession,
     importer: {
       ...current.importer,
       inFlight: false,
@@ -308,10 +319,7 @@ export async function switchWorkspaceFromShell(store, workspaceRoot, { openWorks
       editPhasedAssemblyEnabledInput: false,
       summary: i18nT(current, "importer.runtime.optionsLoadedSummary"),
     },
-    assembly: {
-      ...current.assembly,
-      ...buildEmptyAssemblyViewState(current),
-    },
+    assembly: nextAssembly,
     projectExport: buildEmptyProjectExportState(),
   });
   return true;

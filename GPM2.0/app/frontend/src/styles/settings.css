@@ -58,7 +58,7 @@
 .app-settings-dialog :focus-visible { outline: 2px solid #6f91b9; outline-offset: 2px; }
 .app-settings-dialog .settings-combobox input:focus-visible { outline: none; }
 .app-nav { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.app-settings-button { margin-left: auto; white-space: nowrap; }
+.app-settings-button { white-space: nowrap; }
 @media (max-width: 480px) {
   .app-settings-dialog { padding: 20px; }
   .settings-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }

@@ -152,11 +152,11 @@ test("buildProjectSwitchItems returns placeholder when no project is selected", 
   assert.equal(items[2].label, "project-b");
 });
 
-test("switchWorkspaceFromShell opens a directory and selects its sole project", async () => {
+test("switchWorkspaceFromShell keeps the current route when the directory has one project", async () => {
   const previousSubviewRenderCache = assemblyPageSession.subviewRenderCache;
   assemblyPageSession.subviewRenderCache.segmentPairs.set("old-workspace", [{ id: 1 }]);
   const store = createStore({
-    activeRoute: "assembly",
+    activeRoute: "projectExport",
     locale: "zh",
     session: {
       workspacePath: "/tmp/old",
@@ -191,7 +191,7 @@ test("switchWorkspaceFromShell opens a directory and selects its sole project", 
   });
 
   const next = store.getState();
-  assert.equal(next.activeRoute, "importer");
+  assert.equal(next.activeRoute, "projectExport");
   assert.equal(next.session.workspacePath, "/tmp/new");
   assert.equal(next.session.projectId, 22);
   assert.equal(next.session.projectName, "new-project");
@@ -200,6 +200,81 @@ test("switchWorkspaceFromShell opens a directory and selects its sole project", 
   assert.deepEqual(next.assembly.chrCtgs, []);
   assert.notEqual(assemblyPageSession.subviewRenderCache, previousSubviewRenderCache);
   assert.equal(assemblyPageSession.subviewRenderCache.segmentPairs.size, 0);
+});
+
+test("switchWorkspaceFromShell restores each project's selected chromosome", async () => {
+  clearAssemblySessionCache();
+  const projectsByWorkspace = {
+    "/tmp/project-a": [{ projectId: 7, projectName: "project-a" }],
+    "/tmp/project-b": [{ projectId: 8, projectName: "project-b" }],
+  };
+  const store = createStore({
+    activeRoute: "assembly",
+    locale: "zh",
+    session: { workspacePath: "/tmp/project-a", projectId: 7, projectName: "project-a" },
+    importer: { stages: [] },
+    initializer: { existingProjects: projectsByWorkspace["/tmp/project-a"] },
+    assembly: {
+      loading: false,
+      selectedChrName: "Chr08",
+      chromosomes: [{ chrName: "Chr08" }],
+      chrCtgs: [{ assemblyCtgId: 700 }],
+    },
+  });
+  const openWorkspace = async ({ workspaceRoot }) => ({
+    references: [],
+    datasets: [],
+    existingProjects: projectsByWorkspace[workspaceRoot],
+  });
+
+  await switchWorkspaceFromShell(store, "/tmp/project-b", { openWorkspace });
+  assert.equal(store.getState().activeRoute, "assembly");
+  assert.equal(store.getState().assembly.selectedChrName, "");
+
+  store.setState({
+    ...store.getState(),
+    assembly: {
+      ...store.getState().assembly,
+      selectedChrName: "Chr03",
+      chromosomes: [{ chrName: "Chr03" }],
+      chrCtgs: [{ assemblyCtgId: 800 }],
+    },
+  });
+
+  await switchWorkspaceFromShell(store, "/tmp/project-a", { openWorkspace });
+  assert.equal(store.getState().activeRoute, "assembly");
+  assert.equal(store.getState().assembly.selectedChrName, "Chr08");
+  assert.deepEqual(store.getState().assembly.chrCtgs, [{ assemblyCtgId: 700 }]);
+
+  await switchWorkspaceFromShell(store, "/tmp/project-b", { openWorkspace });
+  assert.equal(store.getState().assembly.selectedChrName, "Chr03");
+  assert.deepEqual(store.getState().assembly.chrCtgs, [{ assemblyCtgId: 800 }]);
+});
+
+test("switchWorkspaceFromShell falls back to the project page when selection is required", async () => {
+  clearAssemblySessionCache();
+  const store = createStore({
+    activeRoute: "projectExport",
+    locale: "zh",
+    session: { workspacePath: "/tmp/old", projectId: 1, projectName: "old" },
+    importer: { stages: [] },
+    initializer: { existingProjects: [{ projectId: 1, projectName: "old" }] },
+    assembly: { selectedChrName: "Chr01" },
+  });
+
+  await switchWorkspaceFromShell(store, "/tmp/multi", {
+    openWorkspace: async () => ({
+      references: [],
+      datasets: [],
+      existingProjects: [
+        { projectId: 2, projectName: "a" },
+        { projectId: 3, projectName: "b" },
+      ],
+    }),
+  });
+
+  assert.equal(store.getState().activeRoute, "importer");
+  assert.equal(store.getState().session.projectId, null);
 });
 
 test("switchProjectFromShell updates the current project and resets assembly runtime state", () => {
