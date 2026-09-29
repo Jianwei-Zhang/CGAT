@@ -38,6 +38,7 @@ from server.tools.grt_step23 import (
     project_interval_after_refills,
     reject_ambiguous_reference_anchors,
     reject_candidates_spanning_other_gaps,
+    reconcile_step2_events_with_step3,
     replay_step3,
     step2_strategy,
     step2_strategy_applied,
@@ -50,6 +51,121 @@ STEP23_TOOL = REPO_ROOT / "server/tools/grt_step23.py"
 
 
 class GrtStep23Tests(unittest.TestCase):
+    @staticmethod
+    def reconciliation_fixture():
+        q2_hash = "q2-hash"
+        q3_hash = "q3-hash"
+        step2_event = {
+            "event_id": "step2-gap",
+            "chr": "Chr01",
+            "action": "replace",
+            "status": "accepted",
+            "reason": "simple_gap",
+            "edit": {"replacement_kind": "gap"},
+            "q_after": {
+                "version": "q2", "start": 101, "end": 200,
+                "sha256": q2_hash,
+            },
+        }
+        q2_row = {
+            "chr": "Chr01", "q_version": "q2",
+            "q_start": 101, "q_end": 200, "segment_kind": "gap",
+            "evidence_ids_json": "[]",
+        }
+        step2 = {
+            "events": [step2_event], "q_rows": [q2_row],
+            "usage_rows": [], "evidence_rows": [],
+        }
+        step3 = {
+            "q_input_version": "q2", "q_input_sha256": q2_hash,
+            "q_output_version": "q3", "q_output_sha256": q3_hash,
+            "events": [], "q_rows": [],
+        }
+        return step2, step3
+
+    def test_reconcile_keeps_verified_empty_evidence_gap_surviving_in_q3(self):
+        step2, step3 = self.reconciliation_fixture()
+        step3["events"].append(
+            {
+                "event_id": "step3-unresolved", "chr": "Chr01",
+                "action": "refill", "status": "unresolved",
+                "q_before": {
+                    "version": "q2", "start": 101, "end": 200,
+                    "sha256": "q2-hash",
+                },
+                "q_after": {
+                    "version": "q3", "start": 121, "end": 220,
+                    "sha256": "q3-hash",
+                },
+                "q_after_projection": "surviving_origin_gap",
+            }
+        )
+        step3["q_rows"].append(
+            {
+                "chr": "Chr01", "q_version": "q3",
+                "q_start": 121, "q_end": 220, "segment_kind": "gap",
+                "evidence_ids_json": "[]",
+            }
+        )
+
+        reconcile_step2_events_with_step3(step2, step3)
+
+        self.assertEqual(step2["events"][0]["status"], "accepted")
+
+    def test_reconcile_still_supersedes_gap_with_accepted_step3_replacement(self):
+        step2, step3 = self.reconciliation_fixture()
+        replacement = {
+            "event_id": "step3-refill", "chr": "Chr01",
+            "action": "refill", "status": "accepted",
+            "q_before": {
+                "version": "q2", "start": 101, "end": 200,
+                "sha256": "q2-hash",
+            },
+            "q_after": {
+                "version": "q3", "start": 101, "end": 250,
+                "sha256": "q3-hash",
+            },
+        }
+        step3["events"].append(replacement)
+
+        reconcile_step2_events_with_step3(step2, step3)
+
+        event = step2["events"][0]
+        self.assertEqual(event["status"], "superseded")
+        self.assertEqual(event["superseded_by_event_id"], "step3-refill")
+        self.assertEqual(replacement["superseded_event_ids"], ["step2-gap"])
+
+    def test_reconcile_still_rejects_unexplained_empty_evidence_gap_loss(self):
+        step2, step3 = self.reconciliation_fixture()
+
+        with self.assertRaisesRegex(
+            SystemExit, "accepted Step2 path segment disappeared in q3"
+        ):
+            reconcile_step2_events_with_step3(step2, step3)
+
+    def test_reconcile_rejects_survival_projection_without_q3_gap(self):
+        step2, step3 = self.reconciliation_fixture()
+        step3["events"].append(
+            {
+                "event_id": "step3-unresolved", "chr": "Chr01",
+                "action": "refill", "status": "unresolved",
+                "q_before": {
+                    "version": "q2", "start": 101, "end": 200,
+                    "sha256": "q2-hash",
+                },
+                "q_after": {
+                    "version": "q3", "start": 121, "end": 220,
+                    "sha256": "q3-hash",
+                },
+                "q_after_projection": "surviving_origin_gap",
+            }
+        )
+
+        with self.assertRaisesRegex(
+            SystemExit, "accepted Step2 path segment disappeared in q3"
+        ):
+            reconcile_step2_events_with_step3(step2, step3)
+
     def test_mummer_filter_retains_upstream_repeat_hits(self):
         parameters = grt_mummer_parameters(8)
         self.assertFalse(parameters["delta_filter"]["reference_best"])

@@ -4943,11 +4943,72 @@ def publish_step23_metadata(
     )
 
 
+def step2_gap_survives_step3(
+    event: dict[str, object],
+    q2_rows: list[dict[str, object]],
+    step3: dict[str, object],
+) -> bool:
+    """Return true only for a provenance-verified explicit gap retained in q3."""
+    edit = event.get("edit")
+    if not isinstance(edit, dict) or edit.get("replacement_kind") != "gap":
+        return False
+    chromosome = str(event["chr"])
+    after = event["q_after"]
+    after_start = int(after["start"])
+    after_end = int(after["end"])
+    if (
+        after.get("version") != step3.get("q_input_version")
+        or after.get("sha256") != step3.get("q_input_sha256")
+    ):
+        return False
+    if not any(
+        row.get("segment_kind") == "gap"
+        and row.get("q_version") == after.get("version")
+        and int(row["q_start"]) == after_start
+        and int(row["q_end"]) == after_end
+        and not json.loads(str(row["evidence_ids_json"]))
+        for row in q2_rows
+    ):
+        return False
+
+    q3_rows = [
+        row for row in step3["q_rows"] if str(row["chr"]) == chromosome
+    ]
+    for candidate in step3["events"]:
+        if (
+            str(candidate["chr"]) != chromosome
+            or candidate.get("q_after_projection") != "surviving_origin_gap"
+        ):
+            continue
+        q_before = candidate.get("q_before")
+        q_after = candidate.get("q_after")
+        if not isinstance(q_before, dict) or not isinstance(q_after, dict):
+            continue
+        if (
+            q_before.get("version") != step3.get("q_input_version")
+            or q_before.get("sha256") != step3.get("q_input_sha256")
+            or int(q_before["start"]) != after_start
+            or int(q_before["end"]) != after_end
+            or q_after.get("version") != step3.get("q_output_version")
+            or q_after.get("sha256") != step3.get("q_output_sha256")
+        ):
+            continue
+        if any(
+            row.get("segment_kind") == "gap"
+            and row.get("q_version") == q_after.get("version")
+            and int(row["q_start"]) == int(q_after["start"])
+            and int(row["q_end"]) == int(q_after["end"])
+            for row in q3_rows
+        ):
+            return True
+    return False
+
+
 def reconcile_step2_events_with_step3(
     step2: dict[str, object],
     step3: dict[str, object],
 ) -> None:
-    """Supersede accepted Step2 source segments removed by Step3 edits."""
+    """Reconcile accepted Step2 path segments with the finalized q3 path."""
     surviving_evidence = {
         str(evidence_id)
         for row in step3["q_rows"]
@@ -5006,6 +5067,10 @@ def reconcile_step2_events_with_step3(
             ):
                 replacements.append((candidate, replacement))
         if not replacements:
+            if step2_gap_survives_step3(
+                event, q2_rows_by_chr.get(chromosome, []), step3
+            ):
+                continue
             fail(
                 "accepted Step2 path segment disappeared in q3 without an "
                 f"accepted structural replacement: {event['event_id']}"
