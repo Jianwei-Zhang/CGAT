@@ -932,6 +932,92 @@ fn initial_pairwise_bulk_load_cancellation_rolls_back_hits_and_indexes() {
 }
 
 #[test]
+fn initial_pairwise_bulk_load_cancellation_before_index_creation_rolls_back() {
+    let temp = tempdir().unwrap();
+    let bundle_root = temp.path().join("gpm_server");
+    create_two_contig_pairwise_bundle(&bundle_root);
+    let cancel = std::cell::Cell::new(false);
+
+    let error = import_from_extracted_bundle_with_options_and_hooks(
+        &bundle_root,
+        ImportOptions {
+            pairwise_parser_workers: Some(1),
+        },
+        &mut |step| {
+            if step.stage == "index_pairwise_paf_indexes" {
+                cancel.set(true);
+            }
+        },
+        &mut || cancel.get(),
+    )
+    .unwrap_err();
+
+    assert_pairwise_bulk_load_cancelled_and_rolled_back(&bundle_root, &error);
+}
+
+#[test]
+fn initial_pairwise_bulk_load_cancellation_after_index_creation_rolls_back() {
+    let temp = tempdir().unwrap();
+    let bundle_root = temp.path().join("gpm_server");
+    create_two_contig_pairwise_bundle(&bundle_root);
+    let index_stage_reached = std::cell::Cell::new(false);
+    let checks_after_index_stage = std::cell::Cell::new(0_u8);
+
+    let error = import_from_extracted_bundle_with_options_and_hooks(
+        &bundle_root,
+        ImportOptions {
+            pairwise_parser_workers: Some(1),
+        },
+        &mut |step| {
+            if step.stage == "index_pairwise_paf_indexes" {
+                index_stage_reached.set(true);
+            }
+        },
+        &mut || {
+            if !index_stage_reached.get() {
+                return false;
+            }
+            let checks = checks_after_index_stage.get() + 1;
+            checks_after_index_stage.set(checks);
+            checks >= 2
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(checks_after_index_stage.get(), 2);
+    assert_pairwise_bulk_load_cancelled_and_rolled_back(&bundle_root, &error);
+}
+
+fn assert_pairwise_bulk_load_cancelled_and_rolled_back(bundle_root: &Path, error: &anyhow::Error) {
+    assert!(error.to_string().contains("import cancelled"));
+    let conn = Connection::open(bundle_root.join(PROJECT_DB_NAME)).unwrap();
+    assert_eq!(
+        conn.query_row("SELECT COUNT(*) FROM pairwise_alignment_run", [], |row| row
+            .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        conn.query_row("SELECT COUNT(*) FROM pairwise_alignment_hit", [], |row| row
+            .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    let index_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type='index' AND name IN (
+                 'idx_pairwise_hit_query_target',
+                 'idx_pairwise_hit_target_query'
+             )",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(index_count, 2);
+}
+
+#[test]
 fn rejects_unsupported_pairwise_parser_worker_count() {
     let error = ImportOptions {
         pairwise_parser_workers: Some(3),

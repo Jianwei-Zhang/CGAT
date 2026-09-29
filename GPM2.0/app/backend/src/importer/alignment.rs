@@ -244,8 +244,10 @@ where
     );
 
     if prepared_runs.is_empty() {
+        check_import_cancel(should_cancel)?;
         tx.execute_batch(CREATE_PAIRWISE_HIT_INDEXES_SQL)
             .context("failed to create pairwise hit indexes after empty bulk load")?;
+        check_import_cancel(should_cancel)?;
         tx.commit()
             .context("failed to commit empty pairwise bulk load")?;
         recorder.record(
@@ -389,8 +391,10 @@ where
         "index_pairwise_paf_indexes",
         "creating pairwise query indexes after bulk load".to_string(),
     );
+    check_import_cancel(should_cancel)?;
     tx.execute_batch(CREATE_PAIRWISE_HIT_INDEXES_SQL)
         .context("failed to create pairwise hit indexes after bulk load")?;
+    check_import_cancel(should_cancel)?;
     tx.commit()
         .context("failed to commit initial pairwise bulk load")?;
 
