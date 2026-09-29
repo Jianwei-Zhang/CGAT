@@ -45,10 +45,6 @@
 }
 
 .nav-session-field select {
-  width: clamp(150px, 18vw, 260px);
-  min-width: 0;
-}
-
-.nav-session-field-language select {
   width: 96px;
+  min-width: 0;
 }
