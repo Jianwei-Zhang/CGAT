@@ -232,6 +232,57 @@ class GrtAppPackageTests(unittest.TestCase):
         self.assertEqual(mummer_left["association"], "supporting_precursor")
         self.assertEqual(mummer_left["target"]["start"], 221)
 
+    def test_omits_unrenderable_superseded_precursor_but_keeps_accepted_evidence(self) -> None:
+        root, final_path, source_lengths, cards = self._write_display_evidence_fixture()
+        members = root / "metadata/grt_donor_members.tsv"
+        members.write_text(
+            members.read_text(encoding="utf-8")
+            + "d0\tmember-precursor\tsupport\tprecursor\t1\t1000\t+\tgrt_member-precursor\thash2\n",
+            encoding="utf-8",
+        )
+        corrections = root / "grt/evidence/step3/correction_candidates.tsv"
+        corrections.write_text(
+            corrections.read_text(encoding="utf-8").replace(
+                "member-1\tsupport\tdonor1", "member-precursor\tsupport\tprecursor"
+            ),
+            encoding="utf-8",
+        )
+        alignments = root / "grt/evidence/step3/mummer/alignments.tsv"
+        alignments.write_text(
+            alignments.read_text(encoding="utf-8").replace(
+                "member-1\tsupport\tdonor1", "member-precursor\tsupport\tprecursor"
+            ),
+            encoding="utf-8",
+        )
+        registry = root / "metadata/grt_evidence_registry.tsv"
+        registry.write_text(
+            registry.read_text(encoding="utf-8").replace(
+                "ev-mummer\tmummer_structural_correction\tsuperseded\tq2\tsupport\tdonor1",
+                "ev-mummer\tmummer_structural_correction\tsuperseded\tq2\tsupport\tprecursor",
+            ),
+            encoding="utf-8",
+        )
+        source_lengths[("support", "precursor")] = 1000
+        cards.add(("support", "precursor", "Chr02"))
+
+        projected = build_display_evidence(
+            root, final_path, source_lengths, cards
+        )["Chr01"]
+
+        self.assertEqual(len(projected), 2)
+        self.assertEqual({row["association"] for row in projected}, {"accepted"})
+        self.assertEqual({row["tool"] for row in projected}, {"minimap2"})
+
+    def test_accepted_display_evidence_still_requires_endpoint_cards(self) -> None:
+        root, final_path, source_lengths, cards = self._write_display_evidence_fixture()
+        cards.remove(("support", "donor1", "Chr01"))
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "has no App display source card for support:donor1:Chr01",
+        ):
+            build_display_evidence(root, final_path, source_lengths, cards)
+
     def test_display_evidence_selects_accepted_candidate_regardless_of_row_order(self) -> None:
         fixture = self._write_display_evidence_fixture()
         root = fixture[0]

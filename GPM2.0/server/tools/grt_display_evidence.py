@@ -443,13 +443,12 @@ def _local_alignments_for_event(
     return results
 
 
-def _validate_endpoint(
+def _endpoint_source_card(
     endpoint: object,
     label: str,
     chromosome: str,
     source_lengths: dict[tuple[str, str], int],
-    display_source_cards: set[tuple[str, str, str]],
-) -> None:
+) -> tuple[str, str, str]:
     if not isinstance(endpoint, dict):
         raise ValueError(f"{label} must be an object")
     dataset = str(endpoint.get("dataset", "")).strip()
@@ -467,8 +466,43 @@ def _validate_endpoint(
         or orientation not in {"+", "-"}
     ):
         raise ValueError(f"{label} has an invalid display source interval")
-    if (dataset, contig, chromosome) not in display_source_cards:
+    return dataset, contig, chromosome
+
+
+def _validate_endpoint(
+    endpoint: object,
+    label: str,
+    chromosome: str,
+    source_lengths: dict[tuple[str, str], int],
+    display_source_cards: set[tuple[str, str, str]],
+) -> None:
+    card = _endpoint_source_card(endpoint, label, chromosome, source_lengths)
+    if card not in display_source_cards:
+        dataset, contig, _chromosome = card
         raise ValueError(f"{label} has no App display source card for {dataset}:{contig}:{chromosome}")
+
+
+def _renderable_supporting_evidence(
+    item: dict[str, object],
+    chromosome: str,
+    source_lengths: dict[tuple[str, str], int],
+    display_source_cards: set[tuple[str, str, str]],
+) -> bool:
+    """Return whether an optional precursor has both App endpoint cards."""
+    evidence_id = str(item.get("evidence_id", "")).strip() or "<empty>"
+    source_card = _endpoint_source_card(
+        item.get("source"),
+        f"display evidence {evidence_id}.source",
+        chromosome,
+        source_lengths,
+    )
+    target_card = _endpoint_source_card(
+        item.get("target"),
+        f"display evidence {evidence_id}.target",
+        chromosome,
+        source_lengths,
+    )
+    return source_card in display_source_cards and target_card in display_source_cards
 
 
 def validate_display_evidence(
@@ -630,6 +664,45 @@ def build_display_evidence(
                     )
                 )
         projected.sort(key=lambda item: str(item["evidence_id"]))
+        validation_cards = set(display_source_cards)
+        for item in projected:
+            if item.get("association") != "supporting_precursor":
+                continue
+            evidence_id = str(item.get("evidence_id", "")).strip() or "<empty>"
+            validation_cards.add(
+                _endpoint_source_card(
+                    item.get("source"),
+                    f"display evidence {evidence_id}.source",
+                    chromosome_name,
+                    source_lengths,
+                )
+            )
+            validation_cards.add(
+                _endpoint_source_card(
+                    item.get("target"),
+                    f"display evidence {evidence_id}.target",
+                    chromosome_name,
+                    source_lengths,
+                )
+            )
+        validate_display_evidence(
+            chromosome=chromosome_name,
+            evidence=projected,
+            final_segment_events=final_segment_events,
+            source_lengths=source_lengths,
+            display_source_cards=validation_cards,
+        )
+        projected = [
+            item
+            for item in projected
+            if item.get("association") != "supporting_precursor"
+            or _renderable_supporting_evidence(
+                item,
+                chromosome_name,
+                source_lengths,
+                display_source_cards,
+            )
+        ]
         validate_display_evidence(
             chromosome=chromosome_name,
             evidence=projected,
