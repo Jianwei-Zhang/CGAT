@@ -1,5 +1,19 @@
 use super::*;
 
+pub(super) fn initial_import_options(value: Option<String>) -> ImportOptions {
+    let normalized = value.unwrap_or_default().trim().to_ascii_lowercase();
+    let pairwise_parser_workers = match normalized.as_str() {
+        "1" => Some(1),
+        "2" => Some(2),
+        "4" => Some(4),
+        "8" => Some(8),
+        _ => None,
+    };
+    ImportOptions {
+        pairwise_parser_workers,
+    }
+}
+
 #[tauri::command]
 #[allow(non_snake_case)]
 pub async fn import_zip(
@@ -7,10 +21,12 @@ pub async fn import_zip(
     zipPath: String,
     workspaceRoot: String,
     runId: Option<String>,
+    importParallelism: Option<String>,
 ) -> CommandResult<Value> {
     let zip_path = zipPath;
     let workspace_root = workspaceRoot;
     let run_id = normalize_optional_run_id(runId);
+    let import_options = initial_import_options(importParallelism);
     // Preserve a request submitted after the dialog opens but before this worker starts.
     tauri::async_runtime::spawn_blocking(move || {
         let progress_run_id = run_id.clone();
@@ -24,9 +40,10 @@ pub async fn import_zip(
                 .as_deref()
                 .is_some_and(import_cancel::is_cancelled)
         };
-        let result = import_from_zip_with_hooks(
+        let result = import_from_zip_with_options_and_hooks(
             Path::new(&zip_path),
             Path::new(&workspace_root),
+            import_options,
             &mut on_progress,
             &mut should_cancel,
         );
@@ -57,9 +74,11 @@ pub async fn import_extracted(
     app: AppHandle,
     extractedPath: String,
     runId: Option<String>,
+    importParallelism: Option<String>,
 ) -> CommandResult<Value> {
     let extracted_path = extractedPath;
     let run_id = normalize_optional_run_id(runId);
+    let import_options = initial_import_options(importParallelism);
     // Preserve a request submitted after the dialog opens but before this worker starts.
     tauri::async_runtime::spawn_blocking(move || {
         let progress_run_id = run_id.clone();
@@ -73,8 +92,9 @@ pub async fn import_extracted(
                 .as_deref()
                 .is_some_and(import_cancel::is_cancelled)
         };
-        let result = import_from_extracted_bundle_with_hooks(
+        let result = import_from_extracted_bundle_with_options_and_hooks(
             Path::new(&extracted_path),
+            import_options,
             &mut on_progress,
             &mut should_cancel,
         );

@@ -1,11 +1,36 @@
 use super::*;
 
 pub fn import_from_extracted_bundle(path: &Path) -> Result<(ImportOutcome, Vec<ImportProgress>)> {
-    import_from_extracted_bundle_with_hooks(path, &mut |_| {}, &mut || false)
+    import_from_extracted_bundle_with_options(path, ImportOptions::default())
+}
+
+pub fn import_from_extracted_bundle_with_options(
+    path: &Path,
+    options: ImportOptions,
+) -> Result<(ImportOutcome, Vec<ImportProgress>)> {
+    import_from_extracted_bundle_with_options_and_hooks(path, options, &mut |_| {}, &mut || false)
 }
 
 pub fn import_from_extracted_bundle_with_hooks<P, C>(
     path: &Path,
+    on_progress: &mut P,
+    should_cancel: &mut C,
+) -> Result<(ImportOutcome, Vec<ImportProgress>)>
+where
+    P: FnMut(ImportProgress),
+    C: FnMut() -> bool,
+{
+    import_from_extracted_bundle_with_options_and_hooks(
+        path,
+        ImportOptions::default(),
+        on_progress,
+        should_cancel,
+    )
+}
+
+pub fn import_from_extracted_bundle_with_options_and_hooks<P, C>(
+    path: &Path,
+    options: ImportOptions,
     on_progress: &mut P,
     should_cancel: &mut C,
 ) -> Result<(ImportOutcome, Vec<ImportProgress>)>
@@ -62,6 +87,7 @@ where
         &resolved.bundle_root,
         &mut recorder,
         should_cancel,
+        options,
     )?;
 
     recorder.set_phase(5, EXTRACTED_IMPORT_PHASE_TOTAL);
@@ -85,12 +111,46 @@ pub fn import_from_zip(
     zip_path: &Path,
     workspace_root: &Path,
 ) -> Result<(ImportOutcome, Vec<ImportProgress>)> {
-    import_from_zip_with_hooks(zip_path, workspace_root, &mut |_| {}, &mut || false)
+    import_from_zip_with_options(zip_path, workspace_root, ImportOptions::default())
+}
+
+pub fn import_from_zip_with_options(
+    zip_path: &Path,
+    workspace_root: &Path,
+    options: ImportOptions,
+) -> Result<(ImportOutcome, Vec<ImportProgress>)> {
+    import_from_zip_with_options_and_hooks(
+        zip_path,
+        workspace_root,
+        options,
+        &mut |_| {},
+        &mut || false,
+    )
 }
 
 pub fn import_from_zip_with_hooks<P, C>(
     zip_path: &Path,
     workspace_root: &Path,
+    on_progress: &mut P,
+    should_cancel: &mut C,
+) -> Result<(ImportOutcome, Vec<ImportProgress>)>
+where
+    P: FnMut(ImportProgress),
+    C: FnMut() -> bool,
+{
+    import_from_zip_with_options_and_hooks(
+        zip_path,
+        workspace_root,
+        ImportOptions::default(),
+        on_progress,
+        should_cancel,
+    )
+}
+
+pub fn import_from_zip_with_options_and_hooks<P, C>(
+    zip_path: &Path,
+    workspace_root: &Path,
+    options: ImportOptions,
     on_progress: &mut P,
     should_cancel: &mut C,
 ) -> Result<(ImportOutcome, Vec<ImportProgress>)>
@@ -230,6 +290,7 @@ where
         workspace_root,
         &mut recorder,
         should_cancel,
+        options,
     ) {
         remove_failed_zip_workspace(workspace_root, &error)?;
         return Err(error);

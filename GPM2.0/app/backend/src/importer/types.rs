@@ -13,6 +13,20 @@ pub enum ImportMode {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PairwiseImportProgress {
+    pub active_run: String,
+    pub active_path: String,
+    pub current_bytes: u64,
+    pub total_bytes: u64,
+    pub parsed_rows: u64,
+    pub written_hits: u64,
+    pub file_index: usize,
+    pub file_total: usize,
+    pub overall_bytes: u64,
+    pub overall_total_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ImportProgress {
     pub stage: &'static str,
     pub detail: String,
@@ -20,6 +34,28 @@ pub struct ImportProgress {
     pub progress_total: Option<usize>,
     pub phase_index: Option<usize>,
     pub phase_total: Option<usize>,
+    pub pairwise: Option<PairwiseImportProgress>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ImportOptions {
+    /// `None` selects a bounded value from host parallelism. Explicit values
+    /// are limited to the choices exposed by the desktop settings UI.
+    pub pairwise_parser_workers: Option<usize>,
+}
+
+impl ImportOptions {
+    pub fn resolved_pairwise_parser_workers(self) -> Result<usize> {
+        match self.pairwise_parser_workers {
+            Some(workers @ (1 | 2 | 4 | 8)) => Ok(workers),
+            Some(workers) => {
+                bail!("pairwise parser workers must be Auto or one of 1, 2, 4, 8; got {workers}")
+            }
+            None => Ok(std::thread::available_parallelism()
+                .map(|parallelism| parallelism.get().saturating_sub(1).clamp(1, 8))
+                .unwrap_or(1)),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

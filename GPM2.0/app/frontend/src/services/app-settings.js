@@ -1,5 +1,10 @@
 export const APP_SETTINGS_KEY = "gpm_next:app_settings";
-export const DEFAULT_APP_SETTINGS = Object.freeze({ fontSize: 14, graphFontSize: null, historyCapacity: 50 });
+export const DEFAULT_APP_SETTINGS = Object.freeze({
+  fontSize: 14,
+  graphFontSize: null,
+  historyCapacity: 50,
+  importParallelism: "auto",
+});
 
 export function normalizeAppSettings(value = {}) {
   return {
@@ -7,6 +12,9 @@ export function normalizeAppSettings(value = {}) {
     graphFontSize: [10, 12, 14, 16].includes(value?.graphFontSize) ? value.graphFontSize : null,
     historyCapacity: Number.isSafeInteger(value?.historyCapacity) && value.historyCapacity >= 0
       && value.historyCapacity <= 1000000 ? value.historyCapacity : 50,
+    importParallelism: ["auto", "1", "2", "4", "8"].includes(String(value?.importParallelism || "").toLowerCase())
+      ? String(value.importParallelism).toLowerCase()
+      : "auto",
   };
 }
 
@@ -40,3 +48,5 @@ export function estimateGraphTextWidth(text, characterWidth = 6.2) {
   return Math.max(10, [...String(text || "")].reduce((width, char) =>
     width + (char.codePointAt(0) > 255 ? 10 : characterWidth), 0)) * getGraphTextScale();
 }
+
+export function getImportParallelism() { return current.importParallelism; }

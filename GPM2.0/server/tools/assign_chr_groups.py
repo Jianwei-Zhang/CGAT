@@ -108,6 +108,75 @@ def write_single_record_fasta(path, name, sequence):
         handle.write(f">{name}\n{sequence}\n")
 
 
+def write_self_pair_inputs(run_dir, source_fasta):
+    records = read_fasta_records(source_fasta)
+    if len(records) < 2:
+        return None
+    names = [name for name, _sequence in records]
+    if len(set(names)) != len(names):
+        fail(f"self alignment input has duplicate record names: {source_fasta}")
+
+    # Minimap2 -X includes --dual=no, which skips query names that sort after
+    # the target name. Interleaving target ``a`` and query ``b`` aliases makes
+    # each same-record pair sort as query > target while retaining one direction
+    # for every pair of different records.
+    width = max(9, len(str(len(names))))
+    rank_by_name = {
+        name: index
+        for index, name in enumerate(
+            sorted(names, key=lambda value: value.encode("utf-8")), start=1
+        )
+    }
+    target_path = run_dir / "self_target.fa"
+    query_path = run_dir / "self_query.fa"
+    mapping_path = run_dir / "self_name_map.tsv"
+    restore_path = run_dir / "restore_self_paf.py"
+
+    with target_path.open("w", encoding="utf-8") as target_handle, query_path.open(
+        "w", encoding="utf-8"
+    ) as query_handle, mapping_path.open("w", encoding="utf-8", newline="") as mapping_handle:
+        for name, sequence in records:
+            rank = rank_by_name[name]
+            target_name = f"gpm_pair_{rank:0{width}d}a"
+            query_name = f"gpm_pair_{rank:0{width}d}b"
+            target_handle.write(f">{target_name}\n{sequence}\n")
+            query_handle.write(f">{query_name}\n{sequence}\n")
+            mapping_handle.write(f"{target_name}\t{name}\n{query_name}\t{name}\n")
+
+    restore_path.write_text(
+        r"""#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+mapping = {}
+for raw in Path(sys.argv[1]).read_bytes().splitlines():
+    if not raw:
+        continue
+    alias, original = raw.split(b"\t", 1)
+    if alias in mapping:
+        raise SystemExit(f"duplicate self-alignment alias: {alias!r}")
+    mapping[alias] = original
+
+for line_number, raw in enumerate(sys.stdin.buffer, start=1):
+    fields = raw.rstrip(b"\r\n").split(b"\t")
+    if len(fields) < 12:
+        raise SystemExit(f"invalid self-alignment PAF row {line_number}")
+    try:
+        fields[0] = mapping[fields[0]]
+        fields[5] = mapping[fields[5]]
+    except KeyError as error:
+        raise SystemExit(
+            f"unknown self-alignment alias at PAF row {line_number}: {error.args[0]!r}"
+        ) from None
+    if fields[0] == fields[5]:
+        raise SystemExit(f"same-contig self alignment survived at PAF row {line_number}")
+    sys.stdout.buffer.write(b"\t".join(fields) + b"\n")
+""",
+        encoding="utf-8",
+    )
+    return target_path, query_path, mapping_path, restore_path
+
+
 def iter_n_regions(sequence):
     index = 0
     while index < len(sequence):
@@ -120,13 +189,44 @@ def iter_n_regions(sequence):
         yield start + 1, index, index - start
 
 
-def write_run_command_script(path, run_dir, left_fa, right_fa, self_mode, threads, minimap_preset):
+def write_run_command_script(
+    path,
+    run_dir,
+    left_fa,
+    right_fa,
+    self_mode,
+    threads,
+    minimap_preset,
+    self_name_map=None,
+    self_restore_script=None,
+):
     lines = ["#!/usr/bin/env bash", "set -euo pipefail", f"cd {shlex.quote(str(run_dir))}"]
     args = ["minimap2", "-c", "-x", minimap_preset]
     if self_mode:
-        args.append("-X")
-    args.extend(["-t", THREAD_ARGUMENT, "-o", "result.paf", str(left_fa), str(right_fa)])
-    lines.append(" ".join(quote_command_arg(part) for part in args) + " > stdout.log 2> stderr.log")
+        if self_name_map is None or self_restore_script is None:
+            fail("self alignment command requires canonical-name restoration inputs")
+        args.extend(["-X", "--no-hash-name"])
+        args.extend(["-t", THREAD_ARGUMENT, str(left_fa), str(right_fa)])
+        restore_args = ["python3", str(self_restore_script), str(self_name_map)]
+        lines.extend(
+            [
+                "rm -f result.paf result.paf.tmp",
+                "{",
+                "  "
+                + " ".join(quote_command_arg(part) for part in args)
+                + " | "
+                + " ".join(quote_command_arg(part) for part in restore_args)
+                + " > result.paf.tmp",
+                "} > stdout.log 2> stderr.log",
+                "mv result.paf.tmp result.paf",
+            ]
+        )
+    else:
+        args.extend(["-t", THREAD_ARGUMENT, "-o", "result.paf", str(left_fa), str(right_fa)])
+        lines.append(
+            " ".join(quote_command_arg(part) for part in args)
+            + " > stdout.log 2> stderr.log"
+        )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -756,20 +856,27 @@ for chr_name in reference_chr_names:
     task_priorities = {}
     if not skip_self:
         for dataset_name, output_fasta in selected_dataset_fastas:
+            if len(read_fasta_records(output_fasta)) < 2:
+                continue
             run_dir = chr_run_dir / f"{dataset_name}_vs_self"
             run_dir.mkdir(parents=True, exist_ok=True)
+            self_inputs = write_self_pair_inputs(run_dir, output_fasta)
+            assert self_inputs is not None
+            target_fasta, query_fasta, name_map, restore_script = self_inputs
             command_path = run_dir / "command.sh"
             write_run_command_script(
                 command_path,
                 run_dir,
-                output_fasta,
-                output_fasta,
+                target_fasta,
+                query_fasta,
                 self_mode=True,
                 threads=threads,
                 minimap_preset=minimap_preset,
+                self_name_map=name_map,
+                self_restore_script=restore_script,
             )
             command_paths.append(command_path)
-            task_caps[command_path] = query_threads(output_fasta, "minimap2", int(threads))
+            task_caps[command_path] = query_threads(query_fasta, "minimap2", int(threads))
             task_priorities[command_path] = output_fasta.stat().st_size ** 2
 
     for left_index, (left_name, left_fasta) in enumerate(selected_dataset_fastas):

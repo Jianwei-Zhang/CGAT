@@ -1,0 +1,503 @@
+schema: comet.native.v4
+name: pairwise-import-performance
+language: en
+phase: archive
+status: done
+state_version: 9
+brief: brief.md
+shape_confirmation_hash: 5d350a8aecea79239a1b8e41ba5ae06e3cd356dfcc0e69e55e61cbb88d0fb7c6
+children_contract_hash: 012f762be28d9677d4bf22f7815d2e5bc23e1c3402cb029af9492a6a0547d36e
+coordination_mode: single-session
+spec_changes:
+  - capability: import-performance-controls
+    operation: create
+    source: specs/import-performance-controls/spec.md
+  - capability: pairwise-import-engine
+    operation: create
+    source: specs/pairwise-import-engine/spec.md
+  - capability: server-pairwise-generation
+    operation: create
+    source: specs/server-pairwise-generation/spec.md
+workspace:
+  isolation: branch
+  change_branch: comet/pairwise-import-performance
+  target_branch: master
+  finish: merge
+loop:
+  stage: done
+  goal_cycle: 1
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: "A1: A chromosome-partitioned dataset track with zero or one contig
+      schedules no `*_vs_self` alignment task and produces no required pairwise
+      run for that track."
+    result: passed
+    reason:
+      text: Server skips self-run creation and scheduling for tracks with fewer than
+        two contigs and cleans stale task directories.
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: "A2: A chromosome-partitioned dataset track with two or more contigs
+      produces alignments for every required different-contig unordered pair
+      exactly once, with no same-contig pair and no duplicate reverse-direction
+      pair."
+    result: passed
+    reason:
+      text: Deterministic aliases with minimap2 -X retain each distinct-contig
+        unordered pair once, with no same-contig or reverse duplicate pair.
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: "A3: The final Server PAF uses original contig names and preserves
+      downstream coordinates, strand, MAPQ, alignment metrics, CIGAR semantics,
+      hashes, checkpoints, reports, Full delivery, and Light delivery
+      contracts."
+    result: passed
+    reason:
+      text: Canonical-name restoration changes only PAF names, preserves alignment
+        semantics, publishes atomically, fingerprints helper inputs, and
+        preserves Full/Light contracts.
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: "A4: Desktop import persists the same usable cross-contig pairwise
+      evidence as the canonical Server PAF and existing pairwise queries return
+      equivalent results after the optimized load."
+    result: passed
+    reason:
+      text: Optimized import preserves canonical usable cross-contig evidence and
+        equivalent normal/swapped query results, including the large-package
+        comparison.
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: "A5: Initial pairwise import uses bounded batches and a single SQLite
+      writer, avoids maintaining the two pairwise-hit lookup indexes per
+      inserted row, creates those indexes after loading, and retains
+      cancellation and rollback safety."
+    result: passed
+    reason:
+      text: Bounded parsers feed one SQLite writer; deferred indexes share one
+        transaction with loading, and parser/write/pre-index/post-index
+        cancellation rolls back data and indexes.
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: "A6: The Settings panel offers persisted `Auto`, `1`, `2`, `4`, and `8`
+      import-parallelism choices, defaults to `Auto`, and applies the selected
+      value to parser workers without creating concurrent SQLite writers."
+    result: passed
+    reason:
+      text: Auto/1/2/4/8 persists and passes through archive and extracted imports to
+        bounded parser workers while SQLite remains one writer.
+      truncated: false
+  - id: A7
+    source: brief.md
+    text: "A7: Import progress reports the active PAF, bytes processed, rows parsed,
+      hits written, per-file progress, and overall pairwise progress often
+      enough that a large file does not appear stalled."
+    result: passed
+    reason:
+      text: Structured transient progress reports active PAF, bytes, rows, hits, file
+        position, and overall progress without durable-row or log flooding.
+      truncated: false
+  - id: A8
+    source: brief.md
+    text: "A8: On the same Windows host and clean destination, the optimized
+      candidate reduces the pairwise-index phase wall time for
+      `zyr-test9.light.tar.gz` by at least 30 percent versus the recorded
+      baseline, with matching usable hit results and no required verification
+      regression."
+    result: passed
+    reason:
+      text: Same-host clean-destination Runtime evidence improved the pairwise phase
+        from 250466 ms to 100079 ms (60.043%) with matching usable results and
+        healthy databases.
+      truncated: false
+  - id: A9
+    source: specs/import-performance-controls/spec.md
+    text: Persist an explicit import parallelism Given the user selects `4`, when
+      the application restarts and starts a supported initial import, then the
+      Settings panel still shows `4` and the backend uses four parser workers
+      with one SQLite writer.
+    result: passed
+    reason:
+      text: Persisted value 4 survives settings reload and is propagated to four
+        parser workers, subject only to reducing unused workers when files are
+        fewer; writer count stays one.
+      truncated: false
+  - id: A10
+    source: specs/import-performance-controls/spec.md
+    text: Use Auto safely Given the setting is absent, invalid, or set to `Auto`,
+      when an import starts, then the application resolves a bounded
+      host-appropriate parser count and does not create concurrent SQLite
+      writers.
+    result: passed
+    reason:
+      text: Missing, invalid, or Auto values resolve to a host-appropriate bounded
+        count of 1 through 8 without concurrent SQLite writers.
+      truncated: false
+  - id: A11
+    source: specs/import-performance-controls/spec.md
+    text: Show live progress without log flooding Given a large PAF is being
+      indexed, when structured progress events arrive, then the current progress
+      presentation updates bytes, rows, hits, file percentage, and overall
+      percentage without adding one permanent stage row per tick.
+    result: passed
+    reason:
+      text: Transient updates replace one live pairwise row and display bytes, parsed
+        rows, hits, file percentage, and overall percentage without permanent
+        tick rows.
+      truncated: false
+  - id: A12
+    source: specs/import-performance-controls/spec.md
+    text: Preserve Windows frontend validation Given the settings and progress UI
+      changes are complete, when frontend tests and the production build run
+      with Windows Node/npm.cmd, then they pass and no generated `dist/` remains
+      tracked or untracked afterward.
+    result: passed
+    reason:
+      text: Windows npm.cmd frontend validation passed 1142 tests and production
+        build, and generated dist was removed and remains absent.
+      truncated: false
+  - id: A13
+    source: specs/pairwise-import-engine/spec.md
+    text: Bulk-load pairwise hits safely Given multiple large pairwise PAF files,
+      when initial import loads them, then bounded parser workers feed one
+      writer, hit indexes are created after data loading, and the completed
+      database passes integrity and query checks.
+    result: passed
+    reason:
+      text: Large multi-file loads use bounded workers and one transactional writer,
+        rebuild required indexes after loading, pass quick_check, and retain
+        working queries.
+      truncated: false
+  - id: A14
+    source: specs/pairwise-import-engine/spec.md
+    text: Preserve pairwise query results Given a canonical package and the same
+      query filters, when results are queried from baseline and optimized
+      imports, then both normal and swapped-direction pairwise evidence are
+      equivalent.
+    result: passed
+    reason:
+      text: Coordinate, strand, identity, MAPQ, CIGAR, and normal/swapped query
+        semantics are covered by unit and representative large-package
+        equivalence checks.
+      truncated: false
+  - id: A15
+    source: specs/pairwise-import-engine/spec.md
+    text: Cancel during a large PAF Given an import is cancelled while parser
+      workers are active, when cancellation propagates, then workers and the
+      writer stop, no partial workspace is accepted, and the existing rollback
+      contract is preserved.
+    result: passed
+    reason:
+      text: Cancellation during parser work or before/after index creation stops work
+        and rolls back runs, hits, and index changes; dedicated regressions
+        pass.
+      truncated: false
+  - id: A16
+    source: specs/pairwise-import-engine/spec.md
+    text: Report granular progress Given a PAF requires long processing, when import
+      is active, then progress updates advance within that file and report
+      bytes, rows, hits, file position, and overall pairwise position without
+      waiting for the next file.
+    result: passed
+    reason:
+      text: Worker batches and byte thresholds emit throttled within-file
+        bytes/rows/hits and file/overall position during long PAF processing.
+      truncated: false
+  - id: A17
+    source: specs/pairwise-import-engine/spec.md
+    text: Meet the large-package performance target Given baseline and candidate
+      imports of `zyr-test9.light.tar.gz` on the same Windows host and clean
+      destinations, when the pairwise-index phase is measured, then the
+      candidate is at least 30 percent faster and produces equivalent usable hit
+      results.
+    result: passed
+    reason:
+      text: Formal large-package evidence exceeds the 30% target with 60.043%
+        improvement and matching runs, hits, summaries, and representative
+        bidirectional queries.
+      truncated: false
+  - id: A18
+    source: specs/server-pairwise-generation/spec.md
+    text: Skip a track partition with one contig Given a chromosome partition in
+      which a dataset track contains one selected contig, when Server prepares
+      alignment tasks, then it does not schedule that track's `*_vs_self` task
+      and the absence is treated as a valid no-pair condition.
+    result: passed
+    reason:
+      text: A one-contig chromosome track creates no self-run directory, command, or
+        manifest task and is treated as a valid no-pair condition.
+      truncated: false
+  - id: A19
+    source: specs/server-pairwise-generation/spec.md
+    text: Preserve auxiliary-track internal relationships Given an auxiliary dataset
+      track with multiple contigs in one chromosome partition, when Server runs
+      its self alignment, then every required relationship between different
+      contigs is present exactly once and no same-contig or reverse-duplicate
+      pair is published.
+    result: passed
+    reason:
+      text: The same per-track logic preserves every required internal auxiliary-track
+        distinct-contig unordered relationship exactly once.
+      truncated: false
+  - id: A20
+    source: specs/server-pairwise-generation/spec.md
+    text: Publish canonical names and evidence Given Server uses temporary alignment
+      identifiers internally, when the self-run completes, then the final PAF
+      and every downstream hash, checkpoint, report, evidence reference, Full
+      package, and Light package use the restored original contig names and
+      canonical artifact.
+    result: passed
+    reason:
+      text: Temporary identifiers are restored before canonical publication;
+        checkpoints, evidence, and Full/Light packages consume canonical
+        result.paf and exclude alias helpers.
+      truncated: false
+  - id: A21
+    source: specs/server-pairwise-generation/spec.md
+    text: Preserve cross-contig alignment semantics Given the legacy self-run output
+      and the optimized output for the same multi-contig fixture, when legacy
+      same-contig and reverse-duplicate rows are normalized away, then the
+      remaining cross-contig records are equivalent in names, coordinates,
+      strand, MAPQ, alignment metrics, and CIGAR semantics.
+    result: passed
+    reason:
+      text: Real minimap2 evidence shows normalized legacy and optimized cross-contig
+        records equivalent in names, coordinates, strand, MAPQ, metrics, and
+        CIGAR.
+      truncated: false
+builder_handoff:
+  candidate_id: 3098a50c-35e7-47d4-96e2-43f92134e4e1
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:37071fdc-281d-4b8d-9b31-bee1a8885f3c
+  iteration: 1
+  summary:
+    text: Integrated Server pairwise generation, bounded multi-parser/single-writer
+      desktop pairwise bulk import, persisted import parallelism controls, and
+      structured live progress. Parent review found and the Builder fixed the
+      final SQLite index-creation cancellation window in local commit 8100a67;
+      Windows backend fmt, clippy -D warnings, and 199 tests pass. All work
+      remains local with no push or PR.
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+    - A7
+    - A8
+    - A9
+    - A10
+    - A11
+    - A12
+    - A13
+    - A14
+    - A15
+    - A16
+    - A17
+    - A18
+    - A19
+    - A20
+    - A21
+  checks:
+    - name:
+        text: Server pairwise generation and packaging regressions
+        truncated: false
+      result: passed
+      note:
+        text: Server Python suite, full preparation, metadata/package regressions, and
+          real minimap2 canonical cross-contig equivalence passed.
+        truncated: false
+    - name:
+        text: Windows backend format, lint, and tests
+        truncated: false
+      result: passed
+      note:
+        text: cargo fmt --check and clippy -D warnings passed; 199 backend tests passed
+          after adding both index-stage cancellation rollback regressions.
+        truncated: false
+    - name:
+        text: Windows large-package performance and query equivalence
+        truncated: false
+      result: passed
+      note:
+        text: On the same Windows host and clean destinations, zyr-test9.light.tar.gz
+          pairwise phase improved 60.043%; 34 runs and 9,261,872 hits matched,
+          quick_check was ok, both indexes existed, all per-run summaries and 12
+          representative normal/swapped query keys were equivalent.
+        truncated: false
+    - name:
+        text: Windows frontend tests and production build
+        truncated: false
+      result: passed
+      note:
+        text: 1142 frontend tests and the production build passed with Windows npm.cmd;
+          generated dist was removed.
+        truncated: false
+    - name:
+        text: Windows Tauri format, lint, and tests
+        truncated: false
+      result: passed
+      note:
+        text: Integrated Tauri validation passed with 15 tests, including import option
+          boundary and structured progress payload coverage.
+        truncated: false
+    - name:
+        text: Independent parent code review
+        truncated: false
+      result: passed
+      note:
+        text: Fresh read-only review of master...8100a67 passed after confirming the
+          index-creation cancellation window is closed and no required fixes
+          remain.
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: Cancellation during an active SQLite CREATE INDEX is observed after that
+        statement returns and then rolls back before commit; immediate
+        interruption would require a SQLite progress handler or interrupt.
+      truncated: false
+    - text: Large-package equivalence used all per-run summaries plus 12
+        representative high-volume normal/swapped query keys rather than a
+        cryptographic normalized hash of all 9,261,872 rows.
+      truncated: false
+    - text: Performance evidence is one Runtime comparison on one Windows host and one
+        large package, with a margin substantially above the required 30
+        percent.
+      truncated: false
+    - text: Explicit 8-worker parsing remains bounded but may use more memory than
+        Auto on low-memory hosts.
+      truncated: false
+  known_limits_truncated: false
+  review:
+    status: passed
+    summary:
+      text: Independent parent review PASS at candidate
+        8100a672906a74205661523153bccbd6f4d7b8e1. Server canonical pair
+        generation, bounded transactional importer, settings/progress flow, and
+        the repaired pre/post-index cancellation rollback contract were
+        confirmed; no required fixes remain.
+      truncated: false
+    reviewer_execution_ref: c5072ab4-d72d-40db-8f23-d6dbca26de75
+  submitted_at: 2026-09-29T02:05:56.476Z
+blockers: []
+verification:
+  candidate_id: 3098a50c-35e7-47d4-96e2-43f92134e4e1
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:65e785b5-b810-46cc-b810-183ef5540c42
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: parent-windows-backend-validation-v2
+      name:
+        text: Parent Windows backend format, clippy, and tests after cancellation fix
+        truncated: false
+      argv_display:
+        - text: /d
+          truncated: false
+        - text: /s
+          truncated: false
+        - text: /c
+          truncated: false
+        - text: cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo
+            test
+          truncated: false
+      argv_truncated: false
+      cwd_ref: GPM2.0/app/backend
+      status: passed
+      exit_code: 0
+      duration_ms: 7922
+    - id: parent-integrated-diff-check
+      name:
+        text: Parent integrated diff whitespace validation
+        truncated: false
+      argv_display:
+        - text: diff
+          truncated: false
+        - text: --check
+          truncated: false
+        - text: master...HEAD
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 664
+  summary:
+    text: "Independent final Verifier PASS. It reviewed all 21 acceptance scenarios,
+      brief, three Specs, supervisor evidence, formal Runtime receipts, and
+      master...HEAD implementation at 8100a67. Current Windows backend
+      fmt/clippy/199 tests and integrated diff check pass; prior Server,
+      frontend, Tauri, and large-package evidence remains valid. No required
+      fixes remain. Verifier execution reference:
+      skill-coordinated:verifier:65e785b5-b810-46cc-b810-183ef5540c42."
+    truncated: false
+  risks:
+    - text: Cancellation during SQLite CREATE INDEX is detected after the statement
+        returns and then rolls back before commit; immediate interruption would
+        require a SQLite progress handler or interrupt.
+      truncated: false
+    - text: Large-package semantic equivalence covers every per-run summary and 12
+        representative high-volume normal/swapped query keys, not a normalized
+        row-by-row hash of all 9,261,872 hits.
+      truncated: false
+    - text: The 60.043% performance result is one formal comparison on one Windows
+        host and one package, although the margin is well above the 30%
+        requirement.
+      truncated: false
+    - text: Explicit 8-worker mode is bounded but can consume more memory than Auto on
+        low-memory systems.
+      truncated: false
+    - text: Archive must retain candidate commit
+        8100a672906a74205661523153bccbd6f4d7b8e1 or a descendant containing its
+        cancellation fix.
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-09-29T02:19:04.155Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: "Independent final Verifier PASS. It reviewed all 21 acceptance scenarios,
+        brief, three Specs, supervisor evidence, formal Runtime receipts, and
+        master...HEAD implementation at 8100a67. Current Windows backend
+        fmt/clippy/199 tests and integrated diff check pass; prior Server,
+        frontend, Tauri, and large-package evidence remains valid. No required
+        fixes remain. Verifier execution reference:
+        skill-coordinated:verifier:65e785b5-b810-46cc-b810-183ef5540c42."
+      truncated: false
+    completed_at: 2026-09-29T02:19:04.155Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-09-28T15:38:55.895Z

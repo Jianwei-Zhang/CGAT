@@ -709,3 +709,320 @@ fn rejects_delivery_without_track_member_order_metadata() {
             .contains("metadata/track_member_orders.tsv")
     );
 }
+
+fn create_two_contig_pairwise_bundle(bundle_root: &Path) {
+    create_partitioned_fast_bundle_root(bundle_root, true);
+    fs::write(
+        bundle_root.join("metadata/chr_assignments.tsv"),
+        concat!(
+            "dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsource_orientation\torientation_source\tsupport_bp\tsupport_percent\tanchor_start\n",
+            "ds_a\td\t4\tr\t+\tref_alignment\t4\t100.000\t1\n",
+            "ds_a\te\t4\tr\t+\tref_alignment\t4\t100.000\t5\n",
+        ),
+    )
+    .unwrap();
+    fs::write(
+        bundle_root.join("metadata/track_member_orders.tsv"),
+        concat!(
+            "target_track\ttarget_chr\tmember_dataset\tmember_ctg\tmember_order\n",
+            "ds_a\tr\tds_a\td\t1\n",
+            "ds_a\tr\tds_a\te\t2\n",
+        ),
+    )
+    .unwrap();
+    fs::write(
+        bundle_root.join("metadata/source_seq_locator.tsv"),
+        concat!(
+            "dataset_name\tseq_name\tfasta_relpath\n",
+            "ds_a\td\tdata/partitions/chr/r/ds_a.fa\n",
+            "ds_a\te\tdata/partitions/chr/r/ds_a.fa\n",
+        ),
+    )
+    .unwrap();
+    fs::write(
+        bundle_root.join("data/datasets/ds.fa.fai"),
+        "d\t4\t0\t4\t5\ne\t4\t0\t4\t5\n",
+    )
+    .unwrap();
+    fs::write(
+        bundle_root.join("data/datasets/ds.fa"),
+        ">d\nACGT\n>e\nTGCA\n",
+    )
+    .unwrap();
+    fs::write(
+        bundle_root.join("data/partitions/chr/r/ds_a.fa"),
+        ">d\nACGT\n>e\nTGCA\n",
+    )
+    .unwrap();
+    install_minimal_grt_contract(bundle_root);
+    fs::create_dir_all(bundle_root.join("runs/chr_r/ds_a_vs_self")).unwrap();
+    fs::write(
+        bundle_root.join("runs/chr_r/ds_a_vs_self/result.paf"),
+        concat!(
+            "d\t4\t0\t4\t+\te\t4\t0\t4\t4\t4\t60\tcg:Z:4M\n",
+            "d\t4\t0\t4\t+\td\t4\t0\t4\t4\t4\t60\tcg:Z:4M\n",
+            "unknown\t4\t0\t4\t+\te\t4\t0\t4\t4\t4\t60\n",
+        ),
+    )
+    .unwrap();
+}
+
+#[test]
+fn initial_pairwise_bulk_load_preserves_hits_queries_indexes_and_progress() {
+    let temp = tempdir().unwrap();
+    let bundle_root = temp.path().join("gpm_server");
+    create_two_contig_pairwise_bundle(&bundle_root);
+    let emitted = std::cell::RefCell::new(Vec::new());
+
+    let (outcome, progress) = import_from_extracted_bundle_with_options_and_hooks(
+        &bundle_root,
+        ImportOptions {
+            pairwise_parser_workers: Some(2),
+        },
+        &mut |step| emitted.borrow_mut().push(step),
+        &mut || false,
+    )
+    .unwrap();
+
+    assert_eq!(
+        count_rows(&outcome.project_db_path, "pairwise_alignment_run"),
+        1
+    );
+    assert_eq!(
+        count_rows(&outcome.project_db_path, "pairwise_alignment_hit"),
+        1
+    );
+    let conn = Connection::open(&outcome.project_db_path).unwrap();
+    let index_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type='index' AND name IN (
+                 'idx_pairwise_hit_query_target',
+                 'idx_pairwise_hit_target_query'
+             )",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(index_count, 2);
+    let (run_id, d_id, e_id): (i64, i64, i64) = conn
+        .query_row(
+            "SELECT r.id,
+                    (SELECT id FROM source_seq WHERE seq_name='d'),
+                    (SELECT id FROM source_seq WHERE seq_name='e')
+             FROM pairwise_alignment_run r",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .unwrap();
+    let normal = crate::junction_inspection::query_pairwise_cached_hits(
+        &conn,
+        run_id,
+        &[d_id],
+        &[e_id],
+        1,
+        0.0,
+        "test",
+    )
+    .unwrap();
+    assert_eq!(normal.len(), 1);
+    assert_eq!(normal[0].query_source_seq_name, "d");
+    assert_eq!(normal[0].subject_source_seq_name, "e");
+    assert_eq!(normal[0].query_start, 1);
+    assert_eq!(normal[0].query_end, 4);
+    assert_eq!(normal[0].subject_start, 1);
+    assert_eq!(normal[0].subject_end, 4);
+    assert_eq!(normal[0].mapq, 60);
+    assert_eq!(normal[0].cg_tag.as_deref(), Some("4M"));
+
+    let swapped = crate::junction_inspection::query_pairwise_cached_hits(
+        &conn,
+        run_id,
+        &[e_id],
+        &[d_id],
+        1,
+        0.0,
+        "test",
+    )
+    .unwrap();
+    assert_eq!(swapped.len(), 1);
+    assert_eq!(swapped[0].query_source_seq_name, "e");
+    assert_eq!(swapped[0].subject_source_seq_name, "d");
+    assert_eq!(swapped[0].cg_tag.as_deref(), Some("4M"));
+
+    assert!(progress.iter().any(|step| {
+        step.stage == "index_pairwise_paf_complete"
+            && step.detail.contains("indexed_hits=1")
+            && step.detail.contains("parsed_rows=3")
+    }));
+    let emitted = emitted.into_inner();
+    let granular = emitted
+        .iter()
+        .filter_map(|step| step.pairwise.as_ref())
+        .next_back()
+        .expect("structured pairwise progress");
+    assert_eq!(granular.active_run, "ds_a_vs_self");
+    assert!(
+        granular
+            .active_path
+            .ends_with("chr_r/ds_a_vs_self/result.paf")
+    );
+    assert_eq!(granular.current_bytes, granular.total_bytes);
+    assert_eq!(granular.parsed_rows, 3);
+    assert_eq!(granular.written_hits, 1);
+    assert_eq!(granular.file_index, 1);
+    assert_eq!(granular.file_total, 1);
+    assert_eq!(granular.overall_bytes, granular.overall_total_bytes);
+}
+
+#[test]
+fn initial_pairwise_bulk_load_cancellation_rolls_back_hits_and_indexes() {
+    let temp = tempdir().unwrap();
+    let bundle_root = temp.path().join("gpm_server");
+    create_two_contig_pairwise_bundle(&bundle_root);
+    let paf_path = bundle_root.join("runs/chr_r/ds_a_vs_self/result.paf");
+    let mut large_paf = String::new();
+    for _ in 0..5_000 {
+        large_paf.push_str("d\t4\t0\t4\t+\te\t4\t0\t4\t4\t4\t60\tcg:Z:4M\n");
+    }
+    fs::write(&paf_path, large_paf).unwrap();
+    let cancel = std::cell::Cell::new(false);
+
+    let error = import_from_extracted_bundle_with_options_and_hooks(
+        &bundle_root,
+        ImportOptions {
+            pairwise_parser_workers: Some(1),
+        },
+        &mut |step| {
+            if step.stage == "index_pairwise_paf_progress" {
+                cancel.set(true);
+            }
+        },
+        &mut || cancel.get(),
+    )
+    .unwrap_err();
+
+    assert!(error.to_string().contains("import cancelled"));
+    let project_db_path = bundle_root.join(PROJECT_DB_NAME);
+    let conn = Connection::open(project_db_path).unwrap();
+    assert_eq!(
+        conn.query_row("SELECT COUNT(*) FROM pairwise_alignment_run", [], |row| row
+            .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        conn.query_row("SELECT COUNT(*) FROM pairwise_alignment_hit", [], |row| row
+            .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    let index_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type='index' AND name IN (
+                 'idx_pairwise_hit_query_target',
+                 'idx_pairwise_hit_target_query'
+             )",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(index_count, 2);
+}
+
+#[test]
+fn initial_pairwise_bulk_load_cancellation_before_index_creation_rolls_back() {
+    let temp = tempdir().unwrap();
+    let bundle_root = temp.path().join("gpm_server");
+    create_two_contig_pairwise_bundle(&bundle_root);
+    let cancel = std::cell::Cell::new(false);
+
+    let error = import_from_extracted_bundle_with_options_and_hooks(
+        &bundle_root,
+        ImportOptions {
+            pairwise_parser_workers: Some(1),
+        },
+        &mut |step| {
+            if step.stage == "index_pairwise_paf_indexes" {
+                cancel.set(true);
+            }
+        },
+        &mut || cancel.get(),
+    )
+    .unwrap_err();
+
+    assert_pairwise_bulk_load_cancelled_and_rolled_back(&bundle_root, &error);
+}
+
+#[test]
+fn initial_pairwise_bulk_load_cancellation_after_index_creation_rolls_back() {
+    let temp = tempdir().unwrap();
+    let bundle_root = temp.path().join("gpm_server");
+    create_two_contig_pairwise_bundle(&bundle_root);
+    let index_stage_reached = std::cell::Cell::new(false);
+    let checks_after_index_stage = std::cell::Cell::new(0_u8);
+
+    let error = import_from_extracted_bundle_with_options_and_hooks(
+        &bundle_root,
+        ImportOptions {
+            pairwise_parser_workers: Some(1),
+        },
+        &mut |step| {
+            if step.stage == "index_pairwise_paf_indexes" {
+                index_stage_reached.set(true);
+            }
+        },
+        &mut || {
+            if !index_stage_reached.get() {
+                return false;
+            }
+            let checks = checks_after_index_stage.get() + 1;
+            checks_after_index_stage.set(checks);
+            checks >= 2
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(checks_after_index_stage.get(), 2);
+    assert_pairwise_bulk_load_cancelled_and_rolled_back(&bundle_root, &error);
+}
+
+fn assert_pairwise_bulk_load_cancelled_and_rolled_back(bundle_root: &Path, error: &anyhow::Error) {
+    assert!(error.to_string().contains("import cancelled"));
+    let conn = Connection::open(bundle_root.join(PROJECT_DB_NAME)).unwrap();
+    assert_eq!(
+        conn.query_row("SELECT COUNT(*) FROM pairwise_alignment_run", [], |row| row
+            .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        conn.query_row("SELECT COUNT(*) FROM pairwise_alignment_hit", [], |row| row
+            .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    let index_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type='index' AND name IN (
+                 'idx_pairwise_hit_query_target',
+                 'idx_pairwise_hit_target_query'
+             )",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(index_count, 2);
+}
+
+#[test]
+fn rejects_unsupported_pairwise_parser_worker_count() {
+    let error = ImportOptions {
+        pairwise_parser_workers: Some(3),
+    }
+    .resolved_pairwise_parser_workers()
+    .unwrap_err();
+    assert!(error.to_string().contains("one of 1, 2, 4, 8"));
+}

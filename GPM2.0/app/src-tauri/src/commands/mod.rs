@@ -34,8 +34,8 @@ use gpm_next_backend::grt_package::{
     load_grt_project_view_for_project as backend_load_grt_project_view,
 };
 use gpm_next_backend::importer::{
-    AddCtgImportTarget, ImportProgress, import_add_ctg_package_with_hooks,
-    import_from_extracted_bundle_with_hooks, import_from_zip_with_hooks,
+    AddCtgImportTarget, ImportOptions, ImportProgress, import_add_ctg_package_with_hooks,
+    import_from_extracted_bundle_with_options_and_hooks, import_from_zip_with_options_and_hooks,
     import_workspace_add_dataset_package_with_hooks,
 };
 use gpm_next_backend::junction_inspection::{
@@ -527,7 +527,19 @@ fn import_progress_payload(run_id: &str, step: &ImportProgress) -> Value {
         "progressIndex": step.progress_index,
         "progressTotal": step.progress_total,
         "phaseIndex": step.phase_index,
-        "phaseTotal": step.phase_total
+        "phaseTotal": step.phase_total,
+        "pairwise": step.pairwise.as_ref().map(|progress| json!({
+            "activeRun": progress.active_run,
+            "activePath": progress.active_path,
+            "currentBytes": progress.current_bytes,
+            "totalBytes": progress.total_bytes,
+            "parsedRows": progress.parsed_rows,
+            "writtenHits": progress.written_hits,
+            "fileIndex": progress.file_index,
+            "fileTotal": progress.file_total,
+            "overallBytes": progress.overall_bytes,
+            "overallTotalBytes": progress.overall_total_bytes,
+        }))
     })
 }
 
@@ -773,6 +785,27 @@ mod tests {
     }
 
     #[test]
+    fn initial_import_parallelism_is_validated_at_the_tauri_boundary() {
+        assert_eq!(
+            initial_import_options(Some("4".to_string())).pairwise_parser_workers,
+            Some(4)
+        );
+        assert_eq!(
+            initial_import_options(Some("8".to_string())).pairwise_parser_workers,
+            Some(8)
+        );
+        assert_eq!(
+            initial_import_options(Some("3".to_string())).pairwise_parser_workers,
+            None
+        );
+        assert_eq!(
+            initial_import_options(Some("auto".to_string())).pairwise_parser_workers,
+            None
+        );
+        assert_eq!(initial_import_options(None).pairwise_parser_workers, None);
+    }
+
+    #[test]
     fn import_progress_payload_includes_phase_metadata() {
         let payload = import_progress_payload(
             "run-1",
@@ -783,6 +816,7 @@ mod tests {
                 progress_total: Some(674),
                 phase_index: Some(4),
                 phase_total: Some(7),
+                pairwise: None,
             },
         );
 
@@ -792,6 +826,43 @@ mod tests {
         assert_eq!(payload["progressTotal"], 674);
         assert_eq!(payload["phaseIndex"], 4);
         assert_eq!(payload["phaseTotal"], 7);
+    }
+
+    #[test]
+    fn import_progress_payload_includes_structured_pairwise_progress() {
+        let payload = import_progress_payload(
+            "run-pairwise",
+            &ImportProgress {
+                stage: "index_pairwise_paf_progress",
+                detail: "assembly_vs_self".to_string(),
+                progress_index: Some(12),
+                progress_total: Some(20),
+                phase_index: Some(6),
+                phase_total: Some(7),
+                pairwise: Some(gpm_next_backend::importer::PairwiseImportProgress {
+                    active_run: "assembly_vs_self".to_string(),
+                    active_path: "runs/chr_Chr02/assembly_vs_self/result.paf".to_string(),
+                    current_bytes: 512,
+                    total_bytes: 1024,
+                    parsed_rows: 100,
+                    written_hits: 75,
+                    file_index: 2,
+                    file_total: 34,
+                    overall_bytes: 4096,
+                    overall_total_bytes: 8192,
+                }),
+            },
+        );
+
+        assert_eq!(payload["pairwise"]["activeRun"], "assembly_vs_self");
+        assert_eq!(payload["pairwise"]["currentBytes"], 512);
+        assert_eq!(payload["pairwise"]["totalBytes"], 1024);
+        assert_eq!(payload["pairwise"]["parsedRows"], 100);
+        assert_eq!(payload["pairwise"]["writtenHits"], 75);
+        assert_eq!(payload["pairwise"]["fileIndex"], 2);
+        assert_eq!(payload["pairwise"]["fileTotal"], 34);
+        assert_eq!(payload["pairwise"]["overallBytes"], 4096);
+        assert_eq!(payload["pairwise"]["overallTotalBytes"], 8192);
     }
 
     #[test]

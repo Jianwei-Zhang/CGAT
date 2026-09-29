@@ -14,9 +14,9 @@ const {
   importAddCtgPackage: importAddCtgPackageTauri,
 } = tauri;
 
-export async function importZipBundle({ zipPath, workspaceRoot, onStage, runId = "", stateOrLocale = "zh" }) {
+export async function importZipBundle({ zipPath, workspaceRoot, onStage, runId = "", importParallelism = "auto", stateOrLocale = "zh" }) {
   if (isTauriRuntime()) {
-    return importZipBundleTauri({ zipPath, workspaceRoot, onStage, runId, stateOrLocale });
+    return importZipBundleTauri({ zipPath, workspaceRoot, onStage, runId, importParallelism, stateOrLocale });
   }
   try {
     const response = await callDevBridge("/api/import-zip", {
@@ -37,9 +37,9 @@ export async function importZipBundle({ zipPath, workspaceRoot, onStage, runId =
   return importZipBundleMock({ zipPath, workspaceRoot, onStage, stateOrLocale });
 }
 
-export async function importExtractedBundle({ extractedPath, onStage, runId = "", stateOrLocale = "zh" }) {
+export async function importExtractedBundle({ extractedPath, onStage, runId = "", importParallelism = "auto", stateOrLocale = "zh" }) {
   if (isTauriRuntime()) {
-    return importExtractedBundleTauri({ extractedPath, onStage, runId, stateOrLocale });
+    return importExtractedBundleTauri({ extractedPath, onStage, runId, importParallelism, stateOrLocale });
   }
   try {
     const response = await callDevBridge("/api/import-extracted", {
