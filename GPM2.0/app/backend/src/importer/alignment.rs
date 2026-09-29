@@ -575,7 +575,7 @@ fn send_pairwise_worker_message(
 fn parse_pairwise_paf_row(line: &[u8], run: &PreparedPairwiseImportRun) -> Option<PairwiseHitRow> {
     let mut fields = line.split(|byte| *byte == b'\t');
     let query_name = std::str::from_utf8(fields.next()?).ok()?;
-    parse_paf_i64(fields.next()?)?;
+    let query_length = parse_paf_i64(fields.next()?)?;
     let query_start_0 = parse_paf_i64(fields.next()?)?;
     let query_end = parse_paf_i64(fields.next()?)?;
     let strand = match fields.next()? {
@@ -584,20 +584,29 @@ fn parse_pairwise_paf_row(line: &[u8], run: &PreparedPairwiseImportRun) -> Optio
         _ => return None,
     };
     let target_name = std::str::from_utf8(fields.next()?).ok()?;
-    parse_paf_i64(fields.next()?)?;
+    let target_length = parse_paf_i64(fields.next()?)?;
     let target_start_0 = parse_paf_i64(fields.next()?)?;
     let target_end = parse_paf_i64(fields.next()?)?;
     let match_length = parse_paf_i64(fields.next()?)?;
     let align_length = parse_paf_i64(fields.next()?)?;
     let mapq = parse_paf_i64(fields.next()?)?;
-    if align_length <= 0 {
+    if query_length < 0
+        || target_length < 0
+        || query_start_0 < 0
+        || target_start_0 < 0
+        || query_end < query_start_0
+        || target_end < target_start_0
+        || query_end > query_length
+        || target_end > target_length
+        || match_length < 0
+        || align_length <= 0
+        || match_length > align_length
+        || !(0..=255).contains(&mapq)
+    {
         return None;
     }
-    let query_start = query_start_0 + 1;
-    let target_start = target_start_0 + 1;
-    if query_start < 1 || query_end < query_start || target_start < 1 || target_end < target_start {
-        return None;
-    }
+    let query_start = query_start_0.checked_add(1)?;
+    let target_start = target_start_0.checked_add(1)?;
     let query_source_seq_id = run.query_name_map.get(query_name).copied()?;
     let target_source_seq_id = run.target_name_map.get(target_name).copied()?;
     if run.self_run && query_source_seq_id == target_source_seq_id {

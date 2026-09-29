@@ -762,6 +762,10 @@ fn create_two_contig_pairwise_bundle(bundle_root: &Path) {
             "d\t4\t0\t4\t+\te\t4\t0\t4\t4\t4\t60\tcg:Z:4M\n",
             "d\t4\t0\t4\t+\td\t4\t0\t4\t4\t4\t60\tcg:Z:4M\n",
             "unknown\t4\t0\t4\t+\te\t4\t0\t4\t4\t4\t60\n",
+            "d\t4\t0\t4\t+\te\t4\t0\t4\t-1\t4\t60\n",
+            "d\t4\t0\t4\t+\te\t4\t0\t4\t4\t4\t-1\n",
+            "d\t4\t0\t5\t+\te\t4\t0\t4\t4\t4\t60\n",
+            "d\t4\t0\t4\t+\te\t4\t0\t4\t5\t4\t60\n",
         ),
     )
     .unwrap();
@@ -853,7 +857,7 @@ fn initial_pairwise_bulk_load_preserves_hits_queries_indexes_and_progress() {
     assert!(progress.iter().any(|step| {
         step.stage == "index_pairwise_paf_complete"
             && step.detail.contains("indexed_hits=1")
-            && step.detail.contains("parsed_rows=3")
+            && step.detail.contains("parsed_rows=7")
     }));
     let emitted = emitted.into_inner();
     let granular = emitted
@@ -868,7 +872,7 @@ fn initial_pairwise_bulk_load_preserves_hits_queries_indexes_and_progress() {
             .ends_with("chr_r/ds_a_vs_self/result.paf")
     );
     assert_eq!(granular.current_bytes, granular.total_bytes);
-    assert_eq!(granular.parsed_rows, 3);
+    assert_eq!(granular.parsed_rows, 7);
     assert_eq!(granular.written_hits, 1);
     assert_eq!(granular.file_index, 1);
     assert_eq!(granular.file_total, 1);
