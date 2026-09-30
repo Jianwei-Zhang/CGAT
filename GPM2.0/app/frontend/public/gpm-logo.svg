@@ -29,6 +29,6 @@
     <path fill="#003366" d="M3 5 4 6 3 7 2 6Zm2 0 1 1-1 1-1-1ZM3 7l1 1H2Zm2 0 1 1H4Z"/>
   </g>
 
-  <!-- The version label is deliberately large and separated from the mark for legibility at small sizes. -->
-  <text x="760" y="258" fill="#003366" font-family="Arial, Helvetica, sans-serif" font-size="120" font-weight="700" text-anchor="middle">2.0</text>
+  <!-- Version marker: outlined navy 2 from gpm_logo_variant_02_current.svg. -->
+  <g id="version-marker" role="img" aria-label="2" data-ink-height="140" data-ink-width="99.934211" data-original-font="DejaVu Sans Bold" data-equivalent-font-size="188.631579"><g id="numeral-2" transform="translate(744 180)"><path id="numeral-outline" d="M39.421053 113.934211H99.934211V140H0V113.934211L50.197368 69.631579Q56.921053 63.552632 60.144737 57.75Q63.368421 51.947368 63.368421 45.684211Q63.368421 36.013158 56.875 30.118421Q50.381579 24.223684 39.605263 24.223684Q31.315789 24.223684 21.460526 27.769737Q11.605263 31.315789 0.368421 38.315789V8.105263Q12.342105 4.144737 24.039474 2.072368Q35.736842 0 46.973684 0Q71.657895 0 85.335526 10.868421Q99.013158 21.736842 99.013158 41.171053Q99.013158 52.407895 93.210526 62.125Q87.407895 71.842105 68.802632 88.144737Z" fill="#003366"/></g></g>
 </svg>
