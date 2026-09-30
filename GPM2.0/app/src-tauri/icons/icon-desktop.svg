@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">GPM 2.0</title>
+  <desc id="desc">GPM mark with a clear 2.0 version label.</desc>
   <defs>
     <linearGradient id="plate-background" x1="176" y1="142" x2="848" y2="886" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#F3F7FA"/>
@@ -15,26 +17,18 @@
       <feDropShadow dx="0" dy="0.225" stdDeviation="0.2" flood-color="#294759" flood-opacity="0.18"/>
     </filter>
     <path id="plate-shape" d="M285 100H739C841 100 924 183 924 285V739C924 841 841 924 739 924H285C183 924 100 841 100 739V285C100 183 183 100 285 100Z"/>
-    <clipPath id="plate-clip">
-      <use href="#plate-shape"/>
-    </clipPath>
+    <clipPath id="plate-clip"><use href="#plate-shape"/></clipPath>
   </defs>
 
-  <g filter="url(#plate-shadow)">
-    <use href="#plate-shape" fill="url(#plate-background)"/>
-  </g>
-  <g clip-path="url(#plate-clip)">
-    <rect x="100" y="100" width="824" height="824" fill="url(#plate-highlight)"/>
-  </g>
+  <g filter="url(#plate-shadow)"><use href="#plate-shape" fill="url(#plate-background)"/></g>
+  <g clip-path="url(#plate-clip)"><rect x="100" y="100" width="824" height="824" fill="url(#plate-highlight)"/></g>
 
   <g filter="url(#mark-shadow)" transform="translate(192 192) scale(80)">
     <path fill="#003366" d="M4 0 5 1 4 2 3 1Z"/>
     <path fill="#cc0033" d="M0 2h2l1 1 1-1 1 1 1-1h2L5 5 4 4 3 5Z"/>
     <path fill="#003366" d="M3 5 4 6 3 7 2 6Zm2 0 1 1-1 1-1-1ZM3 7l1 1H2Zm2 0 1 1H4Z"/>
   </g>
-  <g id="version-badge" aria-label="2.0">
-    <rect x="684" y="720" width="212" height="132" rx="66" fill="#D80034"/>
-    <rect x="674" y="718" width="210" height="124" rx="62" fill="#003366"/>
-    <text x="779" y="807" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="80" font-weight="700" text-anchor="middle">2.0</text>
-  </g>
+
+  <!-- The version label is deliberately large and separated from the mark for legibility at small sizes. -->
+  <text x="760" y="258" fill="#003366" font-family="Arial, Helvetica, sans-serif" font-size="120" font-weight="700" text-anchor="middle">2.0</text>
 </svg>
