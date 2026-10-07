@@ -1,34 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
-  <title id="title">GPM 2.0</title>
-  <desc id="desc">GPM mark with a clear 2.0 version label.</desc>
-  <defs>
-    <linearGradient id="plate-background" x1="176" y1="142" x2="848" y2="886" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#F3F7FA"/>
-      <stop offset="1" stop-color="#D6E3EC"/>
-    </linearGradient>
-    <radialGradient id="plate-highlight" cx="0" cy="0" r="1" gradientTransform="translate(344 282) rotate(44) scale(548 506)" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFFFFF" stop-opacity="0.46"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
-    </radialGradient>
-    <filter id="plate-shadow" x="32" y="32" width="960" height="976" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#20394A" flood-opacity="0.22"/>
-    </filter>
-    <filter id="mark-shadow" x="-20%" y="-20%" width="140%" height="150%" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="0.225" stdDeviation="0.2" flood-color="#294759" flood-opacity="0.18"/>
-    </filter>
-    <path id="plate-shape" d="M285 100H739C841 100 924 183 924 285V739C924 841 841 924 739 924H285C183 924 100 841 100 739V285C100 183 183 100 285 100Z"/>
-    <clipPath id="plate-clip"><use href="#plate-shape"/></clipPath>
-  </defs>
+<?xml version='1.0' encoding='UTF-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" version="1.1" role="img" aria-labelledby="title desc"><title id="title">GPM - 1 (top right, green backing only, Barlow Bold)</title><desc id="desc">White 2 in a Huanong green (#0B7B36) badge, top right, no red backing. Numeral outlined in Barlow Bold (64.8 by 96 units of ink) inside a 160-unit badge.</desc><!--Base logo copied from gpm-logo-editable.svg. Numeral outlined to avoid font substitution.--><path id="logo-background" fill="#EAF1F6" d="M285 100H739C841 100 924 183 924 285V739C924 841 841 924 739 924H285C183 924 100 841 100 739V285C100 183 183 100 285 100Z"/>
 
-  <g filter="url(#plate-shadow)"><use href="#plate-shape" fill="url(#plate-background)"/></g>
-  <g clip-path="url(#plate-clip)"><rect x="100" y="100" width="824" height="824" fill="url(#plate-highlight)"/></g>
-
-  <g filter="url(#mark-shadow)" transform="translate(192 192) scale(80)">
-    <path fill="#003366" d="M4 0 5 1 4 2 3 1Z"/>
-    <path fill="#cc0033" d="M0 2h2l1 1 1-1 1 1 1-1h2L5 5 4 4 3 5Z"/>
-    <path fill="#003366" d="M3 5 4 6 3 7 2 6Zm2 0 1 1-1 1-1-1ZM3 7l1 1H2Zm2 0 1 1H4Z"/>
+  <g id="gpm-mark" transform="translate(192 192) scale(80)">
+    <path id="mark-top" fill="#003366" d="M4 0 5 1 4 2 3 1Z"/>
+    <path id="mark-middle" fill="#CC0033" d="M0 2h2l1 1 1-1 1 1 1-1h2L5 5 4 4 3 5Z"/>
+    <path id="mark-bottom-left" fill="#003366" d="M3 5 4 6 3 7 2 6Z"/>
+    <path id="mark-bottom-right" fill="#003366" d="M5 5 6 6 5 7 4 6Z"/>
+    <path id="mark-base-left" fill="#003366" d="M3 7 4 8H2Z"/>
+    <path id="mark-base-right" fill="#003366" d="M5 7 6 8H4Z"/>
   </g>
 
-  <!-- Version marker: outlined navy 2 from gpm_logo_variant_02_current.svg. -->
-  <g id="version-marker" role="img" aria-label="2" data-ink-height="140" data-ink-width="99.934211" data-original-font="DejaVu Sans Bold" data-equivalent-font-size="188.631579"><g id="numeral-2" transform="translate(744 180)"><path id="numeral-outline" d="M39.421053 113.934211H99.934211V140H0V113.934211L50.197368 69.631579Q56.921053 63.552632 60.144737 57.75Q63.368421 51.947368 63.368421 45.684211Q63.368421 36.013158 56.875 30.118421Q50.381579 24.223684 39.605263 24.223684Q31.315789 24.223684 21.460526 27.769737Q11.605263 31.315789 0.368421 38.315789V8.105263Q12.342105 4.144737 24.039474 2.072368Q35.736842 0 46.973684 0Q71.657895 0 85.335526 10.868421Q99.013158 21.736842 99.013158 41.171053Q99.013158 52.407895 93.210526 62.125Q87.407895 71.842105 68.802632 88.144737Z" fill="#003366"/></g></g>
-</svg>
+
+<g id="version-marker" role="img" aria-label="2" data-numeral-font="Barlow Bold" data-ink-height="96.000000" data-ink-width="64.813559"><circle id="badge-green" cx="790.0" cy="246.0" r="80" fill="#0B7B36"/><g id="numeral-2" transform="translate(752.033898 294.000000) scale(0.135593220 -0.135593220)"><path id="numeral-outline" d="M236 121H507Q512 121 515.5 117.5Q519 114 519 109V12Q519 7 515.5 3.5Q512 0 507 0H57Q52 0 48.5 3.5Q45 7 45 12V104Q45 113 51 119Q100 167 151.0 223.5Q202 280 215 294Q243 327 272 357Q363 458 363 507Q363 542 338.0 564.5Q313 587 273 587Q233 587 208.0 564.5Q183 542 183 505V480Q183 475 179.5 471.5Q176 468 171 468H53Q48 468 44.5 471.5Q41 475 41 480V527Q44 581 75.0 622.5Q106 664 157.5 686.0Q209 708 273 708Q344 708 396.5 681.5Q449 655 477.5 610.0Q506 565 506 510Q506 468 485.0 424.0Q464 380 422 329Q391 290 355.0 252.0Q319 214 248 142L233 127Q231 125 232.0 123.0Q233 121 236 121Z" fill="#FFFFFF"/></g></g></svg>
