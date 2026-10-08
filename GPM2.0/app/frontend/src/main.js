@@ -1,3 +1,6 @@
+import { projectEntryBusy } from "./services/project-drop-controller.js";
+import { bindProjectDrop } from "./ui/shell/project-drop.js";
+import { readWorkspaceHistory as readSharedHistory, writeWorkspaceHistory as writeSharedHistory } from "./services/workspace-history.js";
 import { applyAppTypography } from "./services/app-settings.js";
 import { bindAppSettings } from "./ui/shell/app-settings-panel.js";
 import "./styles/settings.css";
@@ -19,7 +22,6 @@ import "./styles/layout.css";
 import "./styles/components.css";
 
 const LAST_WORKSPACE_KEY = "gpm_next:last_workspace";
-const WORKSPACE_HISTORY_KEY = "gpm_next:workspace_history";
 const LOCALE_STORAGE_KEY = "gpm_next:locale";
 const app = document.getElementById("app");
 const initialLocale = readPreferredLocale();
@@ -37,6 +39,7 @@ const store = createStore({
   },
   importer: {
     importDialogOpen: false,
+    restoringSession: true,
     importSource: "zip",
     projectNameInput: "",
     projectError: "",
@@ -253,7 +256,11 @@ registerRoutes(app, store, () => {
 });
 renderCurrentRoute(app, store);
 syncSessionHeader(store.getState());
-restoreLastWorkspace(store);
+bindProjectDrop(app, store).catch(error => console.error("GPM drag/drop setup failed", error));
+restoreLastWorkspace(store).finally(() => {
+  store.setState({ importer: { ...store.getState().importer, restoringSession: false } });
+  window.dispatchEvent(new Event("gpm-next:route-refresh"));
+});
 
 let lastRoute = store.getState().activeRoute;
 let lastSessionWorkspacePath = normalizeWorkspacePath(store.getState().session.workspacePath);
@@ -289,7 +296,7 @@ function syncSessionHeader(state) {
   document.querySelectorAll(".route-button").forEach(button => {
     const needsProject = ["assembly", "projectExport"].includes(button.dataset.route);
     button.disabled = (needsProject && (!state.session.workspacePath || !state.session.projectId))
-      || state.importer.inFlight || state.initializer.autoPipelineRunning;
+      || projectEntryBusy(state);
     button.title = needsProject && !state.session.projectId
       ? (state.locale === "en" ? "Open a project first" : "请先打开项目") : "";
   });
@@ -300,7 +307,7 @@ function syncSessionHeader(state) {
       labels,
     });
     replaceSelectOptions(workspaceSelect, workspaceItems);
-    workspaceSelect.disabled = state.importer.inFlight || state.initializer.autoPipelineRunning || (workspaceItems.length === 1 && !workspaceItems[0]?.value);
+    workspaceSelect.disabled = projectEntryBusy(state) || (workspaceItems.length === 1 && !workspaceItems[0]?.value);
   }
 }
 
@@ -403,6 +410,7 @@ function bindGlobalSessionSwitchers(root, storeRef) {
   const workspaceSelect = root.querySelector("#session-workspace-select");
 
   workspaceSelect?.addEventListener("change", async () => {
+    if (projectEntryBusy(storeRef.getState())) return;
     const nextWorkspacePath = normalizeWorkspacePath(workspaceSelect.value);
     const currentWorkspacePath = normalizeWorkspacePath(storeRef.getState().session.workspacePath);
     if (!nextWorkspacePath || nextWorkspacePath === currentWorkspacePath) {
@@ -466,14 +474,14 @@ async function restoreLastWorkspace(storeRef) {
     storeRef.setState({
       session: {
         ...storeRef.getState().session,
-        workspacePath: snapshot.workspacePath,
+        workspacePath: (options.workspaceRoot || snapshot.workspacePath),
         projectId: matchedProject?.projectId || null,
         projectName: matchedProject?.projectName || "",
       },
       importer: {
         ...storeRef.getState().importer,
-        workspaceRoot: snapshot.workspacePath,
-        openWorkspacePath: snapshot.workspacePath,
+        workspaceRoot: (options.workspaceRoot || snapshot.workspacePath),
+        openWorkspacePath: (options.workspaceRoot || snapshot.workspacePath),
         inFlight: false,
         importRunId: null,
         importCancelling: false,
@@ -555,46 +563,9 @@ function normalizeWorkspacePath(value) {
   return String(value || "").trim();
 }
 
-function readWorkspaceHistory() {
-  try {
-    const raw = window.localStorage.getItem(WORKSPACE_HISTORY_KEY);
-    if (!raw) {
-      return [];
-    }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed
-      .map((item) => {
-        if (!item || typeof item.path !== "string") {
-          return null;
-        }
-        const path = normalizeWorkspacePath(item.path);
-        if (!path) {
-          return null;
-        }
-        return {
-          path,
-          projectName: String(item.projectName || ""),
-          lastUsedAt: Number.isFinite(Number(item.lastUsedAt))
-            ? Number(item.lastUsedAt)
-            : Date.now(),
-        };
-      })
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
-}
+function readWorkspaceHistory() { return readSharedHistory(); }
 
-function writeWorkspaceHistory(records) {
-  try {
-    window.localStorage.setItem(WORKSPACE_HISTORY_KEY, JSON.stringify(records));
-  } catch {
-    // ignore localStorage failures
-  }
-}
+function writeWorkspaceHistory(records) { writeSharedHistory(records); }
 
 function appendWorkspaceHistory(workspacePath, projectName = "") {
   const path = normalizeWorkspacePath(workspacePath);

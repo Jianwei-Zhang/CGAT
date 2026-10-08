@@ -176,13 +176,24 @@ where
     }
 
     recorder.set_phase(2, ZIP_IMPORT_PHASE_TOTAL);
-    ensure_workspace_root_can_be_created(workspace_root)?;
-    fs::create_dir_all(workspace_root).with_context(|| {
-        format!(
-            "failed to create workspace root at {}",
-            workspace_root.display()
-        )
-    })?;
+    if options.require_new_workspace {
+        // create_dir is atomic: a race or even an empty existing directory is an
+        // error. Never claim or clean up a directory that this import did not own.
+        fs::create_dir(workspace_root).with_context(|| {
+            format!(
+                "cannot create new workspace (destination must not exist): {}",
+                workspace_root.display()
+            )
+        })?;
+    } else {
+        ensure_workspace_root_can_be_created(workspace_root)?;
+        fs::create_dir_all(workspace_root).with_context(|| {
+            format!(
+                "failed to create workspace root at {}",
+                workspace_root.display()
+            )
+        })?;
+    }
     if let Err(error) = recorder.enable_log(workspace_root) {
         remove_failed_zip_workspace(workspace_root, &error)?;
         return Err(error);

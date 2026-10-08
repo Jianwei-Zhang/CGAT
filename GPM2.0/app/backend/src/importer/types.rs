@@ -42,6 +42,8 @@ pub struct ImportOptions {
     /// `None` selects a bounded value from host parallelism. Explicit values
     /// are limited to the choices exposed by the desktop settings UI.
     pub pairwise_parser_workers: Option<usize>,
+    /// Desktop drop confirmations require a new directory reserved atomically.
+    pub require_new_workspace: bool,
 }
 
 impl ImportOptions {

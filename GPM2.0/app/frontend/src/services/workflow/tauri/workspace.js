@@ -1,3 +1,4 @@
+import { readWorkspaceHistory, reconcileWorkspaceHistory } from "../../workspace-history.js";
 import { applyListLimit } from "../contracts.js";
 
 export function createTauriWorkspaceOperations({ invokeCommand, listenBackendEvent }) {
@@ -23,11 +24,15 @@ async function listProjectInitializerOptionsTauri({ workspaceRoot }) {
 }
 
 async function openWorkspaceTauri({ workspaceRoot }) {
+  const historyPaths = readWorkspaceHistory().map(record => record.path);
   const result = await invokeCommand("open_workspace", {
     workspaceRoot,
+    ...(historyPaths.length ? { historyPaths } : {}),
   });
+  const canonical = result.workspaceRoot || workspaceRoot;
+  reconcileWorkspaceHistory(canonical, result.workspaceAliases || []);
   return {
-    workspaceRoot,
+    workspaceRoot: canonical,
     packageMetadata: result.packageMetadata || {
       packageMode: "fast",
       sequenceLayout: "partitioned",

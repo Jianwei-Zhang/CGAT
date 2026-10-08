@@ -66,3 +66,24 @@ test("invalid directories fail before initialization", async () => {
     initializeProject: () => assert.fail("must not initialize invalid input"),
   }), /missing directory/);
 });
+
+test("opening an existing empty workspace can explicitly forbid project creation", async () => {
+  const result = await openProjectWorkspace({ workspaceRoot: "/existing-empty", createIfMissing: false }, {
+    openWorkspace: async () => ({ workspaceRoot: "/canonical-empty", existingProjects: [] }),
+    initializeProject: () => assert.fail("opening must not initialize a project"),
+  });
+  assert.equal(result.workspaceRoot, "/canonical-empty"); assert.equal(result.existingProjects.length, 0);
+});
+test("concurrent canonical aliases initialize one project and use the canonical root", async () => {
+  let creations = 0;
+  const deps = {
+    openWorkspace: async () => ({ workspaceRoot: "/canonical-shared", existingProjects: [] }),
+    initializeProject: async ({ workspaceRoot }) => {
+      assert.equal(workspaceRoot, "/canonical-shared"); creations++;
+      await new Promise(resolve => setTimeout(resolve, 10));
+      return { existingProjects: [{ projectId: 1 }] };
+    },
+  };
+  const results = await Promise.all([openProjectWorkspace({ workspaceRoot: "/alias-a" }, deps), openProjectWorkspace({ workspaceRoot: "/alias-b" }, deps)]);
+  assert.equal(creations, 1); assert.deepEqual(results[0], results[1]);
+});

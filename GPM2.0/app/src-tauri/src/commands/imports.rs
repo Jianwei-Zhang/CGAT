@@ -11,6 +11,7 @@ pub(super) fn initial_import_options(value: Option<String>) -> ImportOptions {
     };
     ImportOptions {
         pairwise_parser_workers,
+        ..ImportOptions::default()
     }
 }
 
@@ -22,11 +23,13 @@ pub async fn import_zip(
     workspaceRoot: String,
     runId: Option<String>,
     importParallelism: Option<String>,
+    requireNewWorkspace: Option<bool>,
 ) -> CommandResult<Value> {
     let zip_path = zipPath;
     let workspace_root = workspaceRoot;
     let run_id = normalize_optional_run_id(runId);
-    let import_options = initial_import_options(importParallelism);
+    let mut import_options = initial_import_options(importParallelism);
+    import_options.require_new_workspace = requireNewWorkspace.unwrap_or(false);
     // Preserve a request submitted after the dialog opens but before this worker starts.
     tauri::async_runtime::spawn_blocking(move || {
         let progress_run_id = run_id.clone();

@@ -12,6 +12,7 @@ pub fn run() {
             commands::import_add_ctg_package,
             commands::request_import_cancel,
             commands::open_workspace,
+            commands::inspect_project_entry,
             commands::validate_workspace_integrity,
             commands::delete_workspace_directory,
             commands::copy_project_workspace,

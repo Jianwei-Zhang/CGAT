@@ -62,13 +62,14 @@ async function withImportProgressListener(runId, onStage, operation) {
   }
 }
 
-async function importZipBundleTauri({ zipPath, workspaceRoot, onStage, runId = "", importParallelism = "auto", stateOrLocale = "zh" }) {
+async function importZipBundleTauri({ zipPath, workspaceRoot, onStage, runId = "", importParallelism = "auto", requireNewWorkspace = false, stateOrLocale = "zh" }) {
   onStage?.(t(stateOrLocale, "importer.runtime.tauriImportZipStage"));
   const result = await withImportProgressListener(runId, onStage, () => invokeCommand("import_zip", {
     zipPath,
     workspaceRoot,
     runId,
     importParallelism,
+    ...(requireNewWorkspace ? { requireNewWorkspace: true } : {}),
   }, stateOrLocale));
   return {
     workspaceRoot: result.workspaceRoot || workspaceRoot,

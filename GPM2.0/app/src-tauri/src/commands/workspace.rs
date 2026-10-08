@@ -71,8 +71,34 @@ pub fn list_project_initializer_options(workspaceRoot: String) -> CommandResult<
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn open_workspace(workspaceRoot: String) -> CommandResult<Value> {
-    read_initializer_options(&workspaceRoot, true).map_err(format_error)
+pub fn open_workspace(
+    workspaceRoot: String,
+    historyPaths: Option<Vec<String>>,
+) -> CommandResult<Value> {
+    (|| {
+        let canonical =
+            gpm_next_backend::project_entry::canonical_workspace_path(Path::new(&workspaceRoot))?;
+        let readable = gpm_next_backend::project_entry::display_path(&canonical);
+        let mut result = read_initializer_options(&readable, true)?;
+        result["workspaceAliases"] = json!(gpm_next_backend::project_entry::workspace_aliases(
+            &canonical,
+            &historyPaths.unwrap_or_default()
+        ));
+        Ok(result)
+    })()
+    .map_err(format_error)
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub async fn inspect_project_entry(entryPath: String, timestamp: String) -> CommandResult<Value> {
+    tauri::async_runtime::spawn_blocking(move || {
+        gpm_next_backend::project_entry::inspect_project_entry(Path::new(&entryPath), &timestamp)
+            .and_then(|entry| serde_json::to_value(entry).map_err(Into::into))
+    })
+    .await
+    .map_err(|err| format!("project entry inspection failed: {err}"))?
+    .map_err(format_error)
 }
 
 #[tauri::command]

@@ -12,6 +12,7 @@ pub mod main_view;
 pub mod main_view_history;
 pub mod phased_assembly;
 pub mod project_catalog;
+pub mod project_entry;
 pub mod project_initializer;
 mod reference_geometry;
 pub mod reference_segments;

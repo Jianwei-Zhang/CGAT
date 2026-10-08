@@ -1,3 +1,4 @@
+import { projectEntryBusy } from "../../services/project-drop-controller.js";
 import { defaultProjectName } from "../../services/project-session.js";
 import { projectIcon } from "./project-icons.js";
 import { getMessages } from "../i18n/index.js";
@@ -9,6 +10,8 @@ export function projectLabels(state) {
     name: "Project name (optional)", nameDefault: "Use directory name", location: "Project directory",
     zip: "Bundle (ZIP / tar.gz)", extracted: "Extracted directory", source: "Source", browse: "Browse",
     cancel: "Cancel", submit: "Import",
+    newDirectory: "Project directory (will be created)",
+    directoryHint: "You may edit this path. Existing directories will not be overwritten.",
     legacy: "This directory contains multiple legacy projects. Select one to continue.",
     pending: "Project initialization incomplete", retry: "Retry initialization",
     delete: "Delete project files",
@@ -22,6 +25,8 @@ export function projectLabels(state) {
     name: "项目名称（可选）", nameDefault: "使用目录名称", location: "项目目录",
     zip: "交付包（ZIP / tar.gz）", extracted: "已解压目录", source: "来源", browse: "选择",
     cancel: "取消", submit: "导入",
+    newDirectory: "工作目录（将新建）",
+    directoryHint: "可修改此路径；不会覆盖已有目录。",
     legacy: "此目录包含多个旧版项目，请选择要打开的项目。",
     pending: "项目待初始化", retry: "重试初始化",
     delete: "删除项目文件",
@@ -84,9 +89,10 @@ export function renderProjectImportDialog(state, messages) {
         <button type="button" id="${extracted ? "pick-extracted-button" : "pick-zip-button"}" class="button ghost" title="${labels.browse}" aria-label="${labels.browse}">${projectIcon("open")}</button>
       </div>
       ${extracted ? `<p class="project-path muted">${messages.page.importExtractedRule}</p>` : `
-        <label for="zip-workspace-root-input">${messages.page.workspaceDir}</label>
-        <div class="inline-input"><input id="zip-workspace-root-input" value="${html(directory)}" required />
-          <button type="button" id="pick-zip-workspace-button" class="button ghost" title="${labels.browse}" aria-label="${labels.browse}">${projectIcon("open")}</button></div>`}
+        <label for="zip-workspace-root-input">${importer.requireNewWorkspace ? labels.newDirectory : messages.page.workspaceDir}</label>
+        <div class="inline-input"><input id="zip-workspace-root-input" value="${html(directory)}" ${importer.requireNewWorkspace ? 'aria-describedby="project-workspace-hint"' : ""} required />
+          <button type="button" id="pick-zip-workspace-button" class="button ghost" title="${labels.browse}" aria-label="${labels.browse}">${projectIcon("open")}</button></div>
+        ${importer.requireNewWorkspace ? `<p id="project-workspace-hint" class="project-path muted">${labels.directoryHint}</p>` : ""}`}
       <label for="import-project-name">${labels.name}</label>
       <input id="import-project-name" value="${html(importer.projectNameInput)}" placeholder="${html(directory ? defaultProjectName(directory) : labels.nameDefault)}" />
       ${importer.projectError ? `<p class="error-text" role="alert">${html(importer.projectError)}</p>` : ""}
@@ -101,7 +107,7 @@ export function renderProjectImportDialog(state, messages) {
 export function renderProjectsBody(state, { records, messages, summaryHtml }) {
   const labels = projectLabels(state);
   const importer = state.importer;
-  const busy = importer.inFlight || state.initializer?.autoPipelineRunning;
+  const busy = projectEntryBusy(state);
   const disabled = busy ? "disabled" : "";
   const empty = !records.length && !state.session?.workspacePath;
   const actions = `<div class="project-entry-actions">

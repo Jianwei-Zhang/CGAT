@@ -1,3 +1,4 @@
+export { updateWorkspaceHistory } from "../../services/workspace-history.js";
 import { defaultProjectName } from "../../services/project-session.js";
 import { t as i18nT } from "../i18n/index.js";
 import {
@@ -198,20 +199,6 @@ export function migrateWorkspaceHistoryToArrivalOrder(storage) {
   }
 }
 
-export function updateWorkspaceHistory(records = [], workspacePath, projectName = "", lastUsedAt = Date.now()) {
-  const path = normalizeWorkspacePath(workspacePath);
-  if (!path) return records.slice(0, 20);
-  const existingIndex = records.findIndex(record => normalizeWorkspacePath(record?.path) === path);
-  if (existingIndex < 0) {
-    return [...records, { path, projectName: String(projectName || ""), lastUsedAt }].slice(-20);
-  }
-  return records.map((record, index) => index === existingIndex ? {
-    ...record,
-    path,
-    projectName: String(projectName || record.projectName || ""),
-    lastUsedAt,
-  } : record).slice(0, 20);
-}
 
 export function buildProjectSwitchItems({ state, labels }) {
   const currentProjectId = normalizeProjectId(state?.session?.projectId);
@@ -233,11 +220,12 @@ export function buildProjectSwitchItems({ state, labels }) {
 }
 
 export async function switchWorkspaceFromShell(store, workspaceRoot, { openWorkspace }) {
-  const normalizedPath = normalizeWorkspacePath(workspaceRoot);
+  let normalizedPath = normalizeWorkspacePath(workspaceRoot);
   if (!normalizedPath || typeof openWorkspace !== "function") {
     return false;
   }
   const options = await openWorkspace({ workspaceRoot: normalizedPath });
+  normalizedPath = options.workspaceRoot || normalizedPath;
   const current = store.getState();
   rememberAssemblyState(current);
   resetAssemblyPageSession();

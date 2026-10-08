@@ -1,0 +1,117 @@
+schema: comet.native.v4
+name: drag-drop-project-entry
+language: en
+phase: build
+status: active
+state_version: 3
+brief: brief.md
+shape_confirmation_hash: 6f569015745c28465a9052f51799fd37a38dba69e3377259f1d1c8d723b37f2f
+spec_changes:
+  - capability: drag-drop-project-entry
+    operation: create
+    source: specs/drag-drop-project-entry/spec.md
+workspace:
+  isolation: current
+  change_branch: master
+  target_branch: master
+  finish: null
+loop:
+  stage: building
+  goal_cycle: 1
+  iteration: 1
+  attempt: 0
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: submit-builder-candidate
+acceptance:
+  - id: A1
+    source: brief.md
+    text: "A1: Dropping a valid delivery archive (.zip or .tar.gz, retaining
+      existing .tgz compatibility) enters the existing compressed-archive import
+      flow with the selected destination policy, retains progress/cancellation,
+      and opens the successfully imported workspace."
+    result: pending
+    reason: null
+  - id: A2
+    source: brief.md
+    text: "A2: Dropping a fresh extracted delivery root or a supported one-level
+      wrapper resolves the bundle and uses the existing in-place import flow,
+      without requiring the user to recreate a ZIP."
+    result: pending
+    reason: null
+  - id: A3
+    source: brief.md
+    text: "A3: Dropping an existing workspace opens its existing projects and edits
+      without running delivery import or creating a new database project."
+    result: pending
+    reason: null
+  - id: A4
+    source: brief.md
+    text: "A4: Reopening a workspace already recorded on the project page leaves
+      exactly one record for that filesystem workspace, preserving its existing
+      user metadata and arrival order. Equivalent path spellings and supported
+      canonical aliases do not add records."
+    result: pending
+    reason: null
+  - id: A5
+    source: brief.md
+    text: "A5: Dropping the currently open workspace is harmless and does not
+      duplicate records or recreate the active project. A separate workspace
+      copy remains an independent record."
+    result: pending
+    reason: null
+  - id: A6
+    source: brief.md
+    text: "A6: Invalid inputs, ambiguous wrapper directories, unusable existing
+      databases, unsupported multi-item drops, and drops during conflicting work
+      produce actionable feedback without starting imports or adding history
+      records."
+    result: pending
+    reason: null
+  - id: A7
+    source: brief.md
+    text: "A7: Switching through drag-and-drop retains the existing assembly-state
+      flush/session handling, and cancel/error paths do not present the
+      operation as a successful import."
+    result: pending
+    reason: null
+  - id: A8
+    source: brief.md
+    text: "A8: The existing button-based compressed archive import, extracted
+      import, workspace open, and project-page entry flows remain available and
+      share the same identity/deduplication rules."
+    result: pending
+    reason: null
+  - id: A9
+    source: brief.md
+    text: "A9: The archive confirmation pre-fills an editable destination beside the
+      archive using its complete stem plus a local timestamp formatted
+      YYYYMMDD_HHMMSS. A compound .tar.gz suffix is entirely removed,
+      intervening stem suffixes such as .no_fasta are preserved, generated-name
+      collisions receive a visible numeric disambiguator before confirmation,
+      and an existing destination or a creation-time race is rejected without
+      overwriting it. Cancelling the confirmation creates no workspace or
+      project history."
+    result: pending
+    reason: null
+builder_handoff: null
+blockers: []
+verification: null
+history: []
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pending
+verification_report: null
+archived: false
+created_at: 2026-10-08T05:24:34.619Z

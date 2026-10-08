@@ -782,6 +782,7 @@ fn initial_pairwise_bulk_load_preserves_hits_queries_indexes_and_progress() {
         &bundle_root,
         ImportOptions {
             pairwise_parser_workers: Some(2),
+            ..ImportOptions::default()
         },
         &mut |step| emitted.borrow_mut().push(step),
         &mut || false,
@@ -896,6 +897,7 @@ fn initial_pairwise_bulk_load_cancellation_rolls_back_hits_and_indexes() {
         &bundle_root,
         ImportOptions {
             pairwise_parser_workers: Some(1),
+            ..ImportOptions::default()
         },
         &mut |step| {
             if step.stage == "index_pairwise_paf_progress" {
@@ -946,6 +948,7 @@ fn initial_pairwise_bulk_load_cancellation_before_index_creation_rolls_back() {
         &bundle_root,
         ImportOptions {
             pairwise_parser_workers: Some(1),
+            ..ImportOptions::default()
         },
         &mut |step| {
             if step.stage == "index_pairwise_paf_indexes" {
@@ -971,6 +974,7 @@ fn initial_pairwise_bulk_load_cancellation_after_index_creation_rolls_back() {
         &bundle_root,
         ImportOptions {
             pairwise_parser_workers: Some(1),
+            ..ImportOptions::default()
         },
         &mut |step| {
             if step.stage == "index_pairwise_paf_indexes" {
@@ -1025,6 +1029,7 @@ fn assert_pairwise_bulk_load_cancelled_and_rolled_back(bundle_root: &Path, error
 fn rejects_unsupported_pairwise_parser_worker_count() {
     let error = ImportOptions {
         pairwise_parser_workers: Some(3),
+        ..ImportOptions::default()
     }
     .resolved_pairwise_parser_workers()
     .unwrap_err();

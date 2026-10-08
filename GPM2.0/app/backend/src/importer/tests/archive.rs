@@ -99,3 +99,90 @@ fn truncated_gzip_and_cancelled_tar_imports_leave_no_workspace() {
     assert!(import_from_zip(&path, &workspace).is_err());
     assert!(!workspace.exists());
 }
+
+#[test]
+fn desktop_archive_import_atomically_reserves_a_new_directory_and_never_claims_existing_ones() {
+    let temp = tempdir().unwrap();
+    let source = temp.path().join("source");
+    create_bundle_root(&source);
+    for suffix in ["zip", "tar.gz"] {
+        let package = temp.path().join(format!("delivery.{suffix}"));
+        if suffix == "zip" {
+            write_bundle_zip(&package);
+        } else {
+            tar_bundle(&package, &source);
+        }
+        let options = ImportOptions {
+            require_new_workspace: true,
+            ..ImportOptions::default()
+        };
+        let existing = temp.path().join(format!("existing-{suffix}"));
+        fs::create_dir(&existing).unwrap();
+        let error = import_from_zip_with_options_and_hooks(
+            &package,
+            &existing,
+            options,
+            &mut |_| {},
+            &mut || false,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("must not exist"));
+        assert!(existing.is_dir());
+        assert_eq!(fs::read_dir(&existing).unwrap().count(), 0);
+        fs::write(existing.join("keep.txt"), "user data").unwrap();
+        assert!(
+            import_from_zip_with_options_and_hooks(
+                &package,
+                &existing,
+                options,
+                &mut |_| {},
+                &mut || false
+            )
+            .is_err()
+        );
+        assert_eq!(
+            fs::read_to_string(existing.join("keep.txt")).unwrap(),
+            "user data"
+        );
+
+        let raced = temp.path().join(format!("raced-{suffix}"));
+        let mut on_progress = |step: ImportProgress| {
+            if step.stage == "validate_input" {
+                fs::create_dir(&raced).unwrap();
+                fs::write(raced.join("keep"), "competitor").unwrap();
+            }
+        };
+        assert!(
+            import_from_zip_with_options_and_hooks(
+                &package,
+                &raced,
+                options,
+                &mut on_progress,
+                &mut || false
+            )
+            .is_err()
+        );
+        assert_eq!(
+            fs::read_to_string(raced.join("keep")).unwrap(),
+            "competitor"
+        );
+
+        let destination = temp.path().join(format!("new-{suffix}"));
+        let (outcome, _) = import_from_zip_with_options_and_hooks(
+            &package,
+            &destination,
+            options,
+            &mut |_| {},
+            &mut || false,
+        )
+        .unwrap();
+        assert!(outcome.project_db_path.exists());
+        assert_eq!(count_rows(&outcome.project_db_path, "dataset"), 1);
+        assert_eq!(
+            crate::project_entry::inspect_project_entry(&destination, "")
+                .unwrap()
+                .kind,
+            "workspace"
+        );
+    }
+}

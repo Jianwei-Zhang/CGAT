@@ -1,3 +1,4 @@
+import { workspacePathIdentity } from "./workspace-history.js";
 import { openWorkspace, initializeProject } from "./workflow-api.js";
 
 export function defaultProjectName(path) {
@@ -7,26 +8,35 @@ export function defaultProjectName(path) {
 }
 
 const pending = new Map();
+const initializing = new Map();
 
 // Serialize opens for a directory so a retry cannot create a second project.
-export function openProjectWorkspace({ workspaceRoot, projectName = "" }, deps = {}) {
-  const key = String(workspaceRoot || "").trim().replace(/[\\/]+$/, "");
+export function openProjectWorkspace({ workspaceRoot, projectName = "", createIfMissing = true }, deps = {}) {
+  const key = `${createIfMissing}:${workspacePathIdentity(workspaceRoot)}`;
   if (pending.has(key)) return pending.get(key);
   const operation = (async () => {
     const options = await (deps.openWorkspace || openWorkspace)({ workspaceRoot });
-    if (options.existingProjects?.length) return options;
-    try {
-      const created = await (deps.initializeProject || initializeProject)({
-        workspaceRoot,
-        projectName: String(projectName || "").trim() || defaultProjectName(workspaceRoot),
-        phasedAssemblyEnabled: true,
-      });
-      return { ...options, existingProjects: created.existingProjects, grtProjectView: created.grtProjectView };
-    } catch (cause) {
-      const error = new Error(String(cause?.message || cause), { cause });
-      error.pendingProjectPath = workspaceRoot;
-      throw error;
-    }
+    if (options.existingProjects?.length || !createIfMissing) return options;
+    const canonical = options.workspaceRoot || workspaceRoot;
+    const identity = workspacePathIdentity(canonical);
+    if (initializing.has(identity)) return initializing.get(identity);
+    const creation = (async () => {
+      try {
+        const created = await (deps.initializeProject || initializeProject)({
+          workspaceRoot: canonical,
+          projectName: String(projectName || "").trim() || defaultProjectName(canonical),
+          phasedAssemblyEnabled: true,
+        });
+        return { ...options, workspaceRoot: canonical, existingProjects: created.existingProjects, grtProjectView: created.grtProjectView };
+      } catch (cause) {
+        const error = new Error(String(cause?.message || cause), { cause });
+        error.pendingProjectPath = canonical;
+        throw error;
+      }
+    })();
+    initializing.set(identity, creation);
+    creation.finally(() => initializing.delete(identity)).catch(() => {});
+    return creation;
   })();
   pending.set(key, operation);
   operation.finally(() => pending.delete(key)).catch(() => {});

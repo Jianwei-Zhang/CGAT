@@ -1,3 +1,5 @@
+import { relocateWorkspaceSuggestion } from "../../services/project-drop-controller.js";
+import { readWorkspaceHistory as readSharedHistory, writeWorkspaceHistory as writeSharedHistory, updateWorkspaceHistory as updateSharedHistory } from "../../services/workspace-history.js";
 import {
   copyProjectWorkspace,
   deleteWorkspaceDirectory,
@@ -23,7 +25,6 @@ import { getMessages, t as i18nT } from "../i18n/index.js";
 import { projectIcon } from "./project-icons.js";
 import { getAppSettings } from "../../services/app-settings.js";
 
-const WORKSPACE_HISTORY_KEY = "gpm_next:workspace_history";
 const IMPORT_PROGRESS_BOTTOM_THRESHOLD_PX = 24;
 const IMPORTER_STATUS_TOAST_AUTO_DISMISS_MS = 1000;
 const IMPORTER_STATUS_TOAST_DISMISS = Symbol("importerStatusToastDismiss");
@@ -238,7 +239,10 @@ export function bindImporterPage(host, store) {
     if (!selectedPath) {
       return;
     }
-    updateImporterState(store, { workspaceRoot: selectedPath });
+    const importer = store.getState().importer;
+    const workspaceRoot = importer.requireNewWorkspace
+      ? relocateWorkspaceSuggestion(selectedPath, importer.workspaceRoot) : selectedPath;
+    updateImporterState(store, { workspaceRoot });
     rerender(host, store);
   });
 
@@ -410,7 +414,7 @@ export function bindImporterPage(host, store) {
 }
 
 function bindProjectEntryControls(host, store) {
-  const busy = () => store.getState().importer.inFlight || store.getState().initializer?.autoPipelineRunning;
+  const busy = () => store.getState().importer.inFlight || store.getState().importer.entryResolving || store.getState().initializer?.autoPipelineRunning || store.getState().initializer?.updating;
   const openDirectory = async () => {
     if (busy()) return;
     const path = await pickDirectoryPath(store.getState());
@@ -419,7 +423,7 @@ function bindProjectEntryControls(host, store) {
   };
   host.querySelector("#project-import-button")?.addEventListener("click", () => {
     if (busy()) return;
-    updateImporterState(store, { importDialogOpen: true, projectError: "", pendingProjectPath: "" });
+    updateImporterState(store, { importDialogOpen: true, requireNewWorkspace: false, projectError: "", pendingProjectPath: "" });
     rerender(host, store);
     host.querySelector("#zip-path-input, #extracted-path-input")?.focus();
   });
@@ -757,7 +761,7 @@ async function runImportZipFlow(host, store) {
     return;
   }
 
-  if (importer.inFlight) return;
+  if (importer.inFlight || importer.entryResolving || snapshot.initializer?.autoPipelineRunning || snapshot.initializer?.updating) return;
   const runId = createImportRunId("zip");
   updateImporterState(store, {
     inFlight: true,
@@ -777,9 +781,11 @@ async function runImportZipFlow(host, store) {
 
   let importOperationCompleted = false;
   try {
+    await flushAssemblyProjectState(host, store);
     const result = await importZipBundle({
       zipPath: importer.zipPath,
       workspaceRoot: importer.workspaceRoot,
+      requireNewWorkspace: importer.requireNewWorkspace === true,
       runId,
       stateOrLocale: snapshot,
       importParallelism: getAppSettings().importParallelism,
@@ -824,7 +830,7 @@ async function runImportZipFlow(host, store) {
   rerender(host, store);
 }
 
-async function runImportExtractedFlow(host, store) {
+export async function runImportExtractedFlow(host, store) {
   const snapshot = store.getState();
   const importer = snapshot.importer;
   if (!importer.extractedPath) {
@@ -836,7 +842,7 @@ async function runImportExtractedFlow(host, store) {
     return;
   }
 
-  if (importer.inFlight) return;
+  if (importer.inFlight || importer.entryResolving || snapshot.initializer?.autoPipelineRunning || snapshot.initializer?.updating) return;
   const runId = createImportRunId("extracted");
   updateImporterState(store, {
     inFlight: true,
@@ -853,6 +859,7 @@ async function runImportExtractedFlow(host, store) {
 
   let importOperationCompleted = false;
   try {
+    await flushAssemblyProjectState(host, store);
     const result = await importExtractedBundle({
       extractedPath: importer.extractedPath,
       runId,
@@ -989,11 +996,11 @@ async function runImportAddPackageFlow(host, store, workspaceRoot) {
   rerender(host, store);
 }
 
-async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
+export async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "", createIfMissing = true) {
   const snapshot = store.getState();
   const importer = snapshot.importer;
-  if (importer.inFlight || snapshot.initializer?.autoPipelineRunning || snapshot.initializer?.updating) return false;
-  const workspaceRoot = String(forcedWorkspacePath || importer.openWorkspacePath || "").trim();
+  if (importer.inFlight || importer.entryResolving || snapshot.initializer?.autoPipelineRunning || snapshot.initializer?.updating) return false;
+  let workspaceRoot = String(forcedWorkspacePath || importer.openWorkspacePath || "").trim();
   if (!workspaceRoot) {
     updateImporterState(store, {
       status: i18nT(snapshot, "importer.runtime.incompleteParamsStatus"),
@@ -1018,7 +1025,8 @@ async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
 
   try {
     await flushAssemblyProjectState(host, store);
-    const options = await openWorkspace({ workspaceRoot, projectName: importer.pendingProjectPath === workspaceRoot ? importer.projectNameInput : "" });
+    const options = await openWorkspace({ workspaceRoot, createIfMissing, projectName: importer.pendingProjectPath === workspaceRoot ? importer.projectNameInput : "" });
+    workspaceRoot = options.workspaceRoot || workspaceRoot;
     const defaultReferenceId = options.references[0]?.referenceGenomeId || "";
     const defaultPrimaryDatasetId = options.datasets[0]?.datasetId || "";
     applyWorkspaceLoadedState(store, {
@@ -1052,6 +1060,7 @@ async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = "") {
   }
 
   if (store.getState().importer.pendingProjectPath || !syncProjectSelection(host, store)) rerender(host, store);
+  return false;
 }
 
 // Keep the project library mounted while opening a project; replace only the detail after success.
@@ -1299,7 +1308,7 @@ async function enterWorkspaceAfterImport(store, payload) {
   const defaultReferenceId = options.references[0]?.referenceGenomeId || "";
   const defaultPrimaryDatasetId = options.datasets[0]?.datasetId || "";
   applyWorkspaceLoadedState(store, {
-    workspaceRoot,
+    workspaceRoot: options.workspaceRoot || workspaceRoot,
     packageMetadata: options.packageMetadata,
     grtRecipe: options.grtRecipe,
     references: options.references,
@@ -2161,57 +2170,12 @@ function createImportRunId(prefix) {
   return `${prefix}-${Date.now()}-${randomPart}`;
 }
 
-function readWorkspaceHistory() {
-  try {
-    const raw = window.localStorage.getItem(WORKSPACE_HISTORY_KEY);
-    if (!raw) {
-      return [];
-    }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed
-      .map((item) => {
-        if (!item || typeof item.path !== "string") {
-          return null;
-        }
-        const path = item.path.trim();
-        if (!path) {
-          return null;
-        }
-        return {
-          path,
-          ...(item.projectName ? { projectName: String(item.projectName) } : {}),
-          lastUsedAt: Number.isFinite(Number(item.lastUsedAt))
-            ? Number(item.lastUsedAt)
-            : Date.now(),
-        };
-      })
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
-}
+function readWorkspaceHistory() { return readSharedHistory(); }
 
-function writeWorkspaceHistory(records) {
-  try {
-    window.localStorage.setItem(WORKSPACE_HISTORY_KEY, JSON.stringify(records));
-  } catch {
-    // ignore localStorage failures
-  }
-}
+function writeWorkspaceHistory(records) { writeSharedHistory(records); }
 
 function appendWorkspaceHistoryRecord(workspacePath, projectName) {
-  const path = String(workspacePath || "").trim();
-  if (!path) return;
-  const records = readWorkspaceHistory();
-  const existingIndex = records.findIndex(record => record.path === path);
-  const record = { path, projectName: String(projectName || ""), lastUsedAt: Date.now() };
-  const nextRecords = existingIndex < 0
-    ? [...records, record]
-    : records.map((item, index) => index === existingIndex ? record : item);
-  writeWorkspaceHistory(nextRecords.slice(-20));
+  writeWorkspaceHistory(updateSharedHistory(readWorkspaceHistory(), workspacePath, projectName));
 }
 
 function removeWorkspaceHistoryPaths(paths) {
