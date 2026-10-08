@@ -1,11 +1,11 @@
 schema: comet.native.v4
 name: drag-drop-project-entry
 language: en
-phase: build
-status: active
-state_version: 3
+phase: shape
+status: await-user
+state_version: 5
 brief: brief.md
-shape_confirmation_hash: 6f569015745c28465a9052f51799fd37a38dba69e3377259f1d1c8d723b37f2f
+shape_confirmation_hash: 520796899ed21d0c532598c8e5bbdb87c92696702958c12eed8b9ee0655c0cdd
 spec_changes:
   - capability: drag-drop-project-entry
     operation: create
@@ -16,16 +16,16 @@ workspace:
   target_branch: master
   finish: null
 loop:
-  stage: building
-  goal_cycle: 1
-  iteration: 1
+  stage: await-user
+  goal_cycle: 2
+  iteration: 0
   attempt: 0
   retry_epoch: 0
   failed_iteration_count: 0
   no_progress_count: 0
   execution_failure_count: 0
   previous_unresolved_ids: []
-  next_action: submit-builder-candidate
+  next_action: confirm-shape
 acceptance:
   - id: A1
     source: brief.md
@@ -100,7 +100,16 @@ acceptance:
 builder_handoff: null
 blockers: []
 verification: null
-history: []
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native Shape artifacts changed
+      truncated: false
+    completed_at: 2026-10-08T07:08:44.181Z
 history_overflow:
   dropped_entries: 0
   first_dropped_at: null
