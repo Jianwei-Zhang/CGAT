@@ -1,9 +1,9 @@
 schema: comet.native.v4
 name: drag-drop-project-entry
 language: en
-phase: shape
+phase: verify
 status: await-user
-state_version: 5
+state_version: 9
 brief: brief.md
 shape_confirmation_hash: 520796899ed21d0c532598c8e5bbdb87c92696702958c12eed8b9ee0655c0cdd
 spec_changes:
@@ -18,14 +18,20 @@ workspace:
 loop:
   stage: await-user
   goal_cycle: 2
-  iteration: 0
-  attempt: 0
+  iteration: 1
+  attempt: 1
   retry_epoch: 0
   failed_iteration_count: 0
   no_progress_count: 0
   execution_failure_count: 0
-  previous_unresolved_ids: []
-  next_action: confirm-shape
+  previous_unresolved_ids:
+    - A1
+    - A2
+    - A3
+    - A5
+    - A6
+    - A7
+  next_action: resolve-verifier-blocker
 acceptance:
   - id: A1
     source: brief.md
@@ -33,58 +39,93 @@ acceptance:
       existing .tgz compatibility) enters the existing compressed-archive import
       flow with the selected destination policy, retains progress/cancellation,
       and opens the successfully imported workspace."
-    result: pending
-    reason: null
+    result: blocked
+    reason:
+      text: 已核对三种后缀的控制器路由、现有压缩导入的进度/取消/完成路径及 Runtime 回归通过结果；但没有 Windows 和 macOS
+        真实文件管理器拖入 .zip/.tar.gz/.tgz 后完成导入、显示进度、取消和打开工作区的可追溯记录。browser 六场景没有执行实际
+        archive import，Windows 用户反馈不能替代此矩阵。阻断依据为 brief.md:65 和
+        specs/drag-drop-project-entry/spec.md:43。
+      truncated: false
   - id: A2
     source: brief.md
     text: "A2: Dropping a fresh extracted delivery root or a supported one-level
       wrapper resolves the bundle and uses the existing in-place import flow,
       without requiring the user to recreate a ZIP."
-    result: pending
-    reason: null
+    result: blocked
+    reason:
+      text: backend/src/project_entry.rs 的根目录/唯一一层 wrapper 分类及 importer/initial.rs
+        的原位导入路径得到实现和回归支持；但缺少 Windows Explorer、macOS Finder 拖入真实 fresh delivery
+        root 和一层 wrapper 后完成原位导入、打开工作区的证据。现有 browser 场景未覆盖 extracted import。
+      truncated: false
   - id: A3
     source: brief.md
     text: "A3: Dropping an existing workspace opens its existing projects and edits
       without running delivery import or creating a new database project."
-    result: pending
-    reason: null
+    result: blocked
+    reason:
+      text: 已有数据库优先、只读分类、直接 open 及 createIfMissing=false
+        路径均已核对，回归覆盖不重新初始化项目；但正式要求的真实原生拖放尚未证明既有工作区中的项目和编辑保持不变。需要携带已知编辑的真实
+        workspace 的拖放前后比较，而不是仅有 mock 返回的 existingProjects。
+      truncated: false
   - id: A4
     source: brief.md
     text: "A4: Reopening a workspace already recorded on the project page leaves
       exactly one record for that filesystem workspace, preserving its existing
       user metadata and arrival order. Equivalent path spellings and supported
       canonical aliases do not add records."
-    result: pending
-    reason: null
+    result: passed
+    reason:
+      text: 共享 workspace-history.js 保留首条记录的位置和用户元数据；Tauri open_workspace 返回文件系统
+        canonical aliases，并在两条 history 写入路径使用前统一 reconcile。Windows 后端别名测试、独立
+        Linux 大小写/符号链接测试、共享 history 回归及 browser 重复打开的一条记录和 note 保留断言均通过。此通过不代表
+        macOS 原生拖放已验证。
+      truncated: false
   - id: A5
     source: brief.md
     text: "A5: Dropping the currently open workspace is harmless and does not
       duplicate records or recreate the active project. A separate workspace
       copy remains an independent record."
-    result: pending
-    reason: null
+    result: blocked
+    reason:
+      text: 控制器的 active canonical workspace no-op、重复事件锁以及 distinct workspace copies
+        的身份隔离得到源码和测试支持，browser 也验证了 mock active workspace 不再次 open；但缺少真实
+        Windows/macOS 当前工作区重复拖入和独立副本拖入的项目数、历史数与会话保持记录，不能完成正式原生验收。
+      truncated: false
   - id: A6
     source: brief.md
     text: "A6: Invalid inputs, ambiguous wrapper directories, unusable existing
       databases, unsupported multi-item drops, and drops during conflicting work
       produce actionable feedback without starting imports or adding history
       records."
-    result: pending
-    reason: null
+    result: blocked
+    reason:
+      text: 已核对无效数据库不回退导入、歧义 wrapper 拒绝、多项输入拒绝、冲突操作及重复事件守卫，相关自动回归通过；但没有真实 native drop
+        下无效输入、多项拖放、坏数据库和运行中冲突的反馈与不产生文件/历史记录证据。brief.md:65 明确要求原生 busy feedback
+        检查。
+      truncated: false
   - id: A7
     source: brief.md
     text: "A7: Switching through drag-and-drop retains the existing assembly-state
       flush/session handling, and cancel/error paths do not present the
       operation as a successful import."
-    result: pending
-    reason: null
+    result: blocked
+    reason:
+      text: 拖放入口和既有 import/open flow 调用 assembly-state
+        flush，失败路径及取消回归已检查；但未提供真实原生切换前存在未保存 assembly
+        编辑、切换后重新打开验证编辑保留，以及实际进行中取消/错误不产生成功项目的记录。确认框取消 mock 不能覆盖导入进行中取消和真实会话持久化。
+      truncated: false
   - id: A8
     source: brief.md
     text: "A8: The existing button-based compressed archive import, extracted
       import, workspace open, and project-page entry flows remain available and
       share the same identity/deduplication rules."
-    result: pending
-    reason: null
+    result: passed
+    reason:
+      text: 既有压缩导入、解压目录导入和 workspace-open 按钮仍绑定原 flow；项目页 click/selection 使用共享结构身份并交由
+        native 解析 canonical aliases。已独立核对 importer-page.js:342-351,2212-2223
+        和共享写入路径；Runtime frontend 日志确认实际绑定 click handler 的六项 POSIX literal
+        backslash、大小写、Windows separator/alias 和同路径回归通过。未使用先前 reviewer 的通过结论代替判断。
+      truncated: false
   - id: A9
     source: brief.md
     text: "A9: The archive confirmation pre-fills an editable destination beside the
@@ -95,11 +136,277 @@ acceptance:
       and an existing destination or a creation-time race is rejected without
       overwriting it. Cancelling the confirmation creates no workspace or
       project history."
-    result: pending
-    reason: null
-builder_handoff: null
-blockers: []
-verification: null
+    result: passed
+    reason:
+      text: 已核对本地秒级时间戳、完整移除 .tar.gz/.zip/.tgz 且保留 .no_fasta、只读占用探测及可见 _01
+        等消歧；建议值保存在确认状态中。browser 验证字段可编辑、重渲染保留和确认取消不调用 import/initialize；backend
+        archive 回归验证已有目标及 creation-time race 被原子 create_dir 拒绝且原数据保留。相关 Runtime
+        检查通过，此项通过仅覆盖目的地与确认策略，不补足 A1 的原生导入生命周期证据。
+      truncated: false
+builder_handoff:
+  candidate_id: 0718214f-aeb6-4064-8148-a60db224568d
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:4c769adf-e33b-4eff-ba63-d7466efbef8d
+  iteration: 1
+  summary:
+    text: "Implemented native one-item delivery/workspace drop entry, editable
+      second-resolution sibling archive destinations, atomic no-overwrite
+      imports, existing-workspace priority and shared metadata-preserving
+      canonical history. Candidate 41d5cc6 fixes the independent A8 review
+      omission: real project-page click/selection now uses shared
+      filesystem-aware structural identity; legacy copy/delete safety checks are
+      separately retained."
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+    - A7
+    - A8
+    - A9
+  checks:
+    - name:
+        text: Windows frontend npm.cmd test
+        truncated: false
+      result: passed
+      note:
+        text: 1181/1181; focused importer-page 35/35; reviewer independently ran six
+          real-click regressions.
+        truncated: false
+    - name:
+        text: Windows frontend production build
+        truncated: false
+      result: passed
+      note:
+        text: Windows Node/npm.cmd; existing nonfatal chunk warning; generated dist
+          removed.
+        truncated: false
+    - name:
+        text: Production bundle browser regressions
+        truncated: false
+      result: passed
+      note:
+        text: 6/6; archive 1280/390/320px, overlay/cancel/existing workspace; native
+          event/backend mocks, not OS drop.
+        truncated: false
+    - name:
+        text: Windows backend cargo.exe test
+        truncated: false
+      result: passed
+      note:
+        text: 206 library tests on original implementation; backend code unchanged by
+          current fix.
+        truncated: false
+    - name:
+        text: Windows Tauri cargo.exe test
+        truncated: false
+      result: passed
+      note:
+        text: 15 library tests on original implementation; native code unchanged by
+          current fix.
+        truncated: false
+    - name:
+        text: Linux backend path identity tests
+        truncated: false
+      result: passed
+      note:
+        text: 6/6 with separate /tmp target; no WSL desktop tests or shared frontend
+          dependency use.
+        truncated: false
+    - name:
+        text: Task diff and LF checks
+        truncated: false
+      result: passed
+      note:
+        text: Task-scoped commits; diff --check; clean workspace after candidate commit
+          and push.
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: User reported actual Windows desktop drop now works after troubleshooting;
+        this is limited user feedback, not an agent-observed per-format
+        lifecycle native matrix.
+      truncated: false
+    - text: macOS real file-manager dragging, full Windows/macOS
+        per-format/progress/cancel/busy matrices remain untested.
+      truncated: false
+    - text: No release installers or release/version update; Reads-QC badge change
+        be4a080 is independent of this acceptance scope.
+      truncated: false
+  known_limits_truncated: false
+  review:
+    status: passed
+    summary:
+      text: Independent read-only re-review at 41d5cc6 found previous A8 blocker
+        fixed, independently passed six actual bound click regressions, checked
+        1181-test/build/browser logs and found no additional blocking code risk
+        across A1-A9. Reviewer made no repository writes. Native platform
+        validation limits remain explicit.
+      truncated: false
+    reviewer_execution_ref: 01a11a3f-f18e-7222-937b-bbe51e5e5daa
+  submitted_at: 2026-10-08T07:20:28.313Z
+blockers:
+  - owner: user
+    reason:
+      text: 对 candidate 0718214f-aeb6-4064-8148-a60db224568d、stateVersion 8、iteration
+        1、attempt 1 完成独立只读复核。先核对完整 A1-A9、brief、Spec、实际代码及六项 Runtime 日志，最后参考
+        Builder 交接线索。A4/A8/A9 passed，A1/A2/A3/A5/A6/A7 blocked，无确证 failed
+        项。阻断是正式规格要求的真实 Windows/macOS native smoke
+        证据缺失，而不是自动检查失败。下一步应补齐当前实现候选的原生操作矩阵和前后状态证据，再交独立 Verifier 复核；不得把 Windows
+        可以了或 browser mock 扩张为完整验收。
+      truncated: false
+    acceptance_ids:
+      - A1
+      - A2
+      - A3
+      - A5
+      - A6
+      - A7
+    resolution_action: resolve-verifier-blocker
+verification:
+  candidate_id: 0718214f-aeb6-4064-8148-a60db224568d
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:09c1cae7-6b1f-47a9-a98e-5c0056b0d80f
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: blocked
+  checks:
+    - id: drag-drop-frontend
+      name:
+        text: Windows frontend unit tests (1181 current tests)
+        truncated: false
+      argv_display:
+        - text: proxy
+          truncated: false
+        - text: python3
+          truncated: false
+        - text: /tmp/gpm-drag-drop-runtime-check.py
+          truncated: false
+        - text: frontend
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 3531
+    - id: drag-drop-backend
+      name:
+        text: Windows backend full regression
+        truncated: false
+      argv_display:
+        - text: proxy
+          truncated: false
+        - text: python3
+          truncated: false
+        - text: /tmp/gpm-drag-drop-runtime-check.py
+          truncated: false
+        - text: backend
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 7055
+    - id: drag-drop-tauri
+      name:
+        text: Windows Tauri desktop regression
+        truncated: false
+      argv_display:
+        - text: proxy
+          truncated: false
+        - text: python3
+          truncated: false
+        - text: /tmp/gpm-drag-drop-runtime-check.py
+          truncated: false
+        - text: tauri
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 1098
+    - id: drag-drop-browser
+      name:
+        text: Windows production build and six browser smoke scenarios, cleanup dist
+        truncated: false
+      argv_display:
+        - text: proxy
+          truncated: false
+        - text: python3
+          truncated: false
+        - text: /tmp/gpm-drag-drop-runtime-check.py
+          truncated: false
+        - text: browser
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 8335
+    - id: drag-drop-linux
+      name:
+        text: Linux backend project-entry identity tests with separate target
+        truncated: false
+      argv_display:
+        - text: proxy
+          truncated: false
+        - text: python3
+          truncated: false
+        - text: /tmp/gpm-drag-drop-runtime-check.py
+          truncated: false
+        - text: linux
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 11044
+    - id: drag-drop-diff
+      name:
+        text: Tracked diff whitespace safety
+        truncated: false
+      argv_display:
+        - text: proxy
+          truncated: false
+        - text: python3
+          truncated: false
+        - text: /tmp/gpm-drag-drop-runtime-check.py
+          truncated: false
+        - text: diff
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 1907
+  summary:
+    text: 对 candidate 0718214f-aeb6-4064-8148-a60db224568d、stateVersion 8、iteration
+      1、attempt 1 完成独立只读复核。先核对完整 A1-A9、brief、Spec、实际代码及六项 Runtime 日志，最后参考
+      Builder 交接线索。A4/A8/A9 passed，A1/A2/A3/A5/A6/A7 blocked，无确证 failed
+      项。阻断是正式规格要求的真实 Windows/macOS native smoke
+      证据缺失，而不是自动检查失败。下一步应补齐当前实现候选的原生操作矩阵和前后状态证据，再交独立 Verifier 复核；不得把 Windows
+      可以了或 browser mock 扩张为完整验收。
+    truncated: false
+  risks:
+    - text: 正式 Shape 明确要求 Windows 和 macOS 的真实 native filesystem drag/drop 验证；当前 macOS
+        无此证据，Windows 只有用户报告恢复响应，完整 Shape 不得据此通过或归档。
+      truncated: false
+    - text: 1181 frontend、206 backend、15 Tauri、生产构建与六项 browser smoke、六项隔离 Linux
+        identity 检查及 diff 检查均通过，但 browser 替换了 Tauri native API 和 backend
+        commands，不能证明实际 OS 拖放或完整导入生命周期。
+      truncated: false
+    - text: 补证必须覆盖真实格式、目录/一层 wrapper、既有编辑、重复/副本工作区、无效/多项/忙碌及进行中取消；继续重复全量自动测试不能消除此证据阻断。
+      truncated: false
+    - text: 本次核对的 HEAD 为 74b5670974551ae8a4db27c307352e38e3d399cf，包含 feature 79dc199 和
+        A8 修复 41d5cc6；独立 ReadsQC 变更 be4a080 不在本验收范围。工作区原有 comet-state.yaml
+        Runtime 状态修改保持不变。
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-10-08T07:29:09.971Z
 history:
   - goal_cycle: 1
     iteration: 1
@@ -110,6 +417,26 @@ history:
       text: Native Shape artifacts changed
       truncated: false
     completed_at: 2026-10-08T07:08:44.181Z
+  - goal_cycle: 2
+    iteration: 1
+    attempt: 1
+    outcome: blocked
+    unresolved_ids:
+      - A1
+      - A2
+      - A3
+      - A5
+      - A6
+      - A7
+    summary:
+      text: 对 candidate 0718214f-aeb6-4064-8148-a60db224568d、stateVersion 8、iteration
+        1、attempt 1 完成独立只读复核。先核对完整 A1-A9、brief、Spec、实际代码及六项 Runtime 日志，最后参考
+        Builder 交接线索。A4/A8/A9 passed，A1/A2/A3/A5/A6/A7 blocked，无确证 failed
+        项。阻断是正式规格要求的真实 Windows/macOS native smoke
+        证据缺失，而不是自动检查失败。下一步应补齐当前实现候选的原生操作矩阵和前后状态证据，再交独立 Verifier 复核；不得把 Windows
+        可以了或 browser mock 扩张为完整验收。
+      truncated: false
+    completed_at: 2026-10-08T07:29:09.971Z
 history_overflow:
   dropped_entries: 0
   first_dropped_at: null
@@ -120,7 +447,7 @@ history_overflow:
     blocked: 0
     execution-error: 0
     recovery: 0
-verification_result: pending
-verification_report: null
+verification_result: blocked
+verification_report: verification.md
 archived: false
 created_at: 2026-10-08T05:24:34.619Z
