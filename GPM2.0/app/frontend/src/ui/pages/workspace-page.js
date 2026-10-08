@@ -268,10 +268,10 @@ export function bindWorkspacePage(host, store) {
 }
 
 function renderProjectHeaderMetadata(initializer, state) {
+  if (initializer.grtRecipe?.readsQcEnabled !== true) return "";
   const messages = getMessages(state, "workspace");
-  const enabled = initializer.grtRecipe?.readsQcEnabled === true;
   return `<div class="project-heading-meta">
-    <span class="project-qc-tag ${enabled ? "is-enabled" : ""}">${messages.cards.readsQc} · ${enabled ? messages.cards.enabled : messages.cards.disabled}</span>
+    <span class="project-qc-tag is-enabled">${messages.cards.readsQc} · ${messages.cards.enabled}</span>
   </div>`;
 }
 

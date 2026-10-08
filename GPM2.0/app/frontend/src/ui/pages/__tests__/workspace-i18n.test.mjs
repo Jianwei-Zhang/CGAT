@@ -296,7 +296,8 @@ test("rename editor is tied to the exact directory and project and cancel discar
   bindWorkspacePage(host, store);
   await rename.click();
   const editingHtml = renderWorkspacePage(store.getState());
-  assert.match(editingHtml, /class="project-heading">\s*<form class="project-title-row project-rename-form"[\s\S]*id="selected-project-name-input"[\s\S]*<\/form>\s*<div class="project-heading-meta">/);
+  assert.match(editingHtml, /class="project-heading">\s*<form class="project-title-row project-rename-form"[\s\S]*id="selected-project-name-input"[\s\S]*<\/form>\s*<\/div>/);
+  assert.doesNotMatch(editingHtml, /project-heading-meta|project-qc-tag/);
   assert.match(editingHtml, /id="selected-project-name-input"[^>]*size="9"/);
   assert.doesNotMatch(editingHtml, /<h2>|id="selected-project-rename-button"/);
   const otherDirectory = { ...store.getState(), session: { ...store.getState().session, workspacePath: "D:/other" } };
@@ -339,8 +340,7 @@ test("selected GRT project shows read-only metadata and offers on-demand renamin
   assert.match(html, /<h2>project_locked<\/h2>/);
   assert.match(html, /id="selected-project-rename-button"/);
   assert.doesNotMatch(html, /id="selected-project-name-input"|id="selected-project-save-button"/);
-  assert.match(html, /class="project-heading-meta"/);
-  assert.match(html, /class="project-qc-tag ">Reads QC · Disabled<\/span>/);
+  assert.doesNotMatch(html, /project-heading-meta|project-qc-tag|Reads QC · Disabled/);
   assert.match(html, /class="project-catalog-created">Created /);
   assert.ok(html.indexOf('class="project-catalog-created"') > html.indexOf('id="project-data-catalog"'));
   assert.doesNotMatch(html, /project-heading-created/);
@@ -352,6 +352,50 @@ test("selected GRT project shows read-only metadata and offers on-demand renamin
   assert.doesNotMatch(html, /id="selected-project-support-dataset-list"/);
   assert.doesNotMatch(html, /id="selected-project-chr-assignment-threshold-input"/);
   assert.doesNotMatch(html, /id="selected-project-phased-assembly-enabled-input"/);
+});
+
+for (const locale of ["zh", "en"]) {
+  for (const [status, recipe] of [
+    ["disabled", { readsQcEnabled: false }],
+    ["missing flag", {}],
+    ["missing recipe", null],
+    ["enabled", { readsQcEnabled: true }],
+  ]) {
+    test(`Reads QC badge is only rendered when enabled (${locale}, ${status})`, () => {
+      const html = renderWorkspacePage(createState({
+        locale,
+        session: { projectId: 7 },
+        initializer: {
+          existingProjects: [{ projectId: 7, projectName: "QC badge test" }],
+          grtRecipe: recipe,
+        },
+      }));
+      if (status === "enabled") {
+        assert.match(html, /class="project-heading-meta"/);
+        assert.match(html, locale === "zh"
+          ? /class="project-qc-tag is-enabled">Reads 质控 · 已启用<\/span>/
+          : /class="project-qc-tag is-enabled">Reads QC · Enabled<\/span>/);
+        assert.equal((html.match(/class="project-qc-tag/g) || []).length, 1);
+      } else {
+        assert.doesNotMatch(html, /project-qc-tag|project-heading-meta|Reads 质控|Reads QC/);
+      }
+    });
+  }
+}
+
+test("Reads QC badge visibility follows the current workspace on rerender", () => {
+  const state = createState({
+    session: { projectId: 7 },
+    initializer: {
+      existingProjects: [{ projectId: 7, projectName: "QC badge test" }],
+      grtRecipe: { readsQcEnabled: true },
+    },
+  });
+  assert.match(renderWorkspacePage(state), /project-qc-tag is-enabled/);
+  state.initializer.grtRecipe = { readsQcEnabled: false };
+  assert.doesNotMatch(renderWorkspacePage(state), /project-qc-tag|project-heading-meta/);
+  state.initializer.grtRecipe = { readsQcEnabled: true };
+  assert.match(renderWorkspacePage(state), /project-qc-tag is-enabled/);
 });
 
 test("processed selected-project name input mutates the edit draft", async () => {
