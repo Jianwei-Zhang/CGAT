@@ -2150,3 +2150,50 @@ test("import cancellation request failures restore the running dialog", async ()
     globalThis.clearTimeout = previousClearTimeout;
   }
 });
+
+for (const [name, activePath, clickedPath, shouldOpen] of [
+  ["literal POSIX backslash", "/data/a\\b", "/data/a/b", true],
+  ["case-sensitive POSIX paths", "/data/Project", "/data/project", true],
+  ["equivalent Windows separators", "D:\\Work\\Project\\", "D:/Work/Project", false],
+  ["Windows case aliases resolve natively", "D:/Work/Project", "D:/work/project", true],
+  ["equivalent trailing separator", "/data/Project/", "/data/Project", false],
+  ["same literal POSIX backslash", "/data/a\\b", "/data/a\\b", false],
+]) {
+  test(`project-page record click uses shared workspace identity: ${name}`, async () => {
+    const previousWindow = globalThis.window;
+    const previousDocument = globalThis.document;
+    const calls = [];
+    const button = createButton();
+    button.dataset.recentPath = clickedPath;
+    const host = createHost({ "[data-recent-index]": [button] });
+    // Observe the real click/open handler without replacing page DOM in this fixture.
+    host.closest = () => null;
+    const state = createImporterScrollState({ inFlight: false, importRunId: null });
+    state.session = { workspacePath: activePath, projectId: 7, projectName: "Current" };
+    const store = createStore(state);
+    try {
+      globalThis.document = { querySelector: () => null };
+      globalThis.window = {
+        localStorage: { getItem: () => JSON.stringify([{ path: activePath }, { path: clickedPath }]) },
+        dispatchEvent() {}, setTimeout: () => 1, clearTimeout() {},
+        __TAURI__: { core: { invoke: async (command, args) => {
+          calls.push({ command, args });
+          assert.equal(command, "open_workspace");
+          throw new Error("test stopped after native workspace open");
+        } } },
+      };
+      bindImporterPage(host, store);
+      await button.click();
+      assert.equal(calls.length, shouldOpen ? 1 : 0);
+      if (shouldOpen) {
+        assert.equal(calls[0].args.workspaceRoot, clickedPath);
+        assert.match(store.getState().importer.summary, /test stopped after native workspace open/);
+      }
+      assert.equal(store.getState().session.workspacePath, activePath);
+      assert.equal(store.getState().session.projectId, 7);
+    } finally {
+      globalThis.window = previousWindow;
+      globalThis.document = previousDocument;
+    }
+  });
+}

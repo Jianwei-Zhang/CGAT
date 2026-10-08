@@ -1,5 +1,5 @@
 import { relocateWorkspaceSuggestion } from "../../services/project-drop-controller.js";
-import { readWorkspaceHistory as readSharedHistory, writeWorkspaceHistory as writeSharedHistory, updateWorkspaceHistory as updateSharedHistory } from "../../services/workspace-history.js";
+import { readWorkspaceHistory as readSharedHistory, writeWorkspaceHistory as writeSharedHistory, updateWorkspaceHistory as updateSharedHistory, workspacePathIdentity } from "../../services/workspace-history.js";
 import {
   copyProjectWorkspace,
   deleteWorkspaceDirectory,
@@ -729,8 +729,8 @@ async function runCopyProjectFlow(host, store) {
 
 function validateProjectCopyInput(state, dialog) {
   const name = String(dialog.projectName || "").trim();
-  const target = normalizeWorkspacePathIdentity(dialog.targetRoot);
-  const source = normalizeWorkspacePathIdentity(dialog.sourceRoot);
+  const target = workspaceOperationSafetyIdentity(dialog.targetRoot);
+  const source = workspaceOperationSafetyIdentity(dialog.sourceRoot);
   if (!name) return i18nT(state, "importer.runtime.copyNameRequired");
   if (!target) return i18nT(state, "importer.runtime.copyPathRequired");
   if (target === source) return i18nT(state, "importer.runtime.copyPathSame");
@@ -1255,7 +1255,7 @@ async function runDeleteSelectedFlow(host, store) {
 
   const nextSession = { ...store.getState().session };
   const closedWorkspacePaths = deleteProjectRecord ? completedPaths : removedPaths;
-  if (workspacePathListIncludes(closedWorkspacePaths, nextSession.workspacePath)) {
+  if (workspacePathListIncludes(closedWorkspacePaths, nextSession.workspacePath, workspaceOperationSafetyIdentity)) {
     closeProjectSession(store);
     nextSession.workspacePath = "";
     nextSession.projectId = null;
@@ -1277,7 +1277,7 @@ async function runDeleteSelectedFlow(host, store) {
       deleteWithFiles: false,
       deleteTargets: [],
       historyValidation: nextValidation,
-      openWorkspacePath: workspacePathListIncludes(closedWorkspacePaths, currentImporter.openWorkspacePath)
+      openWorkspacePath: workspacePathListIncludes(closedWorkspacePaths, currentImporter.openWorkspacePath, workspaceOperationSafetyIdentity)
         ? ""
         : currentImporter.openWorkspacePath,
       projectError: failures.join("\n"),
@@ -2209,15 +2209,17 @@ function normalizePathList(paths) {
   return Array.from(deduped);
 }
 
-function workspacePathListIncludes(paths, candidatePath) {
-  const candidateIdentity = normalizeWorkspacePathIdentity(candidatePath);
+function workspacePathListIncludes(paths, candidatePath, pathIdentity = workspacePathIdentity) {
+  const candidateIdentity = pathIdentity(candidatePath);
   return Boolean(candidateIdentity) && paths.some(
-    (path) => normalizeWorkspacePathIdentity(path) === candidateIdentity,
+    (path) => pathIdentity(path) === candidateIdentity,
   );
 }
 
-function normalizeWorkspacePathIdentity(value) {
-  const normalized = String(value || "").trim().replace(/\\/g, "/").replace(/\/+$/, "");
+// Retain legacy Windows copy/delete safety checks, never use this coarse
+// comparison for project entry or history identity. Native code resolves aliases.
+function workspaceOperationSafetyIdentity(value) {
+  const normalized = workspacePathIdentity(value);
   return /^(?:[a-z]:\/|\/\/)/i.test(normalized) ? normalized.toLowerCase() : normalized;
 }
 
