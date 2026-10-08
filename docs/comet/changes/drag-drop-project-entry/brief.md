@@ -53,6 +53,7 @@ Allow the user to drag a delivery archive (.zip or .tar.gz, retaining existing .
 - User-proposed naming adopted in the draft: create the workspace beside the archive with the same archive stem plus a timestamp accurate to seconds. Use YYYYMMDD_HHMMSS to avoid filesystem-invalid colon characters.
 - Safe default: generated destination collisions use a visible _01, _02, ... suffix before confirmation; user-specified existing destinations and creation-time collisions are rejected, never overwritten.
 - Confirmed by user on 2026-10-08: the complete Shape including first-version boundaries; enter implementation.
+- Explicit scope revision requested by user on 2026-10-08: skip macOS native desktop acceptance for this change only, record it as skipped/unverified, keep Windows native acceptance and A1-A9 behavior unchanged, and make no macOS verification claim.
 
 # Open questions
 
@@ -62,7 +63,7 @@ No unresolved requirement questions. Shape was explicitly confirmed; remaining w
 
 - Unit and integration coverage for input classification, directory precedence, Windows/case-sensitive path identity, record metadata preservation, history deduplication across both existing writers, busy guards, invalid/multi-item inputs, repeated events, and session switching.
 - Backend fixtures for valid Full/Light deliveries in ZIP and tar.gz formats, an extracted wrapper, an existing workspace, and an unusable pre-existing database; unsuccessful classification must not mutate the filesystem.
-- Real desktop smoke checks on Windows and macOS for dragging .zip/.tar.gz/.tgz archives and directories from the file manager, overlay lifecycle, success, cancellation, busy feedback, and preservation of existing work. Browser mocks alone are not desktop-drag acceptance.
+- Real desktop smoke checks on Windows for dragging .zip/.tar.gz/.tgz archives and directories from Explorer, overlay lifecycle, success, cancellation, busy feedback, and preservation of existing work. Browser mocks alone are not desktop-drag acceptance. macOS Finder/native desktop checks are explicitly skipped for this change at the user's request on 2026-10-08, remain unverified, and are not required for this change's acceptance; this is not a macOS pass or a removal of functional support.
 - Deterministic timestamp/compound-extension and collision tests, custom-path validation, confirmation cancellation, and preservation of a prefilled path across rendering.
 - Existing importer and project-session regression tests plus a Windows-host production build, removal of generated dist, task-scoped Git diff review, and the configured Comet Verify gate at implementation time.
 
@@ -83,3 +84,9 @@ No unresolved requirement questions. Shape was explicitly confirmed; remaining w
 - User reported actual Windows desktop drop initially did not trigger, then explicitly reported "可以了" after troubleshooting. This is user-reported native Windows functionality, not an agent-observed per-format or full lifecycle desktop matrix. Local token inspection during diagnosis showed an elevated GPM process and non-elevated Explorer. macOS desktop dragging remains untested.
 - Reads-QC badge visibility was changed independently in `be4a080`; it is not an added acceptance requirement for this change.
 - Independent re-review, Runtime checks, Verifier results and Archive are still pending at this checkpoint. No formal pass is inferred from the manual feedback alone.
+
+## Validation scope revision (2026-10-08)
+
+- User explicitly requested "macos跳过验收". This change no longer requires a macOS Finder/native desktop test matrix for acceptance. Such checks are skipped/unverified, not passed; implemented cross-platform behavior is unchanged.
+- Windows Explorer/native desktop evidence remains required for archive formats and import lifecycle, fresh extracted roots/wrappers, preservation of existing projects/edits, active/copy workspaces, invalid/multi-item/busy feedback, session persistence and cancellation/error safety. A1-A9 behavioral requirements remain unchanged.
+- The prior independent blocked result and all completed automatic checks remain historical evidence. Skipping macOS does not create missing Windows observations or silently convert the prior blocked verdict into a pass. Re-confirm the revised complete Shape and have a new independent Verifier evaluate the Windows evidence before Archive.
