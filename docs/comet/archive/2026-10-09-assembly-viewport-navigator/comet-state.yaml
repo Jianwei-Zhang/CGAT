@@ -1,0 +1,557 @@
+schema: comet.native.v4
+name: assembly-viewport-navigator
+language: en
+phase: archive
+status: done
+state_version: 24
+brief: brief.md
+shape_confirmation_hash: f2f148ec1cf5e8e90abea7bec661a96847e17bd49db3054bd236b38fdb0c1d1e
+spec_changes:
+  - capability: assembly-view-navigation
+    operation: create
+    source: specs/assembly-view-navigation/spec.md
+workspace:
+  isolation: current
+  change_branch: master
+  target_branch: master
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 5
+  iteration: 2
+  attempt: 2
+  retry_epoch: 0
+  failed_iteration_count: 1
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: "A1: Main and local views remove the visible legacy 最小刻度单位(kb) and 最多可展示数
+      fields. Each view renders one navigator below its own toolbar and above
+      its graphic; the overview remains outside the horizontally scrolling
+      content and its axis aligns with the plot area rather than the track-name
+      gutter."
+    result: passed
+    reason:
+      text: Legacy scale fields are removed; one external navigator per main/local
+        view is correctly placed and aligned.
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: "A2: Dragging the overview selection translates the actual visible genomic
+      interval without changing its span, stays within the complete view domain,
+      and updates the graphic. Scrolling the graphic updates that same overview
+      selection and span display; neither direction creates a feedback loop."
+    result: passed
+    reason:
+      text: Overview range drag preserves span, clamps to the domain, synchronizes
+        plot scroll, and avoids feedback loops.
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: "A3: Dragging either selection edge changes the visible span with the
+      opposite edge stationary, within the valid domain and supported rendering
+      limits. The overview, read-only Window display, ruler, and graphic remain
+      synchronized; completing or cancelling a drag does not edit contigs."
+    result: passed
+    reason:
+      text: Edge resize preserves the opposite endpoint, respects bounds, synchronizes
+        all representations, and does not edit contigs.
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: "A4: Main/local wheel zoom decreases/increases span within bounds; the
+      navigator has no minus/plus zoom buttons. Full range (全览) selects the
+      entire current domain and displays all current content, without changing
+      font size or track height. Its tooltip explains that it displays the
+      complete viewing range, not application fullscreen."
+    result: passed
+    reason:
+      text: Bounded main/local wheel zoom and Full range behavior pass with no
+        plus/minus controls and correct tooltip semantics.
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: "A5: The navigator shows a read-only Window (窗口) span value with automatic
+      kb/Mb formatting. It contains no editable span input or unit selector.
+      Wheel zoom, edge resize, panning, horizontal scrolling, Full range,
+      content changes and refreshes keep this display synchronized with the
+      actual visible span."
+    result: passed
+    reason:
+      text: Window is read-only and geometry-derived; empty primary content now shows
+        — with disabled, aria-disabled, inert navigation while populated views
+        retain kb/Mb synchronization.
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: "A6: Main/local ruler spacing is controlled directly in the existing
+      toolbar, not inside Display settings. A single editable interval control
+      offers Auto as its first/default option, the shared kb presets (250, 500,
+      750, 1000, 10000, 100000), and custom positive values. Enter or blur
+      commits; invalid input gives explicit feedback without changing ruler or
+      window state. Changing ticks leaves visible interval, contig geometry,
+      scroll position, filters and the other view unchanged; Auto stays legible
+      at actual plot/font width."
+    result: passed
+    reason:
+      text: Inline Auto/numeric ruler controls, all presets, validation, keyboard
+        operation, and interval independence pass.
+      truncated: false
+  - id: A7
+    source: brief.md
+    text: "A7: Main and local navigation state remain independent after entry.
+      Ordinary, track-pair, and composition local modes all navigate their own
+      complete rendered domain rather than automatically using the entire
+      reference chromosome; changes of chromosome/content safely clamp or
+      restore an applicable interval."
+    result: passed
+    reason:
+      text: Main/local state isolation and ordinary, track-pair, and composition
+        domain navigation pass, including responsive composition interval
+        preservation.
+      truncated: false
+  - id: A8
+    source: brief.md
+    text: "A8: Legacy saved preferences are accepted without losing assembly data or
+      unrelated settings. Existing scale preferences are interpreted for
+      main/local viewing-range compatibility where applicable; no obsolete
+      tick-count preference can secretly change a migrated view when the new
+      ruler interval changes. Existing persisted/session ownership boundaries
+      are retained unless necessary for the navigator."
+    result: passed
+    reason:
+      text: Legacy scale migration initializes visible span while ruler settings
+        remain independent and persistence ownership is preserved.
+      truncated: false
+  - id: A9
+    source: brief.md
+    text: "A9: Navigation, tick changes, responsive layout changes, and view
+      restoration do not create assembly edit-history entries or alter contig
+      positions, orientations, local anchors, alignment evidence, Final Path
+      order, or exported sequence/data. Existing selection, contig dragging,
+      focus and history actions continue to work in mouse mode; hand-mode drag
+      exclusively pans the viewing interval."
+    result: passed
+    reason:
+      text: Navigation changes only view state and preserves biological records,
+        offsets, anchors, evidence, selections, histories, and Final Path state.
+      truncated: false
+  - id: A10
+    source: brief.md
+    text: "A10: Final Path removes both legacy inputs from the App header and
+      displays only its ruler interval control. It has no new overview range
+      navigator, visible-span input, fit-all button, or zoom buttons. Main/local
+      navigation does not modify its interval preference."
+    result: passed
+    reason:
+      text: Final Path remains navigator-free and exposes only its independent direct
+        ruler interval control.
+      truncated: false
+  - id: A11
+    source: brief.md
+    text: "A11: Final Path exposes one ruler interval control, defaulting to Auto
+      with manual spacing available. Manual ruler changes affect only
+      ticks/labels, not path pixel geometry, segment order, segment lengths, or
+      export coordinates. Empty and very short paths remain well defined."
+    result: passed
+    reason:
+      text: Final Path Auto/manual ruler changes leave segment geometry and state
+        unchanged, including defined empty/short behavior.
+      truncated: false
+  - id: A12
+    source: brief.md
+    text: "A12: Final Path displays its complete assembled path fitted to the
+      available plot width on render and window resize, without needing
+      horizontal navigation to reach the last segment. Legacy scale/tick-count
+      preferences cannot override that fit; automatic tick density follows the
+      width while a manually chosen interval remains a ruler-only preference."
+    result: passed
+    reason:
+      text: Final Path fits the measured viewport across responsive widths and ignores
+        legacy scale fields for geometry.
+      truncated: false
+  - id: A13
+    source: brief.md
+    text: "A13: New main/local controls and the direct Final Path interval control
+      have Chinese/English labels and accessible names. Tick entry and selection
+      remain keyboard-operable; window display is not editable or focusable.
+      Overview handles remain usable when the selected interval is wide enough;
+      below 48px on the overview axis hide resize handles and prioritize pan
+      through a transparent target of at least 24px, clamped inside the axis.
+      Keep the visible selection proportional to the real interval; wheel zoom
+      remains available and handles return at 48px or wider. Wide/narrow layouts
+      group left/right movement icons before the overview axis and keep Full
+      range directly on its right without covering the graphic."
+    result: passed
+    reason:
+      text: Localization, accessibility, keyboard operation, responsive grouping,
+        compact pan target, and focus fallbacks pass.
+      truncated: false
+  - id: A14
+    source: brief.md
+    text: "A14: Current Windows-host frontend regression tests and a Windows-host
+      production build pass, with generated dist removed after inspection.
+      Interaction/visual evidence covers main view, all local modes, and Final
+      Path, including reciprocal scroll/range updates, boundaries, empty data,
+      and manual ticks; unexecuted native or platform checks are reported as
+      unverified, not passed."
+    result: passed
+    reason:
+      text: Current Runtime receipts pass 1227/1227 Windows tests, production build
+        with dist removed, 43+34+34 populated and 6 empty browser checks, no
+        page errors, and Git diff check.
+      truncated: false
+  - id: A15
+    source: brief.md
+    text: "A15: Ordinary wheel over the main/local overview axis or plot zooms
+      without Ctrl/Space in either interaction mode. Wheel-up zooms in and
+      wheel-down zooms out, anchored at the cursor's genomic point on the plot
+      or the current range center on the overview. Range, span, graphic and
+      ruler stay synchronized; invalid/empty domains, limits and high-frequency
+      events remain bounded. Wheel over form fields, menus or outside these
+      surfaces is not captured as chart zoom, and Final Path gains no new wheel
+      zoom."
+    result: passed
+    reason:
+      text: Modifier-free wheel handling has correct surfaces, anchoring, coalescing,
+        isolation, bounds, empty-domain inertness, and Final Path exclusion.
+      truncated: false
+  - id: A16
+    source: brief.md
+    text: "A16: Each main/local navigation row has one clear sliding mouse/hand mode
+      switch component (off = mouse, on = hand), not separate independent mode
+      buttons, defaulting to mouse for a new context and independent of the
+      other view. Mouse mode preserves existing selection/contig-drag/blank-area
+      box-selection behavior; hand mode makes ordinary plot left-drag pan the
+      interval without changing its span, moving contigs, committing a box
+      selection or triggering a post-drag click. Cursor/active state reflect the
+      mode; pointer cancellation, mode change, blur and repeated rerenders do
+      not leave dragging stuck or duplicate handlers."
+    result: passed
+    reason:
+      text: The mutual-exclusive mouse/hand switch, ownership, span-preserving pan,
+        click suppression, cancellation, cleanup, and rerender behavior pass.
+      truncated: false
+  - id: A17
+    source: brief.md
+    text: "A17: Left/right icons form an adjacent movement group before each
+      overview axis; Full range is immediately after the axis. Each moves the
+      visible interval by half its current genomic span toward lower/higher
+      coordinates, preserving span and synchronizing plot/range/display. Near
+      edges move only the remaining distance and disable blocked directions;
+      disable both on Full range. They are navigation controls, not history
+      controls, and are absent from Final Path."
+    result: passed
+    reason:
+      text: Half-window controls are correctly placed, named, bounded, disable at
+        edges/full range, preserve span, and are absent from Final Path.
+      truncated: false
+builder_handoff:
+  candidate_id: e101a090-da9b-4e22-b4c8-7e9e592b34dc
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:22fbf3c4-27df-44e4-a60f-c8f6e984e4db
+  iteration: 2
+  summary:
+    text: Repair A5/A14/A15 empty-state defect. Main renderer now marks navigation
+      content from actual support/primary/phased/mirror contig rows (excluding
+      reference-only geometry); empty content suppresses navigation geometry,
+      shows Window as unavailable, disables native controls, marks the range
+      slider aria-disabled and removes it from tab order, while populated
+      content restores normal behavior. Empty ordinary/track-pair/composition
+      local views remain navigator-absent and empty Final Path remains fitted
+      and tick-only. Commit f12cd24 pushed on master.
+    truncated: false
+  addressed_acceptance_ids:
+    - A5
+    - A14
+    - A15
+  checks:
+    - name:
+        text: Windows npm.cmd test
+        truncated: false
+      result: passed
+      note:
+        text: 1227/1227 tests; viewport-empty-repair-tests.log
+        truncated: false
+    - name:
+        text: Windows npm.cmd run build
+        truncated: false
+      result: passed
+      note:
+        text: 1975 modules; dist removed; existing chunk-size warning only
+        truncated: false
+    - name:
+        text: Windows Chrome populated browser interactions
+        truncated: false
+      result: passed
+      note:
+        text: 43 general + 34 compact + 34 closure checks after repair
+        truncated: false
+    - name:
+        text: Windows Chrome empty-state interactions
+        truncated: false
+      result: passed
+      note:
+        text: "6/6 entries: primary disabled/unavailable and inert; empty
+          ordinary/track-pair/composition local absent; empty Final Path
+          fitted/tick-only; no page errors"
+        truncated: false
+    - name:
+        text: git diff --check
+        truncated: false
+      result: passed
+      note:
+        text: Six repair files committed and pushed
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: Frontend browser uses real renderer fixtures with intercepted APIs; not
+        native Tauri desktop acceptance.
+      truncated: false
+    - text: Real backend persistence and live export were not separately invoked;
+        backend/Rust contracts unchanged.
+      truncated: false
+    - text: No installer, release, deployment, or platform-native checks executed.
+      truncated: false
+  known_limits_truncated: false
+  review:
+    status: passed
+    summary:
+      text: "Independent read-only Builder review found no blocker: actual track-row
+        content predicate preserves support/phased/mirror-only navigation, empty
+        geometry is rejected, UI/accessibility and inert interaction semantics
+        are correct, populated semantics restore, and tests meaningfully cover
+        the repair."
+      truncated: false
+    reviewer_execution_ref: 01a12026-ef8b-7cc1-b70f-6b3860ea1bfd
+  submitted_at: 2026-10-09T10:18:49.632Z
+blockers: []
+verification:
+  candidate_id: e101a090-da9b-4e22-b4c8-7e9e592b34dc
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:4eee7341-3922-4a5b-91a0-6a5d4f5abca0
+  iteration: 2
+  attempt: 2
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: windows-frontend-tests-repair
+      name:
+        text: Windows frontend regression tests after empty-state repair
+        truncated: false
+      argv_display:
+        - text: proxy
+          truncated: false
+        - text: /mnt/c/Program Files/PowerShell/7/pwsh.exe
+          truncated: false
+        - text: -NoLogo
+          truncated: false
+        - text: -NoProfile
+          truncated: false
+        - text: -Command
+          truncated: false
+        - text: Set-Location "D:\desktop\CGAT\GPM2.0\app\frontend"; & npm.cmd test; exit
+            $LASTEXITCODE
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 3655
+    - id: windows-frontend-build-repair
+      name:
+        text: Windows production build and cleanup after empty-state repair
+        truncated: false
+      argv_display:
+        - text: proxy
+          truncated: false
+        - text: /mnt/c/Program Files/PowerShell/7/pwsh.exe
+          truncated: false
+        - text: -NoLogo
+          truncated: false
+        - text: -NoProfile
+          truncated: false
+        - text: -Command
+          truncated: false
+        - text: Set-Location "D:\desktop\CGAT\GPM2.0\app\frontend"; try { & npm.cmd run
+            build; $code=$LASTEXITCODE } finally { if (Test-Path "dist") {
+            Remove-Item -Recurse -Force "dist" } }; exit $code
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 5689
+    - id: windows-populated-browser-repair
+      name:
+        text: Windows Chrome populated general, compact, and closure checks after repair
+        truncated: false
+      argv_display:
+        - text: proxy
+          truncated: false
+        - text: /mnt/c/Program Files/PowerShell/7/pwsh.exe
+          truncated: false
+        - text: -NoLogo
+          truncated: false
+        - text: -NoProfile
+          truncated: false
+        - text: -Command
+          truncated: false
+        - text: '& "D:\desktop\CGAT\.comet\runtime\viewport-runtime-browser.ps1"; exit
+            $LASTEXITCODE'
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 81010
+    - id: windows-empty-state-browser-repair
+      name:
+        text: Windows Chrome empty primary/local/Final Path acceptance after repair
+        truncated: false
+      argv_display:
+        - text: proxy
+          truncated: false
+        - text: /mnt/c/Program Files/PowerShell/7/pwsh.exe
+          truncated: false
+        - text: -NoLogo
+          truncated: false
+        - text: -NoProfile
+          truncated: false
+        - text: -Command
+          truncated: false
+        - text: Set-Location "D:\desktop\CGAT"; & node
+            .comet/runtime/viewport-empty-state-browser.cjs; exit $LASTEXITCODE
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 6974
+    - id: task-git-diff-check-repair
+      name:
+        text: Repair Git whitespace check
+        truncated: false
+      argv_display:
+        - text: git
+          truncated: false
+        - text: diff
+          truncated: false
+        - text: --check
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 5298
+  summary:
+    text: "Final full pass: independent read-only verification found A1-A17
+      satisfied on current HEAD f12cd24 after the empty-state repair; Runtime
+      checks and browser evidence all pass within the disclosed non-native
+      boundary."
+    truncated: false
+  risks:
+    - text: Browser acceptance used the real frontend renderer with fixture state and
+        intercepted APIs, not native Tauri/live-backend end-to-end acceptance.
+      truncated: false
+    - text: Real backend persistence/live export and unchanged Rust/backend contracts
+        were not separately exercised.
+      truncated: false
+    - text: Installer, release, deployment, and platform-native checks were not run.
+      truncated: false
+    - text: The successful build retained the pre-existing greater-than-500-kB chunk
+        warning.
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-10-09T10:31:22.043Z
+history:
+  - goal_cycle: 1
+    iteration: 0
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native confirmed acceptance criteria changed
+      truncated: false
+    completed_at: 2026-10-09T05:55:32.897Z
+  - goal_cycle: 2
+    iteration: 1
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native confirmed acceptance criteria changed
+      truncated: false
+    completed_at: 2026-10-09T07:10:39.181Z
+  - goal_cycle: 3
+    iteration: 1
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native confirmed acceptance criteria changed
+      truncated: false
+    completed_at: 2026-10-09T07:43:55.681Z
+  - goal_cycle: 4
+    iteration: 1
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native confirmed acceptance criteria changed
+      truncated: false
+    completed_at: 2026-10-09T08:29:39.486Z
+  - goal_cycle: 5
+    iteration: 1
+    attempt: 1
+    outcome: fail
+    unresolved_ids:
+      - A5
+      - A14
+      - A15
+    summary:
+      text: "Fail: A5, A14, and A15 failed because an empty primary assembly is
+        presented as a normal 2 Mb navigable window instead of an unavailable
+        noninteractive state; the other 14 acceptance items passed."
+      truncated: false
+    completed_at: 2026-10-09T10:08:47.213Z
+  - goal_cycle: 5
+    iteration: 2
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Repair verification passed for A5, A14, A15; final full verification is
+        required.
+      truncated: false
+    completed_at: 2026-10-09T10:24:16.094Z
+  - goal_cycle: 5
+    iteration: 2
+    attempt: 2
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: "Final full pass: independent read-only verification found A1-A17
+        satisfied on current HEAD f12cd24 after the empty-state repair; Runtime
+        checks and browser evidence all pass within the disclosed non-native
+        boundary."
+      truncated: false
+    completed_at: 2026-10-09T10:31:22.043Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-10-09T05:33:11.446Z
