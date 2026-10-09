@@ -228,6 +228,13 @@ test("assembly english view renders localized track labels and mirror empty stat
   assert.doesNotMatch(html, /主 ds 轨道|辅 ds 轨道|mirror 轨道/);
 });
 
+test("assembly main view marks empty track content as unavailable for navigation", () => {
+  const empty = renderAssemblyPage(createState({ assembly: { chrCtgs: [], supportChrCtgs: [], supportMirroredCtgs: [], phasedChrTracks: [] } }));
+  assert.match(empty, /data-track-role="primary"[\s\S]*?data-view-navigation-content="0"/);
+  const populated = renderAssemblyPage(createState());
+  assert.match(populated, /data-track-role="primary"[\s\S]*?data-view-navigation-content="1"/);
+});
+
 test("assembly main view renders unified single-card track container", () => {
   const html = renderAssemblyPage(
     createState({

@@ -36,7 +36,7 @@ export function formatViewSpan(bp, preferredUnit) {
 }
 
 export function readViewNavigationGeometry(scrollEl, metrics) {
-  if (!metrics || !scrollEl) return null;
+  if (!metrics || !scrollEl || scrollEl.dataset?.viewNavigationContent === "0") return null;
   const bpPerPx = metrics.domainSpanBp / metrics.innerWidth;
   const min = metrics.windowStartBp + metrics.viewboxMinX * bpPerPx;
   const width = Math.max(metrics.viewportWidth, Number(scrollEl.scrollWidth) || metrics.innerWidth);

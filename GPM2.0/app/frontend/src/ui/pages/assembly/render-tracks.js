@@ -1497,6 +1497,9 @@ function renderAssemblyTracks({
         && normalizeSupportDatasetId(row.datasetId) === normalizedSupportDatasetId,
     })),
   );
+  const hasNavigableTrackContent = trackRows.some(
+    (row) => Array.isArray(row.trackModel?.ctgs) && row.trackModel.ctgs.length > 0,
+  );
 
   const rulerTop = 24 * TRACK_HEIGHT_SCALE;
   let cursorY = 44 * TRACK_HEIGHT_SCALE;
@@ -2380,6 +2383,7 @@ function renderAssemblyTracks({
         <div
           class="assembly-track-scroll"
           data-track-role="primary"
+          data-view-navigation-content="${hasNavigableTrackContent ? "1" : "0"}"
           data-focus-center="${focusCenterContentX}"
           data-focus-start="${focusStartContentX}"
           data-track-window-start-bp="${visualWindowStart}"

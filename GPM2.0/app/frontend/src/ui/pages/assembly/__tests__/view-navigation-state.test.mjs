@@ -45,6 +45,7 @@ test("viewport geometry includes viewbox origin and native scroll position", () 
   assert.deepEqual(geometry.domain, { start: -100, end: 5900, viewportWidth: 1000 });
   assert.deepEqual(geometry.range, { start: 700, span: 2000 });
   assert.equal(readViewNavigationGeometry(null, null), null);
+  assert.equal(readViewNavigationGeometry({ dataset: { viewNavigationContent: "0" }, scrollWidth: 3000, scrollLeft: 400 }, { windowStartBp: 100, viewboxMinX: -100, innerWidth: 2000, domainSpanBp: 4000, viewportWidth: 1000 }), null);
 });
 test("legacy scale migrates once and ticks cannot change the new span", () => {
   const legacy = resolveTrackPrefs({ minTickUnitKb: 500, maxTickCount: 15 });

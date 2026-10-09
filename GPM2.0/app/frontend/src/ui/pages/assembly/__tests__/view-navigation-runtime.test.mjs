@@ -249,6 +249,24 @@ test("invalid tick values do not commit and Escape restores the last valid Auto 
   } finally { h.dispose(); }
 });
 
+test("explicit empty primary content disables navigation without fabricating a window", () => {
+  const h = harness();
+  try {
+    h.views.primary.scroll.dataset.viewNavigationContent = "0";
+    for (const action of ["toggle-mode", "left", "right", "fit"]) h.views.primary.action(action);
+    h.bind();
+    assert.equal(h.views.primary.display.textContent, "—");
+    for (const action of ["toggle-mode", "left", "right", "fit"]) assert.equal(h.views.primary.action(action).disabled, true);
+    assert.equal(h.views.primary.selection.attrs["aria-disabled"], "true");
+    assert.equal(h.views.primary.selection.attrs.tabindex, "-1");
+    const before = JSON.stringify(h.store.getState());
+    h.root.emit("wheel", h.event(h.views.primary.scroll, { deltaY: -100 })); h.flush();
+    h.root.emit("click", h.event(h.views.primary.action("fit")));
+    assert.equal(JSON.stringify(h.store.getState()), before);
+    assert.equal(h.writes, 0);
+  } finally { h.dispose(); }
+});
+
 test("window text follows actual metrics, is automatic in units and cannot commit input", () => {
   const h = harness();
   try {

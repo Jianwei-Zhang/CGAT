@@ -76,15 +76,19 @@ function createController(root, store, window) {
     const modeSwitch = bar.querySelector("[data-view-nav-action='toggle-mode']");
     modeSwitch.setAttribute("aria-checked", String(current.mode === "hand"));
     modeSwitch.setAttribute("title", viewNavText(locale())[current.mode]);
+    const selection = bar.querySelector("[data-view-nav-window]");
     if (!geometry) {
       bar.querySelector("[data-view-nav-span]").textContent = "—";
       bar.querySelector("[data-view-nav-grip]").hidden = true;
       bar.querySelectorAll("button,input,select").forEach((node) => { node.disabled = true; });
+      selection.setAttribute("aria-disabled", "true");
+      selection.setAttribute("tabindex", "-1");
       return;
     }
     const { domain, range } = geometry;
     bar.querySelectorAll("button,input,select").forEach((node) => { node.disabled = false; });
-    const selection = bar.querySelector("[data-view-nav-window]");
+    selection.setAttribute("aria-disabled", "false");
+    selection.setAttribute("tabindex", "0");
     selection.style.left = `${100 * (range.start - domain.start) / (domain.end - domain.start)}%`;
     selection.style.width = `${100 * range.span / (domain.end - domain.start)}%`;
     // Preserve the true selected width; enlarge only the transparent pan target.
