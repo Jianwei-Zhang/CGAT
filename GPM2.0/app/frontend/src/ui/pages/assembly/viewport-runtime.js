@@ -207,14 +207,15 @@ export function createAssemblyViewportController({
       && Number.isFinite(innerWidth) && innerWidth > 0
       ? domainSpanBp / innerWidth
       : null;
-    const bpPerPx = Number(savedViewport.bpPerPx) > 0
-      ? Number(savedViewport.bpPerPx)
-      : measuredBpPerPx;
+    const bpPerPx = state.assembly?.subviewTrackView?.fullRange === true
+      ? measuredBpPerPx
+      : Number(savedViewport.bpPerPx) > 0 ? Number(savedViewport.bpPerPx) : measuredBpPerPx;
     if (!Number.isFinite(bpPerPx) || bpPerPx <= 0) return false;
     const viewboxMinX = Number(element?.dataset?.subviewViewboxMinX || 0);
     const leftBp = (Math.max(0, Number(scrollLeft || 0))
       + (Number.isFinite(viewboxMinX) ? viewboxMinX : 0)) * bpPerPx;
-    if (Math.abs(Number(savedViewport.leftBp || 0) - leftBp) < 0.5) return false;
+    if (Math.abs(Number(savedViewport.leftBp || 0) - leftBp) < 0.5
+      && Math.abs(Number(savedViewport.bpPerPx || 0) - bpPerPx) < 0.000001) return false;
     store.setState({
       ...state,
       assembly: updateSubviewCompositionViewport(state.assembly, {
@@ -424,6 +425,10 @@ export function createAssemblyViewportController({
           session.lastSubviewScrollLeft = anchoredScrollLeft;
         }
         session.pendingSubviewViewportAnchorBp = null;
+      }
+      if (state.assembly.subviewTrackView?.fullRange === true) {
+        session.lastSubviewScrollLeft = 0;
+        setSubviewCompositionViewportFromScroll(store, primarySubviewScroll, 0);
       }
       if (setAssemblyViewportScrollState(store, "subviewTrackScrollState", {
         viewportKey: session.lastSubviewViewportKey,

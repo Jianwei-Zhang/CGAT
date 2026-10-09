@@ -168,6 +168,7 @@ function createRenderTracksRenderer(deps = {}) {
     getMeasuredTrackViewportPx: getMeasuredTrackViewportPxImpl,
     getSupportDatasetOptions,
     getMainTrackDragPreviewOffset = () => null,
+    getSubviewTrackDragPreview = () => null,
   } = deps;
   if (
     typeof escapeAttr !== "function"
@@ -195,6 +196,7 @@ function createRenderTracksRenderer(deps = {}) {
     escapeAttr,
     escapeHtml,
     formatBpInterval,
+    getSubviewTrackDragPreview,
     getMeasuredTrackViewportPx,
     renderTrackNumberInput,
     resolveSubviewTrackDragOffsetBp,

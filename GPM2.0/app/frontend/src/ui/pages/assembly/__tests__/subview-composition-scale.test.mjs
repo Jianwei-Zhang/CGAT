@@ -362,3 +362,17 @@ test("context-menu remove deletes one composition member and records one history
   assert.equal(refreshed, 1);
   assert.equal(persisted, 1);
 });
+
+
+test("composition full-range mode derives each fit from current member bounds on both sides", () => {
+  const prefs = { fullRange: true, visibleSpanBp: 900000 };
+  for (const xBp of [-50000, 50000, 0]) {
+    const composition = { members: [member(100000, xBp)] };
+    const viewport = resolveSubviewCompositionScaleViewport(composition, {
+      trackPrefs: prefs, viewportWidthPx: 1000, centerBp: -999999,
+    });
+    const start = Math.min(0, xBp), end = Math.max(0, xBp + 100000);
+    assert.equal(viewport.leftBp, start);
+    assert.equal(viewport.bpPerPx * 1000, end - start);
+  }
+});

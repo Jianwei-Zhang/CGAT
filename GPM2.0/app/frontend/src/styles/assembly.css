@@ -218,6 +218,8 @@
 }
 
 .assembly-track-panel {
+  min-width: 0;
+  box-sizing: border-box;
   border: 1px solid #c7c7c7;
   background: #f3f3f3;
   padding: 10px;
@@ -682,12 +684,14 @@
 }
 
 .assembly-main-view {
+  min-width: 0;
   position: relative;
   display: grid;
   gap: 8px;
 }
 
 .assembly-track-content-stack {
+  min-width: 0;
   position: relative;
   display: grid;
   gap: 8px;
@@ -1184,6 +1188,7 @@
 }
 
 .assembly-track-layout {
+  min-width: 0;
   position: relative;
   display: grid;
   grid-template-columns: 136px minmax(0, 1fr);
@@ -1192,6 +1197,8 @@
 }
 
 .assembly-track-label-column {
+  box-sizing: border-box;
+  max-width: 100%;
   position: sticky;
   left: 0;
   z-index: 2;
@@ -1253,11 +1260,22 @@
 }
 
 .assembly-track-scroll {
+  min-width: 0;
+  box-sizing: border-box;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   position: relative;
   overflow-x: auto;
   overflow-y: hidden;
   border: 1px solid #d2d2d2;
   background: #fff;
+}
+
+/* Keep scrolling for the top navigator and hand tool, without a second control. */
+.assembly-track-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .track-sticky-label-layer {
@@ -1921,6 +1939,9 @@
 
 /* Navigation and graphic share one card; only the graphic scrolls horizontally. */
 .assembly-view-card {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow: hidden;
   min-width: 0;
   border: 1px solid #d2d2d2;
   background: #fff;
@@ -1979,7 +2000,7 @@
 .view-nav-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .view-nav-button:hover:not(:disabled), .view-nav-fit:hover { background: #edf4fc; }
 .view-nav-button:disabled, .view-nav-fit:disabled { color: #a6b0be; background: #f6f8fa; cursor: default; }
-.view-nav-fit { padding: 3px 8px; white-space: nowrap; font: inherit; }
+.view-nav-fit { flex: 0 0 auto; padding: 3px 8px; white-space: nowrap; font: inherit; }
 .view-nav-axis {
   position: relative;
   flex: 1 1 auto;
@@ -2021,8 +2042,21 @@
 .view-nav-edge.is-right { right: 0; }
 .view-nav-edge.is-left::after { left: 2px; }
 .view-nav-edge.is-right::after { right: 2px; }
-.view-nav-span { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; margin-left: auto; }
-.view-nav-span [data-view-nav-span] { font-variant-numeric: tabular-nums; }
+.view-nav-span {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  align-items: center;
+  white-space: nowrap;
+  margin-left: auto;
+  padding-left: 12px;
+}
+.view-nav-span [data-view-nav-span] {
+  display: inline-block;
+  width: 16ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 .view-tick-control input {
   height: 28px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 5px; color: inherit; background: #fff; font: inherit;
 }

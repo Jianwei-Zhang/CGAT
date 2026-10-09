@@ -830,3 +830,59 @@ test("bindSubviewTrackContigDrag preserves the preview world viewport after rere
     globalThis.window = originalWindow;
   }
 });
+
+
+for (const composition of [false, true]) {
+  for (const cancel of [false, true]) {
+    test(`full-range Subview ${composition ? "composition" : "pair"} preview ${cancel ? "cancels" : "commits once"} without refit drift`, () => {
+      const originalWindow = globalThis.window;
+      const win = createWindowStub();
+      globalThis.window = win;
+      try {
+        const host = createHost();
+        const state = { assembly: { activeTab: "assembly", subview: {},
+          subviewTrackView: { fullRange: true }, subviewTrackDragOffsets: [] } };
+        const store = createStore(state);
+        const scroll = { scrollLeft: 0,
+          dataset: { subviewDomainSpanBp: "100", subviewInnerWidth: "100" } };
+        const node = { getAttribute: (name) => ({
+          "data-subview-track-slot": "top", "data-subview-contig-id": "12",
+          "data-subview-composition-entity-key": composition ? "assembly:12" : "",
+        })[name] || null, closest: () => scroll };
+        const target = { closest: (selector) => selector === "[data-subview-contig-id][data-subview-track-slot]" ? node : null };
+        const previews = [], commits = [], clears = [];
+        let persisted = 0;
+        bindSubviewTrackContigDrag(host, store, {
+          clearSubviewTrackDragPreview() {},
+          applySubviewTrackDragOffset(_host, _store, payload) { commits.push(payload); },
+          convertTrackOffsetPxToBp(value, context) { return value * context.domainSpanBp / context.innerWidth; },
+          previewSubviewTrackContigDrag() { assert.fail("full overview must not retain an old DOM envelope"); },
+          previewFullRangeSubviewContigDrag(_host, _store, payload) {
+            previews.push(payload);
+            scroll.dataset.subviewDomainSpanBp = "200";
+          },
+          clearFullRangeSubviewDragPreview(_host, _store, options) { clears.push(options); },
+          resolveActiveTrackScrollElement: () => scroll,
+          resolveSubviewTrackDragOffsetBp: () => 7,
+          roundTrackMetric: (value) => value,
+          persistSubviewTrackDragOffsets() { persisted += 1; },
+        });
+        host.listeners.get("pointerdown")({ button: 0, clientX: 5, target, preventDefault() {} });
+        win.listeners.get("pointermove")({ clientX: 17 });
+        win.flushAnimationFrame();
+        win.listeners.get("pointermove")({ clientX: 22 });
+        win.flushAnimationFrame();
+        // Twelve bp at initial scale, then ten at the new scale. A stationary
+        // release contributes no automatic projection displacement.
+        const expected = { slot: "top", contigId: 12,
+          ...(composition ? { compositionEntityKey: "assembly:12", dragDeltaBp: 22 } : { offsetBp: 29 }) };
+        assert.deepEqual(previews.at(-1), expected);
+        if (cancel) win.listeners.get("pointercancel")();
+        else win.listeners.get("pointerup")({ clientX: 22 });
+        assert.deepEqual(commits, cancel ? [] : [expected]);
+        assert.equal(persisted, cancel ? 0 : 1);
+        if (cancel) assert.ok(clears.some((options) => options?.cancelled));
+      } finally { globalThis.window = originalWindow; }
+    });
+  }
+}

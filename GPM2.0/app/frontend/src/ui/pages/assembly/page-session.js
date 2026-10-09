@@ -40,6 +40,7 @@ export function createAssemblyPageSession() {
     pendingTrackAutoFocusMode: null,
     trackContigDragActive: false,
     mainTrackDragPreview: null,
+    subviewTrackDragPreview: null,
     pendingPrimaryViewportAnchorBp: null,
     pendingSubviewViewportAnchorBp: null,
     deferredRerenderCoordinator: null,

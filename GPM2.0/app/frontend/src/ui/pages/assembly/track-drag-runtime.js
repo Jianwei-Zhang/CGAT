@@ -383,8 +383,30 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     let pendingPreviewScrollLeft = null;
     let pendingPreviewViewportLeftX = null;
     let pendingPointerClientX = startClientX;
+    const fullRangeDrag = state.assembly.subviewTrackView?.fullRange === true
+      && typeof deps.previewFullRangeSubviewContigDrag === "function"
+      && typeof deps.clearFullRangeSubviewDragPreview === "function";
+    const dragHost = fullRangeDrag ? scrollEl.closest?.("#route-host") || host : host;
+    let lastPointerClientX = startClientX;
+    let finished = false;
+    const sameContext = () => {
+      const next = store.getState();
+      return next.session?.projectId === state.session?.projectId
+        && next.assembly?.selectedChrName === state.assembly?.selectedChrName
+        && next.assembly?.subview === state.assembly?.subview;
+    };
 
     const scheduler = createFrameScheduler(() => {
+      if (fullRangeDrag) {
+        if (!sameContext()) { finish(false); return; }
+        deps.previewFullRangeSubviewContigDrag(dragHost, store, {
+          slot, contigId,
+          ...(compositionEntityKey
+            ? { compositionEntityKey, dragDeltaBp: pendingOffsetBp }
+            : { offsetBp: pendingOffsetBp }),
+        });
+        return;
+      }
       const offsetPx = deps.roundTrackMetric(
         deltaOffsetBpToPx(pendingOffsetBp - baseOffsetBp, deps, scaleContext),
       );
@@ -406,12 +428,27 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     });
 
     const updatePendingPointerPosition = (pointerEvent) => {
+      if (finished) return;
+      if (fullRangeDrag && !sameContext()) { finish(false); return; }
       const currentClientX = Number(pointerEvent?.clientX);
       if (!Number.isFinite(currentClientX)) {
         return;
       }
       pendingPointerClientX = currentClientX;
-      const currentScrollEl = deps.resolveActiveTrackScrollElement(host, "subview", scrollEl);
+      const currentScrollEl = deps.resolveActiveTrackScrollElement(dragHost, "subview", scrollEl);
+      if (fullRangeDrag) {
+        if (!dragging && Math.abs(currentClientX - startClientX) < 2) return;
+        const deltaX = currentClientX - lastPointerClientX;
+        if (!deltaX) return;
+        dragging = true;
+        pendingOffsetBp = deps.roundTrackMetric(pendingOffsetBp + deps.convertTrackOffsetPxToBp(deltaX, {
+          domainSpanBp: Number(currentScrollEl?.dataset?.subviewDomainSpanBp || 0),
+          innerWidth: Number(currentScrollEl?.dataset?.subviewInnerWidth || 0),
+        }));
+        lastPointerClientX = currentClientX;
+        scheduler.schedule();
+        return;
+      }
       const currentScrollLeft = Number(currentScrollEl?.scrollLeft || 0);
       const scrollDeltaX = (currentScrollLeft - startScrollLeft) - previewAutoScrollDeltaPx;
       const currentCompositionPointerWorldX = compositionEntityKey
@@ -439,6 +476,9 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     };
 
     const finish = (shouldCommit) => {
+      if (finished) return;
+      // Async evidence or a context switch must not apply the drag to a new pair.
+      if (fullRangeDrag && !sameContext()) shouldCommit = false;
       const windowObject = getWindowObject();
       windowObject?.removeEventListener?.("pointermove", onPointerMove, true);
       windowObject?.removeEventListener?.("pointerup", onPointerUp, true);
@@ -448,11 +488,15 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       } else {
         scheduler.cancel();
       }
+      if (finished) return;
+      finished = true;
       deps.clearSubviewTrackDragPreview(host);
+      if (fullRangeDrag) deps.clearFullRangeSubviewDragPreview(dragHost, store);
       const hasEffectiveMovement = dragging
         && Math.abs(pendingOffsetBp - baseOffsetBp) >= 0.000001;
       if (shouldCommit && hasEffectiveMovement) {
-        deps.applySubviewTrackDragOffset(host, store, {
+        if (fullRangeDrag) deps.setSuppressTrackContigClickUntil?.(Date.now() + TRACK_CONTIG_CLICK_SUPPRESS_MS);
+        deps.applySubviewTrackDragOffset(dragHost, store, {
           slot,
           contigId,
           ...(compositionEntityKey
@@ -473,7 +517,9 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
             activeScrollEl.scrollLeft = Math.max(0, Number(nextScrollLeft) || 0);
           }
         }
-        void deps.persistSubviewTrackDragOffsets(host, store);
+        void deps.persistSubviewTrackDragOffsets(dragHost, store);
+      } else if (fullRangeDrag && dragging) {
+        deps.clearFullRangeSubviewDragPreview(dragHost, store, { cancelled: true });
       }
     };
 

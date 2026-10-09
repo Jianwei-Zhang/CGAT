@@ -120,7 +120,7 @@ function createController(root, store, window) {
     const t = viewNavText(locale());
     bar.title = `${t.group}: ${Math.round(range.start).toLocaleString("en-US")}–${Math.round(range.start + range.span).toLocaleString("en-US")} bp`;
   }
-  function applyRange(role, requested, fitAttempt = 0) {
+  function applyRange(role, requested) {
     const geometry = geometryFor(role), scroll = scrollFor(role);
     if (!geometry || !scroll) return;
     const range = clampViewRange(requested, geometry.domain);
@@ -152,7 +152,7 @@ function createController(root, store, window) {
     const currentScroll = scrollFor(role), metrics = readTrackViewportMetrics(currentScroll, role);
     if (metrics && currentScroll) {
       const px = (range.start - metrics.windowStartBp) * metrics.innerWidth / metrics.domainSpanBp - metrics.viewboxMinX;
-      currentScroll.scrollLeft = Math.max(0, px);
+      currentScroll.scrollLeft = fullRange ? 0 : Math.max(0, px);
     }
     sync(role);
     if (focusSelector) {
@@ -163,15 +163,6 @@ function createController(root, store, window) {
         ? selection : bar?.querySelector(focusSelector);
       if (target?.disabled) target = selection;
       target?.focus?.({ preventScroll: true });
-    }
-    // Fixed-pixel labels and rounded SVG bounds may change the domain after
-    // scaling. Settle full-range requests from both handles and the Fit button.
-    if (role !== "primary" && fullRange && fitAttempt < 4) {
-      const nextGeometry = geometryFor(role);
-      if (nextGeometry && nextGeometry.range.span < nextGeometry.domain.end - nextGeometry.domain.start) {
-        applyRange(role, { start: nextGeometry.domain.start, span: nextGeometry.domain.end - nextGeometry.domain.start }, fitAttempt + 1);
-        return;
-      }
     }
     persist(role);
   }
@@ -477,7 +468,7 @@ function createController(root, store, window) {
       // persistence; content bounds are re-derived by the renderer every time.
       const state = store.getState(), viewKey = viewKeyFor(role), prefs = state.assembly?.[viewKey];
       const geometry = geometryFor(role);
-      if (role === "primary" && geometry) {
+      if (geometry) {
         const fullRange = prefs?.fullRange === true
           || geometry.range.span >= geometry.domain.end - geometry.domain.start - geometry.bpPerPx / 2;
         const span = Math.max(1, Math.round(geometry.domain.end - geometry.domain.start));

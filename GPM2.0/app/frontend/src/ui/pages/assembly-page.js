@@ -314,6 +314,11 @@ const renderTracksDeps = {
   getDatasetNameById,
   getMeasuredTrackViewportPx: (role) => getMeasuredTrackViewportPx(role),
   getSupportDatasetOptions,
+  getSubviewTrackDragPreview: (assembly) => {
+    const preview = assemblyPageSession.subviewTrackDragPreview;
+    return preview && preview.subview === assembly.subview
+      && preview.chrName === assembly.selectedChrName ? preview.offset : null;
+  },
   getMainTrackDragPreviewOffset: (state) => {
     const preview = assemblyPageSession.mainTrackDragPreview;
     return preview && preview.projectId === state.session?.projectId
@@ -1167,6 +1172,19 @@ const trackDragRuntimeDeps = {
   persistSubviewTrackDragOffsets,
   previewSubviewTrackContigDrag,
   previewTrackContigDrag,
+  previewFullRangeSubviewContigDrag: (host, store, offset) => {
+    const state = store.getState();
+    assemblyPageSession.subviewTrackDragPreview = {
+      subview: state.assembly.subview,
+      chrName: state.assembly.selectedChrName,
+      offset,
+    };
+    rerenderSubviewPanel(host, store);
+  },
+  clearFullRangeSubviewDragPreview: (host, store, { cancelled = false } = {}) => {
+    assemblyPageSession.subviewTrackDragPreview = null;
+    if (cancelled) rerenderSubviewPanel(host, store);
+  },
   previewFullRangeTrackContigDrag: (host, store, offset) => {
     const state = store.getState();
     assemblyPageSession.mainTrackDragPreview = {

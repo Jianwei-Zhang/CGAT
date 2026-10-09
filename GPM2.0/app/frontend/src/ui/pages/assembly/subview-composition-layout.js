@@ -12,8 +12,9 @@ export function resolveSubviewCompositionScaleViewport(composition, {
   const windowEnd = Math.max(0, ...members.map((member) => member.xBp + member.lengthBp));
   const domainSpanBp = Math.max(1, windowEnd - windowStart);
   const viewportWidth = normalizePositiveInt(viewportWidthPx) ?? 1_200;
-  const innerWidth = resolveTrackInnerWidthFromScale({
-    ...resolveTrackPrefs(trackPrefs),
+  const prefs = resolveTrackPrefs(trackPrefs);
+  const innerWidth = prefs.fullRange ? viewportWidth : resolveTrackInnerWidthFromScale({
+    ...prefs,
     domainSpanBp,
     baseViewportPx: viewportWidth,
   });
@@ -31,6 +32,7 @@ export function buildSubviewCompositionLayout(composition, {
   bpPerPx = 1_000,
   viewportWidthPx = 1_200,
   leftBp = 0,
+  fullRange = false,
 } = {}) {
   const normalized = normalizeSubviewComposition(composition);
   const scale = Number.isFinite(Number(bpPerPx)) && Number(bpPerPx) > 0 ? Number(bpPerPx) : 1_000;
@@ -43,8 +45,10 @@ export function buildSubviewCompositionLayout(composition, {
     width: Math.max(1, member.lengthBp / scale),
     bpPerPx: scale,
   }));
-  const minimumX = Math.min(0, leftBp / scale, ...members.map((member) => member.x));
-  const maximumX = Math.max(
+  const contentMinX = Math.floor(Math.min(0, ...members.map((member) => member.x)));
+  const contentMaxX = Math.ceil(Math.max(0, ...members.map((member) => member.x + member.width)));
+  const minimumX = fullRange ? contentMinX : Math.min(0, leftBp / scale, ...members.map((member) => member.x));
+  const maximumX = fullRange ? contentMaxX : Math.max(
     viewportWidth + leftBp / scale,
     ...members.map((member) => member.x + member.width),
   );
@@ -54,8 +58,10 @@ export function buildSubviewCompositionLayout(composition, {
     bottom: members.filter((member) => member.lane === "bottom"),
     bpPerPx: scale,
     leftBp: Number.isFinite(Number(leftBp)) ? Number(leftBp) : 0,
+    contentStartBp: contentMinX * scale,
+    contentEndBp: contentMaxX * scale,
     viewBoxMinX: Math.floor(minimumX),
-    width: Math.max(viewportWidth, Math.ceil(maximumX - minimumX)),
+    width: Math.max(fullRange ? 1 : viewportWidth, Math.ceil(maximumX) - Math.floor(minimumX)),
   };
 }
 

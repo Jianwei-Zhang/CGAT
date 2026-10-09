@@ -1,3 +1,4 @@
+import { resolveFullRangeVisibleSpan } from "./view-navigation-state.js";
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
@@ -457,13 +458,23 @@ export function renderSubviewCompositionAlignmentCard({
   if (!composition?.members.length) return "";
   const prefs = resolveTrackPrefs(trackPrefs);
   const savedViewport = supportContext?.compositionViewport;
-  const viewport = Number(savedViewport?.bpPerPx) > 0 ? savedViewport
+  let viewport = !prefs.fullRange && Number(savedViewport?.bpPerPx) > 0 ? savedViewport
     : resolveSubviewCompositionScaleViewport(composition, { trackPrefs: prefs, viewportWidthPx });
-  const layout = buildSubviewCompositionLayout(composition, {
+  let layout = buildSubviewCompositionLayout(composition, {
     bpPerPx: viewport.bpPerPx,
     viewportWidthPx,
     leftBp: viewport.leftBp,
+    fullRange: prefs.fullRange,
   });
+  // Full overview uses current members, not the previous world's empty viewport.
+  for (let pass = 0; prefs.fullRange && pass < 6; pass += 1) {
+    const span = resolveFullRangeVisibleSpan({ contentWidth: layout.width,
+      innerWidth: viewportWidthPx, domainSpanBp: viewport.bpPerPx * viewportWidthPx,
+      viewportWidth: viewportWidthPx });
+    if (span === null) break;
+    viewport = { ...viewport, bpPerPx: span / viewportWidthPx };
+    layout = buildSubviewCompositionLayout(composition, { ...viewport, viewportWidthPx, fullRange: true });
+  }
   const candidates = supportContext?.compositionCandidates || [];
   const candidatesLoaded = supportContext?.compositionCandidatesLoaded === true;
   const grtEntries = layout.members.map((member) => ({
@@ -587,7 +598,9 @@ export function renderSubviewCompositionAlignmentCard({
         <div class="assembly-track-label-row" style="top:${BOTTOM_Y - 4}px">${escapeHtml(i18n.subview.tools.compositionManager.lanes.bottom)}</div>
       </div>
       <div class="assembly-track-scroll subview-track-scroll" data-track-role="subview"
-        data-subview-domain-span-bp="${Math.round(layout.width * layout.bpPerPx)}" data-subview-inner-width="${layout.width}"
+        data-view-navigation-start-bp="${layout.contentStartBp}"
+        data-view-navigation-end-bp="${layout.contentEndBp}"
+        data-subview-domain-span-bp="${layout.width * layout.bpPerPx}" data-subview-inner-width="${layout.width}"
         data-subview-viewbox-min-x="${layout.viewBoxMinX}" data-subview-window-start-bp="0">
         <div class="subview-band-tooltip is-hidden" data-subview-band-tooltip-delay-ms="500" aria-hidden="true"></div>
         <svg class="assembly-track-svg subview-track-svg" width="${layout.width}" height="${CONTENT_HEIGHT}"

@@ -577,15 +577,17 @@ for (const role of ["primary", "subview"]) {
 }
 
 
-test("Full range persists overview mode and an explicit zoom exits it", () => {
-  const h = harness();
-  try {
-    h.root.emit("click", h.event(h.views.primary.action("fit")));
-    assert.equal(h.store.getState().assembly.trackView.fullRange, true);
-    assert.equal(h.store.getState().assembly.trackView.allowSubViewportScale, true);
-    h.root.emit("click", h.event(h.views.primary.action("toggle-mode")));
-    h.root.emit("wheel", h.event(h.views.primary.scroll, { deltaY: -100 }));
-    h.flush();
-    assert.notEqual(h.store.getState().assembly.trackView.fullRange, true);
-  } finally { h.dispose(); }
-});
+for (const [role, viewKey] of [["primary", "trackView"], ["subview", "subviewTrackView"]]) {
+  test(`${role} Full range persists overview mode and an explicit zoom exits it`, () => {
+    const h = harness();
+    try {
+      h.root.emit("click", h.event(h.views[role].action("fit")));
+      assert.equal(h.store.getState().assembly[viewKey].fullRange, true);
+      assert.equal(h.store.getState().assembly[viewKey].allowSubViewportScale, true);
+      h.root.emit("click", h.event(h.views[role].action("toggle-mode")));
+      h.root.emit("wheel", h.event(h.views[role].scroll, { deltaY: -100 }));
+      h.flush();
+      assert.notEqual(h.store.getState().assembly[viewKey].fullRange, true);
+    } finally { h.dispose(); }
+  });
+}

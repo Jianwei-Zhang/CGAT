@@ -1,3 +1,4 @@
+import { resolveFullRangeVisibleSpan } from "./view-navigation-state.js";
 import { renderViewTickControl } from "./view-navigation-ui.js";
 import { renderSourceGapConnections } from "./source-fragment-layout.js";
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
@@ -20,6 +21,7 @@ import {
 } from "./track-prefs.js";
 import {
   normalizeSupportDatasetId,
+  setSubviewTrackDragOffset,
 } from "./selection-state.js";
 import {
   buildRefSubviewCtgPool,
@@ -57,7 +59,7 @@ import { renderSubviewToolsToggle } from "./render-subview-tools.js";
 import { buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
 import { buildSubviewGrtAnchorScene } from "./subview-grt-anchor-state.js";
 import { renderSubviewCompositionAlignmentCard } from "./render-subview-composition-canvas.js";
-import { getSubviewComposition } from "./subview-composition-state.js";
+import { getSubviewComposition, createSubviewCompositionSummary, setSubviewCompositionMemberPosition } from "./subview-composition-state.js";
 import {
   buildTrackCtgHoverTitle,
   formatTrackCtgOrientationLabel,
@@ -680,6 +682,7 @@ export function createAssemblySubviewRenderer(deps = {}) {
     escapeHtml,
     formatBpInterval,
     getMeasuredTrackViewportPx,
+    getSubviewTrackDragPreview = () => null,
     renderTrackNumberInput,
     resolveSubviewTrackDragOffsetBp,
     resolveSubviewTrackDragOffsetPx,
@@ -743,6 +746,24 @@ function resolveSubviewAnchorSourceDescriptor(selection, ctg, supportContext) {
 }
 
 function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n) {
+  // Render transient drag geometry only; history and saved offsets change on release.
+  const preview = getSubviewTrackDragPreview(assembly);
+  if (preview) {
+    const composition = getSubviewComposition(assembly.subview);
+    if (composition && preview.compositionEntityKey) {
+      const member = composition.members.find((entry) => entry.entityKey === preview.compositionEntityKey);
+      if (member) {
+        const positioned = setSubviewCompositionMemberPosition(composition, member.entityKey,
+          member.xBp + preview.dragDeltaBp);
+        assembly = { ...assembly, subview: { ...assembly.subview,
+          summary: createSubviewCompositionSummary(positioned.composition),
+        } };
+      }
+    } else {
+      assembly = { ...assembly, subviewTrackDragOffsets:
+        setSubviewTrackDragOffset(assembly.subviewTrackDragOffsets, preview) };
+    }
+  }
   const subview = getSubviewStateImpl(assembly);
   const candidates = getSubviewSelections(subview);
   const trackSelections = getSubviewTrackSelections(subview);
@@ -1558,7 +1579,7 @@ function renderSubviewAlignmentCard(
     minTickUnitKb: resolvedTrackPrefs.minTickUnitKb,
     maxTickCount: resolvedTrackPrefs.maxTickCount,
     visibleSpanBp: resolvedTrackPrefs.visibleSpanBp,
-    allowSubViewportScale: resolvedTrackPrefs.allowSubViewportScale,
+    allowSubViewportScale: resolvedTrackPrefs.fullRange || resolvedTrackPrefs.allowSubViewportScale,
     tickMode: resolvedTrackPrefs.tickMode,
     tickIntervalBp: resolvedTrackPrefs.tickIntervalBp,
     baseViewportPx: getMeasuredTrackViewportPx("subview"),
@@ -1582,6 +1603,8 @@ function renderSubviewAlignmentCard(
     minTickUnitKb: resolvedTrackPrefs.minTickUnitKb,
     maxTickCount: resolvedTrackPrefs.maxTickCount,
     visibleSpanBp: resolvedTrackPrefs.visibleSpanBp,
+    fullRange: resolvedTrackPrefs.fullRange,
+    allowSubViewportScale: resolvedTrackPrefs.allowSubViewportScale,
     tickMode: resolvedTrackPrefs.tickMode,
     tickIntervalBp: resolvedTrackPrefs.tickIntervalBp,
     topManualOffsetPx: resolveSubviewTrackDragOffsetPx(
@@ -1837,6 +1860,8 @@ function renderSubviewAlignmentCard(
         <div
           class="assembly-track-scroll subview-track-scroll"
           data-track-role="subview"
+          data-view-navigation-start-bp="${svgModel.renderViewBoxMinX * svgModel.domainSpanBp / svgModel.baseInnerWidth}"
+          data-view-navigation-end-bp="${(svgModel.renderViewBoxMinX + svgModel.renderInnerWidth) * svgModel.domainSpanBp / svgModel.baseInnerWidth}"
           data-subview-domain-span-bp="${svgModel.domainSpanBp}"
           data-subview-inner-width="${svgModel.baseInnerWidth}"
           data-subview-viewbox-min-x="${svgModel.renderViewBoxMinX}"
@@ -2026,6 +2051,7 @@ function renderSubviewTrackPairAlignmentCard(
   i18n,
   grtResult = {},
   history = null,
+  fullRangeFitPass = 0,
 ) {
   const summary = subview?.summary || null;
   const topTrack = normalizeSubviewTrackSummary(summary?.topTrack);
@@ -2089,7 +2115,7 @@ function renderSubviewTrackPairAlignmentCard(
     minTickUnitKb: resolvedTrackPrefs.minTickUnitKb,
     maxTickCount: resolvedTrackPrefs.maxTickCount,
     visibleSpanBp: resolvedTrackPrefs.visibleSpanBp,
-    allowSubViewportScale: resolvedTrackPrefs.allowSubViewportScale,
+    allowSubViewportScale: resolvedTrackPrefs.fullRange || resolvedTrackPrefs.allowSubViewportScale,
     tickMode: resolvedTrackPrefs.tickMode,
     tickIntervalBp: resolvedTrackPrefs.tickIntervalBp,
     baseViewportPx: getMeasuredTrackViewportPx("subview"),
@@ -2157,7 +2183,8 @@ function renderSubviewTrackPairAlignmentCard(
       windowStart: domainStart,
       domainSpanBp,
       innerWidth: baseInnerWidth,
-      minGapPx: TRACK_MIN_ADJACENT_GAP_PX,
+      minGapPx: TRACK_MIN_ADJACENT_GAP_PX * (resolvedTrackPrefs.fullRange
+        ? Math.min(1, baseInnerWidth / getMeasuredTrackViewportPx("subview")) : 1),
     });
   const baseRectsByLayoutId = new Map(
     rowLayouts.map((layout) => [layout.id, buildRectsForLayout(layout)]),
@@ -2276,6 +2303,16 @@ function renderSubviewTrackPairAlignmentCard(
   const renderViewBoxMinX = Math.floor(Math.min(0, minRectLeft, minLabelLeft));
   const renderMaxX = Math.ceil(Math.max(baseInnerWidth, maxRectRight, maxLabelRight));
   const renderInnerWidth = Math.max(baseInnerWidth, renderMaxX - renderViewBoxMinX);
+  if (resolvedTrackPrefs.fullRange && fullRangeFitPass < 6) {
+    const span = resolveFullRangeVisibleSpan({ contentWidth: renderInnerWidth,
+      innerWidth: baseInnerWidth, domainSpanBp,
+      viewportWidth: getMeasuredTrackViewportPx("subview") });
+    if (span !== null && span !== resolvedTrackPrefs.visibleSpanBp) {
+      return renderSubviewTrackPairAlignmentCard(subview, supportContext,
+        { ...resolvedTrackPrefs, visibleSpanBp: span }, subviewTrackDragOffsets,
+        i18n, grtResult, history, fullRangeFitPass + 1);
+    }
+  }
   const blockLength = Math.max(1, normalizePositiveInt(resolvedTrackPrefs.alignmentLength) ?? 1);
   const minIdentityPct = Math.max(
     0,
@@ -3090,7 +3127,7 @@ function renderSubviewTrackPairAlignmentCard(
           })}
           <div class="assembly-track-label-row${bottomRoleClass}" style="top:${resolvedBottomLayout.labelTop}px">${escapeHtml(bottomTrackLabel)}</div>
         </div>
-        <div class="assembly-track-scroll subview-track-scroll" data-track-role="subview" data-subview-domain-span-bp="${domainSpanBp}" data-subview-inner-width="${baseInnerWidth}" data-subview-viewbox-min-x="${renderViewBoxMinX}" data-subview-window-start-bp="${domainStart}">
+        <div class="assembly-track-scroll subview-track-scroll" data-track-role="subview" data-view-navigation-start-bp="${domainStart + renderViewBoxMinX * domainSpanBp / baseInnerWidth}" data-view-navigation-end-bp="${domainStart + (renderViewBoxMinX + renderInnerWidth) * domainSpanBp / baseInnerWidth}" data-subview-domain-span-bp="${domainSpanBp}" data-subview-inner-width="${baseInnerWidth}" data-subview-viewbox-min-x="${renderViewBoxMinX}" data-subview-window-start-bp="${domainStart}">
           ${renderTrackBandCanvasLayer({
             sceneKind: "subview-track-pair",
             width: renderInnerWidth,
@@ -3208,23 +3245,27 @@ function collectSubviewRenderableHits(ctg, { blockLength, minIdentityPct, preser
     .filter(Boolean);
 }
 
-function buildSubviewAlignmentSvgModel({
-  topCtg,
-  bottomCtg,
-  topHits,
-  bottomHits,
-  pairCacheKey = "",
-  pairingMode = "reference-overlap",
-  minTickUnitKb,
-  maxTickCount,
-  visibleSpanBp,
-  tickMode,
-  tickIntervalBp,
-  topManualOffsetPx = 0,
-  bottomManualOffsetPx = 0,
-  topManualOffsetBp = 0,
-  bottomManualOffsetBp = 0,
-}) {
+function buildSubviewAlignmentSvgModel(args) {
+  const {
+    topCtg,
+    bottomCtg,
+    topHits,
+    bottomHits,
+    pairCacheKey = "",
+    pairingMode = "reference-overlap",
+    minTickUnitKb,
+    maxTickCount,
+    visibleSpanBp,
+    tickMode,
+    tickIntervalBp,
+    topManualOffsetPx = 0,
+    bottomManualOffsetPx = 0,
+    topManualOffsetBp = 0,
+    bottomManualOffsetBp = 0,
+    allowSubViewportScale = false,
+    fullRange = false,
+    fullRangeFitPass = 0,
+  } = args;
   const graphTextScale = Math.max(1, getGraphFontSize() / 12);
   const TRACK_HEIGHT_SCALE = 2 * graphTextScale;
   const TRACK_LANE_HEIGHT = 18 * TRACK_HEIGHT_SCALE;
@@ -3262,6 +3303,7 @@ function buildSubviewAlignmentSvgModel({
     minTickUnitKb: safeMinTickUnitKb,
     maxTickCount: safeMaxTickCount,
     visibleSpanBp,
+    allowSubViewportScale: fullRange || allowSubViewportScale,
     tickMode,
     tickIntervalBp,
     baseViewportPx: getMeasuredTrackViewportPx("subview"),
@@ -3328,8 +3370,10 @@ function buildSubviewAlignmentSvgModel({
     }
     return roundTrackMetric(numeric);
   };
-  const resolvedTopManualOffsetPx = resolveManualOffsetPx(topManualOffsetPx);
-  const resolvedBottomManualOffsetPx = resolveManualOffsetPx(bottomManualOffsetPx);
+  const resolvedTopManualOffsetPx = resolveManualOffsetPx(fullRange
+    ? topManualOffsetBp * baseInnerWidth / domainSpan : topManualOffsetPx);
+  const resolvedBottomManualOffsetPx = resolveManualOffsetPx(fullRange
+    ? bottomManualOffsetBp * baseInnerWidth / domainSpan : bottomManualOffsetPx);
   const topBarX = roundTrackMetric(topBarBaseX + resolvedTopManualOffsetPx);
   const bottomBarX = roundTrackMetric(bottomBarBaseX + resolvedBottomManualOffsetPx);
   const topWorldStartBp = roundTrackMetric(resolveSubviewWorldStartBp({
@@ -3347,6 +3391,16 @@ function buildSubviewAlignmentSvgModel({
     bottomBarX + bottomBarWidth,
   ));
   const renderInnerWidth = Math.max(baseInnerWidth, renderMaxX - renderViewBoxMinX);
+  if (fullRange && fullRangeFitPass < 6) {
+    const span = resolveFullRangeVisibleSpan({ contentWidth: renderInnerWidth,
+      innerWidth: baseInnerWidth, domainSpanBp: domainSpan,
+      viewportWidth: getMeasuredTrackViewportPx("subview") });
+    if (span !== null && span !== visibleSpanBp) {
+      return buildSubviewAlignmentSvgModel({ ...args, visibleSpanBp: span,
+        fullRangeFitPass: fullRangeFitPass + 1 });
+    }
+  }
+
   const topSegments = toSegments(topHits, topOffsetBp).sort((left, right) => left.refMid - right.refMid);
   const bottomSegments = toSegments(bottomHits, bottomOffsetBp).sort(
     (left, right) => left.refMid - right.refMid,

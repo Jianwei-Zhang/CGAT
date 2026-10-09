@@ -18,6 +18,8 @@ const PREVIEW_ENVELOPE_ATTR = "data-drag-preview-envelope";
 const ORIGINAL_WIDTH_ATTR = "data-drag-preview-original-width";
 const ORIGINAL_VIEW_BOX_ATTR = "data-drag-preview-original-view-box";
 const ORIGINAL_STYLE_WIDTH_ATTR = "data-drag-preview-original-style-width";
+const ORIGINAL_NAV_START_ATTR = "data-drag-preview-original-navigation-start";
+const ORIGINAL_NAV_END_ATTR = "data-drag-preview-original-navigation-end";
 const ORIGINAL_SUBVIEW_VIEWBOX_MIN_X_ATTR = "data-drag-preview-original-subview-viewbox-min-x";
 const PREVIEW_ENVELOPE_MIN_X_ATTR = "data-drag-preview-envelope-min-x";
 const PREVIEW_ENVELOPE_MAX_X_ATTR = "data-drag-preview-envelope-max-x";
@@ -251,6 +253,8 @@ function restoreSubviewPreviewEnvelope(host) {
     restorePreviewAttribute(node, ORIGINAL_WIDTH_ATTR, "width");
     restorePreviewAttribute(node, ORIGINAL_VIEW_BOX_ATTR, "viewBox");
     restorePreviewAttribute(node, ORIGINAL_X_ATTR, "x");
+    restorePreviewAttribute(node, ORIGINAL_NAV_START_ATTR, "data-view-navigation-start-bp");
+    restorePreviewAttribute(node, ORIGINAL_NAV_END_ATTR, "data-view-navigation-end-bp");
     restorePreviewAttribute(
       node,
       ORIGINAL_SUBVIEW_VIEWBOX_MIN_X_ATTR,
@@ -374,6 +378,15 @@ function applySubviewPreviewEnvelope(groupNodes, offsetPx, { pointerClientX = nu
       clipRectNode.setAttribute?.("width", formattedWidth);
       clipRectNode.setAttribute?.(PREVIEW_ENVELOPE_ATTR, "1");
     });
+    const domainSpan = Number(scrollNode.dataset?.subviewDomainSpanBp);
+    const innerWidth = Number(scrollNode.dataset?.subviewInnerWidth);
+    const windowStart = Number(scrollNode.dataset?.subviewWindowStartBp || 0);
+    if (domainSpan > 0 && innerWidth > 0 && Number.isFinite(windowStart)) {
+      rememberPreviewAttribute(scrollNode, ORIGINAL_NAV_START_ATTR, "data-view-navigation-start-bp");
+      rememberPreviewAttribute(scrollNode, ORIGINAL_NAV_END_ATTR, "data-view-navigation-end-bp");
+      scrollNode.setAttribute?.("data-view-navigation-start-bp", String(windowStart + nextMinX * domainSpan / innerWidth));
+      scrollNode.setAttribute?.("data-view-navigation-end-bp", String(windowStart + nextMaxX * domainSpan / innerWidth));
+    }
     scrollNode.setAttribute?.("data-subview-viewbox-min-x", formattedMinX);
     scrollNode.setAttribute?.(PREVIEW_ENVELOPE_MIN_X_ATTR, formattedMinX);
     scrollNode.setAttribute?.(PREVIEW_ENVELOPE_MAX_X_ATTR, formatPreviewMetric(nextMaxX));
