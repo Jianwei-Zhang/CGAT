@@ -2094,8 +2094,15 @@ function renderSubviewTrackPairAlignmentCard(
     prefs: resolvedTrackPrefs,
     preserveInputOrder: true,
   });
-  const domainStart = Number(pairModel.windowStart || 0);
-  const domainEnd = Math.max(domainStart, Number(pairModel.windowEnd || 0));
+  // The legacy layout pads its window to at least 500 kb. In full overview
+  // only the source ruler and current marks count as content, not that padding.
+  const pairCtgs = [...(pairModel.primary?.ctgs || []), ...(pairModel.companion?.ctgs || [])];
+  const domainStart = resolvedTrackPrefs.fullRange
+    ? Math.min(0, ...pairCtgs.map((ctg) => Number(ctg.startBp)))
+    : Number(pairModel.windowStart || 0);
+  const domainEnd = resolvedTrackPrefs.fullRange
+    ? Math.max(domainStart, ...pairCtgs.map((ctg) => Number(ctg.endBp)))
+    : Math.max(domainStart, Number(pairModel.windowEnd || 0));
   const domainSpanBp = Math.max(1, domainEnd - domainStart + 1);
   const graphTextScale = Math.max(1, getGraphFontSize() / 12);
   const TRACK_HEIGHT_SCALE = 2 * graphTextScale;

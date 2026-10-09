@@ -64,8 +64,12 @@ test("composition canvas keeps world positions and exposes evidence cuts from re
   assert.equal((html.match(/data-subview-action="swap-track-order"/g) || []).length, 1);
   assert.match(
     html,
-    /class="assembly-track-label-row" style="top:78px">上轨<\/div>[\s\S]*?data-subview-action="swap-track-order"[\s\S]*?class="assembly-track-label-row" style="top:186px">下轨<\/div>/,
+    /class="assembly-track-label-row" style="top:61px">上轨<\/div>[\s\S]*?data-subview-action="swap-track-order"[\s\S]*?class="assembly-track-label-row" style="top:169px">下轨<\/div>/,
   );
+  // Default-size composition ruler remains at 48; top lane starts at 65,
+  // preserving the requested half-height gap (17 instead of 34 pixels).
+  assert.match(html, /class="track-ruler-line" x1="0" y1="48"/);
+  assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*?y="65"/);
   assert.doesNotMatch(html, /data-subview-composition-swap/);
   assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*data-subview-rect-x="-50\.00"/);
   assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*data-subview-world-start-bp="-500"/);

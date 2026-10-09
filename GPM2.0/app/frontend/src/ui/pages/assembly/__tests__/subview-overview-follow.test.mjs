@@ -25,7 +25,8 @@ function overview(state) {
   });
   assert.ok(width <= 1201, `local content fits one viewport, got ${width}`);
   assert.equal(geometry.range.start, geometry.domain.start);
-  assert.equal(geometry.range.span, geometry.domain.end - geometry.domain.start);
+  assert.ok(Math.abs(geometry.range.span - (geometry.domain.end - geometry.domain.start)) < 0.000001,
+    "the selected range covers the full domain within floating-point precision");
   return geometry;
 }
 

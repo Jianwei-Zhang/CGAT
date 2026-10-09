@@ -100,7 +100,10 @@ test("a contig originally outside the reference does not keep its old empty enve
   state.assembly.chromosomes[0].chrLength = 16000;
   state.assembly.trackView = resolveTrackPrefs({ ...state.assembly.trackView,
     fullRange: true, allowSubViewportScale: true });
-  state.assembly.chrCtgs[0].anchorStart = 24001;
+  // Source layout is cumulative sequence length, not anchorStart. A 40 kb
+  // contig genuinely extends beyond the 16 kb reference before being moved.
+  state.assembly.chrCtgs[0].totalLength = 40000;
+  state.assembly.chrCtgs[0].lengthBp = 40000;
   const original = overview(state);
   state.assembly.trackView.visibleSpanBp = Math.round(original.range.span);
   state.assembly.trackDragOffsets = [{ trackRole: "primary", assemblyCtgId: 2, offsetBp: -24000 }];
