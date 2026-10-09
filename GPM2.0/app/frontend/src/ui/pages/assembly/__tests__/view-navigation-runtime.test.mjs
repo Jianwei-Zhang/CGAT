@@ -33,8 +33,8 @@ function harness() {
       if (!nodes.has(key)) nodes.set(key, {
         style: {}, attrs: {}, value: "500", textContent: "",
         dataset: {}, isConnected: true,
-        setAttribute(k, v) { this.attrs[k] = v; }, hasAttribute(k) { return k === key; },
-        setCustomValidity(value) { this.error = value; }, reportValidity() {}, focus() {},
+        setAttribute(k, v) { this.attrs[k] = v; }, getAttribute(k) { return this.attrs[k]; }, hasAttribute(k) { return k === key; },
+        setCustomValidity(value) { this.error = value; }, reportValidity() {}, focus() { root.ownerDocument.activeElement = this; },
       });
       return nodes.get(key);
     };
@@ -74,7 +74,9 @@ function harness() {
     display.closest = (selector) => selector === "[data-view-navigation]" ? bar : null;
     const grip = node("data-view-nav-grip");
     grip.closest = (selector) => selector === "[data-view-nav-grip]" ? grip : selector === "[data-view-navigation]" ? bar : null;
-    views[role] = { scroll, bar, display, action, grip, selection: node("data-view-nav-window"), axis: node("data-view-nav-axis") };
+    const selection = node("data-view-nav-window");
+    selection.closest = selector => selector === "[data-view-navigation]" ? bar : selector === "[data-view-nav-window]" ? selection : null;
+    views[role] = { scroll, bar, display, action, grip, selection, axis: node("data-view-nav-axis") };
   }
   const ticks = {};
   for (const key of ["trackView", "subviewTrackView", "finalPathTrackView"]) {
@@ -303,4 +305,65 @@ for (const role of ["primary", "subview"]) {
       assert.equal(h.win.count("pointermove"), 0);
     } finally { h.dispose(); }
   });
+}
+
+for (const role of ["primary", "subview"]) {
+  test(`${role} repeated slider key navigation restores equivalent focus after replacement`, () => {
+    const h = harness();
+    try {
+      const view = h.views[role]; view.scroll.scrollWidth = 100000; h.bind();
+      const renderKey = role === "primary" ? "rerenderAssemblyMainTab" : "rerenderSubviewPanel";
+      h.deps[renderKey] = () => { h.root.ownerDocument.activeElement = null; };
+      view.selection.focus();
+      for (let n = 0; n < 3; n++) {
+        h.root.emit("keydown", h.event(h.root.ownerDocument.activeElement, { key: "ArrowRight" }));
+        assert.equal(h.root.ownerDocument.activeElement, view.selection);
+      }
+      assert.equal(h.writes, 3);
+      assert.equal(h.store.getState().assembly[role === "primary" ? "trackView" : "subviewTrackView"].visibleSpanBp, 500);
+    } finally { h.dispose(); }
+  });
+  test(`${role} focused half-window button is restored to replacement rather than detached node`, () => {
+    const h = harness();
+    try {
+      const view = h.views[role], old = view.action("right");
+      const replacement = { focus() { h.root.ownerDocument.activeElement = this; } };
+      h.root.ownerDocument.activeElement = old;
+      const renderKey = role === "primary" ? "rerenderAssemblyMainTab" : "rerenderSubviewPanel";
+      const originalQuery = view.bar.querySelector;
+      h.deps[renderKey] = () => {
+        h.root.ownerDocument.activeElement = null;
+        view.bar.querySelector = selector => selector === "[data-view-nav-action='right']" ? replacement : originalQuery(selector);
+      };
+      h.root.emit("click", h.event(old));
+      assert.equal(h.root.ownerDocument.activeElement, replacement);
+    } finally { h.dispose(); }
+  });
+}
+
+
+for (const role of ["primary", "subview"]) {
+  for (const direction of ["left", "right"]) {
+    test(`${role} half-window boundary restores slider focus instead of disabled replacement`, () => {
+      const h = harness();
+      try {
+        const view = h.views[role], old = view.action(direction);
+        view.scroll.scrollLeft = direction === "left" ? 100 : 900;
+        h.bind();
+        const replacement = { disabled: false, focus() { assert.fail("disabled control cannot receive focus"); } };
+        h.root.ownerDocument.activeElement = old;
+        const renderKey = role === "primary" ? "rerenderAssemblyMainTab" : "rerenderSubviewPanel";
+        const originalQuery = view.bar.querySelector;
+        h.deps[renderKey] = () => {
+          h.root.ownerDocument.activeElement = null;
+          view.bar.querySelector = selector => selector === `[data-view-nav-action='${direction}']` ? replacement : originalQuery(selector);
+        };
+        h.root.emit("click", h.event(old));
+        assert.equal(replacement.disabled, true);
+        assert.equal(h.root.ownerDocument.activeElement, view.selection);
+        h.root.emit("keydown", h.event(view.selection, { key: direction === "left" ? "ArrowRight" : "ArrowLeft" }));
+        assert.equal(h.root.ownerDocument.activeElement, view.selection);
+      } finally { h.dispose(); }
+    });
+  }
 }

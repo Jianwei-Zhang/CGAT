@@ -115,6 +115,13 @@ function createController(root, store, window) {
     if (!geometry || !scroll) return;
     const range = clampViewRange(requested, geometry.domain);
     if (!range) return;
+    const active = root.ownerDocument.activeElement;
+    let focusSelector = null;
+    if (active?.closest?.("[data-view-navigation]")?.dataset?.viewNavigation === role) {
+      if (active.dataset?.viewNavAction) focusSelector = `[data-view-nav-action='${active.dataset.viewNavAction}']`;
+      else if (active.dataset?.viewNavEdge) focusSelector = `[data-view-nav-edge='${active.dataset.viewNavEdge}']`;
+      else if (active.hasAttribute?.("data-view-nav-window")) focusSelector = "[data-view-nav-window]";
+    }
     const state = store.getState(), viewKey = viewKeyFor(role), a = state.assembly;
     let next = { ...a, [viewKey]: resolveTrackPrefs({ ...a[viewKey], visibleSpanBp: Math.max(1, Math.round(range.span)) }) };
     if (role === "subview" && a.subview?.summary?.mode === "composition") {
@@ -137,6 +144,15 @@ function createController(root, store, window) {
       currentScroll.scrollLeft = Math.max(0, px);
     }
     sync(role);
+    if (focusSelector) {
+      const bar = controller.roles[role]?.bar;
+      const selection = bar?.querySelector("[data-view-nav-window]");
+      let target = focusSelector.startsWith("[data-view-nav-edge")
+        && selection?.getAttribute?.("data-view-nav-compact") === "true"
+        ? selection : bar?.querySelector(focusSelector);
+      if (target?.disabled) target = selection;
+      target?.focus?.({ preventScroll: true });
+    }
     persist(role);
   }
   function flushPending() {

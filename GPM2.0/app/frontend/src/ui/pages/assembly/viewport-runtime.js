@@ -132,6 +132,23 @@ export function createAssemblyViewportController({
     };
   }
 
+  function updateMeasuredWidths(store, nextWidths, rebaseComposition = true) {
+    const previous = resolveMeasuredTrackViewportWidths(session.measuredTrackViewportPxByRole);
+    const next = resolveMeasuredTrackViewportWidths(nextWidths, previous);
+    session.measuredTrackViewportPxByRole = next;
+    const state = store.getState(), assembly = state.assembly;
+    const viewport = assembly?.subviewCompositionViewport;
+    const scale = Number(viewport?.bpPerPx);
+    if (!rebaseComposition || assembly?.subview?.summary?.mode !== "composition" || !Number.isFinite(scale) || scale <= 0
+      || Math.abs(next.subview - previous.subview) <= 1) return false;
+    // A saved composition scale belongs to the previous measured width. Rebase
+    // it before rendering so resize preserves the genomic interval, not pixels.
+    store.setState({ ...state, assembly: updateSubviewCompositionViewport(assembly, {
+      ...viewport, bpPerPx: scale * previous.subview / next.subview,
+    }) });
+    return true;
+  }
+
   function bindTrackViewportResize(host, store) {
     const routeHost = host?.closest?.("#route-host") || null;
     if (routeHost && routeHost !== host) {
@@ -147,12 +164,7 @@ export function createAssemblyViewportController({
     const coordinator = createTrackViewportResizeCoordinator({
       getViewportWidths: () => readAssemblyTrackViewportWidths(host),
       getMeasuredWidths: () => session.measuredTrackViewportPxByRole,
-      setMeasuredWidths: (nextWidths) => {
-        session.measuredTrackViewportPxByRole = resolveMeasuredTrackViewportWidths(
-          nextWidths,
-          session.measuredTrackViewportPxByRole,
-        );
-      },
+      setMeasuredWidths: (nextWidths) => { updateMeasuredWidths(store, nextWidths); },
       onViewportResize: () => {
         rerender(host, store);
       },
@@ -259,8 +271,14 @@ export function createAssemblyViewportController({
       session.measuredTrackViewportPxByRole,
       nextMeasuredTrackViewportWidths,
     )) {
-      session.measuredTrackViewportPxByRole = nextMeasuredTrackViewportWidths;
+      // First measurement/new context must restore the saved world viewport;
+      // only a previously bound same-context interval can be rebased on resize.
+      const sameContext = session.lastSubviewViewportKey === buildSubviewTrackViewportKey(store.getState());
+      const compositionRebased = updateMeasuredWidths(store, nextMeasuredTrackViewportWidths, sameContext);
       viewportChanged = true;
+      // These elements still contain the old scale. Let the caller rerender
+      // before restoring/synchronizing their pixel scroll positions.
+      if (compositionRebased) return true;
     }
     const trackScrollEls = Array.from(
       host?.querySelectorAll?.(".assembly-track-scroll[data-track-role]") || [],
@@ -416,10 +434,15 @@ export function createAssemblyViewportController({
 
       let subviewSyncing = false;
       subviewTrackScrollEls.forEach((element) => {
+        // Restoration is quantized by the browser. Its queued scroll event
+        // must not overwrite the precise world interval (and accumulate drift
+        // on repeated resize); actual subsequent movement still owns scrolling.
+        let observedScrollLeft = element.scrollLeft;
         element.addEventListener("scroll", () => {
-          if (subviewSyncing) {
+          if (subviewSyncing || element.scrollLeft === observedScrollLeft) {
             return;
           }
+          observedScrollLeft = element.scrollLeft;
           subviewSyncing = true;
           session.lastSubviewScrollLeft = element.scrollLeft;
           applyTrackScrollLeft(subviewTrackScrollEls, session.lastSubviewScrollLeft, element);
