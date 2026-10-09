@@ -74,10 +74,8 @@ test("subview track controls render independently from main track controls", () 
     html,
     /<div class="assembly-track-label-column subview-track-label-column"[\s\S]*class="button ghost tiny subview-track-order-toggle is-in-label-column"[\s\S]*<\/div>\s*<div\s+class="assembly-track-scroll subview-track-scroll"/,
   );
-  assert.match(html, /data-view-tick-control="subviewTrackView"/);
+  assert.doesNotMatch(html, /data-view-tick-control|data-view-tick-interval/);
   assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
-  assert.match(html, /data-view-tick-control="trackView"[\s\S]*data-view-tick-interval[^>]*value="250"/);
-  assert.match(html, /data-view-tick-control="subviewTrackView"[\s\S]*data-view-tick-interval[^>]*value="10000"/);
 });
 
 test("subview chart uses real relative ctg lengths so top and bottom bars can differ", () => {

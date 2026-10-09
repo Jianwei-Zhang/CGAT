@@ -92,18 +92,22 @@ test("composition reference projections use block length and identity before cre
   assert.doesNotMatch(renderAssemblyPage(state), /data-subview-anchor-hit-key="[^"]*\|(?:short|low)"/);
 });
 
-test("composition emits main-view-aligned non-negative ruler metadata using the current minimum tick unit", () => {
+test("composition emits non-negative ruler metadata and ignores legacy manual tick intervals", () => {
   const state = controlState();
+  const autoHtml = renderAssemblyPage(state);
+  const autoTick = autoHtml.match(/data-subview-ruler-tick-bp="([^"]+)"/);
+  assert.ok(autoTick);
+  assert.ok(Number(autoTick[1]) > 0);
   state.assembly.subviewTrackView.tickMode = "manual";
   state.assembly.subviewTrackView.tickIntervalBp = 1000;
   let html = renderAssemblyPage(state);
   assert.match(html, /data-subview-virtual-ruler="1"/);
   assert.match(html, /data-subview-ruler-origin-x="0.0000"/);
   assert.match(html, /data-subview-ruler-window-start="0.0000"/);
-  assert.match(html, /data-subview-ruler-tick-bp="1000.0000"/);
+  assert.equal(html.match(/data-subview-ruler-tick-bp="([^"]+)"/)[1], autoTick[1]);
   state.assembly.subviewTrackView.tickIntervalBp = 2000;
   html = renderAssemblyPage(state);
-  assert.match(html, /data-subview-ruler-tick-bp="2000.0000"/);
+  assert.equal(html.match(/data-subview-ruler-tick-bp="([^"]+)"/)[1], autoTick[1]);
 });
 
 test("composition GRT switch and both layer selections control the shared result scene", () => {

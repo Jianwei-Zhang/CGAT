@@ -57,7 +57,8 @@ test("legacy scale migrates once and ticks cannot change the new span", () => {
   assert.equal(auto.visibleSpanBp, legacy.visibleSpanBp);
   const options = { domainSpanBp: 30_000_000, baseViewportPx: 1000 };
   assert.equal(resolveTrackInnerWidthFromScale({ ...legacy, ...options }), resolveTrackInnerWidthFromScale({ ...manual, ...options }));
-  assert.equal(resolveTickBpFromScale({ ...manual, ...options }), 250_000);
+  assert.equal(manual.tickMode, "auto");
+  assert.equal(resolveTickBpFromScale({ ...manual, ...options }), 1_000_000);
   assert.equal(resolveTickBpFromScale({ ...auto, ...options }), 1_000_000);
 });
 test("short content fits the viewport regardless of requested legacy/new span", () => {
@@ -85,16 +86,14 @@ test("localized navigation groups movement and places Full range after its axis 
   assert.doesNotMatch(zh, /<input|<select|data-view-nav-unit|data-view-nav-action="(?:minus|plus)"|跨度|适应全部/);
   assert.doesNotMatch(zh, /Ctrl|Space|最小刻度|最多可展示数/);
 });
-test("tick UI is directly inline with Auto as the default option and custom kb values", () => {
-  const auto = renderViewTickControl({}, "zh", "trackView");
-  assert.match(auto, /data-view-tick-interval[^>]*value="Auto"/);
-  assert.deepEqual([...auto.matchAll(/data-view-tick-option="([^"]+)"/g)].map(match => match[1]), ["Auto", "250", "500", "750", "1000", "10000", "100000"]);
-  assert.match(auto, /aria-controls="view-tick-options-trackView"/);
-  assert.match(auto, /刻度间隔 \(kb\)/);
-  assert.doesNotMatch(auto, /<details|<select|显示设置|data-view-tick-mode/);
-  const manual = renderViewTickControl({ tickMode: "manual", tickIntervalBp: 250_000 }, "en", "finalPathTrackView", true);
-  assert.match(manual, /Tick interval/); assert.match(manual, /data-view-tick-interval[^>]*value="250"/);
-  assert.doesNotMatch(manual, /<details|data-view-navigation|minTickUnitKb|maxTickCount/);
+test("tick settings stay hidden in all assembly views and locales, including legacy manual preferences", () => {
+  for (const viewKey of ["trackView", "subviewTrackView", "finalPathTrackView"]) {
+    for (const locale of ["zh", "en"]) {
+      for (const prefs of [{}, { tickMode: "manual", tickIntervalBp: 250_000 }]) {
+        assert.equal(renderViewTickControl(prefs, locale, viewKey), "");
+      }
+    }
+  }
 });
 
 for (const role of ["primary", "subview"]) {

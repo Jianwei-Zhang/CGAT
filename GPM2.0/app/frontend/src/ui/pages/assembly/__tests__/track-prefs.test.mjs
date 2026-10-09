@@ -6,6 +6,7 @@ import {
   normalizePositiveInt,
   normalizeTrackPrefInputValue,
   resolveTrackPrefs,
+  resolveTickBpFromScale,
 } from "../track-prefs.js";
 
 test("manual track inputs accept only safe decimal integers within the field range", () => {
@@ -145,4 +146,27 @@ test("resolveTrackPrefs keeps free non-negative support ds ctg length input with
   assert.equal(resolveTrackPrefs({ supportDsCtgLen: 0 }).supportDsCtgLen, 0);
   assert.equal(resolveTrackPrefs({ supportDsCtgLen: 12345 }).supportDsCtgLen, 12345);
   assert.equal(resolveTrackPrefs({ supportDsCtgLen: -1 }).supportDsCtgLen, 0);
+});
+
+test("resolveTrackPrefs overrides persisted manual tick mode without changing viewport or filters", () => {
+  const prefs = resolveTrackPrefs({
+    tickMode: "manual",
+    tickIntervalBp: 250_000,
+    visibleSpanBp: 7_500_000,
+    alignmentLength: 6500,
+    minIdentityPct: 90,
+  });
+  assert.equal(prefs.tickMode, "auto");
+  assert.equal(prefs.visibleSpanBp, 7_500_000);
+  assert.equal(prefs.alignmentLength, 6500);
+  assert.equal(prefs.minIdentityPct, 90);
+  assert.equal(resolveTrackPrefs(prefs).tickMode, "auto");
+});
+
+test("automatic spacing follows viewing range and viewport width rather than saved manual interval", () => {
+  const prefs = resolveTrackPrefs({ tickMode: "manual", tickIntervalBp: 1 });
+  const scale = { ...prefs, domainSpanBp: 100_000_000, visibleSpanBp: 1_000_000, baseViewportPx: 1200 };
+  assert.equal(resolveTickBpFromScale(scale), 100_000);
+  assert.equal(resolveTickBpFromScale({ ...scale, visibleSpanBp: 10_000_000 }), 1_000_000);
+  assert.equal(resolveTickBpFromScale({ ...scale, baseViewportPx: 600 }), 200_000);
 });

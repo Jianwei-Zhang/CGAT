@@ -64,7 +64,7 @@ test("subview panel renders chart sub-card with parameter labels after entering"
   assert.doesNotMatch(html, /命中：/);
   assert.match(html, /support-ctg/);
   assert.match(html, /ctg-alpha/);
-  assert.match(html, /data-view-tick-control="subviewTrackView"/);
+  assert.doesNotMatch(html, /data-view-tick-control|data-view-tick-interval/);
   assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
 });
 

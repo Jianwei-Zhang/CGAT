@@ -84,12 +84,12 @@ test("assembly main view renders chr-length reference span, all guides, sparse r
   assert.match(html, /<canvas class="track-band-canvas"[^>]*data-track-band-canvas="1"/);
   assert.match(html, /<rect[\s\S]*class="track-reference-bar"[\s\S]*rx="0"[\s\S]*ry="0"/);
   assert.match(html, /track-collinearity-band[^>]*data-track-band-proxy="1"/);
-  assert.equal(tickGuideCount, tickLabelCount + 2);
-  assert.equal(tickLabelCount, 19);
-  // Both trailing intermediate labels collide with the complete endpoint label.
-  assert.equal(tickGuideCount, 21);
+  assert.equal(tickGuideCount, tickLabelCount + 1);
+  assert.equal(tickLabelCount, 10);
+  // Auto spacing keeps one trailing label clear of the complete endpoint label.
+  assert.equal(tickGuideCount, 11);
   assert.match(html, /<text class="track-tick-label"[^>]*>0<\/text>/);
-  assert.match(html, /<text class="track-tick-label"[^>]*>250k<\/text>/);
+  assert.match(html, /<text class="track-tick-label"[^>]*>500k<\/text>/);
   assert.match(html, /<text class="track-tick-label"[^>]*>5,000,000 bp<\/text>/);
   assert.doesNotMatch(html, /<text class="track-tick-label"[^>]*>4,750k<\/text>/);
   assert.doesNotMatch(html, /<text class="track-tick-label"[^>]*>50k<\/text>/);
@@ -564,5 +564,5 @@ test("end tick keeps k-unit label and hides previous label when text overlaps", 
   assert.match(html, /<text class="track-tick-label"[^>]*>4,899,999 bp<\/text>/);
   assert.doesNotMatch(html, /<text class="track-tick-label"[^>]*>4,750k<\/text>/);
   assert.doesNotMatch(html, /<text class="track-tick-label"[^>]*>4,899,999<\/text>/);
-  assert.equal(tickGuideCount, tickLabelCount + 2);
+  assert.equal(tickGuideCount, tickLabelCount + 1);
 });

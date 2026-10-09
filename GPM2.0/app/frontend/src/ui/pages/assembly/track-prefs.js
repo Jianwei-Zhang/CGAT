@@ -84,7 +84,8 @@ export function resolveTrackPrefs(trackView) {
     // Legacy fields remain readable for compatibility, but are not the live scale model.
     visibleSpanBp: normalizePositiveInt(trackView?.visibleSpanBp)
       ?? Math.min(Number.MAX_SAFE_INTEGER, minTickUnitKb * 1000 * maxTickCount),
-    tickMode: trackView?.tickMode === "manual" ? "manual" : "auto",
+    // Assembly rulers always choose tick spacing from the current viewing range.
+    tickMode: "auto",
     tickIntervalBp: normalizePositiveInt(trackView?.tickIntervalBp) ?? minTickUnitKb * 1000,
     showTelomeres: trackView?.showTelomeres !== false,
     showCentromeres: trackView?.showCentromeres !== false,

@@ -156,7 +156,8 @@ test("renderFinalPathCard migrates the legacy DEGAP view to Graph and embeds DEG
   assert.match(html, /<p class="helper-hint degap-form-help">READS path 为服务器端原始测序数据；HiFi 或 ONT 至少填写一个。<\/p>/);
   assert.match(html, /DEGAP-JOBS/);
   assert.match(html, /data-final-path-export-action="all"[\s\S]*final-path-export-divider[\s\S]*data-final-path-export-action="degap-jobs"/);
-  assert.match(html, /class="final-path-card-head-controls"[\s\S]*data-view-tick-control="finalPathTrackView"[\s\S]*刻度间隔[\s\S]*data-view-tick-interval[\s\S]*导出/);
+  assert.match(html, /class="final-path-card-head-controls"[\s\S]*导出/);
+  assert.doesNotMatch(html, /data-view-tick-control|data-view-tick-interval|刻度间隔/);
   assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
   assert.doesNotMatch(html, /data-view-navigation|data-view-nav-span/);
   assert.doesNotMatch(html, /data-degap-scale-(?:combo-)?field/);
@@ -1746,16 +1747,18 @@ test("graph keeps tiny ctg and gap segments visible without changing source coor
 });
 
 
-test("fitted Final Path retains fine interval guides but avoids unreadable overlapping labels", () => {
-  const html = renderFinalPathGraph({
+test("fitted Final Path ignores legacy manual spacing and automatically avoids overlapping labels", () => {
+  const options = {
     ...createDeps(), trackViewportPx: 120,
     finalPathEntry: { segments: [{ type: "gap", segmentId: "gap1", gapSizeBp: 10_000_000 }] },
-    trackControls: { tickMode: "manual", tickIntervalBp: 1 },
+  };
+  const html = renderFinalPathGraph({
+    ...options, trackControls: { tickMode: "manual", tickIntervalBp: 1 },
   });
+  assert.equal(html, renderFinalPathGraph(options));
   const guides = html.match(/class="track-tick-guide is-major"/g) || [];
   const labels = html.match(/class="track-tick-label"/g) || [];
-  assert.ok(guides.length <= 514);
-  assert.ok(guides.length > 100);
+  assert.ok(guides.length >= 2 && guides.length <= 3);
   assert.ok(labels.length <= 2);
   assert.match(html, /10,000,000 bp/);
 });

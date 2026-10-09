@@ -237,8 +237,8 @@ test("schema 2 renders independent GRT result switches and exact main-track over
   assert.match(html, /Precomputed path/);
   assert.match(html, /Alignment evidence/);
   const subviewToggleIndex = html.indexOf('data-grt-result-toggle="subview"');
-  const subviewMinTickIndex = html.indexOf('data-view-tick-control="subviewTrackView"');
-  assert.ok(subviewToggleIndex >= 0 && subviewToggleIndex < subviewMinTickIndex);
+  assert.ok(subviewToggleIndex >= 0);
+  assert.doesNotMatch(html, /data-view-tick-control|data-view-tick-interval/);
   const subviewTitleRow = html.match(/<div class="subview-panel-title-row"[^>]*>[\s\S]*?<\/div>/)?.[0] || "";
   assert.doesNotMatch(subviewTitleRow, /data-grt-result-toggle=/);
   assert.match(html, /data-grt-result-entry-key="support:202:0"/);

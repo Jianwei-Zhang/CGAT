@@ -311,13 +311,13 @@ test("a queued wheel cannot apply an old chromosome window to a newly selected c
 });
 
 
-test("direct tick entry commits numeric or Auto values without changing window geometry", () => {
+test("legacy tick events cannot restore manual mode or change window geometry", () => {
   const h = harness();
   try {
     const input = h.ticks.trackView.input;
     input.value = "100.25"; h.root.emit("keydown", h.event(input, { key: "Enter" }));
     const manual = h.store.getState().assembly.trackView;
-    assert.equal(manual.tickMode, "manual"); assert.equal(manual.tickIntervalBp, 100250);
+    assert.equal(manual.tickMode, "auto"); assert.equal(manual.tickIntervalBp, 100250);
     assert.equal(manual.visibleSpanBp, 500); assert.equal(h.views.primary.scroll.scrollLeft, 200);
     input.value = "aUtO"; h.root.emit("change", h.event(input));
     assert.equal(h.store.getState().assembly.trackView.tickMode, "auto");
