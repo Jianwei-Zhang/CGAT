@@ -128,7 +128,7 @@ export function buildVisibleSubviewRulerTicks(options = {}) {
   const sortedTicks = Array.from(
     new Map(ticks.map((tick) => [Number(tick.bp), tick])).values(),
   ).sort((left, right) => left.bp - right.bp);
-  return sortedTicks.map((tick, index) => {
+  const labelledTicks = sortedTicks.map((tick, index) => {
     const isFirst = index === 0;
     const isLast = Number(tick.bp) === Number(windowEnd);
     const isSingle = isFirst && isLast;
@@ -148,14 +148,16 @@ export function buildVisibleSubviewRulerTicks(options = {}) {
       labelText: isLast ? formatRulerEndLabel(tick.bp) : formatRulerTickLabel(tick.bp),
       showLabel: true,
     };
-  }).map((tick, index, allTicks) => {
-    if (index < allTicks.length - 1 && Number(allTicks[index + 1].bp) === Number(windowEnd)) {
-      const previousBounds = resolveRulerLabelBounds(tick);
-      const endBounds = resolveRulerLabelBounds(allTicks[index + 1]);
-      if (previousBounds.right > endBounds.left) {
-        return { ...tick, showLabel: false };
-      }
+  });
+  const endTick = labelledTicks.at(-1)?.bp === windowEnd ? labelledTicks.at(-1) : null;
+  const endBounds = endTick ? resolveRulerLabelBounds(endTick) : null;
+  let lastRight = -Infinity;
+  return labelledTicks.map((tick) => {
+    const bounds = resolveRulerLabelBounds(tick);
+    if (tick !== endTick && (bounds.left < lastRight + 4 || (endBounds && bounds.right + 4 > endBounds.left))) {
+      return { ...tick, showLabel: false };
     }
+    lastRight = bounds.right;
     return tick;
   });
 }
@@ -178,7 +180,7 @@ function readRulerOptions(layer, scrollNode) {
     tickY1: readRulerNumber(layer, "subviewRulerTickY1"),
     tickY2: readRulerNumber(layer, "subviewRulerTickY2"),
     tickLabelY: readRulerNumber(layer, "subviewRulerTickLabelY"),
-    viewBoxMinX: readFiniteNumber(scrollNode?.dataset?.subviewViewboxMinX, 0),
+    viewBoxMinX: readFiniteNumber(scrollNode?.dataset?.subviewViewboxMinX ?? scrollNode?.dataset?.trackViewboxMinX, 0),
     viewportLeft: readFiniteNumber(scrollNode?.scrollLeft, 0),
     viewportWidth: Math.max(1, readFiniteNumber(scrollNode?.clientWidth, DEFAULT_VIEWPORT_WIDTH_PX)),
   };
@@ -206,7 +208,10 @@ function resolveAnimationFrameApi() {
 
 export function bindSubviewRulerRuntime(host) {
   const { request, cancel } = resolveAnimationFrameApi();
-  const scrollNodes = host?.querySelectorAll?.(".subview-track-scroll") || [];
+  const scrollNodes = new Set([
+    ...Array.from(host?.querySelectorAll?.(".subview-track-scroll") || []),
+    ...Array.from(host?.querySelectorAll?.(".assembly-track-scroll[data-track-role='primary']") || []),
+  ]);
   Array.from(scrollNodes).forEach((scrollNode) => {
     const layer = scrollNode?.querySelector?.("[data-subview-virtual-ruler='1']");
     if (!layer) {

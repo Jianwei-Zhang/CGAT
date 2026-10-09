@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { renderFinalPathCard } from "../final-path-card.js";
+import { renderFinalPathCard, renderFinalPathGraph } from "../final-path-card.js";
 import { renderDegapJobCard, renderDegapRuntime } from "../degap-card.js";
 import { readStylesheetTree } from "../../../../styles/__tests__/style-test-support.mjs";
 
@@ -156,7 +156,9 @@ test("renderFinalPathCard migrates the legacy DEGAP view to Graph and embeds DEG
   assert.match(html, /<p class="helper-hint degap-form-help">READS path 为服务器端原始测序数据；HiFi 或 ONT 至少填写一个。<\/p>/);
   assert.match(html, /DEGAP-JOBS/);
   assert.match(html, /data-final-path-export-action="all"[\s\S]*final-path-export-divider[\s\S]*data-final-path-export-action="degap-jobs"/);
-  assert.match(html, /class="final-path-card-head-controls"[\s\S]*最小刻度单位\(kb\)[\s\S]*data-track-combo-field="minTickUnitKb"[\s\S]*value="500"[\s\S]*最多可展示数[\s\S]*data-track-combo-field="maxTickCount"[\s\S]*value="15"[\s\S]*导出/);
+  assert.match(html, /class="final-path-card-head-controls"[\s\S]*data-view-tick-control="finalPathTrackView"[\s\S]*刻度间隔[\s\S]*data-view-tick-mode[\s\S]*导出/);
+  assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
+  assert.doesNotMatch(html, /data-view-navigation|data-view-nav-span/);
   assert.doesNotMatch(html, /data-degap-scale-(?:combo-)?field/);
   assert.doesNotMatch(html, /degap-graph-toolbar/);
   assert.doesNotMatch(html, /DEGAP-gapfiller-config/);
@@ -1741,4 +1743,19 @@ test("graph keeps tiny ctg and gap segments visible without changing source coor
   }
   assert.ok(Math.abs(right - 800) <= 0.02);
   assert.deepEqual(segments, before);
+});
+
+
+test("fitted Final Path retains fine interval guides but avoids unreadable overlapping labels", () => {
+  const html = renderFinalPathGraph({
+    ...createDeps(), trackViewportPx: 120,
+    finalPathEntry: { segments: [{ type: "gap", segmentId: "gap1", gapSizeBp: 10_000_000 }] },
+    trackControls: { tickMode: "manual", tickIntervalBp: 1 },
+  });
+  const guides = html.match(/class="track-tick-guide is-major"/g) || [];
+  const labels = html.match(/class="track-tick-label"/g) || [];
+  assert.ok(guides.length <= 514);
+  assert.ok(guides.length > 100);
+  assert.ok(labels.length <= 2);
+  assert.match(html, /10,000,000 bp/);
 });

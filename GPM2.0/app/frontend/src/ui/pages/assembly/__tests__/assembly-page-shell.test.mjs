@@ -144,8 +144,9 @@ test("assembly tab renders english labels when locale is en", () => {
   assert.match(html, /class="assembly-view-title" data-main-track-control-title>Main View</);
   assert.match(html, /aria-label="Main View Controls"/);
   assert.match(html, />Support Dataset</);
-  assert.match(html, />Min Tick Unit \(kb\)</);
-  assert.match(html, />Max Visible Count</);
+  assert.match(html, />Display settings</);
+  assert.match(html, />Tick interval</);
+  assert.doesNotMatch(html, />Max Visible Count</);
   assert.match(html, /_Chr01 Primary ds track members/);
 });
 

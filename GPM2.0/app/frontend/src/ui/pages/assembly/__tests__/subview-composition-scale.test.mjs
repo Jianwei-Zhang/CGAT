@@ -1,3 +1,4 @@
+import { MAX_TRACK_RENDER_PX } from "../track-prefs.js";
 import { test, assert, createState, createStore, renderAssemblyPage } from "./tabs-semantics-harness.mjs";
 import { resolveSubviewCompositionScaleViewport } from "../subview-composition-layout.js";
 import { applySubviewComposition } from "../subview-composition-state.js";
@@ -23,7 +24,7 @@ test("composition scale fits short content just as main tracks do and caps long 
         const viewport = resolveSubviewCompositionScaleViewport({ members: [member(length)] }, {
           trackPrefs, viewportWidthPx: width,
         });
-        const visibleSpan = Math.min(length, unit * count * 1000);
+        const visibleSpan = Math.min(length, Math.max(unit * count * 1000, length * width / MAX_TRACK_RENDER_PX));
         assert.ok(Math.abs(viewport.bpPerPx * width - visibleSpan) < 1);
         assert.equal(viewport.leftBp, 0);
       }

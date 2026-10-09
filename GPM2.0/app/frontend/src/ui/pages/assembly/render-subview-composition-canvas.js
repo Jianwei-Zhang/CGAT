@@ -18,7 +18,7 @@ import {
   resolveSubviewWorldStartBp,
   sortTrackEntriesForRender,
 } from "./track-render-geometry.js";
-import { normalizePositiveInt, resolveTrackPrefs } from "./track-prefs.js";
+import { normalizePositiveInt, resolveTrackPrefs, resolveTickBpFromScale } from "./track-prefs.js";
 import { resolveSubviewCompositionCandidate } from "./subview-composition-candidates.js";
 import { buildSubviewCompositionLayout, resolveSubviewCompositionScaleViewport } from "./subview-composition-layout.js";
 import { getSubviewComposition } from "./subview-composition-state.js";
@@ -559,7 +559,7 @@ export function renderSubviewCompositionAlignmentCard({
   const rulerGeometry = resolveSubviewRulerGeometry({
     windowStart: 0,
     windowEnd: rulerEndBp,
-    tickBp: prefs.minTickUnitKb * 1000,
+    tickBp: resolveTickBpFromScale({ ...prefs, domainSpanBp: Math.max(1, rulerEndBp), visibleSpanBp: viewportWidthPx * layout.bpPerPx, baseViewportPx: viewportWidthPx }),
     innerWidth: rulerWidth,
     domainSpanBp: Math.max(1, rulerEndBp),
     originX: 0,

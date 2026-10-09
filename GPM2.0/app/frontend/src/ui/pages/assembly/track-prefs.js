@@ -13,6 +13,8 @@ export const DEFAULT_MAX_TICK_COUNT = MAX_TICK_COUNT_OPTIONS[1];
 export const DEFAULT_ALIGNMENT_LENGTH = ALIGNMENT_LENGTH_OPTIONS[1];
 export const DEFAULT_MIN_IDENTITY_PCT = IDENTITY_PCT_OPTIONS[0];
 export const DEFAULT_SUPPORT_DS_CTG_LEN_BP = SUPPORT_DS_CTG_LEN_BP_OPTIONS[0];
+// Bound full SVG dimensions independently of biological sequence length.
+export const MAX_TRACK_RENDER_PX = 4_000_000;
 export const TRACK_PREF_OPTIONS = Object.freeze({
   supportDsCtgLen: SUPPORT_DS_CTG_LEN_BP_OPTIONS,
   minTickUnitKb: MIN_TICK_UNIT_KB_OPTIONS,
@@ -79,6 +81,11 @@ export function resolveTrackPrefs(trackView) {
   );
 
   return {
+    // Legacy fields remain readable for compatibility, but are not the live scale model.
+    visibleSpanBp: normalizePositiveInt(trackView?.visibleSpanBp)
+      ?? Math.min(Number.MAX_SAFE_INTEGER, minTickUnitKb * 1000 * maxTickCount),
+    tickMode: trackView?.tickMode === "manual" ? "manual" : "auto",
+    tickIntervalBp: normalizePositiveInt(trackView?.tickIntervalBp) ?? minTickUnitKb * 1000,
     showTelomeres: trackView?.showTelomeres !== false,
     showCentromeres: trackView?.showCentromeres !== false,
     supportDsCtgLen,
@@ -97,36 +104,41 @@ export function resolveTrackPrefs(trackView) {
 }
 
 export function resolveTickBpFromScale({
-  domainSpanBp,
-  minTickUnitKb,
-  maxTickCount,
-  fallbackTickBp = DEFAULT_TICK_LENGTH,
+  domainSpanBp, minTickUnitKb, maxTickCount, fallbackTickBp = DEFAULT_TICK_LENGTH,
+  tickMode, tickIntervalBp, visibleSpanBp, baseViewportPx = 1200,
 }) {
-  const fallback = normalizePositiveInt(fallbackTickBp) ?? DEFAULT_TICK_LENGTH;
-  const resolvedMinTickUnitKb = normalizePositiveInt(minTickUnitKb) ?? DEFAULT_MIN_TICK_UNIT_KB;
-  if (normalizePositiveInt(domainSpanBp) === null || normalizePositiveInt(maxTickCount) === null) {
-    return fallback;
+  // Calls without the new ruler contract retain their legacy behavior.
+  if (tickMode === undefined) {
+    if (normalizePositiveInt(domainSpanBp) === null || normalizePositiveInt(maxTickCount) === null) {
+      return normalizePositiveInt(fallbackTickBp) ?? DEFAULT_TICK_LENGTH;
+    }
+    return (normalizePositiveInt(minTickUnitKb) ?? DEFAULT_MIN_TICK_UNIT_KB) * 1000;
   }
-  return resolvedMinTickUnitKb * 1000;
+  if (tickMode === "manual") return normalizePositiveInt(tickIntervalBp) ?? 10_000;
+  const span = Math.min(normalizePositiveInt(domainSpanBp) ?? 1,
+    normalizePositiveInt(visibleSpanBp) ?? normalizePositiveInt(domainSpanBp) ?? 1);
+  const count = Math.max(2, Math.floor((Number(baseViewportPx) || 1200) / 110));
+  const raw = Math.max(1, span / count);
+  const power = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 5, 10].find((value) => value * power >= raw) ?? 10;
+  return Math.max(1, Math.ceil(step * power));
 }
 
 export function resolveTrackInnerWidthFromScale({
-  domainSpanBp,
-  minTickUnitKb,
-  maxTickCount,
-  baseViewportPx = 1200,
-  fallbackInnerWidth = baseViewportPx,
+  domainSpanBp, minTickUnitKb, maxTickCount, visibleSpanBp,
+  baseViewportPx = 1200, fallbackInnerWidth = baseViewportPx,
 }) {
   const spanBp = normalizePositiveInt(domainSpanBp);
   const viewportPx = Math.max(1, normalizePositiveInt(baseViewportPx) ?? 1200);
   const fallback = Math.max(viewportPx, normalizePositiveInt(fallbackInnerWidth) ?? viewportPx);
-  const resolvedMinTickUnitKb = normalizePositiveInt(minTickUnitKb) ?? DEFAULT_MIN_TICK_UNIT_KB;
-  const resolvedMaxTickCount = normalizePositiveInt(maxTickCount) ?? DEFAULT_MAX_TICK_COUNT;
-  if (spanBp === null) {
-    return fallback;
-  }
-  const visibleSpanBp = Math.max(1, resolvedMinTickUnitKb * 1000 * resolvedMaxTickCount);
-  return Math.max(viewportPx, Math.ceil((spanBp / visibleSpanBp) * viewportPx));
+  if (spanBp === null) return fallback;
+  const requestedSpan = normalizePositiveInt(visibleSpanBp)
+    ?? (normalizePositiveInt(minTickUnitKb) ?? DEFAULT_MIN_TICK_UNIT_KB) * 1000
+      * (normalizePositiveInt(maxTickCount) ?? DEFAULT_MAX_TICK_COUNT);
+  // Short content always fills the plot, including when restoring legacy settings.
+  const lowerWidth = viewportPx;
+  return Math.min(MAX_TRACK_RENDER_PX,
+    Math.max(lowerWidth, Math.ceil(spanBp / requestedSpan * viewportPx)));
 }
 
 export function normalizeAllowedOption(value, allowedOptions, defaultValue) {

@@ -167,3 +167,16 @@ test("virtual ruler markup carries geometry metadata without serializing ticks",
   assert.ok((markup.match(/track-tick-guide/g) || []).length <= 20);
   assert.match(markup, /43,726,252 bp/);
 });
+
+
+test("very fine manual ticks are sampled across the viewport and labels do not collide", () => {
+  const ticks = buildVisibleSubviewRulerTicks({
+    windowStart: 0, windowEnd: 10_000_000, tickBp: 1,
+    innerWidth: 120, domainSpanBp: 10_000_000, viewportWidth: 120,
+  });
+  assert.ok(ticks.length <= 257);
+  assert.ok(ticks.some(tick => tick.x > 90 && tick.bp < 10_000_000));
+  assert.equal(ticks.at(-1).bp, 10_000_000);
+  assert.equal(ticks.at(-1).showLabel, true);
+  assert.ok(ticks.filter(tick => tick.showLabel).length <= 2);
+});

@@ -59,7 +59,7 @@ export function readTrackViewportMetrics(scrollEl, trackRole) {
     }
     return {
       viewportWidth,
-      windowStartBp: 0,
+      windowStartBp: Number(dataset.subviewWindowStartBp) || 0,
       domainSpanBp,
       innerWidth,
       viewboxMinX: Number.isFinite(viewboxMinX) ? viewboxMinX : 0,

@@ -142,7 +142,7 @@ export function bindTrackContigDrag(host, store, deps) {
   }
 
   host.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0 || event.ctrlKey || event.metaKey) {
+    if (event.defaultPrevented || event.target?.closest?.("[data-view-interaction-mode='hand']")?.dataset?.viewInteractionMode === "hand" || event.button !== 0 || event.ctrlKey || event.metaKey) {
       return;
     }
     const state = store.getState();
@@ -284,7 +284,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
   }
 
   host.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0 || event.ctrlKey || event.metaKey) {
+    if (event.defaultPrevented || event.target?.closest?.("[data-view-interaction-mode='hand']")?.dataset?.viewInteractionMode === "hand" || event.button !== 0 || event.ctrlKey || event.metaKey) {
       return;
     }
     const state = store.getState();

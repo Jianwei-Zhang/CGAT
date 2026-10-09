@@ -1,3 +1,4 @@
+import { buildVisibleSubviewRulerMarkup } from "./subview-ruler-runtime.js";
 import { readHitIdentityPct } from "./alignment-band-style.js";
 import { normalizeNonNegativeInt, normalizePositiveInt } from "./track-prefs.js";
 import { normalizeSupportDatasetId } from "./selection-state.js";
@@ -79,6 +80,7 @@ export function renderSubviewVirtualRuler({
   tickLabelY,
   edgeLabelPadding = 16,
   originX = 0,
+  initialViewportWidth = 0,
 }) {
   const attributes = [
     ["data-subview-virtual-ruler", "1"],
@@ -95,7 +97,12 @@ export function renderSubviewVirtualRuler({
   ]
     .map(([name, value]) => `${name}="${name === "data-subview-virtual-ruler" ? value : Number(value || 0).toFixed(4)}"`)
     .join(" ");
-  return `<g ${attributes}></g>`;
+  const initialMarkup = initialViewportWidth > 0 ? buildVisibleSubviewRulerMarkup({
+    windowStart, windowEnd, tickBp, innerWidth, domainSpanBp, tickY1, tickY2,
+    tickLabelY, edgeLabelPadding, originX, viewportLeft: 0,
+    viewportWidth: initialViewportWidth, viewBoxMinX: 0,
+  }) : "";
+  return `<g ${attributes}>${initialMarkup}</g>`;
 }
 
 export function isTrackTickLabelOverlap(previousTick, endTick) {

@@ -37,14 +37,14 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   assert.doesNotMatch(html, /id="assembly-export-agp-button"/);
   assert.doesNotMatch(html, /Controls \/ 控件/);
   assert.match(html, /辅ds_ctg_len\(bp\)/);
-  assert.match(html, /最小刻度单位\(kb\)/);
-  assert.match(html, /最多可展示数/);
+  assert.match(html, /显示设置/);
+  assert.match(html, /data-view-tick-control="trackView"/);
+  assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
+  assert.ok(html.indexOf("辅ds_ctg_len") < html.indexOf("显示设置"));
+  assert.ok(html.indexOf("显示设置") < html.indexOf("比对长度"));
   assert.match(html, /比对长度\(bp\)/);
   assert.match(html, /一致性\(%\)/);
   assert.ok(html.indexOf("辅 ds") < html.indexOf("辅ds_ctg_len"));
-  assert.ok(html.indexOf("辅ds_ctg_len") < html.indexOf("最小刻度单位"));
-  assert.ok(html.indexOf("最小刻度单位") < html.indexOf("最多可展示数"));
-  assert.ok(html.indexOf("最多可展示数") < html.indexOf("比对长度"));
   assert.ok(html.indexOf("比对长度") < html.indexOf("一致性"));
 
   assert.match(
@@ -65,39 +65,10 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   assert.match(html, /data-track-combo-value="10000"/);
   assert.match(html, /data-track-combo-value="100000"/);
 
-  assert.match(
-    html,
-    /<div class="assembly-track-combo" data-track-combo-field="minTickUnitKb">/,
-  );
-  assert.match(
-    html,
-    /<input\s+id="assembly-track-min-tick-unit-kb"\s+class="assembly-track-combo-input"\s+type="text"\s+inputmode="numeric"\s+pattern="\[0-9\]\*"\s+value="10000"\s+autocomplete="off"[^>]*>/,
-  );
-  assert.match(
-    html,
-    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开最小刻度单位\(kb\)候选值" aria-expanded="false" aria-controls="assembly-track-min-tick-unit-kb-menu">/,
-  );
   assert.match(html, /<span class="assembly-track-control-marker" aria-hidden="true">▾<\/span>/);
-  assert.match(html, /<div id="assembly-track-min-tick-unit-kb-menu" class="assembly-track-combo-menu is-hidden" role="listbox">/);
-  assert.match(html, /data-track-combo-value="250"/);
-  assert.match(html, /data-track-combo-value="500"/);
-  assert.match(html, /data-track-combo-value="750"/);
   assert.match(html, /data-track-combo-value="1000"/);
   assert.match(html, /data-track-combo-value="10000"/);
 
-  assert.match(
-    html,
-    /<div class="assembly-track-combo" data-track-combo-field="maxTickCount">/,
-  );
-  assert.match(
-    html,
-    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开最多可展示数候选值" aria-expanded="false" aria-controls="assembly-track-max-tick-count-menu">/,
-  );
-  assert.match(html, /<div id="assembly-track-max-tick-count-menu" class="assembly-track-combo-menu is-hidden" role="listbox">/);
-  assert.match(html, /data-track-combo-value="5"/);
-  assert.match(html, /data-track-combo-value="10"/);
-  assert.match(html, /data-track-combo-value="15"/);
-  assert.match(html, /data-track-combo-value="20"/);
 
   assert.match(
     html,
@@ -128,8 +99,6 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   assert.match(html, /data-track-combo-value="85"/);
   assert.match(html, /data-track-combo-value="90"/);
   assert.match(html, /data-track-combo-value="95"/);
-  assert.doesNotMatch(html, /<datalist id="assembly-track-min-tick-unit-kb-options">/);
-  assert.doesNotMatch(html, /<datalist id="assembly-track-max-tick-count-options">/);
   assert.doesNotMatch(html, /<datalist id="assembly-track-alignment-length-options">/);
   assert.doesNotMatch(html, /<datalist id="assembly-track-identity-pct-options">/);
   assert.doesNotMatch(html, /<datalist id="assembly-track-support-ds-ctg-len-options">/);

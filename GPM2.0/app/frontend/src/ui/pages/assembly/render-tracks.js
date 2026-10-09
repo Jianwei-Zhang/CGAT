@@ -1,3 +1,4 @@
+import { renderViewTickControl } from "./view-navigation-ui.js";
 import { renderSourceGapConnections } from "./source-fragment-layout.js";
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
@@ -68,6 +69,7 @@ import {
   buildTrackReferenceWidth,
   buildTrackTickItems,
   isTrackTickLabelOverlap,
+  renderSubviewVirtualRuler,
   resolveHitIdentityPct,
   resolveMaxTrackEndBp,
   roundTrackMetric,
@@ -1017,14 +1019,6 @@ function renderAssemblyTrackControls({
         optionsHtml: supportOptions,
       })
     : "";
-  const minTickUnitInput = renderTrackNumberInput({
-    field: "minTickUnitKb",
-    id: "assembly-track-min-tick-unit-kb",
-    label: i18n.trackControls.minTickUnitKb,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.minTickUnitKb),
-    value: trackPrefs.minTickUnitKb,
-    options: MIN_TICK_UNIT_KB_OPTIONS,
-  });
   const supportDsCtgLenInput = renderSupportDsCtgLenControl({
     field: "supportDsCtgLen",
     id: "assembly-track-support-ds-ctg-len",
@@ -1035,14 +1029,6 @@ function renderAssemblyTrackControls({
     supportDsCtgLenRules,
     chrLength,
     i18n,
-  });
-  const maxTickCountInput = renderTrackNumberInput({
-    field: "maxTickCount",
-    id: "assembly-track-max-tick-count",
-    label: i18n.trackControls.maxTickCount,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.maxTickCount),
-    value: trackPrefs.maxTickCount,
-    options: MAX_TICK_COUNT_OPTIONS,
   });
   const alignmentInput = renderTrackNumberInput({
     field: "alignmentLength",
@@ -1075,14 +1061,7 @@ function renderAssemblyTrackControls({
         <label>${renderSupportDsCtgLenLabel(i18n)}</label>
         ${supportDsCtgLenInput}
       </div>
-      <div class="assembly-v1-control-item">
-        <label>${escapeHtml(i18n.trackControls.minTickUnitKb)}</label>
-        ${minTickUnitInput}
-      </div>
-      <div class="assembly-v1-control-item">
-        <label>${escapeHtml(i18n.trackControls.maxTickCount)}</label>
-        ${maxTickCountInput}
-      </div>
+      ${renderViewTickControl(trackPrefs, i18n, "trackView")}
       <div class="assembly-v1-control-item">
         <label>${escapeHtml(i18n.trackControls.alignmentLengthBp)}</label>
         ${alignmentInput}
@@ -1120,14 +1099,6 @@ function renderAssemblyTrackInlineControls({
         optionsHtml: supportOptions,
       })
     : "";
-  const minTickUnitInput = renderTrackNumberInput({
-    field: "minTickUnitKb",
-    id: "assembly-track-min-tick-unit-kb",
-    label: i18n.trackControls.minTickUnitKb,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.minTickUnitKb),
-    value: trackPrefs.minTickUnitKb,
-    options: MIN_TICK_UNIT_KB_OPTIONS,
-  });
   const supportDsCtgLenInput = renderSupportDsCtgLenControl({
     field: "supportDsCtgLen",
     id: "assembly-track-support-ds-ctg-len",
@@ -1138,14 +1109,6 @@ function renderAssemblyTrackInlineControls({
     supportDsCtgLenRules,
     chrLength,
     i18n,
-  });
-  const maxTickCountInput = renderTrackNumberInput({
-    field: "maxTickCount",
-    id: "assembly-track-max-tick-count",
-    label: i18n.trackControls.maxTickCount,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.maxTickCount),
-    value: trackPrefs.maxTickCount,
-    options: MAX_TICK_COUNT_OPTIONS,
   });
   const alignmentInput = renderTrackNumberInput({
     field: "alignmentLength",
@@ -1190,14 +1153,7 @@ function renderAssemblyTrackInlineControls({
         ${renderSupportDsCtgLenLabel(i18n)}
         ${supportDsCtgLenInput}
       </label>
-      <label class="assembly-track-inline-field">
-        <span>${escapeHtml(i18n.trackControls.minTickUnitKb)}</span>
-        ${minTickUnitInput}
-      </label>
-      <label class="assembly-track-inline-field">
-        <span>${escapeHtml(i18n.trackControls.maxTickCount)}</span>
-        ${maxTickCountInput}
-      </label>
+      ${renderViewTickControl(trackPrefs, i18n, "trackView")}
       <label class="assembly-track-inline-field">
         <span>${escapeHtml(i18n.trackControls.alignmentLengthBp)}</span>
         ${alignmentInput}
@@ -1457,13 +1413,20 @@ function renderAssemblyTracks({
     domainSpanBp: visualDomainSpanBp,
     minTickUnitKb: trackPrefs?.minTickUnitKb,
     maxTickCount: trackPrefs?.maxTickCount,
+    visibleSpanBp: trackPrefs?.visibleSpanBp,
+    tickMode: trackPrefs?.tickMode,
+    tickIntervalBp: trackPrefs?.tickIntervalBp,
     baseViewportPx: getMeasuredTrackViewportPx("primary"),
     fallbackInnerWidth: model.primary.innerWidth,
   });
   const tickBp = resolveTickBpFromScale({
+    baseViewportPx: getMeasuredTrackViewportPx("primary"),
     domainSpanBp: visualDomainSpanBp,
     minTickUnitKb: trackPrefs?.minTickUnitKb,
     maxTickCount: trackPrefs?.maxTickCount,
+    visibleSpanBp: trackPrefs?.visibleSpanBp,
+    tickMode: trackPrefs?.tickMode,
+    tickIntervalBp: trackPrefs?.tickIntervalBp,
     fallbackTickBp: trackPrefs?.tickBp,
   });
   const visualWindowEnd = visualWindowStart + visualDomainSpanBp;
@@ -2004,55 +1967,13 @@ function renderAssemblyTracks({
     ? resolvedChrLength
     : visualWindowEnd;
   const rulerWindowEnd = Math.max(0, Math.min(visualWindowEnd, refWindowEnd));
-  const tickItems = buildTrackTickItems({
-    windowStart: visualWindowStart,
-    windowEnd: rulerWindowEnd,
-    tickBp,
-    innerWidth,
-    domainSpanBp: visualDomainSpanBp,
+  const tickLines = renderSubviewVirtualRuler({
+    initialViewportWidth: getMeasuredTrackViewportPx("primary"),
+    windowStart: visualWindowStart, windowEnd: rulerWindowEnd, tickBp, innerWidth,
+    domainSpanBp: visualDomainSpanBp, tickY1: rulerTop + TRACK_LABEL_OFFSET_Y,
+    tickY2: contentBottom - 3 * TRACK_HEIGHT_SCALE,
+    tickLabelY: rulerTop - TRACK_LABEL_OFFSET_Y, edgeLabelPadding: TRACK_EDGE_LABEL_PADDING,
   });
-  const tickRenderItems = tickItems.map((tick, index) => {
-      const isFirst = index === 0;
-      const isLast = index === tickItems.length - 1;
-      const isSingle = isFirst && isLast;
-      const labelAnchor = isSingle ? "middle" : isFirst ? "start" : isLast ? "end" : "middle";
-      const labelX = isSingle
-        ? tick.x
-        : isFirst
-          ? Math.min(innerWidth, tick.x + TRACK_EDGE_LABEL_PADDING)
-          : isLast
-            ? Math.max(0, tick.x - TRACK_EDGE_LABEL_PADDING)
-            : tick.x;
-      return {
-        ...tick,
-        labelAnchor,
-        labelX,
-        bp: tick.bp,
-        labelText: isLast ? formatBp(tick.bp) : formatRulerTickLabel(tick.bp),
-        hideLabel: false,
-      };
-    });
-
-  if (tickRenderItems.length >= 2) {
-    const endTick = tickRenderItems[tickRenderItems.length - 1];
-    const previousTick = tickRenderItems[tickRenderItems.length - 2];
-    if (isTrackTickLabelOverlap(previousTick, endTick)) {
-      previousTick.hideLabel = true;
-    }
-  }
-
-  const tickLines = tickRenderItems
-    .map((tick) => `<g class="track-tick">
-        <line class="track-tick-guide is-major" x1="${tick.x.toFixed(2)}" y1="${rulerTop + TRACK_LABEL_OFFSET_Y}" x2="${tick.x.toFixed(2)}" y2="${(contentBottom - 3 * TRACK_HEIGHT_SCALE).toFixed(2)}" />
-        ${
-          tick.hideLabel
-            ? ""
-            : `<text class="track-tick-label" x="${tick.labelX.toFixed(2)}" y="${rulerTop - TRACK_LABEL_OFFSET_Y}" text-anchor="${tick.labelAnchor}">${escapeHtml(
-                tick.labelText,
-              )}</text>`
-        }
-      </g>`)
-    .join("");
 
   const hiddenPrimaryCtgIdSet = new Set(normalizeTrackSelectionCtgIds(hiddenPrimaryCtgIds));
   const resolveTrackCtgVerticalOffset = (layoutRole, assemblyCtgId) =>

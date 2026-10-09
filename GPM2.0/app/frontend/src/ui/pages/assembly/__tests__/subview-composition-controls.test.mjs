@@ -94,12 +94,14 @@ test("composition reference projections use block length and identity before cre
 
 test("composition emits main-view-aligned non-negative ruler metadata using the current minimum tick unit", () => {
   const state = controlState();
+  state.assembly.subviewTrackView.tickMode = "manual";
+  state.assembly.subviewTrackView.tickIntervalBp = 1000;
   let html = renderAssemblyPage(state);
   assert.match(html, /data-subview-virtual-ruler="1"/);
   assert.match(html, /data-subview-ruler-origin-x="0.0000"/);
   assert.match(html, /data-subview-ruler-window-start="0.0000"/);
   assert.match(html, /data-subview-ruler-tick-bp="1000.0000"/);
-  state.assembly.subviewTrackView.minTickUnitKb = 2;
+  state.assembly.subviewTrackView.tickIntervalBp = 2000;
   html = renderAssemblyPage(state);
   assert.match(html, /data-subview-ruler-tick-bp="2000.0000"/);
 });

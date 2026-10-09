@@ -1,3 +1,4 @@
+import { renderViewTickControl } from "./view-navigation-ui.js";
 import { renderSourceGapConnections } from "./source-fragment-layout.js";
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
@@ -895,22 +896,6 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
     escapeHtml,
     escapeAttr,
   });
-  const minTickUnitInput = renderTrackNumberInput({
-    field: "minTickUnitKb",
-    id: "subview-track-min-tick-unit-kb",
-    label: i18n.trackControls.minTickUnitKb,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.minTickUnitKb),
-    value: trackPrefs?.minTickUnitKb,
-    options: MIN_TICK_UNIT_KB_OPTIONS,
-  });
-  const maxTickCountInput = renderTrackNumberInput({
-    field: "maxTickCount",
-    id: "subview-track-max-tick-count",
-    label: i18n.trackControls.maxTickCount,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.maxTickCount),
-    value: trackPrefs?.maxTickCount,
-    options: MAX_TICK_COUNT_OPTIONS,
-  });
   const alignmentInput = renderTrackNumberInput({
     field: "alignmentLength",
     id: "subview-track-alignment-length",
@@ -931,14 +916,7 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
   return `
     <div class="assembly-track-inline-controls subview-track-inline-controls" role="group" aria-label="${escapeAttr(i18n.subview.trackControlsAria)}">
       ${grtResultControls}
-      <label class="assembly-track-inline-field">
-        <span>${escapeHtml(i18n.trackControls.minTickUnitKb)}</span>
-        ${minTickUnitInput}
-      </label>
-      <label class="assembly-track-inline-field">
-        <span>${escapeHtml(i18n.trackControls.maxTickCount)}</span>
-        ${maxTickCountInput}
-      </label>
+      ${renderViewTickControl(trackPrefs, i18n, "subviewTrackView")}
       <label class="assembly-track-inline-field">
         <span>${escapeHtml(i18n.trackControls.alignmentLengthBp)}</span>
         ${alignmentInput}
@@ -1579,6 +1557,9 @@ function renderSubviewAlignmentCard(
     domainSpanBp: subviewDomainSpanBp,
     minTickUnitKb: resolvedTrackPrefs.minTickUnitKb,
     maxTickCount: resolvedTrackPrefs.maxTickCount,
+    visibleSpanBp: resolvedTrackPrefs.visibleSpanBp,
+    tickMode: resolvedTrackPrefs.tickMode,
+    tickIntervalBp: resolvedTrackPrefs.tickIntervalBp,
     baseViewportPx: getMeasuredTrackViewportPx("subview"),
     fallbackInnerWidth: getMeasuredTrackViewportPx("subview"),
   });
@@ -1599,6 +1580,9 @@ function renderSubviewAlignmentCard(
       : "reference-overlap",
     minTickUnitKb: resolvedTrackPrefs.minTickUnitKb,
     maxTickCount: resolvedTrackPrefs.maxTickCount,
+    visibleSpanBp: resolvedTrackPrefs.visibleSpanBp,
+    tickMode: resolvedTrackPrefs.tickMode,
+    tickIntervalBp: resolvedTrackPrefs.tickIntervalBp,
     topManualOffsetPx: resolveSubviewTrackDragOffsetPx(
       subviewTrackDragOffsets,
       "top",
@@ -2103,6 +2087,9 @@ function renderSubviewTrackPairAlignmentCard(
     domainSpanBp,
     minTickUnitKb: resolvedTrackPrefs.minTickUnitKb,
     maxTickCount: resolvedTrackPrefs.maxTickCount,
+    visibleSpanBp: resolvedTrackPrefs.visibleSpanBp,
+    tickMode: resolvedTrackPrefs.tickMode,
+    tickIntervalBp: resolvedTrackPrefs.tickIntervalBp,
     baseViewportPx: getMeasuredTrackViewportPx("subview"),
     fallbackInnerWidth: Math.max(1, Number(pairModel.innerWidth || getMeasuredTrackViewportPx("subview"))),
   });
@@ -2153,9 +2140,13 @@ function renderSubviewTrackPairAlignmentCard(
   const contentBottom = cursorY;
 
   const tickBp = resolveTickBpFromScale({
+    baseViewportPx: getMeasuredTrackViewportPx("subview"),
     domainSpanBp,
     minTickUnitKb: resolvedTrackPrefs.minTickUnitKb,
     maxTickCount: resolvedTrackPrefs.maxTickCount,
+    visibleSpanBp: resolvedTrackPrefs.visibleSpanBp,
+    tickMode: resolvedTrackPrefs.tickMode,
+    tickIntervalBp: resolvedTrackPrefs.tickIntervalBp,
     fallbackTickBp: resolvedTrackPrefs.tickBp,
   });
   const buildRectsForLayout = (layout) =>
@@ -3223,6 +3214,9 @@ function buildSubviewAlignmentSvgModel({
   pairingMode = "reference-overlap",
   minTickUnitKb,
   maxTickCount,
+  visibleSpanBp,
+  tickMode,
+  tickIntervalBp,
   topManualOffsetPx = 0,
   bottomManualOffsetPx = 0,
   topManualOffsetBp = 0,
@@ -3263,13 +3257,20 @@ function buildSubviewAlignmentSvgModel({
     domainSpanBp: domainSpan,
     minTickUnitKb: safeMinTickUnitKb,
     maxTickCount: safeMaxTickCount,
+    visibleSpanBp,
+    tickMode,
+    tickIntervalBp,
     baseViewportPx: getMeasuredTrackViewportPx("subview"),
     fallbackInnerWidth: getMeasuredTrackViewportPx("subview"),
   });
   const tickBp = resolveTickBpFromScale({
+    baseViewportPx: getMeasuredTrackViewportPx("subview"),
     domainSpanBp: domainSpan,
     minTickUnitKb: safeMinTickUnitKb,
     maxTickCount: safeMaxTickCount,
+    visibleSpanBp,
+    tickMode,
+    tickIntervalBp,
     fallbackTickBp: safeMinTickUnitKb * 1000,
   });
   const toX = (bpValue) =>

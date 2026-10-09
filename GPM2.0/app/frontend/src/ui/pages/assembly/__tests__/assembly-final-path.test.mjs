@@ -42,8 +42,8 @@ test("assembly main view renders the persisted final path card for the current c
   );
 
   assert.match(html, /projA_Chr01 path/);
-  assert.match(html, /final-path-track-min-tick-unit-kb/);
-  assert.match(html, /final-path-track-max-tick-count/);
+  assert.match(html, /data-view-tick-control="finalPathTrackView"/);
+  assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
   assert.match(html, /assembly-final-path-layout/);
   assert.match(html, /assembly-final-path-svg-wrap/);
   assert.match(html, /assembly-final-path-svg/);

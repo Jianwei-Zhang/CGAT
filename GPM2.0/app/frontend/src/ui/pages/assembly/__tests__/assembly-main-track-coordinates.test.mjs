@@ -58,6 +58,8 @@ test("assembly main view renders chr-length reference span, all guides, sparse r
         ],
         trackView: {
           minTickUnitKb: 250,
+          tickMode: "manual",
+          tickIntervalBp: 250 * 1000,
           maxTickCount: 20,
           alignmentLength: 1000,
         },
@@ -82,8 +84,10 @@ test("assembly main view renders chr-length reference span, all guides, sparse r
   assert.match(html, /<canvas class="track-band-canvas"[^>]*data-track-band-canvas="1"/);
   assert.match(html, /<rect[\s\S]*class="track-reference-bar"[\s\S]*rx="0"[\s\S]*ry="0"/);
   assert.match(html, /track-collinearity-band[^>]*data-track-band-proxy="1"/);
-  assert.equal(tickGuideCount, tickLabelCount + 1);
-  assert.equal(tickLabelCount, 20);
+  assert.equal(tickGuideCount, tickLabelCount + 2);
+  assert.equal(tickLabelCount, 19);
+  // Both trailing intermediate labels collide with the complete endpoint label.
+  assert.equal(tickGuideCount, 21);
   assert.match(html, /<text class="track-tick-label"[^>]*>0<\/text>/);
   assert.match(html, /<text class="track-tick-label"[^>]*>250k<\/text>/);
   assert.match(html, /<text class="track-tick-label"[^>]*>5,000,000 bp<\/text>/);
@@ -152,6 +156,8 @@ test("full-chr ruler ticks stop at ref_chr end even when ctg extends beyond chr 
         supportChrCtgs: [],
         trackView: {
           minTickUnitKb: 500,
+          tickMode: "manual",
+          tickIntervalBp: 500 * 1000,
           maxTickCount: 10,
           alignmentLength: 1000,
         },
@@ -262,6 +268,8 @@ test("negative anchors do not shift viewport start when x layout is sequential",
         supportChrCtgs: [],
         trackView: {
           minTickUnitKb: 1,
+          tickMode: "manual",
+          tickIntervalBp: 1 * 1000,
           maxTickCount: 10,
           alignmentLength: 1000,
         },
@@ -304,6 +312,8 @@ test("collinearity bands use real reference coordinates instead of reusing conti
         supportChrCtgs: [],
         trackView: {
           minTickUnitKb: 1,
+          tickMode: "manual",
+          tickIntervalBp: 1 * 1000,
           maxTickCount: 10,
           alignmentLength: 1000,
         },
@@ -353,6 +363,8 @@ test("collinearity bands do not extend left of the visible ref track when hits s
         supportChrCtgs: [],
         trackView: {
           minTickUnitKb: 1,
+          tickMode: "manual",
+          tickIntervalBp: 1 * 1000,
           maxTickCount: 10,
           alignmentLength: 1000,
         },
@@ -415,6 +427,8 @@ test("collinearity bands do not extend right of the visible ref track when hits 
         ],
         trackView: {
           minTickUnitKb: 250,
+          tickMode: "manual",
+          tickIntervalBp: 250 * 1000,
           maxTickCount: 20,
           alignmentLength: 1000,
         },
@@ -485,6 +499,8 @@ test("collinearity bands do not artificially widen tiny ref-edge hits", () => {
         ],
         trackView: {
           minTickUnitKb: 250,
+          tickMode: "manual",
+          tickIntervalBp: 250 * 1000,
           maxTickCount: 20,
           alignmentLength: 1000,
         },
@@ -532,6 +548,8 @@ test("end tick keeps k-unit label and hides previous label when text overlaps", 
         supportChrCtgs: [],
         trackView: {
           minTickUnitKb: 250,
+          tickMode: "manual",
+          tickIntervalBp: 250 * 1000,
           maxTickCount: 20,
           alignmentLength: 1000,
         },
@@ -546,5 +564,5 @@ test("end tick keeps k-unit label and hides previous label when text overlaps", 
   assert.match(html, /<text class="track-tick-label"[^>]*>4,899,999 bp<\/text>/);
   assert.doesNotMatch(html, /<text class="track-tick-label"[^>]*>4,750k<\/text>/);
   assert.doesNotMatch(html, /<text class="track-tick-label"[^>]*>4,899,999<\/text>/);
-  assert.equal(tickGuideCount, tickLabelCount + 1);
+  assert.equal(tickGuideCount, tickLabelCount + 2);
 });

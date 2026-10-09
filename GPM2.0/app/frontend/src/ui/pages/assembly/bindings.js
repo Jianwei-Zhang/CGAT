@@ -1,3 +1,4 @@
+import { bindAssemblyViewNavigation } from "./view-navigation-runtime.js";
 import { normalizeNonNegativeInt, normalizePositiveInt, normalizeTrackPrefInputValue, resolveTrackPrefs } from "./track-prefs.js";
 import { bindTrackNumberInput as bindTrackNumberInputRuntime } from "./track-number-input-runtime.js";
 import { normalizeDeletedCtgRecordIds, normalizeSupportDatasetId } from "./selection-state.js";
@@ -1584,6 +1585,11 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     rerender(host, store);
     return;
   }
+  bindAssemblyViewNavigation(host, store, {
+    rerenderAssemblyMainTab, rerenderSubviewPanel, rerenderFinalPathCard,
+    persistMainTrackViewState, persistProjectAssemblyViewStateFromStore,
+    rememberTrackViewportAnchor, markNextTrackAutoFocusSuppressed,
+  });
   bindSubviewRulerRuntime(host);
   bindStickyCtgLabels(host);
 

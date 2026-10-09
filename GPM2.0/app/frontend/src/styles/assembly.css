@@ -1917,3 +1917,104 @@
   background: #fff4d6;
   color: #704400;
 }
+
+
+/* Range navigation stays outside the horizontally scrolling biological graphic. */
+.assembly-view-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px 0;
+  border-top: 1px solid #e3e8ee;
+  color: #334155;
+  font-size: var(--app-font-size, 14px);
+}
+.view-nav-modes, .view-nav-shift, .view-nav-zoom {
+  display: inline-flex;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+.view-nav-modes { padding-right: 5px; border-right: 1px solid #d8e0e8; }
+.view-nav-button, .view-nav-fit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  border: 1px solid #d3dce5;
+  border-radius: 5px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+}
+.view-nav-button { width: 28px; padding: 5px; }
+.view-nav-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.view-nav-button[aria-pressed="true"] { background: #e6f0ff; border-color: #78a7e8; color: #1858a4; }
+.view-nav-button:hover:not(:disabled), .view-nav-fit:hover { background: #edf4fc; }
+.view-nav-button:disabled { color: #a6b0be; background: #f6f8fa; cursor: default; }
+.view-nav-fit { padding: 3px 8px; white-space: nowrap; font: inherit; }
+.view-nav-axis {
+  position: relative;
+  flex: 1 1 130px;
+  min-width: 90px;
+  height: 26px;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), #dce4ed calc(10% - 1px), #dce4ed 10%), #f3f6f9;
+  touch-action: none;
+}
+.view-nav-window {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border: 1px solid #397fc4;
+  border-radius: 3px;
+  background: #91baf077;
+  cursor: grab;
+  touch-action: none;
+}
+.view-nav-window:focus-visible, .view-nav-button:focus-visible, .view-nav-fit:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.view-nav-edge {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.view-nav-edge::after { content: ""; position: absolute; top: 5px; bottom: 5px; width: 3px; border-radius: 2px; background: #397fc4; }
+.view-nav-edge.is-left { left: 0; }
+.view-nav-edge.is-right { right: 0; }
+.view-nav-edge.is-left::after { left: 2px; }
+.view-nav-edge.is-right::after { right: 2px; }
+.view-nav-span { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; }
+.view-nav-span input { width: 66px; min-width: 0; }
+.view-nav-span select { width: 58px; }
+.view-nav-span input, .view-nav-span select, .view-tick-control input, .view-tick-control select {
+  height: 28px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 5px; color: inherit; background: #fff; font: inherit;
+}
+.view-nav-message:empty { display: none; }
+.view-nav-message { flex-basis: 100%; color: #99631a; font-size: .9em; }
+.assembly-track-scroll[data-view-interaction-mode="hand"] { cursor: grab; touch-action: none; }
+.assembly-track-scroll[data-view-interaction-mode="hand"] * { cursor: inherit; }
+.assembly-track-scroll.is-view-panning, .assembly-track-scroll.is-view-panning * { cursor: grabbing; }
+.view-display-settings { position: relative; }
+.view-display-settings > summary { cursor: pointer; white-space: nowrap; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 4px; }
+.view-display-settings-body { position: absolute; right: 0; top: calc(100% + 5px); z-index: 30; padding: 10px; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 5px 16px #20385822; }
+.view-tick-control { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.view-tick-control input { width: 85px; }
+.view-tick-control [hidden] { display: none; }
+@media (max-width: 900px) {
+  .view-nav-axis { flex-basis: calc(100% - 143px); }
+  .view-nav-zoom { margin-left: auto; }
+}
+@media (max-width: 520px) {
+  .assembly-view-navigation { gap: 4px; }
+  .view-nav-axis { flex-basis: calc(100% - 139px); }
+  .view-nav-span input { width: 59px; }
+  .view-display-settings-body { right: auto; left: 0; }
+}

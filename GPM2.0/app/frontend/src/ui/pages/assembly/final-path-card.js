@@ -1,3 +1,4 @@
+import { renderViewTickControl } from "./view-navigation-ui.js";
 import { estimateGraphTextWidth, getGraphFontSize } from "../../../services/app-settings.js";
 import {
   DEFAULT_MAX_TICK_COUNT,
@@ -438,7 +439,8 @@ function buildTrackTickItems({ windowStart, windowEnd, tickBp, innerWidth, domai
   const ticks = [];
   const resolvedEnd = Math.max(windowStart, windowEnd);
   const firstTick = Math.max(0, Math.ceil(Math.max(0, windowStart) / tickBp) * tickBp);
-  for (let bp = firstTick; bp <= resolvedEnd; bp += tickBp) {
+  const stride = Math.max(1, Math.ceil((resolvedEnd - firstTick) / Math.max(1, tickBp) / 512));
+  for (let bp = firstTick; bp <= resolvedEnd; bp += tickBp * stride) {
     const x = ((Math.min(bp, resolvedEnd) - windowStart) / domainSpanBp) * innerWidth;
     ticks.push({ bp, x });
   }
@@ -512,36 +514,7 @@ function renderFinalPathHeadControls({
   return `
     <div class="final-path-card-head-controls">
       <div class="assembly-track-inline-controls final-path-track-inline-controls" role="group" aria-label="${escapeAttr(ariaLabel)}">
-        <label class="assembly-track-inline-field">
-          <span>${escapeHtml(labels.minTickUnitLabel)}</span>
-          ${renderTrackNumberInput({
-            escapeAttr,
-            escapeHtml,
-            field: "minTickUnitKb",
-            id: `${idPrefix}-min-tick-unit-kb`,
-            label: labels.minTickUnitLabel,
-            openOptionLabel: labels.openMinTickUnitLabel,
-            value: trackControls.minTickUnitKb,
-            options: MIN_TICK_UNIT_KB_OPTIONS,
-            extraComboFieldAttr,
-            inputFieldAttr,
-          })}
-        </label>
-        <label class="assembly-track-inline-field">
-          <span>${escapeHtml(labels.maxTickCountLabel)}</span>
-          ${renderTrackNumberInput({
-            escapeAttr,
-            escapeHtml,
-            field: "maxTickCount",
-            id: `${idPrefix}-max-tick-count`,
-            label: labels.maxTickCountLabel,
-            openOptionLabel: labels.openMaxTickCountLabel,
-            value: trackControls.maxTickCount,
-            options: MAX_TICK_COUNT_OPTIONS,
-            extraComboFieldAttr,
-            inputFieldAttr,
-          })}
-        </label>
+        ${renderViewTickControl(trackControls, { trackControls: { minTickUnitKb: labels.minTickUnitLabel } }, "finalPathTrackView", true)}
       </div>
       ${restoreAction}
       ${exportMenu}
@@ -1082,7 +1055,7 @@ export function renderFinalPathGraph({
   primaryDatasetName = "",
   previewSegmentOrder = null,
   scaleDomainSpanBp = null,
-  fitToViewport = false,
+  fitToViewport = true,
   showRuler = true,
   compact = false,
   rightLengthLabel = "",
@@ -1142,6 +1115,10 @@ export function renderFinalPathGraph({
     domainSpanBp,
     minTickUnitKb: resolvedTrackPrefs.minTickUnitKb,
     maxTickCount: resolvedTrackPrefs.maxTickCount,
+    tickMode: resolvedTrackPrefs.tickMode,
+    tickIntervalBp: resolvedTrackPrefs.tickIntervalBp,
+    visibleSpanBp: domainSpanBp,
+    baseViewportPx,
     fallbackTickBp: resolvedTrackPrefs.minTickUnitKb * 1000,
   });
   const tickItems = buildTrackTickItems({
@@ -1168,9 +1145,11 @@ export function renderFinalPathGraph({
     };
   });
   const endTick = tickItems[tickItems.length - 1];
-  const previousTick = tickItems[tickItems.length - 2];
-  if (isTrackTickLabelOverlap(previousTick, endTick)) {
-    previousTick.showLabel = false;
+  let lastLabel = null;
+  for (const tick of tickItems) {
+    if (tick !== endTick && (isTrackTickLabelOverlap(tick, endTick) || isTrackTickLabelOverlap(lastLabel, tick))) {
+      tick.showLabel = false;
+    } else lastLabel = tick;
   }
   const tickLines = tickItems
     .map((tick) => `<line class="track-tick-guide is-major" x1="${tick.x.toFixed(2)}" y1="${graphMetrics.tickY1.toFixed(2)}" x2="${tick.x.toFixed(2)}" y2="${graphMetrics.tickY2.toFixed(2)}" />`)
@@ -1181,7 +1160,7 @@ export function renderFinalPathGraph({
     .join("");
 
   const layoutItems = resolveSegmentLayoutItems(segments, domainSpanBp, innerWidth);
-  const visualLayouts = fitToViewport ? null : resolveFinalPathVisualLayouts(layoutItems, innerWidth);
+  const visualLayouts = resolveFinalPathVisualLayouts(layoutItems, innerWidth);
   const gapMarkerLayouts = resolveGapMarkerLayouts(layoutItems, innerWidth, visualLayouts);
   const ctgLabelPlacements = resolveFinalPathCtgLabelPlacements(
     layoutItems,

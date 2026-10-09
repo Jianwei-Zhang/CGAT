@@ -53,12 +53,8 @@ test("subview panel renders chart sub-card with parameter labels after entering"
   assert.match(html, /data-subview-remove-type="candidate"/);
   assert.match(html, /data-subview-remove-role="support"/);
   assert.match(html, /data-subview-remove-contig-id="30"/);
-  assert.match(html, /最小刻度单位\(kb\)/);
-  assert.match(html, /最多可展示数/);
   assert.match(html, /比对长度\(bp\)/);
   assert.match(html, /一致性\(%\)/);
-  assert.match(html, /id="subview-track-min-tick-unit-kb"/);
-  assert.match(html, /id="subview-track-max-tick-count"/);
   assert.match(html, /id="subview-track-alignment-length"/);
   assert.match(html, /id="subview-track-identity-pct"/);
   assert.match(html, /class="assembly-track-layout subview-track-layout"/);
@@ -68,6 +64,8 @@ test("subview panel renders chart sub-card with parameter labels after entering"
   assert.doesNotMatch(html, /命中：/);
   assert.match(html, /support-ctg/);
   assert.match(html, /ctg-alpha/);
+  assert.match(html, /data-view-tick-control="subviewTrackView"/);
+  assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
 });
 
 test("schema 3 renders local GRT evidence in contig-pair and track-pair Subviews", () => {

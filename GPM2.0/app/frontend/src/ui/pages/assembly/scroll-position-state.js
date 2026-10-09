@@ -20,17 +20,15 @@ export function areViewportScrollStatesEqual(left, right) {
 
 export function buildMainTrackViewportKey(state) {
   const prefs = resolveTrackPrefs(state?.assembly?.trackView);
-  // Contig selection is transient; explicit focus commands own intentional viewport moves.
-  return [
-    state?.session?.projectId || "",
-    state?.assembly?.selectedChrName || "",
+  // Keep existing saved pixel-scroll identities valid on first legacy migration.
+  const legacyKey = [
+    state?.session?.projectId || "", state?.assembly?.selectedChrName || "",
     normalizeSupportDatasetId(state?.assembly?.supportDatasetId) || "",
-    prefs.supportDsCtgLen,
-    prefs.minTickUnitKb,
-    prefs.maxTickCount,
-    prefs.alignmentLength,
-    prefs.minIdentityPct,
+    prefs.supportDsCtgLen, prefs.minTickUnitKb, prefs.maxTickCount,
+    prefs.alignmentLength, prefs.minIdentityPct,
   ].join(":");
+  const legacySpan = prefs.minTickUnitKb * 1000 * prefs.maxTickCount;
+  return prefs.visibleSpanBp === legacySpan ? legacyKey : `${legacyKey}:span:${prefs.visibleSpanBp}`;
 }
 
 export function buildSubviewTrackViewportKey(state) {

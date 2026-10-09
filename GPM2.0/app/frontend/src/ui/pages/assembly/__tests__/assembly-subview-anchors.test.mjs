@@ -52,17 +52,11 @@ test("subview track controls render independently from main track controls", () 
     }),
   );
 
-  assert.match(html, /id="assembly-track-min-tick-unit-kb"[^>]*value="250"/);
-  assert.match(html, /id="assembly-track-max-tick-count"[^>]*value="20"/);
   assert.match(html, /id="assembly-track-alignment-length"[^>]*value="10000"/);
   assert.match(html, /id="assembly-track-identity-pct"[^>]*value="95"/);
 
-  assert.match(html, /id="subview-track-min-tick-unit-kb"[^>]*value="10000"/);
-  assert.match(html, /id="subview-track-max-tick-count"[^>]*value="5"/);
   assert.match(html, /id="subview-track-alignment-length"[^>]*value="1000"/);
   assert.match(html, /id="subview-track-identity-pct"[^>]*value="0"/);
-  assert.match(html, /id="assembly-track-min-tick-unit-kb-menu"[\s\S]*data-track-combo-value="100000"/);
-  assert.match(html, /id="subview-track-min-tick-unit-kb-menu"[\s\S]*data-track-combo-value="100000"/);
   assert.match(html, /data-subview-action="swap-track-order"/);
   assert.match(
     html,
@@ -76,6 +70,10 @@ test("subview track controls render independently from main track controls", () 
     html,
     /<div class="assembly-track-label-column subview-track-label-column"[\s\S]*class="button ghost tiny subview-track-order-toggle is-in-label-column"[\s\S]*<\/div>\s*<div\s+class="assembly-track-scroll subview-track-scroll"/,
   );
+  assert.match(html, /data-view-tick-control="subviewTrackView"/);
+  assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
+  assert.match(html, /data-view-tick-control="trackView"[\s\S]*data-view-tick-interval[^>]*value="250"/);
+  assert.match(html, /data-view-tick-control="subviewTrackView"[\s\S]*data-view-tick-interval[^>]*value="10000"/);
 });
 
 test("subview chart uses real relative ctg lengths so top and bottom bars can differ", () => {

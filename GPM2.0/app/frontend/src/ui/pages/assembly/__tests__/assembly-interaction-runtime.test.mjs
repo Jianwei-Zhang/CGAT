@@ -1424,6 +1424,9 @@ test("bindings persist main-track view changes after committing a main control i
   await new Promise(resolve => setTimeout(resolve, 0));
 
   assert.deepEqual(store.getState().assembly.trackView, {
+    visibleSpanBp: 5_000_000,
+    tickMode: "auto",
+    tickIntervalBp: 500_000,
     showTelomeres: true,
     showCentromeres: true,
     supportDsCtgLen: 0,
@@ -1441,6 +1444,9 @@ test("bindings persist main-track view changes after committing a main control i
   });
   assert.deepEqual(persisted, [
     {
+      visibleSpanBp: 5_000_000,
+      tickMode: "auto",
+      tickIntervalBp: 500_000,
       showTelomeres: true,
       showCentromeres: true,
       supportDsCtgLen: 0,
@@ -2012,6 +2018,9 @@ test("bindings update final-path track prefs without persisting main-track view 
   await new Promise(resolve => setTimeout(resolve, 0));
 
   assert.deepEqual(store.getState().assembly.finalPathTrackView, {
+    visibleSpanBp: 5_000_000,
+    tickMode: "auto",
+    tickIntervalBp: 500_000,
     showTelomeres: true,
     showCentromeres: true,
     supportDsCtgLen: 0,
