@@ -1823,7 +1823,7 @@ function renderSubviewAlignmentCard(
         ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context, history)}
       </div>
       <div class="assembly-track-layout subview-track-layout">
-        ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr, svgModel.rulerTop)}
+        ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
         <div class="assembly-track-label-column subview-track-label-column" style="width:${svgModel.labelColumnWidth}px;height:${svgModel.contentBottom}px">
           <div class="assembly-track-label-row${topRowClass}" style="top:${svgModel.topLabelTop}px" title="${escapeAttr(topDisplayCtgName)}">${escapeHtml(topVisibleCtgName)}</div>
           ${renderSubviewTrackOrderToggleButton({
@@ -2126,8 +2126,9 @@ function renderSubviewTrackPairAlignmentCard(
     laneCount: Math.max(1, Number(layout.trackModel?.laneCount || 1)),
   }));
 
-  const rulerTop = 12 * TRACK_HEIGHT_SCALE;
-  let cursorY = 32 * TRACK_HEIGHT_SCALE;
+  const rulerTop = 24 * TRACK_HEIGHT_SCALE;
+  // Halve the ruler-to-first-track gap: 30 instead of 60 scaled pixels.
+  let cursorY = rulerTop + 15 * TRACK_HEIGHT_SCALE - TRACK_ROW_PADDING_TOP;
   rowLayouts.forEach((layout, index) => {
     const rowHeight = layout.laneCount * TRACK_LANE_HEIGHT + TRACK_ROW_EXTRA_HEIGHT;
     layout.rowTop = cursorY;
@@ -3077,7 +3078,7 @@ function renderSubviewTrackPairAlignmentCard(
         ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context, history)}
       </div>
       <div class="assembly-track-layout subview-track-layout">
-        ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr, rulerTop)}
+        ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
         <div class="assembly-track-label-column subview-track-label-column" style="width:${LABEL_COLUMN_WIDTH_PX}px;height:${contentBottom}px">
           <div class="assembly-track-label-row${topRoleClass}" style="top:${resolvedTopLayout.labelTop}px">${escapeHtml(topTrackLabel)}</div>
           ${renderSubviewTrackOrderToggleButton({
@@ -3235,8 +3236,9 @@ function buildSubviewAlignmentSvgModel({
   const TRACK_TEXT_OFFSET_Y = 11 * graphTextScale;
   const LABEL_COLUMN_WIDTH_PX = 136;
 
-  const rulerTop = 12 * TRACK_HEIGHT_SCALE;
-  let cursorY = 32 * TRACK_HEIGHT_SCALE;
+  const rulerTop = 24 * TRACK_HEIGHT_SCALE;
+  // Halve the ruler-to-first-track gap: 30 instead of 60 scaled pixels.
+  let cursorY = rulerTop + 15 * TRACK_HEIGHT_SCALE - TRACK_ROW_PADDING_TOP;
   const rowHeight = TRACK_LANE_HEIGHT + TRACK_ROW_EXTRA_HEIGHT;
   const topBarY = cursorY + TRACK_ROW_PADDING_TOP;
   const topLabelTop = topBarY;

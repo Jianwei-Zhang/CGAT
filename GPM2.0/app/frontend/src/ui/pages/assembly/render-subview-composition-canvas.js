@@ -33,7 +33,8 @@ import {
 
 function getCompositionVerticalMetrics() {
   const scale = Math.max(1, getGraphFontSize() / 12);
-  return { RULER_Y: 24 * scale, TOP_Y: 58 * scale, BOTTOM_Y: 166 * scale, BAR_HEIGHT: 14 * scale, CONTENT_HEIGHT: 224 * scale };
+  // Keep the legend above the ruler and halve its 34px gap to the top lane.
+  return { RULER_Y: 48 * scale, TOP_Y: 65 * scale, BOTTOM_Y: 173 * scale, BAR_HEIGHT: 14 * scale, CONTENT_HEIGHT: 231 * scale };
 }
 
 function number(value) {
@@ -575,7 +576,7 @@ export function renderSubviewCompositionAlignmentCard({
         ? evidenceStatus(subview?.pairwiseEvidence, i18n.subview, escapeHtml)
         : `<span class="muted">${escapeHtml(i18n.subview.compositionEvidenceNeedsBothLanes)}</span>`}</div>
     <div class="assembly-track-layout subview-track-layout">
-      ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr, RULER_Y)}
+      ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
       <div class="assembly-track-label-column subview-track-label-column" style="width:136px;height:${CONTENT_HEIGHT}px">
         <div class="assembly-track-label-row" style="top:${TOP_Y - 4}px">${escapeHtml(i18n.subview.tools.compositionManager.lanes.top)}</div>
         ${renderTrackOrderToggleButton({

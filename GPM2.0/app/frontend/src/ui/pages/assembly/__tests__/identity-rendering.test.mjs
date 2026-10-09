@@ -101,7 +101,7 @@ test("legacy reference overlap does not invent direct ctg-to-ctg identity", () =
 });
 
 for (const mode of ["2-contig", "track-pair", "composition"]) {
-  test(`${mode}: compact rulers keep legends just below the axis at every font scale`, () => {
+  test(`${mode}: legends stay above the axis while the first-track gap is halved`, () => {
     const settings = getAppSettings();
     try {
       for (const [fontSize, graphFontSize] of [[12, 10], [14, 12], [18, 16], [18, 10]]) {
@@ -116,14 +116,20 @@ for (const mode of ["2-contig", "track-pair", "composition"]) {
         assert.equal(legends.length, 2);
         axes.forEach(([axis], index) => {
           const rulerTop = Number(attr(axis, "y1"));
-          assert.equal(rulerTop, 24 * scale, "remove 24 scaled pixels above the ruler");
+          assert.equal(rulerTop, 48 * scale, "keep the ruler below the original legend position");
           assert.equal(attr(axis, "y2"), String(rulerTop));
-          assert.equal(attr(legends[index][0], "style"), `top:${rulerTop + 4}px`,
-            "legend follows the ruler instead of sitting above its tick labels");
+          assert.equal(attr(legends[index][0], "style"), undefined,
+            "CSS keeps the legend in its original upper-right position");
+          const bars = [...layouts[index][0].matchAll(/<rect\s+class="track-ctg(?:\s[^"]*)?"[^>]*>/g)];
+          assert.ok(bars.length > 0);
+          const firstTrackTop = Math.min(...bars.map(([bar]) => Number(attr(bar, "y"))));
+          const expectedGap = mode === "composition" && index === 1 ? 17 : 30;
+          assert.ok(Math.abs(firstTrackTop - rulerTop - expectedGap * scale) < 0.01,
+            "first-track gap is half of the previous 34/60 scaled pixels");
         });
         if (mode === "composition") {
-          assert.match(html, new RegExp(`class="assembly-track-svg subview-track-svg"[^>]*height="${224 * scale}"`),
-            "composition height also shrinks without changing lane separation");
+          assert.match(html, new RegExp(`class="assembly-track-svg subview-track-svg"[^>]*height="${231 * scale}"`),
+            "composition retains lane separation with the halved top gap");
         }
       }
     } finally {
@@ -139,5 +145,5 @@ test("identity legend remains a non-interactive overlay pinned to the right", ()
   assert.match(legendRule, /position:\s*absolute/);
   assert.match(legendRule, /right:\s*12px/);
   assert.match(legendRule, /pointer-events:\s*none/);
-  assert.doesNotMatch(legendRule, /(?:^|[;\s])top:/, "ruler geometry owns the vertical position");
+  assert.match(legendRule, /top:\s*8px/, "preserve the original legend position above the axis");
 });

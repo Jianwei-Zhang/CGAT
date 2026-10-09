@@ -1501,8 +1501,9 @@ function renderAssemblyTracks({
     (row) => Array.isArray(row.trackModel?.ctgs) && row.trackModel.ctgs.length > 0,
   );
 
-  const rulerTop = 12 * TRACK_HEIGHT_SCALE;
-  let cursorY = 32 * TRACK_HEIGHT_SCALE;
+  const rulerTop = 24 * TRACK_HEIGHT_SCALE;
+  // Halve the ruler-to-first-track gap: 30 instead of 60 scaled pixels.
+  let cursorY = rulerTop + 15 * TRACK_HEIGHT_SCALE - TRACK_ROW_PADDING_TOP;
   const rowLayouts = [];
   const refLabel = resolveReferenceTrackLabel(selectedChrName);
   const refRowLayout = {
@@ -2376,7 +2377,7 @@ function renderAssemblyTracks({
       </div>
       ${grtResultToastMarkup}
       <div class="assembly-track-layout">
-        ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr, rulerTop)}
+        ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
         <div class="assembly-track-label-column" style="width:${LABEL_COLUMN_WIDTH_PX}px;height:${contentBottom}px">
           ${labelRows}
         </div>
