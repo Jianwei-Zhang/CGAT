@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { getAppSettings, setAppSettings } from "../../../../services/app-settings.js";
 import { test, assert, renderAssemblyPage } from "./tabs-semantics-harness.mjs";
 import { createIdentityRenderState } from "./identity-render-fixture.mjs";
 import { resolveAlignmentBandStyle } from "../alignment-band-style.js";
@@ -25,11 +27,11 @@ for (const mode of ["2-contig", "track-pair", "composition"]) {
     assert.match(html, /Identity: Unknown/);
     assert.match(html, /Identity: 0.00%/);
     assert.match(html, /alignment-identity-legend/);
-    const legends = [...html.matchAll(/<div class="alignment-identity-legend"[\s\S]*?<\/div>/g)];
+    const legends = [...html.matchAll(/<div class="alignment-identity-legend"[^>]*>[\s\S]*?<\/div>/g)];
     assert.equal(legends.length, 2, "one legend in the main chart and one in Subview");
     legends.forEach(([legend]) => assert.doesNotMatch(legend, /未知|Unknown|unknown/));
     assert.equal(
-      [...html.matchAll(/<div class="assembly-track-layout(?: subview-track-layout)?">\s*<div class="alignment-identity-legend"/g)].length,
+      [...html.matchAll(/<div class="assembly-track-layout(?: subview-track-layout)?">\s*<div class="alignment-identity-legend"[^>]*>/g)].length,
       2,
       "legends belong inside the chart layouts, not in standalone card rows",
     );
@@ -96,4 +98,46 @@ test("legacy reference overlap does not invent direct ctg-to-ctg identity", () =
   assert.ok(bands(html).length > 0);
   assert.ok(identities(bands(html)).every((identity) => identity === ""));
   assert.match(html, /Identity: Unknown \(reference overlap; not a direct alignment\)/);
+});
+
+for (const mode of ["2-contig", "track-pair", "composition"]) {
+  test(`${mode}: compact rulers keep legends just below the axis at every font scale`, () => {
+    const settings = getAppSettings();
+    try {
+      for (const [fontSize, graphFontSize] of [[12, 10], [14, 12], [18, 16], [18, 10]]) {
+        setAppSettings({ ...settings, fontSize, graphFontSize }, { persist: false });
+        const html = renderAssemblyPage(createIdentityRenderState(mode));
+        const scale = Math.max(1, graphFontSize / 12);
+        const layouts = [...html.matchAll(/<div class="assembly-track-layout(?: subview-track-layout)?">([\s\S]*?)<\/svg>/g)];
+        assert.equal(layouts.length, 2);
+        const axes = layouts.map(([layout]) => layout.match(/<line class="track-ruler-line"[^>]*>/));
+        const legends = layouts.map(([layout]) => layout.match(/<div class="alignment-identity-legend"[^>]*>/));
+        assert.equal(axes.length, 2);
+        assert.equal(legends.length, 2);
+        axes.forEach(([axis], index) => {
+          const rulerTop = Number(attr(axis, "y1"));
+          assert.equal(rulerTop, 24 * scale, "remove 24 scaled pixels above the ruler");
+          assert.equal(attr(axis, "y2"), String(rulerTop));
+          assert.equal(attr(legends[index][0], "style"), `top:${rulerTop + 4}px`,
+            "legend follows the ruler instead of sitting above its tick labels");
+        });
+        if (mode === "composition") {
+          assert.match(html, new RegExp(`class="assembly-track-svg subview-track-svg"[^>]*height="${224 * scale}"`),
+            "composition height also shrinks without changing lane separation");
+        }
+      }
+    } finally {
+      setAppSettings(settings, { persist: false });
+    }
+  });
+}
+
+test("identity legend remains a non-interactive overlay pinned to the right", () => {
+  const css = readFileSync(new URL("../../../../styles/assembly.css", import.meta.url), "utf8");
+  const legendRule = css.match(/\.alignment-identity-legend\s*\{([^}]*)\}/)?.[1];
+  assert.ok(legendRule);
+  assert.match(legendRule, /position:\s*absolute/);
+  assert.match(legendRule, /right:\s*12px/);
+  assert.match(legendRule, /pointer-events:\s*none/);
+  assert.doesNotMatch(legendRule, /(?:^|[;\s])top:/, "ruler geometry owns the vertical position");
 });

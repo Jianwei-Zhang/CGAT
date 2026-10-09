@@ -33,7 +33,7 @@ import {
 
 function getCompositionVerticalMetrics() {
   const scale = Math.max(1, getGraphFontSize() / 12);
-  return { TOP_Y: 82 * scale, BOTTOM_Y: 190 * scale, BAR_HEIGHT: 14 * scale, CONTENT_HEIGHT: 248 * scale };
+  return { RULER_Y: 24 * scale, TOP_Y: 58 * scale, BOTTOM_Y: 166 * scale, BAR_HEIGHT: 14 * scale, CONTENT_HEIGHT: 224 * scale };
 }
 
 function number(value) {
@@ -451,7 +451,7 @@ export function renderSubviewCompositionAlignmentCard({
   escapeHtml,
   escapeAttr,
 }) {
-  const { TOP_Y, BOTTOM_Y, BAR_HEIGHT, CONTENT_HEIGHT } = getCompositionVerticalMetrics();
+  const { RULER_Y, TOP_Y, BOTTOM_Y, BAR_HEIGHT, CONTENT_HEIGHT } = getCompositionVerticalMetrics();
   const composition = getSubviewComposition(subview);
   if (!composition?.members.length) return "";
   const prefs = resolveTrackPrefs(trackPrefs);
@@ -575,7 +575,7 @@ export function renderSubviewCompositionAlignmentCard({
         ? evidenceStatus(subview?.pairwiseEvidence, i18n.subview, escapeHtml)
         : `<span class="muted">${escapeHtml(i18n.subview.compositionEvidenceNeedsBothLanes)}</span>`}</div>
     <div class="assembly-track-layout subview-track-layout">
-      ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
+      ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr, RULER_Y)}
       <div class="assembly-track-label-column subview-track-label-column" style="width:136px;height:${CONTENT_HEIGHT}px">
         <div class="assembly-track-label-row" style="top:${TOP_Y - 4}px">${escapeHtml(i18n.subview.tools.compositionManager.lanes.top)}</div>
         ${renderTrackOrderToggleButton({
@@ -591,12 +591,12 @@ export function renderSubviewCompositionAlignmentCard({
         <div class="subview-band-tooltip is-hidden" data-subview-band-tooltip-delay-ms="500" aria-hidden="true"></div>
         <svg class="assembly-track-svg subview-track-svg" width="${layout.width}" height="${CONTENT_HEIGHT}"
           viewBox="${layout.viewBoxMinX} 0 ${layout.width} ${CONTENT_HEIGHT}" preserveAspectRatio="xMinYMin meet">
-          <line class="track-ruler-line" x1="0" y1="48" x2="${rulerWidth}" y2="48" />
+          <line class="track-ruler-line" x1="0" y1="${RULER_Y}" x2="${rulerWidth}" y2="${RULER_Y}" />
           ${renderSubviewVirtualRuler({
             ...rulerGeometry,
-            tickY1: 48,
+            tickY1: RULER_Y,
             tickY2: CONTENT_HEIGHT - 20,
-            tickLabelY: 42,
+            tickLabelY: RULER_Y - 6 * Math.max(1, getGraphFontSize() / 12),
           })}
           ${bandMarkup}${emptyTop}${emptyBottom}
           ${grtResult.context?.subviewEnabled ? grtScene.junctionMarkup : ""}

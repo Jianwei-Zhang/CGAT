@@ -40,10 +40,10 @@ export function alignmentBandTooltipMetrics(hit) {
   return `Identity: ${identity === null ? "Unknown" : `${identity.toFixed(2)}%`} | Alignment length: ${Number.isFinite(length) && length > 0 ? `${Math.round(length).toLocaleString("en-US")} bp` : "Unknown"}`;
 }
 
-export function renderAlignmentIdentityLegend(labels, escapeAttr) {
+export function renderAlignmentIdentityLegend(labels, escapeAttr, rulerTop = 24) {
   const gradient = (tone) => `linear-gradient(to right, ${resolveAlignmentBandStyle(tone, 80).fill}, ${resolveAlignmentBandStyle(tone, 100).fill})`;
   const hint = labels?.identityLegendHint || "Darker means higher Identity. Fixed scale; ≤80% uses the lightest shade.";
-  return `<div class="alignment-identity-legend" title="${escapeAttr(hint)}" aria-label="${escapeAttr(hint)}">
+  return `<div class="alignment-identity-legend" style="top:${rulerTop + 4}px" title="${escapeAttr(hint)}" aria-label="${escapeAttr(hint)}">
     <span>Identity</span><span>≤80%</span><span class="alignment-identity-scale" aria-hidden="true">
       <i style="background:${gradient("primary")}"></i><i style="background:${gradient("companion")}"></i>
     </span><span>100%</span>
