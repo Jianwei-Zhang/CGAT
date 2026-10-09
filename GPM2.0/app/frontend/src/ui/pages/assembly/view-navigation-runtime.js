@@ -307,6 +307,8 @@ function createController(root, store, window) {
     const plot = event.target?.closest?.(".assembly-track-scroll[data-track-role]");
     const role = roleOf(event.target), geometry = geometryFor(role);
     if ((!axis && !plot) || !["primary", "subview"].includes(role) || !geometry || controller.gesture) return;
+    // Mouse mode must leave the wheel to page scrolling, including over the overview.
+    if (controller.roles[role]?.mode !== "hand") return;
     if (!Number.isFinite(event.deltaY) || !event.deltaY || Math.abs(event.deltaX || 0) > Math.abs(event.deltaY)) return;
     event.preventDefault(); event.stopPropagation();
     const range = controller.pending?.role === role && controller.pending.key === contextKey(role) ? controller.pending.range : geometry.range;
@@ -433,6 +435,17 @@ function createController(root, store, window) {
       if (controller.gesture?.role === role && (previous?.key !== key || (!controller.applyingRange && controller.gesture.scroll !== scroll))) endGesture(true);
       const current = previous?.key === key ? previous : { key, mode: "mouse" };
       const localeKey = locale();
+      // Share a card with the graphic, but never put navigation in its horizontal scroller.
+      let card = layout.parentNode;
+      if (card.dataset?.viewNavigationCard !== role) {
+        card = root.ownerDocument.createElement("div");
+        card.className = "assembly-view-card";
+        card.dataset.viewNavigationCard = role;
+        const existingBar = layout.previousElementSibling;
+        layout.parentNode.insertBefore(card, layout);
+        if (existingBar?.dataset?.viewNavigation === role) card.appendChild(existingBar);
+        card.appendChild(layout);
+      }
       let bar = layout.previousElementSibling;
       if (bar?.dataset?.viewNavigation !== role || bar.dataset.navLocale !== localeKey) {
         if (bar?.dataset?.viewNavigation === role) bar.remove();

@@ -32,11 +32,33 @@ function harness() {
   root.querySelectorAll = () => [];
   root.ownerDocument = { defaultView: win, createElement() {}, activeElement: null };
   const views = {}, renderedNavigation = [];
-  root.ownerDocument.createElement = () => ({
+  function attachElement(node) {
+    node.parentNode = null;
+    node.remove = () => {
+      if (!node.parentNode) return;
+      const children = node.parentNode.children;
+      children.splice(children.indexOf(node), 1);
+      node.parentNode = null;
+    };
+    Object.defineProperty(node, "previousElementSibling", {
+      get() { return node.parentNode?.children[node.parentNode.children.indexOf(node) - 1] || null; },
+    });
+    return node;
+  }
+  root.ownerDocument.createElement = () => attachElement({
+    className: "", dataset: {}, children: [],
+    insertBefore(child, before = null) {
+      child.remove();
+      const index = before ? this.children.indexOf(before) : this.children.length;
+      this.children.splice(index, 0, child); child.parentNode = this;
+      return child;
+    },
+    appendChild(child) { return this.insertBefore(child); },
+    get firstElementChild() { return this.children[0] || null; },
     set innerHTML(html) {
       renderedNavigation.push(html);
       const role = html.match(/data-view-navigation="([^"]+)"/)[1];
-      this.firstElementChild = views[role].bar;
+      this.appendChild(views[role].bar);
     },
   });
   for (const role of ["primary", "subview"]) {
@@ -71,9 +93,10 @@ function harness() {
     }
     const originalQuery = bar.querySelector;
     bar.querySelector = (selector) => selector.includes("data-view-nav-action=") ? action(selector.match(/='([^']+)'/)[1]) : originalQuery(selector);
-    const layout = { previousElementSibling: bar, parentNode: {
-      insertBefore(nextBar) { layout.previousElementSibling = nextBar; },
-    } };
+    attachElement(bar);
+    const layout = attachElement({ dataset: {} });
+    const panel = root.ownerDocument.createElement("div");
+    panel.appendChild(bar); panel.appendChild(layout);
     const scroll = new Events();
     Object.assign(scroll, {
       isConnected: true, clientWidth: 1000, scrollWidth: 2000, scrollLeft: 200,
@@ -92,7 +115,8 @@ function harness() {
     grip.closest = (selector) => selector === "[data-view-nav-grip]" ? grip : selector === "[data-view-navigation]" ? bar : null;
     const selection = node("data-view-nav-window");
     selection.closest = selector => selector === "[data-view-navigation]" ? bar : selector === "[data-view-nav-window]" ? selection : null;
-    views[role] = { scroll, bar, layout, display, action, grip, selection, axis: node("data-view-nav-axis") };
+    views[role] = { scroll, bar, layout, panel, display, action, grip, selection, axis: node("data-view-nav-axis") };
+    views[role].axis.closest = selector => selector === "[data-view-nav-axis]" ? views[role].axis : selector === "[data-view-navigation]" ? bar : null;
   }
   const ticks = {};
   for (const key of ["trackView", "subviewTrackView", "finalPathTrackView"]) {
@@ -137,6 +161,79 @@ test("partial refreshes retain exactly one owner and independent default mouse m
   assert.equal(h.root.count("wheel"), 0); assert.equal(h.views.primary.scroll.count("scroll"), 0);
 });
 
+for (const role of ["primary", "subview"]) {
+  test(`${role} navigation shares the graphic card without entering the horizontal scroller`, () => {
+    const h = harness();
+    try {
+      const view = h.views[role], card = view.layout.parentNode;
+      assert.equal(card.className, "assembly-view-card");
+      assert.equal(card.dataset.viewNavigationCard, role);
+      assert.deepEqual(card.children, [view.bar, view.layout]);
+      assert.equal(view.layout.previousElementSibling, view.bar);
+      assert.equal(view.scroll.closest(".assembly-track-layout"), view.layout);
+      assert.equal(card.parentNode, view.panel);
+      for (let i = 0; i < 5; i++) h.bind();
+      assert.deepEqual(view.panel.children, [card]);
+      assert.deepEqual(card.children, [view.bar, view.layout]);
+      h.store.setState({ ...h.store.getState(), locale: "en" });
+      h.bind();
+      assert.equal(view.layout.parentNode, card);
+      assert.deepEqual(card.children, [view.bar, view.layout]);
+      assert.equal(view.bar.dataset.navLocale, "en");
+    } finally { h.dispose(); }
+  });
+
+  for (const target of ["scroll", "axis"]) {
+    test(`${role} ${target} wheel scrolls the page in mouse mode and zooms only in hand mode`, () => {
+      const h = harness();
+      try {
+        const view = h.views[role];
+        const wheel = () => h.event(view[target], { deltaY: -100 });
+        const mouseWheel = wheel();
+        h.root.emit("wheel", mouseWheel);
+        assert.equal(mouseWheel.defaultPrevented, undefined);
+        assert.equal(h.frames.size, 0); assert.equal(h.writes, 0);
+        h.root.emit("click", h.event(view.action("toggle-mode")));
+        const handWheel = wheel();
+        h.root.emit("wheel", handWheel);
+        assert.equal(handWheel.defaultPrevented, true);
+        assert.equal(h.frames.size, 1);
+        h.flush(); assert.equal(h.writes, 1);
+        const otherRole = role === "primary" ? "subview" : "primary";
+        const otherWheel = h.event(h.views[otherRole][target], { deltaY: -100 });
+        h.root.emit("wheel", otherWheel);
+        assert.equal(otherWheel.defaultPrevented, undefined);
+        h.root.emit("click", h.event(view.action("toggle-mode")));
+        const restoredWheel = wheel();
+        h.root.emit("wheel", restoredWheel);
+        assert.equal(restoredWheel.defaultPrevented, undefined);
+        assert.equal(h.frames.size, 0); assert.equal(h.writes, 1);
+      } finally { h.dispose(); }
+    });
+  }
+}
+
+test("hand mode never consumes wheel events outside the plot and overview or horizontal gestures", () => {
+  const h = harness();
+  try {
+    for (const role of ["primary", "subview"]) {
+      const view = h.views[role];
+      h.root.emit("click", h.event(view.action("toggle-mode")));
+      for (const target of [view.display, view.action("fit"), { closest: () => null }]) {
+        const event = h.event(target, { deltaY: -100 });
+        h.root.emit("wheel", event);
+        assert.equal(event.defaultPrevented, undefined);
+      }
+      for (const target of [view.scroll, view.axis]) {
+        const event = h.event(target, { deltaY: 10, deltaX: 100 });
+        h.root.emit("wheel", event);
+        assert.equal(event.defaultPrevented, undefined);
+      }
+    }
+    assert.equal(h.frames.size, 0); assert.equal(h.writes, 0);
+  } finally { h.dispose(); }
+});
+
 test("one mode switch toggles mutually exclusive states without changing window/data", () => {
   const h = harness();
   try {
@@ -166,7 +263,7 @@ for (const role of ["primary", "subview"]) {
     try {
       const view = h.views[role];
       h.root.emit("click", h.event(view.action("toggle-mode")));
-      view.layout.previousElementSibling = null;
+      view.bar.remove();
       h.bind();
       const html = h.renderedNavigation.at(-1);
       assert.match(html, /role="switch" aria-checked="true"/);
@@ -233,6 +330,7 @@ for (const role of ["primary", "subview"]) {
 
 test("wheel is coalesced, excludes controls and becomes inert after unbinding", () => {
   const h = harness();
+  h.root.emit("click", h.event(h.views.primary.action("toggle-mode")));
   for (let i = 0; i < 30; i++) h.root.emit("wheel", h.event(h.views.primary.scroll, { deltaY: -1 }));
   assert.equal(h.frames.size, 1); assert.equal(h.writes, 0);
   h.flush(); assert.equal(h.writes, 1); assert.equal(h.renders, 1);
@@ -277,6 +375,7 @@ test("focused input replacement does not reenter commit from synchronous blur/ch
 test("persistence is debounced and does not write into a newly selected context", async () => {
   const h = harness();
   try {
+    h.root.emit("click", h.event(h.views.primary.action("toggle-mode")));
     h.root.emit("wheel", h.event(h.views.primary.scroll, { deltaY: -20 })); h.flush();
     h.store.setState({ ...h.store.getState(), assembly: { ...h.store.getState().assembly, selectedChrName: "Chr2" } });
     await new Promise(resolve => setTimeout(resolve, 200));
@@ -301,6 +400,7 @@ test("overview edge buttons support keyboard resizing without changing data cont
 test("a queued wheel cannot apply an old chromosome window to a newly selected chromosome", () => {
   const h = harness();
   try {
+    h.root.emit("click", h.event(h.views.primary.action("toggle-mode")));
     h.root.emit("wheel", h.event(h.views.primary.scroll, { deltaY: -100 }));
     const state = h.store.getState();
     h.store.setState({ ...state, assembly: { ...state.assembly, selectedChrName: "Chr2" } });

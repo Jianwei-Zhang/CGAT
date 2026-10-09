@@ -1919,15 +1919,28 @@
 }
 
 
-/* Range navigation stays outside the horizontally scrolling biological graphic. */
+/* Navigation and graphic share one card; only the graphic scrolls horizontally. */
+.assembly-view-card {
+  min-width: 0;
+  border: 1px solid #d2d2d2;
+  background: #fff;
+}
+.assembly-view-card > .assembly-track-layout > .assembly-track-label-column {
+  border-left: 0;
+  border-bottom: 0;
+}
+.assembly-view-card > .assembly-track-layout > .assembly-track-scroll {
+  border-right: 0;
+  border-bottom: 0;
+}
 .assembly-view-navigation {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  padding: 7px 0;
-  border-top: 1px solid #e3e8ee;
+  padding: 7px 10px;
+  background: #f8fafc;
   color: #334155;
   font-size: var(--app-font-size, 14px);
 }
