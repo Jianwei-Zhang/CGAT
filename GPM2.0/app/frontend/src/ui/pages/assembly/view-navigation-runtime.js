@@ -6,6 +6,8 @@ import { assemblyPageSession } from "./page-session.js";
 import { updateSubviewCompositionViewport } from "./subview-history-state.js";
 
 const BOUND = Symbol("assemblyViewNavigation");
+const COMPACT_WINDOW_PX = 48;
+const MIN_WINDOW_GRIP_PX = 24;
 const viewKeyFor = (role) => role === "primary" ? "trackView" : "subviewTrackView";
 const scrollSelector = (role) => `.assembly-track-scroll[data-track-role='${role}']`;
 
@@ -76,6 +78,7 @@ function createController(root, store, window) {
     modeSwitch.setAttribute("title", viewNavText(locale())[current.mode]);
     if (!geometry) {
       bar.querySelector("[data-view-nav-span]").textContent = "—";
+      bar.querySelector("[data-view-nav-grip]").hidden = true;
       bar.querySelectorAll("button,input,select").forEach((node) => { node.disabled = true; });
       return;
     }
@@ -84,6 +87,17 @@ function createController(root, store, window) {
     const selection = bar.querySelector("[data-view-nav-window]");
     selection.style.left = `${100 * (range.start - domain.start) / (domain.end - domain.start)}%`;
     selection.style.width = `${100 * range.span / (domain.end - domain.start)}%`;
+    // Preserve the true selected width; enlarge only the transparent pan target.
+    const axisWidth = Math.max(0, bar.querySelector("[data-view-nav-axis]").clientWidth);
+    const windowWidth = axisWidth * range.span / (domain.end - domain.start);
+    const compact = windowWidth < COMPACT_WINDOW_PX;
+    selection.setAttribute("data-view-nav-compact", String(compact));
+    const grip = bar.querySelector("[data-view-nav-grip]");
+    const gripWidth = Math.min(axisWidth, Math.max(MIN_WINDOW_GRIP_PX, windowWidth));
+    const center = axisWidth * (range.start + range.span / 2 - domain.start) / (domain.end - domain.start);
+    grip.hidden = !compact;
+    grip.style.width = `${gripWidth}px`;
+    grip.style.left = `${Math.max(0, Math.min(axisWidth - gripWidth, center - gripWidth / 2))}px`;
     selection.setAttribute("aria-valuemin", String(Math.round(domain.start)));
     selection.setAttribute("aria-valuemax", String(Math.round(domain.end - range.span)));
     selection.setAttribute("aria-valuenow", String(Math.round(range.start)));
@@ -238,7 +252,7 @@ function createController(root, store, window) {
     const role = roleOf(event.target);
     if (!["primary", "subview"].includes(role)) return;
     const edge = event.target.closest("[data-view-nav-edge]");
-    const selection = event.target.closest("[data-view-nav-window]");
+    const selection = event.target.closest("[data-view-nav-window]") || event.target.closest("[data-view-nav-grip]");
     const plot = event.target.closest(scrollSelector(role));
     const kind = edge?.dataset.viewNavEdge || (selection ? "window" : plot && controller.roles[role]?.mode === "hand" ? "pan" : null);
     const geometry = geometryFor(role), scroll = scrollFor(role);

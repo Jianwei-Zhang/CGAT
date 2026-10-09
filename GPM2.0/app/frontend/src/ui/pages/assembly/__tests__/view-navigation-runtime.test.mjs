@@ -72,7 +72,9 @@ function harness() {
     });
     const display = node("data-view-nav-span");
     display.closest = (selector) => selector === "[data-view-navigation]" ? bar : null;
-    views[role] = { scroll, bar, display, action };
+    const grip = node("data-view-nav-grip");
+    grip.closest = (selector) => selector === "[data-view-nav-grip]" ? grip : selector === "[data-view-navigation]" ? bar : null;
+    views[role] = { scroll, bar, display, action, grip, selection: node("data-view-nav-window"), axis: node("data-view-nav-axis") };
   }
   const ticks = {};
   for (const key of ["trackView", "subviewTrackView", "finalPathTrackView"]) {
@@ -260,3 +262,45 @@ test("window text follows actual metrics, is automatic in units and cannot commi
     assert.ok(h.views.primary.action("left").disabled);
   } finally { h.dispose(); }
 });
+
+for (const role of ["primary", "subview"]) {
+  test(`${role} compact overview keeps scale accurate and restores handles when wider`, () => {
+    const h = harness();
+    try {
+      const view = h.views[role];
+      // Default range is half the complete domain. At 47px the pan target wins.
+      view.axis.clientWidth = 94; h.bind();
+      assert.equal(view.selection.attrs["data-view-nav-compact"], "true");
+      assert.equal(view.selection.style.width, "50%");
+      assert.equal(view.grip.hidden, false);
+      assert.equal(view.grip.style.width, "47px");
+      view.axis.clientWidth = 96; h.bind();
+      assert.equal(view.selection.attrs["data-view-nav-compact"], "false");
+      assert.equal(view.grip.hidden, true);
+      view.axis.clientWidth = 500; view.scroll.scrollWidth = 100000; h.bind();
+      assert.equal(view.selection.style.width, "1%");
+      assert.equal(view.grip.style.width, "24px");
+      assert.equal(view.grip.hidden, false);
+      view.scroll.scrollLeft = 0; view.scroll.emit("scroll");
+      assert.equal(view.grip.style.left, "0px");
+      view.scroll.scrollLeft = 99000; view.scroll.emit("scroll");
+      assert.equal(view.grip.style.left, "476px");
+    } finally { h.dispose(); }
+  });
+  test(`${role} transparent compact target pans instead of resizing in default mouse mode`, () => {
+    const h = harness();
+    try {
+      const view = h.views[role], key = role === "primary" ? "trackView" : "subviewTrackView";
+      view.scroll.scrollWidth = 100000; h.bind();
+      const span = h.store.getState().assembly[key].visibleSpanBp;
+      const start = view.scroll.scrollLeft;
+      h.root.emit("pointerdown", h.event(view.grip));
+      h.win.emit("pointermove", h.event(view.grip, { clientX: 230 })); h.flush();
+      h.win.emit("pointerup", h.event(view.grip, { clientX: 230 }));
+      assert.equal(h.store.getState().assembly[key].visibleSpanBp, span);
+      assert.ok(view.scroll.scrollLeft > start);
+      assert.equal(view.scroll.dataset.viewInteractionMode, "mouse");
+      assert.equal(h.win.count("pointermove"), 0);
+    } finally { h.dispose(); }
+  });
+}

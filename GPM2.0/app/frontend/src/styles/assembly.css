@@ -1999,6 +1999,9 @@
   cursor: ew-resize;
   touch-action: none;
 }
+.view-nav-window[data-view-nav-compact="true"] .view-nav-edge { display: none; }
+.view-nav-grip { position: absolute; top: 2px; bottom: 2px; cursor: grab; touch-action: none; }
+.view-nav-grip[hidden] { display: none; }
 .view-nav-edge::after { content: ""; position: absolute; top: 5px; bottom: 5px; width: 3px; border-radius: 2px; background: #397fc4; }
 .view-nav-edge.is-left { left: 0; }
 .view-nav-edge.is-right { right: 0; }

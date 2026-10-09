@@ -47,6 +47,7 @@ export function renderViewNavigation(role, locale) {
           <button type="button" class="view-nav-edge is-left" data-view-nav-edge="left" aria-label="${t.edgeLeft}"></button>
           <button type="button" class="view-nav-edge is-right" data-view-nav-edge="right" aria-label="${t.edgeRight}"></button>
         </div>
+        <div class="view-nav-grip" data-view-nav-grip aria-hidden="true" hidden></div>
       </div>
       <button type="button" class="view-nav-fit" data-view-nav-action="fit" title="${t.fitHint}">${t.fit}</button>
     </div>

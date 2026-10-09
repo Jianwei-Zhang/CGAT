@@ -78,6 +78,7 @@ test("localized navigation groups movement and places Full range after its axis 
   assert.match(zh, /role="switch" aria-checked="false"/);
   assert.doesNotMatch(zh, /data-view-nav-action="(?:mouse|hand)"|aria-pressed/);
   assert.match(zh, /窗口/); assert.match(zh, />全览<\/button>/); assert.match(en, /Full range/);
+  assert.match(en, /data-view-nav-grip aria-hidden="true" hidden/);
   assert.match(en, /<span data-view-nav-span/); assert.match(en, /role="slider"/);
   assert.doesNotMatch(zh, /<input|<select|data-view-nav-unit|data-view-nav-action="(?:minus|plus)"|跨度|适应全部/);
   assert.doesNotMatch(zh, /Ctrl|Space|最小刻度|最多可展示数/);
