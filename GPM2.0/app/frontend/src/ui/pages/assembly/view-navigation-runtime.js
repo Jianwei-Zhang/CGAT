@@ -67,15 +67,21 @@ function createController(root, store, window) {
     }, 160));
   }
 
+  // Mode changes are independent of high-frequency viewport/scroll updates.
+  function syncInteractionMode(role) {
+    const current = controller.roles[role], scroll = scrollFor(role);
+    if (!current?.bar?.isConnected || !scroll) return;
+    if (scroll.dataset.viewInteractionMode !== current.mode) scroll.dataset.viewInteractionMode = current.mode;
+    const modeSwitch = current.bar.querySelector("[data-view-nav-action='toggle-mode']");
+    const checked = String(current.mode === "hand"), title = viewNavText(locale())[current.mode];
+    if (modeSwitch.getAttribute("aria-checked") !== checked) modeSwitch.setAttribute("aria-checked", checked);
+    if (modeSwitch.getAttribute("title") !== title) modeSwitch.setAttribute("title", title);
+  }
   function sync(role) {
     const current = controller.roles[role], scroll = scrollFor(role);
     if (!current?.bar?.isConnected || !scroll) return;
     const bar = current.bar, geometry = geometryFor(role);
-    scroll.dataset.viewInteractionMode = current.mode;
     scroll.classList.toggle("is-view-panning", controller.gesture?.role === role && controller.gesture?.kind === "pan");
-    const modeSwitch = bar.querySelector("[data-view-nav-action='toggle-mode']");
-    modeSwitch.setAttribute("aria-checked", String(current.mode === "hand"));
-    modeSwitch.setAttribute("title", viewNavText(locale())[current.mode]);
     const selection = bar.querySelector("[data-view-nav-window]");
     if (!geometry) {
       bar.querySelector("[data-view-nav-span]").textContent = "—";
@@ -223,6 +229,7 @@ function createController(root, store, window) {
     const gesture = controller.gesture;
     if (!gesture) return;
     controller.gesture = null;
+    delete root.dataset.viewNavigationGesture;
     gestureObserver?.disconnect();
     window?.removeEventListener("blur", onBlur);
     if (cancelled) { if (controller.frame !== null) cancelFrame(controller.frame); controller.frame = null; controller.pending = null; }
@@ -281,6 +288,8 @@ function createController(root, store, window) {
     event.preventDefault(); event.stopPropagation();
     controller.gesture = { role, kind, scroll, pointerId: event.pointerId, clientX: event.clientX,
       scrollLeft: scroll.scrollLeft, ...geometry, axisWidth: Math.max(1, controller.roles[role].bar.querySelector("[data-view-nav-axis]").clientWidth), moved: false };
+    // Capture stays on the stable route host, so its cursor must own the gesture too.
+    root.dataset.viewNavigationGesture = kind;
     try { root.setPointerCapture?.(event.pointerId); } catch { /* synthetic/unsupported pointer */ }
     gestureObserver?.observe(root.ownerDocument, { childList: true, subtree: true });
     window?.addEventListener("blur", onBlur);
@@ -289,6 +298,9 @@ function createController(root, store, window) {
     window?.addEventListener("pointercancel", onPointerCancel, true);
     sync(role);
   }, true);
+  listen(root, "lostpointercapture", (event) => {
+    if (event.pointerId === controller.gesture?.pointerId) endGesture(true);
+  });
   listen(root, "wheel", (event) => {
     if (event.target?.closest?.("input,select,textarea,button,summary,[contenteditable='true']")) return;
     const axis = event.target?.closest?.("[data-view-nav-axis]");
@@ -324,7 +336,7 @@ function createController(root, store, window) {
     const role = roleOf(button), current = controller.roles[role], action = button.dataset.viewNavAction;
     if (!current) return;
     flushPending();
-    if (action === "toggle-mode") { endGesture(true); current.mode = current.mode === "mouse" ? "hand" : "mouse"; sync(role); return; }
+    if (action === "toggle-mode") { endGesture(true); current.mode = current.mode === "mouse" ? "hand" : "mouse"; syncInteractionMode(role); sync(role); return; }
     const geometry = geometryFor(role); if (!geometry) return;
     const { range, domain } = geometry;
     if (action === "left" || action === "right") applyRange(role, moveViewRange(range, domain, (action === "left" ? -1 : 1) * range.span / 2));
@@ -424,11 +436,12 @@ function createController(root, store, window) {
       let bar = layout.previousElementSibling;
       if (bar?.dataset?.viewNavigation !== role || bar.dataset.navLocale !== localeKey) {
         if (bar?.dataset?.viewNavigation === role) bar.remove();
-        const wrapper = root.ownerDocument.createElement("div"); wrapper.innerHTML = renderViewNavigation(role, localeKey);
+        const wrapper = root.ownerDocument.createElement("div"); wrapper.innerHTML = renderViewNavigation(role, localeKey, current.mode);
         bar = wrapper.firstElementChild; bar.dataset.navLocale = localeKey;
         layout.parentNode.insertBefore(bar, layout);
       }
       current.bar = bar; controller.roles[role] = current;
+      syncInteractionMode(role);
       // On wide rows align the overview with the actual plot gutter, including font changes.
       // Narrow rows prioritize a usable axis with Full range attached on its right.
       if (typeof bar.getBoundingClientRect === "function") {

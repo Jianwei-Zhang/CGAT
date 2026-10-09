@@ -30,12 +30,12 @@ const paths = {
   hand: '<path d="M8 12V5a1.5 1.5 0 0 1 3 0v6-7a1.5 1.5 0 0 1 3 0v7-5a1.5 1.5 0 0 1 3 0v6-3a1.5 1.5 0 0 1 3 0v7c0 4-3 6-7 6-2 0-3-1-4-3l-4-5a1.5 1.5 0 0 1 2-2l2 2Z"/>',
   left: '<path d="m14 6-6 6 6 6M8 12h12"/>', right: '<path d="m10 6 6 6-6 6M4 12h12"/>',
 };
-export function renderViewNavigation(role, locale) {
-  const t = viewNavText(locale);
+export function renderViewNavigation(role, locale, mode = "mouse") {
+  const t = viewNavText(locale), isHand = mode === "hand";
   const icon = (action) => `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[action]}</svg>`;
   const button = (action, title) => `<button type="button" class="view-nav-button" data-view-nav-action="${action}" aria-label="${escape(title)}" title="${escape(title)}">${icon(action)}</button>`;
   return `<div class="assembly-view-navigation" data-view-navigation="${role}" role="group" aria-label="${t.group}">
-    <button type="button" class="view-nav-mode-switch" data-view-nav-action="toggle-mode" role="switch" aria-checked="false" aria-label="${t.mode}" title="${t.mouse}">
+    <button type="button" class="view-nav-mode-switch" data-view-nav-action="toggle-mode" role="switch" aria-checked="${isHand}" aria-label="${t.mode}" title="${isHand ? t.hand : t.mouse}">
       <span class="view-nav-mode-thumb" aria-hidden="true"></span>
       <span class="view-nav-mode-icon is-mouse" aria-hidden="true">${icon("mouse")}</span>
       <span class="view-nav-mode-icon is-hand" aria-hidden="true">${icon("hand")}</span>

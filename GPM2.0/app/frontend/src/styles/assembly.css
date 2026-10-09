@@ -2015,6 +2015,12 @@
 .assembly-track-scroll[data-view-interaction-mode="hand"] { cursor: grab; touch-action: none; }
 .assembly-track-scroll[data-view-interaction-mode="hand"] * { cursor: inherit; }
 .assembly-track-scroll.is-view-panning, .assembly-track-scroll.is-view-panning * { cursor: grabbing; }
+/* Pointer capture targets the route host, not the plot beneath the pointer. */
+[data-view-navigation-gesture="pan"],
+[data-view-navigation-gesture="window"] { cursor: grabbing !important; }
+[data-view-navigation-gesture="left"],
+[data-view-navigation-gesture="right"] { cursor: ew-resize !important; }
+[data-view-navigation-gesture] * { cursor: inherit !important; }
 .view-tick-control { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .view-tick-combo { display: inline-flex; position: relative; width: 85px; }
 .view-tick-combo input { width: calc(100% - 22px); min-width: 0; border-radius: 4px 0 0 4px; }

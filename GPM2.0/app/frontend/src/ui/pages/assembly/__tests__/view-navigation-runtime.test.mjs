@@ -23,10 +23,22 @@ function harness() {
     disconnect() { this.active = false; }
   };
   root.isConnected = true;
+  root.dataset = {};
+  const capturedPointers = new Set();
+  root.setPointerCapture = (id) => capturedPointers.add(id);
+  root.releasePointerCapture = (id) => capturedPointers.delete(id);
+  root.hasPointerCapture = (id) => capturedPointers.has(id);
   root.closest = () => root;
   root.querySelectorAll = () => [];
   root.ownerDocument = { defaultView: win, createElement() {}, activeElement: null };
-  const views = {};
+  const views = {}, renderedNavigation = [];
+  root.ownerDocument.createElement = () => ({
+    set innerHTML(html) {
+      renderedNavigation.push(html);
+      const role = html.match(/data-view-navigation="([^"]+)"/)[1];
+      this.firstElementChild = views[role].bar;
+    },
+  });
   for (const role of ["primary", "subview"]) {
     const nodes = new Map();
     const node = (key) => {
@@ -50,14 +62,18 @@ function harness() {
     const actions = new Map();
     function action(name) {
       if (!actions.has(name)) actions.set(name, {
-        dataset: { viewNavAction: name },
-        setAttribute(k, v) { this[k] = v; },
+        dataset: { viewNavAction: name }, attributeWrites: [],
+        setAttribute(k, v) { this.attributeWrites.push([k, v]); this[k] = v; },
+        getAttribute(k) { return this[k] ?? null; },
         closest(selector) { return selector === "[data-view-nav-action]" ? this : selector === "[data-view-navigation]" ? bar : null; },
       });
       return actions.get(name);
     }
     const originalQuery = bar.querySelector;
     bar.querySelector = (selector) => selector.includes("data-view-nav-action=") ? action(selector.match(/='([^']+)'/)[1]) : originalQuery(selector);
+    const layout = { previousElementSibling: bar, parentNode: {
+      insertBefore(nextBar) { layout.previousElementSibling = nextBar; },
+    } };
     const scroll = new Events();
     Object.assign(scroll, {
       isConnected: true, clientWidth: 1000, scrollWidth: 2000, scrollLeft: 200,
@@ -66,7 +82,7 @@ function harness() {
       classList: { values: new Set(), toggle(key, on) { if (on) this.values.add(key); else this.values.delete(key); } },
       getBoundingClientRect: () => ({ left: 0, width: 1000 }),
       closest(selector) {
-        if (selector === ".assembly-track-layout") return { parentNode: root, previousElementSibling: bar };
+        if (selector === ".assembly-track-layout") return layout;
         return selector.includes(".assembly-track-scroll") ? this : null;
       },
     });
@@ -76,7 +92,7 @@ function harness() {
     grip.closest = (selector) => selector === "[data-view-nav-grip]" ? grip : selector === "[data-view-navigation]" ? bar : null;
     const selection = node("data-view-nav-window");
     selection.closest = selector => selector === "[data-view-navigation]" ? bar : selector === "[data-view-nav-window]" ? selection : null;
-    views[role] = { scroll, bar, display, action, grip, selection, axis: node("data-view-nav-axis") };
+    views[role] = { scroll, bar, layout, display, action, grip, selection, axis: node("data-view-nav-axis") };
   }
   const ticks = {};
   for (const key of ["trackView", "subviewTrackView", "finalPathTrackView"]) {
@@ -101,7 +117,7 @@ function harness() {
     preventDefault() { this.defaultPrevented = true; }, stopPropagation() {}, stopImmediatePropagation() {}, ...extra });
   const bind = () => bindAssemblyViewNavigation(root, store, deps);
   bind();
-  return { root, win, frames, views, ticks, store, deps, bind, event,
+  return { root, win, frames, views, ticks, store, deps, bind, event, renderedNavigation,
     get observer() { return observer; }, get writes() { return writes; }, get renders() { return renders; }, get persists() { return persists; },
     flush() { for (const [id, fn] of [...frames]) { frames.delete(id); fn(); } },
     dispose() { unbindAssemblyViewNavigation(root); },
@@ -144,6 +160,77 @@ test("one mode switch toggles mutually exclusive states without changing window/
   } finally { h.dispose(); }
 });
 
+for (const role of ["primary", "subview"]) {
+  test(`${role} rebuilding navigation starts in the selected mode, not the mouse default`, () => {
+    const h = harness();
+    try {
+      const view = h.views[role];
+      h.root.emit("click", h.event(view.action("toggle-mode")));
+      view.layout.previousElementSibling = null;
+      h.bind();
+      const html = h.renderedNavigation.at(-1);
+      assert.match(html, /role="switch" aria-checked="true"/);
+      assert.equal(view.action("toggle-mode")["aria-checked"], "true");
+      assert.equal(view.scroll.dataset.viewInteractionMode, "hand");
+      assert.equal(h.views[role === "primary" ? "subview" : "primary"].scroll.dataset.viewInteractionMode, "mouse");
+    } finally { h.dispose(); }
+  });
+  test(`${role} hand pan owns the capture cursor without switching modes during movement`, () => {
+    const h = harness();
+    try {
+      const view = h.views[role], mode = view.action("toggle-mode");
+      h.root.emit("click", h.event(mode));
+      const modeWrites = mode.attributeWrites.length;
+      h.root.emit("pointerdown", h.event(view.scroll));
+      assert.equal(h.root.hasPointerCapture(1), true);
+      assert.equal(h.root.dataset.viewNavigationGesture, "pan");
+      for (const clientX of [190, 170, 220, 180]) {
+        h.win.emit("pointermove", h.event(h.root, { clientX }));
+        view.scroll.emit("scroll"); h.bind();
+        assert.equal(mode.attributeWrites.length, modeWrites);
+        assert.equal(h.root.dataset.viewNavigationGesture, "pan");
+        assert.equal(mode["aria-checked"], "true");
+        assert.equal(view.scroll.dataset.viewInteractionMode, "hand");
+        assert.equal(view.scroll.classList.values.has("is-view-panning"), true);
+      }
+      assert.equal(view.scroll.scrollLeft, 220);
+      assert.equal(h.writes, 0);
+      h.win.emit("pointerup", h.event(h.root, { clientX: 180 }));
+      assert.equal(h.root.hasPointerCapture(1), false);
+      assert.equal(h.root.dataset.viewNavigationGesture, undefined);
+      assert.equal(view.scroll.classList.values.has("is-view-panning"), false);
+      assert.equal(mode["aria-checked"], "true");
+      assert.equal(mode.attributeWrites.length, modeWrites);
+    } finally { h.dispose(); }
+  });
+  for (const kind of ["window", "left", "right"]) {
+    test(`${role} overview ${kind} retains the capture cursor through range refreshes`, () => {
+      const h = harness();
+      try {
+        const view = h.views[role];
+        const target = kind === "window" ? view.selection : {
+          dataset: { viewNavEdge: kind },
+          closest(selector) {
+            return selector === "[data-view-navigation]" ? view.bar : selector === "[data-view-nav-edge]" ? this : null;
+          },
+        };
+        h.root.emit("pointerdown", h.event(target));
+        assert.equal(h.root.dataset.viewNavigationGesture, kind);
+        assert.equal(h.root.hasPointerCapture(1), true);
+        for (const clientX of [210, 220]) {
+          h.win.emit("pointermove", h.event(h.root, { clientX }));
+          h.flush(); h.bind();
+          assert.equal(h.root.dataset.viewNavigationGesture, kind);
+          assert.equal(view.scroll.dataset.viewInteractionMode, "mouse");
+        }
+        h.win.emit("pointerup", h.event(h.root, { clientX: 220 }));
+        assert.equal(h.root.dataset.viewNavigationGesture, undefined);
+        assert.equal(h.root.hasPointerCapture(1), false);
+      } finally { h.dispose(); }
+    });
+  }
+}
+
 test("wheel is coalesced, excludes controls and becomes inert after unbinding", () => {
   const h = harness();
   for (let i = 0; i < 30; i++) h.root.emit("wheel", h.event(h.views.primary.scroll, { deltaY: -1 }));
@@ -155,7 +242,7 @@ test("wheel is coalesced, excludes controls and becomes inert after unbinding", 
   h.dispose(); assert.equal(h.frames.size, 0); assert.equal(h.win.count("pointermove"), 0);
 });
 
-for (const termination of ["pointercancel", "blur", "replacement", "removal", "unbind"]) {
+for (const termination of ["pointerup", "pointercancel", "lostpointercapture", "blur", "replacement", "removal", "unbind"]) {
   test(`hand pan cleans capture/listeners on ${termination} without store edits`, () => {
     const h = harness();
     try {
@@ -167,9 +254,12 @@ for (const termination of ["pointercancel", "blur", "replacement", "removal", "u
       if (termination === "replacement") { h.views.primary.scroll.isConnected = false; h.observer.callback(); }
       else if (termination === "removal") { h.root.isConnected = false; h.observer.callback(); }
       else if (termination === "unbind") h.dispose();
+      else if (termination === "lostpointercapture") h.root.emit(termination, h.event(h.root));
       else h.win.emit(termination, h.event(h.views.primary.scroll));
       for (const name of ["pointermove", "pointerup", "pointercancel", "blur"]) assert.equal(h.win.count(name), 0, name);
       assert.equal(h.observer.active, false); assert.equal(h.writes, 0);
+      assert.equal(h.root.dataset.viewNavigationGesture, undefined);
+      assert.equal(h.root.hasPointerCapture(1), false);
       assert.equal(h.views.primary.scroll.classList.values.has("is-view-panning"), false);
     } finally { h.dispose(); }
   });

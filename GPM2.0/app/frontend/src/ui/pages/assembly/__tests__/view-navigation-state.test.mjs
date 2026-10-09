@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { clampViewRange, zoomViewRange, moveViewRange, parseViewSpan, formatViewSpan, readViewNavigationGeometry } from "../view-navigation-state.js";
 import { resolveTrackPrefs, resolveTrackInnerWidthFromScale, resolveTickBpFromScale, MAX_TRACK_RENDER_PX } from "../track-prefs.js";
 import { renderViewNavigation, renderViewTickControl } from "../view-navigation-ui.js";
@@ -94,4 +95,24 @@ test("tick UI is directly inline with Auto as the default option and custom kb v
   const manual = renderViewTickControl({ tickMode: "manual", tickIntervalBp: 250_000 }, "en", "finalPathTrackView", true);
   assert.match(manual, /Tick interval/); assert.match(manual, /data-view-tick-interval[^>]*value="250"/);
   assert.doesNotMatch(manual, /<details|data-view-navigation|minTickUnitKb|maxTickCount/);
+});
+
+for (const role of ["primary", "subview"]) {
+  for (const locale of ["zh", "en"]) {
+    test(`${role} ${locale} replacement navigation renders the selected hand mode immediately`, () => {
+      const hand = renderViewNavigation(role, locale, "hand");
+      const mouse = renderViewNavigation(role, locale);
+      assert.match(hand, /role="switch" aria-checked="true"/);
+      assert.doesNotMatch(hand, /aria-checked="false"/);
+      assert.match(mouse, /role="switch" aria-checked="false"/);
+      assert.match(hand, locale === "zh" ? /title="手形模式：拖动视野"/ : /title="Hand mode: pan the view"/);
+    });
+  }
+}
+
+test("gesture cursor belongs to the stable capture host and overrides descendant cursors", () => {
+  const css = readFileSync(new URL("../../../../styles/assembly.css", import.meta.url), "utf8");
+  assert.match(css, /\[data-view-navigation-gesture="pan"\],\s*\[data-view-navigation-gesture="window"\]\s*\{\s*cursor: grabbing !important;/);
+  assert.match(css, /\[data-view-navigation-gesture="left"\],\s*\[data-view-navigation-gesture="right"\]\s*\{\s*cursor: ew-resize !important;/);
+  assert.match(css, /\[data-view-navigation-gesture\] \*\s*\{\s*cursor: inherit !important;/);
 });
