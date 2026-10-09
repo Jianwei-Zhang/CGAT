@@ -156,7 +156,7 @@ test("renderFinalPathCard migrates the legacy DEGAP view to Graph and embeds DEG
   assert.match(html, /<p class="helper-hint degap-form-help">READS path 为服务器端原始测序数据；HiFi 或 ONT 至少填写一个。<\/p>/);
   assert.match(html, /DEGAP-JOBS/);
   assert.match(html, /data-final-path-export-action="all"[\s\S]*final-path-export-divider[\s\S]*data-final-path-export-action="degap-jobs"/);
-  assert.match(html, /class="final-path-card-head-controls"[\s\S]*data-view-tick-control="finalPathTrackView"[\s\S]*刻度间隔[\s\S]*data-view-tick-mode[\s\S]*导出/);
+  assert.match(html, /class="final-path-card-head-controls"[\s\S]*data-view-tick-control="finalPathTrackView"[\s\S]*刻度间隔[\s\S]*data-view-tick-interval[\s\S]*导出/);
   assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
   assert.doesNotMatch(html, /data-view-navigation|data-view-nav-span/);
   assert.doesNotMatch(html, /data-degap-scale-(?:combo-)?field/);

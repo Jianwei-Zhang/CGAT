@@ -65,20 +65,17 @@ function createController(root, store, window) {
     }, 160));
   }
 
-  function message(role, text) {
-    const output = controller.roles[role]?.bar?.querySelector("[data-view-nav-message]");
-    if (output) output.textContent = text;
-  }
   function sync(role) {
     const current = controller.roles[role], scroll = scrollFor(role);
     if (!current?.bar?.isConnected || !scroll) return;
     const bar = current.bar, geometry = geometryFor(role);
     scroll.dataset.viewInteractionMode = current.mode;
     scroll.classList.toggle("is-view-panning", controller.gesture?.role === role && controller.gesture?.kind === "pan");
-    bar.querySelectorAll("[data-view-nav-action='mouse'],[data-view-nav-action='hand']").forEach((button) => {
-      button.setAttribute("aria-pressed", String(button.dataset.viewNavAction === current.mode));
-    });
+    const modeSwitch = bar.querySelector("[data-view-nav-action='toggle-mode']");
+    modeSwitch.setAttribute("aria-checked", String(current.mode === "hand"));
+    modeSwitch.setAttribute("title", viewNavText(locale())[current.mode]);
     if (!geometry) {
+      bar.querySelector("[data-view-nav-span]").textContent = "—";
       bar.querySelectorAll("button,input,select").forEach((node) => { node.disabled = true; });
       return;
     }
@@ -94,17 +91,11 @@ function createController(root, store, window) {
     const epsilon = Math.max(0.01, geometry.bpPerPx / 2);
     bar.querySelector("[data-view-nav-action='left']").disabled = range.start <= domain.start + epsilon;
     bar.querySelector("[data-view-nav-action='right']").disabled = range.start + range.span >= domain.end - epsilon;
-    bar.querySelector("[data-view-nav-action='minus']").disabled = range.span >= domain.end - domain.start - epsilon;
-    bar.querySelector("[data-view-nav-action='plus']").disabled = range.span <= Math.max(1, (domain.end - domain.start) * domain.viewportWidth / 4_000_000);
-    const input = bar.querySelector("[data-view-nav-span]"), unit = bar.querySelector("[data-view-nav-unit]");
-    if (documentActiveElement() !== input) {
-      const formatted = formatViewSpan(range.span, current.unit);
-      input.value = formatted.value; unit.value = formatted.unit;
-    }
+    const formatted = formatViewSpan(range.span);
+    bar.querySelector("[data-view-nav-span]").textContent = `${formatted.value} ${formatted.unit}`;
     const t = viewNavText(locale());
     bar.title = `${t.group}: ${Math.round(range.start).toLocaleString("en-US")}–${Math.round(range.start + range.span).toLocaleString("en-US")} bp`;
   }
-  function documentActiveElement() { return root.ownerDocument.activeElement; }
   function applyRange(role, requested) {
     const geometry = geometryFor(role), scroll = scrollFor(role);
     if (!geometry || !scroll) return;
@@ -144,28 +135,54 @@ function createController(root, store, window) {
     controller.pending = { role, range, key: contextKey(role) };
     if (controller.frame === null) controller.frame = requestFrame(() => { controller.frame = null; flushPending(); });
   }
-  function changeTicks(control, mode, value) {
+  function closeTickOptions(control) {
+    const menu = control?.querySelector?.("[data-view-tick-options]");
+    if (!menu) return;
+    menu.hidden = true;
+    const input = control.querySelector("[data-view-tick-interval]");
+    input.setAttribute("aria-expanded", "false"); input.removeAttribute("aria-activedescendant");
+    control.querySelector("[data-view-tick-toggle]").setAttribute("aria-expanded", "false");
+  }
+  function tickOptions(control) { return [...(control.querySelectorAll?.("[data-view-tick-option]") || [])]; }
+  function selectTickOption(control, index) {
+    const options = tickOptions(control);
+    options.forEach((option, position) => option.setAttribute("aria-selected", String(position === index)));
+    if (options[index]) control.querySelector("[data-view-tick-interval]").setAttribute("aria-activedescendant", options[index].id);
+  }
+  function openTickOptions(control) {
+    for (const other of root.querySelectorAll("[data-view-tick-control]")) if (other !== control) closeTickOptions(other);
+    const menu = control.querySelector("[data-view-tick-options]");
+    if (!menu) return;
+    menu.hidden = false;
+    const input = control.querySelector("[data-view-tick-interval]");
+    input.setAttribute("aria-expanded", "true");
+    control.querySelector("[data-view-tick-toggle]").setAttribute("aria-expanded", "true");
+    input.focus({ preventScroll: true });
+    const index = tickOptions(control).findIndex(option => option.dataset.viewTickOption.toLowerCase() === input.value.trim().toLowerCase());
+    selectTickOption(control, Math.max(0, index));
+  }
+  function changeTicks(control) {
+    const input = control.querySelector("[data-view-tick-interval]");
+    const value = String(input?.value || "").trim();
+    const mode = value.toLowerCase() === "auto" ? "auto" : "manual";
     const viewKey = control.dataset.viewTickControl, state = store.getState();
     if (!["trackView", "subviewTrackView", "finalPathTrackView"].includes(viewKey)) return;
     const current = resolveTrackPrefs(state.assembly?.[viewKey]);
     const parsed = mode === "manual" ? parseViewSpan(value, "kb") : current.tickIntervalBp;
-    const input = control.querySelector("[data-view-tick-interval]");
     if (parsed === null) {
       input?.setCustomValidity(viewNavText(locale()).tickInvalid); input?.reportValidity(); return;
     }
     input?.setCustomValidity("");
+    closeTickOptions(control);
     controller.deps.rememberTrackViewportAnchor?.(root, viewKey);
     controller.deps.markNextTrackAutoFocusSuppressed?.();
-    const wasOpen = control.closest("details")?.open;
-    const activeAttribute = documentActiveElement()?.hasAttribute?.("data-view-tick-interval") ? "data-view-tick-interval" : "data-view-tick-mode";
     store.setState({ ...state, assembly: { ...state.assembly, [viewKey]: resolveTrackPrefs({ ...current, tickMode: mode, tickIntervalBp: parsed }) } });
     const rerender = viewKey === "trackView" ? controller.deps.rerenderAssemblyMainTab
       : viewKey === "subviewTrackView" ? controller.deps.rerenderSubviewPanel : controller.deps.rerenderFinalPathCard;
     controller.applyingRange = true;
     try { rerender?.(root, store); } finally { controller.applyingRange = false; }
     const next = root.querySelector(`[data-view-tick-control='${viewKey}']`);
-    if (wasOpen && next?.closest("details")) next.closest("details").open = true;
-    next?.querySelector(`[${activeAttribute}]`)?.focus?.({ preventScroll: true });
+    next?.querySelector("[data-view-tick-interval]")?.focus?.({ preventScroll: true });
     if (viewKey !== "finalPathTrackView") persist(viewKey === "trackView" ? "primary" : "subview");
   }
   function endGesture(cancelled = false) {
@@ -215,6 +232,8 @@ function createController(root, store, window) {
   function onPointerUp(event) { if (event.pointerId === controller.gesture?.pointerId) endGesture(); }
   function onPointerCancel(event) { if (event.pointerId === controller.gesture?.pointerId) endGesture(true); }
   listen(root, "pointerdown", (event) => {
+    // Keep focus and drafts on the combobox until a choice is explicitly committed.
+    if (event.button === 0 && event.target?.closest?.("[data-view-tick-toggle],[data-view-tick-option]")) { event.preventDefault(); return; }
     if (event.button !== 0 || controller.gesture || event.target?.closest?.("input,select,textarea,[contenteditable='true']")) return;
     const role = roleOf(event.target);
     if (!["primary", "subview"].includes(role)) return;
@@ -251,6 +270,18 @@ function createController(root, store, window) {
     queueRange(role, zoomViewRange(range, geometry.domain, Math.exp(Math.max(-240, Math.min(240, delta)) / 400), fraction));
   }, { capture: true, passive: false });
   listen(root, "click", (event) => {
+    const tickControl = event.target?.closest?.("[data-view-tick-control]");
+    for (const control of root.querySelectorAll("[data-view-tick-control]")) if (control !== tickControl) closeTickOptions(control);
+    if (tickControl && event.target.closest("[data-view-tick-toggle]")) {
+      const menu = tickControl.querySelector("[data-view-tick-options]");
+      if (menu.hidden) openTickOptions(tickControl); else closeTickOptions(tickControl);
+      return;
+    }
+    const option = event.target?.closest?.("[data-view-tick-option]");
+    if (tickControl && option) {
+      tickControl.querySelector("[data-view-tick-interval]").value = option.dataset.viewTickOption;
+      changeTicks(tickControl); return;
+    }
     if (Date.now() < controller.suppressClickUntil && event.target?.closest?.(".assembly-track-scroll[data-track-role]")) {
       event.preventDefault(); event.stopImmediatePropagation(); return;
     }
@@ -259,11 +290,10 @@ function createController(root, store, window) {
     const role = roleOf(button), current = controller.roles[role], action = button.dataset.viewNavAction;
     if (!current) return;
     flushPending();
-    if (action === "mouse" || action === "hand") { endGesture(true); current.mode = action; sync(role); return; }
+    if (action === "toggle-mode") { endGesture(true); current.mode = current.mode === "mouse" ? "hand" : "mouse"; sync(role); return; }
     const geometry = geometryFor(role); if (!geometry) return;
     const { range, domain } = geometry;
     if (action === "left" || action === "right") applyRange(role, moveViewRange(range, domain, (action === "left" ? -1 : 1) * range.span / 2));
-    if (action === "minus" || action === "plus") applyRange(role, zoomViewRange(range, domain, action === "plus" ? 1 / 1.5 : 1.5));
     if (action === "fit") {
       applyRange(role, { start: domain.start, span: domain.end - domain.start });
       // Fixed-pixel labels can extend beyond the old domain after a scale change.
@@ -274,41 +304,47 @@ function createController(root, store, window) {
       }
     }
   }, true);
-  function commitSpan(bar) {
-    const role = bar.dataset.viewNavigation, geometry = geometryFor(role);
-    if (!geometry) return;
-    const input = bar.querySelector("[data-view-nav-span]"), unit = bar.querySelector("[data-view-nav-unit]");
-    const span = parseViewSpan(input.value, unit.value), t = viewNavText(locale());
-    if (span === null) { input.setCustomValidity(t.invalid); input.reportValidity(); message(role, t.invalid); return; }
-    input.setCustomValidity(""); controller.roles[role].unit = unit.value;
-    const requested = { start: geometry.range.start + (geometry.range.span - span) / 2, span };
-    const clamped = clampViewRange(requested, geometry.domain);
-    applyRange(role, clamped);
-    const next = controller.roles[role]?.bar?.querySelector("[data-view-nav-span]");
-    next?.focus?.({ preventScroll: true });
-    if (Math.abs(clamped.span - span) > 1) message(role, t.bounded);
-  }
   listen(root, "change", (event) => {
     // Replacing a focused input can synchronously emit blur/change in Chromium.
-    // Never start another section replacement from that outgoing input.
     if (controller.applyingRange || event.target?.isConnected === false) return;
     const control = event.target?.closest?.("[data-view-tick-control]");
-    if (control) {
-      const mode = control.querySelector("[data-view-tick-mode]").value;
-      changeTicks(control, mode, control.querySelector("[data-view-tick-interval]").value); return;
-    }
-    const bar = event.target?.closest?.("[data-view-navigation]");
-    if (!bar) return;
-    if (event.target.hasAttribute("data-view-nav-unit")) {
-      const role = bar.dataset.viewNavigation, geometry = geometryFor(role);
-      if (!geometry) return;
-      controller.roles[role].unit = event.target.value;
-      bar.querySelector("[data-view-nav-span]").value = formatViewSpan(geometry.range.span, event.target.value).value;
-    } else if (event.target.hasAttribute("data-view-nav-span")) commitSpan(bar);
+    if (control) changeTicks(control);
+  });
+  listen(root, "focusout", (event) => {
+    const control = event.target?.closest?.("[data-view-tick-control]");
+    if (control && !control.contains?.(event.relatedTarget)) closeTickOptions(control);
   });
   listen(root, "keydown", (event) => {
+    const control = event.target?.closest?.("[data-view-tick-control]");
+    if (control && ["ArrowDown", "ArrowUp"].includes(event.key)) {
+      event.preventDefault();
+      const menu = control.querySelector("[data-view-tick-options]");
+      if (menu?.hidden) openTickOptions(control);
+      else {
+        const options = tickOptions(control), index = options.findIndex(option => option.getAttribute("aria-selected") === "true");
+        selectTickOption(control, Math.max(0, Math.min(options.length - 1, index + (event.key === "ArrowDown" ? 1 : -1))));
+      }
+      return;
+    }
+    if (control && event.key === "Enter") {
+      event.preventDefault();
+      const menu = control.querySelector("[data-view-tick-options]");
+      if (menu && !menu.hidden) {
+        const option = tickOptions(control).find(option => option.getAttribute("aria-selected") === "true");
+        if (option) control.querySelector("[data-view-tick-interval]").value = option.dataset.viewTickOption;
+      }
+      changeTicks(control); return;
+    }
+    if (control && event.key === "Tab") closeTickOptions(control);
+    if (control && event.key === "Escape") {
+      event.preventDefault();
+      const prefs = resolveTrackPrefs(store.getState().assembly?.[control.dataset.viewTickControl]);
+      const input = control.querySelector("[data-view-tick-interval]");
+      input.value = prefs.tickMode === "auto" ? "Auto" : String(prefs.tickIntervalBp / 1000);
+      input.setCustomValidity(""); closeTickOptions(control);
+      return;
+    }
     const bar = event.target?.closest?.("[data-view-navigation]"); if (!bar) return;
-    if (event.target.hasAttribute("data-view-nav-span") && event.key === "Enter") { event.preventDefault(); commitSpan(bar); return; }
     const edge = event.target.closest?.("[data-view-nav-edge]");
     if (!edge && !event.target.hasAttribute("data-view-nav-window")) return;
     const role = bar.dataset.viewNavigation, geometry = geometryFor(role); if (!geometry) return;
@@ -328,6 +364,7 @@ function createController(root, store, window) {
   });
   function onBlur() { endGesture(true); }
   controller.dispose = () => {
+    for (const control of root.querySelectorAll("[data-view-tick-control]")) closeTickOptions(control);
     endGesture(true);
     if (controller.frame !== null) cancelFrame(controller.frame);
     controller.frame = null; controller.pending = null;
@@ -338,6 +375,7 @@ function createController(root, store, window) {
     scrollListeners.clear(); controller.roles = {};
   };
   controller.mount = () => {
+    for (const control of root.querySelectorAll("[data-view-tick-control]")) closeTickOptions(control);
     for (const role of ["primary", "subview"]) {
       const scroll = scrollFor(role), layout = scroll?.closest(".assembly-track-layout");
       if (!scroll || !layout?.parentNode) {
@@ -347,7 +385,7 @@ function createController(root, store, window) {
       }
       const key = contextKey(role), previous = controller.roles[role];
       if (controller.gesture?.role === role && (previous?.key !== key || (!controller.applyingRange && controller.gesture.scroll !== scroll))) endGesture(true);
-      const current = previous?.key === key ? previous : { key, mode: "mouse", unit: null };
+      const current = previous?.key === key ? previous : { key, mode: "mouse" };
       const localeKey = locale();
       let bar = layout.previousElementSibling;
       if (bar?.dataset?.viewNavigation !== role || bar.dataset.navLocale !== localeKey) {
@@ -357,6 +395,16 @@ function createController(root, store, window) {
         layout.parentNode.insertBefore(bar, layout);
       }
       current.bar = bar; controller.roles[role] = current;
+      // On wide rows align the overview with the actual plot gutter, including font changes.
+      // Narrow rows prioritize a usable axis with Full range attached on its right.
+      if (typeof bar.getBoundingClientRect === "function") {
+        const rangeControls = bar.querySelector(".view-nav-range");
+        const axis = bar.querySelector("[data-view-nav-axis]");
+        const previousInset = Number.parseFloat(rangeControls.style.paddingLeft) || 0;
+        const inset = bar.clientWidth >= 700
+          ? Math.max(0, previousInset + scroll.getBoundingClientRect().left - axis.getBoundingClientRect().left) : 0;
+        rangeControls.style.paddingLeft = `${Math.round(inset)}px`;
+      }
       if (!scrollListeners.has(scroll)) {
         const listener = () => sync(role);
         scroll.addEventListener("scroll", listener, { passive: true }); scrollListeners.set(scroll, listener);

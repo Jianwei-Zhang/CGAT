@@ -13,12 +13,16 @@ test("subview track controls render independently from main track controls", () 
       assembly: {
         trackView: {
           minTickUnitKb: 250,
+          tickMode: "manual",
+          tickIntervalBp: 250000,
           maxTickCount: 20,
           alignmentLength: 10000,
           minIdentityPct: 95,
         },
         subviewTrackView: {
           minTickUnitKb: 10000,
+          tickMode: "manual",
+          tickIntervalBp: 10000000,
           maxTickCount: 5,
           alignmentLength: 1000,
           minIdentityPct: 0,

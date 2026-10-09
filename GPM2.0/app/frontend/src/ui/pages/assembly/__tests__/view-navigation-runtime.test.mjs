@@ -31,7 +31,7 @@ function harness() {
     const nodes = new Map();
     const node = (key) => {
       if (!nodes.has(key)) nodes.set(key, {
-        style: {}, attrs: {}, value: key === "data-view-nav-unit" ? "kb" : "500",
+        style: {}, attrs: {}, value: "500", textContent: "",
         dataset: {}, isConnected: true,
         setAttribute(k, v) { this.attrs[k] = v; }, hasAttribute(k) { return k === key; },
         setCustomValidity(value) { this.error = value; }, reportValidity() {}, focus() {},
@@ -43,7 +43,7 @@ function harness() {
       querySelector(selector) { return node(selector.match(/\[([^='\]]+)/)[1]); },
       querySelectorAll(selector) {
         if (selector.includes("mouse")) return ["mouse", "hand"].map(action);
-        return [node("data-view-nav-span"), node("data-view-nav-unit")];
+        return [...actions.values()];
       },
     };
     node("data-view-nav-axis").clientWidth = 500;
@@ -70,11 +70,21 @@ function harness() {
         return selector.includes(".assembly-track-scroll") ? this : null;
       },
     });
-    const input = node("data-view-nav-span");
-    input.closest = (selector) => selector === "[data-view-navigation]" ? bar : null;
-    views[role] = { scroll, bar, input, action };
+    const display = node("data-view-nav-span");
+    display.closest = (selector) => selector === "[data-view-navigation]" ? bar : null;
+    views[role] = { scroll, bar, display, action };
   }
-  root.querySelector = (selector) => views[selector.includes("subview") ? "subview" : "primary"]?.scroll;
+  const ticks = {};
+  for (const key of ["trackView", "subviewTrackView", "finalPathTrackView"]) {
+    const control = { dataset: { viewTickControl: key }, querySelector: selector => selector === "[data-view-tick-interval]" ? input : null };
+    const input = { value: "Auto", isConnected: true, error: "", focus() {}, reportValidity() {},
+      setCustomValidity(error) { this.error = error; },
+      closest: selector => selector === "[data-view-tick-control]" ? control : null };
+    ticks[key] = { control, input };
+  }
+  root.querySelector = (selector) => selector.includes("data-view-tick-control=")
+    ? ticks[selector.match(/='([^']+)'/)[1]].control
+    : views[selector.includes("subview") ? "subview" : "primary"]?.scroll;
   root.contains = (scroll) => scroll.isConnected;
   let state = { locale: "zh", session: { projectId: 1 }, assembly: { selectedChrName: "Chr1", trackView: resolveTrackPrefs({ visibleSpanBp: 500 }), subviewTrackView: resolveTrackPrefs({ visibleSpanBp: 500 }), subview: { summary: { mode: "pair" } } } };
   let writes = 0, persists = 0, renders = 0;
@@ -87,7 +97,7 @@ function harness() {
     preventDefault() { this.defaultPrevented = true; }, stopPropagation() {}, stopImmediatePropagation() {}, ...extra });
   const bind = () => bindAssemblyViewNavigation(root, store, deps);
   bind();
-  return { root, win, frames, views, store, deps, bind, event,
+  return { root, win, frames, views, ticks, store, deps, bind, event,
     get observer() { return observer; }, get writes() { return writes; }, get renders() { return renders; }, get persists() { return persists; },
     flush() { for (const [id, fn] of [...frames]) { frames.delete(id); fn(); } },
     dispose() { unbindAssemblyViewNavigation(root); },
@@ -100,11 +110,34 @@ test("partial refreshes retain exactly one owner and independent default mouse m
     for (let i = 0; i < 12; i++) h.bind();
     assert.equal(h.root.count("wheel"), 1); assert.equal(h.root.count("pointerdown"), 1);
     assert.equal(h.win.count("blur"), 0);
-    h.root.emit("click", h.event(h.views.primary.action("hand")));
+    h.root.emit("click", h.event(h.views.primary.action("toggle-mode")));
     assert.equal(h.views.primary.scroll.dataset.viewInteractionMode, "hand");
     assert.equal(h.views.subview.scroll.dataset.viewInteractionMode, "mouse");
   } finally { h.dispose(); }
   assert.equal(h.root.count("wheel"), 0); assert.equal(h.views.primary.scroll.count("scroll"), 0);
+});
+
+test("one mode switch toggles mutually exclusive states without changing window/data", () => {
+  const h = harness();
+  try {
+    const mode = h.views.primary.action("toggle-mode");
+    assert.equal(mode["aria-checked"], "false");
+    const before = JSON.stringify(h.store.getState());
+    h.root.emit("click", h.event(mode));
+    assert.equal(mode["aria-checked"], "true");
+    assert.equal(h.views.primary.scroll.dataset.viewInteractionMode, "hand");
+    h.bind();
+    assert.equal(mode["aria-checked"], "true");
+    h.root.emit("pointerdown", h.event(h.views.primary.scroll));
+    assert.equal(h.win.count("pointermove"), 1);
+    h.root.emit("click", h.event(mode));
+    assert.equal(mode["aria-checked"], "false");
+    assert.equal(h.views.primary.scroll.dataset.viewInteractionMode, "mouse");
+    assert.equal(h.win.count("pointermove"), 0);
+    assert.equal(h.views.subview.action("toggle-mode")["aria-checked"], "false");
+    assert.equal(JSON.stringify(h.store.getState()), before);
+    assert.equal(h.writes, 0);
+  } finally { h.dispose(); }
 });
 
 test("wheel is coalesced, excludes controls and becomes inert after unbinding", () => {
@@ -122,7 +155,7 @@ for (const termination of ["pointercancel", "blur", "replacement", "removal", "u
   test(`hand pan cleans capture/listeners on ${termination} without store edits`, () => {
     const h = harness();
     try {
-      h.root.emit("click", h.event(h.views.primary.action("hand")));
+      h.root.emit("click", h.event(h.views.primary.action("toggle-mode")));
       h.root.emit("pointerdown", h.event(h.views.primary.scroll));
       assert.equal(h.win.count("pointermove"), 1); assert.equal(h.win.count("blur"), 1);
       h.win.emit("pointermove", h.event(h.views.primary.scroll, { clientX: 170 }));
@@ -141,8 +174,8 @@ for (const termination of ["pointercancel", "blur", "replacement", "removal", "u
 test("focused input replacement does not reenter commit from synchronous blur/change", () => {
   const h = harness();
   try {
-    h.deps.rerenderAssemblyMainTab = () => h.root.emit("change", h.event(h.views.primary.input));
-    h.root.emit("keydown", h.event(h.views.primary.input, { key: "Enter" }));
+    h.deps.rerenderAssemblyMainTab = () => h.root.emit("change", h.event(h.ticks.trackView.input));
+    h.root.emit("keydown", h.event(h.ticks.trackView.input, { key: "Enter" }));
     assert.equal(h.writes, 1);
   } finally { h.dispose(); }
 });
@@ -180,5 +213,50 @@ test("a queued wheel cannot apply an old chromosome window to a newly selected c
     h.flush();
     assert.equal(h.writes, 1);
     assert.equal(h.store.getState().assembly.trackView.visibleSpanBp, 500);
+  } finally { h.dispose(); }
+});
+
+
+test("direct tick entry commits numeric or Auto values without changing window geometry", () => {
+  const h = harness();
+  try {
+    const input = h.ticks.trackView.input;
+    input.value = "100.25"; h.root.emit("keydown", h.event(input, { key: "Enter" }));
+    const manual = h.store.getState().assembly.trackView;
+    assert.equal(manual.tickMode, "manual"); assert.equal(manual.tickIntervalBp, 100250);
+    assert.equal(manual.visibleSpanBp, 500); assert.equal(h.views.primary.scroll.scrollLeft, 200);
+    input.value = "aUtO"; h.root.emit("change", h.event(input));
+    assert.equal(h.store.getState().assembly.trackView.tickMode, "auto");
+    assert.equal(h.store.getState().assembly.trackView.visibleSpanBp, 500);
+    assert.equal(h.store.getState().assembly.subviewTrackView.tickMode, "auto");
+  } finally { h.dispose(); }
+});
+
+test("invalid tick values do not commit and Escape restores the last valid Auto value", () => {
+  const h = harness();
+  try {
+    const input = h.ticks.trackView.input;
+    for (const value of ["", "0", "-1", "Infinity", "1e6", "abc"]) {
+      input.value = value; h.root.emit("change", h.event(input));
+      assert.ok(input.error); assert.equal(h.writes, 0);
+    }
+    h.root.emit("keydown", h.event(input, { key: "Escape" }));
+    assert.equal(input.value, "Auto"); assert.equal(input.error, ""); assert.equal(h.writes, 0);
+  } finally { h.dispose(); }
+});
+
+test("window text follows actual metrics, is automatic in units and cannot commit input", () => {
+  const h = harness();
+  try {
+    assert.equal(h.views.primary.display.textContent, "0.5 kb");
+    h.views.primary.scroll.dataset.trackDomainSpanBp = "5000000";
+    h.bind(); assert.equal(h.views.primary.display.textContent, "2.5 Mb");
+    assert.equal(h.views.subview.display.textContent, "0.5 kb");
+    h.root.emit("change", h.event(h.views.primary.display));
+    h.root.emit("keydown", h.event(h.views.primary.display, { key: "Enter" }));
+    assert.equal(h.writes, 0);
+    h.views.primary.scroll.dataset.trackDomainSpanBp = "0";
+    h.bind(); assert.equal(h.views.primary.display.textContent, "—");
+    assert.ok(h.views.primary.action("left").disabled);
   } finally { h.dispose(); }
 });

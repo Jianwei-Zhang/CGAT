@@ -1931,12 +1931,26 @@
   color: #334155;
   font-size: var(--app-font-size, 14px);
 }
-.view-nav-modes, .view-nav-shift, .view-nav-zoom {
-  display: inline-flex;
-  gap: 2px;
-  flex: 0 0 auto;
+.view-nav-moves { display: inline-flex; gap: 3px; flex: 0 0 auto; }
+.view-nav-range { display: flex; align-items: center; gap: 6px; flex: 1 1 240px; min-width: 154px; }
+.view-nav-mode-switch {
+  display: inline-flex; position: relative; align-items: center; flex: 0 0 58px; height: 28px;
+  padding: 2px; border: 1px solid #cbd5e1; border-radius: 14px; background: #edf2f7;
+  color: #64748b; cursor: pointer;
 }
-.view-nav-modes { padding-right: 5px; border-right: 1px solid #d8e0e8; }
+.view-nav-mode-thumb {
+  position: absolute; left: 2px; top: 2px; bottom: 2px; width: 25px;
+  border-radius: 12px; background: #fff; box-shadow: 0 1px 3px #20385826;
+  transition: transform 140ms ease;
+}
+.view-nav-mode-icon { display: inline-flex; position: relative; align-items: center; justify-content: center; width: 25px; }
+.view-nav-mode-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.view-nav-mode-switch[aria-checked="false"] .is-mouse { color: #1858a4; }
+.view-nav-mode-switch[aria-checked="true"] { border-color: #78a7e8; background: #e6f0ff; }
+.view-nav-mode-switch[aria-checked="true"] .view-nav-mode-thumb { transform: translateX(25px); }
+.view-nav-mode-switch[aria-checked="true"] .is-hand { color: #1858a4; }
+.view-nav-mode-switch:disabled { opacity: .5; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .view-nav-mode-thumb { transition: none; } }
 .view-nav-button, .view-nav-fit {
   display: inline-flex;
   align-items: center;
@@ -1950,13 +1964,12 @@
 }
 .view-nav-button { width: 28px; padding: 5px; }
 .view-nav-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.view-nav-button[aria-pressed="true"] { background: #e6f0ff; border-color: #78a7e8; color: #1858a4; }
 .view-nav-button:hover:not(:disabled), .view-nav-fit:hover { background: #edf4fc; }
-.view-nav-button:disabled { color: #a6b0be; background: #f6f8fa; cursor: default; }
+.view-nav-button:disabled, .view-nav-fit:disabled { color: #a6b0be; background: #f6f8fa; cursor: default; }
 .view-nav-fit { padding: 3px 8px; white-space: nowrap; font: inherit; }
 .view-nav-axis {
   position: relative;
-  flex: 1 1 130px;
+  flex: 1 1 auto;
   min-width: 90px;
   height: 26px;
   border: 1px solid #cbd5e1;
@@ -1974,7 +1987,7 @@
   cursor: grab;
   touch-action: none;
 }
-.view-nav-window:focus-visible, .view-nav-button:focus-visible, .view-nav-fit:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.view-nav-window:focus-visible, .view-nav-button:focus-visible, .view-nav-fit:focus-visible, .view-nav-mode-switch:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .view-nav-edge {
   position: absolute;
   top: -2px;
@@ -1991,30 +2004,26 @@
 .view-nav-edge.is-right { right: 0; }
 .view-nav-edge.is-left::after { left: 2px; }
 .view-nav-edge.is-right::after { right: 2px; }
-.view-nav-span { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; }
-.view-nav-span input { width: 66px; min-width: 0; }
-.view-nav-span select { width: 58px; }
-.view-nav-span input, .view-nav-span select, .view-tick-control input, .view-tick-control select {
+.view-nav-span { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; margin-left: auto; }
+.view-nav-span [data-view-nav-span] { font-variant-numeric: tabular-nums; }
+.view-tick-control input {
   height: 28px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 5px; color: inherit; background: #fff; font: inherit;
 }
-.view-nav-message:empty { display: none; }
-.view-nav-message { flex-basis: 100%; color: #99631a; font-size: .9em; }
 .assembly-track-scroll[data-view-interaction-mode="hand"] { cursor: grab; touch-action: none; }
 .assembly-track-scroll[data-view-interaction-mode="hand"] * { cursor: inherit; }
 .assembly-track-scroll.is-view-panning, .assembly-track-scroll.is-view-panning * { cursor: grabbing; }
-.view-display-settings { position: relative; }
-.view-display-settings > summary { cursor: pointer; white-space: nowrap; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 4px; }
-.view-display-settings-body { position: absolute; right: 0; top: calc(100% + 5px); z-index: 30; padding: 10px; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 5px 16px #20385822; }
 .view-tick-control { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-.view-tick-control input { width: 85px; }
-.view-tick-control [hidden] { display: none; }
+.view-tick-combo { display: inline-flex; position: relative; width: 85px; }
+.view-tick-combo input { width: calc(100% - 22px); min-width: 0; border-radius: 4px 0 0 4px; }
+.view-tick-toggle { width: 22px; height: 28px; padding: 0; border: 1px solid #cbd5e1; border-left: 0; border-radius: 0 4px 4px 0; background: #f8fafc; color: inherit; cursor: pointer; }
+.view-tick-options { position: absolute; top: calc(100% + 3px); right: 0; z-index: 40; min-width: 100%; max-height: 220px; overflow-y: auto; padding: 3px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; box-shadow: 0 5px 16px #20385822; }
+.view-tick-options[hidden] { display: none; }
+.view-tick-options [role="option"] { display: block; width: 100%; padding: 4px 8px; border: 0; background: transparent; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.view-tick-options [role="option"]:hover, .view-tick-options [aria-selected="true"] { background: #e6f0ff; }
 @media (max-width: 900px) {
-  .view-nav-axis { flex-basis: calc(100% - 143px); }
-  .view-nav-zoom { margin-left: auto; }
+  .view-nav-range { flex-basis: calc(100% - 135px); }
 }
 @media (max-width: 520px) {
   .assembly-view-navigation { gap: 4px; }
-  .view-nav-axis { flex-basis: calc(100% - 139px); }
-  .view-nav-span input { width: 59px; }
-  .view-display-settings-body { right: auto; left: 0; }
+  .view-nav-range { gap: 4px; min-width: 130px; flex-basis: 100%; }
 }

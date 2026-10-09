@@ -37,11 +37,12 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   assert.doesNotMatch(html, /id="assembly-export-agp-button"/);
   assert.doesNotMatch(html, /Controls \/ 控件/);
   assert.match(html, /辅ds_ctg_len\(bp\)/);
-  assert.match(html, /显示设置/);
+  assert.match(html, /刻度间隔 \(kb\)/);
+  assert.doesNotMatch(html, /view-display-settings/);
   assert.match(html, /data-view-tick-control="trackView"/);
   assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
-  assert.ok(html.indexOf("辅ds_ctg_len") < html.indexOf("显示设置"));
-  assert.ok(html.indexOf("显示设置") < html.indexOf("比对长度"));
+  assert.ok(html.indexOf("辅ds_ctg_len") < html.indexOf("刻度间隔"));
+  assert.ok(html.indexOf("刻度间隔") < html.indexOf("比对长度"));
   assert.match(html, /比对长度\(bp\)/);
   assert.match(html, /一致性\(%\)/);
   assert.ok(html.indexOf("辅 ds") < html.indexOf("辅ds_ctg_len"));

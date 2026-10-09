@@ -66,18 +66,30 @@ test("ruler-only preferences do not invalidate main viewport scroll identity", (
   const next = structuredClone(state); next.assembly.trackView.tickIntervalBp = 10; next.assembly.trackView.tickMode = "manual";
   assert.equal(buildMainTrackViewportKey(next), buildMainTrackViewportKey(state));
 });
-test("localized navigation provides unambiguous modes, half-window controls and units", () => {
+test("localized navigation groups movement and places Full range after its axis and shows only a read-only window", () => {
   const zh = renderViewNavigation("primary", "zh"), en = renderViewNavigation("subview", "en");
-  for (const action of ["mouse", "hand", "left", "right", "minus", "plus", "fit"]) assert.match(zh, new RegExp(`data-view-nav-action="${action}"`));
+  for (const action of ["toggle-mode", "left", "right", "fit"]) assert.match(zh, new RegExp(`data-view-nav-action="${action}"`));
   assert.match(zh, /左移半屏/); assert.match(en, /Move right half a window/);
-  assert.match(en, /data-view-nav-unit/); assert.match(en, /role="slider"/);
+  assert.ok(zh.indexOf('data-view-nav-action="left"') < zh.indexOf("data-view-nav-axis"));
+  assert.ok(zh.indexOf('data-view-nav-action="right"') < zh.indexOf("data-view-nav-axis"));
+  assert.ok(zh.indexOf("data-view-nav-axis") < zh.indexOf('data-view-nav-action="fit"'));
+  assert.ok(zh.indexOf('data-view-nav-action="fit"') < zh.indexOf('data-view-nav-span'));
+  assert.equal([...zh.matchAll(/role="switch"/g)].length, 1);
+  assert.match(zh, /role="switch" aria-checked="false"/);
+  assert.doesNotMatch(zh, /data-view-nav-action="(?:mouse|hand)"|aria-pressed/);
+  assert.match(zh, /窗口/); assert.match(zh, />全览<\/button>/); assert.match(en, /Full range/);
+  assert.match(en, /<span data-view-nav-span/); assert.match(en, /role="slider"/);
+  assert.doesNotMatch(zh, /<input|<select|data-view-nav-unit|data-view-nav-action="(?:minus|plus)"|跨度|适应全部/);
   assert.doesNotMatch(zh, /Ctrl|Space|最小刻度|最多可展示数/);
 });
-test("tick UI is interval-only, automatic by default, manual interval is explicit", () => {
+test("tick UI is directly inline with Auto as the default option and custom kb values", () => {
   const auto = renderViewTickControl({}, "zh", "trackView");
-  assert.match(auto, /显示设置/); assert.match(auto, /value="auto" selected/);
-  assert.match(auto, /data-view-tick-interval[^>]* hidden/);
+  assert.match(auto, /data-view-tick-interval[^>]*value="Auto"/);
+  assert.deepEqual([...auto.matchAll(/data-view-tick-option="([^"]+)"/g)].map(match => match[1]), ["Auto", "250", "500", "750", "1000", "10000", "100000"]);
+  assert.match(auto, /aria-controls="view-tick-options-trackView"/);
+  assert.match(auto, /刻度间隔 \(kb\)/);
+  assert.doesNotMatch(auto, /<details|<select|显示设置|data-view-tick-mode/);
   const manual = renderViewTickControl({ tickMode: "manual", tickIntervalBp: 250_000 }, "en", "finalPathTrackView", true);
-  assert.match(manual, /Tick interval/); assert.match(manual, /value="250"/);
+  assert.match(manual, /Tick interval/); assert.match(manual, /data-view-tick-interval[^>]*value="250"/);
   assert.doesNotMatch(manual, /<details|data-view-navigation|minTickUnitKb|maxTickCount/);
 });
