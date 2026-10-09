@@ -1414,6 +1414,7 @@ function renderAssemblyTracks({
     minTickUnitKb: trackPrefs?.minTickUnitKb,
     maxTickCount: trackPrefs?.maxTickCount,
     visibleSpanBp: trackPrefs?.visibleSpanBp,
+    allowSubViewportScale: trackPrefs?.allowSubViewportScale,
     tickMode: trackPrefs?.tickMode,
     tickIntervalBp: trackPrefs?.tickIntervalBp,
     baseViewportPx: getMeasuredTrackViewportPx("primary"),

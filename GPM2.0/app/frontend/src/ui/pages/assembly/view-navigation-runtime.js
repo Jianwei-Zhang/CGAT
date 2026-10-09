@@ -120,11 +120,12 @@ function createController(root, store, window) {
     const t = viewNavText(locale());
     bar.title = `${t.group}: ${Math.round(range.start).toLocaleString("en-US")}–${Math.round(range.start + range.span).toLocaleString("en-US")} bp`;
   }
-  function applyRange(role, requested) {
+  function applyRange(role, requested, fitAttempt = 0) {
     const geometry = geometryFor(role), scroll = scrollFor(role);
     if (!geometry || !scroll) return;
     const range = clampViewRange(requested, geometry.domain);
     if (!range) return;
+    const fullRange = range.span >= geometry.domain.end - geometry.domain.start;
     const active = root.ownerDocument.activeElement;
     let focusSelector = null;
     if (active?.closest?.("[data-view-navigation]")?.dataset?.viewNavigation === role) {
@@ -133,7 +134,7 @@ function createController(root, store, window) {
       else if (active.hasAttribute?.("data-view-nav-window")) focusSelector = "[data-view-nav-window]";
     }
     const state = store.getState(), viewKey = viewKeyFor(role), a = state.assembly;
-    let next = { ...a, [viewKey]: resolveTrackPrefs({ ...a[viewKey], visibleSpanBp: Math.max(1, Math.round(range.span)) }) };
+    let next = { ...a, [viewKey]: resolveTrackPrefs({ ...a[viewKey], visibleSpanBp: Math.max(1, Math.round(range.span)), allowSubViewportScale: true }) };
     if (role === "subview" && a.subview?.summary?.mode === "composition") {
       next = updateSubviewCompositionViewport(next, {
         ...a.subviewCompositionViewport, bpPerPx: range.span / scroll.clientWidth, leftBp: range.start,
@@ -162,6 +163,15 @@ function createController(root, store, window) {
         ? selection : bar?.querySelector(focusSelector);
       if (target?.disabled) target = selection;
       target?.focus?.({ preventScroll: true });
+    }
+    // Fixed-pixel labels and rounded SVG bounds may change the domain after
+    // scaling. Settle full-range requests from both handles and the Fit button.
+    if (fullRange && fitAttempt < 4) {
+      const nextGeometry = geometryFor(role);
+      if (nextGeometry && nextGeometry.range.span < nextGeometry.domain.end - nextGeometry.domain.start) {
+        applyRange(role, { start: nextGeometry.domain.start, span: nextGeometry.domain.end - nextGeometry.domain.start }, fitAttempt + 1);
+        return;
+      }
     }
     persist(role);
   }
@@ -344,12 +354,6 @@ function createController(root, store, window) {
     if (action === "left" || action === "right") applyRange(role, moveViewRange(range, domain, (action === "left" ? -1 : 1) * range.span / 2));
     if (action === "fit") {
       applyRange(role, { start: domain.start, span: domain.end - domain.start });
-      // Fixed-pixel labels can extend beyond the old domain after a scale change.
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        const next = geometryFor(role);
-        if (!next || next.range.span >= next.domain.end - next.domain.start - next.bpPerPx) break;
-        applyRange(role, { start: next.domain.start, span: next.domain.end - next.domain.start });
-      }
     }
   }, true);
   listen(root, "change", (event) => {

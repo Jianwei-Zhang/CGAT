@@ -81,6 +81,8 @@ export function resolveTrackPrefs(trackView) {
   );
 
   return {
+    // Explicit navigation may fit content that extends beyond the base ruler.
+    ...(trackView?.allowSubViewportScale === true ? { allowSubViewportScale: true } : {}),
     // Legacy fields remain readable for compatibility, but are not the live scale model.
     visibleSpanBp: normalizePositiveInt(trackView?.visibleSpanBp)
       ?? Math.min(Number.MAX_SAFE_INTEGER, minTickUnitKb * 1000 * maxTickCount),
@@ -127,7 +129,7 @@ export function resolveTickBpFromScale({
 
 export function resolveTrackInnerWidthFromScale({
   domainSpanBp, minTickUnitKb, maxTickCount, visibleSpanBp,
-  baseViewportPx = 1200, fallbackInnerWidth = baseViewportPx,
+  baseViewportPx = 1200, fallbackInnerWidth = baseViewportPx, allowSubViewportScale = false,
 }) {
   const spanBp = normalizePositiveInt(domainSpanBp);
   const viewportPx = Math.max(1, normalizePositiveInt(baseViewportPx) ?? 1200);
@@ -136,10 +138,12 @@ export function resolveTrackInnerWidthFromScale({
   const requestedSpan = normalizePositiveInt(visibleSpanBp)
     ?? (normalizePositiveInt(minTickUnitKb) ?? DEFAULT_MIN_TICK_UNIT_KB) * 1000
       * (normalizePositiveInt(maxTickCount) ?? DEFAULT_MAX_TICK_COUNT);
-  // Short content always fills the plot, including when restoring legacy settings.
-  const lowerWidth = viewportPx;
-  return Math.min(MAX_TRACK_RENDER_PX,
-    Math.max(lowerWidth, Math.ceil(spanBp / requestedSpan * viewportPx)));
+  // Legacy/initial short views fill the plot. Explicit navigation must also be
+  // able to fit overhanging contigs/labels outside the base ruler in one window.
+  const lowerWidth = allowSubViewportScale ? 1 : viewportPx;
+  const scaledWidth = spanBp / requestedSpan * viewportPx;
+  const roundedWidth = allowSubViewportScale ? Math.floor(scaledWidth) : Math.ceil(scaledWidth);
+  return Math.min(MAX_TRACK_RENDER_PX, Math.max(lowerWidth, roundedWidth));
 }
 
 export function normalizeAllowedOption(value, allowedOptions, defaultValue) {

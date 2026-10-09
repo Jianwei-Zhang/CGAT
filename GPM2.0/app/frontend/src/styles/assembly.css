@@ -1940,8 +1940,8 @@
   gap: 6px;
   min-width: 0;
   padding: 7px 10px;
-  background: #f8fafc;
-  color: #334155;
+  background: #fafafa;
+  color: #555;
   font-size: var(--app-font-size, 14px);
 }
 .view-nav-moves { display: inline-flex; gap: 3px; flex: 0 0 auto; }
@@ -1984,27 +1984,28 @@
   position: relative;
   flex: 1 1 auto;
   min-width: 90px;
-  height: 26px;
-  border: 1px solid #cbd5e1;
-  border-radius: 5px;
-  background: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), #dce4ed calc(10% - 1px), #dce4ed 10%), #f3f6f9;
+  height: 22px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), #eee calc(10% - 1px), #eee 10%), #fafafa;
   touch-action: none;
 }
 .view-nav-window {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
-  border: 1px solid #397fc4;
-  border-radius: 3px;
-  background: #91baf077;
+  top: 4px;
+  bottom: 4px;
+  border: 1px solid #999;
+  border-radius: 2px;
+  background: #d6d6d6;
   cursor: grab;
   touch-action: none;
 }
+.view-nav-axis:hover .view-nav-window { border-color: #808080; background: #c9c9c9; }
 .view-nav-window:focus-visible, .view-nav-button:focus-visible, .view-nav-fit:focus-visible, .view-nav-mode-switch:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .view-nav-edge {
   position: absolute;
-  top: -2px;
-  bottom: -2px;
+  top: -5px;
+  bottom: -5px;
   width: 14px;
   padding: 0;
   border: 0;
@@ -2013,9 +2014,9 @@
   touch-action: none;
 }
 .view-nav-window[data-view-nav-compact="true"] .view-nav-edge { display: none; }
-.view-nav-grip { position: absolute; top: 2px; bottom: 2px; cursor: grab; touch-action: none; }
+.view-nav-grip { position: absolute; top: 0; bottom: 0; cursor: grab; touch-action: none; }
 .view-nav-grip[hidden] { display: none; }
-.view-nav-edge::after { content: ""; position: absolute; top: 5px; bottom: 5px; width: 3px; border-radius: 2px; background: #397fc4; }
+.view-nav-edge::after { content: ""; position: absolute; top: 5px; bottom: 5px; width: 3px; border-radius: 2px; background: #666; }
 .view-nav-edge.is-left { left: 0; }
 .view-nav-edge.is-right { right: 0; }
 .view-nav-edge.is-left::after { left: 2px; }
