@@ -39,6 +39,7 @@ export function createAssemblyPageSession() {
     subviewPairwiseEvidenceRequestSeq: 0,
     pendingTrackAutoFocusMode: null,
     trackContigDragActive: false,
+    mainTrackDragPreview: null,
     pendingPrimaryViewportAnchorBp: null,
     pendingSubviewViewportAnchorBp: null,
     deferredRerenderCoordinator: null,

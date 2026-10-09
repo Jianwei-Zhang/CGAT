@@ -81,6 +81,8 @@ export function resolveTrackPrefs(trackView) {
   );
 
   return {
+    // Full range is sticky until the user explicitly narrows the window.
+    ...(trackView?.fullRange === true ? { fullRange: true } : {}),
     // Explicit navigation may fit content that extends beyond the base ruler.
     ...(trackView?.allowSubViewportScale === true ? { allowSubViewportScale: true } : {}),
     // Legacy fields remain readable for compatibility, but are not the live scale model.

@@ -40,7 +40,24 @@ export function readViewNavigationGeometry(scrollEl, metrics) {
   const bpPerPx = metrics.domainSpanBp / metrics.innerWidth;
   const min = metrics.windowStartBp + metrics.viewboxMinX * bpPerPx;
   const width = Math.max(metrics.viewportWidth, Number(scrollEl.scrollWidth) || metrics.innerWidth);
-  const domain = { start: min, end: min + width * bpPerPx, viewportWidth: metrics.viewportWidth };
+  // A fitted SVG may be narrower than its viewport. scrollWidth then includes
+  // empty viewport padding, which must not become a historical content bound.
+  const contentStart = Number(scrollEl.dataset?.viewNavigationStartBp);
+  const contentEnd = Number(scrollEl.dataset?.viewNavigationEndBp);
+  const hasContentBounds = Number.isFinite(contentStart) && Number.isFinite(contentEnd) && contentEnd > contentStart;
+  const domain = {
+    start: hasContentBounds ? contentStart : min,
+    end: hasContentBounds ? contentEnd : min + width * bpPerPx,
+    viewportWidth: metrics.viewportWidth,
+  };
   const range = clampViewRange({ start: min + (Number(scrollEl.scrollLeft) || 0) * bpPerPx, span: metrics.viewportWidth * bpPerPx }, domain);
   return range ? { domain, range, bpPerPx } : null;
+}
+
+// Refit from current marks plus reference/ruler bounds, never from scrollWidth
+// or a remembered maximum. The same calculation handles either side.
+export function resolveFullRangeVisibleSpan({ contentWidth, innerWidth, domainSpanBp, viewportWidth }) {
+  if (![contentWidth, innerWidth, domainSpanBp, viewportWidth].every((value) => Number.isFinite(value) && value > 0)) return null;
+  if (contentWidth <= viewportWidth && viewportWidth - contentWidth <= 1) return null;
+  return Math.max(1, Math.ceil(contentWidth * domainSpanBp / innerWidth));
 }

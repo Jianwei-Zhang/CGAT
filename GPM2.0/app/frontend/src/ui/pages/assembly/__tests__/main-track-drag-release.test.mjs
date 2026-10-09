@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { bindTrackContigDrag } from "../track-drag-runtime.js";
 
-function fixture(commit) {
+function fixture(commit, { fullRange = false } = {}) {
   const host = new EventTarget();
   const window = new EventTarget();
   // Node needs the options form to remove capture listeners like a browser.
@@ -21,13 +21,20 @@ function fixture(commit) {
     closest: () => scroll,
   };
   const calls = [];
-  const store = { getState: () => ({ assembly: { activeTab: "assembly", trackDragOffsets: [] } }) };
+  const store = { getState: () => ({ assembly: { activeTab: "assembly", trackView: { fullRange }, trackDragOffsets: [] } }) };
   bindTrackContigDrag(host, store, {
     clearTrackDragPreview: (target) => calls.push({ kind: "clear", target }),
     commitTrackDragOffset: (_host, _store, offset) => { calls.push({ kind: "commit", offset }); return commit?.(); },
-    convertTrackOffsetPxToBp: (value) => value,
+    convertTrackOffsetPxToBp: (value, metrics) => fullRange
+      ? value * Number(metrics.domainSpanBp) / Number(metrics.innerWidth) : value,
     resolveActiveTrackScrollElement: () => scroll,
     previewTrackContigDrag: (target, offset) => calls.push({ kind: "preview", target, offset }),
+    previewFullRangeTrackContigDrag: (_host, _store, offset) => {
+      calls.push({ kind: "full-preview", offset });
+      // Simulate the latest fitted projection being replaced during drag.
+      scroll.dataset.trackInnerWidth = "50";
+    },
+    clearFullRangeTrackDragPreview: (_host, _store, options) => calls.push({ kind: "full-clear", options }),
     resolveTrackDragOffsetBp: () => 10,
     roundTrackMetric: (value) => value,
     setTrackContigDragActive: (active) => calls.push({ kind: "active", active }),
@@ -89,5 +96,43 @@ test("main drag cancellation discards queued preview without saving and allows a
     f.fire("pointerup", 40);
     await Promise.resolve();
     assert.equal(f.calls.filter((c) => c.kind === "commit").length, 1);
+  } finally { globalThis.window = originalWindow; }
+});
+
+for (const direction of [-1, 1]) {
+  test(`full-range ${direction < 0 ? "left" : "right"} drag follows the new scale without release drift`, async () => {
+    const f = fixture(() => Promise.resolve(true), { fullRange: true });
+    const originalWindow = globalThis.window;
+    globalThis.window = f.window;
+    try {
+      f.fire("pointerdown", 20);
+      f.fire("pointermove", 20 + direction * 20);
+      for (const [id, callback] of [...f.frames]) { f.frames.delete(id); callback(); }
+      f.fire("pointermove", 20 + direction * 30);
+      for (const [id, callback] of [...f.frames]) { f.frames.delete(id); callback(); }
+      const lastPreview = f.calls.filter((call) => call.kind === "full-preview").at(-1);
+      assert.equal(lastPreview.offset.offsetBp, 10 + direction * 40);
+      assert.ok(!f.calls.some((call) => call.kind === "commit"), "preview does not commit biological layout");
+      f.fire("pointerup", 20 + direction * 30);
+      await Promise.resolve();
+      const commits = f.calls.filter((call) => call.kind === "commit");
+      assert.equal(commits.length, 1);
+      assert.equal(commits[0].offset.offsetBp, lastPreview.offset.offsetBp,
+        "stationary release does not treat refitting as extra pointer movement");
+    } finally { globalThis.window = originalWindow; }
+  });
+}
+
+test("cancelling full-range preview restores the authoritative layout without committing", () => {
+  const f = fixture(null, { fullRange: true });
+  const originalWindow = globalThis.window;
+  globalThis.window = f.window;
+  try {
+    f.fire("pointerdown", 20);
+    f.fire("pointermove", 60);
+    for (const [id, callback] of [...f.frames]) { f.frames.delete(id); callback(); }
+    f.fire("pointercancel", 60);
+    assert.ok(!f.calls.some((call) => call.kind === "commit"));
+    assert.ok(f.calls.some((call) => call.kind === "full-clear" && call.options?.cancelled));
   } finally { globalThis.window = originalWindow; }
 });

@@ -314,6 +314,11 @@ const renderTracksDeps = {
   getDatasetNameById,
   getMeasuredTrackViewportPx: (role) => getMeasuredTrackViewportPx(role),
   getSupportDatasetOptions,
+  getMainTrackDragPreviewOffset: (state) => {
+    const preview = assemblyPageSession.mainTrackDragPreview;
+    return preview && preview.projectId === state.session?.projectId
+      && preview.chrName === state.assembly?.selectedChrName ? preview.offset : null;
+  },
 };
 function renderAssemblyMainTab(state) {
   return renderAssemblyMainTabImpl(state, renderTracksDeps);
@@ -1162,6 +1167,22 @@ const trackDragRuntimeDeps = {
   persistSubviewTrackDragOffsets,
   previewSubviewTrackContigDrag,
   previewTrackContigDrag,
+  previewFullRangeTrackContigDrag: (host, store, offset) => {
+    const state = store.getState();
+    assemblyPageSession.mainTrackDragPreview = {
+      projectId: state.session?.projectId,
+      chrName: state.assembly?.selectedChrName,
+      offset,
+    };
+    assemblyPageSession.suppressNextTrackAutoFocus = true;
+    rerenderAssemblyMainTab(host, store, { trackOnly: true });
+  },
+  clearFullRangeTrackDragPreview: (host, store, { cancelled = false, released = false } = {}) => {
+    // Async cleanup from an earlier release must not erase a newer preview.
+    if (released && assemblyPageSession.mainTrackDragPreview) return;
+    assemblyPageSession.mainTrackDragPreview = null;
+    if (cancelled) rerenderAssemblyMainTab(host, store, { trackOnly: true });
+  },
   resolveActiveTrackScrollElement,
   resolveSubviewTrackDragOffsetBp,
   resolveTrackDragOffsetBp,
@@ -1567,7 +1588,7 @@ function rerenderAssemblyConfirmModal(host, store) {
   bindAssemblyPage(nextOverlay, store, { scope: "main" });
 }
 
-function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false } = {}) {
+function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false, trackOnly = false } = {}) {
   cancelDeferredRerender();
   const routeHost = resolveCurrentRouteHost(host);
   if (!routeHost) {
@@ -1584,6 +1605,7 @@ function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false } 
   const nextContent = template.content;
   const selectors = preserveTrackGeometry
     ? [".main-view-history-controls"]
+    : trackOnly ? [".assembly-track-unified"]
     : [".chr-strip.has-members-panel", ".assembly-track-unified"];
   const replacedNodes = selectors.map((selector) =>
     replaceRenderedAssemblySection(routeHost, nextContent, selector),

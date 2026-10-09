@@ -191,8 +191,31 @@ export function bindTrackContigDrag(host, store, deps) {
     );
     let dragging = false;
     let pendingOffsetBp = baseOffsetBp;
+    const fullRangeDrag = state.assembly.trackView?.fullRange === true
+      && typeof deps.previewFullRangeTrackContigDrag === "function"
+      && typeof deps.clearFullRangeTrackDragPreview === "function";
+    const dragHost = fullRangeDrag ? scrollEl.closest?.("#route-host") || host : host;
+    let lastPointerClientX = startClientX;
+    let cancelled = false;
+    const sameContext = () => {
+      const next = store.getState();
+      return next.session?.projectId === state.session?.projectId
+        && next.assembly?.selectedChrName === state.assembly?.selectedChrName
+        && next.assembly?.supportDatasetId === state.assembly?.supportDatasetId;
+    };
 
     const scheduler = createFrameScheduler(() => {
+      if (!sameContext()) { onPointerCancel(); return; }
+      if (fullRangeDrag) {
+        deps.previewFullRangeTrackContigDrag(dragHost, store, {
+          trackRole, assemblyCtgId,
+          ...(datasetId ? { datasetId } : {}),
+          ...(phasedTrackId ? { phasedTrackId } : {}),
+          ...(phasedTrackItemId ? { phasedTrackItemId } : {}),
+          offsetBp: pendingOffsetBp,
+        });
+        return;
+      }
       const offsetPx = deps.roundTrackMetric(
         deltaOffsetBpToPx(pendingOffsetBp - baseOffsetBp, deps, scaleContext),
       );
@@ -207,9 +230,26 @@ export function bindTrackContigDrag(host, store, deps) {
     });
 
     const updatePendingOffset = (moveEvent) => {
+      if (cancelled) return;
+      if (!sameContext()) { onPointerCancel(); return; }
       if (!Number.isFinite(Number(moveEvent?.clientX))) return;
       const currentClientX = Number(moveEvent.clientX || 0);
-      const currentScrollEl = deps.resolveActiveTrackScrollElement(host, "primary", scrollEl);
+      const currentScrollEl = deps.resolveActiveTrackScrollElement(dragHost, "primary", scrollEl);
+      if (fullRangeDrag) {
+        if (!dragging && Math.abs(currentClientX - startClientX) < 2) return;
+        const deltaX = currentClientX - lastPointerClientX;
+        if (!deltaX) return;
+        dragging = true;
+        // Rebase each physical pointer step onto the latest fitted scale. A
+        // stationary release must not convert the auto-refit into extra motion.
+        pendingOffsetBp = deps.roundTrackMetric(pendingOffsetBp + deps.convertTrackOffsetPxToBp(deltaX, {
+          domainSpanBp: Number(currentScrollEl?.dataset?.trackDomainSpanBp || 0),
+          innerWidth: Number(currentScrollEl?.dataset?.trackInnerWidth || 0),
+        }));
+        lastPointerClientX = currentClientX;
+        scheduler.schedule();
+        return;
+      }
       const currentScrollLeft = Number(currentScrollEl?.scrollLeft || 0);
       const deltaX = deps.roundTrackMetric((currentClientX - startClientX) + (currentScrollLeft - startScrollLeft));
       if (!dragging && Math.abs(deltaX) < 2) {
@@ -231,13 +271,17 @@ export function bindTrackContigDrag(host, store, deps) {
     };
     const clearPreview = () => deps.clearTrackDragPreview(scrollEl);
     const onPointerUp = (upEvent) => {
+      if (cancelled) return;
       detachListeners();
       try {
         updatePendingOffset(upEvent);
+        if (cancelled) return;
         scheduler.flushNow();
+        if (cancelled) return;
+        if (fullRangeDrag) deps.clearFullRangeTrackDragPreview(dragHost, store);
         if (dragging) {
           deps.setSuppressTrackContigClickUntil(Date.now() + TRACK_CONTIG_CLICK_SUPPRESS_MS);
-          const committed = deps.commitTrackDragOffset(host, store, {
+          const committed = deps.commitTrackDragOffset(dragHost, store, {
             trackRole,
             assemblyCtgId,
             ...(datasetId ? { datasetId } : {}),
@@ -247,21 +291,30 @@ export function bindTrackContigDrag(host, store, deps) {
           });
           // Keep the released geometry until the authoritative refresh. Scope
           // cleanup to the old scroll node so it cannot erase a newer preview.
-          void Promise.resolve(committed).then(clearPreview, clearPreview);
+          void Promise.resolve(committed).then((changed) => {
+            clearPreview();
+            if (fullRangeDrag && changed === false) deps.clearFullRangeTrackDragPreview(dragHost, store, { cancelled: true, released: true });
+          }, () => {
+            clearPreview();
+            if (fullRangeDrag) deps.clearFullRangeTrackDragPreview(dragHost, store, { cancelled: true, released: true });
+          });
         } else {
           clearPreview();
         }
       } catch (error) {
         clearPreview();
+        if (fullRangeDrag) deps.clearFullRangeTrackDragPreview(dragHost, store, { cancelled: true });
         throw error;
       } finally {
         deps.setTrackContigDragActive(false);
       }
     };
     const onPointerCancel = () => {
+      cancelled = true;
       detachListeners();
       scheduler.cancel();
       clearPreview();
+      if (fullRangeDrag) deps.clearFullRangeTrackDragPreview(dragHost, store, { cancelled: true });
       deps.setTrackContigDragActive(false);
     };
 

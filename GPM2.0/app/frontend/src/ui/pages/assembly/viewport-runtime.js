@@ -351,6 +351,7 @@ export function createAssemblyViewportController({
         }
         session.pendingTrackAutoFocusMode = null;
       }
+      if (state.assembly.trackView?.fullRange === true) session.lastTrackScrollLeft = 0;
       if (setAssemblyViewportScrollState(store, "trackScrollState", {
         viewportKey: session.lastTrackViewportKey,
         scrollLeft: session.lastTrackScrollLeft,

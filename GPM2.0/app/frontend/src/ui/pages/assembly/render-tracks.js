@@ -1,4 +1,5 @@
 import { renderViewTickControl } from "./view-navigation-ui.js";
+import { resolveFullRangeVisibleSpan } from "./view-navigation-state.js";
 import { renderSourceGapConnections } from "./source-fragment-layout.js";
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
@@ -31,6 +32,7 @@ import {
   normalizeTrackRole,
   normalizeTrackSelectionCtgIds,
   normalizeSubviewTrackDragOffsets,
+  setTrackDragOffset,
 } from "./selection-state.js";
 import {
   buildSupportSubviewCtgPool,
@@ -165,6 +167,7 @@ function createRenderTracksRenderer(deps = {}) {
     getDatasetNameById,
     getMeasuredTrackViewportPx: getMeasuredTrackViewportPxImpl,
     getSupportDatasetOptions,
+    getMainTrackDragPreviewOffset = () => null,
   } = deps;
   if (
     typeof escapeAttr !== "function"
@@ -885,7 +888,9 @@ function createRenderTracksRenderer(deps = {}) {
             subview,
             selectionCtgIds: assembly.trackSelectedCtgIds,
             hiddenPrimaryCtgIds: assembly.hiddenPrimaryCtgIds,
-            dragOffsets: assembly.trackDragOffsets,
+            dragOffsets: getMainTrackDragPreviewOffset(state)
+              ? setTrackDragOffset(assembly.trackDragOffsets, getMainTrackDragPreviewOffset(state))
+              : assembly.trackDragOffsets,
             supportMirroredCtgs,
             activeHitsTrackKey: assembly.activeHitsTrackKey,
             phasedAssemblyEnabled: Boolean(currentProject?.phasedAssemblyEnabled),
@@ -1335,36 +1340,38 @@ function renderTrackNumberInput({ field, id, label, openOptionLabel = "", value,
   `;
 }
 
-function renderAssemblyTracks({
-  model,
-  hasPrimaryData,
-  hasSupportTrack,
-  primaryDatasetName,
-  supportDatasetName,
-  supportDatasetOptions,
-  supportDatasetId,
-  hasSupportDatasetOptions,
-  selectedChrName,
-  chrLength,
-  supportDsCtgLenRules = [],
-  supportDsCtgLenRulesDialogOpen = false,
-  refTrackMembers = [],
-  trackPrefs,
-  subview,
-  selectionCtgIds = [],
-  hiddenPrimaryCtgIds = [],
-  dragOffsets = [],
-  supportMirroredCtgs = [],
-  activeHitsTrackKey = "primary",
-  phasedAssemblyEnabled = false,
-  phasedChrTracks = [],
-  grtResultContext = null,
-  grtResultPlan = null,
-  grtResultToast = null,
-  mainViewHistory = null,
-  historyHighlightCtgId = null,
-  i18n,
-}) {
+function renderAssemblyTracks(args) {
+  const {
+    model,
+    hasPrimaryData,
+    hasSupportTrack,
+    primaryDatasetName,
+    supportDatasetName,
+    supportDatasetOptions,
+    supportDatasetId,
+    hasSupportDatasetOptions,
+    selectedChrName,
+    chrLength,
+    supportDsCtgLenRules = [],
+    supportDsCtgLenRulesDialogOpen = false,
+    refTrackMembers = [],
+    trackPrefs,
+    subview,
+    selectionCtgIds = [],
+    hiddenPrimaryCtgIds = [],
+    dragOffsets = [],
+    supportMirroredCtgs = [],
+    activeHitsTrackKey = "primary",
+    phasedAssemblyEnabled = false,
+    phasedChrTracks = [],
+    grtResultContext = null,
+    grtResultPlan = null,
+    grtResultToast = null,
+    mainViewHistory = null,
+    historyHighlightCtgId = null,
+    i18n,
+    fullRangeFitPass = 0,
+  } = args;
   const graphTextScale = Math.max(1, getGraphFontSize() / 12);
   const TRACK_HEIGHT_SCALE = 2 * graphTextScale;
   const TRACK_LANE_HEIGHT = 18 * TRACK_HEIGHT_SCALE;
@@ -1399,10 +1406,13 @@ function renderAssemblyTracks({
     mirrorRows.flatMap((row) => (Array.isArray(row.trackModel?.ctgs) ? row.trackModel.ctgs : [])),
   );
   const maxTrackEndBp = Math.max(maxPrimaryEndBp, maxCompanionEndBp, maxMirrorEndBp);
-  const visualWindowStart = hasResolvedChrLength
+  // In overview the immutable floor is the reference, not the original
+  // (pre-drag) contig envelope. Current display rectangles supply both edges.
+  const fitReference = trackPrefs?.fullRange === true && hasResolvedChrLength;
+  const visualWindowStart = fitReference ? 0 : hasResolvedChrLength
     ? Math.min(0, model.primary.windowStart)
     : model.primary.windowStart;
-  const visualDomainSpanBp = hasResolvedChrLength
+  const visualDomainSpanBp = fitReference ? resolvedChrLength : hasResolvedChrLength
     ? Math.max(
         1,
         resolvedChrLength - visualWindowStart,
@@ -1414,7 +1424,7 @@ function renderAssemblyTracks({
     minTickUnitKb: trackPrefs?.minTickUnitKb,
     maxTickCount: trackPrefs?.maxTickCount,
     visibleSpanBp: trackPrefs?.visibleSpanBp,
-    allowSubViewportScale: trackPrefs?.allowSubViewportScale,
+    allowSubViewportScale: trackPrefs?.fullRange === true || trackPrefs?.allowSubViewportScale,
     tickMode: trackPrefs?.tickMode,
     tickIntervalBp: trackPrefs?.tickIntervalBp,
     baseViewportPx: getMeasuredTrackViewportPx("primary"),
@@ -1597,7 +1607,10 @@ function renderAssemblyTracks({
           windowStart: visualWindowStart,
           domainSpanBp: visualDomainSpanBp,
           innerWidth: resolvedInnerWidth,
-          minGapPx: TRACK_MIN_ADJACENT_GAP_PX,
+          // Fit-mode visual gaps must shrink with the reference scale too;
+          // fixed pixel gaps would prevent dense tracks from fitting at all.
+          minGapPx: TRACK_MIN_ADJACENT_GAP_PX * (trackPrefs?.fullRange === true
+            ? Math.min(1, resolvedInnerWidth / getMeasuredTrackViewportPx("primary")) : 1),
           preserveWidths: true,
         }),
       ]),
@@ -1856,6 +1869,7 @@ function renderAssemblyTracks({
   );
   const minRectLeft = Math.min(
     0,
+    ...refMemberRects.map((rect) => rect.x),
     ...rowLayouts
       .flatMap((layout) => layout.trackModel.ctgs.map((ctg, index) => ({ layout, ctg, index })))
       .map(({ layout, ctg, index }) => {
@@ -1928,6 +1942,21 @@ function renderAssemblyTracks({
   const renderMaxX = Math.ceil(Math.max(innerWidth, maxRectRight, maxLabelRight));
   const renderInnerWidth = Math.max(innerWidth, renderMaxX - renderMinX);
   const renderViewBoxMinX = renderMinX;
+  if (trackPrefs?.fullRange === true && fullRangeFitPass < 6) {
+    const fittedSpan = resolveFullRangeVisibleSpan({
+      contentWidth: renderInnerWidth,
+      innerWidth,
+      domainSpanBp: visualDomainSpanBp,
+      viewportWidth: getMeasuredTrackViewportPx("primary"),
+    });
+    if (fittedSpan !== null && fittedSpan !== trackPrefs.visibleSpanBp) {
+      return renderAssemblyTracks({
+        ...args,
+        trackPrefs: { ...trackPrefs, visibleSpanBp: fittedSpan, allowSubViewportScale: true },
+        fullRangeFitPass: fullRangeFitPass + 1,
+      });
+    }
+  }
   const focusCtg = model.primary.ctgs.find((ctg) => ctg.isSelected) || model.primary.ctgs[0] || null;
   const primaryRects = trackRectsByLayoutId.get("primary") || [];
   const focusCtgIndex = focusCtg
@@ -2386,6 +2415,8 @@ function renderAssemblyTracks({
           class="assembly-track-scroll"
           data-track-role="primary"
           data-view-navigation-content="${hasNavigableTrackContent ? "1" : "0"}"
+          data-view-navigation-start-bp="${visualWindowStart + renderMinX * visualDomainSpanBp / innerWidth}"
+          data-view-navigation-end-bp="${visualWindowStart + renderMaxX * visualDomainSpanBp / innerWidth}"
           data-focus-center="${focusCenterContentX}"
           data-focus-start="${focusStartContentX}"
           data-track-window-start-bp="${visualWindowStart}"

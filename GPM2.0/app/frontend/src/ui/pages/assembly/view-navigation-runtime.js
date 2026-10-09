@@ -125,7 +125,7 @@ function createController(root, store, window) {
     if (!geometry || !scroll) return;
     const range = clampViewRange(requested, geometry.domain);
     if (!range) return;
-    const fullRange = range.span >= geometry.domain.end - geometry.domain.start;
+    const fullRange = range.span >= geometry.domain.end - geometry.domain.start - geometry.bpPerPx / 2;
     const active = root.ownerDocument.activeElement;
     let focusSelector = null;
     if (active?.closest?.("[data-view-navigation]")?.dataset?.viewNavigation === role) {
@@ -134,7 +134,7 @@ function createController(root, store, window) {
       else if (active.hasAttribute?.("data-view-nav-window")) focusSelector = "[data-view-nav-window]";
     }
     const state = store.getState(), viewKey = viewKeyFor(role), a = state.assembly;
-    let next = { ...a, [viewKey]: resolveTrackPrefs({ ...a[viewKey], visibleSpanBp: Math.max(1, Math.round(range.span)), allowSubViewportScale: true }) };
+    let next = { ...a, [viewKey]: resolveTrackPrefs({ ...a[viewKey], visibleSpanBp: Math.max(1, Math.round(range.span)), allowSubViewportScale: true, fullRange }) };
     if (role === "subview" && a.subview?.summary?.mode === "composition") {
       next = updateSubviewCompositionViewport(next, {
         ...a.subviewCompositionViewport, bpPerPx: range.span / scroll.clientWidth, leftBp: range.start,
@@ -166,7 +166,7 @@ function createController(root, store, window) {
     }
     // Fixed-pixel labels and rounded SVG bounds may change the domain after
     // scaling. Settle full-range requests from both handles and the Fit button.
-    if (fullRange && fitAttempt < 4) {
+    if (role !== "primary" && fullRange && fitAttempt < 4) {
       const nextGeometry = geometryFor(role);
       if (nextGeometry && nextGeometry.range.span < nextGeometry.domain.end - nextGeometry.domain.start) {
         applyRange(role, { start: nextGeometry.domain.start, span: nextGeometry.domain.end - nextGeometry.domain.start }, fitAttempt + 1);
@@ -472,6 +472,21 @@ function createController(root, store, window) {
       if (!scrollListeners.has(scroll)) {
         const listener = () => sync(role);
         scroll.addEventListener("scroll", listener, { passive: true }); scrollListeners.set(scroll, listener);
+      }
+      // Keep the fitted range in view preferences for subsequent gestures and
+      // persistence; content bounds are re-derived by the renderer every time.
+      const state = store.getState(), viewKey = viewKeyFor(role), prefs = state.assembly?.[viewKey];
+      const geometry = geometryFor(role);
+      if (role === "primary" && geometry) {
+        const fullRange = prefs?.fullRange === true
+          || geometry.range.span >= geometry.domain.end - geometry.domain.start - geometry.bpPerPx / 2;
+        const span = Math.max(1, Math.round(geometry.domain.end - geometry.domain.start));
+        if (fullRange && (prefs?.fullRange !== true || prefs.visibleSpanBp !== span)) {
+          store.setState({ ...state, assembly: { ...state.assembly,
+            [viewKey]: resolveTrackPrefs({ ...prefs, fullRange: true, allowSubViewportScale: true, visibleSpanBp: span }),
+          } });
+          persist(role);
+        }
       }
       sync(role);
     }
