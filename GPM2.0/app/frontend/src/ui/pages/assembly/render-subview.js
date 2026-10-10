@@ -860,7 +860,6 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
     assembly?.subviewTrackDragOffsets,
     i18n,
     { context: grtResultContext, plan: grtResultPlan, anchorPlan: grtAnchorPlan },
-    history,
   );
   const grtResultToast = assembly?.grtResultToast?.scope === "subview"
     && assembly?.grtResultToast?.chrName === grtResultContext.chrName
@@ -872,10 +871,15 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
         <div class="subview-panel-title-row" data-grt-result-card="subview">
           <h4 class="assembly-view-title">${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
           ${renderSubviewToolsToggle(i18n.subview.tools, { escapeHtml, escapeAttr })}
-          <p class="muted subview-panel-guide">${escapeHtml(i18n.subview.guide)}</p>
+          <details class="subview-panel-help">
+            <summary class="button ghost tiny" aria-label="${escapeAttr(i18n.subview.helpLabel)}" title="${escapeAttr(i18n.subview.guide)}">?</summary>
+            <p class="subview-panel-guide">${escapeHtml(i18n.subview.guide)}</p>
+          </details>
           ${allBadges ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}
         </div>
+        ${alignmentCard ? renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext, history) : ""}
       </div>
+      ${!alignmentCard ? `<p class="muted subview-empty-guide">${escapeHtml(i18n.subview.guide)}</p>` : ""}
       ${grtResultToast}
       ${subview.error ? `<p class="error-text">${escapeHtml(subview.error)}</p>` : ""}
       ${alignmentCard}
@@ -1443,7 +1447,6 @@ function renderSubviewAlignmentCard(
   subviewTrackDragOffsets = [],
   i18n,
   grtResult = {},
-  history = null,
 ) {
   const summary = subview?.summary || null;
   if (!summary) {
@@ -1457,12 +1460,6 @@ function renderSubviewAlignmentCard(
       trackPrefs: resolvedTrackPrefs,
       grtResult,
       i18n,
-      historyControls: renderSubviewTrackInlineControls(
-        resolvedTrackPrefs,
-        i18n,
-        grtResult.context,
-        history,
-      ),
       viewportWidthPx: getMeasuredTrackViewportPx("subview"),
       chrName: grtResult.context?.chrName,
       grtAnchorPlan: grtResult.anchorPlan,
@@ -1480,7 +1477,6 @@ function renderSubviewAlignmentCard(
       subviewTrackDragOffsets,
       i18n,
       grtResult,
-      history,
     );
   }
   const topSelection = normalizeSubviewSummarySelection(summary.top);
@@ -1842,10 +1838,6 @@ function renderSubviewAlignmentCard(
   });
   return `
     <article class="assembly-track-panel subview-alignment-card" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
-      <div class="assembly-track-panel-head">
-        <strong>${escapeHtml(`${topVisibleCtgName} vs ${bottomVisibleCtgName}`)}</strong>
-        ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context, history)}
-      </div>
       <div class="assembly-track-layout subview-track-layout">
         ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
         <div class="assembly-track-label-column subview-track-label-column" style="width:${svgModel.labelColumnWidth}px;height:${svgModel.contentBottom}px">
@@ -2050,7 +2042,6 @@ function renderSubviewTrackPairAlignmentCard(
   subviewTrackDragOffsets = [],
   i18n,
   grtResult = {},
-  history = null,
   fullRangeFitPass = 0,
 ) {
   const summary = subview?.summary || null;
@@ -2317,7 +2308,7 @@ function renderSubviewTrackPairAlignmentCard(
     if (span !== null && span !== resolvedTrackPrefs.visibleSpanBp) {
       return renderSubviewTrackPairAlignmentCard(subview, supportContext,
         { ...resolvedTrackPrefs, visibleSpanBp: span }, subviewTrackDragOffsets,
-        i18n, grtResult, history, fullRangeFitPass + 1);
+        i18n, grtResult, fullRangeFitPass + 1);
     }
   }
   const blockLength = Math.max(1, normalizePositiveInt(resolvedTrackPrefs.alignmentLength) ?? 1);
@@ -3119,10 +3110,6 @@ function renderSubviewTrackPairAlignmentCard(
   };
   return `
     <article class="assembly-track-panel subview-alignment-card" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
-      <div class="assembly-track-panel-head">
-        <strong>${escapeHtml(`${topTrackLabel} vs ${bottomTrackLabel}`)}</strong>
-        ${renderSubviewTrackInlineControls(resolvedTrackPrefs, i18n, grtResult.context, history)}
-      </div>
       <div class="assembly-track-layout subview-track-layout">
         ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
         <div class="assembly-track-label-column subview-track-label-column" style="width:${LABEL_COLUMN_WIDTH_PX}px;height:${contentBottom}px">

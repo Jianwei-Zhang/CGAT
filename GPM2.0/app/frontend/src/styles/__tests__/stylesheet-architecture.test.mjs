@@ -45,7 +45,7 @@ test("feature styles declare owners, use LF, and keep responsive rules with thei
 
   assert.match(readFileSync(new URL("./workspace.css", entryUrl), "utf8"), /@media \(max-width: 560px\)/);
   assert.match(readFileSync(new URL("./assembly.css", entryUrl), "utf8"), /@media \(max-width: 1200px\)/);
-  assert.match(readFileSync(new URL("./subview.css", entryUrl), "utf8"), /@media \(max-width: 1200px\)/);
+  assert.match(readFileSync(new URL("./subview.css", entryUrl), "utf8"), /@media \(max-width: 700px\)/);
   assert.match(readFileSync(new URL("./final-path.css", entryUrl), "utf8"), /@media \(max-width: 760px\)/);
   assert.match(readFileSync(new URL("./project-export.css", entryUrl), "utf8"), /@media \(max-width: 1180px\)/);
 });

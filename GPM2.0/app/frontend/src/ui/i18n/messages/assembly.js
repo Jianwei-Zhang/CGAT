@@ -304,6 +304,7 @@ export const zh = {
   },
   subview: {
     panelTitle: "局部视图",
+    helpLabel: "局部视图操作说明",
     tools: {
       toggle: "工具",
       title: "局部工具",
@@ -914,6 +915,7 @@ export const en = {
   },
   subview: {
     panelTitle: "Local View",
+    helpLabel: "Local View instructions",
     tools: {
       toggle: "Tools",
       title: "Local View Tools",

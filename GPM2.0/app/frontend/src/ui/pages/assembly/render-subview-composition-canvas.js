@@ -444,7 +444,6 @@ export function renderSubviewCompositionAlignmentCard({
   trackPrefs,
   grtResult = {},
   i18n,
-  historyControls,
   viewportWidthPx,
   chrName,
   grtAnchorPlan,
@@ -579,13 +578,12 @@ export function renderSubviewCompositionAlignmentCard({
   const emptyTop = topCount ? "" : `<text class="track-row-empty-label" x="12" y="${TOP_Y + 12}">${escapeHtml(i18n.trackControls.topTrackEmpty)}</text>`;
   const emptyBottom = bottomCount ? "" : `<text class="track-row-empty-label" x="12" y="${BOTTOM_Y + 12}">${escapeHtml(i18n.trackControls.bottomTrackEmpty)}</text>`;
   const trackOrderButtonTopPx = ((TOP_Y + BOTTOM_Y) / 2 - 4).toFixed(2);
+  const statusMarkup = topCount && bottomCount
+    ? evidenceStatus(subview?.pairwiseEvidence, i18n.subview, escapeHtml)
+    : `<span class="muted">${escapeHtml(i18n.subview.compositionEvidenceNeedsBothLanes)}</span>`;
   return `<article class="assembly-track-panel subview-alignment-card" data-subview-composition-scene="1"
     data-grt-result-scene-visible="${grtScene.hasVisibleResult ? "1" : "0"}">
-    <div class="assembly-track-panel-head"><strong>${escapeHtml(i18n.subview.compositionTitle
-      .replace("{top}", topCount).replace("{bottom}", bottomCount))}</strong>${historyControls}
-      ${topCount && bottomCount
-        ? evidenceStatus(subview?.pairwiseEvidence, i18n.subview, escapeHtml)
-        : `<span class="muted">${escapeHtml(i18n.subview.compositionEvidenceNeedsBothLanes)}</span>`}</div>
+    ${statusMarkup ? `<div class="subview-evidence-status" role="status">${statusMarkup}</div>` : ""}
     <div class="assembly-track-layout subview-track-layout">
       ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}
       <div class="assembly-track-label-column subview-track-label-column" style="width:136px;height:${CONTENT_HEIGHT}px">

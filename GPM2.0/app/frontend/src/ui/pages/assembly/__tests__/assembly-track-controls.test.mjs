@@ -246,17 +246,18 @@ test("track tick label css does not force middle anchor", () => {
   assert.doesNotMatch(css, /\.track-tick-label\s*\{[^}]*text-anchor:\s*middle;/);
 });
 
-test("subview title guide and candidates share one responsive first row", () => {
+test("subview toolbar keeps title and candidates compact and wraps whole controls on narrow screens", () => {
   const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
   );
 
   assert.match(css, /\.subview-panel-title-row\s*\{[^}]*justify-content:\s*flex-start;/);
-  assert.match(css, /\.subview-panel-guide\s*\{[^}]*flex:\s*1 1 560px;/);
-  assert.match(css, /@media \(max-width:\s*900px\)[\s\S]*\.subview-panel-guide\s*\{[^}]*flex-basis:\s*100%;/);
-  assert.match(css, /\.subview-candidate-row\s*\{[^}]*justify-content:\s*flex-start;[^}]*flex:\s*0 1 auto;[^}]*min-width:\s*0;/);
-  assert.match(css, /@media \(max-width:\s*900px\)[\s\S]*\.subview-candidate-row\s*\{[^}]*flex-basis:\s*100%;/);
+  assert.match(css, /\.subview-panel-head\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap;/);
+  assert.match(css, /\.subview-panel-guide\s*\{[^}]*position:\s*absolute;/);
+  assert.match(css, /\.subview-candidate-row\s*\{[^}]*justify-content:\s*flex-start;[^}]*flex:\s*1 1 auto;[^}]*min-width:\s*0;/);
+  assert.match(css, /\.subview-track-inline-controls\s*\{[^}]*flex:\s*0 0 auto;[^}]*flex-wrap:\s*nowrap;/);
+  assert.match(css, /@media \(max-width:\s*700px\)[\s\S]*\.subview-track-inline-controls\s*\{[^}]*flex-basis:\s*100%;[^}]*flex-wrap:\s*wrap;/);
   assert.match(css, /\.subview-candidate-badge\s*\{[^}]*height:\s*2\.1429rem;[^}]*overflow:\s*hidden;[^}]*border:\s*1px solid #b8c2cc;[^}]*border-radius:\s*4px;/);
   assert.match(css, /\.subview-candidate-slot\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/);
   assert.match(css, /\.subview-candidate-remove\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/);
@@ -836,7 +837,7 @@ test("assembly visible ctg labels strip chr suffix while hover titles keep full 
 
   assert.match(html, />ptg000009l \(\+\)<\/text>/);
   assert.match(html, />Ctg1617 \(-\)<\/text>/);
-  assert.match(html, /<strong>Ctg1617 \(-\) vs ptg000009l \(\+\)<\/strong>/);
+  assert.doesNotMatch(html, /<strong>Ctg1617 \(-\) vs ptg000009l \(\+\)<\/strong>/);
   assert.match(html, /class="subview-candidate-badge" title="ptg000009l@Chr22 \(\+\)"><strong class="subview-candidate-slot">A<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">ptg000009l \(\+\)<\/span><span class="subview-candidate-meta">/);
   assert.match(html, /class="subview-candidate-badge" title="Ctg1617@Chr22 \(-\)"><strong class="subview-candidate-slot">B<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">Ctg1617 \(-\)<\/span><span class="subview-candidate-meta">/);
   assert.match(html, /class="subview-candidate-remove"[^>]*aria-label="移除该候选"[^>]*><svg class="subview-candidate-remove-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">/);

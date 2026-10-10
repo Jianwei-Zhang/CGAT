@@ -9,7 +9,7 @@ import {
   createStore,
 } from "./tabs-semantics-harness.mjs";
 
-test("subview panel renders chart sub-card with parameter labels after entering", () => {
+test("subview panel renders unified toolbar with parameter labels after entering", () => {
   const html = renderAssemblyPage(
     createState({
       assembly: {
@@ -49,7 +49,9 @@ test("subview panel renders chart sub-card with parameter labels after entering"
     html,
     /Ctrl\/Cmd 选择两个 ctg 进入局部视图；也可选择两个轨道进入轨道模式。/,
   );
-  assert.match(html, /support-ctg \(\+\) vs ctg-alpha \(\+\)/);
+  assert.doesNotMatch(html, /support-ctg \(\+\) vs ctg-alpha \(\+\)/);
+  assert.match(html, /class="subview-candidate-name">support-ctg \(\+\)<\/span>/);
+  assert.match(html, /class="subview-candidate-name">ctg-alpha \(\+\)<\/span>/);
   assert.match(html, /data-subview-remove-type="candidate"/);
   assert.match(html, /data-subview-remove-role="support"/);
   assert.match(html, /data-subview-remove-contig-id="30"/);
@@ -558,7 +560,7 @@ test("subview local contig flips only affect subview labels and leave main-view 
   );
 
   assert.match(html, /data-track-role="primary"[^>]*>[\s\S]*?primary-track \(\+\)<\/text>/);
-  assert.match(html, /<strong>primary-track \(\+\) vs primary-track \(-\)<\/strong>/);
+  assert.doesNotMatch(html, /<strong>primary-track \(\+\) vs primary-track \(-\)<\/strong>/);
   assert.match(html, /class="subview-candidate-badge" title="primary-track \(\+\)"[\s\S]*?class="subview-candidate-slot">A<\/strong>[\s\S]*?class="subview-candidate-name">primary-track \(\+\)<\/span>/);
   assert.match(html, /class="subview-candidate-badge" title="primary-track \(-\)"[\s\S]*?class="subview-candidate-slot">B<\/strong>[\s\S]*?class="subview-candidate-name">primary-track \(-\)<\/span>/);
   assert.match(html, /data-subview-label-slot="top"[^>]*>primary-track \(\+\)<\/text>/);

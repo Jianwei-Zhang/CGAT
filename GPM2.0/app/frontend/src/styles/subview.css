@@ -38,16 +38,26 @@
 }
 
 .subview-panel-head {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  min-width: 0;
 }
 
 .subview-panel-title-row {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  flex: 1 1 360px;
+  min-width: 0;
   gap: 8px 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+}
+
+.subview-panel-title-row > [data-subview-tools-toggle] {
+  flex: 0 0 auto;
 }
 
 .subview-panel-title-row h4 {
@@ -55,9 +65,50 @@
   margin: 0;
 }
 
+.subview-panel-help {
+  flex: 0 0 auto;
+}
+
+.subview-panel-help > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  list-style: none;
+  cursor: pointer;
+}
+
+.subview-panel-help > summary::-webkit-details-marker {
+  display: none;
+}
+
+.subview-panel-help > summary:focus-visible {
+  outline: 2px solid #4f82b5;
+  outline-offset: 2px;
+}
+
 .subview-panel-guide {
-  flex: 1 1 560px;
-  min-width: 260px;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 64px));
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #b8c2cc;
+  border-radius: 4px;
+  background: #fff;
+  color: #444;
+  font-size: var(--font-body);
+  line-height: 1.5;
+  box-shadow: 0 4px 12px rgba(34, 48, 61, 0.12);
+}
+
+.subview-empty-guide {
   margin: 0;
 }
 
@@ -615,16 +666,18 @@
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .subview-candidate-badge {
   display: inline-flex;
   align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
   box-sizing: border-box;
   height: 2.1429rem;
   max-width: min(320px, 100%);
@@ -808,9 +861,14 @@
 
 .subview-track-inline-controls {
   justify-content: flex-end;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  max-width: 100%;
+  margin-inline-start: auto;
 }
 
 .subview-track-inline-controls .assembly-track-inline-field {
+  flex: 0 0 auto;
   width: auto;
   min-width: 0;
 }
@@ -990,25 +1048,20 @@
   display: none;
 }
 
-@media (max-width: 1200px) {
-  .subview-track-inline-controls .assembly-track-inline-field {
-    width: calc(50% - 6px);
+/* Move the complete parameter group below the title when space is tight.
+   At phone widths only whole fields wrap, never a label away from its input. */
+@media (max-width: 700px) {
+  .subview-track-inline-controls {
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    margin-inline-start: 0;
   }
-
-  .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="minTickUnitKb"],
-  .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="maxTickCount"],
-  .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="alignmentLength"],
-  .subview-track-inline-controls .assembly-track-inline-field [data-track-combo-field="minIdentityPct"] {
-    width: 100%;
-    min-width: 0;
-  }
-
 }
 
-@media (max-width: 900px) {
-  .subview-panel-guide {
-    flex-basis: 100%;
-    min-width: 0;
+@media (max-width: 520px) {
+  .subview-panel-title-row {
+    flex-wrap: wrap;
   }
 
   .subview-candidate-row {
