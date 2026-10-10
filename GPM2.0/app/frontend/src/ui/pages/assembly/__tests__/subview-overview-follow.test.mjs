@@ -100,6 +100,6 @@ test("shared view card contains both plots and hides only the redundant native s
   assert.match(css, /\.assembly-track-label-column\s*\{[^}]*box-sizing:\s*border-box/s);
   assert.match(css, /\.assembly-track-scroll\s*\{[^}]*scrollbar-width:\s*none[^}]*overflow-x:\s*auto/s);
   assert.match(css, /\.assembly-track-scroll::-webkit-scrollbar\s*\{[^}]*display:\s*none/s);
-  assert.match(css, /\.view-nav-span\s*\{[^}]*flex:\s*0 0 auto[^}]*padding-left:\s*12px/s);
-  assert.match(css, /\.view-nav-span \[data-view-nav-span\]\s*\{[^}]*width:\s*16ch[^}]*font-variant-numeric:\s*tabular-nums/s);
+  assert.match(css, /\.view-nav-span\s*\{[^}]*flex:\s*0 0 auto[^}]*margin-inline-start:\s*12px/s);
+  assert.match(css, /\.view-nav-span \[data-view-nav-span\]\s*\{[^}]*text-align:\s*start[^}]*font-variant-numeric:\s*tabular-nums/s);
 });

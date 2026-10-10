@@ -31,6 +31,8 @@
 }
 
 .subview-selection-panel {
+  min-width: 0;
+  display: grid;
   gap: 10px;
   position: relative;
 }

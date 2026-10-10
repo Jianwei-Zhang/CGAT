@@ -472,7 +472,7 @@ test("phased track ctg bars reuse the matching primary layout rect", () => {
   assert.equal(phased.width, primary.width);
 });
 
-test("assembly tab keeps the main view card and subview card but removes their shared outer card wrapper", () => {
+test("assembly tab groups main and local views in one card and keeps Final Path separate", () => {
   const html = renderAssemblyPage(
     createState({
       assembly: {
@@ -483,10 +483,11 @@ test("assembly tab keeps the main view card and subview card but removes their s
   );
 
   assert.match(html, /<section class="assembly-track-content-stack">/);
-  assert.match(html, /<section class="assembly-main-view">/);
-  assert.doesNotMatch(html, /<section class="card assembly-main-view">/);
+  assert.match(html, /<section class="card assembly-main-view">/);
+  assert.match(html, /<section class="card assembly-main-view">[\s\S]*?<div class="assembly-track-unified[\s\S]*?<article class="subview-selection-panel" data-subview-panel="1">[\s\S]*?<\/section>\s*<article class="card final-path-card"/);
+  assert.doesNotMatch(html, /class="card subview-selection-panel"/);
   assert.match(html, /<div class="assembly-track-unified assembly-track-panel"\s+data-show-telomeres="true"\s+data-show-centromeres="true">/);
-  assert.match(html, /<article class="card subview-selection-panel"[^>]*>/);
+  assert.match(html, /<article class="subview-selection-panel"[^>]*>/);
   assert.match(html, /<article class="card final-path-card"/);
 });
 
@@ -501,6 +502,7 @@ test("assembly tab renders a loading curtain over assembly content while data is
   );
   const loadedHtml = renderAssemblyPage(createState());
 
+  assert.match(loadingHtml, /<section class="card assembly-main-view">/);
   assert.match(loadingHtml, /data-assembly-loading-curtain="1"/);
   assert.doesNotMatch(loadingHtml, /data-track-contig-id="/);
   assert.doesNotMatch(loadedHtml, /data-assembly-loading-curtain="1"/);

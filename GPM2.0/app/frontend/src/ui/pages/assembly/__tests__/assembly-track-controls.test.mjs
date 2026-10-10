@@ -277,7 +277,7 @@ test("subview anchor endpoints share a row and wrap with the tools window", () =
 test("subview selection panel hides history controls before a pair enters", () => {
   const html = renderAssemblyPage(createState());
 
-  assert.match(html, /<article class="card subview-selection-panel" data-subview-panel="1">/);
+  assert.match(html, /<article class="subview-selection-panel" data-subview-panel="1">/);
   assert.doesNotMatch(html, /data-subview-action="close-clear"/);
   assert.doesNotMatch(html, /data-subview-action="history-rollback"/);
   assert.doesNotMatch(html, /data-subview-action="history-restore-rollback"/);

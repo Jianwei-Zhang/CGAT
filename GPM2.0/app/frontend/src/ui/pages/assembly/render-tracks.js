@@ -612,7 +612,7 @@ function createRenderTracksRenderer(deps = {}) {
         </article>
       </div>
       <section class="assembly-track-content-stack is-loading">
-        <section class="assembly-main-view">
+        <section class="card assembly-main-view">
           ${renderAssemblyStatusToast(assembly)}
           <div class="assembly-track-unified assembly-track-panel assembly-track-loading-shell" aria-hidden="true"></div>
         </section>
@@ -870,7 +870,7 @@ function createRenderTracksRenderer(deps = {}) {
         </article>
       </div>
       <section class="assembly-track-content-stack">
-        <section class="assembly-main-view">
+        <section class="card assembly-main-view">
           ${renderAssemblyStatusToast(assembly)}
           ${renderAssemblyTracks({
             model: trackModel,

@@ -690,6 +690,23 @@
   gap: 8px;
 }
 
+/* Main and local views share one frame; their plot/navigation frames remain. */
+.assembly-main-view.card {
+  background: #f3f3f3;
+}
+
+.assembly-main-view > .assembly-track-unified,
+.assembly-main-view > .subview-selection-panel > .subview-alignment-card {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.assembly-main-view > .subview-selection-panel {
+  border-top: 1px solid #d2d2d2;
+  padding-top: 10px;
+}
+
 .assembly-track-content-stack {
   min-width: 0;
   position: relative;
@@ -2048,13 +2065,11 @@
   gap: 4px;
   align-items: center;
   white-space: nowrap;
-  margin-left: auto;
-  padding-left: 12px;
+  margin-inline-start: 12px;
 }
 .view-nav-span [data-view-nav-span] {
   display: inline-block;
-  width: 16ch;
-  text-align: right;
+  text-align: start;
   font-variant-numeric: tabular-nums;
 }
 .view-tick-control input {

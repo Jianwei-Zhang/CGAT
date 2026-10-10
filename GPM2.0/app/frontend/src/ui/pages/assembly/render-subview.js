@@ -867,7 +867,7 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
     ? `<div class="grt-result-toast" role="status">${escapeHtml(i18n.grtResult.noSubviewLinks)}</div>`
     : "";
   return `
-    <article class="card subview-selection-panel" data-subview-panel="1">
+    <article class="subview-selection-panel" data-subview-panel="1">
       <div class="subview-panel-head">
         <div class="subview-panel-title-row" data-grt-result-card="subview">
           <h4 class="assembly-view-title">${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
