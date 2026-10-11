@@ -876,10 +876,10 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
             <p class="subview-panel-guide">${escapeHtml(i18n.subview.guide)}</p>
           </details>
           ${allBadges ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}
+          ${!alignmentCard ? `<p class="muted subview-empty-guide" title="${escapeAttr(i18n.subview.guide)}">${escapeHtml(i18n.subview.guide)}</p>` : ""}
         </div>
         ${alignmentCard ? renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext, history) : ""}
       </div>
-      ${!alignmentCard ? `<p class="muted subview-empty-guide">${escapeHtml(i18n.subview.guide)}</p>` : ""}
       ${grtResultToast}
       ${subview.error ? `<p class="error-text">${escapeHtml(subview.error)}</p>` : ""}
       ${alignmentCard}

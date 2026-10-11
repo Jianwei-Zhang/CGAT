@@ -53,9 +53,11 @@ for (const mode of ["2-contig", "track-pair", "composition"]) {
 }
 
 for (const locale of ["zh", "en"]) {
-  test(`empty ${locale} view keeps visible guidance without inactive parameter controls`, () => {
+  test(`empty ${locale} view keeps guidance inside the unified toolbar without inactive controls`, () => {
     const html = localMarkup(createState({ locale }));
-    assert.match(html, /<p class="muted subview-empty-guide">[^<]+<\/p>/);
+    const titleRow = html.match(/<div class="subview-panel-title-row"[^>]*>[\s\S]*?<\/div>/)?.[0] || "";
+    assert.match(titleRow, /<p class="muted subview-empty-guide" title="[^"]+">[^<]+<\/p>/);
+    assert.match(html, /subview-empty-guide[^>]*>[^<]+<\/p>\s*<\/div>\s*<\/div>/);
     assert.match(html, /<details class="subview-panel-help">/);
     assert.doesNotMatch(html, /subview-track-inline-controls|subview-alignment-card|data-subview-action="history-/);
   });
@@ -97,4 +99,12 @@ test("help disclosure floats over the view rather than consuming toolbar height"
   assert.match(ruleBody(css, ".subview-panel-guide"), /position:\s*absolute/);
   assert.match(ruleBody(css, ".subview-panel-guide"), /width:\s*min\(360px, calc\(100vw - 64px\)\)/);
   assert.match(ruleBody(css, ".subview-panel-help > summary:focus-visible"), /outline:\s*2px solid/);
+});
+
+test("empty guidance shrinks inline without forcing another toolbar row", () => {
+  const hint = ruleBody(css, ".subview-empty-guide");
+  assert.match(hint, /flex:\s*1 1 0/);
+  assert.match(hint, /min-width:\s*0/);
+  assert.match(hint, /white-space:\s*nowrap/);
+  assert.match(hint, /text-overflow:\s*ellipsis/);
 });

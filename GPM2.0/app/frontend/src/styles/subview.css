@@ -109,7 +109,12 @@
 }
 
 .subview-empty-guide {
+  flex: 1 1 0;
+  min-width: 0;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .subview-tools-toggle {
