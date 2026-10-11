@@ -1023,7 +1023,7 @@ test("track-driven subview selection enters Subview-ctg immediately after select
   assert.equal(subview.error, "");
 });
 
-test("enterSubviewFromCandidates copies main-track scale prefs into subviewTrackView", () => {
+test("enterSubviewFromCandidates inherits main-track filters and starts in full overview", () => {
   const host = {
     closest() {
       return null;
@@ -1085,6 +1085,8 @@ test("enterSubviewFromCandidates copies main-track scale prefs into subviewTrack
   __testEnterSubviewFromCandidates(host, store);
 
   assert.deepEqual(store.getState().assembly.subviewTrackView, {
+    fullRange: true,
+    allowSubViewportScale: true,
     supportDsCtgLen: 10000,
     minTickUnitKb: 750,
     minTickKb: 750,

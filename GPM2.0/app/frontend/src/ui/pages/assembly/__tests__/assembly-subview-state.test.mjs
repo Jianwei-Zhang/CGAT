@@ -162,7 +162,7 @@ test("selectSubviewTrack enters track-pair summary after selecting two ds tracks
   assert.equal(afterSupport.summary.bottomTrack.role, "primary");
 });
 
-test("enterSubviewFromTrackSelections copies main-track scale prefs into subviewTrackView", () => {
+test("enterSubviewFromTrackSelections inherits main-track filters and starts in full overview", () => {
   const host = {
     closest() {
       return null;
@@ -212,6 +212,8 @@ test("enterSubviewFromTrackSelections copies main-track scale prefs into subview
   __testEnterSubviewFromTrackSelections(host, store);
 
   assert.deepEqual(store.getState().assembly.subviewTrackView, {
+    fullRange: true,
+    allowSubViewportScale: true,
     supportDsCtgLen: 10000,
     minTickUnitKb: 500,
     minTickKb: 500,
@@ -409,7 +411,7 @@ test("swap subview track order keeps persisted anchors visible", () => {
   );
 });
 
-test("track label selection inherits main-track scale prefs when entering subview-track", () => {
+test("track label selection inherits main-track filters and enters full overview", () => {
   const host = {
     closest() {
       return null;
@@ -465,6 +467,8 @@ test("track label selection inherits main-track scale prefs when entering subvie
 
   assert.equal(store.getState().assembly.subview.summary?.mode, "track-pair");
   assert.deepEqual(store.getState().assembly.subviewTrackView, {
+    fullRange: true,
+    allowSubViewportScale: true,
     supportDsCtgLen: 15000,
     minTickUnitKb: 500,
     minTickKb: 500,

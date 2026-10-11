@@ -2,6 +2,7 @@ import { MAX_TRACK_RENDER_PX } from "../track-prefs.js";
 import { test, assert, createState, createStore, renderAssemblyPage } from "./tabs-semantics-harness.mjs";
 import { resolveSubviewCompositionScaleViewport } from "../subview-composition-layout.js";
 import { applySubviewComposition } from "../subview-composition-state.js";
+import { buildSubviewClearProjection } from "../subview-clear-state.js";
 import {
   createSubviewCompositionController,
   projectCurrentSubviewToComposition,
@@ -375,4 +376,56 @@ test("composition full-range mode derives each fit from current member bounds on
     assert.equal(viewport.leftBp, start);
     assert.equal(viewport.bpPerPx * 1000, end - start);
   }
+});
+
+test("composition reopens fully fitted after closing but later edits retain a manual zoom", async () => {
+  const candidate = { ...member(120_000), candidateKey: "assembly:1", entityKey: "assembly:1" };
+  const session = {};
+  let hasGraph = false;
+  const host = { querySelector: () => hasGraph ? {} : null, querySelectorAll: () => [] };
+  const store = createStore(createState({ assembly: {
+    subview: applySubviewComposition({}, { members: [candidate] }),
+    subviewTrackView: { fullRange: false, visibleSpanBp: 10_000, allowSubViewportScale: true, alignmentLength: 4321, minIdentityPct: 95 },
+    subviewCompositionViewport: { bpPerPx: 10, leftBp: 30_000, topPx: 0 },
+    subviewCompositionCandidates: [candidate], subviewCompositionCandidatesLoaded: true,
+  } }));
+  const mainView = structuredClone(store.getState().assembly.trackView);
+  store.setState({ assembly: buildSubviewClearProjection(store.getState().assembly).assembly });
+  const controller = createSubviewCompositionController({
+    session, getMeasuredTrackViewportPx: () => 600,
+    listChrViewCtgs: async () => ({ items: [] }),
+    persistProjectAssemblyViewStateFromStore: async () => {},
+    rerenderSubviewPanel() {}, refreshSubviewPairwiseEvidence() {}, anchorController: { resetScope() {} },
+  });
+  const scopeKey = "reopen-fixture";
+  controller.resetScope(scopeKey);
+  session.subviewCompositionToolsState.checkedKeys = [candidate.candidateKey];
+  const context = { host, store, scopeKey, sync() {} };
+  controller.onAction({ target: { closest: (selector) =>
+    selector === "[data-subview-composition-confirm-add]" ? {} : null } }, context);
+  await Promise.resolve();
+  const reopened = store.getState().assembly;
+  assert.equal(reopened.subviewTrackView.fullRange, true);
+  assert.equal(reopened.subviewTrackView.allowSubViewportScale, true);
+  assert.equal(reopened.subviewCompositionViewport.bpPerPx, 200);
+  assert.equal(reopened.subviewCompositionViewport.leftBp, 0);
+  assert.equal(reopened.subviewTrackView.alignmentLength, 4321);
+  assert.equal(reopened.subviewTrackView.minIdentityPct, 95);
+  assert.deepEqual(reopened.trackView, mainView);
+
+  hasGraph = true;
+  store.setState({ assembly: { ...reopened,
+    subviewTrackView: { ...reopened.subviewTrackView, fullRange: false, visibleSpanBp: 6000 },
+    subviewCompositionViewport: { bpPerPx: 10, leftBp: 3000, topPx: 0 },
+  } });
+  controller.onAction({ target: { closest: (selector) => selector === "[data-subview-composition-move]"
+    ? { dataset: { subviewCompositionMove: "assembly:1", subviewCompositionTargetLane: "bottom" } } : null } }, context);
+  await Promise.resolve();
+  const edited = store.getState().assembly;
+  assert.equal(edited.subviewTrackView.fullRange, false);
+  assert.equal(edited.subviewTrackView.visibleSpanBp, 6000);
+  assert.equal(edited.subviewCompositionViewport.bpPerPx, 10);
+  assert.equal(edited.subviewCompositionViewport.leftBp, 3000);
+  assert.equal(edited.subview.summary.members[0].lane, "bottom");
+  assert.equal(edited.subview.summary.members[0].xBp, candidate.xBp);
 });

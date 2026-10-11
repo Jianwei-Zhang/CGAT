@@ -355,14 +355,23 @@ export function createSubviewCompositionController({
 
   async function commit(host, store, composition, operation, sync) {
     const state = store.getState();
-    const viewport = host?.querySelector?.(".subview-track-scroll")
+    const currentSubview = getSubviewState(state.assembly);
+    const hasActiveSubview = currentSubview.summary?.mode === "composition"
+      ? Boolean(getSubviewComposition(currentSubview)?.members.length)
+      : Boolean(currentSubview.summary);
+    // A reopened composition starts fitted; edits to an open view keep its zoom.
+    const assembly = hasActiveSubview ? state.assembly : {
+      ...state.assembly,
+      subviewTrackView: { ...state.assembly?.subviewTrackView, fullRange: true, allowSubViewportScale: true },
+    };
+    const viewport = hasActiveSubview && host?.querySelector?.(".subview-track-scroll")
       ? resolveCurrentSubviewCompositionViewport(state, host)
       : resolveSubviewCompositionScaleViewport(composition, {
-        trackPrefs: state.assembly?.subviewTrackView,
+        trackPrefs: assembly.subviewTrackView,
         viewportWidthPx: getMeasuredTrackViewportPx?.("subview"),
       });
-    const nextSubview = applySubviewComposition(getSubviewState(state.assembly), composition);
-    const result = commitSubviewCompositionHistoryOperation(state.assembly, {
+    const nextSubview = applySubviewComposition(currentSubview, composition);
+    const result = commitSubviewCompositionHistoryOperation(assembly, {
       nextSubview,
       operation,
       viewport,

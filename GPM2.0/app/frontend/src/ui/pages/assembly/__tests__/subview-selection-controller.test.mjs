@@ -390,3 +390,61 @@ test("two-track quick entry clears the active graph and creates fresh default tr
   assert.deepEqual(harness.pairwiseLoads.map((summary) => summary.mode), ["track-pair"]);
   assert.equal(harness.persisted.length, 2);
 });
+
+function enterOverviewFixture(harness, mode, explicit = false) {
+  if (explicit) {
+    const assembly = harness.store.getState().assembly;
+    harness.store.setState({ assembly: { ...assembly, subview: mode === "2-contig" ? {
+      mode, selectedAContigId: 2, selectedARole: "primary", selectedBContigId: 30, selectedBRole: "support",
+    } : { mode, selectedTrackSelections: [
+      { role: "primary" }, { role: "support", source: "mother", datasetId: 22 },
+    ] } } });
+    if (mode === "2-contig") harness.controller.enterSubviewFromCandidates({}, harness.store);
+    else harness.controller.enterSubviewFromTrackSelections({}, harness.store);
+    return;
+  }
+  if (mode === "2-contig") {
+    harness.controller.handleTrackSubviewCandidateSelection({}, harness.store, { trackRole: "primary", contigId: 2 });
+    harness.controller.handleTrackSubviewCandidateSelection({}, harness.store, { trackRole: "support", contigId: 30 });
+  } else {
+    harness.controller.handleTrackSubviewTrackSelection({}, harness.store, { trackRole: "primary" });
+    harness.controller.handleTrackSubviewTrackSelection({}, harness.store, { trackRole: "support", source: "mother", datasetId: 22 });
+  }
+}
+
+for (const mode of ["2-contig", "track-pair"]) {
+  for (const close of ["clear", "badges", "explicit-reentry"]) {
+    test(`${mode} reopens in full overview after ${close}, without changing the main view`, () => {
+      const harness = createEntryHarness(createCompositionBackedState());
+      enterOverviewFixture(harness, mode);
+      const assembly = harness.store.getState().assembly;
+      harness.store.setState({ assembly: {
+        ...assembly,
+        trackView: { ...assembly.trackView, fullRange: false, visibleSpanBp: 400 },
+        subviewTrackView: { ...assembly.subviewTrackView, fullRange: false, visibleSpanBp: 200, allowSubViewportScale: true },
+        subviewTrackScrollState: { viewportKey: "old-zoom", scrollLeft: 550 },
+      } });
+      const mainView = structuredClone(harness.store.getState().assembly.trackView);
+      if (close === "badges") {
+        if (mode === "2-contig") {
+          harness.controller.handleSubviewCandidateRemoval({}, harness.store, { trackRole: "primary", contigId: 2 });
+          harness.controller.handleSubviewCandidateRemoval({}, harness.store, { trackRole: "support", contigId: 30 });
+        } else {
+          harness.controller.handleSubviewTrackSelectionRemoval({}, harness.store, { trackRole: "primary", source: "mother" });
+          harness.controller.handleSubviewTrackSelectionRemoval({}, harness.store, { trackRole: "support", source: "mother", datasetId: 22 });
+        }
+      } else assert.equal(harness.controller.handleSubviewClear({}, harness.store), true);
+      assert.equal(harness.store.getState().assembly.subview.summary, null);
+      enterOverviewFixture(harness, mode, close === "explicit-reentry");
+      const reopened = harness.store.getState().assembly;
+      assert.equal(reopened.subview.summary.mode, mode);
+      assert.equal(reopened.subviewTrackView.fullRange, true);
+      assert.equal(reopened.subviewTrackView.allowSubViewportScale, true);
+      assert.deepEqual(reopened.trackView, mainView);
+      assert.equal(reopened.subviewTrackView.alignmentLength, mainView.alignmentLength);
+      assert.equal(reopened.subviewTrackView.minIdentityPct, mainView.minIdentityPct);
+      assert.deepEqual(reopened.subviewCompositionViewport, {});
+      assert.deepEqual(reopened.subviewTrackDragOffsets, []);
+    });
+  }
+}

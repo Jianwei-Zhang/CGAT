@@ -51,6 +51,9 @@ export function createSubviewSelectionController({
     const { mapq: _legacyMapq, ...previousSubviewTrackView } = assembly?.subviewTrackView || {};
     return {
       ...previousSubviewTrackView,
+      // Every fresh entry fits current content rather than reusing the old zoom.
+      fullRange: true,
+      allowSubViewportScale: true,
       supportDsCtgLen: mainTrackPrefs.supportDsCtgLen,
       minTickUnitKb: mainTrackPrefs.minTickUnitKb,
       minTickKb: mainTrackPrefs.minTickUnitKb,
