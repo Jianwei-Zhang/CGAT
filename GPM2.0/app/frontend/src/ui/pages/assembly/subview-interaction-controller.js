@@ -21,6 +21,10 @@ import {
 } from "./subview-state.js";
 import { commitSubviewHistoryOperation } from "./subview-history-state.js";
 import {
+  preserveSubviewRemovalViewport,
+  captureSubviewTrackPairRemovalLayout,
+} from "./subview-removal-viewport.js";
+import {
   collectSubviewAnchorScene,
   deleteSubviewAnchorObjects,
   enrichSubviewAnchorObjectDescriptors,
@@ -47,11 +51,14 @@ export function createSubviewInteractionController({
   async function commitSubviewEdit(host, store, {
     nextSubview,
     operation,
+    preserveViewport = false,
     persist = persistProjectAssemblyViewStateFromStore,
     rerender = rerenderSubviewPanel,
   }) {
     const state = store.getState();
-    const result = commitSubviewHistoryOperation(state.assembly, {
+    const assembly = preserveViewport
+      ? preserveSubviewRemovalViewport(state.assembly, host) : state.assembly;
+    const result = commitSubviewHistoryOperation(assembly, {
       nextSubview,
       operation,
       stateOrLocale: state,
@@ -100,9 +107,17 @@ export function createSubviewInteractionController({
             === buildSubviewTrackPairHiddenCtgKey(entry.trackRole, entry.contigId),
       ),
     );
+    if (next.length === current.length && next.every((entry, index) =>
+      buildSubviewTrackPairHiddenCtgKey(entry.trackRole, entry.contigId)
+        === buildSubviewTrackPairHiddenCtgKey(current[index]?.trackRole, current[index]?.contigId))) {
+      return;
+    }
+    const removalLayout = hidden ? captureSubviewTrackPairRemovalLayout(state.assembly, host) : {};
     await commitSubviewEdit(host, store, {
+      preserveViewport: hidden,
       nextSubview: {
         ...currentSubview,
+        ...removalLayout,
         trackPairHiddenCtgs: next,
         trackPairSelectedCtgs: nextSelections,
       },

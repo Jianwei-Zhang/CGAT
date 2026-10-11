@@ -2065,17 +2065,15 @@ function renderSubviewTrackPairAlignmentCard(
       buildSubviewTrackPairHiddenCtgKey(entry.trackRole, entry.contigId),
     ),
   );
+  // Hidden members still occupy their original layout slots. Filtering before
+  // building the model would rebase every subsequent contig in that track.
   const topCtgs = rawTopCtgs
-    .filter((ctg) =>
-      !hiddenKeySet.has(buildSubviewTrackPairHiddenCtgKey(topTrack.role, ctg?.assemblyCtgId)),
-    )
     .map((ctg) => resolveSubviewRenderableContig(ctg, flippedKeySet, "top"));
   const bottomCtgs = rawBottomCtgs
-    .filter((ctg) =>
-      !hiddenKeySet.has(buildSubviewTrackPairHiddenCtgKey(bottomTrack.role, ctg?.assemblyCtgId)),
-    )
     .map((ctg) => resolveSubviewRenderableContig(ctg, flippedKeySet, "bottom"));
-  if (!topCtgs.length && !bottomCtgs.length) return "";
+  const isVisible = (role, ctg) => !hiddenKeySet.has(
+    buildSubviewTrackPairHiddenCtgKey(role, ctg?.assemblyCtgId),
+  );
   const resolvedTrackPrefs = resolveTrackPrefs(trackPrefs || {});
   const pairModel = buildDualTrackModel({
     primaryCtgs: bottomCtgs,
@@ -2085,13 +2083,20 @@ function renderSubviewTrackPairAlignmentCard(
     prefs: resolvedTrackPrefs,
     preserveInputOrder: true,
   });
+  const visibleTopCtgs = (pairModel.companion?.ctgs || [])
+    .filter((ctg) => isVisible(topTrack.role, ctg));
+  const visibleBottomCtgs = (pairModel.primary?.ctgs || [])
+    .filter((ctg) => isVisible(bottomTrack.role, ctg));
+  if (!visibleTopCtgs.length && !visibleBottomCtgs.length) return "";
   // The legacy layout pads its window to at least 500 kb. In full overview
   // only the source ruler and current marks count as content, not that padding.
-  const pairCtgs = [...(pairModel.primary?.ctgs || []), ...(pairModel.companion?.ctgs || [])];
-  const domainStart = resolvedTrackPrefs.fullRange
+  const pairCtgs = [...visibleBottomCtgs, ...visibleTopCtgs];
+  const savedLayoutViewport = !resolvedTrackPrefs.fullRange ? subview.trackPairLayoutViewport : null;
+  const domainStart = savedLayoutViewport ? savedLayoutViewport.windowStartBp : resolvedTrackPrefs.fullRange
     ? Math.min(0, ...pairCtgs.map((ctg) => Number(ctg.startBp)))
     : Number(pairModel.windowStart || 0);
-  const domainEnd = resolvedTrackPrefs.fullRange
+  const domainEnd = savedLayoutViewport
+    ? domainStart + savedLayoutViewport.domainSpanBp - 1 : resolvedTrackPrefs.fullRange
     ? Math.max(domainStart, ...pairCtgs.map((ctg) => Number(ctg.endBp)))
     : Math.max(domainStart, Number(pairModel.windowEnd || 0));
   const domainSpanBp = Math.max(1, domainEnd - domainStart + 1);
@@ -2108,7 +2113,10 @@ function renderSubviewTrackPairAlignmentCard(
   const TRACK_EMPTY_TEXT_OFFSET_Y = 12 * TRACK_HEIGHT_SCALE;
   const TRACK_MIN_ADJACENT_GAP_PX = 20;
   const LABEL_COLUMN_WIDTH_PX = 136;
-  const baseInnerWidth = resolveTrackInnerWidthFromScale({
+  const keepRenderedScale = savedLayoutViewport
+    && savedLayoutViewport.visibleSpanBp === resolvedTrackPrefs.visibleSpanBp
+    && savedLayoutViewport.viewportWidthPx === getMeasuredTrackViewportPx("subview");
+  const baseInnerWidth = keepRenderedScale ? savedLayoutViewport.innerWidth : resolveTrackInnerWidthFromScale({
     domainSpanBp,
     minTickUnitKb: resolvedTrackPrefs.minTickUnitKb,
     maxTickCount: resolvedTrackPrefs.maxTickCount,
@@ -2127,7 +2135,8 @@ function renderSubviewTrackPairAlignmentCard(
     isMirror: topTrack.isMirror === true,
     phasedTrackId: topTrack.phasedTrackId,
     haplotypeKey: topTrack.haplotypeKey,
-    trackModel: pairModel.companion || buildEmptyTrackModelLike(),
+    layoutCtgs: pairModel.companion?.ctgs || [],
+    trackModel: { ...(pairModel.companion || buildEmptyTrackModelLike()), ctgs: visibleTopCtgs },
     className: resolveTrackToneClass(topTrack.role).trim(),
     emptyMessage: i18n.trackControls.topTrackEmpty,
   };
@@ -2139,7 +2148,8 @@ function renderSubviewTrackPairAlignmentCard(
     isMirror: bottomTrack.isMirror === true,
     phasedTrackId: bottomTrack.phasedTrackId,
     haplotypeKey: bottomTrack.haplotypeKey,
-    trackModel: pairModel.primary || buildEmptyTrackModelLike(),
+    layoutCtgs: pairModel.primary?.ctgs || [],
+    trackModel: { ...(pairModel.primary || buildEmptyTrackModelLike()), ctgs: visibleBottomCtgs },
     className: resolveTrackToneClass(bottomTrack.role).trim(),
     emptyMessage: i18n.trackControls.bottomTrackEmpty,
   };
@@ -2176,20 +2186,30 @@ function renderSubviewTrackPairAlignmentCard(
     tickIntervalBp: resolvedTrackPrefs.tickIntervalBp,
     fallbackTickBp: resolvedTrackPrefs.tickBp,
   });
-  const buildRectsForLayout = (layout) =>
-    buildTrackRectsWithMinGap(layout.trackModel?.ctgs || [], {
+  const savedLayoutGapBp = subview.trackPairLayoutGapBp;
+  const minGapPx = typeof savedLayoutGapBp === "number" && Number.isFinite(savedLayoutGapBp)
+    ? savedLayoutGapBp * baseInnerWidth / domainSpanBp
+    : TRACK_MIN_ADJACENT_GAP_PX * (resolvedTrackPrefs.fullRange
+      ? Math.min(1, baseInnerWidth / getMeasuredTrackViewportPx("subview")) : 1);
+  const baseRectsByLayoutId = new Map(rowLayouts.map((layout) => {
+    const rects = buildTrackRectsWithMinGap(layout.layoutCtgs, {
       windowStart: domainStart,
       domainSpanBp,
       innerWidth: baseInnerWidth,
-      minGapPx: TRACK_MIN_ADJACENT_GAP_PX * (resolvedTrackPrefs.fullRange
-        ? Math.min(1, baseInnerWidth / getMeasuredTrackViewportPx("subview")) : 1),
+      minGapPx,
     });
-  const baseRectsByLayoutId = new Map(
-    rowLayouts.map((layout) => [layout.id, buildRectsForLayout(layout)]),
-  );
+    return [layout.id, new Map(layout.layoutCtgs.map((ctg, index) =>
+      [ctg, rects[index]]))];
+  }));
+  // Retain the pre-removal canvas envelope, including empty display slots, so
+  // hiding an edge member cannot rebase or clamp the old horizontal viewport.
+  const envelopeScale = savedLayoutViewport ? baseInnerWidth / savedLayoutViewport.innerWidth : 1;
+  const envelopeMinX = savedLayoutViewport ? savedLayoutViewport.viewboxMinX * envelopeScale : 0;
+  const envelopeMaxX = savedLayoutViewport
+    ? (savedLayoutViewport.viewboxMinX + savedLayoutViewport.renderInnerWidth) * envelopeScale : baseInnerWidth;
   const resolveLayoutSlot = (layoutId) => (layoutId === "top" ? "top" : "bottom");
-  const resolveTrackPairDisplayRect = (layout, ctg, index) => {
-    const baseRect = (baseRectsByLayoutId.get(layout.id) || [])[index] || buildTrackRect(ctg, {
+  const resolveTrackPairDisplayRect = (layout, ctg) => {
+    const baseRect = baseRectsByLayoutId.get(layout.id)?.get(ctg) || buildTrackRect(ctg, {
       windowStart: domainStart,
       domainSpanBp,
       innerWidth: baseInnerWidth,
@@ -2298,8 +2318,8 @@ function renderSubviewTrackPairAlignmentCard(
       return Math.min(ctgMin, labelLeft);
     }, layoutMin);
   }, 0);
-  const renderViewBoxMinX = Math.floor(Math.min(0, minRectLeft, minLabelLeft));
-  const renderMaxX = Math.ceil(Math.max(baseInnerWidth, maxRectRight, maxLabelRight));
+  const renderViewBoxMinX = Math.floor(Math.min(0, envelopeMinX, minRectLeft, minLabelLeft));
+  const renderMaxX = Math.ceil(Math.max(baseInnerWidth, envelopeMaxX, maxRectRight, maxLabelRight));
   const renderInnerWidth = Math.max(baseInnerWidth, renderMaxX - renderViewBoxMinX);
   if (resolvedTrackPrefs.fullRange && fullRangeFitPass < 6) {
     const span = resolveFullRangeVisibleSpan({ contentWidth: renderInnerWidth,

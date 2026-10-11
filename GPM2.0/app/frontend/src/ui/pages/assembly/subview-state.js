@@ -1,3 +1,4 @@
+import { normalizeSubviewTrackPairLayoutViewport } from "./subview-removal-viewport.js";
 import {
   normalizeSupportDatasetId,
   normalizeSupportMirroredCtgs,
@@ -605,6 +606,16 @@ export function getSubviewState(assembly) {
     error: String(subview.error || ""),
     summary: subview.summary || null,
   };
+  // Display geometry survives hide/undo; it is not a biological gap or edit.
+  if (typeof subview.trackPairLayoutGapBp === "number"
+    && Number.isFinite(subview.trackPairLayoutGapBp) && subview.trackPairLayoutGapBp >= 0
+    && String(normalized.summary?.mode || "") === "track-pair") {
+    normalized.trackPairLayoutGapBp = subview.trackPairLayoutGapBp;
+  }
+  const layoutViewport = normalizeSubviewTrackPairLayoutViewport(subview.trackPairLayoutViewport);
+  if (layoutViewport && String(normalized.summary?.mode || "") === "track-pair") {
+    normalized.trackPairLayoutViewport = layoutViewport;
+  }
   const historyKey = String(subview.historyKey || "").trim();
   if (historyKey) {
     normalized.historyKey = historyKey;
@@ -1124,6 +1135,8 @@ export function selectSubviewCandidate({
   nextSubview.selectedTrackBDatasetId = null;
   nextSubview.selectedTrackBIsMirror = false;
   nextSubview.trackPairHiddenCtgs = [];
+  delete nextSubview.trackPairLayoutGapBp;
+  delete nextSubview.trackPairLayoutViewport;
   nextSubview.trackPairSelectedCtgs = [];
   nextSubview.summary = null;
   nextSubview.error = "";
@@ -1184,6 +1197,8 @@ export function selectSubviewTrack({
   nextSubview.selectedBPhasedTrackItemId = null;
   nextSubview.selectedBPhasedHaplotypeKey = "";
   nextSubview.trackPairHiddenCtgs = [];
+  delete nextSubview.trackPairLayoutGapBp;
+  delete nextSubview.trackPairLayoutViewport;
   nextSubview.trackPairSelectedCtgs = [];
   nextSubview.error = "";
   nextSubview.summary = null;
@@ -1286,6 +1301,8 @@ export function removeSubviewTrackSelection({
   }
   const nextSubview = applySubviewTrackSelections(currentSubview, nextSelections);
   nextSubview.trackPairHiddenCtgs = [];
+  delete nextSubview.trackPairLayoutGapBp;
+  delete nextSubview.trackPairLayoutViewport;
   nextSubview.trackPairSelectedCtgs = [];
   nextSubview.summary = null;
   nextSubview.error = "";

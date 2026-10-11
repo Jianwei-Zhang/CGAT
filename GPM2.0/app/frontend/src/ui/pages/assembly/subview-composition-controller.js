@@ -23,6 +23,7 @@ import {
 import { normalizeSupportDatasetId } from "./selection-state.js";
 import { renderSubviewCompositionPanel } from "./render-subview-composition.js";
 import { resolveSubviewCompositionScaleViewport } from "./subview-composition-layout.js";
+import { preserveSubviewRemovalViewport } from "./subview-removal-viewport.js";
 
 function defaultUi(scopeKey = "") {
   return {
@@ -360,16 +361,26 @@ export function createSubviewCompositionController({
       ? Boolean(getSubviewComposition(currentSubview)?.members.length)
       : Boolean(currentSubview.summary);
     // A reopened composition starts fitted; edits to an open view keep its zoom.
-    const assembly = hasActiveSubview ? state.assembly : {
+    let assembly = hasActiveSubview ? state.assembly : {
       ...state.assembly,
       subviewTrackView: { ...state.assembly?.subviewTrackView, fullRange: true, allowSubViewportScale: true },
     };
+    const removing = hasActiveSubview && operation?.kind === "remove-members";
+    const previousComposition = removing ? projectCurrentSubviewToComposition(state, host) : null;
     const viewport = hasActiveSubview && host?.querySelector?.(".subview-track-scroll")
       ? resolveCurrentSubviewCompositionViewport(state, host)
-      : resolveSubviewCompositionScaleViewport(composition, {
-        trackPrefs: assembly.subviewTrackView,
+      : removing && Number(state.assembly?.subviewCompositionViewport?.bpPerPx) > 0
+        ? state.assembly.subviewCompositionViewport
+        : resolveSubviewCompositionScaleViewport(previousComposition || composition, {
+          trackPrefs: assembly.subviewTrackView,
+          viewportWidthPx: getMeasuredTrackViewportPx?.("subview"),
+        });
+    if (removing) {
+      assembly = preserveSubviewRemovalViewport(assembly, host, {
+        viewport,
         viewportWidthPx: getMeasuredTrackViewportPx?.("subview"),
       });
+    }
     const nextSubview = applySubviewComposition(currentSubview, composition);
     const result = commitSubviewCompositionHistoryOperation(assembly, {
       nextSubview,
