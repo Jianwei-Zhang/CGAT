@@ -47,7 +47,7 @@ test("subview panel renders unified toolbar with parameter labels after entering
   assert.match(html, /<h4 class="assembly-view-title">局部视图<\/h4>/);
   assert.match(
     html,
-    /Ctrl\/Cmd 选择两个 ctg 进入局部视图；也可选择两个轨道进入轨道模式。/,
+    /Ctrl\/Cmd 选择两个 ctg 或两个轨道进行比较；通过「工具」添加 ctg 进入组合模式。/,
   );
   assert.doesNotMatch(html, /support-ctg \(\+\) vs ctg-alpha \(\+\)/);
   assert.match(html, /class="subview-candidate-name">support-ctg \(\+\)<\/span>/);

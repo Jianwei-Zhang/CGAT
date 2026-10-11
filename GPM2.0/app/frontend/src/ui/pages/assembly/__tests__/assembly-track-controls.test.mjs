@@ -477,7 +477,7 @@ test("assembly main view shows 3-track labels when support ds is available", () 
   assert.match(html, /辅\(flye\)/);
   assert.match(html, /ref_chr1/);
   assert.match(html, /主\(hifiasm\)/);
-  assert.match(html, /Ctrl\/Cmd 选择两个 ctg 进入局部视图/);
+  assert.match(html, /Ctrl\/Cmd 选择两个 ctg 或两个轨道进行比较/);
   assert.doesNotMatch(html, /Junction 检查/);
   assert.doesNotMatch(html, /subview2-a-ctg-id/);
   assert.doesNotMatch(html, /enter-subview-2/);
