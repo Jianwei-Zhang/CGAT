@@ -258,7 +258,11 @@ mod tests {
             }
             let first = inspect_project_entry(&source, "20261008_143025").unwrap();
             assert_eq!(first.kind, "archive");
-            let expected = temp.path().join("sample.no_fasta_20261008_143025");
+            // TEMP may use a Windows 8.3 alias while inspection returns the
+            // canonical long path. Compare the same canonical parent identity.
+            let expected = fs::canonicalize(temp.path())
+                .unwrap()
+                .join("sample.no_fasta_20261008_143025");
             assert_eq!(first.suggested_workspace, Some(display_path(&expected)));
             assert!(!expected.exists());
             fs::create_dir(&expected).unwrap();
