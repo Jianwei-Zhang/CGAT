@@ -8,7 +8,7 @@ GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流�
 
 | 组件 | 职责 |
 | --- | --- |
-| Linux 服务端 | 执行比对与 GRT 计算，生成 App 交付包。部署时上传仓库中的 `server/` 目录。 |
+| Linux 服务端 | 执行比对与 GRT 计算，生成 App 交付包。从 Release 下载 Server 工具包并在 Linux 服务端解压部署。 |
 | 桌面端 App | 导入交付包，提供可视化、编辑、DEGAP 集成与导出。 |
 
 `win-x86`、`win-arm64`、`mac-x86`、`mac-arm64` 安装包发布在 [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases)。开发和发布检查见[质量门禁](QUALITY_zh.md)。
@@ -17,12 +17,15 @@ GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流�
 
 ![GPM 服务端流程](app/readme-assets/serve_pipeline_zh.png)
 
-### 1. 创建环境
+### 1. 下载工具并创建环境
 
-首次在 Linux 服务端执行：
+在 Linux 服务端执行以下命令，从 [Release v2.0.10](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.10) 下载 Server 工具包（源码），解压并进入工具目录后安装：
 
 ```bash
-bash server/install.sh
+curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.10/GPM_Server_2.0.10_source.tar.gz
+tar -xzf GPM_Server_2.0.10_source.tar.gz
+cd GPM_Server
+bash install.sh
 ```
 
 脚本会复用 `mamba`、`micromamba` 或 `conda`；均不存在时，为当前用户无 sudo 安装 micromamba。也可用 `--manager conda|mamba|micromamba` 明确选择。安装结束显示 `GPM Server installation: READY` 后，按脚本打印的命令激活环境，例如：
@@ -34,10 +37,10 @@ micromamba activate cgat-server
 随时可以只检查、不修改环境：
 
 ```bash
-bash server/install.sh --check
+bash install.sh --check
 ```
 
-再次运行 `install.sh` 会校验托管环境，仅在依赖配置变化时更新；原 `env.sh` 入口继续兼容。只部署 `server/` 目录时，从其中的 [服务端快速入门](server/README_zh.md) 开始。
+再次运行 `install.sh` 会校验托管环境，仅在依赖配置变化时更新；原 `env.sh` 入口继续兼容。下方服务端命令均在 `GPM_Server/` 目录中执行；使用仓库源码时，先进入 `GPM2.0/server/`。更多说明见[服务端快速入门](server/README_zh.md)。
 
 | 用途 | 安装或要求的命令 |
 | --- | --- |
@@ -52,7 +55,7 @@ bash server/install.sh --check
 显式指定输出目录的最简示例：
 
 ```bash
-bash server/run.sh \
+bash run.sh \
   --ref /path/to/rice_IRGSP_1_0.fa \
   --ds /path/to/hifiasm.fa \
   --ds /path/to/flye.fa \
@@ -95,7 +98,7 @@ GPM Server 固定使用 Minimap2。BLASTN 与 Winnowmap 的全基因组运行无
 ### 3. 恢复与监控
 
 ```bash
-bash server/run.sh -o ./gpm_server
+bash run.sh -o ./gpm_server
 ```
 
 该命令串行执行生成的计划，遇到首个错误即停止，复用前会重新校验 checkpoint，并在 `gpm_server/` 同级目录生成两个交付包：
@@ -173,7 +176,7 @@ xattr -dr com.apple.quarantine /Applications/GPM2.0.app
 先在 App 中导出 Final Path TSV，再将 TSV 放回保留原始 FASTA 的服务器：
 
 ```bash
-bash server/export_final_path_fasta.sh \
+bash export_final_path_fasta.sh \
   --tsv /path/to/project_Chr01_path.tsv \
   --gpm_server ./gpm_server \
   -o /path/to/project_Chr01_path.fa

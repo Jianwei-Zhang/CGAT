@@ -8,7 +8,7 @@ GPM2.0 combines reference-anchored results from multiple de novo assemblies in o
 
 | Component | Role |
 | --- | --- |
-| Linux server | Runs alignment and GRT processing, then creates App delivery archives. Upload the repository's `server/` directory to the server. |
+| Linux server | Runs alignment and GRT processing, then creates App delivery archives. Download the Server tools from Releases and extract them on the Linux server. |
 | Desktop App | Imports a delivery archive and provides visualization, editing, DEGAP integration, and export. |
 
 Installers for `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64` are published on [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases). Development and release checks are documented in [Quality gates](QUALITY.md).
@@ -17,12 +17,15 @@ Installers for `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64` are published 
 
 ![GPM server-side workflow](app/readme-assets/serve_pipeline_en.png)
 
-### 1. Create the environment
+### 1. Download the tools and create the environment
 
-Run once on the Linux server:
+On your Linux server, download the Server tools (source package) from [Release v2.0.10](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.10), then extract, enter the tool directory, and install:
 
 ```bash
-bash server/install.sh
+curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.10/GPM_Server_2.0.10_source.tar.gz
+tar -xzf GPM_Server_2.0.10_source.tar.gz
+cd GPM_Server
+bash install.sh
 ```
 
 The script reuses `mamba`, `micromamba`, or `conda`. If none is available, it installs micromamba for the current user without `sudo`. Use `--manager conda|mamba|micromamba` to select one explicitly. After the installer prints `GPM Server installation: READY`, activate the environment with the command it provides, for example:
@@ -34,10 +37,10 @@ micromamba activate cgat-server
 Check the installation later without changing it:
 
 ```bash
-bash server/install.sh --check
+bash install.sh --check
 ```
 
-Re-running `install.sh` validates the managed environment and updates it only when the dependency specification changes. The previous `env.sh` entry remains compatible. When only `server/` is deployed, start with its [server quick start](server/README.md).
+Re-running `install.sh` validates the managed environment and updates it only when the dependency specification changes. The previous `env.sh` entry remains compatible. Run all subsequent Server commands from `GPM_Server/`; when using repository source, first enter `GPM2.0/server/`. See the [server quick start](server/README.md) for details.
 
 | Purpose | Commands installed or required |
 | --- | --- |
@@ -52,7 +55,7 @@ Keep this environment active for `run.sh`.
 Minimal example with an explicit output directory:
 
 ```bash
-bash server/run.sh \
+bash run.sh \
   --ref /path/to/rice_IRGSP_1_0.fa \
   --ds /path/to/hifiasm.fa \
   --ds /path/to/flye.fa \
@@ -95,7 +98,7 @@ GPM Server always uses Minimap2. BLASTN and Winnowmap are not available because 
 ### 3. Resume and monitor
 
 ```bash
-bash server/run.sh -o ./gpm_server
+bash run.sh -o ./gpm_server
 ```
 
 The runner executes the generated plan serially, stops at the first error, validates checkpoints before reuse, and creates both archives beside `gpm_server/`:
@@ -173,7 +176,7 @@ Display names and notes are editable; original identifiers, filenames, and seque
 Export Final Path TSV from the App, copy it back to the server that retains the original FASTA files, and run:
 
 ```bash
-bash server/export_final_path_fasta.sh \
+bash export_final_path_fasta.sh \
   --tsv /path/to/project_Chr01_path.tsv \
   --gpm_server ./gpm_server \
   -o /path/to/project_Chr01_path.fa
