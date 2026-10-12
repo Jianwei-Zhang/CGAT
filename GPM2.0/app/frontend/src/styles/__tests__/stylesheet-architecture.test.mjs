@@ -88,3 +88,38 @@ test("assembly status toast stays above desktop controls and returns to flow on 
   assert.match(narrowRule[1], /position:\s*static;/);
   assert.match(narrowRule[1], /max-width:\s*none;/);
 });
+
+
+test("project library actions keep their own row before and after validation", () => {
+  const importerCss = readFileSync(new URL("./importer.css", entryUrl), "utf8");
+  const headerRule = importerCss.match(/\.project-recents-header\s*\{([^}]*)\}/);
+  const actionsRule = importerCss.match(/\.project-library-actions\s*\{([^}]*)\}/);
+  const buttonRule = importerCss.match(/\.projects-page \.project-history-action\s*\{([^}]*)\}/);
+
+  assert.ok(headerRule);
+  assert.match(headerRule[1], /display:\s*grid;/);
+  assert.match(headerRule[1], /grid-template-columns:\s*minmax\(0,\s*1fr\);/);
+  assert.ok(actionsRule);
+  assert.match(actionsRule[1], /flex-wrap:\s*wrap;/);
+  assert.doesNotMatch(actionsRule[1], /margin-left:\s*auto;/);
+  assert.ok(buttonRule);
+  assert.match(buttonRule[1], /flex:\s*0 0 auto;/);
+  assert.match(buttonRule[1], /white-space:\s*nowrap;/);
+  assert.match(importerCss, /\.projects-page \.project-library-actions \[hidden\][^{]*\{[^}]*display:\s*none;/);
+});
+
+test("importer toast keeps its status horizontal and wraps long workspace paths", () => {
+  const overlaysCss = readFileSync(new URL("./overlays.css", entryUrl), "utf8");
+  const toastRule = overlaysCss.match(/\.importer-status-toast\s*\{([^}]*)\}/);
+  const statusRule = overlaysCss.match(/\.importer-status-toast > strong\s*\{([^}]*)\}/);
+  const summaryRule = overlaysCss.match(/\.importer-status-toast > span\s*\{([^}]*)\}/);
+
+  assert.ok(toastRule);
+  assert.match(toastRule[1], /min-width:\s*0;/);
+  assert.ok(statusRule);
+  assert.match(statusRule[1], /flex:\s*0 0 auto;/);
+  assert.match(statusRule[1], /white-space:\s*nowrap;/);
+  assert.ok(summaryRule);
+  assert.match(summaryRule[1], /min-width:\s*0;/);
+  assert.match(summaryRule[1], /overflow-wrap:\s*anywhere;/);
+});

@@ -253,6 +253,7 @@
 .importer-status-toast {
   display: flex;
   align-items: baseline;
+  min-width: 0;
   gap: 8px;
   padding: 9px 12px;
   border: 1px solid #d7d7d7;
@@ -260,6 +261,16 @@
   background: rgba(247, 247, 247, 0.98);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   color: #333;
+}
+
+.importer-status-toast > strong {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.importer-status-toast > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .importer-status-toast.error {
