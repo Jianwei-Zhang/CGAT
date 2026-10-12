@@ -2209,7 +2209,7 @@ function renderAssemblyTracks(args) {
   const sourceGapConnections = rowLayouts.map((layout) => renderSourceGapConnections(
     layout.trackModel.ctgs.filter((ctg) => !(layout.role === "primary" && hiddenPrimaryCtgIdSet.has(Number(ctg.assemblyCtgId))))
       .map((ctg) => ({ ctg, rect: resolveTrackCtgDisplayRect(layout, ctg, layout.trackModel.ctgs.indexOf(ctg)),
-        y: layout.laneTop + ctg.laneIndex * TRACK_LANE_HEIGHT + TRACK_BAR_HEIGHT / 2 })), escapeHtml,
+        y: layout.laneTop + ctg.laneIndex * TRACK_LANE_HEIGHT, height: TRACK_BAR_HEIGHT })), escapeHtml,
   )).join("");
 
   const rowBlocks = rowLayouts

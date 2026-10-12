@@ -5,7 +5,8 @@
 - Keep the release version aligned in `app/frontend/package.json`, `app/frontend/package-lock.json`, `app/backend/Cargo.toml`, `app/backend/Cargo.lock`, `app/src-tauri/Cargo.toml`, `app/src-tauri/Cargo.lock`, and `app/src-tauri/tauri.conf.json`.
 - Commit and push the release version before creating the matching `vX.Y.Z` tag.
 - Build installers only with the GitHub Actions `GPM2.0 Release installers` workflow. Do not publish installers built locally.
-- A completed release must contain exactly four verified assets: `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64`.
+- A completed release must contain exactly four verified installer assets: `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64`.
+- Additional test-data attachments require explicit approval. Name them in both release-note sections and verify their downloaded SHA-256 against the supplied file.
 
 ## Release notes
 
@@ -39,5 +40,5 @@ xattr -dr com.apple.quarantine /Applications/GPM.app
 ## Publication checks
 
 - Confirm the quality job and all four installer jobs succeeded for the release workflow.
-- Confirm the Release title is `GPM vX.Y.Z`, the tag and embedded app version match, and exactly four installer assets are present.
+- Confirm the Release title is `GPM vX.Y.Z`, the tag and embedded app version match, and exactly four installer assets are present, plus only explicitly approved supplemental attachments.
 - Review the published body to ensure English precedes Chinese and both macOS first-launch sections remain intact.

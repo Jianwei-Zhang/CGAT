@@ -3125,7 +3125,7 @@ function renderSubviewTrackPairAlignmentCard(
       })
       .filter((entry) => entry && entry.markup);
     return renderSourceGapConnections(renderEntries.map((entry) => ({ ...entry,
-      y: layout.laneTop + Math.max(0, Number(entry.ctg?.laneIndex || 0)) * TRACK_LANE_HEIGHT + TRACK_BAR_HEIGHT / 2,
+      y: layout.laneTop + Math.max(0, Number(entry.ctg?.laneIndex || 0)) * TRACK_LANE_HEIGHT, height: TRACK_BAR_HEIGHT,
     })), escapeHtml) + sortTrackEntriesForRender(renderEntries).map((entry) => entry.markup).join("");
   };
   return `
