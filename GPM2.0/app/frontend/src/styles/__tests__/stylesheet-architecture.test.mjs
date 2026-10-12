@@ -10,6 +10,7 @@ const expectedImports = [
   "./overlays.css",
   "./shell.css",
   "./importer.css",
+  "./project-preview.css",
   "./workspace.css",
   "./assembly.css",
   "./subview.css",
@@ -23,7 +24,7 @@ test("component stylesheet entry keeps the documented cascade order", () => {
   const expanded = readStylesheetTree(entryUrl);
 
   assert.deepEqual(readStylesheetImports(entryUrl), expectedImports);
-  assert.ok(entry.trim().split("\n").length <= 12);
+  assert.ok(entry.trim().split("\n").length <= 13);
   assert.ok(expanded.indexOf(".modal-dialog {") < expanded.indexOf(".assembly-confirm-dialog {"));
   assert.ok(
     expanded.indexOf(".track-collinearity-band {") <
@@ -129,4 +130,18 @@ test("importer toast keeps its status horizontal and wraps long workspace paths"
   assert.ok(summaryRule);
   assert.match(summaryRule[1], /min-width:\s*0;/);
   assert.match(summaryRule[1], /overflow-wrap:\s*anywhere;/);
+});
+
+
+test("route content boundaries use the Project Export inset without nested Assembly or Project overrides", () => {
+  const layoutCss = readFileSync(new URL("./layout.css", entryUrl), "utf8");
+  const importerCss = readFileSync(new URL("./importer.css", entryUrl), "utf8");
+  const assemblyCss = readFileSync(new URL("./assembly.css", entryUrl), "utf8");
+  assert.match(layoutCss, /--route-content-inset:\s*8px/);
+  assert.match(layoutCss, /\.panel\.stage-panel\s*\{[^}]*padding:\s*var\(--route-content-inset\)/);
+  assert.match(layoutCss, /#route-host > :is\(\.page, \.projects-page, \.project-preview-page\)\s*\{[^}]*margin:\s*0;[^}]*padding:\s*0;/);
+  const projectRule = importerCss.match(/\.stage-panel:has\(\.projects-page\)\s*\{([^}]*)\}/)?.[1];
+  assert.ok(projectRule);
+  assert.doesNotMatch(projectRule, /padding:/);
+  assert.match(assemblyCss, /\.assembly-tabs > \.tab-body\s*\{[^}]*padding:\s*0;/);
 });

@@ -231,6 +231,7 @@ const store = createStore({
     },
     error: "",
   },
+  projectPreview: null,
   projectExport: {
     loading: false,
     loaded: false,
@@ -294,7 +295,7 @@ function syncSessionHeader(state) {
   const workspaceSelect = document.querySelector("#session-workspace-select");
   const labels = getMessages(state, "shell");
   document.querySelectorAll(".route-button").forEach(button => {
-    const needsProject = ["assembly", "projectExport"].includes(button.dataset.route);
+    const needsProject = ["projectPreview", "assembly", "projectExport"].includes(button.dataset.route);
     button.disabled = (needsProject && (!state.session.workspacePath || !state.session.projectId))
       || projectEntryBusy(state);
     button.title = needsProject && !state.session.projectId

@@ -70,6 +70,11 @@
   gap: 8px;
 }
 
+/* The route shell already supplies the shared Project Export inset. */
+.assembly-tabs > .tab-body {
+  padding: 0;
+}
+
 .assembly-tabular-card {
   gap: 10px;
 }

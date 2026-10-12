@@ -376,7 +376,6 @@
 .stage-panel:has(.projects-page) {
   display: grid;
   min-width: 0;
-  padding: 0;
   background: #fff;
 }
 

@@ -2,6 +2,7 @@ import { renderImporterPage } from "../pages/importer-page.js";
 import { bindAssemblyPage, renderAssemblyPage, syncAssemblySubviewTools } from "../pages/assembly-page.js";
 import { bindImporterPage } from "../pages/importer-page.js";
 import { bindProjectExportPage, renderProjectExportPage } from "../pages/project-export-page.js";
+import { bindProjectPreviewPage, renderProjectPreviewPage } from "../pages/project-preview-page.js";
 import { getMessages, t } from "../i18n/index.js";
 import {
   buildAssemblyDomCacheKey,
@@ -12,6 +13,7 @@ import {
 const routeRenderers = {
   importer: renderImporterPage,
   workspace: renderImporterPage,
+  projectPreview: renderProjectPreviewPage,
   assembly: renderAssemblyPage,
   projectExport: renderProjectExportPage,
 };
@@ -19,6 +21,7 @@ const routeRenderers = {
 const routeBinders = {
   importer: bindImporterPage,
   workspace: bindImporterPage,
+  projectPreview: bindProjectPreviewPage,
   assembly: bindAssemblyPage,
   projectExport: bindProjectExportPage,
 };
@@ -36,7 +39,7 @@ export function registerRoutes(root, store, onRouteChanged) {
 
 export function renderCurrentRoute(root, store) {
   let state = store.getState();
-  const requiresProject = ["assembly", "projectExport"].includes(state.activeRoute);
+  const requiresProject = ["projectPreview", "assembly", "projectExport"].includes(state.activeRoute);
   if (state.activeRoute === "workspace" || (requiresProject && (!state.session?.workspacePath || !state.session?.projectId))) {
     store.setState({ activeRoute: "importer" });
     state = store.getState();
@@ -65,6 +68,7 @@ export function renderCurrentRoute(root, store) {
       : "";
     const restoredAssemblyDom = state.activeRoute === "assembly"
       && !state.assembly?.projectExportScrollToBottom
+      && !state.assembly?.previewRequestedChrName
       && previousRoute
       && previousAssemblyDomCacheKey !== nextAssemblyDomCacheKey
       && restoreAssemblyDom(host, state);
@@ -91,7 +95,7 @@ export function renderCurrentRoute(root, store) {
     setRouteHostDataset(host, state.activeRoute, "");
   }
   root.querySelectorAll(".route-button").forEach((button) => {
-    const requiresProject = ["assembly", "projectExport"].includes(button.dataset.route);
+    const requiresProject = ["projectPreview", "assembly", "projectExport"].includes(button.dataset.route);
     button.disabled = requiresProject && (!state.session?.workspacePath || !state.session?.projectId);
     button.title = button.disabled ? (state.locale === "en" ? "Open a project first" : "请先打开项目") : "";
     const active = button.dataset.route === state.activeRoute;

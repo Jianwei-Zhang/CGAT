@@ -1,3 +1,4 @@
+import { layoutFinalPathStrip, syncFinalPathStripGeometry } from "./assembly/final-path-visual-layout.js";
 import { getGraphFontSize, estimateGraphTextWidth } from "../../services/app-settings.js";
 import { pickDirectoryPath, pickSaveFilePath } from "../../services/backend-api.js";
 import {
@@ -646,19 +647,19 @@ function buildProjectFinalPathSvgSnapshot({ entries, projectName, primaryDataset
   const maxLengthBp = Math.max(1, ...rows.map((row) => Math.max(0, Number(row.lengthBp || 0))));
   const rowMarkup = rows.map(({ chrName, entry, lengthBp }, rowIndex) => {
     const y = topPadding + rowIndex * rowHeight;
-    let cursorBp = 0;
-    const segments = Array.isArray(entry?.segments) ? entry.segments : [];
-    const segmentMarkup = segments.map((segment) => {
+    const segments = (Array.isArray(entry?.segments) ? entry.segments : []).filter(segment => resolveFinalPathSegmentLengthBp(segment) > 0);
+    const visualLayouts = layoutFinalPathStrip(segments.map(segment => ({ segment, length: resolveFinalPathSegmentLengthBp(segment) })), trackWidth, maxLengthBp);
+    const segmentMarkup = segments.map((segment, index) => {
       const segmentLengthBp = Math.max(0, resolveFinalPathSegmentLengthBp(segment));
       if (segmentLengthBp <= 0) {
         return "";
       }
-      const x = trackX + (cursorBp / maxLengthBp) * trackWidth;
-      const segmentWidth = Math.max(1, (segmentLengthBp / maxLengthBp) * trackWidth);
-      cursorBp += segmentLengthBp;
+      const x = trackX + visualLayouts[index].x;
+      const segmentWidth = visualLayouts[index].width;
       if (isFinalPathGapSegment(segment)) {
         return `
-          <rect x="${x.toFixed(2)}" y="${(y + 19).toFixed(2)}" width="${segmentWidth.toFixed(2)}" height="10" fill="#ffffff" stroke="#1b1b1b" stroke-width="1" />
+          <rect x="${x.toFixed(2)}" y="${(y + 19).toFixed(2)}" width="${segmentWidth.toFixed(2)}" height="10" fill="#ffffff" stroke="#1b1b1b" stroke-width="1"><title>GAP ${formatNumber(segmentLengthBp)} bp</title></rect>
+          <text x="${(x + segmentWidth / 2).toFixed(2)}" y="${(y + 13).toFixed(2)}" text-anchor="middle" font-size="${getGraphFontSize() * 0.917}" fill="#666">GAP</text>
         `;
       }
       const isRef = isFinalPathRefSegment(segment);
@@ -1289,7 +1290,7 @@ function getFinalPathPreviewEntries(state) {
 function renderFinalPathPreviewTrack({ entry, lengthBp, maxLengthBp, primaryDatasetName }) {
   const segments = Array.isArray(entry?.segments) ? entry.segments : [];
   const domainBp = Math.max(1, Number(maxLengthBp || 0), Number(lengthBp || 0));
-  let cursorBp = 0;
+  let cursorBp = 0, visualIndex = 0;
   const segmentNodes = segments.map((segment, index) => {
     const segmentLengthBp = Math.max(0, resolveFinalPathSegmentLengthBp(segment));
     if (segmentLengthBp <= 0) {
@@ -1298,15 +1299,17 @@ function renderFinalPathPreviewTrack({ entry, lengthBp, maxLengthBp, primaryData
     const startPct = Math.max(0, Math.min(100, (cursorBp / domainBp) * 100));
     const endPct = Math.max(startPct, Math.min(100, ((cursorBp + segmentLengthBp) / domainBp) * 100));
     const widthPct = Math.max(0, endPct - startPct);
+    const currentVisualIndex = visualIndex++;
     cursorBp += segmentLengthBp;
     if (isFinalPathGapSegment(segment)) {
       return `
         <span
           class="project-export-final-path-preview-gap"
+          data-final-path-segment="1" data-final-path-kind="gap" data-final-path-length="${segmentLengthBp}"
           style="left: clamp(0px, calc(${endPct.toFixed(4)}% - 4px), calc(100% - 8px));"
           title="GAP ${formatNumber(segmentLengthBp)} bp"
         ></span>
-        <span class="project-export-final-path-preview-gap-label" style="left: clamp(14px, ${endPct.toFixed(4)}%, calc(100% - 14px));">GAP</span>
+        <span class="project-export-final-path-preview-gap-label" style="left: clamp(14px, ${endPct.toFixed(4)}%, calc(100% - 14px));" data-final-path-gap-label="${currentVisualIndex}">GAP</span>
       `;
     }
     if (!isFinalPathCtgSegment(segment)) {
@@ -1321,6 +1324,7 @@ function renderFinalPathPreviewTrack({ entry, lengthBp, maxLengthBp, primaryData
     return `
       <span
         class="project-export-final-path-preview-ctg${toneClass}"
+        data-final-path-segment="1" data-final-path-kind="ctg" data-final-path-length="${segmentLengthBp}"
         style="left: ${startPct.toFixed(4)}%; width: ${widthPct.toFixed(4)}%;"
         title="${escapeAttr(title)}"
       >
@@ -1329,7 +1333,7 @@ function renderFinalPathPreviewTrack({ entry, lengthBp, maxLengthBp, primaryData
     `;
   }).join("");
   return `
-    <div class="project-export-final-path-preview-track" aria-hidden="true">
+    <div class="project-export-final-path-preview-track" data-final-path-strip="1" data-final-path-domain="${domainBp}" aria-hidden="true">
       ${segmentNodes}
     </div>
   `;
@@ -1743,6 +1747,7 @@ function syncProjectExportDetailFilterControls(host) {
 }
 
 function syncProjectExportPreviewLabels(host) {
+  syncFinalPathStripGeometry(host);
   if (!host?.querySelectorAll) {
     return;
   }
@@ -2256,6 +2261,10 @@ export function bindProjectExportPage(host, store, deps = {}) {
   if (!host[PROJECT_EXPORT_RESIZE_BOUND] && typeof window !== "undefined" && window?.addEventListener) {
     host[PROJECT_EXPORT_RESIZE_BOUND] = true;
     window.addEventListener("resize", () => syncProjectExportPreviewLabels(host));
+    if (typeof window.ResizeObserver === "function") {
+      const observer = new window.ResizeObserver(() => syncProjectExportPreviewLabels(host));
+      observer.observe(host);
+    }
   }
   const state = store.getState();
   if (

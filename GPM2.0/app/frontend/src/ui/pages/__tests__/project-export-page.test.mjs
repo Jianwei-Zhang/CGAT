@@ -1620,7 +1620,7 @@ test("project export final path preview clamps edge gap markers inside the track
   assert.match(html, /class="project-export-final-path-preview-gap"/);
   assert.match(html, /class="project-export-final-path-preview-ctg is-after-gap"/);
   assert.match(html, /left: clamp\(0px, calc\([0-9.]+% - 4px\), calc\(100% - 8px\)\);/);
-  assert.match(html, /class="project-export-final-path-preview-gap-label" style="left: clamp\(14px, [0-9.]+%, calc\(100% - 14px\)\);">GAP<\/span>/);
+  assert.match(html, /class="project-export-final-path-preview-gap-label" style="left: clamp\(14px, [0-9.]+%, calc\(100% - 14px\)\);"[^>]*>GAP<\/span>/);
 });
 
 test("project export final path row jump switches to assembly chr and requests bottom scroll", () => {
@@ -1919,4 +1919,19 @@ test("detail card defaults collapsed and remembers expansion while preserving it
   assert.deepEqual(state.projectExport.detailTableFilters, before.detailTableFilters);
   assert.deepEqual(state.projectExport.detailTableSort, before.detailTableSort);
   assert.deepEqual(state.projectExport.finalPathByChr, before.finalPathByChr);
+});
+
+
+test("project export preview tags both gaps and contigs for shared minimum-pixel layout", () => {
+  const value = createState();
+  value.projectExport.finalPathByChr = { Chr01: { mode: "segments", chrName: "Chr01", segments: [
+    { type: "ctg", assemblyCtgId: 1, datasetName: "primary", ctgName: "long", overallLen: 1000000, start: 1, end: 1000000 },
+    { type: "gap", gapSizeBp: 1 },
+    { type: "ctg", assemblyCtgId: 2, datasetName: "primary", ctgName: "tiny", overallLen: 1, start: 1, end: 1 },
+  ] } };
+  const output = renderProjectExportPage(value);
+  assert.match(output, /data-final-path-strip="1"/);
+  assert.match(output, /data-final-path-kind="gap" data-final-path-length="1"/);
+  assert.match(output, /data-final-path-kind="ctg" data-final-path-length="1"/);
+  assert.match(output, /data-final-path-gap-label="1"/);
 });

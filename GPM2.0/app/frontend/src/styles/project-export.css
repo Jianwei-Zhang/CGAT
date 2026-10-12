@@ -12,10 +12,13 @@
   gap: 16px;
 }
 
+.project-export-page > h3,
 .project-export-head h3 {
   margin: 0;
-  font-size: var(--font-hero);
-  line-height: 1.15;
+  font-family: inherit;
+  font-size: var(--font-heading);
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .project-export-title-row {

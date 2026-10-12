@@ -47,3 +47,12 @@ test("app shell renders english labels when locale is en", () => {
   assert.match(html, />English</);
   assert.doesNotMatch(html, />Chinese</);
 });
+
+
+test("preview navigation is placed between Project and Assembly in both languages", () => {
+  for (const locale of ["zh", "en"]) {
+    const html = renderAppShell({ locale });
+    assert.match(html, /data-route="importer"[\s\S]*data-route="projectPreview"[\s\S]*data-route="assembly"[\s\S]*data-route="projectExport"/);
+    assert.match(html, locale === "zh" ? />预览<\/button>/ : />Preview<\/button>/);
+  }
+});

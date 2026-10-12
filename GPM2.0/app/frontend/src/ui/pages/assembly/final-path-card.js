@@ -1,3 +1,4 @@
+import { FINAL_PATH_SEGMENT_MIN_WIDTH_PX, resolveFinalPathVisualLayouts } from "./final-path-visual-layout.js";
 import { renderViewTickControl } from "./view-navigation-ui.js";
 import { estimateGraphTextWidth, getGraphFontSize } from "../../../services/app-settings.js";
 import {
@@ -141,7 +142,6 @@ const FINAL_PATH_GRAPH_BAR_Y = 70;
 const FINAL_PATH_GRAPH_BAR_HEIGHT = 14;
 const FINAL_PATH_GRAPH_TEXT_OFFSET_Y = 11;
 const FINAL_PATH_GRAPH_BAR_RADIUS = 4;
-const FINAL_PATH_SEGMENT_MIN_WIDTH_PX = 8;
 const FINAL_PATH_GAP_LABEL_TEXT = "GAP";
 const TRACK_EDGE_LABEL_PADDING = 16;
 
@@ -777,98 +777,6 @@ function resolveSegmentLayoutItems(segments, domainSpanBp, innerWidth) {
   });
 }
 
-function distributeWidthsWithMinimums(baseWidths, totalWidth, minWidths) {
-  const resolvedBaseWidths = (Array.isArray(baseWidths) ? baseWidths : []).map((width) =>
-    Math.max(0, Number(width) || 0),
-  );
-  const resolvedMinWidths = (Array.isArray(minWidths) ? minWidths : []).map((width) =>
-    Math.max(0, Number(width) || 0),
-  );
-  const resolvedTotalWidth = Math.max(0, Number(totalWidth) || 0);
-  const minWidthSum = resolvedMinWidths.reduce((sum, width) => sum + width, 0);
-  if (minWidthSum >= resolvedTotalWidth) {
-    const factor = minWidthSum > 0 ? resolvedTotalWidth / minWidthSum : 0;
-    return resolvedMinWidths.map((width) => width * factor);
-  }
-  const leftoverWidth = resolvedTotalWidth - minWidthSum;
-  const flexWeights = resolvedBaseWidths.map((width, index) =>
-    Math.max(0, width - resolvedMinWidths[index]),
-  );
-  const flexWeightSum = flexWeights.reduce((sum, width) => sum + width, 0);
-  if (flexWeightSum <= 0) {
-    const eligibleIndexes = resolvedBaseWidths
-      .map((width, index) => (width > 0 || resolvedMinWidths[index] > 0 ? index : -1))
-      .filter((index) => index >= 0);
-    const sharedExtraWidth = eligibleIndexes.length > 0 ? leftoverWidth / eligibleIndexes.length : 0;
-    return resolvedMinWidths.map((width, index) =>
-      width + (eligibleIndexes.includes(index) ? sharedExtraWidth : 0),
-    );
-  }
-  return resolvedMinWidths.map((width, index) =>
-    width + (leftoverWidth * flexWeights[index]) / flexWeightSum,
-  );
-}
-
-function resolveFinalPathVisualLayouts(items, innerWidth) {
-  const resolvedInnerWidth = Math.max(0, Number(innerWidth) || 0);
-  const ctgItems = [];
-  const gapItems = [];
-  items.forEach((item, index) => {
-    if (isFinalPathGapSegment(item?.segment)) {
-      gapItems.push({
-        index,
-        baseWidth: Math.max(0, Number(item?.width) || 0),
-      });
-      return;
-    }
-    if (isFinalPathCtgSegment(item?.segment)) {
-      ctgItems.push({
-        index,
-        baseWidth: Math.max(0, Number(item?.width) || 0),
-      });
-    }
-  });
-  const minimumWidth = Math.min(
-    FINAL_PATH_SEGMENT_MIN_WIDTH_PX,
-    resolvedInnerWidth / Math.max(1, ctgItems.length + gapItems.length),
-  );
-  const ctgMinWidths = ctgItems.map(() => minimumWidth);
-  const desiredGapWidths = gapItems.map(({ baseWidth }) =>
-    Math.max(FINAL_PATH_SEGMENT_MIN_WIDTH_PX, baseWidth),
-  );
-  const maxGapBudget = Math.max(
-    0,
-    resolvedInnerWidth - ctgMinWidths.reduce((sum, width) => sum + width, 0),
-  );
-  const gapWidthSum = desiredGapWidths.reduce((sum, width) => sum + width, 0);
-  const gapWidths = gapWidthSum <= maxGapBudget
-    ? desiredGapWidths
-    : distributeWidthsWithMinimums(
-      desiredGapWidths,
-      maxGapBudget,
-      desiredGapWidths.map(() => minimumWidth),
-    );
-  const ctgBudget = Math.max(0, resolvedInnerWidth - gapWidths.reduce((sum, width) => sum + width, 0));
-  const ctgWidths = distributeWidthsWithMinimums(
-    ctgItems.map(({ baseWidth }) => baseWidth),
-    ctgBudget,
-    ctgMinWidths,
-  );
-  const gapWidthByIndex = new Map(gapItems.map(({ index }, gapIndex) => [index, gapWidths[gapIndex] || 0]));
-  const ctgWidthByIndex = new Map(ctgItems.map(({ index }, ctgIndex) => [index, ctgWidths[ctgIndex] || 0]));
-  let cursorX = 0;
-  return items.map((item, index) => {
-    const width = gapWidthByIndex.has(index)
-      ? gapWidthByIndex.get(index)
-      : ctgWidthByIndex.get(index) || 0;
-    const x = cursorX;
-    cursorX += width;
-    return {
-      x,
-      width,
-    };
-  });
-}
 
 function resolveGapMarkerBaseLayout(item, innerWidth) {
   const rawMarkerWidth = Math.max(FINAL_PATH_SEGMENT_MIN_WIDTH_PX, item?.width || 0);

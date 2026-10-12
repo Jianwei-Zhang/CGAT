@@ -1594,6 +1594,19 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   bindStickyCtgLabels(host);
 
   const state = store.getState();
+  const previewChrName = String(state.assembly?.previewRequestedChrName || "").trim();
+  if (isFullPageBinding && previewChrName && state.session?.workspacePath && state.session?.projectId) {
+    // Consume the target once. A scoped rebind must never repeat navigation,
+    // and a cold entry must keep the requested chromosome during bootstrap.
+    store.setState({ assembly: { ...state.assembly, previewRequestedChrName: "" } });
+    if (!state.assembly.chromosomes.length || state.assembly.loading || state.assembly.error) {
+      store.setState({ assembly: { ...store.getState().assembly, selectedChrName: previewChrName } });
+      void loadAssemblyView(host, store, { keepCurrentChr: true, keepCurrentCtg: false });
+    } else if (state.assembly.selectedChrName !== previewChrName) {
+      void selectChromosome(host, store, previewChrName);
+    }
+    return;
+  }
   if (
     isFullPageBinding
     &&

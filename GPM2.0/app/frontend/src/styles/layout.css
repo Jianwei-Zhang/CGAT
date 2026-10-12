@@ -14,7 +14,26 @@
 
 
 .stage-panel {
+  /* Project Export's existing outer inset is the shared route boundary. */
+  --route-content-inset: 8px;
   min-height: calc(100vh - 70px);
+}
+
+.panel.stage-panel {
+  min-width: 0;
+  padding: var(--route-content-inset);
+}
+
+.stage-panel > #route-host {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.stage-panel > #route-host > :is(.page, .projects-page, .project-preview-page) {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .page {

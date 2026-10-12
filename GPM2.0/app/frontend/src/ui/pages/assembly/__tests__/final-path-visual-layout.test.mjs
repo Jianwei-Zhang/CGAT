@@ -1,0 +1,44 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { layoutFinalPathStrip, syncFinalPathStripGeometry } from "../final-path-visual-layout.js";
+
+const ctg = length => ({ segment: { type: "ctg" }, length });
+const gap = length => ({ segment: { type: "gap" }, length });
+
+test("short contigs and gaps share Assembly's 8px floor without overlap", () => {
+  const layouts = layoutFinalPathStrip([ctg(1000000), gap(1), ctg(1), ctg(1000000)], 800, 2000002);
+  assert.equal(layouts.length, 4);
+  assert.ok(layouts[1].width >= 8);
+  assert.ok(layouts[2].width >= 8);
+  layouts.forEach((item, index) => {
+    assert.ok(item.width > 0);
+    if (index) assert.ok(Math.abs(item.x - layouts[index - 1].x - layouts[index - 1].width) < 1e-8);
+  });
+  assert.ok(Math.abs(layouts.at(-1).x + layouts.at(-1).width - 800) < 1e-8);
+});
+
+test("a short chromosome remains proportional unless its visibility floor is needed", () => {
+  assert.equal(layoutFinalPathStrip([ctg(100)], 800, 200)[0].width, 400);
+  assert.equal(layoutFinalPathStrip([ctg(1)], 800, 1000000)[0].width, 8);
+  const dense = layoutFinalPathStrip(Array.from({ length: 20 }, () => ctg(1)), 100, 20);
+  assert.ok(dense.every(item => item.width >= 5 - 1e-8));
+  assert.ok(Math.abs(dense.at(-1).x + dense.at(-1).width - 100) < 1e-8);
+});
+
+test("adopted source overlays use the same measured layout as the matching Final Path", () => {
+  const patch = { style: {} }, label = { style: {} };
+  const source = { dataset: { finalPathSourcePath: "Chr1", finalPathSourceIndex: "1",
+    finalPathSourceOffset: "0", finalPathUsedStart: "10", finalPathUsedEnd: "11",
+    finalPathSourceLength: "100" }, style: {},
+    querySelector: selector => selector === ".project-preview-used" ? patch : label };
+  const nodes = [1000000, 1].map(length => ({ dataset: { finalPathKind: "ctg", finalPathLength: String(length) }, style: {} }));
+  const strip = { dataset: { finalPathStrip: "1", finalPathName: "Chr1", finalPathDomain: "1000001" }, clientWidth: 800,
+    querySelectorAll: selector => selector === "[data-final-path-segment]" ? nodes : [],
+    closest: () => ({ querySelectorAll: () => [source] }) };
+  syncFinalPathStripGeometry({ querySelectorAll: () => [strip] });
+  assert.equal(nodes[1].style.width, "8px");
+  const absolutePatchX = parseFloat(source.style.left) + 1 + parseFloat(patch.style.left);
+  assert.ok(Math.abs(absolutePatchX - parseFloat(nodes[1].style.left)) <= 1);
+  assert.equal(label.style.left, patch.style.left);
+  assert.equal(label.style.width, patch.style.width);
+});

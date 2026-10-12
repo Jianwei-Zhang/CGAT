@@ -3,6 +3,7 @@
 @import "./overlays.css";
 @import "./shell.css";
 @import "./importer.css";
+@import "./project-preview.css";
 @import "./workspace.css";
 @import "./assembly.css";
 @import "./subview.css";

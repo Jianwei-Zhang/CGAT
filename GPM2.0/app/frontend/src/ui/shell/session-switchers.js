@@ -69,6 +69,7 @@ export function buildEmptyAssemblyViewState(stateOrLocale) {
     chromosomes: [],
     chrPickerOpen: false,
     selectedChrName: "",
+    previewRequestedChrName: "",
     chrCtgs: [],
     refTrackMembers: [],
     phasedChrTracks: [],
@@ -308,6 +309,7 @@ export async function switchWorkspaceFromShell(store, workspaceRoot, { openWorks
       summary: i18nT(current, "importer.runtime.optionsLoadedSummary"),
     },
     assembly: nextAssembly,
+    projectPreview: null,
     projectExport: buildEmptyProjectExportState(),
   });
   return true;
@@ -356,6 +358,7 @@ export function switchProjectFromShell(store, projectId) {
       editPhasedAssemblyEnabledInput: nextDraft.phasedAssemblyEnabled,
     },
     assembly: nextAssembly,
+    projectPreview: null,
     projectExport: buildEmptyProjectExportState(),
   });
   return true;
@@ -371,6 +374,7 @@ export function closeProjectSession(store) {
     session: { ...current.session, workspacePath: "", projectId: null, projectName: "" },
     initializer: { ...current.initializer, existingProjects: [], optionsLoaded: false, optionsError: "", autoPipelineModalOpen: false },
     assembly: { ...current.assembly, ...buildEmptyAssemblyViewState(current) },
+    projectPreview: null,
     projectExport: buildEmptyProjectExportState(),
   });
 }

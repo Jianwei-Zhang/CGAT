@@ -1,17 +1,20 @@
 import { zh as shellZh, en as shellEn } from "./messages/shell.js";
 import { zh as importerZh, en as importerEn } from "./messages/importer.js";
 import { zh as workspaceZh, en as workspaceEn } from "./messages/workspace.js";
+import { zh as projectPreviewZh, en as projectPreviewEn } from "./messages/project-preview.js";
 import { zh as assemblyZh, en as assemblyEn } from "./messages/assembly.js";
 
 const catalogs = {
   zh: {
     shell: shellZh,
+    projectPreview: projectPreviewZh,
     importer: importerZh,
     workspace: workspaceZh,
     assembly: assemblyZh,
   },
   en: {
     shell: shellEn,
+    projectPreview: projectPreviewEn,
     importer: importerEn,
     workspace: workspaceEn,
     assembly: assemblyEn,
