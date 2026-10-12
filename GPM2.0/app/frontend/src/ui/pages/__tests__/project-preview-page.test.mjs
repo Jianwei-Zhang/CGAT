@@ -81,7 +81,7 @@ test("late preview requests cannot overwrite a different project or a newer requ
 test("source colors remain dataset-specific and adopted interval outlines are card-scoped hover feedback", () => {
   const css = readFileSync(new URL("../../../styles/project-preview.css", import.meta.url), "utf8");
   assert.match(css, /\.project-preview-used[^}]*background:\s*transparent/);
-  assert.match(css, /\.project-preview-card:has\(\.project-preview-paths:hover\)[^{]*\.project-preview-used/);
+  assert.match(css, /\.project-preview-card:hover\s+\.project-preview-source-plots\s+\.project-preview-used/);
   assert.match(css, /border-color:\s*var\(--source-color\)/);
   const value = state();
   const cards = buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }], referenceGenomeId: 1,
@@ -90,7 +90,12 @@ test("source colors remain dataset-specific and adopted interval outlines are ca
     finalPathByChr: { Chr1: { segments: [segment] } } });
   value.projectPreview = { key: previewProjectKey(value), loaded: true, cards };
   const output = renderProjectPreviewPage(value);
-  for (const track of cards[0].tracks) assert.ok(output.includes(`background:${track.color}55`));
+  const fills = [...output.matchAll(/class="project-preview-contig[^>]*background:(#[0-9a-f]{6});border-color:#[0-9a-f]{6}/g)].map(match => match[1]);
+  assert.equal(new Set(fills).size, cards[0].tracks.length);
+  assert.match(css, /\.project-preview-contig\s*\{[^}]*height:\s*16px/);
+  assert.doesNotMatch(css, /\.project-preview-contig\.is-context\s*\{[^}]*(height|transform|opacity):/);
+  assert.match(css, /\.project-preview-final-part > span\s*\{[^}]*text-overflow:\s*clip/);
+  assert.match(output, /data-final-path-fit-label/);
   assert.match(output, /--source-color:/);
 });
 

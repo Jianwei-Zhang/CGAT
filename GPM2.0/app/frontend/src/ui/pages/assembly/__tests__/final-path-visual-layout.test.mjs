@@ -42,3 +42,26 @@ test("adopted source overlays use the same measured layout as the matching Final
   assert.equal(label.style.left, patch.style.left);
   assert.equal(label.style.width, patch.style.width);
 });
+
+
+test("preview path labels hide completely when too narrow and reappear after resize", () => {
+  const nodes = [ctg(100), gap(1), ctg(1000)].map((item, index) => {
+    const node = { dataset: { finalPathKind: item.segment.type, finalPathLength: String(item.length) }, style: {} };
+    const label = { style: {}, scrollWidth: [70, 27, 40][index],
+      get clientWidth() { return Math.max(0, Math.floor(parseFloat(node.style.width) - 2)); } };
+    node.querySelector = selector => selector === "[data-final-path-fit-label]" ? label : null;
+    node.label = label;
+    return node;
+  });
+  const strip = { dataset: { finalPathStrip: "1", finalPathDomain: "1101" }, clientWidth: 80,
+    querySelectorAll: selector => selector === "[data-final-path-segment]" ? nodes : [] };
+  const host = { querySelectorAll: () => [strip] };
+  syncFinalPathStripGeometry(host);
+  assert.equal(nodes[0].label.style.visibility, "hidden");
+  assert.equal(nodes[1].label.style.visibility, "hidden");
+  assert.equal(nodes[2].label.style.visibility, "");
+  strip.clientWidth = 1000;
+  syncFinalPathStripGeometry(host);
+  assert.equal(nodes[0].label.style.visibility, "");
+  assert.equal(nodes[1].label.style.visibility, "hidden");
+});

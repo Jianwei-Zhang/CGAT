@@ -121,6 +121,14 @@ export function syncFinalPathStripGeometry(host) {
       const layout = layouts[index];
       node.style.left = `${layout.x}px`;
       node.style.width = `${layout.width}px`;
+      // Preview names are all-or-nothing; preserve the complete tooltip, not
+      // a few clipped letters on a short contig or gap. Re-evaluate on resize.
+      const label = node.querySelector?.("[data-final-path-fit-label]");
+      if (label) {
+        const needed = Number(label.scrollWidth || 0);
+        const available = Number(label.clientWidth || 0);
+        label.style.visibility = needed > available ? "hidden" : "";
+      }
     });
     for (const label of strip.querySelectorAll("[data-final-path-gap-label]")) {
       const layout = layouts[Number(label.dataset.finalPathGapLabel)];

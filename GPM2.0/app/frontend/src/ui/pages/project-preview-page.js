@@ -29,6 +29,14 @@ function renderHighlight(patch, length, labels) {
   return `<span class="project-preview-used" style="left:${percent(patch.start / length * 100)}%;width:${percent((patch.end - patch.start) / length * 100)}%;--source-color:${patch.part.color}" title="${html(`${labels.used}: ${partTitle(patch.part, labels)}`)}"></span>`;
 }
 
+// Flatten dataset colors over white: overlapping source-context strips must
+// not accumulate translucent fills and look like internal shadows.
+function datasetTint(color, weight) {
+  return "#" + color.slice(1).match(/../g).map(channel =>
+    Math.round(parseInt(channel, 16) * weight + 255 * (1 - weight)).toString(16).padStart(2, "0")
+  ).join("");
+}
+
 function renderContig(item, track, domain, labels) {
   const visibleStart = domain ? Math.max(domain.start, item.start) : 0;
   const visibleEnd = domain ? Math.min(domain.end, item.start + item.length) : item.length;
@@ -40,7 +48,7 @@ function renderContig(item, track, domain, labels) {
   const alignment = item.alignment;
   const attrs = alignment ? ` data-final-path-aligned-source="1" data-final-path-source-path="${html(alignment.pathName)}" data-final-path-source-index="${alignment.index}" data-final-path-source-offset="${alignment.offset}" data-final-path-used-start="${alignment.usedStart}" data-final-path-used-end="${alignment.usedEnd}" data-final-path-source-length="${item.length}"` : "";
   const title = `${item.name} · ${number(item.length)} bp`;
-  return `<span class="project-preview-contig${item.highlights.length ? " is-adopted" : " is-context"}" ${attrs} style="left:${percent(start)}%;width:${percent(width)}%;top:${(item.lane || 0) * 20 + 2}px;background:${track.color}55;border-color:${track.color}66" title="${html(title)}">
+  return `<span class="project-preview-contig${item.highlights.length ? " is-adopted" : " is-context"}" ${attrs} style="left:${percent(start)}%;width:${percent(width)}%;top:${(item.lane || 0) * 20 + 2}px;background:${datasetTint(track.color, .33)};border-color:${datasetTint(track.color, .4)}" title="${html(title)}">
     ${item.highlights.map(patch => renderHighlight({ ...patch, start: Math.max(0, patch.start - clipped), end: Math.min(visibleLength, patch.end - clipped) }, visibleLength, labels)).join("")}
     <span class="project-preview-contig-label">${html(item.name)}${(item.displayOrient || (item.reverse ? "-" : "+")) === "-" ? " (−)" : ""}</span>
   </span>`;
@@ -59,12 +67,12 @@ function renderCard(card, labels) {
     </span></span></div>` : "";
   const rows = card.tracks.map(track => `<div class="project-preview-row"><span class="project-preview-track-label" title="${html(track.name || labels.unknown)}"><span class="project-preview-dataset-dot" style="background:${track.color}"></span>${html(track.name || labels.unknown)}</span>
     <div class="project-preview-source-plots">
-      ${track.positioned.length ? `<span class="project-preview-plot" style="height:${track.laneCount * 20 + 4}px">${track.positioned.map(item => renderContig(item, track, domain, labels)).join("")}</span>` : ""}
+      ${track.positioned.length ? `<span class="project-preview-plot" style="height:${track.laneCount * 20 + 4}px">${track.positioned.slice().sort((a, b) => Number(Boolean(a.alignment)) - Number(Boolean(b.alignment))).map(item => renderContig(item, track, domain, labels)).join("")}</span>` : ""}
       ${!track.positioned.length ? `<span class="project-preview-empty-track">—</span>` : ""}
     </div></div>`).join("");
   const paths = card.paths.map(path => path.parts.length ? `<div class="project-preview-path">
     <div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label" title="${html(path.name)}">Final Path${path.name !== card.chrName ? `<small>${html(path.name)}</small>` : ""}</span>
-      <span class="project-preview-plot project-preview-final-plot${path.parts.some(part => part.gap) ? " has-gaps" : ""}" data-final-path-strip="1" data-final-path-name="${html(path.name)}" data-final-path-domain="${domain.end}" style="height:${path.parts.some(part => part.gap) ? 40 : 24}px">${path.parts.map((part, index) => `<span class="project-preview-final-part${part.gap ? " is-gap" : ""}" data-final-path-segment="1" data-final-path-kind="${part.gap ? "gap" : "ctg"}" data-final-path-length="${part.length}" style="left:${percent(part.start / domain.end * 100)}%;width:${percent(part.length / domain.end * 100)}%;background:${part.gap ? "#dbd2bd" : `${part.color}70`}" title="${html(`${partTitle(part, labels)} · ${number(part.length)} bp`)}"><span>${html(part.gap ? labels.gap : resolveFinalPathSegmentDisplayName(part.segment))}${!part.gap && (part.source?.orient === "-" || part.segment.orient === "-") ? " (−)" : ""}</span></span>${part.gap ? `<span class="project-preview-gap-label" data-final-path-gap-label="${index}" style="left:clamp(14px, ${percent((part.start + part.length / 2) / domain.end * 100)}%, calc(100% - 14px));" title="${html(partTitle(part, labels))}">${html(labels.gap)}</span>` : ""}`).join("")}</span>
+      <span class="project-preview-plot project-preview-final-plot${path.parts.some(part => part.gap) ? " has-gaps" : ""}" data-final-path-strip="1" data-final-path-name="${html(path.name)}" data-final-path-domain="${domain.end}" style="height:${path.parts.some(part => part.gap) ? 40 : 24}px">${path.parts.map((part, index) => `<span class="project-preview-final-part${part.gap ? " is-gap" : ""}" data-final-path-segment="1" data-final-path-kind="${part.gap ? "gap" : "ctg"}" data-final-path-length="${part.length}" style="left:${percent(part.start / domain.end * 100)}%;width:${percent(part.length / domain.end * 100)}%;background:${part.gap ? "#dbd2bd" : `${part.color}70`}" title="${html(`${partTitle(part, labels)} · ${number(part.length)} bp`)}"><span data-final-path-fit-label>${html(part.gap ? labels.gap : resolveFinalPathSegmentDisplayName(part.segment))}${!part.gap && (part.source?.orient === "-" || part.segment.orient === "-") ? " (−)" : ""}</span></span>${part.gap ? `<span class="project-preview-gap-label" data-final-path-gap-label="${index}" style="left:clamp(14px, ${percent((part.start + part.length / 2) / domain.end * 100)}%, calc(100% - 14px));" title="${html(partTitle(part, labels))}">${html(labels.gap)}</span>` : ""}`).join("")}</span>
     </div></div>` : `<div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label">Final Path${path.name !== card.chrName ? `<small>${html(path.name)}</small>` : ""}</span><span class="project-preview-empty-track">${html(labels.noPath)}</span></div>`).join("");
   const pathSummary = card.paths.filter(path => path.parts.length).map(path => bpLabel(path.length)).join(" / ");
   const summary = [card.hasReference ? `Ref ${bpLabel(card.refLength)}` : "", pathSummary ? `Final Path ${pathSummary}` : ""].filter(Boolean).join(" · ");
