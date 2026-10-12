@@ -215,6 +215,7 @@
   padding: 6px;
   display: grid;
   gap: 6px;
+  border-radius: var(--card-radius);
 }
 
 .assembly-track-stack {
@@ -231,6 +232,7 @@
   display: grid;
   gap: 8px;
   position: relative;
+  border-radius: var(--card-radius);
 }
 
 .assembly-track-panel.is-companion {
@@ -634,6 +636,7 @@
   display: grid;
   gap: 8px;
   min-height: 100%;
+  border-radius: var(--card-radius);
 }
 
 .assembly-v1-tool-card-right {
@@ -750,6 +753,7 @@
   display: grid;
   justify-items: center;
   gap: 10px;
+  border-radius: var(--card-radius);
 }
 
 .assembly-loading-spinner {
@@ -1967,6 +1971,7 @@
   min-width: 0;
   border: 1px solid #d2d2d2;
   background: #fff;
+  border-radius: var(--card-radius);
 }
 .assembly-view-card > .assembly-track-layout > .assembly-track-label-column {
   border-left: 0;

@@ -50,7 +50,7 @@ function renderContig(item, track, domain, labels) {
   const title = `${item.name} · ${number(item.length)} bp`;
   return `<span class="project-preview-contig${item.highlights.length ? " is-adopted" : " is-context"}" ${attrs} style="left:${percent(start)}%;width:${percent(width)}%;top:${(item.lane || 0) * 20 + 2}px;background:${datasetTint(track.color, .33)};border-color:${datasetTint(track.color, .4)}" title="${html(title)}">
     ${item.highlights.map(patch => renderHighlight({ ...patch, start: Math.max(0, patch.start - clipped), end: Math.min(visibleLength, patch.end - clipped) }, visibleLength, labels)).join("")}
-    <span class="project-preview-contig-label">${html(item.name)}${(item.displayOrient || (item.reverse ? "-" : "+")) === "-" ? " (−)" : ""}</span>
+    <span class="project-preview-contig-label" data-preview-source-fit-label="1">${html(item.name)}${(item.displayOrient || (item.reverse ? "-" : "+")) === "-" ? " (−)" : ""}</span>
   </span>`;
 }
 

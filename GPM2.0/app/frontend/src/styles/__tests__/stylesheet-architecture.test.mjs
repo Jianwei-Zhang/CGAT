@@ -145,3 +145,37 @@ test("route content boundaries use the Project Export inset without nested Assem
   assert.doesNotMatch(projectRule, /padding:/);
   assert.match(assemblyCss, /\.assembly-tabs > \.tab-body\s*\{[^}]*padding:\s*0;/);
 });
+
+
+test("internal cards share one radius token while outer panels stay square", () => {
+  const baseCss = readFileSync(new URL("./base.css", entryUrl), "utf8");
+  const sharedCss = readFileSync(new URL("./shared-components.css", entryUrl), "utf8");
+  assert.match(baseCss, /--card-radius:\s*6px;/);
+  assert.match(sharedCss, /\.panel\s*\{[^}]*border-radius:\s*0;/);
+  const owners = [
+    ["shared-components.css", ".card"],
+    ["importer.css", ".project-recent-row"],
+    ["importer.css", ".project-current .workspace-recipe-field"],
+    ["importer.css", ".project-dataset-scroll"],
+    ["workspace.css", ".workspace-recipe-summary"],
+    ["project-preview.css", ".project-preview-card"],
+    ["assembly.css", ".assembly-view-card"],
+    ["assembly.css", ".assembly-track-panel"],
+    ["subview.css", ".subview-tools-window"],
+    ["subview.css", ".subview-anchor-object"],
+    ["final-path.css", ".final-path-all-card"],
+    ["final-path.css", ".final-path-sort-card"],
+    ["degap.css", ".degap-job-card"],
+    ["project-export.css", ".project-export-panel"],
+    ["project-export.css", ".project-export-detail-section"],
+  ];
+  for (const [owner, selector] of owners) {
+    const css = readFileSync(new URL(`./${owner}`, entryUrl), "utf8");
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const rule = css.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`));
+    assert.ok(rule, `${owner}: ${selector}`);
+    assert.match(rule[1], /border-radius:\s*var\(--card-radius\);/, `${owner}: ${selector}`);
+  }
+  // Do not clip generic cards: their export and combo menus may extend outside.
+  assert.doesNotMatch(sharedCss.match(/\.card\s*\{([^}]*)\}/)[1], /overflow:\s*hidden/);
+});

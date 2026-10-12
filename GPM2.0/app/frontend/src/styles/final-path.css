@@ -37,6 +37,7 @@
 
 .final-path-all-card {
   min-width: 0;
+  border-radius: var(--card-radius);
 }
 
 .final-path-all-card.is-table,
@@ -120,6 +121,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   padding: 10px;
   transition: box-shadow 120ms ease, transform 120ms ease, opacity 120ms ease, border-color 120ms ease;
+  border-radius: var(--card-radius);
 }
 
 .final-path-sort-row.is-gap .final-path-sort-card {
@@ -317,6 +319,7 @@
   padding: 22px 12px 12px;
   border: 1px solid #d1d1d1;
   background: #fbfbfb;
+  border-radius: var(--card-radius);
 }
 
 .final-path-log-legend {

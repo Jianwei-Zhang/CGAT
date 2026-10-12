@@ -4,6 +4,7 @@
   border: 1px solid #9f9f9f;
   background: linear-gradient(#f6f6f6, #ebebeb);
   padding: 8px;
+  border-radius: 0;
 }
 
 .kicker {
@@ -31,6 +32,7 @@
   padding: 10px;
   display: grid;
   gap: 8px;
+  border-radius: var(--card-radius);
 }
 
 .card h4 {

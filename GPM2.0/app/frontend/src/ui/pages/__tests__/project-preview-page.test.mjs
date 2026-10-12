@@ -96,6 +96,8 @@ test("source colors remain dataset-specific and adopted interval outlines are ca
   assert.doesNotMatch(css, /\.project-preview-contig\.is-context\s*\{[^}]*(height|transform|opacity):/);
   assert.match(css, /\.project-preview-final-part > span\s*\{[^}]*text-overflow:\s*clip/);
   assert.match(output, /data-final-path-fit-label/);
+  assert.match(output, /data-preview-source-fit-label="1"/);
+  assert.match(css, /\.project-preview-contig-label\s*\{[^}]*text-overflow:\s*clip/);
   assert.match(output, /--source-color:/);
 });
 

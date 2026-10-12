@@ -11,6 +11,7 @@
   --font-heading: 1.429rem;
   --font-page-title: 1.714rem;
   --font-hero: 2rem;
+  --card-radius: 6px;
   --font-graph-label: var(--graph-font-size, 12px);
   --font-graph-small: calc(var(--graph-font-size, 12px) * 0.917);
   --font-graph-tick: calc(var(--graph-font-size, 12px) * 0.917);

@@ -238,6 +238,7 @@
   border: 1px solid #d4d9df;
   background: #f8fafc;
   padding: 8px;
+  border-radius: var(--card-radius);
 }
 
 .degap-job-card.is-collapsed {

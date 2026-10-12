@@ -51,7 +51,7 @@
   gap: 0;
   padding: 0;
   border: 1px solid #dde4ec;
-  border-radius: 8px;
+  border-radius: var(--card-radius);
   background: #ffffff;
   color: #1f2937;
   box-shadow: 0 18px 50px rgba(15, 23, 42, 0.22);
@@ -129,7 +129,7 @@
   gap: 6px;
   padding: 10px 12px;
   border: 1px solid #dbe4ee;
-  border-radius: 6px;
+  border-radius: var(--card-radius);
   background: #f8fafc;
 }
 
@@ -334,7 +334,7 @@
   .importer-import-progress-dialog {
     width: 100%;
     max-height: calc(100dvh - 20px);
-    border-radius: 8px;
+    border-radius: var(--card-radius);
   }
 
   .importer-import-progress-overview {
@@ -462,13 +462,13 @@
 .project-recents .project-entry-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 20px; }
 .project-recents .project-entry-actions .button { min-width: 0; min-height: 40px; padding: 10px; }
 .project-recents-header { position: relative; margin-bottom: 12px; }
-.project-recent-row { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: center; min-width: 0; min-height: 44px; padding: 5px; border: 1px solid #dedede; border-radius: 5px; background: #fff; }
+.project-recent-row { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: center; min-width: 0; min-height: 44px; padding: 5px; border: 1px solid #dedede; border-radius: var(--card-radius); background: #fff; }
 .project-recent-row + .project-recent-row { margin-top: 8px; }
 .project-recent-row:hover { background: #f7f7f7; border-color: #b8b8b8; }
 .project-recent-row.is-active { background: #efefef; border-color: #888; box-shadow: inset 2px 0 #555; }
 .project-recent-open { display: flex; min-width: 0; align-items: center; min-height: 32px; padding: 0 5px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
 /* Extend the native switch button through the card border; only action buttons sit above it. */
-.project-recent-open::after { content: ""; position: absolute; inset: -1px; z-index: 0; border-radius: 5px; }
+.project-recent-open::after { content: ""; position: absolute; inset: -1px; z-index: 0; border-radius: var(--card-radius); }
 .project-recent-open:focus-visible { outline: none; }
 .project-recent-open:focus-visible::after { outline: 2px solid #555; outline-offset: 2px; }
 .project-recent-name { display: flex; min-width: 0; align-items: center; gap: 8px; }
@@ -514,7 +514,7 @@
 .project-metadata { margin-top: 20px; }
 .project-current .workspace-recipe-summary { margin: 0; border: 0; border-radius: 0; background: none; overflow: visible; }
 .project-current .workspace-recipe-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; background: transparent; }
-.project-current .workspace-recipe-field { display: grid; min-width: 0; align-content: start; gap: 8px; padding: 16px; border: 1px solid #e6e6e6; border-radius: 5px; background: #fafafa; }
+.project-current .workspace-recipe-field { display: grid; min-width: 0; align-content: start; gap: 8px; padding: 16px; border: 1px solid #e6e6e6; border-radius: var(--card-radius); background: #fafafa; }
 .project-current .workspace-recipe-label { color: #6b6b6b; font-size: var(--font-body); font-weight: 400; line-height: 1.5; }
 .project-current .workspace-recipe-value { color: #333; font-size: var(--font-section); overflow-wrap: anywhere; }
 .project-current .workspace-recipe-value:is(.is-enabled, .is-disabled) { padding: 0; border: 0; border-radius: 0; background: transparent; font-weight: 400; }
@@ -531,7 +531,7 @@
 .projects-page > :is(p, .project-pending) { margin: 16px 24px; }
 .projects-page > .error-text { overflow-wrap: anywhere; font-weight: 400; }
 
-.project-import-dialog { display: grid; gap: 10px; width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 28px; border: 1px solid #d9d9d9; border-radius: 6px; background: #fff; }
+.project-import-dialog { display: grid; gap: 10px; width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 28px; border: 1px solid #d9d9d9; border-radius: var(--card-radius); background: #fff; }
 .project-import-dialog h3 { margin: 0 0 14px; font-size: var(--font-heading); font-weight: 600; }
 .project-import-dialog input:not([type="radio"]) { min-width: 0; width: 100%; min-height: 38px; border-color: #d3d3d3; border-radius: 4px; }
 .project-import-dialog .inline-input { flex-wrap: nowrap; min-width: 0; margin-bottom: 10px; }
@@ -540,7 +540,7 @@
 .project-import-dialog label { font-size: var(--font-body); font-weight: 500; }
 .project-import-dialog .project-path { overflow-wrap: anywhere; font-size: var(--font-small); margin-bottom: 10px; }
 .project-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; padding-top: 18px; border-top: 1px solid #eee; }
-.project-copy-dialog { display: grid; gap: 14px; width: min(520px, calc(100vw - 32px)); padding: 28px; border: 1px solid #d9d9d9; border-radius: 6px; background: #fff; }
+.project-copy-dialog { display: grid; gap: 14px; width: min(520px, calc(100vw - 32px)); padding: 28px; border: 1px solid #d9d9d9; border-radius: var(--card-radius); background: #fff; }
 .project-copy-dialog h3 { margin: 0 0 6px; font-size: var(--font-heading); font-weight: 600; }
 .project-copy-form { display: grid; gap: 9px; min-width: 0; }
 .project-copy-form > label { font-size: var(--font-body); font-weight: 500; }
@@ -565,7 +565,7 @@
 
 #project-data-catalog { min-width: 0; margin-top: 24px; }
 .project-dataset-section { margin-top: 24px; min-width: 0; }
-.project-dataset-scroll { overflow-x: auto; border: 1px solid #e5e5e5; border-radius: 6px; }
+.project-dataset-scroll { overflow-x: auto; border: 1px solid #e5e5e5; border-radius: var(--card-radius); }
 .project-dataset-table { width: 100%; min-width: 840px; table-layout: fixed; border-collapse: collapse; font-size: var(--font-body); text-align: left; }
 .project-dataset-actions-column { width: 64px; }
 .project-dataset-table th, .project-dataset-table td { padding: 12px 10px; border-bottom: 1px solid #ececec; vertical-align: middle; }
@@ -581,7 +581,7 @@
 .project-dataset-note { display: block; width: 100%; padding: 4px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; background: none; color: #666; text-align: left; cursor: pointer; font: inherit; }
 .project-dataset-note:hover { color: #111; text-decoration: underline; }
 .project-dataset-note:disabled { cursor: default; opacity: .55; }
-.project-catalog-dialog { width: min(540px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 24px; overflow-y: auto; border: 1px solid #e5e5e5; border-radius: 8px; background: #fff; color: #222; font-size: var(--font-body); box-shadow: 0 16px 60px #0002; }
+.project-catalog-dialog { width: min(540px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 24px; overflow-y: auto; border: 1px solid #e5e5e5; border-radius: var(--card-radius); background: #fff; color: #222; font-size: var(--font-body); box-shadow: 0 16px 60px #0002; }
 .project-catalog-dialog[open] { display: flex; flex-direction: column; overflow: hidden; }
 .project-catalog-dialog::backdrop { background: rgb(0 0 0 / 30%); }
 .project-catalog-dialog-head { display: flex; flex-shrink: 0; align-items: center; gap: 12px; margin-bottom: 18px; }
@@ -597,7 +597,7 @@
 .project-dataset-editor { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
 .project-dataset-editor-body { display: grid; gap: 10px; min-height: 0; overflow-y: auto; padding: 3px; margin: -3px; }
 .project-dataset-paths { display: grid; gap: 8px; margin-top: 8px; }
-.project-dataset-path { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px 12px; padding: 10px 12px; border-radius: 4px; background: #f7f7f7; }
+.project-dataset-path { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px 12px; padding: 10px 12px; border-radius: var(--card-radius); background: #f7f7f7; }
 .project-dataset-path code { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; color: #555; font-size: var(--font-small); line-height: 1.6; }
 .projects-page .project-dataset-path .button { flex: 0 0 auto; min-height: 26px; padding: 3px 8px; font-size: var(--font-small); }
 .project-dataset-editor input, .project-dataset-editor textarea { width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; padding: 8px 10px; font: inherit; background: white; }

@@ -65,3 +65,28 @@ test("preview path labels hide completely when too narrow and reappear after res
   assert.equal(nodes[0].label.style.visibility, "");
   assert.equal(nodes[1].label.style.visibility, "hidden");
 });
+
+
+test("source contig labels fit the adopted interval, not the full source strip", () => {
+  const patch = { style: {} };
+  const label = { dataset: { previewSourceFitLabel: "1" }, style: {}, scrollWidth: 90,
+    get clientWidth() { return Math.max(0, Math.floor(parseFloat(this.style.width))); } };
+  const source = { dataset: { finalPathSourcePath: "Chr1", finalPathSourceIndex: "0",
+    finalPathSourceOffset: "0", finalPathUsedStart: "10", finalPathUsedEnd: "60",
+    finalPathSourceLength: "1000" }, style: {},
+    querySelector: selector => selector === ".project-preview-used" ? patch : label };
+  const node = { dataset: { finalPathKind: "ctg", finalPathLength: "1000" }, style: {} };
+  const strip = { dataset: { finalPathStrip: "1", finalPathName: "Chr1", finalPathDomain: "1000" }, clientWidth: 800,
+    querySelectorAll: selector => selector === "[data-final-path-segment]" ? [node] : [],
+    closest: () => ({ querySelectorAll: () => [source] }) };
+  const contextLabel = { dataset: { previewSourceFitLabel: "1" }, style: {}, clientWidth: 30, scrollWidth: 90 };
+  const host = { querySelectorAll: selector => selector === "[data-final-path-strip]" ? [strip] : [label, contextLabel] };
+  syncFinalPathStripGeometry(host);
+  assert.equal(label.style.visibility, "hidden");
+  assert.equal(contextLabel.style.visibility, "hidden");
+  strip.clientWidth = 3000;
+  contextLabel.clientWidth = 120;
+  syncFinalPathStripGeometry(host);
+  assert.equal(label.style.visibility, "");
+  assert.equal(contextLabel.style.visibility, "");
+});

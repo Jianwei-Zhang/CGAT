@@ -109,6 +109,13 @@ export function layoutFinalPathStrip(items, viewportWidth, domainLengthBp) {
   })), budget);
 }
 
+function syncFullLabelVisibility(label) {
+  if (!label?.style) return;
+  const needed = Number(label.scrollWidth || 0);
+  const available = Number(label.clientWidth || 0);
+  label.style.visibility = needed > available ? "hidden" : "";
+}
+
 export function syncFinalPathStripGeometry(host) {
   if (!host?.querySelectorAll) return;
   for (const strip of host.querySelectorAll("[data-final-path-strip]")) {
@@ -123,12 +130,7 @@ export function syncFinalPathStripGeometry(host) {
       node.style.width = `${layout.width}px`;
       // Preview names are all-or-nothing; preserve the complete tooltip, not
       // a few clipped letters on a short contig or gap. Re-evaluate on resize.
-      const label = node.querySelector?.("[data-final-path-fit-label]");
-      if (label) {
-        const needed = Number(label.scrollWidth || 0);
-        const available = Number(label.clientWidth || 0);
-        label.style.visibility = needed > available ? "hidden" : "";
-      }
+      syncFullLabelVisibility(node.querySelector?.("[data-final-path-fit-label]"));
     });
     for (const label of strip.querySelectorAll("[data-final-path-gap-label]")) {
       const layout = layouts[Number(label.dataset.finalPathGapLabel)];
@@ -169,5 +171,10 @@ export function syncFinalPathStripGeometry(host) {
         }
       }
     }
+  }
+  // Source labels must be measured after their adopted intervals have been
+  // aligned above, not against the much wider whole-contig background strip.
+  for (const label of host.querySelectorAll("[data-preview-source-fit-label]")) {
+    if (label.dataset?.previewSourceFitLabel === "1") syncFullLabelVisibility(label);
   }
 }

@@ -60,6 +60,7 @@
   padding: 12px;
   border: 1px solid #d1d1d1;
   background: #fbfbfb;
+  border-radius: var(--card-radius);
 }
 
 .project-export-panel h4 {
@@ -122,7 +123,7 @@
 .project-export-detail-section {
   min-width: 0;
   border: 1px solid #cdd6e0;
-  border-radius: 8px;
+  border-radius: var(--card-radius);
   background: #fff;
   box-shadow: 0 1px 3px rgb(35 53 74 / 5%);
 }
@@ -197,7 +198,7 @@
   overflow: auto;
   scrollbar-gutter: stable;
   border-top: 1px solid #e0e6ed;
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px);
 }
 
 .project-export-detail-section .final-path-log-table-wrap[hidden] {

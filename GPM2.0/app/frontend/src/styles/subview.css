@@ -100,7 +100,7 @@
   margin: 0;
   padding: 10px 12px;
   border: 1px solid #b8c2cc;
-  border-radius: 4px;
+  border-radius: var(--card-radius);
   background: #fff;
   color: #444;
   font-size: var(--font-body);
@@ -139,7 +139,7 @@
   box-sizing: border-box;
   overflow: hidden;
   border: 1px solid #aeb7c2;
-  border-radius: 5px;
+  border-radius: var(--card-radius);
   background: #f5f7f9;
   color: #344354;
   box-shadow: 0 4px 16px rgba(26, 39, 52, 0.18);
@@ -298,7 +298,7 @@
   gap: 6px;
   padding: 6px;
   border: 1px solid #e1e5ea;
-  border-radius: 6px;
+  border-radius: var(--card-radius);
   background: #fff;
   cursor: default;
 }
@@ -440,7 +440,7 @@
   min-height: 64px;
   padding: 6px;
   border: 1px solid #d6dce3;
-  border-radius: 4px;
+  border-radius: var(--card-radius);
   background: #fff;
 }
 
@@ -808,6 +808,7 @@
   display: grid;
   justify-items: center;
   gap: 10px;
+  border-radius: var(--card-radius);
 }
 
 .subview-pairwise-loading-close {

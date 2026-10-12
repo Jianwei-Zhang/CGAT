@@ -7,13 +7,13 @@
 .project-preview-legend { position: static; flex: 0 0 auto; color: #737373; }
 .project-preview-legend > summary { display: grid; place-items: center; width: 18px; height: 18px; border: 1px solid #aeb7c0; border-radius: 50%; font-size: 12px; line-height: 1; list-style: none; cursor: pointer; }
 .project-preview-legend > summary::-webkit-details-marker { display: none; }
-.project-preview-hint { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; width: min(460px, 100%); max-width: 100%; padding: 10px 12px; border: 1px solid #d7dde3; border-radius: 4px; background: #fff; box-shadow: 0 4px 12px rgba(0, 0, 0, .08); color: #666; font-size: var(--font-small); }
+.project-preview-hint { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; width: min(460px, 100%); max-width: 100%; padding: 10px 12px; border: 1px solid #d7dde3; border-radius: var(--card-radius); background: #fff; box-shadow: 0 4px 12px rgba(0, 0, 0, .08); color: #666; font-size: var(--font-small); }
 .project-preview-legend:not([open]) > .project-preview-hint { display: none; }
 .project-preview-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; min-width: 0; }
-.project-preview-card { min-width: 0; padding: 0 16px 12px; border: 1px solid #b8c2cc; border-radius: 5px; background: #fff; color: #333; cursor: pointer; }
+.project-preview-card { min-width: 0; padding: 0 16px 12px; border: 1px solid #b8c2cc; border-radius: var(--card-radius); background: #fff; color: #333; cursor: pointer; }
 .project-preview-card:hover { border-color: #9aafc2; }
-.project-preview-card-header { display: flex; align-items: baseline; gap: 12px; min-width: 0; margin: 0 -16px 10px; width: calc(100% + 32px); padding: 10px 16px; border: 0; border-bottom: 1px solid #d4dbe2; border-radius: 4px 4px 0 0; background: #f4f6f8; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.project-preview-card-header:focus-visible { outline: 2px solid #4678ad; outline-offset: 4px; border-radius: 2px; }
+.project-preview-card-header { display: flex; align-items: baseline; gap: 12px; min-width: 0; margin: 0 -16px 10px; width: calc(100% + 32px); padding: 10px 16px; border: 0; border-bottom: 1px solid #d4dbe2; border-radius: calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px) 0 0; background: #f4f6f8; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.project-preview-card-header:focus-visible { outline: 2px solid #4678ad; outline-offset: 4px; }
 .project-preview-chr-name { flex: 0 0 auto; font-weight: 700; font-size: var(--font-body); }
 .project-preview-card-summary { min-width: 0; color: #808892; font-size: var(--font-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .project-preview-open { flex: 0 0 auto; margin-left: auto; color: #7a8795; font-size: var(--font-small); white-space: nowrap; }
@@ -28,7 +28,7 @@
 .project-preview-contig { position: absolute; display: block; height: 16px; min-width: 2px; overflow: hidden; border: 1px solid #c9d0d6; border-radius: 2px; box-shadow: none; background-image: none; }
 .project-preview-contig.is-context { z-index: 0; }
 .project-preview-contig.is-context .project-preview-contig-label { visibility: hidden; }
-.project-preview-contig-label { position: relative; z-index: 3; display: block; padding: 0 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 14px; color: #374151; font-size: var(--font-graph-small); }
+.project-preview-contig-label { position: relative; z-index: 3; display: block; padding: 0 3px; overflow: hidden; text-overflow: clip; white-space: nowrap; line-height: 14px; color: #374151; font-size: var(--font-graph-small); }
 .project-preview-used { position: absolute; z-index: 2; display: block; top: 0; bottom: 0; min-width: 2px; border: 2px solid transparent; background: transparent; opacity: 1; }
 .project-preview-card:hover .project-preview-source-plots .project-preview-used,
 .project-preview-card:has(.project-preview-card-header:focus-visible) .project-preview-source-plots .project-preview-used { border-color: var(--source-color); }
