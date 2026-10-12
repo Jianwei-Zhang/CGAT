@@ -2,6 +2,15 @@
 
 [中文](README_zh.md) | **English**
 
+## Download
+
+Download `GPM_Server_*_source.tar.gz` from [Releases](https://github.com/Jianwei-Zhang/CGAT/releases/latest) onto your Linux server. Extract the standalone source package before installing:
+
+```bash
+tar -xzf GPM_Server_*_source.tar.gz
+cd GPM_Server
+```
+
 ## Quick start
 
 ```bash

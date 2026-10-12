@@ -2,6 +2,15 @@
 
 **中文** | [English](README.md)
 
+## 下载
+
+在 Linux 服务器上下载 [Releases](https://github.com/Jianwei-Zhang/CGAT/releases/latest) 中的 `GPM_Server_*_source.tar.gz`（独立 Server 源码包），解压后安装：
+
+```bash
+tar -xzf GPM_Server_*_source.tar.gz
+cd GPM_Server
+```
+
 ## 快速开始
 
 ```bash
