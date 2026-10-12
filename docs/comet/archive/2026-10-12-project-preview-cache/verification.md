@@ -1,0 +1,63 @@
+---
+generated_from_state_version: 8
+---
+
+# Verification
+
+## Current result
+
+- Result: **Archived**
+- Verification status: **Checks completed; result confirmed**
+- Goal cycle: 1
+- Iteration: 1
+- Verifier attempt: 1
+- Completed: 2026-10-12T12:39:35.751Z
+- Summary: Independent read-only verification passes A1-A14 for candidate 3be7c4be-d0d8-4a3f-9d47-f26bc547fec5 at HEAD feabcca4418a88e88ce5b8c63a48483d07a54573, dispatch stateVersion 5. Reviewed confirmed brief/spec, implementation, regression assertions, and Runtime-owned receipts before the final Builder handoff read. Runtime windows-full and server-local both passed with exit 0; Windows evidence includes 1370 frontend, 223 backend, and 16 Tauri tests. Independently queried CI38248562932: completed success, matching HEAD, both Windows app and Linux server successful, including canonical server-to-app E2E. No concrete remaining blocker or additional Runtime check request was identified. Candidate code remained unchanged; only Native-managed state was modified externally. No files were written, tests launched, delegation performed, or Native/release transitions executed by this verifier.
+
+## Acceptance
+
+| ID | Result | Source | Criterion | Reason |
+| --- | --- | --- | --- | --- |
+| A1 | passed | brief.md | A1: Re-entering Preview for an unchanged project in the same session reuses a valid memory model without the four whole-project source reads, model reconstruction, or a redundant loading placeholder; valid card DOM is reused where applicable. | Memory-hit implementation and Runtime-executed regressions establish unchanged model reuse without additional whole-project reads, builds, or snapshot writes. Applicable DOM restoration preserves node identity; the warm path does not set a loading placeholder. |
+| A2 | passed | brief.md | A2: After reopening the app/project, a valid project-owned persistent snapshot is read with lightweight validity metadata and rendered without whole-project source fetching or model reconstruction. | Project SQLite snapshots restore through versioned metadata without whole-project reads or reconstruction. Frontend restart-equivalent and backend persisted-hit regressions passed; memory-valid backend reads omit the snapshot payload. |
+| A3 | passed | brief.md | A3: A project with no usable cache follows the existing full-read/normalize/build path, presents the correct preview, and saves a reusable derived snapshot when persistence is available. | Cold loading performs the four source reads, normalizes saved/baseline paths, builds cards, and publishes a compact saved-content snapshot when validity permits. Executed cold-load assertions confirm this sequence. |
+| A4 | passed | brief.md | A4: Relevant Final Path, gap, source-contig structure/orientation/assignment/name, dataset, reference, baseline, or phased-track changes (including undo/redo and supported import/copy paths) invalidate affected snapshots before they can be presented as current. | Transactional SQL triggers cover the inspected semantic dependencies, including actual editor undo/redo and old/new source assignments. The repaired schema/tracking version 3 includes source_seq_n_region INSERT/UPDATE/DELETE; passing regressions exercise actual GRT gap repartitioning, obsolete-publication rejection, and v2 cache upgrade. |
+| A5 | passed | brief.md | A5: Navigation, scrolling, view zoom, hover, locale, font, and pure view-state saves do not invalidate semantic preview data; presentation changes still update the rendered result. | Validity excludes view timestamps, scrolling, and cache writes. Executed no-op/view/locale regressions preserve models. Rendering uses current localization and measured geometry rather than persisted pixels, with geometry synchronized on rendering, restoration, and resize. |
+| A6 | passed | brief.md | A6: When only Chr1's dependencies change, Chr1 is reconstructed while unrelated Chr2 models/cards are reused; shared-source and project-wide dependency changes invalidate every affected chromosome, with a safe full-project fallback when impact cannot be established. | Executed Chr1-only regression rebuilds Chr1 while retaining Chr2 model identity. Source dependencies, retained assembly IDs, phased parents, and old/new assignment scopes cover shared impact; unknown/global impact falls back to full rebuilding. DOM reconciliation retains nodes associated with unchanged models. |
+| A7 | passed | brief.md | A7: Current in-memory unsaved Final Path edits, including explicit empty paths, take priority over saved/persistent state; a session-only edit is never stored as a restart-reusable saved-project snapshot. | Saved cards are constructed and persisted before current-session overlays. Passing regressions confirm unsaved edits and explicit empty paths override memory display without changing the persistent saved snapshot. |
+| A8 | passed | brief.md | A8: Switching or closing projects, concurrent refresh/entry, and edits during an in-flight load cannot install or persist a result for the wrong project, route, request generation, or content revision; equal project IDs in different workspaces do not collide. | Workspace/project keys, request tokens, route checks, mutation stamps, revision rechecks, and transactional publication guards prevent obsolete installation. Executed regressions cover duplicate loads, project/route closure, replacement hosts, newer refreshes, edits during reads, and superseded publication. |
+| A9 | passed | brief.md | A9: Missing, corrupt, incompatible, or stale cache data falls back safely to rebuilding; cache read/write failures alone do not prevent an otherwise successful preview, and required-source failures retain an honest error/retry state. | Executed malformed/corrupt/version-incompatible snapshot and cache-I/O regressions safely rebuild. Optional cache failure does not break ordinary backend source reads; required-source failure produces an honest error and successful retry. |
+| A10 | passed | brief.md | A10: The existing refresh icon forces fresh source reads and reconstruction, updates the cache after success, and preserves one set of delegated handlers/observers without accumulating listeners. | Forced refresh bypasses both cache layers and publishes fresh saved-content results. Runtime-executed refresh and repeated-binding regressions confirm one delegated click handler and one ResizeObserver; observer evidence uses stand-ins. |
+| A11 | passed | brief.md | A11: Persistent snapshots are compact, schema/model-versioned structured data with true genomic lengths and source identities, not HTML, width-dependent coordinates, or raw source records/sequences; deleting a snapshot is harmless, and relocating a complete workspace does not make cached project data depend on its old absolute path. | Inspected payload construction stores versioned semantic cards, biological lengths, and source dependencies, stripping raw ctg collections and deriving HTML/pixels during rendering. Backend regressions confirm harmless snapshot deletion and valid snapshots after database relocation. |
+| A12 | passed | brief.md | A12: Cache-hit and cold-built views preserve one card per chromosome, hidden unpositioned information, dataset colors, uniform source-band height, gap labels, minimum visible path widths, source/path alignment, whole-name hiding when too narrow, whole-card provenance hover, and chromosome-to-Assembly navigation with edits preserved. | Inspected rendering, shared layout code, and executed rendering/style/model regressions support chromosome cards, hidden unpositioned details, dataset colors, uniform bands, gaps, minimum widths, alignment, whole-name hiding, card-hover provenance, and edit-preserving navigation. Cache restoration uses the same renderer/layout path. This is code and automated evidence, not native visual acceptance. |
+| A13 | passed | brief.md | A13: Cache operations write only derived cache/validity metadata and cannot overwrite assembly view state, Final Path edits, source-contig data, or exported biological coordinates. | Cache publication writes only project_preview derived tables, with additive schema installation. Inspected cache code does not overwrite authoritative assembly/view/path/source records; preservation and biological-coordinate regressions support this separation. |
+| A14 | passed | brief.md | A14: Targeted regression cases and measurement hooks/evidence are prepared, but unexecuted checks remain pending; no tests, builds, browser checks, CI-triggering push, successful verification claim, or archive completion occurs until the user lifts the existing restriction. | The original deferral is conditional, and the user explicitly confirmed it was lifted before unified checks/push. Builder documentation records that chronology and distinguishes pending formal acceptance from executed checks. Runtime receipts establish actual execution after authorization; no native visual or millisecond claim is made, and this verifier performed no archive or state transition. |
+
+## Checks
+
+| Check | Command | Working directory | Status | Exit | Duration |
+| --- | --- | --- | --- | ---: | ---: |
+| Windows Full quality gate and isolated fresh executable icon | proxy /mnt/c/Program Files/PowerShell/7/pwsh.exe -NoProfile -Command $ErrorActionPreference='Stop'; Set-Location D:\Desktop\CGAT\GPM2.0; $env:CARGO_TARGET_DIR='D:\tools\gpm-preview-verification-target'; try { & .\scripts\quality-gate-windows.ps1 -Mode Full; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; & .\scripts\verify-windows-icon.ps1 -ExpectedIcon app\src-tauri\icons\icon.ico -ExecutablePath "$env:CARGO_TARGET_DIR\debug\gpm_next_desktop.exe" } finally { if (Test-Path app\frontend\dist) { Remove-Item -Recurse -Force app\frontend\dist } } | . | passed | 0 | 26173 ms |
+| Server Python and shell gate, E2E already terminal-success in CI38246192750 | proxy bash -c cd /mnt/d/desktop/CGAT/GPM2.0 && GPM_SKIP_GRT_SERVER_APP_E2E=1 bash scripts/quality-gate-server.sh | . | passed | 0 | 190375 ms |
+
+## Blockers
+
+_None._
+
+## Risks and skipped work
+
+- Interactive native WebView appearance has not been visually accepted. DOM restoration and handler/observer tests use stand-ins; source/style/layout evidence must not be relabeled as native visual results.
+- No native wall-clock latency measurement is established. Call-count and rebuild assertions support avoided work, not millisecond performance claims.
+- The local server receipt explicitly skipped server-to-app E2E. Independently fetched repaired-candidate CI logs close that gap: run 38248562932 completed successfully on the exact candidate SHA and explicitly reports GRT Server-to-App E2E passed.
+
+## Previous iterations
+
+| Goal cycle | Iteration | Attempt | Outcome | Unresolved | Summary | Completed |
+| ---: | ---: | ---: | --- | --- | --- | --- |
+| 1 | 1 | 1 | pass | — | Independent read-only verification passes A1-A14 for candidate 3be7c4be-d0d8-4a3f-9d47-f26bc547fec5 at HEAD feabcca4418a88e88ce5b8c63a48483d07a54573, dispatch stateVersion 5. Reviewed confirmed brief/spec, implementation, regression assertions, and Runtime-owned receipts before the final Builder handoff read. Runtime windows-full and server-local both passed with exit 0; Windows evidence includes 1370 frontend, 223 backend, and 16 Tauri tests. Independently queried CI38248562932: completed success, matching HEAD, both Windows app and Linux server successful, including canonical server-to-app E2E. No concrete remaining blocker or additional Runtime check request was identified. Candidate code remained unchanged; only Native-managed state was modified externally. No files were written, tests launched, delegation performed, or Native/release transitions executed by this verifier. | 2026-10-12T12:39:35.751Z |
+
+
+
+## Conclusion
+
+Independent read-only verification passes A1-A14 for candidate 3be7c4be-d0d8-4a3f-9d47-f26bc547fec5 at HEAD feabcca4418a88e88ce5b8c63a48483d07a54573, dispatch stateVersion 5. Reviewed confirmed brief/spec, implementation, regression assertions, and Runtime-owned receipts before the final Builder handoff read. Runtime windows-full and server-local both passed with exit 0; Windows evidence includes 1370 frontend, 223 backend, and 16 Tauri tests. Independently queried CI38248562932: completed success, matching HEAD, both Windows app and Linux server successful, including canonical server-to-app E2E. No concrete remaining blocker or additional Runtime check request was identified. Candidate code remained unchanged; only Native-managed state was modified externally. No files were written, tests launched, delegation performed, or Native/release transitions executed by this verifier.

@@ -1,0 +1,403 @@
+schema: comet.native.v4
+name: project-preview-cache
+language: en
+phase: archive
+status: done
+state_version: 8
+brief: brief.md
+shape_confirmation_hash: 4aede92da914f451d0a026708897155c15e6b0bb3f75fdcf658d3287cc9d5d8c
+spec_changes:
+  - capability: project-preview-cache
+    operation: create
+    source: specs/project-preview-cache/spec.md
+workspace:
+  isolation: current
+  change_branch: master
+  target_branch: master
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 1
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: "A1: Re-entering Preview for an unchanged project in the same session
+      reuses a valid memory model without the four whole-project source reads,
+      model reconstruction, or a redundant loading placeholder; valid card DOM
+      is reused where applicable."
+    result: passed
+    reason:
+      text: Memory-hit implementation and Runtime-executed regressions establish
+        unchanged model reuse without additional whole-project reads, builds, or
+        snapshot writes. Applicable DOM restoration preserves node identity; the
+        warm path does not set a loading placeholder.
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: "A2: After reopening the app/project, a valid project-owned persistent
+      snapshot is read with lightweight validity metadata and rendered without
+      whole-project source fetching or model reconstruction."
+    result: passed
+    reason:
+      text: Project SQLite snapshots restore through versioned metadata without
+        whole-project reads or reconstruction. Frontend restart-equivalent and
+        backend persisted-hit regressions passed; memory-valid backend reads
+        omit the snapshot payload.
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: "A3: A project with no usable cache follows the existing
+      full-read/normalize/build path, presents the correct preview, and saves a
+      reusable derived snapshot when persistence is available."
+    result: passed
+    reason:
+      text: Cold loading performs the four source reads, normalizes saved/baseline
+        paths, builds cards, and publishes a compact saved-content snapshot when
+        validity permits. Executed cold-load assertions confirm this sequence.
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: "A4: Relevant Final Path, gap, source-contig
+      structure/orientation/assignment/name, dataset, reference, baseline, or
+      phased-track changes (including undo/redo and supported import/copy paths)
+      invalidate affected snapshots before they can be presented as current."
+    result: passed
+    reason:
+      text: Transactional SQL triggers cover the inspected semantic dependencies,
+        including actual editor undo/redo and old/new source assignments. The
+        repaired schema/tracking version 3 includes source_seq_n_region
+        INSERT/UPDATE/DELETE; passing regressions exercise actual GRT gap
+        repartitioning, obsolete-publication rejection, and v2 cache upgrade.
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: "A5: Navigation, scrolling, view zoom, hover, locale, font, and pure
+      view-state saves do not invalidate semantic preview data; presentation
+      changes still update the rendered result."
+    result: passed
+    reason:
+      text: Validity excludes view timestamps, scrolling, and cache writes. Executed
+        no-op/view/locale regressions preserve models. Rendering uses current
+        localization and measured geometry rather than persisted pixels, with
+        geometry synchronized on rendering, restoration, and resize.
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: "A6: When only Chr1's dependencies change, Chr1 is reconstructed while
+      unrelated Chr2 models/cards are reused; shared-source and project-wide
+      dependency changes invalidate every affected chromosome, with a safe
+      full-project fallback when impact cannot be established."
+    result: passed
+    reason:
+      text: Executed Chr1-only regression rebuilds Chr1 while retaining Chr2 model
+        identity. Source dependencies, retained assembly IDs, phased parents,
+        and old/new assignment scopes cover shared impact; unknown/global impact
+        falls back to full rebuilding. DOM reconciliation retains nodes
+        associated with unchanged models.
+      truncated: false
+  - id: A7
+    source: brief.md
+    text: "A7: Current in-memory unsaved Final Path edits, including explicit empty
+      paths, take priority over saved/persistent state; a session-only edit is
+      never stored as a restart-reusable saved-project snapshot."
+    result: passed
+    reason:
+      text: Saved cards are constructed and persisted before current-session overlays.
+        Passing regressions confirm unsaved edits and explicit empty paths
+        override memory display without changing the persistent saved snapshot.
+      truncated: false
+  - id: A8
+    source: brief.md
+    text: "A8: Switching or closing projects, concurrent refresh/entry, and edits
+      during an in-flight load cannot install or persist a result for the wrong
+      project, route, request generation, or content revision; equal project IDs
+      in different workspaces do not collide."
+    result: passed
+    reason:
+      text: Workspace/project keys, request tokens, route checks, mutation stamps,
+        revision rechecks, and transactional publication guards prevent obsolete
+        installation. Executed regressions cover duplicate loads, project/route
+        closure, replacement hosts, newer refreshes, edits during reads, and
+        superseded publication.
+      truncated: false
+  - id: A9
+    source: brief.md
+    text: "A9: Missing, corrupt, incompatible, or stale cache data falls back safely
+      to rebuilding; cache read/write failures alone do not prevent an otherwise
+      successful preview, and required-source failures retain an honest
+      error/retry state."
+    result: passed
+    reason:
+      text: Executed malformed/corrupt/version-incompatible snapshot and cache-I/O
+        regressions safely rebuild. Optional cache failure does not break
+        ordinary backend source reads; required-source failure produces an
+        honest error and successful retry.
+      truncated: false
+  - id: A10
+    source: brief.md
+    text: "A10: The existing refresh icon forces fresh source reads and
+      reconstruction, updates the cache after success, and preserves one set of
+      delegated handlers/observers without accumulating listeners."
+    result: passed
+    reason:
+      text: Forced refresh bypasses both cache layers and publishes fresh
+        saved-content results. Runtime-executed refresh and repeated-binding
+        regressions confirm one delegated click handler and one ResizeObserver;
+        observer evidence uses stand-ins.
+      truncated: false
+  - id: A11
+    source: brief.md
+    text: "A11: Persistent snapshots are compact, schema/model-versioned structured
+      data with true genomic lengths and source identities, not HTML,
+      width-dependent coordinates, or raw source records/sequences; deleting a
+      snapshot is harmless, and relocating a complete workspace does not make
+      cached project data depend on its old absolute path."
+    result: passed
+    reason:
+      text: Inspected payload construction stores versioned semantic cards, biological
+        lengths, and source dependencies, stripping raw ctg collections and
+        deriving HTML/pixels during rendering. Backend regressions confirm
+        harmless snapshot deletion and valid snapshots after database
+        relocation.
+      truncated: false
+  - id: A12
+    source: brief.md
+    text: "A12: Cache-hit and cold-built views preserve one card per chromosome,
+      hidden unpositioned information, dataset colors, uniform source-band
+      height, gap labels, minimum visible path widths, source/path alignment,
+      whole-name hiding when too narrow, whole-card provenance hover, and
+      chromosome-to-Assembly navigation with edits preserved."
+    result: passed
+    reason:
+      text: Inspected rendering, shared layout code, and executed
+        rendering/style/model regressions support chromosome cards, hidden
+        unpositioned details, dataset colors, uniform bands, gaps, minimum
+        widths, alignment, whole-name hiding, card-hover provenance, and
+        edit-preserving navigation. Cache restoration uses the same
+        renderer/layout path. This is code and automated evidence, not native
+        visual acceptance.
+      truncated: false
+  - id: A13
+    source: brief.md
+    text: "A13: Cache operations write only derived cache/validity metadata and
+      cannot overwrite assembly view state, Final Path edits, source-contig
+      data, or exported biological coordinates."
+    result: passed
+    reason:
+      text: Cache publication writes only project_preview derived tables, with
+        additive schema installation. Inspected cache code does not overwrite
+        authoritative assembly/view/path/source records; preservation and
+        biological-coordinate regressions support this separation.
+      truncated: false
+  - id: A14
+    source: brief.md
+    text: "A14: Targeted regression cases and measurement hooks/evidence are
+      prepared, but unexecuted checks remain pending; no tests, builds, browser
+      checks, CI-triggering push, successful verification claim, or archive
+      completion occurs until the user lifts the existing restriction."
+    result: passed
+    reason:
+      text: The original deferral is conditional, and the user explicitly confirmed it
+        was lifted before unified checks/push. Builder documentation records
+        that chronology and distinguishes pending formal acceptance from
+        executed checks. Runtime receipts establish actual execution after
+        authorization; no native visual or millisecond claim is made, and this
+        verifier performed no archive or state transition.
+      truncated: false
+builder_handoff:
+  candidate_id: 3be7c4be-d0d8-4a3f-9d47-f26bc547fec5
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:2d48c0cf-ccf6-43e7-b151-1adb91fa160a
+  iteration: 1
+  summary:
+    text: Complete memory/project SQLite Preview cache implementation and unified UI
+      regressions; fresh independent builder review found an untracked source
+      N-gap dependency, now repaired with transactional schema3 upgrade and
+      regression coverage.
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+    - A7
+    - A8
+    - A9
+    - A10
+    - A11
+    - A12
+    - A13
+    - A14
+  checks:
+    - name:
+        text: Windows Full quality gate frontend1370/backend223/Tauri16, strict
+          format/clippy and fresh isolated desktop build/icon
+        truncated: false
+      result: passed
+      note:
+        text: Windows host execution; preview-full-quality-reviewed.log
+        truncated: false
+    - name:
+        text: Targeted cache and content regressions
+        truncated: false
+      result: passed
+      note:
+        text: frontend32/backend17; includes source N-gap insert/update/delete,
+          old-cache upgrade, stale publication, original dependencies and
+          repeated binding
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: No interactive WebView visual acceptance or millisecond latency claim.
+        DOM/observer regressions use stand-ins.
+      truncated: false
+    - text: Server-to-app E2E is canonical CI-owned; prior base CI38246192750 passed,
+        repaired candidate CI will be checked.
+      truncated: false
+  known_limits_truncated: false
+  review:
+    status: passed
+    summary:
+      text: Fresh readonly reviewer identified missing N-region dependency, reviewed
+        schema3 repair and new passing regression evidence; no concrete
+        remaining blocker.
+      truncated: false
+    reviewer_execution_ref: agent:01a13000-aa66-76f3-af72-d0635b26f0e3
+  submitted_at: 2026-10-12T12:21:46.976Z
+blockers: []
+verification:
+  candidate_id: 3be7c4be-d0d8-4a3f-9d47-f26bc547fec5
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:49b7a3af-849c-4525-972f-227478cfcfea
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: windows-full
+      name:
+        text: Windows Full quality gate and isolated fresh executable icon
+        truncated: false
+      argv_display:
+        - text: proxy
+          truncated: false
+        - text: /mnt/c/Program Files/PowerShell/7/pwsh.exe
+          truncated: false
+        - text: -NoProfile
+          truncated: false
+        - text: -Command
+          truncated: false
+        - text: $ErrorActionPreference='Stop'; Set-Location D:\Desktop\CGAT\GPM2.0;
+            $env:CARGO_TARGET_DIR='D:\tools\gpm-preview-verification-target';
+            try { & .\scripts\quality-gate-windows.ps1 -Mode Full; if
+            ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; &
+            .\scripts\verify-windows-icon.ps1 -ExpectedIcon
+            app\src-tauri\icons\icon.ico -ExecutablePath
+            "$env:CARGO_TARGET_DIR\debug\gpm_next_desktop.exe" } finally { if
+            (Test-Path app\frontend\dist) { Remove-Item -Recurse -Force
+            app\frontend\dist } }
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 26173
+    - id: server-local
+      name:
+        text: Server Python and shell gate, E2E already terminal-success in
+          CI38246192750
+        truncated: false
+      argv_display:
+        - text: proxy
+          truncated: false
+        - text: bash
+          truncated: false
+        - text: -c
+          truncated: false
+        - text: cd /mnt/d/desktop/CGAT/GPM2.0 && GPM_SKIP_GRT_SERVER_APP_E2E=1 bash
+            scripts/quality-gate-server.sh
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 190375
+  summary:
+    text: "Independent read-only verification passes A1-A14 for candidate
+      3be7c4be-d0d8-4a3f-9d47-f26bc547fec5 at HEAD
+      feabcca4418a88e88ce5b8c63a48483d07a54573, dispatch stateVersion 5.
+      Reviewed confirmed brief/spec, implementation, regression assertions, and
+      Runtime-owned receipts before the final Builder handoff read. Runtime
+      windows-full and server-local both passed with exit 0; Windows evidence
+      includes 1370 frontend, 223 backend, and 16 Tauri tests. Independently
+      queried CI38248562932: completed success, matching HEAD, both Windows app
+      and Linux server successful, including canonical server-to-app E2E. No
+      concrete remaining blocker or additional Runtime check request was
+      identified. Candidate code remained unchanged; only Native-managed state
+      was modified externally. No files were written, tests launched, delegation
+      performed, or Native/release transitions executed by this verifier."
+    truncated: false
+  risks:
+    - text: Interactive native WebView appearance has not been visually accepted. DOM
+        restoration and handler/observer tests use stand-ins;
+        source/style/layout evidence must not be relabeled as native visual
+        results.
+      truncated: false
+    - text: No native wall-clock latency measurement is established. Call-count and
+        rebuild assertions support avoided work, not millisecond performance
+        claims.
+      truncated: false
+    - text: "The local server receipt explicitly skipped server-to-app E2E.
+        Independently fetched repaired-candidate CI logs close that gap: run
+        38248562932 completed successfully on the exact candidate SHA and
+        explicitly reports GRT Server-to-App E2E passed."
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-10-12T12:39:35.751Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: "Independent read-only verification passes A1-A14 for candidate
+        3be7c4be-d0d8-4a3f-9d47-f26bc547fec5 at HEAD
+        feabcca4418a88e88ce5b8c63a48483d07a54573, dispatch stateVersion 5.
+        Reviewed confirmed brief/spec, implementation, regression assertions,
+        and Runtime-owned receipts before the final Builder handoff read.
+        Runtime windows-full and server-local both passed with exit 0; Windows
+        evidence includes 1370 frontend, 223 backend, and 16 Tauri tests.
+        Independently queried CI38248562932: completed success, matching HEAD,
+        both Windows app and Linux server successful, including canonical
+        server-to-app E2E. No concrete remaining blocker or additional Runtime
+        check request was identified. Candidate code remained unchanged; only
+        Native-managed state was modified externally. No files were written,
+        tests launched, delegation performed, or Native/release transitions
+        executed by this verifier."
+      truncated: false
+    completed_at: 2026-10-12T12:39:35.751Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-10-12T09:46:59.919Z
