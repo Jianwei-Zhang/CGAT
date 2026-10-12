@@ -252,6 +252,10 @@ pub(crate) fn create_schema(conn: &Connection) -> Result<()> {
             ],
         ),
         ("derived_ctg", vec!["source_seq_id", "source"]),
+        (
+            "source_seq_n_region",
+            vec!["source_seq_id", "start_bp", "end_bp", "length_bp"],
+        ),
     ] {
         install(conn, table, &columns, |row| {
             dataset_scope(&format!(
@@ -286,7 +290,7 @@ pub(crate) fn create_schema(conn: &Connection) -> Result<()> {
         })?;
     }
     conn.execute(
-        "INSERT OR REPLACE INTO project_preview_schema(id, version) VALUES (1, 2)",
+        "INSERT OR REPLACE INTO project_preview_schema(id, version) VALUES (1, 3)",
         [],
     )?;
     Ok(())
@@ -386,16 +390,16 @@ fn ensure_cache_schema(conn: &Connection) -> Result<()> {
     } else {
         0
     };
-    if version == 2 {
+    if version == 3 {
         return Ok(());
     }
-    if !(0..=2).contains(&version) {
+    if !(0..=3).contains(&version) {
         bail!("unsupported derived Preview cache schema {version}");
     }
     // Optional derived-cache migration, independent of mandatory project reads.
     let tx = conn.unchecked_transaction()?;
     let legacy_tables: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'project_preview_revision')", [], |row| row.get(0))?;
-    if version == 1 || (version == 0 && legacy_tables) {
+    if version == 1 || version == 2 || (version == 0 && legacy_tables) {
         let names = {
             let mut stmt = tx.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'preview_v1_%'")?;
             stmt.query_map([], |row| row.get::<_, String>(0))?
@@ -403,6 +407,9 @@ fn ensure_cache_schema(conn: &Connection) -> Result<()> {
         };
         for name in names {
             tx.execute_batch(&format!("DROP TRIGGER \"{}\";", name.replace('"', "\"\"")))?;
+        }
+        if has_columns(&tx, "project_preview_source_dependency", &["project_id"])? {
+            tx.execute("DELETE FROM project_preview_source_dependency", [])?;
         }
         tx.execute_batch("DELETE FROM project_preview_cache;
             DELETE FROM project_preview_dependency;
@@ -515,7 +522,7 @@ pub fn get_project_preview_cache(
     tx.commit()?;
     Ok(
         json!({"available": true, "identity": identity, "revision": current,
-        "trackingVersion": 2, "memoryValid": memory_valid, "valid": valid, "snapshot": snapshot,
+        "trackingVersion": 3, "memoryValid": memory_valid, "valid": valid, "snapshot": snapshot,
         "snapshotRevision": snapshot_revision, "dirtyChrNames": dirty, "sourceMetadata": source_metadata}),
     )
 }

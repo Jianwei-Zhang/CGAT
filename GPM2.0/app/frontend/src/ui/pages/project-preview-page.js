@@ -199,7 +199,7 @@ export function loadProjectPreviewData(host, store, deps = {}, options = {}) {
     try {
       const metadata = await getCache({ ...args, modelVersion: PREVIEW_MODEL_VERSION,
         expectedIdentity: entry?.identity || null, sinceRevision: entry?.revision ?? null });
-      return metadata?.trackingVersion >= 2 ? metadata : { available: false };
+      return metadata?.trackingVersion >= 3 ? metadata : { available: false };
     }
     catch { return { available: false }; }
   };

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createStore } from "../../../state/store.js";
 import { buildProjectPreviewModel, previewProjectKey } from "../project-preview-state.js";
-import { loadProjectPreviewData } from "../project-preview-page.js";
+import { loadProjectPreviewData, bindProjectPreviewPage } from "../project-preview-page.js";
 import { isPreviewSnapshot, previewSession, previewStateIsApplicable, markPreviewDom, rememberProjectPreviewDom, restoreProjectPreviewDom } from "../project-preview-cache.js";
 
 let fixtureId = 0;
@@ -20,7 +20,7 @@ function fixture() {
       metrics.metadata++;
       const memoryValid = expectedIdentity === db.identity && sinceRevision === db.revision;
       const since = expectedIdentity === db.identity ? sinceRevision : db.snapshotRevision;
-      return { available: true, trackingVersion: 2, identity: db.identity, revision: db.revision, memoryValid,
+      return { available: true, trackingVersion: 3, identity: db.identity, revision: db.revision, memoryValid,
         valid: memoryValid || Boolean(db.snapshot && db.snapshotRevision === db.revision),
         snapshot: memoryValid ? null : structuredClone(db.snapshot),
         dirtyChrNames: since === db.revision ? [] : db.dirty.length ? db.dirty : ["*"],
@@ -260,4 +260,56 @@ test("an entry on a different host supersedes rather than sharing an obsolete pe
   resolve({ items: [] });
   // Host-specific request tokens cannot clobber a newer model for this store.
   assert.equal(await old, false);
+});
+
+
+test("restart and incremental reuse retain both assembly IDs and original-source dependencies", async () => {
+  const value = fixture();
+  value.db.paths.Chr2.segments[0].source = { dataset: "ds", contig: "ctg2", start: 1, end: 1000, orientation: "+" };
+  await load(value);
+  value.store = createStore(value.state);
+  const restored = await load(value);
+  value.db.paths.Chr1.segments[0].end = 400;
+  value.db.revision++; value.db.dirty = ["Chr1"];
+  const changed = await load(value);
+  assert.equal(changed.cards[1], restored.cards[1]);
+  const dependencies = value.db.snapshot.dependencies.find(row => row.chrName === "Chr2");
+  assert.ok(dependencies.ctgIds.includes(2));
+  assert.deepEqual(dependencies.sourceNames, [{ datasetName: "ds", contigName: "ctg2" }]);
+  value.db.paths.Chr2.segments[0].source.end = 500;
+  value.db.revision++; value.db.dirty = ["Chr2"];
+  await load(value);
+  assert.deepEqual(value.metrics.builds.at(-1), ["Chr2"]);
+  value.db.revision++; value.db.dirty = ["Chr1", "Chr2"];
+  await load(value);
+  assert.deepEqual(value.metrics.builds.at(-1), ["Chr1", "Chr2"]);
+});
+
+test("repeated binding and refresh retain one delegated click handler and ResizeObserver", async () => {
+  const value = fixture(); let handlers = 0, observers = 0, observations = 0;
+  value.host.addEventListener = (name, handler) => { handlers++; value.host[name] = handler; };
+  value.host.contains = () => true;
+  value.host.ownerDocument = { defaultView: { ResizeObserver: class {
+    constructor() { observers++; }
+    observe(host) { assert.equal(host, value.host); observations++; }
+  } } };
+  for (let index = 0; index < 3; index++) bindProjectPreviewPage(value.host, value.store, value.deps);
+  await load(value);
+  assert.equal(handlers, 1); assert.equal(observers, 1); assert.equal(observations, 1);
+  const writes = value.metrics.writes;
+  value.host.click({ target: { closest: selector => selector === "[data-preview-refresh]" ? {} : null } });
+  await load(value);
+  assert.equal(value.metrics.writes, writes + 1);
+  bindProjectPreviewPage(value.host, value.store, value.deps);
+  await load(value);
+  assert.equal(handlers, 1); assert.equal(observers, 1); assert.equal(observations, 1);
+});
+
+test("older native dependency tracking is a miss rather than a falsely valid cache", async () => {
+  const value = fixture(); await load(value);
+  const read = value.deps.getProjectPreviewCache;
+  value.deps.getProjectPreviewCache = async args => ({ ...await read(args), trackingVersion: 2 });
+  const before = value.metrics.sources;
+  assert.equal((await load(value)).cacheSource, "rebuilt");
+  assert.equal(value.metrics.sources, before + 4);
 });

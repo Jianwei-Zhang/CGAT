@@ -2,7 +2,7 @@
 
 ## Implementation status
 
-Implementation and regression additions are complete. The user lifted the test/build/push deferral in this conversation on 2026-10-12 and requested unified checks for all jobs, followed by push. This file records Builder evidence, not an independent Native verifier verdict. Native acceptance and archive remain pending; the repository forbids subagents/delegation, so no independent verifier was launched or impersonated.
+Implementation and regression additions are complete. The user lifted the test/build/push deferral in this conversation on 2026-10-12 and requested unified checks for all jobs, followed by push. This file records Builder evidence, not an independent Native verifier verdict. Native acceptance and archive remain pending; the original verification turn did not authorize independent agents, so no independent verifier was launched or impersonated at that point. The user explicitly authorized an independent verifier on 2026-10-12 in the subsequent release request.
 
 ## Scope checked
 
@@ -40,3 +40,13 @@ Local Server checks explicitly skipped server-to-app E2E to avoid using Linux No
 Fixture call-count assertions show a cold load makes four source reads and one whole-project build. Subsequent unchanged session entry makes no further source reads, builds, or snapshot writes; restart-equivalent snapshot restoration also makes no full-source reads or model builds. A committed Chr1-only path edit rebuilds Chr1 while preserving the Chr2 model identity. No native wall-clock latency claim is made.
 
 No browser or interactive desktop visual acceptance was performed. Automated rendering/style/geometry and native command tests are not a substitute for visual acceptance. Native Build-to-Verify review/acceptance remains pending under the no-subagent policy.
+
+
+## Independent-review repair before release
+
+The fresh read-only review found that `source_seq_n_region` affects GRT display-app baseline gap partitioning but was missing from invalidation. Publication was held. The Builder added N-region INSERT/UPDATE/DELETE tracking, derived-cache schema/tracking version 3, transactional legacy cache reset, and an older-native tracking safe miss. Regression tests exercise actual GRT gap partition changes (50 bp, 100 bp, then no gap), stale publication rejection, snapshot/cold equivalence, v2 cache migration, old/new chromosome/source reassignment, retained assembly/original-source dependencies across restart/incremental rebuild, and repeated delegated binding/observer ownership.
+
+The targeted Windows frontend suite now passes 32 checks and backend cache suite passes 17. Updated full-gate and independent formal verdict evidence must be checked before release; this repair note alone is not a verdict.
+
+
+Fresh read-only builder re-review `01a13000-aa66-76f3-af72-d0635b26f0e3` returned PASS after the repair; it is separate from the Builder and is not the formal Native verdict. Completed Windows Full gate evidence in `.comet/runtime/preview-full-quality-reviewed.log`: frontend 1370 passed, backend 223 passed, Tauri 16 passed, strict format/Clippy, production build, isolated desktop build and icon checks passed. The DOM/observer regression uses stand-ins, not a visual WebView test. The formal Verifier will receive Runtime-owned checks next.

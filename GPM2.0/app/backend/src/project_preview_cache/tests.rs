@@ -263,6 +263,7 @@ fn full_schema_installs_invalidation_for_every_semantic_source() -> Result<()> {
         "phased_chr_track_item",
         "dataset",
         "source_seq",
+        "source_seq_n_region",
         "reference_chr",
         "imported_chr_assignment",
         "ref_alignment_hit",
@@ -397,5 +398,146 @@ fn native_editor_undo_and_redo_all_invalidate_cached_content() -> Result<()> {
         assert!(after["revision"].as_i64() > before["revision"].as_i64());
         assert_eq!(after["valid"], false);
     }
+    Ok(())
+}
+
+#[test]
+fn source_n_gap_changes_invalidate_snapshots_and_reject_inflight_publication() -> Result<()> {
+    use crate::grt_package::load_grt_final_path_by_chr_for_project;
+    let (_root, db) = fixture()?;
+    let conn = open_workspace_db(&db)?;
+    conn.execute_batch("INSERT INTO grt_package VALUES(1,'gpm_grt_app_precomputed_v2','2','2','recipe','ds','[]',0,'','','','','','','{}');")?;
+    let chromosome = json!({"chr":"Chr1","q4_length":1000,"segments":[{"segment_id":"source","kind":"contig","length":1000,
+        "source":{"dataset":"ds","contig":"a","start":1,"end":1000,"orientation":"+"}}]});
+    conn.execute("INSERT INTO grt_final_path_chr(chr,q4_length,q4_sha256,chromosome_json) VALUES('Chr1',1000,'',?1)", [chromosome.to_string()])?;
+    for (sql, expected_gap) in [
+        (
+            "INSERT INTO source_seq_n_region(source_seq_id,start_bp,end_bp,length_bp) VALUES(1,401,450,50)",
+            50,
+        ),
+        (
+            "UPDATE source_seq_n_region SET end_bp=500,length_bp=100 WHERE source_seq_id=1",
+            100,
+        ),
+        ("DELETE FROM source_seq_n_region WHERE source_seq_id=1", 0),
+    ] {
+        let before = metadata(&db)?;
+        let mut payload = snapshot();
+        payload["baseline"] =
+            serde_json::to_value(load_grt_final_path_by_chr_for_project(&db, 1)?)?;
+        put_project_preview_cache(
+            &db,
+            1,
+            1,
+            before["identity"].as_str().unwrap(),
+            before["revision"].as_i64().unwrap(),
+            &payload,
+        )?;
+        conn.execute(sql, [])?;
+        let changed = get_project_preview_cache(
+            &db,
+            1,
+            1,
+            before["identity"].as_str(),
+            before["revision"].as_i64(),
+        )?;
+        assert_eq!(changed["valid"], false);
+        assert_eq!(changed["memoryValid"], false);
+        assert_eq!(changed["dirtyChrNames"], json!(["*"]));
+        assert_eq!(
+            put_project_preview_cache(
+                &db,
+                1,
+                1,
+                before["identity"].as_str().unwrap(),
+                before["revision"].as_i64().unwrap(),
+                &payload
+            )?["superseded"],
+            true
+        );
+        let cold = serde_json::to_value(load_grt_final_path_by_chr_for_project(&db, 1)?)?;
+        let gap_length: i64 = cold["Chr1"]["segments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|part| part["kind"] == "gap")
+            .map(|part| part["length"].as_i64().unwrap())
+            .sum();
+        assert_eq!(gap_length, expected_gap);
+        payload["baseline"] = cold.clone();
+        put_project_preview_cache(
+            &db,
+            1,
+            1,
+            changed["identity"].as_str().unwrap(),
+            changed["revision"].as_i64().unwrap(),
+            &payload,
+        )?;
+        assert_eq!(metadata(&db)?["snapshot"]["baseline"], cold);
+    }
+    Ok(())
+}
+
+#[test]
+fn cache_v2_upgrade_resets_identity_and_reinstalls_n_gap_tracking() -> Result<()> {
+    let (_root, db) = fixture()?;
+    let before = metadata(&db)?;
+    store(&db, &before)?;
+    let conn = open_workspace_db(&db)?;
+    conn.execute_batch("UPDATE project_preview_schema SET version=2; DROP TRIGGER preview_v1_source_seq_n_region_insert; DROP TRIGGER preview_v1_source_seq_n_region_update; DROP TRIGGER preview_v1_source_seq_n_region_delete;")?;
+    let upgraded = metadata(&db)?;
+    assert_ne!(upgraded["identity"], before["identity"]);
+    assert_eq!(upgraded["valid"], false);
+    assert_eq!(upgraded["trackingVersion"], 3);
+    conn.execute("INSERT INTO source_seq_n_region(source_seq_id,start_bp,end_bp,length_bp) VALUES(1,401,450,50)", [])?;
+    assert!(metadata(&db)?["revision"].as_i64() > upgraded["revision"].as_i64());
+    assert_eq!(
+        conn.query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))?,
+        crate::db::CURRENT_SCHEMA_VERSION
+    );
+    Ok(())
+}
+
+#[test]
+fn source_and_chromosome_reassignment_invalidates_old_and_new_scopes() -> Result<()> {
+    let (_root, db) = fixture()?;
+    let before = metadata(&db)?;
+    store(&db, &before)?;
+    let conn = open_workspace_db(&db)?;
+    conn.execute(
+        "UPDATE assembly_ctg SET assigned_chr_name='Chr2' WHERE id=1",
+        [],
+    )?;
+    let changed = get_project_preview_cache(
+        &db,
+        1,
+        1,
+        before["identity"].as_str(),
+        before["revision"].as_i64(),
+    )?;
+    assert_eq!(changed["dirtyChrNames"], json!(["Chr1", "Chr2"]));
+    let payload = json!({"modelVersion":1,"cards":[],"dependencies":[
+        {"chrName":"Chr1","ctgIds":[],"sourceNames":[{"datasetName":"ds","contigName":"a"}]},
+        {"chrName":"Chr2","ctgIds":[],"sourceNames":[{"datasetName":"ds","contigName":"b"}]}]});
+    put_project_preview_cache(
+        &db,
+        1,
+        1,
+        changed["identity"].as_str().unwrap(),
+        changed["revision"].as_i64().unwrap(),
+        &payload,
+    )?;
+    conn.execute(
+        "UPDATE assembly_seq SET source_seq_id=2,instance_key='reassigned' WHERE id=1",
+        [],
+    )?;
+    let after = get_project_preview_cache(
+        &db,
+        1,
+        1,
+        changed["identity"].as_str(),
+        changed["revision"].as_i64(),
+    )?;
+    assert_eq!(after["dirtyChrNames"], json!(["Chr1", "Chr2"]));
     Ok(())
 }
