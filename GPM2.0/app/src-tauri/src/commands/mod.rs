@@ -756,12 +756,14 @@ mod assembly;
 mod files;
 mod imports;
 mod persistence;
+mod project_preview;
 mod workspace;
 
 pub use assembly::*;
 pub use files::*;
 pub use imports::*;
 pub use persistence::*;
+pub use project_preview::*;
 pub use workspace::*;
 
 #[cfg(test)]
@@ -782,6 +784,44 @@ mod tests {
         let path = std::env::temp_dir().join(unique);
         fs::create_dir_all(&path).expect("create temp workspace root");
         path
+    }
+
+    #[test]
+    fn preview_cache_commands_roundtrip_without_changing_assembly_state() {
+        let root = create_test_workspace_root();
+        let workspace = root.display().to_string();
+        let db = project_db_path(&workspace);
+        let conn = open_workspace_db(&db).expect("open fixture");
+        conn.execute_batch("INSERT INTO reference_genome(id,name,species_name,assembly_label,fasta_path,fai_path) VALUES(1,'ref','s','a','ref.fa','ref.fai');
+            INSERT INTO dataset(id,name,assembler,fasta_path,fai_path) VALUES(1,'ds','a','ds.fa','ds.fai');
+            INSERT INTO project(id,name,version,reference_genome_id,primary_dataset_id,created_at) VALUES(1,'p',1,1,1,'0');
+            INSERT INTO project_assembly_view_state(project_id,updated_at,final_path_by_chr_json) VALUES(1,'0','{}');").expect("seed fixture");
+        let metadata =
+            get_project_preview_cache(workspace.clone(), 1, 2, None, None).expect("cache metadata");
+        let request: PutProjectPreviewCacheRequest = serde_json::from_value(json!({
+            "workspaceRoot": workspace, "projectId": 1, "modelVersion": 2,
+            "expectedIdentity": metadata["identity"], "expectedRevision": metadata["revision"],
+            "payload": {"modelVersion": 2, "cards": [], "dependencies": []}
+        }))
+        .expect("decode camelCase cache request");
+        assert_eq!(
+            put_project_preview_cache(request).expect("write snapshot")["stored"],
+            true
+        );
+        let reopened =
+            get_project_preview_cache(workspace, 1, 2, None, None).expect("read snapshot");
+        assert_eq!(reopened["valid"], true);
+        assert_eq!(reopened["snapshot"]["modelVersion"], 2);
+        let paths: String = conn
+            .query_row(
+                "SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read source state");
+        assert_eq!(paths, "{}");
+        drop(conn);
+        fs::remove_dir_all(root).expect("cleanup fixture");
     }
 
     #[test]

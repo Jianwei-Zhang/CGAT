@@ -1,5 +1,11 @@
 import { projectIcon } from "./project-icons.js";
 import { syncFinalPathStripGeometry } from "./assembly/final-path-visual-layout.js";
+import { previewSemanticSignature, previewMutationStamp } from "../../services/preview-content-events.js";
+import { getProjectPreviewCache, putProjectPreviewCache } from "../../services/workflow-api.js";
+import { PREVIEW_MODEL_VERSION, previewSession, rememberPreviewEntry, previewLocalSignatures,
+  pathSignatures, previewOverrideSignature, previewStateIsApplicable, compactPreviewInputs, previewPaletteKey,
+  previewPathParents, affectedPreviewChromosomes, persistentPreviewPayload, isPreviewSnapshot,
+  markPreviewDom, restoreProjectPreviewDom } from "./project-preview-cache.js";
 import { getMessages } from "../i18n/index.js";
 import { getGrtProjectView, getProjectAssemblyViewState, listChrViewCtgs,
   listPhasedChrTracks, listProjectChromosomes } from "../../services/workflow-api.js";
@@ -10,6 +16,7 @@ import { buildProjectPreviewModel, previewProjectKey, requestPreviewChromosome }
 
 const requests = new WeakMap();
 const BOUND = Symbol("projectPreviewBound");
+const nodeModels = new WeakMap();
 const html = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;")
   .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 const number = value => Number(value).toLocaleString("en-US");
@@ -90,64 +97,233 @@ export function renderProjectPreviewPage(state) {
   const preview = state.projectPreview?.key === key ? state.projectPreview : {};
   const content = !key ? `<p class="muted">${html(labels.noProject)}</p>`
     : preview.error ? `<p class="error-text" role="alert">${html(preview.error)}</p><button type="button" class="button" data-preview-refresh>${html(labels.retry)}</button>`
-    : preview.loading || !preview.loaded ? `<p class="muted" role="status">${html(labels.loading)}</p>`
+    : !preview.loaded || (preview.localSignature !== undefined && !previewStateIsApplicable(state)) ? `<p class="muted" role="status">${html(labels.loading)}</p>`
     : preview.cards?.length ? `<div class="project-preview-cards">${preview.cards.map(card => renderCard(card, labels)).join("")}</div>`
     : `<p class="muted">${html(labels.empty)}</p>`;
-  return `<section class="project-preview-page"><header class="project-preview-heading"><h2>${html(labels.title)}</h2><span class="project-preview-subtitle" title="${html(labels.subtitle)}">${html(labels.subtitle)}</span>
+  return `<section class="project-preview-page" data-preview-project="${html(key)}" data-preview-locale="${html(state.locale)}" aria-busy="${Boolean(preview.loading)}"><header class="project-preview-heading"><h2>${html(labels.title)}</h2><span class="project-preview-subtitle" title="${html(labels.subtitle)}">${html(labels.subtitle)}</span>
     <details class="project-preview-legend"><summary aria-label="${html(labels.legend)}" title="${html(labels.legend)}">i</summary><div class="project-preview-hint">${html(labels.hint)}</div></details>
     <button type="button" class="button project-preview-refresh" data-preview-refresh title="${html(labels.refresh)}" aria-label="${html(labels.refresh)}" ${!key || preview.loading ? "disabled" : ""}>${projectIcon("refresh")}</button></header>
     ${content}</section>`;
 }
 
-export async function loadProjectPreviewData(host, store, deps = {}) {
-  const state = store.getState(), key = previewProjectKey(state);
-  if (!key) return false;
-  const request = {};
-  requests.set(store, request);
-  const isCurrent = () => requests.get(store) === request && previewProjectKey(store.getState()) === key
-    && store.getState().activeRoute === "projectPreview";
-  const rerender = () => { if (isCurrent()) { host.innerHTML = renderProjectPreviewPage(store.getState()); syncFinalPathStripGeometry(host); } };
-  store.setState({ projectPreview: { key, loading: true, loaded: false, error: "" } });
-  rerender();
-  const args = { workspaceRoot: state.session.workspacePath, projectId: state.session.projectId };
-  try {
-    const [chromosomes, ctgResult, view, rawGrt] = await Promise.all([
-      (deps.listProjectChromosomes || listProjectChromosomes)(args),
-      (deps.listChrViewCtgs || listChrViewCtgs)({ ...args, chrName: null }),
-      (deps.getProjectAssemblyViewState || getProjectAssemblyViewState)(args),
-      (deps.getGrtProjectView || getGrtProjectView)(args),
-    ]);
-    if (!isCurrent()) return false;
-    const project = state.initializer?.existingProjects?.find(item => Number(item.projectId) === Number(args.projectId)) || {};
-    const phasedChrTracksByChr = {};
-    if (project.phasedAssemblyEnabled) {
-      for (const chr of chromosomes.items || []) {
-        if (!isCurrent()) return false;
-        const result = await (deps.listPhasedChrTracks || listPhasedChrTracks)({ ...args, parentChrName: chr.chrName });
-        phasedChrTracksByChr[chr.chrName] = result.tracks || [];
+function updatePreviewDom(host, state) {
+  const preview = state.projectPreview, page = host.querySelector?.(".project-preview-page");
+  const container = page?.querySelector?.(".project-preview-cards");
+  if (container && preview?.loaded && preview.cards.length && page.dataset.previewProject === preview.key
+    && page.dataset.previewLocale === state.locale && !preview.error && previewStateIsApplicable(state)) {
+    const existing = new Map([...container.querySelectorAll("[data-preview-chr]")].map(node => [node.dataset.previewChr, node]));
+    const nodes = preview.cards.map(card => {
+      let node = existing.get(card.chrName);
+      if (nodeModels.get(node) !== card) {
+        const wrapper = host.ownerDocument.createElement("div");
+        wrapper.innerHTML = renderCard(card, getMessages(state, "projectPreview"));
+        node = wrapper.firstElementChild;
+        nodeModels.set(node, card);
       }
+      return node;
+    });
+    const wanted = new Set(nodes);
+    for (const node of [...container.children]) if (!wanted.has(node)) node.remove();
+    nodes.forEach((node, index) => {
+      const current = container.children[index];
+      if (current !== node) container.insertBefore(node, current || null);
+    });
+  } else {
+    host.innerHTML = renderProjectPreviewPage(state);
+    for (const node of host.querySelectorAll?.("[data-preview-chr]") || []) {
+      const card = preview?.cards?.find(card => card.chrName === node.dataset.previewChr);
+      if (card) nodeModels.set(node, card);
     }
-    if (!isCurrent()) return false;
-    const baseline = normalizeGrtProjectView(rawGrt).baselineFinalPathByChr;
-    // In-memory edits win over persisted paths, including explicit empty paths.
-    const finalPathByChr = canonicalizeFinalPathOverallLengths({ ...baseline,
-      ...normalizeFinalPathByChr(view?.finalPathByChr),
-      ...normalizeFinalPathByChr(store.getState().assembly?.finalPathByChr),
-    }, baseline);
-    const cards = buildProjectPreviewModel({ chromosomes: chromosomes.items || [],
-      referenceGenomeId: chromosomes.referenceGenomeId, ctgs: ctgResult.items || [],
-      datasets: state.initializer?.datasets || [], project, finalPathByChr, phasedChrTracksByChr });
-    store.setState({ projectPreview: { key, loading: false, loaded: true, error: "",
-      chromosomes: chromosomes.items || [], cards } });
-    rerender();
-    return true;
-  } catch (error) {
-    if (!isCurrent()) return false;
-    store.setState({ projectPreview: { key, loading: false, loaded: false,
-      error: String(error?.message || error) } });
-    rerender();
-    return false;
   }
+  const currentPage = host.querySelector?.(".project-preview-page");
+  currentPage?.setAttribute?.("aria-busy", String(Boolean(preview?.loading)));
+  const refresh = host.querySelector?.("[data-preview-refresh]");
+  if (refresh) refresh.disabled = Boolean(preview?.loading);
+  syncFinalPathStripGeometry(host);
+  markPreviewDom(host, state);
+}
+
+function buildCards(inputs, paths, previous, affected, build) {
+  const selected = affected ? inputs.chromosomes.filter(chr => affected.has(chr.chrName)) : inputs.chromosomes;
+  const replacements = new Map(build({ ...inputs, chromosomes: selected, finalPathByChr: paths }).map(card => [card.chrName, card]));
+  const old = new Map((previous || []).map(card => [card.chrName, card]));
+  return inputs.chromosomes.slice().sort((a, b) => Number(a.chrOrder || 0) - Number(b.chrOrder || 0)
+    || a.chrName.localeCompare(b.chrName, undefined, { numeric: true }))
+    .map(chr => replacements.get(chr.chrName) || old.get(chr.chrName)).filter(Boolean);
+}
+
+async function readPreviewSources(state, args, metadata, deps) {
+  const [chromosomes, ctgResult, view, rawGrt] = await Promise.all([
+    (deps.listProjectChromosomes || listProjectChromosomes)(args),
+    (deps.listChrViewCtgs || listChrViewCtgs)({ ...args, chrName: null }),
+    (deps.getProjectAssemblyViewState || getProjectAssemblyViewState)(args),
+    (deps.getGrtProjectView || getGrtProjectView)(args),
+  ]);
+  const project = metadata?.sourceMetadata?.project
+    || state.initializer?.existingProjects?.find(item => Number(item.projectId) === Number(args.projectId)) || {};
+  const phasedChrTracksByChr = {};
+  if (project.phasedAssemblyEnabled) {
+    const pending = (chromosomes.items || []).slice();
+    // Bounded concurrency rather than a serial roundtrip for every chromosome.
+    await Promise.all(Array.from({ length: Math.min(3, pending.length) }, async () => {
+      while (pending.length) {
+        const chr = pending.shift();
+        const result = await (deps.listPhasedChrTracks || listPhasedChrTracks)({ ...args, parentChrName: chr.chrName });
+        phasedChrTracksByChr[chr.chrName] = (result.tracks || []).map(track => ({ label: track.label }));
+      }
+    }));
+  }
+  const baseline = normalizeGrtProjectView(rawGrt).baselineFinalPathByChr;
+  const savedPaths = canonicalizeFinalPathOverallLengths({ ...baseline, ...normalizeFinalPathByChr(view?.finalPathByChr) }, baseline);
+  return compactPreviewInputs({ chromosomes: chromosomes.items || [], referenceGenomeId: chromosomes.referenceGenomeId,
+    ctgs: ctgResult.items || [], datasets: metadata?.sourceMetadata?.datasets || state.initializer?.datasets || [],
+    project, phasedChrTracksByChr, baseline, savedPaths });
+}
+
+export function loadProjectPreviewData(host, store, deps = {}, options = {}) {
+  const initial = store.getState(), key = previewProjectKey(initial);
+  if (!key) return Promise.resolve(false);
+  const session = previewSession(store);
+  const pending = session.pending.get(key);
+  if (!options.force && pending?.host === host && pending.mutationStamp === previewMutationStamp({
+    workspaceRoot: initial.session.workspacePath, projectId: initial.session.projectId,
+  }) && pending.localSignature === previewSemanticSignature(previewLocalSignatures(initial))) return pending.promise;
+  const token = {}; requests.set(store, token);
+  const isCurrent = () => requests.get(store) === token && previewProjectKey(store.getState()) === key
+    && store.getState().activeRoute === "projectPreview";
+  const args = { workspaceRoot: initial.session.workspacePath, projectId: initial.session.projectId };
+  const getCache = deps.getProjectPreviewCache || getProjectPreviewCache;
+  const putCache = deps.putProjectPreviewCache || putProjectPreviewCache;
+  const build = deps.buildProjectPreviewModel || buildProjectPreviewModel;
+  const readMetadata = async entry => {
+    try {
+      const metadata = await getCache({ ...args, modelVersion: PREVIEW_MODEL_VERSION,
+        expectedIdentity: entry?.identity || null, sinceRevision: entry?.revision ?? null });
+      return metadata?.trackingVersion >= 2 ? metadata : { available: false };
+    }
+    catch { return { available: false }; }
+  };
+  const apply = entry => {
+    if (!isCurrent()) return false;
+    rememberPreviewEntry(store, key, entry);
+    store.setState({ projectPreview: { key, loading: false, loaded: true, error: "",
+      modelVersion: PREVIEW_MODEL_VERSION, identity: entry.identity, revision: entry.revision,
+      chromosomes: entry.payload.chromosomes, cards: entry.cards,
+      savedPathSignatures: entry.payload.savedPathSignatures,
+      localSignature: entry.localSignature, mutationStamp: entry.mutationStamp, cacheSource: entry.cacheSource } });
+    // No paint/await between restoring the old foundation and replacing the
+    // changed cards; unaffected node identities (and keyboard focus) survive.
+    if (!isCurrent()) return false;
+    restoreProjectPreviewDom(host, store.getState(), { allowModelMismatch: true });
+    updatePreviewDom(host, store.getState());
+    return true;
+  };
+  const run = async () => {
+    try {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const cached = session.entries.get(key);
+        const previous = cached?.payload?.modelVersion === PREVIEW_MODEL_VERSION ? cached : null;
+        const stamp = previewMutationStamp(args);
+        const metadata = await readMetadata(previous);
+        if (!isCurrent()) return false;
+        if (stamp !== previewMutationStamp(args)) continue;
+        const sameIdentity = metadata.available && previous?.identity === metadata.identity;
+        const sameRevision = sameIdentity && metadata.memoryValid && previous.revision === metadata.revision;
+        const local = previewLocalSignatures(store.getState());
+        const localSignature = previewOverrideSignature(local, previous?.payload?.savedPathSignatures || metadata.snapshot?.savedPathSignatures);
+        if (!options.force && sameRevision && previous.localSignature === localSignature) {
+          return apply({ ...previous, mutationStamp: stamp, cacheSource: "memory" });
+        }
+        const supplied = isPreviewSnapshot(metadata.snapshot) ? metadata.snapshot : null;
+        let payload = sameRevision ? previous.payload : supplied;
+        let savedCards = sameRevision ? previous.savedCards : supplied?.cards;
+        if (!sameRevision && sameIdentity && metadata.valid && supplied) {
+          const oldCompact = new Map(previous.payload.cards.map(card => [card.chrName, card]));
+          const oldModels = new Map(previous.savedCards.map(card => [card.chrName, card]));
+          savedCards = supplied.cards.map(card => previewSemanticSignature(oldCompact.get(card.chrName)) === previewSemanticSignature(card)
+            ? oldModels.get(card.chrName) || card : card);
+        }
+        let inputs = sameRevision ? previous.inputs : null;
+        const savedIsCurrent = !options.force && (sameRevision || (metadata.valid && supplied));
+        const overlayNames = payload ? Object.keys(local).filter(name => local[name] !== payload.savedPathSignatures[name]) : [];
+        if (savedIsCurrent && !overlayNames.length) {
+          return apply({ identity: metadata.identity, revision: metadata.revision, payload, savedCards,
+            inputs, sourceMetadata: metadata.sourceMetadata || previous?.sourceMetadata,
+            cards: savedCards, localSignature: previewOverrideSignature(local, payload.savedPathSignatures), mutationStamp: stamp,
+            incrementalSafe: sameRevision ? previous.incrementalSafe : true, cacheSource: sameRevision ? "memory" : "project" });
+        }
+        let stored = sameRevision ? previous.incrementalSafe : Boolean(savedIsCurrent);
+        if (!savedIsCurrent || !inputs) {
+          const visible = store.getState().projectPreview;
+          store.setState({ projectPreview: { ...(visible?.key === key ? visible : { loaded: false }), key, loading: true, error: "" } });
+          const refresh = host.querySelector?.("[data-preview-refresh]");
+          if (refresh) refresh.disabled = true;
+          host.querySelector?.(".project-preview-page")?.setAttribute?.("aria-busy", "true");
+          inputs = await readPreviewSources(store.getState(), args,
+            { ...metadata, sourceMetadata: metadata.sourceMetadata || (sameRevision ? previous?.sourceMetadata : null) }, deps);
+          if (!isCurrent()) return false;
+          const after = metadata.available ? await readMetadata({ identity: metadata.identity, revision: metadata.revision }) : null;
+          if (!isCurrent()) return false;
+          if (stamp !== previewMutationStamp(args) || (after?.available
+            && (!after.memoryValid || after.identity !== metadata.identity || after.revision !== metadata.revision))) continue;
+          // An unavailable validity check does not authorize publishing a cache.
+          const publishable = metadata.available && after?.available;
+          const palette = previewPaletteKey(inputs, inputs.savedPaths);
+          const baseCards = sameIdentity && previous ? previous.savedCards : supplied?.cards;
+          let affected = !options.force && baseCards && (previous?.incrementalSafe || !previous)
+            ? affectedPreviewChromosomes(metadata.dirtyChrNames, baseCards, payload?.pathParents) : null;
+          if (!payload || palette !== payload.paletteKey) affected = null;
+          if (savedIsCurrent && previewSemanticSignature(pathSignatures(inputs.savedPaths)) === previewSemanticSignature(payload.savedPathSignatures)) {
+            // Sources were fetched solely to overlay a session-only edit.
+            savedCards = savedCards || payload.cards;
+          } else {
+            savedCards = buildCards(inputs, inputs.savedPaths, baseCards, affected, build);
+          }
+          const retained = Object.fromEntries((payload?.dependencies || []).filter(dependency =>
+            baseCards?.find(card => card.chrName === dependency.chrName) === savedCards.find(card => card.chrName === dependency.chrName))
+            .map(dependency => [dependency.chrName, dependency.ctgIds]));
+          payload = persistentPreviewPayload(inputs, inputs.savedPaths, savedCards, retained);
+          stored = false;
+          if (publishable) {
+            try {
+              const result = await putCache({ ...args, modelVersion: PREVIEW_MODEL_VERSION,
+                expectedIdentity: metadata.identity, expectedRevision: metadata.revision, payload });
+              if (result?.superseded) continue;
+              stored = Boolean(result?.stored);
+            } catch { /* Derived-cache write failure must not hide a valid fresh view. */ }
+          }
+          if (!isCurrent()) return false;
+          if (stamp !== previewMutationStamp(args)) continue;
+        }
+        const latestLocal = previewLocalSignatures(store.getState());
+        const overlay = Object.keys(latestLocal).filter(name => latestLocal[name] !== payload.savedPathSignatures[name]);
+        let cards = savedCards;
+        if (overlay.length) {
+          const paths = canonicalizeFinalPathOverallLengths({ ...inputs.savedPaths,
+            ...normalizeFinalPathByChr(store.getState().assembly?.finalPathByChr) }, inputs.baseline);
+          const affected = previewPaletteKey(inputs, paths) === payload.paletteKey
+            ? affectedPreviewChromosomes(overlay, savedCards, previewPathParents(inputs)) : null;
+          cards = buildCards(inputs, paths, savedCards, affected, build);
+        }
+        return apply({ identity: metadata.available ? metadata.identity : null,
+          revision: metadata.available ? metadata.revision : null, payload, savedCards, inputs, cards,
+          sourceMetadata: metadata.sourceMetadata || (sameRevision ? previous?.sourceMetadata : null),
+          localSignature: previewOverrideSignature(latestLocal, payload.savedPathSignatures), mutationStamp: stamp,
+          // Unsaved adopted sources may add dependencies not present on disk.
+          incrementalSafe: stored && !overlay.length, cacheSource: "rebuilt" });
+      }
+      throw new Error(initial.locale === "en" ? "Project content changed during Preview loading; retry." : "项目内容在预览加载期间发生变化，请重试。");
+    } catch (error) {
+      if (!isCurrent()) return false;
+      store.setState({ projectPreview: { key, loading: false, loaded: false, error: String(error?.message || error) } });
+      updatePreviewDom(host, store.getState());
+      return false;
+    }
+  };
+  const promise = run().finally(() => { if (session.pending.get(key)?.promise === promise) session.pending.delete(key); });
+  session.pending.set(key, { promise, host, mutationStamp: previewMutationStamp(args),
+    localSignature: previewSemanticSignature(previewLocalSignatures(initial)) });
+  return promise;
 }
 
 export function bindProjectPreviewPage(host, store, deps = {}) {
@@ -162,7 +338,7 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
         return;
       }
       const refresh = event.target?.closest?.("[data-preview-refresh]");
-      if (refresh && host.contains(refresh)) void loadProjectPreviewData(host, binding.store, binding.deps);
+      if (refresh && host.contains(refresh)) void loadProjectPreviewData(host, binding.store, binding.deps, { force: true });
     });
     const win = host.ownerDocument?.defaultView;
     const Observer = win?.ResizeObserver;
@@ -177,6 +353,14 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
       });
     }
     host[BOUND] = binding;
+  }
+  if (previewStateIsApplicable(store.getState())) {
+    for (const node of host.querySelectorAll?.("[data-preview-chr]") || []) {
+      const card = store.getState().projectPreview.cards.find(card => card.chrName === node.dataset.previewChr);
+      if (card && !nodeModels.has(node)) nodeModels.set(node, card);
+    }
+    markPreviewDom(host, store.getState());
+    syncFinalPathStripGeometry(host);
   }
   void loadProjectPreviewData(host, store, deps);
 }

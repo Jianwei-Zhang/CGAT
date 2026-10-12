@@ -70,6 +70,8 @@ async function updateRuntimeSettingsTauri({
 }
 
   return {
+    getProjectPreviewCache(args) { return invokeCommand("get_project_preview_cache", args); },
+    putProjectPreviewCache(request) { return invokeCommand("put_project_preview_cache", { request }); },
     getProjectAssemblyViewState: getProjectAssemblyViewStateTauri,
     setProjectAssemblyViewState: setProjectAssemblyViewStateTauri,
     getRuntimeSettings: getRuntimeSettingsTauri,

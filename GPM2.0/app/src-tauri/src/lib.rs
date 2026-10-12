@@ -60,6 +60,8 @@ pub fn run() {
             commands::list_export_records,
             commands::get_runtime_settings,
             commands::update_runtime_settings,
+            commands::get_project_preview_cache,
+            commands::put_project_preview_cache,
             commands::get_project_assembly_view_state,
             commands::update_project_assembly_view_state,
             commands::append_edit_audit_log,

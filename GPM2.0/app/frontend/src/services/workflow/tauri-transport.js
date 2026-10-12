@@ -1,3 +1,4 @@
+import { beginPreviewContentOperation, finishPreviewContentOperation } from "../preview-content-events.js";
 import {
   invokeCommand as defaultInvokeCommand,
   listenBackendEvent as defaultListenBackendEvent,
@@ -14,9 +15,13 @@ export function createTauriTransport({
   getPackageMetadataFallback = () => ({}),
 } = {}) {
   async function invokeNormalized(command, args, stateOrLocale) {
+    const operation = beginPreviewContentOperation(command, args);
     try {
-      return await invoke(command, args, stateOrLocale);
+      const result = await invoke(command, args, stateOrLocale);
+      finishPreviewContentOperation(operation, command, result, true);
+      return result;
     } catch (error) {
+      finishPreviewContentOperation(operation, command, null, false);
       throw normalizeWorkflowError(error, {
         code: "TAURI_INVOKE_ERROR",
         source: "tauri",

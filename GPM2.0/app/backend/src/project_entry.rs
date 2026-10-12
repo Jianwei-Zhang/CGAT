@@ -325,7 +325,10 @@ mod tests {
         let root = temp.path().join("MixedCaseProject");
         workspace(&root);
         let alias = display_path(&root).to_ascii_uppercase();
-        assert_eq!(workspace_aliases(&root, &[alias.clone()]), vec![alias]);
+        assert_eq!(
+            workspace_aliases(&root, std::slice::from_ref(&alias)),
+            vec![alias]
+        );
     }
     #[test]
     fn corrupt_archives_and_unsupported_files_do_not_create_a_workspace() {

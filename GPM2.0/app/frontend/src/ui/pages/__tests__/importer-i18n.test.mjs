@@ -1741,7 +1741,7 @@ test("import progress css keeps the active label on one line and uses status ico
   assert.match(css, /\.importer-import-progress-overlay\s*\{/);
   assert.match(
     css,
-    /\.importer-import-progress-dialog\s*\{[^}]*width:\s*min\(900px,[^}]*max-height:\s*min\(760px,[^}]*border-radius:\s*8px;/,
+    /\.importer-import-progress-dialog\s*\{[^}]*width:\s*min\(900px,[^}]*max-height:\s*min\(760px,[^}]*border-radius:\s*var\(--card-radius\);/,
   );
   assert.match(
     css,
@@ -1765,7 +1765,7 @@ test("import progress css keeps the active label on one line and uses status ico
   );
   assert.match(
     css,
-    /@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.importer-import-progress-dialog\s*\{[^}]*border-radius:\s*8px;/,
+    /@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.importer-import-progress-dialog\s*\{[^}]*border-radius:\s*var\(--card-radius\);/,
   );
   assert.doesNotMatch(
     css,

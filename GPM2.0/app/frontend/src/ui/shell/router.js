@@ -3,6 +3,7 @@ import { bindAssemblyPage, renderAssemblyPage, syncAssemblySubviewTools } from "
 import { bindImporterPage } from "../pages/importer-page.js";
 import { bindProjectExportPage, renderProjectExportPage } from "../pages/project-export-page.js";
 import { bindProjectPreviewPage, renderProjectPreviewPage } from "../pages/project-preview-page.js";
+import { rememberProjectPreviewDom, restoreProjectPreviewDom } from "../pages/project-preview-cache.js";
 import { getMessages, t } from "../i18n/index.js";
 import {
   buildAssemblyDomCacheKey,
@@ -51,6 +52,7 @@ export function renderCurrentRoute(root, store) {
     state = store.getState();
   }
   const previousAssemblyDomCacheKey = String(host?.dataset?.assemblyDomCacheKey || "");
+  if (previousRoute === "projectPreview") rememberProjectPreviewDom(host);
   if (previousRoute === "assembly") {
     rememberAssemblyDom(host, state);
   }
@@ -72,7 +74,8 @@ export function renderCurrentRoute(root, store) {
       && previousRoute
       && previousAssemblyDomCacheKey !== nextAssemblyDomCacheKey
       && restoreAssemblyDom(host, state);
-    if (!restoredAssemblyDom) {
+    const restoredPreviewDom = state.activeRoute === "projectPreview" && restoreProjectPreviewDom(host, state);
+    if (!restoredAssemblyDom && !restoredPreviewDom) {
       host.innerHTML = renderer(state);
       setRouteHostDataset(host, state.activeRoute, nextAssemblyDomCacheKey);
       const binder = routeBinders[state.activeRoute];
@@ -81,7 +84,8 @@ export function renderCurrentRoute(root, store) {
       }
     } else {
       setRouteHostDataset(host, state.activeRoute, nextAssemblyDomCacheKey);
-      syncAssemblySubviewTools(host, store);
+      if (restoredPreviewDom) bindProjectPreviewPage(host, store);
+      else syncAssemblySubviewTools(host, store);
     }
   } catch (error) {
     const message = String(error?.stack || error?.message || error || "unknown route render error");

@@ -90,9 +90,13 @@ function assignLanes(items) {
 
 export function buildProjectPreviewModel({ chromosomes = [], referenceGenomeId = 0, ctgs = [],
   datasets = [], project = {}, finalPathByChr = {}, phasedChrTracksByChr = {} } = {}) {
-  const byId = new Map(), bySource = new Map();
+  const byId = new Map(), bySource = new Map(), byChr = new Map();
   const sourceKey = (dataset, contig) => JSON.stringify([text(dataset), text(contig)]);
   ctgs.forEach(ctg => {
+    for (const name of new Set([text(ctg.assignedChrName), ...(ctg.coAssignedChrNames || []).map(text)].filter(Boolean))) {
+      if (!byChr.has(name)) byChr.set(name, []);
+      byChr.get(name).push(ctg);
+    }
     if (positive(ctg.assemblyCtgId)) byId.set(positive(ctg.assemblyCtgId), ctg);
     for (const name of new Set([text(ctg.originId), text(ctg.name)].filter(Boolean))) {
       const key = sourceKey(ctg.datasetName, name), items = bySource.get(key) || [];
@@ -138,8 +142,7 @@ export function buildProjectPreviewModel({ chromosomes = [], referenceGenomeId =
       }
       return item;
     };
-    ctgs.filter(ctg => text(ctg.assignedChrName) === chrName
-      || (ctg.coAssignedChrNames || []).includes(chrName)).forEach(includeCtg);
+    (byChr.get(chrName) || []).forEach(includeCtg);
     const phasedNames = (phasedChrTracksByChr[chrName] || []).map(track => text(track.label));
     const pathNames = phasedNames.some(name => finalPathByChr[name]) ? phasedNames : [chrName];
     const refHighlights = [], paths = [];

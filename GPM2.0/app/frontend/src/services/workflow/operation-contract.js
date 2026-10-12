@@ -59,6 +59,8 @@ const DEFINITIONS = {
     ["exportDegapJobs", "bridge"],
   ],
   state: [
+    ["getProjectPreviewCache", "unavailable"],
+    ["putProjectPreviewCache", "unavailable"],
     ["getRuntimeSettings", "bridge"],
     ["updateRuntimeSettings", "bridge"],
     ["getProjectAssemblyViewState", "mock"],

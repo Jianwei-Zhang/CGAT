@@ -1,9 +1,9 @@
 schema: comet.native.v4
 name: project-preview-cache
 language: en
-phase: shape
-status: await-user
-state_version: 2
+phase: build
+status: active
+state_version: 3
 brief: brief.md
 shape_confirmation_hash: 4aede92da914f451d0a026708897155c15e6b0bb3f75fdcf658d3287cc9d5d8c
 spec_changes:
@@ -16,16 +16,16 @@ workspace:
   target_branch: master
   finish: null
 loop:
-  stage: await-user
+  stage: building
   goal_cycle: 1
-  iteration: 0
+  iteration: 1
   attempt: 0
   retry_epoch: 0
   failed_iteration_count: 0
   no_progress_count: 0
   execution_failure_count: 0
   previous_unresolved_ids: []
-  next_action: confirm-shape
+  next_action: submit-builder-candidate
 acceptance:
   - id: A1
     source: brief.md

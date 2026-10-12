@@ -39,6 +39,7 @@ test("preview uses single-line heading, icon refresh, hides unpositioned informa
   assert.doesNotMatch(output, /project-preview-refresh[^>]*>刷新/);
   assert.doesNotMatch(output, /project-preview-unpositioned|data-preview-unpositioned|未定位/);
   assert.match(output, /data-final-path-gap-label="1"/);
+  assert.match(output, /data-final-path-kind="gap"[^>]*background:#ffffff/);
   assert.match(output, /title="Gap: 1 bp">Gap<\/span>/);
   assert.match(output, /a&lt;ctg&gt;/);
 });
@@ -65,14 +66,16 @@ test("late preview requests cannot overwrite a different project or a newer requ
   options.listProjectChromosomes = () => new Promise(done => { resolve = done; });
   const store = createStore(state()), node = host();
   const pending = loadProjectPreviewData(node, store, options);
+  await new Promise(done => setImmediate(done));
   store.setState({ session: { workspacePath: "/other", projectId: 2 }, projectPreview: null });
   resolve({ items: [] });
   assert.equal(await pending, false);
   assert.equal(store.getState().projectPreview, null);
   store.setState(state());
   const first = loadProjectPreviewData(node, store, options);
+  await new Promise(done => setImmediate(done));
   const resolveFirst = resolve;
-  assert.equal(await loadProjectPreviewData(node, store, deps()), true);
+  assert.equal(await loadProjectPreviewData(node, store, deps(), { force: true }), true);
   resolveFirst({ items: [] });
   assert.equal(await first, false);
   assert.equal(store.getState().projectPreview.cards.length, 1);

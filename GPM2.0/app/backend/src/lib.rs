@@ -14,6 +14,7 @@ pub mod phased_assembly;
 pub mod project_catalog;
 pub mod project_entry;
 pub mod project_initializer;
+pub mod project_preview_cache;
 mod reference_geometry;
 pub mod reference_segments;
 pub mod runtime_persistence;
