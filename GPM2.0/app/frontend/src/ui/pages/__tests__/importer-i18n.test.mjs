@@ -196,7 +196,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.progressStages.validate_grt_app_fai, "校验来源与 reference 的 FAI 长度");
   assert.equal(zh.runtime.importPhaseProgress, "阶段 {current}/{total}");
   assert.equal(zh.buttons.validateHistory, "校验项目");
-  assert.equal(zh.buttons.deleteFailedRecords, "删除失败项目");
+  assert.equal(zh.buttons.deleteFailedRecords, "删除失败");
   assert.equal(zh.page.deleteFailedConfirmTitle, "删除失败项目");
   assert.equal(zh.page.deleteWithFiles, "是否同步删除对应文件（此操作不可逆，请谨慎操作）");
   assert.equal(zh.runtime.deleteDoneFailedHistorySummary, "已从项目库删除 {count} 个校验失败项目。");
@@ -220,7 +220,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.progressStages.validate_grt_app_fai, "Validate source and reference FAI lengths");
   assert.equal(en.runtime.importPhaseProgress, "Phase {current}/{total}");
   assert.equal(en.buttons.validateHistory, "Validate projects");
-  assert.equal(en.buttons.deleteFailedRecords, "Delete failed projects");
+  assert.equal(en.buttons.deleteFailedRecords, "Delete failed");
   assert.equal(en.page.deleteFailedConfirmTitle, "Delete failed projects");
   assert.equal(en.page.deleteWithFiles, "Also delete files on disk (irreversible).");
   assert.equal(en.runtime.deleteDoneFailedHistorySummary, "Removed {count} projects that failed validation from the library.");
@@ -370,7 +370,7 @@ test("importer bulk delete removes only current failed history records", async (
     const store = createStore(state);
 
     const initialHtml = renderImporterPage(store.getState());
-    assert.match(initialHtml, /id="validate-history-button"[^>]*>校验项目<\/button>\s*<button id="delete-failed-history-button"[^>]*>删除失败项目<\/button>/);
+    assert.match(initialHtml, /id="validate-history-button"[^>]*>校验项目<\/button>\s*<button id="delete-failed-history-button"[^>]*>删除失败<\/button>/);
     assert.doesNotMatch(initialHtml, /id="delete-failed-history-button"[^>]*hidden/);
 
     bindImporterPage(host, store);

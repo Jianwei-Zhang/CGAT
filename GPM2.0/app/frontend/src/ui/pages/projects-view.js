@@ -141,7 +141,7 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
       <header class="project-recents-header"><h4 id="project-recents-title">${labels.recent}<span class="project-count">${records.length}</span></h4>
         ${records.length ? `<div class="project-library-actions">
           <button id="validate-history-button" class="button ghost project-history-action" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button>
-          <button id="delete-failed-history-button" class="button ghost project-history-action" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button>
+          <button id="delete-failed-history-button" class="button ghost project-history-action" title="${html(messages.page.deleteFailedConfirmTitle)}" aria-label="${html(messages.page.deleteFailedConfirmTitle)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button>
         </div>` : ""}
       </header>
       <div class="project-recent-list">${rows}</div>

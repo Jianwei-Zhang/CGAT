@@ -400,15 +400,16 @@
 }
 
 .project-recents-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
-.project-recents-header h4 { display: flex; align-items: center; gap: 8px; font-size: var(--font-body); font-weight: 500; color: #666; }
+.project-recents-header h4 { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; white-space: nowrap; font-size: var(--font-body); font-weight: 500; color: #666; }
 .project-count { color: #777; font-variant-numeric: tabular-nums; }
-.project-library-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.project-library-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; max-width: 100%; margin-left: auto; }
 .projects-page .project-library-actions [hidden], .project-recent-error[hidden] { display: none; }
 .project-entry-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .project-icon { flex: 0 0 auto; vertical-align: middle; }
@@ -435,7 +436,7 @@
 .projects-page :is(button, summary, input, select):focus-visible { outline: 2px solid #555; outline-offset: 3px; }
 .projects-page .project-icon-button { width: 32px; min-height: 32px; height: 32px; padding: 0; border-color: transparent; flex: 0 0 auto; }
 .projects-page .project-icon-button:not(.project-primary) { color: #707070; }
-.projects-page .project-history-action { flex: 0 0 auto; min-height: 30px; padding: 5px 8px; font-size: var(--font-small); white-space: nowrap; }
+.projects-page .project-history-action { flex: 0 0 auto; min-height: 30px; padding: 5px 6px; font-size: var(--font-small); white-space: nowrap; }
 
 .project-empty {
   flex: 1;
