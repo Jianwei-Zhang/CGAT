@@ -6,6 +6,48 @@ import {
   persistProjectAssemblyViewState,
 } from "../project-view-state.js";
 
+test("first assembly entry fits the main overview without changing track filters", async () => {
+  for (const trackScrollState of [undefined, {}, { viewportKey: " ", scrollLeft: 320 }]) {
+    const result = await loadProjectAssemblyViewState({ workspaceRoot: "/tmp/ws", projectId: 7 }, {
+      async getProjectAssemblyViewState() {
+        return {
+          trackView: {
+            visibleSpanBp: 100000000,
+            supportDsCtgLen: 1000,
+            alignmentLength: 10000,
+            minIdentityPct: 95,
+            showTelomeres: false,
+          },
+          trackScrollState,
+        };
+      },
+    });
+    assert.equal(result.trackView.fullRange, true);
+    assert.equal(result.trackView.allowSubViewportScale, true);
+    assert.equal(result.trackView.supportDsCtgLen, 1000);
+    assert.equal(result.trackView.alignmentLength, 10000);
+    assert.equal(result.trackView.minIdentityPct, 95);
+    assert.equal(result.trackView.showTelomeres, false);
+    assert.equal(result.trackScrollState.viewportKey, "");
+  }
+});
+
+test("saved main viewports restore their range and scroll instead of being forced to overview", async () => {
+  for (const scrollLeft of [0, 320]) {
+    for (const fullRange of [false, true]) {
+      const trackScrollState = { viewportKey: "7:Chr01:saved", scrollLeft };
+      const result = await loadProjectAssemblyViewState({ workspaceRoot: "/tmp/ws", projectId: 7 }, {
+        async getProjectAssemblyViewState() {
+          return { trackView: { visibleSpanBp: 500000, fullRange }, trackScrollState };
+        },
+      });
+      assert.equal(result.trackView.fullRange === true, fullRange);
+      assert.equal(result.trackView.visibleSpanBp, 500000);
+      assert.deepEqual(result.trackScrollState, trackScrollState);
+    }
+  }
+});
+
 test("marker visibility persists independently and survives project reload", async () => {
   let saved;
   const request = { workspaceRoot: "/tmp/ws", projectId: 7 };

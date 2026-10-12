@@ -68,9 +68,16 @@ export async function loadProjectAssemblyViewState({ workspaceRoot, projectId },
     };
   }
   const result = await getProjectAssemblyViewState({ workspaceRoot, projectId });
+  const trackScrollState = normalizeTrackScrollState(result?.trackScrollState);
+  // A project without a saved main viewport has not been navigated yet. Fit
+  // its actual track content on first entry instead of using the legacy scale.
+  // Saved viewports retain their zoom and scroll position on later entries.
+  const trackView = trackScrollState.viewportKey
+    ? result?.trackView
+    : { ...result?.trackView, fullRange: true, allowSubViewportScale: true };
   return {
     supportDatasetId: normalizeSupportId(result?.supportDatasetId),
-    trackView: normalizeTrackView(result?.trackView),
+    trackView: normalizeTrackView(trackView),
     supportMirroredCtgs: normalizeMirrors(result?.supportMirroredCtgs),
     supportDsCtgLenRulesByChr: normalizeSupportDsCtgLenRulesByChr(result?.supportDsCtgLenRulesByChr),
     hiddenPrimaryCtgIds: normalizeHiddenIds(result?.hiddenPrimaryCtgIds),
@@ -79,7 +86,7 @@ export async function loadProjectAssemblyViewState({ workspaceRoot, projectId },
     subviewTrackDragOffsets: normalizeSubviewOffsets(result?.subviewTrackDragOffsets),
     subviewAnchorStateByKey: normalizeSubviewAnchorStateByKey(result?.subviewAnchorStateByKey),
     subviewHistoryByKey: normalizeSubviewHistoryByKey(result?.subviewHistoryByKey),
-    trackScrollState: normalizeTrackScrollState(result?.trackScrollState),
+    trackScrollState,
     subviewTrackScrollState: normalizeTrackScrollState(result?.subviewTrackScrollState),
     finalPathTrackScrollState: normalizeTrackScrollState(result?.finalPathTrackScrollState),
     membersCardCollapsed: normalizeMembersCollapsed(result?.membersCardCollapsed),
