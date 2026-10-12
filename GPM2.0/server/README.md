@@ -2,25 +2,23 @@
 
 [中文](README_zh.md) | **English**
 
-## Download
-
-Download `GPM_Server_*_source.tar.gz` from [Releases](https://github.com/Jianwei-Zhang/CGAT/releases/latest) onto your Linux server. Extract the standalone source package before installing:
-
-```bash
-tar -xzf GPM_Server_*_source.tar.gz
-cd GPM_Server
-```
-
 ## Quick start
 
+On your Linux server, download the GPM Server tools (source package) from [Release v2.0.10](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.10), then extract, enter the tool directory, and install:
+
 ```bash
-# 1. Install and verify the isolated environment
+# 1. Download, extract, and enter the Server tool directory
+curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.10/GPM_Server_2.0.10_source.tar.gz
+tar -xzf GPM_Server_2.0.10_source.tar.gz
+cd GPM_Server
+
+# 2. Install and verify the isolated environment
 bash install.sh
 
-# 2. Activate it with the command printed by the installer, for example
+# 3. Activate it with the command printed by the installer, for example
 mamba activate cgat-server
 
-# 3. Prepare, compute, and create the delivery archives
+# 4. Prepare, compute, and create the delivery archives
 bash run.sh \
   --ref /path/to/reference.fa \
   --ds /path/to/assembly.fa \

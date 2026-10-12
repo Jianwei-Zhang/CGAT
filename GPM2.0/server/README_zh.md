@@ -2,25 +2,23 @@
 
 **中文** | [English](README.md)
 
-## 下载
-
-在 Linux 服务器上下载 [Releases](https://github.com/Jianwei-Zhang/CGAT/releases/latest) 中的 `GPM_Server_*_source.tar.gz`（独立 Server 源码包），解压后安装：
-
-```bash
-tar -xzf GPM_Server_*_source.tar.gz
-cd GPM_Server
-```
-
 ## 快速开始
 
+在 Linux 服务端依次执行以下命令：从 [Release v2.0.10](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.10) 下载 GPM Server 工具包（源码），解压并进入工具目录，然后安装和运行。
+
 ```bash
-# 1. 安装并验证独立环境
+# 1. 下载、解压并进入 Server 工具目录
+curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.10/GPM_Server_2.0.10_source.tar.gz
+tar -xzf GPM_Server_2.0.10_source.tar.gz
+cd GPM_Server
+
+# 2. 安装并验证独立环境
 bash install.sh
 
-# 2. 使用安装程序最后打印的命令激活环境，例如
+# 3. 使用安装程序最后打印的命令激活环境，例如
 mamba activate cgat-server
 
-# 3. 准备、计算并生成交付包
+# 4. 准备、计算并生成交付包
 bash run.sh \
   --ref /path/to/reference.fa \
   --ds /path/to/assembly.fa \
