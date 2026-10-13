@@ -126,22 +126,23 @@ resource budget, and local scheduler/environment instructions. For example:
 > Follow this cluster's submission rules; do not run on the login node, alter
 > scientific parameters, or overwrite existing results. Report logs and outputs.
 
-Skill v2 supports [user-local operational lessons](skills/gpm-server/references/local-learning.md)
-in `local/notes.md`, separate from the official rules. It reads relevant lessons on
-future tasks, but saves a verified repair only with user consent (default: ask;
-explicit scoped `auto-local` opt-in or `off` is supported). This is agent guidance,
-not a background learning service or enforced permission system. Local notes never
-authorize scientific parameter changes, destructive repairs, or uploads.
+Skill v3 automatically retains concise, verified operational lessons in
+`local/notes.md` when a similar pitfall could plausibly recur; it does not ask users
+to choose persistence modes. It deduplicates notes and checks their scope/evidence
+before reuse. Explicit no-write instructions and permissions still apply. Notes
+never authorize scientific parameter changes, destructive repairs or uploads.
+See [local learning](skills/gpm-server/references/local-learning.md).
 
-For an approved skill upgrade, use the new bundle's `scripts/stage_skill_update.py`
-to stage a **new directory outside agent discovery**, preserving the existing
-`local/` and tools binding. Review and activate it separately; do not overwrite the
-installed folder. The helper does not upgrade Server tools, merge custom official
-files, or change agent configuration. See the linked instructions for consent scope
-and revalidating old lessons. Earlier v1 smoke records do not validate v2 learning;
-its automated checks cover filesystem preservation, not agent decision behavior.
-
-See the [v2 validation boundary and behavioral acceptance matrix](validation/agent-skill-v2-local-learning.md).
+For [official version checks and updates](skills/gpm-server/references/official-updates.md),
+`official_update.py check` queries the official stable Server Release and the
+repository-current skill separately. It uses asset digests and pinned commits,
+not a historical version string. `stage` verifies a reviewed plan, downloads new
+source to a fresh directory, preserves user-local experience and binds the candidate
+to the new tools. Validation/activation and environment changes remain separate;
+it does not overwrite a running installation, migrate runs or edit agent settings.
+The offline `stage_skill_update.py` is still available for trusted local bundles.
+This is agent guidance, not a background service or enforced permissions sandbox.
+See the [v3 validation boundary](validation/agent-skill-v3-official-updates.md).
 
 For a workflow-only trial, ask for the [synthetic smoke test](skills/gpm-server/references/smoke-test.md).
 It uses small generated inputs and real tools, not scientifically meaningful data.

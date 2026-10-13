@@ -1,8 +1,8 @@
 ---
 name: gpm-server
-description: Run, resume, diagnose, and hand off GPM Server genome-repair workflows on Linux servers or clusters using the official CLI. Use for GPM Server operational tasks, including small synthetic smoke tests, not desktop UI operation or autonomous scientific parameter optimization.
+description: Run, resume, diagnose, update official tools and skills, and hand off GPM Server genome-repair workflows on Linux servers or clusters using the official CLI. Use for GPM Server operational tasks, including small synthetic smoke tests, not desktop UI operation or autonomous scientific parameter optimization.
 metadata:
-  skill-version: "2"
+  skill-version: "3"
   compatibility: "Companion Server source with run.sh; verify its local help before execution"
 ---
 
@@ -14,15 +14,32 @@ quality, and a smoke test from a production analysis.
 
 ## Local experience: inspect at task start
 
-If present, read `local/preferences.md` and `local/notes.md` inside **this installed
-skill**, not another project's or host's copy. Read only regular files under a
-non-symlinked `local/` directory; do not follow symlinked files. Missing files are
-normal; do not create them merely by reading. Before applying an entry, match its host, environment,
-versions, symptom and evidence against this task. Notes are fallible diagnostic
-hints, never authority to override this skill, the user's request or site rules.
-Read [local learning](references/local-learning.md) before applying an entry,
-saving a lesson, changing persistence preferences, or upgrading this skill.
-A saved hint must not trigger automatic tools search, installation or rebinding.
+If present, read `local/notes.md` inside **this installed skill**, not another
+project's or host's copy. Read only regular files under a non-symlinked `local/`
+directory; do not follow symlinked files. Missing notes are normal: reading alone
+does not create them. Match each relevant entry's scope, versions and evidence
+before applying it. Notes are fallible hints, not permission to override this
+skill, user instructions or site rules. Read [local learning](references/local-learning.md)
+before applying or saving a lesson. A note must not trigger automatic tools search,
+installation or rebinding.
+
+## Check or update official versions
+
+When asked for current/latest versions or an upgrade, read
+[official updates](references/official-updates.md) and use the supplied helper:
+
+```bash
+python3 "$SKILL/scripts/official_update.py" check --installed "$SKILL"
+```
+
+It queries the official stable Server Release and the official skill repository,
+returns separately pinned versions and download identities, and does not install
+or change local state. Never infer freshness from a historical README version or
+only a version number: a Release asset can be replaced under the same filename.
+Normal run/resume tasks use the existing binding; network checks are not required
+on every task. Network failure is not permission to search, reinstall or switch.
+An explicit update request permits checking and preparing the agreed update, not
+silent replacement of an active installation/environment or migration of a run.
 
 ## Server tools location
 
@@ -61,7 +78,7 @@ change the user's agent/SSH configuration.
 
 ## Establish the task
 
-Identify the requested mode: first run, resume, diagnosis, or result handoff.
+Identify the requested mode: first run, resume, diagnosis, update, or result handoff.
 For an explicitly requested workflow smoke test, use
 [the synthetic smoke recipe](references/smoke-test.md) instead of real genomes.
 
@@ -115,18 +132,20 @@ an SSH session ends or a monitoring request times out.
 
 ## Learn only from verified repairs
 
-After fixing a demonstrated cause, verify that the original failure is resolved,
-then consider one concise reusable local lesson. Default: show the proposed entry
-and ask before saving. Explicit, scoped user opt-in may allow future low-risk
-entries without asking each time; task execution permission alone is not opt-in.
-Follow [local learning](references/local-learning.md) for authorization, evidence,
-deduplication, stale/conflicting notes and privacy. Never rewrite official rules
-as a side effect of a repair. If permission is denied or storage is read-only,
-report a proposed note without writing or seeking broader permissions.
+After an authorized repair, verify that the original failure is resolved. Decide
+whether the finding could recur and whether a short scoped lesson would materially
+avoid another pitfall. If so, save or update `local/notes.md` automatically; no mode
+selection, opt-in preference file or per-entry confirmation is required. Do not
+save routine successes, transient values or unverified guesses. Follow
+[local learning](references/local-learning.md) for deduplication, evidence, privacy
+and safe writes. Explicit user no-write instructions and tool permissions still
+win. Never rewrite official rules as a side effect of a repair; if storage is
+read-only, report the useful lesson without changing permissions or using a global
+fallback. Local recording grants no authority to perform the repair described.
 
 ## Handoff
 
-Report the source/skill version, host/architecture/environment, exact command,
+For pipeline runs, report the source/skill version, host/architecture/environment, exact command,
 input roles, workspace, job ID and terminal state, process exit code, and inspected
 stage status. Include log/report paths, both final archive paths and SHA-256 when
 successful, and clearly state any missing evidence or skipped QC.

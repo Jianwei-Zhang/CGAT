@@ -60,6 +60,25 @@ class SkillUpdateTests(unittest.TestCase):
         if os.name == "posix":
             self.assertEqual(self.out.stat().st_mode & 0o777, 0o700)
 
+    def test_explicit_new_tools_binding_preserves_notes_and_old_binding(self):
+        self.local_state()
+        tools = self.root / "new Server"
+        (tools / "tools/grt_core").mkdir(parents=True)
+        for name in ("run.sh", "prepare.sh", "install.sh", "tools/server_run.py"):
+            (tools / name).write_text("# not executed\n")
+        update.stage(self.source, self.old, self.out, tools)
+        self.assertEqual((self.out / "server-tools.path").read_text(), str(tools) + "\n")
+        self.assertEqual((self.old / "server-tools.path").read_bytes(), self.binding)
+        self.assertEqual((self.out / "local/notes.md").read_bytes(),
+                         (self.old / "local/notes.md").read_bytes())
+
+    def test_incomplete_or_relative_new_tools_never_changes_old_state(self):
+        for tools in (Path("relative"), self.root / "missing"):
+            with self.assertRaises((ValueError, FileNotFoundError)):
+                update.stage(self.source, self.old, self.out, tools)
+            self.assertFalse(self.out.exists())
+            self.assertEqual((self.old / "server-tools.path").read_bytes(), self.binding)
+
     def test_no_local_state_does_not_create_preferences_or_notes(self):
         self.stage()
         self.assertFalse((self.out / "local").exists())

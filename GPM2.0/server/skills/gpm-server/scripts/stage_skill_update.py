@@ -73,7 +73,8 @@ def copy_entries(entries: list[Path], root: Path, output: Path) -> None:
             raise ValueError(f"Content changed to an unsupported type: {source}")
 
 
-def stage(source: Path, installed: Path, output: Path) -> Path:
+def stage(source: Path, installed: Path, output: Path,
+          server_tools: Path | None = None) -> Path:
     source, installed = checked_path(source), checked_path(installed)
     output = checked_path(output)
     if not source.is_dir() or not installed.is_dir():
@@ -99,7 +100,22 @@ def stage(source: Path, installed: Path, output: Path) -> Path:
     for name in ("agents", "references", "scripts"):
         if not (source / name).is_dir():
             raise ValueError(f"Source {name} must be a directory")
-    binding = preserved_binding(installed)
+    if server_tools is None:
+        binding = preserved_binding(installed)
+    else:
+        if not server_tools.is_absolute() or any(c in str(server_tools) for c in "\n\r\0"):
+            raise ValueError("New Server tools must be a single-line absolute path")
+        server_tools = checked_path(server_tools)
+        for name in ("run.sh", "prepare.sh", "install.sh", "tools/server_run.py"):
+            path = server_tools / name
+            inventory(path)
+            if not path.is_file():
+                raise ValueError(f"Incomplete new Server tools: {name}")
+        core = server_tools / "tools/grt_core"
+        checked_path(core)
+        if not core.is_dir():
+            raise ValueError("Incomplete new Server tools: tools/grt_core")
+        binding = (str(server_tools) + "\n").encode("utf-8")
     local = installed / "local"
     local_entries = inventory(local) if os.path.lexists(local) else []
     if local_entries and not local.is_dir():
@@ -124,14 +140,17 @@ def main() -> int:
                         help="Existing user skill on this host (never modified)")
     parser.add_argument("--out", type=Path, required=True,
                         help="New staging directory outside agent discovery; parent must exist")
+    parser.add_argument("--server-tools", type=Path,
+                        help="Explicitly bind the staged skill to these complete new Server tools")
     args = parser.parse_args()
     try:
-        output = stage(Path(__file__).absolute().parents[1], args.installed, args.out)
+        output = stage(Path(__file__).absolute().parents[1], args.installed, args.out, args.server_tools)
     except (OSError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     print(f"Staged: {output}")
-    print("Preserved user-local state and tools binding; no tools were run.")
+    print("Preserved user-local state; tools binding was preserved or explicitly selected.")
+    print("No tools were run.")
     print("Not activated. Review customizations, consent scope and note applicability.")
     return 0
 

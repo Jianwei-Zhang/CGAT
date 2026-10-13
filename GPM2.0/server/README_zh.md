@@ -111,19 +111,18 @@ skill 目录的 `../..`；单独复制安装后，执行一次
 > /work/runs/sample，最多使用 4 线程。遵循本集群的作业提交规则，不在登录节点
 > 计算，不擅自调整科学参数或覆盖已有结果，结束后给出日志和结果位置。
 
-Skill v2 支持[用户本地经验](skills/gpm-server/references/local-learning.md)：将已验证的注意点
-保存在 `local/notes.md`，与官方规则分开，后续任务先核对适用条件再复用。
-默认先展示拟保存内容并询问；用户可明确授权限定范围的 `auto-local`，或设为 `off`。
-这是 agent 的操作约定，不是后台学习服务或强制权限系统；经验不能授权修改科学参数、
-破坏性修复或上传数据，也不会自动回传官方。
+Skill v3 默认自动积累简明的本地经验：问题已修复并验证，且类似坑以后可能再遇到、
+记录能减少踩坑时，保存或更新 `local/notes.md`，不再让用户选择记录模式。
+后续使用前核对适用条件和证据；用户明确的禁止写入要求及工具权限仍优先。
+经验不能授权修改科学参数、破坏性修复或上传数据，详见[本地经验规则](skills/gpm-server/references/local-learning.md)。
 
-经授权升级 skill 时，用新版本的 `scripts/stage_skill_update.py` 在 **agent 不会自动发现的
-新目录**中准备新版本，保留旧安装的 `local/` 和 tools 路径，再单独审核、启用。
-不要覆盖安装目录；此工具不升级 Server tools、不合并官方文件中的用户修改，也不改 agent 配置。
-旧经验及自动记录授权的适用范围需重新核对，详见上面的说明。此前 v1 冒烟记录不代表
-v2 学习行为已通过验证；本轮自动测试验证文件保留等机制，不验证 agent 的实际判断能力。
-
-详见 [v2 验证边界与行为验收矩阵](validation/agent-skill-v2-local-learning.md)。
+[官方版本检查与更新](skills/gpm-server/references/official-updates.md)由
+`official_update.py check` 分别查询官网指向的正式 Server Release 和官方仓库当前 skill，
+使用附件摘要及固定提交识别版本，而不是依赖历史版本号。`stage` 复核已审阅的计划，
+校验下载到新目录，保留本地经验并将候选 skill 绑定到新 tools。
+校验、启用及环境变更仍是单独步骤，不覆盖运行中的安装、不迁移已有任务、不改 agent 配置。
+已下载的可信本地 skill 仍可用 `stage_skill_update.py` 准备升级。
+这是 agent 指导，不是后台更新服务或强制权限沙箱；验证范围见 [v3 记录](validation/agent-skill-v3-official-updates.md)。
 
 只想验证能否跑通时，可要求执行 [合成小数据冒烟测试](skills/gpm-server/references/smoke-test.md)。
 它使用小型生成数据与真实工具，不用于科学结论。实际覆盖范围与未验证项见
