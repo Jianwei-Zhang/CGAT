@@ -96,6 +96,30 @@ Then rerun or resubmit that workspace's `run_all.sh` in the same environment.
 Keep the existing workspace and caches; compatible raw MUMmer alignments can be
 reused while the corrected stage outputs are regenerated.
 
+## Optional AI agent skill
+
+The source tree includes the official [gpm-server skill](skills/gpm-server/SKILL.md)
+for first runs, safe resume, diagnosis, and verified result handoff. It is optional:
+the CLI above still works without an AI agent. Keep the skill with its companion
+Server source; do not assume older release archives already include this addition.
+
+Point your agent at that `SKILL.md`, or copy the **whole** `skills/gpm-server/`
+folder into your chosen agent's skill directory according to its documentation.
+No agent configuration is changed by `install.sh`. Tell the agent the absolute
+Server path, input roles (the first `--ds` is the primary assembly), output path,
+resource budget, and local scheduler/environment instructions. For example:
+
+> Follow the gpm-server skill. The Server tools are at /work/GPM_Server. Use
+> /work/inputs/ref.fa as reference and /work/inputs/assembly.fa as primary.
+> Check the environment, then run in /work/runs/sample with at most 4 threads.
+> Follow this cluster's submission rules; do not run on the login node, alter
+> scientific parameters, or overwrite existing results. Report logs and outputs.
+
+For a workflow-only trial, ask for the [synthetic smoke test](skills/gpm-server/references/smoke-test.md).
+It uses small generated inputs and real tools, not scientifically meaningful data.
+See the [first-edition validation record](validation/agent-skill-v1-180.md) for
+actual coverage and exclusions; a skill is guidance, not a permissions sandbox.
+
 ## File roles
 
 | File | Purpose | When to run it |

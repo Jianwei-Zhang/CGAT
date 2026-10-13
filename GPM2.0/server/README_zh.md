@@ -90,6 +90,26 @@ cp tools/grt_step23.py "$workspace/.prepare_lib/tools/grt_step23.py"
 随后在原环境中重新运行或提交该工作区的 `run_all.sh`。保留原工作区和
 缓存，流程可复用兼容的 MUMmer 原始比对，并重新生成修复后的阶段结果。
 
+## 可选的 AI agent skill
+
+源码内提供官方 [gpm-server skill](skills/gpm-server/SKILL.md)，覆盖首次运行、
+安全恢复、失败诊断与结果交付。它是可选入口，不使用 AI 仍可直接执行上面的 CLI。
+请让 skill 与配套 Server 源码一起使用；不要假设此前发布的压缩包已包含本次新增内容。
+
+可让 agent 直接阅读该 `SKILL.md`，或按所用 agent 的说明，将**整个**
+`skills/gpm-server/` 目录复制到其 skill 目录。`install.sh` 不会修改 agent 配置。
+使用时明确 Server 绝对路径、输入角色（第一个 `--ds` 是主组装）、输出目录、
+资源预算，以及所在集群的提交与环境说明。例如：
+
+> 请按 gpm-server skill 操作。Server 工具在 /work/GPM_Server，参考是
+> /work/inputs/ref.fa，主组装是 /work/inputs/assembly.fa。先检查环境，再运行到
+> /work/runs/sample，最多使用 4 线程。遵循本集群的作业提交规则，不在登录节点
+> 计算，不擅自调整科学参数或覆盖已有结果，结束后给出日志和结果位置。
+
+只想验证能否跑通时，可要求执行 [合成小数据冒烟测试](skills/gpm-server/references/smoke-test.md)。
+它使用小型生成数据与真实工具，不用于科学结论。实际覆盖范围与未验证项见
+[首版验证记录](validation/agent-skill-v1-180.md)；skill 是操作指导，不是权限沙箱。
+
 ## 文件用途
 
 | 文件 | 用途 | 何时执行 |

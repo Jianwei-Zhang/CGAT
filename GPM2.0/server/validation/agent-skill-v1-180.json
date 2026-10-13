@@ -1,0 +1,126 @@
+{
+  "source_base_commit": "b8caa58038e995899a764c0d59834001c4e46ab8",
+  "source_transfer_sha256": "b955b109b6c5cdff42a02901906e387c7008680852f7fffc6e36413f9f9f2f4b",
+  "fixture": {
+    "schema_version": 1,
+    "purpose": "synthetic workflow smoke test only",
+    "seed": 20261013,
+    "chromosome_length": 60000,
+    "primary_gap_start_0based": 25000,
+    "primary_gap_length": 200,
+    "reads_qc": "not tested",
+    "inputs": [
+      {
+        "role": "reference",
+        "file": "reference.fa",
+        "records": 2,
+        "bases": 120000,
+        "n_bases": 0,
+        "sha256": "7e6b5384ae911266048fa6eb7c548fff15f0288f1b82433ffc45ac44e0893461"
+      },
+      {
+        "role": "primary",
+        "file": "primary.fa",
+        "records": 2,
+        "bases": 120000,
+        "n_bases": 400,
+        "sha256": "f21e248fb08bf214c61dfd902efa40351866a9d023d46b536bba93b15098f96b"
+      },
+      {
+        "role": "support",
+        "file": "support.fa",
+        "records": 2,
+        "bases": 120000,
+        "n_bases": 0,
+        "sha256": "cbe5fc53c367dec26f52ea43c5eeee1ce65862d77e5439151d4ee71017979ef5"
+      }
+    ]
+  },
+  "runs": {
+    "fresh": {
+      "job_id": 40529698,
+      "scheduler_state": "SUCCEEDED",
+      "exit_code": 0,
+      "run_id": "20261013T024727Z-2027793-3766ebd9",
+      "stage_count": 12,
+      "successful_stages": 12,
+      "skip_valid_count": 0,
+      "started": "2026-10-13T10:47:25+08:00",
+      "ended": "2026-10-13T10:47:44+08:00",
+      "host": [
+        "agent-ARM-40",
+        "aarch64"
+      ],
+      "archives": {
+        "full": {
+          "members": 86,
+          "fasta_members": 10,
+          "report_status": "success",
+          "report_run_id": "20261013T024727Z-2027793-3766ebd9",
+          "bytes": 362971,
+          "sha256": "0c40511fd5bb577c0ab58c91bf3ae7e89d6aacf3b11f182062eee7501c4812f1"
+        },
+        "light": {
+          "members": 69,
+          "fasta_members": 0,
+          "report_status": "success",
+          "report_run_id": "20261013T024727Z-2027793-3766ebd9",
+          "bytes": 101359,
+          "sha256": "aaf07af54bd80be6d99d87e9ab4c5ece462a2e991174aa3a2518ff453836592f"
+        }
+      }
+    },
+    "resume": {
+      "job_id": 40529701,
+      "scheduler_state": "SUCCEEDED",
+      "exit_code": 0,
+      "run_id": "20261013T024901Z-2034403-188775ac",
+      "stage_count": 12,
+      "successful_stages": 12,
+      "skip_valid_count": 5,
+      "started": "2026-10-13T10:49:00+08:00",
+      "ended": "2026-10-13T10:49:09+08:00",
+      "host": [
+        "agent-ARM-40",
+        "aarch64"
+      ],
+      "archives": {
+        "full": {
+          "file": "gpm_server.tar.gz",
+          "members": 86,
+          "fasta_members": 10,
+          "report_status": "success",
+          "report_run_id": "20261013T024901Z-2034403-188775ac",
+          "bytes": 365444,
+          "sha256": "721d45dacfddfdef14222fff867cec4f175e82f9523708ee433900bdb5d83f64"
+        },
+        "light": {
+          "file": "gpm_server.light.tar.gz",
+          "members": 69,
+          "fasta_members": 0,
+          "report_status": "success",
+          "report_run_id": "20261013T024901Z-2034403-188775ac",
+          "bytes": 103806,
+          "sha256": "00028b84eba8571231b6a917dce70a48784be2304db0dd7f3d842b2afcba7f28"
+        }
+      }
+    }
+  },
+  "negative_exits": {
+    "missing_input": "2",
+    "zero_threads": "1"
+  },
+  "skill_sha256": {
+    "SKILL.md": "eaa2acc0dbab1daaf38656fa9f094855fbf1896d2c371e24c35d62608f962f4d",
+    "agents/openai.yaml": "e20185eeabf281e42bda14a8d5fe69f88c52c0c83552cc00658f8a0ed9ed4e1b",
+    "references/execution.md": "7f12d1d22f496a5dbcd1ed9ca9372232968d1775677e4527734ed9e63438d54a",
+    "references/smoke-test.md": "107d0ff2c95d3183fa96f62a51b6c6326b293d5a7179eae21a09e774cc0aaf03",
+    "references/troubleshooting.md": "9e81d2903e2a6b56596c0331a089ccf97d22de9361dfbc24895831a86c8becdc",
+    "scripts/make_smoke_inputs.py": "5fb75aa42b3f24a49317a23fd4e1fa71e247a617b6c91a22b1af253d29f0d941"
+  },
+  "coverage_limits": [
+    "maintainer-guided, not independent fresh-agent evaluation",
+    "no reads QC, installation, biological quality, desktop import or browser validation",
+    "completed-workspace resume, not forced interruption at every stage"
+  ]
+}

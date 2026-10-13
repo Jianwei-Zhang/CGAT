@@ -1,0 +1,4 @@
+interface:
+  display_name: "GPM Server"
+  short_description: "Run and diagnose GPM Server workflows safely"
+  default_prompt: "Use $gpm-server to inspect my inputs and environment, then run or resume the authorized GPM Server task and report verified outputs."
