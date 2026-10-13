@@ -24,6 +24,11 @@ permission to execute arbitrary installation commands.
 
 ## Check (read-only)
 
+Use Python from the existing verified companion/site environment; inspect its
+version first. A bare login-shell `python3` may be missing or not match the pipeline
+runtime. Use the authorized existing micromamba/module environment rather than
+reinstalling software or modifying startup files to make the command resolve.
+
 ```bash
 python3 "$SKILL/scripts/official_update.py" check --installed "$SKILL"
 ```
@@ -88,6 +93,18 @@ clean only this invocation's new staged files; they do not delete existing data.
 The offline `stage_skill_update.py --server-tools /absolute/new/Server` also allows
 an explicit validated tools binding; without this argument it preserves the old
 binding. Neither helper activates or installs dependencies.
+
+### When this server cannot reach the official endpoints
+
+Stop and retain the online error; do not loop, change proxies/routing/auth or
+claim that offline staging fixed the network. If within the agreed update scope,
+a user-approved networked machine may fetch the exact reviewed official archive
+and pinned skill, then explicitly transfer them over existing authorized SSH to
+the agreed new destination. Verify transferred hashes against the official plan
+before use, and use the offline stager with an explicit new tools binding.
+Agree any new machine/transfer/destination outside the existing scope first.
+Record the offline provenance/check time and revalidation limits; never label this
+as a successful direct online update or substitute an arbitrary mirror.
 
 ## Validate and activate without breaking tasks
 

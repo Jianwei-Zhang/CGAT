@@ -1,0 +1,263 @@
+{
+  "schema": "gpm-server-skill-v3-three-host-test.v1",
+  "date": "2026-10-13",
+  "skill_commit": "fdf195a4df35d34f5f60ceb6457a3bbe8c2d4157",
+  "source_transfer_sha256": "e70950d68932d8b5c98635bb5e7d2992170a3debd50e2dd3820746e98583c7b6",
+  "hosts": {
+    "WSL": {
+      "update": {
+        "host": "WSL",
+        "python": "3.11.14",
+        "server": {
+          "tag": "v2.0.10",
+          "asset": "GPM_Server_2.0.10_source.tar.gz",
+          "asset_id": 636332952,
+          "size": 319644,
+          "sha256": "28cf865759cf62928967390ea41048d321334deca6021ff2942d12ef7227c677",
+          "url": "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.10/GPM_Server_2.0.10_source.tar.gz"
+        },
+        "skill_version": "3",
+        "skill_commit": "fdf195a4df35d34f5f60ceb6457a3bbe8c2d4157",
+        "check_read_only": true,
+        "old_copy_unchanged_before_activation": true,
+        "local_state_byte_preserved": true,
+        "test_installation_activated": true,
+        "bound_server_tools": "/home/xbzhang/projects/gpm-server-skill-v3-test-20261013-fdf195a/official-update-stage/GPM_Server",
+        "local_entries": 1,
+        "repeat_success_did_not_duplicate_notes": true,
+        "production_installation_or_environment_changed": false,
+        "retained_original_skill": "/home/xbzhang/projects/gpm-server-skill-v3-test-20261013-fdf195a/retained-original-skill"
+      },
+      "workflow": {
+        "host": "WSL",
+        "runs": {
+          "fresh": {
+            "run_id": "20261013T085950Z-37429-99318cf9",
+            "stages": 12,
+            "exit": 0,
+            "skip_valid": 0,
+            "cache_hit": 0,
+            "node": [
+              "xbzhang",
+              "x86_64"
+            ]
+          },
+          "resume": {
+            "run_id": "20261013T085953Z-37995-75fdde98",
+            "stages": 12,
+            "exit": 0,
+            "skip_valid": 5,
+            "cache_hit": 4,
+            "node": [
+              "xbzhang",
+              "x86_64"
+            ]
+          }
+        },
+        "archives": {
+          "full": {
+            "sha256": "db1537b05747352d38bead6c049fb3a4be30bcf5f6d3136151f4e4b090f558fc",
+            "bytes": 364115,
+            "members": 86,
+            "fasta_files": 10,
+            "current_report_verified": true,
+            "gzip_crc_verified": true
+          },
+          "light": {
+            "sha256": "e580259742b644f734009d12e66056b578116a213501f1ae56557603d6979552",
+            "bytes": 103499,
+            "members": 69,
+            "fasta_files": 0,
+            "current_report_verified": true,
+            "gzip_crc_verified": true
+          }
+        },
+        "input_sha256": {
+          "reference.fa": "7e6b5384ae911266048fa6eb7c548fff15f0288f1b82433ffc45ac44e0893461",
+          "primary.fa": "f21e248fb08bf214c61dfd902efa40351866a9d023d46b536bba93b15098f96b",
+          "support.fa": "cbe5fc53c367dec26f52ea43c5eeee1ce65862d77e5439151d4ee71017979ef5"
+        },
+        "local_notes_sha256": "93760d2a0e86936eb3dfe5c165f6b3202e7d8edfa9a575854e4d1ce04e74ff4e",
+        "local_notes_unchanged_after_update_and_runs": true,
+        "new_preferences_file_created": false,
+        "reads_qc": "not tested; no reads",
+        "scientific_quality": "not claimed",
+        "independent_pi_agent_test": false
+      }
+    },
+    "140-1": {
+      "update": {
+        "host": "140-1",
+        "python": "3.11.15",
+        "online_update_passed": false,
+        "offline_update_passed": true,
+        "old_copy_unchanged_before_activation": true,
+        "local_state_byte_preserved": true,
+        "test_installation_activated": true,
+        "bound_server_tools": "/public/home/xbzhang/gpm-skill-smoke/20261013-v3-fdf195a/offline-update-stage/GPM_Server",
+        "repeat_did_not_duplicate_notes": true,
+        "production_or_environment_changed": false,
+        "retained_original_skill": "/public/home/xbzhang/gpm-skill-smoke/20261013-v3-fdf195a/retained-original-skill",
+        "provenance": {
+          "transport": "explicit verified SSH transfer from WSL",
+          "online_check": "failed: direct read timed out",
+          "server_tag": "v2.0.10",
+          "server_asset_id": 636332952,
+          "server_sha256": "28cf865759cf62928967390ea41048d321334deca6021ff2942d12ef7227c677",
+          "skill_commit": "fdf195a4df35d34f5f60ceb6457a3bbe8c2d4157"
+        }
+      },
+      "workflow": {
+        "host": "140-1",
+        "runs": {
+          "fresh": {
+            "run_id": "20261013T090916Z-98602-34ca7fe8",
+            "stages": 12,
+            "exit": 0,
+            "skip_valid": 0,
+            "cache_hit": 0,
+            "node": [
+              "gpu02",
+              "x86_64"
+            ],
+            "job_id": 75780718
+          },
+          "resume": {
+            "run_id": "20261013T091207Z-99346-c9be881f",
+            "stages": 12,
+            "exit": 0,
+            "skip_valid": 5,
+            "cache_hit": 4,
+            "node": [
+              "gpu02",
+              "x86_64"
+            ],
+            "job_id": 75781263
+          }
+        },
+        "archives": {
+          "full": {
+            "sha256": "fbb3b3fc3dbdb2b81bcff05e614b7021c4f8b7759079f53dd065aeebd1bbf235",
+            "bytes": 364472,
+            "members": 86,
+            "fasta_files": 10,
+            "current_report_verified": true,
+            "gzip_crc_verified": true
+          },
+          "light": {
+            "sha256": "3895471b956293fd53fec7500938852265a420a0c6ec70743f7ca58998a1aa5a",
+            "bytes": 103654,
+            "members": 69,
+            "fasta_files": 0,
+            "current_report_verified": true,
+            "gzip_crc_verified": true
+          }
+        },
+        "input_sha256": {
+          "reference.fa": "7e6b5384ae911266048fa6eb7c548fff15f0288f1b82433ffc45ac44e0893461",
+          "primary.fa": "f21e248fb08bf214c61dfd902efa40351866a9d023d46b536bba93b15098f96b",
+          "support.fa": "cbe5fc53c367dec26f52ea43c5eeee1ce65862d77e5439151d4ee71017979ef5"
+        },
+        "local_notes_sha256": "b8bc0978bbe9c062a80285d1ab20de710c23a6a65b76ab054f72feaeaab6acfa",
+        "local_notes_unchanged_after_update_and_runs": true,
+        "new_preferences_file_created": false,
+        "reads_qc": "not tested; no reads",
+        "scientific_quality": "not claimed",
+        "independent_pi_agent_test": false,
+        "scheduler_terminal_states": {
+          "75780718": "DONE",
+          "75781263": "DONE"
+        },
+        "resume_interactive_client_exit": 255,
+        "resume_runner_exit": 0
+      }
+    },
+    "180": {
+      "update": {
+        "host": "180",
+        "python": "3.11.11",
+        "online_update_passed": false,
+        "offline_update_passed": true,
+        "old_copy_unchanged_before_activation": true,
+        "local_state_byte_preserved": true,
+        "test_installation_activated": true,
+        "bound_server_tools": "/share/home/xbzhang26/cgat-reads-debug/skill-v3-20261013-fdf195a/offline-update-stage/GPM_Server",
+        "repeat_did_not_duplicate_notes": true,
+        "production_or_environment_changed": false,
+        "retained_original_skill": "/share/home/xbzhang26/cgat-reads-debug/skill-v3-20261013-fdf195a/retained-original-skill",
+        "provenance": {
+          "transport": "explicit verified SSH transfer from WSL",
+          "online_check": "failed: direct read timed out",
+          "server_tag": "v2.0.10",
+          "server_asset_id": 636332952,
+          "server_sha256": "28cf865759cf62928967390ea41048d321334deca6021ff2942d12ef7227c677",
+          "skill_commit": "fdf195a4df35d34f5f60ceb6457a3bbe8c2d4157"
+        }
+      },
+      "workflow": {
+        "host": "180",
+        "runs": {
+          "fresh": {
+            "run_id": "20261013T090851Z-2802845-0e9be893",
+            "stages": 12,
+            "exit": 0,
+            "skip_valid": 0,
+            "cache_hit": 0,
+            "node": [
+              "agent-ARM-11",
+              "aarch64"
+            ],
+            "job_id": 40531309
+          },
+          "resume": {
+            "run_id": "20261013T091537Z-2835047-ae1801ee",
+            "stages": 12,
+            "exit": 0,
+            "skip_valid": 5,
+            "cache_hit": 4,
+            "node": [
+              "agent-ARM-11",
+              "aarch64"
+            ],
+            "job_id": 40531317
+          }
+        },
+        "archives": {
+          "full": {
+            "sha256": "1c55e77655c530831a489551e30332d5d9da21648671b35dcdbc9bee9d6468c2",
+            "bytes": 365423,
+            "members": 86,
+            "fasta_files": 10,
+            "current_report_verified": true,
+            "gzip_crc_verified": true
+          },
+          "light": {
+            "sha256": "bd017c28f6869037b736c562a5e15ec9406f594fd8a127f10a2cef3c48f44936",
+            "bytes": 103814,
+            "members": 69,
+            "fasta_files": 0,
+            "current_report_verified": true,
+            "gzip_crc_verified": true
+          }
+        },
+        "input_sha256": {
+          "reference.fa": "7e6b5384ae911266048fa6eb7c548fff15f0288f1b82433ffc45ac44e0893461",
+          "primary.fa": "f21e248fb08bf214c61dfd902efa40351866a9d023d46b536bba93b15098f96b",
+          "support.fa": "cbe5fc53c367dec26f52ea43c5eeee1ce65862d77e5439151d4ee71017979ef5"
+        },
+        "local_notes_sha256": "6caa687a5699c18b80dd64cfd6cefcb5f98d6ab656bff49ea28330028f931090",
+        "local_notes_unchanged_after_update_and_runs": true,
+        "new_preferences_file_created": false,
+        "reads_qc": "not tested; no reads",
+        "scientific_quality": "not claimed",
+        "independent_pi_agent_test": false,
+        "scheduler_terminal_states": {
+          "40531309": "SUCCEEDED",
+          "40531317": "SUCCEEDED"
+        }
+      }
+    }
+  },
+  "independent_pi_agent_test": false,
+  "notes": "Current main agent followed skill; runtime/helper validation, not independent-agent or scientific-quality acceptance."
+}

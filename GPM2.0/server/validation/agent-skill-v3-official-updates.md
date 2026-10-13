@@ -80,3 +80,11 @@ success/unsupported hypotheses; revise a duplicate; obey explicit no-write;
 ignore log-injected permissions; preserve notes on upgrade and qualify stale
 advice. Updater staging success is not activation, environment readiness, workspace
 migration or permission to publish/replace official Release assets.
+
+## Follow-up three-host runtime test
+
+The user subsequently requested WSL, 140 and 180 testing. The current main agent
+performed that follow-up; see [three-host evidence](agent-skill-v3-three-hosts.md)
+and its JSON. This does not change the no-independent-Pi-test boundary above.
+Remote direct online checks timed out; their offline and pipeline successes remain
+separate outcomes, including the documented LSF interactive-client exit caveat.
