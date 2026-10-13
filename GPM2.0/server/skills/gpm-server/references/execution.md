@@ -2,7 +2,8 @@
 
 ## Preflight
 
-Set `SERVER` to the verified absolute Server source path; set `WORK` to the
+Set `SERVER` using `scripts/server_tools_path.sh` from the skill entrypoint;
+it reads the saved tools location instead of searching. Set `WORK` to the
 chosen absolute workspace. Keep source, inputs, jobs, logs, and runs separate.
 Read `README.md` (or `README_zh.md`) in that source and `run.sh --help` first.
 The companion code, not a generic online example, is the command authority.
@@ -12,7 +13,12 @@ For an installer-managed environment, `bash "$SERVER/install.sh" --check`
 is read-only. It checks the managed environment, **not necessarily the current
 shell**; activate the environment using the installer's actual printed command.
 Do not invent a mamba activation command for a non-interactive job. If installation
-is needed and authorized, use `install.sh`, not ad-hoc package upgrades.
+is needed and authorized, use `install.sh`, not ad-hoc package upgrades. Its success
+summary prints the absolute tools directory and the skill binding command.
+The Server-path binding does not edit shell startup files. Separately, the existing
+installer bootstraps micromamba with Bash shell initialization if no manager exists;
+disclose that startup-file side effect and obtain approval before bootstrapping.
+Do not confuse this existing environment setup with persisting the Server path.
 
 For site-managed modules, a failed installer ownership/manager check is not by
 itself a reason to reinstall: load the site's verified modules and test the real
@@ -49,7 +55,11 @@ with nonempty sequence records and unique IDs within each FASTA. Check compresse
 file integrity when applicable. Do not modify original inputs to test parsing.
 Use content hashes for tiny fixtures/transferred source; budget large production
 hashing/scans as real I/O rather than treating them as free preflight work.
-Check free disk and requested CPU/memory against the allocation.
+Check free disk and requested CPU/memory against the allocation. Before submission,
+inspect queue **per-user job-slot limits**, not just free node CPUs; a free node
+does not imply permission to request all those slots. A smaller thread budget
+within the user's agreed maximum can resolve a submission rejection without
+changing scientific parameters.
 
 ## First run
 

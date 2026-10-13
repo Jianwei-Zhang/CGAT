@@ -12,8 +12,10 @@ root. Keep `source/`, `inputs/`, `jobs/`, `runs/`, `logs/`, and `reports/` benea
 Do not reuse a production workspace. Copy the complete companion Server source,
 not just entrypoint scripts; verify the source archive's SHA-256 before use.
 
-Set `SKILL` to the actual skill directory, `SERVER` to the staged Server source,
-and `TASK` to the dedicated task root. Generate deterministic local input:
+Set `SKILL` to the actual skill directory and `TASK` to the dedicated task root.
+Bind the staged Server once with `bash "$SKILL/scripts/server_tools_path.sh"
+--set "$TASK/source/server"`, then resolve `SERVER` with the same helper without
+arguments. The following tasks reuse that recorded location. Generate deterministic local input:
 
 ```bash
 python3 "$SKILL/scripts/make_smoke_inputs.py" --out "$TASK/inputs/tiny"

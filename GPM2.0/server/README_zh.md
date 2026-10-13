@@ -98,6 +98,11 @@ cp tools/grt_step23.py "$workspace/.prepare_lib/tools/grt_step23.py"
 
 可让 agent 直接阅读该 `SKILL.md`，或按所用 agent 的说明，将**整个**
 `skills/gpm-server/` 目录复制到其 skill 目录。`install.sh` 不会修改 agent 配置。
+skill 内的 `server-tools.path` 明确记录 Server tools 位置：随源码分发时为相对于
+skill 目录的 `../..`；单独复制安装后，执行一次
+`bash /实际/skill目录/scripts/server_tools_path.sh --set /实际/Server目录` 绑定绝对路径。
+后续 agent 直接读取、校验该记录，不再搜索工具目录；路径失效时明确报错，不自动切换版本。
+路径失效时先询问用户现有安装的位置；用户也不清楚时，再询问是否授权限定范围查找或重新安装，确认前均不执行。安装成功提示会列出工具绝对路径和 skill 绑定命令，不额外写入 Server 路径到 `.bashrc`/`.zshrc`。这与原安装器首次引导 micromamba 时已有的 Bash 初始化是两回事。
 使用时明确 Server 绝对路径、输入角色（第一个 `--ds` 是主组装）、输出目录、
 资源预算，以及所在集群的提交与环境说明。例如：
 
@@ -108,7 +113,9 @@ cp tools/grt_step23.py "$workspace/.prepare_lib/tools/grt_step23.py"
 
 只想验证能否跑通时，可要求执行 [合成小数据冒烟测试](skills/gpm-server/references/smoke-test.md)。
 它使用小型生成数据与真实工具，不用于科学结论。实际覆盖范围与未验证项见
-[首版验证记录](validation/agent-skill-v1-180.md)；skill 是操作指导，不是权限沙箱。
+[ARM/Donau 验证记录](validation/agent-skill-v1-180.md)和
+[x86/LSF 与工具路径绑定验证记录](validation/agent-skill-v1-140-1.md)；
+skill 是操作指导，不是权限沙箱。
 
 ## 文件用途
 

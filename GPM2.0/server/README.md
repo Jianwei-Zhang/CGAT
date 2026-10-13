@@ -105,8 +105,19 @@ Server source; do not assume older release archives already include this additio
 
 Point your agent at that `SKILL.md`, or copy the **whole** `skills/gpm-server/`
 folder into your chosen agent's skill directory according to its documentation.
-No agent configuration is changed by `install.sh`. Tell the agent the absolute
-Server path, input roles (the first `--ds` is the primary assembly), output path,
+No agent configuration is changed by `install.sh`.
+The skill's `server-tools.path` records the tools location: `../..` relative to
+the skill directory in a complete source bundle. After installing the skill alone,
+run `bash /actual/skill/scripts/server_tools_path.sh --set /actual/Server` once.
+Later tasks read and validate that saved location without searching; a stale path
+fails explicitly rather than silently choosing another installation.
+On failure, the agent first asks for the existing tools location. If unknown, it
+asks whether to perform a bounded search or reinstall; neither happens without
+authorization. The installer summary prints the absolute tools path and binding
+command without adding Server-path exports to `.bashrc`/`.zshrc`. This is separate
+from the existing Bash initialization when bootstrapping micromamba.
+For first setup, tell the agent the Server path; later tasks reuse the binding.
+Provide input roles (the first `--ds` is the primary assembly), output path,
 resource budget, and local scheduler/environment instructions. For example:
 
 > Follow the gpm-server skill. The Server tools are at /work/GPM_Server. Use
@@ -117,8 +128,9 @@ resource budget, and local scheduler/environment instructions. For example:
 
 For a workflow-only trial, ask for the [synthetic smoke test](skills/gpm-server/references/smoke-test.md).
 It uses small generated inputs and real tools, not scientifically meaningful data.
-See the [first-edition validation record](validation/agent-skill-v1-180.md) for
-actual coverage and exclusions; a skill is guidance, not a permissions sandbox.
+See the [ARM/Donau record](validation/agent-skill-v1-180.md) and
+[x86/LSF and tools-location record](validation/agent-skill-v1-140-1.md) for actual
+coverage and exclusions; a skill is guidance, not a permissions sandbox.
 
 ## File roles
 

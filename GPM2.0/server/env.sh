@@ -316,7 +316,15 @@ print_usage_summary() {
   echo "Activate:   $manager_command activate $ENV_NAME"
   echo "Deactivate: $manager_command deactivate"
   echo "Recheck:    bash $INSTALL_ENTRYPOINT --check --manager $ENV_MANAGER_KIND"
-  echo "Next:       bash ${SCRIPT_DIR}/prepare.sh --help"
+  echo "Server tools: $SCRIPT_DIR"
+  local skill_dir="${SCRIPT_DIR}/skills/gpm-server"
+  if [[ -f "$skill_dir/SKILL.md" ]]; then
+    echo "Agent skill:  $skill_dir/SKILL.md"
+    printf 'Tools path:   bash %q\n' "$skill_dir/scripts/server_tools_path.sh"
+    printf 'Bind copied skill: bash /path/to/installed/gpm-server/scripts/server_tools_path.sh --set %q\n' "$SCRIPT_DIR"
+    echo "Server-path discovery does not require a .bashrc/.zshrc edit."
+  fi
+  printf 'Next:       bash %q --help\n' "${SCRIPT_DIR}/run.sh"
 }
 
 check_environment() {

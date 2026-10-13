@@ -7,6 +7,7 @@ same failure persists, stop and report the evidence rather than looping.
 
 | Symptom | Evidence and next decision |
 | --- | --- |
+| Saved Server tools location fails validation | Show `server-tools.path` and the error, then ask for the correct existing location. If the user does not know, ask whether to perform a bounded search or a new installation; confirm scope before either. No automatic search, reinstall, shell-startup edit, or fallback to another version. |
 | SSH connects but submission fails | Inspect scheduler authentication/queue permissions separately. A query command may have different permissions from submission. Request user authentication if required; never ask for passwords in chat. |
 | `module` absent or module initialization fails | Consult site startup instructions and load modules explicitly in the job. Site-required variables must be set first; do not solve this by editing global shell startup files. |
 | `GLIBCXX_* not found`, wrong ELF architecture, help cannot start | Check node architecture, actual executable path, and loaded compiler runtime. Use matching site modules or an authorized isolated installation. `command -v` alone is not validation. |

@@ -115,5 +115,100 @@ class AgentSkillFixtureTests(unittest.TestCase):
             self.assertTrue((dest / "support.fa").is_file())
 
 
+class ServerToolsLocationTests(unittest.TestCase):
+    def run_helper(self, skill, *args, cwd=None):
+        return subprocess.run(["bash", str(skill / "scripts/server_tools_path.sh"), *args],
+                              cwd=cwd, capture_output=True, text=True)
+
+    def make_server(self, root):
+        (root / "tools/grt_core").mkdir(parents=True)
+        for relative in ("run.sh", "prepare.sh", "install.sh", "tools/server_run.py"):
+            (root / relative).write_text("# fixture marker; never executed\n")
+        return root
+
+    def test_bundle_location_does_not_depend_on_current_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = self.run_helper(SKILL, cwd=tmp)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(Path(result.stdout.strip()).samefile(SKILL.parents[1]))
+
+    def test_relocated_complete_bundle_uses_relative_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            server = self.make_server(Path(tmp) / "relocated tools")
+            skill = server / "skills/gpm-server"
+            shutil.copytree(SKILL, skill)
+            result = self.run_helper(skill, cwd="/")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(Path(result.stdout.strip()), server)
+
+    def test_standalone_copy_binds_once_and_reuses_literal_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = Path(tmp) / "installed skill"
+            shutil.copytree(SKILL, skill)
+            # A semicolon in the path is data, not a shell command.
+            server = self.make_server(Path(tmp) / "Server tools; literal")
+            result = self.run_helper(skill, "--set", str(server))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((skill / "server-tools.path").read_text(), str(server) + "\n")
+            resolved = self.run_helper(skill, cwd="/")
+            self.assertEqual(resolved.returncode, 0, resolved.stderr)
+            self.assertEqual(Path(resolved.stdout.strip()), server)
+            self.assertEqual(list(skill.glob(".server-tools.path.*")), [])
+
+    def test_stale_location_fails_without_falling_back_or_modifying_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = Path(tmp) / "installed"
+            shutil.copytree(SKILL, skill)
+            record = skill / "server-tools.path"
+            original = str(Path(tmp) / "missing") + "\n"
+            record.write_text(original)
+            self.make_server(Path(tmp) / "other-perfectly-valid-server")
+            result = self.run_helper(skill)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("unavailable", result.stderr)
+            self.assertEqual(result.stdout, "")
+            self.assertEqual(record.read_text(), original)
+
+    def test_invalid_bind_leaves_existing_binding_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = Path(tmp) / "installed"
+            shutil.copytree(SKILL, skill)
+            record = skill / "server-tools.path"
+            original = record.read_bytes()
+            incomplete = Path(tmp) / "incomplete"
+            incomplete.mkdir()
+            for value in ("relative/path", str(incomplete), str(Path(tmp) / "missing")):
+                result = self.run_helper(skill, "--set", value)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(record.read_bytes(), original)
+
+    def test_invalid_or_missing_record_fails_explicitly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = Path(tmp) / "installed"
+            shutil.copytree(SKILL, skill)
+            record = skill / "server-tools.path"
+            for contents in ("", "\n", "../..\n/other\n", "../..\r\n"):
+                record.write_bytes(contents.encode())
+                result = self.run_helper(skill)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("ERROR:", result.stderr)
+            record.unlink()
+            self.assertEqual(self.run_helper(skill).returncode, 2)
+
+    def test_bind_refuses_to_replace_symlinked_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = Path(tmp) / "installed"
+            shutil.copytree(SKILL, skill)
+            record = skill / "server-tools.path"
+            record.unlink()
+            shared = Path(tmp) / "shared-setting"
+            shared.write_text("unchanged\n")
+            record.symlink_to(shared)
+            result = self.run_helper(skill, "--set", str(SKILL.parents[1]))
+            self.assertEqual(result.returncode, 2)
+            self.assertTrue(record.is_symlink())
+            self.assertEqual(shared.read_text(), "unchanged\n")
+
+
 if __name__ == "__main__":
     unittest.main()

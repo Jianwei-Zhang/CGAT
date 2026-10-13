@@ -1,0 +1,149 @@
+{
+  "source_base_commit": "6c1e255cb292bb07d3184785d9682f828c2bf9dc",
+  "source_transfer_sha256": "8cf5aeb29da23dc2dc1d41bd028b8116026fc6933ac77fede48a89f1dec6a28a",
+  "source_note": "Base source plus first-skill location/installer-summary refinements; pipeline unchanged.",
+  "fixture": {
+    "schema_version": 1,
+    "purpose": "synthetic workflow smoke test only",
+    "seed": 20261013,
+    "chromosome_length": 60000,
+    "primary_gap_start_0based": 25000,
+    "primary_gap_length": 200,
+    "reads_qc": "not tested",
+    "inputs": [
+      {
+        "role": "reference",
+        "file": "reference.fa",
+        "records": 2,
+        "bases": 120000,
+        "n_bases": 0,
+        "sha256": "7e6b5384ae911266048fa6eb7c548fff15f0288f1b82433ffc45ac44e0893461"
+      },
+      {
+        "role": "primary",
+        "file": "primary.fa",
+        "records": 2,
+        "bases": 120000,
+        "n_bases": 400,
+        "sha256": "f21e248fb08bf214c61dfd902efa40351866a9d023d46b536bba93b15098f96b"
+      },
+      {
+        "role": "support",
+        "file": "support.fa",
+        "records": 2,
+        "bases": 120000,
+        "n_bases": 0,
+        "sha256": "cbe5fc53c367dec26f52ea43c5eeee1ce65862d77e5439151d4ee71017979ef5"
+      }
+    ]
+  },
+  "runs": {
+    "fresh": {
+      "job_id": 75764477,
+      "scheduler_state": "DONE",
+      "exit_code": 0,
+      "run_id": "20261013T032538Z-57234-277e957c",
+      "stage_count": 12,
+      "successful_stages": 12,
+      "skip_valid_count": 0,
+      "started": "2026-10-13T11:25:35+0800",
+      "ended": "2026-10-13T11:25:43+0800",
+      "host": [
+        "gpu02",
+        "x86_64"
+      ],
+      "allocation": {
+        "queue": "interactive",
+        "hosts": "gpu02 gpu02",
+        "requested_cpus": "2"
+      },
+      "server_tools_location": "/public/home/xbzhang/gpm-skill-smoke/20261013-140-1/source/server",
+      "archives": {
+        "full": {
+          "file": "gpm_server.tar.gz",
+          "members": 86,
+          "fasta_members": 10,
+          "report_status": "success",
+          "report_run_id": "20261013T032538Z-57234-277e957c",
+          "bytes": 361939,
+          "sha256": "a352010f3ceb739cb3de66643ac1a9f42bf8605f2e76072e23893adc2acc2643"
+        },
+        "light": {
+          "file": "gpm_server.light.tar.gz",
+          "members": 69,
+          "fasta_members": 0,
+          "report_status": "success",
+          "report_run_id": "20261013T032538Z-57234-277e957c",
+          "bytes": 101150,
+          "sha256": "689695b4e183d8e78b4c648855d2e66f4a24a5257b16b5dfa3bc65ec95d63c5d"
+        }
+      }
+    },
+    "resume": {
+      "job_id": 75765716,
+      "scheduler_state": "DONE",
+      "exit_code": 0,
+      "run_id": "20261013T053801Z-74724-65439e90",
+      "stage_count": 12,
+      "successful_stages": 12,
+      "skip_valid_count": 5,
+      "started": "2026-10-13T13:37:56+0800",
+      "ended": "2026-10-13T13:38:08+0800",
+      "host": [
+        "gpu02",
+        "x86_64"
+      ],
+      "allocation": {
+        "queue": "interactive",
+        "hosts": "gpu02 gpu02",
+        "requested_cpus": "2"
+      },
+      "server_tools_location": "/public/home/xbzhang/gpm-skill-smoke/20261013-140-1/source/server",
+      "archives": {
+        "full": {
+          "file": "gpm_server.tar.gz",
+          "members": 86,
+          "fasta_members": 10,
+          "report_status": "success",
+          "report_run_id": "20261013T053801Z-74724-65439e90",
+          "bytes": 364693,
+          "sha256": "31435542963c070d35cbc0cee431539411e7fa1371d49ad5b79b418930c0d6cd"
+        },
+        "light": {
+          "file": "gpm_server.light.tar.gz",
+          "members": 69,
+          "fasta_members": 0,
+          "report_status": "success",
+          "report_run_id": "20261013T053801Z-74724-65439e90",
+          "bytes": 103891,
+          "sha256": "5877e87289701f825907c0082612cb55b9a30142f07d593561d774b8152f2600"
+        }
+      }
+    }
+  },
+  "negative_exits": {
+    "missing_input": "2",
+    "zero_threads": "1"
+  },
+  "initial_submission": {
+    "requested_cpus": 4,
+    "job_created": false,
+    "reason": "Queue does not have enough per-user job slots."
+  },
+  "bound_skill_directory": "/public/home/xbzhang/gpm-skill-smoke/20261013-140-1/skills/gpm-server",
+  "skill_sha256": {
+    "SKILL.md": "37948555bedcecbe545b3c8973fcffc1d9139836eebafa749ec67fbc9027ea5b",
+    "agents/openai.yaml": "e20185eeabf281e42bda14a8d5fe69f88c52c0c83552cc00658f8a0ed9ed4e1b",
+    "references/execution.md": "53cbc285156dc49ae2cff3a2bbb6b51ba7ef64596697a69858754d79870f52bf",
+    "references/smoke-test.md": "66bda02c7f81e456d97c8001087d1260c307c8ff15aec1d9b9c55aa5b6116c91",
+    "references/troubleshooting.md": "deafd643cf7c80dd5ab987a914c8e8cbb6dd01fac61fc156049d3d445927d4c7",
+    "scripts/make_smoke_inputs.py": "5fb75aa42b3f24a49317a23fd4e1fa71e247a617b6c91a22b1af253d29f0d941",
+    "scripts/server_tools_path.sh": "724d41e8969d1f86e753e6a3475059b565eef2c36facddebae09260c496fd1ba",
+    "server-tools.path": "fcafe91af2a5c0849083919611fcb8dbe430b761e826d493faa8ca3de85467df"
+  },
+  "coverage_limits": [
+    "maintainer-guided, not independent fresh-agent evaluation",
+    "no reads QC, installation, biological quality, desktop import or browser validation",
+    "completed-workspace resume, not forced interruption at every stage"
+  ]
+}

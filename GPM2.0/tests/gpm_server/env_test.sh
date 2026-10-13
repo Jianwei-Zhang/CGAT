@@ -72,6 +72,7 @@ copy_installer() {
   cp "$ENV_SCRIPT" "${case_dir}/server/env.sh"
   cp "$INSTALL_SCRIPT" "${case_dir}/server/install.sh"
   cp "${REPO_ROOT}/server/"*.conda-spec.txt "${case_dir}/server/"
+  cp -R "${REPO_ROOT}/server/skills" "${case_dir}/server/skills"
 }
 
 install_fake_managers() {
@@ -429,6 +430,31 @@ EOF
   done
 }
 
+test_tools_location_summary_does_not_change_startup_or_binding() {
+  local case_dir="${TMP_DIR}/tools-location"
+  local bin_dir="${case_dir}/bin"
+  copy_installer "$case_dir"
+  install_fake_managers "$bin_dir" micromamba
+  mkdir -p "${case_dir}/home"
+  printf 'keep bash settings\n' > "${case_dir}/home/.bashrc"
+  printf 'keep zsh settings\n' > "${case_dir}/home/.zshrc"
+  local before after
+  before="$(sha256sum "${case_dir}/home/.bashrc" "${case_dir}/home/.zshrc" "${case_dir}/server/skills/gpm-server/server-tools.path")"
+  run_installer "$case_dir" "$bin_dir" > "${case_dir}/install.out"
+  run_installer_with_args "$case_dir" "$bin_dir" --check > "${case_dir}/check.out"
+  after="$(sha256sum "${case_dir}/home/.bashrc" "${case_dir}/home/.zshrc" "${case_dir}/server/skills/gpm-server/server-tools.path")"
+  [[ "$before" == "$after" ]]
+  local output
+  for output in "${case_dir}/install.out" "${case_dir}/check.out"; do
+    grep -F "Server tools: ${case_dir}/server" "$output" >/dev/null
+    grep -F "Agent skill:  ${case_dir}/server/skills/gpm-server/SKILL.md" "$output" >/dev/null
+    grep -F "server_tools_path.sh --set ${case_dir}/server" "$output" >/dev/null
+    grep -F "Next:       bash ${case_dir}/server/run.sh --help" "$output" >/dev/null
+  done
+  [[ ! -e "${case_dir}/shell-init.called" ]]
+}
+
+test_tools_location_summary_does_not_change_startup_or_binding
 test_platform_dependency_spec_selection
 test_existing_manager_priority_create_reuse_and_update
 test_conda_uses_strict_channel_priority

@@ -172,3 +172,14 @@ Not covered: installer creation/update, reads QC/Meryl/Merqury/CRAQ, other clust
 or architectures, real biological accuracy/QV/T2T, interruption at every stage,
 App import/FASTA export, native UI/browser rendering, or independent-agent behavior.
 The successful completed-workspace resume is not proof of all interruption paths.
+
+## Same-day follow-up: persisted tools location
+
+A separate updated skill copy under `~/cgat-reads-debug/skill-v1-20261013/skills/`
+was bound explicitly to the original staged Server source. Resolution from `/`
+returned `/share/home/xbzhang26/cgat-reads-debug/skill-v1-20261013/source/server`.
+This verifies the new path-binding helper on ARM without relying on shell startup
+or the caller's working directory; it is not another biological pipeline run.
+The source/skill hashes above remain the **earlier tested snapshot**, not rewritten
+hashes of the follow-up skill. See the [follow-up record](agent-skill-v1-140-1.md)
+for the current helper policy and real-tool x86/LSF validation.

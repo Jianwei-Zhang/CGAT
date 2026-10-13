@@ -12,6 +12,41 @@ Operate the official pipeline; do not reimplement its biological decisions.
 Reply in the user's language. Distinguish execution success from scientific
 quality, and a smoke test from a production analysis.
 
+## Server tools location: read this first
+
+The location is recorded in [server-tools.path](server-tools.path), not discovered
+by searching the machine. Resolve and validate it before using any Server command:
+
+```bash
+# SKILL is the absolute directory containing this SKILL.md.
+SERVER="$(bash "$SKILL/scripts/server_tools_path.sh")" || exit
+```
+
+The shipped value `../..` is relative to **this skill directory**, so the complete
+`Server/skills/gpm-server/` bundle has an explicit, relocatable binding to `Server/`.
+If the skill is installed separately, bind its location **once on that host**:
+
+```bash
+bash "$SKILL/scripts/server_tools_path.sh" --set /absolute/path/to/Server
+```
+
+That command verifies the Server entrypoints/runtime and records the absolute path
+inside this skill's `server-tools.path`. Future tasks reuse it. Do not copy an
+absolute binding blindly between hosts. If validation fails:
+1. Show the recorded path and concrete error, then ask the user where the existing
+   Server tools are. Rebind only after the user identifies the intended installation.
+2. If the user does not know, ask whether they authorize a bounded search for an
+   existing installation or prefer a new installation. Do neither automatically.
+3. Agree search roots/time limits before searching; present matches for confirmation,
+   not silent selection. Before reinstalling, agree the destination/environment and
+   impact; never overwrite existing source, environments, or run workspaces as a
+   fallback. An authorized install does not authorize restarting scientific work.
+
+Do not add Server-path exports to `.bashrc`, `.zshrc`, or other startup files.
+This skill's saved location is the authority and works independently of shell startup.
+The helper only locates tools; it does not install software, run the pipeline, or
+change the user's agent/SSH configuration.
+
 ## Establish the task
 
 Identify the requested mode: first run, resume, diagnosis, or result handoff.
@@ -20,8 +55,7 @@ For an explicitly requested workflow smoke test, use
 
 Before computing, establish:
 - Server source directory and provenance (release/source revision or archive hash).
-  This skill ships under `server/skills/gpm-server/`, but may be installed elsewhere;
-  **never infer the Server location from an installed skill's parent directory**.
+  Use the recorded location above, including for a separately installed skill.
   Read that Server's README and `bash "$SERVER/run.sh" --help`; do not assume
   that a release mentioned in an example is the installed or latest release.
 - Reference, **primary assembly (first `--ds`)**, optional support assemblies in
