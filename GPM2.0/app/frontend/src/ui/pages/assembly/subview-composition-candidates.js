@@ -37,6 +37,7 @@ function projectCandidate(ctg, sourcePatch, index) {
       : { assemblyCtgId: ctg?.assemblyCtgId }),
     sourceKey: buildSubviewCompositionSourceKey(source),
     assemblyCtgId: ctg?.assemblyCtgId,
+    sourceFragment: ctg?.sourceFragment,
     source,
     reference,
     label: ctg?.name || ctg?.ctgName,

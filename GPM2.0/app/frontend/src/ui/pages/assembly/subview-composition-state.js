@@ -93,6 +93,8 @@ export function normalizeSubviewCompositionMember(value, fallbackOrder = 0) {
     entityKey,
     sourceKey: String(value.sourceKey || buildSubviewCompositionSourceKey(source)).trim(),
     assemblyCtgId,
+    ...(value.sourceFragment?.sourceSeqId && value.sourceFragment?.groupKey
+      ? { sourceFragment: { ...value.sourceFragment } } : {}),
     source,
     reference,
     label: String(value.label || value.name || entityKey).trim() || entityKey,

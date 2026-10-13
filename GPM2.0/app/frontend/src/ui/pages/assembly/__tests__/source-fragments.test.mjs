@@ -92,6 +92,9 @@ test("main-view bands attach to the split contigs and leave the displayed one-N 
   const boxes = parts.map(c => {
     const match = html.match(new RegExp(`<g class="track-ctg-group[^>]*data-track-contig-id="${c.assemblyCtgId}"[^>]*data-track-role="primary"[^>]*data-track-rect-x="([^"]+)"[^>]*data-track-rect-y="([^"]+)"[^>]*data-track-rect-width="([^"]+)"`));
     assert.ok(match);
+    assert.match(match[0], /data-source-fragment-seq-id="1"/);
+    assert.match(match[0], /data-source-fragment-group="n-fragment:chr:Chr01"/);
+    assert.match(match[0], /data-source-gap-drag-key="main:/);
     const height = html.match(new RegExp(`data-track-contig-id="${c.assemblyCtgId}"[^>]*data-track-role="primary"[^>]*data-track-rect-height="([^"]+)"`));
     assert.ok(height);
     const box = { x: +match[1], y: +match[2], width: +match[3], height: +height[1] };
@@ -117,6 +120,9 @@ test("track-pair local view aligns source-gap edges with the split contig rectan
   const boxes = parts.map(ctg => {
     const group = svg.match(new RegExp(`<g\\s+class="track-ctg-group[^>]*data-subview-track-pair-contig-id="${ctg.assemblyCtgId}"[^>]*>`))?.[0];
     assert.ok(group, `local-view rectangle for fragment ${ctg.assemblyCtgId}`);
+    assert.match(group, /data-source-fragment-seq-id="1"/);
+    assert.match(group, /data-source-fragment-group="n-fragment:chr:Chr01"/);
+    assert.match(group, /data-source-gap-drag-key="subview:/);
     const attr = name => Number(group.match(new RegExp(`data-subview-rect-${name}="([^"]+)"`))[1]);
     return { x: attr("x"), y: attr("y"), width: attr("width"), height: attr("height") };
   });

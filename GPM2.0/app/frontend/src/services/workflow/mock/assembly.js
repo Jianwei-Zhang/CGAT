@@ -59,17 +59,21 @@ function applyMockLayoutAction(viewState, action, args) {
     ? next.supportMirroredCtgs
     : [];
   if (action === "drag-ctg") {
-    const targetKey = buildMockTrackOffsetKey(args);
-    const offsets = next.trackDragOffsets.filter(
-      (entry) => buildMockTrackOffsetKey(entry) !== targetKey,
-    );
-    const offset = Number.isFinite(Number(args.offsetBp))
-      ? Number(args.offsetBp)
-      : Number(args.offsetPx);
-    if (Number.isFinite(offset) && Math.abs(offset) >= 0.01) {
-      offsets.push(structuredClone(args));
+    const targets = Array.isArray(args.targets) && args.targets.length ? args.targets : [args];
+    for (const target of targets) {
+      const targetKey = buildMockTrackOffsetKey(target);
+      const offsets = next.trackDragOffsets.filter(
+        (entry) => buildMockTrackOffsetKey(entry) !== targetKey,
+      );
+      const offset = Number.isFinite(Number(target.offsetBp))
+        ? Number(target.offsetBp)
+        : Number(target.offsetPx);
+      if (Number.isFinite(offset) && Math.abs(offset) >= 0.01) {
+        const { targets: _targets, ...entry } = target;
+        offsets.push(structuredClone(entry));
+      }
+      next.trackDragOffsets = offsets;
     }
-    next.trackDragOffsets = offsets;
   } else {
     const datasetId = Number(args.datasetId || 0);
     const assemblyCtgId = Number(args.assemblyCtgId || 0);
@@ -558,9 +562,12 @@ async function runMainViewLayoutActionMock({ projectId, chrName, action, args = 
   const beforeViewState = structuredClone(getMockProjectViewState(projectId));
   const afterViewState = applyMockLayoutAction(beforeViewState, normalizedAction, args);
   const affectedCtgId = Number(args.assemblyCtgId || 0);
+  const affectedIds = normalizedAction === "drag-ctg" && Array.isArray(args.targets)
+    ? [...new Set(args.targets.map((entry) => Number(entry.assemblyCtgId)).filter((id) => id > 0))]
+    : affectedCtgId > 0 ? [affectedCtgId] : [];
   const operation = {
     kind: normalizedAction,
-    targetCount: 1,
+    targetCount: affectedIds.length || 1,
     targetName: affectedCtgId > 0 ? `Ctg${affectedCtgId}` : null,
   };
   if (JSON.stringify(beforeViewState) === JSON.stringify(afterViewState)) {
@@ -582,7 +589,7 @@ async function runMainViewLayoutActionMock({ projectId, chrName, action, args = 
     projectId,
     chrName,
     operation,
-    affectedCtgId > 0 ? [affectedCtgId] : [],
+    affectedIds,
   );
 }
 

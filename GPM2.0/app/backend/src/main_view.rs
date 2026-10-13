@@ -70,7 +70,10 @@ pub struct SourceFragment {
     pub gap_after_bp: i64,
 }
 
-fn load_source_fragment(conn: &Connection, ctg_id: i64) -> Result<Option<SourceFragment>> {
+pub(crate) fn load_source_fragment(
+    conn: &Connection,
+    ctg_id: i64,
+) -> Result<Option<SourceFragment>> {
     let row = conn
         .query_row(
             "SELECT s.source_seq_id,s.instance_key,s.source_start,s.source_end,ss.length

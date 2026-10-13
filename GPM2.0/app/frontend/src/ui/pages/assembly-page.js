@@ -1,3 +1,4 @@
+import { setTrackDragGroupOffsets, setSubviewDragGroupOffsets, moveSubviewCompositionDrag } from "./assembly/source-fragment-drag.js";
 import { requestAppPrompt } from "../shell/app-dialog.js";
 import {
   pickDirectoryPath,
@@ -60,7 +61,6 @@ import {
 import {
   applySubviewComposition,
   getSubviewComposition,
-  setSubviewCompositionMemberPosition,
 } from "./assembly/subview-composition-state.js";
 import {
   activateSubviewCompositionHistory,
@@ -212,8 +212,6 @@ import {
   normalizeTrackDragOffsets,
   normalizeTrackSelectionCtgIds,
   normalizeSubviewTrackDragOffsets,
-  setSubviewTrackDragOffset,
-  setTrackDragOffset,
   swapSubviewTrackDragOffsetsForSummarySwap,
 } from "./assembly/selection-state.js";
 import {
@@ -1981,7 +1979,7 @@ function shouldSuppressTrackContigClick() {
 function commitTrackDragOffset(host, store, nextOffset) {
   const state = store.getState();
   const normalizedCurrent = normalizeTrackDragOffsets(state.assembly?.trackDragOffsets);
-  const normalizedNext = setTrackDragOffset(normalizedCurrent, nextOffset);
+  const normalizedNext = setTrackDragGroupOffsets(normalizedCurrent, nextOffset);
   if (areTrackDragOffsetsEqual(normalizedCurrent, normalizedNext)) {
     return Promise.resolve(false);
   }
@@ -2032,11 +2030,7 @@ function applySubviewTrackDragOffset(host, store, nextOffset) {
     if (!member) return;
     const dragDeltaBp = Number(nextOffset.dragDeltaBp);
     if (!Number.isFinite(dragDeltaBp)) return;
-    const positioned = setSubviewCompositionMemberPosition(
-      composition,
-      member.entityKey,
-      member.xBp + dragDeltaBp,
-    );
+    const positioned = moveSubviewCompositionDrag(composition, nextOffset);
     if (!positioned.changed) return;
     const nextSubview = applySubviewComposition(state.assembly.subview, positioned.composition);
     const committedComposition = commitSubviewHistoryOperation(state.assembly, {
@@ -2050,7 +2044,7 @@ function applySubviewTrackDragOffset(host, store, nextOffset) {
     return;
   }
   const normalizedCurrent = normalizeSubviewTrackDragOffsets(state.assembly.subviewTrackDragOffsets);
-  const normalizedNext = setSubviewTrackDragOffset(normalizedCurrent, nextOffset);
+  const normalizedNext = setSubviewDragGroupOffsets(normalizedCurrent, nextOffset);
   if (areSubviewTrackDragOffsetsEqual(normalizedCurrent, normalizedNext)) {
     return;
   }

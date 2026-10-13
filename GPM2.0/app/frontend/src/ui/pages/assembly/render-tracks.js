@@ -1,6 +1,7 @@
+import { setTrackDragGroupOffsets } from "./source-fragment-drag.js";
 import { renderViewTickControl } from "./view-navigation-ui.js";
 import { resolveFullRangeVisibleSpan } from "./view-navigation-state.js";
-import { renderSourceGapConnections } from "./source-fragment-layout.js";
+import { renderSourceGapConnections, sourceFragmentDragAttrs } from "./source-fragment-layout.js";
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
@@ -32,7 +33,6 @@ import {
   normalizeTrackRole,
   normalizeTrackSelectionCtgIds,
   normalizeSubviewTrackDragOffsets,
-  setTrackDragOffset,
 } from "./selection-state.js";
 import {
   buildSupportSubviewCtgPool,
@@ -891,7 +891,7 @@ function createRenderTracksRenderer(deps = {}) {
             selectionCtgIds: assembly.trackSelectedCtgIds,
             hiddenPrimaryCtgIds: assembly.hiddenPrimaryCtgIds,
             dragOffsets: getMainTrackDragPreviewOffset(state)
-              ? setTrackDragOffset(assembly.trackDragOffsets, getMainTrackDragPreviewOffset(state))
+              ? setTrackDragGroupOffsets(assembly.trackDragOffsets, getMainTrackDragPreviewOffset(state))
               : assembly.trackDragOffsets,
             supportMirroredCtgs,
             activeHitsTrackKey: assembly.activeHitsTrackKey,
@@ -2208,7 +2208,7 @@ function renderAssemblyTracks(args) {
 
   const sourceGapConnections = rowLayouts.map((layout) => renderSourceGapConnections(
     layout.trackModel.ctgs.filter((ctg) => !(layout.role === "primary" && hiddenPrimaryCtgIdSet.has(Number(ctg.assemblyCtgId))))
-      .map((ctg) => ({ ctg, rect: resolveTrackCtgDisplayRect(layout, ctg, layout.trackModel.ctgs.indexOf(ctg)),
+      .map((ctg) => ({ ctg, dragKey: `main:${layout.id}:${ctg.assemblyCtgId}:${ctg.phasedTrackItemId || 0}`, rect: resolveTrackCtgDisplayRect(layout, ctg, layout.trackModel.ctgs.indexOf(ctg)),
         y: layout.laneTop + ctg.laneIndex * TRACK_LANE_HEIGHT, height: TRACK_BAR_HEIGHT })), escapeHtml,
   )).join("");
 
@@ -2269,7 +2269,7 @@ function renderAssemblyTracks(args) {
             ? ` data-track-label-phased-track-id="${phasedTrackId || 0}" data-track-label-phased-track-item-id="${phasedTrackItemId || 0}" data-track-label-phased-haplotype-key="${escapeAttr(phasedHaplotypeKey)}"`
             : "";
           const groupAttrs = layout.selectable
-            ? `data-track-contig-id="${ctg.assemblyCtgId}" data-track-role="${layout.interactiveRole || layout.role}" data-track-contig-name="${escapeAttr(ctg.name)}" data-track-is-mirror="${layout.isMirror ? "1" : "0"}" data-track-dataset-id="${Number(layout.datasetId || 0)}" data-track-ref-orient="${escapeAttr(resolveTrackCtgOrient(ctg))}"${phasedAttrs} ${rectMetricsAttrs}`
+            ? `data-source-gap-drag-key="${escapeAttr(`main:${layout.id}:${ctg.assemblyCtgId}:${ctg.phasedTrackItemId || 0}`)}" ${sourceFragmentDragAttrs(ctg, escapeAttr)} data-track-contig-id="${ctg.assemblyCtgId}" data-track-role="${layout.interactiveRole || layout.role}" data-track-contig-name="${escapeAttr(ctg.name)}" data-track-is-mirror="${layout.isMirror ? "1" : "0"}" data-track-dataset-id="${Number(layout.datasetId || 0)}" data-track-ref-orient="${escapeAttr(resolveTrackCtgOrient(ctg))}"${phasedAttrs} ${rectMetricsAttrs}`
             : "";
           const labelAttrs = layout.selectable
             ? ` data-track-label-for-contig-id="${ctg.assemblyCtgId}" data-track-label-role="${escapeAttr(layout.interactiveRole || layout.role)}" data-track-label-is-mirror="${layout.isMirror ? "1" : "0"}"${phasedLabelAttrs}`

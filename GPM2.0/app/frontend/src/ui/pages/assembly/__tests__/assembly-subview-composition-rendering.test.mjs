@@ -235,3 +235,26 @@ test("composition canvas keeps baseline GRT anchors when result display is off a
   assert.match(html, /data-subview-fragment-contig-id="1"/);
   assert.match(html, /data-subview-fragment-contig-id="2"/);
 });
+
+for (const candidatesLoaded of [true, false]) {
+  test(`composition retains source-fragment drag identity with candidate catalog loaded=${candidatesLoaded}`, () => {
+    const candidates = buildSubviewCompositionCandidates({ primaryDatasetId: 1,
+      allChrCtgs: [1, 2].map((assemblyCtgId) => ({ assemblyCtgId, datasetId: 1,
+        name: `part${assemblyCtgId}`, lengthBp: 1000,
+        sourceFragment: { sourceSeqId: 1, groupKey: "n-fragment:chr:one" },
+      })),
+    });
+    const composition = normalizeSubviewComposition({ members: candidates.map((candidate, i) => ({
+      ...candidate, xBp: i * 1200, lane: "top",
+    })) });
+    const state = compositionState(composition, candidatesLoaded ? candidates : []);
+    state.assembly.subviewCompositionCandidatesLoaded = candidatesLoaded;
+    const html = renderAssemblyPage(state);
+    for (const id of [1, 2]) {
+      const group = html.match(new RegExp(`<g[^>]*data-subview-composition-entity-key="assembly:${id}"[^>]*>`))?.[0];
+      assert.ok(group);
+      assert.match(group, /data-source-fragment-seq-id="1"/);
+      assert.match(group, /data-source-fragment-group="n-fragment:chr:one"/);
+    }
+  });
+}

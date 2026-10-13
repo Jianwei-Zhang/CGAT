@@ -1,3 +1,5 @@
+mod source_fragment_drag;
+
 use anyhow::Result;
 use rusqlite::{Connection, params};
 use serde_json::json;

@@ -1,3 +1,4 @@
+import { setSubviewDragGroupOffsets, moveSubviewCompositionDrag } from "../source-fragment-drag.js";
 import { setAppSettings, DEFAULT_APP_SETTINGS } from "../../../../services/app-settings.js";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -620,3 +621,43 @@ test("composition history retains more than 50 steps and safely applies a smalle
     assert.equal(next.subviewHistoryByKey[key].forward.length,0);
   } finally {setAppSettings(DEFAULT_APP_SETTINGS,{persist:false});}
 });
+
+for (const compositionMode of [false, true]) {
+  test(`linked fragment drag is one undo/redo operation in ${compositionMode ? "composition" : "track-pair"}`, () => {
+    let assembly = buildTrackPairAssembly();
+    const offsets = [{ slot: "top", contigId: 1, offsetBp: -20 },
+      { slot: "top", contigId: 3, offsetBp: 40 }, { slot: "bottom", contigId: 2, offsetBp: 99 }];
+    const composition = normalizeSubviewComposition({ members: [1, 3, 2].map((id, i) => ({
+      assemblyCtgId: id, xBp: [10, 200, 900][i], lengthBp: 100,
+      lane: id === 2 ? "bottom" : "top", flipped: id === 3,
+      source: { role: id === 2 ? "support" : "primary", datasetId: id === 2 ? 22 : 11 },
+      ...(id !== 2 ? { sourceFragment: { sourceSeqId: 1, groupKey: "n-fragment:chr:one" } } : {}),
+    })) });
+    if (compositionMode) assembly.subview = applySubviewComposition(assembly.subview, composition);
+    else assembly.subviewTrackDragOffsets = offsets;
+    assembly = activateSubviewHistory(assembly, { now: 1 }).assembly;
+    const original = compositionMode ? assembly.subview.summary.members : assembly.subviewTrackDragOffsets;
+    const targets = [1, 3].map((id, i) => compositionMode
+      ? { compositionEntityKey: `assembly:${id}`, dragDeltaBp: -30 }
+      : { slot: "top", contigId: id, offsetBp: [-50, 10][i] });
+    const payload = { ...targets[0], targets };
+    const nextSubview = compositionMode
+      ? applySubviewComposition(assembly.subview, moveSubviewCompositionDrag(composition, payload).composition)
+      : assembly.subview;
+    const nextOffsets = compositionMode ? offsets : setSubviewDragGroupOffsets(offsets, payload);
+    const committed = commitSubviewHistoryOperation(assembly, { nextSubview,
+      nextSubviewTrackDragOffsets: nextOffsets, operation: { kind: "drag-contig" }, now: 2 });
+    assert.equal(committed.changed, true);
+    assert.equal(resolveCurrentSubviewHistory(committed.assembly).record.past.length, 1);
+    const undone = rollbackSubviewHistory(committed.assembly, { now: 3 });
+    assert.deepEqual(compositionMode ? undone.assembly.subview.summary.members : undone.assembly.subviewTrackDragOffsets, original);
+    const redone = restoreSubviewHistoryRollback(undone.assembly, { now: 4 });
+    assert.deepEqual(compositionMode ? redone.assembly.subview.summary.members : redone.assembly.subviewTrackDragOffsets,
+      compositionMode ? committed.assembly.subview.summary.members : committed.assembly.subviewTrackDragOffsets);
+    if (compositionMode) {
+      assert.deepEqual(redone.assembly.subview.summary.members.map((member) => member.xBp), [-20, 170, 900]);
+      assert.equal(redone.assembly.subview.summary.members[1].flipped, true);
+      assert.equal(redone.assembly.subview.summary.members[0].sourceFragment.groupKey, "n-fragment:chr:one");
+    } else assert.equal(redone.assembly.subviewTrackDragOffsets.find((entry) => entry.contigId === 2).offsetBp, 99);
+  });
+}

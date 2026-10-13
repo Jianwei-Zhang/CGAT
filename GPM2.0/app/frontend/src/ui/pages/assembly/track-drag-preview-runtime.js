@@ -1,3 +1,4 @@
+import { dragTargets } from "./source-fragment-drag.js";
 import { resolveTrackScrollLeftForViewboxShift } from "./track-viewport.js";
 import { resolveSubviewStickyLabelKey } from "./sticky-ctg-label-runtime.js";
 
@@ -511,87 +512,94 @@ function buildTrackStickyLabelPreviewSelector({ trackRole, assemblyCtgId, isMirr
   return `[data-sticky-label-key="${key}"]`;
 }
 
-export function previewTrackContigDrag(host, {
-  trackRole,
-  assemblyCtgId,
-  phasedTrackId = null,
-  phasedTrackItemId = null,
-  offsetPx,
-}) {
-  if (!host) {
-    return;
+function applySourceGapPreview(host, groupNodes, offsetPx) {
+  const keys = new Set(groupNodes.map((node) => node.getAttribute?.("data-source-gap-drag-key")).filter(Boolean));
+  if (!keys.size) return;
+  for (const line of host.querySelectorAll?.("[data-source-gap-left-key]") || []) {
+    const left = keys.has(line.getAttribute?.("data-source-gap-left-key"));
+    const right = keys.has(line.getAttribute?.("data-source-gap-right-key"));
+    if (left || right) applyJunctionLinePreview(line, left ? offsetPx : 0, right ? offsetPx : 0);
   }
-  host.classList?.add?.(MAIN_TRACK_PREVIEW_CLASS);
-  const groupNodes = host.querySelectorAll?.(
-    buildTrackPreviewSelector({ trackRole, assemblyCtgId, phasedTrackId, phasedTrackItemId }),
-  ) || [];
-  groupNodes.forEach((groupNode) => {
-    applyGroupPreview(groupNode, offsetPx);
-    const stickyLabelNodes = host.querySelectorAll?.(
-      buildTrackStickyLabelPreviewSelector({
-        trackRole,
-        assemblyCtgId,
-        isMirror: groupNode.getAttribute?.("data-track-is-mirror") === "1",
-        phasedTrackId,
-        phasedTrackItemId,
-      }),
-    ) || [];
-    stickyLabelNodes.forEach((labelNode) => applyStickyLabelPreview(labelNode, offsetPx));
-  });
-  applyGrtJunctionPreview(host, groupNodes, offsetPx);
-  applyGrtDisplayEvidencePreview(host, groupNodes, offsetPx);
+}
 
-  const edgeIndexes = String(trackRole || "").trim() === "support" ? [0, 1] : [2, 3];
-  const bandNodes = host.querySelectorAll?.(
-    buildTrackBandPreviewSelector({ trackRole, assemblyCtgId, phasedTrackId, phasedTrackItemId }),
-  ) || [];
-  bandNodes.forEach((bandNode) => applyBandPreview(bandNode, edgeIndexes, offsetPx));
+export function previewTrackContigDrag(host, payload) {
+  if (!host) return;
+  const { offsetPx } = payload;
+  host.classList?.add?.(MAIN_TRACK_PREVIEW_CLASS);
+  const allGroups = new Set();
+  for (const target of dragTargets(payload)) {
+    const { trackRole, assemblyCtgId, phasedTrackId = null, phasedTrackItemId = null } = target;
+    const groupNodes = host.querySelectorAll?.(buildTrackPreviewSelector(target)) || [];
+    groupNodes.forEach((groupNode) => {
+      allGroups.add(groupNode);
+      applyGroupPreview(groupNode, offsetPx);
+      const stickyLabelNodes = host.querySelectorAll?.(
+        buildTrackStickyLabelPreviewSelector({
+          trackRole, assemblyCtgId,
+          isMirror: groupNode.getAttribute?.("data-track-is-mirror") === "1",
+          phasedTrackId, phasedTrackItemId,
+        }),
+      ) || [];
+      stickyLabelNodes.forEach((labelNode) => applyStickyLabelPreview(labelNode, offsetPx));
+    });
+    const edgeIndexes = String(trackRole || "").trim() === "support" ? [0, 1] : [2, 3];
+    const bandNodes = host.querySelectorAll?.(buildTrackBandPreviewSelector(target)) || [];
+    bandNodes.forEach((bandNode) => applyBandPreview(bandNode, edgeIndexes, offsetPx));
+  }
+  const groups = [...allGroups];
+  applySourceGapPreview(host, groups, offsetPx);
+  applyGrtJunctionPreview(host, groups, offsetPx);
+  applyGrtDisplayEvidencePreview(host, groups, offsetPx);
 }
 
 export function clearTrackDragPreview(host) {
   clearPreviewNodes(host, MAIN_TRACK_PREVIEW_CLASS);
 }
 
-export function previewSubviewTrackContigDrag(
-  host,
-  { slot, contigId, offsetPx, pointerClientX = null },
-) {
-  if (!host) {
-    return;
-  }
+export function previewSubviewTrackContigDrag(host, payload) {
+  if (!host) return;
+  const { offsetPx, pointerClientX = null } = payload;
   host.classList?.add?.(SUBVIEW_TRACK_PREVIEW_CLASS);
-  const groupNodes = host.querySelectorAll?.(
-    `[data-subview-track-slot="${slot}"][data-subview-contig-id="${contigId}"]`,
-  ) || [];
-  groupNodes.forEach((groupNode) => {
-    applyGroupPreview(groupNode, offsetPx);
-    const trackRole = String(groupNode.getAttribute?.("data-subview-track-role") || "").trim();
-    if (!trackRole) {
-      return;
-    }
-    const stickyLabelNodes = host.querySelectorAll?.(
-      `[data-sticky-label-key="${resolveSubviewStickyLabelKey(groupNode)}"]`,
+  const allGroups = new Set();
+  const bandEdges = new Map();
+  for (const { slot, contigId } of dragTargets(payload)) {
+    const groupNodes = host.querySelectorAll?.(
+      `[data-subview-track-slot="${slot}"][data-subview-contig-id="${contigId}"]`,
     ) || [];
-    stickyLabelNodes.forEach((labelNode) => applyStickyLabelPreview(labelNode, offsetPx));
-    const labelNodes = host.querySelectorAll?.(
-      `[data-subview-label-slot="${slot}"][data-subview-label-role="${trackRole}"][data-subview-label-contig-id="${contigId}"]`,
-    ) || [];
-    labelNodes.forEach((labelNode) => {
-      if (!isLabelInsideGroup(labelNode, groupNode)) {
-        applyStickyLabelPreview(labelNode, offsetPx);
-      }
+    groupNodes.forEach((groupNode) => {
+      allGroups.add(groupNode);
+      applyGroupPreview(groupNode, offsetPx);
+      const trackRole = String(groupNode.getAttribute?.("data-subview-track-role") || "").trim();
+      if (!trackRole) return;
+      const stickyLabelNodes = host.querySelectorAll?.(
+        `[data-sticky-label-key="${resolveSubviewStickyLabelKey(groupNode)}"]`,
+      ) || [];
+      stickyLabelNodes.forEach((labelNode) => applyStickyLabelPreview(labelNode, offsetPx));
+      const labelNodes = host.querySelectorAll?.(
+        `[data-subview-label-slot="${slot}"][data-subview-label-role="${trackRole}"][data-subview-label-contig-id="${contigId}"]`,
+      ) || [];
+      labelNodes.forEach((labelNode) => {
+        if (!isLabelInsideGroup(labelNode, groupNode)) applyStickyLabelPreview(labelNode, offsetPx);
+      });
     });
-  });
-  applyGrtJunctionPreview(host, groupNodes, offsetPx);
-  applyGrtDisplayEvidencePreview(host, groupNodes, offsetPx);
-
-  const edgeIndexes = String(slot || "").trim() === "top" ? [0, 1] : [2, 3];
-  const bandSelector = String(slot || "").trim() === "top"
-    ? `[data-subview-top-contig-id="${contigId}"]`
-    : `[data-subview-bottom-contig-id="${contigId}"]`;
-  const bandNodes = host.querySelectorAll?.(bandSelector) || [];
-  bandNodes.forEach((bandNode) => applyBandPreview(bandNode, edgeIndexes, offsetPx));
-  return applySubviewPreviewEnvelope(groupNodes, offsetPx, { pointerClientX });
+    const edgeIndexes = String(slot || "").trim() === "top" ? [0, 1] : [2, 3];
+    const bandSelector = String(slot || "").trim() === "top"
+      ? `[data-subview-top-contig-id="${contigId}"]`
+      : `[data-subview-bottom-contig-id="${contigId}"]`;
+    for (const band of host.querySelectorAll?.(bandSelector) || []) {
+      const edges = bandEdges.get(band) || new Set();
+      edgeIndexes.forEach((index) => edges.add(index));
+      bandEdges.set(band, edges);
+    }
+  }
+  // A band can touch two moving fragments; update both ends from its original
+  // points in one pass rather than overwriting the first endpoint's preview.
+  for (const [band, edges] of bandEdges) applyBandPreview(band, [...edges], offsetPx);
+  const groups = [...allGroups];
+  applySourceGapPreview(host, groups, offsetPx);
+  applyGrtJunctionPreview(host, groups, offsetPx);
+  applyGrtDisplayEvidencePreview(host, groups, offsetPx);
+  return applySubviewPreviewEnvelope(groups, offsetPx, { pointerClientX });
 }
 
 export function clearSubviewTrackDragPreview(host) {

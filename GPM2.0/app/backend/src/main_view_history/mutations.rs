@@ -60,68 +60,114 @@ pub(super) fn prepare_layout_mutation(
     }
 }
 
+fn drag_offset_key(args: &Value) -> Result<(ProjectViewTrackOffsetKey, f64)> {
+    let track_role = required_string(args, "trackRole")?.to_ascii_lowercase();
+    let key = ProjectViewTrackOffsetKey {
+        assembly_ctg_id: required_i64(args, "assemblyCtgId")?,
+        dataset_id: (track_role == "support")
+            .then_some(optional_positive_i64(args, "datasetId")?)
+            .flatten(),
+        phased_track_id: (track_role == "phased")
+            .then_some(optional_positive_i64(args, "phasedTrackId")?)
+            .flatten(),
+        phased_track_item_id: (track_role == "phased")
+            .then_some(optional_positive_i64(args, "phasedTrackItemId")?)
+            .flatten(),
+        track_role,
+    };
+    Ok((key, required_f64(args, "offsetBp")?))
+}
+
 fn prepare_drag_ctg(
     conn: &Connection,
     project_id: i64,
     chr_name: &str,
     args: &Value,
 ) -> Result<PreparedMutation> {
-    let track_role = required_string(args, "trackRole")?.to_ascii_lowercase();
-    let ctg_id = required_i64(args, "assemblyCtgId")?;
-    let offset_bp = required_f64(args, "offsetBp")?;
-    let row = load_ctg_target(conn, project_id, chr_name, ctg_id)?;
-    let dataset_id = optional_positive_i64(args, "datasetId")?;
-    let phased_track_id = optional_positive_i64(args, "phasedTrackId")?;
-    let phased_track_item_id = optional_positive_i64(args, "phasedTrackItemId")?;
-    let key = ProjectViewTrackOffsetKey {
-        track_role: track_role.clone(),
-        assembly_ctg_id: ctg_id,
-        dataset_id: (track_role == "support").then_some(dataset_id).flatten(),
-        phased_track_id: (track_role == "phased")
-            .then_some(phased_track_id)
-            .flatten(),
-        phased_track_item_id: (track_role == "phased")
-            .then_some(phased_track_item_id)
-            .flatten(),
+    let (leader_key, leader_offset) = drag_offset_key(args)?;
+    let leader = load_ctg_target(conn, project_id, chr_name, leader_key.assembly_ctg_id)?;
+    let targets = match args.get("targets") {
+        None => vec![args],
+        Some(Value::Array(values)) if !values.is_empty() => values.iter().collect(),
+        _ => bail!("MAIN_VIEW_HISTORY_INVALID_REQUEST: drag targets must be a nonempty array"),
     };
-    validate_drag_target(conn, project_id, chr_name, &row, &key)?;
+    let leader_fragment = if targets.len() > 1 {
+        Some(
+            crate::main_view::load_source_fragment(conn, leader.id)?.ok_or_else(|| {
+                anyhow!("MAIN_VIEW_HISTORY_INVALID_REQUEST: linked drag requires source fragments")
+            })?,
+        )
+    } else {
+        None
+    };
+    let mut keys = Vec::new();
+    let mut offsets = Vec::new();
+    let mut ctg_ids = BTreeSet::new();
+    let mut phased_track_ids = BTreeSet::new();
+    for (index, target) in targets.into_iter().enumerate() {
+        let (key, offset_bp) = drag_offset_key(target)?;
+        if index == 0 && (key != leader_key || offset_bp != leader_offset) {
+            bail!("MAIN_VIEW_HISTORY_INVALID_REQUEST: first drag target must match the leader");
+        }
+        if keys.contains(&key)
+            || key.track_role != leader_key.track_role
+            || key.dataset_id != leader_key.dataset_id
+            || key.phased_track_id != leader_key.phased_track_id
+        {
+            bail!("MAIN_VIEW_HISTORY_INVALID_REQUEST: duplicate or cross-track drag target");
+        }
+        let row = load_ctg_target(conn, project_id, chr_name, key.assembly_ctg_id)?;
+        validate_drag_target(conn, project_id, chr_name, &row, &key)?;
+        if let Some(group) = &leader_fragment {
+            let fragment = crate::main_view::load_source_fragment(conn, row.id)?;
+            if !fragment.is_some_and(|part| {
+                part.source_seq_id == group.source_seq_id && part.group_key == group.group_key
+            }) {
+                bail!(
+                    "MAIN_VIEW_HISTORY_INVALID_REQUEST: drag targets are not sibling source fragments"
+                );
+            }
+        }
+        ctg_ids.insert(row.id);
+        phased_track_ids.extend(key.phased_track_id);
+        if offset_bp.abs() >= 0.01 {
+            let mut offset = json!({
+                "trackRole": key.track_role,
+                "assemblyCtgId": key.assembly_ctg_id,
+                "datasetId": key.dataset_id,
+                "phasedTrackId": key.phased_track_id,
+                "phasedTrackItemId": key.phased_track_item_id,
+                "offsetBp": round_layout_metric(offset_bp),
+            });
+            offset
+                .as_object_mut()
+                .expect("offset object")
+                .retain(|_, value| !value.is_null());
+            offsets.push(offset);
+        }
+        keys.push(key);
+    }
+    let ctg_ids: Vec<_> = ctg_ids.into_iter().collect();
     let scope = SnapshotScope {
-        ctg_ids: vec![ctg_id],
-        phased_track_ids: key.phased_track_id.into_iter().collect(),
+        ctg_ids: ctg_ids.clone(),
+        phased_track_ids: phased_track_ids.into_iter().collect(),
         layout_scope: ProjectViewLayoutScope {
-            track_offset_keys: vec![key],
+            track_offset_keys: keys,
             ..ProjectViewLayoutScope::default()
         },
         ..SnapshotScope::default()
     };
     let before = capture_snapshot(conn, project_id, &scope)?;
     let mut desired_layout = before.layout_state.clone();
-    desired_layout.scoped_track_drag_offsets.clear();
-    if offset_bp.abs() >= 0.01 {
-        desired_layout.scoped_track_drag_offsets.push(json!({
-            "trackRole": track_role,
-            "assemblyCtgId": ctg_id,
-            "datasetId": dataset_id,
-            "phasedTrackId": phased_track_id,
-            "phasedTrackItemId": phased_track_item_id,
-            "offsetBp": round_layout_metric(offset_bp),
-        }));
-        if let Some(object) = desired_layout
-            .scoped_track_drag_offsets
-            .first_mut()
-            .and_then(Value::as_object_mut)
-        {
-            object.retain(|_, value| !value.is_null());
-        }
-    }
+    desired_layout.scoped_track_drag_offsets = offsets;
     reconcile_project_view_layout(conn, project_id, &before.layout_scope, &desired_layout)?;
     finish_simple_mutation(
         conn,
         project_id,
         before,
         "drag-ctg",
-        Some(row.name),
-        vec![ctg_id],
+        Some(leader.name),
+        ctg_ids,
         vec![],
     )
 }

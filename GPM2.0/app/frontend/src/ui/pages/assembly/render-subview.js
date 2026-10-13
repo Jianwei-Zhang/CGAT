@@ -1,6 +1,7 @@
+import { setSubviewDragGroupOffsets, moveSubviewCompositionDrag } from "./source-fragment-drag.js";
 import { resolveFullRangeVisibleSpan } from "./view-navigation-state.js";
 import { renderViewTickControl } from "./view-navigation-ui.js";
-import { renderSourceGapConnections } from "./source-fragment-layout.js";
+import { renderSourceGapConnections, sourceFragmentDragAttrs } from "./source-fragment-layout.js";
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
@@ -21,7 +22,6 @@ import {
 } from "./track-prefs.js";
 import {
   normalizeSupportDatasetId,
-  setSubviewTrackDragOffset,
 } from "./selection-state.js";
 import {
   buildRefSubviewCtgPool,
@@ -59,7 +59,7 @@ import { renderSubviewToolsToggle } from "./render-subview-tools.js";
 import { buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
 import { buildSubviewGrtAnchorScene } from "./subview-grt-anchor-state.js";
 import { renderSubviewCompositionAlignmentCard } from "./render-subview-composition-canvas.js";
-import { getSubviewComposition, createSubviewCompositionSummary, setSubviewCompositionMemberPosition } from "./subview-composition-state.js";
+import { getSubviewComposition, createSubviewCompositionSummary } from "./subview-composition-state.js";
 import {
   buildTrackCtgHoverTitle,
   formatTrackCtgOrientationLabel,
@@ -753,15 +753,14 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
     if (composition && preview.compositionEntityKey) {
       const member = composition.members.find((entry) => entry.entityKey === preview.compositionEntityKey);
       if (member) {
-        const positioned = setSubviewCompositionMemberPosition(composition, member.entityKey,
-          member.xBp + preview.dragDeltaBp);
+        const positioned = moveSubviewCompositionDrag(composition, preview);
         assembly = { ...assembly, subview: { ...assembly.subview,
           summary: createSubviewCompositionSummary(positioned.composition),
         } };
       }
     } else {
       assembly = { ...assembly, subviewTrackDragOffsets:
-        setSubviewTrackDragOffset(assembly.subviewTrackDragOffsets, preview) };
+        setSubviewDragGroupOffsets(assembly.subviewTrackDragOffsets, preview) };
     }
   }
   const subview = getSubviewStateImpl(assembly);
@@ -1911,7 +1910,7 @@ function renderSubviewAlignmentCard(
               data-subview-track-slot="top"
               data-subview-track-ref-orient="${escapeAttr(resolveTrackCtgOrient(topCtg))}"
               data-subview-track-role="${escapeAttr(topSelection.role)}"
-              data-subview-contig-id="${topSelection.contigId}"
+              data-subview-contig-id="${topSelection.contigId}" ${sourceFragmentDragAttrs(topCtg, escapeAttr)}
               data-grt-result-entry-key="top"
               data-subview-rect-x="${svgModel.topBarX.toFixed(2)}"
               data-subview-rect-y="${svgModel.topBarY.toFixed(2)}"
@@ -1970,7 +1969,7 @@ function renderSubviewAlignmentCard(
               data-subview-track-slot="bottom"
               data-subview-track-ref-orient="${escapeAttr(resolveTrackCtgOrient(bottomCtg))}"
               data-subview-track-role="${escapeAttr(bottomSelection.role)}"
-              data-subview-contig-id="${bottomSelection.contigId}"
+              data-subview-contig-id="${bottomSelection.contigId}" ${sourceFragmentDragAttrs(bottomCtg, escapeAttr)}
               data-grt-result-entry-key="bottom"
               data-subview-rect-x="${svgModel.bottomBarX.toFixed(2)}"
               data-subview-rect-y="${svgModel.bottomBarY.toFixed(2)}"
@@ -3067,7 +3066,8 @@ function renderSubviewTrackPairAlignmentCard(
               data-subview-track-ref-orient="${escapeAttr(resolveTrackCtgOrient(ctg))}"
               data-subview-track-slot="${escapeAttr(resolveLayoutSlot(layout.id))}"
               data-subview-track-role="${escapeAttr(layout.role)}"
-              data-subview-contig-id="${contigId}"
+              data-subview-contig-id="${contigId}" ${sourceFragmentDragAttrs(ctg, escapeAttr)}
+              data-source-gap-drag-key="subview:${escapeAttr(resolveLayoutSlot(layout.id))}:${contigId}"
               data-grt-result-entry-key="${escapeAttr(grtOverlayKey)}"
               data-subview-rect-x="${rect.x.toFixed(2)}"
               data-subview-rect-y="${y.toFixed(2)}"
@@ -3125,6 +3125,7 @@ function renderSubviewTrackPairAlignmentCard(
       })
       .filter((entry) => entry && entry.markup);
     return renderSourceGapConnections(renderEntries.map((entry) => ({ ...entry,
+      dragKey: `subview:${resolveLayoutSlot(layout.id)}:${entry.ctg.assemblyCtgId}`,
       y: layout.laneTop + Math.max(0, Number(entry.ctg?.laneIndex || 0)) * TRACK_LANE_HEIGHT, height: TRACK_BAR_HEIGHT,
     })), escapeHtml) + sortTrackEntriesForRender(renderEntries).map((entry) => entry.markup).join("");
   };

@@ -1,3 +1,4 @@
+import { sourceFragmentDragAttrs } from "./source-fragment-layout.js";
 import { resolveFullRangeVisibleSpan } from "./view-navigation-state.js";
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
@@ -408,7 +409,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
       data-subview-track-pair-phased-track-item-id="${member.source?.phasedItemId || 0}"
       data-subview-track-pair-phased-haplotype-key="${escapeAttr(member.source?.hap || "")}"
       data-subview-track-slot="${member.lane}" data-subview-track-role="${escapeAttr(role)}"
-      data-subview-contig-id="${member.assemblyCtgId || 0}" data-subview-track-ref-orient="${orient}"
+      data-subview-contig-id="${member.assemblyCtgId || 0}" ${sourceFragmentDragAttrs(candidate?.ctg?.sourceFragment ? candidate.ctg : member, escapeAttr)} data-subview-track-ref-orient="${orient}"
       data-subview-rect-x="${member.x.toFixed(2)}" data-subview-rect-y="${y}"
       data-subview-rect-width="${member.width.toFixed(2)}" data-subview-rect-height="${BAR_HEIGHT}"
       data-subview-world-start-bp="${worldStartBp}">

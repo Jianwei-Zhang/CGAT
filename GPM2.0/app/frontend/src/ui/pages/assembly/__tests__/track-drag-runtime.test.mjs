@@ -886,3 +886,89 @@ for (const composition of [false, true]) {
     });
   }
 }
+
+for (const view of ["main", "pair", "composition"]) {
+  for (const fullRange of [false, true]) {
+    for (const finish of ["release", "cancel", "context-switch"]) {
+      for (const leaderId of [12, 13]) {
+        test(`source-fragment ${view} drag fullRange=${fullRange}, ${finish}, leader=${leaderId}`, async () => {
+          const originalWindow = globalThis.window;
+          const win = createWindowStub();
+          globalThis.window = win;
+          try {
+            const main = view === "main", composition = view === "composition";
+            const host = createHost();
+            let state = { session: { projectId: 1 }, assembly: { activeTab: "assembly", selectedChrName: "Chr01",
+              subview: {}, trackView: { fullRange }, subviewTrackView: { fullRange },
+              trackDragOffsets: [], subviewTrackDragOffsets: [] } };
+            const store = { getState: () => state };
+            const scroll = { scrollLeft: 0, dataset: {
+              trackDomainSpanBp: "100", trackInnerWidth: "100",
+              subviewDomainSpanBp: "100", subviewInnerWidth: "100",
+            } };
+            const makeNode = (id, group = "n-fragment:chr:one") => ({ getAttribute: (name) => ({
+              "data-source-fragment-seq-id": "1", "data-source-fragment-group": group,
+              ...(main ? { "data-track-role": "primary", "data-track-contig-id": String(id) }
+                : { "data-subview-track-slot": "top", "data-subview-contig-id": String(id),
+                  "data-subview-track-role": "primary",
+                  "data-subview-composition-entity-key": composition ? `assembly:${id}` : "" }),
+            })[name] || null, closest: () => scroll });
+            const nodes = [makeNode(12), makeNode(13), makeNode(14, "n-fragment:chr:other")];
+            scroll.querySelectorAll = () => nodes;
+            const node = nodes.find((entry) => Number(entry.getAttribute(main ? "data-track-contig-id" : "data-subview-contig-id")) === leaderId);
+            const target = { closest: (selector) => selector === (main
+              ? "[data-track-contig-id][data-track-role]" : "[data-subview-contig-id][data-subview-track-slot]") ? node : null };
+            const previews = [], commits = [];
+            let persisted = 0;
+            const preview = (_host, payload) => previews.push(payload);
+            const fullPreview = (_host, _store, payload) => {
+              previews.push(payload);
+              scroll.dataset.trackDomainSpanBp = scroll.dataset.subviewDomainSpanBp = "200";
+            };
+            const commit = (_host, _store, payload) => commits.push(payload);
+            const offset = (_offsets, _role, id) => id === 12 ? 7 : -4;
+            const deps = {
+              clearTrackDragPreview() {}, clearSubviewTrackDragPreview() {},
+              clearFullRangeTrackDragPreview() {}, clearFullRangeSubviewDragPreview() {},
+              commitTrackDragOffset: commit, applySubviewTrackDragOffset: commit,
+              previewTrackContigDrag: preview, previewSubviewTrackContigDrag: preview,
+              previewFullRangeTrackContigDrag: fullPreview, previewFullRangeSubviewContigDrag: fullPreview,
+              convertTrackOffsetPxToBp: (value, context) => value * context.domainSpanBp / context.innerWidth,
+              resolveActiveTrackScrollElement: () => scroll,
+              resolveTrackDragOffsetBp: offset, resolveSubviewTrackDragOffsetBp: offset,
+              roundTrackMetric: (value) => value,
+              setTrackContigDragActive() {}, setSuppressTrackContigClickUntil() {},
+              persistSubviewTrackDragOffsets() { persisted += 1; },
+            };
+            (main ? bindTrackContigDrag : bindSubviewTrackContigDrag)(host, store, deps);
+            host.listeners.get("pointerdown")({ button: 0, clientX: 5, target, preventDefault() {} });
+            win.listeners.get("pointermove")({ clientX: 17 });
+            win.flushAnimationFrame();
+            win.listeners.get("pointermove")({ clientX: 22 });
+            win.flushAnimationFrame();
+            assert.equal(previews.at(-1).targets.length, 2);
+            const delta = fullRange ? 22 : 17;
+            if (!fullRange) assert.equal(previews.at(-1).offsetPx, delta);
+            if (finish === "context-switch") state = { ...state, assembly: { ...state.assembly, selectedChrName: "Chr02" } };
+            win.listeners.get(finish === "cancel" ? "pointercancel" : "pointerup")({ clientX: 22 });
+            await Promise.resolve();
+            if (finish !== "release") {
+              assert.deepEqual(commits, []);
+              assert.equal(persisted, 0);
+            } else {
+              assert.equal(commits.length, 1);
+              assert.equal(persisted, main ? 0 : 1);
+              assert.equal(commits[0].targets.length, 2);
+              for (const entry of commits[0].targets) {
+                const id = main ? entry.assemblyCtgId : entry.contigId;
+                assert.ok([12, 13].includes(id));
+                assert.equal(composition ? entry.dragDeltaBp : entry.offsetBp - (id === 12 ? 7 : -4), delta);
+              }
+              if (fullRange) assert.deepEqual(commits[0], previews.at(-1));
+            }
+          } finally { globalThis.window = originalWindow; }
+        });
+      }
+    }
+  }
+}

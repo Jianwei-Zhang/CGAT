@@ -729,3 +729,54 @@ test("previewSubviewTrackContigDrag applies the stable envelope to subview-track
   assert.equal(clipRectNode.getAttribute("x"), "0");
   assert.equal(clipRectNode.getAttribute("width"), "100");
 });
+
+for (const subview of [false, true]) {
+  test(`linked ${subview ? "subview" : "main"} preview moves both gap endpoints and restores all geometry`, () => {
+    const first = createNode({ "data-source-gap-drag-key": "row:1", "data-grt-result-entry-key": "one" });
+    const second = createNode({ "data-source-gap-drag-key": "row:2", "data-grt-result-entry-key": "two" });
+    const gap = createNode({ "data-source-gap-left-key": "row:1", "data-source-gap-right-key": "row:2", x1: "20", x2: "40" });
+    const otherGap = createNode({ "data-source-gap-left-key": "other:1", "data-source-gap-right-key": "other:2", x1: "20", x2: "40" });
+    const band = createNode({ points: "0,0 10,0 30,20 20,20" });
+    const evidence = createNode({ "data-grt-display-evidence-source-entry-key": "one",
+      "data-grt-display-evidence-target-entry-key": "two", points: "0,0 10,0 30,20 20,20" });
+    const junction = createNode({ "data-grt-result-junction-left-entry-key": "one",
+      "data-grt-result-junction-right-entry-key": "two" });
+    const queryMap = {
+      "[data-source-gap-left-key]": [gap, otherGap],
+      "[data-grt-display-evidence]": [evidence], "[data-grt-result-junction]": [junction],
+      "[data-drag-preview-group='1']": [first, second, junction],
+      "[data-drag-preview-band='1']": [band, evidence],
+      "[data-drag-preview-junction-line='1']": [gap],
+      ...(subview ? {
+        '[data-subview-track-slot="top"][data-subview-contig-id="1"]': [first],
+        '[data-subview-track-slot="bottom"][data-subview-contig-id="2"]': [second],
+        '[data-subview-top-contig-id="1"]': [band], '[data-subview-bottom-contig-id="2"]': [band],
+      } : {
+        '[data-track-contig-id="1"][data-track-role="primary"]': [first],
+        '[data-track-contig-id="2"][data-track-role="primary"]': [second],
+        '[data-band-track-role="primary"][data-band-contig-id="1"]': [band],
+      }),
+    };
+    const host = createHost(queryMap);
+    const targets = subview ? [{ slot: "top", contigId: 1 }, { slot: "bottom", contigId: 2 }]
+      : [1, 2].map((assemblyCtgId) => ({ trackRole: "primary", assemblyCtgId }));
+    const preview = subview ? previewSubviewTrackContigDrag : previewTrackContigDrag;
+    for (const delta of [15, -5]) {
+      preview(host, { ...targets[0], targets, offsetPx: delta });
+      assert.equal(first.getAttribute("transform"), `translate(${delta.toFixed(2)} 0)`);
+      assert.equal(second.getAttribute("transform"), first.getAttribute("transform"));
+      assert.equal(junction.getAttribute("transform"), first.getAttribute("transform"));
+      assert.equal(Number(gap.getAttribute("x1")), 20 + delta);
+      assert.equal(Number(gap.getAttribute("x2")), 40 + delta);
+      assert.equal(otherGap.getAttribute("x1"), "20");
+      const xs = (node) => node.getAttribute("points").split(/\s+/).map((point) => Number(point.split(",")[0]));
+      assert.deepEqual(xs(band), subview ? [delta, 10 + delta, 30 + delta, 20 + delta] : [0, 10, 30 + delta, 20 + delta]);
+      assert.deepEqual(xs(evidence), [delta, 10 + delta, 30 + delta, 20 + delta]);
+    }
+    (subview ? clearSubviewTrackDragPreview : clearTrackDragPreview)(host);
+    for (const group of [first, second, junction]) assert.equal(group.getAttribute("transform"), null);
+    assert.equal(gap.getAttribute("x1"), "20");
+    assert.equal(gap.getAttribute("x2"), "40");
+    assert.equal(band.getAttribute("points"), "0,0 10,0 30,20 20,20");
+  });
+}

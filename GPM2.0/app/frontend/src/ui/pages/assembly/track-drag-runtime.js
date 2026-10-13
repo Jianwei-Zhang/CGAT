@@ -1,3 +1,4 @@
+import { collectSourceFragmentDragTargets, buildSourceFragmentDragPayload } from "./source-fragment-drag.js";
 import { normalizeSupportDatasetId, normalizeTrackRole } from "./selection-state.js";
 
 const ASSEMBLY_TRACK_CONTIG_DRAG_BOUND = Symbol("assemblyTrackContigDragBound");
@@ -189,6 +190,14 @@ export function bindTrackContigDrag(host, store, deps) {
         phasedTrackItemId,
       },
     );
+    const targets = collectSourceFragmentDragTargets(scrollEl, trackNode);
+    const baseOffsets = targets.map((target) => deps.resolveTrackDragOffsetBp(
+      state.assembly.trackDragOffsets, target.trackRole, target.assemblyCtgId,
+      { ...scaleContext, ...target },
+    ));
+    const dragPayload = (offsetBp) => buildSourceFragmentDragPayload(
+      targets, baseOffsets, offsetBp - baseOffsetBp, deps.roundTrackMetric,
+    );
     let dragging = false;
     let pendingOffsetBp = baseOffsetBp;
     const fullRangeDrag = state.assembly.trackView?.fullRange === true
@@ -207,13 +216,7 @@ export function bindTrackContigDrag(host, store, deps) {
     const scheduler = createFrameScheduler(() => {
       if (!sameContext()) { onPointerCancel(); return; }
       if (fullRangeDrag) {
-        deps.previewFullRangeTrackContigDrag(dragHost, store, {
-          trackRole, assemblyCtgId,
-          ...(datasetId ? { datasetId } : {}),
-          ...(phasedTrackId ? { phasedTrackId } : {}),
-          ...(phasedTrackItemId ? { phasedTrackItemId } : {}),
-          offsetBp: pendingOffsetBp,
-        });
+        deps.previewFullRangeTrackContigDrag(dragHost, store, dragPayload(pendingOffsetBp));
         return;
       }
       const offsetPx = deps.roundTrackMetric(
@@ -226,6 +229,7 @@ export function bindTrackContigDrag(host, store, deps) {
         ...(phasedTrackId ? { phasedTrackId } : {}),
         ...(phasedTrackItemId ? { phasedTrackItemId } : {}),
         offsetPx,
+        ...(targets.length > 1 ? { targets } : {}),
       });
     });
 
@@ -281,14 +285,7 @@ export function bindTrackContigDrag(host, store, deps) {
         if (fullRangeDrag) deps.clearFullRangeTrackDragPreview(dragHost, store);
         if (dragging) {
           deps.setSuppressTrackContigClickUntil(Date.now() + TRACK_CONTIG_CLICK_SUPPRESS_MS);
-          const committed = deps.commitTrackDragOffset(dragHost, store, {
-            trackRole,
-            assemblyCtgId,
-            ...(datasetId ? { datasetId } : {}),
-            ...(phasedTrackId ? { phasedTrackId } : {}),
-            ...(phasedTrackItemId ? { phasedTrackItemId } : {}),
-            offsetBp: pendingOffsetBp,
-          });
+          const committed = deps.commitTrackDragOffset(dragHost, store, dragPayload(pendingOffsetBp));
           // Keep the released geometry until the authoritative refresh. Scope
           // cleanup to the old scroll node so it cannot erase a newer preview.
           void Promise.resolve(committed).then((changed) => {
@@ -377,6 +374,13 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       contigId,
       scaleContext,
     );
+    const targets = collectSourceFragmentDragTargets(scrollEl, trackNode, { subview: true });
+    const baseOffsets = targets.map((target) => target.compositionEntityKey ? 0
+      : deps.resolveSubviewTrackDragOffsetBp(state.assembly.subviewTrackDragOffsets,
+        target.slot, target.contigId, scaleContext));
+    const dragPayload = (offsetBp) => buildSourceFragmentDragPayload(
+      targets, baseOffsets, offsetBp - baseOffsetBp, deps.roundTrackMetric,
+    );
     let dragging = false;
     let pendingOffsetBp = baseOffsetBp;
     let previewAutoScrollDeltaPx = 0;
@@ -397,14 +401,9 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     };
 
     const scheduler = createFrameScheduler(() => {
+      if (!sameContext()) { finish(false); return; }
       if (fullRangeDrag) {
-        if (!sameContext()) { finish(false); return; }
-        deps.previewFullRangeSubviewContigDrag(dragHost, store, {
-          slot, contigId,
-          ...(compositionEntityKey
-            ? { compositionEntityKey, dragDeltaBp: pendingOffsetBp }
-            : { offsetBp: pendingOffsetBp }),
-        });
+        deps.previewFullRangeSubviewContigDrag(dragHost, store, dragPayload(pendingOffsetBp));
         return;
       }
       const offsetPx = deps.roundTrackMetric(
@@ -414,6 +413,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
         slot,
         contigId,
         offsetPx,
+        ...(targets.length > 1 ? { targets } : {}),
         pointerClientX: pendingPointerClientX,
       });
       const nextScrollLeft = Number(previewResult?.scrollLeft);
@@ -429,7 +429,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
 
     const updatePendingPointerPosition = (pointerEvent) => {
       if (finished) return;
-      if (fullRangeDrag && !sameContext()) { finish(false); return; }
+      if (!sameContext()) { finish(false); return; }
       const currentClientX = Number(pointerEvent?.clientX);
       if (!Number.isFinite(currentClientX)) {
         return;
@@ -478,7 +478,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     const finish = (shouldCommit) => {
       if (finished) return;
       // Async evidence or a context switch must not apply the drag to a new pair.
-      if (fullRangeDrag && !sameContext()) shouldCommit = false;
+      if (!sameContext()) shouldCommit = false;
       const windowObject = getWindowObject();
       windowObject?.removeEventListener?.("pointermove", onPointerMove, true);
       windowObject?.removeEventListener?.("pointerup", onPointerUp, true);
@@ -496,13 +496,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
         && Math.abs(pendingOffsetBp - baseOffsetBp) >= 0.000001;
       if (shouldCommit && hasEffectiveMovement) {
         if (fullRangeDrag) deps.setSuppressTrackContigClickUntil?.(Date.now() + TRACK_CONTIG_CLICK_SUPPRESS_MS);
-        deps.applySubviewTrackDragOffset(dragHost, store, {
-          slot,
-          contigId,
-          ...(compositionEntityKey
-            ? { compositionEntityKey, dragDeltaBp: pendingOffsetBp }
-            : { offsetBp: pendingOffsetBp }),
-        });
+        deps.applySubviewTrackDragOffset(dragHost, store, dragPayload(pendingOffsetBp));
         if (
           Number.isFinite(pendingPreviewScrollLeft)
           || Number.isFinite(pendingPreviewViewportLeftX)

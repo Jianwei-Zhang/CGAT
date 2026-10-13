@@ -191,3 +191,22 @@ test("mock backend applies layout history to the authoritative project view", as
   assert.equal(view.trackDragOffsets[0].offsetBp, 120);
   assert.equal(view.supportMirroredCtgs[0].orient, "-");
 });
+
+test("mock layout group drag persists each target and undoes the group once", async () => {
+  const backend = createWorkflowMockBackend();
+  const projectId = 7, chrName = "Chr01";
+  await backend.setProjectAssemblyViewState({ projectId });
+  const targets = [
+    { trackRole: "primary", assemblyCtgId: 1, offsetBp: 100 },
+    { trackRole: "primary", assemblyCtgId: 2, offsetBp: 150 },
+  ];
+  const result = await backend.runMainViewLayoutAction({ projectId, chrName,
+    action: "drag-ctg", args: { ...targets[0], targets },
+  });
+  assert.equal(result.changed, true);
+  assert.deepEqual((await backend.getProjectAssemblyViewState({ projectId })).trackDragOffsets, targets);
+  await backend.executeMainViewHistoryAction({ projectId, chrName, action: "undo" });
+  assert.deepEqual((await backend.getProjectAssemblyViewState({ projectId })).trackDragOffsets, []);
+  await backend.executeMainViewHistoryAction({ projectId, chrName, action: "redo" });
+  assert.deepEqual((await backend.getProjectAssemblyViewState({ projectId })).trackDragOffsets, targets);
+});
