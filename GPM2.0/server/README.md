@@ -126,6 +126,23 @@ resource budget, and local scheduler/environment instructions. For example:
 > Follow this cluster's submission rules; do not run on the login node, alter
 > scientific parameters, or overwrite existing results. Report logs and outputs.
 
+Skill v2 supports [user-local operational lessons](skills/gpm-server/references/local-learning.md)
+in `local/notes.md`, separate from the official rules. It reads relevant lessons on
+future tasks, but saves a verified repair only with user consent (default: ask;
+explicit scoped `auto-local` opt-in or `off` is supported). This is agent guidance,
+not a background learning service or enforced permission system. Local notes never
+authorize scientific parameter changes, destructive repairs, or uploads.
+
+For an approved skill upgrade, use the new bundle's `scripts/stage_skill_update.py`
+to stage a **new directory outside agent discovery**, preserving the existing
+`local/` and tools binding. Review and activate it separately; do not overwrite the
+installed folder. The helper does not upgrade Server tools, merge custom official
+files, or change agent configuration. See the linked instructions for consent scope
+and revalidating old lessons. Earlier v1 smoke records do not validate v2 learning;
+its automated checks cover filesystem preservation, not agent decision behavior.
+
+See the [v2 validation boundary and behavioral acceptance matrix](validation/agent-skill-v2-local-learning.md).
+
 For a workflow-only trial, ask for the [synthetic smoke test](skills/gpm-server/references/smoke-test.md).
 It uses small generated inputs and real tools, not scientifically meaningful data.
 See the [ARM/Donau record](validation/agent-skill-v1-180.md) and

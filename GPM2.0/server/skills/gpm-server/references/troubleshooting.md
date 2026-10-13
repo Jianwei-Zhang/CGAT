@@ -26,3 +26,7 @@ Prefer a small diagnostic bundle of logs/status and relevant evidence JSON over
 raw sequence files. State which hypothesis is supported, what changed on a retry,
 and what remains unverified. Never equate a skipped optional QC stage with measured
 scientific quality.
+
+After a verified repair, follow [local learning](local-learning.md) to propose a
+scoped lesson, deduplicate it and obtain persistence consent. Do not record an
+unverified workaround or silently change the official troubleshooting table.

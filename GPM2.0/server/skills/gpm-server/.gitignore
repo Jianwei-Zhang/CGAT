@@ -1,0 +1,4 @@
+# User-owned experience must not enter a shared repository.
+/local/
+__pycache__/
+*.pyc

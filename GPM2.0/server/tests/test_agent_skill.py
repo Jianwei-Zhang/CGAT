@@ -102,7 +102,8 @@ class AgentSkillFixtureTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(len(json.loads(result.stdout)["inputs"]), 3)
             for target in ("references/execution.md", "references/troubleshooting.md",
-                           "references/smoke-test.md", "SKILL.md"):
+                           "references/smoke-test.md", "references/local-learning.md",
+                           "scripts/stage_skill_update.py", "SKILL.md"):
                 self.assertTrue((copied / target).is_file())
 
     def test_cli_success_in_path_with_spaces(self):
