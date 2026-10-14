@@ -153,6 +153,8 @@ successful, and clearly state any missing evidence or skipped QC.
 Full includes FASTA; Light does not and cannot provide FASTA export in the App.
 Archive names follow the workspace basename and selected format: use the actual
 `Final delivery packages` summary rather than hard-coded historical filenames.
+The archive's top-level directory also follows the workspace basename; it is not
+always `gpm_server`. Validate its structure and report using that actual root.
 No finalized delivery claim after a failed run, even if old archives remain.
 Do not claim App import, visual acceptance, T2T, improved QV, or independent agent
 validation unless each was actually checked.

@@ -1124,4 +1124,4 @@ echo "     - bash ${WORK_ROOT}/export_final_path_fasta.sh --tsv /path/to/final_p
 echo
 echo "Delivery reminder:"
 echo "  - gpm_next importer does not require metadata/alignments.tsv"
-echo "  - Both archives contain top-level gpm_server/{metadata,data,runs,report}"
+echo "  - Both archives contain top-level $(basename "$WORK_ROOT")/{metadata,data,runs,report}"

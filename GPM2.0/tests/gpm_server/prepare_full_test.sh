@@ -595,7 +595,8 @@ test_custom_output_root() {
   local ref="${TMP_DIR}/ref.fa"
   local ds_a="${TMP_DIR}/ds-a.fa"
   local ds_b="${TMP_DIR}/ds-b.fa"
-  local output_root="${TMP_DIR}/custom_gpm_server"
+  local output_root="${TMP_DIR}/run01"
+  local prepare_log="${TMP_DIR}/custom_prepare.log"
   write_fasta "$ref" ref
   write_fasta "$ds_a" ds_a
   write_fasta "$ds_b" ds_b
@@ -604,7 +605,16 @@ test_custom_output_root() {
     --ref ref "$ref" \
     --ds ds_a "$ds_a" \
     --ds ds_b "$ds_b" \
-    -o "$output_root" >/dev/null
+    -o "$output_root" >"$prepare_log"
+
+  grep -F 'Both archives contain top-level run01/{metadata,data,runs,report}' "$prepare_log" >/dev/null || {
+    echo "delivery reminder must use the custom workspace basename" >&2
+    exit 1
+  }
+  if grep -F 'Both archives contain top-level gpm_server/' "$prepare_log" >/dev/null; then
+    echo "delivery reminder must not hard-code the default root" >&2
+    exit 1
+  fi
 
   assert_dir "${output_root}/metadata"
   assert_file "${output_root}/metadata/reference.tsv"

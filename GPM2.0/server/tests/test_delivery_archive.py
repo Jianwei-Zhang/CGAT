@@ -9,6 +9,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+import zipfile
 from unittest.mock import patch
 
 PROJECT = Path(__file__).resolve().parents[2]
@@ -33,6 +34,29 @@ class DeliveryArchiveTests(unittest.TestCase):
                 with patch('delivery_archive.os.sched_getaffinity', return_value=set(range(available)), create=True):
                     self.assertEqual(archive_options(root), ('tar.gz', expected))
             self.assertEqual(delivery_path(root, 'light').name, 'gpm_server.light.tar.gz')
+
+    def test_custom_workspace_basename_is_archive_root(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            staging = root / 'staging' / 'run01'
+            (staging / 'report').mkdir(parents=True)
+            (staging / 'report/report.html').write_text('final report')
+            for format_name in ['tar.gz', 'zip']:
+                with self.subTest(format_name=format_name):
+                    output = root / ('run01.' + format_name)
+                    create_archive(staging, output, format_name, 2)
+                    required = {'run01/report/report.html'}
+                    if format_name == 'tar.gz':
+                        validate_tar_archive(output, required)
+                        with tarfile.open(output) as archive:
+                            names = archive.getnames()
+                    else:
+                        with zipfile.ZipFile(output) as archive:
+                            self.assertIsNone(archive.testzip())
+                            names = archive.namelist()
+                    self.assertTrue(required.issubset(names))
+                    self.assertTrue(all(name.split('/')[0] == 'run01' for name in names))
+                    self.assertFalse(any(name.startswith('gpm_server/') for name in names))
 
     def test_missing_compressor_and_corrupt_gzip_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:

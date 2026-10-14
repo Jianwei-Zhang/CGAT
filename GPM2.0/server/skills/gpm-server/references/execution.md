@@ -125,3 +125,12 @@ Inspect together:
 Tar delivery is normally `<workspace>.tar.gz` and `<workspace>.light.tar.gz` in
 its parent directory; ZIP compatibility uses `<workspace>.zip` and
 `<workspace>.no_fasta.zip`. Trust the actual run's summary and metadata.
+
+The archive root is the workspace basename: `-o /work/run01` produces members
+under `run01/`, not `gpm_server/`. Check for one expected root, safe member/link
+paths, finalized `report/`, and the Full/Light FASTA distinction. Do not hard-code
+the example root or merely rename archives to make an incorrect check pass.
+If an added post-run check fails after `run.sh` exited zero, preserve both results:
+the original scheduler failure and the successful Server stages. Fix and rerun
+only the faulty verification on a compute node, then record its separate job ID
+and exit status; do not rerun successful analysis or relabel the original job.

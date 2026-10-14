@@ -42,3 +42,27 @@ xattr -dr com.apple.quarantine /Applications/GPM.app
 - Confirm the quality job and all four installer jobs succeeded for the release workflow.
 - Confirm the Release title is `GPM vX.Y.Z`, the tag and embedded app version match, and exactly four installer assets are present, plus only explicitly approved supplemental attachments.
 - Review the published body to ensure English precedes Chinese and both macOS first-launch sections remain intact.
+
+## Server-only source asset refresh
+
+For a fix to published Server code or its bundled skill, update the existing
+`GPM_Server_<version>_source.tar.gz` attachment as part of task closure. This is
+not a desktop-installer rebuild or a version bump unless the user requests one.
+
+1. Read current Release metadata and preserve the tag, target commit, title,
+   original publication time, four installer assets and approved other attachments.
+2. Run the applicable Server tests and wait for successful quality CI on the
+   pinned source revision. Export only tracked `server/` files with a
+   `GPM_Server/` archive root; exclude environments, caches and user-local notes.
+   Include `SOURCE.json` with release, Git revision/tree, build time and CI run.
+3. Keep the previous source attachment and Release metadata locally for rollback.
+   Replace only the approved source attachment, preserving its public filename.
+   Add a concise refresh bullet in each existing language section; do not remove
+   the installer-platform or macOS first-launch instructions.
+4. Download the replacement through its public Release URL. Verify gzip/tar
+   integrity, safe paths, size, API/upload/download SHA-256 equality, and every
+   packaged source file against the pinned Git tree. From a fresh extraction,
+   check `run.sh --help`, the relative skill binding and applicable skill tests.
+5. Re-read the Release and confirm only the intended asset/notes changed. Record
+   the source revision, quality run, asset identity/digest and validation boundary.
+   Do not call the task closed until public-download verification is complete.
