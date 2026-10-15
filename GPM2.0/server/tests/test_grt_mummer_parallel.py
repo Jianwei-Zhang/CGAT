@@ -430,6 +430,44 @@ while not Path({str(self.root)!r}, 'started-' + other).exists():
         self.assertLessEqual(peak, 2)
         self.assertGreaterEqual(peak, 1)
 
+    def test_identical_screen_queries_share_one_build_and_repair_corruption(self):
+        from threading import Barrier
+        self.records = self.records[:1]
+        self.members = {self.records[0][0]: self.members[self.records[0][0]]}
+        self.lengths = {name: len(seq) for name, seq in self.records}
+        self.update_target()
+        original_worker = engine.cached_mummer_screen_partition
+        original_valid = engine.valid_mummer_cache
+
+        def run_pair(label):
+            simultaneous = Barrier(2)
+            def worker(*args, **kwargs):
+                simultaneous.wait(timeout=20)
+                return original_worker(*args, **kwargs)
+            def validate(directory, *args):
+                valid = original_valid(directory, *args)
+                if not valid and "raw_mummer_screen" in str(directory):
+                    # Without per-key locking both simultaneous callers would
+                    # see a miss and build/publish the same directory.
+                    time.sleep(0.1)
+                return valid
+            with patch.object(engine, "cached_mummer_screen_partition", side_effect=worker), \
+                 patch.object(engine, "valid_mummer_cache", side_effect=validate):
+                return self.collect_alignment("optimized", scope="gap-screen", label=label)
+
+        first, _, _ = run_pair("same-window-first")
+        starts = lambda: len([row for row in self.calls() if row[1] == "start"])
+        # One shared screen, plus one full-query alignment for each chromosome.
+        self.assertEqual(starts(), 3)
+        screen = next((self.server / "grt/cache/step23/raw_mummer_screen/v1").iterdir())
+        (screen / "result.coords").write_text("corrupt\n")
+        shutil.rmtree(self.server / "grt/cache/step23/step2")
+        repaired, _, _ = run_pair("same-window-repaired")
+        self.assertEqual(starts(), 4)
+        self.assertEqual(repaired, first)
+        checkpoint = json.loads((screen / "cache.json").read_text())
+        self.assertTrue(original_valid(screen, checkpoint["input_fingerprint"], list(checkpoint["output_hashes"])))
+
     def test_largest_partition_first_keeps_original_aggregation_order(self):
         partitions = [[("small", "A")], [("large", "A" * 20)], [("medium", "A" * 5)]]
         execution = engine.MummerExecution({}, partitions, [], {}, None, 2, engine.Event())

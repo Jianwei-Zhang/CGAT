@@ -282,3 +282,32 @@ performance. Do not promote Step2 gap-screen to a strict-evidence default.
 Exact-profile history job 40586980 has additionally passed 10g-with-reads
 `gap-screen` and test8 `full`; test8 `gap-screen` remains in progress. Existing
 full pipeline jobs are both still in full Step2, chromosome 7, with no restarts.
+
+## CI-discovered identical-window cache publication race
+
+Quality run **38810533625** on `4111b67` passed Windows app checks but failed
+Linux Server: two chromosome screens with byte-identical query windows computed
+the same raw numerical-cache key and raced `rmtree` / `os.replace`, producing
+`Directory not empty`. The original corpus pairs passed but did not expose this
+scheduling case; `a6e85bd6` must not be promoted without this fix.
+
+The revised shared execution context has per-cache-key thread locks around
+check/build/publish. Different keys remain parallel. The waiting caller validates
+and parses the winning numerical result in its own chromosome/window context;
+no shared mutable parsed rows or cross-chromosome provenance are introduced.
+This is within one stage collection; it does not replace the workspace runner's
+existing process-level exclusion contract.
+
+A synchronized duplicate-window regression asserts one screen build, two distinct
+full-query builds, and one rebuild (not two) after corrupting the shared screen
+cache. Additional test synchronization removes dependence on child startup
+latency, and the failure test reserves a slot for its injected failure regardless
+of coordinator interleaving.
+
+Revised engine SHA-256:
+`080599a354a4caf75e123d7d507348e3a43c2c0358749ed830b5a69cde6f9318`.
+**228 Server tests passed in 99.887 seconds**; 19 focused index/concurrency tests
+passed in 12.821 seconds. The alignment parameters, scopes, cache fingerprints
+and biological selection logic are unchanged. Repeat corpus/cache-assisted checks
+and a real-DNA identical-window positive control are the next gates. Formal source
+asset refresh remains blocked on final gates; all defaults remain baseline/full.
