@@ -372,6 +372,22 @@ else:
         self.members = {self.records[0][0]: self.members[self.records[0][0]]}
         self.lengths = {name: len(seq) for name, seq in self.records}
         self.update_target()
+        # Synchronize the two real child processes; launch latency on a busy
+        # runner/shared filesystem is not a concurrency oracle.
+        path = Path(self.tools["nucmer"]["resolved"])
+        source = path.read_text().replace(
+            "time.sleep(0.4 if index == 1 else 0.05)",
+            f"""qname = Path(query).read_text().splitlines()[0][1:]
+Path({str(self.root)!r}, 'started-' + qname).touch()
+other = 'Chr02' if qname == 'Chr01' else 'Chr01'
+deadline = time.monotonic() + 20
+while not Path({str(self.root)!r}, 'started-' + other).exists():
+    if time.monotonic() >= deadline:
+        raise RuntimeError('shared chromosome synchronization timed out')
+    time.sleep(0.01)""",
+        )
+        path.write_text(source)
+        self.tools["nucmer"] = self.identity(path)
         with patch.object(engine, "read_fasta_allow_empty", wraps=engine.read_fasta_allow_empty) as reads:
             rows, identities, tasks = self.collect_alignment("optimized")
         self.assertEqual(reads.call_count, 1)
@@ -427,7 +443,11 @@ else:
         self.tools["nucmer"] = self.identity(path)
         started = time.monotonic()
         with self.assertRaises(SystemExit):
-            self.collect_alignment("optimized")
+            # Two chromosomes can occupy two slots with their slow first job;
+            # a third slot guarantees the injected failure can start, regardless
+            # of coordinator interleaving. The existing serial-chromosome test
+            # separately verifies termination of an already active command.
+            self.collect_alignment("optimized", threads=3)
         self.assertLess(time.monotonic() - started, 5)
         self.assertTrue(list((self.server / "grt/failed").iterdir()))
         self.assertFalse(list((self.server / "grt/cache/step23/step2").glob("*/**/cache.json")))
