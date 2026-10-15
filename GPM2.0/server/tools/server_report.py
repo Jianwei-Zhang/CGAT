@@ -25,7 +25,9 @@ from render_server_report import render
 TITLES = {
     "prepare": "输入准备", "assign": "染色体归属与排列",
     "grt_prepare": "质量评估、q0 与供体构建", "grt_step1": "GRT Step1",
-    "grt_step23": "GRT Step2 / Step3", "grt_telomere_finalize": "端粒处理与最终路径",
+    "grt_step2": "GRT Step2", "grt_step3": "GRT Step3",
+    "grt_step23": "GRT Step2 / Step3",
+    "grt_telomere_finalize": "端粒处理与最终路径",
     "finalize_evidence": "证据整理与结果校验", "package_full": "完整包交付",
     "package_light": "Light 轻量包交付", "step1_round1": "Step1 · 第一阶段",
     "step1_filter": "Step1 · 过滤阶段", "step1_round2": "Step1 · 第二阶段",

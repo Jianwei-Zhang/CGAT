@@ -42,7 +42,8 @@ LOG_EVENTS = (
 ASSIGN_UNIT_ID = "assign"
 GRT_PREPARE_UNIT_ID = "grt_prepare"
 GRT_STEP1_UNIT_ID = "grt_step1"
-GRT_STEP23_UNIT_ID = "grt_step23"
+GRT_STEP2_UNIT_ID = "grt_step2"
+GRT_STEP3_UNIT_ID = "grt_step3"
 GRT_TELOMERE_FINALIZE_UNIT_ID = "grt_telomere_finalize"
 FINALIZE_EVIDENCE_UNIT_ID = "finalize_evidence"
 PACKAGE_FULL_UNIT_ID = "package_full"
@@ -133,10 +134,11 @@ def build_unit_plan(
             UnitPlanItem(ASSIGN_UNIT_ID, reference_ids),
             UnitPlanItem(GRT_PREPARE_UNIT_ID, (ASSIGN_UNIT_ID,)),
             UnitPlanItem(GRT_STEP1_UNIT_ID, (GRT_PREPARE_UNIT_ID,)),
-            UnitPlanItem(GRT_STEP23_UNIT_ID, (GRT_STEP1_UNIT_ID,)),
+            UnitPlanItem(GRT_STEP2_UNIT_ID, (GRT_STEP1_UNIT_ID,)),
+            UnitPlanItem(GRT_STEP3_UNIT_ID, (GRT_STEP2_UNIT_ID,)),
             UnitPlanItem(
                 GRT_TELOMERE_FINALIZE_UNIT_ID,
-                (GRT_STEP23_UNIT_ID,),
+                (GRT_STEP3_UNIT_ID,),
             ),
         ]
     )

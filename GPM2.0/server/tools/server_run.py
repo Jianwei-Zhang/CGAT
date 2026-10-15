@@ -76,8 +76,15 @@ def check_resume_options(requested: dict, saved: dict, identities: dict) -> None
 
 
 def update_fill_limit(root: Path, limit: str) -> None:
-    script = root / "run_grt_step23.sh"
-    runtime = root / ".prepare_lib/tools/grt_step23.py"
+    script = root / "run_grt_step3.sh"
+    runtime_name = "grt_step3.py"
+    if not script.is_file():
+        # Prepared workspaces are immutable recipes; retain their combined entrypoint.
+        script = root / "run_grt_step23.sh"
+        runtime_name = "grt_step23.py"
+    runtime = root / ".prepare_lib/tools" / runtime_name
+    if not script.is_file() or not runtime.is_file():
+        raise RunnerError("This workspace has no staged GRT Step3 runtime; update its Server runtime before changing the limit.")
     if "--max-fill" not in runtime.read_text(encoding="utf-8"):
         raise RunnerError("This workspace runtime predates --max-fill; update its Server runtime before changing the limit.")
     lines = script.read_text(encoding="utf-8").splitlines()
@@ -85,7 +92,7 @@ def update_fill_limit(root: Path, limit: str) -> None:
         if not line.startswith("python3 "):
             continue
         words = shlex.split(line)
-        if not any(Path(word).name == "grt_step23.py" for word in words):
+        if not any(Path(word).name == runtime_name for word in words):
             continue
         if "--max-fill" in words:
             position = words.index("--max-fill") + 1

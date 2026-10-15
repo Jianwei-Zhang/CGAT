@@ -44,6 +44,8 @@ GRT_WORKFLOW = "gpm_grt_precomputed_v2"
 GRT_STAGE_MAP = {
     "grt_prepare": ("donor_freeze",),
     "grt_step1": ("step1_round1", "step1_filter", "step1_round2"),
+    "grt_step2": ("step2",),
+    "grt_step3": ("step3",),
     "grt_step23": ("step2", "step3"),
     "grt_telomere_finalize": ("step4_telomere", "finalize"),
 }

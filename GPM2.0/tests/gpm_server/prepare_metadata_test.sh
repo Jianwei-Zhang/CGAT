@@ -239,8 +239,8 @@ plan_path="${output_root}/.run_all/plan.tsv"
   exit 1
 }
 grep -F $'unit_id\tcommand_relpath\tdetail_log_relpath' "$plan_path" >/dev/null
-[[ "$(tail -n +2 "$plan_path" | wc -l)" -eq 10 ]] || {
-  echo "expected 10 units in generated run_all plan" >&2
+[[ "$(tail -n +2 "$plan_path" | wc -l)" -eq 11 ]] || {
+  echo "expected 11 units in generated run_all plan" >&2
   exit 1
 }
 expected_plan="$(cat <<'EOF'
@@ -249,7 +249,8 @@ ref:ds_add	runs/ds_add_vs_ref/command.sh	runs/ds_add_vs_ref/stderr.log
 assign	assign_chr_groups.sh	logs/run_all.log
 grt_prepare	prepare_grt_inputs.sh	logs/run_all.log
 grt_step1	run_grt_step1.sh	logs/run_all.log
-grt_step23	run_grt_step23.sh	logs/run_all.log
+grt_step2	run_grt_step2.sh	logs/run_all.log
+grt_step3	run_grt_step3.sh	logs/run_all.log
 grt_telomere_finalize	run_grt_telomere_finalize.sh	logs/run_all.log
 chr:Chr01	runs/chr_Chr01/command.sh	logs/run_all.log
 finalize_evidence	finalize_grt_evidence.sh	logs/run_all.log
@@ -315,13 +316,15 @@ grep -F -- '.prepare_lib/tools/assign_chr_groups.py' "${output_root}/assign_chr_
 python3 "${output_root}/.prepare_lib/tools/grt_prepare_inputs.py" --help >/dev/null
 python3 "${output_root}/.prepare_lib/tools/grt_step1.py" --help >/dev/null
 python3 "${output_root}/.prepare_lib/tools/grt_step23.py" --help >/dev/null
+python3 "${output_root}/.prepare_lib/tools/grt_step2.py" --help >/dev/null
+python3 "${output_root}/.prepare_lib/tools/grt_step3.py" --help >/dev/null
 python3 "${output_root}/.prepare_lib/tools/grt_telomere_finalize.py" --help >/dev/null
 python3 "${output_root}/.prepare_lib/tools/grt_evidence_package.py" --help >/dev/null
 python3 "${output_root}/.prepare_lib/tools/grt_contract.py" --help >/dev/null
 
 grep -F -- "--minimap2 ${FAKE_BIN}/minimap2" "${output_root}/run_grt_step1.sh" >/dev/null
 grep -F -- "--minimap2 ${FAKE_BIN}/minimap2 --nucmer ${FAKE_BIN}/nucmer --delta-filter ${FAKE_BIN}/delta-filter --show-coords ${FAKE_BIN}/show-coords" \
-  "${output_root}/run_grt_step23.sh" >/dev/null
+  "${output_root}/run_grt_step2.sh" "${output_root}/run_grt_step3.sh" >/dev/null
 
 no_chmod_bin="${TMP_DIR}/no-chmod-bin"
 no_chmod_log="${TMP_DIR}/no-chmod.log"
@@ -593,7 +596,7 @@ PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
   --ref refill_ref "$ref" --ds refill_ds "$ds" --max-fill 2000000 \
   -o "${TMP_DIR}/refill-output" >/dev/null
 assert_prepare_option "${TMP_DIR}/refill-output/metadata/prepare_options.tsv" grt_refill_max_length 2000000
-grep -F -- "--max-fill 2000000" "${TMP_DIR}/refill-output/run_grt_step23.sh" >/dev/null
+grep -F -- "--max-fill 2000000" "${TMP_DIR}/refill-output/run_grt_step3.sh" >/dev/null
 for invalid_limit in 0 -1 1.5 nope; do
   if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --max-fill "$invalid_limit" >/dev/null 2>&1; then
     echo "expected invalid refill limit to fail: $invalid_limit" >&2

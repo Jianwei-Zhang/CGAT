@@ -32,7 +32,8 @@ class RunOrchestrationContractTests(unittest.TestCase):
                 "assign",
                 "grt_prepare",
                 "grt_step1",
-                "grt_step23",
+                "grt_step2",
+                "grt_step3",
                 "grt_telomere_finalize",
                 "chr:Chr01",
                 "chr:Chr02",
@@ -42,7 +43,7 @@ class RunOrchestrationContractTests(unittest.TestCase):
             ],
         )
         self.assertEqual(plan[2].dependencies, ("ref:hifiasm", "ref:flye"))
-        self.assertEqual(plan[9].dependencies, ("chr:Chr01", "chr:Chr02"))
+        self.assertEqual(plan[10].dependencies, ("chr:Chr01", "chr:Chr02"))
 
     def test_unit_ids_validate_names_and_preserve_pair_direction(self):
         self.assertEqual(

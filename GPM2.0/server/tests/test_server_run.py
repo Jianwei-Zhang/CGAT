@@ -64,17 +64,30 @@ class ServerRunTests(unittest.TestCase):
     def test_refill_limit_updates_command_without_repreparing(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            runtime = root / ".prepare_lib/tools/grt_step23.py"
+            runtime = root / ".prepare_lib/tools/grt_step3.py"
             runtime.parent.mkdir(parents=True)
             runtime.write_text('# supports --max-fill\n')
-            script = root / "run_grt_step23.sh"
-            script.write_text("#!/usr/bin/env bash\nset -euo pipefail\npython3 '/path with spaces/grt_step23.py' --server-dir '/workspace with spaces' --max-fill 1000000\n")
+            script = root / "run_grt_step3.sh"
+            script.write_text("#!/usr/bin/env bash\nset -euo pipefail\npython3 '/path with spaces/grt_step3.py' --server-dir '/workspace with spaces' --max-fill 1000000\n")
             server_run.update_fill_limit(root, "2000000")
             self.assertIn("--max-fill 2000000", script.read_text())
             self.assertIn("'/workspace with spaces'", script.read_text())
             before = script.stat().st_mtime_ns
             server_run.update_fill_limit(root, "2000000")
             self.assertEqual(script.stat().st_mtime_ns, before)
+
+    def test_refill_limit_keeps_legacy_combined_workspace_supported(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runtime = root / ".prepare_lib/tools/grt_step23.py"
+            runtime.parent.mkdir(parents=True)
+            runtime.write_text('# supports --max-fill\n')
+            script = root / "run_grt_step23.sh"
+            script.write_text("#!/usr/bin/env bash\npython3 /runtime/grt_step23.py --server-dir /workspace\n")
+            server_run.update_fill_limit(root, "2000000")
+            self.assertIn("grt_step23.py", script.read_text())
+            self.assertIn("--max-fill 2000000", script.read_text())
+            self.assertFalse((root / "run_grt_step3.sh").exists())
 
     def test_large_refill_limit_preserves_other_candidate_checks(self):
         gap = {"object_id": "gap", "chr": "chr06", "start0": 10000, "end0": 10100}

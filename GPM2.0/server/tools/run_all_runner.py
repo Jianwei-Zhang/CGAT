@@ -49,6 +49,8 @@ GRT_CACHE_MARKERS = {
         "GRT step1_filter cache hit:",
         "GRT step1_round2 cache hit:",
     ),
+    "grt_step2": ("GRT step2 cache hit:",),
+    "grt_step3": ("GRT step3 cache hit:",),
     "grt_step23": ("GRT step2 cache hit:", "GRT step3 cache hit:"),
     "grt_telomere_finalize": ("GRT step4_telomere cache hit:",),
 }

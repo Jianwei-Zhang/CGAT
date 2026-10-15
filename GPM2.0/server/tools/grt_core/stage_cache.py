@@ -54,6 +54,40 @@ def checkpoint_result(
     except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
         return None
 
+
+def completed_stage_result(server_dir: Path, stage: str) -> dict[str, object]:
+    """Load one completed stage without recomputing its producer fingerprint."""
+    checkpoint_path = server_dir / f"grt/checkpoints/{stage}.json"
+    try:
+        checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+        if not isinstance(checkpoint, dict):
+            fail(f"{stage} checkpoint must be an object")
+        if (
+            checkpoint.get("workflow") != WORKFLOW
+            or checkpoint.get("stage") != stage
+            or checkpoint.get("status") != "success"
+        ):
+            fail(f"{stage} checkpoint identity is invalid")
+        output_hashes = checkpoint.get("output_hashes")
+        if not isinstance(output_hashes, dict) or not output_hashes:
+            fail(f"{stage} checkpoint has no validated outputs")
+        for relpath, expected_hash in output_hashes.items():
+            path = server_dir / str(relpath)
+            if not path.is_file() or sha256_file(path) != expected_hash:
+                fail(f"{stage} checkpoint output is missing or changed: {relpath}")
+        result_path = server_dir / str(checkpoint["result_relpath"])
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+        if not isinstance(result, dict):
+            fail(f"{stage} result must be an object")
+        if (
+            result.get("stage") != stage
+            or result.get("input_fingerprint") != checkpoint.get("input_fingerprint")
+        ):
+            fail(f"{stage} result identity differs from its checkpoint")
+        return result
+    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        fail(f"cannot load completed {stage} result: {exc}")
+
 def commit_stage_directory(temporary: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():

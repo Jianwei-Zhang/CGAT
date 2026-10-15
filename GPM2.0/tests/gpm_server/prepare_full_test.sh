@@ -263,8 +263,8 @@ EOF
 
   PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
 
-  grep -F 'minimap2 -c -x asm5 -X --no-hash-name -t "${GPM_TASK_THREADS:-12}"' "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >/dev/null || {
-    echo "expected chr-local self command to use canonical pair aliases, asm5, -X, --no-hash-name, and 12 threads" >&2
+  grep -F 'minimap2 -c -x asm5 -X --no-hash-name -m 200 -n 100 -t "${GPM_TASK_THREADS:-12}"' "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >/dev/null || {
+    echo "expected chr-local self command to use canonical pair aliases, asm5, -X, --no-hash-name, -m 200, -n 100, and 12 threads" >&2
     cat "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >&2
     exit 1
   }
@@ -443,8 +443,8 @@ assert_chr_partition_run_all_staging() {
     exit 1
   }
   mapfile -t command_lines < <(tail -n +2 "$plan")
-  [[ "${#command_lines[@]}" -eq 11 ]] || {
-    echo "expected 11 staged plan units, got ${#command_lines[@]}" >&2
+  [[ "${#command_lines[@]}" -eq 12 ]] || {
+    echo "expected 12 staged plan units, got ${#command_lines[@]}" >&2
     if [[ "${#command_lines[@]}" -gt 0 ]]; then
       printf '%s\n' "${command_lines[@]}" >&2
     fi
@@ -466,7 +466,8 @@ assert_chr_partition_run_all_staging() {
 assign	assign_chr_groups.sh	logs/run_all.log
 grt_prepare	prepare_grt_inputs.sh	logs/run_all.log
 grt_step1	run_grt_step1.sh	logs/run_all.log
-grt_step23	run_grt_step23.sh	logs/run_all.log
+grt_step2	run_grt_step2.sh	logs/run_all.log
+grt_step3	run_grt_step3.sh	logs/run_all.log
 grt_telomere_finalize	run_grt_telomere_finalize.sh	logs/run_all.log
 chr:${chr_name}	runs/chr_${chr_name}/command.sh	logs/run_all.log
 finalize_evidence	finalize_grt_evidence.sh	logs/run_all.log
@@ -627,12 +628,15 @@ test_custom_output_root() {
   assert_file "${output_root}/.prepare_lib/tools/grt_prepare_inputs.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_step1.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_step23.py"
+  assert_file "${output_root}/.prepare_lib/tools/grt_step2.py"
+  assert_file "${output_root}/.prepare_lib/tools/grt_step3.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_telomere_finalize.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_evidence_package.py"
   assert_file "${output_root}/.prepare_lib/contracts/grt_precomputed_v2.json"
   assert_file "${output_root}/prepare_grt_inputs.sh"
   assert_file "${output_root}/run_grt_step1.sh"
-  assert_file "${output_root}/run_grt_step23.sh"
+  assert_file "${output_root}/run_grt_step2.sh"
+  assert_file "${output_root}/run_grt_step3.sh"
   assert_file "${output_root}/run_grt_telomere_finalize.sh"
   assert_file "${output_root}/finalize_grt_evidence.sh"
   assert_file "${output_root}/package_full_zip.sh"

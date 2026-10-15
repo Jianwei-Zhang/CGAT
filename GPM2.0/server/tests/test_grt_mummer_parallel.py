@@ -85,11 +85,12 @@ print(f'1 10000 | 1 10000 | 10000 10000 | 99.00 | {length} {qlength} | {name} {q
         self.donor_set = {"donor_set_id": "target", "fasta_relpath": "target.fa",
                           "fasta_sha256": hashlib.sha256(self.target.read_bytes()).hexdigest()}
 
-    def run_alignment(self, stage="step2", source="source", threads=2):
+    def run_alignment(self, stage="step2", source="source", threads=2, mummer_scope="full"):
         return engine.cached_mummer_chromosome(
             self.server, stage, "Chr01", source, self.query, [], self.donor_set,
             self.members, self.lengths, self.tools, threads, True,
             target_kind="correction",
+            mummer_scope=mummer_scope,
         )
 
     def calls(self):
@@ -170,6 +171,171 @@ print(f'1 10000 | 1 10000 | 10000 10000 | 99.00 | {length} {qlength} | {name} {q
         self.assertEqual(starts(), 14)
         self.assertIn(" -l 11000 ", (changed / "delta_filter.command.txt").read_text())
 
+    def test_step3_gap_screen_reruns_only_candidate_partitions_against_full_query(self):
+        self.query = "C" * 600_000 + "N" * 100 + "C" * 600_000
+        coords_tool = self.executable("screen-show-coords", '''import sys
+from pathlib import Path
+reference, query = Path(sys.argv[-1]).read_text().splitlines()
+def read(path):
+    lines = Path(path).read_text().splitlines()
+    return lines[0][1:], len(''.join(lines[1:]))
+name, length = read(reference)
+qname, qlength = read(query)
+print(reference + ' ' + query)
+print('NUCMER')
+if qname.startswith('screen_'):
+    if name != 'donor-2':
+        raise SystemExit(0)
+    start = int(qname.split('_')[-2])
+    local = 600001 - start + 1
+    print(f'1 10000 | {local - 5000} {local + 4999} | 10000 10000 | 99.00 | {length} {qlength} | {name} {qname}')
+else:
+    print(f'1 10000 | 1 10000 | 10000 10000 | 99.00 | {length} {qlength} | {name} {qname}')
+''')
+        self.tools["show-coords"] = self.identity(coords_tool)
+
+        result, wrapper_hit, _key = self.run_alignment(
+            stage="step3", source="screened", threads=2, mummer_scope="gap-screen"
+        )
+
+        self.assertFalse(wrapper_hit)
+        self.assertEqual([row["ref_record"] for row in self.parsed(result)], ["donor-2"])
+        manifest = json.loads((result / "target_partitions.json").read_text())
+        self.assertEqual(
+            [row["partition"] for row in manifest if row["selected"]],
+            [2],
+        )
+        screen_rows = (result / "screen_partitions.tsv").read_text().splitlines()
+        self.assertEqual(sum("\ttrue\t" in row for row in screen_rows[1:]), 1)
+        self.assertEqual(len([row for row in self.calls() if row[1] == "start"]), 4)
+        reused, wrapper_hit, _key = self.run_alignment(
+            stage="step3", source="screened", threads=2, mummer_scope="gap-screen"
+        )
+        self.assertTrue(wrapper_hit)
+        self.assertEqual(reused, result)
+        self.assertEqual(len([row for row in self.calls() if row[1] == "start"]), 4)
+
+    def test_step2_gap_screen_reruns_only_candidate_partitions_against_full_query(self):
+        self.query = "C" * 1_200_000 + "N" * 100 + "C" * 1_200_000
+        coords_tool = self.executable("step2-screen-show-coords", '''import sys
+from pathlib import Path
+reference, query = Path(sys.argv[-1]).read_text().splitlines()
+def read(path):
+    lines = Path(path).read_text().splitlines()
+    return lines[0][1:], len(''.join(lines[1:]))
+name, length = read(reference)
+qname, qlength = read(query)
+print(reference + ' ' + query)
+print('NUCMER')
+if qname.startswith('screen_'):
+    if name != 'donor-2':
+        raise SystemExit(0)
+    start = int(qname.split('_')[-2])
+    local = 1200001 - start + 1
+    print(f'1 10000 | {local - 20000} {local - 10001} | 10000 10000 | 99.00 | {length} {qlength} | {name} {qname}')
+    print(f'20001 30000 | {local + 10001} {local + 20000} | 10000 10000 | 99.00 | {length} {qlength} | {name} {qname}')
+else:
+    print(f'1 10000 | 1 10000 | 10000 10000 | 99.00 | {length} {qlength} | {name} {qname}')
+''')
+        self.tools["show-coords"] = self.identity(coords_tool)
+
+        result, wrapper_hit, _key = self.run_alignment(
+            stage="step2", source="screened-step2", threads=2,
+            mummer_scope="gap-screen",
+        )
+
+        self.assertFalse(wrapper_hit)
+        self.assertEqual([row["ref_record"] for row in self.parsed(result)], ["donor-2"])
+        manifest = json.loads((result / "target_partitions.json").read_text())
+        self.assertEqual(
+            [row["partition"] for row in manifest if row["selected"]],
+            [2],
+        )
+        self.assertEqual(len([row for row in self.calls() if row[1] == "start"]), 4)
+
+    def test_screen_preserves_one_sided_anchors_that_stop_window_expansion(self):
+        gap_pos = 1_000_050
+        gap = {"start0": 1_000_000, "end0": 1_000_100}
+        def row(record, start, end):
+            return {"ref_record": record, "query_min": start, "query_max": end,
+                    "identity": 0.99, "query_aligned": end - start + 1}
+        partitions = [
+            [row("near-left-only", gap_pos - 60_000, gap_pos - 50_000)],
+            [row("near-right-only", gap_pos + 50_000, gap_pos + 60_000)],
+            [row("far-pair", gap_pos - 220_000, gap_pos - 200_000),
+             row("far-pair", gap_pos + 200_000, gap_pos + 220_000)],
+        ]
+        original = [r for partition in partitions for r in partition]
+        # Near anchors on different records stop the search at 100 kb; there
+        # must not be an artificial 200 kb pair after screening them away.
+        self.assertEqual(engine._step3_anchor_pairs(gap_pos, original), [])
+        selected = [
+            partition for partition in partitions
+            if engine.step3_screen_partition_relevant([gap], partition)
+        ]
+        self.assertEqual(len(selected), 3)
+        screened = [r for partition in selected for r in partition]
+        self.assertEqual(engine._step3_anchor_pairs(gap_pos, screened), [])
+        outside = [row("irrelevant", gap_pos + 600_000, gap_pos + 620_000)]
+        self.assertFalse(engine.step3_screen_partition_relevant([gap], outside))
+
+    def test_complete_raw_cache_requires_every_partition(self):
+        self.run_alignment(stage="step2", source="cache-source", threads=2)
+        partitions = engine.partition_mummer_targets(dict(self.records))
+        self.assertTrue(
+            engine.complete_raw_mummer_cache(
+                self.server, "Chr01", self.query, partitions, self.tools
+            )
+        )
+        raw_dirs = sorted((self.server / "grt/cache/step23/raw_mummer/v1").iterdir())
+        shutil.rmtree(raw_dirs[0])
+        self.assertFalse(
+            engine.complete_raw_mummer_cache(
+                self.server, "Chr01", self.query, partitions, self.tools
+            )
+        )
+
+    def collect_unchanged_q2(self):
+        q_dir = self.server / "grt/q"
+        q_dir.mkdir(parents=True, exist_ok=True)
+        (q_dir / "q1.fa").write_bytes(engine.fasta_bytes([("Chr01", self.query)]))
+        temporary = self.server / "stage-artifacts"
+        temporary.mkdir()
+        members = [
+            {**member, "fasta_record_name": name}
+            for name, member in self.members.items()
+        ]
+        return engine.collect_mummer(
+            self.server, temporary, "grt/evidence/step3", "step3", "source-q2",
+            ["Chr01"], {"Chr01": self.query}, [], self.donor_set, members,
+            self.tools, 2, target_kind="correction", mummer_scope="gap-screen",
+        )
+
+    def test_unchanged_q2_with_partial_raw_cache_still_screens(self):
+        self.query = "C" * 20_000 + "N" * 100 + "C" * 20_000
+        self.run_alignment(stage="step2")
+        query_sha = engine.sha256_bytes(engine.fasta_bytes([("Chr01", self.query)]))
+        _target, _payload, _fingerprint, cache_dir, _names = engine.raw_mummer_cache_identity(
+            self.server, [self.records[1]], query_sha, self.tools,
+        )
+        shutil.rmtree(cache_dir)
+        before = len([row for row in self.calls() if row[1] == "start"])
+        with patch.object(engine, "screen_mummer_partitions", return_value=({2}, [], [])) as screen:
+            alignments, _identities, _tasks = self.collect_unchanged_q2()
+        screen.assert_called_once()
+        self.assertEqual([row["ref_record"] for row in alignments], ["donor-2"])
+        self.assertEqual(len([row for row in self.calls() if row[1] == "start"]), before + 1)
+
+    def test_unchanged_q2_with_complete_raw_cache_never_launches_nucmer(self):
+        self.query = "C" * 20_000 + "N" * 100 + "C" * 20_000
+        self.run_alignment(stage="step2")
+        before = self.calls()
+        with patch.object(engine, "screen_mummer_partitions") as screen:
+            alignments, _identities, _tasks = self.collect_unchanged_q2()
+        screen.assert_not_called()
+        self.assertEqual([row["ref_record"] for row in alignments], list(self.members))
+        self.assertEqual(self.calls(), before)
+
     def test_failure_keeps_completed_partitions_and_cancels_workers(self):
         self.failure.touch()
         with self.assertRaisesRegex(SystemExit, "injected partition failure.*failed_artifacts="):
@@ -186,6 +352,85 @@ print(f'1 10000 | 1 10000 | 10000 10000 | 99.00 | {length} {qlength} | {name} {q
         self.assertEqual([row for row in self.calls() if row[:2] == ["donor-1", "start"]],
                          [row for row in before if row[:2] == ["donor-1", "start"]])
         self.assertEqual(len(list(raw.iterdir())), 3)
+
+    def collect_alignment(self, profile, *, scope="full", threads=2, label="collect"):
+        temporary = self.server / label
+        temporary.mkdir()
+        query = "C" * 20000 + "N" * 100 + "C" * 20000
+        return engine.collect_mummer(
+            self.server, temporary, "grt/artifacts/step2/fixture", "step2", "source",
+            ["Chr01", "Chr02"], {"Chr01": query, "Chr02": query}, [],
+            self.donor_set, [dict(row, fasta_record_name=name) for name, row in self.members.items()],
+            self.tools, threads, target_kind="correction", mummer_scope=scope,
+            execution_profile=profile,
+        )
+
+    def test_shared_chromosomes_keep_order_and_do_not_multiply_worker_budget(self):
+        # One target per chromosome: the former per-chromosome worker cap must
+        # not accidentally serialize the shared executor to one worker.
+        self.records = self.records[:1]
+        self.members = {self.records[0][0]: self.members[self.records[0][0]]}
+        self.lengths = {name: len(seq) for name, seq in self.records}
+        self.update_target()
+        with patch.object(engine, "read_fasta_allow_empty", wraps=engine.read_fasta_allow_empty) as reads:
+            rows, identities, tasks = self.collect_alignment("optimized")
+        self.assertEqual(reads.call_count, 1)
+        self.assertEqual([row["chr"] for row in rows], ["Chr01", "Chr02"])
+        self.assertEqual([row["chr"] for row in tasks], ["Chr01", "Chr02"])
+        active = peak = 0
+        for _name, event, _at in sorted(self.calls(), key=lambda row: row[2]):
+            active += 1 if event == "start" else -1
+            peak = max(peak, active)
+        self.assertEqual(active, 0)
+        self.assertEqual(peak, 2)
+        paths = list((self.server / "grt/cache/step23/inputs/v1").glob("*.fa"))
+        self.assertEqual(len(paths), 1)
+        paths[0].write_text("corrupt\n")
+        before = len(self.calls())
+        self.collect_alignment("optimized", label="repaired-input")
+        self.assertEqual(len(self.calls()), before)
+        self.assertEqual(paths[0].read_bytes(), engine.fasta_bytes(self.records))
+
+    def test_optimized_execution_matches_baseline_without_new_numerical_keys(self):
+        baseline, _, _ = self.collect_alignment("baseline", label="baseline")
+        starts = len([row for row in self.calls() if row[1] == "start"])
+        self.assertEqual(starts, 6)
+        # Remove wrappers only: optimized input reuse must retain raw-cache keys.
+        shutil.rmtree(self.server / "grt/cache/step23/step2")
+        with patch.object(engine, "parse_mummer_coords", wraps=engine.parse_mummer_coords) as parsed:
+            optimized, _, _ = self.collect_alignment("optimized", label="optimized")
+        self.assertEqual(optimized, baseline)
+        self.assertEqual(len([row for row in self.calls() if row[1] == "start"]), starts)
+        # Six raw validation parses and two merged parses; no third parse in collect.
+        self.assertEqual(parsed.call_count, 8)
+
+    def test_shared_screen_and_full_jobs_obey_one_global_budget(self):
+        self.collect_alignment("optimized", scope="gap-screen")
+        active = peak = 0
+        for _name, event, _at in sorted(self.calls(), key=lambda row: row[2]):
+            active += 1 if event == "start" else -1
+            peak = max(peak, active)
+        self.assertEqual(active, 0)
+        self.assertLessEqual(peak, 2)
+        self.assertGreaterEqual(peak, 1)
+
+    def test_largest_partition_first_keeps_original_aggregation_order(self):
+        partitions = [[("small", "A")], [("large", "A" * 20)], [("medium", "A" * 5)]]
+        execution = engine.MummerExecution({}, partitions, [], {}, None, 2, engine.Event())
+        self.assertEqual(execution.indices(), [2, 3, 1])
+        self.assertEqual(execution.indices({1, 3}), [3, 1])
+
+    def test_shared_failure_cancels_other_chromosomes_promptly(self):
+        self.failure.touch()
+        path = Path(self.tools["nucmer"]["resolved"])
+        path.write_text(path.read_text().replace("0.4 if index == 1", "30 if index == 1"))
+        self.tools["nucmer"] = self.identity(path)
+        started = time.monotonic()
+        with self.assertRaises(SystemExit):
+            self.collect_alignment("optimized")
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertTrue(list((self.server / "grt/failed").iterdir()))
+        self.assertFalse(list((self.server / "grt/cache/step23/step2").glob("*/**/cache.json")))
 
     def test_worker_admission_limits(self):
         workers = engine.mummer_partition_workers

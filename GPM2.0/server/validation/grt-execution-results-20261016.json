@@ -1,0 +1,2336 @@
+{
+  "boundary": "Execution-only historical equivalence and bounded numerical-cold component benchmark. Full customer workflows/delivery validation remain pending.",
+  "cold_component": {
+    "boundary": "Two real chromosomes, eight original intact donor partitions with observed baseline jobs <=180s; fresh numerical caches per case; alternating order mitigates but does not remove filesystem-cache variation. Not a full-pipeline speedup.",
+    "engine_sha256": "a6e85bd653222d530ee6959e6ac875c489059ad6378c1f1fff4ac21f4047c450",
+    "measurements": [
+      {
+        "alignment_rows": 1212,
+        "alignment_sha256": "5190773abb02d212a331e0734ba0169a20369f2d1ce8e38d32ba740bfef181c4",
+        "child_cpu_seconds": 1426.4090070000002,
+        "profile": "baseline",
+        "round": 1,
+        "seconds": 293.78666143119335,
+        "status": "PASS"
+      },
+      {
+        "alignment_rows": 1212,
+        "alignment_sha256": "5190773abb02d212a331e0734ba0169a20369f2d1ce8e38d32ba740bfef181c4",
+        "child_cpu_seconds": 1633.3355789999998,
+        "profile": "optimized",
+        "round": 1,
+        "seconds": 237.35154240578413,
+        "status": "PASS"
+      },
+      {
+        "alignment_rows": 1212,
+        "alignment_sha256": "5190773abb02d212a331e0734ba0169a20369f2d1ce8e38d32ba740bfef181c4",
+        "child_cpu_seconds": 1675.9193619999996,
+        "profile": "optimized",
+        "round": 2,
+        "seconds": 241.38786133378744,
+        "status": "PASS"
+      },
+      {
+        "alignment_rows": 1212,
+        "alignment_sha256": "5190773abb02d212a331e0734ba0169a20369f2d1ce8e38d32ba740bfef181c4",
+        "child_cpu_seconds": 1644.5199960000007,
+        "profile": "baseline",
+        "round": 2,
+        "seconds": 325.28903140872717,
+        "status": "PASS"
+      }
+    ],
+    "status": "PASS",
+    "threads": 8
+  },
+  "customer_step2_scope": {
+    "cache_hit": false,
+    "checks": [
+      {
+        "expected": "ec331115c6daf91d1f2a1ccde94637a6aca9b0f58625dd45b7412f5d21ec2db0",
+        "label": "q2_sha256",
+        "observed": "ec331115c6daf91d1f2a1ccde94637a6aca9b0f58625dd45b7412f5d21ec2db0",
+        "status": "PASS"
+      },
+      {
+        "expected_count": 28,
+        "label": "events",
+        "observed_count": 28,
+        "status": "FAIL"
+      },
+      {
+        "expected_count": 117636,
+        "label": "evidence",
+        "observed_count": 82004,
+        "status": "FAIL"
+      },
+      {
+        "expected_count": 15298,
+        "label": "usage",
+        "observed_count": 10516,
+        "status": "FAIL"
+      },
+      {
+        "count": 64,
+        "label": "q2_segments",
+        "status": "PASS"
+      },
+      {
+        "expected_count": 28,
+        "label": "gap_attempts",
+        "observed_count": 28,
+        "status": "FAIL"
+      },
+      {
+        "expected_count": 8,
+        "label": "strategies",
+        "observed_count": 8,
+        "status": "FAIL"
+      }
+    ],
+    "engine_sha256": "4a427f8844a4c8c426bd49884897c33cd80e5a745fe74951227e4f6bec4b761b",
+    "status": "FAIL"
+  },
+  "customer_step3_scope": {
+    "engine_sha256": "4a427f8844a4c8c426bd49884897c33cd80e5a745fe74951227e4f6bec4b761b",
+    "events": 76,
+    "evidence": 142,
+    "expected_q3_sha256": "a3899e8701f646acd4e07cec2489bce7902119f131c36ce09f9539e8bc7089f0",
+    "observed_q3_sha256": "a3899e8701f646acd4e07cec2489bce7902119f131c36ce09f9539e8bc7089f0",
+    "q3_segments": 63,
+    "status": "PASS",
+    "usage": 40
+  },
+  "customer_step3_supplement": {
+    "boundary": "Metadata-only supplement; actual Q3 file SHA verified by compute-node recovery. Stable trace IDs may differ across engine versions, but component edits and all classification features are retained.",
+    "checks": [
+      {
+        "expected_count": 8,
+        "label": "component_filter_edits_and_q_provenance",
+        "observed_count": 8,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 122,
+        "label": "step3_classifications_all_non_id_fields",
+        "observed_count": 122,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 68,
+        "label": "step3_attempts_and_candidate_counts",
+        "observed_count": 68,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 1,
+        "label": "stage_input_output_sha256",
+        "observed_count": 1,
+        "status": "PASS"
+      }
+    ],
+    "engine_sha256": "4a427f8844a4c8c426bd49884897c33cd80e5a745fe74951227e4f6bec4b761b",
+    "status": "PASS"
+  },
+  "historical_exact_execution": [
+    {
+      "checks": [
+        {
+          "expected_count": 18,
+          "label": "step2:result",
+          "observed_count": 18,
+          "status": "PASS"
+        },
+        {
+          "label": "q2:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 594,
+          "label": "step2:candidates.tsv",
+          "observed_count": 594,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 1188,
+          "label": "step2:evidence.tsv",
+          "observed_count": 1188,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 119,
+          "label": "step2:gap_attempts.tsv",
+          "observed_count": 119,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 242,
+          "label": "step2:q_segments.tsv",
+          "observed_count": 242,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 372,
+          "label": "step2:rejections.tsv",
+          "observed_count": 372,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 12,
+          "label": "step2:strategy.tsv",
+          "observed_count": 12,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 1188,
+          "label": "step2:usage.tsv",
+          "observed_count": 1188,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 17,
+          "label": "step3:result",
+          "observed_count": 17,
+          "status": "PASS"
+        },
+        {
+          "label": "q3:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 7,
+          "label": "step3:classifications.tsv",
+          "observed_count": 7,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 7,
+          "label": "step3:correction_candidates.tsv",
+          "observed_count": 7,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 17,
+          "label": "step3:evidence.tsv",
+          "observed_count": 17,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 21,
+          "label": "step3:gap_attempts.tsv",
+          "observed_count": 21,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 250,
+          "label": "step3:q_segments.tsv",
+          "observed_count": 250,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 10,
+          "label": "step3:refill_candidates.tsv",
+          "observed_count": 10,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 428,
+          "label": "step3:refill_rejections.tsv",
+          "observed_count": 428,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 10,
+          "label": "step3:refill_round1_candidates.tsv",
+          "observed_count": 10,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_round2_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 20,
+          "label": "step3:usage.tsv",
+          "observed_count": 20,
+          "status": "PASS"
+        }
+      ],
+      "dataset": "10g_no_reads",
+      "engine_sha256": "a6e85bd653222d530ee6959e6ac875c489059ad6378c1f1fff4ac21f4047c450",
+      "report_sha256": "cd892221235e6748f1200721536803ddbd53c8095ee5722cd2a20673f856f767",
+      "scope": "full",
+      "status": "PASS",
+      "timings": {
+        "baseline:step2": {
+          "seconds": 174.71988544613123,
+          "stage_cache_hit": false
+        },
+        "baseline:step3": {
+          "seconds": 313.5432482883334,
+          "stage_cache_hit": false
+        },
+        "optimized:step2": {
+          "seconds": 80.43068524450064,
+          "stage_cache_hit": false
+        },
+        "optimized:step3": {
+          "seconds": 195.9392568692565,
+          "stage_cache_hit": false
+        }
+      }
+    },
+    {
+      "checks": [
+        {
+          "expected_count": 18,
+          "label": "step2:result",
+          "observed_count": 18,
+          "status": "PASS"
+        },
+        {
+          "label": "q2:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 587,
+          "label": "step2:candidates.tsv",
+          "observed_count": 587,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 1174,
+          "label": "step2:evidence.tsv",
+          "observed_count": 1174,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 119,
+          "label": "step2:gap_attempts.tsv",
+          "observed_count": 119,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 242,
+          "label": "step2:q_segments.tsv",
+          "observed_count": 242,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 365,
+          "label": "step2:rejections.tsv",
+          "observed_count": 365,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 12,
+          "label": "step2:strategy.tsv",
+          "observed_count": 12,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 1174,
+          "label": "step2:usage.tsv",
+          "observed_count": 1174,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 17,
+          "label": "step3:result",
+          "observed_count": 17,
+          "status": "PASS"
+        },
+        {
+          "label": "q3:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 7,
+          "label": "step3:classifications.tsv",
+          "observed_count": 7,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 7,
+          "label": "step3:correction_candidates.tsv",
+          "observed_count": 7,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 17,
+          "label": "step3:evidence.tsv",
+          "observed_count": 17,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 21,
+          "label": "step3:gap_attempts.tsv",
+          "observed_count": 21,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 250,
+          "label": "step3:q_segments.tsv",
+          "observed_count": 250,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 10,
+          "label": "step3:refill_candidates.tsv",
+          "observed_count": 10,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 428,
+          "label": "step3:refill_rejections.tsv",
+          "observed_count": 428,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 10,
+          "label": "step3:refill_round1_candidates.tsv",
+          "observed_count": 10,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_round2_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 20,
+          "label": "step3:usage.tsv",
+          "observed_count": 20,
+          "status": "PASS"
+        }
+      ],
+      "dataset": "10g_no_reads",
+      "engine_sha256": "a6e85bd653222d530ee6959e6ac875c489059ad6378c1f1fff4ac21f4047c450",
+      "report_sha256": "14ddb817bc34754e1bd86b61317bf343b9f43a3e2085cd6c5fbc058ebd9fe734",
+      "scope": "gap-screen",
+      "status": "PASS",
+      "timings": {
+        "baseline:step2": {
+          "seconds": 174.52731911092997,
+          "stage_cache_hit": false
+        },
+        "baseline:step3": {
+          "seconds": 273.74875808507204,
+          "stage_cache_hit": false
+        },
+        "optimized:step2": {
+          "seconds": 92.27111761271954,
+          "stage_cache_hit": false
+        },
+        "optimized:step3": {
+          "seconds": 193.23593447357416,
+          "stage_cache_hit": false
+        }
+      }
+    },
+    {
+      "checks": [
+        {
+          "expected_count": 18,
+          "label": "step2:result",
+          "observed_count": 18,
+          "status": "PASS"
+        },
+        {
+          "label": "q2:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 588,
+          "label": "step2:candidates.tsv",
+          "observed_count": 588,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 1176,
+          "label": "step2:evidence.tsv",
+          "observed_count": 1176,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 119,
+          "label": "step2:gap_attempts.tsv",
+          "observed_count": 119,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 242,
+          "label": "step2:q_segments.tsv",
+          "observed_count": 242,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 366,
+          "label": "step2:rejections.tsv",
+          "observed_count": 366,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 12,
+          "label": "step2:strategy.tsv",
+          "observed_count": 12,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 1176,
+          "label": "step2:usage.tsv",
+          "observed_count": 1176,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 17,
+          "label": "step3:result",
+          "observed_count": 17,
+          "status": "PASS"
+        },
+        {
+          "label": "q3:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 7,
+          "label": "step3:classifications.tsv",
+          "observed_count": 7,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 7,
+          "label": "step3:correction_candidates.tsv",
+          "observed_count": 7,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 12,
+          "label": "step3:evidence.tsv",
+          "observed_count": 12,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 22,
+          "label": "step3:gap_attempts.tsv",
+          "observed_count": 22,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 250,
+          "label": "step3:q_segments.tsv",
+          "observed_count": 250,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 5,
+          "label": "step3:refill_candidates.tsv",
+          "observed_count": 5,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 276,
+          "label": "step3:refill_rejections.tsv",
+          "observed_count": 276,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 5,
+          "label": "step3:refill_round1_candidates.tsv",
+          "observed_count": 5,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_round2_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 10,
+          "label": "step3:usage.tsv",
+          "observed_count": 10,
+          "status": "PASS"
+        }
+      ],
+      "dataset": "10g_with_reads",
+      "engine_sha256": "a6e85bd653222d530ee6959e6ac875c489059ad6378c1f1fff4ac21f4047c450",
+      "report_sha256": "794a2e4e68f7fa4945ab8e98e910136d7c7e7f90f5337b2fddd5c1756fa4cc08",
+      "scope": "full",
+      "status": "PASS",
+      "timings": {
+        "baseline:step2": {
+          "seconds": 155.8909881785512,
+          "stage_cache_hit": false
+        },
+        "baseline:step3": {
+          "seconds": 248.28682947158813,
+          "stage_cache_hit": false
+        },
+        "optimized:step2": {
+          "seconds": 87.41622979938984,
+          "stage_cache_hit": false
+        },
+        "optimized:step3": {
+          "seconds": 202.2438100874424,
+          "stage_cache_hit": false
+        }
+      }
+    },
+    {
+      "checks": [
+        {
+          "expected_count": 18,
+          "label": "step2:result",
+          "observed_count": 18,
+          "status": "PASS"
+        },
+        {
+          "label": "q2:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 581,
+          "label": "step2:candidates.tsv",
+          "observed_count": 581,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 1162,
+          "label": "step2:evidence.tsv",
+          "observed_count": 1162,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 119,
+          "label": "step2:gap_attempts.tsv",
+          "observed_count": 119,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 242,
+          "label": "step2:q_segments.tsv",
+          "observed_count": 242,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 359,
+          "label": "step2:rejections.tsv",
+          "observed_count": 359,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 12,
+          "label": "step2:strategy.tsv",
+          "observed_count": 12,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 1162,
+          "label": "step2:usage.tsv",
+          "observed_count": 1162,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 17,
+          "label": "step3:result",
+          "observed_count": 17,
+          "status": "PASS"
+        },
+        {
+          "label": "q3:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 7,
+          "label": "step3:classifications.tsv",
+          "observed_count": 7,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 7,
+          "label": "step3:correction_candidates.tsv",
+          "observed_count": 7,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 12,
+          "label": "step3:evidence.tsv",
+          "observed_count": 12,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 22,
+          "label": "step3:gap_attempts.tsv",
+          "observed_count": 22,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 250,
+          "label": "step3:q_segments.tsv",
+          "observed_count": 250,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 5,
+          "label": "step3:refill_candidates.tsv",
+          "observed_count": 5,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 276,
+          "label": "step3:refill_rejections.tsv",
+          "observed_count": 276,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 5,
+          "label": "step3:refill_round1_candidates.tsv",
+          "observed_count": 5,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_round2_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 10,
+          "label": "step3:usage.tsv",
+          "observed_count": 10,
+          "status": "PASS"
+        }
+      ],
+      "dataset": "10g_with_reads",
+      "engine_sha256": "a6e85bd653222d530ee6959e6ac875c489059ad6378c1f1fff4ac21f4047c450",
+      "report_sha256": "aadb33653483deaec184674e933fa1f7ae93b5a5416014e5aaccd576c580e8f7",
+      "scope": "gap-screen",
+      "status": "PASS",
+      "timings": {
+        "baseline:step2": {
+          "seconds": 189.65124714374542,
+          "stage_cache_hit": false
+        },
+        "baseline:step3": {
+          "seconds": 262.48143992573023,
+          "stage_cache_hit": false
+        },
+        "optimized:step2": {
+          "seconds": 109.66967149078846,
+          "stage_cache_hit": false
+        },
+        "optimized:step3": {
+          "seconds": 192.06826271861792,
+          "stage_cache_hit": false
+        }
+      }
+    },
+    {
+      "checks": [
+        {
+          "expected_count": 18,
+          "label": "step2:result",
+          "observed_count": 18,
+          "status": "PASS"
+        },
+        {
+          "label": "q2:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 2,
+          "label": "step2:candidates.tsv",
+          "observed_count": 2,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 4,
+          "label": "step2:evidence.tsv",
+          "observed_count": 4,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 2,
+          "label": "step2:gap_attempts.tsv",
+          "observed_count": 2,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 6,
+          "label": "step2:q_segments.tsv",
+          "observed_count": 6,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step2:rejections.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 2,
+          "label": "step2:strategy.tsv",
+          "observed_count": 2,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 4,
+          "label": "step2:usage.tsv",
+          "observed_count": 4,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 17,
+          "label": "step3:result",
+          "observed_count": 17,
+          "status": "PASS"
+        },
+        {
+          "label": "q3:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:classifications.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:correction_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:evidence.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:gap_attempts.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 6,
+          "label": "step3:q_segments.tsv",
+          "observed_count": 6,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_rejections.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_round1_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_round2_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:usage.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        }
+      ],
+      "dataset": "skillv3",
+      "engine_sha256": "a6e85bd653222d530ee6959e6ac875c489059ad6378c1f1fff4ac21f4047c450",
+      "report_sha256": "7624253bb71ea505abcd2053a6a4a29710cb3ad4788ec54f09832157f5fe91ab",
+      "scope": "full",
+      "status": "PASS",
+      "timings": {
+        "baseline:step2": {
+          "seconds": 0.8178074434399605,
+          "stage_cache_hit": false
+        },
+        "baseline:step3": {
+          "seconds": 0.43365681916475296,
+          "stage_cache_hit": false
+        },
+        "optimized:step2": {
+          "seconds": 0.6994878724217415,
+          "stage_cache_hit": false
+        },
+        "optimized:step3": {
+          "seconds": 0.37875548750162125,
+          "stage_cache_hit": false
+        }
+      }
+    },
+    {
+      "checks": [
+        {
+          "expected_count": 18,
+          "label": "step2:result",
+          "observed_count": 18,
+          "status": "PASS"
+        },
+        {
+          "label": "q2:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 2,
+          "label": "step2:candidates.tsv",
+          "observed_count": 2,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 4,
+          "label": "step2:evidence.tsv",
+          "observed_count": 4,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 2,
+          "label": "step2:gap_attempts.tsv",
+          "observed_count": 2,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 6,
+          "label": "step2:q_segments.tsv",
+          "observed_count": 6,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step2:rejections.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 2,
+          "label": "step2:strategy.tsv",
+          "observed_count": 2,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 4,
+          "label": "step2:usage.tsv",
+          "observed_count": 4,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 17,
+          "label": "step3:result",
+          "observed_count": 17,
+          "status": "PASS"
+        },
+        {
+          "label": "q3:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:classifications.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:correction_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:evidence.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:gap_attempts.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 6,
+          "label": "step3:q_segments.tsv",
+          "observed_count": 6,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_rejections.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_round1_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_round2_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:usage.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        }
+      ],
+      "dataset": "skillv3",
+      "engine_sha256": "a6e85bd653222d530ee6959e6ac875c489059ad6378c1f1fff4ac21f4047c450",
+      "report_sha256": "dd1235b40663325f365cab850f426f5db4aedb200b1240a03aa7d16a47de4381",
+      "scope": "gap-screen",
+      "status": "PASS",
+      "timings": {
+        "baseline:step2": {
+          "seconds": 0.8804318308830261,
+          "stage_cache_hit": false
+        },
+        "baseline:step3": {
+          "seconds": 0.45083312690258026,
+          "stage_cache_hit": false
+        },
+        "optimized:step2": {
+          "seconds": 0.7295328974723816,
+          "stage_cache_hit": false
+        },
+        "optimized:step3": {
+          "seconds": 0.38442397862672806,
+          "stage_cache_hit": false
+        }
+      }
+    },
+    {
+      "checks": [
+        {
+          "expected_count": 18,
+          "label": "step2:result",
+          "observed_count": 18,
+          "status": "PASS"
+        },
+        {
+          "label": "q2:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 4029,
+          "label": "step2:candidates.tsv",
+          "observed_count": 4029,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 8058,
+          "label": "step2:evidence.tsv",
+          "observed_count": 8058,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 119,
+          "label": "step2:gap_attempts.tsv",
+          "observed_count": 119,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 214,
+          "label": "step2:q_segments.tsv",
+          "observed_count": 214,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 3832,
+          "label": "step2:rejections.tsv",
+          "observed_count": 3832,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 12,
+          "label": "step2:strategy.tsv",
+          "observed_count": 12,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 3840,
+          "label": "step2:usage.tsv",
+          "observed_count": 3840,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 17,
+          "label": "step3:result",
+          "observed_count": 17,
+          "status": "PASS"
+        },
+        {
+          "label": "q3:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 105,
+          "label": "step3:classifications.tsv",
+          "observed_count": 105,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 105,
+          "label": "step3:correction_candidates.tsv",
+          "observed_count": 105,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 132,
+          "label": "step3:evidence.tsv",
+          "observed_count": 132,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 272,
+          "label": "step3:gap_attempts.tsv",
+          "observed_count": 272,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 246,
+          "label": "step3:q_segments.tsv",
+          "observed_count": 246,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 27,
+          "label": "step3:refill_candidates.tsv",
+          "observed_count": 27,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 160,
+          "label": "step3:refill_rejections.tsv",
+          "observed_count": 160,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 27,
+          "label": "step3:refill_round1_candidates.tsv",
+          "observed_count": 27,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_round2_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 54,
+          "label": "step3:usage.tsv",
+          "observed_count": 54,
+          "status": "PASS"
+        }
+      ],
+      "dataset": "test8_fixed",
+      "engine_sha256": "a6e85bd653222d530ee6959e6ac875c489059ad6378c1f1fff4ac21f4047c450",
+      "report_sha256": "f99de83510a4fd8bda4a1c575ced3b832a47d87f8e55cb3ed71094315088b624",
+      "scope": "full",
+      "status": "PASS",
+      "timings": {
+        "baseline:step2": {
+          "seconds": 153.87069304287434,
+          "stage_cache_hit": false
+        },
+        "baseline:step3": {
+          "seconds": 396.8488005772233,
+          "stage_cache_hit": false
+        },
+        "optimized:step2": {
+          "seconds": 80.6952731013298,
+          "stage_cache_hit": false
+        },
+        "optimized:step3": {
+          "seconds": 321.1534895449877,
+          "stage_cache_hit": false
+        }
+      }
+    },
+    {
+      "checks": [
+        {
+          "expected_count": 18,
+          "label": "step2:result",
+          "observed_count": 18,
+          "status": "PASS"
+        },
+        {
+          "label": "q2:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 3903,
+          "label": "step2:candidates.tsv",
+          "observed_count": 3903,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 7806,
+          "label": "step2:evidence.tsv",
+          "observed_count": 7806,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 119,
+          "label": "step2:gap_attempts.tsv",
+          "observed_count": 119,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 214,
+          "label": "step2:q_segments.tsv",
+          "observed_count": 214,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 3706,
+          "label": "step2:rejections.tsv",
+          "observed_count": 3706,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 12,
+          "label": "step2:strategy.tsv",
+          "observed_count": 12,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 3796,
+          "label": "step2:usage.tsv",
+          "observed_count": 3796,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 17,
+          "label": "step3:result",
+          "observed_count": 17,
+          "status": "PASS"
+        },
+        {
+          "label": "q3:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 105,
+          "label": "step3:classifications.tsv",
+          "observed_count": 105,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 105,
+          "label": "step3:correction_candidates.tsv",
+          "observed_count": 105,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 132,
+          "label": "step3:evidence.tsv",
+          "observed_count": 132,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 272,
+          "label": "step3:gap_attempts.tsv",
+          "observed_count": 272,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 246,
+          "label": "step3:q_segments.tsv",
+          "observed_count": 246,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 27,
+          "label": "step3:refill_candidates.tsv",
+          "observed_count": 27,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 160,
+          "label": "step3:refill_rejections.tsv",
+          "observed_count": 160,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 27,
+          "label": "step3:refill_round1_candidates.tsv",
+          "observed_count": 27,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_round2_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 54,
+          "label": "step3:usage.tsv",
+          "observed_count": 54,
+          "status": "PASS"
+        }
+      ],
+      "dataset": "test8_fixed",
+      "engine_sha256": "a6e85bd653222d530ee6959e6ac875c489059ad6378c1f1fff4ac21f4047c450",
+      "report_sha256": "e5b57b9baf699afd55a0fc5ed4041f98ba8639d0edb8f57b227f1d997d7f5a61",
+      "scope": "gap-screen",
+      "status": "PASS",
+      "timings": {
+        "baseline:step2": {
+          "seconds": 201.81389728188515,
+          "stage_cache_hit": false
+        },
+        "baseline:step3": {
+          "seconds": 421.6101114824414,
+          "stage_cache_hit": false
+        },
+        "optimized:step2": {
+          "seconds": 90.69969979673624,
+          "stage_cache_hit": false
+        },
+        "optimized:step3": {
+          "seconds": 345.17510068416595,
+          "stage_cache_hit": false
+        }
+      }
+    },
+    {
+      "checks": [
+        {
+          "expected_count": 18,
+          "label": "step2:result",
+          "observed_count": 18,
+          "status": "PASS"
+        },
+        {
+          "label": "q2:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 43,
+          "label": "step2:candidates.tsv",
+          "observed_count": 43,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 86,
+          "label": "step2:evidence.tsv",
+          "observed_count": 86,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 40,
+          "label": "step2:gap_attempts.tsv",
+          "observed_count": 40,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 106,
+          "label": "step2:q_segments.tsv",
+          "observed_count": 106,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 38,
+          "label": "step2:rejections.tsv",
+          "observed_count": 38,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 26,
+          "label": "step2:strategy.tsv",
+          "observed_count": 26,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step2:usage.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 17,
+          "label": "step3:result",
+          "observed_count": 17,
+          "status": "PASS"
+        },
+        {
+          "label": "q3:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 4,
+          "label": "step3:classifications.tsv",
+          "observed_count": 4,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 4,
+          "label": "step3:correction_candidates.tsv",
+          "observed_count": 4,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 53,
+          "label": "step3:evidence.tsv",
+          "observed_count": 53,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 117,
+          "label": "step3:gap_attempts.tsv",
+          "observed_count": 117,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 104,
+          "label": "step3:q_segments.tsv",
+          "observed_count": 104,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 49,
+          "label": "step3:refill_candidates.tsv",
+          "observed_count": 49,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 4449,
+          "label": "step3:refill_rejections.tsv",
+          "observed_count": 4449,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 49,
+          "label": "step3:refill_round1_candidates.tsv",
+          "observed_count": 49,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_round2_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 98,
+          "label": "step3:usage.tsv",
+          "observed_count": 98,
+          "status": "PASS"
+        }
+      ],
+      "dataset": "zebrafish",
+      "engine_sha256": "a6e85bd653222d530ee6959e6ac875c489059ad6378c1f1fff4ac21f4047c450",
+      "report_sha256": "4547d9a6c54818c672ef41dd26e1564a2577ab73fae28b0f839a4887997b9252",
+      "scope": "full",
+      "status": "PASS",
+      "timings": {
+        "baseline:step2": {
+          "seconds": 168.16891994327307,
+          "stage_cache_hit": false
+        },
+        "baseline:step3": {
+          "seconds": 437.20522325485945,
+          "stage_cache_hit": false
+        },
+        "optimized:step2": {
+          "seconds": 143.13937974721193,
+          "stage_cache_hit": false
+        },
+        "optimized:step3": {
+          "seconds": 387.6557584553957,
+          "stage_cache_hit": false
+        }
+      }
+    },
+    {
+      "checks": [
+        {
+          "expected_count": 18,
+          "label": "step2:result",
+          "observed_count": 18,
+          "status": "PASS"
+        },
+        {
+          "label": "q2:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 40,
+          "label": "step2:candidates.tsv",
+          "observed_count": 40,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 80,
+          "label": "step2:evidence.tsv",
+          "observed_count": 80,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 40,
+          "label": "step2:gap_attempts.tsv",
+          "observed_count": 40,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 106,
+          "label": "step2:q_segments.tsv",
+          "observed_count": 106,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 35,
+          "label": "step2:rejections.tsv",
+          "observed_count": 35,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 26,
+          "label": "step2:strategy.tsv",
+          "observed_count": 26,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step2:usage.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 17,
+          "label": "step3:result",
+          "observed_count": 17,
+          "status": "PASS"
+        },
+        {
+          "label": "q3:file_sha256",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 4,
+          "label": "step3:classifications.tsv",
+          "observed_count": 4,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 4,
+          "label": "step3:correction_candidates.tsv",
+          "observed_count": 4,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 53,
+          "label": "step3:evidence.tsv",
+          "observed_count": 53,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 117,
+          "label": "step3:gap_attempts.tsv",
+          "observed_count": 117,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 104,
+          "label": "step3:q_segments.tsv",
+          "observed_count": 104,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 49,
+          "label": "step3:refill_candidates.tsv",
+          "observed_count": 49,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 4449,
+          "label": "step3:refill_rejections.tsv",
+          "observed_count": 4449,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 49,
+          "label": "step3:refill_round1_candidates.tsv",
+          "observed_count": 49,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 0,
+          "label": "step3:refill_round2_candidates.tsv",
+          "observed_count": 0,
+          "status": "PASS"
+        },
+        {
+          "expected_count": 98,
+          "label": "step3:usage.tsv",
+          "observed_count": 98,
+          "status": "PASS"
+        }
+      ],
+      "dataset": "zebrafish",
+      "engine_sha256": "a6e85bd653222d530ee6959e6ac875c489059ad6378c1f1fff4ac21f4047c450",
+      "report_sha256": "eea2c08842891d176fa7d6d96c9105844cbb8f6dfbd813aaec58e5ed7eb04ef8",
+      "scope": "gap-screen",
+      "status": "PASS",
+      "timings": {
+        "baseline:step2": {
+          "seconds": 196.62448739260435,
+          "stage_cache_hit": false
+        },
+        "baseline:step3": {
+          "seconds": 426.50320415198803,
+          "stage_cache_hit": false
+        },
+        "optimized:step2": {
+          "seconds": 169.45921058952808,
+          "stage_cache_hit": false
+        },
+        "optimized:step3": {
+          "seconds": 382.5785607099533,
+          "stage_cache_hit": false
+        }
+      }
+    }
+  ],
+  "historical_scope_comparison": [
+    {
+      "checks": [
+        {
+          "full": "f1974f4accfe7a5919ad740e5e1faaf3f2bb2b6691fde12c4e83c298b366ab9c",
+          "gap": "f1974f4accfe7a5919ad740e5e1faaf3f2bb2b6691fde12c4e83c298b366ab9c",
+          "label": "q2_sha256",
+          "status": "PASS"
+        },
+        {
+          "count": 119,
+          "label": "step2_events",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 1188,
+          "extra": [],
+          "label": "step2_evidence",
+          "missing": [
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'contig_11', 9329189, 12303231, '+', 'chr04', 10822913, 10823012, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'contig_11', 9329189, 12303231, '+', 'chr04', 10822913, 10823012, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 7828043, '-', 'chr11', 18892184, 18892283, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 7828043, '-', 'chr11', 18892184, 18892283, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 10302926, '-', 'chr11', 18892184, 18892283, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 10302926, '-', 'chr11', 18892184, 18892283, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 10302926, '-', 'chr11', 22017826, 22017925, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 10302926, '-', 'chr11', 22017826, 22017925, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 7828043, '-', 'chr11', 22017826, 22017925, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 7828043, '-', 'chr11', 22017826, 22017925, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 10302926, '-', 'chr11', 23987872, 23987971, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 10302926, '-', 'chr11', 23987872, 23987971, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 7828043, '-', 'chr11', 23987872, 23987971, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 7828043, '-', 'chr11', 23987872, 23987971, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')"
+          ],
+          "observed_count": 1174,
+          "status": "FAIL"
+        },
+        {
+          "expected_count": 1188,
+          "extra": [
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_36', 23791089, 23815414, 'step2', 'consumed', 'accepted_with_donor_reuse_of:step2-candidate-91322fbfc0918b444cd8e25b')"
+          ],
+          "label": "step2_usage",
+          "missing": [
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_36', 23791089, 23815414, 'step2', 'consumed', 'accepted_with_donor_reuse_of:step2-candidate-e6cfc8ec03c79015abdb9803')",
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_11', 9329189, 12303231, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_11', 9329189, 12303231, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_37', 2262731, 7828043, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_37', 2262731, 7828043, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_37', 2262731, 7828043, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_37', 2262731, 7828043, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_37', 2262731, 7828043, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_37', 2262731, 7828043, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_37', 2262731, 10302926, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_37', 2262731, 10302926, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_37', 2262731, 10302926, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_37', 2262731, 10302926, 'step2', 'rejected', 'mummer_anchor_orientation_conflict')",
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_37', 2262731, 10302926, 'step2', 'rejected', 'mummer_anchor_orientation_conflict')",
+            "('d0-32cec8cc3f47c8218cc336cf', 'assembly', 'contig_37', 2262731, 10302926, 'step2', 'rejected', 'mummer_anchor_orientation_conflict')"
+          ],
+          "observed_count": 1174,
+          "status": "FAIL"
+        },
+        {
+          "count": 242,
+          "label": "q2_segments",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 119,
+          "extra": [
+            "('chr04', 'gap-599a376c1ea77ebc4130', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 6)",
+            "('chr11', 'gap-98d264b3c3f164f0561b', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 4)",
+            "('chr11', 'gap-70d1b003926acc9b9dc1', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 4)",
+            "('chr11', 'gap-e34479079c799e4ae600', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 4)"
+          ],
+          "label": "step2_attempts",
+          "missing": [
+            "('chr04', 'gap-599a376c1ea77ebc4130', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 7)",
+            "('chr11', 'gap-98d264b3c3f164f0561b', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 6)",
+            "('chr11', 'gap-70d1b003926acc9b9dc1', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 6)",
+            "('chr11', 'gap-e34479079c799e4ae600', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 6)"
+          ],
+          "observed_count": 119,
+          "status": "FAIL"
+        },
+        {
+          "expected_count": 12,
+          "extra": [
+            "('chr04', 'partial_success_no_fixer', 'patcher_result', 8, 39, 18, 8, 0, 0, 'at_least_one_validated_patch_accepted')",
+            "('chr11', 'partial_success_no_fixer', 'patcher_result', 11, 42, 21, 9, 0, 0, 'at_least_one_validated_patch_accepted')"
+          ],
+          "label": "step2_strategies",
+          "missing": [
+            "('chr04', 'partial_success_no_fixer', 'patcher_result', 8, 40, 18, 8, 0, 0, 'at_least_one_validated_patch_accepted')",
+            "('chr11', 'partial_success_no_fixer', 'patcher_result', 11, 48, 21, 9, 0, 0, 'at_least_one_validated_patch_accepted')"
+          ],
+          "observed_count": 12,
+          "status": "FAIL"
+        },
+        {
+          "full": "f1974f4accfe7a5919ad740e5e1faaf3f2bb2b6691fde12c4e83c298b366ab9c",
+          "gap": "f1974f4accfe7a5919ad740e5e1faaf3f2bb2b6691fde12c4e83c298b366ab9c",
+          "label": "q2_file_sha256",
+          "status": "PASS"
+        },
+        {
+          "full": "d22a09882c78c8fb60769ed426825b3575edc03075747e08e0c78192382c951f",
+          "gap": "d22a09882c78c8fb60769ed426825b3575edc03075747e08e0c78192382c951f",
+          "label": "q3_sha256",
+          "status": "PASS"
+        },
+        {
+          "count": 33,
+          "label": "step3_events",
+          "status": "PASS"
+        },
+        {
+          "count": 17,
+          "label": "step3_evidence",
+          "status": "PASS"
+        },
+        {
+          "count": 20,
+          "label": "step3_usage",
+          "status": "PASS"
+        },
+        {
+          "count": 250,
+          "label": "q3_segments",
+          "status": "PASS"
+        },
+        {
+          "count": 21,
+          "label": "step3_attempts",
+          "status": "PASS"
+        },
+        {
+          "count": 7,
+          "label": "step3_classifications",
+          "status": "PASS"
+        },
+        {
+          "full": "d22a09882c78c8fb60769ed426825b3575edc03075747e08e0c78192382c951f",
+          "gap": "d22a09882c78c8fb60769ed426825b3575edc03075747e08e0c78192382c951f",
+          "label": "q3_file_sha256",
+          "status": "PASS"
+        }
+      ],
+      "dataset": "10g_no_reads",
+      "status": "DIFFERENT"
+    },
+    {
+      "checks": [
+        {
+          "full": "f1974f4accfe7a5919ad740e5e1faaf3f2bb2b6691fde12c4e83c298b366ab9c",
+          "gap": "f1974f4accfe7a5919ad740e5e1faaf3f2bb2b6691fde12c4e83c298b366ab9c",
+          "label": "q2_sha256",
+          "status": "PASS"
+        },
+        {
+          "count": 119,
+          "label": "step2_events",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 1176,
+          "extra": [],
+          "label": "step2_evidence",
+          "missing": [
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'contig_11', 9329189, 12303231, '+', 'chr04', 10822913, 10823012, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'contig_11', 9329189, 12303231, '+', 'chr04', 10822913, 10823012, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 10302926, '-', 'chr11', 18892184, 18892283, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 10302926, '-', 'chr11', 18892184, 18892283, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 7828043, '-', 'chr11', 18892184, 18892283, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 7828043, '-', 'chr11', 18892184, 18892283, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 10302926, '-', 'chr11', 22017826, 22017925, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 10302926, '-', 'chr11', 22017826, 22017925, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 7828043, '-', 'chr11', 22017826, 22017925, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 7828043, '-', 'chr11', 22017826, 22017925, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 7828043, '-', 'chr11', 23987872, 23987971, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 7828043, '-', 'chr11', 23987872, 23987971, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 10302926, '-', 'chr11', 23987872, 23987971, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'contig_37', 2262731, 10302926, '-', 'chr11', 23987872, 23987971, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')"
+          ],
+          "observed_count": 1162,
+          "status": "FAIL"
+        },
+        {
+          "expected_count": 1176,
+          "extra": [
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_36', 23791089, 23815414, 'step2', 'consumed', 'accepted_with_donor_reuse_of:step2-candidate-981ef0fa069f9f8063b9efbd')"
+          ],
+          "label": "step2_usage",
+          "missing": [
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_36', 23791089, 23815414, 'step2', 'consumed', 'accepted_with_donor_reuse_of:step2-candidate-5afede111869c74514eaa2ba')",
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_11', 9329189, 12303231, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_11', 9329189, 12303231, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_37', 2262731, 10302926, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_37', 2262731, 10302926, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_37', 2262731, 10302926, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_37', 2262731, 10302926, 'step2', 'rejected', 'mummer_anchor_orientation_conflict')",
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_37', 2262731, 10302926, 'step2', 'rejected', 'mummer_anchor_orientation_conflict')",
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_37', 2262731, 10302926, 'step2', 'rejected', 'mummer_anchor_orientation_conflict')",
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_37', 2262731, 7828043, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_37', 2262731, 7828043, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_37', 2262731, 7828043, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_37', 2262731, 7828043, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_37', 2262731, 7828043, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-d32a1e02b1342b3951885c32', 'assembly', 'contig_37', 2262731, 7828043, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')"
+          ],
+          "observed_count": 1162,
+          "status": "FAIL"
+        },
+        {
+          "count": 242,
+          "label": "q2_segments",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 119,
+          "extra": [
+            "('chr04', 'gap-599a376c1ea77ebc4130', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 6)",
+            "('chr11', 'gap-98d264b3c3f164f0561b', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 4)",
+            "('chr11', 'gap-70d1b003926acc9b9dc1', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 4)",
+            "('chr11', 'gap-e34479079c799e4ae600', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 4)"
+          ],
+          "label": "step2_attempts",
+          "missing": [
+            "('chr04', 'gap-599a376c1ea77ebc4130', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 7)",
+            "('chr11', 'gap-98d264b3c3f164f0561b', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 6)",
+            "('chr11', 'gap-70d1b003926acc9b9dc1', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 6)",
+            "('chr11', 'gap-e34479079c799e4ae600', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 6)"
+          ],
+          "observed_count": 119,
+          "status": "FAIL"
+        },
+        {
+          "expected_count": 12,
+          "extra": [
+            "('chr04', 'partial_success_no_fixer', 'patcher_result', 8, 39, 18, 8, 0, 0, 'at_least_one_validated_patch_accepted')",
+            "('chr11', 'partial_success_no_fixer', 'patcher_result', 11, 42, 21, 9, 0, 0, 'at_least_one_validated_patch_accepted')"
+          ],
+          "label": "step2_strategies",
+          "missing": [
+            "('chr04', 'partial_success_no_fixer', 'patcher_result', 8, 40, 18, 8, 0, 0, 'at_least_one_validated_patch_accepted')",
+            "('chr11', 'partial_success_no_fixer', 'patcher_result', 11, 48, 21, 9, 0, 0, 'at_least_one_validated_patch_accepted')"
+          ],
+          "observed_count": 12,
+          "status": "FAIL"
+        },
+        {
+          "full": "f1974f4accfe7a5919ad740e5e1faaf3f2bb2b6691fde12c4e83c298b366ab9c",
+          "gap": "f1974f4accfe7a5919ad740e5e1faaf3f2bb2b6691fde12c4e83c298b366ab9c",
+          "label": "q2_file_sha256",
+          "status": "PASS"
+        },
+        {
+          "full": "2a2093f6db77ecb280dcc91a8a3f0626a45aba4dc3584f1de52b73bb1e0e969b",
+          "gap": "2a2093f6db77ecb280dcc91a8a3f0626a45aba4dc3584f1de52b73bb1e0e969b",
+          "label": "q3_sha256",
+          "status": "PASS"
+        },
+        {
+          "count": 34,
+          "label": "step3_events",
+          "status": "PASS"
+        },
+        {
+          "count": 12,
+          "label": "step3_evidence",
+          "status": "PASS"
+        },
+        {
+          "count": 10,
+          "label": "step3_usage",
+          "status": "PASS"
+        },
+        {
+          "count": 250,
+          "label": "q3_segments",
+          "status": "PASS"
+        },
+        {
+          "count": 22,
+          "label": "step3_attempts",
+          "status": "PASS"
+        },
+        {
+          "count": 7,
+          "label": "step3_classifications",
+          "status": "PASS"
+        },
+        {
+          "full": "2a2093f6db77ecb280dcc91a8a3f0626a45aba4dc3584f1de52b73bb1e0e969b",
+          "gap": "2a2093f6db77ecb280dcc91a8a3f0626a45aba4dc3584f1de52b73bb1e0e969b",
+          "label": "q3_file_sha256",
+          "status": "PASS"
+        }
+      ],
+      "dataset": "10g_with_reads",
+      "status": "DIFFERENT"
+    },
+    {
+      "checks": [
+        {
+          "full": "7e6b5384ae911266048fa6eb7c548fff15f0288f1b82433ffc45ac44e0893461",
+          "gap": "7e6b5384ae911266048fa6eb7c548fff15f0288f1b82433ffc45ac44e0893461",
+          "label": "q2_sha256",
+          "status": "PASS"
+        },
+        {
+          "count": 2,
+          "label": "step2_events",
+          "status": "PASS"
+        },
+        {
+          "count": 4,
+          "label": "step2_evidence",
+          "status": "PASS"
+        },
+        {
+          "count": 4,
+          "label": "step2_usage",
+          "status": "PASS"
+        },
+        {
+          "count": 6,
+          "label": "q2_segments",
+          "status": "PASS"
+        },
+        {
+          "count": 2,
+          "label": "step2_attempts",
+          "status": "PASS"
+        },
+        {
+          "count": 2,
+          "label": "step2_strategies",
+          "status": "PASS"
+        },
+        {
+          "full": "7e6b5384ae911266048fa6eb7c548fff15f0288f1b82433ffc45ac44e0893461",
+          "gap": "7e6b5384ae911266048fa6eb7c548fff15f0288f1b82433ffc45ac44e0893461",
+          "label": "q2_file_sha256",
+          "status": "PASS"
+        },
+        {
+          "full": "7e6b5384ae911266048fa6eb7c548fff15f0288f1b82433ffc45ac44e0893461",
+          "gap": "7e6b5384ae911266048fa6eb7c548fff15f0288f1b82433ffc45ac44e0893461",
+          "label": "q3_sha256",
+          "status": "PASS"
+        },
+        {
+          "count": 2,
+          "label": "step3_events",
+          "status": "PASS"
+        },
+        {
+          "count": 0,
+          "label": "step3_evidence",
+          "status": "PASS"
+        },
+        {
+          "count": 0,
+          "label": "step3_usage",
+          "status": "PASS"
+        },
+        {
+          "count": 6,
+          "label": "q3_segments",
+          "status": "PASS"
+        },
+        {
+          "count": 0,
+          "label": "step3_attempts",
+          "status": "PASS"
+        },
+        {
+          "count": 0,
+          "label": "step3_classifications",
+          "status": "PASS"
+        },
+        {
+          "full": "7e6b5384ae911266048fa6eb7c548fff15f0288f1b82433ffc45ac44e0893461",
+          "gap": "7e6b5384ae911266048fa6eb7c548fff15f0288f1b82433ffc45ac44e0893461",
+          "label": "q3_file_sha256",
+          "status": "PASS"
+        }
+      ],
+      "dataset": "skillv3",
+      "status": "PASS"
+    },
+    {
+      "checks": [
+        {
+          "full": "d3340c9d29a0785091f21013bdaceef0d2de4fdb507571147171e6ed0bbf33ef",
+          "gap": "d3340c9d29a0785091f21013bdaceef0d2de4fdb507571147171e6ed0bbf33ef",
+          "label": "q2_sha256",
+          "status": "PASS"
+        },
+        {
+          "count": 119,
+          "label": "step2_events",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 8058,
+          "extra": [],
+          "label": "step2_evidence",
+          "missing": [
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, '-', 'chr02', 4736155, 4736254, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, '-', 'chr02', 4736155, 4736254, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 5533121, 8304004, '+', 'chr02', 4736155, 4736254, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 5533121, 8304004, '+', 'chr02', 4736155, 4736254, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 5533121, 8304004, '+', 'chr02', 5093791, 5093890, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 5533121, 8304004, '+', 'chr02', 5093791, 5093890, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, '-', 'chr02', 5093791, 5093890, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, '-', 'chr02', 5093791, 5093890, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 5533121, 8304004, '+', 'chr02', 5981220, 5981319, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 5533121, 8304004, '+', 'chr02', 5981220, 5981319, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, '-', 'chr02', 5981220, 5981319, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, '-', 'chr02', 5981220, 5981319, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, '-', 'chr02', 9721474, 9721573, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, '-', 'chr02', 9721474, 9721573, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 5533121, 8304004, '+', 'chr02', 9721474, 9721573, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 5533121, 8304004, '+', 'chr02', 9721474, 9721573, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 5533121, 8304004, '+', 'chr02', 12047571, 12047670, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 5533121, 8304004, '+', 'chr02', 12047571, 12047670, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, '-', 'chr02', 12047571, 12047670, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, '-', 'chr02', 12047571, 12047670, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')"
+          ],
+          "observed_count": 7806,
+          "status": "FAIL"
+        },
+        {
+          "expected_count": 3840,
+          "extra": [],
+          "label": "step2_usage",
+          "missing": [
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'candidate', 'passed_pair_validation')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')",
+            "('d0-d4b5aafdefd31384e74c1c8f', 'assembly', 'NC_089043.1_RagTag', 8294968, 23278297, 'step2', 'rejected', 'mummer_anchor_distance_gt_1000000')"
+          ],
+          "observed_count": 3796,
+          "status": "FAIL"
+        },
+        {
+          "count": 214,
+          "label": "q2_segments",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 119,
+          "extra": [
+            "('chr02', 'gap-9de9cfa4f01db6039034', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 36)",
+            "('chr02', 'gap-5b96f4d9fc5922ce82ae', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 36)",
+            "('chr02', 'gap-f2428a4084ad9bd50855', 'step2', 'unresolved', 'all_valid_candidates_rejected', 36)",
+            "('chr02', 'gap-c00615452bc9a147f6b1', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 36)",
+            "('chr02', 'gap-47d830cdc3d77c567176', 'step2', 'unresolved', 'all_valid_candidates_rejected', 36)",
+            "('chr02', 'gap-4ae162098a494ddc60ac', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 36)",
+            "('chr02', 'gap-1168cbe1a9b4afa346ba', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 36)",
+            "('chr02', 'gap-630f185e03da5729bda1', 'step2', 'unresolved', 'all_valid_candidates_rejected', 36)",
+            "('chr02', 'gap-3f2af4e6270bd39d9ee3', 'step2', 'unresolved', 'all_valid_candidates_rejected', 36)",
+            "('chr02', 'gap-eb10a0e1fd32b075c324', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 36)",
+            "('chr02', 'gap-3e9fd805486f586a1280', 'step2', 'unresolved', 'all_valid_candidates_rejected', 34)"
+          ],
+          "label": "step2_attempts",
+          "missing": [
+            "('chr02', 'gap-9de9cfa4f01db6039034', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 38)",
+            "('chr02', 'gap-5b96f4d9fc5922ce82ae', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 38)",
+            "('chr02', 'gap-f2428a4084ad9bd50855', 'step2', 'unresolved', 'all_valid_candidates_rejected', 38)",
+            "('chr02', 'gap-c00615452bc9a147f6b1', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 38)",
+            "('chr02', 'gap-47d830cdc3d77c567176', 'step2', 'unresolved', 'all_valid_candidates_rejected', 38)",
+            "('chr02', 'gap-4ae162098a494ddc60ac', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 38)",
+            "('chr02', 'gap-1168cbe1a9b4afa346ba', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 38)",
+            "('chr02', 'gap-630f185e03da5729bda1', 'step2', 'unresolved', 'all_valid_candidates_rejected', 38)",
+            "('chr02', 'gap-3f2af4e6270bd39d9ee3', 'step2', 'unresolved', 'all_valid_candidates_rejected', 38)",
+            "('chr02', 'gap-eb10a0e1fd32b075c324', 'step2', 'accepted', 'accepted_by_global_interval_arbitration', 38)",
+            "('chr02', 'gap-3e9fd805486f586a1280', 'step2', 'unresolved', 'all_valid_candidates_rejected', 36)"
+          ],
+          "observed_count": 119,
+          "status": "FAIL"
+        },
+        {
+          "expected_count": 12,
+          "extra": [
+            "('chr02', 'partial_success_no_fixer', 'patcher_result', 15, 488, 8, 6, 0, 0, 'at_least_one_validated_patch_accepted')",
+            "('chr03', 'full_fixer_reuse_patches', 'fixer_only', 15, 543, 6, 0, 17, 15, 'patchrepair_structural_fixer_accepted')",
+            "('chr04', 'full_fixer_reuse_patches', 'fixer_only', 8, 302, 2, 0, 8, 8, 'patchrepair_structural_fixer_accepted')",
+            "('chr05', 'full_fixer_reuse_patches', 'fixer_only', 9, 242, 2, 0, 9, 9, 'patchrepair_structural_fixer_accepted')",
+            "('chr09', 'full_fixer_reuse_patches', 'fixer_only', 11, 289, 3, 0, 11, 11, 'patchrepair_structural_fixer_accepted')",
+            "('chr12', 'full_fixer_reuse_patches', 'fixer_only', 8, 112, 3, 0, 8, 8, 'patchrepair_structural_fixer_accepted')"
+          ],
+          "label": "step2_strategies",
+          "missing": [
+            "('chr02', 'partial_success_no_fixer', 'patcher_result', 15, 510, 8, 6, 0, 0, 'at_least_one_validated_patch_accepted')",
+            "('chr03', 'full_fixer_reuse_patches', 'fixer_only', 15, 553, 6, 0, 17, 15, 'patchrepair_structural_fixer_accepted')",
+            "('chr04', 'full_fixer_reuse_patches', 'fixer_only', 8, 322, 2, 0, 8, 8, 'patchrepair_structural_fixer_accepted')",
+            "('chr05', 'full_fixer_reuse_patches', 'fixer_only', 9, 258, 2, 0, 9, 9, 'patchrepair_structural_fixer_accepted')",
+            "('chr09', 'full_fixer_reuse_patches', 'fixer_only', 11, 307, 3, 0, 11, 11, 'patchrepair_structural_fixer_accepted')",
+            "('chr12', 'full_fixer_reuse_patches', 'fixer_only', 8, 152, 3, 0, 8, 8, 'patchrepair_structural_fixer_accepted')"
+          ],
+          "observed_count": 12,
+          "status": "FAIL"
+        },
+        {
+          "full": "d3340c9d29a0785091f21013bdaceef0d2de4fdb507571147171e6ed0bbf33ef",
+          "gap": "d3340c9d29a0785091f21013bdaceef0d2de4fdb507571147171e6ed0bbf33ef",
+          "label": "q2_file_sha256",
+          "status": "PASS"
+        },
+        {
+          "full": "6a04f48e5373eb89553a1a2206dc78e71158b4e3224c0323a10f16a2c2de6c30",
+          "gap": "6a04f48e5373eb89553a1a2206dc78e71158b4e3224c0323a10f16a2c2de6c30",
+          "label": "q3_sha256",
+          "status": "PASS"
+        },
+        {
+          "count": 284,
+          "label": "step3_events",
+          "status": "PASS"
+        },
+        {
+          "count": 132,
+          "label": "step3_evidence",
+          "status": "PASS"
+        },
+        {
+          "count": 54,
+          "label": "step3_usage",
+          "status": "PASS"
+        },
+        {
+          "count": 246,
+          "label": "q3_segments",
+          "status": "PASS"
+        },
+        {
+          "count": 272,
+          "label": "step3_attempts",
+          "status": "PASS"
+        },
+        {
+          "count": 105,
+          "label": "step3_classifications",
+          "status": "PASS"
+        },
+        {
+          "full": "6a04f48e5373eb89553a1a2206dc78e71158b4e3224c0323a10f16a2c2de6c30",
+          "gap": "6a04f48e5373eb89553a1a2206dc78e71158b4e3224c0323a10f16a2c2de6c30",
+          "label": "q3_file_sha256",
+          "status": "PASS"
+        }
+      ],
+      "dataset": "test8_fixed",
+      "status": "DIFFERENT"
+    },
+    {
+      "checks": [
+        {
+          "full": "960562565374b961a4965e2011de911ac222b9b6e7bf24655fcc446bacf825a0",
+          "gap": "960562565374b961a4965e2011de911ac222b9b6e7bf24655fcc446bacf825a0",
+          "label": "q2_sha256",
+          "status": "PASS"
+        },
+        {
+          "count": 40,
+          "label": "step2_events",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 86,
+          "extra": [],
+          "label": "step2_evidence",
+          "missing": [
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'Mishima_AB', 'ptg000063l', 1, 70990, '-', 'NC_141024.2', 41944014, 41944113, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'Mishima_AB', 'ptg000063l', 1, 70990, '-', 'NC_141024.2', 41944014, 41944113, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'Mishima_AB', 'ptg000063l', 1, 70990, '-', 'NC_141024.2', 42176127, 42176226, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'Mishima_AB', 'ptg000063l', 1, 70990, '-', 'NC_141024.2', 42176127, 42176226, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')",
+            "('step2', 'mummer_gap_anchor_pair', 'rejected', 'q1', 'Mishima_AB', 'ptg000063l', 1, 70990, '-', 'NC_141024.2', 43185273, 43185372, 'nucmer/delta-filter/show-coords', 'nucmer-c1000-l100;delta-filter-l10000;show-coords-r-l', 'mummer_1_based_closed', 'projected')",
+            "('candidate_validation', 'patch_flank_revalidation', 'rejected', 'q1', 'Mishima_AB', 'ptg000063l', 1, 70990, '-', 'NC_141024.2', 43185273, 43185372, 'minimap2', 'asm5', 'paf_0_based_half_open', 'projected')"
+          ],
+          "observed_count": 80,
+          "status": "FAIL"
+        },
+        {
+          "count": 0,
+          "label": "step2_usage",
+          "status": "PASS"
+        },
+        {
+          "count": 106,
+          "label": "q2_segments",
+          "status": "PASS"
+        },
+        {
+          "count": 40,
+          "label": "step2_attempts",
+          "status": "PASS"
+        },
+        {
+          "expected_count": 26,
+          "extra": [
+            "('NC_141024.2', 'full_fixer_reuse_patches', 'fixer_only', 9, 36, 0, 0, 4, 0, 'no_safe_structural_fixer_edit')"
+          ],
+          "label": "step2_strategies",
+          "missing": [
+            "('NC_141024.2', 'full_fixer_reuse_patches', 'fixer_only', 9, 39, 0, 0, 4, 0, 'no_safe_structural_fixer_edit')"
+          ],
+          "observed_count": 26,
+          "status": "FAIL"
+        },
+        {
+          "full": "960562565374b961a4965e2011de911ac222b9b6e7bf24655fcc446bacf825a0",
+          "gap": "960562565374b961a4965e2011de911ac222b9b6e7bf24655fcc446bacf825a0",
+          "label": "q2_file_sha256",
+          "status": "PASS"
+        },
+        {
+          "full": "b28d5f87922e4db7aab66b0f389ec83274726bd83464481a787b144d6402099a",
+          "gap": "b28d5f87922e4db7aab66b0f389ec83274726bd83464481a787b144d6402099a",
+          "label": "q3_sha256",
+          "status": "PASS"
+        },
+        {
+          "count": 143,
+          "label": "step3_events",
+          "status": "PASS"
+        },
+        {
+          "count": 53,
+          "label": "step3_evidence",
+          "status": "PASS"
+        },
+        {
+          "count": 98,
+          "label": "step3_usage",
+          "status": "PASS"
+        },
+        {
+          "count": 104,
+          "label": "q3_segments",
+          "status": "PASS"
+        },
+        {
+          "count": 117,
+          "label": "step3_attempts",
+          "status": "PASS"
+        },
+        {
+          "count": 4,
+          "label": "step3_classifications",
+          "status": "PASS"
+        },
+        {
+          "full": "b28d5f87922e4db7aab66b0f389ec83274726bd83464481a787b144d6402099a",
+          "gap": "b28d5f87922e4db7aab66b0f389ec83274726bd83464481a787b144d6402099a",
+          "label": "q3_file_sha256",
+          "status": "PASS"
+        }
+      ],
+      "dataset": "zebrafish",
+      "status": "DIFFERENT"
+    }
+  ],
+  "jobs": {
+    "cold_component": "40586982",
+    "customer_step3_cache_only_recovery": "40586983",
+    "historical": "40586980",
+    "zebrafish": "40586981"
+  },
+  "local_validation": {
+    "canonical_shell_groups_passed": 8,
+    "final_focused_regressions": 19,
+    "server_unittest_seconds": 127.875,
+    "server_unittests": 227,
+    "tracked_lf_files_checked": 635
+  },
+  "pending": [
+    "Two original full-data workflows: skip-self and self-m200-n100",
+    "Customer-wide exact-execution and mixed-scope delivery chain using completed numerical caches",
+    "Final CI, pinned Server-only official source asset refresh and fresh public download verification"
+  ],
+  "schema_version": 1,
+  "source": {
+    "alignment_index_sha256": "2c7c6cb1f834245bcd8c64703cee2dffa2e9c99336bf42c7b06a38c9877b3bb1",
+    "base_git_revision": "58f324c",
+    "engine_sha256": "a6e85bd653222d530ee6959e6ac875c489059ad6378c1f1fff4ac21f4047c450",
+    "uncommitted_experiment": true
+  }
+}

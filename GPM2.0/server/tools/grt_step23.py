@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
-"""Run traceable GRT PatchRepair and CorrectRefill against one frozen D0.
+"""Shared GRT Step2/Step3 repair engine against one frozen D0.
 
-This module intentionally retains the cohesive Step2/Step3 repair algorithm.
-Checkpoint fingerprints hash this exact runtime entrypoint, so moving algorithm
-blocks behind imported files would silently weaken the current engine identity.
-A later split must first version the checkpoint contract to hash the entrypoint
-and its imported algorithm modules as one engine closure.
+The generated workflow exposes separate ``grt_step2.py`` and ``grt_step3.py``
+entrypoints so each stage has an independent scheduler unit and resume boundary.
+The biological algorithms remain in this shared, hash-bound engine to avoid
+duplicating repair semantics between those entrypoints.
 """
 
 from __future__ import annotations
@@ -22,6 +21,7 @@ import sys
 import tempfile
 import time
 from collections import defaultdict
+from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from threading import Event
@@ -29,6 +29,7 @@ from threading import Event
 try:
     from grt_core import *
     from grt_core.common import *
+    from grt_core.alignment_index import AlignmentCoordinateIndex, Step2MemberIndex
     from grt_core.mummer import (
         command_identity,
         is_header_only_mummer_delta,
@@ -40,6 +41,7 @@ try:
 except ModuleNotFoundError:  # Imported as server.tools.grt_step23.
     from .grt_core import *
     from .grt_core.common import *
+    from .grt_core.alignment_index import AlignmentCoordinateIndex, Step2MemberIndex
     from .grt_core.mummer import (
         command_identity,
         is_header_only_mummer_delta,
@@ -50,7 +52,7 @@ except ModuleNotFoundError:  # Imported as server.tools.grt_step23.
     )
 
 
-ENGINE_VERSION = 11
+ENGINE_VERSION = 12
 MUMMER_MIN_CLUSTER = 1_000
 MUMMER_MIN_MATCH = 100
 MUMMER_MIN_ALIGNMENT = 10_000
@@ -78,7 +80,12 @@ NORMALIZED_GAP_LENGTH = 100
 MINIMAP_PRESET = "asm5"
 REPAIR_MODES = {"conservative", "aggressive"}
 DEFAULT_REPAIR_MODE = "aggressive"
+MUMMER_SCOPES = {"full", "gap-screen"}
+DEFAULT_MUMMER_SCOPE = "full"
+EXECUTION_PROFILES = {"baseline", "optimized"}
+DEFAULT_EXECUTION_PROFILE = "baseline"
 ENGINE_SHA256 = sha256_file(Path(__file__).resolve())
+EXECUTION_HELPER_SHA256 = sha256_file(Path(sys.modules[AlignmentCoordinateIndex.__module__].__file__))
 
 MUMMER_ALIGNMENT_FIELDS = [
     "stage",
@@ -248,6 +255,265 @@ def partition_mummer_targets(
     return [*large, *chunks]
 
 
+@dataclass(frozen=True)
+class PreparedMummerInput:
+    path: Path
+    sha256: str
+
+
+@dataclass
+class MummerExecution:
+    """One collection's immutable inputs and globally bounded worker pool."""
+
+    records: dict[str, str]
+    partitions: list[list[tuple[str, str]]]
+    manifest: list[dict[str, object]]
+    inputs: dict[int, PreparedMummerInput]
+    pool: ThreadPoolExecutor
+    workers: int
+    cancel_event: Event
+
+    def indices(self, selected: set[int] | None = None) -> list[int]:
+        # Scheduling only: aggregation and every line number retain input order.
+        indices = range(1, len(self.partitions) + 1) if selected is None else selected
+        return sorted(indices, key=lambda i: (
+            -sum(len(sequence) for _name, sequence in self.partitions[i - 1]), i))
+
+
+def mummer_partition_manifest(partitions: list[list[tuple[str, str]]]) -> list[dict[str, object]]:
+    return [
+        {"partition": index, "records": [
+            {"name": name, "length": len(sequence),
+             "sha256": sha256_bytes(sequence.encode("ascii"))}
+            for name, sequence in partition]}
+        for index, partition in enumerate(partitions, start=1)
+    ]
+
+
+def prepare_mummer_inputs(
+    server_dir: Path, partitions: list[list[tuple[str, str]]],
+    members_by_record: dict[str, dict[str, str]] | None = None,
+) -> dict[int, PreparedMummerInput]:
+    """Materialize content-addressed FASTA once; verify existing bytes each run.
+
+    Workers only read these files. Never hard-link mutable workspace artifacts.
+    The numerical raw-cache key remains identical to the baseline key.
+    """
+    parent = server_dir / "grt/cache/step23/inputs/v1"
+    parent.mkdir(parents=True, exist_ok=True)
+    inputs = {}
+    for index, partition in enumerate(partitions, start=1):
+        payload = fasta_bytes(partition)
+        digest = sha256_bytes(payload)
+        path = parent / f"{digest}.fa"
+        if not path.is_file() or sha256_file(path) != digest:
+            descriptor, name = tempfile.mkstemp(prefix=f".{digest}.", dir=parent)
+            temporary = Path(name)
+            try:
+                with os.fdopen(descriptor, "wb") as handle:
+                    handle.write(payload)
+                os.replace(temporary, path)
+            finally:
+                temporary.unlink(missing_ok=True)
+        if members_by_record is not None:
+            descriptor, name = tempfile.mkstemp(prefix=f".{digest}.manifest.", dir=parent)
+            os.close(descriptor)
+            temporary = Path(name)
+            try:
+                write_tsv(temporary, DONOR_MEMBER_FIELDS,
+                          [members_by_record[name] for name, _sequence in partition])
+                os.replace(temporary, path.with_suffix(".manifest.tsv"))
+            finally:
+                temporary.unlink(missing_ok=True)
+        inputs[index] = PreparedMummerInput(path, digest)
+    return inputs
+
+
+def mummer_screen_windows(
+    chromosome: str,
+    stage: str,
+    sequence: str,
+) -> tuple[list[tuple[str, str]], dict[str, dict[str, int]]]:
+    """Build conservative local queries used only to select full-Q reruns.
+
+    Step2 patch candidates allow anchors up to ``PATCH_MAX_ANCHOR_DISTANCE``
+    apart; Step2 structural fallback and Step3 correction use
+    ``CORRECTION_SEARCH_RANGE`` around the gap midpoint. Add one retained
+    alignment length beyond the active range so every >=10 kb alignment with
+    a relevant endpoint still has enough sequence to survive
+    ``delta-filter -l`` in the screen.
+    """
+    if stage == "step2":
+        q_version = "q1"
+        margin = PATCH_MAX_ANCHOR_DISTANCE + MUMMER_MIN_ALIGNMENT
+    elif stage == "step3":
+        q_version = "q2"
+        margin = CORRECTION_SEARCH_RANGE + MUMMER_MIN_ALIGNMENT
+    else:
+        fail(f"gap-screen is unsupported for {stage}")
+    intervals = [
+        (
+            max(1, int(gap["start0"]) + 1 - margin),
+            min(len(sequence), int(gap["end0"]) + margin),
+        )
+        for gap in gap_objects(chromosome, q_version, sequence)
+    ]
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(intervals):
+        if merged and start <= merged[-1][1] + 1:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    records: list[tuple[str, str]] = []
+    windows: dict[str, dict[str, int]] = {}
+    for index, (start, end) in enumerate(merged, start=1):
+        name = f"screen_{index:04d}_{start}_{end}"
+        records.append((name, sequence[start - 1 : end]))
+        windows[name] = {"start": start, "end": end}
+    return records, windows
+
+
+def step3_mummer_screen_windows(
+    chromosome: str,
+    sequence: str,
+) -> tuple[list[tuple[str, str]], dict[str, dict[str, int]]]:
+    """Compatibility wrapper for the original Step3-only screen helper."""
+    return mummer_screen_windows(chromosome, "step3", sequence)
+
+
+def parse_mummer_screen_coords(
+    path: Path,
+    windows: dict[str, dict[str, int]],
+    members_by_record: dict[str, dict[str, str]],
+    donor_lengths: dict[str, int],
+) -> list[dict[str, object]]:
+    """Parse window-query coords and project them into whole-Q2 coordinates."""
+    rows: list[dict[str, object]] = []
+    with path.open(encoding="utf-8") as handle:
+        for line_number, raw in enumerate(handle, start=1):
+            line = raw.rstrip("\n")
+            stripped = line.strip()
+            if (
+                not stripped
+                or stripped.startswith("/")
+                or stripped.startswith("NUCMER")
+                or stripped.startswith("[")
+                or stripped.startswith("=")
+            ):
+                continue
+            fields = [value for value in stripped.split() if value != "|"]
+            if len(fields) < 11:
+                fail(f"invalid MUMmer screen coords row at {path}:{line_number}")
+            try:
+                ref_start, ref_end, query_start, query_end = map(int, fields[:4])
+                ref_aligned, query_aligned = map(int, fields[4:6])
+                identity = float(fields[6])
+                ref_length, query_length = map(int, fields[7:9])
+            except ValueError:
+                fail(f"non-numeric MUMmer screen coords row at {path}:{line_number}")
+            ref_record, query_record = fields[-2:]
+            if ref_record not in members_by_record:
+                fail(f"MUMmer screen references unknown D0 member at {path}:{line_number}")
+            if query_record not in windows:
+                fail(f"MUMmer screen references unknown query window at {path}:{line_number}")
+            window = windows[query_record]
+            expected_query_length = int(window["end"]) - int(window["start"]) + 1
+            if ref_length != donor_lengths[ref_record] or query_length != expected_query_length:
+                fail(f"MUMmer screen length columns disagree with FASTA at {path}:{line_number}")
+            if not (
+                1 <= min(ref_start, ref_end) <= max(ref_start, ref_end) <= ref_length
+                and 1 <= min(query_start, query_end) <= max(query_start, query_end) <= query_length
+                and ref_aligned >= 1
+                and query_aligned >= 1
+                and 0 <= identity <= 100
+            ):
+                fail(f"MUMmer screen has invalid coordinates at {path}:{line_number}")
+            offset = int(window["start"]) - 1
+            query_start += offset
+            query_end += offset
+            rows.append(
+                {
+                    "line_number": line_number,
+                    "ref_record": ref_record,
+                    "ref_start": ref_start,
+                    "ref_end": ref_end,
+                    "ref_min": min(ref_start, ref_end),
+                    "ref_max": max(ref_start, ref_end),
+                    "query_start": query_start,
+                    "query_end": query_end,
+                    "query_min": min(query_start, query_end),
+                    "query_max": max(query_start, query_end),
+                    "identity": identity / 100.0,
+                    "ref_aligned": ref_aligned,
+                    "query_aligned": query_aligned,
+                    "raw_line": line,
+                }
+            )
+    return rows
+
+
+def step3_screen_partition_relevant(
+    gaps: list[dict[str, object]],
+    rows: list[dict[str, object]],
+) -> bool:
+    """Preserve crossing hits and every anchor that can affect window choice.
+
+    The structural controller stops at the first window containing *any* left
+    and *any* right anchor, before checking whether they share a donor record.
+    A one-sided partition can therefore block a more distant pair in another
+    partition. It must not be dropped just because it cannot make a pair alone.
+    """
+    for gap in gaps:
+        gap_pos = (int(gap["start0"]) + int(gap["end0"]) + 1) // 2
+        for row in rows:
+            query_min = int(row["query_min"])
+            query_max = int(row["query_max"])
+            if query_min <= gap_pos <= query_max:
+                return True
+            if min(abs(query_min - gap_pos), abs(query_max - gap_pos)) <= CORRECTION_SEARCH_RANGE:
+                return True
+    return False
+
+
+def step2_screen_partition_relevant(
+    gaps: list[dict[str, object]],
+    rows: list[dict[str, object]],
+) -> bool:
+    """Return whether one partition can contribute any Step2 strategy input."""
+    grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
+    for row in rows:
+        grouped[str(row["ref_record"])].append(row)
+    for gap in gaps:
+        gap_position = int(gap["start0"]) + 1
+        for member_rows in grouped.values():
+            lefts = sorted(
+                (
+                    row
+                    for row in member_rows
+                    if int(row["query_max"]) <= gap_position + 10
+                ),
+                key=lambda row: (-int(row["query_max"]), -float(row["identity"])),
+            )[:2]
+            rights = sorted(
+                (
+                    row
+                    for row in member_rows
+                    if int(row["query_min"]) >= gap_position - 10
+                ),
+                key=lambda row: (int(row["query_min"]), -float(row["identity"])),
+            )[:2]
+            if any(
+                int(right["query_min"]) - int(left["query_max"])
+                <= PATCH_MAX_ANCHOR_DISTANCE
+                for left in lefts
+                for right in rights
+            ):
+                return True
+        if step3_screen_partition_relevant([gap], rows):
+            return True
+    return False
+
+
 MUMMER_LOG_NAMES = [
     f"{tool}.{suffix}"
     for tool in ("nucmer", "delta_filter", "show_coords")
@@ -323,28 +589,63 @@ def valid_mummer_cache(directory: Path, fingerprint: str, names: list[str]) -> b
         return False
 
 
+def raw_mummer_cache_identity(
+    server_dir: Path,
+    partition: list[tuple[str, str]],
+    query_sha256: str,
+    tools: dict[str, dict[str, str]],
+    prepared_input: PreparedMummerInput | None = None,
+) -> tuple[bytes | None, dict[str, object], str, Path, list[str]]:
+    """Return the exact cache identity shared by full-query MUMmer callers."""
+    target_payload = None if prepared_input is not None else fasta_bytes(partition)
+    target_sha256 = prepared_input.sha256 if prepared_input is not None else sha256_bytes(target_payload)
+    payload = {
+        "raw_alignment_version": 1,
+        "query_sha256": query_sha256,
+        "target_sha256": target_sha256,
+        "tools": {name: command_identity(value) for name, value in tools.items()},
+        "parameters": grt_mummer_parameters(1),
+    }
+    fingerprint = json_hash(payload)
+    cache_dir = server_dir / "grt/cache/step23/raw_mummer/v1" / fingerprint
+    return target_payload, payload, fingerprint, cache_dir, ["result.coords", *MUMMER_LOG_NAMES]
+
+
+def complete_raw_mummer_cache(
+    server_dir: Path,
+    chromosome: str,
+    q_sequence: str,
+    target_partitions: list[list[tuple[str, str]]],
+    tools: dict[str, dict[str, str]],
+    execution: MummerExecution | None = None,
+) -> bool:
+    """Return true only when every full-query partition cache is validated."""
+    query_sha256 = sha256_bytes(fasta_bytes([(chromosome, q_sequence)]))
+    for index, partition in enumerate(target_partitions, start=1):
+        _target, _payload, fingerprint, cache_dir, names = raw_mummer_cache_identity(
+            server_dir, partition, query_sha256, tools,
+            execution.inputs[index] if execution is not None else None,
+        )
+        if not valid_mummer_cache(cache_dir, fingerprint, names):
+            return False
+    return bool(target_partitions)
+
+
 def cached_mummer_partition(
     server_dir: Path, temporary: Path, stage: str, chromosome: str,
     index: int, total: int, partition: list[tuple[str, str]],
     query_sha256: str, query_length: int, target_kind: str,
     members_by_record: dict[str, dict[str, str]], donor_lengths: dict[str, int],
     tools: dict[str, dict[str, str]], cancel_event: Event,
+    prepared_input: PreparedMummerInput | None = None,
 ) -> tuple[Path, bool, float]:
     """Cache numerical alignments independently of repair stage/provenance."""
     started = time.monotonic()
     label = f"part-{index:04d}"
-    target_payload = fasta_bytes(partition)
-    payload = {
-        "raw_alignment_version": 1,
-        "query_sha256": query_sha256,
-        "target_sha256": sha256_bytes(target_payload),
-        "tools": {name: command_identity(value) for name, value in tools.items()},
-        "parameters": grt_mummer_parameters(1),
-    }
-    fingerprint = json_hash(payload)
-    cache_parent = server_dir / "grt/cache/step23/raw_mummer/v1"
-    cache_dir = cache_parent / fingerprint
-    names = ["result.coords", *MUMMER_LOG_NAMES]
+    target_payload, payload, fingerprint, cache_dir, names = raw_mummer_cache_identity(
+        server_dir, partition, query_sha256, tools, prepared_input
+    )
+    cache_parent = cache_dir.parent
     if cancel_event.is_set():
         fail("MUMmer partition cancelled")
     if valid_mummer_cache(cache_dir, fingerprint, names):
@@ -355,10 +656,11 @@ def cached_mummer_partition(
         return cache_dir, True, elapsed
     work = temporary / label
     work.mkdir()
-    target_path = work / "target.fa"
-    target_path.write_bytes(target_payload)
+    target_path = prepared_input.path if prepared_input is not None else work / "target.fa"
+    if prepared_input is None:
+        target_path.write_bytes(target_payload)
     del target_payload
-    if target_kind == "ordinary_donor":
+    if target_kind == "ordinary_donor" and prepared_input is None:
         write_tsv(target_path.with_suffix(".manifest.tsv"), DONOR_MEMBER_FIELDS,
                   [members_by_record[name] for name, _sequence in partition])
     delta = work / "result.delta"
@@ -410,6 +712,268 @@ def cached_mummer_partition(
     return cache_dir, False, elapsed
 
 
+def cached_mummer_screen_partition(
+    server_dir: Path,
+    temporary: Path,
+    stage: str,
+    chromosome: str,
+    index: int,
+    total: int,
+    partition: list[tuple[str, str]],
+    query_sha256: str,
+    windows: dict[str, dict[str, int]],
+    members_by_record: dict[str, dict[str, str]],
+    donor_lengths: dict[str, int],
+    tools: dict[str, dict[str, str]],
+    cancel_event: Event,
+    prepared_input: PreparedMummerInput | None = None,
+) -> tuple[Path, bool, float, list[dict[str, object]]]:
+    """Cache a local-window screen used only to select exact full-Q2 reruns."""
+    started = time.monotonic()
+    label = f"part-{index:04d}"
+    target_payload = None if prepared_input is not None else fasta_bytes(partition)
+    payload = {
+        "raw_alignment_version": 1,
+        "screen_version": 1,
+        "query_sha256": query_sha256,
+        "target_sha256": prepared_input.sha256 if prepared_input is not None else sha256_bytes(target_payload),
+        "tools": {name: command_identity(value) for name, value in tools.items()},
+        "parameters": grt_mummer_parameters(1),
+    }
+    fingerprint = json_hash(payload)
+    cache_parent = server_dir / "grt/cache/step23/raw_mummer_screen/v1"
+    cache_dir = cache_parent / fingerprint
+    names = ["result.coords", *MUMMER_LOG_NAMES]
+    if cancel_event.is_set():
+        fail("MUMmer screen partition cancelled")
+    if valid_mummer_cache(cache_dir, fingerprint, names):
+        rows = parse_mummer_screen_coords(
+            cache_dir / "result.coords", windows, members_by_record, donor_lengths
+        )
+        elapsed = time.monotonic() - started
+        print(
+            f"GRT {stage} screen {chromosome} {index}/{total}: CACHE_HIT ({elapsed:.2f}s)",
+            flush=True,
+        )
+        return cache_dir, True, elapsed, rows
+    work = temporary / label
+    work.mkdir()
+    target_path = prepared_input.path if prepared_input is not None else work / "target.fa"
+    if prepared_input is None:
+        target_path.write_bytes(target_payload)
+    del target_payload
+    delta = work / "result.delta"
+    filtered = work / "filtered.delta"
+    coords = work / "result.coords"
+    parameters = payload["parameters"]
+    commands = [
+        (
+            "nucmer",
+            [
+                tools["nucmer"]["resolved"],
+                "-c",
+                str(parameters["nucmer"]["min_cluster"]),
+                "-l",
+                str(parameters["nucmer"]["min_match"]),
+                f"--batch={parameters['nucmer']['batch']}",
+                "-t",
+                "1",
+                "-p",
+                str(work / "result"),
+                str(target_path),
+                str(temporary / "query.fa"),
+            ],
+            None,
+        ),
+        (
+            "delta_filter",
+            [
+                tools["delta-filter"]["resolved"],
+                "-l",
+                str(parameters["delta_filter"]["min_alignment"]),
+                str(delta),
+            ],
+            filtered,
+        ),
+        (
+            "show_coords",
+            [tools["show-coords"]["resolved"], "-r", "-l", str(filtered)],
+            coords,
+        ),
+    ]
+    print(f"GRT {stage} screen {chromosome} {index}/{total}: START", flush=True)
+    header_only_delta = False
+    for tool_name, command, output in commands:
+        logs = [
+            work / f"{tool_name}.{suffix}"
+            for suffix in ("command.txt", "stdout.log", "stderr.log")
+        ]
+        if tool_name == "delta_filter":
+            if not delta.is_file() or delta.stat().st_size == 0:
+                fail(
+                    f"nucmer did not create a non-empty screen delta for "
+                    f"{stage}:{chromosome}:{label}"
+                )
+            header_only_delta = is_header_only_mummer_delta(delta)
+        if tool_name != "nucmer" and header_only_delta:
+            output.write_bytes(delta.read_bytes() if tool_name == "delta_filter" else b"")
+            write_skipped_command_logs(command, *logs, "nucmer screen produced no alignments")
+        else:
+            run_logged(command, work, *logs, output, cancel_event=cancel_event)
+    if not filtered.is_file() or not coords.is_file():
+        fail(
+            f"partitioned MUMmer screen did not create filtered coordinates for "
+            f"{stage}:{chromosome}:{label}"
+        )
+    rows = parse_mummer_screen_coords(coords, windows, members_by_record, donor_lengths)
+    elapsed = time.monotonic() - started
+    checkpoint = {
+        "status": "success",
+        "input_fingerprint": fingerprint,
+        "fingerprint_payload": payload,
+        "elapsed_seconds": elapsed,
+        "output_hashes": {name: sha256_file(work / name) for name in names},
+    }
+    for path in work.iterdir():
+        if path.name not in names:
+            path.unlink()
+    (work / "cache.json").write_text(
+        json.dumps(checkpoint, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    cache_parent.mkdir(parents=True, exist_ok=True)
+    if cache_dir.exists():
+        shutil.rmtree(cache_dir)
+    os.replace(work, cache_dir)
+    print(
+        f"GRT {stage} screen {chromosome} {index}/{total}: SUCCESS ({elapsed:.2f}s)",
+        flush=True,
+    )
+    return cache_dir, False, elapsed, rows
+
+
+def screen_mummer_partitions(
+    server_dir: Path,
+    temporary: Path,
+    stage: str,
+    chromosome: str,
+    q_sequence: str,
+    target_partitions: list[list[tuple[str, str]]],
+    members_by_record: dict[str, dict[str, str]],
+    donor_lengths: dict[str, int],
+    tools: dict[str, dict[str, str]],
+    threads: int,
+    execution: MummerExecution | None = None,
+) -> tuple[set[int], list[dict[str, object]], list[tuple[str, str]]]:
+    """Select partitions, then let the caller rerun them against the full Q."""
+    query_records, windows = mummer_screen_windows(chromosome, stage, q_sequence)
+    if not query_records:
+        return set(), [], []
+    query_payload = fasta_bytes(query_records)
+    screen_root = temporary / "screen"
+    screen_root.mkdir()
+    (screen_root / "query.fa").write_bytes(query_payload)
+    q_version = "q1" if stage == "step2" else "q2"
+    gaps = gap_objects(chromosome, q_version, q_sequence)
+    workers = mummer_partition_workers(
+        threads,
+        [sum(len(sequence) for _name, sequence in part) for part in target_partitions],
+        sum(len(sequence) for _name, sequence in query_records),
+    )
+    print(
+        f"GRT {stage} screen {chromosome}: {len(target_partitions)} partitions, "
+        f"windows={len(query_records)}, workers={workers}",
+        flush=True,
+    )
+    cancel_event = execution.cancel_event if execution is not None else Event()
+    results: dict[int, tuple[Path, bool, float, list[dict[str, object]]]] = {}
+    pool = execution.pool if execution is not None else ThreadPoolExecutor(max_workers=workers)
+    indices = execution.indices() if execution is not None else range(1, len(target_partitions) + 1)
+    futures = {}
+    try:
+        futures = {
+            pool.submit(
+                cached_mummer_screen_partition,
+                server_dir,
+                screen_root,
+                stage,
+                chromosome,
+                index,
+                len(target_partitions),
+                target_partitions[index - 1],
+                sha256_bytes(query_payload),
+                windows,
+                members_by_record,
+                donor_lengths,
+                tools,
+                cancel_event,
+                execution.inputs[index] if execution is not None else None,
+            ): index
+            for index in indices
+        }
+        for future in as_completed(futures):
+            results[futures[future]] = future.result()
+    except BaseException:
+        cancel_event.set()
+        for future in futures:
+            future.cancel()
+        raise
+    finally:
+        if execution is None:
+            pool.shutdown(wait=True, cancel_futures=True)
+    relevant = (
+        step2_screen_partition_relevant
+        if stage == "step2"
+        else step3_screen_partition_relevant
+    )
+    selected = {
+        index
+        for index, (_directory, _hit, _elapsed, rows) in results.items()
+        if relevant(gaps, rows)
+    }
+    rows = [
+        {
+            "partition": str(index),
+            "selected": "true" if index in selected else "false",
+            "alignment_count": str(len(results[index][3])),
+            "cache_hit": "true" if results[index][1] else "false",
+            "elapsed_seconds": f"{results[index][2]:.3f}",
+        }
+        for index in range(1, len(target_partitions) + 1)
+    ]
+    print(
+        f"GRT {stage} screen {chromosome}: selected={len(selected)}/{len(target_partitions)}",
+        flush=True,
+    )
+    shutil.rmtree(screen_root)
+    return selected, rows, query_records
+
+
+def screen_step3_mummer_partitions(
+    server_dir: Path,
+    temporary: Path,
+    chromosome: str,
+    q_sequence: str,
+    target_partitions: list[list[tuple[str, str]]],
+    members_by_record: dict[str, dict[str, str]],
+    donor_lengths: dict[str, int],
+    tools: dict[str, dict[str, str]],
+    threads: int,
+) -> tuple[set[int], list[dict[str, object]], list[tuple[str, str]]]:
+    """Compatibility wrapper for the original Step3-only screen helper."""
+    return screen_mummer_partitions(
+        server_dir,
+        temporary,
+        "step3",
+        chromosome,
+        q_sequence,
+        target_partitions,
+        members_by_record,
+        donor_lengths,
+        tools,
+        threads,
+    )
+
+
 def cached_mummer_chromosome(
     server_dir: Path,
     stage: str,
@@ -424,27 +988,21 @@ def cached_mummer_chromosome(
     threads: int,
     should_align: bool,
     target_kind: str = "ordinary_donor",
+    mummer_scope: str = DEFAULT_MUMMER_SCOPE,
+    execution: MummerExecution | None = None,
+    parsed_rows: list[dict[str, object]] | None = None,
 ) -> tuple[Path, bool, str]:
+    if mummer_scope not in MUMMER_SCOPES:
+        fail(f"unsupported MUMmer scope: {mummer_scope}")
+    if mummer_scope == "gap-screen" and stage not in {"step2", "step3"}:
+        fail("gap-screen MUMmer scope is only supported for Step2/Step3")
     query_payload = fasta_bytes([(chromosome, q_sequence)])
     parameters = grt_mummer_parameters(threads)
-    target_records = dict(
+    target_records = execution.records if execution is not None else dict(
         read_fasta_allow_empty(server_dir / donor_set["fasta_relpath"])
     )
-    target_partitions = partition_mummer_targets(target_records)
-    partition_manifest = [
-        {
-            "partition": index,
-            "records": [
-                {
-                    "name": name,
-                    "length": len(sequence),
-                    "sha256": sha256_bytes(sequence.encode("ascii")),
-                }
-                for name, sequence in partition
-            ],
-        }
-        for index, partition in enumerate(target_partitions, start=1)
-    ]
+    target_partitions = execution.partitions if execution is not None else partition_mummer_targets(target_records)
+    partition_manifest = execution.manifest if execution is not None else mummer_partition_manifest(target_partitions)
     fingerprint_payload = {
         "workflow": WORKFLOW,
         "engine_version": ENGINE_VERSION,
@@ -465,6 +1023,25 @@ def cached_mummer_chromosome(
         ),
         "tools": {name: command_identity(value) for name, value in tools.items()},
         "parameters": parameters,
+        "mummer_scope": mummer_scope,
+        "screen_parameters": (
+            {
+                "search_range": (
+                    PATCH_MAX_ANCHOR_DISTANCE
+                    if stage == "step2"
+                    else CORRECTION_SEARCH_RANGE
+                ),
+                "guard_bp": MUMMER_MIN_ALIGNMENT,
+                "selection": (
+                    "step2_patch_or_structural_candidate"
+                    if stage == "step2"
+                    else "crossing_or_any_window_affecting_anchor"
+                ),
+                "final_alignment": f"selected_partitions_against_full_{'q1' if stage == 'step2' else 'q2'}",
+            }
+            if mummer_scope == "gap-screen"
+            else None
+        ),
         "target_partitioning": {
             "large_record_min_bp": MUMMER_LARGE_TARGET_BP,
             "small_chunk_max_bp": MUMMER_SMALL_CHUNK_BP,
@@ -491,6 +1068,8 @@ def cached_mummer_chromosome(
         "show_coords.stdout.log",
         "show_coords.stderr.log",
     ]
+    if mummer_scope == "gap-screen":
+        output_names.extend(["screen_query.fa", "screen_partitions.tsv"])
     if checkpoint_path.is_file():
         try:
             checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
@@ -505,7 +1084,7 @@ def cached_mummer_chromosome(
                     for name, expected in hashes.items()
                 )
             ):
-                parse_mummer_coords(
+                validated_rows = parse_mummer_coords(
                     cache_dir / "result.coords",
                     stage,
                     chromosome,
@@ -513,6 +1092,8 @@ def cached_mummer_chromosome(
                     members_by_record,
                     donor_lengths,
                 )
+                if parsed_rows is not None:
+                    parsed_rows.extend(validated_rows)
                 return cache_dir, True, chromosome_key
         except (OSError, TypeError, ValueError, json.JSONDecodeError, SystemExit):
             pass
@@ -521,38 +1102,80 @@ def cached_mummer_chromosome(
     try:
         (temporary / "query.fa").write_bytes(query_payload)
         coords = temporary / "result.coords"
-        (temporary / "target_partitions.json").write_text(
-            json.dumps(partition_manifest, ensure_ascii=False, indent=2, sort_keys=True)
-            + "\n",
-            encoding="utf-8",
-            newline="",
-        )
         if should_align:
+            selected_partitions = set(range(1, len(target_partitions) + 1))
+            if mummer_scope == "gap-screen":
+                selected_partitions, screen_rows, screen_query_records = (
+                    screen_mummer_partitions(
+                        server_dir,
+                        temporary,
+                        stage,
+                        chromosome,
+                        q_sequence,
+                        target_partitions,
+                        members_by_record,
+                        donor_lengths,
+                        tools,
+                        threads,
+                        execution,
+                    )
+                )
+                (temporary / "screen_query.fa").write_bytes(
+                    fasta_bytes(screen_query_records)
+                )
+                write_tsv(
+                    temporary / "screen_partitions.tsv",
+                    [
+                        "partition",
+                        "selected",
+                        "alignment_count",
+                        "cache_hit",
+                        "elapsed_seconds",
+                    ],
+                    screen_rows,
+                )
+            partition_manifest = [
+                {**row, "selected": index in selected_partitions}
+                for index, row in enumerate(partition_manifest, start=1)
+            ]
+            (temporary / "target_partitions.json").write_text(
+                json.dumps(partition_manifest, ensure_ascii=False, indent=2, sort_keys=True)
+                + "\n",
+                encoding="utf-8",
+                newline="",
+            )
             aggregate: dict[str, list[bytes]] = {
                 f"{tool_name}.{suffix}": []
                 for tool_name in ("nucmer", "delta_filter", "show_coords")
                 for suffix in ("command.txt", "stdout.log", "stderr.log")
             }
             workers = mummer_partition_workers(
-                threads, [sum(len(seq) for _name, seq in part) for part in target_partitions],
+                threads,
+                [
+                    sum(len(seq) for _name, seq in target_partitions[index - 1])
+                    for index in sorted(selected_partitions)
+                ],
                 len(q_sequence),
             )
-            print(f"GRT {stage} MUMmer {chromosome}: {len(target_partitions)} partitions, "
+            print(f"GRT {stage} MUMmer {chromosome}: {len(selected_partitions)}/"
+                  f"{len(target_partitions)} partitions, "
                   f"workers={workers}, nucmer_threads=1, thread_budget={threads}", flush=True)
-            cancel_event = Event()
+            cancel_event = execution.cancel_event if execution is not None else Event()
             results: dict[int, tuple[Path, bool, float]] = {}
-            pool = ThreadPoolExecutor(max_workers=workers)
+            pool = execution.pool if execution is not None else ThreadPoolExecutor(max_workers=workers)
+            indices = execution.indices(selected_partitions) if execution is not None else sorted(selected_partitions)
             futures = {}
             query_sha256 = sha256_bytes(query_payload)
             try:
                 futures = {
                     pool.submit(
                         cached_mummer_partition, server_dir, temporary, stage, chromosome,
-                        index, len(target_partitions), partition, query_sha256,
+                        index, len(target_partitions), target_partitions[index - 1], query_sha256,
                         len(q_sequence), target_kind, members_by_record, donor_lengths,
                         tools, cancel_event,
+                        execution.inputs[index] if execution is not None else None,
                     ): index
-                    for index, partition in enumerate(target_partitions, start=1)
+                    for index in indices
                 }
                 for future in as_completed(futures):
                     results[futures[future]] = future.result()
@@ -562,11 +1185,12 @@ def cached_mummer_chromosome(
                     future.cancel()
                 raise
             finally:
-                pool.shutdown(wait=True, cancel_futures=True)
+                if execution is None:
+                    pool.shutdown(wait=True, cancel_futures=True)
             # Completion order must never change coordinate line numbers or
             # candidate tie breaking. Aggregate in the original partition order.
             with coords.open("wb") as handle:
-                for index in range(1, len(target_partitions) + 1):
+                for index in sorted(selected_partitions):
                     part_dir, _hit, _elapsed = results[index]
                     with (part_dir / "result.coords").open("rb") as part_handle:
                         shutil.copyfileobj(part_handle, handle)
@@ -576,6 +1200,12 @@ def cached_mummer_chromosome(
             for name, parts in aggregate.items():
                 (temporary / name).write_bytes(b"".join(parts))
         else:
+            (temporary / "target_partitions.json").write_text(
+                json.dumps(partition_manifest, ensure_ascii=False, indent=2, sort_keys=True)
+                + "\n",
+                encoding="utf-8",
+                newline="",
+            )
             coords.write_bytes(b"")
             for prefix in ("nucmer", "delta_filter", "show_coords"):
                 (temporary / f"{prefix}.command.txt").write_text(
@@ -585,7 +1215,20 @@ def cached_mummer_chromosome(
                 )
                 (temporary / f"{prefix}.stdout.log").write_text("", encoding="utf-8")
                 (temporary / f"{prefix}.stderr.log").write_text("", encoding="utf-8")
-        parse_mummer_coords(
+            if mummer_scope == "gap-screen":
+                (temporary / "screen_query.fa").write_bytes(b"")
+                write_tsv(
+                    temporary / "screen_partitions.tsv",
+                    [
+                        "partition",
+                        "selected",
+                        "alignment_count",
+                        "cache_hit",
+                        "elapsed_seconds",
+                    ],
+                    [],
+                )
+        validated_rows = parse_mummer_coords(
             coords,
             stage,
             chromosome,
@@ -612,6 +1255,8 @@ def cached_mummer_chromosome(
         if cache_dir.exists():
             shutil.rmtree(cache_dir)
         os.replace(temporary, cache_dir)
+        if parsed_rows is not None:
+            parsed_rows.extend(validated_rows)
         return cache_dir, False, chromosome_key
     except BaseException as error:
         if temporary.exists():
@@ -652,7 +1297,13 @@ def collect_mummer(
     target_set: dict[str, str] | None = None,
     target_members: list[dict[str, str]] | None = None,
     target_kind: str = "ordinary_donor",
+    mummer_scope: str = DEFAULT_MUMMER_SCOPE,
+    execution_profile: str = DEFAULT_EXECUTION_PROFILE,
 ) -> tuple[list[dict[str, object]], dict[str, dict[str, str]], list[dict[str, object]]]:
+    started = time.monotonic()
+    if execution_profile not in EXECUTION_PROFILES:
+        fail(f"unsupported execution profile: {execution_profile}")
+    optimized = execution_profile == "optimized"
     active_set = donor_set if target_set is None else target_set
     active_members = donor_members if target_members is None else target_members
     members_by_record = {row["fasta_record_name"]: row for row in active_members}
@@ -660,56 +1311,105 @@ def collect_mummer(
     if set(members_by_record) != set(donor_records):
         fail(f"{target_kind} FASTA records differ from its alignment target manifest")
     donor_lengths = {name: len(sequence) for name, sequence in donor_records.items()}
-    alignments: list[dict[str, object]] = []
-    identities: dict[str, dict[str, str]] = {}
-    tasks: list[dict[str, object]] = []
-    for chromosome in chromosome_order:
+    target_partitions = partition_mummer_targets(donor_records)
+    q1_records: dict[str, str] = {}
+    if stage == "step3" and mummer_scope == "gap-screen":
+        q1_records = dict(read_fasta(server_dir / "grt/q/q1.fa"))
+    execution = None
+    input_seconds = 0.0
+
+    def align(chromosome: str):
         chromosome_rows = [row for row in q_rows if row["chr"] == chromosome]
         should_align = bool(donor_records) and bool(gap_objects(chromosome, stage, records[chromosome]))
+        chromosome_scope = mummer_scope
+        if chromosome_scope == "gap-screen" and q1_records.get(chromosome) == records[chromosome]:
+            if complete_raw_mummer_cache(
+                server_dir, chromosome, records[chromosome], target_partitions, tools, execution
+            ):
+                chromosome_scope = "full"
+                print(f"GRT step3 MUMmer {chromosome}: Q2 unchanged from Q1; "
+                      "all full-query partition caches validated", flush=True)
+            else:
+                print(f"GRT step3 MUMmer {chromosome}: Q2 unchanged from Q1 but "
+                      "full-query cache is incomplete; using gap-screen", flush=True)
+        parsed = [] if optimized else None
         cache_dir, cache_hit, chromosome_key = cached_mummer_chromosome(
-            server_dir,
-            stage,
-            chromosome,
-            q_source_sha256,
-            records[chromosome],
-            chromosome_rows,
-            active_set,
-            members_by_record,
-            donor_lengths,
-            tools,
-            threads,
-            should_align,
-            target_kind,
+            server_dir, stage, chromosome, q_source_sha256, records[chromosome],
+            chromosome_rows, active_set, members_by_record, donor_lengths, tools,
+            threads, should_align, target_kind, chromosome_scope, execution, parsed,
         )
         print(f"GRT {stage} MUMmer {chromosome}: {'cache hit' if cache_hit else 'computed'}")
         destination = temporary / "mummer" / "by_chr" / chromosome_key
         destination.parent.mkdir(parents=True, exist_ok=True)
+        copy_started = time.monotonic()
         shutil.copytree(cache_dir, destination)
-        chromosome_alignments = parse_mummer_coords(
-            destination / "result.coords",
-            stage,
-            chromosome,
-            len(records[chromosome]),
-            members_by_record,
-            donor_lengths,
+        copy_seconds = time.monotonic() - copy_started
+        parse_started = time.monotonic()
+        chromosome_alignments = parsed if parsed is not None else parse_mummer_coords(
+            destination / "result.coords", stage, chromosome,
+            len(records[chromosome]), members_by_record, donor_lengths,
         )
-        alignments.extend(chromosome_alignments)
-        query_relpath = f"{artifact_relpath}/mummer/by_chr/{chromosome_key}/query.fa"
-        coords_relpath = f"{artifact_relpath}/mummer/by_chr/{chromosome_key}/result.coords"
-        identities[chromosome] = {
-            "query_relpath": query_relpath,
+        print(f"GRT {stage} {chromosome} artifact metrics: copy_seconds={copy_seconds:.3f} "
+              f"post_copy_parse_seconds={time.monotonic() - parse_started:.3f} "
+              f"parse_reused={parsed is not None}", flush=True)
+        identity = {
+            "query_relpath": f"{artifact_relpath}/mummer/by_chr/{chromosome_key}/query.fa",
             "query_sha256": sha256_file(destination / "query.fa"),
-            "coords_relpath": coords_relpath,
+            "coords_relpath": f"{artifact_relpath}/mummer/by_chr/{chromosome_key}/result.coords",
             "coords_sha256": sha256_file(destination / "result.coords"),
         }
-        tasks.append(
-            {
-                "chr": chromosome,
-                "chromosome_key": chromosome_key,
-                "cache_key": cache_dir.name,
-                **identities[chromosome],
-            }
+        return chromosome_alignments, identity, {
+            "chr": chromosome, "chromosome_key": chromosome_key,
+            "cache_key": cache_dir.name, **identity,
+        }
+
+    collected = {}
+    if optimized and target_partitions and chromosome_order:
+        input_started = time.monotonic()
+        inputs = prepare_mummer_inputs(
+            server_dir, target_partitions,
+            members_by_record if target_kind == "ordinary_donor" else None,
         )
+        manifest = mummer_partition_manifest(target_partitions)
+        input_seconds = time.monotonic() - input_started
+        workers = mummer_partition_workers(
+            threads,
+            [sum(len(seq) for _name, seq in part) for part in target_partitions] * len(chromosome_order),
+            max(len(records[chromosome]) for chromosome in chromosome_order),
+        )
+        print(f"GRT {stage} execution: profile=optimized shared_workers={workers} "
+              f"chromosomes={len(chromosome_order)} order=largest-target-first", flush=True)
+        cancel_event = Event()
+        # Separate coordinators never execute nucmer. Only this shared pool does;
+        # screen and full-query jobs together cannot exceed the global budget.
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            execution = MummerExecution(donor_records, target_partitions, manifest,
+                                        inputs, pool, workers, cancel_event)
+            with ThreadPoolExecutor(max_workers=min(len(chromosome_order), workers)) as coordinators:
+                futures = {coordinators.submit(align, chromosome): chromosome
+                           for chromosome in chromosome_order}
+                try:
+                    for future in as_completed(futures):
+                        collected[futures[future]] = future.result()
+                except BaseException:
+                    cancel_event.set()
+                    for future in futures:
+                        future.cancel()
+                    raise
+    else:
+        for chromosome in chromosome_order:
+            collected[chromosome] = align(chromosome)
+    alignments: list[dict[str, object]] = []
+    identities: dict[str, dict[str, str]] = {}
+    tasks: list[dict[str, object]] = []
+    # Publication order is independent of scheduling and completion order.
+    for chromosome in chromosome_order:
+        chromosome_alignments, identity, task = collected[chromosome]
+        alignments.extend(chromosome_alignments)
+        identities[chromosome] = identity
+        tasks.append(task)
+    print(f"GRT {stage} execution metrics: profile={execution_profile} "
+          f"input_seconds={input_seconds:.3f} collection_seconds={time.monotonic() - started:.3f}", flush=True)
     write_tsv(
         temporary / "mummer" / "chromosome_tasks.tsv",
         [
@@ -742,22 +1442,37 @@ def build_step2_candidates(
     alignments: list[dict[str, object]],
     members_by_record: dict[str, dict[str, str]],
     donor_records: dict[str, str],
+    *, use_index: bool = False,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     grouped: dict[tuple[str, str], list[dict[str, object]]] = defaultdict(list)
     for alignment in alignments:
         grouped[(str(alignment["chr"]), str(alignment["ref_record"]))].append(alignment)
+    member_indexes = {key: Step2MemberIndex(rows) for key, rows in grouped.items()} if use_index else {}
+    grouped_by_chr = defaultdict(list)
+    if use_index:
+        for key, rows in sorted(grouped.items()):
+            grouped_by_chr[key[0]].append((key, rows))
     candidates: list[dict[str, object]] = []
     rejections: list[dict[str, object]] = []
     for gap in gaps:
         chromosome = str(gap["chr"])
         gap_position = int(gap["start0"]) + 1
-        for (candidate_chr, ref_record), member_alignments in sorted(grouped.items()):
+        for (candidate_chr, ref_record), member_alignments in (grouped_by_chr[chromosome] if use_index else sorted(grouped.items())):
             if candidate_chr != chromosome:
                 continue
-            left_rows = [row for row in member_alignments if int(row["query_max"]) <= gap_position + 10]
-            right_rows = [row for row in member_alignments if int(row["query_min"]) >= gap_position - 10]
-            for left in sorted(left_rows, key=lambda row: (-int(row["query_max"]), -float(row["identity"])))[:2]:
-                for right in sorted(right_rows, key=lambda row: (int(row["query_min"]), -float(row["identity"])))[:2]:
+            if use_index:
+                left_rows, right_rows = member_indexes[(candidate_chr, ref_record)].anchors(gap_position)
+            else:
+                left_rows = sorted(
+                    (row for row in member_alignments if int(row["query_max"]) <= gap_position + 10),
+                    key=lambda row: (-int(row["query_max"]), -float(row["identity"])),
+                )[:2]
+                right_rows = sorted(
+                    (row for row in member_alignments if int(row["query_min"]) >= gap_position - 10),
+                    key=lambda row: (int(row["query_min"]), -float(row["identity"])),
+                )[:2]
+            for left in left_rows:
+                for right in right_rows:
                     base = {
                         "stage": "step2",
                         "chr": chromosome,
@@ -1619,11 +2334,17 @@ def run_step2(
     minimap: dict[str, str],
     threads: int,
     repair_mode: str = DEFAULT_REPAIR_MODE,
+    mummer_scope: str = DEFAULT_MUMMER_SCOPE,
+    execution_profile: str = DEFAULT_EXECUTION_PROFILE,
 ) -> tuple[dict[str, object], bool]:
     stage = "step2"
     if repair_mode not in REPAIR_MODES:
         fail(f"unsupported Step2 repair mode: {repair_mode}")
+    if mummer_scope not in MUMMER_SCOPES:
+        fail(f"unsupported Step2 MUMmer scope: {mummer_scope}")
     q_input_sha256 = sha256_file(server_dir / "grt/q/q1.fa")
+    if execution_profile not in EXECUTION_PROFILES:
+        fail(f"unsupported execution profile: {execution_profile}")
     fingerprint_payload = {
         "workflow": WORKFLOW,
         "engine_version": ENGINE_VERSION,
@@ -1639,6 +2360,9 @@ def run_step2(
         ),
         "tools": {name: command_identity(value) for name, value in {**tools, "minimap2": minimap}.items()},
         "mummer_parameters": grt_mummer_parameters(threads),
+        "mummer_scope": mummer_scope,
+        "execution_profile": execution_profile,
+        "execution_helper_sha256": EXECUTION_HELPER_SHA256 if execution_profile == "optimized" else None,
         "validation_parameters": {
             "preset": MINIMAP_PRESET,
             "flank": PATCH_FLANK,
@@ -1683,6 +2407,8 @@ def run_step2(
             donor_members,
             tools,
             threads,
+            mummer_scope=mummer_scope,
+            execution_profile=execution_profile,
         )
         members_by_record = {row["fasta_record_name"]: row for row in donor_members}
         donor_records = dict(read_fasta_allow_empty(server_dir / donor_set["fasta_relpath"]))
@@ -1695,7 +2421,8 @@ def run_step2(
             if row["donor_set_id"] == donor_set["donor_set_id"]
         ]
         gaps = [gap for chromosome in chromosome_order for gap in gap_objects(chromosome, "q1", input_records[chromosome])]
-        candidates, rejections = build_step2_candidates(gaps, alignments, members_by_record, donor_records)
+        candidates, rejections = build_step2_candidates(gaps, alignments, members_by_record, donor_records,
+                                                        use_index=execution_profile == "optimized")
         patch_candidate_counts = {
             chromosome: sum(1 for row in candidates if str(row["chr"]) == chromosome)
             for chromosome in chromosome_order
@@ -1786,6 +2513,7 @@ def run_step2(
                         chromosome_alignments,
                         members_by_record,
                         repair_mode=repair_mode,
+                        use_index=execution_profile == "optimized",
                     )
                 )
             accepted_count = sum(
@@ -2531,28 +3259,32 @@ def _step3_repair_decision(
 def _step3_anchor_pairs(
     gap_pos: int,
     chromosome_alignments: list[dict[str, object]],
+    coordinate_index: AlignmentCoordinateIndex | None = None,
 ) -> list[tuple[dict[str, object], dict[str, object]]]:
     lefts: list[dict[str, object]] = []
     rights: list[dict[str, object]] = []
     for window in range(100_000, CORRECTION_SEARCH_RANGE + 100_000, 100_000):
-        lefts = [
-            row
-            for row in chromosome_alignments
-            if int(row["query_max"]) < gap_pos
-            and (
-                abs(int(row["query_min"]) - gap_pos) <= window
-                or abs(int(row["query_max"]) - gap_pos) <= window
-            )
-        ]
-        rights = [
-            row
-            for row in chromosome_alignments
-            if int(row["query_min"]) > gap_pos
-            and (
-                abs(int(row["query_min"]) - gap_pos) <= window
-                or abs(int(row["query_max"]) - gap_pos) <= window
-            )
-        ]
+        if coordinate_index is not None:
+            lefts, rights = coordinate_index.anchors(gap_pos, window)
+        else:
+            lefts = [
+                row
+                for row in chromosome_alignments
+                if int(row["query_max"]) < gap_pos
+                and (
+                    abs(int(row["query_min"]) - gap_pos) <= window
+                    or abs(int(row["query_max"]) - gap_pos) <= window
+                )
+            ]
+            rights = [
+                row
+                for row in chromosome_alignments
+                if int(row["query_min"]) > gap_pos
+                and (
+                    abs(int(row["query_min"]) - gap_pos) <= window
+                    or abs(int(row["query_max"]) - gap_pos) <= window
+                )
+            ]
         if lefts and rights:
             break
     if not lefts or not rights:
@@ -2582,6 +3314,7 @@ def build_correction_candidates(
     repair_mode: str = DEFAULT_REPAIR_MODE,
     *,
     structural_target: str = "ordinary_donor",
+    use_index: bool = False,
 ) -> list[dict[str, object]]:
     """Build Server-native Type1--Type6 CorrectRefill candidates.
 
@@ -2594,12 +3327,14 @@ def build_correction_candidates(
     by_chr: dict[str, list[dict[str, object]]] = defaultdict(list)
     for alignment in alignments:
         by_chr[str(alignment["chr"])].append(alignment)
+    coordinate_indexes = {chromosome: AlignmentCoordinateIndex(rows) for chromosome, rows in by_chr.items()} if use_index else {}
     candidates: list[dict[str, object]] = []
     for gap in gaps:
         chromosome = str(gap["chr"])
         gap_pos = (int(gap["start0"]) + int(gap["end0"]) + 1) // 2
         chromosome_alignments = by_chr.get(chromosome, [])
-        crossing = [
+        coordinate_index = coordinate_indexes.get(chromosome)
+        crossing = coordinate_index.crossing(gap_pos) if coordinate_index is not None else [
             row for row in chromosome_alignments
             if int(row["query_min"]) <= gap_pos <= int(row["query_max"])
         ]
@@ -2610,7 +3345,7 @@ def build_correction_candidates(
                 key=lambda row: (-float(row["identity"]), -int(row["query_aligned"]), int(row["line_number"])),
             )[0], None))
         else:
-            prototypes.extend(_step3_anchor_pairs(gap_pos, chromosome_alignments))
+            prototypes.extend(_step3_anchor_pairs(gap_pos, chromosome_alignments, coordinate_index))
         for left, right in prototypes:
             features = _step3_alignment_features(gap_pos, left, right)
             error_type, subtype, feature_names, confidence_score = _step3_classify_features(features)
@@ -3085,6 +3820,7 @@ def build_step2_structural_fallback_candidates(
     alignments: list[dict[str, object]],
     members_by_record: dict[str, dict[str, str]],
     repair_mode: str = DEFAULT_REPAIR_MODE,
+    *, use_index: bool = False,
 ) -> list[dict[str, object]]:
     """Build the upstream PatchRepair fixer branch without inserting D0 bases."""
     candidates = build_correction_candidates(
@@ -3093,6 +3829,7 @@ def build_step2_structural_fallback_candidates(
         members_by_record,
         repair_mode=repair_mode,
         structural_target="ordinary_donor",
+        use_index=use_index,
     )
     for candidate in candidates:
         candidate.update(
@@ -4216,13 +4953,19 @@ def run_step3(
     threads: int,
     repair_mode: str = DEFAULT_REPAIR_MODE,
     refill_max_length: int = REFILL_MAX_LENGTH,
+    mummer_scope: str = DEFAULT_MUMMER_SCOPE,
+    execution_profile: str = DEFAULT_EXECUTION_PROFILE,
 ) -> tuple[dict[str, object], bool]:
     stage = "step3"
     if refill_max_length < 1:
         fail("max-fill must be a positive integer")
     if repair_mode not in REPAIR_MODES:
         fail(f"unsupported Step3 repair mode: {repair_mode}")
+    if mummer_scope not in MUMMER_SCOPES:
+        fail(f"unsupported MUMmer scope: {mummer_scope}")
     q_input_sha256 = sha256_file(server_dir / "grt/q/q2.fa")
+    if execution_profile not in EXECUTION_PROFILES:
+        fail(f"unsupported execution profile: {execution_profile}")
     fingerprint_payload = {
         "workflow": WORKFLOW,
         "engine_version": ENGINE_VERSION,
@@ -4244,6 +4987,9 @@ def run_step3(
         },
         "tools": {name: command_identity(value) for name, value in {**tools, "minimap2": minimap}.items()},
         "mummer_parameters": grt_mummer_parameters(threads),
+        "mummer_scope": mummer_scope,
+        "execution_profile": execution_profile,
+        "execution_helper_sha256": EXECUTION_HELPER_SHA256 if execution_profile == "optimized" else None,
         "correction_parameters": {
             "repair_mode": repair_mode,
             "max_search_distance": CORRECTION_SEARCH_RANGE,
@@ -4298,6 +5044,8 @@ def run_step3(
             donor_members,
             tools,
             threads,
+            mummer_scope=mummer_scope,
+            execution_profile=execution_profile,
         )
         members_by_record = {row["fasta_record_name"]: row for row in donor_members}
         fragment_rows = [
@@ -4315,6 +5063,7 @@ def run_step3(
             members_by_record,
             repair_mode=repair_mode,
             structural_target="ordinary_donor",
+            use_index=execution_profile == "optimized",
         )
         promote_direct_primary_overlap_merges(
             gaps,
@@ -4878,6 +5627,9 @@ def publish_step23_metadata(
         for row in read_tsv(metadata / "grt_tool_versions.tsv", TOOL_FIELDS)
         if row["tool"]
         not in {
+            "grt_step_engine",
+            "grt_step2",
+            "grt_step3",
             "grt_step23",
             "step23_nucmer",
             "step23_delta_filter",
@@ -4888,9 +5640,19 @@ def publish_step23_metadata(
     tool_rows.extend(
         [
             {
-                "tool": "grt_step23",
+                "tool": "grt_step_engine",
                 "version": str(ENGINE_VERSION),
                 "executable": ".prepare_lib/tools/grt_step23.py",
+            },
+            {
+                "tool": "grt_step2",
+                "version": str(ENGINE_VERSION),
+                "executable": ".prepare_lib/tools/grt_step2.py",
+            },
+            {
+                "tool": "grt_step3",
+                "version": str(ENGINE_VERSION),
+                "executable": ".prepare_lib/tools/grt_step3.py",
             },
             {
                 "tool": "step23_nucmer",
@@ -5105,7 +5867,7 @@ def reconcile_step2_events_with_step3(
             row["status"] = "superseded"
 
 
-def execute(args: argparse.Namespace) -> None:
+def execution_context(args: argparse.Namespace) -> dict[str, object]:
     server_dir = args.server_dir.resolve()
     package = read_single(server_dir / "metadata/package.tsv")
     if (
@@ -5164,59 +5926,120 @@ def execute(args: argparse.Namespace) -> None:
         },
         24,
     )
+    return {
+        "server_dir": server_dir,
+        "recipe": recipe,
+        "donor_set": donor_set,
+        "donor_members": donor_members,
+        "sources": sources,
+        "assignments": assignments,
+        "q1_rows": q1_rows,
+        "chromosome_order": chromosome_order,
+        "q1_paths": q1_paths,
+        "q1_records": q1_records,
+        "tools": tools,
+        "minimap": minimap,
+        "initial_consumed": initial_consumed,
+        "run_id": run_id,
+    }
+
+
+def execute_step2(args: argparse.Namespace) -> dict[str, object]:
+    context = execution_context(args)
     step2, _step2_cached = run_step2(
-        server_dir,
-        run_id,
-        chromosome_order,
-        q1_paths,
-        q1_records,
-        q1_rows,
-        donor_set,
-        donor_members,
-        assignments,
-        sources,
-        initial_consumed,
-        tools,
-        minimap,
+        context["server_dir"],
+        context["run_id"],
+        context["chromosome_order"],
+        context["q1_paths"],
+        context["q1_records"],
+        context["q1_rows"],
+        context["donor_set"],
+        context["donor_members"],
+        context["assignments"],
+        context["sources"],
+        context["initial_consumed"],
+        context["tools"],
+        context["minimap"],
         args.threads,
         args.repair_mode,
+        getattr(args, "step2_mummer_scope", DEFAULT_MUMMER_SCOPE),
+        getattr(args, "execution_profile", DEFAULT_EXECUTION_PROFILE),
     )
-    publish_step23_metadata(server_dir, [step2], tools, minimap)
-    _, q2_paths, q2_records = load_q_paths(server_dir, "q2", step2["q_rows"], sources)
-    step3_consumed = [*initial_consumed, *step2["accepted_intervals"]]
+    publish_step23_metadata(
+        context["server_dir"], [step2], context["tools"], context["minimap"]
+    )
+    donor_set = context["donor_set"]
+    if step2["donor_set_id"] != donor_set["donor_set_id"]:
+        fail("Step2 does not reference the same frozen donor set as Step1")
+    if step2["target_sha256"] != donor_set["fasta_sha256"]:
+        fail("Step2 donor FASTA hash drifted from frozen D0")
+    print(
+        f"GRT Step2 complete: run={context['run_id']}, "
+        f"donor_set={donor_set['donor_set_id']}, "
+        f"q2_sha256={sha256_file(context['server_dir'] / 'grt/q/q2.fa')}"
+    )
+    return step2
+
+
+def execute_step3(args: argparse.Namespace) -> dict[str, object]:
+    context = execution_context(args)
+    server_dir = context["server_dir"]
+    step2 = completed_stage_result(server_dir, "step2")
+    if (
+        step2.get("engine_version") != ENGINE_VERSION
+        or step2.get("engine_sha256") != ENGINE_SHA256
+    ):
+        fail("Step2 was produced by a different staged engine; rerun Step2 first")
+    _, q2_paths, q2_records = load_q_paths(
+        server_dir, "q2", step2["q_rows"], context["sources"]
+    )
+    step3_consumed = [
+        *context["initial_consumed"],
+        *step2["accepted_intervals"],
+    ]
     step3, _step3_cached = run_step3(
         server_dir,
-        run_id,
-        chromosome_order,
+        context["run_id"],
+        context["chromosome_order"],
         q2_paths,
         q2_records,
         step2["q_rows"],
-        donor_set,
-        donor_members,
-        assignments,
-        sources,
-        recipe["primary_dataset"],
+        context["donor_set"],
+        context["donor_members"],
+        context["assignments"],
+        context["sources"],
+        context["recipe"]["primary_dataset"],
         step3_consumed,
-        tools,
-        minimap,
+        context["tools"],
+        context["minimap"],
         args.threads,
         args.repair_mode,
         refill_max_length=args.refill_max_length,
+        mummer_scope=args.step3_mummer_scope,
+        execution_profile=getattr(args, "execution_profile", DEFAULT_EXECUTION_PROFILE),
     )
     reconcile_step2_events_with_step3(step2, step3)
-    publish_step23_metadata(server_dir, [step2, step3], tools, minimap)
+    publish_step23_metadata(
+        server_dir, [step2, step3], context["tools"], context["minimap"]
+    )
+    donor_set = context["donor_set"]
     if step2["donor_set_id"] != donor_set["donor_set_id"] or step3["donor_set_id"] != donor_set["donor_set_id"]:
         fail("Step2/3 do not reference the same frozen donor set as Step1")
     if step2["target_sha256"] != donor_set["fasta_sha256"] or step3["target_sha256"] != donor_set["fasta_sha256"]:
         fail("Step2/3 donor FASTA hash drifted from frozen D0")
     print(
-        f"GRT Step2/3 complete: run={run_id}, donor_set={donor_set['donor_set_id']}, "
+        f"GRT Step3 complete: run={context['run_id']}, donor_set={donor_set['donor_set_id']}, "
         f"q3_sha256={sha256_file(server_dir / 'grt/q/q3.fa')}"
     )
+    return step3
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
+def execute(args: argparse.Namespace) -> None:
+    execute_step2(args)
+    execute_step3(args)
+
+
+def add_common_cli_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--server-dir", required=True, type=Path)
     parser.add_argument("--nucmer", default="nucmer")
     parser.add_argument("--delta-filter", dest="delta_filter", default="delta-filter")
@@ -5224,8 +6047,9 @@ def main() -> None:
     parser.add_argument("--minimap2", default="minimap2")
     parser.add_argument("--threads", type=int, default=10)
     parser.add_argument(
-        "--max-fill", "-m", dest="refill_max_length", type=int, default=REFILL_MAX_LENGTH,
-        help="Maximum Step3 optimized refill length in bp (default: 1000000)",
+        "--execution-profile", choices=sorted(EXECUTION_PROFILES),
+        default=DEFAULT_EXECUTION_PROFILE,
+        help="Experimental exact execution optimizations (default: baseline)",
     )
     parser.add_argument(
         "--repair-mode",
@@ -5233,9 +6057,42 @@ def main() -> None:
         default=DEFAULT_REPAIR_MODE,
         help="CorrectRefill structural repair mode (default: aggressive)",
     )
-    args = parser.parse_args()
+
+
+def validate_common_cli_arguments(args: argparse.Namespace) -> None:
     if args.threads < 1:
         fail("threads must be a positive integer")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    add_common_cli_arguments(parser)
+    parser.add_argument(
+        "--max-fill", "-m", dest="refill_max_length", type=int, default=REFILL_MAX_LENGTH,
+        help="Maximum Step3 optimized refill length in bp (default: 1000000)",
+    )
+    parser.add_argument(
+        "--step2-mummer-scope",
+        choices=sorted(MUMMER_SCOPES),
+        default=DEFAULT_MUMMER_SCOPE,
+        help=(
+            "Step2 MUMmer scope: full keeps the established path; gap-screen "
+            "screens local gap windows and reruns selected partitions against "
+            "the complete Q1 chromosome (experimental, default: full)"
+        ),
+    )
+    parser.add_argument(
+        "--step3-mummer-scope",
+        choices=sorted(MUMMER_SCOPES),
+        default=DEFAULT_MUMMER_SCOPE,
+        help=(
+            "Step3 MUMmer scope: full keeps the established path; gap-screen "
+            "screens local gap windows and reruns selected partitions against "
+            "the complete Q2 chromosome (experimental, default: full)"
+        ),
+    )
+    args = parser.parse_args()
+    validate_common_cli_arguments(args)
     if args.refill_max_length < 1:
         fail("max-fill must be a positive integer")
     execute(args)

@@ -33,6 +33,7 @@ from server.tools.grt_step23 import (
     evidence_row,
     grt_mummer_parameters,
     parse_mummer_coords,
+    parse_mummer_screen_coords,
     partition_mummer_targets,
     promote_direct_primary_overlap_merges,
     project_interval_after_refills,
@@ -42,12 +43,16 @@ from server.tools.grt_step23 import (
     replay_step3,
     step2_strategy,
     step2_strategy_applied,
+    step3_mummer_screen_windows,
+    step3_screen_partition_relevant,
 )
 
 
 PREPARE_TOOL = REPO_ROOT / "server/tools/grt_prepare_inputs.py"
 STEP1_TOOL = REPO_ROOT / "server/tools/grt_step1.py"
 STEP23_TOOL = REPO_ROOT / "server/tools/grt_step23.py"
+STEP2_TOOL = REPO_ROOT / "server/tools/grt_step2.py"
+STEP3_TOOL = REPO_ROOT / "server/tools/grt_step3.py"
 
 
 class GrtStep23Tests(unittest.TestCase):
@@ -224,6 +229,46 @@ class GrtStep23Tests(unittest.TestCase):
                 [f"small-{index:02d}" for index in range(11)],
                 ["small-11"],
             ],
+        )
+
+    def test_step3_screen_windows_merge_overlapping_gap_ranges(self):
+        sequence = "A" * 800_000 + "N" * 100 + "A" * 399_900 + "N" * 100 + "A" * 800_000
+
+        records, windows = step3_mummer_screen_windows("Chr01", sequence)
+
+        self.assertEqual(len(records), 1)
+        name, fragment = records[0]
+        self.assertEqual(windows[name], {"start": 290_001, "end": 1_710_100})
+        self.assertEqual(len(fragment), 1_420_100)
+
+    def test_screen_coords_project_to_whole_chromosome_and_select_flanks(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            coords = Path(temporary_dir) / "result.coords"
+            coords.write_text(
+                "1 10000 | 400000 409999 | 10000 10000 | 99.00 | "
+                "20000 1020100 | donor-1 screen_0001_490001_1510100\n"
+                "10001 20000 | 610101 620100 | 10000 10000 | 99.00 | "
+                "20000 1020100 | donor-1 screen_0001_490001_1510100\n",
+                encoding="utf-8",
+            )
+            rows = parse_mummer_screen_coords(
+                coords,
+                {"screen_0001_490001_1510100": {"start": 490_001, "end": 1_510_100}},
+                {"donor-1": {"member_id": "member-1"}},
+                {"donor-1": 20_000},
+            )
+
+        self.assertEqual(rows[0]["query_min"], 890_000)
+        self.assertEqual(rows[1]["query_max"], 1_110_100)
+        self.assertTrue(
+            step3_screen_partition_relevant(
+                [{"start0": 999_999, "end0": 1_000_099}], rows
+            )
+        )
+        self.assertFalse(
+            step3_screen_partition_relevant(
+                [{"start0": 1_900_000, "end0": 1_900_099}], rows
+            )
         )
 
     def test_header_only_mummer_delta_is_a_valid_zero_hit_partition(self):
@@ -1687,6 +1732,7 @@ else:
         threads: int = 2,
         step23_tool: Path = STEP23_TOOL,
         refill_max_length: int = 1_000_000,
+        execution_profile: str = "baseline",
     ):
         return subprocess.run(
             [
@@ -1706,12 +1752,128 @@ else:
                 str(threads),
                 "--max-fill",
                 str(refill_max_length),
+                "--execution-profile", execution_profile,
             ],
             check=False,
             capture_output=True,
             text=True,
             env=env,
         )
+
+    def run_split_step2_step3(
+        self,
+        server: Path,
+        tools: dict[str, Path],
+        env: dict[str, str],
+        threads: int = 2,
+    ):
+        common = [
+            "--server-dir", str(server),
+            "--minimap2", str(tools["minimap2"]),
+            "--nucmer", str(tools["nucmer"]),
+            "--delta-filter", str(tools["delta_filter"]),
+            "--show-coords", str(tools["show_coords"]),
+            "--threads", str(threads),
+        ]
+        step2 = subprocess.run(
+            [sys.executable, str(STEP2_TOOL), *common],
+            check=False, capture_output=True, text=True, env=env,
+        )
+        if step2.returncode:
+            return step2, None
+        step3 = subprocess.run(
+            [sys.executable, str(STEP3_TOOL), *common],
+            check=False, capture_output=True, text=True, env=env,
+        )
+        return step2, step3
+
+    def test_split_step2_step3_entrypoints_match_combined_result(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+            combined_server = self.make_server(root / "combined")
+            split_server = self.make_server(root / "split")
+            tools = self.make_tools(root)
+            env = os.environ.copy()
+            env["FAKE_GRT_MINIMAP_LOG"] = str(root / "minimap.log")
+            env["FAKE_GRT_MUMMER_LOG"] = str(root / "mummer.log")
+            for server in (combined_server, split_server):
+                completed = self.run_step1(server, tools, env)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+
+            combined = self.run_step23(combined_server, tools, env)
+            step2, step3 = self.run_split_step2_step3(split_server, tools, env)
+
+            self.assertEqual(combined.returncode, 0, combined.stderr)
+            self.assertEqual(step2.returncode, 0, step2.stderr)
+            self.assertIsNotNone(step3)
+            self.assertEqual(step3.returncode, 0, step3.stderr)
+            self.assertEqual(
+                prepare_fixture.sha256(combined_server / "grt/q/q2.fa"),
+                prepare_fixture.sha256(split_server / "grt/q/q2.fa"),
+            )
+            self.assertEqual(
+                prepare_fixture.sha256(combined_server / "grt/q/q3.fa"),
+                prepare_fixture.sha256(split_server / "grt/q/q3.fa"),
+            )
+
+    def test_optimized_cold_step2_step3_keep_candidates_rejections_and_decisions(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+            servers = {profile: self.make_server(root / profile) for profile in ("baseline", "optimized")}
+            tools = self.make_tools(root)
+            env = os.environ.copy()
+            env["FAKE_GRT_MINIMAP_LOG"] = str(root / "minimap.log")
+            env["FAKE_GRT_MUMMER_LOG"] = str(root / "mummer.log")
+            for profile, server in servers.items():
+                completed = self.run_step1(server, tools, env)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                completed = self.run_step23(server, tools, env, execution_profile=profile)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+            for q in ("q2", "q3"):
+                self.assertEqual(prepare_fixture.sha256(servers["baseline"] / f"grt/q/{q}.fa"),
+                                 prepare_fixture.sha256(servers["optimized"] / f"grt/q/{q}.fa"))
+            for stage in ("step2", "step3"):
+                baseline = servers["baseline"] / "grt/evidence" / stage
+                optimized = servers["optimized"] / "grt/evidence" / stage
+                left = json.loads((baseline / "result.json").read_text())
+                right = json.loads((optimized / "result.json").read_text())
+                for key in ("q_rows", "usage_rows", "events", "attempts", "accepted_intervals", "strategies", "classification_rows"):
+                    if key in left:
+                        self.assertEqual(left[key], right[key], f"{stage}:{key}")
+                evidence = lambda result: [
+                    {k: v for k, v in row.items() if k != "raw_artifact_sha256"}
+                    for row in result["evidence_rows"]
+                ]
+                self.assertEqual(evidence(left), evidence(right), f"{stage}:evidence")
+                for name in ("candidates.tsv", "rejections.tsv", "refill_candidates.tsv", "refill_rejections.tsv"):
+                    if (baseline / name).is_file():
+                        self.assertEqual((baseline / name).read_bytes(), (optimized / name).read_bytes(), f"{stage}:{name}")
+
+    def test_split_step3_rejects_missing_or_modified_step2_checkpoint_outputs(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            root = Path(temporary_dir)
+            server = self.make_server(root)
+            tools = self.make_tools(root)
+            env = os.environ.copy()
+            env["FAKE_GRT_MINIMAP_LOG"] = str(root / "minimap.log")
+            env["FAKE_GRT_MUMMER_LOG"] = str(root / "mummer.log")
+            completed = self.run_step1(server, tools, env)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            step2, step3 = self.run_split_step2_step3(server, tools, env)
+            self.assertEqual(step2.returncode, 0, step2.stderr)
+            self.assertEqual(step3.returncode, 0, step3.stderr)
+            before = (root / "mummer.log").read_text()
+            checkpoint = server / "grt/checkpoints/step2.json"
+            from server.tools.grt_core.stage_cache import completed_stage_result
+            completed_stage_result(server, "step2")
+            q2 = server / "grt/q/q2.fa"
+            q2.write_text(q2.read_text() + "\n")
+            with self.assertRaisesRegex(SystemExit, "checkpoint output is missing or changed"):
+                completed_stage_result(server, "step2")
+            checkpoint.unlink()
+            with self.assertRaisesRegex(SystemExit, "cannot load completed step2 result"):
+                completed_stage_result(server, "step2")
+            self.assertEqual((root / "mummer.log").read_text(), before)
 
     def test_refill_limit_invalidates_step3_but_reuses_step2(self):
         with tempfile.TemporaryDirectory() as temporary_dir:

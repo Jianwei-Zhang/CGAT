@@ -85,10 +85,34 @@ bash install.sh --manager conda
 ```bash
 workspace=/path/to/gpm_server
 cp tools/grt_step23.py "$workspace/.prepare_lib/tools/grt_step23.py"
+cp tools/grt_step2.py "$workspace/.prepare_lib/tools/grt_step2.py"
+cp tools/grt_step3.py "$workspace/.prepare_lib/tools/grt_step3.py"
 ```
 
-随后在原环境中重新运行或提交该工作区的 `run_all.sh`。保留原工作区和
+新生成的工作区会将 Step2、Step3 拆成可独立续跑的 `run_grt_step2.sh`
+和 `run_grt_step3.sh`。随后在原环境中重新运行或提交该工作区的
+`run_all.sh`。保留原工作区和
 缓存，流程可复用兼容的 MUMmer 原始比对，并重新生成修复后的阶段结果。
+
+### 独立 GRT 阶段控制
+
+新工作区生成 `run_grt_step2.sh`、`run_grt_step3.sh`，分别记录调度状态和
+checkpoint。先运行 Step2，再运行 Step3；Step3 会拒绝缺失、已改变或引擎
+不兼容的 Step2 完成结果。旧工作区仍可使用组合入口 `tools/grt_step23.py`。
+
+两个 Python 入口分别提供 `--step2-mummer-scope full|gap-screen`、
+`--step3-mummer-scope full|gap-screen`，默认均为 `full`。`gap-screen` 为实验性
+选项：局部窗口只筛选 donor partition，选中的 partition 仍使用原参数与
+完整输入染色体比对。筛选成功或 FASTA 哈希一致，不代表所有元数据和证据
+严格等价；被拒绝候选的诊断计数可能不同。需要保持原证据范围时使用 `full`。
+
+两个阶段的 Python 入口还支持 `--execution-profile baseline|optimized`，默认
+`baseline`。实验性 `optimized` 保持所选 MUMmer 范围和比对阈值不变，使用
+跨染色体共享且受 CPU/内存预算约束的任务池、较大 donor 分区优先调度、
+内容校验后的分区 FASTA 复用、精确候选查询索引和已校验坐标解析结果复用。
+坐标输出及并列选择仍遵循原顺序。它不等于 `gap-screen`，也不删减拒绝证据。
+在真实数据验收前，生成的工作流仍使用 `baseline`；缓存辅助一致性测试的耗时
+不能当作完整冷启动流程的耗时。
 
 ## 可选的 AI agent skill
 

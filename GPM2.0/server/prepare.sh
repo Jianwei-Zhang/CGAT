@@ -107,7 +107,7 @@ Behavior:
   - Embeds the finalized report/ directory in both delivery archives; no separate report ZIP is created
   - report/render_report.py regenerates HTML using only report/ and Python's standard library
   - Generates package_full_zip.sh, package_light_zip.sh, and export_final_path_fasta.sh
-  - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> GRT Step2/3 -> GRT telomere/q4 finalization -> per-chr commands -> GRT evidence/package validation -> full archive -> light archive
+  - run_all.sh is staged as: vs_ref -> chr assignment helper -> GRT q0/D0/Dtel -> GRT Step1 -> GRT Step2 -> GRT Step3 -> GRT telomere/q4 finalization -> per-chr commands -> GRT evidence/package validation -> full archive -> light archive
   - A successful run_all.sh creates both delivery archives in the parent directory of the work root
   - With --skip-self, same-dataset self alignments are omitted and marked unavailable in metadata/datasets.tsv
   - Prints all generated staged commands to the terminal for manual copy/paste
@@ -543,7 +543,26 @@ write_grt_step1_script() {
   make_executable_if_supported "$output_path"
 }
 
-write_grt_step23_script() {
+write_grt_step2_script() {
+  local output_path="$1"
+  local work_root="$2"
+
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'set -euo pipefail\n'
+    printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s\n' \
+      "$(shell_quote "${work_root}/.prepare_lib/tools/grt_step2.py")" \
+      "$(shell_quote "$work_root")" \
+      "$(shell_quote "$THREADS")" \
+      "$(shell_quote "$GRT_MINIMAP2")" \
+      "$(shell_quote "$GRT_NUCMER")" \
+      "$(shell_quote "$GRT_DELTA_FILTER")" \
+      "$(shell_quote "$GRT_SHOW_COORDS")"
+  } > "$output_path"
+  make_executable_if_supported "$output_path"
+}
+
+write_grt_step3_script() {
   local output_path="$1"
   local work_root="$2"
 
@@ -551,7 +570,7 @@ write_grt_step23_script() {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
     printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --max-fill %s\n' \
-      "$(shell_quote "${work_root}/.prepare_lib/tools/grt_step23.py")" \
+      "$(shell_quote "${work_root}/.prepare_lib/tools/grt_step3.py")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$GRT_MINIMAP2")" \
@@ -1009,7 +1028,7 @@ mapfile -t REFERENCE_CHR_NAMES < <(collect_reference_chr_names "$REF_DST")
 [[ "${#REFERENCE_CHR_NAMES[@]}" -gt 0 ]] \
   || die "Reference FASTA contains no sequence records: $REF_DST"
 
-TOTAL_COMMANDS=$(( DATASET_COUNT + 8 + ${#REFERENCE_CHR_NAMES[@]} ))
+TOTAL_COMMANDS=$(( DATASET_COUNT + 9 + ${#REFERENCE_CHR_NAMES[@]} ))
 COMMAND_INDEX=1
 
 for ((i = 0; i < DATASET_COUNT; i++)); do
@@ -1051,11 +1070,18 @@ printf 'cd %s\n' "$WORK_ROOT"
 printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_step1.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
-write_grt_step23_script "${WORK_ROOT}/run_grt_step23.sh" "$WORK_ROOT"
-append_run_all_unit "grt_step23" "run_grt_step23.sh" "logs/run_all.log"
-printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_grt_step23"
+write_grt_step2_script "${WORK_ROOT}/run_grt_step2.sh" "$WORK_ROOT"
+append_run_all_unit "grt_step2" "run_grt_step2.sh" "logs/run_all.log"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_grt_step2"
 printf 'cd %s\n' "$WORK_ROOT"
-printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_step23.sh"
+printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_step2.sh"
+COMMAND_INDEX=$((COMMAND_INDEX + 1))
+
+write_grt_step3_script "${WORK_ROOT}/run_grt_step3.sh" "$WORK_ROOT"
+append_run_all_unit "grt_step3" "run_grt_step3.sh" "logs/run_all.log"
+printf '[%s/%s] %s\n' "$COMMAND_INDEX" "$TOTAL_COMMANDS" "run_grt_step3"
+printf 'cd %s\n' "$WORK_ROOT"
+printf 'bash %s\n\n' "${WORK_ROOT}/run_grt_step3.sh"
 COMMAND_INDEX=$((COMMAND_INDEX + 1))
 
 write_grt_telomere_finalize_script "${WORK_ROOT}/run_grt_telomere_finalize.sh" "$WORK_ROOT"
@@ -1124,7 +1150,8 @@ echo "  - ${WORK_ROOT}/add_dataset.sh"
 echo "  - ${WORK_ROOT}/add_ctg.sh"
 echo "  - ${WORK_ROOT}/prepare_grt_inputs.sh"
 echo "  - ${WORK_ROOT}/run_grt_step1.sh"
-echo "  - ${WORK_ROOT}/run_grt_step23.sh"
+echo "  - ${WORK_ROOT}/run_grt_step2.sh"
+echo "  - ${WORK_ROOT}/run_grt_step3.sh"
 echo "  - ${WORK_ROOT}/run_grt_telomere_finalize.sh"
 echo "  - ${WORK_ROOT}/finalize_grt_evidence.sh"
 echo "  - ${WORK_ROOT}/export_final_path_fasta.sh"
@@ -1137,7 +1164,7 @@ echo "Next:"
 echo "  1. Run: bash ${WORK_ROOT}/run_all.sh"
 echo "     - This automatically creates both the full and light delivery archives"
 echo "  2. Or execute the staged commands printed above one by one, including the final two package commands"
-echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, GRT q0/D0/Dtel, GRT Step1, GRT Step2/3, GRT telomere/q4 finalization, chr-local jobs, evidence finalization, full packaging, and light packaging"
+echo "  3. Execution order is strict: finish all *_vs_ref jobs first, then assignment, GRT q0/D0/Dtel, GRT Step1, GRT Step2, GRT Step3, GRT telomere/q4 finalization, chr-local jobs, evidence finalization, full packaging, and light packaging"
 if [[ "$SKIP_SELF" == "true" ]]; then
   echo "     - chr-local same-dataset self alignments remain skipped"
 fi

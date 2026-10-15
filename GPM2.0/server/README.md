@@ -90,11 +90,40 @@ checkout, update the failed workspace from this directory:
 ```bash
 workspace=/path/to/gpm_server
 cp tools/grt_step23.py "$workspace/.prepare_lib/tools/grt_step23.py"
+cp tools/grt_step2.py "$workspace/.prepare_lib/tools/grt_step2.py"
+cp tools/grt_step3.py "$workspace/.prepare_lib/tools/grt_step3.py"
 ```
 
-Then rerun or resubmit that workspace's `run_all.sh` in the same environment.
+New workspaces expose Step2 and Step3 as separate resumable units through
+`run_grt_step2.sh` and `run_grt_step3.sh`. Then rerun or resubmit that
+workspace's `run_all.sh` in the same environment.
 Keep the existing workspace and caches; compatible raw MUMmer alignments can be
 reused while the corrected stage outputs are regenerated.
+
+### Independent GRT stage controls
+
+New workspaces generate `run_grt_step2.sh` and `run_grt_step3.sh`, with separate
+scheduler status and checkpoints. Run Step2 before Step3; Step3 refuses a missing,
+changed, or incompatible completed Step2 result. The combined
+`tools/grt_step23.py` entrypoint remains available for older workspaces.
+
+The direct Python entrypoints expose `--step2-mummer-scope full|gap-screen` and
+`--step3-mummer-scope full|gap-screen`, respectively. Both default to `full`.
+`gap-screen` is experimental: local windows select donor partitions, then the
+selected partitions are aligned against the complete input chromosome using the
+established alignment parameters. Do not interpret a successful screen or
+matching FASTA alone as full metadata/evidence equivalence; rejected-candidate
+counts can differ. Keep `full` for runs requiring the established evidence scope.
+
+The direct stage entrypoints also accept `--execution-profile baseline|optimized`
+(default: `baseline`). The experimental `optimized` profile keeps the chosen
+MUMmer scope and alignment thresholds, but shares one CPU/memory-bounded worker
+pool across chromosomes, schedules larger donor partitions first, reuses
+content-verified partition FASTA inputs, and uses exact candidate lookup indexes
+and already-validated parsed coordinates. Coordinate publication and tie-breaking
+retain their original order. It does not mean `gap-screen` and does not discard
+rejected evidence. Prepared workflows remain on `baseline` pending real-input
+acceptance. Cache-assisted equivalence timings are not cold-pipeline benchmarks.
 
 ## Optional AI agent skill
 
