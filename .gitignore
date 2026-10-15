@@ -25,6 +25,7 @@
 !/docs/404.html
 !/docs/comet/
 !/docs/comet/**
+/docs_deploy/
 /DOCS_DEPLOY.md
 /package.json
 /package-lock.json
