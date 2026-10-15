@@ -78,6 +78,8 @@ When preparing the workspace, the first `--ds` becomes the primary dataset and t
 | `-s, --score <0-100>` | `60` | Minimum chromosome-assignment coverage percentage. |
 | `-t, --threads <n>` | `10` | Total compute-thread budget shared by independent alignment tasks and reads-QC jobs. |
 | `--skip-self` | Off | Skip same-dataset self alignment; same-dataset Subview becomes unavailable. |
+| `--self-m <n>`, `-sm <n>` | `200` | Self alignment only: Minimap2 minimum chain score (`-m`). |
+| `--self-n <n>`, `-sn <n>` | `100` | Self alignment only: minimum minimizers per chain (`-n`); higher values trade sensitivity for speed. |
 | `--tel <motif> <count>` | Optional, repeatable | Mark exact telomere-like repeats on both strands. Example: `--tel TTAGGG 20`. |
 | `--cen <fasta>` | Optional | Reference centromere FASTA. Record names must end in `_centromere`, such as `Chr01_centromere`. |
 | `--cen-min-len <bp>` | `10000` | Minimum centromere alignment length. |

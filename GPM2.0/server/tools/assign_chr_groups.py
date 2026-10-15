@@ -197,6 +197,8 @@ def write_run_command_script(
     self_mode,
     threads,
     minimap_preset,
+    self_min_chain_score=None,
+    self_minimizers=None,
     self_name_map=None,
     self_restore_script=None,
 ):
@@ -205,7 +207,13 @@ def write_run_command_script(
     if self_mode:
         if self_name_map is None or self_restore_script is None:
             fail("self alignment command requires canonical-name restoration inputs")
-        args.extend(["-X", "--no-hash-name"])
+        if self_min_chain_score is None or self_minimizers is None:
+            fail("self alignment command requires self-specific Minimap2 thresholds")
+        args.extend([
+            "-X", "--no-hash-name",
+            "-m", str(self_min_chain_score),
+            "-n", str(self_minimizers),
+        ])
         args.extend(["-t", THREAD_ARGUMENT, str(left_fa), str(right_fa)])
         restore_args = ["python3", str(self_restore_script), str(self_name_map)]
         lines.extend(
@@ -577,6 +585,13 @@ def write_generated_command_script(path, command_paths, chr_name):
 work_root = Path(os.environ["GPM_FAST_WORK_ROOT"])
 threads = os.environ["GPM_FAST_THREADS"]
 minimap_preset = os.environ["GPM_FAST_MINIMAP_PRESET"]
+try:
+    self_min_chain_score = int(os.environ["GPM_FAST_SELF_MIN_CHAIN_SCORE"])
+    self_minimizers = int(os.environ["GPM_FAST_SELF_MINIMIZERS"])
+except (KeyError, ValueError) as exc:
+    fail(f"invalid self-alignment Minimap2 thresholds: {exc}")
+if self_min_chain_score < 1 or self_minimizers < 1:
+    fail("self-alignment Minimap2 thresholds must be positive integers")
 metadata_dir = work_root / "metadata"
 runs_dir = work_root / "runs"
 package = read_single_tsv_row(metadata_dir / "package.tsv")
@@ -872,6 +887,8 @@ for chr_name in reference_chr_names:
                 self_mode=True,
                 threads=threads,
                 minimap_preset=minimap_preset,
+                self_min_chain_score=self_min_chain_score,
+                self_minimizers=self_minimizers,
                 self_name_map=name_map,
                 self_restore_script=restore_script,
             )

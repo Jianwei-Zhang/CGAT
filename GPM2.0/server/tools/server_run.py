@@ -14,12 +14,16 @@ from pathlib import Path
 from run_all_runner import Runner, RunnerError, WorkspaceLock, load_plan, new_run_id
 from run_orchestration import OrchestrationContractError, atomic_write_json
 
-ALIASES = {"-o": "--out", "--output": "--out", "-t": "--threads", "-s": "--score", "-m": "--max-fill"}
+ALIASES = {
+    "-o": "--out", "--output": "--out", "-t": "--threads",
+    "-s": "--score", "-m": "--max-fill",
+    "-sm": "--self-m", "-sn": "--self-n",
+}
 SINGLE_OPTIONS = {
     "--out", "--threads", "--score", "--archive-format",
     "--minimap-preset", "--cen", "--cen-min-len",
     "--cen-min-identity", "--reads", "--reads-qc", "--grt-qc-memory-gb",
-    "--grt-kmer-size", "--max-fill",
+    "--grt-kmer-size", "--max-fill", "--self-m", "--self-n",
 }
 PATH_OPTIONS = {"--ref", "--ds", "--reads", "--cen"}
 
@@ -40,8 +44,8 @@ def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
             raise RunnerError(f"{key} requires a value; see run.sh --help")
         if key in PATH_OPTIONS or key == "--out":
             values[-1] = str((cwd / values[-1]).resolve())
-        if key == "--max-fill" and not re.fullmatch(r"[1-9][0-9]*", values[0]):
-            raise RunnerError("--max-fill must be a positive integer")
+        if key in {"--max-fill", "--self-m", "--self-n"} and not re.fullmatch(r"[1-9][0-9]*", values[0]):
+            raise RunnerError(f"{key} must be a positive integer")
         if key in {"--ds", "--reads", "--tel"}:
             options.setdefault(key, []).append(values)
         else:

@@ -17,6 +17,8 @@ WORK_ROOT="$(pwd)/gpm_server"
 THREADS="10"
 ARCHIVE_FORMAT="tar.gz"
 MINIMAP_PRESET="asm10"
+SELF_MIN_CHAIN_SCORE="200"
+SELF_MINIMIZERS="100"
 SKIP_SELF=false
 CHR_ASSIGNMENT_MIN_COVERAGE_PERCENT="60"
 CEN_SRC=""
@@ -43,6 +45,8 @@ Usage:
     [-o|--out <gpm_server_output_dir>] \
     [--score|-s <chr_assignment_min_coverage_percent>] \
     [--minimap-preset asm10|asm5] \
+    [--self-m|-sm <min_chain_score>] \
+    [--self-n|-sn <min_minimizers>] \
     [--threads|-t <thread_budget>] \
     [--archive-format tar.gz|zip] \
     [--skip-self] \
@@ -71,6 +75,8 @@ Behavior:
   - Supports --score/-s to set the chr assignment coverage threshold, default: 60
   - Uses Minimap2 for all reference and chromosome-local alignments
   - Supports --minimap-preset, default: asm10
+  - Self alignment only: --self-m/-sm sets Minimap2 -m, default: 200
+  - Self alignment only: --self-n/-sn sets Minimap2 -n, default: 100
   - Supports --threads/-t to choose the total compute-thread budget, default: 10
   - Independent reference and chromosome-local alignments share this budget
   - Default delivery: tar.gz compressed with pigz using the thread budget; --archive-format zip keeps ZIP output
@@ -152,6 +158,12 @@ validate_minimap_preset() {
       die "Invalid --minimap-preset '$value'. Use asm10 or asm5."
       ;;
   esac
+}
+
+validate_self_alignment_integer() {
+  local option="$1"
+  local value="$2"
+  [[ "$value" =~ ^[1-9][0-9]*$ ]] || die "Invalid ${option} '$value'. Use a positive integer."
 }
 
 validate_threads() {
@@ -402,6 +414,8 @@ write_prepare_options_metadata() {
     printf 'chr_assignment_min_coverage_percent\t%s\n' "$CHR_ASSIGNMENT_MIN_COVERAGE_PERCENT"
     printf 'alignment_engine\t%s\n' "minimap2"
     printf 'minimap_preset\t%s\n' "$MINIMAP_PRESET"
+    printf 'self_min_chain_score\t%s\n' "$SELF_MIN_CHAIN_SCORE"
+    printf 'self_minimizers\t%s\n' "$SELF_MINIMIZERS"
     printf 'threads\t%s\n' "$THREADS"
     printf 'archive_format\t%s\n' "$ARCHIVE_FORMAT"
     printf 'skip_self\t%s\n' "$SKIP_SELF"
@@ -475,9 +489,13 @@ write_assignment_script() {
     --allow GPM_FAST_WORK_ROOT \
     --allow GPM_FAST_THREADS \
     --allow GPM_FAST_MINIMAP_PRESET \
+    --allow GPM_FAST_SELF_MIN_CHAIN_SCORE \
+    --allow GPM_FAST_SELF_MINIMIZERS \
     --shell-var GPM_FAST_WORK_ROOT "$work_root" \
     --shell-var GPM_FAST_THREADS "$THREADS" \
-    --shell-var GPM_FAST_MINIMAP_PRESET "$MINIMAP_PRESET"
+    --shell-var GPM_FAST_MINIMAP_PRESET "$MINIMAP_PRESET" \
+    --shell-var GPM_FAST_SELF_MIN_CHAIN_SCORE "$SELF_MIN_CHAIN_SCORE" \
+    --shell-var GPM_FAST_SELF_MINIMIZERS "$SELF_MINIMIZERS"
   make_executable_if_supported "$output_path"
 }
 
@@ -724,6 +742,18 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || die "--minimap-preset requires asm10 or asm5"
       validate_minimap_preset "$2"
       MINIMAP_PRESET="$2"
+      shift 2
+      ;;
+    --self-m|-sm)
+      [[ $# -ge 2 ]] || die "$1 requires <min_chain_score>"
+      validate_self_alignment_integer "$1" "$2"
+      SELF_MIN_CHAIN_SCORE="$2"
+      shift 2
+      ;;
+    --self-n|-sn)
+      [[ $# -ge 2 ]] || die "$1 requires <min_minimizers>"
+      validate_self_alignment_integer "$1" "$2"
+      SELF_MINIMIZERS="$2"
       shift 2
       ;;
     --max-fill|-m)

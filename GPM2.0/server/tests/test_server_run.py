@@ -96,10 +96,20 @@ class ServerRunTests(unittest.TestCase):
         self.assertFalse(candidates)
         self.assertEqual(rejected[0]["reason"], "anchor_strands_disagree")
 
+    def test_self_alignment_threshold_aliases_are_canonicalized(self):
+        options = server_run.parse_options(
+            ["-sm", "250", "-sn", "75"], Path.cwd()
+        )
+        self.assertEqual(options["--self-m"], [["250"]])
+        self.assertEqual(options["--self-n"], [["75"]])
+        self.assertNotIn("-sm", options)
+        self.assertNotIn("-sn", options)
+
     def test_invalid_limit_and_unknown_resume_options_fail(self):
-        for value in ["0", "-1", "1.5", "nope"]:
-            with self.assertRaises(server_run.RunnerError):
-                server_run.parse_options(["--max-fill", value], Path.cwd())
+        for option in ["--max-fill", "--self-m", "--self-n", "-sm", "-sn"]:
+            for value in ["0", "-1", "1.5", "nope"]:
+                with self.assertRaises(server_run.RunnerError):
+                    server_run.parse_options([option, value], Path.cwd())
         with self.assertRaises(server_run.RunnerError):
             server_run.parse_options(["--unknown", "value"], Path.cwd())
 
