@@ -1,5 +1,1619 @@
 {
-  "boundary": "Execution-only historical equivalence and bounded numerical-cold component benchmark. Full customer workflows/delivery validation remain pending.",
+  "boundary": "Chronological evidence at multiple source revisions. Original source/historical/cold-component sections describe pre-lock a6; cache_lock_revalidation and customer_core_exact_execution identify the accepted cache-lock engine 080. Timings are component or cache-assisted unless explicitly marked cold full workflow.",
+  "cache_lock_revalidation": {
+    "check_count": 210,
+    "customer_input_freeze": {
+      "D0_sha256": "77fea663243cf4e58e68b5598c06300b2721703f37ae34df7523ca92aa6653de",
+      "boundary": "Genuine copied donor-freeze/Step1 checkpoints; mutable metadata/FAI are independent copies, input FASTA hard links are read-only. No runtime replacement and no Step2/Step3 checkpoint fabrication.",
+      "metadata_hashes": {
+        "chr_assignments.tsv": "704c065d572cc63a3160a9db73b5935b31c5933114d283ebc10e17cdcd07a41a",
+        "datasets.tsv": "8c5f4ea5f88ca02ceb0694ade2e32631b7a1909d8a2d95ac9a0ba0d517a5699b",
+        "grt_contig_quality.tsv": "b688d3df9dfb119ebdc3e2a6f73bafd312c301ea3536488747b04567513f17c7",
+        "grt_contig_roles.tsv": "d96c18bf7c8ee0a929a2f7425b84c70e5101cd60729b7d2db9dd258b1d8b4b7d",
+        "grt_donor_fragments.tsv": "14ab66735afffc2ceda33a8cfcf6771f25029cda7f4b2509b1ed56c5af4ba509",
+        "grt_donor_members.tsv": "9e1340324787be499424aeb45fef520222405e6843cb0157546d3b03eb2fd124",
+        "grt_donor_sets.tsv": "0b5ffce26218038e15324be9d2de365864f68a70bbca7f350f8ac8990dfc51ee",
+        "grt_donor_usage.tsv": "f1d2700f343a6e276d699774efd56a34ab3b51d595d5af21b75138df14fc24d5",
+        "grt_events.jsonl": "ddb987a773adbea0686fed23e711b286ae93ca24e00651c95c3ab7fa346d7b9b",
+        "grt_evidence_registry.tsv": "f6bccd94ba1d86394a3475c362ae3a2031b4ab52fece702cd28260a127bdf7c3",
+        "grt_gap_attempts.tsv": "052c680b2acf136313396ea301a36b5f05d8aefd48234a92967adfcfa9dfe16a",
+        "grt_q_segments.tsv": "bdf08bf060697b84eb3b71fa718f6538d8fbd70b0c985692fe5e38afb62a19e2",
+        "grt_recipe.tsv": "76e73a25787b5a8a09fd2bc997acd5fad5a4cc09879186df20884248aee04be5",
+        "grt_stage_status.tsv": "0317ef29aaea42f818f0784c6e02c7ec3814b109b61ce3737846ae7212c79e9b",
+        "grt_step2_strategies.tsv": "f778ef1d6096b657de689de2f798f83df28d22f9d418cda3916339446f62bfa2",
+        "grt_step3_classifications.tsv": "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b",
+        "grt_telomere_rules.tsv": "fa51abb39a255046d8f09c9bbfa8e867654a15981828665184d9c4610a947ab8",
+        "grt_tool_versions.tsv": "ca9b361007344deca779450bd33bb466eaed272c4eecc4e88ee2004d91f58c40",
+        "package.tsv": "56df02621af69b700027085d10f4f061fa754b1b4e974bb101244905cbee2904",
+        "prepare_options.tsv": "338c3faf9a76f7f473731e17e24a2757fa857bba7b60cda7953f1c0bb66dba16",
+        "reference.tsv": "833c45c18b8b7ed3367a8c9332540c8754458a9f5129e9f380e003489d24d4dd",
+        "reference_chr_locator.tsv": "c524d7f4371f27e8c92ea715830b6ba6b6a9e8005fcc92c64585b46b0047a91b",
+        "reference_segments.tsv": "f477ef88ec29ad29c21991f7194a7a20b617c2df5c9d9bf8691d4563ac293cd6",
+        "report_inputs.json": "ea8a1298932977b863edba7cb308bd7b9b304e524ed9ed53c781d8792b60cd65",
+        "source_seq_locator.tsv": "6ca4dfd83422b3b8e7d617ae79d6c7a294418eda980046bfeccd93faa2efba41",
+        "source_seq_n_regions.tsv": "934467f727e8caf9d9db97834771866e24750eb8a2c82086a4837d5d1b2a469c",
+        "track_member_orders.tsv": "8bdd5bf0903c8962296b34ee91a21957bdbb7118a3e6c27a05a78c07251c55b0"
+      },
+      "q1_sha256": "a7d85c35f42e1c4c6b386c29317c45efa663eef577dc83ea18d9cec5934e5970",
+      "source_workspace": "/share/home/xbzhang26/cgat-reads-debug/gpm2665-full-input/workspaces/self-m200-n100",
+      "status": "PASS"
+    },
+    "duplicate_real_window": {
+      "alignment_rows_per_copy": 2,
+      "boundary": "Actual customer DNA positive control for cache-key collision only; not a repair-quality or whole-pipeline speed claim.",
+      "checks": {
+        "coordinate_rows_equal": true,
+        "one_screen_build_for_both_chromosomes": true,
+        "positive_alignment_rows": true,
+        "publication_order_preserved": true,
+        "two_full_queries_keep_own_headers": true
+      },
+      "engine_sha256": "080599a354a4caf75e123d7d507348e3a43c2c0358749ed830b5a69cde6f9318",
+      "nucmer_calls": {
+        "full": 2,
+        "screen": 1
+      },
+      "original_chromosome": "BSWB01000001.1",
+      "original_interval0": [
+        55739171,
+        57939271
+      ],
+      "query_length": 2200100,
+      "query_window_sha256": "836c829cdce5386ffeb6ba1b2ace7695a0a094c0a5d3b4144986e98272450efa",
+      "status": "PASS"
+    },
+    "engine_sha256": "080599a354a4caf75e123d7d507348e3a43c2c0358749ed830b5a69cde6f9318",
+    "generated_at": "2026-10-16T06:52:48.547140+08:00",
+    "historical_exact_execution": [
+      {
+        "boundary": "Cache-assisted exact-execution comparison; not cold full-pipeline timing",
+        "checks": [
+          {
+            "expected_count": 18,
+            "label": "step2:result",
+            "observed_count": 18,
+            "status": "PASS"
+          },
+          {
+            "label": "q2:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 594,
+            "label": "step2:candidates.tsv",
+            "observed_count": 594,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 1188,
+            "label": "step2:evidence.tsv",
+            "observed_count": 1188,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 119,
+            "label": "step2:gap_attempts.tsv",
+            "observed_count": 119,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 242,
+            "label": "step2:q_segments.tsv",
+            "observed_count": 242,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 372,
+            "label": "step2:rejections.tsv",
+            "observed_count": 372,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 12,
+            "label": "step2:strategy.tsv",
+            "observed_count": 12,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 1188,
+            "label": "step2:usage.tsv",
+            "observed_count": 1188,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 17,
+            "label": "step3:result",
+            "observed_count": 17,
+            "status": "PASS"
+          },
+          {
+            "label": "q3:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 7,
+            "label": "step3:classifications.tsv",
+            "observed_count": 7,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 7,
+            "label": "step3:correction_candidates.tsv",
+            "observed_count": 7,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 17,
+            "label": "step3:evidence.tsv",
+            "observed_count": 17,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 21,
+            "label": "step3:gap_attempts.tsv",
+            "observed_count": 21,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 250,
+            "label": "step3:q_segments.tsv",
+            "observed_count": 250,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 10,
+            "label": "step3:refill_candidates.tsv",
+            "observed_count": 10,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 428,
+            "label": "step3:refill_rejections.tsv",
+            "observed_count": 428,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 10,
+            "label": "step3:refill_round1_candidates.tsv",
+            "observed_count": 10,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_round2_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 20,
+            "label": "step3:usage.tsv",
+            "observed_count": 20,
+            "status": "PASS"
+          }
+        ],
+        "dataset": "10g_no_reads",
+        "engine_sha256": "080599a354a4caf75e123d7d507348e3a43c2c0358749ed830b5a69cde6f9318",
+        "excluded_provenance_fields": [
+          "input_fingerprint",
+          "evidence.raw_artifact_sha256"
+        ],
+        "report": "cases-cache-lock/10g_no_reads/full/execution_equivalence_full.json",
+        "scope": "full",
+        "status": "PASS",
+        "timings": {
+          "baseline:step2": {
+            "seconds": 113.05559538095258,
+            "stage_cache_hit": false
+          },
+          "baseline:step3": {
+            "seconds": 119.53763501299545,
+            "stage_cache_hit": false
+          },
+          "optimized:step2": {
+            "seconds": 59.822040932951495,
+            "stage_cache_hit": false
+          },
+          "optimized:step3": {
+            "seconds": 66.9238942079246,
+            "stage_cache_hit": false
+          }
+        }
+      },
+      {
+        "boundary": "Cache-assisted exact-execution comparison; not cold full-pipeline timing",
+        "checks": [
+          {
+            "expected_count": 18,
+            "label": "step2:result",
+            "observed_count": 18,
+            "status": "PASS"
+          },
+          {
+            "label": "q2:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 587,
+            "label": "step2:candidates.tsv",
+            "observed_count": 587,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 1174,
+            "label": "step2:evidence.tsv",
+            "observed_count": 1174,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 119,
+            "label": "step2:gap_attempts.tsv",
+            "observed_count": 119,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 242,
+            "label": "step2:q_segments.tsv",
+            "observed_count": 242,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 365,
+            "label": "step2:rejections.tsv",
+            "observed_count": 365,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 12,
+            "label": "step2:strategy.tsv",
+            "observed_count": 12,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 1174,
+            "label": "step2:usage.tsv",
+            "observed_count": 1174,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 17,
+            "label": "step3:result",
+            "observed_count": 17,
+            "status": "PASS"
+          },
+          {
+            "label": "q3:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 7,
+            "label": "step3:classifications.tsv",
+            "observed_count": 7,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 7,
+            "label": "step3:correction_candidates.tsv",
+            "observed_count": 7,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 17,
+            "label": "step3:evidence.tsv",
+            "observed_count": 17,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 21,
+            "label": "step3:gap_attempts.tsv",
+            "observed_count": 21,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 250,
+            "label": "step3:q_segments.tsv",
+            "observed_count": 250,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 10,
+            "label": "step3:refill_candidates.tsv",
+            "observed_count": 10,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 428,
+            "label": "step3:refill_rejections.tsv",
+            "observed_count": 428,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 10,
+            "label": "step3:refill_round1_candidates.tsv",
+            "observed_count": 10,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_round2_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 20,
+            "label": "step3:usage.tsv",
+            "observed_count": 20,
+            "status": "PASS"
+          }
+        ],
+        "dataset": "10g_no_reads",
+        "engine_sha256": "080599a354a4caf75e123d7d507348e3a43c2c0358749ed830b5a69cde6f9318",
+        "excluded_provenance_fields": [
+          "input_fingerprint",
+          "evidence.raw_artifact_sha256"
+        ],
+        "report": "cases-cache-lock/10g_no_reads/gap-screen/execution_equivalence_gap-screen.json",
+        "scope": "gap-screen",
+        "status": "PASS",
+        "timings": {
+          "baseline:step2": {
+            "seconds": 124.8936011120677,
+            "stage_cache_hit": false
+          },
+          "baseline:step3": {
+            "seconds": 117.0535211628303,
+            "stage_cache_hit": false
+          },
+          "optimized:step2": {
+            "seconds": 70.97948706895113,
+            "stage_cache_hit": false
+          },
+          "optimized:step3": {
+            "seconds": 74.81158979702741,
+            "stage_cache_hit": false
+          }
+        }
+      },
+      {
+        "boundary": "Cache-assisted exact-execution comparison; not cold full-pipeline timing",
+        "checks": [
+          {
+            "expected_count": 18,
+            "label": "step2:result",
+            "observed_count": 18,
+            "status": "PASS"
+          },
+          {
+            "label": "q2:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 588,
+            "label": "step2:candidates.tsv",
+            "observed_count": 588,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 1176,
+            "label": "step2:evidence.tsv",
+            "observed_count": 1176,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 119,
+            "label": "step2:gap_attempts.tsv",
+            "observed_count": 119,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 242,
+            "label": "step2:q_segments.tsv",
+            "observed_count": 242,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 366,
+            "label": "step2:rejections.tsv",
+            "observed_count": 366,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 12,
+            "label": "step2:strategy.tsv",
+            "observed_count": 12,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 1176,
+            "label": "step2:usage.tsv",
+            "observed_count": 1176,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 17,
+            "label": "step3:result",
+            "observed_count": 17,
+            "status": "PASS"
+          },
+          {
+            "label": "q3:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 7,
+            "label": "step3:classifications.tsv",
+            "observed_count": 7,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 7,
+            "label": "step3:correction_candidates.tsv",
+            "observed_count": 7,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 12,
+            "label": "step3:evidence.tsv",
+            "observed_count": 12,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 22,
+            "label": "step3:gap_attempts.tsv",
+            "observed_count": 22,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 250,
+            "label": "step3:q_segments.tsv",
+            "observed_count": 250,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 5,
+            "label": "step3:refill_candidates.tsv",
+            "observed_count": 5,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 276,
+            "label": "step3:refill_rejections.tsv",
+            "observed_count": 276,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 5,
+            "label": "step3:refill_round1_candidates.tsv",
+            "observed_count": 5,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_round2_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 10,
+            "label": "step3:usage.tsv",
+            "observed_count": 10,
+            "status": "PASS"
+          }
+        ],
+        "dataset": "10g_with_reads",
+        "engine_sha256": "080599a354a4caf75e123d7d507348e3a43c2c0358749ed830b5a69cde6f9318",
+        "excluded_provenance_fields": [
+          "input_fingerprint",
+          "evidence.raw_artifact_sha256"
+        ],
+        "report": "cases-cache-lock/10g_with_reads/full/execution_equivalence_full.json",
+        "scope": "full",
+        "status": "PASS",
+        "timings": {
+          "baseline:step2": {
+            "seconds": 110.73042072588578,
+            "stage_cache_hit": false
+          },
+          "baseline:step3": {
+            "seconds": 117.67749855713919,
+            "stage_cache_hit": false
+          },
+          "optimized:step2": {
+            "seconds": 59.09226953005418,
+            "stage_cache_hit": false
+          },
+          "optimized:step3": {
+            "seconds": 67.6031765290536,
+            "stage_cache_hit": false
+          }
+        }
+      },
+      {
+        "boundary": "Cache-assisted exact-execution comparison; not cold full-pipeline timing",
+        "checks": [
+          {
+            "expected_count": 18,
+            "label": "step2:result",
+            "observed_count": 18,
+            "status": "PASS"
+          },
+          {
+            "label": "q2:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 581,
+            "label": "step2:candidates.tsv",
+            "observed_count": 581,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 1162,
+            "label": "step2:evidence.tsv",
+            "observed_count": 1162,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 119,
+            "label": "step2:gap_attempts.tsv",
+            "observed_count": 119,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 242,
+            "label": "step2:q_segments.tsv",
+            "observed_count": 242,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 359,
+            "label": "step2:rejections.tsv",
+            "observed_count": 359,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 12,
+            "label": "step2:strategy.tsv",
+            "observed_count": 12,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 1162,
+            "label": "step2:usage.tsv",
+            "observed_count": 1162,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 17,
+            "label": "step3:result",
+            "observed_count": 17,
+            "status": "PASS"
+          },
+          {
+            "label": "q3:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 7,
+            "label": "step3:classifications.tsv",
+            "observed_count": 7,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 7,
+            "label": "step3:correction_candidates.tsv",
+            "observed_count": 7,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 12,
+            "label": "step3:evidence.tsv",
+            "observed_count": 12,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 22,
+            "label": "step3:gap_attempts.tsv",
+            "observed_count": 22,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 250,
+            "label": "step3:q_segments.tsv",
+            "observed_count": 250,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 5,
+            "label": "step3:refill_candidates.tsv",
+            "observed_count": 5,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 276,
+            "label": "step3:refill_rejections.tsv",
+            "observed_count": 276,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 5,
+            "label": "step3:refill_round1_candidates.tsv",
+            "observed_count": 5,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_round2_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 10,
+            "label": "step3:usage.tsv",
+            "observed_count": 10,
+            "status": "PASS"
+          }
+        ],
+        "dataset": "10g_with_reads",
+        "engine_sha256": "080599a354a4caf75e123d7d507348e3a43c2c0358749ed830b5a69cde6f9318",
+        "excluded_provenance_fields": [
+          "input_fingerprint",
+          "evidence.raw_artifact_sha256"
+        ],
+        "report": "cases-cache-lock/10g_with_reads/gap-screen/execution_equivalence_gap-screen.json",
+        "scope": "gap-screen",
+        "status": "PASS",
+        "timings": {
+          "baseline:step2": {
+            "seconds": 133.2211702510249,
+            "stage_cache_hit": false
+          },
+          "baseline:step3": {
+            "seconds": 116.64570128009655,
+            "stage_cache_hit": false
+          },
+          "optimized:step2": {
+            "seconds": 69.78747612913139,
+            "stage_cache_hit": false
+          },
+          "optimized:step3": {
+            "seconds": 72.22194135491736,
+            "stage_cache_hit": false
+          }
+        }
+      },
+      {
+        "boundary": "Cache-assisted exact-execution comparison; not cold full-pipeline timing",
+        "checks": [
+          {
+            "expected_count": 18,
+            "label": "step2:result",
+            "observed_count": 18,
+            "status": "PASS"
+          },
+          {
+            "label": "q2:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 2,
+            "label": "step2:candidates.tsv",
+            "observed_count": 2,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 4,
+            "label": "step2:evidence.tsv",
+            "observed_count": 4,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 2,
+            "label": "step2:gap_attempts.tsv",
+            "observed_count": 2,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 6,
+            "label": "step2:q_segments.tsv",
+            "observed_count": 6,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step2:rejections.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 2,
+            "label": "step2:strategy.tsv",
+            "observed_count": 2,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 4,
+            "label": "step2:usage.tsv",
+            "observed_count": 4,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 17,
+            "label": "step3:result",
+            "observed_count": 17,
+            "status": "PASS"
+          },
+          {
+            "label": "q3:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:classifications.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:correction_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:evidence.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:gap_attempts.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 6,
+            "label": "step3:q_segments.tsv",
+            "observed_count": 6,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_rejections.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_round1_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_round2_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:usage.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          }
+        ],
+        "dataset": "skillv3",
+        "engine_sha256": "080599a354a4caf75e123d7d507348e3a43c2c0358749ed830b5a69cde6f9318",
+        "excluded_provenance_fields": [
+          "input_fingerprint",
+          "evidence.raw_artifact_sha256"
+        ],
+        "report": "cases-cache-lock/skillv3/full/execution_equivalence_full.json",
+        "scope": "full",
+        "status": "PASS",
+        "timings": {
+          "baseline:step2": {
+            "seconds": 0.8241589958779514,
+            "stage_cache_hit": false
+          },
+          "baseline:step3": {
+            "seconds": 0.41478571691550314,
+            "stage_cache_hit": false
+          },
+          "optimized:step2": {
+            "seconds": 0.6339670459274203,
+            "stage_cache_hit": false
+          },
+          "optimized:step3": {
+            "seconds": 0.3345042390283197,
+            "stage_cache_hit": false
+          }
+        }
+      },
+      {
+        "boundary": "Cache-assisted exact-execution comparison; not cold full-pipeline timing",
+        "checks": [
+          {
+            "expected_count": 18,
+            "label": "step2:result",
+            "observed_count": 18,
+            "status": "PASS"
+          },
+          {
+            "label": "q2:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 2,
+            "label": "step2:candidates.tsv",
+            "observed_count": 2,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 4,
+            "label": "step2:evidence.tsv",
+            "observed_count": 4,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 2,
+            "label": "step2:gap_attempts.tsv",
+            "observed_count": 2,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 6,
+            "label": "step2:q_segments.tsv",
+            "observed_count": 6,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step2:rejections.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 2,
+            "label": "step2:strategy.tsv",
+            "observed_count": 2,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 4,
+            "label": "step2:usage.tsv",
+            "observed_count": 4,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 17,
+            "label": "step3:result",
+            "observed_count": 17,
+            "status": "PASS"
+          },
+          {
+            "label": "q3:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:classifications.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:correction_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:evidence.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:gap_attempts.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 6,
+            "label": "step3:q_segments.tsv",
+            "observed_count": 6,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_rejections.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_round1_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_round2_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:usage.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          }
+        ],
+        "dataset": "skillv3",
+        "engine_sha256": "080599a354a4caf75e123d7d507348e3a43c2c0358749ed830b5a69cde6f9318",
+        "excluded_provenance_fields": [
+          "input_fingerprint",
+          "evidence.raw_artifact_sha256"
+        ],
+        "report": "cases-cache-lock/skillv3/gap-screen/execution_equivalence_gap-screen.json",
+        "scope": "gap-screen",
+        "status": "PASS",
+        "timings": {
+          "baseline:step2": {
+            "seconds": 0.9244461830239743,
+            "stage_cache_hit": false
+          },
+          "baseline:step3": {
+            "seconds": 0.501659246860072,
+            "stage_cache_hit": false
+          },
+          "optimized:step2": {
+            "seconds": 0.669863112969324,
+            "stage_cache_hit": false
+          },
+          "optimized:step3": {
+            "seconds": 0.43415228999219835,
+            "stage_cache_hit": false
+          }
+        }
+      },
+      {
+        "boundary": "Cache-assisted exact-execution comparison; not cold full-pipeline timing",
+        "checks": [
+          {
+            "expected_count": 18,
+            "label": "step2:result",
+            "observed_count": 18,
+            "status": "PASS"
+          },
+          {
+            "label": "q2:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 4029,
+            "label": "step2:candidates.tsv",
+            "observed_count": 4029,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 8058,
+            "label": "step2:evidence.tsv",
+            "observed_count": 8058,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 119,
+            "label": "step2:gap_attempts.tsv",
+            "observed_count": 119,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 214,
+            "label": "step2:q_segments.tsv",
+            "observed_count": 214,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 3832,
+            "label": "step2:rejections.tsv",
+            "observed_count": 3832,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 12,
+            "label": "step2:strategy.tsv",
+            "observed_count": 12,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 3840,
+            "label": "step2:usage.tsv",
+            "observed_count": 3840,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 17,
+            "label": "step3:result",
+            "observed_count": 17,
+            "status": "PASS"
+          },
+          {
+            "label": "q3:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 105,
+            "label": "step3:classifications.tsv",
+            "observed_count": 105,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 105,
+            "label": "step3:correction_candidates.tsv",
+            "observed_count": 105,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 132,
+            "label": "step3:evidence.tsv",
+            "observed_count": 132,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 272,
+            "label": "step3:gap_attempts.tsv",
+            "observed_count": 272,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 246,
+            "label": "step3:q_segments.tsv",
+            "observed_count": 246,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 27,
+            "label": "step3:refill_candidates.tsv",
+            "observed_count": 27,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 160,
+            "label": "step3:refill_rejections.tsv",
+            "observed_count": 160,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 27,
+            "label": "step3:refill_round1_candidates.tsv",
+            "observed_count": 27,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_round2_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 54,
+            "label": "step3:usage.tsv",
+            "observed_count": 54,
+            "status": "PASS"
+          }
+        ],
+        "dataset": "test8_fixed",
+        "engine_sha256": "080599a354a4caf75e123d7d507348e3a43c2c0358749ed830b5a69cde6f9318",
+        "excluded_provenance_fields": [
+          "input_fingerprint",
+          "evidence.raw_artifact_sha256"
+        ],
+        "report": "cases-cache-lock/test8_fixed/full/execution_equivalence_full.json",
+        "scope": "full",
+        "status": "PASS",
+        "timings": {
+          "baseline:step2": {
+            "seconds": 110.85017327405512,
+            "stage_cache_hit": false
+          },
+          "baseline:step3": {
+            "seconds": 126.92339055193588,
+            "stage_cache_hit": false
+          },
+          "optimized:step2": {
+            "seconds": 74.00437670596875,
+            "stage_cache_hit": false
+          },
+          "optimized:step3": {
+            "seconds": 77.6215457469225,
+            "stage_cache_hit": false
+          }
+        }
+      },
+      {
+        "boundary": "Cache-assisted exact-execution comparison; not cold full-pipeline timing",
+        "checks": [
+          {
+            "expected_count": 18,
+            "label": "step2:result",
+            "observed_count": 18,
+            "status": "PASS"
+          },
+          {
+            "label": "q2:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 3903,
+            "label": "step2:candidates.tsv",
+            "observed_count": 3903,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 7806,
+            "label": "step2:evidence.tsv",
+            "observed_count": 7806,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 119,
+            "label": "step2:gap_attempts.tsv",
+            "observed_count": 119,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 214,
+            "label": "step2:q_segments.tsv",
+            "observed_count": 214,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 3706,
+            "label": "step2:rejections.tsv",
+            "observed_count": 3706,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 12,
+            "label": "step2:strategy.tsv",
+            "observed_count": 12,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 3796,
+            "label": "step2:usage.tsv",
+            "observed_count": 3796,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 17,
+            "label": "step3:result",
+            "observed_count": 17,
+            "status": "PASS"
+          },
+          {
+            "label": "q3:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 105,
+            "label": "step3:classifications.tsv",
+            "observed_count": 105,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 105,
+            "label": "step3:correction_candidates.tsv",
+            "observed_count": 105,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 132,
+            "label": "step3:evidence.tsv",
+            "observed_count": 132,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 272,
+            "label": "step3:gap_attempts.tsv",
+            "observed_count": 272,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 246,
+            "label": "step3:q_segments.tsv",
+            "observed_count": 246,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 27,
+            "label": "step3:refill_candidates.tsv",
+            "observed_count": 27,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 160,
+            "label": "step3:refill_rejections.tsv",
+            "observed_count": 160,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 27,
+            "label": "step3:refill_round1_candidates.tsv",
+            "observed_count": 27,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_round2_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 54,
+            "label": "step3:usage.tsv",
+            "observed_count": 54,
+            "status": "PASS"
+          }
+        ],
+        "dataset": "test8_fixed",
+        "engine_sha256": "080599a354a4caf75e123d7d507348e3a43c2c0358749ed830b5a69cde6f9318",
+        "excluded_provenance_fields": [
+          "input_fingerprint",
+          "evidence.raw_artifact_sha256"
+        ],
+        "report": "cases-cache-lock/test8_fixed/gap-screen/execution_equivalence_gap-screen.json",
+        "scope": "gap-screen",
+        "status": "PASS",
+        "timings": {
+          "baseline:step2": {
+            "seconds": 139.04329466307536,
+            "stage_cache_hit": false
+          },
+          "baseline:step3": {
+            "seconds": 160.1848937640898,
+            "stage_cache_hit": false
+          },
+          "optimized:step2": {
+            "seconds": 71.72038795403205,
+            "stage_cache_hit": false
+          },
+          "optimized:step3": {
+            "seconds": 84.97877610102296,
+            "stage_cache_hit": false
+          }
+        }
+      },
+      {
+        "boundary": "Cache-assisted exact-execution comparison; not cold full-pipeline timing",
+        "checks": [
+          {
+            "expected_count": 18,
+            "label": "step2:result",
+            "observed_count": 18,
+            "status": "PASS"
+          },
+          {
+            "label": "q2:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 43,
+            "label": "step2:candidates.tsv",
+            "observed_count": 43,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 86,
+            "label": "step2:evidence.tsv",
+            "observed_count": 86,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 40,
+            "label": "step2:gap_attempts.tsv",
+            "observed_count": 40,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 106,
+            "label": "step2:q_segments.tsv",
+            "observed_count": 106,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 38,
+            "label": "step2:rejections.tsv",
+            "observed_count": 38,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 26,
+            "label": "step2:strategy.tsv",
+            "observed_count": 26,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step2:usage.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 17,
+            "label": "step3:result",
+            "observed_count": 17,
+            "status": "PASS"
+          },
+          {
+            "label": "q3:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 4,
+            "label": "step3:classifications.tsv",
+            "observed_count": 4,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 4,
+            "label": "step3:correction_candidates.tsv",
+            "observed_count": 4,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 53,
+            "label": "step3:evidence.tsv",
+            "observed_count": 53,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 117,
+            "label": "step3:gap_attempts.tsv",
+            "observed_count": 117,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 104,
+            "label": "step3:q_segments.tsv",
+            "observed_count": 104,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 49,
+            "label": "step3:refill_candidates.tsv",
+            "observed_count": 49,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 4449,
+            "label": "step3:refill_rejections.tsv",
+            "observed_count": 4449,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 49,
+            "label": "step3:refill_round1_candidates.tsv",
+            "observed_count": 49,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_round2_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 98,
+            "label": "step3:usage.tsv",
+            "observed_count": 98,
+            "status": "PASS"
+          }
+        ],
+        "dataset": "zebrafish",
+        "engine_sha256": "080599a354a4caf75e123d7d507348e3a43c2c0358749ed830b5a69cde6f9318",
+        "excluded_provenance_fields": [
+          "input_fingerprint",
+          "evidence.raw_artifact_sha256"
+        ],
+        "report": "cases-cache-lock/zebrafish/full/execution_equivalence_full.json",
+        "scope": "full",
+        "status": "PASS",
+        "timings": {
+          "baseline:step2": {
+            "seconds": 181.7075696438551,
+            "stage_cache_hit": false
+          },
+          "baseline:step3": {
+            "seconds": 397.55728294700384,
+            "stage_cache_hit": false
+          },
+          "optimized:step2": {
+            "seconds": 152.52627266198397,
+            "stage_cache_hit": false
+          },
+          "optimized:step3": {
+            "seconds": 348.27827678620815,
+            "stage_cache_hit": false
+          }
+        }
+      },
+      {
+        "boundary": "Cache-assisted exact-execution comparison; not cold full-pipeline timing",
+        "checks": [
+          {
+            "expected_count": 18,
+            "label": "step2:result",
+            "observed_count": 18,
+            "status": "PASS"
+          },
+          {
+            "label": "q2:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 40,
+            "label": "step2:candidates.tsv",
+            "observed_count": 40,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 80,
+            "label": "step2:evidence.tsv",
+            "observed_count": 80,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 40,
+            "label": "step2:gap_attempts.tsv",
+            "observed_count": 40,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 106,
+            "label": "step2:q_segments.tsv",
+            "observed_count": 106,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 35,
+            "label": "step2:rejections.tsv",
+            "observed_count": 35,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 26,
+            "label": "step2:strategy.tsv",
+            "observed_count": 26,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step2:usage.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 17,
+            "label": "step3:result",
+            "observed_count": 17,
+            "status": "PASS"
+          },
+          {
+            "label": "q3:file_sha256",
+            "status": "PASS"
+          },
+          {
+            "expected_count": 4,
+            "label": "step3:classifications.tsv",
+            "observed_count": 4,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 4,
+            "label": "step3:correction_candidates.tsv",
+            "observed_count": 4,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 53,
+            "label": "step3:evidence.tsv",
+            "observed_count": 53,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 117,
+            "label": "step3:gap_attempts.tsv",
+            "observed_count": 117,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 104,
+            "label": "step3:q_segments.tsv",
+            "observed_count": 104,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 49,
+            "label": "step3:refill_candidates.tsv",
+            "observed_count": 49,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 4449,
+            "label": "step3:refill_rejections.tsv",
+            "observed_count": 4449,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 49,
+            "label": "step3:refill_round1_candidates.tsv",
+            "observed_count": 49,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 0,
+            "label": "step3:refill_round2_candidates.tsv",
+            "observed_count": 0,
+            "status": "PASS"
+          },
+          {
+            "expected_count": 98,
+            "label": "step3:usage.tsv",
+            "observed_count": 98,
+            "status": "PASS"
+          }
+        ],
+        "dataset": "zebrafish",
+        "engine_sha256": "080599a354a4caf75e123d7d507348e3a43c2c0358749ed830b5a69cde6f9318",
+        "excluded_provenance_fields": [
+          "input_fingerprint",
+          "evidence.raw_artifact_sha256"
+        ],
+        "report": "cases-cache-lock/zebrafish/gap-screen/execution_equivalence_gap-screen.json",
+        "scope": "gap-screen",
+        "status": "PASS",
+        "timings": {
+          "baseline:step2": {
+            "seconds": 200.63877944648266,
+            "stage_cache_hit": false
+          },
+          "baseline:step3": {
+            "seconds": 403.919853374362,
+            "stage_cache_hit": false
+          },
+          "optimized:step2": {
+            "seconds": 167.0063350200653,
+            "stage_cache_hit": false
+          },
+          "optimized:step3": {
+            "seconds": 363.977424018085,
+            "stage_cache_hit": false
+          }
+        }
+      }
+    ],
+    "jobs": {
+      "40587003": "SUCCEEDED",
+      "40587004": "SUCCEEDED"
+    },
+    "pair_count": 10,
+    "source_git_revision": "d9deccf75b2a74c1eb48ab72ac039fab30167790",
+    "status": "PASS"
+  },
   "cold_component": {
     "boundary": "Two real chromosomes, eight original intact donor partitions with observed baseline jobs <=180s; fresh numerical caches per case; alternating order mitigates but does not remove filesystem-cache variation. Not a full-pipeline speedup.",
     "engine_sha256": "a6e85bd653222d530ee6959e6ac875c489059ad6378c1f1fff4ac21f4047c450",
@@ -43,6 +1657,489 @@
     ],
     "status": "PASS",
     "threads": 8
+  },
+  "customer_core_exact_execution": {
+    "baseline:export": {
+      "case_normalized_DNA_equals_q4": true,
+      "case_sensitive_sequence_equals_q4": false,
+      "chromosome_count": 8,
+      "raw_fasta_sha256": "eaf14952852648e507c8c395b451ef680886949c3e09e3dd2345f9164acdee7b"
+    },
+    "boundary": "Genuine-checkpoint, numerical-cache-assisted Step2 full / Step3 gap-screen + Step4 / Final Path export. Not a cold full workflow or final leaf/package closure.",
+    "checks": [
+      {
+        "label": "baseline:q2:golden_sha256",
+        "status": "PASS"
+      },
+      {
+        "expected_count": 64,
+        "label": "baseline:q2:golden_source_paths",
+        "observed_count": 64,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 58818,
+        "label": "baseline:step2:original_raw_candidates.tsv",
+        "observed_count": 58818,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 58659,
+        "label": "baseline:step2:original_raw_rejections.tsv",
+        "observed_count": 58659,
+        "status": "PASS"
+      },
+      {
+        "label": "optimized:q2:golden_sha256",
+        "status": "PASS"
+      },
+      {
+        "expected_count": 64,
+        "label": "optimized:q2:golden_source_paths",
+        "observed_count": 64,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 58818,
+        "label": "optimized:step2:original_raw_candidates.tsv",
+        "observed_count": 58818,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 58659,
+        "label": "optimized:step2:original_raw_rejections.tsv",
+        "observed_count": 58659,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 18,
+        "label": "step2:result",
+        "observed_count": 18,
+        "status": "PASS"
+      },
+      {
+        "label": "q2:file_sha256",
+        "status": "PASS"
+      },
+      {
+        "expected_count": 58818,
+        "label": "step2:candidates.tsv",
+        "observed_count": 58818,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 117636,
+        "label": "step2:evidence.tsv",
+        "observed_count": 117636,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 28,
+        "label": "step2:gap_attempts.tsv",
+        "observed_count": 28,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 64,
+        "label": "step2:q_segments.tsv",
+        "observed_count": 64,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 58659,
+        "label": "step2:rejections.tsv",
+        "observed_count": 58659,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 8,
+        "label": "step2:strategy.tsv",
+        "observed_count": 8,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 15298,
+        "label": "step2:usage.tsv",
+        "observed_count": 15298,
+        "status": "PASS"
+      },
+      {
+        "label": "baseline:q3:golden_sha256",
+        "status": "PASS"
+      },
+      {
+        "expected_count": 63,
+        "label": "baseline:q3:golden_source_paths",
+        "observed_count": 63,
+        "status": "PASS"
+      },
+      {
+        "label": "optimized:q3:golden_sha256",
+        "status": "PASS"
+      },
+      {
+        "expected_count": 63,
+        "label": "optimized:q3:golden_source_paths",
+        "observed_count": 63,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 17,
+        "label": "step3:result",
+        "observed_count": 17,
+        "status": "PASS"
+      },
+      {
+        "label": "q3:file_sha256",
+        "status": "PASS"
+      },
+      {
+        "expected_count": 122,
+        "label": "step3:classifications.tsv",
+        "observed_count": 122,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 122,
+        "label": "step3:correction_candidates.tsv",
+        "observed_count": 122,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 142,
+        "label": "step3:evidence.tsv",
+        "observed_count": 142,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 68,
+        "label": "step3:gap_attempts.tsv",
+        "observed_count": 68,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 63,
+        "label": "step3:q_segments.tsv",
+        "observed_count": 63,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 20,
+        "label": "step3:refill_candidates.tsv",
+        "observed_count": 20,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 2865,
+        "label": "step3:refill_rejections.tsv",
+        "observed_count": 2865,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 20,
+        "label": "step3:refill_round1_candidates.tsv",
+        "observed_count": 20,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 0,
+        "label": "step3:refill_round2_candidates.tsv",
+        "observed_count": 0,
+        "status": "PASS"
+      },
+      {
+        "expected_count": 40,
+        "label": "step3:usage.tsv",
+        "observed_count": 40,
+        "status": "PASS"
+      },
+      {
+        "expected": "a3899e8701f646acd4e07cec2489bce7902119f131c36ce09f9539e8bc7089f0",
+        "label": "baseline:q4:golden_sha256",
+        "observed": "a3899e8701f646acd4e07cec2489bce7902119f131c36ce09f9539e8bc7089f0",
+        "status": "PASS"
+      },
+      {
+        "expected_canonical_json_sha256": "ec9118a4708ab988119dcdcfbfeb2446f57534337bfd66f4709020cd2f94a086",
+        "expected_count": 63,
+        "label": "baseline:q4:golden_source_paths",
+        "observed_canonical_json_sha256": "ec9118a4708ab988119dcdcfbfeb2446f57534337bfd66f4709020cd2f94a086",
+        "observed_count": 63,
+        "status": "PASS"
+      },
+      {
+        "expected": "success",
+        "label": "baseline:step4_telomere:genuine_checkpoint",
+        "observed": "success",
+        "status": "PASS"
+      },
+      {
+        "expected": "success",
+        "label": "baseline:finalize:genuine_checkpoint",
+        "observed": "success",
+        "status": "PASS"
+      },
+      {
+        "expected_canonical_json_sha256": "06af921906f1e57b06f1ff01f2b5ffb63b1d8f3f5ac30e0b066178aa7b8edafa",
+        "expected_count": 8,
+        "label": "baseline:FinalPath_export:DNA_records_order_length_sha256",
+        "observed_canonical_json_sha256": "06af921906f1e57b06f1ff01f2b5ffb63b1d8f3f5ac30e0b066178aa7b8edafa",
+        "observed_count": 8,
+        "status": "PASS"
+      },
+      {
+        "expected": "a3899e8701f646acd4e07cec2489bce7902119f131c36ce09f9539e8bc7089f0",
+        "label": "optimized:q4:golden_sha256",
+        "observed": "a3899e8701f646acd4e07cec2489bce7902119f131c36ce09f9539e8bc7089f0",
+        "status": "PASS"
+      },
+      {
+        "expected_canonical_json_sha256": "ec9118a4708ab988119dcdcfbfeb2446f57534337bfd66f4709020cd2f94a086",
+        "expected_count": 63,
+        "label": "optimized:q4:golden_source_paths",
+        "observed_canonical_json_sha256": "ec9118a4708ab988119dcdcfbfeb2446f57534337bfd66f4709020cd2f94a086",
+        "observed_count": 63,
+        "status": "PASS"
+      },
+      {
+        "expected": "success",
+        "label": "optimized:step4_telomere:genuine_checkpoint",
+        "observed": "success",
+        "status": "PASS"
+      },
+      {
+        "expected": "success",
+        "label": "optimized:finalize:genuine_checkpoint",
+        "observed": "success",
+        "status": "PASS"
+      },
+      {
+        "expected_canonical_json_sha256": "06af921906f1e57b06f1ff01f2b5ffb63b1d8f3f5ac30e0b066178aa7b8edafa",
+        "expected_count": 8,
+        "label": "optimized:FinalPath_export:DNA_records_order_length_sha256",
+        "observed_canonical_json_sha256": "06af921906f1e57b06f1ff01f2b5ffb63b1d8f3f5ac30e0b066178aa7b8edafa",
+        "observed_count": 8,
+        "status": "PASS"
+      },
+      {
+        "expected": "a3899e8701f646acd4e07cec2489bce7902119f131c36ce09f9539e8bc7089f0",
+        "label": "baseline_optimized:q4_exact_file_sha256",
+        "observed": "a3899e8701f646acd4e07cec2489bce7902119f131c36ce09f9539e8bc7089f0",
+        "status": "PASS"
+      },
+      {
+        "expected": "eaf14952852648e507c8c395b451ef680886949c3e09e3dd2345f9164acdee7b",
+        "label": "baseline_optimized:export_exact_file_sha256",
+        "observed": "eaf14952852648e507c8c395b451ef680886949c3e09e3dd2345f9164acdee7b",
+        "status": "PASS"
+      },
+      {
+        "expected_canonical_json_sha256": "635ce6eb9a430692f7c9b6589e751cc6754d84291142dafe2b9da24ff7460ec6",
+        "expected_count": 4,
+        "label": "baseline_optimized:complete_FinalPath_document",
+        "observed_canonical_json_sha256": "635ce6eb9a430692f7c9b6589e751cc6754d84291142dafe2b9da24ff7460ec6",
+        "observed_count": 4,
+        "status": "PASS"
+      }
+    ],
+    "downloaded_report_sha256": "db54527446d1623bb4647d20a31018e80b5df95dc99ad489440144878abf4549",
+    "engine_sha256": "080599a354a4caf75e123d7d507348e3a43c2c0358749ed830b5a69cde6f9318",
+    "export_diagnosis": [
+      {
+        "case_normalized_equal": true,
+        "exact_equal": true,
+        "export_length": 168670553,
+        "export_name": "BSWB01000001.1",
+        "export_sha256": "32a9dbe98c86d6431bbf4dce31875d2c6e0ca17ab4d896552471dab7a29b89c2",
+        "q4_length": 168670553,
+        "q4_name": "BSWB01000001.1",
+        "q4_sha256": "32a9dbe98c86d6431bbf4dce31875d2c6e0ca17ab4d896552471dab7a29b89c2"
+      },
+      {
+        "case_normalized_equal": true,
+        "exact_equal": true,
+        "export_length": 164120897,
+        "export_name": "BSWB01000002.1",
+        "export_sha256": "28422bc6dd5f01f459c0e85bed374905c4c3682471bf11e4297e832f34dd8cca",
+        "q4_length": 164120897,
+        "q4_name": "BSWB01000002.1",
+        "q4_sha256": "28422bc6dd5f01f459c0e85bed374905c4c3682471bf11e4297e832f34dd8cca"
+      },
+      {
+        "case_normalized_equal": true,
+        "exact_equal": true,
+        "export_length": 159017128,
+        "export_name": "BSWB01000003.1",
+        "export_sha256": "ec2302643b1b88fc49b9a45b6ab27d21bb52b3ed9186f4e29a534738b52faf75",
+        "q4_length": 159017128,
+        "q4_name": "BSWB01000003.1",
+        "q4_sha256": "ec2302643b1b88fc49b9a45b6ab27d21bb52b3ed9186f4e29a534738b52faf75"
+      },
+      {
+        "case_normalized_equal": true,
+        "exact_equal": true,
+        "export_length": 163518696,
+        "export_name": "BSWB01000004.1",
+        "export_sha256": "03a43d68b262293436c9f62406ac0cb42060bf33bf29d7ae8d1f88084a8decff",
+        "q4_length": 163518696,
+        "q4_name": "BSWB01000004.1",
+        "q4_sha256": "03a43d68b262293436c9f62406ac0cb42060bf33bf29d7ae8d1f88084a8decff"
+      },
+      {
+        "case_normalized_equal": true,
+        "exact_equal": true,
+        "export_length": 150740828,
+        "export_name": "BSWB01000005.1",
+        "export_sha256": "e034b22cb4ecfa05c8b0fd99b722ba76210f512e94b4863c5c7538effd21990f",
+        "q4_length": 150740828,
+        "q4_name": "BSWB01000005.1",
+        "q4_sha256": "e034b22cb4ecfa05c8b0fd99b722ba76210f512e94b4863c5c7538effd21990f"
+      },
+      {
+        "case_normalized_equal": true,
+        "exact_equal": false,
+        "export_context": "AATCCCCACAGCCCCttGGGAAGACATTAGC",
+        "export_length": 142955912,
+        "export_name": "BSWB01000006.1",
+        "export_sha256": "64c59670c6ff4aaa25fd869c1872fe1fdd0946c578534cc162962f5faee694c5",
+        "first_difference0": 84731679,
+        "q4_context": "AATCCCCACAGCCCCTTGGGAAGACATTAGC",
+        "q4_length": 142955912,
+        "q4_name": "BSWB01000006.1",
+        "q4_sha256": "3a9d5b1f72b80db3aa354e06554608a0f1152d0a07b709ac6f3bdd818a6f864c"
+      },
+      {
+        "case_normalized_equal": true,
+        "exact_equal": true,
+        "export_length": 139022066,
+        "export_name": "BSWB01000007.1",
+        "export_sha256": "8a004e9bcca2d9551caef38fed5c46b6d41301f23b91bf2628021f06c315a5e9",
+        "q4_length": 139022066,
+        "q4_name": "BSWB01000007.1",
+        "q4_sha256": "8a004e9bcca2d9551caef38fed5c46b6d41301f23b91bf2628021f06c315a5e9"
+      },
+      {
+        "case_normalized_equal": true,
+        "exact_equal": true,
+        "export_length": 129240099,
+        "export_name": "BSWB01000008.1",
+        "export_sha256": "b793951c9a34bb121542732c9e2ebb3d8e97f43eb759262bee4d11c8fc6637eb",
+        "q4_length": 129240099,
+        "q4_name": "BSWB01000008.1",
+        "q4_sha256": "b793951c9a34bb121542732c9e2ebb3d8e97f43eb759262bee4d11c8fc6637eb"
+      }
+    ],
+    "large_value_encoding": "Large expected/observed objects summarized by count and SHA-256 of UTF-8 json.dumps(value, sort_keys=True, separators=(comma,colon)); original complete report retained remotely.",
+    "optimized:export": {
+      "case_normalized_DNA_equals_q4": true,
+      "case_sensitive_sequence_equals_q4": false,
+      "chromosome_count": 8,
+      "raw_fasta_sha256": "eaf14952852648e507c8c395b451ef680886949c3e09e3dd2345f9164acdee7b"
+    },
+    "previous_harness_failure": "Export retained lowercase input letters while GRT Q4 uppercases FASTA. DNA is compared after case normalization; raw-case mismatch remains separately recorded. Production export is unchanged.",
+    "remote_report": "grt-execution-equivalence/customer-core-080599a3/customer_core_recovery.json",
+    "source_git_revision": "d9deccf75b2a74c1eb48ab72ac039fab30167790",
+    "status": "CORE_PASS_DELIVERY_PENDING",
+    "step4_timings_boundary": "Both resumed Step4 invocations may use valid stage/numerical caches; not performance measurements.",
+    "timings": {
+      "baseline:step2": 627.5296594798565,
+      "baseline:step3": 804.1176325306296,
+      "baseline:step4-resumed": 89.54277908895165,
+      "optimized:step2": 301.16370851546526,
+      "optimized:step3": 455.172989808023,
+      "optimized:step4-resumed": 102.53708558192011
+    }
+  },
+  "customer_step2_schedule_model": {
+    "boundary": "Fixed observed TASK WALL durations, not CPU seconds. This is scheduling analysis, not a new execution benchmark, CPU lower bound, or whole-pipeline ETA. Global queue uses chromosome order with largest-target-first blocks; actual coordinator submission order, IO and node contention can differ. Partition boundaries and numerical work are unchanged.",
+    "by_chromosome": [
+      {
+        "chr": "BSWB01000001.1",
+        "model_fifo_seconds": 3594.274756528437,
+        "model_largest_target_first_seconds": 3420.920743651688,
+        "observed_task_wall_seconds_max": 406.1367067694664,
+        "observed_task_wall_seconds_sum": 53814.49234994501,
+        "tasks": 489,
+        "workers": 16
+      },
+      {
+        "chr": "BSWB01000002.1",
+        "model_fifo_seconds": 3523.3285295292735,
+        "model_largest_target_first_seconds": 3335.344507679343,
+        "observed_task_wall_seconds_max": 407.9851617142558,
+        "observed_task_wall_seconds_sum": 52885.74843262881,
+        "tasks": 489,
+        "workers": 16
+      },
+      {
+        "chr": "BSWB01000003.1",
+        "model_fifo_seconds": 3455.71053660661,
+        "model_largest_target_first_seconds": 3188.624802015722,
+        "observed_task_wall_seconds_max": 554.6863676458597,
+        "observed_task_wall_seconds_sum": 50200.208422355354,
+        "tasks": 489,
+        "workers": 16
+      },
+      {
+        "chr": "BSWB01000004.1",
+        "model_fifo_seconds": 3381.8463978618383,
+        "model_largest_target_first_seconds": 3218.543415263295,
+        "observed_task_wall_seconds_max": 382.87480457127094,
+        "observed_task_wall_seconds_sum": 50795.54566152394,
+        "tasks": 489,
+        "workers": 16
+      },
+      {
+        "chr": "BSWB01000005.1",
+        "model_fifo_seconds": 3229.3512167409062,
+        "model_largest_target_first_seconds": 3087.357576981187,
+        "observed_task_wall_seconds_max": 357.8505827859044,
+        "observed_task_wall_seconds_sum": 48657.324439667165,
+        "tasks": 489,
+        "workers": 16
+      },
+      {
+        "chr": "BSWB01000006.1",
+        "model_fifo_seconds": 2993.7588363215327,
+        "model_largest_target_first_seconds": 2826.5397586897016,
+        "observed_task_wall_seconds_max": 357.00585013628006,
+        "observed_task_wall_seconds_sum": 44682.06932040304,
+        "tasks": 489,
+        "workers": 16
+      },
+      {
+        "chr": "BSWB01000007.1",
+        "model_fifo_seconds": 2860.5043446347117,
+        "model_largest_target_first_seconds": 2715.911931499839,
+        "observed_task_wall_seconds_max": 341.88944570720196,
+        "observed_task_wall_seconds_sum": 42815.53769828379,
+        "tasks": 489,
+        "workers": 16
+      },
+      {
+        "chr": "BSWB01000008.1",
+        "model_fifo_seconds": 2772.1522641703486,
+        "model_largest_target_first_seconds": 2635.9845890775323,
+        "observed_task_wall_seconds_max": 310.10524155944586,
+        "observed_task_wall_seconds_sum": 41704.51666022092,
+        "tasks": 489,
+        "workers": 16
+      }
+    ],
+    "model_seconds": {
+      "fixed_duration_schedule_bound": 24097.21518656425,
+      "global_largest_target_first_chromosome_blocks": 24126.431833848357,
+      "oracle_all_tasks_duration_lpt": 24118.433564193547,
+      "per_chromosome_fifo": 25810.926882393658,
+      "per_chromosome_largest_target_first": 24429.227324858308
+    },
+    "model_wall_reduction_fraction": 0.06526286546084248,
+    "observed_alignment_window_seconds": 26017.0,
+    "source": "/share/home/xbzhang26/cgat-reads-debug/gpm2665-full-input/workspaces/self-m200-n100",
+    "stage": "step2",
+    "status": "MODEL_ONLY",
+    "tasks": 3912,
+    "workers": 16
   },
   "customer_step2_scope": {
     "cache_hit": false,
@@ -2317,15 +4414,26 @@
   "local_validation": {
     "canonical_shell_groups_passed": 8,
     "final_focused_regressions": 19,
-    "server_unittest_seconds": 127.875,
-    "server_unittests": 227,
+    "focused_regression_seconds": 12.821,
+    "server_unittest_seconds": 99.887,
+    "server_unittests": 228,
     "tracked_lf_files_checked": 635
   },
   "pending": [
-    "Two original full-data workflows: skip-self and self-m200-n100",
-    "Customer-wide exact-execution and mixed-scope delivery chain using completed numerical caches",
-    "Final CI, pinned Server-only official source asset refresh and fresh public download verification"
+    "Original full-data cold skip-self and self m200/n100 workflows, including actual self/cross leaf runtime and final output hashes.",
+    "Full customer evidence/report/full-light archive delivery suffix using verified original complete leaf PAFs and the checked optimized GRT output; final App import boundary to be reported separately.",
+    "Final evidence commit/push and quality verification, followed by same-version public Server source Release asset refresh and public-download integrity checks."
   ],
+  "quality_ci": {
+    "conclusion": "success",
+    "jobs": {
+      "Linux server": "success",
+      "Windows app": "success"
+    },
+    "run_id": 38813019659,
+    "source_git_revision": "d9deccf75b2a74c1eb48ab72ac039fab30167790",
+    "updated_at": "2026-10-15T21:54:01Z"
+  },
   "schema_version": 1,
   "source": {
     "alignment_index_sha256": "2c7c6cb1f834245bcd8c64703cee2dffa2e9c99336bf42c7b06a38c9877b3bb1",

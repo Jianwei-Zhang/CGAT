@@ -1,19 +1,29 @@
 # GRT performance and consistency validation (2026-10-16)
 
-## Current acceptance summary (05:24 CST)
+## Current acceptance summary (08:16 CST)
 
-- Exact execution: **10/10 historical dataset/scope pairs, 210 checks passed**;
-  Step2/Step3 full results and ordered diagnostics are preserved within each pair.
-- Customer numerical-cold component benchmark: **4/4 passed**, mean 22.67% wall
-  reduction, with identical 1212-row alignment streams. Not a full-pipeline ETA.
-- Customer Step3 gap-screen: Q3 + evidence/source paths passed after fixing the
-  test-only cross-stage run-ID selection; extra classification/edit checks passed.
-- Customer Step2 gap-screen: **not strict-equivalent**; Q2/source paths match but
-  diagnostic evidence/usage/attempt counts differ. Keep Step2 scope `full`.
-- Local: 227 Server tests, 19 final focused tests, all 8 canonical shell groups,
-  LF/syntax/whitespace checks passed. Defaults remain `full` + `baseline`.
-- Remaining: original full-data skip-self/n100 workflows; customer-wide exact
-  execution and delivery-chain closure; final CI/public source-asset refresh.
+- Cache-lock engine `080599a3` at `d9deccf`: **10/10 historical dataset/scope
+  pairs, 210 checks passed again**. The earlier `a6e85bd6` snapshot is retained
+  below for chronology, not used to certify the fixed concurrent cache path.
+- Customer-wide exact execution: **46 checks passed**, including full Step2
+  Q2/source paths, original unreconciled candidate/rejection tables, complete
+  baseline/optimized ordered diagnostics, gap-screen Step3 Q3/source paths,
+  Step4 Q4, the complete Final Path document and exported DNA.
+- Export boundary: baseline/optimized exports are byte-identical. Export versus
+  Q4 differs only in preserved input letter case in chromosome 6; chromosome
+  names/order, lengths and case-normalized DNA hashes all match. Production
+  export case preservation is unchanged; this is not byte equality with Q4.
+- Customer numerical-cold component benchmark (`a6e85bd6`): **4/4 passed**, mean
+  22.67% wall reduction with identical 1212-row alignment streams. Not a
+  full-pipeline ETA. The complete 3912-task Step2 fixed-duration schedule model
+  suggests only 6.53% scheduling savings; a model, not a new benchmark.
+- Customer Step2 gap-screen is **not strict-equivalent**; DNA/source paths match
+  but diagnostic evidence/usage/attempt counts differ. Keep Step2 scope `full`.
+- Local: **228 Server tests**, 19 focused tests, all 8 canonical shell groups,
+  LF/syntax/whitespace checks passed. Quality run **38813019659** is green for
+  Linux Server and Windows App. Defaults remain `full` + `baseline`.
+- Remaining: original full-data skip-self/n100 cold workflows; completed-leaf
+  customer delivery/report/archive closure; final CI/public source-asset refresh.
 
 Machine-readable evidence: [grt-execution-results-20261016.json](grt-execution-results-20261016.json).
 The chronological notes below retain failed variants and test boundaries.
@@ -311,3 +321,90 @@ passed in 12.821 seconds. The alignment parameters, scopes, cache fingerprints
 and biological selection logic are unchanged. Repeat corpus/cache-assisted checks
 and a real-DNA identical-window positive control are the next gates. Formal source
 asset refresh remains blocked on final gates; all defaults remain baseline/full.
+
+
+## Cache-lock revision revalidation and genuine customer suffix
+
+Quality run **38813019659** on `d9deccf75b2a74c1eb48ab72ac039fab30167790`
+passed both Linux Server and Windows App. Source/runtime hashes are pinned in
+`cache_lock_revalidation` of the machine-readable record.
+
+Jobs **40587003** (four historical datasets) and **40587004** (zebrafish) both
+succeeded. All five datasets were tested with `full` and `gap-screen`; each
+baseline/optimized pair uses the same scope and passes 21 exact-result/ordered
+TSV checks, 210 in total. Reusing validated numerical caches makes this a
+correctness/cache-assisted execution test, not a cold end-to-end benchmark.
+The independent full-versus-screen comparisons still expose Step2 diagnostic
+changes, so they do not authorize a scope-default change.
+
+Real-DNA positive control **40587005** passed using a 2,200,100 bp window from
+customer chromosome 1: identical screen windows publish one numerical build,
+while distinct full-query headers retain two full builds and independent parsed
+contexts. Both copies yield the same two coordinate rows in original publication
+order. This tests the real aligner/cache collision path, not repair accuracy.
+
+Freeze job **40587006** captured genuine upstream donor-freeze and Step1
+checkpoints from the running cold producer, before Step3/4 reconciliation could
+change metadata. Independent metadata/FAI copies and immutable FASTA links were
+used; no success certificate was synthesized. Q1/D0 hashes match the diagnostic
+baseline. The genuine upstream source paths (64), donor members (3139), and
+Step1 consumed intervals (zero) also match.
+
+Customer core job **40587007** passed 33 Step2/Step3 checks. Full Step2 preserves
+both golden Q2/source paths and the cold producer's original, unreconciled
+`candidates.tsv`/`rejections.tsv`; only cross-engine trace identifiers are excluded
+from that historical-table comparison. Within the current-engine profile pair,
+complete stage results and ordered TSVs are compared, including trace fields.
+Only wrapper input fingerprints and evidence raw-artifact hashes whose headers
+embed workspace paths are excluded from the stage-result comparison.
+Step3 uses the previously tested gap-screen scope in both profiles and preserves
+the golden Q3. The job forbids launching any new large MUMmer alignment and
+fails on an incompatible/missing numerical cache, rather than silently duplicating
+hours of computation.
+
+Its first Q4 export assertion failed because it compared case-sensitive sequence
+hashes. Diagnostic job **40587016** found equal chromosome names/order and lengths
+for all eight records, exact sequence equality on seven records, and only input
+letter-case differences on chromosome 6. At Q4 position 84,731,680 (1-based), the
+source is `nextdenovo:ctg007740`, source position 146,727. The exporter uses the
+original source FASTA and preserves lowercase; GRT FASTA readers uppercase input.
+This is an existing representation difference, not an optimized-engine base change.
+Do not uppercase production exports merely to satisfy the harness.
+
+Recovery **40587017** retains all 33 completed checks and adds actual production
+Step4/finalize, golden Q4/source paths and genuine success checkpoints for each
+profile. It compares exported DNA after case normalization, retains the raw-case
+mismatch explicitly, and additionally requires byte-identical baseline/optimized
+Q4 and export files plus the complete Final Path JSON document. **46 checks pass**.
+The status is deliberately `CORE_PASS_DELIVERY_PENDING`, not whole-workflow PASS.
+The two resumed Step4 invocations can reuse valid caches; their timings are not
+performance claims.
+
+Cache-assisted Step2 wall time was 627.530 -> 301.164 seconds; Step3 was
+804.118 -> 455.173 seconds. Both use borrowed validated numerical caches and
+fresh stage execution, so these reductions cannot be transferred to cold nucmer
+work or used as a complete workflow ETA.
+
+## Complete Step2 scheduling analysis boundary
+
+Job **40587009** succeeded after analysis-only job 40587008 failed under the
+system Python (the environment-loading line was missing). No production engine
+or compute workflow was restarted. The model reads all **3912** completed raw
+partition records (8 chromosomes x 489 unchanged target partitions), their
+observed task wall durations and original 16-worker budget. Actual alignment
+log window: 26,017 seconds. Fixed-duration simulations:
+
+| Schedule model | Seconds |
+| --- | ---: |
+| Per-chromosome FIFO | 25,810.927 |
+| Per-chromosome largest target first | 24,429.227 |
+| Shared queue, largest-target-first chromosome blocks | 24,126.432 |
+| Oracle all-task duration LPT | 24,118.434 |
+
+The modeled shared-queue reduction is **6.526%**, not the small cold subset's
+22.67%. Observed task wall duration is **not CPU time**: the fixed-duration
+schedule bound (24,097.215 seconds) is not a physical CPU/runtime lower bound.
+Real coordinator order, memory pressure, IO and node contention can change task
+durations. No total-compute reduction, full-workflow time, or measured speedup is
+claimed from this model. It explains why improving scheduling alone cannot remove
+the bulk of full-scope MUMmer work while preserving every diagnostic alignment.
