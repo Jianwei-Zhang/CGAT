@@ -82,7 +82,7 @@ class RefillBatchAlignment:
         tool = dict(self.minimap)
         executable = Path(tool["resolved"])
         tool["sha256"] = sha256_file(executable)
-        payload = {"schema_version": 1, "stage": self.stage, "tool": tool,
+        payload = {"schema_version": 2, "stage": self.stage, "tool": tool,
                    "target_sha256": self.donor_set["fasta_sha256"],
                    "query_sha256": sha256_bytes(query_payload),
                    "mapping": {"preset": PRESET, "cigar": True, "threads": self.threads}}
@@ -157,15 +157,16 @@ class RefillBatchAlignment:
         self.provenance = json.loads((self.cache_dir / "provenance.json").read_text())
         self.provenance["batch_cache_relpath"] = self.cache_dir.relative_to(self.server_dir).as_posix()
         self.provenance["batch_fingerprint"] = key
-        self.rows = {name: [] for name in names}
+        self.rows = []
+        known_names = set(names)
         with (self.cache_dir / "result.paf").open("rb") as handle:
             for line in handle:
                 if not line.strip():
                     continue
                 query = line.split(b"\t", 1)[0].decode("utf-8")
-                if query not in self.rows:
+                if query not in known_names:
                     fail(f"unexpected refill batch query: {query}")
-                self.rows[query].append(line)
+                self.rows.append((query, line))
         self.artifact_dir.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(self.cache_dir, self.artifact_dir)
         print(f"GRT {self.stage}: same-target batch queries={len(names)} "
@@ -174,15 +175,19 @@ class RefillBatchAlignment:
     def __call__(self, query_fasta: Path, paf_path: Path, stage_dir: Path):
         if self.rows is None:
             self._prepare()
-        # Restore original per-chromosome query-record order; preserve every PAF
-        # byte and within-query hit order, including optional tags and CIGAR.
+        # Select from the original PAF stream, not query-grouped rows. With a
+        # multi-part minimap2 index the original order is part1(q1,q2), then
+        # part2(q1,q2); regrouping by query would silently alter line/tie order.
         names = [line[1:].split()[0] for line in query_fasta.read_text().splitlines()
                  if line.startswith(">")]
+        selected = set(names)
+        expected = [name for name, _sequence in self.flank_records if name in selected]
+        if len(names) != len(selected) or names != expected:
+            fail("refill chromosome queries must retain original unique record order")
         with paf_path.open("wb") as handle:
-            for name in names:
-                if name not in self.rows:
-                    fail(f"missing original query in refill batch: {name}")
-                handle.writelines(self.rows[name])
+            for query, line in self.rows:
+                if query in selected:
+                    handle.write(line)
         for name in ("command.txt", "stdout.log", "stderr.log"):
             shutil.copyfile(self.cache_dir / name, stage_dir / name)
         (stage_dir / "batch_provenance.json").write_text(json.dumps(self.provenance, indent=2, sort_keys=True) + "\n")

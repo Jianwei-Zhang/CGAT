@@ -27,9 +27,9 @@ No alignment threshold, reference/query role or donor partition boundary changes
 
 ## Necessary local checks (not the whole test suite)
 
-- Five refill-focused checks: one batch, hit/query order/CIGAR preservation,
+- Six refill-focused checks: one batch, hit/query order/CIGAR preservation,
   actual cross-round index reuse, lazy chromosome-cache hits, corruption rebuild,
-  failure/retry and duplicate IDs. PASS.
+  failure/retry, duplicate IDs and multi-part-index stream ordering. PASS.
 - Seven repair-stage integration checks (including exact cold fixture profile
   comparison, actual split entries, engine identity, resume and invalidation).
   PASS. These exercise the newly split modules, not only the previous revision.

@@ -1,5 +1,6 @@
 """Focused refill batching/cache safety tests; real PAF equality runs on 180."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -22,7 +23,7 @@ class RefillBatchTests(unittest.TestCase):
                       "fasta_sha256": sha256_file(target)}
         self.tool = self.root / "minimap2"
         self.tool.write_text(r'''#!/usr/bin/env python3
-import json, sys
+import json, os, sys
 from pathlib import Path
 args = sys.argv[1:]
 root = Path(__file__).parent
@@ -32,8 +33,10 @@ queries = []
 for line in Path(args[-1]).read_text().splitlines():
  if line.startswith('>'): queries.append(line[1:].split()[0])
 rows = []
-for name in reversed(queries):
- for offset, kind in [(0,'P'),(100,'S')]:
+pairs = [(name,offset,kind) for name in queries for offset,kind in [(0,'P'),(100,'S')]]
+if os.environ.get('FAKE_SPLIT_INDEX'):
+ pairs = [(name,offset,kind) for offset,kind in [(0,'P'),(100,'S')] for name in queries]
+for name,offset,kind in pairs:
   rows.append(f'{name}\t100\t0\t100\t+\tdonor\t1000\t{offset}\t{offset+100}\t100\t100\t60\ttp:A:{kind}\tcg:Z:100M')
 Path(args[args.index('-o')+1]).write_text('\n'.join(rows)+'\n')
 ''')
@@ -77,6 +80,13 @@ Path(args[args.index('-o')+1]).write_text('\n'.join(rows)+'\n')
         self.assertNotIn("-d", self.calls()[1])
         self.assertTrue(self.calls()[1][-2].endswith("target.mmi"))
         self.assertTrue(second_round.provenance["index_cache_hit"])
+
+    def test_multi_part_index_retains_part_then_query_order(self):
+        with patch.dict(os.environ, {"FAKE_SPLIT_INDEX": "1"}):
+            lines = self.emit(self.provider("multipart"), "multipart-output", ["chr1__L", "chr1__R"])
+        self.assertEqual([row.split('\t')[0] for row in lines],
+                         ["chr1__L", "chr1__R", "chr1__L", "chr1__R"])
+        self.assertEqual(len(self.calls()), 1)
 
     def test_existing_chromosome_cache_does_not_trigger_a_batch(self):
         parameters = {"preset": "asm5", "cigar": True, "threads": 2}
