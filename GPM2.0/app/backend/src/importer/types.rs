@@ -40,7 +40,7 @@ pub struct ImportProgress {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ImportOptions {
     /// `None` selects a bounded value from host parallelism. Explicit values
-    /// are limited to the choices exposed by the desktop settings UI.
+    /// are limited to the choices exposed by the desktop import dialog.
     pub pairwise_parser_workers: Option<usize>,
     /// Desktop drop confirmations require a new directory reserved atomically.
     pub require_new_workspace: bool,
@@ -49,9 +49,11 @@ pub struct ImportOptions {
 impl ImportOptions {
     pub fn resolved_pairwise_parser_workers(self) -> Result<usize> {
         match self.pairwise_parser_workers {
-            Some(workers @ (1 | 2 | 4 | 8)) => Ok(workers),
+            Some(workers @ 1..=8) => Ok(workers),
             Some(workers) => {
-                bail!("pairwise parser workers must be Auto or one of 1, 2, 4, 8; got {workers}")
+                bail!(
+                    "pairwise parser workers must be Auto or an integer from 1 to 8; got {workers}"
+                )
             }
             None => Ok(std::thread::available_parallelism()
                 .map(|parallelism| parallelism.get().saturating_sub(1).clamp(1, 8))

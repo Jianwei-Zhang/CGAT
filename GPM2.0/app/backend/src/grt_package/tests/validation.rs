@@ -1,5 +1,6 @@
 use super::test_support::*;
 use crate::grt_package::delivery_validator::validate_app_final_path_manifest_hash;
+use crate::grt_package::parsing::read_fasta_with_cancel;
 
 #[test]
 fn project_view_uses_authoritative_source_lengths_for_repeated_and_split_segments() {
@@ -500,4 +501,22 @@ fn rejects_all_shared_invalid_fixture_mutations_with_stable_codes() {
             case["name"].as_str().unwrap()
         );
     }
+}
+
+#[test]
+fn fasta_validation_observes_cancellation_while_streaming() {
+    let temp = tempdir().unwrap();
+    let fasta = temp.path().join("large.fa");
+    let mut text = String::from(">chr1\n");
+    for _ in 0..1024 {
+        text.push_str("ACGTACGTACGTACGT\n");
+    }
+    fs::write(&fasta, text).unwrap();
+    let mut checks = 0;
+    let error = read_fasta_with_cancel(&fasta, "large FASTA", false, &mut || {
+        checks += 1;
+        checks >= 3
+    })
+    .unwrap_err();
+    assert!(error.to_string().contains("import cancelled"));
 }

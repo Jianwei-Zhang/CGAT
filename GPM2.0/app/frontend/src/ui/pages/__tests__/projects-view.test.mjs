@@ -93,3 +93,19 @@ test("bulk deletion is exposed only after explicit validation completes with cur
   assert.match(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);
   assert.doesNotMatch(render({ records, importer }), /project-validation-summary/);
 });
+
+test("project import dialog owns the numeric PAF worker control and marks the recommendation", () => {
+  const html = render({
+    importer: {
+      importDialogOpen: true,
+      importSource: "zip",
+      zipPath: "/delivery.zip",
+      workspaceRoot: "/workspace",
+      importParallelism: "auto",
+    },
+  });
+  assert.match(html, /id="import-parallelism-select" name="importParallelism"/);
+  assert.match(html, /<option value="[1-8]" selected>[1-8] \(recommended\)<\/option>/);
+  assert.doesNotMatch(html, />Auto \(recommended\)</);
+  assert.match(html, /PAF parser workers/);
+});

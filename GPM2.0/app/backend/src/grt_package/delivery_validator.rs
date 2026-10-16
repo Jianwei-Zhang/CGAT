@@ -4,13 +4,16 @@ use super::*;
 /// workdirs keep using the exhaustive GRT closure validator; App delivery
 /// archives use the projected contract and therefore do not need Server-only
 /// q-stage, donor, evidence, cache, or checkpoint artifacts.
-pub(crate) fn validate_grt_delivery_package_with_progress<P>(
+pub(crate) fn validate_grt_delivery_package_with_progress_and_cancel<P, C>(
     bundle_root: &Path,
     on_progress: &mut P,
+    should_cancel: &mut C,
 ) -> Result<ValidatedGrtPackage>
 where
     P: FnMut(&'static str, &'static str),
+    C: FnMut() -> bool,
 {
+    check_grt_validation_cancel(should_cancel)?;
     let workflow = fs::read_to_string(bundle_root.join("metadata/package.tsv"))
         .ok()
         .and_then(|text| {
@@ -27,19 +30,35 @@ where
         .as_deref()
         .is_some_and(|value| value.starts_with("gpm_grt_app_"))
     {
-        validate_grt_app_package_with_progress(bundle_root, on_progress)
+        validate_grt_app_package_with_progress_and_cancel(bundle_root, on_progress, should_cancel)
     } else {
-        validate_grt_package_with_progress(bundle_root, on_progress)
+        check_grt_validation_cancel(should_cancel)?;
+        let package = validate_grt_package_with_progress(bundle_root, on_progress)?;
+        check_grt_validation_cancel(should_cancel)?;
+        Ok(package)
     }
 }
 
-pub(super) fn validate_grt_app_package_with_progress<P>(
+fn check_grt_validation_cancel<C>(should_cancel: &mut C) -> Result<()>
+where
+    C: FnMut() -> bool,
+{
+    if should_cancel() {
+        bail!("import cancelled");
+    }
+    Ok(())
+}
+
+fn validate_grt_app_package_with_progress_and_cancel<P, C>(
     bundle_root: &Path,
     on_progress: &mut P,
+    should_cancel: &mut C,
 ) -> Result<ValidatedGrtPackage>
 where
     P: FnMut(&'static str, &'static str),
+    C: FnMut() -> bool,
 {
+    check_grt_validation_cancel(should_cancel)?;
     if !bundle_root.is_dir() {
         return grt_err(
             "MISSING_BUNDLE",
@@ -94,6 +113,7 @@ where
     ];
     let mut tables = HashMap::new();
     for (relpath, header, minimum, maximum) in core_specs {
+        check_grt_validation_cancel(should_cancel)?;
         tables.insert(
             *relpath,
             read_tsv(bundle_root, relpath, header, *minimum, *maximum)?,
@@ -199,6 +219,7 @@ where
         "App manifest.final_path_sha256",
     )?;
 
+    check_grt_validation_cancel(should_cancel)?;
     on_progress(
         "validate_grt_app_fai",
         "validating source and reference FAI lengths",
@@ -207,6 +228,7 @@ where
     let mut dataset_names = HashSet::new();
     let mut dataset_fai = HashMap::<String, BTreeMap<String, usize>>::new();
     for row in &datasets.rows {
+        check_grt_validation_cancel(should_cancel)?;
         let dataset = nonempty(row, "dataset_name", "dataset")?;
         if !dataset_names.insert(dataset.to_string()) {
             return grt_err("DUPLICATE_ID", format!("duplicate dataset_name={dataset}"));
@@ -237,10 +259,12 @@ where
         table(&tables, "metadata/source_seq_locator.tsv")?,
         &dataset_fai,
     )?;
+    check_grt_validation_cancel(should_cancel)?;
 
     let mut assignment_baselines = HashMap::<(String, String, String), (String, i64)>::new();
     let mut assignment_ids = HashSet::new();
     for row in &table(&tables, "metadata/chr_assignments.tsv")?.rows {
+        check_grt_validation_cancel(should_cancel)?;
         let dataset = field(row, "dataset_name")?.to_string();
         let seq = field(row, "seq_name")?.to_string();
         let key = (dataset.clone(), seq.clone());
@@ -349,6 +373,7 @@ where
         );
     }
 
+    check_grt_validation_cancel(should_cancel)?;
     validate_app_source_cards(
         table(&tables, "metadata/grt_used_contigs.tsv")?,
         &sources,
@@ -357,6 +382,7 @@ where
     )?;
     let mut display_source_cards = assignment_baselines.keys().cloned().collect::<HashSet<_>>();
     for row in &table(&tables, "metadata/grt_used_contigs.tsv")?.rows {
+        check_grt_validation_cancel(should_cancel)?;
         display_source_cards.insert((
             field(row, "dataset_name")?.to_string(),
             field(row, "contig_name")?.to_string(),
@@ -364,16 +390,27 @@ where
         ));
     }
     let source_sequences = if fasta_available {
-        Some(source_catalog(
+        check_grt_validation_cancel(should_cancel)?;
+        on_progress(
+            "validate_grt_app_fastas",
+            "validating App source FASTA payloads",
+        );
+        Some(source_catalog_with_cancel(
             bundle_root,
             table(&tables, "metadata/source_seq_locator.tsv")?,
+            should_cancel,
         )?)
     } else {
         None
     };
+    check_grt_validation_cancel(should_cancel)?;
+    on_progress(
+        "validate_grt_final_path",
+        "validating App Final Path and q4 payload",
+    );
     let final_path = read_json(bundle_root, "metadata/grt_final_path.json")?;
     validate_app_final_path_manifest_hash(&final_path, manifest_object)?;
-    let (q4_lengths, _q4_records) = validate_app_final_path(
+    let (q4_lengths, _q4_records) = validate_app_final_path_with_cancel(
         bundle_root,
         &final_path,
         AppFinalPathValidationContext {
@@ -385,6 +422,7 @@ where
             expected_schema_version: final_path_schema_version,
             display_source_cards: &display_source_cards,
         },
+        should_cancel,
     )?;
     if let Some(expected_lengths) = manifest_object
         .get("q4_chromosome_lengths")
@@ -414,6 +452,7 @@ where
     // The catalog persistence layer intentionally keeps the Server-shaped
     // tables, but App packages do not carry those trace tables.  Empty tables
     // make the absence explicit without retaining any Server audit payload.
+    check_grt_validation_cancel(should_cancel)?;
     for (relpath, header, _, _) in TABLE_SPECS {
         tables
             .entry(*relpath)

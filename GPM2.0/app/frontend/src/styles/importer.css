@@ -533,7 +533,8 @@
 
 .project-import-dialog { display: grid; gap: 10px; width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 28px; border: 1px solid #d9d9d9; border-radius: var(--card-radius); background: #fff; }
 .project-import-dialog h3 { margin: 0 0 14px; font-size: var(--font-heading); font-weight: 600; }
-.project-import-dialog input:not([type="radio"]) { min-width: 0; width: 100%; min-height: 38px; border-color: #d3d3d3; border-radius: 4px; }
+.project-import-dialog input:not([type="radio"]),
+.project-import-dialog select { min-width: 0; width: 100%; min-height: 38px; border-color: #d3d3d3; border-radius: 4px; }
 .project-import-dialog .inline-input { flex-wrap: nowrap; min-width: 0; margin-bottom: 10px; }
 .project-import-dialog .inline-input > input { flex: 1 1 0; }
 .project-import-dialog .inline-input > button { flex: 0 0 auto; }

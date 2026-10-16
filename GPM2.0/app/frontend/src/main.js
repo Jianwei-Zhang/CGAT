@@ -58,6 +58,8 @@ const store = createStore({
     importRunId: null,
     importCancelling: false,
     importCancelError: "",
+    importProgressDismissed: false,
+    importParallelism: "auto",
     status: getMessages(initialLocale, "importer").runtime.notStarted,
     stages: [],
     summary: t(initialLocale, "importer.page.title"),

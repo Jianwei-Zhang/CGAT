@@ -29,7 +29,8 @@ use crate::alignment_cache::{
 };
 use crate::db::open_workspace_db;
 use crate::grt_package::{
-    ValidatedGrtPackage, persist_grt_package, validate_grt_delivery_package_with_progress,
+    ValidatedGrtPackage, persist_grt_package,
+    validate_grt_delivery_package_with_progress_and_cancel,
 };
 use crate::junction_inspection::ensure_pairwise_alignment_run_cache_cancel;
 use crate::workspace::{resolve_bundle_root_dir, resolve_extracted_bundle_workspace};

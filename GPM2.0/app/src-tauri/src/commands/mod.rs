@@ -836,6 +836,10 @@ mod tests {
         );
         assert_eq!(
             initial_import_options(Some("3".to_string())).pairwise_parser_workers,
+            Some(3)
+        );
+        assert_eq!(
+            initial_import_options(Some("9".to_string())).pairwise_parser_workers,
             None
         );
         assert_eq!(

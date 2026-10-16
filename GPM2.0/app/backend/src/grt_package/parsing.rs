@@ -104,12 +104,38 @@ pub(super) fn read_fasta(
     label: &str,
     allow_empty: bool,
 ) -> Result<BTreeMap<String, String>> {
-    let text = fs::read_to_string(path)
-        .map_err(|error| grt_anyhow("INVALID_FASTA", format!("{label} is not UTF-8: {error}")))?;
+    read_fasta_with_cancel(path, label, allow_empty, &mut || false)
+}
+
+pub(super) fn read_fasta_with_cancel<C>(
+    path: &Path,
+    label: &str,
+    allow_empty: bool,
+    should_cancel: &mut C,
+) -> Result<BTreeMap<String, String>>
+where
+    C: FnMut() -> bool,
+{
+    let file = fs::File::open(path)
+        .map_err(|error| grt_anyhow("INVALID_FASTA", format!("failed to open {label}: {error}")))?;
+    let mut reader = std::io::BufReader::new(file);
     let mut records = BTreeMap::new();
     let mut name: Option<String> = None;
     let mut sequence = String::new();
-    for (offset, raw) in text.lines().enumerate() {
+    let mut raw = String::new();
+    let mut offset = 0_usize;
+    loop {
+        if offset % 256 == 0 && should_cancel() {
+            bail!("import cancelled");
+        }
+        raw.clear();
+        let bytes_read = std::io::BufRead::read_line(&mut reader, &mut raw).map_err(|error| {
+            grt_anyhow("INVALID_FASTA", format!("{label} is not UTF-8: {error}"))
+        })?;
+        if bytes_read == 0 {
+            break;
+        }
+        offset += 1;
         let line = raw.trim();
         if let Some(header) = line.strip_prefix('>') {
             if let Some(previous) = name.take()
@@ -120,14 +146,14 @@ pub(super) fn read_fasta(
             {
                 return grt_err(
                     "INVALID_FASTA",
-                    format!("{label}:{} has empty or duplicate record", offset + 1),
+                    format!("{label}:{offset} has empty or duplicate record"),
                 );
             }
             let record_name = header.split_whitespace().next().unwrap_or("");
             if record_name.is_empty() || records.contains_key(record_name) {
                 return grt_err(
                     "INVALID_FASTA",
-                    format!("{label}:{} has empty or duplicate record", offset + 1),
+                    format!("{label}:{offset} has empty or duplicate record"),
                 );
             }
             name = Some(record_name.to_string());
@@ -135,18 +161,21 @@ pub(super) fn read_fasta(
             if name.is_none() {
                 return grt_err(
                     "INVALID_FASTA",
-                    format!("{label}:{} has sequence before header", offset + 1),
+                    format!("{label}:{offset} has sequence before header"),
                 );
             }
             let upper = line.to_ascii_uppercase();
             if !upper.bytes().all(|base| b"ACGTNRYKMSWBDHV".contains(&base)) {
                 return grt_err(
                     "INVALID_FASTA",
-                    format!("{label}:{} has unsupported bases", offset + 1),
+                    format!("{label}:{offset} has unsupported bases"),
                 );
             }
             sequence.push_str(&upper);
         }
+    }
+    if should_cancel() {
+        bail!("import cancelled");
     }
     if let Some(previous) = name
         && (sequence.is_empty() || records.insert(previous, sequence).is_some())
@@ -272,9 +301,29 @@ pub(super) fn validate_artifact(
 }
 
 pub(super) fn sha256_file(path: &Path) -> Result<String> {
-    let bytes =
-        fs::read(path).with_context(|| format!("failed to read artifact {}", path.display()))?;
-    Ok(sha256_bytes(&bytes))
+    sha256_file_with_cancel(path, &mut || false)
+}
+
+pub(super) fn sha256_file_with_cancel<C>(path: &Path, should_cancel: &mut C) -> Result<String>
+where
+    C: FnMut() -> bool,
+{
+    let mut file = fs::File::open(path)
+        .with_context(|| format!("failed to read artifact {}", path.display()))?;
+    let mut digest = Sha256::new();
+    let mut buffer = vec![0_u8; 1024 * 1024];
+    loop {
+        if should_cancel() {
+            bail!("import cancelled");
+        }
+        let bytes_read = std::io::Read::read(&mut file, &mut buffer)
+            .with_context(|| format!("failed to read artifact {}", path.display()))?;
+        if bytes_read == 0 {
+            break;
+        }
+        digest.update(&buffer[..bytes_read]);
+    }
+    Ok(format!("{:x}", digest.finalize()))
 }
 
 pub(super) fn sha256_bytes(bytes: &[u8]) -> String {

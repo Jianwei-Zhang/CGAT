@@ -60,9 +60,10 @@ where
         "validate_grt_contract_start",
         "starting delivery GRT contract validation".to_string(),
     );
-    let grt_package = validate_grt_delivery_package_with_progress(
+    let grt_package = validate_grt_delivery_package_with_progress_and_cancel(
         &resolved.bundle_root,
         &mut |stage, detail| recorder.record(stage, detail.to_string()),
+        should_cancel,
     )?;
     recorder.record(
         "validate_grt_contract",
@@ -256,16 +257,17 @@ where
         "validate_grt_contract_start",
         "starting delivery GRT contract validation".to_string(),
     );
-    let grt_package =
-        match validate_grt_delivery_package_with_progress(workspace_root, &mut |stage, detail| {
-            recorder.record(stage, detail.to_string())
-        }) {
-            Ok(package) => package,
-            Err(error) => {
-                remove_failed_zip_workspace(workspace_root, &error)?;
-                return Err(error);
-            }
-        };
+    let grt_package = match validate_grt_delivery_package_with_progress_and_cancel(
+        workspace_root,
+        &mut |stage, detail| recorder.record(stage, detail.to_string()),
+        should_cancel,
+    ) {
+        Ok(package) => package,
+        Err(error) => {
+            remove_failed_zip_workspace(workspace_root, &error)?;
+            return Err(error);
+        }
+    };
     recorder.record(
         "validate_grt_contract",
         "delivery GRT contract validated".to_string(),

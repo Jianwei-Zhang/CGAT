@@ -36,7 +36,7 @@ mod types;
 #[cfg(test)]
 pub(crate) use contract_validator::validate_grt_package;
 pub(crate) use contract_validator::validate_grt_package_with_progress;
-pub(crate) use delivery_validator::validate_grt_delivery_package_with_progress;
+pub(crate) use delivery_validator::validate_grt_delivery_package_with_progress_and_cancel;
 pub use initialization::{initialize_grt_project, initialize_grt_project_with_options};
 pub(crate) use persistence::persist_grt_package;
 pub use read_model::{

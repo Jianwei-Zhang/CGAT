@@ -2,13 +2,10 @@ use super::*;
 
 pub(super) fn initial_import_options(value: Option<String>) -> ImportOptions {
     let normalized = value.unwrap_or_default().trim().to_ascii_lowercase();
-    let pairwise_parser_workers = match normalized.as_str() {
-        "1" => Some(1),
-        "2" => Some(2),
-        "4" => Some(4),
-        "8" => Some(8),
-        _ => None,
-    };
+    let pairwise_parser_workers = normalized
+        .parse::<usize>()
+        .ok()
+        .filter(|workers| (1..=8).contains(workers));
     ImportOptions {
         pairwise_parser_workers,
         ..ImportOptions::default()

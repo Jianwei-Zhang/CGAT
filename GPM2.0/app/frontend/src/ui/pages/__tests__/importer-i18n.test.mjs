@@ -162,6 +162,8 @@ function createImporterScrollState(overrides = {}) {
       importRunId: "import-test",
       importCancelling: false,
       importCancelError: "",
+      importProgressDismissed: false,
+      importParallelism: "auto",
       status: "导入中",
       stages: ["stage-1", "stage-2"],
       summary: "正在导入",
@@ -1874,7 +1876,7 @@ test("import progress uses an indeterminate meter when no reliable total exists"
   }
 });
 
-test("import progress cancellation starts on pointerdown and keeps the dialog until the import settles", async () => {
+test("import progress cancellation starts on pointerdown and closes the dialog immediately", async () => {
   const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;
   const previousSetTimeout = globalThis.setTimeout;
@@ -1942,8 +1944,8 @@ test("import progress cancellation starts on pointerdown and keeps the dialog un
     assert.equal(store.getState().importer.inFlight, true);
     assert.equal(store.getState().importer.importRunId, runId);
     assert.equal(store.getState().importer.importCancelling, true);
-    assert.match(host.innerHTML, /disabled aria-disabled="true"/);
-    assert.match(host.innerHTML, /importer-import-progress-cancel-spinner/);
+    assert.equal(store.getState().importer.importProgressDismissed, true);
+    assert.doesNotMatch(host.innerHTML, /importer-import-progress-overlay/);
 
     const duplicateCancelRun = cancelButton.click();
     await duplicateCancelRun;
@@ -1955,13 +1957,15 @@ test("import progress cancellation starts on pointerdown and keeps the dialog un
     cancelDeferred.resolve({ runId, cancelRequested: true });
     await cancelRun;
     assert.equal(store.getState().importer.importCancelling, true);
-    assert.match(host.innerHTML, /已请求终止导入/);
+    assert.equal(store.getState().importer.importProgressDismissed, true);
+    assert.doesNotMatch(host.innerHTML, /importer-import-progress-overlay/);
 
     importDeferred.reject(new Error("import cancelled by backend"));
     await importRun;
     assert.equal(store.getState().importer.inFlight, false);
     assert.equal(store.getState().importer.importRunId, null);
     assert.equal(store.getState().importer.importCancelling, false);
+    assert.equal(store.getState().importer.importDialogOpen, false);
     assert.equal(store.getState().importer.status, zh.runtime.importCancelFinishedStatus);
     assert.equal(store.getState().importer.summary, zh.runtime.importCancelFinishedSummary);
     assert.doesNotMatch(store.getState().importer.summary, /import cancelled by backend/);
@@ -2134,6 +2138,7 @@ test("import cancellation request failures restore the running dialog", async ()
     assert.equal(currentImporter.inFlight, true);
     assert.equal(currentImporter.importRunId, runId);
     assert.equal(currentImporter.importCancelling, false);
+    assert.equal(currentImporter.importProgressDismissed, false);
     assert.equal(currentImporter.summary, zh.runtime.importZipSummary);
     assert.equal(
       currentImporter.importCancelError,

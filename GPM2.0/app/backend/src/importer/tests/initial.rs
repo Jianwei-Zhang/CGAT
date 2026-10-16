@@ -1028,10 +1028,10 @@ fn assert_pairwise_bulk_load_cancelled_and_rolled_back(bundle_root: &Path, error
 #[test]
 fn rejects_unsupported_pairwise_parser_worker_count() {
     let error = ImportOptions {
-        pairwise_parser_workers: Some(3),
+        pairwise_parser_workers: Some(9),
         ..ImportOptions::default()
     }
     .resolved_pairwise_parser_workers()
     .unwrap_err();
-    assert!(error.to_string().contains("one of 1, 2, 4, 8"));
+    assert!(error.to_string().contains("integer from 1 to 8"));
 }

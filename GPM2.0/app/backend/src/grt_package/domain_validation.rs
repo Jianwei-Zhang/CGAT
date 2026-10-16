@@ -347,11 +347,24 @@ pub(super) fn validate_app_display_evidence(
     Ok(())
 }
 
+#[cfg(test)]
 pub(super) fn validate_app_final_path(
     bundle_root: &Path,
     final_path: &Value,
     context: AppFinalPathValidationContext<'_>,
 ) -> Result<AppQ4Validation> {
+    validate_app_final_path_with_cancel(bundle_root, final_path, context, &mut || false)
+}
+
+pub(super) fn validate_app_final_path_with_cancel<C>(
+    bundle_root: &Path,
+    final_path: &Value,
+    context: AppFinalPathValidationContext<'_>,
+    should_cancel: &mut C,
+) -> Result<AppQ4Validation>
+where
+    C: FnMut() -> bool,
+{
     let AppFinalPathValidationContext {
         reference_records,
         sources,
@@ -388,6 +401,9 @@ pub(super) fn validate_app_final_path(
     let mut segment_ids = HashSet::new();
     let mut display_evidence_ids = HashSet::new();
     for chromosome in chromosomes {
+        if should_cancel() {
+            bail!("import cancelled");
+        }
         let chr = chromosome.as_object().ok_or_else(|| {
             grt_anyhow(
                 "INVALID_JSON",
@@ -430,6 +446,9 @@ pub(super) fn validate_app_final_path(
         let mut segment_total = 0_usize;
         let mut segment_events = HashMap::new();
         for segment in segments {
+            if should_cancel() {
+                bail!("import cancelled");
+            }
             let segment = segment.as_object().ok_or_else(|| {
                 grt_anyhow("INVALID_JSON", "App Final Path segment must be an object")
             })?;
@@ -552,12 +571,13 @@ pub(super) fn validate_app_final_path(
     let mut q4_records = None;
     let q4_path = bundle_root.join("grt/q/q4.fa");
     if fasta_available {
-        let records = read_fasta(
+        let records = read_fasta_with_cancel(
             &required_bundle_file(bundle_root, "grt/q/q4.fa", "App q4 FASTA")?,
             "App q4 FASTA",
             false,
+            should_cancel,
         )?;
-        if sha256_file(&q4_path)?
+        if sha256_file_with_cancel(&q4_path, should_cancel)?
             != json_nonempty_str(manifest, "q4_artifact_sha256", "App manifest")?
         {
             return grt_err(
@@ -566,6 +586,9 @@ pub(super) fn validate_app_final_path(
             );
         }
         for chromosome in chromosomes {
+            if should_cancel() {
+                bail!("import cancelled");
+            }
             let chr = chromosome.as_object().unwrap();
             let name = json_str(chr, "chr", "App Final Path chromosome")?;
             let sequence = records.get(name).ok_or_else(|| {
@@ -585,6 +608,9 @@ pub(super) fn validate_app_final_path(
             if let Some(source_sequences) = source_sequences {
                 let mut rebuilt = String::new();
                 for segment in chr["segments"].as_array().unwrap() {
+                    if should_cancel() {
+                        bail!("import cancelled");
+                    }
                     let segment = segment.as_object().unwrap();
                     let length = json_positive_i64(segment, "length", name)? as usize;
                     if segment.get("kind").and_then(Value::as_str) == Some("gap") {
@@ -999,9 +1025,23 @@ pub(super) fn source_catalog(
     bundle_root: &Path,
     table: &TsvTable,
 ) -> Result<HashMap<(String, String), String>> {
+    source_catalog_with_cancel(bundle_root, table, &mut || false)
+}
+
+pub(super) fn source_catalog_with_cancel<C>(
+    bundle_root: &Path,
+    table: &TsvTable,
+    should_cancel: &mut C,
+) -> Result<HashMap<(String, String), String>>
+where
+    C: FnMut() -> bool,
+{
     let mut cache = HashMap::<String, BTreeMap<String, String>>::new();
     let mut sources = HashMap::new();
     for row in &table.rows {
+        if should_cancel() {
+            bail!("import cancelled");
+        }
         let dataset = nonempty(row, "dataset_name", "source locator dataset")?.to_string();
         let contig = nonempty(row, "seq_name", "source locator sequence")?.to_string();
         let relpath = field(row, "fasta_relpath")?.to_string();
@@ -1011,7 +1051,10 @@ pub(super) fn source_catalog(
                 &relpath,
                 &format!("source locator {dataset}:{contig}"),
             )?;
-            cache.insert(relpath.clone(), read_fasta(&path, &relpath, false)?);
+            cache.insert(
+                relpath.clone(),
+                read_fasta_with_cancel(&path, &relpath, false, should_cancel)?,
+            );
         }
         let sequence = cache[&relpath].get(&contig).cloned().ok_or_else(|| {
             grt_anyhow(

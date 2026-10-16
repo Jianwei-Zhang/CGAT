@@ -2,6 +2,7 @@ import { projectEntryBusy } from "../../services/project-drop-controller.js";
 import { defaultProjectName } from "../../services/project-session.js";
 import { projectIcon } from "./project-icons.js";
 import { getMessages } from "../i18n/index.js";
+import { importParserWorkerChoices, normalizeImportParserWorkers, recommendedImportParserWorkers } from "../../services/import-parallelism.js";
 
 export function projectLabels(state) {
   return state.locale === "en" ? {
@@ -19,6 +20,8 @@ export function projectLabels(state) {
     sourceLocation: "Project location", legacyProjects: "Legacy projects",
     noOpen: "No project open", opened: "Open", rename: "Rename project", saved: "Save name",
     lastOpened: "Last opened", created: "Created",
+    importThreads: "PAF parser workers", importThreadsHint: "Used while parsing PAF files during initial import; SQLite still uses one writer.",
+    recommendedThreads: "{number} (recommended)",
   } : {
     import: "导入项目", open: "打开项目", recent: "项目库",
     empty: "尚未添加项目", emptyHint: "导入交付包，或打开已有项目目录。",
@@ -34,6 +37,8 @@ export function projectLabels(state) {
     sourceLocation: "项目位置", legacyProjects: "旧版项目",
     noOpen: "尚未打开项目", opened: "已打开", rename: "重命名项目", saved: "保存名称",
     lastOpened: "上次打开", created: "创建时间",
+    importThreads: "PAF 解析线程", importThreadsHint: "用于初始导入中的 PAF 并行解析；SQLite 仍只使用一个写入线程。",
+    recommendedThreads: "{number}（推荐）",
   };
 }
 
@@ -76,6 +81,14 @@ export function renderProjectImportDialog(state, messages) {
   const source = extracted ? importer.extractedPath : importer.zipPath;
   const directory = extracted ? importer.extractedPath : importer.workspaceRoot;
   const ready = Boolean(String(source || "").trim() && String(directory || "").trim());
+  const recommendedWorkers = recommendedImportParserWorkers();
+  const selectedWorkers = normalizeImportParserWorkers(importer.importParallelism);
+  const workerOptions = importParserWorkerChoices().map((value) => {
+    const label = value === String(recommendedWorkers)
+      ? labels.recommendedThreads.replace("{number}", value)
+      : value;
+    return `<option value="${value}" ${value === selectedWorkers ? "selected" : ""}>${label}</option>`;
+  }).join("");
   return `<div class="modal-overlay" data-project-import-overlay>
     <form class="modal-dialog project-import-dialog" role="dialog" aria-modal="true" aria-labelledby="project-import-title">
       <h3 id="project-import-title">${labels.import}</h3>
@@ -93,6 +106,9 @@ export function renderProjectImportDialog(state, messages) {
         <div class="inline-input"><input id="zip-workspace-root-input" value="${html(directory)}" ${importer.requireNewWorkspace ? 'aria-describedby="project-workspace-hint"' : ""} required />
           <button type="button" id="pick-zip-workspace-button" class="button ghost" title="${labels.browse}" aria-label="${labels.browse}">${projectIcon("open")}</button></div>
         ${importer.requireNewWorkspace ? `<p id="project-workspace-hint" class="project-path muted">${labels.directoryHint}</p>` : ""}`}
+      <label for="import-parallelism-select">${labels.importThreads}</label>
+      <select id="import-parallelism-select" name="importParallelism" aria-describedby="import-parallelism-hint">${workerOptions}</select>
+      <p id="import-parallelism-hint" class="project-path muted">${labels.importThreadsHint}</p>
       <label for="import-project-name">${labels.name}</label>
       <input id="import-project-name" value="${html(importer.projectNameInput)}" placeholder="${html(directory ? defaultProjectName(directory) : labels.nameDefault)}" />
       ${importer.projectError ? `<p class="error-text" role="alert">${html(importer.projectError)}</p>` : ""}

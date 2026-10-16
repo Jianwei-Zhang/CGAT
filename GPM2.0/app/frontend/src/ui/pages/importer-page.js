@@ -23,7 +23,7 @@ import { resetAssemblyPageSession } from "./assembly/page-session.js";
 import { pickDirectoryPath, pickZipFilePath } from "../../services/backend-api.js";
 import { getMessages, t as i18nT } from "../i18n/index.js";
 import { projectIcon } from "./project-icons.js";
-import { getAppSettings } from "../../services/app-settings.js";
+import { normalizeImportParserWorkers } from "../../services/import-parallelism.js";
 
 const IMPORT_PROGRESS_BOTTOM_THRESHOLD_PX = 24;
 const IMPORTER_STATUS_TOAST_AUTO_DISMISS_MS = 1000;
@@ -34,7 +34,7 @@ const DELETE_SELECTION_MODE_PROJECT = "project";
 export function renderImporterPage(state) {
   const importer = state.importer;
   const messages = getMessages(state, "importer");
-  const importProgressOverlay = importer.inFlight && importer.importRunId
+  const importProgressOverlay = importer.inFlight && importer.importRunId && importer.importProgressDismissed !== true
     ? renderImportProgressOverlay(importer, messages)
     : "";
   const statusToast = renderImporterStatusToast(importer, messages);
@@ -188,6 +188,7 @@ export function bindImporterPage(host, store) {
   const modalOverlay = host.querySelector("[data-modal-close='true']");
   const modalDialog = host.querySelector("[data-modal-dialog='true']");
   const cancelImportButtons = host.querySelectorAll("[data-import-cancel]");
+  const importParallelismSelect = host.querySelector("#import-parallelism-select");
   const importProgressList = host.querySelector("[data-import-progress-list='1']");
   const recentPickButtons = host.querySelectorAll("[data-recent-index]");
   const workspaceHistoryRows = host.querySelectorAll("[data-workspace-history-row-path]");
@@ -216,6 +217,12 @@ export function bindImporterPage(host, store) {
   extractedPathInput?.addEventListener("input", (event) => {
     updateImporterState(store, {
       extractedPath: event.target.value.trim(),
+    });
+  });
+
+  importParallelismSelect?.addEventListener("change", (event) => {
+    updateImporterState(store, {
+      importParallelism: normalizeImportParserWorkers(event.target.value),
     });
   });
 
@@ -423,7 +430,13 @@ function bindProjectEntryControls(host, store) {
   };
   host.querySelector("#project-import-button")?.addEventListener("click", () => {
     if (busy()) return;
-    updateImporterState(store, { importDialogOpen: true, requireNewWorkspace: false, projectError: "", pendingProjectPath: "" });
+    updateImporterState(store, {
+      importDialogOpen: true,
+      requireNewWorkspace: false,
+      projectError: "",
+      pendingProjectPath: "",
+      importParallelism: normalizeImportParserWorkers("auto"),
+    });
     rerender(host, store);
     host.querySelector("#zip-path-input, #extracted-path-input")?.focus();
   });
@@ -442,7 +455,7 @@ function bindProjectEntryControls(host, store) {
   dialog?.addEventListener("keydown", event => {
     if (event.key === "Escape") { event.preventDefault?.(); closeImport(); }
     if (event.key === "Tab") {
-      const controls = [...dialog.querySelectorAll("input,button")].filter(node => !node.disabled);
+      const controls = [...dialog.querySelectorAll("input,select,button")].filter(node => !node.disabled);
       const next = event.shiftKey ? controls.at(-1) : controls[0];
       if (event.target === (event.shiftKey ? controls[0] : controls.at(-1))) {
         event.preventDefault?.(); next?.focus();
@@ -768,6 +781,7 @@ async function runImportZipFlow(host, store) {
     importRunId: runId,
     importCancelling: false,
     importCancelError: "",
+    importProgressDismissed: false,
     importProgressAutoScroll: true,
     importProgressScrollTop: 0,
     status: i18nT(snapshot, "importer.runtime.importInProgressStatus"),
@@ -788,7 +802,7 @@ async function runImportZipFlow(host, store) {
       requireNewWorkspace: importer.requireNewWorkspace === true,
       runId,
       stateOrLocale: snapshot,
-      importParallelism: getAppSettings().importParallelism,
+      importParallelism: normalizeImportParserWorkers(importer.importParallelism),
       onStage: (stageText) => {
         if (String(store.getState().importer.importRunId || "") !== runId) {
           return;
@@ -849,6 +863,7 @@ export async function runImportExtractedFlow(host, store) {
     importRunId: runId,
     importCancelling: false,
     importCancelError: "",
+    importProgressDismissed: false,
     importProgressAutoScroll: true,
     importProgressScrollTop: 0,
     status: i18nT(snapshot, "importer.runtime.importInProgressStatus"),
@@ -864,7 +879,7 @@ export async function runImportExtractedFlow(host, store) {
       extractedPath: importer.extractedPath,
       runId,
       stateOrLocale: snapshot,
-      importParallelism: getAppSettings().importParallelism,
+      importParallelism: normalizeImportParserWorkers(importer.importParallelism),
       onStage: (stageText) => {
         if (String(store.getState().importer.importRunId || "") !== runId) {
           return;
@@ -1843,12 +1858,13 @@ function buildImportCompletionErrorPatch(
   const cancellationWasRequested = !importOperationCompleted && importer?.importCancelling === true;
   return {
     projectError: cancellationWasRequested ? "" : String(error?.message || error),
-    importDialogOpen: !importOperationCompleted,
+    importDialogOpen: cancellationWasRequested ? false : !importOperationCompleted,
     pendingProjectPath: importOperationCompleted ? importer.pendingProjectPath : "",
     inFlight: false,
     importRunId: null,
     importCancelling: false,
     importCancelError: "",
+    importProgressDismissed: false,
     status: cancellationWasRequested
       ? i18nT(stateOrLocale, "importer.runtime.importCancelFinishedStatus")
       : i18nT(stateOrLocale, "importer.runtime.importFailedStatus"),
@@ -2122,6 +2138,7 @@ async function cancelCurrentImport(host, store) {
   updateImporterState(store, {
     importCancelling: true,
     importCancelError: "",
+    importProgressDismissed: true,
     summary: i18nT(snapshot, "importer.runtime.importCancellingSummary"),
   });
   rerender(host, store);
@@ -2159,6 +2176,7 @@ async function cancelCurrentImport(host, store) {
     updateImporterState(store, {
       importCancelling: false,
       importCancelError: formatImportCancelRequestError(error, snapshot),
+      importProgressDismissed: false,
       summary: importer.summary,
     });
     rerender(host, store);
