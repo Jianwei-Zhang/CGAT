@@ -38,6 +38,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--case', choices=('skip-self', 'self-m200-n100'), required=True)
+    parser.add_argument('--threads', type=int, default=16)
+    parser.add_argument('--architecture', choices=('x86_64', 'aarch64'), default='x86_64')
+    parser.add_argument('--tool-prefix', type=Path, help='Require all workflow tools inside this environment')
     args = parser.parse_args()
     root = args.root.resolve()
     old_root = Path('/share/home/xbzhang26/cgat-reads-debug/gpm2665-full-input')
@@ -45,7 +48,8 @@ def main():
     golden = old_root.parent / 'grt-execution-equivalence/customer-core-080599a3/baseline'
     workspace = root / 'workspaces' / args.case
     report_file = root / 'reports' / (args.case + '.json')
-    assert platform.machine() == 'x86_64', 'Same-architecture comparison required'
+    assert args.threads > 0, 'Positive thread budget required'
+    assert platform.machine() == args.architecture, 'Unexpected compute architecture'
     assert not workspace.exists(), 'Fresh run only: never overwrite/resume an existing workspace'
     assert not report_file.exists(), 'Do not overwrite previous evidence'
     archive = root / 'gpm-full-optimized-6cc768d.tar.gz'
@@ -55,6 +59,7 @@ def main():
     assert original.count('--out') == 1
     argv = list(original)
     argv[argv.index('--out') + 1] = str(workspace)
+    argv[argv.index('--threads') + 1] = str(args.threads)
     assert not any(x in argv for x in ('--grt-execution-profile', '--grt-step3-mummer-scope', '--step2-mummer-scope'))
     argv += ['--grt-execution-profile', 'optimized', '--grt-step3-mummer-scope', 'gap-screen']
     assert original[original.index('--threads') + 1] == '16'
@@ -62,7 +67,7 @@ def main():
     if args.case == 'self-m200-n100':
         assert original[original.index('--self-m') + 1] == '200'
         assert original[original.index('--self-n') + 1] == '100'
-    # Exactly the previous input paths, names/order, thresholds and options.
+    # Preserve input paths, names/order and scientific settings; budget is explicit.
     inputs = []
     for path, identity in saved['inputs'].items():
         p = Path(path); st = p.stat()
@@ -73,15 +78,28 @@ def main():
     for name in ('python3', 'minimap2', 'nucmer', 'delta-filter', 'show-coords', 'samtools', 'pigz'):
         path = shutil.which(name)
         assert path is not None, name
-        tools[name] = {'resolved': str(Path(path).resolve()), 'sha256': sha(Path(path))}
+        resolved = Path(path).resolve()
+        if args.tool_prefix:
+            assert args.tool_prefix.resolve() in resolved.parents, 'Tool outside selected environment: ' + name
+        with resolved.open('rb') as handle:
+            header = handle.read(20)
+        if header[:4] == b'\x7fELF':
+            machine = int.from_bytes(header[18:20], 'little' if header[5] == 1 else 'big')
+            assert machine == (183 if args.architecture == 'aarch64' else 62), 'Wrong ELF architecture: ' + name
+        tools[name] = {'resolved': str(resolved), 'sha256': sha(resolved)}
+    for name in ('python3', 'minimap2', 'nucmer', 'samtools', 'pigz'):
+        version = subprocess.run([shutil.which(name), '--version'], stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, text=True, timeout=15)
+        assert version.returncode == 0, 'Tool startup failed: ' + name
+        tools[name]['version_output'] = version.stdout.strip()
     command = ['bash', str(source / 'run.sh'), *argv]
-    report = {'status': 'RUNNING', 'case': args.case, 'threads': 16,
+    report = {'status': 'RUNNING', 'case': args.case, 'threads': args.threads,
               'source_revision': '6cc768d864dc2a541964dce080f0f8d938018938',
               'source_archive_sha256': sha(archive), 'hostname': platform.node(),
               'architecture': platform.machine(), 'original_job': 40550762 if args.case == 'skip-self' else 40550763,
               'original_argv': original, 'new_command': command, 'inputs': inputs, 'tools': tools,
               'cache_mode': 'numerical-cold',
-              'boundary': 'Complete data and NEW workflow from assignment/reference alignment through final Full/Light packaging. No old runtime rerun, upstream checkpoint or numerical cache borrowing. Same x86 tools and 16-CPU budget; different nodes/OS cache affect timings. Preflight hashing and postchecks excluded from workflow wall time.',
+              'boundary': 'Complete data and NEW workflow from assignment/reference alignment through final Full/Light packaging. No old runtime rerun, upstream checkpoint or numerical cache borrowing. Requested architecture/thread budget and actual tool identities recorded; architecture/version/CPU/node/OS cache differences preclude a simple causal speedup ratio. Preflight hashing and postchecks excluded from workflow wall time.',
               'golden_results': str(golden), 'checks': []}
     def save():
         tmp = report_file.with_suffix('.tmp')
@@ -101,7 +119,7 @@ def main():
     if result.returncode:
         report['status'] = 'PIPELINE_FAILED'; save(); raise SystemExit(result.returncode)
     options = {r['key']: r['value'] for r in table(workspace / 'metadata/prepare_options.tsv')}
-    for key, value in {'threads': '16', 'grt_execution_profile': 'optimized',
+    for key, value in {'threads': str(args.threads), 'grt_execution_profile': 'optimized',
                        'grt_step2_mummer_scope': 'full', 'grt_step3_mummer_scope': 'gap-screen'}.items():
         check(key, value, options.get(key))
     report['stage_timings'] = table(workspace / 'logs/status.tsv')

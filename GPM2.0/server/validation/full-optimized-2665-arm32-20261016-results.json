@@ -1,0 +1,58 @@
+{
+  "actual_minimap2_version": "2.31-r1302",
+  "boundary": "Independent fresh ARM workspaces and cache/config/HOME. Reuses installed ARM environment read-only, not old numerical caches. Same pinned workflow source/full input/scientific options as x86 jobs except threads32; ARM minimap2/Python/samtools/pigz versions differ from x86. No simple causal ARM32 vs x8616 speedup claim. Submitted and RUNNING is not completion.",
+  "cache_mode": "numerical-cold",
+  "checked_at": "2026-10-16T13:10:52+0800",
+  "environment_prefix": "/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server",
+  "execution": {
+    "grt_execution_profile": "optimized",
+    "self_min_chain_score": 200,
+    "self_minimizers": 100,
+    "step2_scope": "full",
+    "step3_scope": "gap-screen"
+  },
+  "expected_tools": {
+    "minimap2": "2.31-r1302",
+    "mummer": "4.0.1",
+    "pigz": "2.8",
+    "python": "3.11.14",
+    "samtools": "1.23.1"
+  },
+  "generated_config_verified": {
+    "grt_execution_profile": "optimized",
+    "grt_step2_mummer_scope": "full",
+    "grt_step3_mummer_scope": "gap-screen",
+    "skip_self": {
+      "self-m200-n100": "false",
+      "skip-self": "true"
+    },
+    "threads": "32"
+  },
+  "jobs": {
+    "self-m200-n100": {
+      "job_id": 40587688,
+      "node": "agent-ARM-31",
+      "state": "RUNNING"
+    },
+    "skip-self": {
+      "job_id": 40587687,
+      "node": "agent-ARM-01",
+      "state": "RUNNING"
+    }
+  },
+  "launcher_sha256": "658dd18edaa0d97b2e458b17d60dd3020499adaea5560dabde15f4249baa2312",
+  "preflight_input_count": 4,
+  "queue": "arm",
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/full-optimized-2665-arm32-20261016-6cc768d",
+  "source_archive_sha256": "d7718ee3ccedc73471da27a18249d505ffa579bf2d3ef09c5a36119d4f8da49b",
+  "source_revision": "6cc768d864dc2a541964dce080f0f8d938018938",
+  "started_at": "2026-10-16T13:09:49+0800",
+  "status": "RUNNING_PREPARATION",
+  "threads_per_job": 32,
+  "x86_jobs_unchanged": [
+    40587587,
+    40587588,
+    40550762,
+    40550763
+  ]
+}
