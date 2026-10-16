@@ -263,3 +263,29 @@ alignments; self-m200/n100 **40550763** remains in chromosome alignment. Custome
 optimized full/gap jobs **40587514/40587519** remain in Step2. They were not
 modified for the ARM installer test. ARM installer/synthetic workflow evidence
 is documented separately in `arm-install-20261016.md`.
+
+## 2026-10-17 customer completion and semantic review
+
+The two resumed complete-customer GRT suffix jobs reached terminal results:
+
+| Step2 scope | Job | Analysis pipeline | Raw comparison | Semantic review | Remaining boundary |
+| --- | ---: | --- | --- | --- | --- |
+| full (default) | 40587514 | SUCCESS | core PASS; two raw Step3 audit differences | **PASS** | none |
+| gap-screen (experimental) | 40587519 | SUCCESS | core PASS; eight audit differences | CORE_PASS_AUDIT_DIFFERENT | Step2/Step3 diagnostics remain different |
+
+Job 40587514 is retained as scheduler `FAILED` because its strict raw postcheck
+returned nonzero after the analysis pipeline completed. A new metadata-only
+review, job 40590173, resolved the Step3 generated-ID references and passed every
+full-scope core and audit semantic check. It did not rerun an aligner, alter the
+original report or waive DNA/coordinate differences.
+
+Observed own-cache-resume suffix times were 35,774.911 s for default full Step2
+and 23,073.966 s for experimental gap-screen. They are remaining resumed times,
+not cold or same-node causal speedup measurements. Gap-screen still differs in
+Step2 evidence, usage, attempts, strategies and ordered candidate/rejection
+diagnostics; it therefore remains experimental and default-off.
+
+The release gate is the independent latest complete workflow 40588179: complete
+fresh customer inputs, production batching/adaptive scheduling, Full/Light
+packages and 17/17 retained-golden checks passed. See
+`full-latest-2665-arm32-20261017.md`.

@@ -1294,6 +1294,7 @@
       40587513
     ],
     "failed_lock_attempt": 40587515,
+    "final_boundary": "Default full Step2 resolves to semantic PASS. Experimental Step2 gap-screen preserves core/Final Path but retains audit differences and remains default-off. Resumed timings are not cold speedup evidence.",
     "jobs": {
       "full": 40587514,
       "gap-screen": 40587519
@@ -1315,11 +1316,57 @@
       "time": "2026-10-16T12:22:31+0800"
     },
     "lock_recovery_job": 40587518,
+    "results": {
+      "full": {
+        "analysis_pipeline": "SUCCESS",
+        "audit_status": "DIFFERENT",
+        "core_status": "PASS",
+        "job_id": 40587514,
+        "new_suffix_seconds": 35774.91132512689,
+        "raw_report_sha256": "baabef3f4dbdb13ab9b3e6e4776c842abbfb47a477eb397c7504fa3365890861",
+        "raw_status": "FAIL",
+        "remaining_audit_differences": [],
+        "scheduler_state": "FAILED_POSTCHECK",
+        "semantic_review_sha256": "e20371dd187dcdb80f00cb8c82b7896827984b92546a6177e0399efbd1b198b0",
+        "semantic_status": "PASS",
+        "stage_seconds": {
+          "grt_step2": 24500.528,
+          "grt_step3": 10753.7,
+          "grt_telomere_finalize": 171.964
+        }
+      },
+      "gap-screen": {
+        "analysis_pipeline": "SUCCESS",
+        "audit_status": "DIFFERENT",
+        "core_status": "PASS",
+        "job_id": 40587519,
+        "new_suffix_seconds": 23073.96621454903,
+        "raw_report_sha256": "c535819ee842bac13ac255421ec47b4b0f4f930f575cc872dc241327ec4c5a3f",
+        "raw_status": "CORE_PASS_AUDIT_DIFFERENT",
+        "remaining_audit_differences": [
+          "step2 evidence semantics",
+          "step2 usage semantics",
+          "step2 attempts",
+          "step2 strategies",
+          "step2 ordered candidates.tsv",
+          "step2 ordered rejections.tsv"
+        ],
+        "scheduler_state": "SUCCEEDED",
+        "semantic_review_sha256": "aaf808de89a1e19ef6b07185fdb2a91c17aca2725e35de3ffef783be7887ab02",
+        "semantic_status": "CORE_PASS_AUDIT_DIFFERENT",
+        "stage_seconds": {
+          "grt_step2": 13346.107,
+          "grt_step3": 9366.669,
+          "grt_telomere_finalize": 124.311
+        }
+      }
+    },
     "runtime_revision": "7ba84ea",
-    "state": "RUNNING",
+    "semantic_review_job": 40590173,
+    "state": "COMPLETED",
     "threads_per_job": 16,
     "timing_boundary": "Remaining resumed time only; not numerical-cold speedup. Existing 16 CPU partial caches retained.",
-    "updated_at": "2026-10-16T12:23:28.728475+08:00"
+    "updated_at": "2026-10-17T02:52:20+08:00"
   },
   "customer32_replacement": {
     "boundary": "User approved 32 CPU for both customer cases. Fresh empty numerical caches; old 16 CPU outputs retained and excluded from primary timing. Four smaller dataset pairs and old full producer jobs untouched.",
@@ -1523,5 +1570,5 @@
   "production_refill_job": 40587487,
   "source_archive_sha256": "74c8860a4ac20d48e4932576cfbcbf20e5794d270a211f99a012914fde715579",
   "source_revision": "7ba84ea",
-  "status": "THREE_DEFAULT_FULL_CASES_SEMANTIC_PASS_THREE_GAP_CORE_PASS_AUDIT_DIFFERENT_FOUR_CASES_RUNNING"
+  "status": "CUSTOMER_DEFAULT_FULL_SEMANTIC_PASS_CUSTOMER_GAP_CORE_PASS_AUDIT_DIFFERENT_OTHER_RETAINED_CASE_DIFFERENCES_UNCHANGED"
 }

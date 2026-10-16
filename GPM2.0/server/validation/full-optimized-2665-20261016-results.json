@@ -1,7 +1,8 @@
 {
   "boundary": "Fresh complete workflows from preparation through all reference/self/cross alignments, GRT and delivery packaging. Exact original recorded launch argv except output path and explicit optimized/Step3 scope settings. Same tool binaries and input content hashed on compute nodes. No numerical or upstream checkpoint reuse; OS cache and nodes may differ. Original jobs not rerun or modified. No results or speedup asserted yet.",
   "cache_mode": "numerical-cold",
-  "checked_at": "2026-10-16T13:06:27+0800",
+  "checked_at": "2026-10-17T02:54:40+0800",
+  "completion_boundary": "Both x86/16 workflows completed and passed retained-golden checks. Source 6cc768d predates production self query batching/adaptive scheduling; use latest ARM32 job40588179 for release-candidate runtime acceptance.",
   "execution": {
     "grt_execution_profile": "optimized",
     "refill": "production same-target batch and compatible index reuse",
@@ -25,16 +26,26 @@
   "input_root": "/share/home/xbzhang26/cgat-reads-debug/gpm2665-full-input/source_snapshot",
   "jobs": {
     "self-m200-n100": {
+      "checks_passed": 15,
+      "checks_total": 15,
       "job_id": 40587588,
       "node": "agent-X86-27",
       "original_job": 40550763,
-      "state": "RUNNING"
+      "report_sha256": "192b3b7a70be590b42acd99e7161ce6b88abaca678ad46369fd9d2beb8b9ee16",
+      "state": "SUCCEEDED",
+      "status": "PASS",
+      "workflow_seconds": 49741.11324260384
     },
     "skip-self": {
+      "checks_passed": 15,
+      "checks_total": 15,
       "job_id": 40587587,
       "node": "agent-X86-05",
       "original_job": 40550762,
-      "state": "RUNNING"
+      "report_sha256": "9078165aabb3866a5f68ebf7aa1cb673fe8d096bb204347af3e0f27623acd62d",
+      "state": "SUCCEEDED",
+      "status": "PASS",
+      "workflow_seconds": 42910.51421729289
     }
   },
   "launcher_sha256": "9714dc63a85b2a626babb994d7e4e4165d61a9a1c971594160eb299bf6c25350",
@@ -42,7 +53,7 @@
   "remote_root": "/share/home/xbzhang26/cgat-reads-debug/full-optimized-2665-20261016-6cc768d",
   "source_archive_sha256": "d7718ee3ccedc73471da27a18249d505ffa579bf2d3ef09c5a36119d4f8da49b",
   "source_revision": "6cc768d864dc2a541964dce080f0f8d938018938",
-  "status": "RUNNING_PREPARATION",
+  "status": "PASS",
   "threads_per_job": 16,
   "tools_environment": "/share/home/xbzhang26/cgat-reads-debug/gpm2665-full-input/environment.sh",
   "unchanged_parameters": {

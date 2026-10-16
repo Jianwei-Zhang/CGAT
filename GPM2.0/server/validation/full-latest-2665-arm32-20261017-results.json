@@ -1,0 +1,144 @@
+{
+  "boundary": "Complete customer2665 release-candidate workflow on isolated ARM32 workspace; retained golden results read-only. Public summary omits private absolute paths, argv, input hashes and raw biological outputs.",
+  "cache_mode": "numerical-cold",
+  "checks": [
+    {
+      "label": "threads",
+      "status": "PASS"
+    },
+    {
+      "label": "grt_execution_profile",
+      "status": "PASS"
+    },
+    {
+      "label": "grt_step2_mummer_scope",
+      "status": "PASS"
+    },
+    {
+      "label": "grt_step3_mummer_scope",
+      "status": "PASS"
+    },
+    {
+      "label": "production self query batching generated",
+      "status": "PASS"
+    },
+    {
+      "label": "production adaptive task profiles generated",
+      "status": "PASS"
+    },
+    {
+      "label": "all full workflow units successful",
+      "status": "PASS"
+    },
+    {
+      "label": "step2 actual optimized execution",
+      "status": "PASS"
+    },
+    {
+      "label": "step2 actual scope",
+      "status": "PASS"
+    },
+    {
+      "label": "step3 actual optimized execution",
+      "status": "PASS"
+    },
+    {
+      "label": "step3 actual scope",
+      "status": "PASS"
+    },
+    {
+      "label": "q2 vs retained golden DNA file",
+      "status": "PASS"
+    },
+    {
+      "label": "q3 vs retained golden DNA file",
+      "status": "PASS"
+    },
+    {
+      "label": "q4 vs retained golden DNA file",
+      "status": "PASS"
+    },
+    {
+      "label": "Final Path source intervals orientation order kinds and DNA",
+      "status": "PASS"
+    },
+    {
+      "label": "delivery present .tar.gz",
+      "status": "PASS"
+    },
+    {
+      "label": "delivery present .light.tar.gz",
+      "status": "PASS"
+    }
+  ],
+  "checks_passed": 17,
+  "checks_total": 17,
+  "execution": {
+    "grt_execution_profile": "optimized",
+    "profiled_alignment_tasks": 179,
+    "refill_batch_record_count": 2,
+    "self_batch_count": 155,
+    "self_batch_manifest_count": 24,
+    "self_min_chain_score": 200,
+    "self_minimizers": 100,
+    "step2_scope": "full",
+    "step3_scope": "gap-screen"
+  },
+  "job": {
+    "architecture": "aarch64",
+    "ended_at": "2026-10-17T00:27:12+08:00",
+    "job_id": 40588179,
+    "node": "agent-ARM-09",
+    "queue": "arm",
+    "scheduler_state": "SUCCEEDED",
+    "started_at": "2026-10-16T15:43:29+08:00",
+    "threads": 32,
+    "workflow_seconds": 31395.362413324416
+  },
+  "packages": {
+    "full": {
+      "bytes": 3867149694,
+      "sha256": "d7ca0dfa742bc7f123302b95847e54dc8577d22ee5ce88b918560875362646bb"
+    },
+    "light": {
+      "bytes": 785555704,
+      "sha256": "501c4825c5100c8c66c79b17f9822d831fb08a0c9966ec4dca7b558b26f98e2f"
+    }
+  },
+  "release_decision": "PASS. Step2 gap-screen remains experimental/default-off; this acceptance uses full Step2.",
+  "source": {
+    "archive_sha256": "a77f3c16a2585774ae68a2586d63af82ab0a5b55b6356e0198d9e837d3466e0a",
+    "raw_private_report_sha256": "f7752d0636949750125334e409e815eed2f09be5c90f96041e73ca57ccfc6288",
+    "revision": "76db2c9f98357d28f18fbc728fde0ba0b6d6f38e"
+  },
+  "stage_timings_seconds": {
+    "assign": 428.517,
+    "chr:BSWB01000001.1": 3222.079,
+    "chr:BSWB01000002.1": 3398.545,
+    "chr:BSWB01000003.1": 3509.56,
+    "chr:BSWB01000004.1": 3182.696,
+    "chr:BSWB01000005.1": 3311.218,
+    "chr:BSWB01000006.1": 2840.169,
+    "chr:BSWB01000007.1": 2717.101,
+    "chr:BSWB01000008.1": 2920.6,
+    "finalize_evidence": 533.834,
+    "grt_prepare": 390.145,
+    "grt_step1": 265.198,
+    "grt_step2": 13837.665,
+    "grt_step3": 5188.546,
+    "grt_telomere_finalize": 111.244,
+    "package_full": 547.612,
+    "package_light": 485.221,
+    "ref:flye": 2030.504,
+    "ref:hifiasm": 4770.01,
+    "ref:nextdenovo": 722.318
+  },
+  "status": "PASS",
+  "tool_versions": {
+    "minimap2": "2.31-r1302",
+    "nucmer": "4.0.1",
+    "pigz": "pigz 2.8",
+    "python3": "Python 3.11.14",
+    "samtools": "samtools 1.23.1"
+  }
+}

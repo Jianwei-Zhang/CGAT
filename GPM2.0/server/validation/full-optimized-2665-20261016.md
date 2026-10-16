@@ -74,3 +74,20 @@ frontend/browser runs were added.
 At 13:06:27 CST both jobs remained RUNNING. Generated prepare_options.tsv
 confirmed threads16, optimized, Step2 full, Step3 gap-screen, m200/n100 and
 the correct per-case skip_self flag. Both were still in preparation.
+
+## Completion — 2026-10-17
+
+Both independent x86/16 workflows completed and passed their retained-golden
+postchecks:
+
+| Case | Job | Terminal state | Workflow wall | Checks |
+| --- | ---: | --- | ---: | ---: |
+| skip-self | 40587587 | SUCCEEDED | 42,910.514 s (11 h 55 m 11 s) | 15/15 PASS |
+| self-m200-n100 | 40587588 | SUCCEEDED | 49,741.113 s (13 h 49 m 01 s) | 15/15 PASS |
+
+These jobs retain the original x86 tool environment and validate the earlier
+`6cc768d` optimized/full-Step2/gap-Step3 runtime. They predate production
+self-query batching and adaptive scheduling. The release-candidate runtime is
+validated separately by complete ARM32 job 40588179; do not combine the
+architecture, node, tool-version or CPU-budget differences into a pure speedup
+claim.

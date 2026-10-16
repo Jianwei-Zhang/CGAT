@@ -73,3 +73,20 @@ required; no unrelated unit suite, frontend/browser or baseline tests added.
 At 13:10:52 both jobs passed architecture/tool-prefix/input preflight and entered
 preparation. Actual minimap2 was 2.31-r1302; generated options confirmed threads32,
 optimized, Step2 full, Step3 gap-screen and the correct skip_self flag.
+
+## Completion — 2026-10-17
+
+Both independent ARM/32 workflows completed and passed their retained-golden
+postchecks:
+
+| Case | Job | Terminal state | Workflow wall | Checks |
+| --- | ---: | --- | ---: | ---: |
+| skip-self | 40587687 | SUCCEEDED | 25,719.258 s (7 h 08 m 39 s) | 15/15 PASS |
+| self-m200-n100 | 40587688 | SUCCEEDED | 27,417.649 s (7 h 36 m 58 s) | 15/15 PASS |
+
+These jobs validate the earlier `6cc768d` optimized/full-Step2/gap-Step3 runtime
+on ARM. They do **not** contain the later production self-query batching and
+adaptive scheduling. The complete latest-runtime acceptance is therefore the
+separate job 40588179, documented in
+`full-latest-2665-arm32-20261017.md`; no cross-node or cross-architecture wall
+ratio is treated as an isolated optimization effect.

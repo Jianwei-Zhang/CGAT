@@ -2,7 +2,8 @@
   "actual_minimap2_version": "2.31-r1302",
   "boundary": "Independent fresh ARM workspaces and cache/config/HOME. Reuses installed ARM environment read-only, not old numerical caches. Same pinned workflow source/full input/scientific options as x86 jobs except threads32; ARM minimap2/Python/samtools/pigz versions differ from x86. No simple causal ARM32 vs x8616 speedup claim. Submitted and RUNNING is not completion.",
   "cache_mode": "numerical-cold",
-  "checked_at": "2026-10-16T13:10:52+0800",
+  "checked_at": "2026-10-17T02:48:12+0800",
+  "completion_boundary": "Both ARM32 6cc768d workflows completed and passed their saved-golden postchecks. These predate production self query batching/adaptive scheduling; latest runtime acceptance is recorded separately in full-latest-2665-arm32-20261017.*.",
   "environment_prefix": "/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server",
   "execution": {
     "grt_execution_profile": "optimized",
@@ -30,14 +31,24 @@
   },
   "jobs": {
     "self-m200-n100": {
+      "checks_passed": 15,
+      "checks_total": 15,
       "job_id": 40587688,
       "node": "agent-ARM-31",
-      "state": "RUNNING"
+      "report_sha256": "9d220b0e37df0fd18821d09723803ae0a159b19c4b14acd8ca9859a15758bbde",
+      "state": "SUCCEEDED",
+      "status": "PASS",
+      "workflow_seconds": 27417.648860234767
     },
     "skip-self": {
+      "checks_passed": 15,
+      "checks_total": 15,
       "job_id": 40587687,
       "node": "agent-ARM-01",
-      "state": "RUNNING"
+      "report_sha256": "840b5b9f81921c5b139c3d2f9f32e9ce2371dc7aa64bf2dff4cf4a00b461bd0b",
+      "state": "SUCCEEDED",
+      "status": "PASS",
+      "workflow_seconds": 25719.257923305035
     }
   },
   "launcher_sha256": "658dd18edaa0d97b2e458b17d60dd3020499adaea5560dabde15f4249baa2312",
@@ -47,7 +58,7 @@
   "source_archive_sha256": "d7718ee3ccedc73471da27a18249d505ffa579bf2d3ef09c5a36119d4f8da49b",
   "source_revision": "6cc768d864dc2a541964dce080f0f8d938018938",
   "started_at": "2026-10-16T13:09:49+0800",
-  "status": "RUNNING_PREPARATION",
+  "status": "PASS",
   "threads_per_job": 32,
   "x86_jobs_unchanged": [
     40587587,
