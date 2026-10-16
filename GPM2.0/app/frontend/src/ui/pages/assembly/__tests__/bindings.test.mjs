@@ -419,6 +419,110 @@ test("Subview GRT result binding shows each empty-result toast for exactly three
   assert.equal(rerenders, 3);
 });
 
+function createGrtSwitchHarness(scope = "subview") {
+  const listeners = new Map();
+  const layerListeners = new Map();
+  const toggle = {
+    checked: true,
+    dataset: { grtResultToggle: scope },
+    addEventListener(type, handler) {
+      listeners.set(type, handler);
+    },
+  };
+  const layerToggle = {
+    checked: false,
+    dataset: { grtResultLayer: "resultPath", grtResultLayerScope: scope },
+    addEventListener(type, handler) {
+      layerListeners.set(type, handler);
+    },
+  };
+  const resultCard = { dataset: { grtResultSceneVisible: "1" } };
+  const host = {
+    querySelector(selector) {
+      return selector === `[data-grt-result-card="${scope}"]` ? resultCard : null;
+    },
+    querySelectorAll(selector) {
+      if (selector === "[data-grt-result-toggle]") return [toggle];
+      if (selector === "[data-grt-result-layer]") return [layerToggle];
+      return [];
+    },
+    addEventListener() {},
+  };
+  const segment = {
+    segmentId: "seg-1",
+    type: "ctg",
+    datasetName: "primary",
+    ctgName: "ctg1",
+    originId: "ctg1",
+    overallLen: 100,
+    start: 1,
+    end: 100,
+    source: { dataset: "primary", contig: "ctg1", start: 1, end: 100, orientation: "+" },
+  };
+  const entry = { mode: "segments", chrName: "Chr01", segments: [segment] };
+  const state = createState();
+  state.assembly.selectedChrName = "Chr01";
+  state.assembly.isChrPhased = false;
+  state.assembly.finalPathByChr = { Chr01: structuredClone(entry) };
+  state.assembly.grtProjectView = {
+    recipe: { finalPathSchemaVersion: "2" },
+    baselineFinalPathByChr: { Chr01: { ...entry, grtDisplayAvailable: true } },
+  };
+  state.assembly.grtResultDisplayByChr = {};
+  return { host, listeners, layerListeners, state, store: createStore(state) };
+}
+
+test("GRT result switches patch overlay layers in place instead of rebuilding the view", () => {
+  const harness = createGrtSwitchHarness("subview");
+  const patchedScopes = [];
+  let rerenders = 0;
+  bindAssemblyPageImpl(
+    harness.host,
+    harness.store,
+    createBindingDeps({
+      patchGrtResultOverlays(_host, _store, scope) {
+        patchedScopes.push(scope);
+        return true;
+      },
+      rerender() {
+        rerenders += 1;
+      },
+    }),
+  );
+
+  harness.listeners.get("change")?.();
+  harness.layerListeners.get("change")?.();
+
+  // Toggling only repaints the GRT layers, so the plot keeps its scroll state.
+  assert.deepEqual(patchedScopes, ["subview", "subview"]);
+  assert.equal(rerenders, 0);
+});
+
+test("GRT result switches fall back to a rerender when overlay patching cannot apply", () => {
+  const harness = createGrtSwitchHarness("subview");
+  const patchedScopes = [];
+  let rerenders = 0;
+  bindAssemblyPageImpl(
+    harness.host,
+    harness.store,
+    createBindingDeps({
+      patchGrtResultOverlays(_host, _store, scope) {
+        patchedScopes.push(scope);
+        return false;
+      },
+      rerender() {
+        rerenders += 1;
+      },
+    }),
+  );
+
+  harness.listeners.get("change")?.();
+  harness.layerListeners.get("change")?.();
+
+  assert.deepEqual(patchedScopes, ["subview", "subview"]);
+  assert.equal(rerenders, 2);
+});
+
 test("Final Path view switches use the card refresh boundary", async () => {
   const listeners = new Map();
   const tableButton = {

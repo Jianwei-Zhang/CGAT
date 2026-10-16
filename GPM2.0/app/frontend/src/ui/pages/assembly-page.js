@@ -371,6 +371,7 @@ const assemblyPageShellDeps = {
 };
 const {
   patchAssemblyStatusToast,
+  patchGrtResultOverlaysDom,
   patchPrimaryHiddenCtgDom,
   replaceRenderedAssemblySection,
 } = createAssemblyDomPatchController({
@@ -380,6 +381,7 @@ const {
   getAssemblyI18n,
   normalizeTrackSelectionCtgIds,
   renderAssemblyMainTrackSections,
+  renderAssemblySubviewPanel: (state) => renderAssemblySubviewPanelImpl(state, renderTracksDeps),
 });
 const {
   clearSubviewTrackPairHiddenCtgs,
@@ -895,6 +897,7 @@ function createAssemblyPageBindingDeps(options = {}) {
     rerenderAssemblyMainTab: rerenderAssemblyMainTabImpl,
     rerenderFinalPathCard,
     rerenderSubviewPanel,
+    patchGrtResultOverlays: (host, store, scope) => patchGrtResultOverlaysDom(host, store, scope),
     refreshSubviewPairwiseEvidence,
     rememberTrackViewportAnchor,
     rerender: rerenderImpl,

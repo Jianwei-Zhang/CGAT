@@ -5,6 +5,7 @@ export function createAssemblyDomPatchController({
   getAssemblyI18n,
   normalizeTrackSelectionCtgIds,
   renderAssemblyMainTrackSections,
+  renderAssemblySubviewPanel = null,
 }) {
   function createRenderedAssemblyMainTabContent(routeHost, state) {
     const doc = routeHost?.ownerDocument || globalThis.document;
@@ -24,6 +25,116 @@ export function createAssemblyDomPatchController({
     }
     current.replaceWith(next);
     return next;
+  }
+
+  function createRenderedContent(routeHost, html) {
+    const doc = routeHost?.ownerDocument || globalThis.document;
+    if (!doc?.createElement) {
+      return null;
+    }
+    const template = doc.createElement("template");
+    template.innerHTML = String(html || "");
+    return template.content;
+  }
+
+  function collectElementsByAttribute(root, selector, attributeName) {
+    const collected = new Map();
+    Array.from(root?.querySelectorAll?.(selector) || []).forEach((element) => {
+      const value = typeof element?.getAttribute === "function"
+        ? String(element.getAttribute(attributeName) || "").trim()
+        : "";
+      if (value) {
+        collected.set(value, element);
+      }
+    });
+    return collected;
+  }
+
+  function patchGrtResultOverlayNodes(liveRoot, nextRoot) {
+    let touched = false;
+    [
+      ["[data-grt-result-overlay-key]", "data-grt-result-overlay-key"],
+      ["[data-grt-result-overlay-layer]", "data-grt-result-overlay-layer"],
+    ].forEach(([selector, attributeName]) => {
+      const nextNodes = collectElementsByAttribute(nextRoot, selector, attributeName);
+      if (!nextNodes.size) {
+        return;
+      }
+      Array.from(liveRoot?.querySelectorAll?.(selector) || []).forEach((liveNode) => {
+        const marker = String(liveNode?.getAttribute?.(attributeName) || "").trim();
+        const nextNode = marker ? nextNodes.get(marker) : null;
+        if (!nextNode) {
+          return;
+        }
+        const nextMarkup = String(nextNode.innerHTML ?? "");
+        if (String(liveNode.innerHTML ?? "") !== nextMarkup) {
+          liveNode.innerHTML = nextMarkup;
+          touched = true;
+        }
+      });
+    });
+    return touched;
+  }
+
+  function patchGrtResultToastNode(liveRoot, nextRoot) {
+    const liveToast = liveRoot?.querySelector?.(".grt-result-toast") || null;
+    const nextToast = nextRoot?.querySelector?.(".grt-result-toast") || null;
+    if (liveToast && nextToast) {
+      if (String(liveToast.outerHTML || "") !== String(nextToast.outerHTML || "")) {
+        liveToast.replaceWith(nextToast);
+      }
+      return;
+    }
+    if (liveToast) {
+      liveToast.remove?.();
+      return;
+    }
+    if (nextToast?.nodeType === 1) {
+      // The renderers place the toast directly after the card/track head.
+      const anchor = liveRoot?.querySelector?.(".subview-panel-head")
+        || liveRoot?.querySelector?.(".assembly-track-panel-head")
+        || liveRoot?.firstElementChild
+        || null;
+      anchor?.insertAdjacentElement?.("afterend", nextToast);
+    }
+  }
+
+  // Toggling the GRT result switch must not rebuild the whole view: the visual
+  // layers are patched in place so the plot keeps its scroll and zoom state.
+  function patchGrtResultOverlaysDom(host, store, scope) {
+    const normalizedScope = scope === "main" ? "main" : "subview";
+    const routeHost = host?.closest?.("#route-host") || host;
+    if (!routeHost?.querySelector) {
+      return false;
+    }
+    const liveRoot = normalizedScope === "main"
+      ? routeHost.querySelector('[data-grt-result-card="main"]')?.closest?.(".assembly-track-unified") || null
+      : routeHost.querySelector("[data-subview-panel='1']");
+    if (!liveRoot) {
+      return false;
+    }
+    const state = store.getState();
+    const nextHtml = normalizedScope === "main"
+      ? renderAssemblyMainTrackSections(state)
+      : typeof renderAssemblySubviewPanel === "function"
+        ? renderAssemblySubviewPanel(state)
+        : "";
+    const nextRoot = createRenderedContent(routeHost, nextHtml);
+    if (!nextRoot) {
+      return false;
+    }
+    const overlaySelector = "[data-grt-result-overlay-key], [data-grt-result-overlay-layer]";
+    if (
+      nextRoot.querySelectorAll(overlaySelector).length
+      && !liveRoot.querySelectorAll?.(overlaySelector).length
+    ) {
+      // The mounted view does not expose the expected layers; rebuild instead
+      // of leaving stale overlays on screen.
+      return false;
+    }
+    patchGrtResultOverlayNodes(liveRoot, nextRoot);
+    patchGrtResultToastNode(liveRoot, nextRoot);
+    return true;
   }
 
   function patchAssemblyStatusToast(routeHost, nextContent) {
@@ -260,6 +371,7 @@ export function createAssemblyDomPatchController({
   return {
     createRenderedAssemblyMainTabContent,
     patchAssemblyStatusToast,
+    patchGrtResultOverlaysDom,
     patchDeletedPrimaryTrackCtgsDom,
     patchPrimaryHiddenCtgDom,
     replaceRenderedAssemblySection,

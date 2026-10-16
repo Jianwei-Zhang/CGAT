@@ -204,3 +204,20 @@ export function buildGrtResultScene({
     junctionMarkup,
   };
 }
+
+// Keep one stable container per overlay in the DOM, whether the precomputed
+// result is shown or hidden. Toggling the GRT switch then patches these layers
+// in place instead of rebuilding the panel (which drops the current scroll).
+export function renderGrtResultOverlayGroup({
+  entryKey = "",
+  layer = "",
+  markup = "",
+  escapeAttr = escapeFallback,
+} = {}) {
+  const normalizedKey = String(entryKey || "").trim();
+  const normalizedLayer = String(layer || "").trim();
+  const attribute = normalizedKey
+    ? ` data-grt-result-overlay-key="${escapeAttr(normalizedKey)}"`
+    : ` data-grt-result-overlay-layer="${escapeAttr(normalizedLayer)}"`;
+  return `<g class="grt-result-overlay"${attribute}>${markup}</g>`;
+}

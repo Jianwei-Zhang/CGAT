@@ -25,9 +25,30 @@ function overlapState() {
   } });
 }
 
+// Members may now nest overlay groups, so capture each group by tag depth
+// instead of stopping at the first closing tag.
+function sliceGroupMarkup(html, start) {
+  const tagPattern = /<g\b[^>]*>|<\/g>/g;
+  tagPattern.lastIndex = start;
+  let depth = 0;
+  let match;
+  while ((match = tagPattern.exec(html))) {
+    if (match[0] === "</g>") {
+      depth -= 1;
+      if (depth === 0) {
+        return html.slice(start, match.index + "</g>".length);
+      }
+    } else {
+      depth += 1;
+    }
+  }
+  return html.slice(start);
+}
+
 function memberGroups(state) {
-  return [...renderAssemblyPage(state).matchAll(/<g class="track-ctg-group[^\"]*" data-subview-composition-entity-key="([^\"]+)"([\s\S]*?)<\/g>/g)]
-    .map(([, key, markup]) => ({ key, markup }));
+  const html = renderAssemblyPage(state);
+  return [...html.matchAll(/<g class="track-ctg-group[^\"]*" data-subview-composition-entity-key="([^\"]+)"/g)]
+    .map((match) => ({ key: match[1], markup: sliceGroupMarkup(html, match.index) }));
 }
 
 test("composition paints overlapping short members in front independently in both lanes", () => {

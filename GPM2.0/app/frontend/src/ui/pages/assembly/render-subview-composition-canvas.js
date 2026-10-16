@@ -12,7 +12,7 @@ import {
 } from "./subview-anchor-state.js";
 import { buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
 import { buildSubviewGrtAnchorScene } from "./subview-grt-anchor-state.js";
-import { buildGrtResultScene } from "./grt-result-render.js";
+import { buildGrtResultScene, renderGrtResultOverlayGroup } from "./grt-result-render.js";
 import {
   renderSubviewVirtualRuler,
   resolveHitIdentityPct,
@@ -416,7 +416,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
     <title>${escapeHtml(title)}</title>
     <rect class="track-ctg subview-track-ctg${tone}" x="${member.x.toFixed(2)}" y="${y}"
       width="${member.width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4" pointer-events="all" />
-    ${grtOverlay}
+    ${renderGrtResultOverlayGroup({ entryKey: member.entityKey, markup: grtOverlay, escapeAttr })}
     ${renderNRegionMarkersForTrackCtg({
       ctg: candidate?.ctg, rect: member, y, barHeight: BAR_HEIGHT,
       isMirror: member.source?.mirrored,
@@ -612,7 +612,11 @@ export function renderSubviewCompositionAlignmentCard({
             tickLabelY: RULER_Y - 6 * Math.max(1, getGraphFontSize() / 12),
           })}
           ${bandMarkup}${emptyTop}${emptyBottom}
-          ${grtResult.context?.subviewEnabled ? grtScene.junctionMarkup : ""}
+          ${renderGrtResultOverlayGroup({
+            layer: "junction",
+            markup: grtResult.context?.subviewEnabled ? grtScene.junctionMarkup : "",
+            escapeAttr,
+          })}
           ${memberMarkup}
           ${renderEvidenceAnchors(bands, composition.activeAnchors, escapeAttr)}
           ${renderManualAnchors(layout, composition.manualAnchors, escapeAttr)}

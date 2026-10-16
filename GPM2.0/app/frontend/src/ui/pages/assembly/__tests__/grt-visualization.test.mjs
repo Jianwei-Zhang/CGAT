@@ -249,6 +249,46 @@ test("schema 2 renders independent GRT result switches and exact main-track over
   assert.doesNotMatch(html, /data-grt-result-toggle="subview" checked/);
 });
 
+test("schema 2 keeps GRT overlay containers in the DOM while the switches are off", () => {
+  const state = createState();
+  const baseline = state.assembly.grtProjectView.baselineFinalPathByChr.Chr01;
+  state.assembly.grtProjectView.recipe.finalPathSchemaVersion = "2";
+  baseline.grtDisplayAvailable = true;
+  baseline.segments[0].assemblySourceStart = 1;
+  baseline.segments[0].assemblySourceEnd = 800;
+  state.assembly.grtResultDisplayByChr = { Chr01: { main: false, subview: false } };
+  state.assembly.subview = {
+    mode: "2-contig",
+    selectedAContigId: 101,
+    selectedARole: "primary",
+    selectedBContigId: 202,
+    selectedBRole: "support",
+    message: "",
+    error: "",
+    summary: {
+      mode: "2-contig",
+      top: { contigId: 202, role: "support", contigName: "donor_unplaced" },
+      bottom: { contigId: 101, role: "primary", contigName: "primary_grt" },
+    },
+  };
+
+  // Hidden results keep empty layer containers so the switch can patch them in
+  // place instead of rebuilding the panel (which would drop the scroll state).
+  const hidden = renderAssemblyPage(state);
+  assert.match(hidden, /<g class="grt-result-overlay" data-grt-result-overlay-layer="junction"><\/g>/);
+  assert.match(hidden, /<g class="grt-result-overlay" data-grt-result-overlay-key="top"><\/g>/);
+  assert.match(hidden, /<g class="grt-result-overlay" data-grt-result-overlay-key="bottom"><\/g>/);
+  assert.doesNotMatch(hidden, /data-grt-result-overlay-(?:key|layer)="[^"]+">[^<]/);
+  assert.doesNotMatch(hidden, /class="grt-result-mask"/);
+  assert.doesNotMatch(hidden, /data-grt-result-interval="1"/);
+
+  state.assembly.grtResultDisplayByChr = { Chr01: { main: true, subview: true } };
+  const shown = renderAssemblyPage(state);
+  assert.match(shown, /data-grt-result-overlay-key="top">[\s\S]*?data-grt-result-interval="1"/);
+  assert.doesNotMatch(shown, /<g class="grt-result-overlay" data-grt-result-overlay-key="top"><\/g>/);
+  assert.match(shown, /class="grt-result-mask"/);
+});
+
 test("legacy schema 1 keeps both GRT result switches hidden", () => {
   const html = renderAssemblyPage(createState());
 

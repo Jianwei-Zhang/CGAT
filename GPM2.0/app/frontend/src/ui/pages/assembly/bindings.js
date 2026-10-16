@@ -455,6 +455,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     loadAssemblyView,
     loadNewSequencesTab,
     markNextTrackAutoFocusSuppressed,
+    patchGrtResultOverlays = null,
     persistMainTrackViewState,
     persistProjectAssemblyViewStateFromStore = async () => {},
     refreshSubviewPairwiseEvidence = () => {},
@@ -586,6 +587,18 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     });
   });
 
+  // The GRT switch only changes overlay layers. Patch them in place so the plot
+  // keeps its scroll/zoom instead of being rebuilt from scratch.
+  const patchGrtResultControlScope = (target, scope) => {
+    if (
+      typeof patchGrtResultOverlays === "function"
+      && patchGrtResultOverlays(target, store, scope) === true
+    ) {
+      return;
+    }
+    rerender(target, store);
+  };
+
   grtResultToggles.forEach((toggle) => {
     toggle.addEventListener("change", () => {
       const timerApi = deps.timerApi || globalThis;
@@ -612,7 +625,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
           grtResultToast: null,
         },
       });
-      deps.rerender(host, store);
+      patchGrtResultControlScope(host, scope);
       if (!enabled) {
         return;
       }
@@ -637,7 +650,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
           grtResultToast: { scope, chrName: context.chrName, token },
         },
       });
-      deps.rerender(host, store);
+      patchGrtResultControlScope(host, scope);
       assemblyPageSession.grtResultToastTimer = timerApi.setTimeout?.(() => {
         const current = store.getState();
         if (current.assembly?.grtResultToast?.token !== token) {
@@ -647,7 +660,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
           assembly: { ...current.assembly, grtResultToast: null },
         });
         assemblyPageSession.grtResultToastTimer = null;
-        deps.rerender(host, store);
+        patchGrtResultControlScope(host, scope);
       }, 3000) ?? null;
     });
   });
@@ -678,7 +691,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
           grtResultToast: null,
         },
       });
-      deps.rerender(host, store);
+      patchGrtResultControlScope(host, scope);
     });
   });
 

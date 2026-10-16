@@ -53,7 +53,7 @@ import {
 } from "./subview-history-state.js";
 import { assemblyPageSession } from "./page-session.js";
 import { buildGrtResultPlan, resolveGrtResultContext } from "./grt-result-state.js";
-import { buildGrtResultScene } from "./grt-result-render.js";
+import { buildGrtResultScene, renderGrtResultOverlayGroup } from "./grt-result-render.js";
 import { renderGrtResultControls } from "./grt-result-controls.js";
 import { renderSubviewToolsToggle } from "./render-subview-tools.js";
 import { buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
@@ -1896,7 +1896,11 @@ function renderSubviewAlignmentCard(
                 },
               )
               .join("")}
-            ${grtResult.context?.subviewEnabled ? grtResultScene.junctionMarkup : ""}
+            ${renderGrtResultOverlayGroup({
+              layer: "junction",
+              markup: grtResult.context?.subviewEnabled ? grtResultScene.junctionMarkup : "",
+              escapeAttr,
+            })}
             ${grtAnchorScene.markup}
             <g
               class="subview-track-ctg-group${topRowClass}"
@@ -1922,7 +1926,11 @@ function renderSubviewAlignmentCard(
               <rect class="track-ctg subview-track-ctg${topRowClass}" x="${svgModel.topBarX.toFixed(2)}" y="${svgModel.topBarY.toFixed(2)}" width="${svgModel.topBarWidth.toFixed(2)}" height="${svgModel.barHeight}" rx="4" ry="4" pointer-events="all">
                 <title>${escapeHtml(topCtgTitle)}</title>
               </rect>
-              ${grtResult.context?.subviewEnabled ? grtResultScene.overlaysByKey.get("top") || "" : ""}
+              ${renderGrtResultOverlayGroup({
+                entryKey: "top",
+                markup: grtResult.context?.subviewEnabled ? grtResultScene.overlaysByKey.get("top") || "" : "",
+                escapeAttr,
+              })}
               ${renderNRegionMarkersForTrackCtg({
                 ctg: topCtg,
                 rect: { x: svgModel.topBarX, width: svgModel.topBarWidth },
@@ -1981,7 +1989,11 @@ function renderSubviewAlignmentCard(
               <rect class="track-ctg subview-track-ctg${bottomRowClass}" x="${svgModel.bottomBarX.toFixed(2)}" y="${svgModel.bottomBarY.toFixed(2)}" width="${svgModel.bottomBarWidth.toFixed(2)}" height="${svgModel.barHeight}" rx="4" ry="4" pointer-events="all">
                 <title>${escapeHtml(bottomCtgTitle)}</title>
               </rect>
-              ${grtResult.context?.subviewEnabled ? grtResultScene.overlaysByKey.get("bottom") || "" : ""}
+              ${renderGrtResultOverlayGroup({
+                entryKey: "bottom",
+                markup: grtResult.context?.subviewEnabled ? grtResultScene.overlaysByKey.get("bottom") || "" : "",
+                escapeAttr,
+              })}
               ${renderNRegionMarkersForTrackCtg({
                 ctg: bottomCtg,
                 rect: { x: svgModel.bottomBarX, width: svgModel.bottomBarWidth },
@@ -3088,7 +3100,11 @@ function renderSubviewTrackPairAlignmentCard(
               >
                 <title>${escapeHtml(ctgTitle)}</title>
               </rect>
-              ${grtResult.context?.subviewEnabled ? grtResultScene.overlaysByKey.get(grtOverlayKey) || "" : ""}
+              ${renderGrtResultOverlayGroup({
+                entryKey: grtOverlayKey,
+                markup: grtResult.context?.subviewEnabled ? grtResultScene.overlaysByKey.get(grtOverlayKey) || "" : "",
+                escapeAttr,
+              })}
               ${renderNRegionMarkersForTrackCtg({
                 ctg, rect, y, barHeight: TRACK_BAR_HEIGHT, isMirror: layout.isMirror,
                 flipped: isSubviewPairwiseRangeMirrored(ctg), escapeAttr, escapeHtml,
@@ -3188,7 +3204,11 @@ function renderSubviewTrackPairAlignmentCard(
                 )
                 .join("")}
             </g>
-            ${grtResult.context?.subviewEnabled ? grtResultScene.junctionMarkup : ""}
+            ${renderGrtResultOverlayGroup({
+              layer: "junction",
+              markup: grtResult.context?.subviewEnabled ? grtResultScene.junctionMarkup : "",
+              escapeAttr,
+            })}
             ${grtAnchorScene.markup}
             ${renderTrackCtgs(resolvedTopLayout, topRoleClass)}
             ${renderTrackCtgs(resolvedBottomLayout, bottomRoleClass)}

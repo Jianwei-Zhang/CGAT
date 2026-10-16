@@ -83,7 +83,7 @@ import {
   getSubviewSlotToken,
 } from "./render-subview.js";
 import { buildGrtResultPlan, resolveGrtResultContext } from "./grt-result-state.js";
-import { buildGrtResultScene } from "./grt-result-render.js";
+import { buildGrtResultScene, renderGrtResultOverlayGroup } from "./grt-result-render.js";
 import { renderGrtResultControls } from "./grt-result-controls.js";
 
 export {
@@ -2325,7 +2325,11 @@ function renderAssemblyTracks(args) {
             >
               <title>${escapeHtml(ctg.name)} | start=${ctg.startBp} | len=${ctg.lengthBp}</title>
             </rect>
-            ${grtOverlayMarkup}
+            ${renderGrtResultOverlayGroup({
+              entryKey: grtOverlayKey,
+              markup: grtOverlayMarkup,
+              escapeAttr,
+            })}
             ${telomereMarkerMarkup}
             ${centromereMarkerMarkup}
             ${nRegionMarkerMarkup}
@@ -2437,7 +2441,11 @@ function renderAssemblyTracks(args) {
             <line class="track-ruler-line" x1="${refTrackX.toFixed(2)}" y1="${rulerTop}" x2="${(refTrackX + refTrackWidth).toFixed(2)}" y2="${rulerTop}" />
             ${tickLines}
             ${collinearityBands}
-            ${grtResultContext?.mainEnabled ? grtResultScene.junctionMarkup : ""}
+            ${renderGrtResultOverlayGroup({
+              layer: "junction",
+              markup: grtResultContext?.mainEnabled ? grtResultScene.junctionMarkup : "",
+              escapeAttr,
+            })}
             ${sourceGapConnections}
             ${rowBlocks}
             ${refRow}
