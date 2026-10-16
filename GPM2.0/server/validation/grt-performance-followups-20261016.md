@@ -1,9 +1,11 @@
 # Remaining performance opportunities (2026-10-16)
 
-Status: **source/metadata investigation only; no new performance test was run**.
-The user deferred nonessential code tests, integration and performance runs to a
-single later test phase. These are candidates, not implemented/validated speedups.
-The physical Step2/Step3 refactor is also untested after that instruction.
+Status: **three official-index/query-batching component experiments authorized
+and submitted; results pending**. See `grt-official-index-20261016.md`. The user
+still defers nonessential code tests and broad integration/regression runs. These
+are candidates, not implemented/validated production speedups. The physical
+Step2/Step3 refactor remains untested; the standalone benchmark does not import
+or certify it.
 
 ## Why the current headline improvement is small
 
@@ -134,6 +136,12 @@ Step2 gap-screen currently fails strict rejected-diagnostic equality, despite
 matching Q2 and source paths on the tested customer/history cases. It is **not**
 a validated strict-equivalent replacement and remains disabled by default.
 
+The difference can include evidence/usage audit rows and attempt/strategy
+statistics, not just a rejected-candidate count. `usage.tsv` records candidates
+and rejected outcomes too; fewer rows do not mean fewer actually consumed donors.
+Matching Q2 and source paths on tested inputs is not a proof that every accepted
+event field, decision reason or unseen repair outcome is unchanged.
+
 If the intended contract is exact final Q2/Q3/Q4, source paths and accepted repair
 semantics, while the number of *unaccepted diagnostic candidates* may differ, a
 separate fast mode can be revisited. This needs explicit user approval and full
@@ -142,10 +150,13 @@ reinterpret the user's self-only accuracy permission as permission to change GRT
 
 ## Deferred validation boundary
 
-No test job, benchmark, CLI smoke/import, or CI test was started for these
-candidates after the user's deferral. No source modification was made on 180 and
-no running job, cache, runtime or original historical input was changed. Existing
-remote controls and their prior result ledger certify their pinned source only.
+Following explicit user authorization, isolated official-tool benchmarks were
+submitted as jobs 40587362 (nucmer index reuse and query batching) and 40587363
+(refill minimap2 indexing/batching). No self-alignment-parameter experiment or
+broad regression was added. No existing running job, cache, runtime or original
+historical input was changed. Existing controls and prior result ledgers still
+certify only their pinned source. Full repair/event/evidence equivalence and the
+physical refactor remain for the later unified validation phase.
 
 Primary upstream source references for the pinned versions:
 
