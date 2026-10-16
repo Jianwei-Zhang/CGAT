@@ -1,0 +1,68 @@
+{
+  "boundary": "Fresh complete workflows from preparation through all reference/self/cross alignments, GRT and delivery packaging. Exact original recorded launch argv except output path and explicit optimized/Step3 scope settings. Same tool binaries and input content hashed on compute nodes. No numerical or upstream checkpoint reuse; OS cache and nodes may differ. Original jobs not rerun or modified. No results or speedup asserted yet.",
+  "cache_mode": "numerical-cold",
+  "checked_at": "2026-10-16T13:06:27+0800",
+  "execution": {
+    "grt_execution_profile": "optimized",
+    "refill": "production same-target batch and compatible index reuse",
+    "step2_scope": "full",
+    "step3_scope": "gap-screen"
+  },
+  "generated_config_verified": {
+    "both_cases": {
+      "grt_execution_profile": "optimized",
+      "grt_step2_mummer_scope": "full",
+      "grt_step3_mummer_scope": "gap-screen",
+      "self_min_chain_score": "200",
+      "self_minimizers": "100",
+      "threads": "16"
+    },
+    "skip_self": {
+      "self-m200-n100": "false",
+      "skip-self": "true"
+    }
+  },
+  "input_root": "/share/home/xbzhang26/cgat-reads-debug/gpm2665-full-input/source_snapshot",
+  "jobs": {
+    "self-m200-n100": {
+      "job_id": 40587588,
+      "node": "agent-X86-27",
+      "original_job": 40550763,
+      "state": "RUNNING"
+    },
+    "skip-self": {
+      "job_id": 40587587,
+      "node": "agent-X86-05",
+      "original_job": 40550762,
+      "state": "RUNNING"
+    }
+  },
+  "launcher_sha256": "9714dc63a85b2a626babb994d7e4e4165d61a9a1c971594160eb299bf6c25350",
+  "queue": "x86",
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/full-optimized-2665-20261016-6cc768d",
+  "source_archive_sha256": "d7718ee3ccedc73471da27a18249d505ffa579bf2d3ef09c5a36119d4f8da49b",
+  "source_revision": "6cc768d864dc2a541964dce080f0f8d938018938",
+  "status": "RUNNING_PREPARATION",
+  "threads_per_job": 16,
+  "tools_environment": "/share/home/xbzhang26/cgat-reads-debug/gpm2665-full-input/environment.sh",
+  "unchanged_parameters": {
+    "archive_format": "tar.gz",
+    "dataset_order": [
+      "hifiasm",
+      "nextdenovo",
+      "flye"
+    ],
+    "max_fill": 1000000,
+    "minimap_preset": "asm10",
+    "reads": false,
+    "reference": "Caryophyllales_ref",
+    "score": 60,
+    "self_min_chain_score": 200,
+    "self_minimizers": 100,
+    "tel": [
+      "TTTAGGG",
+      3
+    ],
+    "threads": 16
+  }
+}
