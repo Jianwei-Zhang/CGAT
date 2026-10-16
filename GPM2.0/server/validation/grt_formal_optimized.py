@@ -92,9 +92,9 @@ def fasta_dna(path):
     return records
 
 
-def generate_scripts(source, workspace, threads):
+def generate_scripts(source, workspace, threads, step2_scope="full"):
     text=(source/'prepare.sh').read_text()
-    names=('make_executable_if_supported','write_grt_step2_script','write_grt_step3_script',
+    names=('shell_quote','make_executable_if_supported','write_grt_step2_script','write_grt_step3_script',
            'write_grt_telomere_finalize_script')
     definitions=[]
     for name in names:
@@ -114,7 +114,21 @@ def generate_scripts(source, workspace, threads):
         script+=f'\nwrite_grt_{name}_script {q(str(workspace/f"run_grt_{name}.sh"))} {q(str(workspace))}\n'
     (workspace/'generate_formal_scripts.sh').write_text(script)
     subprocess.run(['bash',str(workspace/'generate_formal_scripts.sh')],check=True)
-    state=workspace/'.run_all';state.mkdir()
+    # This is an experiment-only override. Production prepare keeps Step2 full.
+    if step2_scope != 'full':
+        path=workspace/'run_grt_step2.sh'
+        text=path.read_text().replace('--step2-mummer-scope full', '--step2-mummer-scope '+step2_scope)
+        path.write_text(text)
+    for name in ('step2','step3','telomere_finalize'):
+        path=workspace/f'run_grt_{name}.sh'
+        words=shlex.split(path.read_text().splitlines()[-1])
+        expected=str(workspace/f'.prepare_lib/tools/grt_{name}.py')
+        if len(words)<4 or words[0]!='python3' or words[1]!=expected:
+            raise RuntimeError('Invalid generated production command: '+str(path))
+        if words[words.index('--server-dir')+1] != str(workspace):
+            raise RuntimeError('Missing/wrong generated workspace argument')
+        subprocess.run(['bash','-n',str(path)],check=True)
+    state=workspace/'.run_all';state.mkdir(exist_ok=True)
     with (state/'plan.tsv').open('w') as handle:
         handle.write('unit_id\tcommand_relpath\tdetail_log_relpath\n')
         for name in ('step2','step3','telomere_finalize'):
@@ -130,41 +144,49 @@ def main():
     parser.add_argument('--source',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--threads',type=int,default=8)
+    parser.add_argument('--step2-scope',choices=('full','gap-screen'),default='full')
+    parser.add_argument('--resume',action='store_true',help='Resume a NEW-only launcher failure with no numerical cache')
+    parser.add_argument('--paired-full',type=Path,help='Corresponding new optimized full-scope case; read-only timing/result reference')
     args=parser.parse_args()
-    args.output.mkdir(parents=True,exist_ok=False)
-    workspace=args.output/'optimized';workspace.mkdir()
+    args.output.mkdir(parents=True,exist_ok=args.resume)
+    workspace=args.output/'optimized';workspace.mkdir(exist_ok=args.resume)
+    if args.resume and (args.output/'report.json').exists():
+        history=args.output/'launcher-error-before-repair.json'
+        if not history.exists(): shutil.copy2(args.output/'report.json',history)
     report={'status':'RUNNING','dataset':args.name,'threads':args.threads,'checks':[],
-            'boundary':'Only new optimized GRT Step2(full)/Step3(gap-screen)/Step4 and Final Path export on every chromosome and full donors. Upstream assignment/reads-QC/Step1 frozen inputs reused. No old engine invocation, borrowed numerical cache, leaf realignment or delivery packaging. Not whole-pipeline timing.',
-            'old_results':str(args.old_results),'old_final':str(args.old_final),'timing_comparability':'Old timing/cache/resources may differ; no direct speedup ratio is asserted.'}
+            'boundary':'Only new optimized GRT Step2(selected scope)/Step3(gap-screen)/Step4 and Final Path export on every chromosome and full donors. Upstream assignment/reads-QC/Step1 frozen inputs reused. No old engine invocation, borrowed numerical cache, leaf realignment or delivery packaging. Not whole-pipeline timing.',
+            'old_results':str(args.old_results),'old_final':str(args.old_final),'step2_scope':args.step2_scope,
+            'validation_script_sha256':sha(Path(__file__)),'timing_comparability':'Old timing/cache/resources may differ; no direct speedup ratio is asserted.'}
     source_record=args.source/'SOURCE.json'
     if source_record.is_file(): report['source']=json.loads(source_record.read_text())
     def save():
         p=args.output/'report.json';tmp=p.with_suffix('.tmp')
         tmp.write_text(json.dumps(report,indent=2,sort_keys=True)+'\n');tmp.replace(p)
-    def check(label,expected,observed):
+    def check(label,expected,observed,category='core'):
         ok=expected==observed
-        row={'label':label,'status':'PASS' if ok else 'FAIL','expected_sha256':identity(expected),'observed_sha256':identity(observed)}
+        row={'label':label,'category':category,'status':'PASS' if ok else 'FAIL','expected_sha256':identity(expected),'observed_sha256':identity(observed)}
         if not ok:
             row['expected_preview']=repr(expected)[:2000];row['observed_preview']=repr(observed)[:2000]
         report['checks'].append(row);save();print(json.dumps(row),flush=True)
     save()
     try:
-        for name in ('data','metadata','grt/donors','grt/evidence/step1'):
-            shutil.copytree(args.prefix/name,workspace/name,copy_function=freeze_copy)
-        (workspace/'grt/q').mkdir()
-        for name in ('q0.fa','q0r1.fa','q0f.fa','q1.fa'):
-            if (args.prefix/'grt/q'/name).exists(): freeze_copy(args.prefix/'grt/q'/name,workspace/'grt/q'/name)
-        (workspace/'grt/checkpoints').mkdir()
-        for p in (args.prefix/'grt/checkpoints').glob('*.json'):
-            if p.stem=='donor_freeze' or p.stem.startswith('step1_'): shutil.copy2(p,workspace/'grt/checkpoints'/p.name)
-        for name in ('tools','lib','contracts','templates'):
-            shutil.copytree(args.source/name,workspace/'.prepare_lib'/name,ignore=shutil.ignore_patterns('__pycache__'))
-        if (args.prefix/'tel').exists(): shutil.copytree(args.prefix/'tel',workspace/'tel',copy_function=freeze_copy)
-        generate_scripts(args.source,workspace,args.threads)
+        if not args.resume:
+            for name in ('data','metadata','grt/donors','grt/evidence/step1'):
+                shutil.copytree(args.prefix/name,workspace/name,copy_function=freeze_copy)
+            (workspace/'grt/q').mkdir()
+            for name in ('q0.fa','q0r1.fa','q0f.fa','q1.fa'):
+                if (args.prefix/'grt/q'/name).exists(): freeze_copy(args.prefix/'grt/q'/name,workspace/'grt/q'/name)
+            (workspace/'grt/checkpoints').mkdir()
+            for p in (args.prefix/'grt/checkpoints').glob('*.json'):
+                if p.stem=='donor_freeze' or p.stem.startswith('step1_'): shutil.copy2(p,workspace/'grt/checkpoints'/p.name)
+            for name in ('tools','lib','contracts','templates'):
+                shutil.copytree(args.source/name,workspace/'.prepare_lib'/name,ignore=shutil.ignore_patterns('__pycache__'))
+            if (args.prefix/'tel').exists(): shutil.copytree(args.prefix/'tel',workspace/'tel',copy_function=freeze_copy)
+        generate_scripts(args.source,workspace,args.threads,args.step2_scope)
         options=workspace/'metadata/prepare_options.tsv'
         values={row['key']:row['value'] for row in read_tsv(options)}
         values.update(threads=str(args.threads),grt_execution_profile='optimized',
-                      grt_step2_mummer_scope='full',grt_step3_mummer_scope='gap-screen')
+                      grt_step2_mummer_scope=args.step2_scope,grt_step3_mummer_scope='gap-screen')
         with options.open('w') as handle:
             handle.write('key\tvalue\n')
             for key,value in values.items(): handle.write(key+'\t'+value+'\n')
@@ -176,7 +198,7 @@ def main():
         if any(c['status']=='FAIL' for c in report['checks']): raise RuntimeError('Input identity gate failed')
         command=[sys.executable,str(workspace/'.prepare_lib/tools/run_all_runner.py'),'--server-dir',str(workspace)]
         started=time.monotonic()
-        with (args.output/'formal_run.log').open('w') as log: subprocess.run(command,stdout=log,stderr=subprocess.STDOUT,check=True)
+        with (args.output/'formal_run.log').open('a') as log: subprocess.run(command,stdout=log,stderr=subprocess.STDOUT,check=True)
         report['new_suffix_seconds']=time.monotonic()-started
         report['stage_timings']=read_tsv(workspace/'logs/status.tsv')
         evidence_fields=('stage','evidence_type','status','q_version','source_dataset','source_contig','source_start','source_end',
@@ -189,22 +211,32 @@ def main():
             old=json.loads((before/'result.json').read_text());new=json.loads((after/'result.json').read_text())
             check(qversion+' file',old['q_output_sha256'],sha(workspace/'grt/q'/f'{qversion}.fa'))
             check(qversion+' ordered source paths',paths(old['q_rows']),paths(new['q_rows']))
-            check(stage+' events',events(old['events']),events(new['events']))
+            check(stage+' events',events(old['events']),events(new['events']),'audit')
+            check(stage+' accepted events',events([r for r in old['events'] if r.get('status')=='accepted']),
+                  events([r for r in new['events'] if r.get('status')=='accepted']))
             check(stage+' accepted intervals',selected(old['accepted_intervals'],usage_fields[1:5]),selected(new['accepted_intervals'],usage_fields[1:5]))
-            check(stage+' evidence semantics',selected(old['evidence_rows'],evidence_fields),selected(new['evidence_rows'],evidence_fields))
-            check(stage+' usage semantics',selected(old['usage_rows'],usage_fields),selected(new['usage_rows'],usage_fields))
-            check(stage+' attempts',selected(old['attempts'],attempt_fields),selected(new['attempts'],attempt_fields))
+            check(stage+' evidence semantics',selected(old['evidence_rows'],evidence_fields),selected(new['evidence_rows'],evidence_fields),'audit')
+            check(stage+' usage semantics',selected(old['usage_rows'],usage_fields),selected(new['usage_rows'],usage_fields),'audit')
+            check(stage+' attempts',selected(old['attempts'],attempt_fields),selected(new['attempts'],attempt_fields),'audit')
             field='strategies' if stage=='step2' else 'classification_rows'
             keys=sorted(set().union(*(set(row) for row in old[field]+new[field]))-trace)
-            check(stage+' '+field,selected(old[field],keys),selected(new[field],keys))
+            check(stage+' '+field,selected(old[field],keys),selected(new[field],keys),'audit')
+            check(stage+' consumed donor usage',selected([r for r in old['usage_rows'] if r.get('status')=='consumed'],usage_fields),
+                  selected([r for r in new['usage_rows'] if r.get('status')=='consumed'],usage_fields))
+            if stage=='step2':
+                decision_fields=('chr','strategy','strategy_applied','accepted_patch_count','accepted_fallback_count','reason')
+                check('step2 applied strategy',selected(old[field],decision_fields),selected(new[field],decision_fields))
+            else:
+                check('step3 accepted classification',selected([r for r in old[field] if r.get('outcome')=='accepted'],keys),
+                      selected([r for r in new[field] if r.get('outcome')=='accepted'],keys))
             if stage=='step2':
                 for name in ('candidates.tsv','rejections.tsv'):
                     left,right=read_tsv(before/name),read_tsv(after/name)
                     keys=sorted(set().union(*(set(row) for row in left+right))-trace)
-                    check('step2 ordered '+name,[[row.get(k,'') for k in keys] for row in left],[[row.get(k,'') for k in keys] for row in right])
+                    check('step2 ordered '+name,[[row.get(k,'') for k in keys] for row in left],[[row.get(k,'') for k in keys] for row in right],'audit')
             cp=json.loads((workspace/f'grt/checkpoints/{stage}.json').read_text())
             check(stage+' optimized enabled','optimized',cp['fingerprint_payload']['execution_profile'])
-            check(stage+' scope','full' if stage=='step2' else 'gap-screen',cp['fingerprint_payload']['mummer_scope'])
+            check(stage+' scope',args.step2_scope if stage=='step2' else 'gap-screen',cp['fingerprint_payload']['mummer_scope'])
         old_doc=json.loads((args.old_final/'metadata/grt_final_path.json').read_text())
         new_doc=json.loads((workspace/'metadata/grt_final_path.json').read_text())
         check('old Q4 artifact identity',old_stages['finalize']['q_output_sha256'],sha(args.old_final/'grt/q/q4.fa'))
@@ -230,13 +262,29 @@ def main():
         for stage in ('step4_telomere','finalize'):
             cp=json.loads((workspace/f'grt/checkpoints/{stage}.json').read_text());check(stage+' genuine checkpoint','success',cp['status'])
         report['refill_batches']=[json.loads(p.read_text()) for p in (workspace/'grt/evidence/step3/refill').glob('*/batch/provenance.json')]
-        report['status']='PASS' if all(c['status']=='PASS' for c in report['checks']) else 'FAIL'
+        report['core_status']='PASS' if all(c['status']=='PASS' for c in report['checks'] if c['category']=='core') else 'FAIL'
+        report['audit_status']='PASS' if all(c['status']=='PASS' for c in report['checks'] if c['category']=='audit') else 'DIFFERENT'
+        final_labels=('q4 file','Final Path ordered source intervals orientations kinds and DNA','Final Path exported chromosome names order lengths DNA')
+        report['final_path_status']='PASS' if all(c['status']=='PASS' for c in report['checks'] if c['label'] in final_labels) else 'FAIL'
+        report['status']=('FAIL' if report['core_status']!='PASS' else 'PASS' if report['audit_status']=='PASS'
+                          else 'CORE_PASS_AUDIT_DIFFERENT' if args.step2_scope=='gap-screen' else 'FAIL')
+        if args.paired_full:
+            report['paired_full']=str(args.paired_full)
+            pair=args.paired_full/'report.json'
+            if pair.is_file():
+                full=json.loads(pair.read_text())
+                report['paired_full_observed_status']=full['status']
+                if full.get('new_suffix_seconds') and full.get('threads')==args.threads:
+                    report['paired_timing']={'full_seconds':full['new_suffix_seconds'],'gap_seconds':report['new_suffix_seconds'],
+                                            'wall_reduction_fraction':1-report['new_suffix_seconds']/full['new_suffix_seconds'],
+                                            'boundary':'Same pinned new runtime/resources and empty numerical caches; one pass, different nodes/OS caches may affect timing.'}
+        report['result_semantics']='Full audit equality is distinct from core/Final Path equality. No default scope change is authorized by this experiment.'
     except BaseException:
         report['status']='ERROR';report['exception']=traceback.format_exc();raise
     finally:
         save()
     print('FORMAL_OPTIMIZED_RESULT',report['status'],len(report['checks']),flush=True)
-    if report['status']!='PASS': raise SystemExit('Full-data result comparison failed; keep artifacts')
+    if report['status'] not in {'PASS','CORE_PASS_AUDIT_DIFFERENT'}: raise SystemExit('Full-data result comparison failed; keep artifacts')
 
 
 if __name__=='__main__': main()

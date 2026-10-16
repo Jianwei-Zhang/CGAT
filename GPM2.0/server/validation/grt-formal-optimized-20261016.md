@@ -85,3 +85,29 @@ Five NEW-only complete-data suffix jobs were submitted and started at 11:55 CST:
 
 Final result/Final Path equality is still pending for all five. The preserved
 old engines were not launched. Full detail: `grt-formal-optimized-results-20261016.json`.
+
+## 12:00 CST correction and Step2 screen supplement
+
+The first five full-data submissions 40587489-40587493 **failed at launcher
+startup**: the validation generator extracted the production stage functions but
+omitted their `shell_quote` helper, producing empty command arguments. They did
+not execute nucmer/minimap2. Their earlier RUNNING snapshot is historical, not a
+current successful alignment claim. The real production refill PASS is unaffected.
+
+The corrected validation launcher extracts the quoting helper too and validates
+the resulting argument vector and Bash syntax before starting any stage. Both
+full and experimental gap-screen scripts, including paths containing spaces,
+pass a targeted generation check. Production prepare defaults remain unchanged.
+
+Full-scope NEW runs resume only these failed, still-numerical-cold test workspaces;
+old engines and original two full producers are not touched. Five additional
+NEW-only Step2 gap-screen cases use independent empty caches, matching inputs,
+thread budgets, runtime, Step3 scope and refill mode. Each records Stage2 and
+GRT-suffix wall times; matching full-group timing is joined when available.
+
+Core/Final Path equality is recorded separately from audit equality. Core checks
+include Q2/Q3/Q4 hashes and ordered paths, accepted events/consumed donor usage,
+applied strategy, accepted classifications, final accepted repairs and complete
+semantic Final Path plus exported DNA. Audit differences retain their failed
+checks and previews; `CORE_PASS_AUDIT_DIFFERENT` is not strict equivalence or
+permission to enable Step2 screening by default. Any core change remains FAIL.

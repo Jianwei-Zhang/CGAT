@@ -4449,7 +4449,7 @@
     "production_refill_job": 40587487,
     "remote_boundary": "Only new optimized complete-data GRT suffix runs; old results read-only. No baseline reruns or numerical-cache borrowing.",
     "source_revision": "7ba84ea",
-    "status": "PRODUCTION_REFILL_PASS_FULL_DATA_RUNNING"
+    "status": "PRODUCTION_REFILL_PASS_FIRST_FULL_LAUNCH_HARNESS_FAILED"
   },
   "pending_physical_stage_split": {
     "base_validated_revision": "2f52515e659ad75bea614d648880f2b6d621ed1b",

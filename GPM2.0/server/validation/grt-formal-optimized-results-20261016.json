@@ -1,5 +1,16 @@
 {
   "boundary": "Only new optimized complete-data GRT suffix runs; old results read-only. No baseline reruns, numerical-cache borrowing, full leaf/reads-QC reexecution or release-acceptance claim.",
+  "first_launch_failure": {
+    "cause": "Validation generator omitted shell_quote; empty arguments. No numerical alignments were run.",
+    "corrected_launcher_checks": "Full/gap script arguments, whitespace quoting and bash syntax pass",
+    "jobs": [
+      40587489,
+      40587490,
+      40587491,
+      40587492,
+      40587493
+    ]
+  },
   "full_data_jobs": {
     "jobs": {
       "10g_no_reads": 40587489,
@@ -150,5 +161,5 @@
   "production_refill_job": 40587487,
   "source_archive_sha256": "74c8860a4ac20d48e4932576cfbcbf20e5794d270a211f99a012914fde715579",
   "source_revision": "7ba84ea",
-  "status": "REMOTE_FULL_DATA_RUNNING"
+  "status": "FIRST_LAUNCH_FAILED_HARNESS_REPAIR_PREPARED"
 }
