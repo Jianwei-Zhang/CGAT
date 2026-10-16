@@ -432,6 +432,13 @@ function bindProjectEntryControls(host, store) {
     if (busy()) return;
     updateImporterState(store, {
       importDialogOpen: true,
+      // A new import must not reuse an opened or failed workspace as its target.
+      // Closing/retrying the current dialog still preserves that dialog's inputs.
+      importSource: "zip",
+      zipPath: "",
+      extractedPath: "",
+      workspaceRoot: "",
+      projectNameInput: "",
       requireNewWorkspace: false,
       projectError: "",
       pendingProjectPath: "",

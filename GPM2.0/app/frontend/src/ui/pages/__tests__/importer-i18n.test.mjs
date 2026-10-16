@@ -1300,6 +1300,113 @@ test("importer feedback toast dismisses after one second", () => {
   assert.deepEqual(dismissed, [true]);
 });
 
+test("a new import starts with an independent form and retains failed history", () => {
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  try {
+    globalThis.window = { localStorage: { getItem: () => JSON.stringify([{ path: "D:/failed" }]) } };
+    globalThis.document = { querySelector: () => null };
+    const start = createButton();
+    const host = createHost({ "#project-import-button": start });
+    const state = createImporterScrollState({
+      inFlight: false, importRunId: null, importSource: "extracted",
+      zipPath: "D:/old.zip", extractedPath: "D:/failed", workspaceRoot: "D:/failed",
+      projectNameInput: "Failed project", projectError: "Directory is not empty",
+      pendingProjectPath: "D:/failed", requireNewWorkspace: true,
+      historyValidation: { "D:/failed": { ok: false, message: "Missing project.sqlite" } },
+      historyValidatedPaths: ["D:/failed"],
+    });
+    state.session = { workspacePath: "D:/current", projectId: 1, projectName: "Current" };
+    const store = createStore(state);
+    bindImporterPage(host, store);
+    start.click();
+    const importer = store.getState().importer;
+    assert.equal(importer.importDialogOpen, true);
+    assert.equal(importer.importSource, "zip");
+    for (const field of ["zipPath", "extractedPath", "workspaceRoot", "projectNameInput", "projectError", "pendingProjectPath"]) {
+      assert.equal(importer[field], "", field);
+    }
+    assert.equal(importer.requireNewWorkspace, false);
+    assert.equal(store.getState().session, state.session);
+    assert.equal(store.getState().initializer, state.initializer);
+    assert.equal(importer.historyValidation, state.importer.historyValidation);
+    assert.deepEqual(importer.historyValidatedPaths, ["D:/failed"]);
+    assert.match(host.innerHTML, /id="import-zip-start-button"[^>]*disabled/);
+  } finally {
+    globalThis.window = previousWindow;
+    globalThis.document = previousDocument;
+  }
+});
+
+for (const source of ["zip", "extracted"]) {
+  test(`${source} import succeeds after an import failure without deleting failed history`, async () => {
+    const previousWindow = globalThis.window;
+    const previousDocument = globalThis.document;
+    const calls = [];
+    const failedValidation = { "D:/failed": { ok: false, message: "Missing project.sqlite" } };
+    try {
+      globalThis.document = { querySelector: () => null };
+      globalThis.window = {
+        localStorage: { getItem: () => JSON.stringify([{ path: "D:/failed" }]) },
+        dispatchEvent() {}, setTimeout: () => 1, clearTimeout() {},
+        __TAURI__: { core: { invoke: async (command, args) => {
+          calls.push({ command, args });
+          if (command === `import_${source}`) {
+            const path = source === "zip" ? args.workspaceRoot : args.extractedPath;
+            if (path === "D:/failed") throw new Error("workspace root already exists and is not empty");
+            assert.equal(path, "D:/new");
+            return { workspaceRoot: "D:/new", message: "Imported" };
+          }
+          assert.equal(command, "open_workspace");
+          assert.equal(args.workspaceRoot, "D:/new");
+          return { workspaceRoot: "D:/new", references: [], datasets: [],
+            existingProjects: [{ projectId: 2, projectName: "New", autoPipelineDone: true }] };
+        } } },
+      };
+      const importButton = createButton();
+      const newButton = Object.assign(createButton(), { focus() {} });
+      const closeButton = createButton();
+      const host = createHost({
+        [`#import-${source}-start-button`]: importButton,
+        "#project-import-button": newButton,
+        "[data-project-import-close]": closeButton,
+      });
+      const state = createImporterScrollState({
+        inFlight: false, importRunId: null, importDialogOpen: true, importSource: source,
+        zipPath: "D:/failed.zip", workspaceRoot: "D:/failed", extractedPath: "D:/failed",
+        projectNameInput: "Old", historyValidation: failedValidation, historyValidatedPaths: ["D:/failed"],
+      });
+      const store = createStore(state);
+      bindImporterPage(host, store);
+      await importButton.click();
+      assert.equal(store.getState().importer.inFlight, false);
+      assert.equal(store.getState().importer.importDialogOpen, true);
+      assert.match(store.getState().importer.projectError, /already exists/);
+      assert.equal(store.getState().importer.workspaceRoot, "D:/failed");
+      assert.equal(store.getState().importer.extractedPath, "D:/failed");
+      assert.equal(store.getState().importer.projectNameInput, "Old");
+      closeButton.click();
+      newButton.click();
+      assert.equal(store.getState().importer.workspaceRoot, "");
+      assert.equal(store.getState().importer.extractedPath, "");
+      store.setState({ importer: { ...store.getState().importer, importSource: source,
+        zipPath: "D:/new.zip", workspaceRoot: "D:/new", extractedPath: "D:/new" } });
+      await importButton.click();
+      assert.deepEqual(calls.map(call => call.command), [`import_${source}`, `import_${source}`, "open_workspace"]);
+      assert.equal(store.getState().session.workspacePath, "D:/new");
+      assert.equal(store.getState().session.projectId, 2);
+      assert.equal(store.getState().importer.inFlight, false);
+      assert.equal(store.getState().importer.importDialogOpen, false);
+      assert.equal(store.getState().importer.projectError, "");
+      assert.deepEqual(store.getState().importer.historyValidation, failedValidation);
+      assert.deepEqual(store.getState().importer.historyValidatedPaths, ["D:/failed"]);
+    } finally {
+      globalThis.window = previousWindow;
+      globalThis.document = previousDocument;
+    }
+  });
+}
+
 test("importer english missing-parameter feedback stays translated after binding", async () => {
   const previousDocument = globalThis.document;
   const previousSetTimeout = globalThis.setTimeout;
