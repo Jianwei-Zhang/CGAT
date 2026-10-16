@@ -1,0 +1,154 @@
+{
+  "boundary": "Only new optimized complete-data GRT suffix runs; old results read-only. No baseline reruns, numerical-cache borrowing, full leaf/reads-QC reexecution or release-acceptance claim.",
+  "full_data_jobs": {
+    "jobs": {
+      "10g_no_reads": 40587489,
+      "10g_with_reads": 40587490,
+      "customer2665": 40587493,
+      "test8_fixed": 40587491,
+      "zebrafish": 40587492
+    },
+    "source_revision": "7ba84ea",
+    "submitted_at": "2026-10-16T11:55:31+0800"
+  },
+  "production_refill": {
+    "boundary": "New production batching only; retained real customer refill PAFs are the reference. No old minimap2 baseline invocation.",
+    "checks": [
+      {
+        "chromosome": "chr-0fb4454bb6b542df",
+        "round": "round1",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-3dbf12174574e9de",
+        "round": "round1",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-89b0765649912e5c",
+        "round": "round1",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-9aa51a819258ffd0",
+        "round": "round1",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-aa0481bd0f544eb8",
+        "round": "round1",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-bcf74573929310e0",
+        "round": "round1",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-e840047493708997",
+        "round": "round1",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-e874bdd71cd245a9",
+        "round": "round1",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-0fb4454bb6b542df",
+        "round": "round2",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-3dbf12174574e9de",
+        "round": "round2",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-89b0765649912e5c",
+        "round": "round2",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-9aa51a819258ffd0",
+        "round": "round2",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-aa0481bd0f544eb8",
+        "round": "round2",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-bcf74573929310e0",
+        "round": "round2",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-e840047493708997",
+        "round": "round2",
+        "status": "PASS"
+      },
+      {
+        "chromosome": "chr-e874bdd71cd245a9",
+        "round": "round2",
+        "status": "PASS"
+      },
+      {
+        "label": "same target index actually reused in round2",
+        "status": "PASS"
+      }
+    ],
+    "rounds": [
+      {
+        "provenance": {
+          "batch_cache_relpath": "grt/cache/step23/raw_refill_batch/v1/step3_refill_round1/2933bcb4f3a87a586fda09cffd2c8a9e65b5d95221b7017684c0c3f61ee36b21",
+          "batch_fingerprint": "2933bcb4f3a87a586fda09cffd2c8a9e65b5d95221b7017684c0c3f61ee36b21",
+          "index_cache_hit": false,
+          "index_fingerprint": "f8370388340d3c161f6fb49f65b8d2dc3971c639cd63b9abd626654199cbf09d",
+          "index_relpath": "grt/cache/minimap_index/v1/f8370388340d3c161f6fb49f65b8d2dc3971c639cd63b9abd626654199cbf09d",
+          "mapping_seconds": 40.0919590590056,
+          "mode": "same_target_batch",
+          "query_count": 50,
+          "query_sha256": "e1af949820bc888d6e6c963bfd1490a45cee7b85ca1307998289d81843e1c9e8",
+          "target_sha256": "77fea663243cf4e58e68b5598c06300b2721703f37ae34df7523ca92aa6653de",
+          "tool": {
+            "command": "minimap2",
+            "resolved": "/share/home/xbzhang26/cgat-reads-debug/gpm2665-20261015/build/minimap2-2.30/minimap2",
+            "sha256": "0e1e27b9812290f3e16b51b0e52063f6ca5c760d6365515fc0e5d26bda6075ed",
+            "version": "2.30-r1287"
+          }
+        },
+        "round": "round1",
+        "seconds": 42.744933964218944
+      },
+      {
+        "provenance": {
+          "batch_cache_relpath": "grt/cache/step23/raw_refill_batch/v1/step3_refill_round2/7adfed5fcb29f553a4069a12b10590a6bfe83df04de41ac604b7d59b2a017fcf",
+          "batch_fingerprint": "7adfed5fcb29f553a4069a12b10590a6bfe83df04de41ac604b7d59b2a017fcf",
+          "index_cache_hit": true,
+          "index_fingerprint": "f8370388340d3c161f6fb49f65b8d2dc3971c639cd63b9abd626654199cbf09d",
+          "index_relpath": "grt/cache/minimap_index/v1/f8370388340d3c161f6fb49f65b8d2dc3971c639cd63b9abd626654199cbf09d",
+          "mapping_seconds": 4.6570357559248805,
+          "mode": "same_target_batch",
+          "query_count": 34,
+          "query_sha256": "1a899cb55271cad9ad8238e42e840d36976a5014e373d286e07f17ff3bfb8f09",
+          "target_sha256": "77fea663243cf4e58e68b5598c06300b2721703f37ae34df7523ca92aa6653de",
+          "tool": {
+            "command": "minimap2",
+            "resolved": "/share/home/xbzhang26/cgat-reads-debug/gpm2665-20261015/build/minimap2-2.30/minimap2",
+            "sha256": "0e1e27b9812290f3e16b51b0e52063f6ca5c760d6365515fc0e5d26bda6075ed",
+            "version": "2.30-r1287"
+          }
+        },
+        "round": "round2",
+        "seconds": 10.884333178866655
+      }
+    ],
+    "status": "PASS"
+  },
+  "production_refill_job": 40587487,
+  "source_archive_sha256": "74c8860a4ac20d48e4932576cfbcbf20e5794d270a211f99a012914fde715579",
+  "source_revision": "7ba84ea",
+  "status": "REMOTE_FULL_DATA_RUNNING"
+}

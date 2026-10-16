@@ -4432,14 +4432,24 @@
       "step3_scope": "gap-screen"
     },
     "engine_version": 14,
+    "full_data_jobs": {
+      "10g_no_reads": 40587489,
+      "10g_with_reads": 40587490,
+      "customer2665": 40587493,
+      "test8_fixed": 40587491,
+      "zebrafish": 40587492
+    },
     "local_evidence": {
       "prepare_metadata_shell": "PASS",
       "refill_focused": 6,
       "repair_integration": 7,
       "run_option_forwarding": "PASS"
     },
+    "production_refill_checks": 17,
+    "production_refill_job": 40587487,
     "remote_boundary": "Only new optimized complete-data GRT suffix runs; old results read-only. No baseline reruns or numerical-cache borrowing.",
-    "status": "LOCAL_FOCUSED_PASS_REMOTE_FULL_DATA_PENDING"
+    "source_revision": "7ba84ea",
+    "status": "PRODUCTION_REFILL_PASS_FULL_DATA_RUNNING"
   },
   "pending_physical_stage_split": {
     "base_validated_revision": "2f52515e659ad75bea614d648880f2b6d621ed1b",

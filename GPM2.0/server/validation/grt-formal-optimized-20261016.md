@@ -1,7 +1,8 @@
 # Formal optimized GRT rollout (2026-10-16)
 
-Status: local focused integration checks passed; remote complete-data comparisons
-pending. This is not a released/fully accepted runtime yet.
+Status: local focused integration checks and real production refill passed;
+five remote complete-data comparisons running. This is not a released/fully
+accepted runtime yet.
 
 ## Authorized boundary
 
@@ -62,3 +63,25 @@ No alignment threshold, reference/query role or donor partition boundary changes
    old timings with different cache/resource conditions. No old engine is run.
 
 Final source-asset refresh remains gated on remote results and delivery closure.
+
+## 11:56 CST checkpoint
+
+Runtime pinned to `7ba84ea`, archive SHA-256
+`74c8860a4ac20d48e4932576cfbcbf20e5794d270a211f99a012914fde715579`;
+verified on 180 before extraction. Production refill job **40587487** succeeded:
+all 16 chromosome/round PAF files are byte-identical to retained old artifacts,
+and actual second-round index reuse passes (17 checks). New production wall
+times including cache publication were 42.745s and 10.884s, not whole-GRT times.
+
+Five NEW-only complete-data suffix jobs were submitted and started at 11:55 CST:
+
+| Dataset | Job | CPUs | Last observed state |
+| --- | ---: | ---: | --- |
+| 10g no reads | 40587489 | 8 | RUNNING; three input/cache-identity gates pass |
+| 10g with reads | 40587490 | 8 | RUNNING; three input/cache-identity gates pass |
+| test8 fixed | 40587491 | 8 | RUNNING; three input/cache-identity gates pass |
+| zebrafish | 40587492 | 8 | RUNNING; three input/cache-identity gates pass |
+| customer 2665 | 40587493 | 16 | RUNNING; three input/cache-identity gates pass |
+
+Final result/Final Path equality is still pending for all five. The preserved
+old engines were not launched. Full detail: `grt-formal-optimized-results-20261016.json`.
