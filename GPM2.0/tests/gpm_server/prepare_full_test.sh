@@ -263,16 +263,32 @@ EOF
 
   PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
 
-  grep -F 'minimap2 -c -x asm5 -X --no-hash-name -m 200 -n 100 -t "${GPM_TASK_THREADS:-12}"' "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >/dev/null || {
-    echo "expected chr-local self command to use canonical pair aliases, asm5, -X, --no-hash-name, -m 200, -n 100, and 12 threads" >&2
-    cat "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >&2
-    exit 1
-  }
-  grep -F 'restore_self_paf.py' "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >/dev/null || {
-    echo "expected chr-local self command to restore canonical contig names" >&2
-    cat "${output_root}/runs/chr_Chr01/ds_a_vs_self/command.sh" >&2
-    exit 1
-  }
+  python3 - "$output_root" <<'PYBATCH'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+run = root / "runs/chr_Chr01/ds_a_vs_self"
+manifest_path = run / "self_batch_manifest.json"
+manifest = json.loads(manifest_path.read_text())
+assert manifest["preset"] == "asm5"
+assert manifest["min_chain_score"] == 200
+assert manifest["minimizers"] == 100
+assert Path(manifest["restore"]) == run / "restore_self_paf.py"
+assert Path(manifest["restore"]).is_file()
+assert Path(manifest["target"]).read_text().startswith(">gpm_pair_000000001a\n")
+assert Path(manifest["query"]).read_text().startswith(">gpm_pair_000000001b\n")
+assert len(manifest["batches"]) == 1
+batch = manifest["batches"][0]
+command = Path(batch["directory"]) / "command.sh"
+assert str(command) in (run / "command.sh").read_text()
+assert "self_alignment_batches.py" in command.read_text()
+assert str(manifest_path) in command.read_text()
+tasks = json.loads((run.parent / "alignment_tasks.json").read_text())["tasks"]
+self_task = next(row for row in tasks if root / row["command"] == command)
+assert self_task["max_threads"] == 2  # Two query records, within the 12-thread budget.
+PYBATCH
   [[ ! -d "${output_root}/runs/chr_Chr01/ds_b_vs_self" ]] || {
     echo "expected the one-contig ds_b track not to schedule a self run" >&2
     exit 1
@@ -305,12 +321,12 @@ tig_z	10	0	10	+	Chr01	10	0	10	10	10	60
 tig_a	10	0	10	+	Chr01	10	0	10	10	10	60
 tig_m	10	0	10	+	Chr01	10	0	10	10	10	60
 EOF
-  PATH="${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
 
   mkdir -p "$pair_bin"
   cat > "${pair_bin}/minimap2" <<'PYFAKE'
 #!/usr/bin/env python3
 import sys
+from pathlib import Path
 
 
 def fasta(path):
@@ -332,8 +348,19 @@ def fasta(path):
     return records
 
 
-targets = fasta(sys.argv[-2])
-queries = fasta(sys.argv[-1])
+args = sys.argv[1:]
+if "-d" in args:
+    # Model the official index build, retaining target records for the fake mapper.
+    Path(args[args.index("-d") + 1]).write_bytes(Path(args[-1]).read_bytes())
+    print("[M::mm_idx_stat] distinct minimizers: 3", file=sys.stderr)
+    raise SystemExit(0)
+assert all(flag in args for flag in ("-c", "-X", "--no-hash-name"))
+assert args[args.index("-x") + 1] == "asm10"
+assert args[args.index("-m") + 1] == "200"
+assert args[args.index("-n") + 1] == "100"
+assert int(args[args.index("-t") + 1]) > 0
+targets = fasta(args[-2])
+queries = fasta(args[-1])
 for query_name, query in queries:
     for target_name, target in targets:
         if query_name > target_name:
@@ -345,6 +372,7 @@ for query_name, query in queries:
         )
 PYFAKE
   chmod +x "${pair_bin}/minimap2"
+  PATH="${pair_bin}:${FAKE_BIN}:$PATH" bash "${output_root}/assign_chr_groups.sh" >/dev/null
 
   PATH="${pair_bin}:${FAKE_BIN}:$PATH" bash \
     "${output_root}/runs/chr_Chr01/assembly_vs_self/command.sh"
