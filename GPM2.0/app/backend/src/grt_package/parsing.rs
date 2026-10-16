@@ -184,7 +184,7 @@ where
     let mut raw = String::new();
     let mut offset = 0_usize;
     loop {
-        if offset % 256 == 0 && should_cancel() {
+        if offset.is_multiple_of(256) && should_cancel() {
             bail!("import cancelled");
         }
         raw.clear();

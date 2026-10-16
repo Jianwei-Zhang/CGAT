@@ -102,8 +102,8 @@ jobs:
         working-directory: GPM2.0
         run: rustup component add rustfmt clippy
 
-      - name: Install parallel compression
-        run: sudo apt-get update && sudo apt-get install -y pigz
+      - name: Install server test dependencies
+        run: sudo apt-get update && sudo apt-get install -y pigz minimap2
 
       - name: Run server quality gate
         working-directory: GPM2.0
