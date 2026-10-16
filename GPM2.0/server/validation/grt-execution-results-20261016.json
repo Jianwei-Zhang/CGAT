@@ -4425,6 +4425,18 @@
     "Final evidence commit/push and quality verification, followed by same-version public Server source Release asset refresh and public-download integrity checks."
   ],
   "pending_formal_optimized_rollout": {
+    "corrected_jobs": {
+      "full_retry:10g_no_reads": 40587500,
+      "full_retry:10g_with_reads": 40587502,
+      "full_retry:customer2665": 40587508,
+      "full_retry:test8_fixed": 40587504,
+      "full_retry:zebrafish": 40587506,
+      "step2_gap:10g_no_reads": 40587501,
+      "step2_gap:10g_with_reads": 40587503,
+      "step2_gap:customer2665": 40587509,
+      "step2_gap:test8_fixed": 40587505,
+      "step2_gap:zebrafish": 40587507
+    },
     "defaults": {
       "execution_profile": "optimized",
       "refill": "batch_with_compatible_index_cache",
@@ -4449,7 +4461,7 @@
     "production_refill_job": 40587487,
     "remote_boundary": "Only new optimized complete-data GRT suffix runs; old results read-only. No baseline reruns or numerical-cache borrowing.",
     "source_revision": "7ba84ea",
-    "status": "PRODUCTION_REFILL_PASS_FIRST_FULL_LAUNCH_HARNESS_FAILED"
+    "status": "CORRECTED_FULL_AND_STEP2_SCREEN_SUBMITTED"
   },
   "pending_physical_stage_split": {
     "base_validated_revision": "2f52515e659ad75bea614d648880f2b6d621ed1b",

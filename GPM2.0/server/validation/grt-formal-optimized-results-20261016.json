@@ -1,5 +1,22 @@
 {
   "boundary": "Only new optimized complete-data GRT suffix runs; old results read-only. No baseline reruns, numerical-cache borrowing, full leaf/reads-QC reexecution or release-acceptance claim.",
+  "corrected_jobs": {
+    "jobs": {
+      "full_retry:10g_no_reads": 40587500,
+      "full_retry:10g_with_reads": 40587502,
+      "full_retry:customer2665": 40587508,
+      "full_retry:test8_fixed": 40587504,
+      "full_retry:zebrafish": 40587506,
+      "step2_gap:10g_no_reads": 40587501,
+      "step2_gap:10g_with_reads": 40587503,
+      "step2_gap:customer2665": 40587509,
+      "step2_gap:test8_fixed": 40587505,
+      "step2_gap:zebrafish": 40587507
+    },
+    "launcher_revision": "b2c124b",
+    "runtime_revision": "7ba84ea",
+    "submitted_at": "2026-10-16T12:03:53+0800"
+  },
   "first_launch_failure": {
     "cause": "Validation generator omitted shell_quote; empty arguments. No numerical alignments were run.",
     "corrected_launcher_checks": "Full/gap script arguments, whitespace quoting and bash syntax pass",
@@ -161,5 +178,5 @@
   "production_refill_job": 40587487,
   "source_archive_sha256": "74c8860a4ac20d48e4932576cfbcbf20e5794d270a211f99a012914fde715579",
   "source_revision": "7ba84ea",
-  "status": "FIRST_LAUNCH_FAILED_HARNESS_REPAIR_PREPARED"
+  "status": "CORRECTED_FULL_AND_STEP2_SCREEN_SUBMITTED"
 }

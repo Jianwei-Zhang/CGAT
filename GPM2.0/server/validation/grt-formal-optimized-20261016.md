@@ -111,3 +111,23 @@ applied strategy, accepted classifications, final accepted repairs and complete
 semantic Final Path plus exported DNA. Audit differences retain their failed
 checks and previews; `CORE_PASS_AUDIT_DIFFERENT` is not strict equivalence or
 permission to enable Step2 screening by default. Any core change remains FAIL.
+
+## 12:04 CST resubmission
+
+Corrected launcher `b2c124b` SHA-256
+`f61be124a45fb6e956927dfb2bcd6e850261e4ec7a621fd17b09e54e44a8f95c`
+was verified on 180. Runtime remains pinned to `7ba84ea`; no aligner algorithm
+or production default was changed for the experimental group.
+
+| Dataset | New optimized full Step2 retry | New optimized gap-screen Step2 |
+| --- | ---: | ---: |
+| 10g no reads | 40587500 | 40587501 |
+| 10g with reads | 40587502 | 40587503 |
+| test8 fixed | 40587504 | 40587505 |
+| zebrafish | 40587506 | 40587507 |
+| customer 2665 | 40587508 | 40587509 |
+
+All ten were observed RUNNING after submission; scientific output comparisons
+remain pending. Old long-running producers 40550762/40550763 remain untouched.
+The full retries append to the earlier failed launcher log; only the new attempt
+and new timings are relevant. Earlier five startup failures are retained.
