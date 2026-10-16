@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from server.tools import grt_step23 as engine
+from server.tools.grt_core import repair_mummer as engine
 
 
 class MummerParallelTests(unittest.TestCase):

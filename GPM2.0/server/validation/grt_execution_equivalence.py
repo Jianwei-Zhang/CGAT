@@ -15,6 +15,7 @@ import json
 import sys
 import time
 from argparse import Namespace
+from types import SimpleNamespace
 from pathlib import Path
 
 
@@ -80,7 +81,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("baseline", type=Path)
     parser.add_argument("optimized", type=Path)
-    parser.add_argument("--engine", type=Path, required=True)
+    parser.add_argument("--tools-dir", type=Path, required=True,
+                        help="Pinned Server tools directory containing both stage entrypoints and grt_core")
     parser.add_argument("--threads", type=int, default=8)
     parser.add_argument("--scope", choices=["full", "gap-screen"], default="full")
     parser.add_argument("--nucmer", default="nucmer")
@@ -93,8 +95,13 @@ def main():
     args.baseline, args.optimized = args.baseline.resolve(), args.optimized.resolve()
     if args.baseline == args.optimized:
         parser.error("workspaces must be independent")
-    sys.path.insert(0, str(args.engine.resolve().parent))
-    import grt_step23 as engine
+    sys.path.insert(0, str(args.tools_dir.resolve()))
+    from grt_core import repair_common, repair_runtime, step2_engine, step3_engine
+    engine = SimpleNamespace(**{
+        name: value
+        for module in (repair_common, repair_runtime, step2_engine, step3_engine)
+        for name, value in vars(module).items() if not name.startswith("_")
+    })
     args.context_factory = None
     if args.snapshot_adapter:
         spec = importlib.util.spec_from_file_location("snapshot_adapter", args.snapshot_adapter)

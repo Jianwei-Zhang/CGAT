@@ -7,21 +7,21 @@ from __future__ import annotations
 import argparse
 
 try:
-    from grt_step23 import (
+    from grt_core.repair_runtime import (
         DEFAULT_MUMMER_SCOPE,
         MUMMER_SCOPES,
         add_common_cli_arguments,
-        execute_step2,
         validate_common_cli_arguments,
     )
+    from grt_core.step2_engine import execute_step2
 except ModuleNotFoundError:  # Imported as server.tools.grt_step2.
-    from .grt_step23 import (
+    from .grt_core.repair_runtime import (
         DEFAULT_MUMMER_SCOPE,
         MUMMER_SCOPES,
         add_common_cli_arguments,
-        execute_step2,
         validate_common_cli_arguments,
     )
+    from .grt_core.step2_engine import execute_step2
 
 
 def main() -> None:

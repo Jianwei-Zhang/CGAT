@@ -7,25 +7,25 @@ from __future__ import annotations
 import argparse
 
 try:
-    from grt_step23 import (
+    from grt_core.repair_runtime import (
         DEFAULT_MUMMER_SCOPE,
         MUMMER_SCOPES,
-        REFILL_MAX_LENGTH,
         add_common_cli_arguments,
-        execute_step3,
-        fail,
         validate_common_cli_arguments,
+        REFILL_MAX_LENGTH,
+        fail,
     )
+    from grt_core.step3_engine import execute_step3
 except ModuleNotFoundError:  # Imported as server.tools.grt_step3.
-    from .grt_step23 import (
+    from .grt_core.repair_runtime import (
         DEFAULT_MUMMER_SCOPE,
         MUMMER_SCOPES,
-        REFILL_MAX_LENGTH,
         add_common_cli_arguments,
-        execute_step3,
-        fail,
         validate_common_cli_arguments,
+        REFILL_MAX_LENGTH,
+        fail,
     )
+    from .grt_core.step3_engine import execute_step3
 
 
 def main() -> None:

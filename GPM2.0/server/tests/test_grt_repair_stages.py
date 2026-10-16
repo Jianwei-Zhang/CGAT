@@ -17,45 +17,55 @@ from server.tests import test_grt_step1 as step1_fixture
 from server.tools.grt_prepare_inputs import read_fasta, reverse_complement
 from server.tools.grt_core.contract.cross_reference import validate_interval
 from server.tools.grt_core.mummer import run_logged
-from server.tools.grt_step23 import (
+from server.tools.grt_core.repair_common import repair_engine_sha256
+from server.tools.grt_core.repair_common import (
+    arbitrate,
+    evidence_row,
+    parse_mummer_coords,
+    reject_candidates_spanning_other_gaps,
+)
+from server.tools.grt_core.step2_engine import (
+    arbitrate_structural_candidates,
+)
+from server.tools.grt_core.repair_mummer import (
+    cached_mummer_chromosome,
+    grt_mummer_parameters,
+    parse_mummer_screen_coords,
+    partition_mummer_targets,
+    step3_mummer_screen_windows,
+    step3_screen_partition_relevant,
+)
+from server.tools.grt_core.repair_structural import (
     _longest_exact_suffix_prefix,
     _step3_classify_features,
     _step3_edit_scope_decision,
     apply_corrections,
-    arbitrate,
-    arbitrate_structural_candidates,
     build_correction_candidates,
-    build_correction_events,
     build_dominated_terminal_component_candidates,
+    promote_direct_primary_overlap_merges,
+    reject_ambiguous_reference_anchors,
+)
+from server.tools.grt_core.step2_engine import (
     build_step2_candidates,
     build_step2_fallback_candidates,
-    cached_mummer_chromosome,
-    evidence_row,
-    grt_mummer_parameters,
-    parse_mummer_coords,
-    parse_mummer_screen_coords,
-    partition_mummer_targets,
-    promote_direct_primary_overlap_merges,
-    project_interval_after_refills,
-    reject_ambiguous_reference_anchors,
-    reject_candidates_spanning_other_gaps,
-    reconcile_step2_events_with_step3,
-    replay_step3,
     step2_strategy,
     step2_strategy_applied,
-    step3_mummer_screen_windows,
-    step3_screen_partition_relevant,
+)
+from server.tools.grt_core.step3_engine import (
+    build_correction_events,
+    project_interval_after_refills,
+    reconcile_step2_events_with_step3,
+    replay_step3,
 )
 
 
 PREPARE_TOOL = REPO_ROOT / "server/tools/grt_prepare_inputs.py"
 STEP1_TOOL = REPO_ROOT / "server/tools/grt_step1.py"
-STEP23_TOOL = REPO_ROOT / "server/tools/grt_step23.py"
 STEP2_TOOL = REPO_ROOT / "server/tools/grt_step2.py"
 STEP3_TOOL = REPO_ROOT / "server/tools/grt_step3.py"
 
 
-class GrtStep23Tests(unittest.TestCase):
+class GrtRepairStagesTests(unittest.TestCase):
     @staticmethod
     def reconciliation_fixture():
         q2_hash = "q2-hash"
@@ -1724,40 +1734,39 @@ else:
             env=env,
         )
 
-    def run_step23(
+    def run_repair_stages(
         self,
         server: Path,
         tools: dict[str, Path],
         env: dict[str, str],
         threads: int = 2,
-        step23_tool: Path = STEP23_TOOL,
+        step2_tool: Path = STEP2_TOOL,
+        step3_tool: Path = STEP3_TOOL,
         refill_max_length: int = 1_000_000,
         execution_profile: str = "baseline",
     ):
-        return subprocess.run(
-            [
-                sys.executable,
-                str(step23_tool),
-                "--server-dir",
-                str(server),
-                "--minimap2",
-                str(tools["minimap2"]),
-                "--nucmer",
-                str(tools["nucmer"]),
-                "--delta-filter",
-                str(tools["delta_filter"]),
-                "--show-coords",
-                str(tools["show_coords"]),
-                "--threads",
-                str(threads),
-                "--max-fill",
-                str(refill_max_length),
-                "--execution-profile", execution_profile,
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            env=env,
+        common = [
+            "--server-dir", str(server),
+            "--minimap2", str(tools["minimap2"]),
+            "--nucmer", str(tools["nucmer"]),
+            "--delta-filter", str(tools["delta_filter"]),
+            "--show-coords", str(tools["show_coords"]),
+            "--threads", str(threads),
+            "--execution-profile", execution_profile,
+        ]
+        first = subprocess.run(
+            [sys.executable, str(step2_tool), *common],
+            check=False, capture_output=True, text=True, env=env,
+        )
+        if first.returncode:
+            return first
+        second = subprocess.run(
+            [sys.executable, str(step3_tool), *common, "--max-fill", str(refill_max_length)],
+            check=False, capture_output=True, text=True, env=env,
+        )
+        return subprocess.CompletedProcess(
+            second.args, second.returncode,
+            first.stdout + second.stdout, first.stderr + second.stderr,
         )
 
     def run_split_step2_step3(
@@ -1787,34 +1796,31 @@ else:
         )
         return step2, step3
 
-    def test_split_step2_step3_entrypoints_match_combined_result(self):
+    def test_independent_step2_then_step3_leave_stage_specific_checkpoints(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
-            combined_server = self.make_server(root / "combined")
-            split_server = self.make_server(root / "split")
+            server = self.make_server(root)
             tools = self.make_tools(root)
             env = os.environ.copy()
             env["FAKE_GRT_MINIMAP_LOG"] = str(root / "minimap.log")
             env["FAKE_GRT_MUMMER_LOG"] = str(root / "mummer.log")
-            for server in (combined_server, split_server):
-                completed = self.run_step1(server, tools, env)
-                self.assertEqual(completed.returncode, 0, completed.stderr)
-
-            combined = self.run_step23(combined_server, tools, env)
-            step2, step3 = self.run_split_step2_step3(split_server, tools, env)
-
-            self.assertEqual(combined.returncode, 0, combined.stderr)
+            first = self.run_step1(server, tools, env)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            common = ["--server-dir", str(server), "--threads", "2"]
+            for key, value in tools.items():
+                common += ["--" + key.replace("_", "-"), str(value)]
+            step2 = subprocess.run([sys.executable, str(STEP2_TOOL), *common],
+                                   capture_output=True, text=True, env=env)
             self.assertEqual(step2.returncode, 0, step2.stderr)
-            self.assertIsNotNone(step3)
+            self.assertTrue((server / "grt/checkpoints/step2.json").is_file())
+            self.assertFalse((server / "grt/checkpoints/step3.json").exists())
+            q2_hash = prepare_fixture.sha256(server / "grt/q/q2.fa")
+            step3 = subprocess.run([sys.executable, str(STEP3_TOOL), *common],
+                                   capture_output=True, text=True, env=env)
             self.assertEqual(step3.returncode, 0, step3.stderr)
-            self.assertEqual(
-                prepare_fixture.sha256(combined_server / "grt/q/q2.fa"),
-                prepare_fixture.sha256(split_server / "grt/q/q2.fa"),
-            )
-            self.assertEqual(
-                prepare_fixture.sha256(combined_server / "grt/q/q3.fa"),
-                prepare_fixture.sha256(split_server / "grt/q/q3.fa"),
-            )
+            self.assertEqual(q2_hash, prepare_fixture.sha256(server / "grt/q/q2.fa"))
+            self.assertTrue((server / "grt/checkpoints/step3.json").is_file())
+            self.assertFalse((REPO_ROOT / "server/tools/grt_step23.py").exists())
 
     def test_optimized_cold_step2_step3_keep_candidates_rejections_and_decisions(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
@@ -1827,7 +1833,7 @@ else:
             for profile, server in servers.items():
                 completed = self.run_step1(server, tools, env)
                 self.assertEqual(completed.returncode, 0, completed.stderr)
-                completed = self.run_step23(server, tools, env, execution_profile=profile)
+                completed = self.run_repair_stages(server, tools, env, execution_profile=profile)
                 self.assertEqual(completed.returncode, 0, completed.stderr)
             for q in ("q2", "q3"):
                 self.assertEqual(prepare_fixture.sha256(servers["baseline"] / f"grt/q/{q}.fa"),
@@ -1885,19 +1891,39 @@ else:
             env["FAKE_GRT_MUMMER_LOG"] = str(root / "mummer.log")
             step1 = self.run_step1(server, tools, env)
             self.assertEqual(step1.returncode, 0, step1.stderr)
-            first = self.run_step23(server, tools, env)
+            first = self.run_repair_stages(server, tools, env)
             self.assertEqual(first.returncode, 0, first.stderr)
-            changed = self.run_step23(server, tools, env, refill_max_length=2_000_000)
+            changed = self.run_repair_stages(server, tools, env, refill_max_length=2_000_000)
             self.assertEqual(changed.returncode, 0, changed.stderr)
             self.assertIn("GRT step2 cache hit:", changed.stdout)
             self.assertNotIn("GRT step3 cache hit:", changed.stdout)
             checkpoint = json.loads((server / "grt/checkpoints/step3.json").read_text())
             self.assertEqual(checkpoint["fingerprint_payload"]["refill_parameters"]["max_fill_length"], 2_000_000)
-            repeated = self.run_step23(server, tools, env, refill_max_length=2_000_000)
+            repeated = self.run_repair_stages(server, tools, env, refill_max_length=2_000_000)
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
             self.assertIn("GRT step3 cache hit:", repeated.stdout)
 
-    def test_step23_runtime_script_hash_invalidates_successful_checkpoints(self):
+    def test_engine_identity_covers_both_stages_helpers_and_entry_scripts(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            runtime = Path(temporary_dir) / "runtime"
+            shutil.copytree(REPO_ROOT / "server/tools", runtime,
+                            ignore=shutil.ignore_patterns("__pycache__"))
+            original = repair_engine_sha256(runtime / "grt_core")
+            self.assertEqual(original, repair_engine_sha256())
+            for relative in (
+                "grt_core/step2_engine.py", "grt_core/step3_engine.py",
+                "grt_core/repair_mummer.py", "grt_core/alignment_index.py",
+                "grt_step2.py", "grt_step3.py",
+            ):
+                with self.subTest(relative=relative):
+                    path = runtime / relative
+                    before = path.read_bytes()
+                    path.write_bytes(before + b"\n# identity mutation\n")
+                    self.assertNotEqual(original, repair_engine_sha256(runtime / "grt_core"))
+                    path.write_bytes(before)
+                    self.assertEqual(original, repair_engine_sha256(runtime / "grt_core"))
+
+    def test_shared_engine_module_hash_invalidates_stage_checkpoints_not_raw_alignments(self):
         with tempfile.TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
             server = self.make_server(root)
@@ -1913,17 +1939,19 @@ else:
                     [str(REPO_ROOT / "server/tools"), env.get("PYTHONPATH", "")],
                 )
             )
-            runtime_tool = root / "grt_step23_runtime.py"
-            shutil.copy2(STEP23_TOOL, runtime_tool)
+            runtime = root / "runtime"
+            shutil.copytree(REPO_ROOT / "server/tools", runtime,
+                            ignore=shutil.ignore_patterns("__pycache__"))
+            runtime_tool = runtime / "grt_core/step2_engine.py"
 
             step1 = self.run_step1(server, tools, env)
             self.assertEqual(step1.returncode, 0, step1.stderr)
-            first = self.run_step23(server, tools, env, step23_tool=runtime_tool)
+            first = self.run_repair_stages(server, tools, env, step2_tool=runtime / "grt_step2.py", step3_tool=runtime / "grt_step3.py")
             self.assertEqual(first.returncode, 0, first.stderr)
             initial_calls = mummer_log.read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(initial_calls), 2)
 
-            repeated = self.run_step23(server, tools, env, step23_tool=runtime_tool)
+            repeated = self.run_repair_stages(server, tools, env, step2_tool=runtime / "grt_step2.py", step3_tool=runtime / "grt_step3.py")
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
             self.assertEqual(mummer_log.read_text(encoding="utf-8").splitlines(), initial_calls)
 
@@ -1932,7 +1960,7 @@ else:
                 encoding="utf-8",
                 newline="",
             )
-            changed = self.run_step23(server, tools, env, step23_tool=runtime_tool)
+            changed = self.run_repair_stages(server, tools, env, step2_tool=runtime / "grt_step2.py", step3_tool=runtime / "grt_step3.py")
             self.assertEqual(changed.returncode, 0, changed.stderr)
             self.assertIn("GRT step2 complete", changed.stdout)
             # Recompute repair decisions after engine changes, retaining
@@ -1943,7 +1971,7 @@ else:
             )
             self.assertEqual(
                 checkpoint["fingerprint_payload"]["engine_sha256"],
-                prepare_fixture.sha256(runtime_tool),
+                repair_engine_sha256(runtime / "grt_core"),
             )
 
     def test_fixed_d0_step2_step3_interval_usage_replay_and_resume(self):
@@ -1962,7 +1990,7 @@ else:
             self.assertFalse(minimap_log.exists())
             self.assertEqual(len(re.findall(r"N{100,}", dict(read_fasta(server / "grt/q/q1.fa"))["Chr01"])), 2)
 
-            completed = self.run_step23(server, tools, env)
+            completed = self.run_repair_stages(server, tools, env)
             self.assertEqual(completed.returncode, 0, completed.stderr)
             filter_commands = list(
                 (server / "grt/cache/step23").glob(
@@ -2107,7 +2135,7 @@ else:
             q3_hash = prepare_fixture.sha256(server / "grt/q/q3.fa")
             mummer_calls = mummer_log.read_text(encoding="utf-8").splitlines()
             minimap_calls = minimap_log.read_text(encoding="utf-8").splitlines()
-            repeated = self.run_step23(server, tools, env)
+            repeated = self.run_repair_stages(server, tools, env)
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
             self.assertEqual(mummer_log.read_text(encoding="utf-8").splitlines(), mummer_calls)
             self.assertEqual(minimap_log.read_text(encoding="utf-8").splitlines(), minimap_calls)
@@ -2115,14 +2143,14 @@ else:
 
             with (server / "grt/q/q2.fa").open("a", encoding="utf-8", newline="") as handle:
                 handle.write("# injected output hash mismatch\n")
-            output_invalidated = self.run_step23(server, tools, env)
+            output_invalidated = self.run_repair_stages(server, tools, env)
             self.assertEqual(output_invalidated.returncode, 0, output_invalidated.stderr)
             self.assertIn("GRT step2 complete", output_invalidated.stdout)
             self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 2)
             self.assertEqual(prepare_fixture.sha256(server / "grt/q/q2.fa"), q2_hash)
             self.assertEqual(prepare_fixture.sha256(server / "grt/q/q3.fa"), q3_hash)
 
-            parameter_invalidated = self.run_step23(server, tools, env, threads=3)
+            parameter_invalidated = self.run_repair_stages(server, tools, env, threads=3)
             self.assertEqual(parameter_invalidated.returncode, 0, parameter_invalidated.stderr)
             # The scheduling budget does not change nucmer's effective -t 1.
             self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 2)
@@ -2138,7 +2166,7 @@ else:
                 encoding="utf-8",
                 newline="",
             )
-            tool_invalidated = self.run_step23(server, tools, env, threads=3)
+            tool_invalidated = self.run_repair_stages(server, tools, env, threads=3)
             self.assertEqual(tool_invalidated.returncode, 0, tool_invalidated.stderr)
             self.assertEqual(len(mummer_log.read_text(encoding="utf-8").splitlines()), 4)
             self.assertEqual(prepare_fixture.sha256(server / "grt/q/q3.fa"), q3_hash)

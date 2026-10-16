@@ -315,7 +315,9 @@ grep -F -- '.prepare_lib/tools/assign_chr_groups.py' "${output_root}/assign_chr_
 }
 python3 "${output_root}/.prepare_lib/tools/grt_prepare_inputs.py" --help >/dev/null
 python3 "${output_root}/.prepare_lib/tools/grt_step1.py" --help >/dev/null
-python3 "${output_root}/.prepare_lib/tools/grt_step23.py" --help >/dev/null
+[[ ! -e "${output_root}/.prepare_lib/tools/grt_step23.py" ]]
+[[ -f "${output_root}/.prepare_lib/tools/grt_core/step2_engine.py" ]]
+[[ -f "${output_root}/.prepare_lib/tools/grt_core/step3_engine.py" ]]
 python3 "${output_root}/.prepare_lib/tools/grt_step2.py" --help >/dev/null
 python3 "${output_root}/.prepare_lib/tools/grt_step3.py" --help >/dev/null
 python3 "${output_root}/.prepare_lib/tools/grt_telomere_finalize.py" --help >/dev/null

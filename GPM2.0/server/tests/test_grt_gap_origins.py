@@ -1,6 +1,6 @@
 import unittest
 
-from server.tools import grt_step23 as engine
+from server.tools.grt_core import step3_engine as engine
 
 
 class GapOriginTests(unittest.TestCase):

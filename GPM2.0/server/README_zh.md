@@ -84,21 +84,28 @@ bash install.sh --manager conda
 
 ```bash
 workspace=/path/to/gpm_server
-cp tools/grt_step23.py "$workspace/.prepare_lib/tools/grt_step23.py"
 cp tools/grt_step2.py "$workspace/.prepare_lib/tools/grt_step2.py"
 cp tools/grt_step3.py "$workspace/.prepare_lib/tools/grt_step3.py"
+cp -R tools/grt_core "$workspace/.prepare_lib/tools/"
 ```
 
-新生成的工作区会将 Step2、Step3 拆成可独立续跑的 `run_grt_step2.sh`
-和 `run_grt_step3.sh`。随后在原环境中重新运行或提交该工作区的
-`run_all.sh`。保留原工作区和
-缓存，流程可复用兼容的 MUMmer 原始比对，并重新生成修复后的阶段结果。
+以上更新适用于已有独立 Step2/Step3 入口的工作区，且须先确认工作区未在运行。
+随后在原环境中重新运行或提交 `run_all.sh`。保留缓存，流程可复用兼容的
+MUMmer 原始比对，并重新生成阶段结果。仍使用 `run_grt_step23.sh` 的旧工作区
+应保留其原配套运行库；仅复制文件不会将旧调度计划迁移为独立阶段。
 
 ### 独立 GRT 阶段控制
 
 新工作区生成 `run_grt_step2.sh`、`run_grt_step3.sh`，分别记录调度状态和
 checkpoint。先运行 Step2，再运行 Step3；Step3 会拒绝缺失、已改变或引擎
-不兼容的 Step2 完成结果。旧工作区仍可使用组合入口 `tools/grt_step23.py`。
+不兼容的 Step2 完成结果。算法实现也已分离：`grt_core/step2_engine.py`、
+`grt_core/step3_engine.py`，共用比对、结构分析和元数据服务位于同目录的
+`repair_*.py`。源码不再分发 `tools/grt_step23.py`；旧工作区内已有的组合入口
+及运行库不自动修改。
+
+Step2/Step3 共用一个覆盖两个引擎、入口和共用模块的内容指纹。更改任一部分
+会使阶段结果失效并要求重新执行 Step2；输入、工具和参数均一致时，独立的
+MUMmer 原始数值缓存仍可复用。
 
 两个 Python 入口分别提供 `--step2-mummer-scope full|gap-screen`、
 `--step3-mummer-scope full|gap-screen`，默认均为 `full`。`gap-screen` 为实验性

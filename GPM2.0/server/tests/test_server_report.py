@@ -268,12 +268,12 @@ class ServerReportTests(unittest.TestCase):
 
 def make_grt_report_fixture(root: Path) -> tuple[Path, dict]:
     """Actual GRT implementations with deterministic external-tool fixtures."""
-    from server.tests.test_grt_step23 import GrtStep23Tests
+    from server.tests.test_grt_repair_stages import GrtRepairStagesTests
     from server.tests.test_grt_telomere_finalize import GrtTelomereFinalizeTests
     from server.tests.test_grt_evidence_package import GrtEvidencePackageTests
 
     tel = GrtTelomereFinalizeTests()
-    step = GrtStep23Tests()
+    step = GrtRepairStagesTests()
     evidence = GrtEvidencePackageTests()
     server = tel.make_server(root)
     step_tools, tel_tools = step.make_tools(root), tel.make_tools(root)
@@ -290,7 +290,8 @@ def make_grt_report_fixture(root: Path) -> tuple[Path, dict]:
     for unit, tool, external in [
         ("grt_prepare", "grt_prepare_inputs.py", {}),
         ("grt_step1", "grt_step1.py", {"minimap2": step_tools["minimap2"]}),
-        ("grt_step23", "grt_step23.py", step_tools),
+        ("grt_step2", "grt_step2.py", step_tools),
+        ("grt_step3", "grt_step3.py", step_tools),
         ("grt_telomere_finalize", "grt_telomere_finalize.py", tel_tools),
         ("finalize_evidence", "grt_evidence_package.py", {"minimap2": minimap}),
     ]:
@@ -346,7 +347,7 @@ class GrtReportIntegrationTests(unittest.TestCase):
             records = [read_json(path) for path in (report / "steps").glob("[0-9]*.json")]
             self.assertTrue(any(row["execution"] == "cache_reused" for row in records))
             self.assertEqual(read_json(report / "steps/grt-step1_round1.json")["execution"], "cache_reused")
-            (server / "grt_step23.sh").write_text("#!/bin/bash\necho deliberate-failure >&2\nexit 19\n")
+            (server / "grt_step2.sh").write_text("#!/bin/bash\necho deliberate-failure >&2\nexit 19\n")
             failed = helper.run_runner(server, env=environment)
             self.assertEqual(failed.returncode, 19, failed.stdout + failed.stderr)
             self.assertTrue((server / "grt/q/q4.fa").is_file())

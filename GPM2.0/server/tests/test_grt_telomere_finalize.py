@@ -11,7 +11,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).parents[2]
 from server.tests import test_grt_prepare_inputs as prepare_fixture
-from server.tests import test_grt_step23 as step23_fixture
+from server.tests import test_grt_repair_stages as step23_fixture
 from server.tools.grt_prepare_inputs import read_fasta
 from server.tools.grt_telomere_finalize import verify_final_path
 
@@ -27,7 +27,7 @@ class GrtTelomereFinalizeTests(unittest.TestCase):
         return path
 
     def make_server(self, root: Path):
-        helper = step23_fixture.GrtStep23Tests(
+        helper = step23_fixture.GrtRepairStagesTests(
             "test_fixed_d0_step2_step3_interval_usage_replay_and_resume"
         )
         server = helper.make_server(root)
@@ -104,7 +104,7 @@ class GrtTelomereFinalizeTests(unittest.TestCase):
         env["FAKE_GRT_MUMMER_LOG"] = str(root / "step23_mummer.log")
         step1 = helper.run_step1(server, step23_tools, env)
         self.assertEqual(step1.returncode, 0, step1.stderr)
-        step23 = helper.run_step23(server, step23_tools, env)
+        step23 = helper.run_repair_stages(server, step23_tools, env)
         self.assertEqual(step23.returncode, 0, step23.stderr)
         return server
 

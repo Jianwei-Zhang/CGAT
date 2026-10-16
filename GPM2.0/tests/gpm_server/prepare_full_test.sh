@@ -627,7 +627,9 @@ test_custom_output_root() {
   assert_file "${output_root}/.prepare_lib/tools/add_dataset_package.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_prepare_inputs.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_step1.py"
-  assert_file "${output_root}/.prepare_lib/tools/grt_step23.py"
+  [[ ! -e "${output_root}/.prepare_lib/tools/grt_step23.py" ]]
+  assert_file "${output_root}/.prepare_lib/tools/grt_core/step2_engine.py"
+  assert_file "${output_root}/.prepare_lib/tools/grt_core/step3_engine.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_step2.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_step3.py"
   assert_file "${output_root}/.prepare_lib/tools/grt_telomere_finalize.py"

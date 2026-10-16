@@ -89,23 +89,32 @@ checkout, update the failed workspace from this directory:
 
 ```bash
 workspace=/path/to/gpm_server
-cp tools/grt_step23.py "$workspace/.prepare_lib/tools/grt_step23.py"
 cp tools/grt_step2.py "$workspace/.prepare_lib/tools/grt_step2.py"
 cp tools/grt_step3.py "$workspace/.prepare_lib/tools/grt_step3.py"
+cp -R tools/grt_core "$workspace/.prepare_lib/tools/"
 ```
 
-New workspaces expose Step2 and Step3 as separate resumable units through
-`run_grt_step2.sh` and `run_grt_step3.sh`. Then rerun or resubmit that
-workspace's `run_all.sh` in the same environment.
-Keep the existing workspace and caches; compatible raw MUMmer alignments can be
-reused while the corrected stage outputs are regenerated.
+These updates apply to workspaces that already have independent Step2/Step3
+entrypoints, and only while the workspace is not running. Rerun or resubmit
+`run_all.sh` in the same environment; compatible raw MUMmer alignments can be
+reused while stage results are regenerated. Older workspaces using
+`run_grt_step23.sh` must retain their matching runtime; copying these files alone
+does not migrate a combined execution plan.
 
 ### Independent GRT stage controls
 
 New workspaces generate `run_grt_step2.sh` and `run_grt_step3.sh`, with separate
 scheduler status and checkpoints. Run Step2 before Step3; Step3 refuses a missing,
-changed, or incompatible completed Step2 result. The combined
-`tools/grt_step23.py` entrypoint remains available for older workspaces.
+changed, or incompatible completed Step2 result. Implementations are physically
+separate in `grt_core/step2_engine.py` and `grt_core/step3_engine.py`; shared
+alignment, structural-analysis and metadata services live in `repair_*.py`.
+The source no longer ships `tools/grt_step23.py`. Existing legacy workspaces
+retain their own combined entrypoint/runtime and are not modified automatically.
+
+Both stages share a content fingerprint covering both engines, entry scripts
+and common modules. Changing any of them invalidates repair-stage results and
+requires Step2 to run again. Independently validated raw MUMmer results remain
+reusable when their exact input, tool and alignment-parameter identities match.
 
 The direct Python entrypoints expose `--step2-mummer-scope full|gap-screen` and
 `--step3-mummer-scope full|gap-screen`, respectively. Both default to `full`.

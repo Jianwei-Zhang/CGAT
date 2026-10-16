@@ -2,7 +2,7 @@ import random
 import unittest
 
 from server.tools.grt_core.alignment_index import AlignmentCoordinateIndex, Step2MemberIndex
-from server.tools import grt_step23 as engine
+from server.tools.grt_core import repair_structural as engine
 
 
 class AlignmentIndexTests(unittest.TestCase):
