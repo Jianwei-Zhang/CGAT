@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from server.tools.grt_core import repair_mummer as engine
+from server.tools.grt_core.repair_structural import _step3_anchor_pairs
 
 
 class MummerParallelTests(unittest.TestCase):
@@ -268,14 +269,14 @@ else:
         original = [r for partition in partitions for r in partition]
         # Near anchors on different records stop the search at 100 kb; there
         # must not be an artificial 200 kb pair after screening them away.
-        self.assertEqual(engine._step3_anchor_pairs(gap_pos, original), [])
+        self.assertEqual(_step3_anchor_pairs(gap_pos, original), [])
         selected = [
             partition for partition in partitions
             if engine.step3_screen_partition_relevant([gap], partition)
         ]
         self.assertEqual(len(selected), 3)
         screened = [r for partition in selected for r in partition]
-        self.assertEqual(engine._step3_anchor_pairs(gap_pos, screened), [])
+        self.assertEqual(_step3_anchor_pairs(gap_pos, screened), [])
         outside = [row("irrelevant", gap_pos + 600_000, gap_pos + 620_000)]
         self.assertFalse(engine.step3_screen_partition_relevant([gap], outside))
 
