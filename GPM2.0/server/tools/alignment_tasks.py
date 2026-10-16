@@ -8,6 +8,7 @@ import json
 import os
 import selectors
 import signal
+import statistics
 import subprocess
 import time
 from dataclasses import dataclass
@@ -24,6 +25,8 @@ class AlignmentTask:
     max_threads: int
     priority: int = 0
     max_concurrent: int | None = None
+    work: int = 0
+    largest_fraction: float | None = None
 
 
 def query_threads(fasta: Path, engine: str, budget: int) -> int:
@@ -35,20 +38,114 @@ def query_threads(fasta: Path, engine: str, budget: int) -> int:
     return max(1, min(budget, count))
 
 
+def query_profile(fasta: Path) -> tuple[int, float]:
+    lengths = []
+    with fasta.open("rb") as handle:
+        for line in handle:
+            if line.startswith(b">"):
+                lengths.append(0)
+            elif lengths:
+                lengths[-1] += len(line.strip())
+    total = sum(lengths)
+    if not lengths or total < 1:
+        raise ValueError(f"query FASTA has no non-empty records: {fasta}")
+    return total, max(lengths) / total
+
+
+class AdaptiveDispatcher:
+    """Non-preemptive, query-skew-aware admission for profiled Minimap2 tasks."""
+
+    def __init__(self) -> None:
+        self.rates: list[float] = []
+
+    @staticmethod
+    def desired(task: AlignmentTask, budget: int) -> int:
+        if task.largest_fraction is None:
+            return 1
+        serial = task.largest_fraction
+        cap = min(task.max_threads, budget, 8)
+        threads = 1
+        while threads < cap:
+            before = serial + (1 - serial) / threads
+            after = serial + (1 - serial) / (threads + 1)
+            if before / after - 1 < 0.08:
+                break
+            threads += 1
+        return threads
+
+    def complete(self, task: AlignmentTask, threads: int, seconds: float) -> None:
+        if task.largest_fraction is None or task.work < 1 or seconds <= 0:
+            return
+        fraction = task.largest_fraction + (1 - task.largest_fraction) / threads
+        self.rates.append(seconds / max(task.work * fraction, 1))
+
+    def __call__(self, pending, available, budget, active, slots):
+        if not available or not slots:
+            return []
+        ordered = sorted(pending, key=lambda task: task.work or task.priority, reverse=True)
+        selected = []
+        for task in ordered:
+            if any(task is chosen for chosen, _threads in selected):
+                continue
+            need = self.desired(task, budget)
+            if need > available:
+                if not self.rates or not active:
+                    break
+                rate = statistics.median(self.rates)
+                now = time.monotonic()
+                remaining = [
+                    max(
+                        0.1,
+                        (item["task"].work or item["task"].priority)
+                        * rate
+                        * (
+                            (item["task"].largest_fraction or 1.0)
+                            + (1 - (item["task"].largest_fraction or 1.0))
+                            / item["threads"]
+                        )
+                        - (now - item.get("started", now)),
+                    )
+                    for item in active
+                ]
+                short = next(
+                    (
+                        candidate
+                        for candidate in ordered
+                        if not any(candidate is chosen for chosen, _threads in selected)
+                        and self.desired(candidate, budget) <= available
+                        and (candidate.work or candidate.priority) * rate <= min(remaining) / 2
+                    ),
+                    None,
+                )
+                if short is not None:
+                    selected.append((short, self.desired(short, budget)))
+                break
+            selected.append((task, need))
+            available -= need
+            if not available or len(selected) >= slots:
+                break
+        return selected
+
+
 def write_manifest(
     path: Path,
     root: Path,
-    tasks: list[tuple[Path, int, int]],
+    tasks: list[tuple],
     max_concurrent: int | None = None,
 ) -> None:
-    payload = {"version": 2, "tasks": [
-        {
+    rows = []
+    for row in tasks:
+        command, cap, priority, *profile = row
+        item = {
             "command": command.relative_to(root).as_posix(),
             "max_threads": cap,
             "priority": priority,
         }
-        for command, cap, priority in tasks
-    ]}
+        if profile:
+            work, largest_fraction = profile
+            item.update(work=work, largest_fraction=largest_fraction)
+        rows.append(item)
+    payload = {"version": 3, "tasks": rows}
     if max_concurrent is not None:
         payload["max_concurrent"] = max_concurrent
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -59,7 +156,7 @@ def load_tasks(root: Path, unit_id: str, command: str) -> list[AlignmentTask] | 
     if not manifest.is_file():
         return None  # Older prepared workspaces retain their sequential contract.
     payload = json.loads(manifest.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict) or payload.get("version") not in {1, 2}:
+    if not isinstance(payload, dict) or payload.get("version") not in {1, 2, 3}:
         raise ValueError(f"invalid alignment task manifest: {manifest}")
     max_concurrent = payload.get("max_concurrent")
     if max_concurrent is not None and (type(max_concurrent) is not int or max_concurrent < 1):
@@ -74,15 +171,22 @@ def load_tasks(root: Path, unit_id: str, command: str) -> list[AlignmentTask] | 
             raise ValueError(f"invalid alignment task: {manifest}")
         relative, cap = row.get("command"), row.get("max_threads")
         priority = row.get("priority", 0)
+        work = row.get("work", priority)
+        largest_fraction = row.get("largest_fraction")
         if not isinstance(relative, str) or not relative or Path(relative).is_absolute():
             raise ValueError(f"invalid alignment task command: {manifest}")
         path = (root / relative).resolve()
         path.relative_to(root.resolve())
         if (not path.is_file() or path in seen or type(cap) is not int or cap < 1
-                or type(priority) is not int or priority < 0):
+                or type(priority) is not int or priority < 0 or type(work) is not int or work < 0
+                or (largest_fraction is not None and (
+                    type(largest_fraction) is not float or not 0 < largest_fraction <= 1
+                ))):
             raise ValueError(f"invalid or duplicate alignment task: {manifest}")
         seen.add(path)
-        tasks.append(AlignmentTask(unit_id, path, cap, priority, max_concurrent))
+        tasks.append(AlignmentTask(
+            unit_id, path, cap, priority, max_concurrent, work, largest_fraction
+        ))
     return tasks
 
 
@@ -165,6 +269,7 @@ def run_tasks(tasks, budget, children, cancel_signal, on_start, on_line, on_fini
                     assert child.stdout is not None
                     os.set_blocking(child.stdout.fileno(), False)
                     item = {"task": task, "child": child, "threads": threads,
+                            "started": time.monotonic(),
                             "decoder": codecs.getincrementaldecoder("utf-8")("replace"),
                             "buffer": "", "eof": False}
                     active[child.pid] = item

@@ -50,8 +50,12 @@ class HotspotFixtureTests(unittest.TestCase):
             self.assertEqual(result['status'], 'TIMEOUT')
             pid = int((root/'run/raw.paf').read_text().strip())
             status = Path(f'/proc/{pid}/status')
-            if status.exists():
-                state = next(x for x in status.read_text().splitlines() if x.startswith('State:'))
+            try:
+                lines = status.read_text().splitlines()
+            except FileNotFoundError:
+                lines = []
+            if lines:
+                state = next(x for x in lines if x.startswith('State:'))
                 self.assertIn('Z', state)  # dead, waiting for its init reaper
 
     def test_comparison_uses_real_summary_keys(self):

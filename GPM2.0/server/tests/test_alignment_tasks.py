@@ -9,10 +9,43 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from alignment_tasks import AlignmentTask, allocate_threads, run_tasks
+from alignment_tasks import (
+    AdaptiveDispatcher,
+    AlignmentTask,
+    allocate_threads,
+    load_tasks,
+    run_tasks,
+    write_manifest,
+)
 
 
 class AlignmentTasksTests(unittest.TestCase):
+    def test_profiled_manifest_round_trip(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            operation = root / "operation"
+            operation.mkdir()
+            command = operation / "command.sh"
+            command.write_text("exit 0\n")
+            write_manifest(operation / "alignment_tasks.json", root,
+                           [(command, 6, 123, 456, .25)])
+            tasks = load_tasks(root, "chr:test", "operation/command.sh")
+            self.assertIsNotNone(tasks)
+            self.assertEqual(tasks[0].work, 456)
+            self.assertEqual(tasks[0].largest_fraction, .25)
+            self.assertEqual(tasks[0].max_threads, 6)
+
+    def test_adaptive_dispatch_uses_query_skew_without_one_thread_tail(self):
+        dispatcher = AdaptiveDispatcher()
+        balanced = AlignmentTask("balanced", Path("/tmp/balanced"), 8, 100, None, 100, .05)
+        skewed = AlignmentTask("skewed", Path("/tmp/skewed"), 4, 90, None, 90, .6)
+        single = AlignmentTask("single", Path("/tmp/single"), 1, 10, None, 10, 1.0)
+        self.assertEqual(dispatcher.desired(balanced, 16), 8)
+        self.assertEqual(dispatcher.desired(skewed, 16), 3)
+        self.assertEqual(dispatcher.desired(single, 16), 1)
+        grants = dispatcher((balanced, skewed, single), 16, 16, (), 3)
+        self.assertEqual(grants, [(balanced, 8), (skewed, 3), (single, 1)])
+
     def test_allocation_returns_capacity_from_single_query_jobs(self):
         self.assertEqual(allocate_threads([1, 32, 1], 32), [1, 30, 1])
         self.assertEqual(allocate_threads([1] * 36, 32), [1] * 32)

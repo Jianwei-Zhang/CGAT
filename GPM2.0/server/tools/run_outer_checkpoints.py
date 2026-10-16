@@ -375,6 +375,7 @@ class OuterCheckpointManager:
         for optional in [
             self.server_dir / ".prepare_lib/tools/assign_chr_groups.py",
             self.server_dir / ".prepare_lib/tools/alignment_tasks.py",
+            self.server_dir / ".prepare_lib/tools/self_alignment_batches.py",
             self.server_dir / "tel/rules.tsv",
             self.server_dir / "cen/reference.tsv",
         ]:
@@ -423,6 +424,15 @@ class OuterCheckpointManager:
             if command.is_file():
                 paths.append(command)
             paths.extend(path for path in child.glob("*.fa") if path.is_file())
+            batch_manifest = child / "self_batch_manifest.json"
+            if batch_manifest.is_file():
+                paths.append(batch_manifest)
+                paths.extend(
+                    path
+                    for pattern in ("batches/batch-*/command.sh", "batches/batch-*/query.fa")
+                    for path in child.glob(pattern)
+                    if path.is_file()
+                )
 
             for support_name in ("self_name_map.tsv", "restore_self_paf.py"):
 
@@ -432,6 +442,7 @@ class OuterCheckpointManager:
 
                     paths.append(support_path)
         for optional in [
+            self.server_dir / ".prepare_lib/tools/self_alignment_batches.py",
             self.server_dir / "tel/rules.tsv",
             self.server_dir / "cen/reference.tsv",
         ]:

@@ -9,16 +9,19 @@ focused Server integration tests exercise Minimap2 output.
 """
 
 import csv
+import hashlib
+import json
 import os
 import shlex
 import shutil
 import sys
 from pathlib import Path
 
-from alignment_tasks import MANIFEST, query_threads, write_manifest
+from alignment_tasks import MANIFEST, query_profile, query_threads, write_manifest
 
 
 THREAD_ARGUMENT = object()
+SELF_BATCH_BASES = 20_000_000
 
 
 def quote_command_arg(value):
@@ -30,6 +33,20 @@ def quote_command_arg(value):
 def fail(message):
     print(message, file=sys.stderr)
     raise SystemExit(1)
+
+
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def json_identity(value):
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
 
 
 def read_tsv_rows(path):
@@ -63,6 +80,49 @@ def read_fasta_records(path):
     if current_name is not None:
         records.append((current_name, "".join(current_sequence_parts)))
     return records
+
+
+def iter_fasta_records(path):
+    current_name = None
+    current_sequence_parts = []
+    with path.open(encoding="utf-8") as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+            if not line:
+                continue
+            if line.startswith(">"):
+                if current_name is not None:
+                    yield current_name, "".join(current_sequence_parts)
+                current_name = line[1:].split()[0]
+                current_sequence_parts = []
+                continue
+            if current_name is None:
+                fail(f"sequence before FASTA header: {path}")
+            current_sequence_parts.append(line)
+    if current_name is not None:
+        yield current_name, "".join(current_sequence_parts)
+
+
+def fasta_lengths(path):
+    lengths = {}
+    current_name = None
+    with path.open(encoding="utf-8") as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+            if not line:
+                continue
+            if line.startswith(">"):
+                current_name = line[1:].split()[0]
+                if not current_name or current_name in lengths:
+                    fail(f"duplicate or empty FASTA name: {path}")
+                lengths[current_name] = 0
+                continue
+            if current_name is None:
+                fail(f"sequence before FASTA header: {path}")
+            lengths[current_name] += len(line)
+    if not lengths or any(length < 1 for length in lengths.values()):
+        fail(f"empty FASTA input: {path}")
+    return lengths
 
 
 def merged_interval_coverage(intervals):
@@ -236,6 +296,142 @@ def write_run_command_script(
             + " > stdout.log 2> stderr.log"
         )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_self_batch_scripts(
+    run_dir,
+    target_fasta,
+    query_fasta,
+    name_map,
+    restore_script,
+    batch_runner,
+    threads,
+    minimap_preset,
+    self_min_chain_score,
+    self_minimizers,
+):
+    target_lengths = fasta_lengths(target_fasta)
+    target_bases = sum(target_lengths.values())
+    if target_bases >= 8_000_000_000:
+        fail(f"self alignment target requires a multipart Minimap2 index: {target_fasta}")
+    minimap2 = Path(shutil.which("minimap2") or "")
+    if not minimap2.is_file():
+        fail("minimap2 is unavailable while preparing self-alignment batches")
+    identities = {
+        "tool": sha256_file(minimap2.resolve()),
+        "target": sha256_file(target_fasta),
+        "query": sha256_file(query_fasta),
+        "name_map": sha256_file(name_map),
+        "restore": sha256_file(restore_script),
+        "batch_runner": sha256_file(batch_runner),
+    }
+    index_key = json_identity(
+        {"tool": identities["tool"], "target": identities["target"], "preset": minimap_preset}
+    )
+    batch_root = run_dir / "batches"
+    batch_root.mkdir(parents=True, exist_ok=True)
+    groups = []
+    current = []
+    bases = 0
+    for name, sequence in iter_fasta_records(query_fasta):
+        if current and bases + len(sequence) > SELF_BATCH_BASES:
+            groups.append(current)
+            current = []
+            bases = 0
+        current.append((name, sequence))
+        bases += len(sequence)
+        if bases >= SELF_BATCH_BASES:
+            groups.append(current)
+            current = []
+            bases = 0
+    if current:
+        groups.append(current)
+    if not groups:
+        fail(f"self alignment query has no records: {query_fasta}")
+
+    manifest_path = run_dir / "self_batch_manifest.json"
+    batch_rows = []
+    task_rows = []
+    batch_commands = []
+    for index, group in enumerate(groups):
+        directory = batch_root / f"batch-{index:05d}"
+        directory.mkdir(parents=True, exist_ok=True)
+        batch_query = directory / "query.fa"
+        with batch_query.open("w", encoding="utf-8") as handle:
+            for name, sequence in group:
+                handle.write(f">{name}\n{sequence}\n")
+        entries = [{"name": name, "length": len(sequence)} for name, sequence in group]
+        query_hash = sha256_file(batch_query)
+        key = json_identity(
+            {
+                "tool": identities["tool"],
+                "target": identities["target"],
+                "query": query_hash,
+                "name_map": identities["name_map"],
+                "restore": identities["restore"],
+                "runner": identities["batch_runner"],
+                "preset": minimap_preset,
+                "min_chain_score": self_min_chain_score,
+                "minimizers": self_minimizers,
+            }
+        )
+        batch_rows.append(
+            {
+                "directory": str(directory),
+                "query": str(batch_query),
+                "query_sha256": query_hash,
+                "entries": entries,
+                "key": key,
+            }
+        )
+        command = directory / "command.sh"
+        command.write_text(
+            "#!/usr/bin/env bash\nset -euo pipefail\nexec python3 "
+            + shlex.quote(str(batch_runner))
+            + " --manifest "
+            + shlex.quote(str(manifest_path))
+            + " --batch-index "
+            + str(index)
+            + "\n",
+            encoding="utf-8",
+        )
+        batch_commands.append(command)
+        total, largest_fraction = query_profile(batch_query)
+        work = total * target_bases
+        task_rows.append(
+            (
+                command,
+                query_threads(batch_query, "minimap2", int(threads)),
+                work,
+                work,
+                largest_fraction,
+            )
+        )
+
+    manifest = {
+        "version": 1,
+        "target": str(target_fasta),
+        "query": str(query_fasta),
+        "name_map": str(name_map),
+        "restore": str(restore_script),
+        "output": str(run_dir / "result.paf"),
+        "cache": str(run_dir / ".self_batch_cache" / index_key),
+        "preset": minimap_preset,
+        "min_chain_score": int(self_min_chain_score),
+        "minimizers": int(self_minimizers),
+        "identities": identities,
+        "target_lengths": target_lengths,
+        "batches": batch_rows,
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    master = run_dir / "command.sh"
+    master.write_text(
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        + "\n".join("bash " + shlex.quote(str(command)) for command in batch_commands)
+        + "\n",
+        encoding="utf-8",
+    )
+    return master, task_rows
 
 
 def write_tel_scan_command_script(path, run_dir, work_root, chr_name, selected_dataset_fastas):
@@ -869,6 +1065,8 @@ for chr_name in reference_chr_names:
     command_paths = []
     task_caps = {}
     task_priorities = {}
+    task_profiles = {}
+    expanded_tasks = {}
     if not skip_self:
         for dataset_name, output_fasta in selected_dataset_fastas:
             if len(read_fasta_records(output_fasta)) < 2:
@@ -878,23 +1076,20 @@ for chr_name in reference_chr_names:
             self_inputs = write_self_pair_inputs(run_dir, output_fasta)
             assert self_inputs is not None
             target_fasta, query_fasta, name_map, restore_script = self_inputs
-            command_path = run_dir / "command.sh"
-            write_run_command_script(
-                command_path,
+            command_path, batch_tasks = write_self_batch_scripts(
                 run_dir,
                 target_fasta,
                 query_fasta,
-                self_mode=True,
+                name_map,
+                restore_script,
+                work_root / ".prepare_lib/tools/self_alignment_batches.py",
                 threads=threads,
                 minimap_preset=minimap_preset,
                 self_min_chain_score=self_min_chain_score,
                 self_minimizers=self_minimizers,
-                self_name_map=name_map,
-                self_restore_script=restore_script,
             )
             command_paths.append(command_path)
-            task_caps[command_path] = query_threads(query_fasta, "minimap2", int(threads))
-            task_priorities[command_path] = output_fasta.stat().st_size ** 2
+            expanded_tasks[command_path] = batch_tasks
 
     for left_index, (left_name, left_fasta) in enumerate(selected_dataset_fastas):
         for right_name, right_fasta in selected_dataset_fastas[left_index + 1 :]:
@@ -913,6 +1108,8 @@ for chr_name in reference_chr_names:
             command_paths.append(command_path)
             task_caps[command_path] = query_threads(right_fasta, "minimap2", int(threads))
             task_priorities[command_path] = left_fasta.stat().st_size * right_fasta.stat().st_size
+            total, largest_fraction = query_profile(right_fasta)
+            task_profiles[command_path] = (total * left_fasta.stat().st_size, largest_fraction)
 
     tel_rules_path = work_root / "tel" / "rules.tsv"
     if tel_rules_path.exists() and selected_dataset_fastas:
@@ -945,11 +1142,17 @@ for chr_name in reference_chr_names:
             command_paths.append(command_path)
 
     write_generated_command_script(chr_run_dir / "generated_command.sh", command_paths, chr_name)
-    write_manifest(chr_run_dir / MANIFEST, work_root, [
-        (
+    manifest_tasks = []
+    for command in command_paths:
+        if command in expanded_tasks:
+            manifest_tasks.extend(expanded_tasks[command])
+            continue
+        row = (
             command,
             task_caps.get(command, 1),
             task_priorities.get(command, 0),
         )
-        for command in command_paths
-    ])
+        if command in task_profiles:
+            row += task_profiles[command]
+        manifest_tasks.append(row)
+    write_manifest(chr_run_dir / MANIFEST, work_root, manifest_tasks)

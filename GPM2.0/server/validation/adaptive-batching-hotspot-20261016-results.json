@@ -1,0 +1,563 @@
+{
+  "status": "HOTSPOT_ACCEPTED_FULL_DEFERRED",
+  "checked_at": "2026-10-16T15:23:04+08:00",
+  "root": "/share/home/xbzhang26/cgat-reads-debug/fast-hotspot-v2-20261016",
+  "architecture": "aarch64",
+  "policy": {
+    "fast_and_hotspot_are_current_acceptance_gate": true,
+    "full_workflow_deferred": true,
+    "public_tuning_options_added": false
+  },
+  "source_sha256": {
+    "tools/alignment_tasks.py": "6f3d53b93cf64cb6d40eb8595841343256fdfcd29e1c654971f421ed7025a5fc",
+    "tools/assign_chr_groups.py": "7479e8b068644b069b6aaa4015f7560c5e68acec6915f9299ce39c88395a1713",
+    "tools/run_all_runner.py": "e6e0463b1c8c4ecdd54cf99ae222bd83ad6fc5035b96433ab7b9ab0e26b52763",
+    "tools/run_outer_checkpoints.py": "ccf52177a8e569c489a5458aa98f1e0e9841a7c06b9b6880f91c4810ce404eb0",
+    "tools/self_alignment_batches.py": "c059f0853af5a86375253280e2753bf0304a4e6c096eeea85deff23e5ea8d8b9",
+    "validation/self_schedule_fixture.py": "e5bf8bc3c3520663d78ddf8b282aa39f85060bcae91d3e0fbd66388e098309bd",
+    "validation/self_batch_hotspot.py": "5cc941c3d968683d2a34e5c7a4bbad3c575393d3f352d7e1e24dc810695f27c1"
+  },
+  "jobs": {
+    "adaptive_schedule": {
+      "id": 40588040,
+      "queue": "arm",
+      "cpus": 16,
+      "state": "SUCCEEDED",
+      "report_sha256": "7cfd1c61f273e6762437c451a090fd0e9c5e32b9a6aaca52120d4a5eac4507cd",
+      "report": {
+        "status": "PASS",
+        "boundary": "Two heavy tasks each repeat one real 250kb window as 12 query records; 14 short one-record tasks fill the 16-task current scheduler. Complete original target, same binary/flags/node, current then adaptive. Duplicate aliases make this a scheduler fixture only, not biological acceptance.",
+        "source": {
+          "target": "/share/home/xbzhang26/cgat-reads-debug/gpm2665-full-input/workspaces/self-m200-n100/runs/chr_BSWB01000003.1/flye_vs_self/self_target.fa",
+          "target_sha256": "a8b1cb7e70ae005a0b92b9d364d5ebf1a18be328283e1f2c752df53e2af9cb3b",
+          "query": "/share/home/xbzhang26/cgat-reads-debug/gpm2665-full-input/workspaces/self-m200-n100/runs/chr_BSWB01000003.1/flye_vs_self/self_query.fa",
+          "query_sha256": "51855c10f33d78b4246fbaac4cf0c29db80590cfcb2d6d0a1ddc2b6225407c63",
+          "query_name": "gpm_pair_000000019b",
+          "interval": [
+            19488966,
+            19738966
+          ]
+        },
+        "tool": {
+          "path": "/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/minimap2",
+          "sha256": "03f361d0b8dba343adb6067fbdc109719196ef0e2619ba02c5295826dcec56dc"
+        },
+        "runs": {
+          "current": {
+            "exit": 0,
+            "seconds": 89.62231609225273,
+            "tasks": [
+              {
+                "task": "short-04",
+                "threads": 1,
+                "seconds": 7.67427459359169,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-01",
+                "threads": 1,
+                "seconds": 7.786570094525814,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-03",
+                "threads": 1,
+                "seconds": 7.779438853263855,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-00",
+                "threads": 1,
+                "seconds": 7.889875575900078,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-13",
+                "threads": 1,
+                "seconds": 7.828696697950363,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-08",
+                "threads": 1,
+                "seconds": 7.959302194416523,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-11",
+                "threads": 1,
+                "seconds": 8.14366901665926,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-10",
+                "threads": 1,
+                "seconds": 8.248198695480824,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-09",
+                "threads": 1,
+                "seconds": 8.554414369165897,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-02",
+                "threads": 1,
+                "seconds": 9.587097592651844,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-07",
+                "threads": 1,
+                "seconds": 10.069991335272789,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-05",
+                "threads": 1,
+                "seconds": 12.682049222290516,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-12",
+                "threads": 1,
+                "seconds": 17.453337900340557,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-06",
+                "threads": 1,
+                "seconds": 20.19137592613697,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "heavy-2",
+                "threads": 1,
+                "seconds": 87.21603336185217,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "heavy-1",
+                "threads": 1,
+                "seconds": 89.52318213135004,
+                "exit": 0,
+                "cancelled": false
+              }
+            ],
+            "paf": {
+              "heavy-1": {
+                "rows": 3828,
+                "ordered_sha256": "820aee61ac8b1e193b0c69c1ae76f2d619845bc865d4b7b41149ef8ba926e5a2",
+                "unordered_sum": "0x28f2f47b25fabf9780f73aee411305c8b34e2530bed72580dacf7dac05bf3860",
+                "unordered_square_sum": "0x1c949b23fce36f0287cc1af104c37a35886f422942c82ca3ff26a30e9cbe3988"
+              },
+              "heavy-2": {
+                "rows": 3828,
+                "ordered_sha256": "820aee61ac8b1e193b0c69c1ae76f2d619845bc865d4b7b41149ef8ba926e5a2",
+                "unordered_sum": "0x28f2f47b25fabf9780f73aee411305c8b34e2530bed72580dacf7dac05bf3860",
+                "unordered_square_sum": "0x1c949b23fce36f0287cc1af104c37a35886f422942c82ca3ff26a30e9cbe3988"
+              },
+              "short-00": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-01": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-02": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-03": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-04": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-05": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-06": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-07": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-08": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-09": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-10": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-11": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-12": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-13": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              }
+            }
+          },
+          "adaptive": {
+            "exit": 0,
+            "seconds": 62.92640884965658,
+            "tasks": [
+              {
+                "task": "heavy-2",
+                "threads": 8,
+                "seconds": 14.67514655739069,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "heavy-1",
+                "threads": 8,
+                "seconds": 17.89090569317341,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-04",
+                "threads": 1,
+                "seconds": 19.30034164339304,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-03",
+                "threads": 1,
+                "seconds": 22.232444018125534,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-13",
+                "threads": 1,
+                "seconds": 19.462939500808716,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-09",
+                "threads": 1,
+                "seconds": 21.286815956234932,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-08",
+                "threads": 1,
+                "seconds": 21.49656355381012,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-06",
+                "threads": 1,
+                "seconds": 34.90033891797066,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-05",
+                "threads": 1,
+                "seconds": 36.33370289951563,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-00",
+                "threads": 1,
+                "seconds": 37.549789912998676,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-10",
+                "threads": 1,
+                "seconds": 37.029577150940895,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-07",
+                "threads": 1,
+                "seconds": 42.6108201444149,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-11",
+                "threads": 1,
+                "seconds": 40.73321132361889,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-12",
+                "threads": 1,
+                "seconds": 40.73033229261637,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-02",
+                "threads": 1,
+                "seconds": 47.41809110343456,
+                "exit": 0,
+                "cancelled": false
+              },
+              {
+                "task": "short-01",
+                "threads": 1,
+                "seconds": 48.14661178737879,
+                "exit": 0,
+                "cancelled": false
+              }
+            ],
+            "paf": {
+              "heavy-1": {
+                "rows": 3828,
+                "ordered_sha256": "820aee61ac8b1e193b0c69c1ae76f2d619845bc865d4b7b41149ef8ba926e5a2",
+                "unordered_sum": "0x28f2f47b25fabf9780f73aee411305c8b34e2530bed72580dacf7dac05bf3860",
+                "unordered_square_sum": "0x1c949b23fce36f0287cc1af104c37a35886f422942c82ca3ff26a30e9cbe3988"
+              },
+              "heavy-2": {
+                "rows": 3828,
+                "ordered_sha256": "820aee61ac8b1e193b0c69c1ae76f2d619845bc865d4b7b41149ef8ba926e5a2",
+                "unordered_sum": "0x28f2f47b25fabf9780f73aee411305c8b34e2530bed72580dacf7dac05bf3860",
+                "unordered_square_sum": "0x1c949b23fce36f0287cc1af104c37a35886f422942c82ca3ff26a30e9cbe3988"
+              },
+              "short-00": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-01": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-02": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-03": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-04": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-05": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-06": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-07": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-08": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-09": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-10": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-11": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-12": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              },
+              "short-13": {
+                "rows": 319,
+                "ordered_sha256": "c385aadf313205ea64ac5a284b1faf286b9f031f7193ebc7e4d3ab51f384d3d1",
+                "unordered_sum": "0x98bee9b4edd4e54ca0149a3e856c407b64468319653c987567914a79007a9a08",
+                "unordered_square_sum": "0x261b7985512f3eae0a6579415baf4d9cb5e9ad8c590ae62ffede2ebe2652f76"
+              }
+            }
+          }
+        },
+        "content_equal": true,
+        "ordered_equal": true,
+        "speed_ratio": 1.4242401200166668
+      }
+    },
+    "query_batching": {
+      "id": 40588041,
+      "queue": "arm",
+      "cpus": 4,
+      "state": "SUCCEEDED",
+      "report_sha256": "9c92051d730fcae207763360410e4f44fe6ad182f5c2a1e9415f2487d87b66bc",
+      "report": {
+        "status": "PASS",
+        "boundary": "Two 250kb windows from distinct real chr03 flye query records, complete original target, same ARM binary/flags. Forced one whole record per batch only to keep the hotspot bounded; no contig splitting or biological acceptance claim.",
+        "inputs": {
+          "target_sha256": "a8b1cb7e70ae005a0b92b9d364d5ebf1a18be328283e1f2c752df53e2af9cb3b",
+          "query_sha256": "c3a8dbb94b0bd09bd08d147d26fe94883d5809ec3c44b00f1981ffc7fdaecbd9"
+        },
+        "stages": [
+          {
+            "name": "cold",
+            "seconds": 20.151835210621357
+          },
+          {
+            "name": "baseline",
+            "seconds": 21.33090978488326
+          },
+          {
+            "name": "resume",
+            "seconds": 1.274464026093483,
+            "logs": [
+              "SELF_BATCH_CACHE_HIT 1/2",
+              "SELF_BATCH_CACHE_HIT 2/2"
+            ]
+          },
+          {
+            "name": "corrupt-one",
+            "seconds": 12.595009963959455,
+            "log": "SELF_BATCH_COMMITTED 1/2 threads=1"
+          }
+        ],
+        "ordered_equal": true,
+        "baseline_sha256": "fd4f6e0e5b94252d7627842490742264ab2d524d4bbdea1c3180ed8c74c4d46d",
+        "batched_sha256": "fd4f6e0e5b94252d7627842490742264ab2d524d4bbdea1c3180ed8c74c4d46d",
+        "repaired_equal": true
+      }
+    }
+  },
+  "superseded_long_test": {
+    "id": 40587709,
+    "state": "CANCELLED_BY_USER_POLICY",
+    "reason": "Replaced by bounded ARM scheduler hotspot; partial evidence archived; not a scientific failure."
+  },
+  "acceptance": {
+    "adaptive_schedule": {
+      "accepted": true,
+      "final_exact_source_speed_ratio": 1.4242401200166668,
+      "ordered_equal": true,
+      "content_equal": true,
+      "heavy_allocations": {
+        "current": [
+          1,
+          1
+        ],
+        "adaptive": [
+          8,
+          8
+        ]
+      }
+    },
+    "query_batching": {
+      "accepted": true,
+      "ordered_equal": true,
+      "resume_cache_hits": 2,
+      "corrupt_one_recomputed_only_one": true,
+      "repaired_equal": true
+    }
+  },
+  "boundaries": [
+    "Whole query records only; a single record is never split.",
+    "Hotspot acceptance is implementation evidence, not final complete-workflow or Final Path acceptance.",
+    "Existing complete workflows remain background evidence and do not block this change.",
+    "Step2 gap-screen remains disabled by default."
+  ]
+}

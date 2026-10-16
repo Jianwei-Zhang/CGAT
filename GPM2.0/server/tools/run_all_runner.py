@@ -26,7 +26,7 @@ from pathlib import Path
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
 from run_orchestration import OrchestrationContractError, atomic_write_json
 from server_report import ReportSession, finalize_delivery_archives_from_staging
-from alignment_tasks import AlignmentTask, load_tasks, run_tasks
+from alignment_tasks import AdaptiveDispatcher, AlignmentTask, load_tasks, run_tasks
 
 
 PLAN_FIELDS = ["unit_id", "command_relpath", "detail_log_relpath"]
@@ -392,6 +392,10 @@ class Runner:
             tasks.extend(unit_tasks)
         if not tasks:
             return 0
+        dispatcher = AdaptiveDispatcher() if any(
+            task.largest_fraction is not None for task in tasks
+        ) else None
+        allocations = {}
         self._event("PARALLEL", None, f"alignment_tasks={len(tasks)} thread_budget={budget}")
 
         def start(task, allocation):
@@ -404,11 +408,15 @@ class Runner:
                 atomic_write_status(self.status_path, self.status_rows)
                 self._event("START", unit, f"attempt={row['attempt']} command={unit.command_relpath}")
             self._event("TASK_START", unit, f"threads={allocation} command={task.command.relative_to(self.server_dir)}")
+            allocations[task.command] = (allocation, time.monotonic())
 
         def finish(task, code, cancelling):
             unit = by_id[task.unit_id]
             row = self._row(unit)
             remaining[task.unit_id] -= 1
+            allocation, task_started = allocations.pop(task.command)
+            if code == 0 and dispatcher is not None:
+                dispatcher.complete(task, allocation, time.monotonic() - task_started)
             self._event("TASK_END", unit, f"exit_code={code} command={task.command.relative_to(self.server_dir)}")
             if row["state"] in {"failed", "interrupted"}:
                 return
@@ -437,6 +445,7 @@ class Runner:
                 tasks, budget, self.active_children, lambda: self.received_signal,
                 start, lambda task, line: self._child_line(by_id[task.unit_id], line), finish,
                 {**os.environ, "GPM_REPORT_RUN_ID": self.run_id},
+                dispatch=dispatcher,
             )
         finally:
             if code:

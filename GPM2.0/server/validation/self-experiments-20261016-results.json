@@ -1,6 +1,6 @@
 {
-  "status": "RUNNING",
-  "checked_at": "2026-10-16T14:04:46+0800",
+  "status": "PRECISION_COMPLETE_LONG_SCHEDULE_SUPERSEDED",
+  "checked_at": "2026-10-16T15:23:04+08:00",
   "root": "/share/home/xbzhang26/cgat-reads-debug/self-experiments-20261016",
   "jobs": {
     "scheduler_pair": 40587709,
@@ -48,5 +48,14 @@
     "queue_verified": "arm",
     "waiting_reason": "Job dependency is not satisfied",
     "other_pending_jobs": 0
+  },
+  "scheduler_replacement": {
+    "job": 40588040,
+    "queue": "arm",
+    "state": "SUCCEEDED",
+    "speed_ratio": 1.4242401200166668,
+    "ordered_equal": true,
+    "content_equal": true,
+    "long_job_40587709": "cancelled after partial current-only control; replaced by bounded hotspot"
   }
 }

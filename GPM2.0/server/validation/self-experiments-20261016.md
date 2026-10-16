@@ -114,3 +114,13 @@ ARM script and unchanged comparator were SHA256-verified. Already-running x86
 experiments were not stopped. Waiting for unfinished dependencies will persist
 regardless of ARM capacity. Future submissions prefer ARM unless a documented
 compatibility or controlled same-architecture/version comparison requires x86.
+
+## Long scheduler pair superseded
+
+The user changed the acceptance boundary to a bounded hotspot and deferred complete
+workloads. Job 40587709 was therefore cancelled at 2026-10-16 15:19:30 +08:00
+after preserving its partial current-only report/log. It had not started adaptive,
+so it is not a failed adaptive result. ARM job 40588040 replaced it with the same
+production dispatcher on a two-heavy-plus-fourteen-short real-window fixture and
+passed output equality at 1.424x final-source makespan speedup. See
+`adaptive-batching-hotspot-20261016.md`.
