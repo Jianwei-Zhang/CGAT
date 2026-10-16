@@ -1,12 +1,13 @@
 # GRT performance and consistency validation (2026-10-16)
 
-> **Development update: physical stage split, validation deferred.** The current
-> source uses independently implemented Step2/Step3 modules and multi-file engine
-> identity version 13. At the user's request, the split and adjusted regressions
-> have **not** been runtime-tested; only static dependency/diff review is done.
-> The passing results below certify pinned revision `2f52515` / engine `080599a3`
-> and its earlier snapshots, **not** this untested refactor. Final regression,
-> remote equivalence and public source-asset refresh remain pending.
+> **Development update: formal optimized route wired, remote acceptance pending.**
+> Current source uses independently split Step2/Step3 modules, engine identity 14,
+> optimized execution, full Step2 and gap-screen Step3. Production refill now
+> batches and reuses compatible indexes. Necessary local focused checks pass;
+> see `grt-formal-optimized-20261016.md`. Historical results below still certify
+> their pinned snapshots, not complete acceptance of this new runtime. Remote
+> complete-data suffix comparisons use retained old artifacts, never old reruns.
+> Public source-asset refresh remains pending.
 
 ## Current acceptance summary (08:16 CST)
 

@@ -233,6 +233,7 @@ def cached_chromosome_alignment(
     parameters: dict[str, object],
     threads: int,
     cache_scope: str = "step1",
+    alignment_runner=None,
 ) -> tuple[Path, bool, str]:
     flank_payload = fasta_bytes(flank_records)
     fingerprint_payload = {
@@ -281,7 +282,9 @@ def cached_chromosome_alignment(
         flank_path = temporary / "flanks.fa"
         flank_path.write_bytes(flank_payload)
         paf_path = temporary / "result.paf"
-        if flank_records and donor_has_records:
+        if flank_records and donor_has_records and alignment_runner is not None:
+            alignment_runner(flank_path, paf_path, temporary)
+        elif flank_records and donor_has_records:
             run_minimap(
                 str(minimap["resolved"]),
                 threads,
@@ -301,6 +304,8 @@ def cached_chromosome_alignment(
             (temporary / "stderr.log").write_text("", encoding="utf-8")
         parse_paf(paf_path, query_map, target_lengths)
         output_names = ["flanks.fa", "result.paf", "command.txt", "stdout.log", "stderr.log"]
+        if (temporary / "batch_provenance.json").is_file():
+            output_names.append("batch_provenance.json")
         checkpoint = {
             "workflow": WORKFLOW,
             "engine_version": ENGINE_VERSION,

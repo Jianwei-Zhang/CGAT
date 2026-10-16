@@ -116,23 +116,31 @@ and common modules. Changing any of them invalidates repair-stage results and
 requires Step2 to run again. Independently validated raw MUMmer results remain
 reusable when their exact input, tool and alignment-parameter identities match.
 
-The direct Python entrypoints expose `--step2-mummer-scope full|gap-screen` and
-`--step3-mummer-scope full|gap-screen`, respectively. Both default to `full`.
-`gap-screen` is experimental: local windows select donor partitions, then the
-selected partitions are aligned against the complete input chromosome using the
-established alignment parameters. Do not interpret a successful screen or
-matching FASTA alone as full metadata/evidence equivalence; rejected-candidate
-counts can differ. Keep `full` for runs requiring the established evidence scope.
+Newly prepared workflows enable the validated optimization route by default:
 
-The direct stage entrypoints also accept `--execution-profile baseline|optimized`
-(default: `baseline`). The experimental `optimized` profile keeps the chosen
-MUMmer scope and alignment thresholds, but shares one CPU/memory-bounded worker
-pool across chromosomes, schedules larger donor partitions first, reuses
-content-verified partition FASTA inputs, and uses exact candidate lookup indexes
-and already-validated parsed coordinates. Coordinate publication and tie-breaking
-retain their original order. It does not mean `gap-screen` and does not discard
-rejected evidence. Prepared workflows remain on `baseline` pending real-input
-acceptance. Cache-assisted equivalence timings are not cold-pipeline benchmarks.
+- `--grt-execution-profile optimized`: a shared CPU/memory-bounded nucmer pool,
+  largest-target-first scheduling, verified partition FASTA reuse, exact anchor
+  indexes and reuse of already-validated parsed coordinates. Publication and
+  candidate tie-breaking retain their original order.
+- Step2 remains **full scope**; its diagnostic-changing screen is not enabled.
+- `--grt-step3-mummer-scope gap-screen`: anchor-safe donor-partition screening,
+  followed by full-chromosome alignment of selected original partitions.
+- Optimized Step3 refill batches same-round flank queries, preserves each
+  chromosome’s query/hit order, and reuses a compatible content-verified `.mmi`.
+  A cold mapping saves its index in the same invocation; changed target bytes,
+  preset or executable invalidate index reuse. Empty queries remain skipped.
+
+For rollback when preparing a **new** workspace, use
+`--grt-execution-profile baseline --grt-step3-mummer-scope full` with either
+`run.sh` or `prepare.sh`. Direct Python entries accept
+`--execution-profile baseline|optimized` and the corresponding
+`--step2-mummer-scope` / `--step3-mummer-scope`; defaults are optimized, full Step2
+and gap-screen Step3. Refill batching follows the execution profile.
+
+Existing workspace scripts/runtime are not modified automatically. Do not copy
+these changes into a running workspace. Screening is not proof of universal
+metadata/evidence equivalence; full datasets are compared against preserved old
+results before release. Cache-assisted timings are not cold-pipeline benchmarks.
 
 ## Optional AI agent skill
 

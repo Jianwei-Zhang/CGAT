@@ -226,7 +226,7 @@ def add_common_cli_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--execution-profile", choices=sorted(EXECUTION_PROFILES),
         default=DEFAULT_EXECUTION_PROFILE,
-        help="Experimental exact execution optimizations (default: baseline)",
+        help="Exact execution profile: optimized (default) or baseline rollback",
     )
     parser.add_argument(
         "--repair-mode",

@@ -4424,6 +4424,23 @@
     "Full customer evidence/report/full-light archive delivery suffix using verified original complete leaf PAFs and the checked optimized GRT output; final App import boundary to be reported separately.",
     "Final evidence commit/push and quality verification, followed by same-version public Server source Release asset refresh and public-download integrity checks."
   ],
+  "pending_formal_optimized_rollout": {
+    "defaults": {
+      "execution_profile": "optimized",
+      "refill": "batch_with_compatible_index_cache",
+      "step2_scope": "full",
+      "step3_scope": "gap-screen"
+    },
+    "engine_version": 14,
+    "local_evidence": {
+      "prepare_metadata_shell": "PASS",
+      "refill_focused": 5,
+      "repair_integration": 7,
+      "run_option_forwarding": "PASS"
+    },
+    "remote_boundary": "Only new optimized complete-data GRT suffix runs; old results read-only. No baseline reruns or numerical-cache borrowing.",
+    "status": "LOCAL_FOCUSED_PASS_REMOTE_FULL_DATA_PENDING"
+  },
   "pending_physical_stage_split": {
     "base_validated_revision": "2f52515e659ad75bea614d648880f2b6d621ed1b",
     "identity": "Content hash of both entry scripts and the complete grt_core Python source tree; raw alignment keys are unchanged.",
@@ -4439,7 +4456,7 @@
       "tools/grt_core/step2_engine.py",
       "tools/grt_core/step3_engine.py"
     ],
-    "status": "UNTESTED_USER_DEFERRED",
+    "status": "LOCAL_FOCUSED_PASS_REMOTE_FULL_DATA_PENDING",
     "validation_boundary": "Static dependency/source review only. Previously passing engine-080 tests are historical evidence, not validation of this split. No new test jobs or CI tests requested before the final unified test phase."
   },
   "quality_ci": {

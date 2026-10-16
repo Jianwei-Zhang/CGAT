@@ -45,7 +45,7 @@ def repair_engine_sha256(core_root: Path | None = None) -> str:
         for path in files
     }).encode("utf-8"))
 
-ENGINE_VERSION = 13
+ENGINE_VERSION = 14
 MUMMER_MIN_CLUSTER = 1_000
 MUMMER_MIN_MATCH = 100
 MUMMER_MIN_ALIGNMENT = 10_000
@@ -75,8 +75,9 @@ REPAIR_MODES = {"conservative", "aggressive"}
 DEFAULT_REPAIR_MODE = "aggressive"
 MUMMER_SCOPES = {"full", "gap-screen"}
 DEFAULT_MUMMER_SCOPE = "full"
+DEFAULT_STEP3_MUMMER_SCOPE = "gap-screen"
 EXECUTION_PROFILES = {"baseline", "optimized"}
-DEFAULT_EXECUTION_PROFILE = "baseline"
+DEFAULT_EXECUTION_PROFILE = "optimized"
 ENGINE_SHA256 = repair_engine_sha256()
 EXECUTION_HELPER_SHA256 = sha256_file(Path(sys.modules[AlignmentCoordinateIndex.__module__].__file__))
 

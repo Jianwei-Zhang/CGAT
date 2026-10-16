@@ -35,6 +35,8 @@ GRT_SHOW_COORDS="show-coords"
 GRT_QC_MEMORY_GB="80"
 GRT_KMER_SIZE="21"
 GRT_REFILL_MAX_LENGTH="1000000"
+GRT_EXECUTION_PROFILE="optimized"
+GRT_STEP3_MUMMER_SCOPE="gap-screen"
 
 usage() {
   cat <<'EOF'
@@ -58,6 +60,8 @@ Usage:
     [--grt-qc-memory-gb <memory_gb>] \
     [--grt-kmer-size <kmer_size>] \
     [--max-fill <bp>] \
+    [--grt-execution-profile optimized|baseline] \
+    [--grt-step3-mummer-scope gap-screen|full] \
     [--ds [<dataset_name>] <dataset_fasta_path> ...]
 
 Example:
@@ -85,6 +89,9 @@ Behavior:
   - Supports --cen-min-len and --cen-min-identity to filter centromere alignments
   - The first --ds is the locked GRT primary dataset; later initial --ds inputs are support datasets
   - --max-fill sets the Step3 optimized refill length limit in bp, default: 1000000
+  - GRT defaults: optimized execution, full Step2, anchor-safe gap-screen Step3
+  - --grt-execution-profile baseline restores legacy scheduling and per-chromosome refill
+  - --grt-step3-mummer-scope full restores the complete Step3 MUMmer alignment scope
   - Discovers minimap2, nucmer, delta-filter, and show-coords from PATH and records their resolved paths
   - Repeatable --reads enables one shared Meryl database plus parallel Merqury QV for every initial dataset
   - The --threads budget is divided across concurrent reads-QC dataset jobs
@@ -433,6 +440,9 @@ write_prepare_options_metadata() {
     printf 'grt_merqury\t%s\n' "$GRT_MERQURY"
     printf 'grt_craq\t%s\n' "$GRT_CRAQ"
     printf 'grt_refill_max_length\t%s\n' "$GRT_REFILL_MAX_LENGTH"
+    printf 'grt_execution_profile\t%s\n' "$GRT_EXECUTION_PROFILE"
+    printf 'grt_step2_mummer_scope\tfull\n'
+    printf 'grt_step3_mummer_scope\t%s\n' "$GRT_STEP3_MUMMER_SCOPE"
     printf 'grt_qc_memory_gb\t%s\n' "$GRT_QC_MEMORY_GB"
     printf 'grt_kmer_size\t%s\n' "$GRT_KMER_SIZE"
   } > "$output_path"
@@ -550,14 +560,15 @@ write_grt_step2_script() {
   {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
-    printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s\n' \
+    printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --execution-profile %s --step2-mummer-scope full\n' \
       "$(shell_quote "${work_root}/.prepare_lib/tools/grt_step2.py")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
       "$(shell_quote "$GRT_MINIMAP2")" \
       "$(shell_quote "$GRT_NUCMER")" \
       "$(shell_quote "$GRT_DELTA_FILTER")" \
-      "$(shell_quote "$GRT_SHOW_COORDS")"
+      "$(shell_quote "$GRT_SHOW_COORDS")" \
+      "$(shell_quote "$GRT_EXECUTION_PROFILE")"
   } > "$output_path"
   make_executable_if_supported "$output_path"
 }
@@ -569,7 +580,7 @@ write_grt_step3_script() {
   {
     printf '#!/usr/bin/env bash\n'
     printf 'set -euo pipefail\n'
-    printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --max-fill %s\n' \
+    printf 'python3 %s --server-dir %s --threads %s --minimap2 %s --nucmer %s --delta-filter %s --show-coords %s --max-fill %s --execution-profile %s --step3-mummer-scope %s\n' \
       "$(shell_quote "${work_root}/.prepare_lib/tools/grt_step3.py")" \
       "$(shell_quote "$work_root")" \
       "$(shell_quote "$THREADS")" \
@@ -577,7 +588,9 @@ write_grt_step3_script() {
       "$(shell_quote "$GRT_NUCMER")" \
       "$(shell_quote "$GRT_DELTA_FILTER")" \
       "$(shell_quote "$GRT_SHOW_COORDS")" \
-      "$(shell_quote "$GRT_REFILL_MAX_LENGTH")"
+      "$(shell_quote "$GRT_REFILL_MAX_LENGTH")" \
+      "$(shell_quote "$GRT_EXECUTION_PROFILE")" \
+      "$(shell_quote "$GRT_STEP3_MUMMER_SCOPE")"
   } > "$output_path"
   make_executable_if_supported "$output_path"
 }
@@ -773,6 +786,16 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || die "$1 requires <min_minimizers>"
       validate_self_alignment_integer "$1" "$2"
       SELF_MINIMIZERS="$2"
+      shift 2
+      ;;
+    --grt-execution-profile)
+      [[ $# -ge 2 ]] || die "$1 requires optimized or baseline"
+      case "$2" in optimized|baseline) GRT_EXECUTION_PROFILE="$2" ;; *) die "Invalid $1 '$2'." ;; esac
+      shift 2
+      ;;
+    --grt-step3-mummer-scope)
+      [[ $# -ge 2 ]] || die "$1 requires gap-screen or full"
+      case "$2" in gap-screen|full) GRT_STEP3_MUMMER_SCOPE="$2" ;; *) die "Invalid $1 '$2'." ;; esac
       shift 2
       ;;
     --max-fill|-m)

@@ -1552,6 +1552,10 @@ def fasta(path):
 args = sys.argv[1:]
 out = args[args.index('-o') + 1]
 target_path = args[-2]
+if Path(target_path).suffix == '.mmi':
+    target_path = Path(target_path).read_text().splitlines()[1]
+if '-d' in args:
+    Path(args[args.index('-d') + 1]).write_text('FAKE_INDEX\n' + target_path + '\n')
 query_path = args[-1]
 targets = fasta(target_path)
 queries = fasta(query_path)
@@ -1761,7 +1765,7 @@ else:
         if first.returncode:
             return first
         second = subprocess.run(
-            [sys.executable, str(step3_tool), *common, "--max-fill", str(refill_max_length)],
+            [sys.executable, str(step3_tool), *common, "--step3-mummer-scope", "full", "--max-fill", str(refill_max_length)],
             check=False, capture_output=True, text=True, env=env,
         )
         return subprocess.CompletedProcess(
@@ -1913,6 +1917,7 @@ else:
             for relative in (
                 "grt_core/step2_engine.py", "grt_core/step3_engine.py",
                 "grt_core/repair_mummer.py", "grt_core/alignment_index.py",
+                "grt_core/refill_batch.py", "grt_core/stage_cache.py",
                 "grt_step2.py", "grt_step3.py",
             ):
                 with self.subTest(relative=relative):

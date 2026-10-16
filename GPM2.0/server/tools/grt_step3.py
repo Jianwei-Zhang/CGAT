@@ -8,7 +8,7 @@ import argparse
 
 try:
     from grt_core.repair_runtime import (
-        DEFAULT_MUMMER_SCOPE,
+        DEFAULT_STEP3_MUMMER_SCOPE,
         MUMMER_SCOPES,
         add_common_cli_arguments,
         validate_common_cli_arguments,
@@ -18,7 +18,7 @@ try:
     from grt_core.step3_engine import execute_step3
 except ModuleNotFoundError:  # Imported as server.tools.grt_step3.
     from .grt_core.repair_runtime import (
-        DEFAULT_MUMMER_SCOPE,
+        DEFAULT_STEP3_MUMMER_SCOPE,
         MUMMER_SCOPES,
         add_common_cli_arguments,
         validate_common_cli_arguments,
@@ -42,11 +42,11 @@ def main() -> None:
     parser.add_argument(
         "--step3-mummer-scope",
         choices=sorted(MUMMER_SCOPES),
-        default=DEFAULT_MUMMER_SCOPE,
+        default=DEFAULT_STEP3_MUMMER_SCOPE,
         help=(
             "Step3 MUMmer scope: full keeps the established path; gap-screen "
             "screens local gap windows and reruns selected partitions against "
-            "the complete Q2 chromosome (experimental, default: full)"
+            "the complete Q2 chromosome (default: gap-screen; full preserves the complete alignment scope)"
         ),
     )
     args = parser.parse_args()

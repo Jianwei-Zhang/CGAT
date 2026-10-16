@@ -107,19 +107,27 @@ Step2/Step3 共用一个覆盖两个引擎、入口和共用模块的内容指�
 会使阶段结果失效并要求重新执行 Step2；输入、工具和参数均一致时，独立的
 MUMmer 原始数值缓存仍可复用。
 
-两个 Python 入口分别提供 `--step2-mummer-scope full|gap-screen`、
-`--step3-mummer-scope full|gap-screen`，默认均为 `full`。`gap-screen` 为实验性
-选项：局部窗口只筛选 donor partition，选中的 partition 仍使用原参数与
-完整输入染色体比对。筛选成功或 FASTA 哈希一致，不代表所有元数据和证据
-严格等价；被拒绝候选的诊断计数可能不同。需要保持原证据范围时使用 `full`。
+新生成的正式工作流默认启用以下优化路线：
 
-两个阶段的 Python 入口还支持 `--execution-profile baseline|optimized`，默认
-`baseline`。实验性 `optimized` 保持所选 MUMmer 范围和比对阈值不变，使用
-跨染色体共享且受 CPU/内存预算约束的任务池、较大 donor 分区优先调度、
-内容校验后的分区 FASTA 复用、精确候选查询索引和已校验坐标解析结果复用。
-坐标输出及并列选择仍遵循原顺序。它不等于 `gap-screen`，也不删减拒绝证据。
-在真实数据验收前，生成的工作流仍使用 `baseline`；缓存辅助一致性测试的耗时
-不能当作完整冷启动流程的耗时。
+- `--grt-execution-profile optimized`：跨染色体共享且受 CPU/内存约束的
+  nucmer 池、大分区优先调度、校验后的分区 FASTA 复用、精确锚点索引与
+  已校验坐标解析结果复用。输出和候选平局选择仍保留原顺序。
+- Step2 继续使用 **full 全量范围**，不启用会改变诊断的 Step2 筛选。
+- `--grt-step3-mummer-scope gap-screen`：使用修订的锚点安全筛选，选中的
+  原始 donor 分区仍与完整染色体比对。
+- optimized Step3 refill 同轮合并 flank query，恢复每条染色体的 query／命中
+  顺序，并复用内容校验的兼容 `.mmi`。首次比对在同一次调用中保存索引；
+  目标字节、preset 或工具变化都会使索引失效。空 query 仍跳过。
+
+如需回退，在用 `run.sh` 或 `prepare.sh` **新建工作区**时传入
+`--grt-execution-profile baseline --grt-step3-mummer-scope full`。
+Python 入口对应支持 `--execution-profile baseline|optimized`、
+`--step2-mummer-scope`／`--step3-mummer-scope`，默认 optimized、Step2 full、
+Step3 gap-screen；refill 合批随 execution profile 开关。
+
+已有工作区脚本和运行库不会自动升级，不要修改正在运行的工作区。筛选通过
+不代表所有数据都已证明完整证据等价；发布前会用完整数据集与保留的旧结果
+对照，不重跑旧版。缓存辅助计时不能当作完整冷启动流程的耗时。
 
 ## 可选的 AI agent skill
 

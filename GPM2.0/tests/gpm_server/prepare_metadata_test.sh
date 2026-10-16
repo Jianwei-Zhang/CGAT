@@ -594,10 +594,19 @@ if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --archive-format unknown >
 fi
 
 assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" grt_refill_max_length 1000000
+assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" grt_execution_profile optimized
+assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" grt_step2_mummer_scope full
+assert_prepare_option "${TMP_DIR}/default-tar-output/metadata/prepare_options.tsv" grt_step3_mummer_scope gap-screen
+grep -F -- "--execution-profile optimized --step2-mummer-scope full" "${TMP_DIR}/default-tar-output/run_grt_step2.sh" >/dev/null
+grep -F -- "--execution-profile optimized --step3-mummer-scope gap-screen" "${TMP_DIR}/default-tar-output/run_grt_step3.sh" >/dev/null
 PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" \
   --ref refill_ref "$ref" --ds refill_ds "$ds" --max-fill 2000000 \
+  --grt-execution-profile baseline --grt-step3-mummer-scope full \
   -o "${TMP_DIR}/refill-output" >/dev/null
 assert_prepare_option "${TMP_DIR}/refill-output/metadata/prepare_options.tsv" grt_refill_max_length 2000000
+assert_prepare_option "${TMP_DIR}/refill-output/metadata/prepare_options.tsv" grt_execution_profile baseline
+assert_prepare_option "${TMP_DIR}/refill-output/metadata/prepare_options.tsv" grt_step3_mummer_scope full
+grep -F -- "--execution-profile baseline --step3-mummer-scope full" "${TMP_DIR}/refill-output/run_grt_step3.sh" >/dev/null
 grep -F -- "--max-fill 2000000" "${TMP_DIR}/refill-output/run_grt_step3.sh" >/dev/null
 for invalid_limit in 0 -1 1.5 nope; do
   if PATH="${FAKE_BIN}:$PATH" "$PREPARE_BASH" "$SCRIPT" --max-fill "$invalid_limit" >/dev/null 2>&1; then

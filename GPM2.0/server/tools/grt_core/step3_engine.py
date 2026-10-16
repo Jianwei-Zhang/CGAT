@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .repair_common import *
+from .refill_batch import RefillBatchAlignment
 from .repair_mummer import (
     collect_mummer,
     grt_mummer_parameters,
@@ -123,6 +124,7 @@ def run_refill_alignment(
     *,
     round_name: str = "round1",
     max_fill_length: int = REFILL_MAX_LENGTH,
+    execution_profile: str = DEFAULT_EXECUTION_PROFILE,
 ) -> tuple[
     list[dict[str, object]],
     list[dict[str, object]],
@@ -150,6 +152,11 @@ def run_refill_alignment(
     artifact_identities: dict[str, dict[str, str]] = {}
     paf_rows: list[dict[str, object]] = []
     paf_parts: list[bytes] = []
+    batch = (RefillBatchAlignment(
+        server_dir, f"step3_refill_{round_name}", donor_set, minimap, threads,
+        flank_records, query_map, target_lengths,
+        temporary / "refill" / round_name / "batch",
+    ) if execution_profile == "optimized" else None)
     for chromosome in chromosome_order:
         chromosome_flanks = [
             (name, sequence)
@@ -174,6 +181,7 @@ def run_refill_alignment(
             parameters,
             threads,
             cache_scope="step23",
+            alignment_runner=batch,
         )
         print(
             f"GRT step3 refill {round_name} {chromosome}: "
@@ -951,6 +959,7 @@ def run_step3(
             threads,
             round_name="round1",
             max_fill_length=refill_max_length,
+            execution_profile=execution_profile,
         )
         attach_gap_origins(corrected_gaps, gap_origins)
         annotate_gap_path_origins(corrected_paths, corrected_gaps)
@@ -1056,6 +1065,7 @@ def run_step3(
             threads,
             round_name="round2",
             max_fill_length=refill_max_length,
+            execution_profile=execution_profile,
         )
         attach_gap_origins_from_paths(
             filter_paths_result,

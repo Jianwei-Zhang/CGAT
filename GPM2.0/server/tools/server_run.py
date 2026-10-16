@@ -24,6 +24,7 @@ SINGLE_OPTIONS = {
     "--minimap-preset", "--cen", "--cen-min-len",
     "--cen-min-identity", "--reads", "--reads-qc", "--grt-qc-memory-gb",
     "--grt-kmer-size", "--max-fill", "--self-m", "--self-n",
+    "--grt-execution-profile", "--grt-step3-mummer-scope",
 }
 PATH_OPTIONS = {"--ref", "--ds", "--reads", "--cen"}
 
@@ -46,6 +47,10 @@ def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
             values[-1] = str((cwd / values[-1]).resolve())
         if key in {"--max-fill", "--self-m", "--self-n"} and not re.fullmatch(r"[1-9][0-9]*", values[0]):
             raise RunnerError(f"{key} must be a positive integer")
+        allowed = {"--grt-execution-profile": {"baseline", "optimized"},
+                   "--grt-step3-mummer-scope": {"full", "gap-screen"}}
+        if key in allowed and values[0] not in allowed[key]:
+            raise RunnerError(f"Invalid {key}: {values[0]}")
         if key in {"--ds", "--reads", "--tel"}:
             options.setdefault(key, []).append(values)
         else:
