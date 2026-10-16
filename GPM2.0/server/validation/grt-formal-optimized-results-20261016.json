@@ -1,4 +1,26 @@
 {
+  "arm_assessment": {
+    "available_modules": {
+      "minimap2": "2.28-r1209",
+      "mummer": "4.0.0rc1",
+      "python": "3.11.11",
+      "samtools": "1.21"
+    },
+    "checked_at": "2026-10-16T12:23:00+0800",
+    "current_x86_comparison_tools": {
+      "minimap2": "2.30-r1287",
+      "mummer": "4.0.1"
+    },
+    "decision": "Do not migrate or duplicate running x86 comparisons. Stock ARM aligner versions differ; matching pinned versions and independent cache validation required before an ARM comparison. No ARM benchmark submitted.",
+    "free_cpu_snapshot": {
+      "agent-ARM-07": 128,
+      "agent-ARM-08": 128,
+      "agent-ARM-14": 128,
+      "agent-ARM-18": 96,
+      "agent-ARM-21": 128
+    },
+    "login": "180 port18081 cli-ARM-01 aarch64"
+  },
   "boundary": "Only new optimized complete-data GRT suffix runs; old results read-only. No baseline reruns, numerical-cache borrowing, full leaf/reads-QC reexecution or release-acceptance claim.",
   "corrected_jobs": {
     "jobs": {
@@ -17,26 +39,60 @@
     "runtime_revision": "7ba84ea",
     "submitted_at": "2026-10-16T12:03:53+0800"
   },
+  "customer16_resume": {
+    "cache_mode": "own-cache-resume",
+    "cancelled_pending_32_cpu": [
+      40587512,
+      40587513
+    ],
+    "failed_lock_attempt": 40587515,
+    "jobs": {
+      "full": 40587514,
+      "gap-screen": 40587519
+    },
+    "launcher_sha256": "a94f894672883dedf8013daa1520ee8cd7dbd912e3e5c610a599618ea1f0120b",
+    "lock_recovery": {
+      "archive": "/share/home/xbzhang26/cgat-reads-debug/grt-formal-optimized-20261016/cases-step2-gap/customer2665/optimized/.run_all/lock-archive-40587509-1792124551",
+      "evidence": "Scheduler job40587509 user-terminated 12:11:04; original PID identity absent; no same-user workspace commands on original node",
+      "host": "agent-X86-27",
+      "owner": {
+        "acquired_at": "2026-10-16T12:04:01+08:00",
+        "hostname": "agent-X86-27",
+        "pid": 3417061,
+        "process_start": "6256128363",
+        "run_id": "20261016T040401Z-3417061-c21bbd9e",
+        "workspace": "/share/home/xbzhang26/cgat-reads-debug/grt-formal-optimized-20261016/cases-step2-gap/customer2665/optimized"
+      },
+      "status": "STALE_LOCK_ARCHIVED",
+      "time": "2026-10-16T12:22:31+0800"
+    },
+    "lock_recovery_job": 40587518,
+    "runtime_revision": "7ba84ea",
+    "state": "RUNNING",
+    "threads_per_job": 16,
+    "timing_boundary": "Remaining resumed time only; not numerical-cold speedup. Existing 16 CPU partial caches retained.",
+    "updated_at": "2026-10-16T12:23:28.728475+08:00"
+  },
   "customer32_replacement": {
     "boundary": "User approved 32 CPU for both customer cases. Fresh empty numerical caches; old 16 CPU outputs retained and excluded from primary timing. Four smaller dataset pairs and old full producer jobs untouched.",
     "jobs": {
       "full": 40587512,
       "gap-screen": 40587513
     },
-    "last_observed_state": "PENDING at 2026-10-16 12:11 CST",
+    "last_observed_state": "Scheduler FAILED after explicit cancellation, no start time; cancelled at 2026-10-16 12:14:56 CST",
     "launcher_revision": "b2c124b",
     "outputs": {
       "full": "/share/home/xbzhang26/cgat-reads-debug/grt-formal-optimized-20261016/cases-customer32/full",
       "gap-screen": "/share/home/xbzhang26/cgat-reads-debug/grt-formal-optimized-20261016/cases-customer32/gap"
     },
     "runtime_revision": "7ba84ea",
-    "state": "SUBMITTED",
+    "state": "CANCELLED_BEFORE_START",
     "superseded_jobs": {
       "full": 40587508,
       "gap-screen": 40587509
     },
     "threads_per_job": 32,
-    "updated_at": "2026-10-16T12:11:03+0800"
+    "updated_at": "2026-10-16T12:23:00+0800"
   },
   "first_launch_failure": {
     "cause": "Validation generator omitted shell_quote; empty arguments. No numerical alignments were run.",
@@ -59,6 +115,26 @@
     },
     "source_revision": "7ba84ea",
     "submitted_at": "2026-10-16T11:55:31+0800"
+  },
+  "partial_stage2_observations": {
+    "10g_no_reads": {
+      "full_seconds": 1073.758,
+      "gap_seconds": 788.853
+    },
+    "10g_with_reads": {
+      "full_state": "RUNNING",
+      "gap_seconds": 855.783
+    },
+    "boundary": "New optimized full vs experimental Step2 gap-screen, 8 CPUs, separate nodes. Only stage wall times, final-path checks pending; not overall speedup or acceptance.",
+    "checked_at": "2026-10-16T12:23:00+0800",
+    "test8_fixed": {
+      "full_seconds": 641.82,
+      "gap_state": "RUNNING"
+    },
+    "zebrafish": {
+      "full_seconds": 518.102,
+      "gap_seconds": 506.729
+    }
   },
   "production_refill": {
     "boundary": "New production batching only; retained real customer refill PAFs are the reference. No old minimap2 baseline invocation.",
@@ -199,5 +275,5 @@
   "production_refill_job": 40587487,
   "source_archive_sha256": "74c8860a4ac20d48e4932576cfbcbf20e5794d270a211f99a012914fde715579",
   "source_revision": "7ba84ea",
-  "status": "SMALL_CASES_RUNNING_CUSTOMER32_SUBMITTED"
+  "status": "SMALL_CASES_RUNNING_CUSTOMER16_RESUMED"
 }

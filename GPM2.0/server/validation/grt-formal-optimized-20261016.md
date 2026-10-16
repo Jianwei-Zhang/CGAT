@@ -154,3 +154,56 @@ More allocated CPUs do not promise linear speedup, and queue delay is additional
 The four smaller dataset pairs retain 8 CPUs and are not restarted. Original
 whole-workflow producers **40550762/40550763** are unchanged. No production default
 or released source asset changes accompany this resource adjustment.
+
+## 12:23 CST: 16-CPU recovery and ARM assessment
+
+The 32-CPU customer jobs **40587512/40587513** were explicitly cancelled while
+pending at 12:14:56, without running computation. Following the user's request
+not to wait for a long queue, the customer pair resumed their **own** existing
+16-CPU workspaces/caches (not the historical baseline cache):
+
+| Scope | Current job | Observed state | Node |
+| --- | ---: | --- | --- |
+| full | 40587514 | RUNNING, Step2 alignment | agent-X86-38 |
+| gap-screen | 40587519 | RUNNING, input gates passed | agent-X86-33 |
+
+The first gap resume **40587515** failed at startup because the terminated
+40587509 left a workspace lock owned by another node. The runner conservatively
+refuses cross-node takeover. Recovery job **40587518** ran on the original
+agent-X86-27: the original PID/start identity was absent and no same-user command
+referenced this workspace. It archived (did not delete) the unchanged lock and
+recorded owner/provenance in remote `gap-lock-recovery.json`, then succeeded.
+The failed report and old logs remain retained; only gap was resubmitted.
+No live locks were bypassed, no production lock policy or active runtime changed.
+
+The validation launcher now requires explicit `--resume --reuse-own-cache` to
+resume numerical work. Reports label this `own-cache-resume`: remaining wall
+time is **not cold timing**, and no cold full/gap speed ratio is emitted for
+these resumed customer cases. Correctness/Final Path gates remain unchanged.
+Only scoped source/diff validation is required for this launcher-only change;
+no unrelated regression suite or frontend tests are run.
+
+All eight small-case tasks **40587500–40587507** are still RUNNING. Partial
+8-CPU Step2 observations (different nodes, single measurements):
+
+| Dataset | Full Step2 | Gap-screen Step2 | Current boundary |
+| --- | ---: | ---: | --- |
+| 10g no reads | 1073.758 s | 788.853 s | Stage2 wall reduction about 26.5%; Final Path pending |
+| zebrafish | 518.102 s | 506.729 s | Stage2 wall reduction about 2.2%; Final Path pending |
+| 10g with reads | running | 855.783 s | Not a completed pair |
+| test8 fixed | 641.820 s | running | Not a completed pair |
+
+These are NOT overall workflow speedups and NOT proof of Final Path equality.
+Step2 gap-screen remains experimental/default-off.
+
+ARM login via port18081 was verified as cli-ARM-01/aarch64. At this checkpoint,
+ARM-07/08/14/21 each had 128 free CPUs and ARM-18 had 96. Stock ARM modules load,
+but minimap2 **2.28-r1209** and MUMmer **4.0.0rc1** differ from the pinned x86
+**2.30-r1287 / 4.0.1** comparison. No version-mixed ARM benchmark is submitted,
+and already-running x86 tests are not restarted just to change architecture.
+Future ARM comparisons need matching pinned versions and their own validated
+cache/tool identity; cross-architecture timing must be reported separately.
+
+Original whole-workflow producers **40550762/40550763** remain RUNNING and
+untouched, past GRT finalize and into per-chromosome leaf alignment. The full
+suite's Final Path acceptance remains pending; official Release assets unchanged.

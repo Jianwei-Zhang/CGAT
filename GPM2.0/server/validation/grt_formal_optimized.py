@@ -145,9 +145,11 @@ def main():
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--threads',type=int,default=8)
     parser.add_argument('--step2-scope',choices=('full','gap-screen'),default='full')
-    parser.add_argument('--resume',action='store_true',help='Resume a NEW-only launcher failure with no numerical cache')
+    parser.add_argument('--resume',action='store_true',help='Resume a NEW-only workspace; cache reuse requires --reuse-own-cache')
+    parser.add_argument('--reuse-own-cache',action='store_true',help='Resume existing validated numerical cache; NOT cold timing')
     parser.add_argument('--paired-full',type=Path,help='Corresponding new optimized full-scope case; read-only timing/result reference')
     args=parser.parse_args()
+    if args.reuse_own_cache and not args.resume: parser.error('--reuse-own-cache requires --resume')
     args.output.mkdir(parents=True,exist_ok=args.resume)
     workspace=args.output/'optimized';workspace.mkdir(exist_ok=args.resume)
     if args.resume and (args.output/'report.json').exists():
@@ -155,7 +157,7 @@ def main():
         if not history.exists(): shutil.copy2(args.output/'report.json',history)
     report={'status':'RUNNING','dataset':args.name,'threads':args.threads,'checks':[],
             'boundary':'Only new optimized GRT Step2(selected scope)/Step3(gap-screen)/Step4 and Final Path export on every chromosome and full donors. Upstream assignment/reads-QC/Step1 frozen inputs reused. No old engine invocation, borrowed numerical cache, leaf realignment or delivery packaging. Not whole-pipeline timing.',
-            'old_results':str(args.old_results),'old_final':str(args.old_final),'step2_scope':args.step2_scope,
+            'old_results':str(args.old_results),'old_final':str(args.old_final),'step2_scope':args.step2_scope,'cache_mode':'own-cache-resume' if args.reuse_own_cache else 'numerical-cold',
             'validation_script_sha256':sha(Path(__file__)),'timing_comparability':'Old timing/cache/resources may differ; no direct speedup ratio is asserted.'}
     source_record=args.source/'SOURCE.json'
     if source_record.is_file(): report['source']=json.loads(source_record.read_text())
@@ -194,7 +196,12 @@ def main():
         old_stages={row['stage']:row for row in read_tsv(args.old_final/'metadata/grt_stage_status.tsv')}
         check('complete frozen Q1 identity',prefix_stages['step1_round2']['q_output_sha256'],sha(workspace/'grt/q/q1.fa'))
         check('old Final Path shares frozen Q1',prefix_stages['step1_round2']['q_output_sha256'],old_stages['step1_round2']['q_output_sha256'])
-        check('new numerical cache starts empty',False,(workspace/'grt/cache').exists())
+        if args.reuse_own_cache:
+            report['timing_comparability']='Interrupted own-cache resume; new_suffix_seconds is remaining resumed wall time, NOT cold speedup. Final Path and correctness gates unchanged.'
+            report['resumed_cache_present']=(workspace/'grt/cache').exists()
+            check('explicit own-cache resume',True,args.resume)
+        else:
+            check('new numerical cache starts empty',False,(workspace/'grt/cache').exists())
         if any(c['status']=='FAIL' for c in report['checks']): raise RuntimeError('Input identity gate failed')
         command=[sys.executable,str(workspace/'.prepare_lib/tools/run_all_runner.py'),'--server-dir',str(workspace)]
         started=time.monotonic()
@@ -274,7 +281,8 @@ def main():
             if pair.is_file():
                 full=json.loads(pair.read_text())
                 report['paired_full_observed_status']=full['status']
-                if full.get('new_suffix_seconds') and full.get('threads')==args.threads:
+                if (not args.reuse_own_cache and full.get('cache_mode')=='numerical-cold'
+                        and full.get('new_suffix_seconds') and full.get('threads')==args.threads):
                     report['paired_timing']={'full_seconds':full['new_suffix_seconds'],'gap_seconds':report['new_suffix_seconds'],
                                             'wall_reduction_fraction':1-report['new_suffix_seconds']/full['new_suffix_seconds'],
                                             'boundary':'Same pinned new runtime/resources and empty numerical caches; one pass, different nodes/OS caches may affect timing.'}
