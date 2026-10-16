@@ -101,7 +101,7 @@ def allocate_threads(caps: list[int], budget: int) -> list[int]:
     return allocations
 
 
-def run_tasks(tasks, budget, children, cancel_signal, on_start, on_line, on_finish, environment):
+def run_tasks(tasks, budget, children, cancel_signal, on_start, on_line, on_finish, environment, *, dispatch=None):
     """All callbacks run on the caller thread; each command owns a process group."""
     pending = sorted(tasks, key=lambda task: task.priority, reverse=True)
     limits = [task.max_concurrent for task in tasks if task.max_concurrent is not None]
@@ -134,11 +134,24 @@ def run_tasks(tasks, budget, children, cancel_signal, on_start, on_line, on_fini
                 slots = len(pending)
                 if max_concurrent is not None:
                     slots = max(0, max_concurrent - len(active))
-                allocations = allocate_threads(
-                    [task.max_threads for task in pending[:slots]], available
-                )
-                for threads in allocations:
-                    task = pending.pop(0)
+                if dispatch is None:
+                    allocations = allocate_threads(
+                        [task.max_threads for task in pending[:slots]], available
+                    )
+                    grants = list(zip(pending[:len(allocations)], allocations))
+                else:
+                    # Internal experiment hook only. Default/public scheduling is unchanged.
+                    grants = dispatch(tuple(pending), available, budget, tuple(active.values()), slots)
+                    identities = [id(task) for task, _ in grants]
+                    if (len(identities) != len(set(identities)) or len(grants) > slots
+                            or sum(n for _, n in grants) > available
+                            or any(not any(task is p for p in pending) or type(n) is not int
+                                   or not 1 <= n <= task.max_threads for task, n in grants)):
+                        raise ValueError("invalid dispatch grants or CPU budget exceeded")
+                    if pending and not active and not grants:
+                        raise ValueError("dispatch stalled with no running tasks")
+                for task, threads in grants:
+                    pending.remove(task)
                     on_start(task, threads)
                     child = subprocess.Popen(
                         ["bash", str(task.command)], cwd=task.command.parent,

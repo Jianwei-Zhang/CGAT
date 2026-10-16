@@ -1,0 +1,26 @@
+{
+  "status": "RUNNING",
+  "checked_at": "2026-10-16T14:04:46+0800",
+  "root": "/share/home/xbzhang26/cgat-reads-debug/self-experiments-20261016",
+  "jobs": {
+    "scheduler_pair": 40587709,
+    "precision_baseline": 40587710,
+    "precision_rmq100": 40587711,
+    "precision_rmq0": 40587712,
+    "precision_freq100": 40587713,
+    "precision_compare": 40587714
+  },
+  "threads": {
+    "scheduler_pair": 16,
+    "precision_each": 2,
+    "comparison": 1
+  },
+  "source_files_sha256": {
+    "tools/alignment_tasks.py": "b3a8b392553155626566bc64ea970ba2677f05e19b8e143d500239d402c8a9de",
+    "self_alignment_experiments.py": "0eb502d6bc80f87e4f6e8d725cc59be6eedccb3d731da953b1776ed2a0cdd19d",
+    "self_precision_compare.py": "7adc15edbde8ae4b9d16a7558d894011696753eeea3882b83e15d52d152f846c"
+  },
+  "defaults_changed": false,
+  "numerical_input_splitting": false,
+  "boundary": "Internal experiments only. Original running workflows not modified. Scheduler trials are self-only 24-task workload, not complete mixed cross/self workflow. New current-scheduler control runs are explicitly authorized for this scheduling experiment; historical m40/n3 or old GRT engines are not rerun. Sensitivity measurements are not true biological precision or final scientific acceptance."
+}

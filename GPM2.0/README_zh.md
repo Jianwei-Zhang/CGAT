@@ -78,8 +78,6 @@ bash run.sh \
 | `-s, --score <0-100>` | `60` | 染色体分配的最小覆盖率百分比。 |
 | `-t, --threads <数量>` | `10` | 总计算线程预算，在独立比对任务及 reads QC 任务之间分配。 |
 | `--skip-self` | 关闭 | 跳过同 dataset 自比对；同 dataset Subview 将不可用。 |
-| `--self-m <n>`, `-sm <n>` | `200` | 仅自比对：Minimap2 最低 chain score（`-m`）。 |
-| `--self-n <n>`, `-sn <n>` | `100` | 仅自比对：每条 chain 的最少 minimizer 数（`-n`）；值越高，速度越快但灵敏度越低。 |
 | `--tel <motif> <次数>` | 可选，可重复 | 标记双链上的精确端粒样重复。例如 `--tel TTAGGG 20`。 |
 | `--cen <fasta>` | 可选 | 参考着丝粒 FASTA；记录名必须以 `_centromere` 结尾，例如 `Chr01_centromere`。 |
 | `--cen-min-len <bp>` | `10000` | 着丝粒比对最小长度。 |

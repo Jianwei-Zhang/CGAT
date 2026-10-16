@@ -210,6 +210,5 @@ Rerun the same `run.sh` command, or use `bash run.sh -o ./gpm_server` to resume 
 
 `--max-fill <bp>` sets the length limit for both Step3 optimized refill rounds (default: `1000000`). Change it with `bash run.sh -o ./gpm_server --max-fill 2000000`; use a new output directory when changing inputs or other preparation settings.
 
-Self-alignment performance defaults to `--self-m 200 --self-n 100`; short aliases are `-sm` and `-sn`. These thresholds affect only different-contig alignment within the same dataset. Higher values reduce sensitivity. Reference, cross-dataset, scan, and GRT alignments are unchanged. Use a new output directory when changing either threshold.
 
 See the parent repository's `README.md` for the complete options and desktop workflow.

@@ -116,6 +116,35 @@ update(-threads)
             self.assertEqual(started[:2], [("1", 4), ("2", 4)])
             self.assertTrue(all(threads == 4 for _, threads in started))
 
+    def test_dispatch_reclaims_budget_without_underallocating_waiting_task(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scripts = []
+            for i in range(3):
+                script = root / f"{i}.sh"
+                script.write_text("sleep .05\n")
+                scripts.append(script)
+            tasks = [AlignmentTask(str(i), path, 4) for i, path in enumerate(scripts)]
+            starts, finishes = [], []
+            def dispatch(pending, available, budget, active, slots):
+                return [(pending[0], 4)] if pending and available >= 4 else []
+            code = run_tasks(tasks, 4, {}, lambda: None,
+                             lambda t, n: starts.append((t.unit_id, n, len(finishes))),
+                             lambda *_: None, lambda t, *_: finishes.append(t.unit_id),
+                             os.environ.copy(), dispatch=dispatch)
+            self.assertEqual(code, 0)
+            self.assertEqual(starts, [("0", 4, 0), ("1", 4, 1), ("2", 4, 2)])
+
+    def test_dispatch_rejects_oversubscription(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            command = Path(temporary) / "command.sh"
+            command.write_text("exit 0\n")
+            task = AlignmentTask("a", command, 8)
+            with self.assertRaisesRegex(ValueError, "budget"):
+                run_tasks([task], 4, {}, lambda: None, lambda *_: None,
+                          lambda *_: None, lambda *_: None, os.environ.copy(),
+                          dispatch=lambda *args: [(task, 8)])
+
 
 if __name__ == "__main__":
     unittest.main()

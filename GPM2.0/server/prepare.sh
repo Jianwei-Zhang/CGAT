@@ -47,8 +47,6 @@ Usage:
     [-o|--out <gpm_server_output_dir>] \
     [--score|-s <chr_assignment_min_coverage_percent>] \
     [--minimap-preset asm10|asm5] \
-    [--self-m|-sm <min_chain_score>] \
-    [--self-n|-sn <min_minimizers>] \
     [--threads|-t <thread_budget>] \
     [--archive-format tar.gz|zip] \
     [--skip-self] \
@@ -79,8 +77,6 @@ Behavior:
   - Supports --score/-s to set the chr assignment coverage threshold, default: 60
   - Uses Minimap2 for all reference and chromosome-local alignments
   - Supports --minimap-preset, default: asm10
-  - Self alignment only: --self-m/-sm sets Minimap2 -m, default: 200
-  - Self alignment only: --self-n/-sn sets Minimap2 -n, default: 100
   - Supports --threads/-t to choose the total compute-thread budget, default: 10
   - Independent reference and chromosome-local alignments share this budget
   - Default delivery: tar.gz compressed with pigz using the thread budget; --archive-format zip keeps ZIP output
