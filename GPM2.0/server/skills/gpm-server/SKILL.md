@@ -4,6 +4,7 @@ description: Run, resume, diagnose, update official tools and skills, and hand o
 metadata:
   skill-version: "3"
   compatibility: "Companion Server source with run.sh; verify its local help before execution"
+  companion-server-revision: "76db2c9"
 ---
 
 # GPM Server
@@ -11,6 +12,35 @@ metadata:
 Operate the official pipeline; do not reimplement its biological decisions.
 Reply in the user's language. Distinguish execution success from scientific
 quality, and a smoke test from a production analysis.
+
+## Current companion defaults
+
+This repository's current companion Server baseline is revision `76db2c9`.
+When the bound Server is this revision or newer within the same compatibility
+contract, a fresh workspace uses the following defaults without extra user
+flags:
+
+- optimized GRT execution profile;
+- Step2 full MUMmer search and Step3 gap-screen;
+- content/tool/preset-validated refill batching and compatible `.mmi` reuse;
+- query-skew-aware, bounded task admission for profiled chromosome-local
+  Minimap2 work;
+- self-alignment whole-record query batching with per-batch checkpoints and
+  original-order PAF merge;
+- self-alignment `-m 200 -n 100` compatibility thresholds.
+
+These are execution safeguards and scheduling optimizations, not biological
+decisions. A single giant FASTA record is never split by the self-batch layer;
+it remains a possible serial tail. The Step2 gap-screen is not a default: only
+Step3 uses the default gap-screen scope. Do not expose internal batch sizes or
+dispatcher controls as public user parameters without a separate acceptance.
+
+The bounded ARM hotspot gate for batching and adaptive admission passed with
+ordered/content-equivalent PAF checks. Complete-data and Final Path acceptance
+remain a separate gate; do not report this maintainer evidence as a full
+workflow scientific validation. If the installed Server is an older release,
+follow that Server's local help and provenance rather than assuming these
+defaults are present.
 
 ## Local experience: inspect at task start
 

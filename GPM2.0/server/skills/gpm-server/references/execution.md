@@ -61,6 +61,22 @@ does not imply permission to request all those slots. A smaller thread budget
 within the user's agreed maximum can resolve a submission rejection without
 changing scientific parameters.
 
+For the current companion Server revision, record the resolved defaults from
+`metadata/prepare_options.tsv` after preparation. A fresh workspace should show
+`grt_execution_profile=optimized`, `grt_step2_mummer_scope=full`, and
+`grt_step3_mummer_scope=gap-screen`. Self alignment uses `m200/n100`; query
+records may be split into independent whole-record batches with validated
+checkpoints and one compatible target index. A record is never divided internally.
+The scheduler may assign different `GPM_TASK_THREADS` values to independent
+profiled tasks while preserving the requested total `--threads` budget; report
+per-task allocations separately from the total budget.
+
+On ARM and x86, validate tools on the actual execution architecture. Do not reuse
+a cross-architecture binary or `.mmi` without the workflow's content/tool/preset
+identity checks, and do not infer an optimization speedup from an ARM/x86 wall
+time difference alone. Existing workspaces retain their copied `.prepare_lib/`
+runtime; updating the source or skill does not hot-edit them.
+
 ## First run
 
 The first `--ds` is the locked primary assembly, not an interchangeable list.
@@ -108,6 +124,13 @@ rerun invalidated stages. Do not promise every previous stage will be skipped.
 If `.run_all/lock/` exists, inspect owner/job/process state first. A disconnected
 SSH session or old-looking timestamp does not prove the owner is dead. Never
 remove a lock merely to get past a failure.
+
+For a maintainer-only fast gate before a complete-data run, use the repository's
+focused unit tests, synthetic checkpoint fixture, and bounded real-data hotspot
+fixture when available. These establish scheduler/batching correctness and PAF
+equivalence, but do not replace complete-workflow, Final Path, or biological
+acceptance. If a full run is explicitly deferred, preserve its status as
+unvalidated rather than calling the hotspot gate a production result.
 
 ## Completion gates
 
