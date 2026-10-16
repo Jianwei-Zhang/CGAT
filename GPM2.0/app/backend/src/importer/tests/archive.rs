@@ -31,6 +31,24 @@ fn imports_tar_gz_and_tgz_with_the_same_catalog_as_zip() {
                 .filter(|step| step.stage == "extract_entry")
                 .all(|step| step.progress_total.is_none())
         );
+        assert!(
+            streaming_steps.iter().any(|step| {
+                step.stage == "extract_entry"
+                    && step.detail.ends_with("gpm_server/metadata/reference.tsv")
+            }),
+            "tar.gz extraction must report entry level progress"
+        );
+        let banner = streaming_steps
+            .iter()
+            .position(|step| step.stage == "extract_native_archive");
+        let first_entry = streaming_steps
+            .iter()
+            .position(|step| step.stage == "extract_entry");
+        assert!(
+            matches!((banner, first_entry), (Some(banner), Some(entry)) if banner < entry)
+                || banner.is_none(),
+            "entry progress must start after the extractor banner"
+        );
         #[cfg(any(target_os = "windows", target_os = "macos"))]
         assert!(
             streaming_steps

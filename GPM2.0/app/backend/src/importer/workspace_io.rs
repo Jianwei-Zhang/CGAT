@@ -413,22 +413,6 @@ fn configure_native_tar_command(command: &mut std::process::Command) {
     }
 }
 
-fn collect_native_tar_stderr(mut stderr: impl io::Read) -> Vec<u8> {
-    let mut kept = Vec::new();
-    let mut buffer = [0_u8; 4096];
-    loop {
-        let Ok(read) = stderr.read(&mut buffer) else {
-            break;
-        };
-        if read == 0 {
-            break;
-        }
-        let remaining = NATIVE_TAR_STDERR_LIMIT.saturating_sub(kept.len());
-        kept.extend_from_slice(&buffer[..read.min(remaining)]);
-    }
-    kept
-}
-
 fn validate_native_extracted_tree(root: &Path) -> Result<()> {
     let canonical_root = root
         .canonicalize()
@@ -479,6 +463,93 @@ fn validate_native_extracted_tree(root: &Path) -> Result<()> {
     Ok(())
 }
 
+const NATIVE_TAR_ENTRY_QUEUE: usize = 64;
+
+/// GNU tar prints one bare path per processed entry on stdout.
+fn native_tar_entry_label(line: &str) -> Option<String> {
+    let trimmed = line.trim_end_matches(['\r', '\n']).trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let name = trimmed
+        .strip_prefix("x ")
+        .or_else(|| trimmed.strip_prefix("a "))
+        .unwrap_or(trimmed)
+        .trim();
+    (!name.is_empty()).then(|| name.to_string())
+}
+
+/// bsdtar reports verbose extraction on stderr, prefixed with its operation
+/// marker. Only marked lines are entries; everything else is a diagnostic.
+fn native_tar_marked_entry_label(line: &str) -> Option<String> {
+    let trimmed = line.trim_end_matches(['\r', '\n']).trim();
+    let name = trimmed
+        .strip_prefix("x ")
+        .or_else(|| trimmed.strip_prefix("a "))?;
+    let name = name.trim();
+    (!name.is_empty()).then(|| name.to_string())
+}
+
+/// Reads entry names from stdout and splits stderr into entry names plus a
+/// bounded diagnostic tail, so the caller can report per-entry progress while
+/// still surfacing extractor errors.
+fn spawn_native_tar_readers(
+    stdout: Option<std::process::ChildStdout>,
+    stderr: Option<std::process::ChildStderr>,
+    entry_sender: std::sync::mpsc::SyncSender<String>,
+) -> (
+    std::thread::JoinHandle<()>,
+    std::thread::JoinHandle<Vec<u8>>,
+) {
+    let stdout_entries = entry_sender.clone();
+    let stdout_handle = std::thread::spawn(move || {
+        let Some(stdout) = stdout else {
+            return;
+        };
+        for line in BufReader::new(stdout).lines() {
+            let Ok(line) = line else {
+                break;
+            };
+            let Some(label) = native_tar_entry_label(&line) else {
+                continue;
+            };
+            if stdout_entries.send(label).is_err() {
+                break;
+            }
+        }
+    });
+    let stderr_handle = std::thread::spawn(move || {
+        let mut diagnostics = Vec::new();
+        let Some(stderr) = stderr else {
+            return diagnostics;
+        };
+        let mut reader = BufReader::new(stderr);
+        let mut buffer = Vec::new();
+        loop {
+            buffer.clear();
+            match reader.read_until(b'\n', &mut buffer) {
+                Ok(0) => break,
+                Ok(_) => {}
+                Err(_) => break,
+            }
+            let text = String::from_utf8_lossy(&buffer);
+            if let Some(label) = native_tar_marked_entry_label(&text) {
+                if entry_sender.send(label).is_err() {
+                    break;
+                }
+                continue;
+            }
+            let remaining = NATIVE_TAR_STDERR_LIMIT.saturating_sub(diagnostics.len());
+            if remaining == 0 {
+                continue;
+            }
+            diagnostics.extend_from_slice(&text.as_bytes()[..text.len().min(remaining)]);
+        }
+        diagnostics
+    });
+    (stdout_handle, stderr_handle)
+}
+
 fn extract_tar_gz_with_system_tar(
     path: &Path,
     extract_root: &Path,
@@ -502,7 +573,10 @@ fn extract_tar_gz_with_system_tar(
         .arg(path)
         .arg("-C")
         .arg(extract_root)
-        .stdout(std::process::Stdio::null())
+        // Verbose extraction reports every entry on stdout, which is how the
+        // dialog keeps entry level feedback while the system tar works.
+        .arg("-v")
+        .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
     configure_native_tar_command(&mut command);
     let mut child = match command.spawn() {
@@ -517,27 +591,44 @@ fn extract_tar_gz_with_system_tar(
             });
         }
     };
-    let stderr = child.stderr.take();
-    let stderr_handle =
-        std::thread::spawn(move || stderr.map(collect_native_tar_stderr).unwrap_or_default());
+    let (entry_sender, entry_receiver) =
+        std::sync::mpsc::sync_channel::<String>(NATIVE_TAR_ENTRY_QUEUE);
+    let (entry_reader, stderr_handle) =
+        spawn_native_tar_readers(child.stdout.take(), child.stderr.take(), entry_sender);
     let status = loop {
+        // Entry lines arrive continuously while tar runs; a quiet interval only
+        // means "nothing finished yet", never that the extraction is over.
+        match entry_receiver.recv_timeout(NATIVE_TAR_POLL_INTERVAL) {
+            Ok(label) => {
+                on_progress(step("extract_entry", label));
+                continue;
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {}
+        }
         if should_cancel() {
             let _ = child.kill();
             let _ = child.wait();
+            let _ = entry_reader.join();
             let _ = stderr_handle.join();
             bail!("import cancelled");
         }
         match child.try_wait() {
             Ok(Some(status)) => break status,
-            Ok(None) => std::thread::sleep(NATIVE_TAR_POLL_INTERVAL),
+            Ok(None) => {}
             Err(error) => {
                 let _ = child.kill();
                 let _ = child.wait();
+                let _ = entry_reader.join();
                 let _ = stderr_handle.join();
                 return Err(error).context("failed to poll system tar extractor");
             }
         }
     };
+    let _ = entry_reader.join();
+    while let Ok(label) = entry_receiver.try_recv() {
+        on_progress(step("extract_entry", label));
+    }
     let stderr = stderr_handle.join().unwrap_or_default();
     if !status.success() {
         let detail = String::from_utf8_lossy(&stderr).trim().to_string();
@@ -956,5 +1047,29 @@ mod tests {
         .unwrap();
 
         assert_fixture_tree(&root, &entries);
+    }
+
+    #[test]
+    fn native_tar_verbose_lines_become_entry_labels() {
+        assert_eq!(
+            native_tar_entry_label("x gpm_server/data/datasets/ds.fa").as_deref(),
+            Some("gpm_server/data/datasets/ds.fa")
+        );
+        assert_eq!(
+            native_tar_entry_label("gpm_server/data/datasets/ds.fa\r").as_deref(),
+            Some("gpm_server/data/datasets/ds.fa")
+        );
+        assert_eq!(native_tar_entry_label("x ./").as_deref(), Some("./"));
+        assert_eq!(
+            native_tar_marked_entry_label("x gpm_server/metadata/reference.tsv").as_deref(),
+            Some("gpm_server/metadata/reference.tsv")
+        );
+        assert_eq!(
+            native_tar_marked_entry_label("tar: Error exit delayed"),
+            None
+        );
+        assert_eq!(native_tar_marked_entry_label("gpm_server/top.txt"), None);
+        assert_eq!(native_tar_entry_label("   "), None);
+        assert_eq!(native_tar_entry_label(""), None);
     }
 }

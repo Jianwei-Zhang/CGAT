@@ -1573,6 +1573,9 @@ function renderWorkspaceHistoryContextMenu(contextMenu, messages) {
 function renderImportProgressOverlay(importer, messages) {
   const allStages = Array.isArray(importer.stages) ? importer.stages : [];
   const progressMeta = buildImportProgressMeta(allStages);
+  const streamingEntries = isStreamingEntryStage(allStages[allStages.length - 1])
+    ? allStages.filter((stage) => isStreamingEntryStage(stage)).length
+    : 0;
   const recentOffset = Math.max(0, allStages.length - 60);
   const recentStages = allStages.slice(recentOffset);
   const isCancelling = importer.importCancelling === true;
@@ -1642,7 +1645,7 @@ function renderImportProgressOverlay(importer, messages) {
         <section class="importer-import-progress-overview">
           <strong class="importer-import-progress-current-stage">${escapeHtml(currentStage)}</strong>
           ${activePairwise ? renderPairwiseImportProgress(activePairwise, messages) : ""}
-          ${renderImportProgressMeter(progressMeta, messages)}
+          ${renderImportProgressMeter(progressMeta, messages, streamingEntries)}
           <p id="import-progress-dialog-summary" class="importer-import-progress-summary" aria-live="polite">${escapeHtml(summary)}</p>
           ${importer.importCancelError
             ? `<p class="importer-import-progress-error" role="alert">${escapeHtml(String(importer.importCancelError))}</p>`
@@ -2027,6 +2030,16 @@ function getStagePhaseTotal(stage) {
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
+function isStreamingEntryStage(stage) {
+  if (stage && typeof stage === "object") {
+    return String(stage.stageCode || "").trim() === "extract_entry";
+  }
+  const text = String(stage || "");
+  const separator = text.indexOf("：");
+  const code = separator >= 0 ? text.slice(0, separator) : text;
+  return code.trim() === "extract_entry";
+}
+
 function stripImportProgressSuffix(value) {
   return String(value || "").replace(/\s*(?:\(\d+\/\d+\)|（\d+\/\d+）)\s*$/, "");
 }
@@ -2037,14 +2050,21 @@ function stripImportCurrentStageSuffix(value) {
     .trimEnd();
 }
 
-function renderImportProgressMeter(progressMeta, messages) {
+function renderImportProgressMeter(progressMeta, messages, streamingEntries = 0) {
   const isDeterminate = progressMeta.mode !== "indeterminate" && progressMeta.total > 0;
   const mode = isDeterminate ? progressMeta.mode : "indeterminate";
+  const entryCount = Math.max(0, Number(streamingEntries) || 0);
   const meterText = mode === "phase"
-    ? formatImporterMessage(messages.runtime.importPhaseProgress, {
-      current: progressMeta.current,
-      total: progressMeta.total,
-    })
+    ? entryCount > 0
+      ? formatImporterMessage(messages.runtime.importPhaseProgressEntries, {
+        current: progressMeta.current,
+        total: progressMeta.total,
+        entries: formatCount(entryCount),
+      })
+      : formatImporterMessage(messages.runtime.importPhaseProgress, {
+        current: progressMeta.current,
+        total: progressMeta.total,
+      })
     : mode === "step"
       ? formatImporterMessage(messages.runtime.importStepProgress, {
         current: progressMeta.current,
@@ -2060,9 +2080,10 @@ function renderImportProgressMeter(progressMeta, messages) {
   const fillStyle = isDeterminate
     ? ` style="width: ${escapeAttr(percent.toFixed(1))}%;"`
     : "";
+  const liveAttribute = mode === "phase" && entryCount > 0 ? ' data-progress-live="1"' : "";
   return `<div
     class="import-progress-meter"
-    data-progress-mode="${escapeAttr(mode)}"
+    data-progress-mode="${escapeAttr(mode)}"${liveAttribute}
     role="progressbar"
     aria-label="${escapeAttr(meterText)}"
     aria-valuetext="${escapeAttr(meterText)}"${ariaValues}

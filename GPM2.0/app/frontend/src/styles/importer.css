@@ -174,6 +174,12 @@
   transition: width 240ms ease;
 }
 
+.importer-import-progress-dialog .import-progress-meter[data-progress-live="1"] .import-progress-meter-fill {
+  background-image: linear-gradient(90deg, #4f82b5 0%, #9ec9ec 50%, #4f82b5 100%);
+  background-size: 220% 100%;
+  animation: importer-import-progress-activity 1.45s linear infinite;
+}
+
 .importer-import-progress-dialog .import-progress-meter[data-progress-mode="indeterminate"] .import-progress-meter-fill {
   width: 36%;
   background: linear-gradient(90deg, #8bb4d8, #4f82b5, #8bb4d8);
@@ -316,6 +322,15 @@
   border-top-color: currentColor;
 }
 
+@keyframes importer-import-progress-activity {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -30% 0;
+  }
+}
+
 @keyframes importer-import-progress-indeterminate {
   0% {
     transform: translateX(-100%);
@@ -323,6 +338,12 @@
   55%,
   100% {
     transform: translateX(280%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .importer-import-progress-dialog .import-progress-meter[data-progress-live="1"] .import-progress-meter-fill {
+    animation: none;
   }
 }
 

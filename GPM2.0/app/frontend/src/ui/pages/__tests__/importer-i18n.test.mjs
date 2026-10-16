@@ -199,6 +199,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.progressStages.validate_grt_app_fastas, "检查 App 来源 FASTA 文件");
   assert.equal(zh.progressStages.extract_native_archive, "使用系统解压器展开交付包");
   assert.equal(zh.runtime.importPhaseProgress, "阶段 {current}/{total}");
+  assert.equal(zh.runtime.importPhaseProgressEntries, "阶段 {current}/{total} · 已展开 {entries} 个条目");
   assert.equal(zh.buttons.validateHistory, "校验项目");
   assert.equal(zh.buttons.deleteFailedRecords, "删除失败");
   assert.equal(zh.page.deleteFailedConfirmTitle, "删除失败项目");
@@ -225,6 +226,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.progressStages.validate_grt_app_fastas, "Check App source FASTA files");
   assert.equal(en.progressStages.extract_native_archive, "Extract delivery bundle with the system extractor");
   assert.equal(en.runtime.importPhaseProgress, "Phase {current}/{total}");
+  assert.equal(en.runtime.importPhaseProgressEntries, "Phase {current}/{total} · {entries} entries extracted");
   assert.equal(en.buttons.validateHistory, "Validate projects");
   assert.equal(en.buttons.deleteFailedRecords, "Delete failed");
   assert.equal(en.page.deleteFailedConfirmTitle, "Delete failed projects");
@@ -2206,3 +2208,52 @@ for (const [name, activePath, clickedPath, shouldOpen] of [
     }
   });
 }
+
+test("import progress meter reports streaming extraction entries while it stays phase based", () => {
+  const previousWindow = globalThis.window;
+  try {
+    globalThis.window = {
+      localStorage: {
+        getItem() {
+          return null;
+        },
+      },
+    };
+    const html = renderImporterPage({
+      locale: "zh",
+      importer: {
+        zipPath: "",
+        workspaceRoot: "",
+        extractedPath: "",
+        openWorkspacePath: "",
+        historyValidation: {},
+        deleteConfirmOpen: false,
+        deleteWithFiles: false,
+        deleteTargets: [],
+        inFlight: true,
+        importRunId: "import-tar",
+        importCancelling: false,
+        status: "导入中",
+        stages: [
+          {
+            stageCode: "extract_native_archive",
+            detail: "extractor=C:\\Windows\\System32\\tar.exe",
+            phaseIndex: 2,
+            phaseTotal: 7,
+          },
+          { stageCode: "extract_entry", detail: "gpm_server/data/a.fa", phaseIndex: 2, phaseTotal: 7 },
+          { stageCode: "extract_entry", detail: "gpm_server/data/b.fa", phaseIndex: 2, phaseTotal: 7 },
+          { stageCode: "extract_entry", detail: "gpm_server/data/c.fa", phaseIndex: 2, phaseTotal: 7 },
+        ],
+        summary: zh.runtime.importZipSummary,
+      },
+    });
+
+    assert.match(html, /data-progress-mode="phase"/);
+    assert.match(html, /data-progress-live="1"/);
+    assert.match(html, /阶段 2\/7 · 已展开 3 个条目/);
+    assert.match(html, /解压文件：gpm_server\/data\/c\.fa/);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});

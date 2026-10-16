@@ -56,6 +56,7 @@ test("component stylesheet tree keeps unique animation owners", () => {
   const keyframes = [...stylesheet.matchAll(/@keyframes\s+([\w-]+)/g)].map((match) => match[1]);
 
   assert.deepEqual(keyframes.sort(), [
+    "importer-import-progress-activity",
     "importer-import-progress-indeterminate",
     "main-view-history-chip-pulse",
     "main-view-history-track-pulse",
