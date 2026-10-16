@@ -2,7 +2,7 @@ import { previewSemanticSignature, previewMutationStamp } from "../../services/p
 import { normalizeFinalPathByChr } from "./assembly/final-path-state.js";
 import { previewProjectKey, previewSourceRange } from "./project-preview-state.js";
 
-export const PREVIEW_MODEL_VERSION = 2;
+export const PREVIEW_MODEL_VERSION = 3;
 const sessions = new WeakMap();
 const domEntries = new Map();
 const DOM = Symbol("previewDom");
@@ -124,6 +124,10 @@ export function isPreviewSnapshot(snapshot) {
     && Array.isArray(snapshot.cards) && snapshot.cards.every(card => object(card) && typeof card.chrName === "string"
       && card.domain?.start === 0 && finite(card.domain.end) && card.domain.end > 0
       && finite(card.refLength) && typeof card.hasReference === "boolean"
+      && object(card.reference) && finite(card.reference.start) && typeof card.reference.reverse === "boolean"
+      && (card.reference.alignment === null || (object(card.reference.alignment)
+        && typeof card.reference.alignment.pathName === "string" && Number.isInteger(card.reference.alignment.index)
+        && finite(card.reference.alignment.offset)))
       && Array.isArray(card.refHighlights) && card.refHighlights.every(patch)
       && Array.isArray(card.paths) && card.paths.every(path => object(path) && typeof path.name === "string"
         && finite(path.length) && path.length >= 0 && Array.isArray(path.parts) && path.parts.every(part))

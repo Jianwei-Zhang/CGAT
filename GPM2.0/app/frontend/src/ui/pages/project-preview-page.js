@@ -66,12 +66,29 @@ function axis(label, start, end) {
     <span class="project-preview-axis-values"><span>${html(bpLabel(start))}</span><span>${html(bpLabel(end))}</span></span></span>`;
 }
 
+function renderReference(card, labels) {
+  const { domain } = card;
+  const reference = card.reference || { start: 0, reverse: false };
+  const refStart = Math.max(domain.start, reference.start), refEnd = Math.min(domain.end, reference.start + card.refLength);
+  const refAlignment = reference.alignment;
+  const refAttrs = refAlignment ? ` data-preview-reference-path="${html(refAlignment.pathName)}" data-preview-reference-index="${refAlignment.index}" data-preview-reference-offset="${refAlignment.offset}" data-preview-reference-length="${card.refLength}"` : "";
+  const refPatches = card.refHighlights.map(patch => ({ ...patch,
+    start: reference.reverse ? card.refLength - patch.end : patch.start,
+    end: reference.reverse ? card.refLength - patch.start : patch.end }));
+  return card.hasReference ? `<div class="project-preview-row"><span class="project-preview-track-label">Ref</span>
+    <span class="project-preview-plot" style="height:18px"><span class="project-preview-reference"${refAttrs} style="left:${percent((refStart - domain.start) / (domain.end - domain.start) * 100)}%;width:${percent(Math.max(0, refEnd - refStart) / (domain.end - domain.start) * 100)}%" title="${html(`${labels.referenceHint}: ${card.chrName} · ${number(card.refLength)} bp`)}">
+      ${refPatches.map(patch => {
+        const start = Math.max(refStart, reference.start + patch.start);
+        const end = Math.min(refEnd, reference.start + patch.end);
+        const length = Math.max(1, refEnd - refStart);
+        return `<span class="project-preview-used" data-preview-reference-highlight-start="${patch.start}" data-preview-reference-highlight-end="${patch.end}" style="left:${percent((start - refStart) / length * 100)}%;width:${percent(Math.max(0, end - start) / length * 100)}%;--source-color:${patch.part.color}" title="${html(`${labels.used}: ${partTitle(patch.part, labels)}`)}"></span>`;
+      }).join("")}
+    </span></span></div>` : "";
+}
+
 function renderCard(card, labels) {
   const { domain } = card;
-  const ref = card.hasReference ? `<div class="project-preview-row"><span class="project-preview-track-label">Ref</span>
-    <span class="project-preview-plot" style="height:18px"><span class="project-preview-reference" style="left:${percent(-domain.start / (domain.end - domain.start) * 100)}%;width:${percent(card.refLength / (domain.end - domain.start) * 100)}%" title="${html(`${labels.referenceHint}: ${card.chrName} · ${number(card.refLength)} bp`)}">
-      ${card.refHighlights.map(patch => renderHighlight(patch, card.refLength, labels)).join("")}
-    </span></span></div>` : "";
+  const ref = renderReference(card, labels);
   const rows = card.tracks.map(track => `<div class="project-preview-row"><span class="project-preview-track-label" title="${html(track.name || labels.unknown)}"><span class="project-preview-dataset-dot" style="background:${track.color}"></span>${html(track.name || labels.unknown)}</span>
     <div class="project-preview-source-plots">
       ${track.positioned.length ? `<span class="project-preview-plot" style="height:${track.laneCount * 20 + 4}px">${track.positioned.slice().sort((a, b) => Number(Boolean(a.alignment)) - Number(Boolean(b.alignment))).map(item => renderContig(item, track, domain, labels)).join("")}</span>` : ""}

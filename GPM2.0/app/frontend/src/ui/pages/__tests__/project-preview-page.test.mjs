@@ -116,3 +116,16 @@ test("preview and project-export heading typography matches the Assembly chromos
     assert.match(rule, /font-weight:\s*700/);
   }
 });
+
+
+test("rendered reference carries its adopted-path anchor rather than a fixed zero origin", () => {
+  const value = state();
+  const cards = buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }], referenceGenomeId: 1,
+    ctgs: [{ assemblyCtgId: 1, datasetName: "dsA", name: "a", totalLength: 1000,
+      assignedChrName: "Chr1", anchorStart: -500 }],
+    finalPathByChr: { Chr1: { segments: [segment] } } });
+  value.projectPreview = { key: previewProjectKey(value), loaded: true, cards };
+  const output = renderProjectPreviewPage(value);
+  assert.match(output, /class="project-preview-reference"[^>]*data-preview-reference-path="Chr1"[^>]*data-preview-reference-index="0"[^>]*data-preview-reference-offset="500"[^>]*style="left:20\.00000%;width:80\.00000%/);
+  assert.match(output, /data-final-path-domain="2500"/);
+});

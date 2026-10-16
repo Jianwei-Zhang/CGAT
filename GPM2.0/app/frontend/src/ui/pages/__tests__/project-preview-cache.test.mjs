@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createStore } from "../../../state/store.js";
 import { buildProjectPreviewModel, previewProjectKey } from "../project-preview-state.js";
 import { loadProjectPreviewData, bindProjectPreviewPage } from "../project-preview-page.js";
-import { isPreviewSnapshot, previewSession, previewStateIsApplicable, markPreviewDom, rememberProjectPreviewDom, restoreProjectPreviewDom } from "../project-preview-cache.js";
+import { PREVIEW_MODEL_VERSION, isPreviewSnapshot, previewSession, previewStateIsApplicable, markPreviewDom, rememberProjectPreviewDom, restoreProjectPreviewDom } from "../project-preview-cache.js";
 
 let fixtureId = 0;
 function fixture() {
@@ -312,4 +312,17 @@ test("older native dependency tracking is a miss rather than a falsely valid cac
   const before = value.metrics.sources;
   assert.equal((await load(value)).cacheSource, "rebuilt");
   assert.equal(value.metrics.sources, before + 4);
+});
+
+
+test("snapshots predating reference placement rebuild instead of restoring a zero-origin Ref", async () => {
+  const value = fixture();
+  await load(value);
+  value.db.snapshot.modelVersion = PREVIEW_MODEL_VERSION - 1;
+  value.store = createStore(value.state);
+  const builds = value.metrics.builds.length;
+  const restored = await load(value);
+  assert.equal(value.metrics.builds.length, builds + 1);
+  assert.ok(restored.cards.every(card => card.reference && Number.isFinite(card.reference.start)));
+  assert.equal(value.db.snapshot.modelVersion, PREVIEW_MODEL_VERSION);
 });

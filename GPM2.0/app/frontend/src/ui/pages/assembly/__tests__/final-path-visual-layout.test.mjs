@@ -90,3 +90,40 @@ test("source contig labels fit the adopted interval, not the full source strip",
   assert.equal(label.style.visibility, "");
   assert.equal(contextLabel.style.visibility, "");
 });
+
+
+test("reference uses its adopted anchor's measured scale after gap enlargement and resize", () => {
+  const reference = { dataset: { previewReferencePath: "Chr1", previewReferenceIndex: "2",
+    previewReferenceOffset: "-50", previewReferenceLength: "150" }, style: {}, querySelectorAll: () => [] };
+  const nodes = [ctg(100), gap(1), ctg(100)].map(item => ({
+    dataset: { finalPathKind: item.segment.type, finalPathLength: String(item.length) }, style: {} }));
+  const strip = { dataset: { finalPathStrip: "1", finalPathName: "Chr1", finalPathDomain: "201" }, clientWidth: 400,
+    querySelectorAll: selector => selector === "[data-final-path-segment]" ? nodes : [],
+    closest: () => ({ querySelectorAll: selector => selector === "[data-preview-reference-path]" ? [reference] : [] }) };
+  const host = { querySelectorAll: () => [strip] };
+  for (const width of [400, 800]) {
+    strip.clientWidth = width;
+    syncFinalPathStripGeometry(host);
+    assert.equal(nodes[1].style.width, "8px");
+    const scale = parseFloat(nodes[2].style.width) / 100;
+    assert.ok(Math.abs(parseFloat(reference.style.left) - (parseFloat(nodes[2].style.left) - 50 * scale)) < 1e-8);
+    assert.ok(Math.abs(parseFloat(reference.style.width) - 150 * scale) < 1e-8);
+  }
+});
+
+test("reference highlights remain aligned when the reference starts before the visible domain", () => {
+  const patch = { style: {} };
+  const reference = { dataset: { previewReferencePath: "Chr1", previewReferenceIndex: "0",
+    previewReferenceOffset: "-50", previewReferenceLength: "200" }, style: {},
+    querySelectorAll: () => [patch] };
+  patch.dataset = { previewReferenceHighlightStart: "25", previewReferenceHighlightEnd: "100" };
+  const strip = { dataset: { finalPathStrip: "1", finalPathName: "Chr1", finalPathDomain: "150" }, clientWidth: 300,
+    querySelectorAll: selector => selector === "[data-final-path-segment]"
+      ? [{ dataset: { finalPathKind: "ctg", finalPathLength: "100" }, style: {} }] : [],
+    closest: () => ({ querySelectorAll: selector => selector === "[data-preview-reference-path]" ? [reference] : [] }) };
+  syncFinalPathStripGeometry({ querySelectorAll: () => [strip] });
+  assert.equal(reference.style.left, "0px");
+  assert.equal(reference.style.width, "300px");
+  assert.equal(patch.style.left, "0px");
+  assert.equal(patch.style.width, "100px");
+});

@@ -62,3 +62,51 @@ test("card navigation requests the real chromosome without discarding current as
   assert.equal(store.getState().assembly.selectedChrName, "Chr2");
   assert.deepEqual(store.getState().assembly.finalPathByChr, { draft: {} });
 });
+
+
+test("reference follows the adopted contig anchor, including the NC_141022.1 left overhang", () => {
+  const [card] = buildProjectPreviewModel({
+    chromosomes: [{ chrName: "NC_141022.1", chrLength: 63929756 }], referenceGenomeId: 1,
+    project: { primaryDatasetId: 1 },
+    ctgs: [{ assemblyCtgId: 6, datasetId: 1, datasetName: "Mishima_AB", name: "ptg000006l",
+      assignedChrName: "NC_141022.1", anchorStart: -25919310, orient: "-", totalLength: 76328920 },
+    { assemblyCtgId: 40, datasetId: 1, datasetName: "Mishima_AB", name: "ptg000040l",
+      assignedChrName: "NC_141022.1", anchorStart: 50475386, orient: "-", totalLength: 12765239 }],
+    finalPathByChr: { "NC_141022.1": { segments: [
+      { type: "ctg", start: 76328920, end: 1, source: { dataset: "Mishima_AB", contig: "ptg000006l", start: 1, end: 76328920, orientation: "-" } },
+      { type: "gap", gapSizeBp: 100 },
+      { type: "ctg", start: 12765239, end: 1, source: { dataset: "Mishima_AB", contig: "ptg000040l", start: 1, end: 12765239, orientation: "-" } },
+    ] } },
+  });
+  assert.equal(card.reference.start, 25919310);
+  assert.equal(card.reference.reverse, false);
+  assert.deepEqual(card.reference.alignment, { pathName: "NC_141022.1", index: 0, offset: 25919310 });
+  assert.equal(card.domain.end, 89849066);
+  assert.equal(card.tracks[0].positioned[0].start, 0);
+  assert.equal(card.paths[0].parts[2].start, 76329020);
+});
+
+test("trimmed and reversed adoption projects Ref and unused context through the same origin", () => {
+  const [card] = buildProjectPreviewModel({ ...base,
+    ctgs: [...base.ctgs, { ...base.ctgs[0], assemblyCtgId: 2, name: "unused", anchorStart: 500, totalLength: 50 }],
+    finalPathByChr: { Chr1: { segments: [sourceSegment] } } });
+  // Adopted source positions 1101..1200 are reversed. The whole Ref reverses
+  // around that interval, rather than silently retaining its original origin.
+  assert.equal(card.reference.start, -1900);
+  assert.equal(card.reference.reverse, true);
+  assert.equal(card.reference.alignment.offset, -1900);
+  const unused = card.tracks[0].positioned.find(item => !item.alignment);
+  assert.equal(unused.start, 50);
+});
+
+test("explicit reference adoption supplies its own origin; unknown sources do not invent anchors", () => {
+  const [card] = buildProjectPreviewModel({ ...base, ctgs: [], finalPathByChr: { Chr1: { segments: [
+    { type: "gap", gapSizeBp: 1000 },
+    { type: "ctg", sourceKind: "ref_segment", referenceChrName: "Chr1", start: 501, end: 600,
+      memberStartBp: 1, memberEndBp: 2500, overallLen: 2500 },
+  ] } } });
+  assert.equal(card.reference.start, 500);
+  assert.equal(card.domain.end, 3000);
+  const [unknown] = buildProjectPreviewModel({ ...base, ctgs: [], finalPathByChr: { Chr1: { segments: [sourceSegment] } } });
+  assert.deepEqual(unknown.reference, { start: 0, reverse: false, alignment: null });
+});

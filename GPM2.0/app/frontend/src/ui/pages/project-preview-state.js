@@ -88,6 +88,35 @@ function assignLanes(items) {
   return Math.max(1, ends.length);
 }
 
+// Final Path has its own origin. Anchor the reference to the longest adopted
+// interval with known reference placement, not to Final Path coordinate zero.
+// One intact reference cannot follow every rearrangement/reuse independently.
+function referencePlacement(rows, highlights, chrName, refLength, primaryDatasetId) {
+  const candidates = highlights.map(patch => {
+    const reverse = patch.part.segment.orient === "-";
+    const start = reverse ? patch.part.start + patch.end - refLength : patch.part.start - patch.start;
+    return { start, reverse, length: patch.end - patch.start, primary: true, part: patch.part };
+  });
+  for (const row of rows) {
+    for (const item of row.positioned) {
+      const anchor = item.ctg.anchorStart;
+      if (!item.alignment || text(item.ctg.assignedChrName) !== chrName
+        || anchor === null || anchor === undefined || !Number.isFinite(Number(anchor))) continue;
+      const start = item.reverse
+        ? item.start + item.length + Number(anchor) - refLength
+        : item.start - Number(anchor);
+      candidates.push({ start, reverse: item.reverse,
+        length: item.alignment.usedEnd - item.alignment.usedStart,
+        primary: positive(item.ctg.datasetId) === positive(primaryDatasetId),
+        part: item.highlights[0].part });
+    }
+  }
+  const best = candidates.sort((a, b) => b.length - a.length || Number(b.primary) - Number(a.primary))[0];
+  return best ? { start: best.start, reverse: best.reverse,
+    alignment: { pathName: best.part.pathName, index: best.part.index, offset: best.start - best.part.start } }
+    : { start: 0, reverse: false, alignment: null };
+}
+
 export function buildProjectPreviewModel({ chromosomes = [], referenceGenomeId = 0, ctgs = [],
   datasets = [], project = {}, finalPathByChr = {}, phasedChrTracksByChr = {} } = {}) {
   const byId = new Map(), bySource = new Map(), byChr = new Map();
@@ -240,9 +269,14 @@ export function buildProjectPreviewModel({ chromosomes = [], referenceGenomeId =
       positioned.filter(item => !item.alignment).forEach(item => { item.lane = 0; });
       return { ...track, items, positioned, unpositioned: items.filter(item => item.start === null), laneCount };
     });
+    const reference = referencePlacement(rows, refHighlights, chrName, refLength, project.primaryDatasetId);
+    // Context-only contigs still use reference coordinates; translate them too.
+    if (hasReference) rows.forEach(row => row.positioned.filter(item => !item.alignment).forEach(item => {
+      item.start = reference.start + (reference.reverse ? refLength - item.start - item.length : item.start);
+    }));
     const start = 0;
-    const end = paths.reduce((max, path) => Math.max(max, path.length), Math.max(1, hasReference ? refLength : 0));
-    return { chrName, refLength, hasReference, refHighlights, tracks: rows, paths,
+    const end = paths.reduce((max, path) => Math.max(max, path.length), Math.max(1, hasReference ? reference.start + refLength : 0));
+    return { chrName, refLength, hasReference, reference, refHighlights, tracks: rows, paths,
       domain: { start, end }, unresolvedCount,
       unpositionedCount: rows.reduce((sum, row) => sum + row.unpositioned.length, 0) };
   });

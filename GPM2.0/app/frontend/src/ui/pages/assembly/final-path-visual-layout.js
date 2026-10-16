@@ -140,6 +140,25 @@ export function syncFinalPathStripGeometry(host) {
     }
     const card = strip.closest?.(".project-preview-card");
     if (!card) continue;
+    for (const reference of card.querySelectorAll("[data-preview-reference-path]")) {
+      if (reference.dataset.previewReferencePath !== strip.dataset.finalPathName) continue;
+      const index = Number(reference.dataset.previewReferenceIndex), layout = layouts[index];
+      const partLength = items[index]?.length;
+      if (!layout || !(partLength > 0)) continue;
+      const scale = layout.width / partLength;
+      const x = layout.x + Number(reference.dataset.previewReferenceOffset) * scale;
+      const left = Math.max(0, x), right = Math.min(strip.clientWidth,
+        x + Number(reference.dataset.previewReferenceLength) * scale);
+      reference.style.left = `${left}px`;
+      reference.style.width = `${Math.max(0, right - left)}px`;
+      for (const patch of reference.querySelectorAll("[data-preview-reference-highlight-start]")) {
+        const start = x + Number(patch.dataset.previewReferenceHighlightStart) * scale;
+        const end = x + Number(patch.dataset.previewReferenceHighlightEnd) * scale;
+        patch.style.left = `${Math.max(0, start - left)}px`;
+        patch.style.width = `${Math.max(0, Math.min(right, end) - Math.max(left, start))}px`;
+        patch.style.minWidth = "0";
+      }
+    }
     for (const source of card.querySelectorAll("[data-final-path-aligned-source]")) {
       if (source.dataset.finalPathSourcePath !== strip.dataset.finalPathName) continue;
       const index = Number(source.dataset.finalPathSourceIndex), layout = layouts[index];
