@@ -192,3 +192,90 @@ fn desktop_archive_import_atomically_reserves_a_new_directory_and_never_claims_e
         );
     }
 }
+#[test]
+fn zip_delivery_import_extracts_every_entry_through_the_shared_worker_budget() {
+    let temp = tempdir().unwrap();
+    let path = temp.path().join("delivery.zip");
+    write_bundle_zip(&path);
+    let workspace = temp.path().join("workspace");
+    let mut extracted = Vec::new();
+    let (outcome, progress) = import_from_zip_with_options_and_hooks(
+        &path,
+        &workspace,
+        ImportOptions {
+            import_workers: Some(4),
+            ..ImportOptions::default()
+        },
+        &mut |step| {
+            if step.stage == "extract_entry" {
+                extracted.push(step.detail.clone());
+            }
+        },
+        &mut || false,
+    )
+    .unwrap();
+
+    assert!(
+        extracted.len() >= 14,
+        "every zip payload entry must be reported: {extracted:?}"
+    );
+    let mut unique = extracted.clone();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(
+        unique.len(),
+        extracted.len(),
+        "a duplicate zip path must be planned exactly once: {extracted:?}"
+    );
+    assert!(
+        extracted
+            .iter()
+            .any(|name| name.ends_with("metadata/reference.tsv"))
+    );
+    assert_eq!(progress.last().unwrap().stage, "complete");
+    assert_eq!(count_rows(&outcome.project_db_path, "dataset"), 1);
+    let reference_tsv =
+        fs::read_to_string(outcome.bundle_root.join("metadata/reference.tsv")).unwrap();
+    assert!(reference_tsv.contains("ref_a"));
+}
+
+#[test]
+fn zip_delivery_import_rejects_traversal_and_removes_the_failed_workspace() {
+    let temp = tempdir().unwrap();
+    let path = temp.path().join("traversal.zip");
+    {
+        let file = File::create(&path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let options = FileOptions::default().compression_method(CompressionMethod::Deflated);
+        for (name, bytes) in [
+            (
+                "gpm_server/metadata/reference.tsv",
+                b"reference_name".to_vec(),
+            ),
+            ("../escape.fa", b"escape".to_vec()),
+        ] {
+            zip.start_file(name, options).unwrap();
+            zip.write_all(&bytes).unwrap();
+        }
+        zip.finish().unwrap();
+    }
+    let workspace = temp.path().join("workspace");
+    let error = import_from_zip_with_options_and_hooks(
+        &path,
+        &workspace,
+        ImportOptions {
+            import_workers: Some(4),
+            ..ImportOptions::default()
+        },
+        &mut |_| {},
+        &mut || false,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.to_string().contains("unsafe path traversal"),
+        "unexpected error: {error}"
+    );
+    assert!(!workspace.exists());
+    assert!(!temp.path().join("escape.fa").exists());
+}

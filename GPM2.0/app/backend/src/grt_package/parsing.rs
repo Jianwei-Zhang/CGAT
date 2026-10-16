@@ -107,6 +107,40 @@ pub(super) fn read_fasta(
     read_fasta_with_cancel(path, label, allow_empty, &mut || false)
 }
 
+/// Streams a FASTA through SHA-256 while it is parsed. Callers that need both
+/// the records and the file digest read a multi-gigabyte q artifact once
+/// instead of once to parse and again to hash.
+struct Sha256Reader<R> {
+    inner: R,
+    digest: Sha256,
+}
+
+impl<R> Sha256Reader<R> {
+    fn new(inner: R) -> Self {
+        Self {
+            inner,
+            digest: Sha256::new(),
+        }
+    }
+
+    fn finish(self) -> String {
+        format!("{:x}", self.digest.finalize())
+    }
+}
+
+impl<R: std::io::Read> std::io::Read for Sha256Reader<R> {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        let read = self.inner.read(buffer)?;
+        self.digest.update(&buffer[..read]);
+        Ok(read)
+    }
+}
+
+fn open_fasta_reader(path: &Path, label: &str) -> Result<fs::File> {
+    fs::File::open(path)
+        .map_err(|error| grt_anyhow("INVALID_FASTA", format!("failed to open {label}: {error}")))
+}
+
 pub(super) fn read_fasta_with_cancel<C>(
     path: &Path,
     label: &str,
@@ -116,9 +150,34 @@ pub(super) fn read_fasta_with_cancel<C>(
 where
     C: FnMut() -> bool,
 {
-    let file = fs::File::open(path)
-        .map_err(|error| grt_anyhow("INVALID_FASTA", format!("failed to open {label}: {error}")))?;
-    let mut reader = std::io::BufReader::new(file);
+    let mut reader = std::io::BufReader::new(open_fasta_reader(path, label)?);
+    read_fasta_records(&mut reader, label, allow_empty, should_cancel)
+}
+
+pub(super) fn read_fasta_with_sha256_and_cancel<C>(
+    path: &Path,
+    label: &str,
+    allow_empty: bool,
+    should_cancel: &mut C,
+) -> Result<(BTreeMap<String, String>, String)>
+where
+    C: FnMut() -> bool,
+{
+    let mut reader = std::io::BufReader::new(Sha256Reader::new(open_fasta_reader(path, label)?));
+    let records = read_fasta_records(&mut reader, label, allow_empty, should_cancel)?;
+    Ok((records, reader.into_inner().finish()))
+}
+
+fn read_fasta_records<R, C>(
+    reader: &mut R,
+    label: &str,
+    allow_empty: bool,
+    should_cancel: &mut C,
+) -> Result<BTreeMap<String, String>>
+where
+    R: std::io::BufRead,
+    C: FnMut() -> bool,
+{
     let mut records = BTreeMap::new();
     let mut name: Option<String> = None;
     let mut sequence = String::new();
@@ -129,7 +188,7 @@ where
             bail!("import cancelled");
         }
         raw.clear();
-        let bytes_read = std::io::BufRead::read_line(&mut reader, &mut raw).map_err(|error| {
+        let bytes_read = reader.read_line(&mut raw).map_err(|error| {
             grt_anyhow("INVALID_FASTA", format!("{label} is not UTF-8: {error}"))
         })?;
         if bytes_read == 0 {

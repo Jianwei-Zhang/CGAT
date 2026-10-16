@@ -39,27 +39,33 @@ pub struct ImportProgress {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ImportOptions {
-    /// `None` selects a bounded value from host parallelism. Explicit values
-    /// are limited to the choices exposed by the desktop import dialog.
-    pub pairwise_parser_workers: Option<usize>,
+    /// Shared import worker budget: parallel archive entry extraction and
+    /// parallel alignment parsing. `None` selects a bounded value from host
+    /// parallelism. Explicit values are limited to the choices exposed by the
+    /// desktop import dialog.
+    pub import_workers: Option<usize>,
     /// Desktop drop confirmations require a new directory reserved atomically.
     pub require_new_workspace: bool,
 }
 
 impl ImportOptions {
-    pub fn resolved_pairwise_parser_workers(self) -> Result<usize> {
-        match self.pairwise_parser_workers {
+    pub fn resolved_import_workers(self) -> Result<usize> {
+        match self.import_workers {
             Some(workers @ 1..=8) => Ok(workers),
             Some(workers) => {
-                bail!(
-                    "pairwise parser workers must be Auto or an integer from 1 to 8; got {workers}"
-                )
+                bail!("import workers must be Auto or an integer from 1 to 8; got {workers}")
             }
-            None => Ok(std::thread::available_parallelism()
-                .map(|parallelism| parallelism.get().saturating_sub(1).clamp(1, 8))
-                .unwrap_or(1)),
+            None => Ok(default_import_workers()),
         }
     }
+}
+
+/// Bounded host-derived worker budget for flows that do not surface the desktop
+/// import dialog choice, such as the `add dataset` and `add ctg` packages.
+pub(super) fn default_import_workers() -> usize {
+    std::thread::available_parallelism()
+        .map(|parallelism| parallelism.get().saturating_sub(1).clamp(1, 8))
+        .unwrap_or(1)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

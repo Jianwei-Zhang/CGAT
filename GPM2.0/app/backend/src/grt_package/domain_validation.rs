@@ -571,14 +571,15 @@ where
     let mut q4_records = None;
     let q4_path = bundle_root.join("grt/q/q4.fa");
     if fasta_available {
-        let records = read_fasta_with_cancel(
+        // Parsing and hashing share one pass: q4 artifacts reach gigabytes and
+        // the digest used to cost a second full read.
+        let (records, q4_observed_sha256) = read_fasta_with_sha256_and_cancel(
             &required_bundle_file(bundle_root, "grt/q/q4.fa", "App q4 FASTA")?,
             "App q4 FASTA",
             false,
             should_cancel,
         )?;
-        if sha256_file_with_cancel(&q4_path, should_cancel)?
-            != json_nonempty_str(manifest, "q4_artifact_sha256", "App manifest")?
+        if q4_observed_sha256 != json_nonempty_str(manifest, "q4_artifact_sha256", "App manifest")?
         {
             return grt_err(
                 "CHECKSUM_MISMATCH",

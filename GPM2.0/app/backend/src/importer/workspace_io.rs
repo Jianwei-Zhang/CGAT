@@ -133,6 +133,7 @@ pub(super) fn ensure_workspace_root_can_be_created(workspace_root: &Path) -> Res
 pub(super) fn extract_delivery_to_root(
     zip_path: &Path,
     extract_root: &Path,
+    workers: usize,
     on_progress: &mut impl FnMut(ImportProgress),
     should_cancel: &mut impl FnMut() -> bool,
 ) -> Result<()> {
@@ -142,59 +143,245 @@ pub(super) fn extract_delivery_to_root(
         }
         return extract_tar_gz_to_root(zip_path, extract_root, on_progress, should_cancel);
     }
+    return extract_zip_to_root(zip_path, extract_root, workers, on_progress, should_cancel);
+}
+const ZIP_EXTRACT_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(50);
+const ZIP_EXTRACT_PROGRESS_QUEUE: usize = 64;
+
+/// One regular-file entry that still has to be written to disk. Directories are
+/// created up front by the planner, so workers only ever write disjoint files.
+struct PlannedZipEntry {
+    archive_index: usize,
+    name: String,
+    output: PathBuf,
+}
+
+enum ZipWorkerEvent {
+    Extracted(String),
+    /// The failure message itself is carried by the shared error slot so that
+    /// the first real error wins instead of whichever event arrives last.
+    Failed,
+}
+
+fn plan_zip_extraction(zip_path: &Path, extract_root: &Path) -> Result<Vec<PlannedZipEntry>> {
     let file = File::open(zip_path)
         .with_context(|| format!("failed to open zip: {}", zip_path.display()))?;
     let mut archive = ZipArchive::new(file)
         .with_context(|| format!("failed to read zip archive: {}", zip_path.display()))?;
     let archive_len = archive.len();
-
-    for index in 0..archive_len {
-        check_import_cancel(should_cancel)?;
-        let mut entry = archive.by_index(index).with_context(|| {
+    let mut entries = Vec::new();
+    let mut last_claim = HashMap::new();
+    for archive_index in 0..archive_len {
+        let entry = archive.by_index(archive_index).with_context(|| {
             format!(
                 "failed to read zip entry index {} from {}",
-                index,
+                archive_index,
                 zip_path.display()
             )
         })?;
-
-        let enclosed = entry.enclosed_name().ok_or_else(|| {
-            anyhow::anyhow!("zip entry contains unsafe path traversal: {}", entry.name())
-        })?;
-
-        let output_path = extract_root.join(enclosed);
-        on_progress(step("extract_entry", entry.name().to_string()));
-        if entry.name().ends_with('/') {
-            fs::create_dir_all(&output_path).with_context(|| {
-                format!(
-                    "failed to create extracted directory {}",
-                    output_path.display()
-                )
+        let name = entry.name().to_string();
+        let enclosed = entry
+            .enclosed_name()
+            .ok_or_else(|| anyhow::anyhow!("zip entry contains unsafe path traversal: {name}"))?;
+        let output = extract_root.join(enclosed);
+        if name.ends_with('/') {
+            fs::create_dir_all(&output).with_context(|| {
+                format!("failed to create extracted directory {}", output.display())
             })?;
             continue;
         }
-
-        if let Some(parent) = output_path.parent() {
-            fs::create_dir_all(parent).with_context(|| {
-                format!(
-                    "failed to create extracted file parent {}",
-                    parent.display()
-                )
-            })?;
+        last_claim.insert(output.clone(), entries.len());
+        entries.push(PlannedZipEntry {
+            archive_index,
+            name,
+            output,
+        });
+    }
+    // A zip may legally carry several entries for one path. Sequential
+    // extraction kept the last one, so only that claimant may be planned:
+    // leaving two of them in place would let parallel workers race on the same
+    // output file instead of overwriting it in archive order.
+    let mut planned = Vec::with_capacity(entries.len());
+    for (position, entry) in entries.into_iter().enumerate() {
+        if last_claim.get(&entry.output) == Some(&position) {
+            planned.push(entry);
         }
+    }
+    Ok(planned)
+}
 
-        let mut output = File::create(&output_path).with_context(|| {
-            format!("failed to create extracted file {}", output_path.display())
-        })?;
-        copy_with_import_cancel(&mut entry, &mut output, should_cancel).with_context(|| {
+fn extract_one_zip_entry<C>(
+    archive: &mut ZipArchive<File>,
+    entry: &PlannedZipEntry,
+    should_cancel: &mut C,
+) -> Result<()>
+where
+    C: FnMut() -> bool,
+{
+    let mut source = archive
+        .by_index(entry.archive_index)
+        .with_context(|| format!("failed to read zip entry {}", entry.name))?;
+    if source.name() != entry.name {
+        bail!(
+            "zip archive changed while extracting: expected entry {} at index {}",
+            entry.name,
+            entry.archive_index
+        );
+    }
+    if let Some(parent) = entry.output.parent() {
+        fs::create_dir_all(parent).with_context(|| {
             format!(
-                "failed to extract zip entry {} to {}",
-                entry.name(),
-                output_path.display()
+                "failed to create extracted file parent {}",
+                parent.display()
             )
         })?;
     }
+    let mut output = File::create(&entry.output)
+        .with_context(|| format!("failed to create extracted file {}", entry.output.display()))?;
+    copy_with_import_cancel(&mut source, &mut output, should_cancel).with_context(|| {
+        format!(
+            "failed to extract zip entry {} to {}",
+            entry.name,
+            entry.output.display()
+        )
+    })?;
+    Ok(())
+}
 
+fn extract_zip_to_root(
+    zip_path: &Path,
+    extract_root: &Path,
+    workers: usize,
+    on_progress: &mut impl FnMut(ImportProgress),
+    should_cancel: &mut impl FnMut() -> bool,
+) -> Result<()> {
+    let planned = plan_zip_extraction(zip_path, extract_root)?;
+    if planned.is_empty() {
+        return Ok(());
+    }
+    check_import_cancel(should_cancel)?;
+    let worker_count = workers.min(planned.len());
+    if worker_count <= 1 {
+        let file = File::open(zip_path)
+            .with_context(|| format!("failed to open zip: {}", zip_path.display()))?;
+        let mut archive = ZipArchive::new(file)
+            .with_context(|| format!("failed to read zip archive: {}", zip_path.display()))?;
+        for entry in &planned {
+            check_import_cancel(should_cancel)?;
+            on_progress(step("extract_entry", entry.name.clone()));
+            extract_one_zip_entry(&mut archive, entry, should_cancel)?;
+        }
+        return Ok(());
+    }
+    extract_zip_entries_in_parallel(
+        zip_path,
+        planned,
+        worker_count,
+        ZIP_EXTRACT_POLL_INTERVAL,
+        on_progress,
+        should_cancel,
+    )
+}
+
+fn extract_zip_entries_in_parallel(
+    zip_path: &Path,
+    planned: Vec<PlannedZipEntry>,
+    worker_count: usize,
+    poll_interval: std::time::Duration,
+    on_progress: &mut impl FnMut(ImportProgress),
+    should_cancel: &mut impl FnMut() -> bool,
+) -> Result<()> {
+    use std::sync::atomic::Ordering;
+    use std::sync::{Arc, Mutex};
+
+    let planned = Arc::new(planned);
+    let next = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let cancelled = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let first_error = Arc::new(Mutex::new(None::<String>));
+    let (sender, receiver) =
+        std::sync::mpsc::sync_channel::<ZipWorkerEvent>(ZIP_EXTRACT_PROGRESS_QUEUE);
+    let mut handles = Vec::with_capacity(worker_count);
+    for worker_index in 0..worker_count {
+        let planned = Arc::clone(&planned);
+        let next = Arc::clone(&next);
+        let cancelled = Arc::clone(&cancelled);
+        let first_error = Arc::clone(&first_error);
+        let sender = sender.clone();
+        let zip_path = zip_path.to_path_buf();
+        handles.push(
+            std::thread::Builder::new()
+                .name(format!("zip-extract-{}", worker_index + 1))
+                .spawn(move || {
+                    let run = || -> Result<()> {
+                        let file = File::open(&zip_path)?;
+                        let mut archive = ZipArchive::new(file)?;
+                        loop {
+                            if cancelled.load(Ordering::Acquire) {
+                                return Ok(());
+                            }
+                            let index = next.fetch_add(1, Ordering::AcqRel);
+                            if index >= planned.len() {
+                                return Ok(());
+                            }
+                            let entry = &planned[index];
+                            extract_one_zip_entry(&mut archive, entry, &mut || {
+                                cancelled.load(Ordering::Acquire)
+                            })?;
+                            if sender
+                                .send(ZipWorkerEvent::Extracted(entry.name.clone()))
+                                .is_err()
+                            {
+                                return Ok(());
+                            }
+                        }
+                    };
+                    if let Err(error) = run() {
+                        // The first failing worker owns the reported error. A
+                        // sibling that only stops because this worker already
+                        // cancelled the batch must not mask the root cause with
+                        // its own "import cancelled" noise.
+                        if !cancelled.swap(true, Ordering::AcqRel) {
+                            let message = format!("{error:#}");
+                            if let Ok(mut slot) = first_error.lock() {
+                                *slot = Some(message);
+                            }
+                            let _ = sender.send(ZipWorkerEvent::Failed);
+                        }
+                    }
+                })
+                .context("failed to spawn zip extraction worker")?,
+        );
+    }
+    drop(sender);
+
+    loop {
+        // A quiet period only means "no entry finished yet": treating it like a
+        // closed channel would end the batch early and silently drop the
+        // entries that are still being written.
+        match receiver.recv_timeout(poll_interval) {
+            Ok(ZipWorkerEvent::Extracted(name)) => on_progress(step("extract_entry", name)),
+            Ok(ZipWorkerEvent::Failed) => cancelled.store(true, Ordering::Release),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+        if should_cancel() {
+            cancelled.store(true, Ordering::Release);
+        }
+    }
+    cancelled.store(true, Ordering::Release);
+
+    for handle in handles {
+        if handle.join().is_err() {
+            let mut slot = first_error.lock().expect("zip worker error slot");
+            if slot.is_none() {
+                *slot = Some("zip extraction worker panicked".to_string());
+            }
+        }
+    }
+    if let Some(message) = first_error.lock().expect("zip worker error slot").take() {
+        return Err(anyhow::anyhow!("{message}"));
+    }
+    check_import_cancel(should_cancel)?;
     Ok(())
 }
 
@@ -546,5 +733,228 @@ mod tests {
 
         assert_eq!(copied, input.len() as u64);
         assert_eq!(output, input);
+    }
+
+    fn write_test_zip(path: &Path, entries: &[(&str, &[u8])]) {
+        let mut zip = zip::ZipWriter::new(File::create(path).unwrap());
+        let options =
+            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        for (name, bytes) in entries {
+            if name.ends_with('/') {
+                zip.add_directory(*name, options).unwrap();
+                continue;
+            }
+            zip.start_file(*name, options).unwrap();
+            zip.write_all(bytes).unwrap();
+        }
+        zip.finish().unwrap();
+    }
+
+    fn synthetic_entries(count: usize) -> Vec<(String, Vec<u8>)> {
+        (0..count)
+            .map(|index| {
+                let bytes = if index == 0 {
+                    Vec::new()
+                } else {
+                    let mut bytes = vec![0_u8; index * 4096];
+                    for (offset, byte) in bytes.iter_mut().enumerate() {
+                        *byte = (offset as u8).wrapping_mul(31).wrapping_add(index as u8);
+                    }
+                    bytes
+                };
+                (
+                    format!("gpm_server/data/partitions/chr/ref/part_{index:03}.fa"),
+                    bytes,
+                )
+            })
+            .collect()
+    }
+
+    fn extract_zip_fixture(
+        zip_path: &Path,
+        root: &Path,
+        workers: usize,
+    ) -> Result<Vec<ImportProgress>> {
+        if !root.exists() {
+            fs::create_dir_all(root).unwrap();
+        }
+        let mut steps = Vec::new();
+        extract_delivery_to_root(
+            zip_path,
+            root,
+            workers,
+            &mut |step| steps.push(step),
+            &mut || false,
+        )?;
+        Ok(steps)
+    }
+
+    fn assert_fixture_tree(root: &Path, entries: &[(String, Vec<u8>)]) {
+        for (name, bytes) in entries {
+            let extracted = fs::read(root.join(name)).unwrap_or_else(|error| {
+                panic!("missing extracted entry {name}: {error}");
+            });
+            assert_eq!(&extracted, bytes, "entry {name} differs");
+        }
+    }
+
+    #[test]
+    fn parallel_zip_extraction_matches_the_sequential_extraction() {
+        let temp = tempfile::tempdir().unwrap();
+        let entries = synthetic_entries(24);
+        let borrowed = entries
+            .iter()
+            .map(|(name, bytes)| (name.as_str(), bytes.as_slice()))
+            .collect::<Vec<_>>();
+        let zip_path = temp.path().join("bundle.zip");
+        write_test_zip(&zip_path, &borrowed);
+
+        let parallel_root = temp.path().join("parallel");
+        let steps = extract_zip_fixture(&zip_path, &parallel_root, 8).unwrap();
+        assert_fixture_tree(&parallel_root, &entries);
+        assert_eq!(
+            steps
+                .iter()
+                .filter(|step| step.stage == "extract_entry")
+                .count(),
+            entries.len()
+        );
+
+        let sequential_root = temp.path().join("sequential");
+        extract_zip_fixture(&zip_path, &sequential_root, 1).unwrap();
+        assert_fixture_tree(&sequential_root, &entries);
+    }
+
+    #[test]
+    fn parallel_zip_extraction_keeps_the_last_duplicate_entry() {
+        let temp = tempfile::tempdir().unwrap();
+        let zip_path = temp.path().join("duplicate.zip");
+        write_test_zip(
+            &zip_path,
+            &[
+                ("gpm_server/a.fa", b"first"),
+                ("gpm_server/a.fa", b"second"),
+            ],
+        );
+        let root = temp.path().join("out");
+
+        let steps = extract_zip_fixture(&zip_path, &root, 4).unwrap();
+
+        assert_eq!(
+            steps
+                .iter()
+                .filter(|step| step.stage == "extract_entry")
+                .count(),
+            1,
+            "a path must be planned exactly once"
+        );
+        assert_eq!(fs::read(root.join("gpm_server/a.fa")).unwrap(), b"second");
+    }
+
+    #[test]
+    fn parallel_zip_extraction_rejects_traversal_entries() {
+        let temp = tempfile::tempdir().unwrap();
+        let zip_path = temp.path().join("traversal.zip");
+        write_test_zip(
+            &zip_path,
+            &[("gpm_server/ok.fa", b"ok"), ("../escape.fa", b"escape")],
+        );
+        let root = temp.path().join("out");
+
+        let error = extract_zip_fixture(&zip_path, &root, 4).unwrap_err();
+
+        assert!(
+            error.to_string().contains("unsafe path traversal"),
+            "unexpected error: {error}"
+        );
+        assert!(!temp.path().join("escape.fa").exists());
+    }
+
+    #[test]
+    fn parallel_zip_extraction_stops_workers_on_cancel() {
+        let temp = tempfile::tempdir().unwrap();
+        let entries = synthetic_entries(32);
+        let borrowed = entries
+            .iter()
+            .map(|(name, bytes)| (name.as_str(), bytes.as_slice()))
+            .collect::<Vec<_>>();
+        let zip_path = temp.path().join("cancel.zip");
+        write_test_zip(&zip_path, &borrowed);
+        let root = temp.path().join("out");
+        fs::create_dir_all(&root).unwrap();
+
+        let extracted = std::cell::Cell::new(0_usize);
+        let error = extract_delivery_to_root(
+            &zip_path,
+            &root,
+            4,
+            &mut |step| {
+                if step.stage == "extract_entry" {
+                    extracted.set(extracted.get() + 1);
+                }
+            },
+            &mut || extracted.get() >= 3,
+        )
+        .unwrap_err();
+
+        assert!(
+            error.to_string().contains("cancelled"),
+            "unexpected error: {error}"
+        );
+        assert!(extracted.get() < entries.len());
+    }
+
+    #[test]
+    fn parallel_zip_extraction_propagates_worker_write_failures() {
+        let temp = tempfile::tempdir().unwrap();
+        let entries = synthetic_entries(6);
+        let borrowed = entries
+            .iter()
+            .map(|(name, bytes)| (name.as_str(), bytes.as_slice()))
+            .collect::<Vec<_>>();
+        let zip_path = temp.path().join("blocked.zip");
+        write_test_zip(&zip_path, &borrowed);
+        let root = temp.path().join("out");
+        // A directory where a file has to be written makes the worker's file
+        // creation fail instead of racing with another worker.
+        let blocked = root.join(&entries[3].0);
+        fs::create_dir_all(&blocked).unwrap();
+
+        let error = extract_zip_fixture(&zip_path, &root, 4).unwrap_err();
+
+        assert!(
+            error.to_string().contains("part_003.fa"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn parallel_zip_extraction_waits_out_quiet_periods_without_events() {
+        let temp = tempfile::tempdir().unwrap();
+        let entries = synthetic_entries(24);
+        let borrowed = entries
+            .iter()
+            .map(|(name, bytes)| (name.as_str(), bytes.as_slice()))
+            .collect::<Vec<_>>();
+        let zip_path = temp.path().join("quiet.zip");
+        write_test_zip(&zip_path, &borrowed);
+        let root = temp.path().join("out");
+        fs::create_dir_all(&root).unwrap();
+
+        let planned = plan_zip_extraction(&zip_path, &root).unwrap();
+        // A zero poll interval turns every quiet period into a timeout, which is
+        // exactly what a loaded machine produces. Extraction must still wait for
+        // the workers instead of reporting a truncated batch as complete.
+        extract_zip_entries_in_parallel(
+            &zip_path,
+            planned,
+            4,
+            std::time::Duration::ZERO,
+            &mut |_| {},
+            &mut || false,
+        )
+        .unwrap();
+
+        assert_fixture_tree(&root, &entries);
     }
 }

@@ -20,7 +20,7 @@ where
     C: FnMut() -> bool,
 {
     check_import_cancel(should_cancel)?;
-    options.resolved_pairwise_parser_workers()?;
+    let import_workers = options.resolved_import_workers()?;
     let mut conn = open_workspace_db(project_db_path)?;
     let ref_run_count = count_bundle_ref_alignment_runs(&conn, bundle_root)?;
     let pairwise_runs = discover_pairwise_import_runs(&conn, bundle_root)?;
@@ -35,6 +35,7 @@ where
     let ref_summary = index_bundle_ref_alignment_hits_with_cancel(
         &mut conn,
         bundle_root,
+        import_workers,
         should_cancel,
         &mut |run_name, paf_path| {
             recorder.record(
@@ -159,7 +160,7 @@ where
     C: FnMut() -> bool,
 {
     check_import_cancel(should_cancel)?;
-    let requested_workers = options.resolved_pairwise_parser_workers()?;
+    let requested_workers = options.resolved_import_workers()?;
     let name_maps = pairwise_source_seq_name_maps(conn, &pairwise_runs)?;
     conn.execute_batch("PRAGMA cache_size = -262144;")
         .context("failed to configure pairwise bulk-load sqlite cache")?;

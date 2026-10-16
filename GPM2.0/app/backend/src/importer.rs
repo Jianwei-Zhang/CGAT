@@ -83,7 +83,7 @@ use types::{
     DerivedCtgRow, EXTRACTED_IMPORT_PHASE_TOTAL, FaiRow, ImportedChrAssignmentRow,
     ImportedTrackMemberOrderRow, PackageRow, ReferenceChrLocatorRow, ReferenceRow,
     SourceSeqLocatorRow, SourceSeqNRegionRow, TelomereMarkRow, TelomereRuleRow, TrackMemberRow,
-    ValidatedAddCtgPackage, ZIP_IMPORT_PHASE_TOTAL,
+    ValidatedAddCtgPackage, ZIP_IMPORT_PHASE_TOTAL, default_import_workers,
 };
 use workspace_io::*;
 

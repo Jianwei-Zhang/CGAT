@@ -827,26 +827,26 @@ mod tests {
     #[test]
     fn initial_import_parallelism_is_validated_at_the_tauri_boundary() {
         assert_eq!(
-            initial_import_options(Some("4".to_string())).pairwise_parser_workers,
+            initial_import_options(Some("4".to_string())).import_workers,
             Some(4)
         );
         assert_eq!(
-            initial_import_options(Some("8".to_string())).pairwise_parser_workers,
+            initial_import_options(Some("8".to_string())).import_workers,
             Some(8)
         );
         assert_eq!(
-            initial_import_options(Some("3".to_string())).pairwise_parser_workers,
+            initial_import_options(Some("3".to_string())).import_workers,
             Some(3)
         );
         assert_eq!(
-            initial_import_options(Some("9".to_string())).pairwise_parser_workers,
+            initial_import_options(Some("9".to_string())).import_workers,
             None
         );
         assert_eq!(
-            initial_import_options(Some("auto".to_string())).pairwise_parser_workers,
+            initial_import_options(Some("auto".to_string())).import_workers,
             None
         );
-        assert_eq!(initial_import_options(None).pairwise_parser_workers, None);
+        assert_eq!(initial_import_options(None).import_workers, None);
     }
 
     #[test]

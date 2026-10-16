@@ -91,6 +91,7 @@ where
     extract_delivery_to_root(
         zip_path,
         &extract_root,
+        default_import_workers(),
         &mut |step| recorder.record_step(step),
         should_cancel,
     )?;

@@ -20,7 +20,7 @@ export function projectLabels(state) {
     sourceLocation: "Project location", legacyProjects: "Legacy projects",
     noOpen: "No project open", opened: "Open", rename: "Rename project", saved: "Save name",
     lastOpened: "Last opened", created: "Created",
-    importThreads: "PAF parser workers", importThreadsHint: "Used while parsing PAF files during initial import; SQLite still uses one writer.",
+    importThreads: "Parallel import workers", importThreadsHint: "Shared by archive extraction and PAF parsing during import; SQLite still uses one writer.",
     recommendedThreads: "{number} (recommended)",
   } : {
     import: "导入项目", open: "打开项目", recent: "项目库",
@@ -37,7 +37,7 @@ export function projectLabels(state) {
     sourceLocation: "项目位置", legacyProjects: "旧版项目",
     noOpen: "尚未打开项目", opened: "已打开", rename: "重命名项目", saved: "保存名称",
     lastOpened: "上次打开", created: "创建时间",
-    importThreads: "PAF 解析线程", importThreadsHint: "用于初始导入中的 PAF 并行解析；SQLite 仍只使用一个写入线程。",
+    importThreads: "并行导入线程", importThreadsHint: "导入时由交付包解压与 PAF 解析共用；SQLite 仍只使用一个写入线程。",
     recommendedThreads: "{number}（推荐）",
   };
 }

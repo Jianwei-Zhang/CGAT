@@ -2,7 +2,9 @@ use super::test_support::*;
 use crate::grt_package::delivery_validator::{
     validate_app_final_path_manifest_hash, validate_app_source_fasta_paths,
 };
-use crate::grt_package::parsing::read_fasta_with_cancel;
+use crate::grt_package::parsing::{
+    read_fasta_with_cancel, read_fasta_with_sha256_and_cancel, sha256_file,
+};
 
 #[test]
 fn project_view_uses_authoritative_source_lengths_for_repeated_and_split_segments() {
@@ -553,4 +555,23 @@ fn app_source_fasta_import_check_is_lightweight_but_requires_safe_existing_files
     let unsafe_error =
         validate_app_source_fasta_paths(temp.path(), &unsafe_table, &mut || false).unwrap_err();
     assert!(unsafe_error.to_string().contains("safe relative path"));
+}
+
+#[test]
+fn q4_fasta_digest_comes_from_the_same_pass_as_the_records() {
+    let temp = tempdir().unwrap();
+    let path = temp.path().join("q4.fa");
+    let contents = ">chr1\nACGTN\nACGT\n>chr2\nNNNN\n";
+    fs::write(&path, contents).unwrap();
+
+    let (records, digest) =
+        read_fasta_with_sha256_and_cancel(&path, "App q4 FASTA", false, &mut || false).unwrap();
+
+    assert_eq!(records.get("chr1").map(String::as_str), Some("ACGTNACGT"));
+    assert_eq!(records.get("chr2").map(String::as_str), Some("NNNN"));
+    assert_eq!(digest, sha256_file(&path).unwrap());
+    assert_eq!(
+        digest, "bcd80d30c15226a9b70ccd7499440fc97f47a34fcffedb8af009e6496ce5bc64",
+        "the digest must cover every byte of the artifact"
+    );
 }

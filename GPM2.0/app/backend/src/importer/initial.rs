@@ -160,6 +160,8 @@ where
     C: FnMut() -> bool,
 {
     check_import_cancel(should_cancel)?;
+    // Fail fast on an unsupported worker budget before the workspace is claimed.
+    let import_workers = options.resolved_import_workers()?;
     let mut recorder = ImportProgressWriter::new(on_progress);
     recorder.set_phase(1, ZIP_IMPORT_PHASE_TOTAL);
     recorder.record(
@@ -207,6 +209,7 @@ where
     if let Err(error) = extract_delivery_to_root(
         zip_path,
         workspace_root,
+        import_workers,
         &mut |step| recorder.record_step(step),
         should_cancel,
     ) {

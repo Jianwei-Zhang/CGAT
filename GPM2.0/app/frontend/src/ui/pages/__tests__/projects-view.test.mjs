@@ -94,7 +94,7 @@ test("bulk deletion is exposed only after explicit validation completes with cur
   assert.doesNotMatch(render({ records, importer }), /project-validation-summary/);
 });
 
-test("project import dialog owns the numeric PAF worker control and marks the recommendation", () => {
+test("project import dialog owns the numeric import worker control and marks the recommendation", () => {
   const html = render({
     importer: {
       importDialogOpen: true,
@@ -107,5 +107,6 @@ test("project import dialog owns the numeric PAF worker control and marks the re
   assert.match(html, /id="import-parallelism-select" name="importParallelism"/);
   assert.match(html, /<option value="[1-8]" selected>[1-8] \(recommended\)<\/option>/);
   assert.doesNotMatch(html, />Auto \(recommended\)</);
-  assert.match(html, /PAF parser workers/);
+  assert.match(html, /Parallel import workers/);
+  assert.match(html, /Shared by archive extraction and PAF parsing/);
 });

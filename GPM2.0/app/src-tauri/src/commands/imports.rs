@@ -2,12 +2,12 @@ use super::*;
 
 pub(super) fn initial_import_options(value: Option<String>) -> ImportOptions {
     let normalized = value.unwrap_or_default().trim().to_ascii_lowercase();
-    let pairwise_parser_workers = normalized
+    let import_workers = normalized
         .parse::<usize>()
         .ok()
         .filter(|workers| (1..=8).contains(workers));
     ImportOptions {
-        pairwise_parser_workers,
+        import_workers,
         ..ImportOptions::default()
     }
 }

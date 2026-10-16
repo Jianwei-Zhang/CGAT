@@ -781,7 +781,7 @@ fn initial_pairwise_bulk_load_preserves_hits_queries_indexes_and_progress() {
     let (outcome, progress) = import_from_extracted_bundle_with_options_and_hooks(
         &bundle_root,
         ImportOptions {
-            pairwise_parser_workers: Some(2),
+            import_workers: Some(2),
             ..ImportOptions::default()
         },
         &mut |step| emitted.borrow_mut().push(step),
@@ -896,7 +896,7 @@ fn initial_pairwise_bulk_load_cancellation_rolls_back_hits_and_indexes() {
     let error = import_from_extracted_bundle_with_options_and_hooks(
         &bundle_root,
         ImportOptions {
-            pairwise_parser_workers: Some(1),
+            import_workers: Some(1),
             ..ImportOptions::default()
         },
         &mut |step| {
@@ -947,7 +947,7 @@ fn initial_pairwise_bulk_load_cancellation_before_index_creation_rolls_back() {
     let error = import_from_extracted_bundle_with_options_and_hooks(
         &bundle_root,
         ImportOptions {
-            pairwise_parser_workers: Some(1),
+            import_workers: Some(1),
             ..ImportOptions::default()
         },
         &mut |step| {
@@ -973,7 +973,7 @@ fn initial_pairwise_bulk_load_cancellation_after_index_creation_rolls_back() {
     let error = import_from_extracted_bundle_with_options_and_hooks(
         &bundle_root,
         ImportOptions {
-            pairwise_parser_workers: Some(1),
+            import_workers: Some(1),
             ..ImportOptions::default()
         },
         &mut |step| {
@@ -1028,10 +1028,10 @@ fn assert_pairwise_bulk_load_cancelled_and_rolled_back(bundle_root: &Path, error
 #[test]
 fn rejects_unsupported_pairwise_parser_worker_count() {
     let error = ImportOptions {
-        pairwise_parser_workers: Some(9),
+        import_workers: Some(9),
         ..ImportOptions::default()
     }
-    .resolved_pairwise_parser_workers()
+    .resolved_import_workers()
     .unwrap_err();
     assert!(error.to_string().contains("integer from 1 to 8"));
 }
