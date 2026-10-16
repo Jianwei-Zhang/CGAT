@@ -273,21 +273,32 @@ where
         for job in chunk {
             on_dataset(&job.run_name, &job.run_paf);
         }
-        let parsed = parse_ref_paf_chunk(chunk, &ref_chr_by_name, worker_count, should_cancel);
-        for (job, rows) in chunk.iter().zip(parsed) {
-            let rows = rows?;
+        let mut parsed = parse_ref_paf_chunk(chunk, &ref_chr_by_name, worker_count, should_cancel)
+            .map(Vec::into_iter);
+        for job in chunk {
             if should_cancel() {
                 bail!("import cancelled");
             }
-            // SQLite has a single writer, so every chunk is still committed on
-            // the caller thread and in dataset order.
+            // SQLite has a single writer. Large/sequential inputs are streamed
+            // directly into this dataset transaction instead of buffered.
             let tx = conn.transaction()?;
-            tx.execute(
-                "DELETE FROM ref_alignment_hit WHERE dataset_id = ?1",
-                params![job.dataset_id],
-            )
-            .context("failed to clear old ref_alignment_hit rows for dataset")?;
-            let inserted = insert_ref_paf_hit_rows(&tx, job.dataset_id, &job.run_name, &rows)?;
+            let inserted = if let Some(parsed) = &mut parsed {
+                let rows = parsed
+                    .next()
+                    .context("missing parsed reference PAF dataset")??;
+                clear_ref_alignment_hits(&tx, RefHitClearScope::Dataset(job.dataset_id))?;
+                insert_ref_paf_hit_rows(&tx, job.dataset_id, &job.run_name, &rows, should_cancel)?
+            } else {
+                load_ref_paf_hits_for_dataset(
+                    &tx,
+                    job.dataset_id,
+                    &job.run_name,
+                    &job.run_paf,
+                    &job.source_seq_by_name,
+                    &ref_chr_by_name,
+                    should_cancel,
+                )?
+            };
             tx.commit()?;
             loaded_dataset_count += 1;
             loaded_hit_count += inserted;
@@ -302,15 +313,14 @@ where
     })
 }
 
-/// Parses one worker-sized chunk of datasets. Large PAFs are parsed on the
-/// caller thread because buffering every row of a huge file per worker would
-/// otherwise scale memory with the worker budget.
+/// Buffer only bounded, parallel-safe chunks. `None` tells the caller to
+/// stream each dataset into SQLite, including when only one worker is used.
 fn parse_ref_paf_chunk<F>(
     jobs: &[RefPafDatasetJob],
     ref_chr_by_name: &HashMap<String, i64>,
     worker_count: usize,
     should_cancel: &mut F,
-) -> Vec<Result<Vec<RefPafHitRow>>>
+) -> Option<Vec<Result<Vec<RefPafHitRow>>>>
 where
     F: FnMut() -> bool,
 {
@@ -322,19 +332,13 @@ where
                 .unwrap_or(false)
         });
     if !parallel_safe {
-        return jobs
-            .iter()
-            .map(|job| {
-                parse_ref_paf_hits(
-                    &job.run_paf,
-                    &job.source_seq_by_name,
-                    ref_chr_by_name,
-                    should_cancel,
-                )
-            })
-            .collect();
+        return None;
     }
-    parse_ref_paf_jobs_in_parallel(jobs, ref_chr_by_name, should_cancel)
+    Some(parse_ref_paf_jobs_in_parallel(
+        jobs,
+        ref_chr_by_name,
+        should_cancel,
+    ))
 }
 
 fn parse_ref_paf_jobs_in_parallel<F>(
@@ -609,10 +613,34 @@ fn parse_ref_paf_hits<C>(
 where
     C: FnMut() -> bool,
 {
+    let mut rows = Vec::new();
+    visit_ref_paf_hits(
+        run_paf_path,
+        source_seq_by_name,
+        ref_chr_by_name,
+        should_cancel,
+        &mut |row| {
+            rows.push(row);
+            Ok(())
+        },
+    )?;
+    Ok(rows)
+}
+
+fn visit_ref_paf_hits<C, V>(
+    run_paf_path: &Path,
+    source_seq_by_name: &HashMap<String, i64>,
+    ref_chr_by_name: &HashMap<String, i64>,
+    should_cancel: &mut C,
+    on_hit: &mut V,
+) -> Result<()>
+where
+    C: FnMut() -> bool,
+    V: FnMut(RefPafHitRow) -> Result<()>,
+{
     let file = File::open(run_paf_path)
         .with_context(|| format!("failed to open paf file {}", run_paf_path.display()))?;
     let reader = BufReader::new(file);
-    let mut rows = Vec::new();
     for line in reader.lines() {
         if should_cancel() {
             bail!("auto pipeline cancelled");
@@ -638,7 +666,7 @@ where
             continue;
         };
 
-        rows.push(RefPafHitRow {
+        on_hit(RefPafHitRow {
             source_seq_id: *source_seq_id,
             reference_chr_id: *reference_chr_id,
             strand: hit.strand,
@@ -650,9 +678,43 @@ where
             block_length: hit.block_length,
             mapq: hit.mapq,
             cg_tag: hit.cg_tag,
-        });
+        })?;
     }
-    Ok(rows)
+    Ok(())
+}
+
+fn prepare_ref_paf_hit_insert(conn: &Connection) -> Result<rusqlite::Statement<'_>> {
+    Ok(conn.prepare(
+        "INSERT INTO ref_alignment_hit (
+            dataset_id, source_seq_id, reference_chr_id, strand,
+            query_start, query_end, ref_start, ref_end,
+            match_length, block_length, mapq, cg_tag, run_name, note
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, NULL)",
+    )?)
+}
+
+fn insert_ref_paf_hit_row(
+    insert_stmt: &mut rusqlite::Statement<'_>,
+    dataset_id: i64,
+    run_name: &str,
+    row: &RefPafHitRow,
+) -> Result<()> {
+    insert_stmt.execute(params![
+        dataset_id,
+        row.source_seq_id,
+        row.reference_chr_id,
+        &row.strand,
+        row.query_start,
+        row.query_end,
+        row.ref_start,
+        row.ref_end,
+        row.match_length,
+        row.block_length,
+        row.mapq,
+        row.cg_tag.as_deref(),
+        run_name
+    ])?;
+    Ok(())
 }
 
 fn insert_ref_paf_hit_rows(
@@ -660,33 +722,14 @@ fn insert_ref_paf_hit_rows(
     dataset_id: i64,
     run_name: &str,
     rows: &[RefPafHitRow],
+    should_cancel: &mut impl FnMut() -> bool,
 ) -> Result<i64> {
-    if rows.is_empty() {
-        return Ok(0);
-    }
-    let mut insert_stmt = conn.prepare(
-        "INSERT INTO ref_alignment_hit (
-            dataset_id, source_seq_id, reference_chr_id, strand,
-            query_start, query_end, ref_start, ref_end,
-            match_length, block_length, mapq, cg_tag, run_name, note
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, NULL)",
-    )?;
+    let mut insert_stmt = prepare_ref_paf_hit_insert(conn)?;
     for row in rows {
-        insert_stmt.execute(params![
-            dataset_id,
-            row.source_seq_id,
-            row.reference_chr_id,
-            &row.strand,
-            row.query_start,
-            row.query_end,
-            row.ref_start,
-            row.ref_end,
-            row.match_length,
-            row.block_length,
-            row.mapq,
-            row.cg_tag.as_deref(),
-            run_name
-        ])?;
+        if should_cancel() {
+            bail!("import cancelled");
+        }
+        insert_ref_paf_hit_row(&mut insert_stmt, dataset_id, run_name, row)?;
     }
     Ok(rows.len() as i64)
 }
@@ -709,13 +752,20 @@ fn load_ref_paf_hits(
     }
 
     clear_ref_alignment_hits(conn, clear_scope)?;
-    let rows = parse_ref_paf_hits(
+    let mut insert_stmt = prepare_ref_paf_hit_insert(conn)?;
+    let mut inserted = 0;
+    visit_ref_paf_hits(
         run_paf_path,
         source_seq_by_name,
         ref_chr_by_name,
         should_cancel,
+        &mut |row| {
+            insert_ref_paf_hit_row(&mut insert_stmt, dataset_id, run_name, &row)?;
+            inserted += 1;
+            Ok(())
+        },
     )?;
-    insert_ref_paf_hit_rows(conn, dataset_id, run_name, &rows)
+    Ok(inserted)
 }
 
 fn parse_paf_line(line: &str) -> Option<ParsedPafHit> {
@@ -955,6 +1005,71 @@ mod tests {
         .expect("query")
         .collect::<std::result::Result<Vec<_>, _>>()
         .expect("collect")
+    }
+
+    #[test]
+    fn large_and_single_worker_ref_pafs_stream_before_reading_the_tail() {
+        for workers in [1, 4] {
+            let temp = tempdir().expect("tempdir");
+            let (mut conn, bundle) = seed_ref_alignment_bundle(temp.path(), 2, 1);
+            let paf = bundle.join("runs/ds1_vs_ref/result.paf");
+            let mut bytes = fs::read(&paf).expect("read PAF");
+            // If the importer buffers the whole file, this invalid UTF-8 tail
+            // fails before the first insert. Streaming must hit the trigger first.
+            bytes.extend_from_slice(b"\xff\n");
+            fs::write(&paf, bytes).expect("write invalid tail");
+            if workers > 1 {
+                fs::OpenOptions::new()
+                    .write(true)
+                    .open(&paf)
+                    .unwrap()
+                    .set_len(super::REF_PAF_PARALLEL_PARSE_MAX_BYTES + 1)
+                    .unwrap();
+            }
+            conn.execute_batch(
+                "CREATE TEMP TRIGGER reject_ref_hit BEFORE INSERT ON ref_alignment_hit
+                 BEGIN SELECT RAISE(ABORT, 'streamed first reference hit'); END;",
+            )
+            .expect("create insert probe");
+
+            let error = index_bundle_ref_alignment_hits_with_cancel(
+                &mut conn,
+                &bundle,
+                workers,
+                &mut || false,
+                &mut |_, _| {},
+            )
+            .expect_err("first row must reach SQLite before the tail is read");
+            assert!(
+                format!("{error:#}").contains("streamed first reference hit"),
+                "workers={workers}: {error:#}"
+            );
+            assert!(
+                stored_ref_hits(&conn).is_empty(),
+                "failed transaction must roll back"
+            );
+        }
+    }
+
+    #[test]
+    fn streaming_ref_paf_cancellation_rolls_back_rows_already_inserted() {
+        let temp = tempdir().expect("tempdir");
+        let (mut conn, bundle) = seed_ref_alignment_bundle(temp.path(), 1, 4);
+        let tx = conn.transaction().expect("begin dataset transaction");
+        let error = load_ref_paf_hits_for_dataset(
+            &tx,
+            1,
+            "ds1_vs_ref",
+            &bundle.join("runs/ds1_vs_ref/result.paf"),
+            &HashMap::from([("tig1".to_string(), 1)]),
+            &HashMap::from([("Chr01".to_string(), 1)]),
+            &mut || stored_ref_hits(&tx).len() >= 2,
+        )
+        .expect_err("cancel after two streamed inserts");
+        assert!(error.to_string().contains("cancelled"), "{error:#}");
+        assert_eq!(stored_ref_hits(&tx).len(), 2);
+        drop(tx);
+        assert!(stored_ref_hits(&conn).is_empty());
     }
 
     #[test]
