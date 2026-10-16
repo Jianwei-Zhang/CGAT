@@ -8,7 +8,7 @@
     "precision_rmq100": 40587711,
     "precision_rmq0": 40587712,
     "precision_freq100": 40587713,
-    "precision_compare": 40587714
+    "precision_compare": 40587735
   },
   "threads": {
     "scheduler_pair": 16,
@@ -22,5 +22,31 @@
   },
   "defaults_changed": false,
   "numerical_input_splitting": false,
-  "boundary": "Internal experiments only. Original running workflows not modified. Scheduler trials are self-only 24-task workload, not complete mixed cross/self workflow. New current-scheduler control runs are explicitly authorized for this scheduling experiment; historical m40/n3 or old GRT engines are not rerun. Sensitivity measurements are not true biological precision or final scientific acceptance."
+  "boundary": "Internal experiments only. Original running workflows not modified. Scheduler trials are self-only 24-task workload, not complete mixed cross/self workflow. New current-scheduler control runs are explicitly authorized for this scheduling experiment; historical m40/n3 or old GRT engines are not rerun. Sensitivity measurements are not true biological precision or final scientific acceptance.",
+  "comparator_migration": {
+    "at": "2026-10-16T14:43:46+08:00",
+    "from_job": 40587714,
+    "to_job": 40587735,
+    "from_queue": "x86",
+    "to_queue": "arm",
+    "cpus": 1,
+    "reason": "User requested migration of waiting jobs to ARM",
+    "dependencies_unchanged": [
+      40587710,
+      40587711,
+      40587712,
+      40587713
+    ],
+    "interpreter": "/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/python3",
+    "interpreter_version": "3.11.14",
+    "script_sha256": "43b09a3caee02f6c98d4901997c7ef4d813ef3d1accfb9e1c705b5745221634e",
+    "boundary": "Pure-Python comparison only; original x86 measurement jobs and files unchanged. Still waits for successful upstream jobs, not CPU availability.",
+    "verified_at": "2026-10-16T14:44:06+08:00",
+    "old_state": "FAILED",
+    "old_state_reason": "User-authorized cancellation before execution; no test failure",
+    "new_state": "WAITING",
+    "queue_verified": "arm",
+    "waiting_reason": "Job dependency is not satisfied",
+    "other_pending_jobs": 0
+  }
 }

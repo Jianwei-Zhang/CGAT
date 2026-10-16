@@ -101,3 +101,16 @@ validation and packaging take tens of minutes in our completed old run, but were
 still pending at the user's 62h+ snapshot and cannot explain that elapsed time.
 Cross-process repeated validation/data scans remain a follow-up profiling target,
 not another measured multi-day bottleneck or already-adopted optimization.
+
+## Waiting comparator moved to ARM (2026-10-16 14:43 +08:00)
+
+On the user's request, replaced waiting x86 comparator 40587714 with ARM job
+40587735 (one CPU, isolated ARM Python 3.11.14). At migration audit this was the
+only waiting job; no PENDING jobs matched the user's queue inventory. Preserved
+all four success dependencies: 40587710/711/712/713. It is standard-library JSON
+comparison, not a new alignment benchmark; original timings/PAFs stay unchanged.
+The old script/job metadata were archived in `migration-arm-20261016/`; the new
+ARM script and unchanged comparator were SHA256-verified. Already-running x86
+experiments were not stopped. Waiting for unfinished dependencies will persist
+regardless of ARM capacity. Future submissions prefer ARM unless a documented
+compatibility or controlled same-architecture/version comparison requires x86.
