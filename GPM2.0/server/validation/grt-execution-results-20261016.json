@@ -4437,6 +4437,27 @@
       "step2_gap:test8_fixed": 40587505,
       "step2_gap:zebrafish": 40587507
     },
+    "customer32_replacement": {
+      "boundary": "User approved 32 CPU for both customer cases. Fresh empty numerical caches; old 16 CPU outputs retained and excluded from primary timing. Four smaller dataset pairs and old full producer jobs untouched.",
+      "jobs": {
+        "full": 40587512,
+        "gap-screen": 40587513
+      },
+      "last_observed_state": "PENDING at 2026-10-16 12:11 CST",
+      "launcher_revision": "b2c124b",
+      "outputs": {
+        "full": "/share/home/xbzhang26/cgat-reads-debug/grt-formal-optimized-20261016/cases-customer32/full",
+        "gap-screen": "/share/home/xbzhang26/cgat-reads-debug/grt-formal-optimized-20261016/cases-customer32/gap"
+      },
+      "runtime_revision": "7ba84ea",
+      "state": "SUBMITTED",
+      "superseded_jobs": {
+        "full": 40587508,
+        "gap-screen": 40587509
+      },
+      "threads_per_job": 32,
+      "updated_at": "2026-10-16T12:11:03+0800"
+    },
     "defaults": {
       "execution_profile": "optimized",
       "refill": "batch_with_compatible_index_cache",
@@ -4461,7 +4482,7 @@
     "production_refill_job": 40587487,
     "remote_boundary": "Only new optimized complete-data GRT suffix runs; old results read-only. No baseline reruns or numerical-cache borrowing.",
     "source_revision": "7ba84ea",
-    "status": "CORRECTED_FULL_AND_STEP2_SCREEN_SUBMITTED"
+    "status": "SMALL_CASES_RUNNING_CUSTOMER32_SUBMITTED"
   },
   "pending_physical_stage_split": {
     "base_validated_revision": "2f52515e659ad75bea614d648880f2b6d621ed1b",

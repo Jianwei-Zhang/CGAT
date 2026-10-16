@@ -131,3 +131,26 @@ All ten were observed RUNNING after submission; scientific output comparisons
 remain pending. Old long-running producers 40550762/40550763 remain untouched.
 The full retries append to the earlier failed launcher log; only the new attempt
 and new timings are relevant. Earlier five startup failures are retained.
+
+## 12:11 CST: approved customer-pair CPU increase
+
+At the user's approval, only customer validation jobs **40587508/40587509** were
+terminated and superseded. The scheduler reports them FAILED after the requested
+termination; this is not an aligner correctness failure. Their outputs/logs remain
+untouched for history and are excluded from the primary cold-timing comparison.
+
+Fresh isolated customer cases, both requesting **32 CPUs** and `--threads 32`:
+
+| Step2 scope | Replacement job | Initial observed state |
+| --- | ---: | --- |
+| full | 40587512 | PENDING |
+| gap-screen | 40587513 | PENDING |
+
+Root: `grt-formal-optimized-20261016/cases-customer32/{full,gap}` on SSH 180.
+Neither case borrows any numerical caches from the prior 16-CPU attempts. The
+runtime/launcher remain 7ba84ea/b2c124b; gap/full inputs and thread budgets match.
+More allocated CPUs do not promise linear speedup, and queue delay is additional.
+
+The four smaller dataset pairs retain 8 CPUs and are not restarted. Original
+whole-workflow producers **40550762/40550763** are unchanged. No production default
+or released source asset changes accompany this resource adjustment.
