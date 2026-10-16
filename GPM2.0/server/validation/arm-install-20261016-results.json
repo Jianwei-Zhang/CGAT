@@ -1,0 +1,562 @@
+{
+  "archive_sha256": "59dbc3e8b048662dccf89d49a271bee437b8ea9bb13c27b6ab0cee2aee72112b",
+  "boundary": "Fresh installer-managed environment and two synthetic complete workflows on ARM compute node; not real-genome performance, biological accuracy, x86/ARM exact numerical equivalence, every optional branch, or public release acceptance.",
+  "checked_at": "2026-10-16T12:51:09.937996+08:00",
+  "environment_prefix": "/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server",
+  "fixture_no_reads": {
+    "chromosome_length": 60000,
+    "inputs": [
+      {
+        "bases": 120000,
+        "file": "reference.fa",
+        "n_bases": 0,
+        "records": 2,
+        "role": "reference",
+        "sha256": "7e6b5384ae911266048fa6eb7c548fff15f0288f1b82433ffc45ac44e0893461"
+      },
+      {
+        "bases": 120000,
+        "file": "primary.fa",
+        "n_bases": 400,
+        "records": 2,
+        "role": "primary",
+        "sha256": "f21e248fb08bf214c61dfd902efa40351866a9d023d46b536bba93b15098f96b"
+      },
+      {
+        "bases": 120000,
+        "file": "support.fa",
+        "n_bases": 0,
+        "records": 2,
+        "role": "support",
+        "sha256": "cbe5fc53c367dec26f52ea43c5eeee1ce65862d77e5439151d4ee71017979ef5"
+      }
+    ],
+    "primary_gap_length": 200,
+    "primary_gap_start_0based": 25000,
+    "purpose": "synthetic workflow smoke test only",
+    "reads": {
+      "bases": 3612000,
+      "length": 6000,
+      "records": 602,
+      "sha256": "654fe17f4ee23d9bfae8aa971dc69adb272573e68a10d9ff0fc83271d1fb7e0c",
+      "substitution_rate": 0.001
+    },
+    "reads_qc": "synthetic long-read full QC smoke; not biological accuracy validation",
+    "schema_version": 1,
+    "seed": 20261013
+  },
+  "fixture_reads": {
+    "chromosome_length": 120000,
+    "inputs": [
+      {
+        "bases": 240000,
+        "file": "reference.fa",
+        "n_bases": 0,
+        "records": 2,
+        "role": "reference",
+        "sha256": "69fe4fd5a3d752eaa5105fb971e5538152f8c1c9f2a90f6b9bc23c48ee417ef2"
+      },
+      {
+        "bases": 240000,
+        "file": "primary.fa",
+        "n_bases": 400,
+        "records": 2,
+        "role": "primary",
+        "sha256": "048dc110d4b153d32748708150ede58674c5b838b279df46459d243402ecbffd"
+      },
+      {
+        "bases": 240000,
+        "file": "support.fa",
+        "n_bases": 0,
+        "records": 2,
+        "role": "support",
+        "sha256": "cc36600d04884c14ba2b937394f11d942d68ea2e68671de1e62162323c14e72a"
+      }
+    ],
+    "primary_gap_length": 200,
+    "primary_gap_start_0based": 25000,
+    "purpose": "synthetic workflow smoke test only",
+    "reads": {
+      "bases": 7608000,
+      "length": 6000,
+      "records": 1268,
+      "sha256": "ef75e2de3cdbf1c32db423ccf6aa36ba4ea0025eb8a5c5b10bbe9416f711bda7",
+      "substitution_rate": 0.001
+    },
+    "reads_qc": "synthetic long-read full QC smoke; not biological accuracy validation",
+    "schema_version": 1,
+    "seed": 20261013
+  },
+  "install_exit": 0,
+  "installed_package_subdirs": {
+    "linux-aarch64": 138,
+    "noarch": 50
+  },
+  "isolation": {
+    "CONDA_ENVS_PATH": "/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs",
+    "CONDA_PKGS_DIRS": "/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/pkgs",
+    "HOME": "/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/home",
+    "public_module_environment_modified": false,
+    "shell_startup_modified": false,
+    "x86_env_file_checks": [
+      {
+        "expected_sha256": "dd7a00d72ac98f1222c475c875e573f7b42e06cbfc5cf3b668d5383fda26c3ef",
+        "observed_sha256": "dd7a00d72ac98f1222c475c875e573f7b42e06cbfc5cf3b668d5383fda26c3ef",
+        "path": "/share/home/xbzhang26/gpm2-test8-validation/env/micromamba/envs/cgat-server/conda-meta/cgat-server-owner.tsv"
+      },
+      {
+        "expected_sha256": "6005ce5904f210145cda423a47d327a178b1c1e423cc97e5b027db815c39ce03",
+        "observed_sha256": "6005ce5904f210145cda423a47d327a178b1c1e423cc97e5b027db815c39ce03",
+        "path": "/share/home/xbzhang26/gpm2-test8-validation/env/micromamba/envs/cgat-server/conda-meta/cgat-server-state.tsv"
+      },
+      {
+        "expected_sha256": "115a7310414587045959a8d8bcb07e409cbacb1433af6cb30f5df0a917d48e88",
+        "observed_sha256": "115a7310414587045959a8d8bcb07e409cbacb1433af6cb30f5df0a917d48e88",
+        "path": "/share/home/xbzhang26/gpm2-test8-validation/env/micromamba/envs/cgat-server/conda-meta/history"
+      }
+    ],
+    "x86_env_files_unchanged": true
+  },
+  "managed_check_exit": 0,
+  "manager": "ARM micromamba 2.9.0, official install.sh --manager micromamba",
+  "quality_rows": [
+    {
+      "contig_name": "primary_ctg1",
+      "craq": "8.136909",
+      "dataset_name": "primary",
+      "length_bp": "120000",
+      "n_fraction": "0.001666667",
+      "qv": "46.600700",
+      "reads_qc_pass": "true"
+    },
+    {
+      "contig_name": "primary_ctg2",
+      "craq": "8.136909",
+      "dataset_name": "primary",
+      "length_bp": "120000",
+      "n_fraction": "0.001666667",
+      "qv": "48.094000",
+      "reads_qc_pass": "true"
+    },
+    {
+      "contig_name": "support_ctg1",
+      "craq": "18.777581",
+      "dataset_name": "support",
+      "length_bp": "120000",
+      "n_fraction": "0.000000000",
+      "qv": "46.608700",
+      "reads_qc_pass": "true"
+    },
+    {
+      "contig_name": "support_ctg2",
+      "craq": "18.777581",
+      "dataset_name": "support",
+      "length_bp": "120000",
+      "n_fraction": "0.000000000",
+      "qv": "48.102000",
+      "reads_qc_pass": "true"
+    }
+  ],
+  "remote_root": "/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9",
+  "retained_failures": [
+    {
+      "attempt": "initial launcher",
+      "cause": "Test archive layout used wrong source directory; fixed before dependency install",
+      "exit": 127
+    },
+    {
+      "attempt": "stock ARM Conda install",
+      "cause": "repodata HTTP ChunkedEncodingError/InvalidChunkLength; no solve/installation acceptance",
+      "exit": 1
+    },
+    {
+      "attempt": "60kb chromosomes full reads QC fixture",
+      "cause": "Both Merqury/CRAQ datasets succeeded, then q-eligible input gate rejected fixture. Preserved failed run. 120kb replacement used unchanged production thresholds.",
+      "exit": 1,
+      "job_id": 40587549
+    }
+  ],
+  "runs": {
+    "no_reads": {
+      "archives": [
+        {
+          "bytes": 365038,
+          "fasta_members": 10,
+          "file": "no_reads.tar.gz",
+          "members": 87,
+          "sha256": "bceae4c246363cad1ddaf5d16e64cc72e5851d74dbe61867ca020203ad6e6a0b"
+        },
+        {
+          "bytes": 104039,
+          "fasta_members": 0,
+          "file": "no_reads.light.tar.gz",
+          "members": 70,
+          "sha256": "26cb76df5b00793b6d6b99f0f537b680ebd8e4b9371af51ad93a1bf32fa20e53"
+        }
+      ],
+      "job": {
+        "job_id": 40587548,
+        "query_exit": 0,
+        "scheduler_output": "ID           NAME         STATE      USER         ACCOUNT      QUEUE        START_TIME           END_TIME             EXEC_NODES           \n40587548     gpm_arm_ins* SUCCEEDED  xbzhang26    default      arm          2026/10/16 12:43:35  2026/10/16 12:44:07  agent-ARM-39"
+      },
+      "pipeline_exit": 0,
+      "stages": [
+        {
+          "attempt": "1",
+          "detail_log_relpath": "runs/primary_vs_ref/stderr.log",
+          "elapsed_seconds": "0.144",
+          "ended_at": "2026-10-16T12:43:56+08:00",
+          "exit_code": "0",
+          "phase_index": "1",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:43:56+08:00",
+          "state": "success",
+          "unit_id": "ref:primary"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "runs/support_vs_ref/stderr.log",
+          "elapsed_seconds": "0.349",
+          "ended_at": "2026-10-16T12:43:56+08:00",
+          "exit_code": "0",
+          "phase_index": "2",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:43:56+08:00",
+          "state": "success",
+          "unit_id": "ref:support"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.336",
+          "ended_at": "2026-10-16T12:43:57+08:00",
+          "exit_code": "0",
+          "phase_index": "3",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:43:57+08:00",
+          "state": "success",
+          "unit_id": "assign"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.476",
+          "ended_at": "2026-10-16T12:43:58+08:00",
+          "exit_code": "0",
+          "phase_index": "4",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:43:57+08:00",
+          "state": "success",
+          "unit_id": "grt_prepare"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "1.093",
+          "ended_at": "2026-10-16T12:43:59+08:00",
+          "exit_code": "0",
+          "phase_index": "5",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:43:58+08:00",
+          "state": "success",
+          "unit_id": "grt_step1"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "1.243",
+          "ended_at": "2026-10-16T12:44:00+08:00",
+          "exit_code": "0",
+          "phase_index": "6",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:43:59+08:00",
+          "state": "success",
+          "unit_id": "grt_step2"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "1.096",
+          "ended_at": "2026-10-16T12:44:01+08:00",
+          "exit_code": "0",
+          "phase_index": "7",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:44:00+08:00",
+          "state": "success",
+          "unit_id": "grt_step3"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.940",
+          "ended_at": "2026-10-16T12:44:02+08:00",
+          "exit_code": "0",
+          "phase_index": "8",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:44:01+08:00",
+          "state": "success",
+          "unit_id": "grt_telomere_finalize"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.088",
+          "ended_at": "2026-10-16T12:44:03+08:00",
+          "exit_code": "0",
+          "phase_index": "9",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:44:02+08:00",
+          "state": "success",
+          "unit_id": "chr:chr1"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.223",
+          "ended_at": "2026-10-16T12:44:03+08:00",
+          "exit_code": "0",
+          "phase_index": "10",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:44:02+08:00",
+          "state": "success",
+          "unit_id": "chr:chr2"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.414",
+          "ended_at": "2026-10-16T12:44:03+08:00",
+          "exit_code": "0",
+          "phase_index": "11",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:44:03+08:00",
+          "state": "success",
+          "unit_id": "finalize_evidence"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "1.230",
+          "ended_at": "2026-10-16T12:44:05+08:00",
+          "exit_code": "0",
+          "phase_index": "12",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:44:03+08:00",
+          "state": "success",
+          "unit_id": "package_full"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.806",
+          "ended_at": "2026-10-16T12:44:06+08:00",
+          "exit_code": "0",
+          "phase_index": "13",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:44:05+08:00",
+          "state": "success",
+          "unit_id": "package_light"
+        }
+      ],
+      "status": "PASS",
+      "workspace": "/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/runs/no_reads"
+    },
+    "with_reads-v2": {
+      "archives": [
+        {
+          "bytes": 622264,
+          "fasta_members": 10,
+          "file": "with_reads-v2.tar.gz",
+          "members": 87,
+          "sha256": "b4e3513fe2348b6d1bf94094c8e5deee298d3d3312da8c83fd949cdc975d360f"
+        },
+        {
+          "bytes": 106303,
+          "fasta_members": 0,
+          "file": "with_reads-v2.light.tar.gz",
+          "members": 70,
+          "sha256": "f651c3e31ecadcd10fc93dd0c442c1b78a4cdd366462d92b89f4d67898af32c2"
+        }
+      ],
+      "job": {
+        "job_id": 40587562,
+        "query_exit": 0,
+        "scheduler_output": "ID           NAME         STATE      USER         ACCOUNT      QUEUE        START_TIME           END_TIME             EXEC_NODES           \n40587562     gpm_arm_rea* SUCCEEDED  xbzhang26    default      arm          2026/10/16 12:47:04  2026/10/16 12:47:59  agent-ARM-39"
+      },
+      "pipeline_exit": 0,
+      "stages": [
+        {
+          "attempt": "1",
+          "detail_log_relpath": "runs/primary_vs_ref/stderr.log",
+          "elapsed_seconds": "0.144",
+          "ended_at": "2026-10-16T12:47:19+08:00",
+          "exit_code": "0",
+          "phase_index": "1",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:47:19+08:00",
+          "state": "success",
+          "unit_id": "ref:primary"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "runs/support_vs_ref/stderr.log",
+          "elapsed_seconds": "0.171",
+          "ended_at": "2026-10-16T12:47:19+08:00",
+          "exit_code": "0",
+          "phase_index": "2",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:47:19+08:00",
+          "state": "success",
+          "unit_id": "ref:support"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.295",
+          "ended_at": "2026-10-16T12:47:19+08:00",
+          "exit_code": "0",
+          "phase_index": "3",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:47:19+08:00",
+          "state": "success",
+          "unit_id": "assign"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "30.388",
+          "ended_at": "2026-10-16T12:47:50+08:00",
+          "exit_code": "0",
+          "phase_index": "4",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:47:19+08:00",
+          "state": "success",
+          "unit_id": "grt_prepare"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.577",
+          "ended_at": "2026-10-16T12:47:50+08:00",
+          "exit_code": "0",
+          "phase_index": "5",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:47:50+08:00",
+          "state": "success",
+          "unit_id": "grt_step1"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "1.362",
+          "ended_at": "2026-10-16T12:47:52+08:00",
+          "exit_code": "0",
+          "phase_index": "6",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:47:51+08:00",
+          "state": "success",
+          "unit_id": "grt_step2"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "1.120",
+          "ended_at": "2026-10-16T12:47:53+08:00",
+          "exit_code": "0",
+          "phase_index": "7",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:47:52+08:00",
+          "state": "success",
+          "unit_id": "grt_step3"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.779",
+          "ended_at": "2026-10-16T12:47:54+08:00",
+          "exit_code": "0",
+          "phase_index": "8",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:47:53+08:00",
+          "state": "success",
+          "unit_id": "grt_telomere_finalize"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.121",
+          "ended_at": "2026-10-16T12:47:54+08:00",
+          "exit_code": "0",
+          "phase_index": "9",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:47:54+08:00",
+          "state": "success",
+          "unit_id": "chr:chr1"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.171",
+          "ended_at": "2026-10-16T12:47:55+08:00",
+          "exit_code": "0",
+          "phase_index": "10",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:47:54+08:00",
+          "state": "success",
+          "unit_id": "chr:chr2"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.359",
+          "ended_at": "2026-10-16T12:47:55+08:00",
+          "exit_code": "0",
+          "phase_index": "11",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:47:55+08:00",
+          "state": "success",
+          "unit_id": "finalize_evidence"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.944",
+          "ended_at": "2026-10-16T12:47:56+08:00",
+          "exit_code": "0",
+          "phase_index": "12",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:47:55+08:00",
+          "state": "success",
+          "unit_id": "package_full"
+        },
+        {
+          "attempt": "1",
+          "detail_log_relpath": "logs/run_all.log",
+          "elapsed_seconds": "0.900",
+          "ended_at": "2026-10-16T12:47:57+08:00",
+          "exit_code": "0",
+          "phase_index": "13",
+          "phase_total": "13",
+          "started_at": "2026-10-16T12:47:56+08:00",
+          "state": "success",
+          "unit_id": "package_light"
+        }
+      ],
+      "status": "PASS",
+      "workspace": "/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/runs/with_reads-v2"
+    }
+  },
+  "scripts_sha256": {
+    "arm-install-launch.sh": "cc5512ae683031a7f9ea32965aae4ce38cdfd83651fa306f22fd8eb5de7b1cff",
+    "environment.sh": "d8d3286e86d1354c8a11c08bddb0c2991afc6d58f368854f38bb0898c951c1d3",
+    "make_reads.py": "1dd521bc67a1ca6b37d6a4eb564928dca5a2d9f68728bebc772e86268a139d8c",
+    "make_reads_v2.py": "a7d46059f573f2e47f1306b97ee44c0c9952f3f0eee9033e6bb0275dd338f95c",
+    "no_reads.dsub": "892d9d9b3ff56e9b9426d1045aa8fc15562c244feb378331be5db4ed051c7fb6",
+    "startup.sh": "7ff5d0389b86790fecb11a2eaa11f5aa21ceef3bdc031b516f35ba3750bcc36c",
+    "verify_run.py": "10e22a05787cff8acfe90fe82e39aca348b8f0a43ba46935b38640ebb0ecd0a5",
+    "with_reads_v2.dsub": "4533a06df88704f75c471c53a85917b2b5aae65a50f7aec51e3ec75394c37526"
+  },
+  "source_revision": "b12fce9f375eb0422adbeccc9ec10586bccf251b",
+  "status": "PASS",
+  "tools_startup": "agent-ARM-39\naarch64\n/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/python3\n/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/samtools\n/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/minimap2\n/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/nucmer\n/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/delta-filter\n/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/show-coords\n/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/meryl\n/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/merqury.sh\n/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/craq\n/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/pigz\n/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/zip\n/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/bin/gzip\nPython 3.11.14\n2.31-r1302\nsamtools 1.23.1\nUsing htslib 1.23.1\n4.0.1\nmeryl 1.4.2\npigz 2.8\nMERQURY=/share/home/xbzhang26/cgat-reads-debug/arm-install-20261016-b12fce9/mamba/envs/cgat-server/share/merqury\n"
+}

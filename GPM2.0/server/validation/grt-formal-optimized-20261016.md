@@ -1,8 +1,9 @@
 # Formal optimized GRT rollout (2026-10-16)
 
-Status: local focused integration checks and real production refill passed;
-five remote complete-data comparisons running. This is not a released/fully
-accepted runtime yet.
+Status (12:51 CST): production refill passed; three default full-scope cases
+passed metadata-semantic review; three Step2 gap-screen cases have core/Final
+Path equality but audit differences. Four other case runs remain pending.
+Raw comparison failures remain retained. This is not released/full acceptance.
 
 ## Authorized boundary
 
@@ -207,3 +208,58 @@ cache/tool identity; cross-architecture timing must be reported separately.
 Original whole-workflow producers **40550762/40550763** remain RUNNING and
 untouched, past GRT finalize and into per-chromosome leaf alignment. The full
 suite's Final Path acceptance remains pending; official Release assets unchanged.
+
+## 12:51 CST: completed comparisons and trace-reference review
+
+The numerical Step2/3/finalize stages and Final Path export completed successfully
+for six cases. Their scheduler jobs report **FAILED** because the strict raw
+comparison exit was nonzero, NOT because an alignment or stage crashed. Original
+`report.json`/logs and scheduler states remain unchanged.
+
+| Dataset | Default full Step2 | Experimental gap-screen Step2 |
+| --- | --- | --- |
+| 10g no reads | semantic PASS | CORE_PASS_AUDIT_DIFFERENT |
+| 10g with reads | semantic PASS | CORE_PASS_AUDIT_DIFFERENT |
+| test8 fixed | semantic PASS | CORE_PASS_AUDIT_DIFFERENT |
+| zebrafish | finalize running | finalize running |
+| customer2665 | Step2 running, own-cache resume | Step2 running, own-cache resume |
+
+Every completed case passed Q2/Q3/Q4 DNA, ordered source paths, semantic Final
+Path and actual exported sequence checks. A metadata-only sidecar review
+`grt_semantic_review.py` resolves **actual references**, without running old/new
+aligners or modifying an active runtime:
+
+- Component-filter object IDs are generated from run_id. Their complete retained
+  event semantics (including kept/removed intervals) match across runs.
+- Gap-screen changes alignment line indices and derived candidate IDs. Donor
+  reuse references resolve to candidate objects with identical source/target
+  coordinates, orientation, scores and decisions; no reference is simply dropped.
+- Attempt reasons embed event IDs. These resolve to the same semantic event.
+  Finalized event IDs are resolved against final metadata, separately from the
+  stage snapshot IDs, since their run IDs can differ.
+- Missing/cyclic references fail, coordinate changes remain failures. Focused
+  negative controls verify changed coordinates and dangling references fail.
+- All unreviewed original core checks must still pass. Sidecar reports preserve
+  raw result identity/script hashes and do not overwrite original failed reports.
+
+Default full-scope cases have no remaining semantic audit differences after this
+review. Gap-screen retains differences in evidence/usage/attempt/strategy and
+ordered candidate/rejection diagnostics; these have NOT all been proven limited
+to rejected-count changes. Thus Step2 screening remains experimental/default-off.
+
+| Dataset | Full Step2 | Gap Step2 | Stage2 wall change | Full suffix | Gap suffix |
+| --- | ---: | ---: | --- | ---: | ---: |
+| 10g no reads | 1073.758s | 788.853s | 26.5% reduction | 1738.955s | 1333.204s |
+| 10g with reads | 1115.755s | 855.783s | 23.3% reduction | 1802.764s | 1418.656s |
+| test8 fixed | 641.820s | 1165.282s | 81.6% increase | 1752.080s | 2662.857s |
+
+These are observed new-full vs new-gap timings, one pass with eight CPUs on
+different/shared nodes, not a same-node isolated causal measurement. Test8
+shows no measured benefit in this round; do not report a universal speedup.
+No strict old-vs-new full-workflow speed ratio is established by these suffix runs.
+
+Original skip-self **40550762** is at finalize_evidence after all chromosome
+alignments; self-m200/n100 **40550763** remains in chromosome alignment. Customer
+optimized full/gap jobs **40587514/40587519** remain in Step2. They were not
+modified for the ARM installer test. ARM installer/synthetic workflow evidence
+is documented separately in `arm-install-20261016.md`.

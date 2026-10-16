@@ -22,6 +22,1254 @@
     "login": "180 port18081 cli-ARM-01 aarch64"
   },
   "boundary": "Only new optimized complete-data GRT suffix runs; old results read-only. No baseline reruns, numerical-cache borrowing, full leaf/reads-QC reexecution or release-acceptance claim.",
+  "checkpoint_1251": {
+    "boundary": "Raw scheduler FAILED states are retained. Completed numerical stages succeeded; separate semantic review resolves generated IDs through actual referenced objects. No old runtime reruns or active workspace modification. Gap-screen audits still differ.",
+    "cases": {
+      "cases-step2-gap/10g_no_reads": {
+        "new_suffix_seconds": 1333.2043087151833,
+        "raw_failed_checks": [
+          {
+            "category": "audit",
+            "expected_sha256": "25d136dfb04839a4d9c1ee7cfbbd777cd0115c4dde79c082b1e38f2fc1bf574a",
+            "label": "step2 events",
+            "observed_sha256": "9a7c2032efd56cc4319abee87c499e231ecfce4c9d3b024b6b5f7b8fdba16e92"
+          },
+          {
+            "category": "core",
+            "expected_sha256": "7d9f260373a3a8d2ecd9b7f8706914634049dc290bdae51c675527fd22174c68",
+            "label": "step2 accepted events",
+            "observed_sha256": "1dcf65cb22f2bc0a4295035230c274f147df8e07e8a14e883d95717c9eb22992"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "6f2f7da94428e2754a10ae9a34f24929bbfa559b8d89deda2864cf370a1f93f7",
+            "label": "step2 evidence semantics",
+            "observed_sha256": "80e9141459cd9c035bda035d6e8986d8157be2e07cb45b2a50a147781a9409b5"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "21f4905d59b1c001cc17c30982290d40ef47e96b345e4b3d1f4ca82cbc243ea8",
+            "label": "step2 usage semantics",
+            "observed_sha256": "afe754073c10b34e8ae1a00babb69e7b13a85394ca64e0598e5ea3dd231d75f4"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "b89506a938dcf167fdbfffb99d361f4a49572aac558202d85ff9bd84e6c5911e",
+            "label": "step2 attempts",
+            "observed_sha256": "2e24a0d2d7f0b6370ffa62cdf3e6bc9ef7f13123e8496e0e2c9bd341077129ea"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "2b9025d4e9a933cbf2d00d033e0b3ca2740dbff9794ad0c8a31c96ac6e0b3c38",
+            "label": "step2 strategies",
+            "observed_sha256": "ea0bc87f428044e42cb92ab0d584431f4dcbceed5a7164ec8f9038a627141031"
+          },
+          {
+            "category": "core",
+            "expected_sha256": "e713067849840349d8736552f37a5500c4a46768dd2a0d65fcb51ef1091d58b5",
+            "label": "step2 consumed donor usage",
+            "observed_sha256": "167d267e58af540336c461bb14b635a5043fb513778ef0e94518b88e0b507d1e"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "9b3b70285eef37152b6baa785ef2995785b76d414a027c18ea5b1bf2da64ba3f",
+            "label": "step2 ordered candidates.tsv",
+            "observed_sha256": "fccf0d3c5f169012786d2622ea993dcb3e9c39c8fb7a37f6604b5b6ab0ad294d"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "b4a3f186b14bfa27d3f623c60ce4cdf2b730ac3dba20a9fd9f25deca9cfdad5f",
+            "label": "step2 ordered rejections.tsv",
+            "observed_sha256": "a2940de3f13f495bc5472548e3e654a7879363617b36d0e8c6f64703cb2bd6be"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "996a20c04aa592026d7421a97e4609a2c77838366cab083d062eac209dbae0b1",
+            "label": "step3 events",
+            "observed_sha256": "d3706e8e260911a94bf449aac5b9bb62053a33f6221eb9b8dfab7dd95e13e79b"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "0099c938a2fa8411a3cabba020c0a131b2f7c72fbf185c8f802e434723a56fd5",
+            "label": "step3 attempts",
+            "observed_sha256": "733197c381c99b07ec0efb94a038f17bef40060777c0d4176b1b5ab03e43da7b"
+          },
+          {
+            "category": "core",
+            "expected_sha256": "8fa7aa8d763994c51614a214b52661fd91d47199b888297a725621354e958cc8",
+            "label": "finalized accepted repairs",
+            "observed_sha256": "9e08cdb025d1ec3b572dc01c476ccef2b93d1650bdf0f8665fccdc4e1467d831"
+          }
+        ],
+        "raw_status": "FAIL",
+        "semantic_review": {
+          "boundary": "Metadata-only semantic reference resolution. Original reports unchanged; no runtime or baseline rerun. Raw alignment line numbers and generated IDs are trace fields, not scientific coordinates. Not permission to enable Step2 gap-screen.",
+          "case": "/share/home/xbzhang26/cgat-reads-debug/grt-formal-optimized-20261016/cases-step2-gap/10g_no_reads",
+          "checks": [
+            {
+              "category": "audit",
+              "expected_sha256": "eb6df7d6c2883823155d0585c34afdae49c26280e3f709027011468e87b765b1",
+              "label": "step2 events",
+              "observed_sha256": "eb6df7d6c2883823155d0585c34afdae49c26280e3f709027011468e87b765b1",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "469bb5ae0910aeb271b2145c4404a40e4082dc6f92c2fe502d87fde3f2dcc5f2",
+              "label": "step2 accepted events",
+              "observed_sha256": "469bb5ae0910aeb271b2145c4404a40e4082dc6f92c2fe502d87fde3f2dcc5f2",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "6c4be00219a5726a4a6f8d0713804e78886573e98ad7dde1c603405be325bf7f",
+              "label": "step2 consumed donor usage",
+              "observed_sha256": "6c4be00219a5726a4a6f8d0713804e78886573e98ad7dde1c603405be325bf7f",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "b89506a938dcf167fdbfffb99d361f4a49572aac558202d85ff9bd84e6c5911e",
+              "label": "step2 attempts",
+              "observed_sha256": "2e24a0d2d7f0b6370ffa62cdf3e6bc9ef7f13123e8496e0e2c9bd341077129ea",
+              "status": "FAIL"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "e7060bb1301cfaa5fd6daa7b2bcf520e6b1f990f529e660a950938cd8e683fcc",
+              "label": "step3 events",
+              "observed_sha256": "e7060bb1301cfaa5fd6daa7b2bcf520e6b1f990f529e660a950938cd8e683fcc",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "9e44eeacc707271a9e6df2df0fc87515e9feda1fde5e3ee1002cef266e85abeb",
+              "label": "step3 accepted events",
+              "observed_sha256": "9e44eeacc707271a9e6df2df0fc87515e9feda1fde5e3ee1002cef266e85abeb",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "e5cb880736b9f11a85bd05b9a2bb5b1d9efc0dfcb7712e7c88ed5b5198b3d89f",
+              "label": "step3 consumed donor usage",
+              "observed_sha256": "e5cb880736b9f11a85bd05b9a2bb5b1d9efc0dfcb7712e7c88ed5b5198b3d89f",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "8ce235242bfcc036a7655df18ffb3a2cbdea382ec5d3154a221ece1a4e2b73a4",
+              "label": "step3 attempts",
+              "observed_sha256": "8ce235242bfcc036a7655df18ffb3a2cbdea382ec5d3154a221ece1a4e2b73a4",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "b525b56020eaf7f46bb47ce824bd6a89ab0866c7395ed351aed9a970401c461a",
+              "label": "finalized accepted repairs",
+              "observed_sha256": "b525b56020eaf7f46bb47ce824bd6a89ab0866c7395ed351aed9a970401c461a",
+              "status": "PASS"
+            }
+          ],
+          "core_failures": [],
+          "raw_report_sha256": "b58994ed8f0bdd9595f0ac571852d4621eb06b2de6b89e364a440efe98dbd66c",
+          "raw_status": "FAIL",
+          "remaining_audit_differences": [
+            "step2 evidence semantics",
+            "step2 usage semantics",
+            "step2 attempts",
+            "step2 strategies",
+            "step2 ordered candidates.tsv",
+            "step2 ordered rejections.tsv"
+          ],
+          "resolved_candidate_references": [
+            1,
+            1
+          ],
+          "review_script_sha256": "397b818701b355c1cb1b86b3d03b71d90f23612632be11315f6f4a023763d6cf",
+          "status": "CORE_PASS_AUDIT_DIFFERENT",
+          "validator_sha256": "a94f894672883dedf8013daa1520ee8cd7dbd912e3e5c610a599618ea1f0120b"
+        },
+        "stage_timings": [
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/step2.log",
+            "elapsed_seconds": "788.853",
+            "ended_at": "2026-10-16T12:17:45+08:00",
+            "exit_code": "0",
+            "phase_index": "1",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:04:36+08:00",
+            "state": "success",
+            "unit_id": "grt_step2"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/step3.log",
+            "elapsed_seconds": "255.449",
+            "ended_at": "2026-10-16T12:22:13+08:00",
+            "exit_code": "0",
+            "phase_index": "2",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:17:58+08:00",
+            "state": "success",
+            "unit_id": "grt_step3"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/telomere_finalize.log",
+            "elapsed_seconds": "235.946",
+            "ended_at": "2026-10-16T12:26:11+08:00",
+            "exit_code": "0",
+            "phase_index": "3",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:22:15+08:00",
+            "state": "success",
+            "unit_id": "grt_telomere_finalize"
+          }
+        ]
+      },
+      "cases-step2-gap/10g_with_reads": {
+        "new_suffix_seconds": 1418.6558244070038,
+        "raw_failed_checks": [
+          {
+            "category": "audit",
+            "expected_sha256": "849d0eed02f171457dcb11f7f231b96a92e7c3213cfc710467efc5a137aaeec4",
+            "label": "step2 events",
+            "observed_sha256": "09c64671b0d0871c82f08cc542d8f09ad51b5c60e86a4b683e67f273f884fcff"
+          },
+          {
+            "category": "core",
+            "expected_sha256": "43681aaad46671f9c12d321228e754f5a60f0f052d0d7e87d1b5d588cf1855e1",
+            "label": "step2 accepted events",
+            "observed_sha256": "3dda7431e3f31d0fe4bc2538914c88ac94b4938e4dc849e913317fbd93d66683"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "f8daec854c55513a01197ae97026aaebeadca83efbdf0fb6f1d84120b16eeeda",
+            "label": "step2 evidence semantics",
+            "observed_sha256": "cebe3f3acf36cf26858eae650166aea38715d812cac69274c85805a33c0d1407"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "0e2dff6a10bd98d99a6f9ad0b666f9a972e6e565efe7e350c1f89313fc28f870",
+            "label": "step2 usage semantics",
+            "observed_sha256": "092ba33a91149bd554fac5399b5682d79a6b93136bde15f3821d23b76dc51d80"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "01f59b0294c834a867036832055d67b67a9caed34b6cfe1de3776228039d2ac1",
+            "label": "step2 attempts",
+            "observed_sha256": "1c1f2226e5cfe95cb55dcafee2cdd5e94e3e20bd8e6030272fee6b5f2b32bdf7"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "e9f6b48b8886c121e6930c4c739c84d3cfd392f5b3c726de8787290c40c2b04e",
+            "label": "step2 strategies",
+            "observed_sha256": "9f92c77a27228f93305e6be401e50a648102550de36033ee3c25763dd8105e06"
+          },
+          {
+            "category": "core",
+            "expected_sha256": "78630ab306917da4436e72a169288624d7317bca328d68694681ec1988a9eeb8",
+            "label": "step2 consumed donor usage",
+            "observed_sha256": "a79499fcf6feb86453a4d19f6bd8bd370b12279635829db9c42029b8fc65144b"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "27c8a5ee0383fdd59485128bf087d056309fa4335c01def1edd3f80b8fdbd0ed",
+            "label": "step2 ordered candidates.tsv",
+            "observed_sha256": "93e71b49c9abbbda8f9788d6fd0542b71920a423b354030afc50264e7faa6e5b"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "dacb8347a9868d06760e5cbb3d8a0a8743bcb5a499973fc54caca89bbc3bd40d",
+            "label": "step2 ordered rejections.tsv",
+            "observed_sha256": "b9aaed2a9768e9f19ee7f8f23ee45f993a42369a59517fdd2218d68ea7707b97"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "bff7898128088723cf8b63f4a6ff14b02aa664cf49539071160e9d022f7a5290",
+            "label": "step3 events",
+            "observed_sha256": "d11354c84af1b0922c2955157b530549182262a63ff7db1ba6e6d52d16019963"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "cc2f2e7dc26709d5f16997faf5a946cc77fde7bdd19ee26822eddfd6f911ea75",
+            "label": "step3 attempts",
+            "observed_sha256": "ae2de6772fd24ec1e43e9675f627f770c80be5147b27fa048ccecebdcfd9d5cd"
+          },
+          {
+            "category": "core",
+            "expected_sha256": "df6d295e9ff5fab9b5b4c16862351d5501e16c0af200337d25d4b791bfa33f69",
+            "label": "finalized accepted repairs",
+            "observed_sha256": "f09175d551ec183ea4c63b5a32dda69a1910b3b9f180d8c014d0aa1e399b62de"
+          }
+        ],
+        "raw_status": "FAIL",
+        "semantic_review": {
+          "boundary": "Metadata-only semantic reference resolution. Original reports unchanged; no runtime or baseline rerun. Raw alignment line numbers and generated IDs are trace fields, not scientific coordinates. Not permission to enable Step2 gap-screen.",
+          "case": "/share/home/xbzhang26/cgat-reads-debug/grt-formal-optimized-20261016/cases-step2-gap/10g_with_reads",
+          "checks": [
+            {
+              "category": "audit",
+              "expected_sha256": "014ec9daba2b1520468d53a1a51700b75e43f49af4fa5af9ee9fcf6be4db7198",
+              "label": "step2 events",
+              "observed_sha256": "014ec9daba2b1520468d53a1a51700b75e43f49af4fa5af9ee9fcf6be4db7198",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "261933d91a496fd9d8345b482b615acb88c29ffaff8fdd8f1f831cc2a16287a9",
+              "label": "step2 accepted events",
+              "observed_sha256": "261933d91a496fd9d8345b482b615acb88c29ffaff8fdd8f1f831cc2a16287a9",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "570d55227b340c2659b59b46be9fa63a2ece57644f26eeef092690ca3493eaad",
+              "label": "step2 consumed donor usage",
+              "observed_sha256": "570d55227b340c2659b59b46be9fa63a2ece57644f26eeef092690ca3493eaad",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "01f59b0294c834a867036832055d67b67a9caed34b6cfe1de3776228039d2ac1",
+              "label": "step2 attempts",
+              "observed_sha256": "1c1f2226e5cfe95cb55dcafee2cdd5e94e3e20bd8e6030272fee6b5f2b32bdf7",
+              "status": "FAIL"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "bd268db51e780665f24f00471303d5877a865113a4e09c09bce55f9f6d59eacb",
+              "label": "step3 events",
+              "observed_sha256": "bd268db51e780665f24f00471303d5877a865113a4e09c09bce55f9f6d59eacb",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "5baff75eb297806d058fea40db44bf2b063e5d122c7170f466468d85cec51d19",
+              "label": "step3 accepted events",
+              "observed_sha256": "5baff75eb297806d058fea40db44bf2b063e5d122c7170f466468d85cec51d19",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "216bf872fcf1b2fd730b3c3017df8b7661e1c7bbee9d03751d24b39a05cd8781",
+              "label": "step3 consumed donor usage",
+              "observed_sha256": "216bf872fcf1b2fd730b3c3017df8b7661e1c7bbee9d03751d24b39a05cd8781",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "14a83c2c44edf1f031e918f3b6f2986d62c0aabe11cee751647942a6166375b6",
+              "label": "step3 attempts",
+              "observed_sha256": "14a83c2c44edf1f031e918f3b6f2986d62c0aabe11cee751647942a6166375b6",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "67d281f1bd1e2f9f8be262b117bc31d2de9cbf02bb13ac4d24f62b234adec382",
+              "label": "finalized accepted repairs",
+              "observed_sha256": "67d281f1bd1e2f9f8be262b117bc31d2de9cbf02bb13ac4d24f62b234adec382",
+              "status": "PASS"
+            }
+          ],
+          "core_failures": [],
+          "raw_report_sha256": "18e5a9eeb24682a1f454d83e14fa5b26d33108e0805ee5171a788a34b10c55b4",
+          "raw_status": "FAIL",
+          "remaining_audit_differences": [
+            "step2 evidence semantics",
+            "step2 usage semantics",
+            "step2 attempts",
+            "step2 strategies",
+            "step2 ordered candidates.tsv",
+            "step2 ordered rejections.tsv"
+          ],
+          "resolved_candidate_references": [
+            1,
+            1
+          ],
+          "review_script_sha256": "397b818701b355c1cb1b86b3d03b71d90f23612632be11315f6f4a023763d6cf",
+          "status": "CORE_PASS_AUDIT_DIFFERENT",
+          "validator_sha256": "a94f894672883dedf8013daa1520ee8cd7dbd912e3e5c610a599618ea1f0120b"
+        },
+        "stage_timings": [
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/step2.log",
+            "elapsed_seconds": "855.783",
+            "ended_at": "2026-10-16T12:18:54+08:00",
+            "exit_code": "0",
+            "phase_index": "1",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:04:39+08:00",
+            "state": "success",
+            "unit_id": "grt_step2"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/step3.log",
+            "elapsed_seconds": "261.693",
+            "ended_at": "2026-10-16T12:23:30+08:00",
+            "exit_code": "0",
+            "phase_index": "2",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:19:08+08:00",
+            "state": "success",
+            "unit_id": "grt_step3"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/telomere_finalize.log",
+            "elapsed_seconds": "244.899",
+            "ended_at": "2026-10-16T12:27:37+08:00",
+            "exit_code": "0",
+            "phase_index": "3",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:23:32+08:00",
+            "state": "success",
+            "unit_id": "grt_telomere_finalize"
+          }
+        ]
+      },
+      "cases-step2-gap/customer2665": {
+        "new_suffix_seconds": null,
+        "raw_failed_checks": [],
+        "raw_status": "RUNNING",
+        "stage_timings": [
+          {
+            "attempt": "2",
+            "detail_log_relpath": "logs/step2.log",
+            "elapsed_seconds": "",
+            "ended_at": "",
+            "exit_code": "",
+            "phase_index": "1",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:25:44+08:00",
+            "state": "running",
+            "unit_id": "grt_step2"
+          },
+          {
+            "attempt": "0",
+            "detail_log_relpath": "logs/step3.log",
+            "elapsed_seconds": "",
+            "ended_at": "",
+            "exit_code": "",
+            "phase_index": "2",
+            "phase_total": "3",
+            "started_at": "",
+            "state": "pending",
+            "unit_id": "grt_step3"
+          },
+          {
+            "attempt": "0",
+            "detail_log_relpath": "logs/telomere_finalize.log",
+            "elapsed_seconds": "",
+            "ended_at": "",
+            "exit_code": "",
+            "phase_index": "3",
+            "phase_total": "3",
+            "started_at": "",
+            "state": "pending",
+            "unit_id": "grt_telomere_finalize"
+          }
+        ]
+      },
+      "cases-step2-gap/test8_fixed": {
+        "new_suffix_seconds": 2662.856817215681,
+        "raw_failed_checks": [
+          {
+            "category": "audit",
+            "expected_sha256": "3ff4f3496bd1b8e2a4616742176144b861c47c3c42353627339c1d21c6c43a6e",
+            "label": "step2 evidence semantics",
+            "observed_sha256": "adb0b16685b4c852edbd2b3f1f29a5b8d76c246c97ac51b6511a49eb8bb7d21e"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "ed475e85861e736fc758e40ac01653241077eae2c11dbb03128d6ea6a9a3c190",
+            "label": "step2 usage semantics",
+            "observed_sha256": "02c2d9aecc719df16d292189648c5a2e2fb08ea64e52894abd5b9bf092889441"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "ddaec4472570772392f6ed9b219eb82ec55f6337055b13f38b08a17c79f6778e",
+            "label": "step2 attempts",
+            "observed_sha256": "f7ce470442d7b51b8c5cd269ed3e1f22158d86ecfcaed24b636a8bb1975cb176"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "aa3a798e48c5c9fd304cf4a41d36998c4bc37ef980db8f463ab7dbfcaa0a2bca",
+            "label": "step2 strategies",
+            "observed_sha256": "45bdfe164551814d6a18339eb680c43f9d5b9025ed8afed4cb09ca718635578b"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "6322269c96c4448d4d704e7f05b3d8b96d6d63247e5cfe5db1b8ddacc02d6d27",
+            "label": "step2 ordered candidates.tsv",
+            "observed_sha256": "75e1170c4874085691057779a5f06c11db60a185fdd0aef02d53646e139975ca"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "63266968d9e8c79783bb2327f214e38c581643c1170f57a6ccad9deda05d373b",
+            "label": "step2 ordered rejections.tsv",
+            "observed_sha256": "c15ee32bb29b47a59229b0cc3681c16f1090420f700b24d17ea37b1542c791ab"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "f18dd04d1b9cecfd058ed9275536560fc4f28411cb0d7b8b4027c20afd9ff668",
+            "label": "step3 events",
+            "observed_sha256": "42e90f80cc8dd1cb32068ed7cc97993f288ecb4d791982e74f4e83b7b9dff4ca"
+          },
+          {
+            "category": "core",
+            "expected_sha256": "ebb532e9d0cccfe16d2485ed97251dfdf1cf08a3264110cf284e144dc5e658cc",
+            "label": "step3 accepted events",
+            "observed_sha256": "5da1e51023181460c9af1dd1894cc3affaf78794ff7512cd773cfdb4a0c9bce6"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "7b6508ba4ef20b788fbf4d4fda34326afacc7b72ca4917b94f4a22abf4d1a9cf",
+            "label": "step3 attempts",
+            "observed_sha256": "fa42aba3ef14c4183193358971fb1385986c11686be1a9ae4bac393ce4aa9857"
+          },
+          {
+            "category": "core",
+            "expected_sha256": "71c618ec563a5fdd320805f943493fbb724e83ed4492070ad8e94667355b2670",
+            "label": "finalized accepted repairs",
+            "observed_sha256": "e560e3916f27f4c3ed86556bd9071741e86ff7dc00907064522197ea49370acd"
+          }
+        ],
+        "raw_status": "FAIL",
+        "semantic_review": {
+          "boundary": "Metadata-only semantic reference resolution. Original reports unchanged; no runtime or baseline rerun. Raw alignment line numbers and generated IDs are trace fields, not scientific coordinates. Not permission to enable Step2 gap-screen.",
+          "case": "/share/home/xbzhang26/cgat-reads-debug/grt-formal-optimized-20261016/cases-step2-gap/test8_fixed",
+          "checks": [
+            {
+              "category": "audit",
+              "expected_sha256": "b22b7d82d809e80949c6e9be9ec1d388cf972441f9bc254514d84a9054a708f9",
+              "label": "step2 events",
+              "observed_sha256": "b22b7d82d809e80949c6e9be9ec1d388cf972441f9bc254514d84a9054a708f9",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "9bd4c8357eb3d1259d7c783ada29f2e9864877c095f240c2a98b5aaf4eb12b23",
+              "label": "step2 accepted events",
+              "observed_sha256": "9bd4c8357eb3d1259d7c783ada29f2e9864877c095f240c2a98b5aaf4eb12b23",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "0cd5132405b0dc66f732339410c59b10cab0255691da293e002e0a6727d045a9",
+              "label": "step2 consumed donor usage",
+              "observed_sha256": "0cd5132405b0dc66f732339410c59b10cab0255691da293e002e0a6727d045a9",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "ddaec4472570772392f6ed9b219eb82ec55f6337055b13f38b08a17c79f6778e",
+              "label": "step2 attempts",
+              "observed_sha256": "f7ce470442d7b51b8c5cd269ed3e1f22158d86ecfcaed24b636a8bb1975cb176",
+              "status": "FAIL"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "d51d45b3d599c852db5ba4d2b8f8735b898acc74b1d7211c1f9a0dfbf706f4f7",
+              "label": "step3 events",
+              "observed_sha256": "d51d45b3d599c852db5ba4d2b8f8735b898acc74b1d7211c1f9a0dfbf706f4f7",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "56c390858b738b3ea1b6f0611f6b3fca6cd76b7a6e4e429c4dd1112967db3a9b",
+              "label": "step3 accepted events",
+              "observed_sha256": "56c390858b738b3ea1b6f0611f6b3fca6cd76b7a6e4e429c4dd1112967db3a9b",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "966e8f62c61822ed62c8b0a2265da996ea97d578ce0d24625af47ce82f728d45",
+              "label": "step3 consumed donor usage",
+              "observed_sha256": "966e8f62c61822ed62c8b0a2265da996ea97d578ce0d24625af47ce82f728d45",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "b559fe1056ecc378a8e18c24908a13ae8943bca1be123eb229a105e804b777d2",
+              "label": "step3 attempts",
+              "observed_sha256": "b559fe1056ecc378a8e18c24908a13ae8943bca1be123eb229a105e804b777d2",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "1b3bef91c4f961be8a40fbb7806123cde9bc906f71b0c31a7ca04ef9c8660f97",
+              "label": "finalized accepted repairs",
+              "observed_sha256": "1b3bef91c4f961be8a40fbb7806123cde9bc906f71b0c31a7ca04ef9c8660f97",
+              "status": "PASS"
+            }
+          ],
+          "core_failures": [],
+          "raw_report_sha256": "15bec829173cfde967e9a599181072900d1a5bfb296d57a0b7f0ed1fe3a61856",
+          "raw_status": "FAIL",
+          "remaining_audit_differences": [
+            "step2 evidence semantics",
+            "step2 usage semantics",
+            "step2 attempts",
+            "step2 strategies",
+            "step2 ordered candidates.tsv",
+            "step2 ordered rejections.tsv"
+          ],
+          "resolved_candidate_references": [
+            0,
+            0
+          ],
+          "review_script_sha256": "397b818701b355c1cb1b86b3d03b71d90f23612632be11315f6f4a023763d6cf",
+          "status": "CORE_PASS_AUDIT_DIFFERENT",
+          "validator_sha256": "a94f894672883dedf8013daa1520ee8cd7dbd912e3e5c610a599618ea1f0120b"
+        },
+        "stage_timings": [
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/step2.log",
+            "elapsed_seconds": "1165.282",
+            "ended_at": "2026-10-16T12:25:33+08:00",
+            "exit_code": "0",
+            "phase_index": "1",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:06:08+08:00",
+            "state": "success",
+            "unit_id": "grt_step2"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/step3.log",
+            "elapsed_seconds": "759.293",
+            "ended_at": "2026-10-16T12:39:10+08:00",
+            "exit_code": "0",
+            "phase_index": "2",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:26:30+08:00",
+            "state": "success",
+            "unit_id": "grt_step3"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/telomere_finalize.log",
+            "elapsed_seconds": "543.530",
+            "ended_at": "2026-10-16T12:48:18+08:00",
+            "exit_code": "0",
+            "phase_index": "3",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:39:14+08:00",
+            "state": "success",
+            "unit_id": "grt_telomere_finalize"
+          }
+        ]
+      },
+      "cases-step2-gap/zebrafish": {
+        "new_suffix_seconds": null,
+        "raw_failed_checks": [],
+        "raw_status": "RUNNING",
+        "stage_timings": [
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/step2.log",
+            "elapsed_seconds": "506.729",
+            "ended_at": "2026-10-16T12:14:54+08:00",
+            "exit_code": "0",
+            "phase_index": "1",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:06:28+08:00",
+            "state": "success",
+            "unit_id": "grt_step2"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/step3.log",
+            "elapsed_seconds": "722.464",
+            "ended_at": "2026-10-16T12:28:35+08:00",
+            "exit_code": "0",
+            "phase_index": "2",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:16:32+08:00",
+            "state": "success",
+            "unit_id": "grt_step3"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/telomere_finalize.log",
+            "elapsed_seconds": "",
+            "ended_at": "",
+            "exit_code": "",
+            "phase_index": "3",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:28:46+08:00",
+            "state": "running",
+            "unit_id": "grt_telomere_finalize"
+          }
+        ]
+      },
+      "cases/10g_no_reads": {
+        "new_suffix_seconds": 1738.9554030373693,
+        "raw_failed_checks": [
+          {
+            "category": "audit",
+            "expected_sha256": "996a20c04aa592026d7421a97e4609a2c77838366cab083d062eac209dbae0b1",
+            "label": "step3 events",
+            "observed_sha256": "d3706e8e260911a94bf449aac5b9bb62053a33f6221eb9b8dfab7dd95e13e79b"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "0099c938a2fa8411a3cabba020c0a131b2f7c72fbf185c8f802e434723a56fd5",
+            "label": "step3 attempts",
+            "observed_sha256": "733197c381c99b07ec0efb94a038f17bef40060777c0d4176b1b5ab03e43da7b"
+          }
+        ],
+        "raw_status": "FAIL",
+        "semantic_review": {
+          "boundary": "Metadata-only semantic reference resolution. Original reports unchanged; no runtime or baseline rerun. Raw alignment line numbers and generated IDs are trace fields, not scientific coordinates. Not permission to enable Step2 gap-screen.",
+          "case": "/share/home/xbzhang26/cgat-reads-debug/grt-formal-optimized-20261016/cases/10g_no_reads",
+          "checks": [
+            {
+              "category": "audit",
+              "expected_sha256": "eb6df7d6c2883823155d0585c34afdae49c26280e3f709027011468e87b765b1",
+              "label": "step2 events",
+              "observed_sha256": "eb6df7d6c2883823155d0585c34afdae49c26280e3f709027011468e87b765b1",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "469bb5ae0910aeb271b2145c4404a40e4082dc6f92c2fe502d87fde3f2dcc5f2",
+              "label": "step2 accepted events",
+              "observed_sha256": "469bb5ae0910aeb271b2145c4404a40e4082dc6f92c2fe502d87fde3f2dcc5f2",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "6c4be00219a5726a4a6f8d0713804e78886573e98ad7dde1c603405be325bf7f",
+              "label": "step2 consumed donor usage",
+              "observed_sha256": "6c4be00219a5726a4a6f8d0713804e78886573e98ad7dde1c603405be325bf7f",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "b89506a938dcf167fdbfffb99d361f4a49572aac558202d85ff9bd84e6c5911e",
+              "label": "step2 attempts",
+              "observed_sha256": "b89506a938dcf167fdbfffb99d361f4a49572aac558202d85ff9bd84e6c5911e",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "e7060bb1301cfaa5fd6daa7b2bcf520e6b1f990f529e660a950938cd8e683fcc",
+              "label": "step3 events",
+              "observed_sha256": "e7060bb1301cfaa5fd6daa7b2bcf520e6b1f990f529e660a950938cd8e683fcc",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "9e44eeacc707271a9e6df2df0fc87515e9feda1fde5e3ee1002cef266e85abeb",
+              "label": "step3 accepted events",
+              "observed_sha256": "9e44eeacc707271a9e6df2df0fc87515e9feda1fde5e3ee1002cef266e85abeb",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "e5cb880736b9f11a85bd05b9a2bb5b1d9efc0dfcb7712e7c88ed5b5198b3d89f",
+              "label": "step3 consumed donor usage",
+              "observed_sha256": "e5cb880736b9f11a85bd05b9a2bb5b1d9efc0dfcb7712e7c88ed5b5198b3d89f",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "8ce235242bfcc036a7655df18ffb3a2cbdea382ec5d3154a221ece1a4e2b73a4",
+              "label": "step3 attempts",
+              "observed_sha256": "8ce235242bfcc036a7655df18ffb3a2cbdea382ec5d3154a221ece1a4e2b73a4",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "b525b56020eaf7f46bb47ce824bd6a89ab0866c7395ed351aed9a970401c461a",
+              "label": "finalized accepted repairs",
+              "observed_sha256": "b525b56020eaf7f46bb47ce824bd6a89ab0866c7395ed351aed9a970401c461a",
+              "status": "PASS"
+            }
+          ],
+          "core_failures": [],
+          "raw_report_sha256": "3192abc9204c8c1243029cc976d955bafcf5983d6943df9fd09acc8a65b8138a",
+          "raw_status": "FAIL",
+          "remaining_audit_differences": [],
+          "resolved_candidate_references": [
+            1,
+            1
+          ],
+          "review_script_sha256": "397b818701b355c1cb1b86b3d03b71d90f23612632be11315f6f4a023763d6cf",
+          "status": "PASS",
+          "validator_sha256": "a94f894672883dedf8013daa1520ee8cd7dbd912e3e5c610a599618ea1f0120b"
+        },
+        "stage_timings": [
+          {
+            "attempt": "2",
+            "detail_log_relpath": "logs/step2.log",
+            "elapsed_seconds": "1073.758",
+            "ended_at": "2026-10-16T12:22:31+08:00",
+            "exit_code": "0",
+            "phase_index": "1",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:04:37+08:00",
+            "state": "success",
+            "unit_id": "grt_step2"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/step3.log",
+            "elapsed_seconds": "315.051",
+            "ended_at": "2026-10-16T12:28:00+08:00",
+            "exit_code": "0",
+            "phase_index": "2",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:22:45+08:00",
+            "state": "success",
+            "unit_id": "grt_step3"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/telomere_finalize.log",
+            "elapsed_seconds": "291.893",
+            "ended_at": "2026-10-16T12:32:54+08:00",
+            "exit_code": "0",
+            "phase_index": "3",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:28:02+08:00",
+            "state": "success",
+            "unit_id": "grt_telomere_finalize"
+          }
+        ]
+      },
+      "cases/10g_with_reads": {
+        "new_suffix_seconds": 1802.7642966583371,
+        "raw_failed_checks": [
+          {
+            "category": "audit",
+            "expected_sha256": "bff7898128088723cf8b63f4a6ff14b02aa664cf49539071160e9d022f7a5290",
+            "label": "step3 events",
+            "observed_sha256": "d11354c84af1b0922c2955157b530549182262a63ff7db1ba6e6d52d16019963"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "cc2f2e7dc26709d5f16997faf5a946cc77fde7bdd19ee26822eddfd6f911ea75",
+            "label": "step3 attempts",
+            "observed_sha256": "ae2de6772fd24ec1e43e9675f627f770c80be5147b27fa048ccecebdcfd9d5cd"
+          }
+        ],
+        "raw_status": "FAIL",
+        "semantic_review": {
+          "boundary": "Metadata-only semantic reference resolution. Original reports unchanged; no runtime or baseline rerun. Raw alignment line numbers and generated IDs are trace fields, not scientific coordinates. Not permission to enable Step2 gap-screen.",
+          "case": "/share/home/xbzhang26/cgat-reads-debug/grt-formal-optimized-20261016/cases/10g_with_reads",
+          "checks": [
+            {
+              "category": "audit",
+              "expected_sha256": "014ec9daba2b1520468d53a1a51700b75e43f49af4fa5af9ee9fcf6be4db7198",
+              "label": "step2 events",
+              "observed_sha256": "014ec9daba2b1520468d53a1a51700b75e43f49af4fa5af9ee9fcf6be4db7198",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "261933d91a496fd9d8345b482b615acb88c29ffaff8fdd8f1f831cc2a16287a9",
+              "label": "step2 accepted events",
+              "observed_sha256": "261933d91a496fd9d8345b482b615acb88c29ffaff8fdd8f1f831cc2a16287a9",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "570d55227b340c2659b59b46be9fa63a2ece57644f26eeef092690ca3493eaad",
+              "label": "step2 consumed donor usage",
+              "observed_sha256": "570d55227b340c2659b59b46be9fa63a2ece57644f26eeef092690ca3493eaad",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "01f59b0294c834a867036832055d67b67a9caed34b6cfe1de3776228039d2ac1",
+              "label": "step2 attempts",
+              "observed_sha256": "01f59b0294c834a867036832055d67b67a9caed34b6cfe1de3776228039d2ac1",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "bd268db51e780665f24f00471303d5877a865113a4e09c09bce55f9f6d59eacb",
+              "label": "step3 events",
+              "observed_sha256": "bd268db51e780665f24f00471303d5877a865113a4e09c09bce55f9f6d59eacb",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "5baff75eb297806d058fea40db44bf2b063e5d122c7170f466468d85cec51d19",
+              "label": "step3 accepted events",
+              "observed_sha256": "5baff75eb297806d058fea40db44bf2b063e5d122c7170f466468d85cec51d19",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "216bf872fcf1b2fd730b3c3017df8b7661e1c7bbee9d03751d24b39a05cd8781",
+              "label": "step3 consumed donor usage",
+              "observed_sha256": "216bf872fcf1b2fd730b3c3017df8b7661e1c7bbee9d03751d24b39a05cd8781",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "14a83c2c44edf1f031e918f3b6f2986d62c0aabe11cee751647942a6166375b6",
+              "label": "step3 attempts",
+              "observed_sha256": "14a83c2c44edf1f031e918f3b6f2986d62c0aabe11cee751647942a6166375b6",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "67d281f1bd1e2f9f8be262b117bc31d2de9cbf02bb13ac4d24f62b234adec382",
+              "label": "finalized accepted repairs",
+              "observed_sha256": "67d281f1bd1e2f9f8be262b117bc31d2de9cbf02bb13ac4d24f62b234adec382",
+              "status": "PASS"
+            }
+          ],
+          "core_failures": [],
+          "raw_report_sha256": "ccfe112be592839f79e62940a9f955083727fbe4553ed8648f5db38939bc0a54",
+          "raw_status": "FAIL",
+          "remaining_audit_differences": [],
+          "resolved_candidate_references": [
+            1,
+            1
+          ],
+          "review_script_sha256": "397b818701b355c1cb1b86b3d03b71d90f23612632be11315f6f4a023763d6cf",
+          "status": "PASS",
+          "validator_sha256": "a94f894672883dedf8013daa1520ee8cd7dbd912e3e5c610a599618ea1f0120b"
+        },
+        "stage_timings": [
+          {
+            "attempt": "2",
+            "detail_log_relpath": "logs/step2.log",
+            "elapsed_seconds": "1115.755",
+            "ended_at": "2026-10-16T12:24:14+08:00",
+            "exit_code": "0",
+            "phase_index": "1",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:05:39+08:00",
+            "state": "success",
+            "unit_id": "grt_step2"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/step3.log",
+            "elapsed_seconds": "309.699",
+            "ended_at": "2026-10-16T12:29:38+08:00",
+            "exit_code": "0",
+            "phase_index": "2",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:24:29+08:00",
+            "state": "success",
+            "unit_id": "grt_step3"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/telomere_finalize.log",
+            "elapsed_seconds": "258.478",
+            "ended_at": "2026-10-16T12:34:00+08:00",
+            "exit_code": "0",
+            "phase_index": "3",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:29:41+08:00",
+            "state": "success",
+            "unit_id": "grt_telomere_finalize"
+          }
+        ]
+      },
+      "cases/customer2665": {
+        "new_suffix_seconds": null,
+        "raw_failed_checks": [],
+        "raw_status": "RUNNING",
+        "stage_timings": [
+          {
+            "attempt": "3",
+            "detail_log_relpath": "logs/step2.log",
+            "elapsed_seconds": "",
+            "ended_at": "",
+            "exit_code": "",
+            "phase_index": "1",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:18:04+08:00",
+            "state": "running",
+            "unit_id": "grt_step2"
+          },
+          {
+            "attempt": "0",
+            "detail_log_relpath": "logs/step3.log",
+            "elapsed_seconds": "",
+            "ended_at": "",
+            "exit_code": "",
+            "phase_index": "2",
+            "phase_total": "3",
+            "started_at": "",
+            "state": "pending",
+            "unit_id": "grt_step3"
+          },
+          {
+            "attempt": "0",
+            "detail_log_relpath": "logs/telomere_finalize.log",
+            "elapsed_seconds": "",
+            "ended_at": "",
+            "exit_code": "",
+            "phase_index": "3",
+            "phase_total": "3",
+            "started_at": "",
+            "state": "pending",
+            "unit_id": "grt_telomere_finalize"
+          }
+        ]
+      },
+      "cases/test8_fixed": {
+        "new_suffix_seconds": 1752.0797259258106,
+        "raw_failed_checks": [
+          {
+            "category": "audit",
+            "expected_sha256": "f18dd04d1b9cecfd058ed9275536560fc4f28411cb0d7b8b4027c20afd9ff668",
+            "label": "step3 events",
+            "observed_sha256": "42e90f80cc8dd1cb32068ed7cc97993f288ecb4d791982e74f4e83b7b9dff4ca"
+          },
+          {
+            "category": "core",
+            "expected_sha256": "ebb532e9d0cccfe16d2485ed97251dfdf1cf08a3264110cf284e144dc5e658cc",
+            "label": "step3 accepted events",
+            "observed_sha256": "5da1e51023181460c9af1dd1894cc3affaf78794ff7512cd773cfdb4a0c9bce6"
+          },
+          {
+            "category": "audit",
+            "expected_sha256": "7b6508ba4ef20b788fbf4d4fda34326afacc7b72ca4917b94f4a22abf4d1a9cf",
+            "label": "step3 attempts",
+            "observed_sha256": "fa42aba3ef14c4183193358971fb1385986c11686be1a9ae4bac393ce4aa9857"
+          },
+          {
+            "category": "core",
+            "expected_sha256": "71c618ec563a5fdd320805f943493fbb724e83ed4492070ad8e94667355b2670",
+            "label": "finalized accepted repairs",
+            "observed_sha256": "e560e3916f27f4c3ed86556bd9071741e86ff7dc00907064522197ea49370acd"
+          }
+        ],
+        "raw_status": "FAIL",
+        "semantic_review": {
+          "boundary": "Metadata-only semantic reference resolution. Original reports unchanged; no runtime or baseline rerun. Raw alignment line numbers and generated IDs are trace fields, not scientific coordinates. Not permission to enable Step2 gap-screen.",
+          "case": "/share/home/xbzhang26/cgat-reads-debug/grt-formal-optimized-20261016/cases/test8_fixed",
+          "checks": [
+            {
+              "category": "audit",
+              "expected_sha256": "b22b7d82d809e80949c6e9be9ec1d388cf972441f9bc254514d84a9054a708f9",
+              "label": "step2 events",
+              "observed_sha256": "b22b7d82d809e80949c6e9be9ec1d388cf972441f9bc254514d84a9054a708f9",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "9bd4c8357eb3d1259d7c783ada29f2e9864877c095f240c2a98b5aaf4eb12b23",
+              "label": "step2 accepted events",
+              "observed_sha256": "9bd4c8357eb3d1259d7c783ada29f2e9864877c095f240c2a98b5aaf4eb12b23",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "0cd5132405b0dc66f732339410c59b10cab0255691da293e002e0a6727d045a9",
+              "label": "step2 consumed donor usage",
+              "observed_sha256": "0cd5132405b0dc66f732339410c59b10cab0255691da293e002e0a6727d045a9",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "ddaec4472570772392f6ed9b219eb82ec55f6337055b13f38b08a17c79f6778e",
+              "label": "step2 attempts",
+              "observed_sha256": "ddaec4472570772392f6ed9b219eb82ec55f6337055b13f38b08a17c79f6778e",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "d51d45b3d599c852db5ba4d2b8f8735b898acc74b1d7211c1f9a0dfbf706f4f7",
+              "label": "step3 events",
+              "observed_sha256": "d51d45b3d599c852db5ba4d2b8f8735b898acc74b1d7211c1f9a0dfbf706f4f7",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "56c390858b738b3ea1b6f0611f6b3fca6cd76b7a6e4e429c4dd1112967db3a9b",
+              "label": "step3 accepted events",
+              "observed_sha256": "56c390858b738b3ea1b6f0611f6b3fca6cd76b7a6e4e429c4dd1112967db3a9b",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "966e8f62c61822ed62c8b0a2265da996ea97d578ce0d24625af47ce82f728d45",
+              "label": "step3 consumed donor usage",
+              "observed_sha256": "966e8f62c61822ed62c8b0a2265da996ea97d578ce0d24625af47ce82f728d45",
+              "status": "PASS"
+            },
+            {
+              "category": "audit",
+              "expected_sha256": "b559fe1056ecc378a8e18c24908a13ae8943bca1be123eb229a105e804b777d2",
+              "label": "step3 attempts",
+              "observed_sha256": "b559fe1056ecc378a8e18c24908a13ae8943bca1be123eb229a105e804b777d2",
+              "status": "PASS"
+            },
+            {
+              "category": "core",
+              "expected_sha256": "1b3bef91c4f961be8a40fbb7806123cde9bc906f71b0c31a7ca04ef9c8660f97",
+              "label": "finalized accepted repairs",
+              "observed_sha256": "1b3bef91c4f961be8a40fbb7806123cde9bc906f71b0c31a7ca04ef9c8660f97",
+              "status": "PASS"
+            }
+          ],
+          "core_failures": [],
+          "raw_report_sha256": "b1661f6524da096b86f9a60b64cd32b060972823ee9a2f1da1786af6e805f55a",
+          "raw_status": "FAIL",
+          "remaining_audit_differences": [],
+          "resolved_candidate_references": [
+            0,
+            0
+          ],
+          "review_script_sha256": "397b818701b355c1cb1b86b3d03b71d90f23612632be11315f6f4a023763d6cf",
+          "status": "PASS",
+          "validator_sha256": "a94f894672883dedf8013daa1520ee8cd7dbd912e3e5c610a599618ea1f0120b"
+        },
+        "stage_timings": [
+          {
+            "attempt": "2",
+            "detail_log_relpath": "logs/step2.log",
+            "elapsed_seconds": "641.820",
+            "ended_at": "2026-10-16T12:15:14+08:00",
+            "exit_code": "0",
+            "phase_index": "1",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:04:32+08:00",
+            "state": "success",
+            "unit_id": "grt_step2"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/step3.log",
+            "elapsed_seconds": "577.636",
+            "ended_at": "2026-10-16T12:25:07+08:00",
+            "exit_code": "0",
+            "phase_index": "2",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:15:30+08:00",
+            "state": "success",
+            "unit_id": "grt_step3"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/telomere_finalize.log",
+            "elapsed_seconds": "475.367",
+            "ended_at": "2026-10-16T12:33:06+08:00",
+            "exit_code": "0",
+            "phase_index": "3",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:25:11+08:00",
+            "state": "success",
+            "unit_id": "grt_telomere_finalize"
+          }
+        ]
+      },
+      "cases/zebrafish": {
+        "new_suffix_seconds": null,
+        "raw_failed_checks": [],
+        "raw_status": "RUNNING",
+        "stage_timings": [
+          {
+            "attempt": "2",
+            "detail_log_relpath": "logs/step2.log",
+            "elapsed_seconds": "518.102",
+            "ended_at": "2026-10-16T12:15:04+08:00",
+            "exit_code": "0",
+            "phase_index": "1",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:06:26+08:00",
+            "state": "success",
+            "unit_id": "grt_step2"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/step3.log",
+            "elapsed_seconds": "706.957",
+            "ended_at": "2026-10-16T12:28:19+08:00",
+            "exit_code": "0",
+            "phase_index": "2",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:16:32+08:00",
+            "state": "success",
+            "unit_id": "grt_step3"
+          },
+          {
+            "attempt": "1",
+            "detail_log_relpath": "logs/telomere_finalize.log",
+            "elapsed_seconds": "",
+            "ended_at": "",
+            "exit_code": "",
+            "phase_index": "3",
+            "phase_total": "3",
+            "started_at": "2026-10-16T12:28:33+08:00",
+            "state": "running",
+            "unit_id": "grt_telomere_finalize"
+          }
+        ]
+      }
+    },
+    "checked_at": "2026-10-16T12:51:09.937996+08:00",
+    "completed_pair_timings": {
+      "10g_no_reads": {
+        "boundary": "Single new full vs new experimental gap run, 8 CPUs, empty numerical caches, different/shared nodes. Observed wall times, not same-node causally isolated speedup or old-vs-new whole-pipeline ratio.",
+        "full_stage2_seconds": 1073.758,
+        "full_suffix_seconds": 1738.9554030373693,
+        "gap_stage2_seconds": 788.853,
+        "gap_suffix_seconds": 1333.2043087151833,
+        "stage2_wall_reduction_fraction": 0.2653344608375444,
+        "suffix_wall_reduction_fraction": 0.2333303623620684
+      },
+      "10g_with_reads": {
+        "boundary": "Single new full vs new experimental gap run, 8 CPUs, empty numerical caches, different/shared nodes. Observed wall times, not same-node causally isolated speedup or old-vs-new whole-pipeline ratio.",
+        "full_stage2_seconds": 1115.755,
+        "full_suffix_seconds": 1802.7642966583371,
+        "gap_stage2_seconds": 855.783,
+        "gap_suffix_seconds": 1418.6558244070038,
+        "stage2_wall_reduction_fraction": 0.23300097243570506,
+        "suffix_wall_reduction_fraction": 0.21306638530801247
+      },
+      "test8_fixed": {
+        "boundary": "Single new full vs new experimental gap run, 8 CPUs, empty numerical caches, different/shared nodes. Observed wall times, not same-node causally isolated speedup or old-vs-new whole-pipeline ratio.",
+        "full_stage2_seconds": 641.82,
+        "full_suffix_seconds": 1752.0797259258106,
+        "gap_stage2_seconds": 1165.282,
+        "gap_suffix_seconds": 2662.856817215681,
+        "stage2_wall_reduction_fraction": -0.8155900408214138,
+        "suffix_wall_reduction_fraction": -0.5198262829099343
+      }
+    },
+    "customer_jobs": [
+      {
+        "job_id": 40587514,
+        "query_exit": 0,
+        "scheduler_output": "ID           NAME         STATE      USER         ACCOUNT      QUEUE        START_TIME           END_TIME             EXEC_NODES           \n40587514     grt_custome* RUNNING    xbzhang26    default      x86          2026/10/16 12:15:00  -                    agent-X86-38"
+      },
+      {
+        "job_id": 40587519,
+        "query_exit": 0,
+        "scheduler_output": "ID           NAME         STATE      USER         ACCOUNT      QUEUE        START_TIME           END_TIME             EXEC_NODES           \n40587519     grt_custome* RUNNING    xbzhang26    default      x86          2026/10/16 12:22:50  -                    agent-X86-33"
+      }
+    ],
+    "original_full_jobs": [
+      {
+        "job_id": 40550762,
+        "query_exit": 0,
+        "scheduler_output": "ID           NAME         STATE      USER         ACCOUNT      QUEUE        START_TIME           END_TIME             EXEC_NODES           \n40550762     gpm2665_ful* RUNNING    xbzhang26    default      x86          2026/10/15 21:30:51  -                    agent-X86-54"
+      },
+      {
+        "job_id": 40550763,
+        "query_exit": 0,
+        "scheduler_output": "ID           NAME         STATE      USER         ACCOUNT      QUEUE        START_TIME           END_TIME             EXEC_NODES           \n40550763     gpm2665_ful* RUNNING    xbzhang26    default      x86          2026/10/15 21:30:53  -                    agent-X86-45"
+      }
+    ]
+  },
   "corrected_jobs": {
     "jobs": {
       "full_retry:10g_no_reads": 40587500,
@@ -275,5 +1523,5 @@
   "production_refill_job": 40587487,
   "source_archive_sha256": "74c8860a4ac20d48e4932576cfbcbf20e5794d270a211f99a012914fde715579",
   "source_revision": "7ba84ea",
-  "status": "SMALL_CASES_RUNNING_CUSTOMER16_RESUMED"
+  "status": "THREE_DEFAULT_FULL_CASES_SEMANTIC_PASS_THREE_GAP_CORE_PASS_AUDIT_DIFFERENT_FOUR_CASES_RUNNING"
 }
