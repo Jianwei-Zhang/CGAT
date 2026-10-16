@@ -1,5 +1,7 @@
 use super::test_support::*;
-use crate::grt_package::delivery_validator::validate_app_final_path_manifest_hash;
+use crate::grt_package::delivery_validator::{
+    validate_app_final_path_manifest_hash, validate_app_source_fasta_paths,
+};
 use crate::grt_package::parsing::read_fasta_with_cancel;
 
 #[test]
@@ -519,4 +521,36 @@ fn fasta_validation_observes_cancellation_while_streaming() {
     })
     .unwrap_err();
     assert!(error.to_string().contains("import cancelled"));
+}
+
+#[test]
+fn app_source_fasta_import_check_is_lightweight_but_requires_safe_existing_files() {
+    let temp = tempdir().unwrap();
+    let relative = "data/partitions/chr/Chr01/dataset.fa";
+    let path = temp.path().join(relative);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, [0xff, 0x00, 0x7f]).unwrap();
+    let table = TsvTable {
+        rows: vec![BTreeMap::from([
+            ("dataset_name".to_string(), "dataset".to_string()),
+            ("seq_name".to_string(), "contig".to_string()),
+            ("fasta_relpath".to_string(), relative.to_string()),
+        ])],
+    };
+    validate_app_source_fasta_paths(temp.path(), &table, &mut || false).unwrap();
+
+    fs::remove_file(&path).unwrap();
+    let missing = validate_app_source_fasta_paths(temp.path(), &table, &mut || false).unwrap_err();
+    assert!(missing.to_string().contains("does not exist"));
+
+    let unsafe_table = TsvTable {
+        rows: vec![BTreeMap::from([
+            ("dataset_name".to_string(), "dataset".to_string()),
+            ("seq_name".to_string(), "contig".to_string()),
+            ("fasta_relpath".to_string(), "../outside.fa".to_string()),
+        ])],
+    };
+    let unsafe_error =
+        validate_app_source_fasta_paths(temp.path(), &unsafe_table, &mut || false).unwrap_err();
+    assert!(unsafe_error.to_string().contains("safe relative path"));
 }

@@ -389,20 +389,16 @@ where
             field(row, "target_chr")?.to_string(),
         ));
     }
-    let source_sequences = if fasta_available {
+    if fasta_available {
         check_grt_validation_cancel(should_cancel)?;
-        on_progress(
-            "validate_grt_app_fastas",
-            "validating App source FASTA payloads",
-        );
-        Some(source_catalog_with_cancel(
+        on_progress("validate_grt_app_fastas", "checking App source FASTA paths");
+        validate_app_source_fasta_paths(
             bundle_root,
             table(&tables, "metadata/source_seq_locator.tsv")?,
             should_cancel,
-        )?)
-    } else {
-        None
-    };
+        )?;
+    }
+
     check_grt_validation_cancel(should_cancel)?;
     on_progress(
         "validate_grt_final_path",
@@ -418,7 +414,9 @@ where
             sources: &sources,
             manifest: manifest_object,
             fasta_available,
-            source_sequences: source_sequences.as_ref(),
+            // Official App packages are already closed over q4 and Final Path hashes.
+            // Source FASTA content is validated lazily when a source record is used.
+            source_sequences: None,
             expected_schema_version: final_path_schema_version,
             display_source_cards: &display_source_cards,
         },
@@ -466,6 +464,25 @@ where
         q0_artifact_sha256: String::new(),
         q4_artifact_sha256: q4_artifact_sha256.to_string(),
     })
+}
+
+pub(super) fn validate_app_source_fasta_paths<C>(
+    bundle_root: &Path,
+    source_locators: &TsvTable,
+    should_cancel: &mut C,
+) -> Result<()>
+where
+    C: FnMut() -> bool,
+{
+    let mut checked_paths = HashSet::new();
+    for row in &source_locators.rows {
+        check_grt_validation_cancel(should_cancel)?;
+        let relpath = field(row, "fasta_relpath")?;
+        if checked_paths.insert(relpath.to_string()) {
+            required_bundle_file(bundle_root, relpath, "App source FASTA")?;
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn validate_app_final_path_manifest_hash(

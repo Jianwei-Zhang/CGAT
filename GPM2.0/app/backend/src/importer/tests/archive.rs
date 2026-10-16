@@ -31,6 +31,12 @@ fn imports_tar_gz_and_tgz_with_the_same_catalog_as_zip() {
                 .filter(|step| step.stage == "extract_entry")
                 .all(|step| step.progress_total.is_none())
         );
+        #[cfg(any(target_os = "windows", target_os = "macos"))]
+        assert!(
+            streaming_steps
+                .iter()
+                .any(|step| step.stage == "extract_native_archive")
+        );
         assert!(outcome.project_db_path.exists());
         assert_eq!(count_rows(&outcome.project_db_path, "dataset"), 1);
         assert_eq!(count_rows(&outcome.project_db_path, "source_seq"), 1);

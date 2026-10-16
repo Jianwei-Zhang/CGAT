@@ -137,6 +137,9 @@ pub(super) fn extract_delivery_to_root(
     should_cancel: &mut impl FnMut() -> bool,
 ) -> Result<()> {
     if is_tar_gz(zip_path) {
+        if extract_tar_gz_with_system_tar(zip_path, extract_root, on_progress, should_cancel)? {
+            return Ok(());
+        }
         return extract_tar_gz_to_root(zip_path, extract_root, on_progress, should_cancel);
     }
     let file = File::open(zip_path)
@@ -193,6 +196,177 @@ pub(super) fn extract_delivery_to_root(
     }
 
     Ok(())
+}
+
+const NATIVE_TAR_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(50);
+const NATIVE_TAR_STDERR_LIMIT: usize = 64 * 1024;
+
+fn native_tar_executable() -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        let root = std::env::var_os("SystemRoot")?;
+        let path = PathBuf::from(root).join("System32").join("tar.exe");
+        return path.is_file().then_some(path);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let path = PathBuf::from("/usr/bin/tar");
+        return path.is_file().then_some(path);
+    }
+    #[allow(unreachable_code)]
+    None
+}
+
+fn configure_native_tar_command(command: &mut std::process::Command) {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+}
+
+fn collect_native_tar_stderr(mut stderr: impl io::Read) -> Vec<u8> {
+    let mut kept = Vec::new();
+    let mut buffer = [0_u8; 4096];
+    loop {
+        let Ok(read) = stderr.read(&mut buffer) else {
+            break;
+        };
+        if read == 0 {
+            break;
+        }
+        let remaining = NATIVE_TAR_STDERR_LIMIT.saturating_sub(kept.len());
+        kept.extend_from_slice(&buffer[..read.min(remaining)]);
+    }
+    kept
+}
+
+fn validate_native_extracted_tree(root: &Path) -> Result<()> {
+    let canonical_root = root
+        .canonicalize()
+        .with_context(|| format!("failed to resolve extracted root {}", root.display()))?;
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(&directory).with_context(|| {
+            format!(
+                "failed to inspect extracted directory {}",
+                directory.display()
+            )
+        })? {
+            let entry = entry?;
+            let path = entry.path();
+            let relative = path.strip_prefix(root).unwrap_or(&path);
+            if relative.components().any(|component| match component {
+                Component::Normal(name) => {
+                    let name = name.to_string_lossy();
+                    name.contains('\\') || name.contains(':')
+                }
+                Component::CurDir => false,
+                _ => true,
+            }) {
+                bail!("system tar produced an unsafe path: {}", relative.display());
+            }
+            let metadata = fs::symlink_metadata(&path)?;
+            let file_type = metadata.file_type();
+            if file_type.is_symlink() || (!file_type.is_file() && !file_type.is_dir()) {
+                bail!(
+                    "system tar produced an unsupported entry type: {}",
+                    relative.display()
+                );
+            }
+            let canonical = path
+                .canonicalize()
+                .with_context(|| format!("failed to resolve extracted path {}", path.display()))?;
+            if !canonical.starts_with(&canonical_root) {
+                bail!(
+                    "system tar extracted outside the workspace: {}",
+                    path.display()
+                );
+            }
+            if file_type.is_dir() {
+                pending.push(path);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn extract_tar_gz_with_system_tar(
+    path: &Path,
+    extract_root: &Path,
+    on_progress: &mut impl FnMut(ImportProgress),
+    should_cancel: &mut impl FnMut() -> bool,
+) -> Result<bool> {
+    let Some(executable) = native_tar_executable() else {
+        return Ok(false);
+    };
+    check_import_cancel(should_cancel)?;
+    on_progress(step(
+        "extract_native_archive",
+        format!("extractor={}", executable.display()),
+    ));
+    let mut command = std::process::Command::new(&executable);
+    command
+        .arg("-x")
+        .arg("-k")
+        .arg("-m")
+        .arg("-f")
+        .arg(path)
+        .arg("-C")
+        .arg(extract_root)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped());
+    configure_native_tar_command(&mut command);
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => {
+            return Err(error).with_context(|| {
+                format!(
+                    "failed to start system tar extractor {}",
+                    executable.display()
+                )
+            });
+        }
+    };
+    let stderr = child.stderr.take();
+    let stderr_handle =
+        std::thread::spawn(move || stderr.map(collect_native_tar_stderr).unwrap_or_default());
+    let status = loop {
+        if should_cancel() {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = stderr_handle.join();
+            bail!("import cancelled");
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => std::thread::sleep(NATIVE_TAR_POLL_INTERVAL),
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = stderr_handle.join();
+                return Err(error).context("failed to poll system tar extractor");
+            }
+        }
+    };
+    let stderr = stderr_handle.join().unwrap_or_default();
+    if !status.success() {
+        let detail = String::from_utf8_lossy(&stderr).trim().to_string();
+        bail!(
+            "system tar extraction failed with status {}{}",
+            status,
+            if detail.is_empty() {
+                String::new()
+            } else {
+                format!(": {detail}")
+            }
+        );
+    }
+    check_import_cancel(should_cancel)?;
+    validate_native_extracted_tree(extract_root)?;
+    Ok(true)
 }
 
 fn extract_tar_gz_to_root(

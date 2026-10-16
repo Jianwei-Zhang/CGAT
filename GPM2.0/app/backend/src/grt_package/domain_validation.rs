@@ -1025,23 +1025,9 @@ pub(super) fn source_catalog(
     bundle_root: &Path,
     table: &TsvTable,
 ) -> Result<HashMap<(String, String), String>> {
-    source_catalog_with_cancel(bundle_root, table, &mut || false)
-}
-
-pub(super) fn source_catalog_with_cancel<C>(
-    bundle_root: &Path,
-    table: &TsvTable,
-    should_cancel: &mut C,
-) -> Result<HashMap<(String, String), String>>
-where
-    C: FnMut() -> bool,
-{
     let mut cache = HashMap::<String, BTreeMap<String, String>>::new();
     let mut sources = HashMap::new();
     for row in &table.rows {
-        if should_cancel() {
-            bail!("import cancelled");
-        }
         let dataset = nonempty(row, "dataset_name", "source locator dataset")?.to_string();
         let contig = nonempty(row, "seq_name", "source locator sequence")?.to_string();
         let relpath = field(row, "fasta_relpath")?.to_string();
@@ -1051,10 +1037,7 @@ where
                 &relpath,
                 &format!("source locator {dataset}:{contig}"),
             )?;
-            cache.insert(
-                relpath.clone(),
-                read_fasta_with_cancel(&path, &relpath, false, should_cancel)?,
-            );
+            cache.insert(relpath.clone(), read_fasta(&path, &relpath, false)?);
         }
         let sequence = cache[&relpath].get(&contig).cloned().ok_or_else(|| {
             grt_anyhow(
