@@ -495,6 +495,7 @@
 .project-recent-name { display: flex; min-width: 0; align-items: center; gap: 8px; }
 .project-recent-name > .project-icon { width: 16px; height: 16px; color: #808080; }
 .project-recent-name strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.project-recent-row.has-validation-error .project-recent-name strong { color: #b91c1c; }
 
 .project-row-actions { display: flex; align-items: center; gap: 2px; pointer-events: none; }
 .projects-page .project-row-actions .project-icon-button { position: relative; z-index: 1; pointer-events: auto; background: transparent; }

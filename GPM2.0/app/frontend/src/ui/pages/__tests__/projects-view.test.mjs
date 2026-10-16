@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { renderProjectsBody } from "../projects-view.js";
+import { renderProjectsBody, syncProjectValidation } from "../projects-view.js";
 import { getMessages } from "../../i18n/index.js";
 
 function render({ session = {}, importer = {}, records = [], summaryHtml = "" } = {}) {
@@ -109,4 +109,55 @@ test("project import dialog owns the numeric import worker control and marks the
   assert.doesNotMatch(html, />Auto \(recommended\)</);
   assert.match(html, /Parallel import workers/);
   assert.match(html, /Shared by archive extraction and PAF parsing/);
+});
+
+test("only failed project names are marked, including the active project", () => {
+  const records = [
+    { path: "/failed", projectName: "Failed project" },
+    { path: "/passed", projectName: "Passed project" },
+    { path: "/unchecked", projectName: "Unchecked project" },
+  ];
+  const importer = {
+    historyValidation: { "/failed": { ok: false }, "/passed": { ok: true } },
+    historyValidatedPaths: ["/failed", "/passed"],
+  };
+  const rendered = render({ session: { workspacePath: "/failed" }, records, importer });
+  assert.match(rendered, /class="project-recent-row is-active has-validation-error" data-workspace-history-row-path="\/failed"/);
+  assert.equal((rendered.match(/has-validation-error/g) || []).length, 1);
+  importer.historyValidation["/failed"] = { ok: true };
+  assert.doesNotMatch(render({ records, importer }), /has-validation-error/);
+});
+
+test("validation sync updates existing rows and clears recovered or removed failure state", () => {
+  const records = [{ path: "/failed" }, { path: "/passed" }, { path: "/unchecked" }];
+  const rows = records.map(record => {
+    const classes = new Set(["project-recent-row", "is-active"]);
+    return {
+      dataset: { workspaceHistoryRowPath: record.path },
+      classList: {
+        toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); },
+        contains(name) { return classes.has(name); },
+      },
+    };
+  });
+  const host = {
+    querySelector: () => null,
+    querySelectorAll(selector) {
+      assert.equal(selector, "[data-workspace-history-row-path]");
+      return rows;
+    },
+  };
+  const state = { locale: "en", importer: {
+    historyValidation: { "/failed": { ok: false }, "/passed": { ok: true } },
+  } };
+  syncProjectValidation(host, state, records);
+  assert.deepEqual(rows.map(row => row.classList.contains("has-validation-error")), [true, false, false]);
+  assert.ok(rows.every(row => row.classList.contains("is-active")));
+  state.importer.historyValidation["/failed"] = { ok: true };
+  state.importer.historyValidation["/passed"] = { ok: false };
+  syncProjectValidation(host, state, records);
+  assert.deepEqual(rows.map(row => row.classList.contains("has-validation-error")), [false, true, false]);
+  state.importer.historyValidation = {};
+  syncProjectValidation(host, state, records);
+  assert.ok(rows.every(row => !row.classList.contains("has-validation-error")));
 });

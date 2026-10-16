@@ -60,6 +60,10 @@ function projectValidationView(state, records) {
 
 export function syncProjectValidation(host, state, records) {
   const view = projectValidationView(state, records);
+  host.querySelectorAll("[data-workspace-history-row-path]").forEach(row => {
+    row.classList.toggle("has-validation-error",
+      state.importer.historyValidation?.[row.dataset.workspaceHistoryRowPath]?.ok === false);
+  });
   const validate = host.querySelector("#validate-history-button");
   if (validate) {
     validate.disabled = view.disabled;
@@ -134,7 +138,8 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
   const rows = records.map((record, index) => {
     const active = state.session?.workspacePath === record.path;
     const name = (active && state.session?.projectName) || record.projectName || defaultProjectName(record.path);
-    return `<div class="project-recent-row ${active ? "is-active" : ""}" data-workspace-history-row-path="${html(record.path)}">
+    const failed = importer.historyValidation?.[record.path]?.ok === false;
+    return `<div class="project-recent-row ${active ? "is-active" : ""}${failed ? " has-validation-error" : ""}" data-workspace-history-row-path="${html(record.path)}">
       <button class="project-recent-open" data-recent-index="${index}" data-recent-path="${html(record.path)}" aria-current="${active ? "true" : "false"}" title="${html(record.path)}" ${disabled}>
         <span class="project-recent-name">${projectIcon("folder")}<strong>${html(name)}</strong></span>
       </button>
