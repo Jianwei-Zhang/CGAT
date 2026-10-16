@@ -404,12 +404,12 @@ fn native_tar_executable() -> Option<PathBuf> {
     None
 }
 
-fn configure_native_tar_command(command: &mut std::process::Command) {
+fn configure_native_tar_command(_command: &mut std::process::Command) {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
+        _command.creation_flags(CREATE_NO_WINDOW);
     }
 }
 
