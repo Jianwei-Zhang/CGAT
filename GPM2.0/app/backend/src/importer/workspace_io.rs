@@ -143,7 +143,7 @@ pub(super) fn extract_delivery_to_root(
         }
         return extract_tar_gz_to_root(zip_path, extract_root, on_progress, should_cancel);
     }
-    return extract_zip_to_root(zip_path, extract_root, workers, on_progress, should_cancel);
+    extract_zip_to_root(zip_path, extract_root, workers, on_progress, should_cancel)
 }
 const ZIP_EXTRACT_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(50);
 const ZIP_EXTRACT_PROGRESS_QUEUE: usize = 64;
@@ -550,6 +550,38 @@ fn spawn_native_tar_readers(
     (stdout_handle, stderr_handle)
 }
 
+/// Drain progress while polling cancellation and exit on every iteration.
+/// Keep draining after process exit so bounded reader queues cannot block joins.
+fn wait_for_native_tar_entries(
+    entries: &std::sync::mpsc::Receiver<String>,
+    on_progress: &mut impl FnMut(ImportProgress),
+    should_cancel: &mut impl FnMut() -> bool,
+    mut poll_exit: impl FnMut() -> io::Result<bool>,
+) -> Result<()> {
+    let mut exited = false;
+    loop {
+        let disconnected = match entries.recv_timeout(NATIVE_TAR_POLL_INTERVAL) {
+            Ok(label) => {
+                on_progress(step("extract_entry", label));
+                false
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => false,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => true,
+        };
+        check_import_cancel(should_cancel)?;
+        if !exited {
+            exited = poll_exit().context("failed to poll system tar extractor")?;
+        }
+        if exited && disconnected {
+            return Ok(());
+        }
+        if disconnected {
+            // A process may close both pipes before it actually exits.
+            std::thread::sleep(NATIVE_TAR_POLL_INTERVAL);
+        }
+    }
+}
+
 fn extract_tar_gz_with_system_tar(
     path: &Path,
     extract_root: &Path,
@@ -595,41 +627,22 @@ fn extract_tar_gz_with_system_tar(
         std::sync::mpsc::sync_channel::<String>(NATIVE_TAR_ENTRY_QUEUE);
     let (entry_reader, stderr_handle) =
         spawn_native_tar_readers(child.stdout.take(), child.stderr.take(), entry_sender);
-    let status = loop {
-        // Entry lines arrive continuously while tar runs; a quiet interval only
-        // means "nothing finished yet", never that the extraction is over.
-        match entry_receiver.recv_timeout(NATIVE_TAR_POLL_INTERVAL) {
-            Ok(label) => {
-                on_progress(step("extract_entry", label));
-                continue;
-            }
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
-            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {}
-        }
-        if should_cancel() {
-            let _ = child.kill();
-            let _ = child.wait();
-            let _ = entry_reader.join();
-            let _ = stderr_handle.join();
-            bail!("import cancelled");
-        }
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) => {}
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                let _ = entry_reader.join();
-                let _ = stderr_handle.join();
-                return Err(error).context("failed to poll system tar extractor");
-            }
-        }
-    };
-    let _ = entry_reader.join();
-    while let Ok(label) = entry_receiver.try_recv() {
-        on_progress(step("extract_entry", label));
+    let mut status = None;
+    let result = wait_for_native_tar_entries(&entry_receiver, on_progress, should_cancel, || {
+        status = child.try_wait()?;
+        Ok(status.is_some())
+    });
+    // On cancellation/error, unblock any reader waiting on a full progress
+    // queue before joining it. On success the queue has already been drained.
+    drop(entry_receiver);
+    if result.is_err() {
+        let _ = child.kill();
+        let _ = child.wait();
     }
+    let _ = entry_reader.join();
     let stderr = stderr_handle.join().unwrap_or_default();
+    result?;
+    let status = status.context("system tar exited without an exit status")?;
     if !status.success() {
         let detail = String::from_utf8_lossy(&stderr).trim().to_string();
         bail!(
@@ -1047,6 +1060,48 @@ mod tests {
         .unwrap();
 
         assert_fixture_tree(&root, &entries);
+    }
+
+    #[test]
+    fn native_tar_continuous_progress_does_not_starve_cancellation() {
+        let (sender, receiver) = std::sync::mpsc::sync_channel(NATIVE_TAR_ENTRY_QUEUE);
+        // Prefill the bounded queue: every initial receive is immediately ready.
+        for index in 0..NATIVE_TAR_ENTRY_QUEUE {
+            sender.send(format!("file-{index}")).unwrap();
+        }
+        let emitted = std::cell::Cell::new(0);
+        let polls = std::cell::Cell::new(0);
+        let error = wait_for_native_tar_entries(
+            &receiver,
+            &mut |_| emitted.set(emitted.get() + 1),
+            &mut || emitted.get() >= 3,
+            || {
+                polls.set(polls.get() + 1);
+                Ok(false)
+            },
+        )
+        .expect_err("cancel must be checked even when progress is always ready");
+        assert!(error.to_string().contains("cancelled"));
+        assert_eq!(emitted.get(), 3);
+        assert_eq!(polls.get(), 2);
+    }
+
+    #[test]
+    fn native_tar_exit_drains_more_than_one_queue_before_joining_readers() {
+        let (sender, receiver) = std::sync::mpsc::sync_channel(NATIVE_TAR_ENTRY_QUEUE);
+        let count = NATIVE_TAR_ENTRY_QUEUE * 4;
+        let reader = std::thread::spawn(move || {
+            for index in 0..count {
+                if sender.send(format!("file-{index}")).is_err() {
+                    break;
+                }
+            }
+        });
+        let mut emitted = 0;
+        wait_for_native_tar_entries(&receiver, &mut |_| emitted += 1, &mut || false, || Ok(true))
+            .expect("already exited process must still drain all buffered entries");
+        reader.join().unwrap();
+        assert_eq!(emitted, count);
     }
 
     #[test]
