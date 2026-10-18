@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+import csv
 import hashlib
 from pathlib import Path
 
@@ -11,6 +12,11 @@ try:
 except ModuleNotFoundError:  # Imported as server.tools.server_report_collect.
     from .delivery_archive import delivery_path, delivery_staging_path
     from .server_report_io import SCHEMA, digest, fasta_stats, local_path, read_events, read_json, read_tsv, write_json
+
+try:
+    from render_server_report import REPORT_PREVIEW_ROWS
+except ModuleNotFoundError:
+    from .render_server_report import REPORT_PREVIEW_ROWS
 
 GRT_STAGES = {
     "step1_round1": "grt/evidence/step1/round1",
@@ -35,9 +41,19 @@ def sequence_stats(root: Path, path: Path) -> dict | None:
     return value
 
 
-def table(root: Path, relative: str) -> dict:
+def table(root: Path, relative: str, *, row_limit: int | None = None) -> dict:
     path = local_path(root, relative)
-    return {"source": relative, "available": path.is_file(), "rows": read_tsv(path)}
+    if row_limit is None:
+        return {"source": relative, "available": path.is_file(), "rows": read_tsv(path)}
+    rows, count = [], 0
+    if path.is_file():
+        with path.open(encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle, delimiter="\t"):
+                count += 1
+                if len(rows) < row_limit:
+                    rows.append(row)
+    return {"source": relative, "available": path.is_file(), "rows": rows,
+            "row_count": count, "preview_only": count > len(rows)}
 
 
 def options(root: Path) -> dict:
@@ -147,7 +163,7 @@ def collect_grt_result(root: Path, result: dict) -> dict:
     tables = {}
     if evidence_dir:
         for path in sorted((root / evidence_dir).glob("*.tsv")):
-            tables[path.stem] = table(root, path.relative_to(root).as_posix())
+            tables[path.stem] = table(root, path.relative_to(root).as_posix(), row_limit=REPORT_PREVIEW_ROWS)
     versions = {key: sequence_stats(root, root / f"grt/q/{key}.fa")
                 for key in (result["q_input_version"], result["q_output_version"])}
     notes = ["这里保留本阶段发布时的事件；最终保留情况见最终结果。"]
@@ -352,7 +368,7 @@ def collect_unit(root: Path, unit_id: str, input_data: dict) -> dict:
     if unit_id == "finalize_evidence":
         return {"summary": read_json(root / "metadata/grt_contract_summary.json", {}),
                 "tables": {"used_contigs": table(root, "metadata/grt_used_contigs.tsv"),
-                           "evidence": table(root, "metadata/grt_evidence_registry.tsv"),
+                           "evidence": table(root, "metadata/grt_evidence_registry.tsv", row_limit=REPORT_PREVIEW_ROWS),
                            "tools": table(root, "metadata/grt_tool_versions.tsv")}}
     if unit_id in {"package_full", "package_light"}:
         kind = "full" if unit_id == "package_full" else "light"

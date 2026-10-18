@@ -75,11 +75,12 @@ const DROP_PAIRWISE_HIT_INDEXES_SQL: &str = "
     DROP INDEX IF EXISTS idx_pairwise_hit_target_query;
 ";
 
+// Both cache directions constrain run_id AND both sequence ids (equality/IN).
+// Swapping filter names does not need a second permutation of the same keys.
+// mapq is selected, but is not a lookup predicate; keep align_length's range key.
 const CREATE_PAIRWISE_HIT_INDEXES_SQL: &str = "
     CREATE INDEX IF NOT EXISTS idx_pairwise_hit_query_target
-        ON pairwise_alignment_hit(run_id, query_source_seq_id, target_source_seq_id, align_length, mapq);
-    CREATE INDEX IF NOT EXISTS idx_pairwise_hit_target_query
-        ON pairwise_alignment_hit(run_id, target_source_seq_id, query_source_seq_id, align_length, mapq);
+        ON pairwise_alignment_hit(run_id, query_source_seq_id, target_source_seq_id, align_length);
 ";
 
 #[derive(Debug)]
@@ -240,7 +241,7 @@ where
     recorder.record(
         "index_pairwise_paf_start",
         format!(
-            "files={file_total}, total_bytes={total_bytes}, parser_workers={parser_workers}, sqlite_writers=1, deferred_indexes=2"
+            "files={file_total}, total_bytes={total_bytes}, parser_workers={parser_workers}, sqlite_writers=1, deferred_indexes=1"
         ),
     );
 
@@ -1170,11 +1171,14 @@ mod bulk_load_performance_tests {
     #[ignore = "opt-in synthetic or read-only workspace SQLite index performance probe"]
     fn benchmark_pairwise_query_indexes() {
         let temp = tempfile::tempdir().unwrap();
-        // Extra sort helpers showed no consistent benefit on the measured
-        // delivery. Keep this comparison opt-in; production retains SQLite's
-        // default worker policy instead of assuming more threads are faster.
-        for sort_workers in [0, 2] {
-            let path = temp.path().join(format!("indexes-{sort_workers}.sqlite"));
+        let legacy_sql = "CREATE INDEX idx_pairwise_hit_query_target ON pairwise_alignment_hit(run_id, query_source_seq_id, target_source_seq_id, align_length, mapq);
+            CREATE INDEX idx_pairwise_hit_target_query ON pairwise_alignment_hit(run_id, target_source_seq_id, query_source_seq_id, align_length, mapq);";
+        let mut baseline_results = None;
+        for (strategy, index_sql, expected_indexes) in [
+            ("legacy", legacy_sql, 2),
+            ("compact", CREATE_PAIRWISE_HIT_INDEXES_SQL, 1),
+        ] {
+            let path = temp.path().join(format!("indexes-{strategy}.sqlite"));
             let conn = rusqlite::Connection::open(path).unwrap();
             if let Some(source) = std::env::var_os("GPM_IMPORT_BENCH_DB") {
                 // URI mode=ro is enforced by SQLite for the user's attached
@@ -1219,19 +1223,19 @@ mod bulk_load_performance_tests {
             }
             let schema = "main";
             conn.execute_batch("PRAGMA cache_size = -262144;").unwrap();
-            conn.pragma_update(None, "threads", sort_workers).unwrap();
+            conn.pragma_update(None, "threads", 0).unwrap();
             let row_count_sql = format!("SELECT COUNT(*) FROM {schema}.pairwise_alignment_hit");
             let rows: i64 = conn
                 .query_row(&row_count_sql, [], |row| row.get(0))
                 .unwrap();
-            let sql = CREATE_PAIRWISE_HIT_INDEXES_SQL.replace(
+            let sql = index_sql.replace(
                 "CREATE INDEX IF NOT EXISTS idx_",
                 &format!("CREATE INDEX IF NOT EXISTS {schema}.idx_"),
             );
             let started = std::time::Instant::now();
             conn.execute_batch(&sql).unwrap();
             println!(
-                "pairwise_indexes rows={rows} sort_workers={sort_workers} elapsed_ms={}",
+                "pairwise_indexes rows={rows} strategy={strategy} elapsed_ms={}",
                 started.elapsed().as_millis()
             );
             let index_count: i64 = conn
@@ -1241,11 +1245,50 @@ mod bulk_load_performance_tests {
                     |row| row.get(0),
                 )
                 .unwrap();
-            assert_eq!(index_count, 2);
+            assert_eq!(index_count, expected_indexes);
             let after_rows: i64 = conn
                 .query_row(&row_count_sql, [], |row| row.get(0))
                 .unwrap();
             assert_eq!(after_rows, rows);
+            let sample: Vec<(i64, i64, i64)> = conn.prepare("SELECT run_id, query_source_seq_id, target_source_seq_id FROM pairwise_alignment_hit NOT INDEXED LIMIT 16").unwrap()
+                .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))).unwrap()
+                .collect::<rusqlite::Result<_>>().unwrap();
+            let mut results = Vec::new();
+            for (run, query, target) in sample {
+                for swapped in [false, true] {
+                    let (query, target) = if swapped {
+                        (target, query)
+                    } else {
+                        (query, target)
+                    };
+                    let sql = "SELECT COUNT(*), COALESCE(SUM(align_length),0), COALESCE(SUM(mapq),0) FROM pairwise_alignment_hit WHERE run_id=?1 AND query_source_seq_id IN (?2,?2+1,?2+2) AND target_source_seq_id IN (?3,?3+1) AND align_length>=100";
+                    let plan = format!("EXPLAIN QUERY PLAN {sql}");
+                    let steps: Vec<String> = conn
+                        .prepare(&plan)
+                        .unwrap()
+                        .query_map(params![run, query, target], |row| row.get(3))
+                        .unwrap()
+                        .collect::<rusqlite::Result<_>>()
+                        .unwrap();
+                    assert!(
+                        steps.iter().any(|step| step.contains("INDEX")
+                            && step.contains("query_source_seq_id=?")
+                            && step.contains("target_source_seq_id=?")),
+                        "{steps:?}"
+                    );
+                    let counts: (i64, i64, i64) = conn
+                        .query_row(sql, params![run, query, target], |row| {
+                            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+                        })
+                        .unwrap();
+                    results.push(counts);
+                }
+            }
+            if let Some(baseline) = &baseline_results {
+                assert_eq!(&results, baseline);
+            } else {
+                baseline_results = Some(results);
+            }
             let result: String = conn
                 .query_row(&format!("PRAGMA {schema}.integrity_check"), [], |row| {
                     row.get(0)

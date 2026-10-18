@@ -10,6 +10,50 @@ import tempfile
 from pathlib import Path
 
 SCHEMA = "cgat_server_report_v1"
+# The report is a portable overview, not another copy of the evidence registry.
+# Exact counts and original provenance stay visible; full audit files stay on
+# the Server. This projection also bounds legacy report snapshots at render time.
+REPORT_PREVIEW_ROWS = 200
+
+
+def project_report_facts(facts: dict) -> dict:
+    projected = dict(facts)
+    projected_tables = {}
+    for name, value in facts.get("tables", {}).items():
+        rows = value.get("rows", [])
+        count = value.get("row_count", len(rows))
+        projected_tables[name] = {**value, "rows": rows[:REPORT_PREVIEW_ROWS],
+                                  "row_count": count,
+                                  "preview_only": count > min(len(rows), REPORT_PREVIEW_ROWS)}
+    if "tables" in facts:
+        projected["tables"] = projected_tables
+    if isinstance(facts.get("result"), dict):
+        result = dict(facts["result"])
+        counts = dict(result.get("report_array_counts", {}))
+        audit_arrays = {"events", "strategies", "classification_rows", "terminal_rows",
+                        "evidence_rows", "usage_rows", "q_rows", "attempts"}
+        for key, value in list(result.items()):
+            if key in audit_arrays and isinstance(value, list):
+                counts.setdefault(key, len(value))
+                # final_summary reconciles every published event against q4.
+                # Keep the complete event snapshot; HTML still previews it.
+                if key != "events":
+                    result[key] = value[:REPORT_PREVIEW_ROWS]
+        for key, name in (("evidence_rows", "evidence"), ("usage_rows", "usage"), ("q_rows", "q_segments")):
+            table = projected_tables.get(name)
+            if key in result and table and table.get("available"):
+                result[key] = {"report_table": name, "row_count": table["row_count"],
+                               "source": table.get("source")}
+        if counts:
+            result["report_array_counts"] = counts
+        projected["result"] = result
+    return projected
+
+
+def project_report_record(record: dict) -> dict:
+    return {**record, "facts": project_report_facts(record.get("facts", {}))}
+
+
 LABELS = {
     "success": "完成", "failed": "失败", "interrupted": "中断", "pending": "未执行",
     "running": "运行中", "prepared": "输入已准备，等待运行", "preparing": "准备中",
@@ -397,14 +441,14 @@ JS = r"""
 const data=JSON.parse(document.getElementById('report-data').textContent);
 const labels=data.labels, enums=new Set(['status','action','reason','outcome','role','process_status','process_reason','final_status','final_reason','reads_qc','self_alignment']), fmt=(v,key)=>v===null||v===undefined||v===''?'未记录 / 未测量':typeof v==='object'?JSON.stringify(v,null,2):(enums.has(key)?labels[String(v)]||String(v):String(v));
 const save=(value,name)=>{const a=document.createElement('a');const u=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json;charset=utf-8'}));a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
-document.getElementById('download').onclick=()=>save(data.payload,'server-report.json');
+document.getElementById('download').onclick=()=>save({...data.payload,tables:data.tables},'server-report.json');
 for(const box of document.querySelectorAll('[data-table]')){
  let ready=false;
  box.addEventListener('toggle',()=>{if(!box.open||ready)return;ready=true;
  const rows=data.tables[Number(box.dataset.table)], cols=[...new Set(rows.flatMap(r=>Object.keys(r)))];
  const toolbar=document.createElement('div');toolbar.className='toolbar';
- const search=document.createElement('input');search.type='search';search.placeholder='搜索此表的所有记录';search.setAttribute('aria-label',box.querySelector('summary').textContent+' 搜索');
- const prev=document.createElement('button'),next=document.createElement('button'),count=document.createElement('span'),download=document.createElement('button');prev.textContent='上一页';next.textContent='下一页';download.textContent='下载完整 JSON';toolbar.append(search,prev,count,next,download);box.append(toolbar);
+ const search=document.createElement('input');search.type='search';search.placeholder='搜索本报告已嵌入的记录';search.setAttribute('aria-label',box.querySelector('summary').textContent+' 搜索');
+ const prev=document.createElement('button'),next=document.createElement('button'),count=document.createElement('span'),download=document.createElement('button');prev.textContent='上一页';next.textContent='下一页';download.textContent='下载表格展示数据 JSON';toolbar.append(search,prev,count,next,download);box.append(toolbar);
  const scroll=document.createElement('div');scroll.className='scroll';const table=document.createElement('table');const head=document.createElement('thead'),tr=document.createElement('tr');for(const key of cols){const th=document.createElement('th');th.textContent=labels[key]||key;tr.append(th)}head.append(tr);const body=document.createElement('tbody');table.append(head,body);scroll.append(table);box.append(scroll);
  let page=0,filtered=rows;const size=50;
  const draw=()=>{body.replaceChildren();for(const row of filtered.slice(page*size,(page+1)*size)){const tr=document.createElement('tr');for(const key of cols){const td=document.createElement('td'),value=row[key];if(value&&typeof value==='object'){const d=document.createElement('details'),s=document.createElement('summary'),p=document.createElement('pre');s.textContent='查看详情';p.textContent=fmt(value,key);d.append(s,p);td.append(d)}else{td.textContent=fmt(value,key)}tr.append(td)}body.append(tr)}count.textContent=`${filtered.length? page*size+1:0}–${Math.min((page+1)*size,filtered.length)} / ${filtered.length}`;prev.disabled=page===0;next.disabled=(page+1)*size>=filtered.length};
@@ -422,8 +466,8 @@ def render(root: Path) -> Path:
     input_record = load(root, "inputs.json")
     if input_record.get("run_id") != manifest["run_id"] or input_record.get("schema_version") != SCHEMA:
         raise ValueError("mixed invocation or schema in report input record")
-    records = [load(root, relative) for relative in manifest["steps"]]
-    grt = [load(root, p.relative_to(root).as_posix()) for p in sorted((root / "steps").glob("grt-*.json"))]
+    records = [project_report_record(load(root, relative)) for relative in manifest["steps"]]
+    grt = [project_report_record(load(root, p.relative_to(root).as_posix())) for p in sorted((root / "steps").glob("grt-*.json"))]
     stage_order = ["step1_round1", "step1_filter", "step1_round2", "step2", "step3", "step4_telomere"]
     grt.sort(key=lambda row: stage_order.index(row["stage_id"]) if row["stage_id"] in stage_order else len(stage_order))
     for record in [*records, *grt]:
@@ -433,13 +477,36 @@ def render(root: Path) -> Path:
     if final and (final.get("run_id") != manifest["run_id"] or final.get("schema_version") != SCHEMA):
         raise ValueError("mixed invocation or schema in final report summary")
     tables = []
+    table_sources = []  # Keep source identities alive until payload references are built.
+    table_ids = {}
 
-    def data_table(name, rows, available=True):
+    def data_table(name, rows, available=True, metadata=None):
         if not available:
             return f'<p class="note">{esc(label(name))}：未记录 / 未测量</p>'
-        index = len(tables)
-        tables.append(rows)
-        return f'<details class="block" data-table="{index}"><summary>{esc(label(name))}<span class="badge">{len(rows):,} 条</span></summary></details>'
+        count = (metadata or {}).get("row_count", len(rows))
+        if id(rows) not in table_ids:
+            table_ids[id(rows)] = len(tables)
+            tables.append(rows if len(rows) <= REPORT_PREVIEW_ROWS else rows[:REPORT_PREVIEW_ROWS])
+            table_sources.append(rows)
+        index = table_ids[id(rows)]
+        preview = len(tables[index])
+        detail = ""
+        if count > preview:
+            source = (metadata or {}).get("source")
+            origin = f'；完整明细来源：{esc(source)}' if source else ''
+            detail = f'<p class="note">本报告仅预览前 {preview:,} / 共 {count:,} 条{origin}。完整审计文件保留在服务器工作目录中。</p>'
+        return f'<details class="block" data-table="{index}"><summary>{esc(label(name))}<span class="badge">{count:,} 条</span></summary>{detail}</details>'
+
+    def export_payload(value, path=()):
+        if isinstance(value, list):
+            # Input provenance keeps its established JSON shape. Only audit
+            # snapshots/final-detail lists use the separate table store.
+            if path and path[0] in {"steps", "grt_steps", "final_summary"} and id(value) in table_ids:
+                return {"table_index": table_ids[id(value)]}
+            return [export_payload(item, (*path, str(index))) for index, item in enumerate(value)]
+        if isinstance(value, dict):
+            return {key: export_payload(item, (*path, key)) for key, item in value.items()}
+        return value
 
     def stats_table(name, versions):
         rows = [{"sequence": version, **{key: value.get(key) for key in
@@ -468,11 +535,11 @@ def render(root: Path) -> Path:
         if facts.get("sequence_versions"):
             body += stats_table("阶段前后对比", facts["sequence_versions"])
         for name, value in facts.get("tables", {}).items():
-            body += data_table(name, value["rows"], value["available"])
+            body += data_table(name, value["rows"], value["available"], value)
         result = facts.get("result", {})
         for name in ("events", "strategies", "classification_rows", "terminal_rows"):
             if name in result:
-                body += data_table("处理事件" if name == "events" else name, result[name])
+                body += data_table("处理事件" if name == "events" else name, result[name], metadata={"row_count": result.get("report_array_counts", {}).get(name, len(result[name]))})
         if facts.get("outputs"):
             body += data_table("输出文件与校验值", facts["outputs"])
         if record.get("output_tail"):
@@ -552,9 +619,10 @@ def render(root: Path) -> Path:
     outputs = [output for record in records if record["stage_id"].startswith("package_")
                for output in record.get("facts", {}).get("outputs", [])]
     body += data_table("交付包 App 数据载荷", outputs)
-    body += '<p class="note">为避免报告对所在 ZIP 产生自引用，表中校验值只覆盖嵌入报告前的 App 数据载荷。最终 ZIP 的 SHA-256 会在流程结束时写入终端和 run_all.log。报告随两个交付包提供，也可在服务端工作目录中直接打开；完整报告目录可用 Python 标准库重新生成。</p><button id="download" type="button">下载本报告完整 JSON</button></section><p class="footer">CGAT · 独立离线报告 · 坐标沿用各源记录定义；q/source 区间为 1-based inclusive，PAF 区间为 0-based half-open。</p></main>'
-    payload = {"manifest": manifest, "inputs": input_record, "steps": records, "grt_steps": grt, "final_summary": final}
-    embedded = json.dumps({"labels": LABELS, "tables": tables, "payload": payload}, ensure_ascii=False, allow_nan=False).replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+    body += '<p class="note">为避免报告对所在 ZIP 产生自引用，表中校验值只覆盖嵌入报告前的 App 数据载荷。最终 ZIP 的 SHA-256 会在流程结束时写入终端和 run_all.log。报告随两个交付包提供，也可在服务端工作目录中直接打开；完整报告目录可用 Python 标准库重新生成。报告只内嵌有限行预览和准确总行数，全量审计明细保留在服务器原始文件中，不在 HTML 或 App 报告中反复复制。</p><button id="download" type="button">下载报告展示数据 JSON</button></section><p class="footer">CGAT · 独立离线报告 · 坐标沿用各源记录定义；q/source 区间为 1-based inclusive，PAF 区间为 0-based half-open。</p></main>'
+    payload = export_payload({"report_data_kind": "summary_with_table_previews_v1", "preview_row_limit": REPORT_PREVIEW_ROWS,
+                              "manifest": manifest, "inputs": input_record, "steps": records, "grt_steps": grt, "final_summary": final})
+    embedded = json.dumps({"labels": LABELS, "tables": tables, "payload": payload}, ensure_ascii=False, allow_nan=False, separators=(",", ":")).replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
     document = '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data:; connect-src \'none\'; base-uri \'none\'"><title>CGAT Server 报告</title><style>' + CSS + '</style></head><body>' + body + '<noscript>汇总可直接阅读。搜索、分页和 JSON 下载需要浏览器启用 JavaScript。</noscript><script id="report-data" type="application/json">' + embedded + '</script><script>' + JS + '</script></body></html>\n'
     fd, temporary = tempfile.mkstemp(prefix=".report.html.", dir=root)
     try:

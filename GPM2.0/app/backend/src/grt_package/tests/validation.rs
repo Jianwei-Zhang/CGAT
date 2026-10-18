@@ -800,3 +800,27 @@ fn app_q4_summary_checks_artifact_chromosome_and_reconstruction_contracts() {
             .contains("lacks chromosome Chr06")
     );
 }
+
+#[test]
+fn q4_hash_batches_preserve_short_long_lines_and_chromosome_boundaries() {
+    let temp = tempdir().unwrap();
+    let path = temp.path().join("q4.fa");
+    let long = "acgtnrykmswbdhv".repeat(10_000);
+    fs::write(
+        &path,
+        format!(
+            ">first\n{}>second\n{long}\n>third\nNN\n",
+            "acgtn\n".repeat(20_000)
+        ),
+    )
+    .unwrap();
+    let (records, file_hash) =
+        read_fasta_with_sha256_and_cancel(&path, "q4", false, &mut || false).unwrap();
+    let (summaries, digest) =
+        read_fasta_summaries_with_sha256_and_cancel(&path, "q4", false, &mut || false).unwrap();
+    assert_eq!(digest, file_hash);
+    for (name, sequence) in records {
+        assert_eq!(summaries[&name].length, sequence.len());
+        assert_eq!(summaries[&name].sha256, sha256_bytes(sequence.as_bytes()));
+    }
+}

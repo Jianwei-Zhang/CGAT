@@ -104,11 +104,16 @@ summaries; source-reconstruction callers still retain records. Both paths use
 the same FASTA validation and cancellation checks. The summary reader's memory
 depends on chromosome count and the longest FASTA line, not the total wrapped
 genome sequence.
-The SQLite probe uses disposable databases, checks both query indexes and
-integrity, and compares zero/two sort helpers. Extra helpers showed no consistent
-benefit on the measured delivery, so production retains SQLite's default worker
-policy. Transactions and durability settings are unchanged.
-Debug profiles optimize SHA-256 and bundled SQLite in both Cargo roots.
+Normalized chromosome bases are hashed in 64 KiB batches rather than one short
+FASTA line per digest call. The SQLite probe uses disposable databases to compare
+two legacy five-column indexes with one four-column index, verifies equivalent
+forward/reverse multi-id lookup results/plans, and checks database integrity.
+Both directions constrain run id and both sequence ids; the reverse permutation
+is redundant, and mapq is selected but not a lookup predicate. Existing current-
+version databases are not rewritten on open; new imports use the compact index.
+Transactions, durability settings, and SQLite's default worker policy are unchanged.
+Debug profiles optimize SHA-256/SQLite and use opt-level 2 for backend data loops
+in both Cargo roots, retaining debug symbols and an unoptimized Tauri/UI crate.
 
 `cache/import.log` appends monotonic `elapsed_ms` to each step. Root resolution,
 per-entry directory promotion (rename, not payload copy), index creation, and

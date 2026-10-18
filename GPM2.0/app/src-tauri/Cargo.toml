@@ -26,3 +26,8 @@ opt-level = 3
 
 [profile.dev.package.libsqlite3-sys]
 opt-level = 3
+
+# Optimize the data-processing crate while retaining debug symbols and the
+# unoptimized Tauri/UI crate. Per-base FASTA loops otherwise dominate dev import.
+[profile.dev.package.gpm_next_backend]
+opt-level = 2

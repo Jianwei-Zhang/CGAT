@@ -31,6 +31,11 @@ delivery files are `gpm_server.tar.gz` (Full: FASTA + report) and
 `gpm_server/report/` directory; no separate report ZIP is created. The local report
 remains available at `gpm_server/report/report.html`.
 
+Report tables embed up to 200 preview rows with exact full counts and source paths;
+full audit details remain in the Server workspace. This keeps HTML and App report
+snapshots compact instead of repeatedly embedding the evidence registry.
+
+
 The default is parallel `tar.gz` compression with pigz. Use `--archive-format zip` for ZIP; the App accepts both formats.
 
 `--ref` and repeatable `--ds` accept either `<name> <fasta>` or just `<fasta>`.

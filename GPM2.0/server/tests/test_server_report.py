@@ -19,13 +19,88 @@ TOOLS = PROJECT / "server/tools"
 sys.path.insert(0, str(TOOLS))
 
 from server_report import ReportSession, prepare_finish, prepare_start, record_grt_result
-from server_report_collect import capture_final, final_summary, paf_summary
+from server_report_collect import capture_final, final_summary, paf_summary, table as collect_report_table
 from server_report_io import SCHEMA, digest, fasta_stats, read_json, write_json
-from render_server_report import render
+from render_server_report import REPORT_PREVIEW_ROWS, project_report_facts, render
 import test_run_all_runner as runner_fixture
 
 
 class ServerReportTests(unittest.TestCase):
+    def test_report_previews_preserve_exact_counts_and_do_not_mutate_audit(self):
+        rows = [{"evidence_id": str(index), "detail": "audit-" + "x" * 2048} for index in range(1001)]
+        facts = {"summary": {"event_count": len(rows)},
+                 "tables": {"evidence": {"available": True, "source": "grt/evidence/step2/evidence.tsv", "rows": rows}},
+                 "result": {"q_input_sha256": "original-hash", "evidence_rows": rows,
+                            "events": [{"event_id": row["evidence_id"]} for row in rows],
+                            "accepted_intervals": list(range(1001))}}
+        original = copy.deepcopy(facts)
+        projected = project_report_facts(facts)
+        self.assertEqual(facts, original)
+        evidence = projected["tables"]["evidence"]
+        self.assertEqual(evidence["row_count"], 1001)
+        self.assertEqual(len(evidence["rows"]), REPORT_PREVIEW_ROWS)
+        self.assertTrue(evidence["preview_only"])
+        self.assertEqual(projected["summary"]["event_count"], 1001)
+        self.assertEqual(projected["result"]["report_array_counts"]["events"], 1001)
+        self.assertEqual(projected["result"]["events"], facts["result"]["events"])
+        self.assertEqual(projected["result"]["evidence_rows"]["row_count"], 1001)
+        self.assertEqual(projected["result"]["q_input_sha256"], "original-hash")
+        self.assertEqual(projected["result"]["accepted_intervals"], list(range(1001)))
+        self.assertEqual(project_report_facts(projected), projected)
+
+    def test_all_published_events_remain_available_for_final_reconciliation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            report = root / "report"
+            write_json(report / "manifest.json", {"schema_version": SCHEMA, "run_id": "many-events"})
+            events = [{"event_id": f"event-{index}", "stage": "step2", "status": "rejected"} for index in range(1001)]
+            write_json(report / "steps/grt-step2.json", {"facts": project_report_facts({"result": {"events": events}})})
+            summary = final_summary(root, report)
+            self.assertEqual(summary["process_summary"]["event_count"], 1001)
+            self.assertEqual(len(summary["event_reconciliation"]), 1001)
+
+    def test_large_legacy_report_embeds_previews_once_with_provenance(self):
+        helper = runner_fixture.RunAllRunnerTests()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            server = helper.make_workspace(root, [("one", "true")])
+            self.assertEqual(helper.run_runner(server).returncode, 0)
+            report = server / "report"
+            manifest = read_json(report / "manifest.json")
+            path = report / manifest["steps"][0]
+            record = read_json(path)
+            rows = [{"evidence_id": str(index), "detail": "x" * 2048} for index in range(1001)]
+            record["facts"] = {"summary": {"total_evidence_rows": len(rows)},
+                "tables": {"evidence": {"available": True, "source": "metadata/grt_evidence_registry.tsv", "rows": rows}},
+                "result": {"evidence_rows": rows}}
+            write_json(path, record)
+            before = path.read_bytes()
+            render(report)
+            html = (report / "report.html").read_text()
+            embedded = re.search(r'<script id="report-data" type="application/json">(.*?)</script>', html, re.S)
+            data = json.loads(embedded[1])
+            evidence = data["payload"]["steps"][0]["facts"]["tables"]["evidence"]
+            self.assertEqual(evidence["row_count"], 1001)
+            self.assertEqual(len(data["tables"][evidence["rows"]["table_index"]]), REPORT_PREVIEW_ROWS)
+            self.assertLess((report / "report.html").stat().st_size, 700_000)
+            self.assertIn("前 200 / 共 1,001 条", html)
+            self.assertIn("metadata/grt_evidence_registry.tsv", html)
+            self.assertIn("服务器工作目录", html)
+            self.assertNotIn("下载完整 JSON", html)
+            self.assertEqual(path.read_bytes(), before, "rendering must not overwrite legacy audit snapshots")
+
+    def test_streaming_table_preview_keeps_full_counts_and_full_default(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "evidence.tsv"
+            path.write_text("id\tnote\n" + "".join(f"{index}\tvalue-{index}\n" for index in range(1001)))
+            before = path.read_bytes()
+            preview = collect_report_table(root, "evidence.tsv", row_limit=REPORT_PREVIEW_ROWS)
+            self.assertEqual(preview["row_count"], 1001)
+            self.assertEqual(len(preview["rows"]), REPORT_PREVIEW_ROWS)
+            self.assertEqual(len(collect_report_table(root, "evidence.tsv")["rows"]), 1001)
+            self.assertEqual(path.read_bytes(), before)
+
     def test_fasta_gap_boundaries_n50_and_paf_union(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

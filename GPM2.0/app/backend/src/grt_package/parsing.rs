@@ -180,6 +180,55 @@ pub(super) struct FastaRecordSummary {
     pub(super) sha256: String,
 }
 
+// FASTA lines are often only 60-80 bases. Hashing each line independently
+// spends most debug time in tiny digest updates; batch normalized bases while
+// preserving the raw file digest and the common parser's validation grammar.
+const FASTA_HASH_BATCH_BYTES: usize = 64 * 1024;
+
+struct FastaSummaryBuilder {
+    length: usize,
+    digest: Sha256,
+    pending: Vec<u8>,
+}
+
+impl Default for FastaSummaryBuilder {
+    fn default() -> Self {
+        Self {
+            length: 0,
+            digest: Sha256::new(),
+            pending: Vec::with_capacity(FASTA_HASH_BATCH_BYTES),
+        }
+    }
+}
+
+impl FastaSummaryBuilder {
+    fn append(&mut self, line: &str) {
+        self.length += line.len();
+        if line.len() >= FASTA_HASH_BATCH_BYTES {
+            self.flush();
+            self.digest.update(line.as_bytes());
+        } else {
+            self.pending.extend_from_slice(line.as_bytes());
+            if self.pending.len() >= FASTA_HASH_BATCH_BYTES {
+                self.flush();
+            }
+        }
+    }
+
+    fn flush(&mut self) {
+        self.digest.update(&self.pending);
+        self.pending.clear();
+    }
+
+    fn finish(mut self) -> FastaRecordSummary {
+        self.flush();
+        FastaRecordSummary {
+            length: self.length,
+            sha256: format!("{:x}", self.digest.finalize()),
+        }
+    }
+}
+
 pub(super) fn read_fasta_summaries_with_sha256_and_cancel<C>(
     path: &Path,
     label: &str,
@@ -198,14 +247,8 @@ where
         label,
         allow_empty,
         should_cancel,
-        |state: &mut (usize, Sha256), line| {
-            state.0 += line.len();
-            state.1.update(line.as_bytes());
-        },
-        |(length, digest)| FastaRecordSummary {
-            length,
-            sha256: format!("{:x}", digest.finalize()),
-        },
+        FastaSummaryBuilder::append,
+        FastaSummaryBuilder::finish,
     )?;
     Ok((records, reader.into_inner().finish()))
 }

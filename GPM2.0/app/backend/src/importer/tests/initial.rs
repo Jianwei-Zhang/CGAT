@@ -842,7 +842,7 @@ fn initial_pairwise_bulk_load_preserves_hits_queries_indexes_and_progress() {
             |row| row.get(0),
         )
         .unwrap();
-    assert_eq!(index_count, 2);
+    assert_eq!(index_count, 1);
     let (run_id, d_id, e_id): (i64, i64, i64) = conn
         .query_row(
             "SELECT r.id,
@@ -967,7 +967,7 @@ fn initial_pairwise_bulk_load_cancellation_rolls_back_hits_and_indexes() {
             |row| row.get(0),
         )
         .unwrap();
-    assert_eq!(index_count, 2);
+    assert_eq!(index_count, 1);
 }
 
 #[test]
@@ -1055,7 +1055,7 @@ fn assert_pairwise_bulk_load_cancelled_and_rolled_back(bundle_root: &Path, error
             |row| row.get(0),
         )
         .unwrap();
-    assert_eq!(index_count, 2);
+    assert_eq!(index_count, 1);
 }
 
 #[test]

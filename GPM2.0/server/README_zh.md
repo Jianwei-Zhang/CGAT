@@ -30,6 +30,10 @@ bash run.sh \
 包含报告）两个文件；两者都内置完整的 `gpm_server/report/` 目录，不再单独生成
 报告 ZIP。本地报告仍可在 `gpm_server/report/report.html` 直接打开。
 
+报告表格最多内嵌前 200 行预览，并标明准确总行数与来源路径；全量审计明细仍保留在
+Server 工作目录中，不再反复塞入 HTML 和 App 报告快照。搜索与分页只针对已标注的预览。
+
+
 默认使用 pigz 多线程压缩为 `tar.gz`；`--archive-format zip` 可保留 ZIP 格式，App 支持两者。
 
 `--ref` 和可重复使用的 `--ds` 都支持 `<名称> <fasta>` 与仅传 `<fasta>`

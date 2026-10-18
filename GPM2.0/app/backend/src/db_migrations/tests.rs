@@ -534,3 +534,64 @@ const LEGACY_SCHEMA_FIXTURE: &str = r#"
         (id, phased_track_id, assembly_ctg_id, display_order, created_at)
         VALUES (1, 1, 1, 1, 'legacy-time');
 "#;
+
+#[test]
+fn fresh_pairwise_index_supports_both_directions_without_a_reverse_copy() -> Result<()> {
+    let conn = Connection::open_in_memory()?;
+    super::migrate_workspace_schema(&conn)?;
+    let columns = conn
+        .prepare("PRAGMA index_info(idx_pairwise_hit_query_target)")?
+        .query_map([], |row| row.get::<_, String>(2))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    assert_eq!(
+        columns,
+        [
+            "run_id",
+            "query_source_seq_id",
+            "target_source_seq_id",
+            "align_length"
+        ]
+    );
+    let reverse: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE name='idx_pairwise_hit_target_query'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(reverse, 0);
+    for (left, right) in [
+        ("query_source_seq_id", "target_source_seq_id"),
+        ("target_source_seq_id", "query_source_seq_id"),
+    ] {
+        let sql = format!(
+            "EXPLAIN QUERY PLAN SELECT * FROM pairwise_alignment_hit WHERE run_id=1 AND {left} IN (1,2) AND {right} IN (3,4) AND align_length>=100"
+        );
+        let plans = conn
+            .prepare(&sql)?
+            .query_map([], |row| row.get::<_, String>(3))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        assert!(
+            plans
+                .iter()
+                .any(|plan| plan.contains("idx_pairwise_hit_query_target")
+                    && plan.contains("query_source_seq_id=?")
+                    && plan.contains("target_source_seq_id=?")),
+            "{plans:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn opening_current_database_preserves_existing_legacy_pairwise_indexes() -> Result<()> {
+    let conn = Connection::open_in_memory()?;
+    super::migrate_workspace_schema(&conn)?;
+    conn.execute_batch("DROP INDEX idx_pairwise_hit_query_target;
+        CREATE INDEX idx_pairwise_hit_query_target ON pairwise_alignment_hit(run_id,query_source_seq_id,target_source_seq_id,align_length,mapq);
+        CREATE INDEX idx_pairwise_hit_target_query ON pairwise_alignment_hit(run_id,target_source_seq_id,query_source_seq_id,align_length,mapq);")?;
+    let before = sqlite_schema_version(&conn)?;
+    super::migrate_workspace_schema(&conn)?;
+    assert_eq!(sqlite_schema_version(&conn)?, before);
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE name IN ('idx_pairwise_hit_query_target','idx_pairwise_hit_target_query')", [], |row| row.get(0))?;
+    assert_eq!(count, 2);
+    Ok(())
+}

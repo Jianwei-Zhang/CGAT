@@ -68,8 +68,17 @@ and a browser suffice; no third-party renderer packages are required.
   for normalized FASTA and delivered archives; reads are not reread solely to
   manufacture a report checksum. Coverage statistics union query intervals,
   avoiding double-counting overlapping PAF rows.
-- JSON retains all collected rows. HTML tables are searchable and paginated;
-  summary content is visible without JavaScript. User-controlled text is escaped
+- Report snapshots and HTML tables retain at most 200 preview rows per table,
+  together with exact original row counts and provenance paths. Counts and
+  biological summaries are computed before projection. Full audit TSV/JSONL
+  files remain unchanged in the Server workspace; they are not copied repeatedly
+  into App delivery reports. Duplicate result arrays refer to their report table,
+  and HTML/download payloads reference each embedded table only once. Search and
+  pagination cover the explicitly labelled preview, not the full Server audit.
+  Complete published-event snapshots remain in the report JSON so final
+  reconciliation and process totals never operate on a preview. Accepted
+  interval summaries and final paths are not truncated. Legacy snapshots are
+  projected when rendered without rewriting their JSON. Summary content is visible without JavaScript. User-controlled text is escaped
   and the document blocks network connections with a content security policy.
 
 ## Validation

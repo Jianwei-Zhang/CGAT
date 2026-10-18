@@ -656,9 +656,7 @@ pub(super) fn create_current_schema(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_edit_audit_log_project_created
             ON edit_audit_log(project_id, created_at DESC, id DESC);
         CREATE INDEX IF NOT EXISTS idx_pairwise_hit_query_target
-            ON pairwise_alignment_hit(run_id, query_source_seq_id, target_source_seq_id, align_length, mapq);
-        CREATE INDEX IF NOT EXISTS idx_pairwise_hit_target_query
-            ON pairwise_alignment_hit(run_id, target_source_seq_id, query_source_seq_id, align_length, mapq);
+            ON pairwise_alignment_hit(run_id, query_source_seq_id, target_source_seq_id, align_length);
         CREATE INDEX IF NOT EXISTS idx_pairwise_scope_project_chr_pair
             ON pairwise_alignment_scope(project_id, assigned_chr_name, query_dataset_id, target_dataset_id);
         CREATE INDEX IF NOT EXISTS idx_pairwise_scoped_hit_query_target

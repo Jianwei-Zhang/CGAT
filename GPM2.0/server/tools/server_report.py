@@ -20,7 +20,7 @@ from server_report_collect import (
     capture_final, collect_grt_result, collect_unit, final_summary, inputs,
 )
 from server_report_io import SCHEMA, digest, local_path, now, read_json, write_json
-from render_server_report import render
+from render_server_report import project_report_facts, render
 
 TITLES = {
     "prepare": "输入准备", "assign": "染色体归属与排列",
@@ -77,7 +77,7 @@ def record_grt_result(root: Path, result: dict) -> None:
         return  # First publication is immutable, including during republishing.
     write_json(path, step_record(run_id, result["stage"], parent_unit=unit_id,
                                status="success", execution="see_parent_unit",
-                               facts=collect_grt_result(root, result)))
+                               facts=project_report_facts(collect_grt_result(root, result))))
 
 
 class ReportSession:
@@ -146,7 +146,7 @@ class ReportSession:
         if event in {"CACHE_HIT", "SKIP_VALID"}:
             record["execution"] = "cache_reused"
         if event in {"SUCCESS", "SKIP_VALID"}:
-            record["facts"] = collect_unit(self.root, unit.unit_id, self.input_data)
+            record["facts"] = project_report_facts(collect_unit(self.root, unit.unit_id, self.input_data))
             for path in (self.report / "steps").glob("grt-*.json"):
                 substage = read_json(path)
                 if substage.get("parent_unit") == unit.unit_id:
