@@ -4,12 +4,12 @@
 
 ## Quick start
 
-On your Linux server, download the GPM Server tools (source package) from [Release v2.0.10](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.10), then extract, enter the tool directory, and install:
+On your Linux server, download the GPM Server tools (source package) from [Release v2.0.11](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.11), then extract, enter the tool directory, and install:
 
 ```bash
 # 1. Download, extract, and enter the Server tool directory
-curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.10/GPM_Server_2.0.10_source.tar.gz
-tar -xzf GPM_Server_2.0.10_source.tar.gz
+curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.11/GPM_Server_2.0.11_source.tar.gz
+tar -xzf GPM_Server_2.0.11_source.tar.gz
 cd GPM_Server
 
 # 2. Install and verify the isolated environment

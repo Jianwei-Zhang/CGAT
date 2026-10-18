@@ -4,12 +4,12 @@
 
 ## 快速开始
 
-在 Linux 服务端依次执行以下命令：从 [Release v2.0.10](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.10) 下载 GPM Server 工具包（源码），解压并进入工具目录，然后安装和运行。
+在 Linux 服务端依次执行以下命令：从 [Release v2.0.11](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.11) 下载 GPM Server 工具包（源码），解压并进入工具目录，然后安装和运行。
 
 ```bash
 # 1. 下载、解压并进入 Server 工具目录
-curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.10/GPM_Server_2.0.10_source.tar.gz
-tar -xzf GPM_Server_2.0.10_source.tar.gz
+curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.11/GPM_Server_2.0.11_source.tar.gz
+tar -xzf GPM_Server_2.0.11_source.tar.gz
 cd GPM_Server
 
 # 2. 安装并验证独立环境
