@@ -13,7 +13,7 @@ import {
   validateWorkspaceIntegrity,
 } from "../../services/workflow-api.js";
 import { flushAssemblyProjectState } from "./assembly-page.js";
-import { defaultProjectName } from "../../services/project-session.js";
+import { defaultProjectName, projectImportName } from "../../services/project-session.js";
 import { openProjectWorkspace as openWorkspace } from "../../services/project-session.js";
 import { renderProjectsBody, projectLabels, syncProjectValidation } from "./projects-view.js";
 import { renderWorkspacePage, bindWorkspacePage } from "./workspace-page.js";
@@ -168,6 +168,9 @@ function formatCopyBytes(value) {
 export function bindImporterPage(host, store) {
   if (store.getState().initializer) bindWorkspacePage(host, store);
   bindProjectEntryControls(host, store);
+  if (store.getState().importer.importDialogOpen && !store.getState().importer.inFlight) {
+    syncImportProjectName(host, store);
+  }
   bindProjectCopyDialog(host, store);
   const zipPathInput = host.querySelector("#zip-path-input");
   const zipWorkspaceRootInput = host.querySelector("#zip-workspace-root-input");
@@ -212,12 +215,14 @@ export function bindImporterPage(host, store) {
     updateImporterState(store, {
       workspaceRoot: event.target.value.trim(),
     });
+    syncImportProjectName(host, store);
   });
 
   extractedPathInput?.addEventListener("input", (event) => {
     updateImporterState(store, {
       extractedPath: event.target.value.trim(),
     });
+    syncImportProjectName(host, store);
   });
 
   importParallelismSelect?.addEventListener("change", (event) => {
@@ -260,6 +265,7 @@ export function bindImporterPage(host, store) {
     const workspaceRoot = importer.requireNewWorkspace
       ? relocateWorkspaceSuggestion(selectedPath, importer.workspaceRoot) : selectedPath;
     updateImporterState(store, { workspaceRoot });
+    syncImportProjectName(host, store);
     rerender(host, store);
   });
 
@@ -269,6 +275,7 @@ export function bindImporterPage(host, store) {
       return;
     }
     updateImporterState(store, { extractedPath: selectedPath });
+    syncImportProjectName(host, store);
     rerender(host, store);
   });
 
@@ -449,6 +456,7 @@ function bindProjectEntryControls(host, store) {
       extractedPath: "",
       workspaceRoot: "",
       projectNameInput: "",
+      projectNameEdited: false,
       requireNewWorkspace: false,
       projectError: "",
       pendingProjectPath: "",
@@ -484,15 +492,16 @@ function bindProjectEntryControls(host, store) {
     const source = host.querySelector(extracted ? "#extracted-path-input" : "#zip-path-input")?.value.trim();
     const directory = extracted ? source : host.querySelector("#zip-workspace-root-input")?.value.trim();
     dialog.querySelector('[type="submit"]').disabled = !source || !directory;
-    dialog.querySelector("#import-project-name").placeholder = directory ? defaultProjectName(directory) : projectLabels(store.getState()).nameDefault;
+    syncImportProjectName(host, store);
   });
   host.querySelectorAll('[name="project-source"]').forEach(input => input.addEventListener("change", () => {
     updateImporterState(store, { importSource: input.value, projectError: "" });
+    syncImportProjectName(host, store);
     rerender(host, store);
     host.querySelector(`[name="project-source"][value="${input.value}"]`)?.focus();
   }));
   host.querySelector("#import-project-name")?.addEventListener("input", event => {
-    updateImporterState(store, { projectNameInput: event.target.value });
+    updateImporterState(store, { projectNameInput: event.target.value, projectNameEdited: true });
   });
   host.querySelector("#project-retry-button")?.addEventListener("click", async () => {
     if (busy()) return;
@@ -1507,6 +1516,18 @@ export function mergeImportProgressStage(stages, incoming) {
   const next = [...current];
   next[index] = incoming;
   return next;
+}
+
+function syncImportProjectName(host, store) {
+  const importer = store.getState().importer;
+  const directory = importer.importSource === "extracted" ? importer.extractedPath : importer.workspaceRoot;
+  const projectNameInput = projectImportName(importer, directory);
+  updateImporterState(store, {
+    projectNameInput,
+    projectNameEdited: importer.projectNameEdited ?? Boolean(importer.projectNameInput),
+  });
+  const input = host.querySelector("#import-project-name");
+  if (input && input.value !== projectNameInput) input.value = projectNameInput;
 }
 
 function updateImporterState(store, patch) {

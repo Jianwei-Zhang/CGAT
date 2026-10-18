@@ -7,6 +7,14 @@ export function defaultProjectName(path) {
   return parts.at(-1) || "Project";
 }
 
+// An untouched recommendation follows the directory; an edited name is a draft,
+// including an intentionally empty one. Preserve existing drafts without the flag.
+export function projectImportName(importer, directory) {
+  const edited = importer.projectNameEdited ?? Boolean(importer.projectNameInput);
+  if (edited) return String(importer.projectNameInput || "");
+  return String(directory || "").trim() ? defaultProjectName(directory) : "";
+}
+
 const pending = new Map();
 const initializing = new Map();
 

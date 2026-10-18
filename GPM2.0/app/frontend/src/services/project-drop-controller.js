@@ -1,3 +1,4 @@
+import { defaultProjectName } from "./project-session.js";
 import { workspacePathIdentity } from "./workspace-history.js";
 
 export function localWorkspaceTimestamp(date = new Date()) {
@@ -22,7 +23,8 @@ export function archiveImportForm(entry) {
   return {
     importDialogOpen: true, importSource: "zip", zipPath: entry.path,
     workspaceRoot: entry.suggestedWorkspace, requireNewWorkspace: true,
-    projectNameInput: "", projectError: "", pendingProjectPath: "",
+    projectNameInput: defaultProjectName(entry.suggestedWorkspace), projectNameEdited: false,
+    projectError: "", pendingProjectPath: "",
   };
 }
 
@@ -102,7 +104,7 @@ export function createProjectDropController({ store, inspect, prepareSwitch = as
         refresh();
       } else if (entry.kind === "extracted") {
         store.setState({ activeRoute: "importer", importer: { ...store.getState().importer,
-          extractedPath: entry.path, projectNameInput: "", projectError: "", pendingProjectPath: "" } });
+          extractedPath: entry.path, projectNameInput: defaultProjectName(entry.path), projectNameEdited: false, projectError: "", pendingProjectPath: "" } });
         refresh();
         await importExtracted(entry.path);
       } else {

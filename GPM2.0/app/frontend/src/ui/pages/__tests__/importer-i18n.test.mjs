@@ -34,6 +34,10 @@ function createButton() {
     addEventListener(type, handler) {
       listeners.set(type, handler);
     },
+    input(value) {
+      this.value = value;
+      return listeners.get("input")?.({ currentTarget: this, target: this });
+    },
     click() {
       const handler = listeners.get("click");
       if (handler) {
@@ -2414,7 +2418,10 @@ for (const suffix of [".zip", ".tar.gz", ".tgz"]) {
       assert.equal(importer.importSource, "zip");
       assert.equal(importer.importDialogOpen, true);
       assert.equal(importer.entryResolving, false);
-      for (const key of ["projectError", "projectNameInput", "pendingProjectPath"]) assert.equal(importer[key], "");
+      for (const key of ["projectError", "pendingProjectPath"]) assert.equal(importer[key], "");
+      assert.equal(importer.projectNameInput, "sample.v2_20261018_103000_01");
+      assert.equal(importer.projectNameEdited, false);
+      assert.match(host.innerHTML, /id="import-project-name" value="sample.v2_20261018_103000_01"/);
       assert.equal(store.getState().session, session);
       assert.deepEqual(calls.map(call => call.command), ["pick_zip_file_path", "inspect_project_entry"]);
       assert.match(host.innerHTML, /id="zip-workspace-root-input"[^>]*value="D:\/Delivery folder\/sample.v2_20261018_103000_01"/);
@@ -2491,3 +2498,49 @@ test("picked archive keeps its generated leaf when choosing a parent and refresh
     assert.equal(store.getState().importer.zipPath, selected);
   });
 });
+
+for (const source of ["zip", "extracted"]) {
+  test(`${source} import name is prefilled and editable without replacing the form`, () => {
+    const previousWindow = globalThis.window;
+    const previousDocument = globalThis.document;
+    try {
+      globalThis.window = {};
+      globalThis.document = { querySelector: () => null };
+      const name = createButton();
+      const directory = createButton();
+      const store = createStore(createImporterScrollState({
+        inFlight: false, importRunId: null, importDialogOpen: true, importSource: source,
+        workspaceRoot: "D:/sample_20261018_103000", extractedPath: "D:/sample/gpm_server",
+        projectNameInput: "", projectNameEdited: false,
+      }));
+      const host = createHost({
+        "#import-project-name": name,
+        [source === "zip" ? "#zip-workspace-root-input" : "#extracted-path-input"]: directory,
+      });
+      bindImporterPage(host, store);
+      const initial = source === "zip" ? "sample_20261018_103000" : "sample";
+      assert.equal(name.value, initial);
+      assert.equal(store.getState().importer.projectNameInput, initial);
+      assert.match(renderImporterPage(store.getState()), new RegExp(`id="import-project-name" value="${initial}"`));
+      const originalHtml = host.innerHTML;
+      directory.input("D:/next-project");
+      assert.equal(name.value, "next-project");
+      assert.equal(store.getState().importer.projectNameInput, "next-project");
+      assert.equal(host.innerHTML, originalHtml);
+      name.input("next-project-edited");
+      assert.equal(store.getState().importer.projectNameEdited, true);
+      directory.input("D:/another-directory");
+      assert.equal(name.value, "next-project-edited");
+      assert.equal(store.getState().importer.projectNameInput, "next-project-edited");
+      assert.match(renderImporterPage(store.getState()), /id="import-project-name" value="next-project-edited"/);
+      name.input("");
+      bindImporterPage(host, store);
+      assert.equal(name.value, "");
+      assert.equal(store.getState().importer.projectNameInput, "");
+      assert.match(renderImporterPage(store.getState()), /id="import-project-name" value=""/);
+    } finally {
+      globalThis.window = previousWindow;
+      globalThis.document = previousDocument;
+    }
+  });
+}

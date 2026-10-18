@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { defaultProjectName, openProjectWorkspace } from "../project-session.js";
+import { defaultProjectName, projectImportName, openProjectWorkspace } from "../project-session.js";
 
 test("project names use the final directory and handle extracted bundles and Windows paths", () => {
   assert.equal(defaultProjectName("D:\\data\\rice\\gpm_server\\"), "rice");
@@ -86,4 +86,14 @@ test("concurrent canonical aliases initialize one project and use the canonical 
   };
   const results = await Promise.all([openProjectWorkspace({ workspaceRoot: "/alias-a" }, deps), openProjectWorkspace({ workspaceRoot: "/alias-b" }, deps)]);
   assert.equal(creations, 1); assert.deepEqual(results[0], results[1]);
+});
+
+test("import name prefills from the directory until edited, including an intentionally empty draft", () => {
+  assert.equal(projectImportName({}, "D:/delivery/sample_20261018_103000"), "sample_20261018_103000");
+  assert.equal(projectImportName({ projectNameInput: "previous", projectNameEdited: false }, "/data/next"), "next");
+  assert.equal(projectImportName({ projectNameInput: "Custom project", projectNameEdited: true }, "/data/next"), "Custom project");
+  assert.equal(projectImportName({ projectNameInput: "", projectNameEdited: true }, "/data/next"), "");
+  assert.equal(projectImportName({ projectNameInput: "Existing draft" }, "/data/next"), "Existing draft");
+  assert.equal(projectImportName({}, ""), "");
+  assert.equal(projectImportName({}, "/data/sample/gpm_server"), "sample");
 });

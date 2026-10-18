@@ -28,6 +28,8 @@ for (const suffix of [".zip", ".tar.gz", ".tgz"]) {
     const state = h.store.getState();
     assert.equal(state.activeRoute, "importer"); assert.equal(state.importer.importDialogOpen, true);
     assert.equal(state.importer.requireNewWorkspace, true);
+    assert.equal(state.importer.projectNameInput, "sample_20261008_143025");
+    assert.equal(state.importer.projectNameEdited, false);
     assert.equal(state.importer.workspaceRoot, "/deliveries/sample_20261008_143025");
     assert.deepEqual(state.session, { workspacePath: "/previous", projectId: 4 });
     assert.equal(h.calls.some(row => row[0] === "open" || row[0] === "import"), false);

@@ -1,5 +1,5 @@
 import { projectEntryBusy } from "../../services/project-drop-controller.js";
-import { defaultProjectName } from "../../services/project-session.js";
+import { defaultProjectName, projectImportName } from "../../services/project-session.js";
 import { projectIcon } from "./project-icons.js";
 import { getMessages } from "../i18n/index.js";
 import { importParserWorkerChoices, normalizeImportParserWorkers, recommendedImportParserWorkers } from "../../services/import-parallelism.js";
@@ -114,7 +114,7 @@ export function renderProjectImportDialog(state, messages) {
       <select id="import-parallelism-select" name="importParallelism" aria-describedby="import-parallelism-hint">${workerOptions}</select>
       <p id="import-parallelism-hint" class="project-path muted">${labels.importThreadsHint}</p>
       <label for="import-project-name">${labels.name}</label>
-      <input id="import-project-name" value="${html(importer.projectNameInput)}" placeholder="${html(directory ? defaultProjectName(directory) : labels.nameDefault)}" />
+      <input id="import-project-name" value="${html(projectImportName(importer, directory))}" placeholder="${html(labels.nameDefault)}" />
       ${importer.projectError ? `<p class="error-text" role="alert">${html(importer.projectError)}</p>` : ""}
       <footer class="project-dialog-actions">
         <button type="button" data-project-import-close class="button ghost">${labels.cancel}</button>
