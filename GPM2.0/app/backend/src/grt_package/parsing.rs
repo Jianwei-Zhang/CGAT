@@ -141,29 +141,29 @@ fn open_fasta_reader(path: &Path, label: &str) -> Result<fs::File> {
         .map_err(|error| grt_anyhow("INVALID_FASTA", format!("failed to open {label}: {error}")))
 }
 
-pub(super) fn read_fasta_with_cancel<C>(
+// Keep FASTA entry points concrete and non-inlined. Otherwise the desktop's
+// generic cancellation callback makes its opt-level=0 crate instantiate the
+// per-base parser/hash loops, bypassing this backend's opt-level override.
+// Dynamic dispatch happens only at cancellation checkpoints, not per base.
+#[inline(never)]
+pub(super) fn read_fasta_with_cancel(
     path: &Path,
     label: &str,
     allow_empty: bool,
-    should_cancel: &mut C,
-) -> Result<BTreeMap<String, String>>
-where
-    C: FnMut() -> bool,
-{
+    should_cancel: &mut dyn FnMut() -> bool,
+) -> Result<BTreeMap<String, String>> {
     let mut reader =
         std::io::BufReader::with_capacity(1024 * 1024, open_fasta_reader(path, label)?);
     read_fasta_records(&mut reader, label, allow_empty, should_cancel)
 }
 
-pub(super) fn read_fasta_with_sha256_and_cancel<C>(
+#[inline(never)]
+pub(super) fn read_fasta_with_sha256_and_cancel(
     path: &Path,
     label: &str,
     allow_empty: bool,
-    should_cancel: &mut C,
-) -> Result<(BTreeMap<String, String>, String)>
-where
-    C: FnMut() -> bool,
-{
+    should_cancel: &mut dyn FnMut() -> bool,
+) -> Result<(BTreeMap<String, String>, String)> {
     let mut reader = std::io::BufReader::with_capacity(
         1024 * 1024,
         Sha256Reader::new(open_fasta_reader(path, label)?),
@@ -229,15 +229,13 @@ impl FastaSummaryBuilder {
     }
 }
 
-pub(super) fn read_fasta_summaries_with_sha256_and_cancel<C>(
+#[inline(never)]
+pub(super) fn read_fasta_summaries_with_sha256_and_cancel(
     path: &Path,
     label: &str,
     allow_empty: bool,
-    should_cancel: &mut C,
-) -> Result<(BTreeMap<String, FastaRecordSummary>, String)>
-where
-    C: FnMut() -> bool,
-{
+    should_cancel: &mut dyn FnMut() -> bool,
+) -> Result<(BTreeMap<String, FastaRecordSummary>, String)> {
     let mut reader = std::io::BufReader::with_capacity(
         1024 * 1024,
         Sha256Reader::new(open_fasta_reader(path, label)?),
@@ -261,7 +259,7 @@ fn read_fasta_records<R, C>(
 ) -> Result<BTreeMap<String, String>>
 where
     R: std::io::BufRead,
-    C: FnMut() -> bool,
+    C: FnMut() -> bool + ?Sized,
 {
     read_fasta_records_into(
         reader,
@@ -283,7 +281,7 @@ fn read_fasta_records_into<R, C, S, T>(
 ) -> Result<BTreeMap<String, T>>
 where
     R: std::io::BufRead,
-    C: FnMut() -> bool,
+    C: FnMut() -> bool + ?Sized,
     S: Default,
 {
     let mut records = BTreeMap::new();

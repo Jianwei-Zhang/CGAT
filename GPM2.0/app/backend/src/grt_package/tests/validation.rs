@@ -3,7 +3,7 @@ use crate::grt_package::delivery_validator::{
     validate_app_final_path_manifest_hash, validate_app_source_fasta_paths,
 };
 use crate::grt_package::parsing::{
-    read_fasta_summaries_with_sha256_and_cancel, read_fasta_with_cancel,
+    FastaRecordSummary, read_fasta_summaries_with_sha256_and_cancel, read_fasta_with_cancel,
     read_fasta_with_sha256_and_cancel, sha256_file,
 };
 
@@ -645,6 +645,44 @@ fn benchmark_q4_validation() {
 }
 
 #[test]
+fn fasta_readers_accept_erased_cancellation_without_caller_specialization() {
+    let temp = tempdir().unwrap();
+    let path = temp.path().join("q4.fa");
+    fs::write(&path, ">Chr01\r\n acgtNRy \r\n>Chr02\nNNnn\n").unwrap();
+    let mut checks = 0;
+    let mut cancel = || {
+        checks += 1;
+        false
+    };
+    // An erased callback must reach all FASTA entry points without requiring
+    // a caller-specific generic instantiation in an unoptimized UI crate.
+    let should_cancel: &mut dyn FnMut() -> bool = &mut cancel;
+    let records = read_fasta_with_cancel(&path, "q4", false, should_cancel).unwrap();
+    let (full, full_hash) =
+        read_fasta_with_sha256_and_cancel(&path, "q4", false, should_cancel).unwrap();
+    let (summaries, summary_hash) =
+        read_fasta_summaries_with_sha256_and_cancel(&path, "q4", false, should_cancel).unwrap();
+    assert_eq!(records, full);
+    assert_eq!(full_hash, summary_hash);
+    assert_eq!(summary_hash, sha256_file(&path).unwrap());
+    assert_eq!(
+        summaries["Chr01"],
+        FastaRecordSummary {
+            length: 7,
+            sha256: sha256_bytes(b"ACGTNRY"),
+        }
+    );
+    assert_eq!(
+        summaries["Chr02"],
+        FastaRecordSummary {
+            length: 4,
+            sha256: sha256_bytes(b"NNNN"),
+        }
+    );
+    assert!(checks >= 6);
+}
+
+#[test]
 fn fasta_summary_matches_record_validation_and_both_hashes() {
     let temp = tempdir().unwrap();
     let path = temp.path().join("q4.fa");
@@ -710,11 +748,13 @@ fn fasta_summary_observes_mid_stream_cancellation() {
     let path = temp.path().join("q4.fa");
     fs::write(&path, format!(">Chr01\n{}", "NNNN\n".repeat(2048))).unwrap();
     let mut checks = 0;
-    let error = read_fasta_summaries_with_sha256_and_cancel(&path, "q4", false, &mut || {
+    let mut cancel = || {
         checks += 1;
         checks > 2
-    })
-    .unwrap_err();
+    };
+    let should_cancel: &mut dyn FnMut() -> bool = &mut cancel;
+    let error =
+        read_fasta_summaries_with_sha256_and_cancel(&path, "q4", false, should_cancel).unwrap_err();
     assert_eq!(checks, 3);
     assert!(error.to_string().contains("import cancelled"));
 }
