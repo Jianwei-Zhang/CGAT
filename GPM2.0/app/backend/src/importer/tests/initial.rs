@@ -60,6 +60,25 @@ fn imports_zip_delivery_and_prepares_named_workspace() {
         items[0].phase_index.unwrap_or_default() <= items[1].phase_index.unwrap_or_default()
     }));
     let stages = progress.iter().map(|item| item.stage).collect::<Vec<_>>();
+    let resolve_start_index = stages
+        .iter()
+        .position(|stage| *stage == "resolve_bundle_root_start")
+        .unwrap();
+    let resolve_index = stages
+        .iter()
+        .position(|stage| *stage == "resolve_bundle_root")
+        .unwrap();
+    let normalize_start_index = stages
+        .iter()
+        .position(|stage| *stage == "normalize_workspace_layout_start")
+        .unwrap();
+    let normalize_entry_index = stages
+        .iter()
+        .position(|stage| *stage == "normalize_workspace_layout_entry")
+        .unwrap();
+    assert!(resolve_start_index < resolve_index);
+    assert!(resolve_index < normalize_start_index);
+    assert!(normalize_start_index < normalize_entry_index);
     let normalize_index = stages
         .iter()
         .position(|stage| *stage == "normalize_workspace_layout")
@@ -72,6 +91,7 @@ fn imports_zip_delivery_and_prepares_named_workspace() {
         .iter()
         .position(|stage| *stage == "validate_grt_contract")
         .unwrap();
+    assert!(normalize_entry_index < normalize_index);
     assert!(normalize_index < validation_start_index);
     assert!(validation_start_index < validation_complete_index);
     assert!(stages.contains(&"validate_grt_source_fastas"));
@@ -678,6 +698,19 @@ fn imports_partitioned_alignment_pafs_into_global_hit_tables() {
     let log_text = fs::read_to_string(outcome.workspace_root.join("cache/import.log")).unwrap();
     assert!(log_text.contains("index_ref_paf"));
     assert!(log_text.contains("index_pairwise_paf"));
+    let times = log_text
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .map(|line| {
+            line.rsplit_once("\telapsed_ms=")
+                .expect("each step has monotonic timing")
+                .1
+                .parse::<u128>()
+                .unwrap()
+        })
+        .collect::<Vec<_>>();
+    assert!(!times.is_empty());
+    assert!(times.windows(2).all(|pair| pair[0] <= pair[1]));
 }
 
 #[test]
@@ -1034,4 +1067,27 @@ fn rejects_unsupported_pairwise_parser_worker_count() {
     .resolved_import_workers()
     .unwrap_err();
     assert!(error.to_string().contains("integer from 1 to 8"));
+}
+
+#[test]
+fn zip_import_cancels_during_directory_promotion_and_cleans_owned_workspace() {
+    let temp = tempdir().unwrap();
+    let zip_path = temp.path().join("delivery.zip");
+    write_bundle_zip(&zip_path);
+    let workspace_root = temp.path().join("workspace");
+    let cancel = std::cell::Cell::new(false);
+    let error = import_from_zip_with_hooks(
+        &zip_path,
+        &workspace_root,
+        &mut |step| {
+            if step.stage == "normalize_workspace_layout_entry" {
+                cancel.set(true);
+            }
+        },
+        &mut || cancel.get(),
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("import cancelled"));
+    assert!(!workspace_root.exists());
+    assert!(zip_path.exists());
 }

@@ -17,3 +17,11 @@ zip = { version = "0.6.6", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 tempfile = "3.20"
+
+# Keep native import hot paths optimized in the interactive debug app too.
+# Cargo uses the root manifest's profiles, so mirror these in both crates.
+[profile.dev.package.sha2]
+opt-level = 3
+
+[profile.dev.package.libsqlite3-sys]
+opt-level = 3

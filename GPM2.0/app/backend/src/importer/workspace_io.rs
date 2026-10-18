@@ -718,10 +718,16 @@ fn extract_tar_gz_to_root(
     Ok(())
 }
 
-pub(super) fn promote_bundle_root_to_workspace_root(
+pub(super) fn promote_bundle_root_to_workspace_root<P, C>(
     workspace_root: &Path,
     bundle_root: &Path,
-) -> Result<()> {
+    on_progress: &mut P,
+    should_cancel: &mut C,
+) -> Result<()>
+where
+    P: FnMut(String),
+    C: FnMut() -> bool,
+{
     if bundle_root == workspace_root {
         return Ok(());
     }
@@ -743,8 +749,11 @@ pub(super) fn promote_bundle_root_to_workspace_root(
                 bundle_root.display()
             )
         })?;
+        check_import_cancel(should_cancel)?;
         let source = entry.path();
         let target = workspace_root.join(entry.file_name());
+        on_progress(entry.file_name().to_string_lossy().into_owned());
+        check_import_cancel(should_cancel)?;
         if target.exists() {
             bail!(
                 "cannot promote bundle entry; target already exists: {}",
@@ -760,6 +769,7 @@ pub(super) fn promote_bundle_root_to_workspace_root(
         })?;
     }
 
+    check_import_cancel(should_cancel)?;
     fs::remove_dir(bundle_root).with_context(|| {
         format!(
             "failed to remove now-empty promoted bundle root {}",

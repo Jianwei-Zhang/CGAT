@@ -150,7 +150,8 @@ pub(super) fn read_fasta_with_cancel<C>(
 where
     C: FnMut() -> bool,
 {
-    let mut reader = std::io::BufReader::new(open_fasta_reader(path, label)?);
+    let mut reader =
+        std::io::BufReader::with_capacity(1024 * 1024, open_fasta_reader(path, label)?);
     read_fasta_records(&mut reader, label, allow_empty, should_cancel)
 }
 
@@ -163,8 +164,49 @@ pub(super) fn read_fasta_with_sha256_and_cancel<C>(
 where
     C: FnMut() -> bool,
 {
-    let mut reader = std::io::BufReader::new(Sha256Reader::new(open_fasta_reader(path, label)?));
+    let mut reader = std::io::BufReader::with_capacity(
+        1024 * 1024,
+        Sha256Reader::new(open_fasta_reader(path, label)?),
+    );
     let records = read_fasta_records(&mut reader, label, allow_empty, should_cancel)?;
+    Ok((records, reader.into_inner().finish()))
+}
+
+/// App import needs lengths and normalized chromosome digests, not gigabytes
+/// of sequence strings. Both readers use the same FASTA grammar and errors.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct FastaRecordSummary {
+    pub(super) length: usize,
+    pub(super) sha256: String,
+}
+
+pub(super) fn read_fasta_summaries_with_sha256_and_cancel<C>(
+    path: &Path,
+    label: &str,
+    allow_empty: bool,
+    should_cancel: &mut C,
+) -> Result<(BTreeMap<String, FastaRecordSummary>, String)>
+where
+    C: FnMut() -> bool,
+{
+    let mut reader = std::io::BufReader::with_capacity(
+        1024 * 1024,
+        Sha256Reader::new(open_fasta_reader(path, label)?),
+    );
+    let records = read_fasta_records_into(
+        &mut reader,
+        label,
+        allow_empty,
+        should_cancel,
+        |state: &mut (usize, Sha256), line| {
+            state.0 += line.len();
+            state.1.update(line.as_bytes());
+        },
+        |(length, digest)| FastaRecordSummary {
+            length,
+            sha256: format!("{:x}", digest.finalize()),
+        },
+    )?;
     Ok((records, reader.into_inner().finish()))
 }
 
@@ -178,9 +220,33 @@ where
     R: std::io::BufRead,
     C: FnMut() -> bool,
 {
+    read_fasta_records_into(
+        reader,
+        label,
+        allow_empty,
+        should_cancel,
+        |sequence: &mut String, line| sequence.push_str(line),
+        |sequence| sequence,
+    )
+}
+
+fn read_fasta_records_into<R, C, S, T>(
+    reader: &mut R,
+    label: &str,
+    allow_empty: bool,
+    should_cancel: &mut C,
+    mut append: impl FnMut(&mut S, &str),
+    mut finish: impl FnMut(S) -> T,
+) -> Result<BTreeMap<String, T>>
+where
+    R: std::io::BufRead,
+    C: FnMut() -> bool,
+    S: Default,
+{
     let mut records = BTreeMap::new();
     let mut name: Option<String> = None;
-    let mut sequence = String::new();
+    let mut sequence = S::default();
+    let mut sequence_length = 0_usize;
     let mut raw = String::new();
     let mut offset = 0_usize;
     loop {
@@ -197,16 +263,18 @@ where
         offset += 1;
         let line = raw.trim();
         if let Some(header) = line.strip_prefix('>') {
-            if let Some(previous) = name.take()
-                && (sequence.is_empty()
+            if let Some(previous) = name.take() {
+                if sequence_length == 0
                     || records
-                        .insert(previous.clone(), std::mem::take(&mut sequence))
-                        .is_some())
-            {
-                return grt_err(
-                    "INVALID_FASTA",
-                    format!("{label}:{offset} has empty or duplicate record"),
-                );
+                        .insert(previous, finish(std::mem::take(&mut sequence)))
+                        .is_some()
+                {
+                    return grt_err(
+                        "INVALID_FASTA",
+                        format!("{label}:{offset} has empty or duplicate record"),
+                    );
+                }
+                sequence_length = 0;
             }
             let record_name = header.split_whitespace().next().unwrap_or("");
             if record_name.is_empty() || records.contains_key(record_name) {
@@ -223,21 +291,43 @@ where
                     format!("{label}:{offset} has sequence before header"),
                 );
             }
-            let upper = line.to_ascii_uppercase();
-            if !upper.bytes().all(|base| b"ACGTNRYKMSWBDHV".contains(&base)) {
+            // Normalize in place instead of allocating one uppercase String
+            // per FASTA line. A byte match avoids a linear alphabet search.
+            raw.make_ascii_uppercase();
+            let upper = raw.trim();
+            if !upper.bytes().all(|base| {
+                matches!(
+                    base,
+                    b'A' | b'C'
+                        | b'G'
+                        | b'T'
+                        | b'N'
+                        | b'R'
+                        | b'Y'
+                        | b'K'
+                        | b'M'
+                        | b'S'
+                        | b'W'
+                        | b'B'
+                        | b'D'
+                        | b'H'
+                        | b'V'
+                )
+            }) {
                 return grt_err(
                     "INVALID_FASTA",
                     format!("{label}:{offset} has unsupported bases"),
                 );
             }
-            sequence.push_str(&upper);
+            sequence_length += upper.len();
+            append(&mut sequence, upper);
         }
     }
     if should_cancel() {
         bail!("import cancelled");
     }
     if let Some(previous) = name
-        && (sequence.is_empty() || records.insert(previous, sequence).is_some())
+        && (sequence_length == 0 || records.insert(previous, finish(sequence)).is_some())
     {
         return grt_err(
             "INVALID_FASTA",

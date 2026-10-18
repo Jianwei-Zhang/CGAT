@@ -5,6 +5,8 @@ where
     P: FnMut(ImportProgress),
 {
     progress: Vec<ImportProgress>,
+    progress_elapsed_ms: Vec<u128>,
+    started_at: std::time::Instant,
     on_progress: &'a mut P,
     log_path: Option<PathBuf>,
     emitted_count: usize,
@@ -20,6 +22,8 @@ where
     pub(super) fn new(on_progress: &'a mut P) -> Self {
         Self {
             progress: Vec::new(),
+            progress_elapsed_ms: Vec::new(),
+            started_at: std::time::Instant::now(),
             on_progress,
             log_path: None,
             emitted_count: 0,
@@ -62,8 +66,8 @@ where
                     .unwrap_or_else(|_| "0".to_string())
             ),
         )?;
-        for step in &self.progress {
-            append_import_log_step(&log_path, step)?;
+        for (step, elapsed_ms) in self.progress.iter().zip(&self.progress_elapsed_ms) {
+            append_import_log_step(&log_path, step, *elapsed_ms)?;
         }
         self.log_path = Some(log_path);
         Ok(())
@@ -85,11 +89,13 @@ where
         if item.phase_total.is_none() {
             item.phase_total = self.phase_total;
         }
+        let elapsed_ms = self.started_at.elapsed().as_millis();
         (self.on_progress)(item.clone());
         if let Some(log_path) = self.log_path.as_deref() {
-            let _ = append_import_log_step(log_path, &item);
+            let _ = append_import_log_step(log_path, &item, elapsed_ms);
         }
         self.progress.push(item);
+        self.progress_elapsed_ms.push(elapsed_ms);
     }
 
     /// Emits an in-place progress update without growing the durable step list.
@@ -121,8 +127,15 @@ where
     }
 }
 
-pub(super) fn append_import_log_step(path: &Path, step: &ImportProgress) -> Result<()> {
-    append_import_log_line(path, &format!("{}\t{}", step.stage, step.detail))
+pub(super) fn append_import_log_step(
+    path: &Path,
+    step: &ImportProgress,
+    elapsed_ms: u128,
+) -> Result<()> {
+    append_import_log_line(
+        path,
+        &format!("{}\t{}\telapsed_ms={elapsed_ms}", step.stage, step.detail),
+    )
 }
 
 pub(super) fn append_import_log_line(path: &Path, line: &str) -> Result<()> {

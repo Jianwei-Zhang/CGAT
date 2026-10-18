@@ -3,7 +3,8 @@ use crate::grt_package::delivery_validator::{
     validate_app_final_path_manifest_hash, validate_app_source_fasta_paths,
 };
 use crate::grt_package::parsing::{
-    read_fasta_with_cancel, read_fasta_with_sha256_and_cancel, sha256_file,
+    read_fasta_summaries_with_sha256_and_cancel, read_fasta_with_cancel,
+    read_fasta_with_sha256_and_cancel, sha256_file,
 };
 
 #[test]
@@ -573,5 +574,229 @@ fn q4_fasta_digest_comes_from_the_same_pass_as_the_records() {
     assert_eq!(
         digest, "bcd80d30c15226a9b70ccd7499440fc97f47a34fcffedb8af009e6496ce5bc64",
         "the digest must cover every byte of the artifact"
+    );
+}
+
+#[test]
+#[ignore = "opt-in read-only q4 performance probe"]
+fn benchmark_q4_validation() {
+    let temp = tempdir().unwrap();
+    let path = if let Some(path) = std::env::var_os("GPM_IMPORT_BENCH_Q4") {
+        PathBuf::from(path)
+    } else {
+        let path = temp.path().join("q4.fa");
+        let mut output = std::io::BufWriter::new(fs::File::create(&path).unwrap());
+        for chromosome in 0..8 {
+            writeln!(output, ">Chr{chromosome}").unwrap();
+            let line = format!("{}\n", "ACGTNRYKMSWBDHV".repeat(5));
+            for _ in 0..112_000 {
+                output.write_all(line.as_bytes()).unwrap();
+            }
+        }
+        output.flush().unwrap();
+        path
+    };
+    let started = std::time::Instant::now();
+    let (records, artifact_hash) =
+        read_fasta_with_sha256_and_cancel(&path, "q4 benchmark", false, &mut || false).unwrap();
+    let summaries = records
+        .iter()
+        .map(|(name, sequence)| {
+            (
+                name.clone(),
+                (sequence.len(), sha256_bytes(sequence.as_bytes())),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    println!(
+        "q4_records bytes={} records={} elapsed_ms={} artifact_hash={artifact_hash}",
+        fs::metadata(&path).unwrap().len(),
+        records.len(),
+        started.elapsed().as_millis()
+    );
+    drop(records);
+    let started = std::time::Instant::now();
+    let (observed, observed_hash) =
+        read_fasta_summaries_with_sha256_and_cancel(&path, "q4 benchmark", false, &mut || false)
+            .unwrap();
+    let elapsed = started.elapsed();
+    assert_eq!(observed_hash, artifact_hash);
+    for (name, (length, hash)) in &summaries {
+        assert_eq!(observed[name].length, *length);
+        assert_eq!(observed[name].sha256, *hash);
+    }
+    assert_eq!(observed.len(), summaries.len());
+    println!(
+        "q4_summaries bytes={} records={} elapsed_ms={} retained_sequence_bytes=0 artifact_hash={observed_hash}",
+        fs::metadata(&path).unwrap().len(),
+        observed.len(),
+        elapsed.as_millis()
+    );
+    if std::env::var_os("GPM_IMPORT_BENCH_Q4").is_some() {
+        let root = path.parent().unwrap().parent().unwrap().parent().unwrap();
+        let started = std::time::Instant::now();
+        let detected = crate::workspace::resolve_bundle_root_dir(root).unwrap();
+        println!(
+            "resolve_bundle_root elapsed_us={} root={}",
+            started.elapsed().as_micros(),
+            detected.display()
+        );
+    }
+}
+
+#[test]
+fn fasta_summary_matches_record_validation_and_both_hashes() {
+    let temp = tempdir().unwrap();
+    let path = temp.path().join("q4.fa");
+    let text = " \r\n>Chr01 Mixed case header\r\n acgtnry \r\n kmswbdhv\r\n\r\n>Chr02\nNNnn\n";
+    fs::write(&path, text).unwrap();
+    let (records, file_hash) =
+        read_fasta_with_sha256_and_cancel(&path, "q4", false, &mut || false).unwrap();
+    let (summaries, observed_hash) =
+        read_fasta_summaries_with_sha256_and_cancel(&path, "q4", false, &mut || false).unwrap();
+    assert_eq!(observed_hash, file_hash);
+    assert_eq!(observed_hash, sha256_file(&path).unwrap());
+    assert_eq!(summaries.len(), records.len());
+    for (name, sequence) in records {
+        assert_eq!(summaries[&name].length, sequence.len());
+        assert_eq!(summaries[&name].sha256, sha256_bytes(sequence.as_bytes()));
+    }
+}
+
+#[test]
+fn fasta_summary_preserves_invalid_fasta_errors_and_empty_mode() {
+    let temp = tempdir().unwrap();
+    let path = temp.path().join("q4.fa");
+    for text in [
+        "",
+        "NN\n",
+        ">\nNN\n",
+        ">Chr01\n",
+        ">Chr01\n>Chr02\nNN\n",
+        ">Chr01\nNN\n>Chr01 duplicate\nNN\n",
+        ">Chr01\nACGU\n",
+        ">Chr01\nA C\n",
+        ">Chr01\n非ASCII\n",
+    ] {
+        fs::write(&path, text).unwrap();
+        let full_error =
+            read_fasta_with_sha256_and_cancel(&path, "q4", false, &mut || false).unwrap_err();
+        let summary_error =
+            read_fasta_summaries_with_sha256_and_cancel(&path, "q4", false, &mut || false)
+                .unwrap_err();
+        assert_eq!(
+            summary_error.to_string(),
+            full_error.to_string(),
+            "input={text:?}"
+        );
+    }
+    fs::write(&path, [b'>', b'x', b'\n', 0xff]).unwrap();
+    assert!(
+        read_fasta_summaries_with_sha256_and_cancel(&path, "q4", false, &mut || false)
+            .unwrap_err()
+            .to_string()
+            .contains("not UTF-8")
+    );
+    fs::write(&path, "\n").unwrap();
+    let (summaries, digest) =
+        read_fasta_summaries_with_sha256_and_cancel(&path, "q4", true, &mut || false).unwrap();
+    assert!(summaries.is_empty());
+    assert_eq!(digest, sha256_file(&path).unwrap());
+}
+
+#[test]
+fn fasta_summary_observes_mid_stream_cancellation() {
+    let temp = tempdir().unwrap();
+    let path = temp.path().join("q4.fa");
+    fs::write(&path, format!(">Chr01\n{}", "NNNN\n".repeat(2048))).unwrap();
+    let mut checks = 0;
+    let error = read_fasta_summaries_with_sha256_and_cancel(&path, "q4", false, &mut || {
+        checks += 1;
+        checks > 2
+    })
+    .unwrap_err();
+    assert_eq!(checks, 3);
+    assert!(error.to_string().contains("import cancelled"));
+}
+
+#[test]
+fn app_q4_summary_checks_artifact_chromosome_and_reconstruction_contracts() {
+    let temp = tempdir().unwrap();
+    fs::create_dir_all(temp.path().join("grt/q")).unwrap();
+    let path = temp.path().join("grt/q/q4.fa");
+    let text = ">Chr06\nnnnnnnnnnn\n";
+    fs::write(&path, text).unwrap();
+    let references = BTreeMap::from([("Chr06".to_string(), 10)]);
+    let sources = HashMap::new();
+    let cards = HashSet::new();
+    let manifest = serde_json::Map::from_iter([(
+        "q4_artifact_sha256".to_string(),
+        Value::String(sha256_bytes(text.as_bytes())),
+    )]);
+    let final_path = serde_json::json!({
+        "workflow": GRT_APP_WORKFLOW,
+        "schema_version": GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION,
+        "q4_relpath": "grt/q/q4.fa",
+        "chromosomes": [{"chr": "Chr06", "q4_length": 10,
+            "q4_sha256": sha256_bytes(b"NNNNNNNNNN"),
+            "segments": [{"segment_id": "gap-1", "kind": "gap", "length": 10}]}]
+    });
+    let validate = |final_path: &Value, manifest: &Map<String, Value>, source_sequences| {
+        validate_app_final_path(
+            temp.path(),
+            final_path,
+            AppFinalPathValidationContext {
+                reference_records: &references,
+                sources: &sources,
+                manifest,
+                fasta_available: true,
+                source_sequences,
+                expected_schema_version: GRT_APP_DISPLAY_FINAL_PATH_SCHEMA_VERSION,
+                display_source_cards: &cards,
+            },
+        )
+    };
+    let (lengths, records) = validate(&final_path, &manifest, None).unwrap();
+    assert_eq!(lengths["Chr06"], 10);
+    assert!(
+        records.is_none(),
+        "App import must not retain q4 sequence strings"
+    );
+    let source_sequences = HashMap::new();
+    let (_, records) = validate(&final_path, &manifest, Some(&source_sequences)).unwrap();
+    assert_eq!(records.unwrap()["Chr06"], "NNNNNNNNNN");
+    let mut wrong_manifest = manifest.clone();
+    wrong_manifest["q4_artifact_sha256"] = Value::String("0".repeat(64));
+    assert!(
+        validate(&final_path, &wrong_manifest, None)
+            .unwrap_err()
+            .to_string()
+            .contains("GRT_IMPORT_CHECKSUM_MISMATCH")
+    );
+    let mut wrong_path = final_path.clone();
+    wrong_path["chromosomes"][0]["q4_sha256"] = Value::String("0".repeat(64));
+    assert!(
+        validate(&wrong_path, &manifest, None)
+            .unwrap_err()
+            .to_string()
+            .contains("GRT_IMPORT_FINAL_PATH_MISMATCH")
+    );
+    wrong_path = final_path.clone();
+    wrong_path["chromosomes"][0]["q4_length"] = Value::from(11);
+    wrong_path["chromosomes"][0]["segments"][0]["length"] = Value::from(11);
+    assert!(
+        validate(&wrong_path, &manifest, None)
+            .unwrap_err()
+            .to_string()
+            .contains("GRT_IMPORT_FINAL_PATH_MISMATCH")
+    );
+    let missing = ">Chr09\nnnnnnnnnnn\n";
+    fs::write(&path, missing).unwrap();
+    wrong_manifest["q4_artifact_sha256"] = Value::String(sha256_bytes(missing.as_bytes()));
+    assert!(
+        validate(&final_path, &wrong_manifest, None)
+            .unwrap_err()
+            .to_string()
+            .contains("lacks chromosome Chr06")
     );
 }

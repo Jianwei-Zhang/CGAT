@@ -73,6 +73,36 @@ cargo test --locked --no-default-features
 门禁建立时，backend Rust 测试为 116 项，Tauri Rust 测试为 7 项。测试数可以增长；
 门禁会发现完整测试集，并不锁死这些数量。
 
+## App 导入性能探针
+
+在 Windows 宿主机的 `app/backend` 目录运行以下可选探针：
+
+```powershell
+cargo test --lib benchmark_q4_validation -- --ignored --nocapture
+cargo test --lib benchmark_pairwise_query_indexes -- --ignored --nocapture
+# 可选：只读校验现有 q4，替代生成合成数据。
+$env:GPM_IMPORT_BENCH_Q4 = 'D:\path\to\project\grt\q\q4.fa'
+cargo test --lib benchmark_q4_validation -- --ignored --nocapture
+Remove-Item Env:GPM_IMPORT_BENCH_Q4
+# 可选：只读打开现有数据库，复制索引列至临时库。
+$env:GPM_IMPORT_BENCH_DB = 'D:\path\to\project\project.sqlite'
+cargo test --lib benchmark_pairwise_query_indexes -- --ignored --nocapture
+Remove-Item Env:GPM_IMPORT_BENCH_DB
+```
+
+q4 探针对比保留序列与流式摘要两种路径，断言文件哈希、染色体哈希及长度完全一致。
+App 导入只保留摘要；需要来源片段重建的调用仍保留序列。两条路径共用 FASTA 格式
+校验与取消检查。摘要读取器的内存取决于染色体数和最长 FASTA 行，而不是整个折行
+基因组序列。
+SQLite 探针使用临时数据库，检查两个查询索引及完整性，并比较零/两个排序辅助线程。
+本次交付包上辅助线程没有稳定收益，因此生产代码保留 SQLite 的默认线程策略；事务
+和持久化设置不变。
+两个 Cargo 根目录的 debug profile 均优化 SHA-256 和内置 SQLite。
+
+`cache/import.log` 为每个步骤追加单调递增的 `elapsed_ms`。根目录定位、逐项目录提升
+（重命名而非复制数据）、创建索引和提交事务使用独立事件。应在相同输入、构建模式下
+对比；缓存及杀毒状态会影响计时。这些探针不代表完整导入或原生界面验收。
+
 ## CI 与发布
 
 `.github/workflows/quality.yml` 会在 Pull Request 和推送到 `master` 时执行同一组脚本。

@@ -401,7 +401,7 @@ where
 
     check_grt_validation_cancel(should_cancel)?;
     on_progress(
-        "validate_grt_final_path",
+        "validate_grt_app_final_path",
         "validating App Final Path and q4 payload",
     );
     let final_path = read_json(bundle_root, "metadata/grt_final_path.json")?;

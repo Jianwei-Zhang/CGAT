@@ -81,6 +81,41 @@ The baseline when this gate was introduced was 116 backend Rust tests and 7
 Tauri Rust tests. Test counts may grow; the gate discovers the full suites
 rather than pinning those counts.
 
+## App import performance probes
+
+Run these opt-in probes on the Windows host from `app/backend`:
+
+```powershell
+cargo test --lib benchmark_q4_validation -- --ignored --nocapture
+cargo test --lib benchmark_pairwise_query_indexes -- --ignored --nocapture
+# Optional: validate an existing q4 read-only instead of generating synthetic data.
+$env:GPM_IMPORT_BENCH_Q4 = 'D:\path\to\project\grt\q\q4.fa'
+cargo test --lib benchmark_q4_validation -- --ignored --nocapture
+Remove-Item Env:GPM_IMPORT_BENCH_Q4
+# Optional: copy index columns from a read-only existing database.
+$env:GPM_IMPORT_BENCH_DB = 'D:\path\to\project\project.sqlite'
+cargo test --lib benchmark_pairwise_query_indexes -- --ignored --nocapture
+Remove-Item Env:GPM_IMPORT_BENCH_DB
+```
+
+The q4 probe compares retained records with streaming summaries and asserts
+identical artifact/chromosome hashes and lengths. App import retains only
+summaries; source-reconstruction callers still retain records. Both paths use
+the same FASTA validation and cancellation checks. The summary reader's memory
+depends on chromosome count and the longest FASTA line, not the total wrapped
+genome sequence.
+The SQLite probe uses disposable databases, checks both query indexes and
+integrity, and compares zero/two sort helpers. Extra helpers showed no consistent
+benefit on the measured delivery, so production retains SQLite's default worker
+policy. Transactions and durability settings are unchanged.
+Debug profiles optimize SHA-256 and bundled SQLite in both Cargo roots.
+
+`cache/import.log` appends monotonic `elapsed_ms` to each step. Root resolution,
+per-entry directory promotion (rename, not payload copy), index creation, and
+transaction commit are distinct events. Compare equivalent inputs/build modes;
+cache and antivirus state affect timings. These probes are not full import or
+native-UI acceptance tests.
+
 ## CI and releases
 
 `.github/workflows/quality.yml` runs the same scripts for pull requests and

@@ -24,7 +24,7 @@ where
     let mut conn = open_workspace_db(project_db_path)?;
     let ref_run_count = count_bundle_ref_alignment_runs(&conn, bundle_root)?;
     let pairwise_runs = discover_pairwise_import_runs(&conn, bundle_root)?;
-    let pairwise_remaining = if pairwise_runs.is_empty() { 3 } else { 4 };
+    let pairwise_remaining = if pairwise_runs.is_empty() { 3 } else { 5 };
     recorder.reserve_remaining(1 + ref_run_count + 1 + pairwise_runs.len() + pairwise_remaining);
     conn.execute("DELETE FROM ref_alignment_hit", [])
         .context("failed to clear old ref alignment hits before import indexing")?;
@@ -393,18 +393,27 @@ where
         "creating pairwise query indexes after bulk load".to_string(),
     );
     check_import_cancel(should_cancel)?;
+    let indexes_started = std::time::Instant::now();
     tx.execute_batch(CREATE_PAIRWISE_HIT_INDEXES_SQL)
         .context("failed to create pairwise hit indexes after bulk load")?;
     check_import_cancel(should_cancel)?;
+    let index_duration_ms = indexes_started.elapsed().as_millis();
+    recorder.record(
+        "index_pairwise_paf_commit",
+        format!("indexes created in {index_duration_ms} ms; committing pairwise bulk load"),
+    );
+    check_import_cancel(should_cancel)?;
+    let commit_started = std::time::Instant::now();
     tx.commit()
         .context("failed to commit initial pairwise bulk load")?;
 
     let indexed_hit_count = states.iter().map(|state| state.written_hits).sum::<u64>();
     let parsed_row_count = states.iter().map(|state| state.parsed_rows).sum::<u64>();
+    let commit_duration_ms = commit_started.elapsed().as_millis();
     recorder.record(
         "index_pairwise_paf_complete",
         format!(
-            "indexed_runs={file_total}, indexed_hits={indexed_hit_count}, parsed_rows={parsed_row_count}, parser_workers={parser_workers}"
+            "indexed_runs={file_total}, indexed_hits={indexed_hit_count}, parsed_rows={parsed_row_count}, parser_workers={parser_workers}, index_duration_ms={index_duration_ms}, commit_duration_ms={commit_duration_ms}"
         ),
     );
     Ok(())
@@ -1151,4 +1160,98 @@ pub(super) fn discover_pairwise_import_runs_for_dataset(
     }
     runs.sort_by(|a, b| a.paf_path.cmp(&b.paf_path));
     Ok(runs)
+}
+
+#[cfg(test)]
+mod bulk_load_performance_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "opt-in synthetic or read-only workspace SQLite index performance probe"]
+    fn benchmark_pairwise_query_indexes() {
+        let temp = tempfile::tempdir().unwrap();
+        // Extra sort helpers showed no consistent benefit on the measured
+        // delivery. Keep this comparison opt-in; production retains SQLite's
+        // default worker policy instead of assuming more threads are faster.
+        for sort_workers in [0, 2] {
+            let path = temp.path().join(format!("indexes-{sort_workers}.sqlite"));
+            let conn = rusqlite::Connection::open(path).unwrap();
+            if let Some(source) = std::env::var_os("GPM_IMPORT_BENCH_DB") {
+                // URI mode=ro is enforced by SQLite for the user's attached
+                // database; all writes target this disposable main database.
+                let source = PathBuf::from(source);
+                assert!(source.is_absolute());
+                let normalized = source.to_string_lossy().replace('\\', "/");
+                let encoded = normalized
+                    .bytes()
+                    .map(|byte| {
+                        if byte.is_ascii_alphanumeric() || b"/-._~:".contains(&byte) {
+                            (byte as char).to_string()
+                        } else {
+                            format!("%{byte:02X}")
+                        }
+                    })
+                    .collect::<String>();
+                let uri = format!("file:{encoded}?mode=ro");
+                conn.execute("ATTACH DATABASE ?1 AS source", [&uri])
+                    .unwrap();
+                assert!(
+                    conn.is_readonly(rusqlite::DatabaseName::Attached("source"))
+                        .unwrap()
+                );
+                conn.execute_batch(
+                    "CREATE TABLE main.pairwise_alignment_hit AS
+                    SELECT run_id, query_source_seq_id, target_source_seq_id, align_length, mapq
+                    FROM source.pairwise_alignment_hit NOT INDEXED;",
+                )
+                .unwrap();
+            } else {
+                conn.execute_batch(
+                    "CREATE TABLE pairwise_alignment_hit (
+                    id INTEGER PRIMARY KEY, run_id INTEGER, query_source_seq_id INTEGER,
+                    target_source_seq_id INTEGER, align_length INTEGER, mapq INTEGER
+                );
+                WITH RECURSIVE rows(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM rows WHERE n<750000)
+                INSERT INTO pairwise_alignment_hit SELECT n, n%48, (n*7919)%100003,
+                    (n*3571)%100003, 100+n%10000, n%61 FROM rows;",
+                )
+                .unwrap();
+            }
+            let schema = "main";
+            conn.execute_batch("PRAGMA cache_size = -262144;").unwrap();
+            conn.pragma_update(None, "threads", sort_workers).unwrap();
+            let row_count_sql = format!("SELECT COUNT(*) FROM {schema}.pairwise_alignment_hit");
+            let rows: i64 = conn
+                .query_row(&row_count_sql, [], |row| row.get(0))
+                .unwrap();
+            let sql = CREATE_PAIRWISE_HIT_INDEXES_SQL.replace(
+                "CREATE INDEX IF NOT EXISTS idx_",
+                &format!("CREATE INDEX IF NOT EXISTS {schema}.idx_"),
+            );
+            let started = std::time::Instant::now();
+            conn.execute_batch(&sql).unwrap();
+            println!(
+                "pairwise_indexes rows={rows} sort_workers={sort_workers} elapsed_ms={}",
+                started.elapsed().as_millis()
+            );
+            let index_count: i64 = conn
+                .query_row(
+                    &format!("SELECT COUNT(*) FROM {schema}.sqlite_master WHERE type='index'"),
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(index_count, 2);
+            let after_rows: i64 = conn
+                .query_row(&row_count_sql, [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(after_rows, rows);
+            let result: String = conn
+                .query_row(&format!("PRAGMA {schema}.integrity_check"), [], |row| {
+                    row.get(0)
+                })
+                .unwrap();
+            assert_eq!(result, "ok");
+        }
+    }
 }

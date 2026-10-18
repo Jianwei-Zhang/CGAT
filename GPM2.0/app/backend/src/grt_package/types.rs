@@ -25,6 +25,7 @@ pub(super) fn is_display_app_final_path_schema(value: &str) -> bool {
 }
 
 pub(super) type TsvRow = BTreeMap<String, String>;
+// Sequence strings are retained only when source reconstruction is requested.
 pub(super) type AppQ4Validation = (BTreeMap<String, usize>, Option<BTreeMap<String, String>>);
 
 #[derive(Debug, Clone)]

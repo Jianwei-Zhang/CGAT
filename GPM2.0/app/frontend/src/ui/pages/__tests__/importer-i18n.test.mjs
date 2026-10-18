@@ -201,6 +201,12 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.progressStages.validate_grt_app_required_files, "检查 App 交付包必需文件");
   assert.equal(zh.progressStages.validate_grt_app_fai, "校验来源与 reference 的 FAI 长度");
   assert.equal(zh.progressStages.validate_grt_app_fastas, "检查 App 来源 FASTA 文件");
+  assert.equal(zh.progressStages.validate_grt_app_final_path, "校验 Final Path 与 q4 序列摘要");
+  assert.equal(zh.progressStages.normalize_workspace_layout_start, "整理项目目录");
+  assert.equal(zh.progressStages.normalize_workspace_layout_entry, "整理项目目录：{detail}");
+  assert.equal(zh.progressStages.resolve_bundle_root_start, "定位交付包根目录");
+  assert.equal(zh.progressStages.resolve_bundle_root, "交付包根目录已定位");
+  assert.equal(zh.progressStages.index_pairwise_paf_commit, "保存 pairwise 索引事务");
   assert.equal(zh.progressStages.extract_native_archive, "使用系统解压器展开交付包");
   assert.equal(zh.runtime.importPhaseProgress, "阶段 {current}/{total}");
   assert.equal(zh.runtime.importPhaseProgressEntries, "阶段 {current}/{total} · 已展开 {entries} 个条目");
@@ -228,6 +234,15 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.progressStages.validate_grt_app_required_files, "Check required App delivery files");
   assert.equal(en.progressStages.validate_grt_app_fai, "Validate source and reference FAI lengths");
   assert.equal(en.progressStages.validate_grt_app_fastas, "Check App source FASTA files");
+  assert.equal(en.progressStages.validate_grt_app_final_path, "Validate Final Path and q4 sequence digests");
+  assert.equal(en.progressStages.normalize_workspace_layout_start, "Normalize project layout");
+  assert.equal(en.progressStages.normalize_workspace_layout_entry, "Normalize project layout: {detail}");
+  assert.equal(en.progressStages.resolve_bundle_root_start, "Resolve delivery bundle root");
+  assert.equal(en.progressStages.resolve_bundle_root, "Delivery bundle root resolved");
+  assert.equal(en.progressStages.index_pairwise_paf_start, "Prepare pairwise bulk indexing");
+  assert.equal(en.progressStages.index_pairwise_paf_progress, "Pairwise indexing progress: {detail}");
+  assert.equal(en.progressStages.index_pairwise_paf_indexes, "Create pairwise query indexes");
+  assert.equal(en.progressStages.index_pairwise_paf_commit, "Commit pairwise index transaction");
   assert.equal(en.progressStages.extract_native_archive, "Extract delivery bundle with the system extractor");
   assert.equal(en.runtime.importPhaseProgress, "Phase {current}/{total}");
   assert.equal(en.runtime.importPhaseProgressEntries, "Phase {current}/{total} · {entries} entries extracted");

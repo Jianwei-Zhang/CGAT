@@ -571,8 +571,47 @@ where
     let mut q4_records = None;
     let q4_path = bundle_root.join("grt/q/q4.fa");
     if fasta_available {
-        // Parsing and hashing share one pass: q4 artifacts reach gigabytes and
-        // the digest used to cost a second full read.
+        if source_sequences.is_none() {
+            // Official App deliveries are closed over Final Path and q4 hashes.
+            // Validate the same FASTA grammar and both levels of SHA-256 while
+            // retaining only O(chromosomes) summaries, not O(genome) strings.
+            let (summaries, observed_hash) = read_fasta_summaries_with_sha256_and_cancel(
+                &required_bundle_file(bundle_root, "grt/q/q4.fa", "App q4 FASTA")?,
+                "App q4 FASTA",
+                false,
+                should_cancel,
+            )?;
+            if observed_hash != json_nonempty_str(manifest, "q4_artifact_sha256", "App manifest")? {
+                return grt_err(
+                    "CHECKSUM_MISMATCH",
+                    "App q4 artifact checksum differs from manifest",
+                );
+            }
+            for chromosome in chromosomes {
+                if should_cancel() {
+                    bail!("import cancelled");
+                }
+                let chr = chromosome.as_object().unwrap();
+                let name = json_str(chr, "chr", "App Final Path chromosome")?;
+                let summary = summaries.get(name).ok_or_else(|| {
+                    grt_anyhow(
+                        "FINAL_PATH_MISMATCH",
+                        format!("App q4 FASTA lacks chromosome {name}"),
+                    )
+                })?;
+                if summary.length != final_lengths[name]
+                    || summary.sha256 != json_str(chr, "q4_sha256", name)?
+                {
+                    return grt_err(
+                        "FINAL_PATH_MISMATCH",
+                        format!("App q4 FASTA differs from Final Path for {name}"),
+                    );
+                }
+            }
+            return Ok((final_lengths, None));
+        }
+        // Reconstruction callers still need the actual sequences. Parsing and
+        // artifact hashing share one pass here too.
         let (records, q4_observed_sha256) = read_fasta_with_sha256_and_cancel(
             &required_bundle_file(bundle_root, "grt/q/q4.fa", "App q4 FASTA")?,
             "App q4 FASTA",

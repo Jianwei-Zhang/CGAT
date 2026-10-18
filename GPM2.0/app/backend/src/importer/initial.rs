@@ -44,14 +44,20 @@ where
     recorder.record("validate_input", format!("extract_path={}", path.display()));
     recorder.reserve_remaining(6);
 
+    recorder.record(
+        "resolve_bundle_root_start",
+        format!("path={}", path.display()),
+    );
+    let resolve_started = std::time::Instant::now();
     let resolved = resolve_extracted_bundle_workspace(path)?;
     check_import_cancel(should_cancel)?;
     recorder.record(
         "resolve_bundle_root",
         format!(
-            "bundle_root={}, workspace_root={}",
+            "bundle_root={}, workspace_root={}, duration_ms={}",
             resolved.bundle_root.display(),
-            resolved.workspace_root.display()
+            resolved.workspace_root.display(),
+            resolve_started.elapsed().as_millis()
         ),
     );
 
@@ -222,6 +228,11 @@ where
     );
 
     recorder.set_phase(3, ZIP_IMPORT_PHASE_TOTAL);
+    recorder.record(
+        "resolve_bundle_root_start",
+        format!("path={}", workspace_root.display()),
+    );
+    let resolve_started = std::time::Instant::now();
     let detected_bundle_root = match resolve_bundle_root_dir(workspace_root) {
         Ok(path) => path,
         Err(error) => {
@@ -235,22 +246,35 @@ where
     }
     recorder.record(
         "resolve_bundle_root",
-        format!("bundle_root={}", detected_bundle_root.display()),
+        format!(
+            "bundle_root={}, duration_ms={}",
+            detected_bundle_root.display(),
+            resolve_started.elapsed().as_millis()
+        ),
     );
 
     if detected_bundle_root != workspace_root {
-        if let Err(error) =
-            promote_bundle_root_to_workspace_root(workspace_root, &detected_bundle_root)
-        {
+        recorder.record(
+            "normalize_workspace_layout_start",
+            "promoting top-level bundle entries without copying payloads".to_string(),
+        );
+        let normalize_started = std::time::Instant::now();
+        if let Err(error) = promote_bundle_root_to_workspace_root(
+            workspace_root,
+            &detected_bundle_root,
+            &mut |detail| recorder.record("normalize_workspace_layout_entry", detail),
+            should_cancel,
+        ) {
             remove_failed_zip_workspace(workspace_root, &error)?;
             return Err(error);
         }
         recorder.record(
             "normalize_workspace_layout",
             format!(
-                "promoted {} into {}",
+                "promoted {} into {}, duration_ms={}",
                 detected_bundle_root.display(),
-                workspace_root.display()
+                workspace_root.display(),
+                normalize_started.elapsed().as_millis()
             ),
         );
     }

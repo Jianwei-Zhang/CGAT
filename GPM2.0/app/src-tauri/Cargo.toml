@@ -18,3 +18,11 @@ rfd = "0.15"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tauri = { version = "2.11.1", features = [] }
+
+# Keep native import hot paths optimized in the interactive debug app too.
+# Cargo uses the root manifest's profiles, so mirror these in both crates.
+[profile.dev.package.sha2]
+opt-level = 3
+
+[profile.dev.package.libsqlite3-sys]
+opt-level = 3
