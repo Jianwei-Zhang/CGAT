@@ -43,6 +43,31 @@ xattr -dr com.apple.quarantine /Applications/GPM.app
 - Confirm the Release title is `GPM vX.Y.Z`, the tag and embedded app version match, and exactly four installer assets are present, plus only explicitly approved supplemental attachments.
 - Review the published body to ensure English precedes Chinese and both macOS first-launch sections remain intact.
 
+## Installer-only refresh of an existing version
+
+For an approved same-version installer replacement, preserve the official tag,
+Release title, target commit and original publication time. Keep all seven app
+version locations unchanged; record the actual rebuild revision in the notes.
+
+1. Back up the Release metadata, bilingual notes and existing assets, verifying
+   their size and SHA-256 so the previous downloads can be restored.
+2. Create a temporary **draft** Release and dispatch `release-installers.yml`
+   from the reviewed, pushed source branch with that draft as its `tag` input.
+   Do not publish the draft. This isolates the workflow's installer-deletion
+   step from the official Release and keeps existing downloads available.
+3. Wait for the full quality gate and all four installer jobs to succeed.
+   Download and verify the staged assets, including version, type, size and
+   SHA-256, alongside the workflow's native architecture/signing checks.
+4. Upload the verified, newly timestamped installers to the official Release
+   without overwriting old filenames. Verify fresh anonymous public downloads
+   before deleting only the four superseded installer assets.
+5. Preserve Server/test-data attachments and their identities/digests. Update
+   both language sections with the rebuild revision and workflow run while
+   retaining the platform list and both macOS first-launch sections.
+6. Re-read the official Release and verify the final asset set and preserved
+   metadata. Delete only the temporary staging draft and any tag it created;
+   never move the official version tag. Retain local rollback/audit evidence.
+
 ## Server-only source asset refresh
 
 For a fix to published Server code or its bundled skill, update the existing
