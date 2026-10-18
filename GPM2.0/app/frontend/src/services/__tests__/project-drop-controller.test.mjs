@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createProjectDropController, localWorkspaceTimestamp, relocateWorkspaceSuggestion, projectEntryBusy } from "../project-drop-controller.js";
+import { archiveImportForm, createProjectDropController, localWorkspaceTimestamp, relocateWorkspaceSuggestion, projectEntryBusy } from "../project-drop-controller.js";
 
 function harness(overrides = {}) {
   let state = { locale: "en", activeRoute: "assembly", importer: {}, initializer: {}, session: { workspacePath: "/previous", projectId: 4 } };
@@ -105,4 +105,12 @@ test("entry-resolving prevents button-based work from racing a drop", () => {
 test("choosing a new parent preserves the editable suggested-directory leaf", () => {
   assert.equal(relocateWorkspaceSuggestion("D:\\New Parent", "D:\\Deliveries\\sample_20261008_143025"), "D:/New Parent/sample_20261008_143025");
   assert.equal(relocateWorkspaceSuggestion("/new-parent/", "/deliveries/custom-name"), "/new-parent/custom-name");
+});
+
+test("archive form rejects non-archives or missing collision-safe destinations", () => {
+  for (const entry of [null, { kind: "workspace", path: "/existing" },
+    { kind: "archive", path: "/sample.zip" },
+    { kind: "archive", suggestedWorkspace: "/sample_20261018_103000" }]) {
+    assert.throws(() => archiveImportForm(entry), /new workspace/);
+  }
 });

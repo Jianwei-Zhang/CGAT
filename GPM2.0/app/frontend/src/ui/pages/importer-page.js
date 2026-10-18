@@ -1,4 +1,4 @@
-import { relocateWorkspaceSuggestion } from "../../services/project-drop-controller.js";
+import { archiveImportForm, localWorkspaceTimestamp, relocateWorkspaceSuggestion } from "../../services/project-drop-controller.js";
 import { readWorkspaceHistory as readSharedHistory, writeWorkspaceHistory as writeSharedHistory, updateWorkspaceHistory as updateSharedHistory, workspacePathIdentity } from "../../services/workspace-history.js";
 import {
   copyProjectWorkspace,
@@ -20,7 +20,7 @@ import { renderWorkspacePage, bindWorkspacePage } from "./workspace-page.js";
 import { switchProjectFromShell, closeProjectSession, buildEmptyAssemblyViewState, buildEmptyProjectExportState } from "../shell/session-switchers.js";
 import { clearAssemblySessionCache } from "../shell/assembly-session-cache.js";
 import { resetAssemblyPageSession } from "./assembly/page-session.js";
-import { pickDirectoryPath, pickZipFilePath } from "../../services/backend-api.js";
+import { invokeCommand, pickDirectoryPath, pickZipFilePath } from "../../services/backend-api.js";
 import { getMessages, t as i18nT } from "../i18n/index.js";
 import { projectIcon } from "./project-icons.js";
 import { normalizeImportParserWorkers } from "../../services/import-parallelism.js";
@@ -233,12 +233,22 @@ export function bindImporterPage(host, store) {
   });
 
   pickZipButton?.addEventListener("click", async () => {
-    const selectedPath = await pickZipFilePath(store.getState());
-    if (!selectedPath) {
-      return;
+    const importer = store.getState().importer;
+    if (importer.inFlight || importer.entryResolving) return;
+    updateImporterState(store, { entryResolving: true });
+    try {
+      const selectedPath = await pickZipFilePath(store.getState());
+      if (!selectedPath) return;
+      const entry = await invokeCommand("inspect_project_entry", {
+        entryPath: selectedPath, timestamp: localWorkspaceTimestamp(),
+      }, store.getState());
+      updateImporterState(store, archiveImportForm(entry));
+    } catch (error) {
+      updateImporterState(store, { projectError: String(error?.message || error) });
+    } finally {
+      updateImporterState(store, { entryResolving: false });
+      rerender(host, store);
     }
-    updateImporterState(store, { zipPath: selectedPath });
-    rerender(host, store);
   });
 
   pickZipWorkspaceButton?.addEventListener("click", async () => {

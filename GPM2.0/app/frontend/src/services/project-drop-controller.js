@@ -13,6 +13,19 @@ export function relocateWorkspaceSuggestion(parent, current) {
   return root && leaf ? `${root.replace(/\/+$/, "")}/${leaf}` : String(parent || "").trim();
 }
 
+// Both native drops and the archive picker populate the same import form.
+// Keep the backend's collision-safe destination and require a new directory.
+export function archiveImportForm(entry) {
+  if (entry?.kind !== "archive" || !entry.path || !entry.suggestedWorkspace) {
+    throw new Error("Unable to prepare a new workspace for the delivery archive.");
+  }
+  return {
+    importDialogOpen: true, importSource: "zip", zipPath: entry.path,
+    workspaceRoot: entry.suggestedWorkspace, requireNewWorkspace: true,
+    projectNameInput: "", projectError: "", pendingProjectPath: "",
+  };
+}
+
 export const projectDropCopy = {
   zh: {
     overlay: "松开以导入交付包或打开项目", hint: "ZIP / tar.gz · 已解压交付目录 · 已有工作路径",
@@ -84,11 +97,8 @@ export function createProjectDropController({ store, inspect, prepareSwitch = as
       if (busy()) { await feedback(labels().busy); return false; }
       resolving(false);
       if (entry.kind === "archive") {
-        if (!entry.suggestedWorkspace) throw new Error(labels().error);
-        store.setState({ activeRoute: "importer", importer: { ...store.getState().importer,
-          importDialogOpen: true, importSource: "zip", zipPath: entry.path,
-          workspaceRoot: entry.suggestedWorkspace, requireNewWorkspace: true,
-          projectNameInput: "", projectError: "", pendingProjectPath: "" } });
+        store.setState({ activeRoute: "importer", importer: {
+          ...store.getState().importer, ...archiveImportForm(entry) } });
         refresh();
       } else if (entry.kind === "extracted") {
         store.setState({ activeRoute: "importer", importer: { ...store.getState().importer,

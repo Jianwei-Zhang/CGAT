@@ -2364,3 +2364,130 @@ test("import progress meter reports streaming extraction entries while it stays 
     globalThis.window = previousWindow;
   }
 });
+
+// Picking an archive must use the same native inspection and destination as a drop.
+async function withArchivePicker(invoke, run) {
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  try {
+    globalThis.document = { querySelector: () => null };
+    globalThis.window = { __TAURI__: { core: { invoke } } };
+    const picker = createButton();
+    const parentPicker = createButton();
+    const importButton = createButton();
+    const store = createStore(createImporterScrollState({
+      inFlight: false, importRunId: null, importDialogOpen: true,
+      zipPath: "D:/old.zip", workspaceRoot: "D:/old-project", projectError: "old error",
+      projectNameInput: "Old name", pendingProjectPath: "D:/old-project",
+    }));
+    const host = createHost({
+      "#pick-zip-button": picker, "#pick-zip-workspace-button": parentPicker,
+      "#import-zip-start-button": importButton,
+    });
+    bindImporterPage(host, store);
+    await run({ picker, parentPicker, importButton, store, host });
+  } finally {
+    globalThis.window = previousWindow;
+    globalThis.document = previousDocument;
+  }
+}
+
+for (const suffix of [".zip", ".tar.gz", ".tgz"]) {
+  test(`archive picker ${suffix} fills the backend's sibling timestamp directory without importing`, async () => {
+    const selected = `D:/Delivery folder/sample.v2${suffix}`;
+    const suggested = "D:/Delivery folder/sample.v2_20261018_103000_01";
+    const calls = [];
+    await withArchivePicker(async (command, args) => {
+      calls.push({ command, args });
+      if (command === "pick_zip_file_path") return selected;
+      assert.equal(command, "inspect_project_entry");
+      assert.equal(args.entryPath, selected);
+      assert.match(args.timestamp, /^\d{8}_\d{6}$/);
+      return { kind: "archive", path: selected, suggestedWorkspace: suggested };
+    }, async ({ picker, store, host }) => {
+      const session = store.getState().session;
+      await picker.click();
+      const importer = store.getState().importer;
+      assert.equal(importer.zipPath, selected);
+      assert.equal(importer.workspaceRoot, suggested);
+      assert.equal(importer.requireNewWorkspace, true);
+      assert.equal(importer.importSource, "zip");
+      assert.equal(importer.importDialogOpen, true);
+      assert.equal(importer.entryResolving, false);
+      for (const key of ["projectError", "projectNameInput", "pendingProjectPath"]) assert.equal(importer[key], "");
+      assert.equal(store.getState().session, session);
+      assert.deepEqual(calls.map(call => call.command), ["pick_zip_file_path", "inspect_project_entry"]);
+      assert.match(host.innerHTML, /id="zip-workspace-root-input"[^>]*value="D:\/Delivery folder\/sample.v2_20261018_103000_01"/);
+      assert.doesNotMatch(host.innerHTML, /id="import-zip-start-button"[^>]*disabled/);
+    });
+  });
+}
+
+test("archive picker cancellation preserves both existing paths", async () => {
+  await withArchivePicker(async command => {
+    assert.equal(command, "pick_zip_file_path");
+    return null;
+  }, async ({ picker, store }) => {
+    const before = store.getState().importer;
+    await picker.click();
+    assert.deepEqual(store.getState().importer, { ...before, entryResolving: false });
+  });
+});
+
+test("archive picker errors keep the previous path pair and release the resolving guard", async () => {
+  await withArchivePicker(async command => {
+    if (command === "pick_zip_file_path") return "D:/bad.zip";
+    assert.equal(command, "inspect_project_entry");
+    throw new Error("invalid ZIP delivery archive");
+  }, async ({ picker, store, host }) => {
+    await picker.click();
+    const importer = store.getState().importer;
+    assert.equal(importer.zipPath, "D:/old.zip");
+    assert.equal(importer.workspaceRoot, "D:/old-project");
+    assert.equal(importer.entryResolving, false);
+    assert.match(importer.projectError, /invalid ZIP delivery archive/);
+    assert.match(host.innerHTML, /role="alert">invalid ZIP delivery archive/);
+  });
+});
+
+test("archive picker prevents duplicate selection and import while inspection is pending", async () => {
+  const pending = createDeferred();
+  const inspecting = createDeferred();
+  const calls = [];
+  await withArchivePicker(async command => {
+    calls.push(command);
+    if (command === "pick_zip_file_path") return "D:/sample.zip";
+    assert.equal(command, "inspect_project_entry");
+    inspecting.resolve();
+    return pending.promise;
+  }, async ({ picker, importButton, store }) => {
+    const first = picker.click();
+    await inspecting.promise;
+    await picker.click();
+    await importButton.click();
+    assert.equal(store.getState().importer.entryResolving, true);
+    assert.deepEqual(calls, ["pick_zip_file_path", "inspect_project_entry"]);
+    pending.resolve({ kind: "archive", path: "D:/sample.zip", suggestedWorkspace: "D:/sample_20261018_103000" });
+    await first;
+    assert.equal(store.getState().importer.entryResolving, false);
+  });
+});
+
+test("picked archive keeps its generated leaf when choosing a parent and refreshes it on reselection", async () => {
+  let selected = "D:/first.zip";
+  await withArchivePicker(async command => {
+    if (command === "pick_zip_file_path") return selected;
+    if (command === "pick_directory_path") return "E:/Custom parent";
+    assert.equal(command, "inspect_project_entry");
+    return { kind: "archive", path: selected, suggestedWorkspace: selected.replace(".zip", "_20261018_103000") };
+  }, async ({ picker, parentPicker, store }) => {
+    await picker.click();
+    await parentPicker.click();
+    assert.equal(store.getState().importer.workspaceRoot, "E:/Custom parent/first_20261018_103000");
+    assert.equal(store.getState().importer.requireNewWorkspace, true);
+    selected = "D:/second.zip";
+    await picker.click();
+    assert.equal(store.getState().importer.workspaceRoot, "D:/second_20261018_103000");
+    assert.equal(store.getState().importer.zipPath, selected);
+  });
+});
