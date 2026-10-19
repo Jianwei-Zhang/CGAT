@@ -1854,8 +1854,8 @@ test("project export final path preview hides labels that cannot fit fully", () 
   const fittingNode = createCtgNode(40, 80);
 
   __test.syncProjectExportPreviewLabels({
-    querySelectorAll() {
-      return [clippedNode, fittingNode];
+    querySelectorAll(selector) {
+      return selector === ".project-export-final-path-preview-ctg" ? [clippedNode, fittingNode] : [];
     },
   });
 
@@ -1934,4 +1934,54 @@ test("project export preview tags both gaps and contigs for shared minimum-pixel
   assert.match(output, /data-final-path-kind="gap" data-final-path-length="1"/);
   assert.match(output, /data-final-path-kind="ctg" data-final-path-length="1"/);
   assert.match(output, /data-final-path-gap-label="1"/);
+});
+
+
+test("project export hides overlapping GAP text per row and restores it after resize", () => {
+  function createLabel(left, width = 28) {
+    return {
+      left,
+      style: {},
+      getBoundingClientRect() {
+        return { left: this.left, right: this.left + width, width };
+      },
+    };
+  }
+  const first = createLabel(10);
+  const overlapping = createLabel(20);
+  const touching = createLabel(38);
+  const isolated = createLabel(100);
+  const otherRow = createLabel(10);
+  const gapMarker = { style: { left: "20px", width: "8px" }, title: "GAP 100 bp" };
+  const host = {
+    querySelectorAll(selector) {
+      if (selector !== ".project-export-final-path-preview-track") return [];
+      return [[first, overlapping, touching, isolated], [otherRow]].map((labels) => ({
+        querySelectorAll(labelSelector) {
+          assert.equal(labelSelector, "[data-final-path-gap-label]");
+          return labels;
+        },
+        gapMarker,
+      }));
+    },
+  };
+
+  __test.syncProjectExportPreviewLabels(host);
+  assert.equal(first.style.visibility, "");
+  assert.equal(overlapping.style.visibility, "hidden");
+  assert.equal(touching.style.visibility, "");
+  assert.equal(isolated.style.visibility, "");
+  assert.equal(otherRow.style.visibility, "");
+  assert.deepEqual(gapMarker, { style: { left: "20px", width: "8px" }, title: "GAP 100 bp" });
+
+  overlapping.left = 50;
+  touching.left = 80;
+  isolated.left = 120;
+  __test.syncProjectExportPreviewLabels(host);
+  assert.equal(overlapping.style.visibility, "");
+  assert.equal(touching.style.visibility, "");
+
+  overlapping.left = 20;
+  __test.syncProjectExportPreviewLabels(host);
+  assert.equal(overlapping.style.visibility, "hidden");
 });

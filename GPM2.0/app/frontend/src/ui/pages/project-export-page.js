@@ -1763,6 +1763,22 @@ function syncProjectExportPreviewLabels(host) {
       ctgNode.classList?.add?.("is-label-hidden");
     }
   });
+  host.querySelectorAll(".project-export-final-path-preview-track").forEach((track) => {
+    const labels = Array.from(track.querySelectorAll("[data-final-path-gap-label]"));
+    // Visibility preserves label measurements so a wider viewport can restore them.
+    labels.forEach((label) => { label.style.visibility = ""; });
+    const bounds = labels.map((label) => ({ label, rect: label.getBoundingClientRect() }))
+      .filter(({ rect }) => rect.width > 0)
+      .sort((left, right) => left.rect.left - right.rect.left);
+    let visibleRight = -Infinity;
+    bounds.forEach(({ label, rect }) => {
+      if (rect.left < visibleRight) {
+        label.style.visibility = "hidden";
+      } else {
+        visibleRight = rect.right;
+      }
+    });
+  });
 }
 
 function setProjectExportDetailFilter(host, store, filterKey, value, checked = false) {
