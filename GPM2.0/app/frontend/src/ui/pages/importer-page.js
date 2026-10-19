@@ -473,11 +473,37 @@ function bindProjectEntryControls(host, store) {
     host.querySelector("#project-import-button")?.focus();
   };
   host.querySelector("[data-project-import-close]")?.addEventListener("click", closeImport);
-  host.querySelector("[data-project-import-overlay]")?.addEventListener("click", event => {
-    if (event.target === event.currentTarget) closeImport();
+  const overlay = host.querySelector("[data-project-import-overlay]");
+  let backdropPointerId = null;
+  let dismissFromBackdrop = false;
+  // Text-selection drags can produce a click on the dialog/backdrop's common
+  // ancestor. Only dismiss when the same primary pointer starts AND ends outside.
+  overlay?.addEventListener("pointerdown", event => {
+    dismissFromBackdrop = false;
+    backdropPointerId = event.target === event.currentTarget && event.button === 0 && event.isPrimary !== false
+      ? event.pointerId : null;
+  });
+  overlay?.addEventListener("pointerup", event => {
+    dismissFromBackdrop = backdropPointerId !== null && event.pointerId === backdropPointerId
+      && event.target === event.currentTarget;
+    backdropPointerId = null;
+  });
+  overlay?.addEventListener("pointercancel", () => {
+    backdropPointerId = null;
+    dismissFromBackdrop = false;
+  });
+  overlay?.addEventListener("click", event => {
+    const dismiss = dismissFromBackdrop && event.target === event.currentTarget;
+    dismissFromBackdrop = false;
+    if (dismiss) closeImport();
   });
   const dialog = host.querySelector(".project-import-dialog");
+  let composing = false;
+  dialog?.addEventListener("compositionstart", () => { composing = true; });
+  dialog?.addEventListener("compositionend", () => { composing = false; });
   dialog?.addEventListener("keydown", event => {
+    // Escape belongs to the IME while selecting/cancelling a candidate.
+    if (event.defaultPrevented || composing || event.isComposing || event.keyCode === 229) return;
     if (event.key === "Escape") { event.preventDefault?.(); closeImport(); }
     if (event.key === "Tab") {
       const controls = [...dialog.querySelectorAll("input,select,button")].filter(node => !node.disabled);

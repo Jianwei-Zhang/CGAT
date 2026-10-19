@@ -34,6 +34,9 @@ function createButton() {
     addEventListener(type, handler) {
       listeners.set(type, handler);
     },
+    emit(type, event = {}) {
+      return listeners.get(type)?.({ currentTarget: this, target: this, ...event });
+    },
     input(value) {
       this.value = value;
       return listeners.get("input")?.({ currentTarget: this, target: this });
@@ -2557,5 +2560,151 @@ for (const source of ["zip", "extracted"]) {
       globalThis.window = previousWindow;
       globalThis.document = previousDocument;
     }
+  });
+}
+
+
+function withEditableImportDialog(source, run) {
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  try {
+    globalThis.window = {};
+    globalThis.document = { querySelector: () => null };
+    const name = createButton();
+    const overlay = createButton();
+    const dialog = createButton();
+    const cancel = createButton();
+    const submit = createButton();
+    dialog.querySelector = () => submit;
+    dialog.querySelectorAll = () => [name, cancel, submit];
+    const directory = createButton();
+    directory.value = "D:/sample";
+    const archive = createButton();
+    archive.value = "D:/sample.zip";
+    const store = createStore(createImporterScrollState({
+      inFlight: false, importRunId: null, importDialogOpen: true, importSource: source,
+      zipPath: "D:/sample.zip", workspaceRoot: directory.value, extractedPath: directory.value,
+      projectNameInput: "sample", projectNameEdited: false,
+    }));
+    const host = createHost({
+      "#import-project-name": name,
+      "#zip-path-input": archive,
+      "#zip-workspace-root-input": directory,
+      "#extracted-path-input": directory,
+      ".project-import-dialog": dialog,
+      "[data-project-import-overlay]": overlay,
+      "[data-project-import-close]": cancel,
+    });
+    host.innerHTML = renderImporterPage(store.getState());
+    bindImporterPage(host, store);
+    const originalHtml = host.innerHTML;
+    const edit = value => {
+      name.input(value);
+      dialog.emit("input", { target: name });
+    };
+    const assertStillEditing = () => {
+      assert.equal(store.getState().importer.importDialogOpen, true);
+      assert.equal(store.getState().importer.inFlight, false);
+      assert.equal(store.getState().importer.projectNameInput, name.value);
+      assert.equal(host.innerHTML, originalHtml, "editing must not replace the form");
+    };
+    const pointer = (type, target, extra = {}) => overlay.emit(type, {
+      target, pointerId: 1, button: 0, isPrimary: true, ...extra,
+    });
+    run({ name, overlay, dialog, cancel, store, host, edit, assertStillEditing, pointer });
+  } finally {
+    globalThis.window = previousWindow;
+    globalThis.document = previousDocument;
+  }
+}
+
+for (const source of ["zip", "extracted"]) {
+  test(`${source} import stays open when selecting a project name ends on the backdrop`, () => {
+    withEditableImportDialog(source, ({ name, overlay, edit, assertStillEditing, pointer }) => {
+      for (const value of ["sample-edited", "项目名称", ""]) {
+        edit(value);
+        pointer("pointerdown", name);
+        pointer("pointerup", overlay);
+        // A drag crossing the dialog boundary can click their common ancestor.
+        overlay.emit("click");
+        assertStillEditing();
+      }
+    });
+  });
+
+  test(`${source} import ignores incomplete, reversed and cancelled backdrop gestures`, () => {
+    withEditableImportDialog(source, ({ name, overlay, edit, assertStillEditing, pointer }) => {
+      edit("keep this draft");
+      overlay.emit("click");
+      assertStillEditing();
+      pointer("pointerdown", overlay);
+      pointer("pointerup", name);
+      overlay.emit("click");
+      assertStillEditing();
+      pointer("pointerdown", overlay);
+      pointer("pointercancel", overlay);
+      overlay.emit("click");
+      assertStillEditing();
+      pointer("pointerdown", overlay, { button: 2 });
+      pointer("pointerup", overlay, { button: 2 });
+      overlay.emit("click");
+      assertStillEditing();
+      pointer("pointerdown", overlay, { isPrimary: false });
+      pointer("pointerup", overlay, { isPrimary: false });
+      overlay.emit("click");
+      assertStillEditing();
+      pointer("pointerdown", overlay);
+      pointer("pointerup", overlay, { pointerId: 2 });
+      overlay.emit("click");
+      assertStillEditing();
+    });
+  });
+
+  test(`${source} import still closes on an intentional backdrop click and retains the draft`, () => {
+    withEditableImportDialog(source, ({ overlay, edit, store, host, pointer }) => {
+      edit("edited before closing");
+      pointer("pointerdown", overlay);
+      pointer("pointerup", overlay);
+      overlay.emit("click");
+      assert.equal(store.getState().importer.importDialogOpen, false);
+      assert.equal(store.getState().importer.projectNameInput, "edited before closing");
+      assert.doesNotMatch(host.innerHTML, /class="modal-dialog project-import-dialog"/);
+    });
+  });
+
+  for (const imeState of [{ isComposing: true }, { keyCode: 229 }, { defaultPrevented: true }]) {
+    test(`${source} import ignores handled/IME Escape ${JSON.stringify(imeState)}`, () => {
+      withEditableImportDialog(source, ({ name, dialog, edit, assertStillEditing }) => {
+        edit("中文项目");
+        dialog.emit("keydown", { target: name, key: "Escape", ...imeState,
+          preventDefault() { assert.fail("do not consume the input method's Escape"); } });
+        assertStillEditing();
+      });
+    });
+  }
+
+  test(`${source} import tracks composition and still supports ordinary Escape afterwards`, () => {
+    withEditableImportDialog(source, ({ name, dialog, store, edit, assertStillEditing }) => {
+      dialog.emit("compositionstart", { target: name });
+      edit("中文草稿");
+      dialog.emit("keydown", { target: name, key: "Escape",
+        preventDefault() { assert.fail("composition must keep its Escape"); } });
+      assertStillEditing();
+      dialog.emit("compositionend", { target: name });
+      let prevented = false;
+      dialog.emit("keydown", { target: name, key: "Escape", preventDefault() { prevented = true; } });
+      assert.equal(prevented, true);
+      assert.equal(store.getState().importer.importDialogOpen, false);
+      assert.equal(store.getState().importer.projectNameInput, "中文草稿");
+    });
+  });
+
+  test(`${source} import cancel button still closes after editing the name`, () => {
+    withEditableImportDialog(source, ({ cancel, store, edit }) => {
+      edit("a preserved draft");
+      cancel.click();
+      assert.equal(store.getState().importer.importDialogOpen, false);
+      assert.equal(store.getState().importer.projectNameInput, "a preserved draft");
+    });
   });
 }
