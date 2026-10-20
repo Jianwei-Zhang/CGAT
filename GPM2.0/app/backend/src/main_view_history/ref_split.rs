@@ -1,7 +1,7 @@
-//! A single current-Ref envelope cut. No reassignment, recommendation or UI dialog.
+//! Same-track single cuts: current-Ref envelope shortcuts and manual source positions.
 use super::types::PreparedMutation;
 use crate::contig_split::{
-    SplitCommitParams, SplitPart, SplitPreview, load_split_source, partition,
+    SplitCommitParams, SplitPart, SplitPreview, SplitSource, load_split_source, partition,
 };
 use anyhow::{Context, Result, bail};
 use rusqlite::Connection;
@@ -72,6 +72,48 @@ pub(super) fn prepare_ref_split(
             "CTG_SPLIT_STALE_BOUNDARY: reopen the menu; the displayed boundary is no longer splittable"
         );
     }
+    apply_same_track_cut(conn, project_id, source, cut, "alignment-boundary")
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ManualRequest {
+    assembly_ctg_id: i64,
+    cut_after: i64,
+    source_start: i64,
+    source_end: i64,
+    orient: String,
+}
+
+pub(super) fn prepare_manual_split(
+    conn: &Connection,
+    project_id: i64,
+    chr_name: &str,
+    args: &Value,
+) -> Result<PreparedMutation> {
+    let request: ManualRequest =
+        serde_json::from_value(args.clone()).context("CTG_SPLIT_INVALID_REQUEST")?;
+    let source = load_split_source(conn, project_id, request.assembly_ctg_id)?;
+    if source.assigned_chr_name.as_deref() != Some(chr_name)
+        || source.source_start != request.source_start
+        || source.source_end != request.source_end
+        || source.orient != request.orient
+    {
+        bail!("CTG_SPLIT_STALE_SOURCE: contig changed; reopen the manual split panel");
+    }
+    if request.cut_after < source.source_start || request.cut_after >= source.source_end {
+        bail!("CTG_SPLIT_INVALID_CUT: cut must lie inside the source interval");
+    }
+    apply_same_track_cut(conn, project_id, source, request.cut_after, "manual")
+}
+
+fn apply_same_track_cut(
+    conn: &Connection,
+    project_id: i64,
+    source: SplitSource,
+    cut: i64,
+    reason: &str,
+) -> Result<PreparedMutation> {
     let parts = partition(&source, &[cut])
         .into_iter()
         .map(|(a, b)| SplitPart {
@@ -86,7 +128,7 @@ pub(super) fn prepare_ref_split(
         cut_after: vec![cut],
         assignments: vec![source.assigned_chr_name.clone(); 2],
         preview_token: String::new(),
-        reason: "alignment-boundary".into(),
+        reason: reason.into(),
     };
     let preview = SplitPreview {
         source,

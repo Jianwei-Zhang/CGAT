@@ -338,7 +338,7 @@ export async function runMainViewEditorAction({
   if (isTauriRuntime()) {
     return runMainViewEditorActionTauri(payload);
   }
-  if (["split-source-ctg", "split-ref-boundary"].includes(payload.action)) {
+  if (["split-source-ctg", "split-ref-boundary", "split-manual-contig"].includes(payload.action)) {
     return callDevBridge("/api/main-view-editor-action", payload);
   }
   return callMainViewBridgeOrMock(

@@ -3,35 +3,49 @@ import { resolveHitIdentityPct } from "./track-render-geometry.js";
 import { resolveTrackCtgOrient } from "./track-label-geometry.js";
 
 export const splitCopy = {
-  zh: { title: "分割 contig", left: "在比对最左侧分割", right: "在比对最右侧分割",
+  zh: { title: "分割 contig", manual: "手动分割…", left: "在比对最左侧分割", right: "在比对最右侧分割",
     unavailable: "没有可用的比对边界，或边界已在 contig 端部", stale: "比对或当前视图已变化，请重新打开菜单。",
     done: "已分割 contig；两段保留在原轨道，可撤销。" },
-  en: { title: "Split contig", left: "Split at leftmost alignment", right: "Split at rightmost alignment",
+  en: { title: "Split contig", manual: "Manual split…", left: "Split at leftmost alignment", right: "Split at rightmost alignment",
     unavailable: "No alignment boundary, or the boundary is already at the contig end", stale: "Alignment or view changed. Reopen the menu.",
     done: "Contig split; both fragments remain on the original track. Undo is available." },
 };
 
-// Use the same per-hit length/identity filters as the main Ref-band renderer.
-// The viewport does not crop biological evidence. Current chromosome data only.
-export function resolveContigSplitBoundaries(assembly, assemblyCtgId) {
-  if (assembly?.activeHitsTrackKey && assembly.activeHitsTrackKey !== "primary") return null;
+// Shared immutable source model for envelope cuts and the compact manual panel.
+export function resolveContigSplitModel(assembly, assemblyCtgId) {
   const ctg = assembly?.chrCtgs?.find((c) => Number(c.assemblyCtgId) === Number(assemblyCtgId));
   if (!ctg || (assembly.hiddenPrimaryCtgIds || []).map(Number).includes(Number(assemblyCtgId))) return null;
   const prefs = resolveTrackPrefs(assembly.trackView);
   const sourceStart = Number(ctg.sourceFragment?.sourceStart || 1);
   const sourceEnd = Number(ctg.sourceFragment?.sourceEnd || ctg.totalLength);
-  const reverse = resolveTrackCtgOrient(ctg) === "-";
+  if (!Number.isSafeInteger(sourceStart) || !Number.isSafeInteger(sourceEnd) || sourceStart < 1 || sourceEnd <= sourceStart) return null;
+  const orient = resolveTrackCtgOrient(ctg);
   const hits = (ctg.hits || []).filter((h) => Number(h.blockLength ?? h.block_length) >= prefs.alignmentLength
     && resolveHitIdentityPct(h) >= prefs.minIdentityPct
-    && !(h.chrName && h.chrName !== assembly.selectedChrName));
-  const intervals = hits.map((h) => [Number(h.queryStart ?? h.query_start), Number(h.queryEnd ?? h.query_end)])
-    .filter(([a,b]) => Number.isSafeInteger(a) && Number.isSafeInteger(b) && a >= sourceStart && b <= sourceEnd && a <= b);
-  if (!intervals.length) return null;
-  const low = Math.min(...intervals.map(([a]) => a)) - 1;
-  const high = Math.max(...intervals.map(([,b]) => b));
-  const valid = (cut) => cut >= sourceStart && cut < sourceEnd ? cut : null;
-  return { assemblyCtgId: Number(assemblyCtgId), left: valid(reverse ? high : low), right: valid(reverse ? low : high),
-    reverse, minAlignmentLength: prefs.alignmentLength, minIdentityPct: prefs.minIdentityPct };
+    && !(h.chrName && h.chrName !== assembly.selectedChrName))
+    .map((h) => ({ queryStart: Number(h.queryStart ?? h.query_start), queryEnd: Number(h.queryEnd ?? h.query_end),
+      refStart: Number(h.refStart ?? h.ref_start), refEnd: Number(h.refEnd ?? h.ref_end), strand: h.strand }))
+    .filter((h) => Number.isSafeInteger(h.queryStart) && Number.isSafeInteger(h.queryEnd)
+      && h.queryStart >= sourceStart && h.queryEnd <= sourceEnd && h.queryStart <= h.queryEnd);
+  const chromosome = assembly.chromosomes?.find((c) => c.chrName === assembly.selectedChrName);
+  const refLength = Number(chromosome?.chrLength || chromosome?.length)
+    || Math.max(0, ...hits.map((h) => Number.isFinite(h.refEnd) ? h.refEnd : 0));
+  return { assemblyCtgId: Number(assemblyCtgId), name: String(ctg.name || ctg.originId || "contig"),
+    sourceStart, sourceEnd, orient, chrName: String(assembly.selectedChrName || ""), refLength, hits,
+    minAlignmentLength: prefs.alignmentLength, minIdentityPct: prefs.minIdentityPct };
+}
+
+// Use all current-Ref hits passing the same per-hit filters as the main renderer.
+export function resolveContigSplitBoundaries(assembly, assemblyCtgId) {
+  if (assembly?.activeHitsTrackKey && assembly.activeHitsTrackKey !== "primary") return null;
+  const model = resolveContigSplitModel(assembly, assemblyCtgId);
+  if (!model?.hits.length) return null;
+  const low = Math.min(...model.hits.map((h) => h.queryStart)) - 1;
+  const high = Math.max(...model.hits.map((h) => h.queryEnd));
+  const reverse = model.orient === "-";
+  const valid = (cut) => cut >= model.sourceStart && cut < model.sourceEnd ? cut : null;
+  return { assemblyCtgId: model.assemblyCtgId, left: valid(reverse ? high : low), right: valid(reverse ? low : high),
+    reverse, minAlignmentLength: model.minAlignmentLength, minIdentityPct: model.minIdentityPct };
 }
 
 // Attach the preview to the exact rendered band edge, not to a guessed Ref X.

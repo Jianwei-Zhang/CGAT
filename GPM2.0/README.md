@@ -190,10 +190,12 @@ bash ./gpm_server/export_final_path_fasta.sh \
   -o /path/to/project_Chr01_path.fa
 ```
 
-### Split contig at the current Ref alignment envelope
+### Split contig
 
 Right-click a primary contig (or one of its Ref alignment bands), choose **Split contig**, then **Split at leftmost alignment** or **Split at rightmost alignment**. The bounds include all current-Ref hits passing the main view length/identity filters, not just the clicked band. Left/right follow the displayed orientation. An unavailable/end-of-contig boundary is disabled.
 
 Hover or focus an option to highlight that boundary in the graph like a local-view anchor; leaving the option, closing the menu or pressing Escape removes the preview without edits. Clicking performs one split directly—no split panel, recommendation list or chromosome-assignment dialog.
 
-Both fragments remain on the same chromosome/dataset track, retain orientation and placement/drag offsets, and appear as `ctg.1` and `ctg.2` in display order with a visual gap. No bases or Ns are inserted. Original FASTA is unchanged; Final Path source intervals preserve the same DNA and order. The main-view Undo/Redo controls restore/reapply the operation. Other-chromosome assignment and algorithm/manual-cut UI are not exposed in this step.
+Both fragments remain on the same chromosome/dataset track, retain orientation and placement/drag offsets, and appear as `ctg.1` and `ctg.2` in display order with a visual gap. No bases or Ns are inserted. Original FASTA is unchanged; Final Path source intervals preserve the same DNA and order. The main-view Undo/Redo controls restore/reapply the operation. Other-chromosome assignment and algorithm recommendations are not exposed.
+
+**Manual split…**, above the two boundary shortcuts, opens a compact panel with the current Ref/contig preview, one source-coordinate input, left/right lengths and Cancel/Split. Typing updates the cut line immediately; clicking any alignment edge (including internal block edges) updates the same coordinate. Coordinates are 1-based: cut after base `k`. Reverse display is handled automatically. Preview/cancel do not write to the project; confirmation uses the same original-track split and undo protections.

@@ -1023,3 +1023,16 @@ test("direct boundary splitting routes through persistent native history without
     assert.deepEqual(calls[0].args.request.args,args);
   } finally {globalThis.window=previousWindow;}
 });
+
+test("manual contig split sends only its coordinate and source precondition through native history", async () => {
+  const previousWindow=globalThis.window;const calls=[];
+  try {
+    globalThis.window={__TAURI__:{core:{invoke:async(command,args)=>{calls.push({command,args});return {changed:true};}}}};
+    const args={assemblyCtgId:6,cutAfter:42424,sourceStart:1,sourceEnd:100000,orient:"-"};
+    await runMainViewEditorAction({workspaceRoot:"D:/workspace",projectId:1,chrName:"ChrA",action:"split-manual-contig",args});
+    assert.equal(calls.length,1);assert.equal(calls[0].command,"run_main_view_editor_action");
+    assert.equal(calls[0].args.request.action,"split-manual-contig");assert.deepEqual(calls[0].args.request.args,args);
+    globalThis.window.__TAURI__.core.invoke=async()=>{throw new Error("stale source");};
+    await assert.rejects(runMainViewEditorAction({workspaceRoot:"D:/workspace",projectId:1,chrName:"ChrA",action:"split-manual-contig",args}),/stale source/);
+  } finally {globalThis.window=previousWindow;}
+});

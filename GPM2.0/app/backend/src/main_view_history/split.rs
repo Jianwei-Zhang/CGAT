@@ -309,7 +309,9 @@ pub(super) fn apply_split(
     let after = capture_snapshot(conn, project_id, &snapshot_scope(&before))?;
     Ok(PreparedMutation {
         descriptor: MainViewHistoryOperationDescriptor {
-            kind: if keep_placement {
+            kind: if keep_placement && request.reason == "manual" {
+                "split-manual-contig"
+            } else if keep_placement {
                 "split-ref-boundary"
             } else {
                 "split-source-ctg"

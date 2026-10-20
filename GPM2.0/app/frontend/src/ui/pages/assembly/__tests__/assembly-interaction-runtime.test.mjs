@@ -2713,7 +2713,7 @@ test("assembly page public binder wires host-level listeners once for the same h
   ]);
 });
 
-test("split contig menu only exposes outer Ref boundaries from all filtered hits", async () => {
+test("split contig menu places manual split before outer Ref boundaries", async () => {
   const calls=[];
   const ctg={assemblyCtgId:2,totalLength:1000,orient:"-",hits:[
     {queryStart:101,queryEnd:300,blockLength:200,identityPct:99},
@@ -2721,12 +2721,12 @@ test("split contig menu only exposes outer Ref boundaries from all filtered hits
     {queryStart:1,queryEnd:1000,blockLength:10,identityPct:99}]};
   const store=createStore(createState({assembly:{selectedChrName:"Chr01",trackSelectedCtgIds:[],trackView:{alignmentLength:100},chrCtgs:[ctg]}}));
   const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:"primary"},memberNode:null,host:{},store,
-    actions:{canEditTrackCtg:()=>true,splitContigAtRefBoundary:async (_host,_store,args)=>calls.push(args)}});
+    actions:{canEditTrackCtg:()=>true,splitContigAtRefBoundary:async (_host,_store,args)=>calls.push(args),openManualContigSplit:async (_host,_store,args)=>calls.push({manual:args.assemblyCtgId})}});
   const split=items.find((item)=>item.label==="分割 contig");assert.ok(split);
-  assert.deepEqual(split.children.map(i=>i.label),["在比对最左侧分割","在比对最右侧分割"]);
-  assert.ok(split.children.every(i=>typeof i.preview==="function"));
+  assert.deepEqual(split.children.map(i=>i.label),["手动分割…","在比对最左侧分割","在比对最右侧分割"]);
+  assert.ok(split.children.slice(1).every(i=>typeof i.preview==="function"));
   for(const child of split.children) await child.run();
-  assert.deepEqual(calls,[{assemblyCtgId:2,side:"left",cutAfter:700,minAlignmentLength:100,minIdentityPct:0},{assemblyCtgId:2,side:"right",cutAfter:100,minAlignmentLength:100,minIdentityPct:0}]);
+  assert.deepEqual(calls,[{manual:2},{assemblyCtgId:2,side:"left",cutAfter:700,minAlignmentLength:100,minIdentityPct:0},{assemblyCtgId:2,side:"right",cutAfter:100,minAlignmentLength:100,minIdentityPct:0}]);
 });
 
 test("split menu hover, side switch, focus, scroll and Escape have transient anchor cleanup", () => {
@@ -2752,4 +2752,12 @@ test("split menu hover, side switch, focus, scroll and Escape have transient anc
   listeners.get("keydown")({key:"Escape"});assert.ok(groups[2].removed);assert.equal(menu.innerHTML,"");
   open();left=buttons.find(b=>b.label==="在比对最左侧分割");left.handlers.get("pointerenter")();listeners.get("scroll")();assert.ok(groups[3].removed);
   assert.equal(JSON.stringify(store.getState()),before,"hover never edits assembly state");
+});
+
+test("manual split remains available without a Ref alignment while envelope shortcuts stay disabled",()=>{
+  const store=createStore(createState({assembly:{selectedChrName:"Chr01",trackSelectedCtgIds:[],chrCtgs:[{assemblyCtgId:2,totalLength:1000,name:"tig",hits:[]}]}}));
+  const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:"primary"},memberNode:null,host:{},store,actions:{canEditTrackCtg:()=>true}});
+  const split=items.find(i=>i.label==="分割 contig");assert.ok(split);
+  assert.equal(split.children[0].label,"手动分割…");assert.equal(split.children[0].disabled,false);
+  assert.ok(split.children.slice(1).every(i=>i.disabled));
 });

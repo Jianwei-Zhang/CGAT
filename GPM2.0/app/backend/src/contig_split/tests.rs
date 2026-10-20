@@ -257,7 +257,7 @@ fn final_path_export_dna_is_identical_after_reverse_split() -> Result<()> {
             ],
         },
     )?;
-    cut_ref(&db, 1, "left", 60000, 10000, 0.0)?;
+    cut_manual(&db, 1, 60000, 1, 100000, "-")?;
     let paths = paths(&db)?;
     let segments = paths["ChrA"]["segments"]
         .as_array()
@@ -613,5 +613,94 @@ fn ref_boundary_without_saved_view_roundtrips_and_repeat_cut_preserves_sibling_i
     assert!(groups.iter().all(|g| g.starts_with("manual-fragment:1:")));
     assert!(undo_main_view_history(&db, &target())?.changed);
     assert!(undo_main_view_history(&db, &target())?.changed);
+    Ok(())
+}
+
+fn cut_manual(
+    db: &Path,
+    ctg_id: i64,
+    cut: i64,
+    start: i64,
+    end: i64,
+    orient: &str,
+) -> Result<MainViewHistoryMutationSummary> {
+    run_main_view_editor_action(
+        db,
+        &RunMainViewEditorActionParams {
+            history_capacity: None,
+            project_id: 1,
+            chr_name: "ChrA".into(),
+            action: "split-manual-contig".into(),
+            args: json!({"assemblyCtgId":ctg_id,"cutAfter":cut,"sourceStart":start,"sourceEnd":end,"orient":orient}),
+        },
+    )
+}
+
+#[test]
+fn manual_cut_accepts_non_alignment_position_and_retains_track_orientation_placement_and_history()
+-> Result<()> {
+    let (_dir, db) = seed()?;
+    let before = paths(&db)?;
+    let result = cut_manual(&db, 1, 42424, 1, 100000, "-")?;
+    assert_eq!(result.descriptor.unwrap().kind, "split-manual-contig");
+    let conn = Connection::open(&db)?;
+    let rows=conn.prepare("SELECT c.name,c.assigned_chr_name,c.anchor_start,s.source_start,s.source_end,s.orient FROM assembly_ctg c JOIN assembly_seq s ON s.id=c.assembly_seq_id ORDER BY c.anchor_start")?
+        .query_map([],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,i64>(2)?,r.get::<_,i64>(3)?,r.get::<_,i64>(4)?,r.get::<_,String>(5)?)))?.collect::<rusqlite::Result<Vec<_>>>()?;
+    assert_eq!(
+        rows,
+        vec![
+            (
+                "tig.1".into(),
+                "ChrA".into(),
+                -39999,
+                42425,
+                100000,
+                "-".into()
+            ),
+            ("tig.2".into(), "ChrA".into(), 17577, 1, 42424, "-".into())
+        ]
+    );
+    assert_eq!(paths(&db)?["ChrB"], before["ChrB"]);
+    assert!(undo_main_view_history(&db, &target())?.changed);
+    assert_eq!(paths(&db)?, before);
+    assert!(redo_main_view_history(&db, &target())?.changed);
+    Ok(())
+}
+
+#[test]
+fn manual_cut_without_reference_hits_and_repeated_fragment_coordinates_are_supported() -> Result<()>
+{
+    let (_dir, db) = seed()?;
+    let conn = Connection::open(&db)?;
+    conn.execute("DELETE FROM ref_alignment_hit", [])?;
+    conn.execute("UPDATE assembly_seq SET orient='+'", [])?;
+    cut_manual(&db, 1, 40000, 1, 100000, "+")?;
+    cut_manual(&db, 3, 70000, 40001, 100000, "+")?;
+    let count=conn.query_row::<i64,_,_>("SELECT SUM(s.source_end-s.source_start+1) FROM assembly_ctg c JOIN assembly_seq s ON s.id=c.assembly_seq_id",[],|r|r.get(0))?;
+    assert_eq!(count, 100000);
+    assert!(undo_main_view_history(&db, &target())?.changed);
+    assert!(undo_main_view_history(&db, &target())?.changed);
+    Ok(())
+}
+
+#[test]
+fn manual_cut_rejects_invalid_or_stale_source_without_creating_fragments() -> Result<()> {
+    let (_dir, db) = seed()?;
+    let before = paths(&db)?;
+    for (cut, start, end, orient) in [
+        (0, 1, 100000, "-"),
+        (100000, 1, 100000, "-"),
+        (50000, 2, 100000, "-"),
+        (50000, 1, 99999, "-"),
+        (50000, 1, 100000, "+"),
+    ] {
+        assert!(cut_manual(&db, 1, cut, start, end, orient).is_err());
+    }
+    let conn = Connection::open(&db)?;
+    assert_eq!(
+        conn.query_row::<i64, _, _>("SELECT COUNT(*) FROM assembly_ctg", [], |r| r.get(0))?,
+        1
+    );
+    assert_eq!(paths(&db)?, before);
     Ok(())
 }

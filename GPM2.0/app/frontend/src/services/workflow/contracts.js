@@ -2,6 +2,7 @@ const SUPPORTED_CTG_EDITOR_ACTIONS = new Set([
   "rename-ctg",
   "split-source-ctg",
   "split-ref-boundary",
+  "split-manual-contig",
   "flip-ctg",
   "delete-ctg",
   "restore-deleted-ctg",

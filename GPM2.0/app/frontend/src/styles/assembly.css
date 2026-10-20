@@ -2115,3 +2115,23 @@
 .track-split-preview-line { fill: none; stroke: #7a1fff; stroke-width: 6; vector-effect: non-scaling-stroke;
   filter: drop-shadow(0 0 2px rgba(255,255,255,.95)); }
 .track-split-preview circle { fill: #fff; stroke: #7a1fff; stroke-width: 2; vector-effect: non-scaling-stroke; }
+
+/* Compact manual split: one coordinate, live preview, no assignment controls. */
+.manual-contig-split-dialog { width: min(720px, 92vw); max-width: 92vw; max-height: 88vh; overflow: auto; }
+.manual-split-svg { display: block; width: 100%; background: #fff; font-size: 12px; }
+.manual-split-ref { fill: #d4d4d4; stroke: #888; }
+.manual-split-band { fill: #6c8fb7; opacity: .45; }
+.manual-split-contig { fill: #b8cee5; stroke: #617f9f; }
+.manual-split-left { fill: #b8cee5; pointer-events: none; }
+.manual-split-right { fill: #e2c9a5; pointer-events: none; }
+.manual-split-cut-line { stroke: #7a1fff; stroke-width: 3; stroke-dasharray: 4 2; vector-effect: non-scaling-stroke; pointer-events: none; }
+.manual-split-edge { cursor: pointer; }
+.manual-split-edge-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; vector-effect: non-scaling-stroke; }
+.manual-split-edge-focus { fill: none; stroke: #7a1fff; stroke-width: 4; opacity: 0; pointer-events: none; vector-effect: non-scaling-stroke; }
+.manual-split-edge circle { fill: white; stroke: #567eab; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.manual-split-edge:hover .manual-split-edge-focus, .manual-split-edge:focus .manual-split-edge-focus { opacity: 1; }
+.manual-split-edge:hover circle, .manual-split-edge:focus circle { stroke: #7a1fff; fill: #eee3ff; }
+.manual-split-coordinate { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.manual-split-coordinate input { width: 180px; max-width: 50vw; }
+.manual-split-summary { display: flex; justify-content: space-between; gap: .5rem; margin: .5rem 0; font-size: .9em; }
+.manual-contig-split-dialog [data-manual-split-error] { color: #a22; font-size: .9em; margin: .3rem 0; }

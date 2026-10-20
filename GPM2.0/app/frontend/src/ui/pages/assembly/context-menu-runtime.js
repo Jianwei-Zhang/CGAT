@@ -287,6 +287,7 @@ export function buildAssemblyContextMenuActions(actionDeps, overrides = {}) {
     openAssemblyContextMenuAt: resolveAction("openAssemblyContextMenuAt"),
     applyEditorAction: resolveAction("applyEditorAction"),
     splitContigAtRefBoundary: resolveAction("splitContigAtRefBoundary"),
+    openManualContigSplit: resolveAction("openManualContigSplit"),
     promptForRenameCtg: resolveAction("promptForRenameCtg"),
     promptForDeleteShorterThanLength: resolveAction("promptForDeleteShorterThanLength"),
     buildRenameCtgActionArgs: resolveAction("buildRenameCtgActionArgs"),

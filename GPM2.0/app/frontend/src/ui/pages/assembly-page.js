@@ -1,5 +1,6 @@
+import { openManualContigSplit } from "./assembly/manual-contig-split.js";
 import { normalizeMainViewHistoryStatus } from "./assembly/main-view-history-state.js";
-import { splitCopy, resolveContigSplitBoundaries } from "./assembly/contig-split-boundary.js";
+import { splitCopy, resolveContigSplitBoundaries, resolveContigSplitModel } from "./assembly/contig-split-boundary.js";
 import { setTrackDragGroupOffsets, setSubviewDragGroupOffsets, moveSubviewCompositionDrag } from "./assembly/source-fragment-drag.js";
 import { requestAppPrompt } from "../shell/app-dialog.js";
 import {
@@ -1119,6 +1120,7 @@ const degapRuntimeDeps = {
 
 const contextMenuRuntimeDeps = {
   splitContigAtRefBoundary: splitAssemblyContigAtRefBoundary,
+  openManualContigSplit: openAssemblyManualContigSplit,
   addContextCtgToComposition,
   moveContextSubviewMemberToOtherLane,
   removeContextSubviewMember,
@@ -3012,8 +3014,37 @@ async function splitAssemblyContigAtRefBoundary(host, store, options) {
     || current.minAlignmentLength !== options.minAlignmentLength || current.minIdentityPct !== options.minIdentityPct) {
     setAssemblyActionFeedback(host, store, { actionError: labels.stale }); return false;
   }
+  return commitAssemblyContigSplit(host, store, "split-ref-boundary", options);
+}
+
+async function openAssemblyManualContigSplit(host, store, { assemblyCtgId }) {
+  const state = store.getState();
+  if (state.assembly?.mainViewHistory?.inFlight || state.assembly?.loading) return false;
+  const model = resolveContigSplitModel(state.assembly, assemblyCtgId);
+  if (!model) return false;
+  const isCurrent = () => {
+    const latest = store.getState();
+    const live = resolveContigSplitModel(latest.assembly, assemblyCtgId);
+    return latest.session.workspacePath === state.session.workspacePath && latest.session.projectId === state.session.projectId
+      && latest.assembly.selectedChrName === model.chrName && live?.sourceStart === model.sourceStart
+      && live?.sourceEnd === model.sourceEnd && live?.orient === model.orient;
+  };
+  return openManualContigSplit(host, model, { locale: state.locale, isCurrent,
+    commit: async (args) => {
+      if (!isCurrent()) throw new Error(splitCopy[state.locale === "en" ? "en" : "zh"].stale);
+      const result = await commitAssemblyContigSplit(host, store, "split-manual-contig", args);
+      if (!result) throw new Error(store.getState().assembly.actionError || splitCopy[state.locale === "en" ? "en" : "zh"].stale);
+      return result;
+    },
+  });
+}
+
+async function commitAssemblyContigSplit(host, store, action, args) {
+  const state = store.getState();
+  if (state.assembly?.mainViewHistory?.inFlight || state.assembly?.loading) return false;
+  const labels = splitCopy[state.locale === "en" ? "en" : "zh"];
   const payload = { workspaceRoot: state.session.workspacePath, projectId: state.session.projectId,
-    chrName: state.assembly.selectedChrName, action: "split-ref-boundary", args: options };
+    chrName: state.assembly.selectedChrName, action, args };
   store.setState({ assembly: { ...state.assembly, mainViewHistory: { ...state.assembly.mainViewHistory, inFlight: true } } });
   try {
     await flushAssemblyProjectState(host, store);

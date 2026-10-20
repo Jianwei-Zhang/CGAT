@@ -23,6 +23,9 @@ pub(super) fn prepare_editor_mutation(
     args: &Value,
 ) -> Result<PreparedMutation> {
     match action {
+        "split-manual-contig" => {
+            super::ref_split::prepare_manual_split(conn, project_id, chr_name, args)
+        }
         "split-ref-boundary" => {
             super::ref_split::prepare_ref_split(conn, project_id, chr_name, args)
         }

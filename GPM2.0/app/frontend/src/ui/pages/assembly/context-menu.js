@@ -1,4 +1,4 @@
-import { splitCopy, resolveContigSplitBoundaries, highlightContigSplitBoundary } from "./contig-split-boundary.js";
+import { splitCopy, resolveContigSplitBoundaries, highlightContigSplitBoundary, resolveContigSplitModel } from "./contig-split-boundary.js";
 import {
   buildSupportMirrorKey,
   filterPrimaryTrackSelectionCtgIds,
@@ -1287,6 +1287,10 @@ export function buildAssemblyContextMenuItems({
               minAlignmentLength: boundary?.minAlignmentLength, minIdentityPct: boundary?.minIdentityPct,
             }),
           }));
+          if (typeof contextMenuActions.openManualContigSplit === "function") {
+            splitChildren.unshift({ label: labels.manual, disabled: !resolveContigSplitModel(state.assembly, ctgId),
+              run: () => contextMenuActions.openManualContigSplit(host, store, { assemblyCtgId: ctgId }) });
+          }
           items.push({ label: labels.title, children: splitChildren });
         }
         items.push({
