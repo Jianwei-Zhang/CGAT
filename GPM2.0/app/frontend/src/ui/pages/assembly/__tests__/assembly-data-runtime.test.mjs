@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { handleNewSequenceRowAction, loadAssemblyView, selectChromosome, selectCtg } from "../assembly-data-runtime.js";
+import { backfillFinalPathOriginIds, handleNewSequenceRowAction, loadAssemblyView, selectChromosome, selectCtg } from "../assembly-data-runtime.js";
 import { normalizeFinalPathByChr } from "../final-path-state.js";
 
 test("handleNewSequenceRowAction ignores removed add-seq-to-ctg action", async () => {
@@ -2086,4 +2086,15 @@ test("loadAssemblyView keeps split source paths detached from sibling IDs during
   assert.equal(segment.splitFromAssemblyCtgId, 6);
   assert.equal(segment.splitFragmentCtgId, 73);
   assert.deepEqual(normalizeFinalPathByChr(state.assembly.finalPathByChr), state.assembly.finalPathByChr);
+});
+
+
+test("cross-chr inspection copies do not auto-attach to existing Final Path source locators",()=>{
+  const copy={assemblyCtgId:42,datasetName:"ds",originId:"tig",sourceFragment:{groupKey:"manual-fragment:chr-add:1:42",sourceStart:101,sourceEnd:1100}};
+  const paths={B:{segments:[{type:"ctg",assemblyCtgId:null,source:{dataset:"ds",contig:"tig",start:1,end:2000},start:1,end:2000,serverBaseline:true}]}};
+  const before=structuredClone(paths);
+  assert.equal(backfillFinalPathOriginIds(paths,"B",[copy],[]),paths);
+  assert.deepEqual(paths,before);
+  const adopted={B:{segments:[{...paths.B.segments[0],assemblyCtgId:42}]}};
+  assert.equal(backfillFinalPathOriginIds(adopted,"B",[copy],[]).B.segments[0].assemblyCtgId,42,"explicit adoption remains valid");
 });

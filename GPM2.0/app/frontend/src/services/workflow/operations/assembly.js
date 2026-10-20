@@ -52,6 +52,12 @@ const {
   appendEditAuditLog: appendEditAuditLogTauri,
 } = tauri;
 
+// Real evidence only: never fall back to fabricated mock alignment data.
+export async function getContigChrAlignments(payload) {
+  if (isTauriRuntime()) return tauri.getContigChrAlignments(payload);
+  return callDevBridge("/api/contig-chr-alignments",payload);
+}
+
 export async function listChrViewCtgs({ workspaceRoot, projectId, chrName, datasetId = null }) {
   if (isTauriRuntime()) {
     return listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId });
@@ -338,7 +344,7 @@ export async function runMainViewEditorAction({
   if (isTauriRuntime()) {
     return runMainViewEditorActionTauri(payload);
   }
-  if (["split-source-ctg", "split-ref-boundary", "split-manual-contig"].includes(payload.action)) {
+  if (["split-source-ctg", "split-ref-boundary", "split-manual-contig", "add-contig-to-chr"].includes(payload.action)) {
     return callDevBridge("/api/main-view-editor-action", payload);
   }
   return callMainViewBridgeOrMock(

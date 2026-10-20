@@ -2761,3 +2761,10 @@ test("manual split remains available without a Ref alignment while envelope shor
   assert.equal(split.children[0].label,"手动分割…");assert.equal(split.children[0].disabled,false);
   assert.ok(split.children.slice(1).every(i=>i.disabled));
 });
+
+
+test("other-chr alignment menu is independent from split and targets just the clicked primary contig",async()=>{
+  const calls=[];const store=createStore(createState({assembly:{selectedChrName:"Chr01",trackSelectedCtgIds:[],chrCtgs:[{assemblyCtgId:2,totalLength:1000,name:"tig",hits:[]}]}}));
+  const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:"primary"},memberNode:null,host:{},store,actions:{canEditTrackCtg:()=>true,openContigChrAlignments:async(_h,_s,args)=>calls.push(args)}});
+  const item=items.find(i=>i.label==="查看其他 chr 比对…");assert.ok(item);assert.equal(item.disabled,false);assert.equal(item.children,undefined);await item.run();assert.deepEqual(calls,[{assemblyCtgId:2}]);
+});

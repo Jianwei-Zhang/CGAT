@@ -972,3 +972,24 @@ pub fn preview_contig_split(
     })()
     .map_err(format_error)
 }
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub async fn get_contig_chr_alignments(
+    workspaceRoot: String,
+    projectId: i64,
+    args: Value,
+) -> CommandResult<Value> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let request = serde_json::from_value(args)?;
+        let result = gpm_next_backend::contig_chr_alignments::get_contig_chr_alignments(
+            &project_db_path(&workspaceRoot),
+            projectId,
+            &request,
+        )?;
+        Ok(serde_json::to_value(result)?)
+    })
+    .await
+    .map_err(|err| format!("get_contig_chr_alignments join error: {err}"))?
+    .map_err(format_error)
+}

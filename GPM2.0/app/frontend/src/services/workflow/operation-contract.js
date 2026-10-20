@@ -40,6 +40,7 @@ const DEFINITIONS = {
     ["restoreDeletedCtg", "bridge"],
     ["getCtgDetail", "bridge"],
     ["listCtgEditCandidates", "bridge"],
+    ["getContigChrAlignments", "bridge"],
     ["runCtgEditorAction", "bridge"],
     ["getMainViewHistoryStatus", "bridge"],
     ["inspectMainViewDelete", "bridge"],

@@ -2135,3 +2135,16 @@
 .manual-split-coordinate input { width: 180px; max-width: 50vw; }
 .manual-split-summary { display: flex; justify-content: space-between; gap: .5rem; margin: .5rem 0; font-size: .9em; }
 .manual-contig-split-dialog [data-manual-split-error] { color: #a22; font-size: .9em; margin: .3rem 0; }
+
+/* Fragment-scoped cross-chromosome evidence: a short list and one local preview. */
+.contig-chr-dialog { width: min(760px, 92vw); max-width: 92vw; max-height: 88vh; overflow: auto; }
+.contig-chr-table { max-height: 240px; overflow: auto; }
+.contig-chr-table table { width: 100%; border-collapse: collapse; font-size: .9em; }
+.contig-chr-table th, .contig-chr-table td { padding: .4rem .5rem; text-align: left; border-bottom: 1px solid #ddd; }
+.contig-chr-table tr[data-chr-index] { cursor: pointer; }
+.contig-chr-table tr[aria-selected="true"] { background: #e9f1fb; }
+.contig-chr-table tr[data-chr-index]:focus { outline: 2px solid #7a1fff; outline-offset: -2px; }
+.contig-chr-presence { color: #666; margin-right: .5rem; font-size: .9em; }
+.contig-chr-filter { color: #777; font-size: .8em; margin: .3rem 0; }
+.contig-chr-dialog [data-chr-error] { color: #a22; font-size: .9em; margin: .3rem 0; }
+.contig-chr-dialog [data-chr-status] { color: #35724c; font-size: .85em; margin: .3rem 0; }

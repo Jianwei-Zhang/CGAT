@@ -1036,3 +1036,21 @@ test("manual contig split sends only its coordinate and source precondition thro
     await assert.rejects(runMainViewEditorAction({workspaceRoot:"D:/workspace",projectId:1,chrName:"ChrA",action:"split-manual-contig",args}),/stale source/);
   } finally {globalThis.window=previousWindow;}
 });
+
+
+test("cross-chr evidence and adds use native transport with source identity and no mock success",async()=>{
+  const {getContigChrAlignments}=await import("../workflow-api.js");
+  const previousWindow=globalThis.window,calls=[];
+  try {
+    globalThis.window={__TAURI__:{core:{invoke:async(command,args)=>{calls.push({command,args});return {items:[]};}}}};
+    const args={assemblyCtgId:6,minAlignmentLength:10000,minIdentityPct:90};
+    await getContigChrAlignments({workspaceRoot:"D:/workspace",projectId:1,args});
+    assert.equal(calls[0].command,"get_contig_chr_alignments");assert.deepEqual(calls[0].args.args,args);
+    const mutation={assemblyCtgId:6,sourceSeqId:1,sourceStart:1,sourceEnd:100000,orient:"-",targetChrName:"B",...args};
+    await runMainViewEditorAction({workspaceRoot:"D:/workspace",projectId:1,chrName:"A",action:"add-contig-to-chr",args:mutation});
+    assert.equal(calls[1].command,"run_main_view_editor_action");assert.equal(calls[1].args.request.action,"add-contig-to-chr");assert.deepEqual(calls[1].args.request.args,mutation);
+    globalThis.window.__TAURI__.core.invoke=async()=>{throw new Error("native failed");};
+    await assert.rejects(getContigChrAlignments({workspaceRoot:"D:/workspace",projectId:1,args}),/native failed/);
+    await assert.rejects(runMainViewEditorAction({workspaceRoot:"D:/workspace",projectId:1,chrName:"A",action:"add-contig-to-chr",args:mutation}),/native failed/);
+  } finally {globalThis.window=previousWindow;}
+});

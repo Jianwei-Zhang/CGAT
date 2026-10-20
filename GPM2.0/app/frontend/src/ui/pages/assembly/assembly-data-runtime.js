@@ -39,7 +39,7 @@ function annotateGrtSourceCards(ctgs, sourceCards, chrName) {
   });
 }
 
-function backfillFinalPathOriginIds(finalPathByChr, chrName, primaryCtgs, supportCtgs) {
+export function backfillFinalPathOriginIds(finalPathByChr, chrName, primaryCtgs, supportCtgs) {
   const source = finalPathByChr && typeof finalPathByChr === "object" && !Array.isArray(finalPathByChr)
     ? finalPathByChr
     : {};
@@ -64,6 +64,9 @@ function backfillFinalPathOriginIds(finalPathByChr, chrName, primaryCtgs, suppor
     });
   const ctgBySource = new Map();
   ctgs.forEach((ctg) => {
+    // An inspection copy on another chr is NOT an adopted Final Path object.
+    // Preserve source locators until the user explicitly adds/adopts the copy.
+    if (String(ctg.sourceFragment?.groupKey || "").startsWith("manual-fragment:chr-add:")) return;
     const datasetName = normalizeString(ctg?.datasetName).toLowerCase();
     const originId = normalizeString(ctg?.originId || ctg?.name).replace(/@[^@]+$/, "").toLowerCase();
     if (datasetName && originId) {

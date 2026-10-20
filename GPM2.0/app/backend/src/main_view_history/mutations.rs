@@ -23,6 +23,7 @@ pub(super) fn prepare_editor_mutation(
     args: &Value,
 ) -> Result<PreparedMutation> {
     match action {
+        "add-contig-to-chr" => super::chr_add::prepare_add(conn, project_id, chr_name, args),
         "split-manual-contig" => {
             super::ref_split::prepare_manual_split(conn, project_id, chr_name, args)
         }

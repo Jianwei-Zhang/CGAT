@@ -296,6 +296,11 @@ enum Commands {
         project_id: i64,
         chr_name: String,
     },
+    GetContigChrAlignments {
+        workspace_root: PathBuf,
+        project_id: i64,
+        args_json: String,
+    },
     PreviewContigSplit {
         workspace_root: PathBuf,
         project_id: i64,

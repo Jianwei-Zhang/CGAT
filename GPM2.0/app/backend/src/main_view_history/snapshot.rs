@@ -58,6 +58,13 @@ pub(super) fn merge_snapshot_scopes<'a>(
             .layout_scope
             .mirror_keys
             .extend(snapshot.layout_scope.mirror_keys.iter().cloned());
+        scope.layout_scope.primary_visibility_keys.extend(
+            snapshot
+                .layout_scope
+                .primary_visibility_keys
+                .iter()
+                .cloned(),
+        );
     }
     normalize_scope(&mut scope);
     scope
@@ -392,6 +399,7 @@ pub(super) fn apply_snapshot(
     }
     if !desired.layout_scope.track_offset_keys.is_empty()
         || !desired.layout_scope.mirror_keys.is_empty()
+        || !desired.layout_scope.primary_visibility_keys.is_empty()
     {
         reconcile_project_view_layout(
             conn,
@@ -412,6 +420,8 @@ fn normalize_scope(scope: &mut SnapshotScope) {
     normalize_ids(&mut scope.export_record_ids);
     scope.layout_scope.track_offset_keys.sort();
     scope.layout_scope.track_offset_keys.dedup();
+    scope.layout_scope.primary_visibility_keys.sort();
+    scope.layout_scope.primary_visibility_keys.dedup();
     scope.layout_scope.mirror_keys.sort();
     scope.layout_scope.mirror_keys.dedup();
 }
@@ -642,7 +652,10 @@ fn capture_project_view_layout(
     project_id: i64,
     scope: &ProjectViewLayoutScope,
 ) -> Result<ProjectViewLayoutSnapshot> {
-    if scope.track_offset_keys.is_empty() && scope.mirror_keys.is_empty() {
+    if scope.track_offset_keys.is_empty()
+        && scope.mirror_keys.is_empty()
+        && scope.primary_visibility_keys.is_empty()
+    {
         return Ok(ProjectViewLayoutSnapshot::default());
     }
     let row = conn
@@ -654,12 +667,29 @@ fn capture_project_view_layout(
         )
         .optional()
         .context("failed to capture project view layout history state")?;
-    let Some((track_offsets_json, mirrors_json)) = row else {
-        return Ok(ProjectViewLayoutSnapshot::default());
-    };
+    let (track_offsets_json, mirrors_json) = row.unwrap_or_else(|| ("[]".into(), "[]".into()));
     let track_offsets = parse_layout_array(&track_offsets_json, "track_drag_offsets_json")?;
     let mirrors = parse_layout_array(&mirrors_json, "support_mirrored_ctgs_json")?;
+    let primary_visibility = scope
+        .primary_visibility_keys
+        .iter()
+        .map(|key| {
+            let (in_list, in_chr, in_path) = crate::contig_chr_alignments::hidden_flags(
+                conn,
+                project_id,
+                &key.chr_name,
+                key.assembly_ctg_id,
+            )?;
+            Ok(super::types::PrimaryVisibilityState {
+                key: key.clone(),
+                in_list,
+                in_chr,
+                in_path,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
     Ok(ProjectViewLayoutSnapshot {
+        primary_visibility,
         scoped_track_drag_offsets: track_offsets
             .into_iter()
             .filter(|entry| {
@@ -687,17 +717,23 @@ pub(super) fn reconcile_project_view_layout(
     scope: &ProjectViewLayoutScope,
     desired: &ProjectViewLayoutSnapshot,
 ) -> Result<()> {
-    if desired.scoped_track_drag_offsets.iter().any(|entry| {
-        !scope
-            .track_offset_keys
-            .iter()
-            .any(|key| track_offset_matches_key(entry, key))
-    }) || desired.scoped_support_mirrors.iter().any(|entry| {
-        !scope
-            .mirror_keys
-            .iter()
-            .any(|key| mirror_matches_key(entry, key))
-    }) {
+    if desired
+        .primary_visibility
+        .iter()
+        .any(|entry| !scope.primary_visibility_keys.contains(&entry.key))
+        || desired.scoped_track_drag_offsets.iter().any(|entry| {
+            !scope
+                .track_offset_keys
+                .iter()
+                .any(|key| track_offset_matches_key(entry, key))
+        })
+        || desired.scoped_support_mirrors.iter().any(|entry| {
+            !scope
+                .mirror_keys
+                .iter()
+                .any(|key| mirror_matches_key(entry, key))
+        })
+    {
         bail!("{HISTORY_CONFLICT_CODE}: recorded layout state is outside its target scope");
     }
     conn.execute(
@@ -726,6 +762,17 @@ pub(super) fn reconcile_project_view_layout(
             .iter()
             .any(|key| mirror_matches_key(entry, key))
     });
+    for entry in &desired.primary_visibility {
+        crate::contig_chr_alignments::set_hidden_flags(
+            conn,
+            project_id,
+            &entry.key.chr_name,
+            entry.key.assembly_ctg_id,
+            entry.in_list,
+            entry.in_chr,
+            entry.in_path,
+        )?;
+    }
     track_offsets.extend(desired.scoped_track_drag_offsets.iter().cloned());
     mirrors.extend(desired.scoped_support_mirrors.iter().cloned());
     let updated = conn.execute(

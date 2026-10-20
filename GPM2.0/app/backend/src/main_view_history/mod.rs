@@ -1,3 +1,4 @@
+mod chr_add;
 mod mutations;
 mod ref_split;
 mod snapshot;

@@ -50,6 +50,7 @@ pub fn run() {
             commands::get_main_view_history_status,
             commands::inspect_main_view_delete,
             commands::preview_contig_split,
+            commands::get_contig_chr_alignments,
             commands::run_main_view_editor_action,
             commands::run_main_view_layout_action,
             commands::run_main_view_batch_delete,

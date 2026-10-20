@@ -328,7 +328,7 @@ pub(super) fn apply_split(
     })
 }
 
-fn next_id(conn: &Connection, table: &str) -> Result<i64> {
+pub(super) fn next_id(conn: &Connection, table: &str) -> Result<i64> {
     // table is always a compile-time identifier from the two callers above.
     Ok(conn.query_row(&format!("SELECT MAX(COALESCE((SELECT MAX(id) FROM {table}),0),COALESCE((SELECT seq FROM sqlite_sequence WHERE name=?1),0))+1"),[table],|r|r.get(0))?)
 }

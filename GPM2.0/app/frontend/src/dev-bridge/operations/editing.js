@@ -8,6 +8,12 @@ import {
 export function createEditingOperations(runtime) {
   const { runBackend } = runtime;
 
+async function getContigChrAlignments({workspaceRoot,projectId,args}) {
+  requireString("workspaceRoot",workspaceRoot);requireNumber("projectId",projectId);
+  requireNumber("args.assemblyCtgId",args?.assemblyCtgId);
+  return parseResultJson(await runBackend(["get-contig-chr-alignments",workspaceRoot,String(projectId),JSON.stringify(args)]));
+}
+
 async function listDeletedCtgs(payload) {
   const { workspaceRoot, projectId, chrName, datasetId } = payload || {};
   requireString("workspaceRoot", workspaceRoot);
@@ -473,6 +479,7 @@ function buildCtgEditorCommandArgs(action, workspaceRoot, projectId, args) {
 }
 
   return {
+    getContigChrAlignments,
     listDeletedCtgs,
     getCtgDetail,
     listCtgEditCandidates,

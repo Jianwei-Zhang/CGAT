@@ -62,6 +62,17 @@ pub(crate) fn materialize_reference_segments(
     chr_name: &str,
     reference_fasta_path: &str,
 ) -> Result<Option<Vec<ReferenceSegment>>> {
+    let Some(segments) = read_reference_segments_from_fasta(chr_name, reference_fasta_path)? else {
+        return Ok(None);
+    };
+    store_reference_segments(conn, reference_chr_id, &segments)?;
+    Ok(Some(segments))
+}
+
+pub(crate) fn read_reference_segments_from_fasta(
+    chr_name: &str,
+    reference_fasta_path: &str,
+) -> Result<Option<Vec<ReferenceSegment>>> {
     if reference_fasta_path.trim().is_empty() || !Path::new(reference_fasta_path).is_file() {
         return Ok(None);
     }
@@ -75,7 +86,6 @@ pub(crate) fn materialize_reference_segments(
         return Ok(None);
     };
     let segments = detect_reference_segments(chr_name, &sequence, MIN_GAP_RUN_BP);
-    store_reference_segments(conn, reference_chr_id, &segments)?;
     Ok(Some(segments))
 }
 

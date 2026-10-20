@@ -285,6 +285,7 @@ async function appendEditAuditLogTauri({ workspaceRoot, projectId, category, act
     restoreDeletedCtg: restoreDeletedCtgTauri,
     getCtgDetail: getCtgDetailTauri,
     listCtgEditCandidates: listCtgEditCandidatesTauri,
+    getContigChrAlignments: (payload) => invokeCommand("get_contig_chr_alignments", payload),
     runCtgEditorAction: runCtgEditorActionTauri,
     getMainViewHistoryStatus: getMainViewHistoryStatusTauri,
     inspectMainViewDelete: inspectMainViewDeleteTauri,

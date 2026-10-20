@@ -56,6 +56,7 @@ const MAIN_VIEW_HISTORY_ELIGIBLE_ACTIONS = new Set([
   "split-source-ctg",
   "split-ref-boundary",
   "split-manual-contig",
+  "add-contig-to-chr",
   "flip-ctg",
   "delete-ctg",
   "restore-deleted-ctg",

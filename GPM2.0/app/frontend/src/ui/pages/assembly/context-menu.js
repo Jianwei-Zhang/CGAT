@@ -1,3 +1,4 @@
+import { chrAlignmentCopy } from "./contig-chr-alignments.js";
 import { splitCopy, resolveContigSplitBoundaries, highlightContigSplitBoundary, resolveContigSplitModel } from "./contig-split-boundary.js";
 import {
   buildSupportMirrorKey,
@@ -1274,6 +1275,12 @@ export function buildAssemblyContextMenuItems({
         });
       }
       if (!isSupportTrackCtg) {
+        if (!isPhasedCtgContext && typeof contextMenuActions.openContigChrAlignments === "function"
+          && String(state.assembly.selectedChrName || "").toLowerCase() !== "unplaced") {
+          items.push({label:chrAlignmentCopy[state.locale === "en" ? "en" : "zh"].title,
+            disabled:!resolveContigSplitModel(state.assembly,ctgId),
+            run:()=>contextMenuActions.openContigChrAlignments(host,store,{assemblyCtgId:ctgId})});
+        }
         if (!isPhasedCtgContext && typeof contextMenuActions.splitContigAtRefBoundary === "function"
           && String(state.assembly.selectedChrName || "").toLowerCase() !== "unplaced") {
           const labels = splitCopy[state.locale === "en" ? "en" : "zh"];

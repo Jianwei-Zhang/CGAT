@@ -1062,6 +1062,36 @@ fn load_chr_view_telomere_mark_rows(
     .context("failed to decode chr view telomere marks")
 }
 
+/// Project one existing contig against all Ref chromosomes using the exact same
+/// source/ref gap clipping as the main renderer, without changing its assignment.
+pub(crate) fn project_contig_hits_to_all_chr(
+    conn: &Connection,
+    project_id: i64,
+    ctg_id: i64,
+) -> Result<Vec<ChrViewHitItem>> {
+    let genome = conn.query_row(
+        "SELECT reference_genome_id FROM project WHERE id=?1",
+        [project_id],
+        |r| r.get(0),
+    )?;
+    let mut stmt=conn.prepare("SELECT DISTINCT rc.chr_name FROM assembly_ctg c JOIN assembly_seq s ON s.id=c.assembly_seq_id JOIN ref_alignment_hit h ON h.source_seq_id=s.source_seq_id JOIN reference_chr rc ON rc.id=h.reference_chr_id WHERE c.project_id=?1 AND c.id=?2 AND rc.reference_genome_id=?3 AND h.query_end>=s.source_start AND h.query_start<=s.source_end")?;
+    let names = stmt
+        .query_map(params![project_id, ctg_id, genome], |r| {
+            r.get::<_, String>(0)
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut gaps = HashMap::new();
+    for name in names {
+        gaps.extend(load_main_view_reference_gaps_with_policy(
+            conn,
+            genome,
+            Some(&name),
+            false,
+        )?);
+    }
+    list_chr_view_hits_with_connection(conn, project_id, genome, ctg_id, None, None, &gaps)
+}
+
 fn list_chr_view_hits_with_connection(
     conn: &Connection,
     project_id: i64,
@@ -1391,6 +1421,14 @@ fn load_main_view_reference_gaps(
     reference_genome_id: i64,
     chr_name: Option<&str>,
 ) -> Result<HashMap<i64, Vec<ReferenceGapInterval>>> {
+    load_main_view_reference_gaps_with_policy(conn, reference_genome_id, chr_name, true)
+}
+fn load_main_view_reference_gaps_with_policy(
+    conn: &Connection,
+    reference_genome_id: i64,
+    chr_name: Option<&str>,
+    persist: bool,
+) -> Result<HashMap<i64, Vec<ReferenceGapInterval>>> {
     let mut stmt = conn.prepare(
         "SELECT rc.id, rc.chr_name, rc.length, rg.fasta_path
          FROM reference_chr rc JOIN reference_genome rg ON rg.id = rc.reference_genome_id
@@ -1409,8 +1447,8 @@ fn load_main_view_reference_gaps(
     let root = conn.path().and_then(|path| Path::new(path).parent());
     let mut result = HashMap::new();
     for (id, name, length, fasta) in chromosomes {
-        let (_, gaps) = resolve_reference_track_segments_with_connection(
-            conn, id, root, &fasta, &name, length,
+        let (_, gaps) = resolve_reference_track_segments_with_policy(
+            conn, id, root, &fasta, &name, length, persist,
         )?;
         result.insert(id, gaps);
     }
@@ -1750,6 +1788,26 @@ fn resolve_reference_track_segments_with_connection(
     chr_name: &str,
     chr_length: i64,
 ) -> Result<(Vec<ReferenceSegment>, Vec<ReferenceGapInterval>)> {
+    resolve_reference_track_segments_with_policy(
+        conn,
+        reference_chr_id,
+        workspace_root,
+        reference_fasta_path,
+        chr_name,
+        chr_length,
+        true,
+    )
+}
+#[allow(clippy::too_many_arguments)]
+fn resolve_reference_track_segments_with_policy(
+    conn: &Connection,
+    reference_chr_id: i64,
+    workspace_root: Option<&Path>,
+    reference_fasta_path: &str,
+    chr_name: &str,
+    chr_length: i64,
+    persist: bool,
+) -> Result<(Vec<ReferenceSegment>, Vec<ReferenceGapInterval>)> {
     if let Some(segments) =
         crate::reference_geometry::persisted_reference_segments(conn, reference_chr_id)?
     {
@@ -1762,19 +1820,32 @@ fn resolve_reference_track_segments_with_connection(
         // Persist what the package already describes so later reads are pure
         // database lookups and the FASTA is never scanned for this chromosome.
         // A workspace that cannot be written still renders from this answer.
-        let _ =
-            crate::reference_geometry::store_reference_segments(conn, reference_chr_id, &segments);
+        if persist {
+            let _ = crate::reference_geometry::store_reference_segments(
+                conn,
+                reference_chr_id,
+                &segments,
+            );
+        }
         let gaps = derive_reference_gaps_from_segments(&segments, chr_length);
         return Ok((segments, gaps));
     }
     // Legacy packages without a packaged description: read the chromosome
     // through the FASTA index once, then keep the spans in the database.
-    if let Some(segments) = crate::reference_geometry::materialize_reference_segments(
-        conn,
-        reference_chr_id,
-        chr_name,
-        reference_fasta_path,
-    )? {
+    let segments = if persist {
+        crate::reference_geometry::materialize_reference_segments(
+            conn,
+            reference_chr_id,
+            chr_name,
+            reference_fasta_path,
+        )?
+    } else {
+        crate::reference_geometry::read_reference_segments_from_fasta(
+            chr_name,
+            reference_fasta_path,
+        )?
+    };
+    if let Some(segments) = segments {
         let gaps = derive_reference_gaps_from_segments(&segments, chr_length);
         return Ok((segments, gaps));
     }

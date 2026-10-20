@@ -1,6 +1,7 @@
 pub mod alignment_cache;
 pub mod auto_orientation;
 pub mod auto_placement;
+pub mod contig_chr_alignments;
 pub mod contig_split;
 pub mod ctg_editor;
 pub mod db;

@@ -141,39 +141,7 @@ pub(crate) fn preview_with_connection(
 ) -> Result<SplitPreview> {
     let source = load_split_source(conn, project_id, request.assembly_ctg_id)?;
     let cuts = validate_cuts(&source, &request.cut_after)?;
-    let mut stmt = conn.prepare(
-        "SELECT h.id,r.chr_name,h.strand,h.query_start,h.query_end,h.ref_start,h.ref_end,
-                h.match_length,h.block_length,h.mapq,h.cg_tag
-         FROM ref_alignment_hit h JOIN reference_chr r ON r.id=h.reference_chr_id
-         JOIN project p ON p.reference_genome_id=r.reference_genome_id
-         WHERE p.id=?1 AND h.source_seq_id=?2 AND h.query_end>=?3 AND h.query_start<=?4
-         ORDER BY h.query_start,h.query_end,h.id",
-    )?;
-    let hits = stmt
-        .query_map(
-            params![
-                project_id,
-                source.source_seq_id,
-                source.source_start,
-                source.source_end
-            ],
-            |r| {
-                Ok(SplitHit {
-                    id: r.get(0)?,
-                    chr_name: r.get(1)?,
-                    strand: r.get(2)?,
-                    query_start: r.get(3)?,
-                    query_end: r.get(4)?,
-                    ref_start: r.get(5)?,
-                    ref_end: r.get(6)?,
-                    match_length: r.get(7)?,
-                    block_length: r.get(8)?,
-                    mapq: r.get(9)?,
-                    cigar: r.get(10)?,
-                })
-            },
-        )?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let hits = load_source_hits(conn, project_id, &source)?;
     let parts = partition(&source, &cuts)
         .into_iter()
         .map(|(a, b)| {
@@ -208,6 +176,47 @@ pub(crate) fn preview_with_connection(
         final_path_reference_count,
         preview_token,
     })
+}
+
+pub(crate) fn load_source_hits(
+    conn: &Connection,
+    project_id: i64,
+    source: &SplitSource,
+) -> Result<Vec<SplitHit>> {
+    let mut stmt = conn.prepare(
+        "SELECT h.id,r.chr_name,h.strand,h.query_start,h.query_end,h.ref_start,h.ref_end,
+                h.match_length,h.block_length,h.mapq,h.cg_tag
+         FROM ref_alignment_hit h JOIN reference_chr r ON r.id=h.reference_chr_id
+         JOIN project p ON p.reference_genome_id=r.reference_genome_id
+         WHERE p.id=?1 AND h.source_seq_id=?2 AND h.query_end>=?3 AND h.query_start<=?4
+         ORDER BY h.query_start,h.query_end,h.id",
+    )?;
+    let hits = stmt
+        .query_map(
+            params![
+                project_id,
+                source.source_seq_id,
+                source.source_start,
+                source.source_end
+            ],
+            |r| {
+                Ok(SplitHit {
+                    id: r.get(0)?,
+                    chr_name: r.get(1)?,
+                    strand: r.get(2)?,
+                    query_start: r.get(3)?,
+                    query_end: r.get(4)?,
+                    ref_start: r.get(5)?,
+                    ref_end: r.get(6)?,
+                    match_length: r.get(7)?,
+                    block_length: r.get(8)?,
+                    mapq: r.get(9)?,
+                    cigar: r.get(10)?,
+                })
+            },
+        )?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(hits)
 }
 
 fn validate_cuts(source: &SplitSource, cuts: &[i64]) -> Result<Vec<i64>> {

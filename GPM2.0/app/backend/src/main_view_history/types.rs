@@ -191,11 +191,29 @@ pub(super) struct ProjectViewMirrorKey {
     pub assembly_ctg_id: i64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct PrimaryVisibilityKey {
+    pub chr_name: String,
+    pub assembly_ctg_id: i64,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct PrimaryVisibilityState {
+    pub key: PrimaryVisibilityKey,
+    pub in_list: bool,
+    pub in_chr: bool,
+    #[serde(default)]
+    pub in_path: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct ProjectViewLayoutScope {
     pub track_offset_keys: Vec<ProjectViewTrackOffsetKey>,
     pub mirror_keys: Vec<ProjectViewMirrorKey>,
+    #[serde(default)]
+    pub primary_visibility_keys: Vec<PrimaryVisibilityKey>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -203,6 +221,8 @@ pub(super) struct ProjectViewLayoutScope {
 pub(super) struct ProjectViewLayoutSnapshot {
     pub scoped_track_drag_offsets: Vec<Value>,
     pub scoped_support_mirrors: Vec<Value>,
+    #[serde(default)]
+    pub primary_visibility: Vec<PrimaryVisibilityState>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]

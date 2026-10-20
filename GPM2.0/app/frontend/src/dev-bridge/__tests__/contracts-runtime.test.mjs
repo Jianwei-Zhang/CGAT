@@ -150,7 +150,7 @@ test("operation factory exposes every registered operation and maps exact CLI co
     },
   });
 
-  assert.equal(Object.keys(handlers).length, 46);
+  assert.equal(Object.keys(handlers).length, 47);
   assert.equal(typeof handlers.listProjectCatalog, "function");
   assert.equal(typeof handlers.updateProjectCatalog, "function");
   const sequences = await handlers.listNewSequences({
@@ -300,4 +300,12 @@ test("alignment operations pass identity thresholds and preserve raw MAPQ in par
   assert.equal(inspection.hits[0].mapq, 60);
   assert.equal(reference.items[0].hits[0].identityPct, 98.75);
   assert.equal(reference.items[0].hits[0].mapq, 40);
+});
+
+
+test("cross-chr evidence dev bridge preserves the typed query and result JSON",async()=>{
+  const calls=[];const operations=createBackendOperations({runBackend:async args=>{calls.push(args);return {stdout:'result_json={"items":[]}\n'};}});
+  const args={assemblyCtgId:6,minAlignmentLength:10000,minIdentityPct:90};
+  assert.deepEqual(await operations.getContigChrAlignments({workspaceRoot:"D:/workspace",projectId:1,args}),{items:[]});
+  assert.deepEqual(calls[0],["get-contig-chr-alignments","D:/workspace","1",JSON.stringify(args)]);
 });
