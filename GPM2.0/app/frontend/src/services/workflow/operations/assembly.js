@@ -338,6 +338,9 @@ export async function runMainViewEditorAction({
   if (isTauriRuntime()) {
     return runMainViewEditorActionTauri(payload);
   }
+  if (payload.action === "split-source-ctg") {
+    return callDevBridge("/api/main-view-editor-action", payload);
+  }
   return callMainViewBridgeOrMock(
     "/api/main-view-editor-action",
     payload,
@@ -507,4 +510,11 @@ export async function appendEditAuditLog({ workspaceRoot, projectId, category, a
     // fallback to mock flow
   }
   return appendEditAuditLogMock({ workspaceRoot, projectId, category, action, detail });
+}
+
+// A split preview must come from real workspace evidence, never fabricated mock hits.
+export async function previewContigSplit({ workspaceRoot, projectId, assemblyCtgId, cutAfter = [] }) {
+  const payload = { workspaceRoot, projectId, args: { assemblyCtgId, cutAfter } };
+  if (isTauriRuntime()) return tauri.previewContigSplit(payload);
+  return callDevBridge("/api/preview-contig-split", payload);
 }

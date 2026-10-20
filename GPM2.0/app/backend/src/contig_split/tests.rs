@@ -1,0 +1,434 @@
+use super::*;
+use crate::main_view_history::*;
+use serde_json::{Value, json};
+
+fn seed() -> Result<(tempfile::TempDir, std::path::PathBuf)> {
+    let dir = tempfile::tempdir()?;
+    let db = dir.path().join("project.sqlite");
+    let conn = Connection::open(&db)?;
+    crate::db::init_workspace_schema(&conn)?;
+    conn.execute_batch("INSERT INTO reference_genome(id,name,species_name,assembly_label,fasta_path,fai_path) VALUES(1,'ref','sp','v1','ref.fa','ref.fa.fai');
+        INSERT INTO reference_chr(id,reference_genome_id,chr_name,chr_order,length) VALUES(1,1,'ChrA',1,200000),(2,1,'ChrB',2,200000);
+        INSERT INTO dataset(id,name,assembler,fasta_path,fai_path) VALUES(1,'ds','asm','ds.fa','ds.fa.fai');
+        INSERT INTO source_seq(id,dataset_id,seq_name,seq_order,length) VALUES(1,1,'tig',1,100000);
+        INSERT INTO project(id,name,version,reference_genome_id,primary_dataset_id,created_at) VALUES(1,'p',1,1,1,'1');
+        INSERT INTO project_dataset(project_id,dataset_id,dataset_role,display_order) VALUES(1,1,'primary',1);
+        INSERT INTO assembly_seq(id,project_id,source_seq_id,instance_key,orient,source_start,source_end,left_end_type,right_end_type,created_at) VALUES(1,1,1,'chr:1','-',1,100000,'telomere','normal','1');
+        INSERT INTO assembly_ctg(id,project_id,assembly_seq_id,name,assigned_chr_name,chr_order,anchor_start,placement_mode,created_at) VALUES(1,1,1,'tig@ChrA','ChrA',1,-39999,'auto','1');
+        INSERT INTO ref_alignment_hit(dataset_id,source_seq_id,reference_chr_id,strand,query_start,query_end,ref_start,ref_end,match_length,block_length,mapq,cg_tag,run_name)
+        VALUES(1,1,1,'-',1,60000,1,60000,59900,60000,60,'60000M','test'),(1,1,2,'-',59901,100000,2001,42100,40000,40100,60,'40100M','test');")?;
+    let paths = json!({"ChrA":{"chrName":"ChrA","mode":"segments","segments":[
+        {"type":"ctg","segmentId":"baseline","assemblyCtgId":null,"source":{"dataset":"ds","contig":"tig","start":1,"end":100000,"orientation":"-"},"start":100000,"end":1,"overallLen":100000,"serverBaseline":true},
+        {"type":"gap","segmentId":"gap","gapSizeBp":100}],"totalLength":100100},
+        "ChrB":{"chrName":"ChrB","segments":[]}});
+    conn.execute("INSERT INTO project_assembly_view_state(project_id,final_path_by_chr_json,updated_at) VALUES(1,?1,'1')",[paths.to_string()])?;
+    Ok((dir, db))
+}
+fn target() -> MainViewHistoryTargetParams {
+    MainViewHistoryTargetParams {
+        history_capacity: None,
+        project_id: 1,
+        chr_name: "ChrA".into(),
+    }
+}
+fn preview(db: &Path, cuts: Vec<i64>) -> Result<SplitPreview> {
+    preview_contig_split(
+        db,
+        1,
+        &SplitPreviewParams {
+            assembly_ctg_id: 1,
+            cut_after: cuts,
+        },
+    )
+}
+fn commit(db: &Path, p: &SplitPreview) -> Result<MainViewHistoryMutationSummary> {
+    run_main_view_editor_action(
+        db,
+        &RunMainViewEditorActionParams {
+            history_capacity: None,
+            project_id: 1,
+            chr_name: "ChrA".into(),
+            action: "split-source-ctg".into(),
+            args: json!({"assemblyCtgId":1,"cutAfter":p.cut_after,"assignments":["ChrA","ChrB"],"previewToken":p.preview_token,"reason":"recommended"}),
+        },
+    )
+}
+fn paths(db: &Path) -> Result<Value> {
+    Ok(serde_json::from_str(
+        &Connection::open(db)?.query_row::<String, _, _>(
+            "SELECT final_path_by_chr_json FROM project_assembly_view_state WHERE project_id=1",
+            [],
+            |r| r.get(0),
+        )?,
+    )?)
+}
+
+#[test]
+fn read_only_preview_uses_fragment_denominators_and_overlap_alternatives() -> Result<()> {
+    let (_dir, db) = seed()?;
+    let before = std::fs::read(&db)?;
+    let p = preview(&db, vec![60000])?;
+    assert_eq!(std::fs::read(&db)?, before);
+    assert_eq!(p.parts[1].candidates[0].chr_name, "ChrB");
+    assert_eq!(p.parts[1].candidates[0].coverage_percent, 100.0);
+    assert_eq!(p.parts[1].candidates[0].orient, "-");
+    assert_eq!(p.parts[1].candidates[0].anchor_start, 2001);
+    assert!(
+        p.recommendations
+            .iter()
+            .any(|r| r.cut_after == vec![59900] && r.kind == "overlap")
+    );
+    assert!(
+        p.recommendations
+            .iter()
+            .any(|r| r.cut_after == vec![60000] && r.kind == "overlap")
+    );
+    assert_eq!(p.final_path_reference_count, 1);
+    Ok(())
+}
+
+#[test]
+fn split_moves_only_fragments_and_undo_redo_restore_both_chromosomes() -> Result<()> {
+    let (_dir, db) = seed()?;
+    let original = paths(&db)?;
+    let p = preview(&db, vec![60000])?;
+    let result = commit(&db, &p)?;
+    assert_eq!(result.affected_ctg_ids, vec![1, 2, 3]);
+    let conn = Connection::open(&db)?;
+    assert_eq!(
+        conn.query_row::<i64, _, _>(
+            "SELECT COUNT(*) FROM assembly_ctg WHERE assigned_chr_name='ChrB'",
+            [],
+            |r| r.get(0)
+        )?,
+        1
+    );
+    let fragment = crate::main_view::load_source_fragment(&conn, 3)?.unwrap();
+    assert_eq!(
+        (
+            fragment.source_start,
+            fragment.source_end,
+            fragment.gap_before_bp
+        ),
+        (60001, 100000, 0)
+    );
+    assert_eq!(conn.query_row::<i64,_,_>("SELECT SUM(s.source_end-s.source_start+1) FROM assembly_ctg c JOIN assembly_seq s ON s.id=c.assembly_seq_id",[],|r|r.get(0))?,100000);
+    assert_eq!(
+        conn.query_row::<String, _, _>(
+            "SELECT left_end_type FROM assembly_seq WHERE id=3",
+            [],
+            |r| r.get(0)
+        )?,
+        "telomere"
+    );
+    assert_eq!(
+        conn.query_row::<String, _, _>(
+            "SELECT left_end_type FROM assembly_seq WHERE id=2",
+            [],
+            |r| r.get(0)
+        )?,
+        "normal"
+    );
+    let split_paths = paths(&db)?;
+    assert_eq!(split_paths["ChrA"]["segments"][0]["start"], 100000);
+    assert_eq!(split_paths["ChrA"]["segments"][0]["end"], 60001);
+    assert_eq!(split_paths["ChrA"]["segments"][1]["start"], 60000);
+    assert_eq!(split_paths["ChrA"]["segments"][1]["end"], 1);
+    assert_eq!(split_paths["ChrB"], original["ChrB"]);
+    assert_eq!(
+        split_paths["ChrA"]["segments"][2],
+        original["ChrA"]["segments"][1]
+    );
+    undo_main_view_history(&db, &target())?;
+    assert_eq!(paths(&db)?, original);
+    assert_eq!(
+        conn.query_row::<i64, _, _>("SELECT COUNT(*) FROM assembly_ctg", [], |r| r.get(0))?,
+        1
+    );
+    assert_eq!(
+        conn.query_row::<i64, _, _>("SELECT COUNT(*) FROM assembly_seq", [], |r| r.get(0))?,
+        1
+    );
+    redo_main_view_history(&db, &target())?;
+    assert_eq!(paths(&db)?, split_paths);
+    reset_main_view_history(&db, &target())?;
+    assert_eq!(paths(&db)?, original);
+    undo_main_view_history(&db, &target())?;
+    assert_eq!(paths(&db)?, split_paths);
+    Ok(())
+}
+
+#[test]
+fn rejects_stale_preview_and_invalid_assignments_without_partial_mutation() -> Result<()> {
+    let (_dir, db) = seed()?;
+    let p = preview(&db, vec![60000])?;
+    let conn = Connection::open(&db)?;
+    conn.execute("UPDATE assembly_ctg SET name='changed' WHERE id=1", [])?;
+    assert!(format!("{:#}", commit(&db, &p).unwrap_err()).contains("CTG_SPLIT_STALE_PREVIEW"));
+    let p = preview(&db, vec![60000])?;
+    let err=run_main_view_editor_action(&db,&RunMainViewEditorActionParams {history_capacity:None,project_id:1,chr_name:"ChrA".into(),action:"split-source-ctg".into(),args:json!({"assemblyCtgId":1,"cutAfter":p.cut_after,"assignments":["missing","ChrB"],"previewToken":p.preview_token,"reason":"manual"})}).unwrap_err();
+    assert!(format!("{err:#}").contains("CTG_SPLIT_UNSUPPORTED_ASSIGNMENT"));
+    assert_eq!(
+        conn.query_row::<i64, _, _>("SELECT COUNT(*) FROM assembly_seq", [], |r| r.get(0))?,
+        1
+    );
+    for cuts in [vec![0], vec![100000], vec![60000, 60000]] {
+        assert!(preview(&db, cuts).is_err());
+    }
+    Ok(())
+}
+
+#[test]
+fn undo_does_not_overwrite_subsequent_edits_in_destination_chr() -> Result<()> {
+    let (_dir, db) = seed()?;
+    commit(&db, &preview(&db, vec![60000])?)?;
+    run_main_view_editor_action(
+        &db,
+        &RunMainViewEditorActionParams {
+            history_capacity: None,
+            project_id: 1,
+            chr_name: "ChrB".into(),
+            action: "rename-ctg".into(),
+            args: json!({"assemblyCtgId":3,"newName":"user-edit"}),
+        },
+    )?;
+    let undo = undo_main_view_history(&db, &target())?;
+    assert!(undo.invalidated && !undo.changed);
+    assert_eq!(
+        Connection::open(&db)?.query_row::<String, _, _>(
+            "SELECT name FROM assembly_ctg WHERE id=3",
+            [],
+            |r| r.get(0)
+        )?,
+        "user-edit"
+    );
+    Ok(())
+}
+
+#[test]
+fn duplicate_hits_do_not_inflate_coverage_or_recommend_same_chr_gaps() -> Result<()> {
+    let (_dir, db) = seed()?;
+    let conn = Connection::open(&db)?;
+    conn.execute("UPDATE ref_alignment_hit SET reference_chr_id=1", [])?;
+    conn.execute("INSERT INTO ref_alignment_hit(dataset_id,source_seq_id,reference_chr_id,strand,query_start,query_end,ref_start,ref_end,match_length,block_length,mapq,cg_tag,run_name) SELECT dataset_id,source_seq_id,reference_chr_id,strand,query_start,query_end,ref_start,ref_end,match_length,block_length,mapq,cg_tag,run_name FROM ref_alignment_hit",[])?;
+    let p = preview(&db, vec![])?;
+    assert_eq!(p.parts[0].candidates[0].coverage_percent, 100.0);
+    assert!(p.recommendations.is_empty());
+    conn.execute("UPDATE ref_alignment_hit SET mapq=0", [])?;
+    assert!(preview(&db, vec![])?.recommendations.is_empty());
+    Ok(())
+}
+
+#[test]
+fn final_path_export_dna_is_identical_after_reverse_split() -> Result<()> {
+    use crate::exporter::{
+        ExportFinalPathFastaParams, FinalPathExportSegment, export_final_path_fasta,
+    };
+    let (dir, db) = seed()?;
+    let dna = "AACCGT".repeat(16667)[..100000].to_string();
+    let fasta = dir.path().join("ds.fa");
+    let fai = dir.path().join("ds.fa.fai");
+    std::fs::write(&fasta, format!(">tig\n{dna}\n"))?;
+    std::fs::write(&fai, "tig\t100000\t5\t100000\t100001\n")?;
+    Connection::open(&db)?.execute(
+        "UPDATE dataset SET fasta_path=?1,fai_path=?2 WHERE id=1",
+        params![fasta.to_string_lossy(), fai.to_string_lossy()],
+    )?;
+    Connection::open(&db)?.execute(
+        "INSERT INTO source_seq_locator(source_seq_id,fasta_path) VALUES(1,?1)",
+        [fasta.to_string_lossy()],
+    )?;
+    let before = dir.path().join("before.fa");
+    let after = dir.path().join("after.fa");
+    export_final_path_fasta(
+        &db,
+        1,
+        &ExportFinalPathFastaParams {
+            chr_name: "ChrA".into(),
+            output_path: before.clone(),
+            final_path_segments: vec![
+                FinalPathExportSegment::Source {
+                    dataset_name: "ds".into(),
+                    contig_name: "tig".into(),
+                    start: 100000,
+                    end: 1,
+                },
+                FinalPathExportSegment::Gap { gap_size_bp: 100 },
+            ],
+        },
+    )?;
+    commit(&db, &preview(&db, vec![60000])?)?;
+    let paths = paths(&db)?;
+    let segments = paths["ChrA"]["segments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| {
+            if s["type"] == "gap" {
+                FinalPathExportSegment::Gap {
+                    gap_size_bp: s["gapSizeBp"].as_i64().unwrap(),
+                }
+            } else {
+                FinalPathExportSegment::Source {
+                    dataset_name: "ds".into(),
+                    contig_name: "tig".into(),
+                    start: s["start"].as_i64().unwrap(),
+                    end: s["end"].as_i64().unwrap(),
+                }
+            }
+        })
+        .collect();
+    export_final_path_fasta(
+        &db,
+        1,
+        &ExportFinalPathFastaParams {
+            chr_name: "ChrA".into(),
+            output_path: after.clone(),
+            final_path_segments: segments,
+        },
+    )?;
+    assert_eq!(std::fs::read(before)?, std::fs::read(after)?);
+    Ok(())
+}
+
+#[test]
+fn trimmed_ctg_path_conversion_is_source_relative_not_display_relative() -> Result<()> {
+    let (_dir, db) = seed()?;
+    let mut source = preview(&db, vec![])?.source;
+    source.source_start = 101;
+    source.source_end = 900;
+    let mut paths = json!({"ChrA":{"segments":[{"type":"ctg","assemblyCtgId":1,"segmentId":"trimmed","start":700,"end":200}]}});
+    rewrite_final_paths(&mut paths, &source, &[500], &[(2, 101, 500), (3, 501, 900)])?;
+    assert_eq!(paths["ChrA"]["segments"][0]["start"], 800);
+    assert_eq!(paths["ChrA"]["segments"][0]["end"], 501);
+    assert_eq!(paths["ChrA"]["segments"][1]["start"], 500);
+    assert_eq!(paths["ChrA"]["segments"][1]["end"], 300);
+    Ok(())
+}
+
+#[test]
+fn unaligned_transition_can_keep_middle_fragment_unplaced_and_preserve_phase_members() -> Result<()>
+{
+    let (_dir, db) = seed()?;
+    let conn = Connection::open(&db)?;
+    conn.execute("UPDATE ref_alignment_hit SET query_start=70001,ref_end=32000,block_length=30000,match_length=29900,cg_tag='30000M' WHERE reference_chr_id=2",[])?;
+    conn.execute_batch("INSERT INTO phased_chr_track(id,project_id,parent_chr_name,haplotype_key,label,display_order,created_at) VALUES(1,1,'ChrA','A','phase',1,'1');
+      INSERT INTO phased_chr_track_item(id,phased_track_id,assembly_ctg_id,display_order,gap_before_px,orient,created_at) VALUES(1,1,1,1,7,'-','1');")?;
+    let p = preview(&db, vec![60000, 70000])?;
+    assert!(
+        p.recommendations
+            .iter()
+            .any(|r| r.cut_after == vec![60000, 70000] && r.kind == "unaligned")
+    );
+    assert!(p.parts[1].candidates.is_empty());
+    run_main_view_editor_action(
+        &db,
+        &RunMainViewEditorActionParams {
+            history_capacity: None,
+            project_id: 1,
+            chr_name: "ChrA".into(),
+            action: "split-source-ctg".into(),
+            args: json!({"assemblyCtgId":1,"cutAfter":p.cut_after,"assignments":["ChrA",null,"ChrB"],"previewToken":p.preview_token,"reason":"recommended"}),
+        },
+    )?;
+    assert_eq!(
+        conn.query_row::<i64, _, _>(
+            "SELECT COUNT(*) FROM assembly_ctg WHERE assigned_chr_name IS NULL",
+            [],
+            |r| r.get(0)
+        )?,
+        1
+    );
+    assert_eq!(
+        conn.query_row::<i64, _, _>(
+            "SELECT assembly_ctg_id FROM phased_chr_track_item",
+            [],
+            |r| r.get(0)
+        )?,
+        2
+    );
+    undo_main_view_history(&db, &target())?;
+    assert_eq!(
+        conn.query_row::<i64, _, _>(
+            "SELECT assembly_ctg_id FROM phased_chr_track_item",
+            [],
+            |r| r.get(0)
+        )?,
+        1
+    );
+    redo_main_view_history(&db, &target())?;
+    assert_eq!(
+        conn.query_row::<i64, _, _>(
+            "SELECT assembly_ctg_id FROM phased_chr_track_item",
+            [],
+            |r| r.get(0)
+        )?,
+        2
+    );
+    Ok(())
+}
+
+#[test]
+fn frontend_json_key_order_does_not_invalidate_split_history() -> Result<()> {
+    let (_dir, db) = seed()?;
+    let original = paths(&db)?;
+    commit(&db, &preview(&db, vec![60000])?)?;
+    let conn = Connection::open(&db)?;
+    let formatted = serde_json::to_string_pretty(&paths(&db)?)?;
+    conn.execute(
+        "UPDATE project_assembly_view_state SET final_path_by_chr_json=?1",
+        [formatted],
+    )?;
+    let result = undo_main_view_history(&db, &target())?;
+    assert!(result.changed && !result.invalidated);
+    assert_eq!(paths(&db)?, original);
+    Ok(())
+}
+
+#[test]
+fn chromosome_export_does_not_insert_gap_between_adjacent_manual_fragments() -> Result<()> {
+    use crate::exporter::{ExportChrFastaParams, export_chr_fasta};
+    let (dir, db) = seed()?;
+    let fasta = dir.path().join("ds.fa");
+    let dna = "AACCGT".repeat(16667)[..100000].to_string();
+    std::fs::write(&fasta, format!(">tig\n{dna}\n"))?;
+    let conn = Connection::open(&db)?;
+    conn.execute(
+        "INSERT INTO source_seq_locator(source_seq_id,fasta_path) VALUES(1,?1)",
+        [fasta.to_string_lossy()],
+    )?;
+    conn.execute("UPDATE ref_alignment_hit SET reference_chr_id=1", [])?;
+    let before = export_chr_fasta(
+        &db,
+        1,
+        &ExportChrFastaParams {
+            chr_name: Some("ChrA".into()),
+        },
+    )?;
+    let original = std::fs::read(&before.output_path)?;
+    let p = preview(&db, vec![60000])?;
+    run_main_view_editor_action(
+        &db,
+        &RunMainViewEditorActionParams {
+            history_capacity: None,
+            project_id: 1,
+            chr_name: "ChrA".into(),
+            action: "split-source-ctg".into(),
+            args: json!({"assemblyCtgId":1,"cutAfter":p.cut_after,"assignments":["ChrA","ChrA"],"previewToken":p.preview_token,"reason":"manual"}),
+        },
+    )?;
+    // Place in original source order for an unchanged chromosome export.
+    conn.execute(
+        "UPDATE assembly_ctg SET chr_order=CASE id WHEN 3 THEN 1 ELSE 2 END",
+        [],
+    )?;
+    let after = export_chr_fasta(
+        &db,
+        1,
+        &ExportChrFastaParams {
+            chr_name: Some("ChrA".into()),
+        },
+    )?;
+    assert_eq!(std::fs::read(&after.output_path)?, original);
+    Ok(())
+}

@@ -159,6 +159,7 @@ export const zh = {
     },
     operations: {
       "rename-ctg": "重命名 {target}",
+      "split-source-ctg": "分段 {target}",
       "flip-ctg": "翻转 {target}",
       "flip-seq": "翻转 {target} 的序列",
       "hide-seq": "隐藏 {target} 的序列",
@@ -770,6 +771,7 @@ export const en = {
     },
     operations: {
       "rename-ctg": "rename {target}",
+      "split-source-ctg": "Split {target}",
       "flip-ctg": "flip {target}",
       "flip-seq": "flip a sequence in {target}",
       "hide-seq": "hide a sequence in {target}",

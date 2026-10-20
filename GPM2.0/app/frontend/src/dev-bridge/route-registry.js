@@ -38,6 +38,7 @@ const ROUTE_GROUPS = Object.freeze({
     ["/ctg-editor-action", "runCtgEditorAction"],
     ["/main-view-history-status", "getMainViewHistoryStatus"],
     ["/inspect-main-view-delete", "inspectMainViewDelete"],
+    ["/preview-contig-split", "previewContigSplit"],
     ["/main-view-editor-action", "runMainViewEditorAction"],
     ["/main-view-layout-action", "runMainViewLayoutAction"],
     ["/main-view-batch-delete", "runMainViewBatchDelete"],

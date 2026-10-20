@@ -159,6 +159,8 @@ export function buildFinalPathCtgSegment(
     anchorSource = "",
     source = null,
     serverBaseline = false,
+    splitFragmentCtgId = null,
+    splitFromAssemblyCtgId = null,
   } = {},
   index = 0,
 ) {
@@ -176,6 +178,8 @@ export function buildFinalPathCtgSegment(
   const normalizedEnd = normalizePositiveInteger(end);
   const normalizedOrient = normalizeSegmentOrient(orient);
   const traceMetadata = {
+    ...(normalizePositiveInteger(splitFragmentCtgId) ? { splitFragmentCtgId: normalizePositiveInteger(splitFragmentCtgId) } : {}),
+    ...(normalizePositiveInteger(splitFromAssemblyCtgId) ? { splitFromAssemblyCtgId: normalizePositiveInteger(splitFromAssemblyCtgId) } : {}),
     ...(normalizeString(grtKind) ? { grtKind: normalizeString(grtKind) } : {}),
     ...(normalizeString(eventId) ? { eventId: normalizeString(eventId) } : {}),
     ...(normalizeStringList(evidenceIds).length
@@ -330,6 +334,8 @@ function normalizeSegment(segment, index = 0) {
       anchorSource: segment.anchorSource,
       source: segment.source,
       serverBaseline: segment.serverBaseline,
+      splitFragmentCtgId: segment.splitFragmentCtgId,
+      splitFromAssemblyCtgId: segment.splitFromAssemblyCtgId,
     },
     index,
   );

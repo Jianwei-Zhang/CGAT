@@ -1891,3 +1891,199 @@ for (const reject of [false, true]) {
     assert.equal(harness.store.getState().assembly.error, "");
   });
 }
+
+test("loadAssemblyView keeps split source paths detached from sibling IDs during hydration", async () => {
+  const host = {};
+  let state = {
+    session: {
+      workspacePath: "/tmp/ws",
+      projectId: 9,
+    },
+    initializer: {
+      existingProjects: [{ projectId: 9, primaryDatasetId: 1, supportDatasetIds: [] }],
+      datasets: [],
+    },
+    assembly: {
+      selectedChrName: "Chr01",
+      selectedCtgId: null,
+      selectedMemberSeqId: null,
+      supportDatasetId: null,
+      supportMirroredCtgs: [],
+      finalPathByChr: {},
+      finalPathViewMode: "graph",
+      trackSelectedCtgIds: [],
+      hiddenPrimaryCtgIds: [],
+      trackDragOffsets: [],
+      subviewTrackDragOffsets: [],
+      selectedDeletedCtgRecordIds: [],
+      subview: {
+        summary: null,
+        trackPairHiddenCtgs: [],
+        trackPairSelectedCtgs: [],
+      },
+    },
+  };
+  const store = {
+    getState() {
+      return state;
+    },
+    setState(nextState) {
+      state = {
+        ...state,
+        ...nextState,
+      };
+    },
+  };
+
+  await loadAssemblyView(host, store, { keepCurrentChr: true, keepCurrentCtg: false }, {
+    buildClearedSubviewState(assembly) {
+      return assembly.subview;
+    },
+    buildSubviewTrackPairHiddenCtgKey(trackRole, contigId) {
+      return `${trackRole}:${contigId}`;
+    },
+    buildSubviewTrackPairPoolsFromAssembly() {
+      return { top: [], bottom: [] };
+    },
+    filterPrimaryTrackSelectionCtgIds(values) {
+      return values;
+    },
+    filterSubviewTrackDragOffsetsBySummary(values) {
+      return values;
+    },
+    filterSubviewTrackPairHiddenCtgs(values) {
+      return values;
+    },
+    filterSubviewTrackPairSelectionCtgs(values) {
+      return values;
+    },
+    filterTrackDragOffsets(values) {
+      return values;
+    },
+    getCurrentProject(currentState) {
+      return currentState.initializer.existingProjects[0];
+    },
+    getSupportDatasetOptions() {
+      return [];
+    },
+    async getProjectAssemblyViewState() {
+      return {
+        finalPathViewMode: "table",
+        finalPathByChr: {
+          Chr01: {
+            mode: "segments",
+            chrName: "Chr01",
+            segments: [
+              {
+                segmentId: "seg-1",
+                type: "ctg",
+                assemblyCtgId: 7,
+                datasetName: "flye",
+                ctgName: "flye_ctg7",
+                overallLen: 900,
+                start: 1,
+                end: 900,
+                source: {
+                  dataset: "flye",
+                  contig: "utig4-001122l",
+                  start: 1,
+                  end: 900,
+                  orientation: "+",
+                },
+                serverBaseline: true,
+              splitFromAssemblyCtgId: 6,
+              splitFragmentCtgId: 73,
+              },
+            ],
+            updatedAt: "1",
+          },
+        },
+      };
+    },
+    async listChrViewCtgs() {
+      return {
+        items: [{
+          assemblyCtgId: 7,
+          name: "Ctg7",
+          originId: "utig4-001122l",
+          datasetName: "flye",
+          totalLength: 1200,
+        }],
+      };
+    },
+    async getGrtProjectView() {
+      return {
+        baselineFinalPathByChr: {
+          Chr01: {
+            mode: "segments",
+            chrName: "Chr01",
+            segments: [{
+              segmentId: "seg-1",
+              type: "ctg",
+              assemblyCtgId: null,
+              datasetName: "flye",
+              ctgName: "flye_ctg7",
+              originId: "utig4-001122l",
+              overallLen: 1200,
+              start: 1,
+              end: 900,
+              source: {
+                dataset: "flye",
+                contig: "utig4-001122l",
+                start: 1,
+                end: 900,
+                orientation: "+",
+              },
+              serverBaseline: true,
+              splitFromAssemblyCtgId: 6,
+              splitFragmentCtgId: 73,
+            }],
+          },
+        },
+      };
+    },
+    async listProjectChromosomes() {
+      return {
+        items: [{ chrName: "Chr01" }],
+        referenceGenomeId: 3,
+        unplacedCtgCount: 0,
+        unplacedBp: 0,
+      };
+    },
+    async loadDatasetChrCtgs() {
+      return [];
+    },
+    async loadDeletedCtgsForChr() {
+      return [];
+    },
+    async loadSideDataForCtg() {
+      return {
+        detail: { members: [] },
+        candidates: { moveTargetCtgs: [], addSeqCandidates: [] },
+      };
+    },
+    mapAssemblyError({ error }) {
+      return { userMessage: String(error?.message || error) };
+    },
+    normalizeDeletedCtgRecordIds(values) {
+      return values;
+    },
+    normalizeFinalPathByChr,
+    normalizeSupportDatasetId(value) {
+      return value == null ? null : Number(value);
+    },
+    normalizeSupportMirroredCtgs(values) {
+      return values;
+    },
+    normalizeTrackSelectionCtgIds(values) {
+      return values;
+    },
+    rerender() {},
+  });
+
+  const segment = state.assembly.finalPathByChr.Chr01.segments[0];
+  assert.equal(segment.assemblyCtgId, null);
+  assert.equal(segment.splitFromAssemblyCtgId, 6);
+  assert.equal(segment.splitFragmentCtgId, 73);
+  assert.deepEqual(normalizeFinalPathByChr(state.assembly.finalPathByChr), state.assembly.finalPathByChr);
+});

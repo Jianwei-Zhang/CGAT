@@ -472,7 +472,13 @@ function buildCtgEditorCommandArgs(action, workspaceRoot, projectId, args) {
   }
 }
 
+  async function previewContigSplit({ workspaceRoot, projectId, args }) {
+    requireString("workspaceRoot", workspaceRoot);
+    requireNumber("projectId", projectId);
+    return parseResultJson(await runBackend(["preview-contig-split", workspaceRoot, String(projectId), JSON.stringify(args)]));
+  }
   return {
+    previewContigSplit,
     listDeletedCtgs,
     getCtgDetail,
     listCtgEditCandidates,

@@ -1,3 +1,4 @@
+import { renderManualSplitMarkers } from "./source-fragment-layout.js";
 import { setTrackDragGroupOffsets } from "./source-fragment-drag.js";
 import { renderViewTickControl } from "./view-navigation-ui.js";
 import { resolveFullRangeVisibleSpan } from "./view-navigation-state.js";
@@ -2178,6 +2179,8 @@ function renderAssemblyTracks(args) {
               tooltipText: `${ctg.name || ctg.assemblyCtgId}: ${Math.round(hitStartOffset)}–${Math.round(hitEndOffset)} | ${selectedChrName}: ${refStartBp}–${refEndBp} | ${alignmentBandTooltipMetrics({ identityPct: readHitIdentityPct(hit), alignLength: hitBlockLength })}${part.referenceProjectionApproximate ? ` | ${i18n.trackControls.approximateReferenceProjection}` : ""}`,
               refStartBp,
               refEndBp,
+              queryStart: Number(hit.queryStart ?? hit.query_start),
+              queryEnd: Number(hit.queryEnd ?? hit.query_end),
               approximate: Boolean(part.referenceProjectionApproximate),
               className: layout.className ? ` ${layout.className}` : "",
               tone: trackRole === "support" ? "companion" : "primary",
@@ -2202,7 +2205,7 @@ function renderAssemblyTracks(args) {
         : "";
       return `<polygon class="track-collinearity-band${band.className}" data-band-track-role="${escapeAttr(
           band.trackRole,
-        )}" data-band-contig-id="${band.contigId}"${phasedBandAttrs} data-band-ref-start="${band.refStartBp}" data-band-ref-end="${band.refEndBp}" data-band-approximate="${band.approximate ? "1" : "0"}" data-track-band-proxy="1" points="${band.points}" ${alignmentBandSvgAttrs(band)}><title>${escapeHtml(band.tooltipText)}</title></polygon>`;
+        )}" data-band-contig-id="${band.contigId}"${phasedBandAttrs} data-band-query-start="${band.queryStart}" data-band-query-end="${band.queryEnd}" data-band-ref-start="${band.refStartBp}" data-band-ref-end="${band.refEndBp}" data-band-approximate="${band.approximate ? "1" : "0"}" data-track-band-proxy="1" points="${band.points}" ${alignmentBandSvgAttrs(band)}><title>${escapeHtml(band.tooltipText)}</title></polygon>`;
     })
     .join("");
 
@@ -2333,6 +2336,7 @@ function renderAssemblyTracks(args) {
             ${telomereMarkerMarkup}
             ${centromereMarkerMarkup}
             ${nRegionMarkerMarkup}
+            ${renderManualSplitMarkers(ctg, rect, y, TRACK_BAR_HEIGHT, escapeHtml)}
             ${labelMarkup}
             ${
               slotToken

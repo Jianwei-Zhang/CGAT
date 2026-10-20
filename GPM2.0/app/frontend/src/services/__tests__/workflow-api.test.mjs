@@ -19,6 +19,7 @@ import {
   listProjectInitializerOptions,
   openWorkspace,
   inspectMainViewDelete,
+  previewContigSplit,
   removePhasedChrTrackItem,
   reorderPhasedChrTrackItems,
   runCtgEditorAction,
@@ -1011,4 +1012,23 @@ test("phased track services route tauri invoke commands with camelCase payloads"
   } finally {
     globalThis.window = previousWindow;
   }
+});
+
+test("source split preview and mutation route through native evidence and persistent history", async () => {
+  const previousWindow = globalThis.window;
+  const calls = [];
+  try {
+    globalThis.window = { __TAURI__: { core: { invoke: async (command, args) => {
+      calls.push({ command, args }); return { previewToken: "verified" };
+    } } } };
+    const target = { workspaceRoot: "D:/workspace", projectId: 1 };
+    await previewContigSplit({ ...target, assemblyCtgId: 6, cutAfter: [50038020] });
+    const args = { assemblyCtgId: 6, cutAfter: [50038020], assignments: ["A", "B"], previewToken: "verified", reason: "recommended" };
+    await runMainViewEditorAction({ ...target, chrName: "A", action: "split-source-ctg", args });
+    assert.deepEqual(calls[0], { command: "preview_contig_split", args: { ...target, args: { assemblyCtgId: 6, cutAfter: [50038020] } } });
+    assert.equal(calls[1].command, "run_main_view_editor_action");
+    assert.deepEqual(calls[1].args.request.args, args);
+    globalThis.window.__TAURI__.core.invoke = async () => { throw new Error("invalid evidence"); };
+    await assert.rejects(previewContigSplit({ ...target, assemblyCtgId: 6 }), /invalid evidence/);
+  } finally { globalThis.window = previousWindow; }
 });

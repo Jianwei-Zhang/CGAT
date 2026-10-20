@@ -1400,8 +1400,11 @@ fn sort_ctg_models(ctgs: &mut [CtgExportModel]) {
 
 fn fragment_member(ctg: &CtgExportModel) -> Option<&CtgMemberModel> {
     let member = ctg.members.first()?;
-    (ctg.members.len() == 1 && !member.hidden && member.instance_key.starts_with("n-fragment:"))
-        .then_some(member)
+    (ctg.members.len() == 1
+        && !member.hidden
+        && (member.instance_key.starts_with("n-fragment:")
+            || member.instance_key.starts_with("manual-fragment:")))
+    .then_some(member)
 }
 
 fn original_gap_between(
@@ -1422,6 +1425,9 @@ fn original_gap_between(
     } else {
         (a.source_end + 1, b.source_start - 1)
     };
+    if end + 1 == start && a.instance_key.starts_with("manual-fragment:") {
+        return Some(0); // Adjacent manual fragments do not introduce artificial Ns.
+    }
     if end < start {
         return None;
     }
@@ -1468,7 +1474,7 @@ fn merge_ctg_chunks_for_chr(
         let original_gap = index
             .checked_sub(1)
             .and_then(|previous| original_gap_between(&chr_ctgs[previous], ctg, source_sequences));
-        if has_output && !last_component_is_gap {
+        if has_output && !last_component_is_gap && original_gap != Some(0) {
             merged.push(CtgChunk::Gap {
                 length: original_gap.unwrap_or(DEFAULT_CHR_GAP_BP),
                 gap_type: "contig",

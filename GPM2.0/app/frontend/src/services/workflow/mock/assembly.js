@@ -533,6 +533,7 @@ function buildMockHistoryMutation(projectId, chrName, operation, affectedCtgIds 
 }
 
 async function runMainViewEditorActionMock({ projectId, chrName, action, args = {} }) {
+  if (action === "split-source-ctg") throw new Error("Contig splitting requires a real workspace");
   await sleep(60);
   const history = resolveMainHistory(projectId, chrName);
   const affectedCtgId = Number(args.assemblyCtgId || 0);
@@ -788,6 +789,7 @@ async function appendEditAuditLogMock({ projectId, category, action, detail }) {
     runCtgEditorAction: runCtgEditorActionMock,
     getMainViewHistoryStatus: getMainViewHistoryStatusMock,
     inspectMainViewDelete: inspectMainViewDeleteMock,
+    previewContigSplit: async () => { throw new Error("Contig split preview requires a real workspace"); },
     runMainViewEditorAction: runMainViewEditorActionMock,
     runMainViewLayoutAction: runMainViewLayoutActionMock,
     runMainViewBatchDelete: runMainViewBatchDeleteMock,

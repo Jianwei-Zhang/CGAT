@@ -1,3 +1,6 @@
+import { normalizeMainViewHistoryStatus } from "./assembly/main-view-history-state.js";
+import { openContigSplitDialog } from "./assembly/contig-split-runtime.js";
+import { splitCopy } from "./assembly/contig-split-state.js";
 import { setTrackDragGroupOffsets, setSubviewDragGroupOffsets, moveSubviewCompositionDrag } from "./assembly/source-fragment-drag.js";
 import { requestAppPrompt } from "../shell/app-dialog.js";
 import {
@@ -30,6 +33,7 @@ import {
   runMainViewLayoutAction as runMainViewLayoutActionApi,
   executeMainViewHistoryAction,
   inspectMainViewDelete,
+  previewContigSplit,
   writeFinalPathExportBinaryFile,
   writeFinalPathExportTextFile,
 } from "../../services/workflow-api.js";
@@ -1116,6 +1120,7 @@ const degapRuntimeDeps = {
 };
 
 const contextMenuRuntimeDeps = {
+  openContigSplit: openAssemblyContigSplit,
   addContextCtgToComposition,
   moveContextSubviewMemberToOtherLane,
   removeContextSubviewMember,
@@ -2998,4 +3003,39 @@ function escapeHtml(value) {
 
 function escapeAttr(value) {
   return escapeHtml(value).replaceAll('"', "&quot;");
+}
+
+async function openAssemblyContigSplit(host, store, options) {
+  const state = store.getState();
+  if (state.assembly?.mainViewHistory?.inFlight || state.assembly?.loading) return false;
+  try {
+    await flushAssemblyProjectState(host, store);
+    return await openContigSplitDialog(host, store, options, {
+      preview: previewContigSplit,
+      commit: (payload) => runSerializedProjectViewMutation(store, async (isCurrent) => {
+        if (!isCurrent()) throw new Error(splitCopy[state.locale === "en" ? "en" : "zh"].stale);
+        store.setState({ assembly: { ...store.getState().assembly,
+          mainViewHistory: { ...store.getState().assembly.mainViewHistory, inFlight: true } } });
+        try {
+          const result = await runMainViewEditorAction(payload);
+          if (!isCurrent()) return result;
+          await loadAssemblyView(host, store, { keepCurrentChr: true, keepCurrentCtg: false, renderLoading: false });
+          if (!isCurrent()) return result;
+          store.setState({ assembly: { ...store.getState().assembly,
+            mainViewHistory: normalizeMainViewHistoryStatus(result.status, { chrName: payload.chrName }),
+            trackSelectedCtgIds: [], actionError: "",
+            actionStatus: splitCopy[state.locale === "en" ? "en" : "zh"].done,
+          } });
+          rerenderAssemblyMainTab(host, store);
+          return result;
+        } finally {
+          if (isCurrent()) store.setState({ assembly: { ...store.getState().assembly,
+            mainViewHistory: { ...store.getState().assembly.mainViewHistory, inFlight: false } } });
+        }
+      }),
+    });
+  } catch (error) {
+    setAssemblyActionFeedback(host, store, { actionError: String(error.message || error) });
+    return false;
+  }
 }

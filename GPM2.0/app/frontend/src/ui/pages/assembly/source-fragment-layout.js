@@ -39,3 +39,16 @@ export function sourceFragmentDragAttrs(ctg, escapeAttr) {
   if (!part?.sourceSeqId || !part?.groupKey) return "";
   return `data-source-fragment-seq-id="${Number(part.sourceSeqId)}" data-source-fragment-group="${escapeAttr(part.groupKey)}"`;
 }
+
+// Manual cuts are boundaries, not synthetic Ns. Mark even a lone moved fragment.
+export function renderManualSplitMarkers(ctg, rect, y, height, escapeHtml) {
+  const part = ctg?.sourceFragment;
+  if (!String(part?.groupKey || "").startsWith("manual-fragment:")) return "";
+  const reversed = (ctg.orient ?? ctg.refOrient) === "-";
+  return [part.sourceStart > 1 ? { source: part.sourceStart - 1, left: !reversed } : null,
+    part.sourceEnd < part.sourceLength ? { source: part.sourceEnd, left: reversed } : null]
+    .filter(Boolean).map(({ source, left }) => {
+      const x = left ? rect.x : rect.x + rect.width;
+      return `<path class="track-manual-split" data-manual-split-after="${source}" d="M ${x - 2} ${y - 3} l 4 5 l -4 5 l 4 ${height - 4}" fill="none" stroke="#a45528" stroke-width="1.5" pointer-events="none"><title>${escapeHtml(`Split after source base ${source}; no inserted bases`)}</title></path>`;
+    }).join("");
+}

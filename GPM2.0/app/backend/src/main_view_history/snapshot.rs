@@ -145,6 +145,18 @@ pub(super) fn validate_snapshot(
     let mut expected = expected.clone();
     normalize_layout_offsets_for_comparison(&mut actual.layout_state);
     normalize_layout_offsets_for_comparison(&mut expected.layout_state);
+    // View state crosses a JS/Rust boundary. Object key order/whitespace is not
+    // an edit; compare canonical JSON while retaining every semantic field.
+    for snapshot in [&mut actual, &mut expected] {
+        if let Some(view) = &mut snapshot.view_state {
+            for raw in [
+                &mut view.final_path_by_chr_json,
+                &mut view.degap_project_state_json,
+            ] {
+                *raw = serde_json::to_string(&serde_json::from_str::<Value>(raw)?)?;
+            }
+        }
+    }
     if actual != expected {
         bail!(
             "{HISTORY_CONFLICT_CODE}: current database state no longer matches the recorded history precondition"
@@ -196,41 +208,19 @@ pub(super) fn apply_snapshot(
     validate_desired_names(conn, project_id, desired)?;
 
     for row in &desired.seqs {
-        let updated = conn.execute(
-            "UPDATE assembly_seq
-             SET project_id = ?1,
-                 source_seq_id = ?2,
-                 instance_key = ?3,
-                 orient = ?4,
-                 source_start = ?5,
-                 source_end = ?6,
-                 left_end_type = ?7,
-                 right_end_type = ?8,
-                 hidden = ?9,
-                 created_at = ?10,
-                 note = ?11
-             WHERE id = ?12",
-            params![
-                row.project_id,
-                row.source_seq_id,
-                row.instance_key,
-                row.orient,
-                row.source_start,
-                row.source_end,
-                row.left_end_type,
-                row.right_end_type,
-                row.hidden,
-                row.created_at,
-                row.note,
-                row.id,
-            ],
+        conn.execute(
+            "INSERT INTO assembly_seq (project_id, source_seq_id, instance_key, orient,
+                 source_start, source_end, left_end_type, right_end_type, hidden, created_at, note, id)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)
+             ON CONFLICT(id) DO UPDATE SET project_id=excluded.project_id,
+                 source_seq_id=excluded.source_seq_id, instance_key=excluded.instance_key,
+                 orient=excluded.orient, source_start=excluded.source_start, source_end=excluded.source_end,
+                 left_end_type=excluded.left_end_type, right_end_type=excluded.right_end_type,
+                 hidden=excluded.hidden, created_at=excluded.created_at, note=excluded.note",
+            params![row.project_id, row.source_seq_id, row.instance_key, row.orient,
+                row.source_start, row.source_end, row.left_end_type, row.right_end_type,
+                row.hidden, row.created_at, row.note, row.id],
         )?;
-        if updated != 1 {
-            bail!(
-                "{HISTORY_CONFLICT_CODE}: assembly_seq_id {} cannot be restored",
-                row.id
-            );
-        }
     }
 
     for track_id in &expected.phased_track_ids {
@@ -321,6 +311,22 @@ pub(super) fn apply_snapshot(
                     row.created_at,
                     row.note,
                 ],
+            )?;
+        }
+    }
+
+    // Split history creates sequence instances. Remove only IDs covered by the
+    // validated snapshot, after dependent contigs have been restored/removed.
+    let desired_seq_ids = desired
+        .seqs
+        .iter()
+        .map(|row| row.id)
+        .collect::<BTreeSet<_>>();
+    for seq_id in &desired.seq_ids {
+        if !desired_seq_ids.contains(seq_id) {
+            conn.execute(
+                "DELETE FROM assembly_seq WHERE id=?1 AND project_id=?2",
+                params![seq_id, project_id],
             )?;
         }
     }

@@ -189,3 +189,14 @@ bash ./gpm_server/export_final_path_fasta.sh \
   --tsv /path/to/project_Chr01_path.tsv \
   -o /path/to/project_Chr01_path.fa
 ```
+
+### Non-destructive contig splitting
+
+In Assembly, right-click a primary contig and choose **Split contig and assign fragments**:
+- **Manual cut**: enter source coordinates, or click/drag the preview cut line.
+- **Ref alignment boundary**: choose an alignment endpoint; right-clicking a main-view alignment band also exposes its source endpoints.
+- **Recommended cuts**: inspect cross-chromosome support transitions. Overlap boundaries remain alternatives, not a uniquely proven breakpoint; an unaligned middle interval can be retained separately.
+
+The preview ranks chromosome candidates using union coverage divided by **fragment length**, with MAPQ, whole-hit weighted identity, orientation and reference coordinates. Default suggestions require at least 60% MAPQ ≥20 coverage and a 10-percentage-point lead over the next candidate. Automatic breakpoint proposals additionally require at least 10 kb per outer fragment. Ambiguous fragments remain unplaced; choices are editable before confirmation. This uses retained reference alignments, not a new alignment run or proof of misassembly.
+
+Cuts use 1-based original source coordinates: cut after `k` produces `[start,k]` and `[k+1,end]`. Reverse display does not change this convention. FASTA stays unchanged, no Ns are inserted, and manual cut ends receive a boundary marker. Chromosome assignment changes the main track, **not adoption into the destination Final Path**. Existing Final Path references are partitioned into source intervals without changing DNA/order. Undo/redo from the initiating chromosome restores all affected fragments atomically; later conflicting edits are never overwritten. Preview and confirmation require a real workspace, not mock data.

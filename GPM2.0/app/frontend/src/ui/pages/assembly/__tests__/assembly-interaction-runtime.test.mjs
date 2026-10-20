@@ -2711,3 +2711,14 @@ test("assembly page public binder wires host-level listeners once for the same h
     "pointerdown",
   ]);
 });
+
+test("primary ctg split menu wires all three entries and exact query-boundary shortcuts", async () => {
+  const calls=[];
+  const store=createStore(createState({assembly:{selectedChrName:"Chr01",trackSelectedCtgIds:[],chrCtgs:[{assemblyCtgId:2,totalLength:1000}]}}));
+  const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:"primary",splitQueryStart:301,splitQueryEnd:700},memberNode:null,host:{},store,
+    actions:{canEditTrackCtg:()=>true,openContigSplit:async (_host,_store,args)=>calls.push(args)}});
+  const split=items.find((item)=>item.label==="ctg 分段与染色体归组");
+  assert.ok(split);assert.equal(split.children.length,5);
+  for(const child of split.children) await child.run();
+  assert.deepEqual(calls,[{assemblyCtgId:2,mode:"manual"},{assemblyCtgId:2,mode:"boundary"},{assemblyCtgId:2,mode:"recommended"},{assemblyCtgId:2,mode:"boundary",cutAfter:300},{assemblyCtgId:2,mode:"boundary",cutAfter:700}]);
+});

@@ -1,3 +1,4 @@
+import { splitCopy } from "./contig-split-state.js";
 import {
   buildSupportMirrorKey,
   filterPrimaryTrackSelectionCtgIds,
@@ -145,6 +146,16 @@ export function resolveAssemblyCtgContextTarget(target) {
         segmentEnd,
       };
     }
+  }
+
+  const band = target?.closest?.('[data-band-contig-id][data-band-track-role="primary"]');
+  if (band) {
+    const assemblyCtgId = normalizeSupportDatasetId(band.getAttribute("data-band-contig-id"));
+    if (assemblyCtgId) return {
+      assemblyCtgId, trackRole: "primary", isMirror: false, datasetId: null,
+      splitQueryStart: Number(band.getAttribute("data-band-query-start")),
+      splitQueryEnd: Number(band.getAttribute("data-band-query-end")),
+    };
   }
 
   const legacyNode = target?.closest?.("[data-assembly-ctg-id]");
@@ -1265,6 +1276,30 @@ export function buildAssemblyContextMenuItems({
         });
       }
       if (!isSupportTrackCtg) {
+        if (!isPhasedCtgContext && typeof contextMenuActions.openContigSplit === "function"
+          && String(state.assembly.selectedChrName || "").toLowerCase() !== "unplaced") {
+          const labels = splitCopy[state.locale === "en" ? "en" : "zh"];
+          const open = (mode, cutAfter) => contextMenuActions.openContigSplit(host, store, {
+            assemblyCtgId: ctgId, mode, ...(cutAfter ? { cutAfter } : {}),
+          });
+          const splitChildren = [
+            { label: labels.manual, run: () => open("manual") },
+            { label: labels.boundary, run: () => open("boundary") },
+            { label: labels.recommended, run: () => open("recommended") },
+          ];
+          const sourceCtg = state.assembly.chrCtgs?.find((ctg) => Number(ctg.assemblyCtgId) === ctgId);
+          const sourceStart = Number(sourceCtg?.sourceFragment?.sourceStart || 1);
+          const sourceEnd = Number(sourceCtg?.sourceFragment?.sourceEnd || sourceCtg?.totalLength || Infinity);
+          if (ctgContext.splitQueryStart - 1 >= sourceStart && ctgContext.splitQueryStart - 1 < sourceEnd) splitChildren.push({
+            label: `${labels.boundaryStart} (${ctgContext.splitQueryStart - 1})`,
+            run: () => open("boundary", ctgContext.splitQueryStart - 1),
+          });
+          if (ctgContext.splitQueryEnd >= sourceStart && ctgContext.splitQueryEnd < sourceEnd) splitChildren.push({
+            label: `${labels.boundaryEnd} (${ctgContext.splitQueryEnd})`,
+            run: () => open("boundary", ctgContext.splitQueryEnd),
+          });
+          items.push({ label: labels.title, children: splitChildren });
+        }
         items.push({
           label: isHiddenPrimaryTrackCtg ? i18n.contextMenu.unhideContig : i18n.contextMenu.hideContig,
           run: async () => {

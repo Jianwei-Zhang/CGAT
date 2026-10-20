@@ -23,6 +23,7 @@ pub(super) fn prepare_editor_mutation(
     args: &Value,
 ) -> Result<PreparedMutation> {
     match action {
+        "split-source-ctg" => super::split::prepare_split(conn, project_id, chr_name, args),
         "rename-ctg" => prepare_rename_ctg(conn, project_id, chr_name, args),
         "flip-ctg" => prepare_flip_ctg(conn, project_id, chr_name, args),
         "flip-seq" => prepare_flip_seq(conn, project_id, chr_name, args),
@@ -975,7 +976,7 @@ fn count_value_references(value: &Value, targets: &BTreeSet<i64>) -> i64 {
     }
 }
 
-fn mark_json_references(value: &mut Value, targets: &BTreeSet<i64>) -> i64 {
+pub(super) fn mark_json_references(value: &mut Value, targets: &BTreeSet<i64>) -> i64 {
     match value {
         Value::Array(items) => items
             .iter_mut()

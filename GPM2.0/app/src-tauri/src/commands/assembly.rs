@@ -953,3 +953,22 @@ pub async fn get_track_pairwise_evidence(
     .map_err(|join_error| format!("get_track_pairwise_evidence join error: {join_error}"))?
     .map_err(format_error)
 }
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn preview_contig_split(
+    workspaceRoot: String,
+    projectId: i64,
+    args: Value,
+) -> CommandResult<Value> {
+    (|| {
+        let request = serde_json::from_value(args)?;
+        let preview = gpm_next_backend::contig_split::preview_contig_split(
+            &project_db_path(&workspaceRoot),
+            projectId,
+            &request,
+        )?;
+        Ok(serde_json::to_value(preview)?)
+    })()
+    .map_err(format_error)
+}

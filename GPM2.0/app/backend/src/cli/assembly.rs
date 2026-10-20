@@ -2,6 +2,20 @@ use super::*;
 
 pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
     match command {
+        Commands::PreviewContigSplit {
+            workspace_root,
+            project_id,
+            args_json,
+        } => {
+            let request = serde_json::from_str(&args_json)?;
+            let preview = gpm_next_backend::contig_split::preview_contig_split(
+                &workspace_root.join("project.sqlite"),
+                project_id,
+                &request,
+            )?;
+            println!("result_json={}", serde_json::to_string(&preview)?);
+        }
+
         Commands::ListChrViewCtgs {
             workspace_root,
             project_id,

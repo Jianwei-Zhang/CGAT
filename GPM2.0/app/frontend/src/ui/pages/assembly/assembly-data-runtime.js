@@ -76,6 +76,9 @@ function backfillFinalPathOriginIds(finalPathByChr, chrName, primaryCtgs, suppor
     if (normalizeString(segment?.type).toLowerCase() === "gap") {
       return segment;
     }
+    // Split paths deliberately remain immutable source locators. Reattaching a
+    // full-source interval to an arbitrary sibling would corrupt its coordinates.
+    if (Number(segment?.splitFromAssemblyCtgId) > 0) return segment;
     const ctgId = Number(segment?.assemblyCtgId || 0);
     const sourceDataset = normalizeString(segment?.source?.dataset || segment?.datasetName).toLowerCase();
     const sourceContig = normalizeString(

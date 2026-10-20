@@ -286,6 +286,7 @@ export function buildAssemblyContextMenuActions(actionDeps, overrides = {}) {
     setAssemblyActionFeedback: resolveAction("setAssemblyActionFeedback"),
     openAssemblyContextMenuAt: resolveAction("openAssemblyContextMenuAt"),
     applyEditorAction: resolveAction("applyEditorAction"),
+    openContigSplit: resolveAction("openContigSplit"),
     promptForRenameCtg: resolveAction("promptForRenameCtg"),
     promptForDeleteShorterThanLength: resolveAction("promptForDeleteShorterThanLength"),
     buildRenameCtgActionArgs: resolveAction("buildRenameCtgActionArgs"),
@@ -319,7 +320,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
     const fragmentNode = target?.closest?.("[data-subview-fragment-key][data-subview-fragment-contig-id]");
     fragmentNode?.classList?.add?.("is-menu-active");
     activeSubviewFragmentNode = fragmentNode || null;
-    const hitNode = target?.closest?.("[data-subview-hit-key]");
+    const hitNode = target?.closest?.("[data-subview-hit-key], [data-band-contig-id]");
     hitNode?.classList?.add?.("is-menu-active");
     activeSubviewHitNode = hitNode || null;
   };

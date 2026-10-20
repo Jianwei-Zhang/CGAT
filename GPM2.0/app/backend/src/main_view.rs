@@ -79,7 +79,7 @@ pub(crate) fn load_source_fragment(
             "SELECT s.source_seq_id,s.instance_key,s.source_start,s.source_end,ss.length
          FROM assembly_ctg c JOIN assembly_seq s ON s.id=c.assembly_seq_id
          JOIN source_seq ss ON ss.id=s.source_seq_id
-         WHERE c.id=?1 AND s.instance_key LIKE 'n-fragment:%'",
+         WHERE c.id=?1 AND (s.instance_key LIKE 'n-fragment:%' OR s.instance_key LIKE 'manual-fragment:%')",
             [ctg_id],
             |r| {
                 Ok((
