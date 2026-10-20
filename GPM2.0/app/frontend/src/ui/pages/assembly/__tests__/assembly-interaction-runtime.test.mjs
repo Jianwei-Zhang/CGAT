@@ -1306,7 +1306,7 @@ test("context-menu listeners install only once for the route host", () => {
   __testBindAssemblyContextMenu(host, createStore(createState()));
   __testBindAssemblyContextMenu(host, createStore(createState()));
 
-  assert.deepEqual(listenerTypes, ["click", "scroll", "contextmenu"]);
+  assert.deepEqual(listenerTypes, ["keydown", "click", "scroll", "contextmenu"]);
 });
 
 test("bindings binder rejects missing required deps at the boundary", () => {
@@ -2702,6 +2702,7 @@ test("assembly page public binder wires host-level listeners once for the same h
     "pointerover",
     "pointerout",
     "click",
+    "keydown",
     "click",
     "scroll",
     "contextmenu",
@@ -2712,13 +2713,43 @@ test("assembly page public binder wires host-level listeners once for the same h
   ]);
 });
 
-test("primary ctg split menu wires all three entries and exact query-boundary shortcuts", async () => {
+test("split contig menu only exposes outer Ref boundaries from all filtered hits", async () => {
   const calls=[];
-  const store=createStore(createState({assembly:{selectedChrName:"Chr01",trackSelectedCtgIds:[],chrCtgs:[{assemblyCtgId:2,totalLength:1000}]}}));
-  const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:"primary",splitQueryStart:301,splitQueryEnd:700},memberNode:null,host:{},store,
-    actions:{canEditTrackCtg:()=>true,openContigSplit:async (_host,_store,args)=>calls.push(args)}});
-  const split=items.find((item)=>item.label==="ctg 分段与染色体归组");
-  assert.ok(split);assert.equal(split.children.length,5);
+  const ctg={assemblyCtgId:2,totalLength:1000,orient:"-",hits:[
+    {queryStart:101,queryEnd:300,blockLength:200,identityPct:99},
+    {queryStart:501,queryEnd:700,blockLength:200,identityPct:99},
+    {queryStart:1,queryEnd:1000,blockLength:10,identityPct:99}]};
+  const store=createStore(createState({assembly:{selectedChrName:"Chr01",trackSelectedCtgIds:[],trackView:{alignmentLength:100},chrCtgs:[ctg]}}));
+  const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:"primary"},memberNode:null,host:{},store,
+    actions:{canEditTrackCtg:()=>true,splitContigAtRefBoundary:async (_host,_store,args)=>calls.push(args)}});
+  const split=items.find((item)=>item.label==="分割 contig");assert.ok(split);
+  assert.deepEqual(split.children.map(i=>i.label),["在比对最左侧分割","在比对最右侧分割"]);
+  assert.ok(split.children.every(i=>typeof i.preview==="function"));
   for(const child of split.children) await child.run();
-  assert.deepEqual(calls,[{assemblyCtgId:2,mode:"manual"},{assemblyCtgId:2,mode:"boundary"},{assemblyCtgId:2,mode:"recommended"},{assemblyCtgId:2,mode:"boundary",cutAfter:300},{assemblyCtgId:2,mode:"boundary",cutAfter:700}]);
+  assert.deepEqual(calls,[{assemblyCtgId:2,side:"left",cutAfter:700,minAlignmentLength:100,minIdentityPct:0},{assemblyCtgId:2,side:"right",cutAfter:100,minAlignmentLength:100,minIdentityPct:0}]);
+});
+
+test("split menu hover, side switch, focus, scroll and Escape have transient anchor cleanup", () => {
+  const listeners=new Map();let buttons=[];const groups=[];
+  const doc={createElementNS:(_ns,tag)=>({tag,attrs:{},children:[],setAttribute(k,v){this.attrs[k]=v;},append(v){this.children.push(v);},remove(){this.removed=true;}})};
+  const menu={innerHTML:"",style:{},classList:{add(){},remove(){}},querySelectorAll(selector){
+    if(selector!=="[data-menu-action-path]")return [];
+    buttons=[...this.innerHTML.matchAll(/<button[^>]*data-menu-action-path="([^"]+)"[^>]*>([^<]+)<\/button>/g)].map(([,path,label])=>({label,handlers:new Map(),getAttribute:()=>path,addEventListener(type,fn){this.handlers.set(type,fn);}}));return buttons;
+  }};
+  const band={ownerDocument:doc,ownerSVGElement:{append:g=>groups.push(g)},getAttribute:k=>({"data-band-contig-id":"2","data-band-query-start":"101","data-band-query-end":"700","data-band-left-anchor":"20,90 200,24","data-band-right-anchor":"100,90 250,24"})[k],classList:{add(){},remove(){}}};
+  const host={ownerDocument:doc,closest:()=>null,querySelector:selector=>selector==="#assembly-context-menu"?menu:null,
+    querySelectorAll:selector=>selector.includes("data-band-track-role")?[band]:[],addEventListener:(type,fn)=>listeners.set(type,fn)};
+  const state=createState({assembly:{selectedChrName:"Chr01",trackSelectedCtgIds:[],trackView:{alignmentLength:100},chrCtgs:[{assemblyCtgId:2,totalLength:1000,orient:"+",hits:[{queryStart:101,queryEnd:700,blockLength:600,identityPct:99}]}]}});
+  const store=createStore(state);const before=JSON.stringify(store.getState());
+  __testBindAssemblyContextMenu(host,store);
+  const target={closest:selector=>selector.includes("data-band-contig-id")?band:null};
+  const open=()=>listeners.get("contextmenu")({target,clientX:10,clientY:10,preventDefault(){}});
+  open();let left=buttons.find(b=>b.label==="在比对最左侧分割"),right=buttons.find(b=>b.label==="在比对最右侧分割");assert.ok(left&&right);
+  left.handlers.get("pointerenter")();assert.equal(groups.length,1);
+  right.handlers.get("pointerenter")();assert.ok(groups[0].removed);assert.equal(groups.length,2);
+  right.handlers.get("pointerleave")();assert.ok(groups[1].removed);
+  left.handlers.get("focus")();assert.equal(groups.length,3);
+  listeners.get("keydown")({key:"Escape"});assert.ok(groups[2].removed);assert.equal(menu.innerHTML,"");
+  open();left=buttons.find(b=>b.label==="在比对最左侧分割");left.handlers.get("pointerenter")();listeners.get("scroll")();assert.ok(groups[3].removed);
+  assert.equal(JSON.stringify(store.getState()),before,"hover never edits assembly state");
 });

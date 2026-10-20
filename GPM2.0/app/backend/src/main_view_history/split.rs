@@ -1,7 +1,11 @@
-use super::snapshot::{capture_snapshot, snapshot_scope};
-use super::types::{MainViewHistoryOperationDescriptor, PreparedMutation, SnapshotScope};
+use super::snapshot::{capture_snapshot, reconcile_project_view_layout, snapshot_scope};
+use super::types::{
+    MainViewHistoryOperationDescriptor, PreparedMutation, ProjectViewLayoutScope,
+    ProjectViewTrackOffsetKey, SnapshotScope,
+};
 use crate::contig_split::{
-    SplitCommitParams, SplitPreviewParams, preview_with_connection, rewrite_final_paths,
+    SplitCommitParams, SplitPreview, SplitPreviewParams, preview_with_connection,
+    rewrite_final_paths,
 };
 use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, params};
@@ -35,6 +39,17 @@ pub(super) fn prepare_split(
     if preview.preview_token != request.preview_token {
         bail!("CTG_SPLIT_STALE_PREVIEW: refresh the split preview before confirming");
     }
+    apply_split(conn, project_id, request, preview, false)
+}
+
+pub(super) fn apply_split(
+    conn: &Connection,
+    project_id: i64,
+    request: SplitCommitParams,
+    preview: SplitPreview,
+    keep_placement: bool,
+) -> Result<PreparedMutation> {
+    let source = &preview.source;
     if request.assignments.len() != preview.parts.len() {
         bail!("CTG_SPLIT_INVALID_REQUEST: choose a group for every fragment");
     }
@@ -48,6 +63,7 @@ pub(super) fn prepare_split(
                 "CTG_SPLIT_UNSUPPORTED_ASSIGNMENT: selected chromosome has no evidence for this fragment"
             );
         }
+        let candidate = if keep_placement { None } else { candidate };
         let orient = candidate
             .map(|c| c.orient.clone())
             .unwrap_or_else(|| source.orient.clone());
@@ -77,6 +93,21 @@ pub(super) fn prepare_split(
     all_ctgs.extend(&child_ids);
     let mut all_seqs = vec![source.assembly_seq_id];
     all_seqs.extend(&seq_ids);
+    let has_view: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM project_assembly_view_state WHERE project_id=?1)",
+        [project_id],
+        |r| r.get(0),
+    )?;
+    let offset_keys: Vec<ProjectViewTrackOffsetKey> = all_ctgs
+        .iter()
+        .map(|id| ProjectViewTrackOffsetKey {
+            track_role: "primary".into(),
+            assembly_ctg_id: *id,
+            dataset_id: None,
+            phased_track_id: None,
+            phased_track_item_id: None,
+        })
+        .collect();
     let before = capture_snapshot(
         conn,
         project_id,
@@ -85,6 +116,14 @@ pub(super) fn prepare_split(
             seq_ids: all_seqs.clone(),
             dependency_ctg_ids: all_ctgs.clone(),
             include_view_state: true,
+            layout_scope: if keep_placement && has_view {
+                ProjectViewLayoutScope {
+                    track_offset_keys: offset_keys,
+                    ..Default::default()
+                }
+            } else {
+                Default::default()
+            },
             ..SnapshotScope::default()
         },
     )?;
@@ -95,13 +134,24 @@ pub(super) fn prepare_split(
         .context("missing split source")?;
     let note=json!({"manualSplit":{"parentCtgId":source.assembly_ctg_id,"parentSourceStart":source.source_start,
         "parentSourceEnd":source.source_end,"cutAfter":preview.cut_after,"reason":request.reason}}).to_string();
+    let original_ctg = before
+        .ctgs
+        .iter()
+        .find(|c| c.id == source.assembly_ctg_id)
+        .context("missing split contig")?;
     let now = super::now_timestamp_string();
     for (i, part) in preview.parts.iter().enumerate() {
         let (chr, orient, anchor) = &placements[i];
-        let key = format!(
-            "manual-fragment:{}:{}-{}",
-            source.assembly_ctg_id, part.source_start, part.source_end
-        );
+        let group = if keep_placement && source.instance_key.starts_with("manual-fragment:") {
+            source
+                .instance_key
+                .rsplit_once(':')
+                .map(|p| p.0.to_string())
+                .unwrap_or_default()
+        } else {
+            format!("manual-fragment:{}", source.assembly_ctg_id)
+        };
+        let key = format!("{group}:{}-{}", part.source_start, part.source_end);
         // End types are display-oriented; only original exterior ends are inherited.
         let low_type = if source.orient == "-" {
             &parent.right_end_type
@@ -131,16 +181,52 @@ pub(super) fn prepare_split(
         conn.execute("INSERT INTO assembly_seq(id,project_id,source_seq_id,instance_key,orient,source_start,source_end,left_end_type,right_end_type,hidden,created_at,note)
             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,0,?10,?11)",
             params![seq_ids[i],project_id,source.source_seq_id,key,orient,part.source_start,part.source_end,left,right,now,note])?;
-        let name = format!(
-            "{}[{}-{}]#{}{}",
-            source.contig_name,
-            part.source_start,
-            part.source_end,
-            child_ids[i],
-            chr.as_ref().map(|c| format!("@{c}")).unwrap_or_default()
-        );
+        let name = if keep_placement {
+            let base = source
+                .name
+                .rsplit_once('@')
+                .map(|p| p.0)
+                .unwrap_or(&source.name);
+            let display_index = if source.orient == "-" {
+                preview.parts.len() - i
+            } else {
+                i + 1
+            };
+            let stem = format!("{base}.{display_index}");
+            let mut name = stem.clone();
+            let mut suffix = 2;
+            while conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM assembly_ctg WHERE project_id=?1 AND name=?2)",
+                params![project_id, name],
+                |r| r.get::<_, bool>(0),
+            )? {
+                name = format!("{stem}_{suffix}");
+                suffix += 1;
+            }
+            name
+        } else {
+            format!(
+                "{}[{}-{}]#{}{}",
+                source.contig_name,
+                part.source_start,
+                part.source_end,
+                child_ids[i],
+                chr.as_ref().map(|c| format!("@{c}")).unwrap_or_default()
+            )
+        };
+        let order = if keep_placement {
+            original_ctg.chr_order
+        } else {
+            None
+        };
+        let ref_orient = if keep_placement {
+            original_ctg.ref_orient.as_deref()
+        } else {
+            None
+        };
         conn.execute("INSERT INTO assembly_ctg(id,project_id,assembly_seq_id,name,assigned_chr_name,chr_order,anchor_start,ref_orient,placement_mode,created_at,note)
-            VALUES(?1,?2,?3,?4,?5,NULL,?6,NULL,'manual',?7,?8)",params![child_ids[i],project_id,seq_ids[i],name,chr,anchor,now,note])?;
+            VALUES(?1,?2,?3,?4,?5,?6,?7,?8,'manual',?9,?10)",
+            params![child_ids[i],project_id,seq_ids[i],name,chr,order,anchor,ref_orient,now,note])?;
     }
     // Replace phase-track references only with children that remain in that chromosome.
     for track in &before.phased_tracks {
@@ -201,10 +287,34 @@ pub(super) fn prepare_split(
         "UPDATE assembly_seq SET hidden=1 WHERE id=?1",
         [source.assembly_seq_id],
     )?;
+    if keep_placement && before.view_state.is_some() {
+        let mut layout = before.layout_state.clone();
+        let original = layout
+            .scoped_track_drag_offsets
+            .iter()
+            .find(|v| {
+                v.get("assemblyCtgId").and_then(Value::as_i64) == Some(source.assembly_ctg_id)
+            })
+            .cloned();
+        layout.scoped_track_drag_offsets.clear();
+        if let Some(original) = original {
+            for id in &child_ids {
+                let mut offset = original.clone();
+                offset["assemblyCtgId"] = json!(id);
+                layout.scoped_track_drag_offsets.push(offset);
+            }
+        }
+        reconcile_project_view_layout(conn, project_id, &before.layout_scope, &layout)?;
+    }
     let after = capture_snapshot(conn, project_id, &snapshot_scope(&before))?;
     Ok(PreparedMutation {
         descriptor: MainViewHistoryOperationDescriptor {
-            kind: "split-source-ctg".into(),
+            kind: if keep_placement {
+                "split-ref-boundary"
+            } else {
+                "split-source-ctg"
+            }
+            .into(),
             target_count: 1,
             target_name: Some(source.name.clone()),
         },

@@ -190,13 +190,10 @@ bash ./gpm_server/export_final_path_fasta.sh \
   -o /path/to/project_Chr01_path.fa
 ```
 
-### Non-destructive contig splitting
+### Split contig at the current Ref alignment envelope
 
-In Assembly, right-click a primary contig and choose **Split contig and assign fragments**:
-- **Manual cut**: enter source coordinates, or click/drag the preview cut line.
-- **Ref alignment boundary**: choose an alignment endpoint; right-clicking a main-view alignment band also exposes its source endpoints.
-- **Recommended cuts**: inspect cross-chromosome support transitions. Overlap boundaries remain alternatives, not a uniquely proven breakpoint; an unaligned middle interval can be retained separately.
+Right-click a primary contig (or one of its Ref alignment bands), choose **Split contig**, then **Split at leftmost alignment** or **Split at rightmost alignment**. The bounds include all current-Ref hits passing the main view length/identity filters, not just the clicked band. Left/right follow the displayed orientation. An unavailable/end-of-contig boundary is disabled.
 
-The preview ranks chromosome candidates using union coverage divided by **fragment length**, with MAPQ, whole-hit weighted identity, orientation and reference coordinates. Default suggestions require at least 60% MAPQ ≥20 coverage and a 10-percentage-point lead over the next candidate. Automatic breakpoint proposals additionally require at least 10 kb per outer fragment. Ambiguous fragments remain unplaced; choices are editable before confirmation. This uses retained reference alignments, not a new alignment run or proof of misassembly.
+Hover or focus an option to highlight that boundary in the graph like a local-view anchor; leaving the option, closing the menu or pressing Escape removes the preview without edits. Clicking performs one split directly—no split panel, recommendation list or chromosome-assignment dialog.
 
-Cuts use 1-based original source coordinates: cut after `k` produces `[start,k]` and `[k+1,end]`. Reverse display does not change this convention. FASTA stays unchanged, no Ns are inserted, and manual cut ends receive a boundary marker. Chromosome assignment changes the main track, **not adoption into the destination Final Path**. Existing Final Path references are partitioned into source intervals without changing DNA/order. Undo/redo from the initiating chromosome restores all affected fragments atomically; later conflicting edits are never overwritten. Preview and confirmation require a real workspace, not mock data.
+Both fragments remain on the same chromosome/dataset track, retain orientation and placement/drag offsets, and appear as `ctg.1` and `ctg.2` in display order with a visual gap. No bases or Ns are inserted. Original FASTA is unchanged; Final Path source intervals preserve the same DNA and order. The main-view Undo/Redo controls restore/reapply the operation. Other-chromosome assignment and algorithm/manual-cut UI are not exposed in this step.

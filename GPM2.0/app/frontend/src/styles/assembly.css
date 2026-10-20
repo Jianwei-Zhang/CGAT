@@ -2110,22 +2110,8 @@
   .view-nav-range { gap: 4px; min-width: 130px; flex-basis: 100%; }
 }
 
-/* Source-coordinate split preview: no synthetic N-gap is inserted. */
-.ctg-split-dialog { width: min(1100px, 92vw); max-width: 92vw; max-height: 88vh; overflow: auto; }
-.ctg-split-dialog h3 { margin: .7rem 0 .4rem; }
-.ctg-split-dialog p { margin: .6rem 0; }
-.ctg-split-modes { display: flex; flex-wrap: wrap; gap: .4rem; }
-.ctg-split-modes [aria-pressed="true"] { border-color: #567eab; background: #e4edf7; }
-.ctg-split-coordinate { display: flex; flex-direction: column; gap: .3rem; margin: .6rem 0; }
-.ctg-split-coordinate input { width: 100%; box-sizing: border-box; }
-.ctg-split-dialog [data-split-slider] { width: min(550px, 70%); vertical-align: middle; }
-.ctg-split-dialog [data-split-evidence] { max-height: 330px; overflow: auto; }
-.ctg-split-dialog svg { display: block; width: 100%; min-height: 100px; background: #fff; touch-action: none; cursor: crosshair; font-size: 12px; }
-.ctg-split-boundary { fill: white; stroke: #243a54; stroke-width: 2; cursor: pointer; }
-.ctg-split-boundary:hover, .ctg-split-boundary:focus { fill: #e8b55b; stroke: #9e5a12; }
-.ctg-split-boundary-list { display: flex; flex-direction: column; gap: .3rem; max-height: 180px; overflow: auto; }
-.ctg-split-part { border-top: 1px solid #ccc; margin-top: .7rem; padding: .4rem 0; }
-.ctg-split-table-scroll { overflow-x: auto; }
-.ctg-split-part table { width: 100%; border-collapse: collapse; margin-top: .5rem; font-size: .9em; }
-.ctg-split-part th, .ctg-split-part td { padding: .3rem .5rem; text-align: left; white-space: nowrap; border-bottom: 1px solid #ddd; }
-.ctg-split-dialog [data-split-error] { color: #a22; min-height: 1.2em; }
+/* Transient Ref-envelope split preview, matching focused local-view anchors. */
+.track-split-preview { pointer-events: none; }
+.track-split-preview-line { fill: none; stroke: #7a1fff; stroke-width: 6; vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 2px rgba(255,255,255,.95)); }
+.track-split-preview circle { fill: #fff; stroke: #7a1fff; stroke-width: 2; vector-effect: non-scaling-stroke; }

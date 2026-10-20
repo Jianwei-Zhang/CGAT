@@ -54,6 +54,7 @@ export function normalizeMainViewHistoryStatus(value, { chrName = "", inFlight =
 const MAIN_VIEW_HISTORY_ELIGIBLE_ACTIONS = new Set([
   "rename-ctg",
   "split-source-ctg",
+  "split-ref-boundary",
   "flip-ctg",
   "delete-ctg",
   "restore-deleted-ctg",

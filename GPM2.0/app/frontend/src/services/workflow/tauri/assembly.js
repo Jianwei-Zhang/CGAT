@@ -288,7 +288,6 @@ async function appendEditAuditLogTauri({ workspaceRoot, projectId, category, act
     runCtgEditorAction: runCtgEditorActionTauri,
     getMainViewHistoryStatus: getMainViewHistoryStatusTauri,
     inspectMainViewDelete: inspectMainViewDeleteTauri,
-    previewContigSplit: (payload) => invokeCommand("preview_contig_split", payload),
     runMainViewEditorAction: runMainViewEditorActionTauri,
     runMainViewLayoutAction: runMainViewLayoutActionTauri,
     runMainViewBatchDelete: runMainViewBatchDeleteTauri,

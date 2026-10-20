@@ -43,7 +43,6 @@ const DEFINITIONS = {
     ["runCtgEditorAction", "bridge"],
     ["getMainViewHistoryStatus", "bridge"],
     ["inspectMainViewDelete", "bridge"],
-    ["previewContigSplit", "bridge"],
     ["runMainViewEditorAction", "bridge"],
     ["runMainViewLayoutAction", "bridge"],
     ["runMainViewBatchDelete", "bridge"],

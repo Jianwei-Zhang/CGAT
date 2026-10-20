@@ -150,7 +150,7 @@ test("operation factory exposes every registered operation and maps exact CLI co
     },
   });
 
-  assert.equal(Object.keys(handlers).length, 47);
+  assert.equal(Object.keys(handlers).length, 46);
   assert.equal(typeof handlers.listProjectCatalog, "function");
   assert.equal(typeof handlers.updateProjectCatalog, "function");
   const sequences = await handlers.listNewSequences({
@@ -300,17 +300,4 @@ test("alignment operations pass identity thresholds and preserve raw MAPQ in par
   assert.equal(inspection.hits[0].mapq, 60);
   assert.equal(reference.items[0].hits[0].identityPct, 98.75);
   assert.equal(reference.items[0].hits[0].mapq, 40);
-});
-
-test("split preview bridge carries source-coordinate cuts and propagates backend errors", async () => {
-  const calls = [];
-  const handlers = createBackendOperations({ async runBackend(args) {
-    calls.push(args);
-    return { stdout: 'result_json={"previewToken":"token","parts":[]}', stderr: "" };
-  } });
-  const args = { assemblyCtgId: 6, cutAfter: [50038020] };
-  assert.equal((await handlers.previewContigSplit({ workspaceRoot: "D:/workspace", projectId: 7, args })).previewToken, "token");
-  assert.deepEqual(calls, [["preview-contig-split", "D:/workspace", "7", JSON.stringify(args)]]);
-  const failed = createBackendOperations({ async runBackend() { throw new Error("read failed"); } });
-  await assert.rejects(failed.previewContigSplit({ workspaceRoot: "D:/workspace", projectId: 7, args }), /read failed/);
 });

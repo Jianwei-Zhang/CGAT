@@ -1,6 +1,5 @@
 import { normalizeMainViewHistoryStatus } from "./assembly/main-view-history-state.js";
-import { openContigSplitDialog } from "./assembly/contig-split-runtime.js";
-import { splitCopy } from "./assembly/contig-split-state.js";
+import { splitCopy, resolveContigSplitBoundaries } from "./assembly/contig-split-boundary.js";
 import { setTrackDragGroupOffsets, setSubviewDragGroupOffsets, moveSubviewCompositionDrag } from "./assembly/source-fragment-drag.js";
 import { requestAppPrompt } from "../shell/app-dialog.js";
 import {
@@ -33,7 +32,6 @@ import {
   runMainViewLayoutAction as runMainViewLayoutActionApi,
   executeMainViewHistoryAction,
   inspectMainViewDelete,
-  previewContigSplit,
   writeFinalPathExportBinaryFile,
   writeFinalPathExportTextFile,
 } from "../../services/workflow-api.js";
@@ -1120,7 +1118,7 @@ const degapRuntimeDeps = {
 };
 
 const contextMenuRuntimeDeps = {
-  openContigSplit: openAssemblyContigSplit,
+  splitContigAtRefBoundary: splitAssemblyContigAtRefBoundary,
   addContextCtgToComposition,
   moveContextSubviewMemberToOtherLane,
   removeContextSubviewMember,
@@ -3005,37 +3003,40 @@ function escapeAttr(value) {
   return escapeHtml(value).replaceAll('"', "&quot;");
 }
 
-async function openAssemblyContigSplit(host, store, options) {
+async function splitAssemblyContigAtRefBoundary(host, store, options) {
   const state = store.getState();
   if (state.assembly?.mainViewHistory?.inFlight || state.assembly?.loading) return false;
+  const labels = splitCopy[state.locale === "en" ? "en" : "zh"];
+  const current = resolveContigSplitBoundaries(state.assembly, options.assemblyCtgId);
+  if (!current || current[options.side] == null || current[options.side] !== options.cutAfter
+    || current.minAlignmentLength !== options.minAlignmentLength || current.minIdentityPct !== options.minIdentityPct) {
+    setAssemblyActionFeedback(host, store, { actionError: labels.stale }); return false;
+  }
+  const payload = { workspaceRoot: state.session.workspacePath, projectId: state.session.projectId,
+    chrName: state.assembly.selectedChrName, action: "split-ref-boundary", args: options };
+  store.setState({ assembly: { ...state.assembly, mainViewHistory: { ...state.assembly.mainViewHistory, inFlight: true } } });
   try {
     await flushAssemblyProjectState(host, store);
-    return await openContigSplitDialog(host, store, options, {
-      preview: previewContigSplit,
-      commit: (payload) => runSerializedProjectViewMutation(store, async (isCurrent) => {
-        if (!isCurrent()) throw new Error(splitCopy[state.locale === "en" ? "en" : "zh"].stale);
-        store.setState({ assembly: { ...store.getState().assembly,
-          mainViewHistory: { ...store.getState().assembly.mainViewHistory, inFlight: true } } });
-        try {
-          const result = await runMainViewEditorAction(payload);
-          if (!isCurrent()) return result;
-          await loadAssemblyView(host, store, { keepCurrentChr: true, keepCurrentCtg: false, renderLoading: false });
-          if (!isCurrent()) return result;
-          store.setState({ assembly: { ...store.getState().assembly,
-            mainViewHistory: normalizeMainViewHistoryStatus(result.status, { chrName: payload.chrName }),
-            trackSelectedCtgIds: [], actionError: "",
-            actionStatus: splitCopy[state.locale === "en" ? "en" : "zh"].done,
-          } });
-          rerenderAssemblyMainTab(host, store);
-          return result;
-        } finally {
-          if (isCurrent()) store.setState({ assembly: { ...store.getState().assembly,
-            mainViewHistory: { ...store.getState().assembly.mainViewHistory, inFlight: false } } });
-        }
-      }),
+    if (store.getState().session.workspacePath !== payload.workspaceRoot || store.getState().session.projectId !== payload.projectId
+      || store.getState().assembly.selectedChrName !== payload.chrName) return false;
+    return await runSerializedProjectViewMutation(store, async (isCurrent) => {
+      if (!isCurrent() || store.getState().assembly.selectedChrName !== payload.chrName) return false;
+      const result = await runMainViewEditorAction(payload);
+      if (!isCurrent()) return false;
+      await loadAssemblyView(host, store, { keepCurrentChr: true, keepCurrentCtg: false, renderLoading: false });
+      if (!isCurrent()) return false;
+      store.setState({ assembly: { ...store.getState().assembly,
+        mainViewHistory: normalizeMainViewHistoryStatus(result.status, { chrName: payload.chrName }),
+        trackSelectedCtgIds: [], actionError: "", actionStatus: labels.done } });
+      rerenderAssemblyMainTab(host, store);
+      return true;
     });
   } catch (error) {
-    setAssemblyActionFeedback(host, store, { actionError: String(error.message || error) });
-    return false;
+    setAssemblyActionFeedback(host, store, { actionError: String(error.message || error) }); return false;
+  } finally {
+    if (store.getState().session.workspacePath === payload.workspaceRoot && store.getState().session.projectId === payload.projectId) {
+      store.setState({ assembly: { ...store.getState().assembly,
+        mainViewHistory: { ...store.getState().assembly.mainViewHistory, inFlight: false } } });
+    }
   }
 }

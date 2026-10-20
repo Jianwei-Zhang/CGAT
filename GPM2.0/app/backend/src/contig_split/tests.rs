@@ -257,7 +257,7 @@ fn final_path_export_dna_is_identical_after_reverse_split() -> Result<()> {
             ],
         },
     )?;
-    commit(&db, &preview(&db, vec![60000])?)?;
+    cut_ref(&db, 1, "left", 60000, 10000, 0.0)?;
     let paths = paths(&db)?;
     let segments = paths["ChrA"]["segments"]
         .as_array()
@@ -430,5 +430,188 @@ fn chromosome_export_does_not_insert_gap_between_adjacent_manual_fragments() -> 
         },
     )?;
     assert_eq!(std::fs::read(&after.output_path)?, original);
+    Ok(())
+}
+
+fn cut_ref(
+    db: &Path,
+    ctg_id: i64,
+    side: &str,
+    cut: i64,
+    min_length: i64,
+    identity: f64,
+) -> Result<MainViewHistoryMutationSummary> {
+    run_main_view_editor_action(
+        db,
+        &RunMainViewEditorActionParams {
+            history_capacity: None,
+            project_id: 1,
+            chr_name: "ChrA".into(),
+            action: "split-ref-boundary".into(),
+            args: json!({"assemblyCtgId":ctg_id,"side":side,"cutAfter":cut,"minAlignmentLength":min_length,"minIdentityPct":identity}),
+        },
+    )
+}
+
+#[test]
+fn ref_boundary_keeps_reverse_fragments_in_original_track_with_short_display_names() -> Result<()> {
+    let (_dir, db) = seed()?;
+    let conn = Connection::open(&db)?;
+    conn.execute("UPDATE assembly_ctg SET ref_orient='-',chr_order=7", [])?;
+    conn.execute(
+        "UPDATE project_assembly_view_state SET track_drag_offsets_json=?1",
+        [json!([
+        {"trackRole":"primary","assemblyCtgId":1,"offsetBp":1234},
+        {"trackRole":"primary","assemblyCtgId":99,"offsetBp":99}])
+        .to_string()],
+    )?;
+    let before = paths(&db)?;
+    cut_ref(&db, 1, "left", 60000, 10000, 0.0)?;
+    let mut q=conn.prepare("SELECT c.name,c.assigned_chr_name,c.anchor_start,c.chr_order,c.ref_orient,s.orient,s.source_start,s.source_end FROM assembly_ctg c JOIN assembly_seq s ON s.id=c.assembly_seq_id ORDER BY c.anchor_start")?;
+    let parts = q
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, i64>(2)?,
+                r.get::<_, i64>(3)?,
+                r.get::<_, String>(4)?,
+                r.get::<_, String>(5)?,
+                r.get::<_, i64>(6)?,
+                r.get::<_, i64>(7)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    assert_eq!(
+        parts,
+        vec![
+            (
+                "tig.1".into(),
+                "ChrA".into(),
+                -39999,
+                7,
+                "-".into(),
+                "-".into(),
+                60001,
+                100000
+            ),
+            (
+                "tig.2".into(),
+                "ChrA".into(),
+                1,
+                7,
+                "-".into(),
+                "-".into(),
+                1,
+                60000
+            )
+        ]
+    );
+    let offsets: Value = serde_json::from_str(&conn.query_row::<String, _, _>(
+        "SELECT track_drag_offsets_json FROM project_assembly_view_state",
+        [],
+        |r| r.get(0),
+    )?)?;
+    assert_eq!(offsets.as_array().unwrap().len(), 3);
+    assert_eq!(
+        offsets
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|o| o["offsetBp"] == 1234)
+            .count(),
+        2
+    );
+    let items = crate::main_view::list_chr_view_ctgs_with_connection(&conn, 1, Some("ChrA"), None)?;
+    assert_eq!(items.len(), 2);
+    assert_eq!(items.iter().map(|i| i.total_length).sum::<i64>(), 100000);
+    assert!(
+        items
+            .iter()
+            .find(|i| i.name == "tig.1")
+            .unwrap()
+            .hits
+            .is_empty(),
+        "unaligned tail remains in current track"
+    );
+    assert_eq!(paths(&db)?["ChrB"], before["ChrB"]);
+    assert!(undo_main_view_history(&db, &target())?.changed);
+    assert_eq!(paths(&db)?, before);
+    let restored: Value = serde_json::from_str(&conn.query_row::<String, _, _>(
+        "SELECT track_drag_offsets_json FROM project_assembly_view_state",
+        [],
+        |r| r.get(0),
+    )?)?;
+    assert_eq!(restored.as_array().unwrap().len(), 2);
+    assert!(redo_main_view_history(&db, &target())?.changed);
+    Ok(())
+}
+
+#[test]
+fn ref_boundary_uses_all_current_chr_hits_and_display_filters_not_an_individual_hit() -> Result<()>
+{
+    let (_dir, db) = seed()?;
+    let conn = Connection::open(&db)?;
+    conn.execute("UPDATE assembly_seq SET orient='+'", [])?;
+    conn.execute("INSERT INTO ref_alignment_hit(dataset_id,source_seq_id,reference_chr_id,strand,query_start,query_end,ref_start,ref_end,match_length,block_length,mapq,cg_tag,run_name) VALUES(1,1,1,'+',70001,90000,100001,120000,19800,20000,60,'20000M','test')",[])?;
+    assert!(
+        cut_ref(&db, 1, "right", 60000, 10000, 0.0).is_err(),
+        "not the envelope edge"
+    );
+    assert!(
+        cut_ref(&db, 1, "right", 100000, 10000, 0.0).is_err(),
+        "other chr hits do not extend envelope"
+    );
+    cut_ref(&db, 1, "right", 90000, 10000, 0.0)?;
+    assert!(undo_main_view_history(&db, &target())?.changed);
+    cut_ref(&db, 1, "right", 60000, 30000, 0.0)?;
+    assert!(undo_main_view_history(&db, &target())?.changed);
+    cut_ref(&db, 1, "right", 60000, 10000, 99.5)?;
+    Ok(())
+}
+
+#[test]
+fn ref_boundary_rejects_absent_terminal_and_stale_edges_without_partial_writes() -> Result<()> {
+    let (_dir, db) = seed()?;
+    let original = paths(&db)?;
+    for (side, cut, length) in [
+        ("right", 0, 1),
+        ("left", 60000, 100000),
+        ("left", 59900, 1),
+        ("invalid", 60000, 1),
+    ] {
+        assert!(cut_ref(&db, 1, side, cut, length, 0.0).is_err());
+    }
+    assert_eq!(paths(&db)?, original);
+    assert_eq!(
+        Connection::open(&db)?.query_row::<i64, _, _>(
+            "SELECT COUNT(*) FROM assembly_ctg",
+            [],
+            |r| r.get(0)
+        )?,
+        1
+    );
+    Ok(())
+}
+
+#[test]
+fn ref_boundary_without_saved_view_roundtrips_and_repeat_cut_preserves_sibling_identity()
+-> Result<()> {
+    let (_dir, db) = seed()?;
+    let conn = Connection::open(&db)?;
+    conn.execute("DELETE FROM project_assembly_view_state", [])?;
+    conn.execute("UPDATE ref_alignment_hit SET query_start=1001,ref_end=59000,block_length=59000,match_length=58900,cg_tag='59000M' WHERE reference_chr_id=1",[])?;
+    cut_ref(&db, 1, "left", 60000, 10000, 0.0)?;
+    assert!(undo_main_view_history(&db, &target())?.changed);
+    assert!(redo_main_view_history(&db, &target())?.changed);
+    cut_ref(&db, 2, "right", 1000, 10000, 0.0)?;
+    let groups = conn
+        .prepare("SELECT instance_key FROM assembly_seq WHERE hidden=0")?
+        .query_map([], |r| r.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    assert_eq!(groups.len(), 3);
+    assert!(groups.iter().all(|g| g.starts_with("manual-fragment:1:")));
+    assert!(undo_main_view_history(&db, &target())?.changed);
+    assert!(undo_main_view_history(&db, &target())?.changed);
     Ok(())
 }

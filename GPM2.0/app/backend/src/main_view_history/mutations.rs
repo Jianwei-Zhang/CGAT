@@ -23,6 +23,9 @@ pub(super) fn prepare_editor_mutation(
     args: &Value,
 ) -> Result<PreparedMutation> {
     match action {
+        "split-ref-boundary" => {
+            super::ref_split::prepare_ref_split(conn, project_id, chr_name, args)
+        }
         "split-source-ctg" => super::split::prepare_split(conn, project_id, chr_name, args),
         "rename-ctg" => prepare_rename_ctg(conn, project_id, chr_name, args),
         "flip-ctg" => prepare_flip_ctg(conn, project_id, chr_name, args),

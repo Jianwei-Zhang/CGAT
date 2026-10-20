@@ -139,35 +139,7 @@ pub(crate) fn preview_with_connection(
     project_id: i64,
     request: &SplitPreviewParams,
 ) -> Result<SplitPreview> {
-    let source = conn
-        .query_row(
-            "SELECT c.id,s.id,s.source_seq_id,c.name,d.name,q.seq_name,s.source_start,s.source_end,
-                q.length,s.orient,c.assigned_chr_name,c.anchor_start,s.instance_key
-         FROM assembly_ctg c JOIN assembly_seq s ON s.id=c.assembly_seq_id
-         JOIN source_seq q ON q.id=s.source_seq_id JOIN dataset d ON d.id=q.dataset_id
-         JOIN project p ON p.id=c.project_id
-         WHERE c.id=?1 AND c.project_id=?2 AND s.project_id=?2 AND s.hidden=0
-           AND q.dataset_id=p.primary_dataset_id",
-            params![request.assembly_ctg_id, project_id],
-            |r| {
-                Ok(SplitSource {
-                    assembly_ctg_id: r.get(0)?,
-                    assembly_seq_id: r.get(1)?,
-                    source_seq_id: r.get(2)?,
-                    name: r.get(3)?,
-                    dataset_name: r.get(4)?,
-                    contig_name: r.get(5)?,
-                    source_start: r.get(6)?,
-                    source_end: r.get(7)?,
-                    source_length: r.get(8)?,
-                    orient: r.get(9)?,
-                    assigned_chr_name: r.get(10)?,
-                    anchor_start: r.get(11)?,
-                    instance_key: r.get(12)?,
-                })
-            },
-        )
-        .context("CTG_SPLIT_INVALID_TARGET: select a visible primary contig")?;
+    let source = load_split_source(conn, project_id, request.assembly_ctg_id)?;
     let cuts = validate_cuts(&source, &request.cut_after)?;
     let mut stmt = conn.prepare(
         "SELECT h.id,r.chr_name,h.strand,h.query_start,h.query_end,h.ref_start,h.ref_end,
@@ -458,4 +430,39 @@ fn recommend(source: &SplitSource, hits: &[SplitHit]) -> Result<Vec<SplitRecomme
         }
     }
     Ok(recommendations)
+}
+
+pub(crate) fn load_split_source(
+    conn: &Connection,
+    project_id: i64,
+    assembly_ctg_id: i64,
+) -> Result<SplitSource> {
+    conn.query_row(
+        "SELECT c.id,s.id,s.source_seq_id,c.name,d.name,q.seq_name,s.source_start,s.source_end,
+                q.length,s.orient,c.assigned_chr_name,c.anchor_start,s.instance_key
+         FROM assembly_ctg c JOIN assembly_seq s ON s.id=c.assembly_seq_id
+         JOIN source_seq q ON q.id=s.source_seq_id JOIN dataset d ON d.id=q.dataset_id
+         JOIN project p ON p.id=c.project_id
+         WHERE c.id=?1 AND c.project_id=?2 AND s.project_id=?2 AND s.hidden=0
+           AND q.dataset_id=p.primary_dataset_id",
+        params![assembly_ctg_id, project_id],
+        |r| {
+            Ok(SplitSource {
+                assembly_ctg_id: r.get(0)?,
+                assembly_seq_id: r.get(1)?,
+                source_seq_id: r.get(2)?,
+                name: r.get(3)?,
+                dataset_name: r.get(4)?,
+                contig_name: r.get(5)?,
+                source_start: r.get(6)?,
+                source_end: r.get(7)?,
+                source_length: r.get(8)?,
+                orient: r.get(9)?,
+                assigned_chr_name: r.get(10)?,
+                anchor_start: r.get(11)?,
+                instance_key: r.get(12)?,
+            })
+        },
+    )
+    .context("CTG_SPLIT_INVALID_TARGET: select a visible primary contig")
 }

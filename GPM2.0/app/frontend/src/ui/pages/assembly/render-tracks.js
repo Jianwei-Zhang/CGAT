@@ -1,3 +1,4 @@
+import { bandBoundaryAnchors } from "./contig-split-boundary.js";
 import { renderManualSplitMarkers } from "./source-fragment-layout.js";
 import { setTrackDragGroupOffsets } from "./source-fragment-drag.js";
 import { renderViewTickControl } from "./view-navigation-ui.js";
@@ -2192,6 +2193,7 @@ function renderAssemblyTracks(args) {
                 ? String(layout.phasedHaplotypeKey || ctg.phasedHaplotypeKey || "").trim()
                 : "",
               points: bandPoints,
+              anchors: bandBoundaryAnchors(bandPoints, layout.connectorDirection, resolveTrackHitDisplayReversed(ctg, hit)),
             };
           });
         });
@@ -2205,7 +2207,7 @@ function renderAssemblyTracks(args) {
         : "";
       return `<polygon class="track-collinearity-band${band.className}" data-band-track-role="${escapeAttr(
           band.trackRole,
-        )}" data-band-contig-id="${band.contigId}"${phasedBandAttrs} data-band-query-start="${band.queryStart}" data-band-query-end="${band.queryEnd}" data-band-ref-start="${band.refStartBp}" data-band-ref-end="${band.refEndBp}" data-band-approximate="${band.approximate ? "1" : "0"}" data-track-band-proxy="1" points="${band.points}" ${alignmentBandSvgAttrs(band)}><title>${escapeHtml(band.tooltipText)}</title></polygon>`;
+        )}" data-band-contig-id="${band.contigId}"${phasedBandAttrs} data-band-left-anchor="${band.anchors.left}" data-band-right-anchor="${band.anchors.right}" data-band-query-start="${band.queryStart}" data-band-query-end="${band.queryEnd}" data-band-ref-start="${band.refStartBp}" data-band-ref-end="${band.refEndBp}" data-band-approximate="${band.approximate ? "1" : "0"}" data-track-band-proxy="1" points="${band.points}" ${alignmentBandSvgAttrs(band)}><title>${escapeHtml(band.tooltipText)}</title></polygon>`;
     })
     .join("");
 

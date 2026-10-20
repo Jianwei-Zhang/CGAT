@@ -286,7 +286,7 @@ export function buildAssemblyContextMenuActions(actionDeps, overrides = {}) {
     setAssemblyActionFeedback: resolveAction("setAssemblyActionFeedback"),
     openAssemblyContextMenuAt: resolveAction("openAssemblyContextMenuAt"),
     applyEditorAction: resolveAction("applyEditorAction"),
-    openContigSplit: resolveAction("openContigSplit"),
+    splitContigAtRefBoundary: resolveAction("splitContigAtRefBoundary"),
     promptForRenameCtg: resolveAction("promptForRenameCtg"),
     promptForDeleteShorterThanLength: resolveAction("promptForDeleteShorterThanLength"),
     buildRenameCtgActionArgs: resolveAction("buildRenameCtgActionArgs"),
@@ -301,6 +301,8 @@ export function bindAssemblyContextMenu(host, store, deps) {
     return;
   }
 
+  let activePreviewCleanup = null;
+  const clearItemPreview = () => { activePreviewCleanup?.(); activePreviewCleanup = null; };
   let activeSubviewFragmentNode = null;
   let activeSubviewHitNode = null;
 
@@ -326,6 +328,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
   };
 
   const closeMenu = () => {
+    clearItemPreview();
     const menu = host.querySelector("#assembly-context-menu");
     clearSubviewFragmentMenuHighlight();
     clearSubviewHitMenuHighlight();
@@ -386,6 +389,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
       closeMenu();
       return;
     }
+    clearItemPreview();
     setSubviewFragmentMenuHighlight(target);
     menu.innerHTML = renderContextMenuItems(items, runtimeDeps);
     menu.classList.remove("is-hidden");
@@ -393,11 +397,20 @@ export function bindAssemblyContextMenu(host, store, deps) {
     bindContextSubmenuInteractions(menu);
 
     menu.querySelectorAll("[data-menu-action-path]").forEach((button) => {
+      const item = resolveContextMenuItemByPath(items, button.getAttribute("data-menu-action-path"));
+      const preview = () => {
+        clearItemPreview();
+        if (!item?.disabled && typeof item?.preview === "function") activePreviewCleanup = item.preview();
+      };
+      button.addEventListener("pointerenter", preview);
+      button.addEventListener("pointerleave", clearItemPreview);
+      button.addEventListener("focus", preview);
+      button.addEventListener("blur", clearItemPreview);
       button.addEventListener("click", async (event) => {
         event?.stopPropagation?.();
         const item = resolveContextMenuItemByPath(items, button.getAttribute("data-menu-action-path"));
         closeMenu();
-        if (typeof item?.run !== "function") {
+        if (item?.disabled || typeof item?.run !== "function") {
           return;
         }
         await item.run();
@@ -409,6 +422,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
     return;
   }
 
+  host.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); });
   host.addEventListener("click", () => {
     closeMenu();
   });
