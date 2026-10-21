@@ -216,3 +216,17 @@ test("shell navigation uses a segmented control bar and expanded workspace selec
   assert.doesNotMatch(shellCss, /width:\s*96px;/);
   assert.doesNotMatch(stylesheet, /linear-gradient\(#(?:fafafa|f6f6f6|fbfbfb|ffffff|f0f0f0|ededed)/);
 });
+
+test("final path card shares the main view subtle surface and keeps table and log layouts compact and aligned", () => {
+  const assemblyCss = readFileSync(new URL("./assembly.css", entryUrl), "utf8");
+  const finalPathCss = readFileSync(new URL("./final-path.css", entryUrl), "utf8");
+
+  assert.match(assemblyCss, /\.assembly-main-view\.card\s*\{[^}]*background:\s*var\(--surface-subtle,\s*#f8fafc\);/);
+  assert.match(finalPathCss, /\.final-path-card\.card\s*\{[^}]*background:\s*var\(--surface-subtle,\s*#f8fafc\);/);
+  assert.match(finalPathCss, /\.final-path-card-list-head\s*\{[^}]*padding:\s*0 0 4px;/);
+  assert.match(finalPathCss, /\.final-path-card-list-head-card\s*\{[^}]*padding:\s*0 9px;/);
+  assert.match(finalPathCss, /\.final-path-card-list\s*\{[^}]*gap:\s*4px;/);
+  assert.match(finalPathCss, /\.final-path-sort-card\s*\{[^}]*padding:\s*4px 8px;/);
+  assert.match(finalPathCss, /\.final-path-log-summary\s*\{[^}]*background:\s*#ffffff;/);
+  assert.match(finalPathCss, /\.final-path-log-table-wrap\s*\{[^}]*background:\s*#ffffff;/);
+});
