@@ -211,6 +211,7 @@ export function renderAssemblyFinalPathCard(state, deps = {}) {
       trackView: assembly.finalPathTrackView,
       trackViewportPx: getMeasuredTrackViewportPx("final-path"),
       primaryDatasetName,
+      ctgColorContext: { primaryCtgs: assembly.chrCtgs, supportCtgs: assembly.supportChrCtgs },
       graphPreviewSegmentOrder,
       graphAddonByChr,
       degapRuntimeBody: renderDegapRuntime({ degap: assembly.degap }, degapRenderDeps),

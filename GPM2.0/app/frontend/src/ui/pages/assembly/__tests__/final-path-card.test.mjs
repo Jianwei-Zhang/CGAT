@@ -978,7 +978,7 @@ test("renderFinalPathCard graph mode keeps a tiny gap marker from overlapping th
     /data-final-path-segment-id="seg-gap"[\s\S]*?<rect[\s\S]*?class="final-path-gap-marker"[\s\S]*?x="([^"]+)"[\s\S]*?width="([^"]+)"/,
   );
   const nextCtgMatch = html.match(
-    /data-final-path-segment-id="seg-2"[\s\S]*?<rect[\s\S]*?class="track-ctg is-active"[\s\S]*?x="([^"]+)"/,
+    /data-final-path-segment-id="seg-2"[\s\S]*?<rect[\s\S]*?class="track-ctg"[\s\S]*?x="([^"]+)"/,
   );
 
   assert.ok(gapMatch);
@@ -1010,9 +1010,9 @@ test("renderFinalPathCard graph mode shrinks all ctg bars proportionally when a 
       },
     );
     return {
-      first: Number(html.match(/data-final-path-segment-id="seg-1"[\s\S]*?<rect[^>]*class="track-ctg is-active"[^>]*width="([^"]+)"/)?.[1]),
-      second: Number(html.match(/data-final-path-segment-id="seg-2"[\s\S]*?<rect[^>]*class="track-ctg is-active"[^>]*width="([^"]+)"/)?.[1]),
-      third: Number(html.match(/data-final-path-segment-id="seg-3"[\s\S]*?<rect[^>]*class="track-ctg is-active"[^>]*width="([^"]+)"/)?.[1]),
+      first: Number(html.match(/data-final-path-segment-id="seg-1"[\s\S]*?<rect[^>]*class="track-ctg"[^>]*width="([^"]+)"/)?.[1]),
+      second: Number(html.match(/data-final-path-segment-id="seg-2"[\s\S]*?<rect[^>]*class="track-ctg"[^>]*width="([^"]+)"/)?.[1]),
+      third: Number(html.match(/data-final-path-segment-id="seg-3"[\s\S]*?<rect[^>]*class="track-ctg"[^>]*width="([^"]+)"/)?.[1]),
       gap: Number(html.match(/data-final-path-segment-id="seg-gap"[\s\S]*?<rect[^>]*class="final-path-gap-marker"[^>]*width="([^"]+)"/)?.[1] || 0),
     };
   };
@@ -1585,8 +1585,8 @@ test("renderFinalPathCard graph mode applies companion color class for non-prima
       i18n: createI18n(),
     },
   );
-  assert.match(html, /data-final-path-segment-id="seg-1"[\s\S]*class="track-ctg is-active"/);
-  assert.match(html, /data-final-path-segment-id="seg-2"[\s\S]*class="track-ctg is-active is-companion"/);
+  assert.match(html, /data-final-path-segment-id="seg-1"[\s\S]*class="track-ctg"/);
+  assert.match(html, /data-final-path-segment-id="seg-2"[\s\S]*class="track-ctg is-companion"/);
 });
 
 test("renderFinalPathCard graph mode keeps ref segments on the ref gray palette", () => {
@@ -1604,12 +1604,12 @@ test("renderFinalPathCard graph mode keeps ref segments on the ref gray palette"
     },
   );
 
-  assert.match(html, /data-final-path-segment-id="seg-ref"[\s\S]*class="track-ctg is-active is-ref"/);
+  assert.match(html, /data-final-path-segment-id="seg-ref"[\s\S]*class="track-ctg is-ref"/);
   assert.match(
     html,
     /data-final-path-segment-id="seg-ref"[\s\S]*?<text class="track-ctg-label is-ref[^"]*"[^>]*>ref_Chr01:5201-5600 \(\+\)<\/text>/,
   );
-  assert.match(html, /data-final-path-segment-id="seg-ds"[\s\S]*class="track-ctg is-active"/);
+  assert.match(html, /data-final-path-segment-id="seg-ds"[\s\S]*class="track-ctg"/);
 });
 
 test("renderFinalPathCard table mode renders editable card rows and actions", () => {

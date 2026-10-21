@@ -266,6 +266,10 @@
   background: #e4e4e4;
 }
 
+.assembly-final-path-svg .track-ctg-label {
+  font-weight: 700;
+}
+
 .assembly-final-path-svg-wrap {
   margin-top: 4px;
 }

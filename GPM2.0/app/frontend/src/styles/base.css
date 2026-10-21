@@ -12,6 +12,15 @@
   --font-page-title: 1.714rem;
   --font-hero: 2rem;
   --card-radius: 6px;
+  --ctg-primary-fill: #d2dfef;
+  --ctg-primary-stroke: #6d85a1;
+  --ctg-primary-text: #243a54;
+  --ctg-companion-fill: #e7dec4;
+  --ctg-companion-stroke: #8a7551;
+  --ctg-companion-text: #5c492a;
+  --ctg-ref-fill: #cfcfcf;
+  --ctg-ref-stroke: #8e8e8e;
+  --ctg-ref-text: #4f4f4f;
   --font-graph-label: var(--graph-font-size, 12px);
   --font-graph-small: calc(var(--graph-font-size, 12px) * 0.917);
   --font-graph-tick: calc(var(--graph-font-size, 12px) * 0.917);

@@ -1190,3 +1190,25 @@ test("bindings preserve all-mode final-path target chr on table edits", async ()
     { segmentId: "seg-a", field: "ctg", value: "ctg-alpha", targetChrName: "Chr01A" },
   ]);
 });
+
+
+test("Final Path inherits derived primary and companion track tones without permanent active colors", () => {
+  const html = renderAssemblyPage(createState({
+    initializer: {
+      datasets: [{ datasetId: 1, name: "hifiasm" }],
+      existingProjects: [{ projectId: 7, primaryDatasetId: 1 }],
+    },
+    assembly: {
+      chrCtgs: [{ assemblyCtgId: 101, name: "derived-primary", datasetName: "flye", totalLength: 100 }],
+      supportChrCtgs: [{ assemblyCtgId: 102, name: "aux", datasetName: "flye", totalLength: 100 }],
+      finalPathByChr: { Chr01: { chrName: "Chr01", mode: "segments", segments: [
+        { segmentId: "derived", type: "ctg", assemblyCtgId: 101, datasetName: "flye", ctgName: "renamed-primary", overallLen: 100, start: 1, end: 100 },
+        { segmentId: "aux", type: "ctg", assemblyCtgId: 102, datasetName: "flye", ctgName: "renamed-aux", overallLen: 100, start: 1, end: 100 },
+      ] } },
+      finalPathViewMode: "graph",
+    },
+  }));
+  assert.match(html, /class="track-ctg-group"\s+data-final-path-segment-id="derived"/);
+  assert.match(html, /class="track-ctg-group is-companion"\s+data-final-path-segment-id="aux"/);
+  assert.doesNotMatch(html, /class="track-ctg-group is-active[^"]*"\s+data-final-path-segment-id/);
+});

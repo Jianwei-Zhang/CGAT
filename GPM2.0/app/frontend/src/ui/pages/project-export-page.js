@@ -1,3 +1,4 @@
+import { createContigColorResolver, getContigPalette } from "./assembly/contig-colors.js";
 import { layoutFinalPathStrip, syncFinalPathStripGeometry } from "./assembly/final-path-visual-layout.js";
 import { getGraphFontSize, estimateGraphTextWidth } from "../../services/app-settings.js";
 import { pickDirectoryPath, pickSaveFilePath } from "../../services/backend-api.js";
@@ -224,10 +225,15 @@ function resolveFinalPathPreviewCtgLabel(segment) {
   return `${displayName} (${start > end ? "-" : "+"})`;
 }
 
-function isCompanionFinalPathSegment(segment, primaryDatasetName = "") {
-  const segmentDataset = normalizeString(segment?.datasetName).toLowerCase();
-  const primaryDataset = normalizeString(primaryDatasetName).toLowerCase();
-  return Boolean(segmentDataset && primaryDataset && segmentDataset !== primaryDataset);
+function getProjectContigColorContext(state) {
+  const exportState = getScopedProjectExportState(state);
+  return {
+    primaryCtgs: [
+      ...Object.values(exportState.primaryCtgsByChr || {}).flat(),
+      ...(state?.assembly?.chrCtgs || []),
+    ],
+    supportCtgs: state?.assembly?.supportChrCtgs || [],
+  };
 }
 
 function mergeFinalPathByChr(...sources) {
@@ -634,7 +640,9 @@ function buildProjectFinalPathTsvText(entries) {
   return `${rows.join("\n")}\n`;
 }
 
-function buildProjectFinalPathSvgSnapshot({ entries, projectName, primaryDatasetName }) {
+function buildProjectFinalPathSvgSnapshot({ entries, projectName, primaryDatasetName, ctgColorContext = {} }) {
+  const resolveColorRole = createContigColorResolver({ ...ctgColorContext, primaryDatasetName });
+  const palette = getContigPalette();
   const rows = Array.isArray(entries) ? entries : [];
   const labelWidth = Math.max(132, ...rows.map(row => estimateGraphTextWidth(row.chrName, 7) * 1.1 + 16));
   const rightPadding = Math.max(116, ...rows.map(row => estimateGraphTextWidth(`${formatNumber(row.lengthBp)} bp`, 7) + 24));
@@ -662,10 +670,7 @@ function buildProjectFinalPathSvgSnapshot({ entries, projectName, primaryDataset
           <text x="${(x + segmentWidth / 2).toFixed(2)}" y="${(y + 13).toFixed(2)}" text-anchor="middle" font-size="${getGraphFontSize() * 0.917}" fill="#666">GAP</text>
         `;
       }
-      const isRef = isFinalPathRefSegment(segment);
-      const isCompanion = isCompanionFinalPathSegment(segment, primaryDatasetName);
-      const fill = isRef ? "#cfcfcf" : isCompanion ? "#e7dec4" : "#d2dfef";
-      const stroke = isRef ? "#8e8e8e" : isCompanion ? "#8a7551" : "#6d85a1";
+      const { fill, stroke } = palette[resolveColorRole(segment)];
       return `
         <rect x="${x.toFixed(2)}" y="${(y + 17).toFixed(2)}" width="${segmentWidth.toFixed(2)}" height="14" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1" />
       `;
@@ -1287,7 +1292,7 @@ function getFinalPathPreviewEntries(state) {
     });
 }
 
-function renderFinalPathPreviewTrack({ entry, lengthBp, maxLengthBp, primaryDatasetName }) {
+function renderFinalPathPreviewTrack({ entry, lengthBp, maxLengthBp, resolveColorRole }) {
   const segments = Array.isArray(entry?.segments) ? entry.segments : [];
   const domainBp = Math.max(1, Number(maxLengthBp || 0), Number(lengthBp || 0));
   let cursorBp = 0, visualIndex = 0;
@@ -1316,10 +1321,9 @@ function renderFinalPathPreviewTrack({ entry, lengthBp, maxLengthBp, primaryData
       return "";
     }
     const label = resolveFinalPathPreviewCtgLabel(segment);
-    const isRef = isFinalPathRefSegment(segment);
-    const isCompanion = isCompanionFinalPathSegment(segment, primaryDatasetName);
+    const colorRole = resolveColorRole(segment);
     const afterGapClass = index > 0 && isFinalPathGapSegment(segments[index - 1]) ? " is-after-gap" : "";
-    const toneClass = `${isRef ? " is-ref" : isCompanion ? " is-companion" : ""}${afterGapClass}`;
+    const toneClass = `${colorRole === "ref" ? " is-ref" : colorRole === "companion" ? " is-companion" : ""}${afterGapClass}`;
     const title = `${resolveFinalPathSegmentDisplayName(segment)} | ${formatNumber(segmentLengthBp)} bp`;
     return `
       <span
@@ -1340,6 +1344,7 @@ function renderFinalPathPreviewTrack({ entry, lengthBp, maxLengthBp, primaryData
 }
 
 function renderFinalPathPreviewRows(state, { primaryDatasetName }) {
+  const resolveColorRole = createContigColorResolver({ ...getProjectContigColorContext(state), primaryDatasetName });
   const rows = getFinalPathPreviewEntries(state);
   if (!rows.length) {
     return "";
@@ -1363,7 +1368,7 @@ function renderFinalPathPreviewRows(state, { primaryDatasetName }) {
               entry,
               lengthBp,
               maxLengthBp,
-              primaryDatasetName,
+              resolveColorRole,
             })}
             <span class="project-export-final-path-preview-length">${escapeHtml(`${formatNumber(lengthBp)} bp`)}</span>
           </div>
@@ -2229,6 +2234,7 @@ async function runProjectExport(host, store, kind, deps = {}) {
             entries: exportEntries,
             projectName,
             primaryDatasetName,
+            ctgColorContext: getProjectContigColorContext(state),
           })),
           stateOrLocale: state,
         });

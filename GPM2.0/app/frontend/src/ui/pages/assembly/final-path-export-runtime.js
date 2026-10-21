@@ -1,3 +1,4 @@
+import { getContigPalette } from "./contig-colors.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
   getCurrentChrFinalPath,
@@ -30,25 +31,28 @@ const FINAL_PATH_EXPORT_BOUND = Symbol("finalPathExportBound");
 const FINAL_PATH_EXPORT_CLOSE_TIMER = "__finalPathExportCloseTimer";
 const FINAL_PATH_FALLBACK_CARD_CONTENT_INSET_PX = 22;
 const FINAL_PATH_FALLBACK_CARD_LAYOUT_OFFSET_PX = 138;
-function finalPathExportSvgStyleText() { return [
-  ".assembly-track-svg{display:block;background:#fff;font-family:system-ui,Segoe UI,Microsoft YaHei,sans-serif;}",
-  ".track-ruler-line{stroke:#5f5f5f;stroke-width:1;}",
-  ".track-tick-guide{stroke-dasharray:3,3;stroke-width:1;stroke:#d7d7d7;}",
-  ".track-tick-guide.is-major{stroke:#8d8d8d;}",
-  ".track-tick-guide.is-minor{display:none;}",
-  `.track-tick-label{fill:#666;font-size:${getGraphFontSize() * 0.917}px;}`,
-  ".track-ctg{fill:#d2dfef;stroke:#6d85a1;stroke-width:1;}",
-  ".track-ctg.is-active{fill:#b9d0ea;stroke:#38516c;}",
-  ".track-ctg.is-ref,.track-ctg.is-ref.is-active{fill:#cfcfcf;stroke:#8e8e8e;}",
-  ".track-ctg.is-companion{fill:#e7dec4;stroke:#8a7551;}",
-  ".track-ctg.is-companion.is-active{fill:#dccba4;stroke:#725d39;}",
-  `.track-ctg-label{fill:#243a54;font-size:${getGraphFontSize()}px;}`,
-  ".track-ctg-label.is-ref{fill:#4f4f4f;}",
-  ".track-ctg-label.is-companion{fill:#5c492a;}",
-  `.track-ctg-label.is-outside{font-size:${getGraphFontSize() * 0.917}px;}`,
-  ".final-path-gap-marker{fill:#ffffff;stroke:#1b1b1b;stroke-width:1;}",
-  `.final-path-gap-label{fill:#1b1b1b;font-size:${getGraphFontSize()}px;font-weight:700;}`,
-].join(""); }
+function finalPathExportSvgStyleText() {
+  const palette = getContigPalette();
+  return [
+    ".assembly-track-svg{display:block;background:#fff;font-family:system-ui,Segoe UI,Microsoft YaHei,sans-serif;}",
+    ".track-ruler-line{stroke:#5f5f5f;stroke-width:1;}",
+    ".track-tick-guide{stroke-dasharray:3,3;stroke-width:1;stroke:#d7d7d7;}",
+    ".track-tick-guide.is-major{stroke:#8d8d8d;}",
+    ".track-tick-guide.is-minor{display:none;}",
+    `.track-tick-label{fill:#666;font-size:${getGraphFontSize() * 0.917}px;}`,
+    `.track-ctg{fill:${palette.primary.fill};stroke:${palette.primary.stroke};stroke-width:1;}`,
+    ".track-ctg.is-active{fill:#b9d0ea;stroke:#38516c;}",
+    `.track-ctg.is-ref,.track-ctg.is-ref.is-active{fill:${palette.ref.fill};stroke:${palette.ref.stroke};}`,
+    `.track-ctg.is-companion{fill:${palette.companion.fill};stroke:${palette.companion.stroke};}`,
+    ".track-ctg.is-companion.is-active{fill:#dccba4;stroke:#725d39;}",
+    `.track-ctg-label{fill:${palette.primary.text};font-size:${getGraphFontSize()}px;font-weight:700;}`,
+    `.track-ctg-label.is-ref{fill:${palette.ref.text};}`,
+    `.track-ctg-label.is-companion{fill:${palette.companion.text};}`,
+    `.track-ctg-label.is-outside{font-size:${getGraphFontSize() * 0.917}px;}`,
+    ".final-path-gap-marker{fill:#ffffff;stroke:#1b1b1b;stroke-width:1;}",
+    `.final-path-gap-label{fill:#1b1b1b;font-size:${getGraphFontSize()}px;font-weight:700;}`,
+  ].join("");
+}
 
 function hasBoundFinalPathExportAncestor(host) {
   let ancestor = host?.parentElement || host?.parentNode || null;
@@ -352,6 +356,7 @@ function buildFallbackFinalPathGraphCardHtml({ state, finalPathEntry, trackViewp
       trackView: assembly.finalPathTrackView,
       trackViewportPx,
       primaryDatasetName,
+      ctgColorContext: { primaryCtgs: assembly.chrCtgs, supportCtgs: assembly.supportChrCtgs },
     },
     {
       escapeAttr,

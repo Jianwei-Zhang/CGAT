@@ -1380,13 +1380,13 @@
 }
 
 .track-reference-member {
-  fill: #cfcfcf;
-  stroke: #8e8e8e;
+  fill: var(--ctg-ref-fill);
+  stroke: var(--ctg-ref-stroke);
   stroke-width: 1;
 }
 
 .track-reference-member-label {
-  fill: #4f4f4f;
+  fill: var(--ctg-ref-text);
   font-size: var(--font-graph-label);
   pointer-events: none;
 }
@@ -1437,8 +1437,8 @@
 }
 
 .track-ctg {
-  fill: #d2dfef;
-  stroke: #6d85a1;
+  fill: var(--ctg-primary-fill);
+  stroke: var(--ctg-primary-stroke);
   stroke-width: 1;
   cursor: pointer;
 }
@@ -1450,13 +1450,13 @@
 
 .track-ctg.is-ref,
 .track-ctg.is-ref.is-active {
-  fill: #cfcfcf;
-  stroke: #8e8e8e;
+  fill: var(--ctg-ref-fill);
+  stroke: var(--ctg-ref-stroke);
 }
 
 .track-ctg.is-companion {
-  fill: #e7dec4;
-  stroke: #8a7551;
+  fill: var(--ctg-companion-fill);
+  stroke: var(--ctg-companion-stroke);
   cursor: default;
 }
 
@@ -1589,7 +1589,7 @@
 }
 
 .track-ctg-label {
-  fill: #243a54;
+  fill: var(--ctg-primary-text);
   font-size: var(--font-graph-label);
   pointer-events: none;
 }
@@ -1602,24 +1602,24 @@
   position: absolute;
   white-space: nowrap;
   font-size: var(--font-graph-label);
-  color: #243a54;
+  color: var(--ctg-primary-text);
   pointer-events: none;
 }
 
 .track-sticky-label.is-companion {
-  color: #5c492a;
+  color: var(--ctg-companion-text);
 }
 
 .track-sticky-label.is-ref {
-  color: #4f4f4f;
+  color: var(--ctg-ref-text);
 }
 
 .track-ctg-label.is-companion {
-  fill: #5c492a;
+  fill: var(--ctg-companion-text);
 }
 
 .track-ctg-label.is-ref {
-  fill: #4f4f4f;
+  fill: var(--ctg-ref-text);
 }
 
 .track-ctg-source-tag {

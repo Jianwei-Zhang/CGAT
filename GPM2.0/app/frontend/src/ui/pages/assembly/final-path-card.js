@@ -1,3 +1,4 @@
+import { createContigColorResolver } from "./contig-colors.js";
 import { FINAL_PATH_SEGMENT_MIN_WIDTH_PX, resolveFinalPathVisualLayouts } from "./final-path-visual-layout.js";
 import { renderViewTickControl } from "./view-navigation-ui.js";
 import { estimateGraphTextWidth, getGraphFontSize } from "../../../services/app-settings.js";
@@ -93,15 +94,6 @@ function resolveFinalPathGraphLabelText(segment) {
     return displayCtgName;
   }
   return `${displayCtgName} (${orient})`;
-}
-
-function isCompanionFinalPathSegment(segment, primaryDatasetName) {
-  const segmentDataset = normalizeString(segment?.datasetName).toLowerCase();
-  const primaryDataset = normalizeString(primaryDatasetName).toLowerCase();
-  if (!segmentDataset || !primaryDataset) {
-    return false;
-  }
-  return segmentDataset !== primaryDataset;
 }
 
 function normalizeFinalPathSegments(finalPathEntry) {
@@ -961,6 +953,7 @@ export function renderFinalPathGraph({
   trackControls,
   trackViewportPx,
   primaryDatasetName = "",
+  ctgColorContext = {},
   previewSegmentOrder = null,
   scaleDomainSpanBp = null,
   fitToViewport = true,
@@ -970,6 +963,7 @@ export function renderFinalPathGraph({
   targetChrName = "",
   allGraphLabel = "",
 }) {
+  const resolveColorRole = createContigColorResolver({ ...ctgColorContext, primaryDatasetName });
   const segments = resolveGraphSegmentsForRender(finalPathEntry, previewSegmentOrder);
   const actualSpanBp = Math.max(1, normalizePositiveInt(resolveFinalPathTotalLengthBp(finalPathEntry)) ?? 1);
   const domainSpanBp = Math.max(actualSpanBp, normalizePositiveInt(scaleDomainSpanBp) ?? actualSpanBp);
@@ -1183,11 +1177,10 @@ export function renderFinalPathGraph({
       }
       const orient = resolveFinalPathSegmentOrient(segment);
       const tooltipText = `${displayCtgName} | len=${String(segment?.overallLen || 0)} | start=${String(segment?.start || "")} | end=${String(segment?.end || "")} | orient=${orient}`;
-      const isCompanion = isCompanionFinalPathSegment(segment, primaryDatasetName);
-      const isRefSegment = isFinalPathRefSegment(segment);
-      const toneClass = isRefSegment ? " is-ref" : (isCompanion ? " is-companion" : "");
-      const groupClass = `track-ctg-group is-active${toneClass}`;
-      const ctgClass = `track-ctg is-active${toneClass}`;
+      const colorRole = resolveColorRole(segment);
+      const toneClass = colorRole === "ref" ? " is-ref" : (colorRole === "companion" ? " is-companion" : "");
+      const groupClass = `track-ctg-group${toneClass}`;
+      const ctgClass = `track-ctg${toneClass}`;
       const { visualStartX, barWidth } = resolveFinalPathCtgVisualLayout(
         items,
         index,
@@ -1541,6 +1534,7 @@ export function renderFinalPathCard(
     trackView = null,
     trackViewportPx = null,
     primaryDatasetName = "",
+    ctgColorContext = {},
     graphPreviewSegmentOrder = null,
     graphAddonByChr = {},
     degapRuntimeBody = "",
@@ -1701,6 +1695,7 @@ export function renderFinalPathCard(
           trackControls,
           trackViewportPx,
           primaryDatasetName,
+          ctgColorContext,
           previewSegmentOrder: allMode ? entry.graphPreviewSegmentOrder : graphPreviewSegmentOrder,
           targetChrName: allMode ? entry.chrName : "",
           allGraphLabel: allMode ? entry.label : "",

@@ -522,10 +522,10 @@
   top: 20px;
   height: 16px;
   overflow: hidden;
-  border: 1px solid #38516c;
+  border: 1px solid var(--ctg-primary-stroke);
   border-radius: 2px;
-  background: #b9d0ea;
-  color: #17324d;
+  background: var(--ctg-primary-fill);
+  color: var(--ctg-primary-text);
   font-size: var(--font-small);
   font-weight: 700;
   line-height: 14px;
@@ -533,15 +533,15 @@
 }
 
 .project-export-final-path-preview-ctg.is-companion {
-  border-color: #725d39;
-  background: #dccba4;
-  color: #4d3c20;
+  border-color: var(--ctg-companion-stroke);
+  background: var(--ctg-companion-fill);
+  color: var(--ctg-companion-text);
 }
 
 .project-export-final-path-preview-ctg.is-ref {
-  border-color: #8e8e8e;
-  background: #cfcfcf;
-  color: #333;
+  border-color: var(--ctg-ref-stroke);
+  background: var(--ctg-ref-fill);
+  color: var(--ctg-ref-text);
 }
 
 .project-export-final-path-preview-ctg span {
