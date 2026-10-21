@@ -29,10 +29,18 @@ export function parseViewSpan(value, unit = "Mb") {
   return multiplier && Number.isSafeInteger(bp) && bp > 0 ? bp : null;
 }
 
-export function formatViewSpan(bp, preferredUnit) {
-  const unit = preferredUnit === "kb" || preferredUnit === "Mb" ? preferredUnit : bp >= 1_000_000 ? "Mb" : "kb";
-  const value = Number(bp) / (unit === "Mb" ? 1_000_000 : 1000);
-  return { unit, value: String(Number(value.toFixed(unit === "Mb" ? 6 : 3))) };
+const VIEW_SPAN_UNITS = ["bp", "kb", "Mb", "Gb", "Tb", "Pb"];
+
+export function formatViewSpan(bp) {
+  let unitIndex = 0;
+  while (unitIndex < VIEW_SPAN_UNITS.length - 1 && bp >= 1000 ** (unitIndex + 1)) unitIndex++;
+  let value = Number((Number(bp) / 1000 ** unitIndex).toFixed(unitIndex === 0 ? 0 : 2));
+  // Rounding near a unit boundary must not leave a wider "1000" label.
+  if (value >= 1000 && unitIndex < VIEW_SPAN_UNITS.length - 1) {
+    value = Number((value / 1000).toFixed(2));
+    unitIndex++;
+  }
+  return { unit: VIEW_SPAN_UNITS[unitIndex], value: String(value) };
 }
 
 export function readViewNavigationGeometry(scrollEl, metrics) {

@@ -38,8 +38,29 @@ test("span input validates explicit genomic units and meaningful decimals", () =
   assert.equal(parseViewSpan(" 25 ", "kb"), 25_000);
   for (const invalid of ["", "0", "-1", "Infinity", "NaN", "1e3", "0x10", "abc", "9007199254740992"]) assert.equal(parseViewSpan(invalid, "Mb"), null, invalid);
   assert.equal(parseViewSpan("2", "pixels"), null);
-  assert.deepEqual(formatViewSpan(2_500_000), { value: "2.5", unit: "Mb" });
-  assert.deepEqual(formatViewSpan(1), { value: "0.001", unit: "kb" });
+});
+
+test("window display uses compact automatic units and promotes rounded unit boundaries", () => {
+  for (const [bp, value, unit] of [
+    [1, "1", "bp"],
+    [999, "999", "bp"],
+    [1000, "1", "kb"],
+    [2500, "2.5", "kb"],
+    [123456, "123.46", "kb"],
+    [999994, "999.99", "kb"],
+    [999999, "1", "Mb"],
+    [1_000_000, "1", "Mb"],
+    [64_054_887, "64.05", "Mb"],
+    [999_999_999, "1", "Gb"],
+    [123_456_789_012, "123.46", "Gb"],
+    [1e12, "1", "Tb"],
+    [1e15, "1", "Pb"],
+    [Number.MAX_SAFE_INTEGER, "9.01", "Pb"],
+  ]) {
+    const formatted = formatViewSpan(bp);
+    assert.deepEqual(formatted, { value, unit }, String(bp));
+    assert.match(formatted.value, /^\d{1,3}(?:\.\d{1,2})?$/);
+  }
 });
 test("viewport geometry includes viewbox origin and native scroll position", () => {
   const geometry = readViewNavigationGeometry({ scrollWidth: 3000, scrollLeft: 400 }, { windowStartBp: 100, viewboxMinX: -100, innerWidth: 2000, domainSpanBp: 4000, viewportWidth: 1000 });

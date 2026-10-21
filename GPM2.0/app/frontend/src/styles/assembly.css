@@ -2099,21 +2099,22 @@
 .view-nav-span {
   display: inline-flex;
   /* Reserve the same space as the span text changes during navigation. */
-  flex: 0 0 24ch;
+  flex: 0 0 18ch;
   min-width: 0;
-  max-width: calc(100% - 12px);
+  max-width: 100%;
   gap: 4px;
   align-items: center;
+  justify-content: flex-end;
   white-space: nowrap;
-  margin-inline-start: 12px;
+  margin-inline-start: auto;
 }
 .view-nav-span [data-view-nav-span] {
   display: inline-block;
-  flex: 1 1 0;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: start;
+  text-align: end;
   font-variant-numeric: tabular-nums;
 }
 .view-tick-control input {

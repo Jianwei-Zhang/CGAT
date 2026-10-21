@@ -120,7 +120,7 @@ function createController(root, store, window) {
     const formatted = formatViewSpan(range.span);
     const spanText = `${formatted.value} ${formatted.unit}`;
     spanDisplay.textContent = spanText;
-    spanDisplay.title = spanText;
+    spanDisplay.title = `${Math.round(range.span).toLocaleString("en-US")} bp`;
     const t = viewNavText(locale());
     bar.title = `${t.group}: ${Math.round(range.start).toLocaleString("en-US")}–${Math.round(range.start + range.span).toLocaleString("en-US")} bp`;
   }
