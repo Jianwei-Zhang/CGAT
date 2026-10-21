@@ -1055,8 +1055,13 @@ def apply_corrections(
             replacement_length = 0 if gapless_junction else NORMALIZED_GAP_LENGTH
             output_start = output_cursor + 1
             if gapless_junction:
-                # q_after identifies the first retained right-side base.  The
-                # edit itself inserts no sequence and creates no corrected gap.
+                # Anchor at the first retained right-side base, or the last
+                # retained left-side base when deleting a terminal component.
+                # The edit inserts no sequence and creates no corrected gap.
+                if end0 == len(sequence):
+                    if output_cursor < 1:
+                        fail(f"gapless correction would remove the entire chromosome: {candidate['candidate_id']}")
+                    output_start = output_cursor
                 output_end = output_start
             else:
                 gap_segment = {

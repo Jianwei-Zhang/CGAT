@@ -116,6 +116,13 @@ alignment, structural-analysis and metadata services live in `repair_*.py`.
 The source no longer ships `tools/grt_step23.py`. Existing legacy workspaces
 retain their own combined entrypoint/runtime and are not modified automatically.
 
+Step2 structural edits that remove a gap record the retained junction coordinate,
+not a nonexistent output gap. Their events use `replacement_kind: none`, zero
+replacement length and the empty-sequence digest; absorbed gap events retain
+explicit supersession links. Terminal deletions anchor to a retained base rather
+than one past the chromosome end. Missing gap origins or invalid edit prototypes
+still fail explicitly; no gap is silently skipped or replaced with synthetic Ns.
+
 Both stages share a content fingerprint covering both engines, entry scripts
 and common modules. Changing any of them invalidates repair-stage results and
 requires Step2 to run again. Independently validated raw MUMmer results remain

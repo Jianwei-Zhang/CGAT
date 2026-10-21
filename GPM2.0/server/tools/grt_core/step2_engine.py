@@ -1259,7 +1259,32 @@ def build_step2_structural_events(
         event_id = stable_id(
             "event", [run_id, "step2", object_id, "structural"], 24
         )
-        q_after_start, q_after_end = output_interval_by_object[object_id]
+        prototype = None
+        gapless_junction = False
+        if accepted is not None:
+            candidate_id = str(accepted["candidate_id"])
+            prototype = prototype_by_candidate.get(candidate_id)
+            if prototype is None:
+                fail(f"Step2 structural event is missing its edit prototype: {candidate_id}")
+            gapless_junction = accepted.get("junction_policy") in {
+                PRIMARY_OVERLAP_POLICY, DOMINATED_COMPONENT_POLICY,
+            }
+        if gapless_junction:
+            # A deleted gap has no output gap origin. Its event (including any
+            # absorbed objects) points at the retained junction, not a fake N.
+            q_after_start = int(prototype["intermediate_start"])
+            q_after_end = int(prototype["intermediate_end"])
+            if (
+                int(prototype["replacement_length"]) != 0
+                or q_after_start != q_after_end
+                or q_after_start < 1
+            ):
+                fail(f"Step2 gapless edit has an invalid junction prototype: {candidate_id}")
+        else:
+            interval = output_interval_by_object.get(object_id)
+            if interval is None:
+                fail(f"Step2 structural event is missing its output gap interval: {object_id}")
+            q_after_start, q_after_end = interval
         if accepted is None:
             conflict = any(row.get("outcome") == "conflicted" for row in related)
             status = "conflicted" if conflict else "unresolved"
@@ -1338,7 +1363,6 @@ def build_step2_structural_events(
                 "superseded_by_event_id": primary_event_id,
             }
         else:
-            prototype = prototype_by_candidate[str(accepted["candidate_id"])]
             event = {
                 "run_id": run_id,
                 "event_id": event_id,
@@ -1367,18 +1391,42 @@ def build_step2_structural_events(
                 "final_path_segment_id": "",
                 "edit": {
                     "operation": "replace_interval",
-                    "replacement_kind": "gap",
+                    "replacement_kind": "none" if gapless_junction else "gap",
                     "input_coordinate_space": "q1_1_based_closed",
                     "input_start": int(accepted["input_start"]),
                     "input_end": int(accepted["input_end"]),
                     "intermediate_output_start": prototype["intermediate_start"],
                     "intermediate_output_end": prototype["intermediate_end"],
-                    "replacement_length": NORMALIZED_GAP_LENGTH,
+                    "replacement_length": int(prototype["replacement_length"]),
                     "replacement_sequence_sha256": sha256_bytes(
-                        ("N" * NORMALIZED_GAP_LENGTH).encode("ascii")
+                        ("N" * int(prototype["replacement_length"])).encode("ascii")
                     ),
                 },
             }
+            if accepted.get("junction_policy") == PRIMARY_OVERLAP_POLICY:
+                event["junction"] = {
+                    "policy": PRIMARY_OVERLAP_POLICY,
+                    "left_trim": int(accepted["trim_left"]),
+                    "right_trim": int(accepted["trim_right"]),
+                    "direct_overlap_bp": int(accepted["direct_overlap_bp"]),
+                    "left_source": {
+                        "dataset": accepted["primary_left_dataset"],
+                        "contig": accepted["primary_left_contig"],
+                        "orientation": accepted["primary_left_orientation"],
+                    },
+                    "right_source": {
+                        "dataset": accepted["primary_right_dataset"],
+                        "contig": accepted["primary_right_contig"],
+                        "orientation": accepted["primary_right_orientation"],
+                    },
+                    "support_sequence_inserted": False,
+                }
+            elif accepted.get("junction_policy") == DOMINATED_COMPONENT_POLICY:
+                event["junction"] = {
+                    "policy": DOMINATED_COMPONENT_POLICY,
+                    "dominated_side": accepted["dominated_side"],
+                    "support_sequence_inserted": False,
+                }
             primary_events[object_id] = event
         classification = accepted or (related[0] if related else None)
         if classification is not None:
