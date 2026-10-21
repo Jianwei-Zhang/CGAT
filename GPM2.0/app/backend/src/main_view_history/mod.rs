@@ -4,6 +4,7 @@ mod ref_split;
 mod snapshot;
 mod split;
 mod types;
+mod unsplit;
 
 use std::collections::BTreeSet;
 use std::path::Path;

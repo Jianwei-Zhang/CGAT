@@ -151,7 +151,14 @@ pub(super) fn apply_split(
         } else {
             format!("manual-fragment:{}", source.assembly_ctg_id)
         };
-        let key = format!("{group}:{}-{}", part.source_start, part.source_end);
+        let mut key = format!("{group}:{}-{}", part.source_start, part.source_end);
+        // Merging and splitting again must not collide with retired sequence instances.
+        if conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM assembly_seq WHERE project_id=?1 AND source_seq_id=?2 AND instance_key=?3)",
+            params![project_id, source.source_seq_id, key], |r| r.get::<_, bool>(0),
+        )? {
+            key = format!("{key}~{}", seq_ids[i]);
+        }
         // End types are display-oriented; only original exterior ends are inherited.
         let low_type = if source.orient == "-" {
             &parent.right_end_type

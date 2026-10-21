@@ -5,9 +5,13 @@ import { resolveTrackCtgOrient } from "./track-label-geometry.js";
 export const splitCopy = {
   zh: { title: "分割 contig", manual: "手动分割…", left: "在比对最左侧分割", right: "在比对最右侧分割",
     unavailable: "没有可用的比对边界，或边界已在 contig 端部", stale: "比对或当前视图已变化，请重新打开菜单。",
+    undoTitle: "撤销分割 contig", undoLeft: "撤销左侧分割", undoRight: "撤销右侧分割",
+    undoUnavailable: "该侧没有可合并的同源相邻分割片段", undoDone: "已撤销该侧分割；可通过主视图撤销/重做恢复。",
     done: "已分割 contig；两段保留在原轨道，可撤销。" },
   en: { title: "Split contig", manual: "Manual split…", left: "Split at leftmost alignment", right: "Split at rightmost alignment",
     unavailable: "No alignment boundary, or the boundary is already at the contig end", stale: "Alignment or view changed. Reopen the menu.",
+    undoTitle: "Undo contig split", undoLeft: "Undo left split", undoRight: "Undo right split",
+    undoUnavailable: "No compatible adjacent split fragment on this side", undoDone: "Split boundary removed. Main-view undo/redo is available.",
     done: "Contig split; both fragments remain on the original track. Undo is available." },
 };
 
@@ -82,4 +86,34 @@ export function bandBoundaryAnchors(points, direction, reversed) {
   if (direction === "down") return { left: `${p[0]} ${p[3]}`, right: `${p[1]} ${p[2]}` };
   return reversed ? { left: `${p[2]} ${p[1]}`, right: `${p[3]} ${p[0]}` }
     : { left: `${p[3]} ${p[0]}`, right: `${p[2]} ${p[1]}` };
+}
+
+// Restore one source boundary, never join unrelated contigs or synthesize gap bases.
+export function resolveContigUnsplitModel(assembly, assemblyCtgId) {
+  const ctg = assembly?.chrCtgs?.find((c) => Number(c.assemblyCtgId) === Number(assemblyCtgId));
+  const fragment = ctg?.sourceFragment;
+  if (!fragment?.groupKey?.startsWith("manual-fragment:")) return null;
+  const hidden = new Set((assembly.hiddenPrimaryCtgIds || []).map(Number));
+  const orient = resolveTrackCtgOrient(ctg);
+  const sameGroup = (assembly.chrCtgs || []).filter((c) => c !== ctg
+    && c.sourceFragment?.groupKey === fragment.groupKey
+    && Number(c.sourceFragment.sourceSeqId) === Number(fragment.sourceSeqId));
+  // A cross-chromosome inspection copy alone is not a split state.
+  if (!sameGroup.length && (fragment.groupKey.startsWith("manual-fragment:chr-add:")
+    || Number(fragment.sourceStart) === 1 && Number(fragment.sourceEnd) === Number(fragment.sourceLength))) return null;
+  const result = { assemblyCtgId: Number(assemblyCtgId), left: null, right: null };
+  if (hidden.has(Number(assemblyCtgId))) return result;
+  for (const side of ["left", "right"]) {
+    const low = (side === "left") !== (orient === "-");
+    const candidates = sameGroup.filter((c) => !hidden.has(Number(c.assemblyCtgId))
+      && resolveTrackCtgOrient(c) === orient
+      && (low ? Number(c.sourceFragment.sourceEnd) + 1 === Number(fragment.sourceStart)
+        : Number(fragment.sourceEnd) + 1 === Number(c.sourceFragment.sourceStart)));
+    if (candidates.length !== 1) continue;
+    const neighbor = candidates[0];
+    result[side] = { assemblyCtgId: Number(assemblyCtgId), neighborCtgId: Number(neighbor.assemblyCtgId), side,
+      sourceStart: Number(fragment.sourceStart), sourceEnd: Number(fragment.sourceEnd), orient,
+      neighborSourceStart: Number(neighbor.sourceFragment.sourceStart), neighborSourceEnd: Number(neighbor.sourceFragment.sourceEnd) };
+  }
+  return result;
 }

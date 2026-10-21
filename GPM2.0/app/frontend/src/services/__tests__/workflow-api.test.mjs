@@ -1054,3 +1054,16 @@ test("cross-chr evidence and adds use native transport with source identity and 
     await assert.rejects(runMainViewEditorAction({workspaceRoot:"D:/workspace",projectId:1,chrName:"A",action:"add-contig-to-chr",args:mutation}),/native failed/);
   } finally {globalThis.window=previousWindow;}
 });
+
+test("undo contig split uses persistent native history and propagates conflicts without mock fallback", async () => {
+  const previousWindow = globalThis.window, calls = [];
+  try {
+    globalThis.window={__TAURI__:{core:{invoke:async(command,args)=>{calls.push({command,args});return {changed:true};}}}};
+    const args={assemblyCtgId:3,neighborCtgId:2,side:"left",sourceStart:301,sourceEnd:700,neighborSourceStart:1,neighborSourceEnd:300,orient:"+"};
+    await runMainViewEditorAction({workspaceRoot:"D:/workspace",projectId:1,chrName:"ChrA",action:"undo-contig-split",args});
+    assert.equal(calls.length,1); assert.equal(calls[0].command,"run_main_view_editor_action");
+    assert.equal(calls[0].args.request.action,"undo-contig-split"); assert.deepEqual(calls[0].args.request.args,args);
+    globalThis.window.__TAURI__.core.invoke=async()=>{throw new Error("CTG_UNSPLIT_STALE_SOURCE");};
+    await assert.rejects(runMainViewEditorAction({workspaceRoot:"D:/workspace",projectId:1,chrName:"ChrA",action:"undo-contig-split",args}),/CTG_UNSPLIT_STALE_SOURCE/);
+  } finally {globalThis.window=previousWindow;}
+});

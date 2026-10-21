@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveContigSplitBoundaries, highlightContigSplitBoundary, bandBoundaryAnchors } from "../contig-split-boundary.js";
+import { resolveContigUnsplitModel, resolveContigSplitBoundaries, highlightContigSplitBoundary, bandBoundaryAnchors } from "../contig-split-boundary.js";
 import { buildCollinearityBandPoints } from "../track-render-geometry.js";
 import { createState, renderAssemblyPage } from "./tabs-semantics-harness.mjs";
 const hit=(a,b,identityPct=99,blockLength=b-a+1)=>({queryStart:a,queryEnd:b,identityPct,blockLength});
@@ -47,4 +47,38 @@ test("main rendering keeps .1 then .2 on one ds row with visible spacing and mat
   const boxes=ctgs.map(c=>{const m=html.match(new RegExp(`<g class="track-ctg-group[^>]*data-track-contig-id="${c.assemblyCtgId}"[^>]*data-track-role="primary"[^>]*data-track-rect-x="([^"]+)"[^>]*data-track-rect-y="([^"]+)"[^>]*data-track-rect-width="([^"]+)"`));assert.ok(m);return {x:+m[1],y:+m[2],width:+m[3]};});
   assert.equal(boxes[0].y,boxes[1].y);assert.ok(boxes[1].x-boxes[0].x-boxes[0].width>=19.98);
   assert.match(html,/tig.1/);assert.match(html,/tig.2/);assert.match(html,/data-band-left-anchor=/);assert.doesNotMatch(html,/ctg-split-dialog/);
+});
+
+function splitAssembly(orient = "+") {
+  return { chrCtgs: [[2, 1, 300], [3, 301, 700], [4, 701, 1000]].map(([assemblyCtgId, sourceStart, sourceEnd]) => ({
+    assemblyCtgId, orient, sourceFragment: { sourceSeqId: 1, groupKey: "manual-fragment:1", sourceStart, sourceEnd, sourceLength: 1000 },
+  })) };
+}
+test("unsplit sides follow display orientation and retain immutable source preconditions", () => {
+  for (const orient of ["+", "-"]) {
+    const a = splitAssembly(orient), m = resolveContigUnsplitModel(a, 3);
+    assert.equal(m.left.neighborCtgId, orient === "+" ? 2 : 4);
+    assert.equal(m.right.neighborCtgId, orient === "+" ? 4 : 2);
+    assert.equal(m.left.sourceStart, 301); assert.equal(m.left.sourceEnd, 700);
+    assert.equal(m.left.orient, orient);
+    assert.equal(resolveContigUnsplitModel(a, 2)[orient === "+" ? "left" : "right"], null);
+  }
+});
+test("unsplit excludes full contigs, inspection-only copies, other sources/groups, gaps, hidden and flipped neighbors", () => {
+  assert.equal(resolveContigUnsplitModel({ chrCtgs: [{ assemblyCtgId: 1, totalLength: 1000 }] }, 1), null);
+  const full = splitAssembly(); full.chrCtgs = [full.chrCtgs[0]]; full.chrCtgs[0].sourceFragment.sourceEnd = 1000;
+  assert.equal(resolveContigUnsplitModel(full, 2), null);
+  const copy = splitAssembly(); copy.chrCtgs = [copy.chrCtgs[0]]; copy.chrCtgs[0].sourceFragment.groupKey = "manual-fragment:chr-add:1:2";
+  assert.equal(resolveContigUnsplitModel(copy, 2), null);
+  for (const mutate of [
+    (a) => { a.chrCtgs[0].sourceFragment.sourceSeqId = 2; },
+    (a) => { a.chrCtgs[0].sourceFragment.groupKey = "manual-fragment:2"; },
+    (a) => { a.chrCtgs[0].sourceFragment.sourceEnd = 299; },
+    (a) => { a.hiddenPrimaryCtgIds = [2]; },
+    (a) => { a.chrCtgs[0].orient = "-"; },
+  ]) {
+    const a = splitAssembly(); mutate(a); assert.equal(resolveContigUnsplitModel(a, 3).left, null);
+  }
+  const ambiguous = splitAssembly(); ambiguous.chrCtgs.push({ ...ambiguous.chrCtgs[0], assemblyCtgId: 9 });
+  assert.equal(resolveContigUnsplitModel(ambiguous, 3).left, null);
 });

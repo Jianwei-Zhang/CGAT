@@ -344,7 +344,7 @@ export async function runMainViewEditorAction({
   if (isTauriRuntime()) {
     return runMainViewEditorActionTauri(payload);
   }
-  if (["split-source-ctg", "split-ref-boundary", "split-manual-contig", "add-contig-to-chr"].includes(payload.action)) {
+  if (["split-source-ctg", "split-ref-boundary", "split-manual-contig", "undo-contig-split", "add-contig-to-chr"].includes(payload.action)) {
     return callDevBridge("/api/main-view-editor-action", payload);
   }
   return callMainViewBridgeOrMock(

@@ -30,6 +30,7 @@ pub(super) fn prepare_editor_mutation(
         "split-ref-boundary" => {
             super::ref_split::prepare_ref_split(conn, project_id, chr_name, args)
         }
+        "undo-contig-split" => super::unsplit::prepare_unsplit(conn, project_id, chr_name, args),
         "split-source-ctg" => super::split::prepare_split(conn, project_id, chr_name, args),
         "rename-ctg" => prepare_rename_ctg(conn, project_id, chr_name, args),
         "flip-ctg" => prepare_flip_ctg(conn, project_id, chr_name, args),

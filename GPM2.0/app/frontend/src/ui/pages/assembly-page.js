@@ -1,7 +1,7 @@
 import { openContigChrAlignments, chrAlignmentCopy } from "./assembly/contig-chr-alignments.js";
 import { openManualContigSplit } from "./assembly/manual-contig-split.js";
 import { normalizeMainViewHistoryStatus } from "./assembly/main-view-history-state.js";
-import { splitCopy, resolveContigSplitBoundaries, resolveContigSplitModel } from "./assembly/contig-split-boundary.js";
+import { splitCopy, resolveContigUnsplitModel, resolveContigSplitBoundaries, resolveContigSplitModel } from "./assembly/contig-split-boundary.js";
 import { setTrackDragGroupOffsets, setSubviewDragGroupOffsets, moveSubviewCompositionDrag } from "./assembly/source-fragment-drag.js";
 import { requestAppPrompt } from "../shell/app-dialog.js";
 import {
@@ -1122,6 +1122,7 @@ const degapRuntimeDeps = {
 
 const contextMenuRuntimeDeps = {
   splitContigAtRefBoundary: splitAssemblyContigAtRefBoundary,
+  undoContigSplit: undoAssemblyContigSplit,
   openManualContigSplit: openAssemblyManualContigSplit,
   openContigChrAlignments: openAssemblyContigChrAlignments,
   addContextCtgToComposition,
@@ -3018,6 +3019,17 @@ async function splitAssemblyContigAtRefBoundary(host, store, options) {
     setAssemblyActionFeedback(host, store, { actionError: labels.stale }); return false;
   }
   return commitAssemblyContigSplit(host, store, "split-ref-boundary", options);
+}
+
+async function undoAssemblyContigSplit(host, store, options) {
+  const state = store.getState();
+  if (state.assembly?.mainViewHistory?.inFlight || state.assembly?.loading) return false;
+  const labels = splitCopy[state.locale === "en" ? "en" : "zh"];
+  const current = resolveContigUnsplitModel(state.assembly, options.assemblyCtgId)?.[options.side];
+  if (!current || Object.keys(current).some((key) => current[key] !== options[key])) {
+    setAssemblyActionFeedback(host, store, { actionError: labels.stale }); return false;
+  }
+  return commitAssemblyContigSplit(host, store, "undo-contig-split", options, labels.undoDone);
 }
 
 async function openAssemblyManualContigSplit(host, store, { assemblyCtgId }) {

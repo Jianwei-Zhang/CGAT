@@ -1,5 +1,5 @@
 import { chrAlignmentCopy } from "./contig-chr-alignments.js";
-import { splitCopy, resolveContigSplitBoundaries, highlightContigSplitBoundary, resolveContigSplitModel } from "./contig-split-boundary.js";
+import { splitCopy, resolveContigUnsplitModel, resolveContigSplitBoundaries, highlightContigSplitBoundary, resolveContigSplitModel } from "./contig-split-boundary.js";
 import {
   buildSupportMirrorKey,
   filterPrimaryTrackSelectionCtgIds,
@@ -1299,6 +1299,14 @@ export function buildAssemblyContextMenuItems({
               run: () => contextMenuActions.openManualContigSplit(host, store, { assemblyCtgId: ctgId }) });
           }
           items.push({ label: labels.title, children: splitChildren });
+          const unsplit = resolveContigUnsplitModel(state.assembly, ctgId);
+          if (unsplit && typeof contextMenuActions.undoContigSplit === "function") {
+            items.push({ label: labels.undoTitle, children: ["left", "right"].map((side) => ({
+              label: side === "left" ? labels.undoLeft : labels.undoRight,
+              disabled: !unsplit[side], title: unsplit[side] ? "" : labels.undoUnavailable,
+              run: () => unsplit[side] && contextMenuActions.undoContigSplit(host, store, unsplit[side]),
+            })) });
+          }
         }
         items.push({
           label: isHiddenPrimaryTrackCtg ? i18n.contextMenu.unhideContig : i18n.contextMenu.hideContig,

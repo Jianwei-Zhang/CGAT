@@ -2768,3 +2768,27 @@ test("other-chr alignment menu is independent from split and targets just the cl
   const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:"primary"},memberNode:null,host:{},store,actions:{canEditTrackCtg:()=>true,openContigChrAlignments:async(_h,_s,args)=>calls.push(args)}});
   const item=items.find(i=>i.label==="查看其他 chr 比对…");assert.ok(item);assert.equal(item.disabled,false);assert.equal(item.children,undefined);await item.run();assert.deepEqual(calls,[{assemblyCtgId:2}]);
 });
+
+test("undo-split menu appears immediately below split only for split fragments and dispatches the selected side", async () => {
+  for (const locale of ["zh", "en"]) for (const orient of ["+", "-"]) {
+    const calls = [];
+    const ctgs = [[2, 1, 300], [3, 301, 700], [4, 701, 1000]].map(([assemblyCtgId, sourceStart, sourceEnd]) => ({
+      assemblyCtgId, orient, totalLength: sourceEnd-sourceStart+1,
+      sourceFragment: { sourceSeqId: 1, groupKey: "manual-fragment:1", sourceStart, sourceEnd, sourceLength: 1000 },
+    }));
+    const store = createStore({...createState({assembly: {selectedChrName: "Chr01", trackSelectedCtgIds: [], chrCtgs: ctgs}}), locale});
+    const menu = (id, role="primary") => __testBuildAssemblyContextMenuItems({ctgContext: {assemblyCtgId:id, trackRole:role}, memberNode:null, host:{}, store,
+      actions:{canEditTrackCtg:()=>true, undoContigSplit:async(_h,_s,args)=>calls.push(args)}});
+    const items = menu(3), splitIndex = items.findIndex((i)=>i.label===(locale==="zh"?"分割 contig":"Split contig"));
+    const undo = items[splitIndex+1]; assert.equal(undo.label, locale==="zh"?"撤销分割 contig":"Undo contig split");
+    assert.deepEqual(undo.children.map((i)=>i.label), locale==="zh"?["撤销左侧分割","撤销右侧分割"]:["Undo left split","Undo right split"]);
+    assert.ok(undo.children.every((i)=>!i.disabled));
+    await undo.children[0].run(); await undo.children[1].run();
+    assert.deepEqual(calls.map((c)=>c.neighborCtgId), orient==="+"?[2,4]:[4,2]);
+    const endMenu=menu(2).find((i)=>i.label===undo.label);
+    assert.equal(endMenu.children[orient==="+"?0:1].disabled,true);
+    assert.ok(!menu(3,"support").some((i)=>i.label===undo.label));
+    store.setState({assembly:{...store.getState().assembly,chrCtgs:[{assemblyCtgId:3,totalLength:1000}]}});
+    assert.ok(!menu(3).some((i)=>i.label===undo.label));
+  }
+});
