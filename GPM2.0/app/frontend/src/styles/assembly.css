@@ -1683,7 +1683,7 @@
 }
 
 .track-ctg-group.is-active .track-ctg-label {
-  fill: #1f3248;
+  fill: var(--ctg-primary-text);
   font-weight: 700;
 }
 
@@ -1715,28 +1715,28 @@
 }
 
 .track-ctg-group.is-active .track-ctg-label.is-ref {
-  fill: #4f4f4f;
+  fill: var(--ctg-ref-text);
 }
 
 .track-sticky-label.is-active {
-  color: var(--theme-ink, #1f3248);
+  color: var(--ctg-primary-text);
   font-weight: 700;
 }
 
 .track-ctg-group.is-companion.is-active .track-ctg-label {
-  fill: #4d3c21;
+  fill: var(--ctg-companion-text);
 }
 
 .track-sticky-label.is-companion.is-active {
-  color: var(--theme-amber-ink, #4d3c21);
+  color: var(--ctg-companion-text);
 }
 
 .track-sticky-label.is-ref.is-active {
-  color: var(--theme-ink, #3d3d3d);
+  color: var(--ctg-ref-text);
 }
 
 .track-slot-badge {
-  fill: #111;
+  fill: var(--theme-ink, #111);
   font-size: var(--font-graph-label);
   font-weight: 700;
   text-anchor: end;
@@ -2154,11 +2154,17 @@
 /* Compact manual split: one coordinate, live preview, no assignment controls. */
 .manual-contig-split-dialog { width: min(720px, 92vw); max-width: 92vw; max-height: 88vh; overflow: auto; }
 .manual-split-svg { display: block; width: 100%; background: var(--surface-panel, #fff); font-size: 12px; }
-.manual-split-ref { fill: #d4d4d4; stroke: var(--theme-strong-line, #888); }
+.manual-split-svg text { fill: currentColor; }
+.manual-split-ref { fill: var(--ctg-ref-fill); stroke: var(--ctg-ref-stroke); }
 .manual-split-band { fill: #6c8fb7; opacity: .45; }
-.manual-split-contig { fill: #b8cee5; stroke: var(--theme-strong-line, #617f9f); }
-.manual-split-left { fill: #b8cee5; pointer-events: none; }
-.manual-split-right { fill: #e2c9a5; pointer-events: none; }
+.manual-split-contig { fill: var(--ctg-primary-fill); stroke: var(--ctg-primary-stroke); }
+/* Cross-chromosome inspection reuses this preview for auxiliary sources too. */
+.manual-split-svg[data-contig-role="companion"] .manual-split-contig {
+  fill: var(--ctg-companion-fill);
+  stroke: var(--ctg-companion-stroke);
+}
+.manual-split-left { fill: var(--ctg-primary-fill); pointer-events: none; }
+.manual-split-right { fill: var(--ctg-primary-fill); pointer-events: none; }
 .manual-split-cut-line { stroke: var(--theme-purple-line, #7a1fff); stroke-width: 3; stroke-dasharray: 4 2; vector-effect: non-scaling-stroke; pointer-events: none; }
 .manual-split-edge { cursor: pointer; }
 .manual-split-edge-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; vector-effect: non-scaling-stroke; }

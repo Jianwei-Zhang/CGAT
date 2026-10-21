@@ -37,3 +37,37 @@ test("first paint follows OS or saved preference even with missing, null, or cor
     assert.equal(document.documentElement.dataset.theme, systemDark ? "dark" : "light");
   }
 });
+
+
+test("selected SVG and sticky labels keep readable role ink on the same pale contig bars", () => {
+  const css = readFileSync(new URL("../assembly.css", import.meta.url), "utf8");
+  const rules = [
+    [".track-ctg-group.is-active .track-ctg-label", "fill", "primary"],
+    [".track-sticky-label.is-active", "color", "primary"],
+    [".track-ctg-group.is-companion.is-active .track-ctg-label", "fill", "companion"],
+    [".track-sticky-label.is-companion.is-active", "color", "companion"],
+    [".track-ctg-group.is-active .track-ctg-label.is-ref", "fill", "ref"],
+    [".track-sticky-label.is-ref.is-active", "color", "ref"],
+  ];
+  for (const [selector, property, role] of rules) {
+    const start = css.indexOf(`${selector} {`);
+    assert.notEqual(start, -1, selector);
+    const rule = css.slice(start, css.indexOf("}", start));
+    assert.ok(rule.includes(`${property}: var(--ctg-${role}-text);`), selector);
+    assert.doesNotMatch(rule, /--theme-/);
+  }
+  assert.match(css, /\.track-slot-badge\s*\{[^}]*fill:\s*var\(--theme-ink,\s*#111\)/);
+});
+
+test("manual split uses shared Ref and primary colors without implying an auxiliary right fragment", () => {
+  const css = readFileSync(new URL("../assembly.css", import.meta.url), "utf8");
+  assert.match(css, /\.manual-split-svg text\s*\{[^}]*fill:\s*currentColor/);
+  assert.match(css, /\.manual-split-ref\s*\{[^}]*fill:\s*var\(--ctg-ref-fill\);[^}]*stroke:\s*var\(--ctg-ref-stroke\)/);
+  assert.match(css, /data-contig-role="companion"\] \.manual-split-contig\s*\{[^}]*fill:\s*var\(--ctg-companion-fill\)/);
+  for (const selector of ["contig", "left", "right"]) {
+    const start = css.indexOf(`.manual-split-${selector} {`);
+    assert.notEqual(start, -1);
+    const rule = css.slice(start, css.indexOf("}", start));
+    assert.ok(rule.includes("fill: var(--ctg-primary-fill);"));
+  }
+});

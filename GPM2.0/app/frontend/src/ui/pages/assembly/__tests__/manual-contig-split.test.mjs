@@ -86,3 +86,9 @@ test("confirmation serializes one write and cannot be duplicated while it is in 
   h.dialog().fire("cancel");assert.equal(h.dialog().removed,undefined);assert.equal(writes,1);
   resolveCommit(true);await committing;assert.equal(await done,true);
 });
+
+
+test("manual split preview is scoped to the primary lane, not an auxiliary contig", () => {
+  const assembly = {selectedChrName:"Chr1", chrCtgs:[], supportChrCtgs:[{assemblyCtgId:99, totalLength:1000}]};
+  assert.equal(resolveContigSplitModel(assembly, 99), null);
+});

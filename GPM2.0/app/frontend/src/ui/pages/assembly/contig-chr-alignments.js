@@ -14,6 +14,7 @@ export function resolveContigChrAlignmentModel(assembly, context) {
   if (!Number.isSafeInteger(sourceStart) || !Number.isSafeInteger(sourceEnd) || sourceStart < 1 || sourceEnd < sourceStart) return null;
   const prefs = resolveTrackPrefs(assembly.trackView);
   return { assemblyCtgId: Number(target.assemblyCtgId), sourceStart, sourceEnd,
+    colorRole: support ? "companion" : "primary",
     sourceSeqId: Number(ctg.originSourceSeqId ?? ctg.sourceFragment?.sourceSeqId) || null,
     orient: resolveTrackCtgOrient(ctg), chrName: String(assembly.selectedChrName || ""),
     sourceChrName: ctg.assignedChrName === null ? "unplaced" : String(ctg.assignedChrName || assembly.selectedChrName || "unplaced"),
@@ -37,7 +38,7 @@ export function chrAlignmentAction(item) {
   return ["existing","contained"].includes(item.presence) ? "locate" : "add";
 }
 
-export function renderChrAlignmentPreview(source, item) {
+export function renderChrAlignmentPreview(source, item, sourceRole = "primary") {
   const X=64,W=632,Y=116;
   const q=(cut)=>X+W*(item.orient==="-" ? (source.sourceEnd-cut)/(source.sourceEnd-source.sourceStart+1) : (cut-source.sourceStart+1)/(source.sourceEnd-source.sourceStart+1));
   const r=(cut)=>X+W*cut/Math.max(1,item.refLength);
@@ -45,7 +46,7 @@ export function renderChrAlignmentPreview(source, item) {
     const a=q(h.queryStart-1),b=q(h.queryEnd),left=h.strand==="-"?b:a,right=h.strand==="-"?a:b;
     return `<polygon class="manual-split-band" points="${r(h.refStart-1)},56 ${r(h.refEnd)},56 ${right},${Y} ${left},${Y}"/>`;
   }).join("");
-  return `<svg class="manual-split-svg" viewBox="0 0 720 166" role="img" aria-label="${html(source.name)} / ${html(item.chrName)}">
+  return `<svg class="manual-split-svg" data-contig-role="${sourceRole === "companion" ? "companion" : "primary"}" viewBox="0 0 720 166" role="img" aria-label="${html(source.name)} / ${html(item.chrName)}">
     <text x="64" y="30">${html(item.chrName)}</text><text x="696" y="30" text-anchor="end">${bp(item.refLength)} bp</text>
     <rect x="64" y="44" width="632" height="12" class="manual-split-ref"/>${bands}
     <text x="64" y="105">${html(source.name)} (${item.orient === "-" ? "−" : "+"})</text>
@@ -55,7 +56,7 @@ export function renderChrAlignmentPreview(source, item) {
 }
 
 // Read-only loading/row selection; the only write is an explicitly clicked Add/Show.
-export function openContigChrAlignments(host,{locale="zh",load,add,locate,isCurrent=()=>true}={}) {
+export function openContigChrAlignments(host,{locale="zh",sourceRole="primary",load,add,locate,isCurrent=()=>true}={}) {
   const doc=host?.ownerDocument||globalThis.document;
   if(!doc?.body||doc.querySelector(".contig-chr-dialog")) return Promise.resolve(false);
   const labels=chrAlignmentCopy[locale==="en"?"en":"zh"],previousFocus=doc.activeElement;
@@ -70,7 +71,7 @@ export function openContigChrAlignments(host,{locale="zh",load,add,locate,isCurr
   let closed=false,busy=false,data=null,selected=0,overlapChr=null,resolveDone;
   const done=new Promise(resolve=>{resolveDone=resolve;});
   const finish=()=>{if(closed)return;closed=true;if(dialog.open)dialog.close();dialog.remove();if(previousFocus?.isConnected)previousFocus.focus();resolveDone(true);};
-  const renderPreview=()=>{el("[data-chr-preview]").innerHTML=data?.items[selected]?renderChrAlignmentPreview(data.source,data.items[selected]):"";
+  const renderPreview=()=>{el("[data-chr-preview]").innerHTML=data?.items[selected]?renderChrAlignmentPreview(data.source,data.items[selected],sourceRole):"";
     dialog.querySelectorAll("tr[data-chr-index]").forEach(row=>row.setAttribute("aria-selected",String(Number(row.getAttribute("data-chr-index"))===selected)));};
   const renderTable=()=>{
     const items=data?.items||[];

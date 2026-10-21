@@ -3062,7 +3062,7 @@ async function openAssemblyContigChrAlignments(host,store,context) {
       && live?.sourceEnd===model.sourceEnd && live?.orient===model.orient && liveId===sourceId
       && live?.sourceChrName===model.sourceChrName;
   };
-  return openContigChrAlignments(host,{locale:state.locale,isCurrent,
+  return openContigChrAlignments(host,{locale:state.locale,sourceRole:model.colorRole,isCurrent,
     load:async()=>{
       const result=await getContigChrAlignments(payload),source=result.source;
       if(!isCurrent() || (source.assignedChrName || "unplaced")!==model.sourceChrName || source.sourceStart!==model.sourceStart
