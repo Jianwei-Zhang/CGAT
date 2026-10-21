@@ -1798,7 +1798,7 @@ test("project export final path preview css is clickable and hides graph label s
   );
   assert.match(
     componentsCss,
-    /\.project-export-final-path-preview-track\s*\{[\s\S]*height:\s*52px;/,
+    /\.project-export-final-path-preview-track\s*\{[^}]*min-height:\s*64px;/,
   );
   assert.match(
     componentsCss,
@@ -1828,6 +1828,31 @@ test("project export final path preview css is clickable and hides graph label s
     componentsCss,
     /\.project-export-final-path-preview-gap-label\s*\{[\s\S]*z-index:\s*4;/,
   );
+});
+
+test("project export preview fills the card height without a nested frame", () => {
+  const rowRule = componentsCss.match(/\.project-export-final-path-row\s*\{([^}]*)\}/)?.[1] || "";
+  const graphRule = componentsCss.match(/\.project-export-final-path-row-graph\s*\{([^}]*)\}/)?.[1] || "";
+  const trackRule = componentsCss.match(/\.project-export-final-path-preview-track\s*\{([^}]*)\}/)?.[1] || "";
+
+  assert.match(rowRule, /padding:\s*0 10px;/);
+  assert.match(rowRule, /border:\s*1px solid var\(--border-subtle, #dbe3ec\);/);
+  assert.match(graphRule, /align-self:\s*stretch;/);
+  assert.match(graphRule, /align-items:\s*center;/);
+  assert.match(trackRule, /align-self:\s*stretch;/);
+  assert.match(trackRule, /min-height:\s*64px;/);
+  assert.match(trackRule, /height:\s*auto;/);
+  assert.match(trackRule, /border:\s*0;/);
+  assert.match(trackRule, /border-radius:\s*0;/);
+  assert.match(trackRule, /background:\s*#fff;/);
+
+  for (const selector of ["ctg", "gap"]) {
+    const rule = componentsCss.match(new RegExp(`\\.project-export-final-path-preview-${selector}\\s*\\{([^}]*)\\}`))?.[1] || "";
+    assert.match(rule, /top:\s*calc\(50% - 6px\);/);
+    assert.match(rule, /height:\s*16px;/);
+  }
+  const gapLabelRule = componentsCss.match(/\.project-export-final-path-preview-gap-label\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(gapLabelRule, /top:\s*calc\(50% - 18px\);/);
 });
 
 test("project export final path preview hides labels that cannot fit fully", () => {

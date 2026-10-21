@@ -466,7 +466,7 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
-  padding: 6px 10px;
+  padding: 0 10px;
   border: 1px solid var(--border-subtle, #dbe3ec);
   border-radius: var(--card-radius);
   background: var(--surface-subtle, #f8fafc);
@@ -489,6 +489,7 @@
 
 .project-export-final-path-row-graph {
   display: flex;
+  align-self: stretch;
   align-items: center;
   gap: 10px;
   min-width: 0;
@@ -516,18 +517,20 @@
 .project-export-final-path-preview-track {
   position: relative;
   flex: 1 1 auto;
+  align-self: stretch;
   min-width: 0;
-  height: 52px;
+  min-height: 64px;
+  height: auto;
   overflow: hidden;
-  border: 1px solid var(--border-subtle, #dbe3ec);
-  border-radius: 4px;
+  border: 0;
+  border-radius: 0;
   background: #fff;
 }
 
 .project-export-final-path-preview-ctg {
   position: absolute;
   z-index: 1;
-  top: 20px;
+  top: calc(50% - 6px);
   height: 16px;
   overflow: hidden;
   border: 1px solid var(--ctg-primary-stroke);
@@ -570,7 +573,7 @@
 .project-export-final-path-preview-gap {
   position: absolute;
   z-index: 3;
-  top: 20px;
+  top: calc(50% - 6px);
   width: 8px;
   height: 16px;
   border: 1px solid #555;
@@ -581,7 +584,7 @@
 .project-export-final-path-preview-gap-label {
   position: absolute;
   z-index: 4;
-  top: 8px;
+  top: calc(50% - 18px);
   transform: translateX(-50%);
   color: #111;
   font-size: var(--font-caption);
