@@ -457,21 +457,35 @@ test("explicit empty primary content disables navigation without fabricating a w
   } finally { h.dispose(); }
 });
 
-test("window text follows actual metrics, is automatic in units and cannot commit input", () => {
-  const h = harness();
-  try {
-    assert.equal(h.views.primary.display.textContent, "0.5 kb");
-    h.views.primary.scroll.dataset.trackDomainSpanBp = "5000000";
-    h.bind(); assert.equal(h.views.primary.display.textContent, "2.5 Mb");
-    assert.equal(h.views.subview.display.textContent, "0.5 kb");
-    h.root.emit("change", h.event(h.views.primary.display));
-    h.root.emit("keydown", h.event(h.views.primary.display, { key: "Enter" }));
-    assert.equal(h.writes, 0);
-    h.views.primary.scroll.dataset.trackDomainSpanBp = "0";
-    h.bind(); assert.equal(h.views.primary.display.textContent, "—");
-    assert.ok(h.views.primary.action("left").disabled);
-  } finally { h.dispose(); }
-});
+for (const role of ["primary", "subview"]) {
+  test(`${role} window text and tooltip follow short, long and unavailable spans without committing input`, () => {
+    const h = harness();
+    try {
+      const view = h.views[role];
+      const domainKey = role === "primary" ? "trackDomainSpanBp" : "subviewDomainSpanBp";
+      const otherRole = role === "primary" ? "subview" : "primary";
+      for (const [domain, expected] of [
+        ["1000", "0.5 kb"],
+        ["5000000", "2.5 Mb"],
+        ["246913578024", "123456.789012 Mb"],
+      ]) {
+        view.scroll.dataset[domainKey] = domain;
+        h.bind();
+        assert.equal(view.display.textContent, expected);
+        assert.equal(view.display.title, expected);
+      }
+      assert.equal(h.views[otherRole].display.textContent, "0.5 kb");
+      h.root.emit("change", h.event(view.display));
+      h.root.emit("keydown", h.event(view.display, { key: "Enter" }));
+      assert.equal(h.writes, 0);
+      view.scroll.dataset[domainKey] = "0";
+      h.bind();
+      assert.equal(view.display.textContent, "—");
+      assert.equal(view.display.title, "—");
+      assert.ok(view.action("left").disabled);
+    } finally { h.dispose(); }
+  });
+}
 
 for (const role of ["primary", "subview"]) {
   test(`${role} compact overview keeps scale accurate and restores handles when wider`, () => {

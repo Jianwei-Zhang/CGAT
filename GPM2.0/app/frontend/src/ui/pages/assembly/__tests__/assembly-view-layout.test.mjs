@@ -24,16 +24,25 @@ for (const role of ["primary", "subview"]) {
   }
 }
 
-test("window summary stays compact and reserves spacing before the whole group", () => {
+test("shared window summary reserves a fixed slot without resizing the fit button or navigation axis", () => {
   const group = ruleBody(assemblyCss, ".view-nav-span");
   assert.match(group, /display:\s*inline-flex/);
-  assert.match(group, /flex:\s*0 0 auto/);
+  assert.match(group, /flex:\s*0 0 24ch/);
+  assert.match(group, /min-width:\s*0/);
+  assert.match(group, /max-width:\s*calc\(100% - 12px\)/);
   assert.match(group, /white-space:\s*nowrap/);
   assert.match(group, /gap:\s*4px/);
   assert.match(group, /margin-inline-start:\s*12px/);
   const value = ruleBody(assemblyCss, ".view-nav-span [data-view-nav-span]");
-  assert.doesNotMatch(value, /(?:^|;)\s*(?:min-|max-)?width\s*:/);
+  assert.match(value, /flex:\s*1 1 0/);
+  assert.match(value, /min-width:\s*0/);
+  assert.match(value, /overflow:\s*hidden/);
+  assert.match(value, /text-overflow:\s*ellipsis/);
   assert.match(value, /text-align:\s*start/);
+  assert.match(value, /font-variant-numeric:\s*tabular-nums/);
+  assert.match(ruleBody(assemblyCss, ".assembly-view-navigation"), /flex-wrap:\s*wrap/);
+  assert.match(ruleBody(assemblyCss, ".view-nav-range"), /flex:\s*1 1 240px/);
+  assert.match(assemblyCss, /@media \(max-width: 520px\)\s*\{[^}]*\}\s*\.view-nav-range\s*\{[^}]*flex-basis:\s*100%/);
 });
 
 test("shared view card removes nested panel frames but keeps a local-view divider", () => {

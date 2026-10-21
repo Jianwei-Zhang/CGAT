@@ -2098,7 +2098,10 @@
 .view-nav-edge.is-right::after { right: 2px; }
 .view-nav-span {
   display: inline-flex;
-  flex: 0 0 auto;
+  /* Reserve the same space as the span text changes during navigation. */
+  flex: 0 0 24ch;
+  min-width: 0;
+  max-width: calc(100% - 12px);
   gap: 4px;
   align-items: center;
   white-space: nowrap;
@@ -2106,6 +2109,10 @@
 }
 .view-nav-span [data-view-nav-span] {
   display: inline-block;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-align: start;
   font-variant-numeric: tabular-nums;
 }

@@ -83,8 +83,10 @@ function createController(root, store, window) {
     const bar = current.bar, geometry = geometryFor(role);
     scroll.classList.toggle("is-view-panning", controller.gesture?.role === role && controller.gesture?.kind === "pan");
     const selection = bar.querySelector("[data-view-nav-window]");
+    const spanDisplay = bar.querySelector("[data-view-nav-span]");
     if (!geometry) {
-      bar.querySelector("[data-view-nav-span]").textContent = "—";
+      spanDisplay.textContent = "—";
+      spanDisplay.title = "—";
       bar.querySelector("[data-view-nav-grip]").hidden = true;
       bar.querySelectorAll("button,input,select").forEach((node) => { node.disabled = true; });
       selection.setAttribute("aria-disabled", "true");
@@ -116,7 +118,9 @@ function createController(root, store, window) {
     bar.querySelector("[data-view-nav-action='left']").disabled = range.start <= domain.start + epsilon;
     bar.querySelector("[data-view-nav-action='right']").disabled = range.start + range.span >= domain.end - epsilon;
     const formatted = formatViewSpan(range.span);
-    bar.querySelector("[data-view-nav-span]").textContent = `${formatted.value} ${formatted.unit}`;
+    const spanText = `${formatted.value} ${formatted.unit}`;
+    spanDisplay.textContent = spanText;
+    spanDisplay.title = spanText;
     const t = viewNavText(locale());
     bar.title = `${t.group}: ${Math.round(range.start).toLocaleString("en-US")}–${Math.round(range.start + range.span).toLocaleString("en-US")} bp`;
   }
