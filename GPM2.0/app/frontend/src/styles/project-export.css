@@ -461,6 +461,8 @@
 }
 
 .project-export-final-path-row {
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: minmax(72px, max-content) minmax(0, 1fr);
   align-items: center;
@@ -471,15 +473,31 @@
   border-radius: var(--card-radius);
   background: var(--surface-subtle, #f8fafc);
   cursor: pointer;
-  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+/* Paint the interaction ring above the full-height preview and its labels. */
+.project-export-final-path-row::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: 5;
+  border: 2px solid transparent;
+  border-radius: inherit;
+  pointer-events: none;
+  transition: border-color 120ms ease;
 }
 
 .project-export-final-path-row:hover,
 .project-export-final-path-row:focus-visible {
   border-color: #7c9bbc;
   background: #f4f8fc;
-  box-shadow: inset 0 0 0 1px #7c9bbc;
   outline: none;
+}
+
+.project-export-final-path-row:hover::after,
+.project-export-final-path-row:focus-visible::after {
+  border-color: #7c9bbc;
 }
 
 .project-export-final-path-row-label {

@@ -1790,7 +1790,7 @@ test("project export final path preview css is clickable and hides graph label s
   );
   assert.match(
     componentsCss,
-    /\.project-export-final-path-row:hover,\s*\.project-export-final-path-row:focus-visible\s*\{[\s\S]*box-shadow:\s*inset 0 0 0 1px #7c9bbc;/,
+    /\.project-export-final-path-row:hover::after,\s*\.project-export-final-path-row:focus-visible::after\s*\{[^}]*border-color:\s*#7c9bbc;/,
   );
   assert.match(
     componentsCss,
@@ -1853,6 +1853,31 @@ test("project export preview fills the card height without a nested frame", () =
   }
   const gapLabelRule = componentsCss.match(/\.project-export-final-path-preview-gap-label\s*\{([^}]*)\}/)?.[1] || "";
   assert.match(gapLabelRule, /top:\s*calc\(50% - 18px\);/);
+});
+
+test("project export hover and focus ring stays above the preview without intercepting input", () => {
+  const rowRule = componentsCss.match(/\.project-export-final-path-row\s*\{([^}]*)\}/)?.[1] || "";
+  const ringRule = componentsCss.match(/\.project-export-final-path-row::after\s*\{([^}]*)\}/)?.[1] || "";
+  const activeRowRule = componentsCss.match(/\.project-export-final-path-row:hover,\s*\.project-export-final-path-row:focus-visible\s*\{([^}]*)\}/)?.[1] || "";
+  const activeRingRule = componentsCss.match(/\.project-export-final-path-row:hover::after,\s*\.project-export-final-path-row:focus-visible::after\s*\{([^}]*)\}/)?.[1] || "";
+
+  assert.match(rowRule, /position:\s*relative;/);
+  assert.match(rowRule, /isolation:\s*isolate;/);
+  assert.match(ringRule, /content:\s*"";/);
+  assert.match(ringRule, /position:\s*absolute;/);
+  assert.match(ringRule, /inset:\s*-1px;/);
+  assert.match(ringRule, /border:\s*2px solid transparent;/);
+  assert.match(ringRule, /border-radius:\s*inherit;/);
+  assert.match(ringRule, /pointer-events:\s*none;/);
+  assert.doesNotMatch(activeRowRule, /box-shadow:/);
+  assert.match(activeRingRule, /border-color:\s*#7c9bbc;/);
+
+  const ringZIndex = Number(ringRule.match(/z-index:\s*(\d+);/)?.[1] || 0);
+  for (const selector of ["ctg", "gap", "gap-label"]) {
+    const rule = componentsCss.match(new RegExp(`\\.project-export-final-path-preview-${selector}\\s*\\{([^}]*)\\}`))?.[1] || "";
+    const contentZIndex = Number(rule.match(/z-index:\s*(\d+);/)?.[1] || 0);
+    assert.ok(ringZIndex > contentZIndex, `${selector} must stay below the interaction ring`);
+  }
 });
 
 test("project export final path preview hides labels that cannot fit fully", () => {
