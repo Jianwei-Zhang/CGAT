@@ -199,14 +199,34 @@ export function bindFinalPathCardDrag(host, store, deps) {
     if (state?.assembly?.activeTab !== "assembly") {
       return;
     }
-    const handleNode = event.target?.closest?.("[data-final-path-row-drag-id]");
-    if (!handleNode) {
+    const handleNode = event.target?.closest?.("[data-final-path-row-drag-id]") || null;
+    const isInteractiveField = !handleNode && Boolean(
+      event.target?.closest?.(
+        "input:not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not([data-final-path-row-drag-id])",
+      ),
+    );
+    if (isInteractiveField) {
       return;
     }
-    const sourceSegmentId = String(handleNode.dataset.finalPathRowDragId || "").trim();
-    const targetChrName = String(handleNode.dataset.finalPathTargetChrName || handleNode.closest?.("[data-final-path-target-chr-name]")?.dataset?.finalPathTargetChrName || "").trim();
-    const sourceRowNode = handleNode.closest?.("[data-final-path-row-id]") || null;
-    const sourceCardNode = sourceRowNode?.querySelector?.("[data-final-path-card-body]") || null;
+    const cardBodyNode = handleNode
+      ? null
+      : event.target?.closest?.("[data-final-path-card-body]") || null;
+    const triggerNode = handleNode || cardBodyNode;
+    if (!triggerNode) {
+      return;
+    }
+    const sourceSegmentId = String(
+      handleNode?.dataset?.finalPathRowDragId
+      || cardBodyNode?.dataset?.finalPathCardBody
+      || "",
+    ).trim();
+    const targetChrName = String(
+      triggerNode.dataset?.finalPathTargetChrName
+      || triggerNode.closest?.("[data-final-path-target-chr-name]")?.dataset?.finalPathTargetChrName
+      || "",
+    ).trim();
+    const sourceRowNode = triggerNode.closest?.("[data-final-path-row-id]") || null;
+    const sourceCardNode = cardBodyNode || sourceRowNode?.querySelector?.("[data-final-path-card-body]") || null;
     const listNode = sourceRowNode?.closest?.("[data-final-path-card-list]") || null;
     if (!sourceSegmentId || !sourceRowNode || !sourceCardNode || !listNode) {
       return;

@@ -223,10 +223,11 @@ test("final path card shares the main view subtle surface and keeps table and lo
 
   assert.match(assemblyCss, /\.assembly-main-view\.card\s*\{[^}]*background:\s*var\(--surface-subtle,\s*#f8fafc\);/);
   assert.match(finalPathCss, /\.final-path-card\.card\s*\{[^}]*background:\s*var\(--surface-subtle,\s*#f8fafc\);/);
-  assert.match(finalPathCss, /\.final-path-card-list-head\s*\{[^}]*padding:\s*0 0 4px;/);
-  assert.match(finalPathCss, /\.final-path-card-list-head-card\s*\{[^}]*padding:\s*0 9px;/);
-  assert.match(finalPathCss, /\.final-path-card-list\s*\{[^}]*gap:\s*4px;/);
-  assert.match(finalPathCss, /\.final-path-sort-card\s*\{[^}]*padding:\s*4px 8px;/);
+  assert.match(finalPathCss, /\.final-path-card-list-head\s*>\s*:first-child\s*\{[^}]*background:\s*#eef2f6;/);
+  assert.match(finalPathCss, /\.final-path-card-list-head-card\s*\{[^}]*padding:\s*4px 8px 4px 11px;[^}]*background:\s*#eef2f6;/);
+  assert.match(finalPathCss, /\.final-path-card-list\s*\{[^}]*gap:\s*5px;/);
+  assert.match(finalPathCss, /\.final-path-sort-card\s*\{[^}]*border-left:\s*4px solid var\(--ctg-primary-stroke,\s*#6d85a1\);[^}]*padding:\s*4px 8px;[^}]*cursor:\s*grab;/);
+  assert.match(finalPathCss, /\.final-path-card-cell input:disabled[\s\S]*?border-color:\s*transparent;[\s\S]*?pointer-events:\s*none;/);
   assert.match(finalPathCss, /\.final-path-log-summary\s*\{[^}]*background:\s*#ffffff;/);
   assert.match(finalPathCss, /\.final-path-log-table-wrap\s*\{[^}]*background:\s*#ffffff;/);
 });
