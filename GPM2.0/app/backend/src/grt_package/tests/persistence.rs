@@ -392,3 +392,78 @@ fn initializes_locked_recipe_with_requested_phased_assembly_capability() {
         .unwrap();
     assert_eq!(enabled, 1);
 }
+
+#[test]
+fn four_dataset_bundle_preserves_all_three_supports_through_import_and_catalog() {
+    let temp = tempdir().unwrap();
+    let bundle_root = temp.path().join("gpm_server");
+    copy_tree(&fixture_root(), &bundle_root);
+    // Inputs without chromosome hits must still retain their project roles.
+    for name in ["support2", "support3"] {
+        for extension in ["fa", "fa.fai"] {
+            fs::copy(
+                bundle_root.join(format!("data/datasets/support.{extension}")),
+                bundle_root.join(format!("data/datasets/{name}.{extension}")),
+            )
+            .unwrap();
+        }
+        for file in [
+            "datasets.tsv",
+            "source_seq_locator.tsv",
+            "grt_contig_roles.tsv",
+        ] {
+            let path = bundle_root.join("metadata").join(file);
+            let content = fs::read_to_string(&path).unwrap();
+            let extra = content
+                .lines()
+                .filter(|line| line.starts_with("support\t"))
+                .map(|line| line.replace("support", name))
+                .collect::<Vec<_>>()
+                .join("\n");
+            fs::write(path, format!("{content}{extra}\n")).unwrap();
+        }
+    }
+    let recipe_path = bundle_root.join("metadata/grt_recipe.tsv");
+    let recipe = fs::read_to_string(&recipe_path).unwrap().replace(
+        "\"[\"\"support\"\"]\"",
+        "\"[\"\"support\"\",\"\"support2\"\",\"\"support3\"\"]\"",
+    );
+    fs::write(recipe_path, recipe).unwrap();
+    let (outcome, _) = crate::importer::import_from_extracted_bundle(&bundle_root).unwrap();
+    assert_eq!(
+        load_grt_locked_recipe(&outcome.project_db_path)
+            .unwrap()
+            .support_datasets,
+        vec!["support", "support2", "support3"]
+    );
+    let initialized = initialize_grt_project(&outcome.project_db_path, "four-datasets").unwrap();
+    assert_eq!(initialized.support_dataset_ids.len(), 3);
+    assert_eq!(initialized.project_dataset_count, 4);
+    let conn = open_workspace_db(&outcome.project_db_path).unwrap();
+    let roles: Vec<(String, String)> = conn
+        .prepare("SELECT d.name, pd.dataset_role FROM project_dataset pd JOIN dataset d ON d.id=pd.dataset_id WHERE pd.project_id=?1 ORDER BY pd.display_order")
+        .unwrap().query_map([initialized.project_id], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap().collect::<rusqlite::Result<_>>().unwrap();
+    assert_eq!(
+        roles,
+        vec![
+            ("primary".into(), "primary".into()),
+            ("support".into(), "support".into()),
+            ("support2".into(), "support".into()),
+            ("support3".into(), "support".into())
+        ]
+    );
+    let catalog = crate::project_catalog::list_project_catalog(
+        &outcome.project_db_path,
+        initialized.project_id,
+    )
+    .unwrap();
+    assert_eq!(
+        catalog
+            .datasets
+            .iter()
+            .filter(|row| row.role == "support")
+            .count(),
+        3
+    );
+}
