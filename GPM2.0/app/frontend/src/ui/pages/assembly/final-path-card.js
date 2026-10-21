@@ -1238,9 +1238,10 @@ export function renderFinalPathGraph({
     <div class="assembly-final-path-layout assembly-track-layout">
       <div
         class="assembly-final-path-label-spacer assembly-track-label-column"
+        title="${escapeAttr(normalizedAllGraphLabel || "Final Path")}"
         style="width:${FINAL_PATH_LABEL_COLUMN_WIDTH_PX}px"
-        ${normalizedAllGraphLabel ? `data-final-path-all-graph-label="${escapeAttr(normalizedAllGraphLabel)}"` : "aria-hidden=\"true\""}
-      >${normalizedAllGraphLabel ? `<strong>${escapeHtml(normalizedAllGraphLabel)}</strong>` : ""}</div>
+        ${normalizedAllGraphLabel ? `data-final-path-all-graph-label="${escapeAttr(normalizedAllGraphLabel)}"` : ""}
+      ><strong>${escapeHtml(normalizedAllGraphLabel || "Final Path")}</strong></div>
       <div class="assembly-track-scroll assembly-final-path-svg-wrap" data-final-path-graph-viewport>
         <svg
           class="assembly-track-svg assembly-final-path-svg"

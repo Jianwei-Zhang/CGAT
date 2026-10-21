@@ -50,7 +50,7 @@ input,
 select {
   border: 1px solid var(--border-default, #cbd5e1);
   border-radius: var(--control-radius, 5px);
-  background: #fff;
+  background: var(--surface-panel, #fff);
   color: var(--text-primary, #1e293b);
   padding: 5px 8px;
   transition: border-color 120ms ease, box-shadow 120ms ease;
@@ -73,7 +73,7 @@ textarea:focus-visible {
 .button {
   border: 1px solid var(--border-default, #cbd5e1);
   border-radius: var(--control-radius, 5px);
-  background: #ffffff;
+  background: var(--surface-panel, #ffffff);
   color: var(--text-primary, #1e293b);
   padding: 5px 10px;
   font-weight: 500;
@@ -112,7 +112,7 @@ textarea:focus-visible {
 }
 
 .button.ghost {
-  background: #ffffff;
+  background: var(--surface-panel, #ffffff);
   border-color: var(--border-subtle, #dbe3ec);
   color: var(--text-secondary, #334155);
 }
@@ -142,10 +142,10 @@ textarea:focus-visible {
 .notice.warning {
   margin: 0;
   padding: 10px 12px;
-  border: 1px solid #f59e0b;
+  border: 1px solid var(--theme-amber-line, #f59e0b);
   border-radius: var(--card-radius);
-  background: #fffbeb;
-  color: #78350f;
+  background: var(--theme-amber-surface, #fffbeb);
+  color: var(--theme-amber-ink, #78350f);
 }
 
 .list,
@@ -212,14 +212,14 @@ textarea:focus-visible {
 }
 
 .icon-button.danger {
-  color: #b91c1c;
-  border-color: #e5b8b8;
+  color: var(--danger, #b91c1c);
+  border-color: var(--theme-red-line, #e5b8b8);
 }
 
 .icon-button.danger:hover:not(:disabled) {
-  background: #fef2f2;
-  border-color: #dc2626;
-  color: #991b1b;
+  background: var(--theme-red-surface, #fef2f2);
+  border-color: var(--theme-red-line, #dc2626);
+  color: var(--theme-red-ink, #991b1b);
 }
 
 .detail-header {

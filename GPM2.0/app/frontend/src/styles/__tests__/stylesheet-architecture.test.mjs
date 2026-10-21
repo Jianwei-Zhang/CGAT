@@ -134,7 +134,7 @@ test("importer toast keeps its status horizontal and wraps long workspace paths"
 });
 
 
-test("route content boundaries use the Project Export inset without nested Assembly or Project overrides", () => {
+test("routes share the content inset except for the full-bleed Project library", () => {
   const layoutCss = readFileSync(new URL("./layout.css", entryUrl), "utf8");
   const importerCss = readFileSync(new URL("./importer.css", entryUrl), "utf8");
   const assemblyCss = readFileSync(new URL("./assembly.css", entryUrl), "utf8");
@@ -143,7 +143,8 @@ test("route content boundaries use the Project Export inset without nested Assem
   assert.match(layoutCss, /#route-host > :is\(\.page, \.projects-page, \.project-preview-page\)\s*\{[^}]*margin:\s*0;[^}]*padding:\s*0;/);
   const projectRule = importerCss.match(/\.stage-panel:has\(\.projects-page\)\s*\{([^}]*)\}/)?.[1];
   assert.ok(projectRule);
-  assert.doesNotMatch(projectRule, /padding:/);
+  assert.match(projectRule, /padding:\s*0;/);
+  assert.match(projectRule, /overflow:\s*hidden;/);
   assert.match(assemblyCss, /\.assembly-tabs > \.tab-body\s*\{[^}]*padding:\s*0;/);
 });
 
@@ -206,13 +207,13 @@ test("root tokens define unified slate surfaces, borders, focus rings, and calib
   }
 });
 
-test("shell navigation uses a segmented control bar and expanded workspace selector without legacy gray gradients", () => {
+test("shell navigation uses a segmented control bar and bounded selected-name workspace selector without legacy gray gradients", () => {
   const shellCss = readFileSync(new URL("./shell.css", entryUrl), "utf8");
   const stylesheet = readStylesheetTree(entryUrl);
 
   assert.match(shellCss, /\.route-nav\s*\{[^}]*border-radius:\s*7px;[^}]*background:\s*var\(--surface-muted/);
-  assert.match(shellCss, /\.route-button\.is-active\s*\{[^}]*background:\s*#ffffff;/);
-  assert.match(shellCss, /\.nav-session-field select\s*\{[^}]*clamp\(132px,\s*18vw,\s*220px\)/);
+  assert.match(shellCss, /\.route-button\.is-active\s*\{[^}]*background:\s*var\(--surface-panel,\s*#ffffff\);/);
+  assert.match(shellCss, /\.nav-session-field select\s*\{[^}]*width:\s*var\(--workspace-select-width,\s*12ch\)/);
   assert.doesNotMatch(shellCss, /width:\s*96px;/);
   assert.doesNotMatch(stylesheet, /linear-gradient\(#(?:fafafa|f6f6f6|fbfbfb|ffffff|f0f0f0|ededed)/);
 });
@@ -223,11 +224,11 @@ test("final path card shares the main view subtle surface and keeps table and lo
 
   assert.match(assemblyCss, /\.assembly-main-view\.card\s*\{[^}]*background:\s*var\(--surface-subtle,\s*#f8fafc\);/);
   assert.match(finalPathCss, /\.final-path-card\.card\s*\{[^}]*background:\s*var\(--surface-subtle,\s*#f8fafc\);/);
-  assert.match(finalPathCss, /\.final-path-card-list-head\s*>\s*:first-child\s*\{[^}]*background:\s*#eef2f6;/);
-  assert.match(finalPathCss, /\.final-path-card-list-head-card\s*\{[^}]*padding:\s*4px 8px 4px 11px;[^}]*background:\s*#eef2f6;/);
+  assert.match(finalPathCss, /\.final-path-card-list-head\s*>\s*:first-child\s*\{[^}]*background:\s*var\(--surface-muted,\s*#eef2f6\);/);
+  assert.match(finalPathCss, /\.final-path-card-list-head-card\s*\{[^}]*padding:\s*4px 8px 4px 11px;[^}]*background:\s*var\(--surface-muted,\s*#eef2f6\);/);
   assert.match(finalPathCss, /\.final-path-card-list\s*\{[^}]*gap:\s*5px;/);
   assert.match(finalPathCss, /\.final-path-sort-card\s*\{[^}]*border-left:\s*4px solid var\(--ctg-primary-stroke,\s*#6d85a1\);[^}]*padding:\s*4px 8px;[^}]*cursor:\s*grab;/);
   assert.match(finalPathCss, /\.final-path-card-cell input:disabled[\s\S]*?border-color:\s*transparent;[\s\S]*?pointer-events:\s*none;/);
-  assert.match(finalPathCss, /\.final-path-log-summary\s*\{[^}]*background:\s*#ffffff;/);
-  assert.match(finalPathCss, /\.final-path-log-table-wrap\s*\{[^}]*background:\s*#ffffff;/);
+  assert.match(finalPathCss, /\.final-path-log-summary\s*\{[^}]*background:\s*var\(--surface-panel,\s*#ffffff\);/);
+  assert.match(finalPathCss, /\.final-path-log-table-wrap\s*\{[^}]*background:\s*var\(--surface-panel,\s*#ffffff\);/);
 });

@@ -58,8 +58,8 @@
   gap: 8px;
   min-width: 0;
   padding: 12px;
-  border: 1px solid #cdd6e0;
-  background: #ffffff;
+  border: 1px solid var(--theme-line, #cdd6e0);
+  background: var(--surface-panel, #ffffff);
   border-radius: var(--card-radius);
   box-shadow: 0 1px 3px rgb(35 53 74 / 5%);
 }
@@ -83,7 +83,7 @@
   justify-content: flex-end;
   gap: 10px;
   font-size: var(--font-small);
-  color: #555;
+  color: var(--theme-muted-ink, #555);
 }
 
 .project-export-legend span {
@@ -123,9 +123,9 @@
 
 .project-export-detail-section {
   min-width: 0;
-  border: 1px solid #cdd6e0;
+  border: 1px solid var(--theme-line, #cdd6e0);
   border-radius: var(--card-radius);
-  background: #fff;
+  background: var(--surface-panel, #fff);
   box-shadow: 0 1px 3px rgb(35 53 74 / 5%);
 }
 
@@ -150,7 +150,7 @@
 }
 
 .project-export-detail-count {
-  color: #69788b;
+  color: var(--theme-muted-ink, #69788b);
   font-size: var(--font-small);
   font-variant-numeric: tabular-nums;
 }
@@ -163,7 +163,7 @@
   border: 1px solid transparent;
   border-radius: 5px;
   background: transparent;
-  color: #52677f;
+  color: var(--theme-muted-ink, #52677f);
   font: inherit;
   font-size: var(--font-small);
   white-space: nowrap;
@@ -171,12 +171,12 @@
 }
 
 .project-export-detail-toggle:hover {
-  background: #edf3f9;
-  color: #284f7c;
+  background: var(--theme-blue-surface, #edf3f9);
+  color: var(--theme-blue-ink, #284f7c);
 }
 
 .project-export-detail-toggle:focus-visible {
-  outline: 2px solid #6f91b9;
+  outline: 2px solid var(--theme-line, #6f91b9);
   outline-offset: 2px;
 }
 
@@ -198,7 +198,7 @@
   max-height: min(52vh, 560px);
   overflow: auto;
   scrollbar-gutter: stable;
-  border-top: 1px solid #e0e6ed;
+  border-top: 1px solid var(--theme-line, #e0e6ed);
   border-radius: 0 0 calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px);
 }
 
@@ -229,8 +229,8 @@
   top: 0;
   z-index: 2;
   white-space: nowrap;
-  background: #f3f6fa;
-  color: #46566a;
+  background: var(--theme-surface-subtle, #f3f6fa);
+  color: var(--theme-muted-ink, #46566a);
   box-shadow: 0 1px 0 #dce3eb;
 }
 
@@ -244,26 +244,26 @@
 .project-export-detail-table td {
   padding: 6px 10px;
   border: 0;
-  border-bottom: 1px solid #e9edf2;
-  border-right: 1px solid #edf0f4;
+  border-bottom: 1px solid var(--theme-line, #e9edf2);
+  border-right: 1px solid var(--theme-line, #edf0f4);
 }
 
 .project-export-detail-table td {
-  background: #fff;
+  background: var(--surface-panel, #fff);
   font-variant-numeric: tabular-nums;
 }
 
 .project-export-detail-table tr:nth-child(even) td {
-  background: #fafbfd;
+  background: var(--theme-surface-subtle, #fafbfd);
 }
 
 .project-export-detail-table tr:hover td {
-  background: #f0f5fb;
+  background: var(--theme-blue-surface, #f0f5fb);
 }
 
 .project-export-detail-table td.final-path-log-type-cell {
-  background: #f7f9fc;
-  color: #52677f;
+  background: var(--theme-blue-surface, #f7f9fc);
+  color: var(--theme-muted-ink, #52677f);
   max-width: 200px;
 }
 
@@ -295,7 +295,7 @@
   height: 18px;
   border: 1px solid var(--border-default, #cbd5e1);
   border-radius: 4px;
-  background: #fff;
+  background: var(--surface-panel, #fff);
   cursor: pointer;
   list-style: none;
   transition: background 120ms ease, border-color 120ms ease;
@@ -309,25 +309,25 @@
   content: "";
   width: 0;
   height: 0;
-  border-top: 5px solid #333;
+  border-top: 5px solid var(--theme-strong-line, #333);
   border-right: 4px solid transparent;
   border-left: 4px solid transparent;
 }
 
 .project-export-detail-filter[open] > summary::before {
   border-top: 0;
-  border-bottom: 5px solid #333;
+  border-bottom: 5px solid var(--theme-strong-line, #333);
 }
 
 .project-export-detail-filter > summary:hover,
 .project-export-detail-filter[open] > summary {
-  border-color: #8ba9c9;
-  background: #f4f8fc;
+  border-color: var(--theme-line, #8ba9c9);
+  background: var(--theme-blue-surface, #f4f8fc);
 }
 
 .project-export-detail-filter.is-active > summary {
-  border-color: #4d78a8;
-  background: #eef6ff;
+  border-color: var(--theme-strong-line, #4d78a8);
+  background: var(--theme-blue-surface, #eef6ff);
 }
 
 .project-export-detail-filter-menu {
@@ -343,7 +343,7 @@
   padding: 6px;
   border: 1px solid var(--border-default, #cbd5e1);
   border-radius: 6px;
-  background: #fff;
+  background: var(--surface-panel, #fff);
   box-shadow: var(--shadow-md);
 }
 
@@ -395,7 +395,7 @@
 }
 
 .project-export-assignment-value-separator {
-  color: #111;
+  color: var(--theme-ink, #111);
 }
 
 .project-export-assignment-bar {
@@ -405,8 +405,8 @@
   height: 12px;
   overflow: hidden;
   border-radius: 999px;
-  background: #e2e8f0;
-  border: 1px solid #cbd5e1;
+  background: var(--theme-surface-subtle, #e2e8f0);
+  border: 1px solid var(--border-default, #cbd5e1);
 }
 
 .project-export-assignment-segment {
@@ -430,7 +430,7 @@
 
 .project-export-swatch.is-unassigned,
 .project-export-assignment-segment.is-unassigned {
-  background: #d1d5db;
+  background: var(--theme-surface-subtle, #d1d5db);
   --stat-segment-highlight: #6b7280;
 }
 
@@ -490,14 +490,14 @@
 
 .project-export-final-path-row:hover,
 .project-export-final-path-row:focus-visible {
-  border-color: #7c9bbc;
-  background: #f4f8fc;
+  border-color: var(--theme-line, #7c9bbc);
+  background: var(--theme-blue-surface, #f4f8fc);
   outline: none;
 }
 
 .project-export-final-path-row:hover::after,
 .project-export-final-path-row:focus-visible::after {
-  border-color: #7c9bbc;
+  border-color: var(--theme-line, #7c9bbc);
 }
 
 .project-export-final-path-row-label {
@@ -542,7 +542,7 @@
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  background: #fff;
+  background: var(--surface-panel, #fff);
 }
 
 .project-export-final-path-preview-ctg {
@@ -594,9 +594,9 @@
   top: calc(50% - 6px);
   width: 8px;
   height: 16px;
-  border: 1px solid #555;
+  border: 1px solid var(--theme-strong-line, #555);
   border-radius: 2px;
-  background: #f8f8f8;
+  background: var(--theme-surface-subtle, #f8f8f8);
 }
 
 .project-export-final-path-preview-gap-label {
@@ -604,7 +604,7 @@
   z-index: 4;
   top: calc(50% - 18px);
   transform: translateX(-50%);
-  color: #111;
+  color: var(--theme-ink, #111);
   font-size: var(--font-caption);
   font-weight: 700;
   white-space: nowrap;
@@ -612,7 +612,7 @@
 
 .project-export-final-path-preview-length {
   flex: 0 0 120px;
-  color: #4f4f4f;
+  color: var(--theme-ink, #4f4f4f);
   font-size: var(--font-body);
   white-space: nowrap;
 }

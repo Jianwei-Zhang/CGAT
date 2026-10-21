@@ -1270,11 +1270,11 @@ test("importer add-package hint keeps added black and dataset names bold", () =>
 
   assert.match(
     css,
-    /\.list-item-button\s+\.add-package-hint\s*\{[^}]*color:\s*#2c6b2f;[^}]*font-weight:\s*700;/,
+    /\.list-item-button\s+\.add-package-hint\s*\{[^}]*color:\s*var\(--theme-green-ink,\s*#2c6b2f\);[^}]*font-weight:\s*700;/,
   );
   assert.match(
     css,
-    /\.list-item-button\s+\.add-package-hint\s+strong\s*\{[^}]*color:\s*#111111;[^}]*font-weight:\s*700;/,
+    /\.list-item-button\s+\.add-package-hint\s+strong\s*\{[^}]*color:\s*var\(--theme-ink,\s*#111111\);[^}]*font-weight:\s*700;/,
   );
 });
 
@@ -1860,7 +1860,7 @@ test("import progress css keeps the active label on one line and uses status ico
 
   assert.match(
     css,
-    /\.importer-import-progress-dialog \.pipeline-step-row\.import-progress-step\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto;[^}]*border-bottom:\s*1px\s+solid\s+#edf1f5;/,
+    /\.importer-import-progress-dialog \.pipeline-step-row\.import-progress-step\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto;[^}]*border-bottom:\s*1px\s+solid\s+var\(--theme-line,\s*#edf1f5\);/,
   );
   assert.match(
     css,
@@ -1886,7 +1886,7 @@ test("import progress css keeps the active label on one line and uses status ico
   );
   assert.match(
     css,
-    /\.importer-import-progress-overview\s*\{[^}]*padding:\s*24px\s+32px\s+18px;[^}]*background:\s*#ffffff;/,
+    /\.importer-import-progress-overview\s*\{[^}]*padding:\s*24px\s+32px\s+18px;[^}]*background:\s*var\(--surface-panel,\s*#ffffff\);/,
   );
   assert.match(
     css,

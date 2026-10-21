@@ -1,5 +1,6 @@
 export const APP_SETTINGS_KEY = "gpm_next:app_settings";
 export const DEFAULT_APP_SETTINGS = Object.freeze({
+  theme: "system",
   fontSize: 14,
   graphFontSize: null,
   historyCapacity: 50,
@@ -7,6 +8,7 @@ export const DEFAULT_APP_SETTINGS = Object.freeze({
 
 export function normalizeAppSettings(value = {}) {
   return {
+    theme: ["system", "light", "dark"].includes(value?.theme) ? value.theme : "system",
     fontSize: [12, 14, 16, 18].includes(value?.fontSize) ? value.fontSize : 14,
     graphFontSize: [10, 12, 14, 16].includes(value?.graphFontSize) ? value.graphFontSize : null,
     historyCapacity: Number.isSafeInteger(value?.historyCapacity) && value.historyCapacity >= 0
@@ -26,6 +28,7 @@ export function setAppSettings(value, { persist = true } = {}) {
   if (persist) globalThis.localStorage?.setItem(APP_SETTINGS_KEY, JSON.stringify(next));
   current = next;
   applyAppTypography();
+  applyAppTheme();
   return getAppSettings();
 }
 export function getHistoryCapacity() { return current.historyCapacity; }
@@ -43,4 +46,26 @@ export function applyAppTypography(root = globalThis.document?.documentElement) 
 export function estimateGraphTextWidth(text, characterWidth = 6.2) {
   return Math.max(10, [...String(text || "")].reduce((width, char) =>
     width + (char.codePointAt(0) > 255 ? 10 : characterWidth), 0)) * getGraphTextScale();
+}
+
+export function resolveAppTheme(preference, systemDark = false) {
+  return preference === "dark" || (preference !== "light" && systemDark) ? "dark" : "light";
+}
+
+export function applyAppTheme(root = globalThis.document?.documentElement, systemDark) {
+  const dark = systemDark ?? globalThis.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
+  const theme = resolveAppTheme(current.theme, dark);
+  if (root) root.dataset.theme = theme;
+  return theme;
+}
+
+// Only system-following settings react to live OS changes. No route rerender is
+// needed: every screen, SVG and open dialog inherits the same theme tokens.
+export function initializeAppTheme({ root = globalThis.document?.documentElement,
+  matchMedia = globalThis.matchMedia?.bind(globalThis) } = {}) {
+  const media = matchMedia?.("(prefers-color-scheme: dark)");
+  const update = () => applyAppTheme(root, media?.matches ?? false);
+  update();
+  media?.addEventListener?.("change", update);
+  return () => media?.removeEventListener?.("change", update);
 }

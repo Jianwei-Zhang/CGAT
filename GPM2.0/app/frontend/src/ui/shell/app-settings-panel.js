@@ -3,7 +3,7 @@ import { DEFAULT_APP_SETTINGS, getAppSettings, setAppSettings } from "../../serv
 
 const copy = {
   zh: {
-    title: "App 设置", close: "关闭", display: "外观", size: "界面字号", graph: "图内字号",
+    title: "App 设置", close: "关闭", display: "外观", theme: "主题", system: "跟随系统", light: "浅色", dark: "深色", size: "界面字号", graph: "图内字号",
     follow: "跟随界面", language: "语言", history: "编辑", capacity: "回溯容量",
     custom: "自定义…", unlimited: "不限步数", steps: "步", enterSteps: "输入步数",
     preview: "预览文字效果", previewTitle: "装配视图", previewBody: "正文与控件名称",
@@ -15,7 +15,7 @@ const copy = {
     scope: "本机设置 · 自动保存", applied: "已保存", choose: "选择回溯容量",
   },
   en: {
-    title: "App settings", close: "Close", display: "Appearance", size: "Interface text", graph: "Graph text",
+    title: "App settings", close: "Close", display: "Appearance", theme: "Theme", system: "Follow system", light: "Light", dark: "Dark", size: "Interface text", graph: "Graph text",
     follow: "Follow interface", language: "Language", history: "Editing", capacity: "History capacity",
     custom: "Custom…", unlimited: "Unlimited", steps: "steps", enterSteps: "Enter steps",
     preview: "Preview typography", previewTitle: "Assembly view", previewBody: "Body text and control labels",
@@ -39,10 +39,11 @@ export function renderSettingsContent(locale, settings = getAppSettings()) {
   return `<header class="settings-heading"><h2 id="app-settings-title">${c.title}</h2><button type="button" class="settings-close" data-settings-close aria-label="${c.close}">×</button></header>
     <section class="settings-section" aria-labelledby="settings-appearance-title">
       <h3 id="settings-appearance-title">${c.display}</h3>
+      <div class="settings-row"><label for="settings-theme">${c.theme}</label><select id="settings-theme" name="theme">${["system", "light", "dark"].map(theme => `<option value="${theme}" ${theme === (settings.theme || "system") ? "selected" : ""}>${c[theme]}</option>`).join("")}</select></div>
       <div class="settings-row"><label for="settings-font-size">${c.size}</label><select id="settings-font-size" name="fontSize">${options([12, 14, 16, 18], settings.fontSize)}</select></div>
       <div class="settings-row"><div class="settings-field-label"><label for="settings-graph-size">${c.graph}</label>${help("settings-graph-help", c.graph, c.graphHint)}</div><select id="settings-graph-size" name="graphFontSize"><option value="" ${settings.graphFontSize === null ? "selected" : ""}>${c.follow}</option>${options([10, 12, 14, 16], settings.graphFontSize)}</select></div>
       <div class="settings-row"><label for="settings-language">${c.language}</label><select id="settings-language" name="language"><option value="zh" ${locale !== "en" ? "selected" : ""}>中文</option><option value="en" ${locale === "en" ? "selected" : ""}>English</option></select></div>
-      <details class="settings-preview"><summary>${c.preview}</summary><div class="settings-preview-content"><h4>${c.previewTitle}</h4><p>${c.previewBody}</p><p class="settings-hint">${c.previewHint}</p><div class="settings-preview-actions"><button type="button" class="button">${c.button}</button><button type="button" class="button tiny">${c.smallButton}</button></div><svg viewBox="0 0 320 54" role="img" aria-label="contig / bp"><rect x="8" y="28" width="295" height="14" rx="2" fill="#d2dfef"/><text class="track-ctg-label" x="12" y="23">contig_001</text><text class="track-tick-label" x="230" y="23">100 kb</text></svg></div></details>
+      <details class="settings-preview"><summary>${c.preview}</summary><div class="settings-preview-content"><h4>${c.previewTitle}</h4><p>${c.previewBody}</p><p class="settings-hint">${c.previewHint}</p><div class="settings-preview-actions"><button type="button" class="button">${c.button}</button><button type="button" class="button tiny">${c.smallButton}</button></div><svg viewBox="0 0 320 54" role="img" aria-label="contig / bp"><rect x="8" y="28" width="295" height="14" rx="2" fill="var(--ctg-primary-fill)"/><text class="track-ctg-label" x="12" y="23">contig_001</text><text class="track-tick-label" x="230" y="23">100 kb</text></svg></div></details>
     </section>
     <section class="settings-section" aria-labelledby="settings-editing-title"><h3 id="settings-editing-title">${c.history}</h3>
       <div class="settings-row"><div class="settings-field-label"><label for="settings-history-input">${c.capacity}</label>${help("settings-history-help", c.capacity, c.historyHint, true)}</div>
@@ -146,6 +147,7 @@ export function bindAppSettings(root, { getLocale, onTypographyChange, onLanguag
     });
     dialog.addEventListener("change", event => {
       const { name, value } = event.target;
+      if (name === "theme") save({ theme: value });
       if (name === "fontSize") save({ fontSize: Number(value) });
       if (name === "graphFontSize") save({ graphFontSize: value === "" ? null : Number(value) });
       if (name === "language") { onLanguageChange(value); render(); }

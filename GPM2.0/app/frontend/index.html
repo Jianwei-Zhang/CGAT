@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/gpm-logo.svg" />
     <title>GPM</title>
+    <script>
+      // Set the scheme before first paint, including when saved settings are corrupt.
+      (() => {
+        let theme;
+        try { theme = JSON.parse(localStorage.getItem("gpm_next:app_settings") || "{}").theme; } catch {}
+        const dark = theme === "dark" || (theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      })();
+    </script>
     <script type="module" src="/src/main.js"></script>
   </head>
   <body>

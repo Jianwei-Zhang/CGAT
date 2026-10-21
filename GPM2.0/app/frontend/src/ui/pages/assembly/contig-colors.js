@@ -8,6 +8,12 @@ export const DEFAULT_CONTIG_PALETTE = Object.freeze({
   ref: Object.freeze({ fill: "#cfcfcf", stroke: "#8e8e8e", text: "#4f4f4f" }),
 });
 
+export function contigColorToken(role, property = "fill") {
+  const palette = DEFAULT_CONTIG_PALETTE[role] || DEFAULT_CONTIG_PALETTE.companion;
+  const normalizedRole = DEFAULT_CONTIG_PALETTE[role] ? role : "companion";
+  return `var(--ctg-${normalizedRole}-${property}, ${palette[property]})`;
+}
+
 export function getContigPalette() {
   const root = globalThis.document?.documentElement;
   const styles = root && typeof globalThis.getComputedStyle === "function"

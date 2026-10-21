@@ -1,0 +1,77 @@
+/* Light is the existing design; semantic fallback literals retain it exactly.
+   Dark overrides UI surfaces and ink, never dataset-role/biological colors. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-app: #101720;
+  --surface-panel: #17212e;
+  --surface-card: #17212e;
+  --surface-subtle: #1d2938;
+  --surface-muted: #243244;
+  --surface-elevated: #223044;
+  --border-subtle: #344458;
+  --border-default: #42546a;
+  --border-strong: #748ba5;
+  --text-primary: #e5edf7;
+  --text-secondary: #c7d5e6;
+  --text-muted: #9bacc1;
+  --muted: #9bacc1;
+  --accent: #8abaff;
+  --action-primary-bg: #2f5f92;
+  --action-primary-border: #648db8;
+  --action-primary-hover: #386fa8;
+  --focus-ring: #91bfff;
+  --danger: #ffaaa5;
+  --helper-hint-bg: #3a2c1b;
+  --helper-hint-border: #d6a452;
+  --helper-hint-text: #f6d49e;
+  --shadow-xs: 0 1px 2px #0003;
+  --shadow-sm: 0 2px 5px #0004;
+  --shadow-md: 0 8px 24px #0006;
+  --shadow-lg: 0 18px 48px #0008;
+  --theme-ink: var(--text-primary);
+  --theme-muted-ink: var(--text-muted);
+  --theme-surface-subtle: var(--surface-subtle);
+  --theme-translucent-surface: #1d2938f5;
+  --theme-line: var(--border-default);
+  --theme-strong-line: var(--border-strong);
+  --theme-blue-ink: #a6ccff;
+  --theme-blue-surface: #253d57;
+  --theme-blue-line: #7fa4d1;
+  --theme-amber-ink: #f4d098;
+  --theme-amber-surface: #3a3022;
+  --theme-amber-line: #b79966;
+  --theme-red-ink: #ffb4ae;
+  --theme-red-surface: #422b31;
+  --theme-red-line: #c68989;
+  --theme-green-ink: #a2dfb3;
+  --theme-green-surface: #20382d;
+  --theme-green-line: #77b38b;
+  --theme-purple-ink: #d3bbff;
+  --theme-purple-surface: #352c49;
+  --theme-purple-line: #ad91d7;
+}
+
+/* Native controls, editor fields and scrollbar thumbs follow the active scheme. */
+:root { accent-color: var(--accent); }
+textarea { background: var(--surface-panel); color: var(--text-primary); }
+:root[data-theme="dark"] ::selection { background: #3b5e89; color: #fff; }
+
+/* Labels outside pale contig bars sit on the dark canvas, not the role fill. */
+:root[data-theme="dark"] .track-ctg-label.is-outside,
+:root[data-theme="dark"] .settings-preview .track-ctg-label {
+  fill: var(--text-primary);
+}
+:root[data-theme="dark"] .grt-result-gap-label,
+:root[data-theme="dark"] .grt-result-repeat-count {
+  stroke: var(--surface-panel);
+}
+
+:root[data-theme="dark"] .track-ctg-label.is-outside .track-ctg-source-tag {
+  fill: var(--theme-amber-ink);
+}
+:root[data-theme="dark"] .track-ctg-label.is-outside .track-ctg-source-tag.is-source-gapfiller {
+  fill: var(--theme-red-ink);
+}
+:root[data-theme="dark"] .track-ctg-label.is-outside .track-ctg-source-tag.is-source-telseeker {
+  fill: var(--theme-blue-ink);
+}

@@ -200,7 +200,6 @@ export function migrateWorkspaceHistoryToArrivalOrder(storage) {
   }
 }
 
-
 export function buildProjectSwitchItems({ state, labels }) {
   const currentProjectId = normalizeProjectId(state?.session?.projectId);
   const projects = Array.isArray(state?.initializer?.existingProjects)
@@ -377,4 +376,10 @@ export function closeProjectSession(store) {
     projectPreview: null,
     projectExport: buildEmptyProjectExportState(),
   });
+}
+
+export function workspaceSelectPresentation(name) {
+  const title = String(name || "");
+  const units = [...title].reduce((width, char) => width + (char.codePointAt(0) > 255 ? 2 : 1), 0);
+  return { title, width: `${Math.min(32, Math.max(10, units + 5))}ch` };
 }

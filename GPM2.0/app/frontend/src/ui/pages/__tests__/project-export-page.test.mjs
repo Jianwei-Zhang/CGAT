@@ -1774,11 +1774,11 @@ test("project export final path row jump keeps clicked phased chr target instead
 test("project export final path preview css is clickable and hides graph label spacer", () => {
   assert.match(
     componentsCss,
-    /\.project-export-detail-section\s*\{[\s\S]*border:\s*1px solid #cdd6e0;/,
+    /\.project-export-detail-section\s*\{[\s\S]*border:\s*1px solid var\(--theme-line,\s*#cdd6e0\);/,
   );
   assert.match(
     componentsCss,
-    /\.project-export-detail-table td\s*\{[\s\S]*background:\s*#fff;/,
+    /\.project-export-detail-table td\s*\{[\s\S]*background:\s*var\(--surface-panel,\s*#fff\);/,
   );
   assert.match(
     componentsCss,
@@ -1786,11 +1786,11 @@ test("project export final path preview css is clickable and hides graph label s
   );
   assert.match(
     componentsCss,
-    /\.project-export-detail-filter\[open\] > summary::before\s*\{[\s\S]*border-bottom:\s*5px solid #333;/,
+    /\.project-export-detail-filter\[open\] > summary::before\s*\{[\s\S]*border-bottom:\s*5px solid var\(--theme-strong-line,\s*#333\);/,
   );
   assert.match(
     componentsCss,
-    /\.project-export-final-path-row:hover::after,\s*\.project-export-final-path-row:focus-visible::after\s*\{[^}]*border-color:\s*#7c9bbc;/,
+    /\.project-export-final-path-row:hover::after,\s*\.project-export-final-path-row:focus-visible::after\s*\{[^}]*border-color:\s*var\(--theme-line,\s*#7c9bbc\);/,
   );
   assert.match(
     componentsCss,
@@ -1844,7 +1844,7 @@ test("project export preview fills the card height without a nested frame", () =
   assert.match(trackRule, /height:\s*auto;/);
   assert.match(trackRule, /border:\s*0;/);
   assert.match(trackRule, /border-radius:\s*0;/);
-  assert.match(trackRule, /background:\s*#fff;/);
+  assert.match(trackRule, /background:\s*var\(--surface-panel,\s*#fff\);/);
 
   for (const selector of ["ctg", "gap"]) {
     const rule = componentsCss.match(new RegExp(`\\.project-export-final-path-preview-${selector}\\s*\\{([^}]*)\\}`))?.[1] || "";
@@ -1870,7 +1870,7 @@ test("project export hover and focus ring stays above the preview without interc
   assert.match(ringRule, /border-radius:\s*inherit;/);
   assert.match(ringRule, /pointer-events:\s*none;/);
   assert.doesNotMatch(activeRowRule, /box-shadow:/);
-  assert.match(activeRingRule, /border-color:\s*#7c9bbc;/);
+  assert.match(activeRingRule, /border-color:\s*var\(--theme-line,\s*#7c9bbc\);/);
 
   const ringZIndex = Number(ringRule.match(/z-index:\s*(\d+);/)?.[1] || 0);
   for (const selector of ["ctg", "gap", "gap-label"]) {

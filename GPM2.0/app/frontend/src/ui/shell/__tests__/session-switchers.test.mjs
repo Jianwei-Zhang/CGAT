@@ -1,3 +1,4 @@
+import { workspaceSelectPresentation } from "../session-switchers.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -416,4 +417,13 @@ test("switchProjectFromShell restores cached assembly state when returning to an
   assert.equal(switchProjectFromShell(store, 8), true);
   assert.equal(store.getState().assembly.selectedChrName, "Chr08");
   assert.deepEqual(store.getState().assembly.chrCtgs, [{ assemblyCtgId: 800 }]);
+});
+
+
+test("workspace selector sizes the selected name, caps long labels, and retains the full title", () => {
+  assert.equal(workspaceSelectPresentation("test11").width, "11ch");
+  assert.equal(workspaceSelectPresentation("项目一").width, "11ch");
+  const name = "project-".repeat(100);
+  assert.equal(workspaceSelectPresentation(name).width, "32ch");
+  assert.equal(workspaceSelectPresentation(name).title, name);
 });

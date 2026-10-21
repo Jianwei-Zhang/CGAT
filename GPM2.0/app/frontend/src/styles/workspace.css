@@ -79,9 +79,9 @@
 }
 
 .workspace-recipe-value.is-enabled {
-  border-color: #86efac;
-  background: #f0fdf4;
-  color: #166534;
+  border-color: var(--theme-green-line, #86efac);
+  background: var(--theme-green-surface, #f0fdf4);
+  color: var(--theme-green-ink, #166534);
 }
 
 .workspace-recipe-value.is-disabled {
