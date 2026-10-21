@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   readHitIdentityPct, resolveAlignmentBandStyle, sortAlignmentBands,
-  alignmentBandSvgAttrs, alignmentBandTooltipMetrics,
+  alignmentBandSvgAttrs, alignmentBandTooltipMetrics, renderAlignmentIdentityLegend,
 } from "../alignment-band-style.js";
 import { resolveHitIdentityPct } from "../track-render-geometry.js";
 
@@ -50,4 +50,32 @@ test("SVG export attributes and exact tooltip distinguish unknown from zero", ()
   assert.equal(alignmentBandTooltipMetrics({ identityPct: 93.27, alignLength: 10000 }), "Identity: 93.27% | Alignment length: 10,000 bp");
   assert.match(alignmentBandTooltipMetrics({ identityPct: 0 }), /^Identity: 0.00%/);
   assert.match(alignmentBandTooltipMetrics({ mapq: 60 }), /^Identity: Unknown/);
+});
+
+
+test("100 percent identity uses a softened opaque endpoint with a stronger but restrained outline", () => {
+  for (const [tone,fill,stroke,oldBase] of [
+    ["primary","rgb(148, 169, 197)","rgb(132, 157, 189)",[97,129,170]],
+    ["companion","rgb(186, 167, 135)","rgb(176, 154, 117)",[154,126,78]],
+  ]) {
+    const style=resolveAlignmentBandStyle(tone,100);
+    assert.deepEqual(style,{fill,stroke});
+    const channels=style.fill.match(/\d+/g).map(Number);
+    const outline=style.stroke.match(/\d+/g).map(Number);
+    channels.forEach((channel,i)=>{assert.ok(channel>oldBase[i]);assert.ok(outline[i]<channel);});
+    assert.deepEqual(resolveAlignmentBandStyle(tone,110),style);
+    assert.notEqual(resolveAlignmentBandStyle(tone,99).fill,style.fill,"99 and 100 remain distinguishable");
+    assert.equal(alignmentBandTooltipMetrics({identityPct:100}),"Identity: 100.00% | Alignment length: Unknown");
+  }
+});
+
+test("legend endpoints stay identical to the main/local/export paint scale without rescaling identity", () => {
+  const html=renderAlignmentIdentityLegend({},value=>value);
+  for (const tone of ["primary","companion"]) {
+    const light=resolveAlignmentBandStyle(tone,80).fill,high=resolveAlignmentBandStyle(tone,100).fill;
+    assert.ok(html.includes(`linear-gradient(to right, ${light}, ${high})`));
+    assert.ok(alignmentBandSvgAttrs({identityPct:100},tone).includes(`fill="${high}"`));
+  }
+  assert.match(html,/≤80%/);assert.match(html,/100%/);assert.match(html,/softened/);
+  assert.doesNotMatch(html,/rgba\(|opacity/);
 });

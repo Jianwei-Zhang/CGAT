@@ -190,6 +190,12 @@ bash ./gpm_server/export_final_path_fasta.sh \
   -o /path/to/project_Chr01_path.fa
 ```
 
+### Assembly menu and alignment colors
+
+Main-view contig actions are ordered as common destinations, alignment inspection, editing, then hide/delete. **Add to Local View → Top track / Bottom track** is one submenu; the unavailable More Contig Actions placeholder is removed. Split fragments retain **Undo contig split** immediately below **Split contig**.
+
+Identity retains a fixed 80–100% sequential scale, with ≤80% at the lightest shade and a softened 100% endpoint. Main view, local view, legends and SVG exports share this mapping. Fills remain opaque; identity values, filtering and band stacking order are unchanged.
+
 ### Split contig
 
 Right-click a primary contig (or one of its Ref alignment bands), choose **Split contig**, then **Split at leftmost alignment** or **Split at rightmost alignment**. The bounds include all current-Ref hits passing the main view length/identity filters, not just the clicked band. Left/right follow the displayed orientation. An unavailable/end-of-contig boundary is disabled.

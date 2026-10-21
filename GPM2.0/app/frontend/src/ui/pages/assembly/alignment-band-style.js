@@ -1,5 +1,9 @@
 // One absolute scale for Canvas, SVG, drag previews and serialized SVGs.
 // Missing evidence is not a measured zero; MAPQ is never a fallback.
+// Keep the absolute identity domain; soften paint strength, not opacity, so
+// overlapping bands never become artificially darker than their identity.
+const MIN_COLOR_STRENGTH = 0.18;
+const MAX_COLOR_STRENGTH = 0.68;
 export function readHitIdentityPct(hit) {
   const numeric = (value) => value === null || value === undefined || String(value).trim() === ""
     ? null : Number.isFinite(Number(value)) ? Number(value) : null;
@@ -15,7 +19,8 @@ export function resolveAlignmentBandStyle(tone, identityPct) {
   const identity = readHitIdentityPct({ identityPct });
   if (identity === null) return { fill: "rgb(222, 224, 227)", stroke: "rgb(194, 198, 204)" };
   const base = tone === "companion" ? [154, 126, 78] : [97, 129, 170];
-  const strength = 0.18 + 0.82 * Math.max(0, Math.min(1, (identity - 80) / 20));
+  const strength = MIN_COLOR_STRENGTH + (MAX_COLOR_STRENGTH - MIN_COLOR_STRENGTH)
+    * Math.max(0, Math.min(1, (identity - 80) / 20));
   const blend = (amount) => `rgb(${base.map((channel) => Math.round(255 + (channel - 255) * amount)).join(", ")})`;
   return { fill: blend(strength), stroke: blend(Math.min(1, strength + 0.1)) };
 }
@@ -42,7 +47,7 @@ export function alignmentBandTooltipMetrics(hit) {
 
 export function renderAlignmentIdentityLegend(labels, escapeAttr) {
   const gradient = (tone) => `linear-gradient(to right, ${resolveAlignmentBandStyle(tone, 80).fill}, ${resolveAlignmentBandStyle(tone, 100).fill})`;
-  const hint = labels?.identityLegendHint || "Darker means higher Identity. Fixed scale; ≤80% uses the lightest shade.";
+  const hint = labels?.identityLegendHint || "Darker means higher Identity. Fixed, softened 80–100% color scale; ≤80% uses the lightest shade.";
   return `<div class="alignment-identity-legend" title="${escapeAttr(hint)}" aria-label="${escapeAttr(hint)}">
     <span>Identity</span><span>≤80%</span><span class="alignment-identity-scale" aria-hidden="true">
       <i style="background:${gradient("primary")}"></i><i style="background:${gradient("companion")}"></i>

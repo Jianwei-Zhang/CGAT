@@ -912,26 +912,32 @@ export function buildAssemblyContextMenuItems({
   }
 
   if (ctgContext && !deletedCtgContext && !memberNode && !subviewTrackPairContext) {
-    if (!isRefTrackContext && typeof contextMenuActions.openContigChrAlignments === "function") {
-      const target = { assemblyCtgId: contextCtgId, trackRole: ctgTrackRole };
-      if (resolveContigChrAlignmentModel(state.assembly, target)) {
-        items.push({ label: chrAlignmentCopy[state.locale === "en" ? "en" : "zh"].title,
-          run: () => contextMenuActions.openContigChrAlignments(host, store, target) });
+    // Keep common destinations first, inspection next, and edits/destructive
+    // actions last. Reuse the same grouping for primary, support and phased ctgs.
+    const pushInspectionItems = () => {
+      if (typeof addContextCtgToComposition === "function") {
+        items.push({
+          label: i18n.contextMenu.addToSubview,
+          children: [
+            { label: i18n.contextMenu.addToSubviewTop,
+              run: async () => addContextCtgToComposition(host, store, ctgContext, "top") },
+            { label: i18n.contextMenu.addToSubviewBottom,
+              run: async () => addContextCtgToComposition(host, store, ctgContext, "bottom") },
+          ],
+        });
       }
-    }
-    if (typeof addContextCtgToComposition === "function") {
-      items.push({
-        label: i18n.contextMenu.addToSubviewTop,
-        run: async () => addContextCtgToComposition(host, store, ctgContext, "top"),
-      });
-      items.push({
-        label: i18n.contextMenu.addToSubviewBottom,
-        run: async () => addContextCtgToComposition(host, store, ctgContext, "bottom"),
-      });
-    }
+      if (!isRefTrackContext && typeof contextMenuActions.openContigChrAlignments === "function") {
+        const target = { assemblyCtgId: contextCtgId, trackRole: ctgTrackRole };
+        if (resolveContigChrAlignmentModel(state.assembly, target)) {
+          items.push({ label: chrAlignmentCopy[state.locale === "en" ? "en" : "zh"].title,
+            run: () => contextMenuActions.openContigChrAlignments(host, store, target) });
+        }
+      }
+    };
     if (isPhasedCtgContext) {
       const phasedTrackItemId = normalizeSupportDatasetId(ctgContext.phasedTrackItemId);
       pushAppendTrackContigItems(ctgContext, { allowAnyPhasedTarget: true });
+      pushInspectionItems();
       if (contextCtgId) {
         items.push({
           label: i18n.contextMenu.flipContig,
@@ -1005,6 +1011,7 @@ export function buildAssemblyContextMenuItems({
         },
       });
     }
+    pushInspectionItems();
   }
   if (subviewTrackPairContext && !deletedCtgContext && !memberNode) {
     addSubviewTrackPairActions(subviewTrackPairContext);
@@ -1324,11 +1331,6 @@ export function buildAssemblyContextMenuItems({
               }),
             });
           },
-        });
-        items.push({
-          label: i18n.contextMenu.moreContigActions,
-          disabled: true,
-          title: i18n.contextMenu.currentVersionUnavailable,
         });
       }
     }

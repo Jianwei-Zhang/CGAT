@@ -271,10 +271,9 @@ test("support and mirror menus expose cross-chr inspection while mirror editing 
   assert.ok(supportItems.includes("加入 Final Path"));
   assert.ok(supportItems.includes("撤销镜像 contig"));
   assert.deepEqual(mirrorItems, [
-    "跨 chr 比对…",
-    "加入局部视图上轨",
-    "加入局部视图下轨",
     "加入 Final Path",
+    "加入局部视图",
+    "跨 chr 比对…",
     "撤销镜像 contig",
   ]);
 });
@@ -545,10 +544,9 @@ test("phased track item context menu appends, flips, and removes only that phase
   });
 
   assert.deepEqual(items.map((item) => item.label), [
-    "加入局部视图上轨",
-    "加入局部视图下轨",
     "加入 Final Path A",
     "加入 Final Path B",
+    "加入局部视图",
     "翻转 contig",
     "从该分型组删除",
   ]);

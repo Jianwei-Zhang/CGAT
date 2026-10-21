@@ -2805,3 +2805,41 @@ test("cross-chr entry is available for full, split, single-base, auxiliary, phas
     await item.run();assert.deepEqual(calls,[{assemblyCtgId:2,trackRole:role}]);
   }
 });
+
+
+test("main contig menu groups local-view destinations and orders common actions before edits and deletion", () => {
+  for (const locale of ["zh", "en"]) {
+    const chrCtgs=[[2,1,300],[3,301,700],[4,701,1000]].map(([assemblyCtgId,sourceStart,sourceEnd])=>({
+      assemblyCtgId,totalLength:sourceEnd-sourceStart+1,orient:"+",
+      sourceFragment:{sourceSeqId:1,groupKey:"manual-fragment:1",sourceStart,sourceEnd,sourceLength:1000},
+    }));
+    const store=createStore({...createState({assembly:{selectedChrName:"Chr01",trackSelectedCtgIds:[],chrCtgs}}),locale});
+    const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:3,trackRole:"primary"},memberNode:null,host:{},store,
+      actions:{canEditTrackCtg:()=>true}});
+    assert.deepEqual(items.map(i=>i.label),locale==="zh"?[
+      "加入 Final Path","加入局部视图","跨 chr 比对…","翻转 contig","重命名 contig...",
+      "分割 contig","撤销分割 contig","隐藏 contig","删除 contig",
+    ]:[
+      "Add to Final Path","Add to Local View","Cross-chr alignments…","Flip Contig","Rename Contig...",
+      "Split contig","Undo contig split","Hide Contig","Delete Contig",
+    ]);
+    assert.deepEqual(items[1].children.map(i=>i.label),locale==="zh"?["上轨","下轨"]:["Top track","Bottom track"]);
+    assert.equal(items[1].run,undefined,"parent opens a submenu instead of editing the composition");
+    assert.ok(!items.some(i=>/更多 contig|More Contig/.test(i.label)));
+  }
+});
+
+test("local-view submenu keeps exact primary, auxiliary and phased identities for both destinations", async () => {
+  for (const trackRole of ["primary","support","phased"]) {
+    const ctg={assemblyCtgId:2,totalLength:1000,orient:"+"};
+    const context={assemblyCtgId:2,trackRole,datasetId:7,...(trackRole==="phased"?{phasedTrackId:8,phasedTrackItemId:9,phasedHaplotypeKey:"A"}:{})};
+    const store=createStore(createState({assembly:{selectedChrName:"Chr01",trackSelectedCtgIds:[],chrCtgs:[ctg],supportChrCtgs:[ctg]}}));
+    const calls=[];
+    const items=__testBuildAssemblyContextMenuItems({ctgContext:context,memberNode:null,host:{},store,
+      actions:{canEditTrackCtg:()=>true,addContextCtgToComposition:async(_h,_s,target,slot)=>calls.push({target,slot})}});
+    const parent=items.find(i=>i.label==="加入局部视图");assert.ok(parent);
+    await parent.children[0].run();await parent.children[1].run();
+    assert.deepEqual(calls,[{target:context,slot:"top"},{target:context,slot:"bottom"}]);
+    assert.equal(calls[0].target,context,"do not drop phased item/dataset scope when nesting actions");
+  }
+});
