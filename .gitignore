@@ -19,12 +19,16 @@
 **/src-tauri/gen/
 
 # Local documentation source, toolchain, and deployment artifacts.
-# Keep only the two redirect pages used by branch-based GitHub Pages.
+# Keep redirect pages, Comet docs, and explicitly versioned design specifications.
 /docs/*
 !/docs/index.html
 !/docs/404.html
 !/docs/comet/
 !/docs/comet/**
+!/docs/design/
+/docs/design/*
+!/docs/design/frontend-design-alignment.md
+!/docs/design/frontend-upgrade-tasks.md
 /docs_deploy/
 /DOCS_DEPLOY.md
 /package.json
