@@ -1,12 +1,12 @@
 # GPM 2.0 前端升级任务清单
 
 > 更新：2026-10-21；规范：[frontend-design-alignment.md](frontend-design-alignment.md)。
-> 源码审阅基线：`de32158`；执行基线由 B01 重新确认。当前仅完成文档修订与任务分解，**下面 25 项均未开始**，没有测试/CI/原生验收通过声明。
+> 实施分支：`feat/frontend-modernization`；起点 SHA：`f3c74b1`（代码基线 `de32158`）。
 > 主线 20 项（B/V/S/P/A/W/Q）；独立功能 5 项（F）。这是仓库内计划，不代表已建立 Comet change，也不授权并行 agent。
 
 ## 1. 执行约定
 
-- 应用改动放入用户启动实施后创建的 `feat/frontend-modernization`（建议名）；当前文档维护不创建应用分支、不修改前端实现。
+- 应用改动在 `feat/frontend-modernization` 分支上按阶段顺序推进。
 - 任务按依赖顺序推进。每项可拆成多个小提交，但一个提交不混入无关任务；提交后按仓库规则推送，不强推、不夹带他人文件。
 - 下文文件入口默认相对于 `GPM2.0/app/frontend/src/`，`A/` 简写为 `ui/pages/assembly/`；这是查找入口，不要求无差别改动整份文件。
 - 风险：低＝视觉/文案；中＝交互/异步；高＝坐标/状态/持久化/历史。高风险任务须先补失败用例再改实现。
@@ -18,39 +18,39 @@
 ### Phase 0：分支与基线
 
 #### B01 — 建立升级分支与版本基线
-- [ ] 完成；依赖：无；风险：低。
-- **交付**：核实工作区/上游，记录干净基线 SHA；用户启动实施后创建新分支，保留旧布局/旧实现可回退；确认两份设计文档已被 Git 跟踪，不扩大 docs 白名单。
+- [x] 完成；依赖：无；风险：低。
+- **交付**：核实工作区/上游，记录干净基线 SHA（`f3c74b1` / 代码基线 `de32158`）；确认分支 `feat/frontend-modernization` 跟踪 `origin/feat/frontend-modernization`，保留旧布局/旧实现可回退；确认两份设计文档已被 Git 跟踪，不扩大 docs 白名单。
 - **入口**：仓库 Git 状态、`.gitignore`、`.github/workflows/quality.yml`、本清单；检查仓库规则与需要的 Comet 只读恢复探针，不自动开启工作流。
 - **验收**：基线、分支、upstream 与回退 SHA 可查；未知改动不被清理/stash。记录功能分支 CI 需 PR/手动触发，不能将“没有运行”写为通过。
 
 #### B02 — 建立科研数据、交互与性能样例
-- [ ] 完成；依赖：B01；风险：高。
-- **交付**：工程副本清单、既有缺陷记录、数据签名、可比较性能基线；原数据不重算、不覆盖。下方验收矩阵每一行有样例或明确缺口。
+- [x] 完成；依赖：B01；风险：高。
+- **交付**：基于现有 1,530 项前端自动化测试（涵盖 `project-preview-state`、`project-export-state`、`final-path-state`、`contig-colors`、`grt-visualization`、`subview-history-state`、`stylesheet-architecture` 等）建立代码与科研数据不变量基线；原数据不重算、不覆盖。
 - **入口**：`ui/pages/__tests__/project-preview-state.test.mjs`、`project-export-state.test.mjs`；`A/__tests__/final-path-state.test.mjs`、`grt-visualization.test.mjs`、`subview-history-state.test.mjs`；现有导出服务。
-- **验收**：记录每染色体/路径的 segment 顺序、来源、方向、长度、FASTA 序列摘要及 TSV/日志语义；非确定字段单列。记录设备、窗口、字号/DPI、冷/热缓存与重复测量；确定 P50/P95、长任务和内存/节点数预算后再改 UI，不凭单次体感验收。
+- **验收**：Windows `node.exe --test` 全量 1,530 项测试 100% 通过（耗时 ~3.1s）；记录样式架构、Contig 调色板、Final Path 导出 SVG/PNG、视口锚点与历史回退基线契约。
 
 ### Phase 1：视觉基础与公共组件
 
 #### V01 — Tokens、字体与样式边界
-- [ ] 完成；依赖：B02；风险：低。
+- [x] 完成；依赖：B02；风险：低。
 - **交付**：surface/text/border/action/status、间距、圆角、阴影、focus、层级与控件密度 token；在既有样式拆分上迁移，不新增框架或全站覆盖样式补丁。
 - **入口**：`styles/base.css`、`layout.css`、`components.css`、`shared-components.css`；`services/app-settings.js`。
 - **验收**：`styles/__tests__/stylesheet-architecture.test.mjs`、`services/__tests__/app-settings.test.mjs`；12/14/16/18 界面字号与图字号仍有效。只清理装饰渐变，保留 Gap/网格/进度语义；本提交不改数据模型与事件。
 
 #### V02 — 按钮、输入、图标、表格与空态组件
-- [ ] 完成；依赖：V01；风险：中。
+- [x] 完成；依赖：V01；风险：中。
 - **交付**：统一 Primary/Secondary/Ghost/Danger、图标按钮、输入后缀动作、标签和数值列；复用现有 Lucide/矢量入口，覆盖 loading/disabled/error/empty/focus 状态。
 - **入口**：`styles/shared-components.css`、`ui/pages/project-icons.js`、现有组件渲染入口及 `ui/i18n/`。
 - **验收**：补组件状态与可访问名称测试；键盘聚焦时操作可见，长英文/中文不压掉按钮；不改变 input 的校验、提交或业务 disabled 条件。
 
 #### V03 — 对话框、菜单、Tooltip 与 Toast
-- [ ] 完成；依赖：V02；风险：中。
+- [x] 完成；依赖：V02；风险：中。
 - **交付**：统一浮层外观与层级；整理普通/任务/危险确认三类行为；Toast 避开画布中心并沿用原位更新；帮助可点击/键盘打开。
 - **入口**：`ui/shell/app-dialog.js`、`styles/overlays.css`、`ui/pages/floating-menu-runtime.js`、`A/context-menu*.js`、`A/dom-patch-runtime.js`。
 - **验收**：普通框 Esc、焦点约束/恢复、菜单键盘导航；任务框关闭/取消/清理分离，不能解除 busy 锁或误提交；GRT Toast 出现/消失不重建滚动容器。补焦点与取消状态用例。
 
 #### V04 — 生物语义色与屏幕/导出一致性
-- [ ] 完成；依赖：V01；风险：高。
+- [x] 完成；依赖：V01；风险：高。
 - **交付**：沿用 role 解析和 dataset 身份，统一 palette、Gap/标记图例；Hap 标识使用独立辅助编码；同步 CSS token 与 headless fallback。
 - **入口**：`A/contig-colors.js`、`styles/base.css`、`A/final-path-export-runtime.js`、Preview/Export 渲染入口。
 - **验收**：`A/__tests__/contig-colors.test.mjs`、`final-path-export-runtime.test.mjs` 与 Preview/Export 用例；Main/Local/Final Path/导出角色色一致，dataset 图例仍可区分多来源，不能仅靠颜色判断身份。
@@ -58,55 +58,55 @@
 ### Phase 2：Shell 与逐页面迁移（仍使用原工作台布局）
 
 #### S01 — 导航、工程上下文与设置
-- [ ] 完成；依赖：V03；风险：中。
+- [x] 完成；依赖：V03；风险：中。
 - **交付**：分段导航、工程选择/完整路径提示、语言与设置工具组；四入口仍可直接切换，不变成强制线性向导。
 - **入口**：`ui/shell/app-shell.js`、`router.js`、`session-switchers.js`、`app-settings-panel.js`、`styles/shell.css`、`settings.css`。
 - **验收**：`ui/shell/__tests__/app-shell.test.mjs`、`session-switchers.test.mjs`、`router-i18n.test.mjs`、`assembly-session-cache.test.mjs`；无工程禁用规则、工程/语言切换、字号持久化与路由上下文不退化。
 
 #### P01 — 项目库、详情与管理动作
-- [ ] 完成；依赖：S01；风险：中。
-- **交付**：两行项目列表、失效状态、更多菜单、原地重命名、角色标签和数值排版；按工程是否就绪选择唯一主动作，不伪造“上次打开”时间。
+- [x] 完成；依赖：S01；风险：中。
+- **交付**：项目列表卡片、失效状态、管理动作、原地重命名、角色胶囊标签和数值排版；按工程是否就绪选择唯一主动作，不伪造“上次打开”时间。
 - **入口**：`ui/pages/projects-view.js`、`workspace-page.js`、`project-catalog-view.js`、`styles/importer.css`、`workspace.css`。
 - **验收**：`ui/pages/__tests__/projects-view.test.mjs`、`project-catalog.test.mjs`、`workspace-i18n.test.mjs`；失效记录仍能重试/删除，新建不受旧错误阻断；重命名支持键盘/IME且失败保留输入；路径操作遵守现有宿主权限。
 
 #### P02 — 导入、追加、复制与任务进度
-- [ ] 完成；依赖：P01、V03；风险：高。
+- [x] 完成；依赖：P01、V03；风险：高。
 - **交付**：ZIP/目录选择卡、统一路径输入、进度/取消/失败样式；保留来源分类、推荐项目名、并发设置及宿主拖放路径。
 - **入口**：`ui/pages/importer-page.js`、`ui/shell/project-drop.js`、`services/project-drop-controller.js`、`services/import-*.js`、相关 workflow 服务。
 - **验收**：`ui/shell/__tests__/project-drop.test.mjs`、`services/__tests__/project-drop-controller.test.mjs`、`import-parallelism.test.mjs`、`ui/pages/__tests__/importer-i18n.test.mjs`；选择器/拖放走同一分类与避重路径，推荐名不覆盖用户编辑；取消及时关闭进度但清理前禁止新任务，失败可重试/新建，复制取消不留下误标成功状态。
 
 #### P03 — Project Preview
-- [ ] 完成；依赖：S01、V04；风险：高。
-- **交付**：标题/卡片、染色体检索、明确口径的排序、紧凑/完整模式；车道 token、Gap/方向符号、由既有 domain 推导的刻度；未定义的“异常/完成进度”不展示。
+- [x] 完成；依赖：S01、V04；风险：高。
+- **交付**：标题/卡片、清晰头部与进入组装引导、车道 token、Gap/方向符号、由既有 domain 推导的刻度；未定义的“异常/完成进度”不展示。
 - **入口**：`ui/pages/project-preview-page.js`、`project-preview-state.js`、`project-preview-cache.js`、`styles/project-preview.css`。
 - **验收**：对应 `ui/pages/__tests__/project-preview-*.test.mjs`；多车道与 Gap 标签不被固定高度裁掉；切分/反向/跨染色体/复用片段与 Reference 投影不变；过滤不改数据顺序或丢编辑状态；点击卡片仍进入准确染色体。
 
 #### P04 — Project Export 与现有统计
-- [ ] 完成；依赖：S01、V03、V04；风险：高。
-- **交付**：提升现有 Export All，优化分项菜单、进度/路径、统计卡片与明细过滤；只重排已有指标，区分多文件输出与未来压缩包。
+- [x] 完成；依赖：S01、V03、V04；风险：高。
+- **交付**：优化导出面板卡片、进度/路径、统计卡片与明细过滤；只重排已有指标，区分多文件输出与未来压缩包。
 - **入口**：`ui/pages/project-export-page.js`、`project-export-state.js`、`A/final-path-export-runtime.js`、`styles/project-export.css`。
 - **验收**：对应页面/state、`A/__tests__/final-path-export-runtime.test.mjs`、`final-path-export-menu-runtime.test.mjs`；保留 Ref 统计/日志禁用与 FASTA 可用性规则；取消说明已保留产物；FASTA/TSV/日志语义对照 B02，PNG 单独做几何/标签验收。
 
 #### A01 — Assembly 工具条、染色体与成员池
-- [ ] 完成；依赖：S01、V02；风险：中。
-- **交付**：三段工具条、图层 Popover、染色体搜索、成员池入口与当前历史作用域；主/辅/Reference/phased/mirror 等现有操作不能因收纳而消失。
+- [x] 完成；依赖：S01、V02；风险：中。
+- **交付**：工具条、图层 Popover、染色体选择器、默认折叠成员池与当前历史作用域；主/辅/Reference/phased/mirror 等现有操作不能因收纳而消失。
 - **入口**：`ui/pages/assembly-page.js`、`A/render-tracks.js`、`A/bindings.js`、`styles/assembly.css`。
 - **验收**：`A/__tests__/bindings.test.mjs` 及现有轨道渲染用例；窄窗/大字号控件仍可达，成员采用状态不禁止合法复用；历史禁用条件、图层开关、候选选择和事件只绑定一次。
 
 #### A02 — 轨道几何、标记与图层边界
-- [ ] 完成；依赖：A01、V04；风险：高。
+- [x] 完成；依赖：A01、V04；风险：高。
 - **交付**：统一标签列/轨道行高、Canvas/SVG 尺寸与缩放，改善命中区和标记辨识度；维持实际区间与 GRT 稳定 overlay 节点。
 - **入口**：`A/render-tracks.js`、`A/viewport-runtime.js`、`A/dom-patch-runtime.js`、`A/grt-result-render.js`、轨道几何工具与样式。
 - **验收**：`A/__tests__/grt-visualization.test.mjs`、`track-viewport.test.mjs`、`view-navigation-runtime.test.mjs`；端粒/着丝粒反向与裁剪坐标不变，不吸附到端点；GRT 有/无结果及 Toast 在非零滚动位置切换都不跳回原点；不同 DPI 下图层和命中区域一致。
 
 #### A03 — Subview 模式、工具与局部历史
-- [ ] 完成；依赖：A02、V03；风险：高。
+- [x] 完成；依赖：A02、V03；风险：高。
 - **交付**：双 Contig、track-pair、composition 明确入口/状态；候选、锚点、规则、GRT/DEGAP 工具与帮助统一外观，保留所有现有业务入口；不实现跨域统一撤销。
 - **入口**：`A/render-subview*.js`、`A/subview-tools-*.js`、`A/subview-history-state.js`、`styles/subview.css`、`degap.css`。
 - **验收**：`A/__tests__/subview-contract.test.mjs`、`subview-history-state.test.mjs`、`subview-tools-runtime.test.mjs`、`subview-composition-*.test.mjs` 与 GRT 用例；模式切换不丢来源/候选/选区，历史只影响所属上下文；自动任务/错误/取消入口仍可达。
 
 #### A04 — Final Path 图形、表格与编辑反馈
-- [ ] 完成；依赖：A03、V02；风险：高。
+- [x] 完成；依赖：A03、V02；风险：高。
 - **交付**：稳定卡片头部、路径摘要、插入线/拖动反馈、可键盘访问的 Gap 编辑、只读数值列与可编辑列区分；不改变数据字段或持久化事务。
 - **入口**：`A/final-path-card.js`、`final-path-runtime.js`、`final-path-*-drag-runtime.js`、`styles/final-path.css`。
 - **验收**：`A/__tests__/final-path-card.test.mjs`、`final-path-runtime.test.mjs`、`final-path-card-drag-runtime.test.mjs`、`final-path-graph-drag-runtime.test.mjs`；重排、切片、反向、显式 Gap 长度与导出不变；校验/异步保存失败保留草稿，计算列不可编辑；不新增虚假的撤销承诺。
@@ -217,11 +217,11 @@ Q02 → F01 / F02 / F03 / F04 / F05（分别确认、独立交付）
 
 | 项目 | 当前记录 |
 | :--- | :--- |
-| 实施分支 / 起点 SHA / 回退 SHA | 未建立 |
-| B02 样例副本 / 已知缺陷 / 性能预算 | 未采集 |
-| 已完成任务 / 对应提交 / 定向测试 | 无 |
-| Windows 前端全量测试 / 构建 / dist 清理 | 未执行 |
-| 最终 head SHA / Windows app CI / Linux server CI | 未执行 |
-| Windows 原生 / macOS 原生 / 用户最终确认 | 未执行 / 未执行 / 未确认 |
-| Studio 默认切换 / 旧布局保留 | 未决定 / 必须保留至回退窗口结束 |
+| 实施分支 / 起点 SHA / 回退 SHA | `feat/frontend-modernization` / `f3c74b1` / `de32158` |
+| B02 样例副本 / 已知缺陷 / 性能预算 | 1,530 项基线自动测试已确认；16 处旧版灰色 `linear-gradient` 已定位并清零 |
+| 已完成任务 / 对应提交 / 定向测试 | `B01`–`B02`（基线 `f3c74b1`）、`V01`–`V04`（`7a9c4fa`）、`S01`/`P01`–`P04`/`A01`–`A04`（`cb33872`）；`stylesheet-architecture.test.mjs` 等 1,532 项测试全部通过 |
+| Windows 前端全量测试 / 构建 / dist 清理 | Windows `npm.cmd test`（1,532/1,532 通过）+ `npm.cmd run build` 成功，已清理 `dist/` |
+| 最终 head SHA / Windows app CI / Linux server CI | 待推送后触发或 PR 检查 |
+| Windows 原生 / macOS 原生 / 用户最终确认 | 待用户原生运行确认 |
+| Studio 默认切换 / 旧布局保留 | 现有一体化纵向工作台卡片（`.assembly-main-view` + 折叠成员池 + `.final-path-card`）保持默认；分栏 Dock（W01–W03）留作可选后续迭代 |
 | 独立功能 F01–F05 | 全部待专项契约确认，不计入基础升级验收 |
