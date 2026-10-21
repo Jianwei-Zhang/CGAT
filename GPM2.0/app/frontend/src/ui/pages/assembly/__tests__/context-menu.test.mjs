@@ -229,7 +229,7 @@ test("buildAssemblyContextMenuItems exposes move and remove for every Subview mo
       actions: createContextMenuActionsCapture(calls),
     });
     assert.deepEqual(items.map((item) => item.label), [
-      "追加到路径",
+      "加入 Final Path",
       "移至另一轨",
       "翻转 contig",
       "移出局部视图",
@@ -543,7 +543,7 @@ test("buildAssemblyContextMenuItems passes ref fragment metadata through append-
     actions: createContextMenuActionsCapture(calls),
   });
 
-  const item = items.find((entry) => entry.label === "追加到路径");
+  const item = items.find((entry) => entry.label === "加入 Final Path");
   assert.ok(item);
   await item.run();
   assert.deepEqual(calls.at(-1), {
@@ -966,7 +966,7 @@ test("buildAssemblyContextMenuItems exposes unified fragment actions in 2-contig
   });
 
   assert.deepEqual(items.map((item) => item.label), [
-    "追加到路径",
+    "加入 Final Path",
     "移至另一轨",
     "翻转 contig",
     "移出局部视图",
@@ -1038,12 +1038,12 @@ test("buildAssemblyContextMenuItems offers phased append targets for subview-ctg
   });
 
   assert.deepEqual(
-    items.map((item) => item.label).filter((label) => label.startsWith("追加到路径 ")),
-    ["追加到路径 A", "追加到路径 B"],
+    items.map((item) => item.label).filter((label) => label.startsWith("加入 Final Path ")),
+    ["加入 Final Path A", "加入 Final Path B"],
   );
-  assert.equal(items.some((item) => item.label === "追加到路径"), false);
+  assert.equal(items.some((item) => item.label === "加入 Final Path"), false);
 
-  await items.find((item) => item.label === "追加到路径 B").run();
+  await items.find((item) => item.label === "加入 Final Path B").run();
   assert.deepEqual(calls.at(-1), {
     name: "appendTrackContigToFinalPath",
     args: [
@@ -1111,11 +1111,11 @@ test("buildAssemblyContextMenuItems offers all phased append targets for phased 
   });
 
   assert.deepEqual(
-    items.map((item) => item.label).filter((label) => label.startsWith("追加到路径 ")),
-    ["追加到路径 A", "追加到路径 B"],
+    items.map((item) => item.label).filter((label) => label.startsWith("加入 Final Path ")),
+    ["加入 Final Path A", "加入 Final Path B"],
   );
 
-  await items.find((item) => item.label === "追加到路径 B").run();
+  await items.find((item) => item.label === "加入 Final Path B").run();
   assert.equal(calls.at(-1).name, "appendTrackContigToFinalPath");
   assert.equal(calls.at(-1).args[2].phasedHaplotypeKey, "A");
   assert.deepEqual(calls.at(-1).args[3], {
@@ -1166,11 +1166,11 @@ test("buildAssemblyContextMenuItems offers all phased append targets in subview-
   });
 
   assert.deepEqual(
-    items.map((item) => item.label).filter((label) => label.startsWith("追加到路径 ")),
-    ["追加到路径 A", "追加到路径 B"],
+    items.map((item) => item.label).filter((label) => label.startsWith("加入 Final Path ")),
+    ["加入 Final Path A", "加入 Final Path B"],
   );
 
-  await items.find((item) => item.label === "追加到路径 B").run();
+  await items.find((item) => item.label === "加入 Final Path B").run();
   assert.deepEqual(calls.at(-1), {
     name: "appendTrackContigToFinalPath",
     args: [
@@ -1233,7 +1233,7 @@ test("buildAssemblyContextMenuItems exposes fragment-local subview actions in tr
   });
 
   assert.deepEqual(items.map((item) => item.label), [
-    "追加到路径",
+    "加入 Final Path",
     "移至另一轨",
     "翻转 contig",
     "移出局部视图",
@@ -1488,7 +1488,7 @@ test("buildAssemblyContextMenuItems exposes append-to-path for any main-view ctg
     actions: createContextMenuActionsCapture(calls),
   });
 
-  const item = items.find((entry) => entry.label === "追加到路径");
+  const item = items.find((entry) => entry.label === "加入 Final Path");
   assert.ok(item);
   await item.run();
   assert.deepEqual(calls.at(-1), {
@@ -1571,7 +1571,7 @@ test("buildAssemblyContextMenuItems exposes append-to-path for subview ctg conta
     actions: createContextMenuActionsCapture(calls),
   });
 
-  const item = items.find((entry) => entry.label === "追加到路径");
+  const item = items.find((entry) => entry.label === "加入 Final Path");
   assert.ok(item);
   await item.run();
   assert.deepEqual(calls.at(-1), {

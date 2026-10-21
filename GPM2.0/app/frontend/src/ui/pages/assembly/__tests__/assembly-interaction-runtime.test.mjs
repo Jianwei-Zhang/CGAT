@@ -2766,7 +2766,7 @@ test("manual split remains available without a Ref alignment while envelope shor
 test("other-chr alignment menu is independent from split and targets just the clicked primary contig",async()=>{
   const calls=[];const store=createStore(createState({assembly:{selectedChrName:"Chr01",trackSelectedCtgIds:[],chrCtgs:[{assemblyCtgId:2,totalLength:1000,name:"tig",hits:[]}]}}));
   const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:"primary"},memberNode:null,host:{},store,actions:{canEditTrackCtg:()=>true,openContigChrAlignments:async(_h,_s,args)=>calls.push(args)}});
-  const item=items.find(i=>i.label==="查看其他 chr 比对…");assert.ok(item);assert.equal(item.disabled,false);assert.equal(item.children,undefined);await item.run();assert.deepEqual(calls,[{assemblyCtgId:2}]);
+  const item=items.find(i=>i.label==="跨 chr 比对…");assert.ok(item);assert.ok(!item.disabled);assert.equal(item.children,undefined);await item.run();assert.deepEqual(calls,[{assemblyCtgId:2,trackRole:"primary"}]);
 });
 
 test("undo-split menu appears immediately below split only for split fragments and dispatches the selected side", async () => {
@@ -2790,5 +2790,18 @@ test("undo-split menu appears immediately below split only for split fragments a
     assert.ok(!menu(3,"support").some((i)=>i.label===undo.label));
     store.setState({assembly:{...store.getState().assembly,chrCtgs:[{assemblyCtgId:3,totalLength:1000}]}});
     assert.ok(!menu(3).some((i)=>i.label===undo.label));
+  }
+});
+
+
+test("cross-chr entry is available for full, split, single-base, auxiliary, phased and unplaced contigs", async () => {
+  for (const [role,chrName,length] of [["primary","Chr01",1000],["primary","Chr01",1],["primary","unplaced",1000],["support","Chr01",1000],["phased","Chr01",1000]]) {
+    const ctg={assemblyCtgId:2,totalLength:length,orient:"+",originSourceSeqId:1};
+    const store=createStore(createState({assembly:{selectedChrName:chrName,chrCtgs:role==="support"?[]:[ctg],supportChrCtgs:role==="support"?[ctg]:[],trackSelectedCtgIds:[]}}));
+    const calls=[];
+    const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:role},memberNode:null,host:{},store,
+      actions:{canEditTrackCtg:()=>false,openContigChrAlignments:async(_h,_s,args)=>calls.push(args)}});
+    const item=items.find(i=>i.label==="跨 chr 比对…");assert.ok(item,`${role}/${chrName}/${length}`);assert.ok(!item.disabled);
+    await item.run();assert.deepEqual(calls,[{assemblyCtgId:2,trackRole:role}]);
   }
 });

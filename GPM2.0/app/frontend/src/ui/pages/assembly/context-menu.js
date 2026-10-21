@@ -1,4 +1,4 @@
-import { chrAlignmentCopy } from "./contig-chr-alignments.js";
+import { chrAlignmentCopy, resolveContigChrAlignmentModel } from "./contig-chr-alignments.js";
 import { splitCopy, resolveContigUnsplitModel, resolveContigSplitBoundaries, highlightContigSplitBoundary, resolveContigSplitModel } from "./contig-split-boundary.js";
 import {
   buildSupportMirrorKey,
@@ -912,6 +912,13 @@ export function buildAssemblyContextMenuItems({
   }
 
   if (ctgContext && !deletedCtgContext && !memberNode && !subviewTrackPairContext) {
+    if (!isRefTrackContext && typeof contextMenuActions.openContigChrAlignments === "function") {
+      const target = { assemblyCtgId: contextCtgId, trackRole: ctgTrackRole };
+      if (resolveContigChrAlignmentModel(state.assembly, target)) {
+        items.push({ label: chrAlignmentCopy[state.locale === "en" ? "en" : "zh"].title,
+          run: () => contextMenuActions.openContigChrAlignments(host, store, target) });
+      }
+    }
     if (typeof addContextCtgToComposition === "function") {
       items.push({
         label: i18n.contextMenu.addToSubviewTop,
@@ -1275,12 +1282,6 @@ export function buildAssemblyContextMenuItems({
         });
       }
       if (!isSupportTrackCtg) {
-        if (!isPhasedCtgContext && typeof contextMenuActions.openContigChrAlignments === "function"
-          && String(state.assembly.selectedChrName || "").toLowerCase() !== "unplaced") {
-          items.push({label:chrAlignmentCopy[state.locale === "en" ? "en" : "zh"].title,
-            disabled:!resolveContigSplitModel(state.assembly,ctgId),
-            run:()=>contextMenuActions.openContigChrAlignments(host,store,{assemblyCtgId:ctgId})});
-        }
         if (!isPhasedCtgContext && typeof contextMenuActions.splitContigAtRefBoundary === "function"
           && String(state.assembly.selectedChrName || "").toLowerCase() !== "unplaced") {
           const labels = splitCopy[state.locale === "en" ? "en" : "zh"];

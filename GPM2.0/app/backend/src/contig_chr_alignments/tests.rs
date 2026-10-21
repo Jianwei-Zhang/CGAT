@@ -2,7 +2,7 @@ use super::*;
 use crate::db::init_workspace_schema;
 use crate::main_view_history::{
     MainViewHistoryTargetParams, RunMainViewEditorActionParams, redo_main_view_history,
-    run_main_view_editor_action, undo_main_view_history,
+    run_main_view_editor_action, undo_main_view_history, get_main_view_history_status,
 };
 use tempfile::{TempDir, tempdir};
 fn seed() -> Result<(TempDir, std::path::PathBuf)> {
@@ -57,7 +57,7 @@ fn add(
 fn history() -> MainViewHistoryTargetParams {
     MainViewHistoryTargetParams {
         project_id: 1,
-        chr_name: "A".into(),
+        chr_name: "B".into(),
         history_capacity: None,
     }
 }
@@ -380,5 +380,144 @@ fn uncached_legacy_reference_fasta_is_read_without_attempting_cache_writes() -> 
             .get(0))?,
         0
     );
+    Ok(())
+}
+
+
+#[test]
+fn additions_belong_only_to_destination_history_and_keep_source_steps_independent() -> Result<()> {
+    let (_dir, db) = seed()?;
+    run_main_view_editor_action(&db, &RunMainViewEditorActionParams {
+        project_id:1,chr_name:"A".into(),history_capacity:None,action:"split-manual-contig".into(),
+        args:json!({"assemblyCtgId":1,"sourceStart":40001,"sourceEnd":100000,"orient":"-","cutAfter":70000}),
+    })?;
+    let source_history = MainViewHistoryTargetParams { chr_name:"A".into(), ..history() };
+    let before = get_main_view_history_status(&db,&source_history)?;
+    let result = run_main_view_editor_action(&db,&RunMainViewEditorActionParams {
+        project_id:1,chr_name:"A".into(),history_capacity:None,action:"add-contig-to-chr".into(),
+        args:json!({"assemblyCtgId":3,"sourceSeqId":1,"sourceStart":70001,"sourceEnd":100000,"orient":"-","targetChrName":"B","minAlignmentLength":10000,"minIdentityPct":90.0}),
+    })?;
+    assert_eq!(result.status.chr_name,"B");
+    assert_eq!(result.status.applied_operation_count,1);
+    assert_eq!(get_main_view_history_status(&db,&source_history)?,before);
+    assert!(undo_main_view_history(&db,&source_history)?.changed);
+    let conn=Connection::open(&db)?;
+    assert_eq!(conn.query_row::<i64,_,_>("SELECT COUNT(*) FROM assembly_ctg WHERE assigned_chr_name='B'",[],|r|r.get(0))?,1);
+    assert!(undo_main_view_history(&db,&history())?.changed);
+    assert_eq!(conn.query_row::<i64,_,_>("SELECT COUNT(*) FROM assembly_ctg WHERE assigned_chr_name='B'",[],|r|r.get(0))?,0);
+    assert!(redo_main_view_history(&db,&history())?.changed);
+    assert!(redo_main_view_history(&db,&source_history)?.changed);
+    Ok(())
+}
+
+#[test]
+fn destination_add_history_ignores_unrelated_paths_but_protects_adoption_on_any_chr() -> Result<()> {
+    for adopted in [false,true] {
+        let (_dir,db)=seed()?;
+        let result=add(&db,false)?;
+        let id=result.affected_ctg_ids[0];
+        let conn=Connection::open(&db)?;
+        let segment=if adopted {json!({"type":"ctg","assemblyCtgId":id})} else {json!({"type":"gap","gapSizeBp":17})};
+        conn.execute("UPDATE project_assembly_view_state SET final_path_by_chr_json=?1",[json!({"A":{"segments":[segment]},"B":{"segments":[]}}).to_string()])?;
+        let before=view(&conn)?;
+        let undo=undo_main_view_history(&db,&history())?;
+        assert_eq!(undo.changed,!adopted);
+        assert_eq!(undo.invalidated,adopted);
+        assert_eq!(view(&conn)?,before,"never overwrite the source chromosome's path");
+    }
+    Ok(())
+}
+
+#[test]
+fn full_contigs_and_auxiliary_dataset_sources_support_cross_chr_inspection_and_addition() -> Result<()> {
+    for auxiliary in [false,true] {
+        let (_dir,db)=seed()?;
+        let conn=Connection::open(&db)?;
+        conn.execute("UPDATE assembly_seq SET instance_key='chr:1',source_start=1,source_end=100000,source_seq_id=?1 WHERE id=1",[if auxiliary {2} else {1}])?;
+        if auxiliary {conn.execute("UPDATE ref_alignment_hit SET source_seq_id=2,dataset_id=2",[])?;}
+        assert!(crate::main_view::load_source_fragment(&conn,1)?.is_none());
+        let preview=get_contig_chr_alignments(&db,1,&request())?;
+        assert_eq!(preview.source.source_start,1);
+        assert_eq!(preview.source.source_end,100000);
+        assert!(preview.items.iter().any(|i|i.candidate.chr_name=="B"));
+        let result=run_main_view_editor_action(&db,&RunMainViewEditorActionParams {
+            project_id:1,chr_name:"A".into(),history_capacity:None,action:"add-contig-to-chr".into(),
+            args:json!({"assemblyCtgId":1,"sourceSeqId":if auxiliary {2} else {1},"sourceStart":1,"sourceEnd":100000,"orient":"-","targetChrName":"B","minAlignmentLength":10000,"minIdentityPct":90.0}),
+        })?;
+        let id=result.affected_ctg_ids[0];
+        let source:(i64,i64,i64)=conn.query_row("SELECT s.source_seq_id,s.source_start,s.source_end FROM assembly_ctg c JOIN assembly_seq s ON s.id=c.assembly_seq_id WHERE c.id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?)))?;
+        assert_eq!(source,(if auxiliary {2} else {1},1,100000));
+        assert_eq!(result.status.chr_name,"B");
+        assert!(undo_main_view_history(&db,&history())?.changed);
+        assert!(redo_main_view_history(&db,&history())?.changed);
+        if auxiliary {assert!(crate::contig_split::load_split_source(&conn,1,1).is_err(),"split remains primary-only");}
+    }
+    Ok(())
+}
+
+#[test]
+fn unplaced_and_mirrored_sources_validate_actual_source_chr_but_record_destination_history() -> Result<()> {
+    for unplaced in [false,true] {
+        let (_dir,db)=seed()?;
+        let conn=Connection::open(&db)?;
+        if unplaced {conn.execute("UPDATE assembly_ctg SET assigned_chr_name=NULL WHERE id=1",[])?;}
+        let source_chr=if unplaced {"unplaced"} else {"A"};
+        let result=run_main_view_editor_action(&db,&RunMainViewEditorActionParams {
+            project_id:1,chr_name:if unplaced {"unplaced"} else {"C"}.into(),history_capacity:None,action:"add-contig-to-chr".into(),
+            args:json!({"assemblyCtgId":1,"sourceSeqId":1,"sourceChrName":source_chr,"sourceStart":40001,"sourceEnd":100000,"orient":"-","targetChrName":"B","minAlignmentLength":10000,"minIdentityPct":90.0}),
+        })?;
+        assert_eq!(result.status.chr_name,"B");
+        assert!(undo_main_view_history(&db,&history())?.changed);
+    }
+    Ok(())
+}
+
+#[test]
+fn destination_add_history_protects_new_degap_jobs_without_owning_source_jobs() -> Result<()> {
+    for target_job in [false,true] {
+        let (_dir,db)=seed()?;
+        let result=add(&db,false)?;
+        let conn=Connection::open(&db)?;
+        let id=if target_job {result.affected_ctg_ids[0]} else {1};
+        let state=json!({"jobs":[{"source":{"assemblyCtgId":id}}]}).to_string();
+        conn.execute("UPDATE project_assembly_view_state SET degap_project_state_json=?1",[&state])?;
+        let undo=undo_main_view_history(&db,&history())?;
+        assert_eq!(undo.changed,!target_job);
+        assert_eq!(undo.invalidated,target_job);
+        assert_eq!(conn.query_row::<String,_,_>("SELECT degap_project_state_json FROM project_assembly_view_state",[],|r|r.get(0))?,state);
+    }
+    Ok(())
+}
+
+
+#[test]
+fn adding_preserves_source_redo_and_appends_to_existing_destination_steps() -> Result<()> {
+    let (_dir,db)=seed()?;
+    let conn=Connection::open(&db)?;
+    existing(&conn,1,1,10000,false)?;
+    let edit=|chr:&str,id:i64,name:&str| run_main_view_editor_action(&db,&RunMainViewEditorActionParams {
+        project_id:1,chr_name:chr.into(),history_capacity:None,action:"rename-ctg".into(),args:json!({"assemblyCtgId":id,"newName":name}),
+    });
+    edit("A",1,"source-renamed")?;
+    let source_history=MainViewHistoryTargetParams {chr_name:"A".into(),..history()};
+    assert!(undo_main_view_history(&db,&source_history)?.changed);
+    let source_before=get_main_view_history_status(&db,&source_history)?;
+    assert!(source_before.can_redo);
+    edit("B",2,"destination-renamed")?;
+    let added=add(&db,false)?;
+    assert_eq!(added.status.applied_operation_count,2);
+    assert_eq!(get_main_view_history_status(&db,&source_history)?,source_before);
+    assert!(undo_main_view_history(&db,&history())?.changed);
+    assert_eq!(conn.query_row::<String,_,_>("SELECT name FROM assembly_ctg WHERE id=2",[],|r|r.get(0))?,"destination-renamed");
+    assert!(undo_main_view_history(&db,&history())?.changed);
+    assert_eq!(conn.query_row::<String,_,_>("SELECT name FROM assembly_ctg WHERE id=2",[],|r|r.get(0))?,"renamed");
+    assert!(redo_main_view_history(&db,&history())?.changed);
+    assert!(redo_main_view_history(&db,&history())?.changed);
+    assert!(redo_main_view_history(&db,&source_history)?.changed);
+    assert!(crate::main_view_history::reset_main_view_history(&db,&history())?.changed);
+    assert_eq!(conn.query_row::<i64,_,_>("SELECT COUNT(*) FROM assembly_ctg WHERE assigned_chr_name='B'",[],|r|r.get(0))?,1);
+    assert_eq!(conn.query_row::<String,_,_>("SELECT name FROM assembly_ctg WHERE id=1",[],|r|r.get(0))?,"source-renamed");
+    assert!(undo_main_view_history(&db,&history())?.changed);
+    assert_eq!(conn.query_row::<i64,_,_>("SELECT COUNT(*) FROM assembly_ctg WHERE assigned_chr_name='B'",[],|r|r.get(0))?,2);
     Ok(())
 }

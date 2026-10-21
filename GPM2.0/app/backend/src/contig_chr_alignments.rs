@@ -1,6 +1,6 @@
 //! Read-only, fragment-scoped cross-chromosome evidence and semantic presence checks.
 use crate::contig_split::{
-    SplitCandidate, SplitHit, SplitSource, load_source_hits, load_split_source, rank_candidates,
+    SplitCandidate, SplitHit, SplitSource, load_source_hits, load_chr_alignment_source, rank_candidates,
 };
 use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
@@ -56,7 +56,7 @@ pub(crate) fn preview_with_connection(
     {
         bail!("CTG_CHR_INVALID_FILTER: invalid alignment filters");
     }
-    let source = load_split_source(conn, project_id, request.assembly_ctg_id)?;
+    let source = load_chr_alignment_source(conn, project_id, request.assembly_ctg_id)?;
     let raw = load_source_hits(conn, project_id, &source)?
         .into_iter()
         .map(|h| (h.id, h))

@@ -5,6 +5,7 @@ import { runMainViewHistoryControlAction } from "../main-view-history-runtime.js
 import {
   isMainViewHistoryEligibleAction,
   normalizeMainViewHistoryStatus,
+  resolveMainViewHistoryAfterMutation,
 } from "../main-view-history-state.js";
 
 function createStore(overrides = {}) {
@@ -174,4 +175,17 @@ test("main-view history invalidation reports one error without a duplicate statu
   assert.match(store.getState().assembly.actionError, /历史.*不一致/);
   assert.equal(store.getState().assembly.actionStatus, "");
   assert.equal(store.getState().assembly.mainViewHistory.inFlight, false);
+});
+
+
+test("destination mutation status never overwrites the source chromosome history", () => {
+  const source={chrName:"chr1",canUndo:true,canRedo:true,canReset:true,appliedOperationCount:2,retainedOperationCount:3,
+    undoOperation:{kind:"split-manual-contig",targetCount:1,targetName:"source"},redoOperation:{kind:"rename-ctg",targetCount:1,targetName:"source"}};
+  const destination={chrName:"chr2",canUndo:true,canRedo:false,appliedOperationCount:5,retainedOperationCount:5,
+    undoOperation:{kind:"add-contig-to-chr",targetCount:1,targetName:"source → chr2"}};
+  const onSource=resolveMainViewHistoryAfterMutation(source,destination,"chr1");
+  assert.equal(onSource.chrName,"chr1");assert.equal(onSource.appliedOperationCount,2);assert.equal(onSource.canRedo,true);
+  assert.equal(onSource.undoOperation.kind,"split-manual-contig");
+  const onDestination=resolveMainViewHistoryAfterMutation(source,destination,"chr2");
+  assert.equal(onDestination.chrName,"chr2");assert.equal(onDestination.appliedOperationCount,5);assert.equal(onDestination.undoOperation.kind,"add-contig-to-chr");
 });

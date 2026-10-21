@@ -74,3 +74,11 @@ export function isMainViewHistoryEligibleAction(action, args = {}) {
   }
   return MAIN_VIEW_HISTORY_ELIGIBLE_ACTIONS.has(normalized);
 }
+
+// A mutation may belong to another chromosome (e.g. a cross-chr add).
+// Never replace the current view's history with the destination's status.
+export function resolveMainViewHistoryAfterMutation(currentStatus, mutationStatus, chrName) {
+  return normalizeMainViewHistoryStatus(
+    mutationStatus?.chrName === chrName ? mutationStatus : currentStatus, { chrName },
+  );
+}

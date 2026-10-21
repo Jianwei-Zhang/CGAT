@@ -14,6 +14,7 @@ use serde_json::{Value, json};
 struct Request {
     assembly_ctg_id: i64,
     source_seq_id: i64,
+    source_chr_name: Option<String>,
     source_start: i64,
     source_end: i64,
     orient: String,
@@ -43,7 +44,7 @@ pub(super) fn prepare_add(
     )?;
     let source = &preview.source;
     if source.source_seq_id != r.source_seq_id
-        || source.assigned_chr_name.as_deref() != Some(chr)
+        || source.assigned_chr_name.as_deref().unwrap_or("unplaced") != r.source_chr_name.as_deref().unwrap_or(chr)
         || source.source_start != r.source_start
         || source.source_end != r.source_end
         || source.orient != r.orient
@@ -80,7 +81,10 @@ pub(super) fn prepare_add(
         ctg_ids: vec![ctg_id],
         seq_ids: vec![seq_id],
         dependency_ctg_ids: if !existing { vec![ctg_id] } else { vec![] },
-        include_view_state: !existing,
+        // Addition never writes Final Path. Guard the destination/adopted object
+        // without owning or restoring unrelated chromosomes' paths.
+        include_view_state: false,
+        protected_final_path_chr_names: vec![r.target_chr_name.clone()],
         layout_scope: if existing && item.existing_hidden {
             ProjectViewLayoutScope {
                 primary_visibility_keys: vec![PrimaryVisibilityKey {

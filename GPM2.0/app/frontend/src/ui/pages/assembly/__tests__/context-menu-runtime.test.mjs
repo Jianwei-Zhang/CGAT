@@ -462,7 +462,7 @@ test("bindAssemblyContextMenu renders fragment menu entries for subview fragment
     globalThis.window = originalWindow;
   }
 
-  assert.match(menuState.innerHTML, /追加到路径/);
+  assert.match(menuState.innerHTML, /加入 Final Path/);
   assert.match(menuState.innerHTML, /翻转 contig/);
   assert.doesNotMatch(menuState.innerHTML, /进入 Ctg8 菜单/);
 });
@@ -665,7 +665,7 @@ test("bindAssemblyContextMenu renders track-pair fragment local actions", () => 
     globalThis.window = originalWindow;
   }
 
-  assert.match(menuState.innerHTML, /追加到路径/);
+  assert.match(menuState.innerHTML, /加入 Final Path/);
   assert.match(menuState.innerHTML, /翻转 contig/);
   assert.match(menuState.innerHTML, /移出局部视图/);
   assert.doesNotMatch(menuState.innerHTML, /进入 Ctg30 菜单/);

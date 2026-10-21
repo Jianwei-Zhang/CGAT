@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, OptionalExtension, params};
@@ -19,6 +19,7 @@ pub(super) fn is_history_conflict(error: &anyhow::Error) -> bool {
 
 pub(super) fn snapshot_scope(snapshot: &DatabaseSnapshot) -> SnapshotScope {
     SnapshotScope {
+        protected_final_path_chr_names: snapshot.protected_final_path_chr_names.clone(),
         ctg_ids: snapshot.ctg_ids.clone(),
         seq_ids: snapshot.seq_ids.clone(),
         deleted_record_ids: snapshot.deleted_record_ids.clone(),
@@ -50,6 +51,7 @@ pub(super) fn merge_snapshot_scopes<'a>(
             .export_record_ids
             .extend(snapshot.export_record_ids.iter().copied());
         scope.include_view_state |= snapshot.include_view_state;
+        scope.protected_final_path_chr_names.extend(snapshot.protected_final_path_chr_names.iter().cloned());
         scope
             .layout_scope
             .track_offset_keys
@@ -122,6 +124,7 @@ pub(super) fn capture_snapshot(
         None
     };
     let layout_state = capture_project_view_layout(conn, project_id, &resolved_scope.layout_scope)?;
+    let (protected_final_paths, protected_degap_state) = capture_protected_final_paths(conn, project_id, &resolved_scope)?;
 
     Ok(DatabaseSnapshot {
         ctg_ids: resolved_scope.ctg_ids,
@@ -140,6 +143,9 @@ pub(super) fn capture_snapshot(
         view_state,
         layout_scope: resolved_scope.layout_scope,
         layout_state,
+        protected_final_paths,
+        protected_final_path_chr_names: resolved_scope.protected_final_path_chr_names,
+        protected_degap_state,
     })
 }
 
@@ -412,6 +418,8 @@ pub(super) fn apply_snapshot(
 }
 
 fn normalize_scope(scope: &mut SnapshotScope) {
+    scope.protected_final_path_chr_names.sort();
+    scope.protected_final_path_chr_names.dedup();
     normalize_ids(&mut scope.ctg_ids);
     normalize_ids(&mut scope.seq_ids);
     normalize_ids(&mut scope.deleted_record_ids);
@@ -625,6 +633,52 @@ fn load_export_record(
     )
     .optional()
     .context("failed to capture export record history state")
+}
+
+// Guard only destination paths, plus any adoption of the owned contigs elsewhere.
+// Unrelated source-chromosome edits must not invalidate destination-only history.
+type ProtectedFinalPaths = BTreeMap<String, Option<Value>>;
+
+fn capture_protected_final_paths(
+    conn: &Connection, project_id: i64, scope: &SnapshotScope,
+) -> Result<(ProtectedFinalPaths, Option<Value>)> {
+    if scope.protected_final_path_chr_names.is_empty() { return Ok((BTreeMap::new(), None)); }
+    let view = load_project_view_dependency(conn, project_id)?;
+    let paths: Value = serde_json::from_str(view.as_ref().map(|v| v.final_path_by_chr_json.as_str()).unwrap_or("{}"))?;
+    let mut result: BTreeMap<_, _> = scope.protected_final_path_chr_names.iter()
+        .map(|chr| {
+            let mut path = paths.get(chr).cloned();
+            // Visibility IDs are a set. Scoped visibility restoration may append
+            // an ID in a different order without changing the actual state.
+            if let Some(ids) = path.as_mut().and_then(|p| p.get_mut("hiddenPrimaryCtgIds")).and_then(Value::as_array_mut) {
+                ids.sort_by_cached_key(Value::to_string);
+                ids.dedup();
+            }
+            (chr.clone(), path)
+        }).collect();
+    let ids = scope.ctg_ids.iter().copied().collect::<BTreeSet<_>>();
+    if let Some(paths) = paths.as_object() {
+        for (chr, path) in paths {
+            if result.contains_key(chr) { continue; }
+            let segments: Vec<Value> = path.get("segments").and_then(Value::as_array).into_iter().flatten()
+                .filter(|segment| references_owned_contig(segment, &ids)).cloned().collect();
+            if !segments.is_empty() {
+                result.insert(chr.clone(), Some(Value::Array(segments)));
+            }
+        }
+    }
+    let degap: Value = serde_json::from_str(view.as_ref().map(|v| v.degap_project_state_json.as_str()).unwrap_or("{}"))?;
+    let protected_degap = references_owned_contig(&degap, &ids).then_some(degap);
+    Ok((result, protected_degap))
+}
+fn references_owned_contig(value: &Value, ids: &BTreeSet<i64>) -> bool {
+    match value {
+        Value::Array(items) => items.iter().any(|v| references_owned_contig(v, ids)),
+        Value::Object(object) => ["assemblyCtgId", "assembly_ctg_id", "splitFragmentCtgId"].iter()
+            .any(|key| object.get(*key).and_then(Value::as_i64).is_some_and(|id| ids.contains(&id)))
+            || object.values().any(|v| references_owned_contig(v, ids)),
+        _ => false,
+    }
 }
 
 fn load_project_view_dependency(

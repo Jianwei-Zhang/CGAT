@@ -446,6 +446,20 @@ pub(crate) fn load_split_source(
     project_id: i64,
     assembly_ctg_id: i64,
 ) -> Result<SplitSource> {
+    load_contig_source(conn, project_id, assembly_ctg_id, true)
+}
+
+// Cross-chromosome inspection/addition also supports auxiliary-dataset contigs;
+// splitting retains its existing primary-only contract.
+pub(crate) fn load_chr_alignment_source(
+    conn: &Connection, project_id: i64, assembly_ctg_id: i64,
+) -> Result<SplitSource> {
+    load_contig_source(conn, project_id, assembly_ctg_id, false)
+}
+
+fn load_contig_source(
+    conn: &Connection, project_id: i64, assembly_ctg_id: i64, primary_only: bool,
+) -> Result<SplitSource> {
     conn.query_row(
         "SELECT c.id,s.id,s.source_seq_id,c.name,d.name,q.seq_name,s.source_start,s.source_end,
                 q.length,s.orient,c.assigned_chr_name,c.anchor_start,s.instance_key
@@ -453,8 +467,8 @@ pub(crate) fn load_split_source(
          JOIN source_seq q ON q.id=s.source_seq_id JOIN dataset d ON d.id=q.dataset_id
          JOIN project p ON p.id=c.project_id
          WHERE c.id=?1 AND c.project_id=?2 AND s.project_id=?2 AND s.hidden=0
-           AND q.dataset_id=p.primary_dataset_id",
-        params![assembly_ctg_id, project_id],
+           AND (?3=0 OR q.dataset_id=p.primary_dataset_id)",
+        params![assembly_ctg_id, project_id, primary_only],
         |r| {
             Ok(SplitSource {
                 assembly_ctg_id: r.get(0)?,
@@ -473,5 +487,5 @@ pub(crate) fn load_split_source(
             })
         },
     )
-    .context("CTG_SPLIT_INVALID_TARGET: select a visible primary contig")
+    .context("CTG_SPLIT_INVALID_TARGET: select a visible contig with an eligible source")
 }

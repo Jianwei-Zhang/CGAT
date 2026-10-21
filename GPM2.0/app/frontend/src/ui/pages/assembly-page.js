@@ -1,6 +1,6 @@
-import { openContigChrAlignments, chrAlignmentCopy } from "./assembly/contig-chr-alignments.js";
+import { openContigChrAlignments, chrAlignmentCopy, resolveContigChrAlignmentModel } from "./assembly/contig-chr-alignments.js";
 import { openManualContigSplit } from "./assembly/manual-contig-split.js";
-import { normalizeMainViewHistoryStatus } from "./assembly/main-view-history-state.js";
+import { normalizeMainViewHistoryStatus, resolveMainViewHistoryAfterMutation } from "./assembly/main-view-history-state.js";
 import { splitCopy, resolveContigUnsplitModel, resolveContigSplitBoundaries, resolveContigSplitModel } from "./assembly/contig-split-boundary.js";
 import { setTrackDragGroupOffsets, setSubviewDragGroupOffsets, moveSubviewCompositionDrag } from "./assembly/source-fragment-drag.js";
 import { requestAppPrompt } from "../shell/app-dialog.js";
@@ -3054,25 +3054,27 @@ async function openAssemblyManualContigSplit(host, store, { assemblyCtgId }) {
   });
 }
 
-async function openAssemblyContigChrAlignments(host,store,{assemblyCtgId}) {
+async function openAssemblyContigChrAlignments(host,store,context) {
+  const {assemblyCtgId}=context;
   const state=store.getState();
   if(state.assembly?.mainViewHistory?.inFlight || state.assembly?.loading) return false;
-  const model=resolveContigSplitModel(state.assembly,assemblyCtgId);if(!model)return false;
-  const sourceId=state.assembly.chrCtgs.find(c=>Number(c.assemblyCtgId)===Number(assemblyCtgId))?.originSourceSeqId;
+  const model=resolveContigChrAlignmentModel(state.assembly,context);if(!model)return false;
+  const sourceId=model.sourceSeqId;
   const labels=chrAlignmentCopy[state.locale==="en"?"en":"zh"];
   const payload={workspaceRoot:state.session.workspacePath,projectId:state.session.projectId,
     args:{assemblyCtgId,minAlignmentLength:model.minAlignmentLength,minIdentityPct:model.minIdentityPct}};
   const isCurrent=()=>{
-    const latest=store.getState(),live=resolveContigSplitModel(latest.assembly,assemblyCtgId);
-    const liveId=latest.assembly.chrCtgs.find(c=>Number(c.assemblyCtgId)===Number(assemblyCtgId))?.originSourceSeqId;
+    const latest=store.getState(),live=resolveContigChrAlignmentModel(latest.assembly,context);
+    const liveId=live?.sourceSeqId;
     return latest.session.workspacePath===payload.workspaceRoot && latest.session.projectId===payload.projectId
       && latest.assembly.selectedChrName===model.chrName && live?.sourceStart===model.sourceStart
-      && live?.sourceEnd===model.sourceEnd && live?.orient===model.orient && liveId===sourceId;
+      && live?.sourceEnd===model.sourceEnd && live?.orient===model.orient && liveId===sourceId
+      && live?.sourceChrName===model.sourceChrName;
   };
   return openContigChrAlignments(host,{locale:state.locale,isCurrent,
     load:async()=>{
       const result=await getContigChrAlignments(payload),source=result.source;
-      if(!isCurrent() || source.assignedChrName!==model.chrName || source.sourceStart!==model.sourceStart
+      if(!isCurrent() || (source.assignedChrName || "unplaced")!==model.sourceChrName || source.sourceStart!==model.sourceStart
         || source.sourceEnd!==model.sourceEnd || source.orient!==model.orient
         || sourceId && Number(source.sourceSeqId)!==Number(sourceId)) throw new Error(labels.stale);
       return result;
@@ -3091,7 +3093,7 @@ async function openAssemblyContigChrAlignments(host,store,{assemblyCtgId}) {
       await selectChromosome(host,store,item.chrName);
       const latest=store.getState();
       if(latest.session.workspacePath!==payload.workspaceRoot || latest.session.projectId!==payload.projectId
-        || latest.assembly.selectedChrName!==item.chrName || !latest.assembly.chrCtgs.some(c=>Number(c.assemblyCtgId)===Number(item.existingCtgId))) throw new Error(labels.stale);
+        || latest.assembly.selectedChrName!==item.chrName || ![...(latest.assembly.chrCtgs || []),...(latest.assembly.supportChrCtgs || [])].some(c=>Number(c.assemblyCtgId)===Number(item.existingCtgId))) throw new Error(labels.stale);
       await selectCtg(host,store,item.existingCtgId,{focusMode:"center"});
     },
   });
@@ -3115,7 +3117,7 @@ async function commitAssemblyContigSplit(host, store, action, args, doneMessage 
       await loadAssemblyView(host, store, { keepCurrentChr: true, keepCurrentCtg: false, renderLoading: false });
       if (!isCurrent()) return false;
       store.setState({ assembly: { ...store.getState().assembly,
-        mainViewHistory: normalizeMainViewHistoryStatus(result.status, { chrName: payload.chrName }),
+        mainViewHistory: resolveMainViewHistoryAfterMutation(store.getState().assembly.mainViewHistory, result.status, payload.chrName),
         trackSelectedCtgIds: [], actionError: "", actionStatus: action === "add-contig-to-chr" && !result.changed
           ? chrAlignmentCopy[state.locale === "en" ? "en" : "zh"].existing : doneMessage || labels.done } });
       rerenderAssemblyMainTab(host, store);

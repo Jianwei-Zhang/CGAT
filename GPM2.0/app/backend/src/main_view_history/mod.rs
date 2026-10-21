@@ -76,12 +76,21 @@ pub fn run_main_view_editor_action(
     project_db_path: &Path,
     params: &RunMainViewEditorActionParams,
 ) -> Result<MainViewHistoryMutationSummary> {
-    validate_target_params(params.project_id, &params.chr_name)?;
     let action = params.action.trim().to_ascii_lowercase();
+    // Cross-chromosome additions affect the destination, not the source history.
+    // Keep params.chr_name as source-view context for mutation preconditions.
+    let history_chr = if action == "add-contig-to-chr" {
+        params.args.get("targetChrName").and_then(serde_json::Value::as_str)
+            .filter(|name| !name.trim().is_empty())
+            .context("CTG_CHR_INVALID_REQUEST: targetChrName is required")?
+    } else {
+        &params.chr_name
+    };
+    validate_target_params(params.project_id, history_chr)?;
     run_new_mutation(
         project_db_path,
         params.project_id,
-        &params.chr_name,
+        history_chr,
         params.history_capacity,
         |conn| {
             prepare_editor_mutation(

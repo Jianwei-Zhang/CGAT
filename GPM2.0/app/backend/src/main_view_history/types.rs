@@ -241,6 +241,13 @@ pub(super) struct DatabaseSnapshot {
     pub export_records: Vec<ExportRecordRow>,
     pub include_view_state: bool,
     pub view_state: Option<ProjectViewDependencyRow>,
+    /// Read-only Final Path guards; unlike view_state these are never restored wholesale.
+    #[serde(default)]
+    pub protected_final_paths: std::collections::BTreeMap<String, Option<Value>>,
+    #[serde(default)]
+    pub protected_final_path_chr_names: Vec<String>,
+    #[serde(default)]
+    pub protected_degap_state: Option<Value>,
     #[serde(default)]
     pub layout_scope: ProjectViewLayoutScope,
     #[serde(default)]
@@ -249,6 +256,7 @@ pub(super) struct DatabaseSnapshot {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub(super) struct SnapshotScope {
+    pub protected_final_path_chr_names: Vec<String>,
     pub ctg_ids: Vec<i64>,
     pub seq_ids: Vec<i64>,
     pub deleted_record_ids: Vec<i64>,

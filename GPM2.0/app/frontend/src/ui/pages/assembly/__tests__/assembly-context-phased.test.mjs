@@ -209,7 +209,7 @@ test("primary track context menu toggles hide/unhide contig label by hidden stat
   assert.ok(hiddenItems.every((item) => item.label !== "隐藏 contig"));
 });
 
-test("support track context menu exposes mirror toggle and mirror bar keeps only unmirror action", () => {
+test("support and mirror menus expose cross-chr inspection while mirror editing stays restricted", () => {
   const host = {};
   const store = createStore(
     createState({
@@ -268,12 +268,13 @@ test("support track context menu exposes mirror toggle and mirror bar keeps only
 
   assert.ok(supportItems.includes("翻转 contig"));
   assert.ok(supportItems.includes("重命名 contig..."));
-  assert.ok(supportItems.includes("追加到路径"));
+  assert.ok(supportItems.includes("加入 Final Path"));
   assert.ok(supportItems.includes("撤销镜像 contig"));
   assert.deepEqual(mirrorItems, [
+    "跨 chr 比对…",
     "加入局部视图上轨",
     "加入局部视图下轨",
-    "追加到路径",
+    "加入 Final Path",
     "撤销镜像 contig",
   ]);
 });
@@ -314,13 +315,13 @@ test("phased mode primary contig context menu offers per-haplotype add and appen
   const labels = items.map((item) => item.label);
 
   assert.deepEqual(
-    labels.filter((label) => label.startsWith("添加至轨道 ") || label.startsWith("追加到路径 ")),
-    ["添加至轨道 Chr01A", "添加至轨道 Chr01B", "追加到路径 A", "追加到路径 B"],
+    labels.filter((label) => label.startsWith("添加至轨道 ") || label.startsWith("加入 Final Path ")),
+    ["添加至轨道 Chr01A", "添加至轨道 Chr01B", "加入 Final Path A", "加入 Final Path B"],
   );
-  assert.equal(labels.includes("追加到路径"), false);
+  assert.equal(labels.includes("加入 Final Path"), false);
 
   await items.find((item) => item.label === "添加至轨道 Chr01B").run();
-  await items.find((item) => item.label === "追加到路径 B").run();
+  await items.find((item) => item.label === "加入 Final Path B").run();
 
   assert.deepEqual(calls, [
     {
@@ -379,13 +380,13 @@ test("phased mode support contig context menu offers grouped per-haplotype appen
   const labels = items.map((item) => item.label);
 
   assert.deepEqual(
-    labels.filter((label) => label.startsWith("追加到路径 ")),
-    ["追加到路径 A", "追加到路径 B"],
+    labels.filter((label) => label.startsWith("加入 Final Path ")),
+    ["加入 Final Path A", "加入 Final Path B"],
   );
   assert.equal(labels.some((label) => label.startsWith("添加到 ")), false);
-  assert.equal(labels.includes("追加到路径"), false);
+  assert.equal(labels.includes("加入 Final Path"), false);
 
-  await items.find((item) => item.label === "追加到路径 B").run();
+  await items.find((item) => item.label === "加入 Final Path B").run();
 
   assert.deepEqual(calls, [
     {
@@ -546,12 +547,12 @@ test("phased track item context menu appends, flips, and removes only that phase
   assert.deepEqual(items.map((item) => item.label), [
     "加入局部视图上轨",
     "加入局部视图下轨",
-    "追加到路径 A",
-    "追加到路径 B",
+    "加入 Final Path A",
+    "加入 Final Path B",
     "翻转 contig",
     "从该分型组删除",
   ]);
-  await items.find((item) => item.label === "追加到路径 B").run();
+  await items.find((item) => item.label === "加入 Final Path B").run();
   await items.find((item) => item.label === "翻转 contig").run();
   await items.find((item) => item.label === "从该分型组删除").run();
   assert.deepEqual(calls, [

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {chrAlignmentAction,renderChrAlignmentPreview,openContigChrAlignments} from "../contig-chr-alignments.js";
-const source={assemblyCtgId:6,sourceSeqId:1,name:"tig.1",sourceStart:101,sourceEnd:1100,orient:"-"};
+import {resolveContigChrAlignmentModel,chrAlignmentAction,renderChrAlignmentPreview,openContigChrAlignments} from "../contig-chr-alignments.js";
+const source={assemblyCtgId:6,sourceSeqId:1,assignedChrName:"chrA",name:"tig.1",sourceStart:101,sourceEnd:1100,orient:"-"};
 const candidate=(overrides={})=>({chrName:"chrB",orient:"+",refLength:10000,coveragePercent:80,identityPercent:99,presence:"missing",existingCtgId:null,existingHidden:false,hits:[{queryStart:101,queryEnd:900,refStart:1001,refEnd:1800,strand:"+"}],...overrides});
 const report=(items=[candidate()])=>({source,items});
 test("actions distinguish identity, visibility, containment and partial overlap",()=>{
@@ -27,7 +27,7 @@ function harness(){
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 test("opening and selecting rows are local read-only previews",async()=>{
   const h=harness();let loads=0,writes=0;const done=openContigChrAlignments(h.host,{load:async()=>{loads++;return report([candidate(),candidate({chrName:"chrC"})]);},add:async()=>{writes++;}});
-  await tick();assert.equal(loads,1);assert.match(h.el("table").innerHTML,/片段覆盖率/);assert.match(h.el("preview").innerHTML,/chrB/);
+  await tick();assert.equal(loads,1);assert.match(h.el("table").innerHTML,/覆盖率/);assert.match(h.el("preview").innerHTML,/chrB/);
   h.clickRow(1);assert.match(h.el("preview").innerHTML,/chrC/);assert.equal(loads,1);assert.equal(writes,0);
   h.dialog().fire("cancel");await done;assert.equal(writes,0);assert.equal(h.restored(),1);
 });
@@ -36,7 +36,7 @@ test("Add writes exact source preconditions once then refreshes to Exists/Locate
   const done=openContigChrAlignments(h.host,{load:async()=>report([candidate(added?{presence:"existing",existingCtgId:42}:{})]),
     add:async args=>{writes.push(args);added=true;return true;},locate:async i=>locations.push(i.existingCtgId)});
   await tick();h.clickAction(0);await tick();assert.equal(writes.length,1);
-  assert.deepEqual(writes[0],{assemblyCtgId:6,sourceSeqId:1,sourceStart:101,sourceEnd:1100,orient:"-",targetChrName:"chrB",allowOverlap:false,revealContained:false});
+  assert.deepEqual(writes[0],{assemblyCtgId:6,sourceSeqId:1,sourceChrName:"chrA",sourceStart:101,sourceEnd:1100,orient:"-",targetChrName:"chrB",allowOverlap:false,revealContained:false});
   assert.match(h.el("table").innerHTML,/已存在/);assert.equal(locations.length,0);assert.equal(h.dialog().removed,undefined);
   h.clickAction(0);await tick();await done;assert.deepEqual(locations,[42]);assert.equal(writes.length,1);
 });
@@ -73,4 +73,34 @@ test("a target created after opening is refreshed as existing without claiming a
   const h=harness();let attempted=false;
   const done=openContigChrAlignments(h.host,{load:async()=>report([candidate(attempted?{presence:"existing",existingCtgId:42}:{})]),add:async()=>{attempted=true;return {changed:false};}});
   await tick();h.clickAction(0);await tick();assert.equal(h.el("status").textContent,"已存在");assert.match(h.el("table").innerHTML,/定位/);h.el("close").fire("click");await done;
+});
+
+
+test("cross-chr source model accepts full, split, auxiliary and single-base contigs without split eligibility", () => {
+  const full={assemblyCtgId:1,totalLength:1000,originSourceSeqId:11,orient:"+",assignedChrName:"chrA"};
+  const split={assemblyCtgId:2,totalLength:100,orient:"-",sourceFragment:{sourceSeqId:12,sourceStart:501,sourceEnd:600}};
+  const tiny={assemblyCtgId:3,totalLength:1,orient:"+",assignedChrName:null};
+  const auxiliary={assemblyCtgId:4,totalLength:2000,originSourceSeqId:14,orient:"-",assignedChrName:"chrC"};
+  const assembly={selectedChrName:"chrA",chrCtgs:[full,split,tiny],supportChrCtgs:[auxiliary],trackView:{alignmentLength:10}};
+  assert.equal(resolveContigChrAlignmentModel(assembly,1).sourceEnd,1000);
+  assert.equal(resolveContigChrAlignmentModel(assembly,2).sourceStart,501);
+  assert.equal(resolveContigChrAlignmentModel(assembly,2).sourceEnd,600);
+  assert.equal(resolveContigChrAlignmentModel(assembly,3).sourceEnd,1);
+  assert.equal(resolveContigChrAlignmentModel(assembly,3).sourceChrName,"unplaced");
+  assert.equal(resolveContigChrAlignmentModel(assembly,{assemblyCtgId:4,trackRole:"support"}).sourceSeqId,14);
+  assert.equal(resolveContigChrAlignmentModel(assembly,{assemblyCtgId:4,trackRole:"support"}).sourceChrName,"chrC");
+  assert.equal(resolveContigChrAlignmentModel(assembly,{assemblyCtgId:1,trackRole:"phased"}).sourceEnd,1000);
+  assert.equal(resolveContigChrAlignmentModel({...assembly,hiddenPrimaryCtgIds:[1]},1),null);
+  assert.equal(resolveContigChrAlignmentModel(assembly,999),null);
+  assert.equal(resolveContigChrAlignmentModel({...assembly,chrCtgs:[{...full,memberCount:2}]},1),null);
+});
+
+test("cross-chr feedback directs undo to the destination, not the source", async () => {
+  const h=harness(),writes=[];
+  const done=openContigChrAlignments(h.host,{load:async()=>report(),add:async args=>{writes.push(args);return {changed:true};}});
+  await tick();h.clickAction(0);await tick();
+  assert.equal(writes[0].sourceChrName,"chrA");
+  assert.match(h.el("status").textContent,/目标 chr 撤销/);
+  assert.doesNotMatch(h.el("status").textContent,/当前 chr 撤销/);
+  h.el("close").fire("click");await done;
 });
