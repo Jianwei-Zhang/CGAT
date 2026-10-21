@@ -1,19 +1,20 @@
 /* Owner: shared UI primitives. Reusable cards, controls, lists, status text, legacy detail blocks, and cross-feature statistics interactions. */
 
 .panel {
-  border: 1px solid #9f9f9f;
-  background: linear-gradient(#f6f6f6, #ebebeb);
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  background: var(--surface-panel, #ffffff);
   padding: 8px;
   border-radius: 0;
+  box-shadow: var(--shadow-xs);
 }
 
 .kicker {
-  color: #666;
+  color: var(--text-muted, #64748b);
   font-size: var(--font-small);
 }
 
 .muted {
-  color: #666;
+  color: var(--text-muted, #64748b);
 }
 
 .helper-hint {
@@ -27,12 +28,13 @@
 }
 
 .card {
-  border: 1px solid #c2c2c2;
-  background: #f8f8f8;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  background: var(--surface-card, #ffffff);
   padding: 10px;
   display: grid;
   gap: 8px;
   border-radius: var(--card-radius);
+  box-shadow: var(--shadow-xs);
 }
 
 .card h4 {
@@ -40,15 +42,26 @@
 }
 
 label {
-  color: #333;
-  font-weight: 700;
+  color: var(--text-secondary, #334155);
+  font-weight: 600;
 }
 
 input,
 select {
-  border: 1px solid #b9b9b9;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: var(--control-radius, 5px);
   background: #fff;
-  padding: 5px 6px;
+  color: var(--text-primary, #1e293b);
+  padding: 5px 8px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--focus-ring, #4f82b5);
+  outline-offset: 1px;
+  border-color: var(--focus-ring, #4f82b5);
 }
 
 .inline-input {
@@ -58,25 +71,66 @@ select {
 }
 
 .button {
-  border: 1px solid #a2a2a2;
-  background: linear-gradient(#fbfbfb, #dfdfdf);
-  color: #222;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: var(--control-radius, 5px);
+  background: #ffffff;
+  color: var(--text-primary, #1e293b);
   padding: 5px 10px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--surface-subtle, #f8fafc);
+  border-color: var(--border-strong, #94a3b8);
+}
+
+.button:active:not(:disabled) {
+  background: var(--surface-muted, #eef2f6);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--focus-ring, #4f82b5);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.button.primary {
+  border-color: var(--action-primary-border, #1d3f63);
+  background: var(--action-primary-bg, #234b76);
+  color: var(--action-primary-text, #ffffff);
+}
+
+.button.primary:hover:not(:disabled) {
+  border-color: var(--action-primary-hover, #1b3c60);
+  background: var(--action-primary-hover, #1b3c60);
 }
 
 .button.ghost {
-  background: linear-gradient(#ffffff, #ececec);
+  background: #ffffff;
+  border-color: var(--border-subtle, #dbe3ec);
+  color: var(--text-secondary, #334155);
+}
+
+.button.ghost:hover:not(:disabled) {
+  background: var(--surface-muted, #eef2f6);
+  border-color: var(--border-default, #cbd5e1);
+  color: var(--text-primary, #1e293b);
 }
 
 .button.tiny {
-  padding: 2px 6px;
+  padding: 2px 7px;
   font-size: var(--font-small);
 }
 
 .button.menu::after {
   content: "  >";
-  color: #555;
+  color: var(--text-muted, #64748b);
 }
 
 .final-path-log-ratio-segment:hover,
@@ -88,15 +142,17 @@ select {
 .notice.warning {
   margin: 0;
   padding: 10px 12px;
-  border: 1px solid #e3b35f;
-  background: #fff8e8;
-  color: #5b4300;
+  border: 1px solid #f59e0b;
+  border-radius: var(--card-radius);
+  background: #fffbeb;
+  color: #78350f;
 }
 
 .list,
 .checklist {
-  border: 1px solid #d1d1d1;
-  background: #fafafa;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: var(--card-radius);
+  background: var(--surface-subtle, #f8fafc);
   min-height: 120px;
   max-height: 420px;
   overflow: auto;
@@ -105,7 +161,7 @@ select {
 
 .list-item {
   padding: 4px 0;
-  border-bottom: 1px dashed #d7d7d7;
+  border-bottom: 1px dashed var(--border-subtle, #dbe3ec);
 }
 
 .list-item:last-child {
@@ -122,7 +178,7 @@ select {
 }
 
 .error-text {
-  color: #b33030;
+  color: var(--danger, #b91c1c);
   font-weight: 700;
 }
 
@@ -137,15 +193,15 @@ select {
 .list-item-button {
   width: 100%;
   border: 0;
-  border-bottom: 1px dashed #d7d7d7;
+  border-bottom: 1px dashed var(--border-subtle, #dbe3ec);
   background: transparent;
   text-align: left;
-  padding: 6px 2px;
+  padding: 6px 4px;
   cursor: pointer;
 }
 
 .list-item-button.is-active {
-  background: #ececec;
+  background: var(--surface-muted, #eef2f6);
   font-weight: 700;
 }
 
@@ -156,8 +212,14 @@ select {
 }
 
 .icon-button.danger {
-  color: #a12626;
-  border-color: #bf9999;
+  color: #b91c1c;
+  border-color: #e5b8b8;
+}
+
+.icon-button.danger:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #dc2626;
+  color: #991b1b;
 }
 
 .detail-header {
@@ -167,7 +229,7 @@ select {
 }
 
 .detail-meta {
-  color: #666;
+  color: var(--text-muted, #64748b);
   margin: 6px 0;
 }
 
@@ -177,20 +239,22 @@ select {
 }
 
 .detail-member {
-  border: 1px solid #d7d7d7;
-  background: #fafafa;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: var(--control-radius, 5px);
+  background: var(--surface-subtle, #f8fafc);
   padding: 6px;
   display: grid;
   gap: 2px;
 }
 
 .detail-member span {
-  color: #666;
+  color: var(--text-muted, #64748b);
 }
 
 .junction-report {
-  border: 1px solid #d7d7d7;
-  background: #fafafa;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: var(--control-radius, 5px);
+  background: var(--surface-subtle, #f8fafc);
   padding: 8px;
   display: grid;
   gap: 6px;
@@ -204,18 +268,21 @@ select {
 .records-table {
   width: 100%;
   border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
 }
 
 .records-table th,
 .records-table td {
-  border: 1px solid #d8d8d8;
-  padding: 6px;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  padding: 6px 8px;
   text-align: left;
   vertical-align: top;
 }
 
 .records-table th {
-  background: #efefef;
+  background: var(--surface-subtle, #f8fafc);
+  color: var(--text-secondary, #334155);
+  font-weight: 600;
 }
 
 .records-table code {
