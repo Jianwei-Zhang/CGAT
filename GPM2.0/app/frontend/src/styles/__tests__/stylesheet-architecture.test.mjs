@@ -180,3 +180,39 @@ test("internal cards share one radius token while outer panels stay square", () 
   // Do not clip generic cards: their export and combo menus may extend outside.
   assert.doesNotMatch(sharedCss.match(/\.card\s*\{([^}]*)\}/)[1], /overflow:\s*hidden/);
 });
+
+test("root tokens define unified slate surfaces, borders, focus rings, and calibrated contig colors", () => {
+  const baseCss = readFileSync(new URL("./base.css", entryUrl), "utf8");
+  for (const token of [
+    "--surface-app:",
+    "--surface-panel:",
+    "--surface-card:",
+    "--surface-subtle:",
+    "--surface-muted:",
+    "--border-subtle:",
+    "--border-default:",
+    "--text-primary:",
+    "--text-secondary:",
+    "--text-muted:",
+    "--action-primary-bg:",
+    "--focus-ring:",
+    "--shadow-xs:",
+    "--shadow-md:",
+    "--ctg-primary-fill:",
+    "--ctg-companion-fill:",
+    "--ctg-ref-fill:",
+  ]) {
+    assert.ok(baseCss.includes(token), `expected ${token} in base.css`);
+  }
+});
+
+test("shell navigation uses a segmented control bar and expanded workspace selector without legacy gray gradients", () => {
+  const shellCss = readFileSync(new URL("./shell.css", entryUrl), "utf8");
+  const stylesheet = readStylesheetTree(entryUrl);
+
+  assert.match(shellCss, /\.route-nav\s*\{[^}]*border-radius:\s*7px;[^}]*background:\s*var\(--surface-muted/);
+  assert.match(shellCss, /\.route-button\.is-active\s*\{[^}]*background:\s*#ffffff;/);
+  assert.match(shellCss, /\.nav-session-field select\s*\{[^}]*clamp\(132px,\s*18vw,\s*220px\)/);
+  assert.doesNotMatch(shellCss, /width:\s*96px;/);
+  assert.doesNotMatch(stylesheet, /linear-gradient\(#(?:fafafa|f6f6f6|fbfbfb|ffffff|f0f0f0|ededed)/);
+});

@@ -58,9 +58,10 @@
   gap: 8px;
   min-width: 0;
   padding: 12px;
-  border: 1px solid #d1d1d1;
-  background: #fbfbfb;
+  border: 1px solid #cdd6e0;
+  background: #ffffff;
   border-radius: var(--card-radius);
+  box-shadow: 0 1px 3px rgb(35 53 74 / 5%);
 }
 
 .project-export-panel h4 {
@@ -292,7 +293,8 @@
   place-items: center;
   width: 18px;
   height: 18px;
-  border: 1px solid #bdbdbd;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: 4px;
   background: #fff;
   cursor: pointer;
   list-style: none;
@@ -339,9 +341,10 @@
   max-height: 220px;
   overflow: auto;
   padding: 6px;
-  border: 1px solid #bdbdbd;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: 6px;
   background: #fff;
-  box-shadow: 0 4px 12px rgb(0 0 0 / 16%);
+  box-shadow: var(--shadow-md);
 }
 
 .project-export-detail-filter-menu label {
@@ -401,8 +404,9 @@
   min-width: 0;
   height: 12px;
   overflow: hidden;
-  background: #e6e6e6;
-  border: 1px solid #c9c9c9;
+  border-radius: 999px;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
 }
 
 .project-export-assignment-segment {
@@ -440,8 +444,9 @@
   display: grid;
   gap: 6px;
   padding: 10px 12px;
-  border: 1px solid #cfcfcf;
-  background: #f8f8f8;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: var(--card-radius);
+  background: var(--surface-subtle, #f8fafc);
 }
 
 .project-export-job ul {
@@ -461,10 +466,12 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
-  padding: 4px 10px;
-  border: 1px solid #d1d1d1;
-  background: #fbfbfb;
+  padding: 6px 10px;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: var(--card-radius);
+  background: var(--surface-subtle, #f8fafc);
   cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
 }
 
 .project-export-final-path-row:hover,
@@ -512,7 +519,8 @@
   min-width: 0;
   height: 52px;
   overflow: hidden;
-  border: 1px solid #d2d2d2;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: 4px;
   background: #fff;
 }
 

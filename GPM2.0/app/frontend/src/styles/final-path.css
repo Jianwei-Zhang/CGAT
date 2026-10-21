@@ -42,8 +42,8 @@
 
 .final-path-all-card.is-table,
 .final-path-all-card.is-log {
-  border: 1px solid #d2d2d2;
-  background: #fbfbfb;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  background: var(--surface-subtle, #f8fafc);
   padding: 10px;
 }
 
@@ -116,16 +116,16 @@
 }
 
 .final-path-sort-card {
-  border: 1px solid #cfcfcf;
-  background: linear-gradient(#ffffff, #f7f7f7);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  background: #ffffff;
+  box-shadow: var(--shadow-xs);
   padding: 10px;
   transition: box-shadow 120ms ease, transform 120ms ease, opacity 120ms ease, border-color 120ms ease;
   border-radius: var(--card-radius);
 }
 
 .final-path-sort-row.is-gap .final-path-sort-card {
-  background: linear-gradient(#fafafa, #f1f1f1);
+  background: var(--surface-subtle, #f8fafc);
 }
 
 .final-path-sort-row.is-dragging .final-path-sort-card {
@@ -134,11 +134,11 @@
 }
 
 .final-path-sort-row.is-drop-before .final-path-sort-card {
-  box-shadow: inset 0 3px 0 #7d7d7d, 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: inset 0 3px 0 #3b82f6, 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .final-path-sort-row.is-drop-after .final-path-sort-card {
-  box-shadow: inset 0 -3px 0 #7d7d7d, 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: inset 0 -3px 0 #3b82f6, 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .final-path-sort-card.is-drag-ghost {
@@ -169,8 +169,9 @@
 }
 
 .final-path-card-toggle-button.is-active {
-  border-color: #7c7c7c;
-  background: linear-gradient(#ededed, #d3d3d3);
+  border-color: #7da2c8;
+  background: #eff6ff;
+  color: #1e3a5f;
   font-weight: 700;
 }
 
@@ -192,10 +193,10 @@
   z-index: 20;
   min-width: 52px;
   padding: 4px;
-  border: 1px solid #b9b9b9;
+  border: 1px solid var(--border-default, #cbd5e1);
   border-radius: 6px;
   background: #ffffff;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
+  box-shadow: var(--shadow-md);
 }
 
 .final-path-phased-selector-menu.is-hidden {
@@ -209,7 +210,7 @@
   border-radius: 4px;
   background: transparent;
   padding: 4px 9px;
-  color: #202020;
+  color: var(--text-primary, #1e293b);
   text-align: left;
   font: inherit;
   cursor: pointer;
@@ -217,7 +218,8 @@
 
 .final-path-phased-selector-option:hover,
 .final-path-phased-selector-option.is-active {
-  background: #ececec;
+  background: var(--surface-muted, #eef2f6);
+  color: #1e3a5f;
   font-weight: 700;
 }
 
@@ -237,8 +239,9 @@
   gap: 2px;
   padding: 6px;
   background: #ffffff;
-  border: 1px solid #c9c9c9;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: 6px;
+  box-shadow: var(--shadow-md);
   z-index: 20;
 }
 
@@ -251,13 +254,15 @@
   width: 100%;
   padding: 6px 8px;
   border: 0;
+  border-radius: 4px;
   background: transparent;
+  color: var(--text-primary, #1e293b);
   text-align: left;
   cursor: pointer;
 }
 
 .final-path-export-item:hover {
-  background: #f0f0f0;
+  background: var(--surface-muted, #eef2f6);
 }
 
 .final-path-export-divider {
@@ -321,8 +326,8 @@
   column-gap: 10px;
   gap: 8px;
   padding: 22px 12px 12px;
-  border: 1px solid #d1d1d1;
-  background: #fbfbfb;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  background: var(--surface-subtle, #f8fafc);
   border-radius: var(--card-radius);
 }
 
@@ -382,8 +387,9 @@
   min-width: 0;
   height: 12px;
   overflow: hidden;
-  background: #e6e6e6;
-  border: 1px solid #c9c9c9;
+  border-radius: 999px;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
 }
 
 .final-path-log-ratio-segment {
@@ -417,14 +423,15 @@
 
 .final-path-log-table th,
 .final-path-log-table td {
-  border: 1px solid #dedede;
+  border: 1px solid var(--border-subtle, #dbe3ec);
   padding: 6px 8px;
   text-align: left;
   vertical-align: top;
 }
 
 .final-path-log-table th {
-  background: #f3f3f3;
+  background: var(--surface-subtle, #f8fafc);
+  color: var(--text-secondary, #334155);
   font-weight: 700;
 }
 
@@ -482,10 +489,12 @@
   display: flex;
   align-items: center;
   min-height: 2.2143rem;
-  border: 1px solid #d7d7d7;
-  background: #fafafa;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: var(--control-radius, 5px);
+  background: var(--surface-subtle, #f8fafc);
   padding: 0 10px;
-  color: #444444;
+  color: var(--text-secondary, #475569);
+  font-variant-numeric: tabular-nums;
 }
 
 .final-path-row-index-cell {

@@ -1,34 +1,53 @@
 /* Owner: application shell. Route navigation and compact session controls. */
 
 .app-nav {
-  padding: 4px 8px;
+  padding: 6px 10px;
 }
 
 .route-nav {
-  display: flex;
-  gap: 4px;
+  display: inline-flex;
+  gap: 3px;
   flex-wrap: wrap;
+  padding: 3px;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: 7px;
+  background: var(--surface-muted, #eef2f6);
 }
 
 .route-button {
-  border: 1px solid #b9b9b9;
-  background: linear-gradient(#fafafa, #e6e6e6);
-  color: #333;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary, #334155);
   text-align: center;
-  padding: 6px 12px;
+  padding: 5px 14px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.route-button:hover:not(.is-active):not(:disabled) {
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--text-primary, #1e293b);
+}
+
+.route-button:focus-visible {
+  outline: 2px solid var(--focus-ring, #4f82b5);
+  outline-offset: 1px;
 }
 
 .route-button.is-active {
-  background: linear-gradient(#f0f0f0, #d7d7d7);
-  border-color: #8c8c8c;
+  background: #ffffff;
+  border-color: var(--border-subtle, #dbe3ec);
+  color: #1e3a5f;
   font-weight: 700;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
 .nav-session-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
   margin-left: auto;
 }
@@ -38,13 +57,20 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  color: #4f4f4f;
+  color: var(--text-secondary, #334155);
   font-size: var(--font-small);
   font-weight: 600;
   white-space: nowrap;
 }
 
 .nav-session-field select {
-  width: 96px;
+  width: clamp(132px, 18vw, 220px);
+  max-width: 240px;
   min-width: 0;
+  text-overflow: ellipsis;
+}
+
+.nav-session-field-language select {
+  width: auto;
+  min-width: 88px;
 }

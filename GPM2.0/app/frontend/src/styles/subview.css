@@ -614,7 +614,7 @@
   padding: 0;
   border: 0;
   border-radius: 0;
-  background: linear-gradient(#fff, #eef1f4);
+  background: #ffffff;
   color: #344354;
   transition: background-color 100ms ease, color 100ms ease, box-shadow 100ms ease;
 }
@@ -689,7 +689,7 @@
   overflow: hidden;
   border: 1px solid #b8c2cc;
   border-radius: 4px;
-  background: linear-gradient(#fff, #f1f4f6);
+  background: #ffffff;
   box-shadow: 0 1px 1px rgba(34, 48, 61, 0.06);
   color: #293540;
   font-size: var(--font-body);

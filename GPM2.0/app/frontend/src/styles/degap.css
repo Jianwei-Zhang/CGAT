@@ -126,7 +126,8 @@
 }
 
 .degap-param-group {
-  border: 1px solid #d7d7d7;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: var(--card-radius);
   margin: 0;
   padding: 12px 10px 10px;
 }
@@ -135,7 +136,7 @@
   max-width: calc(100% - 12px);
   padding: 0 6px;
   background: #ffffff;
-  color: #363636;
+  color: var(--text-secondary, #334155);
   font-weight: 700;
   font-size: var(--font-body);
   line-height: 1.2;
@@ -183,7 +184,8 @@
 .degap-param-group select {
   width: 100%;
   min-width: 0;
-  border: 1px solid #c5c5c5;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: var(--control-radius, 5px);
   background: #fff;
   padding: 5px 7px;
   font: inherit;
@@ -211,21 +213,24 @@
   gap: 2px;
   min-width: 128px;
   padding: 6px;
-  border: 1px solid #bdbdbd;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: 6px;
   background: #ffffff;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+  box-shadow: var(--shadow-md);
 }
 
 .degap-gap-menu button {
   border: 0;
+  border-radius: 4px;
   background: transparent;
+  color: var(--text-primary, #1e293b);
   padding: 6px 8px;
   text-align: left;
   cursor: pointer;
 }
 
 .degap-gap-menu button:hover {
-  background: #eeeeee;
+  background: var(--surface-muted, #eef2f6);
 }
 
 .degap-jobs-panel {
@@ -298,7 +303,8 @@
 
 .degap-job-row {
   min-height: 40px;
-  border: 1px solid #cecece;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: var(--control-radius, 5px);
   background: #ffffff;
   padding: 5px 6px;
 }
