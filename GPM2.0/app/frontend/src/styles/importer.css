@@ -632,7 +632,7 @@
 .project-dataset-path { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--border-subtle, #dbe3ec); border-radius: var(--card-radius); background: var(--surface-subtle, #f8fafc); }
 .project-dataset-path code { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; color: var(--text-secondary, #475569); font-size: var(--font-small); line-height: 1.6; }
 .projects-page .project-dataset-path .button { flex: 0 0 auto; min-height: 26px; padding: 3px 8px; font-size: var(--font-small); }
-.project-dataset-editor input, .project-dataset-editor textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--border-default, #cbd5e1); border-radius: 5px; padding: 8px 10px; font: inherit; background: white; }
+.project-dataset-editor input, .project-dataset-editor textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--border-default, #cbd5e1); border-radius: 5px; padding: 8px 10px; font: inherit; background: var(--surface-panel, #fff); color: var(--text-primary, #1e293b); }
 .project-dataset-editor textarea { resize: vertical; min-height: 76px; }
 .project-dataset-editor-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .project-dataset-editor-actions { flex-shrink: 0; padding-top: 14px; border-top: 1px solid var(--border-subtle, #dbe3ec); background: var(--surface-panel, #fff); }
@@ -687,7 +687,7 @@
   pointer-events: none;
   border: 3px dashed var(--accent, #326bd1);
   border-radius: 16px;
-  background: rgba(246, 249, 255, 0.95);
+  background: var(--theme-translucent-surface, rgba(246, 249, 255, 0.95));
   color: var(--theme-ink, #17345c);
   text-align: center;
 }

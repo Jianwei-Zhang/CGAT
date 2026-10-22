@@ -32,6 +32,7 @@
   --theme-muted-ink: var(--text-muted);
   --theme-surface-subtle: var(--surface-subtle);
   --theme-translucent-surface: #1d2938f5;
+  --theme-loading-scrim: #101720bf;
   --theme-line: var(--border-default);
   --theme-strong-line: var(--border-strong);
   --theme-blue-ink: #a6ccff;

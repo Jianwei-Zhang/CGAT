@@ -86,3 +86,27 @@ test("Preview and Project Export keep gap markers white and use black or white P
   assert.match(previewCss, /(?:^|\n)\.project-preview-gap-label\s*\{[^}]*color:\s*#000000;/);
   assert.match(previewCss, /:root\[data-theme="dark"\] \.project-preview-gap-label\s*\{[^}]*color:\s*#ffffff;/);
 });
+
+test("dataset editor fields, drop overlay, and loading curtains use theme-aware surfaces in dark mode", () => {
+  const importerCss = readFileSync(new URL("../importer.css", import.meta.url), "utf8");
+  const assemblyCss = readFileSync(new URL("../assembly.css", import.meta.url), "utf8");
+  const subviewCss = readFileSync(new URL("../subview.css", import.meta.url), "utf8");
+
+  assert.match(themeCss, /--theme-loading-scrim:\s*#101720bf;/);
+  assert.match(
+    importerCss,
+    /\.project-dataset-editor input,\s*\.project-dataset-editor textarea\s*\{[^}]*background:\s*var\(--surface-panel,\s*#fff\);[^}]*color:\s*var\(--text-primary,\s*#1e293b\);/,
+  );
+  assert.match(
+    importerCss,
+    /\.project-drop-overlay\s*\{[^}]*background:\s*var\(--theme-translucent-surface,\s*rgba\(246,\s*249,\s*255,\s*0\.95\)\);/,
+  );
+  assert.match(
+    assemblyCss,
+    /\.assembly-loading-curtain\s*\{[^}]*background:\s*var\(--theme-loading-scrim,\s*rgba\(248,\s*248,\s*248,\s*0\.78\)\);/,
+  );
+  assert.match(
+    subviewCss,
+    /\.subview-pairwise-loading-overlay\s*\{[^}]*background:\s*var\(--theme-loading-scrim,\s*rgba\(248,\s*248,\s*248,\s*0\.72\)\);/,
+  );
+});

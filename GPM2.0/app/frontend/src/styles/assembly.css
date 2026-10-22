@@ -756,7 +756,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(248, 248, 248, 0.78);
+  background: var(--theme-loading-scrim, rgba(248, 248, 248, 0.78));
   pointer-events: none;
 }
 

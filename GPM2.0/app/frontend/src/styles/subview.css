@@ -795,7 +795,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(248, 248, 248, 0.72);
+  background: var(--theme-loading-scrim, rgba(248, 248, 248, 0.72));
 }
 
 .subview-pairwise-loading-panel {
