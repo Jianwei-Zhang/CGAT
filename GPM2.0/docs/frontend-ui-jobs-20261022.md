@@ -41,3 +41,24 @@ Branch / 分支：`feat/frontend-modernization`。本轮仅改显示及辅助集
 预览与项目导出的 Gap 标记改用独立 `--gap-marker-fill`，在黑白主题下都保持白色，不再复用面板背景色。预览上方的 `GAP` 文本在浅色主题下为纯黑色、深色主题下为纯白色；标记内部文字保持深色以保证白底可读。长度、坐标、提示信息及既有重叠隐藏规则不变。
 
 验证：52 项针对性测试通过；Windows 全量测试 1556/1556 通过，生产构建成功，`dist/` 已清理。本轮使用源码、渲染及 CSS 契约检查，未启动浏览器，不宣称新增原生窗口视觉验收。
+
+
+## Job 5 native smoke / 第 5 项实际 App 复测
+
+2026-10-22 在已合并前端改动的 `master`（`a2c4137`）上构建四 ds ZIP，
+使用当前 Windows Debug 后端与当前前端，隔离 WebView2 配置和工作目录，
+通过实际导入表单及 Tauri invoke 完成导入；没有 mock 或改写 App 状态。
+
+- 包：`D:\Desktop\cgat-data\qa-four-datasets-20261022\four-datasets.zip`，14,759 bytes。
+- SHA-256：`3ebea165eaa091693a6f59d6cb598ecb101fb33e8631b2c27a6526b3dc0715cc`。
+- 可打开的工作区：`D:\Desktop\cgat-data\qa-four-datasets-20261022\app-workspace`。
+- 实际项目目录表显示 `primary` 主组装与 `support`、`support2`、`support3` 三个辅助组装。
+- 装配页三个辅助集均能切换，页面重载后仍保留三个选项；运行时异常为 0。
+- 只读 SQLite 复核：`project_dataset` 为 1 主 + 3 辅，display order 为 1–4。
+- 三个辅助集均没有染色体分配，因此空的对应 chr 轨道属于预期，不代表丢失数据集。
+- Windows 后端四 ds 专项回归 1/1、相关前端回归 53/53 通过；ZIP 重复生成的 SHA-256 一致。
+- 证据位于同目录 `evidence/`：`native-report.json`、`db-report.json`、目录表及三个辅助集切换截图。
+
+本次构造包在原生 Debug App 中未复现“第四个数据集丢失”。这不是用户原四 ds 包的复测，
+也不是已发布安装版或真实大基因组全流程验收。测试未修改既有项目，测试 App 关闭后保留包和工作区。
+可复用生成器与原生检查脚本见 `tests/fixtures/grt_contract_v2/README.md`。
