@@ -667,7 +667,6 @@ function buildProjectFinalPathSvgSnapshot({ entries, projectName, primaryDataset
       if (isFinalPathGapSegment(segment)) {
         return `
           <rect x="${x.toFixed(2)}" y="${(y + 19).toFixed(2)}" width="${segmentWidth.toFixed(2)}" height="10" fill="#ffffff" stroke="#1b1b1b" stroke-width="1"><title>GAP ${formatNumber(segmentLengthBp)} bp</title></rect>
-          <text x="${(x + segmentWidth / 2).toFixed(2)}" y="${(y + 13).toFixed(2)}" text-anchor="middle" font-size="${getGraphFontSize() * 0.917}" fill="#666">GAP</text>
         `;
       }
       const { fill, stroke } = palette[resolveColorRole(segment)];
@@ -1295,7 +1294,7 @@ function getFinalPathPreviewEntries(state) {
 function renderFinalPathPreviewTrack({ entry, lengthBp, maxLengthBp, resolveColorRole }) {
   const segments = Array.isArray(entry?.segments) ? entry.segments : [];
   const domainBp = Math.max(1, Number(maxLengthBp || 0), Number(lengthBp || 0));
-  let cursorBp = 0, visualIndex = 0;
+  let cursorBp = 0;
   const segmentNodes = segments.map((segment, index) => {
     const segmentLengthBp = Math.max(0, resolveFinalPathSegmentLengthBp(segment));
     if (segmentLengthBp <= 0) {
@@ -1304,7 +1303,6 @@ function renderFinalPathPreviewTrack({ entry, lengthBp, maxLengthBp, resolveColo
     const startPct = Math.max(0, Math.min(100, (cursorBp / domainBp) * 100));
     const endPct = Math.max(startPct, Math.min(100, ((cursorBp + segmentLengthBp) / domainBp) * 100));
     const widthPct = Math.max(0, endPct - startPct);
-    const currentVisualIndex = visualIndex++;
     cursorBp += segmentLengthBp;
     if (isFinalPathGapSegment(segment)) {
       return `
@@ -1314,7 +1312,6 @@ function renderFinalPathPreviewTrack({ entry, lengthBp, maxLengthBp, resolveColo
           style="left: clamp(0px, calc(${endPct.toFixed(4)}% - 4px), calc(100% - 8px));"
           title="GAP ${formatNumber(segmentLengthBp)} bp"
         ></span>
-        <span class="project-export-final-path-preview-gap-label" style="left: clamp(14px, ${endPct.toFixed(4)}%, calc(100% - 14px));" data-final-path-gap-label="${currentVisualIndex}">GAP</span>
       `;
     }
     if (!isFinalPathCtgSegment(segment)) {
@@ -1767,22 +1764,6 @@ function syncProjectExportPreviewLabels(host) {
     if (labelWidth > 0 && visibleWidth > 0 && labelWidth > visibleWidth + 1) {
       ctgNode.classList?.add?.("is-label-hidden");
     }
-  });
-  host.querySelectorAll(".project-export-final-path-preview-track").forEach((track) => {
-    const labels = Array.from(track.querySelectorAll("[data-final-path-gap-label]"));
-    // Visibility preserves label measurements so a wider viewport can restore them.
-    labels.forEach((label) => { label.style.visibility = ""; });
-    const bounds = labels.map((label) => ({ label, rect: label.getBoundingClientRect() }))
-      .filter(({ rect }) => rect.width > 0)
-      .sort((left, right) => left.rect.left - right.rect.left);
-    let visibleRight = -Infinity;
-    bounds.forEach(({ label, rect }) => {
-      if (rect.left < visibleRight) {
-        label.style.visibility = "hidden";
-      } else {
-        visibleRight = rect.right;
-      }
-    });
   });
 }
 

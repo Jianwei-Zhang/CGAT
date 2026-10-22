@@ -132,12 +132,6 @@ export function syncFinalPathStripGeometry(host) {
       // a few clipped letters on a short contig or gap. Re-evaluate on resize.
       syncFullLabelVisibility(node.querySelector?.("[data-final-path-fit-label]"));
     });
-    for (const label of strip.querySelectorAll("[data-final-path-gap-label]")) {
-      const layout = layouts[Number(label.dataset.finalPathGapLabel)];
-      if (!layout) continue;
-      const halfLabel = Math.min(strip.clientWidth / 2, Math.max(14, Number(label.offsetWidth || 0) / 2));
-      label.style.left = `${Math.min(strip.clientWidth - halfLabel, Math.max(halfLabel, layout.x + layout.width / 2))}px`;
-    }
     const card = strip.closest?.(".project-preview-card");
     if (!card) continue;
     for (const reference of card.querySelectorAll("[data-preview-reference-path]")) {
@@ -169,8 +163,11 @@ export function syncFinalPathStripGeometry(host) {
       const usedEnd = Number(source.dataset.finalPathUsedEnd);
       const offset = Number(source.dataset.finalPathSourceOffset);
       const length = Number(source.dataset.finalPathSourceLength);
-      const x = layout.x + (offset - usedStart) * scale;
-      const left = Math.max(0, x), right = Math.min(strip.clientWidth, x + length * scale);
+      // Draw only the adopted interval at this scale, not the whole source.
+      // Otherwise a 22kb donor from a 31Mb source becomes a viewport-wide bar.
+      const x = layout.x + offset * scale;
+      const left = Math.max(0, x), right = Math.min(strip.clientWidth,
+        x + Math.min(length - usedStart, usedEnd - usedStart) * scale);
       source.style.left = `${left}px`;
       source.style.width = `${Math.max(0, right - left)}px`;
       source.style.minWidth = "0";

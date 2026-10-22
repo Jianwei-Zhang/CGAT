@@ -599,17 +599,6 @@
   background: var(--gap-marker-fill, #ffffff);
 }
 
-.project-export-final-path-preview-gap-label {
-  position: absolute;
-  z-index: 4;
-  top: calc(50% - 18px);
-  transform: translateX(-50%);
-  color: var(--theme-ink, #111);
-  font-size: var(--font-caption);
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 .project-export-final-path-preview-length {
   flex: 0 0 120px;
   color: var(--theme-ink, #4f4f4f);

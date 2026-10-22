@@ -127,3 +127,22 @@ test("reference highlights remain aligned when the reference starts before the v
   assert.equal(patch.style.left, "0px");
   assert.equal(patch.style.width, "100px");
 });
+
+
+test("a tiny donor is drawn only over its adopted interval, not as a giant whole-source bar", () => {
+  const source = { dataset: { finalPathSourcePath: "Chr1", finalPathSourceIndex: "1",
+    finalPathSourceOffset: "0", finalPathUsedStart: "17930988", finalPathUsedEnd: "17953329",
+    finalPathSourceLength: "31678158" }, style: {}, querySelector: () => null };
+  const nodes = [35418230, 22341, 2097513].map(length => ({
+    dataset: { finalPathKind: "ctg", finalPathLength: String(length) }, style: {} }));
+  const strip = { dataset: { finalPathStrip: "1", finalPathName: "Chr1", finalPathDomain: "81415374" }, clientWidth: 1800,
+    querySelectorAll: selector => selector === "[data-final-path-segment]" ? nodes : [],
+    closest: () => ({ querySelectorAll: selector => selector === "[data-final-path-aligned-source]" ? [source] : [] }) };
+  for (const width of [1800, 900]) {
+    strip.clientWidth = width;
+    syncFinalPathStripGeometry({ querySelectorAll: () => [strip] });
+    assert.equal(source.style.left, nodes[1].style.left);
+    assert.equal(source.style.width, nodes[1].style.width);
+    assert.equal(source.style.width, "8px");
+  }
+});

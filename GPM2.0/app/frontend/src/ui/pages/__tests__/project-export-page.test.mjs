@@ -1620,7 +1620,7 @@ test("project export final path preview clamps edge gap markers inside the track
   assert.match(html, /class="project-export-final-path-preview-gap"/);
   assert.match(html, /class="project-export-final-path-preview-ctg is-after-gap"/);
   assert.match(html, /left: clamp\(0px, calc\([0-9.]+% - 4px\), calc\(100% - 8px\)\);/);
-  assert.match(html, /class="project-export-final-path-preview-gap-label" style="left: clamp\(14px, [0-9.]+%, calc\(100% - 14px\)\);"[^>]*>GAP<\/span>/);
+  assert.doesNotMatch(html, /project-export-final-path-preview-gap-label|>GAP<\/span>/);
 });
 
 test("project export final path row jump switches to assembly chr and requests bottom scroll", () => {
@@ -1824,10 +1824,6 @@ test("project export final path preview css is clickable and hides graph label s
     componentsCss,
     /\.project-export-final-path-preview-gap\s*\{[\s\S]*z-index:\s*3;/,
   );
-  assert.match(
-    componentsCss,
-    /\.project-export-final-path-preview-gap-label\s*\{[\s\S]*z-index:\s*4;/,
-  );
 });
 
 test("project export preview fills the card height without a nested frame", () => {
@@ -1851,8 +1847,6 @@ test("project export preview fills the card height without a nested frame", () =
     assert.match(rule, /top:\s*calc\(50% - 6px\);/);
     assert.match(rule, /height:\s*16px;/);
   }
-  const gapLabelRule = componentsCss.match(/\.project-export-final-path-preview-gap-label\s*\{([^}]*)\}/)?.[1] || "";
-  assert.match(gapLabelRule, /top:\s*calc\(50% - 18px\);/);
 });
 
 test("project export hover and focus ring stays above the preview without intercepting input", () => {
@@ -1873,7 +1867,7 @@ test("project export hover and focus ring stays above the preview without interc
   assert.match(activeRingRule, /border-color:\s*var\(--theme-line,\s*#7c9bbc\);/);
 
   const ringZIndex = Number(ringRule.match(/z-index:\s*(\d+);/)?.[1] || 0);
-  for (const selector of ["ctg", "gap", "gap-label"]) {
+  for (const selector of ["ctg", "gap"]) {
     const rule = componentsCss.match(new RegExp(`\\.project-export-final-path-preview-${selector}\\s*\\{([^}]*)\\}`))?.[1] || "";
     const contentZIndex = Number(rule.match(/z-index:\s*(\d+);/)?.[1] || 0);
     assert.ok(ringZIndex > contentZIndex, `${selector} must stay below the interaction ring`);
@@ -1983,55 +1977,14 @@ test("project export preview tags both gaps and contigs for shared minimum-pixel
   assert.match(output, /data-final-path-strip="1"/);
   assert.match(output, /data-final-path-kind="gap" data-final-path-length="1"/);
   assert.match(output, /data-final-path-kind="ctg" data-final-path-length="1"/);
-  assert.match(output, /data-final-path-gap-label="1"/);
+  assert.doesNotMatch(output, /data-final-path-gap-label|>GAP<\/span>/);
 });
 
 
-test("project export hides overlapping GAP text per row and restores it after resize", () => {
-  function createLabel(left, width = 28) {
-    return {
-      left,
-      style: {},
-      getBoundingClientRect() {
-        return { left: this.left, right: this.left + width, width };
-      },
-    };
-  }
-  const first = createLabel(10);
-  const overlapping = createLabel(20);
-  const touching = createLabel(38);
-  const isolated = createLabel(100);
-  const otherRow = createLabel(10);
-  const gapMarker = { style: { left: "20px", width: "8px" }, title: "GAP 100 bp" };
-  const host = {
-    querySelectorAll(selector) {
-      if (selector !== ".project-export-final-path-preview-track") return [];
-      return [[first, overlapping, touching, isolated], [otherRow]].map((labels) => ({
-        querySelectorAll(labelSelector) {
-          assert.equal(labelSelector, "[data-final-path-gap-label]");
-          return labels;
-        },
-        gapMarker,
-      }));
-    },
-  };
-
-  __test.syncProjectExportPreviewLabels(host);
-  assert.equal(first.style.visibility, "");
-  assert.equal(overlapping.style.visibility, "hidden");
-  assert.equal(touching.style.visibility, "");
-  assert.equal(isolated.style.visibility, "");
-  assert.equal(otherRow.style.visibility, "");
-  assert.deepEqual(gapMarker, { style: { left: "20px", width: "8px" }, title: "GAP 100 bp" });
-
-  overlapping.left = 50;
-  touching.left = 80;
-  isolated.left = 120;
-  __test.syncProjectExportPreviewLabels(host);
-  assert.equal(overlapping.style.visibility, "");
-  assert.equal(touching.style.visibility, "");
-
-  overlapping.left = 20;
-  __test.syncProjectExportPreviewLabels(host);
-  assert.equal(overlapping.style.visibility, "hidden");
+test("project export SVG keeps white gap markers and tooltips without GAP text", () => {
+  const { svgMarkup } = __test.buildProjectFinalPathSvgSnapshot({ entries: [{ chrName: "Chr1", lengthBp: 102,
+    entry: { segments: [{ type: "gap", gapSizeBp: 100 },
+      { type: "ctg", start: 1, end: 2, overallLen: 2, ctgName: "a" }] } }], projectName: "test" });
+  assert.match(svgMarkup, /fill="#ffffff"[^>]*><title>GAP 100 bp<\/title>/);
+  assert.doesNotMatch(svgMarkup, /<text[^>]*>GAP<\/text>/);
 });

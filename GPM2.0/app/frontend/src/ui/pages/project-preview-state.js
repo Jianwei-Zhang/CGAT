@@ -248,12 +248,20 @@ export function buildProjectPreviewModel({ chromosomes = [], referenceGenomeId =
       paths.push({ name, length: cursor, parts });
     }
     const rows = [...tracks.values()].map(track => {
+      const adoptedSources = new Set();
       const items = track.items.flatMap(item => {
         if (!item.highlights.length) return [item];
         // Split reused/reordered sources by the actual adopted fragment. A
         // single whole-contig translation cannot align all of its uses.
-        return item.highlights.map(patch => {
+        return item.highlights.flatMap(patch => {
           const source = patch.part.source;
+          // Mirrored and original instances can resolve to the same adopted
+          // source interval. They are provenance aliases, not extra haplotypes.
+          const key = JSON.stringify([patch.part.pathName, patch.part.index,
+            source.datasetName, source.contigName, source.original ? 0 : source.assemblyCtgId,
+            patch.coveredStart, patch.coveredEnd]);
+          if (adoptedSources.has(key)) return [];
+          adoptedSources.add(key);
           const localStart = item.reverse ? item.length - patch.end : patch.start;
           const localEnd = item.reverse ? item.length - patch.start : patch.end;
           const reverse = source.original ? (source.orient === "-") !== (item.ctg.orient === "-") : source.orient === "-";

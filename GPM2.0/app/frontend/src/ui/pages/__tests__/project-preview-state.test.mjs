@@ -125,3 +125,18 @@ test("four datasets retain one primary and all three supports with shared Assemb
   assert.deepEqual(card.tracks.map(t => t.color), ["#d2dfef", "#e7dec4", "#e7dec4", "#e7dec4"]);
   assert.deepEqual(card.paths[0].parts.map(p => p.role), ["primary", "companion", "companion", "companion"]);
 });
+
+
+test("mirrored and original aliases of a tiny donor produce one adopted source, not extra lanes", () => {
+  const donor = { ...base.ctgs[0], name: "donor@Chr1", originId: "donor", totalLength: 31678158,
+    sourceFragment: { sourceStart: 1, sourceEnd: 31678158 } };
+  const [card] = buildProjectPreviewModel({ ...base, ctgs: [donor,
+    { ...donor, assemblyCtgId: 2, name: "donor", assignedChrName: "Chr2" }],
+    finalPathByChr: { Chr1: { segments: [{ type: "ctg", start: 17930989, end: 17953329,
+      source: { dataset: "dsA", contig: "donor", start: 17930989, end: 17953329, orientation: "+" } }] } } });
+  const row = card.tracks[0];
+  assert.equal(row.positioned.length, 1);
+  assert.equal(row.laneCount, 1);
+  assert.equal(row.positioned[0].alignment.usedEnd - row.positioned[0].alignment.usedStart, 22341);
+  assert.equal(card.paths[0].length, 22341);
+});

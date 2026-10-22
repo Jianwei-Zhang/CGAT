@@ -25,7 +25,7 @@ function deps() {
   };
 }
 
-test("preview uses single-line heading, icon refresh, hides unpositioned information, and labels gaps", () => {
+test("preview uses single-line heading, icon refresh, hides unpositioned information, and keeps gaps without text", () => {
   const value = state();
   const cards = buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }], referenceGenomeId: 1,
     ctgs: [{ assemblyCtgId: 2, datasetName: "dsA", name: "unknown", totalLength: 100,
@@ -38,9 +38,9 @@ test("preview uses single-line heading, icon refresh, hides unpositioned informa
   assert.match(output, /project-preview-refresh[^>]*aria-label="刷新"[^>]*>[\s\S]*?<svg/);
   assert.doesNotMatch(output, /project-preview-refresh[^>]*>刷新/);
   assert.doesNotMatch(output, /project-preview-unpositioned|data-preview-unpositioned|未定位/);
-  assert.match(output, /data-final-path-gap-label="1"/);
+  assert.doesNotMatch(output, /data-final-path-gap-label|project-preview-gap-label|>Gap<\/span>/);
   assert.match(output, /data-final-path-kind="gap"[^>]*background:var\(--gap-marker-fill, #ffffff\)/);
-  assert.match(output, /title="Gap: 1 bp">Gap<\/span>/);
+  assert.match(output, /title="Gap: 1 bp/);
   assert.match(output, /data-final-path-kind="gap"[^>]*data-final-path-length="1"/);
   assert.match(output, /data-final-path-kind="gap"[^>]*color:var\(--gap-marker-text, #1b1b1b\)/);
   assert.match(output, /a&lt;ctg&gt;/);
@@ -171,4 +171,38 @@ test("rendered reference carries its adopted-path anchor rather than a fixed zer
   const output = renderProjectPreviewPage(value);
   assert.match(output, /class="project-preview-reference"[^>]*data-preview-reference-path="Chr1"[^>]*data-preview-reference-index="0"[^>]*data-preview-reference-offset="500"[^>]*style="left:20\.00000%;width:80\.00000%/);
   assert.match(output, /data-final-path-domain="2500"/);
+});
+
+
+test("preview source and Final Path strips have identical thickness and centered rows", () => {
+  const css = readFileSync(new URL("../../../styles/project-preview.css", import.meta.url), "utf8");
+  for (const selector of ["contig", "final-part"]) {
+    const rule = css.match(new RegExp(`\\.project-preview-${selector}\\s*\\{([^}]*)\\}`))?.[1] || "";
+    assert.match(rule, /height:\s*16px/);
+  }
+  assert.match(css, /\.project-preview-final-part\s*\{[^}]*top:\s*2px/);
+  assert.doesNotMatch(css, /has-gaps|project-preview-gap-label/);
+  for (const gaps of [[], [{ type: "gap", gapSizeBp: 100 }]]) {
+    const value = state();
+    value.projectPreview = { key: previewProjectKey(value), loaded: true,
+      cards: buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }],
+        finalPathByChr: { Chr1: { segments: [segment, ...gaps] } } }) };
+    const output = renderProjectPreviewPage(value);
+    assert.match(output, /data-final-path-domain="[^"]+" style="height:20px"/);
+    assert.doesNotMatch(output, /has-gaps|data-final-path-gap-label/);
+  }
+});
+
+
+test("preview clips a donor to the adopted interval even before measured geometry runs", () => {
+  const value = state();
+  value.projectPreview = { key: previewProjectKey(value), loaded: true,
+    cards: buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 81415375 }],
+      referenceGenomeId: 1, ctgs: [{ assemblyCtgId: 1, datasetName: "dsA", name: "donor", totalLength: 31678158 }],
+      finalPathByChr: { Chr1: { segments: [{ type: "ctg", start: 17930989, end: 17953329,
+        source: { dataset: "dsA", contig: "donor", start: 17930989, end: 17953329, orientation: "+" } }] } } }) };
+  const output = renderProjectPreviewPage(value);
+  const source = output.match(/class="project-preview-contig is-adopted"[^>]+/)[0];
+  assert.match(source, /left:0\.00000%;width:0\.02744%/);
+  assert.match(source, /title="donor · 采用区间: dsA \/ donor: 17,930,989–17,953,329 \(\+\) · 22,341 bp"/);
 });
