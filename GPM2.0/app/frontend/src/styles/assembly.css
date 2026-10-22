@@ -2097,7 +2097,7 @@
   height: 22px;
   border: 1px solid var(--theme-line, #ddd);
   border-radius: 4px;
-  background: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), var(--view-nav-grid, #eee) calc(10% - 1px), var(--view-nav-grid, #eee) 10%), var(--theme-surface-subtle, #fafafa);
+  background: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), var(--view-nav-grid, #eee) calc(10% - 1px), var(--view-nav-grid, #eee) 10%), var(--view-nav-trough, #fafafa);
   touch-action: none;
 }
 .view-nav-window {

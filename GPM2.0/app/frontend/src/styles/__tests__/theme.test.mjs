@@ -165,12 +165,23 @@ test("dark horizontal view navigation distinguishes the window, grid and draggab
   };
   const contrast = (a, b) => (Math.max(luminance(a), luminance(b)) + 0.05)
     / (Math.min(luminance(a), luminance(b)) + 0.05);
-  for (const name of ["view-nav-window-fill", "view-nav-window-hover-fill", "view-nav-window-border", "view-nav-window-edge"]) {
-    assert.ok(contrast(darkToken(name), darkToken("surface-subtle")) >= 3, name);
-  }
-  assert.notEqual(darkToken("view-nav-grid"), darkToken("surface-subtle"));
+
+  // The trough is its own recessed well so the window never has to glow for contrast.
+  assert.notEqual(darkToken("view-nav-trough"), darkToken("surface-subtle"));
+  assert.ok(luminance(darkToken("view-nav-trough")) < luminance(darkToken("surface-panel")));
+  assert.notEqual(darkToken("view-nav-grid"), darkToken("view-nav-trough"));
+
+  // A full-width window must stay calm: identifiable, but well below the old glow.
+  const fillContrast = contrast(darkToken("view-nav-window-fill"), darkToken("view-nav-trough"));
+  assert.ok(fillContrast >= 1.9 && fillContrast <= 3, `window/trough ${fillContrast}`);
+  assert.ok(contrast(darkToken("view-nav-window-hover-fill"), darkToken("view-nav-trough")) > fillContrast);
+  // Precise edges and the grip line still carry the grab affordance.
+  assert.ok(contrast(darkToken("view-nav-window-border"), darkToken("view-nav-window-fill")) >= 1.8);
+  assert.ok(contrast(darkToken("view-nav-window-edge"), darkToken("view-nav-window-fill")) >= 3);
+
   assert.match(css, /\.view-nav-window\s*\{[^}]*border: 1px solid var\(--view-nav-window-border, #999\);[^}]*background: var\(--view-nav-window-fill, #d6d6d6\);/);
   assert.match(css, /\.view-nav-axis:hover \.view-nav-window\s*\{[^}]*background: var\(--view-nav-window-hover-fill, #c9c9c9\);/);
   assert.match(css, /\.view-nav-edge::after\s*\{[^}]*background: var\(--view-nav-window-edge, #666\);/);
   assert.match(css, /var\(--view-nav-grid, #eee\)/);
+  assert.match(css, /var\(--view-nav-trough, #fafafa\)/);
 });
