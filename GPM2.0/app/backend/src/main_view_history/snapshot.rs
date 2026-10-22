@@ -51,7 +51,9 @@ pub(super) fn merge_snapshot_scopes<'a>(
             .export_record_ids
             .extend(snapshot.export_record_ids.iter().copied());
         scope.include_view_state |= snapshot.include_view_state;
-        scope.protected_final_path_chr_names.extend(snapshot.protected_final_path_chr_names.iter().cloned());
+        scope
+            .protected_final_path_chr_names
+            .extend(snapshot.protected_final_path_chr_names.iter().cloned());
         scope
             .layout_scope
             .track_offset_keys
@@ -124,7 +126,8 @@ pub(super) fn capture_snapshot(
         None
     };
     let layout_state = capture_project_view_layout(conn, project_id, &resolved_scope.layout_scope)?;
-    let (protected_final_paths, protected_degap_state) = capture_protected_final_paths(conn, project_id, &resolved_scope)?;
+    let (protected_final_paths, protected_degap_state) =
+        capture_protected_final_paths(conn, project_id, &resolved_scope)?;
 
     Ok(DatabaseSnapshot {
         ctg_ids: resolved_scope.ctg_ids,
@@ -640,43 +643,78 @@ fn load_export_record(
 type ProtectedFinalPaths = BTreeMap<String, Option<Value>>;
 
 fn capture_protected_final_paths(
-    conn: &Connection, project_id: i64, scope: &SnapshotScope,
+    conn: &Connection,
+    project_id: i64,
+    scope: &SnapshotScope,
 ) -> Result<(ProtectedFinalPaths, Option<Value>)> {
-    if scope.protected_final_path_chr_names.is_empty() { return Ok((BTreeMap::new(), None)); }
+    if scope.protected_final_path_chr_names.is_empty() {
+        return Ok((BTreeMap::new(), None));
+    }
     let view = load_project_view_dependency(conn, project_id)?;
-    let paths: Value = serde_json::from_str(view.as_ref().map(|v| v.final_path_by_chr_json.as_str()).unwrap_or("{}"))?;
-    let mut result: BTreeMap<_, _> = scope.protected_final_path_chr_names.iter()
+    let paths: Value = serde_json::from_str(
+        view.as_ref()
+            .map(|v| v.final_path_by_chr_json.as_str())
+            .unwrap_or("{}"),
+    )?;
+    let mut result: BTreeMap<_, _> = scope
+        .protected_final_path_chr_names
+        .iter()
         .map(|chr| {
             let mut path = paths.get(chr).cloned();
             // Visibility IDs are a set. Scoped visibility restoration may append
             // an ID in a different order without changing the actual state.
-            if let Some(ids) = path.as_mut().and_then(|p| p.get_mut("hiddenPrimaryCtgIds")).and_then(Value::as_array_mut) {
+            if let Some(ids) = path
+                .as_mut()
+                .and_then(|p| p.get_mut("hiddenPrimaryCtgIds"))
+                .and_then(Value::as_array_mut)
+            {
                 ids.sort_by_cached_key(Value::to_string);
                 ids.dedup();
             }
             (chr.clone(), path)
-        }).collect();
+        })
+        .collect();
     let ids = scope.ctg_ids.iter().copied().collect::<BTreeSet<_>>();
     if let Some(paths) = paths.as_object() {
         for (chr, path) in paths {
-            if result.contains_key(chr) { continue; }
-            let segments: Vec<Value> = path.get("segments").and_then(Value::as_array).into_iter().flatten()
-                .filter(|segment| references_owned_contig(segment, &ids)).cloned().collect();
+            if result.contains_key(chr) {
+                continue;
+            }
+            let segments: Vec<Value> = path
+                .get("segments")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter(|segment| references_owned_contig(segment, &ids))
+                .cloned()
+                .collect();
             if !segments.is_empty() {
                 result.insert(chr.clone(), Some(Value::Array(segments)));
             }
         }
     }
-    let degap: Value = serde_json::from_str(view.as_ref().map(|v| v.degap_project_state_json.as_str()).unwrap_or("{}"))?;
+    let degap: Value = serde_json::from_str(
+        view.as_ref()
+            .map(|v| v.degap_project_state_json.as_str())
+            .unwrap_or("{}"),
+    )?;
     let protected_degap = references_owned_contig(&degap, &ids).then_some(degap);
     Ok((result, protected_degap))
 }
 fn references_owned_contig(value: &Value, ids: &BTreeSet<i64>) -> bool {
     match value {
         Value::Array(items) => items.iter().any(|v| references_owned_contig(v, ids)),
-        Value::Object(object) => ["assemblyCtgId", "assembly_ctg_id", "splitFragmentCtgId"].iter()
-            .any(|key| object.get(*key).and_then(Value::as_i64).is_some_and(|id| ids.contains(&id)))
-            || object.values().any(|v| references_owned_contig(v, ids)),
+        Value::Object(object) => {
+            ["assemblyCtgId", "assembly_ctg_id", "splitFragmentCtgId"]
+                .iter()
+                .any(|key| {
+                    object
+                        .get(*key)
+                        .and_then(Value::as_i64)
+                        .is_some_and(|id| ids.contains(&id))
+                })
+                || object.values().any(|v| references_owned_contig(v, ids))
+        }
         _ => false,
     }
 }

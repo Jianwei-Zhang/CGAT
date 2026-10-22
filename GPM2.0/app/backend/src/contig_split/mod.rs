@@ -452,13 +452,18 @@ pub(crate) fn load_split_source(
 // Cross-chromosome inspection/addition also supports auxiliary-dataset contigs;
 // splitting retains its existing primary-only contract.
 pub(crate) fn load_chr_alignment_source(
-    conn: &Connection, project_id: i64, assembly_ctg_id: i64,
+    conn: &Connection,
+    project_id: i64,
+    assembly_ctg_id: i64,
 ) -> Result<SplitSource> {
     load_contig_source(conn, project_id, assembly_ctg_id, false)
 }
 
 fn load_contig_source(
-    conn: &Connection, project_id: i64, assembly_ctg_id: i64, primary_only: bool,
+    conn: &Connection,
+    project_id: i64,
+    assembly_ctg_id: i64,
+    primary_only: bool,
 ) -> Result<SplitSource> {
     conn.query_row(
         "SELECT c.id,s.id,s.source_seq_id,c.name,d.name,q.seq_name,s.source_start,s.source_end,

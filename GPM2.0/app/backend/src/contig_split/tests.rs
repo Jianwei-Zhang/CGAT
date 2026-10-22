@@ -705,18 +705,26 @@ fn manual_cut_rejects_invalid_or_stale_source_without_creating_fragments() -> Re
     Ok(())
 }
 
-
 fn unsplit_args(db: &Path, id: i64, neighbor: i64, side: &str) -> Result<Value> {
     let conn = Connection::open(db)?;
     let a = load_split_source(&conn, 1, id)?;
     let b = load_split_source(&conn, 1, neighbor)?;
-    Ok(json!({"assemblyCtgId":id,"neighborCtgId":neighbor,"side":side,"sourceStart":a.source_start,"sourceEnd":a.source_end,
-        "orient":a.orient,"neighborSourceStart":b.source_start,"neighborSourceEnd":b.source_end}))
+    Ok(
+        json!({"assemblyCtgId":id,"neighborCtgId":neighbor,"side":side,"sourceStart":a.source_start,"sourceEnd":a.source_end,
+        "orient":a.orient,"neighborSourceStart":b.source_start,"neighborSourceEnd":b.source_end}),
+    )
 }
 fn unsplit(db: &Path, args: Value) -> Result<MainViewHistoryMutationSummary> {
-    run_main_view_editor_action(db, &RunMainViewEditorActionParams {
-        history_capacity: None, project_id: 1, chr_name: "ChrA".into(), action: "undo-contig-split".into(), args,
-    })
+    run_main_view_editor_action(
+        db,
+        &RunMainViewEditorActionParams {
+            history_capacity: None,
+            project_id: 1,
+            chr_name: "ChrA".into(),
+            action: "undo-contig-split".into(),
+            args,
+        },
+    )
 }
 fn active_intervals(db: &Path) -> Result<Vec<(i64, i64)>> {
     Ok(Connection::open(db)?.prepare("SELECT s.source_start,s.source_end FROM assembly_ctg c JOIN assembly_seq s ON s.id=c.assembly_seq_id ORDER BY s.source_start")?
@@ -736,11 +744,29 @@ fn unsplit_left_and_right_follow_display_orientation_and_roundtrip_history() -> 
             let low_side = (side == "left") != (orient == "-");
             let other = if low_side { 2 } else { 5 };
             let before = paths(&db)?;
-            let old_anchor: i64 = conn.query_row("SELECT anchor_start FROM assembly_ctg WHERE id=4", [], |r| r.get(0))?;
+            let old_anchor: i64 = conn.query_row(
+                "SELECT anchor_start FROM assembly_ctg WHERE id=4",
+                [],
+                |r| r.get(0),
+            )?;
             let result = unsplit(&db, unsplit_args(&db, 4, other, side)?)?;
             assert_eq!(result.descriptor.unwrap().kind, "undo-contig-split");
-            assert_eq!(active_intervals(&db)?, if low_side {vec![(1,70000),(70001,100000)]} else {vec![(1,30000),(30001,100000)]});
-            assert_eq!(conn.query_row::<i64,_,_>("SELECT anchor_start FROM assembly_ctg WHERE id=4", [], |r| r.get(0))?, old_anchor - if side == "left" {30000} else {0});
+            assert_eq!(
+                active_intervals(&db)?,
+                if low_side {
+                    vec![(1, 70000), (70001, 100000)]
+                } else {
+                    vec![(1, 30000), (30001, 100000)]
+                }
+            );
+            assert_eq!(
+                conn.query_row::<i64, _, _>(
+                    "SELECT anchor_start FROM assembly_ctg WHERE id=4",
+                    [],
+                    |r| r.get(0)
+                )?,
+                old_anchor - if side == "left" { 30000 } else { 0 }
+            );
             assert_eq!(paths(&db)?["ChrB"], before["ChrB"]);
             let after = paths(&db)?;
             let mut before_dna = before.clone();
@@ -752,33 +778,40 @@ fn unsplit_left_and_right_follow_display_orientation_and_roundtrip_history() -> 
                     }
                 }
             }
-            assert_eq!(before_dna, after_dna, "source intervals, strand, order and gaps stay unchanged");
+            assert_eq!(
+                before_dna, after_dna,
+                "source intervals, strand, order and gaps stay unchanged"
+            );
             assert!(undo_main_view_history(&db, &target())?.changed);
-            assert_eq!(active_intervals(&db)?, vec![(1,30000),(30001,70000),(70001,100000)]);
+            assert_eq!(
+                active_intervals(&db)?,
+                vec![(1, 30000), (30001, 70000), (70001, 100000)]
+            );
             assert_eq!(paths(&db)?, before);
             assert!(redo_main_view_history(&db, &target())?.changed);
             assert_eq!(paths(&db)?, after);
             // Remove the remaining boundary; a full original interval remains.
-            let remaining = if low_side {5} else {2};
-            let other_side = if side == "left" {"right"} else {"left"};
+            let remaining = if low_side { 5 } else { 2 };
+            let other_side = if side == "left" { "right" } else { "left" };
             unsplit(&db, unsplit_args(&db, 4, remaining, other_side)?)?;
-            assert_eq!(active_intervals(&db)?, vec![(1,100000)]);
+            assert_eq!(active_intervals(&db)?, vec![(1, 100000)]);
             // Splitting a restored interval again must not collide with retired keys.
             cut_manual(&db, 4, 30000, 1, 100000, orient)?;
-            assert_eq!(active_intervals(&db)?, vec![(1,30000),(30001,100000)]);
+            assert_eq!(active_intervals(&db)?, vec![(1, 30000), (30001, 100000)]);
             assert!(undo_main_view_history(&db, &target())?.changed);
             assert!(undo_main_view_history(&db, &target())?.changed);
             assert!(undo_main_view_history(&db, &target())?.changed);
             assert!(undo_main_view_history(&db, &target())?.changed);
             assert!(undo_main_view_history(&db, &target())?.changed);
-            assert_eq!(active_intervals(&db)?, vec![(1,100000)]);
+            assert_eq!(active_intervals(&db)?, vec![(1, 100000)]);
         }
     }
     Ok(())
 }
 
 #[test]
-fn unsplit_rejects_stale_wrong_side_nonadjacent_flipped_foreign_group_and_hidden_fragments_atomically() -> Result<()> {
+fn unsplit_rejects_stale_wrong_side_nonadjacent_flipped_foreign_group_and_hidden_fragments_atomically()
+-> Result<()> {
     for case in 0..8 {
         let (_dir, db) = seed()?;
         cut_manual(&db, 1, 30000, 1, 100000, "-")?;
@@ -789,16 +822,31 @@ fn unsplit_rejects_stale_wrong_side_nonadjacent_flipped_foreign_group_and_hidden
             0 => args["sourceStart"] = json!(30002),
             1 => args["neighborSourceEnd"] = json!(99999),
             2 => args["side"] = json!("right"),
-            3 => { conn.execute("UPDATE assembly_seq SET source_start=70002 WHERE id=(SELECT assembly_seq_id FROM assembly_ctg WHERE id=5)", [])?; args = unsplit_args(&db,4,5,"left")?; },
-            4 => { conn.execute("UPDATE assembly_seq SET orient='+' WHERE id=(SELECT assembly_seq_id FROM assembly_ctg WHERE id=5)", [])?; },
-            5 => { conn.execute("UPDATE assembly_seq SET instance_key='manual-fragment:99:70001-100000' WHERE id=(SELECT assembly_seq_id FROM assembly_ctg WHERE id=5)", [])?; },
-            6 => { conn.execute("UPDATE assembly_seq SET hidden=1 WHERE id=(SELECT assembly_seq_id FROM assembly_ctg WHERE id=5)", [])?; },
-            _ => { conn.execute("UPDATE assembly_ctg SET assigned_chr_name='ChrB' WHERE id=5", [])?; },
+            3 => {
+                conn.execute("UPDATE assembly_seq SET source_start=70002 WHERE id=(SELECT assembly_seq_id FROM assembly_ctg WHERE id=5)", [])?;
+                args = unsplit_args(&db, 4, 5, "left")?;
+            }
+            4 => {
+                conn.execute("UPDATE assembly_seq SET orient='+' WHERE id=(SELECT assembly_seq_id FROM assembly_ctg WHERE id=5)", [])?;
+            }
+            5 => {
+                conn.execute("UPDATE assembly_seq SET instance_key='manual-fragment:99:70001-100000' WHERE id=(SELECT assembly_seq_id FROM assembly_ctg WHERE id=5)", [])?;
+            }
+            6 => {
+                conn.execute("UPDATE assembly_seq SET hidden=1 WHERE id=(SELECT assembly_seq_id FROM assembly_ctg WHERE id=5)", [])?;
+            }
+            _ => {
+                conn.execute(
+                    "UPDATE assembly_ctg SET assigned_chr_name='ChrB' WHERE id=5",
+                    [],
+                )?;
+            }
         }
         let before = paths(&db)?;
         let intervals = active_intervals(&db)?;
-        assert!(unsplit(&db,args).is_err(), "case {case}");
-        assert_eq!(paths(&db)?,before); assert_eq!(active_intervals(&db)?,intervals);
+        assert!(unsplit(&db, args).is_err(), "case {case}");
+        assert_eq!(paths(&db)?, before);
+        assert_eq!(active_intervals(&db)?, intervals);
     }
     Ok(())
 }
@@ -806,138 +854,214 @@ fn unsplit_rejects_stale_wrong_side_nonadjacent_flipped_foreign_group_and_hidden
 #[test]
 fn unsplit_preserves_adopted_partial_intervals_gaps_metadata_and_all_chromosomes() -> Result<()> {
     let (_dir, db) = seed()?;
-    cut_manual(&db,1,40000,1,100000,"-")?;
+    cut_manual(&db, 1, 40000, 1, 100000, "-")?;
     let conn = Connection::open(&db)?;
     let before = json!({"ChrA":{"segments":[
         {"type":"ctg","segmentId":"partial","assemblyCtgId":3,"start":20000,"end":2,"custom":"keep"},
         {"type":"gap","segmentId":"gap","gapSizeBp":99}],"totalLength":20098},
         "ChrB":{"segments":[{"type":"ctg","segmentId":"other","assemblyCtgId":2,"start":1,"end":10}]}});
-    conn.execute("UPDATE project_assembly_view_state SET final_path_by_chr_json=?1", [before.to_string()])?;
-    unsplit(&db,unsplit_args(&db,2,3,"left")?)?;
+    conn.execute(
+        "UPDATE project_assembly_view_state SET final_path_by_chr_json=?1",
+        [before.to_string()],
+    )?;
+    unsplit(&db, unsplit_args(&db, 2, 3, "left")?)?;
     let after = paths(&db)?;
-    assert_eq!(after["ChrA"]["segments"][0]["source"],json!({"dataset":"ds","contig":"tig","start":40002,"end":60000,"orientation":"-"}));
-    assert_eq!(after["ChrA"]["segments"][0]["start"],60000);
-    assert_eq!(after["ChrA"]["segments"][0]["end"],40002);
-    assert_eq!(after["ChrA"]["segments"][0]["segmentId"],"partial");
-    assert_eq!(after["ChrA"]["segments"][0]["custom"],"keep");
-    assert_eq!(after["ChrA"]["segments"][1],before["ChrA"]["segments"][1]);
-    assert_eq!(after["ChrA"]["totalLength"],before["ChrA"]["totalLength"]);
-    assert_eq!(after["ChrB"]["segments"][0]["source"]["start"],1);
-    assert_eq!(after["ChrB"]["segments"][0]["source"]["end"],10);
-    assert!(undo_main_view_history(&db,&target())?.changed); assert_eq!(paths(&db)?,before);
-    assert!(redo_main_view_history(&db,&target())?.changed); assert_eq!(paths(&db)?,after);
+    assert_eq!(
+        after["ChrA"]["segments"][0]["source"],
+        json!({"dataset":"ds","contig":"tig","start":40002,"end":60000,"orientation":"-"})
+    );
+    assert_eq!(after["ChrA"]["segments"][0]["start"], 60000);
+    assert_eq!(after["ChrA"]["segments"][0]["end"], 40002);
+    assert_eq!(after["ChrA"]["segments"][0]["segmentId"], "partial");
+    assert_eq!(after["ChrA"]["segments"][0]["custom"], "keep");
+    assert_eq!(after["ChrA"]["segments"][1], before["ChrA"]["segments"][1]);
+    assert_eq!(after["ChrA"]["totalLength"], before["ChrA"]["totalLength"]);
+    assert_eq!(after["ChrB"]["segments"][0]["source"]["start"], 1);
+    assert_eq!(after["ChrB"]["segments"][0]["source"]["end"], 10);
+    assert!(undo_main_view_history(&db, &target())?.changed);
+    assert_eq!(paths(&db)?, before);
+    assert!(redo_main_view_history(&db, &target())?.changed);
+    assert_eq!(paths(&db)?, after);
     Ok(())
 }
-
 
 #[test]
 fn unsplit_preserves_exterior_end_types_offsets_and_unrelated_layout() -> Result<()> {
     let (_dir, db) = seed()?;
     let conn = Connection::open(&db)?;
-    conn.execute("UPDATE project_assembly_view_state SET track_drag_offsets_json=?1", [json!([
-        {"trackRole":"primary","assemblyCtgId":1,"offsetBp":123},
-        {"trackRole":"support","assemblyCtgId":99,"datasetId":2,"offsetBp":456}
-    ]).to_string()])?;
-    cut_manual(&db,1,40000,1,100000,"-")?;
-    let before_offsets: Value = serde_json::from_str(&conn.query_row::<String,_,_>("SELECT track_drag_offsets_json FROM project_assembly_view_state",[],|r|r.get(0))?)?;
-    unsplit(&db,unsplit_args(&db,2,3,"left")?)?;
+    conn.execute(
+        "UPDATE project_assembly_view_state SET track_drag_offsets_json=?1",
+        [json!([
+            {"trackRole":"primary","assemblyCtgId":1,"offsetBp":123},
+            {"trackRole":"support","assemblyCtgId":99,"datasetId":2,"offsetBp":456}
+        ])
+        .to_string()],
+    )?;
+    cut_manual(&db, 1, 40000, 1, 100000, "-")?;
+    let before_offsets: Value = serde_json::from_str(&conn.query_row::<String, _, _>(
+        "SELECT track_drag_offsets_json FROM project_assembly_view_state",
+        [],
+        |r| r.get(0),
+    )?)?;
+    unsplit(&db, unsplit_args(&db, 2, 3, "left")?)?;
     let ends: (String,String) = conn.query_row("SELECT left_end_type,right_end_type FROM assembly_seq WHERE id=(SELECT assembly_seq_id FROM assembly_ctg WHERE id=2)",[],|r|Ok((r.get(0)?,r.get(1)?)))?;
-    assert_eq!(ends,("telomere".into(),"normal".into()));
-    let offsets: Value = serde_json::from_str(&conn.query_row::<String,_,_>("SELECT track_drag_offsets_json FROM project_assembly_view_state",[],|r|r.get(0))?)?;
-    assert_eq!(offsets,json!([
-        {"trackRole":"support","assemblyCtgId":99,"datasetId":2,"offsetBp":456},
-        {"trackRole":"primary","assemblyCtgId":2,"offsetBp":123}
-    ]));
-    assert!(undo_main_view_history(&db,&target())?.changed);
-    let restored: Value = serde_json::from_str(&conn.query_row::<String,_,_>("SELECT track_drag_offsets_json FROM project_assembly_view_state",[],|r|r.get(0))?)?;
-    assert_eq!(restored,before_offsets);
+    assert_eq!(ends, ("telomere".into(), "normal".into()));
+    let offsets: Value = serde_json::from_str(&conn.query_row::<String, _, _>(
+        "SELECT track_drag_offsets_json FROM project_assembly_view_state",
+        [],
+        |r| r.get(0),
+    )?)?;
+    assert_eq!(
+        offsets,
+        json!([
+            {"trackRole":"support","assemblyCtgId":99,"datasetId":2,"offsetBp":456},
+            {"trackRole":"primary","assemblyCtgId":2,"offsetBp":123}
+        ])
+    );
+    assert!(undo_main_view_history(&db, &target())?.changed);
+    let restored: Value = serde_json::from_str(&conn.query_row::<String, _, _>(
+        "SELECT track_drag_offsets_json FROM project_assembly_view_state",
+        [],
+        |r| r.get(0),
+    )?)?;
+    assert_eq!(restored, before_offsets);
     Ok(())
 }
 
 #[test]
 fn unsplit_without_saved_view_supports_undo_redo() -> Result<()> {
     let (_dir, db) = seed()?;
-    Connection::open(&db)?.execute("DELETE FROM project_assembly_view_state",[])?;
-    cut_manual(&db,1,40000,1,100000,"-")?;
-    unsplit(&db,unsplit_args(&db,2,3,"left")?)?;
-    assert_eq!(active_intervals(&db)?,vec![(1,100000)]);
-    assert!(undo_main_view_history(&db,&target())?.changed);
-    assert_eq!(active_intervals(&db)?,vec![(1,40000),(40001,100000)]);
-    assert!(redo_main_view_history(&db,&target())?.changed);
-    assert_eq!(active_intervals(&db)?,vec![(1,100000)]);
-    assert_eq!(Connection::open(&db)?.query_row::<i64,_,_>("SELECT COUNT(*) FROM project_assembly_view_state",[],|r|r.get(0))?,0);
+    Connection::open(&db)?.execute("DELETE FROM project_assembly_view_state", [])?;
+    cut_manual(&db, 1, 40000, 1, 100000, "-")?;
+    unsplit(&db, unsplit_args(&db, 2, 3, "left")?)?;
+    assert_eq!(active_intervals(&db)?, vec![(1, 100000)]);
+    assert!(undo_main_view_history(&db, &target())?.changed);
+    assert_eq!(active_intervals(&db)?, vec![(1, 40000), (40001, 100000)]);
+    assert!(redo_main_view_history(&db, &target())?.changed);
+    assert_eq!(active_intervals(&db)?, vec![(1, 100000)]);
+    assert_eq!(
+        Connection::open(&db)?.query_row::<i64, _, _>(
+            "SELECT COUNT(*) FROM project_assembly_view_state",
+            [],
+            |r| r.get(0)
+        )?,
+        0
+    );
     Ok(())
 }
 
 #[test]
-fn unsplit_coalesces_compatible_phased_pair_and_rejects_partial_or_job_dependencies() -> Result<()> {
+fn unsplit_coalesces_compatible_phased_pair_and_rejects_partial_or_job_dependencies() -> Result<()>
+{
     for case in 0..4 {
         let (_dir, db) = seed()?;
         let conn = Connection::open(&db)?;
-        cut_manual(&db,1,40000,1,100000,"-")?;
+        cut_manual(&db, 1, 40000, 1, 100000, "-")?;
         conn.execute("INSERT INTO phased_chr_track(id,project_id,parent_chr_name,haplotype_key,label,display_order,created_at) VALUES(1,1,'ChrA','h1','hap1',1,'1')",[])?;
         conn.execute("INSERT INTO phased_chr_track_item(id,phased_track_id,assembly_ctg_id,display_order,gap_before_px,orient,created_at) VALUES(1,1,3,1,5,'-','1')",[])?;
         if case != 1 {
             conn.execute("INSERT INTO phased_chr_track_item(id,phased_track_id,assembly_ctg_id,display_order,gap_before_px,orient,created_at) VALUES(2,1,2,2,?1,'-','1')",[if case==2 {10} else {0}])?;
         }
         if case == 3 {
-            conn.execute("UPDATE project_assembly_view_state SET degap_project_state_json=?1",[json!({"jobs":[{"source":{"assemblyCtgId":3}}]}).to_string()])?;
+            conn.execute(
+                "UPDATE project_assembly_view_state SET degap_project_state_json=?1",
+                [json!({"jobs":[{"source":{"assemblyCtgId":3}}]}).to_string()],
+            )?;
         }
         let before = paths(&db)?;
-        let result = unsplit(&db,unsplit_args(&db,2,3,"left")?);
+        let result = unsplit(&db, unsplit_args(&db, 2, 3, "left")?);
         if case == 0 {
             assert!(result?.changed);
             let items: Vec<(i64,i64)> = conn.prepare("SELECT assembly_ctg_id,gap_before_px FROM phased_chr_track_item ORDER BY display_order")?
                 .query_map([],|r|Ok((r.get(0)?,r.get(1)?)))?.collect::<rusqlite::Result<_>>()?;
-            assert_eq!(items,vec![(2,5)]);
-            assert!(undo_main_view_history(&db,&target())?.changed);
-            assert_eq!(conn.query_row::<i64,_,_>("SELECT COUNT(*) FROM phased_chr_track_item",[],|r|r.get(0))?,2);
-            assert_eq!(paths(&db)?,before);
-            assert!(redo_main_view_history(&db,&target())?.changed);
+            assert_eq!(items, vec![(2, 5)]);
+            assert!(undo_main_view_history(&db, &target())?.changed);
+            assert_eq!(
+                conn.query_row::<i64, _, _>(
+                    "SELECT COUNT(*) FROM phased_chr_track_item",
+                    [],
+                    |r| r.get(0)
+                )?,
+                2
+            );
+            assert_eq!(paths(&db)?, before);
+            assert!(redo_main_view_history(&db, &target())?.changed);
         } else {
-            assert!(result.is_err(),"case {case}"); assert_eq!(paths(&db)?,before);
-            assert_eq!(active_intervals(&db)?,vec![(1,40000),(40001,100000)]);
+            assert!(result.is_err(), "case {case}");
+            assert_eq!(paths(&db)?, before);
+            assert_eq!(active_intervals(&db)?, vec![(1, 40000), (40001, 100000)]);
         }
     }
     Ok(())
 }
 
-
 #[test]
 fn unsplit_final_path_export_dna_is_unchanged_for_partial_reverse_adoptions() -> Result<()> {
-    use crate::exporter::{ExportFinalPathFastaParams, FinalPathExportSegment, export_final_path_fasta};
+    use crate::exporter::{
+        ExportFinalPathFastaParams, FinalPathExportSegment, export_final_path_fasta,
+    };
     let (dir, db) = seed()?;
     let dna = "AACCGT".repeat(16667)[..100000].to_string();
     let fasta = dir.path().join("ds.fa");
-    std::fs::write(&fasta,format!(">tig\n{dna}\n"))?;
-    Connection::open(&db)?.execute("INSERT INTO source_seq_locator(source_seq_id,fasta_path) VALUES(1,?1)",[fasta.to_string_lossy()])?;
-    cut_manual(&db,1,40000,1,100000,"-")?;
+    std::fs::write(&fasta, format!(">tig\n{dna}\n"))?;
+    Connection::open(&db)?.execute(
+        "INSERT INTO source_seq_locator(source_seq_id,fasta_path) VALUES(1,?1)",
+        [fasta.to_string_lossy()],
+    )?;
+    cut_manual(&db, 1, 40000, 1, 100000, "-")?;
     let adopted = json!({"ChrA":{"segments":[
         {"type":"ctg","segmentId":"partial","assemblyCtgId":3,"start":20000,"end":2},
         {"type":"gap","gapSizeBp":31},
         {"type":"ctg","segmentId":"retained","assemblyCtgId":2,"start":39999,"end":123}]}});
-    Connection::open(&db)?.execute("UPDATE project_assembly_view_state SET final_path_by_chr_json=?1",[adopted.to_string()])?;
+    Connection::open(&db)?.execute(
+        "UPDATE project_assembly_view_state SET final_path_by_chr_json=?1",
+        [adopted.to_string()],
+    )?;
     let export = |name: &str| -> Result<Vec<u8>> {
         let path = paths(&db)?;
-        let segments = path["ChrA"]["segments"].as_array().unwrap().iter().map(|s| {
-            if s["type"] == "gap" {
-                FinalPathExportSegment::Gap { gap_size_bp:s["gapSizeBp"].as_i64().unwrap() }
-            } else if s["source"].is_object() {
-                FinalPathExportSegment::Source { dataset_name:"ds".into(),contig_name:"tig".into(),start:s["start"].as_i64().unwrap(),end:s["end"].as_i64().unwrap() }
-            } else {
-                FinalPathExportSegment::Ctg { assembly_ctg_id:s["assemblyCtgId"].as_i64().unwrap(),start:s["start"].as_i64().unwrap(),end:s["end"].as_i64().unwrap() }
-            }
-        }).collect();
+        let segments = path["ChrA"]["segments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| {
+                if s["type"] == "gap" {
+                    FinalPathExportSegment::Gap {
+                        gap_size_bp: s["gapSizeBp"].as_i64().unwrap(),
+                    }
+                } else if s["source"].is_object() {
+                    FinalPathExportSegment::Source {
+                        dataset_name: "ds".into(),
+                        contig_name: "tig".into(),
+                        start: s["start"].as_i64().unwrap(),
+                        end: s["end"].as_i64().unwrap(),
+                    }
+                } else {
+                    FinalPathExportSegment::Ctg {
+                        assembly_ctg_id: s["assemblyCtgId"].as_i64().unwrap(),
+                        start: s["start"].as_i64().unwrap(),
+                        end: s["end"].as_i64().unwrap(),
+                    }
+                }
+            })
+            .collect();
         let output = dir.path().join(name);
-        export_final_path_fasta(&db,1,&ExportFinalPathFastaParams {chr_name:"ChrA".into(),output_path:output.clone(),final_path_segments:segments})?;
+        export_final_path_fasta(
+            &db,
+            1,
+            &ExportFinalPathFastaParams {
+                chr_name: "ChrA".into(),
+                output_path: output.clone(),
+                final_path_segments: segments,
+            },
+        )?;
         Ok(std::fs::read(output)?)
     };
     let before = export("before-unsplit.fa")?;
-    unsplit(&db,unsplit_args(&db,2,3,"left")?)?;
-    assert_eq!(export("after-unsplit.fa")?,before);
-    assert!(undo_main_view_history(&db,&target())?.changed);
-    assert_eq!(export("undo-unsplit.fa")?,before);
-    assert!(redo_main_view_history(&db,&target())?.changed);
-    assert_eq!(export("redo-unsplit.fa")?,before);
+    unsplit(&db, unsplit_args(&db, 2, 3, "left")?)?;
+    assert_eq!(export("after-unsplit.fa")?, before);
+    assert!(undo_main_view_history(&db, &target())?.changed);
+    assert_eq!(export("undo-unsplit.fa")?, before);
+    assert!(redo_main_view_history(&db, &target())?.changed);
+    assert_eq!(export("redo-unsplit.fa")?, before);
     Ok(())
 }

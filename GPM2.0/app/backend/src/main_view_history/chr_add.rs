@@ -44,7 +44,8 @@ pub(super) fn prepare_add(
     )?;
     let source = &preview.source;
     if source.source_seq_id != r.source_seq_id
-        || source.assigned_chr_name.as_deref().unwrap_or("unplaced") != r.source_chr_name.as_deref().unwrap_or(chr)
+        || source.assigned_chr_name.as_deref().unwrap_or("unplaced")
+            != r.source_chr_name.as_deref().unwrap_or(chr)
         || source.source_start != r.source_start
         || source.source_end != r.source_end
         || source.orient != r.orient

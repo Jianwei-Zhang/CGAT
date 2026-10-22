@@ -80,7 +80,10 @@ pub fn run_main_view_editor_action(
     // Cross-chromosome additions affect the destination, not the source history.
     // Keep params.chr_name as source-view context for mutation preconditions.
     let history_chr = if action == "add-contig-to-chr" {
-        params.args.get("targetChrName").and_then(serde_json::Value::as_str)
+        params
+            .args
+            .get("targetChrName")
+            .and_then(serde_json::Value::as_str)
             .filter(|name| !name.trim().is_empty())
             .context("CTG_CHR_INVALID_REQUEST: targetChrName is required")?
     } else {

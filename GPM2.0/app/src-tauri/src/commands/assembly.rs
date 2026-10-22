@@ -15,12 +15,7 @@ pub fn list_chr_view_ctgs(
         let items = if preview_only {
             backend_list_chr_view_ctgs_for_preview(&db_path, projectId)?
         } else {
-            backend_list_chr_view_ctgs(
-                &db_path,
-                projectId,
-                chrName.as_deref(),
-                datasetId,
-            )?
+            backend_list_chr_view_ctgs(&db_path, projectId, chrName.as_deref(), datasetId)?
         };
         let mapped = items
             .into_iter()

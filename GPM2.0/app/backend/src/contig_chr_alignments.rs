@@ -1,6 +1,7 @@
 //! Read-only, fragment-scoped cross-chromosome evidence and semantic presence checks.
 use crate::contig_split::{
-    SplitCandidate, SplitHit, SplitSource, load_source_hits, load_chr_alignment_source, rank_candidates,
+    SplitCandidate, SplitHit, SplitSource, load_chr_alignment_source, load_source_hits,
+    rank_candidates,
 };
 use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
