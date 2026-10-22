@@ -43,7 +43,7 @@
 .project-preview-final-part { position: absolute; display: block; top: 3px; height: 18px; min-width: 2px; overflow: hidden; border: 1px solid rgba(0, 0, 0, .2); border-radius: 2px; }
 .project-preview-final-part > span { display: block; padding: 0 3px; color: inherit; font-size: var(--font-graph-small); line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: clip; }
 .project-preview-final-plot.has-gaps .project-preview-final-part { top: 19px; }
-.project-preview-gap-label { position: absolute; top: 1px; transform: translateX(-50%); color: var(--theme-amber-ink, #766239); font-size: var(--font-graph-small); font-weight: 600; white-space: nowrap; }
+.project-preview-gap-label { position: absolute; top: 1px; transform: translateX(-50%); color: #000000; font-size: var(--font-graph-small); font-weight: 600; white-space: nowrap; }
 .project-preview-final-part.is-gap { background-image: repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255, 255, 255, .4) 3px, rgba(255, 255, 255, .4) 5px); }
 .project-preview-warning { display: block; margin-top: 6px; color: var(--theme-amber-ink, #8a612d); font-size: var(--font-small); }
 @media (max-width: 560px) {

@@ -73,7 +73,7 @@ test("manual split uses shared Ref and primary colors without implying an auxili
 });
 
 
-test("Preview and Project Export keep gap markers white and use white Preview GAP text on dark canvas", () => {
+test("Preview and Project Export keep gap markers white and use black or white Preview GAP text for the theme", () => {
   const previewCss = readFileSync(new URL("../project-preview.css", import.meta.url), "utf8");
   const exportCss = readFileSync(new URL("../project-export.css", import.meta.url), "utf8");
   assert.match(baseCss, /--gap-marker-fill:\s*#ffffff;/);
@@ -83,5 +83,6 @@ test("Preview and Project Export keep gap markers white and use white Preview GA
   assert.ok(gapRule);
   assert.match(gapRule, /background:\s*var\(--gap-marker-fill,\s*#ffffff\);/);
   assert.doesNotMatch(gapRule, /background:\s*var\(--(?:surface-|theme-)/);
+  assert.match(previewCss, /(?:^|\n)\.project-preview-gap-label\s*\{[^}]*color:\s*#000000;/);
   assert.match(previewCss, /:root\[data-theme="dark"\] \.project-preview-gap-label\s*\{[^}]*color:\s*#ffffff;/);
 });
