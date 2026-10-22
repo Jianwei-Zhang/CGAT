@@ -47,6 +47,9 @@
   --ctg-ref-fill: #cfcfcf;
   --ctg-ref-stroke: #8e8e8e;
   --ctg-ref-text: #4f4f4f;
+  /* Gap markers are sequence symbols, not theme-dependent panel surfaces. */
+  --gap-marker-fill: #ffffff;
+  --gap-marker-text: #1b1b1b;
   --font-graph-label: var(--graph-font-size, 12px);
   --font-graph-small: calc(var(--graph-font-size, 12px) * 0.917);
   --font-graph-tick: calc(var(--graph-font-size, 12px) * 0.917);

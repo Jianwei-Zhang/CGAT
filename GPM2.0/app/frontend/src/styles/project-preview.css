@@ -53,3 +53,6 @@
   .project-preview-heading { gap: 8px; }
   .project-preview-card-header { gap: 8px; }
 }
+
+/* GAP text sits above the white marker, directly on the dark plot canvas. */
+:root[data-theme="dark"] .project-preview-gap-label { color: #ffffff; }

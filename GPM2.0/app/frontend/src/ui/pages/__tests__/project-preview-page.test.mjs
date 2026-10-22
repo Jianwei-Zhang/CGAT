@@ -39,8 +39,10 @@ test("preview uses single-line heading, icon refresh, hides unpositioned informa
   assert.doesNotMatch(output, /project-preview-refresh[^>]*>刷新/);
   assert.doesNotMatch(output, /project-preview-unpositioned|data-preview-unpositioned|未定位/);
   assert.match(output, /data-final-path-gap-label="1"/);
-  assert.match(output, /data-final-path-kind="gap"[^>]*background:var\(--surface-panel\)/);
+  assert.match(output, /data-final-path-kind="gap"[^>]*background:var\(--gap-marker-fill, #ffffff\)/);
   assert.match(output, /title="Gap: 1 bp">Gap<\/span>/);
+  assert.match(output, /data-final-path-kind="gap"[^>]*data-final-path-length="1"/);
+  assert.match(output, /data-final-path-kind="gap"[^>]*color:var\(--gap-marker-text, #1b1b1b\)/);
   assert.match(output, /a&lt;ctg&gt;/);
 });
 

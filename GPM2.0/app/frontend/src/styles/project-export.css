@@ -596,7 +596,7 @@
   height: 16px;
   border: 1px solid var(--theme-strong-line, #555);
   border-radius: 2px;
-  background: var(--theme-surface-subtle, #f8f8f8);
+  background: var(--gap-marker-fill, #ffffff);
 }
 
 .project-export-final-path-preview-gap-label {

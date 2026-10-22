@@ -71,3 +71,17 @@ test("manual split uses shared Ref and primary colors without implying an auxili
     assert.ok(rule.includes("fill: var(--ctg-primary-fill);"));
   }
 });
+
+
+test("Preview and Project Export keep gap markers white and use white Preview GAP text on dark canvas", () => {
+  const previewCss = readFileSync(new URL("../project-preview.css", import.meta.url), "utf8");
+  const exportCss = readFileSync(new URL("../project-export.css", import.meta.url), "utf8");
+  assert.match(baseCss, /--gap-marker-fill:\s*#ffffff;/);
+  assert.match(baseCss, /--gap-marker-text:\s*#1b1b1b;/);
+  assert.doesNotMatch(themeCss, /--gap-marker-(?:fill|text)\s*:/);
+  const gapRule = exportCss.match(/\.project-export-final-path-preview-gap\s*\{([^}]*)\}/)?.[1];
+  assert.ok(gapRule);
+  assert.match(gapRule, /background:\s*var\(--gap-marker-fill,\s*#ffffff\);/);
+  assert.doesNotMatch(gapRule, /background:\s*var\(--(?:surface-|theme-)/);
+  assert.match(previewCss, /:root\[data-theme="dark"\] \.project-preview-gap-label\s*\{[^}]*color:\s*#ffffff;/);
+});
