@@ -445,6 +445,10 @@ function createController(root, store, window) {
       // Share a card with the graphic, but never put navigation in its horizontal scroller.
       let card = layout.parentNode;
       if (card.dataset?.viewNavigationCard !== role) {
+        // Scroll sync has already restored this viewport. Moving the live
+        // layout into its card clears descendant offsets in Chromium/WebView2;
+        // restore them before the queued scroll event can persist a false zero.
+        const scrollLeft = scroll.scrollLeft, scrollTop = scroll.scrollTop;
         card = root.ownerDocument.createElement("div");
         card.className = "assembly-view-card";
         card.dataset.viewNavigationCard = role;
@@ -452,6 +456,8 @@ function createController(root, store, window) {
         layout.parentNode.insertBefore(card, layout);
         if (existingBar?.dataset?.viewNavigation === role) card.appendChild(existingBar);
         card.appendChild(layout);
+        scroll.scrollLeft = scrollLeft;
+        scroll.scrollTop = scrollTop;
       }
       let bar = layout.previousElementSibling;
       if (bar?.dataset?.viewNavigation !== role || bar.dataset.navLocale !== localeKey) {

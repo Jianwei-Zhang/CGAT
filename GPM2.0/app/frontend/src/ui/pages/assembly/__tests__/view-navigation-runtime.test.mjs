@@ -12,7 +12,7 @@ class Events {
   emit(type, event = {}) { for (const fn of [...(this.handlers.get(type) || [])]) fn(event); }
   count(type) { return this.handlers.get(type)?.size || 0; }
 }
-function harness() {
+function harness({ resetScrollOnReparent = false } = {}) {
   const root = new Events(), win = new Events(), frames = new Map();
   let frameId = 0, observer;
   win.requestAnimationFrame = (fn) => { frames.set(++frameId, fn); return frameId; };
@@ -36,6 +36,14 @@ function harness() {
     node.parentNode = null;
     node.remove = () => {
       if (!node.parentNode) return;
+      // Browsers clear descendant scroll offsets when a live layout is moved.
+      if (resetScrollOnReparent) {
+        for (const view of Object.values(views)) {
+          if (view.layout !== node) continue;
+          view.scroll.scrollLeft = 0;
+          view.scroll.scrollTop = 0;
+        }
+      }
       const children = node.parentNode.children;
       children.splice(children.indexOf(node), 1);
       node.parentNode = null;
@@ -99,7 +107,7 @@ function harness() {
     panel.appendChild(bar); panel.appendChild(layout);
     const scroll = new Events();
     Object.assign(scroll, {
-      isConnected: true, clientWidth: 1000, scrollWidth: 2000, scrollLeft: 200,
+      isConnected: true, clientWidth: 1000, scrollWidth: 2000, scrollLeft: 200, scrollTop: 25,
       dataset: { trackRole: role, trackWindowStartBp: "0", trackDomainSpanBp: "1000", trackInnerWidth: "2000", trackViewboxMinX: "0",
         subviewWindowStartBp: "0", subviewDomainSpanBp: "1000", subviewInnerWidth: "2000", subviewViewboxMinX: "0" },
       classList: { values: new Set(), toggle(key, on) { if (on) this.values.add(key); else this.values.delete(key); } },
@@ -162,6 +170,34 @@ test("partial refreshes retain exactly one owner and independent default mouse m
 });
 
 for (const role of ["primary", "subview"]) {
+  test(`${role} navigation mounting preserves restored scroll through live layout reparenting`, () => {
+    const h = harness({ resetScrollOnReparent: true });
+    try {
+      const view = h.views[role];
+      assert.equal(view.scroll.scrollLeft, 200);
+      assert.equal(view.scroll.scrollTop, 25);
+      assert.equal(view.selection.getAttribute("aria-valuenow"), "100");
+      h.root.emit("click", h.event(view.action("toggle-mode")));
+      const state = h.store.getState();
+      // A scoped render produces a fresh, unwrapped layout; scroll sync runs
+      // before navigation mounts its card. Reproduce that ordering repeatedly.
+      for (const left of [730, 410, 900]) {
+        const previousCard = view.layout.parentNode;
+        view.panel.appendChild(view.layout);
+        previousCard.remove();
+        view.scroll.scrollLeft = left;
+        view.scroll.scrollTop = 45;
+        h.bind();
+        assert.equal(view.scroll.scrollLeft, left);
+        assert.equal(view.scroll.scrollTop, 45);
+        assert.equal(view.selection.getAttribute("aria-valuenow"), String(left / 2));
+        assert.equal(view.scroll.dataset.viewInteractionMode, "hand");
+        assert.equal(h.store.getState(), state, "mounting must not change viewport preferences or edits");
+        assert.equal(view.panel.children.length, 1);
+      }
+    } finally { h.dispose(); }
+  });
+
   test(`${role} navigation shares the graphic card without entering the horizontal scroller`, () => {
     const h = harness();
     try {
