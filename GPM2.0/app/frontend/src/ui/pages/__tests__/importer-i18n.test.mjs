@@ -193,6 +193,8 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.runtime.incompleteAddPackageWorkspaceSummary, "请先加载已有项目。");
   assert.equal(zh.runtime.incompleteAddPackageZipSummary, "请先选择数据集追加压缩包。");
   assert.equal(zh.runtime.importAddPackageDoneStage, "数据集追加包导入完成并刷新候选项");
+  assert.equal("skipPreviewPreparation" in zh.buttons, false);
+  assert.equal("skipPreviewPreparation" in en.buttons, false);
   assert.equal(zh.runtime.addPackageHint, "（added {datasetName}）");
   assert.equal(zh.runtime.importFailedSummary, "导入失败：{message}");
   assert.equal(zh.runtime.importCancellingStatus, "终止请求中");
@@ -2069,6 +2071,14 @@ test("import progress cancellation starts on pointerdown and closes the dialog i
               return cancelDeferred.promise;
             }
             if (command === "initialize_project") return Promise.resolve({ projectId: 1, projectName: "empty", existingProjects: [{ projectId: 1, projectName: "empty", phasedAssemblyEnabled: true }] });
+            if (command === "get_project_preview_cache") return Promise.resolve({
+              available: true, trackingVersion: 3, identity: "preview-db", revision: 0,
+              memoryValid: false, valid: false, snapshot: null, dirtyChrNames: ["*"],
+            });
+            if (command === "list_project_chromosomes") return Promise.resolve({ items: [] });
+            if (command === "list_chr_view_ctgs") return Promise.resolve({ items: [] });
+            if (command === "get_project_assembly_view_state" || command === "get_grt_project_view") return Promise.resolve({});
+            if (command === "put_project_preview_cache") return Promise.resolve({ stored: true });
             throw new Error(`unexpected command: ${command}`);
           },
         },
@@ -2160,7 +2170,7 @@ test("normal import success wins over a pending cancellation response", async ()
     globalThis.window = {
       __TAURI__: {
         core: {
-          invoke(command) {
+          invoke(command, args) {
             if (command === "import_zip") {
               return importDeferred.promise;
             }
@@ -2177,6 +2187,15 @@ test("normal import success wins over a pending cancellation response", async ()
               });
             }
             if (command === "initialize_project") return Promise.resolve({ projectId: 1, projectName: "empty", existingProjects: [{ projectId: 1, projectName: "empty", phasedAssemblyEnabled: true }] });
+            if (command === "get_project_preview_cache") return Promise.resolve({
+              available: true, trackingVersion: 3, identity: "preview-db", revision: 0,
+              memoryValid: args.expectedIdentity === "preview-db" && args.sinceRevision === 0,
+              valid: false, snapshot: null, dirtyChrNames: ["*"],
+            });
+            if (command === "list_project_chromosomes") return Promise.resolve({ items: [] });
+            if (command === "list_chr_view_ctgs") return Promise.resolve({ items: [] });
+            if (command === "get_project_assembly_view_state" || command === "get_grt_project_view") return Promise.resolve({});
+            if (command === "put_project_preview_cache") return Promise.resolve({ stored: true });
             throw new Error(`unexpected command: ${command}`);
           },
         },
@@ -2897,11 +2916,74 @@ test("project menu opens on the entire row, clamps to the viewport and supports 
 });
 
 
-for (const behavior of ["skip", "read failure", "multiple projects"]) {
-  test(`import preview preparation: ${behavior} preserves the imported workspace`, async () => {
+
+test("import preview preparation is fixed, has no skip or cancel control, and ignores cancellation attempts", async () => {
+  const previousWindow = globalThis.window, previousDocument = globalThis.document;
+  const previousSetTimeout = globalThis.setTimeout, previousClearTimeout = globalThis.clearTimeout;
+  const sourceRead = createDeferred(), started = createDeferred();
+  const calls = [], saved = new Map();
+  try {
+    globalThis.document = { querySelector: () => null };
+    globalThis.setTimeout = () => 1; globalThis.clearTimeout = () => {};
+    globalThis.window = {
+      localStorage: { getItem: () => null }, dispatchEvent() {},
+      __TAURI__: { core: { invoke: async (command, args) => {
+        calls.push({ command, args });
+        if (command === "import_zip") return { workspaceRoot: "D:/preview-fixed", message: "Imported" };
+        if (command === "open_workspace") return { workspaceRoot: args.workspaceRoot, references: [], datasets: [],
+          existingProjects: [{ projectId: 1, projectName: "P1" }] };
+        if (command === "get_project_preview_cache") return { available: true, trackingVersion: 3,
+          identity: "preview-db", revision: 0, memoryValid: args.expectedIdentity === "preview-db" && args.sinceRevision === 0,
+          valid: false, snapshot: null, dirtyChrNames: ["*"] };
+        if (command === "list_project_chromosomes") {
+          started.resolve();
+          await sourceRead.promise;
+          return { items: [{ chrName: "Chr1", chrLength: 1000 }] };
+        }
+        if (command === "list_chr_view_ctgs") return { items: [] };
+        if (command === "get_project_assembly_view_state" || command === "get_grt_project_view") return {};
+        if (command === "put_project_preview_cache") {
+          saved.set(args.request.projectId, args.request.payload); return { stored: true };
+        }
+        throw new Error(`Unexpected command: ${command}`);
+      } } },
+    };
+    const startButton = createButton(), cancelButton = createButton();
+    const host = createHost({ "#import-zip-start-button": startButton, "[data-import-cancel]": cancelButton });
+    const store = createStore(createImporterScrollState({ inFlight: false, importRunId: null,
+      zipPath: "D:/bundle.zip", workspaceRoot: "D:/preview-fixed" }));
+    bindImporterPage(host, store);
+    const importing = startButton.click();
+    await started.promise;
+    const preparing = store.getState().importer;
+    assert.equal(preparing.inFlight, true);
+    assert.equal(preparing.importPreparingPreview, true);
+    const progressHtml = renderImporterPage(store.getState());
+    assert.doesNotMatch(progressHtml, /data-import-cancel/);
+    assert.doesNotMatch(progressHtml, /跳过预览准备|Skip preview preparation/);
+    await cancelButton.pointerdown();
+    assert.equal(store.getState().importer.importCancelling, false);
+    assert.equal(store.getState().importer.importProgressDismissed, false);
+    assert.equal(store.getState().importer.importPreparingPreview, true);
+    assert.equal(calls.some(call => call.command === "request_import_cancel"), false);
+    sourceRead.resolve();
+    await importing;
+    assert.equal(saved.size, 1);
+    assert.equal(store.getState().projectPreview.loaded, true);
+    assert.equal(store.getState().session.workspacePath, "D:/preview-fixed");
+    assert.equal(store.getState().importer.inFlight, false);
+    assert.equal(calls.some(call => call.command === "request_import_cancel"), false);
+  } finally {
+    sourceRead.resolve();
+    globalThis.window = previousWindow; globalThis.document = previousDocument;
+    globalThis.setTimeout = previousSetTimeout; globalThis.clearTimeout = previousClearTimeout;
+  }
+});
+
+for (const behavior of ["read failure", "multiple projects"]) {
+  test(`import preview preparation: ${behavior} does not turn a successful import into a failure`, async () => {
     const previousWindow = globalThis.window, previousDocument = globalThis.document;
     const previousSetTimeout = globalThis.setTimeout, previousClearTimeout = globalThis.clearTimeout;
-    const sourceRead = createDeferred(), started = createDeferred();
     const calls = [], saved = new Map();
     try {
       globalThis.document = { querySelector: () => null };
@@ -2917,9 +2999,7 @@ for (const behavior of ["skip", "read failure", "multiple projects"]) {
             identity: "preview-db", revision: 0, memoryValid: args.expectedIdentity === "preview-db" && args.sinceRevision === 0,
             valid: false, snapshot: null, dirtyChrNames: ["*"] };
           if (command === "list_project_chromosomes") {
-            started.resolve();
             if (behavior === "read failure") throw new Error("temporary preview read failure");
-            if (behavior === "skip") await sourceRead.promise;
             return { items: [{ chrName: "Chr1", chrLength: 1000 }] };
           }
           if (command === "list_chr_view_ctgs") return { items: [] };
@@ -2930,22 +3010,12 @@ for (const behavior of ["skip", "read failure", "multiple projects"]) {
           throw new Error(`Unexpected command: ${command}`);
         } } },
       };
-      const startButton = createButton(), cancelButton = createButton();
-      const host = createHost({ "#import-zip-start-button": startButton, "[data-import-cancel]": cancelButton });
+      const startButton = createButton();
+      const host = createHost({ "#import-zip-start-button": startButton });
       const store = createStore(createImporterScrollState({ inFlight: false, importRunId: null,
         zipPath: "D:/bundle.zip", workspaceRoot: `D:/preview-${behavior}` }));
       bindImporterPage(host, store);
-      const importing = startButton.click();
-      await started.promise;
-      assert.equal(store.getState().importer.inFlight, true);
-      if (behavior === "skip") {
-        assert.match(renderImporterPage(store.getState()), /跳过预览准备/);
-        await cancelButton.pointerdown();
-        assert.equal(store.getState().importer.importProgressDismissed, true);
-        assert.equal(store.getState().importer.inFlight, true, "keep new imports blocked until the read settles");
-        sourceRead.resolve();
-      }
-      await importing;
+      await startButton.click();
       assert.equal(store.getState().session.workspacePath, `D:/preview-${behavior}`);
       assert.equal(store.getState().importer.inFlight, false);
       assert.equal(store.getState().importer.importPreparingPreview, false);
@@ -2958,7 +3028,6 @@ for (const behavior of ["skip", "read failure", "multiple projects"]) {
         assert.equal(store.getState().projectPreview, null, "multiple projects must not select an arbitrary model");
       }
     } finally {
-      sourceRead.resolve();
       globalThis.window = previousWindow; globalThis.document = previousDocument;
       globalThis.setTimeout = previousSetTimeout; globalThis.clearTimeout = previousClearTimeout;
     }

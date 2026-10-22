@@ -391,7 +391,7 @@ test("preparation failure leaves import state intact and Preview can retry norma
   assert.equal((await load(value)).loaded, true);
 });
 
-test("skipping import preparation cannot publish a pending stale model or overwrite a newer session", async () => {
+test("an invalidated import preparation cannot publish a pending stale model or overwrite a newer session", async () => {
   const value = fixture(), original = value.deps.listProjectChromosomes;
   let proceed = true;
   value.deps.listProjectChromosomes = async args => { proceed = false; return original(args); };

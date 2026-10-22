@@ -1434,8 +1434,7 @@ async function enterWorkspaceAfterImport(store, payload) {
   updateImporterState(store, { importPreparingPreview: true });
   try {
     for (const [index, project] of projects.entries()) {
-      const shouldContinue = () => store.getState().importer.importRunId === runId
-        && !store.getState().importer.importCancelling;
+      const shouldContinue = () => store.getState().importer.importRunId === runId;
       if (!shouldContinue()) break;
       const stage = i18nT(store.getState(), "importer.runtime.preparePreviewStage", {
         current: index + 1, total: projects.length, projectName: project.projectName || project.projectId,
@@ -1767,7 +1766,7 @@ function renderImportProgressOverlay(importer, messages) {
   const activePairwise = [...recentStages].reverse().find(stage => stage?.pairwise)?.pairwise || null;
   const cancelLabel = isCancelling
     ? messages.buttons.cancelImportPending
-    : importer.importPreparingPreview ? messages.buttons.skipPreviewPreparation : messages.buttons.cancelImport;
+    : messages.buttons.cancelImport;
   const cancelIcon = isCancelling
     ? `<span class="pipeline-spinner importer-import-progress-cancel-spinner" aria-hidden="true"></span>`
     : `<svg viewBox="0 0 20 20" width="16" height="16" focusable="false" aria-hidden="true">
@@ -1811,7 +1810,7 @@ function renderImportProgressOverlay(importer, messages) {
         aria-label="${escapeAttr(messages.page.importProgressTitle)}"
         aria-describedby="import-progress-dialog-summary"
       >
-        <button
+        ${importer.importPreparingPreview ? "" : `<button
           type="button"
           class="button ghost import-progress-close importer-import-progress-close"
           data-import-cancel="1"
@@ -1820,7 +1819,7 @@ function renderImportProgressOverlay(importer, messages) {
           ${isCancelling ? 'disabled aria-disabled="true"' : ""}
         >
           ${cancelIcon}
-        </button>
+        </button>`}
         <section class="importer-import-progress-overview">
           <strong class="importer-import-progress-current-stage">${escapeHtml(currentStage)}</strong>
           ${activePairwise ? renderPairwiseImportProgress(activePairwise, messages) : ""}
@@ -2333,7 +2332,7 @@ async function cancelCurrentImport(host, store) {
   const snapshot = store.getState();
   const importer = snapshot.importer || {};
   const runId = String(importer.importRunId || "").trim();
-  if (!runId || !importer.inFlight || importer.importCancelling) {
+  if (!runId || !importer.inFlight || importer.importCancelling || importer.importPreparingPreview) {
     return;
   }
   updateImporterState(store, {
@@ -2343,9 +2342,6 @@ async function cancelCurrentImport(host, store) {
     summary: i18nT(snapshot, "importer.runtime.importCancellingSummary"),
   });
   rerender(host, store);
-
-  // Import is already committed: skip optional preparation, never cancel/delete it.
-  if (importer.importPreparingPreview) return;
 
   try {
     const result = await requestImportCancel({ runId, stateOrLocale: snapshot });
