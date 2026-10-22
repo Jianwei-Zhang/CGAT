@@ -1088,3 +1088,37 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+
+/* Match the hovered band's colour family, not its transparent Canvas proxy.
+   Role tokens keep the panel readable in both light and dark themes. */
+.alignment-band-tooltip[data-alignment-tone="primary"] {
+  background: var(--ctg-primary-fill);
+  border-color: var(--ctg-primary-stroke);
+  color: var(--ctg-primary-text);
+}
+.alignment-band-tooltip[data-alignment-tone="companion"] {
+  background: var(--ctg-companion-fill);
+  border-color: var(--ctg-companion-stroke);
+  color: var(--ctg-companion-text);
+}
+.alignment-band-tooltip[data-alignment-tone="neutral"] {
+  background: var(--surface-elevated, #f1f5f9);
+  border-color: var(--border-strong, #94a3b8);
+  color: var(--text-primary, #1e293b);
+}
+.alignment-band-tooltip[data-alignment-tone="green"] {
+  background: var(--theme-green-surface, #e9f7ed);
+  border-color: var(--theme-green-line, #2f9e44);
+  color: var(--theme-green-ink, #285f37);
+}
+.alignment-band-tooltip[data-alignment-tone="purple"] {
+  background: color-mix(in srgb, #7a56a8 22%, var(--surface-panel, #fff));
+  border-color: #9472bf;
+  color: var(--text-primary, #1e293b);
+}
+.alignment-band-tooltip[data-alignment-tone="teal"] {
+  background: color-mix(in srgb, #00897b 22%, var(--surface-panel, #fff));
+  border-color: #329c91;
+  color: var(--text-primary, #1e293b);
+}

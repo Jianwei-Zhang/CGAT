@@ -3,6 +3,20 @@
 const BOUND = Symbol("alignmentTooltipBound");
 const TARGET = "[data-subview-band-tooltip]";
 
+function alignmentTooltipTone(node) {
+  if (node?.matches?.(".track-collinearity-band")) {
+    // Unknown identity is painted gray, not a measured blue/orange band.
+    if (node.getAttribute("data-band-identity-pct") === "") return "neutral";
+    return node.matches(".is-companion") ? "companion" : "primary";
+  }
+  if (node?.matches?.(".grt-display-evidence-band.is-mummer")) return "purple";
+  if (node?.matches?.(".grt-display-evidence-band.is-minimap2")) return "teal";
+  if (node?.matches?.(".grt-result-hover-proxy")) {
+    return node.closest?.(".is-gap") ? "neutral" : "green";
+  }
+  return "neutral";
+}
+
 export function bindAlignmentTooltips(host, { createCoordinator, timerApi = globalThis } = {}) {
   host = host?.closest?.("#route-host") || host;
   if (!host?.addEventListener || host[BOUND] || !host.ownerDocument?.createElement) return;
@@ -16,6 +30,7 @@ export function bindAlignmentTooltips(host, { createCoordinator, timerApi = glob
     if (token?.isConnected === false || host.isConnected === false) return hide();
     // A route rerender removes the previous panel but not the delegated owner.
     if (!host.contains(tooltip)) host.append(tooltip);
+    tooltip.setAttribute("data-alignment-tone", alignmentTooltipTone(token));
     tooltip.textContent = text;
     tooltip.classList.remove("is-hidden");
     tooltip.setAttribute("aria-hidden", "false");
