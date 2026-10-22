@@ -52,13 +52,15 @@ bash install.sh --check
 
 #### 更新 Server 工具（已有环境）
 
-确认没有任务正在运行后，将当前发布的工具包重新下载到新目录；同一版本的源码附件也可能包含更新：
+确认没有任务正在运行后，将 `TOOLS_DIR` 改为希望存放工具的绝对路径，例如 `/data/tools/GPM_Server_new`。须指定尚不存在的新目录，父目录会自动创建；同一版本的源码附件也可能包含更新：
 
 ```bash
-cd "$(mktemp -d "$HOME/GPM_Server_update.XXXXXX")" &&
+TOOLS_DIR="$HOME/GPM_Server_new"
+mkdir -p "$(dirname "$TOOLS_DIR")" &&
+mkdir "$TOOLS_DIR" &&
+cd "$TOOLS_DIR" &&
 curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.11/GPM_Server_2.0.11_source.tar.gz &&
-tar -xzf GPM_Server_2.0.11_source.tar.gz &&
-cd GPM_Server &&
+tar -xzf GPM_Server_2.0.11_source.tar.gz --strip-components=1 &&
 bash install.sh
 ```
 

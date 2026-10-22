@@ -52,13 +52,15 @@ Keep this environment active for `run.sh`.
 
 #### Update the Server tools (existing environment)
 
-Once no jobs are running, download the currently published tools into a new directory. The source attachment may be refreshed without changing the release version:
+Once no jobs are running, set `TOOLS_DIR` to your preferred absolute tool path, such as `/data/tools/GPM_Server_new`. Choose a new directory that does not exist; its parents are created automatically. The source attachment may be refreshed without changing the release version:
 
 ```bash
-cd "$(mktemp -d "$HOME/GPM_Server_update.XXXXXX")" &&
+TOOLS_DIR="$HOME/GPM_Server_new"
+mkdir -p "$(dirname "$TOOLS_DIR")" &&
+mkdir "$TOOLS_DIR" &&
+cd "$TOOLS_DIR" &&
 curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.11/GPM_Server_2.0.11_source.tar.gz &&
-tar -xzf GPM_Server_2.0.11_source.tar.gz &&
-cd GPM_Server &&
+tar -xzf GPM_Server_2.0.11_source.tar.gz --strip-components=1 &&
 bash install.sh
 ```
 
