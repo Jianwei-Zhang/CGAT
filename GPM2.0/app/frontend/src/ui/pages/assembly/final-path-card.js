@@ -444,53 +444,6 @@ function buildTrackTickItems({ windowStart, windowEnd, tickBp, innerWidth, domai
   return ticks;
 }
 
-function renderTrackNumberInput({
-  escapeAttr,
-  escapeHtml,
-  field,
-  id,
-  label,
-  openOptionLabel = "",
-  value,
-  options,
-  extraComboFieldAttr = "",
-  inputFieldAttr = "",
-}) {
-  const normalized = normalizePositiveInt(value) ?? 1;
-  const menuId = `${id}-menu`;
-  const optionButtons = options
-    .map((optionValue) => {
-      const active = Number(optionValue) === Number(normalized) ? " is-active" : "";
-      const selected = Number(optionValue) === Number(normalized) ? "true" : "false";
-      return `<button type="button" class="assembly-track-combo-option${active}" data-track-combo-option data-track-combo-value="${optionValue}" role="option" aria-selected="${selected}">${escapeHtml(String(optionValue))}</button>`;
-    })
-    .join("");
-  const inputFieldMarkup = inputFieldAttr ? ` ${inputFieldAttr}="${escapeAttr(field)}"` : "";
-  const extraComboFieldMarkup = extraComboFieldAttr ? ` ${extraComboFieldAttr}="${escapeAttr(field)}"` : "";
-  return `
-    <div class="assembly-track-combo" data-track-combo-field="${escapeAttr(field)}"${extraComboFieldMarkup}>
-      <input
-        id="${id}"
-        class="assembly-track-combo-input"
-        type="text"
-        inputmode="numeric"
-        pattern="[0-9]*"
-        value="${escapeAttr(String(normalized))}"
-        autocomplete="off"
-        ${inputFieldMarkup}
-        aria-controls="${escapeAttr(menuId)}"
-        aria-expanded="false"
-      >
-      <button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="${escapeAttr(openOptionLabel || label)}" aria-expanded="false" aria-controls="${escapeAttr(menuId)}">
-        <span class="assembly-track-control-marker" aria-hidden="true">▾</span>
-      </button>
-      <div id="${menuId}" class="assembly-track-combo-menu is-hidden" role="listbox">
-        ${optionButtons}
-      </div>
-    </div>
-  `;
-}
-
 function renderFinalPathHeadControls({
   escapeAttr,
   escapeHtml,

@@ -1032,7 +1032,6 @@ function renderAssemblyTrackControls({
     field: "supportDsCtgLen",
     id: "assembly-track-support-ds-ctg-len",
     label: i18n.trackControls.supportDatasetLengthBp,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.supportDatasetLengthBp),
     value: trackPrefs.supportDsCtgLen,
     options: SUPPORT_DS_CTG_LEN_BP_OPTIONS,
     supportDsCtgLenRules,
@@ -1043,7 +1042,6 @@ function renderAssemblyTrackControls({
     field: "alignmentLength",
     id: "assembly-track-alignment-length",
     label: i18n.trackControls.alignmentLengthBp,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.alignmentLengthBp),
     value: trackPrefs.alignmentLength,
     options: ALIGNMENT_LENGTH_OPTIONS,
   });
@@ -1051,7 +1049,6 @@ function renderAssemblyTrackControls({
     field: "minIdentityPct",
     id: "assembly-track-identity-pct",
     label: i18n.trackControls.identityPct,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.identityPct),
     value: trackPrefs.minIdentityPct,
     options: IDENTITY_PCT_OPTIONS,
     allowZero: true,
@@ -1112,7 +1109,6 @@ function renderAssemblyTrackInlineControls({
     field: "supportDsCtgLen",
     id: "assembly-track-support-ds-ctg-len",
     label: i18n.trackControls.supportDatasetLengthBp,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.supportDatasetLengthBp),
     value: trackPrefs.supportDsCtgLen,
     options: SUPPORT_DS_CTG_LEN_BP_OPTIONS,
     supportDsCtgLenRules,
@@ -1123,7 +1119,6 @@ function renderAssemblyTrackInlineControls({
     field: "alignmentLength",
     id: "assembly-track-alignment-length",
     label: i18n.trackControls.alignmentLengthBp,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.alignmentLengthBp),
     value: trackPrefs.alignmentLength,
     options: ALIGNMENT_LENGTH_OPTIONS,
   });
@@ -1131,7 +1126,6 @@ function renderAssemblyTrackInlineControls({
     field: "minIdentityPct",
     id: "assembly-track-identity-pct",
     label: i18n.trackControls.identityPct,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.identityPct),
     value: trackPrefs.minIdentityPct,
     options: IDENTITY_PCT_OPTIONS,
     allowZero: true,
@@ -1259,7 +1253,6 @@ function renderSupportDsCtgLenControl({
   field,
   id,
   label,
-  openOptionLabel = "",
   value,
   options,
   supportDsCtgLenRules = [],
@@ -1285,7 +1278,6 @@ function renderSupportDsCtgLenControl({
       field,
       id,
       label,
-      openOptionLabel,
       value,
       options,
       allowZero: true,
@@ -1310,16 +1302,12 @@ function renderSupportDsCtgLenLabel(i18n) {
   `;
 }
 
-function renderTrackNumberInput({ field, id, label, openOptionLabel = "", value, options, allowZero = false }) {
+function renderTrackNumberInput({ field, id, label, value, options, allowZero = false }) {
   const normalizedRaw = allowZero ? normalizeNonNegativeInt(value) : normalizePositiveInt(value);
   const normalized = normalizedRaw ?? (allowZero ? 0 : 1);
-  const menuId = `${id}-menu`;
-  const optionButtons = options
-    .map((optionValue) => {
-      const active = Number(optionValue) === Number(normalized) ? " is-active" : "";
-      const selected = Number(optionValue) === Number(normalized) ? "true" : "false";
-      return `<button type="button" class="assembly-track-combo-option${active}" data-track-combo-option data-track-combo-value="${optionValue}" role="option" aria-selected="${selected}">${escapeHtml(String(optionValue))}</button>`;
-    })
+  const listId = `${id}-options`;
+  const optionHtml = options
+    .map(optionValue => `<option value="${escapeAttr(String(optionValue))}"></option>`)
     .join("");
   return `
     <div class="assembly-track-combo" data-track-combo-field="${escapeAttr(field)}">
@@ -1331,15 +1319,10 @@ function renderTrackNumberInput({ field, id, label, openOptionLabel = "", value,
         pattern="[0-9]*"
         value="${escapeAttr(String(normalized))}"
         autocomplete="off"
-        aria-controls="${escapeAttr(menuId)}"
-        aria-expanded="false"
+        aria-label="${escapeAttr(label)}"
+        list="${escapeAttr(listId)}"
       >
-      <button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="${escapeAttr(openOptionLabel || label)}" aria-expanded="false" aria-controls="${escapeAttr(menuId)}">
-        <span class="assembly-track-control-marker" aria-hidden="true">▾</span>
-      </button>
-      <div id="${menuId}" class="assembly-track-combo-menu is-hidden" role="listbox">
-        ${optionButtons}
-      </div>
+      <datalist id="${escapeAttr(listId)}">${optionHtml}</datalist>
     </div>
   `;
 }

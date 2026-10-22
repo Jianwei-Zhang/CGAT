@@ -47,13 +47,8 @@ function setup({ field = "alignmentLength", initial = 10000 } = {}) {
   let onCommit = () => {};
   const makeInput = (id = "test-input") => {
     const input = new Events();
-    const toggle = new Events();
-    const option = new Events();
-    option.dataset = { trackComboValue: "50000" };
     const combo = {
-      contains: node => [input, toggle, option].includes(node),
-      querySelector: () => toggle,
-      querySelectorAll: () => [option],
+      contains: node => node === input,
     };
     Object.assign(input, { id, ownerDocument: doc, value: String(value), isConnected: true,
       selectionStart: 0, selectionEnd: 0, selectionDirection: "none", attributes: {},
@@ -75,13 +70,11 @@ function setup({ field = "alignmentLength", initial = 10000 } = {}) {
       },
     });
     nodes.set(id, input);
-    return { input, toggle, option };
+    return { input };
   };
   const bind = input => bindTrackNumberInput({ input, field, key: field, registry,
     timerApi: clock, isCurrentScope: () => current, readValue: () => value,
     commitValue(next) { value = next; commits.push(next); onCommit(); },
-    setMenuOpen(open, target) { target.menuOpen = open; },
-    closeOtherMenus() {}, isMenuOpen: target => target.menuOpen,
   });
   const controls = makeInput();
   bind(controls.input);
@@ -171,11 +164,36 @@ test("auto-apply retains focused input and caret across a synchronous toolbar re
   assert.equal(h.doc.activeElement.selectionDirection, "backward");
 });
 
-test("dropdown pointer selection replaces the draft and does not double-apply", () => {
+test("native suggestion input and change replace the draft without double-applying", () => {
   const h = setup(); h.input.focus(); h.edit("20000");
-  h.option.emit("pointerdown"); h.clock.tick(2000);
+  h.input.value = "50000";
+  h.input.emit("input", { inputType: "insertReplacementText" });
+  h.input.emit("change"); h.clock.tick(2000);
   assert.deepEqual(h.commits, [50000]);
-  assert.equal(h.input.value, "50000"); assert.equal(h.input.menuOpen, false);
+  assert.equal(h.input.value, "50000");
+});
+
+test("native datalist keyboard defaults run before Enter commits the selected value", () => {
+  const h = setup(); h.input.focus(); h.edit("20000");
+  const arrow = h.input.emit("keydown", { key: "ArrowDown" });
+  assert.notEqual(arrow.defaultPrevented, true);
+  const enter = h.input.emit("keydown", { key: "Enter" });
+  assert.notEqual(enter.defaultPrevented, true);
+  assert.deepEqual(h.commits, []);
+  // Simulate the browser's default selection after keydown, before the next task.
+  h.input.value = "100000";
+  h.input.emit("input"); h.clock.tick(0);
+  assert.deepEqual(h.commits, [100000]);
+  h.clock.tick(2000); assert.deepEqual(h.commits, [100000]);
+  const escape = h.input.emit("keydown", { key: "Escape" });
+  assert.notEqual(escape.defaultPrevented, true);
+});
+
+test("pending native Enter commits are cancelled when their input is replaced", () => {
+  const h = setup(); h.input.focus(); h.edit("20000");
+  h.input.emit("keydown", { key: "Enter" });
+  h.replace(); h.clock.tick(2000);
+  assert.deepEqual(h.commits, []);
 });
 
 test("reject invalid typing and paste as whole tokens, including fallback input events", () => {

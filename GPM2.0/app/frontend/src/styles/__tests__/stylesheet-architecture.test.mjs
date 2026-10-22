@@ -66,15 +66,10 @@ test("component stylesheet tree keeps unique animation owners", () => {
   assert.equal(new Set(keyframes).size, keyframes.length);
 });
 
-test("assembly combo menus keep their feature-owned hidden display override", () => {
-  const stylesheet = readStylesheetTree(entryUrl);
-  const menuRule = stylesheet.match(/\.assembly-track-combo-menu\s*\{([^}]*)\}/);
-  const hiddenMenuRule = stylesheet.match(/\.assembly-track-combo-menu\.is-hidden\s*\{([^}]*)\}/);
-
-  assert.ok(menuRule, "expanded component styles should define the assembly combo menu");
-  assert.match(menuRule[1], /display:\s*grid;/);
-  assert.ok(hiddenMenuRule, "the Assembly owner should override the shared hidden utility");
-  assert.match(hiddenMenuRule[1], /display:\s*none;/);
+test("native numeric suggestions have room for the browser indicator and no custom popup styles", () => {
+  const css = readFileSync(new URL("./assembly.css", entryUrl), "utf8");
+  assert.match(css, /\.assembly-track-combo-input\s*\{[^}]*padding-right:\s*8px;/);
+  assert.doesNotMatch(css, /\.assembly-track-combo-(?:toggle|menu|option)(?:[\s.{:]|$)/);
 });
 
 test("assembly status toast stays above desktop controls and returns to flow on narrow screens", () => {

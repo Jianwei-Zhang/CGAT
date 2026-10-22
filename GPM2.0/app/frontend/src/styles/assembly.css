@@ -1087,22 +1087,6 @@
   display: none;
 }
 
-.assembly-track-combo-toggle {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 22px;
-  border: 0;
-  background: transparent;
-  color: var(--theme-ink, #222);
-  padding: 0;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .assembly-track-control-marker {
   position: absolute;
   top: 0;
@@ -1121,53 +1105,9 @@
   line-height: 1;
 }
 
-.assembly-track-combo.is-open {
-  border-color: var(--border-strong, #94a3b8);
-}
-
-.assembly-track-combo.is-open .assembly-track-combo-toggle {
-  background: transparent;
-}
-
-.assembly-track-combo.is-open .assembly-track-control-marker {
-  background: var(--surface-muted, #eef2f6);
-}
-
-.assembly-track-combo-menu {
-  position: absolute;
-  top: calc(100% + 2px);
-  left: -1px;
-  right: -1px;
-  z-index: 30;
-  display: grid;
-  gap: 0;
-  border: 1px solid var(--border-default, #cbd5e1);
-  border-radius: var(--control-radius, 5px);
-  background: var(--surface-panel, #fff);
-  box-shadow: var(--shadow-md);
-}
-
-.assembly-track-combo-menu.is-hidden {
-  display: none;
-}
-
-.assembly-track-combo-option {
-  border: 0;
-  border-top: 1px solid var(--theme-line, #ececec);
-  background: var(--surface-panel, #fff);
-  color: var(--theme-ink, #222);
-  text-align: left;
-  padding: 5px 8px;
-  cursor: pointer;
-}
-
-.assembly-track-combo-option:first-child {
-  border-top: 0;
-}
-
-.assembly-track-combo-option:hover,
-.assembly-track-combo-option.is-active {
-  background: var(--theme-surface-subtle, #efefef);
+/* The browser owns the datalist indicator and popup; do not reserve a custom arrow. */
+.assembly-track-combo-input {
+  padding-right: 8px;
 }
 
 .assembly-track-inline-field .assembly-track-select-shell.is-support {

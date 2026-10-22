@@ -924,7 +924,6 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
     field: "alignmentLength",
     id: "subview-track-alignment-length",
     label: i18n.trackControls.alignmentLengthBp,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.alignmentLengthBp),
     value: trackPrefs?.alignmentLength,
     options: ALIGNMENT_LENGTH_OPTIONS,
   });
@@ -932,7 +931,6 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
     field: "minIdentityPct",
     id: "subview-track-identity-pct",
     label: i18n.trackControls.identityPct,
-    openOptionLabel: i18n.trackControls.openOptionCandidates.replace("{label}", i18n.trackControls.identityPct),
     value: trackPrefs?.minIdentityPct,
     options: IDENTITY_PCT_OPTIONS,
     allowZero: true,

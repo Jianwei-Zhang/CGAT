@@ -59,6 +59,14 @@ test("subview panel renders unified toolbar with parameter labels after entering
   assert.match(html, /一致性\(%\)/);
   assert.match(html, /id="subview-track-alignment-length"/);
   assert.match(html, /id="subview-track-identity-pct"/);
+  for (const scope of ["assembly", "subview"]) {
+    for (const field of ["alignment-length", "identity-pct"]) {
+      const id = `${scope}-track-${field}`;
+      assert.match(html, new RegExp(`<input\\s+id="${id}"[^>]*list="${id}-options"`));
+      assert.equal(html.split(`<datalist id="${id}-options">`).length - 1, 1);
+    }
+  }
+  assert.doesNotMatch(html, /assembly-track-combo-(?:menu|toggle|option)/);
   assert.match(html, /class="assembly-track-layout subview-track-layout"/);
   assert.doesNotMatch(html, /规则：/);
   assert.doesNotMatch(html, /上轨：/);

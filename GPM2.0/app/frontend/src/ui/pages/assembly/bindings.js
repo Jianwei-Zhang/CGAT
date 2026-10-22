@@ -29,7 +29,6 @@ import { updateSubviewCompositionViewport } from "./subview-history-state.js";
 import { resolveSubviewCompositionScaleViewport } from "./subview-composition-layout.js";
 import { getSubviewComposition } from "./subview-composition-state.js";
 
-const ASSEMBLY_TRACK_COMBO_BOUND = Symbol("assemblyTrackComboBound");
 const MARKER_VISIBILITY_BOUND = Symbol("markerVisibilityBound");
 const ASSEMBLY_DROPDOWN_CLOSE_DELAY_MS = 400;
 const REQUIRED_BINDING_DEPS = [
@@ -99,73 +98,6 @@ function captureFinalPathTrackScrollState(host, nextState) {
   return normalizeViewportScrollState({
     viewportKey: buildFinalPathTrackViewportKey(nextState),
     scrollLeft: Number(finalPathScrollEl.scrollLeft || 0),
-  });
-}
-
-function setTrackComboOpenState(comboNode, isOpen) {
-  if (!comboNode) {
-    return;
-  }
-  const input = comboNode.querySelector(".assembly-track-combo-input");
-  const toggle = comboNode.querySelector("[data-track-combo-toggle]");
-  const menu = comboNode.querySelector(".assembly-track-combo-menu");
-  comboNode.classList.toggle("is-open", isOpen);
-  input?.setAttribute("aria-expanded", isOpen ? "true" : "false");
-  toggle?.setAttribute("aria-expanded", isOpen ? "true" : "false");
-  if (menu) {
-    menu.classList.toggle("is-hidden", !isOpen);
-    if (isOpen) {
-      syncTrackComboMenuPlacement(comboNode);
-    } else {
-      menu.style.top = "";
-      menu.style.bottom = "";
-      menu.style.maxHeight = "";
-      menu.style.overflowY = "";
-    }
-  }
-}
-
-function syncTrackComboMenuPlacement(comboNode) {
-  if (!comboNode || typeof comboNode.getBoundingClientRect !== "function") {
-    return;
-  }
-  const menu = comboNode.querySelector(".assembly-track-combo-menu");
-  if (!menu || typeof menu.getBoundingClientRect !== "function") {
-    return;
-  }
-  const viewportHeight =
-    Number(globalThis.window?.innerHeight)
-    || Number(globalThis.document?.documentElement?.clientHeight)
-    || 0;
-  if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) {
-    return;
-  }
-  const comboRect = comboNode.getBoundingClientRect();
-  const menuRect = menu.getBoundingClientRect();
-  const offset = 2;
-  const margin = 8;
-  const spaceBelow = Math.max(0, viewportHeight - Number(comboRect?.bottom || 0) - offset - margin);
-  const spaceAbove = Math.max(0, Number(comboRect?.top || 0) - offset - margin);
-  const menuHeight = Math.max(0, Number(menuRect?.height || menu.scrollHeight || 0));
-  const shouldOpenUpward = menuHeight > spaceBelow && spaceAbove > spaceBelow;
-  if (shouldOpenUpward) {
-    menu.style.top = "auto";
-    menu.style.bottom = "calc(100% + 2px)";
-    menu.style.maxHeight = `${spaceAbove}px`;
-  } else {
-    menu.style.top = "calc(100% + 2px)";
-    menu.style.bottom = "auto";
-    menu.style.maxHeight = `${spaceBelow}px`;
-  }
-  menu.style.overflowY = "auto";
-}
-
-function closeTrackComboMenus(host, keepNode = null) {
-  host.querySelectorAll?.("[data-track-combo-field]")?.forEach((comboNode) => {
-    if (keepNode && comboNode === keepNode) {
-      return;
-    }
-    setTrackComboOpenState(comboNode, false);
   });
 }
 
@@ -254,17 +186,6 @@ function captureScrollableRegionState(host, selector) {
   };
 }
 
-function syncTrackComboSelection(comboNode, selectedValue) {
-  if (!comboNode) {
-    return;
-  }
-  comboNode.querySelectorAll("[data-track-combo-option]").forEach((optionNode) => {
-    const active = Number(optionNode.dataset.trackComboValue || 0) === Number(selectedValue);
-    optionNode.classList.toggle("is-active", active);
-    optionNode.setAttribute("aria-selected", active ? "true" : "false");
-  });
-}
-
 function resolveTrackPrefValue(trackPrefs, field) {
   if (field === "supportDsCtgLen") {
     return trackPrefs.supportDsCtgLen;
@@ -346,27 +267,6 @@ function appendSupportDsCtgLenRuleRow(dialog) {
   body.appendChild(row);
 }
 
-function bindTrackComboDismiss(host) {
-  if (typeof host?.addEventListener !== "function") {
-    return;
-  }
-  if (host[ASSEMBLY_TRACK_COMBO_BOUND]) {
-    return;
-  }
-  host.addEventListener(
-    "pointerdown",
-    (event) => {
-      const insideCombo = event.target?.closest?.("[data-track-combo-field]");
-      if (insideCombo) {
-        return;
-      }
-      closeTrackComboMenus(host);
-    },
-    true,
-  );
-  host[ASSEMBLY_TRACK_COMBO_BOUND] = true;
-}
-
 function getCreateEmptyFinalPathRow(deps) {
   if (typeof deps?.createEmptyFinalPathRow === "function") {
     return deps.createEmptyFinalPathRow;
@@ -445,7 +345,6 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     updateDeletedCtgSelection,
   } = deps;
 
-  bindTrackComboDismiss(host);
   bindAssemblyActionFeedbackDismiss(host, store);
   const initialState = store.getState();
   // Initial load resolves saved support selection and the complete project view.
@@ -1482,7 +1381,6 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
       return;
     }
     commitTrackInput(field, inputElement, viewKey);
-    syncTrackComboSelection(inputElement.closest("[data-track-combo-field]"), inputElement.value);
   };
 
   const flushPendingMainTrackInputs = () => {
@@ -1514,11 +1412,6 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
         target.value = String(value);
         commitTrackComboInput(field, target, viewKey);
       },
-      setMenuOpen: (open, target) => setTrackComboOpenState(target.closest("[data-track-combo-field]"), open),
-      closeOtherMenus: target => closeTrackComboMenus(
-        target.closest("#route-host") || host, target.closest("[data-track-combo-field]"),
-      ),
-      isMenuOpen: target => target.closest("[data-track-combo-field]")?.classList.contains("is-open"),
     });
   };
 
