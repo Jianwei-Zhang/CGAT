@@ -138,10 +138,10 @@ textarea { background: var(--surface-panel); color: var(--text-primary); }
   fill: #2b3646;
   stroke: #64748b;
 }
-:root[data-theme="dark"] .assembly-track-scroll,
-:root[data-theme="dark"] .assembly-track-svg {
-  background: var(--surface-panel);
-}
+
+/* The plot keeps its own surfaces: `.assembly-track-svg` and `.subview-track-svg`
+   must stay transparent so the Canvas band layer underneath remains visible.
+   Never raise specificity on those backgrounds from the theme file. */
 
 /* Identity bands keep their light-export colours in SVG attributes and switch to
    canvas-matched dark tints only in the mounted app. */

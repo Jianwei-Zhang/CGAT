@@ -35,7 +35,9 @@
 .project-preview-card:hover .project-preview-source-plots .project-preview-used,
 .project-preview-card:has(.project-preview-card-header:focus-visible) .project-preview-source-plots .project-preview-used { border-color: var(--source-color); }
 .project-preview-contig:has(.project-preview-used) .project-preview-contig-label { color: inherit; }
-.project-preview-reference { position: absolute; display: block; height: 4px; top: 7px; overflow: hidden; background: var(--ctg-ref-fill); border-radius: 2px; }
+/* Same Ref role colour as the Assembly track, plus a 1px role outline: the
+   bare fill alone disappears against the dark plot canvas. */
+.project-preview-reference { position: absolute; display: block; height: 6px; top: 6px; overflow: hidden; background: var(--ctg-ref-fill); border-radius: 3px; box-shadow: inset 0 0 0 1px var(--ctg-ref-stroke); }
 .project-preview-empty-track { display: block; padding: 4px 0; color: var(--theme-muted-ink, #999); font-size: var(--font-small); }
 .project-preview-paths { display: grid; gap: 6px; margin-top: 8px; padding-top: 5px; border-top: 1px solid var(--theme-line, #e8edf1); }
 .project-preview-path { display: block; }

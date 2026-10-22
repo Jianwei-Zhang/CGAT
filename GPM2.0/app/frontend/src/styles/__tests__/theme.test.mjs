@@ -102,6 +102,34 @@ test("Preview and Project Export keep gap markers white and use black or white P
   assert.match(previewCss, /:root\[data-theme="dark"\] \.project-preview-gap-label\s*\{[^}]*color:\s*#ffffff;/);
 });
 
+test("dark theme never paints over the Canvas band layer or the track surfaces", () => {
+  const assemblyCss = readFileSync(new URL("../assembly.css", import.meta.url), "utf8");
+  const subviewCss = readFileSync(new URL("../subview.css", import.meta.url), "utf8");
+
+  // The Canvas band layer sits below the SVG overlay; an opaque themed
+  // background on the overlay hides every collinearity band.
+  assert.doesNotMatch(themeCss, /:root\[data-theme="dark"\][^{]*\.assembly-track-svg[^{]*\{[^}]*background/);
+  assert.doesNotMatch(themeCss, /:root\[data-theme="dark"\][^{]*\.assembly-track-scroll[^{]*\{[^}]*background/);
+  assert.doesNotMatch(themeCss, /:root\[data-theme="dark"\][^{]*\.subview-track-svg[^{]*\{[^}]*background/);
+  assert.match(assemblyCss, /\[data-track-band-svg-overlay="1"\]\s*\{[^}]*background:\s*transparent;/);
+  assert.match(subviewCss, /\.subview-track-svg\s*\{[^}]*background:\s*transparent;/);
+  // Surfaces stay theme-aware through the shared tokens instead.
+  assert.match(assemblyCss, /\.assembly-track-scroll\s*\{[^}]*background:\s*var\(--surface-panel,\s*#fff\);/);
+  assert.match(assemblyCss, /\.assembly-track-svg\s*\{[^}]*background:\s*var\(--surface-panel,\s*#fff\);/);
+});
+
+test("preview Ref strip keeps the Assembly Ref palette and gains an outline for the dark canvas", () => {
+  const previewCss = readFileSync(new URL("../project-preview.css", import.meta.url), "utf8");
+  const rule = previewCss.match(/\.project-preview-reference\s*\{([^}]*)\}/)?.[1];
+  assert.ok(rule);
+  assert.match(rule, /background:\s*var\(--ctg-ref-fill\);/);
+  assert.match(rule, /box-shadow:\s*inset 0 0 0 1px var\(--ctg-ref-stroke\);/);
+  assert.match(rule, /height:\s*6px;/);
+  assert.doesNotMatch(rule, /height:\s*4px;/);
+  // No theme-specific override of the fill: role parity with the Assembly track.
+  assert.doesNotMatch(themeCss, /:root\[data-theme="dark"\][^{]*\.project-preview-reference[^{]*\{[^}]*background/);
+});
+
 test("dataset editor fields, drop overlay, and loading curtains use theme-aware surfaces in dark mode", () => {
   const importerCss = readFileSync(new URL("../importer.css", import.meta.url), "utf8");
   const assemblyCss = readFileSync(new URL("../assembly.css", import.meta.url), "utf8");
