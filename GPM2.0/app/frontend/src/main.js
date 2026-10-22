@@ -7,7 +7,7 @@ import "./styles/settings.css";
 import { createStore } from "./state/store.js";
 import { flushAssemblyProjectState } from "./ui/pages/assembly-page.js";
 import { openProjectWorkspace as openWorkspace } from "./services/project-session.js";
-import { renderAppShell } from "./ui/shell/app-shell.js";
+import { bindAppThemeToggle, renderAppShell } from "./ui/shell/app-shell.js";
 import { registerRoutes, renderCurrentRoute } from "./ui/shell/router.js";
 import {
   buildWorkspaceSwitchItems,
@@ -616,6 +616,7 @@ function escapeAttr(value) {
 }
 
 function bindSettings(root, storeRef) {
+  bindAppThemeToggle(root, { getLocale: () => storeRef.getState().locale });
   bindAppSettings(root, {
     getLocale: () => storeRef.getState().locale === "en" ? "en" : "zh",
     onTypographyChange: () => window.dispatchEvent(new Event("gpm-next:route-refresh")),

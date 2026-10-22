@@ -1439,11 +1439,19 @@ async function enterWorkspaceAfterImport(store, payload) {
       const stage = i18nT(store.getState(), "importer.runtime.preparePreviewStage", {
         current: index + 1, total: projects.length, projectName: project.projectName || project.projectId,
       });
+      const previewStageIndex = store.getState().importer.stages.length;
       updateImporterState(store, { summary: stage, stages: [...store.getState().importer.stages, stage] });
       globalThis.window?.dispatchEvent?.(new Event("gpm-next:route-refresh"));
       const prepared = await prepareProjectPreviewData(store, {
         workspaceRoot: options.workspaceRoot || workspaceRoot, project, datasets: options.datasets,
       }, {}, { shouldContinue });
+      if (prepared && shouldContinue()) {
+        const stages = [...store.getState().importer.stages];
+        stages[previewStageIndex] = i18nT(store.getState(), "importer.runtime.preparePreviewDone", {
+          projectName: project.projectName || project.projectId,
+        });
+        updateImporterState(store, { stages });
+      }
       if (projects.length === 1) projectPreview = prepared;
       if (!prepared && shouldContinue()) {
         previewStages.push(i18nT(store.getState(), "importer.runtime.preparePreviewFailed", {

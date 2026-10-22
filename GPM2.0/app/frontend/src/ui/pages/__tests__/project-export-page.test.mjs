@@ -1798,7 +1798,7 @@ test("project export final path preview css is clickable and hides graph label s
   );
   assert.match(
     componentsCss,
-    /\.project-export-final-path-preview-track\s*\{[^}]*min-height:\s*64px;/,
+    /\.project-export-final-path-preview-track\s*\{[^}]*min-height:\s*40px;/,
   );
   assert.match(
     componentsCss,
@@ -1836,7 +1836,7 @@ test("project export preview fills the card height without a nested frame", () =
   assert.match(graphRule, /align-self:\s*stretch;/);
   assert.match(graphRule, /align-items:\s*center;/);
   assert.match(trackRule, /align-self:\s*stretch;/);
-  assert.match(trackRule, /min-height:\s*64px;/);
+  assert.match(trackRule, /min-height:\s*40px;/);
   assert.match(trackRule, /height:\s*auto;/);
   assert.match(trackRule, /border:\s*0;/);
   assert.match(trackRule, /border-radius:\s*0;/);
@@ -1844,7 +1844,7 @@ test("project export preview fills the card height without a nested frame", () =
 
   for (const selector of ["ctg", "gap"]) {
     const rule = componentsCss.match(new RegExp(`\\.project-export-final-path-preview-${selector}\\s*\\{([^}]*)\\}`))?.[1] || "";
-    assert.match(rule, /top:\s*calc\(50% - 6px\);/);
+    assert.match(rule, /top:\s*calc\(50% - 8px\);/);
     assert.match(rule, /height:\s*16px;/);
   }
 });

@@ -76,3 +76,16 @@
 }
 
 .nav-session-field-language select { max-width: none; }
+
+
+/* Compact appearance shortcut beside Settings; the full system preference
+   remains in the Settings dialog. */
+.app-theme-toggle {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+}

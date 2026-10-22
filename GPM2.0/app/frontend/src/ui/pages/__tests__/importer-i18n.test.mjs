@@ -1395,6 +1395,8 @@ for (const source of ["zip", "extracted"]) {
           if (command === "put_project_preview_cache") {
             assert.equal(store.getState().importer.inFlight, true, "import must wait for persistence");
             assert.equal(store.getState().importer.importPreparingPreview, true);
+            assert.match(store.getState().importer.stages.at(-1), /正在构建项目预览（1\/1）：New/);
+            assert.notEqual(store.getState().importer.status, "导入完成");
             snapshot = args.request.payload;
             return { stored: true };
           }
@@ -1442,7 +1444,8 @@ for (const source of ["zip", "extracted"]) {
       assert.equal(store.getState().projectPreview.loaded, true);
       assert.equal(previewStateIsApplicable(store.getState()), true);
       assert.equal(snapshot.cards.length, 1);
-      assert.ok(store.getState().importer.stages.some(stage => String(stage).includes("准备项目预览（1/1）")));
+      assert.equal(store.getState().importer.stages.at(-2), "项目预览构建完成：New");
+      assert.equal(store.getState().importer.stages.at(-1), "导入完成");
       assert.equal(store.getState().session.workspacePath, "D:/new");
       assert.equal(store.getState().session.projectId, 2);
       assert.equal(store.getState().importer.inFlight, false);
@@ -3022,9 +3025,11 @@ for (const behavior of ["read failure", "multiple projects"]) {
       assert.equal(store.getState().importer.projectError, "");
       assert.equal(calls.some(call => call.command === "request_import_cancel"), false);
       assert.equal(saved.size, behavior === "multiple projects" ? 2 : 0);
+      assert.equal(store.getState().importer.stages.at(-1), "导入完成");
       if (behavior === "read failure") assert.match(store.getState().importer.summary, /项目已导入，进入预览时将重试/);
       if (behavior === "multiple projects") {
-        assert.ok(store.getState().importer.stages.some(stage => String(stage).includes("准备项目预览（2/2）")));
+        assert.equal(store.getState().importer.stages.at(-3), "项目预览构建完成：P1");
+        assert.equal(store.getState().importer.stages.at(-2), "项目预览构建完成：P2");
         assert.equal(store.getState().projectPreview, null, "multiple projects must not select an arbitrary model");
       }
     } finally {
@@ -3033,3 +3038,14 @@ for (const behavior of ["read failure", "multiple projects"]) {
     }
   });
 }
+
+
+test("backend import completion is not labeled as whole-workflow completion", () => {
+  for (const messages of [zh, en]) {
+    assert.notEqual(messages.progressStages.complete, messages.runtime.importZipDoneStage);
+    assert.equal(messages.runtime.importZipDoneStage, messages.runtime.importDoneStatus);
+    assert.equal(messages.runtime.importExtractedDoneStage, messages.runtime.importDoneStatus);
+  }
+  assert.equal(zh.progressStages.complete, "项目数据已导入");
+  assert.equal(en.progressStages.complete, "Project data imported");
+});

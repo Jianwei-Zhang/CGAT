@@ -537,7 +537,7 @@
   flex: 1 1 auto;
   align-self: stretch;
   min-width: 0;
-  min-height: 64px;
+  min-height: 40px;
   height: auto;
   overflow: hidden;
   border: 0;
@@ -548,7 +548,7 @@
 .project-export-final-path-preview-ctg {
   position: absolute;
   z-index: 1;
-  top: calc(50% - 6px);
+  top: calc(50% - 8px);
   height: 16px;
   overflow: hidden;
   border: 1px solid var(--ctg-primary-stroke);
@@ -591,7 +591,7 @@
 .project-export-final-path-preview-gap {
   position: absolute;
   z-index: 3;
-  top: calc(50% - 6px);
+  top: calc(50% - 8px);
   width: 8px;
   height: 16px;
   border: 1px solid var(--theme-strong-line, #555);
