@@ -52,10 +52,34 @@ export function resolveAppTheme(preference, systemDark = false) {
   return preference === "dark" || (preference !== "light" && systemDark) ? "dark" : "light";
 }
 
+let appliedTheme = null;
+const themeSubscribers = new Set();
+
+// Theme changes repaint SVG/Canvas series colours, so mounted views subscribe
+// once instead of each module watching matchMedia on its own.
+export function subscribeAppTheme(listener) {
+  if (typeof listener !== "function") return () => {};
+  themeSubscribers.add(listener);
+  return () => themeSubscribers.delete(listener);
+}
+
+export function getAppliedAppTheme() { return appliedTheme; }
+
 export function applyAppTheme(root = globalThis.document?.documentElement, systemDark) {
   const dark = systemDark ?? globalThis.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
   const theme = resolveAppTheme(current.theme, dark);
   if (root) root.dataset.theme = theme;
+  if (theme !== appliedTheme) {
+    const previous = appliedTheme;
+    appliedTheme = theme;
+    for (const listener of [...themeSubscribers]) {
+      try {
+        listener(theme, previous);
+      } catch {
+        // A subscriber failure must not block the theme switch itself.
+      }
+    }
+  }
   return theme;
 }
 

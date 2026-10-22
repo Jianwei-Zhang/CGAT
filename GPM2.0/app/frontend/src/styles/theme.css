@@ -95,3 +95,93 @@ textarea { background: var(--surface-panel); color: var(--text-primary); }
 :root[data-theme="dark"] .track-ctg-label.is-outside .track-ctg-source-tag.is-source-telseeker {
   fill: var(--theme-blue-ink);
 }
+
+/* Contig bars move to mid-dark role fills so they sit on the dark canvas instead
+   of glowing. Hue, stroke order (blue > amber > grey) and role ink stay distinct;
+   standalone SVG/PNG exports always keep the light publication palette. */
+:root[data-theme="dark"] {
+  --ctg-primary-fill: #28486e;
+  --ctg-primary-stroke: #6899d1;
+  --ctg-primary-text: #e8f2ff;
+  --ctg-companion-fill: #594527;
+  --ctg-companion-stroke: #bf9b63;
+  --ctg-companion-text: #faefd9;
+  --ctg-ref-fill: #384352;
+  --ctg-ref-stroke: #8292a6;
+  --ctg-ref-text: #e2e8f0;
+  --alignment-legend-primary-low: rgb(45, 68, 96);
+  --alignment-legend-primary-high: rgb(81, 127, 180);
+  --alignment-legend-companion-low: rgb(75, 69, 59);
+  --alignment-legend-companion-high: rgb(161, 128, 80);
+}
+
+/* Transient selection must stay a lighter step of the same role, not a pale bar. */
+:root[data-theme="dark"] .track-ctg.is-active {
+  fill: #33587f;
+  stroke: #8fb6e0;
+}
+:root[data-theme="dark"] .track-ctg.is-companion.is-active {
+  fill: #6b5330;
+  stroke: #d3ae74;
+}
+:root[data-theme="dark"] .track-ctg.is-multi-selected {
+  stroke: #9dc2ea;
+}
+:root[data-theme="dark"] .track-ctg.is-companion.is-multi-selected {
+  stroke: #d7b47c;
+}
+:root[data-theme="dark"] .track-reference-member {
+  fill: var(--ctg-ref-fill);
+  stroke: var(--ctg-ref-stroke);
+}
+:root[data-theme="dark"] .track-reference-bar {
+  fill: #2b3646;
+  stroke: #64748b;
+}
+:root[data-theme="dark"] .assembly-track-scroll,
+:root[data-theme="dark"] .assembly-track-svg {
+  background: var(--surface-panel);
+}
+
+/* Identity bands keep their light-export colours in SVG attributes and switch to
+   canvas-matched dark tints only in the mounted app. */
+:root[data-theme="dark"] .track-collinearity-band {
+  fill: var(--alignment-band-dark-fill, var(--alignment-band-fill, rgb(36, 48, 63)));
+  stroke: var(--alignment-band-dark-stroke, var(--alignment-band-stroke, rgb(52, 68, 88)));
+}
+:root[data-theme="dark"] .track-collinearity-band.is-companion {
+  fill: var(--alignment-band-dark-fill, var(--alignment-band-fill, rgb(36, 48, 63)));
+  stroke: var(--alignment-band-dark-stroke, var(--alignment-band-stroke, rgb(52, 68, 88)));
+}
+:root[data-theme="dark"] .is-track-drag-preview [data-track-band-svg-overlay="1"] .track-collinearity-band[data-track-band-proxy="1"],
+:root[data-theme="dark"] .is-subview-track-drag-preview .subview-track-svg .track-collinearity-band[data-track-band-proxy="1"] {
+  fill: var(--alignment-band-dark-fill, var(--alignment-band-fill, rgb(36, 48, 63)));
+  stroke: var(--alignment-band-dark-stroke, var(--alignment-band-stroke, rgb(52, 68, 88)));
+}
+
+/* Source tags sit inside the bar, so they need ink for the dark role fill. */
+:root[data-theme="dark"] .track-ctg-label .track-ctg-source-tag {
+  fill: #ffcf85;
+}
+:root[data-theme="dark"] .track-ctg-label .track-ctg-source-tag.is-source-gapfiller {
+  fill: #ff9f96;
+}
+:root[data-theme="dark"] .track-ctg-label .track-ctg-source-tag.is-source-telseeker {
+  fill: #7fd9e8;
+}
+:root[data-theme="dark"] .track-ctg-label .track-ctg-source-tag.is-source-derived {
+  fill: #ffe08a;
+}
+
+/* Manual split and cross-chromosome previews use the same dark role fills. */
+:root[data-theme="dark"] .manual-split-band {
+  fill: #6f9ac4;
+  opacity: 0.5;
+}
+:root[data-theme="dark"] .manual-split-edge circle {
+  fill: var(--surface-panel);
+}
+:root[data-theme="dark"] .manual-split-edge:hover circle,
+:root[data-theme="dark"] .manual-split-edge:focus circle {
+  fill: #3c2f5c;
+}

@@ -1,4 +1,8 @@
-import { resolveAlignmentBandStyle, sortAlignmentBands } from "./alignment-band-style.js";
+import {
+  resolveAlignmentBandStyle,
+  resolveDarkAlignmentBandStyle,
+  sortAlignmentBands,
+} from "./alignment-band-style.js";
 
 const TRACK_BAND_CANVAS_BOUND = Symbol("trackBandCanvasBound");
 const TRACK_BAND_CANVAS_READY_CLASS = "is-track-band-canvas-ready";
@@ -121,12 +125,14 @@ function drawTrackBandCanvasLayer(layer, scene) {
     context.clip();
   }
 
+  const dark = (layer?.ownerDocument || globalThis.document)?.documentElement?.dataset?.theme === "dark";
+  const resolveBandStyle = dark ? resolveDarkAlignmentBandStyle : resolveAlignmentBandStyle;
   sortAlignmentBands(Array.isArray(scene.bands) ? scene.bands : []).forEach((band) => {
     drawPolygon(
       context,
       band?.points,
       offsetX,
-      resolveAlignmentBandStyle(band?.tone, band?.identityPct),
+      resolveBandStyle(band?.tone, band?.identityPct),
     );
   });
 
@@ -145,8 +151,9 @@ export function bindBandCanvasRuntime(host) {
     }
     const sceneNode = layer.querySelector?.("[data-track-band-canvas-scene]");
     const sceneText = String(sceneNode?.textContent || "");
+    const activeTheme = (layer?.ownerDocument || globalThis.document)?.documentElement?.dataset?.theme || "light";
     const previous = layer[TRACK_BAND_CANVAS_BOUND] || null;
-    if (previous?.sceneText === sceneText) {
+    if (previous?.sceneText === sceneText && (previous?.theme || "light") === activeTheme) {
       return;
     }
     if (previous?.frameHandle !== undefined) {
@@ -172,6 +179,7 @@ export function bindBandCanvasRuntime(host) {
     });
     layer[TRACK_BAND_CANVAS_BOUND] = {
       sceneText,
+      theme: activeTheme,
       frameHandle,
     };
   });

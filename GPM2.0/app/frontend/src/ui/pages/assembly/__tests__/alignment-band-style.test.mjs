@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  readHitIdentityPct, resolveAlignmentBandStyle, sortAlignmentBands,
+  readHitIdentityPct, resolveAlignmentBandStyle, resolveDarkAlignmentBandStyle, sortAlignmentBands,
   alignmentBandSvgAttrs, alignmentBandTooltipMetrics, renderAlignmentIdentityLegend,
 } from "../alignment-band-style.js";
 import { resolveHitIdentityPct } from "../track-render-geometry.js";
@@ -71,11 +71,59 @@ test("100 percent identity uses a softened opaque endpoint with a stronger but r
 
 test("legend endpoints stay identical to the main/local/export paint scale without rescaling identity", () => {
   const html=renderAlignmentIdentityLegend({},value=>value);
+  // Swatches resolve the same endpoints through tokens, so the legend follows
+  // the active theme without duplicating the paint scale.
   for (const tone of ["primary","companion"]) {
-    const light=resolveAlignmentBandStyle(tone,80).fill,high=resolveAlignmentBandStyle(tone,100).fill;
-    assert.ok(html.includes(`linear-gradient(to right, ${light}, ${high})`));
-    assert.ok(alignmentBandSvgAttrs({identityPct:100},tone).includes(`fill="${high}"`));
+    assert.ok(html.includes(`linear-gradient(to right, var(--alignment-legend-${tone}-low), var(--alignment-legend-${tone}-high))`));
+    assert.ok(alignmentBandSvgAttrs({identityPct:100},tone).includes(`fill="${resolveAlignmentBandStyle(tone,100).fill}"`));
   }
   assert.match(html,/≤80%/);assert.match(html,/100%/);assert.match(html,/softened/);
   assert.doesNotMatch(html,/rgba\(|opacity/);
+});
+
+test("dark band ramp keeps primary and companion hues apart and monotonic without alpha", () => {
+  const levels=[0,80,85,90,95,100];
+  const ramp=(tone)=>levels.map((identity)=>resolveDarkAlignmentBandStyle(tone,identity));
+  for (const tone of ["primary","companion"]) {
+    const styles=ramp(tone);
+    styles.forEach(({fill,stroke})=>{
+      assert.match(fill,/^rgb\(\d+, \d+, \d+\)$/);
+      assert.match(stroke,/^rgb\(\d+, \d+, \d+\)$/);
+    });
+    assert.deepEqual(styles[0],styles[1],"unknown/<=80 share the darkest floor");
+    const luminances=styles.slice(1).map(({fill})=>{
+      const [r,g,b]=fill.match(/\d+/g).map(Number);
+      return 0.2126*r+0.7152*g+0.0722*b;
+    });
+    luminances.slice(1).forEach((value,index)=>assert.ok(value>luminances[index],`${tone} ramp brightens with identity`));
+    assert.notEqual(resolveDarkAlignmentBandStyle(tone,null).fill,styles[0].fill,"unknown is not a measured zero");
+  }
+  levels.forEach((identity)=>{
+    const primary=resolveDarkAlignmentBandStyle("primary",identity).fill;
+    const companion=resolveDarkAlignmentBandStyle("companion",identity).fill;
+    assert.notEqual(primary,companion,`tone separation at identity ${identity}`);
+    const [pr,pg,pb]=primary.match(/\d+/g).map(Number);
+    const [cr,cg,cb]=companion.match(/\d+/g).map(Number);
+    assert.ok(pb>cr,"primary stays bluer than companion at every level");
+    assert.ok(cg>=pg-14,"companion stays warmer than primary at every level");
+  });
+  // The mounted dark ramp must stay below the pale light ramp so bars do not glow.
+  for (const tone of ["primary","companion"]) {
+    for (const identity of [80,100]) {
+      const light=resolveAlignmentBandStyle(tone,identity).fill.match(/\d+/g).map(Number);
+      const dark=resolveDarkAlignmentBandStyle(tone,identity).fill.match(/\d+/g).map(Number);
+      assert.ok(dark.reduce((a,b)=>a+b,0)<light.reduce((a,b)=>a+b,0),
+        `${tone} ${identity}% dark fill is deeper than the light fill`);
+    }
+  }
+});
+
+test("band svg attributes keep light export paint and carry the dark ramp as variables", () => {
+  const attrs=alignmentBandSvgAttrs({identityPct:93.27},"primary");
+  const light=resolveAlignmentBandStyle("primary",93.27);
+  const dark=resolveDarkAlignmentBandStyle("primary",93.27);
+  assert.ok(attrs.includes(`--alignment-band-fill:${light.fill};`));
+  assert.ok(attrs.includes(`--alignment-band-dark-fill:${dark.fill};`));
+  assert.ok(attrs.includes(`--alignment-band-dark-stroke:${dark.stroke}`));
+  assert.doesNotMatch(attrs,/rgba\(/);
 });

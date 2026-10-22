@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createContigColorResolver, DEFAULT_CONTIG_PALETTE, getContigPalette } from "../contig-colors.js";
+import {
+  createContigColorResolver,
+  DEFAULT_CONTIG_PALETTE,
+  DARK_CONTIG_PALETTE,
+  getContigPalette,
+} from "../contig-colors.js";
 import { renderFinalPathGraph } from "../final-path-card.js";
 import { buildViewportScopedSvgMarkup } from "../final-path-export-runtime.js";
 import { __test, renderProjectExportPage } from "../../project-export-page.js";
@@ -90,6 +95,48 @@ test("Final Path and Project Export render the same stable tone for each ctg wit
 
 test("headless exports have the same palette fallbacks as the app", () => {
   assert.deepEqual(getContigPalette(), palette);
+});
+
+test("standalone exports keep the light publication palette even while the app runs in dark mode", () => {
+  const originalDocument = globalThis.document;
+  const originalGetComputedStyle = globalThis.getComputedStyle;
+  try {
+    globalThis.document = { documentElement: { dataset: { theme: "dark" } } };
+    let computedStyleReads = 0;
+    globalThis.getComputedStyle = () => {
+      computedStyleReads += 1;
+      return { getPropertyValue: () => " #112233 " };
+    };
+    assert.deepEqual(getContigPalette(), palette);
+    assert.equal(computedStyleReads, 0, "a dark mounted app must not leak dark tokens into exports");
+
+    globalThis.document.documentElement.dataset.theme = "light";
+    assert.equal(getContigPalette().primary.fill, "#112233", "light theme still resolves live tokens");
+  } finally {
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
+    if (originalGetComputedStyle === undefined) delete globalThis.getComputedStyle;
+    else globalThis.getComputedStyle = originalGetComputedStyle;
+  }
+});
+
+test("dark theme remaps every contig role to a deeper fill with lighter ink", () => {
+  const luminance = (hex) => {
+    const [r, g, b] = hex.replace("#", "").match(/../g).map((channel) => parseInt(channel, 16));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  for (const role of ["primary", "companion", "ref"]) {
+    const dark = DARK_CONTIG_PALETTE[role];
+    const light = palette[role];
+    assert.ok(luminance(dark.fill) < luminance(light.fill) - 40, `${role} fill is deeper in dark`);
+    assert.ok(luminance(dark.stroke) > luminance(dark.fill), `${role} stroke reads against its fill`);
+    assert.ok(luminance(dark.text) > luminance(dark.fill) + 120, `${role} ink contrasts its fill`);
+  }
+  // Role separation survives the dark remap in fill, stroke and ink.
+  for (const property of ["fill", "stroke", "text"]) {
+    const values = ["primary", "companion", "ref"].map((role) => DARK_CONTIG_PALETTE[role][property]);
+    assert.equal(new Set(values).size, 3, `${property} stays distinct per role`);
+  }
 });
 
 test("standalone SVG exports resolve current root tokens instead of leaking app-only CSS variables", () => {

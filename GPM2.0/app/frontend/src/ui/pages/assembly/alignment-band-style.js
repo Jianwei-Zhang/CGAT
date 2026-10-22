@@ -4,6 +4,8 @@
 // overlapping bands never become artificially darker than their identity.
 const MIN_COLOR_STRENGTH = 0.18;
 const MAX_COLOR_STRENGTH = 0.68;
+const DARK_MIN_COLOR_STRENGTH = 0.3;
+const DARK_MAX_COLOR_STRENGTH = 0.8;
 export function readHitIdentityPct(hit) {
   const numeric = (value) => value === null || value === undefined || String(value).trim() === ""
     ? null : Number.isFinite(Number(value)) ? Number(value) : null;
@@ -25,6 +27,21 @@ export function resolveAlignmentBandStyle(tone, identityPct) {
   return { fill: blend(strength), stroke: blend(Math.min(1, strength + 0.1)) };
 }
 
+export function resolveDarkAlignmentBandStyle(tone, identityPct) {
+  const identity = readHitIdentityPct({ identityPct });
+  // Unknown identity is a neutral slate wash, never a fabricated strength.
+  if (identity === null) return { fill: "rgb(38, 50, 66)", stroke: "rgb(56, 72, 92)" };
+  const canvas = [23, 33, 46];
+  const base = tone === "companion" ? [196, 152, 88] : [96, 150, 214];
+  const strength = DARK_MIN_COLOR_STRENGTH
+    + (DARK_MAX_COLOR_STRENGTH - DARK_MIN_COLOR_STRENGTH)
+    * Math.max(0, Math.min(1, (identity - 80) / 20));
+  const blend = (amount) => `rgb(${base
+    .map((channel, index) => Math.round(canvas[index] + (channel - canvas[index]) * amount))
+    .join(", ")})`;
+  return { fill: blend(strength), stroke: blend(Math.min(1, strength + 0.12)) };
+}
+
 export function sortAlignmentBands(bands) {
   // Sort render records only, never source hits: hit keys and anchors stay stable.
   return [...bands].sort((left, right) =>
@@ -34,9 +51,10 @@ export function sortAlignmentBands(bands) {
 export function alignmentBandSvgAttrs(band, tone = band?.tone) {
   const identity = readHitIdentityPct(band);
   const { fill, stroke } = resolveAlignmentBandStyle(tone, identity);
+  const dark = resolveDarkAlignmentBandStyle(tone, identity);
   // Attributes survive standalone SVG export; variables let Canvas proxies
   // become transparent and drag previews restore exactly the same colors.
-  return `data-band-identity-pct="${identity ?? ""}" fill="${fill}" stroke="${stroke}" style="--alignment-band-fill:${fill};--alignment-band-stroke:${stroke}"`;
+  return `data-band-identity-pct="${identity ?? ""}" fill="${fill}" stroke="${stroke}" style="--alignment-band-fill:${fill};--alignment-band-stroke:${stroke};--alignment-band-dark-fill:${dark.fill};--alignment-band-dark-stroke:${dark.stroke}"`;
 }
 
 export function alignmentBandTooltipMetrics(hit) {
@@ -46,7 +64,9 @@ export function alignmentBandTooltipMetrics(hit) {
 }
 
 export function renderAlignmentIdentityLegend(labels, escapeAttr) {
-  const gradient = (tone) => `linear-gradient(to right, ${resolveAlignmentBandStyle(tone, 80).fill}, ${resolveAlignmentBandStyle(tone, 100).fill})`;
+  // Endpoint stops come from the same tokens the paint scale resolves, so the
+  // legend follows the active theme without rescaling identity.
+  const gradient = (tone) => `linear-gradient(to right, var(--alignment-legend-${tone}-low), var(--alignment-legend-${tone}-high))`;
   const hint = labels?.identityLegendHint || "Darker means higher Identity. Fixed, softened 80–100% color scale; ≤80% uses the lightest shade.";
   return `<div class="alignment-identity-legend" title="${escapeAttr(hint)}" aria-label="${escapeAttr(hint)}">
     <span>Identity</span><span>≤80%</span><span class="alignment-identity-scale" aria-hidden="true">

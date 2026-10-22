@@ -1,7 +1,7 @@
 import { projectEntryBusy } from "./services/project-drop-controller.js";
 import { bindProjectDrop } from "./ui/shell/project-drop.js";
 import { readWorkspaceHistory as readSharedHistory, writeWorkspaceHistory as writeSharedHistory } from "./services/workspace-history.js";
-import { applyAppTypography, initializeAppTheme } from "./services/app-settings.js";
+import { applyAppTypography, initializeAppTheme, subscribeAppTheme } from "./services/app-settings.js";
 import { bindAppSettings } from "./ui/shell/app-settings-panel.js";
 import "./styles/settings.css";
 import { createStore } from "./state/store.js";
@@ -253,6 +253,11 @@ const store = createStore({
 migrateWorkspaceHistoryToArrivalOrder(window.localStorage);
 applyAppTypography();
 initializeAppTheme();
+// Chart colours live in SVG attributes and Canvas pixels, so a theme switch has
+// to repaint the mounted route instead of relying on CSS alone.
+subscribeAppTheme(() => {
+  window.dispatchEvent(new Event("gpm-next:route-refresh"));
+});
 app.innerHTML = renderAppShell(store.getState());
 bindSettings(app, store);
 bindGlobalLanguageSwitch(app, store);

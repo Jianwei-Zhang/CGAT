@@ -8,20 +8,24 @@ const baseCss = readFileSync(new URL("../base.css", import.meta.url), "utf8");
 const html = readFileSync(new URL("../../../index.html", import.meta.url), "utf8");
 const prepaint = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 
-test("dark theme changes surfaces, ink, native controls and statuses without recoloring dataset roles", () => {
+test("dark theme changes surfaces, ink, native controls and statuses and remaps contig bars for the dark canvas", () => {
   assert.match(themeCss, /:root\[data-theme="dark"\]\s*\{[^}]*color-scheme:\s*dark;/);
   for (const token of ["surface-app", "surface-panel", "surface-card", "surface-subtle", "surface-muted",
     "border-subtle", "border-default", "border-strong", "text-primary", "text-secondary", "text-muted",
     "focus-ring", "danger", "theme-blue-ink", "theme-amber-ink", "theme-red-ink", "theme-green-ink"]) {
     assert.match(themeCss, new RegExp(`--${token}:`));
   }
+  // Light stays the baseline palette; the mounted dark theme remaps the same
+  // role tokens so bars sit on the dark canvas instead of glowing, while
+  // hue order (blue > amber > grey) and role ink remain distinguishable.
   for (const [role, fill] of [["primary", "#d2dfef"], ["companion", "#e7dec4"], ["ref", "#cfcfcf"]]) {
     assert.match(baseCss, new RegExp(`--ctg-${role}-fill: ${fill};`));
+    assert.match(themeCss, new RegExp(`--ctg-${role}-fill: #`), `dark ${role} fill`);
   }
-  assert.doesNotMatch(themeCss, /--ctg-(?:primary|companion|ref)-[\w-]+\s*:/);
   assert.doesNotMatch(themeCss, /filter:\s*invert/);
   assert.match(themeCss, /\.track-ctg-label\.is-outside,[\s\S]*?fill:\s*var\(--text-primary\)/);
   assert.match(themeCss, /\.grt-result-repeat-count\s*\{[^}]*stroke:\s*var\(--surface-panel\)/);
+  assert.match(themeCss, /:root\[data-theme="dark"\] \.track-ctg\.is-active\s*\{[^}]*fill:\s*#33587f;/);
 });
 
 test("native select popup options and groups have explicit dark surfaces and readable enabled or disabled ink", () => {

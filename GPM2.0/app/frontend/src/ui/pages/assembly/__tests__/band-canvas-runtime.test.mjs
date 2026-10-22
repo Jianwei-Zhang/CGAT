@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { bindBandCanvasRuntime } from "../band-canvas-runtime.js";
-import { resolveAlignmentBandStyle } from "../alignment-band-style.js";
+import { resolveAlignmentBandStyle, resolveDarkAlignmentBandStyle } from "../alignment-band-style.js";
 
 function createClassList() {
   const values = new Set();
@@ -131,6 +131,39 @@ test("canvas draws opaque identity fills low-to-high with stable equal-quality t
   } finally {
     globalThis.requestAnimationFrame = originalRequest;
     globalThis.cancelAnimationFrame = originalCancel;
+  }
+});
+
+test("band canvas repaints with the dark band ramp when the mounted theme changes", () => {
+  const originalRequest = globalThis.requestAnimationFrame;
+  const originalCancel = globalThis.cancelAnimationFrame;
+  const originalDocument = globalThis.document;
+  globalThis.requestAnimationFrame = (callback) => { callback(0); return 1; };
+  globalThis.cancelAnimationFrame = () => {};
+  globalThis.document = { documentElement: { dataset: { theme: "light" } } };
+  try {
+    const paints = [];
+    const context = createContextRecorder();
+    context.fill = function () { paints.push(this.fillStyle); };
+    const { host } = createCanvasLayer({ context });
+
+    bindBandCanvasRuntime(host);
+    assert.deepEqual(paints, [resolveAlignmentBandStyle("primary", null).fill]);
+
+    // Same scene text, different theme: the memo must not skip the repaint.
+    globalThis.document.documentElement.dataset.theme = "dark";
+    bindBandCanvasRuntime(host);
+    assert.equal(paints.length, 2);
+    assert.equal(paints[1], resolveDarkAlignmentBandStyle("primary", null).fill);
+
+    // Unchanged theme and scene stay memoized.
+    bindBandCanvasRuntime(host);
+    assert.equal(paints.length, 2);
+  } finally {
+    globalThis.requestAnimationFrame = originalRequest;
+    globalThis.cancelAnimationFrame = originalCancel;
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
   }
 });
 

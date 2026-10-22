@@ -8,6 +8,12 @@ export const DEFAULT_CONTIG_PALETTE = Object.freeze({
   ref: Object.freeze({ fill: "#cfcfcf", stroke: "#8e8e8e", text: "#4f4f4f" }),
 });
 
+export const DARK_CONTIG_PALETTE = Object.freeze({
+  primary: Object.freeze({ fill: "#28486e", stroke: "#6899d1", text: "#e8f2ff" }),
+  companion: Object.freeze({ fill: "#594527", stroke: "#bf9b63", text: "#faefd9" }),
+  ref: Object.freeze({ fill: "#384352", stroke: "#8292a6", text: "#e2e8f0" }),
+});
+
 export function contigColorToken(role, property = "fill") {
   const palette = DEFAULT_CONTIG_PALETTE[role] || DEFAULT_CONTIG_PALETTE.companion;
   const normalizedRole = DEFAULT_CONTIG_PALETTE[role] ? role : "companion";
@@ -16,7 +22,8 @@ export function contigColorToken(role, property = "fill") {
 
 export function getContigPalette() {
   const root = globalThis.document?.documentElement;
-  const styles = root && typeof globalThis.getComputedStyle === "function"
+  // Standalone SVG/PNG exports always use a white publication canvas.
+  const styles = root && root.dataset?.theme !== "dark" && typeof globalThis.getComputedStyle === "function"
     ? globalThis.getComputedStyle(root)
     : null;
   return Object.fromEntries(Object.entries(DEFAULT_CONTIG_PALETTE).map(([role, colors]) => [

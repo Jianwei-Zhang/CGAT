@@ -47,6 +47,11 @@
   --ctg-ref-fill: #cfcfcf;
   --ctg-ref-stroke: #8e8e8e;
   --ctg-ref-text: #4f4f4f;
+  /* Identity legend endpoints mirror the band paint scale at 80% and 100%. */
+  --alignment-legend-primary-low: rgb(227, 232, 240);
+  --alignment-legend-primary-high: rgb(148, 169, 197);
+  --alignment-legend-companion-low: rgb(237, 232, 223);
+  --alignment-legend-companion-high: rgb(186, 167, 135);
   /* Gap markers are sequence symbols, not theme-dependent panel surfaces. */
   --gap-marker-fill: #ffffff;
   --gap-marker-text: #1b1b1b;
