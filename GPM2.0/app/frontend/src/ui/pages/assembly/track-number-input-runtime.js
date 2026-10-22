@@ -4,6 +4,7 @@ export const TRACK_NUMBER_INPUT_IDLE_MS = 600;
 
 export function bindTrackNumberInput({
   input, field, key, registry, isCurrentScope, readValue, commitValue,
+  setMenuOpen, closeOtherMenus, isMenuOpen,
   timerApi = globalThis.window || globalThis,
 }) {
   if (!input) return;
@@ -72,6 +73,7 @@ export function bindTrackNumberInput({
         restoreSelection(next, focus.selection);
       }
     }
+    if (reason !== "idle") setMenuOpen(false, liveInput());
     if (!disposed) { rememberDraft(); validate(); }
   };
   const activity = () => {
@@ -144,6 +146,8 @@ export function bindTrackNumberInput({
     pointerHeld = false;
     pointerOutside = false;
     watchDocument();
+    closeOtherMenus(input);
+    setMenuOpen(true, input);
     activity();
   });
   listen(input, "beforeinput", event => {
@@ -180,23 +184,35 @@ export function bindTrackNumberInput({
   listen(input, "keydown", event => {
     if (composing || event.isComposing) return;
     if (event.key === "Enter") {
-      // Let the native datalist accept its highlighted suggestion before reading
-      // the value. Applying during keydown can replace the toolbar too early.
-      clearIdle(); clearExplicit();
-      const previous = readValue();
-      explicitTimer = timerApi.setTimeout(() => {
-        explicitTimer = null;
-        if (disposed || !connected() || !editable() || readValue() !== previous) return;
-        apply("enter");
-      }, 0);
+      event.preventDefault();
+      apply("enter");
     } else if (event.key === "Escape") {
-      // Do not cancel Escape: the browser also needs to dismiss its popup.
+      event.preventDefault();
       clearIdle(); clearExplicit();
       input.value = String(readValue());
       rememberDraft(); validate();
+      setMenuOpen(false, input);
     } else {
+      if (event.key === "ArrowDown") {
+        event.preventDefault(); closeOtherMenus(input); setMenuOpen(true, input);
+      }
       activity();
     }
+  });
+  const toggle = combo?.querySelector("[data-track-combo-toggle]");
+  listen(toggle, "pointerdown", event => event.preventDefault());
+  listen(toggle, "click", event => {
+    event.preventDefault();
+    const open = !isMenuOpen(input);
+    input.focus(); closeOtherMenus(input); setMenuOpen(open, input);
+    activity();
+  });
+  combo?.querySelectorAll("[data-track-combo-option]").forEach(option => {
+    listen(option, "pointerdown", event => {
+      event.preventDefault();
+      apply("option", option.dataset.trackComboValue);
+      liveInput().focus(); setMenuOpen(false, liveInput());
+    });
   });
   return { destroy };
 }

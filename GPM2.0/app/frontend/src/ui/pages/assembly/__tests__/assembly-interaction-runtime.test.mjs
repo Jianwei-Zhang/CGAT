@@ -1734,6 +1734,161 @@ test("bindings do not auto-scroll or snap the final-path card to the bottom when
   assert.deepEqual(scrollCalls, []);
 });
 
+test("bindings open track combo upward when the dropdown would overflow the window bottom", () => {
+  const toggleListeners = new Map();
+  const menuNode = {
+    style: {},
+    classList: {
+      toggle() {},
+    },
+    getBoundingClientRect() {
+      return {
+        height: 220,
+      };
+    },
+  };
+  const comboNode = {
+    classList: {
+      values: new Set(),
+      toggle(name, enabled) {
+        if (enabled) {
+          this.values.add(name);
+        } else {
+          this.values.delete(name);
+        }
+      },
+      contains(name) {
+        return this.values.has(name);
+      },
+    },
+    querySelector(selector) {
+      if (selector === ".assembly-track-combo-input") {
+        return input;
+      }
+      if (selector === "[data-track-combo-toggle]") {
+        return toggleButton;
+      }
+      if (selector === ".assembly-track-combo-menu") {
+        return menuNode;
+      }
+      return null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+    getBoundingClientRect() {
+      return {
+        top: 860,
+        bottom: 892,
+        height: 32,
+      };
+    },
+    contains() {
+      return false;
+    },
+  };
+  const input = {
+    value: "10000",
+    closest(selector) {
+      return selector === "[data-track-combo-field]" ? comboNode : null;
+    },
+    addEventListener() {},
+    focus() {},
+    setAttribute() {},
+  };
+  const toggleButton = {
+    addEventListener(type, handler) {
+      toggleListeners.set(type, handler);
+    },
+    setAttribute() {},
+  };
+  const host = {
+    querySelector(selector) {
+      if (selector === "#assembly-track-min-tick-unit-kb") {
+        return input;
+      }
+      return null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+    addEventListener() {},
+  };
+  const store = createStore(createState());
+  const deps = Object.fromEntries([
+    "appendFinalPathRow",
+    "applySupportDatasetSelection",
+    "bindBandCanvasRuntime",
+    "cancelSubviewPairwiseEvidence",
+    "bindAssemblyActionFeedbackDismiss",
+    "bindAssemblyContextMenu",
+    "bindCtgActions",
+    "bindDeletedMemberChipBoxSelection",
+    "bindSeqActions",
+    "bindStickyCtgLabels",
+    "bindSubviewBandTooltips",
+    "bindSubviewTrackContigDrag",
+    "bindTrackBoxSelection",
+    "bindTrackContigDrag",
+    "bindTrackScrollSync",
+    "bindTrackSelectionHotkeys",
+    "bindTrackViewportResize",
+    "handleNewSequenceRowAction",
+    "handleSubviewCandidateRemoval",
+    "handleSubviewClear",
+    "handleSubviewHistoryReset",
+    "handleSubviewHistoryRestoreRollback",
+    "handleSubviewHistoryRollback",
+    "handleSubviewSwapTrackOrder",
+    "handleSubviewTrackSelectionRemoval",
+    "handleTrackSubviewCandidateSelection",
+    "handleTrackSubviewTrackSelection",
+    "loadAssemblyView",
+    "loadNewSequencesTab",
+    "markNextTrackAutoFocusSuppressed",
+    "persistMainTrackViewState",
+    "rememberTrackViewportAnchor",
+    "normalizeTrackFocusMode",
+    "rerender",
+    "resolveTrackContigClickAction",
+    "removeFinalPathRow",
+    "restoreSelectedDeletedCtgs",
+    "runCtgSearch",
+    "selectChromosome",
+    "selectCtg",
+    "setAssemblyActionFeedback",
+    "shouldSuppressTrackContigClick",
+    "syncSupportDatasetSelection",
+    "togglePrimaryTrackSelection",
+    "moveFinalPathRow",
+    "updateFinalPathRow",
+    "updateDeletedCtgSelection",
+  ].map((name) => [name, () => {}]));
+  deps.syncSupportDatasetSelection = () => ({ changed: false, supportDatasetId: null });
+
+  const originalWindow = globalThis.window;
+  globalThis.window = {
+    innerHeight: 900,
+    setTimeout,
+    clearTimeout,
+    addEventListener() {},
+    removeEventListener() {},
+  };
+
+  try {
+    bindAssemblyPageImpl(host, store, deps);
+    toggleListeners.get("click")?.({
+      preventDefault() {},
+    });
+  } finally {
+    globalThis.window = originalWindow;
+  }
+
+  assert.equal(comboNode.classList.contains("is-open"), true);
+  assert.equal(menuNode.style.top, "auto");
+  assert.equal(menuNode.style.bottom, "calc(100% + 2px)");
+});
+
 test("bindings update final-path track prefs without persisting main-track view state", async () => {
   const listenerMap = new Map();
   const input = {
@@ -2538,6 +2693,7 @@ test("assembly page public binder wires host-level listeners once for the same h
   }
 
   assert.deepEqual(listenerTypes, [
+    "pointerdown",
     "pointermove",
     "pointerdown",
     "pointerdown",

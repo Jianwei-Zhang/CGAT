@@ -22,7 +22,7 @@ test("main ctgs use hover-only outlines matching the Subview role colors", () =>
   assert.match(css, /\.assembly-track-svg:not\(\.subview-track-svg\) \.track-ctg-group:hover > \.track-reference-member\s*\{\s*stroke: #8e8e8e;\s*stroke-width: 2;\s*\}/);
 });
 
-test("assembly main view renders native numeric suggestions with editable inputs", () => {
+test("assembly main view renders v1-style collapsible menus with selectable presets and numeric track inputs", () => {
   const html = renderAssemblyPage(createState());
 
   assert.doesNotMatch(html, /assembly-v1-tool-strip/);
@@ -47,28 +47,61 @@ test("assembly main view renders native numeric suggestions with editable inputs
   assert.ok(html.indexOf("辅 ds") < html.indexOf("辅ds_ctg_len"));
   assert.ok(html.indexOf("比对长度") < html.indexOf("一致性"));
 
-  for (const [suffix, field, initial, values] of [
-    ["support-ds-ctg-len", "supportDsCtgLen", 0, [0, 1000, 10000, 100000]],
-    ["alignment-length", "alignmentLength", 1000, [1000, 10000, 100000]],
-    ["identity-pct", "minIdentityPct", 0, [0, 85, 90, 95]],
-  ]) {
-    const id = `assembly-track-${suffix}`;
-    assert.ok(html.includes(`data-track-combo-field="${field}"`));
-    const input = html.match(new RegExp(`<input\\s+id="${id}"[^>]*>`))?.[0];
-    assert.ok(input, id);
-    assert.ok(input.includes('type="text"'));
-    assert.ok(input.includes('inputmode="numeric"'));
-    assert.ok(input.includes('pattern="[0-9]*"'));
-    assert.ok(input.includes(`value="${initial}"`));
-    assert.ok(input.includes(`list="${id}-options"`));
-    assert.match(input, /aria-label="[^"]+"/);
-    assert.doesNotMatch(input, /aria-expanded|aria-controls/);
-    const list = html.match(new RegExp(`<datalist id="${id}-options">([\\s\\S]*?)</datalist>`))?.[1];
-    assert.ok(list, `${id} native presets`);
-    assert.deepEqual([...list.matchAll(/<option value="(\d+)">/g)].map(match => Number(match[1])), values);
-  }
-  assert.doesNotMatch(html, /assembly-track-combo-(?:toggle|menu|option)/);
+  assert.match(
+    html,
+    /<div class="assembly-track-combo" data-track-combo-field="supportDsCtgLen">/,
+  );
+  assert.match(
+    html,
+    /<input\s+id="assembly-track-support-ds-ctg-len"\s+class="assembly-track-combo-input"\s+type="text"\s+inputmode="numeric"\s+pattern="\[0-9\]\*"\s+value="0"\s+autocomplete="off"[^>]*>/,
+  );
+  assert.match(
+    html,
+    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开辅ds_ctg_len\(bp\)候选值" aria-expanded="false" aria-controls="assembly-track-support-ds-ctg-len-menu">/,
+  );
+  assert.match(html, /<div id="assembly-track-support-ds-ctg-len-menu" class="assembly-track-combo-menu is-hidden" role="listbox">/);
+  assert.match(html, /data-track-combo-value="0"/);
+  assert.match(html, /data-track-combo-value="1000"/);
+  assert.match(html, /data-track-combo-value="10000"/);
+  assert.match(html, /data-track-combo-value="100000"/);
 
+  assert.match(html, /<span class="assembly-track-control-marker" aria-hidden="true">▾<\/span>/);
+  assert.match(html, /data-track-combo-value="1000"/);
+  assert.match(html, /data-track-combo-value="10000"/);
+
+
+  assert.match(
+    html,
+    /<div class="assembly-track-combo" data-track-combo-field="alignmentLength">/,
+  );
+  assert.match(
+    html,
+    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开比对长度\(bp\)候选值" aria-expanded="false" aria-controls="assembly-track-alignment-length-menu">/,
+  );
+  assert.match(html, /<div id="assembly-track-alignment-length-menu" class="assembly-track-combo-menu is-hidden" role="listbox">/);
+  assert.match(html, /data-track-combo-value="1000"/);
+  assert.match(html, /data-track-combo-value="10000"/);
+  assert.match(html, /data-track-combo-value="100000"/);
+  assert.match(
+    html,
+    /<div class="assembly-track-combo" data-track-combo-field="minIdentityPct">/,
+  );
+  assert.match(
+    html,
+    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开一致性\(%\)候选值" aria-expanded="false" aria-controls="assembly-track-identity-pct-menu">/,
+  );
+  assert.match(html, /<div id="assembly-track-identity-pct-menu" class="assembly-track-combo-menu is-hidden" role="listbox">/);
+  assert.match(
+    html,
+    /<input\s+id="assembly-track-identity-pct"\s+class="assembly-track-combo-input"\s+type="text"\s+inputmode="numeric"\s+pattern="\[0-9\]\*"\s+value="0"\s+autocomplete="off"[^>]*>/,
+  );
+  assert.match(html, /data-track-combo-value="0"/);
+  assert.match(html, /data-track-combo-value="85"/);
+  assert.match(html, /data-track-combo-value="90"/);
+  assert.match(html, /data-track-combo-value="95"/);
+  assert.doesNotMatch(html, /<datalist id="assembly-track-alignment-length-options">/);
+  assert.doesNotMatch(html, /<datalist id="assembly-track-identity-pct-options">/);
+  assert.doesNotMatch(html, /<datalist id="assembly-track-support-ds-ctg-len-options">/);
 });
 
 test("support ds ctg len rules dialog renders close in header and actions in footer", () => {
@@ -109,7 +142,7 @@ test("support ds ctg len rules dialog renders close in header and actions in foo
   assert.match(footMatch[1], /data-support-ds-ctg-len-rules-save="1"/);
 });
 
-test("track control shells retain their sizing and native select overflow rules", () => {
+test("track combo styles keep dropdown menu unclipped", () => {
   const css = readStylesheetTree(
     new URL("../../../../styles/components.css", import.meta.url),
     "utf8",
