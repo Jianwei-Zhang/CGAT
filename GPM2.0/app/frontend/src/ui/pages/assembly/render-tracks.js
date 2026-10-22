@@ -2202,7 +2202,7 @@ function renderAssemblyTracks(args) {
         : "";
       return `<polygon class="track-collinearity-band${band.className}" data-band-track-role="${escapeAttr(
           band.trackRole,
-        )}" data-band-contig-id="${band.contigId}"${phasedBandAttrs} data-band-left-anchor="${band.anchors.left}" data-band-right-anchor="${band.anchors.right}" data-band-query-start="${band.queryStart}" data-band-query-end="${band.queryEnd}" data-band-ref-start="${band.refStartBp}" data-band-ref-end="${band.refEndBp}" data-band-approximate="${band.approximate ? "1" : "0"}" data-track-band-proxy="1" points="${band.points}" ${alignmentBandSvgAttrs(band)}><title>${escapeHtml(band.tooltipText)}</title></polygon>`;
+        )}" data-band-contig-id="${band.contigId}"${phasedBandAttrs} data-band-left-anchor="${band.anchors.left}" data-band-right-anchor="${band.anchors.right}" data-band-query-start="${band.queryStart}" data-band-query-end="${band.queryEnd}" data-band-ref-start="${band.refStartBp}" data-band-ref-end="${band.refEndBp}" data-band-approximate="${band.approximate ? "1" : "0"}" data-track-band-proxy="1" data-subview-band-tooltip="${escapeAttr(band.tooltipText)}" points="${band.points}" ${alignmentBandSvgAttrs(band)}></polygon>`;
     })
     .join("");
 

@@ -1306,7 +1306,7 @@ test("context-menu listeners install only once for the route host", () => {
   __testBindAssemblyContextMenu(host, createStore(createState()));
   __testBindAssemblyContextMenu(host, createStore(createState()));
 
-  assert.deepEqual(listenerTypes, ["keydown", "click", "scroll", "contextmenu"]);
+  assert.deepEqual(listenerTypes, ["pointerover", "pointerout", "focusin", "focusout", "keydown", "click", "scroll", "contextmenu"]);
 });
 
 test("bindings binder rejects missing required deps at the boundary", () => {
@@ -2701,7 +2701,13 @@ test("assembly page public binder wires host-level listeners once for the same h
     "click",
     "pointerover",
     "pointerout",
+    "focusin",
+    "focusout",
     "click",
+    "pointerover",
+    "pointerout",
+    "focusin",
+    "focusout",
     "keydown",
     "click",
     "scroll",

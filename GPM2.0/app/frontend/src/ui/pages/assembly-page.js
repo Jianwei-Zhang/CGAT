@@ -1,3 +1,4 @@
+import { bindAlignmentTooltips } from "./assembly/alignment-tooltip-runtime.js";
 import { buildSupportDatasetOptions } from "./assembly/support-dataset-options.js";
 import { openContigChrAlignments, chrAlignmentCopy, resolveContigChrAlignmentModel } from "./assembly/contig-chr-alignments.js";
 import { openManualContigSplit } from "./assembly/manual-contig-split.js";
@@ -288,7 +289,6 @@ import {
 } from "./assembly/progress-modals.js";
 import {
   resolveActiveTrackScrollElement,
-  resolveTrackPointerContentPoint,
 } from "./assembly/track-viewport.js";
 import {
   createAssemblyViewportController,
@@ -557,7 +557,6 @@ export function renderAssemblyPage(state) {
   return renderAssemblyPageShell(state, assemblyPageShellDeps);
 }
 const ASSEMBLY_ACTION_FEEDBACK_DISMISS = Symbol("assemblyActionFeedbackDismiss");
-const ASSEMBLY_SUBVIEW_BAND_TOOLTIP_BOUND = Symbol("assemblySubviewBandTooltipBound");
 const ACTION_FEEDBACK_AUTO_DISMISS_MS = 1000;
 const ACTION_FEEDBACK_POINTER_DISMISS_MS = 500;
 
@@ -1480,87 +1479,10 @@ async function moveFinalPathRow(host, store, payload) {
 }
 
 function bindSubviewBandTooltips(host) {
-  const timerApi = resolveTimerApi();
-  const scrollNodes = host.querySelectorAll?.(".subview-track-scroll") || [];
-  scrollNodes.forEach((scrollNode) => {
-    if (!scrollNode || scrollNode[ASSEMBLY_SUBVIEW_BAND_TOOLTIP_BOUND]) {
-      return;
-    }
-    const tooltipNode = scrollNode.querySelector?.(".subview-band-tooltip");
-    if (!tooltipNode) {
-      return;
-    }
-    const coordinator = createSubviewBandTooltipCoordinator({
-      setTimeoutFn: timerApi.setTimeout.bind(timerApi),
-      clearTimeoutFn: timerApi.clearTimeout.bind(timerApi),
-      hoverDelayMs: SUBVIEW_BAND_TOOLTIP_HOVER_DELAY_MS,
-      onShow: ({ text, point }) => {
-        showSubviewBandTooltip(scrollNode, tooltipNode, text, point);
-      },
-      onMove: ({ text, point }) => {
-        showSubviewBandTooltip(scrollNode, tooltipNode, text, point);
-      },
-      onHide: () => {
-        hideSubviewBandTooltip(tooltipNode);
-      },
-    });
-    const bandNodes = scrollNode.querySelectorAll?.("[data-subview-band-tooltip]") || [];
-    bandNodes.forEach((bandNode) => {
-      bandNode.addEventListener("pointerenter", (event) => {
-        coordinator.enter({
-          token: bandNode,
-          text: readSubviewBandTooltipText(bandNode),
-          point: resolveTrackPointerContentPoint(event, scrollNode),
-        });
-      });
-      bandNode.addEventListener("pointermove", (event) => {
-        coordinator.move({
-          token: bandNode,
-          text: readSubviewBandTooltipText(bandNode),
-          point: resolveTrackPointerContentPoint(event, scrollNode),
-        });
-      });
-      bandNode.addEventListener("pointerleave", () => {
-        coordinator.leave(bandNode);
-      });
-    });
-    scrollNode.addEventListener("scroll", () => {
-      coordinator.hide();
-    });
-    scrollNode[ASSEMBLY_SUBVIEW_BAND_TOOLTIP_BOUND] = {
-      coordinator,
-    };
+  bindAlignmentTooltips(host, {
+    createCoordinator: createSubviewBandTooltipCoordinator,
+    timerApi: resolveTimerApi(),
   });
-}
-
-function readSubviewBandTooltipText(node) {
-  return String(node?.getAttribute?.("data-subview-band-tooltip") || "").replaceAll(" | ", "\n");
-}
-
-function showSubviewBandTooltip(scrollNode, tooltipNode, text, point) {
-  tooltipNode.textContent = String(text || "");
-  tooltipNode.classList.remove("is-hidden");
-  tooltipNode.setAttribute("aria-hidden", "false");
-
-  const scrollLeft = Number(scrollNode?.scrollLeft || 0);
-  const scrollTop = Number(scrollNode?.scrollTop || 0);
-  const viewportWidth = Number(scrollNode?.clientWidth || 0);
-  const viewportHeight = Number(scrollNode?.clientHeight || 0);
-  const tooltipWidth = Number(tooltipNode?.offsetWidth || 0);
-  const tooltipHeight = Number(tooltipNode?.offsetHeight || 0);
-  const desiredLeft = Number(point?.x || 0) + 14;
-  const desiredTop = Number(point?.y || 0) + 14;
-  const maxLeft = Math.max(scrollLeft + 8, scrollLeft + viewportWidth - tooltipWidth - 8);
-  const maxTop = Math.max(scrollTop + 8, scrollTop + viewportHeight - tooltipHeight - 8);
-  const left = Math.min(Math.max(scrollLeft + 8, desiredLeft), maxLeft);
-  const top = Math.min(Math.max(scrollTop + 8, desiredTop), maxTop);
-  tooltipNode.style.left = `${left}px`;
-  tooltipNode.style.top = `${top}px`;
-}
-
-function hideSubviewBandTooltip(tooltipNode) {
-  tooltipNode.classList.add("is-hidden");
-  tooltipNode.setAttribute("aria-hidden", "true");
 }
 
 function rerender(host, store) {

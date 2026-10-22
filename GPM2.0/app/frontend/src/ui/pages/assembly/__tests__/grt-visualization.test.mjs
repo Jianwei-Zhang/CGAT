@@ -295,3 +295,18 @@ test("legacy schema 1 keeps both GRT result switches hidden", () => {
   assert.doesNotMatch(html, /data-grt-result-toggle=/);
   assert.doesNotMatch(html, /class="grt-result-mask"/);
 });
+
+
+test("GRT evidence and result hover proxies use the same styled alignment tooltip payload", () => {
+  const state = createState();
+  state.assembly.grtProjectView.recipe.finalPathSchemaVersion = "2";
+  const baseline = state.assembly.grtProjectView.baselineFinalPathByChr.Chr01;
+  baseline.grtDisplayAvailable = true;
+  baseline.segments[0].assemblySourceStart = 1; baseline.segments[0].assemblySourceEnd = 800;
+  state.assembly.grtResultDisplayByChr = { Chr01: { main: true, subview: true } };
+  const html = renderAssemblyPage(state);
+  const proxies = [...html.matchAll(/<(?:polygon|rect|path|line) class="(?:grt-result-hover-proxy|grt-display-evidence-band)[^>]*>/g)];
+  assert.ok(proxies.length > 0);
+  for (const [proxy] of proxies) assert.match(proxy, /data-subview-band-tooltip="/);
+  assert.doesNotMatch(html, /class="(?:grt-result-hover-proxy|grt-display-evidence-band)[^>]*><title>/);
+});

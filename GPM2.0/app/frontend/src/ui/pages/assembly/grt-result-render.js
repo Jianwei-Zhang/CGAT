@@ -47,7 +47,7 @@ function renderIntervalOverlay(interval, entry, escapeHtml) {
     : "";
   return `<g class="grt-result-interval-group" data-grt-result-interval="1">
     <rect class="grt-result-interval" x="${x.toFixed(2)}" y="${entry.y.toFixed(2)}" width="${width.toFixed(2)}" height="${entry.height.toFixed(2)}" rx="3" ry="3" pointer-events="none" />
-    <rect class="grt-result-hover-proxy" x="${x.toFixed(2)}" y="${entry.y.toFixed(2)}" width="${width.toFixed(2)}" height="${entry.height.toFixed(2)}" fill="transparent" pointer-events="all"><title>${escapeHtml(title)}</title></rect>
+    <rect class="grt-result-hover-proxy" x="${x.toFixed(2)}" y="${entry.y.toFixed(2)}" width="${width.toFixed(2)}" height="${entry.height.toFixed(2)}" fill="transparent" pointer-events="all" data-subview-band-tooltip="${escapeFallback(title)}"></rect>
     ${countMarkup}
   </g>`;
 }
@@ -89,7 +89,7 @@ function renderJunction(junction, entries, escapeHtml, gapLabel) {
       : "";
     return `<g class="grt-result-junction-group${cssClass}" data-grt-result-junction="${junction.kind}" ${endpointAttrs}>
       <path class="grt-result-junction${cssClass}" d="${path}" pointer-events="none" />
-      <path class="grt-result-hover-proxy" d="${path}" fill="none" stroke="transparent" stroke-width="8" pointer-events="stroke"><title>${escapeHtml(title)}</title></path>
+      <path class="grt-result-hover-proxy" d="${path}" fill="none" stroke="transparent" stroke-width="8" pointer-events="stroke" data-subview-band-tooltip="${escapeFallback(title)}"></path>
       ${label}
     </g>`;
   }
@@ -101,7 +101,7 @@ function renderJunction(junction, entries, escapeHtml, gapLabel) {
     : "";
   return `<g class="grt-result-junction-group${cssClass}" data-grt-result-junction="${junction.kind}" ${endpointAttrs}>
     <line class="grt-result-junction${cssClass}" data-grt-result-junction-line="1" x1="${left.x.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${right.x.toFixed(2)}" y2="${y2.toFixed(2)}" pointer-events="none" />
-    <line class="grt-result-hover-proxy" data-grt-result-junction-line="1" x1="${left.x.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${right.x.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="transparent" stroke-width="8" pointer-events="stroke"><title>${escapeHtml(title)}</title></line>
+    <line class="grt-result-hover-proxy" data-grt-result-junction-line="1" x1="${left.x.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${right.x.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="transparent" stroke-width="8" pointer-events="stroke" data-subview-band-tooltip="${escapeFallback(title)}"></line>
     ${label}
   </g>`;
 }
@@ -149,7 +149,7 @@ function renderDisplayEvidence(evidence, entries, escapeHtml) {
   ].filter(Boolean).join(" ");
   const sourceEntryKey = String(sourceFirst.entry?.key || "");
   const targetEntryKey = String(targetFirst.entry?.key || "");
-  return `<polygon class="${classNames}" points="${points}" pointer-events="visibleFill" data-grt-display-evidence="${escapeHtml(evidence.evidenceId || "")}" data-grt-display-evidence-source-entry-key="${escapeHtml(sourceEntryKey)}" data-grt-display-evidence-target-entry-key="${escapeHtml(targetEntryKey)}"><title>${escapeHtml(title)}</title></polygon>`;
+  return `<polygon class="${classNames}" points="${points}" pointer-events="visibleFill" data-grt-display-evidence="${escapeHtml(evidence.evidenceId || "")}" data-grt-display-evidence-source-entry-key="${escapeHtml(sourceEntryKey)}" data-grt-display-evidence-target-entry-key="${escapeHtml(targetEntryKey)}" data-subview-band-tooltip="${escapeFallback(title)}"></polygon>`;
 }
 
 export function buildGrtResultScene({

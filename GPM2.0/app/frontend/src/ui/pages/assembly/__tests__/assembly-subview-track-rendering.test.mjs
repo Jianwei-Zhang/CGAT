@@ -1134,7 +1134,7 @@ test("subview track-pair mode ignores malformed hits without explicit contig coo
     }),
   );
 
-  assert.doesNotMatch(html, /data-subview-band-tooltip="/);
+  assert.doesNotMatch(html, /data-subview-hit-key="[^"]*"[^>]*data-subview-band-tooltip="|data-subview-band-tooltip="[^"]*"[^>]*data-subview-hit-key="/);
 });
 
 test("subview track-pair mode marks box-selected ctgs as multi-selected", () => {

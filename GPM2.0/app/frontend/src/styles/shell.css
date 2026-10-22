@@ -89,3 +89,30 @@
   min-height: 30px;
   padding: 0;
 }
+
+
+/* Same custom option surface, border, selection and focus tokens as the
+   Assembly support-dataset picker, in both themes (no OS-native popup). */
+.shell-select { position: relative; display: inline-flex; min-width: 0; }
+.shell-select-toggle {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  width: var(--workspace-select-width, 12ch); max-width: min(32ch, 28vw);
+  padding: 4px 0 4px 8px; border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: var(--control-radius, 5px); background: var(--surface-panel, #fff);
+  color: var(--text-primary, #1e293b); font: inherit; text-align: left; cursor: pointer;
+}
+[data-shell-select-caption] { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shell-select-marker {
+  align-self: stretch; display: grid; place-items: center; flex: 0 0 22px;
+  border-left: 1px solid var(--border-subtle, #dbe3ec);
+  background: var(--surface-subtle, #f8fafc); color: var(--text-secondary, #334155);
+}
+.nav-session-field-language .shell-select-toggle { width: auto; min-width: 88px; max-width: none; }
+.shell-select-menu { z-index: 45; left: auto; right: 0; min-width: 100%; max-width: min(420px, 60vw); max-height: min(360px, 70vh); overflow: auto; }
+.nav-session-field-language .shell-select-menu { right: 0; left: auto; }
+.shell-select-menu .assembly-track-combo-option { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.shell-select-toggle:focus-visible, .shell-select-menu .assembly-track-combo-option:focus-visible {
+  outline: 2px solid var(--focus-ring, #4f82b5); outline-offset: -2px;
+  background: var(--theme-surface-subtle, #efefef);
+}
+.shell-select-toggle:disabled { cursor: default; opacity: .55; }

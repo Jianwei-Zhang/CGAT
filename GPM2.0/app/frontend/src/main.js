@@ -1,3 +1,4 @@
+import { bindShellSelects, syncShellSelect } from "./ui/shell/shell-select-runtime.js";
 import { projectEntryBusy } from "./services/project-drop-controller.js";
 import { bindProjectDrop } from "./ui/shell/project-drop.js";
 import { readWorkspaceHistory as readSharedHistory, writeWorkspaceHistory as writeSharedHistory } from "./services/workspace-history.js";
@@ -323,6 +324,7 @@ function syncSessionHeader(state) {
     workspaceSelect.title = presentation.title;
     workspaceSelect.style.setProperty("--workspace-select-width", presentation.width);
     workspaceSelect.disabled = projectEntryBusy(state) || (workspaceItems.length === 1 && !workspaceItems[0]?.value);
+    syncShellSelect(workspaceSelect);
   }
 }
 
@@ -400,6 +402,7 @@ function syncLanguageSwitch(state) {
     if (select.value !== nextValue) {
       select.value = nextValue;
     }
+    syncShellSelect(select);
   }
 }
 
@@ -616,6 +619,7 @@ function escapeAttr(value) {
 }
 
 function bindSettings(root, storeRef) {
+  bindShellSelects(root);
   bindAppThemeToggle(root, { getLocale: () => storeRef.getState().locale });
   bindAppSettings(root, {
     getLocale: () => storeRef.getState().locale === "en" ? "en" : "zh",

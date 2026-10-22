@@ -147,3 +147,16 @@ test("identity legend remains a non-interactive overlay pinned to the right", ()
   assert.match(legendRule, /pointer-events:\s*none/);
   assert.match(legendRule, /top:\s*8px/, "preserve the original legend position above the axis");
 });
+
+
+test("main and local alignment proxies share styled tooltip payloads, never native black title strips", () => {
+  for (const mode of ["2-contig", "track-pair", "composition"]) {
+    const html = renderAssemblyPage(createIdentityRenderState(mode));
+    const polygons = [...html.matchAll(/<polygon class="track-collinearity-band[^>]*>[\s\S]*?<\/polygon>/g)];
+    assert.ok(polygons.length > 0);
+    for (const [polygon] of polygons) {
+      assert.match(polygon, /data-subview-band-tooltip="/);
+      assert.doesNotMatch(polygon, /<title>/);
+    }
+  }
+});

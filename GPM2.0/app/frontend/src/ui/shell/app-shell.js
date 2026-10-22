@@ -1,3 +1,4 @@
+import { renderShellSelect } from "./shell-select-runtime.js";
 import { getMessages } from "../i18n/index.js";
 import { getAppliedAppTheme, getAppSettings, resolveAppTheme, setAppSettings, subscribeAppTheme } from "../../services/app-settings.js";
 import { projectIcon } from "../pages/project-icons.js";
@@ -56,18 +57,15 @@ export function renderAppShell(state) {
           <button class="route-button" data-route="projectExport">${labels.projectExport}</button>
         </nav>
         <div class="nav-session-controls">
-          <label class="nav-session-field" for="session-workspace-select">
+          <label class="nav-session-field" for="session-workspace-select-toggle">
             <span>${labels.workspace}</span>
-            <select id="session-workspace-select" aria-label="${labels.workspace}">
-              <option value="">${labels.workspacePlaceholder}</option>
-            </select>
+            ${renderShellSelect("session-workspace-select", labels.workspace,
+              [{ value: "", label: labels.workspacePlaceholder, selected: true }])}
           </label>
-          <label class="nav-session-field nav-session-field-language" for="app-language-select">
+          <label class="nav-session-field nav-session-field-language" for="app-language-select-toggle">
             <span>${labels.language}</span>
-            <select id="app-language-select" aria-label="${labels.language}">
-              <option value="zh" ${locale === "zh" ? "selected" : ""}>中文</option>
-              <option value="en" ${locale === "en" ? "selected" : ""}>English</option>
-            </select>
+            ${renderShellSelect("app-language-select", labels.language,
+              [{ value: "zh", label: "中文", selected: locale === "zh" }, { value: "en", label: "English", selected: locale === "en" }])}
           </label>
           <button type="button" class="button app-theme-toggle" data-app-theme-toggle title="${themeLabel}" aria-label="${themeLabel}" aria-pressed="${dark}">${projectIcon(dark ? "sun" : "moon")}</button>
           <button type="button" class="button app-settings-button" data-app-settings aria-haspopup="dialog">⚙ ${locale === "en" ? "Settings" : "设置"}</button>

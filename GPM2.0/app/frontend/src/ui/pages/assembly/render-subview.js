@@ -1922,7 +1922,6 @@ function renderSubviewAlignmentCard(
               data-subview-rect-height="${svgModel.barHeight}"
               data-subview-world-start-bp="${svgModel.topWorldStartBp}"
             >
-              <title>${escapeHtml(topCtgTitle)}</title>
               <rect class="track-ctg subview-track-ctg${topRowClass}" x="${svgModel.topBarX.toFixed(2)}" y="${svgModel.topBarY.toFixed(2)}" width="${svgModel.topBarWidth.toFixed(2)}" height="${svgModel.barHeight}" rx="4" ry="4" pointer-events="all">
                 <title>${escapeHtml(topCtgTitle)}</title>
               </rect>
@@ -1985,7 +1984,6 @@ function renderSubviewAlignmentCard(
               data-subview-rect-height="${svgModel.barHeight}"
               data-subview-world-start-bp="${svgModel.bottomWorldStartBp}"
             >
-              <title>${escapeHtml(bottomCtgTitle)}</title>
               <rect class="track-ctg subview-track-ctg${bottomRowClass}" x="${svgModel.bottomBarX.toFixed(2)}" y="${svgModel.bottomBarY.toFixed(2)}" width="${svgModel.bottomBarWidth.toFixed(2)}" height="${svgModel.barHeight}" rx="4" ry="4" pointer-events="all">
                 <title>${escapeHtml(bottomCtgTitle)}</title>
               </rect>
@@ -3087,7 +3085,6 @@ function renderSubviewTrackPairAlignmentCard(
               data-subview-rect-height="${TRACK_BAR_HEIGHT}"
               data-subview-world-start-bp="${resolveTrackPairWorldStartBp(layout, ctg)}"
             >
-              <title>${escapeHtml(ctgTitle)}</title>
               <rect
                 class="track-ctg subview-track-ctg${roleClass}${selectedClass}"
                 x="${rect.x.toFixed(2)}"

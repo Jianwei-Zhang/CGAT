@@ -413,9 +413,8 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
       data-subview-rect-x="${member.x.toFixed(2)}" data-subview-rect-y="${y}"
       data-subview-rect-width="${member.width.toFixed(2)}" data-subview-rect-height="${BAR_HEIGHT}"
       data-subview-world-start-bp="${worldStartBp}">
-    <title>${escapeHtml(title)}</title>
     <rect class="track-ctg subview-track-ctg${tone}" x="${member.x.toFixed(2)}" y="${y}"
-      width="${member.width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4" pointer-events="all" />
+      width="${member.width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4" pointer-events="all"><title>${escapeHtml(title)}</title></rect>
     ${renderGrtResultOverlayGroup({ entryKey: member.entityKey, markup: grtOverlay, escapeAttr })}
     ${renderNRegionMarkersForTrackCtg({
       ctg: candidate?.ctg, rect: member, y, barHeight: BAR_HEIGHT,
