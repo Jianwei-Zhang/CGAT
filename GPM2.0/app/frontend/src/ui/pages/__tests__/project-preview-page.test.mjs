@@ -66,7 +66,19 @@ test("hover and keyboard focus promote the whole preview card, not just its head
   assert.match(stateRule, /box-shadow:\s*inset 0 0 0 1px var\(--preview-card-ring[^;]*\),\s*0 2px 8px var\(--preview-card-glow/);
   assert.doesNotMatch(stateRule, /var\(--shadow-md\)|var\(--shadow-lg\)/);
   assert.doesNotMatch(stateRule, /box-shadow:\s*0 0 0 1px/);
-  assert.match(css, /\.project-preview-card:hover \.project-preview-card-header,[\s\S]*?\.project-preview-card:focus-within \.project-preview-card-header\s*\{[^}]*border-bottom-color:\s*var\(--preview-card-ring/);
+  // The title row must carry the same inset ring as the card, otherwise the
+  // header's opaque background hides it and the title frame reads thinner than
+  // the lower frame. Frame, title divider and lower edges share one 2px weight.
+  const headerStateRule = css.match(/\.project-preview-card:hover \.project-preview-card-header,\s*\n\.project-preview-card:focus-within \.project-preview-card-header\s*\{([^}]*)\}/)?.[1];
+  assert.ok(headerStateRule, "header hover and focus-within must share one rule");
+  assert.match(headerStateRule, /border-bottom-color:\s*var\(--preview-card-ring/);
+  assert.match(headerStateRule, /box-shadow:\s*inset 0 0 0 1px var\(--preview-card-ring[^;]*\);/);
+  const headerBaseRule = css.match(/^\.project-preview-card-header\s*\{([^}]*)\}/m)?.[1];
+  assert.ok(headerBaseRule);
+  assert.match(headerBaseRule, /border-bottom:\s*1px solid var\(--border-subtle/);
+  assert.match(headerBaseRule, /width:\s*calc\(100% \+ 32px\)/, "header spans the card's full width");
+  // Hover must not add a thicker divider of its own.
+  assert.doesNotMatch(headerStateRule, /border-bottom-width|border-bottom:\s*2px/);
   // Focus keeps an outline for forced-colors mode, drawn inside the header strip.
   assert.match(css, /\.project-preview-card-header:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--preview-card-ring[^}]*outline-offset:\s*-3px;/);
   // Ring and glow are themed and stay visible on both surfaces.

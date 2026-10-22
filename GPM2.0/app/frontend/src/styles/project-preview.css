@@ -21,9 +21,14 @@
   border-color: var(--preview-card-ring, #3f6fa3);
   box-shadow: inset 0 0 0 1px var(--preview-card-ring, #3f6fa3), 0 2px 8px var(--preview-card-glow, rgba(63, 111, 163, 0.18));
 }
+/* The header is a child with its own opaque background and spans the full card
+   width, so it hides the card's inset ring along the title row. Repeat the same
+   inset ring on the header: frame, title divider and lower edges then share one
+   2px weight (1px border + 1px inset ring) and line up exactly. */
 .project-preview-card:hover .project-preview-card-header,
 .project-preview-card:focus-within .project-preview-card-header {
   border-bottom-color: var(--preview-card-ring, #3f6fa3);
+  box-shadow: inset 0 0 0 1px var(--preview-card-ring, #3f6fa3);
 }
 .project-preview-card:hover .project-preview-open,
 .project-preview-card:focus-within .project-preview-open {
