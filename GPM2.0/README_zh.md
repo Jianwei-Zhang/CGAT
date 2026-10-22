@@ -19,11 +19,11 @@ GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流�
 
 ### 1. 下载工具并创建环境
 
-在 Linux 服务端执行以下命令，从 [Release v2.0.11](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.11) 下载 Server 工具包（源码），解压并进入工具目录后安装：
+在 Linux 服务端执行以下命令，从 [Release v2.0.12](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.12) 下载 Server 工具包（源码），解压并进入工具目录后安装：
 
 ```bash
-curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.11/GPM_Server_2.0.11_source.tar.gz
-tar -xzf GPM_Server_2.0.11_source.tar.gz
+curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/GPM_Server_2.0.12_source.tar.gz
+tar -xzf GPM_Server_2.0.12_source.tar.gz
 cd GPM_Server
 bash install.sh
 ```
@@ -59,8 +59,8 @@ TOOLS_DIR="$HOME/GPM_Server_new"
 mkdir -p "$(dirname "$TOOLS_DIR")" &&
 mkdir "$TOOLS_DIR" &&
 cd "$TOOLS_DIR" &&
-curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.11/GPM_Server_2.0.11_source.tar.gz &&
-tar -xzf GPM_Server_2.0.11_source.tar.gz --strip-components=1 &&
+curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/GPM_Server_2.0.12_source.tar.gz &&
+tar -xzf GPM_Server_2.0.12_source.tar.gz --strip-components=1 &&
 bash install.sh
 ```
 

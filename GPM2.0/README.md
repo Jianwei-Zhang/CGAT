@@ -19,11 +19,11 @@ Installers for `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64` are published 
 
 ### 1. Download the tools and create the environment
 
-On your Linux server, download the Server tools (source package) from [Release v2.0.11](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.11), then extract, enter the tool directory, and install:
+On your Linux server, download the Server tools (source package) from [Release v2.0.12](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.12), then extract, enter the tool directory, and install:
 
 ```bash
-curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.11/GPM_Server_2.0.11_source.tar.gz
-tar -xzf GPM_Server_2.0.11_source.tar.gz
+curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/GPM_Server_2.0.12_source.tar.gz
+tar -xzf GPM_Server_2.0.12_source.tar.gz
 cd GPM_Server
 bash install.sh
 ```
@@ -59,8 +59,8 @@ TOOLS_DIR="$HOME/GPM_Server_new"
 mkdir -p "$(dirname "$TOOLS_DIR")" &&
 mkdir "$TOOLS_DIR" &&
 cd "$TOOLS_DIR" &&
-curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.11/GPM_Server_2.0.11_source.tar.gz &&
-tar -xzf GPM_Server_2.0.11_source.tar.gz --strip-components=1 &&
+curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/GPM_Server_2.0.12_source.tar.gz &&
+tar -xzf GPM_Server_2.0.12_source.tar.gz --strip-components=1 &&
 bash install.sh
 ```
 

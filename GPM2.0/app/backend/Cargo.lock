@@ -315,7 +315,7 @@ dependencies = [
 
 [[package]]
 name = "gpm_next_backend"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "anyhow",
  "clap",

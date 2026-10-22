@@ -6,7 +6,17 @@
 - Commit and push the release version before creating the matching `vX.Y.Z` tag.
 - Build installers only with the GitHub Actions `GPM2.0 Release installers` workflow. Do not publish installers built locally.
 - A completed release must contain exactly four verified installer assets: `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64`.
-- Additional test-data attachments require explicit approval. Name them in both release-note sections and verify their downloaded SHA-256 against the supplied file.
+- Carry forward previously published test-data attachments unchanged by default; absence from the immediately previous Release is not permission to omit them. New or changed test datasets require explicit approval. Name all test-data attachments in both release-note sections and verify their downloaded SHA-256 against the preserved original.
+
+## Required preflight: Server commands and retained attachments
+
+Before creating a new version tag:
+
+1. Update the Server download/install and tool-update commands in all four guides: `README.md`, `README_zh.md`, `server/README.md`, and `server/README_zh.md`. Every active Release link, archive filename and extraction command must use the new version and match the Server asset being published. Do not rewrite historical validation records.
+2. Inventory the previous Release's assets and inspect earlier official Releases for retained examples such as `test_data.zip`. If the immediately previous Release omitted the dataset, use the most recent official Release that contains it rather than repeating the omission. Record the source Release, asset name, size and SHA-256 before uploading anything.
+3. Download the retained dataset and verify its archive integrity and SHA-256. Carry the exact bytes and original filename into the new Release; do not regenerate, rename, or silently omit existing test data. Removing or changing a retained dataset requires explicit user approval. Never delete earlier Releases' attachments as part of a new-version release.
+4. Freeze the expected asset inventory before publication: four platform installers, the matching `GPM_Server_<version>_source.tar.gz`, and every retained/approved supplemental attachment. A workflow that builds only installers does not satisfy this inventory by itself.
+5. Keep the new Release as a draft until the required jobs succeed and the expected assets and bilingual notes are ready. After publication, independently download every asset and compare name, size and SHA-256 with the uploaded file and GitHub metadata. Recheck the original dataset asset as well. Do not report release completion while any expected attachment or public-download check is missing.
 
 ## Release notes
 
@@ -40,8 +50,8 @@ xattr -dr com.apple.quarantine /Applications/GPM.app
 ## Publication checks
 
 - Confirm the quality job and all four installer jobs succeeded for the release workflow.
-- Confirm the Release title is `GPM vX.Y.Z`, the tag and embedded app version match, and exactly four installer assets are present, plus only explicitly approved supplemental attachments.
-- Review the published body to ensure English precedes Chinese and both macOS first-launch sections remain intact.
+- Confirm the Release title is `GPM vX.Y.Z`, the tag and embedded app version match, and exactly four installer assets are present, plus the matching Server source archive and all retained/approved supplemental attachments from the preflight inventory. Verify the four README guides point to that published Server archive.
+- Review the published body to ensure English precedes Chinese, both macOS first-launch sections remain intact, and retained test-data filenames and provenance appear in both languages. Verify fresh public downloads, including the retained dataset, before declaring completion.
 
 ## Installer-only refresh of an existing version
 
