@@ -370,6 +370,28 @@
   border-color: transparent;
   background: transparent;
 }
+.workspace-history-context-menu {
+  min-width: min(224px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.workspace-history-context-menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border-default, #cbd5e1);
+}
+
+.workspace-history-context-menu .context-menu-item.is-danger:not(:disabled) {
+  color: var(--theme-red-ink, #8f2424);
+}
+
+.workspace-history-context-menu .context-menu-item.is-danger:not(:disabled):hover {
+  background: var(--theme-red-surface, #fff5f5);
+}
+
 .app-dialog {
   box-sizing: border-box;
   width: min(440px, calc(100vw - 32px));

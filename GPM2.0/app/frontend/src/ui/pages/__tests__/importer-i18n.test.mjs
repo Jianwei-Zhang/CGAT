@@ -271,6 +271,7 @@ test("project copy action opens an editable dialog with backend defaults", async
     summary: "",
   });
   state.session = { workspacePath: "D:/projects/rice", projectId: null, projectName: "Rice" };
+  state.importer.workspaceContextMenu = { open: true, workspacePath: "D:/projects/rice", x: 12, y: 24 };
   const store = createStore(state);
 
   try {
@@ -305,6 +306,7 @@ test("project copy action opens an editable dialog with backend defaults", async
       args: { workspaceRoot: "D:/projects/rice" },
     }]);
     assert.equal(store.getState().session.workspacePath, "D:/projects/rice");
+    assert.equal(store.getState().importer.workspaceContextMenu, null);
     assert.deepEqual(store.getState().importer.copyDialog, {
       open: true,
       loading: false,
@@ -2708,3 +2710,158 @@ for (const source of ["zip", "extracted"]) {
     });
   });
 }
+
+
+test("project library menu groups all project actions with deletion last in both locales", () => {
+  const previousWindow = globalThis.window;
+  try {
+    globalThis.window = { localStorage: { getItem: () => "[]" } };
+    for (const locale of ["zh", "en"]) {
+      const state = createImporterScrollState({ inFlight: false, importRunId: null,
+        workspaceContextMenu: { open: true, workspacePath: 'D:/项目 & "rice"', x: 12, y: 24 } });
+      state.locale = locale;
+      const html = renderImporterPage(state).split('role="menu"')[1];
+      const actions = [...html.matchAll(/(data-project-(?:open-path|reveal-path|rename-path|copy|delete-files)|data-workspace-import-add-package-path)=/g)].map(match => match[1]);
+      assert.deepEqual(actions, ["data-project-open-path", "data-project-reveal-path", "data-project-rename-path",
+        "data-workspace-import-add-package-path", "data-project-copy", "data-project-delete-files"]);
+      assert.equal((html.match(/role="separator"/g) || []).length, 2);
+      assert.equal((html.match(/role="menuitem"/g) || []).length, 6);
+      assert.match(html, /D:\/项目 &amp; &quot;rice&quot;/);
+      assert.match(html, locale === "zh" ? /打开项目文件所在位置/ : /Open project file location/);
+      assert.match(html, /context-menu-item is-danger[^>]*data-project-delete-files/);
+      for (const importer of [{ inFlight: true }, { entryResolving: true }, { copyDialog: { open: true } }]) {
+        const busy = renderImporterPage({ ...state, importer: { ...state.importer, ...importer } }).split('role="menu"')[1];
+        assert.equal((busy.match(/role="menuitem"[^>]*disabled/g) || []).length, 6);
+      }
+    }
+  } finally { globalThis.window = previousWindow; }
+});
+
+function projectMenuHarness(buttons, invoke) {
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  const path = "D:/projects/项目 & rice";
+  globalThis.document = { querySelector: () => null };
+  globalThis.window = { dispatchEvent() {}, localStorage: { getItem: () => "[]", setItem() {} },
+    __TAURI__: { core: { invoke } } };
+  const state = createImporterScrollState({ inFlight: false, importRunId: null, status: "", summary: "",
+    workspaceContextMenu: { open: true, workspacePath: path, x: 12, y: 24 } });
+  const store = createStore(state);
+  const host = createHost(buttons);
+  return { path, store, host, restore() { globalThis.window = previousWindow; globalThis.document = previousDocument; } };
+}
+
+test("project location opens the clicked directory without opening or switching a project and reports errors", async () => {
+  const button = createButton();
+  const calls = [];
+  let fail = false;
+  const h = projectMenuHarness({ "[data-project-reveal-path]": button }, async (command, args) => {
+    calls.push({ command, args });
+    if (fail) throw new Error("Directory no longer exists");
+  });
+  try {
+    button.dataset.projectRevealPath = h.path;
+    bindImporterPage(h.host, h.store);
+    await button.click();
+    assert.deepEqual(calls, [{ command: "reveal_project_location", args: { workspaceRoot: h.path } }]);
+    assert.equal(h.store.getState().importer.workspaceContextMenu, null);
+    assert.equal(h.store.getState().session.workspacePath, "");
+    fail = true;
+    await button.click();
+    assert.equal(h.store.getState().importer.status, "无法打开项目文件所在位置");
+    assert.equal(h.store.getState().importer.summary, "Directory no longer exists");
+    h.store.setState({ importer: { ...h.store.getState().importer, entryResolving: true } });
+    await button.click();
+    assert.equal(calls.length, 2);
+  } finally { h.restore(); }
+});
+
+for (const action of ["open", "rename"]) {
+  test(`project menu ${action} uses the clicked workspace and the existing project flow`, async () => {
+    const button = createButton();
+    const renameButton = createButton();
+    const calls = [];
+    const h = projectMenuHarness({ [`[data-project-${action}-path]`]: button,
+      "#selected-project-rename-button": renameButton }, async (command, args) => {
+      calls.push({ command, args });
+      return { workspaceRoot: args.workspaceRoot, existingProjects: [{ projectId: 7, projectName: "Rice", autoPipelineDone: true }],
+        references: [], datasets: [] };
+    });
+    try {
+      button.dataset[action === "open" ? "projectOpenPath" : "projectRenamePath"] = h.path;
+      bindImporterPage(h.host, h.store);
+      await button.click();
+      assert.deepEqual(calls, [{ command: "open_workspace", args: { workspaceRoot: h.path } }]);
+      assert.equal(h.store.getState().session.workspacePath, h.path);
+      assert.equal(h.store.getState().importer.workspaceContextMenu, null);
+      if (action === "rename") assert.equal(h.store.getState().initializer.renameProjectKey, `${h.path}:7`);
+      await button.click();
+      assert.equal(calls.length, 1, "the active project is not reopened");
+    } finally { h.restore(); }
+  });
+}
+
+test("project menu rename never edits the current project when opening the clicked project fails", async () => {
+  const button = createButton();
+  const renameButton = createButton();
+  const h = projectMenuHarness({ "[data-project-rename-path]": button, "#selected-project-rename-button": renameButton }, async () => {
+    throw new Error("Missing project");
+  });
+  try {
+    h.store.setState({ session: { workspacePath: "D:/current", projectId: 1, projectName: "Current" },
+      initializer: { ...h.store.getState().initializer, existingProjects: [{ projectId: 1, projectName: "Current" }] } });
+    button.dataset.projectRenamePath = h.path;
+    bindImporterPage(h.host, h.store);
+    await button.click();
+    assert.equal(h.store.getState().initializer.renameProjectKey, undefined);
+    assert.equal(h.store.getState().session.workspacePath, "D:/current");
+    assert.equal(h.store.getState().importer.projectError, "Missing project");
+  } finally { h.restore(); }
+});
+
+test("project menu deletion closes the menu and still requires the existing file deletion confirmation", async () => {
+  const button = createButton();
+  const h = projectMenuHarness({ "[data-project-delete-files]": button }, () => assert.fail("no backend call before confirmation"));
+  try {
+    button.dataset.projectDeleteFiles = h.path;
+    bindImporterPage(h.host, h.store);
+    await button.click();
+    assert.equal(h.store.getState().importer.workspaceContextMenu, null);
+    assert.equal(h.store.getState().importer.deleteConfirmOpen, true);
+    assert.equal(h.store.getState().importer.deleteWithFiles, true);
+    assert.equal(h.store.getState().importer.deleteSelectionMode, "project");
+    assert.deepEqual(h.store.getState().importer.deleteTargets, [h.path]);
+  } finally { h.restore(); }
+});
+
+test("project menu opens on the entire row, clamps to the viewport and supports keyboard dismissal", () => {
+  const row = createButton();
+  const menu = createButton();
+  const h = projectMenuHarness({ "[data-workspace-history-row-path]": row, "[data-workspace-history-context-menu='1']": menu });
+  try {
+    row.dataset.workspaceHistoryRowPath = h.path;
+    menu.dataset.workspaceHistoryContextMenuPath = h.path;
+    menu.style = {};
+    let focused = -1;
+    const items = Array.from({ length: 6 }, (_, index) => ({ focus() { focused = index; } }));
+    menu.querySelector = () => items[0];
+    menu.querySelectorAll = () => items;
+    menu.getBoundingClientRect = () => ({ left: 790, top: 590, width: 224, height: 240 });
+    globalThis.window.innerWidth = 800;
+    globalThis.window.innerHeight = 600;
+    bindImporterPage(h.host, h.store);
+    row.contextmenu({ clientX: 790, clientY: 590 });
+    assert.equal(h.store.getState().importer.workspaceContextMenu.workspacePath, h.path);
+    assert.deepEqual(menu.style, { left: "568px", top: "352px" });
+    assert.equal(focused, 0);
+    for (const [key, target, expected] of [["ArrowDown", items[0], 1], ["ArrowUp", items[0], 5], ["End", items[0], 5], ["Home", items[5], 0]]) {
+      menu.emit("keydown", { key, target, preventDefault() {} });
+      assert.equal(focused, expected);
+    }
+    menu.emit("keydown", { key: "Escape", preventDefault() {} });
+    assert.equal(h.store.getState().importer.workspaceContextMenu, null);
+    h.store.setState({ importer: { ...h.store.getState().importer, inFlight: true } });
+    row.contextmenu();
+    assert.equal(h.store.getState().importer.workspaceContextMenu, null);
+  } finally { h.restore(); }
+});
