@@ -2,8 +2,7 @@ import { cancelDelayedFloatingClose, scheduleDelayedFloatingClose } from "../flo
 
 const BOUND = Symbol("markerDisplayMenuBound");
 const CLOSE_TIMER = "__markerDisplayCloseTimer";
-const ROOT = ".assembly-marker-display";
-const MARKER_DISPLAY_CLOSE_DELAY_MS = 200;
+const ROOT = ".assembly-marker-display, .grt-result-layer-menu";
 
 export function bindMarkerDisplayMenus(host, options = {}) {
   if (!host?.addEventListener || host[BOUND]) return;
@@ -12,9 +11,14 @@ export function bindMarkerDisplayMenus(host, options = {}) {
   }
   if (!host.querySelectorAll?.(ROOT)?.length) return;
   host[BOUND] = true;
-  const timerOptions = { ...options, delayMs: options.delayMs ?? MARKER_DISPLAY_CLOSE_DELAY_MS };
+  const timerOptions = options;
   const cancel = (root) => cancelDelayedFloatingClose(root, CLOSE_TIMER, timerOptions);
   const setOpen = (root, open) => {
+    if (root?.matches?.(".grt-result-layer-menu")) {
+      cancel(root);
+      root.open = open;
+      return;
+    }
     const button = root?.querySelector?.("[data-marker-display-toggle]");
     const panel = root?.querySelector?.(".assembly-marker-display-menu");
     if (!button || !panel) return;
@@ -51,7 +55,7 @@ export function bindMarkerDisplayMenus(host, options = {}) {
     if (!root || event.key !== "Escape") return;
     // Move focus before hiding the panel; never collapse a native <details>
     // synchronously inside its focusout handler.
-    root.querySelector("[data-marker-display-toggle]")?.focus?.();
+    (root.querySelector("[data-marker-display-toggle]") || root.querySelector("summary"))?.focus?.();
     setOpen(root, false);
     event.preventDefault();
     event.stopPropagation();

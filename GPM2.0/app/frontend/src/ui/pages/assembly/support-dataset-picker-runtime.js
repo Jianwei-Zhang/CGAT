@@ -1,3 +1,4 @@
+import { bindDelayedFloatingClose, cancelDelayedFloatingClose } from "../floating-menu-runtime.js";
 const BOUND = Symbol("supportDatasetPickerBound");
 
 // Keep the existing select/change data contract; only the visible popup is custom.
@@ -7,6 +8,7 @@ export function bindSupportDatasetPicker({ select, setOpen, closeOthers }) {
   const options = [...(combo?.querySelectorAll("[data-support-dataset-option]") || [])];
   if (!toggle || !options.length || combo[BOUND]) return;
   combo[BOUND] = true;
+  const closeTimer = Symbol("supportDatasetCloseTimer");
   const isOpen = () => combo.classList.contains("is-open");
   const activeIndex = () => Math.max(0, options.findIndex(option => option.dataset.supportDatasetOption === select.value));
   const sync = () => {
@@ -21,10 +23,12 @@ export function bindSupportDatasetPicker({ select, setOpen, closeOthers }) {
     });
   };
   const close = (restoreFocus = false) => {
+    cancelDelayedFloatingClose(combo, closeTimer);
     setOpen(combo, false);
     if (restoreFocus) toggle.focus();
   };
   const open = (index = activeIndex()) => {
+    cancelDelayedFloatingClose(combo, closeTimer);
     closeOthers(combo);
     setOpen(combo, true);
     options[index].focus();
@@ -70,6 +74,7 @@ export function bindSupportDatasetPicker({ select, setOpen, closeOthers }) {
       }
     });
   });
+  bindDelayedFloatingClose(combo, () => close(), { timerKey: closeTimer });
   combo.addEventListener("focusout", event => {
     if (!combo.contains(event.relatedTarget)) close();
   });

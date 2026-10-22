@@ -89,3 +89,23 @@ test("repeated binding is inert and external select changes synchronize the visi
   assert.equal(h.toggle.textContent, "ds-44");
   assert.equal(h.options[2].attributes["aria-selected"], "true");
 });
+
+
+test("support dataset popup shares 400ms dismissal and cancels a stale timer on reopening", () => {
+  const originalSet = globalThis.setTimeout, originalClear = globalThis.clearTimeout;
+  const timers = new Map(); let id = 0;
+  try {
+    globalThis.setTimeout = (callback, delay) => { timers.set(++id, { callback, delay }); return id; };
+    globalThis.clearTimeout = timer => timers.delete(timer);
+    const h = setup(); h.toggle.emit("click");
+    h.combo.emit("pointerleave", { relatedTarget: h.options[0] }); assert.equal(timers.size, 0);
+    h.combo.emit("pointerleave", { relatedTarget: null });
+    assert.equal([...timers.values()][0].delay, 400);
+    h.combo.emit("pointerenter"); assert.equal(timers.size, 0);
+    h.combo.emit("pointerleave", { relatedTarget: null });
+    h.toggle.emit("click"); h.toggle.emit("click"); assert.equal(timers.size, 0);
+    h.combo.emit("pointerleave", { relatedTarget: null });
+    const callback = [...timers.values()][0].callback; timers.clear(); callback();
+    assert.equal(h.toggle.attributes["aria-expanded"], "false");
+  } finally { globalThis.setTimeout = originalSet; globalThis.clearTimeout = originalClear; }
+});

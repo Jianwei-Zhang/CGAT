@@ -1,3 +1,4 @@
+import { FLOATING_MENU_CLOSE_DELAY_MS } from "./floating-menu-runtime.js";
 import { archiveImportForm, localWorkspaceTimestamp, relocateWorkspaceSuggestion, projectEntryBusy } from "../../services/project-drop-controller.js";
 import { readWorkspaceHistory as readSharedHistory, writeWorkspaceHistory as writeSharedHistory, updateWorkspaceHistory as updateSharedHistory, workspacePathIdentity } from "../../services/workspace-history.js";
 import {
@@ -1707,7 +1708,7 @@ function scheduleWorkspaceContextMenuClose(host, store, workspacePath = "") {
   workspaceContextMenuCloseTimer = setTimeout(() => {
     workspaceContextMenuCloseTimer = null;
     closeWorkspaceContextMenu(host, store, currentPath);
-  }, 400);
+  }, FLOATING_MENU_CLOSE_DELAY_MS);
 }
 
 function closeWorkspaceContextMenu(host, store, workspacePath = "") {

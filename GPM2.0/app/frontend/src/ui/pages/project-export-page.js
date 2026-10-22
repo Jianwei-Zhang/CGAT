@@ -18,7 +18,7 @@ import {
   renderFinalPathViewportPng,
   resolveExportTimestamp,
 } from "./assembly/final-path-export-runtime.js";
-import { bindDelegatedDelayedFloatingClose } from "./floating-menu-runtime.js";
+import { FLOATING_MENU_CLOSE_DELAY_MS, bindDelegatedDelayedFloatingClose } from "./floating-menu-runtime.js";
 import {
   canonicalizeFinalPathOverallLengths,
   normalizeFinalPathByChr,
@@ -39,7 +39,6 @@ const PROJECT_EXPORT_RESIZE_BOUND = Symbol("projectExportResizeBound");
 const PROJECT_EXPORT_MENU_CLOSE_TIMER = "__projectExportMenuCloseTimer";
 const PROJECT_EXPORT_DETAIL_FILTER_KEYS = new Set(["type", "chr", "dataset"]);
 const PROJECT_EXPORT_DETAIL_FILTER_NONE = "__project_export_filter_none__";
-const PROJECT_EXPORT_DETAIL_FILTER_CLOSE_DELAY_MS = 400;
 const projectExportDetailFilterCloseTimers = new WeakMap();
 
 function normalizeString(value) {
@@ -1833,7 +1832,7 @@ function scheduleProjectExportDetailFilterClose(detailsNode) {
   projectExportDetailFilterCloseTimers.set(detailsNode, setTimeout(() => {
     detailsNode.open = false;
     projectExportDetailFilterCloseTimers.delete(detailsNode);
-  }, PROJECT_EXPORT_DETAIL_FILTER_CLOSE_DELAY_MS));
+  }, FLOATING_MENU_CLOSE_DELAY_MS));
 }
 
 function toggleProjectExportDetailSort(host, store, sortKey) {

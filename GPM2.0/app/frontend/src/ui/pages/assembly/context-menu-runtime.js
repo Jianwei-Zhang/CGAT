@@ -1,3 +1,4 @@
+import { bindDelayedFloatingClose, bindDelegatedDelayedFloatingClose, cancelDelayedFloatingClose } from "../floating-menu-runtime.js";
 import { requestAppConfirm } from "../../shell/app-dialog.js";
 import {
   filterPrimaryTrackSelectionCtgIds,
@@ -21,6 +22,7 @@ import {
   resolveTrackLabelContextTarget,
 } from "./context-menu.js";
 
+const CONTEXT_MENU_CLOSE_TIMER = Symbol("contextMenuCloseTimer");
 const ASSEMBLY_CONTEXT_MENU_BOUND = Symbol("assemblyContextMenuBound");
 const REQUIRED_CONTEXT_MENU_ACTION_NAMES = [
   "enterSubviewFromTrackSelections",
@@ -218,14 +220,17 @@ export function positionContextSubmenuWithinViewport(group, submenu) {
   submenu.style.top = `${Math.max(minTop, Math.min(defaultTop, maxTop))}px`;
 }
 
-export function bindContextSubmenuInteractions(menu) {
+export function bindContextSubmenuInteractions(menu, options = {}) {
+  const cleanups = [];
   menu?.querySelectorAll?.("[data-context-submenu-group]").forEach((group) => {
     const submenu = group.querySelector?.("[data-context-submenu]");
     const trigger = group.querySelector?.("[data-context-submenu-trigger]");
     if (!submenu || trigger?.disabled || group.classList?.contains?.("is-disabled")) {
       return;
     }
+    const closeTimer = Symbol("submenuCloseTimer");
     const open = () => {
+      cancelDelayedFloatingClose(group, closeTimer, options);
       group.classList?.add?.("is-open");
       trigger?.setAttribute?.("aria-expanded", "true");
       positionContextSubmenuWithinViewport(group, submenu);
@@ -234,13 +239,14 @@ export function bindContextSubmenuInteractions(menu) {
       group.classList?.remove?.("is-open");
       trigger?.setAttribute?.("aria-expanded", "false");
     };
+    cleanups.push(bindDelayedFloatingClose(group, close, { ...options, timerKey: closeTimer }));
     group.addEventListener?.("pointerenter", open);
-    group.addEventListener?.("pointerleave", close);
     trigger?.addEventListener?.("click", (event) => {
       event?.stopPropagation?.();
       open();
     });
   });
+  return () => cleanups.forEach(cleanup => cleanup());
 }
 
 export function buildAssemblyContextMenuActions(actionDeps, overrides = {}) {
@@ -304,6 +310,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
     return;
   }
 
+  let submenuCleanup = null;
   let activePreviewCleanup = null;
   const clearItemPreview = () => { activePreviewCleanup?.(); activePreviewCleanup = null; };
   let activeSubviewFragmentNode = null;
@@ -331,6 +338,8 @@ export function bindAssemblyContextMenu(host, store, deps) {
   };
 
   const closeMenu = () => {
+    cancelDelayedFloatingClose(host, CONTEXT_MENU_CLOSE_TIMER);
+    submenuCleanup?.(); submenuCleanup = null;
     clearItemPreview();
     const menu = host.querySelector("#assembly-context-menu");
     clearSubviewFragmentMenuHighlight();
@@ -392,12 +401,14 @@ export function bindAssemblyContextMenu(host, store, deps) {
       closeMenu();
       return;
     }
+    cancelDelayedFloatingClose(host, CONTEXT_MENU_CLOSE_TIMER);
+    submenuCleanup?.();
     clearItemPreview();
     setSubviewFragmentMenuHighlight(target);
     menu.innerHTML = renderContextMenuItems(items, runtimeDeps);
     menu.classList.remove("is-hidden");
     positionContextMenuWithinViewport(menu, clientX, clientY);
-    bindContextSubmenuInteractions(menu);
+    submenuCleanup = bindContextSubmenuInteractions(menu);
 
     menu.querySelectorAll("[data-menu-action-path]").forEach((button) => {
       const item = resolveContextMenuItemByPath(items, button.getAttribute("data-menu-action-path"));
@@ -425,6 +436,10 @@ export function bindAssemblyContextMenu(host, store, deps) {
     return;
   }
 
+  bindDelegatedDelayedFloatingClose(host, {
+    rootSelector: "#assembly-context-menu", timerKey: CONTEXT_MENU_CLOSE_TIMER,
+    close: menu => { if (host.querySelector("#assembly-context-menu") === menu) closeMenu(); },
+  });
   host.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); });
   host.addEventListener("click", () => {
     closeMenu();

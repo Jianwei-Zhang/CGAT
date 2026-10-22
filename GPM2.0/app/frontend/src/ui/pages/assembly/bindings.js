@@ -1,3 +1,4 @@
+import { FLOATING_MENU_CLOSE_DELAY_MS } from "../floating-menu-runtime.js";
 import { bindSupportDatasetPicker } from "./support-dataset-picker-runtime.js";
 import { bindAssemblyViewNavigation } from "./view-navigation-runtime.js";
 import { normalizeNonNegativeInt, normalizePositiveInt, normalizeTrackPrefInputValue, resolveTrackPrefs } from "./track-prefs.js";
@@ -32,7 +33,6 @@ import { getSubviewComposition } from "./subview-composition-state.js";
 
 const ASSEMBLY_TRACK_COMBO_BOUND = Symbol("assemblyTrackComboBound");
 const MARKER_VISIBILITY_BOUND = Symbol("markerVisibilityBound");
-const ASSEMBLY_DROPDOWN_CLOSE_DELAY_MS = 400;
 const REQUIRED_BINDING_DEPS = [
   "appendFinalPathRow",
   "applySupportDatasetSelection",
@@ -1011,7 +1011,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     menu.addEventListener?.("pointerenter", cancelClose);
     menu.addEventListener?.("pointerleave", () => {
       cancelClose();
-      closeTimer = setTimeout(close, ASSEMBLY_DROPDOWN_CLOSE_DELAY_MS);
+      closeTimer = setTimeout(close, FLOATING_MENU_CLOSE_DELAY_MS);
     });
   });
   membersCardToggleButton?.addEventListener("click", async (event) => {
@@ -1186,7 +1186,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     chrPickerInline.addEventListener?.("pointerenter", cancelClose);
     chrPickerInline.addEventListener?.("pointerleave", () => {
       cancelClose();
-      closeTimer = setTimeout(close, ASSEMBLY_DROPDOWN_CLOSE_DELAY_MS);
+      closeTimer = setTimeout(close, FLOATING_MENU_CLOSE_DELAY_MS);
     });
   }
 

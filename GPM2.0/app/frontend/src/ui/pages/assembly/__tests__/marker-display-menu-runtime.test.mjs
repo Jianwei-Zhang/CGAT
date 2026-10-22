@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { bindMarkerDisplayMenus } from "../marker-display-menu-runtime.js";
 import { scheduleDelayedFloatingClose, cancelDelayedFloatingClose } from "../../floating-menu-runtime.js";
 
-function fixture() {
+function fixture(grt = false) {
   const events = new Map(), timers = new Map();
   let nextTimer = 0, focusCount = 0;
   const panel = { hidden: true };
   const root = {
+    open: false, matches: selector => grt && selector === ".grt-result-layer-menu",
     querySelector: selector => selector === "[data-marker-display-toggle]" ? button : panel,
     contains: node => [root, button, input, panel].includes(node),
     closest: () => root,
@@ -19,7 +20,7 @@ function fixture() {
     setAttribute: (_name, value) => { button.expanded = value; },
     focus: () => { focusCount += 1; },
   };
-  const input = { closest: selector => selector === ".assembly-marker-display" ? root : null };
+  const input = { closest: selector => selector.includes(".assembly-marker-display") ? root : null };
   const host = {
     querySelectorAll: () => [root],
     addEventListener(type, callback) {
@@ -58,14 +59,14 @@ test("repeated menu opens and rebinding have one owner and preserve checkbox foc
   assert.equal(f.focusCount(), 0);
 });
 
-test("pointer departure closes after 200ms; returning or moving inside cancels dismissal", () => {
+test("pointer departure closes after 400ms; returning or moving inside cancels dismissal", () => {
   const f = fixture();
   f.fire("click");
   f.fire("pointerout", f.input, { relatedTarget: f.button });
   assert.equal(f.timers.size, 0);
   f.fire("pointerout", f.input, { relatedTarget: null });
   assert.equal(f.panel.hidden, false);
-  assert.equal([...f.timers.values()][0].delay, 200);
+  assert.equal([...f.timers.values()][0].delay, 400);
   f.fire("pointerover", f.button);
   f.flush();
   assert.equal(f.panel.hidden, false);
@@ -105,4 +106,16 @@ test("floating-menu timers retain the browser global receiver", () => {
     globalThis.setTimeout = originalSet;
     globalThis.clearTimeout = originalClear;
   }
+});
+
+
+test("GRT result layer popup shares the 400ms delay, cancels on return, and keeps inner checkbox moves open", () => {
+  const f = fixture(true);
+  f.root.open = true;
+  f.fire("pointerout", f.input, { relatedTarget: f.button }); assert.equal(f.timers.size, 0);
+  f.fire("pointerout", f.input, { relatedTarget: null });
+  assert.equal([...f.timers.values()][0].delay, 400);
+  assert.equal(f.root.open, true);
+  f.fire("pointerover", f.input); f.flush(); assert.equal(f.root.open, true);
+  f.fire("pointerout", f.input, { relatedTarget: null }); f.flush(); assert.equal(f.root.open, false);
 });

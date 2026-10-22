@@ -1,3 +1,4 @@
+import { bindDelegatedDelayedFloatingClose, cancelDelayedFloatingClose } from "../floating-menu-runtime.js";
 import { resolveTrackPrefs } from "./track-prefs.js";
 import { readTrackViewportMetrics } from "./track-viewport.js";
 import { clampViewRange, zoomViewRange, moveViewRange, parseViewSpan, formatViewSpan, readViewNavigationGeometry } from "./view-navigation-state.js";
@@ -30,6 +31,7 @@ export function unbindAssemblyViewNavigation(host) {
 }
 
 function createController(root, store, window) {
+  const tickCloseTimer = Symbol("tickCloseTimer");
   const controller = { deps: {}, roles: {}, gesture: null, frame: null, pending: null, persistTimers: new Map(), suppressClickUntil: 0, applyingRange: false };
   const listeners = [], scrollListeners = new Map();
   const listen = (target, type, callback, options) => {
@@ -181,6 +183,7 @@ function createController(root, store, window) {
     if (controller.frame === null) controller.frame = requestFrame(() => { controller.frame = null; flushPending(); });
   }
   function closeTickOptions(control) {
+    cancelDelayedFloatingClose(root, tickCloseTimer);
     const menu = control?.querySelector?.("[data-view-tick-options]");
     if (!menu) return;
     menu.hidden = true;
@@ -195,6 +198,7 @@ function createController(root, store, window) {
     if (options[index]) control.querySelector("[data-view-tick-interval]").setAttribute("aria-activedescendant", options[index].id);
   }
   function openTickOptions(control) {
+    cancelDelayedFloatingClose(root, tickCloseTimer);
     for (const other of root.querySelectorAll("[data-view-tick-control]")) if (other !== control) closeTickOptions(other);
     const menu = control.querySelector("[data-view-tick-options]");
     if (!menu) return;
@@ -357,6 +361,9 @@ function createController(root, store, window) {
     const control = event.target?.closest?.("[data-view-tick-control]");
     if (control) changeTicks(control);
   });
+  const unbindTickAutoClose = bindDelegatedDelayedFloatingClose(root, {
+    rootSelector: "[data-view-tick-control]", timerKey: tickCloseTimer, close: closeTickOptions,
+  });
   listen(root, "focusout", (event) => {
     const control = event.target?.closest?.("[data-view-tick-control]");
     if (control && !control.contains?.(event.relatedTarget)) closeTickOptions(control);
@@ -411,6 +418,7 @@ function createController(root, store, window) {
   });
   function onBlur() { endGesture(true); }
   controller.dispose = () => {
+    unbindTickAutoClose?.();
     for (const control of root.querySelectorAll("[data-view-tick-control]")) closeTickOptions(control);
     endGesture(true);
     if (controller.frame !== null) cancelFrame(controller.frame);

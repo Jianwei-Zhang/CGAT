@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { FLOATING_MENU_CLOSE_DELAY_MS } from "../../floating-menu-runtime.js";
 import {
   bindAssemblyContextMenu,
   bindContextSubmenuInteractions,
@@ -135,53 +136,32 @@ test("positionContextSubmenuWithinViewport opens a submenu left near the right e
   assert.equal(classSet.has("opens-left"), true);
 });
 
-test("bindContextSubmenuInteractions keeps a submenu open until its wrapper is left", () => {
-  const listenerMap = new Map();
-  const classSet = new Set();
-  const submenu = {
-    classList: { toggle() {} },
-    style: {},
-    getBoundingClientRect() {
-      return { width: 180, height: 100 };
-    },
-  };
+test("submenus close after the shared delay and reentry cancels dismissal", () => {
+  const handlers = new Map(), classes = new Set(), timers = new Map();
+  const trigger = { setAttribute() {}, addEventListener() {} };
+  const submenu = { style: {}, getBoundingClientRect: () => ({ width: 180, height: 100 }) };
   const group = {
-    classList: {
-      add(name) {
-        classSet.add(name);
-      },
-      remove(name) {
-        classSet.delete(name);
-      },
-    },
-    addEventListener(type, handler) {
-      listenerMap.set(type, handler);
-    },
-    querySelector() {
-      return submenu;
-    },
-    getBoundingClientRect() {
-      return { left: 100, right: 260, top: 120, bottom: 148 };
-    },
+    classList: { add: name => classes.add(name), remove: name => classes.delete(name), contains: () => false },
+    addEventListener(type, handler) { const list = handlers.get(type) || []; list.push(handler); handlers.set(type, list); },
+    querySelector: selector => selector === "[data-context-submenu]" ? submenu : trigger,
+    contains: node => node === submenu || node === trigger,
+    getBoundingClientRect: () => ({ left: 100, right: 260, top: 120, bottom: 148 }),
   };
-  const menu = {
-    querySelectorAll(selector) {
-      return selector === "[data-context-submenu-group]" ? [group] : [];
-    },
-  };
-  const originalWindow = globalThis.window;
-  globalThis.window = { innerWidth: 1200, innerHeight: 800 };
-
-  try {
-    bindContextSubmenuInteractions(menu);
-    listenerMap.get("pointerenter")?.();
-    assert.equal(classSet.has("is-open"), true);
-    listenerMap.get("pointerleave")?.();
-  } finally {
-    globalThis.window = originalWindow;
-  }
-
-  assert.equal(classSet.has("is-open"), false);
+  let id = 0;
+  const cleanup = bindContextSubmenuInteractions({ querySelectorAll: () => [group] }, {
+    setTimeout(callback, delay) { timers.set(++id, { callback, delay }); return id; },
+    clearTimeout: timer => timers.delete(timer),
+  });
+  const fire = (type, relatedTarget = null) => handlers.get(type)?.forEach(handler => handler({ relatedTarget }));
+  fire("pointerenter"); assert.equal(classes.has("is-open"), true);
+  fire("pointerleave", submenu); assert.equal(timers.size, 0);
+  fire("pointerleave"); assert.equal(classes.has("is-open"), true);
+  assert.equal([...timers.values()][0].delay, FLOATING_MENU_CLOSE_DELAY_MS);
+  fire("pointerenter"); assert.equal(timers.size, 0);
+  fire("pointerleave");
+  const callback = [...timers.values()][0].callback; timers.clear(); callback();
+  assert.equal(classes.has("is-open"), false);
+  fire("pointerenter"); fire("pointerleave"); cleanup(); assert.equal(timers.size, 0);
 });
 
 test("bindAssemblyContextMenu clamps the menu inside the viewport bottom edge", () => {
@@ -669,4 +649,32 @@ test("bindAssemblyContextMenu renders track-pair fragment local actions", () => 
   assert.match(menuState.innerHTML, /翻转 contig/);
   assert.match(menuState.innerHTML, /移出局部视图/);
   assert.doesNotMatch(menuState.innerHTML, /进入 Ctg30 菜单/);
+});
+
+
+test("assembly context menu closes after 400ms, cancels on return, and clears stale close timers", () => {
+  const originalSet = globalThis.setTimeout, originalClear = globalThis.clearTimeout;
+  const handlers = new Map(), classes = new Set(), timers = new Map();
+  let id = 0;
+  const child = { closest: selector => selector === "#assembly-context-menu" ? menu : null };
+  const menu = { innerHTML: "contents", contains: node => node === child,
+    classList: { add: name => classes.add(name) },
+  };
+  const host = { querySelector: () => menu,
+    addEventListener(type, handler) { handlers.set(type, handler); } };
+  try {
+    globalThis.setTimeout = (callback, delay) => { timers.set(++id, { callback, delay }); return id; };
+    globalThis.clearTimeout = timer => timers.delete(timer);
+    bindAssemblyContextMenu(host, { getState: () => ({ assembly: { activeTab: "assembly" } }) }, createRuntimeDeps());
+    handlers.get("pointerout")({ target: child, relatedTarget: child }); assert.equal(timers.size, 0);
+    handlers.get("pointerout")({ target: child, relatedTarget: null });
+    assert.equal([...timers.values()][0].delay, 400); assert.equal(menu.innerHTML, "contents");
+    handlers.get("pointerover")({ target: child }); assert.equal(timers.size, 0);
+    handlers.get("pointerout")({ target: child, relatedTarget: null });
+    const callback = [...timers.values()][0].callback; timers.clear(); callback();
+    assert.equal(menu.innerHTML, ""); assert.equal(classes.has("is-hidden"), true);
+    handlers.get("pointerout")({ target: child, relatedTarget: null });
+    handlers.get("keydown")({ key: "Escape" });
+    assert.equal(timers.size, 0);
+  } finally { globalThis.setTimeout = originalSet; globalThis.clearTimeout = originalClear; }
 });

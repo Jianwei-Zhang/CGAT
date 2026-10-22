@@ -608,3 +608,27 @@ for (const [role, viewKey] of [["primary", "trackView"], ["subview", "subviewTra
     } finally { h.dispose(); }
   });
 }
+
+
+test("tick options close after 400ms, cancel on return, and dispose pending close timers", () => {
+  const originalSet = globalThis.setTimeout, originalClear = globalThis.clearTimeout;
+  const timers = new Map(); let id = 0;
+  const h = harness();
+  const panel = { hidden: false }, input = { setAttribute() {}, removeAttribute() {} }, toggle = { setAttribute() {} };
+  const control = { querySelector: selector => selector === "[data-view-tick-options]" ? panel
+    : selector === "[data-view-tick-interval]" ? input : toggle,
+    contains: node => node === child };
+  const child = { closest: selector => selector === "[data-view-tick-control]" ? control : null };
+  try {
+    globalThis.setTimeout = (callback, delay) => { timers.set(++id, { callback, delay }); return id; };
+    globalThis.clearTimeout = timer => timers.delete(timer);
+    h.root.emit("pointerout", h.event(child, { relatedTarget: child })); assert.equal(timers.size, 0);
+    h.root.emit("pointerout", h.event(child, { relatedTarget: null }));
+    assert.equal([...timers.values()][0].delay, 400); assert.equal(panel.hidden, false);
+    h.root.emit("pointerover", h.event(child)); assert.equal(timers.size, 0);
+    h.root.emit("pointerout", h.event(child, { relatedTarget: null }));
+    const callback = [...timers.values()][0].callback; timers.clear(); callback(); assert.equal(panel.hidden, true);
+    h.root.emit("pointerout", h.event(child, { relatedTarget: null }));
+    h.dispose(); assert.equal(timers.size, 0);
+  } finally { h.dispose(); globalThis.setTimeout = originalSet; globalThis.clearTimeout = originalClear; }
+});
