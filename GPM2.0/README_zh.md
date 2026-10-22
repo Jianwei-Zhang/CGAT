@@ -50,6 +50,22 @@ bash install.sh --check
 
 执行 `run.sh` 时保持该环境已激活。
 
+#### 更新 Server 工具（已有环境）
+
+确认没有任务正在运行后，将当前发布的工具包重新下载到新目录；同一版本的源码附件也可能包含更新：
+
+```bash
+cd "$(mktemp -d "$HOME/GPM_Server_update.XXXXXX")" &&
+curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.11/GPM_Server_2.0.11_source.tar.gz &&
+tar -xzf GPM_Server_2.0.11_source.tar.gz &&
+cd GPM_Server &&
+bash install.sh
+```
+
+已有的 `cgat-server` 托管环境会复用，仅在依赖配置变化时更新。按安装程序输出激活环境，再从这个新工具目录按下一节运行，并为 `-o` 指定新的输出目录。
+
+**更新工具不会更新旧工作目录中的 `.prepare_lib`。要使用修复后的代码重新计算，不要继续执行旧目录的 `run_all.sh`；旧工具和结果无需删除。**
+
 ### 2. 运行完整流程
 
 显式指定输出目录的最简示例：

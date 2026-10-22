@@ -50,6 +50,22 @@ Re-running `install.sh` validates the managed environment and updates it only wh
 
 Keep this environment active for `run.sh`.
 
+#### Update the Server tools (existing environment)
+
+Once no jobs are running, download the currently published tools into a new directory. The source attachment may be refreshed without changing the release version:
+
+```bash
+cd "$(mktemp -d "$HOME/GPM_Server_update.XXXXXX")" &&
+curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.11/GPM_Server_2.0.11_source.tar.gz &&
+tar -xzf GPM_Server_2.0.11_source.tar.gz &&
+cd GPM_Server &&
+bash install.sh
+```
+
+The existing managed `cgat-server` environment is reused and updated only if its dependency specification changed. Activate it as instructed, then run the next section from this new tool directory with a new output directory for `-o`.
+
+**Updating the tools does not update `.prepare_lib` inside an existing workspace. To recompute with the fixed code, do not resume its old `run_all.sh`; keep the old tools and results intact.**
+
 ### 2. Run the full workflow
 
 Minimal example with an explicit output directory:
