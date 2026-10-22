@@ -27,8 +27,8 @@ use gpm_next_backend::importer::{
 };
 use gpm_next_backend::junction_inspection::{GetJunctionInspectionParams, get_junction_inspection};
 use gpm_next_backend::main_view::{
-    get_ctg_detail, list_chr_view_ctgs, list_ctg_edit_candidates, list_project_chromosomes,
-    list_project_new_sequences, list_reference_track_members,
+    get_ctg_detail, list_chr_view_ctgs, list_chr_view_ctgs_for_preview, list_ctg_edit_candidates,
+    list_project_chromosomes, list_project_new_sequences, list_reference_track_members,
 };
 use gpm_next_backend::main_view_history::{
     MainViewHistoryMutationSummary, MainViewHistoryStatus, MainViewHistoryTargetParams,
@@ -161,6 +161,8 @@ enum Commands {
         chr_name: Option<String>,
         #[arg(long)]
         dataset_id: Option<i64>,
+        #[arg(long)]
+        preview_only: bool,
     },
     ListReferenceTrackMembers {
         workspace_root: PathBuf,

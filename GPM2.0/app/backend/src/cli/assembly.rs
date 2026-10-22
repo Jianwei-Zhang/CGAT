@@ -35,14 +35,19 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             project_id,
             chr_name,
             dataset_id,
+            preview_only,
         } => {
             let project_db_path = workspace_root.join("project.sqlite");
-            let items = list_chr_view_ctgs(
-                &project_db_path,
-                project_id,
-                chr_name.as_deref(),
-                dataset_id,
-            )?;
+            let items = if preview_only {
+                list_chr_view_ctgs_for_preview(&project_db_path, project_id)?
+            } else {
+                list_chr_view_ctgs(
+                    &project_db_path,
+                    project_id,
+                    chr_name.as_deref(),
+                    dataset_id,
+                )?
+            };
             println!("ctg_count={}", items.len());
             for item in items {
                 println!("ctg_json={}", serde_json::to_string(&item)?);

@@ -9,18 +9,14 @@ export function createAssemblyOperations(runtime) {
   const { runBackend } = runtime;
 
 async function listChrViewCtgs(payload) {
-  const { workspaceRoot, projectId, chrName, datasetId = null } = payload || {};
+  const { workspaceRoot, projectId, chrName, datasetId = null, previewOnly = false } = payload || {};
   requireString("workspaceRoot", workspaceRoot);
   requireNumber("projectId", projectId);
-  requireString("chrName", chrName);
+  if (!previewOnly) requireString("chrName", chrName);
 
-  const args = [
-    "list-chr-view-ctgs",
-    workspaceRoot,
-    String(projectId),
-    "--chr-name",
-    chrName,
-  ];
+  const args = ["list-chr-view-ctgs", workspaceRoot, String(projectId)];
+  if (previewOnly) args.push("--preview-only");
+  else args.push("--chr-name", chrName);
   if (Number.isFinite(Number(datasetId)) && Number(datasetId) > 0) {
     args.push("--dataset-id", String(Math.trunc(Number(datasetId))));
   }

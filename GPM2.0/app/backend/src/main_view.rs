@@ -411,6 +411,24 @@ pub fn list_chr_view_ctgs_with_connection(
     chr_name: Option<&str>,
     dataset_id: Option<i64>,
 ) -> Result<Vec<ChrViewCtgItem>> {
+    list_chr_view_ctgs_with_connection_options(conn, project_id, chr_name, dataset_id, true)
+}
+
+pub fn list_chr_view_ctgs_for_preview(
+    project_db_path: &Path,
+    project_id: i64,
+) -> Result<Vec<ChrViewCtgItem>> {
+    let conn = open_workspace_db(project_db_path)?;
+    list_chr_view_ctgs_with_connection_options(&conn, project_id, None, None, false)
+}
+
+fn list_chr_view_ctgs_with_connection_options(
+    conn: &Connection,
+    project_id: i64,
+    chr_name: Option<&str>,
+    dataset_id: Option<i64>,
+    include_details: bool,
+) -> Result<Vec<ChrViewCtgItem>> {
     let chr_param = chr_name.map(ToOwned::to_owned);
     let dataset_param = dataset_id;
     let primary_dataset_id: i64 = conn
@@ -528,6 +546,12 @@ pub fn list_chr_view_ctgs_with_connection(
     populate_co_assigned_chr_names(conn, project_id, &mut ctgs)?;
     for ctg in &mut ctgs {
         ctg.source_fragment = load_source_fragment(conn, ctg.assembly_ctg_id)?;
+    }
+
+    // Preview needs placement and provenance only. Hits, N regions and end marks
+    // are Assembly evidence and require several additional queries per contig.
+    if !include_details {
+        return Ok(ctgs);
     }
 
     let reference_genome_id: i64 = conn
@@ -2322,6 +2346,24 @@ mod tests {
         assert_eq!(chr2.placed_bp, 0);
         assert_eq!(chromosomes.unplaced_ctg_count, 1);
         assert_eq!(chromosomes.unplaced_bp, 200);
+    }
+
+    #[test]
+    fn preview_ctg_list_keeps_provenance_without_assembly_evidence() {
+        let temp = tempdir().unwrap();
+        let db_path = temp.path().join("project.sqlite");
+        let conn = Connection::open(&db_path).unwrap();
+        init_workspace_schema(&conn).unwrap();
+        seed_basic_data(&conn);
+
+        let preview =
+            list_chr_view_ctgs_with_connection_options(&conn, 1, None, None, false).unwrap();
+        assert!(!preview.is_empty());
+        assert!(preview.iter().all(|item| item.hits.is_empty()));
+        assert!(preview.iter().all(|item| item.n_regions.is_empty()));
+        assert!(preview.iter().all(|item| item.telomere_marks.is_empty()));
+        assert!(preview.iter().all(|item| item.centromere_marks.is_empty()));
+        assert!(preview.iter().any(|item| item.name.contains("ctg")));
     }
 
     #[test]

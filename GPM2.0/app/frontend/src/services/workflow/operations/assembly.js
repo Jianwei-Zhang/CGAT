@@ -58,9 +58,9 @@ export async function getContigChrAlignments(payload) {
   return callDevBridge("/api/contig-chr-alignments",payload);
 }
 
-export async function listChrViewCtgs({ workspaceRoot, projectId, chrName, datasetId = null }) {
+export async function listChrViewCtgs({ workspaceRoot, projectId, chrName, datasetId = null, previewOnly = false }) {
   if (isTauriRuntime()) {
-    return listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId });
+    return listChrViewCtgsTauri({ workspaceRoot, projectId, chrName, datasetId, previewOnly });
   }
   try {
     return await callDevBridge("/api/list-chr-view-ctgs", {
@@ -68,6 +68,7 @@ export async function listChrViewCtgs({ workspaceRoot, projectId, chrName, datas
       projectId,
       chrName,
       datasetId,
+      previewOnly,
     });
   } catch {
     // fallback to mock flow

@@ -36,7 +36,7 @@ function fixture() {
     },
     async listProjectChromosomes() { metrics.sources++; return { referenceGenomeId: 1,
       items: [1,2].map(id => ({ chrName: `Chr${id}`, chrLength: 2000, chrOrder: id })) }; },
-    async listChrViewCtgs() { metrics.sources++; return { items: [1,2].map(id => ({ assemblyCtgId: id,
+    async listChrViewCtgs(args) { metrics.sources++; assert.equal(args.previewOnly, true); return { items: [1,2].map(id => ({ assemblyCtgId: id,
       datasetId: 1, datasetName: "ds", name: `ctg${id}`, totalLength: 1000, assignedChrName: `Chr${id}`, anchorStart: 0,
       hits: [{ unusedLargeRawAlignment: true }] })) }; },
     async getProjectAssemblyViewState() { metrics.sources++; return { finalPathByChr: structuredClone(db.paths) }; },

@@ -42,6 +42,12 @@ test("Tauri transport preserves exact command payload and normalizes failures", 
     chrName: "Chr01",
     datasetId: 2,
   });
+  await tauri.listChrViewCtgs({
+    workspaceRoot: "D:/workspace",
+    projectId: 7,
+    chrName: null,
+    previewOnly: true,
+  });
   await assert.rejects(
     tauri.exportFinalPathFasta({
       workspaceRoot: "D:/workspace",
@@ -65,6 +71,17 @@ test("Tauri transport preserves exact command payload and normalizes failures", 
       projectId: 7,
       chrName: "Chr01",
       datasetId: 2,
+    },
+    locale: undefined,
+  });
+  assert.deepEqual(calls[1], {
+    command: "list_chr_view_ctgs",
+    payload: {
+      workspaceRoot: "D:/workspace",
+      projectId: 7,
+      chrName: null,
+      datasetId: null,
+      previewOnly: true,
     },
     locale: undefined,
   });

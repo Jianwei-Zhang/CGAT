@@ -45,6 +45,7 @@ use gpm_next_backend::junction_inspection::{
 };
 use gpm_next_backend::main_view::{
     get_ctg_detail as backend_get_ctg_detail, list_chr_view_ctgs as backend_list_chr_view_ctgs,
+    list_chr_view_ctgs_for_preview as backend_list_chr_view_ctgs_for_preview,
     list_ctg_edit_candidates as backend_list_ctg_edit_candidates,
     list_project_chromosomes as backend_list_project_chromosomes,
     list_project_new_sequences as backend_list_project_new_sequences,
@@ -1166,6 +1167,7 @@ mod tests {
             7,
             Some("Chr01".to_string()),
             Some(11),
+            None,
         )
         .expect("list chr view ctgs");
 
@@ -1175,6 +1177,33 @@ mod tests {
         );
         assert_eq!(result["items"][0]["orient"].as_str(), Some("-"));
         assert_eq!(result["items"][0]["refOrient"].as_str(), Some("+"));
+
+        let preview = list_chr_view_ctgs(
+            workspace_root.to_string_lossy().into_owned(),
+            7,
+            None,
+            None,
+            Some(true),
+        )
+        .expect("list compact preview ctgs");
+        assert_eq!(
+            preview["items"][0]["originId"].as_str(),
+            Some("utig4-001122l")
+        );
+        assert_eq!(preview["items"][0]["memberCount"].as_i64(), Some(1));
+        for omitted in [
+            "chrOrder",
+            "placementMode",
+            "derivedSource",
+            "derivedTargetDatasetId",
+            "derivedTargetDatasetName",
+            "hits",
+            "nRegions",
+            "telomereMarks",
+            "centromereMarks",
+        ] {
+            assert!(preview["items"][0].get(omitted).is_none(), "{omitted}");
+        }
 
         drop(conn);
         fs::remove_dir_all(workspace_root).expect("remove temp workspace root");

@@ -7,14 +7,21 @@ pub fn list_chr_view_ctgs(
     projectId: i64,
     chrName: Option<String>,
     datasetId: Option<i64>,
+    previewOnly: Option<bool>,
 ) -> CommandResult<Value> {
     (|| {
-        let items = backend_list_chr_view_ctgs(
-            &project_db_path(&workspaceRoot),
-            projectId,
-            chrName.as_deref(),
-            datasetId,
-        )?;
+        let preview_only = previewOnly.unwrap_or(false);
+        let db_path = project_db_path(&workspaceRoot);
+        let items = if preview_only {
+            backend_list_chr_view_ctgs_for_preview(&db_path, projectId)?
+        } else {
+            backend_list_chr_view_ctgs(
+                &db_path,
+                projectId,
+                chrName.as_deref(),
+                datasetId,
+            )?
+        };
         let mapped = items
             .into_iter()
             .map(|item| {
@@ -90,30 +97,33 @@ pub fn list_chr_view_ctgs(
                         })
                     })
                     .collect::<Vec<_>>();
-                json!({
+                let mut payload = json!({
                     "assemblyCtgId": item.assembly_ctg_id,
                     "name": item.name,
                     "originId": item.origin_id,
                     "coAssignedChrNames": item.co_assigned_chr_names,
                     "assignedChrName": item.assigned_chr_name,
-                    "chrOrder": item.chr_order,
                     "anchorStart": item.anchor_start,
                     "refOrient": item.ref_orient,
                     "orient": item.orient,
-                    "placementMode": item.placement_mode,
                     "memberCount": item.member_count,
                     "totalLength": item.total_length,
                     "datasetId": item.dataset_id,
                     "datasetName": item.dataset_name,
-                    "derivedSource": item.derived_source,
-                    "derivedTargetDatasetId": item.derived_target_dataset_id,
-                    "derivedTargetDatasetName": item.derived_target_dataset_name,
-                    "hits": hits,
-                    "nRegions": n_regions,
-                    "sourceFragment": item.source_fragment,
-                    "telomereMarks": telomere_marks,
-                    "centromereMarks": centromere_marks
-                })
+                    "sourceFragment": item.source_fragment
+                });
+                if !preview_only {
+                    payload["chrOrder"] = json!(item.chr_order);
+                    payload["placementMode"] = json!(item.placement_mode);
+                    payload["derivedSource"] = json!(item.derived_source);
+                    payload["derivedTargetDatasetId"] = json!(item.derived_target_dataset_id);
+                    payload["derivedTargetDatasetName"] = json!(item.derived_target_dataset_name);
+                    payload["hits"] = json!(hits);
+                    payload["nRegions"] = json!(n_regions);
+                    payload["telomereMarks"] = json!(telomere_marks);
+                    payload["centromereMarks"] = json!(centromere_marks);
+                }
+                payload
             })
             .collect::<Vec<_>>();
         Ok(json!({ "items": mapped }))

@@ -165,7 +165,7 @@ function buildCards(inputs, paths, previous, affected, build) {
 async function readPreviewSources(state, args, metadata, deps) {
   const [chromosomes, ctgResult, view, rawGrt] = await Promise.all([
     (deps.listProjectChromosomes || listProjectChromosomes)(args),
-    (deps.listChrViewCtgs || listChrViewCtgs)({ ...args, chrName: null }),
+    (deps.listChrViewCtgs || listChrViewCtgs)({ ...args, chrName: null, previewOnly: true }),
     (deps.getProjectAssemblyViewState || getProjectAssemblyViewState)(args),
     (deps.getGrtProjectView || getGrtProjectView)(args),
   ]);
