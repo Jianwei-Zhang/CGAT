@@ -11,11 +11,26 @@
 .project-preview-hint { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; width: min(460px, 100%); max-width: 100%; padding: 10px 12px; border: 1px solid var(--border-default, #cbd5e1); border-radius: var(--card-radius); background: var(--surface-panel, #fff); box-shadow: var(--shadow-md); color: var(--text-secondary, #475569); font-size: var(--font-small); }
 .project-preview-legend:not([open]) > .project-preview-hint { display: none; }
 .project-preview-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
-.project-preview-card { min-width: 0; padding: 0 16px 12px; border: 1px solid var(--border-subtle, #dbe3ec); border-radius: var(--card-radius); background: var(--surface-panel, #fff); color: var(--text-primary, #1e293b); box-shadow: var(--shadow-xs); cursor: pointer; transition: border-color 140ms ease, box-shadow 140ms ease; }
-.project-preview-card:hover { border-color: var(--theme-line, #8ba8c7); box-shadow: var(--shadow-sm); }
+.project-preview-card { min-width: 0; padding: 0 16px 12px; border: 1px solid var(--border-subtle, #dbe3ec); border-radius: var(--card-radius); background: var(--surface-panel, #fff); color: var(--text-primary, #1e293b); box-shadow: var(--shadow-xs); cursor: pointer; transition: border-color 140ms ease, box-shadow 160ms ease, background-color 140ms ease; }
+/* Hover or keyboard focus promotes the whole card into one selectable object:
+   a 1px accent ring drawn with box-shadow (no layout shift) plus elevation. */
+.project-preview-card:hover,
+.project-preview-card:focus-within {
+  border-color: var(--preview-card-ring, #3f6fa3);
+  box-shadow: 0 0 0 1px var(--preview-card-ring, #3f6fa3), var(--shadow-md);
+}
+.project-preview-card:hover .project-preview-card-header,
+.project-preview-card:focus-within .project-preview-card-header {
+  border-bottom-color: var(--preview-card-ring, #3f6fa3);
+}
+.project-preview-card:hover .project-preview-open,
+.project-preview-card:focus-within .project-preview-open {
+  color: var(--preview-card-ring, #2b5784);
+}
 .project-preview-card-header { display: flex; align-items: baseline; gap: 12px; min-width: 0; margin: 0 -16px 10px; width: calc(100% + 32px); padding: 10px 16px; border: 0; border-bottom: 1px solid var(--border-subtle, #dbe3ec); border-radius: calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px) 0 0; background: var(--surface-subtle, #f8fafc); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color 140ms ease; }
 .project-preview-card:hover .project-preview-card-header { background: var(--theme-blue-surface, #f1f6fc); }
-.project-preview-card-header:focus-visible { outline: 2px solid var(--theme-strong-line, #4678ad); outline-offset: 4px; }
+/* Keep a real outline for forced-colors mode, drawn inside the header strip. */
+.project-preview-card-header:focus-visible { outline: 2px solid var(--preview-card-ring, #4678ad); outline-offset: -3px; }
 .project-preview-chr-name { flex: 0 0 auto; font-weight: 700; font-size: var(--font-body); color: var(--theme-ink, #0f172a); }
 .project-preview-card-summary { min-width: 0; color: var(--text-muted, #64748b); font-size: var(--font-small); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .project-preview-open { flex: 0 0 auto; margin-left: auto; color: var(--theme-blue-ink, #2b5784); font-size: var(--font-small); font-weight: 600; white-space: nowrap; }

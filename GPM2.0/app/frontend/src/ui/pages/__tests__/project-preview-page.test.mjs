@@ -53,6 +53,26 @@ test("preview styles keep one chromosome per row and contain the legend", () => 
   assert.match(css, /\.project-preview-hint[^}]*left:\s*0;[^}]*max-width:\s*100%/);
 });
 
+test("hover and keyboard focus promote the whole preview card, not just its header", () => {
+  const css = readFileSync(new URL("../../../styles/project-preview.css", import.meta.url), "utf8");
+  const base = readFileSync(new URL("../../../styles/base.css", import.meta.url), "utf8");
+  const theme = readFileSync(new URL("../../../styles/theme.css", import.meta.url), "utf8");
+
+  const stateRule = css.match(/\.project-preview-card:hover,\s*\n\.project-preview-card:focus-within\s*\{([^}]*)\}/)?.[1];
+  assert.ok(stateRule, "hover and focus-within must share one rule");
+  assert.match(stateRule, /border-color:\s*var\(--preview-card-ring/);
+  // The accent ring is drawn with box-shadow so the card never reflows.
+  assert.match(stateRule, /box-shadow:\s*0 0 0 1px var\(--preview-card-ring[^;]*\),\s*var\(--shadow-md\);/);
+  assert.match(css, /\.project-preview-card:hover \.project-preview-card-header,[\s\S]*?\.project-preview-card:focus-within \.project-preview-card-header\s*\{[^}]*border-bottom-color:\s*var\(--preview-card-ring/);
+  // Focus keeps an outline for forced-colors mode, drawn inside the header strip.
+  assert.match(css, /\.project-preview-card-header:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--preview-card-ring[^}]*outline-offset:\s*-3px;/);
+  // Ring colour is themed and clearly visible on both surfaces.
+  assert.match(base, /--preview-card-ring:\s*#3f6fa3;/);
+  assert.match(theme, /--preview-card-ring:\s*#8ab6e6;/);
+  // Per-source outlines stay scoped to their own interval inside the card.
+  assert.match(css, /\.project-preview-card:hover \.project-preview-source-plots \.project-preview-used/);
+});
+
 test("loading preview preserves assembly state and in-memory path edits", async () => {
   const value = state();
   value.assembly.finalPathByChr = { Chr1: { mode: "segments", segments: [{ ...segment, end: 500 }] } };
