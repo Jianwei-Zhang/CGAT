@@ -1170,6 +1170,41 @@
   background: var(--theme-surface-subtle, #efefef);
 }
 
+/* Support datasets share the numeric preset popup, but remain select-only. */
+.assembly-track-select-shell.is-support {
+  overflow: visible;
+}
+
+.assembly-support-dataset-value {
+  display: none;
+}
+
+.assembly-support-dataset-toggle {
+  color: var(--text-primary, #1e293b);
+  text-align: left;
+  cursor: pointer;
+}
+
+.assembly-support-dataset-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring, #4f82b5);
+  outline-offset: -2px;
+}
+
+.assembly-track-select-shell.is-support .assembly-track-combo-menu {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.assembly-track-select-shell.is-support .assembly-track-combo-option {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assembly-track-select-shell.is-support .assembly-track-combo-option:focus-visible {
+  background: var(--theme-surface-subtle, #efefef);
+}
+
 .assembly-track-inline-field .assembly-track-select-shell.is-support {
   width: 86px;
   min-width: 86px;

@@ -1380,10 +1380,31 @@ test("support dataset selection persists project-scoped main track view state", 
 test("four dataset Assembly renders all three support options, even without placed support contigs", () => {
   const html = renderAssemblyPage(createState({
     initializer: {existingProjects:[{projectId:7, primaryDatasetId:11, supportDatasetIds:[22,33,44]}],
-      datasets:[11,22,33,44].map(datasetId=>({datasetId,name:`ds-${datasetId}`}))},
+      datasets:[11,22,33,44].map(datasetId=>({datasetId,name:datasetId === 22 ? "nextdenovo_with_a_very_long_name" : `ds-${datasetId}`}))},
     assembly: {supportDatasetId:22, supportChrCtgs:[]},
   }));
   const options = html.match(/<select[^>]*id="assembly-support-dataset-id"[^>]*>([\s\S]*?)<\/select>/)?.[1];
   assert.ok(options, "support dataset select is rendered");
   assert.deepEqual([...options.matchAll(/<option value="(\d+)"/g)].map(match=>Number(match[1])), [22,33,44]);
+  assert.match(html, /<select[^>]*id="assembly-support-dataset-id"[^>]*hidden/);
+  assert.match(html, /id="assembly-support-dataset-id-toggle"[^>]*aria-haspopup="listbox"[^>]*aria-expanded="false"[^>]*aria-controls="assembly-support-dataset-id-menu"/);
+  const menu = html.match(/<div id="assembly-support-dataset-id-menu" class="assembly-track-combo-menu is-hidden"[^>]*>([\s\S]*?)<\/div>/)?.[1];
+  assert.ok(menu, "support datasets use the same menu class as numeric presets");
+  assert.deepEqual([...menu.matchAll(/data-support-dataset-option="(\d+)"/g)].map(match => Number(match[1])), [22,33,44]);
+  assert.match(menu, /class="assembly-track-combo-option is-active" data-support-dataset-option="22" role="option" aria-selected="true"/);
+  assert.match(menu, /class="assembly-track-combo-option" data-support-dataset-option="33"/);
+  const css = readStylesheetTree(new URL("../../../../styles/components.css", import.meta.url), "utf8");
+  assert.match(css, /\.assembly-track-select-shell\.is-support\s*\{[^}]*overflow:\s*visible;/);
+  assert.match(css, /\.assembly-support-dataset-value\s*\{[^}]*display:\s*none;/);
+  assert.match(menu, /data-support-dataset-option="22"[^>]*title="nextdenovo_with_a_very_long_name"/);
+  assert.match(html, /id="assembly-support-dataset-id-toggle"[^>]*title="nextdenovo_with_a_very_long_name"/);
+  const popupRule = css.match(/\.assembly-track-select-shell\.is-support \.assembly-track-combo-menu\s*\{([^}]*)\}/)?.[1];
+  assert.match(popupRule, /grid-template-columns:\s*minmax\(0,\s*1fr\);/);
+  assert.doesNotMatch(popupRule, /width:\s*max-content|right:\s*auto/);
+  const optionRule = css.match(/\.assembly-track-select-shell\.is-support \.assembly-track-combo-option\s*\{([^}]*)\}/)?.[1];
+  for (const declaration of ["min-width: 0;", "overflow: hidden;", "text-overflow: ellipsis;", "white-space: nowrap;"]) {
+    assert.ok(optionRule.includes(declaration), declaration);
+  }
+
+
 });

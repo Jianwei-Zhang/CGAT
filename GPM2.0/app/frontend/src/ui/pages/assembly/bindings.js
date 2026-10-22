@@ -1,3 +1,4 @@
+import { bindSupportDatasetPicker } from "./support-dataset-picker-runtime.js";
 import { bindAssemblyViewNavigation } from "./view-navigation-runtime.js";
 import { normalizeNonNegativeInt, normalizePositiveInt, normalizeTrackPrefInputValue, resolveTrackPrefs } from "./track-prefs.js";
 import { bindTrackNumberInput as bindTrackNumberInputRuntime } from "./track-number-input-runtime.js";
@@ -1533,6 +1534,11 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   bindTrackNumberInput("minIdentityPct", subviewTrackIdentityInput, "subviewTrackView");
   bindTrackNumberInput("minTickUnitKb", finalPathTrackMinTickUnitKbInput, "finalPathTrackView");
   bindTrackNumberInput("maxTickCount", finalPathTrackMaxTickCountInput, "finalPathTrackView");
+  bindSupportDatasetPicker({
+    select: supportDatasetSelect,
+    setOpen: setTrackComboOpenState,
+    closeOthers: combo => closeTrackComboMenus(host, combo),
+  });
   supportDatasetSelect?.addEventListener("change", async () => {
     await applySupportDatasetSelection(host, store, supportDatasetSelect.value);
   });

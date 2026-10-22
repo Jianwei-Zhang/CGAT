@@ -1013,19 +1013,11 @@ function renderAssemblyTrackControls({
   supportDatasetId,
   i18n,
 }) {
-  const supportOptions = supportDatasetOptions.length
-    ? supportDatasetOptions
-        .map((dataset) => {
-          const active = dataset.datasetId === supportDatasetId ? "selected" : "";
-          return `<option value="${dataset.datasetId}" ${active}>${escapeHtml(dataset.label)}</option>`;
-        })
-        .join("")
-    : "";
   const supportDatasetSelect = supportDatasetOptions.length
-    ? renderFixedTrackSelect({
-        id: "assembly-support-dataset-id",
-        shellClassName: "assembly-track-select-shell is-support",
-        optionsHtml: supportOptions,
+    ? renderSupportDatasetSelect({
+        options: supportDatasetOptions,
+        value: supportDatasetId,
+        label: i18n.trackControls.supportDataset,
       })
     : "";
   const supportDsCtgLenInput = renderSupportDsCtgLenControl({
@@ -1093,19 +1085,11 @@ function renderAssemblyTrackInlineControls({
   mainViewHistory,
   i18n,
 }) {
-  const supportOptions = supportDatasetOptions.length
-    ? supportDatasetOptions
-        .map((dataset) => {
-          const active = dataset.datasetId === supportDatasetId ? "selected" : "";
-          return `<option value="${dataset.datasetId}" ${active}>${escapeHtml(dataset.label)}</option>`;
-        })
-        .join("")
-    : "";
   const supportDatasetSelect = supportDatasetOptions.length
-    ? renderFixedTrackSelect({
-        id: "assembly-support-dataset-id",
-        shellClassName: "assembly-track-select-shell is-support",
-        optionsHtml: supportOptions,
+    ? renderSupportDatasetSelect({
+        options: supportDatasetOptions,
+        value: supportDatasetId,
+        label: i18n.trackControls.supportDataset,
       })
     : "";
   const supportDsCtgLenInput = renderSupportDsCtgLenControl({
@@ -1246,11 +1230,22 @@ function renderCreatePhasedTrackButton({ phasedAssemblyEnabled, phasedTrackCount
   return `<button type="button" class="button ghost tiny" data-create-phased-track="1" ${disabled}>${escapeHtml(label)}</button>`;
 }
 
-function renderFixedTrackSelect({ id, shellClassName = "assembly-track-select-shell", optionsHtml }) {
+function renderSupportDatasetSelect({ options, value, label }) {
+  const id = "assembly-support-dataset-id";
+  const selected = options.find(dataset => dataset.datasetId === value) || options[0];
+  const optionsHtml = options.map(dataset =>
+    `<option value="${dataset.datasetId}" ${dataset === selected ? "selected" : ""}>${escapeHtml(dataset.label)}</option>`,
+  ).join("");
+  const menuHtml = options.map(dataset => {
+    const active = dataset === selected;
+    return `<button type="button" class="assembly-track-combo-option${active ? " is-active" : ""}" data-support-dataset-option="${dataset.datasetId}" role="option" aria-selected="${active}" tabindex="-1" title="${escapeAttr(dataset.label)}">${escapeHtml(dataset.label)}</button>`;
+  }).join("");
   return `
-    <div class="${shellClassName}">
-      <select id="${id}" class="assembly-track-fixed-select">${optionsHtml}</select>
+    <div class="assembly-track-select-shell assembly-track-combo is-support" data-track-combo-field="supportDatasetId">
+      <button type="button" id="${id}-toggle" class="assembly-track-fixed-select assembly-support-dataset-toggle" data-track-combo-toggle data-support-dataset-label="${escapeAttr(label)}" aria-label="${escapeAttr(`${label}: ${selected.label}`)}" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}-menu" title="${escapeAttr(selected.label)}">${escapeHtml(selected.label)}</button>
+      <select id="${id}" class="assembly-support-dataset-value" hidden aria-hidden="true" tabindex="-1">${optionsHtml}</select>
       <span class="assembly-track-control-marker" aria-hidden="true">▾</span>
+      <div id="${id}-menu" class="assembly-track-combo-menu is-hidden" role="listbox" aria-label="${escapeAttr(label)}">${menuHtml}</div>
     </div>
   `;
 }
