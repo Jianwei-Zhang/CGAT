@@ -1,3 +1,4 @@
+import { resolveAppTheme, initializeAppTheme, applyAppTheme } from "../app-settings.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeAppSettings, setAppSettings, getAppSettings, DEFAULT_APP_SETTINGS, getGraphFontSize, estimateGraphTextWidth, APP_SETTINGS_KEY } from "../app-settings.js";
@@ -37,4 +38,41 @@ test("persistence failure leaves previously applied settings intact", () => {
     if(original)Object.defineProperty(globalThis,"localStorage",original);else delete globalThis.localStorage;
     setAppSettings(DEFAULT_APP_SETTINGS,{persist:false});
   }
+});
+
+
+test("theme defaults to system and manual light/dark takes precedence over OS", () => {
+  assert.equal(normalizeAppSettings({}).theme, "system");
+  assert.equal(normalizeAppSettings({theme:"obsolete"}).theme, "system");
+  for (const systemDark of [false, true]) {
+    assert.equal(resolveAppTheme("system", systemDark), systemDark ? "dark" : "light");
+    assert.equal(resolveAppTheme("dark", systemDark), "dark");
+    assert.equal(resolveAppTheme("light", systemDark), "light");
+  }
+});
+
+test("system theme changes live while manual selection stays fixed, and listener is disposable", () => {
+  const root = {dataset:{}};
+  const listeners = new Set();
+  const media = {matches:true, addEventListener:(name, listener)=>listeners.add(listener),
+    removeEventListener:(name, listener)=>listeners.delete(listener)};
+  try {
+    setAppSettings({theme:"system"}, {persist:false});
+    const dispose = initializeAppTheme({root, matchMedia:()=>media});
+    assert.equal(root.dataset.theme, "dark");
+    media.matches = false;
+    listeners.forEach(listener=>listener());
+    assert.equal(root.dataset.theme, "light");
+    setAppSettings({theme:"dark"}, {persist:false});
+    listeners.forEach(listener=>listener());
+    assert.equal(root.dataset.theme, "dark");
+    setAppSettings({theme:"light"}, {persist:false});
+    media.matches = true;
+    listeners.forEach(listener=>listener());
+    assert.equal(root.dataset.theme, "light");
+    setAppSettings({theme:"system"}, {persist:false});
+    assert.equal(applyAppTheme(root, true), "dark");
+    dispose();
+    assert.equal(listeners.size, 0);
+  } finally { setAppSettings(DEFAULT_APP_SETTINGS,{persist:false}); }
 });

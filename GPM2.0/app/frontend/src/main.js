@@ -1,7 +1,7 @@
 import { projectEntryBusy } from "./services/project-drop-controller.js";
 import { bindProjectDrop } from "./ui/shell/project-drop.js";
 import { readWorkspaceHistory as readSharedHistory, writeWorkspaceHistory as writeSharedHistory } from "./services/workspace-history.js";
-import { applyAppTypography } from "./services/app-settings.js";
+import { applyAppTypography, initializeAppTheme } from "./services/app-settings.js";
 import { bindAppSettings } from "./ui/shell/app-settings-panel.js";
 import "./styles/settings.css";
 import { createStore } from "./state/store.js";
@@ -11,6 +11,7 @@ import { renderAppShell } from "./ui/shell/app-shell.js";
 import { registerRoutes, renderCurrentRoute } from "./ui/shell/router.js";
 import {
   buildWorkspaceSwitchItems,
+  workspaceSelectPresentation,
   migrateWorkspaceHistoryToArrivalOrder,
   switchWorkspaceFromShell,
   updateWorkspaceHistory,
@@ -18,6 +19,7 @@ import {
 import { getMessages, t } from "./ui/i18n/index.js";
 import { relocalizeAppState } from "./ui/i18n/state-relocalize.js";
 import "./styles/base.css";
+import "./styles/theme.css";
 import "./styles/layout.css";
 import "./styles/components.css";
 
@@ -250,6 +252,7 @@ const store = createStore({
 
 migrateWorkspaceHistoryToArrivalOrder(window.localStorage);
 applyAppTypography();
+initializeAppTheme();
 app.innerHTML = renderAppShell(store.getState());
 bindSettings(app, store);
 bindGlobalLanguageSwitch(app, store);
@@ -310,6 +313,10 @@ function syncSessionHeader(state) {
       labels,
     });
     replaceSelectOptions(workspaceSelect, workspaceItems);
+    const selectedName = workspaceSelect.selectedOptions[0]?.textContent || labels.workspacePlaceholder;
+    const presentation = workspaceSelectPresentation(selectedName);
+    workspaceSelect.title = presentation.title;
+    workspaceSelect.style.setProperty("--workspace-select-width", presentation.width);
     workspaceSelect.disabled = projectEntryBusy(state) || (workspaceItems.length === 1 && !workspaceItems[0]?.value);
   }
 }

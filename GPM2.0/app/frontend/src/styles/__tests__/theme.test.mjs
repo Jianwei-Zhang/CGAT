@@ -1,0 +1,112 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
+
+const themeCss = readFileSync(new URL("../theme.css", import.meta.url), "utf8");
+const baseCss = readFileSync(new URL("../base.css", import.meta.url), "utf8");
+const html = readFileSync(new URL("../../../index.html", import.meta.url), "utf8");
+const prepaint = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+
+test("dark theme changes surfaces, ink, native controls and statuses without recoloring dataset roles", () => {
+  assert.match(themeCss, /:root\[data-theme="dark"\]\s*\{[^}]*color-scheme:\s*dark;/);
+  for (const token of ["surface-app", "surface-panel", "surface-card", "surface-subtle", "surface-muted",
+    "border-subtle", "border-default", "border-strong", "text-primary", "text-secondary", "text-muted",
+    "focus-ring", "danger", "theme-blue-ink", "theme-amber-ink", "theme-red-ink", "theme-green-ink"]) {
+    assert.match(themeCss, new RegExp(`--${token}:`));
+  }
+  for (const [role, fill] of [["primary", "#d2dfef"], ["companion", "#e7dec4"], ["ref", "#cfcfcf"]]) {
+    assert.match(baseCss, new RegExp(`--ctg-${role}-fill: ${fill};`));
+  }
+  assert.doesNotMatch(themeCss, /--ctg-(?:primary|companion|ref)-[\w-]+\s*:/);
+  assert.doesNotMatch(themeCss, /filter:\s*invert/);
+  assert.match(themeCss, /\.track-ctg-label\.is-outside,[\s\S]*?fill:\s*var\(--text-primary\)/);
+  assert.match(themeCss, /\.grt-result-repeat-count\s*\{[^}]*stroke:\s*var\(--surface-panel\)/);
+});
+
+test("first paint follows OS or saved preference even with missing, null, or corrupt storage", () => {
+  for (const systemDark of [false, true]) {
+    for (const stored of [null, "null", "{}", "broken", '{"theme":"system"}', '{"theme":"obsolete"}', '{"theme":"light"}', '{"theme":"dark"}']) {
+      const document = {documentElement:{dataset:{}}};
+      runInNewContext(prepaint, {document, localStorage:{getItem:()=>stored}, matchMedia:()=>({matches:systemDark})});
+      const expected = stored === '{"theme":"dark"}' ? "dark" : stored === '{"theme":"light"}' ? "light" : systemDark ? "dark" : "light";
+      assert.equal(document.documentElement.dataset.theme, expected, `${stored}, OS dark=${systemDark}`);
+    }
+    const document = {documentElement:{dataset:{}}};
+    runInNewContext(prepaint, {document, localStorage:{getItem:()=>{throw Error("denied");}}, matchMedia:()=>({matches:systemDark})});
+    assert.equal(document.documentElement.dataset.theme, systemDark ? "dark" : "light");
+  }
+});
+
+
+test("selected SVG and sticky labels keep readable role ink on the same pale contig bars", () => {
+  const css = readFileSync(new URL("../assembly.css", import.meta.url), "utf8");
+  const rules = [
+    [".track-ctg-group.is-active .track-ctg-label", "fill", "primary"],
+    [".track-sticky-label.is-active", "color", "primary"],
+    [".track-ctg-group.is-companion.is-active .track-ctg-label", "fill", "companion"],
+    [".track-sticky-label.is-companion.is-active", "color", "companion"],
+    [".track-ctg-group.is-active .track-ctg-label.is-ref", "fill", "ref"],
+    [".track-sticky-label.is-ref.is-active", "color", "ref"],
+  ];
+  for (const [selector, property, role] of rules) {
+    const start = css.indexOf(`${selector} {`);
+    assert.notEqual(start, -1, selector);
+    const rule = css.slice(start, css.indexOf("}", start));
+    assert.ok(rule.includes(`${property}: var(--ctg-${role}-text);`), selector);
+    assert.doesNotMatch(rule, /--theme-/);
+  }
+  assert.match(css, /\.track-slot-badge\s*\{[^}]*fill:\s*var\(--theme-ink,\s*#111\)/);
+});
+
+test("manual split uses shared Ref and primary colors without implying an auxiliary right fragment", () => {
+  const css = readFileSync(new URL("../assembly.css", import.meta.url), "utf8");
+  assert.match(css, /\.manual-split-svg text\s*\{[^}]*fill:\s*currentColor/);
+  assert.match(css, /\.manual-split-ref\s*\{[^}]*fill:\s*var\(--ctg-ref-fill\);[^}]*stroke:\s*var\(--ctg-ref-stroke\)/);
+  assert.match(css, /data-contig-role="companion"\] \.manual-split-contig\s*\{[^}]*fill:\s*var\(--ctg-companion-fill\)/);
+  for (const selector of ["contig", "left", "right"]) {
+    const start = css.indexOf(`.manual-split-${selector} {`);
+    assert.notEqual(start, -1);
+    const rule = css.slice(start, css.indexOf("}", start));
+    assert.ok(rule.includes("fill: var(--ctg-primary-fill);"));
+  }
+});
+
+
+test("Preview and Project Export keep gap markers white and use black or white Preview GAP text for the theme", () => {
+  const previewCss = readFileSync(new URL("../project-preview.css", import.meta.url), "utf8");
+  const exportCss = readFileSync(new URL("../project-export.css", import.meta.url), "utf8");
+  assert.match(baseCss, /--gap-marker-fill:\s*#ffffff;/);
+  assert.match(baseCss, /--gap-marker-text:\s*#1b1b1b;/);
+  assert.doesNotMatch(themeCss, /--gap-marker-(?:fill|text)\s*:/);
+  const gapRule = exportCss.match(/\.project-export-final-path-preview-gap\s*\{([^}]*)\}/)?.[1];
+  assert.ok(gapRule);
+  assert.match(gapRule, /background:\s*var\(--gap-marker-fill,\s*#ffffff\);/);
+  assert.doesNotMatch(gapRule, /background:\s*var\(--(?:surface-|theme-)/);
+  assert.match(previewCss, /(?:^|\n)\.project-preview-gap-label\s*\{[^}]*color:\s*#000000;/);
+  assert.match(previewCss, /:root\[data-theme="dark"\] \.project-preview-gap-label\s*\{[^}]*color:\s*#ffffff;/);
+});
+
+test("dataset editor fields, drop overlay, and loading curtains use theme-aware surfaces in dark mode", () => {
+  const importerCss = readFileSync(new URL("../importer.css", import.meta.url), "utf8");
+  const assemblyCss = readFileSync(new URL("../assembly.css", import.meta.url), "utf8");
+  const subviewCss = readFileSync(new URL("../subview.css", import.meta.url), "utf8");
+
+  assert.match(themeCss, /--theme-loading-scrim:\s*#101720bf;/);
+  assert.match(
+    importerCss,
+    /\.project-dataset-editor input,\s*\.project-dataset-editor textarea\s*\{[^}]*background:\s*var\(--surface-panel,\s*#fff\);[^}]*color:\s*var\(--text-primary,\s*#1e293b\);/,
+  );
+  assert.match(
+    importerCss,
+    /\.project-drop-overlay\s*\{[^}]*background:\s*var\(--theme-translucent-surface,\s*rgba\(246,\s*249,\s*255,\s*0\.95\)\);/,
+  );
+  assert.match(
+    assemblyCss,
+    /\.assembly-loading-curtain\s*\{[^}]*background:\s*var\(--theme-loading-scrim,\s*rgba\(248,\s*248,\s*248,\s*0\.78\)\);/,
+  );
+  assert.match(
+    subviewCss,
+    /\.subview-pairwise-loading-overlay\s*\{[^}]*background:\s*var\(--theme-loading-scrim,\s*rgba\(248,\s*248,\s*248,\s*0\.72\)\);/,
+  );
+});

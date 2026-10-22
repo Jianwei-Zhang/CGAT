@@ -2,6 +2,7 @@
   color-scheme: light;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
   font-size: var(--app-font-size, 14px);
+  --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
   --font-micro: 0.786rem;
   --font-caption: 0.857rem;
   --font-small: 0.929rem;
@@ -12,6 +13,31 @@
   --font-page-title: 1.714rem;
   --font-hero: 2rem;
   --card-radius: 6px;
+  --control-radius: 5px;
+  --surface-app: #f1f5f9;
+  --surface-panel: #ffffff;
+  --surface-card: #ffffff;
+  --surface-subtle: #f8fafc;
+  --surface-muted: #eef2f6;
+  --surface-elevated: #ffffff;
+  --border-subtle: #dbe3ec;
+  --border-default: #cbd5e1;
+  --border-strong: #94a3b8;
+  --text-primary: #1e293b;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --muted: #64748b;
+  --accent: #2563eb;
+  --action-primary-bg: #234b76;
+  --action-primary-border: #1d3f63;
+  --action-primary-hover: #1b3c60;
+  --action-primary-text: #ffffff;
+  --focus-ring: #4f82b5;
+  --danger: #b91c1c;
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.10);
+  --shadow-lg: 0 18px 48px rgba(15, 23, 42, 0.16);
   --ctg-primary-fill: #d2dfef;
   --ctg-primary-stroke: #6d85a1;
   --ctg-primary-text: #243a54;
@@ -21,12 +47,15 @@
   --ctg-ref-fill: #cfcfcf;
   --ctg-ref-stroke: #8e8e8e;
   --ctg-ref-text: #4f4f4f;
+  /* Gap markers are sequence symbols, not theme-dependent panel surfaces. */
+  --gap-marker-fill: #ffffff;
+  --gap-marker-text: #1b1b1b;
   --font-graph-label: var(--graph-font-size, 12px);
   --font-graph-small: calc(var(--graph-font-size, 12px) * 0.917);
   --font-graph-tick: calc(var(--graph-font-size, 12px) * 0.917);
   line-height: 1.45;
-  background: #e6e6e6;
-  color: #222;
+  background: var(--surface-app);
+  color: var(--text-primary);
   --helper-hint-bg: #fff7ed;
   --helper-hint-border: #f59e0b;
   --helper-hint-text: #92400e;
@@ -38,7 +67,8 @@
 
 body {
   margin: 0;
-  background: #e6e6e6;
+  background: var(--surface-app);
+  color: var(--text-primary);
 }
 
 h1,

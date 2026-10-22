@@ -177,45 +177,6 @@ function resolveLiveFinalPathBindingRoot(host) {
   return doc?.querySelector?.("#route-host") || host;
 }
 
-function keepFinalPathCardVisible(host) {
-  const windowObject = globalThis.window;
-  const root = resolveLiveFinalPathBindingRoot(host);
-  const cardNode = root?.matches?.(".final-path-card")
-    ? root
-    : root?.querySelector?.(".final-path-card");
-  if (!cardNode || typeof cardNode.getBoundingClientRect !== "function" || typeof windowObject?.scrollBy !== "function") {
-    return;
-  }
-  const rect = cardNode.getBoundingClientRect();
-  const viewportHeight =
-    Number(windowObject.innerHeight)
-    || Number(globalThis.document?.documentElement?.clientHeight)
-    || 0;
-  if (!Number.isFinite(viewportHeight) || viewportHeight <= 0 || !Number.isFinite(rect?.top) || !Number.isFinite(rect?.bottom)) {
-    return;
-  }
-  const margin = 16;
-  const maxVisibleHeight = Math.max(0, viewportHeight - margin * 2);
-  let deltaY = 0;
-  if (rect.height <= maxVisibleHeight) {
-    if (rect.top < margin) {
-      deltaY = rect.top - margin;
-    } else if (rect.bottom > viewportHeight - margin) {
-      deltaY = rect.bottom - (viewportHeight - margin);
-    }
-  } else if (rect.top < margin) {
-    deltaY = rect.top - margin;
-  }
-  if (Math.abs(deltaY) < 1) {
-    return;
-  }
-  windowObject.scrollBy({
-    left: 0,
-    top: deltaY,
-    behavior: "auto",
-  });
-}
-
 function keepFinalPathNodeBottomVisible(node) {
   const windowObject = globalThis.window;
   if (!node || typeof node.getBoundingClientRect !== "function" || typeof windowObject?.scrollBy !== "function") {
@@ -1006,7 +967,6 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
         },
       });
       rerenderFinalPathCard(host, store);
-      keepFinalPathCardVisible(host);
       await persistMainTrackViewState(host, store);
     });
   });

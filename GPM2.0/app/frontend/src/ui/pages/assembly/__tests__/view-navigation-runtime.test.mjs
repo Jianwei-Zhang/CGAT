@@ -457,21 +457,38 @@ test("explicit empty primary content disables navigation without fabricating a w
   } finally { h.dispose(); }
 });
 
-test("window text follows actual metrics, is automatic in units and cannot commit input", () => {
-  const h = harness();
-  try {
-    assert.equal(h.views.primary.display.textContent, "0.5 kb");
-    h.views.primary.scroll.dataset.trackDomainSpanBp = "5000000";
-    h.bind(); assert.equal(h.views.primary.display.textContent, "2.5 Mb");
-    assert.equal(h.views.subview.display.textContent, "0.5 kb");
-    h.root.emit("change", h.event(h.views.primary.display));
-    h.root.emit("keydown", h.event(h.views.primary.display, { key: "Enter" }));
-    assert.equal(h.writes, 0);
-    h.views.primary.scroll.dataset.trackDomainSpanBp = "0";
-    h.bind(); assert.equal(h.views.primary.display.textContent, "—");
-    assert.ok(h.views.primary.action("left").disabled);
-  } finally { h.dispose(); }
-});
+for (const role of ["primary", "subview"]) {
+  test(`${role} window text and tooltip follow short, long and unavailable spans without committing input`, () => {
+    const h = harness();
+    try {
+      const view = h.views[role];
+      const domainKey = role === "primary" ? "trackDomainSpanBp" : "subviewDomainSpanBp";
+      const otherRole = role === "primary" ? "subview" : "primary";
+      for (const [domain, expected, precise] of [
+        ["1000", "500 bp", "500 bp"],
+        ["5000", "2.5 kb", "2,500 bp"],
+        ["5000000", "2.5 Mb", "2,500,000 bp"],
+        ["128109774", "64.05 Mb", "64,054,887 bp"],
+        ["246913578024", "123.46 Gb", "123,456,789,012 bp"],
+        ["2000000000000", "1 Tb", "1,000,000,000,000 bp"],
+      ]) {
+        view.scroll.dataset[domainKey] = domain;
+        h.bind();
+        assert.equal(view.display.textContent, expected);
+        assert.equal(view.display.title, precise);
+      }
+      assert.equal(h.views[otherRole].display.textContent, "500 bp");
+      h.root.emit("change", h.event(view.display));
+      h.root.emit("keydown", h.event(view.display, { key: "Enter" }));
+      assert.equal(h.writes, 0);
+      view.scroll.dataset[domainKey] = "0";
+      h.bind();
+      assert.equal(view.display.textContent, "—");
+      assert.equal(view.display.title, "—");
+      assert.ok(view.action("left").disabled);
+    } finally { h.dispose(); }
+  });
+}
 
 for (const role of ["primary", "subview"]) {
   test(`${role} compact overview keeps scale accurate and restores handles when wider`, () => {

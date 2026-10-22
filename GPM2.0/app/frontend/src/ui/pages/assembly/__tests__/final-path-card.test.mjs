@@ -1762,3 +1762,9 @@ test("fitted Final Path ignores legacy manual spacing and automatically avoids o
   assert.ok(labels.length <= 2);
   assert.match(html, /10,000,000 bp/);
 });
+
+
+test("single-path graph identifies its label column instead of leaving a blank block", () => {
+  const output = renderFinalPathGraph({ segments: [], ...createDeps(), i18n: createI18n() });
+  assert.match(output, /assembly-final-path-label-spacer[\s\S]*?<strong>Final Path<\/strong>/);
+});

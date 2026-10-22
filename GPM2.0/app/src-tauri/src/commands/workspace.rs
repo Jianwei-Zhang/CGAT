@@ -1,5 +1,36 @@
 use super::*;
 
+// Keep paths as a single argument, never interpolate them into a shell command.
+fn directory_open_command(directory: &Path) -> Result<std::process::Command> {
+    if !directory.is_absolute() || !directory.is_dir() {
+        bail!(
+            "directory does not exist or is not an absolute directory: {}",
+            directory.display()
+        );
+    }
+    #[cfg(target_os = "windows")]
+    let mut command = std::process::Command::new("explorer.exe");
+    #[cfg(target_os = "macos")]
+    let mut command = std::process::Command::new("open");
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let mut command = std::process::Command::new("xdg-open");
+    // Normalize slash-separated workspace history paths for Windows Explorer.
+    command.arg(directory.components().collect::<PathBuf>());
+    Ok(command)
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn reveal_project_location(workspaceRoot: String) -> CommandResult<()> {
+    (|| {
+        directory_open_command(Path::new(&workspaceRoot))?
+            .spawn()
+            .context("failed to open project directory")?;
+        Ok(())
+    })()
+    .map_err(format_error)
+}
+
 #[tauri::command]
 #[allow(non_snake_case)]
 pub fn reveal_catalog_location(
@@ -17,14 +48,7 @@ pub fn reveal_catalog_location(
             objectId,
             locationIndex,
         )?;
-        #[cfg(target_os = "windows")]
-        let mut command = std::process::Command::new("explorer.exe");
-        #[cfg(target_os = "macos")]
-        let mut command = std::process::Command::new("open");
-        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-        let mut command = std::process::Command::new("xdg-open");
-        command
-            .arg(directory)
+        directory_open_command(&directory)?
             .spawn()
             .context("failed to open dataset directory")?;
         Ok(())
@@ -690,4 +714,46 @@ pub fn list_new_sequences(
         Ok(json!({ "items": mapped }))
     })()
     .map_err(format_error)
+}
+
+#[cfg(test)]
+mod location_tests {
+    use super::*;
+
+    #[test]
+    fn project_location_keeps_directory_as_one_literal_argument() {
+        let root = std::env::temp_dir().join(format!("gpm location 中文 & {}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        let command = directory_open_command(&root).unwrap();
+        assert_eq!(
+            command.get_args().collect::<Vec<_>>(),
+            vec![root.as_os_str()]
+        );
+        #[cfg(target_os = "windows")]
+        assert_eq!(command.get_program(), "explorer.exe");
+        #[cfg(target_os = "macos")]
+        assert_eq!(command.get_program(), "open");
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        assert_eq!(command.get_program(), "xdg-open");
+        #[cfg(target_os = "windows")]
+        {
+            let forward_slashes = root.to_string_lossy().replace('\\', "/");
+            let normalized = directory_open_command(Path::new(&forward_slashes)).unwrap();
+            assert_eq!(
+                normalized.get_args().collect::<Vec<_>>(),
+                vec![root.as_os_str()]
+            );
+        }
+        fs::write(root.join("project.sqlite"), b"test").unwrap();
+        assert!(directory_open_command(&root.join("project.sqlite")).is_err());
+        fs::remove_dir_all(&root).unwrap();
+        assert!(directory_open_command(&root).is_err());
+    }
+
+    #[test]
+    fn project_location_rejects_relative_and_missing_paths_without_launching() {
+        assert!(reveal_project_location(String::new()).is_err());
+        assert!(reveal_project_location(".".into()).is_err());
+        assert!(reveal_project_location("--help".into()).is_err());
+    }
 }

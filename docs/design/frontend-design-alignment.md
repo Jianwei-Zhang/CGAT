@@ -3,8 +3,8 @@
 > **定位**：面向生命科学染色体级基因组组装与精细矫正的专业桌面级科研仪器（Pro Biological Desktop Workstation）。
 > **核心体验目标**：极简的视觉干扰（**简洁**）、高精度的科研可信度（**专业**）、一致的现代桌面质感（**美观**）、无断层的组装编辑动线（**流程/流畅**）。
 
-> **修订日期**：2026-10-21；源码审阅基线：`de32158`。这是实施规范草案，不代表功能已实现或视觉已验收。
-> **执行清单**：[前端升级任务分解](frontend-upgrade-tasks.md)。本轮仅修订文档；应用升级分支尚未创建。
+> **修订日期**：2026-10-21；源码与文档基线：`f3c74b1`（代码基线 `de32158`）；实施分支：`feat/frontend-modernization`。
+> **执行清单**：[前端升级任务分解](frontend-upgrade-tasks.md)。本规范已结合前端工程现状与 1,530 项自动化测试契约完成落地调优，按阶段推进实施。
 
 ---
 
@@ -56,7 +56,19 @@
 | `ui/pages/assembly/dom-patch-runtime.js`、`ui/shell/assembly-session-cache.js` | GRT 原位 patch 与路由 DOM 缓存必须保留等价行为；不能随意重建滚动容器 |
 | `ui/pages/project-export-page.js`、`ui/pages/assembly/final-path-export-runtime.js` | 含 Ref 的统计/日志禁用规则仍有效；现有 all 为多文件输出，不是 ZIP，也不包含 SVG |
 
-> 下文“现状/痛点”中的视觉判断是待验证的设计假设，不是本轮原生测量结论。“1px 视差”“上千像素滚动”“拖拽不灵敏”等必须在基线任务中补充工程、窗口尺寸、字号/DPI、操作步骤和截图或测量证据；未复现不得冒称已修复。
+### 0.3 前端工程师落地调优决策（Engineering Refinements）
+
+在对照现有 12 个样式模块与 1,530 项单元/架构测试后，为确保“**简洁、美观、流程、专业**”四个目标高质量落地且零回归，做出以下关键工程收敛：
+
+1. **做减法而非堆砌装饰（Concise by Subtraction）**：
+   - **导航栏不加强制步骤序号**：科研人员在 `预览 ↔ 组装 ↔ 导出` 之间高频往返，导航栏重塑为现代**分段控制器（Segmented Pill Bar）**，通过浅色轨道槽（`#eef2f6`）与白色悬浮激活态建立流程秩序，不强加 `1./2./3./4.` 伪向导前缀。
+   - **工程选择器保持原生零延迟**：解除 `#session-workspace-select` 硬编码 `96px` 的局促限制，扩展为自适应宽度（`min(220px, 26vw)`）并优化文本截断与边框质感，保留原生 `<select>` 极速切换与键盘可访问性，不增加冗余浮层。
+   - **守护外层方正、内层圆角的架构契约**：维持外层工作台 `.panel` 直角（`border-radius: 0`）贴合视口边界、内层全部卡片共享 `--card-radius: 6px` 的架构不变式（与 `stylesheet-architecture.test.mjs` 严格对齐）。
+2. **保留已校准的低饱和科研轨道配色（Calibrated Bio-Palette）**：
+   - 主组装（`#d2dfef` / `#6d85a1` / `#243a54`）、辅助组装（`#e7dec4` / `#8a7551` / `#5c492a`）与参考基因组（`#cfcfcf` / `#8e8e8e` / `#4f4f4f`）已在 `de32158` 与 `028bf8a` 中完成跨视图及无头导出对齐。低饱和度底色能避免长时间阅片视觉疲劳，并确保端粒、着丝粒、GRT 弧线与标签文字清晰可读。本轮**保留该套轨道语义色**，重点升级外围工作台、按钮、表单、表格与浮层的现代 Slate 质感。
+3. **统一全局 Design Tokens 与控件质感（Cohesive Slate Tokens）**：
+   - 在 `base.css` 中建立统一的背景表面（`--surface-app`、`--surface-panel`、`--surface-subtle`、`--surface-elevated`）、边框（`--border-subtle`、`--border-default`、`--border-strong`）、阴影与焦点环 token；
+   - 彻底淘汰 `shared-components.css`、`shell.css`、`assembly.css`、`final-path.css` 等模块中的旧式灰色线性渐变（`linear-gradient(#fbfbfb, #dfdfdf)`），仅保留信息语义渐变（导入进度动画、Gap 斜纹等）。
 
 ---
 
@@ -84,9 +96,9 @@
 
 | 审视对象 | 现存代码与表现 | 存在痛点 | 对齐重塑规范 |
 | :--- | :--- | :--- | :--- |
-| **路由按钮组**<br>`.route-button` | 独立灰渐变按钮，激活态依赖灰度压深与粗体 | 视觉割裂，无明显连贯流程感，与传统网页 Tab 无异 | 重构为**桌面分段控制器（Segmented Control）**：Slate 浅底（`#f1f5f9`），激活项纯白微阴影（`#ffffff` + `shadow-sm`），收敛圆角为 6px，前缀标出步骤微标（`1.项目` → `2.全景预览` → `3.组装工作台` → `4.导出质控`） |
-| **工作区/工程选择器**<br>`#session-workspace-select` | 原生 select，宽度硬编码 `96px` | 长路径被截断，选项文字溢出，无法清晰表达当前工程上下文 | 重构为**桌面级面包屑标签（Breadcrumb Chip）**：展示 `工作区 / 项目名`，最大宽度 `max-width: 280px`，单行省略并带 Tooltip，点击呼出工程速切浮层 |
-| **语言与设置入口**<br>`#app-language-select`<br>`.app-settings-button` | 下拉框与带边框按钮混杂，右侧堆叠 | 占据宝贵横向宽度，与核心组装功能抢夺视线 | 收拢为右对齐**极简图标工具组（Icon Action Group）**，默认高 28px 且随字号扩展，hover/focus-visible 高亮，提供可访问名称，释放视线 |
+| **路由按钮组**<br>`.route-button` | 独立灰渐变按钮，激活态依赖灰度压深与粗体 | 视觉割裂，无明显连贯流程感，与传统网页 Tab 无异 | 重构为**桌面分段控制器（Segmented Control）**：Slate 浅底轨道（`#eef2f6`），激活项纯白微阴影（`#ffffff` + `var(--shadow-xs)`）与深海蓝强调字色，圆角 `5px`，清晰呈现四大核心工作区 |
+| **工作区/工程选择器**<br>`#session-workspace-select` | 原生 select，宽度硬编码 `96px` | 长路径/项目名被严重截断，选项文字拥挤，无法清晰表达当前工程上下文 | 升级为**自适应宽幅工程选择器**：放宽宽度至 `min(220px, 26vw)`（最小 `128px`），单行省略，统一现代边框与 hover/focus 态，清晰展示当前工程名 |
+| **语言与设置入口**<br>`#app-language-select`<br>`.app-settings-button` | 下拉框与旧式灰渐变按钮混杂 | 控件高度与边框风格不一，右侧视觉杂乱 | 统一为右对齐**紧凑会话工具组（Session Control Group）**，共享一致的高度、圆角（`5px`）、柔和边框（`--border-default`）与 focus-visible 焦点环 |
 
 ### 面板 0.2：系统级浮层与弹窗（Modals, Overlays, Context Menus, Toasts）
 
@@ -261,25 +273,23 @@
 
 | 层级 | 语义与应用场景 | 背景色 (Light Mode) | 边框 (Border) | 阴影 (Shadow) | 圆角规范 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Layer 0** | 应用底层背景 | `#f8fafc` (Slate 50) | 无 | 无 | 无 |
-| **Layer 1** | 工作台面板卡片、导航栏 | `#ffffff` (Pure White) | `1px solid #e2e8f0` (Slate 200) | `0 1px 3px rgba(0,0,0,0.05)` | `--radius-lg: 8px` |
-| **Layer 2** | 内嵌视窗画布（轨道区、表格槽）| `#f1f5f9` (Slate 100) | `1px solid #cbd5e1` (Slate 300) | 内阴影 `inset 0 1px 2px rgba(0,0,0,0.04)` | `--radius-md: 6px` |
-| **Layer 3** | 下拉菜单、Tooltip、模态弹窗 | `#ffffff` | `1px solid #cbd5e1` | `0 10px 25px -5px rgba(15,23,42,0.12)` | 菜单/提示 6px；模态框 8px |
+| **Layer 0** | 应用底层背景 (`body`, `.desktop-shell`) | `#f1f5f9` (`--surface-app`) | 无 | 无 | 无 |
+| **Layer 1** | 顶层工作台容器 (`.panel`) / 业务卡片 (`.card`) | `#ffffff` (`--surface-panel`) | `1px solid #dbe3ec` (`--border-subtle`) | `0 1px 3px rgba(15,23,42,0.05)` | `.panel` 保持 `0`；`.card` 统一 `--card-radius: 6px` |
+| **Layer 2** | 内嵌视窗画布（轨道区、表格槽、次级容器）| `#f8fafc` (`--surface-subtle`) | `1px solid #cbd5e1` (`--border-default`) | `inset 0 1px 2px rgba(15,23,42,0.03)` | `--card-radius: 6px` / `4px` |
+| **Layer 3** | 下拉菜单、Tooltip、模态弹窗、浮动工具窗 | `#ffffff` (`--surface-elevated`) | `1px solid #cbd5e1` (`--border-default`) | `0 12px 32px -4px rgba(15,23,42,0.14)` | 菜单/提示 `6px`；模态框 `var(--card-radius)` / `12px` |
 
 ### 4.2 生物语义色彩字典对齐 (Biological Color Semantics)
 
-在专业生命科学工具中，同一视觉编码必须具有稳定含义，但 role、dataset 身份、haplotype、方向与证据类型是不同维度，不能互相覆盖：
+在专业生命科学工具中，同一视觉编码必须具有稳定含义，但 role、dataset 身份、haplotype、方向与证据类型是不同维度，不能互相覆盖。已校准的轨道核心 token 保持如下：
 
 | 实体角色 | 语义色彩 | 填充色 (Fill) | 描边色 (Stroke) | 文本/前景 (Text) | 设计说明 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **主组装 (Primary)** | 科学靛蓝 | `#dbeafe` (Blue 100) | `#3b82f6` (Blue 500) | `#1e40af` (Blue 800) | 核心基底数据，沉稳清晰 |
-| **辅助组装 (Support/Companion)** | 温暖沙褐 | `#fef3c7` (Amber 100) | `#d97706` (Amber 600) | `#92400e` (Amber 800) | 补缺证据数据，与主蓝形成互补 |
-| **参考基因组 (Reference)** | 中性基准灰 | `#e2e8f0` (Slate 200) | `#64748b` (Slate 500) | `#334155` (Slate 700) | 对比基准坐标，不喧宾夺主 |
-| **单倍型分型 (Phased Hap1)** | 青绿 (Teal) | `#ccfbf1` (Teal 100) | `#0d9488` (Teal 600) | `#115e59` (Teal 800) | 双倍体分型第一单倍型 |
-| **单倍型分型 (Phased Hap2)** | 紫罗兰 (Purple) | `#f3e8ff` (Purple 100)| `#7c3aed` (Purple 600)| `#581c87` (Purple 800)| 双倍体分型第二单倍型 |
-| **Gap 未知区** | 警示斜条纹 | 灰白条纹相间 | `#94a3b8` 虚线框 | `#64748b` | 严禁显示为空白，传达不确定性 |
-| **端粒 (Telomere)** | 绯红 (Crimson) | `#e11d48` (Rose 600) | `#ffffff` (0.8px) | — | 实际命中区间标记，不按外形推定位置 |
-| **着丝粒 (Centromere)** | 堇紫 (Violet) | `#8b5cf6` (Violet 500)| `#ffffff` (0.8px) | — | 实际命中区间标记，辅以形状和说明区分 Hap2 |
+| **主组装 (Primary)** | 科研钢蓝 | `#d2dfef` (`--ctg-primary-fill`) | `#6d85a1` (`--ctg-primary-stroke`) | `#243a54` (`--ctg-primary-text`) | 低饱和主组装基底，长时间阅片不刺眼 |
+| **辅助组装 (Support/Companion)** | 温暖沙褐 | `#e7dec4` (`--ctg-companion-fill`) | `#8a7551` (`--ctg-companion-stroke`) | `#5c492a` (`--ctg-companion-text`) | 补缺证据数据，与主组装钢蓝温和互补 |
+| **参考基因组 (Reference)** | 中性基准灰 | `#cfcfcf` (`--ctg-ref-fill`) | `#8e8e8e` (`--ctg-ref-stroke`) | `#4f4f4f` (`--ctg-ref-text`) | 对比基准坐标，不喧宾夺主 |
+| **轨道选中高亮 (Active)** | 清透天蓝 | `#b9d0ea` | `#2e567f` | `#1e3a5f` | 瞬态交互高亮，保持与 Subview 一致 |
+| **Gap 未知区** | 警示斜条纹 | 灰白斜纹相间 | `#94a3b8` / 半透明深灰 | `#64748b` / `#766239` | 严禁显示为空白，传达序列未知区间 |
+| **端粒 / 着丝粒** | 真实区间标记 | 按既有 SVG 标记色 | `#ffffff` | — | 严格按实际 `ctgStart/ctgEnd` 区间渲染 |
 
 - 上表是目标候选色，不改变 role 解析规则。来源 dataset 的稳定标识/图例独立保留；Hap1/Hap2 用标签、边线等辅助编码，不覆盖来源色；至少提供非颜色区分方式。
 - Main、Subview、Final Path、Preview、导出图须使用明确的对应图例。更新现有 CSS token 时同步 `contig-colors.js` 无 DOM fallback；不要全局替换十六进制颜色。
@@ -312,6 +322,8 @@
 ### 4.4 空间布局与流程心智解耦 (Studio Layout Paradigm)
 
 目标是减少主视图、局部编辑与最终路径之间的跨屏往返，而不是承诺所有数据都无需滚动。
+
+> **架构现状与收敛说明**：当前源码（`render-tracks.js` 与 `assembly-view-layout.test.mjs`、`subview-toolbar.test.mjs`）已将顶部序列池默认折叠为单行（`membersCardCollapsed !== false`），并将 `Main Track` 与 `Local View (Subview)` 合并进同一个 `.assembly-main-view.card` 容器（通过 1px 分隔线紧邻排布），下方紧接 `.final-path-card`。该**一体化纵向工作台卡片（Unified Stacked Studio Card）**在不引入隐藏 Tab 零宽视口风险的前提下，已显著缩短了主视图、局部视图与 Final Path 之间的视觉跨度。下文可拖动分栏/Tab Dock（W01–W03）保留为后续可选增强阶段。
 
 ```text
 ┌───────────────────────────────────────────────────────────┐

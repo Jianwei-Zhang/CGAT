@@ -39,8 +39,10 @@ test("preview uses single-line heading, icon refresh, hides unpositioned informa
   assert.doesNotMatch(output, /project-preview-refresh[^>]*>刷新/);
   assert.doesNotMatch(output, /project-preview-unpositioned|data-preview-unpositioned|未定位/);
   assert.match(output, /data-final-path-gap-label="1"/);
-  assert.match(output, /data-final-path-kind="gap"[^>]*background:#ffffff/);
+  assert.match(output, /data-final-path-kind="gap"[^>]*background:var\(--gap-marker-fill, #ffffff\)/);
   assert.match(output, /title="Gap: 1 bp">Gap<\/span>/);
+  assert.match(output, /data-final-path-kind="gap"[^>]*data-final-path-length="1"/);
+  assert.match(output, /data-final-path-kind="gap"[^>]*color:var\(--gap-marker-text, #1b1b1b\)/);
   assert.match(output, /a&lt;ctg&gt;/);
 });
 
@@ -81,20 +83,23 @@ test("late preview requests cannot overwrite a different project or a newer requ
   assert.equal(store.getState().projectPreview.cards.length, 1);
 });
 
-test("source colors remain dataset-specific and adopted interval outlines are card-scoped hover feedback", () => {
+test("source colors follow Assembly roles and adopted interval outlines are card-scoped hover feedback", () => {
   const css = readFileSync(new URL("../../../styles/project-preview.css", import.meta.url), "utf8");
   assert.match(css, /\.project-preview-used[^}]*background:\s*transparent/);
   assert.match(css, /\.project-preview-card:hover\s+\.project-preview-source-plots\s+\.project-preview-used/);
   assert.match(css, /border-color:\s*var\(--source-color\)/);
   const value = state();
   const cards = buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }], referenceGenomeId: 1,
-    ctgs: [{ assemblyCtgId: 1, datasetName: "dsA", name: "a", totalLength: 1000, assignedChrName: "Chr1", anchorStart: 0 },
-      { assemblyCtgId: 2, datasetName: "dsB", name: "b", totalLength: 1000, assignedChrName: "Chr1", anchorStart: 0 }],
+    datasets: [{ datasetId: 1, name: "dsA" }, { datasetId: 2, name: "dsB" }],
+    project: { primaryDatasetId: 1, supportDatasetIds: [2] },
+    ctgs: [{ assemblyCtgId: 1, datasetId: 1, datasetName: "dsA", name: "a", totalLength: 1000, assignedChrName: "Chr1", anchorStart: 0 },
+      { assemblyCtgId: 2, datasetId: 2, datasetName: "dsB", name: "b", totalLength: 1000, assignedChrName: "Chr1", anchorStart: 0 }],
     finalPathByChr: { Chr1: { segments: [segment] } } });
   value.projectPreview = { key: previewProjectKey(value), loaded: true, cards };
   const output = renderProjectPreviewPage(value);
-  const fills = [...output.matchAll(/class="project-preview-contig[^>]*background:(#[0-9a-f]{6});border-color:#[0-9a-f]{6}/g)].map(match => match[1]);
-  assert.equal(new Set(fills).size, cards[0].tracks.length);
+  assert.match(output, /background:var\(--ctg-primary-fill, #d2dfef\)/);
+  assert.match(output, /background:var\(--ctg-companion-fill, #e7dec4\)/);
+  assert.match(output, /border-color:var\(--ctg-companion-stroke, #8a7551\)/);
   assert.match(css, /\.project-preview-contig\s*\{[^}]*height:\s*16px/);
   assert.doesNotMatch(css, /\.project-preview-contig\.is-context\s*\{[^}]*(height|transform|opacity):/);
   assert.match(css, /\.project-preview-final-part > span\s*\{[^}]*text-overflow:\s*clip/);
@@ -121,7 +126,9 @@ test("preview and project-export heading typography matches the Assembly chromos
 test("rendered reference carries its adopted-path anchor rather than a fixed zero origin", () => {
   const value = state();
   const cards = buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }], referenceGenomeId: 1,
-    ctgs: [{ assemblyCtgId: 1, datasetName: "dsA", name: "a", totalLength: 1000,
+    datasets: [{ datasetId: 1, name: "dsA" }, { datasetId: 2, name: "dsB" }],
+    project: { primaryDatasetId: 1, supportDatasetIds: [2] },
+    ctgs: [{ assemblyCtgId: 1, datasetId: 1, datasetName: "dsA", name: "a", totalLength: 1000,
       assignedChrName: "Chr1", anchorStart: -500 }],
     finalPathByChr: { Chr1: { segments: [segment] } } });
   value.projectPreview = { key: previewProjectKey(value), loaded: true, cards };

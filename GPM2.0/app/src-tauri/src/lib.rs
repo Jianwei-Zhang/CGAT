@@ -22,6 +22,7 @@ pub fn run() {
             commands::list_project_catalog,
             commands::update_project_catalog,
             commands::reveal_catalog_location,
+            commands::reveal_project_location,
             commands::initialize_project,
             commands::get_grt_project_view,
             commands::update_project,

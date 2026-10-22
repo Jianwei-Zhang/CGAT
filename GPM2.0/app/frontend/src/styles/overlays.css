@@ -3,7 +3,8 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(2px);
   display: grid;
   place-items: center;
   z-index: 50;
@@ -14,6 +15,7 @@
   width: min(760px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   overflow: auto;
+  box-shadow: var(--shadow-lg);
 }
 
 .import-progress-overlay {
@@ -62,18 +64,18 @@
 
 .import-progress-meter-track {
   height: 12px;
-  border: 1px solid #a8a8a8;
-  background: #f3f3f3;
+  border: 1px solid var(--theme-line, #a8a8a8);
+  background: var(--theme-surface-subtle, #f3f3f3);
   overflow: hidden;
 }
 
 .import-progress-meter-fill {
   height: 100%;
-  background: #6f8fb7;
+  background: var(--theme-surface-subtle, #6f8fb7);
 }
 
 .import-progress-meter-text {
-  color: #333;
+  color: var(--theme-ink, #333);
   font-size: var(--font-body);
   white-space: nowrap;
 }
@@ -171,7 +173,7 @@
 }
 
 .assembly-final-path-export-status.success {
-  color: #2c6b2f;
+  color: var(--theme-green-ink, #2c6b2f);
 }
 
 .pipeline-done,
@@ -184,16 +186,16 @@
 }
 
 .pipeline-done {
-  color: #2c6b2f;
+  color: var(--theme-green-ink, #2c6b2f);
 }
 
 .pipeline-error {
-  color: #a12622;
+  color: var(--theme-red-ink, #a12622);
 }
 
 .pipeline-pending,
 .pipeline-skipped {
-  color: #888;
+  color: var(--theme-muted-ink, #888);
 }
 
 .pipeline-step-row {
@@ -217,8 +219,8 @@
 .pipeline-spinner {
   width: 12px;
   height: 12px;
-  border: 2px solid #c7c7c7;
-  border-top-color: #666;
+  border: 2px solid var(--theme-line, #c7c7c7);
+  border-top-color: var(--theme-strong-line, #666);
   border-radius: 50%;
   animation: pipeline-spin 0.9s linear infinite;
 }
@@ -256,11 +258,11 @@
   min-width: 0;
   gap: 8px;
   padding: 9px 12px;
-  border: 1px solid #d7d7d7;
+  border: 1px solid var(--border-default, #cbd5e1);
   border-radius: 6px;
-  background: rgba(247, 247, 247, 0.98);
+  background: var(--theme-translucent-surface, rgba(255, 255, 255, 0.98));
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  color: #333;
+  color: var(--text-primary, #1e293b);
 }
 
 .importer-status-toast > strong {
@@ -274,17 +276,18 @@
 }
 
 .importer-status-toast.error {
-  border-color: #e2b1b1;
-  background: rgba(255, 245, 245, 0.98);
-  color: #8f2424;
+  border-color: var(--theme-red-line, #e2b1b1);
+  background: var(--theme-red-surface, rgba(255, 245, 245, 0.98));
+  color: var(--theme-red-ink, #8f2424);
 }
 
 .context-menu,
 .context-menu-submenu {
-  border: 1px solid #9d9d9d;
-  background: #f9f9f9;
-  min-width: 180px;
-  box-shadow: 1px 1px 6px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: 6px;
+  background: var(--surface-panel, #ffffff);
+  min-width: 184px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
   padding: 4px;
   display: grid;
   gap: 2px;
@@ -341,19 +344,23 @@
 
 .context-menu-item {
   border: 1px solid transparent;
+  border-radius: 4px;
   background: transparent;
+  color: var(--text-primary, #1e293b);
   text-align: left;
-  padding: 4px 8px;
+  padding: 5px 10px;
   cursor: pointer;
+  transition: background-color 100ms ease, color 100ms ease;
 }
 
 .context-menu-item:hover {
-  border-color: #b8b8b8;
-  background: #ececec;
+  border-color: transparent;
+  background: var(--surface-muted, #eef2f6);
+  color: var(--theme-ink, #0f172a);
 }
 
 .context-menu-item:disabled {
-  color: #8c8c8c;
+  color: var(--theme-muted-ink, #94a3b8);
   cursor: not-allowed;
   border-color: transparent;
   background: transparent;
@@ -363,25 +370,47 @@
   border-color: transparent;
   background: transparent;
 }
+.workspace-history-context-menu {
+  min-width: min(224px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.workspace-history-context-menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border-default, #cbd5e1);
+}
+
+.workspace-history-context-menu .context-menu-item.is-danger:not(:disabled) {
+  color: var(--theme-red-ink, #8f2424);
+}
+
+.workspace-history-context-menu .context-menu-item.is-danger:not(:disabled):hover {
+  background: var(--theme-red-surface, #fff5f5);
+}
+
 .app-dialog {
   box-sizing: border-box;
   width: min(440px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   overflow-y: auto;
   padding: 24px;
-  border: 1px solid #dce1e7;
+  border: 1px solid var(--theme-line, #dce1e7);
   border-radius: 12px;
-  background: #fff;
-  color: #252d38;
+  background: var(--surface-panel, #fff);
+  color: var(--theme-ink, #252d38);
   box-shadow: 0 16px 64px #17202c33;
 }
 .app-dialog::backdrop { background: #17202c55; }
 .app-dialog-title { margin: 0 0 12px; font-size: var(--font-heading); font-weight: 650; }
-.app-dialog-message { margin: 0; color: #68788b; font-size: var(--font-small); line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
-.app-dialog-input { box-sizing: border-box; width: 100%; min-width: 0; margin-top: 16px; padding: 8px 10px; border: 1px solid #d7dde5; border-radius: 6px; color: #26374d; background: #fff; font: inherit; font-size: var(--font-body); }
+.app-dialog-message { margin: 0; color: var(--theme-muted-ink, #68788b); font-size: var(--font-small); line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.app-dialog-input { box-sizing: border-box; width: 100%; min-width: 0; margin-top: 16px; padding: 8px 10px; border: 1px solid var(--theme-line, #d7dde5); border-radius: 6px; color: var(--theme-ink, #26374d); background: var(--surface-panel, #fff); font: inherit; font-size: var(--font-body); }
 .app-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
 .app-dialog-actions .button { border-radius: 6px; padding: 6px 14px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; font-size: var(--font-body); }
-.app-dialog-actions .button.primary { border-color: #3f638d; background: #3f638d; color: #fff; }
-.app-dialog-actions .button.ghost { border-color: #d7dde5; background: #fff; color: #53677f; }
+.app-dialog-actions .button.primary { border-color: var(--theme-strong-line, #3f638d); background: #3f638d; color: #fff; }
+.app-dialog-actions .button.ghost { border-color: var(--theme-line, #d7dde5); background: var(--surface-panel, #fff); color: var(--theme-muted-ink, #53677f); }
 .app-dialog-actions .button:hover { filter: brightness(.96); }
-.app-dialog :focus-visible { outline: 2px solid #6f91b9; outline-offset: 2px; }
+.app-dialog :focus-visible { outline: 2px solid var(--theme-line, #6f91b9); outline-offset: 2px; }

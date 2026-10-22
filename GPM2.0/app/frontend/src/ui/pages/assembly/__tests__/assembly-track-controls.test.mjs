@@ -258,11 +258,11 @@ test("subview toolbar keeps title and candidates compact and wraps whole control
   assert.match(css, /\.subview-candidate-row\s*\{[^}]*justify-content:\s*flex-start;[^}]*flex:\s*1 1 auto;[^}]*min-width:\s*0;/);
   assert.match(css, /\.subview-track-inline-controls\s*\{[^}]*flex:\s*0 0 auto;[^}]*flex-wrap:\s*nowrap;/);
   assert.match(css, /@media \(max-width:\s*700px\)[\s\S]*\.subview-track-inline-controls\s*\{[^}]*flex-basis:\s*100%;[^}]*flex-wrap:\s*wrap;/);
-  assert.match(css, /\.subview-candidate-badge\s*\{[^}]*height:\s*2\.1429rem;[^}]*overflow:\s*hidden;[^}]*border:\s*1px solid #b8c2cc;[^}]*border-radius:\s*4px;/);
+  assert.match(css, /\.subview-candidate-badge\s*\{[^}]*height:\s*2\.1429rem;[^}]*overflow:\s*hidden;[^}]*border:\s*1px solid var\(--theme-line,\s*#b8c2cc\);[^}]*border-radius:\s*4px;/);
   assert.match(css, /\.subview-candidate-slot\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/);
   assert.match(css, /\.subview-candidate-remove\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/);
-  assert.match(css, /\.subview-candidate-remove:hover\s*\{[^}]*background:\s*#f7e8e8;[^}]*color:\s*#8f2f2f;/);
-  assert.match(css, /\.subview-candidate-remove:focus-visible\s*\{[^}]*outline:\s*2px solid #4f82b5;/);
+  assert.match(css, /\.subview-candidate-remove:hover\s*\{[^}]*background:\s*var\(--theme-red-surface,\s*#f7e8e8\);[^}]*color:\s*var\(--theme-red-ink,\s*#8f2f2f\);/);
+  assert.match(css, /\.subview-candidate-remove:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--theme-strong-line,\s*#4f82b5\);/);
 });
 
 test("subview anchor endpoints share a row and wrap with the tools window", () => {
@@ -330,7 +330,7 @@ test("subview history controls follow Identity as one icon group and disable una
   assert.match(css, /\.subview-history-controls \.button\s*\{[^}]*height:\s*100%;[^}]*width:\s*30px;[^}]*min-width:\s*30px;/);
   assert.match(css, /\.subview-history-icon\s*\{[^}]*width:\s*16px;[^}]*height:\s*16px;/);
   assert.match(css, /\.subview-history-reset-icon\s*\{[^}]*stroke-width:\s*2;/);
-  assert.match(css, /\.subview-history-controls \.button:disabled\s*\{[^}]*color:\s*#a5abb2;[^}]*cursor:\s*default;/);
+  assert.match(css, /\.subview-history-controls \.button:disabled\s*\{[^}]*color:\s*var\(--theme-muted-ink,\s*#a5abb2\);[^}]*cursor:\s*default;/);
 
   assembly = commitSubviewHistoryOperation(assembly, {
     nextSubview: {
@@ -406,7 +406,7 @@ test("hidden contig css uses dashed chips, blue hidden tag, and outline-only bar
   );
 
   assert.match(css, /\.ctg-chip\.is-hidden-contig\s*\{[\s\S]*border-style:\s*dashed;/);
-  assert.match(css, /\.ctg-chip-hidden-tag\s*\{[\s\S]*color:\s*#2e567f;/);
+  assert.match(css, /\.ctg-chip-hidden-tag\s*\{[\s\S]*color:\s*var\(--theme-blue-ink,\s*#2e567f\);/);
   assert.match(css, /\.track-ctg\.is-hidden-contig,\s*\.track-ctg\.is-hidden-contig\.is-active,\s*\.track-ctg\.is-hidden-contig\.is-multi-selected\s*\{[\s\S]*fill:\s*none;/);
   assert.match(
     css,
@@ -1374,4 +1374,16 @@ test("support dataset selection persists project-scoped main track view state", 
       finalPathByChr: store.getState().assembly.finalPathByChr,
     },
   ]);
+});
+
+
+test("four dataset Assembly renders all three support options, even without placed support contigs", () => {
+  const html = renderAssemblyPage(createState({
+    initializer: {existingProjects:[{projectId:7, primaryDatasetId:11, supportDatasetIds:[22,33,44]}],
+      datasets:[11,22,33,44].map(datasetId=>({datasetId,name:`ds-${datasetId}`}))},
+    assembly: {supportDatasetId:22, supportChrCtgs:[]},
+  }));
+  const options = html.match(/<select[^>]*id="assembly-support-dataset-id"[^>]*>([\s\S]*?)<\/select>/)?.[1];
+  assert.ok(options, "support dataset select is rendered");
+  assert.deepEqual([...options.matchAll(/<option value="(\d+)"/g)].map(match=>Number(match[1])), [22,33,44]);
 });

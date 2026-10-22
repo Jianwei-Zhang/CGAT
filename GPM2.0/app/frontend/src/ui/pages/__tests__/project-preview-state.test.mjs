@@ -110,3 +110,18 @@ test("explicit reference adoption supplies its own origin; unknown sources do no
   const [unknown] = buildProjectPreviewModel({ ...base, ctgs: [], finalPathByChr: { Chr1: { segments: [sourceSegment] } } });
   assert.deepEqual(unknown.reference, { start: 0, reverse: false, alignment: null });
 });
+
+
+test("four datasets retain one primary and all three supports with shared Assembly role colors", () => {
+  const datasets = [1, 2, 3, 4].map(datasetId => ({datasetId, name: `ds${datasetId}`}));
+  const [card] = buildProjectPreviewModel({ ...base, datasets,
+    project: {primaryDatasetId: 1, supportDatasetIds: [2, 3, 4]},
+    ctgs: datasets.map(ds => ({assemblyCtgId: ds.datasetId, datasetId: ds.datasetId,
+      datasetName: ds.name, name: `ctg${ds.datasetId}`, totalLength: 100, anchorStart: 0, assignedChrName: "Chr1"})),
+    finalPathByChr: {Chr1: {segments: datasets.map(ds => ({type: "ctg", assemblyCtgId: ds.datasetId,
+      datasetName: ds.name, ctgName: `ctg${ds.datasetId}`, start: 1, end: 100, overallLen: 100}))}} });
+  assert.equal(card.tracks.length, 4);
+  assert.deepEqual(card.tracks.map(t => t.role), ["primary", "companion", "companion", "companion"]);
+  assert.deepEqual(card.tracks.map(t => t.color), ["#d2dfef", "#e7dec4", "#e7dec4", "#e7dec4"]);
+  assert.deepEqual(card.paths[0].parts.map(p => p.role), ["primary", "companion", "companion", "companion"]);
+});

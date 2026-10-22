@@ -31,9 +31,9 @@
 
 .workspace-recipe-summary {
   margin-top: 4px;
-  border: 1px solid #d1d1d1;
+  border: 1px solid var(--border-subtle, #dbe3ec);
   border-radius: var(--card-radius);
-  background: #d8d8d8;
+  background: var(--border-subtle, #dbe3ec);
   overflow: hidden;
 }
 
@@ -41,7 +41,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
-  background: #d8d8d8;
+  background: var(--border-subtle, #dbe3ec);
 }
 
 .workspace-recipe-field {
@@ -49,19 +49,19 @@
   display: grid;
   gap: 3px;
   padding: 8px 10px;
-  background: #f7f7f7;
+  background: var(--surface-subtle, #f8fafc);
 }
 
 .workspace-recipe-label {
-  color: #666;
+  color: var(--text-muted, #64748b);
   font-size: var(--font-small);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
 }
 
 .workspace-recipe-value {
   min-width: 0;
-  color: #222;
+  color: var(--text-primary, #1e293b);
   overflow-wrap: anywhere;
 }
 
@@ -70,7 +70,7 @@
   width: fit-content;
   max-width: 100%;
   padding: 1px 7px;
-  border: 1px solid #a7a7a7;
+  border: 1px solid var(--border-default, #cbd5e1);
   border-radius: 999px;
   font-size: var(--font-small);
   font-weight: 700;
@@ -79,15 +79,15 @@
 }
 
 .workspace-recipe-value.is-enabled {
-  border-color: #56825d;
-  background: #edf7ef;
-  color: #285b31;
+  border-color: var(--theme-green-line, #86efac);
+  background: var(--theme-green-surface, #f0fdf4);
+  color: var(--theme-green-ink, #166534);
 }
 
 .workspace-recipe-value.is-disabled {
-  border-color: #b0b0b0;
-  background: #f1f1f1;
-  color: #666;
+  border-color: var(--border-subtle, #dbe3ec);
+  background: var(--surface-muted, #eef2f6);
+  color: var(--text-muted, #64748b);
 }
 
 .workspace-create-option {
@@ -97,9 +97,9 @@
   gap: 12px;
   margin-top: 10px;
   padding: 10px 12px;
-  border: 1px solid #c8c8c8;
+  border: 1px solid var(--border-subtle, #dbe3ec);
   border-radius: var(--card-radius);
-  background: #f7f7f7;
+  background: var(--surface-subtle, #f8fafc);
   cursor: pointer;
 }
 
@@ -110,7 +110,7 @@
 }
 
 .workspace-create-option-title {
-  color: #222;
+  color: var(--text-primary, #1e293b);
   font-weight: 700;
 }
 

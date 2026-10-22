@@ -5,8 +5,7 @@ import {
   resolveFinalPathSegmentLengthBp,
 } from "./assembly/final-path-state.js";
 
-const COLORS = ["#4678ad", "#b07b32", "#38856c", "#8865ad", "#ba6267", "#458d9c", "#8b8643", "#777da6"];
-const REF_COLOR = "#65717f";
+import { DEFAULT_CONTIG_PALETTE, createContigColorResolver } from "./assembly/contig-colors.js";
 const text = value => String(value ?? "").trim();
 const positive = value => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : 0;
 
@@ -135,11 +134,19 @@ export function buildProjectPreviewModel({ chromosomes = [], referenceGenomeId =
   const findSource = source => source.original
     ? bySource.get(sourceKey(source.datasetName, source.contigName)) || []
     : [byId.get(source.assemblyCtgId)].filter(Boolean);
+  const primaryDataset = datasets.find(ds => positive(ds.datasetId) === positive(project.primaryDatasetId));
+  const primaryName = text(primaryDataset?.name || primaryDataset?.label
+    || ctgs.find(ctg => positive(ctg.datasetId) === positive(project.primaryDatasetId))?.datasetName);
+  const resolveRole = createContigColorResolver({ primaryDatasetName: primaryName,
+    primaryCtgs: ctgs.filter(ctg => positive(ctg.datasetId) === positive(project.primaryDatasetId)),
+    supportCtgs: ctgs.filter(ctg => positive(ctg.datasetId) !== positive(project.primaryDatasetId)) });
   const catalog = new Map();
   const registerDataset = (name, id = 0) => {
     const key = text(name) || `ds:${positive(id) || "unknown"}`;
+    const role = positive(id) && positive(id) === positive(project.primaryDatasetId)
+      || primaryName && text(name).toLowerCase() === primaryName.toLowerCase() ? "primary" : "companion";
     if (!catalog.has(key)) catalog.set(key, { key, name: text(name) || (id ? `ds ${id}` : ""),
-      color: COLORS[catalog.size % COLORS.length] });
+      role, color: DEFAULT_CONTIG_PALETTE[role].fill });
     return catalog.get(key);
   };
   const projectIds = new Set([project.primaryDatasetId, ...(project.supportDatasetIds || [])].map(positive).filter(Boolean));
@@ -184,7 +191,7 @@ export function buildProjectPreviewModel({ chromosomes = [], referenceGenomeId =
       for (const segment of entry.segments || []) {
         const length = resolveFinalPathSegmentLengthBp(segment);
         if (!(length > 0)) { unresolvedCount++; continue; }
-        const part = { segment, pathName: name, index: parts.length, start: cursor, length, gap: isFinalPathGapSegment(segment), color: REF_COLOR };
+        const part = { segment, pathName: name, index: parts.length, start: cursor, length, gap: isFinalPathGapSegment(segment), role: "ref", color: DEFAULT_CONTIG_PALETTE.ref.fill };
         cursor += length;
         if (!part.gap && isFinalPathRefSegment(segment)) {
           const range = resolveFinalPathRefSegmentAbsoluteRange(segment);
@@ -196,7 +203,10 @@ export function buildProjectPreviewModel({ chromosomes = [], referenceGenomeId =
         } else if (!part.gap) {
           const source = previewSourceRange(segment);
           const ds = registerDataset(source.datasetName);
-          part.color = ds.color; part.source = source;
+          part.role = resolveRole(segment);
+          // Unknown dataset names are support, not an accidental extra primary track.
+          if (!primaryName && !positive(segment.assemblyCtgId)) part.role = ds.role;
+          part.color = DEFAULT_CONTIG_PALETTE[part.role].fill; part.source = source;
           const covered = [];
           if (source.valid) {
             for (const ctg of findSource(source)) {

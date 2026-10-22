@@ -2,7 +2,7 @@ import { previewSemanticSignature, previewMutationStamp } from "../../services/p
 import { normalizeFinalPathByChr } from "./assembly/final-path-state.js";
 import { previewProjectKey, previewSourceRange } from "./project-preview-state.js";
 
-export const PREVIEW_MODEL_VERSION = 3;
+export const PREVIEW_MODEL_VERSION = 4;
 const sessions = new WeakMap();
 const domEntries = new Map();
 const DOM = Symbol("previewDom");
@@ -107,6 +107,7 @@ export function isPreviewSnapshot(snapshot) {
   const color = value => typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
   const part = value => object(value) && finite(value.start) && value.start >= 0
     && finite(value.length) && value.length > 0 && color(value.color)
+    && ["primary", "companion", "ref"].includes(value.role)
     && typeof value.gap === "boolean" && typeof value.pathName === "string"
     && Number.isInteger(value.index) && value.index >= 0 && object(value.segment)
     && ["ctg", "gap"].includes(value.segment.type)
@@ -132,7 +133,7 @@ export function isPreviewSnapshot(snapshot) {
       && Array.isArray(card.paths) && card.paths.every(path => object(path) && typeof path.name === "string"
         && finite(path.length) && path.length >= 0 && Array.isArray(path.parts) && path.parts.every(part))
       && Array.isArray(card.tracks) && card.tracks.every(track => object(track) && typeof track.name === "string"
-        && color(track.color) && Number.isInteger(track.laneCount) && track.laneCount >= 1
+        && color(track.color) && ["primary", "companion"].includes(track.role) && Number.isInteger(track.laneCount) && track.laneCount >= 1
         && Array.isArray(track.positioned) && track.positioned.every(item => object(item) && typeof item.name === "string"
           && finite(item.start) && finite(item.length) && item.length > 0
           && (!item.alignment || (object(item.alignment) && typeof item.alignment.pathName === "string"

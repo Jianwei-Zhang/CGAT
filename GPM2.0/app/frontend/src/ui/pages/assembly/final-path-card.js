@@ -1238,9 +1238,10 @@ export function renderFinalPathGraph({
     <div class="assembly-final-path-layout assembly-track-layout">
       <div
         class="assembly-final-path-label-spacer assembly-track-label-column"
+        title="${escapeAttr(normalizedAllGraphLabel || "Final Path")}"
         style="width:${FINAL_PATH_LABEL_COLUMN_WIDTH_PX}px"
-        ${normalizedAllGraphLabel ? `data-final-path-all-graph-label="${escapeAttr(normalizedAllGraphLabel)}"` : "aria-hidden=\"true\""}
-      >${normalizedAllGraphLabel ? `<strong>${escapeHtml(normalizedAllGraphLabel)}</strong>` : ""}</div>
+        ${normalizedAllGraphLabel ? `data-final-path-all-graph-label="${escapeAttr(normalizedAllGraphLabel)}"` : ""}
+      ><strong>${escapeHtml(normalizedAllGraphLabel || "Final Path")}</strong></div>
       <div class="assembly-track-scroll assembly-final-path-svg-wrap" data-final-path-graph-viewport>
         <svg
           class="assembly-track-svg assembly-final-path-svg"
@@ -1265,9 +1266,12 @@ function renderFinalPathTable({
   escapeHtml,
   finalPathEntry,
   labels,
+  primaryDatasetName = "",
+  ctgColorContext = {},
   targetChrName = "",
   indexHeaderLabel = "",
 }) {
+  const resolveColorRole = createContigColorResolver({ ...ctgColorContext, primaryDatasetName });
   const segments = normalizeFinalPathSegments(finalPathEntry);
   const normalizedTargetChrName = normalizeString(targetChrName);
   const targetChrAttr = normalizedTargetChrName
@@ -1280,6 +1284,8 @@ function renderFinalPathTable({
       const segmentId = normalizeString(segment.segmentId) || `seg-${index + 1}`;
       const isGap = isFinalPathGapSegment(segment);
       const isRefSegment = isFinalPathRefSegment(segment);
+      const colorRole = isGap ? "" : resolveColorRole(segment);
+      const roleClass = colorRole === "ref" ? " is-ref" : (colorRole === "companion" ? " is-companion" : "");
       const metrics = rowMetrics[index] || {};
       const displayName = isGap ? "Gap" : resolveFinalPathVisibleCtgName(segment);
       const fullDisplayName = isGap ? displayName : resolveFinalPathDisplayCtgName(segment);
@@ -1311,7 +1317,7 @@ function renderFinalPathTable({
                   <option value="-" ${orientText === "-" ? "selected" : ""}>-</option>
                 </select>
               `;
-      const rowTypeClass = isGap ? " is-gap" : "";
+      const rowTypeClass = isGap ? " is-gap" : roleClass;
       return `
         <div data-final-path-row-id="${escapeAttr(segmentId)}" data-final-path-segment-id="${escapeAttr(segmentId)}"${targetChrAttr} class="final-path-sort-row${rowTypeClass}">
           <div class="final-path-row-index-cell">
@@ -1685,6 +1691,8 @@ export function renderFinalPathCard(
           escapeHtml,
           finalPathEntry: entry.finalPathEntry,
           labels,
+          primaryDatasetName,
+          ctgColorContext,
           targetChrName: allMode ? entry.chrName : "",
           indexHeaderLabel: allMode ? entry.label : "",
         })

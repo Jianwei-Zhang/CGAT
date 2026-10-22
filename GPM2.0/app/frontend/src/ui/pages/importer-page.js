@@ -1,4 +1,4 @@
-import { archiveImportForm, localWorkspaceTimestamp, relocateWorkspaceSuggestion } from "../../services/project-drop-controller.js";
+import { archiveImportForm, localWorkspaceTimestamp, relocateWorkspaceSuggestion, projectEntryBusy } from "../../services/project-drop-controller.js";
 import { readWorkspaceHistory as readSharedHistory, writeWorkspaceHistory as writeSharedHistory, updateWorkspaceHistory as updateSharedHistory, workspacePathIdentity } from "../../services/workspace-history.js";
 import {
   copyProjectWorkspace,
@@ -82,7 +82,7 @@ export function renderImporterPage(state) {
       ${renderProjectCopyDialog(state, messages)}
 
       ${importProgressOverlay}
-      ${workspaceContextMenu.open ? renderWorkspaceHistoryContextMenu(workspaceContextMenu, messages) : ""}
+      ${workspaceContextMenu.open ? renderWorkspaceHistoryContextMenu(workspaceContextMenu, messages, state) : ""}
     </section>
   `;
 }
@@ -375,26 +375,15 @@ export function bindImporterPage(host, store) {
       await runOpenWorkspaceFlow(host, store, workspacePath);
     });
     button.addEventListener("contextmenu", (event) => {
-      event.preventDefault?.();
-      const workspacePath = String(button.dataset.recentPath || "").trim();
-      if (!workspacePath) {
-        return;
-      }
-      const x = Number.isFinite(Number(event.clientX)) ? Number(event.clientX) : 0;
-      const y = Number.isFinite(Number(event.clientY)) ? Number(event.clientY) : 0;
-      updateImporterState(store, {
-        workspaceContextMenu: {
-          open: true,
-          workspacePath,
-          x,
-          y,
-        },
-      });
-      rerender(host, store);
+      event.stopPropagation?.();
+      openWorkspaceContextMenu(event, button.dataset.recentPath, host, store);
     });
   });
 
   workspaceHistoryRows.forEach((row) => {
+    row.addEventListener("contextmenu", event => {
+      openWorkspaceContextMenu(event, row.dataset.workspaceHistoryRowPath, host, store);
+    });
     row.addEventListener("pointerenter", () => {
       const workspacePath = String(row.dataset.workspaceHistoryRowPath || "").trim();
       cancelWorkspaceContextMenuClose(workspacePath, store);
@@ -415,6 +404,28 @@ export function bindImporterPage(host, store) {
     });
   });
 
+  // Measure the expanded menu so all actions remain reachable near window edges.
+  const menuBounds = workspaceContextMenu?.getBoundingClientRect?.();
+  if (menuBounds) {
+    workspaceContextMenu.style.left = `${Math.max(8, Math.min(menuBounds.left, window.innerWidth - menuBounds.width - 8))}px`;
+    workspaceContextMenu.style.top = `${Math.max(8, Math.min(menuBounds.top, window.innerHeight - menuBounds.height - 8))}px`;
+  }
+  workspaceContextMenu?.addEventListener("keydown", event => {
+    if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+      event.preventDefault?.();
+      const items = [...workspaceContextMenu.querySelectorAll('[role="menuitem"]:not(:disabled)')];
+      const index = items.indexOf(event.target);
+      const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1
+        : (index + (event.key === "ArrowUp" ? -1 : 1) + items.length) % items.length;
+      items[next]?.focus();
+      return;
+    }
+    if (event.key !== "Escape") return;
+    event.preventDefault?.();
+    const path = workspaceContextMenu.dataset.workspaceHistoryContextMenuPath;
+    closeWorkspaceContextMenu(host, store, path);
+    [...host.querySelectorAll("[data-recent-index]")].find(button => button.dataset.recentPath === path)?.focus?.();
+  });
   workspaceContextMenu?.addEventListener("click", (event) => {
     event.stopPropagation?.();
   });
@@ -431,6 +442,7 @@ export function bindImporterPage(host, store) {
 
   importAddPackageMenuButtons.forEach((importAddPackageMenuButton) => importAddPackageMenuButton.addEventListener("click", async (event) => {
     event.stopPropagation?.();
+    if (projectEntryBusy(store.getState())) return;
     const workspacePath = String(importAddPackageMenuButton.dataset.workspaceImportAddPackagePath || "").trim();
     closeWorkspaceContextMenu(host, store, workspacePath);
     await runImportAddPackageFlow(host, store, workspacePath);
@@ -439,6 +451,39 @@ export function bindImporterPage(host, store) {
 
 function bindProjectEntryControls(host, store) {
   const busy = () => store.getState().importer.inFlight || store.getState().importer.entryResolving || store.getState().initializer?.autoPipelineRunning || store.getState().initializer?.updating;
+  host.querySelectorAll("[data-project-open-path]").forEach(button => button.addEventListener("click", async event => {
+    event.stopPropagation?.();
+    if (projectEntryBusy(store.getState())) return;
+    const path = button.dataset.projectOpenPath;
+    closeWorkspaceContextMenu(host, store, path);
+    const state = store.getState();
+    if (state.session.projectId && workspacePathListIncludes([state.session.workspacePath], path)) return;
+    await runOpenWorkspaceFlow(host, store, path);
+  }));
+  host.querySelectorAll("[data-project-reveal-path]").forEach(button => button.addEventListener("click", async event => {
+    event.stopPropagation?.();
+    if (projectEntryBusy(store.getState())) return;
+    const path = button.dataset.projectRevealPath;
+    closeWorkspaceContextMenu(host, store, path);
+    try {
+      await invokeCommand("reveal_project_location", { workspaceRoot: path }, store.getState());
+    } catch (error) {
+      updateImporterState(store, { status: projectLabels(store.getState()).openLocationFailed, summary: String(error.message || error) });
+      rerender(host, store);
+    }
+  }));
+  host.querySelectorAll("[data-project-rename-path]").forEach(button => button.addEventListener("click", async event => {
+    event.stopPropagation?.();
+    if (projectEntryBusy(store.getState())) return;
+    const path = button.dataset.projectRenamePath;
+    closeWorkspaceContextMenu(host, store, path);
+    const state = store.getState();
+    if (!state.session.projectId || !workspacePathListIncludes([state.session.workspacePath], path)) {
+      if (!await runOpenWorkspaceFlow(host, store, path)) return;
+    }
+    // Reuse the detail panel's inline editor, including save/cancel and IME handling.
+    host.querySelector("#selected-project-rename-button")?.click();
+  }));
   const openDirectory = async () => {
     if (busy()) return;
     const path = await pickDirectoryPath(store.getState());
@@ -547,15 +592,18 @@ function bindProjectEntryControls(host, store) {
       rerender(host, store);
     }
   });
-  host.querySelectorAll("[data-project-delete-files]").forEach(button => button.addEventListener("click", () => {
-    if (busy()) return;
+  host.querySelectorAll("[data-project-delete-files]").forEach(button => button.addEventListener("click", event => {
+    event.stopPropagation?.();
+    if (projectEntryBusy(store.getState())) return;
+    closeWorkspaceContextMenu(host, store, button.dataset.projectDeleteFiles);
     openDeleteSelectionConfirm(host, store, [button.dataset.projectDeleteFiles], DELETE_SELECTION_MODE_PROJECT);
     updateImporterState(store, { deleteWithFiles: true });
     rerender(host, store);
   }));
   host.querySelectorAll("[data-project-copy]").forEach(button => button.addEventListener("click", async event => {
     event.stopPropagation?.();
-    if (busy()) return;
+    if (projectEntryBusy(store.getState())) return;
+    closeWorkspaceContextMenu(host, store, button.dataset.projectCopy);
     await openProjectCopyDialog(host, store, button.dataset.projectCopy);
   }));
 }
@@ -1623,13 +1671,37 @@ function closeWorkspaceContextMenu(host, store, workspacePath = "") {
   rerender(host, store);
 }
 
-function renderWorkspaceHistoryContextMenu(contextMenu, messages) {
+function openWorkspaceContextMenu(event, path, host, store) {
+  event.preventDefault?.();
+  const workspacePath = String(path || "").trim();
+  if (!workspacePath || projectEntryBusy(store.getState())) return;
+  cancelWorkspaceContextMenuClose("", store);
+  updateImporterState(store, { workspaceContextMenu: {
+    open: true, workspacePath,
+    x: Number.isFinite(Number(event.clientX)) ? Number(event.clientX) : 0,
+    y: Number.isFinite(Number(event.clientY)) ? Number(event.clientY) : 0,
+  } });
+  rerender(host, store);
+  host.querySelector("[data-workspace-history-context-menu='1']")?.querySelector?.('[role="menuitem"]:not(:disabled)')?.focus?.({ preventScroll: true });
+}
+
+function renderWorkspaceHistoryContextMenu(contextMenu, messages, state) {
   const left = Number.isFinite(Number(contextMenu.x)) ? Number(contextMenu.x) : 0;
   const top = Number.isFinite(Number(contextMenu.y)) ? Number(contextMenu.y) : 0;
-  const workspacePath = String(contextMenu.workspacePath || "").trim();
+  const path = escapeAttr(String(contextMenu.workspacePath || "").trim());
+  const labels = projectLabels(state);
+  const disabled = projectEntryBusy(state) ? "disabled" : "";
+  const item = (attribute, label, danger = false) => `<button type="button" role="menuitem" class="context-menu-item${danger ? " is-danger" : ""}" ${attribute}="${path}" ${disabled}>${escapeHtml(label)}</button>`;
   return `
-    <div class="context-menu" data-workspace-history-context-menu="1" data-workspace-history-context-menu-path="${escapeAttr(workspacePath)}" style="left: ${left}px; top: ${top}px;">
-      <button class="context-menu-item" data-workspace-import-add-package-path="${escapeAttr(workspacePath)}">${escapeHtml(messages.buttons.importAddPackage)}</button>
+    <div class="context-menu workspace-history-context-menu" role="menu" aria-label="${escapeAttr(labels.recent)}" data-workspace-history-context-menu="1" data-workspace-history-context-menu-path="${path}" style="left: ${left}px; top: ${top}px;">
+      ${item("data-project-open-path", labels.open)}
+      ${item("data-project-reveal-path", labels.openLocation)}
+      <div class="workspace-history-context-menu-separator" role="separator"></div>
+      ${item("data-project-rename-path", labels.rename)}
+      ${item("data-workspace-import-add-package-path", messages.buttons.importAddPackage)}
+      ${item("data-project-copy", messages.buttons.copyProject)}
+      <div class="workspace-history-context-menu-separator" role="separator"></div>
+      ${item("data-project-delete-files", labels.delete, true)}
     </div>
   `;
 }

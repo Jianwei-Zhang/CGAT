@@ -57,7 +57,7 @@ function renderDetails(row, catalog, state) {
   const paths = row.locations || [];
   return `<dialog class="project-catalog-dialog" data-catalog-dialog aria-labelledby="catalog-dialog-title" aria-modal="true" tabindex="-1">
     <header class="project-catalog-dialog-head"><h3 id="catalog-dialog-title">${l.details}</h3>
-      <span class="project-dataset-role">${l[row.role] || escape(row.role)}</span>
+      <span class="project-dataset-role" data-dataset-role="${escape(row.role)}">${l[row.role] || escape(row.role)}</span>
       <button type="button" data-catalog-close class="button project-icon-button" aria-label="${l.close}" ${busy}>${projectIcon("close")}</button></header>
     <form data-catalog-form class="project-dataset-editor">
       <div class="project-dataset-editor-body">
@@ -93,7 +93,7 @@ function renderTable(rows, title, catalog, state) {
         const disabled = catalog.saving || state.importer?.inFlight || state.initializer?.autoPipelineRunning || (catalog.editor && !editing) ? "disabled" : "";
         const stats = row.statistics || {};
         return `<tr data-catalog-object="${escape(key)}">
-          <td><span class="project-dataset-role">${l[row.role] || escape(row.role)}</span></td>
+          <td><span class="project-dataset-role" data-dataset-role="${escape(row.role)}">${l[row.role] || escape(row.role)}</span></td>
           <th scope="row"><span class="project-dataset-name" title="${escape(row.displayName)}">${escape(row.displayName)}</span>${row.derived && row.role !== "derived" ? `<small class="muted">${l.includesDerived}</small>` : ""}</th>
           <td class="numeric">${number(stats.sequenceCount, state)}</td><td class="numeric">${length(stats.totalLengthBp, state)}</td>
           <td class="numeric">${length(stats.n50, state)}</td><td class="numeric">${length(stats.n90, state)}</td>

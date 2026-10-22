@@ -948,3 +948,113 @@ test("bindFinalPathCardDrag drops above the first row into the first position ev
     globalThis.document = originalDocument;
   }
 });
+
+test("bindFinalPathCardDrag allows dragging from the card body while ignoring enabled inputs", async () => {
+  const originalWindow = globalThis.window;
+  const originalDocument = globalThis.document;
+  const windowStub = createWindowStub();
+  globalThis.window = windowStub;
+  globalThis.document = { body: { appendChild() {} } };
+
+  try {
+    const hostListeners = new Map();
+    const host = {
+      addEventListener(type, handler) {
+        hostListeners.set(type, handler);
+      },
+    };
+    const store = {
+      getState() {
+        return { assembly: { activeTab: "assembly" } };
+      },
+    };
+    const cardList = {
+      querySelectorAll(selector) {
+        return selector === "[data-final-path-row-id]" ? [sourceRow, targetRow] : [];
+      },
+    };
+    const sourceCard = {
+      dataset: { finalPathCardBody: "seg-1" },
+      getBoundingClientRect() {
+        return { left: 100, top: 200, width: 720, height: 36 };
+      },
+      cloneNode() {
+        return { style: {}, classList: createClassList(), remove() {} };
+      },
+      closest(selector) {
+        if (selector === "[data-final-path-row-id]") return sourceRow;
+        return null;
+      },
+    };
+    const sourceRow = {
+      dataset: { finalPathRowId: "seg-1" },
+      classList: createClassList(),
+      querySelector(selector) {
+        return selector === "[data-final-path-card-body]" ? sourceCard : null;
+      },
+      closest(selector) {
+        return selector === "[data-final-path-card-list]" ? cardList : null;
+      },
+    };
+    const targetRow = {
+      dataset: { finalPathRowId: "seg-2" },
+      classList: createClassList(),
+      querySelector(selector) {
+        return selector === "[data-final-path-card-body]"
+          ? { getBoundingClientRect: () => ({ top: 260, bottom: 296 }) }
+          : null;
+      },
+    };
+    let movePayload = null;
+    bindFinalPathCardDrag(host, store, {
+      moveFinalPathRow(_host, _store, payload) {
+        movePayload = payload;
+      },
+    });
+
+    // Clicking an enabled input does not start a drag
+    hostListeners.get("pointerdown")?.({
+      button: 0,
+      ctrlKey: false,
+      metaKey: false,
+      clientX: 140,
+      clientY: 210,
+      preventDefault() {},
+      target: {
+        closest(selector) {
+          if (selector.includes("input:not(:disabled)")) return {};
+          if (selector === "[data-final-path-card-body]") return sourceCard;
+          return null;
+        },
+      },
+    });
+    assert.equal(windowStub.listeners.has("pointermove"), false);
+
+    // Dragging the card body itself moves the row as one object
+    hostListeners.get("pointerdown")?.({
+      button: 0,
+      ctrlKey: false,
+      metaKey: false,
+      clientX: 140,
+      clientY: 210,
+      preventDefault() {},
+      target: {
+        closest(selector) {
+          if (selector === "[data-final-path-card-body]") return sourceCard;
+          return null;
+        },
+      },
+    });
+    windowStub.listeners.get("pointermove")?.({ clientX: 160, clientY: 310 });
+    windowStub.listeners.get("pointerup")?.();
+
+    assert.deepEqual(movePayload, {
+      sourceSegmentId: "seg-1",
+      targetSegmentId: "seg-2",
+      placement: "after",
+    });
+  } finally {
+    globalThis.window = originalWindow;
+    globalThis.document = originalDocument;
+  }
+});

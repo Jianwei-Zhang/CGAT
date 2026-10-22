@@ -1774,11 +1774,11 @@ test("project export final path row jump keeps clicked phased chr target instead
 test("project export final path preview css is clickable and hides graph label spacer", () => {
   assert.match(
     componentsCss,
-    /\.project-export-detail-section\s*\{[\s\S]*border:\s*1px solid #cdd6e0;/,
+    /\.project-export-detail-section\s*\{[\s\S]*border:\s*1px solid var\(--theme-line,\s*#cdd6e0\);/,
   );
   assert.match(
     componentsCss,
-    /\.project-export-detail-table td\s*\{[\s\S]*background:\s*#fff;/,
+    /\.project-export-detail-table td\s*\{[\s\S]*background:\s*var\(--surface-panel,\s*#fff\);/,
   );
   assert.match(
     componentsCss,
@@ -1786,11 +1786,11 @@ test("project export final path preview css is clickable and hides graph label s
   );
   assert.match(
     componentsCss,
-    /\.project-export-detail-filter\[open\] > summary::before\s*\{[\s\S]*border-bottom:\s*5px solid #333;/,
+    /\.project-export-detail-filter\[open\] > summary::before\s*\{[\s\S]*border-bottom:\s*5px solid var\(--theme-strong-line,\s*#333\);/,
   );
   assert.match(
     componentsCss,
-    /\.project-export-final-path-row:hover,\s*\.project-export-final-path-row:focus-visible\s*\{[\s\S]*box-shadow:\s*inset 0 0 0 1px #7c9bbc;/,
+    /\.project-export-final-path-row:hover::after,\s*\.project-export-final-path-row:focus-visible::after\s*\{[^}]*border-color:\s*var\(--theme-line,\s*#7c9bbc\);/,
   );
   assert.match(
     componentsCss,
@@ -1798,7 +1798,7 @@ test("project export final path preview css is clickable and hides graph label s
   );
   assert.match(
     componentsCss,
-    /\.project-export-final-path-preview-track\s*\{[\s\S]*height:\s*52px;/,
+    /\.project-export-final-path-preview-track\s*\{[^}]*min-height:\s*64px;/,
   );
   assert.match(
     componentsCss,
@@ -1828,6 +1828,56 @@ test("project export final path preview css is clickable and hides graph label s
     componentsCss,
     /\.project-export-final-path-preview-gap-label\s*\{[\s\S]*z-index:\s*4;/,
   );
+});
+
+test("project export preview fills the card height without a nested frame", () => {
+  const rowRule = componentsCss.match(/\.project-export-final-path-row\s*\{([^}]*)\}/)?.[1] || "";
+  const graphRule = componentsCss.match(/\.project-export-final-path-row-graph\s*\{([^}]*)\}/)?.[1] || "";
+  const trackRule = componentsCss.match(/\.project-export-final-path-preview-track\s*\{([^}]*)\}/)?.[1] || "";
+
+  assert.match(rowRule, /padding:\s*0 10px;/);
+  assert.match(rowRule, /border:\s*1px solid var\(--border-subtle, #dbe3ec\);/);
+  assert.match(graphRule, /align-self:\s*stretch;/);
+  assert.match(graphRule, /align-items:\s*center;/);
+  assert.match(trackRule, /align-self:\s*stretch;/);
+  assert.match(trackRule, /min-height:\s*64px;/);
+  assert.match(trackRule, /height:\s*auto;/);
+  assert.match(trackRule, /border:\s*0;/);
+  assert.match(trackRule, /border-radius:\s*0;/);
+  assert.match(trackRule, /background:\s*var\(--surface-panel,\s*#fff\);/);
+
+  for (const selector of ["ctg", "gap"]) {
+    const rule = componentsCss.match(new RegExp(`\\.project-export-final-path-preview-${selector}\\s*\\{([^}]*)\\}`))?.[1] || "";
+    assert.match(rule, /top:\s*calc\(50% - 6px\);/);
+    assert.match(rule, /height:\s*16px;/);
+  }
+  const gapLabelRule = componentsCss.match(/\.project-export-final-path-preview-gap-label\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(gapLabelRule, /top:\s*calc\(50% - 18px\);/);
+});
+
+test("project export hover and focus ring stays above the preview without intercepting input", () => {
+  const rowRule = componentsCss.match(/\.project-export-final-path-row\s*\{([^}]*)\}/)?.[1] || "";
+  const ringRule = componentsCss.match(/\.project-export-final-path-row::after\s*\{([^}]*)\}/)?.[1] || "";
+  const activeRowRule = componentsCss.match(/\.project-export-final-path-row:hover,\s*\.project-export-final-path-row:focus-visible\s*\{([^}]*)\}/)?.[1] || "";
+  const activeRingRule = componentsCss.match(/\.project-export-final-path-row:hover::after,\s*\.project-export-final-path-row:focus-visible::after\s*\{([^}]*)\}/)?.[1] || "";
+
+  assert.match(rowRule, /position:\s*relative;/);
+  assert.match(rowRule, /isolation:\s*isolate;/);
+  assert.match(ringRule, /content:\s*"";/);
+  assert.match(ringRule, /position:\s*absolute;/);
+  assert.match(ringRule, /inset:\s*-1px;/);
+  assert.match(ringRule, /border:\s*2px solid transparent;/);
+  assert.match(ringRule, /border-radius:\s*inherit;/);
+  assert.match(ringRule, /pointer-events:\s*none;/);
+  assert.doesNotMatch(activeRowRule, /box-shadow:/);
+  assert.match(activeRingRule, /border-color:\s*var\(--theme-line,\s*#7c9bbc\);/);
+
+  const ringZIndex = Number(ringRule.match(/z-index:\s*(\d+);/)?.[1] || 0);
+  for (const selector of ["ctg", "gap", "gap-label"]) {
+    const rule = componentsCss.match(new RegExp(`\\.project-export-final-path-preview-${selector}\\s*\\{([^}]*)\\}`))?.[1] || "";
+    const contentZIndex = Number(rule.match(/z-index:\s*(\d+);/)?.[1] || 0);
+    assert.ok(ringZIndex > contentZIndex, `${selector} must stay below the interaction ring`);
+  }
 });
 
 test("project export final path preview hides labels that cannot fit fully", () => {

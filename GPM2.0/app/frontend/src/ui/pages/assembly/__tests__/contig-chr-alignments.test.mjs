@@ -104,3 +104,19 @@ test("cross-chr feedback directs undo to the destination, not the source", async
   assert.doesNotMatch(h.el("status").textContent,/当前 chr 撤销/);
   h.el("close").fire("click");await done;
 });
+
+
+test("cross-chr preview retains the actual primary or support source role", async () => {
+  const ctg = {assemblyCtgId:6, totalLength:1000, memberCount:1};
+  const assembly = {chrCtgs:[ctg], supportChrCtgs:[{...ctg, assemblyCtgId:7}]};
+  assert.equal(resolveContigChrAlignmentModel(assembly, {assemblyCtgId:6, trackRole:"primary"}).colorRole, "primary");
+  assert.equal(resolveContigChrAlignmentModel(assembly, {assemblyCtgId:7, trackRole:"support"}).colorRole, "companion");
+  assert.match(renderChrAlignmentPreview(source, candidate(), "companion"), /data-contig-role="companion"/);
+  assert.match(renderChrAlignmentPreview(source, candidate()), /data-contig-role="primary"/);
+  const h = harness();
+  const done = openContigChrAlignments(h.host, {sourceRole:"companion", load:async()=>report()});
+  await tick();
+  assert.match(h.el("preview").innerHTML, /data-contig-role="companion"/);
+  h.el("close").fire("click");
+  await done;
+});

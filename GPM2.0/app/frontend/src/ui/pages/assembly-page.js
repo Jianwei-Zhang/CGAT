@@ -1,3 +1,4 @@
+import { buildSupportDatasetOptions } from "./assembly/support-dataset-options.js";
 import { openContigChrAlignments, chrAlignmentCopy, resolveContigChrAlignmentModel } from "./assembly/contig-chr-alignments.js";
 import { openManualContigSplit } from "./assembly/manual-contig-split.js";
 import { normalizeMainViewHistoryStatus, resolveMainViewHistoryAfterMutation } from "./assembly/main-view-history-state.js";
@@ -1355,17 +1356,7 @@ function getCurrentProject(state) {
 }
 
 function getSupportDatasetOptions(state, currentProject = getCurrentProject(state)) {
-  if (!currentProject) {
-    return [];
-  }
-  return (currentProject.supportDatasetIds || [])
-    .map((datasetId) => normalizeSupportDatasetId(datasetId))
-    .filter((datasetId) => datasetId !== null)
-    .map((datasetId) => ({
-      datasetId,
-      label: state.initializer?.datasets?.find(item => Number(item.datasetId) === datasetId)?.displayName
-        || getDatasetNameById(state.initializer?.datasets || [], datasetId),
-    }));
+  return buildSupportDatasetOptions(currentProject, state.initializer?.datasets || []);
 }
 
 function getDatasetNameById(datasets, datasetId) {
@@ -3071,7 +3062,7 @@ async function openAssemblyContigChrAlignments(host,store,context) {
       && live?.sourceEnd===model.sourceEnd && live?.orient===model.orient && liveId===sourceId
       && live?.sourceChrName===model.sourceChrName;
   };
-  return openContigChrAlignments(host,{locale:state.locale,isCurrent,
+  return openContigChrAlignments(host,{locale:state.locale,sourceRole:model.colorRole,isCurrent,
     load:async()=>{
       const result=await getContigChrAlignments(payload),source=result.source;
       if(!isCurrent() || (source.assignedChrName || "unplaced")!==model.sourceChrName || source.sourceStart!==model.sourceStart

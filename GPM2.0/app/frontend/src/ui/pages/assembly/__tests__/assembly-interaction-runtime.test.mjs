@@ -1584,7 +1584,7 @@ test("bindings switch the final path card between graph and table modes and pers
   assert.deepEqual(persistCalls, [{ finalPathViewMode: "table" }]);
 });
 
-test("bindings keep the switched final-path table fully visible when it fits in the viewport", () => {
+test("bindings do not auto-scroll or snap the final-path card to the bottom when switching view modes", () => {
   const tableListeners = new Map();
   const tableButton = {
     dataset: {
@@ -1731,7 +1731,7 @@ test("bindings keep the switched final-path table fully visible when it fits in 
 
   assert.equal(store.getState().assembly.finalPathViewMode, "table");
   assert.equal(rerenderCount, 1);
-  assert.deepEqual(scrollCalls, [{ left: 0, top: 56, behavior: "auto" }]);
+  assert.deepEqual(scrollCalls, []);
 });
 
 test("bindings open track combo upward when the dropdown would overflow the window bottom", () => {

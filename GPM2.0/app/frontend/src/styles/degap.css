@@ -13,7 +13,7 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: #40464f;
+  color: var(--theme-ink, #40464f);
   font-size: var(--font-heading);
   line-height: 1;
   cursor: pointer;
@@ -21,7 +21,7 @@
 
 .degap-settings-button:hover,
 .degap-settings-button:focus-visible {
-  background: #eceff3;
+  background: var(--theme-surface-subtle, #eceff3);
 }
 
 .degap-panel {
@@ -35,17 +35,17 @@
   z-index: 30;
   max-width: min(420px, calc(100% - 16px));
   padding: 7px 10px;
-  border: 1px solid #bfcbd8;
-  background: #ffffff;
-  color: #26313f;
+  border: 1px solid var(--theme-line, #bfcbd8);
+  background: var(--surface-panel, #ffffff);
+  color: var(--theme-ink, #26313f);
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.16);
   font-size: var(--font-body);
   line-height: 1.35;
 }
 
 .degap-toast.is-danger {
-  border-color: #d7a7a7;
-  color: #8a2020;
+  border-color: var(--theme-red-line, #d7a7a7);
+  color: var(--theme-red-ink, #8a2020);
 }
 
 .degap-panel-body {
@@ -71,14 +71,14 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 10px;
   overflow: hidden;
-  border: 1px solid #bfc5ce;
-  background: #ffffff;
+  border: 1px solid var(--theme-line, #bfc5ce);
+  background: var(--surface-panel, #ffffff);
   box-shadow: 0 20px 50px rgba(15, 23, 42, 0.22);
 }
 
 .degap-job-editor {
-  border: 1px solid #c6ccd4;
-  background: #fbfcfd;
+  border: 1px solid var(--theme-line, #c6ccd4);
+  background: var(--theme-surface-subtle, #fbfcfd);
   padding: 10px;
 }
 
@@ -126,7 +126,8 @@
 }
 
 .degap-param-group {
-  border: 1px solid #d7d7d7;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: var(--card-radius);
   margin: 0;
   padding: 12px 10px 10px;
 }
@@ -134,8 +135,8 @@
 .degap-param-group legend {
   max-width: calc(100% - 12px);
   padding: 0 6px;
-  background: #ffffff;
-  color: #363636;
+  background: var(--surface-panel, #ffffff);
+  color: var(--text-secondary, #334155);
   font-weight: 700;
   font-size: var(--font-body);
   line-height: 1.2;
@@ -183,8 +184,9 @@
 .degap-param-group select {
   width: 100%;
   min-width: 0;
-  border: 1px solid #c5c5c5;
-  background: #fff;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: var(--control-radius, 5px);
+  background: var(--surface-panel, #fff);
   padding: 5px 7px;
   font: inherit;
 }
@@ -199,8 +201,8 @@
 }
 
 .degap-graph-wrap .assembly-final-path-layout {
-  border: 1px solid #dedede;
-  background: #fff;
+  border: 1px solid var(--theme-line, #dedede);
+  background: var(--surface-panel, #fff);
   padding: 6px 0;
 }
 
@@ -211,21 +213,24 @@
   gap: 2px;
   min-width: 128px;
   padding: 6px;
-  border: 1px solid #bdbdbd;
-  background: #ffffff;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: 6px;
+  background: var(--surface-panel, #ffffff);
+  box-shadow: var(--shadow-md);
 }
 
 .degap-gap-menu button {
   border: 0;
+  border-radius: 4px;
   background: transparent;
+  color: var(--text-primary, #1e293b);
   padding: 6px 8px;
   text-align: left;
   cursor: pointer;
 }
 
 .degap-gap-menu button:hover {
-  background: #eeeeee;
+  background: var(--surface-muted, #eef2f6);
 }
 
 .degap-jobs-panel {
@@ -235,8 +240,8 @@
 
 .degap-job-card {
   margin-top: 10px;
-  border: 1px solid #d4d9df;
-  background: #f8fafc;
+  border: 1px solid var(--theme-line, #d4d9df);
+  background: var(--surface-subtle, #f8fafc);
   padding: 8px;
   border-radius: var(--card-radius);
 }
@@ -253,18 +258,18 @@
   border: 0;
   background: transparent;
   padding: 4px 6px;
-  color: #263544;
+  color: var(--theme-ink, #263544);
   cursor: pointer;
 }
 
 .degap-job-card-toggle:hover,
 .degap-job-card-toggle:focus-visible {
-  background: #eceff3;
+  background: var(--theme-surface-subtle, #eceff3);
 }
 
 .degap-job-card-indicator {
   width: 12px;
-  color: #607080;
+  color: var(--theme-muted-ink, #607080);
   text-align: center;
 }
 
@@ -284,10 +289,10 @@
 }
 
 .degap-job-group-head {
-  border-left: 3px solid #57728f;
-  background: #f5f7f9;
+  border-left: 3px solid var(--theme-strong-line, #57728f);
+  background: var(--theme-surface-subtle, #f5f7f9);
   padding: 5px 8px;
-  color: #263544;
+  color: var(--theme-ink, #263544);
   font-size: var(--font-body);
 }
 
@@ -298,8 +303,9 @@
 
 .degap-job-row {
   min-height: 40px;
-  border: 1px solid #cecece;
-  background: #ffffff;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: var(--control-radius, 5px);
+  background: var(--surface-panel, #ffffff);
   padding: 5px 6px;
 }
 
@@ -314,26 +320,26 @@
 
 .degap-job-type-badge {
   flex: 0 0 auto;
-  border: 1px solid #c8d0d8;
+  border: 1px solid var(--theme-line, #c8d0d8);
   border-radius: 4px;
-  background: #f5f7f9;
+  background: var(--theme-surface-subtle, #f5f7f9);
   padding: 2px 6px;
-  color: #3a4a5a;
+  color: var(--theme-ink, #3a4a5a);
   font-size: var(--font-small);
   line-height: 1.2;
   white-space: nowrap;
 }
 
 .degap-job-type-badge.is-gapfiller {
-  border-color: #e0b66d;
-  background: #fff8e8;
-  color: #7a4f00;
+  border-color: var(--theme-amber-line, #e0b66d);
+  background: var(--theme-amber-surface, #fff8e8);
+  color: var(--theme-amber-ink, #7a4f00);
 }
 
 .degap-job-type-badge.is-telseeker {
-  border-color: #75b7c6;
-  background: #eaf8fb;
-  color: #075f6b;
+  border-color: var(--theme-blue-line, #75b7c6);
+  background: var(--theme-blue-surface, #eaf8fb);
+  color: var(--theme-blue-ink, #075f6b);
 }
 
 .degap-job-remove,
@@ -352,10 +358,10 @@
 .degap-job-expand:hover,
 .degap-job-remove:focus-visible,
 .degap-job-expand:focus-visible {
-  background: #edf0f3;
+  background: var(--theme-surface-subtle, #edf0f3);
 }
 
 .degap-empty {
-  border: 1px dashed #c8c8c8;
+  border: 1px dashed var(--theme-line, #c8c8c8);
   padding: 10px;
 }

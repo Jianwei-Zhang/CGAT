@@ -897,7 +897,7 @@ test("export dialog css centers its content block and keeps step icons pinned on
   assert.match(css, /\.assembly-final-path-export-step\s*\{[^}]*width:\s*100%;/);
   assert.match(css, /\.pipeline-step-label\s*\{[^}]*white-space:\s*nowrap;/);
   assert.match(css, /\.pipeline-step-icon\s*\{[^}]*justify-self:\s*end;/);
-  assert.match(css, /\.assembly-final-path-export-status\.success\s*\{[^}]*color:\s*#2c6b2f;/);
+  assert.match(css, /\.assembly-final-path-export-status\.success\s*\{[^}]*color:\s*var\(--theme-green-ink,\s*#2c6b2f\);/);
 });
 
 test("bindings commit edits from the editable empty final-path row", async () => {
