@@ -11,6 +11,12 @@
   --border-subtle: #344458;
   --border-default: #42546a;
   --border-strong: #748ba5;
+  --view-nav-grid: #344458;
+  --view-nav-window-fill: #7894b3;
+  --view-nav-window-border: #a7bfd9;
+  --view-nav-window-hover-fill: #90aac7;
+  --view-nav-window-hover-border: #c7d5e6;
+  --view-nav-window-edge: #e5edf7;
   --text-primary: #e5edf7;
   --text-secondary: #c7d5e6;
   --text-muted: #9bacc1;

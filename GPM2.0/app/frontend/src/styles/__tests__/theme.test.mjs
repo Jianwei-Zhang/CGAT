@@ -121,3 +121,24 @@ test("dataset editor fields, drop overlay, and loading curtains use theme-aware 
     /\.subview-pairwise-loading-overlay\s*\{[^}]*background:\s*var\(--theme-loading-scrim,\s*rgba\(248,\s*248,\s*248,\s*0\.72\)\);/,
   );
 });
+
+
+test("dark horizontal view navigation distinguishes the window, grid and draggable edges from the trough", () => {
+  const css = readFileSync(new URL("../assembly.css", import.meta.url), "utf8");
+  const darkToken = name => themeCss.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6});`))?.[1];
+  const luminance = hex => {
+    const rgb = hex.slice(1).match(/../g).map(value => parseInt(value, 16) / 255)
+      .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+  };
+  const contrast = (a, b) => (Math.max(luminance(a), luminance(b)) + 0.05)
+    / (Math.min(luminance(a), luminance(b)) + 0.05);
+  for (const name of ["view-nav-window-fill", "view-nav-window-hover-fill", "view-nav-window-border", "view-nav-window-edge"]) {
+    assert.ok(contrast(darkToken(name), darkToken("surface-subtle")) >= 3, name);
+  }
+  assert.notEqual(darkToken("view-nav-grid"), darkToken("surface-subtle"));
+  assert.match(css, /\.view-nav-window\s*\{[^}]*border: 1px solid var\(--view-nav-window-border, #999\);[^}]*background: var\(--view-nav-window-fill, #d6d6d6\);/);
+  assert.match(css, /\.view-nav-axis:hover \.view-nav-window\s*\{[^}]*background: var\(--view-nav-window-hover-fill, #c9c9c9\);/);
+  assert.match(css, /\.view-nav-edge::after\s*\{[^}]*background: var\(--view-nav-window-edge, #666\);/);
+  assert.match(css, /var\(--view-nav-grid, #eee\)/);
+});

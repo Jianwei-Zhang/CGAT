@@ -13,6 +13,7 @@ import {
   validateWorkspaceIntegrity,
 } from "../../services/workflow-api.js";
 import { flushAssemblyProjectState } from "./assembly-page.js";
+import { prepareProjectPreviewData } from "./project-preview-preparation.js";
 import { defaultProjectName, projectImportName } from "../../services/project-session.js";
 import { openProjectWorkspace as openWorkspace } from "../../services/project-session.js";
 import { renderProjectsBody, projectLabels, syncProjectValidation } from "./projects-view.js";
@@ -880,6 +881,7 @@ async function runImportZipFlow(host, store) {
     inFlight: true,
     importRunId: runId,
     importCancelling: false,
+    importPreparingPreview: false,
     importCancelError: "",
     importProgressDismissed: false,
     importProgressAutoScroll: true,
@@ -962,6 +964,7 @@ export async function runImportExtractedFlow(host, store) {
     inFlight: true,
     importRunId: runId,
     importCancelling: false,
+    importPreparingPreview: false,
     importCancelError: "",
     importProgressDismissed: false,
     importProgressAutoScroll: true,
@@ -1047,6 +1050,7 @@ async function runImportAddPackageFlow(host, store, workspaceRoot) {
     inFlight: true,
     importRunId: runId,
     importCancelling: false,
+    importPreparingPreview: false,
     importCancelError: "",
     importProgressAutoScroll: true,
     importProgressScrollTop: 0,
@@ -1130,6 +1134,7 @@ export async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = ""
     projectError: "",
     importRunId: null,
     importCancelling: false,
+    importPreparingPreview: false,
     importCancelError: "",
     status: i18nT(snapshot, "importer.runtime.openInProgressStatus"),
     summary: i18nT(snapshot, "importer.runtime.openSummary"),
@@ -1168,6 +1173,7 @@ export async function runOpenWorkspaceFlow(host, store, forcedWorkspacePath = ""
       inFlight: false,
       importRunId: null,
       importCancelling: false,
+      importPreparingPreview: false,
       importCancelError: "",
       status: i18nT(snapshot, "importer.runtime.openFailedStatus"),
       summary: String(error.message || error),
@@ -1417,9 +1423,39 @@ async function runDeleteSelectedFlow(host, store) {
 
 async function enterWorkspaceAfterImport(store, payload) {
   const { workspaceRoot, importerStatus, importerSummary, appendStage } = payload;
+  const runId = store.getState().importer.importRunId;
   await flushAssemblyProjectState(globalThis.document?.querySelector("#route-host"), store);
   updateImporterState(store, { stages: [...store.getState().importer.stages, projectLabels(store.getState()).pending] });
   const options = await openWorkspace({ workspaceRoot, projectName: store.getState().importer.projectNameInput });
+  if (store.getState().importer.importRunId !== runId) return;
+  const projects = options.existingProjects || [];
+  let projectPreview = null;
+  const previewStages = [];
+  updateImporterState(store, { importPreparingPreview: true });
+  try {
+    for (const [index, project] of projects.entries()) {
+      const shouldContinue = () => store.getState().importer.importRunId === runId
+        && !store.getState().importer.importCancelling;
+      if (!shouldContinue()) break;
+      const stage = i18nT(store.getState(), "importer.runtime.preparePreviewStage", {
+        current: index + 1, total: projects.length, projectName: project.projectName || project.projectId,
+      });
+      updateImporterState(store, { summary: stage, stages: [...store.getState().importer.stages, stage] });
+      globalThis.window?.dispatchEvent?.(new Event("gpm-next:route-refresh"));
+      const prepared = await prepareProjectPreviewData(store, {
+        workspaceRoot: options.workspaceRoot || workspaceRoot, project, datasets: options.datasets,
+      }, {}, { shouldContinue });
+      if (projects.length === 1) projectPreview = prepared;
+      if (!prepared && shouldContinue()) {
+        previewStages.push(i18nT(store.getState(), "importer.runtime.preparePreviewFailed", {
+          projectName: project.projectName || project.projectId,
+        }));
+      }
+    }
+  } finally {
+    if (store.getState().importer.importRunId === runId) updateImporterState(store, { importPreparingPreview: false });
+  }
+  if (store.getState().importer.importRunId !== runId) return;
   const defaultReferenceId = options.references[0]?.referenceGenomeId || "";
   const defaultPrimaryDatasetId = options.datasets[0]?.datasetId || "";
   applyWorkspaceLoadedState(store, {
@@ -1434,6 +1470,8 @@ async function enterWorkspaceAfterImport(store, payload) {
     importerStatus,
     importerSummary,
     appendStage,
+    projectPreview,
+    previewStages,
   });
 }
 
@@ -1450,12 +1488,15 @@ function applyWorkspaceLoadedState(store, payload) {
     importerStatus,
     importerSummary,
     appendStage,
+    projectPreview = null,
+    previewStages = [],
   } = payload;
   const current = store.getState();
   const selectedProject = existingProjects.length === 1 ? existingProjects[0] : null;
   resetAssemblyPageSession();
   clearAssemblySessionCache();
   store.setState({
+    projectPreview,
     session: {
       ...current.session,
       workspacePath: workspaceRoot,
@@ -1467,6 +1508,7 @@ function applyWorkspaceLoadedState(store, payload) {
       inFlight: false,
       importRunId: null,
       importCancelling: false,
+      importPreparingPreview: false,
       importCancelError: "",
       workspaceRoot,
       openWorkspacePath: workspaceRoot,
@@ -1481,8 +1523,8 @@ function applyWorkspaceLoadedState(store, payload) {
       deleteWithFiles: false,
       deleteTargets: [],
       status: importerStatus,
-      summary: importerSummary,
-      stages: appendStage ? [...current.importer.stages, appendStage] : [...current.importer.stages],
+      summary: [importerSummary, ...previewStages].filter(Boolean).join("\n"),
+      stages: [...current.importer.stages, ...previewStages, ...(appendStage ? [appendStage] : [])],
     },
     initializer: {
       ...current.initializer,
@@ -1551,6 +1593,7 @@ function applyAddPackageImportedState(store, payload) {
       inFlight: false,
       importRunId: null,
       importCancelling: false,
+      importPreparingPreview: false,
       importCancelError: "",
       workspaceRoot,
       openWorkspacePath: workspaceRoot,
@@ -1724,7 +1767,7 @@ function renderImportProgressOverlay(importer, messages) {
   const activePairwise = [...recentStages].reverse().find(stage => stage?.pairwise)?.pairwise || null;
   const cancelLabel = isCancelling
     ? messages.buttons.cancelImportPending
-    : messages.buttons.cancelImport;
+    : importer.importPreparingPreview ? messages.buttons.skipPreviewPreparation : messages.buttons.cancelImport;
   const cancelIcon = isCancelling
     ? `<span class="pipeline-spinner importer-import-progress-cancel-spinner" aria-hidden="true"></span>`
     : `<svg viewBox="0 0 20 20" width="16" height="16" focusable="false" aria-hidden="true">
@@ -2002,6 +2045,7 @@ function buildImportCompletionErrorPatch(
     inFlight: false,
     importRunId: null,
     importCancelling: false,
+    importPreparingPreview: false,
     importCancelError: "",
     importProgressDismissed: false,
     status: cancellationWasRequested
@@ -2299,6 +2343,9 @@ async function cancelCurrentImport(host, store) {
     summary: i18nT(snapshot, "importer.runtime.importCancellingSummary"),
   });
   rerender(host, store);
+
+  // Import is already committed: skip optional preparation, never cancel/delete it.
+  if (importer.importPreparingPreview) return;
 
   try {
     const result = await requestImportCancel({ runId, stateOrLocale: snapshot });

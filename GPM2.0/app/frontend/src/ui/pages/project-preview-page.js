@@ -200,7 +200,8 @@ export function loadProjectPreviewData(host, store, deps = {}, options = {}) {
   }) && pending.localSignature === previewSemanticSignature(previewLocalSignatures(initial))) return pending.promise;
   const token = {}; requests.set(store, token);
   const isCurrent = () => requests.get(store) === token && previewProjectKey(store.getState()) === key
-    && store.getState().activeRoute === "projectPreview";
+    && (options.background || store.getState().activeRoute === "projectPreview")
+    && (options.shouldContinue?.() ?? true);
   const args = { workspaceRoot: initial.session.workspacePath, projectId: initial.session.projectId };
   const getCache = deps.getProjectPreviewCache || getProjectPreviewCache;
   const putCache = deps.putProjectPreviewCache || putProjectPreviewCache;
@@ -224,8 +225,10 @@ export function loadProjectPreviewData(host, store, deps = {}, options = {}) {
     // No paint/await between restoring the old foundation and replacing the
     // changed cards; unaffected node identities (and keyboard focus) survive.
     if (!isCurrent()) return false;
-    restoreProjectPreviewDom(host, store.getState(), { allowModelMismatch: true });
-    updatePreviewDom(host, store.getState());
+    if (host) {
+      restoreProjectPreviewDom(host, store.getState(), { allowModelMismatch: true });
+      updatePreviewDom(host, store.getState());
+    }
     return true;
   };
   const run = async () => {
@@ -266,9 +269,9 @@ export function loadProjectPreviewData(host, store, deps = {}, options = {}) {
         if (!savedIsCurrent || !inputs) {
           const visible = store.getState().projectPreview;
           store.setState({ projectPreview: { ...(visible?.key === key ? visible : { loaded: false }), key, loading: true, error: "" } });
-          const refresh = host.querySelector?.("[data-preview-refresh]");
+          const refresh = host?.querySelector?.("[data-preview-refresh]");
           if (refresh) refresh.disabled = true;
-          host.querySelector?.(".project-preview-page")?.setAttribute?.("aria-busy", "true");
+          host?.querySelector?.(".project-preview-page")?.setAttribute?.("aria-busy", "true");
           inputs = await readPreviewSources(store.getState(), args,
             { ...metadata, sourceMetadata: metadata.sourceMetadata || (sameRevision ? previous?.sourceMetadata : null) }, deps);
           if (!isCurrent()) return false;
@@ -326,7 +329,7 @@ export function loadProjectPreviewData(host, store, deps = {}, options = {}) {
     } catch (error) {
       if (!isCurrent()) return false;
       store.setState({ projectPreview: { key, loading: false, loaded: false, error: String(error?.message || error) } });
-      updatePreviewDom(host, store.getState());
+      if (host) updatePreviewDom(host, store.getState());
       return false;
     }
   };

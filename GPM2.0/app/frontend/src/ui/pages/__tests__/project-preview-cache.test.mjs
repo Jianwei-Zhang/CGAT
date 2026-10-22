@@ -5,6 +5,8 @@ import { buildProjectPreviewModel, previewProjectKey } from "../project-preview-
 import { loadProjectPreviewData, bindProjectPreviewPage } from "../project-preview-page.js";
 import { PREVIEW_MODEL_VERSION, isPreviewSnapshot, previewSession, previewStateIsApplicable, markPreviewDom, rememberProjectPreviewDom, restoreProjectPreviewDom } from "../project-preview-cache.js";
 
+import { prepareProjectPreviewData } from "../project-preview-preparation.js";
+
 let fixtureId = 0;
 function fixture() {
   const state = { locale: "zh", activeRoute: "projectPreview", session: { workspacePath: `/preview-test-${++fixtureId}`, projectId: 1 },
@@ -325,4 +327,75 @@ test("snapshots predating reference placement rebuild instead of restoring a zer
   assert.equal(value.metrics.builds.length, builds + 1);
   assert.ok(restored.cards.every(card => card.reference && Number.isFinite(card.reference.start)));
   assert.equal(value.db.snapshot.modelVersion, PREVIEW_MODEL_VERSION);
+});
+
+function prepare(value, options) {
+  return prepareProjectPreviewData(value.store, {
+    workspaceRoot: value.state.session.workspacePath,
+    project: value.state.initializer.existingProjects[0], datasets: value.state.initializer.datasets,
+  }, value.deps, options);
+}
+
+test("import preparation persists the saved model and first Preview entry reuses memory without source reads", async () => {
+  const value = fixture();
+  value.store.setState({ activeRoute: "importer", session: { workspacePath: "/old-project", projectId: 99 },
+    assembly: { finalPathByChr: { Chr1: { mode: "segments", segments: [] } } } });
+  const before = value.store.getState();
+  const prepared = await prepare(value);
+  assert.equal(value.store.getState(), before, "preparation must not change the current route/session/unsaved edits");
+  assert.equal(prepared.loaded, true);
+  assert.equal(prepared.cards[0].paths[0].length, 1000, "old unsaved paths must not leak into the new project");
+  assert.ok(isPreviewSnapshot(value.db.snapshot));
+  assert.equal(value.metrics.writes, 1);
+  value.store.setState({ ...value.state, projectPreview: prepared });
+  assert.equal(previewStateIsApplicable(value.store.getState()), true);
+  const firstEntry = await load(value);
+  assert.equal(firstEntry.cacheSource, "memory");
+  assert.equal(firstEntry.cards, prepared.cards);
+  assert.equal(value.metrics.sources, 4);
+  assert.equal(value.metrics.builds.length, 1);
+  assert.equal(value.metrics.writes, 1);
+});
+
+test("a new application session opens the import-prepared persistent snapshot without source reads", async () => {
+  const value = fixture();
+  await prepare(value);
+  value.store = createStore(value.state);
+  const preview = await load(value);
+  assert.equal(preview.cacheSource, "project");
+  assert.equal(value.metrics.sources, 4);
+  assert.equal(value.metrics.builds.length, 1);
+});
+
+test("import preparation retains revision checks and rebuilds changed content on first entry", async () => {
+  const value = fixture();
+  await prepare(value);
+  value.db.paths.Chr1.segments[0].end = 500;
+  value.db.revision++; value.db.dirty = ["Chr1"];
+  const preview = await load(value);
+  assert.equal(preview.cards[0].paths[0].length, 500);
+  assert.deepEqual(value.metrics.builds.at(-1), ["Chr1"]);
+});
+
+test("preparation failure leaves import state intact and Preview can retry normally", async () => {
+  const value = fixture(), original = value.deps.listChrViewCtgs;
+  value.store.setState({ activeRoute: "importer" });
+  const before = value.store.getState();
+  value.deps.listChrViewCtgs = async () => { throw new Error("temporary read failure"); };
+  assert.equal(await prepare(value), null);
+  assert.equal(value.store.getState(), before);
+  assert.equal(value.metrics.writes, 0);
+  assert.equal(previewSession(value.store).entries.size, 0);
+  value.deps.listChrViewCtgs = original;
+  value.store.setState({ activeRoute: "projectPreview" });
+  assert.equal((await load(value)).loaded, true);
+});
+
+test("skipping import preparation cannot publish a pending stale model or overwrite a newer session", async () => {
+  const value = fixture(), original = value.deps.listProjectChromosomes;
+  let proceed = true;
+  value.deps.listProjectChromosomes = async args => { proceed = false; return original(args); };
+  assert.equal(await prepare(value, { shouldContinue: () => proceed }), null);
+  assert.equal(value.metrics.writes, 0);
+  assert.equal(previewSession(value.store).entries.size, 0);
 });

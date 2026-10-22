@@ -7,6 +7,8 @@ import {
   mergeImportProgressStage,
   renderImporterPage,
 } from "../importer-page.js";
+import { loadProjectPreviewData } from "../project-preview-page.js";
+import { previewStateIsApplicable } from "../project-preview-cache.js";
 import { en, zh } from "../../i18n/messages/importer.js";
 import { readStylesheetTree } from "../../../styles/__tests__/style-test-support.mjs";
 
@@ -1367,6 +1369,8 @@ for (const source of ["zip", "extracted"]) {
     const previousWindow = globalThis.window;
     const previousDocument = globalThis.document;
     const calls = [];
+    let snapshot = null;
+    let store;
     const failedValidation = { "D:/failed": { ok: false, message: "Missing project.sqlite" } };
     try {
       globalThis.document = { querySelector: () => null };
@@ -1381,6 +1385,20 @@ for (const source of ["zip", "extracted"]) {
             assert.equal(path, "D:/new");
             return { workspaceRoot: "D:/new", message: "Imported" };
           }
+          if (command === "get_project_preview_cache") return {
+            available: true, trackingVersion: 3, identity: "imported-db", revision: 0,
+            memoryValid: args.expectedIdentity === "imported-db" && args.sinceRevision === 0,
+            valid: Boolean(snapshot), snapshot, dirtyChrNames: ["*"],
+          };
+          if (command === "put_project_preview_cache") {
+            assert.equal(store.getState().importer.inFlight, true, "import must wait for persistence");
+            assert.equal(store.getState().importer.importPreparingPreview, true);
+            snapshot = args.request.payload;
+            return { stored: true };
+          }
+          if (command === "list_project_chromosomes") return { items: [{ chrName: "Chr1", chrLength: 1000 }] };
+          if (command === "list_chr_view_ctgs") return { items: [] };
+          if (command === "get_project_assembly_view_state" || command === "get_grt_project_view") return {};
           assert.equal(command, "open_workspace");
           assert.equal(args.workspaceRoot, "D:/new");
           return { workspaceRoot: "D:/new", references: [], datasets: [],
@@ -1400,7 +1418,7 @@ for (const source of ["zip", "extracted"]) {
         zipPath: "D:/failed.zip", workspaceRoot: "D:/failed", extractedPath: "D:/failed",
         projectNameInput: "Old", historyValidation: failedValidation, historyValidatedPaths: ["D:/failed"],
       });
-      const store = createStore(state);
+      store = createStore(state);
       bindImporterPage(host, store);
       await importButton.click();
       assert.equal(store.getState().importer.inFlight, false);
@@ -1416,7 +1434,13 @@ for (const source of ["zip", "extracted"]) {
       store.setState({ importer: { ...store.getState().importer, importSource: source,
         zipPath: "D:/new.zip", workspaceRoot: "D:/new", extractedPath: "D:/new" } });
       await importButton.click();
-      assert.deepEqual(calls.map(call => call.command), [`import_${source}`, `import_${source}`, "open_workspace"]);
+      assert.deepEqual(calls.map(call => call.command), [`import_${source}`, `import_${source}`, "open_workspace",
+        "get_project_preview_cache", "list_project_chromosomes", "list_chr_view_ctgs", "get_project_assembly_view_state",
+        "get_grt_project_view", "get_project_preview_cache", "put_project_preview_cache"]);
+      assert.equal(store.getState().projectPreview.loaded, true);
+      assert.equal(previewStateIsApplicable(store.getState()), true);
+      assert.equal(snapshot.cards.length, 1);
+      assert.ok(store.getState().importer.stages.some(stage => String(stage).includes("准备项目预览（1/1）")));
       assert.equal(store.getState().session.workspacePath, "D:/new");
       assert.equal(store.getState().session.projectId, 2);
       assert.equal(store.getState().importer.inFlight, false);
@@ -1424,6 +1448,12 @@ for (const source of ["zip", "extracted"]) {
       assert.equal(store.getState().importer.projectError, "");
       assert.deepEqual(store.getState().importer.historyValidation, failedValidation);
       assert.deepEqual(store.getState().importer.historyValidatedPaths, ["D:/failed"]);
+      const callsAfterImport = calls.length;
+      store.setState({ activeRoute: "projectPreview" });
+      assert.equal(await loadProjectPreviewData(host, store), true);
+      assert.equal(store.getState().projectPreview.cacheSource, "memory");
+      assert.deepEqual(calls.slice(callsAfterImport).map(call => call.command), ["get_project_preview_cache"]);
+
     } finally {
       globalThis.window = previousWindow;
       globalThis.document = previousDocument;
@@ -2865,3 +2895,72 @@ test("project menu opens on the entire row, clamps to the viewport and supports 
     assert.equal(h.store.getState().importer.workspaceContextMenu, null);
   } finally { h.restore(); }
 });
+
+
+for (const behavior of ["skip", "read failure", "multiple projects"]) {
+  test(`import preview preparation: ${behavior} preserves the imported workspace`, async () => {
+    const previousWindow = globalThis.window, previousDocument = globalThis.document;
+    const previousSetTimeout = globalThis.setTimeout, previousClearTimeout = globalThis.clearTimeout;
+    const sourceRead = createDeferred(), started = createDeferred();
+    const calls = [], saved = new Map();
+    try {
+      globalThis.document = { querySelector: () => null };
+      globalThis.setTimeout = () => 1; globalThis.clearTimeout = () => {};
+      const projects = (behavior === "multiple projects" ? [1, 2] : [1]).map(projectId => ({ projectId, projectName: `P${projectId}` }));
+      globalThis.window = {
+        localStorage: { getItem: () => null }, dispatchEvent() {},
+        __TAURI__: { core: { invoke: async (command, args) => {
+          calls.push({ command, args });
+          if (command === "import_zip") return { workspaceRoot: `D:/preview-${behavior}`, message: "Imported" };
+          if (command === "open_workspace") return { workspaceRoot: args.workspaceRoot, references: [], datasets: [], existingProjects: projects };
+          if (command === "get_project_preview_cache") return { available: true, trackingVersion: 3,
+            identity: "preview-db", revision: 0, memoryValid: args.expectedIdentity === "preview-db" && args.sinceRevision === 0,
+            valid: false, snapshot: null, dirtyChrNames: ["*"] };
+          if (command === "list_project_chromosomes") {
+            started.resolve();
+            if (behavior === "read failure") throw new Error("temporary preview read failure");
+            if (behavior === "skip") await sourceRead.promise;
+            return { items: [{ chrName: "Chr1", chrLength: 1000 }] };
+          }
+          if (command === "list_chr_view_ctgs") return { items: [] };
+          if (command === "get_project_assembly_view_state" || command === "get_grt_project_view") return {};
+          if (command === "put_project_preview_cache") {
+            saved.set(args.request.projectId, args.request.payload); return { stored: true };
+          }
+          throw new Error(`Unexpected command: ${command}`);
+        } } },
+      };
+      const startButton = createButton(), cancelButton = createButton();
+      const host = createHost({ "#import-zip-start-button": startButton, "[data-import-cancel]": cancelButton });
+      const store = createStore(createImporterScrollState({ inFlight: false, importRunId: null,
+        zipPath: "D:/bundle.zip", workspaceRoot: `D:/preview-${behavior}` }));
+      bindImporterPage(host, store);
+      const importing = startButton.click();
+      await started.promise;
+      assert.equal(store.getState().importer.inFlight, true);
+      if (behavior === "skip") {
+        assert.match(renderImporterPage(store.getState()), /跳过预览准备/);
+        await cancelButton.pointerdown();
+        assert.equal(store.getState().importer.importProgressDismissed, true);
+        assert.equal(store.getState().importer.inFlight, true, "keep new imports blocked until the read settles");
+        sourceRead.resolve();
+      }
+      await importing;
+      assert.equal(store.getState().session.workspacePath, `D:/preview-${behavior}`);
+      assert.equal(store.getState().importer.inFlight, false);
+      assert.equal(store.getState().importer.importPreparingPreview, false);
+      assert.equal(store.getState().importer.projectError, "");
+      assert.equal(calls.some(call => call.command === "request_import_cancel"), false);
+      assert.equal(saved.size, behavior === "multiple projects" ? 2 : 0);
+      if (behavior === "read failure") assert.match(store.getState().importer.summary, /项目已导入，进入预览时将重试/);
+      if (behavior === "multiple projects") {
+        assert.ok(store.getState().importer.stages.some(stage => String(stage).includes("准备项目预览（2/2）")));
+        assert.equal(store.getState().projectPreview, null, "multiple projects must not select an arbitrary model");
+      }
+    } finally {
+      sourceRead.resolve();
+      globalThis.window = previousWindow; globalThis.document = previousDocument;
+      globalThis.setTimeout = previousSetTimeout; globalThis.clearTimeout = previousClearTimeout;
+    }
+  });
+}

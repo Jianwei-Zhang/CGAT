@@ -2097,20 +2097,20 @@
   height: 22px;
   border: 1px solid var(--theme-line, #ddd);
   border-radius: 4px;
-  background: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), var(--theme-surface-subtle, #eee) calc(10% - 1px), var(--theme-surface-subtle, #eee) 10%), var(--theme-surface-subtle, #fafafa);
+  background: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), var(--view-nav-grid, #eee) calc(10% - 1px), var(--view-nav-grid, #eee) 10%), var(--theme-surface-subtle, #fafafa);
   touch-action: none;
 }
 .view-nav-window {
   position: absolute;
   top: 4px;
   bottom: 4px;
-  border: 1px solid var(--theme-line, #999);
+  border: 1px solid var(--view-nav-window-border, #999);
   border-radius: 2px;
-  background: var(--theme-surface-subtle, #d6d6d6);
+  background: var(--view-nav-window-fill, #d6d6d6);
   cursor: grab;
   touch-action: none;
 }
-.view-nav-axis:hover .view-nav-window { border-color: var(--theme-strong-line, #808080); background: var(--theme-surface-subtle, #c9c9c9); }
+.view-nav-axis:hover .view-nav-window { border-color: var(--view-nav-window-hover-border, #808080); background: var(--view-nav-window-hover-fill, #c9c9c9); }
 .view-nav-window:focus-visible, .view-nav-button:focus-visible, .view-nav-fit:focus-visible, .view-nav-mode-switch:focus-visible { outline: 2px solid var(--theme-blue-line, #2563eb); outline-offset: 2px; }
 .view-nav-edge {
   position: absolute;
@@ -2126,7 +2126,7 @@
 .view-nav-window[data-view-nav-compact="true"] .view-nav-edge { display: none; }
 .view-nav-grip { position: absolute; top: 0; bottom: 0; cursor: grab; touch-action: none; }
 .view-nav-grip[hidden] { display: none; }
-.view-nav-edge::after { content: ""; position: absolute; top: 5px; bottom: 5px; width: 3px; border-radius: 2px; background: var(--theme-strong-line, #666); }
+.view-nav-edge::after { content: ""; position: absolute; top: 5px; bottom: 5px; width: 3px; border-radius: 2px; background: var(--view-nav-window-edge, #666); }
 .view-nav-edge.is-left { left: 0; }
 .view-nav-edge.is-right { right: 0; }
 .view-nav-edge.is-left::after { left: 2px; }
