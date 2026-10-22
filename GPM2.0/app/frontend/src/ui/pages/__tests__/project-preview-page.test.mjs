@@ -61,13 +61,17 @@ test("hover and keyboard focus promote the whole preview card, not just its head
   const stateRule = css.match(/\.project-preview-card:hover,\s*\n\.project-preview-card:focus-within\s*\{([^}]*)\}/)?.[1];
   assert.ok(stateRule, "hover and focus-within must share one rule");
   assert.match(stateRule, /border-color:\s*var\(--preview-card-ring/);
-  // The accent ring is drawn with box-shadow so the card never reflows.
-  assert.match(stateRule, /box-shadow:\s*0 0 0 1px var\(--preview-card-ring[^;]*\),\s*var\(--shadow-md\);/);
+  // The ring is inset and the glow stays narrower than the 16px card gap, so
+  // the card never looks inflated and never covers a neighbour's border.
+  assert.match(stateRule, /box-shadow:\s*inset 0 0 0 1px var\(--preview-card-ring[^;]*\),\s*0 2px 8px var\(--preview-card-glow/);
+  assert.doesNotMatch(stateRule, /var\(--shadow-md\)|var\(--shadow-lg\)/);
+  assert.doesNotMatch(stateRule, /box-shadow:\s*0 0 0 1px/);
   assert.match(css, /\.project-preview-card:hover \.project-preview-card-header,[\s\S]*?\.project-preview-card:focus-within \.project-preview-card-header\s*\{[^}]*border-bottom-color:\s*var\(--preview-card-ring/);
   // Focus keeps an outline for forced-colors mode, drawn inside the header strip.
   assert.match(css, /\.project-preview-card-header:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--preview-card-ring[^}]*outline-offset:\s*-3px;/);
-  // Ring colour is themed and clearly visible on both surfaces.
+  // Ring and glow are themed and stay visible on both surfaces.
   assert.match(base, /--preview-card-ring:\s*#3f6fa3;/);
+  assert.match(base, /--preview-card-glow:\s*rgba\(63, 111, 163, 0\.18\);/);
   assert.match(theme, /--preview-card-ring:\s*#8ab6e6;/);
   // Per-source outlines stay scoped to their own interval inside the card.
   assert.match(css, /\.project-preview-card:hover \.project-preview-source-plots \.project-preview-used/);

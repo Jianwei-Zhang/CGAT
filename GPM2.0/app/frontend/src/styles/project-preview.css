@@ -12,12 +12,14 @@
 .project-preview-legend:not([open]) > .project-preview-hint { display: none; }
 .project-preview-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
 .project-preview-card { min-width: 0; padding: 0 16px 12px; border: 1px solid var(--border-subtle, #dbe3ec); border-radius: var(--card-radius); background: var(--surface-panel, #fff); color: var(--text-primary, #1e293b); box-shadow: var(--shadow-xs); cursor: pointer; transition: border-color 140ms ease, box-shadow 160ms ease, background-color 140ms ease; }
-/* Hover or keyboard focus promotes the whole card into one selectable object:
-   a 1px accent ring drawn with box-shadow (no layout shift) plus elevation. */
+/* Hover or keyboard focus promotes the whole card into one selectable object.
+   The accent ring is drawn INSIDE the border box and the glow stays smaller
+   than the 16px card gap, so neither the card bounds nor the neighbouring
+   card borders ever move or get covered. */
 .project-preview-card:hover,
 .project-preview-card:focus-within {
   border-color: var(--preview-card-ring, #3f6fa3);
-  box-shadow: 0 0 0 1px var(--preview-card-ring, #3f6fa3), var(--shadow-md);
+  box-shadow: inset 0 0 0 1px var(--preview-card-ring, #3f6fa3), 0 2px 8px var(--preview-card-glow, rgba(63, 111, 163, 0.18));
 }
 .project-preview-card:hover .project-preview-card-header,
 .project-preview-card:focus-within .project-preview-card-header {

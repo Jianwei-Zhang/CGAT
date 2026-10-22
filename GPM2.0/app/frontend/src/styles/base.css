@@ -54,6 +54,7 @@
   --alignment-legend-companion-high: rgb(186, 167, 135);
   /* Preview chromosome cards read as one selectable object on hover/focus. */
   --preview-card-ring: #3f6fa3;
+  --preview-card-glow: rgba(63, 111, 163, 0.18);
   /* Gap markers are sequence symbols, not theme-dependent panel surfaces. */
   --gap-marker-fill: #ffffff;
   --gap-marker-text: #1b1b1b;

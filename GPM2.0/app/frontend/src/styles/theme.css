@@ -115,6 +115,7 @@ textarea { background: var(--surface-panel); color: var(--text-primary); }
   --alignment-legend-companion-low: rgb(75, 69, 59);
   --alignment-legend-companion-high: rgb(161, 128, 80);
   --preview-card-ring: #8ab6e6;
+  --preview-card-glow: rgba(0, 0, 0, 0.45);
 }
 
 /* Transient selection must stay a lighter step of the same role, not a pale bar. */
