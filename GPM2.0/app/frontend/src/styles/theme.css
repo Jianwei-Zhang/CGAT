@@ -57,6 +57,19 @@
 textarea { background: var(--surface-panel); color: var(--text-primary); }
 :root[data-theme="dark"] ::selection { background: #3b5e89; color: #fff; }
 
+/* Native popup rows need explicit colors even when the select itself is transparent.
+   Leave selection and hover highlighting to the native control. */
+:root[data-theme="dark"] select option,
+:root[data-theme="dark"] select optgroup {
+  background-color: var(--surface-panel);
+  color: var(--text-primary);
+}
+:root[data-theme="dark"] select option:disabled,
+:root[data-theme="dark"] select optgroup:disabled,
+:root[data-theme="dark"] select optgroup:disabled option {
+  color: var(--text-muted);
+}
+
 /* Labels outside pale contig bars sit on the dark canvas, not the role fill. */
 :root[data-theme="dark"] .track-ctg-label.is-outside,
 :root[data-theme="dark"] .settings-preview .track-ctg-label {

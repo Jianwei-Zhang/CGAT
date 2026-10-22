@@ -24,6 +24,17 @@ test("dark theme changes surfaces, ink, native controls and statuses without rec
   assert.match(themeCss, /\.grt-result-repeat-count\s*\{[^}]*stroke:\s*var\(--surface-panel\)/);
 });
 
+test("native select popup options and groups have explicit dark surfaces and readable enabled or disabled ink", () => {
+  assert.match(
+    themeCss,
+    /:root\[data-theme="dark"\] select option,\s*:root\[data-theme="dark"\] select optgroup\s*\{[^}]*background-color:\s*var\(--surface-panel\);[^}]*color:\s*var\(--text-primary\);/,
+  );
+  assert.match(
+    themeCss,
+    /:root\[data-theme="dark"\] select option:disabled,\s*:root\[data-theme="dark"\] select optgroup:disabled,\s*:root\[data-theme="dark"\] select optgroup:disabled option\s*\{[^}]*color:\s*var\(--text-muted\);/,
+  );
+});
+
 test("first paint follows OS or saved preference even with missing, null, or corrupt storage", () => {
   for (const systemDark of [false, true]) {
     for (const stored of [null, "null", "{}", "broken", '{"theme":"system"}', '{"theme":"obsolete"}', '{"theme":"light"}', '{"theme":"dark"}']) {
