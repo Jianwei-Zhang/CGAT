@@ -544,7 +544,8 @@ export function previewTrackContigDrag(host, payload) {
     });
     const edgeIndexes = String(trackRole || "").trim() === "support" ? [0, 1] : [2, 3];
     const bandNodes = host.querySelectorAll?.(buildTrackBandPreviewSelector(target)) || [];
-    bandNodes.forEach((bandNode) => applyBandPreview(bandNode, edgeIndexes, offsetPx));
+    bandNodes.forEach((bandNode) => applyBandPreview(bandNode,
+      bandNode.getAttribute?.("data-main-anchor-edge") ? [0] : edgeIndexes, offsetPx));
   }
   const groups = [...allGroups];
   applySourceGapPreview(host, groups, offsetPx);

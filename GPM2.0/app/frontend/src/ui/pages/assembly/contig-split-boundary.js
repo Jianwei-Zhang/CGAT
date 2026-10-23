@@ -1,15 +1,16 @@
+import { mainActiveAnchorKeys, mainAlignmentEndpointKey } from "./main-alignment-anchors.js";
 import { resolveTrackPrefs } from "./track-prefs.js";
 import { resolveHitIdentityPct } from "./track-render-geometry.js";
 import { resolveTrackCtgOrient } from "./track-label-geometry.js";
 
 export const splitCopy = {
-  zh: { title: "分割 contig", manual: "手动分割…", left: "在比对最左侧分割", right: "在比对最右侧分割",
-    unavailable: "没有可用的比对边界，或边界已在 contig 端部", stale: "比对或当前视图已变化，请重新打开菜单。",
+  zh: { title: "分割 contig", manual: "手动分割…", left: "左侧分割", right: "右侧分割",
+    unavailable: "没有可用边界、尚未选中锚点片段，或边界已在 contig 端部", stale: "比对或当前视图已变化，请重新打开菜单。",
     undoTitle: "撤销分割 contig", undoLeft: "撤销左侧分割", undoRight: "撤销右侧分割",
     undoUnavailable: "该侧没有可合并的同源相邻分割片段", undoDone: "已撤销该侧分割；可通过主视图撤销/重做恢复。",
     done: "已分割 contig；各片段保留在原轨道，可撤销。" },
-  en: { title: "Split contig", manual: "Manual split…", left: "Split at leftmost alignment", right: "Split at rightmost alignment",
-    unavailable: "No alignment boundary, or the boundary is already at the contig end", stale: "Alignment or view changed. Reopen the menu.",
+  en: { title: "Split contig", manual: "Manual split…", left: "Split left", right: "Split right",
+    unavailable: "No boundary, no anchor-delimited fragment selected, or boundary at contig end", stale: "Alignment or view changed. Reopen the menu.",
     undoTitle: "Undo contig split", undoLeft: "Undo left split", undoRight: "Undo right split",
     undoUnavailable: "No compatible adjacent split fragment on this side", undoDone: "Split boundary removed. Main-view undo/redo is available.",
     done: "Contig split; all fragments remain on the original track. Undo is available." },
@@ -35,20 +36,22 @@ export function resolveContigSplitModel(assembly, assemblyCtgId) {
   const refLength = Number(chromosome?.chrLength || chromosome?.length)
     || Math.max(0, ...hits.map((h) => Number.isFinite(h.refEnd) ? h.refEnd : 0));
   return { assemblyCtgId: Number(assemblyCtgId), name: String(ctg.name || ctg.originId || "contig"),
+    sourceSeqId: Number(ctg.originSourceSeqId ?? ctg.sourceFragment?.sourceSeqId) || null,
     sourceStart, sourceEnd, orient, chrName: String(assembly.selectedChrName || ""), refLength, hits,
     minAlignmentLength: prefs.alignmentLength, minIdentityPct: prefs.minIdentityPct };
 }
 
 // Each visible alignment endpoint is a shortcut, including interior boundaries.
 // Keep distinct Ref anchors even when they share the same source cut.
-export function resolveContigSplitAnchors(assembly, assemblyCtgId) {
+export function resolveContigSplitAnchors(assembly, assemblyCtgId, { includeTerminals = false } = {}) {
   if (assembly?.activeHitsTrackKey && assembly.activeHitsTrackKey !== "primary") return [];
   const model = resolveContigSplitModel(assembly, assemblyCtgId);
   if (!model) return [];
   const seen = new Set();
   return model.hits.flatMap((hit) => ["start", "end"].flatMap((edge) => {
     const cutAfter = edge === "start" ? hit.queryStart - 1 : hit.queryEnd;
-    if (cutAfter < model.sourceStart || cutAfter >= model.sourceEnd) return [];
+    if (includeTerminals ? cutAfter < model.sourceStart - 1 || cutAfter > model.sourceEnd
+      : cutAfter < model.sourceStart || cutAfter >= model.sourceEnd) return [];
     const refBp = (edge === "start") !== (hit.strand === "-") ? hit.refStart : hit.refEnd;
     if (!Number.isSafeInteger(refBp) || refBp < 1) return [];
     const anchor = { assemblyCtgId: model.assemblyCtgId, cutAfter, edge, refBp,
@@ -63,7 +66,43 @@ export function resolveContigSplitAnchors(assembly, assemblyCtgId) {
     || a.refBp - b.refBp);
 }
 
+// Only enabled anchors partition the current source interval; unrelated hit endpoints do not.
+export function resolveSelectedContigSplitBoundaries(assembly, assemblyCtgId, sourceBp = null) {
+  const model = resolveContigSplitModel(assembly, assemblyCtgId);
+  if (!model) return null;
+  const candidates = resolveContigSplitAnchors(assembly, assemblyCtgId, { includeTerminals: true });
+  const active = mainActiveAnchorKeys(assembly);
+  const enabled = candidates.filter((anchor) => {
+    const side = (anchor.edge === "start") !== (model.orient === "-") ? "left" : "right";
+    return active.has(mainAlignmentEndpointKey(model.chrName, model, anchor, side));
+  }).sort((a, b) => a.cutAfter - b.cutAfter);
+  let low, high;
+  if (enabled.length) {
+    if (!Number.isSafeInteger(sourceBp) || sourceBp < model.sourceStart || sourceBp > model.sourceEnd) {
+      return { left: null, right: null, key: "unselected" };
+    }
+    low = enabled.filter((a) => a.cutAfter < sourceBp).at(-1)?.cutAfter ?? model.sourceStart - 1;
+    high = enabled.find((a) => a.cutAfter >= sourceBp)?.cutAfter ?? model.sourceEnd;
+  } else {
+    low = Math.min(...model.hits.map((h) => h.queryStart)) - 1;
+    high = Math.max(...model.hits.map((h) => h.queryEnd));
+  }
+  const key = JSON.stringify([model.sourceStart, model.sourceEnd, model.orient, model.chrName,
+    enabled.map((a) => [a.cutAfter, a.refBp]), low, high]);
+  const at = (cut, side) => {
+    const anchor = cut >= model.sourceStart && cut < model.sourceEnd
+      ? (enabled.length ? enabled : candidates).find((a) => a.cutAfter === cut) : null;
+    return anchor ? { ...anchor, selection: { sourceBp, side, key } } : null;
+  };
+  return { key, left: at(model.orient === "-" ? high : low, "left"),
+    right: at(model.orient === "-" ? low : high, "right") };
+}
+
 export function isCurrentContigSplitAnchor(assembly, anchor) {
+  if (anchor?.selection) {
+    const live = resolveSelectedContigSplitBoundaries(assembly, anchor.assemblyCtgId, anchor.selection.sourceBp);
+    if (live?.key !== anchor.selection.key || live?.[anchor.selection.side]?.cutAfter !== anchor.cutAfter) return false;
+  }
   return resolveContigSplitAnchors(assembly, anchor?.assemblyCtgId)
     .some((live) => Object.keys(live).every((key) => live[key] === anchor[key]));
 }

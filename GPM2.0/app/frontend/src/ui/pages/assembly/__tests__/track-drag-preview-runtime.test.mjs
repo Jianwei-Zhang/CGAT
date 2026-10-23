@@ -796,3 +796,14 @@ test("composition preview never moves another instance that shares a backing ctg
   assert.equal(bandA.getAttribute("points"), "15.00,0.00 25.00,0.00 20.00,10.00 10.00,10.00");
   assert.equal(bandB.getAttribute("points"), "0,0 10,0 20,10 10,10");
 });
+
+
+test("main anchor line and hit zone follow the contig endpoint while Ref stays fixed", () => {
+  const line = createNode({ "points": "20,90 200,24", "data-main-anchor-edge": "left" });
+  const hit = createNode({ "points": "100,90 250,24", "data-main-anchor-edge": "right" });
+  const host = { classList: { add() {}, remove() {} }, querySelectorAll: (selector) =>
+    selector === '[data-band-track-role="primary"][data-band-contig-id="6"]' ? [line, hit] : [] };
+  previewTrackContigDrag(host, { trackRole: "primary", assemblyCtgId: 6, offsetPx: 25 });
+  assert.deepEqual(line.getAttribute("points").split(" ").map(p => p.split(",").map(Number)), [[45,90],[200,24]]);
+  assert.deepEqual(hit.getAttribute("points").split(" ").map(p => p.split(",").map(Number)), [[125,90],[250,24]]);
+});

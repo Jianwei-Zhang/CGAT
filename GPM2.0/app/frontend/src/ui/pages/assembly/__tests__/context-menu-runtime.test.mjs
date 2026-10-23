@@ -698,7 +698,7 @@ test("anchor submenu hover/focus previews clean up on leave, blur, Escape, scrol
   const target={closest:s=>s==="[data-track-contig-id][data-track-role]"?track:null};
   const original=globalThis.window;globalThis.window={innerWidth:1200,innerHeight:800};t.after(()=>{globalThis.window=original;});
   bindAssemblyContextMenu(host,store,createRuntimeDeps({splitContigAtAnchor:async(_h,_s,anchor)=>calls.push(anchor),openManualContigSplit(){}}));
-  const open=()=>{handlers.get("contextmenu")({target,clientX:80,clientY:90,preventDefault(){}});return buttons.find(b=>b.label.includes("锚点 1"));};
+  const open=()=>{handlers.get("contextmenu")({target,clientX:80,clientY:90,preventDefault(){}});return buttons.find(b=>b.label === "左侧分割");};
   let button=open();assert.ok(button);
   const fire=(name)=>button.handlers.get(name)?.({stopPropagation(){}});
   fire("pointerenter");assert.equal(groups.filter(g=>!g.removed).length,1);

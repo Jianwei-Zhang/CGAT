@@ -2719,7 +2719,7 @@ test("assembly page public binder wires host-level listeners once for the same h
   ]);
 });
 
-test("Main split submenu contains manual entry and one shortcut for every anchor, including interior cuts", async () => {
+test("Main split submenu always contains manual, left and right boundaries instead of every alignment endpoint", async () => {
   const calls=[];
   const hits=[[101,300,201,400],[501,800,601,900]].map(([queryStart,queryEnd,refStart,refEnd])=>({queryStart,queryEnd,refStart,refEnd,strand:"+",identityPct:99,blockLength:300}));
   const store=createStore(createState({assembly:{selectedChrName:"Chr01",trackView:{alignmentLength:1},trackSelectedCtgIds:[],chrCtgs:[{assemblyCtgId:2,totalLength:1000,hits}]}}));
@@ -2728,14 +2728,14 @@ test("Main split submenu contains manual entry and one shortcut for every anchor
       openManualContigSplit:async(_host,_store,args)=>calls.push({manual:args})}});
   const split=items.find(i=>i.label==="分割 contig");assert.ok(split);assert.equal(split.disabled,false);
   assert.equal(split.run,undefined);assert.equal(split.children[0].label,"手动分割…");
-  assert.equal(split.children.length,5);assert.ok(!items.some(i=>i.label==="手动分割…"));
+  assert.deepEqual(split.children.map(i=>i.label),["手动分割…","左侧分割","右侧分割"]);assert.equal(split.children.length,3);assert.ok(!items.some(i=>i.label==="手动分割…"));
   await split.children[0].run();assert.deepEqual(calls[0],{manual:{assemblyCtgId:2}});
   for(const item of split.children.slice(1)){assert.equal(typeof item.preview,"function");item.preview()();await item.run();}
-  assert.deepEqual(calls.slice(1).map(c=>c.cutAfter),[100,300,500,800]);
+  assert.deepEqual(calls.slice(1).map(c=>c.cutAfter),[100,800]);
   store.setState({assembly:{...store.getState().assembly,chrCtgs:[{assemblyCtgId:2,totalLength:1000,hits:[]}]}});
   const empty=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:"primary"},host:{},store,actions:{canEditTrackCtg:()=>true}})
     .find(i=>i.label==="分割 contig");
-  assert.equal(empty.children[0].disabled,false);assert.equal(empty.children[1].disabled,true);
+  assert.equal(empty.children.length,3);assert.equal(empty.children[0].disabled,false);assert.equal(empty.children[1].disabled,true);assert.equal(empty.children[2].disabled,true);
 });
 
 test("other-chr alignment menu is independent from split and targets just the clicked primary contig",async()=>{

@@ -1,3 +1,4 @@
+import { resolveMainAlignmentContextTarget, resolveMainContigSourcePosition } from "./main-alignment-anchors.js";
 import { bindDelayedFloatingClose, bindDelegatedDelayedFloatingClose, cancelDelayedFloatingClose } from "../floating-menu-runtime.js";
 import { requestAppConfirm } from "../../shell/app-dialog.js";
 import {
@@ -297,6 +298,7 @@ export function buildAssemblyContextMenuActions(actionDeps, overrides = {}) {
     openContigChrAlignments: resolveAction("openContigChrAlignments"),
     openManualContigSplit: resolveAction("openManualContigSplit"),
     splitContigAtAnchor: resolveAction("splitContigAtAnchor"),
+    toggleMainAlignmentAnchor: resolveAction("toggleMainAlignmentAnchor"),
     resolveLocalFragmentMenu: resolveAction("resolveLocalFragmentMenu"),
     flipLocalFragment: resolveAction("flipLocalFragment"),
     openLocalContigSplit: resolveAction("openLocalContigSplit"),
@@ -368,6 +370,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
       trackLabelContext = null,
       subviewTrackPairContext = null,
       subviewHitContext = null,
+      mainAlignmentContext = null,
       subviewAnchorEdgeContext = null,
       subviewFragmentContext = null,
       deletedCtgContext = null,
@@ -385,6 +388,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
       trackLabelContext,
       subviewTrackPairContext,
       subviewHitContext,
+      mainAlignmentContext,
       subviewAnchorEdgeContext,
       subviewFragmentContext,
       deletedCtgContext,
@@ -464,6 +468,10 @@ export function bindAssemblyContextMenu(host, store, deps) {
       return;
     }
     const ctgContext = resolveAssemblyCtgContextTarget(event.target);
+    const mainAlignmentContext = resolveMainAlignmentContextTarget(event.target);
+    if (ctgContext) {
+      ctgContext.sourceBp = resolveMainContigSourcePosition(state.assembly, ctgContext, event.target, event.clientX, event.clientY);
+    }
     const trackLabelContext = resolveTrackLabelContextTarget(event.target);
     const subviewTrackPairContext = resolveSubviewTrackPairContextTarget(event.target);
     const subviewHitContext = resolveSubviewHitContextTarget(event.target);
@@ -537,6 +545,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
       !trackLabelContext &&
       !subviewTrackPairContext &&
       !subviewHitContext &&
+      !mainAlignmentContext &&
       !subviewAnchorEdgeContext &&
       !subviewFragmentContext &&
       !deletedCtgContext &&
@@ -557,6 +566,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
       trackLabelContext,
       subviewTrackPairContext,
       subviewHitContext,
+      mainAlignmentContext,
       subviewAnchorEdgeContext,
       subviewFragmentContext,
             deletedCtgContext,

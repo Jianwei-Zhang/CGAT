@@ -1,3 +1,4 @@
+import { mainAlignmentKey, mainAlignmentEndpointKey, mainActiveAnchorKeys, renderMainAlignmentAnchors } from "./main-alignment-anchors.js";
 import { describeMainMemberLocalState, resolveMainMemberSourceRange, resolveMainMemberCardName } from "./main-member-local-state.js";
 import { bandBoundaryAnchors } from "./contig-split-boundary.js";
 import { renderManualSplitMarkers } from "./source-fragment-layout.js";
@@ -891,6 +892,7 @@ function createRenderTracksRenderer(deps = {}) {
           ${renderAssemblyStatusToast(assembly)}
           ${renderAssemblyTracks({
             model: trackModel,
+            mainAnchorKeys: mainActiveAnchorKeys(assembly),
             hasPrimaryData: assembly.chrCtgs.length > 0,
             hasSupportTrack: supportDatasetId !== null,
             primaryDatasetName: state.initializer?.datasets?.find(item => Number(item.datasetId) === Number(currentProject?.primaryDatasetId))?.displayName || primaryDatasetName,
@@ -2186,6 +2188,12 @@ function renderAssemblyTracks(args) {
               ? normalizeSupportDatasetId(ctg.phasedTrackItemId)
               : null;
             return {
+              mainEndpointKeys: Object.fromEntries(["left", "right"].map((edge) => [edge,
+                mainAlignmentEndpointKey(selectedChrName, ctg, hit, edge, trackRole, layout.datasetId ?? ctg.datasetId)])),
+              mainHitKey: ["primary", "support"].includes(trackRole) && !part.referenceProjectionApproximate
+                && Number.isSafeInteger(Number(hit.queryStart ?? hit.query_start))
+                && Number.isSafeInteger(Number(hit.queryEnd ?? hit.query_end))
+                ? mainAlignmentKey(selectedChrName, ctg, hit, trackRole, layout.datasetId ?? ctg.datasetId) : "",
               identityPct: readHitIdentityPct(hit),
               tooltipText: `${ctg.name || ctg.assemblyCtgId}: ${Math.round(hitStartOffset)}–${Math.round(hitEndOffset)} | ${selectedChrName}: ${refStartBp}–${refEndBp} | ${alignmentBandTooltipMetrics({ identityPct: readHitIdentityPct(hit), alignLength: hitBlockLength })}${part.referenceProjectionApproximate ? ` | ${i18n.trackControls.approximateReferenceProjection}` : ""}`,
               refStartBp,
@@ -2210,6 +2218,7 @@ function renderAssemblyTracks(args) {
       });
     })
     .filter(Boolean);
+  const mainAnchorKeys = args.mainAnchorKeys || new Set();
   const collinearityBands = sortAlignmentBands(collinearityBandItems)
     .map((band) => {
       const phasedBandAttrs = band.trackRole === "phased"
@@ -2217,9 +2226,12 @@ function renderAssemblyTracks(args) {
         : "";
       return `<polygon class="track-collinearity-band${band.className}" data-band-track-role="${escapeAttr(
           band.trackRole,
-        )}" data-band-contig-id="${band.contigId}"${phasedBandAttrs} data-band-left-anchor="${band.anchors.left}" data-band-right-anchor="${band.anchors.right}" data-band-query-start="${band.queryStart}" data-band-query-end="${band.queryEnd}" data-band-ref-start="${band.refStartBp}" data-band-ref-end="${band.refEndBp}" data-band-approximate="${band.approximate ? "1" : "0"}" data-track-band-proxy="1" data-subview-band-tooltip="${escapeAttr(band.tooltipText)}" points="${band.points}" ${alignmentBandSvgAttrs(band)}></polygon>`;
+        )}" data-band-contig-id="${band.contigId}"${phasedBandAttrs}${band.mainHitKey ? ` data-main-alignment-key="${escapeAttr(band.mainHitKey)}"` : ""} data-band-left-anchor="${band.anchors.left}" data-band-right-anchor="${band.anchors.right}" data-band-query-start="${band.queryStart}" data-band-query-end="${band.queryEnd}" data-band-ref-start="${band.refStartBp}" data-band-ref-end="${band.refEndBp}" data-band-approximate="${band.approximate ? "1" : "0"}" data-track-band-proxy="1" data-subview-band-tooltip="${escapeAttr(band.tooltipText)}" points="${band.points}" ${alignmentBandSvgAttrs(band)}></polygon>`;
     })
     .join("");
+
+  const mainAlignmentAnchors = collinearityBandItems.map((band) =>
+    renderMainAlignmentAnchors(band, mainAnchorKeys, escapeAttr)).join("");
 
   const sourceGapConnections = rowLayouts.map((layout) => renderSourceGapConnections(
     layout.trackModel.ctgs.filter((ctg) => !(layout.role === "primary" && hiddenPrimaryCtgIdSet.has(Number(ctg.assemblyCtgId))))
@@ -2457,6 +2469,7 @@ function renderAssemblyTracks(args) {
             <line class="track-ruler-line" x1="${refTrackX.toFixed(2)}" y1="${rulerTop}" x2="${(refTrackX + refTrackWidth).toFixed(2)}" y2="${rulerTop}" />
             ${tickLines}
             ${collinearityBands}
+            ${mainAlignmentAnchors}
             ${renderGrtResultOverlayGroup({
               layer: "junction",
               markup: grtResultContext?.mainEnabled ? grtResultScene.junctionMarkup : "",
@@ -2670,6 +2683,8 @@ function buildSupportMirroredCtgsForRender({
         ...entry,
         datasetName: entry.datasetName || fallbackDatasetName || `ds-${entry.datasetId}`,
         name: String(liveCtg?.name || entry.name || `Ctg${entry.assemblyCtgId}`),
+        originSourceSeqId: liveCtg.originSourceSeqId,
+        sourceFragment: liveCtg.sourceFragment,
         totalLength: Math.max(
           1,
           normalizePositiveInt(liveCtg?.totalLength ?? liveCtg?.lengthBp ?? entry.totalLength) ?? entry.totalLength,

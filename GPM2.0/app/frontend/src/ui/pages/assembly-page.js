@@ -1,3 +1,4 @@
+import { toggleMainAlignmentAnchorState, patchMainAlignmentAnchors } from "./assembly/main-alignment-anchors.js";
 import { openManualContigSplit } from "./assembly/manual-contig-split.js";
 import { openAnchorContigSplit } from "./assembly/anchor-contig-split-dialog.js";
 import { createMainMemberAnnotationRefresh } from "./assembly/main-member-local-state.js";
@@ -1154,6 +1155,7 @@ const contextMenuRuntimeDeps = {
   flipLocalFragment: subviewFragmentController.flipLocalFragment,
   undoContigSplit: undoAssemblyContigSplit,
   splitContigAtAnchor: splitAssemblyContigAtAnchor,
+  toggleMainAlignmentAnchor: toggleMainAlignmentAnchor,
   openManualContigSplit: openAssemblyManualContigSplit,
   openLocalContigSplit: subviewFragmentController.openLocalContigSplit,
   openContigChrAlignments: openAssemblyContigChrAlignments,
@@ -2990,6 +2992,17 @@ async function openAssemblyManualContigSplit(host, store, { assemblyCtgId }) {
       return result;
     },
   });
+}
+
+async function toggleMainAlignmentAnchor(host, store, context) {
+  const state = store.getState();
+  if (state.assembly?.mainViewHistory?.inFlight || state.assembly?.loading || state.assembly?.sourceEditingReloadRequired) return false;
+  const assembly = toggleMainAlignmentAnchorState(state.assembly, context);
+  if (!assembly) return false;
+  store.setState({ assembly });
+  patchMainAlignmentAnchors(host, assembly);
+  persistProjectAssemblyViewStateFromStore(host, store);
+  return true;
 }
 
 async function splitAssemblyContigAtAnchor(host, store, anchor) {

@@ -1,6 +1,7 @@
+import { mainActiveAnchorKeys, mainAlignmentEndpointKey, findMainAlignment } from "./main-alignment-anchors.js";
 import { localFragmentCopy } from "./subview-fragment-copy.js";
 import { chrAlignmentCopy, resolveContigChrAlignmentModel } from "./contig-chr-alignments.js";
-import { splitCopy, resolveContigUnsplitModel, resolveContigSplitModel, resolveContigSplitAnchors, isCurrentContigSplitAnchor, highlightContigSplitAnchor } from "./contig-split-boundary.js";
+import { splitCopy, resolveContigUnsplitModel, resolveContigSplitModel, resolveSelectedContigSplitBoundaries, isCurrentContigSplitAnchor, highlightContigSplitAnchor } from "./contig-split-boundary.js";
 import {
   buildSupportMirrorKey,
   filterPrimaryTrackSelectionCtgIds,
@@ -416,6 +417,7 @@ export function buildAssemblyContextMenuItems({
   trackLabelContext,
   subviewTrackPairContext,
   subviewHitContext,
+  mainAlignmentContext,
   subviewAnchorEdgeContext,
   subviewFragmentContext,
   deletedCtgContext,
@@ -720,6 +722,27 @@ export function buildAssemblyContextMenuItems({
       },
     });
   };
+
+  if (mainAlignmentContext && typeof contextMenuActions.toggleMainAlignmentAnchor === "function") {
+    const alignment = findMainAlignment(state.assembly, mainAlignmentContext);
+    if (!alignment) return items;
+    const active = mainActiveAnchorKeys(state.assembly);
+    const singleEdge = mainAlignmentContext.edge;
+    for (const edge of singleEdge ? [singleEdge] : ["left", "right"]) {
+      const enabled = active.has(mainAlignmentEndpointKey(state.assembly.selectedChrName,
+        alignment.ctg, alignment.hit, edge, alignment.role, alignment.ctg.datasetId ?? state.assembly.supportDatasetId));
+      const label = singleEdge ? (enabled ? i18n.contextMenu.anchorOff : i18n.contextMenu.anchorOn)
+        : edge === "left" ? (enabled ? i18n.contextMenu.leftAnchorOff : i18n.contextMenu.leftAnchorOn)
+          : (enabled ? i18n.contextMenu.rightAnchorOff : i18n.contextMenu.rightAnchorOn);
+      items.push({ label, run: () => {
+        const latest = store.getState();
+        if (latest.session?.workspacePath !== state.session?.workspacePath
+          || latest.session?.projectId !== state.session?.projectId) return false;
+        return contextMenuActions.toggleMainAlignmentAnchor(host, store, { ...mainAlignmentContext, edge });
+      } });
+    }
+    if (singleEdge || !ctgContext) return items;
+  }
 
   if (subviewAnchorEdgeContext) {
     if (subviewAnchorEdgeContext.kind === "manual") {
@@ -1328,22 +1351,21 @@ export function buildAssemblyContextMenuItems({
           && String(state.assembly.selectedChrName || "").toLowerCase() !== "unplaced") {
           const labels = splitCopy[state.locale === "en" ? "en" : "zh"];
           const model = resolveContigSplitModel(state.assembly, ctgId);
-          const anchors = resolveContigSplitAnchors(state.assembly, ctgId);
+          const boundaries = resolveSelectedContigSplitBoundaries(state.assembly, ctgId, ctgContext?.sourceBp);
           const isSameProject = () => store.getState().session?.workspacePath === state.session?.workspacePath
             && store.getState().session?.projectId === state.session?.projectId;
           const children = [{ label: labels.manual, disabled: !model,
             run: () => contextMenuActions.openManualContigSplit(host, store, { assemblyCtgId: ctgId }) },
-            ...anchors.map((anchor, index) => ({
-              label: state.locale === "en"
-                ? `Anchor ${index + 1} · ${anchor.cutAfter.toLocaleString()} bp`
-                : `锚点 ${index + 1} · ${anchor.cutAfter.toLocaleString()} bp`,
-              title: `${anchor.chrName}:${anchor.refBp.toLocaleString()} → ${anchor.cutAfter.toLocaleString()} | ${anchor.queryStart.toLocaleString()}–${anchor.queryEnd.toLocaleString()}`,
-              preview: () => isSameProject() && isCurrentContigSplitAnchor(store.getState().assembly, anchor)
-                ? highlightContigSplitAnchor(host, anchor) : () => {},
-              run: () => isSameProject() && contextMenuActions.splitContigAtAnchor(host, store, anchor),
-            }))];
-          if (!anchors.length) children.push({ disabled: true,
-            label: state.locale === "en" ? "No available internal anchors" : "没有可用的内部锚点" });
+            ...["left", "right"].map((side) => {
+              const anchor = boundaries?.[side];
+              return {
+                label: labels[side], disabled: !anchor,
+                title: anchor ? `${anchor.chrName}:${anchor.refBp.toLocaleString()} → ${anchor.cutAfter.toLocaleString()}` : labels.unavailable,
+                preview: () => anchor && isSameProject() && isCurrentContigSplitAnchor(store.getState().assembly, anchor)
+                  ? highlightContigSplitAnchor(host, anchor) : () => {},
+                run: () => anchor && isSameProject() && contextMenuActions.splitContigAtAnchor(host, store, anchor),
+              };
+            })];
           items.push({ label: labels.title, disabled: !model, children });
           const unsplit = resolveContigUnsplitModel(state.assembly, ctgId);
           if (unsplit && typeof contextMenuActions.undoContigSplit === "function") {
