@@ -1235,7 +1235,7 @@ test("context menu on blank area exposes batch subview delete for box-selected t
   });
 
   assert.ok(
-    items.some((item) => item.label === "移出局部视图（已选 2）"),
+    items.some((item) => item.label === "删除 contig（局部已选 2）"),
   );
 });
 

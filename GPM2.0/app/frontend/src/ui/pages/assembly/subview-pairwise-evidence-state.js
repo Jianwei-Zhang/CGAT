@@ -67,12 +67,14 @@ export function buildSubviewPairwiseEvidenceKey(summary, scope = {}) {
   const mode = String(summary?.mode || "").trim();
   if (mode === "composition") {
     const members = normalizeSubviewCompositionMembers(summary?.members);
+    const token = (member) => `${member.entityKey}@${member.sourceKey}` + (member.localFragment
+      ? `#parts:${member.localFragment.parts.map((part) => `${part.assemblyCtgId}:${part.sourceStart}-${part.sourceEnd}:${part.orient}`).sort().join(";")}` : "");
     const topToken = members.filter((member) => member.lane === "top"
       && member.source?.role !== "ref" && member.assemblyCtgId)
-      .map((member) => `${member.entityKey}@${member.sourceKey}`).sort().join(",");
+      .map(token).sort().join(",");
     const bottomToken = members.filter((member) => member.lane === "bottom"
       && member.source?.role !== "ref" && member.assemblyCtgId)
-      .map((member) => `${member.entityKey}@${member.sourceKey}`).sort().join(",");
+      .map(token).sort().join(",");
     return topToken && bottomToken ? `composition:${topToken}|${bottomToken}` : "";
   }
   if (mode === "track-pair") {

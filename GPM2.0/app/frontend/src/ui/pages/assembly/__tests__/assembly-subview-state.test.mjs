@@ -884,6 +884,8 @@ test("context menu shows local subview delete action in track-pair mode", () => 
   const store = createStore(
     createState({
       assembly: {
+        supportDatasetId: 22,
+        supportChrCtgs: [{ assemblyCtgId: 30, datasetId: 22, name: "support", totalLength: 100 }],
         phasedChrTracks: [
           {
             phasedTrackId: 101,
@@ -896,7 +898,7 @@ test("context menu shows local subview delete action in track-pair mode", () => 
         subview: {
           summary: {
             mode: "track-pair",
-            topTrack: { role: "support" },
+            topTrack: { role: "support", source: "mother", datasetId: 22 },
             bottomTrack: { role: "primary" },
           },
         },
@@ -916,7 +918,11 @@ test("context menu shows local subview delete action in track-pair mode", () => 
     store,
     host,
   });
-  assert.ok(items.some((item) => item.label === "移出局部视图"));
+  assert.ok(items.every((item) => item.label !== "移出局部视图"));
+  const deletion = items.find((item) => item.label === "删除 contig");
+  assert.ok(deletion);
+  assert.deepEqual(deletion.children.map((item) => item.label), ["仅从当前局部视图删除", "同步从主视图删除…"]);
+  assert.equal(deletion.children[1].disabled, true, "support objects are not editable Main DS entities");
 });
 
 test("context menu shows flip action for phased ctg in subview track-pair mode", () => {

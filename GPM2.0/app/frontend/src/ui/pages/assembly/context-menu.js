@@ -1,3 +1,4 @@
+import { localFragmentCopy } from "./subview-fragment-copy.js";
 import { chrAlignmentCopy, resolveContigChrAlignmentModel } from "./contig-chr-alignments.js";
 import { splitCopy, resolveContigUnsplitModel, resolveContigSplitBoundaries, highlightContigSplitBoundary, resolveContigSplitModel } from "./contig-split-boundary.js";
 import {
@@ -334,6 +335,8 @@ export function resolveSubviewFragmentContextTarget(target) {
   }
   return {
     fragmentKey,
+    ...(String(node.getAttribute("data-subview-fragment-entity-key") || "").trim()
+      ? { compositionEntityKey: String(node.getAttribute("data-subview-fragment-entity-key")).trim() } : {}),
     assemblyCtgId,
     slot: String(node.getAttribute("data-subview-fragment-slot") || "").trim().toLowerCase(),
     trackRole,
@@ -644,6 +647,7 @@ export function buildAssemblyContextMenuItems({
       datasetId: normalizeSupportDatasetId(targetContext?.datasetId),
       phasedTrackId: normalizeSupportDatasetId(targetContext?.phasedTrackId),
       phasedTrackItemId: normalizeSupportDatasetId(targetContext?.phasedTrackItemId),
+      ...(targetContext?.start != null ? { start: targetContext.start, end: targetContext.end, fragmentKey: targetContext.fragmentKey } : {}),
     };
     const subviewCtgContext = normalizedTrackRole && assemblyCtgId ? {
       assemblyCtgId,
@@ -652,29 +656,64 @@ export function buildAssemblyContextMenuItems({
       datasetId: memberContext.datasetId,
       isMirror: targetContext?.isMirror === true,
       refOrient: String(targetContext?.refOrient || "").trim(),
+      ...(compositionEntityKey ? { localFragmentEntityKey: compositionEntityKey } : {}),
     } : null;
     if (subviewCtgContext) attachPhasedSubviewIdentity(subviewCtgContext, targetContext);
     if (includeAppend && subviewCtgContext) {
       pushAppendTrackContigItems(subviewCtgContext, { allowAnyPhasedTarget: true });
     }
+    const unsafeLegacyInterval = memberContext.start != null
+      && typeof contextMenuActions.resolveLocalFragmentMenu !== "function";
+    const unavailableTitle = unsafeLegacyInterval ? localFragmentCopy[state.locale === "en" ? "en" : "zh"].stale : "";
     items.push({
       label: i18n.contextMenu.moveSubviewCtgToOtherTrack,
-      run: async () => moveContextSubviewMemberToOtherLane(host, store, memberContext),
+      disabled: unsafeLegacyInterval, title: unavailableTitle,
+      run: async () => unsafeLegacyInterval ? false : moveContextSubviewMemberToOtherLane(host, store, memberContext),
     });
     if (subviewCtgContext && canEditTrackCtg(subviewCtgContext, state.assembly)) {
       items.push({
         label: i18n.contextMenu.flipContig,
+        disabled: unsafeLegacyInterval, title: unavailableTitle,
         run: async () => {
-          toggleSubviewContigFlip(host, store, {
-            slot: subviewCtgContext.slot,
-            assemblyCtgId,
-          });
+          if (unsafeLegacyInterval) return false;
+          if (typeof contextMenuActions.flipLocalFragment === "function") return contextMenuActions.flipLocalFragment(host, store, memberContext);
+          toggleSubviewContigFlip(host, store, { slot: subviewCtgContext.slot, assemblyCtgId });
         },
       });
     }
+    if (typeof contextMenuActions.resolveLocalFragmentMenu === "function") {
+      const model = contextMenuActions.resolveLocalFragmentMenu(state, host, memberContext);
+      if (!model) return;
+      const labels = localFragmentCopy[state.locale === "en" ? "en" : "zh"];
+      const isFragment = Boolean(model.member.localFragment);
+      items.push({ label: isFragment ? labels.splitFragment : labels.split,
+        disabled: !model.canSplit, title: model.canSplit ? "" : labels.splitUnavailable,
+        children: [
+          { label: labels.localSplit, run: () => contextMenuActions.openLocalContigSplit(host, store, memberContext) },
+          { label: labels.mainSplit, disabled: !model.canSync || !contextMenuActions.synchronizeLocalFragment,
+            title: !model.canSync ? labels.syncUnavailable : !contextMenuActions.synchronizeLocalFragment ? labels.syncPending : "",
+            run: () => contextMenuActions.openLocalContigSplit(host, store, memberContext, { synchronize: true }) },
+        ],
+      });
+      items.push({ label: labels.merge, children: [
+        { label: labels.mergeLeft, disabled: !model.left, title: model.left ? "" : labels.mergeUnavailable,
+          run: () => contextMenuActions.mergeLocalFragment(host, store, memberContext, "left") },
+        { label: labels.mergeRight, disabled: !model.right, title: model.right ? "" : labels.mergeUnavailable,
+          run: () => contextMenuActions.mergeLocalFragment(host, store, memberContext, "right") },
+      ] });
+      items.push({ label: isFragment ? labels.deleteFragment : labels.delete, children: [
+        { label: labels.localDelete, run: () => removeContextSubviewMember(host, store, memberContext) },
+        { label: labels.mainDelete, disabled: !model.canSync || !contextMenuActions.synchronizeLocalFragment,
+          title: !model.canSync ? labels.syncUnavailable : !contextMenuActions.synchronizeLocalFragment ? labels.syncPending : "",
+          run: () => contextMenuActions.synchronizeLocalFragment(host, store, memberContext, { action: "delete" }) },
+      ] });
+      return;
+    }
     items.push({
       label: i18n.contextMenu.deleteLocalSubviewContig,
+      disabled: unsafeLegacyInterval, title: unavailableTitle,
       run: async () => {
+        if (unsafeLegacyInterval) return false;
         if (String(normalizedSubview.summary?.mode || "") === "track-pair"
           && normalizedTrackRole && assemblyCtgId) {
           return setSubviewTrackPairCtgHidden(host, store, {
@@ -728,7 +767,6 @@ export function buildAssemblyContextMenuItems({
   }
 
   if (subviewFragmentContext) {
-    pushSubviewHitAnchorItems(subviewHitContext);
     const fragmentAppendContext = attachPhasedSubviewIdentity({
       assemblyCtgId: subviewFragmentContext.assemblyCtgId,
       slot: subviewFragmentContext.slot,
@@ -736,6 +774,7 @@ export function buildAssemblyContextMenuItems({
       datasetId: subviewFragmentContext.datasetId,
       isMirror: subviewFragmentContext.isMirror === true,
       refOrient: subviewFragmentContext.refOrient,
+      ...(subviewFragmentContext.compositionEntityKey ? { localFragmentEntityKey: subviewFragmentContext.compositionEntityKey } : {}),
       start: subviewFragmentContext.start,
       end: subviewFragmentContext.end,
       sourceKind: subviewFragmentContext.sourceKind,
@@ -756,7 +795,8 @@ export function buildAssemblyContextMenuItems({
         phasedTrackId: subviewFragmentContext.phasedTrackId,
         phasedTrackItemId: subviewFragmentContext.phasedTrackItemId,
         phasedHaplotypeKey: subviewFragmentContext.phasedHaplotypeKey,
-        compositionEntityKey: subviewTrackPairContext?.compositionEntityKey,
+        compositionEntityKey: subviewFragmentContext.compositionEntityKey || subviewTrackPairContext?.compositionEntityKey,
+        start: subviewFragmentContext.start, end: subviewFragmentContext.end, fragmentKey: subviewFragmentContext.fragmentKey,
       },
       { includeAppend: false },
     );

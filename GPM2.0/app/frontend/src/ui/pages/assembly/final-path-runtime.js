@@ -1,3 +1,4 @@
+import { resolveLocalFinalPathContexts } from "./subview-fragment-model.js";
 import { requestAppPrompt } from "../../shell/app-dialog.js";
 import {
   FINAL_PATH_GAP_BP,
@@ -715,24 +716,23 @@ export async function appendTrackContigToFinalPath(host, store, ctgContext, deps
     return null;
   }
   const { state, chrName, currentEntry } = context;
-  const ctg = resolveTrackContigFromAssembly(state.assembly, ctgContext);
-  if (!ctg) {
-    return null;
+  const appendContexts = ctgContext?.localFragmentEntityKey
+    ? resolveLocalFinalPathContexts(state.assembly.subview?.summary?.members || [], ctgContext) : [ctgContext];
+  if (!appendContexts?.length) return null;
+  const nextSegments = [];
+  for (const appendContext of appendContexts) {
+    const ctg = resolveTrackContigFromAssembly(state.assembly, appendContext);
+    if (!ctg) return null;
+    const segment = buildTrackContigFinalPathSegment(state, appendContext, ctg, resolveNextSegmentId([...currentEntry.segments, ...nextSegments]));
+    if (!segment) return null;
+    nextSegments.push(segment);
   }
-  const nextSegment = buildTrackContigFinalPathSegment(
-    state,
-    ctgContext,
-    ctg,
-    resolveNextSegmentId(currentEntry.segments),
-  );
-  if (!nextSegment) {
-    return null;
-  }
+  const nextSegment = nextSegments[0];
   return persistCurrentEntrySegments(
     host,
     store,
     context,
-    [...currentEntry.segments, nextSegment],
+    [...currentEntry.segments, ...nextSegments],
     deps,
     {
       actionStatus: tAssembly(state, "runtime.appendToPathDone", {

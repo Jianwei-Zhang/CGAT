@@ -1,3 +1,4 @@
+import { createSubviewFragmentController, resolveLocalFragmentMenu } from "./assembly/subview-fragment-controller.js";
 import { clearOtherViewSelection } from "./assembly/selection-state.js";
 import { bindAlignmentTooltips } from "./assembly/alignment-tooltip-runtime.js";
 import { buildSupportDatasetOptions } from "./assembly/support-dataset-options.js";
@@ -443,6 +444,12 @@ const {
   moveContextSubviewMemberToOtherLane,
   removeContextSubviewMember,
 } = subviewToolsContentController;
+const subviewFragmentController = createSubviewFragmentController({
+  openManualContigSplit,
+  persistProjectAssemblyViewStateFromStore: (host, store) => persistProjectAssemblyViewStateFromStore(host, store),
+  rerenderSubviewPanel: (host, store) => rerenderSubviewPanel(host, store),
+  refreshSubviewPairwiseEvidence,
+});
 const {
   enterSubviewFromCandidates,
   enterSubviewFromTrackSelections,
@@ -1122,13 +1129,17 @@ const degapRuntimeDeps = {
 };
 
 const contextMenuRuntimeDeps = {
+  resolveLocalFragmentMenu,
+  flipLocalFragment: subviewFragmentController.flipLocalFragment,
+  openLocalContigSplit: subviewFragmentController.openLocalContigSplit,
+  mergeLocalFragment: subviewFragmentController.mergeLocalFragment,
   splitContigAtRefBoundary: splitAssemblyContigAtRefBoundary,
   undoContigSplit: undoAssemblyContigSplit,
   openManualContigSplit: openAssemblyManualContigSplit,
   openContigChrAlignments: openAssemblyContigChrAlignments,
   addContextCtgToComposition,
-  moveContextSubviewMemberToOtherLane,
-  removeContextSubviewMember,
+  moveContextSubviewMemberToOtherLane: subviewFragmentController.moveLocalFragmentToOtherLane,
+  removeContextSubviewMember: subviewFragmentController.deleteLocalFragment,
   addFinalPathContigRelativeToSegment,
   addFinalPathGapRelativeToSegment,
   applyEditorAction: editorActionRuntimeAdapters.applyEditorAction,

@@ -38,6 +38,7 @@ function projectCandidate(ctg, sourcePatch, index) {
     sourceKey: buildSubviewCompositionSourceKey(source),
     assemblyCtgId: ctg?.assemblyCtgId,
     sourceFragment: ctg?.sourceFragment,
+    originSourceSeqId: ctg?.originSourceSeqId,
     source,
     reference,
     label: ctg?.name || ctg?.ctgName,
@@ -113,5 +114,8 @@ export function resolveSubviewCompositionCandidate(candidates, member) {
   return source.find((candidate) => candidate.entityKey === member?.entityKey
     && candidate.sourceKey === member?.sourceKey)
     || source.find((candidate) => candidate.entityKey === member?.entityKey)
+    || source.find((candidate) => candidate.assemblyCtgId === member?.assemblyCtgId && candidate.sourceKey === member?.sourceKey)
+    || (member?.localFragment ? source.find((candidate) => member.localFragment.parts.some((part) => part.assemblyCtgId === candidate.assemblyCtgId)
+      && candidate.sourceKey === member.sourceKey) : null)
     || null;
 }

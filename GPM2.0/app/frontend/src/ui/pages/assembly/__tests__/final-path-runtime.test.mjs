@@ -1683,3 +1683,35 @@ test("addFinalPathContigRelativeToSegment does not persist when async input is c
   assert.equal(persisted, false);
   assert.deepEqual(store.getState(), before);
 });
+
+for (const reversed of [false, true]) {
+  test(`appending a joined local fragment adds only its real source intervals once, reverse=${reversed}`, async () => {
+    const { normalizeSubviewComposition, applySubviewComposition } = await import("../subview-composition-state.js");
+    const { mergeLocalMember, isolateLocalMemberInterval } = await import("../subview-fragment-model.js");
+    const sourceFragment = { sourceSeqId: 100, groupKey: "manual-fragment:joined", sourceLength: 1200 };
+    const real = [
+      { assemblyCtgId: 9, name: "Ctg9", originId: "ctg-source", totalLength: 400, datasetId: 11,
+        sourceFragment: { ...sourceFragment, sourceStart: 1, sourceEnd: 400 } },
+      { assemblyCtgId: 10, name: "Ctg10", originId: "ctg-source", totalLength: 800, datasetId: 11,
+        sourceFragment: { ...sourceFragment, sourceStart: 401, sourceEnd: 1200 } },
+    ];
+    const composition = normalizeSubviewComposition({ members: real.map((ctg, index) => ({ ...ctg,
+      source: { role: "primary", datasetId: 11 }, xBp: index * 400, baseOrientation: reversed ? "-" : "+" })) });
+    const joined = mergeLocalMember(composition, "assembly:9", reversed ? "left" : "right");
+    assert.equal(joined.changed, true);
+    const store = createStore({ chrCtgs: real, subview: applySubviewComposition({}, joined.composition) });
+    const persisted = [];
+    await appendTrackContigToFinalPath({}, store, { assemblyCtgId: 9, trackRole: "primary", datasetId: 11,
+      localFragmentEntityKey: joined.member.entityKey, start: 201, end: 1000 }, createDeps({
+      async persistProjectAssemblyViewState(payload) { persisted.push(payload); return payload; },
+    }));
+    const segments = store.getState().assembly.finalPathByChr.Chr01.segments;
+    assert.equal(segments.length, 2);
+    assert.deepEqual(segments.map((segment) => segment.segmentId), ["seg-1", "seg-2"]);
+    assert.equal(segments.reduce((sum, segment) => sum + Math.abs(segment.end - segment.start) + 1, 0), 800);
+    assert.deepEqual(segments.map((segment) => segment.assemblyCtgId), reversed ? [10, 9] : [9, 10]);
+    assert.deepEqual(segments.map((segment) => [segment.start, segment.end]), reversed ? [[600, 1], [400, 201]] : [[201, 400], [1, 600]]);
+    assert.equal(persisted.length, 1, "joined fragment append is one atomic Final Path edit");
+    assert.deepEqual(store.getState().assembly.chrCtgs, real);
+  });
+}

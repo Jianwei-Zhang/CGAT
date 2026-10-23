@@ -232,7 +232,7 @@ test("buildAssemblyContextMenuItems exposes move and remove for every Subview mo
       "加入 Final Path",
       "移至另一轨",
       "翻转 contig",
-      "移出局部视图",
+      "删除 contig",
     ]);
     await items[1].run();
     assert.equal(calls.at(-1).name, "moveContextSubviewMemberToOtherLane");
@@ -786,9 +786,9 @@ test("buildAssemblyContextMenuItems exposes track-pair move, flip, and remove ac
 
   assert.ok(items.some((item) => item.label === "移至另一轨"));
   assert.ok(items.some((item) => item.label === "翻转 contig"));
-  assert.ok(items.some((item) => item.label === "移出局部视图"));
+  assert.ok(items.some((item) => item.label === "删除 contig"));
   const flipItem = items.find((item) => item.label === "翻转 contig");
-  const removeItem = items.find((item) => item.label === "移出局部视图");
+  const removeItem = items.find((item) => item.label === "删除 contig");
   await flipItem.run();
   assert.deepEqual(calls.at(-1), {
     name: "toggleSubviewContigFlip",
@@ -969,7 +969,7 @@ test("buildAssemblyContextMenuItems exposes unified fragment actions in 2-contig
     "加入 Final Path",
     "移至另一轨",
     "翻转 contig",
-    "移出局部视图",
+    "删除 contig",
   ]);
 
   await items[0].run();
@@ -992,14 +992,10 @@ test("buildAssemblyContextMenuItems exposes unified fragment actions in 2-contig
     }],
   });
 
-  await items[2].run();
-  assert.deepEqual(calls.at(-1), {
-    name: "toggleSubviewContigFlip",
-    args: [host, store, {
-      slot: "bottom",
-      assemblyCtgId: 8,
-    }],
-  });
+  assert.equal(items[2].disabled, true, "legacy handlers cannot safely edit a clicked interval");
+  const callCount = calls.length;
+  assert.equal(await items[2].run(), false);
+  assert.equal(calls.length, callCount, "must not flip the whole parent as a fallback");
 });
 
 test("buildAssemblyContextMenuItems offers phased append targets for subview-ctg fragments", async () => {
@@ -1236,23 +1232,14 @@ test("buildAssemblyContextMenuItems exposes fragment-local subview actions in tr
     "加入 Final Path",
     "移至另一轨",
     "翻转 contig",
-    "移出局部视图",
+    "删除 contig",
   ]);
 
-  await items[2].run();
-  assert.deepEqual(calls.at(-1), {
-    name: "toggleSubviewContigFlip",
-    args: [host, store, {
-      slot: "top",
-      assemblyCtgId: 30,
-    }],
-  });
-
-  await items[3].run();
-  assert.deepEqual(calls.at(-1), {
-    name: "setSubviewTrackPairCtgHidden",
-    args: [host, store, { trackRole: "support", contigId: 30, hidden: true }],
-  });
+  for (const item of items.slice(1)) {
+    assert.equal(item.disabled, true);
+    assert.equal(await item.run(), false);
+  }
+  assert.equal(calls.length, 0, "a missing interval editor must not silently mutate the whole parent");
 });
 
 test("buildAssemblyContextMenuItems exposes final-path graph ctg actions", async () => {
@@ -1641,7 +1628,7 @@ test("buildAssemblyContextMenuItems renders english labels when locale is en", (
     actions: createContextMenuActionsCapture([]),
   });
   assert.ok(subviewItems.some((item) => item.label === "Move to Other Track"));
-  assert.ok(subviewItems.some((item) => item.label === "Remove from Local View"));
+  assert.ok(subviewItems.some((item) => item.label === "Delete contig"));
 });
 
 

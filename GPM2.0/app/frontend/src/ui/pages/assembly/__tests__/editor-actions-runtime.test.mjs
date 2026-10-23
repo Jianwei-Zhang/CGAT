@@ -77,13 +77,13 @@ test("deleteSelectedSubviewTrackPairCtgs hides normalized subview selections and
     },
   );
 
-  assert.deepEqual(confirms, ["确认将已框选的 1 个 contig 移出局部视图吗？"]);
+  assert.deepEqual(confirms, ["确认仅从当前局部视图删除已框选的 1 个 contig 吗？"]);
   assert.deepEqual(state.assembly.subview.trackPairHiddenCtgs, [
     { trackRole: "primary", contigId: 3 },
     { trackRole: "primary", contigId: 7 },
   ]);
   assert.deepEqual(state.assembly.subview.trackPairSelectedCtgs, []);
-  assert.equal(state.assembly.actionStatus, "已从局部视图移出 1 个 contig。");
+  assert.equal(state.assembly.actionStatus, "已仅从当前局部视图删除 1 个 contig。");
   assert.equal(state.assembly.actionError, "");
   assert.equal(rerenders.length, 1);
   assert.equal(persists.length, 1);

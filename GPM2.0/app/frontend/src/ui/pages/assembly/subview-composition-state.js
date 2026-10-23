@@ -1,3 +1,4 @@
+import { normalizeLocalFragment, replaceLocalMembers } from "./subview-fragment-model.js";
 import {
   normalizeSubviewActiveAnchors,
   normalizeSubviewManualAnchors,
@@ -89,16 +90,21 @@ export function normalizeSubviewCompositionMember(value, fallbackOrder = 0) {
   })).trim();
   if (!entityKey) return null;
   const source = normalizeSubviewCompositionSource(value.source || value);
+  const localFragment = normalizeLocalFragment(value.localFragment);
+  if (value.localFragment && !localFragment) return null;
   return {
     entityKey,
     sourceKey: String(value.sourceKey || buildSubviewCompositionSourceKey(source)).trim(),
     assemblyCtgId,
+    ...(normalizeSupportDatasetId(value.originSourceSeqId) ? { originSourceSeqId: normalizeSupportDatasetId(value.originSourceSeqId) } : {}),
+    ...(localFragment ? { localFragment } : {}),
     ...(value.sourceFragment?.sourceSeqId && value.sourceFragment?.groupKey
       ? { sourceFragment: { ...value.sourceFragment } } : {}),
     source,
     reference,
     label: String(value.label || value.name || entityKey).trim() || entityKey,
-    lengthBp: normalizePositiveLength(value.lengthBp ?? value.totalLength),
+    lengthBp: localFragment ? localFragment.sourceEnd - localFragment.sourceStart + 1
+      : normalizePositiveLength(value.lengthBp ?? value.totalLength),
     baseOrientation: normalizeOrientation(value.baseOrientation ?? value.orient ?? value.refOrient),
     lane: normalizeSubviewCompositionLane(value.lane),
     xBp: normalizeFiniteNumber(value.xBp, 0),
@@ -195,6 +201,9 @@ export function addSubviewCompositionMembers(composition, candidates, lane) {
   const targetLane = normalizeSubviewCompositionLane(lane);
   const members = normalized.members.map((member) => ({ ...member }));
   const memberIndexByKey = new Map(members.map((member, index) => [member.entityKey, index]));
+  members.forEach((member, index) => {
+    if (!member.localFragment) memberIndexByKey.set(buildSubviewCompositionEntityKey(member), index);
+  });
   let nextX = resolveLaneRight(members, targetLane, normalized.layoutGapBp);
   let nextOrder = members.reduce((maximum, member) => Math.max(maximum, member.order), -1) + 1;
   let addedCount = 0;
@@ -213,14 +222,25 @@ export function addSubviewCompositionMembers(composition, candidates, lane) {
       movedCount += 1;
       return;
     }
+    // Re-adding the real parent after local splitting/deletion is an explicit
+    // new presentation. It must not reuse an edited fragment's view identity.
+    let entityKey = candidate.entityKey;
+    if (members.some((member) => member.sourceKey === candidate.sourceKey
+      && (member.assemblyCtgId === candidate.assemblyCtgId
+        || member.localFragment?.parts.some((part) => part.assemblyCtgId === candidate.assemblyCtgId)))) {
+      let instance = 1;
+      while (members.some((member) => member.entityKey === `${candidate.entityKey}:instance:${instance}`)) instance += 1;
+      entityKey = `${candidate.entityKey}:instance:${instance}`;
+    }
     const member = {
       ...candidate,
+      entityKey,
       lane: targetLane,
       xBp: nextX,
       order: nextOrder,
     };
     members.push(member);
-    memberIndexByKey.set(member.entityKey, members.length - 1);
+    memberIndexByKey.set(candidate.entityKey, members.length - 1);
     nextX += member.lengthBp + normalized.layoutGapBp;
     nextOrder += 1;
     addedCount += 1;
@@ -238,11 +258,11 @@ export function removeSubviewCompositionMembers(composition, entityKeys) {
   const normalized = normalizeSubviewComposition(composition);
   const removeKeys = new Set((Array.isArray(entityKeys) ? entityKeys : [entityKeys])
     .map((key) => String(key || "").trim()).filter(Boolean));
-  const members = normalized.members.filter((member) => !removeKeys.has(member.entityKey));
+  const removed = normalized.members.filter((member) => removeKeys.has(member.entityKey));
   return {
-    composition: { ...normalized, members },
-    changed: members.length !== normalized.members.length,
-    removedCount: normalized.members.length - members.length,
+    composition: replaceLocalMembers(normalized, removed, []),
+    changed: removed.length > 0,
+    removedCount: removed.length,
   };
 }
 

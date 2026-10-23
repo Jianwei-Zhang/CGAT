@@ -121,6 +121,8 @@ function memberFromCtg(
   cursorByLane[lane] = Math.max(cursorByLane[lane], xBp + lengthBp + layoutGapBp);
   return normalizeSubviewCompositionMember({
     assemblyCtgId: contigId,
+    originSourceSeqId: ctg?.originSourceSeqId,
+    sourceFragment: ctg?.sourceFragment,
     source: sourceFromSelection(selection, ctg),
     reference: selection?.role === "ref" ? {
       chrName: ctg?.referenceChrName || ctg?.chrName,

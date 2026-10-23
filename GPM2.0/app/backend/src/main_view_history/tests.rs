@@ -1,4 +1,5 @@
 mod explicit_selection_drag;
+mod local_fragment;
 mod source_fragment_drag;
 
 use anyhow::Result;

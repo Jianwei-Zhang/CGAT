@@ -272,3 +272,28 @@ test("composition box selections highlight exactly the selected local member ins
   assert.match(html, /class="track-ctg-group[^"]*is-multi-selected"[^>]*data-subview-composition-entity-key="assembly:1"/);
   assert.doesNotMatch(html, /class="track-ctg-group[^"]*is-multi-selected"[^>]*data-subview-composition-entity-key="assembly:2"/);
 });
+
+
+for (const removeFirst of [false, true]) {
+  test(`split local intervals keep evidence from each backing part without crossing deleted sequence, deleted=${removeFirst}`, async () => {
+    const { splitLocalMember, deleteLocalMember } = await import("../subview-fragment-model.js");
+    const { createIdentityRenderState } = await import("./identity-render-fixture.mjs");
+    const state = createIdentityRenderState("composition");
+    let comp = normalizeSubviewComposition({ members: state.assembly.subview.summary.members });
+    const split = splitLocalMember(comp, "assembly:30", 8000);
+    comp = removeFirst ? deleteLocalMember(split.composition, split.members[0].entityKey).composition : split.composition;
+    state.assembly.subview = applySubviewComposition(state.assembly.subview, comp);
+    const html = renderAssemblyPage(state);
+    const bands = [...html.matchAll(/<polygon[^>]+data-subview-hit-key="([^"]+)"[^>]*>/g)].map((match) => match[1]);
+    assert.equal(bands.length, removeFirst ? 4 : 9);
+    if (removeFirst) {
+      assert.ok(bands.every((key) => !key.startsWith("evidence-1|") && !key.startsWith("evidence-4|")));
+      assert.doesNotMatch(html, new RegExp(`data-subview-composition-entity-key="${split.members[0].entityKey}"`));
+    } else {
+      assert.ok(bands.some((key) => key.includes(split.members[0].entityKey)));
+      assert.ok(bands.some((key) => key.includes(split.members[1].entityKey)));
+    }
+    assert.match(html, /source 8,001-16,000/);
+    assert.match(html, /data-subview-fragment-entity-key="local:/);
+  });
+}

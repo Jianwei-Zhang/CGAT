@@ -1,3 +1,4 @@
+import { memberBackingIds } from "./subview-fragment-model.js";
 import {
   getJunctionInspection,
   getTrackPairwiseEvidence,
@@ -46,14 +47,14 @@ export function createSubviewPairwiseController({
       const members = normalizeSubviewCompositionMembers(summary?.members);
       const topAssemblyCtgIds = members
         .filter((member) => member.lane === "top" && member.source?.role !== "ref")
-        .map((member) => member.assemblyCtgId).filter(Boolean);
+        .flatMap(memberBackingIds).filter(Boolean);
       const bottomAssemblyCtgIds = members
         .filter((member) => member.lane === "bottom" && member.source?.role !== "ref")
-        .map((member) => member.assemblyCtgId).filter(Boolean);
+        .flatMap(memberBackingIds).filter(Boolean);
       return {
         mode: "composition",
-        topAssemblyCtgIds,
-        bottomAssemblyCtgIds,
+        topAssemblyCtgIds: [...new Set(topAssemblyCtgIds)],
+        bottomAssemblyCtgIds: [...new Set(bottomAssemblyCtgIds)],
         key: buildSubviewPairwiseEvidenceKey(summary, { topAssemblyCtgIds, bottomAssemblyCtgIds }),
       };
     }

@@ -16,7 +16,7 @@ function sourceLabel(source, labels) {
 
 function displayLabel(member) {
   return formatTrackCtgOrientationLabel(
-    member?.label,
+    member?.localFragment ? `${member.label}: ${member.localFragment.sourceStart.toLocaleString()}-${member.localFragment.sourceEnd.toLocaleString()}` : member?.label,
     resolveTrackCtgEffectiveOrientation(member?.baseOrientation, member?.flipped),
   );
 }
@@ -92,7 +92,8 @@ function renderPicker(candidates, composition, ui, labels, escapeHtml, escapeAtt
       <button type="button" class="button ghost tiny" data-subview-composition-retry="1">${escapeHtml(labels.retry)}</button></p>` : ""}
     <ul class="subview-composition-candidate-list">
       ${filtered.map((candidate) => {
-        const existing = membersByKey.get(candidate.entityKey);
+        const existing = membersByKey.get(candidate.entityKey) || composition.members.find((member) =>
+          !member.localFragment && member.assemblyCtgId === candidate.assemblyCtgId && member.sourceKey === candidate.sourceKey);
         const displayedCandidate = existing || candidate;
         const moveNote = existing && existing.lane !== ui.targetLane
           ? labels.willMove[existing.lane]

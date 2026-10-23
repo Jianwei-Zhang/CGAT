@@ -23,6 +23,7 @@ pub(super) fn prepare_editor_mutation(
     args: &Value,
 ) -> Result<PreparedMutation> {
     match action {
+        "edit-local-fragment" => super::local_fragment::prepare(conn, project_id, chr_name, args),
         "add-contig-to-chr" => super::chr_add::prepare_add(conn, project_id, chr_name, args),
         "split-manual-contig" => {
             super::ref_split::prepare_manual_split(conn, project_id, chr_name, args)
@@ -933,7 +934,7 @@ fn load_seq_target_ctg(
     load_ctg_target(conn, project_id, chr_name, ctg_id)
 }
 
-fn allocate_deleted_record_ids(conn: &Connection, count: usize) -> Result<Vec<i64>> {
+pub(super) fn allocate_deleted_record_ids(conn: &Connection, count: usize) -> Result<Vec<i64>> {
     let max_id: i64 = conn.query_row(
         "SELECT COALESCE(MAX(id), 0) FROM deleted_assembly_ctg",
         [],

@@ -1,4 +1,5 @@
 mod chr_add;
+mod local_fragment;
 mod mutations;
 mod ref_split;
 mod snapshot;

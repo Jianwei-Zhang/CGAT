@@ -1,3 +1,4 @@
+import { reconcileLocalSubviewWithMain } from "./subview-fragment-reconcile.js";
 function normalizeFinalPathViewMode(value) {
   return normalizeFinalPathViewModeState(value);
 }
@@ -691,6 +692,7 @@ export async function loadAssemblyView(host, store, options, deps) {
       });
       if (activated?.assembly) store.setState({ assembly: activated.assembly });
     }
+    store.setState({ assembly: reconcileLocalSubviewWithMain(store.getState().assembly) });
   } catch (error) {
     if (!isCurrentRequest()) return;
     const mappedError = deps.mapAssemblyError({ error, stateOrLocale: store.getState() });

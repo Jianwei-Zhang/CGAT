@@ -1,3 +1,4 @@
+import { memberAnchorEndpointKey, memberBackingIds, projectLocalAlignment, filterLocalAnchorCuts, memberCoordinateToSource, projectLocalNRegions } from "./subview-fragment-model.js";
 import { sourceFragmentDragAttrs } from "./source-fragment-layout.js";
 import { resolveFullRangeVisibleSpan } from "./view-navigation-state.js";
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
@@ -7,7 +8,6 @@ import {
   sortAlignmentBands, renderAlignmentIdentityLegend,
 } from "./alignment-band-style.js";
 import {
-  buildSubviewAnchorEndpointKey,
   deriveSubviewContigFragments,
 } from "./subview-anchor-state.js";
 import { buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
@@ -75,16 +75,7 @@ function memberFullDisplayLabel(member) {
 }
 
 function endpointKey(member) {
-  return buildSubviewAnchorEndpointKey({
-    role: member.source?.role,
-    contigId: member.assemblyCtgId,
-    datasetId: member.source?.datasetId,
-    source: member.source?.sourceType,
-    isMirror: member.source?.mirrored,
-    phasedTrackId: member.source?.phasedTrackId,
-    phasedTrackItemId: member.source?.phasedItemId,
-    phasedHaplotypeKey: member.source?.hap,
-  });
+  return memberAnchorEndpointKey(member);
 }
 
 function rangeX(member, start, end) {
@@ -108,53 +99,48 @@ function rangeCuts(member, start, end) {
 }
 
 function buildEvidenceBands(layout, evidence, prefs) {
-  const topById = new Map(layout.top.filter((member) => member.assemblyCtgId)
-    .map((member) => [member.assemblyCtgId, member]));
-  const bottomById = new Map(layout.bottom.filter((member) => member.assemblyCtgId)
-    .map((member) => [member.assemblyCtgId, member]));
-  return (Array.isArray(evidence?.hits) ? evidence.hits : []).map((hit, index) => {
+  const indexMembers = (members) => {
+    const result = new Map();
+    for (const member of members) for (const id of memberBackingIds(member)) {
+      if (!result.has(id)) result.set(id, []);
+      result.get(id).push(member);
+    }
+    return result;
+  };
+  const topById = indexMembers(layout.top), bottomById = indexMembers(layout.bottom);
+  return (Array.isArray(evidence?.hits) ? evidence.hits : []).flatMap((hit, index) => {
     const length = normalizePositiveInt(hit?.alignLength ?? hit?.align_length) ?? 0;
-    if (
-      length < prefs.alignmentLength
-      || resolveHitIdentityPct(hit) < prefs.minIdentityPct
-    ) return null;
+    if (length < prefs.alignmentLength || resolveHitIdentityPct(hit) < prefs.minIdentityPct) return [];
     const queryId = normalizeSupportDatasetId(hit?.queryAssemblyCtgId ?? hit?.query_assembly_ctg_id);
     const subjectId = normalizeSupportDatasetId(hit?.subjectAssemblyCtgId ?? hit?.subject_assembly_ctg_id);
-    let top = topById.get(queryId);
-    let bottom = bottomById.get(subjectId);
-    let topStart = hitField(hit, "queryStart", "query_start");
-    let topEnd = hitField(hit, "queryEnd", "query_end");
-    let bottomStart = hitField(hit, "subjectStart", "subject_start");
-    let bottomEnd = hitField(hit, "subjectEnd", "subject_end");
-    if (!top || !bottom) {
-      top = topById.get(subjectId);
-      bottom = bottomById.get(queryId);
-      topStart = hitField(hit, "subjectStart", "subject_start");
-      topEnd = hitField(hit, "subjectEnd", "subject_end");
-      bottomStart = hitField(hit, "queryStart", "query_start");
-      bottomEnd = hitField(hit, "queryEnd", "query_end");
+    const result = [];
+    for (const inverted of [false, true]) {
+      const topId = inverted ? subjectId : queryId, bottomId = inverted ? queryId : subjectId;
+      const prefixA = inverted ? "subject" : "query", prefixB = inverted ? "query" : "subject";
+      const coordinates = {
+        topStart: hitField(hit, `${prefixA}Start`, `${prefixA}_start`),
+        topEnd: hitField(hit, `${prefixA}End`, `${prefixA}_end`),
+        bottomStart: hitField(hit, `${prefixB}Start`, `${prefixB}_start`),
+        bottomEnd: hitField(hit, `${prefixB}End`, `${prefixB}_end`),
+        strand: String(hit?.strand || hit?.orient || "+").trim(),
+      };
+      if (Object.values(coordinates).some((value) => value === null)) continue;
+      for (const top of topById.get(topId) || []) for (const bottom of bottomById.get(bottomId) || []) {
+        const projected = projectLocalAlignment(top, bottom, topId, bottomId, coordinates);
+        if (!projected) continue;
+        const { topStart, topEnd, bottomStart, bottomEnd, strand } = projected;
+        const originalKey = String(hit?.hitKey || `composition-pairwise-${index + 1}`);
+        result.push({
+          hitKey: top.localFragment || bottom.localFragment ? `${originalKey}|${top.entityKey}|${bottom.entityKey}` : originalKey,
+          identityPct: readHitIdentityPct(hit), projectionApproximate: Boolean(hit.projectionApproximate), alignLength: length,
+          top, bottom, topRange: rangeX(top, topStart, topEnd), bottomRange: rangeX(bottom, bottomStart, bottomEnd),
+          topCuts: rangeCuts(top, topStart, topEnd), bottomCuts: rangeCuts(bottom, bottomStart, bottomEnd),
+          reversed: ((strand === "-") !== Boolean(top.flipped)) !== Boolean(bottom.flipped),
+        });
+      }
     }
-    if (!top || !bottom || [topStart, topEnd, bottomStart, bottomEnd].some((value) => value === null)) {
-      return null;
-    }
-    const topRange = rangeX(top, topStart, topEnd);
-    const bottomRange = rangeX(bottom, bottomStart, bottomEnd);
-    const strand = String(hit?.strand || hit?.orient || "+").trim();
-    const reversed = ((strand === "-") !== Boolean(top.flipped)) !== Boolean(bottom.flipped);
-    return {
-      hitKey: String(hit?.hitKey || `composition-pairwise-${index + 1}`),
-      identityPct: readHitIdentityPct(hit),
-      projectionApproximate: Boolean(hit.projectionApproximate),
-      alignLength: length,
-      top,
-      bottom,
-      topRange,
-      bottomRange,
-      topCuts: rangeCuts(top, topStart, topEnd),
-      bottomCuts: rangeCuts(bottom, bottomStart, bottomEnd),
-      reversed,
-    };
-  }).filter(Boolean);
+    return result;
+  });
 }
 
 function buildReferenceBands(layout, candidates, prefs) {
@@ -166,11 +152,11 @@ function buildReferenceBands(layout, candidates, prefs) {
       if (topIsRef === bottomIsRef) continue;
       const ref = topIsRef ? top : bottom;
       const contig = topIsRef ? bottom : top;
-      const candidate = resolveSubviewCompositionCandidate(candidates, contig);
+      const backingCandidates = memberBackingIds(contig).map((id) => candidates.find((item) => item.assemblyCtgId === id && item.sourceKey === contig.sourceKey)).filter(Boolean);
       const referenceStart = Number(ref.reference?.startBp);
       const referenceEnd = Number(ref.reference?.endBp);
-      if (!candidate || !Number.isFinite(referenceStart) || !Number.isFinite(referenceEnd)) continue;
-      for (const [index, hit] of (Array.isArray(candidate.ctg?.hits) ? candidate.ctg.hits : []).entries()) {
+      if (!Number.isFinite(referenceStart) || !Number.isFinite(referenceEnd)) continue;
+      for (const candidate of backingCandidates) for (const [index, hit] of (Array.isArray(candidate.ctg?.hits) ? candidate.ctg.hits : []).entries()) {
         const length = normalizePositiveInt(hit?.blockLength ?? hit?.block_length) ?? 0;
         if (
           length < prefs.alignmentLength
@@ -184,23 +170,28 @@ function buildReferenceBands(layout, candidates, prefs) {
         const overlapStart = Math.max(referenceStart, Math.min(rawRefStart, rawRefEnd));
         const overlapEnd = Math.min(referenceEnd, Math.max(rawRefStart, rawRefEnd));
         if (overlapEnd < overlapStart) continue;
-        const refStart = overlapStart - referenceStart + 1;
-        const refEnd = overlapEnd - referenceStart + 1;
+        const refStart = Math.min(rawRefStart, rawRefEnd) - referenceStart + 1;
+        const refEnd = Math.max(rawRefStart, rawRefEnd) - referenceStart + 1;
         const topStart = topIsRef ? refStart : ctgStart;
         const topEnd = topIsRef ? refEnd : ctgEnd;
         const bottomStart = bottomIsRef ? refStart : ctgStart;
         const bottomEnd = bottomIsRef ? refEnd : ctgEnd;
-        const strand = String(hit?.strand || hit?.orient || "+").trim();
+        const projected = projectLocalAlignment(top, bottom,
+          topIsRef ? ref.assemblyCtgId : candidate.assemblyCtgId,
+          bottomIsRef ? ref.assemblyCtgId : candidate.assemblyCtgId,
+          { topStart, topEnd, bottomStart, bottomEnd, strand: String(hit?.strand || hit?.orient || "+").trim() });
+        if (!projected) continue;
+        const strand = projected.strand;
         bands.push({
           hitKey: `reference:${top.entityKey}|${bottom.entityKey}|${String(hit?.hitKey || index + 1)}`,
           identityPct: readHitIdentityPct(hit),
           alignLength: length,
           top,
           bottom,
-          topRange: rangeX(top, topStart, topEnd),
-          bottomRange: rangeX(bottom, bottomStart, bottomEnd),
-          topCuts: rangeCuts(top, topStart, topEnd),
-          bottomCuts: rangeCuts(bottom, bottomStart, bottomEnd),
+          topRange: rangeX(top, projected.topStart, projected.topEnd),
+          bottomRange: rangeX(bottom, projected.bottomStart, projected.bottomEnd),
+          topCuts: rangeCuts(top, projected.topStart, projected.topEnd),
+          bottomCuts: rangeCuts(bottom, projected.bottomStart, projected.bottomEnd),
           reversed: ((strand === "-") !== Boolean(top.flipped)) !== Boolean(bottom.flipped),
         });
       }
@@ -247,7 +238,7 @@ function anchorAttrs(edge, kind, identity, active, escapeAttr) {
 function renderEvidenceAnchors(bands, activeAnchors, escapeAttr) {
   const { TOP_Y, BOTTOM_Y, BAR_HEIGHT } = getCompositionVerticalMetrics();
   const active = new Set((Array.isArray(activeAnchors) ? activeAnchors : [])
-    .map((anchor) => `${anchor.hitKey}:${anchor.edge}`));
+    .filter((anchor) => !anchor.descriptor).map((anchor) => `${anchor.hitKey}:${anchor.edge}`));
   return bands.flatMap((band) => ["left", "right"].map((side) => {
     const points = edgeDescriptor(band, side);
     const edge = { ...band, ...points, edge: side };
@@ -264,7 +255,7 @@ function renderEvidenceAnchors(bands, activeAnchors, escapeAttr) {
   })).join("");
 }
 
-function renderManualAnchors(layout, anchors, escapeAttr) {
+function renderManualAnchors(layout, anchors, escapeAttr, evidence = false) {
   const { TOP_Y, BOTTOM_Y, BAR_HEIGHT } = getCompositionVerticalMetrics();
   const byEndpoint = new Map(layout.members.map((member) => [endpointKey(member), member]));
   return (Array.isArray(anchors) ? anchors : []).map((anchor) => {
@@ -287,15 +278,18 @@ function renderManualAnchors(layout, anchors, escapeAttr) {
       topCut: topEndpoint.cutBp,
       bottomCut: bottomEndpoint.cutBp,
       manualAnchorId: anchor.manualAnchorId,
-      edge: "manual",
+      hitKey: anchor.hitKey || "",
+      edge: evidence ? anchor.edge : "manual",
     };
-    const objectId = anchorObjectId(edge, "manual", anchor.manualAnchorId);
+    const kind = evidence ? "evidence" : "manual";
+    const identity = evidence ? anchor.hitKey : anchor.manualAnchorId;
+    const objectId = anchorObjectId(edge, kind, identity);
     return `<line class="subview-anchor-line is-active" x1="${edge.topX.toFixed(2)}" y1="${TOP_Y + BAR_HEIGHT}"
       x2="${edge.bottomX.toFixed(2)}" y2="${BOTTOM_Y}" stroke="red" stroke-width="3" pointer-events="none"
       data-subview-anchor-object-id="${escapeAttr(objectId)}" />
       <line class="subview-anchor-hit-zone is-active" x1="${edge.topX.toFixed(2)}" y1="${TOP_Y + BAR_HEIGHT}"
       x2="${edge.bottomX.toFixed(2)}" y2="${BOTTOM_Y}" stroke="transparent" stroke-width="4"
-      pointer-events="stroke" ${anchorAttrs(edge, "manual", anchor.manualAnchorId, true, escapeAttr)} />`;
+      pointer-events="stroke" ${anchorAttrs(edge, kind, identity, true, escapeAttr)} />`;
   }).join("");
 }
 
@@ -320,6 +314,10 @@ function buildAnchorCutsByEndpoint(layout, bands, activeAnchors, manualAnchors) 
     add(anchor?.endpointA?.endpointKey, anchor?.endpointA?.cutBp);
     add(anchor?.endpointB?.endpointKey, anchor?.endpointB?.cutBp);
   });
+  (activeAnchors || []).forEach((anchor) => {
+    add(anchor.descriptor?.top?.endpointKey, anchor.descriptor?.top?.cutBp);
+    add(anchor.descriptor?.bottom?.endpointKey, anchor.descriptor?.bottom?.cutBp);
+  });
   return cuts;
 }
 
@@ -331,17 +329,19 @@ function renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr }) {
       role: member.source?.role,
       lengthBp: member.lengthBp,
     },
-    anchorCuts: cuts,
+    anchorCuts: filterLocalAnchorCuts(member, cuts),
   });
   if (!fragments.length) return "";
   const orientation = memberOrientation(member);
   return fragments.map((fragment) => {
     const range = rangeX(member, fragment.start, fragment.end);
     const width = Math.max(1, range.right - range.left);
-    const title = `${memberFullDisplayLabel(member)}:${fragment.start.toLocaleString()}-${fragment.end.toLocaleString()}`;
+    const sourceA = memberCoordinateToSource(member, fragment.start), sourceB = memberCoordinateToSource(member, fragment.end);
+    const title = `${memberFullDisplayLabel(member)}: source ${Math.min(sourceA, sourceB).toLocaleString()}-${Math.max(sourceA, sourceB).toLocaleString()}`;
     return `<rect class="subview-fragment-hit-zone" x="${range.left.toFixed(2)}" y="${y}"
         width="${width.toFixed(2)}" height="${BAR_HEIGHT}" fill="transparent"
-        data-subview-fragment-key="${escapeAttr(fragment.fragmentKey)}"
+        data-subview-fragment-key="${escapeAttr(member.entityKey)}:${fragment.start}-${fragment.end}"
+        data-subview-fragment-entity-key="${escapeAttr(member.entityKey)}"
         data-subview-fragment-slot="${member.lane}"
         data-subview-fragment-role="${escapeAttr(member.source?.role || "support")}"
         data-subview-fragment-contig-id="${member.assemblyCtgId || 0}"
@@ -380,10 +380,11 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
   const source = sourceName(member, labels);
   const label = memberDisplayLabel(member);
   const worldStartBp = resolveSubviewWorldStartBp({ startBp: member.xBp });
+  const localRangeTitle = member.localFragment ? ` | source ${member.localFragment.sourceStart.toLocaleString()}-${member.localFragment.sourceEnd.toLocaleString()}` : "";
   const title = `${buildTrackCtgHoverTitle(memberFullDisplayLabel(member), {
     startBp: worldStartBp,
     lengthBp: member.lengthBp,
-  })}${source ? ` | ${source}` : ""}`;
+  })}${source ? ` | ${source}` : ""}${localRangeTitle}`;
   const unavailable = (candidate || !candidatesLoaded ? "" : " is-unavailable")
     + (selected ? " is-multi-selected" : "");
   const orient = memberOrientation(member);
@@ -539,6 +540,12 @@ export function renderSubviewCompositionAlignmentCard({
     composition.activeAnchors,
     composition.manualAnchors,
   );
+  const renderCandidate = (member) => {
+    const candidate = resolveSubviewCompositionCandidate(candidates, member);
+    return candidate && member.localFragment ? { ...candidate, ctg: { ...candidate.ctg,
+      totalLength: member.lengthBp, lengthBp: member.lengthBp, nRegions: projectLocalNRegions(member, candidates),
+    } } : candidate;
+  };
   const memberEntries = layout.members.map((member) => ({
     ctg: {
       assemblyCtgId: member.assemblyCtgId,
@@ -548,7 +555,7 @@ export function renderSubviewCompositionAlignmentCard({
     rect: member,
     markup: renderMember(
       member,
-      resolveSubviewCompositionCandidate(candidates, member),
+      renderCandidate(member),
       candidatesLoaded,
       anchorCutsByEndpoint.get(endpointKey(member)) || [],
       member.lane === "top" ? TOP_Y : BOTTOM_Y,
@@ -624,6 +631,7 @@ export function renderSubviewCompositionAlignmentCard({
           ${memberMarkup}
           ${renderEvidenceAnchors(bands, composition.activeAnchors, escapeAttr)}
           ${renderManualAnchors(layout, composition.manualAnchors, escapeAttr)}
+          ${renderManualAnchors(layout, composition.activeAnchors.filter((anchor) => anchor.descriptor).map((anchor) => ({ ...anchor, endpointA: anchor.descriptor.top, endpointB: anchor.descriptor.bottom })), escapeAttr, true)}
           ${grtAnchorScene.markup}
         </svg>
       </div>
