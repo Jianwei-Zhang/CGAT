@@ -695,7 +695,19 @@ export function normalizeSubviewTrackPairHiddenCtgs(values) {
 }
 
 export function normalizeSubviewTrackPairSelectionCtgs(values) {
-  return normalizeSubviewTrackPairHiddenCtgs(values);
+  const entries = new Map();
+  for (const value of Array.isArray(values) ? values : []) {
+    const base = normalizeSubviewTrackPairHiddenCtgs([value])[0];
+    if (!base) continue;
+    const compositionEntityKey = String(value.compositionEntityKey || "").trim();
+    const slot = ["top", "bottom"].includes(value.slot) ? value.slot : "";
+    const entry = { ...base, ...(compositionEntityKey ? { compositionEntityKey } : {}),
+      ...(slot ? { slot } : {}) };
+    entries.set(`${base.trackRole}:${base.contigId}:${compositionEntityKey}:${slot}`, entry);
+  }
+  return [...entries.values()].sort((a, b) =>
+    `${a.trackRole}:${a.contigId}:${a.compositionEntityKey || ""}:${a.slot || ""}`
+      .localeCompare(`${b.trackRole}:${b.contigId}:${b.compositionEntityKey || ""}:${b.slot || ""}`));
 }
 
 export function resolveSubviewCtgOrder(ctg) {
@@ -1489,8 +1501,14 @@ export function buildSubviewSummaryFromTrackSelections({
 
 export function resolveFilteredSubviewTrackPairSelectionsFromAssembly(assembly) {
   const subview = getSubviewState(assembly);
-  if (String(subview.summary?.mode || "") !== "track-pair") {
-    return [];
+  if (!subview.summary) return [];
+  if (String(subview.summary.mode) === SUBVIEW_COMPOSITION_MODE) {
+    const members = getSubviewComposition(subview)?.members || [];
+    return normalizeSubviewTrackPairSelectionCtgs(subview.trackPairSelectedCtgs).filter((entry) =>
+      members.some((member) => entry.compositionEntityKey
+        ? member.entityKey === entry.compositionEntityKey
+        : member.assemblyCtgId === entry.contigId && member.source.role === entry.trackRole
+          && (!entry.slot || member.lane === entry.slot)));
   }
   const pools = buildSubviewTrackPairPoolsFromAssembly(assembly);
   const hiddenKeySet = new Set(

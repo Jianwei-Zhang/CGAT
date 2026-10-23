@@ -10,6 +10,8 @@ import {
   resolveFilteredSubviewTrackPairSelectionsFromAssembly,
 } from "./subview-state.js";
 import { commitSubviewHistoryOperation } from "./subview-history-state.js";
+import { projectCurrentSubviewToComposition } from "./subview-composition-controller.js";
+import { applySubviewComposition, removeSubviewCompositionMembers } from "./subview-composition-state.js";
 
 function normalizeBoolean(value) {
   if (value === true || value === "true") {
@@ -282,9 +284,7 @@ export async function deleteSelectedSubviewTrackPairCtgs(host, store, selectedEn
   ]);
   const state = store.getState();
   const currentSubview = (overrides.getSubviewState || getSubviewState)(state.assembly);
-  if (String(currentSubview.summary?.mode || "") !== "track-pair") {
-    return;
-  }
+  if (!currentSubview.summary) return;
   const normalizeSelections =
     overrides.normalizeSubviewTrackPairSelectionCtgs || normalizeSubviewTrackPairSelectionCtgs;
   const resolveSelections =
@@ -306,16 +306,27 @@ export async function deleteSelectedSubviewTrackPairCtgs(host, store, selectedEn
   if (!(await confirm(tAssembly(store.getState(), "runtime.batchSubviewDeleteConfirm", { count: normalized.length })))) {
     return;
   }
-  const hiddenNext = normalizeHidden([
-    ...normalizeHidden(currentSubview.trackPairHiddenCtgs),
-    ...normalized,
-  ]);
-  const committed = commitSubviewHistoryOperation(state.assembly, {
-    nextSubview: {
+  let nextSubview;
+  if (String(currentSubview.summary.mode) === "track-pair") {
+    nextSubview = {
       ...currentSubview,
-      trackPairHiddenCtgs: hiddenNext,
+      trackPairHiddenCtgs: normalizeHidden([
+        ...normalizeHidden(currentSubview.trackPairHiddenCtgs), ...normalized,
+      ]),
       trackPairSelectedCtgs: [],
-    },
+    };
+  } else {
+    const composition = projectCurrentSubviewToComposition(state, host);
+    const keys = composition.members.filter((member) => normalized.some((entry) =>
+      entry.compositionEntityKey ? member.entityKey === entry.compositionEntityKey
+        : member.assemblyCtgId === entry.contigId && member.source.role === entry.trackRole
+          && (!entry.slot || member.lane === entry.slot))).map((member) => member.entityKey);
+    if (!keys.length) return;
+    const removed = removeSubviewCompositionMembers(composition, keys);
+    nextSubview = applySubviewComposition(currentSubview, removed.composition, { trackPairSelectedCtgs: [] });
+  }
+  const committed = commitSubviewHistoryOperation(state.assembly, {
+    nextSubview,
     operation: { kind: "hide-contigs", count: normalized.length },
     stateOrLocale: state,
   });

@@ -100,7 +100,12 @@ fn prepare_drag_ctg(
         Some(Value::Array(values)) if !values.is_empty() => values.iter().collect(),
         _ => bail!("MAIN_VIEW_HISTORY_INVALID_REQUEST: drag targets must be a nonempty array"),
     };
-    let leader_fragment = if targets.len() > 1 {
+    let explicit_selection = match args.get("dragSelection") {
+        None => false,
+        Some(Value::Bool(value)) => *value,
+        _ => bail!("MAIN_VIEW_HISTORY_INVALID_REQUEST: dragSelection must be a boolean"),
+    };
+    let leader_fragment = if targets.len() > 1 && !explicit_selection {
         Some(
             crate::main_view::load_source_fragment(conn, leader.id)?.ok_or_else(|| {
                 anyhow!("MAIN_VIEW_HISTORY_INVALID_REQUEST: linked drag requires source fragments")
@@ -167,6 +172,28 @@ fn prepare_drag_ctg(
         ..SnapshotScope::default()
     };
     let before = capture_snapshot(conn, project_id, &scope)?;
+    if explicit_selection {
+        let read_offset = |entries: &[Value], key: &ProjectViewTrackOffsetKey| {
+            entries
+                .iter()
+                .find_map(|entry| {
+                    drag_offset_key(entry)
+                        .ok()
+                        .filter(|(entry_key, _)| entry_key == key)
+                        .map(|(_, offset)| offset)
+                })
+                .unwrap_or(0.0)
+        };
+        let delta = leader_offset
+            - read_offset(&before.layout_state.scoped_track_drag_offsets, &leader_key);
+        for key in &before.layout_scope.track_offset_keys {
+            let target_delta = read_offset(&offsets, key)
+                - read_offset(&before.layout_state.scoped_track_drag_offsets, key);
+            if (target_delta - delta).abs() > 0.011 {
+                bail!("MAIN_VIEW_HISTORY_INVALID_REQUEST: selected ctgs must share one drag delta");
+            }
+        }
+    }
     let mut desired_layout = before.layout_state.clone();
     desired_layout.scoped_track_drag_offsets = offsets;
     reconcile_project_view_layout(conn, project_id, &before.layout_scope, &desired_layout)?;
@@ -802,8 +829,12 @@ fn finish_simple_mutation(
     Ok(PreparedMutation {
         descriptor: MainViewHistoryOperationDescriptor {
             kind: kind.to_string(),
-            target_count: 1,
-            target_name,
+            target_count: affected_ctg_ids.len().max(1) as i64,
+            target_name: if affected_ctg_ids.len() > 1 {
+                None
+            } else {
+                target_name
+            },
         },
         changed: before != after,
         before,

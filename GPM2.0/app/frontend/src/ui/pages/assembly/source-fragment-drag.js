@@ -26,15 +26,13 @@ export function moveSubviewCompositionDrag(composition, payload) {
   return { composition: current, changed };
 }
 
-// Resolve only the rendered instances in this view. Do not alter selection, or
-// link another dataset, phased track, or an unrelated instance of the source.
-export function collectSourceFragmentDragTargets(host, node, { subview = false } = {}) {
+// A gesture owns the clicked object unless it belongs to the explicit selection.
+// Provenance is not a movement constraint: same-source siblings do not opt in.
+export function collectContigDragTargets(host, node, {
+  subview = false, selectedIds = [], selectedEntries = [],
+} = {}) {
   const attr = (entry, name) => String(entry?.getAttribute?.(name) || "");
   const positive = (entry, name) => Number(attr(entry, name)) || null;
-  const scopeAttrs = subview
-    ? ["data-subview-track-role", "data-subview-track-pair-dataset-id",
-      "data-subview-track-pair-phased-track-id", "data-subview-track-pair-is-mirror"]
-    : ["data-track-role", "data-track-dataset-id", "data-track-phased-track-id"];
   const identity = (entry) => subview ? {
     slot: attr(entry, "data-subview-track-slot"),
     contigId: positive(entry, "data-subview-contig-id"),
@@ -49,22 +47,32 @@ export function collectSourceFragmentDragTargets(host, node, { subview = false }
       ["phasedTrackItemId", "data-track-phased-track-item-id"],
     ].map(([key, name]) => [key, positive(entry, name)]).filter(([, value]) => value)),
   };
+  const ids = new Set((Array.isArray(selectedIds) ? selectedIds : []).map(Number));
+  const selections = new Set((Array.isArray(selectedEntries) ? selectedEntries : []).map((entry) =>
+    entry.compositionEntityKey ? `entity:${entry.compositionEntityKey}`
+      : `${entry.trackRole}:${Number(entry.contigId)}:${entry.slot || ""}`));
+  const selected = (entry) => {
+    if (!subview) return attr(entry, "data-track-role") === "primary"
+      && ids.has(positive(entry, "data-track-contig-id"));
+    const key = `${attr(entry, "data-subview-track-role")}:${positive(entry, "data-subview-contig-id")}:`;
+    return selections.has(`entity:${attr(entry, "data-subview-composition-entity-key")}`)
+      || selections.has(key) || selections.has(key + attr(entry, "data-subview-track-slot"));
+  };
   const first = identity(node);
   const result = [first];
+  if (!selected(node)) return result;
   const seen = new Set([JSON.stringify(first)]);
-  const group = attr(node, "data-source-fragment-group");
-  const sourceId = attr(node, "data-source-fragment-seq-id");
-  if (!group || !sourceId) return result;
   const selector = subview ? "[data-subview-contig-id][data-subview-track-slot]"
     : "[data-track-contig-id][data-track-role]";
   for (const entry of host?.querySelectorAll?.(selector) || []) {
-    if (attr(entry, "data-source-fragment-group") !== group
-      || attr(entry, "data-source-fragment-seq-id") !== sourceId
-      || scopeAttrs.some((name) => (attr(entry, name) || "0") !== (attr(node, name) || "0"))) continue;
+    if (!selected(entry)) continue;
     const target = identity(entry);
     if (!(subview ? target.contigId : target.assemblyCtgId)) continue;
-    // Composition and legacy track layouts must never share a gesture payload.
-    if (Boolean(target.compositionEntityKey) !== Boolean(first.compositionEntityKey)) continue;
+    if (subview) {
+      if (Boolean(target.compositionEntityKey) !== Boolean(first.compositionEntityKey)) continue;
+    } else if (target.trackRole !== first.trackRole
+      || (target.datasetId || 0) !== (first.datasetId || 0)
+      || (target.phasedTrackId || 0) !== (first.phasedTrackId || 0)) continue;
     const key = JSON.stringify(target);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -74,10 +82,10 @@ export function collectSourceFragmentDragTargets(host, node, { subview = false }
 }
 
 // Keep each member's pre-gesture offset, including older independent drags.
-export function buildSourceFragmentDragPayload(targets, baseOffsets, deltaBp, round) {
+export function buildSourceFragmentDragPayload(targets, baseOffsets, deltaBp, round, explicitSelection = false) {
   const moved = targets.map((target, index) => ({ ...target,
     ...(target.compositionEntityKey ? { dragDeltaBp: round(deltaBp) }
       : { offsetBp: round(baseOffsets[index] + deltaBp) }),
   }));
-  return { ...moved[0], ...(moved.length > 1 ? { targets: moved } : {}) };
+  return { ...moved[0], ...(moved.length > 1 ? { targets: moved, ...(explicitSelection ? { dragSelection: true } : {}) } : {}) };
 }

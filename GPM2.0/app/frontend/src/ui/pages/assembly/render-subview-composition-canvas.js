@@ -370,6 +370,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
   escapeAttr,
   resolveTrackToneClass,
   grtOverlay = "",
+  selected = false,
   minVisibleX,
   maxVisibleX,
 }) {
@@ -383,7 +384,8 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
     startBp: worldStartBp,
     lengthBp: member.lengthBp,
   })}${source ? ` | ${source}` : ""}`;
-  const unavailable = candidate || !candidatesLoaded ? "" : " is-unavailable";
+  const unavailable = (candidate || !candidatesLoaded ? "" : " is-unavailable")
+    + (selected ? " is-multi-selected" : "");
   const orient = memberOrientation(member);
   const placement = resolveBoundedTrackCtgLabelPlacement({
     ctgName: label,
@@ -413,7 +415,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
       data-subview-rect-x="${member.x.toFixed(2)}" data-subview-rect-y="${y}"
       data-subview-rect-width="${member.width.toFixed(2)}" data-subview-rect-height="${BAR_HEIGHT}"
       data-subview-world-start-bp="${worldStartBp}">
-    <rect class="track-ctg subview-track-ctg${tone}" x="${member.x.toFixed(2)}" y="${y}"
+    <rect class="track-ctg subview-track-ctg${tone}${selected ? " is-multi-selected" : ""}" x="${member.x.toFixed(2)}" y="${y}"
       width="${member.width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4" pointer-events="all"><title>${escapeHtml(title)}</title></rect>
     ${renderGrtResultOverlayGroup({ entryKey: member.entityKey, markup: grtOverlay, escapeAttr })}
     ${renderNRegionMarkersForTrackCtg({
@@ -528,8 +530,8 @@ export function renderSubviewCompositionAlignmentCard({
     return `<polygon class="track-collinearity-band${tone === "companion" ? " is-companion" : ""}" points="${points}" ${alignmentBandSvgAttrs(band, tone)} pointer-events="visibleFill"
       data-subview-band-tooltip="${escapeAttr(tooltip)}"
       data-track-band-proxy="1" data-subview-hit-key="${escapeAttr(band.hitKey)}"
-      data-subview-top-contig-id="${band.top.assemblyCtgId || 0}"
-      data-subview-bottom-contig-id="${band.bottom.assemblyCtgId || 0}" />`;
+      data-subview-top-contig-id="${band.top.assemblyCtgId || 0}" data-subview-top-entity-key="${escapeAttr(band.top.entityKey)}"
+      data-subview-bottom-contig-id="${band.bottom.assemblyCtgId || 0}" data-subview-bottom-entity-key="${escapeAttr(band.bottom.entityKey)}" />`;
   }).join("");
   const anchorCutsByEndpoint = buildAnchorCutsByEndpoint(
     layout,
@@ -553,6 +555,9 @@ export function renderSubviewCompositionAlignmentCard({
       i18n,
       {
         escapeHtml, escapeAttr, resolveTrackToneClass,
+        selected: (subview.trackPairSelectedCtgs || []).some((entry) => entry.compositionEntityKey
+          ? entry.compositionEntityKey === member.entityKey
+          : entry.contigId === member.assemblyCtgId && entry.trackRole === member.source.role),
         grtOverlay: grtResult.context?.subviewEnabled ? grtScene.overlaysByKey.get(member.entityKey) : "",
         minVisibleX: layout.viewBoxMinX,
         maxVisibleX: layout.viewBoxMinX + layout.width,

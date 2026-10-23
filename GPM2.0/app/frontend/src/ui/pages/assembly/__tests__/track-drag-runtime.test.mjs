@@ -891,7 +891,7 @@ for (const view of ["main", "pair", "composition"]) {
   for (const fullRange of [false, true]) {
     for (const finish of ["release", "cancel", "context-switch"]) {
       for (const leaderId of [12, 13]) {
-        test(`source-fragment ${view} drag fullRange=${fullRange}, ${finish}, leader=${leaderId}`, async () => {
+        test(`explicit-selected ${view} drag fullRange=${fullRange}, ${finish}, leader=${leaderId}`, async () => {
           const originalWindow = globalThis.window;
           const win = createWindowStub();
           globalThis.window = win;
@@ -899,7 +899,11 @@ for (const view of ["main", "pair", "composition"]) {
             const main = view === "main", composition = view === "composition";
             const host = createHost();
             let state = { session: { projectId: 1 }, assembly: { activeTab: "assembly", selectedChrName: "Chr01",
-              subview: {}, trackView: { fullRange }, subviewTrackView: { fullRange },
+              subview: { trackPairSelectedCtgs: [12, 13].map((contigId) => ({
+                trackRole: "primary", contigId,
+                ...(composition ? { compositionEntityKey: `assembly:${contigId}` } : {}),
+              })) },
+              trackSelectedCtgIds: [12, 13], trackView: { fullRange }, subviewTrackView: { fullRange },
               trackDragOffsets: [], subviewTrackDragOffsets: [] } };
             const store = { getState: () => state };
             const scroll = { scrollLeft: 0, dataset: {

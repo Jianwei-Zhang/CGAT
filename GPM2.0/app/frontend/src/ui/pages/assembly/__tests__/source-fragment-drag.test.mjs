@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { collectSourceFragmentDragTargets, buildSourceFragmentDragPayload,
+import { collectContigDragTargets, buildSourceFragmentDragPayload,
   setTrackDragGroupOffsets, setSubviewDragGroupOffsets, moveSubviewCompositionDrag,
 } from "../source-fragment-drag.js";
 import { normalizeSubviewComposition } from "../subview-composition-state.js";
@@ -17,28 +17,29 @@ function node(id, overrides = {}, subview = false) {
   return { getAttribute: (name) => attrs[name] ?? null };
 }
 
-test("drag membership uses source AND instance identity, not selection, name, or orientation", () => {
-  const first = node(1);
-  const sibling = node(2, { "data-track-ref-orient": "-" });
-  const others = [node(3, { "data-source-fragment-seq-id": "2" }),
-    node(4, { "data-source-fragment-group": "n-fragment:chr:another" }),
-    node(5, { "data-track-role": "support" }),
-    node(6, { "data-track-dataset-id": "2" }),
-    node(7, { "data-source-fragment-group": "" })];
-  const host = { querySelectorAll: () => [first, sibling, ...others, sibling] };
-  assert.deepEqual(collectSourceFragmentDragTargets(host, first), [
-    { trackRole: "primary", assemblyCtgId: 1 }, { trackRole: "primary", assemblyCtgId: 2 },
-  ]);
-  assert.deepEqual(collectSourceFragmentDragTargets(host, others.at(-1)), [
-    { trackRole: "primary", assemblyCtgId: 7 },
-  ]);
+test("a plain drag moves only the clicked object, never same-source siblings", () => {
+  const first = node(1), sibling = node(2);
+  assert.deepEqual(collectContigDragTargets({ querySelectorAll: () => [first, sibling] }, first),
+    [{ trackRole: "primary", assemblyCtgId: 1 }]);
 });
 
-test("phased siblings stay on the same track and retain distinct item identities", () => {
-  const phased = (id, track, item) => node(id, { "data-track-role": "phased",
-    "data-track-phased-track-id": String(track), "data-track-phased-track-item-id": String(item) });
-  const first = phased(1, 40, 50), second = phased(2, 40, 51), otherTrack = phased(2, 41, 52);
-  const targets = collectSourceFragmentDragTargets({ querySelectorAll: () => [first, second, otherTrack] }, first);
+test("a selected leader moves the explicit visible selection, including unrelated sources", () => {
+  const first = node(1), sibling = node(2), unrelated = node(3, { "data-source-fragment-seq-id": "2" });
+  const support = node(4, { "data-track-role": "support" });
+  const host = { querySelectorAll: () => [first, sibling, unrelated, support, unrelated] };
+  assert.deepEqual(collectContigDragTargets(host, first, { selectedIds: [1, 3, 4, 999] }), [
+    { trackRole: "primary", assemblyCtgId: 1 }, { trackRole: "primary", assemblyCtgId: 3 },
+  ]);
+  assert.deepEqual(collectContigDragTargets(host, sibling, { selectedIds: [1, 3] }),
+    [{ trackRole: "primary", assemblyCtgId: 2 }]);
+});
+
+test("explicit selection does not cross native track instance boundaries", () => {
+  const first = node(1, { "data-track-phased-track-id": "40", "data-track-phased-track-item-id": "50" });
+  const second = node(2, { "data-track-phased-track-id": "40", "data-track-phased-track-item-id": "51" });
+  const otherTrack = node(3, { "data-track-phased-track-id": "41", "data-track-phased-track-item-id": "52" });
+  const targets = collectContigDragTargets({ querySelectorAll: () => [first, second, otherTrack] }, first,
+    { selectedIds: [1, 2, 3] });
   assert.deepEqual(targets.map((entry) => [entry.assemblyCtgId, entry.phasedTrackId, entry.phasedTrackItemId]),
     [[1, 40, 50], [2, 40, 51]]);
 });
@@ -56,10 +57,12 @@ test("same delta preserves old independent offsets, zero removes only the affect
   assert.equal(before[0].offsetBp, 10);
 });
 
-test("subview siblings may occupy different lanes but never another source representation", () => {
+test("subview selection may occupy different lanes without implicit mirror inclusion", () => {
   const first = node(1, {}, true), second = node(2, { "data-subview-track-slot": "bottom" }, true);
   const mirror = node(3, { "data-subview-track-pair-is-mirror": "1" }, true);
-  const targets = collectSourceFragmentDragTargets({ querySelectorAll: () => [first, second, mirror] }, first, { subview: true });
+  const targets = collectContigDragTargets({ querySelectorAll: () => [first, second, mirror] }, first, { subview: true,
+    selectedEntries: [{ trackRole: "primary", contigId: 1 }, { trackRole: "primary", contigId: 2 }],
+  });
   assert.deepEqual(targets, [{ slot: "top", contigId: 1 }, { slot: "bottom", contigId: 2 }]);
   const payload = buildSourceFragmentDragPayload(targets, [-20, 40], -10, round);
   assert.deepEqual(setSubviewDragGroupOffsets([], payload), [
@@ -84,4 +87,21 @@ test("composition drag moves sibling positions without merging members or changi
     assert.deepEqual({ ...entry, xBp: composition.members[i].xBp }, composition.members[i]);
   });
   assert.deepEqual(composition.members.map((entry) => entry.xBp), [-100, 200, 900]);
+});
+
+test("local selection can translate both datasets and honors composition instance identity", () => {
+  const first = node(1, { "data-subview-composition-entity-key": "fragment:a" }, true);
+  const other = node(2, { "data-subview-track-role": "support", "data-subview-track-slot": "bottom",
+    "data-subview-composition-entity-key": "fragment:b" }, true);
+  const sameSource = node(1, { "data-subview-composition-entity-key": "fragment:c" }, true);
+  const targets = collectContigDragTargets({ querySelectorAll: () => [first, other, sameSource] }, first, {
+    subview: true, selectedEntries: [{ compositionEntityKey: "fragment:a" }, { compositionEntityKey: "fragment:b" }],
+  });
+  assert.deepEqual(targets, [
+    { slot: "top", contigId: 1, compositionEntityKey: "fragment:a" },
+    { slot: "bottom", contigId: 2, compositionEntityKey: "fragment:b" },
+  ]);
+  const payload = buildSourceFragmentDragPayload(targets, [0, 0], -15, round, true);
+  assert.equal(payload.dragSelection, true);
+  assert.deepEqual(payload.targets.map((entry) => entry.dragDeltaBp), [-15, -15]);
 });

@@ -470,3 +470,15 @@ function normalizeSubviewSummarySelection(selection) {
     contigId,
   };
 }
+
+// Box selections belong to the view that created them. Do not let a stale
+// selection in the other view intercept a subsequent delete or drag gesture.
+export function clearOtherViewSelection(assembly, view) {
+  if (view === "main" && assembly?.subview?.trackPairSelectedCtgs?.length) {
+    return { ...assembly, subview: { ...assembly.subview, trackPairSelectedCtgs: [] } };
+  }
+  if (view === "subview" && assembly?.trackSelectedCtgIds?.length) {
+    return { ...assembly, trackSelectedCtgIds: [] };
+  }
+  return assembly;
+}

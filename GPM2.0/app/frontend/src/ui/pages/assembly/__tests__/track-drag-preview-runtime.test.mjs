@@ -780,3 +780,19 @@ for (const subview of [false, true]) {
     assert.equal(band.getAttribute("points"), "0,0 10,0 30,20 20,20");
   });
 }
+
+test("composition preview never moves another instance that shares a backing ctg id", () => {
+  const first = createNode({ "data-subview-composition-entity-key": "a", "data-subview-track-role": "primary" });
+  const other = createNode({ "data-subview-composition-entity-key": "b", "data-subview-track-role": "primary" });
+  const bandA = createNode({ points: "0,0 10,0 20,10 10,10", "data-subview-top-entity-key": "a" });
+  const bandB = createNode({ points: "0,0 10,0 20,10 10,10", "data-subview-top-entity-key": "b" });
+  const host = createHost({
+    '[data-subview-track-slot="top"][data-subview-contig-id="12"]': [first, other],
+    '[data-subview-top-contig-id="12"]': [bandA, bandB],
+  });
+  previewSubviewTrackContigDrag(host, { slot: "top", contigId: 12, compositionEntityKey: "a", offsetPx: 15 });
+  assert.equal(first.getAttribute("transform"), "translate(15.00 0)");
+  assert.equal(other.getAttribute("transform"), null);
+  assert.equal(bandA.getAttribute("points"), "15.00,0.00 25.00,0.00 20.00,10.00 10.00,10.00");
+  assert.equal(bandB.getAttribute("points"), "0,0 10,0 20,10 10,10");
+});

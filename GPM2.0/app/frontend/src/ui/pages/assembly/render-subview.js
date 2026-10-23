@@ -1639,8 +1639,11 @@ function renderSubviewAlignmentCard(
       },
     ),
   });
-  const topRowClass = resolveTrackToneClass(topSelection.role);
-  const bottomRowClass = resolveTrackToneClass(bottomSelection.role);
+  const selectedEntries = normalizeSubviewTrackPairSelectionCtgs(subview.trackPairSelectedCtgs);
+  const selectionClass = (selection) => selectedEntries.some((entry) =>
+    entry.trackRole === selection.role && entry.contigId === selection.contigId) ? " is-multi-selected" : "";
+  const topRowClass = resolveTrackToneClass(topSelection.role) + selectionClass(topSelection);
+  const bottomRowClass = resolveTrackToneClass(bottomSelection.role) + selectionClass(bottomSelection);
   const connectorClass = topSelection.role === "support" ? " is-companion" : "";
   const bandTone = topSelection.role === "support" ? "companion" : "primary";
   const topLabelText = resolveSubviewCtgLabelText(topCtg, topSelection.contigId);

@@ -258,3 +258,17 @@ for (const candidatesLoaded of [true, false]) {
     }
   });
 }
+
+test("composition box selections highlight exactly the selected local member instances", () => {
+  const candidates = buildSubviewCompositionCandidates({ primaryDatasetId: 1,
+    allChrCtgs: [{ assemblyCtgId: 1, datasetId: 1, name: "one", lengthBp: 100 },
+      { assemblyCtgId: 2, datasetId: 2, name: "two", lengthBp: 100 }] });
+  const composition = normalizeSubviewComposition({ members: candidates });
+  const state = compositionState(composition, candidates);
+  state.assembly.subview.trackPairSelectedCtgs = [
+    { trackRole: "primary", contigId: 1, compositionEntityKey: "assembly:1", slot: "top" },
+  ];
+  const html = renderAssemblyPage(state);
+  assert.match(html, /class="track-ctg-group[^"]*is-multi-selected"[^>]*data-subview-composition-entity-key="assembly:1"/);
+  assert.doesNotMatch(html, /class="track-ctg-group[^"]*is-multi-selected"[^>]*data-subview-composition-entity-key="assembly:2"/);
+});

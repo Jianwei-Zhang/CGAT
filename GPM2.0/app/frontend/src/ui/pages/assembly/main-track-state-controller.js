@@ -1,6 +1,7 @@
 import { tAssembly } from "./i18n.js";
 import {
   buildSupportMirrorKey,
+  clearOtherViewSelection,
   filterPrimaryTrackSelectionCtgIds,
   normalizeDeletedCtgRecordIds,
   normalizeHiddenPrimaryCtgIdsByChr,
@@ -54,15 +55,16 @@ export function createMainTrackStateController({
     const state = store.getState();
     const normalized = filterPrimaryTrackSelectionCtgIds(selectedIds, state.assembly);
     const current = normalizeTrackSelectionCtgIds(state.assembly.trackSelectedCtgIds);
+    const nextAssembly = normalized.length ? clearOtherViewSelection(state.assembly, "main") : state.assembly;
     if (
-      current.length === normalized.length
+      nextAssembly === state.assembly && current.length === normalized.length
       && current.every((value, index) => value === normalized[index])
     ) {
       return;
     }
     store.setState({
       assembly: {
-        ...state.assembly,
+        ...nextAssembly,
         trackSelectedCtgIds: normalized,
       },
     });

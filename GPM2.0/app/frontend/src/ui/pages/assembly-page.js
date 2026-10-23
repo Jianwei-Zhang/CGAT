@@ -1,3 +1,4 @@
+import { clearOtherViewSelection } from "./assembly/selection-state.js";
 import { bindAlignmentTooltips } from "./assembly/alignment-tooltip-runtime.js";
 import { buildSupportDatasetOptions } from "./assembly/support-dataset-options.js";
 import { openContigChrAlignments, chrAlignmentCopy, resolveContigChrAlignmentModel } from "./assembly/contig-chr-alignments.js";
@@ -1862,32 +1863,28 @@ function isTrackRectOverlap(leftRect, rightRect) {
 function updateSubviewTrackPairSelection(host, store, selectedEntries) {
   const state = store.getState();
   const currentSubview = getSubviewState(state.assembly);
-  if (String(currentSubview.summary?.mode || "") !== "track-pair") {
-    return;
-  }
-  const pools = buildSubviewTrackPairPoolsFromAssembly(state.assembly);
-  const hiddenKeySet = new Set(
-    normalizeSubviewTrackPairHiddenCtgs(currentSubview.trackPairHiddenCtgs).map((entry) =>
-      buildSubviewTrackPairHiddenCtgKey(entry.trackRole, entry.contigId),
-    ),
-  );
-  const normalized = filterSubviewTrackPairSelectionCtgs(selectedEntries, pools).filter(
-    (entry) => !hiddenKeySet.has(buildSubviewTrackPairHiddenCtgKey(entry.trackRole, entry.contigId)),
-  );
+  if (!currentSubview.summary) return;
+  const normalized = resolveFilteredSubviewTrackPairSelectionsFromAssembly({
+    ...state.assembly,
+    subview: { ...currentSubview, trackPairSelectedCtgs: selectedEntries },
+  });
   const current = resolveFilteredSubviewTrackPairSelectionsFromAssembly(state.assembly);
+  const nextAssembly = normalized.length ? clearOtherViewSelection(state.assembly, "subview") : state.assembly;
   if (
-    current.length === normalized.length
+    nextAssembly === state.assembly && current.length === normalized.length
     && current.every(
       (entry, index) =>
         entry.trackRole === normalized[index]?.trackRole
-        && entry.contigId === normalized[index]?.contigId,
+        && entry.contigId === normalized[index]?.contigId
+        && entry.compositionEntityKey === normalized[index]?.compositionEntityKey
+        && entry.slot === normalized[index]?.slot,
     )
   ) {
     return;
   }
   store.setState({
     assembly: {
-      ...state.assembly,
+      ...nextAssembly,
       subview: {
         ...currentSubview,
         trackPairSelectedCtgs: normalized,
@@ -1960,7 +1957,7 @@ function applySubviewTrackDragOffset(host, store, nextOffset) {
     const nextSubview = applySubviewComposition(state.assembly.subview, positioned.composition);
     const committedComposition = commitSubviewHistoryOperation(state.assembly, {
       nextSubview,
-      operation: { kind: "drag-contig" },
+      operation: { kind: "drag-contig", count: nextOffset.targets?.length || 1 },
       stateOrLocale: state,
     });
     if (!committedComposition.changed) return;
@@ -1976,7 +1973,7 @@ function applySubviewTrackDragOffset(host, store, nextOffset) {
   const committed = commitSubviewHistoryOperation(state.assembly, {
     nextSubview: state.assembly.subview,
     nextSubviewTrackDragOffsets: normalizedNext,
-    operation: { kind: "drag-contig" },
+    operation: { kind: "drag-contig", count: nextOffset.targets?.length || 1 },
     stateOrLocale: state,
   });
   if (!committed.changed) {

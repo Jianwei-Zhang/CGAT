@@ -1,4 +1,4 @@
-import { collectSourceFragmentDragTargets, buildSourceFragmentDragPayload } from "./source-fragment-drag.js";
+import { collectContigDragTargets, buildSourceFragmentDragPayload } from "./source-fragment-drag.js";
 import { normalizeSupportDatasetId, normalizeTrackRole } from "./selection-state.js";
 
 const ASSEMBLY_TRACK_CONTIG_DRAG_BOUND = Symbol("assemblyTrackContigDragBound");
@@ -190,13 +190,15 @@ export function bindTrackContigDrag(host, store, deps) {
         phasedTrackItemId,
       },
     );
-    const targets = collectSourceFragmentDragTargets(scrollEl, trackNode);
+    const targets = collectContigDragTargets(scrollEl, trackNode, {
+      selectedIds: state.assembly.trackSelectedCtgIds || [],
+    });
     const baseOffsets = targets.map((target) => deps.resolveTrackDragOffsetBp(
       state.assembly.trackDragOffsets, target.trackRole, target.assemblyCtgId,
       { ...scaleContext, ...target },
     ));
     const dragPayload = (offsetBp) => buildSourceFragmentDragPayload(
-      targets, baseOffsets, offsetBp - baseOffsetBp, deps.roundTrackMetric,
+      targets, baseOffsets, offsetBp - baseOffsetBp, deps.roundTrackMetric, true,
     );
     let dragging = false;
     let pendingOffsetBp = baseOffsetBp;
@@ -374,12 +376,14 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       contigId,
       scaleContext,
     );
-    const targets = collectSourceFragmentDragTargets(scrollEl, trackNode, { subview: true });
+    const targets = collectContigDragTargets(scrollEl, trackNode, {
+      subview: true, selectedEntries: state.assembly.subview?.trackPairSelectedCtgs || [],
+    });
     const baseOffsets = targets.map((target) => target.compositionEntityKey ? 0
       : deps.resolveSubviewTrackDragOffsetBp(state.assembly.subviewTrackDragOffsets,
         target.slot, target.contigId, scaleContext));
     const dragPayload = (offsetBp) => buildSourceFragmentDragPayload(
-      targets, baseOffsets, offsetBp - baseOffsetBp, deps.roundTrackMetric,
+      targets, baseOffsets, offsetBp - baseOffsetBp, deps.roundTrackMetric, true,
     );
     let dragging = false;
     let pendingOffsetBp = baseOffsetBp;
@@ -412,6 +416,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       const previewResult = deps.previewSubviewTrackContigDrag(host, {
         slot,
         contigId,
+        ...(compositionEntityKey ? { compositionEntityKey } : {}),
         offsetPx,
         ...(targets.length > 1 ? { targets } : {}),
         pointerClientX: pendingPointerClientX,

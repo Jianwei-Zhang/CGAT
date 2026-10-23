@@ -569,7 +569,7 @@ async function runMainViewLayoutActionMock({ projectId, chrName, action, args = 
   const operation = {
     kind: normalizedAction,
     targetCount: affectedIds.length || 1,
-    targetName: affectedCtgId > 0 ? `Ctg${affectedCtgId}` : null,
+    targetName: affectedIds.length === 1 && affectedCtgId > 0 ? `Ctg${affectedCtgId}` : null,
   };
   if (JSON.stringify(beforeViewState) === JSON.stringify(afterViewState)) {
     return {

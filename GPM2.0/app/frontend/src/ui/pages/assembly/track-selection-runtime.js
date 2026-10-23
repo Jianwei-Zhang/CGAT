@@ -110,7 +110,10 @@ function collectSubviewTrackPairSelectedCtgs(scrollEl, selectionRect) {
     if (!isTrackRectOverlap(selectionRect, nodeRect)) {
       return;
     }
-    selected.push({ trackRole, contigId });
+    const compositionEntityKey = String(node.getAttribute("data-subview-composition-entity-key") || "");
+    selected.push({ trackRole, contigId, ...(compositionEntityKey ? {
+      compositionEntityKey, slot: node.getAttribute("data-subview-track-slot"),
+    } : {}) });
   });
   return normalizeSubviewTrackPairSelectionCtgs(selected);
 }

@@ -562,10 +562,11 @@ export function previewSubviewTrackContigDrag(host, payload) {
   host.classList?.add?.(SUBVIEW_TRACK_PREVIEW_CLASS);
   const allGroups = new Set();
   const bandEdges = new Map();
-  for (const { slot, contigId } of dragTargets(payload)) {
-    const groupNodes = host.querySelectorAll?.(
+  for (const { slot, contigId, compositionEntityKey } of dragTargets(payload)) {
+    const groupNodes = [...(host.querySelectorAll?.(
       `[data-subview-track-slot="${slot}"][data-subview-contig-id="${contigId}"]`,
-    ) || [];
+    ) || [])].filter((node) => !compositionEntityKey
+      || node.getAttribute?.("data-subview-composition-entity-key") === compositionEntityKey);
     groupNodes.forEach((groupNode) => {
       allGroups.add(groupNode);
       applyGroupPreview(groupNode, offsetPx);
@@ -579,7 +580,7 @@ export function previewSubviewTrackContigDrag(host, payload) {
         `[data-subview-label-slot="${slot}"][data-subview-label-role="${trackRole}"][data-subview-label-contig-id="${contigId}"]`,
       ) || [];
       labelNodes.forEach((labelNode) => {
-        if (!isLabelInsideGroup(labelNode, groupNode)) applyStickyLabelPreview(labelNode, offsetPx);
+        if (!compositionEntityKey && !isLabelInsideGroup(labelNode, groupNode)) applyStickyLabelPreview(labelNode, offsetPx);
       });
     });
     const edgeIndexes = String(slot || "").trim() === "top" ? [0, 1] : [2, 3];
@@ -587,6 +588,8 @@ export function previewSubviewTrackContigDrag(host, payload) {
       ? `[data-subview-top-contig-id="${contigId}"]`
       : `[data-subview-bottom-contig-id="${contigId}"]`;
     for (const band of host.querySelectorAll?.(bandSelector) || []) {
+      const entityAttr = slot === "top" ? "data-subview-top-entity-key" : "data-subview-bottom-entity-key";
+      if (compositionEntityKey && band.getAttribute?.(entityAttr) !== compositionEntityKey) continue;
       const edges = bandEdges.get(band) || new Set();
       edgeIndexes.forEach((index) => edges.add(index));
       bandEdges.set(band, edges);

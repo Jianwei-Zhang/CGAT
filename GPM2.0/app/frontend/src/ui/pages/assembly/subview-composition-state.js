@@ -171,7 +171,10 @@ export function applySubviewComposition(subview, composition, patch = {}) {
     selectedTrackBDatasetId: null,
     selectedTrackBIsMirror: false,
     trackPairHiddenCtgs: [],
-    trackPairSelectedCtgs: [],
+    trackPairSelectedCtgs: (subview?.trackPairSelectedCtgs || []).filter((entry) =>
+      normalized.members.some((member) => entry.compositionEntityKey
+        ? member.entityKey === entry.compositionEntityKey
+        : member.assemblyCtgId === entry.contigId && member.source.role === entry.trackRole)),
     flippedCtgs: [],
     activeAnchors: normalized.activeAnchors,
     manualAnchors: normalized.manualAnchors,
