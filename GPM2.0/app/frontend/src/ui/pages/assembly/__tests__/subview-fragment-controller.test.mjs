@@ -5,7 +5,7 @@ import { createIdentityRenderState } from "./identity-render-fixture.mjs";
 import { createStore, __testBuildAssemblyContextMenuItems, renderAssemblyPage } from "./tabs-semantics-harness.mjs";
 import { createSubviewFragmentController, resolveLocalFragmentMenu } from "../subview-fragment-controller.js";
 import { commitSubviewHistoryOperation, rollbackSubviewHistory, restoreSubviewHistoryRollback, resolveCurrentSubviewHistory } from "../subview-history-state.js";
-import { memberSourceInterval, mergeLocalMember, splitLocalMember, filterLocalAnchorCuts } from "../subview-fragment-model.js";
+import { memberSourceInterval, mergeLocalMember, splitLocalMember } from "../subview-fragment-model.js";
 
 import { reconcileLocalSubviewWithMain } from "../subview-fragment-reconcile.js";
 
@@ -60,7 +60,7 @@ test("manual split and local merge remain local, one history entry per edit", as
   assert.equal(await runtime.mergeLocalFragment(host, store, { entityKey: split[0].entityKey }, "right"), true);
   const joined = store.getState().assembly.subview.summary.members.find((m) => m.assemblyCtgId === 30);
   assert.equal(joined.lengthBp, 16000);
-  assert.deepEqual(filterLocalAnchorCuts(joined, [8001]), []);
+  assert.ok(joined.localFragment.suppressedCuts.includes(8000), "Undo Split suppresses the structural marker only");
   assert.equal(store.getState().assembly.chrCtgs, main);
   assert.equal(resolveCurrentSubviewHistory(store.getState().assembly).record.past.length, 2);
 });

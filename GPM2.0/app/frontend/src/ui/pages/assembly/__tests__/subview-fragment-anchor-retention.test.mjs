@@ -5,7 +5,7 @@ import { renderAssemblyPage } from "./tabs-semantics-harness.mjs";
 import { createSubviewFragmentController } from "../subview-fragment-controller.js";
 import { createSubviewInteractionController } from "../subview-interaction-controller.js";
 import { projectRenderedSubviewToComposition } from "../subview-composition-controller.js";
-import { memberAnchorEndpointKey, memberCoordinateToSource } from "../subview-fragment-model.js";
+import { memberAnchorEndpointKey, memberCoordinateToSource, sourceCoordinateToMember } from "../subview-fragment-model.js";
 import { collectSubviewAnchorScene } from "../subview-anchor-objects.js";
 import { rollbackSubviewHistory, restoreSubviewHistoryRollback } from "../subview-history-state.js";
 
@@ -41,6 +41,10 @@ for (const mode of ["2-contig", "track-pair", "composition", "composition-flippe
       const state = store.getState();
       store.setState({ assembly: { ...state.assembly, subview: { ...state.assembly.subview, activeAnchors: ids } } });
     }
+    const fragments = () => [...renderAssemblyPage(store.getState()).matchAll(/<rect[^>]*class="subview-fragment-hit-zone"[^>]*>/g)]
+      .map(([tag]) => Object.fromEntries([...tag.matchAll(/data-subview-fragment-(contig-id|start|end)="([^"]*)"/g)].map((m) => [m[1], m[2]])))
+      .map((entry) => [entry["contig-id"], entry.start, entry.end]).sort();
+    const beforeFragments = fragments();
     const expected = edges.map((edge) => edge.objectId).sort();
     const runtime = createSubviewFragmentController({
       projectHistorical: (state) => projectRenderedSubviewToComposition(state, renderAssemblyPage(state)),
@@ -72,6 +76,7 @@ for (const mode of ["2-contig", "track-pair", "composition", "composition-flippe
     const after = JSON.parse(JSON.stringify(store.getState().assembly));
     store.setState({ assembly: rollbackSubviewHistory(after).assembly });
     assert.deepEqual(active(), edges.map((edge) => edge.objectId).sort());
+    assert.deepEqual(fragments(), beforeFragments, "undo restores actual anchor hit intervals, not just red lines");
     store.setState({ assembly: restoreSubviewHistoryRollback(store.getState().assembly).assembly });
     assert.deepEqual(active(), expected);
     store.setState(JSON.parse(JSON.stringify(store.getState())));
@@ -127,3 +132,73 @@ test("outside anchors survive main history reload followed by local undo/redo wi
     assert.deepEqual(store.getState().assembly.mainViewHistory, mainHistory);
   }
 });
+
+for (const mode of ["2-contig", "track-pair", "composition"]) for (const flipped of [false, true]) for (const manual of [false, true]) {
+  test(`${mode}, flipped=${flipped}, manual=${manual}: restoring a deleted anchor interval through Undo Split keeps the anchor actionable`, async () => {
+    const state = createIdentityRenderState(mode);
+    if (mode === "composition") state.assembly.subview.summary.members.find((m) => m.assemblyCtgId === 2).flipped = flipped;
+    else state.assembly.subview.flippedCtgs = flipped ? [{ slot: "bottom", contigId: 2 }] : [];
+    const store = createStore(state), host = sceneHost(store);
+    const interactions = createSubviewInteractionController({ rerenderSubviewPanel() {}, persistProjectAssemblyViewStateFromStore: async () => {} });
+    const edges = collectSubviewAnchorScene(host).filter((edge) => edge.kind === "evidence" && [500, 1800].includes(edge.descriptor.top.cutBp));
+    assert.equal(edges.length, 2);
+    for (const edge of edges) await interactions.toggleSubviewAnchorEdge(host, store, {
+      hitKey: edge.node.getAttribute("data-subview-anchor-hit-key"), edge: edge.node.getAttribute("data-subview-anchor-edge"),
+    });
+    const sourceState = projectRenderedSubviewToComposition(store.getState(), renderAssemblyPage(store.getState()));
+    const parent = sourceState.members.find((m) => m.assemblyCtgId === 2);
+    const anchorSource = sourceState.activeAnchors.map((a) => a.descriptor.bottom.cutBp).sort((a,b) => a-b);
+    const [start, next] = anchorSource;
+    if (manual) {
+      const { applySubviewComposition } = await import("../subview-composition-state.js");
+      const assembly = store.getState().assembly;
+      store.setState({ assembly: { ...assembly, subview: applySubviewComposition(assembly.subview, { ...sourceState,
+        manualAnchors: sourceState.activeAnchors.map((anchor, i) => ({ manualAnchorId: `manual-${i}`, coordinateSpace: "assembly",
+          endpointA: anchor.descriptor.top, endpointB: anchor.descriptor.bottom })), activeAnchors: [],
+      }) } });
+    }
+    const runtime = createSubviewFragmentController({
+      projectHistorical: (prior) => projectRenderedSubviewToComposition(prior, renderAssemblyPage(prior)),
+      rerenderSubviewPanel() {}, refreshSubviewPairwiseEvidence() {}, persistProjectAssemblyViewStateFromStore: async () => {},
+    });
+    assert.equal(await runtime.deleteLocalFragment(host, store, {
+      assemblyCtgId: 2, trackRole: "primary", slot: "bottom", start, end: next - 1, coordinateSpace: "base",
+    }), true);
+    const left = store.getState().assembly.subview.summary.members.find((m) => m.assemblyCtgId === 2 && m.localFragment.sourceEnd === start - 1);
+    assert.ok(left);
+    assert.equal(await runtime.mergeLocalFragment(host, store, { entityKey: left.entityKey }, flipped ? "left" : "right"), true);
+    const check = () => {
+      const current = store.getState();
+      const merged = current.assembly.subview.summary.members.find((m) => m.assemblyCtgId === 2 && m.localFragment.sourceStart === 1);
+      assert.equal(merged.lengthBp, next - 1);
+      const tags = [...renderAssemblyPage(current).matchAll(/<rect[^>]*class="subview-fragment-hit-zone"[^>]*>/g)].map(([tag]) =>
+        Object.fromEntries([...tag.matchAll(/data-subview-fragment-([\w-]+)="([^"]*)"/g)].map((m) => [m[1], m[2].replaceAll("&amp;", "&")])))
+        .filter((entry) => entry["entity-key"] === merged.entityKey);
+      const ranges = tags.map((entry) => [memberCoordinateToSource(merged, Number(entry.start)), memberCoordinateToSource(merged, Number(entry.end))]
+        .sort((a,b) => a-b)).sort((a,b) => a[0]-b[0]);
+      // Shared cut anchors retain their source boundary through local flips.
+      assert.deepEqual(ranges, [[1, start - 1], [start, next - 1]],
+        "a visible restored anchor must still cut the hit zones, even though the true split marker was removed");
+      assert.equal(collectSubviewAnchorScene(host).filter((edge) => edge.node.getAttribute("data-subview-anchor-active") === "1").length, 2);
+      assert.equal(ranges[0][0], 1);
+      assert.equal(ranges.at(-1)[1], next - 1);
+      assert.doesNotMatch(renderAssemblyPage(current).split('data-subview-panel="1"')[1],
+        new RegExp(`data-manual-split-after="${start - 1}"`), "removed structural split stays hidden while the anchor remains active");
+      return merged;
+    };
+    check();
+    store.setState(JSON.parse(JSON.stringify(store.getState()))); check();
+    const undo = rollbackSubviewHistory(store.getState().assembly);
+    assert.equal(undo.changed, true);
+    store.setState({ assembly: restoreSubviewHistoryRollback(undo.assembly).assembly });
+    const merged = check();
+    // Verify the restored interval remains an actual context-menu target, not
+    // merely a red anchor line drawn over an uncut whole-ctg hit zone.
+    assert.equal(await runtime.deleteLocalFragment(host, store, { entityKey: merged.entityKey,
+      start: Math.min(sourceCoordinateToMember(merged, start), sourceCoordinateToMember(merged, next - 1)),
+      end: Math.max(sourceCoordinateToMember(merged, start), sourceCoordinateToMember(merged, next - 1)), coordinateSpace: "base" }), true);
+    assert.ok(store.getState().assembly.subview.summary.members.filter((m) => m.assemblyCtgId === 2)
+      .every((m) => m.localFragment.sourceEnd < start || m.localFragment.sourceStart >= next));
+    assert.equal(parent.lengthBp, 16000);
+  });
+}

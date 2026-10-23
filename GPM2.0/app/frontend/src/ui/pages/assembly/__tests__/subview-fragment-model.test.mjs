@@ -144,13 +144,13 @@ test("alignment clipping uses a common parameter on both ends including reverse 
 
 
 test("joined reverse parts project alignments and N intervals in the member coordinate system", async () => {
-  const { projectLocalAlignment, projectLocalNRegions, filterLocalAnchorCuts, resolveLocalFinalPathContexts } = await import("../subview-fragment-model.js");
+  const { projectLocalAlignment, projectLocalNRegions, resolveLocalFinalPathContexts } = await import("../subview-fragment-model.js");
   const parent = original({ baseOrientation: "-" });
   const split = splitLocalMember(composition([parent]), parent.entityKey, 40);
   const joined = mergeLocalMember(split.composition, split.members[0].entityKey, "left");
   assert.equal(joined.changed, true);
   assert.equal(joined.member.baseOrientation, "-");
-  assert.deepEqual(filterLocalAnchorCuts(joined.member, [61]), []);
+  assert.ok(joined.member.localFragment.suppressedCuts.includes(40));
   const other = original({ assemblyCtgId: 20, lane: "bottom" });
   const projected = projectLocalAlignment(split.members[0], other, 10, 20,
     { topStart: 50, topEnd: 90, bottomStart: 10, bottomEnd: 50, strand: "+" });

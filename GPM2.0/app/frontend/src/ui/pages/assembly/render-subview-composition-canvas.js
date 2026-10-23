@@ -1,5 +1,5 @@
 import { localGrtProjection, projectLocalGrtEvidence } from "./subview-fragment-grt.js";
-import { memberAnchorEndpointKey, memberBackingIds, memberSourceInterval, projectLocalAlignment, filterLocalAnchorCuts, memberCoordinateToSource, projectLocalNRegions } from "./subview-fragment-model.js";
+import { memberAnchorEndpointKey, memberBackingIds, memberSourceInterval, projectLocalAlignment, memberCoordinateToSource, projectLocalNRegions } from "./subview-fragment-model.js";
 import { sourceFragmentDragAttrs, resolveManualSplitSourceCuts, renderSourceSplitMarkers } from "./source-fragment-layout.js";
 import { resolveFullRangeVisibleSpan } from "./view-navigation-state.js";
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
@@ -338,7 +338,9 @@ function renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr }) {
       role: member.source?.role,
       lengthBp: member.lengthBp,
     },
-    anchorCuts: filterLocalAnchorCuts(member, cuts),
+    // Undo Split suppresses a structural marker, not a user's active anchor.
+    // These are hit-testing intervals only; they never materialize new ctgs.
+    anchorCuts: cuts,
   });
   if (!fragments.length) return "";
   const orientation = memberOrientation(member);

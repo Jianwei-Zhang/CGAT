@@ -329,12 +329,6 @@ export function projectLocalAlignment(top, bottom, topId, bottomId, coordinates)
   return clipped ? { ...clipped, strand } : null;
 }
 
-export function filterLocalAnchorCuts(member, cuts) {
-  const suppressed = new Set(member.localFragment?.suppressedCuts || []);
-  return (cuts || []).filter((cut) => !suppressed.has(memberCoordinateToSource(member, cut)
-    - (member.baseOrientation === "-" ? 0 : 1)));
-}
-
 export function projectLocalNRegions(member, candidates, compatible = (candidate) => candidate.sourceKey === member.sourceKey) {
   if (!member.localFragment) return null;
   const regions = [];
