@@ -697,7 +697,8 @@ export function buildAssemblyContextMenuItems({
             run: () => contextMenuActions.openLocalContigSplit(host, store, memberContext, { synchronize: true }) },
         ],
       });
-      items.push({ label: labels.merge, children: [
+      items.push({ label: labels.merge, disabled: !model.left && !model.right,
+        title: !model.left && !model.right ? labels.mergeUnavailable : "", children: [
         { label: labels.mergeLeft, disabled: !model.left, title: model.left ? "" : labels.mergeUnavailable,
           run: () => contextMenuActions.mergeLocalFragment(host, store, memberContext, "left") },
         { label: labels.mergeRight, disabled: !model.right, title: model.right ? "" : labels.mergeUnavailable,

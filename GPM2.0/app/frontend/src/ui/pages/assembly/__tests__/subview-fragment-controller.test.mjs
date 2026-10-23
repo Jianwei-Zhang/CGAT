@@ -98,6 +98,7 @@ test("local menu has ordered scoped split/delete and local-only merge, with no r
   assert.equal(items[5].children[1].disabled, true);
   const model = resolveLocalFragmentMenu(state, host, context);
   assert.equal(model.left, false); assert.equal(model.right, false);
+  assert.equal(items[4].disabled, true, "the parent Undo Split menu must also be disabled without a real cut");
   assert.ok(items[4].children.every((item) => item.disabled));
 });
 
