@@ -358,3 +358,50 @@ test("local split menus keep three fixed children and dispatch manual/single-sid
   store.setState({ assembly: { ...state.assembly, subview: { ...state.assembly.subview } } });
   assert.equal(await splitMenus[0].children[1].run(), false); assert.equal(calls.length, 3);
 });
+
+
+function fallbackEvidenceHost(state) {
+  const composition = projectRenderedSubviewToComposition(state, renderAssemblyPage(state));
+  const previewLines = [];
+  const doc = { createElementNS: () => ({ attrs: {}, setAttribute(key, value) { this.attrs[key] = value; },
+    remove() { this.removed = true; } }) };
+  const svg = { append: (line) => previewLines.push(line) };
+  const nodes = [[1001, "left"], [14000, "right"]].map(([coordinate, edge]) => {
+    const attrs = { "data-subview-anchor-kind": "evidence", "data-subview-anchor-object-id": `edge:fallback:${edge}`,
+      "data-subview-anchor-top-x": "10", "data-subview-anchor-bottom-x": "20",
+      x1: "10", x2: "20", y1: "90", y2: "24" };
+    for (const [lane, id, role] of [["top", 30, "support"], ["bottom", 2, "primary"]]) {
+      const member = composition.members.find((entry) => entry.assemblyCtgId === id);
+      Object.assign(attrs, { [`data-subview-anchor-${lane}-endpoint-key`]: memberAnchorEndpointKey(member),
+        [`data-subview-anchor-${lane}-contig-id`]: String(id), [`data-subview-anchor-${lane}-cut-bp`]: String(coordinate),
+        [`data-subview-anchor-${lane}-source-role`]: role });
+    }
+    return { getAttribute: (key) => attrs[key] ?? null, ownerDocument: doc, ownerSVGElement: svg };
+  });
+  return { previewLines, querySelectorAll: (selector) => selector === "[data-subview-anchor-kind][data-subview-anchor-object-id]" ? nodes : [] };
+}
+
+for (const synchronize of [false, true]) test(`local fallback side dispatches exactly one original alignment cut; sync=${synchronize}`, async () => {
+  const state = createIdentityRenderState("composition"); addAnchor(state, 4000);
+  const localHost = fallbackEvidenceHost(state), store = createStore(state), calls = [];
+  const context = { ...selectedContext(2), end: 16000, compositionEntityKey: "assembly:2" };
+  const model = resolveLocalFragmentMenu(state, localHost, context);
+  assert.deepEqual(model.boundaries, { left: 4000, right: 14000 });
+  const clearPreview = model.previewSplit(14000);
+  assert.equal(localHost.previewLines.length, 1);
+  assert.match(localHost.previewLines[0].attrs.class, /is-focused/);
+  clearPreview(); assert.equal(localHost.previewLines[0].removed, true);
+  const runtime = controller({ synchronizeLocalFragment: async (_host, _store, target, operation) => {
+    calls.push({ target, operation }); return true;
+  } });
+  assert.equal(await runtime.openLocalContigSplit(localHost, store, context,
+    { side: "right", synchronize, expectedKey: model.splitKey, expectedCut: 14000 }), true);
+  if (synchronize) {
+    assert.deepEqual(calls[0].operation, { action: "split", cuts: [14000] });
+    assert.equal(calls[0].target.start, undefined); assert.equal(calls[0].target.end, undefined);
+  } else {
+    const members = store.getState().assembly.subview.summary.members.filter((member) => member.assemblyCtgId === 2);
+    assert.deepEqual(members.map(memberSourceInterval).map((range) => [range.sourceStart, range.sourceEnd]), [[1, 14000], [14001, 16000]]);
+    assert.equal(runtime.persisted.length, 1);
+  }
+});

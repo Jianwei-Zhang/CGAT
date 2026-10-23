@@ -36,7 +36,11 @@ export function resolveLocalSplitBoundaries({ range, selectedRange, orient, anch
     const ends = [...anchorCuts, range.sourceEnd];
     const index = starts.findIndex((start, i) => start === selectedRange?.sourceStart && ends[i] === selectedRange?.sourceEnd);
     if (index < 0) return { left: null, right: null };
-    low = starts[index] - 1; high = ends[index];
+    const hasLowerAnchor = index > 0, hasUpperAnchor = index < ends.length - 1;
+    low = hasLowerAnchor ? starts[index] - 1 : alignmentRange?.low;
+    high = hasUpperAnchor ? ends[index] : alignmentRange?.high;
+    if (!hasLowerAnchor && !(low < high)) low = null;
+    if (!hasUpperAnchor && !(high > low)) high = null;
   } else {
     low = alignmentRange?.low; high = alignmentRange?.high;
   }

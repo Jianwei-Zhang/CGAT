@@ -13,7 +13,7 @@ for (const orient of ["+", "-"]) {
       orient === "+" ? { left: 300, right: 700 } : { left: 700, right: 300 });
     assert.deepEqual(resolve({ anchorCuts: [300, 700] }), { left: null, right: null });
     assert.deepEqual(resolve({ anchorCuts: [300, 700], selectedRange: { sourceStart: 101, sourceEnd: 300 } }),
-      orient === "+" ? { left: null, right: 300 } : { left: 300, right: null });
+      orient === "+" ? { left: 200, right: 300 } : { left: 300, right: 200 });
     assert.deepEqual(resolve({ alignmentRange: { low: 100, high: 1100 } }), { left: null, right: null });
     assert.deepEqual(resolve({ alignmentRange: null }), { left: null, right: null });
   });
@@ -38,4 +38,24 @@ test("local alignment envelope reads only the current member's evidence, not man
   const legacy = { assembly: { subview: { summary: { mode: "2-contig" } } } };
   const legacyHost = { querySelectorAll: () => [edge(201), edge(800)] };
   assert.deepEqual(resolveLocalAlignmentRange(legacy, legacyHost, { ...member, flipped: true }), { low: 300, high: 900 });
+});
+
+
+for (const orient of ["+", "-"]) test(`local ${orient} unanchored side falls back independently`, () => {
+  const resolve = (overrides) => resolveLocalSplitBoundaries({ range, orient,
+    anchorCuts: [300], selectedRange: { sourceStart: 301, sourceEnd: 1100 },
+    alignmentRange: { low: 200, high: 900 }, ...overrides });
+  assert.deepEqual(resolve({}), orient === "+" ? { left: 300, right: 900 } : { left: 900, right: 300 });
+  assert.deepEqual(resolve({ anchorCuts: [700], selectedRange: { sourceStart: 101, sourceEnd: 700 } }),
+    orient === "+" ? { left: 200, right: 700 } : { left: 700, right: 200 });
+  assert.deepEqual(resolve({ anchorCuts: [300, 700], selectedRange: { sourceStart: 701, sourceEnd: 1100 } }),
+    orient === "+" ? { left: 700, right: 900 } : { left: 900, right: 700 });
+  assert.deepEqual(resolve({ alignmentRange: null }),
+    orient === "+" ? { left: 300, right: null } : { left: null, right: 300 });
+  assert.deepEqual(resolve({ alignmentRange: { low: 100, high: 1100 } }),
+    orient === "+" ? { left: 300, right: null } : { left: null, right: 300 });
+  assert.deepEqual(resolve({ selectedRange: { sourceStart: 101, sourceEnd: 300 }, alignmentRange: { low: 300, high: 900 } }),
+    orient === "+" ? { left: null, right: 300 } : { left: 300, right: null });
+  assert.deepEqual(resolve({ selectedRange: { sourceStart: 101, sourceEnd: 300 }, alignmentRange: { low: 500, high: 900 } }),
+    orient === "+" ? { left: null, right: 300 } : { left: 300, right: null });
 });

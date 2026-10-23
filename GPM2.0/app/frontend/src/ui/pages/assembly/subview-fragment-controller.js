@@ -61,7 +61,7 @@ export function resolveLocalFragmentMenu(state, host, context) {
   return { member, range: selectedRange, canSplit: anchorCuts.length > 0, anchorCuts,
     canManualSplit: Boolean(range && range.sourceEnd > range.sourceStart), boundaries, splitKey,
     canSync: canSyncMember(member), canSyncSplit: Boolean(whole && canSyncMember(whole.member)),
-    previewSplit: (cut) => whole ? highlightLocalSplitBoundary(host, state, whole.member, cut, anchorCuts.length > 0) : () => {},
+    previewSplit: (cut) => whole ? highlightLocalSplitBoundary(host, state, whole.member, cut, anchorCuts.includes(cut)) : () => {},
     left: Boolean(resolveLocalMergeNeighbor(composition, member.entityKey, "left")),
     right: Boolean(resolveLocalMergeNeighbor(composition, member.entityKey, "right")),
   };

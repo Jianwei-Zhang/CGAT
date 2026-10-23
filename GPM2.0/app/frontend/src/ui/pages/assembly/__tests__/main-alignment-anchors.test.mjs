@@ -27,8 +27,8 @@ test("only enabled anchors delimit the clicked fragment; outer alignment shortcu
   assert.deepEqual(cuts(resolveSelectedContigSplitBoundaries(assembly, 6, 400)), [100, 800]);
   assembly = enable(enable(assembly, 0, "right"), 1, "left");
   assert.deepEqual(cuts(resolveSelectedContigSplitBoundaries(assembly, 6, 400)), [300, 500]);
-  assert.deepEqual(cuts(resolveSelectedContigSplitBoundaries(assembly, 6, 200)), [null, 300]);
-  assert.deepEqual(cuts(resolveSelectedContigSplitBoundaries(assembly, 6, 600)), [500, null]);
+  assert.deepEqual(cuts(resolveSelectedContigSplitBoundaries(assembly, 6, 200)), [100, 300]);
+  assert.deepEqual(cuts(resolveSelectedContigSplitBoundaries(assembly, 6, 600)), [500, 800]);
   assert.deepEqual(cuts(resolveSelectedContigSplitBoundaries(assembly, 6)), [null, null]);
   const current = resolveSelectedContigSplitBoundaries(assembly, 6, 400).left;
   assert.equal(isCurrentContigSplitAnchor(assembly, current), true);
@@ -44,7 +44,7 @@ test("anchors persist without touching local histories and survive reverse orien
   assert.deepEqual(cuts(resolveSelectedContigSplitBoundaries(assembly, 6, 400)), [500, 300]);
   assembly.chrCtgs[0] = { ...assembly.chrCtgs[0], assemblyCtgId: 9, orient: "+", totalLength: 700,
     sourceFragment: { sourceSeqId: 77, sourceStart: 301, sourceEnd: 1000 }, hits: [assembly.chrCtgs[0].hits[1]] };
-  assert.deepEqual(cuts(resolveSelectedContigSplitBoundaries(assembly, 9, 600)), [500, null]);
+  assert.deepEqual(cuts(resolveSelectedContigSplitBoundaries(assembly, 9, 600)), [500, 800]);
   assert.equal(mainActiveAnchorKeys({ ...assembly, selectedChrName: "Chr02" }).size, 0);
 });
 
@@ -181,4 +181,41 @@ test("main fragment overlays honor clipped source ranges and alignment filters",
   assert.match(html, /data-main-anchor-segmented="1"/);
   assert.match(html, /data-main-anchor-fragments="1"/);
   assert.match(html, /data-main-fragment-start="301" data-main-fragment-end="500"/);
+});
+
+
+for (const orient of ["+", "-"]) for (const anchoredSide of ["left", "right"]) {
+  test(`main ${orient} single ${anchoredSide} source-side anchor keeps the opposite alignment boundary`, () => {
+    let assembly = anchoredSide === "left" ? enable(fixture(), 0, "right") : enable(fixture(), 1, "left");
+    assembly.chrCtgs[0].orient = orient;
+    const boundaries = resolveSelectedContigSplitBoundaries(assembly, 6, 400);
+    const expected = anchoredSide === "left" ? [300, 800] : [100, 500];
+    assert.deepEqual(cuts(boundaries), orient === "+" ? expected : expected.reverse());
+    assert.equal(isCurrentContigSplitAnchor(assembly, boundaries.left), true);
+    assert.equal(isCurrentContigSplitAnchor(assembly, boundaries.right), true);
+  });
+}
+
+test("main fallback alignment boundary remains actionable in the menu and rejects changed anchors", async () => {
+  const assembly = enable(fixture(), 0, "right");
+  const fallback = resolveSelectedContigSplitBoundaries(assembly, 6, 400).right;
+  const store = createStore(createState({ assembly })), calls = [];
+  const menu = __testBuildAssemblyContextMenuItems({ store, host: {},
+    ctgContext: { assemblyCtgId: 6, trackRole: "primary", sourceBp: 400 },
+    actions: { canEditTrackCtg: () => true, splitContigAtAnchor: async (_host, _store, anchor) => calls.push(anchor) } });
+  const split = menu.find((item) => item.label === "分割 contig");
+  assert.equal(split.children[1].disabled, false); assert.equal(split.children[2].disabled, false);
+  await split.children[2].run(); assert.equal(calls[0].cutAfter, 800);
+  assert.equal(isCurrentContigSplitAnchor(enable(assembly, 1, "left"), fallback), false);
+});
+
+test("main fallback edges cannot duplicate an anchor or split an existing source endpoint", () => {
+  const lowerEdge = enable(fixture(), 0, "left");
+  assert.deepEqual(cuts(resolveSelectedContigSplitBoundaries(lowerEdge, 6, 50)), [null, 100]);
+  const upperEdge = enable(fixture(), 1, "right");
+  assert.deepEqual(cuts(resolveSelectedContigSplitBoundaries(upperEdge, 6, 900)), [800, null]);
+  const assembly = enable(fixture(), 0, "right");
+  assembly.chrCtgs[0].sourceFragment = { sourceSeqId: 77, sourceStart: 101, sourceEnd: 800 };
+  assembly.chrCtgs[0].totalLength = 700;
+  assert.deepEqual(cuts(resolveSelectedContigSplitBoundaries(assembly, 6, 400)), [300, null]);
 });

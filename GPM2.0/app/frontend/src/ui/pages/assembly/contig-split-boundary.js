@@ -76,22 +76,26 @@ export function resolveSelectedContigSplitBoundaries(assembly, assemblyCtgId, so
     const side = (anchor.edge === "start") !== (model.orient === "-") ? "left" : "right";
     return active.has(mainAlignmentEndpointKey(model.chrName, model, anchor, side));
   }).sort((a, b) => a.cutAfter - b.cutAfter);
-  let low, high;
+  const alignmentLow = Math.min(...model.hits.map((hit) => hit.queryStart)) - 1;
+  const alignmentHigh = Math.max(...model.hits.map((hit) => hit.queryEnd));
+  let low = alignmentLow, high = alignmentHigh;
   if (enabled.length) {
     if (!Number.isSafeInteger(sourceBp) || sourceBp < model.sourceStart || sourceBp > model.sourceEnd) {
       return { left: null, right: null, key: "unselected" };
     }
-    low = enabled.filter((a) => a.cutAfter < sourceBp).at(-1)?.cutAfter ?? model.sourceStart - 1;
-    high = enabled.find((a) => a.cutAfter >= sourceBp)?.cutAfter ?? model.sourceEnd;
-  } else {
-    low = Math.min(...model.hits.map((h) => h.queryStart)) - 1;
-    high = Math.max(...model.hits.map((h) => h.queryEnd));
+    const lowerAnchor = enabled.filter((anchor) => anchor.cutAfter < sourceBp).at(-1);
+    const upperAnchor = enabled.find((anchor) => anchor.cutAfter >= sourceBp);
+    // An anchor replaces only its own side; the other side keeps the original alignment edge.
+    low = lowerAnchor?.cutAfter ?? alignmentLow;
+    high = upperAnchor?.cutAfter ?? alignmentHigh;
+    if (!lowerAnchor && !(low < high)) low = null;
+    if (!upperAnchor && !(high > low)) high = null;
   }
   const key = JSON.stringify([model.sourceStart, model.sourceEnd, model.orient, model.chrName,
     enabled.map((a) => [a.cutAfter, a.refBp]), low, high]);
   const at = (cut, side) => {
     const anchor = cut >= model.sourceStart && cut < model.sourceEnd
-      ? (enabled.length ? enabled : candidates).find((a) => a.cutAfter === cut) : null;
+      ? enabled.find((anchor) => anchor.cutAfter === cut) || candidates.find((anchor) => anchor.cutAfter === cut) : null;
     return anchor ? { ...anchor, selection: { sourceBp, side, key } } : null;
   };
   return { key, left: at(model.orient === "-" ? high : low, "left"),
