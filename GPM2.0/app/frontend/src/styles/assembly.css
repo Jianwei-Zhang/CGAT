@@ -2244,7 +2244,7 @@
   .view-nav-range { gap: 4px; min-width: 130px; flex-basis: 100%; }
 }
 
-/* Transient Ref-envelope split preview, matching focused local-view anchors. */
+/* Transient per-anchor split preview, matching focused local-view anchors. */
 .track-split-preview { pointer-events: none; }
 .track-split-preview-line { fill: none; stroke: var(--theme-purple-line, #7a1fff); stroke-width: 6; vector-effect: non-scaling-stroke;
   filter: drop-shadow(0 0 2px rgba(255,255,255,.95)); }

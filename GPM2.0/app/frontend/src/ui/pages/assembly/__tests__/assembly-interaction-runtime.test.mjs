@@ -2719,17 +2719,23 @@ test("assembly page public binder wires host-level listeners once for the same h
   ]);
 });
 
-test("Main split offers anchor-based and manual interactions without Ref-envelope shortcuts", async () => {
+test("Main split submenu contains manual entry and one shortcut for every anchor, including interior cuts", async () => {
   const calls=[];
-  const store=createStore(createState({assembly:{selectedChrName:"Chr01",trackSelectedCtgIds:[],chrCtgs:[{assemblyCtgId:2,totalLength:1000,hits:[]}]}}));
+  const hits=[[101,300,201,400],[501,800,601,900]].map(([queryStart,queryEnd,refStart,refEnd])=>({queryStart,queryEnd,refStart,refEnd,strand:"+",identityPct:99,blockLength:300}));
+  const store=createStore(createState({assembly:{selectedChrName:"Chr01",trackView:{alignmentLength:1},trackSelectedCtgIds:[],chrCtgs:[{assemblyCtgId:2,totalLength:1000,hits}]}}));
   const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:"primary"},memberNode:null,host:{},store,
-    actions:{canEditTrackCtg:()=>true,openAnchorContigSplit:async(_host,_store,args)=>calls.push(args),
+    actions:{canEditTrackCtg:()=>true,splitContigAtAnchor:async(_host,_store,args)=>calls.push(args),
       openManualContigSplit:async(_host,_store,args)=>calls.push({manual:args})}});
   const split=items.find(i=>i.label==="分割 contig");assert.ok(split);assert.equal(split.disabled,false);
-  assert.equal(split.children,undefined);await split.run();assert.deepEqual(calls,[{assemblyCtgId:2}]);
-  const manual=items.find(i=>i.label==="手动分割…");assert.ok(manual);assert.equal(manual.disabled,false);
-  await manual.run();assert.deepEqual(calls[1],{manual:{assemblyCtgId:2}});
-  assert.ok(!items.some((i)=>/比对最/.test(i.label)));
+  assert.equal(split.run,undefined);assert.equal(split.children[0].label,"手动分割…");
+  assert.equal(split.children.length,5);assert.ok(!items.some(i=>i.label==="手动分割…"));
+  await split.children[0].run();assert.deepEqual(calls[0],{manual:{assemblyCtgId:2}});
+  for(const item of split.children.slice(1)){assert.equal(typeof item.preview,"function");item.preview()();await item.run();}
+  assert.deepEqual(calls.slice(1).map(c=>c.cutAfter),[100,300,500,800]);
+  store.setState({assembly:{...store.getState().assembly,chrCtgs:[{assemblyCtgId:2,totalLength:1000,hits:[]}]}});
+  const empty=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:"primary"},host:{},store,actions:{canEditTrackCtg:()=>true}})
+    .find(i=>i.label==="分割 contig");
+  assert.equal(empty.children[0].disabled,false);assert.equal(empty.children[1].disabled,true);
 });
 
 test("other-chr alignment menu is independent from split and targets just the clicked primary contig",async()=>{
@@ -2749,8 +2755,8 @@ test("undo-split menu appears below anchor/manual split only for split fragments
     const menu = (id, role="primary") => __testBuildAssemblyContextMenuItems({ctgContext: {assemblyCtgId:id, trackRole:role}, memberNode:null, host:{}, store,
       actions:{canEditTrackCtg:()=>true, undoContigSplit:async(_h,_s,args)=>calls.push(args)}});
     const items = menu(3), splitIndex = items.findIndex((i)=>i.label===(locale==="zh"?"分割 contig":"Split contig"));
-    assert.equal(items[splitIndex+1].label,locale==="zh"?"手动分割…":"Manual split…");
-    const undo = items[splitIndex+2]; assert.equal(undo.label, locale==="zh"?"撤销分割 contig":"Undo contig split");
+    assert.equal(items[splitIndex].children[0].label,locale==="zh"?"手动分割…":"Manual split…");
+    const undo = items[splitIndex+1]; assert.equal(undo.label, locale==="zh"?"撤销分割 contig":"Undo contig split");
     assert.deepEqual(undo.children.map((i)=>i.label), locale==="zh"?["撤销左侧分割","撤销右侧分割"]:["Undo left split","Undo right split"]);
     assert.ok(undo.children.every((i)=>!i.disabled));
     await undo.children[0].run(); await undo.children[1].run();
@@ -2788,10 +2794,10 @@ test("main contig menu groups local-view destinations and orders common actions 
       actions:{canEditTrackCtg:()=>true}});
     assert.deepEqual(items.map(i=>i.label),locale==="zh"?[
       "加入 Final Path","加入局部视图","跨 chr 比对…","翻转 contig","重命名 contig...",
-      "分割 contig","手动分割…","撤销分割 contig","隐藏 contig","删除 contig",
+      "分割 contig","撤销分割 contig","隐藏 contig","删除 contig",
     ]:[
       "Add to Final Path","Add to Local View","Cross-chr alignments…","Flip Contig","Rename Contig...",
-      "Split contig","Manual split…","Undo contig split","Hide Contig","Delete Contig",
+      "Split contig","Undo contig split","Hide Contig","Delete Contig",
     ]);
     assert.deepEqual(items[1].children.map(i=>i.label),locale==="zh"?["上轨","下轨"]:["Top track","Bottom track"]);
     assert.equal(items[1].run,undefined,"parent opens a submenu instead of editing the composition");

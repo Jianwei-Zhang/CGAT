@@ -39,6 +39,48 @@ export function resolveContigSplitModel(assembly, assemblyCtgId) {
     minAlignmentLength: prefs.alignmentLength, minIdentityPct: prefs.minIdentityPct };
 }
 
+// Each visible alignment endpoint is a shortcut, including interior boundaries.
+// Keep distinct Ref anchors even when they share the same source cut.
+export function resolveContigSplitAnchors(assembly, assemblyCtgId) {
+  if (assembly?.activeHitsTrackKey && assembly.activeHitsTrackKey !== "primary") return [];
+  const model = resolveContigSplitModel(assembly, assemblyCtgId);
+  if (!model) return [];
+  const seen = new Set();
+  return model.hits.flatMap((hit) => ["start", "end"].flatMap((edge) => {
+    const cutAfter = edge === "start" ? hit.queryStart - 1 : hit.queryEnd;
+    if (cutAfter < model.sourceStart || cutAfter >= model.sourceEnd) return [];
+    const refBp = (edge === "start") !== (hit.strand === "-") ? hit.refStart : hit.refEnd;
+    if (!Number.isSafeInteger(refBp) || refBp < 1) return [];
+    const anchor = { assemblyCtgId: model.assemblyCtgId, cutAfter, edge, refBp,
+      queryStart: hit.queryStart, queryEnd: hit.queryEnd, refStart: hit.refStart, refEnd: hit.refEnd,
+      orient: model.orient, strand: hit.strand === "-" ? "-" : "+",
+      sourceStart: model.sourceStart, sourceEnd: model.sourceEnd, chrName: model.chrName };
+    const key = JSON.stringify(anchor);
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [anchor];
+  })).sort((a, b) => (model.orient === "-" ? b.cutAfter - a.cutAfter : a.cutAfter - b.cutAfter)
+    || a.refBp - b.refBp);
+}
+
+export function isCurrentContigSplitAnchor(assembly, anchor) {
+  return resolveContigSplitAnchors(assembly, anchor?.assemblyCtgId)
+    .some((live) => Object.keys(live).every((key) => live[key] === anchor[key]));
+}
+
+// Use actual rendered edge points: no guessed geometry and no viewport movement.
+export function highlightContigSplitAnchor(host, anchor) {
+  const reverse = anchor.orient === "-";
+  const side = (anchor.edge === "start") !== reverse ? "left" : "right";
+  const bands = [...(host?.querySelectorAll?.(`[data-band-track-role="primary"][data-band-contig-id="${anchor.assemblyCtgId}"]`) || [])]
+    .filter((band) => Number(band.getAttribute("data-band-query-start")) === anchor.queryStart
+      && Number(band.getAttribute("data-band-query-end")) === anchor.queryEnd
+      && (Number(band.getAttribute("data-band-ref-start")) === anchor.refBp
+        || Number(band.getAttribute("data-band-ref-end")) === anchor.refBp));
+  return highlightContigSplitBoundary({ querySelectorAll: () => bands, ownerDocument: host?.ownerDocument },
+    { assemblyCtgId: anchor.assemblyCtgId, reverse, [side]: anchor.cutAfter }, side);
+}
+
 // Use all current-Ref hits passing the same per-hit filters as the main renderer.
 export function resolveContigSplitBoundaries(assembly, assemblyCtgId) {
   if (assembly?.activeHitsTrackKey && assembly.activeHitsTrackKey !== "primary") return null;

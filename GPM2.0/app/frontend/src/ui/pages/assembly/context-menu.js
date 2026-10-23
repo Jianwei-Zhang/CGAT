@@ -1,6 +1,6 @@
 import { localFragmentCopy } from "./subview-fragment-copy.js";
 import { chrAlignmentCopy, resolveContigChrAlignmentModel } from "./contig-chr-alignments.js";
-import { splitCopy, resolveContigUnsplitModel, resolveContigSplitModel } from "./contig-split-boundary.js";
+import { splitCopy, resolveContigUnsplitModel, resolveContigSplitModel, resolveContigSplitAnchors, isCurrentContigSplitAnchor, highlightContigSplitAnchor } from "./contig-split-boundary.js";
 import {
   buildSupportMirrorKey,
   filterPrimaryTrackSelectionCtgIds,
@@ -1324,15 +1324,27 @@ export function buildAssemblyContextMenuItems({
         });
       }
       if (!isSupportTrackCtg) {
-        if (!isPhasedCtgContext && typeof contextMenuActions.openAnchorContigSplit === "function"
+        if (!isPhasedCtgContext && typeof contextMenuActions.splitContigAtAnchor === "function"
           && String(state.assembly.selectedChrName || "").toLowerCase() !== "unplaced") {
           const labels = splitCopy[state.locale === "en" ? "en" : "zh"];
-          items.push({ label: labels.title, disabled: !resolveContigSplitModel(state.assembly, ctgId),
-            run: () => contextMenuActions.openAnchorContigSplit(host, store, { assemblyCtgId: ctgId }) });
-          if (typeof contextMenuActions.openManualContigSplit === "function") {
-            items.push({ label: labels.manual, disabled: !resolveContigSplitModel(state.assembly, ctgId),
-              run: () => contextMenuActions.openManualContigSplit(host, store, { assemblyCtgId: ctgId }) });
-          }
+          const model = resolveContigSplitModel(state.assembly, ctgId);
+          const anchors = resolveContigSplitAnchors(state.assembly, ctgId);
+          const isSameProject = () => store.getState().session?.workspacePath === state.session?.workspacePath
+            && store.getState().session?.projectId === state.session?.projectId;
+          const children = [{ label: labels.manual, disabled: !model,
+            run: () => contextMenuActions.openManualContigSplit(host, store, { assemblyCtgId: ctgId }) },
+            ...anchors.map((anchor, index) => ({
+              label: state.locale === "en"
+                ? `Anchor ${index + 1} · ${anchor.cutAfter.toLocaleString()} bp`
+                : `锚点 ${index + 1} · ${anchor.cutAfter.toLocaleString()} bp`,
+              title: `${anchor.chrName}:${anchor.refBp.toLocaleString()} → ${anchor.cutAfter.toLocaleString()} | ${anchor.queryStart.toLocaleString()}–${anchor.queryEnd.toLocaleString()}`,
+              preview: () => isSameProject() && isCurrentContigSplitAnchor(store.getState().assembly, anchor)
+                ? highlightContigSplitAnchor(host, anchor) : () => {},
+              run: () => isSameProject() && contextMenuActions.splitContigAtAnchor(host, store, anchor),
+            }))];
+          if (!anchors.length) children.push({ disabled: true,
+            label: state.locale === "en" ? "No available internal anchors" : "没有可用的内部锚点" });
+          items.push({ label: labels.title, disabled: !model, children });
           const unsplit = resolveContigUnsplitModel(state.assembly, ctgId);
           if (unsplit && typeof contextMenuActions.undoContigSplit === "function") {
             items.push({ label: labels.undoTitle, children: ["left", "right"].map((side) => ({

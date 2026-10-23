@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveContigUnsplitModel, resolveContigSplitBoundaries, highlightContigSplitBoundary, bandBoundaryAnchors } from "../contig-split-boundary.js";
+import { resolveContigSplitAnchors, isCurrentContigSplitAnchor, highlightContigSplitAnchor, resolveContigUnsplitModel, resolveContigSplitBoundaries, highlightContigSplitBoundary, bandBoundaryAnchors } from "../contig-split-boundary.js";
 import { buildCollinearityBandPoints } from "../track-render-geometry.js";
 import { createState, renderAssemblyPage } from "./tabs-semantics-harness.mjs";
 const hit=(a,b,identityPct=99,blockLength=b-a+1)=>({queryStart:a,queryEnd:b,identityPct,blockLength});
@@ -97,4 +97,36 @@ test("undo split offers an adjacent deleted sibling with immutable tombstone pre
   }
   assembly.chrCtgs[0].orient = "-"; deleted.refOrient = "-";
   assert.equal(resolveContigUnsplitModel(assembly, 22).left.neighborDeletedRecordId, 99);
+});
+
+for(const orient of ["+","-"]) for(const strand of ["+","-"]) {
+  test(`individual anchor shortcuts and local-style hover geometry ${orient}/${strand}`,()=>{
+    const a=assembly(orient);
+    a.chrCtgs[0].hits=[{...hit(101,300),refStart:201,refEnd:400,strand},{...hit(501,800),refStart:601,refEnd:900,strand}];
+    const anchors=resolveContigSplitAnchors(a,6);
+    assert.deepEqual(anchors.map(x=>x.cutAfter),orient==="+"?[100,300,500,800]:[800,500,300,100]);
+    const anchor=anchors.find(x=>x.cutAfter===500);
+    assert.equal(anchor.refBp,strand==="+"?601:900);assert.equal(isCurrentContigSplitAnchor(a,anchor),true);
+    const groups=[];
+    const doc={createElementNS:(_ns,tag)=>({tag,attrs:{},children:[],setAttribute(k,v){this.attrs[k]=v;},append(n){this.children.push(n);},remove(){this.removed=true;}})};
+    const band=(q1,q2,r1,r2)=>({ownerDocument:doc,ownerSVGElement:{append:n=>groups.push(n)},getAttribute:key=>({
+      "data-band-query-start":q1,"data-band-query-end":q2,"data-band-ref-start":r1,"data-band-ref-end":r2,
+      "data-band-left-anchor":"20,90 200,24","data-band-right-anchor":"100,90 250,24"})[key]});
+    const host={querySelectorAll:()=>[band(101,300,201,400),band(501,800,601,900),band(501,800,1001,1300)]};
+    const cleanup=highlightContigSplitAnchor(host,anchor);assert.equal(groups.length,1,"highlight only matching anchor, not same ctg's other bands");
+    assert.equal(groups[0].children[0].attrs.points,orient==="+"?"20,90 200,24":"100,90 250,24");
+    assert.match(groups[0].children[0].attrs.class,/subview-anchor-line is-focused/);
+    cleanup();assert.equal(groups[0].removed,true);
+    a.trackView.alignmentLength=10000;assert.equal(isCurrentContigSplitAnchor(a,anchor),false);
+  });
+}
+test("shortcut anchors reject ends, hidden/other active tracks and stale orientation; distinct Ref anchors are retained",()=>{
+  const a=assembly();a.chrCtgs[0].hits=[{...hit(1,1000),refStart:1,refEnd:1000,strand:"+"}];
+  assert.deepEqual(resolveContigSplitAnchors(a,6),[]);
+  const h={...hit(101,300),refStart:201,refEnd:400,strand:"+"};
+  a.chrCtgs[0].hits=[h,{...h},{...h,refStart:501,refEnd:700}];
+  const anchors=resolveContigSplitAnchors(a,6);assert.equal(anchors.length,4);
+  a.chrCtgs[0].orient="-";assert.equal(isCurrentContigSplitAnchor(a,anchors[0]),false);
+  a.hiddenPrimaryCtgIds=[6];assert.deepEqual(resolveContigSplitAnchors(a,6),[]);
+  a.hiddenPrimaryCtgIds=[];a.activeHitsTrackKey="support";assert.deepEqual(resolveContigSplitAnchors(a,6),[]);
 });

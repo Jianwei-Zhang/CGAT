@@ -1,3 +1,4 @@
+import { createState } from "./tabs-semantics-harness.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -677,4 +678,34 @@ test("assembly context menu closes after 400ms, cancels on return, and clears st
     handlers.get("keydown")({ key: "Escape" });
     assert.equal(timers.size, 0);
   } finally { globalThis.setTimeout = originalSet; globalThis.clearTimeout = originalClear; }
+});
+
+test("anchor submenu hover/focus previews clean up on leave, blur, Escape, scroll and commit", async (t) => {
+  const handlers=new Map(),groups=[],calls=[];let buttons=[];
+  const doc={createElementNS:(_ns,tag)=>({tag,attrs:{},children:[],setAttribute(k,v){this.attrs[k]=v;},append(n){this.children.push(n);},remove(){this.removed=true;}})};
+  const band={ownerDocument:doc,ownerSVGElement:{append:n=>groups.push(n)},getAttribute:key=>({
+    "data-band-query-start":101,"data-band-query-end":300,"data-band-ref-start":201,"data-band-ref-end":400,
+    "data-band-left-anchor":"20,90 200,24","data-band-right-anchor":"100,90 250,24"})[key]};
+  const menu={classList:{add(){},remove(){}},style:{},getBoundingClientRect:()=>({width:220,height:180}),
+    set innerHTML(html){this.markup=html;buttons=[...html.matchAll(/data-menu-action-path="([^"]+)"[^>]*>([^<]*)/g)].map((m)=>({
+      label:m[2],handlers:new Map(),getAttribute:()=>m[1],addEventListener(type,fn){this.handlers.set(type,fn);}}));},
+    get innerHTML(){return this.markup;},querySelectorAll:selector=>selector==="[data-menu-action-path]"?buttons:[]};
+  const host={querySelector:s=>s==="#assembly-context-menu"?menu:null,querySelectorAll:()=>[band],addEventListener:(type,fn)=>handlers.set(type,fn)};
+  const state=createState({assembly:{activeTab:"assembly",selectedChrName:"Chr01",trackSelectedCtgIds:[],trackView:{alignmentLength:1},
+    chrCtgs:[{assemblyCtgId:2,totalLength:1000,hits:[{queryStart:101,queryEnd:300,refStart:201,refEnd:400,strand:"+",blockLength:200,identityPct:99}]}]}});
+  const store={getState:()=>state};
+  const track={getAttribute:key=>({"data-track-contig-id":"2","data-track-role":"primary"})[key]??null};
+  const target={closest:s=>s==="[data-track-contig-id][data-track-role]"?track:null};
+  const original=globalThis.window;globalThis.window={innerWidth:1200,innerHeight:800};t.after(()=>{globalThis.window=original;});
+  bindAssemblyContextMenu(host,store,createRuntimeDeps({splitContigAtAnchor:async(_h,_s,anchor)=>calls.push(anchor),openManualContigSplit(){}}));
+  const open=()=>{handlers.get("contextmenu")({target,clientX:80,clientY:90,preventDefault(){}});return buttons.find(b=>b.label.includes("锚点 1"));};
+  let button=open();assert.ok(button);
+  const fire=(name)=>button.handlers.get(name)?.({stopPropagation(){}});
+  fire("pointerenter");assert.equal(groups.filter(g=>!g.removed).length,1);
+  fire("pointerleave");assert.equal(groups.filter(g=>!g.removed).length,0);
+  fire("focus");fire("blur");assert.equal(groups.filter(g=>!g.removed).length,0);
+  fire("pointerenter");handlers.get("keydown")({key:"Escape"});assert.equal(groups.filter(g=>!g.removed).length,0);
+  button=open();fire("focus");handlers.get("scroll")();assert.equal(groups.filter(g=>!g.removed).length,0);
+  button=open();fire("pointerenter");await fire("click");assert.equal(groups.filter(g=>!g.removed).length,0);
+  assert.deepEqual(calls.map(c=>c.cutAfter),[100]);
 });

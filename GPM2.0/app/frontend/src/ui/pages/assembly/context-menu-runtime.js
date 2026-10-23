@@ -296,7 +296,7 @@ export function buildAssemblyContextMenuActions(actionDeps, overrides = {}) {
     undoContigSplit: resolveAction("undoContigSplit"),
     openContigChrAlignments: resolveAction("openContigChrAlignments"),
     openManualContigSplit: resolveAction("openManualContigSplit"),
-    openAnchorContigSplit: resolveAction("openAnchorContigSplit"),
+    splitContigAtAnchor: resolveAction("splitContigAtAnchor"),
     resolveLocalFragmentMenu: resolveAction("resolveLocalFragmentMenu"),
     flipLocalFragment: resolveAction("flipLocalFragment"),
     openLocalContigSplit: resolveAction("openLocalContigSplit"),
