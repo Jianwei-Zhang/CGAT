@@ -4,6 +4,7 @@ import { createSubviewInteractionController } from "../subview-interaction-contr
 import { createSubviewCompositionController } from "../subview-composition-controller.js";
 import { rollbackSubviewHistory, resolveCurrentSubviewHistory } from "../subview-history-state.js";
 import { buildSubviewClearProjection } from "../subview-clear-state.js";
+import { deleteSelectedSubviewTrackPairCtgs } from "../editor-actions-runtime.js";
 import { applySubviewComposition } from "../subview-composition-state.js";
 import { zh, en } from "../../../i18n/messages/assembly.js";
 
@@ -141,3 +142,49 @@ test("Chinese and English local view guidance include pair, track and compositio
   assert.equal(zh.subview.guide, "Ctrl/Cmd 选择两个 ctg 或两个轨道进行比较；通过「工具」添加 ctg 进入组合模式。");
   assert.match(en.subview.guide, /Ctrl\/Cmd.*track labels.*Tools.*composition mode/);
 });
+
+for (const mode of ["track-pair", "composition"]) {
+  for (const fullRange of [true, false]) {
+    test(`box-selection Delete in ${mode}, fullRange=${fullRange} preserves remaining geometry`, async () => {
+      const state = mode === "track-pair" ? trackPairState(20000, fullRange)
+        : createIdentityRenderState("composition");
+      let selected;
+      if (mode === "composition") {
+        const members = state.assembly.subview.summary.members;
+        const base = members.find((entry) => entry.assemblyCtgId === 30);
+        state.assembly.subview = applySubviewComposition(state.assembly.subview, {
+          members: [...members, ...[31, 32].map((id, index) => ({ ...base,
+            entityKey: `assembly:${id}`, assemblyCtgId: id, xBp: (index + 2) * 64000,
+          }))],
+        });
+        state.assembly.subviewTrackView = { ...state.assembly.subviewTrackView,
+          fullRange, visibleSpanBp: fullRange ? 900000 : 10000 };
+        selected = [31, 32].map((contigId) => ({ trackRole: "support", contigId,
+          compositionEntityKey: `assembly:${contigId}`, slot: "top" }));
+      } else {
+        selected = [31, 32].map((contigId) => ({ trackRole: "support", contigId, slot: "top" }));
+      }
+      const before = scene(state, fullRange ? 0 : 130);
+      if (mode === "composition") state.assembly.subviewCompositionViewport = {
+        bpPerPx: before.bpPerPx, leftBp: before.leftBp, topPx: 0,
+      };
+      const store = createStore(state);
+      await deleteSelectedSubviewTrackPairCtgs(hostFor(before), store, selected, {
+        confirm: async () => true, rerender() {},
+        persistProjectAssemblyViewStateFromStore: async () => {},
+      });
+      const after = scene(store.getState(), before.scroll.scrollLeft);
+      assert.equal(store.getState().assembly.subviewTrackView.fullRange, false);
+      assert.equal(after.bpPerPx, before.bpPerPx);
+      assert.equal(after.leftBp, before.leftBp);
+      for (const [key, mark] of before.marks) {
+        if (["top:31", "top:32"].includes(key)) assert.equal(after.marks.has(key), false);
+        else assert.deepEqual(after.marks.get(key), mark, key);
+      }
+      const undone = rollbackSubviewHistory(store.getState().assembly);
+      assert.equal(undone.changed, true);
+      store.setState({ assembly: undone.assembly });
+      assert.deepEqual(scene(store.getState(), before.scroll.scrollLeft).marks, before.marks);
+    });
+  }
+}

@@ -10,7 +10,14 @@ import {
   resolveFilteredSubviewTrackPairSelectionsFromAssembly,
 } from "./subview-state.js";
 import { commitSubviewHistoryOperation } from "./subview-history-state.js";
-import { projectCurrentSubviewToComposition } from "./subview-composition-controller.js";
+import {
+  projectCurrentSubviewToComposition,
+  resolveCurrentSubviewCompositionViewport,
+} from "./subview-composition-controller.js";
+import {
+  captureSubviewTrackPairRemovalLayout,
+  preserveSubviewRemovalViewport,
+} from "./subview-removal-viewport.js";
 import { applySubviewComposition, removeSubviewCompositionMembers } from "./subview-composition-state.js";
 
 function normalizeBoolean(value) {
@@ -307,9 +314,12 @@ export async function deleteSelectedSubviewTrackPairCtgs(host, store, selectedEn
     return;
   }
   let nextSubview;
+  let editAssembly = state.assembly;
   if (String(currentSubview.summary.mode) === "track-pair") {
+    editAssembly = preserveSubviewRemovalViewport(editAssembly, host);
     nextSubview = {
       ...currentSubview,
+      ...captureSubviewTrackPairRemovalLayout(state.assembly, host),
       trackPairHiddenCtgs: normalizeHidden([
         ...normalizeHidden(currentSubview.trackPairHiddenCtgs), ...normalized,
       ]),
@@ -323,9 +333,14 @@ export async function deleteSelectedSubviewTrackPairCtgs(host, store, selectedEn
           && (!entry.slot || member.lane === entry.slot))).map((member) => member.entityKey);
     if (!keys.length) return;
     const removed = removeSubviewCompositionMembers(composition, keys);
+    const viewport = resolveCurrentSubviewCompositionViewport(state, host);
+    editAssembly = {
+      ...preserveSubviewRemovalViewport(editAssembly, host, { viewport }),
+      subviewCompositionViewport: viewport,
+    };
     nextSubview = applySubviewComposition(currentSubview, removed.composition, { trackPairSelectedCtgs: [] });
   }
-  const committed = commitSubviewHistoryOperation(state.assembly, {
+  const committed = commitSubviewHistoryOperation(editAssembly, {
     nextSubview,
     operation: { kind: "hide-contigs", count: normalized.length },
     stateOrLocale: state,

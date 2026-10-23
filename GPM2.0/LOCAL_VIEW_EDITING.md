@@ -26,7 +26,7 @@ Implemented for existing Main View primary-track entities and Local View members
 - A selected leader translates the explicit visible selection, preserving individual prior offsets and one common delta. An unselected leader does not move the old selection.
 - Composition selections retain entity keys, highlight selected instances and avoid moving another presentation sharing a backing contig ID, including in preview.
 - Main View validates same-track/project/chromosome membership, unique targets and a rigid common delta; it records every affected target in one persistent history entry. Local View commits one local history entry.
-- Existing local box-selection Delete handling also works for two-contig/composition selections without modifying Main View data.
+- Existing local box-selection Delete handling also works for two-contig/composition selections without modifying Main View data. Batch deletion freezes the pre-delete rendered scale and viewport in track-pair/composition modes, retaining surviving member positions and undo layout.
 - Automated coverage includes both directions, zoomed/full-range previews, either selected leader, cancellation, context changes, unequal initial offsets, instance isolation, and undo/redo.
 
 Not yet implemented by this stage: independent anchor-derived interval objects; interval-scoped local delete/flip/drag; synchronized partial deletion/splitting; local fragment merging; the new scoped menu layout; Main DS card local-state annotations. The agreed behavior above remains the specification for these next stages, not a claim that their UI or data paths are already shipped.
@@ -35,7 +35,7 @@ Automated checks are not native-window acceptance. A running desktop process can
 
 ### Stage 1 verification snapshot (2026-10-23)
 
-- Windows frontend: 1,617 tests passed; production build passed (existing large-chunk warning only).
+- Windows frontend: 1,621 tests passed; production build passed (existing large-chunk warning only).
 - Windows backend: 299 tests passed, 2 existing ignored; format and strict Clippy passed.
 - Windows Tauri: 18 tests passed; format and strict Clippy passed.
 - The default debug executable was locked by the user's running app. An unused `D:\tools\gpm-preview-verification-target` build succeeded and passed embedded-icon validation without terminating the app. This does not update or visually validate the running window.
