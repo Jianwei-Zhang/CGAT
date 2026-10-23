@@ -690,13 +690,33 @@ export function buildAssemblyContextMenuItems({
       if (!model) return;
       const labels = localFragmentCopy[state.locale === "en" ? "en" : "zh"];
       const isFragment = Boolean(model.member.localFragment);
-      items.push({ label: state.locale === "en" ? "Split contig (Local View only)" : "分割 contig（仅局部）",
-        disabled: !model.canSplit, title: model.canSplit ? "" : (state.locale === "en" ? "Create an internal anchor first" : "请先创建内部锚点"),
-        run: () => contextMenuActions.openLocalContigSplit(host, store, memberContext) });
-      items.push({ label: state.locale === "en" ? "Split contig (affect Main View)" : "分割 contig（影响主视图）",
-        disabled: !model.canSplit || !model.canSync,
-        title: !model.canSync ? labels.syncUnavailable : !model.canSplit ? (state.locale === "en" ? "Create an internal anchor first" : "请先创建内部锚点") : "",
-        run: () => contextMenuActions.openLocalContigSplit(host, store, memberContext, { synchronize: true }) });
+      const splitLabels = splitCopy[state.locale === "en" ? "en" : "zh"];
+      const isCurrentSplit = () => {
+        const live = store.getState();
+        return live.session?.workspacePath === state.session?.workspacePath && live.session?.projectId === state.session?.projectId
+          && live.assembly?.selectedChrName === state.assembly?.selectedChrName && live.assembly?.subview === state.assembly?.subview;
+      };
+      for (const synchronize of [false, true]) {
+        const available = model.canManualSplit && (!synchronize || model.canSyncSplit);
+        const unavailable = synchronize && !model.canSyncSplit ? labels.syncUnavailable : splitLabels.unavailable;
+        const openSplit = (options) => isCurrentSplit() && contextMenuActions.openLocalContigSplit(host, store,
+          memberContext, { synchronize, expectedKey: model.splitKey, ...options });
+        items.push({ label: synchronize
+          ? state.locale === "en" ? "Split contig (affect Main View)" : "分割 contig（影响主视图）"
+          : state.locale === "en" ? "Split contig (Local View only)" : "分割 contig（仅局部）",
+          disabled: !available, title: available ? "" : unavailable, children: [
+            { label: splitLabels.manual, disabled: !available, title: available ? "" : unavailable,
+              run: () => available && openSplit({ mode: "manual" }) },
+            ...["left", "right"].map((side) => {
+              const cut = model.boundaries?.[side], enabled = available && cut != null;
+              return { label: splitLabels[side], disabled: !enabled,
+                title: enabled ? `${cut.toLocaleString()} bp` : unavailable,
+                preview: () => enabled && isCurrentSplit() ? model.previewSplit?.(cut) || (() => {}) : () => {},
+                run: () => enabled && openSplit({ side, expectedCut: cut }),
+              };
+            }),
+          ] });
+      }
       items.push({ label: isFragment ? labels.deleteFragment : labels.delete, children: [
         { label: labels.localDelete, run: () => removeContextSubviewMember(host, store, memberContext) },
         { label: labels.mainDelete, disabled: !model.canSync || !contextMenuActions.synchronizeLocalFragment,

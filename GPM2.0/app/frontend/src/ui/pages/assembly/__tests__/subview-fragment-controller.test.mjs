@@ -105,7 +105,10 @@ test("local menu retains scoped deletion and two anchor split scopes, but no und
   assert.deepEqual(items.map((item) => item.label), ["加入 Final Path", "移至另一轨", "翻转 contig", "分割 contig（仅局部）", "分割 contig（影响主视图）", "删除当前片段"]);
   assert.deepEqual(items[5].children.map((item) => item.label), ["仅从当前局部视图删除", "同步从主视图删除…"]);
   assert.equal(items[5].children[1].disabled, true);
-  assert.ok(items[3].disabled && items[4].disabled);
+  assert.equal(items[3].disabled, false); assert.equal(items[4].disabled, true);
+  assert.deepEqual(items[3].children.map((item) => item.label), ["手动分割…", "左侧分割", "右侧分割"]);
+  assert.equal(items[3].children[0].disabled, false);
+  assert.ok(items[3].children.slice(1).every((item) => item.disabled));
 
 });
 
@@ -208,7 +211,7 @@ for (const mode of ["2-contig", "track-pair", "composition"]) test(`${mode}: con
 });
 
 for (const locale of ["zh", "en"]) for (const role of ["primary", "support"]) for (const fragment of [false, true]) {
-  test(`Local menu hides split/unsplit for ${role}, fragment=${fragment}, ${locale}`, () => {
+  test(`Local menu keeps fixed scoped split submenus without requiring anchors for ${role}, fragment=${fragment}, ${locale}`, () => {
     const state = createIdentityRenderState("composition"); state.locale = locale;
     const id = role === "primary" ? 2 : 30, slot = role === "primary" ? "bottom" : "top";
     const context = { assemblyCtgId: id, trackRole: role, slot, compositionEntityKey: `assembly:${id}`,
@@ -217,7 +220,14 @@ for (const locale of ["zh", "en"]) for (const role of ["primary", "support"]) fo
       subviewFragmentContext: fragment ? context : null, subviewTrackPairContext: context });
     assert.ok(items.length > 0);
     assert.equal(items.filter((item) => /分割|split/i.test(item.label)).length, 2);
-    assert.ok(items.filter((item) => /分割|split/i.test(item.label)).every((item)=>item.disabled));
+    const splitMenus = items.filter((item) => /分割|split/i.test(item.label));
+    assert.equal(splitMenus[0].disabled, false);
+    assert.equal(splitMenus[1].disabled, role !== "primary");
+    for (const menu of splitMenus) {
+      assert.deepEqual(menu.children.map((item) => item.label), locale === "zh"
+        ? ["手动分割…", "左侧分割", "右侧分割"] : ["Manual split…", "Split left", "Split right"]);
+      assert.ok(menu.children.slice(1).every((item) => item.disabled));
+    }
     const deletion = items.at(-1);
     assert.match(deletion.label, /删除|delete/i);
     assert.equal(deletion.children.length, 2);
@@ -248,4 +258,103 @@ test("multiple local anchors split the whole target once; a subsequent fragment 
   const undoSplit=rollbackSubviewHistory(undoFlip.assembly);
   assert.equal(undoSplit.changed,true);
   assert.equal(undoSplit.assembly.subview.summary.members.filter(m=>m.assemblyCtgId===30).length,1);
+});
+
+
+function twoAnchors(state) {
+  addAnchor(state, 4000); const first = structuredClone(state.assembly.subview.activeAnchors[0]);
+  addAnchor(state, 10000); first.hitKey = "first-anchor"; state.assembly.subview.activeAnchors.push(first);
+}
+const selectedContext = (id = 30) => ({ entityKey: `assembly:${id}`, assemblyCtgId: id,
+  slot: id === 30 ? "top" : "bottom", trackRole: id === 30 ? "support" : "primary",
+  start: 4001, end: 10000, coordinateSpace: "base" });
+
+for (const side of ["left", "right"]) test(`directional local split cuts only the selected ${side} boundary`, async () => {
+  const state = createIdentityRenderState("composition"); twoAnchors(state);
+  const store = createStore(state), runtime = controller(), context = selectedContext();
+  const before = store.getState().assembly.chrCtgs;
+  const menu = resolveLocalFragmentMenu(store.getState(), host, context);
+  assert.deepEqual(menu.boundaries, { left: 4000, right: 10000 });
+  assert.equal(await runtime.openLocalContigSplit(host, store, context,
+    { side, expectedKey: menu.splitKey, expectedCut: menu.boundaries[side] }), true);
+  const ranges = store.getState().assembly.subview.summary.members.filter((m) => m.assemblyCtgId === 30).map(memberSourceInterval);
+  assert.deepEqual(ranges.map((range) => [range.sourceStart, range.sourceEnd]),
+    side === "left" ? [[1, 4000], [4001, 16000]] : [[1, 10000], [10001, 16000]]);
+  assert.equal(store.getState().assembly.chrCtgs, before);
+  assert.equal(resolveCurrentSubviewHistory(store.getState().assembly).record.past.length, 1);
+  assert.equal(runtime.persisted.length, 1);
+});
+
+test("manual local split works without anchors and cancel/stale dialogs do not mutate", async () => {
+  const store = createStore(createIdentityRenderState("composition"));
+  const runtime = controller({ openManualContigSplit: async (_host, model, options) => {
+    assert.equal(model.sourceStart, 1); assert.equal(model.sourceEnd, 16000);
+    assert.equal(options.isCurrent(), true); return options.commit({ cutAfter: 7000 });
+  } });
+  assert.equal(await runtime.openLocalContigSplit(host, store, { entityKey: "assembly:30" }, { mode: "manual" }), true);
+  const members = store.getState().assembly.subview.summary.members.filter((m) => m.assemblyCtgId === 30);
+  assert.deepEqual(members.map(memberSourceInterval).map((range) => [range.sourceStart, range.sourceEnd]), [[1, 7000], [7001, 16000]]);
+  assert.equal(runtime.persisted.length, 1);
+  const clean = createStore(createIdentityRenderState("composition")), before = clean.getState();
+  const cancel = controller({ openManualContigSplit: async () => false });
+  assert.equal(await cancel.openLocalContigSplit(host, clean, { entityKey: "assembly:30" }, { mode: "manual" }), false);
+  assert.equal(clean.getState(), before); assert.equal(cancel.persisted.length, 0);
+  const stale = controller({ openManualContigSplit: async (_host, _model, options) => {
+    clean.setState({ assembly: { ...clean.getState().assembly, subview: { ...clean.getState().assembly.subview } } });
+    assert.equal(options.isCurrent(), false);
+    await assert.rejects(options.commit({ cutAfter: 7000 }), /变化|changed/); return false;
+  } });
+  assert.equal(await stale.openLocalContigSplit(host, clean, { entityKey: "assembly:30" }, { mode: "manual" }), false);
+  assert.equal(stale.persisted.length, 0);
+});
+
+test("directional synchronization targets the whole backing member with one cut, not an implicitly isolated fragment", async () => {
+  const state = createIdentityRenderState("composition"); twoAnchors(state);
+  const store = createStore(state), calls = [];
+  const runtime = controller({ synchronizeLocalFragment: async (_host, _store, context, operation) => {
+    calls.push({ context, operation }); return true;
+  } });
+  const context = selectedContext(2);
+  assert.equal(resolveLocalFragmentMenu(state, host, context).canSyncSplit, true);
+  assert.equal(await runtime.openLocalContigSplit(host, store, context, { side: "left", synchronize: true }), true);
+  assert.deepEqual(calls[0].operation, { action: "split", cuts: [4000] });
+  assert.equal(calls[0].context.start, undefined); assert.equal(calls[0].context.end, undefined);
+  assert.equal(runtime.persisted.length, 0);
+});
+
+test("stale or unavailable directional boundaries never edit a different interval", async () => {
+  const state = createIdentityRenderState("composition"); twoAnchors(state);
+  const store = createStore(state), runtime = controller(), context = selectedContext();
+  const model = resolveLocalFragmentMenu(state, host, context);
+  assert.equal(await runtime.openLocalContigSplit(host, store, context,
+    { side: "left", expectedKey: model.splitKey, expectedCut: 5000 }), false);
+  assert.equal(await runtime.openLocalContigSplit(host, store, { entityKey: "assembly:30" }, { side: "left" }), false);
+  const before = store.getState();
+  store.setState({ assembly: { ...before.assembly, subview: { ...before.assembly.subview, activeAnchors: [] } } });
+  assert.equal(await runtime.openLocalContigSplit(host, store, context,
+    { side: "left", expectedKey: model.splitKey, expectedCut: 4000 }), false);
+  assert.equal(runtime.persisted.length, 0);
+});
+
+
+test("local split menus keep three fixed children and dispatch manual/single-side operations to the chosen scope", async () => {
+  const state = createIdentityRenderState("composition"); twoAnchors(state);
+  const store = createStore(state), calls = [];
+  const context = { ...selectedContext(2), compositionEntityKey: "assembly:2" };
+  const items = __testBuildAssemblyContextMenuItems({ store, host, subviewFragmentContext: context,
+    actions: { openLocalContigSplit: async (_host, _store, target, options) => { calls.push({ target, options }); return true; } } });
+  const splitMenus = items.filter((item) => item.label.startsWith("分割 contig"));
+  assert.equal(splitMenus.length, 2);
+  assert.ok(splitMenus.every((item) => !item.disabled && item.run === undefined));
+  for (const menu of splitMenus) {
+    assert.deepEqual(menu.children.map((item) => item.label), ["手动分割…", "左侧分割", "右侧分割"]);
+    assert.ok(menu.children.every((item) => !item.disabled));
+  }
+  await splitMenus[0].children[0].run(); await splitMenus[0].children[1].run(); await splitMenus[1].children[2].run();
+  assert.equal(calls[0].options.mode, "manual"); assert.equal(calls[0].options.synchronize, false);
+  assert.equal(calls[1].options.side, "left"); assert.equal(calls[1].options.expectedCut, 4000);
+  assert.equal(calls[2].options.side, "right"); assert.equal(calls[2].options.expectedCut, 10000);
+  assert.equal(calls[2].options.synchronize, true);
+  store.setState({ assembly: { ...state.assembly, subview: { ...state.assembly.subview } } });
+  assert.equal(await splitMenus[0].children[1].run(), false); assert.equal(calls.length, 3);
 });

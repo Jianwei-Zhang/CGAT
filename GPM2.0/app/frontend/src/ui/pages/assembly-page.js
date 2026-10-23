@@ -467,6 +467,7 @@ const subviewFragmentController = createSubviewFragmentController({
   synchronizeLocalFragment,
   projectHistorical: (state) => projectRenderedSubviewToComposition(state, renderAssemblySubviewPanelImpl(state, renderTracksDeps)),
   openAnchorContigSplit,
+  openManualContigSplit,
   persistProjectAssemblyViewStateFromStore: (host, store) => persistProjectAssemblyViewStateFromStore(host, store),
   rerenderSubviewPanel: (host, store) => rerenderSubviewPanel(host, store),
   refreshSubviewPairwiseEvidence,
