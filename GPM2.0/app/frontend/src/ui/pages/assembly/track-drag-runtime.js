@@ -337,8 +337,8 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     return;
   }
 
-  const startDrag = (event, fragmentGesture = null) => {
-    const runtimeHost = fragmentGesture?.host || host;
+  const startDrag = (event) => {
+    const runtimeHost = host;
     if (event.defaultPrevented || event.target?.closest?.("[data-view-interaction-mode='hand']")?.dataset?.viewInteractionMode === "hand" || event.button !== 0 || event.ctrlKey || event.metaKey) {
       return;
     }
@@ -354,8 +354,8 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     if (!scrollEl) {
       return;
     }
-    if (!fragmentGesture && deps.deferSubviewFragmentDrag?.(runtimeHost, store, event,
-      (next, prepared) => startDrag(next, prepared))) return;
+    // Anchor hit zones belong to this contig/member. A drag changes its
+    // position, never materializes the anchor's display intervals as objects.
     const slot = normalizeSubviewTrackSlot(trackNode.getAttribute("data-subview-track-slot"));
     const contigId = normalizeSupportDatasetId(trackNode.getAttribute("data-subview-contig-id"));
     const compositionEntityKey = String(
@@ -523,11 +523,9 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
             activeScrollEl.scrollLeft = Math.max(0, Number(nextScrollLeft) || 0);
           }
         }
-        fragmentGesture?.accept();
         void deps.persistSubviewTrackDragOffsets(dragHost, store);
       } else {
         if (fullRangeDrag && dragging) deps.clearFullRangeSubviewDragPreview(dragHost, store, { cancelled: true });
-        fragmentGesture?.rollback();
       }
     };
 

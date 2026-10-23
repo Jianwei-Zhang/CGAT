@@ -97,7 +97,8 @@ test("local menu has ordered scoped split/delete and local-only merge, with no r
   assert.equal(items[3].children[1].disabled, true);
   assert.equal(items[5].children[1].disabled, true);
   const model = resolveLocalFragmentMenu(state, host, context);
-  assert.equal(model.left, true); assert.equal(model.right, true);
+  assert.equal(model.left, false); assert.equal(model.right, false);
+  assert.ok(items[4].children.every((item) => item.disabled));
 });
 
 for (const mode of ["2-contig", "track-pair"]) {
@@ -168,4 +169,31 @@ test("deleted local interval survives anchor disable, persisted reopen and undo 
       [[1, 1000], [3001, 16000]]);
     assert.deepEqual(assembly.chrCtgs, state.assembly.chrCtgs);
   }
+});
+
+for (const mode of ["2-contig", "track-pair", "composition"]) test(`${mode}: an anchor-only interval cannot undo a nonexistent split or mutate the view`, async () => {
+  const initial = createIdentityRenderState(mode), store = createStore(initial), runtime = controller();
+  const context = { assemblyCtgId: 30, trackRole: "support", slot: "top", start: 1001, end: 3000 };
+  const before = JSON.stringify(store.getState());
+  const menu = resolveLocalFragmentMenu(store.getState(), host, context);
+  assert.equal(menu.left, false); assert.equal(menu.right, false);
+  for (const side of ["left", "right"]) assert.equal(await runtime.mergeLocalFragment(host, store, context, side), false);
+  assert.equal(JSON.stringify(store.getState()), before);
+  assert.equal(runtime.persisted.length, 0);
+});
+
+for (const mode of ["2-contig", "track-pair", "composition"]) test(`${mode}: controller split of an anchor interval retains visible marks through reload and repeat split`, async () => {
+  const store = createStore(createIdentityRenderState(mode)), runtime = controller();
+  const context = { assemblyCtgId: 30, trackRole: "support", slot: "top", start: 1001, end: 3000 };
+  const marks = () => (renderAssemblyPage(store.getState()).split('data-subview-panel="1"')[1].match(/data-manual-split-after="2000"/g) || []).length;
+  assert.equal(await runtime.openLocalContigSplit(host, store, context), true);
+  assert.equal(marks(), 2);
+  store.setState(JSON.parse(JSON.stringify(store.getState())));
+  assert.equal(marks(), 2);
+  let first = store.getState().assembly.subview.summary.members.find((m) => m.localFragment?.sourceStart === 1001);
+  assert.equal(await runtime.mergeLocalFragment(host, store, { entityKey: first.entityKey }, "right"), true);
+  assert.equal(marks(), 0);
+  const merged = store.getState().assembly.subview.summary.members.find((m) => m.localFragment?.sourceStart === 1001);
+  assert.equal(await runtime.openLocalContigSplit(host, store, { entityKey: merged.entityKey }), true);
+  assert.equal(marks(), 2);
 });

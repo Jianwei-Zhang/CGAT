@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { createIdentityRenderState } from "./identity-render-fixture.mjs";
 import { renderAssemblyPage } from "./tabs-semantics-harness.mjs";
-import { createSubviewFragmentGestureRuntime } from "../subview-fragment-gesture-runtime.js";
+import { resolveSubviewTrackDragOffsetBp } from "../render-tracks.js";
+import { splitLocalMember } from "../subview-fragment-model.js";
 import { projectRenderedSubviewToComposition } from "../subview-composition-controller.js";
 import { bindSubviewTrackContigDrag } from "../track-drag-runtime.js";
 import { bindTrackBoxSelection } from "../track-selection-runtime.js";
 import { applySubviewComposition, getSubviewComposition } from "../subview-composition-state.js";
-import { moveSubviewCompositionDrag } from "../source-fragment-drag.js";
+import { moveSubviewCompositionDrag, setSubviewDragGroupOffsets } from "../source-fragment-drag.js";
 import { commitSubviewHistoryOperation } from "../subview-history-state.js";
 
 const attrs = (tag) => Object.fromEntries([...tag.matchAll(/([\w-]+)="([^"]*)"/g)].map((match) => [match[1], match[2].replaceAll("&amp;", "&").replaceAll("&quot;", '"')]));
@@ -77,12 +78,11 @@ export function gestureHarness(mode, { fullRange = false, flipped = false } = {}
   assert.ok(anchorKey, "fixture has real rendered evidence edges");
   state.assembly.subview.activeAnchors = [{ hitKey: anchorKey, edge: "left" }, { hitKey: anchorKey, edge: "right" }];
   render();
-  const gestures = createSubviewFragmentGestureRuntime({ getWindow: () => win,
-    projectHistorical: (prior) => projectRenderedSubviewToComposition(prior, renderAssemblyPage(prior)), rerenderSubviewPanel: render });
   const previews = [], payloads = []; let persisted = 0;
-  const dragDeps = { ...gestures,
+  const dragDeps = {
+    deferSubviewFragmentDrag() { assert.fail("drag must not invoke the retired implicit-partition hook"); },
     roundTrackMetric: (value) => Number(value.toFixed(6)),
-    resolveSubviewTrackDragOffsetBp: () => 0,
+    resolveSubviewTrackDragOffsetBp,
     convertTrackOffsetPxToBp: (value, metrics) => value * Number(metrics.domainSpanBp) / Number(metrics.innerWidth),
     resolveActiveTrackScrollElement: () => scene.scroll,
     clearSubviewTrackDragPreview() {},
@@ -90,23 +90,36 @@ export function gestureHarness(mode, { fullRange = false, flipped = false } = {}
     applySubviewTrackDragOffset: (_host, _store, payload) => {
       payloads.push(payload);
       const assembly = store.getState().assembly;
-      const moved = moveSubviewCompositionDrag(getSubviewComposition(assembly.subview), payload);
-      assert.equal(moved.changed, true);
+      const composition = getSubviewComposition(assembly.subview);
+      const moved = composition ? moveSubviewCompositionDrag(composition, payload) : null;
+      if (moved) assert.equal(moved.changed, true);
       const committed = commitSubviewHistoryOperation(assembly, {
-        nextSubview: applySubviewComposition(assembly.subview, moved.composition), operation: { kind: "drag-contig", count: payload.targets?.length || 1 },
+        nextSubview: moved ? applySubviewComposition(assembly.subview, moved.composition) : assembly.subview,
+        nextSubviewTrackDragOffsets: moved ? assembly.subviewTrackDragOffsets : setSubviewDragGroupOffsets(assembly.subviewTrackDragOffsets, payload),
+        operation: { kind: "drag-contig", count: payload.targets?.length || 1 },
       });
       assert.equal(committed.changed, true); store.setState({ assembly: committed.assembly }); render();
     },
     persistSubviewTrackDragOffsets: async () => { persisted += 1; },
   };
-  const selectDeps = { ...gestures, updateTrackSelection() {},
+  const selectDeps = {
+    prepareSubviewFragmentSelection() { assert.fail("selection must not invoke the retired implicit-partition hook"); },
+    updateTrackSelection() {},
     updateSubviewTrackPairSelection: (_host, _store, entries) => {
       store.setState({ assembly: { ...state.assembly, subview: { ...state.assembly.subview, trackPairSelectedCtgs: entries } } }); render();
     },
   };
   function pointer(target, clientX, clientY) { return { target, button: 0, pointerId: 1, clientX, clientY, defaultPrevented: false,
     preventDefault() { this.defaultPrevented = true; } }; }
-  return { store, host, win, previews, payloads, get scene() { return scene; }, render, pointer,
+  function split(id, cutAfter) {
+    const composition = projectRenderedSubviewToComposition(state, renderAssemblyPage(state));
+    const parent = composition.members.find((m) => m.assemblyCtgId === id);
+    const result = splitLocalMember(composition, parent.entityKey, cutAfter);
+    assert.equal(result.changed, true);
+    store.setState({ assembly: { ...state.assembly, subview: applySubviewComposition(state.assembly.subview, result.composition) } }); render();
+    return result;
+  }
+  return { store, host, win, previews, payloads, get scene() { return scene; }, render, pointer, split,
     bindDrag() { bindSubviewTrackContigDrag(host, store, dragDeps); },
     bindBox() { bindTrackBoxSelection(host, store, selectDeps); },
     persisted: () => persisted,

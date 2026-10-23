@@ -38,7 +38,7 @@ export function normalizeLocalFragment(value) {
     ...(Array.isArray(value.manualCuts) ? { manualCuts: [...new Set(value.manualCuts.map(Number)
       .filter((cut) => Number.isSafeInteger(cut) && cut > 0 && cut >= sourceStart - 1 && cut <= sourceEnd))].sort((a, b) => a - b) } : {}),
     ...(Array.isArray(value.suppressedCuts) ? { suppressedCuts: [...new Set(value.suppressedCuts.map(Number)
-      .filter((cut) => Number.isSafeInteger(cut) && cut >= sourceStart && cut < sourceEnd))].sort((a, b) => a - b) } : {}),
+      .filter((cut) => Number.isSafeInteger(cut) && cut >= sourceStart - 1 && cut <= sourceEnd))].sort((a, b) => a - b) } : {}),
   };
 }
 
@@ -179,7 +179,8 @@ export function splitLocalMember(composition, entityKey, cutAfter) {
   const range = memberSourceInterval(member);
   if (!positive(cutAfter) || cutAfter < range.sourceStart || cutAfter >= range.sourceEnd) return { composition, changed: false };
   const splitSource = { ...member, localFragment: normalizeLocalFragment({ ...range,
-    manualCuts: [...(range.manualCuts || []), cutAfter] }) };
+    manualCuts: [...(range.manualCuts || []), cutAfter],
+    suppressedCuts: (range.suppressedCuts || []).filter((cut) => cut !== cutAfter) }) };
   const parts = [sliceLocalMember(splitSource, range.sourceStart, cutAfter), sliceLocalMember(splitSource, cutAfter + 1, range.sourceEnd)];
   if (parts.some((part) => !part)) return { composition, changed: false };
   return { composition: replaceLocalMembers(composition, [member], parts), changed: true, members: parts };
@@ -216,7 +217,8 @@ export function deleteLocalMember(composition, entityKey) {
       : range.sourceEnd + 1 === other.sourceStart ? [range.sourceEnd] : [];
   });
   const cutMember = { ...member, localFragment: normalizeLocalFragment({ ...range,
-    manualCuts: [...(range.manualCuts || []), ...newCuts] }) };
+    manualCuts: [...(range.manualCuts || []), ...newCuts],
+    suppressedCuts: (range.suppressedCuts || []).filter((cut) => !newCuts.includes(cut)) }) };
   const prepared = replaceLocalMembers(composition, [member], [cutMember]);
   let next = replaceLocalMembers(prepared, [cutMember], []);
   const lost = (kind) => (prepared[kind] || []).filter((anchor) => !(next[kind] || []).some((kept) => anchorIdentity(kept) === anchorIdentity(anchor)));
@@ -228,7 +230,8 @@ export function deleteLocalMember(composition, entityKey) {
         || other.instanceKey !== range.instanceKey || other.sourceSeqId !== range.sourceSeqId) return entry;
       const cut = other.sourceEnd + 1 === range.sourceStart ? other.sourceEnd
         : range.sourceEnd + 1 === other.sourceStart ? range.sourceEnd : null;
-      return cut === null ? entry : { ...entry, localFragment: normalizeLocalFragment({ ...other, manualCuts: [...(other.manualCuts || []), cut] }) };
+      return cut === null ? entry : { ...entry, localFragment: normalizeLocalFragment({ ...other, manualCuts: [...(other.manualCuts || []), cut],
+        suppressedCuts: (other.suppressedCuts || []).filter((value) => value !== cut) }) };
     }) };
   return { composition: next, changed: true };
 }
@@ -248,8 +251,14 @@ export function resolveLocalMergeNeighbor(composition, entityKey, side) {
     if (entry === member || entry.lane !== member.lane || entry.sourceKey !== member.sourceKey
       || memberEffectiveOrientation(entry) !== orient) return false;
     const other = memberSourceInterval(entry);
+    const boundary = low ? other.sourceEnd : range.sourceEnd;
+    const cuts = [...(range.nativeCuts || []), ...(range.manualCuts || []), ...(other.nativeCuts || []), ...(other.manualCuts || [])];
+    // Source adjacency alone is not proof of a split: anchor hit-testing and
+    // fragment-scoped menus can temporarily slice an otherwise intact member.
     return other.sourceSeqId === range.sourceSeqId && other.groupKey === range.groupKey
-      && (low ? other.sourceEnd + 1 === range.sourceStart : range.sourceEnd + 1 === other.sourceStart);
+      && (low ? other.sourceEnd + 1 === range.sourceStart : range.sourceEnd + 1 === other.sourceStart)
+      && cuts.includes(boundary)
+      && ![...(range.suppressedCuts || []), ...(other.suppressedCuts || [])].includes(boundary);
   });
   return matches.length === 1 ? matches[0] : null;
 }
@@ -377,30 +386,4 @@ export function resolveLocalFinalPathContexts(members, context) {
 export function memberActiveBackingParts(member) {
   const range = memberSourceInterval(member);
   return range.parts.filter((part) => part.sourceStart <= range.sourceEnd && part.sourceEnd >= range.sourceStart);
-}
-
-
-// Materialize rendered anchor pieces without inserting a history operation.
-// The following drag/edit owns the partition and motion in one undo step.
-export function materializeLocalIntervals(composition, descriptors) {
-  let next = composition, changed = false;
-  const selectedKeys = new Map();
-  for (const original of composition.members) {
-    const entries = descriptors.filter((entry) => entry.memberKey === original.entityKey);
-    if (!entries.length) continue;
-    const cuts = [...new Set([1, original.lengthBp + 1, ...entries.flatMap((entry) => [entry.start, entry.end + 1])])]
-      .filter((value) => Number.isSafeInteger(value) && value >= 1 && value <= original.lengthBp + 1).sort((a, b) => a - b);
-    if (cuts.length === 2) { entries.forEach((entry) => selectedKeys.set(entry.key, original.entityKey)); continue; }
-    const replacements = cuts.slice(0, -1).map((start, index) => {
-      const end = cuts[index + 1] - 1;
-      const a = memberCoordinateToSource(original, start), z = memberCoordinateToSource(original, end);
-      const member = sliceLocalMember(original, Math.min(a, z), Math.max(a, z));
-      entries.filter((entry) => entry.start === start && entry.end === end).forEach((entry) => selectedKeys.set(entry.key, member.entityKey));
-      return member;
-    });
-    if (replacements.some((member) => !member)) return { composition, changed: false, selectedKeys: new Map() };
-    next = replaceLocalMembers(next, [original], replacements);
-    changed = true;
-  }
-  return { composition: next, changed, selectedKeys };
 }

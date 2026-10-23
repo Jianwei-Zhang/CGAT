@@ -2,132 +2,133 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { gestureHarness } from "./subview-fragment-gesture-harness.mjs";
 import { memberSourceInterval } from "../subview-fragment-model.js";
-import { rollbackSubviewHistory, resolveCurrentSubviewHistory } from "../subview-history-state.js";
+import { resolveLocalFragmentMenu } from "../subview-fragment-controller.js";
+import { rollbackSubviewHistory, restoreSubviewHistoryRollback, resolveCurrentSubviewHistory } from "../subview-history-state.js";
 
-for (const mode of ["2-contig", "track-pair", "composition"]) for (const fullRange of [false, true]) for (const flipped of [false, true]) {
-  for (const delta of [-15, 20]) {
-    test(`direct virtual fragment drag ${mode}, overview=${fullRange}, flipped=${flipped}, delta=${delta}`, () => {
-      const oldWindow = globalThis.window, h = gestureHarness(mode, { fullRange, flipped }); globalThis.window = h.win;
-      try {
-        h.bindDrag();
-        const initial = h.store.getState(), main = initial.assembly.chrCtgs;
-        const target = h.scene.fragments.filter((node) => node.getAttribute("data-subview-fragment-contig-id") === "30")[1];
-        assert.ok(target, "an active anchor exposes a middle fragment");
-        const start = Number(target.getAttribute("x")) + 1;
-        const event = h.pointer(target, start, Number(target.getAttribute("y")) + 2);
-        h.host.emit("pointerdown", event);
-        assert.equal(h.store.getState().assembly.subview, initial.assembly.subview, "pointerdown does not mutate or partition state");
-        h.win.emit("pointermove", h.pointer(target, start + delta, event.clientY));
-        h.win.flush();
-        const prepared = h.store.getState().assembly.subview.summary.members;
-        const targetKey = h.previews.at(-1)?.compositionEntityKey;
-        assert.ok(targetKey);
-        const before = new Map(prepared.map((member) => [member.entityKey, member.xBp]));
-        const scale = Number(h.scene.scroll.dataset.subviewDomainSpanBp) / Number(h.scene.scroll.dataset.subviewInnerWidth);
-        h.win.emit("pointerup", h.pointer(target, start + delta, event.clientY));
-        assert.equal(h.payloads.length, 1); assert.equal(h.persisted(), 1);
-        const after = h.store.getState().assembly;
-        for (const member of after.subview.summary.members) {
-          const shift = member.xBp - before.get(member.entityKey);
-          assert.ok(Math.abs(shift - (member.entityKey === targetKey ? delta * scale : 0)) < 0.01, "only clicked interval moves by the source-scale delta");
-        }
-        assert.equal(after.chrCtgs, main);
-        assert.equal(resolveCurrentSubviewHistory(after).record.past.length, 1);
-        const undo = rollbackSubviewHistory(JSON.parse(JSON.stringify(after)));
-        assert.equal(undo.changed, true);
-        if (mode === "composition") assert.equal(undo.assembly.subview.summary.members.filter((m) => m.assemblyCtgId === 30).length, 1);
-        else assert.equal(undo.assembly.subview.summary.mode, mode, "undo restores the original comparison mode as well as layout");
-        assert.equal(h.win.listeners.get("pointermove")?.size || 0, 0);
-      } finally { globalThis.window = oldWindow; }
-    });
-  }
+const middleAnchor = (h) => h.scene.fragments.filter((n) => n.getAttribute("data-subview-fragment-contig-id") === "30")[1];
+const historyDepth = (assembly) => resolveCurrentSubviewHistory(assembly).record?.past.length || 0;
+const markers = (h, cut) => (h.scene.html.split('data-subview-panel="1"')[1].match(new RegExp(`data-manual-split-after="${cut}"`, "g")) || []).length;
+function drag(h, target, delta) {
+  h.host.emit("pointerdown", h.pointer(target, 300, 70));
+  h.win.emit("pointermove", h.pointer(target, 300 + delta, 70)); h.win.flush();
+  h.win.emit("pointerup", h.pointer(target, 300 + delta, 70));
+}
+function boxMiddle(h, both = false) {
+  const target = middleAnchor(h);
+  const x = Number(target.getAttribute("x")), width = Number(target.getAttribute("width"));
+  const y = Number(target.getAttribute("y")), vx = Number(h.scene.scroll.dataset.subviewViewboxMinX || 0);
+  const bottom = h.scene.groups.find((node) => node.getAttribute("data-subview-track-slot") === "bottom");
+  const endY = both ? Number(bottom.getAttribute("data-subview-rect-y")) + 16 : y + 16;
+  const blank = { closest: (selector) => selector.includes("assembly-track-scroll") ? h.scene.scroll : null };
+  h.host.emit("pointerdown", h.pointer(blank, x - vx + width * .2, y - 2));
+  h.win.emit("pointermove", h.pointer(blank, x - vx + width * .8, endY));
+  h.win.emit("pointerup", {});
+}
+function assertIntact(before, after) {
+  assert.equal(after.subview.summary.mode, before.subview.summary.mode);
+  if (before.subview.summary.mode === "composition") {
+    assert.deepEqual(after.subview.summary.members.map(({ xBp, ...member }) => member),
+      before.subview.summary.members.map(({ xBp, ...member }) => member));
+  } else assert.deepEqual(after.subview.summary, before.subview.summary);
+  assert.deepEqual(after.subview.activeAnchors, before.subview.activeAnchors);
+  assert.deepEqual(after.subview.manualAnchors, before.subview.manualAnchors);
+  assert.equal(after.chrCtgs, before.chrCtgs);
 }
 
-for (const mode of ["2-contig", "track-pair", "composition"]) {
-  test(`cancel or click before/after virtual preparation keeps ${mode} state and history untouched`, () => {
-    for (const prepare of [false, true]) {
-      const oldWindow = globalThis.window, h = gestureHarness(mode); globalThis.window = h.win;
-      try {
-        h.bindDrag(); const before = JSON.parse(JSON.stringify(h.store.getState().assembly));
-        const target = h.scene.fragments.filter((node) => node.getAttribute("data-subview-fragment-contig-id") === "30")[1];
-        h.host.emit("pointerdown", h.pointer(target, 50, 70));
-        if (prepare) h.win.emit("pointermove", h.pointer(target, 70, 70));
-        h.win.emit("pointercancel", h.pointer(target, 70, 70));
-        assert.deepEqual(JSON.parse(JSON.stringify(h.store.getState().assembly)), before);
-        assert.equal(h.persisted(), 0); assert.equal(h.payloads.length, 0);
-      } finally { globalThis.window = oldWindow; }
-    }
+for (const mode of ["2-contig", "track-pair", "composition"]) for (const fullRange of [false, true]) for (const flipped of [false, true]) for (const delta of [-15, 20]) {
+  test(`anchor hit-zone drag moves the intact ctg without a split: ${mode}, overview=${fullRange}, flipped=${flipped}, delta=${delta}`, () => {
+    const oldWindow = globalThis.window, h = gestureHarness(mode, { fullRange, flipped }); globalThis.window = h.win;
+    try {
+      h.bindDrag(); const before = h.store.getState().assembly, target = middleAnchor(h);
+      assert.ok(target, "active anchors expose a display interval");
+      h.host.emit("pointerdown", h.pointer(target, 300, 70));
+      assert.equal(h.store.getState().assembly, before);
+      h.win.emit("pointermove", h.pointer(target, 300 + delta, 70)); h.win.flush();
+      assert.equal(h.store.getState().assembly, before, "preview cannot materialize anchor pieces");
+      h.win.emit("pointerup", h.pointer(target, 300 + delta, 70));
+      const after = h.store.getState().assembly;
+      assertIntact(before, after);
+      assert.equal(h.payloads.length, 1); assert.equal(h.persisted(), 1);
+      assert.equal(h.payloads[0].contigId, 30); assert.equal(h.payloads[0].slot, "top");
+      assert.equal(historyDepth(after), 1);
+      if (mode === "composition") {
+        const changed = after.subview.summary.members.filter((m, i) => m.xBp !== before.subview.summary.members[i].xBp);
+        assert.equal(changed.length, 1); assert.equal(changed[0].assemblyCtgId, 30);
+      } else assert.ok(after.subviewTrackDragOffsets.some((offset) => offset.contigId === 30 && offset.offsetBp !== 0));
+      const menu = resolveLocalFragmentMenu(h.store.getState(), h.host, { assemblyCtgId: 30, trackRole: "support", slot: "top", start: 1001, end: 3000 });
+      assert.equal(menu.left, false); assert.equal(menu.right, false);
+      assert.doesNotMatch(h.scene.html, /data-manual-split-after=/);
+      const undo = rollbackSubviewHistory(JSON.parse(JSON.stringify(after)));
+      assert.equal(undo.changed, true); assert.deepEqual(undo.assembly.subview.summary, before.subview.summary);
+      assert.equal(restoreSubviewHistoryRollback(undo.assembly).changed, true);
+      assert.equal(h.win.listeners.get("pointermove")?.size || 0, 0);
+    } finally { globalThis.window = oldWindow; }
   });
 }
 
 for (const mode of ["2-contig", "track-pair", "composition"]) {
-  test(`box selection materializes anchor pieces and translates exactly selected instances in ${mode}`, () => {
+  test(`cancelled anchor hit-zone drag leaves ${mode} unchanged`, () => {
+    for (const move of [false, true]) {
+      const oldWindow = globalThis.window, h = gestureHarness(mode); globalThis.window = h.win;
+      try {
+        h.bindDrag(); const before = JSON.stringify(h.store.getState().assembly), target = middleAnchor(h);
+        h.host.emit("pointerdown", h.pointer(target, 50, 70));
+        if (move) h.win.emit("pointermove", h.pointer(target, 70, 70));
+        h.win.emit("pointercancel", h.pointer(target, 70, 70));
+        assert.equal(JSON.stringify(h.store.getState().assembly), before);
+        assert.equal(h.persisted(), 0); assert.equal(h.payloads.length, 0);
+      } finally { globalThis.window = oldWindow; }
+    }
+  });
+  test(`box over an anchor interval selects the owning whole ctg without partitioning: ${mode}`, () => {
     const oldWindow = globalThis.window, h = gestureHarness(mode); globalThis.window = h.win;
     try {
-      h.bindBox(); h.bindDrag();
-      const target = h.scene.fragments.filter((node) => node.getAttribute("data-subview-fragment-contig-id") === "30")[1];
-      const x = Number(target.getAttribute("x")), width = Number(target.getAttribute("width"));
-      const y = Number(target.getAttribute("y")), viewbox = Number(h.scene.scroll.dataset.subviewViewboxMinX || 0);
-      const blank = { closest: (selector) => selector.includes("assembly-track-scroll") ? h.scene.scroll : null };
-      h.host.emit("pointerdown", h.pointer(blank, x - viewbox + width * 0.2, y - 2));
-      h.win.emit("pointermove", h.pointer(blank, x - viewbox + width * 0.8, y + 16));
-      h.win.emit("pointerup", {});
-      const assembly = h.store.getState().assembly;
-      const selected = assembly.subview.trackPairSelectedCtgs;
-      assert.equal(selected.length, 1, "box intersects only the middle interval, not the entire parent");
-      assert.equal(resolveCurrentSubviewHistory(assembly).record.past.length, 0, "selection does not insert a mutation");
-      const key = selected[0].compositionEntityKey;
-      const node = h.scene.groups.find((group) => group.getAttribute("data-subview-composition-entity-key") === key);
-      const initial = new Map(assembly.subview.summary.members.map((m) => [m.entityKey, m.xBp]));
-      h.host.emit("pointerdown", h.pointer(node, 50, y));
-      h.win.emit("pointermove", h.pointer(node, 80, y)); h.win.flush();
-      h.win.emit("pointerup", h.pointer(node, 80, y));
-      assert.equal(h.persisted(), 1);
-      for (const member of h.store.getState().assembly.subview.summary.members) {
-        assert.equal(member.xBp !== initial.get(member.entityKey), member.entityKey === key);
-      }
-      assert.equal(resolveCurrentSubviewHistory(h.store.getState().assembly).record.past.length, 1);
+      h.bindBox(); h.bindDrag(); const before = h.store.getState().assembly;
+      boxMiddle(h);
+      const selected = h.store.getState().assembly.subview.trackPairSelectedCtgs;
+      assert.equal(selected.length, 1); assert.equal(selected[0].contigId, 30);
+      assertIntact(before, h.store.getState().assembly);
+      assert.equal(historyDepth(h.store.getState().assembly), 0);
+      drag(h, middleAnchor(h), 30);
+      assertIntact(before, h.store.getState().assembly); assert.equal(h.persisted(), 1);
+      assert.equal(historyDepth(h.store.getState().assembly), 1);
     } finally { globalThis.window = oldWindow; }
   });
 }
 
 for (const mode of ["2-contig", "track-pair", "composition"]) for (const fullRange of [false, true]) for (const delta of [-20, 25]) {
-  test(`selected virtual intervals on both lanes move rigidly and an unselected leader stays independent: ${mode}, overview=${fullRange}, delta=${delta}`, () => {
+  test(`box-selected ctgs on both lanes move together without cutting at anchors: ${mode}, overview=${fullRange}, delta=${delta}`, () => {
     const oldWindow = globalThis.window, h = gestureHarness(mode, { fullRange }); globalThis.window = h.win;
     try {
-      h.bindBox(); h.bindDrag();
-      const middle = h.scene.fragments.filter((node) => node.getAttribute("data-subview-fragment-contig-id") === "30")[1];
-      const x = Number(middle.getAttribute("x")), width = Number(middle.getAttribute("width"));
-      const bottom = h.scene.fragments.find((node) => node.getAttribute("data-subview-fragment-slot") === "bottom");
-      const topY = Number(middle.getAttribute("y")), bottomY = Number(bottom.getAttribute("y"));
-      const vx = Number(h.scene.scroll.dataset.subviewViewboxMinX || 0);
-      const blank = { closest: (selector) => selector.includes("assembly-track-scroll") ? h.scene.scroll : null };
-      h.host.emit("pointerdown", h.pointer(blank, x - vx + width * 0.2, topY - 2));
-      h.win.emit("pointermove", h.pointer(blank, x - vx + width * 0.8, bottomY + 16)); h.win.emit("pointerup", {});
-      const selected = h.store.getState().assembly.subview.trackPairSelectedCtgs;
-      assert.equal(selected.length, 2);
-      const keys = new Set(selected.map((entry) => entry.compositionEntityKey));
-      const before = new Map(h.store.getState().assembly.subview.summary.members.map((m) => [m.entityKey, m.xBp]));
-      const leader = h.scene.groups.find((node) => node.getAttribute("data-subview-composition-entity-key") === selected[1].compositionEntityKey);
-      const scale = Number(h.scene.scroll.dataset.subviewDomainSpanBp) / Number(h.scene.scroll.dataset.subviewInnerWidth);
-      h.host.emit("pointerdown", h.pointer(leader, 300, bottomY));
-      h.win.emit("pointermove", h.pointer(leader, 300 + delta, bottomY)); h.win.flush();
-      h.win.emit("pointerup", h.pointer(leader, 300 + delta, bottomY));
-      assert.equal(h.payloads[0].targets.length, 2);
-      for (const m of h.store.getState().assembly.subview.summary.members) {
-        assert.ok(Math.abs(m.xBp - before.get(m.entityKey) - (keys.has(m.entityKey) ? delta * scale : 0)) < 0.01);
-      }
+      h.bindBox(); h.bindDrag(); const before = h.store.getState().assembly;
+      boxMiddle(h, true);
       assert.equal(h.store.getState().assembly.subview.trackPairSelectedCtgs.length, 2);
-      assert.equal(resolveCurrentSubviewHistory(h.store.getState().assembly).record.past.length, 1);
-      const current = h.store.getState().assembly.subview.summary.members;
-      const unselected = current.find((m) => !keys.has(m.entityKey));
-      const nextLeader = h.scene.groups.find((node) => node.getAttribute("data-subview-composition-entity-key") === unselected.entityKey);
-      const previous = new Map(current.map((m) => [m.entityKey, m.xBp]));
-      h.host.emit("pointerdown", h.pointer(nextLeader, 300, topY));
-      h.win.emit("pointermove", h.pointer(nextLeader, 320, topY)); h.win.flush();
-      h.win.emit("pointerup", h.pointer(nextLeader, 320, topY));
-      for (const m of h.store.getState().assembly.subview.summary.members) assert.equal(m.xBp !== previous.get(m.entityKey), m.entityKey === unselected.entityKey);
-      assert.equal(h.persisted(), 2);
+      drag(h, middleAnchor(h), delta);
+      assertIntact(before, h.store.getState().assembly);
+      assert.equal(h.payloads[0].targets.length, 2);
+      const offsets = h.payloads[0].targets.map((t) => t.dragDeltaBp ?? t.offsetBp);
+      assert.equal(offsets[0], offsets[1]); assert.ok(offsets[0] * delta > 0);
+      assert.equal(h.persisted(), 1); assert.equal(historyDepth(h.store.getState().assembly), 1);
+    } finally { globalThis.window = oldWindow; }
+  });
+}
+
+for (const mode of ["2-contig", "track-pair", "composition"]) for (const flipped of [false, true]) {
+  test(`an explicit split still moves independently and keeps split marks/history: ${mode}, flipped=${flipped}`, () => {
+    const oldWindow = globalThis.window, h = gestureHarness(mode, { flipped }); globalThis.window = h.win;
+    try {
+      h.split(30, 8000); h.bindDrag();
+      const before = h.store.getState().assembly;
+      const member = before.subview.summary.members.find((m) => memberSourceInterval(m).sourceEnd === 8000);
+      const target = h.scene.groups.find((n) => n.getAttribute("data-subview-composition-entity-key") === member.entityKey);
+      assert.equal(markers(h, 8000), 2);
+      drag(h, target, -20);
+      const after = h.store.getState().assembly;
+      assertIntact(before, after);
+      for (const m of after.subview.summary.members) assert.equal(m.xBp !== before.subview.summary.members.find((b) => b.entityKey === m.entityKey).xBp, m.entityKey === member.entityKey);
+      assert.equal(markers(h, 8000), 2);
+      h.store.setState({ assembly: rollbackSubviewHistory(after).assembly }); h.render(); assert.equal(markers(h, 8000), 2);
+      h.store.setState({ assembly: restoreSubviewHistoryRollback(h.store.getState().assembly).assembly }); h.render(); assert.equal(markers(h, 8000), 2);
     } finally { globalThis.window = oldWindow; }
   });
 }

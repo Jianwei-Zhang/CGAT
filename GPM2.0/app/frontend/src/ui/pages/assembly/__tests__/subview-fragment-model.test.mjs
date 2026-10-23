@@ -252,3 +252,24 @@ test("archived native fragments never invent a split mark at an inherited N edge
   assert.ok(!reloaded.members[0].localFragment.nativeCuts.includes(500));
   assert.ok(!reloaded.members[0].localFragment.manualCuts.includes(500));
 });
+
+for (const baseOrientation of ["+", "-"]) test(`anchor slicing cannot reactivate an undone native cut; explicit split and delete can, ${baseOrientation}`, () => {
+  const a = original({ assemblyCtgId: 10, lengthBp: 40, baseOrientation,
+    sourceFragment: { sourceSeqId: 7, groupKey: "manual-fragment:source", sourceStart: 1, sourceEnd: 40, sourceLength: 100 } });
+  const b = original({ assemblyCtgId: 11, lengthBp: 60, baseOrientation,
+    sourceFragment: { sourceSeqId: 7, groupKey: "manual-fragment:source", sourceStart: 41, sourceEnd: 100, sourceLength: 100 } });
+  const side = baseOrientation === "+" ? "right" : "left";
+  const merged = mergeLocalMember(composition([a, b]), a.entityKey, side);
+  assert.equal(merged.changed, true);
+  const isolated = isolateLocalMemberInterval(merged.composition, merged.member.entityKey,
+    baseOrientation === "+" ? 1 : 61, baseOrientation === "+" ? 40 : 100);
+  assert.equal(resolveLocalMergeNeighbor(isolated.composition, isolated.member.entityKey, side), null);
+  assert.ok(isolated.composition.members.every((m) => m.localFragment.suppressedCuts.includes(40)));
+  const split = splitLocalMember(merged.composition, merged.member.entityKey, 40);
+  assert.equal(split.changed, true);
+  assert.ok(split.members.every((m) => m.localFragment.manualCuts.includes(40) && !m.localFragment.suppressedCuts.includes(40)));
+  assert.ok(resolveLocalMergeNeighbor(split.composition, split.members[0].entityKey, side));
+  const removed = deleteLocalMember(isolated.composition, isolated.member.entityKey);
+  assert.ok(resolveLocalMergeNeighbor(removed.composition, removed.composition.members[0].entityKey,
+    side === "left" ? "right" : "left"));
+});

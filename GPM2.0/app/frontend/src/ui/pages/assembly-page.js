@@ -1,5 +1,4 @@
 import { createMainMemberAnnotationRefresh } from "./assembly/main-member-local-state.js";
-import { createSubviewFragmentGestureRuntime } from "./assembly/subview-fragment-gesture-runtime.js";
 import { createSubviewFragmentSyncRuntime } from "./assembly/subview-fragment-sync-runtime.js";
 import { projectRenderedSubviewToComposition } from "./assembly/subview-composition-controller.js";
 import { createSubviewFragmentController, resolveLocalFragmentMenu } from "./assembly/subview-fragment-controller.js";
@@ -460,10 +459,6 @@ const synchronizeLocalFragment = createSubviewFragmentSyncRuntime({
   rerenderMain: rerenderAssemblyMainTab,
   rerenderSubviewPanel,
   refreshSubviewPairwiseEvidence,
-});
-const subviewFragmentGestureRuntime = createSubviewFragmentGestureRuntime({
-  projectHistorical: (state) => projectRenderedSubviewToComposition(state, renderAssemblySubviewPanelImpl(state, renderTracksDeps)),
-  rerenderSubviewPanel,
 });
 const subviewFragmentController = createSubviewFragmentController({
   synchronizeLocalFragment,
@@ -1210,7 +1205,6 @@ const contextMenuRuntimeDeps = {
 };
 
 const trackDragRuntimeDeps = {
-  deferSubviewFragmentDrag: subviewFragmentGestureRuntime.deferSubviewFragmentDrag,
   applySubviewTrackDragOffset,
   clearSubviewTrackDragPreview,
   clearTrackDragPreview,
@@ -1261,7 +1255,6 @@ const trackDragRuntimeDeps = {
 };
 
 const trackSelectionRuntimeDeps = {
-  prepareSubviewFragmentSelection: subviewFragmentGestureRuntime.prepareSubviewFragmentSelection,
   updateSubviewTrackPairSelection,
   updateTrackSelection,
 };

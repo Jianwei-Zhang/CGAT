@@ -215,9 +215,9 @@ export function bindTrackBoxSelection(host, store, deps) {
         deps.updateTrackSelection(host, store, collectTrackSelectedCtgIds(scrollEl, selectionRect));
         return;
       }
-      const materialized = deps.prepareSubviewFragmentSelection?.(host, store, scrollEl, selectionRect);
-      deps.updateSubviewTrackPairSelection(materialized?.host || host, store,
-        materialized?.entries || collectSubviewTrackPairSelectedCtgs(scrollEl, selectionRect));
+      // Select existing ctgs or explicitly edited fragments, not transient
+      // anchor display pieces. Selection must never change source topology.
+      deps.updateSubviewTrackPairSelection(host, store, collectSubviewTrackPairSelectedCtgs(scrollEl, selectionRect));
     };
 
     const onPointerUp = (upEvent) => {
