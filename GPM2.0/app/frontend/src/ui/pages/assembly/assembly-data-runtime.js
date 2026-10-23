@@ -696,6 +696,16 @@ export async function loadAssemblyView(host, store, options, deps) {
       if (activated?.assembly) store.setState({ assembly: activated.assembly });
     }
     store.setState({ assembly: reconcileLocalSubviewWithMain(store.getState().assembly) });
+    // Persisted Local View history contains editable geometry, not runtime
+    // pairwise hits. Restore those hits after the history and backing IDs are
+    // hydrated, before the first non-loading render (including dev restarts).
+    // Silent mutation callers refresh after installing their transaction state.
+    if (renderResult && store.getState().assembly.subview?.summary) {
+      await deps.refreshSubviewPairwiseEvidence?.(host, store, {
+        rerenderLoading: false, rerenderLoaded: false,
+      });
+      if (!isCurrentRequest()) return;
+    }
   } catch (error) {
     if (!isCurrentRequest()) return;
     const mappedError = deps.mapAssemblyError({ error, stateOrLocale: store.getState() });

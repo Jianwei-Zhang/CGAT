@@ -1037,6 +1037,7 @@ const assemblyDataLoaderDeps = {
 
 const assemblyDataRuntimeDeps = {
   activateSubviewCompositionHistory,
+  refreshSubviewPairwiseEvidence,
   applyEditorAction: (host, store, payload) => editorActionRuntimeAdapters.applyEditorAction(host, store, payload),
   buildClearedSubviewState,
   buildSubviewCompositionHistoryKey,

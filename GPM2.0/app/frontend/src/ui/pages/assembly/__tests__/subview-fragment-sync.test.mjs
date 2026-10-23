@@ -49,12 +49,12 @@ function runtime(store, overrides = {}) {
       });
       return { changed: true, status: { chrName: "Chr01", canUndo: true, appliedOperationCount: historyCount } };
     },
-    loadAssemblyView: async () => {
+    loadAssemblyView: async (_host, _store, options) => {
       const latest = store.getState();
       // Use the production loader, including reading the OLD flushed history
       // and activating it. A reconcile-only mock misses this regression.
       const saved = persisted.at(-1);
-      await loadAssemblyView(host, store, { keepCurrentChr: true, keepCurrentCtg: false, renderLoading: false }, {
+      await loadAssemblyView(host, store, options, {
         getProjectAssemblyViewState: async () => ({ ...saved, supportDatasetId: 22 }),
         getCurrentProject: () => ({ primaryDatasetId: 11 }), getSupportDatasetOptions: () => [{ datasetId: 22 }],
         listProjectChromosomes: async () => ({ items: [{ chrName: "Chr01" }] }),
@@ -68,19 +68,43 @@ function runtime(store, overrides = {}) {
         normalizeDeletedCtgRecordIds: (v) => v || [], normalizeSupportDatasetId: (id) => id == null ? null : Number(id),
         normalizeSupportMirroredCtgs: (v) => v || [], normalizeTrackSelectionCtgIds: (v) => v || [],
         buildSubviewCompositionHistoryKey, activateSubviewCompositionHistory,
-        mapAssemblyError: ({ error }) => ({ userMessage: error.message }), rerender() {},
+        mapAssemblyError: ({ error }) => ({ userMessage: error.message }), rerender() { calls.push(["loader-render"]); },
       });
       assert.equal(store.getState().assembly.error, "");
-      calls.push(["reload"]);
+      calls.push(["reload", options]);
     },
     persistNow: async () => { assert.equal(inside, true); calls.push(["persist"]); persisted.push(JSON.parse(JSON.stringify(store.getState().assembly))); },
-    rerenderMain() {}, rerenderSubviewPanel() {}, refreshSubviewPairwiseEvidence() {},
+    rerenderMain() { calls.push(["render-main"]); },
+    rerenderSubviewPanel() { calls.push(["render-subview"]); },
+    async refreshSubviewPairwiseEvidence(_host, _store, options) {
+      calls.push(["evidence-start", options]);
+      await Promise.resolve();
+      calls.push(["evidence-ready"]);
+    },
     ...overrides,
   });
   return { run: (context, action) => api(host, store, context, action), calls, persisted, historyCount: () => historyCount };
 }
 const contextFor = (mode, start = 1001, end = 5000) => ({ assemblyCtgId: 2, trackRole: "primary", slot: "bottom", start, end,
   ...(mode === "composition" ? { entityKey: "assembly:2" } : {}) });
+
+for (const mode of ["composition", "2-contig", "track-pair"]) {
+  test(`synchronized ${mode} split waits for evidence and renders each card only once`, async () => {
+    const store = createStore(stateFor(mode));
+    const api = runtime(store);
+    assert.equal(await api.run(contextFor(mode), { action: "split", cutAfter: 3000 }), true);
+    assert.deepEqual(api.calls.filter(([name]) => name === "reload")[0][1], {
+      keepCurrentChr: true, keepCurrentCtg: false, renderLoading: false, renderResult: false,
+    });
+    assert.deepEqual(api.calls.filter(([name]) => name === "evidence-start")[0][1], {
+      rerenderLoading: false, rerenderLoaded: false,
+    });
+    assert.deepEqual(api.calls.map(([name]) => name), [
+      "inspect", "confirm", "flush", "native", "reload", "evidence-start", "evidence-ready",
+      "persist", "render-main", "render-subview",
+    ], "no loader page replacement or loading-state card replacement may precede the final render");
+  });
+}
 
 test("synchronized split commits one Local View entry and one Main View entry, and keeps them independent", async () => {
   const state = stateFor("composition");
@@ -109,7 +133,7 @@ for (const mode of ["2-contig", "track-pair", "composition"]) for (const action 
     assert.equal(after.mainViewHistory.appliedOperationCount, 1);
     assert.equal(after.mainViewHistory.inFlight, false);
     assert.equal(after.chrCtgs.length, action === "split" ? 4 : 2);
-    assert.deepEqual(api.calls.map(([kind]) => kind), ["inspect", "confirm", "flush", "native", "reload", "persist"]);
+    assert.deepEqual(api.calls.map(([kind]) => kind), ["inspect", "confirm", "flush", "native", "reload", "evidence-start", "evidence-ready", "persist", "render-main", "render-subview"]);
     assert.match(api.calls[1][1], /不可变源区间/);
     const request = api.calls.find(([kind]) => kind === "native")[1];
     assert.equal(request.action, "edit-local-fragment");

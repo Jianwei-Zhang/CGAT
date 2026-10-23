@@ -2,7 +2,6 @@ import { createState } from "./tabs-semantics-harness.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { FLOATING_MENU_CLOSE_DELAY_MS } from "../../floating-menu-runtime.js";
 import {
   bindAssemblyContextMenu,
   bindContextSubmenuInteractions,
@@ -137,7 +136,7 @@ test("positionContextSubmenuWithinViewport opens a submenu left near the right e
   assert.equal(classSet.has("opens-left"), true);
 });
 
-test("submenus close after the shared delay and reentry cancels dismissal", () => {
+test("submenus close immediately on departure but remain open while entering their children", () => {
   const handlers = new Map(), classes = new Set(), timers = new Map();
   const trigger = { setAttribute() {}, addEventListener() {} };
   const submenu = { style: {}, getBoundingClientRect: () => ({ width: 180, height: 100 }) };
@@ -156,13 +155,13 @@ test("submenus close after the shared delay and reentry cancels dismissal", () =
   const fire = (type, relatedTarget = null) => handlers.get(type)?.forEach(handler => handler({ relatedTarget }));
   fire("pointerenter"); assert.equal(classes.has("is-open"), true);
   fire("pointerleave", submenu); assert.equal(timers.size, 0);
-  fire("pointerleave"); assert.equal(classes.has("is-open"), true);
-  assert.equal([...timers.values()][0].delay, FLOATING_MENU_CLOSE_DELAY_MS);
-  fire("pointerenter"); assert.equal(timers.size, 0);
   fire("pointerleave");
-  const callback = [...timers.values()][0].callback; timers.clear(); callback();
   assert.equal(classes.has("is-open"), false);
-  fire("pointerenter"); fire("pointerleave"); cleanup(); assert.equal(timers.size, 0);
+  assert.equal(timers.size, 0, "submenu departure never schedules a delayed close");
+  fire("pointerenter"); assert.equal(classes.has("is-open"), true);
+  fire("focusout", trigger); assert.equal(classes.has("is-open"), true);
+  fire("focusout"); assert.equal(classes.has("is-open"), false);
+  cleanup(); assert.equal(timers.size, 0);
 });
 
 test("bindAssemblyContextMenu clamps the menu inside the viewport bottom edge", () => {
@@ -653,7 +652,7 @@ test("bindAssemblyContextMenu renders track-pair fragment local actions", () => 
 });
 
 
-test("assembly context menu closes after 400ms, cancels on return, and clears stale close timers", () => {
+test("assembly context menu closes immediately outside the full menu tree without a timer", () => {
   const originalSet = globalThis.setTimeout, originalClear = globalThis.clearTimeout;
   const handlers = new Map(), classes = new Set(), timers = new Map();
   let id = 0;
@@ -669,12 +668,13 @@ test("assembly context menu closes after 400ms, cancels on return, and clears st
     bindAssemblyContextMenu(host, { getState: () => ({ assembly: { activeTab: "assembly" } }) }, createRuntimeDeps());
     handlers.get("pointerout")({ target: child, relatedTarget: child }); assert.equal(timers.size, 0);
     handlers.get("pointerout")({ target: child, relatedTarget: null });
-    assert.equal([...timers.values()][0].delay, 400); assert.equal(menu.innerHTML, "contents");
-    handlers.get("pointerover")({ target: child }); assert.equal(timers.size, 0);
-    handlers.get("pointerout")({ target: child, relatedTarget: null });
-    const callback = [...timers.values()][0].callback; timers.clear(); callback();
     assert.equal(menu.innerHTML, ""); assert.equal(classes.has("is-hidden"), true);
-    handlers.get("pointerout")({ target: child, relatedTarget: null });
+    assert.equal(timers.size, 0, "main and local menus close in the pointer event itself");
+    menu.innerHTML = "reopened";
+    handlers.get("focusout")({ target: child, relatedTarget: child });
+    assert.equal(menu.innerHTML, "reopened");
+    handlers.get("focusout")({ target: child, relatedTarget: null });
+    assert.equal(menu.innerHTML, ""); assert.equal(timers.size, 0);
     handlers.get("keydown")({ key: "Escape" });
     assert.equal(timers.size, 0);
   } finally { globalThis.setTimeout = originalSet; globalThis.clearTimeout = originalClear; }

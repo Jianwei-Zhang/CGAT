@@ -1,7 +1,7 @@
 import { memberBackingIds } from "./subview-fragment-model.js";
 import {
-  getJunctionInspection,
-  getTrackPairwiseEvidence,
+  getJunctionInspection as requestJunctionInspection,
+  getTrackPairwiseEvidence as requestTrackPairwiseEvidence,
 } from "../../../services/workflow-api.js";
 import { mapAssemblyError } from "./error-contract.js";
 import {
@@ -28,6 +28,8 @@ export function createSubviewPairwiseController({
   session,
   rerenderSubviewPanel,
   scheduleDeferredSubviewPanelRerender,
+  getJunctionInspection = requestJunctionInspection,
+  getTrackPairwiseEvidence = requestTrackPairwiseEvidence,
 }) {
   function issueSubviewPairwiseEvidenceRequestKey(summary, scope = {}) {
     const key = String(scope?.key || buildSubviewPairwiseEvidenceKey(summary, scope));

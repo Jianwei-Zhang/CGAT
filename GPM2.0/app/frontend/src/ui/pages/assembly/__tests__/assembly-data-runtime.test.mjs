@@ -2098,3 +2098,62 @@ test("cross-chr inspection copies do not auto-attach to existing Final Path sour
   const adopted={B:{segments:[{...paths.B.segments[0],assemblyCtgId:42}]}};
   assert.equal(backfillFinalPathOriginIds(adopted,"B",[copy],[]).B.segments[0].assemblyCtgId,42,"explicit adoption remains valid");
 });
+
+
+for (const mode of ["composition", "track-pair", "2-contig"]) {
+  test(`cold assembly load restores ${mode} colored evidence without reselecting Local View`, async () => {
+    const { createIdentityRenderState } = await import("./identity-render-fixture.mjs");
+    const { renderAssemblyPage } = await import("./tabs-semantics-harness.mjs");
+    const { activateSubviewCompositionHistory, buildSubviewCompositionHistoryKey } = await import("../subview-history-state.js");
+    const { createSubviewPairwiseController } = await import("../subview-pairwise-controller.js");
+    const fixture = createIdentityRenderState(mode);
+    const hits = fixture.assembly.subview.pairwiseEvidence.hits;
+    const saved = activateSubviewCompositionHistory(fixture.assembly, { stateOrLocale: fixture }).assembly;
+    const events = [], finalHtml = [];
+    let controller;
+    const harness = createInitialLoadHarness({
+      getCurrentProject: () => ({ primaryDatasetId: 11 }),
+      getSupportDatasetOptions: () => [{ datasetId: 22 }],
+      getProjectAssemblyViewState: async () => ({
+        supportDatasetId: 22, subviewHistoryByKey: saved.subviewHistoryByKey,
+      }),
+      listChrViewCtgs: async () => ({ items: fixture.assembly.chrCtgs }),
+      loadDatasetChrCtgs: async () => fixture.assembly.supportChrCtgs,
+      activateSubviewCompositionHistory,
+      buildSubviewCompositionHistoryKey,
+      refreshSubviewPairwiseEvidence: (...args) => controller.refreshSubviewPairwiseEvidence(...args),
+      rerender(_host, store) {
+        if (store.getState().assembly.loading) { events.push("loading-render"); return; }
+        events.push("ready-render");
+        finalHtml.push(renderAssemblyPage(store.getState()));
+      },
+    });
+    // Simulate a fresh process: only persisted history exists; no runtime hits,
+    // candidate catalog or previous Local View selection survives.
+    harness.store.setState({ ...fixture,
+      session: { workspacePath: "D:/fixture", projectId: 7 },
+      assembly: { ...fixture.assembly, chromosomes: [], chrCtgs: [], supportChrCtgs: [],
+        subview: { summary: null }, subviewHistoryByKey: {},
+        subviewCompositionCandidates: [], subviewCompositionCandidatesLoaded: false },
+    });
+    const fetchEvidence = async () => {
+      events.push("evidence-fetch");
+      assert.ok(harness.store.getState().assembly.subview.summary, "history must be restored before fetching hits");
+      await Promise.resolve();
+      return { hits, evidenceSource: "fixture", coverage: [{ status: "ready" }] };
+    };
+    controller = createSubviewPairwiseController({
+      session: { subviewPairwiseEvidenceRequestSeq: 0 },
+      getTrackPairwiseEvidence: fetchEvidence, getJunctionInspection: fetchEvidence,
+      rerenderSubviewPanel() { assert.fail("cold hydration must not flash a loading card"); },
+      scheduleDeferredSubviewPanelRerender() { assert.fail("the assembly loader owns the final render"); },
+    });
+    await harness.load();
+    assert.equal(harness.store.getState().assembly.error, "");
+    assert.equal(harness.store.getState().assembly.subview.pairwiseEvidence.status, "loaded");
+    assert.deepEqual(events, ["loading-render", "evidence-fetch", "ready-render"]);
+    assert.equal(finalHtml.length, 1);
+    assert.match(finalHtml[0], /data-subview-hit-key="[^"]*evidence-1[^"]*"/);
+    assert.match(finalHtml[0], /data-band-identity-pct="93\.27"/);
+  });
+}

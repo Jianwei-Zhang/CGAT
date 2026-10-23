@@ -240,7 +240,7 @@ export function bindContextSubmenuInteractions(menu, options = {}) {
       group.classList?.remove?.("is-open");
       trigger?.setAttribute?.("aria-expanded", "false");
     };
-    cleanups.push(bindDelayedFloatingClose(group, close, { ...options, timerKey: closeTimer }));
+    cleanups.push(bindDelayedFloatingClose(group, close, { delayMs: 0, ...options, timerKey: closeTimer }));
     group.addEventListener?.("pointerenter", open);
     trigger?.addEventListener?.("click", (event) => {
       event?.stopPropagation?.();
@@ -448,7 +448,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
   }
 
   bindDelegatedDelayedFloatingClose(host, {
-    rootSelector: "#assembly-context-menu", timerKey: CONTEXT_MENU_CLOSE_TIMER,
+    rootSelector: "#assembly-context-menu", timerKey: CONTEXT_MENU_CLOSE_TIMER, delayMs: 0,
     close: menu => { if (host.querySelector("#assembly-context-menu") === menu) closeMenu(); },
   });
   host.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); });

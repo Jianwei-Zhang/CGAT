@@ -24,10 +24,15 @@ export function scheduleDelayedFloatingClose(owner, timerKey, callback, options 
   }
   const timerApi = resolveTimerApi(options);
   cancelDelayedFloatingClose(owner, timerKey, options);
+  const delayMs = Number(options.delayMs ?? FLOATING_MENU_CLOSE_DELAY_MS);
+  if (delayMs <= 0) {
+    callback();
+    return;
+  }
   owner[timerKey] = timerApi.setTimeout?.(() => {
     owner[timerKey] = null;
     callback();
-  }, Number(options.delayMs || FLOATING_MENU_CLOSE_DELAY_MS));
+  }, delayMs);
 }
 
 export function bindDelegatedDelayedFloatingClose(host, {

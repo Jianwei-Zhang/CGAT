@@ -89,7 +89,10 @@ export function createSubviewFragmentSyncRuntime(deps) {
           store.setState({ assembly: { ...store.getState().assembly,
             mainViewHistory: { ...resolveMainViewHistoryAfterMutation(store.getState().assembly.mainViewHistory,
               result.status, before.assembly.selectedChrName), inFlight: true } } });
-          await deps.loadAssemblyView(host, store, { keepCurrentChr: true, keepCurrentCtg: false, renderLoading: false });
+          // Keep the mounted cards until native IDs, local history and colored
+          // evidence are all ready; the loader must not render an interim page.
+          await deps.loadAssemblyView(host, store, { keepCurrentChr: true, keepCurrentCtg: false,
+            renderLoading: false, renderResult: false });
           if (!isCurrent() || !sameIdentity(store.getState(), before)) return false;
           const latest = store.getState();
           if (latest.assembly.error) throw new Error(latest.assembly.error);
@@ -121,12 +124,13 @@ export function createSubviewFragmentSyncRuntime(deps) {
           } };
           store.setState({ assembly: { ...local.assembly, subview: { ...local.assembly.subview, trackPairSelectedCtgs: [] },
             trackSelectedCtgIds: [], actionError: "", actionStatus: labels.syncDone } });
+          await deps.refreshSubviewPairwiseEvidence?.(host, store, { rerenderLoading: false, rerenderLoaded: false });
+          if (!isCurrent() || !sameIdentity(store.getState(), before)) return false;
           await deps.persistNow(host, store);
           if (!isCurrent() || !sameIdentity(store.getState(), before)) return false;
           store.setState({ assembly: { ...store.getState().assembly,
             mainViewHistory: { ...store.getState().assembly.mainViewHistory, inFlight: false } } });
           deps.rerenderMain(host, store); deps.rerenderSubviewPanel(host, store);
-          deps.refreshSubviewPairwiseEvidence?.(host, store);
           return true;
         } catch (error) {
           if (isCurrent() && sameIdentity(store.getState(), before) && !nativeCommitted) {

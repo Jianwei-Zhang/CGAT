@@ -64,5 +64,7 @@ test("pairwise evidence cache identity follows real backing changes while local 
   assert.equal(rebound.members[0].entityKey, initial.members[0].entityKey);
   const next = buildSubviewPairwiseEvidenceKey({ mode: "composition", members: rebound.members });
   assert.notEqual(next, original);
-  assert.match(next, /11:1-40/); assert.match(next, /12:41-100/);
+  assert.equal(next, "composition:primary:2:mother:11+12|support:3:mother:20");
+  assert.deepEqual(rebound.members[0].localFragment.parts.map((part) => [part.assemblyCtgId, part.sourceStart, part.sourceEnd]),
+    [[11, 1, 40], [12, 41, 100]], "source intervals remain exact even though evidence is cached by backing IDs");
 });
