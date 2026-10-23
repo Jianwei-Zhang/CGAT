@@ -386,6 +386,7 @@ const assemblyPageShellDeps = {
 const {
   patchAssemblyStatusToast,
   patchGrtResultOverlaysDom,
+  patchSubviewPanelDom,
   patchPrimaryHiddenCtgDom,
   replaceRenderedAssemblySection,
 } = createAssemblyDomPatchController({
@@ -1764,21 +1765,20 @@ function rerenderSubviewPanel(host, store) {
     rerender(host, store);
     return;
   }
-  const currentPanel = routeHost.querySelector("[data-subview-panel='1']");
-  if (!currentPanel) {
-    rerender(host, store);
-    return;
+  const replacedNodes = patchSubviewPanelDom(routeHost, store);
+  if (!replacedNodes?.length) {
+    const currentPanel = routeHost.querySelector("[data-subview-panel='1']");
+    if (!currentPanel) { rerender(host, store); return; }
+    currentPanel.outerHTML = renderAssemblySubviewPanelImpl(store.getState(), renderTracksDeps);
+    const nextPanel = routeHost.querySelector("[data-subview-panel='1']");
+    if (!nextPanel) { rerender(host, store); return; }
+    bindAssemblyPage(nextPanel, store, { scope: "subview", rerender: rerenderSubviewPanel });
+  } else {
+    const livePanel = routeHost.querySelector("[data-subview-panel='1']");
+    if (livePanel) bindAssemblyPage(livePanel, store, {
+      scope: "subview", rerender: rerenderSubviewPanel,
+    });
   }
-  currentPanel.outerHTML = renderAssemblySubviewPanelImpl(store.getState(), renderTracksDeps);
-  const nextPanel = routeHost.querySelector("[data-subview-panel='1']");
-  if (!nextPanel) {
-    rerender(host, store);
-    return;
-  }
-  bindAssemblyPage(nextPanel, store, {
-    scope: "subview",
-    rerender: rerenderSubviewPanel,
-  });
   if (routeHost.querySelector(".assembly-members-panel")) refreshMainMembersForSubview(routeHost, store);
 }
 
@@ -3080,13 +3080,17 @@ async function commitAssemblyContigSplit(host, store, action, args, doneMessage 
       if (!isCurrent() || store.getState().assembly.selectedChrName !== payload.chrName) return false;
       const result = await runMainViewEditorAction(payload);
       if (!isCurrent()) return false;
-      await loadAssemblyView(host, store, { keepCurrentChr: true, keepCurrentCtg: false, renderLoading: false });
+      await loadAssemblyView(host, store, { keepCurrentChr: true, keepCurrentCtg: false,
+        renderLoading: false, renderResult: false });
+      if (!isCurrent()) return false;
+      await refreshSubviewPairwiseEvidence(host, store, { rerenderLoading: false, rerenderLoaded: false });
       if (!isCurrent()) return false;
       store.setState({ assembly: { ...store.getState().assembly,
         mainViewHistory: resolveMainViewHistoryAfterMutation(store.getState().assembly.mainViewHistory, result.status, payload.chrName),
         trackSelectedCtgIds: [], actionError: "", actionStatus: action === "add-contig-to-chr" && !result.changed
           ? chrAlignmentCopy[state.locale === "en" ? "en" : "zh"].existing : doneMessage || labels.done } });
       rerenderAssemblyMainTab(host, store);
+      rerenderSubviewPanel(host, store);
       return action === "add-contig-to-chr" ? result : true;
     });
   } catch (error) {

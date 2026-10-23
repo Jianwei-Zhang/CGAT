@@ -94,10 +94,29 @@ test("composition evidence keys include assembly members and leave reference pro
   assert.equal(shouldLoadSubviewPairwiseEvidence(summary), true);
   assert.equal(
     buildSubviewPairwiseEvidenceKey(summary),
-    "composition:assembly:30@support:2:mother:0:0:|assembly:2@primary:1:mother:0:0:",
+    "composition:support:2:mother:30|primary:1:mother:2",
   );
   assert.equal(shouldLoadSubviewPairwiseEvidence({
     mode: "composition",
     members: [summary.members[1], summary.members[2]],
   }), false);
+
+  const splitSummary = structuredClone(summary);
+  const support = splitSummary.members[0];
+  splitSummary.members.splice(0, 1,
+    { ...support, entityKey: "local:30:1-500",
+      localFragment: { sourceSeqId: 70, groupKey: "support-30", instanceKey: "support-30",
+        sourceStart: 1, sourceEnd: 500,
+        parts: [{ assemblyCtgId: 30, sourceStart: 1, sourceEnd: 500, orient: "+" }] } },
+    { ...support, entityKey: "local:30:501-1000",
+      localFragment: { sourceSeqId: 70, groupKey: "support-30", instanceKey: "support-30",
+        sourceStart: 501, sourceEnd: 1000,
+        parts: [{ assemblyCtgId: 30, sourceStart: 501, sourceEnd: 1000, orient: "+" }] } },
+  );
+  assert.equal(buildSubviewPairwiseEvidenceKey(splitSummary), buildSubviewPairwiseEvidenceKey(summary),
+    "local presentation fragments reuse the same colored evidence");
+  splitSummary.members[0].localFragment.parts[0].assemblyCtgId = 300;
+  splitSummary.members[1].localFragment.parts[0].assemblyCtgId = 301;
+  assert.notEqual(buildSubviewPairwiseEvidenceKey(splitSummary), buildSubviewPairwiseEvidenceKey(summary),
+    "real Main View split IDs require refreshed evidence");
 });

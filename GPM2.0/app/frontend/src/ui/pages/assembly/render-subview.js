@@ -1230,7 +1230,7 @@ function buildSubviewFragmentRects({
   phasedTrackItemId,
   phasedHaplotypeKey,
 }) {
-  return fragments.map((fragment) => {
+  return fragments.map((fragment, index) => {
     const safeLengthBp = Math.max(1, Number(ctgLengthBp || 0));
     const fragmentStart = normalizePositiveInt(fragment.start) || 1;
     const fragmentEnd = normalizePositiveInt(fragment.end) || fragmentStart;
@@ -1286,7 +1286,9 @@ function buildSubviewFragmentRects({
                 stroke="transparent"
                 stroke-width="2.5"
                 pointer-events="none"
-              />`;
+              />${index ? `<line class="main-anchor-fragment-separator subview-anchor-separator" data-main-fragment-role="${escapeAttr(role)}"
+                data-subview-anchor-cut="${fragmentStart}" x1="${x.toFixed(2)}" x2="${x.toFixed(2)}" y1="${Number(barY || 0).toFixed(2)}"
+                y2="${(Number(barY || 0) + Number(barHeight || 0)).toFixed(2)}" pointer-events="none" />` : ""}`;
   }).join("");
 }
 
@@ -1311,6 +1313,8 @@ function renderSubviewAnchorLines(anchorEdges, { topY, bottomY, hitTopY, hitBott
                   stroke-width="3"
                   pointer-events="none"
                   data-subview-anchor-object-id="${escapeAttr(objectId)}"
+                  data-subview-anchor-preview="1" data-subview-anchor-top-contig-id="${Number(edge.topContigId || 0)}"
+                  data-subview-anchor-bottom-contig-id="${Number(edge.bottomContigId || 0)}"
                 />
                 <line
                   class="subview-anchor-hit-zone${edge.active ? " is-active" : ""}"
@@ -1321,6 +1325,7 @@ function renderSubviewAnchorLines(anchorEdges, { topY, bottomY, hitTopY, hitBott
                   stroke="transparent"
                   stroke-width="3"
                   pointer-events="stroke"
+                  data-subview-anchor-preview="1"
                   data-subview-anchor-kind="${anchorKind}"
                   data-subview-anchor-object-id="${escapeAttr(objectId)}"
                   data-subview-anchor-hit-key="${escapeAttr(edge.hitKey)}"

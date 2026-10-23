@@ -1,3 +1,4 @@
+import { memberBackingIds } from "./subview-fragment-model.js";
 import {
   normalizeNonNegativeInt,
   normalizePositiveInt,
@@ -67,14 +68,14 @@ export function buildSubviewPairwiseEvidenceKey(summary, scope = {}) {
   const mode = String(summary?.mode || "").trim();
   if (mode === "composition") {
     const members = normalizeSubviewCompositionMembers(summary?.members);
-    const token = (member) => `${member.entityKey}@${member.sourceKey}` + (member.localFragment
-      ? `#parts:${member.localFragment.parts.map((part) => `${part.assemblyCtgId}:${part.sourceStart}-${part.sourceEnd}:${part.orient}`).sort().join(";")}` : "");
-    const topToken = members.filter((member) => member.lane === "top"
-      && member.source?.role !== "ref" && member.assemblyCtgId)
-      .map(token).sort().join(",");
-    const bottomToken = members.filter((member) => member.lane === "bottom"
-      && member.source?.role !== "ref" && member.assemblyCtgId)
-      .map(token).sort().join(",");
+    // Pairwise evidence belongs to backing Main View entities, not to local
+    // presentation fragments. Local split/move/flip can reuse the same colored
+    // hits; a real Main split changes the backing IDs and therefore the key.
+    const token = (member) => `${member.source?.role || ""}:${member.source?.datasetId || 0}:${member.source?.sourceType || "mother"}`
+      + `:${memberBackingIds(member).sort((a, b) => a - b).join("+")}`;
+    const laneToken = (lane) => [...new Set(members.filter((member) => member.lane === lane
+      && member.source?.role !== "ref" && member.assemblyCtgId).map(token))].sort().join(",");
+    const topToken = laneToken("top"), bottomToken = laneToken("bottom");
     return topToken && bottomToken ? `composition:${topToken}|${bottomToken}` : "";
   }
   if (mode === "track-pair") {

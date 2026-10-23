@@ -384,6 +384,7 @@ export async function loadAssemblyView(host, store, options, deps) {
   });
   const { keepCurrentChr, keepCurrentCtg } = options || {};
   const renderLoading = options?.renderLoading !== false;
+  const renderResult = options?.renderResult !== false;
   const state = store.getState();
   if (!state.session.workspacePath || !state.session.projectId) {
     return;
@@ -714,7 +715,7 @@ export async function loadAssemblyView(host, store, options, deps) {
     });
   }
 
-  deps.rerender(host, store);
+  if (renderResult) deps.rerender(host, store);
 }
 
 const chromosomeRequests = new WeakMap();

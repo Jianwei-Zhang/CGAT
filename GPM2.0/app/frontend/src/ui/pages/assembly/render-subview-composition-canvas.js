@@ -234,12 +234,19 @@ function anchorAttrs(edge, kind, identity, active, escapeAttr) {
     data-subview-anchor-top-cut-bp="${Math.round(edge.topCut)}" data-subview-anchor-bottom-cut-bp="${Math.round(edge.bottomCut)}"
     ${Number.isSafeInteger(edge.topSourceCutAfter) ? `data-subview-anchor-top-source-cut-after="${edge.topSourceCutAfter}"` : ""}
     ${Number.isSafeInteger(edge.bottomSourceCutAfter) ? `data-subview-anchor-bottom-source-cut-after="${edge.bottomSourceCutAfter}"` : ""}
+    data-subview-anchor-preview="1" data-subview-anchor-top-entity-key="${escapeAttr(edge.top.entityKey || "")}" data-subview-anchor-bottom-entity-key="${escapeAttr(edge.bottom.entityKey || "")}"
     data-subview-anchor-top-length-bp="${edge.top.lengthBp}" data-subview-anchor-bottom-length-bp="${edge.bottom.lengthBp}"
     data-subview-anchor-top-name="${escapeAttr(edge.top.label)}" data-subview-anchor-bottom-name="${escapeAttr(edge.bottom.label)}"
     data-subview-anchor-top-source-role="${escapeAttr(topSource.role || "")}" data-subview-anchor-bottom-source-role="${escapeAttr(bottomSource.role || "")}"
     data-subview-anchor-top-source-kind="${escapeAttr(topSource.sourceType || "")}" data-subview-anchor-bottom-source-kind="${escapeAttr(bottomSource.sourceType || "")}"
     data-subview-anchor-top-source-name="${escapeAttr(topSource.datasetName || topSource.hap || "")}" data-subview-anchor-bottom-source-name="${escapeAttr(bottomSource.datasetName || bottomSource.hap || "")}
     " data-subview-anchor-top-x="${edge.topX.toFixed(4)}" data-subview-anchor-bottom-x="${edge.bottomX.toFixed(4)}"`;
+}
+
+function anchorPreviewAttrs(edge, escapeAttr) {
+  return `data-subview-anchor-preview="1" data-subview-anchor-top-contig-id="${edge.top.assemblyCtgId || 0}"
+    data-subview-anchor-bottom-contig-id="${edge.bottom.assemblyCtgId || 0}"
+    data-subview-anchor-top-entity-key="${escapeAttr(edge.top.entityKey || "")}" data-subview-anchor-bottom-entity-key="${escapeAttr(edge.bottom.entityKey || "")}"`;
 }
 
 function renderEvidenceAnchors(bands, activeAnchors, escapeAttr) {
@@ -255,7 +262,7 @@ function renderEvidenceAnchors(bands, activeAnchors, escapeAttr) {
     return `<line class="subview-anchor-line${isActive ? " is-active" : ""}" x1="${points.topX.toFixed(2)}"
       y1="${TOP_Y + BAR_HEIGHT}" x2="${points.bottomX.toFixed(2)}" y2="${BOTTOM_Y}"
       stroke="${isActive ? "red" : "transparent"}" stroke-width="3" pointer-events="none"
-      data-subview-anchor-object-id="${escapeAttr(objectId)}" />
+      data-subview-anchor-object-id="${escapeAttr(objectId)}" ${anchorPreviewAttrs(edge, escapeAttr)} />
       <line class="subview-anchor-hit-zone${isActive ? " is-active" : ""}" x1="${points.topX.toFixed(2)}"
       y1="${TOP_Y + BAR_HEIGHT}" x2="${points.bottomX.toFixed(2)}" y2="${BOTTOM_Y}"
       stroke="transparent" stroke-width="4" pointer-events="stroke" ${attrs} />`;
@@ -295,7 +302,7 @@ function renderManualAnchors(layout, anchors, escapeAttr, evidence = false) {
     const objectId = anchorObjectId(edge, kind, identity);
     return `<line class="subview-anchor-line is-active" x1="${edge.topX.toFixed(2)}" y1="${TOP_Y + BAR_HEIGHT}"
       x2="${edge.bottomX.toFixed(2)}" y2="${BOTTOM_Y}" stroke="red" stroke-width="3" pointer-events="none"
-      data-subview-anchor-object-id="${escapeAttr(objectId)}" />
+      data-subview-anchor-object-id="${escapeAttr(objectId)}" ${anchorPreviewAttrs(edge, escapeAttr)} />
       <line class="subview-anchor-hit-zone is-active" x1="${edge.topX.toFixed(2)}" y1="${TOP_Y + BAR_HEIGHT}"
       x2="${edge.bottomX.toFixed(2)}" y2="${BOTTOM_Y}" stroke="transparent" stroke-width="4"
       pointer-events="stroke" ${anchorAttrs(edge, kind, identity, true, escapeAttr)} />`;
@@ -344,6 +351,12 @@ function renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr }) {
   });
   if (!fragments.length) return "";
   const orientation = memberOrientation(member);
+  const separators = [...new Set(cuts)].filter((cut) => Number.isSafeInteger(cut) && cut > 1 && cut <= member.lengthBp)
+    .map((cut) => {
+      const x = rangeX(member, cut, cut).left;
+      return `<line class="main-anchor-fragment-separator subview-anchor-separator" data-main-fragment-role="${escapeAttr(member.source?.role || "support")}"
+        data-subview-anchor-cut="${cut}" x1="${x.toFixed(2)}" x2="${x.toFixed(2)}" y1="${y}" y2="${y + BAR_HEIGHT}" pointer-events="none" />`;
+    }).join("");
   return fragments.map((fragment) => {
     const range = rangeX(member, fragment.start, fragment.end);
     const width = Math.max(1, range.right - range.left);
@@ -374,7 +387,7 @@ function renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr }) {
       <rect class="subview-fragment-outline" x="${range.left.toFixed(2)}" y="${y}"
         width="${width.toFixed(2)}" height="${BAR_HEIGHT}" rx="4" ry="4"
         fill="none" stroke="transparent" stroke-width="2.5" pointer-events="none" />`;
-  }).join("");
+  }).join("") + separators;
 }
 
 function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {

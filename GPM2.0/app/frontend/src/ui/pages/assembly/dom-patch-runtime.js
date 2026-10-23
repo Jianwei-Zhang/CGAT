@@ -137,6 +137,44 @@ export function createAssemblyDomPatchController({
     return true;
   }
 
+  // Local edits update the panel head and plot as sibling replacements. Keeping
+  // the mounted panel node prevents WebView2 from flashing the whole window and
+  // preserves the scroll container until its replacement is ready.
+  function patchSubviewPanelDom(host, store) {
+    const routeHost = host?.closest?.("#route-host") || host;
+    const livePanel = routeHost?.querySelector?.("[data-subview-panel='1']") || null;
+    if (!livePanel || typeof renderAssemblySubviewPanel !== "function") return null;
+    const nextContent = createRenderedContent(routeHost, renderAssemblySubviewPanel(store.getState()));
+    const nextPanel = nextContent?.querySelector?.("[data-subview-panel='1']") || null;
+    if (!nextPanel) return null;
+    const selectors = [".subview-panel-head", ".subview-alignment-card"];
+    const replacements = selectors.map((selector) => ({
+      current: livePanel.querySelector(selector),
+      next: nextPanel.querySelector(selector),
+    }));
+    if (replacements.some(({ current, next }) => Boolean(current) !== Boolean(next)
+      || (current && typeof current.replaceWith !== "function"))) return null;
+    const currentScroll = livePanel.querySelector(".subview-track-scroll");
+    const scrollLeft = Number(currentScroll?.scrollLeft || 0);
+    const scrollTop = Number(currentScroll?.scrollTop || 0);
+    const replaced = replacements.flatMap(({ current, next }) => {
+      if (!current || !next) return [];
+      current.replaceWith(next);
+      return [next];
+    });
+    if (!replaced.length) return null;
+    const nextScroll = livePanel.querySelector(".subview-track-scroll");
+    if (nextScroll) { nextScroll.scrollLeft = scrollLeft; nextScroll.scrollTop = scrollTop; }
+    patchGrtResultToastNode(livePanel, nextPanel);
+    const liveError = livePanel.querySelector(":scope > .error-text");
+    const nextError = nextPanel.querySelector(":scope > .error-text");
+    if (liveError && nextError) liveError.replaceWith(nextError);
+    else if (liveError) liveError.remove?.();
+    else if (nextError) (livePanel.querySelector(".grt-result-toast")
+      || livePanel.querySelector(".subview-panel-head"))?.insertAdjacentElement?.("afterend", nextError);
+    return replaced;
+  }
+
   function patchAssemblyStatusToast(routeHost, nextContent) {
     const currentMain = routeHost?.querySelector?.(".assembly-main-view") || null;
     if (!currentMain) {
@@ -372,6 +410,7 @@ export function createAssemblyDomPatchController({
     createRenderedAssemblyMainTabContent,
     patchAssemblyStatusToast,
     patchGrtResultOverlaysDom,
+    patchSubviewPanelDom,
     patchDeletedPrimaryTrackCtgsDom,
     patchPrimaryHiddenCtgDom,
     replaceRenderedAssemblySection,

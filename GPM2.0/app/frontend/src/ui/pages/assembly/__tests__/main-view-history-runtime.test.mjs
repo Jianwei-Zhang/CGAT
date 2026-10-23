@@ -102,7 +102,12 @@ test("main-view undo locks controls, reloads the chromosome, and locates one aff
       action: "undo",
     },
     {
-      reload: { keepCurrentChr: true, keepCurrentCtg: true, renderLoading: false },
+      reload: {
+        keepCurrentChr: true,
+        keepCurrentCtg: true,
+        renderLoading: false,
+        renderResult: false,
+      },
     },
   ]);
   assert.deepEqual(rerenderLocks, [true, false]);
@@ -163,14 +168,17 @@ test("main-view history state preserves an active in-flight lock and excludes ph
   assert.equal(isMainViewHistoryEligibleAction("flip-ctg", { phasedTrackItemId: 99 }), false);
 });
 
-test("main undo/redo refreshes Local View pairwise evidence after native reload", async () => {
-  const store = createStore(); let refreshed = 0;
+test("main undo/redo reloads and refreshes Local View evidence before one final render", async () => {
+  const store = createStore(); let refreshed = 0, renders = 0, loadOptions = null, refreshOptions = null;
   const changed = await runMainViewHistoryControlAction({}, store, "undo", {
     async executeMainViewHistoryAction() { return { changed: true, status: { chrName: "Chr01", canUndo: false, canRedo: true }, affectedCtgIds: [2], operation: { kind: "edit-local-fragment", targetCount: 1 } }; },
-    async loadAssemblyView() {}, refreshSubviewPairwiseEvidence() { refreshed += 1; },
-    mapAssemblyError({ error }) { return { userMessage: error.message }; }, rerender() {},
+    async loadAssemblyView(_host, _store, options) { loadOptions = options; },
+    async refreshSubviewPairwiseEvidence(_host, _store, options) { refreshed += 1; refreshOptions = options; },
+    mapAssemblyError({ error }) { return { userMessage: error.message }; }, rerender() { renders += 1; },
   });
-  assert.equal(changed, true); assert.equal(refreshed, 1);
+  assert.equal(changed, true); assert.equal(refreshed, 1); assert.equal(renders, 2);
+  assert.equal(loadOptions.renderResult, false);
+  assert.deepEqual(refreshOptions, { rerenderLoading: false, rerenderLoaded: false });
 });
 
 test("main-view history invalidation reports one error without a duplicate status toast", async () => {

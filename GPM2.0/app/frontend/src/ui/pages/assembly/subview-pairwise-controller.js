@@ -213,7 +213,7 @@ export function createSubviewPairwiseController({
     );
   }
 
-  async function loadSubviewPairwiseEvidence(host, store, summary) {
+  async function loadSubviewPairwiseEvidence(host, store, summary, { rerenderAfter = true } = {}) {
     const startState = store.getState();
     const params = resolveSubviewPairwiseEvidenceParams(startState, summary);
     if (!params) {
@@ -251,7 +251,7 @@ export function createSubviewPairwiseController({
           },
         },
       });
-      scheduleDeferredSubviewPanelRerender(host, store);
+      if (rerenderAfter) scheduleDeferredSubviewPanelRerender(host, store);
     } catch (error) {
       const currentState = store.getState();
       if (!isCurrentRequest(currentState, params)) {
@@ -296,11 +296,11 @@ export function createSubviewPairwiseController({
           },
         },
       });
-      scheduleDeferredSubviewPanelRerender(host, store);
+      if (rerenderAfter) scheduleDeferredSubviewPanelRerender(host, store);
     }
   }
 
-  function refreshSubviewPairwiseEvidence(host, store) {
+  async function refreshSubviewPairwiseEvidence(host, store, { rerenderLoading = true, rerenderLoaded = true } = {}) {
     const state = store.getState();
     const summary = state.assembly?.subview?.summary || null;
     const pairwiseEvidence = buildInitialSubviewPairwiseEvidence(
@@ -317,9 +317,9 @@ export function createSubviewPairwiseController({
             subview: { ...getSubviewState(state.assembly), pairwiseEvidence: null },
           },
         });
-        rerenderSubviewPanel(host, store);
+        if (rerenderLoading) rerenderSubviewPanel(host, store);
       }
-      return;
+      return false;
     }
     const currentEvidence = state.assembly?.subview?.pairwiseEvidence || null;
     const shouldFetch = String(pairwiseEvidence.requestKey || "")
@@ -327,7 +327,7 @@ export function createSubviewPairwiseController({
     const shouldUpdateState = JSON.stringify(pairwiseEvidence)
       !== JSON.stringify(currentEvidence || null);
     if (!shouldUpdateState && !shouldFetch) {
-      return;
+      return false;
     }
     store.setState({
       assembly: {
@@ -338,12 +338,14 @@ export function createSubviewPairwiseController({
         },
       },
     });
-    if (shouldUpdateState) {
+    if (shouldUpdateState && rerenderLoading) {
       rerenderSubviewPanel(host, store);
     }
     if (shouldFetch) {
-      loadSubviewPairwiseEvidence(host, store, summary);
+      await loadSubviewPairwiseEvidence(host, store, summary, { rerenderAfter: rerenderLoaded });
+      return true;
     }
+    return shouldUpdateState;
   }
 
   function cancelSubviewPairwiseEvidence(host, store, options = {}) {

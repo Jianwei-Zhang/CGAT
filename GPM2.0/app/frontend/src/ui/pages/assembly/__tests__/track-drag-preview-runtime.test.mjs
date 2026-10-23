@@ -807,3 +807,33 @@ test("main anchor line and hit zone follow the contig endpoint while Ref stays f
   assert.deepEqual(line.getAttribute("points").split(" ").map(p => p.split(",").map(Number)), [[45,90],[200,24]]);
   assert.deepEqual(hit.getAttribute("points").split(" ").map(p => p.split(",").map(Number)), [[125,90],[250,24]]);
 });
+
+test("Subview drag keeps active anchor lines visible and shifts only the dragged endpoint", () => {
+  const group = createNode({ "data-subview-track-slot": "top", "data-subview-track-role": "support",
+    "data-subview-contig-id": "12", "data-subview-composition-entity-key": "entity-12" });
+  const line = createNode({ x1: "10", y1: "20", x2: "30", y2: "80", "data-subview-anchor-preview": "1",
+    "data-subview-anchor-top-contig-id": "12", "data-subview-anchor-bottom-contig-id": "2",
+    "data-subview-anchor-top-entity-key": "entity-12", "data-subview-anchor-bottom-entity-key": "entity-2" });
+  const hit = createNode({ x1: "10", y1: "20", x2: "30", y2: "80", "data-subview-anchor-preview": "1",
+    "data-subview-anchor-top-contig-id": "12", "data-subview-anchor-bottom-contig-id": "2",
+    "data-subview-anchor-top-entity-key": "entity-12", "data-subview-anchor-bottom-entity-key": "entity-2" });
+  const host = createHost({
+    '[data-subview-track-slot="top"][data-subview-contig-id="12"]': [group],
+    '[data-sticky-label-key="subview:top:support:12"]': [],
+    '[data-subview-label-slot="top"][data-subview-label-role="support"][data-subview-label-contig-id="12"]': [],
+    '[data-subview-anchor-preview="1"]': [line, hit],
+    '[data-subview-top-contig-id="12"]': [],
+    "[data-drag-preview-group='1']": [group],
+    "[data-drag-preview-band='1']": [],
+    "[data-drag-preview-sticky-label='1']": [],
+    "[data-drag-preview-junction-line='1']": [line, hit],
+    "[data-drag-preview-junction-label='1']": [],
+  });
+  previewSubviewTrackContigDrag(host, { slot: "top", contigId: 12,
+    compositionEntityKey: "entity-12", offsetPx: 18 });
+  assert.equal(line.getAttribute("x1"), "28.00"); assert.equal(line.getAttribute("x2"), "30.00");
+  assert.equal(hit.getAttribute("x1"), "28.00"); assert.equal(hit.getAttribute("x2"), "30.00");
+  clearSubviewTrackDragPreview(host);
+  assert.equal(line.getAttribute("x1"), "10"); assert.equal(line.getAttribute("x2"), "30");
+  assert.equal(hit.getAttribute("x1"), "10"); assert.equal(hit.getAttribute("x2"), "30");
+});

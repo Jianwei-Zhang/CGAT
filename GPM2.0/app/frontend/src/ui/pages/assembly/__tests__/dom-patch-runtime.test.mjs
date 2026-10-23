@@ -206,3 +206,30 @@ test("hiding a contig preserves remaining identity values in the rebuilt Canvas 
   assert.deepEqual(JSON.parse(sceneNode.textContent).bands.map((band) => band.identityPct), ["93.27", "0"]);
   assert.equal(redraws, 1);
 });
+
+test("Subview panel patch preserves the mounted panel and viewport while replacing head and plot", () => {
+  const liveScroll = { scrollLeft: 18817, scrollTop: 73 };
+  const nextScroll = { scrollLeft: 0, scrollTop: 0 };
+  const live = new Map(), next = new Map();
+  const replaceable = (key, owner) => ({ replaceWith(node) { owner.set(key, node); } });
+  live.set(".subview-panel-head", replaceable(".subview-panel-head", live));
+  live.set(".subview-alignment-card", { replaceWith(node) {
+    live.set(".subview-alignment-card", node); live.set(".subview-track-scroll", nextScroll);
+  } });
+  live.set(".subview-track-scroll", liveScroll);
+  next.set(".subview-panel-head", { id: "next-head" });
+  next.set(".subview-alignment-card", { id: "next-card" });
+  next.set(".subview-track-scroll", nextScroll);
+  const panel = { querySelector: (selector) => live.get(selector) || null };
+  const nextPanel = { querySelector: (selector) => next.get(selector) || null };
+  const fragment = { querySelector: (selector) => selector === "[data-subview-panel='1']" ? nextPanel : null };
+  const routeHost = {
+    ownerDocument: { createElement: () => ({ content: fragment, set innerHTML(_value) {} }) },
+    querySelector: (selector) => selector === "[data-subview-panel='1']" ? panel : null,
+  };
+  const { patchSubviewPanelDom } = createController({ renderAssemblySubviewPanel: () => "<article></article>" });
+  const replaced = patchSubviewPanelDom(routeHost, { getState: () => ({ assembly: {} }) });
+  assert.deepEqual(replaced.map((node) => node.id), ["next-head", "next-card"]);
+  assert.equal(routeHost.querySelector("[data-subview-panel='1']"), panel, "panel identity stays mounted");
+  assert.equal(nextScroll.scrollLeft, 18817); assert.equal(nextScroll.scrollTop, 73);
+});

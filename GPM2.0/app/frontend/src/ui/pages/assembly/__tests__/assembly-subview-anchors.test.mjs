@@ -368,6 +368,7 @@ test("subview keeps anchored hits visible after alignment length filters non-anc
   const filteredHtml = renderWithAlignmentLength(100000);
 
   assert.match(baseHtml, /class="subview-anchor-line is-active"/);
+  assert.match(baseHtml, /class="main-anchor-fragment-separator subview-anchor-separator"/);
   assert.match(baseHtml, /data-subview-hit-key="hit-1"/);
   assert.match(filteredHtml, /class="subview-anchor-line is-active"/);
   assert.match(filteredHtml, /data-subview-hit-key="hit-1"/);

@@ -234,6 +234,8 @@ test("composition canvas keeps baseline GRT anchors when result display is off a
   assert.match(html, /data-subview-anchor-bottom-contig-id="2"/);
   assert.match(html, /data-subview-fragment-contig-id="1"/);
   assert.match(html, /data-subview-fragment-contig-id="2"/);
+  assert.match(html, /class="main-anchor-fragment-separator subview-anchor-separator"/);
+  assert.match(html, /class="subview-anchor-line is-active"[\s\S]*data-subview-anchor-preview="1"/);
 });
 
 for (const candidatesLoaded of [true, false]) {

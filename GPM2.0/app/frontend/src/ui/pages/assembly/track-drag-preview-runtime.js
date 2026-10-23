@@ -563,6 +563,7 @@ export function previewSubviewTrackContigDrag(host, payload) {
   host.classList?.add?.(SUBVIEW_TRACK_PREVIEW_CLASS);
   const allGroups = new Set();
   const bandEdges = new Map();
+  const anchorOffsets = new Map();
   for (const { slot, contigId, compositionEntityKey } of dragTargets(payload)) {
     const groupNodes = [...(host.querySelectorAll?.(
       `[data-subview-track-slot="${slot}"][data-subview-contig-id="${contigId}"]`,
@@ -584,6 +585,12 @@ export function previewSubviewTrackContigDrag(host, payload) {
         if (!compositionEntityKey && !isLabelInsideGroup(labelNode, groupNode)) applyStickyLabelPreview(labelNode, offsetPx);
       });
     });
+    for (const anchor of host.querySelectorAll?.('[data-subview-anchor-preview="1"]') || []) {
+      if (Number(anchor.getAttribute?.(`data-subview-anchor-${slot}-contig-id`)) !== Number(contigId)) continue;
+      if (compositionEntityKey && anchor.getAttribute?.(`data-subview-anchor-${slot}-entity-key`) !== compositionEntityKey) continue;
+      const offsets = anchorOffsets.get(anchor) || { top: 0, bottom: 0 };
+      offsets[slot] = offsetPx; anchorOffsets.set(anchor, offsets);
+    }
     const edgeIndexes = String(slot || "").trim() === "top" ? [0, 1] : [2, 3];
     const bandSelector = String(slot || "").trim() === "top"
       ? `[data-subview-top-contig-id="${contigId}"]`
@@ -599,6 +606,7 @@ export function previewSubviewTrackContigDrag(host, payload) {
   // A band can touch two moving fragments; update both ends from its original
   // points in one pass rather than overwriting the first endpoint's preview.
   for (const [band, edges] of bandEdges) applyBandPreview(band, [...edges], offsetPx);
+  for (const [anchor, offsets] of anchorOffsets) applyJunctionLinePreview(anchor, offsets.top, offsets.bottom);
   const groups = [...allGroups];
   applySourceGapPreview(host, groups, offsetPx);
   applyGrtJunctionPreview(host, groups, offsetPx);
