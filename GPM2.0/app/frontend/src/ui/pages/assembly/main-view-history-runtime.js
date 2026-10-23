@@ -31,6 +31,7 @@ function describeHistoryOperation(state, operation) {
 export async function runMainViewHistoryControlAction(host, store, action, deps, overrides = {}) {
   assertRuntimeDeps(deps);
   const state = store.getState();
+  const refreshSubviewEvidence = () => deps.refreshSubviewPairwiseEvidence?.(host, store);
   const chrName = String(state.assembly?.selectedChrName || "").trim();
   if (
     !state.session?.workspacePath
@@ -97,6 +98,10 @@ export async function runMainViewHistoryControlAction(host, store, action, deps,
         keepCurrentCtg: true,
         renderLoading: false,
       });
+      // Main undo/redo changes real backing IDs and source intervals. Recompute
+      // Local View evidence against the reloaded entities instead of retaining
+      // the pre-mutation collinearity cache.
+      refreshSubviewEvidence();
       if (!isCurrent()) {
         return false;
       }

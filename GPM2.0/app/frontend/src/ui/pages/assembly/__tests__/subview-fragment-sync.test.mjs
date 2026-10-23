@@ -6,7 +6,7 @@ import { createSubviewFragmentSyncRuntime, buildLocalFragmentSyncRequest } from 
 import { prepareSourceOwnedSubviewHistory } from "../subview-fragment-history.js";
 import { projectRenderedSubviewToComposition } from "../subview-composition-controller.js";
 import { reconcileLocalSubviewWithMain } from "../subview-fragment-reconcile.js";
-import { commitSubviewHistoryOperation, rollbackSubviewHistory, resolveCurrentSubviewHistory } from "../subview-history-state.js";
+import { activateSubviewCompositionHistory, commitSubviewHistoryOperation, rollbackSubviewHistory, restoreSubviewHistoryRollback, resolveCurrentSubviewHistory } from "../subview-history-state.js";
 import { memberSourceInterval } from "../subview-fragment-model.js";
 
 function createStore(initial) { let state = initial; return { getState: () => state, setState: (patch) => { state = { ...state, ...patch }; } }; }
@@ -60,6 +60,24 @@ function runtime(store, overrides = {}) {
 }
 const contextFor = (mode, start = 1001, end = 5000) => ({ assemblyCtgId: 2, trackRole: "primary", slot: "bottom", start, end,
   ...(mode === "composition" ? { entityKey: "assembly:2" } : {}) });
+
+test("synchronized split commits one Local View entry and one Main View entry, and keeps them independent", async () => {
+  const state = stateFor("composition");
+  state.assembly = activateSubviewCompositionHistory(state.assembly, { stateOrLocale: state }).assembly;
+  const store = createStore(state), api = runtime(store);
+  const beforeDepth = resolveCurrentSubviewHistory(state.assembly).record.past.length;
+  assert.equal(await api.run(contextFor("composition"), { action: "split", cutAfter: 3000 }), true);
+  const after = store.getState().assembly;
+  assert.equal(resolveCurrentSubviewHistory(after).record.past.length, beforeDepth + 1);
+  assert.equal(after.mainViewHistory.appliedOperationCount, 1);
+  const localUndone = rollbackSubviewHistory(JSON.parse(JSON.stringify(after)));
+  assert.equal(localUndone.changed, true);
+  assert.equal(localUndone.assembly.chrCtgs.length, after.chrCtgs.length, "Local undo does not undo Main split");
+  assert.equal(localUndone.assembly.mainViewHistory.appliedOperationCount, 1);
+  const localRedone = restoreSubviewHistoryRollback(localUndone.assembly);
+  assert.equal(localRedone.changed, true);
+  assert.equal(localRedone.assembly.chrCtgs.length, after.chrCtgs.length);
+});
 
 for (const mode of ["2-contig", "track-pair", "composition"]) for (const action of ["split", "delete"]) {
   test(`${mode} synchronized ${action} inspects dependencies, mutates main once and preserves independent local history`, async () => {
@@ -192,7 +210,7 @@ for (const mode of ["2-contig", "track-pair", "composition"]) test(`${mode}: Mai
   const store = createStore(stateFor(mode)), api = runtime(store);
   assert.equal(await api.run(contextFor(mode), { action: "delete" }), true);
   let assembly = store.getState().assembly;
-  assert.equal(resolveCurrentSubviewHistory(assembly).canRollback, false, "no duplicate local deletion history");
+  assert.equal(resolveCurrentSubviewHistory(assembly).record.past.length, 1, "the local deletion is one Local View history entry");
   assert.equal(assembly.subview.summary.deletedFragments.length, 1);
   const beforeMain = JSON.stringify([assembly.chrCtgs, assembly.deletedCtgs, assembly.mainViewHistory]);
   const left = assembly.subview.summary.members.find((m) => m.source.role === "primary");
@@ -221,12 +239,12 @@ test("synchronized deletion preserves previous local actions and recovery metada
   const depth = resolveCurrentSubviewHistory(store.getState().assembly).record.past.length;
   const api = runtime(store);
   assert.equal(await api.run(contextFor("composition"), { action: "delete" }), true);
-  assert.equal(resolveCurrentSubviewHistory(store.getState().assembly).record.past.length, depth);
+  assert.equal(resolveCurrentSubviewHistory(store.getState().assembly).record.past.length, depth + 1);
   const beforeMain = JSON.stringify(store.getState().assembly.chrCtgs);
   const rollback = rollbackSubviewHistory(store.getState().assembly);
   assert.equal(rollback.changed, true);
   store.setState({ assembly: rollback.assembly });
-  assert.equal(store.getState().assembly.subview.summary.members.find((m) => m.entityKey === support.entityKey).flipped, false);
+  assert.equal(store.getState().assembly.subview.summary.members.find((m) => m.entityKey === support.entityKey).flipped, true, "undo delete leaves the earlier local flip intact");
   assert.equal(JSON.stringify(store.getState().assembly.chrCtgs), beforeMain);
   const left = store.getState().assembly.subview.summary.members.find((m) => m.source.role === "primary");
   assert.equal(resolveLocalFragmentMenu(store.getState(), host, { entityKey: left.entityKey }).right, true);

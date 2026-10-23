@@ -163,6 +163,16 @@ test("main-view history state preserves an active in-flight lock and excludes ph
   assert.equal(isMainViewHistoryEligibleAction("flip-ctg", { phasedTrackItemId: 99 }), false);
 });
 
+test("main undo/redo refreshes Local View pairwise evidence after native reload", async () => {
+  const store = createStore(); let refreshed = 0;
+  const changed = await runMainViewHistoryControlAction({}, store, "undo", {
+    async executeMainViewHistoryAction() { return { changed: true, status: { chrName: "Chr01", canUndo: false, canRedo: true }, affectedCtgIds: [2], operation: { kind: "edit-local-fragment", targetCount: 1 } }; },
+    async loadAssemblyView() {}, refreshSubviewPairwiseEvidence() { refreshed += 1; },
+    mapAssemblyError({ error }) { return { userMessage: error.message }; }, rerender() {},
+  });
+  assert.equal(changed, true); assert.equal(refreshed, 1);
+});
+
 test("main-view history invalidation reports one error without a duplicate status toast", async () => {
   const store = createStore();
   const changed = await runMainViewHistoryControlAction({}, store, "undo", {

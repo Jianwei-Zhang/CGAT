@@ -1117,6 +1117,7 @@ const mainViewHistoryRuntimeDeps = {
   runSerializedProjectViewMutation: (store, task) =>
     runSerializedProjectViewMutation(store, task),
   rerender: rerenderAssemblyMainTab,
+  refreshSubviewPairwiseEvidence,
   setPendingTrackAutoFocusMode: (mode) => {
     assemblyPageSession.pendingTrackAutoFocusMode = mode;
   },

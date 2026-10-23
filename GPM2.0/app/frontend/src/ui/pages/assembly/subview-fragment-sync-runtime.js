@@ -65,6 +65,17 @@ export function createSubviewFragmentSyncRuntime(deps) {
         ? splitLocalMember(request.composition, request.member.entityKey, operation.cutAfter)
         : deleteLocalMember(request.composition, request.member.entityKey);
       if (!desired.changed) return false;
+      // A synchronized edit is two user-visible edits: keep the local
+      // presentation edit in Local View history before Main owns its native
+      // mutation. The native operation remains a separate Main history entry.
+      const localBase = store.getState().assembly;
+      const localNext = applySubviewComposition(localBase.subview, desired.composition, { trackPairSelectedCtgs: [] });
+      const localCommitted = commitSubviewCompositionHistoryOperation(localBase, { nextSubview: localNext,
+        viewport, operation: { kind: operation.action === "split" ? "split-contig" : "remove-members", count: 1 }, stateOrLocale: before });
+      if (!localCommitted.changed) return false;
+      store.setState({ assembly: { ...localCommitted.assembly,
+        mainViewHistory: { ...localCommitted.assembly.mainViewHistory, inFlight: true } } });
+      installed = store.getState().assembly;
       return await deps.serialize(store, async (isCurrent) => {
         if (!isCurrent() || !stillInstalled()) return false;
         try {
@@ -82,8 +93,9 @@ export function createSubviewFragmentSyncRuntime(deps) {
           if (latest.assembly.error) throw new Error(latest.assembly.error);
           const composition = reconcileLocalCompositionWithMain(desired.composition, latest.assembly.chrCtgs, latest.assembly.deletedCtgs);
           const nextSubview = applySubviewComposition(latest.assembly.subview, composition, { trackPairSelectedCtgs: [] });
-          // Main owns synchronized deletion. Do not append a misleading local
-          // undo entry that cannot restore the native deletion.
+          // The Local View entry was committed before the native mutation. Rebind
+          // its current snapshot to the refreshed source IDs without pushing a
+          // duplicate local history step.
           const historyKey = nextSubview.historyKey;
           const record = latest.assembly.subviewHistoryByKey?.[historyKey];
           const mainArchive = operation.action === "delete" ? (composition.deletedFragments || []).filter(
@@ -94,15 +106,15 @@ export function createSubviewFragmentSyncRuntime(deps) {
             return { ...snapshot, composition: { ...snapshot.composition,
               deletedFragments: [...new Map(entries.map((entry) => [entry.member.entityKey, entry])).values()] } };
           };
-          const local = operation.action === "delete" ? { assembly: { ...latest.assembly, subview: nextSubview,
+          const local = { assembly: { ...latest.assembly, subview: nextSubview,
             ...(record ? { subviewHistoryByKey: { ...latest.assembly.subviewHistoryByKey,
-              [historyKey]: { ...record, current: { kind: "composition", composition }, default: rebase(record.default),
-                past: record.past.map((entry) => ({ ...entry, snapshot: rebase(entry.snapshot) })),
-                forward: record.forward.map((entry) => ({ ...entry, snapshot: rebase(entry.snapshot) })),
+              [historyKey]: { ...record, current: { kind: "composition", composition },
+                ...(operation.action === "delete" ? { default: rebase(record.default),
+                  past: record.past.map((entry) => ({ ...entry, snapshot: rebase(entry.snapshot) })),
+                  forward: record.forward.map((entry) => ({ ...entry, snapshot: rebase(entry.snapshot) })),
+                } : {}),
               } } } : {}),
-          } }
-            : commitSubviewCompositionHistoryOperation(latest.assembly, { nextSubview, viewport,
-            operation: { kind: operation.action === "split" ? "split-contig" : "remove-members", count: 1 }, stateOrLocale: before });
+          } };
           store.setState({ assembly: { ...local.assembly, subview: { ...local.assembly.subview, trackPairSelectedCtgs: [] },
             trackSelectedCtgIds: [], actionError: "", actionStatus: labels.syncDone } });
           await deps.persistNow(host, store);
