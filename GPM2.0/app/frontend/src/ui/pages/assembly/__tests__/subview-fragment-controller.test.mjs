@@ -142,10 +142,13 @@ for (const mode of ["2-contig", "track-pair"]) {
     }));
     const rebound = reconcileLocalSubviewWithMain({ ...undone.assembly, chrCtgs: children });
     assert.equal(rebound.subview.summary.mode, "composition");
-    const primary = rebound.subview.summary.members.find((m) => m.source.role === "primary");
-    assert.deepEqual(primary.localFragment.parts.map((part) => part.assemblyCtgId), [701, 702]);
-    assert.equal(primary.xBp, projectRenderedSubviewToComposition({ ...state, assembly: undone.assembly },
+    const primary = rebound.subview.summary.members.filter((m) => m.source.role === "primary");
+    assert.deepEqual(primary.map((member) => member.assemblyCtgId), [701, 702]);
+    assert.ok(primary.every((member) => member.localFragment.parts.length === 1),
+      "a Main split must create independent Local objects rather than one joined backing");
+    assert.equal(primary[0].xBp, projectRenderedSubviewToComposition({ ...state, assembly: undone.assembly },
       renderAssemblyPage({ ...state, assembly: undone.assembly })).members.find((m) => m.source.role === "primary").xBp);
+    assert.equal(primary[1].xBp, primary[0].xBp + 8000);
     const redone = restoreSubviewHistoryRollback(JSON.parse(JSON.stringify(rebound)));
     assert.equal(redone.changed, true);
     const pieces = redone.assembly.subview.summary.members.filter((m) => m.source.role === "primary");

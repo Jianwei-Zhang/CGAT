@@ -96,7 +96,7 @@ export function createSubviewFragmentSyncRuntime(deps) {
           if (!isCurrent() || !sameIdentity(store.getState(), before)) return false;
           const latest = store.getState();
           if (latest.assembly.error) throw new Error(latest.assembly.error);
-          const composition = reconcileLocalCompositionWithMain(desired.composition, latest.assembly.chrCtgs, latest.assembly.deletedCtgs);
+          const composition = reconcileLocalCompositionWithMain(desired.composition, latest.assembly.chrCtgs, latest.assembly.deletedCtgs, { materializeSplits: true });
           const historyKey = installed.subview.historyKey;
           const record = installed.subviewHistoryByKey?.[historyKey];
           if (!record) throw new Error("Local View history snapshot is missing");

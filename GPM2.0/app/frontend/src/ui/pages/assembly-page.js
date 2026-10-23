@@ -4,7 +4,8 @@ import { openManualContigSplit } from "./assembly/manual-contig-split.js";
 import { openAnchorContigSplit } from "./assembly/anchor-contig-split-dialog.js";
 import { createMainMemberAnnotationRefresh } from "./assembly/main-member-local-state.js";
 import { createSubviewFragmentSyncRuntime } from "./assembly/subview-fragment-sync-runtime.js";
-import { projectRenderedSubviewToComposition } from "./assembly/subview-composition-controller.js";
+import { projectRenderedSubviewToComposition, resolveCurrentSubviewCompositionViewport } from "./assembly/subview-composition-controller.js";
+import { prepareSourceOwnedSubviewHistory } from "./assembly/subview-fragment-history.js";
 import { createSubviewFragmentController, resolveLocalFragmentMenu } from "./assembly/subview-fragment-controller.js";
 import { clearOtherViewSelection } from "./assembly/selection-state.js";
 import { bindAlignmentTooltips } from "./assembly/alignment-tooltip-runtime.js";
@@ -3074,6 +3075,19 @@ async function commitAssemblyContigSplit(host, store, action, args, doneMessage 
     chrName: state.assembly.selectedChrName, action, args };
   store.setState({ assembly: { ...state.assembly, mainViewHistory: { ...state.assembly.mainViewHistory, inFlight: true } } });
   try {
+    const summary = state.assembly.subview?.summary;
+    const splitsMain = action === "split-manual-contig" || (action === "edit-local-fragment" && args?.action === "split");
+    if (splitsMain && summary && summary.mode !== "composition") {
+      // Capture legacy pair/track geometry while the parent IDs still exist.
+      // Otherwise a two-contig view cannot resolve a retired parent at reload.
+      const prepared = prepareSourceOwnedSubviewHistory(state, host, {
+        preserveLegacy: true,
+        viewport: resolveCurrentSubviewCompositionViewport(state, host),
+        projectHistorical: (historical) => projectRenderedSubviewToComposition(historical,
+          renderAssemblySubviewPanelImpl(historical, renderTracksDeps)),
+      });
+      store.setState({ assembly: { ...prepared, mainViewHistory: store.getState().assembly.mainViewHistory } });
+    }
     await flushAssemblyProjectState(host, store);
     if (store.getState().session.workspacePath !== payload.workspaceRoot || store.getState().session.projectId !== payload.projectId
       || store.getState().assembly.selectedChrName !== payload.chrName) return false;

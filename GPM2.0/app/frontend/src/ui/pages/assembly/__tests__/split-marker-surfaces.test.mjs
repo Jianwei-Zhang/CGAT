@@ -92,7 +92,7 @@ test("native split history refresh updates source cuts even without candidate ca
     state.assembly = reconcileLocalSubviewWithMain({ ...state.assembly, chrCtgs: main });
     const html = localMarkup(state);
     assert.equal(markerCount(html, 6000), 2, "independent local cut survives main undo/redo");
-    assert.equal(markerCount(html, 8000), main === children ? 1 : 0, "real cut is projected inside the retained local member");
+    assert.equal(markerCount(html, 8000), main === children ? 2 : 0, "real cuts are rendered at both independently selectable child edges");
   }
 });
 
@@ -106,7 +106,7 @@ test("anchor-derived local intervals do not fabricate manual split marks", async
 });
 
 
-test("a local merge retains the real internal cut, but does not fabricate an extra outer cut", async () => {
+test("a real Main split creates separate Local rectangles with split marks at their own edges", async () => {
   const { reconcileLocalSubviewWithMain } = await import("../subview-fragment-reconcile.js");
   const state = createIdentityRenderState("composition"), parent = state.assembly.chrCtgs[0];
   const children = [[201, 1, 8000], [202, 8001, 16000]].map(([id, start, end]) => ({
@@ -117,12 +117,14 @@ test("a local merge retains the real internal cut, but does not fabricate an ext
   state.assembly.subviewCompositionCandidates = [];
   state.assembly = reconcileLocalSubviewWithMain({ ...state.assembly, chrCtgs: children });
   const html = localMarkup(state);
-  assert.equal(markerCount(html, 8000), 1);
+  assert.equal(markerCount(html, 8000), 2);
+  assert.equal(state.assembly.subview.summary.members.filter((member) => member.source.role === "primary").length, 2);
+  assert.ok(group(html, "local", 202), "the second child is an independent drag and selection group");
   const markup = group(html, "local", 201);
   const rect = markup.match(/<rect[^>]*class="track-ctg[^>]*>/)?.[0];
   const marker = markup.match(/<path[^>]*data-manual-split-after="8000"[^>]*>/)?.[0];
   assert.equal(Number(attr(marker, "d").match(/^M ([\d.-]+)/)[1]) + 2,
-    Number(attr(rect, "x")) + Number(attr(rect, "width")) / 2);
+    Number(attr(rect, "x")) + Number(attr(rect, "width")));
 });
 
 test("local split marks follow a moved and flipped fragment's own rectangle", async () => {
@@ -153,13 +155,15 @@ test("repeated native splits of an N-delimited parent retain local source ancest
     lengthBp: end - start + 1, sourceFragment: { ...sourceFragment, groupKey: "manual-fragment:2",
       sourceStart: start, sourceEnd: end, gapBeforeBp: start === 1001 ? 100 : 0, gapAfterBp: end === 17000 ? 1000 : 0 } });
   state.assembly = reconcileLocalSubviewWithMain({ ...state.assembly, chrCtgs: [child(201, 1001, 9000), child(202, 9001, 17000)] });
-  assert.equal(markerCount(localMarkup(state), 9000), 1);
+  assert.equal(markerCount(localMarkup(state), 9000), 2);
   state.assembly = reconcileLocalSubviewWithMain({ ...state.assembly,
     chrCtgs: [child(301, 1001, 5000), child(302, 5001, 9000), child(202, 9001, 17000)] });
-  const member = state.assembly.subview.summary.members.find((m) => m.source.role === "primary");
-  assert.equal(member.lengthBp, 16000, "the next generation must not lose the prior parent's retained bases");
-  assert.equal(markerCount(localMarkup(state), 5000), 1);
-  assert.equal(markerCount(localMarkup(state), 9000), 1);
+  const members = state.assembly.subview.summary.members.filter((m) => m.source.role === "primary");
+  assert.equal(members.reduce((sum, member) => sum + member.lengthBp, 0), 16000,
+    "the next generation must not lose the prior parent's retained bases");
+  assert.deepEqual(members.map((member) => member.assemblyCtgId), [301, 302, 202]);
+  assert.equal(markerCount(localMarkup(state), 5000), 2);
+  assert.equal(markerCount(localMarkup(state), 9000), 2);
   assert.equal(markerCount(localMarkup(state), 1000), 0);
   assert.equal(markerCount(localMarkup(state), 17000), 0);
 });

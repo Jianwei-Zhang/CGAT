@@ -21,7 +21,7 @@ function sourceOf(ctg) {
 // because it has the same source sequence. Missing source intervals are removed
 // from ordinary local snapshots. Explicit local history recovery (and legacy
 // undo-split objects) may retain archived backing, never a native Main entity.
-export function reconcileLocalCompositionWithMain(composition, mainCtgs, deletedCtgs = [], { recoverDeletedCtgIds = [] } = {}) {
+export function reconcileLocalCompositionWithMain(composition, mainCtgs, deletedCtgs = [], { recoverDeletedCtgIds = [], materializeSplits = false } = {}) {
   const deletedSources = (Array.isArray(deletedCtgs) ? deletedCtgs : []).filter((ctg) => ctg.sourceRange).map((ctg) => ({
     ...ctg, sourceFragment: { ...ctg.sourceRange, groupKey: ctg.sourceGroupKey || `assembly:${ctg.assemblyCtgId}` },
   }));
@@ -42,10 +42,10 @@ export function reconcileLocalCompositionWithMain(composition, mainCtgs, deleted
     const archiveIds = new Set([...(range.archivedCtgIds || []), ...recoverDeletedCtgIds]);
     const available = [...sources, ...deletedSources.filter((ctg) => range.restoredLocally
       || archiveIds.has(Number(ctg.assemblyCtgId))).map(sourceOf)];
-    const candidates = available.filter((source) => (!range.sourceSeqId || !source.sourceSeqId || range.sourceSeqId === source.sourceSeqId)
-      && (originalIds.has(source.assemblyCtgId) || groups.has(canonicalGroup(source.groupKey)))
-      && source.sourceStart <= range.sourceEnd && source.sourceEnd >= range.sourceStart)
+    const family = available.filter((source) => (!range.sourceSeqId || !source.sourceSeqId || range.sourceSeqId === source.sourceSeqId)
+      && (originalIds.has(source.assemblyCtgId) || groups.has(canonicalGroup(source.groupKey))))
       .sort((a, b) => a.sourceStart - b.sourceStart || a.assemblyCtgId - b.assemblyCtgId);
+    const candidates = family.filter((source) => source.sourceStart <= range.sourceEnd && source.sourceEnd >= range.sourceStart);
     if (!member.localFragment && candidates.length === 1 && !candidates[0].deleted) {
       const live = candidates[0], old = range.parts[0];
       if (live.assemblyCtgId === old.assemblyCtgId && live.sourceStart === old.sourceStart
@@ -57,7 +57,20 @@ export function reconcileLocalCompositionWithMain(composition, mainCtgs, deleted
       const last = spans.at(-1);
       if (last && start <= last[1] + 1) last[1] = Math.max(last[1], end); else spans.push([start, end]);
     }
-    const replacements = spans.flatMap(([start, end]) => {
+    // Contiguous backing is not one interactive object: an external Main
+    // split must materialize its boundaries in the open Local View. Historical
+    // snapshots, however, retain their presentation (local undo never undoes
+    // the real Main mutation), and an explicit local merge suppresses its cut.
+    const backingCuts = family.slice(1).flatMap((candidate, index) =>
+      family[index].sourceEnd + 1 === candidate.sourceStart ? [candidate.sourceStart - 1] : []);
+    const internalCuts = backingCuts.filter((cut) => cut >= range.sourceStart && cut < range.sourceEnd);
+    const retainedCuts = internalCuts.filter((cut) => !(range.suppressedCuts || []).includes(cut));
+    const intervals = materializeSplits ? spans.flatMap(([start, end]) => {
+      const boundaries = [start, ...retainedCuts.filter((cut) => cut >= start && cut < end)
+        .map((cut) => cut + 1), end + 1];
+      return boundaries.slice(0, -1).map((left, index) => [left, boundaries[index + 1] - 1]);
+    }) : spans;
+    const replacements = intervals.flatMap(([start, end]) => {
       const sliced = sliceLocalMember(member, start, end);
       if (!sliced) return [];
       const parts = candidates.filter((candidate) => candidate.sourceStart <= end && candidate.sourceEnd >= start)
@@ -67,7 +80,8 @@ export function reconcileLocalCompositionWithMain(composition, mainCtgs, deleted
         .map((candidate) => candidate.assemblyCtgId)])];
       const localFragment = normalizeLocalFragment({ ...sliced.localFragment, parts,
         ...(archivedCtgIds.length ? { archivedCtgIds } : {}),
-        nativeCuts: [...candidates.flatMap((candidate) => candidate.nativeCuts),
+        suppressedCuts: [...(range.suppressedCuts || []), ...(materializeSplits ? [] : internalCuts)],
+        nativeCuts: [...backingCuts, ...candidates.flatMap((candidate) => candidate.nativeCuts),
           ...(range.nativeCuts || []).filter((cut) => candidates.some((candidate) => candidate.deleted
             && cut >= candidate.sourceStart - 1 && cut <= candidate.sourceEnd))],
         sourceSeqId: range.sourceSeqId || candidates[0]?.sourceSeqId });
@@ -90,23 +104,23 @@ export function reconcileLocalCompositionWithMain(composition, mainCtgs, deleted
 export function reconcileLocalSubviewWithMain(assembly) {
   if (!assembly || !Array.isArray(assembly.chrCtgs)) return assembly;
   const key = `composition:${encodeURIComponent(String(assembly.selectedChrName || ""))}`;
-  const transform = (snapshot) => {
-    if (snapshot?.kind === "composition") return { ...snapshot, composition: reconcileLocalCompositionWithMain(snapshot.composition, assembly.chrCtgs, assembly.deletedCtgs) };
+  const transform = (snapshot, materializeSplits = false) => {
+    if (snapshot?.kind === "composition") return { ...snapshot, composition: reconcileLocalCompositionWithMain(snapshot.composition, assembly.chrCtgs, assembly.deletedCtgs, { materializeSplits }) };
     if (snapshot?.kind !== "legacy" || !snapshot.sourceProjection) return snapshot;
-    const rebound = reconcileLocalCompositionWithMain(snapshot.sourceProjection, assembly.chrCtgs, assembly.deletedCtgs);
+    const rebound = reconcileLocalCompositionWithMain(snapshot.sourceProjection, assembly.chrCtgs, assembly.deletedCtgs, { materializeSplits });
     return JSON.stringify(rebound) === JSON.stringify(normalizeSubviewComposition(snapshot.sourceProjection)) ? snapshot
       : { kind: "composition", composition: rebound };
   };
   const record = assembly.subviewHistoryByKey?.[key];
   const subviewHistoryByKey = record ? { ...assembly.subviewHistoryByKey, [key]: { ...record,
-    current: transform(record.current), default: transform(record.default),
+    current: transform(record.current, true), default: transform(record.default),
     past: (record.past || []).map((entry) => ({ ...entry, snapshot: transform(entry.snapshot) })),
     forward: (record.forward || []).map((entry) => ({ ...entry, snapshot: transform(entry.snapshot) })),
   } } : assembly.subviewHistoryByKey;
   let subview = assembly.subview?.summary?.mode === "composition" ? applySubviewComposition(assembly.subview,
     reconcileLocalCompositionWithMain({ members: assembly.subview.summary.members, deletedFragments: assembly.subview.summary.deletedFragments,
       layoutGapBp: assembly.subview.summary.layoutGapBp, activeAnchors: assembly.subview.activeAnchors,
-      manualAnchors: assembly.subview.manualAnchors }, assembly.chrCtgs, assembly.deletedCtgs)) : assembly.subview;
+      manualAnchors: assembly.subview.manualAnchors }, assembly.chrCtgs, assembly.deletedCtgs, { materializeSplits: true })) : assembly.subview;
   if (assembly.subview?.historyKey === key && record?.current?.kind === "legacy"
     && subviewHistoryByKey[key]?.current?.kind === "composition") {
     subview = applySubviewComposition(subview, subviewHistoryByKey[key].current.composition);

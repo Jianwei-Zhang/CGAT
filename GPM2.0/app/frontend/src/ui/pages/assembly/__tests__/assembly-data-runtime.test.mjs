@@ -2100,15 +2100,31 @@ test("cross-chr inspection copies do not auto-attach to existing Final Path sour
 });
 
 
-for (const mode of ["composition", "track-pair", "2-contig"]) {
-  test(`cold assembly load restores ${mode} colored evidence without reselecting Local View`, async () => {
+for (const mode of ["composition", "track-pair", "2-contig"]) for (const mainSplit of [false, true]) {
+  test(`cold assembly load restores ${mode} colored evidence without reselecting Local View, Main split=${mainSplit}`, async () => {
     const { createIdentityRenderState } = await import("./identity-render-fixture.mjs");
     const { renderAssemblyPage } = await import("./tabs-semantics-harness.mjs");
     const { activateSubviewCompositionHistory, buildSubviewCompositionHistoryKey } = await import("../subview-history-state.js");
     const { createSubviewPairwiseController } = await import("../subview-pairwise-controller.js");
     const fixture = createIdentityRenderState(mode);
-    const hits = fixture.assembly.subview.pairwiseEvidence.hits;
-    const saved = activateSubviewCompositionHistory(fixture.assembly, { stateOrLocale: fixture }).assembly;
+    const { prepareSourceOwnedSubviewHistory } = await import("../subview-fragment-history.js");
+    const { projectRenderedSubviewToComposition } = await import("../subview-composition-controller.js");
+    const originalHits = fixture.assembly.subview.pairwiseEvidence.hits;
+    const hits = mainSplit ? [
+      { ...originalHits[0], subjectAssemblyCtgId: 201 },
+      { ...originalHits[6], subjectAssemblyCtgId: 202, subjectStart: 3300, subjectEnd: 4600 },
+    ] : originalHits;
+    const parent = fixture.assembly.chrCtgs[0];
+    const mainCtgs = mainSplit ? [[201, 1, 8000], [202, 8001, 16000]].map(([id, start, end]) => ({
+      ...parent, assemblyCtgId: id, totalLength: end - start + 1, lengthBp: end - start + 1,
+      sourceFragment: { sourceSeqId: 700, groupKey: "manual-fragment:2", sourceStart: start,
+        sourceEnd: end, sourceLength: 16000 },
+    })) : fixture.assembly.chrCtgs;
+    // This is the same pre-mutation capture used by the Main split action.
+    const saved = mainSplit ? prepareSourceOwnedSubviewHistory(fixture, {}, {
+      preserveLegacy: true,
+      projectHistorical: (historical) => projectRenderedSubviewToComposition(historical, renderAssemblyPage(historical)),
+    }) : activateSubviewCompositionHistory(fixture.assembly, { stateOrLocale: fixture }).assembly;
     const events = [], finalHtml = [];
     let controller;
     const harness = createInitialLoadHarness({
@@ -2117,7 +2133,7 @@ for (const mode of ["composition", "track-pair", "2-contig"]) {
       getProjectAssemblyViewState: async () => ({
         supportDatasetId: 22, subviewHistoryByKey: saved.subviewHistoryByKey,
       }),
-      listChrViewCtgs: async () => ({ items: fixture.assembly.chrCtgs }),
+      listChrViewCtgs: async () => ({ items: mainCtgs }),
       loadDatasetChrCtgs: async () => fixture.assembly.supportChrCtgs,
       activateSubviewCompositionHistory,
       buildSubviewCompositionHistoryKey,
@@ -2155,5 +2171,13 @@ for (const mode of ["composition", "track-pair", "2-contig"]) {
     assert.equal(finalHtml.length, 1);
     assert.match(finalHtml[0], /data-subview-hit-key="[^"]*evidence-1[^"]*"/);
     assert.match(finalHtml[0], /data-band-identity-pct="93\.27"/);
+    if (mainSplit) {
+      const members = harness.store.getState().assembly.subview.summary.members.filter((member) => member.source.role === "primary");
+      assert.deepEqual(members.map((member) => member.assemblyCtgId), [201, 202]);
+      assert.equal(new Set(members.map((member) => member.entityKey)).size, 2);
+      assert.match(finalHtml[0], /data-subview-contig-id="201"/);
+      assert.match(finalHtml[0], /data-subview-contig-id="202"/);
+      assert.ok(members.every((member) => member.localFragment.parts.length === 1));
+    }
   });
 }

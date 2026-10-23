@@ -129,7 +129,7 @@ export function replaceLocalMembers(composition, replaced, replacements) {
     const sameInstance = (member) => {
       const range = memberSourceInterval(member);
       return range.groupKey === original.groupKey && range.instanceKey === original.instanceKey
-        && range.sourceSeqId === original.sourceSeqId && member.sourceKey === old.sourceKey && member.lane === old.lane;
+        && (!range.sourceSeqId || !original.sourceSeqId || range.sourceSeqId === original.sourceSeqId) && member.sourceKey === old.sourceKey && member.lane === old.lane;
     };
     const hasBoundary = Number.isSafeInteger(endpoint.sourceCutAfter) && endpoint.sourceCutAfter >= 0;
     const source = hasBoundary ? endpoint.sourceCutAfter + (old.baseOrientation === "-" ? 0 : 1)
