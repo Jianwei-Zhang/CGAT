@@ -1,3 +1,4 @@
+import { resolveManualSplitSourceCuts } from "./source-fragment-layout.js";
 import { buildSubviewAnchorEndpointKey } from "./subview-anchor-state.js";
 
 const positive = (value) => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : null;
@@ -30,6 +31,10 @@ export function normalizeLocalFragment(value) {
   if (next <= sourceEnd) return null;
   return { sourceSeqId: positive(value.sourceSeqId), groupKey, instanceKey: String(value.instanceKey || groupKey), sourceStart, sourceEnd, parts,
     lineageCtgIds: [...new Set([...(Array.isArray(value.lineageCtgIds) ? value.lineageCtgIds : []), ...parts.map((part) => part.assemblyCtgId)].map(positive).filter(Boolean))].sort((a, b) => a - b),
+    ...(Array.isArray(value.nativeCuts) ? { nativeCuts: [...new Set(value.nativeCuts.map(Number)
+      .filter((cut) => Number.isSafeInteger(cut) && cut > 0 && cut >= sourceStart - 1 && cut <= sourceEnd))].sort((a, b) => a - b) } : {}),
+    ...(Array.isArray(value.manualCuts) ? { manualCuts: [...new Set(value.manualCuts.map(Number)
+      .filter((cut) => Number.isSafeInteger(cut) && cut > 0 && cut >= sourceStart - 1 && cut <= sourceEnd))].sort((a, b) => a - b) } : {}),
     ...(Array.isArray(value.suppressedCuts) ? { suppressedCuts: [...new Set(value.suppressedCuts.map(Number)
       .filter((cut) => Number.isSafeInteger(cut) && cut >= sourceStart && cut < sourceEnd))].sort((a, b) => a - b) } : {}),
   };
@@ -46,6 +51,7 @@ export function memberSourceInterval(member) {
     groupKey: String(original?.groupKey || `assembly:${member?.assemblyCtgId}`),
     instanceKey: String(member?.entityKey || `assembly:${member?.assemblyCtgId}`),
     sourceStart, sourceEnd,
+    nativeCuts: resolveManualSplitSourceCuts(member),
     parts: [{ assemblyCtgId: positive(member?.assemblyCtgId), sourceStart, sourceEnd,
       orient: orientation(member?.backingOrientation ?? member?.baseOrientation) }],
   };
@@ -148,7 +154,9 @@ export function splitLocalMember(composition, entityKey, cutAfter) {
   if (!member) return { composition, changed: false };
   const range = memberSourceInterval(member);
   if (!positive(cutAfter) || cutAfter < range.sourceStart || cutAfter >= range.sourceEnd) return { composition, changed: false };
-  const parts = [sliceLocalMember(member, range.sourceStart, cutAfter), sliceLocalMember(member, cutAfter + 1, range.sourceEnd)];
+  const splitSource = { ...member, localFragment: normalizeLocalFragment({ ...range,
+    manualCuts: [...(range.manualCuts || []), cutAfter] }) };
+  const parts = [sliceLocalMember(splitSource, range.sourceStart, cutAfter), sliceLocalMember(splitSource, cutAfter + 1, range.sourceEnd)];
   if (parts.some((part) => !part)) return { composition, changed: false };
   return { composition: replaceLocalMembers(composition, [member], parts), changed: true, members: parts };
 }
@@ -202,6 +210,8 @@ export function mergeLocalMember(composition, entityKey, side) {
   const parts = [...new Map([...a.parts, ...b.parts].map((part) => [part.assemblyCtgId, part])).values()];
   const localFragment = normalizeLocalFragment({ ...a, sourceStart, sourceEnd, parts,
     lineageCtgIds: [...(a.lineageCtgIds || []), ...(b.lineageCtgIds || [])],
+    nativeCuts: [...(a.nativeCuts || []), ...(b.nativeCuts || [])],
+    manualCuts: [...(a.manualCuts || []), ...(b.manualCuts || [])].filter((cut) => cut !== Math.min(a.sourceEnd, b.sourceEnd)),
     suppressedCuts: [...(a.suppressedCuts || []), ...(b.suppressedCuts || []), Math.min(a.sourceEnd, b.sourceEnd)] });
   if (!localFragment) return { composition, changed: false };
   const merged = { ...member, entityKey: fragmentKey(member, a, sourceStart, sourceEnd), localFragment,

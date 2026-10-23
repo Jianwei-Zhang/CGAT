@@ -1,3 +1,4 @@
+import { resolveManualSplitSourceCuts } from "./source-fragment-layout.js";
 import { normalizeSubviewComposition, applySubviewComposition } from "./subview-composition-state.js";
 import { memberSourceInterval, sliceLocalMember, normalizeLocalFragment, replaceLocalMembers } from "./subview-fragment-model.js";
 
@@ -5,7 +6,7 @@ const canonicalGroup = (key) => String(key || "").replace(/^manual-fragment:(\d+
 function sourceOf(ctg) {
   const length = Number(ctg.totalLength ?? ctg.lengthBp);
   const sourceStart = Number(ctg.sourceFragment?.sourceStart || 1);
-  return { assemblyCtgId: Number(ctg.assemblyCtgId),
+  return { assemblyCtgId: Number(ctg.assemblyCtgId), nativeCuts: resolveManualSplitSourceCuts(ctg),
     sourceSeqId: Number(ctg.sourceFragment?.sourceSeqId ?? ctg.originSourceSeqId) || null,
     groupKey: String(ctg.sourceFragment?.groupKey || `assembly:${ctg.assemblyCtgId}`),
     sourceStart, sourceEnd: Number(ctg.sourceFragment?.sourceEnd || sourceStart + length - 1),
@@ -24,7 +25,11 @@ export function reconcileLocalCompositionWithMain(composition, mainCtgs) {
     if (!["primary", "phased"].includes(member.source.role)) continue;
     const range = memberSourceInterval(member);
     const originalIds = new Set(range.parts.map((part) => part.assemblyCtgId));
-    const groups = new Set([canonicalGroup(range.groupKey), ...range.parts.map((part) => `assembly:${part.assemblyCtgId}`)]);
+    // An N-delimited parent receives a manual group at its first real cut.
+    // Later descendants keep that retired parent's group, not their immediate
+    // predecessor ID. Preserve the known ancestry rather than dropping them.
+    const groups = new Set([canonicalGroup(range.groupKey),
+      ...[...originalIds, ...(range.lineageCtgIds || [])].map((id) => `assembly:${id}`)]);
     const candidates = sources.filter((source) => (!range.sourceSeqId || !source.sourceSeqId || range.sourceSeqId === source.sourceSeqId)
       && (originalIds.has(source.assemblyCtgId) || groups.has(canonicalGroup(source.groupKey)))
       && source.sourceStart <= range.sourceEnd && source.sourceEnd >= range.sourceStart)
@@ -46,6 +51,7 @@ export function reconcileLocalCompositionWithMain(composition, mainCtgs) {
       const parts = candidates.filter((candidate) => candidate.sourceStart <= end && candidate.sourceEnd >= start)
         .map(({ assemblyCtgId, sourceStart, sourceEnd, orient }) => ({ assemblyCtgId, sourceStart, sourceEnd, orient }));
       const localFragment = normalizeLocalFragment({ ...sliced.localFragment, parts,
+        nativeCuts: candidates.flatMap((candidate) => candidate.nativeCuts),
         sourceSeqId: range.sourceSeqId || candidates[0]?.sourceSeqId });
       if (!localFragment) return [];
       return [{ ...sliced,

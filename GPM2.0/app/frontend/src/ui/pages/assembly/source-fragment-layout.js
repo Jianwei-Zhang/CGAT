@@ -40,15 +40,35 @@ export function sourceFragmentDragAttrs(ctg, escapeAttr) {
   return `data-source-fragment-seq-id="${Number(part.sourceSeqId)}" data-source-fragment-group="${escapeAttr(part.groupKey)}"`;
 }
 
-// Manual cuts are boundaries, not synthetic Ns. Mark even a lone moved fragment.
-export function renderManualSplitMarkers(ctg, rect, y, height, escapeHtml) {
+// A manual child can retain an exterior N-delimited edge from its parent.
+// That edge is not a new cut merely because its source coordinate is not 1.
+// The gap metadata is source-owned, so this works even after its sibling moves
+// to another view/chromosome or is deleted.
+export function resolveManualSplitSourceCuts(ctg) {
   const part = ctg?.sourceFragment;
-  if (!String(part?.groupKey || "").startsWith("manual-fragment:")) return "";
-  const reversed = (ctg.orient ?? ctg.refOrient) === "-";
-  return [part.sourceStart > 1 ? { source: part.sourceStart - 1, left: !reversed } : null,
-    part.sourceEnd < part.sourceLength ? { source: part.sourceEnd, left: reversed } : null]
-    .filter(Boolean).map(({ source, left }) => {
-      const x = left ? rect.x : rect.x + rect.width;
+  if (!String(part?.groupKey || "").startsWith("manual-fragment:")) return [];
+  return [Number(part.sourceStart) > 1 && !(Number(part.gapBeforeBp) > 0) ? Number(part.sourceStart) - 1 : null,
+    Number(part.sourceEnd) < Number(part.sourceLength) && !(Number(part.gapAfterBp) > 0) ? Number(part.sourceEnd) : null]
+    .filter((cut) => Number.isSafeInteger(cut) && cut > 0);
+}
+
+// Render actual source cuts on any presentation of their retained interval.
+// Joined Local View members can contain a real cut internally; clipping a local
+// interval must neither move that cut to an outer edge nor invent a new one.
+export function renderSourceSplitMarkers(cuts, range, rect, y, height, escapeHtml) {
+  const start = Number(range?.sourceStart), end = Number(range?.sourceEnd);
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 || end < start) return "";
+  const reverse = range.orient === "-";
+  return [...new Set(cuts)].filter((cut) => Number.isSafeInteger(cut) && cut >= start - 1 && cut <= end && cut > 0)
+    .sort((a, b) => a - b).map((source) => {
+      const fraction = (source - start + 1) / (end - start + 1);
+      const x = rect.x + (reverse ? 1 - fraction : fraction) * rect.width;
       return `<path class="track-manual-split" data-manual-split-after="${source}" d="M ${x - 2} ${y - 3} l 4 5 l -4 5 l 4 ${height - 4}" fill="none" stroke="#a45528" stroke-width="1.5" pointer-events="none"><title>${escapeHtml(`Split after source base ${source}; no inserted bases`)}</title></path>`;
     }).join("");
+}
+
+export function renderManualSplitMarkers(ctg, rect, y, height, escapeHtml) {
+  return renderSourceSplitMarkers(resolveManualSplitSourceCuts(ctg), {
+    ...ctg?.sourceFragment, orient: ctg?.orient ?? ctg?.refOrient,
+  }, rect, y, height, escapeHtml);
 }

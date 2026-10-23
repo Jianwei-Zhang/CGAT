@@ -1,7 +1,7 @@
 import { setSubviewDragGroupOffsets, moveSubviewCompositionDrag } from "./source-fragment-drag.js";
 import { resolveFullRangeVisibleSpan } from "./view-navigation-state.js";
 import { renderViewTickControl } from "./view-navigation-ui.js";
-import { renderSourceGapConnections, sourceFragmentDragAttrs } from "./source-fragment-layout.js";
+import { renderSourceGapConnections, sourceFragmentDragAttrs, renderManualSplitMarkers } from "./source-fragment-layout.js";
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
@@ -1941,6 +1941,8 @@ function renderSubviewAlignmentCard(
                 isMirror: String(topCtg?.subviewSource || "") === "mirror",
                 flipped: isSubviewPairwiseRangeMirrored(topCtg), escapeAttr, escapeHtml,
               })}
+              ${renderManualSplitMarkers(topCtg, { x: svgModel.topBarX, width: svgModel.topBarWidth },
+                svgModel.topBarY, svgModel.barHeight, escapeHtml)}
               ${topFragments.length
                 ? buildSubviewFragmentRects({
                     fragments: topFragments,
@@ -2003,6 +2005,8 @@ function renderSubviewAlignmentCard(
                 isMirror: String(bottomCtg?.subviewSource || "") === "mirror",
                 flipped: isSubviewPairwiseRangeMirrored(bottomCtg), escapeAttr, escapeHtml,
               })}
+              ${renderManualSplitMarkers(bottomCtg, { x: svgModel.bottomBarX, width: svgModel.bottomBarWidth },
+                svgModel.bottomBarY, svgModel.barHeight, escapeHtml)}
               ${bottomFragments.length
                 ? buildSubviewFragmentRects({
                     fragments: bottomFragments,
@@ -3110,6 +3114,7 @@ function renderSubviewTrackPairAlignmentCard(
                 ctg, rect, y, barHeight: TRACK_BAR_HEIGHT, isMirror: layout.isMirror,
                 flipped: isSubviewPairwiseRangeMirrored(ctg), escapeAttr, escapeHtml,
               })}
+              ${renderManualSplitMarkers(ctg, rect, y, TRACK_BAR_HEIGHT, escapeHtml)}
               ${fragments.length
                 ? buildSubviewFragmentRects({
                     fragments,

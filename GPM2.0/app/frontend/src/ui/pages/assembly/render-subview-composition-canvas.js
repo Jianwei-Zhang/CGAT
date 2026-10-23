@@ -1,6 +1,6 @@
 import { localGrtProjection, projectLocalGrtEvidence } from "./subview-fragment-grt.js";
-import { memberAnchorEndpointKey, memberBackingIds, projectLocalAlignment, filterLocalAnchorCuts, memberCoordinateToSource, projectLocalNRegions } from "./subview-fragment-model.js";
-import { sourceFragmentDragAttrs } from "./source-fragment-layout.js";
+import { memberAnchorEndpointKey, memberBackingIds, memberSourceInterval, projectLocalAlignment, filterLocalAnchorCuts, memberCoordinateToSource, projectLocalNRegions } from "./subview-fragment-model.js";
+import { sourceFragmentDragAttrs, resolveManualSplitSourceCuts, renderSourceSplitMarkers } from "./source-fragment-layout.js";
 import { resolveFullRangeVisibleSpan } from "./view-navigation-state.js";
 import { renderNRegionMarkersForTrackCtg } from "./n-region-markers.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
@@ -376,6 +376,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
   escapeAttr,
   resolveTrackToneClass,
   grtOverlay = "",
+  splitSourceCuts = [],
   selected = false,
   minVisibleX,
   maxVisibleX,
@@ -431,6 +432,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
       flipped: member.localFragment ? member.flipped : Boolean(member.flipped) !== Boolean(candidate?.ctg?.subviewPhasedOrientFlipped),
       escapeAttr, escapeHtml,
     })}
+    ${renderSourceSplitMarkers(splitSourceCuts, { ...memberSourceInterval(member), orient }, member, y, BAR_HEIGHT, escapeHtml)}
     ${renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr })}
     ${labelMarkup}
   </g>`;
@@ -553,6 +555,14 @@ export function renderSubviewCompositionAlignmentCard({
       totalLength: member.lengthBp, lengthBp: member.lengthBp, nRegions: projectLocalNRegions(member, candidates, (item) => isSubviewCompositionSourceCompatible(item, member)),
     } } : candidate;
   };
+  const splitCuts = (member) => {
+    const ids = new Set(memberBackingIds(member));
+    const sources = candidates.filter((item) => ids.has(item.assemblyCtgId) && isSubviewCompositionSourceCompatible(item, member));
+    const nativeCuts = member.localFragment?.nativeCuts ?? (member.sourceFragment && !member.localFragment
+      ? resolveManualSplitSourceCuts(member)
+      : sources.length ? sources.flatMap((item) => resolveManualSplitSourceCuts(item.ctg)) : resolveManualSplitSourceCuts(member));
+    return [...nativeCuts, ...(member.localFragment?.manualCuts || [])];
+  };
   const memberEntries = layout.members.map((member) => ({
     ctg: {
       assemblyCtgId: member.assemblyCtgId,
@@ -569,6 +579,7 @@ export function renderSubviewCompositionAlignmentCard({
       i18n,
       {
         escapeHtml, escapeAttr, resolveTrackToneClass,
+        splitSourceCuts: splitCuts(member),
         selected: (subview.trackPairSelectedCtgs || []).some((entry) => entry.compositionEntityKey
           ? entry.compositionEntityKey === member.entityKey
           : entry.contigId === member.assemblyCtgId && entry.trackRole === member.source.role),
