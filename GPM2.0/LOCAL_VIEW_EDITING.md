@@ -85,3 +85,11 @@ Stage 2 verification snapshot (2026-10-23, source checkpoint; overall goal still
 - Isolated native artifact: `D:\tools\gpm-preview-verification-target\debug\gpm_next_desktop.exe`; SHA-256 `00265F8679E3E1C4CC86A33A4F6327DF90A226D072025A3E5DD5F6FB8F9C5F29`. The interval-edit native source marker was also checked. This is a verification artifact, not a newly published installer.
 - Automated state/controller/render-contract checks and a native build **do not constitute native GUI interaction acceptance**. No user desktop process was terminated or replaced. Gesture tests use a lightweight event/DOM contract harness rather than a browser.
 - Published installers, release tags, official test-data assets and project workspaces are not modified by this delivery. Repository closure requires a scoped commit/push and successful Quality jobs for that exact final revision; old-checkpoint CI is not evidence for a newer revision.
+
+
+### Viewport regression follow-up (2026-10-23)
+
+- Replacing a local panel can leave a queued scroll-to-zero event on its detached scroll element. That event must not overwrite the current world viewport or persisted pixel position. Shared Main / Local / Final Path scroll binding now accepts only the live node's latest binding in the same workspace/project/view context; rebinding removes the prior listener.
+- Undoing the first interval edit can restore a legacy two-contig/track-pair presentation within source-owned composition history. This is not a new view: restore its saved world position using the rendered origin/scale, and keep that world position current while scrolling, so redo does not jump back.
+- `viewport-edit-preservation.test.mjs` uses real rendered anchor-fragment attributes with controlled scroll-event delivery. It checks deletion, flip, split, local merge, lane movement, undo/redo and delayed evidence-style rerenders across all three local modes. Main/Local/Final Path cases also reject detached and old-context events, retain one live listener, and allow genuine scrolling. These are automated regression checks, not native-window visual acceptance.
+- Follow-up validation: **1,740 Windows-host frontend tests passed** (19 new viewport regressions); production build and Windows Light quality gate passed. No backend, release assets or test-data changes are needed for this frontend-only fix.

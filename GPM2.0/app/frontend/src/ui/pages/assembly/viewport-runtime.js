@@ -13,7 +13,11 @@ import {
   resolveTrackScrollLeftForViewboxShift,
   resolveViewportAnchorBp,
 } from "./track-viewport.js";
-import { updateSubviewCompositionViewport } from "./subview-history-state.js";
+import {
+  buildSubviewCompositionHistoryKey,
+  SUBVIEW_COMPOSITION_HISTORY_SCHEMA_VERSION,
+  updateSubviewCompositionViewport,
+} from "./subview-history-state.js";
 
 const ASSEMBLY_TRACK_RESIZE_BOUND = Symbol("assemblyTrackResizeBound");
 
@@ -111,6 +115,26 @@ export function createAssemblyViewportController({
   persistProjectAssemblyViewStateFromStore,
   rerender,
 }) {
+  const scrollBindings = new WeakMap();
+
+  function bindCurrentViewportScroll(element, store, buildViewportKey, onScroll) {
+    const viewportKey = buildViewportKey(store.getState());
+    const workspacePath = store.getState().session?.workspacePath;
+    const previous = scrollBindings.get(element);
+    if (previous) element.removeEventListener?.("scroll", previous);
+    const listener = () => {
+      // Replacing a panel can queue a scroll-to-zero on its detached scroller.
+      // Never let that obsolete event overwrite the newly restored viewport,
+      // nor let an old binding write into another chromosome/project context.
+      if (element.isConnected === false || scrollBindings.get(element) !== listener
+        || buildViewportKey(store.getState()) !== viewportKey
+        || store.getState().session?.workspacePath !== workspacePath) return;
+      onScroll();
+    };
+    scrollBindings.set(element, listener);
+    element.addEventListener("scroll", listener);
+  }
+
   function getMeasuredTrackViewportPx(role = "primary") {
     const normalizedRole = normalizeTrackViewportRole(role);
     return session.measuredTrackViewportPxByRole[normalizedRole]
@@ -195,11 +219,18 @@ export function createAssemblyViewportController({
     return true;
   }
 
+  function usesSubviewWorldViewport(assembly) {
+    if (assembly?.subview?.summary?.mode === "composition") return true;
+    // Undo may restore the original pair presentation while retaining the same
+    // source-owned editing history. Its viewport must not become a new pair at 0.
+    const key = assembly?.subview?.historyKey;
+    return key === buildSubviewCompositionHistoryKey(assembly?.selectedChrName)
+      && assembly?.subviewHistoryByKey?.[key]?.version === SUBVIEW_COMPOSITION_HISTORY_SCHEMA_VERSION;
+  }
+
   function setSubviewCompositionViewportFromScroll(store, element, scrollLeft) {
     const state = store.getState();
-    if (String(state.assembly?.subview?.summary?.mode || "").trim() !== "composition") {
-      return false;
-    }
+    if (!usesSubviewWorldViewport(state.assembly)) return false;
     const savedViewport = state.assembly?.subviewCompositionViewport || {};
     const domainSpanBp = Number(element?.dataset?.subviewDomainSpanBp);
     const innerWidth = Number(element?.dataset?.subviewInnerWidth);
@@ -208,11 +239,13 @@ export function createAssemblyViewportController({
       ? domainSpanBp / innerWidth
       : null;
     const bpPerPx = state.assembly?.subviewTrackView?.fullRange === true
+      || state.assembly?.subview?.summary?.mode !== "composition"
       ? measuredBpPerPx
       : Number(savedViewport.bpPerPx) > 0 ? Number(savedViewport.bpPerPx) : measuredBpPerPx;
     if (!Number.isFinite(bpPerPx) || bpPerPx <= 0) return false;
     const viewboxMinX = Number(element?.dataset?.subviewViewboxMinX || 0);
-    const leftBp = (Math.max(0, Number(scrollLeft || 0))
+    const leftBp = Number(element?.dataset?.subviewWindowStartBp || 0)
+      + (Math.max(0, Number(scrollLeft || 0))
       + (Number.isFinite(viewboxMinX) ? viewboxMinX : 0)) * bpPerPx;
     if (Math.abs(Number(savedViewport.leftBp || 0) - leftBp) < 0.5
       && Math.abs(Number(savedViewport.bpPerPx || 0) - bpPerPx) < 0.000001) return false;
@@ -363,7 +396,7 @@ export function createAssemblyViewportController({
 
       let syncing = false;
       syncedTrackScrollEls.forEach((element) => {
-        element.addEventListener("scroll", () => {
+        bindCurrentViewportScroll(element, store, buildMainTrackViewportKey, () => {
           if (syncing) {
             return;
           }
@@ -392,15 +425,20 @@ export function createAssemblyViewportController({
       const primarySubviewScroll = subviewTrackScrollEls[0] || null;
       const nextSubviewViewportKey = buildSubviewTrackViewportKey(state);
       const isComposition = String(state.assembly?.subview?.summary?.mode || "").trim() === "composition";
-      if (isComposition) {
-        // Composition owns its world viewport. Old pixel offsets and the pair
-        // anchor path cannot restore a changed scale or a negative world center.
+      if (usesSubviewWorldViewport(state.assembly)) {
+        // Source-owned history, including its legacy baseline, owns the world
+        // viewport. Old pixel offsets and the pair anchor path cannot restore
+        // a changed scale or a negative world center.
         session.lastSubviewViewportKey = nextSubviewViewportKey;
         const viewport = state.assembly?.subviewCompositionViewport || {};
-        const bpPerPx = Number(viewport.bpPerPx);
+        const measuredScale = Number(primarySubviewScroll?.dataset?.subviewDomainSpanBp)
+          / Number(primarySubviewScroll?.dataset?.subviewInnerWidth);
+        const bpPerPx = !isComposition && Number.isFinite(measuredScale) && measuredScale > 0
+          ? measuredScale : Number(viewport.bpPerPx);
+        const windowStartBp = Number(primarySubviewScroll?.dataset?.subviewWindowStartBp || 0);
         const viewboxMinX = Number(primarySubviewScroll?.dataset?.subviewViewboxMinX || 0);
         session.lastSubviewScrollLeft = Number.isFinite(bpPerPx) && bpPerPx > 0
-          ? Math.max(0, Number(viewport.leftBp || 0) / bpPerPx
+          ? Math.max(0, (Number(viewport.leftBp || 0) - windowStartBp) / bpPerPx
             - (Number.isFinite(viewboxMinX) ? viewboxMinX : 0))
           : 0;
         session.pendingSubviewViewportAnchorBp = null;
@@ -444,7 +482,7 @@ export function createAssemblyViewportController({
         // must not overwrite the precise world interval (and accumulate drift
         // on repeated resize); actual subsequent movement still owns scrolling.
         let observedScrollLeft = element.scrollLeft;
-        element.addEventListener("scroll", () => {
+        bindCurrentViewportScroll(element, store, buildSubviewTrackViewportKey, () => {
           if (subviewSyncing || element.scrollLeft === observedScrollLeft) {
             return;
           }
@@ -488,7 +526,7 @@ export function createAssemblyViewportController({
         finalPathScrollEl.scrollLeft = session.lastFinalPathScrollLeft;
         let finalPathSyncing = false;
         if (typeof finalPathScrollEl.addEventListener === "function") {
-          finalPathScrollEl.addEventListener("scroll", () => {
+          bindCurrentViewportScroll(finalPathScrollEl, store, buildFinalPathTrackViewportKey, () => {
             if (finalPathSyncing) {
               return;
             }
