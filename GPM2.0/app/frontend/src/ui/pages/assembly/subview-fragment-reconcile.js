@@ -19,11 +19,11 @@ function sourceOf(ctg) {
 // Rebind source-owned Local View objects after real Main View split/flip/delete
 // and history reload. Never pick an independent co-assigned/cross-chr copy just
 // because it has the same source sequence. Missing source intervals are removed
-// from ordinary local snapshots. Explicit local undo-split may keep read-only
-// tombstone-backed intervals, but never restores a native Main entity.
-export function reconcileLocalCompositionWithMain(composition, mainCtgs, deletedCtgs = []) {
-  const deletedSources = (Array.isArray(deletedCtgs) ? deletedCtgs : []).filter((ctg) => ctg.sourceGroupKey && ctg.sourceRange).map((ctg) => ({
-    ...ctg, sourceFragment: { ...ctg.sourceRange, groupKey: ctg.sourceGroupKey },
+// from ordinary local snapshots. Explicit local history recovery (and legacy
+// undo-split objects) may retain archived backing, never a native Main entity.
+export function reconcileLocalCompositionWithMain(composition, mainCtgs, deletedCtgs = [], { recoverDeletedCtgIds = [] } = {}) {
+  const deletedSources = (Array.isArray(deletedCtgs) ? deletedCtgs : []).filter((ctg) => ctg.sourceRange).map((ctg) => ({
+    ...ctg, sourceFragment: { ...ctg.sourceRange, groupKey: ctg.sourceGroupKey || `assembly:${ctg.assemblyCtgId}` },
   }));
   let current = normalizeSubviewComposition(composition);
   const sources = (mainCtgs || []).map(sourceOf).filter((source) => Number.isSafeInteger(source.sourceEnd)
@@ -37,12 +37,16 @@ export function reconcileLocalCompositionWithMain(composition, mainCtgs, deleted
     // predecessor ID. Preserve the known ancestry rather than dropping them.
     const groups = new Set([canonicalGroup(range.groupKey),
       ...[...originalIds, ...(range.lineageCtgIds || [])].map((id) => `assembly:${id}`)]);
-    const available = range.restoredLocally ? [...sources, ...deletedSources.map(sourceOf)] : sources;
+    // Only the native tombstones created by this synchronized deletion may
+    // back a local undo snapshot. Do not revive other or future Main deletions.
+    const archiveIds = new Set([...(range.archivedCtgIds || []), ...recoverDeletedCtgIds]);
+    const available = [...sources, ...deletedSources.filter((ctg) => range.restoredLocally
+      || archiveIds.has(Number(ctg.assemblyCtgId))).map(sourceOf)];
     const candidates = available.filter((source) => (!range.sourceSeqId || !source.sourceSeqId || range.sourceSeqId === source.sourceSeqId)
       && (originalIds.has(source.assemblyCtgId) || groups.has(canonicalGroup(source.groupKey)))
       && source.sourceStart <= range.sourceEnd && source.sourceEnd >= range.sourceStart)
       .sort((a, b) => a.sourceStart - b.sourceStart || a.assemblyCtgId - b.assemblyCtgId);
-    if (!member.localFragment && candidates.length === 1) {
+    if (!member.localFragment && candidates.length === 1 && !candidates[0].deleted) {
       const live = candidates[0], old = range.parts[0];
       if (live.assemblyCtgId === old.assemblyCtgId && live.sourceStart === old.sourceStart
         && live.sourceEnd === old.sourceEnd && live.orient === old.orient) continue;
@@ -58,7 +62,11 @@ export function reconcileLocalCompositionWithMain(composition, mainCtgs, deleted
       if (!sliced) return [];
       const parts = candidates.filter((candidate) => candidate.sourceStart <= end && candidate.sourceEnd >= start)
         .map(({ assemblyCtgId, sourceStart, sourceEnd, orient }) => ({ assemblyCtgId, sourceStart, sourceEnd, orient }));
+      const archivedCtgIds = [...new Set([...(range.archivedCtgIds || []), ...candidates
+        .filter((candidate) => candidate.deleted && parts.some((part) => part.assemblyCtgId === candidate.assemblyCtgId))
+        .map((candidate) => candidate.assemblyCtgId)])];
       const localFragment = normalizeLocalFragment({ ...sliced.localFragment, parts,
+        ...(archivedCtgIds.length ? { archivedCtgIds } : {}),
         nativeCuts: [...candidates.flatMap((candidate) => candidate.nativeCuts),
           ...(range.nativeCuts || []).filter((cut) => candidates.some((candidate) => candidate.deleted
             && cut >= candidate.sourceStart - 1 && cut <= candidate.sourceEnd))],

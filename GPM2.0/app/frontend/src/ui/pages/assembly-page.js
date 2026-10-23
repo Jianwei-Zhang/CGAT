@@ -1151,8 +1151,6 @@ const contextMenuRuntimeDeps = {
   synchronizeLocalFragment,
   resolveLocalFragmentMenu,
   flipLocalFragment: subviewFragmentController.flipLocalFragment,
-  openLocalContigSplit: subviewFragmentController.openLocalContigSplit,
-  mergeLocalFragment: subviewFragmentController.mergeLocalFragment,
   splitContigAtRefBoundary: splitAssemblyContigAtRefBoundary,
   undoContigSplit: undoAssemblyContigSplit,
   openManualContigSplit: openAssemblyManualContigSplit,

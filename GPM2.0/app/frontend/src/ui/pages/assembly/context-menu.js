@@ -688,22 +688,8 @@ export function buildAssemblyContextMenuItems({
       if (!model) return;
       const labels = localFragmentCopy[state.locale === "en" ? "en" : "zh"];
       const isFragment = Boolean(model.member.localFragment);
-      items.push({ label: isFragment ? labels.splitFragment : labels.split,
-        disabled: !model.canSplit, title: model.canSplit ? "" : labels.splitUnavailable,
-        children: [
-          { label: labels.localSplit, run: () => contextMenuActions.openLocalContigSplit(host, store, memberContext) },
-          { label: labels.mainSplit, disabled: !model.canSync || !contextMenuActions.synchronizeLocalFragment,
-            title: !model.canSync ? labels.syncUnavailable : !contextMenuActions.synchronizeLocalFragment ? labels.syncPending : "",
-            run: () => contextMenuActions.openLocalContigSplit(host, store, memberContext, { synchronize: true }) },
-        ],
-      });
-      items.push({ label: labels.merge, disabled: !model.left && !model.right,
-        title: !model.left && !model.right ? labels.mergeUnavailable : "", children: [
-        { label: labels.mergeLeft, disabled: !model.left, title: model.left ? "" : labels.mergeUnavailable,
-          run: () => contextMenuActions.mergeLocalFragment(host, store, memberContext, "left") },
-        { label: labels.mergeRight, disabled: !model.right, title: model.right ? "" : labels.mergeUnavailable,
-          run: () => contextMenuActions.mergeLocalFragment(host, store, memberContext, "right") },
-      ] });
+      // Explicit split/unsplit belongs to Main View. Local recovery uses
+      // its own undo/redo history; keep existing fragment data readable.
       items.push({ label: isFragment ? labels.deleteFragment : labels.delete, children: [
         { label: labels.localDelete, run: () => removeContextSubviewMember(host, store, memberContext) },
         { label: labels.mainDelete, disabled: !model.canSync || !contextMenuActions.synchronizeLocalFragment,

@@ -1,3 +1,4 @@
+import { loadAssemblyView } from "../assembly-data-runtime.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createIdentityRenderState } from "./identity-render-fixture.mjs";
@@ -6,7 +7,7 @@ import { createSubviewFragmentSyncRuntime, buildLocalFragmentSyncRequest } from 
 import { prepareSourceOwnedSubviewHistory } from "../subview-fragment-history.js";
 import { projectRenderedSubviewToComposition } from "../subview-composition-controller.js";
 import { reconcileLocalSubviewWithMain } from "../subview-fragment-reconcile.js";
-import { activateSubviewCompositionHistory, commitSubviewHistoryOperation, rollbackSubviewHistory, restoreSubviewHistoryRollback, resolveCurrentSubviewHistory } from "../subview-history-state.js";
+import { buildSubviewCompositionHistoryKey, activateSubviewCompositionHistory, commitSubviewHistoryOperation, rollbackSubviewHistory, restoreSubviewHistoryRollback, resolveCurrentSubviewHistory } from "../subview-history-state.js";
 import { memberSourceInterval } from "../subview-fragment-model.js";
 
 function createStore(initial) { let state = initial; return { getState: () => state, setState: (patch) => { state = { ...state, ...patch }; } }; }
@@ -37,9 +38,10 @@ function runtime(store, overrides = {}) {
       children = boundaries.slice(0, -1).flatMap((start, index) => {
         const end = boundaries[index + 1] - 1;
         if (args.action === "delete" && start >= args.sourceStart && end <= args.sourceEnd) {
-          deleted.push({ assemblyCtgId: 701 + index, deletedCtgRecordId: 91 + index,
+          const whole = start === 1 && end === parent.totalLength;
+          deleted.push({ assemblyCtgId: whole ? parent.assemblyCtgId : 701 + index, deletedCtgRecordId: 91 + index,
             totalLength: end - start + 1, refOrient: parent.orient,
-            sourceGroupKey: "manual-fragment:2", sourceRange: { sourceSeqId: 700, sourceStart: start, sourceEnd: end } });
+            sourceGroupKey: whole ? "" : "manual-fragment:2", sourceRange: { sourceSeqId: 700, sourceStart: start, sourceEnd: end } });
           return [];
         }
         return [{ ...parent, assemblyCtgId: 701 + index, totalLength: end - start + 1, lengthBp: end - start + 1,
@@ -49,7 +51,26 @@ function runtime(store, overrides = {}) {
     },
     loadAssemblyView: async () => {
       const latest = store.getState();
-      store.setState({ assembly: reconcileLocalSubviewWithMain({ ...latest.assembly, chrCtgs: children, deletedCtgs: deleted, error: "", loading: false }) });
+      // Use the production loader, including reading the OLD flushed history
+      // and activating it. A reconcile-only mock misses this regression.
+      const saved = persisted.at(-1);
+      await loadAssemblyView(host, store, { keepCurrentChr: true, keepCurrentCtg: false, renderLoading: false }, {
+        getProjectAssemblyViewState: async () => ({ ...saved, supportDatasetId: 22 }),
+        getCurrentProject: () => ({ primaryDatasetId: 11 }), getSupportDatasetOptions: () => [{ datasetId: 22 }],
+        listProjectChromosomes: async () => ({ items: [{ chrName: "Chr01" }] }),
+        listChrViewCtgs: async () => ({ items: children }), loadDatasetChrCtgs: async () => latest.assembly.supportChrCtgs,
+        loadDeletedCtgsForChr: async () => deleted, loadSideDataForCtg: async () => ({ detail: { members: [] }, candidates: {} }),
+        getMainViewHistoryStatus: async () => latest.assembly.mainViewHistory,
+        buildClearedSubviewState: () => ({ summary: null }), buildSubviewTrackPairHiddenCtgKey: () => "",
+        buildSubviewTrackPairPoolsFromAssembly: () => ({}),
+        filterPrimaryTrackSelectionCtgIds: (v) => v || [], filterSubviewTrackDragOffsetsBySummary: (v) => v || [],
+        filterSubviewTrackPairHiddenCtgs: (v) => v || [], filterSubviewTrackPairSelectionCtgs: (v) => v || [],
+        normalizeDeletedCtgRecordIds: (v) => v || [], normalizeSupportDatasetId: (id) => id == null ? null : Number(id),
+        normalizeSupportMirroredCtgs: (v) => v || [], normalizeTrackSelectionCtgIds: (v) => v || [],
+        buildSubviewCompositionHistoryKey, activateSubviewCompositionHistory,
+        mapAssemblyError: ({ error }) => ({ userMessage: error.message }), rerender() {},
+      });
+      assert.equal(store.getState().assembly.error, "");
       calls.push(["reload"]);
     },
     persistNow: async () => { assert.equal(inside, true); calls.push(["persist"]); persisted.push(JSON.parse(JSON.stringify(store.getState().assembly))); },
@@ -246,6 +267,102 @@ test("synchronized deletion preserves previous local actions and recovery metada
   store.setState({ assembly: rollback.assembly });
   assert.equal(store.getState().assembly.subview.summary.members.find((m) => m.entityKey === support.entityKey).flipped, true, "undo delete leaves the earlier local flip intact");
   assert.equal(JSON.stringify(store.getState().assembly.chrCtgs), beforeMain);
-  const left = store.getState().assembly.subview.summary.members.find((m) => m.source.role === "primary");
-  assert.equal(resolveLocalFragmentMenu(store.getState(), host, { entityKey: left.entityKey }).right, true);
+  const recovered = store.getState().assembly.subview.summary.members.find((m) => m.source.role === "primary");
+  assert.equal(recovered.lengthBp, 16000, "local history restores deleted bases without restoring Main entities");
+  assert.ok(recovered.localFragment.archivedCtgIds.length > 0);
+  assert.equal(resolveLocalFragmentMenu(store.getState(), host, { entityKey: recovered.entityKey }).canSync, false);
+  const earlier = rollbackSubviewHistory(store.getState().assembly);
+  assert.equal(earlier.changed, true);
+  assert.equal(earlier.assembly.subview.summary.members.find((m) => m.entityKey === support.entityKey).flipped, false);
+});
+
+for (const mode of ["2-contig", "track-pair", "composition"]) for (const full of [false, true]) {
+  test(`${mode}: synchronized ${full ? "whole ctg" : "anchor interval"} deletion survives persisted reload with independently undoable source coverage`, async () => {
+    const { collectSubviewAnchorScene } = await import("../subview-anchor-objects.js");
+    const state = stateFor(mode), store = createStore(state);
+    const scene = { querySelectorAll() { return [...renderAssemblyPage(store.getState()).matchAll(/<[^>]*data-subview-anchor-kind=[^>]*>/g)]
+      .map(([tag]) => { const attrs = Object.fromEntries([...tag.matchAll(/([\w-]+)="([^"]*)"/g)].map((m) => [m[1], m[2].replaceAll("&amp;", "&").replaceAll("&quot;", '"')]));
+        return { getAttribute: (key) => attrs[key] ?? null }; }); } };
+    const edges = collectSubviewAnchorScene(scene).filter((edge) => edge.kind === "evidence" && [500,1800].includes(edge.descriptor.top.cutBp));
+    assert.equal(edges.length, 2);
+    state.assembly.subview.activeAnchors = edges.map((edge) => ({ hitKey: edge.node.getAttribute("data-subview-anchor-hit-key"),
+      edge: edge.node.getAttribute("data-subview-anchor-edge"), descriptor: edge.descriptor }));
+    const original = project(store.getState());
+    const api = runtime(store);
+    assert.equal(await api.run(contextFor(mode, full ? 1 : 500, full ? 16000 : 1799), { action: "delete" }), true);
+    const after = store.getState().assembly, main = JSON.stringify([after.chrCtgs, after.deletedCtgs, after.mainViewHistory]);
+    assert.equal(resolveCurrentSubviewHistory(after).record.past.length, 1);
+    const saved = JSON.parse(JSON.stringify(api.persisted.at(-1)));
+    // Native history status is loaded afresh; inFlight is not a persisted field.
+    saved.mainViewHistory = after.mainViewHistory;
+    assert.equal(resolveCurrentSubviewHistory(saved).record.past.length, 1, "the final persisted history includes the local entry");
+    const reopened = reconcileLocalSubviewWithMain(activateSubviewCompositionHistory(saved).assembly);
+    assert.equal(reopened.subview.summary.members.filter((m) => m.source.role === "primary").reduce((n,m) => n+m.lengthBp,0), full ? 0 : 14700);
+    const undo = rollbackSubviewHistory(reopened);
+    assert.equal(undo.changed, true);
+    const recovered = reconcileLocalSubviewWithMain(undo.assembly);
+    assert.equal(JSON.stringify([recovered.chrCtgs,recovered.deletedCtgs,recovered.mainViewHistory]), main);
+    const member = recovered.subview.summary.members.find((m) => m.source.role === "primary");
+    assert.equal(member.lengthBp, 16000);
+    assert.deepEqual([member.localFragment.sourceStart, member.localFragment.sourceEnd], [1,16000]);
+    assert.ok(member.localFragment.archivedCtgIds.length);
+    store.setState({ assembly: recovered });
+    const active = collectSubviewAnchorScene(scene).filter((edge) => edge.node.getAttribute("data-subview-anchor-active") === "1");
+    assert.equal(active.length, 2);
+    assert.deepEqual(active.map((edge) => edge.descriptor.bottom.cutBp).sort((a,b)=>a-b),
+      original.activeAnchors.map((a)=>a.descriptor.bottom.cutBp).sort((a,b)=>a-b));
+    const tags = [...renderAssemblyPage(store.getState()).matchAll(/<rect[^>]*class="subview-fragment-hit-zone"[^>]*>/g)].map(([tag]) => tag);
+    assert.ok(tags.some((tag) => tag.includes('data-subview-fragment-start="500"') && tag.includes('data-subview-fragment-end="1799"')),
+      "undo restores anchor hit ranges rather than only red lines");
+    const redo = restoreSubviewHistoryRollback(recovered);
+    assert.equal(redo.changed, true);
+    assert.equal(redo.assembly.subview.summary.members.filter((m) => m.source.role === "primary").reduce((n,m) => n+m.lengthBp,0), full ? 0 : 14700);
+    assert.equal(JSON.stringify([redo.assembly.chrCtgs,redo.assembly.deletedCtgs,redo.assembly.mainViewHistory]), main);
+    // A distinct future Main deletion must not be implicitly restored just
+    // because this object's snapshot can recover the earlier archived ID.
+    if (!full) {
+      const victim = recovered.chrCtgs.at(-1);
+      const future = reconcileLocalSubviewWithMain({ ...recovered,
+        chrCtgs: recovered.chrCtgs.filter((ctg) => ctg !== victim),
+        deletedCtgs: [...recovered.deletedCtgs, { ...victim, deletedCtgRecordId: 999,
+          sourceGroupKey: victim.sourceFragment.groupKey, sourceRange: victim.sourceFragment }],
+      });
+      assert.equal(future.subview.summary.members.find((m) => m.source.role === "primary").lengthBp, 1799);
+    }
+  });
+}
+
+for (const localFirst of [false, true]) test(`Main deletion undo/redo and local undo remain independent, local-first=${localFirst}`, async () => {
+  const { runMainViewHistoryControlAction } = await import("../main-view-history-runtime.js");
+  const state = stateFor("composition"), parents = state.assembly.chrCtgs;
+  const store = createStore(state), api = runtime(store);
+  assert.equal(await api.run(contextFor("composition"), { action: "delete" }), true);
+  const deletedMain = store.getState().assembly.chrCtgs, archives = store.getState().assembly.deletedCtgs;
+  if (localFirst) store.setState({ assembly: rollbackSubviewHistory(store.getState().assembly).assembly });
+  const localHistory = () => { const r = resolveCurrentSubviewHistory(store.getState().assembly).record;
+    return [r.past.length, r.forward.length]; };
+  const expectedHistory = localHistory();
+  const localRanges = () => store.getState().assembly.subview.summary.members.filter((m) => m.source.role === "primary")
+    .map((m) => [memberSourceInterval(m).sourceStart, memberSourceInterval(m).sourceEnd]);
+  const ranges = localRanges();
+  for (const action of ["undo", "redo"]) {
+    const current = store.getState().assembly;
+    store.setState({ assembly: { ...current, mainViewHistory: { chrName: "Chr01", canUndo: true, canRedo: true,
+      undoOperation: { kind: "delete-local-fragment", targetCount: 1 }, redoOperation: { kind: "delete-local-fragment", targetCount: 1 } } } });
+    assert.equal(await runMainViewHistoryControlAction(host, store, action, {
+      executeMainViewHistoryAction: async () => ({ changed: true, affectedCtgIds: [2,701,702,703],
+        operation: { kind: "delete-local-fragment", targetCount: 1 }, status: { chrName: "Chr01" } }),
+      loadAssemblyView: async () => { const assembly = store.getState().assembly;
+        store.setState({ assembly: reconcileLocalSubviewWithMain({ ...assembly,
+          chrCtgs: action === "undo" ? parents : deletedMain, deletedCtgs: action === "undo" ? [] : archives }) }); },
+      mapAssemblyError: ({ error }) => ({ userMessage: error.message }), rerender() {}, refreshSubviewPairwiseEvidence() {},
+    }), true);
+    assert.deepEqual(localHistory(), expectedHistory);
+    assert.deepEqual(localRanges(), ranges);
+  }
+  if (!localFirst) {
+    store.setState({ assembly: rollbackSubviewHistory(store.getState().assembly).assembly });
+    assert.deepEqual(localRanges(), [[1,16000]]);
+  }
+  assert.deepEqual(store.getState().assembly.chrCtgs, deletedMain);
 });

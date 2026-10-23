@@ -31,8 +31,8 @@ function confirmation(state, request, impact) {
   const counts = [impact?.finalPathReferenceCount, impact?.degapReferenceCount, impact?.phasedItemCount, impact?.exportRecordCount]
     .map((value) => Math.max(0, Number(value) || 0));
   return en
-    ? `${action === "delete" ? "Delete" : "Split"} source interval ${sourceStart.toLocaleString()}–${sourceEnd.toLocaleString()} and synchronize ${targets.length} real Main View entity/entities?\nFinal Path references: ${counts[0]}; GRT/DeGap references: ${counts[1]}; phased items: ${counts[2]}; export records: ${counts[3]}.\nAlready-adopted DNA remains an immutable source interval in Final Path; it is not silently deleted. Main View records one undo step. Local fragment merging remains local only.`
-    : `确认${action === "delete" ? "删除" : "分割"}源区间 ${sourceStart.toLocaleString()}–${sourceEnd.toLocaleString()}，并同步修改 ${targets.length} 个主视图真实实体吗？\nFinal Path 引用：${counts[0]}；GRT/DeGap 引用：${counts[1]}；单倍型条目：${counts[2]}；导出记录：${counts[3]}。\n已加入 Final Path 的 DNA 保留为不可变源区间，不会被静默删除。主视图记录一次撤销；合并局部片段仍只影响局部视图。`;
+    ? `${action === "delete" ? "Delete" : "Split"} source interval ${sourceStart.toLocaleString()}–${sourceEnd.toLocaleString()} and synchronize ${targets.length} real Main View entity/entities?\nFinal Path references: ${counts[0]}; GRT/DeGap references: ${counts[1]}; phased items: ${counts[2]}; export records: ${counts[3]}.\nAlready-adopted DNA remains an immutable source interval in Final Path; it is not silently deleted. Main and Local Views each record one undo step. Local undo restores only the local presentation.`
+    : `确认${action === "delete" ? "删除" : "分割"}源区间 ${sourceStart.toLocaleString()}–${sourceEnd.toLocaleString()}，并同步修改 ${targets.length} 个主视图真实实体吗？\nFinal Path 引用：${counts[0]}；GRT/DeGap 引用：${counts[1]}；单倍型条目：${counts[2]}；导出记录：${counts[3]}。\n已加入 Final Path 的 DNA 保留为不可变源区间，不会被静默删除。主视图与局部视图各记录一次回溯；局部撤销只恢复局部展示。`;
 }
 
 export function createSubviewFragmentSyncRuntime(deps) {
@@ -92,28 +92,30 @@ export function createSubviewFragmentSyncRuntime(deps) {
           const latest = store.getState();
           if (latest.assembly.error) throw new Error(latest.assembly.error);
           const composition = reconcileLocalCompositionWithMain(desired.composition, latest.assembly.chrCtgs, latest.assembly.deletedCtgs);
-          const nextSubview = applySubviewComposition(latest.assembly.subview, composition, { trackPairSelectedCtgs: [] });
-          // The Local View entry was committed before the native mutation. Rebind
-          // its current snapshot to the refreshed source IDs without pushing a
-          // duplicate local history step.
-          const historyKey = nextSubview.historyKey;
-          const record = latest.assembly.subviewHistoryByKey?.[historyKey];
-          const mainArchive = operation.action === "delete" ? (composition.deletedFragments || []).filter(
-            (entry) => entry.member.entityKey === request.member.entityKey) : [];
-          const rebase = (snapshot) => {
-            if (snapshot?.kind !== "composition" || !mainArchive.length) return snapshot;
-            const entries = [...(snapshot.composition.deletedFragments || []), ...mainArchive];
-            return { ...snapshot, composition: { ...snapshot.composition,
-              deletedFragments: [...new Map(entries.map((entry) => [entry.member.entityKey, entry])).values()] } };
-          };
+          const historyKey = installed.subview.historyKey;
+          const record = installed.subviewHistoryByKey?.[historyKey];
+          if (!record) throw new Error("Local View history snapshot is missing");
+          const oldDeletedIds = new Set((before.assembly.deletedCtgs || []).map((ctg) => Number(ctg.assemblyCtgId)));
+          const recoverDeletedCtgIds = operation.action === "delete" ? (latest.assembly.deletedCtgs || [])
+            .map((ctg) => Number(ctg.assemblyCtgId)).filter((id) => !oldDeletedIds.has(id)) : [];
+          const rebind = (snapshot) => snapshot?.kind === "composition" ? { ...snapshot,
+            composition: reconcileLocalCompositionWithMain(snapshot.composition, latest.assembly.chrCtgs,
+              latest.assembly.deletedCtgs, { recoverDeletedCtgIds }),
+          } : snapshot;
+          // loadAssemblyView reads the pre-mutation persisted history. Never use
+          // that older record as the source for this newly committed local edit.
+          // Rebind the captured transaction history after native IDs are known.
+          const nextSubview = applySubviewComposition(latest.assembly.subview, composition,
+            { historyKey, trackPairSelectedCtgs: [] });
           const local = { assembly: { ...latest.assembly, subview: nextSubview,
-            ...(record ? { subviewHistoryByKey: { ...latest.assembly.subviewHistoryByKey,
-              [historyKey]: { ...record, current: { kind: "composition", composition },
-                ...(operation.action === "delete" ? { default: rebase(record.default),
-                  past: record.past.map((entry) => ({ ...entry, snapshot: rebase(entry.snapshot) })),
-                  forward: record.forward.map((entry) => ({ ...entry, snapshot: rebase(entry.snapshot) })),
-                } : {}),
-              } } } : {}),
+            subviewCompositionViewport: installed.subviewCompositionViewport,
+            subviewTrackView: installed.subviewTrackView,
+            subviewHistoryByKey: { ...latest.assembly.subviewHistoryByKey,
+              [historyKey]: { ...record, current: { kind: "composition", composition }, default: rebind(record.default),
+                past: record.past.map((entry) => ({ ...entry, snapshot: rebind(entry.snapshot) })),
+                forward: record.forward.map((entry) => ({ ...entry, snapshot: rebind(entry.snapshot) })),
+              },
+            },
           } };
           store.setState({ assembly: { ...local.assembly, subview: { ...local.assembly.subview, trackPairSelectedCtgs: [] },
             trackSelectedCtgIds: [], actionError: "", actionStatus: labels.syncDone } });

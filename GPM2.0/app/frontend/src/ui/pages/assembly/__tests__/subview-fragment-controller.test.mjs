@@ -82,7 +82,7 @@ test("split dialog cancel or stale view does not change state or persist a parti
   assert.equal(stale.persisted.length, 0);
 });
 
-test("local menu has ordered scoped split/delete and local-only merge, with no redundant remove or anchor actions", () => {
+test("local menu retains scoped deletion but exposes no split or undo-split actions", () => {
   const state = createIdentityRenderState("composition"), store = createStore(state);
   const context = { assemblyCtgId: 30, trackRole: "support", slot: "top", start: 1001, end: 3000,
     compositionEntityKey: "assembly:30", fragmentKey: "30:1001-3000" };
@@ -91,15 +91,11 @@ test("local menu has ordered scoped split/delete and local-only merge, with no r
     subviewTrackPairContext: { ...context },
     subviewHitContext: { hitKey: "evidence-1" },
   });
-  assert.deepEqual(items.map((item) => item.label), ["加入 Final Path", "移至另一轨", "翻转 contig", "分割当前片段", "撤销分割", "删除当前片段"]);
-  assert.deepEqual(items[3].children.map((item) => item.label), ["仅在当前局部视图分割…", "分割并同步主视图…"]);
-  assert.deepEqual(items[4].children.map((item) => item.label), ["撤销左侧分割", "撤销右侧分割"]);
+  assert.deepEqual(items.map((item) => item.label), ["加入 Final Path", "移至另一轨", "翻转 contig", "删除当前片段"]);
+  assert.deepEqual(items[3].children.map((item) => item.label), ["仅从当前局部视图删除", "同步从主视图删除…"]);
   assert.equal(items[3].children[1].disabled, true);
-  assert.equal(items[5].children[1].disabled, true);
-  const model = resolveLocalFragmentMenu(state, host, context);
-  assert.equal(model.left, false); assert.equal(model.right, false);
-  assert.equal(items[4].disabled, true, "the parent Undo Split menu must also be disabled without a real cut");
-  assert.ok(items[4].children.every((item) => item.disabled));
+  assert.ok(!items.some((item) => /分割/.test(item.label)));
+
 });
 
 for (const mode of ["2-contig", "track-pair"]) {
@@ -198,3 +194,20 @@ for (const mode of ["2-contig", "track-pair", "composition"]) test(`${mode}: con
   assert.equal(await runtime.openLocalContigSplit(host, store, { entityKey: merged.entityKey }), true);
   assert.equal(marks(), 2);
 });
+
+for (const locale of ["zh", "en"]) for (const role of ["primary", "support"]) for (const fragment of [false, true]) {
+  test(`Local menu hides split/unsplit for ${role}, fragment=${fragment}, ${locale}`, () => {
+    const state = createIdentityRenderState("composition"); state.locale = locale;
+    const id = role === "primary" ? 2 : 30, slot = role === "primary" ? "bottom" : "top";
+    const context = { assemblyCtgId: id, trackRole: role, slot, compositionEntityKey: `assembly:${id}`,
+      ...(fragment ? { start: 1001, end: 3000, fragmentKey: `${id}:1001-3000` } : {}) };
+    const items = __testBuildAssemblyContextMenuItems({ store: createStore(state), host,
+      subviewFragmentContext: fragment ? context : null, subviewTrackPairContext: context });
+    assert.ok(items.length > 0);
+    assert.ok(items.every((item) => !/分割|split/i.test(item.label)));
+    const deletion = items.at(-1);
+    assert.match(deletion.label, /删除|delete/i);
+    assert.equal(deletion.children.length, 2);
+    assert.equal(deletion.children[1].disabled, role !== "primary");
+  });
+}

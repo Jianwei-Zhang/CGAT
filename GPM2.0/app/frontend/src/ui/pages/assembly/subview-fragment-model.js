@@ -31,6 +31,7 @@ export function normalizeLocalFragment(value) {
   }
   if (next <= sourceEnd) return null;
   return { sourceSeqId: positive(value.sourceSeqId), groupKey, instanceKey: String(value.instanceKey || groupKey), sourceStart, sourceEnd, parts,
+    ...(Array.isArray(value.archivedCtgIds) ? { archivedCtgIds: [...new Set(value.archivedCtgIds.map(positive).filter(Boolean))] } : {}),
     ...(value.restoredLocally === true ? { restoredLocally: true } : {}),
     lineageCtgIds: [...new Set([...(Array.isArray(value.lineageCtgIds) ? value.lineageCtgIds : []), ...parts.map((part) => part.assemblyCtgId)].map(positive).filter(Boolean))].sort((a, b) => a - b),
     ...(Array.isArray(value.nativeCuts) ? { nativeCuts: [...new Set(value.nativeCuts.map(Number)
@@ -286,6 +287,8 @@ export function mergeLocalMember(composition, entityKey, side) {
   const localFragment = normalizeLocalFragment({ ...a, sourceStart, sourceEnd, parts,
     restoredLocally: Boolean(deleted || a.restoredLocally || b.restoredLocally),
     lineageCtgIds: [...(a.lineageCtgIds || []), ...(b.lineageCtgIds || [])],
+    ...((a.archivedCtgIds?.length || b.archivedCtgIds?.length)
+      ? { archivedCtgIds: [...(a.archivedCtgIds || []), ...(b.archivedCtgIds || [])] } : {}),
     nativeCuts: [...(a.nativeCuts || []), ...(b.nativeCuts || [])],
     manualCuts: [...(a.manualCuts || []), ...(b.manualCuts || [])].filter((cut) => cut !== Math.min(a.sourceEnd, b.sourceEnd)),
     suppressedCuts: [...(a.suppressedCuts || []), ...(b.suppressedCuts || []), Math.min(a.sourceEnd, b.sourceEnd)] });
