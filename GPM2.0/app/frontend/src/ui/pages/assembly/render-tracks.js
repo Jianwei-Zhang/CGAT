@@ -1,4 +1,4 @@
-import { describeMainMemberLocalState, resolveMainMemberSourceRange } from "./main-member-local-state.js";
+import { describeMainMemberLocalState, resolveMainMemberSourceRange, resolveMainMemberCardName } from "./main-member-local-state.js";
 import { bandBoundaryAnchors } from "./contig-split-boundary.js";
 import { renderManualSplitMarkers } from "./source-fragment-layout.js";
 import { setTrackDragGroupOffsets } from "./source-fragment-drag.js";
@@ -379,15 +379,24 @@ function createRenderTracksRenderer(deps = {}) {
 
   function memberSourceRangeText(ctg, i18n) {
     const range = resolveMainMemberSourceRange(ctg);
-    return range ? ` · ${i18n.page.memberSourceRange.replace("{start}", range.sourceStart.toLocaleString()).replace("{end}", range.sourceEnd.toLocaleString())}` : "";
+    return range ? i18n.page.memberSourceRange.replace("{start}", range.sourceStart.toLocaleString()).replace("{end}", range.sourceEnd.toLocaleString()) : "";
   }
   function memberLocalAnnotation(ctg, assembly, i18n) {
     const detail = describeMainMemberLocalState(ctg, assembly);
-    if (!detail) return "";
+    if (!detail) return '<span class="ctg-chip-local-row" aria-hidden="true"></span>';
     const label = i18n.page.localMemberNotes[detail.kind].replace("{count}", detail.count)
       .replace("{retained}", Number(detail.retainedBp || 0).toLocaleString()).replace("{total}", Number(detail.totalBp || 0).toLocaleString());
     const ranges = detail.ranges.map(([start, end]) => `${start.toLocaleString()}–${end.toLocaleString()}`).join(", ");
-    return `<span class="ctg-chip-meta" data-main-member-local-state="${escapeAttr(detail.kind)}" title="${escapeAttr(i18n.page.localMemberNotes.detail + (ranges ? ` ${ranges}` : ""))}">${escapeHtml(label)}</span>`;
+    const shortLabel = detail.kind === "partial" ? i18n.page.localMemberPartialShort : label;
+    const tooltip = `${label}\n${i18n.page.localMemberNotes.detail}${ranges ? ` ${ranges}` : ""}`;
+    return `<span class="ctg-chip-local-row"><span class="ctg-chip-local-badge" data-main-member-local-state="${escapeAttr(detail.kind)}" title="${escapeAttr(tooltip)}" aria-label="${escapeAttr(tooltip)}">${escapeHtml(shortLabel)}</span></span>`;
+  }
+  function memberChipBody(ctg, visibleName, i18n, { nameClass = "", nameTitle = "", tags = "", localAnnotation = "" } = {}) {
+    const range = memberSourceRangeText(ctg, i18n);
+    const shortName = resolveMainMemberCardName(ctg, visibleName);
+    return `<strong class="ctg-chip-heading"><span class="ctg-chip-name ${nameClass}" title="${escapeAttr(nameTitle).replaceAll("\n", "&#10;")}">${escapeHtml(shortName)}</span><span class="ctg-chip-length">${formatBp(ctg.totalLength)}</span></strong>
+      <span class="ctg-chip-meta ctg-chip-source-range" title="${escapeAttr(range)}">${escapeHtml(range) || "&nbsp;"}</span>
+      ${tags ? `<span class="ctg-chip-tags">${tags}</span>` : ""}${localAnnotation || '<span class="ctg-chip-local-row" aria-hidden="true"></span>'}`;
   }
   function buildDeletedCtgChips(items, selectedRecordIds = new Set(), i18n) {
     const list = Array.isArray(items) ? items : [];
@@ -416,8 +425,7 @@ function createRenderTracksRenderer(deps = {}) {
           data-deleted-assembly-ctg-id="${escapeAttr(String(assemblyCtgId))}"
           title="${escapeAttr(fullName)}"
         >
-          <strong>${escapeHtml(visibleName)}</strong>
-          <span class="ctg-chip-meta">${formatBp(totalLength)}${escapeHtml(memberSourceRangeText(item, i18n))}</span>
+          ${memberChipBody({ ...item, totalLength }, visibleName, i18n, { nameTitle: fullName })}
         </button>
       `;
       })
@@ -792,17 +800,10 @@ function createRenderTracksRenderer(deps = {}) {
           const coAssignedTooltip = coAssignedChrNames.length
             ? i18n.page.coAssignedChrTooltip.replace("{chrNames}", coAssignedChrNames.join(", "))
             : "";
-          if (coAssignedTooltip) {
-            const nameTitle = `${escapeAttr(fullName)}&#10;${escapeAttr(coAssignedTooltip)}`;
-            return `<button class="ctg-chip ${active}${selectedClass}${hiddenClass}${historyHighlightClass}" data-assembly-ctg-id="${ctg.assemblyCtgId}" data-track-focus-mode="start">
-              <strong><span class="ctg-chip-name is-coassigned" title="${nameTitle}">${escapeHtml(visibleName)}</span>${sourceTagMarkup}${grtStatusMarkup}${hiddenTag}</strong>
-              <span class="ctg-chip-meta">${formatBp(ctg.totalLength)}${escapeHtml(memberSourceRangeText(ctg, i18n))}</span>${localAnnotation}
-            </button>`;
-          }
-          const nameTitle = escapeAttr(fullName);
-          return `<button class="ctg-chip ${active}${selectedClass}${hiddenClass}${historyHighlightClass}" data-assembly-ctg-id="${ctg.assemblyCtgId}" data-track-focus-mode="start" title="${nameTitle}">
-            <strong>${escapeHtml(visibleName)}${sourceTagMarkup}${grtStatusMarkup}${hiddenTag}</strong>
-            <span class="ctg-chip-meta">${formatBp(ctg.totalLength)}${escapeHtml(memberSourceRangeText(ctg, i18n))}</span>${localAnnotation}
+          const nameTitle = [fullName, coAssignedTooltip].filter(Boolean).join("\n");
+          return `<button class="ctg-chip ${active}${selectedClass}${hiddenClass}${historyHighlightClass}" data-assembly-ctg-id="${ctg.assemblyCtgId}" data-track-focus-mode="start" type="button" title="${escapeAttr(nameTitle).replaceAll("\n", "&#10;")}" aria-label="${escapeAttr(nameTitle).replaceAll("\n", "&#10;")}">
+            ${memberChipBody(ctg, visibleName, i18n, { nameClass: coAssignedTooltip ? "is-coassigned" : "",
+              nameTitle, tags: sourceTagMarkup + grtStatusMarkup + hiddenTag, localAnnotation })}
           </button>`;
         })
         .join("")

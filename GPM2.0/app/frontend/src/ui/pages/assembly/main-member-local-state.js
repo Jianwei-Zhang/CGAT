@@ -6,6 +6,15 @@ export function resolveMainMemberSourceRange(ctg) {
   return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start > 0 && end >= start
     ? { sourceStart: start, sourceEnd: end, sourceSeqId: Number(value.sourceSeqId) || null } : null;
 }
+// Only compact generated interval labels when an authoritative source range is
+// available. Keep user names and split suffixes intact; the full name remains
+// the tooltip/accessibility label, and exact source coordinates have their row.
+export function resolveMainMemberCardName(ctg, visibleName) {
+  const name = String(visibleName || "");
+  if (!resolveMainMemberSourceRange(ctg)) return name;
+  return name.replace(/(?:\[\d+[-–]\d+\])+(?=(?:\.\d+)*$)/, "") || name;
+}
+
 function legacyContains(summary, id) {
   return summary?.mode === "track-pair" ? [summary.topTrack, summary.bottomTrack].some((track) => track?.role === "primary")
     : [summary?.top, summary?.bottom].some((entry) => entry?.role === "primary" && Number(entry.contigId) === id);

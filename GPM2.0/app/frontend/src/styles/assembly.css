@@ -788,7 +788,7 @@
 }
 
 .assembly-members-panel {
-  --member-chip-row-height: 44px;
+  --member-chip-row-height: 78px;
   margin-bottom: 8px;
 }
 
@@ -837,6 +837,9 @@
 }
 
 .assembly-members-panel .ctg-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+  align-items: stretch;
   position: relative;
   max-height: calc(var(--member-chip-row-height) * 3 + 12px);
   overflow-y: auto;
@@ -851,10 +854,71 @@
 }
 
 .assembly-members-panel .ctg-chip {
+  align-items: stretch;
+  min-width: 0;
   min-height: var(--member-chip-row-height);
+  justify-content: flex-start;
+  gap: 3px;
+}
+
+.assembly-members-panel .ctg-chip-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.assembly-members-panel .ctg-chip-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assembly-members-panel .ctg-chip-length {
+  flex: none;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--theme-muted-ink, #666);
+  font-variant-numeric: tabular-nums;
+}
+
+.assembly-members-panel .ctg-chip-source-range {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.assembly-members-panel .ctg-chip-local-row {
+  display: block;
+  min-height: 17px;
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.assembly-members-panel .ctg-chip-local-badge {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  color: var(--theme-muted-ink, #666);
+}
+
+.assembly-members-panel .ctg-chip-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
 }
 
 .assembly-members-panel .chip-group-separator {
+  grid-column: 1 / -1;
   flex-basis: 100%;
   margin-top: 4px;
   margin-bottom: 2px;

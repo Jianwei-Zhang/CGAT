@@ -5,7 +5,7 @@ import { renderAssemblyPage } from "./tabs-semantics-harness.mjs";
 import { applySubviewComposition, getSubviewComposition } from "../subview-composition-state.js";
 import { splitLocalMember, deleteLocalMember } from "../subview-fragment-model.js";
 import { commitSubviewHistoryOperation, rollbackSubviewHistory } from "../subview-history-state.js";
-import { describeMainMemberLocalState, resolveMainMemberSourceRange } from "../main-member-local-state.js";
+import { describeMainMemberLocalState, resolveMainMemberSourceRange, resolveMainMemberCardName } from "../main-member-local-state.js";
 import { createEditingOperations } from "../../../../dev-bridge/operations/editing.js";
 
 const memberPanel = (html) => html.match(/<article class="card assembly-members-panel[^]*?<\/article>/)?.[0] || "";
@@ -72,4 +72,35 @@ test("member annotation refresh follows local edits but does not redraw on drag-
   state = { ...state, assembly: { ...state.assembly, subview: applySubviewComposition(state.assembly.subview, split.composition) } };
   assert.equal(refresh(host, store), true);
   assert.deepEqual(calls, ["members only", "members only"]);
+});
+
+
+test("compact member names strip only generated coordinate suffixes backed by authoritative ranges", () => {
+  const ctg = { sourceFragment: { sourceStart: 46280956, sourceEnd: 59056711 } };
+  assert.equal(resolveMainMemberCardName(ctg, "Chr01[42739070-59056711].2"), "Chr01.2");
+  assert.equal(resolveMainMemberCardName(ctg, "Chr01[1-100][20-80].1.2"), "Chr01.1.2");
+  assert.equal(resolveMainMemberCardName({}, "sample[1-100].2"), "sample[1-100].2");
+  assert.equal(resolveMainMemberCardName(ctg, "sample[custom-name]"), "sample[custom-name]");
+});
+
+test("member card separates short title, real length, current source range and compact local status", () => {
+  const state = createIdentityRenderState("composition");
+  state.assembly.membersCardCollapsed = false;
+  const original = state.assembly.chrCtgs[0];
+  const split = splitLocalMember(getSubviewComposition(state.assembly.subview), "assembly:2", 8000);
+  const deleted = deleteLocalMember(split.composition, split.members[0].entityKey);
+  state.assembly.subview = applySubviewComposition(state.assembly.subview, deleted.composition);
+  const partial = memberPanel(renderAssemblyPage(state));
+  assert.match(partial, /ctg-chip-heading/);
+  assert.match(partial, /ctg-chip-length[^>]*>16,000 bp/);
+  assert.match(partial, /data-main-member-local-state="partial"[^>]*>局部部分保留<\/span>/);
+  assert.match(partial, /title="局部保留 8,000\/16,000 bp · 1 个对象/);
+  state.assembly.chrCtgs = [{ ...original, name: "Chr01[42739070-59056711].2", totalLength: 12775756,
+    sourceFragment: { sourceSeqId: 1, groupKey: "manual-fragment:2", sourceStart: 46280956, sourceEnd: 59056711 } }];
+  const html = memberPanel(renderAssemblyPage(state));
+  assert.match(html, /title="Chr01\[42739070-59056711\]\.2"/);
+  assert.match(html, />Chr01\.2<\/span>/);
+  assert.match(html, /ctg-chip-source-range[^>]*>源 46,280,956–59,056,711<\/span>/);
+  assert.equal((html.match(/data-assembly-ctg-id=/g) || []).length, 1);
+  assert.equal(state.assembly.chrCtgs[0].name, "Chr01[42739070-59056711].2", "presentation never renames the source entity");
 });

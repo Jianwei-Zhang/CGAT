@@ -145,7 +145,20 @@ function memberFromCtg(
 export function projectCurrentSubviewToComposition(state, host, renderedMetrics = null) {
   const currentSubview = getSubviewState(state?.assembly || {});
   const existing = getSubviewComposition(currentSubview);
-  if (existing) return existing;
+  if (existing) {
+    if (existing.activeAnchors.every((anchor) => anchor.descriptor)) return existing;
+    // Older/saved evidence anchors may only carry a hit key. Fragment edits
+    // change rendered hit keys, so capture the current source-owned endpoints
+    // before replacing members. Composition endpoints already use base space;
+    // never mirror them a second time, or overwrite a stored descriptor.
+    const scene = renderedMetrics?.anchorScene || collectSubviewAnchorScene(host);
+    const byObject = new Map(scene.filter((entry) => entry.descriptor).map((entry) => [entry.objectId, entry.descriptor]));
+    return normalizeSubviewComposition({ ...existing, activeAnchors: existing.activeAnchors.map((anchor) => {
+      if (anchor.descriptor) return anchor;
+      const descriptor = byObject.get(buildSubviewAnchorObjectId("evidence", anchor.hitKey, anchor.edge));
+      return descriptor ? { ...anchor, descriptor } : anchor;
+    }) });
+  }
   const summary = currentSubview.summary;
   if (!summary) return normalizeSubviewComposition({
     activeAnchors: currentSubview.activeAnchors,
