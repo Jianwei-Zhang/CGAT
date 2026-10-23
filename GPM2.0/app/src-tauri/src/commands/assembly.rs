@@ -156,7 +156,11 @@ pub fn list_deleted_ctgs(
                     "placementMode": item.placement_mode,
                     "memberCount": item.member_count,
                     "totalLength": item.total_length,
-                    "deletedAt": item.deleted_at
+                    "deletedAt": item.deleted_at,
+                    "sourceRange": item.source_seq_id.zip(item.source_start).zip(item.source_end)
+                        .map(|((source_seq_id, source_start), source_end)| json!({
+                            "sourceSeqId": source_seq_id, "sourceStart": source_start, "sourceEnd": source_end
+                        }))
                 })
             })
             .collect::<Vec<_>>();

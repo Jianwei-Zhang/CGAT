@@ -16,27 +16,19 @@ function escapeFallback(value) {
 function intervalsForEntry(plan, entry) {
   const contigId = normalizePositiveInteger(entry?.ctg?.assemblyCtgId);
   return (Array.isArray(plan?.visualIntervals) ? plan.visualIntervals : [])
-    .filter((interval) => interval.assemblyCtgId === contigId);
+    .filter((interval) => entry.matchesSourceInterval ? entry.matchesSourceInterval(interval) : interval.assemblyCtgId === contigId)
+    .flatMap((interval) => entry.clipSourceInterval ? [entry.clipSourceInterval(interval)].filter(Boolean) : [interval]);
 }
 
 function renderIntervalOverlay(interval, entry, escapeHtml) {
-  const firstX = projectGrtSourcePositionToRect(
-    interval.sourceStart,
-    interval,
-    entry.ctg,
-    entry.rect,
-  );
-  const secondX = projectGrtSourcePositionToRect(
-    interval.sourceEnd,
-    interval,
-    entry.ctg,
-    entry.rect,
-  );
+  const firstX = projectEntryPosition(entry, interval.sourceStart, interval);
+  const secondX = projectEntryPosition(entry, interval.sourceEnd, interval);
   if (!Number.isFinite(firstX) || !Number.isFinite(secondX)) return "";
   const x = Math.min(firstX, secondX);
   const ctgLength = normalizePositiveInteger(entry?.ctg?.lengthBp ?? entry?.ctg?.totalLength) || 1;
   const baseWidth = Math.max(0, Number(entry?.rect?.width) || 0) / ctgLength;
-  const width = Math.max(2, Math.abs(secondX - firstX) + baseWidth);
+  const naturalWidth = Math.max(2, Math.abs(secondX - firstX) + baseWidth);
+  const width = entry.projectSourcePosition ? Math.min(naturalWidth, Math.max(0, entry.rect.x + entry.rect.width - x)) : naturalWidth;
   const count = Math.max(1, interval.occurrences?.length || 1);
   const rangeList = (interval.occurrences || [interval])
     .map((occurrence) => `${occurrence.sourceStart}-${occurrence.sourceEnd} (${occurrence.orientation})`)
@@ -52,19 +44,20 @@ function renderIntervalOverlay(interval, entry, escapeHtml) {
   </g>`;
 }
 
-function chooseEndpointEntry(endpoint, entries) {
-  const candidates = entries.filter(
-    (entry) => normalizePositiveInteger(entry?.ctg?.assemblyCtgId) === endpoint.assemblyCtgId,
-  );
-  return candidates.find((entry) => entry.isMirror !== true) || candidates[0] || null;
+function projectEntryPosition(entry, position, interval) {
+  return entry.projectSourcePosition ? entry.projectSourcePosition(position, interval)
+    : projectGrtSourcePositionToRect(position, interval, entry.ctg, entry.rect);
 }
-
 function buildEndpoint(endpoint, sourcePosition, entries) {
-  const entry = chooseEndpointEntry(endpoint, entries);
-  if (!entry) return null;
-  const x = projectGrtSourcePositionToRect(sourcePosition, endpoint, entry.ctg, entry.rect);
-  if (!Number.isFinite(x)) return null;
-  return { entry, x };
+  const candidates = entries.filter((entry) => (!endpoint.localEntryKey || endpoint.localEntryKey === entry.key)
+    && (entry.matchesSourceInterval ? entry.matchesSourceInterval(endpoint)
+      : normalizePositiveInteger(entry?.ctg?.assemblyCtgId) === endpoint.assemblyCtgId));
+  const projected = candidates.map((entry) => ({ entry, x: projectEntryPosition(entry, sourcePosition, endpoint) }))
+    .filter((value) => value.x !== null && Number.isFinite(value.x));
+  // Different Local View presentations containing the same point are ambiguous;
+  // never pick one arbitrary copy for a structural junction.
+  if (!endpoint.localEntryKey && projected.some((value) => value.entry.projectSourcePosition) && projected.length !== 1) return null;
+  return projected.find((value) => value.entry.isMirror !== true) || projected[0] || null;
 }
 
 function renderJunction(junction, entries, escapeHtml, gapLabel) {

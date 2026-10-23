@@ -3,6 +3,7 @@ const SUPPORTED_CTG_EDITOR_ACTIONS = new Set([
   "split-source-ctg",
   "split-ref-boundary",
   "split-manual-contig",
+  "edit-local-fragment",
   "undo-contig-split",
   "add-contig-to-chr",
   "flip-ctg",

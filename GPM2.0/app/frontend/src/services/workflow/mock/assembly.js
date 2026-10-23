@@ -533,7 +533,7 @@ function buildMockHistoryMutation(projectId, chrName, operation, affectedCtgIds 
 }
 
 async function runMainViewEditorActionMock({ projectId, chrName, action, args = {} }) {
-  if (["split-source-ctg", "split-ref-boundary", "split-manual-contig", "undo-contig-split", "add-contig-to-chr"].includes(action)) throw new Error("Contig splitting requires a real workspace");
+  if (["split-source-ctg", "split-ref-boundary", "split-manual-contig", "edit-local-fragment", "undo-contig-split", "add-contig-to-chr"].includes(action)) throw new Error("Contig splitting requires a real workspace");
   await sleep(60);
   const history = resolveMainHistory(projectId, chrName);
   const affectedCtgId = Number(args.assemblyCtgId || 0);

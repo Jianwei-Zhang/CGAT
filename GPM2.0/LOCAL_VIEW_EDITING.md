@@ -16,7 +16,9 @@
 
 Use targeted state/controller/rendering tests and Windows-host frontend/backend/Tauri checks. Do not use WSL Node against Windows node_modules. Remove generated frontend dist after verification. Native visual interaction acceptance is separate from automated checks. Commit and push only scoped task changes; do not rebuild or replace published installers without a new release request.
 
-## Implementation progress
+## Implementation history
+
+The stage snapshots below record earlier checkpoints. The final integration audit supersedes their then-pending scope.
 
 ### Stage 1: explicit-selection horizontal drag
 
@@ -51,20 +53,35 @@ Implementation now includes:
 - Composition rendering projects and jointly clips both alignment endpoints to each surviving interval, including reverse strands and multiple real backing IDs. N-region annotations are clipped as well. Manual and stored evidence anchor endpoints follow surviving source bases. Local member hover/manager labels show source ranges.
 - Local fragment append expands the chosen interval into its actual backing ranges, in the effective orientation, with one Final Path persistence operation. Missing backing data aborts the append rather than adding a whole parent or a partial path. Other local edits do not rewrite Final Path.
 - Successful Main View reloads rebind primary-source local objects and composition history snapshots to the current real entities. Main split/undo does not collapse independent local partitions; main-deleted bases are clipped from local composition snapshots. Evidence cache identity includes backing IDs/ranges/orientations, so a stable local identity cannot reuse stale parent evidence.
-- Native `edit-local-fragment` preparation validates source instance, exact expected parent ranges/orientations, chromosome/project/primary-dataset eligibility, unique targets and complete non-overlapping coverage. Requested interval boundaries, cuts, tombstones, dependency changes and layout offsets share one transaction and Main View history entry. This backend primitive is **not yet connected to the frontend synchronized menu entries**.
-- Native split converts adopted Final Path ranges to immutable source locators; deleting a real child does not silently delete already-adopted DNA. Tests verify retained source intervals, tombstone lineage, unaffected other paths, and undo/redo. Dependency inspection/confirmation must explain this behavior when the synchronized UI is connected.
-
-Remaining required work for the full objective (do not mark the overall goal complete):
-
-1. Connect synchronized split/delete through workflow contracts and the native action, with dependency inspection, explicit confirmation, stale/context guards, error recovery, local baseline/history migration and fresh DS data. Verify legacy two-contig/track-pair history baselines as well as existing compositions.
-2. Materialize anchor-derived intervals for direct drag and box selection, not only context actions. A gesture must retain one undo entry, stable instance selection, both movement directions, cancellation and viewport behavior; an untouched sibling must not move.
-3. Audit Main DS member cards against real Main View entities, including source ranges, local-only annotations, deleted members and refresh after synchronized mutations. Do not count virtual pieces as real members.
-4. Audit GRT anchors/overlays and auxiliary/phased source representations against the new interval projection. Complete regression coverage for cross-surface history ownership and persistence/reopen.
-5. Run final scoped and complete Windows frontend/backend/Tauri checks, isolated native build where the running app locks the normal target, and exact-head CI. Remove generated frontend dist, commit/push only scoped files, and keep native-window acceptance separate from automated evidence. Published installers/test data remain unchanged.
-
+- Native `edit-local-fragment` preparation validates source instance, exact expected parent ranges/orientations, chromosome/project/primary-dataset eligibility, unique targets and complete non-overlapping coverage. Requested interval boundaries, cuts, tombstones, dependency changes and layout offsets share one transaction and Main View history entry. At the Stage 2 checkpoint this primitive was not yet connected to frontend synchronized menu entries; that connection is completed in the final integration below.
+- Native split converts adopted Final Path ranges to immutable source locators; deleting a real child does not silently delete already-adopted DNA. Tests verify retained source intervals, tombstone lineage, unaffected other paths, and undo/redo. The final synchronized UI dependency confirmation explains this behavior explicitly.
 
 Stage 2 verification snapshot (2026-10-23, source checkpoint; overall goal still active):
 
 - Windows frontend: 1,652 tests passed; production build passed (existing large-chunk warning only).
 - Windows backend: 305 tests passed, 2 existing ignored; strict all-target Clippy passed. Six new native tests cover interval deletion, reverse placement, joined-real-sibling cuts, invalid/stale scopes, immutable Final Path locators/lineage and rollback after a later dependency failure.
-- This checkpoint does not claim synchronized UI, direct virtual-anchor gestures, Main DS annotations or native-window acceptance. These remain in the required-work list above. No installer/release/test-data assets were changed.
+- This checkpoint does not claim synchronized UI, direct virtual-anchor gestures, Main DS annotations or native-window acceptance. These were completed in the subsequent integration below. No installer/release/test-data assets were changed.
+
+
+## Final integration audit (2026-10-23)
+
+| Requirement | Implementation and regression evidence |
+| --- | --- |
+| Scoped synchronized split/delete | `subview-fragment-sync-runtime.js` connects workflow contracts to native `edit-local-fragment`. Dependency inspection and explicit confirmation precede one native history operation. Exact source preconditions, serialized persistence, stale-context cancellation and post-commit reload-failure guards are covered by `subview-fragment-sync.test.mjs` and `workflow-api.test.mjs`. |
+| Independent anchor-derived objects | Context operations and direct gestures materialize only the relevant source intervals. `subview-fragment-gesture-runtime.js` waits for drag threshold; cancellation restores the baseline. Three local modes, overview/zoom, both directions, flipped intervals, independent siblings and selected multi-lane motion are covered by `subview-fragment-gestures.test.mjs`. |
+| Explicit box-selection movement | Main and Local View drag only the clicked object unless it belongs to the explicit visible selection. Selected members retain their individual initial offsets plus one shared delta. No implicit source-family movement. Stage 1 native atomic-target checks and final local gesture tests cover this contract. |
+| Delete/split/flip/merge and menu order | Local controller/model tests cover clicked-range operations, same-source contiguous local-only merging, stale dialogs and the agreed menu order. Main native tests cover real-child flip after splitting and partial deletion without changing the sibling. No redundant Remove from Local View context action. |
+| Main DS cards reflect real data | `main-member-local-state.js` annotates real entities without increasing real counts/lengths for virtual pieces. Cards show source ranges, local deletion/coverage, split/merge, orientation and movement annotations. Local changes refresh only the member panel, not main geometry. Deleted source ranges pass through CLI/Tauri/dev bridge. `main-member-local-state.test.mjs` covers counts, rendering and refresh. |
+| History and persisted source identity | `subview-fragment-history.js` preserves legacy baselines, drag offsets, anchors, undo and redo. A source-owned backup permits later native parent retirement without stale IDs. `subview-fragment-reconcile.js` rebinds primary/phased members and clips main-deleted bases from local history. Tests cover legacy undo followed by native split and redo, JSON round trips, and local deletion surviving anchor disable/reopen/anchor-only undo. |
+| Final Path ownership | Local append uses selected backing intervals; local edits do not mutate adopted paths. Native synchronized edits preserve adopted DNA as immutable source locators with lineage. Confirmation states this explicitly. Backend interval tests cover dependencies, rollback, deletion and history. |
+| GRT and auxiliary/phased views | `subview-fragment-grt.js` clips overlays/evidence and maps anchor source points through surviving ranges/orientation. Ambiguous duplicate placements fail closed. Phased native and displayed orientations are separate; no wrong-track candidate fallback. `subview-fragment-grt.test.mjs` and `subview-fragment-phased.test.mjs` cover clipping, deleted anchors, lineage and negative orientation. |
+| Viewport and persistence | Local gestures/actions preserve rendered scale and viewport. One gesture commits one local operation. Synchronized edits flush prior state and persist within the mutation coordinator without nested-queue deadlock. Cancel/stale/project-switch tests prevent old-context writes. |
+
+### Final local validation
+
+- Windows-host frontend: **1,721 tests passed**, no failures; production build and Windows Light quality gate passed. Existing large-bundle advisory only. Generated `dist/` is removed after verification.
+- Windows-host backend: **306 passed, 2 existing ignored**; strict all-target Clippy passed.
+- Windows-host Tauri: **18 passed**; formatting and strict Clippy passed. Isolated debug native build passed, with embedded icon sizes/transparency verified.
+- Isolated native artifact: `D:\tools\gpm-preview-verification-target\debug\gpm_next_desktop.exe`; SHA-256 `00265F8679E3E1C4CC86A33A4F6327DF90A226D072025A3E5DD5F6FB8F9C5F29`. The interval-edit native source marker was also checked. This is a verification artifact, not a newly published installer.
+- Automated state/controller/render-contract checks and a native build **do not constitute native GUI interaction acceptance**. No user desktop process was terminated or replaced. Gesture tests use a lightweight event/DOM contract harness rather than a browser.
+- Published installers, release tags, official test-data assets and project workspaces are not modified by this delivery. Repository closure requires a scoped commit/push and successful Quality jobs for that exact final revision; old-checkpoint CI is not evidence for a newer revision.

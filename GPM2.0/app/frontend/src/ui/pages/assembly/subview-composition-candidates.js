@@ -39,6 +39,7 @@ function projectCandidate(ctg, sourcePatch, index) {
     assemblyCtgId: ctg?.assemblyCtgId,
     sourceFragment: ctg?.sourceFragment,
     originSourceSeqId: ctg?.originSourceSeqId,
+    backingOrientation: ctg?.subviewBackingOrientation,
     source,
     reference,
     label: ctg?.name || ctg?.ctgName,
@@ -109,13 +110,17 @@ export function filterSubviewCompositionCandidates(candidates, { query = "", sou
   });
 }
 
+export function isSubviewCompositionSourceCompatible(candidate, member) {
+  if (candidate?.sourceKey === member?.sourceKey) return true;
+  const a = candidate?.source, z = member?.source;
+  return Boolean(member?.localFragment && a?.role === "phased" && z?.role === "phased"
+    && a.phasedTrackId === z.phasedTrackId && a.hap === z.hap && a.datasetId === z.datasetId);
+}
+
 export function resolveSubviewCompositionCandidate(candidates, member) {
-  const source = Array.isArray(candidates) ? candidates : [];
-  return source.find((candidate) => candidate.entityKey === member?.entityKey
-    && candidate.sourceKey === member?.sourceKey)
-    || source.find((candidate) => candidate.entityKey === member?.entityKey)
-    || source.find((candidate) => candidate.assemblyCtgId === member?.assemblyCtgId && candidate.sourceKey === member?.sourceKey)
-    || (member?.localFragment ? source.find((candidate) => member.localFragment.parts.some((part) => part.assemblyCtgId === candidate.assemblyCtgId)
-      && candidate.sourceKey === member.sourceKey) : null)
+  const source = (Array.isArray(candidates) ? candidates : []).filter((candidate) => isSubviewCompositionSourceCompatible(candidate, member));
+  return source.find((candidate) => candidate.entityKey === member?.entityKey)
+    || source.find((candidate) => candidate.assemblyCtgId === member?.assemblyCtgId)
+    || (member?.localFragment ? source.find((candidate) => member.localFragment.parts.some((part) => part.assemblyCtgId === candidate.assemblyCtgId)) : null)
     || null;
 }

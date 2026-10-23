@@ -269,6 +269,7 @@ export function buildPhasedSubviewCtgPool({ phasedChrTracks = [], primaryCtgs = 
             laneIndex: Math.max(0, normalizeNonNegativeInt(source?.laneIndex) ?? 0),
             hits: buildPhasedSubviewCtgHits({ sourceCtg: source, totalLength, itemOrient }),
             subviewPhasedOrientFlipped: itemOrient !== sourceOrient,
+            subviewBackingOrientation: sourceOrient,
             subviewSource: "phased",
           };
         })

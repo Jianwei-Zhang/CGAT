@@ -528,7 +528,7 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
             println!("deleted_ctg_count={}", items.len());
             for item in items {
                 println!(
-                    "deleted_ctg record_id={} ctg_id={} name={} chr={} chr_order={} anchor_start={} ref_orient={} mode={} members={} bp={} deleted_at={}",
+                    "deleted_ctg record_id={} ctg_id={} name={} chr={} chr_order={} anchor_start={} ref_orient={} mode={} members={} bp={} deleted_at={} source_seq_id={} source_start={} source_end={}",
                     item.deleted_ctg_record_id,
                     item.assembly_ctg_id,
                     item.name,
@@ -539,7 +539,10 @@ pub(super) fn dispatch(command: Commands) -> Result<Option<Commands>> {
                     item.placement_mode,
                     item.member_count,
                     item.total_length,
-                    item.deleted_at
+                    item.deleted_at,
+                    opt_i64(item.source_seq_id),
+                    opt_i64(item.source_start),
+                    opt_i64(item.source_end)
                 );
             }
         }

@@ -29,6 +29,7 @@ export function normalizeLocalFragment(value) {
   }
   if (next <= sourceEnd) return null;
   return { sourceSeqId: positive(value.sourceSeqId), groupKey, instanceKey: String(value.instanceKey || groupKey), sourceStart, sourceEnd, parts,
+    lineageCtgIds: [...new Set([...(Array.isArray(value.lineageCtgIds) ? value.lineageCtgIds : []), ...parts.map((part) => part.assemblyCtgId)].map(positive).filter(Boolean))].sort((a, b) => a - b),
     ...(Array.isArray(value.suppressedCuts) ? { suppressedCuts: [...new Set(value.suppressedCuts.map(Number)
       .filter((cut) => Number.isSafeInteger(cut) && cut >= sourceStart && cut < sourceEnd))].sort((a, b) => a - b) } : {}),
   };
@@ -46,7 +47,7 @@ export function memberSourceInterval(member) {
     instanceKey: String(member?.entityKey || `assembly:${member?.assemblyCtgId}`),
     sourceStart, sourceEnd,
     parts: [{ assemblyCtgId: positive(member?.assemblyCtgId), sourceStart, sourceEnd,
-      orient: orientation(member?.baseOrientation) }],
+      orient: orientation(member?.backingOrientation ?? member?.baseOrientation) }],
   };
 }
 
@@ -65,7 +66,11 @@ export function sourceCoordinateToMember(member, coordinate) {
 }
 
 export function projectBackingCoordinate(member, assemblyCtgId, coordinate) {
-  if (!member?.localFragment) return member?.assemblyCtgId === Number(assemblyCtgId) ? Number(coordinate) : null;
+  if (!member?.localFragment) {
+    if (member?.assemblyCtgId !== Number(assemblyCtgId)) return null;
+    return member.backingOrientation && member.backingOrientation !== member.baseOrientation
+      ? member.lengthBp - Number(coordinate) + 1 : Number(coordinate);
+  }
   const part = member.localFragment.parts.find((entry) => entry.assemblyCtgId === Number(assemblyCtgId));
   if (!part) return null;
   const source = part.orient === "-" ? part.sourceEnd - coordinate + 1 : part.sourceStart + coordinate - 1;
@@ -196,6 +201,7 @@ export function mergeLocalMember(composition, entityKey, side) {
   const sourceStart = Math.min(a.sourceStart, b.sourceStart), sourceEnd = Math.max(a.sourceEnd, b.sourceEnd);
   const parts = [...new Map([...a.parts, ...b.parts].map((part) => [part.assemblyCtgId, part])).values()];
   const localFragment = normalizeLocalFragment({ ...a, sourceStart, sourceEnd, parts,
+    lineageCtgIds: [...(a.lineageCtgIds || []), ...(b.lineageCtgIds || [])],
     suppressedCuts: [...(a.suppressedCuts || []), ...(b.suppressedCuts || []), Math.min(a.sourceEnd, b.sourceEnd)] });
   if (!localFragment) return { composition, changed: false };
   const merged = { ...member, entityKey: fragmentKey(member, a, sourceStart, sourceEnd), localFragment,
@@ -243,11 +249,11 @@ export function filterLocalAnchorCuts(member, cuts) {
     - (member.baseOrientation === "-" ? 0 : 1)));
 }
 
-export function projectLocalNRegions(member, candidates) {
+export function projectLocalNRegions(member, candidates, compatible = (candidate) => candidate.sourceKey === member.sourceKey) {
   if (!member.localFragment) return null;
   const regions = [];
   for (const id of memberBackingIds(member)) {
-    const candidate = candidates.find((entry) => entry.assemblyCtgId === id && entry.sourceKey === member.sourceKey);
+    const candidate = candidates.find((entry) => entry.assemblyCtgId === id && compatible(entry));
     for (const region of candidate?.ctg?.nRegions || []) {
       const a = projectBackingCoordinate(member, id, Number(region.ctgStart ?? region.ctg_start ?? region.startBp));
       const b = projectBackingCoordinate(member, id, Number(region.ctgEnd ?? region.ctg_end ?? region.endBp));
@@ -289,4 +295,35 @@ export function resolveLocalFinalPathContexts(members, context) {
         : { orient: "+", refOrient: "+", start: reverse ? b : a, end: reverse ? a : b }),
     };
   });
+}
+
+export function memberActiveBackingParts(member) {
+  const range = memberSourceInterval(member);
+  return range.parts.filter((part) => part.sourceStart <= range.sourceEnd && part.sourceEnd >= range.sourceStart);
+}
+
+
+// Materialize rendered anchor pieces without inserting a history operation.
+// The following drag/edit owns the partition and motion in one undo step.
+export function materializeLocalIntervals(composition, descriptors) {
+  let next = composition, changed = false;
+  const selectedKeys = new Map();
+  for (const original of composition.members) {
+    const entries = descriptors.filter((entry) => entry.memberKey === original.entityKey);
+    if (!entries.length) continue;
+    const cuts = [...new Set([1, original.lengthBp + 1, ...entries.flatMap((entry) => [entry.start, entry.end + 1])])]
+      .filter((value) => Number.isSafeInteger(value) && value >= 1 && value <= original.lengthBp + 1).sort((a, b) => a - b);
+    if (cuts.length === 2) { entries.forEach((entry) => selectedKeys.set(entry.key, original.entityKey)); continue; }
+    const replacements = cuts.slice(0, -1).map((start, index) => {
+      const end = cuts[index + 1] - 1;
+      const a = memberCoordinateToSource(original, start), z = memberCoordinateToSource(original, end);
+      const member = sliceLocalMember(original, Math.min(a, z), Math.max(a, z));
+      entries.filter((entry) => entry.start === start && entry.end === end).forEach((entry) => selectedKeys.set(entry.key, member.entityKey));
+      return member;
+    });
+    if (replacements.some((member) => !member)) return { composition, changed: false, selectedKeys: new Map() };
+    next = replaceLocalMembers(next, [original], replacements);
+    changed = true;
+  }
+  return { composition: next, changed, selectedKeys };
 }

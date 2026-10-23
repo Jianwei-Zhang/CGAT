@@ -625,6 +625,8 @@ export async function loadAssemblyView(host, store, options, deps) {
       assembly: {
         ...store.getState().assembly,
         loading: false,
+        error: "",
+        sourceEditingReloadRequired: false,
         referenceGenomeId: chromosomeResult.referenceGenomeId || 0,
         unplacedCtgCount: chromosomeResult.unplacedCtgCount || 0,
         unplacedBp: chromosomeResult.unplacedBp || 0,

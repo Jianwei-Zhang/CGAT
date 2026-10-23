@@ -167,7 +167,8 @@ export function normalizeSubviewCompositionHistorySnapshot(value) {
   if (kind === "legacy" && isPlainObject(value.summary)) {
     const editableSnapshot = normalizeSubviewEditableSnapshot(value.editableSnapshot);
     if (!editableSnapshot.topKey) return null;
-    return { kind, summary: value.summary, editableSnapshot };
+    return { kind, summary: value.summary, editableSnapshot,
+      ...(value.sourceProjection ? { sourceProjection: normalizeSubviewComposition(value.sourceProjection) } : {}) };
   }
   return null;
 }
@@ -350,7 +351,7 @@ export function areSubviewEditableSnapshotsEqual(left, right) {
     === JSON.stringify(normalizeSubviewEditableSnapshot(right));
 }
 
-function applySubviewEditableSnapshot(subview, snapshot, stateOrLocale = "zh") {
+export function applySubviewEditableSnapshot(subview, snapshot, stateOrLocale = "zh") {
   const normalizedSnapshot = normalizeSubviewEditableSnapshot(snapshot);
   let nextSubview = getSubviewState({ subview });
   const orderKeys = buildSubviewSummaryOrderKeys(nextSubview.summary);
@@ -384,13 +385,13 @@ function applySubviewEditableSnapshot(subview, snapshot, stateOrLocale = "zh") {
   };
 }
 
-function buildSubviewCompositionHistorySnapshot(subview) {
+function buildSubviewCompositionHistorySnapshot(subview, subviewTrackDragOffsets = []) {
   const composition = getSubviewComposition(subview);
   if (composition) {
     return { kind: "composition", composition };
   }
   const summary = subview?.summary;
-  const editableSnapshot = buildSubviewEditableSnapshot(subview, []);
+  const editableSnapshot = buildSubviewEditableSnapshot(subview, subviewTrackDragOffsets);
   return summary && editableSnapshot.topKey
     ? { kind: "legacy", summary, editableSnapshot }
     : { kind: "composition", composition: normalizeSubviewComposition({}) };
@@ -415,17 +416,23 @@ function applySubviewCompositionHistorySnapshot(subview, snapshot, pairKey, stat
 }
 
 function areSubviewCompositionHistorySnapshotsEqual(left, right) {
-  return JSON.stringify(normalizeSubviewCompositionHistorySnapshot(left))
-    === JSON.stringify(normalizeSubviewCompositionHistorySnapshot(right));
+  const comparable = (value) => {
+    const snapshot = normalizeSubviewCompositionHistorySnapshot(value);
+    if (snapshot?.kind !== "legacy") return snapshot;
+    const { sourceProjection: _projection, ...editable } = snapshot;
+    return editable;
+  };
+  return JSON.stringify(comparable(left)) === JSON.stringify(comparable(right));
 }
 
 function createSubviewCompositionHistoryRecord({
   pairKey,
   subview,
+  subviewTrackDragOffsets,
   viewport,
   now,
 }) {
-  const snapshot = buildSubviewCompositionHistorySnapshot(subview);
+  const snapshot = buildSubviewCompositionHistorySnapshot(subview, subviewTrackDragOffsets);
   return {
     version: SUBVIEW_COMPOSITION_HISTORY_SCHEMA_VERSION,
     pairKey,
@@ -461,6 +468,7 @@ export function activateSubviewCompositionHistory(assembly, {
         assembly: {
           ...assembly,
           subview: appliedSubview,
+          ...(record.current.kind === "legacy" ? { subviewTrackDragOffsets: record.current.editableSnapshot.dragOffsets } : {}),
           subviewCompositionViewport: record.viewport,
           subviewHistoryByKey: normalizedHistoryByKey,
         },
@@ -470,7 +478,7 @@ export function activateSubviewCompositionHistory(assembly, {
       };
     }
   }
-  const nextRecord = createSubviewCompositionHistoryRecord({ pairKey, subview, viewport, now });
+  const nextRecord = createSubviewCompositionHistoryRecord({ pairKey, subview, subviewTrackDragOffsets: assembly?.subviewTrackDragOffsets, viewport, now });
   return {
     assembly: {
       ...assembly,
@@ -486,6 +494,7 @@ export function activateSubviewCompositionHistory(assembly, {
 
 export function commitSubviewCompositionHistoryOperation(assembly, {
   nextSubview,
+  nextSourceProjection,
   operation,
   viewport = assembly?.subviewCompositionViewport,
   now = Date.now(),
@@ -501,7 +510,8 @@ export function commitSubviewCompositionHistoryOperation(assembly, {
   const record = currentAssembly?.subviewHistoryByKey?.[pairKey];
   if (!record) return { assembly, changed: false, pairKey };
   const currentSnapshot = record.current;
-  const nextSnapshot = buildSubviewCompositionHistorySnapshot(nextSubview);
+  const nextSnapshot = buildSubviewCompositionHistorySnapshot(nextSubview, assembly?.subviewTrackDragOffsets);
+  if (nextSourceProjection && nextSnapshot.kind === "legacy") nextSnapshot.sourceProjection = normalizeSubviewComposition(nextSourceProjection);
   if (areSubviewCompositionHistorySnapshotsEqual(currentSnapshot, nextSnapshot)) {
     return { assembly: currentAssembly, changed: false, pairKey };
   }
@@ -570,6 +580,7 @@ function moveSubviewCompositionHistory(assembly, direction, {
     assembly: {
       ...assembly,
       subview: appliedSubview,
+      ...(entry.snapshot.kind === "legacy" ? { subviewTrackDragOffsets: entry.snapshot.editableSnapshot.dragOffsets } : {}),
       subviewCompositionViewport: nextRecord.viewport,
       subviewAnchorStateByKey: syncSubviewAnchorState(assembly, appliedSubview),
       subviewHistoryByKey: setSubviewHistoryRecord(assembly, pairKey, nextRecord),
@@ -865,8 +876,11 @@ export function resetSubviewHistory(assembly, options = {}) {
       options.stateOrLocale,
     );
     return nextSubview
-      ? commitSubviewCompositionHistoryOperation(activated.assembly, {
+      ? commitSubviewCompositionHistoryOperation(record.default.kind === "legacy" ? {
+          ...activated.assembly, subviewTrackDragOffsets: record.default.editableSnapshot.dragOffsets,
+        } : activated.assembly, {
           nextSubview,
+          nextSourceProjection: record.default.sourceProjection,
           operation: { kind: "reset" },
           viewport: record.viewport,
           now: options.now,
@@ -911,7 +925,7 @@ export function resolveCurrentSubviewHistory(assembly) {
   }
   const record = normalizeSubviewHistoryByKey(assembly?.subviewHistoryByKey)[pairKey] || null;
   if (record?.version === SUBVIEW_COMPOSITION_HISTORY_SCHEMA_VERSION) {
-    const currentSnapshot = buildSubviewCompositionHistorySnapshot(assembly?.subview);
+    const currentSnapshot = buildSubviewCompositionHistorySnapshot(assembly?.subview, assembly?.subviewTrackDragOffsets);
     return {
       pairKey,
       record,

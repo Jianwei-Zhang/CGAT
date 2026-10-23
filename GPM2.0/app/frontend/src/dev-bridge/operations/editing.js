@@ -31,7 +31,7 @@ async function listDeletedCtgs(payload) {
   const items = [];
   for (const line of lines) {
     const match = line.match(
-      /^deleted_ctg record_id=(\d+) ctg_id=(\d+) name=(.*?) chr=(.*?) chr_order=(\S+) anchor_start=(\S+) ref_orient=(\S+) mode=(\S+) members=(\d+) bp=(\d+) deleted_at=(\S+)$/,
+      /^deleted_ctg record_id=(\d+) ctg_id=(\d+) name=(.*?) chr=(.*?) chr_order=(\S+) anchor_start=(\S+) ref_orient=(\S+) mode=(\S+) members=(\d+) bp=(\d+) deleted_at=(\S+)(?: source_seq_id=(\S+) source_start=(\S+) source_end=(\S+))?$/,
     );
     if (!match) {
       continue;
@@ -48,6 +48,8 @@ async function listDeletedCtgs(payload) {
       memberCount: Number(match[9]),
       totalLength: Number(match[10]),
       deletedAt: match[11],
+      ...(Number(match[12]) > 0 && Number(match[13]) > 0 && Number(match[14]) >= Number(match[13])
+        ? { sourceRange: { sourceSeqId: Number(match[12]), sourceStart: Number(match[13]), sourceEnd: Number(match[14]) } } : {}),
     });
   }
   return { items };

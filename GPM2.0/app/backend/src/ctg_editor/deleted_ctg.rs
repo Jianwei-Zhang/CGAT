@@ -20,6 +20,9 @@ pub struct DeletedCtgItem {
     pub member_count: i64,
     pub total_length: i64,
     pub deleted_at: String,
+    pub source_seq_id: Option<i64>,
+    pub source_start: Option<i64>,
+    pub source_end: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,7 +96,7 @@ pub fn list_deleted_ctgs_with_connection(
                 THEN (s.source_end - s.source_start + 1)
                 ELSE 0
             END AS total_length,
-            d.deleted_at
+            d.deleted_at, s.source_seq_id, s.source_start, s.source_end
          FROM deleted_assembly_ctg d
          LEFT JOIN assembly_seq s
            ON s.id = d.assembly_seq_id
@@ -152,6 +155,9 @@ pub fn list_deleted_ctgs_with_connection(
                     member_count: row.get(9)?,
                     total_length: row.get(10)?,
                     deleted_at: row.get(11)?,
+                    source_seq_id: row.get(12)?,
+                    source_start: row.get(13)?,
+                    source_end: row.get(14)?,
                 })
             })
             .context("failed to query deleted ctgs by chr and dataset")?
@@ -172,6 +178,9 @@ pub fn list_deleted_ctgs_with_connection(
                     member_count: row.get(9)?,
                     total_length: row.get(10)?,
                     deleted_at: row.get(11)?,
+                    source_seq_id: row.get(12)?,
+                    source_start: row.get(13)?,
+                    source_end: row.get(14)?,
                 })
             })
             .context("failed to query deleted ctgs by chr")?
@@ -192,6 +201,9 @@ pub fn list_deleted_ctgs_with_connection(
                     member_count: row.get(9)?,
                     total_length: row.get(10)?,
                     deleted_at: row.get(11)?,
+                    source_seq_id: row.get(12)?,
+                    source_start: row.get(13)?,
+                    source_end: row.get(14)?,
                 })
             })
             .context("failed to query deleted ctgs by dataset")?
@@ -212,6 +224,9 @@ pub fn list_deleted_ctgs_with_connection(
                     member_count: row.get(9)?,
                     total_length: row.get(10)?,
                     deleted_at: row.get(11)?,
+                    source_seq_id: row.get(12)?,
+                    source_start: row.get(13)?,
+                    source_end: row.get(14)?,
                 })
             })
             .context("failed to query deleted ctgs")?

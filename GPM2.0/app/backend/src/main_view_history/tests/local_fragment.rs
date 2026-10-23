@@ -49,6 +49,12 @@ fn partial_deletion_is_one_atomic_split_and_delete_with_undo_redo() -> Result<()
     let conn = Connection::open(&db)?;
     let deleted: (i64,i64)=conn.query_row("SELECT s.source_start,s.source_end FROM deleted_assembly_ctg d JOIN assembly_seq s ON s.id=d.assembly_seq_id WHERE d.project_id=1",[],|r|Ok((r.get(0)?,r.get(1)?)))?;
     assert_eq!(deleted, (201, 600));
+    let cards = crate::ctg_editor::list_deleted_ctgs(&db, 1, Some("Chr01"), Some(1))?;
+    assert_eq!(cards.len(), 1);
+    assert_eq!(cards[0].source_seq_id, Some(101));
+    assert_eq!(cards[0].source_start, Some(201));
+    assert_eq!(cards[0].source_end, Some(600));
+    assert_eq!(cards[0].total_length, 400);
     assert_eq!(
         count(&conn, "assembly_ctg", "id=303")?,
         1,
@@ -228,5 +234,50 @@ fn a_dependency_failure_after_an_earlier_partition_rolls_back_the_entire_batch()
         )?,
         0
     );
+    Ok(())
+}
+
+#[test]
+fn main_flip_after_split_and_partial_deletion_never_flips_or_deletes_a_surviving_sibling()
+-> Result<()> {
+    let temp = tempfile::tempdir()?;
+    let db = temp.path().join("project.sqlite");
+    seed_workspace(&db)?;
+    edit(&db, request("split", 1, 1000, Some(400), 301, 1000, "+"))?;
+    let parts = intervals(&db, 101)?;
+    let left = parts[0].0;
+    let right = parts[1].0;
+    run_main_view_editor_action(
+        &db,
+        &RunMainViewEditorActionParams {
+            history_capacity: None,
+            project_id: 1,
+            chr_name: "Chr01".into(),
+            action: "flip-ctg".into(),
+            args: json!({"assemblyCtgId":left}),
+        },
+    )?;
+    let orientation = |id| -> Result<String> {
+        Ok(Connection::open(&db)?.query_row(
+        "SELECT s.orient FROM assembly_ctg c JOIN assembly_seq s ON s.id=c.assembly_seq_id WHERE c.id=?1", [id], |row|row.get(0))?)
+    };
+    assert_eq!(orientation(left)?, "-");
+    assert_eq!(orientation(right)?, "+");
+    edit(
+        &db,
+        json!({"action":"delete","sourceStart":101,"sourceEnd":200,
+        "targets":[{"assemblyCtgId":left,"sourceStart":1,"sourceEnd":400,"orient":"-"}]}),
+    )?;
+    assert_eq!(orientation(right)?, "+");
+    assert_eq!(
+        intervals(&db, 101)?
+            .iter()
+            .map(|(_, a, b)| (*a, *b))
+            .collect::<Vec<_>>(),
+        vec![(1, 100), (201, 400), (401, 1000)]
+    );
+    assert!(undo_main_view_history(&db, &target("Chr01"))?.changed);
+    assert_eq!(orientation(left)?, "-");
+    assert_eq!(orientation(right)?, "+");
     Ok(())
 }

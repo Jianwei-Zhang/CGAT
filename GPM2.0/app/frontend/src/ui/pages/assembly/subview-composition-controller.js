@@ -1,3 +1,5 @@
+import { collectSubviewAnchorScene, buildSubviewAnchorObjectId } from "./subview-anchor-objects.js";
+import { memberAnchorEndpointKey } from "./subview-fragment-model.js";
 import { buildSubviewCompositionCandidates } from "./subview-composition-candidates.js";
 import {
   addSubviewCompositionMembers,
@@ -122,6 +124,7 @@ function memberFromCtg(
   return normalizeSubviewCompositionMember({
     assemblyCtgId: contigId,
     originSourceSeqId: ctg?.originSourceSeqId,
+    backingOrientation: ctg?.subviewBackingOrientation,
     sourceFragment: ctg?.sourceFragment,
     source: sourceFromSelection(selection, ctg),
     reference: selection?.role === "ref" ? {
@@ -139,7 +142,7 @@ function memberFromCtg(
   }, index);
 }
 
-export function projectCurrentSubviewToComposition(state, host) {
+export function projectCurrentSubviewToComposition(state, host, renderedMetrics = null) {
   const currentSubview = getSubviewState(state?.assembly || {});
   const existing = getSubviewComposition(currentSubview);
   if (existing) return existing;
@@ -149,7 +152,7 @@ export function projectCurrentSubviewToComposition(state, host) {
     manualAnchors: currentSubview.manualAnchors,
   });
   const pools = buildSubviewTrackPairPoolsFromAssembly(state?.assembly || {});
-  const { positions, bpPerPx } = readCurrentRectPositions(host, 20_000);
+  const { positions, bpPerPx } = renderedMetrics || readCurrentRectPositions(host, 20_000);
   const layoutGapBp = Math.max(0, 20 * bpPerPx);
   const flippedKeys = new Set((currentSubview.flippedCtgs || [])
     .map((entry) => `${entry.slot}:${entry.contigId}`));
@@ -176,7 +179,7 @@ export function projectCurrentSubviewToComposition(state, host) {
       if (selection && ctg) entries.push({ lane, selection, ctg });
     }
   }
-  return normalizeSubviewComposition({
+  const composition = normalizeSubviewComposition({
     members: entries.map((entry, index) => memberFromCtg(
       entry.ctg,
       entry.selection,
@@ -190,6 +193,29 @@ export function projectCurrentSubviewToComposition(state, host) {
     layoutGapBp,
     activeAnchors: currentSubview.activeAnchors,
     manualAnchors: currentSubview.manualAnchors,
+  });
+  const scene = renderedMetrics?.anchorScene || collectSubviewAnchorScene(host);
+  const byObject = new Map(scene.map((entry) => [entry.objectId, entry]));
+  const endpoint = (value, assemblySpace = false, lane = "") => {
+    if (!value) return null;
+    const role = value.sourceRole || String(value.endpointKey || "").match(/role:([^:]+)/)?.[1];
+    const matches = composition.members.filter((member) => member.assemblyCtgId === value.contigId
+      && (!role || member.source.role === role) && (!lane || member.lane === lane));
+    if (matches.length !== 1) return value;
+    const member = matches[0];
+    return { ...value, endpointKey: memberAnchorEndpointKey(member), lengthBp: member.lengthBp,
+      baseOrientation: member.baseOrientation,
+      cutBp: !assemblySpace && member.flipped ? member.lengthBp - value.cutBp + 1 : value.cutBp };
+  };
+  return normalizeSubviewComposition({ ...composition,
+    activeAnchors: composition.activeAnchors.map((anchor) => {
+      const descriptor = byObject.get(buildSubviewAnchorObjectId("evidence", anchor.hitKey, anchor.edge))?.descriptor || anchor.descriptor;
+      return descriptor ? { ...anchor, descriptor: { top: endpoint(descriptor.top, false, "top"), bottom: endpoint(descriptor.bottom, false, "bottom") } } : anchor;
+    }),
+    manualAnchors: composition.manualAnchors.map((anchor) => ({ ...anchor, coordinateSpace: "assembly",
+      endpointA: endpoint(anchor.endpointA, anchor.coordinateSpace === "assembly"),
+      endpointB: endpoint(anchor.endpointB, anchor.coordinateSpace === "assembly"),
+    })),
   });
 }
 
@@ -209,7 +235,7 @@ export function resolveCurrentSubviewCompositionViewport(state, host) {
   const viewBoxMinX = Number(scroll?.dataset?.subviewViewboxMinX || 0);
   return {
     bpPerPx,
-    leftBp: (Math.max(0, Number(scroll?.scrollLeft || 0))
+    leftBp: Number(scroll?.dataset?.subviewWindowStartBp || 0) + (Math.max(0, Number(scroll?.scrollLeft || 0))
       + (Number.isFinite(viewBoxMinX) ? viewBoxMinX : 0)) * bpPerPx,
     topPx: 0,
   };
@@ -652,4 +678,27 @@ export function createSubviewCompositionController({
     onDragEnd,
     afterRender,
   };
+}
+
+// Read only our numeric SVG layout contract; this is not a general HTML parser.
+// History migration reuses the real renderer without mounting or mutating DOM.
+export function projectRenderedSubviewToComposition(state, markup) {
+  const attr = (tag, key) => tag.match(new RegExp(`${key}="([^" ]*)"`))?.[1];
+  const scrollTag = String(markup).match(/<[^>]*data-subview-domain-span-bp="[^>]*>/)?.[0] || "";
+  const span = Number(attr(scrollTag, "data-subview-domain-span-bp"));
+  const width = Number(attr(scrollTag, "data-subview-inner-width"));
+  const bpPerPx = span > 0 && width > 0 ? span / width : 1_000;
+  const positions = new Map();
+  for (const match of String(markup).matchAll(/<[^>]*data-subview-contig-id="[^>]*>/g)) {
+    const tag = match[0], id = Number(attr(tag, "data-subview-contig-id"));
+    const slot = attr(tag, "data-subview-track-slot");
+    const raw = attr(tag, "data-subview-world-start-bp"), position = raw == null ? NaN : Number(raw);
+    if (id > 0 && ["top", "bottom"].includes(slot) && Number.isFinite(position)) positions.set(`${slot}:${id}`, position);
+  }
+  const decode = (text) => String(text).replace(/&(amp|quot|lt|gt|#39);/g, (_, key) => ({ amp: "&", quot: '"', lt: "<", gt: ">", "#39": "'" })[key]);
+  const anchorNodes = [...String(markup).matchAll(/<[^>]*data-subview-anchor-object-id="[^>]*>/g)].map((match) => ({
+    getAttribute: (name) => { const raw = match[0].match(new RegExp(`${name}="([^"\\n]*)"`))?.[1]; return raw == null ? null : decode(raw); },
+  }));
+  const anchorScene = collectSubviewAnchorScene({ querySelectorAll: () => anchorNodes });
+  return projectCurrentSubviewToComposition(state, null, { positions, bpPerPx, anchorScene });
 }

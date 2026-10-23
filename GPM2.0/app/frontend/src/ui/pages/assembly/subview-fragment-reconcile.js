@@ -21,7 +21,7 @@ export function reconcileLocalCompositionWithMain(composition, mainCtgs) {
   const sources = (mainCtgs || []).map(sourceOf).filter((source) => Number.isSafeInteger(source.sourceEnd)
     && source.sourceStart > 0 && source.sourceEnd >= source.sourceStart);
   for (const member of current.members.slice()) {
-    if (member.source.role !== "primary") continue;
+    if (!["primary", "phased"].includes(member.source.role)) continue;
     const range = memberSourceInterval(member);
     const originalIds = new Set(range.parts.map((part) => part.assemblyCtgId));
     const groups = new Set([canonicalGroup(range.groupKey), ...range.parts.map((part) => `assembly:${part.assemblyCtgId}`)]);
@@ -60,17 +60,26 @@ export function reconcileLocalCompositionWithMain(composition, mainCtgs) {
 export function reconcileLocalSubviewWithMain(assembly) {
   if (!assembly || !Array.isArray(assembly.chrCtgs)) return assembly;
   const key = `composition:${encodeURIComponent(String(assembly.selectedChrName || ""))}`;
-  const transform = (snapshot) => snapshot?.kind === "composition" ? { ...snapshot,
-    composition: reconcileLocalCompositionWithMain(snapshot.composition, assembly.chrCtgs) } : snapshot;
+  const transform = (snapshot) => {
+    if (snapshot?.kind === "composition") return { ...snapshot, composition: reconcileLocalCompositionWithMain(snapshot.composition, assembly.chrCtgs) };
+    if (snapshot?.kind !== "legacy" || !snapshot.sourceProjection) return snapshot;
+    const rebound = reconcileLocalCompositionWithMain(snapshot.sourceProjection, assembly.chrCtgs);
+    return JSON.stringify(rebound) === JSON.stringify(normalizeSubviewComposition(snapshot.sourceProjection)) ? snapshot
+      : { kind: "composition", composition: rebound };
+  };
   const record = assembly.subviewHistoryByKey?.[key];
   const subviewHistoryByKey = record ? { ...assembly.subviewHistoryByKey, [key]: { ...record,
     current: transform(record.current), default: transform(record.default),
     past: (record.past || []).map((entry) => ({ ...entry, snapshot: transform(entry.snapshot) })),
     forward: (record.forward || []).map((entry) => ({ ...entry, snapshot: transform(entry.snapshot) })),
   } } : assembly.subviewHistoryByKey;
-  const subview = assembly.subview?.summary?.mode === "composition" ? applySubviewComposition(assembly.subview,
+  let subview = assembly.subview?.summary?.mode === "composition" ? applySubviewComposition(assembly.subview,
     reconcileLocalCompositionWithMain({ members: assembly.subview.summary.members,
       layoutGapBp: assembly.subview.summary.layoutGapBp, activeAnchors: assembly.subview.activeAnchors,
       manualAnchors: assembly.subview.manualAnchors }, assembly.chrCtgs)) : assembly.subview;
+  if (assembly.subview?.historyKey === key && record?.current?.kind === "legacy"
+    && subviewHistoryByKey[key]?.current?.kind === "composition") {
+    subview = applySubviewComposition(subview, subviewHistoryByKey[key].current.composition);
+  }
   return { ...assembly, subview, subviewHistoryByKey };
 }

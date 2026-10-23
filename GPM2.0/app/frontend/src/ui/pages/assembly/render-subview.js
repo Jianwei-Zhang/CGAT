@@ -1253,6 +1253,7 @@ function buildSubviewFragmentRects({
                 height="${Number(barHeight || 0).toFixed(2)}"
                 fill="transparent"
                 data-subview-fragment-key="${escapeAttr(fragment.fragmentKey)}"
+                data-subview-fragment-coordinate-space="display"
                 data-subview-fragment-slot="${escapeAttr(slot)}"
                 data-subview-fragment-role="${escapeAttr(role)}"
                 data-subview-fragment-contig-id="${contigId}"

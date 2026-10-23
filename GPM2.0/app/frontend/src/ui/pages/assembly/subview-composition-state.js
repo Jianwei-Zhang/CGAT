@@ -106,6 +106,7 @@ export function normalizeSubviewCompositionMember(value, fallbackOrder = 0) {
     lengthBp: localFragment ? localFragment.sourceEnd - localFragment.sourceStart + 1
       : normalizePositiveLength(value.lengthBp ?? value.totalLength),
     baseOrientation: normalizeOrientation(value.baseOrientation ?? value.orient ?? value.refOrient),
+    ...(["+", "-"].includes(value.backingOrientation) ? { backingOrientation: value.backingOrientation } : {}),
     lane: normalizeSubviewCompositionLane(value.lane),
     xBp: normalizeFiniteNumber(value.xBp, 0),
     flipped: value.flipped === true,

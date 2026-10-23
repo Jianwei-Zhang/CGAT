@@ -1,3 +1,7 @@
+import { createMainMemberAnnotationRefresh } from "./assembly/main-member-local-state.js";
+import { createSubviewFragmentGestureRuntime } from "./assembly/subview-fragment-gesture-runtime.js";
+import { createSubviewFragmentSyncRuntime } from "./assembly/subview-fragment-sync-runtime.js";
+import { projectRenderedSubviewToComposition } from "./assembly/subview-composition-controller.js";
 import { createSubviewFragmentController, resolveLocalFragmentMenu } from "./assembly/subview-fragment-controller.js";
 import { clearOtherViewSelection } from "./assembly/selection-state.js";
 import { bindAlignmentTooltips } from "./assembly/alignment-tooltip-runtime.js";
@@ -444,7 +448,26 @@ const {
   moveContextSubviewMemberToOtherLane,
   removeContextSubviewMember,
 } = subviewToolsContentController;
+const synchronizeLocalFragment = createSubviewFragmentSyncRuntime({
+  inspectMainViewDelete,
+  confirm: (message, context) => requestAssemblyConfirm(context.host, context.store, message),
+  projectHistorical: (state) => projectRenderedSubviewToComposition(state, renderAssemblySubviewPanelImpl(state, renderTracksDeps)),
+  flushBefore: flushAssemblyProjectState,
+  serialize: runSerializedProjectViewMutation,
+  runMainViewEditorAction,
+  loadAssemblyView,
+  persistNow: persistAssemblyProjectStateChecked,
+  rerenderMain: rerenderAssemblyMainTab,
+  rerenderSubviewPanel,
+  refreshSubviewPairwiseEvidence,
+});
+const subviewFragmentGestureRuntime = createSubviewFragmentGestureRuntime({
+  projectHistorical: (state) => projectRenderedSubviewToComposition(state, renderAssemblySubviewPanelImpl(state, renderTracksDeps)),
+  rerenderSubviewPanel,
+});
 const subviewFragmentController = createSubviewFragmentController({
+  synchronizeLocalFragment,
+  projectHistorical: (state) => projectRenderedSubviewToComposition(state, renderAssemblySubviewPanelImpl(state, renderTracksDeps)),
   openManualContigSplit,
   persistProjectAssemblyViewStateFromStore: (host, store) => persistProjectAssemblyViewStateFromStore(host, store),
   rerenderSubviewPanel: (host, store) => rerenderSubviewPanel(host, store),
@@ -1129,6 +1152,7 @@ const degapRuntimeDeps = {
 };
 
 const contextMenuRuntimeDeps = {
+  synchronizeLocalFragment,
   resolveLocalFragmentMenu,
   flipLocalFragment: subviewFragmentController.flipLocalFragment,
   openLocalContigSplit: subviewFragmentController.openLocalContigSplit,
@@ -1186,6 +1210,7 @@ const contextMenuRuntimeDeps = {
 };
 
 const trackDragRuntimeDeps = {
+  deferSubviewFragmentDrag: subviewFragmentGestureRuntime.deferSubviewFragmentDrag,
   applySubviewTrackDragOffset,
   clearSubviewTrackDragPreview,
   clearTrackDragPreview,
@@ -1236,6 +1261,7 @@ const trackDragRuntimeDeps = {
 };
 
 const trackSelectionRuntimeDeps = {
+  prepareSubviewFragmentSelection: subviewFragmentGestureRuntime.prepareSubviewFragmentSelection,
   updateSubviewTrackPairSelection,
   updateTrackSelection,
 };
@@ -1541,22 +1567,25 @@ function rerenderAssemblyConfirmModal(host, store) {
   bindAssemblyPage(nextOverlay, store, { scope: "main" });
 }
 
-function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false, trackOnly = false } = {}) {
+const refreshMainMembersForSubview = createMainMemberAnnotationRefresh({
+  rerenderMembers: (host, store) => rerenderAssemblyMainTab(host, store, { membersOnly: true }),
+});
+function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false, trackOnly = false, membersOnly = false } = {}) {
   cancelDeferredRerender();
   const routeHost = resolveCurrentRouteHost(host);
   if (!routeHost) {
-    if (!preserveTrackGeometry) rerender(host, store);
+    if (!preserveTrackGeometry && !membersOnly) rerender(host, store);
     return;
   }
   const doc = routeHost.ownerDocument || globalThis.document;
   if (!doc?.createElement) {
-    if (!preserveTrackGeometry) rerender(host, store);
+    if (!preserveTrackGeometry && !membersOnly) rerender(host, store);
     return;
   }
   const template = doc.createElement("template");
   template.innerHTML = renderAssemblyMainTrackSections(store.getState());
   const nextContent = template.content;
-  const selectors = preserveTrackGeometry
+  const selectors = membersOnly ? [".assembly-members-panel"] : preserveTrackGeometry
     ? [".main-view-history-controls"]
     : trackOnly ? [".assembly-track-unified"]
     : [".chr-strip.has-members-panel", ".assembly-track-unified"];
@@ -1564,7 +1593,7 @@ function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false, t
     replaceRenderedAssemblySection(routeHost, nextContent, selector),
   ).filter(Boolean);
   if (!replacedNodes.length) {
-    if (!preserveTrackGeometry) rerender(host, store);
+    if (!preserveTrackGeometry && !membersOnly) rerender(host, store);
     return;
   }
   patchAssemblyStatusToast(routeHost, nextContent);
@@ -1575,6 +1604,7 @@ function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false, t
       rerenderAssemblyMainTab,
     });
   });
+  return true;
 }
 
 function rerenderFinalPathCard(host, store) {
@@ -1751,6 +1781,7 @@ function rerenderSubviewPanel(host, store) {
     scope: "subview",
     rerender: rerenderSubviewPanel,
   });
+  if (routeHost.querySelector(".assembly-members-panel")) refreshMainMembersForSubview(routeHost, store);
 }
 
 export async function __testLoadNewSequencesTabData(
@@ -2158,6 +2189,10 @@ async function persistProjectAssemblyViewStateFromStoreNow(
 
 export async function flushAssemblyProjectState(host, store) {
   await assemblyPageSession.projectViewMutationCoordinator.whenIdle();
+  return persistAssemblyProjectStateChecked(host, store);
+}
+
+async function persistAssemblyProjectStateChecked(host, store) {
   const state = store.getState();
   if (!state.session?.projectId || !state.assembly?.selectedChrName || state.assembly.loading) return;
   const requestedIdentity = captureProjectViewIdentity(state);

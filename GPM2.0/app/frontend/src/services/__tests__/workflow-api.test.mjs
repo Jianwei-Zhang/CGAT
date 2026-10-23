@@ -1067,3 +1067,18 @@ test("undo contig split uses persistent native history and propagates conflicts 
     await assert.rejects(runMainViewEditorAction({workspaceRoot:"D:/workspace",projectId:1,chrName:"ChrA",action:"undo-contig-split",args}),/CTG_UNSPLIT_STALE_SOURCE/);
   } finally {globalThis.window=previousWindow;}
 });
+
+
+test("synchronized local fragment edits keep interval preconditions and one native history request", async () => {
+  const previousWindow = globalThis.window, calls = [];
+  try {
+    globalThis.window = { __TAURI__: { core: { invoke: async (command, args) => { calls.push({ command, args }); return { changed: true }; } } } };
+    const args = { action: "delete", sourceStart: 1001, sourceEnd: 5000,
+      targets: [{ assemblyCtgId: 6, sourceStart: 1, sourceEnd: 16000, orient: "-" }] };
+    await runMainViewEditorAction({ workspaceRoot: "D:/workspace", projectId: 1, chrName: "Chr01", action: "edit-local-fragment", args });
+    assert.equal(calls.length, 1); assert.equal(calls[0].command, "run_main_view_editor_action");
+    assert.equal(calls[0].args.request.action, "edit-local-fragment"); assert.deepEqual(calls[0].args.request.args, args);
+    globalThis.window.__TAURI__.core.invoke = async () => { throw new Error("LOCAL_FRAGMENT_STALE_SOURCE"); };
+    await assert.rejects(runMainViewEditorAction({ workspaceRoot: "D:/workspace", projectId: 1, chrName: "Chr01", action: "edit-local-fragment", args }), /LOCAL_FRAGMENT_STALE_SOURCE/);
+  } finally { globalThis.window = previousWindow; }
+});

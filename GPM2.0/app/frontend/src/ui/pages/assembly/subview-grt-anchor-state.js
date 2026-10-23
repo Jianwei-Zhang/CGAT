@@ -71,23 +71,26 @@ export function buildSubviewGrtAnchorObjectId(originId) {
   return normalized ? `grt:${normalized}` : "";
 }
 
-function currentEntryForInterval(interval, entries) {
+function currentEntryForInterval(interval, sourcePosition, entries) {
   const assemblyCtgId = positiveInt(interval?.assemblyCtgId);
   if (!assemblyCtgId) return null;
   const matches = (Array.isArray(entries) ? entries : []).filter((entry) =>
-    positiveInt(entry?.ctg?.assemblyCtgId ?? entry?.assemblyCtgId) === assemblyCtgId
+    (entry.matchesSourceInterval ? entry.matchesSourceInterval(interval)
+      && entry.projectSourcePositionToCtg(sourcePosition, interval) !== null
+      : positiveInt(entry?.ctg?.assemblyCtgId ?? entry?.assemblyCtgId) === assemblyCtgId)
     && String(entry?.sourceRole || "") !== "ref");
   return matches.length === 1 ? matches[0] : null;
 }
 
 function projectEndpoint(interval, sourcePosition, entries) {
-  const entry = currentEntryForInterval(interval, entries);
+  const entry = currentEntryForInterval(interval, sourcePosition, entries);
   if (!entry) return null;
   const lengthBp = positiveInt(entry?.ctg?.lengthBp ?? entry?.ctg?.totalLength ?? entry?.lengthBp);
   const endpointKey = String(entry?.endpointKey || "").trim();
   const lane = String(entry?.lane || "").trim() === "bottom" ? "bottom" : "top";
   const baseOrientation = orientation(entry?.baseOrientation ?? entry?.ctg?.orient);
-  const baseCutBp = projectGrtSourcePositionToCtg(sourcePosition, interval, baseOrientation);
+  const baseCutBp = entry.projectSourcePositionToCtg ? entry.projectSourcePositionToCtg(sourcePosition, interval)
+    : projectGrtSourcePositionToCtg(sourcePosition, interval, baseOrientation);
   const locallyFlipped = entry?.locallyFlipped === true;
   const displayCutBp = baseCutBp && lengthBp
     ? (locallyFlipped ? lengthBp - baseCutBp + 1 : baseCutBp)

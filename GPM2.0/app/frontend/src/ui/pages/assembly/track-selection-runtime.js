@@ -128,11 +128,12 @@ export function bindTrackBoxSelection(host, store, deps) {
   }
 
   host.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0) {
+    if (event.defaultPrevented || event.button !== 0
+      || event.target?.closest?.("[data-view-interaction-mode='hand']")?.dataset?.viewInteractionMode === "hand") {
       return;
     }
     const state = store.getState();
-    if (state.assembly.activeTab !== "assembly") {
+    if (state.assembly.activeTab !== "assembly" || state.assembly.loading || state.assembly.mainViewHistory?.inFlight) {
       return;
     }
     const scrollEl = event.target?.closest?.(".assembly-track-scroll[data-track-role]");
@@ -158,7 +159,14 @@ export function bindTrackBoxSelection(host, store, deps) {
     const startBoxPoint = resolveTrackPointerScrollPoint(event, scrollEl);
     let currentPoint = startPoint;
     let currentBoxPoint = startBoxPoint;
-    let dragging = false;
+    let dragging = false, finished = false;
+    const isCurrent = () => {
+      const next = store.getState();
+      return !next.assembly.loading && !next.assembly.mainViewHistory?.inFlight
+        && next.session?.workspacePath === state.session?.workspacePath && next.session?.projectId === state.session?.projectId
+        && next.assembly.selectedChrName === state.assembly.selectedChrName
+        && (isSubviewTrack ? next.assembly.subview === state.assembly.subview : next.assembly.chrCtgs === state.assembly.chrCtgs);
+    };
 
     const updateSelectionBox = () => {
       const left = Math.min(startBoxPoint.x, currentBoxPoint.x);
@@ -173,6 +181,8 @@ export function bindTrackBoxSelection(host, store, deps) {
     };
 
     const onPointerMove = (moveEvent) => {
+      if (finished) return;
+      if (!isCurrent()) { finishSelection(true); return; }
       currentPoint = resolveTrackPointerContentPoint(moveEvent, scrollEl);
       currentBoxPoint = resolveTrackPointerScrollPoint(moveEvent, scrollEl);
       if (!dragging && hasTrackSelectionDragMoved(startBoxPoint, currentBoxPoint)) {
@@ -183,11 +193,15 @@ export function bindTrackBoxSelection(host, store, deps) {
       }
     };
 
-    const finishSelection = () => {
+    const finishSelection = (cancelled = false) => {
+      if (finished) return;
+      finished = true;
       const windowObject = getWindowObject();
       windowObject?.removeEventListener?.("pointermove", onPointerMove, true);
       windowObject?.removeEventListener?.("pointerup", onPointerUp, true);
+      windowObject?.removeEventListener?.("pointercancel", onPointerCancel, true);
       boxEl.classList.add("is-hidden");
+      if (cancelled || !isCurrent()) return;
       if (!dragging) {
         if (isPrimaryTrack) {
           deps.updateTrackSelection(host, store, []);
@@ -201,16 +215,21 @@ export function bindTrackBoxSelection(host, store, deps) {
         deps.updateTrackSelection(host, store, collectTrackSelectedCtgIds(scrollEl, selectionRect));
         return;
       }
-      deps.updateSubviewTrackPairSelection(host, store, collectSubviewTrackPairSelectedCtgs(scrollEl, selectionRect));
+      const materialized = deps.prepareSubviewFragmentSelection?.(host, store, scrollEl, selectionRect);
+      deps.updateSubviewTrackPairSelection(materialized?.host || host, store,
+        materialized?.entries || collectSubviewTrackPairSelectedCtgs(scrollEl, selectionRect));
     };
 
-    const onPointerUp = () => {
+    const onPointerUp = (upEvent) => {
+      if (Number.isFinite(upEvent?.clientX) && Number.isFinite(upEvent?.clientY)) onPointerMove(upEvent);
       finishSelection();
     };
+    const onPointerCancel = () => finishSelection(true);
 
     const windowObject = getWindowObject();
     windowObject?.addEventListener?.("pointermove", onPointerMove, true);
     windowObject?.addEventListener?.("pointerup", onPointerUp, true);
+    windowObject?.addEventListener?.("pointercancel", onPointerCancel, true);
   });
 
   host[ASSEMBLY_TRACK_BOX_SELECT_BOUND] = true;

@@ -1,15 +1,19 @@
+import { projectRenderedSubviewToComposition } from "../subview-composition-controller.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createIdentityRenderState } from "./identity-render-fixture.mjs";
-import { createStore, __testBuildAssemblyContextMenuItems } from "./tabs-semantics-harness.mjs";
+import { createStore, __testBuildAssemblyContextMenuItems, renderAssemblyPage } from "./tabs-semantics-harness.mjs";
 import { createSubviewFragmentController, resolveLocalFragmentMenu } from "../subview-fragment-controller.js";
-import { rollbackSubviewHistory, restoreSubviewHistoryRollback, resolveCurrentSubviewHistory } from "../subview-history-state.js";
+import { commitSubviewHistoryOperation, rollbackSubviewHistory, restoreSubviewHistoryRollback, resolveCurrentSubviewHistory } from "../subview-history-state.js";
 import { memberSourceInterval, mergeLocalMember, splitLocalMember, filterLocalAnchorCuts } from "../subview-fragment-model.js";
+
+import { reconcileLocalSubviewWithMain } from "../subview-fragment-reconcile.js";
 
 const host = {};
 function controller(overrides = {}) {
   const persisted = [];
   const runtime = createSubviewFragmentController({
+    projectHistorical: (state) => projectRenderedSubviewToComposition(state, renderAssemblyPage(state)),
     openManualContigSplit: async (_host, model, options) => options.commit({ cutAfter: Math.floor((model.sourceStart + model.sourceEnd) / 2) }),
     rerenderSubviewPanel() {}, refreshSubviewPairwiseEvidence() {},
     persistProjectAssemblyViewStateFromStore: async (_host, store) => { persisted.push(JSON.parse(JSON.stringify(store.getState()))); },
@@ -94,4 +98,74 @@ test("local menu has ordered scoped split/delete and local-only merge, with no r
   assert.equal(items[5].children[1].disabled, true);
   const model = resolveLocalFragmentMenu(state, host, context);
   assert.equal(model.left, true); assert.equal(model.right, true);
+});
+
+for (const mode of ["2-contig", "track-pair"]) {
+  test(`${mode} undo restores legacy offsets and later native split rebinds its source backup and redo`, async () => {
+    const state = createIdentityRenderState(mode);
+    state.assembly.chrCtgs[0].originSourceSeqId = 700;
+    const offsets = [{ slot: "bottom", contigId: 2, offsetBp: -900 }];
+    state.assembly.subviewTrackDragOffsets = offsets;
+    // Expose real rendered layout attributes, as the mounted Local View does.
+    // An empty host has no geometry and intentionally uses zero-offset fallback.
+    const html = renderAssemblyPage(state);
+    const rects = [...html.matchAll(/<[^>]+data-subview-rect-x=[^>]+>/g)].map(([tag]) => ({
+      getAttribute: (name) => tag.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? null,
+    }));
+    const renderedHost = { querySelectorAll: (selector) => selector ===
+      "[data-subview-track-slot][data-subview-contig-id][data-subview-rect-x]" ? rects : [] };
+    const store = createStore(state), runtime = controller();
+    assert.equal(await runtime.flipLocalFragment(renderedHost, store, {
+      assemblyCtgId: 2, trackRole: "primary", slot: "bottom", start: 1001, end: 3000,
+    }), true);
+    const undone = rollbackSubviewHistory(JSON.parse(JSON.stringify(store.getState().assembly)));
+    assert.equal(undone.changed, true);
+    assert.equal(undone.assembly.subview.summary.mode, mode);
+    assert.deepEqual(undone.assembly.subviewTrackDragOffsets, offsets);
+    assert.equal(resolveCurrentSubviewHistory(undone.assembly).record.current.kind, "legacy");
+    const parent = state.assembly.chrCtgs[0];
+    const children = [[701, 1, 8000], [702, 8001, 16000]].map(([id, start, end]) => ({
+      ...parent, assemblyCtgId: id, totalLength: end - start + 1, lengthBp: end - start + 1,
+      sourceFragment: { sourceSeqId: 700, groupKey: "manual-fragment:2", sourceStart: start, sourceEnd: end, sourceLength: 16000 },
+    }));
+    const rebound = reconcileLocalSubviewWithMain({ ...undone.assembly, chrCtgs: children });
+    assert.equal(rebound.subview.summary.mode, "composition");
+    const primary = rebound.subview.summary.members.find((m) => m.source.role === "primary");
+    assert.deepEqual(primary.localFragment.parts.map((part) => part.assemblyCtgId), [701, 702]);
+    assert.equal(primary.xBp, projectRenderedSubviewToComposition({ ...state, assembly: undone.assembly },
+      renderAssemblyPage({ ...state, assembly: undone.assembly })).members.find((m) => m.source.role === "primary").xBp);
+    const redone = restoreSubviewHistoryRollback(JSON.parse(JSON.stringify(rebound)));
+    assert.equal(redone.changed, true);
+    const pieces = redone.assembly.subview.summary.members.filter((m) => m.source.role === "primary");
+    assert.deepEqual(pieces.map((m) => [m.localFragment.sourceStart, m.localFragment.sourceEnd, m.flipped]),
+      [[1, 1000, false], [1001, 3000, true], [3001, 16000, false]]);
+    assert.ok(pieces.every((m) => m.localFragment.parts.every((part) => part.assemblyCtgId !== 2)));
+  });
+}
+
+test("deleted local interval survives anchor disable, persisted reopen and undo of only the anchor change", async () => {
+  const state = createIdentityRenderState("composition");
+  const store = createStore(state), runtime = controller();
+  assert.equal(await runtime.deleteLocalFragment(host, store, {
+    assemblyCtgId: 30, trackRole: "support", slot: "top", start: 1001, end: 3000,
+  }), true);
+  const deleted = store.getState().assembly;
+  const changed = commitSubviewHistoryOperation(deleted, {
+    nextSubview: { ...deleted.subview, activeAnchors: [{ hitKey: "evidence-1", endpoint: "start" }] },
+    operation: { kind: "toggle-anchor" },
+  });
+  assert.equal(changed.changed, true);
+  const disabled = commitSubviewHistoryOperation(changed.assembly, {
+    nextSubview: { ...changed.assembly.subview, activeAnchors: [] }, operation: { kind: "toggle-anchor" },
+  });
+  assert.equal(disabled.changed, true);
+  const reopened = JSON.parse(JSON.stringify(disabled.assembly));
+  const undo = rollbackSubviewHistory(reopened);
+  assert.equal(undo.changed, true);
+  for (const assembly of [reopened, undo.assembly]) {
+    const pieces = assembly.subview.summary.members.filter((m) => m.assemblyCtgId === 30);
+    assert.deepEqual(pieces.map((m) => [memberSourceInterval(m).sourceStart, memberSourceInterval(m).sourceEnd]),
+      [[1, 1000], [3001, 16000]]);
+    assert.deepEqual(assembly.chrCtgs, state.assembly.chrCtgs);
+  }
 });

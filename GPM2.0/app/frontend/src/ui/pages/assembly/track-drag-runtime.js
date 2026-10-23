@@ -210,7 +210,9 @@ export function bindTrackContigDrag(host, store, deps) {
     let cancelled = false;
     const sameContext = () => {
       const next = store.getState();
-      return next.session?.projectId === state.session?.projectId
+      return !next.assembly?.mainViewHistory?.inFlight && !next.assembly?.loading
+        && next.session?.workspacePath === state.session?.workspacePath
+        && next.session?.projectId === state.session?.projectId
         && next.assembly?.selectedChrName === state.assembly?.selectedChrName
         && next.assembly?.supportDatasetId === state.assembly?.supportDatasetId;
     };
@@ -335,12 +337,13 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     return;
   }
 
-  host.addEventListener("pointerdown", (event) => {
+  const startDrag = (event, fragmentGesture = null) => {
+    const runtimeHost = fragmentGesture?.host || host;
     if (event.defaultPrevented || event.target?.closest?.("[data-view-interaction-mode='hand']")?.dataset?.viewInteractionMode === "hand" || event.button !== 0 || event.ctrlKey || event.metaKey) {
       return;
     }
     const state = store.getState();
-    if (state.assembly.activeTab !== "assembly") {
+    if (state.assembly.activeTab !== "assembly" || state.assembly.loading || state.assembly.mainViewHistory?.inFlight || state.assembly.sourceEditingReloadRequired) {
       return;
     }
     const trackNode = event.target?.closest?.("[data-subview-contig-id][data-subview-track-slot]");
@@ -351,6 +354,8 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     if (!scrollEl) {
       return;
     }
+    if (!fragmentGesture && deps.deferSubviewFragmentDrag?.(runtimeHost, store, event,
+      (next, prepared) => startDrag(next, prepared))) return;
     const slot = normalizeSubviewTrackSlot(trackNode.getAttribute("data-subview-track-slot"));
     const contigId = normalizeSupportDatasetId(trackNode.getAttribute("data-subview-contig-id"));
     const compositionEntityKey = String(
@@ -394,12 +399,14 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     const fullRangeDrag = state.assembly.subviewTrackView?.fullRange === true
       && typeof deps.previewFullRangeSubviewContigDrag === "function"
       && typeof deps.clearFullRangeSubviewDragPreview === "function";
-    const dragHost = fullRangeDrag ? scrollEl.closest?.("#route-host") || host : host;
+    const dragHost = fullRangeDrag ? scrollEl.closest?.("#route-host") || runtimeHost : runtimeHost;
     let lastPointerClientX = startClientX;
     let finished = false;
     const sameContext = () => {
       const next = store.getState();
-      return next.session?.projectId === state.session?.projectId
+      return !next.assembly?.mainViewHistory?.inFlight && !next.assembly?.loading
+        && next.session?.workspacePath === state.session?.workspacePath
+        && next.session?.projectId === state.session?.projectId
         && next.assembly?.selectedChrName === state.assembly?.selectedChrName
         && next.assembly?.subview === state.assembly?.subview;
     };
@@ -413,7 +420,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       const offsetPx = deps.roundTrackMetric(
         deltaOffsetBpToPx(pendingOffsetBp - baseOffsetBp, deps, scaleContext),
       );
-      const previewResult = deps.previewSubviewTrackContigDrag(host, {
+      const previewResult = deps.previewSubviewTrackContigDrag(runtimeHost, {
         slot,
         contigId,
         ...(compositionEntityKey ? { compositionEntityKey } : {}),
@@ -495,18 +502,18 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
       }
       if (finished) return;
       finished = true;
-      deps.clearSubviewTrackDragPreview(host);
+      deps.clearSubviewTrackDragPreview(runtimeHost);
       if (fullRangeDrag) deps.clearFullRangeSubviewDragPreview(dragHost, store);
       const hasEffectiveMovement = dragging
         && Math.abs(pendingOffsetBp - baseOffsetBp) >= 0.000001;
       if (shouldCommit && hasEffectiveMovement) {
-        if (fullRangeDrag) deps.setSuppressTrackContigClickUntil?.(Date.now() + TRACK_CONTIG_CLICK_SUPPRESS_MS);
+        deps.setSuppressTrackContigClickUntil?.(Date.now() + TRACK_CONTIG_CLICK_SUPPRESS_MS);
         deps.applySubviewTrackDragOffset(dragHost, store, dragPayload(pendingOffsetBp));
         if (
           Number.isFinite(pendingPreviewScrollLeft)
           || Number.isFinite(pendingPreviewViewportLeftX)
         ) {
-          const activeScrollEl = deps.resolveActiveTrackScrollElement(host, "subview", scrollEl);
+          const activeScrollEl = deps.resolveActiveTrackScrollElement(runtimeHost, "subview", scrollEl);
           if (activeScrollEl) {
             const activeViewboxMinX = Number(activeScrollEl.dataset?.subviewViewboxMinX || 0);
             const nextScrollLeft = Number.isFinite(pendingPreviewViewportLeftX)
@@ -516,9 +523,11 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
             activeScrollEl.scrollLeft = Math.max(0, Number(nextScrollLeft) || 0);
           }
         }
+        fragmentGesture?.accept();
         void deps.persistSubviewTrackDragOffsets(dragHost, store);
-      } else if (fullRangeDrag && dragging) {
-        deps.clearFullRangeSubviewDragPreview(dragHost, store, { cancelled: true });
+      } else {
+        if (fullRangeDrag && dragging) deps.clearFullRangeSubviewDragPreview(dragHost, store, { cancelled: true });
+        fragmentGesture?.rollback();
       }
     };
 
@@ -532,7 +541,10 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     windowObject?.addEventListener?.("pointermove", onPointerMove, true);
     windowObject?.addEventListener?.("pointerup", onPointerUp, true);
     windowObject?.addEventListener?.("pointercancel", onPointerCancel, true);
-  });
+
+    return { onPointerMove, onPointerUp, onPointerCancel };
+  };
+  host.addEventListener("pointerdown", startDrag);
 
   host[ASSEMBLY_SUBVIEW_TRACK_CONTIG_DRAG_BOUND] = true;
 }

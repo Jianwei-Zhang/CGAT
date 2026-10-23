@@ -1,3 +1,4 @@
+import { localGrtProjection, projectLocalGrtEvidence } from "./subview-fragment-grt.js";
 import { memberAnchorEndpointKey, memberBackingIds, projectLocalAlignment, filterLocalAnchorCuts, memberCoordinateToSource, projectLocalNRegions } from "./subview-fragment-model.js";
 import { sourceFragmentDragAttrs } from "./source-fragment-layout.js";
 import { resolveFullRangeVisibleSpan } from "./view-navigation-state.js";
@@ -21,7 +22,7 @@ import {
   sortTrackEntriesForRender,
 } from "./track-render-geometry.js";
 import { normalizePositiveInt, resolveTrackPrefs, resolveTickBpFromScale } from "./track-prefs.js";
-import { resolveSubviewCompositionCandidate } from "./subview-composition-candidates.js";
+import { resolveSubviewCompositionCandidate, isSubviewCompositionSourceCompatible } from "./subview-composition-candidates.js";
 import { buildSubviewCompositionLayout, resolveSubviewCompositionScaleViewport } from "./subview-composition-layout.js";
 import { getSubviewComposition } from "./subview-composition-state.js";
 import { normalizeSupportDatasetId } from "./selection-state.js";
@@ -152,7 +153,7 @@ function buildReferenceBands(layout, candidates, prefs) {
       if (topIsRef === bottomIsRef) continue;
       const ref = topIsRef ? top : bottom;
       const contig = topIsRef ? bottom : top;
-      const backingCandidates = memberBackingIds(contig).map((id) => candidates.find((item) => item.assemblyCtgId === id && item.sourceKey === contig.sourceKey)).filter(Boolean);
+      const backingCandidates = memberBackingIds(contig).map((id) => candidates.find((item) => item.assemblyCtgId === id && isSubviewCompositionSourceCompatible(item, contig))).filter(Boolean);
       const referenceStart = Number(ref.reference?.startBp);
       const referenceEnd = Number(ref.reference?.endBp);
       if (!Number.isFinite(referenceStart) || !Number.isFinite(referenceEnd)) continue;
@@ -164,8 +165,12 @@ function buildReferenceBands(layout, candidates, prefs) {
         ) continue;
         const rawRefStart = hitField(hit, "refStart", "ref_start");
         const rawRefEnd = hitField(hit, "refEnd", "ref_end");
-        const ctgStart = hitField(hit, "ctgStart", "ctg_start");
-        const ctgEnd = hitField(hit, "ctgEnd", "ctg_end");
+        let ctgStart = hitField(hit, "ctgStart", "ctg_start");
+        let ctgEnd = hitField(hit, "ctgEnd", "ctg_end");
+        if (ctgStart !== null && ctgEnd !== null && candidate.ctg?.subviewPhasedOrientFlipped) {
+          const parentLength = Number(candidate.ctg.totalLength ?? candidate.ctg.lengthBp);
+          [ctgStart, ctgEnd] = [parentLength - ctgEnd + 1, parentLength - ctgStart + 1];
+        }
         if ([rawRefStart, rawRefEnd, ctgStart, ctgEnd].some((value) => value === null)) continue;
         const overlapStart = Math.max(referenceStart, Math.min(rawRefStart, rawRefEnd));
         const overlapEnd = Math.min(referenceEnd, Math.max(rawRefStart, rawRefEnd));
@@ -342,6 +347,7 @@ function renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr }) {
         width="${width.toFixed(2)}" height="${BAR_HEIGHT}" fill="transparent"
         data-subview-fragment-key="${escapeAttr(member.entityKey)}:${fragment.start}-${fragment.end}"
         data-subview-fragment-entity-key="${escapeAttr(member.entityKey)}"
+        data-subview-fragment-coordinate-space="base"
         data-subview-fragment-slot="${member.lane}"
         data-subview-fragment-role="${escapeAttr(member.source?.role || "support")}"
         data-subview-fragment-contig-id="${member.assemblyCtgId || 0}"
@@ -422,7 +428,7 @@ function renderMember(member, candidate, candidatesLoaded, cuts, y, labels, {
     ${renderNRegionMarkersForTrackCtg({
       ctg: candidate?.ctg, rect: member, y, barHeight: BAR_HEIGHT,
       isMirror: member.source?.mirrored,
-      flipped: Boolean(member.flipped) !== Boolean(candidate?.ctg?.subviewPhasedOrientFlipped),
+      flipped: member.localFragment ? member.flipped : Boolean(member.flipped) !== Boolean(candidate?.ctg?.subviewPhasedOrientFlipped),
       escapeAttr, escapeHtml,
     })}
     ${renderMemberFragments(member, cuts, y, { escapeHtml, escapeAttr })}
@@ -480,6 +486,7 @@ export function renderSubviewCompositionAlignmentCard({
   const candidates = supportContext?.compositionCandidates || [];
   const candidatesLoaded = supportContext?.compositionCandidatesLoaded === true;
   const grtEntries = layout.members.map((member) => ({
+    ...localGrtProjection(member),
     key: member.entityKey,
     ctg: {
       assemblyCtgId: member.assemblyCtgId,
@@ -507,7 +514,7 @@ export function renderSubviewCompositionAlignmentCard({
     escapeAttr,
   });
   const grtScene = buildGrtResultScene({
-    plan: grtResult.context?.available ? grtResult.plan : null,
+    plan: grtResult.context?.available ? projectLocalGrtEvidence(grtResult.plan, grtEntries) : null,
     entries: grtEntries,
     layers: grtResult.context?.subviewLayers,
     escapeHtml,
@@ -543,7 +550,7 @@ export function renderSubviewCompositionAlignmentCard({
   const renderCandidate = (member) => {
     const candidate = resolveSubviewCompositionCandidate(candidates, member);
     return candidate && member.localFragment ? { ...candidate, ctg: { ...candidate.ctg,
-      totalLength: member.lengthBp, lengthBp: member.lengthBp, nRegions: projectLocalNRegions(member, candidates),
+      totalLength: member.lengthBp, lengthBp: member.lengthBp, nRegions: projectLocalNRegions(member, candidates, (item) => isSubviewCompositionSourceCompatible(item, member)),
     } } : candidate;
   };
   const memberEntries = layout.members.map((member) => ({

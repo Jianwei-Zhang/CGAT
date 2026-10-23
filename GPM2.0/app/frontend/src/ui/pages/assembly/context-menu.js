@@ -335,6 +335,7 @@ export function resolveSubviewFragmentContextTarget(target) {
   }
   return {
     fragmentKey,
+    ...(node.getAttribute("data-subview-fragment-coordinate-space") ? { coordinateSpace: node.getAttribute("data-subview-fragment-coordinate-space") } : {}),
     ...(String(node.getAttribute("data-subview-fragment-entity-key") || "").trim()
       ? { compositionEntityKey: String(node.getAttribute("data-subview-fragment-entity-key")).trim() } : {}),
     assemblyCtgId,
@@ -647,7 +648,8 @@ export function buildAssemblyContextMenuItems({
       datasetId: normalizeSupportDatasetId(targetContext?.datasetId),
       phasedTrackId: normalizeSupportDatasetId(targetContext?.phasedTrackId),
       phasedTrackItemId: normalizeSupportDatasetId(targetContext?.phasedTrackItemId),
-      ...(targetContext?.start != null ? { start: targetContext.start, end: targetContext.end, fragmentKey: targetContext.fragmentKey } : {}),
+      ...(targetContext?.start != null ? { start: targetContext.start, end: targetContext.end, fragmentKey: targetContext.fragmentKey,
+        ...(targetContext.coordinateSpace ? { coordinateSpace: targetContext.coordinateSpace } : {}) } : {}),
     };
     const subviewCtgContext = normalizedTrackRole && assemblyCtgId ? {
       assemblyCtgId,
@@ -797,6 +799,7 @@ export function buildAssemblyContextMenuItems({
         phasedHaplotypeKey: subviewFragmentContext.phasedHaplotypeKey,
         compositionEntityKey: subviewFragmentContext.compositionEntityKey || subviewTrackPairContext?.compositionEntityKey,
         start: subviewFragmentContext.start, end: subviewFragmentContext.end, fragmentKey: subviewFragmentContext.fragmentKey,
+        ...(subviewFragmentContext.coordinateSpace ? { coordinateSpace: subviewFragmentContext.coordinateSpace } : {}),
       },
       { includeAppend: false },
     );
