@@ -1207,7 +1207,7 @@ export function buildAssemblyContextMenuItems({
       items.push({
         label: i18n.contextMenu.deletePhasedTrack,
         run: async () => {
-          if (!(await confirm(tAssembly(state, "contextMenu.deletePhasedTrackConfirm", { key: haplotypeKey }), { host, store }))) {
+          if (!(await confirm(tAssembly(state, "contextMenu.deletePhasedTrackConfirm", { key: haplotypeKey }), { host, store, confirmationKey: "delete-phased-track" }))) {
             return;
           }
           await deletePhasedTrack(host, store, { phasedTrackId, haplotypeKey });

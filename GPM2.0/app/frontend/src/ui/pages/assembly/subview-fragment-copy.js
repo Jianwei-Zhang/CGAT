@@ -1,8 +1,8 @@
 export const localFragmentCopy = {
   zh: {
     split: "分割 contig", splitFragment: "分割当前片段", localSplit: "仅在当前局部视图分割…", mainSplit: "分割并同步主视图…",
-    merge: "合并局部片段", mergeLeft: "与左侧片段合并", mergeRight: "与右侧片段合并",
-    mergeUnavailable: "该侧没有同源、同向且源区间连续的局部片段；不会恢复已删除区间",
+    merge: "撤销分割", mergeLeft: "撤销左侧分割", mergeRight: "撤销右侧分割",
+    mergeUnavailable: "该侧没有同源、同向且源区间连续的片段或删除记录；仅作用于局部视图",
     delete: "删除 contig", deleteFragment: "删除当前片段", localDelete: "仅从当前局部视图删除", mainDelete: "同步从主视图删除…",
     syncUnavailable: "该对象不属于当前主 DS 的可编辑实体，不能同步修改主视图",
     stale: "局部视图或片段已变化，请重新打开菜单。", localDone: "已更新当前局部视图；主视图未改变。",
@@ -12,8 +12,8 @@ export const localFragmentCopy = {
   },
   en: {
     split: "Split contig", splitFragment: "Split current fragment", localSplit: "Split only in current Local View…", mainSplit: "Split and synchronize Main View…",
-    merge: "Merge Local Fragments", mergeLeft: "Merge with left fragment", mergeRight: "Merge with right fragment",
-    mergeUnavailable: "No same-source, same-orientation contiguous fragment on this side; deleted intervals are not restored",
+    merge: "Undo split", mergeLeft: "Undo left split", mergeRight: "Undo right split",
+    mergeUnavailable: "No same-source, same-orientation adjacent fragment or deletion record on this side; Local View only",
     delete: "Delete contig", deleteFragment: "Delete current fragment", localDelete: "Delete only from current Local View", mainDelete: "Synchronize deletion to Main View…",
     syncUnavailable: "This object is not an editable entity of the current Main DS",
     stale: "Local View or fragment changed. Reopen the menu.", localDone: "Current Local View updated; Main View unchanged.",

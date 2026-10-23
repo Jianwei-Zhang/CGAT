@@ -32,14 +32,20 @@ for (const baseOrientation of ["+", "-"]) for (const flipped of [false, true]) {
   });
 }
 
-test("anchor-derived middle deletion keeps both remainders and cannot resurrect deleted bases by merge", () => {
+test("anchor-derived deletion is recoverable only by explicit local undo-split", () => {
   const parent = original();
   const isolated = isolateLocalMemberInterval(composition([parent]), parent.entityKey, 31, 70);
   assert.equal(isolated.changed, true);
   assert.equal(isolated.member.lengthBp, 40);
   const removed = deleteLocalMember(isolated.composition, isolated.member.entityKey);
   assert.deepEqual(removed.composition.members.map((m) => [m.localFragment.sourceStart, m.localFragment.sourceEnd]), [[1, 30], [71, 100]]);
-  assert.equal(resolveLocalMergeNeighbor(removed.composition, removed.composition.members[0].entityKey, "right"), null);
+  assert.ok(resolveLocalMergeNeighbor(removed.composition, removed.composition.members[0].entityKey, "right"));
+  const restored = mergeLocalMember(removed.composition, removed.composition.members[0].entityKey, "right");
+  assert.equal(restored.changed, true);
+  assert.deepEqual(restored.composition.members.map((m) => [m.localFragment.sourceStart, m.localFragment.sourceEnd]), [[1,70],[71,100]]);
+  assert.equal(restored.composition.deletedFragments.length, 0);
+  const merged = mergeLocalMember(restored.composition, restored.member.entityKey, "right");
+  assert.equal(merged.member.lengthBp, 100);
   const roundtrip = normalizeSubviewComposition(JSON.parse(JSON.stringify(removed.composition)));
   assert.deepEqual(roundtrip.members, removed.composition.members);
 });
@@ -195,4 +201,54 @@ test("re-adding a real parent after local edits creates an independent instance 
   const removed = deleteLocalMember(copySplit.composition, copySplit.members[0].entityKey);
   assert.equal(removed.composition.members.length, 3);
   assert.ok(removed.composition.members.some((member) => member.entityKey === split.members[0].entityKey));
+});
+
+for (const baseOrientation of ["+", "-"]) test(`shared cut anchors survive adjacent deletion and interior anchors return on explicit unsplit, ${baseOrientation}`, () => {
+  const parent = original({ baseOrientation }), other = original({ assemblyCtgId: 20, lane: "bottom" });
+  const base = composition([parent, other]);
+  base.manualAnchors = [21, 40, 61, 80].map((cutBp) => ({ manualAnchorId: `anchor${cutBp}`,
+    endpointA: { endpointKey: memberAnchorEndpointKey(parent), contigId: 10, cutBp, lengthBp: 100, baseOrientation },
+    endpointB: { endpointKey: memberAnchorEndpointKey(other), contigId: 20, cutBp, lengthBp: 100 } }));
+  const sliced = isolateLocalMemberInterval(base, parent.entityKey, 21, 60);
+  const removed = deleteLocalMember(sliced.composition, sliced.member.entityKey).composition;
+  assert.deepEqual(removed.manualAnchors.map((a) => a.manualAnchorId), ["anchor21", "anchor61", "anchor80"]);
+  const near = removed.members.find((m) => m.assemblyCtgId === 10 && m.xBp === parent.xBp);
+  const restored = mergeLocalMember(JSON.parse(JSON.stringify(removed)), near.entityKey, "right");
+  assert.equal(restored.changed, true);
+  assert.deepEqual(restored.composition.manualAnchors.map((a) => a.manualAnchorId).sort(), ["anchor21", "anchor40", "anchor61", "anchor80"]);
+  for (const anchor of restored.composition.manualAnchors) {
+    const endpoint = anchor.endpointA;
+    const owner = restored.composition.members.find((m) => memberAnchorEndpointKey(m) === endpoint.endpointKey);
+    const old = base.manualAnchors.find((a) => a.manualAnchorId === anchor.manualAnchorId);
+    assert.equal(memberCoordinateToSource(owner, endpoint.cutBp), memberCoordinateToSource(parent, old.endpointA.cutBp));
+  }
+});
+
+test("delete then local unsplit does not invent a cut at the natural terminal endpoint", () => {
+  const parent = original();
+  const split = splitLocalMember(composition([parent]), parent.entityKey, 40);
+  const removed = deleteLocalMember(split.composition, split.members[1].entityKey);
+  const restored = mergeLocalMember(removed.composition, split.members[0].entityKey, "right");
+  assert.equal(restored.changed, true);
+  assert.deepEqual(restored.member.localFragment.manualCuts, []);
+  assert.deepEqual(restored.member.localFragment.nativeCuts, []);
+});
+
+test("archived native fragments never invent a split mark at an inherited N edge", async () => {
+  const { reconcileLocalCompositionWithMain } = await import("../subview-fragment-reconcile.js");
+  const parent = original({ lengthBp: 500, sourceFragment: { sourceSeqId: 7, groupKey: "manual-fragment:10",
+    sourceStart: 501, sourceEnd: 1000, sourceLength: 1000, gapBeforeBp: 100 } });
+  const split = splitLocalMember(composition([parent]), parent.entityKey, 800);
+  const removed = deleteLocalMember(split.composition, split.members[0].entityKey).composition;
+  const live = [{ assemblyCtgId: 12, totalLength: 200, sourceFragment: { sourceSeqId: 7, groupKey: "manual-fragment:10",
+    sourceStart: 801, sourceEnd: 1000, sourceLength: 1000, gapBeforeBp: 0 } }];
+  const deleted = [{ assemblyCtgId: 11, deletedCtgRecordId: 1, totalLength: 300, sourceGroupKey: "manual-fragment:10",
+    sourceRange: { sourceSeqId: 7, sourceStart: 501, sourceEnd: 800 } }];
+  const rebound = reconcileLocalCompositionWithMain(removed, live, deleted);
+  const restored = mergeLocalMember(rebound, rebound.members[0].entityKey, "left");
+  assert.equal(restored.changed, true);
+  const reloaded = reconcileLocalCompositionWithMain(restored.composition, live, deleted);
+  assert.equal(reloaded.members[0].lengthBp, 500);
+  assert.ok(!reloaded.members[0].localFragment.nativeCuts.includes(500));
+  assert.ok(!reloaded.members[0].localFragment.manualCuts.includes(500));
 });

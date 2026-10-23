@@ -597,7 +597,7 @@ fn prepare_set_end_type(
     )
 }
 
-fn prepare_restore_deleted_ctg(
+pub(super) fn prepare_restore_deleted_ctg(
     conn: &Connection,
     project_id: i64,
     chr_name: &str,

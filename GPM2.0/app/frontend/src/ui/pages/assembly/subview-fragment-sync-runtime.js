@@ -50,7 +50,7 @@ export function createSubviewFragmentSyncRuntime(deps) {
         projectId: before.session.projectId, chrName: before.assembly.selectedChrName,
         assemblyCtgIds: request.args.targets.map((part) => part.assemblyCtgId) });
       if (!sameBefore()) return false;
-      if (!(await deps.confirm(confirmation(before, request, impact), { host, store }))) return false;
+      if (!(await deps.confirm(confirmation(before, request, impact), { host, store, confirmationKey: `local-to-main-${operation.action}` }))) return false;
       if (!sameBefore()) return false;
       installed = prepareSourceOwnedSubviewHistory(before, host, { viewport,
         projectHistorical: (state) => deps.projectHistorical(state, host) });
@@ -80,9 +80,28 @@ export function createSubviewFragmentSyncRuntime(deps) {
           if (!isCurrent() || !sameIdentity(store.getState(), before)) return false;
           const latest = store.getState();
           if (latest.assembly.error) throw new Error(latest.assembly.error);
-          const composition = reconcileLocalCompositionWithMain(desired.composition, latest.assembly.chrCtgs);
+          const composition = reconcileLocalCompositionWithMain(desired.composition, latest.assembly.chrCtgs, latest.assembly.deletedCtgs);
           const nextSubview = applySubviewComposition(latest.assembly.subview, composition, { trackPairSelectedCtgs: [] });
-          const local = commitSubviewCompositionHistoryOperation(latest.assembly, { nextSubview, viewport,
+          // Main owns synchronized deletion. Do not append a misleading local
+          // undo entry that cannot restore the native deletion.
+          const historyKey = nextSubview.historyKey;
+          const record = latest.assembly.subviewHistoryByKey?.[historyKey];
+          const mainArchive = operation.action === "delete" ? (composition.deletedFragments || []).filter(
+            (entry) => entry.member.entityKey === request.member.entityKey) : [];
+          const rebase = (snapshot) => {
+            if (snapshot?.kind !== "composition" || !mainArchive.length) return snapshot;
+            const entries = [...(snapshot.composition.deletedFragments || []), ...mainArchive];
+            return { ...snapshot, composition: { ...snapshot.composition,
+              deletedFragments: [...new Map(entries.map((entry) => [entry.member.entityKey, entry])).values()] } };
+          };
+          const local = operation.action === "delete" ? { assembly: { ...latest.assembly, subview: nextSubview,
+            ...(record ? { subviewHistoryByKey: { ...latest.assembly.subviewHistoryByKey,
+              [historyKey]: { ...record, current: { kind: "composition", composition }, default: rebase(record.default),
+                past: record.past.map((entry) => ({ ...entry, snapshot: rebase(entry.snapshot) })),
+                forward: record.forward.map((entry) => ({ ...entry, snapshot: rebase(entry.snapshot) })),
+              } } } : {}),
+          } }
+            : commitSubviewCompositionHistoryOperation(latest.assembly, { nextSubview, viewport,
             operation: { kind: operation.action === "split" ? "split-contig" : "remove-members", count: 1 }, stateOrLocale: before });
           store.setState({ assembly: { ...local.assembly, subview: { ...local.assembly.subview, trackPairSelectedCtgs: [] },
             trackSelectedCtgIds: [], actionError: "", actionStatus: labels.syncDone } });

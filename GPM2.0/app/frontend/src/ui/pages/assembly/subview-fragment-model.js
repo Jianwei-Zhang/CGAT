@@ -3,6 +3,7 @@ import { buildSubviewAnchorEndpointKey } from "./subview-anchor-state.js";
 
 const positive = (value) => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : null;
 const orientation = (value) => value === "-" ? "-" : "+";
+const anchorIdentity = (anchor) => anchor.manualAnchorId || `${anchor.hitKey}:${anchor.edge}`;
 
 // Coordinates here are inclusive SOURCE bases, never screen positions. Each
 // backing part records the orientation/range of the real entity when projected.
@@ -19,8 +20,8 @@ export function normalizeLocalFragment(value) {
   });
   if (!sourceStart || sourceEnd < sourceStart || !groupKey || !parts.length
     || parts.length !== value.parts.length || new Set(parts.map((part) => part.assemblyCtgId)).size !== parts.length) return null;
-  // A persisted joined interval must be fully covered by surviving parts. Gaps
-  // are not mergeable sequence and must not be resurrected on project reopen.
+  // A persisted joined interval must be fully covered by known backing parts.
+  // Unrecorded gaps are not sequence and cannot be invented on project reopen.
   const ranges = parts.map((part) => [Math.max(sourceStart, part.sourceStart), Math.min(sourceEnd, part.sourceEnd)])
     .filter(([start, end]) => end >= start).sort((a, b) => a[0] - b[0]);
   let next = sourceStart;
@@ -30,6 +31,7 @@ export function normalizeLocalFragment(value) {
   }
   if (next <= sourceEnd) return null;
   return { sourceSeqId: positive(value.sourceSeqId), groupKey, instanceKey: String(value.instanceKey || groupKey), sourceStart, sourceEnd, parts,
+    ...(value.restoredLocally === true ? { restoredLocally: true } : {}),
     lineageCtgIds: [...new Set([...(Array.isArray(value.lineageCtgIds) ? value.lineageCtgIds : []), ...parts.map((part) => part.assemblyCtgId)].map(positive).filter(Boolean))].sort((a, b) => a - b),
     ...(Array.isArray(value.nativeCuts) ? { nativeCuts: [...new Set(value.nativeCuts.map(Number)
       .filter((cut) => Number.isSafeInteger(cut) && cut > 0 && cut >= sourceStart - 1 && cut <= sourceEnd))].sort((a, b) => a - b) } : {}),
@@ -113,23 +115,45 @@ export function sliceLocalMember(member, sourceStart, sourceEnd) {
 }
 
 // Keep manual anchors attached to surviving source coordinates when an object
-// becomes several fragments (or several fragments become one). Deleted points
-// lose their anchor; they are never silently snapped to a surviving edge.
+// becomes several fragments (or several fragments become one). Interior deleted
+// points lose their anchor; a shared cut remains on its surviving side.
 export function replaceLocalMembers(composition, replaced, replacements) {
   const keys = new Set(replaced.map((member) => member.entityKey));
   const oldEndpoints = new Map(replaced.map((member) => [memberAnchorEndpointKey(member), member]));
+  const survivors = [...composition.members.filter((member) => !keys.has(member.entityKey)), ...replacements];
   const remap = (endpoint) => {
     const old = oldEndpoints.get(endpoint?.endpointKey);
     if (!old) return endpoint;
-    const source = memberCoordinateToSource(old, endpoint.cutBp);
-    const next = replacements.find((member) => {
+    const original = memberSourceInterval(old);
+    const sameInstance = (member) => {
       const range = memberSourceInterval(member);
-      return range.groupKey === memberSourceInterval(old).groupKey
-        && range.sourceStart <= source && range.sourceEnd >= source;
+      return range.groupKey === original.groupKey && range.instanceKey === original.instanceKey
+        && range.sourceSeqId === original.sourceSeqId && member.sourceKey === old.sourceKey && member.lane === old.lane;
+    };
+    const hasBoundary = Number.isSafeInteger(endpoint.sourceCutAfter) && endpoint.sourceCutAfter >= 0;
+    const source = hasBoundary ? endpoint.sourceCutAfter + (old.baseOrientation === "-" ? 0 : 1)
+      : memberCoordinateToSource(old, endpoint.cutBp);
+    let next = replacements.find((member) => {
+      const range = memberSourceInterval(member);
+      return sameInstance(member) && range.sourceStart <= source && range.sourceEnd >= source;
     });
-    return next ? { ...endpoint, endpointKey: memberAnchorEndpointKey(next),
-      contigId: next.assemblyCtgId, cutBp: sourceCoordinateToMember(next, source), lengthBp: next.lengthBp,
-      baseOrientation: next.baseOrientation } : null;
+    let sourceCutAfter = hasBoundary ? endpoint.sourceCutAfter : null;
+    if (!next) {
+      // An anchor at the cut belongs to the shared boundary, not to the first
+      // deleted base. Keep that boundary on its surviving same-instance side;
+      // never snap an anchor from the interior of a removed interval.
+      const cut = hasBoundary ? endpoint.sourceCutAfter : source - (old.baseOrientation === "-" ? 0 : 1);
+      const adjacent = survivors.filter((member) => {
+        const range = memberSourceInterval(member);
+        return sameInstance(member) && (range.sourceEnd === cut || range.sourceStart === cut + 1);
+      });
+      if (adjacent.length === 1) { next = adjacent[0]; sourceCutAfter = cut; }
+    }
+    if (!next) return null;
+    const point = sourceCutAfter === null ? source : sourceCutAfter + (next.baseOrientation === "-" ? 0 : 1);
+    return { ...endpoint, endpointKey: memberAnchorEndpointKey(next),
+      contigId: next.assemblyCtgId, cutBp: sourceCoordinateToMember(next, point), lengthBp: next.lengthBp,
+      ...(sourceCutAfter === null ? {} : { sourceCutAfter }), baseOrientation: next.baseOrientation };
   };
   const manualAnchors = (composition.manualAnchors || []).flatMap((anchor) => {
     const endpointA = remap(anchor.endpointA), endpointB = remap(anchor.endpointB);
@@ -182,8 +206,31 @@ export function isolateLocalMemberInterval(composition, entityKey, startBp, endB
 
 export function deleteLocalMember(composition, entityKey) {
   const member = composition.members.find((entry) => entry.entityKey === entityKey);
-  return member ? { composition: replaceLocalMembers(composition, [member], []), changed: true }
-    : { composition, changed: false };
+  if (!member) return { composition, changed: false };
+  const range = memberSourceInterval(member);
+  const newCuts = composition.members.flatMap((entry) => {
+    const other = memberSourceInterval(entry);
+    if (entry === member || entry.sourceKey !== member.sourceKey || entry.lane !== member.lane
+      || other.groupKey !== range.groupKey || other.instanceKey !== range.instanceKey || other.sourceSeqId !== range.sourceSeqId) return [];
+    return other.sourceEnd + 1 === range.sourceStart ? [other.sourceEnd]
+      : range.sourceEnd + 1 === other.sourceStart ? [range.sourceEnd] : [];
+  });
+  const cutMember = { ...member, localFragment: normalizeLocalFragment({ ...range,
+    manualCuts: [...(range.manualCuts || []), ...newCuts] }) };
+  const prepared = replaceLocalMembers(composition, [member], [cutMember]);
+  let next = replaceLocalMembers(prepared, [cutMember], []);
+  const lost = (kind) => (prepared[kind] || []).filter((anchor) => !(next[kind] || []).some((kept) => anchorIdentity(kept) === anchorIdentity(anchor)));
+  const record = { member: cutMember, manualAnchors: lost("manualAnchors"), activeAnchors: lost("activeAnchors") };
+  next = { ...next, deletedFragments: [...(composition.deletedFragments || []).filter((entry) => entry.member.entityKey !== member.entityKey), record],
+    members: next.members.map((entry) => {
+      const other = memberSourceInterval(entry);
+      if (entry.sourceKey !== member.sourceKey || entry.lane !== member.lane || other.groupKey !== range.groupKey
+        || other.instanceKey !== range.instanceKey || other.sourceSeqId !== range.sourceSeqId) return entry;
+      const cut = other.sourceEnd + 1 === range.sourceStart ? other.sourceEnd
+        : range.sourceEnd + 1 === other.sourceStart ? range.sourceEnd : null;
+      return cut === null ? entry : { ...entry, localFragment: normalizeLocalFragment({ ...other, manualCuts: [...(other.manualCuts || []), cut] }) };
+    }) };
+  return { composition: next, changed: true };
 }
 
 export function resolveLocalMergeNeighbor(composition, entityKey, side) {
@@ -191,7 +238,13 @@ export function resolveLocalMergeNeighbor(composition, entityKey, side) {
   if (!member || !["left", "right"].includes(side)) return null;
   const range = memberSourceInterval(member), orient = memberEffectiveOrientation(member);
   const low = (side === "left") !== (orient === "-");
-  const matches = composition.members.filter((entry) => {
+  const archived = (composition.deletedFragments || []).map((entry) => entry.member)
+    .filter((entry) => !composition.members.some((live) => {
+      const a = memberSourceInterval(entry), b = memberSourceInterval(live);
+      return entry.sourceKey === live.sourceKey && a.groupKey === b.groupKey && a.sourceSeqId === b.sourceSeqId
+        && a.sourceStart <= b.sourceEnd && a.sourceEnd >= b.sourceStart;
+    }));
+  const matches = [...composition.members, ...archived].filter((entry) => {
     if (entry === member || entry.lane !== member.lane || entry.sourceKey !== member.sourceKey
       || memberEffectiveOrientation(entry) !== orient) return false;
     const other = memberSourceInterval(entry);
@@ -205,10 +258,24 @@ export function mergeLocalMember(composition, entityKey, side) {
   const member = composition.members.find((entry) => entry.entityKey === entityKey);
   const neighbor = resolveLocalMergeNeighbor(composition, entityKey, side);
   if (!member || !neighbor) return { composition, changed: false };
+  const deleted = (composition.deletedFragments || []).find((entry) => entry.member === neighbor);
+  if (deleted) {
+    // This is an explicit local undo-split, never a native restore operation.
+    // Reinsert only the adjacent archive, not an old whole-view snapshot.
+    const availableEndpoints = new Set([...composition.members, neighbor].map(memberAnchorEndpointKey));
+    const appendAnchors = (kind) => [...(composition[kind] || []), ...(deleted[kind] || [])
+      .filter((anchor) => !(composition[kind] || []).some((live) => anchorIdentity(live) === anchorIdentity(anchor)))
+      .filter((anchor) => (kind === "manualAnchors" ? [anchor.endpointA, anchor.endpointB]
+        : [anchor.descriptor?.top, anchor.descriptor?.bottom]).every((endpoint) => availableEndpoints.has(endpoint?.endpointKey)))];
+    composition = { ...composition, members: [...composition.members, neighbor],
+      deletedFragments: composition.deletedFragments.filter((entry) => entry !== deleted),
+      manualAnchors: appendAnchors("manualAnchors"), activeAnchors: appendAnchors("activeAnchors") };
+  }
   const a = memberSourceInterval(member), b = memberSourceInterval(neighbor);
   const sourceStart = Math.min(a.sourceStart, b.sourceStart), sourceEnd = Math.max(a.sourceEnd, b.sourceEnd);
   const parts = [...new Map([...a.parts, ...b.parts].map((part) => [part.assemblyCtgId, part])).values()];
   const localFragment = normalizeLocalFragment({ ...a, sourceStart, sourceEnd, parts,
+    restoredLocally: Boolean(deleted || a.restoredLocally || b.restoredLocally),
     lineageCtgIds: [...(a.lineageCtgIds || []), ...(b.lineageCtgIds || [])],
     nativeCuts: [...(a.nativeCuts || []), ...(b.nativeCuts || [])],
     manualCuts: [...(a.manualCuts || []), ...(b.manualCuts || [])].filter((cut) => cut !== Math.min(a.sourceEnd, b.sourceEnd)),

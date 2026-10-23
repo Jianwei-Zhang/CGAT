@@ -66,7 +66,7 @@ export function bindCtgActions(host, store, deps) {
       return;
     }
     await deps.deleteSelectedTrackCtgs(host, store, [assemblyCtgId], {
-      confirm: (message) => confirm(message),
+      confirm: (message, options) => confirm(message, options),
       confirmMessage: tAssembly(store.getState(), "contextMenu.deleteContigConfirm", {
         assemblyCtgId,
       }),

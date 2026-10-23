@@ -404,7 +404,7 @@ async function removeJob(host, store, jobKey, deps = {}) {
   const resolvedJobKey = buildDegapJobKey(job);
   const confirm = getConfirm(deps);
   const state = store.getState();
-  if (!(await confirm(tAssembly(state, "degap.confirmRemoveJob", { label: job.label || job.jobId }), { host, store }))) {
+  if (!(await confirm(tAssembly(state, "degap.confirmRemoveJob", { label: job.label || job.jobId }), { host, store, confirmationKey: "remove-degap-job" }))) {
     return;
   }
   const nextJobs = degap.jobs.filter((item) => buildDegapJobKey(item) !== resolvedJobKey);

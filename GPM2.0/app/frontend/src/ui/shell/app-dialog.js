@@ -1,3 +1,4 @@
+import { confirmationSkipped, rememberConfirmation, confirmationSessionLabel } from "./confirmation-session.js";
 let dialogSequence = 0;
 
 const copy = {
@@ -6,6 +7,8 @@ const copy = {
 };
 
 function requestDialog(mode, message, options = {}) {
+  const confirmationKey = mode === "confirm" ? options.confirmationKey : null;
+  if (confirmationSkipped(confirmationKey)) return Promise.resolve(true);
   const doc = globalThis.document;
   const cancelled = mode === "prompt" ? null : false;
   if (!doc?.body) return Promise.resolve(cancelled);
@@ -38,6 +41,14 @@ function requestDialog(mode, message, options = {}) {
     input.setAttribute("aria-labelledby", body.id);
     form.append(input);
   }
+  let skip;
+  if (confirmationKey) {
+    const label = doc.createElement("label");
+    skip = doc.createElement("input");
+    skip.type = "checkbox";
+    label.append(skip, doc.createTextNode(confirmationSessionLabel(locale)));
+    form.append(label);
+  }
   const actions = doc.createElement("div");
   actions.className = "app-dialog-actions";
   const cancel = doc.createElement("button");
@@ -68,6 +79,7 @@ function requestDialog(mode, message, options = {}) {
     };
     form.addEventListener("submit", event => {
       event.preventDefault();
+      if (skip?.checked) rememberConfirmation(confirmationKey);
       finish(input ? input.value : true);
     });
     cancel.addEventListener("click", () => finish(cancelled));

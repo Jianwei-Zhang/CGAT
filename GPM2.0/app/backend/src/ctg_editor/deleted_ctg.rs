@@ -23,6 +23,7 @@ pub struct DeletedCtgItem {
     pub source_seq_id: Option<i64>,
     pub source_start: Option<i64>,
     pub source_end: Option<i64>,
+    pub source_instance_key: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -96,7 +97,7 @@ pub fn list_deleted_ctgs_with_connection(
                 THEN (s.source_end - s.source_start + 1)
                 ELSE 0
             END AS total_length,
-            d.deleted_at, s.source_seq_id, s.source_start, s.source_end
+            d.deleted_at, s.source_seq_id, s.source_start, s.source_end, s.instance_key
          FROM deleted_assembly_ctg d
          LEFT JOIN assembly_seq s
            ON s.id = d.assembly_seq_id
@@ -158,6 +159,7 @@ pub fn list_deleted_ctgs_with_connection(
                     source_seq_id: row.get(12)?,
                     source_start: row.get(13)?,
                     source_end: row.get(14)?,
+                    source_instance_key: row.get(15)?,
                 })
             })
             .context("failed to query deleted ctgs by chr and dataset")?
@@ -181,6 +183,7 @@ pub fn list_deleted_ctgs_with_connection(
                     source_seq_id: row.get(12)?,
                     source_start: row.get(13)?,
                     source_end: row.get(14)?,
+                    source_instance_key: row.get(15)?,
                 })
             })
             .context("failed to query deleted ctgs by chr")?
@@ -204,6 +207,7 @@ pub fn list_deleted_ctgs_with_connection(
                     source_seq_id: row.get(12)?,
                     source_start: row.get(13)?,
                     source_end: row.get(14)?,
+                    source_instance_key: row.get(15)?,
                 })
             })
             .context("failed to query deleted ctgs by dataset")?
@@ -227,6 +231,7 @@ pub fn list_deleted_ctgs_with_connection(
                     source_seq_id: row.get(12)?,
                     source_start: row.get(13)?,
                     source_end: row.get(14)?,
+                    source_instance_key: row.get(15)?,
                 })
             })
             .context("failed to query deleted ctgs")?

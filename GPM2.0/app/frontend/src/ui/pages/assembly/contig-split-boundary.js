@@ -95,7 +95,9 @@ export function resolveContigUnsplitModel(assembly, assemblyCtgId) {
   if (!fragment?.groupKey?.startsWith("manual-fragment:")) return null;
   const hidden = new Set((assembly.hiddenPrimaryCtgIds || []).map(Number));
   const orient = resolveTrackCtgOrient(ctg);
-  const sameGroup = (assembly.chrCtgs || []).filter((c) => c !== ctg
+  const deleted = (assembly.deletedCtgs || []).filter((c) => c.sourceGroupKey && c.sourceRange)
+    .map((c) => ({ ...c, sourceFragment: { ...c.sourceRange, groupKey: c.sourceGroupKey } }));
+  const sameGroup = [...(assembly.chrCtgs || []), ...deleted].filter((c) => c !== ctg
     && c.sourceFragment?.groupKey === fragment.groupKey
     && Number(c.sourceFragment.sourceSeqId) === Number(fragment.sourceSeqId));
   // A cross-chromosome inspection copy alone is not a split state.
@@ -112,6 +114,7 @@ export function resolveContigUnsplitModel(assembly, assemblyCtgId) {
     if (candidates.length !== 1) continue;
     const neighbor = candidates[0];
     result[side] = { assemblyCtgId: Number(assemblyCtgId), neighborCtgId: Number(neighbor.assemblyCtgId), side,
+      ...(neighbor.deletedCtgRecordId ? { neighborDeletedRecordId: neighbor.deletedCtgRecordId } : {}),
       sourceStart: Number(fragment.sourceStart), sourceEnd: Number(fragment.sourceEnd), orient,
       neighborSourceStart: Number(neighbor.sourceFragment.sourceStart), neighborSourceEnd: Number(neighbor.sourceFragment.sourceEnd) };
   }

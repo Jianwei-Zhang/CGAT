@@ -1,4 +1,4 @@
-import { normalizeLocalFragment, replaceLocalMembers } from "./subview-fragment-model.js";
+import { normalizeLocalFragment, deleteLocalMember } from "./subview-fragment-model.js";
 import {
   normalizeSubviewActiveAnchors,
   normalizeSubviewManualAnchors,
@@ -130,6 +130,11 @@ export function normalizeSubviewComposition(value) {
   const gap = Number(source.layoutGapBp);
   return {
     members: normalizeSubviewCompositionMembers(source.members),
+    ...(Array.isArray(source.deletedFragments) && source.deletedFragments.length ? { deletedFragments: source.deletedFragments.flatMap((entry) => {
+      const member = normalizeSubviewCompositionMember(entry?.member);
+      return member ? [{ member, manualAnchors: normalizeSubviewManualAnchors(entry.manualAnchors),
+        activeAnchors: normalizeSubviewActiveAnchors(entry.activeAnchors) }] : [];
+    }) } : {}),
     layoutGapBp: Number.isFinite(gap) && gap >= 0 ? gap : SUBVIEW_COMPOSITION_DEFAULT_GAP_BP,
     activeAnchors: normalizeSubviewActiveAnchors(source.activeAnchors),
     manualAnchors: normalizeSubviewManualAnchors(source.manualAnchors),
@@ -141,6 +146,7 @@ export function createSubviewCompositionSummary(composition) {
   return {
     mode: SUBVIEW_COMPOSITION_MODE,
     members: normalized.members,
+    ...(normalized.deletedFragments?.length ? { deletedFragments: normalized.deletedFragments } : {}),
     layoutGapBp: normalized.layoutGapBp,
   };
 }
@@ -150,6 +156,7 @@ export function getSubviewComposition(subview) {
   if (String(summary?.mode || "").trim() !== SUBVIEW_COMPOSITION_MODE) return null;
   return normalizeSubviewComposition({
     members: summary?.members,
+    deletedFragments: summary?.deletedFragments,
     layoutGapBp: summary?.layoutGapBp,
     activeAnchors: subview?.activeAnchors,
     manualAnchors: subview?.manualAnchors,
@@ -261,7 +268,7 @@ export function removeSubviewCompositionMembers(composition, entityKeys) {
     .map((key) => String(key || "").trim()).filter(Boolean));
   const removed = normalized.members.filter((member) => removeKeys.has(member.entityKey));
   return {
-    composition: replaceLocalMembers(normalized, removed, []),
+    composition: removed.reduce((current, member) => deleteLocalMember(current, member.entityKey).composition, normalized),
     changed: removed.length > 0,
     removedCount: removed.length,
   };

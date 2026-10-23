@@ -57,7 +57,7 @@ export async function runMainViewHistoryControlAction(host, store, action, deps,
       chrName,
       count: history.appliedOperationCount,
     });
-    if (!(await confirm(message, { host, store }))) {
+    if (!(await confirm(message, { host, store, confirmationKey: "reset-main-history" }))) {
       return false;
     }
   }

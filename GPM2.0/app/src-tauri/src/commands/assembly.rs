@@ -157,6 +157,7 @@ pub fn list_deleted_ctgs(
                     "memberCount": item.member_count,
                     "totalLength": item.total_length,
                     "deletedAt": item.deleted_at,
+                    "sourceGroupKey": item.source_instance_key.as_deref().and_then(|key| key.rsplit_once(':').map(|pair| pair.0)),
                     "sourceRange": item.source_seq_id.zip(item.source_start).zip(item.source_end)
                         .map(|((source_seq_id, source_start), source_end)| json!({
                             "sourceSeqId": source_seq_id, "sourceStart": source_start, "sourceEnd": source_end

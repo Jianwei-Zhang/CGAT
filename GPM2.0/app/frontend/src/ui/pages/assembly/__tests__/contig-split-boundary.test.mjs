@@ -82,3 +82,19 @@ test("unsplit excludes full contigs, inspection-only copies, other sources/group
   const ambiguous = splitAssembly(); ambiguous.chrCtgs.push({ ...ambiguous.chrCtgs[0], assemblyCtgId: 9 });
   assert.equal(resolveContigUnsplitModel(ambiguous, 3).left, null);
 });
+
+test("undo split offers an adjacent deleted sibling with immutable tombstone preconditions", async () => {
+  const { resolveContigUnsplitModel } = await import("../contig-split-boundary.js");
+  const fragment = { sourceSeqId: 9, groupKey: "manual-fragment:12", sourceStart: 1, sourceEnd: 200, sourceLength: 1000 };
+  const deleted = { assemblyCtgId: 23, deletedCtgRecordId: 99, refOrient: "+",
+    sourceGroupKey: fragment.groupKey, sourceRange: { sourceSeqId: 9, sourceStart: 201, sourceEnd: 600 } };
+  const assembly = { chrCtgs: [{ assemblyCtgId: 22, orient: "+", sourceFragment: fragment }], deletedCtgs: [deleted] };
+  assert.equal(resolveContigUnsplitModel(assembly, 22).right.neighborDeletedRecordId, 99);
+  assert.equal(resolveContigUnsplitModel(assembly, 22).right.neighborSourceEnd, 600);
+  for (const patch of [{ sourceGroupKey: "manual-fragment:other" }, { refOrient: "-" },
+    { sourceRange: { ...deleted.sourceRange, sourceStart: 202 } }, { sourceRange: { ...deleted.sourceRange, sourceSeqId: 10 } }]) {
+    assert.equal(resolveContigUnsplitModel({ ...assembly, deletedCtgs: [{ ...deleted, ...patch }] }, 22).right, null);
+  }
+  assembly.chrCtgs[0].orient = "-"; deleted.refOrient = "-";
+  assert.equal(resolveContigUnsplitModel(assembly, 22).left.neighborDeletedRecordId, 99);
+});

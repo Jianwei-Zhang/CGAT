@@ -232,6 +232,8 @@ function anchorAttrs(edge, kind, identity, active, escapeAttr) {
     data-subview-anchor-top-endpoint-key="${escapeAttr(endpointKey(edge.top))}" data-subview-anchor-bottom-endpoint-key="${escapeAttr(endpointKey(edge.bottom))}"
     data-subview-anchor-top-contig-id="${edge.top.assemblyCtgId || 0}" data-subview-anchor-bottom-contig-id="${edge.bottom.assemblyCtgId || 0}"
     data-subview-anchor-top-cut-bp="${Math.round(edge.topCut)}" data-subview-anchor-bottom-cut-bp="${Math.round(edge.bottomCut)}"
+    ${Number.isSafeInteger(edge.topSourceCutAfter) ? `data-subview-anchor-top-source-cut-after="${edge.topSourceCutAfter}"` : ""}
+    ${Number.isSafeInteger(edge.bottomSourceCutAfter) ? `data-subview-anchor-bottom-source-cut-after="${edge.bottomSourceCutAfter}"` : ""}
     data-subview-anchor-top-length-bp="${edge.top.lengthBp}" data-subview-anchor-bottom-length-bp="${edge.bottom.lengthBp}"
     data-subview-anchor-top-name="${escapeAttr(edge.top.label)}" data-subview-anchor-bottom-name="${escapeAttr(edge.bottom.label)}"
     data-subview-anchor-top-source-role="${escapeAttr(topSource.role || "")}" data-subview-anchor-bottom-source-role="${escapeAttr(bottomSource.role || "")}"
@@ -282,6 +284,8 @@ function renderManualAnchors(layout, anchors, escapeAttr, evidence = false) {
       bottomX: bottomRange.left,
       topCut: topEndpoint.cutBp,
       bottomCut: bottomEndpoint.cutBp,
+      topSourceCutAfter: topEndpoint.sourceCutAfter,
+      bottomSourceCutAfter: bottomEndpoint.sourceCutAfter,
       manualAnchorId: anchor.manualAnchorId,
       hitKey: anchor.hitKey || "",
       edge: evidence ? anchor.edge : "manual",
@@ -561,7 +565,8 @@ export function renderSubviewCompositionAlignmentCard({
     const nativeCuts = member.localFragment?.nativeCuts ?? (member.sourceFragment && !member.localFragment
       ? resolveManualSplitSourceCuts(member)
       : sources.length ? sources.flatMap((item) => resolveManualSplitSourceCuts(item.ctg)) : resolveManualSplitSourceCuts(member));
-    return [...nativeCuts, ...(member.localFragment?.manualCuts || [])];
+    return [...nativeCuts, ...(member.localFragment?.manualCuts || [])]
+      .filter((cut) => !(member.localFragment?.suppressedCuts || []).includes(cut));
   };
   const memberEntries = layout.members.map((member) => ({
     ctg: {

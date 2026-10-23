@@ -696,7 +696,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
         rulesDialog.dataset.supportDsCtgLenRulesUnsavedMessage
           || "Close without saving changes?",
       );
-      const confirmed = await requestAssemblyConfirm(host, store, message);
+      const confirmed = await requestAssemblyConfirm(host, store, message, { confirmationKey: "discard-support-filter-draft" });
       if (!confirmed) {
         return;
       }
@@ -862,6 +862,8 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
         id: button.dataset.assemblyConfirmId,
         confirmed: button.dataset.assemblyConfirmAction === "confirm",
         value,
+        ...(dialogMode === "confirm" ? { skipConfirmation: Boolean(Array.from(host.querySelectorAll("[data-assembly-confirm-skip]")).find(
+          (node) => node.dataset.assemblyConfirmSkip === button.dataset.assemblyConfirmId)?.checked) } : {}),
       });
     });
   });

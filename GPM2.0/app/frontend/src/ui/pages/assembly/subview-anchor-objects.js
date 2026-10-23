@@ -22,12 +22,15 @@ function readEndpoint(node, side) {
   const sourceName = String(node.getAttribute(`${prefix}source-name`) || "").trim();
   const baseCutBp = positiveInt(node.getAttribute(`${prefix}base-cut-bp`));
   const sourcePosition = positiveInt(node.getAttribute(`${prefix}source-position`));
+  const rawSourceCut = node.getAttribute(`${prefix}source-cut-after`);
+  const sourceCutAfter = rawSourceCut == null || rawSourceCut === "" ? null : Number(rawSourceCut);
   const lane = String(node.getAttribute(`${prefix}lane`) || "").trim();
   const baseOrientation = String(node.getAttribute(`${prefix}base-orientation`) || "").trim();
   return {
     endpointKey,
     contigId,
     cutBp,
+    ...(Number.isSafeInteger(sourceCutAfter) && sourceCutAfter >= 0 ? { sourceCutAfter } : {}),
     ...(lengthBp ? { lengthBp } : {}),
     ...(name ? { name } : {}),
     ...(sourceRole ? { sourceRole } : {}),

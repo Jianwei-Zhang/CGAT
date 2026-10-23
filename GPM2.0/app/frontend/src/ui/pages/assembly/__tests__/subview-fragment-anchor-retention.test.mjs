@@ -41,7 +41,7 @@ for (const mode of ["2-contig", "track-pair", "composition", "composition-flippe
       const state = store.getState();
       store.setState({ assembly: { ...state.assembly, subview: { ...state.assembly.subview, activeAnchors: ids } } });
     }
-    const expected = edges.filter((edge) => edge.descriptor.top.cutBp < start || edge.descriptor.top.cutBp > 2299).map((edge) => edge.objectId).sort();
+    const expected = edges.map((edge) => edge.objectId).sort();
     const runtime = createSubviewFragmentController({
       projectHistorical: (state) => projectRenderedSubviewToComposition(state, renderAssemblyPage(state)),
       rerenderSubviewPanel() {}, refreshSubviewPairwiseEvidence() {}, persistProjectAssemblyViewStateFromStore: async () => {},
@@ -66,6 +66,9 @@ for (const mode of ["2-contig", "track-pair", "composition", "composition-flippe
     };
     assert.deepEqual(active(), expected, "anchors outside deleted bases must remain visibly active");
     checkSourcePoints();
+    const rollbackButton = renderAssemblyPage(store.getState()).match(/<button[^>]*data-subview-action="history-rollback"[^>]*>/)?.[0];
+    assert.ok(rollbackButton, "local deletion exposes its history control");
+    assert.doesNotMatch(rollbackButton, /\bdisabled\b/, "local deletion remains undoable after render");
     const after = JSON.parse(JSON.stringify(store.getState().assembly));
     store.setState({ assembly: rollbackSubviewHistory(after).assembly });
     assert.deepEqual(active(), edges.map((edge) => edge.objectId).sort());
@@ -98,7 +101,7 @@ test("outside anchors survive main history reload followed by local undo/redo wi
   await runtime.deleteLocalFragment(host, store, { assemblyCtgId: 30, trackRole: "support", slot: "top", start: 1800, end: 2299 });
   assert.deepEqual(store.getState().assembly.mainViewHistory, originalMainHistory);
   const active = () => collectSubviewAnchorScene(host).filter((edge) => edge.node.getAttribute("data-subview-anchor-active") === "1").map((edge) => edge.objectId).sort();
-  const expected = edges.filter((edge) => edge.descriptor.top.cutBp !== 1800).map((edge) => edge.objectId).sort();
+  const expected = edges.map((edge) => edge.objectId).sort();
   for (const action of ["undo", "redo"]) {
     const before = store.getState().assembly, historyKey = before.subview.historyKey;
     const localDepth = before.subviewHistoryByKey[historyKey].past.length;

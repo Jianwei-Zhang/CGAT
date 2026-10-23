@@ -104,6 +104,7 @@ function normalizeEndpoint(endpoint) {
     endpointKey,
     contigId,
     cutBp,
+    ...(Number.isSafeInteger(endpoint?.sourceCutAfter) && endpoint.sourceCutAfter >= 0 ? { sourceCutAfter: endpoint.sourceCutAfter } : {}),
     ...(lengthBp ? { lengthBp } : {}),
     ...(String(endpoint?.name || "").trim() ? { name: String(endpoint.name).trim() } : {}),
     ...(sourceRole ? { sourceRole } : {}),

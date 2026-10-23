@@ -1,3 +1,4 @@
+import { confirmationSkipped, rememberConfirmation, confirmationSessionLabel } from "../../shell/confirmation-session.js";
 import { requestAppConfirm, requestAppNotice, requestAppPrompt } from "../../shell/app-dialog.js";
 import { assemblyPageSession } from "./page-session.js";
 
@@ -137,6 +138,7 @@ function renderAssemblyConfirmModal(state) {
         <p class="assembly-confirm-message${dangerClass}">${escapeHtml(message)}</p>
         ${promptInput}
         ${anchorOffsetFields}
+        ${mode === "confirm" && dialog.confirmationKey ? `<label><input type="checkbox" data-assembly-confirm-skip="${escapeAttr(id)}"> ${escapeHtml(confirmationSessionLabel(state.locale))}</label>` : ""}
         <div class="assembly-confirm-actions">
           <button
             type="button"
@@ -159,9 +161,10 @@ function renderAssemblyConfirmModal(state) {
   `;
 }
 
-function requestAssemblyConfirm(host, store, message) {
+function requestAssemblyConfirm(host, store, message, options = {}) {
+  if (confirmationSkipped(options.confirmationKey)) return Promise.resolve(true);
   if (!host || !store) {
-    return requestAppConfirm(message, { store });
+    return requestAppConfirm(message, { ...options, store });
   }
   const state = store.getState();
   const id = `assembly-confirm-${assemblyPageSession.assemblyConfirmDialogSeq += 1}`;
@@ -180,6 +183,7 @@ function requestAssemblyConfirm(host, store, message) {
           open: true,
           id,
           mode: "confirm",
+          confirmationKey: options.confirmationKey || "",
           danger: true,
           message: String(message || ""),
         },
@@ -301,10 +305,14 @@ function requestAssemblyAnchorOffsetPrompt(host, store, options = {}) {
   });
 }
 
-function resolveAssemblyConfirmDialog(host, store, { id, confirmed, value }) {
+function resolveAssemblyConfirmDialog(host, store, { id, confirmed, value, skipConfirmation = false }) {
   const state = store.getState();
   const dialogId = String(id || state.assembly?.confirmDialog?.id || "");
+  if (dialogId !== state.assembly?.confirmDialog?.id) return;
   const resolve = assemblyPageSession.pendingAssemblyConfirmResolvers.get(dialogId);
+  if (resolve && confirmed && skipConfirmation && state.assembly.confirmDialog.mode === "confirm") {
+    rememberConfirmation(state.assembly.confirmDialog.confirmationKey);
+  }
   const rawMode = String(state.assembly?.confirmDialog?.mode || "").trim();
   const mode = ["prompt", "anchor-offset", "notice"].includes(rawMode) ? rawMode : "confirm";
   assemblyPageSession.pendingAssemblyConfirmResolvers.delete(dialogId);

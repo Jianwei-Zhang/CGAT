@@ -281,3 +281,90 @@ fn main_flip_after_split_and_partial_deletion_never_flips_or_deletes_a_surviving
     assert_eq!(orientation(right)?, "+");
     Ok(())
 }
+
+#[test]
+fn unsplit_restores_deleted_neighbor_atomically_and_is_itself_undoable() -> Result<()> {
+    let temp = tempfile::tempdir()?;
+    let db = temp.path().join("project.sqlite");
+    seed_workspace(&db)?;
+    edit(&db, request("delete", 201, 600, None, 301, 1000, "+"))?;
+    let after_delete = intervals(&db, 101)?;
+    let deleted = crate::ctg_editor::list_deleted_ctgs(&db, 1, Some("Chr01"), Some(1))?.remove(0);
+    assert!(
+        deleted
+            .source_instance_key
+            .as_deref()
+            .unwrap()
+            .starts_with("manual-fragment:")
+    );
+    let args = json!({"assemblyCtgId":after_delete[0].0,"neighborCtgId":deleted.assembly_ctg_id,
+        "neighborDeletedRecordId":deleted.deleted_ctg_record_id,"side":"right","sourceStart":1,"sourceEnd":200,
+        "neighborSourceStart":201,"neighborSourceEnd":600,"orient":"+"});
+    let run = |args| {
+        run_main_view_editor_action(
+            &db,
+            &RunMainViewEditorActionParams {
+                history_capacity: None,
+                project_id: 1,
+                chr_name: "Chr01".into(),
+                action: "undo-contig-split".into(),
+                args,
+            },
+        )
+    };
+    let mut stale = args.clone();
+    stale["neighborSourceEnd"] = json!(601);
+    assert!(run(stale).is_err());
+    assert_eq!(
+        intervals(&db, 101)?,
+        after_delete,
+        "failed restore must roll back atomically"
+    );
+    assert_eq!(
+        crate::ctg_editor::list_deleted_ctgs(&db, 1, Some("Chr01"), Some(1))?.len(),
+        1
+    );
+    let restored = run(args)?;
+    assert_eq!(restored.status.applied_operation_count, 2);
+    assert_eq!(
+        intervals(&db, 101)?
+            .iter()
+            .map(|(_, a, b)| (*a, *b))
+            .collect::<Vec<_>>(),
+        vec![(1, 600), (601, 1000)]
+    );
+    assert!(crate::ctg_editor::list_deleted_ctgs(&db, 1, Some("Chr01"), Some(1))?.is_empty());
+    assert!(undo_main_view_history(&db, &target("Chr01"))?.changed);
+    assert_eq!(intervals(&db, 101)?, after_delete);
+    assert_eq!(
+        crate::ctg_editor::list_deleted_ctgs(&db, 1, Some("Chr01"), Some(1))?.len(),
+        1
+    );
+    let conn = Connection::open(&db)?;
+    let (history, _) = load_history_state(&conn, 1, 1)?;
+    let expected = &history.future.last().unwrap().before;
+    let actual = super::super::snapshot::capture_snapshot(
+        &conn,
+        1,
+        &super::super::snapshot::snapshot_scope(expected),
+    )?;
+    let expected_json = serde_json::to_value(expected)?;
+    let actual_json = serde_json::to_value(actual)?;
+    for (key, value) in expected_json.as_object().unwrap() {
+        assert_eq!(value, &actual_json[key], "after undo field: {key}");
+    }
+    let redo = redo_main_view_history(&db, &target("Chr01"))?;
+    if !redo.changed {
+        let conn = Connection::open(&db)?;
+        let reason: String = conn.query_row("SELECT detail FROM edit_audit_log WHERE action='history-invalidated' ORDER BY id DESC LIMIT 1", [], |row| row.get(0))?;
+        panic!("{reason}");
+    }
+    assert_eq!(
+        intervals(&db, 101)?
+            .iter()
+            .map(|(_, a, b)| (*a, *b))
+            .collect::<Vec<_>>(),
+        vec![(1, 600), (601, 1000)]
+    );
+    Ok(())
+}

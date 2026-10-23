@@ -564,6 +564,7 @@ export async function restoreFinalPathFromGrtBaseline(host, store, payload = {},
   const confirm = typeof deps.confirm === "function" ? deps.confirm : () => true;
   const confirmed = await confirm(
     tAssembly(state, "runtime.finalPathGrtBaselineConfirm", { chrName }),
+    { host, store, confirmationKey: "restore-final-path-baseline" },
   );
   if (!confirmed) {
     return null;

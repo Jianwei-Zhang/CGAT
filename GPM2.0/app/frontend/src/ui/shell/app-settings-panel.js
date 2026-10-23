@@ -192,7 +192,7 @@ export function bindAppSettings(root, { getLocale, onTypographyChange, onLanguag
       if (event.target.closest("[data-settings-close]")) dialog.close();
       if (event.target.closest("[data-settings-reset]")) {
         if ((getAppSettings().historyCapacity !== 0 && getAppSettings().historyCapacity <= 50)
-          || await requestAppConfirm(labels().restoreConfirm, { locale: getLocale(), title: labels().reset, confirmLabel: labels().reset })) {
+          || await requestAppConfirm(labels().restoreConfirm, { confirmationKey: "reset-app-settings", locale: getLocale(), title: labels().reset, confirmLabel: labels().reset })) {
           if (save(DEFAULT_APP_SETTINGS)) { onLanguageChange("zh"); render(); }
         }
       }

@@ -450,7 +450,7 @@ const {
 } = subviewToolsContentController;
 const synchronizeLocalFragment = createSubviewFragmentSyncRuntime({
   inspectMainViewDelete,
-  confirm: (message, context) => requestAssemblyConfirm(context.host, context.store, message),
+  confirm: (message, context) => requestAssemblyConfirm(context.host, context.store, message, context),
   projectHistorical: (state) => projectRenderedSubviewToComposition(state, renderAssemblySubviewPanelImpl(state, renderTracksDeps)),
   flushBefore: flushAssemblyProjectState,
   serialize: runSerializedProjectViewMutation,
@@ -872,7 +872,7 @@ function createAssemblyPageBindingDeps(options = {}) {
     bindAssemblyContextMenu: (host, store) => bindAssemblyContextMenuImpl(host, store, contextMenuRuntimeDeps),
     bindCtgActions: (host, store) => bindCtgActionsImpl(host, store, {
       ...ctgActionsRuntimeDeps,
-      confirm: (message) => requestAssemblyConfirm(host, store, message),
+      confirm: (message, options) => requestAssemblyConfirm(host, store, message, options),
     }),
     bindDeletedMemberChipBoxSelection: (host, store) => bindDeletedMemberChipBoxSelectionImpl(
       host,
@@ -1110,7 +1110,7 @@ const editorActionsRuntimeDeps = {
   runMainAction: runMainViewEditorAction,
   runBatchDelete: runMainViewBatchDelete,
   inspectMainViewDelete,
-  confirm: (message, context = {}) => requestAssemblyConfirm(context.host, context.store, message),
+  confirm: (message, context = {}) => requestAssemblyConfirm(context.host, context.store, message, context),
 };
 
 const editorActionRuntimeAdapters = createEditorActionRuntimeAdapters(editorActionsRuntimeDeps);
@@ -1125,7 +1125,7 @@ const mainViewHistoryRuntimeDeps = {
   setPendingTrackAutoFocusMode: (mode) => {
     assemblyPageSession.pendingTrackAutoFocusMode = mode;
   },
-  confirm: (message, context = {}) => requestAssemblyConfirm(context.host, context.store, message),
+  confirm: (message, context = {}) => requestAssemblyConfirm(context.host, context.store, message, context),
   scheduleHighlightClear: (host, store, assemblyCtgId) => {
     globalThis.setTimeout(() => {
       const state = store.getState();
@@ -1145,7 +1145,7 @@ const mainViewHistoryRuntimeDeps = {
 
 const degapRuntimeDeps = {
   rerender,
-  confirm: (message, context = {}) => requestAssemblyConfirm(context.host, context.store, message),
+  confirm: (message, context = {}) => requestAssemblyConfirm(context.host, context.store, message, context),
   mapAssemblyError,
   persistDegapProjectState: (host, store) =>
     persistProjectAssemblyViewStateFromStore(host, store, projectAssemblyViewStateRuntimeDeps),
@@ -1190,7 +1190,7 @@ const contextMenuRuntimeDeps = {
   openAssemblyContextMenuAt: () => {},
   promptForRenameCtg,
   promptForDeleteShorterThanLength,
-  confirm: (message, context = {}) => requestAssemblyConfirm(context.host, context.store, message),
+  confirm: (message, context = {}) => requestAssemblyConfirm(context.host, context.store, message, context),
   setAssemblyActionFeedback,
   restoreSelectedDeletedCtgs: editorActionRuntimeAdapters.restoreSelectedDeletedCtgs,
   rerender,
@@ -1470,7 +1470,7 @@ async function appendFinalPathRow(host, store, payload = {}) {
 
 async function restoreFinalPathFromGrtBaseline(host, store, payload = {}) {
   return restoreFinalPathFromGrtBaselineImpl(host, store, payload, createFinalPathMutationRuntimeDeps({
-    confirm: (message) => requestAssemblyConfirm(host, store, message),
+    confirm: (message, options) => requestAssemblyConfirm(host, store, message, options),
   }));
 }
 

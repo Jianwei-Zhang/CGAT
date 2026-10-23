@@ -15,6 +15,7 @@ use serde_json::{Value, json};
 struct Request {
     assembly_ctg_id: i64,
     neighbor_ctg_id: i64,
+    neighbor_deleted_record_id: Option<i64>,
     side: String,
     source_start: i64,
     source_end: i64,
@@ -42,6 +43,59 @@ pub(super) fn prepare_unsplit(
         bail!("CTG_UNSPLIT_INVALID_REQUEST: choose one split boundary");
     }
     let source = load_split_source(conn, project, r.assembly_ctg_id)?;
+    let has_view: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM project_assembly_view_state WHERE project_id=?1)",
+        [project],
+        |r| r.get(0),
+    )?;
+    let restored_before = if let Some(record_id) = r.neighbor_deleted_record_id {
+        let (ctg_id, seq_id): (i64, i64) = conn.query_row(
+            "SELECT assembly_ctg_id, assembly_seq_id FROM deleted_assembly_ctg WHERE id=?1 AND project_id=?2 AND assigned_chr_name=?3",
+            params![record_id, project, chr], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        if ctg_id != r.neighbor_ctg_id {
+            bail!("CTG_UNSPLIT_STALE_SOURCE: deleted neighbor changed");
+        }
+        let before = capture_snapshot(
+            conn,
+            project,
+            &SnapshotScope {
+                ctg_ids: vec![source.assembly_ctg_id, ctg_id],
+                seq_ids: vec![source.assembly_seq_id, seq_id],
+                dependency_ctg_ids: vec![source.assembly_ctg_id, ctg_id],
+                deleted_record_ids: vec![record_id],
+                include_view_state: true,
+                layout_scope: if has_view {
+                    ProjectViewLayoutScope {
+                        track_offset_keys: [source.assembly_ctg_id, ctg_id]
+                            .into_iter()
+                            .map(|id| ProjectViewTrackOffsetKey {
+                                track_role: "primary".into(),
+                                assembly_ctg_id: id,
+                                dataset_id: None,
+                                phased_track_id: None,
+                                phased_track_item_id: None,
+                            })
+                            .collect(),
+                        primary_visibility_keys: [source.assembly_ctg_id, ctg_id]
+                            .into_iter()
+                            .map(|id| PrimaryVisibilityKey {
+                                chr_name: chr.into(),
+                                assembly_ctg_id: id,
+                            })
+                            .collect(),
+                        ..Default::default()
+                    }
+                } else {
+                    Default::default()
+                },
+                ..Default::default()
+            },
+        )?;
+        super::mutations::prepare_restore_deleted_ctg(conn, project, chr, record_id)?;
+        Some(before)
+    } else {
+        None
+    };
     let neighbor = load_split_source(conn, project, r.neighbor_ctg_id)?;
     let low_side = (r.side == "left") != (source.orient == "-");
     if source.assigned_chr_name.as_deref() != Some(chr)
@@ -67,11 +121,6 @@ pub(super) fn prepare_unsplit(
     }
     let ctg_ids = vec![source.assembly_ctg_id, neighbor.assembly_ctg_id];
     let seq_ids = vec![source.assembly_seq_id, neighbor.assembly_seq_id];
-    let has_view: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM project_assembly_view_state WHERE project_id=?1)",
-        [project],
-        |r| r.get(0),
-    )?;
     let before = capture_snapshot(
         conn,
         project,
@@ -250,6 +299,7 @@ pub(super) fn prepare_unsplit(
     if has_view {
         reconcile_project_view_layout(conn, project, &before.layout_scope, &layout)?;
     }
+    let before = restored_before.unwrap_or(before);
     let after = capture_snapshot(conn, project, &snapshot_scope(&before))?;
     Ok(PreparedMutation {
         descriptor: MainViewHistoryOperationDescriptor {

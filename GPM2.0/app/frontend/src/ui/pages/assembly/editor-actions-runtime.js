@@ -278,7 +278,7 @@ export async function deleteSelectedTrackCtgs(host, store, selectedIds, deps, ov
     degapCount: Math.max(0, Number(impact?.degapReferenceCount || 0)),
   });
   const confirm = getConfirm(overrides, deps);
-  if (!(await confirm(`${baseConfirmMessage}\n\n${impactMessage}`, { host, store }))) {
+  if (!(await confirm(`${baseConfirmMessage}\n\n${impactMessage}`, { host, store, confirmationKey: "delete-main-contigs" }))) {
     return;
   }
   await deps.runBatchDeleteTrackCtgs(host, store, normalized, overrides);
@@ -310,7 +310,7 @@ export async function deleteSelectedSubviewTrackPairCtgs(host, store, selectedEn
     return;
   }
   const confirm = getConfirm(overrides, deps);
-  if (!(await confirm(tAssembly(store.getState(), "runtime.batchSubviewDeleteConfirm", { count: normalized.length })))) {
+  if (!(await confirm(tAssembly(store.getState(), "runtime.batchSubviewDeleteConfirm", { count: normalized.length }), { host, store, confirmationKey: "delete-local-selection" }))) {
     return;
   }
   let nextSubview;

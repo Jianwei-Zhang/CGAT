@@ -22,7 +22,7 @@ function stateFor(mode, orient = "+") {
 }
 function runtime(store, overrides = {}) {
   const calls = [], persisted = [];
-  let inside = false, children = [], historyCount = 0;
+  let inside = false, children = [], deleted = [], historyCount = 0;
   const api = createSubviewFragmentSyncRuntime({
     projectHistorical: project,
     inspectMainViewDelete: async (args) => { calls.push(["inspect", args]); return { finalPathReferenceCount: 2, degapReferenceCount: 1 }; },
@@ -36,7 +36,12 @@ function runtime(store, overrides = {}) {
       const boundaries = [1, ...new Set(cuts.map((cut) => cut + 1)), parent.totalLength + 1];
       children = boundaries.slice(0, -1).flatMap((start, index) => {
         const end = boundaries[index + 1] - 1;
-        if (args.action === "delete" && start >= args.sourceStart && end <= args.sourceEnd) return [];
+        if (args.action === "delete" && start >= args.sourceStart && end <= args.sourceEnd) {
+          deleted.push({ assemblyCtgId: 701 + index, deletedCtgRecordId: 91 + index,
+            totalLength: end - start + 1, refOrient: parent.orient,
+            sourceGroupKey: "manual-fragment:2", sourceRange: { sourceSeqId: 700, sourceStart: start, sourceEnd: end } });
+          return [];
+        }
         return [{ ...parent, assemblyCtgId: 701 + index, totalLength: end - start + 1, lengthBp: end - start + 1,
           sourceFragment: { sourceSeqId: 700, groupKey: "manual-fragment:2", sourceStart: start, sourceEnd: end, sourceLength: 16000 } }];
       });
@@ -44,7 +49,7 @@ function runtime(store, overrides = {}) {
     },
     loadAssemblyView: async () => {
       const latest = store.getState();
-      store.setState({ assembly: reconcileLocalSubviewWithMain({ ...latest.assembly, chrCtgs: children, error: "", loading: false }) });
+      store.setState({ assembly: reconcileLocalSubviewWithMain({ ...latest.assembly, chrCtgs: children, deletedCtgs: deleted, error: "", loading: false }) });
       calls.push(["reload"]);
     },
     persistNow: async () => { assert.equal(inside, true); calls.push(["persist"]); persisted.push(JSON.parse(JSON.stringify(store.getState().assembly))); },
@@ -179,4 +184,50 @@ test("legacy evidence and manual anchors preserve source points and canonical en
   assert.equal(endpoint.endpointKey, memberAnchorEndpointKey(member));
   assert.equal(endpoint.cutBp, 500, "assembly-space GRT/manual coordinates must not be flipped twice");
   assert.equal(projected.activeAnchors[0].descriptor.top.endpointKey, memberAnchorEndpointKey(member));
+});
+
+for (const mode of ["2-contig", "track-pair", "composition"]) test(`${mode}: Main owns synchronized deletion; local undo-split restores only local bases and survives reload`, async () => {
+  const { createSubviewFragmentController } = await import("../subview-fragment-controller.js");
+  const { restoreSubviewHistoryRollback } = await import("../subview-history-state.js");
+  const store = createStore(stateFor(mode)), api = runtime(store);
+  assert.equal(await api.run(contextFor(mode), { action: "delete" }), true);
+  let assembly = store.getState().assembly;
+  assert.equal(resolveCurrentSubviewHistory(assembly).canRollback, false, "no duplicate local deletion history");
+  assert.equal(assembly.subview.summary.deletedFragments.length, 1);
+  const beforeMain = JSON.stringify([assembly.chrCtgs, assembly.deletedCtgs, assembly.mainViewHistory]);
+  const left = assembly.subview.summary.members.find((m) => m.source.role === "primary");
+  const controller = createSubviewFragmentController({ projectHistorical: project, rerenderSubviewPanel() {}, persistProjectAssemblyViewStateFromStore: async () => {} });
+  assert.equal(await controller.mergeLocalFragment(host, store, { entityKey: left.entityKey }, "right"), true);
+  assembly = store.getState().assembly;
+  assert.equal(assembly.subview.summary.members.find((m) => m.source.role === "primary").lengthBp, 5000);
+  assert.equal(JSON.stringify([assembly.chrCtgs, assembly.deletedCtgs, assembly.mainViewHistory]), beforeMain);
+  const reloaded = reconcileLocalSubviewWithMain(JSON.parse(JSON.stringify(assembly)));
+  assert.equal(reloaded.subview.summary.members.find((m) => m.source.role === "primary").lengthBp, 5000);
+  const undone = rollbackSubviewHistory(reloaded);
+  assert.equal(undone.changed, true);
+  assert.equal(undone.assembly.subview.summary.members.find((m) => m.source.role === "primary").lengthBp, 1000);
+  const redone = restoreSubviewHistoryRollback(undone.assembly);
+  assert.equal(redone.changed, true);
+  assert.equal(redone.assembly.subview.summary.members.find((m) => m.source.role === "primary").lengthBp, 5000);
+  assert.equal(JSON.stringify([redone.assembly.chrCtgs, redone.assembly.deletedCtgs, redone.assembly.mainViewHistory]), beforeMain);
+});
+
+test("synchronized deletion preserves previous local actions and recovery metadata through local rollback", async () => {
+  const { createSubviewFragmentController, resolveLocalFragmentMenu } = await import("../subview-fragment-controller.js");
+  const store = createStore(stateFor("composition"));
+  const local = createSubviewFragmentController({ projectHistorical: project, rerenderSubviewPanel() {}, persistProjectAssemblyViewStateFromStore: async () => {} });
+  const support = store.getState().assembly.subview.summary.members.find((m) => m.source.role === "support");
+  assert.equal(await local.flipLocalFragment(host, store, { entityKey: support.entityKey }), true);
+  const depth = resolveCurrentSubviewHistory(store.getState().assembly).record.past.length;
+  const api = runtime(store);
+  assert.equal(await api.run(contextFor("composition"), { action: "delete" }), true);
+  assert.equal(resolveCurrentSubviewHistory(store.getState().assembly).record.past.length, depth);
+  const beforeMain = JSON.stringify(store.getState().assembly.chrCtgs);
+  const rollback = rollbackSubviewHistory(store.getState().assembly);
+  assert.equal(rollback.changed, true);
+  store.setState({ assembly: rollback.assembly });
+  assert.equal(store.getState().assembly.subview.summary.members.find((m) => m.entityKey === support.entityKey).flipped, false);
+  assert.equal(JSON.stringify(store.getState().assembly.chrCtgs), beforeMain);
+  const left = store.getState().assembly.subview.summary.members.find((m) => m.source.role === "primary");
+  assert.equal(resolveLocalFragmentMenu(store.getState(), host, { entityKey: left.entityKey }).right, true);
 });

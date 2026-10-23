@@ -91,9 +91,9 @@ test("local menu has ordered scoped split/delete and local-only merge, with no r
     subviewTrackPairContext: { ...context },
     subviewHitContext: { hitKey: "evidence-1" },
   });
-  assert.deepEqual(items.map((item) => item.label), ["加入 Final Path", "移至另一轨", "翻转 contig", "分割当前片段", "合并局部片段", "删除当前片段"]);
+  assert.deepEqual(items.map((item) => item.label), ["加入 Final Path", "移至另一轨", "翻转 contig", "分割当前片段", "撤销分割", "删除当前片段"]);
   assert.deepEqual(items[3].children.map((item) => item.label), ["仅在当前局部视图分割…", "分割并同步主视图…"]);
-  assert.deepEqual(items[4].children.map((item) => item.label), ["与左侧片段合并", "与右侧片段合并"]);
+  assert.deepEqual(items[4].children.map((item) => item.label), ["撤销左侧分割", "撤销右侧分割"]);
   assert.equal(items[3].children[1].disabled, true);
   assert.equal(items[5].children[1].disabled, true);
   const model = resolveLocalFragmentMenu(state, host, context);

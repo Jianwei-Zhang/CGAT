@@ -342,7 +342,7 @@ fn load_ctg_contexts(
 ) -> Result<Vec<JunctionCtgContext>> {
     normalize_requested_ctg_ids(assembly_ctg_ids)
         .into_iter()
-        .map(|assembly_ctg_id| load_ctg_context(conn, project_id, assembly_ctg_id))
+        .map(|assembly_ctg_id| load_ctg_context_readonly(conn, project_id, assembly_ctg_id, true))
         .collect::<Result<Vec<_>>>()
 }
 
@@ -814,11 +814,23 @@ fn load_ctg_context(
     project_id: i64,
     assembly_ctg_id: i64,
 ) -> Result<JunctionCtgContext> {
+    load_ctg_context_readonly(conn, project_id, assembly_ctg_id, false)
+}
+
+fn load_ctg_context_readonly(
+    conn: &Connection,
+    project_id: i64,
+    assembly_ctg_id: i64,
+    allow_deleted: bool,
+) -> Result<JunctionCtgContext> {
+    let ctgs = if allow_deleted {
+        "(SELECT id, project_id, name, assigned_chr_name, anchor_start, placement_mode, assembly_seq_id FROM assembly_ctg UNION ALL SELECT assembly_ctg_id AS id, project_id, name, assigned_chr_name, anchor_start, placement_mode, assembly_seq_id FROM deleted_assembly_ctg WHERE NOT EXISTS (SELECT 1 FROM assembly_ctg c WHERE c.id=deleted_assembly_ctg.assembly_ctg_id))"
+    } else {
+        "assembly_ctg"
+    };
     let head = conn
         .query_row(
-            "SELECT id, project_id, name, assigned_chr_name, anchor_start, placement_mode
-             FROM assembly_ctg
-             WHERE id = ?1",
+            &format!("SELECT id, project_id, name, assigned_chr_name, anchor_start, placement_mode FROM {ctgs} WHERE id = ?1"),
             params![assembly_ctg_id],
             |row| {
                 Ok((
@@ -846,7 +858,7 @@ fn load_ctg_context(
     }
 
     let mut member_stmt = conn
-        .prepare(
+        .prepare(&format!(
             "SELECT
                 c.id,
                 c.assembly_seq_id,
@@ -860,13 +872,13 @@ fn load_ctg_context(
                 s.source_start,
                 s.source_end,
                 s.hidden
-             FROM assembly_ctg c
+             FROM {ctgs} c
              JOIN assembly_seq s ON s.id = c.assembly_seq_id
              JOIN source_seq ss ON ss.id = s.source_seq_id
              JOIN dataset d ON d.id = ss.dataset_id
              WHERE c.id = ?1
-             ORDER BY c.id",
-        )
+             ORDER BY c.id"
+        ))
         .context("failed to prepare assembly_ctg member query")?;
     let members = member_stmt
         .query_map(params![assembly_ctg_id], |row| {
@@ -2057,6 +2069,37 @@ mod tests {
         assert_eq!(track_report.hits[0].query_end, 500);
         assert_eq!(track_report.hits[0].subject_start, 101);
         assert_eq!(track_report.hits[0].subject_end, 600);
+
+        // A local-only undo-split can read archived evidence without restoring
+        // a Main entity. Editing/junction inspection still requires live IDs.
+        let conn = Connection::open(&db_path).unwrap();
+        conn.execute("INSERT INTO deleted_assembly_ctg (project_id,assembly_ctg_id,assembly_seq_id,name,assigned_chr_name,chr_order,anchor_start,ref_orient,placement_mode,created_at,note,deleted_at) SELECT project_id,id,assembly_seq_id,name,assigned_chr_name,chr_order,anchor_start,ref_orient,placement_mode,created_at,note,'2' FROM assembly_ctg WHERE id=301", []).unwrap();
+        conn.execute("DELETE FROM assembly_ctg WHERE id=301", [])
+            .unwrap();
+        assert!(load_ctg_context(&conn, 1, 301).is_err());
+        assert!(load_ctg_context_readonly(&conn, 2, 301, true).is_err());
+        let archived = get_track_pairwise_evidence(
+            &db_path,
+            &GetTrackPairwiseEvidenceParams {
+                project_id: 1,
+                top_assembly_ctg_ids: vec![301],
+                bottom_assembly_ctg_ids: vec![302],
+                min_align_length: Some(300),
+                min_identity_pct: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(archived.evidence_hit_count, track_report.evidence_hit_count);
+        assert_eq!(archived.hits[0].query_start, 1);
+        assert_eq!(
+            conn.query_row(
+                "SELECT count(*) FROM assembly_ctg WHERE id=301",
+                [],
+                |row| row.get::<_, i64>(0)
+            )
+            .unwrap(),
+            0
+        );
     }
 
     #[test]
