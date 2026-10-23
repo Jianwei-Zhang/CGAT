@@ -1596,18 +1596,49 @@
   stroke: #7c6440;
 }
 
-.assembly-track-svg:not(.subview-track-svg) .track-ctg-group:hover > .track-ctg {
+.assembly-track-svg:not(.subview-track-svg) .track-ctg-group:not([data-main-anchor-segmented="1"]):hover > .track-ctg {
   stroke: #2e567f;
   stroke-width: 2;
 }
 
-.assembly-track-svg:not(.subview-track-svg) .track-ctg-group:hover > .track-ctg.is-companion {
+.assembly-track-svg:not(.subview-track-svg) .track-ctg-group:not([data-main-anchor-segmented="1"]):hover > .track-ctg.is-companion {
   stroke: #7c6440;
 }
 
 .assembly-track-svg:not(.subview-track-svg) .track-ctg-group:hover > .track-reference-member {
   stroke: #8e8e8e;
   stroke-width: 2;
+}
+
+.main-anchor-fragment-hit-zone {
+  cursor: pointer;
+}
+
+.main-anchor-fragment-outline {
+  stroke: transparent;
+  transition: stroke 120ms ease;
+  vector-effect: non-scaling-stroke;
+}
+
+.main-anchor-fragment-hit-zone[data-main-fragment-role="primary"]:hover + .main-anchor-fragment-outline,
+.main-anchor-fragment-hit-zone[data-main-fragment-role="primary"].is-menu-active + .main-anchor-fragment-outline {
+  stroke: #2e567f;
+}
+
+.main-anchor-fragment-hit-zone[data-main-fragment-role="support"]:hover + .main-anchor-fragment-outline,
+.main-anchor-fragment-hit-zone[data-main-fragment-role="support"].is-menu-active + .main-anchor-fragment-outline {
+  stroke: #7c6440;
+}
+
+.main-anchor-fragment-separator {
+  stroke: var(--ctg-primary-stroke);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.main-anchor-fragment-separator[data-main-fragment-role="support"] {
+  stroke: var(--ctg-companion-stroke);
 }
 
 .track-ctg.is-hidden-contig,

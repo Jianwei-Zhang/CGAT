@@ -741,7 +741,8 @@ export function buildAssemblyContextMenuItems({
         return contextMenuActions.toggleMainAlignmentAnchor(host, store, { ...mainAlignmentContext, edge });
       } });
     }
-    if (singleEdge || !ctgContext) return items;
+    // A band also identifies its contig, but its menu must not fall through to contig actions.
+    return items;
   }
 
   if (subviewAnchorEdgeContext) {

@@ -1,3 +1,4 @@
+import { resolveMainAnchorFragments, renderMainAnchorFragments, patchMainAnchorFragments } from "../main-anchor-fragments.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mainAlignmentKey, mainAlignmentEndpointKey, mainAnchorStateKey, mainActiveAnchorKeys,
@@ -57,19 +58,26 @@ test("terminal boundaries remain disabled, including reverse full-length alignme
   }
 });
 
-test("main hit and edge menus use the same anchor labels and pass the exact selected edge", async () => {
+test("main hit and edge menus exclude contig actions even when the band also resolves a contig target", async () => {
   const assembly = fixture(), ctg = assembly.chrCtgs[0];
   const hitKey = mainAlignmentKey(assembly.selectedChrName, ctg, ctg.hits[0]);
   const store = createStore(createState({ assembly })), calls = [];
-  const menu = (edge) => __testBuildAssemblyContextMenuItems({ host: {}, store,
+  const ctgContext = { assemblyCtgId: 6, trackRole: "primary", sourceBp: 200 };
+  const menu = (edge) => __testBuildAssemblyContextMenuItems({ host: {}, store, ctgContext,
     mainAlignmentContext: { hitKey, ...(edge ? { edge } : {}) },
     actions: { toggleMainAlignmentAnchor: (_host, _store, context) => calls.push(context) } });
-  const items = menu(); assert.equal(items.length, 2);
+  const items = menu();
+  assert.deepEqual(items.map((item) => item.label), ["启用左侧锚点", "启用右侧锚点"]);
   await items[0].run(); await items[1].run();
   assert.deepEqual(calls.map((c) => c.edge), ["left", "right"]);
   assert.deepEqual(menu("left").map((i) => i.label), ["启用锚点"]);
   store.setState({ assembly: enable(store.getState().assembly, 0, "left") });
   assert.deepEqual(menu("left").map((i) => i.label), ["关闭锚点"]);
+  const contigMenu = __testBuildAssemblyContextMenuItems({ host: {}, store, ctgContext,
+    actions: { canEditTrackCtg: () => true } });
+  assert.ok(contigMenu.some((item) => item.label === "分割 contig"));
+  assert.ok(contigMenu.some((item) => item.label === "重命名 contig..."));
+  assert.ok(!contigMenu.some((item) => item.label.includes("侧锚点")));
   const edgeNode = { getAttribute: (key) => ({ "data-main-alignment-key": hitKey, "data-main-anchor-edge": "right" })[key] };
   assert.deepEqual(resolveMainAlignmentContextTarget({ closest: () => edgeNode }), { hitKey, edge: "right" });
 });
@@ -112,4 +120,65 @@ test("hidden, filtered, switched chromosomes and mismatched tracks reject stale 
   const supportKey = mainAlignmentEndpointKey("Chr01", ctg, ctg.hits[0], "left", "support", 2);
   assert.notEqual(supportKey, mainAlignmentEndpointKey("Chr01", ctg, ctg.hits[0], "left"));
   assert.ok(mainAnchorStateKey("Chr01").startsWith("main-view|"));
+});
+
+
+const fragmentContext = (assembly) => ({ ctg: assembly.chrCtgs[0], chrName: assembly.selectedChrName,
+  role: "primary", active: mainActiveAnchorKeys(assembly), prefs: { alignmentLength: 1, minIdentityPct: 0 } });
+
+test("main anchor fragments match Local View partition semantics and current split boundaries", () => {
+  const assembly = enable(enable(fixture(), 0, "right"), 1, "left");
+  const original = JSON.stringify(assembly.chrCtgs);
+  assert.deepEqual(resolveMainAnchorFragments(fragmentContext(assembly)), [
+    { start: 1, end: 300 }, { start: 301, end: 500 }, { start: 501, end: 1000 },
+  ]);
+  assert.equal(JSON.stringify(assembly.chrCtgs), original);
+  for (const orient of ["+", "-"]) {
+    assembly.chrCtgs[0].orient = orient;
+    const fragments = resolveMainAnchorFragments(fragmentContext(assembly));
+    const middle = fragments[1];
+    const node = { getAttribute: (key) => key === "data-main-fragment-start" ? String(middle.start) : String(middle.end) };
+    const sourceBp = resolveMainContigSourcePosition(assembly, { assemblyCtgId: 6, trackRole: "primary" },
+      { closest: (selector) => selector === "[data-main-fragment-start][data-main-fragment-end]" ? node : null }, 0, 0);
+    assert.deepEqual(cuts(resolveSelectedContigSplitBoundaries(assembly, 6, sourceBp)), orient === "+" ? [300, 500] : [500, 300]);
+    assert.equal(fragments[0].start, orient === "+" ? 1 : 501);
+    const markup = renderMainAnchorFragments({ ...fragmentContext(assembly),
+      rect: { x: 20, width: 100 }, y: 90, height: 14, escapeHtml: String });
+    assert.equal((markup.match(/class="main-anchor-fragment-hit-zone"/g) || []).length, 3);
+    assert.equal((markup.match(/class="main-anchor-fragment-separator"/g) || []).length, 2);
+    assert.match(markup, /data-main-fragment-start="301" data-main-fragment-end="500"/);
+    assert.match(markup, orient === "+" ? /x1="50.00"/ : /x1="70.00"/);
+  }
+  assert.deepEqual(resolveMainAnchorFragments(fragmentContext(fixture())), []);
+});
+
+test("fragment overlays update in place and disappear after anchors are disabled without touching the contig node", () => {
+  const anchored = enable(enable(fixture(), 0, "right"), 1, "left");
+  const attrs = new Map(Object.entries({ "data-track-role": "primary", "data-track-contig-id": "6",
+    "data-track-dataset-id": "1", "data-track-rect-x": "20", "data-track-rect-y": "90",
+    "data-track-rect-width": "100", "data-track-rect-height": "14" }));
+  const group = { getAttribute: (key) => attrs.get(key), setAttribute: (key, value) => attrs.set(key, value),
+    removeAttribute: (key) => attrs.delete(key) };
+  const layer = { innerHTML: "", closest: () => group };
+  const host = { scrollLeft: 1800, scrollTop: 200, querySelectorAll: () => [layer] };
+  patchMainAnchorFragments(host, anchored, String);
+  assert.match(layer.innerHTML, /data-main-fragment-start="301" data-main-fragment-end="500"/);
+  assert.equal(attrs.get("data-main-anchor-segmented"), "1");
+  assert.equal(host.scrollLeft, 1800); assert.equal(host.scrollTop, 200);
+  patchMainAnchorFragments(host, fixture(), String);
+  assert.equal(layer.innerHTML, ""); assert.equal(attrs.has("data-main-anchor-segmented"), false);
+  assert.equal(layer.closest(), group);
+});
+
+test("main fragment overlays honor clipped source ranges and alignment filters", () => {
+  const assembly = enable(enable(fixture(), 0, "right"), 1, "left");
+  assembly.chrCtgs[0] = { ...assembly.chrCtgs[0], assemblyCtgId: 9, totalLength: 700,
+    sourceFragment: { sourceSeqId: 77, sourceStart: 301, sourceEnd: 1000 }, hits: [assembly.chrCtgs[0].hits[1]] };
+  assert.deepEqual(resolveMainAnchorFragments(fragmentContext(assembly)), [{ start: 301, end: 500 }, { start: 501, end: 1000 }]);
+  assert.deepEqual(resolveMainAnchorFragments({ ...fragmentContext(assembly), prefs: { alignmentLength: 5000, minIdentityPct: 0 } }), []);
+  const html = renderAssemblyPage(createState({ assembly: { ...assembly,
+    chromosomes: [{ chrName: "Chr01", chrLength: 1200 }], refTrackMembers: [{ segmentStartBp: 1, segmentEndBp: 1200 }] } }));
+  assert.match(html, /data-main-anchor-segmented="1"/);
+  assert.match(html, /data-main-anchor-fragments="1"/);
+  assert.match(html, /data-main-fragment-start="301" data-main-fragment-end="500"/);
 });

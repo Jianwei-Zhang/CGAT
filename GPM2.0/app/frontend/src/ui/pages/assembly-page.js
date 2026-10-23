@@ -1,3 +1,4 @@
+import { patchMainAnchorFragments } from "./assembly/main-anchor-fragments.js";
 import { toggleMainAlignmentAnchorState, patchMainAlignmentAnchors } from "./assembly/main-alignment-anchors.js";
 import { openManualContigSplit } from "./assembly/manual-contig-split.js";
 import { openAnchorContigSplit } from "./assembly/anchor-contig-split-dialog.js";
@@ -3001,6 +3002,7 @@ async function toggleMainAlignmentAnchor(host, store, context) {
   if (!assembly) return false;
   store.setState({ assembly });
   patchMainAlignmentAnchors(host, assembly);
+  patchMainAnchorFragments(host, assembly, escapeHtml);
   persistProjectAssemblyViewStateFromStore(host, store);
   return true;
 }

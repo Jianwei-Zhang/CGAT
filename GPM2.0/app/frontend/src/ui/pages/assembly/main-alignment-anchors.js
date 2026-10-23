@@ -95,6 +95,15 @@ export function resolveMainContigSourcePosition(assembly, context, target, clien
   if (!ctg) return null;
   const start = Number(ctg.sourceFragment?.sourceStart || 1);
   const end = Number(ctg.sourceFragment?.sourceEnd || ctg.totalLength);
+  const fragment = target?.closest?.("[data-main-fragment-start][data-main-fragment-end]");
+  if (fragment) {
+    const low = Number(fragment.getAttribute("data-main-fragment-start"));
+    const high = Number(fragment.getAttribute("data-main-fragment-end"));
+    if (Number.isSafeInteger(low) && Number.isSafeInteger(high) && low >= start && high <= end && low <= high) {
+      return low + Math.floor((high - low) / 2);
+    }
+    return null;
+  }
   const track = target?.closest?.("[data-track-contig-id][data-track-role]");
   const band = target?.closest?.('[data-band-contig-id][data-band-track-role="primary"]');
   const node = track || band;

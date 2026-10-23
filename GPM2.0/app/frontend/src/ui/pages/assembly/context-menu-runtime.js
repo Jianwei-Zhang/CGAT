@@ -337,7 +337,8 @@ export function bindAssemblyContextMenu(host, store, deps) {
   const setSubviewFragmentMenuHighlight = (target) => {
     clearSubviewFragmentMenuHighlight();
     clearSubviewHitMenuHighlight();
-    const fragmentNode = target?.closest?.("[data-subview-fragment-key][data-subview-fragment-contig-id]");
+    const fragmentNode = target?.closest?.("[data-subview-fragment-key][data-subview-fragment-contig-id]")
+      || target?.closest?.("[data-main-fragment-start][data-main-fragment-end]");
     fragmentNode?.classList?.add?.("is-menu-active");
     activeSubviewFragmentNode = fragmentNode || null;
     const hitNode = target?.closest?.("[data-subview-hit-key], [data-band-contig-id]");

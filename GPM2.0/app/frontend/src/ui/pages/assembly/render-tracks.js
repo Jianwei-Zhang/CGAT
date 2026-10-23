@@ -1,3 +1,4 @@
+import { renderMainAnchorFragments } from "./main-anchor-fragments.js";
 import { mainAlignmentKey, mainAlignmentEndpointKey, mainActiveAnchorKeys, renderMainAlignmentAnchors } from "./main-alignment-anchors.js";
 import { describeMainMemberLocalState, resolveMainMemberSourceRange, resolveMainMemberCardName } from "./main-member-local-state.js";
 import { bandBoundaryAnchors } from "./contig-split-boundary.js";
@@ -2332,6 +2333,11 @@ function renderAssemblyTracks(args) {
             role: layout.interactiveRole || layout.role,
             isMirror: layout.isMirror,
           });
+          const fragmentRole = layout.interactiveRole || layout.role;
+          const anchorFragments = fragmentRole === "primary" && activeHitsTrackKey && activeHitsTrackKey !== "primary"
+            ? "" : renderMainAnchorFragments({ ctg, chrName: selectedChrName, role: fragmentRole,
+              datasetId: layout.datasetId ?? ctg.datasetId, active: mainAnchorKeys, prefs: trackPrefs,
+              rect, y, height: TRACK_BAR_HEIGHT, escapeHtml });
           const grtOverlayKey = `${layout.id}:${ctg.assemblyCtgId}:${index}`;
           const grtOverlayMarkup = grtResultContext?.mainEnabled
             ? grtResultScene.overlaysByKey.get(grtOverlayKey) || ""
@@ -2339,7 +2345,7 @@ function renderAssemblyTracks(args) {
           return {
             ctg,
             rect,
-            markup: `<g class="${groupClass}" ${groupAttrs} data-grt-result-entry-key="${escapeAttr(grtOverlayKey)}">
+            markup: `<g class="${groupClass}" ${groupAttrs} data-grt-result-entry-key="${escapeAttr(grtOverlayKey)}"${anchorFragments ? ' data-main-anchor-segmented="1"' : ""}>
             <rect
               class="track-ctg${activeClass}${slotClass}${multiSelectedClass}${hiddenClass}${mirrorClass}${rowBgClass}"
               data-track-focus="${ctg.isSelected ? "true" : "false"}"
@@ -2352,6 +2358,7 @@ function renderAssemblyTracks(args) {
             >
               <title>${escapeHtml(ctg.name)} | start=${ctg.startBp} | len=${ctg.lengthBp}</title>
             </rect>
+            ${["primary", "support"].includes(fragmentRole) ? `<g data-main-anchor-fragments="1">${anchorFragments}</g>` : ""}
             ${renderGrtResultOverlayGroup({
               entryKey: grtOverlayKey,
               markup: grtOverlayMarkup,
