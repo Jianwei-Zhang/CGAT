@@ -1,6 +1,6 @@
 import { localFragmentCopy } from "./subview-fragment-copy.js";
 import { chrAlignmentCopy, resolveContigChrAlignmentModel } from "./contig-chr-alignments.js";
-import { splitCopy, resolveContigUnsplitModel, resolveContigSplitBoundaries, highlightContigSplitBoundary, resolveContigSplitModel } from "./contig-split-boundary.js";
+import { splitCopy, resolveContigUnsplitModel, resolveContigSplitModel } from "./contig-split-boundary.js";
 import {
   buildSupportMirrorKey,
   filterPrimaryTrackSelectionCtgIds,
@@ -688,8 +688,13 @@ export function buildAssemblyContextMenuItems({
       if (!model) return;
       const labels = localFragmentCopy[state.locale === "en" ? "en" : "zh"];
       const isFragment = Boolean(model.member.localFragment);
-      // Explicit split/unsplit belongs to Main View. Local recovery uses
-      // its own undo/redo history; keep existing fragment data readable.
+      items.push({ label: state.locale === "en" ? "Split contig (Local View only)" : "分割 contig（仅局部）",
+        disabled: !model.canSplit, title: model.canSplit ? "" : (state.locale === "en" ? "Create an internal anchor first" : "请先创建内部锚点"),
+        run: () => contextMenuActions.openLocalContigSplit(host, store, memberContext) });
+      items.push({ label: state.locale === "en" ? "Split contig (affect Main View)" : "分割 contig（影响主视图）",
+        disabled: !model.canSplit || !model.canSync,
+        title: !model.canSync ? labels.syncUnavailable : !model.canSplit ? (state.locale === "en" ? "Create an internal anchor first" : "请先创建内部锚点") : "",
+        run: () => contextMenuActions.openLocalContigSplit(host, store, memberContext, { synchronize: true }) });
       items.push({ label: isFragment ? labels.deleteFragment : labels.delete, children: [
         { label: labels.localDelete, run: () => removeContextSubviewMember(host, store, memberContext) },
         { label: labels.mainDelete, disabled: !model.canSync || !contextMenuActions.synchronizeLocalFragment,
@@ -1319,24 +1324,15 @@ export function buildAssemblyContextMenuItems({
         });
       }
       if (!isSupportTrackCtg) {
-        if (!isPhasedCtgContext && typeof contextMenuActions.splitContigAtRefBoundary === "function"
+        if (!isPhasedCtgContext && typeof contextMenuActions.openAnchorContigSplit === "function"
           && String(state.assembly.selectedChrName || "").toLowerCase() !== "unplaced") {
           const labels = splitCopy[state.locale === "en" ? "en" : "zh"];
-          const boundary = resolveContigSplitBoundaries(state.assembly, ctgId);
-          const splitChildren = ["left", "right"].map((side) => ({
-            label: labels[side], disabled: boundary?.[side] == null,
-            title: boundary?.[side] == null ? labels.unavailable : "",
-            preview: () => highlightContigSplitBoundary(host, boundary, side),
-            run: () => contextMenuActions.splitContigAtRefBoundary(host, store, {
-              assemblyCtgId: ctgId, side, cutAfter: boundary?.[side],
-              minAlignmentLength: boundary?.minAlignmentLength, minIdentityPct: boundary?.minIdentityPct,
-            }),
-          }));
+          items.push({ label: labels.title, disabled: !resolveContigSplitModel(state.assembly, ctgId),
+            run: () => contextMenuActions.openAnchorContigSplit(host, store, { assemblyCtgId: ctgId }) });
           if (typeof contextMenuActions.openManualContigSplit === "function") {
-            splitChildren.unshift({ label: labels.manual, disabled: !resolveContigSplitModel(state.assembly, ctgId),
+            items.push({ label: labels.manual, disabled: !resolveContigSplitModel(state.assembly, ctgId),
               run: () => contextMenuActions.openManualContigSplit(host, store, { assemblyCtgId: ctgId }) });
           }
-          items.push({ label: labels.title, children: splitChildren });
           const unsplit = resolveContigUnsplitModel(state.assembly, ctgId);
           if (unsplit && typeof contextMenuActions.undoContigSplit === "function") {
             items.push({ label: labels.undoTitle, children: ["left", "right"].map((side) => ({

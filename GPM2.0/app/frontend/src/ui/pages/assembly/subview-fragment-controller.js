@@ -1,10 +1,11 @@
+import { wholeMemberContext, localAnchorCuts, splitLocalMemberAtAnchors } from "./anchor-contig-split.js";
 import { prepareSourceOwnedSubviewHistory } from "./subview-fragment-history.js";
 import { getSubviewState } from "./subview-state.js";
 import { projectCurrentSubviewToComposition, resolveCurrentSubviewCompositionViewport } from "./subview-composition-controller.js";
 import { applySubviewComposition, moveSubviewCompositionMembers } from "./subview-composition-state.js";
 import { commitSubviewCompositionHistoryOperation } from "./subview-history-state.js";
 import { preserveSubviewRemovalViewport } from "./subview-removal-viewport.js";
-import { isolateLocalMemberInterval, deleteLocalMember, splitLocalMember, mergeLocalMember,
+import { isolateLocalMemberInterval, deleteLocalMember, mergeLocalMember,
   resolveLocalMergeNeighbor, memberSourceInterval, memberEffectiveOrientation, memberActiveBackingParts } from "./subview-fragment-model.js";
 import { localFragmentCopy } from "./subview-fragment-copy.js";
 
@@ -44,7 +45,9 @@ export function resolveLocalFragmentMenu(state, host, context) {
       && part.sourceEnd === Number(real?.sourceFragment?.sourceEnd || length)
       && part.orient === ((real?.orient ?? real?.refOrient) === "-" ? "-" : "+");
   });
-  return { member, range: memberSourceInterval(member), canSplit: member.lengthBp > 1,
+  const whole = resolveLocalFragmentContext(state, host, wholeMemberContext(context));
+  const anchorCuts = whole ? localAnchorCuts(whole.composition, whole.member) : [];
+  return { member, range: memberSourceInterval(member), canSplit: anchorCuts.length > 0, anchorCuts,
     canSync: member.source.role === "primary" && eligibleChr && validTargets,
     left: Boolean(resolveLocalMergeNeighbor(composition, member.entityKey, "left")),
     right: Boolean(resolveLocalMergeNeighbor(composition, member.entityKey, "right")),
@@ -84,29 +87,27 @@ export function createSubviewFragmentController(deps) {
   }
   const deleteLocalFragment = (host, store, context) => edit(host, store, context, "remove-members",
     (composition, member) => deleteLocalMember(composition, member.entityKey));
-  const flipLocalFragment = (host, store, context) => edit(host, store, context, "flip-contig", (composition, member) => ({
+  const flipLocalFragment = (host, store, context) => edit(host, store, wholeMemberContext(context), "flip-contig", (composition, member) => ({
     changed: true, composition: { ...composition, members: composition.members.map((entry) => entry === member ? { ...entry, flipped: !entry.flipped } : entry) },
   }));
-  const moveLocalFragmentToOtherLane = (host, store, context) => edit(host, store, context, "move-members",
+  const moveLocalFragmentToOtherLane = (host, store, context) => edit(host, store, wholeMemberContext(context), "move-members",
     (composition, member) => moveSubviewCompositionMembers(composition, [member.entityKey], member.lane === "top" ? "bottom" : "top"));
   const mergeLocalFragment = (host, store, context, side) => edit(host, store, context, "merge-fragments",
     (composition, member) => mergeLocalMember(composition, member.entityKey, side));
   async function openLocalContigSplit(host, store, context, { synchronize = false } = {}) {
+    context = wholeMemberContext(context);
     const state = store.getState(), resolved = resolveLocalFragmentContext(state, host, context);
-    if (!resolved || resolved.member.lengthBp < 2) return false;
-    const { member } = resolved, range = memberSourceInterval(member);
-    const model = { assemblyCtgId: member.assemblyCtgId, name: member.label,
-      sourceStart: range.sourceStart, sourceEnd: range.sourceEnd,
-      orient: memberEffectiveOrientation(member), hits: [], refLength: 0 };
-    return deps.openManualContigSplit(host, model, { locale: state.locale,
+    if (!resolved) return false;
+    const { member, composition } = resolved, range = memberSourceInterval(member);
+    const cuts = localAnchorCuts(composition, member);
+    if (!cuts.length) return false;
+    return deps.openAnchorContigSplit(host, { ...range, name: member.label,
+      orient: memberEffectiveOrientation(member), cuts, readOnlyAnchors: true }, { locale: state.locale,
       isCurrent: () => sameContext(store, state),
-      commit: async ({ cutAfter }) => {
-        if (!sameContext(store, state)) throw new Error(labels(state).stale);
-        if (synchronize) {
-          if (!deps.synchronizeLocalFragment) throw new Error(labels(state).syncPending);
-          return deps.synchronizeLocalFragment(host, store, context, { action: "split", cutAfter });
-        }
-        const result = splitLocalMember(resolved.composition, member.entityKey, cutAfter);
+      commit: async ({ cuts: selected }) => {
+        if (!sameContext(store, state) || !selected.length || selected.some((cut) => !cuts.includes(cut))) throw new Error(labels(state).stale);
+        if (synchronize) return deps.synchronizeLocalFragment(host, store, context, { action: "split", cuts: selected });
+        const result = splitLocalMemberAtAnchors(composition, member.entityKey, selected);
         return result.changed ? commit(host, store, state, result.composition, "split-contig") : false;
       },
     });

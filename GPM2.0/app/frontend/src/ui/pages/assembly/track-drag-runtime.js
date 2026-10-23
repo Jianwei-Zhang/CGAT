@@ -211,6 +211,7 @@ export function bindTrackContigDrag(host, store, deps) {
     const sameContext = () => {
       const next = store.getState();
       return !next.assembly?.mainViewHistory?.inFlight && !next.assembly?.loading
+        && !next.assembly?.sourceEditingReloadRequired && next.assembly?.activeTab === "assembly"
         && next.session?.workspacePath === state.session?.workspacePath
         && next.session?.projectId === state.session?.projectId
         && next.assembly?.selectedChrName === state.assembly?.selectedChrName
@@ -402,13 +403,19 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
     const dragHost = fullRangeDrag ? scrollEl.closest?.("#route-host") || runtimeHost : runtimeHost;
     let lastPointerClientX = startClientX;
     let finished = false;
+    // Evidence completion and harmless state normalization replace subview
+    // objects during a drag. Compare editable identity, not object references.
+    const editableIdentity = (view) => JSON.stringify([view?.summary, view?.activeAnchors, view?.manualAnchors,
+      view?.flippedCtgs, view?.trackPairHiddenCtgs, view?.trackPairSelectedCtgs]);
+    const initialIdentity = editableIdentity(state.assembly?.subview);
     const sameContext = () => {
       const next = store.getState();
       return !next.assembly?.mainViewHistory?.inFlight && !next.assembly?.loading
+        && !next.assembly?.sourceEditingReloadRequired && next.assembly?.activeTab === "assembly"
         && next.session?.workspacePath === state.session?.workspacePath
         && next.session?.projectId === state.session?.projectId
         && next.assembly?.selectedChrName === state.assembly?.selectedChrName
-        && next.assembly?.subview === state.assembly?.subview;
+        && editableIdentity(next.assembly?.subview) === initialIdentity;
     };
 
     const scheduler = createFrameScheduler(() => {
@@ -489,7 +496,7 @@ export function bindSubviewTrackContigDrag(host, store, deps) {
 
     const finish = (shouldCommit) => {
       if (finished) return;
-      // Async evidence or a context switch must not apply the drag to a new pair.
+      // An actual edit/context switch must not apply the drag to a new pair.
       if (!sameContext()) shouldCommit = false;
       const windowObject = getWindowObject();
       windowObject?.removeEventListener?.("pointermove", onPointerMove, true);

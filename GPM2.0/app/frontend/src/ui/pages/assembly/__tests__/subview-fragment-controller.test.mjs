@@ -5,7 +5,7 @@ import { createIdentityRenderState } from "./identity-render-fixture.mjs";
 import { createStore, __testBuildAssemblyContextMenuItems, renderAssemblyPage } from "./tabs-semantics-harness.mjs";
 import { createSubviewFragmentController, resolveLocalFragmentMenu } from "../subview-fragment-controller.js";
 import { commitSubviewHistoryOperation, rollbackSubviewHistory, restoreSubviewHistoryRollback, resolveCurrentSubviewHistory } from "../subview-history-state.js";
-import { memberSourceInterval, mergeLocalMember, splitLocalMember } from "../subview-fragment-model.js";
+import { memberAnchorEndpointKey, memberSourceInterval, mergeLocalMember, splitLocalMember } from "../subview-fragment-model.js";
 
 import { reconcileLocalSubviewWithMain } from "../subview-fragment-reconcile.js";
 
@@ -14,24 +14,33 @@ function controller(overrides = {}) {
   const persisted = [];
   const runtime = createSubviewFragmentController({
     projectHistorical: (state) => projectRenderedSubviewToComposition(state, renderAssemblyPage(state)),
-    openManualContigSplit: async (_host, model, options) => options.commit({ cutAfter: Math.floor((model.sourceStart + model.sourceEnd) / 2) }),
+    openAnchorContigSplit: async (_host, model, options) => options.commit({ cuts: model.cuts }),
     rerenderSubviewPanel() {}, refreshSubviewPairwiseEvidence() {},
     persistProjectAssemblyViewStateFromStore: async (_host, store) => { persisted.push(JSON.parse(JSON.stringify(store.getState()))); },
     ...overrides,
   });
   return { ...runtime, persisted };
 }
+function addAnchor(state, cut = 8000) {
+  const composition = projectRenderedSubviewToComposition(state, renderAssemblyPage(state));
+  const member = composition.members.find((m) => m.assemblyCtgId === 30);
+  const other = composition.members.find((m) => m.assemblyCtgId === 2);
+  state.assembly.subview.activeAnchors = [{ hitKey: "test-anchor", edge: "left", descriptor: {
+    top: { endpointKey: memberAnchorEndpointKey(member), contigId: 30, cutBp: cut+1, lengthBp: 16000, sourceRole: "support" },
+    bottom: { endpointKey: memberAnchorEndpointKey(other), contigId: 2, cutBp: cut+1, lengthBp: 16000, sourceRole: "primary" },
+  } }];
+}
 for (const mode of ["2-contig", "track-pair", "composition"]) {
-  test(`local anchor fragment flip and deletion are interval-scoped with independent history from ${mode}`, async () => {
+  test(`local anchor hit flips the whole object while deletion is interval-scoped with independent history from ${mode}`, async () => {
     const state = createIdentityRenderState(mode);
     const original = JSON.parse(JSON.stringify(state));
     const store = createStore(state), runtime = controller();
     const context = { assemblyCtgId: 30, trackRole: "support", slot: "top", start: 1001, end: 3000 };
     assert.equal(await runtime.flipLocalFragment(host, store, context), true);
     const members = store.getState().assembly.subview.summary.members.filter((m) => m.assemblyCtgId === 30);
-    assert.equal(members.length, 3);
-    assert.deepEqual(members.map((m) => m.flipped), [false, true, false]);
-    assert.deepEqual(members.map((m) => m.lengthBp), [1000, 2000, 13000]);
+    assert.equal(members.length, 1);
+    assert.deepEqual(members.map((m) => m.flipped), [true]);
+    assert.deepEqual(members.map((m) => m.lengthBp), [16000]);
     assert.deepEqual(store.getState().assembly.chrCtgs, original.assembly.chrCtgs);
     assert.deepEqual(store.getState().assembly.supportChrCtgs, original.assembly.supportChrCtgs);
     assert.equal(resolveCurrentSubviewHistory(store.getState().assembly).record.past.length, 1);
@@ -41,8 +50,8 @@ for (const mode of ["2-contig", "track-pair", "composition"]) {
     const redone = restoreSubviewHistoryRollback(undone.assembly);
     assert.equal(redone.changed, true);
     store.setState({ assembly: redone.assembly });
-    const middle = members[1];
-    assert.equal(await runtime.deleteLocalFragment(host, store, { entityKey: middle.entityKey }), true);
+    const middle = members[0];
+    assert.equal(await runtime.deleteLocalFragment(host, store, { entityKey: middle.entityKey, start: 1001, end: 3000, coordinateSpace: "base" }), true);
     const surviving = store.getState().assembly.subview.summary.members.filter((m) => m.assemblyCtgId === 30);
     assert.deepEqual(surviving.map((m) => [memberSourceInterval(m).sourceStart, memberSourceInterval(m).sourceEnd]), [[1, 1000], [3001, 16000]]);
     assert.equal(runtime.persisted.length, 2);
@@ -50,9 +59,10 @@ for (const mode of ["2-contig", "track-pair", "composition"]) {
   });
 }
 
-test("manual split and local merge remain local, one history entry per edit", async () => {
+test("anchor split and local merge remain local, one history entry per edit", async () => {
   const store = createStore(createIdentityRenderState("composition")), runtime = controller();
   const main = store.getState().assembly.chrCtgs;
+  addAnchor(store.getState());
   assert.equal(await runtime.openLocalContigSplit(host, store, { entityKey: "assembly:30" }), true);
   const split = store.getState().assembly.subview.summary.members.filter((m) => m.assemblyCtgId === 30);
   assert.equal(split.length, 2);
@@ -67,22 +77,23 @@ test("manual split and local merge remain local, one history entry per edit", as
 
 test("split dialog cancel or stale view does not change state or persist a partial edit", async () => {
   const store = createStore(createIdentityRenderState("composition"));
+  addAnchor(store.getState());
   const before = store.getState();
-  const canceled = controller({ openManualContigSplit: async () => false });
+  const canceled = controller({ openAnchorContigSplit: async () => false });
   assert.equal(await canceled.openLocalContigSplit(host, store, { entityKey: "assembly:30" }), false);
   assert.equal(store.getState(), before);
   assert.equal(canceled.persisted.length, 0);
-  const stale = controller({ openManualContigSplit: async (_host, _model, options) => {
+  const stale = controller({ openAnchorContigSplit: async (_host, _model, options) => {
     store.setState({ assembly: { ...store.getState().assembly, subview: { ...store.getState().assembly.subview } } });
     assert.equal(options.isCurrent(), false);
-    await assert.rejects(options.commit({ cutAfter: 8000 }), /变化|changed/);
+    await assert.rejects(options.commit({ cuts: [8000] }), /变化|changed/);
     return false;
   } });
   assert.equal(await stale.openLocalContigSplit(host, store, { entityKey: "assembly:30" }), false);
   assert.equal(stale.persisted.length, 0);
 });
 
-test("local menu retains scoped deletion but exposes no split or undo-split actions", () => {
+test("local menu retains scoped deletion and two anchor split scopes, but no undo-split action", () => {
   const state = createIdentityRenderState("composition"), store = createStore(state);
   const context = { assemblyCtgId: 30, trackRole: "support", slot: "top", start: 1001, end: 3000,
     compositionEntityKey: "assembly:30", fragmentKey: "30:1001-3000" };
@@ -91,10 +102,10 @@ test("local menu retains scoped deletion but exposes no split or undo-split acti
     subviewTrackPairContext: { ...context },
     subviewHitContext: { hitKey: "evidence-1" },
   });
-  assert.deepEqual(items.map((item) => item.label), ["加入 Final Path", "移至另一轨", "翻转 contig", "删除当前片段"]);
-  assert.deepEqual(items[3].children.map((item) => item.label), ["仅从当前局部视图删除", "同步从主视图删除…"]);
-  assert.equal(items[3].children[1].disabled, true);
-  assert.ok(!items.some((item) => /分割/.test(item.label)));
+  assert.deepEqual(items.map((item) => item.label), ["加入 Final Path", "移至另一轨", "翻转 contig", "分割 contig（仅局部）", "分割 contig（影响主视图）", "删除当前片段"]);
+  assert.deepEqual(items[5].children.map((item) => item.label), ["仅从当前局部视图删除", "同步从主视图删除…"]);
+  assert.equal(items[5].children[1].disabled, true);
+  assert.ok(items[3].disabled && items[4].disabled);
 
 });
 
@@ -136,7 +147,7 @@ for (const mode of ["2-contig", "track-pair"]) {
     assert.equal(redone.changed, true);
     const pieces = redone.assembly.subview.summary.members.filter((m) => m.source.role === "primary");
     assert.deepEqual(pieces.map((m) => [m.localFragment.sourceStart, m.localFragment.sourceEnd, m.flipped]),
-      [[1, 1000, false], [1001, 3000, true], [3001, 16000, false]]);
+      [[1, 16000, true]]);
     assert.ok(pieces.every((m) => m.localFragment.parts.every((part) => part.assemblyCtgId !== 2)));
   });
 }
@@ -181,16 +192,17 @@ for (const mode of ["2-contig", "track-pair", "composition"]) test(`${mode}: an 
 
 for (const mode of ["2-contig", "track-pair", "composition"]) test(`${mode}: controller split of an anchor interval retains visible marks through reload and repeat split`, async () => {
   const store = createStore(createIdentityRenderState(mode)), runtime = controller();
+  addAnchor(store.getState(), 2000);
   const context = { assemblyCtgId: 30, trackRole: "support", slot: "top", start: 1001, end: 3000 };
   const marks = () => (renderAssemblyPage(store.getState()).split('data-subview-panel="1"')[1].match(/data-manual-split-after="2000"/g) || []).length;
   assert.equal(await runtime.openLocalContigSplit(host, store, context), true);
   assert.equal(marks(), 2);
   store.setState(JSON.parse(JSON.stringify(store.getState())));
   assert.equal(marks(), 2);
-  let first = store.getState().assembly.subview.summary.members.find((m) => m.localFragment?.sourceStart === 1001);
+  let first = store.getState().assembly.subview.summary.members.find((m) => m.localFragment?.sourceStart === 1);
   assert.equal(await runtime.mergeLocalFragment(host, store, { entityKey: first.entityKey }, "right"), true);
   assert.equal(marks(), 0);
-  const merged = store.getState().assembly.subview.summary.members.find((m) => m.localFragment?.sourceStart === 1001);
+  const merged = store.getState().assembly.subview.summary.members.find((m) => m.localFragment?.sourceStart === 1);
   assert.equal(await runtime.openLocalContigSplit(host, store, { entityKey: merged.entityKey }), true);
   assert.equal(marks(), 2);
 });
@@ -204,10 +216,36 @@ for (const locale of ["zh", "en"]) for (const role of ["primary", "support"]) fo
     const items = __testBuildAssemblyContextMenuItems({ store: createStore(state), host,
       subviewFragmentContext: fragment ? context : null, subviewTrackPairContext: context });
     assert.ok(items.length > 0);
-    assert.ok(items.every((item) => !/分割|split/i.test(item.label)));
+    assert.equal(items.filter((item) => /分割|split/i.test(item.label)).length, 2);
+    assert.ok(items.filter((item) => /分割|split/i.test(item.label)).every((item)=>item.disabled));
     const deletion = items.at(-1);
     assert.match(deletion.label, /删除|delete/i);
     assert.equal(deletion.children.length, 2);
     assert.equal(deletion.children[1].disabled, role !== "primary");
   });
 }
+
+test("multiple local anchors split the whole target once; a subsequent fragment flip is independent", async () => {
+  const state = createIdentityRenderState("composition");
+  addAnchor(state, 4000);
+  const first = structuredClone(state.assembly.subview.activeAnchors[0]);
+  addAnchor(state, 10000);
+  first.hitKey = "first-anchor";
+  state.assembly.subview.activeAnchors.push(first);
+  const store = createStore(state), runtime = controller();
+  assert.equal(await runtime.openLocalContigSplit(host, store, { entityKey: "assembly:30", start: 4001, end: 10000 }), true);
+  const after = store.getState().assembly;
+  const parts = after.subview.summary.members.filter(m => m.assemblyCtgId === 30);
+  assert.deepEqual(parts.map(m => memberSourceInterval(m)).map(r => [r.sourceStart,r.sourceEnd]), [[1,4000],[4001,10000],[10001,16000]]);
+  assert.equal(resolveCurrentSubviewHistory(after).record.past.length, 1);
+  assert.equal(after.subview.activeAnchors.length, 2);
+  assert.equal(after.subview.summary.members.filter(m => m.assemblyCtgId === 2).length, 1);
+  assert.equal(await runtime.flipLocalFragment(host, store, {entityKey:parts[1].entityKey,start:1,end:100}),true);
+  const flipped=store.getState().assembly.subview.summary.members.filter(m=>m.assemblyCtgId===30);
+  assert.equal(flipped.length,3);assert.deepEqual(flipped.map(m=>m.flipped),[false,true,false]);
+  assert.equal(store.getState().assembly.chrCtgs,state.assembly.chrCtgs);
+  const undoFlip=rollbackSubviewHistory(store.getState().assembly);
+  const undoSplit=rollbackSubviewHistory(undoFlip.assembly);
+  assert.equal(undoSplit.changed,true);
+  assert.equal(undoSplit.assembly.subview.summary.members.filter(m=>m.assemblyCtgId===30).length,1);
+});

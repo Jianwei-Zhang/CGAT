@@ -1,8 +1,9 @@
+import { normalizeAnchorCuts, splitLocalMemberAtAnchors } from "./anchor-contig-split.js";
 import { resolveLocalFragmentContext, resolveLocalFragmentMenu } from "./subview-fragment-controller.js";
 import { prepareSourceOwnedSubviewHistory } from "./subview-fragment-history.js";
 import { resolveCurrentSubviewCompositionViewport } from "./subview-composition-controller.js";
 import { reconcileLocalCompositionWithMain } from "./subview-fragment-reconcile.js";
-import { memberSourceInterval, memberActiveBackingParts, deleteLocalMember, splitLocalMember } from "./subview-fragment-model.js";
+import { memberSourceInterval, memberActiveBackingParts, deleteLocalMember } from "./subview-fragment-model.js";
 import { applySubviewComposition } from "./subview-composition-state.js";
 import { commitSubviewCompositionHistoryOperation } from "./subview-history-state.js";
 import { preserveSubviewRemovalViewport } from "./subview-removal-viewport.js";
@@ -18,10 +19,11 @@ export function buildLocalFragmentSyncRequest(state, host, context, operation) {
   const menu = resolveLocalFragmentMenu(state, host, context);
   if (!resolved || !menu?.canSync || !["split", "delete"].includes(operation?.action)) return null;
   const range = memberSourceInterval(resolved.member);
-  if (operation.action === "split" && (!Number.isSafeInteger(operation.cutAfter)
-    || operation.cutAfter < range.sourceStart || operation.cutAfter >= range.sourceEnd)) return null;
+  const cuts = operation.cuts ?? (operation.cutAfter != null ? [operation.cutAfter] : []);
+  if (operation.action === "split" && (!cuts.length || cuts.length > 1024 || cuts.some((cut) => !Number.isSafeInteger(cut))
+    || normalizeAnchorCuts(cuts, range).length !== new Set(cuts).size)) return null;
   return { ...resolved, args: { action: operation.action, sourceStart: range.sourceStart, sourceEnd: range.sourceEnd,
-    ...(operation.action === "split" ? { cutAfter: operation.cutAfter } : {}),
+    ...(operation.action === "split" ? { ...(operation.cuts ? { cuts } : { cutAfter: operation.cutAfter }) } : {}),
     targets: memberActiveBackingParts(resolved.member).map((part) => ({ ...part })),
   } };
 }
@@ -62,7 +64,7 @@ export function createSubviewFragmentSyncRuntime(deps) {
       await deps.flushBefore(host, store);
       if (!stillInstalled()) return false;
       const desired = operation.action === "split"
-        ? splitLocalMember(request.composition, request.member.entityKey, operation.cutAfter)
+        ? splitLocalMemberAtAnchors(request.composition, request.member.entityKey, operation.cuts || [operation.cutAfter])
         : deleteLocalMember(request.composition, request.member.entityKey);
       if (!desired.changed) return false;
       // A synchronized edit is two user-visible edits: keep the local

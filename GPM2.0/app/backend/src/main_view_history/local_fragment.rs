@@ -32,6 +32,8 @@ struct Request {
     source_start: i64,
     source_end: i64,
     cut_after: Option<i64>,
+    #[serde(default)]
+    cuts: Vec<i64>,
     targets: Vec<Target>,
 }
 
@@ -65,16 +67,24 @@ pub(super) fn prepare(
     let request: Request =
         serde_json::from_value(args.clone()).context("LOCAL_FRAGMENT_INVALID_REQUEST")?;
     let deleting = request.action == "delete";
+    let cuts: BTreeSet<i64> = request
+        .cuts
+        .iter()
+        .copied()
+        .chain(request.cut_after)
+        .collect();
     if !["split", "delete"].contains(&request.action.as_str())
         || request.source_start < 1
         || request.source_end < request.source_start
         || request.targets.is_empty()
         || request.targets.len() > 1024
-        || (deleting && request.cut_after.is_some())
+        || cuts.len() > 1024
+        || (deleting && !cuts.is_empty())
         || (!deleting
-            && !request
-                .cut_after
-                .is_some_and(|cut| cut >= request.source_start && cut < request.source_end))
+            && (cuts.is_empty()
+                || cuts
+                    .iter()
+                    .any(|cut| *cut < request.source_start || *cut >= request.source_end)))
     {
         bail!("LOCAL_FRAGMENT_INVALID_REQUEST: invalid inclusive interval or cut");
     }
@@ -137,15 +147,11 @@ pub(super) fn prepare(
     let mut plans = Vec::new();
     let mut removed_ids = Vec::new();
     for source in sources {
-        let mut cuts: Vec<_> = [
-            Some(request.source_start - 1),
-            Some(request.source_end),
-            request.cut_after,
-        ]
-        .into_iter()
-        .flatten()
-        .filter(|cut| *cut >= source.source_start && *cut < source.source_end)
-        .collect();
+        let mut cuts: Vec<_> = [request.source_start - 1, request.source_end]
+            .into_iter()
+            .chain(cuts.iter().copied())
+            .filter(|cut| *cut >= source.source_start && *cut < source.source_end)
+            .collect();
         cuts.sort_unstable();
         cuts.dedup();
         let ranges = partition(&source, &cuts);

@@ -10,7 +10,7 @@ function pointerEvent(type, properties = {}) {
   return event;
 }
 
-function createFixture(t, mode) {
+function createFixture(t, mode, { fullRange = false } = {}) {
   // Native EventTarget retains all listeners of a type, as the browser does.
   const windowObject = new EventTarget();
   // Node's boolean capture removal differs from DOM; normalize it to options.
@@ -54,7 +54,8 @@ function createFixture(t, mode) {
   const previews = [];
   let persists = 0;
   let positionBp = 2000;
-  const state = { assembly: { activeTab: "assembly" } };
+  let state = { assembly: { activeTab: "assembly", subviewTrackView: { fullRange },
+    subview: { summary: { mode, members: [] }, activeAnchors: [] } } };
   const store = { getState: () => state };
   const preview = (_host, payload) => previews.push(payload);
   const commit = (_host, _store, payload) => {
@@ -73,9 +74,19 @@ function createFixture(t, mode) {
     commitTrackDragOffset: commit, applySubviewTrackDragOffset: commit,
     persistSubviewTrackDragOffsets: () => { persists += 1; },
   };
+  if (fullRange) {
+    deps.previewFullRangeSubviewContigDrag = (_host, _store, payload) => {
+      previews.push(payload);
+      // A freshly normalized/evidence-enriched state replaces the old object.
+      state = { ...state, assembly: { ...state.assembly, subview: { ...structuredClone(state.assembly.subview), loading: false, hits: [{ id: "ready" }] } } };
+    };
+    deps.clearFullRangeSubviewDragPreview = () => {};
+  }
   const bind = (host) => (main ? bindTrackContigDrag : bindSubviewTrackContigDrag)(host, store, deps);
   return {
-    bind, commits, previews, frames,
+    bind, commits, previews, frames, deps,
+    get state() { return state; },
+    replaceSubview(subview) { state = { ...state, assembly: { ...state.assembly, subview } }; },
     get persists() { return persists; },
     get positionBp() { return positionBp; },
     down(hosts, properties = {}) {
@@ -153,3 +164,25 @@ test("nested Subview cancellation and modified clicks leave the next drag usable
   assert.equal(fixture.positionBp, 2400, "release still uses the final pointer position");
   assert.equal(fixture.persists, 1);
 });
+
+for (const mode of ["pair", "composition"]) for (const fullRange of [false, true]) {
+  test(`${mode} drag survives equivalent subview replacement (full range ${fullRange})`, (t) => {
+    const f = createFixture(t, mode, { fullRange }), route = new EventTarget();
+    f.bind(route); f.down([route]); f.move(130);
+    f.replaceSubview({ ...structuredClone(f.state.assembly.subview), loading: false, hits: [{ id: "ready" }] });
+    f.move(150); f.up(150);
+    assert.equal(f.commits.length, 1);
+    assert.equal(f.positionBp, 2500);
+    assert.equal(f.persists, 1);
+    assert.equal(f.frames.size, 0);
+  });
+  test(`${mode} drag cancels on actual anchor/member context edits (full range ${fullRange})`, (t) => {
+    const f = createFixture(t, mode, { fullRange }), route = new EventTarget();
+    f.bind(route); f.down([route]); f.move(130);
+    f.replaceSubview({ ...f.state.assembly.subview, activeAnchors: [{ hitKey: "new-anchor", edge: "left" }] });
+    f.up(150);
+    assert.equal(f.commits.length, 0);
+    assert.equal(f.persists, 0);
+    assert.equal(f.frames.size, 0);
+  });
+}

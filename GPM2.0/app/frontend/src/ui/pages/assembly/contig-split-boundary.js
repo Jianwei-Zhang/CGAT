@@ -7,15 +7,15 @@ export const splitCopy = {
     unavailable: "没有可用的比对边界，或边界已在 contig 端部", stale: "比对或当前视图已变化，请重新打开菜单。",
     undoTitle: "撤销分割 contig", undoLeft: "撤销左侧分割", undoRight: "撤销右侧分割",
     undoUnavailable: "该侧没有可合并的同源相邻分割片段", undoDone: "已撤销该侧分割；可通过主视图撤销/重做恢复。",
-    done: "已分割 contig；两段保留在原轨道，可撤销。" },
+    done: "已分割 contig；各片段保留在原轨道，可撤销。" },
   en: { title: "Split contig", manual: "Manual split…", left: "Split at leftmost alignment", right: "Split at rightmost alignment",
     unavailable: "No alignment boundary, or the boundary is already at the contig end", stale: "Alignment or view changed. Reopen the menu.",
     undoTitle: "Undo contig split", undoLeft: "Undo left split", undoRight: "Undo right split",
     undoUnavailable: "No compatible adjacent split fragment on this side", undoDone: "Split boundary removed. Main-view undo/redo is available.",
-    done: "Contig split; both fragments remain on the original track. Undo is available." },
+    done: "Contig split; all fragments remain on the original track. Undo is available." },
 };
 
-// Shared immutable source model for envelope cuts and the compact manual panel.
+// Immutable source model shared by anchor preview and legacy boundary helpers.
 export function resolveContigSplitModel(assembly, assemblyCtgId) {
   const ctg = assembly?.chrCtgs?.find((c) => Number(c.assemblyCtgId) === Number(assemblyCtgId));
   if (!ctg || (assembly.hiddenPrimaryCtgIds || []).map(Number).includes(Number(assemblyCtgId))) return null;

@@ -22,6 +22,7 @@ function harness(mode) {
   const retired = [], persisted = [];
   const host = { querySelector: (selector) => selector.includes("subview-track-scroll") ? current.scroll : null,
     querySelectorAll: (selector) => selector === ".assembly-track-scroll[data-track-role]" ? [current.scroll]
+      : selector.includes("data-subview-anchor-kind") ? current.anchors
       : selector === "[data-subview-track-slot][data-subview-contig-id][data-subview-rect-x]" ? current.rects : [] };
   const viewport = createAssemblyViewportController({ session, rerender() {}, persistProjectAssemblyViewStateFromStore() {} });
   function render() {
@@ -38,12 +39,15 @@ function harness(mode) {
       const data = attrs(tag); return { getAttribute: (key) => data[key] ?? null };
     });
     const fragments = [...html.matchAll(/<rect\b[^>]*class="subview-fragment-hit-zone"[^>]*>/g)].map(([tag]) => attrs(tag));
-    current = { scroll, rects, fragments };
+    const anchors = [...html.matchAll(/<[^>]*data-subview-anchor-kind=[^>]*>/g)].map(([tag]) => {
+      const data = attrs(tag); return { getAttribute: (key) => data[key]?.replaceAll("&amp;", "&") ?? null };
+    });
+    current = { scroll, rects, fragments, anchors };
     viewport.bindTrackScrollSync(host, store, { scope: "subview", schedulePersistAssemblyScrollState() {} });
   }
   const controller = createSubviewFragmentController({
     projectHistorical: (s) => projectRenderedSubviewToComposition(s, renderAssemblyPage(s)),
-    openManualContigSplit: async (_host, model, options) => options.commit({ cutAfter: Math.floor((model.sourceStart + model.sourceEnd) / 2) }),
+    openAnchorContigSplit: async (_host, model, options) => options.commit({ cuts: model.cuts }),
     rerenderSubviewPanel: render, refreshSubviewPairwiseEvidence() {},
     persistProjectAssemblyViewStateFromStore: async () => persisted.push(JSON.parse(JSON.stringify(state.assembly))),
   });

@@ -1,3 +1,5 @@
+import { openManualContigSplit } from "./assembly/manual-contig-split.js";
+import { openAnchorContigSplit } from "./assembly/anchor-contig-split-dialog.js";
 import { createMainMemberAnnotationRefresh } from "./assembly/main-member-local-state.js";
 import { createSubviewFragmentSyncRuntime } from "./assembly/subview-fragment-sync-runtime.js";
 import { projectRenderedSubviewToComposition } from "./assembly/subview-composition-controller.js";
@@ -6,9 +8,8 @@ import { clearOtherViewSelection } from "./assembly/selection-state.js";
 import { bindAlignmentTooltips } from "./assembly/alignment-tooltip-runtime.js";
 import { buildSupportDatasetOptions } from "./assembly/support-dataset-options.js";
 import { openContigChrAlignments, chrAlignmentCopy, resolveContigChrAlignmentModel } from "./assembly/contig-chr-alignments.js";
-import { openManualContigSplit } from "./assembly/manual-contig-split.js";
 import { normalizeMainViewHistoryStatus, resolveMainViewHistoryAfterMutation } from "./assembly/main-view-history-state.js";
-import { splitCopy, resolveContigUnsplitModel, resolveContigSplitBoundaries, resolveContigSplitModel } from "./assembly/contig-split-boundary.js";
+import { splitCopy, resolveContigUnsplitModel, resolveContigSplitModel } from "./assembly/contig-split-boundary.js";
 import { setTrackDragGroupOffsets, setSubviewDragGroupOffsets, moveSubviewCompositionDrag } from "./assembly/source-fragment-drag.js";
 import { requestAppPrompt } from "../shell/app-dialog.js";
 import {
@@ -463,7 +464,7 @@ const synchronizeLocalFragment = createSubviewFragmentSyncRuntime({
 const subviewFragmentController = createSubviewFragmentController({
   synchronizeLocalFragment,
   projectHistorical: (state) => projectRenderedSubviewToComposition(state, renderAssemblySubviewPanelImpl(state, renderTracksDeps)),
-  openManualContigSplit,
+  openAnchorContigSplit,
   persistProjectAssemblyViewStateFromStore: (host, store) => persistProjectAssemblyViewStateFromStore(host, store),
   rerenderSubviewPanel: (host, store) => rerenderSubviewPanel(host, store),
   refreshSubviewPairwiseEvidence,
@@ -1151,9 +1152,10 @@ const contextMenuRuntimeDeps = {
   synchronizeLocalFragment,
   resolveLocalFragmentMenu,
   flipLocalFragment: subviewFragmentController.flipLocalFragment,
-  splitContigAtRefBoundary: splitAssemblyContigAtRefBoundary,
   undoContigSplit: undoAssemblyContigSplit,
+  openAnchorContigSplit: openAssemblyAnchorContigSplit,
   openManualContigSplit: openAssemblyManualContigSplit,
+  openLocalContigSplit: subviewFragmentController.openLocalContigSplit,
   openContigChrAlignments: openAssemblyContigChrAlignments,
   addContextCtgToComposition,
   moveContextSubviewMemberToOtherLane: subviewFragmentController.moveLocalFragmentToOtherLane,
@@ -2957,18 +2959,6 @@ function escapeAttr(value) {
   return escapeHtml(value).replaceAll('"', "&quot;");
 }
 
-async function splitAssemblyContigAtRefBoundary(host, store, options) {
-  const state = store.getState();
-  if (state.assembly?.mainViewHistory?.inFlight || state.assembly?.loading) return false;
-  const labels = splitCopy[state.locale === "en" ? "en" : "zh"];
-  const current = resolveContigSplitBoundaries(state.assembly, options.assemblyCtgId);
-  if (!current || current[options.side] == null || current[options.side] !== options.cutAfter
-    || current.minAlignmentLength !== options.minAlignmentLength || current.minIdentityPct !== options.minIdentityPct) {
-    setAssemblyActionFeedback(host, store, { actionError: labels.stale }); return false;
-  }
-  return commitAssemblyContigSplit(host, store, "split-ref-boundary", options);
-}
-
 async function undoAssemblyContigSplit(host, store, options) {
   const state = store.getState();
   if (state.assembly?.mainViewHistory?.inFlight || state.assembly?.loading) return false;
@@ -2982,15 +2972,15 @@ async function undoAssemblyContigSplit(host, store, options) {
 
 async function openAssemblyManualContigSplit(host, store, { assemblyCtgId }) {
   const state = store.getState();
-  if (state.assembly?.mainViewHistory?.inFlight || state.assembly?.loading) return false;
+  if (state.assembly?.mainViewHistory?.inFlight || state.assembly?.loading || state.assembly?.sourceEditingReloadRequired) return false;
   const model = resolveContigSplitModel(state.assembly, assemblyCtgId);
   if (!model) return false;
   const isCurrent = () => {
-    const latest = store.getState();
-    const live = resolveContigSplitModel(latest.assembly, assemblyCtgId);
+    const latest = store.getState(), live = resolveContigSplitModel(latest.assembly, assemblyCtgId);
     return latest.session.workspacePath === state.session.workspacePath && latest.session.projectId === state.session.projectId
       && latest.assembly.selectedChrName === model.chrName && live?.sourceStart === model.sourceStart
-      && live?.sourceEnd === model.sourceEnd && live?.orient === model.orient;
+      && live?.sourceEnd === model.sourceEnd && live?.orient === model.orient
+      && !latest.assembly?.loading && !latest.assembly?.sourceEditingReloadRequired && !latest.assembly?.mainViewHistory?.inFlight;
   };
   return openManualContigSplit(host, model, { locale: state.locale, isCurrent,
     commit: async (args) => {
@@ -2998,6 +2988,28 @@ async function openAssemblyManualContigSplit(host, store, { assemblyCtgId }) {
       const result = await commitAssemblyContigSplit(host, store, "split-manual-contig", args);
       if (!result) throw new Error(store.getState().assembly.actionError || splitCopy[state.locale === "en" ? "en" : "zh"].stale);
       return result;
+    },
+  });
+}
+
+async function openAssemblyAnchorContigSplit(host, store, { assemblyCtgId }) {
+  const state = store.getState();
+  if (state.assembly?.mainViewHistory?.inFlight || state.assembly?.loading) return false;
+  const model = resolveContigSplitModel(state.assembly, assemblyCtgId);
+  if (!model) return false;
+  const isCurrent = () => {
+    const latest = store.getState(), live = resolveContigSplitModel(latest.assembly, assemblyCtgId);
+    return latest.session.workspacePath === state.session.workspacePath && latest.session.projectId === state.session.projectId
+      && latest.assembly.selectedChrName === model.chrName && live?.sourceStart === model.sourceStart
+      && live?.sourceEnd === model.sourceEnd && live?.orient === model.orient
+      && !latest.assembly?.loading && !latest.assembly?.sourceEditingReloadRequired && !latest.assembly?.mainViewHistory?.inFlight;
+  };
+  return openAnchorContigSplit(host, model, { locale: state.locale, isCurrent,
+    commit: async ({ cuts }) => {
+      if (!isCurrent()) throw new Error(splitCopy[state.locale === "en" ? "en" : "zh"].stale);
+      return commitAssemblyContigSplit(host, store, "edit-local-fragment", { action: "split", cuts,
+        sourceStart: model.sourceStart, sourceEnd: model.sourceEnd,
+        targets: [{ assemblyCtgId, sourceStart: model.sourceStart, sourceEnd: model.sourceEnd, orient: model.orient }] });
     },
   });
 }

@@ -33,7 +33,7 @@ function runtime(store, overrides = {}) {
     runMainViewEditorAction: async (request) => {
       assert.equal(inside, true); calls.push(["native", request]); historyCount += 1;
       const { args } = request, parent = store.getState().assembly.chrCtgs[0];
-      const cuts = [args.sourceStart - 1, args.cutAfter, args.sourceEnd].filter((cut) => cut > 0 && cut < parent.totalLength).sort((a, b) => a - b);
+      const cuts = [args.sourceStart - 1, args.cutAfter, ...(args.cuts || []), args.sourceEnd].filter((cut) => cut > 0 && cut < parent.totalLength).sort((a, b) => a - b);
       const boundaries = [1, ...new Set(cuts.map((cut) => cut + 1)), parent.totalLength + 1];
       children = boundaries.slice(0, -1).flatMap((start, index) => {
         const end = boundaries[index + 1] - 1;
@@ -365,4 +365,24 @@ for (const localFirst of [false, true]) test(`Main deletion undo/redo and local 
     assert.deepEqual(localRanges(), [[1,16000]]);
   }
   assert.deepEqual(store.getState().assembly.chrCtgs, deletedMain);
+});
+
+for (const orient of ["+", "-"]) test(`multiple ${orient} anchor cuts survive production reload as one local and one main history entry`, async () => {
+  const state = stateFor("composition", orient);
+  const store = createStore(state), api = runtime(store);
+  assert.equal(await api.run({ entityKey: "assembly:2" }, { action: "split", cuts: [4000, 8000, 12000] }), true);
+  const after = store.getState().assembly;
+  assert.equal(api.historyCount(), 1);
+  assert.equal(after.chrCtgs.length, 4);
+  assert.equal(resolveCurrentSubviewHistory(after).record.past.length, 1);
+  const ranges = after.subview.summary.members.filter(m => m.source.role === "primary")
+    .map(m => memberSourceInterval(m)).sort((a,b) => a.sourceStart-b.sourceStart);
+  assert.deepEqual(ranges.map(r => [r.sourceStart,r.sourceEnd]), [[1,4000],[4001,8000],[8001,12000],[12001,16000]]);
+  const undone = rollbackSubviewHistory(JSON.parse(JSON.stringify(after)));
+  assert.equal(undone.changed, true);
+  assert.equal(undone.assembly.chrCtgs.length, 4);
+  assert.equal(undone.assembly.mainViewHistory.appliedOperationCount, 1);
+  const redone = restoreSubviewHistoryRollback(undone.assembly);
+  assert.equal(redone.changed, true);
+  assert.deepEqual(redone.assembly.subview.summary.members, after.subview.summary.members);
 });

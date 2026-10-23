@@ -368,3 +368,32 @@ fn unsplit_restores_deleted_neighbor_atomically_and_is_itself_undoable() -> Resu
     );
     Ok(())
 }
+
+#[test]
+fn multiple_anchor_cuts_are_one_atomic_operation_with_independent_undo_redo() -> Result<()> {
+    for (id, source, length, orient) in [(301, 101, 1000, "+"), (302, 102, 900, "-")] {
+        let temp = tempfile::tempdir()?;
+        let db = temp.path().join("project.sqlite");
+        seed_workspace(&db)?;
+        let args = json!({"action":"split","sourceStart":1,"sourceEnd":length,"cuts":[600,200,400,200],
+            "targets":[{"assemblyCtgId":id,"sourceStart":1,"sourceEnd":length,"orient":orient}]});
+        let mut bad = args.clone();
+        bad["cuts"] = json!([200, length]);
+        assert!(edit(&db, bad).is_err());
+        assert_eq!(intervals(&db, source)?, vec![(id, 1, length)]);
+        let result = edit(&db, args)?;
+        assert_eq!(result.status.applied_operation_count, 1);
+        assert_eq!(
+            intervals(&db, source)?
+                .iter()
+                .map(|(_, a, b)| (*a, *b))
+                .collect::<Vec<_>>(),
+            vec![(1, 200), (201, 400), (401, 600), (601, length)]
+        );
+        assert!(undo_main_view_history(&db, &target("Chr01"))?.changed);
+        assert_eq!(intervals(&db, source)?, vec![(id, 1, length)]);
+        assert!(redo_main_view_history(&db, &target("Chr01"))?.changed);
+        assert_eq!(intervals(&db, source)?.len(), 4);
+    }
+    Ok(())
+}
