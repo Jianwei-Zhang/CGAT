@@ -1440,6 +1440,181 @@ def step2_gap_survives_step3(
 
 
 
+def retain_step2_source_fragments(
+    event: dict[str, object],
+    q2_rows: list[dict[str, object]],
+    step2: dict[str, object],
+    step3: dict[str, object],
+) -> bool:
+    """Materialize proven surviving fragments without rewriting the original edit.
+
+    A correction may trim only part of a Step2 patch. Its remaining evidence is
+    not proof that the *whole* source interval survived. Keep the historical
+    event for q1 -> q2 replay and give each retained q3 fragment its own exact
+    path event/usage. These lineage events describe retained sequence, not new
+    sequence edits, so deliberately have no ``edit`` payload.
+    """
+    source = event.get("source")
+    if not isinstance(source, dict) or not event.get("final_path_segment_id"):
+        return False
+
+    def same_source(row: dict[str, object]) -> bool:
+        return (
+            row.get("segment_kind") == "source"
+            and row.get("dataset_name") == source["dataset"]
+            and row.get("contig_name") == source["contig"]
+            and row.get("orientation") == source["orientation"]
+            and row.get("source_card_key") == event["source_card_key"]
+            and bool(set(json.loads(str(row["evidence_ids_json"])))
+                     & set(event["evidence_ids"]))
+        )
+
+    retained = [
+        row for row in step3["q_rows"]
+        if row["chr"] == event["chr"] and same_source(row)
+    ]
+    if not retained or (
+        len(retained) == 1
+        and int(retained[0]["source_start"]) == int(source["start"])
+        and int(retained[0]["source_end"]) == int(source["end"])
+    ):
+        return False
+    originals = [
+        row for row in q2_rows if same_source(row)
+        and int(row["source_start"]) == int(source["start"])
+        and int(row["source_end"]) == int(source["end"])
+        and int(row["q_start"]) == int(event["q_after"]["start"])
+        and int(row["q_end"]) == int(event["q_after"]["end"])
+    ]
+    if len(originals) != 1:
+        fail(f"partially retained Step2 event lacks one exact q2 segment: {event['event_id']}")
+    original = originals[0]
+    if (
+        event["q_after"].get("version") != step3.get("q_input_version")
+        or event["q_after"].get("sha256") != step3.get("q_input_sha256")
+    ):
+        fail(f"partially retained Step2 event has stale q2 identity: {event['event_id']}")
+    original_evidence = set(json.loads(str(original["evidence_ids_json"])))
+    intervals = []
+    for row in retained:
+        start, end = int(row["source_start"]), int(row["source_end"])
+        if (
+            not int(source["start"]) <= start <= end <= int(source["end"])
+            or end - start != int(row["q_end"]) - int(row["q_start"])
+            or not original_evidence.intersection(json.loads(str(row["evidence_ids_json"])))
+        ):
+            fail(f"invalid retained source projection for Step2 event: {event['event_id']}")
+        offset = (start - int(source["start"]) if source["orientation"] == "+"
+                  else int(source["end"]) - end)
+        input_start = int(original["q_start"]) + offset
+        intervals.append((input_start, input_start + end - start, row))
+    intervals.sort(key=lambda item: item[0])
+    missing = []
+    cursor = int(original["q_start"])
+    for start, end, _row in intervals:
+        if start < cursor:
+            fail(f"overlapping retained source fragments for Step2 event: {event['event_id']}")
+        if cursor < start:
+            missing.append((cursor, start - 1))
+        cursor = end + 1
+    if cursor <= int(original["q_end"]):
+        missing.append((cursor, int(original["q_end"])))
+    if not missing:
+        fail(f"unexplained source segmentation for Step2 event: {event['event_id']}")
+
+    # Only explicit edits in the original q2 coordinate system prove removal.
+    # A whole-chromosome filter q_before or a shifted refill interval does not.
+    step3_events = {str(item["event_id"]): item for item in step3["events"]}
+    cuts = []
+    for candidate in step3["events"]:
+        edit = candidate.get("edit", {})
+        replacement = candidate
+        if candidate["status"] == "superseded":
+            replacement = step3_events.get(str(candidate.get("superseded_by_event_id")), {})
+        if (
+            candidate["chr"] == event["chr"]
+            and replacement.get("status") == "accepted"
+            and replacement.get("chr") == event["chr"]
+            and edit.get("operation") == "replace_interval"
+            and edit.get("input_coordinate_space") == "q2_1_based_closed"
+            and candidate["q_before"].get("version") == step3["q_input_version"]
+            and candidate["q_before"].get("sha256") == step3["q_input_sha256"]
+            and int(edit["input_start"]) == int(candidate["q_before"]["start"])
+            and int(edit["input_end"]) == int(candidate["q_before"]["end"])
+        ):
+            cuts.append((int(edit["input_start"]), int(edit["input_end"]), replacement["event_id"]))
+    replacing_ids = set()
+    for start, end in missing:
+        cursor = start
+        for cut_start, cut_end, replacing_id in sorted(cuts):
+            if cut_end < cursor or cut_start > end:
+                continue
+            if cut_start > cursor:
+                break
+            cursor = max(cursor, cut_end + 1)
+            replacing_ids.add(str(replacing_id))
+            if cursor > end:
+                break
+        if cursor <= end:
+            fail(f"Step2 source fragment disappeared without a proven q2 edit: {event['event_id']}")
+
+    consumed = [row for row in step2["usage_rows"]
+                if row["event_id"] == event["event_id"]
+                and row["status"] in {"accepted", "consumed"}]
+    children = []
+    for start, end, row in intervals:
+        identity = [event["event_id"], row["segment_id"], start, end]
+        child_id = stable_id("event-retained", identity, 24)
+        segment_id = stable_id("grt-segment", identity, 24)
+        child = {
+            "run_id": event["run_id"], "event_id": child_id, "stage": "step3",
+            "chr": event["chr"], "object_id": event["object_id"],
+            "action": "patch", "status": "accepted",
+            "reason": "retained_step2_source_fragment",
+            "q_before": {"version": step3["q_input_version"], "start": start,
+                         "end": end, "sha256": step3["q_input_sha256"]},
+            "q_after": {"version": step3["q_output_version"],
+                        "start": int(row["q_start"]), "end": int(row["q_end"]),
+                        "sha256": step3["q_output_sha256"]},
+            "source": {**source, "start": int(row["source_start"]),
+                       "end": int(row["source_end"])},
+            "source_card_key": event["source_card_key"],
+            "final_path_segment_id": segment_id,
+            "evidence_ids": sorted(original_evidence.intersection(
+                json.loads(str(row["evidence_ids_json"])))),
+            "usage_ids": [], "retained_from_event_id": event["event_id"],
+            "retained_after_event_ids": sorted(replacing_ids),
+        }
+        for usage in consumed:
+            if (usage["source_dataset"] != source["dataset"]
+                or usage["source_contig"] != source["contig"]
+                or int(usage["source_start"]) > int(row["source_start"])
+                or int(usage["source_end"]) < int(row["source_end"])):
+                continue
+            usage_id = stable_id("usage-retained", [usage["usage_id"], child_id], 24)
+            child["usage_ids"].append(usage_id)
+            step3["usage_rows"].append({
+                **usage, "usage_id": usage_id, "stage": "step3", "event_id": child_id,
+                "source_start": int(row["source_start"]),
+                "source_end": int(row["source_end"]),
+                "final_path_segment_id": segment_id,
+                "reason": "retained_step2_source_fragment",
+            })
+        children.append(child)
+    event["status"] = "superseded"
+    event["reason"] = "partially_replaced_by_step3"
+    event["final_path_segment_id"] = ""
+    event["superseded_by_event_id"] = children[0]["event_id"]
+    event["retained_event_ids"] = [child["event_id"] for child in children]
+    children[0]["superseded_event_ids"] = [event["event_id"]]
+    for usage in consumed:
+        usage["status"] = "superseded"
+        usage["final_path_segment_id"] = ""
+        usage["reason"] = "partially_replaced_by_step3"
+    step3["events"].extend(children)
+    return True
+
+
 def reconcile_step2_events_with_step3(
     step2: dict[str, object],
     step3: dict[str, object],
@@ -1486,6 +1661,10 @@ def reconcile_step2_events_with_step3(
             )
             for evidence_id in json.loads(str(row["evidence_ids_json"]))
         }
+        if retain_step2_source_fragments(
+            event, q2_rows_by_chr.get(chromosome, []), step2, step3
+        ):
+            continue
         if path_evidence & surviving_evidence:
             continue
         replacements = []
@@ -1527,6 +1706,7 @@ def reconcile_step2_events_with_step3(
         replacement.setdefault("superseded_event_ids", []).append(event["event_id"])
         superseded[str(event["event_id"])] = str(replacement["event_id"])
         superseded_path_evidence.update(path_evidence)
+    flatten_event_supersession([*step2["events"], *step3["events"]])
     if not superseded:
         return
     for row in step2["usage_rows"]:

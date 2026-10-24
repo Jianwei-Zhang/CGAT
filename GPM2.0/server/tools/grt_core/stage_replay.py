@@ -16,6 +16,30 @@ from .stage_schema import *
 from .stage_io import *
 from .stage_alignment import *
 
+def flatten_event_supersession(events: list[dict[str, object]]) -> None:
+    """Keep historical events linked directly to their final accepted successor."""
+    by_id = {str(event["event_id"]): event for event in events}
+    links: dict[str, list[str]] = defaultdict(list)
+    for event in events:
+        if event["status"] != "superseded":
+            continue
+        replacing_id = str(event.get("superseded_by_event_id", ""))
+        seen = {str(event["event_id"])}
+        while replacing_id in by_id and by_id[replacing_id]["status"] == "superseded":
+            if replacing_id in seen:
+                fail(f"cyclic event supersession: {event['event_id']}")
+            seen.add(replacing_id)
+            replacing_id = str(by_id[replacing_id].get("superseded_by_event_id", ""))
+        if replacing_id not in by_id or by_id[replacing_id]["status"] != "accepted":
+            fail(f"event supersession lacks an accepted successor: {event['event_id']}")
+        event["superseded_by_event_id"] = replacing_id
+        links[replacing_id].append(str(event["event_id"]))
+    for event in events:
+        event_id = str(event["event_id"])
+        if event_id in links or "superseded_event_ids" in event:
+            event["superseded_event_ids"] = sorted(links.get(event_id, []))
+
+
 def source_assignment(
     assignments: dict[tuple[str, str], object],
     candidate: dict[str, object],

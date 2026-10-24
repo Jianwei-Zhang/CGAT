@@ -2125,6 +2125,7 @@ def reconcile_terminal_supersession(
                 row["status"] = "superseded"
                 row["final_path_segment_id"] = ""
                 row["reason"] = "superseded_by_terminal_extension"
+    flatten_event_supersession(events)
     for tel_event in tel_events.values():
         if "superseded_event_ids" in tel_event:
             tel_event["superseded_event_ids"] = sorted(

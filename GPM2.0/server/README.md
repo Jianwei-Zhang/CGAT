@@ -83,11 +83,14 @@ tails so the underlying error remains available after temporary QC cleanup.
 `run.sh -t 32` sets the total compute-thread budget. Newly prepared workspaces
 automatically share it across independent alignment tasks.
 
-### Resuming a workspace after the Step3 gap-origin fix
+### Resuming a workspace after Step3 provenance fixes
 
 The error `cannot map filtered Step3 gap back to q2` can occur when a run of
 `N` bases lies inside a source contig or spans multiple path segments. Step3 now
 preserves those gap origins through filtering, including merged gaps.
+The finalization error `accepted event disappeared before q4 without one exact q3 segment`
+can also result from a partially trimmed Step2 patch; the retained-source fix
+preserves its exact surviving fragments and original replay history.
 
 A prepared workspace contains its own runtime copy. After updating this Server
 checkout, update the failed workspace from this directory:
@@ -96,6 +99,7 @@ checkout, update the failed workspace from this directory:
 workspace=/path/to/gpm_server
 cp tools/grt_step2.py "$workspace/.prepare_lib/tools/grt_step2.py"
 cp tools/grt_step3.py "$workspace/.prepare_lib/tools/grt_step3.py"
+cp tools/grt_telomere_finalize.py "$workspace/.prepare_lib/tools/grt_telomere_finalize.py"
 cp -R tools/grt_core "$workspace/.prepare_lib/tools/"
 ```
 
@@ -122,6 +126,13 @@ replacement length and the empty-sequence digest; absorbed gap events retain
 explicit supersession links. Terminal deletions anchor to a retained base rather
 than one past the chromosome end. Missing gap origins or invalid edit prototypes
 still fail explicitly; no gap is silently skipped or replaced with synthetic Ns.
+
+When Step3 trims part of a Step2 patch, the original event and edit remain
+available for replay. Each proven retained source fragment receives an exact
+path event (`retained_from_event_id`) and donor-usage link. Missing sequence
+must be covered by explicit q2-coordinate edits; shared evidence alone does
+not prove that the original full patch survived. Final Path source matching
+and q4 sequence validation remain exact.
 
 Both stages share a content fingerprint covering both engines, entry scripts
 and common modules. Changing any of them invalidates repair-stage results and

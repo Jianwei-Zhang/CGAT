@@ -78,11 +78,13 @@ bash install.sh --manager conda
 `run.sh -t 32` 设置总计算线程预算；新准备的工作区会在独立比对任务之间
 自动分配线程并行执行。
 
-### Step3 gap 来源修复后的断点恢复
+### Step3 来源追踪修复后的断点恢复
 
 当连续 N 位于原始 contig 内部，或跨越多个路径片段时，旧版可能报错
 `cannot map filtered Step3 gap back to q2`。Step3 现在会在过滤过程中
 保留这些 gap 的来源，以及合并 gap 的全部原始来源。
+最终阶段的 `accepted event disappeared before q4 without one exact q3 segment`
+也可能由 Step2 补片被部分裁剪引起；保留片段修复会记录其精确来源，并保留原始重放历史。
 
 已生成的工作区带有独立运行库副本。更新 Server 代码后，在当前目录执行：
 
@@ -90,6 +92,7 @@ bash install.sh --manager conda
 workspace=/path/to/gpm_server
 cp tools/grt_step2.py "$workspace/.prepare_lib/tools/grt_step2.py"
 cp tools/grt_step3.py "$workspace/.prepare_lib/tools/grt_step3.py"
+cp tools/grt_telomere_finalize.py "$workspace/.prepare_lib/tools/grt_telomere_finalize.py"
 cp -R tools/grt_core "$workspace/.prepare_lib/tools/"
 ```
 
@@ -112,6 +115,11 @@ Step2 结构修复消除 GAP 时，事件记录使用保留序列的连接点坐
 GAP 保留明确的事件替代关联。末端删除锚定到实际保留的碱基，不使用染色体末端
 之外的坐标。缺少 GAP 来源或修复 prototype 无效时仍明确报错，不静默跳过，也不
 人为补入 N。
+
+Step3 仅裁剪 Step2 补片的一部分时，原始事件及 edit 保留用于重放；每个有来源证据的
+保留片段生成精确的路径事件（`retained_from_event_id`）和供体使用关联。消失部分必须
+由 q2 坐标系下的明确编辑覆盖，不能仅凭共享证据认定原补片完整保留。Final Path 的
+来源区间匹配及 q4 序列校验仍保持严格一致。
 
 Step2/Step3 共用一个覆盖两个引擎、入口和共用模块的内容指纹。更改任一部分
 会使阶段结果失效并要求重新执行 Step2；输入、工具和参数均一致时，独立的
