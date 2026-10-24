@@ -92,23 +92,37 @@ The finalization error `accepted event disappeared before q4 without one exact q
 can also result from a partially trimmed Step2 patch; the retained-source fix
 preserves its exact surviving fragments and original replay history.
 
-A prepared workspace contains its own runtime copy. After updating this Server
-checkout, update the failed workspace from this directory:
+A prepared workspace contains its own runtime copy. Updating an installed
+Server tools directory alone does not update an existing workspace. For a
+coordinated update, verify the archive SHA-256 from the Release, extract it to a
+**separate new directory**, stop all runs using either target, then run:
 
 ```bash
+fresh=/path/to/newly-extracted/GPM_Server
 workspace=/path/to/gpm_server
-cp tools/grt_step2.py "$workspace/.prepare_lib/tools/grt_step2.py"
-cp tools/grt_step3.py "$workspace/.prepare_lib/tools/grt_step3.py"
-cp tools/grt_telomere_finalize.py "$workspace/.prepare_lib/tools/grt_telomere_finalize.py"
-cp -R tools/grt_core "$workspace/.prepare_lib/tools/"
+tools=/path/to/installed/GPM_Server
+revision="FULL_GIT_REVISION_FROM_THE_RELEASE"
+python3 "$fresh/tools/update_workspace_runtime.py" \
+  --workspace "$workspace" --tools-root "$tools" \
+  --expected-revision "$revision" --apply
 ```
 
-These updates apply to workspaces that already have independent Step2/Step3
-entrypoints, and only while the workspace is not running. Rerun or resubmit
-`run_all.sh` in the same environment; compatible raw MUMmer alignments can be
-reused while stage results are regenerated. Older workspaces using
-`run_grt_step23.sh` must retain their matching runtime; copying these files alone
-does not migrate a combined execution plan.
+The updater requires the packaged `SOURCE.json` file-hash manifest. It verifies
+all source files, locks both targets, backs up changed files under the
+workspace's `.run_all/runtime-update-*`, and updates the installed tools plus
+`.prepare_lib/tools/grt_core/` and the matching Step2/Step3/finalizer entrypoints.
+User logs, old archives, skill-local notes/bindings, data, results, caches,
+generated commands and the dependency environment are preserved. It rejects
+active runs, symlinked targets and unexpected old core modules. A write failure
+attempts automatic rollback; a completed update can also be rolled back with
+`python3 "$fresh/tools/update_workspace_runtime.py" --rollback BACKUP_DIR`.
+Omit `--apply` for a read-only verification/plan.
+
+These updates require independent Step2/Step3 entrypoints; they do not migrate a
+legacy `run_grt_step23.sh` plan. The updater does **not** run analysis. Once it
+reports `"status": "updated"`, rerun or resubmit `run_all.sh` in the same
+environment. Stage results are regenerated from Step2 as needed while compatible
+raw MUMmer alignments remain reusable. No dependency reinstall is required.
 
 ### Independent GRT stage controls
 
@@ -133,6 +147,10 @@ path event (`retained_from_event_id`) and donor-usage link. Missing sequence
 must be covered by explicit q2-coordinate edits; shared evidence alone does
 not prove that the original full patch survived. Final Path source matching
 and q4 sequence validation remain exact.
+Refill edits also record exact removed-source slices from their working path,
+so pure refills and second-round trims of first-round fills retain correct
+lineage even when corrected/filtered query coordinates no longer equal q2.
+Completely replaced earlier fills are superseded without inventing a survivor.
 
 Both stages share a content fingerprint covering both engines, entry scripts
 and common modules. Changing any of them invalidates repair-stage results and

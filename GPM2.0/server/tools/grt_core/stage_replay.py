@@ -231,6 +231,10 @@ def apply_round(
                 "source": source,
                 "source_card_key": source_card_key,
                 "final_path_segment_id": final_path_segment_id,
+                "replaced_source_segments": [
+                    segment for segment in slice_path(path, before_end, after_start)
+                    if segment["segment_kind"] == "source"
+                ],
                 "candidate": candidate,
             }
             event_prototypes.append(prototype)
@@ -341,6 +345,10 @@ def apply_round(
                 "trim_left": candidate["trim_left"],
                 "trim_right": candidate["trim_right"],
                 "replacement_sequence_sha256": sha256_bytes(str(candidate["fill_sequence"]).encode("ascii")),
+                # Exact immutable-source slices removed from the working path.
+                # Unlike public q_before, these remain meaningful after the
+                # corrected/filtered query has shifted relative to q2.
+                "replaced_source_segments": prototype["replaced_source_segments"],
             }
             event["fragment_id"] = candidate.get("fragment_id", "")
             if candidate.get("donor_reuse"):

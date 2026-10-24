@@ -90,6 +90,10 @@ not a desktop-installer rebuild or a version bump unless the user requests one.
    pinned source revision. Export only tracked `server/` files with a
    `GPM_Server/` archive root; exclude environments, caches and user-local notes.
    Include `SOURCE.json` with release, Git revision/tree, build time and CI run.
+   Also include a `files` map keyed by each tracked Server-relative file path,
+   with its SHA-256 and numeric mode (`420` for 0644 or `493` for 0755). Exclude
+   `SOURCE.json` itself from that map. The code-only tools/workspace updater
+   requires this manifest; verify the map against the same pinned Git tree.
 3. Keep the previous source attachment and Release metadata locally for rollback.
    Replace only the approved source attachment, preserving its public filename.
    Add a concise refresh bullet in each existing language section; do not remove

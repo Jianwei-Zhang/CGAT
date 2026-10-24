@@ -86,20 +86,32 @@ bash install.sh --manager conda
 最终阶段的 `accepted event disappeared before q4 without one exact q3 segment`
 也可能由 Step2 补片被部分裁剪引起；保留片段修复会记录其精确来源，并保留原始重放历史。
 
-已生成的工作区带有独立运行库副本。更新 Server 代码后，在当前目录执行：
+已生成的工作区带有独立运行库副本，仅更新外部 Server 工具目录不会更新已有工作区。
+需要同时更新工具和项目运行库时，先核对 Release 提供的压缩包 SHA-256，将包解压到
+**单独的新目录**，确认两个目标均无运行中的任务，然后执行：
 
 ```bash
+fresh=/path/to/newly-extracted/GPM_Server
 workspace=/path/to/gpm_server
-cp tools/grt_step2.py "$workspace/.prepare_lib/tools/grt_step2.py"
-cp tools/grt_step3.py "$workspace/.prepare_lib/tools/grt_step3.py"
-cp tools/grt_telomere_finalize.py "$workspace/.prepare_lib/tools/grt_telomere_finalize.py"
-cp -R tools/grt_core "$workspace/.prepare_lib/tools/"
+tools=/path/to/installed/GPM_Server
+revision="RELEASE中给出的完整GIT_REVISION"
+python3 "$fresh/tools/update_workspace_runtime.py" \
+  --workspace "$workspace" --tools-root "$tools" \
+  --expected-revision "$revision" --apply
 ```
 
-以上更新适用于已有独立 Step2/Step3 入口的工作区，且须先确认工作区未在运行。
-随后在原环境中重新运行或提交 `run_all.sh`。保留缓存，流程可复用兼容的
-MUMmer 原始比对，并重新生成阶段结果。仍使用 `run_grt_step23.sh` 的旧工作区
-应保留其原配套运行库；仅复制文件不会将旧调度计划迁移为独立阶段。
+更新器要求包内 `SOURCE.json` 带有逐文件摘要清单；先校验全部源文件、锁定两个目标，
+将受影响文件备份到项目的 `.run_all/runtime-update-*`，再同步工具目录以及项目中的
+`.prepare_lib/tools/grt_core/` 和配套 Step2/Step3/finalize 入口。已有日志、旧压缩包、
+skill 本地笔记与绑定、输入、结果、缓存、生成脚本及依赖环境均保留。活动任务、符号链接
+目标及不明旧 core 模块会被拒绝；写入失败会尝试自动回滚。成功更新后也可执行
+`python3 "$fresh/tools/update_workspace_runtime.py" --rollback BACKUP_DIR` 恢复备份。
+省略 `--apply` 仅校验并列出计划，不写文件。
+
+以上更新仅适用于已有独立 Step2/Step3 入口的工作区，不迁移 `run_grt_step23.sh` 旧调度计划。
+更新器**不会自动重跑分析**。输出 `"status": "updated"` 后，再在原环境运行或提交
+`run_all.sh`；流程按需从 Step2 重新生成阶段结果，兼容的 MUMmer 原始比对缓存仍可复用。
+本次无需重装依赖环境。
 
 ### 独立 GRT 阶段控制
 
@@ -120,6 +132,9 @@ Step3 仅裁剪 Step2 补片的一部分时，原始事件及 edit 保留用于�
 保留片段生成精确的路径事件（`retained_from_event_id`）和供体使用关联。消失部分必须
 由 q2 坐标系下的明确编辑覆盖，不能仅凭共享证据认定原补片完整保留。Final Path 的
 来源区间匹配及 q4 序列校验仍保持严格一致。
+补洞编辑也记录实际工作路径中被移除的精确来源片段，因此纯补洞以及第二轮裁剪第一轮
+补片时，即使工作坐标已经偏离 q2，也能保留正确关联；完全被替代的旧补片明确标记为
+superseded，不虚构保留片段。
 
 Step2/Step3 共用一个覆盖两个引擎、入口和共用模块的内容指纹。更改任一部分
 会使阶段结果失效并要求重新执行 Step2；输入、工具和参数均一致时，独立的
