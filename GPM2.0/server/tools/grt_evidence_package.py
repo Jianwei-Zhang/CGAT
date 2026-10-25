@@ -23,7 +23,7 @@ except ModuleNotFoundError:  # Imported as server.tools.grt_evidence_package.
     from .grt_core.common import *
 
 
-ENGINE_VERSION = 1
+ENGINE_VERSION = 2
 DISPLAY_PRESET = "asm5"
 USED_CONTIG_FIELDS = [
     "source_card_key",
@@ -109,6 +109,7 @@ def accepted_source_cards(
     events: list[dict[str, object]],
     assignments: dict[tuple[str, str], set[str]],
     segment_anchors: dict[str, tuple[str, int]],
+    assignment_baselines: dict[tuple[str, str, str], tuple[str, int]],
 ) -> list[dict[str, object]]:
     grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
     for event in events:
@@ -130,6 +131,8 @@ def accepted_source_cards(
         segment_id = str(event.get("final_path_segment_id", ""))
         if segment_id not in segment_anchors or segment_anchors[segment_id][0] != event.get("chr"):
             fail(f"accepted event {event.get('event_id')} lacks its Final Path segment")
+        if source.get("orientation") not in {"+", "-"}:
+            fail(f"accepted event {event.get('event_id')} has invalid source orientation")
         event["_placement_mode"] = placement_mode
         event["_path_anchor"] = segment_anchors[segment_id][1]
         grouped[expected_key].append(event)
@@ -143,7 +146,6 @@ def accepted_source_cards(
             (
                 str(event["source"]["dataset"]),
                 str(event["source"]["contig"]),
-                str(event["source"]["orientation"]),
                 str(event["chr"]),
                 str(event["_placement_mode"]),
             )
@@ -151,6 +153,23 @@ def accepted_source_cards(
         }
         if len(identities) != 1:
             fail(f"source card {card_key} has incompatible accepted placements")
+        # A source card is a full-contig display placement, not an individual
+        # Final Path slice. Inversions can legitimately use slices of one contig
+        # in both directions; event/segment directions remain exact and separate.
+        if prototype["_placement_mode"] == "normal":
+            baseline = assignment_baselines.get(
+                (str(source["dataset"]), str(source["contig"]), str(prototype["chr"]))
+            )
+            if baseline is None:
+                fail(f"normal used source {card_key} lacks an assignment baseline")
+            display_orientation = baseline[0]
+        else:
+            # With no target assignment, use the first retained path slice as a
+            # deterministic display fallback, consistent with grt_anchor.
+            first = min(card_events, key=lambda row: (int(row["_path_anchor"]), str(row["event_id"])))
+            display_orientation = str(first["source"]["orientation"])
+        if display_orientation not in {"+", "-"}:
+            fail(f"source card {card_key} has invalid display orientation")
         cards.append(
             {
                 "source_card_key": card_key,
@@ -159,7 +178,7 @@ def accepted_source_cards(
                 "original_assignment": str(source["original_assignment"]),
                 "target_chr": str(prototype["chr"]),
                 "placement_mode": str(prototype["_placement_mode"]),
-                "orientation": str(source["orientation"]),
+                "orientation": display_orientation,
                 "event_ids": [str(event["event_id"]) for event in card_events],
                 "segment_ids": [str(event["final_path_segment_id"]) for event in card_events],
                 "grt_anchor": min(int(event["_path_anchor"]) for event in card_events),
@@ -639,7 +658,9 @@ def execute(args: argparse.Namespace) -> None:
     final_path = json.loads(
         (server_dir / "metadata/grt_final_path.json").read_text(encoding="utf-8")
     )
-    cards = accepted_source_cards(events, assignments, final_segment_anchors(final_path))
+    cards = accepted_source_cards(
+        events, assignments, final_segment_anchors(final_path), assignment_baselines
+    )
     visible = visible_members(cards, assignment_rows, sources)
     cleanup_stale_display_dirs(server_dir, cards)
 

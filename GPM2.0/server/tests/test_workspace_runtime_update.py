@@ -104,6 +104,19 @@ class WorkspaceRuntimeUpdateTests(unittest.TestCase):
         self.assertFalse((self.workspace / ".run_all/lock").exists())
         self.assertFalse((self.tools / ".run_all/lock").exists())
 
+    def test_evidence_packager_is_updated_in_both_roots_and_restored_on_rollback(self):
+        relative = "tools/grt_evidence_package.py"
+        self.assertIn(relative, updater.ENTRYPOINTS)
+        runtime_file = self.workspace / ".prepare_lib" / relative
+        tool_file = self.tools / relative
+        before = runtime_file.read_bytes(), tool_file.read_bytes()
+        result = self.update()
+        expected = (self.source / relative).read_bytes()
+        self.assertEqual(runtime_file.read_bytes(), expected)
+        self.assertEqual(tool_file.read_bytes(), expected)
+        updater.rollback(Path(result["backup"]))
+        self.assertEqual((runtime_file.read_bytes(), tool_file.read_bytes()), before)
+
     def test_corrupt_source_or_wrong_revision_is_rejected_before_writes(self):
         before = self.snapshot(self.tools), self.snapshot(self.workspace)
         with self.assertRaisesRegex(ValueError, "revision"):
@@ -136,14 +149,18 @@ class WorkspaceRuntimeUpdateTests(unittest.TestCase):
         self.assertEqual(json.loads((lock_dir / "owner.json").read_text()), owner)
 
     def test_standalone_grt_process_is_detected(self):
-        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)",
-                                  str(self.workspace / ".prepare_lib/tools/grt_step2.py")])
-        try:
-            with self.assertRaisesRegex(ValueError, "active Server process"):
-                self.update()
-        finally:
-            child.terminate()
-            child.wait(timeout=5)
+        for relative in (".prepare_lib/tools/grt_step2.py",
+                         ".prepare_lib/tools/grt_evidence_package.py",
+                         "run_finalize_evidence.sh"):
+            with self.subTest(process=relative):
+                child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)",
+                                          str(self.workspace / relative)])
+                try:
+                    with self.assertRaisesRegex(ValueError, "active Server process"):
+                        self.update()
+                finally:
+                    child.terminate()
+                    child.wait(timeout=5)
 
     def test_symlinks_and_unknown_core_modules_are_refused(self):
         path = self.workspace / ".prepare_lib/tools/grt_step2.py"

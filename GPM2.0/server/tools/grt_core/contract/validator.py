@@ -1159,10 +1159,10 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             event["chr"],
         ):
             fail("BROKEN_REFERENCE", f"accepted event {event_id} and used-contig card disagree")
-        if (
-            card["orientation"] != source["orientation"]
-            or card["original_assignment"] != source["original_assignment"]
-        ):
+        # Card orientation places the full contig in the main view. A path
+        # slice may be reversed independently; its exact orientation is checked
+        # against its Final Path segment above, including q4 reconstruction.
+        if card["original_assignment"] != source["original_assignment"]:
             fail("BROKEN_REFERENCE", f"accepted event {event_id} and used-contig card placement disagree")
         if event_id not in parse_json(
             card["accepted_event_ids_json"],

@@ -110,7 +110,8 @@ python3 "$fresh/tools/update_workspace_runtime.py" \
 The updater requires the packaged `SOURCE.json` file-hash manifest. It verifies
 all source files, locks both targets, backs up changed files under the
 workspace's `.run_all/runtime-update-*`, and updates the installed tools plus
-`.prepare_lib/tools/grt_core/` and the matching Step2/Step3/finalizer entrypoints.
+`.prepare_lib/tools/grt_core/` and the matching Step2/Step3/telomere/evidence
+packaging entrypoints.
 User logs, old archives, skill-local notes/bindings, data, results, caches,
 generated commands and the dependency environment are preserved. It rejects
 active runs, symlinked targets and unexpected old core modules. A write failure
@@ -151,6 +152,14 @@ Refill edits also record exact removed-source slices from their working path,
 so pure refills and second-round trims of first-round fills retain correct
 lineage even when corrected/filtered query coordinates no longer equal q2.
 Completely replaced earlier fills are superseded without inventing a survivor.
+
+Source-card `orientation` places the full contig in the main view; it is not
+an orientation constraint on every accepted Final Path slice. Normal cards keep
+their exact `chr_assignments.tsv` orientation/anchor, even when a repair uses an
+oppositely oriented slice. Promoted/cross-chromosome cards use the first retained
+path slice as their deterministic display-orientation fallback. All accepted
+events and segment links are preserved; event/segment source intervals and
+orientations must still agree exactly, and the source slices must reconstruct q4.
 
 Both stages share a content fingerprint covering both engines, entry scripts
 and common modules. Changing any of them invalidates repair-stage results and

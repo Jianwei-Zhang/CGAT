@@ -241,6 +241,48 @@ if "${backend_exe}" get-grt-project-view "${workspace}" 999 >/dev/null 2>&1; the
   exit 1
 fi
 
+# One source card may display in one direction while its Final Path uses both.
+# Exercise the unchanged Rust importer for Server, full App and light App data.
+python3 - "${task_tmp_dir}/mixed" <<'PYMIXED'
+from pathlib import Path
+import sys
+from server.tests.test_source_card_orientation import SourceCardOrientationTests
+for placement in ("normal", "promoted"):
+    SourceCardOrientationTests().make_mixed_bundle(
+        Path(sys.argv[1]) / placement, normal=(placement == "normal"))
+PYMIXED
+for placement in normal promoted; do
+  mixed_source="${task_tmp_dir}/mixed/${placement}/gpm_server"
+  for kind in server full light; do
+    mixed_workspace="${task_tmp_dir}/mixed-${placement}-${kind}/gpm_server"
+    if [[ "$kind" == server ]]; then
+      mkdir -p "$(dirname "$mixed_workspace")"
+      cp -a "$mixed_source" "$mixed_workspace"
+    else
+      fasta_flag=--include-fasta
+      if [[ "$kind" == light ]]; then fasta_flag=--no-fasta; fi
+      python3 server/tools/grt_app_package.py \
+        --source "$mixed_source" --staging "$mixed_workspace" "$fasta_flag" >/dev/null
+    fi
+    "${backend_exe}" import-extracted "$mixed_workspace" >/dev/null
+    "${backend_exe}" initialize-project "$mixed_workspace" "mixed-${kind}-project" >/dev/null
+    mixed_view="$("${backend_exe}" get-grt-project-view "$mixed_workspace" 1)"
+    printf '%s' "$mixed_view" | python3 -c '
+import json, sys
+found = {}
+def visit(value):
+    if isinstance(value, dict):
+        if value.get("segment_id") in {"seg-patch-1-0", "seg-patch-1-1"}:
+            found[value["segment_id"]] = value["source"]["orientation"]
+        for child in value.values(): visit(child)
+    elif isinstance(value, list):
+        for child in value: visit(child)
+visit(json.loads(sys.stdin.read().removeprefix("json=")))
+assert found == {"seg-patch-1-0": "+", "seg-patch-1-1": "-"}, found
+'
+  done
+done
+
 legacy_workspace="${task_tmp_dir}/legacy/gpm_server"
 mkdir -p "$(dirname "${legacy_workspace}")"
 cp -a "${fixture_root}" "${legacy_workspace}"

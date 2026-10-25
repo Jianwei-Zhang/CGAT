@@ -102,7 +102,7 @@ python3 "$fresh/tools/update_workspace_runtime.py" \
 
 更新器要求包内 `SOURCE.json` 带有逐文件摘要清单；先校验全部源文件、锁定两个目标，
 将受影响文件备份到项目的 `.run_all/runtime-update-*`，再同步工具目录以及项目中的
-`.prepare_lib/tools/grt_core/` 和配套 Step2/Step3/finalize 入口。已有日志、旧压缩包、
+`.prepare_lib/tools/grt_core/` 和配套 Step2/Step3/端粒终结/证据封包入口。已有日志、旧压缩包、
 skill 本地笔记与绑定、输入、结果、缓存、生成脚本及依赖环境均保留。活动任务、符号链接
 目标及不明旧 core 模块会被拒绝；写入失败会尝试自动回滚。成功更新后也可执行
 `python3 "$fresh/tools/update_workspace_runtime.py" --rollback BACKUP_DIR` 恢复备份。
@@ -135,6 +135,12 @@ Step3 仅裁剪 Step2 补片的一部分时，原始事件及 edit 保留用于�
 补洞编辑也记录实际工作路径中被移除的精确来源片段，因此纯补洞以及第二轮裁剪第一轮
 补片时，即使工作坐标已经偏离 q2，也能保留正确关联；完全被替代的旧补片明确标记为
 superseded，不虚构保留片段。
+
+来源卡片的 `orientation` 表示整条 contig 在主视图中的显示方向，并不要求每个
+Final Path 使用片段都同向。normal 卡片始终保留 `chr_assignments.tsv` 的原始方向和
+锚点，即使某次修复使用了反向片段；promoted／跨染色体卡片在没有目标分配基线时，
+采用 Final Path 中首个保留片段的方向作为确定性显示回退。所有 accepted 事件及片段
+链接完整保留，事件与片段的来源区间和方向仍必须精确一致，并由来源序列重建 q4 校验。
 
 Step2/Step3 共用一个覆盖两个引擎、入口和共用模块的内容指纹。更改任一部分
 会使阶段结果失效并要求重新执行 Step2；输入、工具和参数均一致时，独立的
