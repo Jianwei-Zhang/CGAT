@@ -151,7 +151,7 @@ class WorkspaceRuntimeUpdateTests(unittest.TestCase):
     def test_standalone_grt_process_is_detected(self):
         for relative in (".prepare_lib/tools/grt_step2.py",
                          ".prepare_lib/tools/grt_evidence_package.py",
-                         "run_finalize_evidence.sh"):
+                         "finalize_grt_evidence.sh"):
             with self.subTest(process=relative):
                 child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)",
                                           str(self.workspace / relative)])

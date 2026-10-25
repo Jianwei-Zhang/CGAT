@@ -131,7 +131,7 @@ def check_direct_processes(workspace: Path, tools_root: Path) -> None:
     prefixes = (str(workspace / ".prepare_lib") + "/", str(tools_root) + "/")
     scripts = {str(workspace / name) for name in
                ("run_all.sh", "run_grt_step2.sh", "run_grt_step3.sh",
-                "run_grt_telomere_finalize.sh", "run_finalize_evidence.sh")}
+                "run_grt_telomere_finalize.sh", "finalize_grt_evidence.sh")}
     for process in proc.iterdir():
         if not process.name.isdigit() or int(process.name) == os.getpid():
             continue
