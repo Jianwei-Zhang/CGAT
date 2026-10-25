@@ -5,6 +5,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -105,17 +106,21 @@ class WorkspaceRuntimeUpdateTests(unittest.TestCase):
         self.assertFalse((self.tools / ".run_all/lock").exists())
 
     def test_evidence_packager_is_updated_in_both_roots_and_restored_on_rollback(self):
-        relative = "tools/grt_evidence_package.py"
-        self.assertIn(relative, updater.ENTRYPOINTS)
-        runtime_file = self.workspace / ".prepare_lib" / relative
-        tool_file = self.tools / relative
-        before = runtime_file.read_bytes(), tool_file.read_bytes()
+        paths = []
+        for relative in ("tools/grt_evidence_package.py", "tools/grt_display_evidence.py"):
+            self.assertIn(relative, updater.ENTRYPOINTS)
+            runtime_file = self.workspace / ".prepare_lib" / relative
+            tool_file = self.tools / relative
+            paths.append((relative, runtime_file, tool_file, runtime_file.read_bytes(), tool_file.read_bytes()))
         result = self.update()
-        expected = (self.source / relative).read_bytes()
-        self.assertEqual(runtime_file.read_bytes(), expected)
-        self.assertEqual(tool_file.read_bytes(), expected)
+        for relative, runtime_file, tool_file, _, _ in paths:
+            expected = (self.source / relative).read_bytes()
+            self.assertEqual(runtime_file.read_bytes(), expected)
+            self.assertEqual(tool_file.read_bytes(), expected)
         updater.rollback(Path(result["backup"]))
-        self.assertEqual((runtime_file.read_bytes(), tool_file.read_bytes()), before)
+        for _, runtime_file, tool_file, old_runtime, old_tool in paths:
+            self.assertEqual(runtime_file.read_bytes(), old_runtime)
+            self.assertEqual(tool_file.read_bytes(), old_tool)
 
     def test_corrupt_source_or_wrong_revision_is_rejected_before_writes(self):
         before = self.snapshot(self.tools), self.snapshot(self.workspace)
@@ -161,6 +166,68 @@ class WorkspaceRuntimeUpdateTests(unittest.TestCase):
                 finally:
                     child.terminate()
                     child.wait(timeout=5)
+
+    def start_script(self, path, argument, cwd):
+        ready = self.root / "child-ready"
+        ready.unlink(missing_ok=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "from pathlib import Path\nimport time\n"
+            f"Path({str(ready)!r}).write_text('ready')\ntime.sleep(60)\n")
+        child = subprocess.Popen([sys.executable, argument], cwd=cwd)
+        self.addCleanup(lambda: (child.terminate(), child.wait(timeout=5)) if child.poll() is None else None)
+        deadline = time.monotonic() + 5
+        while not ready.is_file() and time.monotonic() < deadline:
+            self.assertIsNone(child.poll())
+            time.sleep(.01)
+        self.assertTrue(ready.is_file())
+        return child
+
+    def test_relative_and_aliased_standalone_processes_are_detected_before_writes(self):
+        alias = self.root / "project-alias"
+        alias.symlink_to(self.workspace, target_is_directory=True)
+        relative = ".prepare_lib/tools/grt_evidence_package.py"
+        cases = [
+            (self.workspace / relative, relative, self.workspace),
+            (self.workspace / relative, "./" + relative, self.workspace),
+            (self.workspace / relative, "grt_evidence_package.py", self.workspace / ".prepare_lib/tools"),
+            (self.workspace / relative, str(alias / relative), self.root),
+            (self.workspace / "finalize_grt_evidence.sh", "finalize_grt_evidence.sh", self.workspace),
+            (self.tools / "tools/grt_evidence_package.py", "tools/grt_evidence_package.py", self.tools),
+        ]
+        for path, argument, cwd in cases:
+            with self.subTest(argument=argument):
+                child = self.start_script(path, argument, cwd)
+                before = self.snapshot(self.workspace), self.snapshot(self.tools)
+                try:
+                    for apply in (False, True):
+                        with self.assertRaisesRegex(ValueError, "active Server process"):
+                            self.update(apply=apply)
+                    self.assertEqual(before, (self.snapshot(self.workspace), self.snapshot(self.tools)))
+                finally:
+                    child.terminate()
+                    child.wait(timeout=5)
+
+    def test_unrelated_relative_script_does_not_block_this_workspace(self):
+        unrelated = self.root / "unrelated"
+        relative = ".prepare_lib/tools/grt_evidence_package.py"
+        child = self.start_script(unrelated / relative, relative, unrelated)
+        try:
+            self.assertEqual(self.update(apply=False)["status"], "verified_dry_run")
+        finally:
+            child.terminate()
+            child.wait(timeout=5)
+
+    def test_rollback_refuses_an_active_relative_script(self):
+        result = self.update()
+        relative = ".prepare_lib/tools/grt_evidence_package.py"
+        child = self.start_script(self.workspace / relative, relative, self.workspace)
+        try:
+            with self.assertRaisesRegex(ValueError, "active Server process"):
+                updater.rollback(Path(result["backup"]))
+        finally:
+            child.terminate()
+            child.wait(timeout=5)
 
     def test_symlinks_and_unknown_core_modules_are_refused(self):
         path = self.workspace / ".prepare_lib/tools/grt_step2.py"

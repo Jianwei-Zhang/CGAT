@@ -398,7 +398,13 @@ def validate_contract(bundle_root, schema_path=DEFAULT_SCHEMA_PATH):
             fail("INVALID_VALUE", f"evidence {evidence_id} has invalid coordinate_system")
         if row["projection_status"] not in enums["projection_status"]:
             fail("INVALID_VALUE", f"evidence {evidence_id} has invalid projection_status")
-        parse_json(row["parameters_json"], f"evidence {evidence_id}.parameters_json", dict)
+        evidence_parameters = parse_json(row["parameters_json"], f"evidence {evidence_id}.parameters_json", dict)
+        projection_path = evidence_parameters.get("flank_projection_relpath")
+        projection_hash = evidence_parameters.get("flank_projection_sha256")
+        if projection_path is not None or projection_hash is not None:
+            if not isinstance(projection_path, str) or not isinstance(projection_hash, str) or not projection_path or not projection_hash:
+                fail("INVALID_VALUE", f"evidence {evidence_id} has partial flank projection identity")
+            cached_validate_artifact(projection_path, projection_hash, f"evidence {evidence_id}.flank_projection")
         source_fields = [row["source_dataset"], row["source_contig"], row["source_start"], row["source_end"]]
         if any(source_fields):
             if not all(source_fields):

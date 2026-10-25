@@ -102,9 +102,11 @@ python3 "$fresh/tools/update_workspace_runtime.py" \
 
 更新器要求包内 `SOURCE.json` 带有逐文件摘要清单；先校验全部源文件、锁定两个目标，
 将受影响文件备份到项目的 `.run_all/runtime-update-*`，再同步工具目录以及项目中的
-`.prepare_lib/tools/grt_core/` 和配套 Step2/Step3/端粒终结/证据封包入口。已有日志、旧压缩包、
+`.prepare_lib/tools/grt_core/` 和配套 Step2/Step3/端粒终结/证据封包入口及显示证据投影模块。已有日志、旧压缩包、
 skill 本地笔记与绑定、输入、结果、缓存、生成脚本及依赖环境均保留。活动任务、符号链接
-目标及不明旧 core 模块会被拒绝；写入失败会尝试自动回滚。成功更新后也可执行
+目标及不明旧 core 模块会被拒绝；相对脚本路径按对应进程的工作目录解析。更新前仍须
+停止全部任务（包括其他节点上的独立命令），进程扫描不能阻止扫描后新启动的独立任务。
+写入失败会尝试自动回滚。成功更新后也可执行
 `python3 "$fresh/tools/update_workspace_runtime.py" --rollback BACKUP_DIR` 恢复备份。
 省略 `--apply` 仅校验并列出计划，不写文件。
 
@@ -141,6 +143,12 @@ Final Path 使用片段都同向。normal 卡片始终保留 `chr_assignments.ts
 锚点，即使某次修复使用了反向片段；promoted／跨染色体卡片在没有目标分配基线时，
 采用 Final Path 中首个保留片段的方向作为确定性显示回退。所有 accepted 事件及片段
 链接完整保留，事件与片段的来源区间和方向仍必须精确一致，并由来源序列重建 q4 校验。
+
+保留型子事件通过 `retained_from_event_id` 追溯原始 refill 证据，覆盖拆成多个片段及
+多轮保留。Step3 将编辑前实际使用的 flank 查询路径写入带摘要的 `flank_projection.json`。
+App 导出使用该快照投影历史比对，并标记为 `supporting_precursor`，不套用已偏移的公开 q2
+坐标或子片段的新邻接关系；投影、查询和 PAF 文件均校验摘要。旧的保留型 refill 若没有
+快照会明确报错：用更新后的运行库重新执行 `run_all.sh` 生成 Step3 证据，不再静默遗漏。
 
 Step2/Step3 共用一个覆盖两个引擎、入口和共用模块的内容指纹。更改任一部分
 会使阶段结果失效并要求重新执行 Step2；输入、工具和参数均一致时，独立的

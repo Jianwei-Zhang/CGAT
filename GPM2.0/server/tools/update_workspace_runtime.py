@@ -22,7 +22,7 @@ import uuid
 sys.dont_write_bytecode = True
 ENTRYPOINTS = {
     "tools/grt_step2.py", "tools/grt_step3.py", "tools/grt_telomere_finalize.py",
-    "tools/grt_evidence_package.py",
+    "tools/grt_evidence_package.py", "tools/grt_display_evidence.py",
 }
 BINDING = "skills/gpm-server/server-tools.path"
 
@@ -139,8 +139,30 @@ def check_direct_processes(workspace: Path, tools_root: Path) -> None:
             args = (process / "cmdline").read_bytes().decode(errors="replace").split("\0")
         except OSError:
             continue
-        if any(arg in scripts or arg.startswith(prefixes) for arg in args if arg):
-            raise ValueError(f"stop the active Server process before updating: PID {process.name}")
+        for arg in args:
+            if not arg or arg.startswith("-") or "\n" in arg:
+                continue
+            if arg in scripts or arg.startswith(prefixes):
+                raise ValueError(f"stop the active Server process before updating: PID {process.name}")
+            # /proc stores argv as supplied: relative scripts must be resolved
+            # from THAT process's cwd, not the updater's cwd. Resolve aliases
+            # too, since update() canonicalizes both installation roots.
+            if "/" not in arg and not arg.endswith((".py", ".sh")):
+                continue
+            try:
+                path = Path(arg)
+                if not path.is_absolute():
+                    path = (process / "cwd").resolve(strict=True) / path
+                resolved = str(path.resolve())
+            except (FileNotFoundError, ProcessLookupError):
+                continue  # process exited during inspection
+            except (OSError, RuntimeError) as exc:
+                known = Path(arg).name in {Path(name).name for name in scripts | ENTRYPOINTS}
+                if known or ".prepare_lib/" in arg:
+                    raise ValueError(f"cannot inspect possible Server process PID {process.name}") from exc
+                continue
+            if resolved in scripts or resolved.startswith(prefixes):
+                raise ValueError(f"stop the active Server process before updating: PID {process.name}")
 
 
 def workspace_lock(workspace: Path):
@@ -280,6 +302,7 @@ def rollback(backup: Path) -> dict:
         tools_lock.release()
         raise
     try:
+        check_direct_processes(workspace, tools_root)
         restore_files(journal, backup, verify_current=True)
         journal["status"] = "rolled_back"
         write_atomic(backup / "journal.json", (json.dumps(journal, indent=2) + "\n").encode())

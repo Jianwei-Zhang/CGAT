@@ -109,6 +109,37 @@ def final_gap_coordinates(
 
 
 
+def write_refill_projection(
+    destination: Path,
+    chromosome: str,
+    sequence: str,
+    q_rows: list[dict[str, object]],
+    flank_records: list[tuple[str, str]],
+    query_map: dict[str, tuple[dict[str, object], str]],
+) -> Path:
+    """Freeze the real pre-edit path used by these flank queries, not q2/q3."""
+    queries = {}
+    for name, flank in flank_records:
+        gap, side = query_map[name]
+        start = int(gap["start0"]) - len(flank) + 1 if side == "L" else int(gap["end0"]) + 1
+        end = start + len(flank) - 1
+        if gap["chr"] != chromosome or start < 1 or sequence[start - 1:end] != flank:
+            fail(f"refill flank {name} disagrees with its working query path")
+        queries[name] = {"q_start": start, "q_end": end}
+    payload = {
+        "schema_version": "grt_refill_flank_projection_v1",
+        "chr": chromosome,
+        "query_sha256": sha256_file(destination / "flanks.fa"),
+        "q_chromosome_sha256": sha256_bytes(sequence.encode("ascii")),
+        "q_length": len(sequence),
+        "queries": queries,
+        "working_q_rows": q_rows,
+    }
+    path = destination / "flank_projection.json"
+    path.write_text(canonical_json(payload) + "\n", encoding="utf-8", newline="")
+    return path
+
+
 def run_refill_alignment(
     server_dir: Path,
     temporary: Path,
@@ -190,6 +221,10 @@ def run_refill_alignment(
         destination = temporary / "refill" / round_name / "by_chr" / chromosome_key
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(cache_dir, destination)
+        projection = write_refill_projection(
+            destination, chromosome, records[chromosome], chromosome_rows,
+            chromosome_flanks, chromosome_query_map,
+        )
         paf = destination / "result.paf"
         paf_parts.append(paf.read_bytes())
         paf_rows.extend(parse_paf(paf, chromosome_query_map, target_lengths))
@@ -204,6 +239,11 @@ def run_refill_alignment(
                 f"{chromosome_key}/result.paf"
             ),
             "raw_sha256": sha256_file(paf),
+            "flank_projection_relpath": (
+                f"{artifact_relpath}/refill/{round_name}/by_chr/"
+                f"{chromosome_key}/flank_projection.json"
+            ),
+            "flank_projection_sha256": sha256_file(projection),
         }
     (temporary / "refill" / round_name / "flanks.fa").write_bytes(
         fasta_bytes(flank_records)
@@ -1003,6 +1043,8 @@ def run_step3(
                     "working_query_space": "q2_after_mummer_corrections",
                     "target_projection": "origin_q2_gap",
                     "corrected_fasta_sha256": sha256_file(temporary / "corrected.fa"),
+                    "flank_projection_relpath": refill_artifacts[str(candidate["chr"])]["flank_projection_relpath"],
+                    "flank_projection_sha256": refill_artifacts[str(candidate["chr"])]["flank_projection_sha256"],
                 }
             )
         round1_paths, round1_records, refill_events, refill_usage, refill_attempts = apply_round(
@@ -1122,6 +1164,8 @@ def run_step3(
                     **fingerprint_payload["refill_parameters"],
                     "working_query_space": "q2_after_correction_round1_filter",
                     "target_projection": "origin_q2_gap",
+                    "flank_projection_relpath": round2_artifacts[str(candidate["chr"])]["flank_projection_relpath"],
+                    "flank_projection_sha256": round2_artifacts[str(candidate["chr"])]["flank_projection_sha256"],
                 }
             )
         (

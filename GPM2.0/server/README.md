@@ -111,10 +111,13 @@ The updater requires the packaged `SOURCE.json` file-hash manifest. It verifies
 all source files, locks both targets, backs up changed files under the
 workspace's `.run_all/runtime-update-*`, and updates the installed tools plus
 `.prepare_lib/tools/grt_core/` and the matching Step2/Step3/telomere/evidence
-packaging entrypoints.
+packaging entrypoints, including the display-evidence projector.
 User logs, old archives, skill-local notes/bindings, data, results, caches,
 generated commands and the dependency environment are preserved. It rejects
-active runs, symlinked targets and unexpected old core modules. A write failure
+active runs (resolving relative script paths against each process's working
+directory), symlinked targets and unexpected old core modules. Stop all work,
+including standalone commands on other nodes, before updating; process inspection
+is not a lock against a new standalone command starting later. A write failure
 attempts automatic rollback; a completed update can also be rolled back with
 `python3 "$fresh/tools/update_workspace_runtime.py" --rollback BACKUP_DIR`.
 Omit `--apply` for a read-only verification/plan.
@@ -160,6 +163,15 @@ oppositely oriented slice. Promoted/cross-chromosome cards use the first retaine
 path slice as their deterministic display-orientation fallback. All accepted
 events and segment links are preserved; event/segment source intervals and
 orientations must still agree exactly, and the source slices must reconstruct q4.
+
+Retained source children follow `retained_from_event_id` back to their original
+refill evidence, including split children and nested retention. Step3 freezes the
+actual pre-edit flank-query path in hash-bound `flank_projection.json` artifacts.
+The App export projects historical alignments through that snapshot and marks
+them as `supporting_precursor`; it never substitutes shifted public q2 coordinates
+or the child's current neighbours. Projection, query and PAF hashes are checked.
+Older retained refills without this snapshot fail explicitly: rerun `run_all.sh`
+with the updated runtime to regenerate Step3 evidence rather than omit it silently.
 
 Both stages share a content fingerprint covering both engines, entry scripts
 and common modules. Changing any of them invalidates repair-stage results and

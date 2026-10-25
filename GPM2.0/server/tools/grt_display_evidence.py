@@ -346,6 +346,7 @@ def _parse_paf_line(path: Path, line_number: int) -> dict[str, object]:
         raise ValueError(f"selected GRT local PAF line is invalid: {path}:{line_number}")
     return {
         "query_name": selected[0],
+        "query_length": int(selected[1]),
         "query_start0": int(selected[2]),
         "query_end0": int(selected[3]),
         "strand": selected[4],
@@ -358,10 +359,120 @@ def _parse_paf_line(path: Path, line_number: int) -> dict[str, object]:
     }
 
 
+def _retained_ancestors(event: dict, events: dict[str, dict]) -> list[dict]:
+    """Follow actual retention, which is not the one-to-one supersession edge."""
+    ancestors = []
+    seen = {str(event.get("event_id", ""))}
+    child = event
+    while "retained_from_event_id" in child:
+        parent_id = child["retained_from_event_id"]
+        if not isinstance(parent_id, str) or not parent_id or parent_id in seen:
+            raise ValueError("invalid or cyclic retained-source lineage")
+        seen.add(parent_id)
+        parent = events.get(parent_id)
+        if parent is None or parent.get("status") != "superseded":
+            raise ValueError(f"retained source has a missing/non-superseded parent: {parent_id}")
+        source, original = child.get("source"), parent.get("source")
+        if (
+            not isinstance(source, dict) or not isinstance(original, dict)
+            or child.get("chr") != parent.get("chr")
+            or not child.get("source_card_key")
+            or child.get("source_card_key") != parent.get("source_card_key")
+            or source.get("orientation") not in {"+", "-"}
+            or not source.get("dataset") or not source.get("contig")
+            or any(source.get(k) != original.get(k) for k in ("dataset", "contig", "orientation"))
+            or not (_positive_int(original.get("start"), "retained parent start")
+                    <= _positive_int(source.get("start"), "retained child start")
+                    <= _positive_int(source.get("end"), "retained child end")
+                    <= _positive_int(original.get("end"), "retained parent end"))
+            or not isinstance(parent.get("retained_event_ids"), list)
+            or child.get("event_id") not in parent["retained_event_ids"]
+        ):
+            raise ValueError(f"retained source disagrees with its original parent: {parent_id}")
+        ancestors.append(parent)
+        child = parent
+    return ancestors
+
+
+def _verified_display_artifact(source_root: Path, relative: object, digest: object, cache: dict) -> Path:
+    if not isinstance(relative, str) or not isinstance(digest, str) or len(digest) != 64:
+        raise ValueError("local evidence has an incomplete artifact identity")
+    path = (source_root / relative).resolve()
+    if Path(relative).is_absolute() or not path.is_relative_to(source_root.resolve()):
+        raise ValueError("display evidence artifact escapes the Server workspace")
+    stat = path.stat()
+    key = ("verified", path, digest, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+    if key not in cache:
+        actual = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                actual.update(chunk)
+        if actual.hexdigest() != digest:
+            raise ValueError("display evidence artifact checksum mismatch")
+        cache[key] = True
+    return path
+
+
+def _flank_projection(source_root: Path, profile: dict, cache: dict) -> dict | None:
+    parameters = json.loads(profile.get("parameters_json") or "{}")
+    if not isinstance(parameters, dict):
+        raise ValueError("local evidence parameters must be an object")
+    relative = parameters.get("flank_projection_relpath")
+    digest = parameters.get("flank_projection_sha256")
+    if relative is None and digest is None:
+        return None  # Legacy accepted events can still use their current neighbours.
+    path = _verified_display_artifact(source_root, relative, digest, cache)
+    for path_field, hash_field in (("query_artifact_relpath", "query_sha256"),
+                                   ("raw_artifact_relpath", "raw_artifact_sha256")):
+        _verified_display_artifact(source_root, profile.get(path_field), profile.get(hash_field), cache)
+    key = ("projection", path, digest)
+    if key not in cache:
+        payload = json.loads(path.read_bytes())
+        if not isinstance(payload, dict) or payload.get("schema_version") != "grt_refill_flank_projection_v1":
+            raise ValueError("unsupported refill flank projection")
+        q_length = _positive_int(payload.get("q_length"), "working query length")
+        rows = payload.get("working_q_rows")
+        queries = payload.get("queries")
+        if not isinstance(rows, list) or not isinstance(queries, dict):
+            raise ValueError("flank projection lacks working path/queries")
+        cursor = 1
+        for row in rows:
+            if not isinstance(row, dict) or row.get("chr") != payload.get("chr"):
+                raise ValueError("flank projection chromosome disagrees with its path")
+            start = _positive_int(row.get("q_start"), "working segment start")
+            end = _positive_int(row.get("q_end"), "working segment end")
+            if start != cursor or end < start:
+                raise ValueError("flank projection path is not contiguous")
+            if row.get("segment_kind") not in {"source", "gap"}:
+                raise ValueError("flank projection has an invalid segment kind")
+            if row.get("segment_kind") != "gap":
+                source_start = _positive_int(row.get("source_start"), "working source start")
+                source_end = _positive_int(row.get("source_end"), "working source end")
+                if source_end - source_start != end - start or row.get("orientation") not in {"+", "-"}:
+                    raise ValueError("flank projection has inconsistent source interval/orientation")
+            cursor = end + 1
+        if cursor != q_length + 1:
+            raise ValueError("flank projection path length mismatch")
+        for name, query in queries.items():
+            if not isinstance(query, dict) or not name:
+                raise ValueError("invalid flank query projection")
+            start = _positive_int(query.get("q_start"), "flank query start")
+            end = _positive_int(query.get("q_end"), "flank query end")
+            if not start <= end <= q_length:
+                raise ValueError("flank query exceeds its working path")
+        cache[key] = payload
+    payload = cache[key]
+    if not profile.get("query_sha256") or payload.get("query_sha256") != profile["query_sha256"]:
+        raise ValueError("flank projection belongs to another query artifact")
+    return payload
+
+
 def _local_alignments_for_event(
     *,
     source_root: Path,
     final_event: dict,
+    supporting_event: dict,
+    projection_cache: dict,
     final_segment_id: str,
     segments: list[dict],
     segment_index: int,
@@ -369,8 +480,11 @@ def _local_alignments_for_event(
     members: dict[str, dict[str, str]],
     registry: dict[str, dict[str, str]],
 ) -> list[dict[str, object]]:
-    candidate = refill_candidates.get(str(final_event.get("event_id", "")))
+    historical = supporting_event.get("event_id") != final_event.get("event_id")
+    candidate = refill_candidates.get(str(supporting_event.get("event_id", "")))
     if candidate is None:
+        if historical:
+            raise ValueError("retained refill lacks its original candidate; rerun run_all.sh to regenerate Step3 evidence")
         return []
     if candidate.get("outcome") != "accepted":
         raise ValueError(f"Final Path event {final_event.get('event_id')} lacks an accepted refill candidate")
@@ -378,13 +492,18 @@ def _local_alignments_for_event(
     if member is None:
         raise ValueError(f"GRT refill {candidate.get('candidate_id')} references an unknown donor member")
     profile = _evidence_profile(
-        final_event,
+        supporting_event,
         registry,
         {"corrected_gap_flank_refill", "post_filter_gap_flank_refill"},
         candidate,
     )
     if profile is None:
         raise ValueError(f"GRT refill {candidate.get('candidate_id')} lacks accepted local evidence")
+    projection = _flank_projection(source_root, profile, projection_cache)
+    if historical and projection is None:
+        raise ValueError("retained refill lacks immutable flank projection; rerun run_all.sh to regenerate Step3 evidence")
+    if projection is not None and projection.get("chr") != candidate.get("chr"):
+        raise ValueError("refill flank projection belongs to another chromosome")
     paf_path = source_root / str(profile.get("raw_artifact_relpath", ""))
     results = []
     for side, role, field in (
@@ -411,13 +530,22 @@ def _local_alignments_for_event(
         matches = int(paf["matches"])
         if aligned_span <= 0 or block_length <= 0 or matches < 0 or matches > block_length:
             raise ValueError("selected GRT local PAF has invalid alignment lengths")
-        target = _adjacent_source_endpoint(
-            segments,
-            segment_index,
-            side,
-            aligned_span,
-            strand,
-        )
+        if not (0 <= int(paf["query_start0"]) < int(paf["query_end0"]) <= int(paf["query_length"])):
+            raise ValueError("selected GRT local PAF exceeds its query")
+        if projection is None:
+            target = _adjacent_source_endpoint(
+                segments, segment_index, side, aligned_span, strand,
+            )
+        else:
+            query = projection["queries"].get(query_name)
+            if query is None or int(query["q_end"]) - int(query["q_start"]) + 1 != int(paf["query_length"]):
+                raise ValueError("selected refill PAF disagrees with its frozen flank query")
+            target = _project_q_endpoint(
+                projection["working_q_rows"],
+                int(query["q_start"]) + int(paf["query_start0"]),
+                int(query["q_start"]) + int(paf["query_end0"]) - 1,
+                strand,
+            )
         if target is None:
             continue
         source = _member_source_endpoint(
@@ -428,7 +556,7 @@ def _local_alignments_for_event(
         results.append(
             _alignment_payload(
                 final_event=final_event,
-                supporting_event=final_event,
+                supporting_event=supporting_event,
                 final_segment_id=final_segment_id,
                 tool="minimap2",
                 preset=str(profile.get("preset", "")),
@@ -605,6 +733,7 @@ def build_display_evidence(
         }
 
     result: dict[str, list[dict[str, object]]] = {}
+    projection_cache: dict = {}
     for chromosome in final_path.get("chromosomes", []):
         chromosome_name = str(chromosome.get("chr", ""))
         segments = chromosome.get("segments", [])
@@ -630,12 +759,16 @@ def build_display_evidence(
             if str(final_event.get("chr", "")) != chromosome_name:
                 raise ValueError(f"Final Path event {final_event_id} chromosome does not match")
 
-            supporting_events = [final_event]
+            retained_ancestors = _retained_ancestors(final_event, events)
+            supporting_events = [final_event, *retained_ancestors]
+            supporting_ids = {event["event_id"] for event in supporting_events}
             for supporting_id in final_event.get("superseded_event_ids", []):
                 supporting = events.get(str(supporting_id))
                 if supporting is None:
                     raise ValueError(f"Final Path event {final_event_id} has a dangling precursor event")
-                supporting_events.append(supporting)
+                if supporting_id not in supporting_ids:
+                    supporting_events.append(supporting)
+                    supporting_ids.add(supporting_id)
             for supporting_event in supporting_events:
                 if str(supporting_event.get("stage", "")) in {"step2", "step3"}:
                     projected.extend(
@@ -650,19 +783,22 @@ def build_display_evidence(
                             registry=registry,
                         )
                     )
-            if str(final_event.get("stage", "")) == "step3" and str(final_event.get("action", "")) == "refill":
-                projected.extend(
-                    _local_alignments_for_event(
-                        source_root=source_root,
-                        final_event=final_event,
-                        final_segment_id=final_segment_id,
-                        segments=segments,
-                        segment_index=segment_index,
-                        refill_candidates=refill_candidates,
-                        members=members,
-                        registry=registry,
+            for local_event in [final_event, *retained_ancestors]:
+                if local_event.get("stage") == "step3" and local_event.get("action") == "refill":
+                    projected.extend(
+                        _local_alignments_for_event(
+                            source_root=source_root,
+                            final_event=final_event,
+                            supporting_event=local_event,
+                            projection_cache=projection_cache,
+                            final_segment_id=final_segment_id,
+                            segments=segments,
+                            segment_index=segment_index,
+                            refill_candidates=refill_candidates,
+                            members=members,
+                            registry=registry,
+                        )
                     )
-                )
         projected.sort(key=lambda item: str(item["evidence_id"]))
         validation_cards = set(display_source_cards)
         for item in projected:

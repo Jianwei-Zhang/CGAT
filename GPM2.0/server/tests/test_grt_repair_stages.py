@@ -2116,6 +2116,18 @@ else:
                 (int(refill_evidence["target_start"]), int(refill_evidence["target_end"])),
                 (accepted_refill["q_before"]["start"], accepted_refill["q_before"]["end"]),
             )
+            for row in evidence:
+                if row["evidence_type"] not in {"corrected_gap_flank_refill", "post_filter_gap_flank_refill"}:
+                    continue
+                parameters = json.loads(row["parameters_json"])
+                projection_path = server / parameters["flank_projection_relpath"]
+                payload = projection_path.read_bytes()
+                self.assertEqual(hashlib.sha256(payload).hexdigest(), parameters["flank_projection_sha256"])
+                projection = json.loads(payload)
+                self.assertEqual(projection["query_sha256"], row["query_sha256"])
+                self.assertEqual(projection["schema_version"], "grt_refill_flank_projection_v1")
+                self.assertTrue(projection["working_q_rows"])
+                self.assertTrue(projection["queries"])
 
             usage = prepare_fixture.read_tsv(server / "metadata/grt_donor_usage.tsv")
             accepted_source_rows = [

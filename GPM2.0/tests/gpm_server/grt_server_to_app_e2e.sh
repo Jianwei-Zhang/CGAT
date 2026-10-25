@@ -283,6 +283,40 @@ assert found == {"seg-patch-1-0": "+", "seg-patch-1-1": "-"}, found
   done
 done
 
+# A retained refill can have multiple surviving children. Both App package
+# modes must retain the original local evidence as history, not as a new edit.
+python3 - "${task_tmp_dir}/retained-source" <<'PYRETAINED'
+import sys
+from server.tests.test_retained_display_evidence import make_retained_delivery_fixture
+make_retained_delivery_fixture(sys.argv[1])
+PYRETAINED
+for kind in full light; do
+  retained_workspace="${task_tmp_dir}/retained-${kind}/gpm_server"
+  fasta_flag=--include-fasta
+  if [[ "$kind" == light ]]; then fasta_flag=--no-fasta; fi
+  python3 server/tools/grt_app_package.py \
+    --source "${task_tmp_dir}/retained-source/gpm_server" \
+    --staging "$retained_workspace" "$fasta_flag" >/dev/null
+  "${backend_exe}" import-extracted "$retained_workspace" >/dev/null
+  "${backend_exe}" initialize-project "$retained_workspace" "retained-${kind}-project" >/dev/null
+  "${backend_exe}" get-grt-project-view "$retained_workspace" 1 | python3 -c '
+import json, sys
+evidence = []
+def visit(value):
+    if isinstance(value, dict):
+        evidence.extend(value.get("display_evidence", []))
+        for child in value.values(): visit(child)
+    elif isinstance(value, list):
+        for child in value: visit(child)
+visit(json.loads(sys.stdin.read().removeprefix("json=")))
+assert len(evidence) == 4, evidence
+assert len({row["event_id"] for row in evidence}) == 2
+assert all(row["association"] == "supporting_precursor" for row in evidence)
+assert all(row["supporting_event_id"] == "evt-step1-round1" for row in evidence)
+assert all(row[side]["assembly_ctg_id"] > 0 for row in evidence for side in ("source", "target"))
+'
+done
+
 legacy_workspace="${task_tmp_dir}/legacy/gpm_server"
 mkdir -p "$(dirname "${legacy_workspace}")"
 cp -a "${fixture_root}" "${legacy_workspace}"
