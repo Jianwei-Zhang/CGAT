@@ -105,9 +105,10 @@ class WorkspaceRuntimeUpdateTests(unittest.TestCase):
         self.assertFalse((self.workspace / ".run_all/lock").exists())
         self.assertFalse((self.tools / ".run_all/lock").exists())
 
-    def test_evidence_packager_is_updated_in_both_roots_and_restored_on_rollback(self):
+    def test_evidence_and_logging_tools_update_both_roots_and_restore_on_rollback(self):
         paths = []
-        for relative in ("tools/grt_evidence_package.py", "tools/grt_display_evidence.py"):
+        for relative in ("tools/grt_evidence_package.py", "tools/grt_display_evidence.py",
+                         "tools/run_all_runner.py", "tools/run_progress.py", "tools/view_run_log.py"):
             self.assertIn(relative, updater.ENTRYPOINTS)
             runtime_file = self.workspace / ".prepare_lib" / relative
             tool_file = self.tools / relative
@@ -121,6 +122,22 @@ class WorkspaceRuntimeUpdateTests(unittest.TestCase):
         for _, runtime_file, tool_file, old_runtime, old_tool in paths:
             self.assertEqual(runtime_file.read_bytes(), old_runtime)
             self.assertEqual(tool_file.read_bytes(), old_tool)
+
+    def test_logging_modules_added_to_old_runtime_are_removed_on_rollback(self):
+        added = []
+        for root in (self.tools, self.workspace / ".prepare_lib"):
+            for name in ("tools/run_progress.py", "tools/view_run_log.py"):
+                path = root / name
+                path.unlink()
+                added.append(path)
+        before_tools = self.snapshot(self.tools)
+        before_workspace = self.snapshot(self.workspace)
+        result = self.update()
+        self.assertTrue(all(path.is_file() for path in added))
+        updater.rollback(Path(result["backup"]))
+        self.assertTrue(all(not path.exists() for path in added))
+        self.assertEqual(self.snapshot(self.tools), before_tools)
+        self.assertEqual(self.snapshot(self.workspace), before_workspace)
 
     def test_corrupt_source_or_wrong_revision_is_rejected_before_writes(self):
         before = self.snapshot(self.tools), self.snapshot(self.workspace)

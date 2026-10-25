@@ -143,8 +143,20 @@ python3 /path/to/report/render_report.py
 首次 `run.sh` 会自动准备并运行完整流程；恢复时重复原命令，或仅指定 `-o`。原有 `prepare.sh` 和生成的 `run_all.sh` 仍兼容。线程数固定为准备阶段的值；不支持运行时 `--threads`、`--from`、`--until` 或 `--stage` 覆盖。
 
 ```bash
-tail -F ./gpm_server/logs/run_all.log
+tail -F ./gpm_server/logs/progress.log
 ```
+
+runner 默认输出精简进度，`logs/progress.log` 保存相同的纯文本展示，
+`logs/run_all.log` 保留完整诊断。自动颜色仅用于交互输出，Slurm 日志保持纯文本。
+可用只读查看器彩色监控；加 `--detailed` 切换为完整日志：
+
+```bash
+python3 tools/view_run_log.py --server-dir ./gpm_server --follow
+```
+
+`report/report.html` 继续接收原始事件及诊断输出，不使用精简后的显示内容。
+详见 [日志控制与兼容说明](server/README_zh.md#进度日志与终端颜色)。
+不要更新正在运行作业的工具或内嵌运行库。
 
 当前单元状态写入 `gpm_server/logs/status.tsv`。同一工作目录同时只允许一个 runner。
 

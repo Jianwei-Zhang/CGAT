@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from run_progress import ProgressDisplay, plain
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
 from run_orchestration import OrchestrationContractError, atomic_write_json
 from server_report import ReportSession, finalize_delivery_archives_from_staging
@@ -291,7 +292,7 @@ class WorkspaceLock:
 
 
 class Runner:
-    def __init__(self, server_dir: Path, units: list[PlanUnit], run_id: str):
+    def __init__(self, server_dir: Path, units: list[PlanUnit], run_id: str, *, log_style="compact", color="auto"):
         self.server_dir = server_dir
         self.units = units
         self.run_id = run_id
@@ -300,6 +301,11 @@ class Runner:
         self.status_path = self.logs_dir / "status.tsv"
         self.status_rows: list[dict[str, str]] = []
         self.log_handle = None
+        self.progress = ProgressDisplay(
+            self.logs_dir / "progress.log",
+            {unit.unit_id: f"{index:02d}/{len(units):02d}" for index, unit in enumerate(units, 1)},
+            style=log_style, color=color,
+        )
         self.active_child: subprocess.Popen[str] | None = None
         self.active_children: dict[int, subprocess.Popen] = {}
         self.received_signal: int | None = None
@@ -317,17 +323,19 @@ class Runner:
             )
             position = f"{index}/{len(self.units)}"
             unit_id = unit.unit_id
+        message = plain(message)
         line = (
             f"{timestamp()} [run={self.run_id}] [{position}] "
             f"[{event}] [{unit_id}] {message}"
         )
-        print(line, flush=True)
+        self.progress.raw(line)
         assert self.log_handle is not None
         self.log_handle.write(line + "\n")
         self.log_handle.flush()
 
         if self.report is not None:
             self.report.event(event, unit, message, self._row(unit) if unit else None)
+        self.progress.event(event, unit_id, message)
 
     def _stream_child(self, unit: PlanUnit, child: subprocess.Popen[str]) -> None:
         assert child.stdout is not None
@@ -335,6 +343,7 @@ class Runner:
             self._child_line(unit, raw_line.rstrip("\r\n"))
 
     def _child_line(self, unit: PlanUnit, line: str) -> None:
+        line = plain(line)
         assert self.log_handle is not None
         if self.report is not None:
             self.report.child_output(line, unit.unit_id)
@@ -342,9 +351,10 @@ class Runner:
             if line.startswith(marker):
                 self.child_cache_markers.add(marker)
         rendered = f"{timestamp()} [run={self.run_id}] [CHILD] [{unit.unit_id}] {line}"
-        print(rendered, flush=True)
+        self.progress.raw(rendered)
         self.log_handle.write(rendered + "\n")
         self.log_handle.flush()
+        self.progress.child(unit.unit_id, line)
 
     def _handle_signal(self, signal_number: int, _frame: object) -> None:
         if self.received_signal is None:
@@ -475,8 +485,8 @@ class Runner:
     def _emit_summary(self, lines: list[str]) -> None:
         assert self.log_handle is not None
         for line in lines:
-            print(line, flush=True)
-            self.log_handle.write(line + "\n")
+            self.progress.summary(line)
+            self.log_handle.write(plain(line) + "\n")
         self.log_handle.flush()
 
     @staticmethod
@@ -562,13 +572,14 @@ class Runner:
             except (OSError, UnicodeError, csv.Error, KeyError):
                 pass
 
-        with self.log_path.open("a", encoding="utf-8", buffering=1) as log_handle:
+        with self.log_path.open("a", encoding="utf-8", buffering=1) as log_handle, self.progress:
             self.log_handle = log_handle
             separator = (
                 f"===== RUN {self.run_id} {mode.upper()} "
                 f"workspace={self.server_dir} threads={threads} units={len(self.units)} ====="
             )
-            print(separator, flush=True)
+            self.progress.raw(separator)
+            self.progress.header(self.run_id, mode, self.server_dir, threads)
             log_handle.write(separator + "\n")
             if mode == "resume":
                 self._event("RESUME", None, "rechecking the prepared execution plan")
@@ -821,6 +832,8 @@ def new_run_id() -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the prepared GPM2.0 Server workflow")
     parser.add_argument("--server-dir", required=True, type=Path)
+    parser.add_argument("--log-style", choices=("compact", "detailed"), default="compact")
+    parser.add_argument("--color", choices=("auto", "always", "never"), default="auto")
     return parser.parse_args()
 
 
@@ -835,7 +848,7 @@ def main() -> int:
     try:
         units = load_plan(server_dir)
         lock.acquire()
-        return Runner(server_dir, units, run_id).run()
+        return Runner(server_dir, units, run_id, log_style=args.log_style, color=args.color).run()
     except (OSError, ValueError, RunnerError, OrchestrationContractError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2

@@ -15,6 +15,22 @@ are printed to the terminal and `logs/run_all.log`. Standalone packaging command
 embed the latest workspace report when available; standalone incremental commands
 remain outside the recorded invocation history.
 
+## Logging presentation boundary
+
+`logs/progress.log` and the default console output are compact views. Neither is an
+input to report collection, checkpoint/cache validation, or delivery finalization.
+`ReportSession.event()` receives the original event codes/messages and runtime rows;
+`child_output()` receives original child text before metric suppression, progress
+aggregation or cache-hash shortening. Terminal ANSI controls are removed at that
+boundary. The existing 80-line/4000-character-per-line output-tail limit is unchanged;
+full diagnostics, including copy/parse timings, remain in `logs/run_all.log`.
+
+Color is applied only to terminal output (or the read-only log viewer), never to
+report JSON/HTML or persistent logs. The report schema, renderer, provenance facts,
+cache classifications, failure records and full/light archive embedding are unchanged.
+The `--log-style detailed` option restores verbose console output without changing
+reporting behavior. Progress counts are alignment progress, not biological QC results.
+
 ## Directory contract: `cgat_server_report_v1`
 
 | File | Meaning |

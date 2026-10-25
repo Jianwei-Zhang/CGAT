@@ -23,6 +23,7 @@ sys.dont_write_bytecode = True
 ENTRYPOINTS = {
     "tools/grt_step2.py", "tools/grt_step3.py", "tools/grt_telomere_finalize.py",
     "tools/grt_evidence_package.py", "tools/grt_display_evidence.py",
+    "tools/run_all_runner.py", "tools/run_progress.py", "tools/view_run_log.py",
 }
 BINDING = "skills/gpm-server/server-tools.path"
 

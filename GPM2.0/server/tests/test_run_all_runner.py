@@ -152,8 +152,9 @@ Path('result.paf').write_text('query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t
         return server
 
     def run_runner(self, server: Path, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        log_style = kwargs.pop("log_style", "detailed")
         return subprocess.run(
-            ["python3", str(RUNNER), "--server-dir", str(server)],
+            ["python3", str(RUNNER), "--server-dir", str(server), "--log-style", log_style],
             text=True,
             capture_output=True,
             check=False,
@@ -655,6 +656,15 @@ write_status(stages)
             result = self.run_runner(server)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("[CACHE_HIT] [grt_step1]", result.stdout)
+
+            compact = self.run_runner(server, log_style="compact")
+            self.assertEqual(compact.returncode, 0, compact.stderr)
+            self.assertIn("[DONE] [grt_step1] cached", compact.stdout)
+            self.assertNotIn("[CHILD]", compact.stdout)
+            record = json.loads((server / "report/steps/001.json").read_text())
+            self.assertEqual(record["execution"], "cache_reused")
+            self.assertIn("CACHE_HIT", [item["event"] for item in record["history"]])
+            self.assertIn("GRT step1_round1 cache hit: fixture", record["output_tail"])
 
             (server / "commands/grt_step1.sh").write_text(
                 "#!/usr/bin/env bash\nset -euo pipefail\n"

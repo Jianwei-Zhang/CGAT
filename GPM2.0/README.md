@@ -143,8 +143,21 @@ The renderer reads only report-local records and does not rerun alignments or re
 The first `run.sh` invocation prepares and runs the full workflow automatically. Resume with the same command or just `-o`. The existing `prepare.sh` and generated `run_all.sh` remain compatible. The prepared thread count remains fixed; runtime `--threads`, `--from`, `--until`, and `--stage` overrides are not supported.
 
 ```bash
-tail -F ./gpm_server/logs/run_all.log
+tail -F ./gpm_server/logs/progress.log
 ```
+
+The runner now prints compact progress by default; `logs/progress.log` contains the
+same plain-text view. `logs/run_all.log` retains full diagnostics. Terminal colors
+are automatic only on interactive outputs, so Slurm logs stay plain. Use the
+read-only viewer for colored monitoring, or add `--detailed` for the full log:
+
+```bash
+python3 tools/view_run_log.py --server-dir ./gpm_server --follow
+```
+
+`report/report.html` still receives original events and diagnostic output, not the
+filtered display. See [logging controls and compatibility](server/README.md#progress-logs-and-terminal-colors).
+Do not update a running job's tools or embedded runtime.
 
 Current unit states are written to `gpm_server/logs/status.tsv`. Only one runner may own a workspace at a time.
 

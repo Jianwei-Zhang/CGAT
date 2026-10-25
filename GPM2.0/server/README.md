@@ -258,6 +258,43 @@ See the [ARM/Donau record](validation/agent-skill-v1-180.md) and
 [x86/LSF and tools-location record](validation/agent-skill-v1-140-1.md) for actual
 coverage and exclusions; a skill is guidance, not a permissions sandbox.
 
+## Progress logs and terminal colors
+
+The prepared `run_all.sh` uses a compact console view by default. Stage boundaries,
+validated reuse, rate-limited MUMmer chromosome counts, warnings and errors remain
+visible. Per-chromosome copy/parse timings and cache hashes stay in the detailed log.
+A quiet running unit emits a heartbeat after 60 seconds; progress is append-only,
+not a terminal animation. Unknown child output is retained rather than guessed away.
+
+- `logs/progress.log`: compact, plain-text progress; appended across invocations.
+- `logs/run_all.log`: full timestamp/run-ID/event diagnostics, including performance metrics.
+- `report/report.html`: unchanged report schema and data source. Original events and
+  child output reach reporting/cache detection before presentation filtering. The
+  existing bounded report output tail is retained; the full log remains authoritative.
+
+From the Server tools directory:
+
+```bash
+# Read-only viewer; Ctrl+C stops viewing, not the analysis job.
+python3 tools/view_run_log.py --server-dir ./gpm_server --follow
+# Read full diagnostics instead.
+python3 tools/view_run_log.py --server-dir ./gpm_server --detailed --follow
+# Plain-text viewing works without the viewer.
+tail -F ./gpm_server/logs/progress.log
+```
+
+Colors apply only to displayed status labels. Auto mode colors interactive terminals,
+not Slurm `.out` files or pipes, and respects `NO_COLOR` and `TERM=dumb`.
+Both the viewer and generated runner accept `--color auto|always|never`; an explicit
+`always` overrides auto detection/`NO_COLOR`. Persistent logs and report data never
+receive presentation color codes. To retain the old verbose console format on a
+**subsequent** invocation, use `bash ./gpm_server/run_all.sh --log-style detailed`.
+These flags belong to `run_all.sh`, not `run.sh`/`prepare.sh`.
+
+Old prepared workspaces retain their embedded runtime until explicitly updated.
+Do not replace tools/runtime while a job is running. This presentation change does
+not require deleting caches, repreparing inputs, or changing the dependency environment.
+
 ## File roles
 
 | File | Purpose | When to run it |

@@ -216,6 +216,39 @@ Skill v3 默认自动积累简明的本地经验：问题已修复并验证，�
 [x86/LSF 与工具路径绑定验证记录](validation/agent-skill-v1-140-1.md)；
 skill 是操作指导，不是权限沙箱。
 
+## 进度日志与终端颜色
+
+生成的 `run_all.sh` 默认使用精简终端展示：保留阶段起止、有效结果复用、限频的
+MUMmer 染色体进度以及警告和错误。逐染色体复制/解析耗时和缓存 hash 保留在完整
+日志。运行中的单元静默 60 秒后输出心跳提示；采用逐行追加，不使用终端刷新动画。
+未知子进程输出仍保留，不猜测过滤。
+
+- `logs/progress.log`：精简纯文本进度，多次运行追加记录。
+- `logs/run_all.log`：完整时间、run ID、事件与性能指标等诊断信息。
+- `report/report.html`：格式和数据来源不变。原始事件及子进程输出先进入报告和
+  缓存判定，再做展示过滤。报告仍保留原有长度限制的输出尾部，完整诊断以日志为准。
+
+在 Server 工具目录执行：
+
+```bash
+# 只读查看；Ctrl+C 只退出查看，不停止分析作业。
+python3 tools/view_run_log.py --server-dir ./gpm_server --follow
+# 改为查看完整诊断。
+python3 tools/view_run_log.py --server-dir ./gpm_server --detailed --follow
+# 不使用查看器也能直接查看纯文本。
+tail -F ./gpm_server/logs/progress.log
+```
+
+颜色只用于显示的状态标签。自动模式仅在交互终端上色，Slurm `.out` 和管道默认
+不写颜色，并遵循 `NO_COLOR`、`TERM=dumb`。查看器和生成的 runner 都支持
+`--color auto|always|never`，显式 `always` 优先于自动检测和 `NO_COLOR`。
+磁盘日志和报告数据不写入展示用颜色控制符。如需在**后续运行**中恢复旧的详细
+终端格式，使用 `bash ./gpm_server/run_all.sh --log-style detailed`。
+这些参数属于 `run_all.sh`，不是 `run.sh`/`prepare.sh` 的参数。
+
+旧项目保留原有内嵌运行库，只有明确更新后才启用新展示。作业运行期间不要替换
+工具或运行库；本次展示调整无需删除缓存、重新准备输入或更换依赖环境。
+
 ## 文件用途
 
 | 文件 | 用途 | 何时执行 |

@@ -231,7 +231,7 @@ grep -Fq 'Final delivery packages:' "${output_root}/logs/run_all.log"
 grep -Fq 'Full package (FASTA + report):' "${output_root}/logs/run_all.log"
 grep -Fq 'Light package (report included, FASTA omitted):' "${output_root}/logs/run_all.log"
 
-PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh" > "${TMP_DIR}/resume.out"
+PATH="${FAKE_BIN}:$PATH" bash "${output_root}/run_all.sh" --log-style detailed > "${TMP_DIR}/resume.out"
 grep -Fq '[SKIP_VALID] [ref:ds1]' "${TMP_DIR}/resume.out"
 grep -Fq '[SKIP_VALID] [assign]' "${TMP_DIR}/resume.out"
 grep -Fq '[SKIP_VALID] [chr:Chr01]' "${TMP_DIR}/resume.out"
