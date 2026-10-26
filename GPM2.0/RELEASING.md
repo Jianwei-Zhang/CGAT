@@ -20,17 +20,33 @@ Before creating a new version tag:
 
 ## Release notes
 
-- Describe changes relative to the installers users received in the previous Release. If those assets were replaced after the tag was created, use the replacement workflow run's `headSha` as the comparison base so already shipped work is not repeated.
-- Write a complete English section first and a complete Chinese section second.
-- Use the headings `Updates since vX.Y.Z` and `相对 vX.Y.Z 的更新`.
-- Group related commits into a short list of user-visible changes. Keep the notes concise even when the commit range is large.
-- State that installers are provided for Windows x86/ARM64 and macOS x86/Apple Silicon.
-- Retain the macOS first-launch sections below while releases use ad-hoc signing without Apple notarization.
+For drafting, updating, condensing or reviewing Release Notes, use the project
+skill `.agents/skills/changelog-generator/SKILL.md`, adapted from the
+[upstream Changelog Generator](https://github.com/ComposioHQ/awesome-claude-skills/blob/master/changelog-generator/SKILL.md).
+Do not invoke it for unrelated development or documentation. Its user-facing
+summaries, categorization and noise filtering take precedence over older writing
+conventions; do not maintain a duplicate style guide here.
+
+- Write complete **English first, Chinese second**, with equivalent content and
+  separate **Server / App** parts inside each language.
+- Use the actual shipped App installers and Server source snapshot as separate
+  baselines; do not present unshipped source changes as released installer features.
+  For a Server-only refresh, state under App that installers are unchanged.
+- Name the Windows x64 (`win-x86`)/ARM64 and macOS Intel/Apple Silicon (ARM64)
+  downloads, and retain the test-data names and preservation scope.
+- Preserve the following macOS first-launch text in each matching language section,
+  including applicability to Apple Silicon / ARM64, while builds remain ad-hoc
+  signed and not Apple-notarized.
+
+This skill governs note-writing, not publication authorization. All existing
+artifact-preservation, quality and publication checks in this guide still apply.
 
 ### Required macOS first-launch text
 
 ````markdown
 ### macOS first launch
+
+This guidance applies to both Intel and Apple Silicon (ARM64) builds.
 
 The macOS apps are ad-hoc signed but not Apple-notarized. Drag `GPM.app` to `/Applications` before opening it. If macOS blocks the first launch, open **System Settings -> Privacy & Security** and choose **Open Anyway**. If that control is unavailable, run the following command only for the app downloaded from this official Release:
 
@@ -39,6 +55,8 @@ xattr -dr com.apple.quarantine /Applications/GPM.app
 ```
 
 ### macOS 首次启动
+
+以下提示同时适用于 Intel 和 Apple Silicon（ARM64）版本。
 
 macOS App 使用 ad-hoc 签名，但未经 Apple 公证。请先将 `GPM.app` 拖入 `/Applications` 再打开。如果 macOS 阻止首次启动，请进入 **系统设置 -> 隐私与安全性** 并选择 **仍要打开**。如果该控件不可用，仅对从本项目官方 Release 下载的 App 执行：
 
@@ -96,8 +114,10 @@ not a desktop-installer rebuild or a version bump unless the user requests one.
    requires this manifest; verify the map against the same pinned Git tree.
 3. Keep the previous source attachment and Release metadata locally for rollback.
    Replace only the approved source attachment, preserving its public filename.
-   Add a concise refresh bullet in each existing language section; do not remove
-   the installer-platform or macOS first-launch instructions.
+   Follow the changelog-generator skill to consolidate the refresh into the Server
+   part of each language section, rather than stacking per-commit audit bullets.
+   State under App that installers are unchanged, and retain the platform list,
+   test-data scope and both macOS first-launch instructions.
 4. Download the replacement through its public Release URL. Verify gzip/tar
    integrity, safe paths, size, API/upload/download SHA-256 equality, and every
    packaged source file against the pinned Git tree. From a fresh extraction,
