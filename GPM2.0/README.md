@@ -19,13 +19,31 @@ Installers for `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64` are published 
 
 ### 1. Download the tools and create the environment
 
-On your Linux server, download the Server tools (source package) from [Release v2.0.12](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.12), then extract, enter the tool directory, and install:
+On your Linux server, download the Server tools (source package) from [Release v2.0.12](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.12), or the [official docs](https://riceome.hzau.edu.cn/cgat/en/downloads), then verify, extract into the default or custom directory, and install:
+
+New installations default to `~/bin/GPM_Server`; existing installations keep their actual paths. The subshell below does not change your working directory, so project outputs stay outside the tools directory. Without AI, use the commands below; the [Server README](server/README.md#installation-prompt-for-your-ai-agent) also provides an agent installation prompt.
 
 ```bash
-curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/GPM_Server_2.0.12_source.tar.gz
-tar -xzf GPM_Server_2.0.12_source.tar.gz
-cd GPM_Server
-bash install.sh
+SERVER="$HOME/bin/GPM_Server"  # Custom paths are supported; do not overwrite an existing installation
+(
+  set -euo pipefail
+  mkdir -p "$(dirname "$SERVER")"
+  mkdir "$SERVER"
+  cd "$SERVER"
+  archive=GPM_Server_2.0.12_source.tar.gz
+  curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.12/$archive" ||
+    curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/$archive"
+  curl -fL --connect-timeout 8 --max-time 30 -o SHA256SUMS \
+    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.12/SHA256SUMS ||
+    curl -fL --connect-timeout 8 --max-time 30 \
+      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.12 |
+      python3 -c 'import json,sys; r=json.load(sys.stdin); print("\n".join(a["digest"].removeprefix("sha256:")+"  "+a["name"] for a in r["assets"] if a["name"].endswith("_source.tar.gz")))' > SHA256SUMS
+  grep "  $archive$" SHA256SUMS | sha256sum -c -
+  tar -xzf "$archive" --strip-components=1
+  bash ./install.sh
+)
 ```
 
 The script reuses `mamba`, `micromamba`, or `conda`. If none is available, it installs micromamba for the current user without `sudo`. Use `--manager conda|mamba|micromamba` to select one explicitly. After the installer prints `GPM Server installation: READY`, activate the environment with the command it provides, for example:
@@ -37,10 +55,10 @@ micromamba activate cgat-server
 Check the installation later without changing it:
 
 ```bash
-bash install.sh --check
+bash "$SERVER/install.sh" --check
 ```
 
-Re-running `install.sh` validates the managed environment and updates it only when the dependency specification changes. The previous `env.sh` entry remains compatible. Run all subsequent Server commands from `GPM_Server/`; when using repository source, first enter `GPM2.0/server/`. See the [server quick start](server/README.md) for details.
+Re-running `install.sh` validates the managed environment and updates it only when the dependency specification changes. The previous `env.sh` entry remains compatible. `SERVER` records the actual tools path. Run analysis from your project directory, not inside `~/bin/`. For a repository checkout, set `SERVER` to the absolute `GPM2.0/server/` path. See the [server quick start](server/README.md) for details.
 
 | Purpose | Commands installed or required |
 | --- | --- |
@@ -50,30 +68,31 @@ Re-running `install.sh` validates the managed environment and updates it only wh
 
 Keep this environment active for `run.sh`.
 
-#### Update the Server tools (existing environment)
+#### Update tools, skill, and the current project runtime
 
-Once no jobs are running, set `TOOLS_DIR` to your preferred absolute tool path, such as `/data/tools/GPM_Server_new`. Choose a new directory that does not exist; its parents are created automatically. The source attachment may be refreshed without changing the release version:
+Run the same entrypoint from the project directory or a child directory (use the actual path for custom installations):
 
 ```bash
-TOOLS_DIR="$HOME/GPM_Server_new"
-mkdir -p "$(dirname "$TOOLS_DIR")" &&
-mkdir "$TOOLS_DIR" &&
-cd "$TOOLS_DIR" &&
-curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/GPM_Server_2.0.12_source.tar.gz &&
-tar -xzf GPM_Server_2.0.12_source.tar.gz --strip-components=1 &&
-bash install.sh
+bash ~/bin/GPM_Server/update.sh
 ```
 
-The existing managed `cgat-server` environment is reused and updated only if its dependency specification changed. Activate it as instructed, then run the next section from this new tool directory with a new output directory for `-o`.
+This entrypoint requires a source package containing `update.sh`. If an older package lacks it, follow the Server/skill one-time adoption instructions rather than overwriting the installation.
 
-**Updating the tools does not update `.prepare_lib` inside an existing workspace. To recompute with the fixed code, do not resume its old `run_all.sh`; keep the old tools and results intact.**
+Checks and downloads use the [official docs](https://riceome.hzau.edu.cn/cgat/en/downloads) first, falling back to GitHub Release on failure.
+Tools and skill come from the same release bundle. If everything matches, it reports
+already up to date; otherwise it lists changes and asks `[y/N]`. Only `Y/y` proceeds;
+`N/n`, Enter, or no interactive terminal cancels. There are no extra flags.
+Inside a project it also aligns `.prepare_lib/`; outside a project it does not scan other projects.
+Preserves skill `local/`, actual paths, logs, results, caches, and the environment; never starts analysis.
+Stop all affected jobs, including other nodes, before updating. Backups support rollback.
+See [Server update details](server/README.md#update-tools-skill-and-project-runtime) for legacy adoption and limits.
 
 ### 2. Run the full workflow
 
 Minimal example with an explicit output directory:
 
 ```bash
-bash run.sh \
+bash "$SERVER/run.sh" \
   --ref /path/to/rice_IRGSP_1_0.fa \
   --ds /path/to/hifiasm.fa \
   --ds /path/to/flye.fa \
@@ -116,7 +135,7 @@ GPM Server always uses Minimap2. BLASTN and Winnowmap are not available because 
 ### 3. Resume and monitor
 
 ```bash
-bash run.sh -o ./gpm_server
+bash "$SERVER/run.sh" -o ./gpm_server
 ```
 
 The runner executes the generated plan serially, stops at the first error, validates checkpoints before reuse, and creates both archives beside `gpm_server/`:
@@ -152,7 +171,7 @@ are automatic only on interactive outputs, so Slurm logs stay plain. Use the
 read-only viewer for colored monitoring, or add `--detailed` for the full log:
 
 ```bash
-python3 tools/view_run_log.py --server-dir ./gpm_server --follow
+python3 "$SERVER/tools/view_run_log.py" --server-dir ./gpm_server --follow
 ```
 
 `report/report.html` still receives original events and diagnostic output, not the
@@ -207,7 +226,7 @@ Display names and notes are editable; original identifiers, filenames, and seque
 Export Final Path TSV from the App, copy it back to the server that retains the original FASTA files, and run:
 
 ```bash
-bash export_final_path_fasta.sh \
+bash "$SERVER/export_final_path_fasta.sh" \
   --tsv /path/to/project_Chr01_path.tsv \
   --gpm_server ./gpm_server \
   -o /path/to/project_Chr01_path.fa

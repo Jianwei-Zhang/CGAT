@@ -4,22 +4,42 @@
 
 ## Quick start
 
-On your Linux server, download the GPM Server tools (source package) from [Release v2.0.12](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.12), then extract, enter the tool directory, and install:
+On your Linux server, download the GPM Server tools (source package) from [Release v2.0.12](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.12), or the [official docs](https://riceome.hzau.edu.cn/cgat/en/downloads), then verify, extract into the default or custom directory, and install:
 
 ```bash
-# 1. Download, extract, and enter the Server tool directory
-curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/GPM_Server_2.0.12_source.tar.gz
-tar -xzf GPM_Server_2.0.12_source.tar.gz
-cd GPM_Server
+# 1. Download into the tools directory; keep your project working directory
+SERVER="$HOME/bin/GPM_Server"  # Custom paths are supported; do not overwrite an existing installation
+(
+  set -euo pipefail
+  mkdir -p "$(dirname "$SERVER")"
+  mkdir "$SERVER"
+  cd "$SERVER"
+  archive=GPM_Server_2.0.12_source.tar.gz
+  curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.12/$archive" ||
+    curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/$archive"
+  curl -fL --connect-timeout 8 --max-time 30 -o SHA256SUMS \
+    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.12/SHA256SUMS ||
+    curl -fL --connect-timeout 8 --max-time 30 \
+      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.12 |
+      python3 -c 'import json,sys; r=json.load(sys.stdin); print("\n".join(a["digest"].removeprefix("sha256:")+"  "+a["name"] for a in r["assets"] if a["name"].endswith("_source.tar.gz")))' > SHA256SUMS
+  grep "  $archive$" SHA256SUMS | sha256sum -c -
+  tar -xzf "$archive" --strip-components=1
+  # 2. Install and verify the isolated environment
+  bash ./install.sh
+)
+```
 
-# 2. Install and verify the isolated environment
-bash install.sh
+Continue only after installation succeeds. Run analysis from your project working directory, not the tools directory.
+
+```bash
 
 # 3. Activate it with the command printed by the installer, for example
 mamba activate cgat-server
 
 # 4. Prepare, compute, and create the delivery archives
-bash run.sh \
+bash "$SERVER/run.sh" \
   --ref /path/to/reference.fa \
   --ds /path/to/assembly.fa \
   -o ./gpm_server
@@ -45,7 +65,7 @@ letters, numbers, dot, underscore, and hyphen are replaced with `_`. Use the
 explicit form when you want another name:
 
 ```bash
-bash run.sh \
+bash "$SERVER/run.sh" \
   --ref reference /path/to/reference.fa \
   --ds assembly /path/to/assembly.fa \
   -o ./gpm_server
@@ -54,13 +74,13 @@ bash run.sh \
 A successful installation ends with `GPM Server installation: READY`. Check it later without changing the environment:
 
 ```bash
-bash install.sh --check
+bash "$SERVER/install.sh" --check
 ```
 
 The installer searches for `mamba`, `micromamba`, then `conda`. Select one explicitly when needed:
 
 ```bash
-bash install.sh --manager conda
+bash "$SERVER/install.sh" --manager conda
 ```
 
 ### ARM64 and cluster environments
@@ -92,41 +112,48 @@ The finalization error `accepted event disappeared before q4 without one exact q
 can also result from a partially trimmed Step2 patch; the retained-source fix
 preserves its exact surviving fragments and original replay history.
 
-A prepared workspace contains its own runtime copy. Updating an installed
-Server tools directory alone does not update an existing workspace. For a
-coordinated update, verify the archive SHA-256 from the Release, extract it to a
-**separate new directory**, stop all runs using either target, then run:
+Use the updater below, then rerun or resubmit `run_all.sh` in the same environment
+when you are ready. Required stage results are regenerated while compatible raw
+MUMmer caches can be reused. The updater itself never starts analysis.
+
+### Update tools, skill, and project runtime
+
+Use the same command to check or update:
 
 ```bash
-fresh=/path/to/newly-extracted/GPM_Server
-workspace=/path/to/gpm_server
-tools=/path/to/installed/GPM_Server
-revision="FULL_GIT_REVISION_FROM_THE_RELEASE"
-python3 "$fresh/tools/update_workspace_runtime.py" \
-  --workspace "$workspace" --tools-root "$tools" \
-  --expected-revision "$revision" --apply
+bash ~/bin/GPM_Server/update.sh
 ```
 
-The updater requires the packaged `SOURCE.json` file-hash manifest. It verifies
-all source files, locks both targets, backs up changed files under the
-workspace's `.run_all/runtime-update-*`, and updates the installed tools plus
-`.prepare_lib/tools/grt_core/` and the matching Step2/Step3/telomere/evidence
-packaging entrypoints, including the display-evidence projector.
-User logs, old archives, skill-local notes/bindings, data, results, caches,
-generated commands and the dependency environment are preserved. It rejects
-active runs (resolving relative script paths against each process's working
-directory), symlinked targets and unexpected old core modules. Stop all work,
-including standalone commands on other nodes, before updating; process inspection
-is not a lock against a new standalone command starting later. A write failure
-attempts automatic rollback; a completed update can also be rolled back with
-`python3 "$fresh/tools/update_workspace_runtime.py" --rollback BACKUP_DIR`.
-Omit `--apply` for a read-only verification/plan.
+This entrypoint requires a source package containing `update.sh`. If an older package lacks it, follow the Server/skill one-time adoption instructions rather than overwriting the installation.
 
-These updates require independent Step2/Step3 entrypoints; they do not migrate a
-legacy `run_grt_step23.sh` plan. The updater does **not** run analysis. Once it
-reports `"status": "updated"`, rerun or resubmit `run_all.sh` in the same
-environment. Stage results are regenerated from Step2 as needed while compatible
-raw MUMmer alignments remain reusable. No dependency reinstall is required.
+For custom installations use the actual path. Run it from the project root or a
+child directory to align that project's `.prepare_lib/` with tools. Outside a
+project, other projects are not scanned. Checks/downloads prefer the
+[official docs](https://riceome.hzau.edu.cn/cgat/en/downloads), falling back to
+[GitHub Release](https://github.com/Jianwei-Zhang/CGAT/releases/latest) on failure.
+Size, SHA-256 and the source file manifest are verified. Tools and skill come from
+one release bundle; refreshed same-version assets are detected too.
+
+- All scoped files match: reports already up to date.
+- New files or an outdated runtime: lists changes and asks `[y/N]`.
+- `Y/y` proceeds; `N/n`, Enter, EOF or no interactive terminal cancels. No `--check`/`--yes` flags.
+- Preserves the whole skill `local/`, valid bindings, inputs, results, logs, caches,
+  generated scripts and dependency environment.
+- Separately installed skills registered with `server_tools_path.sh --set` are
+  updated too; agent configuration is not scanned.
+
+Stop all affected jobs, including other nodes, before confirming. Active jobs,
+conflicting paths, known custom edits, dependency-spec changes and unsupported
+legacy plans stop the update; it never reinstalls dependencies or reruns analysis.
+Legacy files without a baseline are listed for review because customizations
+cannot be distinguished automatically. Backups live under the project's
+`.run_all/server-update-*`, or under tools when no project is selected. Failed
+writes attempt rollback; a successful update prints an advanced rollback command.
+Reload the agent session after a skill update. For older tools without `update.sh`,
+follow the [one-time adoption procedure](skills/gpm-server/references/official-updates.md),
+not an overwrite/reinstall. Docs can work without GitHub; a stale mirror cannot
+downgrade a newer installed version/build. Network or integrity failure never
+means “already latest”.
 
 ### Independent GRT stage controls
 
@@ -206,6 +233,23 @@ results before release. Cache-assisted timings are not cold-pipeline benchmarks.
 
 ## Optional AI agent skill
 
+### Installation prompt for your AI agent
+
+Copy this into your current agent:
+
+```text
+Install the official gpm-server skill for this AI agent:
+https://github.com/Jianwei-Zhang/CGAT/tree/master/GPM2.0/server/skills/gpm-server
+For downloads and updates, prefer the Server source package from
+https://riceome.hzau.edu.cn/cgat/ and fall back to GitHub Release on failure.
+Install the complete skills/gpm-server/ directory from that package.
+If Server tools are installed, ask me for their path. Otherwise, ask whether to
+install them at ~/bin/GPM_Server or a location I choose. After confirmation,
+complete installation and path binding; preserve any existing skill local/ experience.
+```
+
+### Installation and use
+
 The source tree includes the official [gpm-server skill](skills/gpm-server/SKILL.md)
 for first runs, safe resume, diagnosis, and verified result handoff. It is optional:
 the CLI above still works without an AI agent. Keep the skill with its companion
@@ -234,23 +278,17 @@ resource budget, and local scheduler/environment instructions. For example:
 > Follow this cluster's submission rules; do not run on the login node, alter
 > scientific parameters, or overwrite existing results. Report logs and outputs.
 
-Skill v3 automatically retains concise, verified operational lessons in
+The skill automatically retains concise, verified operational lessons in
 `local/notes.md` when a similar pitfall could plausibly recur; it does not ask users
 to choose persistence modes. It deduplicates notes and checks their scope/evidence
 before reuse. Explicit no-write instructions and permissions still apply. Notes
 never authorize scientific parameter changes, destructive repairs or uploads.
 See [local learning](skills/gpm-server/references/local-learning.md).
 
-For [official version checks and updates](skills/gpm-server/references/official-updates.md),
-`official_update.py check` queries the official stable Server Release and the
-repository-current skill separately. It uses asset digests and pinned commits,
-not a historical version string. `stage` verifies a reviewed plan, downloads new
-source to a fresh directory, preserves user-local experience and binds the candidate
-to the new tools. Validation/activation and environment changes remain separate;
-it does not overwrite a running installation, migrate runs or edit agent settings.
-The offline `stage_skill_update.py` is still available for trusted local bundles.
-This is agent guidance, not a background service or enforced permissions sandbox.
-See the [v3 validation boundary](validation/agent-skill-v3-official-updates.md).
+Skill installation and updates use the same [official sources and safety rules](skills/gpm-server/references/official-updates.md)
+as Server: `~/bin/GPM_Server` for new tools, existing/custom paths retained, and
+`update.sh` for routine checks and updates. This is optional agent guidance, not
+a background service or an enforced permissions sandbox.
 
 For a workflow-only trial, ask for the [synthetic smoke test](skills/gpm-server/references/smoke-test.md).
 It uses small generated inputs and real tools, not scientifically meaningful data.
@@ -276,9 +314,9 @@ From the Server tools directory:
 
 ```bash
 # Read-only viewer; Ctrl+C stops viewing, not the analysis job.
-python3 tools/view_run_log.py --server-dir ./gpm_server --follow
+python3 "$SERVER/tools/view_run_log.py" --server-dir ./gpm_server --follow
 # Read full diagnostics instead.
-python3 tools/view_run_log.py --server-dir ./gpm_server --detailed --follow
+python3 "$SERVER/tools/view_run_log.py" --server-dir ./gpm_server --detailed --follow
 # Plain-text viewing works without the viewer.
 tail -F ./gpm_server/logs/progress.log
 ```
@@ -305,9 +343,9 @@ not require deleting caches, repreparing inputs, or changing the dependency envi
 | `prepare.sh` | Compatibility entry for preparation only | When separate script generation is needed |
 | `export_final_path_fasta.sh` | Rebuild FASTA from a Final Path TSV exported by the App | Optional late-stage task, not installation |
 
-Rerun the same `run.sh` command, or use `bash run.sh -o ./gpm_server` to resume with validated results reused. The generated `run_all.sh` remains directly executable.
+Rerun the same `run.sh` command, or use `bash "$SERVER/run.sh" -o ./gpm_server` to resume with validated results reused. The generated `run_all.sh` remains directly executable.
 
-`--max-fill <bp>` sets the length limit for both Step3 optimized refill rounds (default: `1000000`). Change it with `bash run.sh -o ./gpm_server --max-fill 2000000`; use a new output directory when changing inputs or other preparation settings.
+`--max-fill <bp>` sets the length limit for both Step3 optimized refill rounds (default: `1000000`). Change it with `bash "$SERVER/run.sh" -o ./gpm_server --max-fill 2000000`; use a new output directory when changing inputs or other preparation settings.
 
 
 See the parent repository's `README.md` for the complete options and desktop workflow.

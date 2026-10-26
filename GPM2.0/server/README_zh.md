@@ -4,22 +4,42 @@
 
 ## 快速开始
 
-在 Linux 服务端依次执行以下命令：从 [Release v2.0.12](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.12) 下载 GPM Server 工具包（源码），解压并进入工具目录，然后安装和运行。
+在 Linux 服务端依次执行以下命令：从 [Release v2.0.12](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.12) 下载 GPM Server 工具包（源码），默认解压到 `~/bin/GPM_Server`（也可自定义），然后安装和运行。官网直连下载失败时回退 GitHub；skill 安装器和更新器也遵循此顺序，并校验版本与摘要。下载摘要见官网或 Release 的 SHA-256 清单。
 
 ```bash
-# 1. 下载、解压并进入 Server 工具目录
-curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/GPM_Server_2.0.12_source.tar.gz
-tar -xzf GPM_Server_2.0.12_source.tar.gz
-cd GPM_Server
+# 1. 下载并解压到工具目录，不改变当前项目目录
+SERVER="$HOME/bin/GPM_Server"  # 可改为自定义路径；已有安装不要覆盖
+(
+  set -euo pipefail
+  mkdir -p "$(dirname "$SERVER")"
+  mkdir "$SERVER"
+  cd "$SERVER"
+  archive=GPM_Server_2.0.12_source.tar.gz
+  curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.12/$archive" ||
+    curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/$archive"
+  curl -fL --connect-timeout 8 --max-time 30 -o SHA256SUMS \
+    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.12/SHA256SUMS ||
+    curl -fL --connect-timeout 8 --max-time 30 \
+      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.12 |
+      python3 -c 'import json,sys; r=json.load(sys.stdin); print("\n".join(a["digest"].removeprefix("sha256:")+"  "+a["name"] for a in r["assets"] if a["name"].endswith("_source.tar.gz")))' > SHA256SUMS
+  grep "  $archive$" SHA256SUMS | sha256sum -c -
+  tar -xzf "$archive" --strip-components=1
+  # 2. 安装并验证独立环境
+  bash ./install.sh
+)
+```
 
-# 2. 安装并验证独立环境
-bash install.sh
+仅在安装成功后继续；下面的分析命令在你的项目工作目录执行，不在工具目录执行。
+
+```bash
 
 # 3. 使用安装程序最后打印的命令激活环境，例如
 mamba activate cgat-server
 
 # 4. 准备、计算并生成交付包
-bash run.sh \
+bash "$SERVER/run.sh" \
   --ref /path/to/reference.fa \
   --ds /path/to/assembly.fa \
   -o ./gpm_server
@@ -42,7 +62,7 @@ Server 工作目录中，不再反复塞入 HTML 和 App 报告快照。搜索�
 下划线和连字符以外的连续字符会替换为 `_`。需要自定义名称时仍可使用显式写法：
 
 ```bash
-bash run.sh \
+bash "$SERVER/run.sh" \
   --ref reference /path/to/reference.fa \
   --ds assembly /path/to/assembly.fa \
   -o ./gpm_server
@@ -51,13 +71,13 @@ bash run.sh \
 安装成功时会明确显示 `GPM Server installation: READY`。以后可执行以下命令只检查、不修改环境：
 
 ```bash
-bash install.sh --check
+bash "$SERVER/install.sh" --check
 ```
 
 安装程序依次查找 `mamba`、`micromamba`、`conda`。需要明确选择时使用：
 
 ```bash
-bash install.sh --manager conda
+bash "$SERVER/install.sh" --manager conda
 ```
 
 ### ARM64 与集群环境
@@ -86,34 +106,39 @@ bash install.sh --manager conda
 最终阶段的 `accepted event disappeared before q4 without one exact q3 segment`
 也可能由 Step2 补片被部分裁剪引起；保留片段修复会记录其精确来源，并保留原始重放历史。
 
-已生成的工作区带有独立运行库副本，仅更新外部 Server 工具目录不会更新已有工作区。
-需要同时更新工具和项目运行库时，先核对 Release 提供的压缩包 SHA-256，将包解压到
-**单独的新目录**，确认两个目标均无运行中的任务，然后执行：
+更新方式见下节。完成更新后，在原环境运行或重新提交 `run_all.sh`；流程按需从
+Step2 重新生成阶段结果，兼容的 MUMmer 原始比对缓存仍可复用。更新器本身不启动分析。
+
+### 更新工具、skill 与项目运行库
+
+无论只想检查还是准备更新，都执行同一个命令：
 
 ```bash
-fresh=/path/to/newly-extracted/GPM_Server
-workspace=/path/to/gpm_server
-tools=/path/to/installed/GPM_Server
-revision="RELEASE中给出的完整GIT_REVISION"
-python3 "$fresh/tools/update_workspace_runtime.py" \
-  --workspace "$workspace" --tools-root "$tools" \
-  --expected-revision "$revision" --apply
+bash ~/bin/GPM_Server/update.sh
 ```
 
-更新器要求包内 `SOURCE.json` 带有逐文件摘要清单；先校验全部源文件、锁定两个目标，
-将受影响文件备份到项目的 `.run_all/runtime-update-*`，再同步工具目录以及项目中的
-`.prepare_lib/tools/grt_core/` 和配套 Step2/Step3/端粒终结/证据封包入口及显示证据投影模块。已有日志、旧压缩包、
-skill 本地笔记与绑定、输入、结果、缓存、生成脚本及依赖环境均保留。活动任务、符号链接
-目标及不明旧 core 模块会被拒绝；相对脚本路径按对应进程的工作目录解析。更新前仍须
-停止全部任务（包括其他节点上的独立命令），进程扫描不能阻止扫描后新启动的独立任务。
-写入失败会尝试自动回滚。成功更新后也可执行
-`python3 "$fresh/tools/update_workspace_runtime.py" --rollback BACKUP_DIR` 恢复备份。
-省略 `--apply` 仅校验并列出计划，不写文件。
+此入口要求工具包包含 `update.sh`；旧包缺少该脚本时不要直接覆盖安装，先按 Server/skill 更新说明完成一次性接入。
 
-以上更新仅适用于已有独立 Step2/Step3 入口的工作区，不迁移 `run_grt_step23.sh` 旧调度计划。
-更新器**不会自动重跑分析**。输出 `"status": "updated"` 后，再在原环境运行或提交
-`run_all.sh`；流程按需从 Step2 重新生成阶段结果，兼容的 MUMmer 原始比对缓存仍可复用。
-本次无需重装依赖环境。
+自定义安装请使用实际路径。在项目根目录或子目录执行，会检测当前项目的
+`.prepare_lib/`，并与 tools 对齐；在项目外执行，不扫描其他项目。
+检查和下载优先走[官网](https://riceome.hzau.edu.cn/cgat/zh/downloads)，失败回退
+[GitHub Release](https://github.com/Jianwei-Zhang/CGAT/releases/latest)，校验大小、SHA-256
+及包内文件清单。tools 与 skill 来自同一发布源码包，同版本附件刷新也能识别。
+
+- 全部最新且一致：告知“当前已是最新版本，无需更新”。
+- 有更新或项目运行库未对齐：展示变更，询问 `是否更新？[y/N]`。
+- `Y/y` 更新；`N/n`、回车、EOF 或无交互终端不更新。不提供 `--check`、`--yes`。
+- 保留 skill 整个 `local/`、有效绑定、项目输入、结果、日志、缓存、生成脚本及依赖环境。
+- 独立安装的 skill 通过 `server_tools_path.sh --set` 登记后一起更新，不扫描 agent 配置。
+
+更新前须停止全部受影响任务，包括其他节点上的任务。运行中任务、路径冲突、已知
+自定义改动、依赖配置变化和不支持的旧调度计划会阻止更新，不自动重装环境或重跑分析。
+没有历史清单的旧文件会列出供确认，无法据此自动区分用户定制。
+备份位于项目的 `.run_all/server-update-*`；无项目时位于 tools 目录下。
+写入失败会尝试回滚，成功后也会打印回滚命令。更新后重新加载 agent 会话。
+旧安装尚无 `update.sh` 时，按 [skill 更新参考](skills/gpm-server/references/official-updates.md)
+完成一次性接入，不直接覆盖旧目录。官网可独立完成检查；若镜像滞后，不会把已安装的
+较新版本/构建降级。网络或校验失败不会被当作“已经最新”。
 
 ### 独立 GRT 阶段控制
 
@@ -172,11 +197,27 @@ Python 入口对应支持 `--execution-profile baseline|optimized`、
 `--step2-mummer-scope`／`--step3-mummer-scope`，默认 optimized、Step2 full、
 Step3 gap-screen；refill 合批随 execution profile 开关。
 
-已有工作区脚本和运行库不会自动升级，不要修改正在运行的工作区。筛选通过
+已有工作区不会随外部工具自动升级；在该项目内显式执行 `update.sh` 可对齐运行库，不改写生成脚本。不要修改正在运行的工作区。筛选通过
 不代表所有数据都已证明完整证据等价；发布前会用完整数据集与保留的旧结果
 对照，不重跑旧版。缓存辅助计时不能当作完整冷启动流程的耗时。
 
 ## 可选的 AI agent skill
+
+### 给 AI agent 的安装提示词
+
+复制以下内容给你正在使用的 agent：
+
+```text
+请为当前 AI agent 安装官方 gpm-server skill：
+https://github.com/Jianwei-Zhang/CGAT/tree/master/GPM2.0/server/skills/gpm-server
+下载和更新优先使用 https://riceome.hzau.edu.cn/cgat/ 的 Server 源码包，
+失败时回退 GitHub Release；skill 位于包内 skills/gpm-server/，请完整安装。
+如果已安装 Server tools，请询问我安装路径；未安装则询问是否安装到
+~/bin/GPM_Server，也允许我指定其他位置。确认后完成安装与路径绑定，
+保留已有 skill 的 local/ 本地经验。
+```
+
+### 安装与使用说明
 
 源码内提供官方 [gpm-server skill](skills/gpm-server/SKILL.md)，覆盖首次运行、
 安全恢复、失败诊断与结果交付。它是可选入口，不使用 AI 仍可直接执行上面的 CLI。
@@ -197,18 +238,14 @@ skill 目录的 `../..`；单独复制安装后，执行一次
 > /work/runs/sample，最多使用 4 线程。遵循本集群的作业提交规则，不在登录节点
 > 计算，不擅自调整科学参数或覆盖已有结果，结束后给出日志和结果位置。
 
-Skill v3 默认自动积累简明的本地经验：问题已修复并验证，且类似坑以后可能再遇到、
+skill 默认自动积累简明的本地经验：问题已修复并验证，且类似坑以后可能再遇到、
 记录能减少踩坑时，保存或更新 `local/notes.md`，不再让用户选择记录模式。
 后续使用前核对适用条件和证据；用户明确的禁止写入要求及工具权限仍优先。
 经验不能授权修改科学参数、破坏性修复或上传数据，详见[本地经验规则](skills/gpm-server/references/local-learning.md)。
 
-[官方版本检查与更新](skills/gpm-server/references/official-updates.md)由
-`official_update.py check` 分别查询官网指向的正式 Server Release 和官方仓库当前 skill，
-使用附件摘要及固定提交识别版本，而不是依赖历史版本号。`stage` 复核已审阅的计划，
-校验下载到新目录，保留本地经验并将候选 skill 绑定到新 tools。
-校验、启用及环境变更仍是单独步骤，不覆盖运行中的安装、不迁移已有任务、不改 agent 配置。
-已下载的可信本地 skill 仍可用 `stage_skill_update.py` 准备升级。
-这是 agent 指导，不是后台更新服务或强制权限沙箱；验证范围见 [v3 记录](validation/agent-skill-v3-official-updates.md)。
+skill 的安装和更新与 Server 使用同一套[官方来源及安全规则](skills/gpm-server/references/official-updates.md)：
+默认安装位置为 `~/bin/GPM_Server`，保留已有或自定义路径；日常更新只需 `update.sh`。
+它是可选 agent 指导，不是后台更新服务或强制权限沙箱。
 
 只想验证能否跑通时，可要求执行 [合成小数据冒烟测试](skills/gpm-server/references/smoke-test.md)。
 它使用小型生成数据与真实工具，不用于科学结论。实际覆盖范围与未验证项见
@@ -232,9 +269,9 @@ MUMmer 染色体进度以及警告和错误。逐染色体复制/解析耗时和
 
 ```bash
 # 只读查看；Ctrl+C 只退出查看，不停止分析作业。
-python3 tools/view_run_log.py --server-dir ./gpm_server --follow
+python3 "$SERVER/tools/view_run_log.py" --server-dir ./gpm_server --follow
 # 改为查看完整诊断。
-python3 tools/view_run_log.py --server-dir ./gpm_server --detailed --follow
+python3 "$SERVER/tools/view_run_log.py" --server-dir ./gpm_server --detailed --follow
 # 不使用查看器也能直接查看纯文本。
 tail -F ./gpm_server/logs/progress.log
 ```
@@ -259,9 +296,9 @@ tail -F ./gpm_server/logs/progress.log
 | `prepare.sh` | 兼容原有的仅准备命令 | 需要单独生成脚本时 |
 | `export_final_path_fasta.sh` | 根据 App 导出的 Final Path TSV 重建 FASTA | 流程后期按需使用，不是安装步骤 |
 
-重复同一条 `run.sh` 命令，或执行 `bash run.sh -o ./gpm_server` 即可恢复；已通过校验的结果会复用。生成的 `run_all.sh` 仍可直接执行。
+重复同一条 `run.sh` 命令，或执行 `bash "$SERVER/run.sh" -o ./gpm_server` 即可恢复；已通过校验的结果会复用。生成的 `run_all.sh` 仍可直接执行。
 
-`--max-fill <bp>` 设置 Step3 两轮优化补洞的长度上限，默认 `1000000`。已有工作目录可用 `bash run.sh -o ./gpm_server --max-fill 2000000` 调整；更换输入或其他准备参数时使用新的输出目录。
+`--max-fill <bp>` 设置 Step3 两轮优化补洞的长度上限，默认 `1000000`。已有工作目录可用 `bash "$SERVER/run.sh" -o ./gpm_server --max-fill 2000000` 调整；更换输入或其他准备参数时使用新的输出目录。
 
 
 完整参数和客户端说明见仓库上一级的 `README_zh.md`。

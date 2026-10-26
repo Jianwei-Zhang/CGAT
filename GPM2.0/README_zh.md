@@ -19,13 +19,31 @@ GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流�
 
 ### 1. 下载工具并创建环境
 
-在 Linux 服务端执行以下命令，从 [Release v2.0.12](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.12) 下载 Server 工具包（源码），解压并进入工具目录后安装：
+在 Linux 服务端执行以下命令，优先从[官网](https://riceome.hzau.edu.cn/cgat/zh/downloads)下载 Server 工具包，失败时回退 [Release v2.0.12](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.12)，校验后解压安装：
+
+新安装默认使用 `~/bin/GPM_Server`，已有安装保留原路径。以下子 shell 不会改变当前工作目录，项目结果仍写入当前工作目录。若不使用 AI，可直接按下列命令安装；AI 安装提示词见[Server README](server/README_zh.md#给-ai-agent-的安装提示词)。
 
 ```bash
-curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/GPM_Server_2.0.12_source.tar.gz
-tar -xzf GPM_Server_2.0.12_source.tar.gz
-cd GPM_Server
-bash install.sh
+SERVER="$HOME/bin/GPM_Server"  # 可改为自定义路径；已有安装不要覆盖
+(
+  set -euo pipefail
+  mkdir -p "$(dirname "$SERVER")"
+  mkdir "$SERVER"
+  cd "$SERVER"
+  archive=GPM_Server_2.0.12_source.tar.gz
+  curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.12/$archive" ||
+    curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/$archive"
+  curl -fL --connect-timeout 8 --max-time 30 -o SHA256SUMS \
+    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.12/SHA256SUMS ||
+    curl -fL --connect-timeout 8 --max-time 30 \
+      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.12 |
+      python3 -c 'import json,sys; r=json.load(sys.stdin); print("\n".join(a["digest"].removeprefix("sha256:")+"  "+a["name"] for a in r["assets"] if a["name"].endswith("_source.tar.gz")))' > SHA256SUMS
+  grep "  $archive$" SHA256SUMS | sha256sum -c -
+  tar -xzf "$archive" --strip-components=1
+  bash ./install.sh
+)
 ```
 
 脚本会复用 `mamba`、`micromamba` 或 `conda`；均不存在时，为当前用户无 sudo 安装 micromamba。也可用 `--manager conda|mamba|micromamba` 明确选择。安装结束显示 `GPM Server installation: READY` 后，按脚本打印的命令激活环境，例如：
@@ -37,10 +55,10 @@ micromamba activate cgat-server
 随时可以只检查、不修改环境：
 
 ```bash
-bash install.sh --check
+bash "$SERVER/install.sh" --check
 ```
 
-再次运行 `install.sh` 会校验托管环境，仅在依赖配置变化时更新；原 `env.sh` 入口继续兼容。下方服务端命令均在 `GPM_Server/` 目录中执行；使用仓库源码时，先进入 `GPM2.0/server/`。更多说明见[服务端快速入门](server/README_zh.md)。
+再次运行 `install.sh` 会校验托管环境，仅在依赖配置变化时更新；原 `env.sh` 入口继续兼容。`SERVER` 保存工具的实际路径；计算命令在项目工作目录执行，避免将结果写入 `~/bin/`。使用仓库源码时，将 `SERVER` 设为 `GPM2.0/server/` 的绝对路径。更多说明见[服务端快速入门](server/README_zh.md)。
 
 | 用途 | 安装或要求的命令 |
 | --- | --- |
@@ -50,30 +68,30 @@ bash install.sh --check
 
 执行 `run.sh` 时保持该环境已激活。
 
-#### 更新 Server 工具（已有环境）
+#### 更新 Server tools、skill 与当前项目运行库
 
-确认没有任务正在运行后，将 `TOOLS_DIR` 改为希望存放工具的绝对路径，例如 `/data/tools/GPM_Server_new`。须指定尚不存在的新目录，父目录会自动创建；同一版本的源码附件也可能包含更新：
+在项目目录或子目录执行同一个入口（自定义安装请使用实际路径）：
 
 ```bash
-TOOLS_DIR="$HOME/GPM_Server_new"
-mkdir -p "$(dirname "$TOOLS_DIR")" &&
-mkdir "$TOOLS_DIR" &&
-cd "$TOOLS_DIR" &&
-curl -fLO https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/GPM_Server_2.0.12_source.tar.gz &&
-tar -xzf GPM_Server_2.0.12_source.tar.gz --strip-components=1 &&
-bash install.sh
+bash ~/bin/GPM_Server/update.sh
 ```
 
-已有的 `cgat-server` 托管环境会复用，仅在依赖配置变化时更新。按安装程序输出激活环境，再从这个新工具目录按下一节运行，并为 `-o` 指定新的输出目录。
+此入口要求工具包包含 `update.sh`；旧包缺少该脚本时不要直接覆盖安装，先按 Server/skill 更新说明完成一次性接入。
 
-**更新工具不会更新旧工作目录中的 `.prepare_lib`。要使用修复后的代码重新计算，不要继续执行旧目录的 `run_all.sh`；旧工具和结果无需删除。**
+检查和下载优先使用[官网](https://riceome.hzau.edu.cn/cgat/zh/downloads)，失败时回退 GitHub Release。tools 和 skill 使用同一发布源码包。
+全部最新且一致时直接告知；否则列出变更并询问 `[y/N]`，只接受 `Y/y` 确认，
+`N/n`、回车或无交互终端均不更新，无需额外参数。
+在项目内执行会同时对齐 `.prepare_lib/`；不在项目内则不扫描其他项目。
+保留 skill `local/`、实际路径、日志、结果、缓存与依赖环境，不自动重跑分析。
+更新前停止所有受影响任务（含其他节点），失败可用备份回滚。
+旧安装首次接入和限制见[Server 更新说明](server/README_zh.md#更新工具skill-与项目运行库)。
 
 ### 2. 运行完整流程
 
 显式指定输出目录的最简示例：
 
 ```bash
-bash run.sh \
+bash "$SERVER/run.sh" \
   --ref /path/to/rice_IRGSP_1_0.fa \
   --ds /path/to/hifiasm.fa \
   --ds /path/to/flye.fa \
@@ -116,7 +134,7 @@ GPM Server 固定使用 Minimap2。BLASTN 与 Winnowmap 的全基因组运行无
 ### 3. 恢复与监控
 
 ```bash
-bash run.sh -o ./gpm_server
+bash "$SERVER/run.sh" -o ./gpm_server
 ```
 
 该命令串行执行生成的计划，遇到首个错误即停止，复用前会重新校验 checkpoint，并在 `gpm_server/` 同级目录生成两个交付包：
@@ -151,7 +169,7 @@ runner 默认输出精简进度，`logs/progress.log` 保存相同的纯文本�
 可用只读查看器彩色监控；加 `--detailed` 切换为完整日志：
 
 ```bash
-python3 tools/view_run_log.py --server-dir ./gpm_server --follow
+python3 "$SERVER/tools/view_run_log.py" --server-dir ./gpm_server --follow
 ```
 
 `report/report.html` 继续接收原始事件及诊断输出，不使用精简后的显示内容。
@@ -206,7 +224,7 @@ xattr -dr com.apple.quarantine /Applications/GPM2.0.app
 先在 App 中导出 Final Path TSV，再将 TSV 放回保留原始 FASTA 的服务器：
 
 ```bash
-bash export_final_path_fasta.sh \
+bash "$SERVER/export_final_path_fasta.sh" \
   --tsv /path/to/project_Chr01_path.tsv \
   --gpm_server ./gpm_server \
   -o /path/to/project_Chr01_path.fa
