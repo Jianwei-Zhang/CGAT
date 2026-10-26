@@ -1,6 +1,6 @@
 const copy = {
   zh: {
-    title: "应用更新", current: "当前版本", check: "检查更新", last: "上次检查", idle: "自动检查新版，优先使用 docs，失败时回退 GitHub。",
+    title: "应用更新", current: "当前版本", check: "检查更新", last: "上次检查", idle: "通过 CGAT 文档镜像自动检查并下载新版本。",
     checking: "正在检查更新…", latest: "当前已是最新版本", available: "发现新版本", downloading: "正在下载更新…",
     ready: "更新已准备就绪", installing: "正在保存项目并安装更新…", unavailable: "此构建尚未启用签名更新。",
     error: "更新失败，请重试。", view: "查看更新", download: "下载更新", install: "安装并重启", later: "稍后",
@@ -14,7 +14,7 @@ const copy = {
     update_install: "安装失败，当前项目未被替换。请重试。", update_unconfigured: "此构建尚未启用签名更新。",
   },
   en: {
-    title: "App updates", current: "Current version", check: "Check for updates", last: "Last checked", idle: "Checks automatically. Uses docs first, with GitHub as fallback.",
+    title: "App updates", current: "Current version", check: "Check for updates", last: "Last checked", idle: "Checks and downloads updates through the CGAT docs mirror.",
     checking: "Checking for updates…", latest: "You are up to date", available: "New version available", downloading: "Downloading update…",
     ready: "Update is ready", installing: "Saving your project and installing…", unavailable: "Signed updates are not enabled in this build.",
     error: "Update failed. Please retry.", view: "View update", download: "Download update", install: "Install and restart", later: "Later",

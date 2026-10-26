@@ -45,6 +45,9 @@ class FeedTests(unittest.TestCase):
         workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
         self.assertEqual(workflow.count("uses: actions/checkout@v4"), 4)
         self.assertEqual(workflow.count("ref: ${{ inputs.tag || github.ref }}"), 4)
+        self.assertIn('TAURI_CLI_VERSION: "2.12.4"', workflow)
+        self.assertEqual(workflow.count("@tauri-apps/cli@${{ env.TAURI_CLI_VERSION }}"), 2)
+        self.assertNotIn("@tauri-apps/cli@^2", workflow)
 
     def test_installer_builds_supply_public_key_to_the_tauri_bundler(self):
         workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
@@ -87,12 +90,14 @@ class FeedTests(unittest.TestCase):
         with self.assertRaises((AssertionError, ValueError)):
             cleanup.embedded_signatures(changed, names, "v2.0.12")
         workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
-        upload = workflow.index("gh release upload \"$TAG_NAME\" update-feed/GPM_*_notes_*.txt update-feed/latest.json")
-        artifact = workflow.index("name: Retain updater files for docs staging", upload)
+        self.assertNotIn("update-feed/GPM_*_notes_*.txt update-feed/latest.json", workflow)
+        build = workflow.index("app-update-feed.py build")
+        artifact = workflow.index("name: Retain updater files for docs staging", build)
         remove = workflow.index("cleanup-updater-assets.py", artifact)
-        self.assertLess(upload, artifact)
+        self.assertLess(build, artifact)
         self.assertLess(artifact, remove)
         self.assertIn("path: update-bundle/*", workflow)
+        self.assertIn("--manifest update-bundle/latest.json", workflow)
 
     def test_build_requires_all_four_signatures_to_verify_before_writing_feed(self):
         verified = []

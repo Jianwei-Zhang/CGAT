@@ -342,20 +342,23 @@ test("Subview reset restores the first-entered default and is itself rollback-ab
   assert.equal(undoReset.assembly.subviewTrackDragOffsets[0].offsetBp, 50);
 });
 
-test("Subview history keeps only the latest 50 logical operations per pair", () => {
-  let assembly = activateSubviewHistory(buildAssembly(), { now: 0 }).assembly;
-  for (let index = 1; index <= SUBVIEW_HISTORY_LIMIT + 1; index += 1) {
-    assembly = commitSubviewHistoryOperation(assembly, {
-      nextSubview: assembly.subview,
-      nextSubviewTrackDragOffsets: [{ slot: "top", contigId: 1, offsetBp: index }],
-      operation: { kind: "drag-contig" },
-      now: index,
-    }).assembly;
-  }
-  const status = resolveCurrentSubviewHistory(assembly);
-  assert.equal(status.record.past.length, SUBVIEW_HISTORY_LIMIT);
-  assert.equal(status.record.forward.length, 0);
-  assert.equal(status.record.current.dragOffsets[0].offsetBp, SUBVIEW_HISTORY_LIMIT + 1);
+test("Subview history honors an explicitly configured 50-step capacity", () => {
+  try {
+    setAppSettings({ historyCapacity: SUBVIEW_HISTORY_LIMIT }, { persist: false });
+    let assembly = activateSubviewHistory(buildAssembly(), { now: 0 }).assembly;
+    for (let index = 1; index <= SUBVIEW_HISTORY_LIMIT + 1; index += 1) {
+      assembly = commitSubviewHistoryOperation(assembly, {
+        nextSubview: assembly.subview,
+        nextSubviewTrackDragOffsets: [{ slot: "top", contigId: 1, offsetBp: index }],
+        operation: { kind: "drag-contig" },
+        now: index,
+      }).assembly;
+    }
+    const status = resolveCurrentSubviewHistory(assembly);
+    assert.equal(status.record.past.length, SUBVIEW_HISTORY_LIMIT);
+    assert.equal(status.record.forward.length, 0);
+    assert.equal(status.record.current.dragOffsets[0].offsetBp, SUBVIEW_HISTORY_LIMIT + 1);
+  } finally { setAppSettings(DEFAULT_APP_SETTINGS, { persist: false }); }
 });
 
 test("Subview track-pair history keeps saved edits when new ctgs join the same tracks", () => {

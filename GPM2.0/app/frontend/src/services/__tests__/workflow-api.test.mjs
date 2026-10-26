@@ -94,6 +94,7 @@ test("main-view history services preserve nested Tauri request payloads", async 
       workspaceRoot: "D:\\Desktop\\GPM\\ws1",
       projectId: 7,
       chrName: "Chr01",
+      historyCapacity: 0,
     };
     await getMainViewHistoryStatus(target);
     await inspectMainViewDelete({ ...target, assemblyCtgIds: [11, 12] });
@@ -110,7 +111,6 @@ test("main-view history services preserve nested Tauri request payloads", async 
     await runMainViewBatchDelete({ ...target, assemblyCtgIds: [11, 12] });
     await executeMainViewHistoryAction({ ...target, action: "redo" });
 
-    target.historyCapacity = 50;
     assert.deepEqual(calls, [
       { command: "get_main_view_history_status", args: { request: target } },
       {

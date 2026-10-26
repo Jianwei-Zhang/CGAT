@@ -13,6 +13,7 @@ on:
 
 env:
   GPM_UPDATER_PUBLIC_KEY: ${{ vars.GPM_UPDATER_PUBLIC_KEY }}
+  TAURI_CLI_VERSION: "2.12.4"
 
 permissions:
   contents: write
@@ -179,7 +180,7 @@ jobs:
         run: rustup target add ${{ matrix.target }}
 
       - name: Install Tauri CLI
-        run: npm install --global --registry=https://registry.npmjs.org @tauri-apps/cli@^2
+        run: npm install --global --registry=https://registry.npmjs.org @tauri-apps/cli@${{ env.TAURI_CLI_VERSION }}
 
       - name: Prepare updater signing config
         working-directory: GPM2.0/app/src-tauri
@@ -311,7 +312,7 @@ jobs:
         run: rustup target add ${{ matrix.target }}
 
       - name: Install Tauri CLI
-        run: npm install --global --registry=https://registry.npmjs.org @tauri-apps/cli@^2
+        run: npm install --global --registry=https://registry.npmjs.org @tauri-apps/cli@${{ env.TAURI_CLI_VERSION }}
 
       - name: Prepare updater signing config
         working-directory: GPM2.0/app/src-tauri
@@ -480,7 +481,6 @@ jobs:
           mkdir -p update-assets update-feed
           gh release download "$TAG_NAME" --dir update-assets
           python3 GPM2.0/scripts/app-update-feed.py build --version "$VERSION" --assets update-assets --output update-feed
-          gh release upload "$TAG_NAME" update-feed/GPM_*_notes_*.txt update-feed/latest.json --clobber
           mkdir -p update-bundle
           python3 - <<'PY'
           import json, pathlib, shutil
@@ -511,4 +511,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 GPM2.0/scripts/cleanup-updater-assets.py --repo "$GITHUB_REPOSITORY" --tag "$TAG_NAME"
+          python3 GPM2.0/scripts/cleanup-updater-assets.py --repo "$GITHUB_REPOSITORY" --tag "$TAG_NAME" --manifest update-bundle/latest.json

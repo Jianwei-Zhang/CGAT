@@ -56,19 +56,21 @@ def internal_asset_names(manifest: dict, asset_names: set[str], tag: str) -> set
                 if target.startswith("darwin-")}
     notes = {info["url"].rsplit("/", 1)[-1] for info in manifest["release_notes"].values()}
     assert len(packages) == 2 and packages <= asset_names
-    assert len(notes) == 2 and notes <= asset_names
-    assert "latest.json" in asset_names
+    assert len(notes) == 2
     # Windows installers are also updater packages and remain user-facing.
     return signatures | packages | notes | {"latest.json"}
 
 
-def cleanup(repo: str, tag: str) -> dict:
+def cleanup(repo: str, tag: str, manifest_path: Path | None = None) -> dict:
     view = json.loads(gh("release", "view", tag, "--repo", repo, "--json", "assets"))
     names = {asset["name"] for asset in view["assets"]}
-    assert "latest.json" in names, "The signed update manifest is missing"
-    with tempfile.TemporaryDirectory(prefix="gpm-signature-cleanup-") as temporary:
-        gh("release", "download", tag, "--repo", repo, "--pattern", "latest.json", "--dir", temporary)
-        manifest = json.loads((Path(temporary) / "latest.json").read_text())
+    if manifest_path is not None:
+        manifest = json.loads(manifest_path.read_text())
+    else:
+        assert "latest.json" in names, "The signed update manifest is missing"
+        with tempfile.TemporaryDirectory(prefix="gpm-signature-cleanup-") as temporary:
+            gh("release", "download", tag, "--repo", repo, "--pattern", "latest.json", "--dir", temporary)
+            manifest = json.loads((Path(temporary) / "latest.json").read_text())
     expected = internal_asset_names(manifest, names, tag)
     existing_signatures = {name for name in names if name.endswith(".sig")}
     expected_signatures = {name for name in expected if name.endswith(".sig")}
@@ -88,5 +90,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", default="Jianwei-Zhang/CGAT")
     parser.add_argument("--tag", required=True)
+    parser.add_argument("--manifest", type=Path, help="Locally generated latest.json")
     args = parser.parse_args()
-    print(json.dumps(cleanup(args.repo, args.tag), indent=2))
+    print(json.dumps(cleanup(args.repo, args.tag, args.manifest), indent=2))

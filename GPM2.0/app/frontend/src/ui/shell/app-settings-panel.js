@@ -2,7 +2,7 @@ import { renderUpdateSettings } from "./app-update-panel.js";
 import { requestAppConfirm } from "./app-dialog.js";
 import { DEFAULT_APP_SETTINGS, getAppSettings, setAppSettings } from "../../services/app-settings.js";
 
-const copy = {
+export const APP_SETTINGS_COPY = {
   zh: {
     title: "App 设置", close: "关闭", display: "外观", theme: "主题", system: "跟随系统", light: "浅色", dark: "深色", size: "界面字号", graph: "图内字号",
     follow: "跟随界面", language: "语言", history: "编辑", capacity: "回溯容量",
@@ -12,7 +12,7 @@ const copy = {
     graphHint: "控制 contig 名称、刻度等图内文字。默认跟随界面字号，也可单独调整。",
     historyHint: "主视图和子视图分别计数。降低容量后，下次新增编辑时裁剪旧记录，已裁剪记录无法恢复。不限步数可能增加存储和读写耗时。",
     invalid: "请输入 1–1000000 的整数，或选择不限步数。", failed: "保存失败，请检查本机存储。",
-    restoreConfirm: "恢复默认设置？回溯容量将恢复为 50 步，下一次新增编辑时可能裁剪旧记录。",
+    restoreConfirm: "恢复默认设置？回溯容量将恢复为不限步数。",
     scope: "本机设置 · 自动保存", applied: "已保存", choose: "选择回溯容量",
   },
   en: {
@@ -24,7 +24,7 @@ const copy = {
     graphHint: "Text inside graphs, including contig names and ticks. Follows the interface size unless set separately.",
     historyHint: "Counted separately for main and local views. A lower limit trims old entries on the next new edit; trimmed entries cannot be recovered. Unlimited history may increase storage and slow saving and loading.",
     invalid: "Enter a whole number from 1 to 1000000, or choose Unlimited.", failed: "Could not save. Check local storage.",
-    restoreConfirm: "Restore defaults? History capacity will return to 50 steps; old entries may be trimmed on the next new edit.",
+    restoreConfirm: "Restore defaults? History capacity will return to unlimited.",
     scope: "This computer · Auto-save", applied: "Saved", choose: "Choose history capacity",
   },
 };
@@ -34,7 +34,7 @@ function help(id, label, text, above = false) {
 }
 
 export function renderSettingsContent(locale, settings = getAppSettings()) {
-  const c = copy[locale === "en" ? "en" : "zh"];
+  const c = APP_SETTINGS_COPY[locale === "en" ? "en" : "zh"];
   const options = (values, selected) => values.map(value => `<option value="${value}" ${value === selected ? "selected" : ""}>${value} px</option>`).join("");
   const capacity = settings.historyCapacity;
   return `<header class="settings-heading"><h2 id="app-settings-title">${c.title}</h2><button type="button" class="settings-close" data-settings-close aria-label="${c.close}">×</button></header>
@@ -49,7 +49,7 @@ export function renderSettingsContent(locale, settings = getAppSettings()) {
     <section class="settings-section" aria-labelledby="settings-editing-title"><h3 id="settings-editing-title">${c.history}</h3>
       <div class="settings-row"><div class="settings-field-label"><label for="settings-history-input">${c.capacity}</label>${help("settings-history-help", c.capacity, c.historyHint, true)}</div>
         <div class="settings-combobox"><div class="settings-combobox-field"><input id="settings-history-input" name="historyCapacity" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="settings-history-options" aria-describedby="settings-history-help settings-status" placeholder="${c.enterSteps}" value="${capacity === 0 ? c.unlimited : capacity}"><span class="settings-unit" ${capacity === 0 ? "hidden" : ""}>${c.steps}</span><button type="button" class="settings-combobox-toggle" data-history-toggle aria-label="${c.choose}" tabindex="-1"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></button></div>
-          <div id="settings-history-options" class="settings-options" role="listbox" aria-label="${c.capacity}" hidden>${[50, 100, 200, 0, "custom"].map(value => `<div id="settings-history-option-${value}" role="option" aria-selected="${value === capacity}" data-history-option="${value}">${value === "custom" ? c.custom : value === 0 ? c.unlimited : `${value} ${c.steps}`}</div>`).join("")}</div>
+          <div id="settings-history-options" class="settings-options" role="listbox" aria-label="${c.capacity}" hidden>${[0, 50, 100, 200, "custom"].map(value => `<div id="settings-history-option-${value}" role="option" aria-selected="${value === capacity}" data-history-option="${value}">${value === "custom" ? c.custom : value === 0 ? c.unlimited : `${value} ${c.steps}`}</div>`).join("")}</div>
         </div>
       </div>
     </section>

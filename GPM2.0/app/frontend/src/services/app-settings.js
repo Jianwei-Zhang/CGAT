@@ -3,7 +3,7 @@ export const DEFAULT_APP_SETTINGS = Object.freeze({
   theme: "system",
   fontSize: 14,
   graphFontSize: null,
-  historyCapacity: 50,
+  historyCapacity: 0,
 });
 
 export function normalizeAppSettings(value = {}) {
@@ -12,7 +12,7 @@ export function normalizeAppSettings(value = {}) {
     fontSize: [12, 14, 16, 18].includes(value?.fontSize) ? value.fontSize : 14,
     graphFontSize: [10, 12, 14, 16].includes(value?.graphFontSize) ? value.graphFontSize : null,
     historyCapacity: Number.isSafeInteger(value?.historyCapacity) && value.historyCapacity >= 0
-      && value.historyCapacity <= 1000000 ? value.historyCapacity : 50,
+      && value.historyCapacity <= 1000000 ? value.historyCapacity : 0,
   };
 }
 

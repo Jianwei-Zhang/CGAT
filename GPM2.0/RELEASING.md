@@ -19,6 +19,16 @@ than bypassing the workflow or generating/rotating a production key implicitly.
 
 Before creating a new version tag:
 
+0. Use risk-based local validation instead of duplicating the full release CI.
+   Always run the targeted tests for changed behavior, version consistency,
+   release-note generation/check and `git diff --check`. Run the full Windows
+   frontend test/build when frontend behavior changed; run applicable Rust/Tauri
+   or Server tests for those changes. A full local Windows/Server gate is not
+   mandatory for docs-only or UI-only releases because the release workflow's
+   full Quality jobs remain mandatory and non-waivable. Never treat a file-lock
+   failure as a pass; close the dev process or use an isolated
+   `CARGO_TARGET_DIR` before relying on that local check.
+
 1. Update the Server download/install and tool-update commands in all four guides: `README.md`, `README_zh.md`, `server/README.md`, and `server/README_zh.md`. Every active Release link, archive filename and extraction command must use the new version and match the Server asset being published. Do not rewrite historical validation records.
 2. Inventory the previous Release's assets and inspect earlier official Releases for retained examples such as `test_data.zip`. If the immediately previous Release omitted the dataset, use the most recent official Release that contains it rather than repeating the omission. Record the source Release, asset name, size and SHA-256 before uploading anything.
 3. Download the retained dataset and verify its archive integrity and SHA-256. Carry the exact bytes and original filename into the new Release; do not regenerate, rename, or silently omit existing test data. Removing or changing a retained dataset requires explicit user approval. Never delete earlier Releases' attachments as part of a new-version release.

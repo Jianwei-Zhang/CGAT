@@ -4,9 +4,12 @@ import assert from "node:assert/strict";
 import { normalizeAppSettings, setAppSettings, getAppSettings, DEFAULT_APP_SETTINGS, getGraphFontSize, estimateGraphTextWidth, APP_SETTINGS_KEY } from "../app-settings.js";
 
 test("invalid or older stored settings migrate to readable defaults", () => {
+  assert.equal(DEFAULT_APP_SETTINGS.historyCapacity, 0);
   assert.deepEqual(normalizeAppSettings(null), DEFAULT_APP_SETTINGS);
   assert.deepEqual(normalizeAppSettings({fontSize:999, graphFontSize:-1, historyCapacity:-1}), DEFAULT_APP_SETTINGS);
+  assert.equal(normalizeAppSettings({fontSize:14}).historyCapacity, 0);
   assert.equal(normalizeAppSettings({historyCapacity:0}).historyCapacity, 0);
+  assert.equal(normalizeAppSettings({historyCapacity:50}).historyCapacity, 50);
   assert.equal(normalizeAppSettings({historyCapacity:123}).historyCapacity, 123);
 });
 
