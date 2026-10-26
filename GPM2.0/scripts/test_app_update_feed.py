@@ -1,5 +1,6 @@
 """Offline updater publishing contract: no keys, network or real installers."""
 import base64
+import copy
 import importlib.util
 import json
 from pathlib import Path
@@ -56,6 +57,42 @@ class FeedTests(unittest.TestCase):
             config_step = block.split("\n      - name: ", 1)[0]
             self.assertNotIn("PRIVATE_KEY", config_step)
             self.assertIn("if (!process.env.GPM_UPDATER_PUBLIC_KEY)", config_step)
+
+    def test_internal_update_assets_are_removed_only_after_docs_bundle_is_ready(self):
+        spec = importlib.util.spec_from_file_location(
+            "cleanup_assets", HERE / "cleanup-updater-assets.py")
+        cleanup = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cleanup)
+        names = {path.name for path in self.assets.iterdir()}
+        changed = copy.deepcopy(self.manifest)
+        raw = b"ED" + b"\0" * 72
+
+        def signature(version):
+            return base64.b64encode(
+                b"untrusted comment: fixture\n" + base64.b64encode(raw) +
+                b"\ntrusted comment: timestamp:1\tversion:" + version.encode() +
+                b"\n" + base64.b64encode(b"x" * 64)
+            ).decode()
+
+        for package in changed["platforms"].values():
+            package["signature"] = signature("2.0.12")
+        signatures = cleanup.embedded_signatures(changed, names, "v2.0.12")
+        self.assertEqual(signatures, {name for name in names if name.endswith(".sig")})
+        internal = cleanup.internal_asset_names(changed, names, "v2.0.12")
+        self.assertEqual(len(internal), 9)
+        self.assertTrue(any(name.endswith("_win-x86_setup.exe") for name in names - internal))
+        self.assertTrue(any(name.endswith("_win-arm64_setup.exe") for name in names - internal))
+        bad = next(iter(changed["platforms"].values()))
+        bad["signature"] = signature("2.0.11")
+        with self.assertRaises((AssertionError, ValueError)):
+            cleanup.embedded_signatures(changed, names, "v2.0.12")
+        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
+        upload = workflow.index("gh release upload \"$TAG_NAME\" update-feed/GPM_*_notes_*.txt update-feed/latest.json")
+        artifact = workflow.index("name: Retain updater files for docs staging", upload)
+        remove = workflow.index("cleanup-updater-assets.py", artifact)
+        self.assertLess(upload, artifact)
+        self.assertLess(artifact, remove)
+        self.assertIn("path: update-bundle/*", workflow)
 
     def test_build_requires_all_four_signatures_to_verify_before_writing_feed(self):
         verified = []

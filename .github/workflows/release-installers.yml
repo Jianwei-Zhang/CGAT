@@ -481,6 +481,34 @@ jobs:
           gh release download "$TAG_NAME" --dir update-assets
           python3 GPM2.0/scripts/app-update-feed.py build --version "$VERSION" --assets update-assets --output update-feed
           gh release upload "$TAG_NAME" update-feed/GPM_*_notes_*.txt update-feed/latest.json --clobber
+          mkdir -p update-bundle
+          python3 - <<'PY'
+          import json, pathlib, shutil
+          assets = pathlib.Path("update-assets")
+          output = pathlib.Path("update-bundle")
+          manifest = json.loads(pathlib.Path("update-feed/latest.json").read_text())
+          files = [info["url"].rsplit("/", 1)[-1]
+                   for info in [*manifest["platforms"].values(), *manifest["release_notes"].values()]]
+          for name in files:
+              shutil.copy2(assets / name, output / name)
+          shutil.copy2("update-feed/latest.json", output / "latest.json")
+          PY
           # Keep the Release draft: canonical notes, Server source, retained test data,
           # public verification and docs promotion remain release-operator gates.
           echo "Draft update feed is ready. Complete RELEASING.md before publication." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain updater files for docs staging
+        uses: actions/upload-artifact@v4
+        with:
+          name: GPM app update ${{ needs.prepare-release.outputs.tag_name }}
+          path: update-bundle/*
+          if-no-files-found: error
+
+      - name: Keep public Release focused on manual downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.prepare-release.outputs.tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 GPM2.0/scripts/cleanup-updater-assets.py --repo "$GITHUB_REPOSITORY" --tag "$TAG_NAME"

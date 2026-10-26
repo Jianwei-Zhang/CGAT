@@ -111,7 +111,8 @@ xattr -dr com.apple.quarantine /Applications/GPM.app
 
 - Confirm the quality job and all four installer jobs succeeded for the release workflow.
 - Confirm the Release title is `GPM vX.Y.Z`, the tag and embedded app version match, and exactly four installer assets are present, plus the matching Server source archive and all retained/approved supplemental attachments from the preflight inventory. Verify the four README guides point to that published Server archive.
-- Review the published body to ensure English precedes Chinese, both macOS first-launch sections remain intact, and retained test-data filenames and provenance appear in both languages. Verify fresh public downloads, including the retained dataset.
+- For an updater-enabled Release, confirm the public Release contains only manual installers, Server source and retained data. The four update packages, both localized notes and `latest.json` must be available through the verified workflow artifact and docs mirror, with signatures embedded in the manifest; no `.sig`, `app.tar.gz`, updater notes or manifest attachments remain on the Release.
+- Review the published body to ensure English precedes Chinese, both macOS first-launch sections remain intact, and retained test-data filenames and provenance appear in both languages. Verify fresh public downloads, including the retained dataset. Keep internal updater packages, notes and manifests out of the public downloads page.
 - Finish with [Required final step: docs alignment](#required-final-step-docs-alignment); successful builds and verified GitHub assets alone are not release closure.
 
 ## Installer-only refresh of an existing version
@@ -244,13 +245,16 @@ The desktop checks docs first and contacts GitHub only on failure. CI must provi
 `GPM_UPDATER_PUBLIC_KEY` and the Tauri signing secrets; it generates signed updater
 artifacts, `latest.json`, and separate English/Chinese notes. Existing manual
 installers, Server source and retained datasets remain required. Additional updater
-assets do not replace any of those deliverables.
+assets do not replace any of those deliverables. CI uploads them as a workflow
+artifact for docs staging, then removes all internal updater files from the public
+Release. Docs is the sole operational update source; do not describe clean Release
+assets as a GitHub fallback.
 
 The installer workflow refuses published-release replacement and leaves new
 Releases as drafts. After all four platform bundles and the ordinary release
 inventory are verified, stage every referenced file on docs and promote its
 `downloads/updates/latest.json` **last**. Do not advertise an incomplete release.
 A successful but stale docs manifest intentionally does not query GitHub; keep
-both feeds synchronized. Do not rotate the signing key or enable downgrade updates
+the docs feed synchronized. Do not rotate the signing key or enable downgrade updates
 as part of an ordinary release. A Server-only source refresh must not change the
 App version or regenerate its updater artifacts.

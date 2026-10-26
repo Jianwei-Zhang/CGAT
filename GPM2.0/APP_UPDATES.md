@@ -8,9 +8,12 @@
   check, manual check, and access to an available/downloaded update.
 - After startup settles, check in the background (10-second initial delay,
   six-hour repeat). Defer automatic dialogs while another dialog/task is active.
-- Check the docs feed first; only timeout, network/HTTP errors or invalid data
-  trigger GitHub fallback. Do the same for the requested locale's notes and the
-  update package. A valid but stale docs feed is authoritative until synchronized.
+- The docs feed and docs-hosted update files are authoritative. GitHub Releases
+  contain only manual installers, Server source and retained data; they do not
+  publish `app.tar.gz`, updater notes or `latest.json`. The legacy GitHub fallback
+  in the v2.0.13 App is intentionally unavailable, so updates require the docs
+  service to be reachable. A valid but stale docs feed is authoritative until
+  synchronized.
 - Do not launch a browser or ask the user to locate an installer. Download within
   the App, validate size/SHA-256 and the signed artifact/version, then offer
   **Install and restart**. System permission or installer UI may still appear.
@@ -60,16 +63,25 @@ of older builds that have no updater.
    macOS retains the manual `.dmg` and adds `.app.tar.gz` + `.sig`. The final job
    independently verifies each signature against the configured public key using
    Minisign, then generates `latest.json` and `GPM_X.Y.Z_notes_en.txt` / `_zh.txt` from the single
-   canonical notes source. It requires exactly one package per OS/architecture.
-3. Verify all Release assets, signatures against the configured public key, notes,
-   retained datasets and Server source before publishing. CI leaves the Release
-   as a draft and refuses overwriting a published release.
-4. Download the exact verified release assets into a staging directory. Stage the
-   update feed with this tracked, offline helper (from repository root):
+   canonical notes source. It requires exactly one package per OS/architecture and
+   embeds all four signatures in `latest.json`. CI then uploads a workflow artifact
+   containing the four update packages, both localized notes and `latest.json` for
+   docs staging, and removes those internal files plus the four `.sig` files from
+   the public Release. The Release keeps only manual installers, Server source and
+   retained data.
+3. Verify the four update packages through the signatures embedded in
+   `latest.json`, confirm none of the internal updater files remain on the Release,
+   and verify notes, retained datasets and Server source before publishing. CI
+   leaves the Release as a draft and refuses overwriting a published release. Do
+   not show internal `.app.tar.gz`, notes or `latest.json` links on the public
+   downloads page; those files are hosted only on the docs update mirror.
+4. Download and extract the workflow artifact named `GPM app update vX.Y.Z`.
+   Treat that directory as the verified updater staging input. Stage the feed with
+   this tracked, offline helper (from repository root):
 
    ```bash
    python3 GPM2.0/scripts/app-update-feed.py stage \
-     --assets /path/to/verified-release-assets --public docs/public
+     --assets /path/to/extracted-update-artifact --public docs/public
    ```
 
    This validates all referenced sizes/hashes/URLs, copies the versioned files,
@@ -79,12 +91,13 @@ of older builds that have no updater.
 5. In the separately authorized docs deployment, upload versioned files first,
    verify public bytes, and switch the production latest manifest last. Serve
    `/cgat/downloads/updates/latest.json` with revalidation/no-cache; versioned
-   update assets may be cached immutably. GitHub serves the same manifest as the
-   Release's `latest.json` attachment. Keep the mirrors byte-identical.
+   update assets may be cached immutably. The public GitHub Release intentionally
+   has no updater manifest, so docs is the sole operational update source.
 6. Verify real native upgrades on Windows x64/ARM64 and macOS Intel/Apple Silicon,
-   including project preservation, install permissions/restart, signature rejection
-   and a failed-docs/GitHub-fallback case. Automated tests alone do not establish
-   native desktop visual or installer acceptance.
+   including project preservation, install permissions/restart and signature
+   rejection. Also verify that docs unavailability reports a clean update failure;
+   GitHub fallback is intentionally not a shipped recovery path. Automated tests
+   alone do not establish native desktop visual or installer acceptance.
 
 The local deployment directory `docs_deploy/` is ignored and machine-specific;
 this tracked helper is the reproducible integration point for its existing
