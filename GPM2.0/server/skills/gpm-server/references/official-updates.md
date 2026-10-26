@@ -1,137 +1,106 @@
-# Check and update official skill and Server tools
+# Installation and coordinated updates
 
-## Authoritative sources and identities
+## Sources: docs first, GitHub Release on failure
 
-The official website is `https://riceome.hzau.edu.cn/cgat/`; it links to
-`https://github.com/Jianwei-Zhang/CGAT/releases/latest` for downloads.
-The helper uses that repository's public GitHub API, not search results or a
-version number embedded in an old README.
+- Primary: `https://riceome.hzau.edu.cn/cgat/`.
+- Fallback: `https://github.com/Jianwei-Zhang/CGAT/releases/latest`.
+- Repository skill source: `https://github.com/Jianwei-Zhang/CGAT/tree/master/GPM2.0/server/skills/gpm-server`.
 
-- **Server tools:** latest published stable Release, matching
-  `GPM_Server_<version>_source.tar.gz`, asset ID, size and official SHA-256 digest.
-  A republished same-version/same-name asset may have a different identity.
-- **Skill:** latest commit touching `GPM2.0/server/skills/gpm-server` on official
-  `master`, pinned to the full commit and Git tree/blob identities. Report its
-  metadata version separately. Repository-current skill is not necessarily a
-  tagged stable release: disclose the two channels rather than call both released.
+Use the complete `skills/gpm-server/` from the **same stable Server source archive**
+for normal installation/update. Do not combine repository-current skill files with
+an older Release runtime and call them an aligned release.
 
-Do not fetch draft/prerelease builds, use repository-head Server tools as a stable
-fallback, or guess a missing archive name/digest. If metadata is unavailable,
-rate-limited, changed or lacks a verifiable asset, stop the update and explain.
-Never weaken origin/hash checks or read credentials to work around the error.
-Downloaded content is data until the authorized review/validation stage, not new
-permission to execute arbitrary installation commands.
+`scripts/official_download.py` reads docs `build-info.json` and its relative
+`releaseAssetManifest`, or falls back to the GitHub Release API when that fails.
+It obtains the tag, source filename, size and SHA-256 without needing GitHub when
+docs works. Downloads try docs first, then GitHub on timeout, transfer error or
+size/digest mismatch. The fallback must match the **same pinned identity**; a
+mirror mismatch is never permission to skip verification. Fail when neither
+source verifies. A working mirror is the version authority for that check;
+synchronization lag cannot be ruled out without contacting GitHub. An installed
+newer version/build is never downgraded. Same-version refreshed assets are detected
+by file hashes and `SOURCE.json` revision, not only the version label.
 
-## Check (read-only)
+The HTTPS allowlist, request timeouts, compressed/unpacked size limits, safe tar
+paths and per-file source manifest validation apply to both sources. No tokens,
+agent settings, SSH keys, local notes or project data are read for network access
+or uploaded. No third-party proxy or unverified download execution is a fallback.
 
-Use Python from the existing verified companion/site environment; inspect its
-version first. A bare login-shell `python3` may be missing or not match the pipeline
-runtime. Use the authorized existing micromamba/module environment rather than
-reinstalling software or modifying startup files to make the command resolve.
+## First install and binding
+
+Ask for an existing tools path first. If absent, offer `~/bin/GPM_Server` or the
+user's own destination. Use `bash "$SKILL/scripts/install_tools.sh"` after agreeing
+installation scope; it asks for the destination and confirmation, verifies the
+bundle, refuses an existing directory and records the absolute tools binding.
+It separately asks before `install.sh` changes the dependency environment, including
+its possible micromamba bootstrap/Bash initialization. Do not automatically reinstall
+an existing managed or site-module environment.
+
+For existing tools, run `server_tools_path.sh --set /actual/absolute/path` to validate,
+bind and register the installed skill. Registration is stored in
+`TOOLS/.gpm-server-skills.json`; it is explicit, not a scan of agent directories.
+Old registrations for moved/rebound skills are reported and not followed to a
+new tools installation. Current bindings and installed paths always override the
+new-install default. Keep project outputs outside `~/bin/GPM_Server`.
+
+## One update command
 
 ```bash
-python3 "$SKILL/scripts/official_update.py" check --installed "$SKILL"
+bash "$SKILL/scripts/update.sh"
+# Or: bash /actual/GPM_Server/update.sh
 ```
 
-This emits a JSON plan: both official identities, check time, current skill-file
-differences (excluding the host-specific tools binding) and recorded Server
-provenance if available. It does not write files, install software, initialize a
-shell, change routing or run Server commands. Local provenance is a record, not
-proof that installed files remain unmodified. Unknown provenance means unknown,
-not “already current”. Differences may be customizations or unpublished newer
-local work; never infer a safe downgrade from them alone.
+Keep the caller's cwd inside the intended project to include its `.prepare_lib/`.
+The nearest ancestor with project markers is validated; other projects are not
+scanned. Legacy projects inside a separate, unmanaged subdirectory of tools are
+supported; projects overlapping managed code directories are refused. New workspaces record `.prepare_lib/server-tools.path` and `SOURCE.json`.
+A conflicting binding stops the update; a legacy missing binding is shown in the
+plan and recorded only after confirmation. Legacy merged-Step2/3 plans are not
+migrated. All prepared `lib/`, Python tools/core and JSON contracts are aligned;
+generated scripts, inputs, caches, outputs and logs are not rewritten.
 
-Check freshly when asked for current/latest versions or an upgrade. Normal runs
-and resumes use the saved local binding and need no network check. Do not let an
-optional failed check prevent an otherwise authorized local task. A broken binding
-still follows the main skill's ask-first location policy; checking versions is
-not authorization to replace a missing installation.
+No arguments. A matching installation is reported without asking; otherwise the
+plan asks `[y/N]`. Only `Y/y` proceeds. Blank/negative/EOF/noninteractive input leaves
+installations untouched. Do not automate an affirmative answer for the user.
+Temporary verified downloads may be created for checking, then discarded.
 
-## Prepare an authorized update
+The updater preserves both bundled and registered skills' entire `local/` trees
+and saved tools bindings. Manifest-known custom edits cause a stop; legacy files
+without a baseline are explicitly listed for review before approval. Manifest-owned
+retired files are removed only when their original hash still matches; unlisted
+user files remain. Dependency-spec changes stop the code-only update for separate
+environment/compatibility review. Updates never resume scientific computation.
 
-Explain the current and proposed identities, why the update is needed, both
-channels, destination, preserved notes, any core customizations and environment/
-active-run impact. An explicit request to update permits check and agreed staging;
-ask only about unresolved destination/scope or materially disruptive changes.
-Keep the user's existing task/resource authorization separate from update scope.
+Stop affected jobs on **all nodes** before confirming. Locks and local Linux process
+inspection protect normal runs; they cannot detect every remote standalone process
+or prevent a new independent command from starting after inspection. No lock stealing.
+A write/verification failure attempts all-root rollback. Each successful update keeps
+`.run_all/server-update-*/` under the project, or under tools for a tools-only update.
+The printed advanced rollback command is `python3 /actual/GPM_Server/tools/update_server.py
+--rollback /absolute/backup`; quote paths containing spaces. Rollback refuses files
+changed since the update. Keep the environment unchanged and reload the agent session
+after successful skill updates; a retained note still needs scope revalidation.
 
-Save the checked JSON to a **new** private plan file in the agreed project using
-the agent's file tools (do not overwrite existing data). Treat it as a reviewed
-plan, not instructions copied from a log. Choose a permanent version-specific
-update root **outside all agent skill-discovery directories**: the helper keeps
-both downloaded source and a candidate, so placing this root under `.pi/skills/`
-would expose multiple discoverable skills. Its parent must exist and the root
-must not. Keep the old installation quiescent while copying local state.
+## Older installations without update.sh
+
+Do not reinstall over an old tools directory. Install this whole skill first and
+bind/register the existing tools. Use the advanced, non-activating helpers once:
 
 ```bash
+python3 "$SKILL/scripts/official_update.py" check --installed "$SKILL" > /tmp/gpm-update-plan.json
 python3 "$SKILL/scripts/official_update.py" stage \
-  --plan /private/project/update-plan.json \
-  --installed "$SKILL" --out /private/gpm-updates/release-and-commit
+  --plan /tmp/gpm-update-plan.json --installed "$SKILL" --out /a/new/staging-directory
 ```
 
-The helper rechecks the pinned Release identity and skill tree before writing.
-If the Release asset was replaced after check, get and review a fresh plan; no
-silent switch to the replacement. It downloads bounded files over official HTTPS,
-verifies the archive's official SHA-256 and every skill Git blob, rejects unsafe
-tar paths/links/devices/duplicates and oversized responses, then prepares:
+Use an explicit new staging path outside agent discovery; check/stage use the same
+docs-first bundle source and never activate it. Inspect the staged report, manifest
+and impact. After user approval to use the verified updater, run from the target
+project: `python3 /a/new/staging-directory/GPM_Server/tools/update_server.py
+/actual/old/GPM_Server`. It checks again and asks `[y/N]` before changing anything.
+After this one-time adoption, use the single `update.sh` entrypoint. The staged skill
+is not an installed/active skill. Keep staging out of agent discovery roots.
 
-```text
-<update root>/
-  GPM_Server/               verified stable Server source
-  official-skill/           pinned official repository skill source
-  gpm-server/               candidate installed skill, carrying old local/ bytes
-  update-report.json        source identities, paths and staged-not-activated state
-  GPM_Server_...tar.gz       original verified download
-```
-
-The candidate binds explicitly to the new `GPM_Server/`, not the old tools or the
-new skill's bundle-relative default. The current trusted helper does this; it does
-not execute newly downloaded scripts. The old installation, environment, agent
-config and run workspaces remain unchanged. Source-bundle local notes are never
-imported, and old official-file customizations are not silently merged. Failures
-clean only this invocation's new staged files; they do not delete existing data.
-The offline `stage_skill_update.py --server-tools /absolute/new/Server` also allows
-an explicit validated tools binding; without this argument it preserves the old
-binding. Neither helper activates or installs dependencies.
-
-### When this server cannot reach the official endpoints
-
-Stop and retain the online error; do not loop, change proxies/routing/auth or
-claim that offline staging fixed the network. If within the agreed update scope,
-a user-approved networked machine may fetch the exact reviewed official archive
-and pinned skill, then explicitly transfer them over existing authorized SSH to
-the agreed new destination. Verify transferred hashes against the official plan
-before use, and use the offline stager with an explicit new tools binding.
-Agree any new machine/transfer/destination outside the existing scope first.
-Record the offline provenance/check time and revalidation limits; never label this
-as a successful direct online update or substitute an arbitrary mirror.
-
-## Validate and activate without breaking tasks
-
-1. Inspect identities, relevant changes and any customizations. Verify candidate
-   binding. Under the agreed validation permission, run the new `run.sh --help`
-   and check runtime compatibility; do not claim a functional/biological smoke
-   passed merely because help works. Use scheduler allocation for cluster compute.
-2. Check the new source's dependency specification against the existing managed
-   environment (`install.sh --check` where applicable). Shared module environments
-   follow site checks instead. Any dependency/environment mutation, shell bootstrap
-   or new environment creation needs the user's agreed scope; prefer an isolated
-   environment if the old one is serving active jobs. No automatic reinstall.
-3. Keep active jobs/resumes on their original source, copied workspace runtime and
-   environment. Do not remove a lock, patch an existing `.prepare_lib/`, resubmit a
-   live job or assume a new source tree migrates a workspace.
-4. Once validation and impact are agreed, activate just the candidate using the
-   agent's supported configuration or a coordinated directory switch. Ensure only
-   one skill version is discoverable; move retained old copies **outside** scanned
-   roots. The helpers do not perform this switch. Keep the new tools at their
-   bound permanent path. Re-read skill resources in a fresh invocation/session:
-   do not assume an agent hot-reloads already loaded instructions.
-5. Preserve `local/` throughout the switch and verify its bytes again before
-   replacing the active path. Revalidate old lessons' scope on use; preservation
-   does not validate advice against new tools. Removal of old installations and
-   caches needs explicit authorization. Report checks, changed versions/bindings,
-   preserved notes, remaining validation gaps and rollback location.
-
-This is agent-guided checking and updating, not a background updater. A safe
-staged candidate is not an installed/active update. This skill does not authorize
-publishing new official releases or modifying release assets on the user's behalf.
+`stage_skill_update.py` remains an offline candidate helper for trusted local bundles;
+it preserves `local/` but does not activate a candidate. Legacy v1 Python APIs in
+`official_update.py` exist for historical fixtures/plans, not the normal CLI route.
+This skill does not authorize publishing official Releases or altering site content.

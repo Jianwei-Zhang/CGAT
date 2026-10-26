@@ -317,6 +317,8 @@ print_usage_summary() {
   echo "Deactivate: $manager_command deactivate"
   echo "Recheck:    bash $INSTALL_ENTRYPOINT --check --manager $ENV_MANAGER_KIND"
   echo "Server tools: $SCRIPT_DIR"
+  echo "New tools default: ~/bin/GPM_Server (existing/custom paths are retained)."
+  printf 'Update tools, skill and current project runtime: bash %q\n' "${SCRIPT_DIR}/update.sh"
   local skill_dir="${SCRIPT_DIR}/skills/gpm-server"
   if [[ -f "$skill_dir/SKILL.md" ]]; then
     echo "Agent skill:  $skill_dir/SKILL.md"

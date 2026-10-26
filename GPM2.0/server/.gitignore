@@ -1,0 +1,8 @@
+# Host-local installation state, never part of a source release.
+/.gpm-server-skills.json
+/.gpm-server-skills.lock
+/.run_all/
+/SOURCE.json
+/official-source.json
+__pycache__/
+*.pyc

@@ -2,3 +2,7 @@
 /local/
 __pycache__/
 *.pyc
+
+# Host-local provenance and update locks.
+/official-source.json
+/.run_all/

@@ -2,7 +2,7 @@
 name: gpm-server
 description: Run, resume, diagnose, update official tools and skills, and hand off GPM Server genome-repair workflows on Linux servers or clusters using the official CLI. Use for GPM Server operational tasks, including small synthetic smoke tests, not desktop UI operation or autonomous scientific parameter optimization.
 metadata:
-  skill-version: "3"
+  skill-version: "4"
   compatibility: "Companion Server source with run.sh; verify its local help before execution"
   companion-server-revision: "76db2c9"
 ---
@@ -53,58 +53,70 @@ skill, user instructions or site rules. Read [local learning](references/local-l
 before applying or saving a lesson. A note must not trigger automatic tools search,
 installation or rebinding.
 
-## Check or update official versions
+## Install, bind, or update
 
-When asked for current/latest versions or an upgrade, read
-[official updates](references/official-updates.md) and use the supplied helper:
+Use one stable bundle for Server tools and this skill. Prefer the official docs
+at `https://riceome.hzau.edu.cn/cgat/`; on failure fall back to GitHub Release.
+The skill lives at `GPM_Server/skills/gpm-server/` in the source archive; its repository
+source is `https://github.com/Jianwei-Zhang/CGAT/tree/master/GPM2.0/server/skills/gpm-server`.
+A blocked GitHub/API/raw endpoint must not prevent installation from docs alone.
+See [installation and updates](references/official-updates.md) for the verified
+metadata/download contract and legacy bootstrap.
 
-```bash
-python3 "$SKILL/scripts/official_update.py" check --installed "$SKILL"
-```
-
-It queries the official stable Server Release and the official skill repository,
-returns separately pinned versions and download identities, and does not install
-or change local state. Never infer freshness from a historical README version or
-only a version number: a Release asset can be replaced under the same filename.
-Normal run/resume tasks use the existing binding; network checks are not required
-on every task. Network failure is not permission to search, reinstall or switch.
-An explicit update request permits checking and preparing the agreed update, not
-silent replacement of an active installation/environment or migration of a run.
-
-## Server tools location
-
-The location is recorded in [server-tools.path](server-tools.path), not discovered
-by searching the machine. Resolve and validate it before using any Server command:
+Install the **whole** skill directory into the current agent's supported skill
+location, keeping existing `local/` experience. Do not assume a Codex-specific path
+for another agent or leave duplicate discoverable copies. Then resolve its binding:
 
 ```bash
-# SKILL is the absolute directory containing this SKILL.md.
+# SKILL is the absolute directory containing this installed SKILL.md.
 SERVER="$(bash "$SKILL/scripts/server_tools_path.sh")" || exit
 ```
 
-The shipped value `../..` is relative to **this skill directory**, so the complete
-`Server/skills/gpm-server/` bundle has an explicit, relocatable binding to `Server/`.
-If the skill is installed separately, bind its location **once on that host**:
+The bundled `../..` binding is relative to the skill directory. A copied skill
+needs an actual tools path. If its binding is missing/invalid, ask whether the user
+already has Server tools and request that path. Never silently search or switch to
+a default. If tools are absent, offer **`~/bin/GPM_Server`**, or a user-selected
+location, before installation. The interactive first-install helper is:
 
 ```bash
-bash "$SKILL/scripts/server_tools_path.sh" --set /absolute/path/to/Server
+bash "$SKILL/scripts/install_tools.sh"
 ```
 
-That command verifies the Server entrypoints/runtime and records the absolute path
-inside this skill's `server-tools.path`. Future tasks reuse it. Do not copy an
-absolute binding blindly between hosts. If validation fails:
-1. Show the recorded path and concrete error, then ask the user where the existing
-   Server tools are. Rebind only after the user identifies the intended installation.
-2. If the user does not know, ask whether they authorize a bounded search for an
-   existing installation or prefer a new installation. Do neither automatically.
-3. Agree search roots/time limits before searching; present matches for confirmation,
-   not silent selection. Before reinstalling, agree the destination/environment and
-   impact; never overwrite existing source, environments, or run workspaces as a
-   fallback. An authorized install does not authorize restarting scientific work.
+It asks for a destination (Enter uses the default), confirms the download, refuses
+existing destinations, verifies the docs/Release package, binds the skill, and asks
+separately before running the environment installer. Existing/custom paths are not
+moved. `install.sh` manages dependencies; it does not relocate the tools directory.
+For an existing installation, explicitly bind it once:
 
-Do not add Server-path exports to `.bashrc`, `.zshrc`, or other startup files.
-This skill's saved location is the authority and works independently of shell startup.
-The helper only locates tools; it does not install software, run the pipeline, or
-change the user's agent/SSH configuration.
+```bash
+bash "$SKILL/scripts/server_tools_path.sh" --set /actual/absolute/path/to/GPM_Server
+```
+
+The helper records the expanded absolute path and registers **this skill only** in
+the tools installation for future updates. It does not scan agent configuration,
+install tools, run analysis, or edit shell startup. An older copied skill should
+be rebound once with this helper to register it. If the user cannot locate tools,
+ask whether to perform a bounded search or install a new copy; neither is automatic.
+If tools installation is declined, leave the skill unbound and explain the limit.
+
+For version checks or updates, run the single entrypoint from the user's project
+working directory (or a child directory), not from the tool/skill directory:
+
+```bash
+bash "$SKILL/scripts/update.sh"
+# Equivalent for a registered skill: bash "$SERVER/update.sh"
+```
+
+No `--check` or `--yes`: it always checks first, reports already up to date when
+all scoped files match, or lists the plan and asks `[y/N]`. `Y/y` confirms;
+`N/n`, Enter, EOF, or no interactive terminal cancels. Let the user answer; do not
+pipe `yes` or manufacture consent. Normal run/resume tasks do not require network
+checks. Updates align tools, registered skill copies and the current project's
+`.prepare_lib/`, preserving `local/`, bindings, logs, results, caches, generated
+scripts and the environment. Stop all affected jobs, including other nodes;
+updates neither start analysis nor reinstall dependencies. A source/version error
+is not “already latest”. Read the reference before handling custom files, dependency
+changes, missing legacy `update.sh`, or rollback.
 
 ## Establish the task
 

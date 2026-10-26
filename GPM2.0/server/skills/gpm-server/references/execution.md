@@ -12,8 +12,9 @@ Record the source revision/hash and the skill's `metadata.skill-version`.
 For an installer-managed environment, `bash "$SERVER/install.sh" --check`
 is read-only. It checks the managed environment, **not necessarily the current
 shell**; activate the environment using the installer's actual printed command.
-Do not invent a mamba activation command for a non-interactive job. If installation
-is needed and authorized, use `install.sh`, not ad-hoc package upgrades. Its success
+Do not invent a mamba activation command for a non-interactive job. For absent tools, ask first and use `scripts/install_tools.sh` with the default
+`~/bin/GPM_Server` or a custom destination. For dependency installation
+in an existing tools directory, use `install.sh`, not ad-hoc package upgrades. Its success
 summary prints the absolute tools directory and the skill binding command.
 The Server-path binding does not edit shell startup files. Separately, the existing
 installer bootstraps micromamba with Bash shell initialization if no manager exists;

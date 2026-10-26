@@ -97,8 +97,11 @@ def verified_source(root: Path, revision: str) -> dict[str, dict]:
     return manifest
 
 
-def validate_targets(workspace: Path, tools_root: Path, source: Path) -> None:
+def validate_targets(workspace: Path, tools_root: Path, source: Path, *,
+                     allow_nested_workspace: bool = False) -> None:
     for first, second in ((workspace, tools_root), (source, workspace), (source, tools_root)):
+        if allow_nested_workspace and first == workspace and second == tools_root and tools_root in workspace.parents:
+            continue
         if first == second or first in second.parents or second in first.parents:
             raise ValueError("source, tools directory and workspace must be separate non-nested directories")
     for root in (workspace, tools_root):
@@ -177,7 +180,8 @@ def workspace_lock(workspace: Path):
 
 
 def restore_files(journal: dict, backup: Path, *, verify_current: bool) -> None:
-    roots = {"tools": Path(journal["tools_root"]), "runtime": Path(journal["workspace"]) / ".prepare_lib"}
+    roots = ({key: Path(value) for key, value in journal["roots"].items()} if "roots" in journal else
+             {"tools": Path(journal["tools_root"]), "runtime": Path(journal["workspace"]) / ".prepare_lib"})
     for item in reversed(journal["files"]):
         path = regular_path(roots[item["kind"]], item["relative"])
         if verify_current and path.exists():

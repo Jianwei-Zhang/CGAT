@@ -4,7 +4,7 @@ set -euo pipefail
 
 PREPARE_REPORT_ARGS=("$@")
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 COMMON_LIB="${SCRIPT_DIR}/lib/incremental_common.sh"
 [[ -f "$COMMON_LIB" ]] || {
   echo "ERROR: Missing server library: $COMMON_LIB" >&2
@@ -326,6 +326,11 @@ write_prepare_lib() {
   cp -R "$tools_src/grt_core" "$tools_dst/grt_core"
   find "$tools_dst/grt_core" -type d -name '__pycache__' -prune -exec rm -rf {} +
   cp -f "$contracts_src"/*.json "$contracts_dst"/
+  # Record the actual installation, not a guessed default, for later updates.
+  printf '%s\n' "$SCRIPT_DIR" > "${work_root}/.prepare_lib/server-tools.path"
+  if [[ -f "${SCRIPT_DIR}/SOURCE.json" ]]; then
+    cp -f "${SCRIPT_DIR}/SOURCE.json" "${work_root}/.prepare_lib/SOURCE.json"
+  fi
 }
 
 write_add_dataset_script() {
@@ -1037,7 +1042,7 @@ mkdir -p "$RUN_ALL_STATE_DIR"
   printf '#!/usr/bin/env bash\n'
   printf 'set -euo pipefail\n'
   printf '\n'
-  printf 'server_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
+  printf 'server_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"\n'
   printf 'exec python3 "${server_dir}/.prepare_lib/tools/run_all_runner.py" --server-dir "$server_dir" "$@"\n'
 } > "$RUN_ALL"
 printf 'unit_id\tcommand_relpath\tdetail_log_relpath\n' > "$RUN_ALL_PLAN"

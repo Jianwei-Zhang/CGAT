@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Check official versions and stage a pinned update; never activate or install."""
+"""Advanced check/stage helper; normal updates use the interactive update.sh.
+
+The CLI uses the same Release/docs bundled source as Server. Legacy v1 Python
+functions remain for previously saved plans, not the normal update route.
+"""
 from __future__ import annotations
 
 import argparse
@@ -284,6 +288,37 @@ def stage(plan: dict, installed: Path, output: Path) -> dict:
     return report
 
 
+def check_bundle(installed: Path) -> dict:
+    import official_download as downloads
+    return {"schema": "gpm-server-bundle-update.v2", "server": downloads.discover(log=lambda message: print(message, file=sys.stderr)),
+            "installed": str(stager.checked_path(installed)), "skill_channel": "release-bundled"}
+
+
+def stage_bundle(plan: dict, installed: Path, output: Path) -> dict:
+    import official_download as downloads
+    installed, output = stager.checked_path(installed), stager.checked_path(output)
+    if (plan.get("schema") != "gpm-server-bundle-update.v2" or output.exists()
+            or output == installed or installed in output.parents or output in installed.parents
+            or not output.parent.is_dir()):
+        raise ValueError("Use a current bundle check plan and a new, separate staging directory")
+    current = downloads.discover(log=lambda message: print(message, file=sys.stderr))
+    if downloads.identity(current) != downloads.identity(plan["server"]):
+        raise ValueError("Official bundle changed; check and review again")
+    output.mkdir(mode=0o700)
+    try:
+        tools = downloads.extract(current, output, log=lambda message: print(message, file=sys.stderr))
+        source_info = downloads.verify_bundle(tools, current)
+        candidate = stager.stage(tools / "skills/gpm-server", installed, output / "gpm-server", tools)
+        report = {"state": "staged-not-activated", "server": current,
+                  "source_revision": source_info["git_revision"], "server_tools": str(tools),
+                  "installed_skill_candidate": str(candidate), "local_state_preserved": True}
+        (output / "update-report.json").write_text(json.dumps(report, indent=2) + "\n")
+    except BaseException:
+        shutil.rmtree(output)
+        raise
+    return report
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -296,10 +331,10 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.command == "check":
-            result = check(args.installed)
+            result = check_bundle(args.installed)
         else:
             stager.checked_path(args.plan)
-            result = stage(json.loads(args.plan.read_text()), args.installed, args.out)
+            result = stage_bundle(json.loads(args.plan.read_text()), args.installed, args.out)
     except (OSError, ValueError, KeyError, TypeError, RuntimeError, tarfile.TarError, EOFError) as exc:
         print(f"ERROR: {exc}; no update was activated.", file=sys.stderr)
         return 2
