@@ -100,14 +100,18 @@ class ReleaseDocsTests(unittest.TestCase):
             (drafts / "v2.0.13.md").write_text(original.replace("v2.0.12", "v2.0.13"))
             self.assertEqual([r["version"] for r in archive.collect_releases(source)], ["v2.0.12"])
 
-    def test_new_release_drafts_use_plain_shared_markdown(self):
+    def test_new_release_notes_use_plain_shared_markdown(self):
         guide = (ROOT / "GPM2.0/RELEASING.md").read_text()
         notices = guide.split("````markdown\n", 1)[1].split("\n````", 1)[0]
         en_notice, zh_notice = notices.split("### macOS 首次启动", 1)
-        for path in (SOURCE / "drafts").glob("v*.md"):
+        sources = list((SOURCE / "drafts").glob("v*.md"))
+        sources += [p for p in SOURCE.glob("v*.md")
+                    if tuple(map(int, p.stem[1:].split("."))) >= (2, 0, 13)]
+        for path in sources:
             with self.subTest(draft=path.name):
                 draft = path.read_text()
-                self.assertIn("Unpublished draft", draft)
+                if path.parent.name == "drafts":
+                    self.assertIn("Unpublished draft", draft)
                 self.assertNotRegex(draft, r"(?m)^> \[!")
                 self.assertNotRegex(draft, r"(?m)^\|")
                 self.assertNotRegex(draft, "[🟢🔵🟣]")

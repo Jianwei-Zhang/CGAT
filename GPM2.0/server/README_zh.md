@@ -4,7 +4,7 @@
 
 ## 快速开始
 
-在 Linux 服务端依次执行以下命令：从 [Release v2.0.12](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.12) 下载 GPM Server 工具包（源码），默认解压到 `~/bin/GPM_Server`（也可自定义），然后安装和运行。官网直连下载失败时回退 GitHub；skill 安装器和更新器也遵循此顺序，并校验版本与摘要。下载摘要见官网或 Release 的 SHA-256 清单。
+在 Linux 服务端依次执行以下命令：从 [Release v2.0.13](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.13) 下载 GPM Server 工具包（源码），默认解压到 `~/bin/GPM_Server`（也可自定义），然后安装和运行。官网直连下载失败时回退 GitHub；skill 安装器和更新器也遵循此顺序，并校验版本与摘要。下载摘要见官网或 Release 的 SHA-256 清单。
 
 ```bash
 # 1. 下载并解压到工具目录，不改变当前项目目录
@@ -14,15 +14,15 @@ SERVER="$HOME/bin/GPM_Server"  # 可改为自定义路径；已有安装不要�
   mkdir -p "$(dirname "$SERVER")"
   mkdir "$SERVER"
   cd "$SERVER"
-  archive=GPM_Server_2.0.12_source.tar.gz
+  archive=GPM_Server_2.0.13_source.tar.gz
   curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.12/$archive" ||
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.13/$archive" ||
     curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/$archive"
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.13/$archive"
   curl -fL --connect-timeout 8 --max-time 30 -o SHA256SUMS \
-    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.12/SHA256SUMS ||
+    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.13/SHA256SUMS ||
     curl -fL --connect-timeout 8 --max-time 30 \
-      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.12 |
+      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.13 |
       python3 -c 'import json,sys; r=json.load(sys.stdin); print("\n".join(a["digest"].removeprefix("sha256:")+"  "+a["name"] for a in r["assets"] if a["name"].endswith("_source.tar.gz")))' > SHA256SUMS
   grep "  $archive$" SHA256SUMS | sha256sum -c -
   tar -xzf "$archive" --strip-components=1

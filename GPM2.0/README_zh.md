@@ -19,7 +19,7 @@ GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流�
 
 ### 1. 下载工具并创建环境
 
-在 Linux 服务端执行以下命令，优先从[官网](https://riceome.hzau.edu.cn/cgat/zh/downloads)下载 Server 工具包，失败时回退 [Release v2.0.12](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.12)，校验后解压安装：
+在 Linux 服务端执行以下命令，优先从[官网](https://riceome.hzau.edu.cn/cgat/zh/downloads)下载 Server 工具包，失败时回退 [Release v2.0.13](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.13)，校验后解压安装：
 
 新安装默认使用 `~/bin/GPM_Server`，已有安装保留原路径。以下子 shell 不会改变当前工作目录，项目结果仍写入当前工作目录。若不使用 AI，可直接按下列命令安装；AI 安装提示词见[Server README](server/README_zh.md#给-ai-agent-的安装提示词)。
 
@@ -30,15 +30,15 @@ SERVER="$HOME/bin/GPM_Server"  # 可改为自定义路径；已有安装不要�
   mkdir -p "$(dirname "$SERVER")"
   mkdir "$SERVER"
   cd "$SERVER"
-  archive=GPM_Server_2.0.12_source.tar.gz
+  archive=GPM_Server_2.0.13_source.tar.gz
   curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.12/$archive" ||
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.13/$archive" ||
     curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/$archive"
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.13/$archive"
   curl -fL --connect-timeout 8 --max-time 30 -o SHA256SUMS \
-    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.12/SHA256SUMS ||
+    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.13/SHA256SUMS ||
     curl -fL --connect-timeout 8 --max-time 30 \
-      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.12 |
+      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.13 |
       python3 -c 'import json,sys; r=json.load(sys.stdin); print("\n".join(a["digest"].removeprefix("sha256:")+"  "+a["name"] for a in r["assets"] if a["name"].endswith("_source.tar.gz")))' > SHA256SUMS
   grep "  $archive$" SHA256SUMS | sha256sum -c -
   tar -xzf "$archive" --strip-components=1
