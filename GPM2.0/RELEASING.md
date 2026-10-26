@@ -10,6 +10,13 @@
 
 ## Required preflight: Server commands and retained attachments
 
+Before changing versions or creating a new version tag, verify that repository
+variable `GPM_UPDATER_PUBLIC_KEY` and secret `TAURI_SIGNING_PRIVATE_KEY` are
+configured (and the matching password secret if needed). Inspect names only;
+never print private values. Missing signing configuration blocks the first
+updater-enabled release: follow `APP_UPDATES.md` with the release owner rather
+than bypassing the workflow or generating/rotating a production key implicitly.
+
 Before creating a new version tag:
 
 1. Update the Server download/install and tool-update commands in all four guides: `README.md`, `README_zh.md`, `server/README.md`, and `server/README_zh.md`. Every active Release link, archive filename and extraction command must use the new version and match the Server asset being published. Do not rewrite historical validation records.
@@ -51,11 +58,12 @@ artifact-preservation, quality and publication checks in this guide still apply.
 - The language headings are source delimiters only: the GitHub export omits
   `English` / `中文` display headings and separates the two complete sections with
   a horizontal rule. Localized docs show only their own language.
-- Use portable GitHub Markdown for styling: category icons, download tables and
-  native `NOTE` / `IMPORTANT` / `WARNING` alerts. Docs render the same markup;
-  do not introduce inline colors, HTML badges or docs-only content into the source.
-  First-launch guidance may be blockquoted inside a warning, but its full wording
-  and executable command must remain unchanged.
+- Keep new notes plain and portable: ordinary headings, short bullets, download
+  lists, and normal paragraphs for first-launch guidance. Do not add category
+  emoji, badges, colored callouts, native alert blocks or download tables. Docs
+  and GitHub must share the same source; keep the complete macOS wording and
+  executable command unchanged. Do not restyle historical releases without
+  explicit authorization.
 - Generate localized docs and their newest-first index from that source; never
   edit the generated pages or maintain separate release text in docs. A same-version
   Server refresh updates its existing version entry/date, not a new App version.

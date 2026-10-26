@@ -90,6 +90,43 @@ class ReleaseDocsTests(unittest.TestCase):
             self.assertEqual(content.count("> xattr -dr com.apple.quarantine /Applications/GPM.app"), 1)
             self.assertEqual(content.count("> ```"), 2)
 
+    def test_unpublished_drafts_are_not_archived(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)
+            original = (SOURCE / "v2.0.12.md").read_text()
+            (source / "v2.0.12.md").write_text(original)
+            drafts = source / "drafts"
+            drafts.mkdir()
+            (drafts / "v2.0.13.md").write_text(original.replace("v2.0.12", "v2.0.13"))
+            self.assertEqual([r["version"] for r in archive.collect_releases(source)], ["v2.0.12"])
+
+    def test_new_release_drafts_use_plain_shared_markdown(self):
+        guide = (ROOT / "GPM2.0/RELEASING.md").read_text()
+        notices = guide.split("````markdown\n", 1)[1].split("\n````", 1)[0]
+        en_notice, zh_notice = notices.split("### macOS 首次启动", 1)
+        for path in (SOURCE / "drafts").glob("v*.md"):
+            with self.subTest(draft=path.name):
+                draft = path.read_text()
+                self.assertIn("Unpublished draft", draft)
+                self.assertNotRegex(draft, r"(?m)^> \[!")
+                self.assertNotRegex(draft, r"(?m)^\|")
+                self.assertNotRegex(draft, "[🟢🔵🟣]")
+                en, zh = draft.split("\n## English\n", 1)[1].split("\n## 中文\n", 1)
+                self.assertIn(en_notice.strip(), en)
+                self.assertIn("### macOS 首次启动" + zh_notice.rstrip(), zh)
+                release = {"version": path.stem, "published": "2026-10-26",
+                           "updated": "2026-10-26", "summary_en": "Draft fixture",
+                           "summary_zh": "草稿测试", "sha256": "fixture",
+                           "en": en.strip(), "zh": zh.strip()}
+                pages = archive.render_pages([release])
+                body = archive.release_body(release)
+                for locale in ("en", "zh"):
+                    content = release[locale]
+                    self.assertLess(content.index("### Server"), content.index("### App"))
+                    self.assertIn("`test_data.zip`", content)
+                    self.assertIn(content, body)
+                    self.assertIn(content, pages[f"{locale}/changelog/{path.stem}.md"])
+
     def test_language_delimiters_are_never_exported_for_any_version(self):
         for release in self.releases:
             body = archive.release_body(release)
