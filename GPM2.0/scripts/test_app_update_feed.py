@@ -3,6 +3,7 @@ import base64
 import copy
 import importlib.util
 import json
+import shutil
 from pathlib import Path
 import tempfile
 import unittest
@@ -98,6 +99,35 @@ class FeedTests(unittest.TestCase):
         self.assertLess(artifact, remove)
         self.assertIn("path: update-bundle/*", workflow)
         self.assertIn("--manifest update-bundle/latest.json", workflow)
+
+    def test_update_bundle_uses_notes_from_the_generated_feed(self):
+        spec = importlib.util.spec_from_file_location(
+            "prepare_bundle", HERE / "prepare-update-bundle.py")
+        bundle = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(bundle)
+        feed_dir = self.root / "feed-only"
+        feed_dir.mkdir()
+        for name in ("latest.json", "GPM_2.0.12_notes_en.txt", "GPM_2.0.12_notes_zh.txt"):
+            shutil.copy2(self.assets / name, feed_dir / name)
+            (self.assets / name).unlink()
+        result = bundle.prepare(self.assets, feed_dir, self.root / "bundle")
+        self.assertEqual(len(result["files"]), 7)
+        self.assertIn("GPM_2.0.12_notes_en.txt", result["files"])
+        self.assertIn("latest.json", result["files"])
+        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
+        self.assertIn("prepare-update-bundle.py --assets update-assets --feed update-feed --output update-bundle", workflow)
+
+    def test_update_bundle_rejects_missing_feed_notes(self):
+        spec = importlib.util.spec_from_file_location(
+            "prepare_bundle_missing", HERE / "prepare-update-bundle.py")
+        bundle = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(bundle)
+        feed_dir = self.root / "missing-feed"
+        feed_dir.mkdir()
+        for name in ("latest.json", "GPM_2.0.12_notes_zh.txt"):
+            shutil.copy2(self.assets / name, feed_dir / name)
+        with self.assertRaisesRegex(AssertionError, "Missing updater staging input"):
+            bundle.prepare(self.assets, feed_dir, self.root / "missing-bundle")
 
     def test_build_requires_all_four_signatures_to_verify_before_writing_feed(self):
         verified = []

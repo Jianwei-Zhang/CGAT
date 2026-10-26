@@ -481,18 +481,7 @@ jobs:
           mkdir -p update-assets update-feed
           gh release download "$TAG_NAME" --dir update-assets
           python3 GPM2.0/scripts/app-update-feed.py build --version "$VERSION" --assets update-assets --output update-feed
-          mkdir -p update-bundle
-          python3 - <<'PY'
-          import json, pathlib, shutil
-          assets = pathlib.Path("update-assets")
-          output = pathlib.Path("update-bundle")
-          manifest = json.loads(pathlib.Path("update-feed/latest.json").read_text())
-          files = [info["url"].rsplit("/", 1)[-1]
-                   for info in [*manifest["platforms"].values(), *manifest["release_notes"].values()]]
-          for name in files:
-              shutil.copy2(assets / name, output / name)
-          shutil.copy2("update-feed/latest.json", output / "latest.json")
-          PY
+          python3 GPM2.0/scripts/prepare-update-bundle.py --assets update-assets --feed update-feed --output update-bundle
           # Keep the Release draft: canonical notes, Server source, retained test data,
           # public verification and docs promotion remain release-operator gates.
           echo "Draft update feed is ready. Complete RELEASING.md before publication." >> "$GITHUB_STEP_SUMMARY"
