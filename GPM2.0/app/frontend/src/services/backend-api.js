@@ -5,6 +5,10 @@ export function isTauriRuntime() {
   return Boolean(window.__TAURI__?.core?.invoke);
 }
 
+let pendingBackendCommands = 0;
+let installingUpdate = false;
+export function getPendingBackendCommands() { return pendingBackendCommands; }
+
 export async function invokeCommand(command, args = {}, stateOrLocale = "zh") {
   if (!isTauriRuntime()) {
     const error = new Error(t(stateOrLocale, "importer.runtime.backendCommandUnavailable", { command }));
@@ -13,7 +17,20 @@ export async function invokeCommand(command, args = {}, stateOrLocale = "zh") {
     error.operation = command;
     throw error;
   }
-  return window.__TAURI__.core.invoke(command, args);
+  const tracked = !command.startsWith("app_update_");
+  const installing = command === "app_update_install";
+  // The checked project flush happens before this call. Freeze new project
+  // commands while the installer is taking over, including delayed autosaves.
+  if ((tracked && installingUpdate) || (installing && (installingUpdate || pendingBackendCommands))) {
+    throw new Error("update_work_busy");
+  }
+  if (installing) installingUpdate = true;
+  if (tracked) pendingBackendCommands++;
+  try { return await window.__TAURI__.core.invoke(command, args); }
+  finally {
+    if (tracked) pendingBackendCommands--;
+    if (installing) installingUpdate = false;
+  }
 }
 
 export async function listenBackendEvent(eventName, handler) {

@@ -1,3 +1,7 @@
+import { createAppUpdater, updateWorkBusy } from "./services/app-update.js";
+import { invokeCommand, listenBackendEvent, getPendingBackendCommands } from "./services/backend-api.js";
+import { openUpdateDialog } from "./ui/shell/app-update-panel.js";
+import "./styles/app-update.css";
 import { bindShellSelects, syncShellSelect } from "./ui/shell/shell-select-runtime.js";
 import { projectEntryBusy } from "./services/project-drop-controller.js";
 import { bindProjectDrop } from "./ui/shell/project-drop.js";
@@ -249,6 +253,26 @@ const store = createStore({
     primaryCtgsByChr: {},
     job: null,
   },
+});
+
+const updater = createAppUpdater({
+  invoke: invokeCommand, listen: listenBackendEvent, storage: window.localStorage,
+  isBusy: () => updateWorkBusy(store.getState(), getPendingBackendCommands()),
+  canNotify: () => !document.hidden && !document.querySelector("dialog[open], .modal-overlay, [role='dialog'][aria-modal='true']"),
+  prepareInstall: async () => {
+    try { await flushAssemblyProjectState(document.querySelector("#route-host"), store); }
+    catch { throw new Error("update_save_failed"); }
+  },
+  onOffer: () => openUpdateDialog(updater, {
+    getLocale: () => store.getState().locale,
+    subscribeLocale: fn => store.subscribe(fn),
+  }),
+});
+void updater.initialize().then(() => {
+  if (!updater.getState().enabled) return;
+  setTimeout(() => void updater.check(), 10_000);
+  setInterval(() => void updater.check(), 6 * 60 * 60 * 1000);
+  setInterval(() => updater.notify(), 30_000);
 });
 
 migrateWorkspaceHistoryToArrivalOrder(window.localStorage);
@@ -622,6 +646,7 @@ function bindSettings(root, storeRef) {
   bindShellSelects(root);
   bindAppThemeToggle(root, { getLocale: () => storeRef.getState().locale });
   bindAppSettings(root, {
+    updater,
     getLocale: () => storeRef.getState().locale === "en" ? "en" : "zh",
     onTypographyChange: () => window.dispatchEvent(new Event("gpm-next:route-refresh")),
     onLanguageChange: locale => {

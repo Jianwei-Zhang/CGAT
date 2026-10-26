@@ -13,11 +13,19 @@ tauri-build = { version = "2.5.6", features = [] }
 [dependencies]
 anyhow = "1.0"
 base64 = "0.22"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+semver = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["time", "macros"] }
+tauri-plugin-updater = "=2.14.0"
 gpm_next_backend = { path = "../backend" }
 rfd = "0.15"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tauri = { version = "2.11.1", features = [] }
+tauri = { version = "2.12.5", features = [] }
+
+[dev-dependencies]
+tauri = { version = "2.12.5", features = ["test"] }
 
 # Keep native import hot paths optimized in the interactive debug app too.
 # Cargo uses the root manifest's profiles, so mirror these in both crates.

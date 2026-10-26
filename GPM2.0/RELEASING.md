@@ -220,3 +220,21 @@ the end. Do not report a release/update complete while docs are stale or pending
 formal-site downloads agree, and the required verification evidence is recorded.
 If any check or deployment is still pending, report the Release as published but
 **docs alignment incomplete**, not as a completed release/update.
+
+## Signed in-app updates
+
+See [App update delivery](APP_UPDATES.md) before the first updater-enabled release.
+The desktop checks docs first and contacts GitHub only on failure. CI must provide
+`GPM_UPDATER_PUBLIC_KEY` and the Tauri signing secrets; it generates signed updater
+artifacts, `latest.json`, and separate English/Chinese notes. Existing manual
+installers, Server source and retained datasets remain required. Additional updater
+assets do not replace any of those deliverables.
+
+The installer workflow refuses published-release replacement and leaves new
+Releases as drafts. After all four platform bundles and the ordinary release
+inventory are verified, stage every referenced file on docs and promote its
+`downloads/updates/latest.json` **last**. Do not advertise an incomplete release.
+A successful but stale docs manifest intentionally does not query GitHub; keep
+both feeds synchronized. Do not rotate the signing key or enable downgrade updates
+as part of an ordinary release. A Server-only source refresh must not change the
+App version or regenerate its updater artifacts.

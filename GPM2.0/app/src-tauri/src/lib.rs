@@ -1,3 +1,4 @@
+mod app_update;
 mod auto_pipeline_cancel;
 mod commands;
 mod import_cancel;
@@ -5,7 +6,14 @@ mod project_copy_cancel;
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(app_update::UpdateState::default())
         .invoke_handler(tauri::generate_handler![
+            app_update::app_update_status,
+            app_update::app_update_check,
+            app_update::app_update_notes,
+            app_update::app_update_download,
+            app_update::app_update_install,
             commands::import_zip,
             commands::import_extracted,
             commands::import_add_dataset_package,

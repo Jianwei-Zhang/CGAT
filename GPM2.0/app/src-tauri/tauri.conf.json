@@ -47,5 +47,18 @@
     "macOS": {
       "signingIdentity": "-"
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "requireSignedVersion": true,
+      "windows": {
+        "installMode": "passive"
+      },
+      "endpoints": [
+        "https://riceome.hzau.edu.cn/cgat/downloads/updates/latest.json",
+        "https://github.com/Jianwei-Zhang/CGAT/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

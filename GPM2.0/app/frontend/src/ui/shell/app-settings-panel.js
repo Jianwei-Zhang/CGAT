@@ -1,3 +1,4 @@
+import { renderUpdateSettings } from "./app-update-panel.js";
 import { requestAppConfirm } from "./app-dialog.js";
 import { DEFAULT_APP_SETTINGS, getAppSettings, setAppSettings } from "../../services/app-settings.js";
 
@@ -52,10 +53,11 @@ export function renderSettingsContent(locale, settings = getAppSettings()) {
         </div>
       </div>
     </section>
+    <section class="settings-section" data-settings-update aria-labelledby="settings-update-title">${renderUpdateSettings(locale)}</section>
     <footer class="settings-footer"><p id="settings-status" class="settings-status" role="status" aria-live="polite">${c.scope}</p><button type="button" class="settings-reset" data-settings-reset>${c.reset}</button></footer>`;
 }
 
-export function bindAppSettings(root, { getLocale, onTypographyChange, onLanguageChange }) {
+export function bindAppSettings(root, { getLocale, onTypographyChange, onLanguageChange, updater }) {
   root.querySelector("[data-app-settings]")?.addEventListener("click", () => {
     const dialog = document.createElement("dialog");
     dialog.className = "app-settings-dialog";
@@ -64,7 +66,18 @@ export function bindAppSettings(root, { getLocale, onTypographyChange, onLanguag
     const input = () => dialog.querySelector("[name=historyCapacity]");
     const list = () => dialog.querySelector(".settings-options");
     let activeOption = -1;
-    const render = () => { dialog.innerHTML = renderSettingsContent(getLocale()); activeOption = -1; };
+    const refreshUpdate = () => {
+      const section = dialog.querySelector("[data-settings-update]");
+      if (section && updater) {
+        const focus = section.contains(document.activeElement) ? document.activeElement : null;
+        const selector = focus?.hasAttribute("data-update-check") ? "[data-update-check]"
+          : focus?.hasAttribute("data-update-view") ? "[data-update-view]" : null;
+        section.innerHTML = renderUpdateSettings(getLocale(), updater.getState());
+        if (selector) section.querySelector(selector)?.focus();
+      }
+    };
+    const render = () => { dialog.innerHTML = renderSettingsContent(getLocale()); activeOption = -1; refreshUpdate(); };
+    const unsubscribeUpdate = updater?.subscribe(refreshUpdate);
     const status = (message, error = false) => {
       const node = dialog.querySelector(".settings-status");
       node.textContent = message;
@@ -134,7 +147,7 @@ export function bindAppSettings(root, { getLocale, onTypographyChange, onLanguag
     };
     render();
     document.body.append(dialog);
-    dialog.addEventListener("close", () => { dialog.remove(); root.querySelector("[data-app-settings]")?.focus(); }, { once: true });
+    dialog.addEventListener("close", () => { unsubscribeUpdate?.(); dialog.remove(); root.querySelector("[data-app-settings]")?.focus(); }, { once: true });
     dialog.addEventListener("input", event => {
       if (event.target.name !== "historyCapacity") return;
       closeOptions();
@@ -175,6 +188,8 @@ export function bindAppSettings(root, { getLocale, onTypographyChange, onLanguag
       }
     });
     dialog.addEventListener("click", async event => {
+      if (event.target.closest("[data-update-check]")) { void updater?.check({ manual: true }); return; }
+      if (event.target.closest("[data-update-view]")) { updater?.notify(true); return; }
       const option = event.target.closest("[data-history-option]");
       if (option) { chooseOption(option.dataset.historyOption); return; }
       if (event.target.closest("[data-history-toggle]")) {

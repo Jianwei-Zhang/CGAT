@@ -1,0 +1,13 @@
+.app-dialog.app-update-dialog { width: min(600px, calc(100vw - 32px)); }
+.app-update-dialog h3 { margin: 20px 0 8px; font-size: var(--font-body); }
+.app-update-notes { max-height: min(36dvh, 320px); overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; border: 1px solid var(--theme-line); border-radius: 6px; background: var(--theme-surface-subtle); color: var(--theme-ink); font-size: var(--font-small); line-height: 1.7; }
+.app-update-dialog #app-update-scope { margin-top: 14px; }
+.app-update-status, .settings-update-status { margin: 10px 0; color: var(--theme-muted-ink); font-size: var(--font-small); overflow-wrap: anywhere; }
+.app-update-status.is-error, .settings-update-status.is-error { color: var(--theme-red-ink); }
+.app-update-progress { display: block; width: 100%; height: 8px; accent-color: var(--theme-blue-ink); margin: 12px 0; }
+.app-update-progress[hidden] { display: none; }
+.app-update-mute { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: var(--font-small); color: var(--theme-muted-ink); }
+.app-update-mute input { accent-color: var(--theme-blue-ink); }
+.settings-update-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.settings-update-actions .button { font-size: var(--font-small); }
+.app-update-dialog button:disabled { opacity: .55; cursor: not-allowed; }
