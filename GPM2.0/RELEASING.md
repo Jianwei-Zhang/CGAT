@@ -95,7 +95,8 @@ xattr -dr com.apple.quarantine /Applications/GPM.app
 
 - Confirm the quality job and all four installer jobs succeeded for the release workflow.
 - Confirm the Release title is `GPM vX.Y.Z`, the tag and embedded app version match, and exactly four installer assets are present, plus the matching Server source archive and all retained/approved supplemental attachments from the preflight inventory. Verify the four README guides point to that published Server archive.
-- Review the published body to ensure English precedes Chinese, both macOS first-launch sections remain intact, and retained test-data filenames and provenance appear in both languages. Verify fresh public downloads, including the retained dataset, before declaring completion.
+- Review the published body to ensure English precedes Chinese, both macOS first-launch sections remain intact, and retained test-data filenames and provenance appear in both languages. Verify fresh public downloads, including the retained dataset.
+- Finish with [Required final step: docs alignment](#required-final-step-docs-alignment); successful builds and verified GitHub assets alone are not release closure.
 
 ## Installer-only refresh of an existing version
 
@@ -121,6 +122,8 @@ version locations unchanged; record the actual rebuild revision in the notes.
 6. Re-read the official Release and verify the final asset set and preserved
    metadata. Delete only the temporary staging draft and any tag it created;
    never move the official version tag. Retain local rollback/audit evidence.
+7. Finish with [Required final step: docs alignment](#required-final-step-docs-alignment),
+   including the refreshed installer filenames and download digests.
 
 ## Server-only source asset refresh
 
@@ -150,4 +153,70 @@ not a desktop-installer rebuild or a version bump unless the user requests one.
    check `run.sh --help`, the relative skill binding and applicable skill tests.
 5. Re-read the Release and confirm only the intended asset/notes changed. Record
    the source revision, quality run, asset identity/digest and validation boundary.
-   Do not call the task closed until public-download verification is complete.
+   Public-download verification is required but does not replace docs alignment.
+6. Finish with [Required final step: docs alignment](#required-final-step-docs-alignment),
+   updating the existing version entry and source-archive mirror without implying
+   that unchanged App installers were rebuilt.
+
+## Required final step: docs alignment
+
+Docs alignment is the **last required closure step** after GitHub publication and
+public-asset verification. It applies to new versions, same-version installer
+refreshes, and Server-only source refreshes. Prepare documentation earlier when
+needed, but reconcile it against the **actually published** assets and notes at
+the end. Do not report a release/update complete while docs are stale or pending.
+
+1. **Reconcile the release source and bilingual changelog.** Update
+   `GPM2.0/releases/vX.Y.Z.md` to match the final published scope, export the GitHub
+   body from that source, and regenerate the English/Chinese changelog pages and
+   index. For a same-version refresh, update the existing entry and `updated`
+   date rather than inventing a new version. Preserve the separate shipped App
+   and Server baselines, retained test-data scope and macOS first-launch guidance.
+2. **Align downloads and mirrors.** Reconcile `docs/en/downloads.md`,
+   `docs/zh/downloads.md`, and the site's download mirror, `release.json` and
+   `SHA256SUMS` with the verified official assets: version, filenames, platform,
+   size and SHA-256. Refresh same-version bytes/digests too; an unchanged tag or
+   filename is not evidence that a cached archive is current. Read
+   `docs_deploy/sync-release-downloads.py` before using it: it selects the latest
+   stable Release, so do not use it blindly for an older-version or prerelease
+   update, or replace the site's current default downloads unintentionally.
+3. **Align the affected bilingual guides.** Review installation, quick start,
+   Server/tool updates, commands, options and workflow descriptions against what
+   actually shipped. Keep the four project/Server README guides consistent with
+   the affected `docs/en/` and `docs/zh/` pages; update only relevant content.
+   Do not document unshipped source features as installed App behavior or rewrite
+   historical validation records.
+4. **Validate locally, then publish within authorization.** From the repository
+   root, run the changelog regression tests and generated-page check:
+
+   ```bash
+   python3 -m unittest discover -s GPM2.0/scripts -p 'test_render_release_docs.py'
+   python3 GPM2.0/scripts/render-release-docs.py --check
+   ```
+
+   Follow the current `docs_deploy/README.md` and
+   `docs_deploy/FORMAL_DEPLOYMENT.md` for
+   formal-site build, backup, publication, HTTP verification and source archival.
+   Use the docs toolchain's own host/dependencies, not the GPM App frontend's
+   `node_modules`. Before remote access, confirm the documented target with
+   `ssh -G`, then verify hostname and service paths after connecting. Back up
+   affected files and record SHA-256 and rollback steps before publication.
+   This checklist does not itself authorize production deployment or changes to
+   unrelated assets; if authorization/access is missing, report docs alignment
+   as pending rather than bypassing the deployment gate.
+5. **Verify the formal site and record closure evidence.** Check both languages'
+   download pages, changelog index/version entry, affected guides and translation
+   links. Compare the served content with the verified build, and verify fresh
+   site-hosted downloads against the official asset sizes/SHA-256, including
+   retained test data. Do not substitute a local build, Git push or development
+   preview for formal-site verification. Record the release tag, App/Server
+   source baselines, docs source snapshot/digest, deployment/backup identifiers,
+   online checks and any outstanding items. The docs source and deployment
+   workspace are currently ignored by Git; use the deployment source archive
+   rather than force-adding ignored site files, backups or credentials. Distinguish
+   source/automated/HTTP evidence from browser or native-App visual acceptance.
+
+**Completion gate:** the published Release, canonical notes, bilingual docs and
+formal-site downloads agree, and the required verification evidence is recorded.
+If any check or deployment is still pending, report the Release as published but
+**docs alignment incomplete**, not as a completed release/update.
