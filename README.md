@@ -1,3 +1,7 @@
+<p>
+  <img src="LIMS/docs/images/logo.png" alt="Pangu logo" width="264" height="64">
+</p>
+
 # CGAT — Complete Genome Assembly Toolkit
 
 **English** | [中文](README_zh.md)
@@ -7,7 +11,7 @@
 
 **CGAT** is an integrated toolkit for chromosome-scale genome assembly, multi-assembly collinearity review, and targeted long-read sequence refinement. It connects automated processing on Linux (**GPM2.0 Server**), interactive visual curation on Windows and macOS (**GPM2.0 Desktop**), and long-read gap filling and telomere extension (**DEGAP2.0**).
 
-![CGAT Overview](GPM2.0/app/readme-assets/cgat-main-figure.svg)
+<img src="GPM2.0/app/readme-assets/cgat-main-figure.svg" alt="CGAT Overview" width="100%">
 
 ---
 

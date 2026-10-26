@@ -1,3 +1,7 @@
+<p>
+  <img src="LIMS/docs/images/logo.png" alt="Pangu logo" width="264" height="64">
+</p>
+
 # CGAT — 完整基因组组装工具集
 
 [English](README.md) | **中文**
@@ -7,7 +11,7 @@
 
 **CGAT（Complete Genome Assembly Toolkit）** 是面向染色体级基因组组装、多组装共线性复核与长读段定点精修的一体化工具集。它将 Linux 服务端的高通量比对与自动修复（**GPM2.0 服务端**）、Windows / macOS 桌面端的交互式证据检查与路径编辑（**GPM2.0 桌面端**），以及基于 HiFi / ONT 长读段的缺口补洞与端粒延伸（**DEGAP2.0**）紧密衔接在一起。
 
-![CGAT 工作流总览](GPM2.0/app/readme-assets/cgat-main-figure.svg)
+<img src="GPM2.0/app/readme-assets/cgat-main-figure.svg" alt="CGAT 工作流总览" width="100%">
 
 ---
 
