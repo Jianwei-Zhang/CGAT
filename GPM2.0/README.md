@@ -215,6 +215,16 @@ xattr -dr com.apple.quarantine /Applications/GPM2.0.app
 
 The package preserves the primary and auxiliary dataset roles established during GRT processing and loads the Server-precomputed Final Path. Project-level paths remain editable and can continue into DEGAP or export.
 
+### In-app updates (updater-enabled builds)
+
+This feature is being implemented; it has not been released as part of this change. The following workflow applies to a signed, updater-enabled build. Users of older builds without an updater must manually install the first updater-enabled version once.
+
+- Open **App settings → App updates** at the bottom of the settings panel to see the current version and **Check for updates**. The App will also check in the background and notify you when a newer version is available.
+- Update metadata, release notes and packages use the **docs download source first**, falling back to **GitHub Releases** on failure. A valid but not-yet-synchronized docs manifest does not trigger an additional GitHub check.
+- The update dialog follows the App's current language, theme and typography. It loads release notes only for the selected language. **Do not remind me for 24 hours** suppresses automatic reminders across restarts; manual checks remain available.
+- Choose **Download update**, then **Install and restart** inside the App. There is no need to open a download webpage or locate and launch an installer manually; the operating system may still request installation permission.
+- Installation requires a verified update package and successful project-state saving. Wait for active tasks to finish; a failed save stops installation. This updates only the desktop App, not remote Server tools or workspaces.
+
 ### Project dataset tables
 
 The project page summarizes sequence count, total length, N50, and N90 for the reference, primary, auxiliary, and derived datasets. Statistics include all sequences without splitting at Ns and are unaffected by moving or hiding contigs in assembly views. Light packages support the same statistics.
