@@ -30,6 +30,21 @@ class FeedTests(unittest.TestCase):
         self.manifest = feed.build("2.0.12", self.assets, self.assets)
         self.public = self.root / "public"
 
+    def test_macos_build_includes_both_manual_and_updater_targets(self):
+        import shlex
+        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
+        macos = workflow.split("  build-macos:\n", 1)[1].split("  update-feed:\n", 1)[0]
+        command = next(line.strip().removeprefix("run: ") for line in macos.splitlines()
+                       if "run: tauri build " in line)
+        args = shlex.split(command)
+        bundles = args[args.index("--bundles") + 1].split(",")
+        self.assertEqual(set(bundles), {"app", "dmg"})
+
+    def test_dispatched_builds_checkout_the_immutable_release_tag(self):
+        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
+        self.assertEqual(workflow.count("uses: actions/checkout@v4"), 4)
+        self.assertEqual(workflow.count("ref: ${{ inputs.tag || github.ref }}"), 4)
+
     def test_build_requires_all_four_signatures_to_verify_before_writing_feed(self):
         verified = []
         def verifier(path, signature):
