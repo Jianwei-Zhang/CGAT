@@ -21,7 +21,7 @@ const labels = {
   right: "right",
   contig: "contig",
   sourcePrimary: "Primary",
-  sourceSupport: "Support",
+  sourceSupport: "Auxiliary",
   sourceGrt: "GRT",
   sourceWithName: "{role} ({name})",
   sourceUnavailable: "Unavailable",

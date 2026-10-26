@@ -6,7 +6,7 @@ import { importParserWorkerChoices, normalizeImportParserWorkers, recommendedImp
 
 export function projectLabels(state) {
   return state.locale === "en" ? {
-    import: "Import project", open: "Open project", recent: "Project library",
+    import: "Import", open: "Open", importTitle: "Import project", recent: "Project library",
     empty: "No projects yet", emptyHint: "Import a delivery bundle or open an existing project directory.",
     name: "Project name (optional)", nameDefault: "Use directory name", location: "Project directory",
     zip: "Bundle (ZIP / tar.gz)", extracted: "Extracted directory", source: "Source", browse: "Browse",
@@ -23,7 +23,7 @@ export function projectLabels(state) {
     importThreads: "Parallel import workers", importThreadsHint: "Shared by archive extraction and PAF parsing during import; SQLite still uses one writer.",
     recommendedThreads: "{number} (recommended)",
   } : {
-    import: "导入项目", open: "打开项目", recent: "项目库",
+    import: "导入", open: "打开", importTitle: "导入项目", recent: "项目库",
     empty: "尚未添加项目", emptyHint: "导入交付包，或打开已有项目目录。",
     name: "项目名称（可选）", nameDefault: "使用目录名称", location: "项目目录",
     zip: "交付包（ZIP / tar.gz）", extracted: "已解压目录", source: "来源", browse: "选择",
@@ -95,7 +95,7 @@ export function renderProjectImportDialog(state, messages) {
   }).join("");
   return `<div class="modal-overlay" data-project-import-overlay>
     <form class="modal-dialog project-import-dialog" role="dialog" aria-modal="true" aria-labelledby="project-import-title">
-      <h3 id="project-import-title">${labels.import}</h3>
+      <h3 id="project-import-title">${labels.importTitle}</h3>
       <fieldset class="project-source-switch"><legend>${labels.source}</legend>
         <label><input type="radio" name="project-source" value="zip" ${extracted ? "" : "checked"} />${labels.zip}</label>
         <label><input type="radio" name="project-source" value="extracted" ${extracted ? "checked" : ""} />${labels.extracted}</label>

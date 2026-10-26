@@ -14,7 +14,7 @@ const messages = {
   },
   en: {
     datasets: "Datasets", name: "Name", role: "Data type", count: "Sequences", details: "Dataset details", more: "More information", close: "Close",
-    total: "Total length", note: "Note", actions: "Actions", primary: "Primary", support: "Support", derived: "Derived", includesDerived: "Includes derived sequences",
+    total: "Total length", note: "Note", actions: "Actions", primary: "Primary", support: "Auxiliary", derived: "Derived", includesDerived: "Includes derived sequences",
     reference: "Reference genome", edit: "View details and edit name or note", emptyNote: "Add note",
     reset: "Restore initial name", location: "Local location", missing: "Sequence files not included or unavailable",
     partial: "Some sequence files are available", open: "Open folder",

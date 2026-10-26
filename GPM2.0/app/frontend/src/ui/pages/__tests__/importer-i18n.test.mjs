@@ -957,7 +957,7 @@ test("importer renders concise failed import feedback while keeping open-workspa
     assert.match(html, /data-importer-status-toast="1"/);
     assert.match(html, /data-importer-status-banner="1" role="alert"/);
     assert.match(html, /导入失败：failed to resolve source_seq for locator gpm:contig_6792/);
-    assert.match(html, /打开项目/);
+    assert.match(html, />打开</);
     assert.doesNotMatch(html, /modal-overlay import-progress-overlay/);
   } finally {
     globalThis.window = previousWindow;

@@ -690,7 +690,7 @@ function renderFinalPathLog({
 }) {
   const model = logModel || buildFinalPathLogModel();
   const normalizedCurrentChrName = normalizeString(model.chrName || currentChrName);
-  const supportTypeLabel = labels.finalPathLogSupportTitle || "Support ds ctgs";
+  const supportTypeLabel = labels.finalPathLogSupportTitle || "Auxiliary ds ctgs";
   const otherChrTypeLabel = labels.finalPathLogOtherChrTitle || "Primary ds ctgs used by other chr";
   const detailRows = [
     ...(Array.isArray(model.supportRows) ? model.supportRows : []).map((row) => ({

@@ -84,14 +84,14 @@ bash run.sh \
 
 `--ref` and `--ds` accept either `<name> <fasta>` or just `<fasta>`. When the name is omitted, it is inferred from the FASTA filename: `.gz` and one `.fa`, `.fasta`, or `.fna` suffix are removed case-insensitively, and runs outside letters, numbers, dot, underscore, and hyphen are replaced with `_`. For example, `/data/primary assembly.fa.gz` becomes `primary_assembly`. Use the explicit form whenever a different name is required.
 
-When preparing the workspace, the first `--ds` becomes the primary dataset and the remaining entries become support datasets; these roles remain fixed throughout GRT processing. Plain or gzip-compressed `.fa`, `.fasta`, and `.fna` inputs are accepted. The generated `add_dataset.sh` supports the same optional-name `--ds` forms.
+When preparing the workspace, the first `--ds` becomes the primary dataset and the remaining entries become auxiliary datasets; these roles remain fixed throughout GRT processing. Plain or gzip-compressed `.fa`, `.fasta`, and `.fna` inputs are accepted. The generated `add_dataset.sh` supports the same optional-name `--ds` forms.
 
 #### Common options
 
 | Option | Required / default | Description |
 | --- | --- | --- |
 | `--ref [<name>] <fasta>` | Required once | Reference FASTA; omit the name to infer it from the filename. |
-| `--ds [<name>] <fasta>` | Required, repeatable | Initial assembly dataset; omit the name to infer it from the filename. The first is primary; the rest are support datasets. |
+| `--ds [<name>] <fasta>` | Required, repeatable | Initial assembly dataset; omit the name to infer it from the filename. The first is primary; the rest are auxiliary datasets. |
 | `-o, --out <dir>` | `./gpm_server` | Server workspace and generated scripts. |
 | `-s, --score <0-100>` | `60` | Minimum chromosome-assignment coverage percentage. |
 | `-t, --threads <n>` | `10` | Total compute-thread budget shared by independent alignment tasks and reads-QC jobs. |
@@ -194,11 +194,11 @@ The macOS app is ad-hoc signed and is not Apple-notarized. Drag `GPM2.0.app` to 
 xattr -dr com.apple.quarantine /Applications/GPM2.0.app
 ```
 
-The package preserves the primary and support dataset roles established during GRT processing and loads the Server-precomputed Final Path. Project-level paths remain editable and can continue into DEGAP or export.
+The package preserves the primary and auxiliary dataset roles established during GRT processing and loads the Server-precomputed Final Path. Project-level paths remain editable and can continue into DEGAP or export.
 
 ### Project dataset tables
 
-The project page summarizes sequence count, total length, N50, and N90 for the reference, primary, support, and derived datasets. Statistics include all sequences without splitting at Ns and are unaffected by moving or hiding contigs in assembly views. Light packages support the same statistics.
+The project page summarizes sequence count, total length, N50, and N90 for the reference, primary, auxiliary, and derived datasets. Statistics include all sequences without splitting at Ns and are unaffected by moving or hiding contigs in assembly views. Light packages support the same statistics.
 
 Display names and notes are editable; original identifiers, filenames, and sequence names remain unchanged.
 

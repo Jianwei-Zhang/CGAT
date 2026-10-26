@@ -97,5 +97,5 @@ test("validateSubviewSelection returns english errors when locale is en", () => 
   });
 
   assert.equal(result.ok, false);
-  assert.equal(result.error, "A must come from the primary dataset and B must come from the support dataset.");
+  assert.equal(result.error, "A must come from the primary dataset and B must come from the auxiliary dataset.");
 });

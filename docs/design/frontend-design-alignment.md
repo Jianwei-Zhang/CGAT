@@ -140,7 +140,7 @@
 *   **对象 3：数据集目录表格 (`project-catalog-view.js`)**
     *   *现状*：表格灰边框重，数据角色仅是纯文本，数值没有右对齐。
     *   *对齐规范*：
-        *   数据角色（Primary / Support / Reference）统一为语义标签胶囊（Tag Pill）；
+        *   数据角色（Primary / Auxiliary / Reference）统一为语义标签胶囊（Tag Pill）；
         *   序列数与总长度数值必须**靠右对齐**并启用等宽数字（`tabular-nums`），千分位格式化；
         *   详情弹窗内增加路径复制；“打开所在目录”仅在现有宿主能力允许时启用，不静默扩大 Tauri 权限或把文件夹打开实现为任意 shell 执行。
 
@@ -285,7 +285,7 @@
 | 实体角色 | 语义色彩 | 填充色 (Fill) | 描边色 (Stroke) | 文本/前景 (Text) | 设计说明 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **主组装 (Primary)** | 科研钢蓝 | `#d2dfef` (`--ctg-primary-fill`) | `#6d85a1` (`--ctg-primary-stroke`) | `#243a54` (`--ctg-primary-text`) | 低饱和主组装基底，长时间阅片不刺眼 |
-| **辅助组装 (Support/Companion)** | 温暖沙褐 | `#e7dec4` (`--ctg-companion-fill`) | `#8a7551` (`--ctg-companion-stroke`) | `#5c492a` (`--ctg-companion-text`) | 补缺证据数据，与主组装钢蓝温和互补 |
+| **辅助组装 (Auxiliary/Companion)** | 温暖沙褐 | `#e7dec4` (`--ctg-companion-fill`) | `#8a7551` (`--ctg-companion-stroke`) | `#5c492a` (`--ctg-companion-text`) | 补缺证据数据，与主组装钢蓝温和互补 |
 | **参考基因组 (Reference)** | 中性基准灰 | `#cfcfcf` (`--ctg-ref-fill`) | `#8e8e8e` (`--ctg-ref-stroke`) | `#4f4f4f` (`--ctg-ref-text`) | 对比基准坐标，不喧宾夺主 |
 | **轨道选中高亮 (Active)** | 清透天蓝 | `#b9d0ea` | `#2e567f` | `#1e3a5f` | 瞬态交互高亮，保持与 Subview 一致 |
 | **Gap 未知区** | 警示斜条纹 | 灰白斜纹相间 | `#94a3b8` / 半透明深灰 | `#64748b` / `#766239` | 严禁显示为空白，传达序列未知区间 |

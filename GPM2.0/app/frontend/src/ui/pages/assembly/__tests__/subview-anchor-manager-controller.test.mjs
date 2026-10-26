@@ -12,7 +12,7 @@ const labels = {
     grtGapType: "GRT gap {size} bp", grtEndpointUnavailable: "Unavailable",
     grtSameLane: "Same lane", grtReadOnly: "Read only", copy: "Copy", copyGrt: "Copy GRT",
     manualType: "Manual {direction} {offset} bp", left: "left", right: "right", contig: "ctg",
-    sourcePrimary: "Primary", sourceSupport: "Support", sourceMirror: "Mirror",
+    sourcePrimary: "Primary", sourceSupport: "Auxiliary", sourceMirror: "Mirror",
     sourceRef: "Reference", sourcePhased: "Phased", sourceGrt: "GRT",
     sourceWithName: "{role} ({name})",
     sourceUnavailable: "Source unavailable", coordinateUnavailable: "?",
@@ -103,7 +103,7 @@ test("anchor manager renders active anchors and resets transient state per scope
   assert.match(html, /class="subview-anchor-object-name">A01/);
   assert.doesNotMatch(html, /Left edge|Right edge/);
   assert.match(html, /Primary \(hifiasm\)/);
-  assert.match(html, /Support \(flye\)/);
+  assert.match(html, /Auxiliary \(flye\)/);
   assert.equal(f.controller.renderContent({
     host: f.host, state: f.store.getState(), tab: "composition", scopeKey: "scope",
     labels, escapeHtml: String, escapeAttr: String,

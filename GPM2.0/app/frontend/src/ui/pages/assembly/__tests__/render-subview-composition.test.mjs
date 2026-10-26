@@ -12,7 +12,7 @@ const labels = {
   searchPlaceholder: "Find",
   sourceFilter: "Source",
   allSources: "All",
-  sources: { primary: "Primary", support: "Support", phased: "Phased", ref: "Reference" },
+  sources: { primary: "Primary", support: "Auxiliary", phased: "Phased", ref: "Reference" },
   unknownSource: "Unknown",
   loading: "Loading",
   retry: "Retry",

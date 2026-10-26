@@ -461,7 +461,7 @@ function getLabels(state) {
       placedUsed: "placed & used",
       placedNotUsed: "placed & not used",
       unassigned: "unassigned",
-      supportType: "Support ds_ctg usage",
+      supportType: "Auxiliary ds_ctg usage",
       otherChrType: "Repeated primary ds_ctg usage",
       detailTitle: "Project details",
       detailCount: "{count} records",
