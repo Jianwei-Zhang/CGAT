@@ -45,6 +45,18 @@ class FeedTests(unittest.TestCase):
         self.assertEqual(workflow.count("uses: actions/checkout@v4"), 4)
         self.assertEqual(workflow.count("ref: ${{ inputs.tag || github.ref }}"), 4)
 
+    def test_installer_builds_supply_public_key_to_the_tauri_bundler(self):
+        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
+        self.assertEqual(workflow.count("- name: Prepare updater signing config"), 2)
+        self.assertEqual(workflow.count("pubkey: process.env.GPM_UPDATER_PUBLIC_KEY"), 2)
+        self.assertEqual(workflow.count("fs.writeFileSync('tauri.updater.build.conf.json'"), 2)
+        self.assertIn("--config tauri.updater.build.conf.json --bundles nsis", workflow)
+        self.assertIn("--config tauri.updater.build.conf.json --bundles app,dmg", workflow)
+        for block in workflow.split("- name: Prepare updater signing config")[1:]:
+            config_step = block.split("\n      - name: ", 1)[0]
+            self.assertNotIn("PRIVATE_KEY", config_step)
+            self.assertIn("if (!process.env.GPM_UPDATER_PUBLIC_KEY)", config_step)
+
     def test_build_requires_all_four_signatures_to_verify_before_writing_feed(self):
         verified = []
         def verifier(path, signature):
