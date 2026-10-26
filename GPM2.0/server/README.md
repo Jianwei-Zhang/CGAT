@@ -155,81 +155,24 @@ not an overwrite/reinstall. Docs can work without GitHub; a stale mirror cannot
 downgrade a newer installed version/build. Network or integrity failure never
 means “already latest”.
 
-### Independent GRT stage controls
+### Independent GRT stage controls and execution profiles
 
-New workspaces generate `run_grt_step2.sh` and `run_grt_step3.sh`, with separate
-scheduler status and checkpoints. Run Step2 before Step3; Step3 refuses a missing,
-changed, or incompatible completed Step2 result. Implementations are physically
-separate in `grt_core/step2_engine.py` and `grt_core/step3_engine.py`; shared
-alignment, structural-analysis and metadata services live in `repair_*.py`.
-The source no longer ships `tools/grt_step23.py`. Existing legacy workspaces
-retain their own combined entrypoint/runtime and are not modified automatically.
-
-Step2 structural edits that remove a gap record the retained junction coordinate,
-not a nonexistent output gap. Their events use `replacement_kind: none`, zero
-replacement length and the empty-sequence digest; absorbed gap events retain
-explicit supersession links. Terminal deletions anchor to a retained base rather
-than one past the chromosome end. Missing gap origins or invalid edit prototypes
-still fail explicitly; no gap is silently skipped or replaced with synthetic Ns.
-
-When Step3 trims part of a Step2 patch, the original event and edit remain
-available for replay. Each proven retained source fragment receives an exact
-path event (`retained_from_event_id`) and donor-usage link. Missing sequence
-must be covered by explicit q2-coordinate edits; shared evidence alone does
-not prove that the original full patch survived. Final Path source matching
-and q4 sequence validation remain exact.
-Refill edits also record exact removed-source slices from their working path,
-so pure refills and second-round trims of first-round fills retain correct
-lineage even when corrected/filtered query coordinates no longer equal q2.
-Completely replaced earlier fills are superseded without inventing a survivor.
-
-Source-card `orientation` places the full contig in the main view; it is not
-an orientation constraint on every accepted Final Path slice. Normal cards keep
-their exact `chr_assignments.tsv` orientation/anchor, even when a repair uses an
-oppositely oriented slice. Promoted/cross-chromosome cards use the first retained
-path slice as their deterministic display-orientation fallback. All accepted
-events and segment links are preserved; event/segment source intervals and
-orientations must still agree exactly, and the source slices must reconstruct q4.
-
-Retained source children follow `retained_from_event_id` back to their original
-refill evidence, including split children and nested retention. Step3 freezes the
-actual pre-edit flank-query path in hash-bound `flank_projection.json` artifacts.
-The App export projects historical alignments through that snapshot and marks
-them as `supporting_precursor`; it never substitutes shifted public q2 coordinates
-or the child's current neighbours. Projection, query and PAF hashes are checked.
-Older retained refills without this snapshot fail explicitly: rerun `run_all.sh`
-with the updated runtime to regenerate Step3 evidence rather than omit it silently.
-
-Both stages share a content fingerprint covering both engines, entry scripts
-and common modules. Changing any of them invalidates repair-stage results and
-requires Step2 to run again. Independently validated raw MUMmer results remain
-reusable when their exact input, tool and alignment-parameter identities match.
+New workspaces generate separate `run_grt_step2.sh` and `run_grt_step3.sh` stage scripts with independent scheduler status and checkpoints. Run Step2 before Step3; Step3 validates that a compatible Step2 result is present before starting. Both stages share a content fingerprint covering the repair engines and shared modules—when any repair code changes, stage outputs are invalidated and regenerated from Step2 while compatible raw MUMmer alignment caches remain reusable.
 
 Newly prepared workflows enable the validated optimization route by default:
 
-- `--grt-execution-profile optimized`: a shared CPU/memory-bounded nucmer pool,
-  largest-target-first scheduling, verified partition FASTA reuse, exact anchor
-  indexes and reuse of already-validated parsed coordinates. Publication and
-  candidate tie-breaking retain their original order.
-- Step2 remains **full scope**; its diagnostic-changing screen is not enabled.
-- `--grt-step3-mummer-scope gap-screen`: anchor-safe donor-partition screening,
-  followed by full-chromosome alignment of selected original partitions.
-- Optimized Step3 refill batches same-round flank queries, preserves each
-  chromosome’s query/hit order, and reuses a compatible content-verified `.mmi`.
-  A cold mapping saves its index in the same invocation; changed target bytes,
-  preset or executable invalidate index reuse. Empty queries remain skipped.
+- `--grt-execution-profile optimized`: uses a shared CPU/memory-bounded `nucmer` pool, largest-target-first scheduling, verified partition FASTA reuse, exact anchor indexes, and coordinate-parse cache reuse while preserving deterministic output and tie-breaking order.
+- Step2 always runs at **full scope**.
+- `--grt-step3-mummer-scope gap-screen`: screens donor partitions safely by anchor before running full-chromosome alignment on selected partitions.
+- Optimized Step3 refill batches same-round flank queries and reuses content-verified `.mmi` indexes.
 
-For rollback when preparing a **new** workspace, use
-`--grt-execution-profile baseline --grt-step3-mummer-scope full` with either
-`run.sh` or `prepare.sh`. Direct Python entries accept
-`--execution-profile baseline|optimized` and the corresponding
-`--step2-mummer-scope` / `--step3-mummer-scope`; defaults are optimized, full Step2
-and gap-screen Step3. Refill batching follows the execution profile.
+To fall back to the unscreened baseline profile when preparing a **new** workspace, pass:
 
-Existing workspace scripts/runtime are not modified automatically. Do not copy
-these changes into a running workspace. Screening is not proof of universal
-metadata/evidence equivalence; full datasets are compared against preserved old
-results before release. Cache-assisted timings are not cold-pipeline benchmarks.
+```bash
+--grt-execution-profile baseline --grt-step3-mummer-scope full
+```
+
+Existing workspace scripts and embedded runtimes are not modified automatically; run `update.sh` inside a stopped project workspace when you want to synchronize its `.prepare_lib/` runtime.
 
 ## Optional AI agent skill
 
@@ -338,6 +281,7 @@ not require deleting caches, repreparing inputs, or changing the dependency envi
 | File | Purpose | When to run it |
 | --- | --- | --- |
 | `install.sh` | Create, update, and verify the `cgat-server` environment | First installation or dependency updates |
+| `update.sh` | Check and update Server tools, bound skills, and project `.prepare_lib/` runtime | Routine maintenance and workspace runtime alignment |
 | `env.sh` | Compatibility entry for `install.sh` | Only for existing commands |
 | `run.sh` | Prepare and execute the full workflow, or resume an existing workspace | First run or recovery |
 | `prepare.sh` | Compatibility entry for preparation only | When separate script generation is needed |

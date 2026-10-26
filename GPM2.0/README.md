@@ -6,12 +6,12 @@ GPM2.0 combines reference-anchored results from multiple de novo assemblies in o
 
 ## Architecture
 
-| Component | Role |
-| --- | --- |
-| Linux server | Runs alignment and GRT processing, then creates App delivery archives. Download the Server tools from Releases and extract them on the Linux server. |
-| Desktop App | Imports a delivery archive and provides visualization, editing, DEGAP integration, and export. |
+| Component | Platform | Role |
+| --- | --- | --- |
+| **GPM2.0 Server** | Linux | Runs reference alignment, chromosome assignment, GRT automated repair, and HTML reporting, then builds Full and Light delivery archives. |
+| **GPM2.0 Desktop** | Windows / macOS | Imports a delivery archive and provides chromosome **Preview**, **Assembly** & **Subview** collinearity inspection, **Final Path** editing, `DEGAP-JOBS` generation, and export. |
 
-Installers for `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64` are published on [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases). Development and release checks are documented in [Quality gates](QUALITY.md).
+Installers for `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64` are available on [CGAT Downloads](https://riceome.hzau.edu.cn/cgat/en/downloads) (direct mirror) and [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases). Development and release checks are documented in [Quality gates](QUALITY.md).
 
 ## Server Workflow
 
@@ -214,6 +214,15 @@ xattr -dr com.apple.quarantine /Applications/GPM2.0.app
 ```
 
 The package preserves the primary and auxiliary dataset roles established during GRT processing and loads the Server-precomputed Final Path. Project-level paths remain editable and can continue into DEGAP or export.
+
+### Core desktop workflow
+
+| Workspace View | Purpose |
+| --- | --- |
+| **1. Project & Datasets** | Import Full/Light archives or `test_data.zip`, manage local workspaces, and inspect per-dataset sequence counts, total lengths, N50, and N90. |
+| **2. Preview** | Inspect chromosome-level Final Path source contributions and remaining gaps at a glance before entering a chromosome workspace. |
+| **3. Assembly & Subview** | Examine chromosome-wide collinearity ribbons, filter alignments, manipulate contig cards, and zoom in on local pairwise evidence in Subview. |
+| **4. Final Path & Export** | Reorder, flip, or insert contig slices and gaps (with per-chromosome baseline restore), export `DEGAP-JOBS`, or export PNG, TSV, LOG, and FASTA files. |
 
 ### In-app updates (updater-enabled builds)
 

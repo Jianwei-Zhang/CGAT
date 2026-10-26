@@ -140,66 +140,24 @@ bash ~/bin/GPM_Server/update.sh
 完成一次性接入，不直接覆盖旧目录。官网可独立完成检查；若镜像滞后，不会把已安装的
 较新版本/构建降级。网络或校验失败不会被当作“已经最新”。
 
-### 独立 GRT 阶段控制
+### 独立 GRT 阶段控制与执行配置
 
-新工作区生成 `run_grt_step2.sh`、`run_grt_step3.sh`，分别记录调度状态和
-checkpoint。先运行 Step2，再运行 Step3；Step3 会拒绝缺失、已改变或引擎
-不兼容的 Step2 完成结果。算法实现也已分离：`grt_core/step2_engine.py`、
-`grt_core/step3_engine.py`，共用比对、结构分析和元数据服务位于同目录的
-`repair_*.py`。源码不再分发 `tools/grt_step23.py`；旧工作区内已有的组合入口
-及运行库不自动修改。
-
-Step2 结构修复消除 GAP 时，事件记录使用保留序列的连接点坐标，不再查找已不存在
-的输出 GAP。替换类型为 `none`、长度为 0，并记录空序列摘要；被同一修复吸收的
-GAP 保留明确的事件替代关联。末端删除锚定到实际保留的碱基，不使用染色体末端
-之外的坐标。缺少 GAP 来源或修复 prototype 无效时仍明确报错，不静默跳过，也不
-人为补入 N。
-
-Step3 仅裁剪 Step2 补片的一部分时，原始事件及 edit 保留用于重放；每个有来源证据的
-保留片段生成精确的路径事件（`retained_from_event_id`）和供体使用关联。消失部分必须
-由 q2 坐标系下的明确编辑覆盖，不能仅凭共享证据认定原补片完整保留。Final Path 的
-来源区间匹配及 q4 序列校验仍保持严格一致。
-补洞编辑也记录实际工作路径中被移除的精确来源片段，因此纯补洞以及第二轮裁剪第一轮
-补片时，即使工作坐标已经偏离 q2，也能保留正确关联；完全被替代的旧补片明确标记为
-superseded，不虚构保留片段。
-
-来源卡片的 `orientation` 表示整条 contig 在主视图中的显示方向，并不要求每个
-Final Path 使用片段都同向。normal 卡片始终保留 `chr_assignments.tsv` 的原始方向和
-锚点，即使某次修复使用了反向片段；promoted／跨染色体卡片在没有目标分配基线时，
-采用 Final Path 中首个保留片段的方向作为确定性显示回退。所有 accepted 事件及片段
-链接完整保留，事件与片段的来源区间和方向仍必须精确一致，并由来源序列重建 q4 校验。
-
-保留型子事件通过 `retained_from_event_id` 追溯原始 refill 证据，覆盖拆成多个片段及
-多轮保留。Step3 将编辑前实际使用的 flank 查询路径写入带摘要的 `flank_projection.json`。
-App 导出使用该快照投影历史比对，并标记为 `supporting_precursor`，不套用已偏移的公开 q2
-坐标或子片段的新邻接关系；投影、查询和 PAF 文件均校验摘要。旧的保留型 refill 若没有
-快照会明确报错：用更新后的运行库重新执行 `run_all.sh` 生成 Step3 证据，不再静默遗漏。
-
-Step2/Step3 共用一个覆盖两个引擎、入口和共用模块的内容指纹。更改任一部分
-会使阶段结果失效并要求重新执行 Step2；输入、工具和参数均一致时，独立的
-MUMmer 原始数值缓存仍可复用。
+新工作区生成独立的 `run_grt_step2.sh` 与 `run_grt_step3.sh` 阶段脚本，分别记录调度状态和 checkpoint。先运行 Step2，再运行 Step3；Step3 启动前会校验兼容的 Step2 结果。两个阶段共用覆盖修复引擎与公共模块的内容指纹：当修复代码更新时，阶段结果会自动从 Step2 重新生成，而输入与参数一致的 MUMmer 原始比对缓存仍可安全复用。
 
 新生成的正式工作流默认启用以下优化路线：
 
-- `--grt-execution-profile optimized`：跨染色体共享且受 CPU/内存约束的
-  nucmer 池、大分区优先调度、校验后的分区 FASTA 复用、精确锚点索引与
-  已校验坐标解析结果复用。输出和候选平局选择仍保留原顺序。
-- Step2 继续使用 **full 全量范围**，不启用会改变诊断的 Step2 筛选。
-- `--grt-step3-mummer-scope gap-screen`：使用修订的锚点安全筛选，选中的
-  原始 donor 分区仍与完整染色体比对。
-- optimized Step3 refill 同轮合并 flank query，恢复每条染色体的 query／命中
-  顺序，并复用内容校验的兼容 `.mmi`。首次比对在同一次调用中保存索引；
-  目标字节、preset 或工具变化都会使索引失效。空 query 仍跳过。
+- `--grt-execution-profile optimized`：启用跨染色体共享且受 CPU / 内存约束的 `nucmer` 池、大分区优先调度、分区 FASTA 复用、精确锚点索引与坐标解析缓存复用，并保持输出与平局选择顺序确定性。
+- Step2 始终使用 **full 全量范围**。
+- `--grt-step3-mummer-scope gap-screen`：使用锚点安全筛选，选中的原始供体分区仍与完整染色体比对。
+- optimized Step3 refill 会同轮合并侧翼查询，并复用经内容校验的 `.mmi` 索引。
 
-如需回退，在用 `run.sh` 或 `prepare.sh` **新建工作区**时传入
-`--grt-execution-profile baseline --grt-step3-mummer-scope full`。
-Python 入口对应支持 `--execution-profile baseline|optimized`、
-`--step2-mummer-scope`／`--step3-mummer-scope`，默认 optimized、Step2 full、
-Step3 gap-screen；refill 合批随 execution profile 开关。
+如需在**新建工作区**时回退为无筛选基线配置，可向 `run.sh` 或 `prepare.sh` 传入：
 
-已有工作区不会随外部工具自动升级；在该项目内显式执行 `update.sh` 可对齐运行库，不改写生成脚本。不要修改正在运行的工作区。筛选通过
-不代表所有数据都已证明完整证据等价；发布前会用完整数据集与保留的旧结果
-对照，不重跑旧版。缓存辅助计时不能当作完整冷启动流程的耗时。
+```bash
+--grt-execution-profile baseline --grt-step3-mummer-scope full
+```
+
+已有工作区不会随外部工具自动修改；如需对齐旧项目的运行库，请在停止任务后进入该项目目录显式执行 `update.sh`。
 
 ## 可选的 AI agent skill
 
@@ -291,6 +249,7 @@ tail -F ./gpm_server/logs/progress.log
 | 文件 | 用途 | 何时执行 |
 | --- | --- | --- |
 | `install.sh` | 创建、更新并验证 `cgat-server` 环境 | 首次安装或依赖更新时 |
+| `update.sh` | 检查并更新 Server 工具、已绑定 skill 与项目 `.prepare_lib/` 运行库 | 日常升级维护或对齐旧项目运行库时 |
 | `env.sh` | `install.sh` 的兼容入口 | 仅供旧命令继续使用 |
 | `run.sh` | 自动准备并执行完整流程，已有工作目录按断点继续 | 首次运行或恢复 |
 | `prepare.sh` | 兼容原有的仅准备命令 | 需要单独生成脚本时 |

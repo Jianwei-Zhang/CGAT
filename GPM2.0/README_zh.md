@@ -6,12 +6,12 @@ GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流�
 
 ## 项目架构
 
-| 组件 | 职责 |
-| --- | --- |
-| Linux 服务端 | 执行比对与 GRT 计算，生成 App 交付包。从 Release 下载 Server 工具包并在 Linux 服务端解压部署。 |
-| 桌面端 App | 导入交付包，提供可视化、编辑、DEGAP 集成与导出。 |
+| 组件 | 运行平台 | 核心职责 |
+| --- | --- | --- |
+| **GPM2.0 服务端** | Linux | 执行参考比对、染色体分配、GRT 自动修复与报告生成，产出 Full 与 Light 交付包。 |
+| **GPM2.0 桌面端** | Windows / macOS | 导入交付包，提供染色体 **Preview** 来源总览、**Assembly** 与 **Subview** 共线性检查、**Final Path** 编辑、`DEGAP-JOBS` 导出与结果导出。 |
 
-`win-x86`、`win-arm64`、`mac-x86`、`mac-arm64` 安装包发布在 [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases)。开发和发布检查见[质量门禁](QUALITY_zh.md)。
+`win-x86`、`win-arm64`、`mac-x86`、`mac-arm64` 安装包可通过 [官方文档站直连下载](https://riceome.hzau.edu.cn/cgat/zh/downloads) 或 [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases) 获取。开发和发布检查见[质量门禁](QUALITY_zh.md)。
 
 ## 服务端流程
 
@@ -102,14 +102,14 @@ bash "$SERVER/run.sh" \
 
 `--ref` 和 `--ds` 均支持 `<名称> <fasta>` 与仅传 `<fasta>` 两种写法。省略名称时，会从 FASTA 文件名自动推导：不区分大小写地移除 `.gz` 及一个 `.fa`、`.fasta` 或 `.fna` 后缀；名称中除字母、数字、点、下划线和连字符以外的连续字符会替换为 `_`。例如 `/data/primary assembly.fa.gz` 会得到名称 `primary_assembly`；需要其他名称时仍可使用原有显式写法。
 
-准备工作目录时，第一个 `--ds` 作为主 ds，其余 `--ds` 作为辅 ds；这些角色用于本次 GRT 计算并保持不变。支持普通或 gzip 压缩的 `.fa`、`.fasta`、`.fna` 输入。生成的 `add_dataset.sh` 同样支持名称可省略的 `--ds` 写法。
+准备工作目录时，第一个 `--ds` 作为主组装（primary dataset），其余 `--ds` 作为辅助组装（auxiliary datasets）；这些角色用于本次 GRT 计算并保持不变。支持普通或 gzip 压缩的 `.fa`、`.fasta`、`.fna` 输入。生成的 `add_dataset.sh` 同样支持名称可省略的 `--ds` 写法。
 
 #### 通用参数
 
 | 参数 | 必填 / 默认值 | 说明 |
 | --- | --- | --- |
 | `--ref [<名称>] <fasta>` | 必填，一次 | 参考基因组 FASTA；省略名称时从文件名自动推导。 |
-| `--ds [<名称>] <fasta>` | 必填，可重复 | 初次输入的组装数据集；省略名称时从文件名自动推导。第一个为主 ds，其余为辅 ds。 |
+| `--ds [<名称>] <fasta>` | 必填，可重复 | 初次输入的组装数据集；省略名称时从文件名自动推导。第一个为主组装，其余为辅助组装。 |
 | `-o, --out <目录>` | `./gpm_server` | 服务端工作目录及生成脚本的位置。 |
 | `-s, --score <0-100>` | `60` | 染色体分配的最小覆盖率百分比。 |
 | `-t, --threads <数量>` | `10` | 总计算线程预算，在独立比对任务及 reads QC 任务之间分配。 |
@@ -146,9 +146,9 @@ bash "$SERVER/run.sh" -o ./gpm_server
 
 默认使用 pigz 多线程压缩为 `tar.gz`；`--archive-format zip` 可保留 ZIP 格式，App 支持两者。
 
-这两个压缩包 是仅有的最终交付文件，不再单独生成报告 ZIP。可直接打开服务端工作目录或任一解压后交付包中的 `gpm_server/report/report.html`。`prepare.sh` 从输入准备阶段开始记录，`run_all.sh` 在阶段结束时更新报告；失败或中断也保留报告及尚未执行的阶段。GRT 首次发布的阶段事件与最终协调后的状态分别保留，缓存复用明确标注。重跑前一份报告保存在工作目录的 `.report_history/` 下。
+这两个压缩包是仅有的最终交付文件，不再单独生成报告 ZIP。可直接打开服务端工作目录或任一解压后交付包中的 `gpm_server/report/report.html`。`prepare.sh` 从输入准备阶段开始记录，`run_all.sh` 在阶段结束时更新报告；失败或中断也保留报告及尚未执行的阶段。GRT 首次发布的阶段事件与最终协调后的状态分别保留，缓存复用明确标注。重跑前一份报告保存在工作目录的 `.report_history/` 下。
 
-为避免校验值引用包含自身的压缩包，报告记录嵌入 `report/` 之前的 App 数据载荷校验值。两个最终压缩包 完成后，`run_all.sh` 会明确打印其路径、大小、SHA-256、用途和本地报告路径；同一摘要也写入 `logs/run_all.log`。
+为避免校验值引用包含自身的压缩包，报告记录嵌入 `report/` 之前的 App 数据载荷校验值。两个最终压缩包完成后，`run_all.sh` 会明确打印其路径、大小、SHA-256、用途和本地报告路径；同一摘要也写入 `logs/run_all.log`。
 
 复制或解压整个 `report/` 后，可在原工作目录不可访问、网络断开的情况下重新生成：
 
@@ -211,7 +211,16 @@ macOS App 使用 ad-hoc 签名，未经 Apple 公证。请先将 `GPM2.0.app` �
 xattr -dr com.apple.quarantine /Applications/GPM2.0.app
 ```
 
-交付包保留 GRT 计算时确定的主 ds 与辅 ds 角色，并直接载入服务端预计算的 Final Path。项目级路径仍可编辑，并可继续进入 DEGAP 或导出流程。
+交付包保留 GRT 计算时确定的主组装与辅助组装角色，并直接载入服务端预计算的 Final Path。项目级路径仍可编辑，并可继续进入 DEGAP 或导出流程。
+
+### 桌面端核心工作流
+
+| 工作区模块 | 功能说明 |
+| --- | --- |
+| **1. 项目导入与数据集表** | 导入 Full / Light 交付包或 `test_data.zip`，管理本地工作区，汇总查看参考、主/辅组装及派生数据集的序列数、总长度、N50 与 N90。 |
+| **2. Preview（来源总览）** | 全局浏览各染色体 Final Path 的来源数据集分布与剩余 Gap 位置，快速定位待复核染色体。 |
+| **3. Assembly 与 Subview** | 在染色体尺度检查共线性比对色带、调整筛选条件、移动/翻转/隐藏/镜像 contig，并在 Subview 中放大核对局部成对比对与锚点证据。 |
+| **4. Final Path 编辑与导出** | 编辑染色体片段顺序与方向（支持按染色体一键恢复服务端预计算基线），导出 `DEGAP-JOBS` 长读段补洞任务，或导出 PNG、TSV、日志与 FASTA。 |
 
 ### 应用内更新（已启用更新的构建）
 

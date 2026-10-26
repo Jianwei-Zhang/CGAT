@@ -1,0 +1,468 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="180mm" height="185mm" viewBox="0 0 180 185" font-family="Arial, Helvetica, sans-serif" fill="#20262E" role="img" aria-labelledby="nm-title nm-desc">
+  <title id="nm-title">CGAT: reference-guided integration and targeted repair</title>
+  <desc id="nm-desc">Four related panels: complementary assembly integration, chromosome organization, assembly-derived GRT repair and iterative read-driven repair. Schematic coordinates, not measured base pairs. Detailed alignment parameters remain in the companion DEGAP figure.</desc>
+  <rect id="background" x="0" y="0" width="180" height="185" fill="white" />
+  <g id="panel-a" data-panel="a" data-bounds="[0, 0, 180, 60]" inkscape:groupmode="layer" inkscape:label="a Inputs, complementary assemblies, residual gap/end and final path; no redundant seed/read zooms.">
+    <text id="panel-label-a" x="0.5" y="3" font-size="2.82222222" text-anchor="start" font-weight="700" fill="#20262E">a</text>
+    <text id="a-input" x="6" y="4.2" font-size="2.46944444" text-anchor="start" font-weight="700" fill="#20262E">Input</text>
+    <line id="a-guide-2" x1="77.29981718" y1="7" x2="77.29981718" y2="56" stroke="#94A3B0" stroke-width="0.10583333" stroke-dasharray="0.8 0.6" />
+    <line id="a-guide-3" x1="89.44515539" y1="7" x2="89.44515539" y2="56" stroke="#94A3B0" stroke-width="0.10583333" stroke-dasharray="0.8 0.6" />
+    <line id="a-guide-4" x1="101.11882998" y1="7" x2="101.11882998" y2="56" stroke="#94A3B0" stroke-width="0.10583333" stroke-dasharray="0.8 0.6" />
+    <line id="a-guide-5" x1="114.20749543" y1="7" x2="114.20749543" y2="56" stroke="#94A3B0" stroke-width="0.10583333" stroke-dasharray="0.8 0.6" />
+    <line id="a-guide-6" x1="126.35283364" y1="7" x2="126.35283364" y2="56" stroke="#94A3B0" stroke-width="0.10583333" stroke-dasharray="0.8 0.6" />
+    <line id="a-guide-7" x1="143.92230347" y1="7" x2="143.92230347" y2="56" stroke="#94A3B0" stroke-width="0.10583333" stroke-dasharray="0.8 0.6" />
+    <line id="a-guide-8" x1="164.32175503" y1="7" x2="164.32175503" y2="56" stroke="#94A3B0" stroke-width="0.10583333" stroke-dasharray="0.8 0.6" />
+    <line id="a-guide-9" x1="178" y1="7" x2="178" y2="56" stroke="#94A3B0" stroke-width="0.10583333" stroke-dasharray="0.8 0.6" />
+    <text id="a-reference-label" x="46.5" y="9.1" font-size="2.11666667" text-anchor="end" font-weight="400" fill="#20262E">Reference</text>
+    <rect id="a-reference" x="49" y="8" width="129" height="1.2" fill="#B3BAC3" data-role="sequence" data-source="reference" />
+    <text id="a-label-A" x="46.5" y="15.55" font-size="2.11666667" text-anchor="end" font-weight="400" fill="#20262E">Assembly A</text>
+    <rect id="a-A-0" x="68.33820841" y="14" width="8.96160878" height="2" fill="#0072B2" data-role="sequence" data-source="A" data-start="80" data-end="200" data-track="A" />
+    <rect id="a-A-1" x="89.44515539" y="14" width="36.90767824" height="2" fill="#0072B2" data-role="sequence" data-source="A" data-start="280" data-end="600" data-track="A" />
+    <rect id="a-A-2" x="143.92230347" y="14" width="20.39945155" height="2" fill="#0072B2" data-role="sequence" data-source="A" data-start="680" data-end="800" data-track="A" />
+    <text id="a-label-B" x="46.5" y="21.55" font-size="2.11666667" text-anchor="end" font-weight="400" fill="#20262E">Assembly B</text>
+    <rect id="a-B-0" x="49.1179159" y="20" width="28.18190128" height="2" fill="#009E73" data-role="sequence" data-source="B" data-start="0" data-end="200" data-track="B" />
+    <rect id="a-B-1" x="89.44515539" y="20" width="11.67367459" height="2" fill="#009E73" data-role="sequence" data-source="B" data-start="280" data-end="400" data-track="B" />
+    <rect id="a-B-2" x="114.20749543" y="20" width="12.14533821" height="2" fill="#009E73" data-role="sequence" data-source="B" data-start="480" data-end="600" data-track="B" />
+    <rect id="a-B-3" x="143.92230347" y="20" width="20.39945155" height="2" fill="#009E73" data-role="sequence" data-source="B" data-start="680" data-end="800" data-track="B" />
+    <text id="a-label-C" x="46.5" y="27.55" font-size="2.11666667" text-anchor="end" font-weight="400" fill="#20262E">Assembly C</text>
+    <rect id="a-C-0" x="68.33820841" y="26" width="32.78062157" height="2" fill="#CC79A7" data-role="sequence" data-source="C" data-start="80" data-end="400" data-track="C" />
+    <rect id="a-C-1" x="114.20749543" y="26" width="12.14533821" height="2" fill="#CC79A7" data-role="sequence" data-source="C" data-start="480" data-end="600" data-track="C" />
+    <rect id="a-C-2" x="143.92230347" y="26" width="20.39945155" height="2" fill="#CC79A7" data-role="sequence" data-source="C" data-start="680" data-end="800" data-track="C" />
+    <rect id="a-gpm-0" x="49.1179159" y="34" width="19.2202925" height="2" fill="#009E73" data-role="sequence" data-source="B" data-start="0" data-end="80" data-track="gpm" />
+    <rect id="a-gpm-1" x="68.33820841" y="34" width="8.96160878" height="2" fill="#0072B2" data-role="sequence" data-source="A" data-start="80" data-end="200" data-track="gpm" />
+    <rect id="a-gpm-2" x="77.29981718" y="34" width="12.14533821" height="2" fill="#CC79A7" data-role="sequence" data-source="C" data-start="200" data-end="280" data-track="gpm" />
+    <rect id="a-gpm-3" x="89.44515539" y="34" width="36.90767824" height="2" fill="#0072B2" data-role="sequence" data-source="A" data-start="280" data-end="600" data-track="gpm" />
+    <rect id="a-gpm-4" x="126.35283364" y="34" width="17.56946984" height="2" fill="white" stroke="#94A3B0" stroke-width="0.14111111" stroke-dasharray="0.8 0.6" data-role="unresolved" data-start="600" data-end="680" />
+    <text id="a-gap-label-600" x="135.13756856" y="35.55" font-size="1.76388889" text-anchor="middle" font-weight="400" fill="#20262E">Gap 3</text>
+    <rect id="a-gpm-5" x="143.92230347" y="34" width="20.39945155" height="2" fill="#0072B2" data-role="sequence" data-source="A" data-start="680" data-end="800" data-track="gpm" />
+    <rect id="a-gpm-6" x="164.32175503" y="34" width="13.67824497" height="2" fill="white" stroke="#94A3B0" stroke-width="0.14111111" stroke-dasharray="0.8 0.6" data-role="unresolved" data-start="800" data-end="880" />
+    <text id="a-gap-label-800" x="171.16087751" y="35.55" font-size="1.76388889" text-anchor="middle" font-weight="400" fill="#20262E">Right end</text>
+    <rect id="a-final-0" x="49.1179159" y="54" width="19.2202925" height="2" fill="#009E73" data-role="sequence" data-source="B" data-start="0" data-end="80" data-track="final" />
+    <rect id="a-final-1" x="68.33820841" y="54" width="8.96160878" height="2" fill="#0072B2" data-role="sequence" data-source="A" data-start="80" data-end="200" data-track="final" />
+    <rect id="a-final-2" x="77.29981718" y="54" width="12.14533821" height="2" fill="#CC79A7" data-role="sequence" data-source="C" data-start="200" data-end="280" data-track="final" />
+    <rect id="a-final-3" x="89.44515539" y="54" width="36.90767824" height="2" fill="#0072B2" data-role="sequence" data-source="A" data-start="280" data-end="600" data-track="final" />
+    <rect id="a-final-4" x="126.35283364" y="54" width="17.56946984" height="2" fill="#E69F00" data-role="sequence" data-source="read-derived" data-start="600" data-end="680" data-track="final" />
+    <rect id="a-final-5" x="143.92230347" y="54" width="20.39945155" height="2" fill="#0072B2" data-role="sequence" data-source="A" data-start="680" data-end="800" data-track="final" />
+    <rect id="a-final-6" x="164.32175503" y="54" width="13.67824497" height="2" fill="#E69F00" data-role="sequence" data-source="read-derived" data-start="800" data-end="880" data-track="final" />
+    <polyline id="a-contribution-B-stem" points="58.72806216,22 58.72806216,33.3" fill="none" stroke="#009E73" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="a-contribution-B-head" points="58.72806216,33.3 58.34806216,32.45 59.10806216,32.45" fill="#009E73" data-role="process-arrow-head" />
+    <polyline id="a-contribution-C-stem" points="83.37248629,28 83.37248629,33.3" fill="none" stroke="#CC79A7" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="a-contribution-C-head" points="83.37248629,33.3 82.99248629,32.45 83.75248629,32.45" fill="#CC79A7" data-role="process-arrow-head" />
+    <polyline id="a-contribution-A-stem" points="107.66316271,16 107.66316271,33.3" fill="none" stroke="#0072B2" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="a-contribution-A-head" points="107.66316271,33.3 107.28316271,32.45 108.04316271,32.45" fill="#0072B2" data-role="process-arrow-head" />
+    <rect id="a-stage-gpm" x="2" y="30" width="20" height="8" fill="white" rx="0.6" stroke="#94A3B0" stroke-width="0.12347222" />
+    <text id="a-stage-label-gpm" x="12" y="33.2" font-size="2.20486111" text-anchor="middle" font-weight="700" fill="#20262E">GPM2.0</text>
+    <rect id="a-stage-degap" x="2" y="42" width="20" height="8" fill="white" rx="0.6" stroke="#94A3B0" stroke-width="0.12347222" />
+    <text id="a-stage-label-degap" x="12" y="46.7" font-size="2.20486111" text-anchor="middle" font-weight="700" fill="#20262E">DEGAP2.0</text>
+    <rect id="a-stage-output" x="2" y="54" width="20" height="5" fill="white" rx="0.6" stroke="#94A3B0" stroke-width="0.12347222" />
+    <text id="a-stage-label-output" x="12" y="57.2" font-size="2.20486111" text-anchor="middle" font-weight="700" fill="#20262E">Output</text>
+    <text id="a-gpm-details" x="12" y="36.4" font-size="1.76388889" text-anchor="middle" font-weight="400" fill="#20262E">(b, c)</text>
+    <text id="a-degap-details" x="12" y="49.2" font-size="1.76388889" text-anchor="middle" font-weight="400" fill="#20262E">(d)</text>
+    <polyline id="a-input-to-gpm-stem" points="12,6.4 12,29.4" fill="none" stroke="#546474" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="a-input-to-gpm-head" points="12,29.4 11.62,28.55 12.38,28.55" fill="#546474" data-role="process-arrow-head" />
+    <polyline id="a-gpm-to-path-stem" points="22,35 48.3,35" fill="none" stroke="#546474" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="a-gpm-to-path-head" points="48.3,35 47.45,35.38 47.45,34.62" fill="#546474" data-role="process-arrow-head" />
+    <polyline id="a-gpm-to-degap-stem" points="12,38 12,41.5" fill="none" stroke="#546474" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="a-gpm-to-degap-head" points="12,41.5 11.62,40.65 12.38,40.65" fill="#546474" data-role="process-arrow-head" />
+    <polyline id="a-degap-to-output-stem" points="12,50 12,53.5" fill="none" stroke="#546474" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="a-degap-to-output-head" points="12,53.5 11.62,52.65 12.38,52.65" fill="#546474" data-role="process-arrow-head" />
+    <polyline id="a-output-to-path-stem" points="22,55 48.3,55" fill="none" stroke="#546474" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="a-output-to-path-head" points="48.3,55 47.45,55.38 47.45,54.62" fill="#546474" data-role="process-arrow-head" />
+    <text id="a-reads-label" x="31" y="42.2" font-size="2.11666667" text-anchor="start" font-weight="400" fill="#20262E">HiFi / ONT reads</text>
+    <rect id="a-read-0" x="31" y="44" width="13" height="0.5" fill="#E69F00" />
+    <rect id="a-read-1" x="46" y="44" width="12" height="0.5" fill="#E69F00" />
+    <rect id="a-read-2" x="34" y="46" width="16" height="0.5" fill="#E69F00" />
+    <rect id="a-read-3" x="51" y="46" width="12" height="0.5" fill="#E69F00" />
+    <rect id="a-read-4" x="32" y="48" width="10" height="0.5" fill="#E69F00" />
+    <rect id="a-read-5" x="44" y="48" width="14" height="0.5" fill="#E69F00" />
+    <polyline id="a-reads-to-degap-stem" points="30,46 22.6,46" fill="none" stroke="#E69F00" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="a-reads-to-degap-head" points="22.6,46 23.45,45.62 23.45,46.38" fill="#E69F00" data-role="process-arrow-head" />
+    <polyline id="a-repair-GapFiller-stem" points="135.13756856,36.4 135.13756856,53.4" fill="none" stroke="#E69F00" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="a-repair-GapFiller-head" points="135.13756856,53.4 134.75756856,52.55 135.51756856,52.55" fill="#E69F00" data-role="process-arrow-head" />
+    <text id="a-repair-label-GapFiller" x="134.13756856" y="44.8" font-size="1.94027778" text-anchor="end" font-weight="400" fill="#20262E">GapFiller</text>
+    <polyline id="a-repair-TelSeeker-stem" points="171.16087751,36.4 171.16087751,53.4" fill="none" stroke="#E69F00" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="a-repair-TelSeeker-head" points="171.16087751,53.4 170.78087751,52.55 171.54087751,52.55" fill="#E69F00" data-role="process-arrow-head" />
+    <text id="a-repair-label-TelSeeker" x="170.16087751" y="44.8" font-size="1.94027778" text-anchor="end" font-weight="400" fill="#20262E">TelSeeker</text>
+    <text id="a-export" x="49" y="59" font-size="1.94027778" text-anchor="start" font-weight="400" fill="#20262E">FASTA + Final Path</text>
+  </g>
+  <g id="panel-b" data-panel="b" data-bounds="[0, 64, 60, 61]" inkscape:groupmode="layer" inkscape:label="b Assignment, A2/A1 reordering and A2 orientation; A3 unplaced.">
+    <text id="panel-label-b" x="0.5" y="67" font-size="2.82222222" text-anchor="start" font-weight="700" fill="#20262E">b</text>
+    <polygon id="b-assigned-A1-main" points="22.5,75.7 32,75.7 49,83 39.5,83" fill="#E5E9ED" data-role="homology-band" data-contig="A1" data-source-interval="10,105" />
+    <line id="b-assigned-A1-main-start" x1="22.5" y1="75.7" x2="39.5" y2="83" stroke="#94A3B0" stroke-width="0.08819444" />
+    <line id="b-assigned-A1-main-end" x1="32" y1="75.7" x2="49" y2="83" stroke="#94A3B0" stroke-width="0.08819444" />
+    <polygon id="b-assigned-A2-left" points="45.5,75.7 48.5,75.7 23.5,83 26.5,83" fill="#E5E9ED" data-role="homology-band" data-contig="A2" data-source-interval="60,90" />
+    <line id="b-assigned-A2-left-start" x1="45.5" y1="75.7" x2="26.5" y2="83" stroke="#94A3B0" stroke-width="0.08819444" />
+    <line id="b-assigned-A2-left-end" x1="48.5" y1="75.7" x2="23.5" y2="83" stroke="#94A3B0" stroke-width="0.08819444" />
+    <polygon id="b-assigned-A2-right" points="40.5,75.7 43.5,75.7 28.5,83 31.5,83" fill="#E5E9ED" data-role="homology-band" data-contig="A2" data-source-interval="10,40" />
+    <line id="b-assigned-A2-right-start" x1="40.5" y1="75.7" x2="31.5" y2="83" stroke="#94A3B0" stroke-width="0.08819444" />
+    <line id="b-assigned-A2-right-end" x1="43.5" y1="75.7" x2="28.5" y2="83" stroke="#94A3B0" stroke-width="0.08819444" />
+    <rect id="b-assigned-reference" x="21" y="83" width="31.9" height="1" fill="#B3BAC3" data-role="sequence" data-source="reference" />
+    <rect id="b-assigned-A1-main-anchor" x="39.5" y="83" width="9.5" height="1" fill="#94A3B0" />
+    <rect id="b-assigned-A2-left-anchor" x="23.5" y="83" width="3" height="1" fill="#94A3B0" />
+    <rect id="b-assigned-A2-right-anchor" x="28.5" y="83" width="3" height="1" fill="#94A3B0" />
+    <text id="b-state-assigned" x="10" y="75.35" font-size="1.94027778" text-anchor="middle" font-weight="400" fill="#20262E">Input</text>
+    <text id="b-ref-label-assigned" x="20" y="84.2" font-size="1.76388889" text-anchor="end" font-weight="400" fill="#20262E">Chr1</text>
+    <rect id="b-assigned-A1" x="21.5" y="74" width="12" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-contig="A1" data-state="assigned" data-source-orientation="1" />
+    <text id="b-label-assigned-A1" x="27.5" y="73.1" font-size="1.94027778" text-anchor="middle" font-weight="700" fill="#20262E">A1</text>
+    <rect id="b-assigned-A2" x="39.5" y="74" width="10" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-contig="A2" data-state="assigned" data-source-orientation="1" />
+    <text id="b-label-assigned-A2" x="44.5" y="73.1" font-size="1.94027778" text-anchor="middle" font-weight="700" fill="#20262E">A2</text>
+    <polygon id="b-ordered-A1-main" points="39.5,92.7 49,92.7 49,100 39.5,100" fill="#E5E9ED" data-role="homology-band" data-contig="A1" data-source-interval="10,105" />
+    <line id="b-ordered-A1-main-start" x1="39.5" y1="92.7" x2="39.5" y2="100" stroke="#94A3B0" stroke-width="0.08819444" />
+    <line id="b-ordered-A1-main-end" x1="49" y1="92.7" x2="49" y2="100" stroke="#94A3B0" stroke-width="0.08819444" />
+    <polygon id="b-ordered-A2-left" points="28.5,92.7 31.5,92.7 23.5,100 26.5,100" fill="#E5E9ED" data-role="homology-band" data-contig="A2" data-source-interval="60,90" />
+    <line id="b-ordered-A2-left-start" x1="28.5" y1="92.7" x2="26.5" y2="100" stroke="#94A3B0" stroke-width="0.08819444" />
+    <line id="b-ordered-A2-left-end" x1="31.5" y1="92.7" x2="23.5" y2="100" stroke="#94A3B0" stroke-width="0.08819444" />
+    <polygon id="b-ordered-A2-right" points="23.5,92.7 26.5,92.7 28.5,100 31.5,100" fill="#E5E9ED" data-role="homology-band" data-contig="A2" data-source-interval="10,40" />
+    <line id="b-ordered-A2-right-start" x1="23.5" y1="92.7" x2="31.5" y2="100" stroke="#94A3B0" stroke-width="0.08819444" />
+    <line id="b-ordered-A2-right-end" x1="26.5" y1="92.7" x2="28.5" y2="100" stroke="#94A3B0" stroke-width="0.08819444" />
+    <rect id="b-ordered-reference" x="21" y="100" width="31.9" height="1" fill="#B3BAC3" data-role="sequence" data-source="reference" />
+    <rect id="b-ordered-A1-main-anchor" x="39.5" y="100" width="9.5" height="1" fill="#94A3B0" />
+    <rect id="b-ordered-A2-left-anchor" x="23.5" y="100" width="3" height="1" fill="#94A3B0" />
+    <rect id="b-ordered-A2-right-anchor" x="28.5" y="100" width="3" height="1" fill="#94A3B0" />
+    <text id="b-state-ordered" x="10" y="92.35" font-size="1.94027778" text-anchor="middle" font-weight="400" fill="#20262E">Ordered</text>
+    <text id="b-ref-label-ordered" x="20" y="101.2" font-size="1.76388889" text-anchor="end" font-weight="400" fill="#20262E">Chr1</text>
+    <rect id="b-ordered-A2" x="22.5" y="91" width="10" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-contig="A2" data-state="ordered" data-source-orientation="1" />
+    <text id="b-label-ordered-A2" x="27.5" y="90.1" font-size="1.94027778" text-anchor="middle" font-weight="700" fill="#20262E">A2</text>
+    <text id="b-ordered-left" x="21.8" y="92.35" font-size="1.76388889" text-anchor="end" font-weight="400" fill="#20262E">1</text>
+    <text id="b-ordered-right" x="33.2" y="92.35" font-size="1.76388889" text-anchor="start" font-weight="400" fill="#20262E">L</text>
+    <rect id="b-ordered-A1" x="38.5" y="91" width="12" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-contig="A1" data-state="ordered" data-source-orientation="1" />
+    <text id="b-label-ordered-A1" x="44.5" y="90.1" font-size="1.94027778" text-anchor="middle" font-weight="700" fill="#20262E">A1</text>
+    <polygon id="b-output-A1-main" points="39.5,109.7 49,109.7 49,117 39.5,117" fill="#E5E9ED" data-role="homology-band" data-contig="A1" data-source-interval="10,105" />
+    <line id="b-output-A1-main-start" x1="39.5" y1="109.7" x2="39.5" y2="117" stroke="#94A3B0" stroke-width="0.08819444" />
+    <line id="b-output-A1-main-end" x1="49" y1="109.7" x2="49" y2="117" stroke="#94A3B0" stroke-width="0.08819444" />
+    <polygon id="b-output-A2-left" points="23.5,109.7 26.5,109.7 26.5,117 23.5,117" fill="#E5E9ED" data-role="homology-band" data-contig="A2" data-source-interval="60,90" />
+    <line id="b-output-A2-left-start" x1="23.5" y1="109.7" x2="23.5" y2="117" stroke="#94A3B0" stroke-width="0.08819444" />
+    <line id="b-output-A2-left-end" x1="26.5" y1="109.7" x2="26.5" y2="117" stroke="#94A3B0" stroke-width="0.08819444" />
+    <polygon id="b-output-A2-right" points="28.5,109.7 31.5,109.7 31.5,117 28.5,117" fill="#E5E9ED" data-role="homology-band" data-contig="A2" data-source-interval="10,40" />
+    <line id="b-output-A2-right-start" x1="28.5" y1="109.7" x2="28.5" y2="117" stroke="#94A3B0" stroke-width="0.08819444" />
+    <line id="b-output-A2-right-end" x1="31.5" y1="109.7" x2="31.5" y2="117" stroke="#94A3B0" stroke-width="0.08819444" />
+    <rect id="b-output-reference" x="21" y="117" width="31.9" height="1" fill="#B3BAC3" data-role="sequence" data-source="reference" />
+    <rect id="b-output-A1-main-anchor" x="39.5" y="117" width="9.5" height="1" fill="#94A3B0" />
+    <rect id="b-output-A2-left-anchor" x="23.5" y="117" width="3" height="1" fill="#94A3B0" />
+    <rect id="b-output-A2-right-anchor" x="28.5" y="117" width="3" height="1" fill="#94A3B0" />
+    <text id="b-state-output" x="10" y="109.35" font-size="1.94027778" text-anchor="middle" font-weight="400" fill="#20262E">Oriented</text>
+    <text id="b-ref-label-output" x="20" y="118.2" font-size="1.76388889" text-anchor="end" font-weight="400" fill="#20262E">Chr1</text>
+    <rect id="b-output-A2" x="22.5" y="108" width="10" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-contig="A2" data-state="output" data-source-orientation="-1" />
+    <text id="b-label-output-A2" x="27.5" y="107.1" font-size="1.94027778" text-anchor="middle" font-weight="700" fill="#20262E">A2</text>
+    <text id="b-output-left" x="21.8" y="109.35" font-size="1.76388889" text-anchor="end" font-weight="400" fill="#20262E">L</text>
+    <text id="b-output-right" x="33.2" y="109.35" font-size="1.76388889" text-anchor="start" font-weight="400" fill="#20262E">1</text>
+    <rect id="b-output-A1" x="38.5" y="108" width="12" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-contig="A1" data-state="output" data-source-orientation="1" />
+    <text id="b-label-output-A1" x="44.5" y="107.1" font-size="1.94027778" text-anchor="middle" font-weight="700" fill="#20262E">A1</text>
+    <rect id="b-input-A3" x="51.5" y="74" width="6" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-contig="A3" data-state="input" />
+    <text id="b-label-input-A3" x="54.5" y="73.1" font-size="1.94027778" text-anchor="middle" font-weight="700" fill="#20262E">A3</text>
+    <rect id="b-unplaced-A3" x="51.5" y="122" width="6" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-contig="A3" data-state="unplaced" />
+    <text id="b-label-unplaced-A3" x="54.5" y="121.1" font-size="1.94027778" text-anchor="middle" font-weight="700" fill="#20262E">A3</text>
+    <text id="b-unplaced" x="10" y="123.35" font-size="1.94027778" text-anchor="middle" font-weight="400" fill="#20262E">Unplaced</text>
+    <polyline id="b-order-stem" points="10,85.8 10,89.7" fill="none" stroke="#546474" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="b-order-head" points="10,89.7 9.62,88.85 10.38,88.85" fill="#546474" data-role="process-arrow-head" />
+    <polyline id="b-orient-stem" points="10,102.8 10,106.7" fill="none" stroke="#546474" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="b-orient-head" points="10,106.7 9.62,105.85 10.38,105.85" fill="#546474" data-role="process-arrow-head" />
+  </g>
+  <g id="panel-c" data-panel="c" data-bounds="[64, 64, 116, 60]" inkscape:groupmode="layer" inkscape:label="c Complete three-case GRT schematic, including the correction inset.">
+    <svg width="116" height="54.29787234" viewBox="0 0 1833 858" version="1.1" font-family="Arial, Helvetica, sans-serif" fill="#20262E" role="img" aria-labelledby="c-figure-title c-figure-description" data-source-style-profile="cgat-unified-style-v1" data-journal-profile="Nature Methods 2026-10-19 trial" id="c-grt-native" x="64" y="64" data-source-figure="gpm-repair">
+      <title id="c-figure-title">GPM/GRT: assembly-derived repair</title>
+      <desc id="c-figure-description">Three assembly-derived repair contexts retained from the right-hand GRT mechanism figure: anchor-based filling, flanking-extension filling, and correction with filling. One shared upper target path and one shared lower repaired example path span all three contexts. L and R are anchoring regions; S is the donor insert. The third context retains its correction inset and return arrow. Telomere markers occur only at the four original main-path endpoints, plus the legend. This schematic is not a universal completion claim or measured base-pair data.</desc>
+      <metadata id="c-provenance">{"raster_source": "drafts/gpm/gpm-repair-02.png", "reference_source": "references/methods/GRT_pipeline_old_right.png", "reference_original": "references/methods/GRT_pipeline_old.png", "authorization": {"user_message": "转svg", "date": "2026-10-14", "meaning": "Authorize SVG conversion of current repair-02; does not pre-approve unseen native-vector appearance."}, "units": "Schematic SVG coordinates, not biological bp. Inset is a separate local scale. Previous synthetic 2+1 fixtures are NOT data for this diagram.", "rectifications": ["Exact shared top/bottom outer span, and exactly four mechanism telomeres.", "Exact extracted-to-inserted spans: I 214..302; II 618..868 including both extensions; III 1128..1324.", "Match main/local anchor, mismatch and cut coordinates, with a separate consistent inset scale.", "Flat fills and square sequence ends; preserve original four telomere triangles as separate symbols and black unresolved-gap connectors.", "Discrete low/high legend swatches replace the old grayscale gradient without removing either meaning."]}</metadata>
+      <g id="c-layer-frames" inkscape:groupmode="layer" inkscape:label="01 Background and three original columns">
+        <rect id="c-background" x="0" y="0" width="1833" height="858" fill="white" />
+        <rect id="c-panel-I" x="30" y="22" width="433" height="653" fill="white" rx="10.1833333333" />
+        <rect id="c-panel-II" x="480" y="22" width="542" height="653" fill="white" rx="10.1833333333" />
+        <rect id="c-panel-III" x="1039" y="22" width="770" height="653" fill="white" rx="10.1833333333" />
+        <rect id="c-legend-frame" x="30" y="688" width="1773" height="148" fill="white" rx="10.1833333333" stroke="none" stroke-width="1.95107399" />
+        <line id="c-white-case-separator-1" x1="471.5" x2="471.5" y1="180" y2="560" stroke="#D1D8DF" stroke-width="1.39362428" fill="none" data-role="decorative-separator" />
+        <line id="c-white-case-separator-2" x1="1030.5" x2="1030.5" y1="180" y2="560" stroke="#D1D8DF" stroke-width="1.39362428" fill="none" data-role="decorative-separator" />
+      </g>
+      <g id="c-layer-boundaries" inkscape:groupmode="layer" inkscape:label="02 Registered anchor and replacement guides">
+        <line id="c-I-guide-upper-0" x1="214" x2="214" y1="184" y2="444" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-I-guide-upper-1" x1="302" x2="302" y1="184" y2="444" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-I-guide-lower-0" x1="214" x2="214" y1="540" y2="642" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-I-guide-lower-1" x1="302" x2="302" y1="540" y2="642" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-II-guide-upper-0" x1="618" x2="618" y1="184" y2="444" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-II-guide-upper-1" x1="664" x2="664" y1="184" y2="444" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-II-guide-upper-2" x1="822" x2="822" y1="184" y2="444" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-II-guide-upper-3" x1="868" x2="868" y1="184" y2="444" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-II-guide-lower-0" x1="618" x2="618" y1="540" y2="642" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-II-guide-lower-1" x1="868" x2="868" y1="540" y2="642" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-III-guide-upper-0" x1="1048" x2="1048" y1="184" y2="444" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-III-guide-upper-1" x1="1128" x2="1128" y1="184" y2="444" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-III-guide-upper-2" x1="1324" x2="1324" y1="184" y2="444" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-III-guide-upper-3" x1="1392" x2="1392" y1="184" y2="444" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-III-guide-lower-0" x1="1128" x2="1128" y1="540" y2="642" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-III-guide-lower-1" x1="1324" x2="1324" y1="540" y2="642" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+      </g>
+      <g id="c-layer-correspondence" inkscape:groupmode="layer" inkscape:label="03 Collinearity and mismatch bands">
+        <polygon id="c-I-anchor-L" points="176,256 214,256 214,370 176,370" fill="#8A9198" data-role="collinearity-band" data-case="I" data-anchor="L" />
+        <polygon id="c-I-anchor-R" points="302,256 340,256 340,370 302,370" fill="#8A9198" data-role="collinearity-band" data-case="I" data-anchor="R" />
+        <polygon id="c-II-anchor-L" points="570,256 664,256 664,370 570,370" fill="#ADB5BD" data-role="collinearity-band" data-case="II" data-anchor="L" />
+        <polygon id="c-II-anchor-R" points="822,256 882,256 882,370 822,370" fill="#ADB5BD" data-role="collinearity-band" data-case="II" data-anchor="R" />
+        <polygon id="c-II-mismatch-band-0" points="664,256 699,256 723,370 664,370" fill="#FAEFCB" data-role="mismatch-band" data-case="II" />
+        <polygon id="c-II-mismatch-band-1" points="788,256 822,256 822,370 763,370" fill="#FAEFCB" data-role="mismatch-band" data-case="II" />
+        <polygon id="c-III-anchor-L" points="1048,256 1128,256 1128,370 1048,370" fill="#D5DADE" data-role="collinearity-band" data-case="III" data-anchor="L" />
+        <polygon id="c-III-anchor-R" points="1324,256 1392,256 1392,370 1324,370" fill="#D5DADE" data-role="collinearity-band" data-case="III" data-anchor="R" />
+        <polygon id="c-III-mismatch-band-0" points="1128,256 1180,256 1226,370 1128,370" fill="#FAEFCB" data-role="mismatch-band" data-case="III" />
+        <polygon id="c-III-mismatch-band-1" points="1272,256 1324,256 1324,370 1226,370" fill="#FAEFCB" data-role="mismatch-band" data-case="III" />
+      </g>
+      <g id="c-layer-shared-paths" inkscape:groupmode="layer" inkscape:label="04 One shared before path and one shared result path">
+        <g id="c-shared-top" data-role="shared-path" data-state="before">
+          <rect id="c-top-A-1" x="104" y="125" width="110" height="30" fill="#0072B2" rx="0" data-role="sequence" data-view="top" data-source="A" />
+          <line id="c-top-gap-I" x1="214" x2="302" y1="140" y2="140" stroke="#20262E" stroke-width="2.78724856" stroke-linecap="butt" data-role="unresolved-gap" data-view="top" />
+          <rect id="c-top-A-2" x="302" y="125" width="397" height="30" fill="#0072B2" rx="0" data-role="sequence" data-view="top" data-source="A" />
+          <line id="c-top-gap-II" x1="699" x2="788" y1="140" y2="140" stroke="#20262E" stroke-width="2.78724856" stroke-linecap="butt" data-role="unresolved-gap" data-view="top" />
+          <rect id="c-top-A-3" x="788" y="125" width="392" height="30" fill="#0072B2" rx="0" data-role="sequence" data-view="top" data-source="A" />
+          <line id="c-top-gap-III" x1="1180" x2="1272" y1="140" y2="140" stroke="#20262E" stroke-width="2.78724856" stroke-linecap="butt" data-role="unresolved-gap" data-view="top" />
+          <rect id="c-top-A-4" x="1272" y="125" width="320" height="30" fill="#0072B2" rx="0" data-role="sequence" data-view="top" data-source="A" />
+          <rect id="c-top-II-mismatch-0" x="664" y="125" width="35" height="30" fill="#F0D98B" rx="0" data-role="mismatch-marker" />
+          <rect id="c-top-II-mismatch-1" x="788" y="125" width="34" height="30" fill="#F0D98B" rx="0" data-role="mismatch-marker" />
+          <rect id="c-top-III-mismatch-0" x="1128" y="125" width="52" height="30" fill="#F0D98B" rx="0" data-role="mismatch-marker" />
+          <rect id="c-top-III-mismatch-1" x="1272" y="125" width="52" height="30" fill="#F0D98B" rx="0" data-role="mismatch-marker" />
+          <polygon id="c-top-telomere-left" points="74,116 100,140 74,164" fill="#17365D" data-role="main-telomere" data-side="left" />
+          <polygon id="c-top-telomere-right" points="1624,116 1596,140 1624,164" fill="#17365D" data-role="main-telomere" data-side="right" />
+        </g>
+        <g id="c-shared-bottom" data-role="shared-path" data-state="after">
+          <rect id="c-bottom-A-1" x="104" y="588" width="110" height="30" fill="#0072B2" rx="0" data-role="sequence" data-view="bottom" data-source="A" />
+          <rect id="c-bottom-I-S" x="214" y="588" width="88" height="30" fill="#009E73" rx="0" data-role="donor-S" data-view="bottom" data-case="I" data-source="B" />
+          <rect id="c-bottom-A-2" x="302" y="588" width="316" height="30" fill="#0072B2" rx="0" data-role="sequence" data-view="bottom" data-source="A" />
+          <rect id="c-bottom-II-extension-left" x="618" y="588" width="46" height="30" fill="#007D62" rx="0" data-role="donor-extension" data-view="bottom" data-case="II" data-source="B" />
+          <rect id="c-bottom-II-S" x="664" y="588" width="158" height="30" fill="#009E73" rx="0" data-role="donor-S" data-view="bottom" data-case="II" data-source="B" />
+          <rect id="c-bottom-II-extension-right" x="822" y="588" width="46" height="30" fill="#007D62" rx="0" data-role="donor-extension" data-view="bottom" data-case="II" data-source="B" />
+          <rect id="c-bottom-A-3" x="868" y="588" width="260" height="30" fill="#0072B2" rx="0" data-role="sequence" data-view="bottom" data-source="A" />
+          <rect id="c-bottom-III-S" x="1128" y="588" width="196" height="30" fill="#009E73" rx="0" data-role="donor-S" data-view="bottom" data-case="III" data-source="B" />
+          <rect id="c-bottom-A-4" x="1324" y="588" width="268" height="30" fill="#0072B2" rx="0" data-role="sequence" data-view="bottom" data-source="A" />
+          <polygon id="c-bottom-telomere-left" points="74,579 100,603 74,627" fill="#17365D" data-role="main-telomere" data-side="left" />
+          <polygon id="c-bottom-telomere-right" points="1624,579 1596,603 1624,627" fill="#17365D" data-role="main-telomere" data-side="right" />
+        </g>
+      </g>
+      <g id="c-layer-local-views" inkscape:groupmode="layer" inkscape:label="05 Local target, donor and extracted pieces">
+        <g id="c-local-I">
+          <rect id="c-I-target-left" x="122" y="226" width="92" height="30" fill="#0072B2" rx="0" data-role="sequence" data-view="local-target" data-case="I" data-source="A" />
+          <rect id="c-I-target-right" x="302" y="226" width="88" height="30" fill="#0072B2" rx="0" data-role="sequence" data-view="local-target" data-case="I" data-source="A" />
+          <line id="c-I-local-gap" x1="214" x2="302" y1="241" y2="241" stroke="#20262E" stroke-width="2.78724856" stroke-linecap="butt" data-role="unresolved-gap" data-view="local-target" />
+          <rect id="c-I-donor" x="176" y="370" width="164" height="30" fill="#009E73" rx="0" data-role="donor-context" data-view="donor" data-case="I" data-source="B" />
+          <rect id="c-extract-I-S" x="214" y="466" width="88" height="30" fill="#009E73" rx="0" data-role="donor-S" data-view="extracted" data-case="I" data-source="B" />
+        </g>
+        <g id="c-local-II">
+          <rect id="c-II-target-left" x="548" y="226" width="151" height="30" fill="#0072B2" rx="0" data-role="sequence" data-view="local-target" data-case="II" data-source="A" />
+          <rect id="c-II-target-right" x="788" y="226" width="150" height="30" fill="#0072B2" rx="0" data-role="sequence" data-view="local-target" data-case="II" data-source="A" />
+          <line id="c-II-local-gap" x1="699" x2="788" y1="241" y2="241" stroke="#20262E" stroke-width="2.78724856" stroke-linecap="butt" data-role="unresolved-gap" data-view="local-target" />
+          <rect id="c-II-local-mismatch-0" x="664" y="226" width="35" height="30" fill="#F0D98B" rx="0" data-role="mismatch-marker" />
+          <rect id="c-II-local-mismatch-1" x="788" y="226" width="34" height="30" fill="#F0D98B" rx="0" data-role="mismatch-marker" />
+          <rect id="c-II-donor" x="570" y="370" width="312" height="30" fill="#009E73" rx="0" data-role="donor-context" data-view="donor" data-case="II" data-source="B" />
+          <rect id="c-extract-II-extension-left" x="618" y="466" width="46" height="30" fill="#007D62" rx="0" data-role="donor-extension" data-view="extracted" data-case="II" data-source="B" />
+          <rect id="c-extract-II-S" x="664" y="466" width="158" height="30" fill="#009E73" rx="0" data-role="donor-S" data-view="extracted" data-case="II" data-source="B" />
+          <rect id="c-extract-II-extension-right" x="822" y="466" width="46" height="30" fill="#007D62" rx="0" data-role="donor-extension" data-view="extracted" data-case="II" data-source="B" />
+        </g>
+        <g id="c-local-III">
+          <rect id="c-III-target-left" x="1048" y="226" width="132" height="30" fill="#0072B2" rx="0" data-role="sequence" data-view="local-target" data-case="III" data-source="A" />
+          <rect id="c-III-target-right" x="1272" y="226" width="172" height="30" fill="#0072B2" rx="0" data-role="sequence" data-view="local-target" data-case="III" data-source="A" />
+          <line id="c-III-local-gap" x1="1180" x2="1272" y1="241" y2="241" stroke="#20262E" stroke-width="2.78724856" stroke-linecap="butt" data-role="unresolved-gap" data-view="local-target" />
+          <rect id="c-III-local-mismatch-0" x="1128" y="226" width="52" height="30" fill="#F0D98B" rx="0" data-role="mismatch-marker" />
+          <rect id="c-III-local-mismatch-1" x="1272" y="226" width="52" height="30" fill="#F0D98B" rx="0" data-role="mismatch-marker" />
+          <rect id="c-III-donor" x="1048" y="370" width="344" height="30" fill="#009E73" rx="0" data-role="donor-context" data-view="donor" data-case="III" data-source="B" />
+          <rect id="c-extract-III-S" x="1128" y="466" width="196" height="30" fill="#009E73" rx="0" data-role="donor-S" data-view="extracted" data-case="III" data-source="B" />
+        </g>
+      </g>
+      <g id="c-layer-correction-inset" inkscape:groupmode="layer" inkscape:label="06 Correction inset retained from the reference">
+        <rect id="c-correction-frame" x="1476" y="244" width="294" height="250" fill="none" stroke="#526273" stroke-width="1.95107399" stroke-dasharray="7 6" />
+        <rect id="c-removed-region-frame" x="1548" y="258" width="140" height="36" fill="none" stroke="#526273" stroke-width="1.95107399" stroke-dasharray="6 5" />
+        <line id="c-inset-guide-0" x1="1560" x2="1560" y1="296" y2="464" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <line id="c-inset-guide-1" x1="1676" x2="1676" y1="296" y2="464" stroke="#526273" stroke-width="1.39362428" stroke-dasharray="6.11 5.0916666667" data-role="boundary-guide" />
+        <polygon id="c-inset-anchor-L" points="1498,358 1560,358 1560,434 1498,434" fill="#8A9198" data-role="collinearity-band" data-case="inset" data-anchor="L" />
+        <rect id="c-inset-target-L" x="1498" y="336" width="62" height="22" fill="#0072B2" rx="0" data-role="sequence" data-view="inset-target" data-case="inset" data-source="A" />
+        <polygon id="c-inset-anchor-R" points="1676,358 1732,358 1732,434 1676,434" fill="#8A9198" data-role="collinearity-band" data-case="inset" data-anchor="R" />
+        <rect id="c-inset-target-R" x="1676" y="336" width="56" height="22" fill="#0072B2" rx="0" data-role="sequence" data-view="inset-target" data-case="inset" data-source="A" />
+        <line id="c-inset-removed-gap" x1="1592" x2="1644" y1="277" y2="277" stroke="#20262E" stroke-width="2.78724856" stroke-linecap="butt" data-role="unresolved-gap" data-view="inset-removed" />
+        <rect id="c-inset-removed-mismatch-0" x="1560" y="266" width="32" height="22" fill="#F0D98B" rx="0" data-role="mismatch-marker" />
+        <rect id="c-inset-removed-mismatch-1" x="1644" y="266" width="32" height="22" fill="#F0D98B" rx="0" data-role="mismatch-marker" />
+        <line id="c-inset-corrected-gap" x1="1560" x2="1676" y1="347" y2="347" stroke="#20262E" stroke-width="2.78724856" stroke-linecap="butt" data-role="unresolved-gap" data-view="inset-target" />
+        <rect id="c-inset-donor" x="1498" y="434" width="234" height="22" fill="#009E73" rx="0" data-role="donor-context" data-view="inset-donor" data-case="inset" data-source="B" />
+      </g>
+      <g id="c-layer-flow" inkscape:groupmode="layer" inkscape:label="07 Mechanism and inset flow arrows">
+        <g id="c-I-expand" data-role="flow-arrow">
+          <polyline id="c-I-expand-stem" points="258,165 258,222" fill="none" stroke="#546474" stroke-width="2.78724856" />
+          <polygon id="c-I-expand-head" points="258,222 264.11,209.78 251.89,209.78" fill="#546474" />
+        </g>
+        <g id="c-II-expand" data-role="flow-arrow">
+          <polyline id="c-II-expand-stem" points="743,165 743,222" fill="none" stroke="#546474" stroke-width="2.78724856" />
+          <polygon id="c-II-expand-head" points="743,222 749.11,209.78 736.89,209.78" fill="#546474" />
+        </g>
+        <g id="c-III-expand" data-role="flow-arrow">
+          <polyline id="c-III-expand-stem" points="1226,165 1226,222" fill="none" stroke="#546474" stroke-width="2.78724856" />
+          <polygon id="c-III-expand-head" points="1226,222 1232.11,209.78 1219.89,209.78" fill="#546474" />
+        </g>
+        <g id="c-I-insert" data-role="flow-arrow">
+          <polyline id="c-I-insert-stem" points="258,518 258,576" fill="none" stroke="#546474" stroke-width="2.78724856" />
+          <polygon id="c-I-insert-head" points="258,576 264.11,563.78 251.89,563.78" fill="#546474" />
+        </g>
+        <g id="c-II-insert" data-role="flow-arrow">
+          <polyline id="c-II-insert-stem" points="743,518 743,576" fill="none" stroke="#546474" stroke-width="2.78724856" />
+          <polygon id="c-II-insert-head" points="743,576 749.11,563.78 736.89,563.78" fill="#546474" />
+        </g>
+        <g id="c-III-insert" data-role="flow-arrow">
+          <polyline id="c-III-insert-stem" points="1226,518 1226,576" fill="none" stroke="#546474" stroke-width="2.78724856" />
+          <polygon id="c-III-insert-head" points="1226,576 1232.11,563.78 1219.89,563.78" fill="#546474" />
+        </g>
+        <g id="c-correction-enter" data-role="flow-arrow">
+          <polyline id="c-correction-enter-stem" points="1414,385 1469,385" fill="none" stroke="#546474" stroke-width="2.78724856" />
+          <polygon id="c-correction-enter-head" points="1469,385 1456.78,378.89 1456.78,391.11" fill="#546474" />
+        </g>
+        <g id="c-correction-return" data-role="flow-arrow">
+          <polyline id="c-correction-return-stem" points="1432,481 1378,481" fill="none" stroke="#546474" stroke-width="2.78724856" />
+          <polygon id="c-correction-return-head" points="1378,481 1390.22,487.11 1390.22,474.89" fill="#546474" />
+        </g>
+      </g>
+      <g id="c-layer-labels" inkscape:groupmode="layer" inkscape:label="08 Live text and compact original legend">
+        <rect id="c-legend-low-key" x="68" y="705" width="21" height="48" fill="#D5DADE" stroke="#94A3B0" stroke-width="1.67234914" />
+        <rect id="c-legend-high-key" x="68" y="758" width="21" height="48" fill="#8A9198" stroke="#94A3B0" stroke-width="1.67234914" />
+        <polygon id="c-legend-mismatch-key" points="465,701 475,701 486,743 454,743" fill="#F0D98B" data-role="legend-symbol" />
+        <polygon id="c-legend-telomere-key" points="484,766 456,790 484,814" fill="#17365D" data-role="legend-telomere" />
+        <text id="c-title-I" x="246.5" y="86" font-size="34.84060704" font-weight="700" text-anchor="middle">I. Anchor-based filling</text>
+        <text id="c-title-II" x="751" y="86" font-size="34.84060704" font-weight="700" text-anchor="middle">II. Flanking-extension filling</text>
+        <text id="c-title-III" x="1424" y="86" font-size="34.84060704" font-weight="700" text-anchor="middle">III. Correction &amp; filling</text>
+        <text id="c-top-II-mismatch-0-text" x="681.5" y="150" font-size="30.6597342" font-weight="400" text-anchor="middle">X</text>
+        <text id="c-top-II-mismatch-1-text" x="805" y="150" font-size="30.6597342" font-weight="400" text-anchor="middle">X</text>
+        <text id="c-top-III-mismatch-0-text" x="1154" y="150" font-size="30.6597342" font-weight="400" text-anchor="middle">XX</text>
+        <text id="c-top-III-mismatch-1-text" x="1298" y="150" font-size="30.6597342" font-weight="400" text-anchor="middle">XX</text>
+        <text id="c-bottom-I-S-label" x="258" y="613" font-size="30.6597342" font-weight="400" text-anchor="middle">S</text>
+        <text id="c-bottom-II-S-label" x="743" y="613" font-size="30.6597342" font-weight="400" text-anchor="middle">S</text>
+        <text id="c-bottom-III-S-label" x="1226" y="613" font-size="30.6597342" font-weight="400" text-anchor="middle">S</text>
+        <text id="c-I-donor-label-L" x="195" y="395" font-size="30.6597342" font-weight="400" text-anchor="middle">L</text>
+        <text id="c-I-donor-label-S" x="258" y="395" font-size="30.6597342" font-weight="400" text-anchor="middle">S</text>
+        <text id="c-I-donor-label-R" x="321" y="395" font-size="30.6597342" font-weight="400" text-anchor="middle">R</text>
+        <text id="c-extract-I-S-label" x="258" y="491" font-size="30.6597342" font-weight="400" text-anchor="middle">S</text>
+        <text id="c-II-local-mismatch-0-text" x="681.5" y="251" font-size="30.6597342" font-weight="400" text-anchor="middle">X</text>
+        <text id="c-II-local-mismatch-1-text" x="805" y="251" font-size="30.6597342" font-weight="400" text-anchor="middle">X</text>
+        <text id="c-II-donor-label-L" x="641" y="395" font-size="30.6597342" font-weight="400" text-anchor="middle">L</text>
+        <text id="c-II-donor-label-S" x="743" y="395" font-size="30.6597342" font-weight="400" text-anchor="middle">S</text>
+        <text id="c-II-donor-label-R" x="845" y="395" font-size="30.6597342" font-weight="400" text-anchor="middle">R</text>
+        <text id="c-extract-II-S-label" x="743" y="491" font-size="30.6597342" font-weight="400" text-anchor="middle">S</text>
+        <text id="c-III-local-mismatch-0-text" x="1154" y="251" font-size="30.6597342" font-weight="400" text-anchor="middle">XX</text>
+        <text id="c-III-local-mismatch-1-text" x="1298" y="251" font-size="30.6597342" font-weight="400" text-anchor="middle">XX</text>
+        <text id="c-III-donor-label-L" x="1088" y="395" font-size="30.6597342" font-weight="400" text-anchor="middle">L</text>
+        <text id="c-III-donor-label-S" x="1226" y="395" font-size="30.6597342" font-weight="400" text-anchor="middle">S</text>
+        <text id="c-III-donor-label-R" x="1358" y="395" font-size="30.6597342" font-weight="400" text-anchor="middle">R</text>
+        <text id="c-extract-III-S-label" x="1226" y="491" font-size="30.6597342" font-weight="400" text-anchor="middle">S</text>
+        <text id="c-inset-removed-mismatch-0-text" x="1576" y="283" font-size="27.87248563" font-weight="400" text-anchor="middle">XX</text>
+        <text id="c-inset-removed-mismatch-1-text" x="1660" y="283" font-size="27.87248563" font-weight="400" text-anchor="middle">XX</text>
+        <text id="c-inset-donor-label-L" x="1529" y="453" font-size="27.87248563" font-weight="400" text-anchor="middle">L</text>
+        <text id="c-inset-donor-label-S" x="1618" y="453" font-size="27.87248563" font-weight="400" text-anchor="middle">S</text>
+        <text id="c-inset-donor-label-R" x="1704" y="453" font-size="27.87248563" font-weight="400" text-anchor="middle">R</text>
+        <text id="c-legend-low-collinearity" x="108" y="742" font-size="27.87248563" font-weight="400" text-anchor="start">Low collinearity</text>
+        <text id="c-legend-high-collinearity" x="108" y="808" font-size="27.87248563" font-weight="400" text-anchor="start">High collinearity</text>
+        <text id="c-legend-mismatch" x="506" y="742" font-size="27.87248563" font-weight="400" text-anchor="start">Mismatch block</text>
+        <text id="c-legend-telomere" x="506" y="808" font-size="27.87248563" font-weight="400" text-anchor="start">Telomere</text>
+        <text id="c-legend-left-anchor" x="858" y="742" font-size="27.87248563" font-weight="400" text-anchor="start">L: Left anchoring region</text>
+        <text id="c-legend-right-anchor" x="858" y="808" font-size="27.87248563" font-weight="400" text-anchor="start">R: Right anchoring region</text>
+        <text id="c-legend-insert" x="1380" y="742" font-size="27.87248563" font-weight="400" text-anchor="start">S: Gap filling sequence</text>
+      </g>
+    </svg>
+    <text id="panel-label-c" x="64.5" y="67" font-size="2.82222222" text-anchor="start" font-weight="700" fill="#20262E">c</text>
+  </g>
+  <g id="panel-d" data-panel="d" data-bounds="[0, 128, 180, 50]" inkscape:groupmode="layer" inkscape:label="d Shared extension cycle, GapFiller rounds and alternative TelSeeker joins.">
+    <text id="panel-label-d" x="0.5" y="131" font-size="2.82222222" text-anchor="start" font-weight="700" fill="#20262E">d</text>
+    <text id="d-cycle-title" x="5" y="131" font-size="2.29305556" text-anchor="start" font-weight="700" fill="#20262E">Iterative extension</text>
+    <text id="d-gap-title" x="65" y="131" font-size="2.29305556" text-anchor="start" font-weight="700" fill="#20262E">GapFiller</text>
+    <text id="d-tel-title" x="122" y="131" font-size="2.29305556" text-anchor="start" font-weight="700" fill="#20262E">TelSeeker</text>
+    <line id="d-gap-guide-left" x1="91.63740458" y1="135" x2="91.63740458" y2="174" stroke="#D1D8DF" stroke-width="0.08819444" stroke-dasharray="0.65 0.55" />
+    <line id="d-gap-guide-right" x1="105.24427481" y1="135" x2="105.24427481" y2="174" stroke="#D1D8DF" stroke-width="0.08819444" stroke-dasharray="0.65 0.55" />
+    <rect id="d-gap-input-left" x="83" y="137" width="8.63740458" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-case="gap" />
+    <rect id="d-gap-input-right" x="105.24427481" y="137" width="8.75572519" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-case="gap" />
+    <text id="d-gap-label-input" x="81.5" y="138.3" font-size="1.94027778" text-anchor="end" font-weight="400" fill="#20262E">Input</text>
+    <rect id="d-gap-round1-left" x="83" y="144" width="8.63740458" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-case="gap" />
+    <rect id="d-gap-round1-extension" x="91.63740458" y="144" width="4.73282443" height="1.7" fill="#E69F00" data-role="sequence" data-source="read-derived" data-case="gap" />
+    <text id="d-gap-label-round1" x="81.5" y="145.3" font-size="1.94027778" text-anchor="end" font-weight="400" fill="#20262E">Round 1</text>
+    <rect id="d-gap-roundn-left" x="83" y="151" width="8.63740458" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-case="gap" />
+    <rect id="d-gap-roundn-extension" x="91.63740458" y="151" width="16.20992366" height="1.7" fill="#E69F00" data-role="sequence" data-source="read-derived" data-case="gap" />
+    <text id="d-gap-label-roundn" x="81.5" y="152.3" font-size="1.94027778" text-anchor="end" font-weight="400" fill="#20262E">Round n</text>
+    <rect id="d-gap-candidate-left" x="83" y="171" width="8.63740458" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-case="gap" />
+    <rect id="d-gap-candidate-right" x="105.24427481" y="171" width="8.75572519" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-case="gap" />
+    <rect id="d-gap-candidate-extension" x="91.63740458" y="171" width="13.60687023" height="1.7" fill="#E69F00" data-role="sequence" data-source="read-derived" data-case="gap" />
+    <text id="d-gap-label-candidate" x="81.5" y="172.3" font-size="1.94027778" text-anchor="end" font-weight="400" fill="#20262E">Candidate</text>
+    <line id="d-gap-unresolved" x1="91.63740458" y1="137.85" x2="105.24427481" y2="137.85" stroke="#94A3B0" stroke-width="0.14111111" stroke-dasharray="0.8 0.6" />
+    <circle id="d-gap-ellipsis-0" cx="95.5" cy="147.1" r="0.12" fill="#20262E" />
+    <circle id="d-gap-ellipsis-1" cx="95.5" cy="148.1" r="0.12" fill="#20262E" />
+    <circle id="d-gap-ellipsis-2" cx="95.5" cy="149.1" r="0.12" fill="#20262E" />
+    <polygon id="d-gap-overlap" points="105.24427481,152.7 107.84732824,152.7 107.84732824,158 105.24427481,158" fill="#D5DADE" data-role="homology-band" />
+    <rect id="d-gap-opposite" x="105.24427481" y="158" width="8.75572519" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-case="gap" />
+    <text id="d-gap-opposite-label" x="81.5" y="159.3" font-size="1.76388889" text-anchor="end" font-weight="400" fill="#20262E">Opposite edge</text>
+    <polyline id="d-gap-candidate-arrow-stem" points="98.5,163 98.5,169.8" fill="none" stroke="#546474" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="d-gap-candidate-arrow-head" points="98.5,169.8 98.12,168.95 98.88,168.95" fill="#546474" data-role="process-arrow-head" />
+    <text id="d-tel-case-direct" x="123" y="135.8" font-size="1.94027778" text-anchor="start" font-weight="700" fill="#20262E">Direct</text>
+    <rect id="d-tel-direct-input-blue" x="145" y="139" width="13.596" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-case="direct" />
+    <polygon id="d-tel-direct-overlap" points="155.164,140.7 158.596,140.7 158.596,143.5 155.164,143.5" fill="#D5DADE" data-role="homology-band" />
+    <rect id="d-tel-direct-read" x="155.164" y="143.5" width="20.856" height="1.7" fill="#E69F00" data-role="sequence" data-source="read-derived" data-case="direct" />
+    <rect id="d-tel-direct-read-motif" x="176.02" y="143.5" width="1.98" height="1.7" fill="#17365D" data-role="sequence" data-source="telomeric" data-case="direct" />
+    <rect id="d-tel-direct-candidate-blue" x="145" y="149.5" width="13.596" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-case="direct" />
+    <rect id="d-tel-direct-candidate-insert" x="158.596" y="149.5" width="17.424" height="1.7" fill="#E69F00" data-role="sequence" data-source="read-derived" data-case="direct" />
+    <rect id="d-tel-direct-candidate-motif" x="176.02" y="149.5" width="1.98" height="1.7" fill="#17365D" data-role="sequence" data-source="telomeric" data-case="direct" />
+    <text id="d-tel-direct-input-label" x="143.5" y="140.3" font-size="1.94027778" text-anchor="end" font-weight="400" fill="#20262E">End</text>
+    <text id="d-tel-direct-read-label" x="143.5" y="144.8" font-size="1.94027778" text-anchor="end" font-weight="400" fill="#20262E">Motif-filtered read</text>
+    <text id="d-tel-direct-candidate-label" x="143.5" y="150.8" font-size="1.94027778" text-anchor="end" font-weight="400" fill="#20262E">Candidate</text>
+    <polyline id="d-tel-direct-arrow-stem" points="160,145.6 160,148.7" fill="none" stroke="#546474" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="d-tel-direct-arrow-head" points="160,148.7 159.62,147.85 160.38,147.85" fill="#546474" data-role="process-arrow-head" />
+    <text id="d-tel-case-extended" x="123" y="155.8" font-size="1.94027778" text-anchor="start" font-weight="700" fill="#20262E">After extension</text>
+    <rect id="d-tel-extended-input-blue" x="145" y="159" width="13.596" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-case="extended" />
+    <rect id="d-tel-extended-input-extension" x="158.596" y="159" width="9.372" height="1.7" fill="#E69F00" data-role="sequence" data-source="read-derived" data-case="extended" />
+    <polygon id="d-tel-extended-overlap" points="164.404,160.7 167.968,160.7 167.968,163.5 164.404,163.5" fill="#D5DADE" data-role="homology-band" />
+    <rect id="d-tel-extended-read" x="164.404" y="163.5" width="11.616" height="1.7" fill="#E69F00" data-role="sequence" data-source="read-derived" data-case="extended" />
+    <rect id="d-tel-extended-read-motif" x="176.02" y="163.5" width="1.98" height="1.7" fill="#17365D" data-role="sequence" data-source="telomeric" data-case="extended" />
+    <rect id="d-tel-extended-candidate-blue" x="145" y="171" width="13.596" height="1.7" fill="#0072B2" data-role="sequence" data-source="A" data-case="extended" />
+    <rect id="d-tel-extended-candidate-insert" x="158.596" y="171" width="17.424" height="1.7" fill="#E69F00" data-role="sequence" data-source="read-derived" data-case="extended" />
+    <rect id="d-tel-extended-candidate-motif" x="176.02" y="171" width="1.98" height="1.7" fill="#17365D" data-role="sequence" data-source="telomeric" data-case="extended" />
+    <text id="d-tel-extended-input-label" x="143.5" y="160.3" font-size="1.94027778" text-anchor="end" font-weight="400" fill="#20262E">Extended end</text>
+    <text id="d-tel-extended-read-label" x="143.5" y="164.8" font-size="1.94027778" text-anchor="end" font-weight="400" fill="#20262E">Motif-filtered read</text>
+    <text id="d-tel-extended-candidate-label" x="143.5" y="172.3" font-size="1.94027778" text-anchor="end" font-weight="400" fill="#20262E">Candidate</text>
+    <polyline id="d-tel-extended-arrow-stem" points="160,165.6 160,170.2" fill="none" stroke="#546474" stroke-width="0.17638889" data-role="process-arrow" />
+    <polygon id="d-tel-extended-arrow-head" points="160,170.2 159.62,169.35 160.38,169.35" fill="#546474" data-role="process-arrow-head" />
+    <g id="d-inner-ring-extension-v6" data-revision="approved-raster02-native-inner-ring" inkscape:groupmode="layer" inkscape:label="Iterative extension: approved inner-ring composition">
+      <rect id="d6-current-assembly" x="23" y="139.1" width="11" height="1.6" fill="#0072B2" data-role="sequence" data-source="A" data-state="current" data-interval="0:11" />
+      <rect id="d6-current-prior" x="34" y="139.1" width="3" height="1.6" fill="#E69F00" data-role="sequence" data-source="read-derived" data-state="current" data-part="previous-extension" data-interval="11:14" />
+      <polyline id="d6-current-seed" points="32,141.25 32,141.7 37,141.7 37,141.25" fill="none" stroke="#546474" stroke-width="0.14111111" data-role="terminal-seed-window" data-state="current" data-seed-width="5" data-window-start="9" data-window-end="14" />
+      <rect id="d6-updated-assembly" x="1.5" y="155" width="11" height="1.6" fill="#0072B2" data-role="sequence" data-source="A" data-state="updated" data-interval="0:11" />
+      <rect id="d6-updated-prior" x="12.5" y="155" width="3" height="1.6" fill="#E69F00" data-role="sequence" data-source="read-derived" data-state="updated" data-part="previous-extension" data-interval="11:14" />
+      <rect id="d6-updated-tail" x="15.5" y="155" width="4" height="1.6" fill="#E69F00" data-role="sequence" data-source="read-derived" data-state="updated" data-part="new-outward-tail" data-interval="14:18" data-candidate-id="chosen" />
+      <line id="d6-updated-tail-boundary" x1="15.5" y1="155" x2="15.5" y2="156.6" stroke="#20262E" stroke-width="0.10583333" data-role="outward-tail-boundary" />
+      <polyline id="d6-updated-seed" points="14.5,157.15 14.5,157.6 19.5,157.6 19.5,157.15" fill="none" stroke="#546474" stroke-width="0.14111111" data-role="terminal-seed-window" data-state="updated" data-seed-width="5" data-window-start="13" data-window-end="18" />
+      <rect id="d6-read-0" x="42" y="153.675" width="10.5" height="0.65" fill="#E69F00" data-role="sequence" data-source="read-derived" data-state="reads" />
+      <rect id="d6-read-1" x="44" y="155.475" width="11.5" height="0.65" fill="#E69F00" data-role="sequence" data-source="read-derived" data-state="reads" />
+      <rect id="d6-read-2" x="45" y="157.275" width="12" height="0.65" fill="#E69F00" data-role="sequence" data-source="read-derived" data-state="reads" />
+      <rect id="d6-candidate-other-a" x="23.6" y="169.6" width="12.8" height="1.6" fill="#E69F00" data-role="sequence" data-source="read-derived" data-candidate-id="other-a" data-state="candidates" fill-opacity="0.32" />
+      <rect id="d6-candidate-chosen" x="23.6" y="172.3" width="9" height="1.6" fill="#E69F00" data-role="sequence" data-source="read-derived" data-candidate-id="chosen" data-state="candidates" stroke="#20262E" stroke-width="0.14111111" data-selected="true" data-overlap-width="5" data-outward-tail-width="4" />
+      <line id="d6-candidate-tail-boundary" x1="28.6" y1="172.3" x2="28.6" y2="173.9" stroke="#20262E" stroke-width="0.10583333" data-role="outward-tail-boundary" data-candidate-id="chosen" />
+      <rect id="d6-candidate-other-b" x="23.6" y="175" width="7.5" height="1.6" fill="#E69F00" data-role="sequence" data-source="read-derived" data-candidate-id="other-b" data-state="candidates" fill-opacity="0.32" />
+      <path id="d6-recruit-stem" d="M 32.90717122 147.81261272 A 8.5 8.5 0 0 1 37.98738728 152.89282878" fill="none" stroke="#546474" stroke-width="0.17638889" data-role="process-arrow" data-from="current" data-to="reads" />
+      <polygon id="d6-recruit-head" points="37.98738728,152.89282878 37.33958696,152.22405771 38.05375335,151.9641224" fill="#546474" data-role="process-arrow-head" />
+      <path id="d6-build-stem" d="M 37.98738728 158.70717122 A 8.5 8.5 0 0 1 32.90717122 163.78738728" fill="none" stroke="#546474" stroke-width="0.17638889" data-role="process-arrow" data-from="reads" data-to="candidates" />
+      <polygon id="d6-build-head" points="32.90717122,163.78738728 33.57594229,163.13958696 33.8358776,163.85375335" fill="#546474" data-role="process-arrow-head" />
+      <path id="d6-update-stem" d="M 27.09282878 163.78738728 A 8.5 8.5 0 0 1 22.01261272 158.70717122" fill="none" stroke="#546474" stroke-width="0.17638889" data-role="process-arrow" data-from="candidates" data-to="updated" data-carries="selected_outward_tail_not_whole_candidate" />
+      <polygon id="d6-update-head" points="22.01261272,158.70717122 22.66041304,159.37594229 21.94624665,159.6358776" fill="#546474" data-role="process-arrow-head" />
+      <path id="d6-repeat-stem" d="M 22.01261272 152.89282878 A 8.5 8.5 0 0 1 27.09282878 147.81261272" fill="none" stroke="#546474" stroke-width="0.17638889" data-role="process-arrow" data-from="updated" data-to="current" data-condition="further_extension_required_and_possible" data-carries="updated_edge_with_recomputed_terminal_seed" />
+      <polygon id="d6-repeat-head" points="27.09282878,147.81261272 26.42405771,148.46041304 26.1641224,147.74624665" fill="#546474" data-role="process-arrow-head" />
+      <text id="d6-label-current" x="30" y="136.3" font-size="2.11666667" text-anchor="middle" font-weight="700" fill="#20262E">Current edge</text>
+      <text id="d6-label-reads" x="49.5" y="151.7" font-size="2.11666667" text-anchor="middle" font-weight="700" fill="#20262E">Recruit reads</text>
+      <text id="d6-label-candidates" x="30" y="167.5" font-size="2.11666667" text-anchor="middle" font-weight="700" fill="#20262E">Build &amp; select</text>
+      <text id="d6-label-updated" x="10.5" y="151.7" font-size="2.11666667" text-anchor="middle" font-weight="700" fill="#20262E">Updated edge</text>
+      <text id="d6-label-seed" x="34.5" y="144.4" font-size="1.94027778" text-anchor="middle" font-weight="400" fill="#20262E">Seed</text>
+      <text id="d6-label-repeat" x="19.5" y="146.6" font-size="1.94027778" text-anchor="middle" font-weight="400" fill="#20262E">If needed</text>
+    </g>
+  </g>
+  <rect id="legend-key-A" x="4" y="181.2" width="3" height="1.4" fill="#0072B2" />
+  <text id="legend-label-A" x="8" y="182.55" font-size="1.94027778" text-anchor="start" font-weight="400" fill="#20262E">Assembly A</text>
+  <rect id="legend-key-B" x="36" y="181.2" width="3" height="1.4" fill="#009E73" />
+  <text id="legend-label-B" x="40" y="182.55" font-size="1.94027778" text-anchor="start" font-weight="400" fill="#20262E">Assembly B</text>
+  <rect id="legend-key-C" x="68" y="181.2" width="3" height="1.4" fill="#CC79A7" />
+  <text id="legend-label-C" x="72" y="182.55" font-size="1.94027778" text-anchor="start" font-weight="400" fill="#20262E">Assembly C</text>
+  <rect id="legend-key-read-derived" x="100" y="181.2" width="3" height="1.4" fill="#E69F00" />
+  <text id="legend-label-read-derived" x="104" y="182.55" font-size="1.94027778" text-anchor="start" font-weight="400" fill="#20262E">Read-derived</text>
+  <rect id="legend-key-telomeric" x="138" y="181.2" width="3" height="1.4" fill="#17365D" />
+  <text id="legend-label-telomeric" x="142" y="182.55" font-size="1.94027778" text-anchor="start" font-weight="400" fill="#20262E">Telomeric motif</text>
+  <metadata id="nm-provenance">{"profile": "src/nature-methods-layout.json", "scientific_fixtures": ["docs/workflow-example.json", "src/gpm-organization-layout.json", "src/gpm-repair-layout.json", "src/degap-layout.json"], "main_compaction": "Parameter-distance detail retained in the companion DEGAP figure; no new empirical claim.", "AI_assistance": "AI-assisted code/layout; earlier raster exploration retained in source history. Author and editorial-policy validation remain required."}</metadata>
+  <metadata id="white-background-provenance">{"profile": "src/nature-methods-white-background.json", "profile_sha256": "f53244ccccbd272fb7c2eb1257ceb839310c1d20aee7c8faf642224b271c4011", "base_svg": "final/nature-methods/cgat-main-figure.svg", "base_sha256": "dfc8b418833c1432bb4c1d2f57970b834a53d17f4ee1a3c7cd0b1a55b8835e0a", "scope": "All original text, positions, sequence geometry, homology, scientific fills, fonts, and symbols remain identical. Only declared decorative fills/strokes and three added separation lines differ.", "status": "author-preview-not-promoted"}</metadata>
+  <metadata id="inner-ring-v6-provenance">{"profile": "src/nature-methods-inner-ring-extension.json", "profile_sha256": "87e5b84d7211031108c65addc75f64b12019244e1f4620dc98ed0d7c249b2b2a", "base_svg": "reviews/2026-10-19-white-background-v1/cgat-main-figure-white-v1.svg", "base_sha256": "fc38b6d2ef7fc234ce645a32755fba2948e1472c86d6b08a0ada21d2a702b3b9", "composition_source": "drafts/degap/iterative-extension/iterative-extension-02.png", "raster_sha256": "b9cbd4d4ba9d2f36b30d3a5af96ce9efd49b82bea588f75c77b0cd6d65b883c1", "composition_author_approved": true, "native_vector_author_review": "pending", "scope": "Only Iterative extension inside [0,133,59,179]mm. All other artwork, including GapFiller, is frozen to white-v1.", "scientific_assumption": "illustrative same-orientation full-seed overlap; not an invariant for all runtime alignments", "AI_provenance": "Earlier CPA gpt-image-2.5 raster02 composition; this artifact uses code-built editable vector primitives, not image embedding or auto-tracing."}</metadata>
+  <metadata id="overview-guides-v7-provenance">{"profile": "src/nature-methods-overview-guides.json", "profile_sha256": "8f9e951e2e4bd90b7b72354cfd685bd4b0900e30bea60db93f81e2b0dc524318", "base_svg": "final/nature-methods/2026-10-19-inner-ring-v6/cgat-main-figure.svg", "base_sha256": "2f34e50efe120b8c9b0ad80927854dd8aa2470818c15cc8d78ea529dc76bd030", "scope": "Delete only the two vertical overview guide lines at schematic0 and80; retain eight flanking guides for gaps1/2/3 and right end. Horizontal absence lines, unresolved outlines, all sequence objects, labels and arrows, panels b-d and legend remain unchanged.", "author_visual_acceptance": false}</metadata>
+  <metadata id="b-alignment-v8-provenance">{"profile": "src/nature-methods-b-alignment.json", "profile_sha256": "7c7243b0c20a8437f28d93fad8fa3020b6deccc8f57a1613d838d106b7f88fce", "base_svg": "final/nature-methods/2026-10-19-overview-guides-v7/cgat-main-figure.svg", "base_sha256": "9ed391fe57816cf1dc04a1cc45a9ab238d1440e0940b38c43929948dd006ccce", "scope": "Only b internal alignment: center columns without changing A1/A2 reordering, align process labels to existing arrows, place unplaced A3 on its input column with label above. Re-anchor input ribbon query ends to shifted bars; reference ends, source intervals, directions, lengths, main row spacing and a/c/d are frozen.", "plan_author_confirmed": true, "new_vector_author_visual_acceptance": false}</metadata>
+  <metadata id="a-dash-style-v9-provenance">{"profile": "src/nature-methods-a-dash-style.json", "profile_sha256": "ec2388c28a0a0c9c191404553b988b3a0f0f48d96ca8d08a506d509152552509", "base_svg": "final/nature-methods/2026-10-19-b-alignment-v8/cgat-main-figure.svg", "base_sha256": "18e0b0e50d304abae914496ec4c74cf1c94ee65a6d09556a41ae5c4d2eabd63a", "scope": "Match only the eight existing vertical a-panel guides to the horizontal absence-line style. Copy stroke color, width and dash pattern; retain positions, lengths, all horizontal lines, other objects, b-d and legend.", "author_visual_acceptance": false}</metadata>
+  <metadata id="a-no-horizontal-v10-provenance">{"profile": "src/nature-methods-a-no-horizontal.json", "profile_sha256": "d38ad3e8b7201ef59773d2df9d9aa1a069cdf3ddf12ecd0aba8223b1a900d8be", "base_svg": "final/nature-methods/2026-10-19-a-dash-style-v9/cgat-main-figure.svg", "base_sha256": "82bf89ed61bcfab16c16d93a0452e0de14f2ec3b65eb1095af151675b56d28e5", "scope": "Only remove12 horizontal assembly absence lines in panel a; retain8 vertical guide lines including v9 style, unresolved boxes, other objects, panels b-d and legend.", "author_visual_acceptance": false}</metadata>
+  <metadata id="panel-forks-provenance">{"variant": "fork1", "profile": "src/nature-methods-panel-forks.json", "profile_sha256": "92b43ed6b1453da6b0353605fe6e565afd5949099e8d3270ae37434d3dd738ae", "base_sha256": "05e30f9a5ba461dffa56d9d7c8707f8d6f194c650c201f7ca48c06788dee32c6", "scope": "Two visual file forks from the same v10. Remove only three outer a/b/c/d divider lines; fork2 adds four unfilled rectangular borders in the gutters. All scientific panel contents, internal separators, coordinates, text, colors and shared legend remain unchanged.", "author_visual_acceptance": false}</metadata>
+  <metadata id="panel-forks-v2-provenance">{"variant": "fork3", "base_svg": "final/nature-methods/2026-10-21-panel-forks/fork1/cgat-main-figure.svg", "base_sha256": "b542f106a90de8ab96fa8541f0a6c6783c5881853b59b6add8bebf374afce0b7", "profile_sha256": "4683872733d1e553847c1c9e2e25b34f2ae590d00dfc2673070a4ea26d4d077a", "scope": "fork2: join adjacent panel frames into one outer rectangle and three shared internal boundaries, with every shared edge drawn once. fork3: from fork1 remove only the two vertical decorative separators flanking GapFiller in d. No scientific contents, coordinates, internal c separators, styles or captions changed.", "author_visual_acceptance": false}</metadata>
+</svg>
