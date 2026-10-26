@@ -41,6 +41,32 @@ conventions; do not maintain a duplicate style guide here.
 This skill governs note-writing, not publication authorization. All existing
 artifact-preservation, quality and publication checks in this guide still apply.
 
+### Versioned archive and single source
+
+- Keep final, actually published notes in `GPM2.0/releases/vX.Y.Z.md`, under Git.
+  Use JSON-string YAML frontmatter: `version`, `published` (GitHub UTC date),
+  `updated`, `summary_en`, `summary_zh`. The body contains `## English` followed
+  by `## 中文`; each has Server, App, downloads and the required macOS notice.
+  Keep unpublished drafts outside this version-file pattern.
+- Generate localized docs and their newest-first index from that source; never
+  edit the generated pages or maintain separate release text in docs. A same-version
+  Server refresh updates its existing version entry/date, not a new App version.
+- The docs archive initially covers v2.0.10–v2.0.12, with an earlier-release link.
+  Earlier entries may be curated from published evidence later; do not invent them.
+- For a newly approved release or refresh, update the canonical notes, regenerate
+  docs, export the GitHub body from the same source, and publish/synchronize both
+  destinations before reporting completion. Archive installation alone does not
+  authorize rewriting historical GitHub Releases or changing any attachments.
+
+```bash
+# Run from the repository root. These commands are local and do not publish.
+python3 GPM2.0/scripts/render-release-docs.py
+python3 GPM2.0/scripts/render-release-docs.py --check
+python3 GPM2.0/scripts/render-release-docs.py --release-body vX.Y.Z > /tmp/GPM-vX.Y.Z-notes.md
+# Only within an authorized release/notes update, after the normal checks:
+# gh release edit vX.Y.Z --notes-file /tmp/GPM-vX.Y.Z-notes.md
+```
+
 ### Required macOS first-launch text
 
 ````markdown

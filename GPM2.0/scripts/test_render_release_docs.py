@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+"""Offline regression checks for the canonical release-note archive."""
+import copy
+import importlib.util
+import json
+from pathlib import Path
+import tempfile
+import unittest
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
+SOURCE = ROOT / "GPM2.0/releases"
+spec = importlib.util.spec_from_file_location("release_docs", HERE / "render-release-docs.py")
+archive = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(archive)
+
+
+class ReleaseDocsTests(unittest.TestCase):
+    def setUp(self):
+        self.releases = archive.collect_releases(SOURCE)
+
+    def test_archive_contains_initial_versions_newest_first(self):
+        versions = [r["version"] for r in self.releases]
+        self.assertTrue({"v2.0.12", "v2.0.11", "v2.0.10"}.issubset(versions))
+        self.assertEqual(versions, sorted(versions, key=lambda v: tuple(map(int, v[1:].split("."))), reverse=True))
+        self.assertEqual(len(versions), len(set(versions)))
+
+    def test_sort_uses_numeric_versions_not_strings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for version in ("v2.0.9", "v2.0.10"):
+                text = (SOURCE / "v2.0.10.md").read_text().replace("v2.0.10", version)
+                (Path(tmp) / (version + ".md")).write_text(text)
+            self.assertEqual(archive.collect_releases(Path(tmp))[0]["version"], "v2.0.10")
+
+    def test_locales_are_not_interleaved(self):
+        releases = copy.deepcopy(self.releases)
+        for release in releases:
+            release["en"] += "\nEN_ONLY"
+            release["zh"] += "\nZH_ONLY"
+        pages = archive.render_pages(releases)
+        self.assertIn("EN_ONLY", pages["en/changelog/v2.0.12.md"])
+        self.assertNotIn("ZH_ONLY", pages["en/changelog/v2.0.12.md"])
+        self.assertIn("ZH_ONLY", pages["zh/changelog/v2.0.12.md"])
+        self.assertNotIn("EN_ONLY", pages["zh/changelog/v2.0.12.md"])
+
+    def test_mac_notices_match_the_canonical_guide(self):
+        guide = (ROOT / "GPM2.0/RELEASING.md").read_text()
+        notices = guide.split("````markdown\n", 1)[1].split("\n````", 1)[0]
+        en, zh = notices.split("### macOS 首次启动\n", 1)
+        for release in self.releases:
+            self.assertIn(en.strip(), release["en"])
+            self.assertIn("### macOS 首次启动\n" + zh.strip(), release["zh"])
+
+    def test_github_export_uses_the_same_language_sections(self):
+        release = self.releases[0]
+        body = archive.release_body(release)
+        self.assertTrue(body.startswith("## English\n"))
+        self.assertLess(body.index("## English"), body.index("## 中文"))
+        self.assertIn(release["en"], body)
+        self.assertIn(release["zh"], body)
+        self.assertNotIn("summary_en:", body)
+        self.assertNotIn("release_source_sha256", body)
+
+    def test_generated_pages_and_registry_are_reproducible(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            docs = Path(tmp)
+            registry = docs / ".vitepress/data/pages.json"
+            registry.parent.mkdir(parents=True)
+            registry.write_text("[]\n")
+            self.assertEqual(archive.generate(SOURCE, docs), (len(self.releases), 2 * (len(self.releases) + 1)))
+            first = registry.read_text()
+            archive.generate(SOURCE, docs)
+            self.assertEqual(first, registry.read_text())
+            self.assertEqual(archive.generate(SOURCE, docs, check=True), (len(self.releases), 2 * (len(self.releases) + 1)))
+            self.assertEqual(len(json.loads(first)), 2 * (len(self.releases) + 1))
+
+    def test_stale_generated_page_fails_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            docs = Path(tmp)
+            archive.generate(SOURCE, docs)
+            (docs / "en/changelog/index.md").write_text("stale")
+            with self.assertRaisesRegex(ValueError, "Stale or missing generated"):
+                archive.generate(SOURCE, docs, check=True)
+
+    def test_missing_route_fails_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            registry = Path(tmp) / "pages.json"
+            registry.write_text("[]\n")
+            with self.assertRaisesRegex(ValueError, "registry"):
+                archive.update_registry(registry, self.releases, check=True)
+
+    def check_rejected_source(self, transform, error):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "v2.0.12.md"
+            target.write_text(transform((SOURCE / "v2.0.12.md").read_text()))
+            with self.assertRaisesRegex(ValueError, error):
+                archive.read_release(target)
+
+    def test_reversed_languages_fail(self):
+        self.check_rejected_source(lambda s: s.replace("## English", "## TEMP").replace("## 中文", "## English").replace("## TEMP", "## 中文"), "English must precede")
+
+    def test_missing_arm64_guidance_fails(self):
+        self.check_rejected_source(lambda s: s.replace("ARM64", "other"), "macOS notice")
+
+    def test_wrong_version_filename_fails(self):
+        self.check_rejected_source(lambda s: s.replace('version: "v2.0.12"', 'version: "v2.0.99"'), "filename")
+
+    def test_invalid_update_date_fails(self):
+        self.check_rejected_source(lambda s: s.replace('updated: "2026-10-26"', 'updated: "2020-01-01"'), "precedes publication")
+
+    def test_unshipped_app_label_changes_are_not_archived_as_released(self):
+        release = next(r for r in self.releases if r["version"] == "v2.0.12")
+        app = release["en"].split("### App\n", 1)[1].split("### Downloads", 1)[0]
+        self.assertNotIn("Auxiliary", app)
+        self.assertNotIn("Import / Open", app)
+        self.assertIn("leave the App installers", release["en"])
+
+
+if __name__ == "__main__":
+    unittest.main()
