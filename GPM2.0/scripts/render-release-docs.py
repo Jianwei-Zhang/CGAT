@@ -54,7 +54,7 @@ def read_release(path):
 
 def release_body(release):
     """Export the same source for an authorized GitHub notes update, without metadata."""
-    return "## English\n\n" + release["en"] + "\n\n## 中文\n\n" + release["zh"] + "\n"
+    return release["en"] + "\n\n---\n\n" + release["zh"] + "\n"
 
 
 def collect_releases(source):
@@ -68,6 +68,7 @@ def frontmatter(title, source_hash=None):
     lines = ["---", "title: " + json.dumps(title, ensure_ascii=False)]
     if source_hash:
         lines.append("release_source_sha256: " + json.dumps(source_hash))
+        lines.append("pageClass: release-notes")
     return "\n".join(lines + ["---", "", "<!-- Generated from GPM2.0/releases; edit the tracked source, not this page. -->", ""])
 
 

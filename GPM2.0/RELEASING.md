@@ -48,6 +48,14 @@ artifact-preservation, quality and publication checks in this guide still apply.
   `updated`, `summary_en`, `summary_zh`. The body contains `## English` followed
   by `## 中文`; each has Server, App, downloads and the required macOS notice.
   Keep unpublished drafts outside this version-file pattern.
+- The language headings are source delimiters only: the GitHub export omits
+  `English` / `中文` display headings and separates the two complete sections with
+  a horizontal rule. Localized docs show only their own language.
+- Use portable GitHub Markdown for styling: category icons, download tables and
+  native `NOTE` / `IMPORTANT` / `WARNING` alerts. Docs render the same markup;
+  do not introduce inline colors, HTML badges or docs-only content into the source.
+  First-launch guidance may be blockquoted inside a warning, but its full wording
+  and executable command must remain unchanged.
 - Generate localized docs and their newest-first index from that source; never
   edit the generated pages or maintain separate release text in docs. A same-version
   Server refresh updates its existing version entry/date, not a new App version.

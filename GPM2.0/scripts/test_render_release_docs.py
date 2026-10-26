@@ -3,6 +3,7 @@
 import copy
 import importlib.util
 import json
+import re
 from pathlib import Path
 import tempfile
 import unittest
@@ -47,19 +48,57 @@ class ReleaseDocsTests(unittest.TestCase):
         guide = (ROOT / "GPM2.0/RELEASING.md").read_text()
         notices = guide.split("````markdown\n", 1)[1].split("\n````", 1)[0]
         en, zh = notices.split("### macOS 首次启动\n", 1)
+        def unquote(markdown):
+            lines = (re.sub(r"^> ?", "", line) for line in markdown.splitlines())
+            return "\n".join(line for line in lines if line.strip() and line != "[!WARNING]")
+
         for release in self.releases:
-            self.assertIn(en.strip(), release["en"])
-            self.assertIn("### macOS 首次启动\n" + zh.strip(), release["zh"])
+            self.assertIn(unquote(en), unquote(release["en"]))
+            self.assertIn(unquote("### macOS 首次启动\n" + zh), unquote(release["zh"]))
 
     def test_github_export_uses_the_same_language_sections(self):
         release = self.releases[0]
         body = archive.release_body(release)
-        self.assertTrue(body.startswith("## English\n"))
-        self.assertLess(body.index("## English"), body.index("## 中文"))
+        self.assertEqual(body, release["en"] + "\n\n---\n\n" + release["zh"] + "\n")
+        self.assertNotIn("## English", body)
+        self.assertNotIn("## 中文", body)
         self.assertIn(release["en"], body)
         self.assertIn(release["zh"], body)
         self.assertNotIn("summary_en:", body)
         self.assertNotIn("release_source_sha256", body)
+
+    def test_release_styling_is_shared_by_github_and_docs(self):
+        release = next(r for r in self.releases if r["version"] == "v2.0.12")
+        pages = archive.render_pages(self.releases)
+        for locale in ("en", "zh"):
+            content = release[locale]
+            page = pages[f"{locale}/changelog/v2.0.12.md"]
+            self.assertIn(content, page)
+            self.assertIn("pageClass: release-notes", page)
+            for alert in ("NOTE", "IMPORTANT", "WARNING"):
+                self.assertEqual(content.count(f"> [!{alert}]"), 1)
+            for icon in ("🟢", "🔵", "🟣"):
+                self.assertIn("#### " + icon, content)
+            self.assertIn(release["summary_" + locale], content)
+            self.assertNotIn("<span", content)
+            self.assertNotIn("style=", content)
+            self.assertNotIn("::: ", content)
+            self.assertIn("| Windows |", content)
+            self.assertIn("| macOS |", content)
+            self.assertIn("| Linux Server |", content)
+            self.assertIn("`test_data.zip`", content)
+            self.assertEqual(content.count("> xattr -dr com.apple.quarantine /Applications/GPM.app"), 1)
+            self.assertEqual(content.count("> ```"), 2)
+
+    def test_language_delimiters_are_never_exported_for_any_version(self):
+        for release in self.releases:
+            body = archive.release_body(release)
+            self.assertTrue(body.startswith(release["en"]))
+            self.assertTrue(body.endswith(release["zh"] + "\n"))
+            self.assertNotRegex(body, r"(?m)^## (English|中文)$")
+            for locale in ("en", "zh"):
+                page = archive.render_pages([release])[f'{locale}/changelog/{release["version"]}.md']
+                self.assertNotRegex(page, r"(?m)^## (English|中文)$")
 
     def test_generated_pages_and_registry_are_reproducible(self):
         with tempfile.TemporaryDirectory() as tmp:
