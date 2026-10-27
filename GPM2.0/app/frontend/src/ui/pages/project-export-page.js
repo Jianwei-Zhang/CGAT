@@ -436,7 +436,7 @@ function getLabels(state) {
       title: "Project Export",
       noProject: "Select a project first.",
       project: "Project",
-      primaryDataset: "Primary ds",
+      primaryDataset: "Primary dataset",
       loadFailed: "Failed to load project export data.",
       loading: "Loading project export data...",
       refresh: "Refresh",
@@ -446,24 +446,37 @@ function getLabels(state) {
       exportTsv: "Table (.tsv)",
       exportFasta: "Sequence (.fasta)",
       exportLog: "Log (.log)",
-      exportDialogTitle: "Exporting final path",
+      exportDialogTitle: "Exporting Final Path",
       exportRunning: "Running: {step}",
-      refDisabled: "A final path in this project contains ref objects. Statistics and log export are disabled; export functions remain available.",
+      refDisabled: "A Final Path in this project contains reference objects. Statistics and log export are disabled; export functions remain available.",
       placedStats: "Placed statistics",
       countLabel: "Count",
       lengthLabel: "Length",
-      primaryCount: "used_primary_ds_ctg_count",
-      primaryLength: "used_primary_ds_ctg_length",
-      assignment: "Primary ds assignment",
+      primaryCount: "Used primary contig count",
+      primaryLength: "Used primary contig length",
+      assignment: "Primary dataset assignment",
       appended: "Appended",
       hidden: "Hidden",
-      placed: "placed",
-      placedUsed: "placed & used",
-      placedNotUsed: "placed & not used",
-      unassigned: "unassigned",
-      supportType: "Auxiliary ds_ctg usage",
-      otherChrType: "Repeated primary ds_ctg usage",
-      detailTitle: "Project details",
+      placed: "Placed",
+      placedUsed: "Placed & Used",
+      placedNotUsed: "Placed & Not Used",
+      unassigned: "Unassigned",
+      supportType: "Auxiliary contig usage",
+      supportTypeOption: "Auxiliary Contig Usage",
+      otherChrType: "Repeated primary contig usage",
+      otherChrTypeOption: "Repeated Primary Contig Usage",
+      detailTitle: "Project Details",
+      detailType: "Type",
+      detailChromosome: "Chromosome",
+      detailDataset: "Dataset",
+      detailOrigin: "Origin ID",
+      detailStart: "Path start",
+      detailEnd: "Path end",
+      detailLength: "Length (bp)",
+      detailUsedBy: "Used by chromosomes",
+      detailFilter: "{label} filter",
+      detailAscending: "Ascending",
+      detailDescending: "Descending",
       detailCount: "{count} records",
       collapse: "Collapse",
       expand: "Expand",
@@ -479,7 +492,7 @@ function getLabels(state) {
     title: "项目导出",
     noProject: "请先选择项目。",
     project: "项目",
-    primaryDataset: "主 ds",
+    primaryDataset: "主数据集",
     loadFailed: "项目导出数据加载失败。",
     loading: "正在加载项目导出数据...",
     refresh: "刷新",
@@ -491,22 +504,35 @@ function getLabels(state) {
     exportLog: "日志(.log)",
     exportDialogTitle: "正在导出 Final Path",
     exportRunning: "正在执行：{step}",
-    refDisabled: "检测到项目中某个 chr 的 Final Path 包含 ref 对象。本页仅保留导出功能，项目统计和日志导出已关闭。",
+    refDisabled: "检测到项目中某个染色体的 Final Path 包含参考序列对象。本页仅保留导出功能，项目统计和日志导出已关闭。",
     placedStats: "已放置统计",
     countLabel: "数目",
     lengthLabel: "长度",
-    primaryCount: "已使用主 ds ctg 数量",
-    primaryLength: "已使用主 ds ctg 长度",
-    assignment: "主 ds 分配统计",
+    primaryCount: "已使用主组装 Contig 数量",
+    primaryLength: "已使用主组装 Contig 长度",
+    assignment: "主数据集分配统计",
     appended: "实际追加",
     hidden: "主图已隐藏",
     placed: "已放置",
     placedUsed: "已放置且已使用",
     placedNotUsed: "已放置但未使用",
     unassigned: "未分配",
-    supportType: "辅 ds ctg 使用情况",
-    otherChrType: "重复主 ds ctg 使用情况",
+    supportType: "辅助组装 Contig 使用情况",
+    supportTypeOption: "辅助组装 Contig 使用情况",
+    otherChrType: "重复主组装 Contig 使用情况",
+    otherChrTypeOption: "重复主组装 Contig 使用情况",
     detailTitle: "项目明细",
+    detailType: "类型",
+    detailChromosome: "染色体",
+    detailDataset: "数据集",
+    detailOrigin: "来源 ID",
+    detailStart: "路径起点",
+    detailEnd: "路径终点",
+    detailLength: "长度 (bp)",
+    detailUsedBy: "使用染色体",
+    detailFilter: "{label}筛选",
+    detailAscending: "升序",
+    detailDescending: "降序",
     detailCount: "{count} 条记录",
     collapse: "收起",
     expand: "展开",
@@ -875,12 +901,14 @@ function buildDetailRows(model, labels) {
       ...row,
       type: "support",
       typeLabel: labels.supportType,
+      typeOptionLabel: labels.supportTypeOption,
       usedByChrNames: [row.chrName],
     })),
     ...(Array.isArray(model.otherChrPrimaryRows) ? model.otherChrPrimaryRows : []).map((row) => ({
       ...row,
       type: "other_chr_primary",
       typeLabel: labels.otherChrType,
+      typeOptionLabel: labels.otherChrTypeOption,
     })),
   ];
 }
@@ -945,7 +973,7 @@ function getDetailFilterValue(row, filterKey) {
 
 function getDetailFilterLabel(row, filterKey) {
   if (filterKey === "type") {
-    return normalizeString(row.typeLabel);
+    return normalizeString(row.typeOptionLabel || row.typeLabel);
   }
   return getDetailFilterValue(row, filterKey);
 }
@@ -989,7 +1017,7 @@ function sortDetailRows(rows, sort) {
   );
 }
 
-function renderDetailFilterHeader({ label, filterKey, options, selectedValues, allLabel = "All" }) {
+function renderDetailFilterHeader({ label, filterKey, options, selectedValues, allLabel = "All", filterCaption = "{label} filter" }) {
   const selectedSet = new Set(normalizeDetailFilterValues(selectedValues));
   const optionValues = options.map((option) => option.value);
   const isNoneSelected = selectedSet.has(PROJECT_EXPORT_DETAIL_FILTER_NONE);
@@ -1008,7 +1036,7 @@ function renderDetailFilterHeader({ label, filterKey, options, selectedValues, a
           class="project-export-detail-filter${isActive}"
           data-project-export-detail-filter-menu="${escapeAttr(filterKey)}"
         >
-          <summary aria-label="${escapeAttr(label)} filter" title="${escapeAttr(label)} filter"></summary>
+          <summary aria-label="${escapeAttr(filterCaption.replace("{label}", label))}" title="${escapeAttr(filterCaption.replace("{label}", label))}"></summary>
           <div class="project-export-detail-filter-menu">
             <label>
               <input
@@ -1039,17 +1067,18 @@ function renderDetailFilterHeader({ label, filterKey, options, selectedValues, a
   `;
 }
 
-function renderLengthSortHeader(sort) {
+function renderLengthSortHeader(sort, labels) {
   const direction = sort?.key === "length_bp" ? sort.direction : "";
-  const marker = direction === "asc" ? " asc" : direction === "desc" ? " desc" : "";
+  const marker = direction === "asc" ? " ↑" : direction === "desc" ? " ↓" : "";
+  const stateLabel = direction === "asc" ? labels.detailAscending : direction === "desc" ? labels.detailDescending : "";
   return `
     <th>
       <button
         type="button"
         class="project-export-detail-sort"
         data-project-export-detail-sort="length_bp"
-        aria-label="length_bp"
-      >length_bp${escapeHtml(marker)}</button>
+        aria-label="${escapeAttr([labels.detailLength, stateLabel].filter(Boolean).join(": "))}"
+      >${escapeHtml(labels.detailLength)}${escapeHtml(marker)}</button>
     </th>
   `;
 }
@@ -1119,31 +1148,34 @@ function renderDetailTable(model, labels, detailTableState) {
           <thead>
             <tr>
               ${renderDetailFilterHeader({
-                label: "Type",
+                label: labels.detailType,
                 filterKey: "type",
                 options: getDetailFilterOptions(rows, "type"),
                 selectedValues: filters.type,
                 allLabel: labels.all,
+                filterCaption: labels.detailFilter,
               })}
               ${renderDetailFilterHeader({
-                label: "chr",
+                label: labels.detailChromosome,
                 filterKey: "chr",
                 options: getDetailFilterOptions(rows, "chr"),
                 selectedValues: filters.chr,
                 allLabel: labels.all,
+                filterCaption: labels.detailFilter,
               })}
               ${renderDetailFilterHeader({
-                label: "dataset",
+                label: labels.detailDataset,
                 filterKey: "dataset",
                 options: getDetailFilterOptions(rows, "dataset"),
                 selectedValues: filters.dataset,
                 allLabel: labels.all,
+                filterCaption: labels.detailFilter,
               })}
-              <th>origin_id</th>
-              <th>start</th>
-              <th>end</th>
-              ${renderLengthSortHeader(detailTableState.sort)}
-              <th>used_by_chr</th>
+              <th>${escapeHtml(labels.detailOrigin)}</th>
+              <th>${escapeHtml(labels.detailStart)}</th>
+              <th>${escapeHtml(labels.detailEnd)}</th>
+              ${renderLengthSortHeader(detailTableState.sort, labels)}
+              <th>${escapeHtml(labels.detailUsedBy)}</th>
             </tr>
           </thead>
           <tbody>${renderDetailRows(sortedRows, labels)}</tbody>

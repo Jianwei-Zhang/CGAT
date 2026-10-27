@@ -139,7 +139,7 @@ for (const xBp of [-48000, 64000]) {
 }
 
 test("Chinese and English local view guidance include pair, track and composition entry points", () => {
-  assert.equal(zh.subview.guide, "Ctrl/Cmd 选择两个 ctg 或两个轨道进行比较；通过「工具」添加 ctg 进入组合模式。");
+  assert.equal(zh.subview.guide, "Ctrl/Cmd 选择两个 Contig 或两个轨道进行比较；通过「工具」添加 Contig 进入组合模式。");
   assert.match(en.subview.guide, /Ctrl\/Cmd.*track labels.*Tools.*composition mode/);
 });
 

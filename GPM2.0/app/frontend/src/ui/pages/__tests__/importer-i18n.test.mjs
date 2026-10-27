@@ -203,10 +203,10 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.runtime.importCancelFinishedStatus, "终止请求已提交");
   assert.equal(zh.runtime.importCancelFinishedSummary, "导入流程已结束。");
   assert.equal(zh.runtime.tauriImportAddPackageStage, "调用后端 import_add_dataset_package");
-  assert.equal(zh.progressStages.validate_grt_source_fastas, "校验 reference/dataset FASTA 与 FAI");
+  assert.equal(zh.progressStages.validate_grt_source_fastas, "校验参考基因组/数据集 FASTA 与 FAI");
   assert.equal(zh.progressStages.validate_grt_contract_start, "开始验证交付契约");
   assert.equal(zh.progressStages.validate_grt_app_required_files, "检查 App 交付包必需文件");
-  assert.equal(zh.progressStages.validate_grt_app_fai, "校验来源与 reference 的 FAI 长度");
+  assert.equal(zh.progressStages.validate_grt_app_fai, "校验来源与参考基因组的 FAI 长度");
   assert.equal(zh.progressStages.validate_grt_app_fastas, "检查 App 来源 FASTA 文件");
   assert.equal(zh.progressStages.validate_grt_app_final_path, "校验 Final Path 与 q4 序列摘要");
   assert.equal(zh.progressStages.normalize_workspace_layout_start, "整理项目目录");
@@ -256,7 +256,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.buttons.validateHistory, "Validate");
   assert.equal(en.buttons.validateHistoryLabel, "Validate projects");
   assert.equal(en.buttons.deleteFailedRecords, "Delete failed");
-  assert.equal(en.page.deleteFailedConfirmTitle, "Delete failed projects");
+  assert.equal(en.page.deleteFailedConfirmTitle, "Delete Failed Projects");
   assert.equal(en.page.deleteWithFiles, "Also delete files on disk (irreversible).");
   assert.equal(en.runtime.deleteDoneFailedHistorySummary, "Removed {count} projects that failed validation from the library.");
 });
@@ -1000,7 +1000,7 @@ test("importer does not render loaded-project add-package actions", () => {
 
   assert.doesNotMatch(html, /draft-assembly/);
   assert.doesNotMatch(html, /data-import-add-package-project-id="42"/);
-  assert.doesNotMatch(html, /<h4>Loaded projects<\/h4>/);
+  assert.doesNotMatch(html, /<h4>Loaded Projects<\/h4>/);
 });
 
 test("importer workspace history row imports add packages without expanding the compact project card", async () => {
@@ -1881,7 +1881,7 @@ test("import progress uses phase metadata and labels GRT validation instead of a
     });
 
     assert.match(html, /整理项目目录/);
-    assert.match(html, /校验 reference\/dataset FASTA 与 FAI/);
+    assert.match(html, /校验参考基因组\/数据集 FASTA 与 FAI/);
     assert.match(html, /阶段 4\/7/);
     assert.doesNotMatch(html, /673\/674/);
     assert.doesNotMatch(html, /validate_grt_source_fastas：/);
@@ -2038,7 +2038,7 @@ test("import progress uses an indeterminate meter when no reliable total exists"
       },
     });
 
-    assert.match(html, /aria-label="Import progress"/);
+    assert.match(html, /aria-label="Import Progress"/);
     assert.doesNotMatch(html, /Current stage/);
     assert.match(html, /data-progress-mode="indeterminate"/);
     assert.match(html, /aria-valuetext="Processing the import\.\.\."/);

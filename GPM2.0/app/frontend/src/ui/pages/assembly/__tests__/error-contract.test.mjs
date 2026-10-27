@@ -56,7 +56,7 @@ test("maps current chromosome contig search miss to centralized Chinese-first me
   });
 
   assert.equal(mapped.category, "current-chr-no-matching-ctg");
-  assert.match(mapped.userMessage, /当前 Chr 未找到匹配的 contig/);
+  assert.match(mapped.userMessage, /当前染色体未找到匹配的 Contig/);
 });
 
 test("maps local assembly editor validation branches to centralized Chinese-first messages", () => {
@@ -94,7 +94,7 @@ test("maps local assembly editor validation branches to centralized Chinese-firs
   assert.equal(splitName.category, "generic");
   assert.match(splitName.userMessage, /装配操作失败|Assembly action failed/);
   assert.equal(searchKeyword.category, "ctg-search-keyword-required");
-  assert.match(searchKeyword.userMessage, /请输入 contig 名称或 ID/);
+  assert.match(searchKeyword.userMessage, /请输入 Contig 名称或 ID/);
   assert.equal(joinType.category, "invalid-params");
   assert.match(joinType.userMessage, /参数/);
   assert.equal(joinGap.category, "invalid-params");
@@ -133,7 +133,7 @@ test("maps support ds unavailable and selection errors to Chinese-first messages
   });
 
   assert.equal(unavailable.category, "support-ds-unavailable");
-  assert.match(unavailable.userMessage, /辅 ds/);
+  assert.match(unavailable.userMessage, /辅助数据集/);
   assert.equal(notSelected.category, "support-ds-not-selected");
   assert.match(notSelected.userMessage, /先选择/);
   assert.equal(noChr.category, "support-ds-no-matching-chr");

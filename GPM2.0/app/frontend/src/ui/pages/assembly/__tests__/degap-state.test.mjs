@@ -290,7 +290,7 @@ test("buildDegapJobsForGap rejects GAP runs missing a flanking ctg", () => {
     sides: ["left"],
     settings,
     stateOrLocale: "zh",
-  }), /没有可用 Ctg/);
+  }), /没有可用 Contig/);
   assert.throws(() => buildDegapJobsForGap({
     finalPathEntry: {
       chrName: "Chr01",
@@ -300,7 +300,7 @@ test("buildDegapJobsForGap rejects GAP runs missing a flanking ctg", () => {
     sides: ["right"],
     settings,
     stateOrLocale: "zh",
-  }), /没有可用 Ctg/);
+  }), /没有可用 Contig/);
 });
 
 test("findDuplicateDegapJobs reports requested jobs that already exist", () => {
@@ -370,6 +370,6 @@ test("resolveDegapTerminalCtgSides distinguishes middle, endpoint, and single-co
 
 test("validateDegapSettings requires one reads group and server paths", () => {
   assert.equal(validateDegapSettings(settings), "");
-  assert.match(validateDegapSettings({ ...settings, hifiReads: [], ontReads: [] }), /Reads PATH/);
+  assert.match(validateDegapSettings({ ...settings, hifiReads: [], ontReads: [] }), /reads path/);
   assert.deepEqual(buildDegapExportSettings(settings).ontReads, ["/reads/b.fq.gz"]);
 });

@@ -1,8 +1,8 @@
 import { normalizeAnchorCuts, anchorSplitRanges } from "./anchor-contig-split.js";
 const escape = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c]);
 const copy = {
-  zh: { title: "锚定分割 contig", hint: "点击 contig 或比对边界设置／取消锚点。红线仅预览切口，确认后才分割。", fixed: "使用当前 ctg 已激活的锚点；不会分割锚线另一端的 ctg。", confirm: "确认分割", cancel: "取消", empty: "没有有效内部锚点", stale: "目标已变化，请重新打开。", failed: "分割未完成", count: "结果片段（源区间）" },
-  en: { title: "Anchor-based contig split", hint: "Click the contig or alignment edges to toggle anchors. Red lines preview cuts; only confirmation splits.", fixed: "Uses this contig's active anchors only; the opposite anchor endpoint is not split.", confirm: "Confirm split", cancel: "Cancel", empty: "No internal anchors", stale: "Target changed. Reopen this dialog.", failed: "Split was not completed", count: "Result fragments (source ranges)" },
+  zh: { title: "锚定分割 Contig", hint: "点击 Contig 或比对边界设置／取消锚点。红线仅预览切口，确认后才分割。", fixed: "使用当前 Contig 已激活的锚点；不会分割锚线另一端的 Contig。", confirm: "确认分割", cancel: "取消", empty: "没有有效内部锚点", stale: "目标已变化，请重新打开。", failed: "分割未完成", count: "结果片段（源区间）" },
+  en: { title: "Anchor-Based Contig Split", hint: "Click the contig or alignment edges to toggle anchors. Red lines preview cuts; only confirmation splits.", fixed: "Uses this contig's active anchors only; the opposite anchor endpoint is not split.", confirm: "Confirm split", cancel: "Cancel", empty: "No internal anchors", stale: "Target changed. Reopen this dialog.", failed: "Split was not completed", count: "Result fragments (source ranges)" },
 };
 export function renderAnchorSplitPreview(model, cuts) {
   const x = (cut) => 40 + 640 * (model.orient === "-" ? 1-(cut-model.sourceStart+1)/(model.sourceEnd-model.sourceStart+1)

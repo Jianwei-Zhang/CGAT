@@ -51,8 +51,8 @@ test("context menu does not expose redundant subview member-editor shortcuts", (
     store,
     host,
   });
-  assert.ok(items.every((item) => item.label !== "编辑上方 ctg 成员"));
-  assert.ok(items.every((item) => item.label !== "编辑下方 ctg 成员"));
+  assert.ok(items.every((item) => item.label !== "编辑上方 Contig 成员"));
+  assert.ok(items.every((item) => item.label !== "编辑下方 Contig 成员"));
 });
 
 test("member editor modal is absent even when member-editor state is populated", () => {
@@ -185,9 +185,9 @@ test("context menu on track blank area exposes batch delete for box-selected ctg
   });
 
   assert.equal(preventDefaultCalls.length, 1);
-  assert.match(menuState.innerHTML, /删除已框选 contig（2）/);
-  assert.match(menuState.innerHTML, /隐藏已框选 contig（2）/);
-  assert.match(menuState.innerHTML, /解除隐藏已框选 contig（2）/);
+  assert.match(menuState.innerHTML, /删除已框选 Contig（2）/);
+  assert.match(menuState.innerHTML, /隐藏已框选 Contig（2）/);
+  assert.match(menuState.innerHTML, /解除隐藏已框选 Contig（2）/);
 });
 
 test("member-card ctg context menu exposes batch hide/unhide/delete for multi-selection", () => {
@@ -207,15 +207,15 @@ test("member-card ctg context menu exposes batch hide/unhide/delete for multi-se
   });
 
   const labels = items.map((item) => item.label);
-  assert.ok(labels.includes("隐藏已框选 contig（2）"));
-  assert.ok(labels.includes("解除隐藏已框选 contig（2）"));
-  assert.ok(labels.includes("删除已框选 contig（2）"));
-  assert.ok(!labels.includes("翻转 contig"));
-  assert.ok(!labels.includes("重命名 contig..."));
-  assert.ok(!labels.includes("隐藏 contig"));
-  assert.ok(!labels.includes("解除隐藏 contig"));
-  assert.ok(!labels.includes("删除 contig"));
-  assert.ok(!labels.includes("更多 contig 操作（当前版本未接入）"));
+  assert.ok(labels.includes("隐藏已框选 Contig（2）"));
+  assert.ok(labels.includes("解除隐藏已框选 Contig（2）"));
+  assert.ok(labels.includes("删除已框选 Contig（2）"));
+  assert.ok(!labels.includes("翻转 Contig"));
+  assert.ok(!labels.includes("重命名 Contig..."));
+  assert.ok(!labels.includes("隐藏 Contig"));
+  assert.ok(!labels.includes("解除隐藏 Contig"));
+  assert.ok(!labels.includes("删除 Contig"));
+  assert.ok(!labels.includes("更多 Contig 操作（当前版本未接入）"));
 });
 
 test("context menu on members blank area exposes batch restore for selected deleted ctgs", () => {
@@ -270,7 +270,7 @@ test("context menu on members blank area exposes batch restore for selected dele
   });
 
   assert.equal(preventDefaultCalls.length, 1);
-  assert.match(menuState.innerHTML, /撤销删除已框选 contig（2）/);
+  assert.match(menuState.innerHTML, /撤销删除已框选 Contig（2）/);
 });
 
 test("context menu on a subview hit exposes left and right anchor toggles for the same hit", () => {
@@ -956,16 +956,16 @@ test("context menu on member row exposes retained sequence actions only", () => 
     preventDefault() {},
   });
 
-  assert.ok(menuState.innerHTML.indexOf("对齐详情（当前版本未接入）") < menuState.innerHTML.indexOf("定位 Seq 101"));
-  assert.ok(menuState.innerHTML.indexOf("定位 Seq 101") < menuState.innerHTML.indexOf("翻转序列"));
+  assert.ok(menuState.innerHTML.indexOf("对齐详情（当前版本未接入）") < menuState.innerHTML.indexOf("定位序列 101"));
+  assert.ok(menuState.innerHTML.indexOf("定位序列 101") < menuState.innerHTML.indexOf("翻转序列"));
   assert.ok(menuState.innerHTML.indexOf("翻转序列") < menuState.innerHTML.indexOf("隐藏序列"));
-  assert.match(menuState.innerHTML, /定位 Seq 101/);
+  assert.match(menuState.innerHTML, /定位序列 101/);
   assert.match(menuState.innerHTML, /对齐详情（当前版本未接入）/);
   assert.match(menuState.innerHTML, /锚点联动（当前版本未接入）/);
   assert.match(menuState.innerHTML, /翻转序列/);
   assert.match(menuState.innerHTML, /隐藏序列/);
   assert.doesNotMatch(menuState.innerHTML, /设置区间/);
-  assert.doesNotMatch(menuState.innerHTML, /从当前 contig 移除/);
+  assert.doesNotMatch(menuState.innerHTML, /从当前 Contig 移除/);
   assert.doesNotMatch(menuState.innerHTML, /在此 member 后拆分/);
   assert.match(menuState.innerHTML, /当前版本未接入/);
   assert.match(menuState.innerHTML, /disabled/);
@@ -2726,7 +2726,7 @@ test("Main split submenu always contains manual, left and right boundaries inste
   const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:"primary"},memberNode:null,host:{},store,
     actions:{canEditTrackCtg:()=>true,splitContigAtAnchor:async(_host,_store,args)=>calls.push(args),
       openManualContigSplit:async(_host,_store,args)=>calls.push({manual:args})}});
-  const split=items.find(i=>i.label==="分割 contig");assert.ok(split);assert.equal(split.disabled,false);
+  const split=items.find(i=>i.label==="分割 Contig");assert.ok(split);assert.equal(split.disabled,false);
   assert.equal(split.run,undefined);assert.equal(split.children[0].label,"手动分割…");
   assert.deepEqual(split.children.map(i=>i.label),["手动分割…","左侧分割","右侧分割"]);assert.equal(split.children.length,3);assert.ok(!items.some(i=>i.label==="手动分割…"));
   await split.children[0].run();assert.deepEqual(calls[0],{manual:{assemblyCtgId:2}});
@@ -2734,14 +2734,14 @@ test("Main split submenu always contains manual, left and right boundaries inste
   assert.deepEqual(calls.slice(1).map(c=>c.cutAfter),[100,800]);
   store.setState({assembly:{...store.getState().assembly,chrCtgs:[{assemblyCtgId:2,totalLength:1000,hits:[]}]}});
   const empty=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:"primary"},host:{},store,actions:{canEditTrackCtg:()=>true}})
-    .find(i=>i.label==="分割 contig");
+    .find(i=>i.label==="分割 Contig");
   assert.equal(empty.children.length,3);assert.equal(empty.children[0].disabled,false);assert.equal(empty.children[1].disabled,true);assert.equal(empty.children[2].disabled,true);
 });
 
 test("other-chr alignment menu is independent from split and targets just the clicked primary contig",async()=>{
   const calls=[];const store=createStore(createState({assembly:{selectedChrName:"Chr01",trackSelectedCtgIds:[],chrCtgs:[{assemblyCtgId:2,totalLength:1000,name:"tig",hits:[]}]}}));
   const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:"primary"},memberNode:null,host:{},store,actions:{canEditTrackCtg:()=>true,openContigChrAlignments:async(_h,_s,args)=>calls.push(args)}});
-  const item=items.find(i=>i.label==="跨 chr 比对…");assert.ok(item);assert.ok(!item.disabled);assert.equal(item.children,undefined);await item.run();assert.deepEqual(calls,[{assemblyCtgId:2,trackRole:"primary"}]);
+  const item=items.find(i=>i.label==="跨染色体比对…");assert.ok(item);assert.ok(!item.disabled);assert.equal(item.children,undefined);await item.run();assert.deepEqual(calls,[{assemblyCtgId:2,trackRole:"primary"}]);
 });
 
 test("undo-split menu appears below anchor/manual split only for split fragments and dispatches the selected side", async () => {
@@ -2754,9 +2754,9 @@ test("undo-split menu appears below anchor/manual split only for split fragments
     const store = createStore({...createState({assembly: {selectedChrName: "Chr01", trackSelectedCtgIds: [], chrCtgs: ctgs}}), locale});
     const menu = (id, role="primary") => __testBuildAssemblyContextMenuItems({ctgContext: {assemblyCtgId:id, trackRole:role}, memberNode:null, host:{}, store,
       actions:{canEditTrackCtg:()=>true, undoContigSplit:async(_h,_s,args)=>calls.push(args)}});
-    const items = menu(3), splitIndex = items.findIndex((i)=>i.label===(locale==="zh"?"分割 contig":"Split contig"));
+    const items = menu(3), splitIndex = items.findIndex((i)=>i.label===(locale==="zh"?"分割 Contig":"Split contig"));
     assert.equal(items[splitIndex].children[0].label,locale==="zh"?"手动分割…":"Manual split…");
-    const undo = items[splitIndex+1]; assert.equal(undo.label, locale==="zh"?"撤销分割 contig":"Undo contig split");
+    const undo = items[splitIndex+1]; assert.equal(undo.label, locale==="zh"?"撤销分割 Contig":"Undo contig split");
     assert.deepEqual(undo.children.map((i)=>i.label), locale==="zh"?["撤销左侧分割","撤销右侧分割"]:["Undo left split","Undo right split"]);
     assert.ok(undo.children.every((i)=>!i.disabled));
     await undo.children[0].run(); await undo.children[1].run();
@@ -2777,7 +2777,7 @@ test("cross-chr entry is available for full, split, single-base, auxiliary, phas
     const calls=[];
     const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:2,trackRole:role},memberNode:null,host:{},store,
       actions:{canEditTrackCtg:()=>false,openContigChrAlignments:async(_h,_s,args)=>calls.push(args)}});
-    const item=items.find(i=>i.label==="跨 chr 比对…");assert.ok(item,`${role}/${chrName}/${length}`);assert.ok(!item.disabled);
+    const item=items.find(i=>i.label==="跨染色体比对…");assert.ok(item,`${role}/${chrName}/${length}`);assert.ok(!item.disabled);
     await item.run();assert.deepEqual(calls,[{assemblyCtgId:2,trackRole:role}]);
   }
 });
@@ -2793,15 +2793,15 @@ test("main contig menu groups local-view destinations and orders common actions 
     const items=__testBuildAssemblyContextMenuItems({ctgContext:{assemblyCtgId:3,trackRole:"primary"},memberNode:null,host:{},store,
       actions:{canEditTrackCtg:()=>true}});
     assert.deepEqual(items.map(i=>i.label),locale==="zh"?[
-      "加入 Final Path","加入局部视图","跨 chr 比对…","翻转 contig","重命名 contig...",
-      "分割 contig","撤销分割 contig","隐藏 contig","删除 contig",
+      "加入 Final Path","加入局部视图","跨染色体比对…","翻转 Contig","重命名 Contig...",
+      "分割 Contig","撤销分割 Contig","隐藏 Contig","删除 Contig",
     ]:[
-      "Add to Final Path","Add to Local View","Cross-chr alignments…","Flip Contig","Rename Contig...",
-      "Split contig","Undo contig split","Hide Contig","Delete Contig",
+      "Add to Final Path","Add to Local View","Cross-chromosome alignments…","Flip contig","Rename contig...",
+      "Split contig","Undo contig split","Hide contig","Delete contig",
     ]);
     assert.deepEqual(items[1].children.map(i=>i.label),locale==="zh"?["上轨","下轨"]:["Top track","Bottom track"]);
     assert.equal(items[1].run,undefined,"parent opens a submenu instead of editing the composition");
-    assert.ok(!items.some(i=>/更多 contig|More Contig/.test(i.label)));
+    assert.ok(!items.some(i=>/更多 Contig|More Contig/.test(i.label)));
   }
 });
 

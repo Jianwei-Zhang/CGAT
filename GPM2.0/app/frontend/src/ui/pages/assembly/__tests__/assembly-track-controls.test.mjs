@@ -31,22 +31,22 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   assert.match(html, /assembly-track-inline-controls/);
   assert.doesNotMatch(html, /data-tool-menu="you-can"/);
   assert.doesNotMatch(html, /data-tool-menu="about-chr"/);
-  assert.doesNotMatch(html, /搜索 contig 名称或 ID/);
+  assert.doesNotMatch(html, /搜索 Contig 名称或 ID/);
   assert.doesNotMatch(html, /打开 \/ 收起染色体列表/);
-  assert.doesNotMatch(html, /查看当前 contig/);
+  assert.doesNotMatch(html, /查看当前 Contig/);
   assert.doesNotMatch(html, /id="assembly-print-view-button"/);
   assert.doesNotMatch(html, /id="assembly-export-chr-ctg-pmolecule-button"/);
   assert.doesNotMatch(html, /id="assembly-export-agp-button"/);
   assert.doesNotMatch(html, /Controls \/ 控件/);
-  assert.match(html, /辅ds_ctg_len\(bp\)/);
+  assert.match(html, /辅助组装 Contig 长度 \(bp\)/);
   assert.doesNotMatch(html, /刻度间隔 \(kb\)/);
   assert.doesNotMatch(html, /view-display-settings/);
   assert.doesNotMatch(html, /data-view-tick-control|data-view-tick-interval/);
   assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
-  assert.ok(html.indexOf("辅ds_ctg_len") < html.indexOf("比对长度"));
-  assert.match(html, /比对长度\(bp\)/);
-  assert.match(html, /一致性\(%\)/);
-  assert.ok(html.indexOf("辅 ds") < html.indexOf("辅ds_ctg_len"));
+  assert.ok(html.indexOf("辅助组装 Contig 长度 ") < html.indexOf("比对长度"));
+  assert.match(html, /比对长度 \(bp\)/);
+  assert.match(html, /一致性 \(%\)/);
+  assert.ok(html.indexOf("辅助数据集") < html.indexOf("辅助组装 Contig 长度 "));
   assert.ok(html.indexOf("比对长度") < html.indexOf("一致性"));
 
   assert.match(
@@ -59,7 +59,7 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   );
   assert.match(
     html,
-    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开辅ds_ctg_len\(bp\)候选值" aria-expanded="false" aria-controls="assembly-track-support-ds-ctg-len-menu">/,
+    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开辅助组装 Contig 长度 \(bp\)候选值" aria-expanded="false" aria-controls="assembly-track-support-ds-ctg-len-menu">/,
   );
   assert.match(html, /<div id="assembly-track-support-ds-ctg-len-menu" class="assembly-track-combo-menu is-hidden" role="listbox">/);
   assert.match(html, /data-track-combo-value="0"/);
@@ -78,7 +78,7 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   );
   assert.match(
     html,
-    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开比对长度\(bp\)候选值" aria-expanded="false" aria-controls="assembly-track-alignment-length-menu">/,
+    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开比对长度 \(bp\)候选值" aria-expanded="false" aria-controls="assembly-track-alignment-length-menu">/,
   );
   assert.match(html, /<div id="assembly-track-alignment-length-menu" class="assembly-track-combo-menu is-hidden" role="listbox">/);
   assert.match(html, /data-track-combo-value="1000"/);
@@ -90,7 +90,7 @@ test("assembly main view renders v1-style collapsible menus with selectable pres
   );
   assert.match(
     html,
-    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开一致性\(%\)候选值" aria-expanded="false" aria-controls="assembly-track-identity-pct-menu">/,
+    /<button type="button" class="assembly-track-combo-toggle" data-track-combo-toggle aria-label="打开一致性 \(%\)候选值" aria-expanded="false" aria-controls="assembly-track-identity-pct-menu">/,
   );
   assert.match(html, /<div id="assembly-track-identity-pct-menu" class="assembly-track-combo-menu is-hidden" role="listbox">/);
   assert.match(
@@ -356,7 +356,7 @@ test("subview history controls follow Identity as one icon group and disable una
   assert.doesNotMatch(restoreButton, /\bdisabled\b/);
   assert.match(html, /class="subview-history-separator" aria-hidden="true"><\/span>/);
   assert.match(html, /data-subview-action="history-reset"[^>]*><svg class="subview-history-icon subview-history-reset-icon"[^>]*>[\s\S]*<\/svg><\/button>/);
-  assert.match(html, /撤销最近一次回退：恢复“翻转 ctg”后的状态/);
+  assert.match(html, /撤销最近一次回退：恢复“翻转 Contig”后的状态/);
 });
 
 test("subview band tooltip keeps each contig interval on its own unwrapped line", () => {
@@ -476,10 +476,10 @@ test("assembly main view shows 3-track labels when support ds is available", () 
     }),
   );
 
-  assert.match(html, /辅\(flye\)/);
+  assert.match(html, /辅助数据集轨道（flye）/);
   assert.match(html, /ref_chr1/);
-  assert.match(html, /主\(hifiasm\)/);
-  assert.match(html, /Ctrl\/Cmd 选择两个 ctg 或两个轨道进行比较/);
+  assert.match(html, /主数据集轨道（hifiasm）/);
+  assert.match(html, /Ctrl\/Cmd 选择两个 Contig 或两个轨道进行比较/);
   assert.doesNotMatch(html, /Junction 检查/);
   assert.doesNotMatch(html, /subview2-a-ctg-id/);
   assert.doesNotMatch(html, /enter-subview-2/);
@@ -497,7 +497,7 @@ test("main primary track label is selectable for track-level context menu action
 
   assert.match(
     html,
-    /class="assembly-track-label-row[^"]*is-track-selectable[^"]*"[^>]*data-track-label-role="primary"[^>]*data-track-label-selectable="1"[^>]*title="主\(hifiasm\)"[^>]*>\s*<span>主\(hifiasm\)<\/span>/,
+    /class="assembly-track-label-row[^"]*is-track-selectable[^"]*"[^>]*data-track-label-role="primary"[^>]*data-track-label-selectable="1"[^>]*title="主数据集轨道（hifiasm）"[^>]*>\s*<span>主数据集轨道（hifiasm）<\/span>/,
   );
 });
 
@@ -843,8 +843,8 @@ test("assembly visible ctg labels strip chr suffix while hover titles keep full 
   assert.match(html, /class="subview-candidate-badge" title="ptg000009l@Chr22 \(\+\)"><strong class="subview-candidate-slot">A<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">ptg000009l \(\+\)<\/span><span class="subview-candidate-meta">/);
   assert.match(html, /class="subview-candidate-badge" title="Ctg1617@Chr22 \(-\)"><strong class="subview-candidate-slot">B<\/strong><span class="subview-candidate-content"><span class="subview-candidate-name">Ctg1617 \(-\)<\/span><span class="subview-candidate-meta">/);
   assert.match(html, /class="subview-candidate-remove"[^>]*aria-label="移除该候选"[^>]*><svg class="subview-candidate-remove-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">/);
-  assert.match(html, /<title>ptg000009l@Chr22 \(\+\) \| start=/);
-  assert.match(html, /<title>Ctg1617@Chr22 \(-\) \| start=/);
+  assert.match(html, /<title>ptg000009l@Chr22 \(\+\) \| Start: /);
+  assert.match(html, /<title>Ctg1617@Chr22 \(-\) \| Start: /);
   assert.doesNotMatch(html, />ptg000009l@Chr22 \(\+\)<\/text>/);
   assert.doesNotMatch(html, />Ctg1617@Chr22 \(-\)<\/text>/);
   assert.doesNotMatch(html, /<strong>ptg000009l@Chr22 \(\+\)<\/strong>/);

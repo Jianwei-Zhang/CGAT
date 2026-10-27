@@ -64,10 +64,10 @@ test("subview track controls render independently from main track controls", () 
   assert.match(html, /data-subview-action="swap-track-order"/);
   assert.match(
     html,
-    /<div class="subview-panel-title-row"[^>]*>\s*<h4 class="assembly-view-title">局部视图<\/h4>\s*<button[^>]*data-subview-tools-toggle="1"[^>]*>[\s\S]*?<\/button>\s*<details class="subview-panel-help">[\s\S]*?<p class="subview-panel-guide">Ctrl\/Cmd 选择两个 ctg 或两个轨道进行比较；通过「工具」添加 ctg 进入组合模式。<\/p>\s*<\/details>\s*<div class="subview-candidate-row">/,
+    /<div class="subview-panel-title-row"[^>]*>\s*<h4 class="assembly-view-title">局部视图<\/h4>\s*<button[^>]*data-subview-tools-toggle="1"[^>]*>[\s\S]*?<\/button>\s*<details class="subview-panel-help">[\s\S]*?<p class="subview-panel-guide">Ctrl\/Cmd 选择两个 Contig 或两个轨道进行比较；通过「工具」添加 Contig 进入组合模式。<\/p>\s*<\/details>\s*<div class="subview-candidate-row">/,
   );
-  assert.doesNotMatch(html, /已选 \d\/2 个ctg；右键选择“进入Subview-ctg”。/);
-  assert.doesNotMatch(html, /已选 \d\/2 条ds轨道。/);
+  assert.doesNotMatch(html, /已选 \d\/2 个 Contig；右键选择“进入Subview-ctg”。/);
+  assert.doesNotMatch(html, /已选 \d\/2 条数据集轨道。/);
   assert.doesNotMatch(html, /Subview 已进入轨道模式。/);
   assert.doesNotMatch(html, /Subview 已切换上下轨道顺序。/);
   assert.match(
@@ -517,11 +517,11 @@ test("anchor-enabled ctgs expose fragment hit zones instead of only whole-contig
   );
   assert.match(
     html,
-    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-key="8:1-500"[\s\S]*?<title>primary-bottom \(\+\) \| start=1 \| len=500<\/title>[\s\S]*?<\/rect>/,
+    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-key="8:1-500"[\s\S]*?<title>primary-bottom \(\+\) \| Start: 1 bp \| Length: 500 bp<\/title>[\s\S]*?<\/rect>/,
   );
   assert.doesNotMatch(
     html,
-    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-key="8:1-500"[\s\S]*?<title>primary-bottom \| start=0 \| len=1000<\/title>[\s\S]*?<\/rect>/,
+    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-key="8:1-500"[\s\S]*?<title>primary-bottom \| Start: 0 bp \| Length: 1000 bp<\/title>[\s\S]*?<\/rect>/,
   );
 });
 
@@ -618,7 +618,7 @@ test("subview-ctg phased anchor fragments expose hoverable phased hit zones", ()
   assert.match(html, /data-subview-fragment-phased-track-item-id="9001"/);
   assert.match(
     html,
-    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-role="support"[\s\S]*?data-subview-fragment-contig-id="30"[\s\S]*?data-subview-fragment-start="1"[\s\S]*?data-subview-fragment-end="100"[\s\S]*?<title>support-bottom \(\+\) \| start=1 \| len=100<\/title>[\s\S]*?<\/rect>/,
+    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-role="support"[\s\S]*?data-subview-fragment-contig-id="30"[\s\S]*?data-subview-fragment-start="1"[\s\S]*?data-subview-fragment-end="100"[\s\S]*?<title>support-bottom \(\+\) \| Start: 1 bp \| Length: 100 bp<\/title>[\s\S]*?<\/rect>/,
   );
 });
 
@@ -710,7 +710,7 @@ test("subview-track phased anchor fragments expose hoverable phased hit zones", 
   assert.match(html, /data-subview-fragment-phased-track-item-id="9001"/);
   assert.match(
     html,
-    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-role="support"[\s\S]*?data-subview-fragment-contig-id="30"[\s\S]*?data-subview-fragment-start="1"[\s\S]*?data-subview-fragment-end="5000"[\s\S]*?<title>support-bottom \(\+\) \| start=1 \| len=5000<\/title>[\s\S]*?<\/rect>/,
+    /<rect\s+class="subview-fragment-hit-zone"[\s\S]*?data-subview-fragment-role="support"[\s\S]*?data-subview-fragment-contig-id="30"[\s\S]*?data-subview-fragment-start="1"[\s\S]*?data-subview-fragment-end="5000"[\s\S]*?<title>support-bottom \(\+\) \| Start: 1 bp \| Length: 5000 bp<\/title>[\s\S]*?<\/rect>/,
   );
 });
 

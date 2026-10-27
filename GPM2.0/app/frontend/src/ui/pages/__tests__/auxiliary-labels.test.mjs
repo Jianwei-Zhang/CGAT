@@ -11,9 +11,9 @@ function strings(value) {
 test("auxiliary terminology changes presentation while preserving support i18n keys", () => {
   const assembly = getMessages("en", "assembly");
   const workspace = getMessages("en", "workspace");
-  assert.equal(assembly.trackControls.supportDataset, "Auxiliary Dataset");
+  assert.equal(assembly.trackControls.supportDataset, "Auxiliary dataset");
   assert.equal(assembly.trackControls.supportTrackLabel, "Auxiliary Dataset Track");
-  assert.equal(workspace.cards.supportDataset, "Auxiliary Dataset");
+  assert.equal(workspace.cards.supportDataset, "Auxiliary dataset");
   assert.match(assembly.page.finalPathLogSupportTitle, /^Auxiliary /);
   assert.match(workspace.pipeline.appendSupportLabel, /auxiliary datasets/);
   for (const text of [...strings(assembly), ...strings(workspace)]) {
@@ -21,7 +21,7 @@ test("auxiliary terminology changes presentation while preserving support i18n k
   }
   // "support" remains a verb when it does not denote the data role.
   assert.match(assembly.page.phasedTrackGrtNoticeMessage, /support GRT/);
-  assert.equal(getMessages("zh", "assembly").trackControls.supportDataset, "辅 ds");
+  assert.equal(getMessages("zh", "assembly").trackControls.supportDataset, "辅助数据集");
 });
 
 for (const locale of ["en", "zh"]) {
@@ -37,7 +37,7 @@ for (const locale of ["en", "zh"]) {
       });
       assert.match(html, new RegExp(`id="project-import-button"[^>]*>[\\s\\S]*?>${labels.import}<`));
       assert.match(html, new RegExp(`id="project-open-button"[^>]*>[\\s\\S]*?>${labels.open}<`));
-      assert.doesNotMatch(html, />Import project<|>Open project<|>导入项目<|>打开项目</);
+      assert.doesNotMatch(html, />Import Project<|>Open project<|>导入项目<|>打开项目</);
     });
   }
 }
@@ -57,6 +57,6 @@ test("compact entry buttons do not shorten the import dialog title", () => {
   for (const locale of ["en", "zh"]) {
     const state = { locale, importer: { importDialogOpen: true } };
     const html = renderProjectImportDialog(state, getMessages(state, "importer"));
-    assert.match(html, new RegExp(`id="project-import-title">${locale === "en" ? "Import project" : "导入项目"}<`));
+    assert.match(html, new RegExp(`id="project-import-title">${locale === "en" ? "Import Project" : "导入项目"}<`));
   }
 });

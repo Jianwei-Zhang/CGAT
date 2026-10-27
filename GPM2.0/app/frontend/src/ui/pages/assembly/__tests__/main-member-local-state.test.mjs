@@ -43,7 +43,7 @@ test("real source fragments and deleted native entities display actual source ra
   const html = memberPanel(renderAssemblyPage(state));
   assert.equal((html.match(/data-assembly-ctg-id=/g) || []).length, 2);
   assert.equal((html.match(/data-deleted-ctg-record-id=/g) || []).length, 1);
-  assert.match(html, /source 1–4,000/); assert.match(html, /source 6,001–16,000/); assert.match(html, /source 4,001–6,000/);
+  assert.match(html, /Source 1–4,000/); assert.match(html, /Source 6,001–16,000/); assert.match(html, /Source 4,001–6,000/);
   assert.equal(resolveMainMemberSourceRange({ sourceRange: { sourceStart: 0, sourceEnd: 50 } }), null);
 });
 

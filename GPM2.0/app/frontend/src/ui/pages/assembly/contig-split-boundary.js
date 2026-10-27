@@ -4,15 +4,15 @@ import { resolveHitIdentityPct } from "./track-render-geometry.js";
 import { resolveTrackCtgOrient } from "./track-label-geometry.js";
 
 export const splitCopy = {
-  zh: { title: "分割 contig", manual: "手动分割…", left: "左侧分割", right: "右侧分割",
-    unavailable: "没有可用边界、尚未选中锚点片段，或边界已在 contig 端部", stale: "比对或当前视图已变化，请重新打开菜单。",
-    undoTitle: "撤销分割 contig", undoLeft: "撤销左侧分割", undoRight: "撤销右侧分割",
+  zh: { title: "分割 Contig", manual: "手动分割…", left: "左侧分割", right: "右侧分割",
+    unavailable: "没有可用边界、尚未选中锚点片段，或边界已在 Contig 端部", stale: "比对或当前视图已变化，请重新打开菜单。",
+    undoTitle: "撤销分割 Contig", undoLeft: "撤销左侧分割", undoRight: "撤销右侧分割",
     undoUnavailable: "该侧没有可合并的同源相邻分割片段", undoDone: "已撤销该侧分割；可通过主视图撤销/重做恢复。",
-    done: "已分割 contig；各片段保留在原轨道，可撤销。" },
+    done: "已分割 Contig；各片段保留在原轨道，可撤销。" },
   en: { title: "Split contig", manual: "Manual split…", left: "Split left", right: "Split right",
     unavailable: "No boundary, no anchor-delimited fragment selected, or boundary at contig end", stale: "Alignment or view changed. Reopen the menu.",
     undoTitle: "Undo contig split", undoLeft: "Undo left split", undoRight: "Undo right split",
-    undoUnavailable: "No compatible adjacent split fragment on this side", undoDone: "Split boundary removed. Main-view undo/redo is available.",
+    undoUnavailable: "No compatible adjacent split fragment on this side", undoDone: "Split boundary removed. Main View undo/redo is available.",
     done: "Contig split; all fragments remain on the original track. Undo is available." },
 };
 

@@ -84,7 +84,7 @@ test("bindCtgActions routes retained rename flip and delete actions through inje
   ]);
   assert.deepEqual(deleteCalls, [{
     selectedIds: [7],
-    confirmMessage: "确认删除 Ctg7 吗？",
+    confirmMessage: "确认删除 Contig 7 吗？",
   }]);
   assert.deepEqual(confirms, []);
   assert.equal(appendButton.hasListener("click"), false);

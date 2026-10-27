@@ -102,7 +102,7 @@ test("local menu retains scoped deletion and two anchor split scopes, but no und
     subviewTrackPairContext: { ...context },
     subviewHitContext: { hitKey: "evidence-1" },
   });
-  assert.deepEqual(items.map((item) => item.label), ["加入 Final Path", "移至另一轨", "翻转 contig", "分割 contig（仅局部）", "分割 contig（影响主视图）", "删除当前片段"]);
+  assert.deepEqual(items.map((item) => item.label), ["加入 Final Path", "移至另一轨", "翻转 Contig", "分割 Contig（仅局部）", "分割 Contig（影响主视图）", "删除当前片段"]);
   assert.deepEqual(items[5].children.map((item) => item.label), ["仅从当前局部视图删除", "同步从主视图删除…"]);
   assert.equal(items[5].children[1].disabled, true);
   assert.equal(items[3].disabled, false); assert.equal(items[4].disabled, true);
@@ -346,7 +346,7 @@ test("local split menus keep three fixed children and dispatch manual/single-sid
   const context = { ...selectedContext(2), compositionEntityKey: "assembly:2" };
   const items = __testBuildAssemblyContextMenuItems({ store, host, subviewFragmentContext: context,
     actions: { openLocalContigSplit: async (_host, _store, target, options) => { calls.push({ target, options }); return true; } } });
-  const splitMenus = items.filter((item) => item.label.startsWith("分割 contig"));
+  const splitMenus = items.filter((item) => item.label.startsWith("分割 Contig"));
   assert.equal(splitMenus.length, 2);
   assert.ok(splitMenus.every((item) => !item.disabled && item.run === undefined));
   for (const menu of splitMenus) {

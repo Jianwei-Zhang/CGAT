@@ -52,7 +52,7 @@ test("catalog uses one table with data type first and reference first, escaping 
   const { state } = fixture();
   const html = renderProjectCatalog(state);
   assert.match(html, /Datasets/);
-  assert.match(html, /Reference genome/);
+  assert.match(html, /Reference Genome/);
   assert.equal((html.match(/<table /g) || []).length, 1);
   assert.doesNotMatch(html, /<h3>|data-catalog-refresh|data-catalog-retry|Refresh datasets|is-primary/);
   assert.match(html, /<colgroup><col span="7"><col class="project-dataset-actions-column"><\/colgroup>/);

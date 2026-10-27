@@ -2360,7 +2360,7 @@ function renderAssemblyTracks(args) {
               rx="${TRACK_HEIGHT_SCALE * 2}"
               ry="${TRACK_HEIGHT_SCALE * 2}"
             >
-              <title>${escapeHtml(ctg.name)} | start=${ctg.startBp} | len=${ctg.lengthBp}</title>
+              <title>${escapeHtml(ctg.name)} | Start: ${ctg.startBp} bp | Length: ${ctg.lengthBp} bp</title>
             </rect>
             ${["primary", "support"].includes(fragmentRole) ? `<g data-main-anchor-fragments="1">${anchorFragments}</g>` : ""}
             ${renderGrtResultOverlayGroup({

@@ -435,7 +435,7 @@ test("buildDegapExportPayload fails when current chromosome has no jobs", () => 
         },
       },
     }),
-    /No DEGAP jobs configured for the current final path \(Chr02\)/,
+    /No DEGAP jobs configured for the current Final Path \(Chr02\)/,
   );
 });
 

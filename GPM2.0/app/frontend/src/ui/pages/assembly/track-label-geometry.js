@@ -58,7 +58,7 @@ export function resolveTrackCtgLabelText(ctg, fallbackId) {
 export function buildTrackCtgHoverTitle(ctgName, { startBp = 0, lengthBp = 0 } = {}) {
   const numericStartBp = Number(startBp);
   const resolvedStartBp = Number.isFinite(numericStartBp) ? Math.round(numericStartBp) : 0;
-  return `${String(ctgName || "").trim()} | start=${resolvedStartBp} | len=${normalizePositiveInt(lengthBp) || 0}`;
+  return `${String(ctgName || "").trim()} | Start: ${resolvedStartBp} bp | Length: ${normalizePositiveInt(lengthBp) || 0} bp`;
 }
 
 function resolveTrackCtgLabelPlacement({

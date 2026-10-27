@@ -15,7 +15,7 @@ const copy = {
   },
   en: {
     title: "App updates", current: "Current version", check: "Check for updates", last: "Last checked", idle: "Checks and downloads updates through the CGAT docs mirror.",
-    checking: "Checking for updates…", latest: "You are up to date", available: "New version available", downloading: "Downloading update…",
+    checking: "Checking for updates…", latest: "You are up to date", available: "New Version Available", downloading: "Downloading update…",
     ready: "Update is ready", installing: "Saving your project and installing…", unavailable: "Signed updates are not enabled in this build.",
     error: "Update failed. Please retry.", view: "View update", download: "Download update", install: "Install and restart", later: "Later",
     background: "Download in background", mute: "Do not remind me for 24 hours", notes: "What’s new", loadingNotes: "Loading release notes…",

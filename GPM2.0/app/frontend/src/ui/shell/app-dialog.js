@@ -3,7 +3,7 @@ let dialogSequence = 0;
 
 const copy = {
   zh: { confirm: "确认操作", prompt: "输入信息", notice: "提示", ok: "确定", cancel: "取消" },
-  en: { confirm: "Confirm action", prompt: "Enter information", notice: "Notice", ok: "OK", cancel: "Cancel" },
+  en: { confirm: "Confirm Action", prompt: "Enter Information", notice: "Notice", ok: "OK", cancel: "Cancel" },
 };
 
 function requestDialog(mode, message, options = {}) {

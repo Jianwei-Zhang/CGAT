@@ -24,7 +24,7 @@ test("real Main and clipped/reversed Local rendering publish biological interval
 });
 
 test("live Final Path has a complete localized controlled tooltip and no duplicate native title", () => {
-  for (const [locale, adopted, source] of [["en", "Adopted length", "Source Contig length"], ["zh", "采用片段长度", "源 Contig 总长度"]]) {
+  for (const [locale, adopted, source] of [["en", "Adopted length", "Source contig length"], ["zh", "采用片段长度", "源 Contig 总长度"]]) {
     const html = renderAssemblyPage({ ...createState({ assembly: { finalPathByChr: { Chr01: { chrName: "Chr01", mode: "segments",
       segments: [{ type: "ctg", segmentId: "selected", assemblyCtgId: 1, datasetName: "Data", ctgName: "ctg1",
         overallLen: 10000, start: 5001, end: 10000 }] } } } }), locale });
@@ -43,7 +43,7 @@ test("mirrored split sources supply original interval and full source length to 
   const html = renderAssemblyPage({ ...createState({ assembly: { supportMirroredCtgs: [mirrored],
     finalPathByChr: { Chr01: { chrName: "Chr01", mode: "segments", segments: [{ type: "ctg", segmentId: "mirror",
       assemblyCtgId: 90, datasetName: "Data", ctgName: "mirror", overallLen: 4000, start: 1, end: 4000 }] } } } }), locale: "en" });
-  assert.match(html, /Source Contig length: 15,000 bp/);
+  assert.match(html, /Source contig length: 15,000 bp/);
   assert.match(html, /Source interval: 6,001–10,000 bp/);
 });
 
@@ -60,7 +60,7 @@ test("synthetic graph exports retain mirrored source provenance and standalone t
     renderFinalPathViewportPng: async snapshot => {
       snapshots++;
       assert.match(snapshot.svgMarkup, /<title>Data_mirror\n/);
-      assert.match(snapshot.svgMarkup, /Source Contig length: 15,000 bp/);
+      assert.match(snapshot.svgMarkup, /Source contig length: 15,000 bp/);
       assert.match(snapshot.svgMarkup, /Source interval: 6,001–10,000 bp/);
       return "YWJj";
     }, writeFinalPathExportBinaryFile: async () => {},

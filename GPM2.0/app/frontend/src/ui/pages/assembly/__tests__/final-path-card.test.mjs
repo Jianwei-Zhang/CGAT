@@ -43,16 +43,16 @@ function createI18n() {
       finalPathOriginIdCol: "Origin ID",
       finalPathOverallLenCol: "overall_len",
       finalPathOrientCol: "orient",
-      finalPathCtgStartCol: "Ctg_start",
+      finalPathCtgStartCol: "Contig 起点",
       finalPathCtgEndCol: "Ctg_end",
-      finalPathChrStartCol: "Chr_start",
+      finalPathChrStartCol: "路径起点",
       finalPathChrEndCol: "Chr_end",
-      finalPathLogPrimaryCount: "已使用主 ds ctg 数量",
-      finalPathLogPrimaryLength: "已使用主 ds ctg 长度",
+      finalPathLogPrimaryCount: "已使用主组装 Contig 数量",
+      finalPathLogPrimaryLength: "已使用主组装 Contig 长度",
       finalPathLogAppended: "实际追加",
       finalPathLogHidden: "主图已隐藏",
-      finalPathLogSupportTitle: "辅 ds ctg 使用情况",
-      finalPathLogOtherChrTitle: "重复主 ds ctg 使用情况",
+      finalPathLogSupportTitle: "辅助组装 Contig 使用情况",
+      finalPathLogOtherChrTitle: "重复主组装 Contig 使用情况",
       finalPathLogNoRows: "暂无记录",
       finalPathRestoreGrtBaseline: "↺ 预计算路径",
       finalPathRestoreGrtBaselineHint: "恢复为 GRT 算法生成的预计算路径",
@@ -66,12 +66,12 @@ function createI18n() {
     degap: {
       settingsTitle: "DEGAP 设置",
       close: "关闭",
-      settingsSummary: "配置服务器端 DEGAP GapFiller 路径；HiFi Reads PATH 或 ONT Reads PATH 至少填写一个。",
+      settingsSummary: "配置服务器端 DEGAP GapFiller 路径；请填写 HiFi 或 ONT 读段路径。",
       requiredPaths: "必填路径",
-      degapPath: "DEGAP PATH",
-      hifiReadsPath: "HiFi Reads PATH",
-      ontReadsPath: "ONT Reads PATH",
-      gpmServerPath: "GPM_server PATH",
+      degapPath: "DEGAP 路径",
+      hifiReadsPath: "HiFi 读段路径",
+      ontReadsPath: "ONT 读段路径",
+      gpmServerPath: "gpm_server 路径",
       mainOut: "Main DEGAP --out",
       jobOut: "Job --out",
       readsHelp: "READS path 为服务器端原始测序数据；HiFi 或 ONT 至少填写一个。",
@@ -148,8 +148,8 @@ test("renderFinalPathCard migrates the legacy DEGAP view to Graph and embeds DEG
   assert.match(html, /data-degap-settings-modal/);
   assert.match(html, /data-final-path-graph-viewport[\s\S]*data-degap-job-card/);
   assert.match(html, /data-degap-settings-open/);
-  assert.doesNotMatch(html, /配置服务器端 DEGAP GapFiller 路径；HiFi Reads PATH 或 ONT Reads PATH 至少填写一个。/);
-  assert.doesNotMatch(html, /DEGAP PATH 为必填项。/);
+  assert.doesNotMatch(html, /配置服务器端 DEGAP GapFiller 路径；请填写 HiFi 或 ONT 读段路径。/);
+  assert.doesNotMatch(html, /请填写 DEGAP 路径。/);
   assert.match(html, /<input type="text" data-degap-setting-field="hifiReads" value="" placeholder="\/server\/reads\/hifi.fastq.gz">/);
   assert.match(html, /<input type="text" data-degap-setting-field="ontReads" value="" placeholder="\/server\/reads\/ont.fastq.gz">/);
   assert.doesNotMatch(html, /<textarea[^>]+data-degap-setting-field="(?:hifiReads|ontReads)"/);
@@ -459,7 +459,7 @@ test("renderFinalPathCard respects the requested graph mode when current chr has
     },
   );
 
-  assert.match(html, /projA_Chr01 path/);
+  assert.match(html, /projA_Chr01 Final Path/);
   assert.match(html, /data-final-path-view-mode="graph"/);
   assert.match(html, /assembly-final-path-svg/);
   assert.match(html, /data-final-path-export-toggle="true"/);
@@ -496,7 +496,7 @@ test("renderFinalPathCard integrates phased haplotype switching as an upper-left
   assert.match(html, /data-phased-final-path-key="A"/);
   assert.match(html, /data-phased-final-path-key="C"/);
   assert.ok(
-    html.indexOf("projA_Chr01B path") < html.indexOf("data-phased-final-path-menu"),
+    html.indexOf("projA_Chr01B Final Path") < html.indexOf("data-phased-final-path-menu"),
     "expected selector to be placed beside the final path title",
   );
   assert.doesNotMatch(html, /role="tablist" aria-label="Haplotype path"/);
@@ -562,7 +562,7 @@ test("renderFinalPathCard graph mode renders ctg + gap segments", () => {
       i18n: createI18n(),
     },
   );
-  assert.match(html, /projA_Chr01 path/);
+  assert.match(html, /projA_Chr01 Final Path/);
   assert.match(html, /data-final-path-view-mode="graph"/);
   assert.match(html, /hifiasm_Ctg9/);
   assert.match(html, /class="assembly-track-svg assembly-final-path-svg"/);
@@ -582,7 +582,7 @@ test("renderFinalPathCard graph mode renders ctg + gap segments", () => {
   );
   assert.match(
     html,
-    /data-final-path-segment-id="seg-1"[\s\S]*?<title>hifiasm_Ctg9\nAdopted length: 1,200 bp\nSource Contig length: 1,200 bp\nSource interval: 1–1,200 bp\nOrientation: \+<\/title>/,
+    /data-final-path-segment-id="seg-1"[\s\S]*?<title>hifiasm_Ctg9\nAdopted length: 1,200 bp\nSource contig length: 1,200 bp\nSource interval: 1–1,200 bp\nOrientation: \+<\/title>/,
   );
   assert.match(html, /data-final-path-segment-id="seg-1"[^>]*data-final-path-slot-left="[^"]+"/);
   assert.match(html, /data-final-path-segment-id="seg-1"[^>]*data-final-path-slot-right="[^"]+"/);
@@ -699,25 +699,25 @@ test("renderFinalPathCard shows log tab and renders compact log metrics when fin
   assert.match(html, /role="img" aria-label="实际追加: 1\/3; 主图已隐藏: 1\/3"/);
   assert.match(html, /title="实际追加: 1,200\/5,000 bp"/);
   assert.match(html, /title="主图已隐藏: 900\/5,000 bp"/);
-  assert.match(html, /<span class="final-path-log-stat-label">已使用主 ds ctg 数量<\/span>\s*<span class="final-path-log-ratio-bar"[\s\S]*?<\/span>\s*<strong class="final-path-log-stat-value">2\/3<\/strong>/);
-  assert.match(html, /已使用主 ds ctg 数量/);
+  assert.match(html, /<span class="final-path-log-stat-label">已使用主组装 Contig 数量<\/span>\s*<span class="final-path-log-ratio-bar"[\s\S]*?<\/span>\s*<strong class="final-path-log-stat-value">2\/3<\/strong>/);
+  assert.match(html, /已使用主组装 Contig 数量/);
   assert.match(html, /2\/3/);
-  assert.match(html, /已使用主 ds ctg 长度/);
+  assert.match(html, /已使用主组装 Contig 长度/);
   assert.match(html, /2,100\/5,000/);
   assert.match(html, /实际追加/);
   assert.match(html, /主图已隐藏/);
   assert.match(html, /<th>Type<\/th>/);
   assert.match(html, /<table class="final-path-log-table project-export-detail-table">/);
   assert.doesNotMatch(html, /<th>ctg<\/th>/);
-  assert.match(html, /<th>used_by_chr<\/th>/);
-  assert.match(html, /<td class="final-path-log-type-cell" rowspan="2">辅 ds ctg 使用情况<\/td>\s*<td>flye<\/td>/);
+  assert.match(html, /<th>Used by chromosomes<\/th>/);
+  assert.match(html, /<td class="final-path-log-type-cell" rowspan="2">辅助组装 Contig 使用情况<\/td>\s*<td>flye<\/td>/);
   assert.doesNotMatch(html, /<td>Ctg10<\/td>/);
   assert.doesNotMatch(html, /<td>Ctg11<\/td>/);
   assert.match(html, /<td>contig_98<\/td>[\s\S]*?<td>Chr01<\/td>/);
   assert.match(html, /<td>contig_99<\/td>[\s\S]*?<td>Chr01<\/td>/);
-  assert.match(html, /<td class="final-path-log-type-cell" rowspan="1">重复主 ds ctg 使用情况<\/td>\s*<td>hifiasm<\/td>/);
-  assert.doesNotMatch(html, /<h5>辅 ds ctg 使用情况<\/h5>/);
-  assert.doesNotMatch(html, /<h5>重复主 ds ctg 使用情况<\/h5>/);
+  assert.match(html, /<td class="final-path-log-type-cell" rowspan="1">重复主组装 Contig 使用情况<\/td>\s*<td>hifiasm<\/td>/);
+  assert.doesNotMatch(html, /<h5>辅助组装 Contig 使用情况<\/h5>/);
+  assert.doesNotMatch(html, /<h5>重复主组装 Contig 使用情况<\/h5>/);
   assert.match(html, /flye/);
   assert.match(html, /Chr02/);
 });
@@ -757,9 +757,9 @@ test("renderFinalPathCard hides empty log detail sections", () => {
     },
   );
 
-  assert.match(html, /已使用主 ds ctg 数量/);
-  assert.doesNotMatch(html, /辅 ds ctg 使用情况/);
-  assert.doesNotMatch(html, /重复主 ds ctg 使用情况/);
+  assert.match(html, /已使用主组装 Contig 数量/);
+  assert.doesNotMatch(html, /辅助组装 Contig 使用情况/);
+  assert.doesNotMatch(html, /重复主组装 Contig 使用情况/);
   assert.doesNotMatch(html, /暂无记录/);
 });
 
@@ -869,7 +869,7 @@ test("renderFinalPathCard strips chr suffix from visible ctg names while keeping
   );
   assert.match(
     graphHtml,
-    /data-final-path-segment-id="seg-1"[\s\S]*?<title>hifiasm_ptg000009l@Chr22\nAdopted length: 1,200 bp\nSource Contig length: 1,200 bp\nSource interval: 1–1,200 bp\nOrientation: \+<\/title>/,
+    /data-final-path-segment-id="seg-1"[\s\S]*?<title>hifiasm_ptg000009l@Chr22\nAdopted length: 1,200 bp\nSource contig length: 1,200 bp\nSource interval: 1–1,200 bp\nOrientation: \+<\/title>/,
   );
   assert.doesNotMatch(graphHtml, />hifiasm_ptg000009l@Chr22 \(\+\)<\/text>/);
   assert.match(
@@ -916,7 +916,7 @@ test("renderFinalPathCard table mode renders a readonly Origin ID column after C
   assert.match(html, /data-final-path-view-mode="table"/);
   assert.match(
     html,
-    /<div>Ctg<\/div>\s*<div>Origin ID<\/div>\s*<div>overall_len<\/div>\s*<div>orient<\/div>\s*<div>Ctg_start<\/div>\s*<div>Ctg_end<\/div>\s*<div>Chr_start<\/div>\s*<div>Chr_end<\/div>/,
+    /<div>Ctg<\/div>\s*<div>Origin ID<\/div>\s*<div>overall_len<\/div>\s*<div>orient<\/div>\s*<div>Contig 起点<\/div>\s*<div>Ctg_end<\/div>\s*<div>路径起点<\/div>\s*<div>Chr_end<\/div>/,
   );
   assert.match(
     html,
@@ -1147,7 +1147,7 @@ test("renderFinalPathCard graph mode hides overflowing ctg labels and keeps tool
   const segmentHtml = extractFinalPathSegmentHtml(html, "seg-1");
   assert.match(
     segmentHtml,
-    /<title>hifiasm_LongLongLongLongLongLongLongLongLongLongCtg2\nAdopted length: 100 bp\nSource Contig length: 100 bp\nSource interval: 1–100 bp\nOrientation: \+<\/title>/,
+    /<title>hifiasm_LongLongLongLongLongLongLongLongLongLongCtg2\nAdopted length: 100 bp\nSource contig length: 100 bp\nSource interval: 1–100 bp\nOrientation: \+<\/title>/,
   );
   assert.doesNotMatch(
     segmentHtml,
@@ -1216,11 +1216,11 @@ test("renderFinalPathCard graph mode hides adjacent overflowing ctg labels", () 
   const secondSegmentHtml = extractFinalPathSegmentHtml(html, "seg-3");
   assert.match(
     firstSegmentHtml,
-    /<title>hifiasm_VeryLongVeryLongVeryLongVeryLongCtg1948\nAdopted length: 150,000 bp\nSource Contig length: 150,000 bp\nSource interval: 1–150,000 bp\nOrientation: \+<\/title>/,
+    /<title>hifiasm_VeryLongVeryLongVeryLongVeryLongCtg1948\nAdopted length: 150,000 bp\nSource contig length: 150,000 bp\nSource interval: 1–150,000 bp\nOrientation: \+<\/title>/,
   );
   assert.match(
     secondSegmentHtml,
-    /<title>hifiasm_VeryLongVeryLongVeryLongVeryLongCtg1949\nAdopted length: 150,000 bp\nSource Contig length: 150,000 bp\nSource interval: 1–150,000 bp\nOrientation: \+<\/title>/,
+    /<title>hifiasm_VeryLongVeryLongVeryLongVeryLongCtg1949\nAdopted length: 150,000 bp\nSource contig length: 150,000 bp\nSource interval: 1–150,000 bp\nOrientation: \+<\/title>/,
   );
   assert.doesNotMatch(firstSegmentHtml, /<text class="track-ctg-label/);
   assert.doesNotMatch(secondSegmentHtml, /<text class="track-ctg-label/);
@@ -1539,7 +1539,7 @@ test("renderFinalPathCard graph mode keeps a GAP label when the adjacent ctg lab
   assert.match(gapSegmentHtml, /<text class="final-path-gap-label"[\s\S]*?>GAP<\/text>/);
   assert.match(
     ctgSegmentHtml,
-    /<title>hifiasm_Ctg3\nAdopted length: 405,280 bp\nSource Contig length: 405,280 bp\nSource interval: 1–405,280 bp\nOrientation: \+<\/title>/,
+    /<title>hifiasm_Ctg3\nAdopted length: 405,280 bp\nSource contig length: 405,280 bp\nSource interval: 1–405,280 bp\nOrientation: \+<\/title>/,
   );
   assert.doesNotMatch(ctgSegmentHtml, /<text class="track-ctg-label/);
 });
@@ -1628,9 +1628,9 @@ test("renderFinalPathCard table mode renders editable card rows and actions", ()
   assert.match(html, /class="final-path-card-table-body"/);
   assert.match(html, /class="final-path-card-list-head"/);
   assert.match(html, /class="final-path-card-list-head"[\s\S]*?>orient</);
-  assert.match(html, /class="final-path-card-list-head"[\s\S]*?>Ctg_start</);
+  assert.match(html, /class="final-path-card-list-head"[\s\S]*?>Contig 起点</);
   assert.match(html, /class="final-path-card-list-head"[\s\S]*?>Ctg_end</);
-  assert.match(html, /class="final-path-card-list-head"[\s\S]*?>Chr_start</);
+  assert.match(html, /class="final-path-card-list-head"[\s\S]*?>路径起点</);
   assert.match(html, /class="final-path-card-list-head"[\s\S]*?>Chr_end</);
   assert.match(html, /data-final-path-card-list/);
   assert.match(html, /data-final-path-row-id="seg-1"/);

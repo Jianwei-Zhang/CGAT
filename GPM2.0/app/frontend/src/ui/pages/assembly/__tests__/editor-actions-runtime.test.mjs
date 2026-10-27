@@ -77,13 +77,13 @@ test("deleteSelectedSubviewTrackPairCtgs hides normalized subview selections and
     },
   );
 
-  assert.deepEqual(confirms, ["确认仅从当前局部视图删除已框选的 1 个 contig 吗？"]);
+  assert.deepEqual(confirms, ["确认仅从当前局部视图删除已框选的 1 个 Contig 吗？"]);
   assert.deepEqual(state.assembly.subview.trackPairHiddenCtgs, [
     { trackRole: "primary", contigId: 3 },
     { trackRole: "primary", contigId: 7 },
   ]);
   assert.deepEqual(state.assembly.subview.trackPairSelectedCtgs, []);
-  assert.equal(state.assembly.actionStatus, "已仅从当前局部视图删除 1 个 contig。");
+  assert.equal(state.assembly.actionStatus, "已仅从当前局部视图删除 1 个 Contig。");
   assert.equal(state.assembly.actionError, "");
   assert.equal(rerenders.length, 1);
   assert.equal(persists.length, 1);
@@ -164,7 +164,7 @@ test("deleteSelectedTrackCtgs waits for async confirmation before deleting", asy
   }]);
   assert.match(confirmMessages[0], /分型轨道项 2/);
   assert.match(confirmMessages[0], /Final Path 引用 3/);
-  assert.match(confirmMessages[0], /失败时不会删除任何 ctg/);
+  assert.match(confirmMessages[0], /失败时不会删除任何 Contig/);
 });
 
 test("applyEditorAction local refresh avoids the loading curtain and uses the local view loader", async () => {
@@ -603,7 +603,7 @@ test("runBatchDeleteTrackCtgs reports one atomic failure for the whole selection
   );
   assert.equal(progressSnapshots[0].items[0].label, "ctg-alpha");
   assert.equal(progressSnapshots[1].items[1].error, "delete failed");
-  assert.match(state.assembly.actionError, /未删除任何 ctg/);
+  assert.match(state.assembly.actionError, /未删除任何 Contig/);
 });
 
 test("runBatchDeleteTrackCtgs clears progress when lightweight refresh fails", async () => {

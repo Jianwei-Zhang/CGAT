@@ -107,8 +107,8 @@ test("project import dialog owns the numeric import worker control and marks the
     },
   });
   assert.match(html, /id="import-parallelism-select" name="importParallelism"/);
-  assert.match(html, /<option value="[1-8]" selected>[1-8] \(recommended\)<\/option>/);
-  assert.doesNotMatch(html, />Auto \(recommended\)</);
+  assert.match(html, /<option value="[1-8]" selected>[1-8] \(Recommended\)<\/option>/);
+  assert.doesNotMatch(html, />Auto \(Recommended\)</);
   assert.match(html, /Parallel import workers/);
   assert.match(html, /Shared by archive extraction and PAF parsing/);
 });

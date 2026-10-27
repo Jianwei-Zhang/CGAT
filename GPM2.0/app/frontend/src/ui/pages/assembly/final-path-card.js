@@ -571,6 +571,7 @@ function renderFinalPathLogRows({
   rows,
   escapeHtml,
   emptyText,
+  labels = {},
 }) {
   const safeRows = Array.isArray(rows) ? rows : [];
   if (!safeRows.length) {
@@ -612,13 +613,13 @@ function renderFinalPathLogRows({
       <table class="final-path-log-table project-export-detail-table">
         <thead>
           <tr>
-            <th>${escapeHtml("Type")}</th>
-            <th>${escapeHtml("dataset")}</th>
-            <th>${escapeHtml("origin_id")}</th>
-            <th>${escapeHtml("start")}</th>
-            <th>${escapeHtml("end")}</th>
-            <th>${escapeHtml("length_bp")}</th>
-            <th>${escapeHtml("used_by_chr")}</th>
+            <th>${escapeHtml(labels.finalPathDetailType || "Type")}</th>
+            <th>${escapeHtml(labels.finalPathDetailDataset || "Dataset")}</th>
+            <th>${escapeHtml(labels.finalPathDetailOrigin || "Origin ID")}</th>
+            <th>${escapeHtml(labels.finalPathDetailStart || "Path start")}</th>
+            <th>${escapeHtml(labels.finalPathDetailEnd || "Path end")}</th>
+            <th>${escapeHtml(labels.finalPathDetailLength || "Length (bp)")}</th>
+            <th>${escapeHtml(labels.finalPathDetailUsedBy || "Used by chromosomes")}</th>
           </tr>
         </thead>
         <tbody>${bodyRows}</tbody>
@@ -691,8 +692,8 @@ function renderFinalPathLog({
 }) {
   const model = logModel || buildFinalPathLogModel();
   const normalizedCurrentChrName = normalizeString(model.chrName || currentChrName);
-  const supportTypeLabel = labels.finalPathLogSupportTitle || "Auxiliary ds ctgs";
-  const otherChrTypeLabel = labels.finalPathLogOtherChrTitle || "Primary ds ctgs used by other chr";
+  const supportTypeLabel = labels.finalPathLogSupportTitle || "Auxiliary contig usage";
+  const otherChrTypeLabel = labels.finalPathLogOtherChrTitle || "Repeated primary contig usage";
   const detailRows = [
     ...(Array.isArray(model.supportRows) ? model.supportRows : []).map((row) => ({
       ...row,
@@ -709,6 +710,7 @@ function renderFinalPathLog({
       <section class="final-path-log-section">
         ${renderFinalPathLogRows({
           rows: detailRows,
+          labels,
           escapeHtml,
           emptyText: labels.finalPathLogNoRows || "No rows",
         })}
@@ -725,7 +727,7 @@ function renderFinalPathLog({
         ${renderFinalPathLogStat({
           escapeHtml,
           escapeAttr,
-          title: labels.finalPathLogPrimaryCount || "used_primary_ds_ctg_count",
+          title: labels.finalPathLogPrimaryCount || "Used primary contig count",
           value: `${formatLogNumber(model.primaryCount.used)}/${formatLogNumber(model.primaryCount.total)}`,
           appended: model.primaryCount.appended,
           hidden: model.primaryCount.hidden,
@@ -736,7 +738,7 @@ function renderFinalPathLog({
         ${renderFinalPathLogStat({
           escapeHtml,
           escapeAttr,
-          title: labels.finalPathLogPrimaryLength || "used_primary_ds_ctg_length",
+          title: labels.finalPathLogPrimaryLength || "Used primary contig length",
           value: `${formatLogNumber(model.primaryLength.usedBp)}/${formatLogNumber(model.primaryLength.totalBp)}`,
           appended: model.primaryLength.appendedBp,
           hidden: model.primaryLength.hiddenBp,
@@ -1144,7 +1146,7 @@ export function renderFinalPathGraph({
         const slotLeft = markerX;
         const slotRight = markerX + markerWidth;
         const slotMid = slotLeft + ((slotRight - slotLeft) / 2);
-        const tooltipText = `GAP | len=${String(item.segmentLength || resolveFinalPathSegmentLengthBp(segment) || 0)} bp`;
+        const tooltipText = `GAP | Length: ${String(item.segmentLength || resolveFinalPathSegmentLengthBp(segment) || 0)} bp`;
         return `
           <g
             data-final-path-segment-id="${escapeAttr(segmentId)}"
@@ -1466,14 +1468,14 @@ function renderFinalPathTable({
           <div>${escapeHtml(firstHeaderLabel)}</div>
           <div class="final-path-card-list-head-card">
             <div aria-hidden="true"></div>
-            <div>${escapeHtml(labels.finalPathCtgCol || "Ctg")}</div>
+            <div>${escapeHtml(labels.finalPathCtgCol || "Contig")}</div>
             <div>${escapeHtml(labels.finalPathOriginIdCol || "Origin ID")}</div>
-            <div>${escapeHtml(labels.finalPathOverallLenCol || "overall_len")}</div>
-            <div>${escapeHtml(labels.finalPathOrientCol || "orient")}</div>
-            <div>${escapeHtml(labels.finalPathCtgStartCol || "Ctg_start")}</div>
-            <div>${escapeHtml(labels.finalPathCtgEndCol || "Ctg_end")}</div>
-            <div>${escapeHtml(labels.finalPathChrStartCol || "Chr_start")}</div>
-            <div>${escapeHtml(labels.finalPathChrEndCol || "Chr_end")}</div>
+            <div>${escapeHtml(labels.finalPathOverallLenCol || "Contig length")}</div>
+            <div>${escapeHtml(labels.finalPathOrientCol || "Orientation")}</div>
+            <div>${escapeHtml(labels.finalPathCtgStartCol || "Contig start")}</div>
+            <div>${escapeHtml(labels.finalPathCtgEndCol || "Contig end")}</div>
+            <div>${escapeHtml(labels.finalPathChrStartCol || "Path start")}</div>
+            <div>${escapeHtml(labels.finalPathChrEndCol || "Path end")}</div>
             <div aria-hidden="true"></div>
           </div>
         </div>
@@ -1608,7 +1610,7 @@ export function renderFinalPathCard(
     primaryDatasetName,
   });
   const normalizedViewMode = normalizeViewMode(viewMode, canLog);
-  const title = `${normalizedProjectName}_${normalizedChrName} path`;
+  const title = `${normalizedProjectName}_${normalizedChrName} Final Path`;
   const graphLabel = String(labels.finalPathGraph || "Graph");
   const tableLabel = String(labels.finalPathTable || "Table");
   const logLabel = String(labels.finalPathLog || "Log");

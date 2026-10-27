@@ -47,7 +47,7 @@ test("subview panel renders unified toolbar with parameter labels after entering
   assert.match(html, /<h4 class="assembly-view-title">局部视图<\/h4>/);
   assert.match(
     html,
-    /Ctrl\/Cmd 选择两个 ctg 或两个轨道进行比较；通过「工具」添加 ctg 进入组合模式。/,
+    /Ctrl\/Cmd 选择两个 Contig 或两个轨道进行比较；通过「工具」添加 Contig 进入组合模式。/,
   );
   assert.doesNotMatch(html, /support-ctg \(\+\) vs ctg-alpha \(\+\)/);
   assert.match(html, /class="subview-candidate-name">support-ctg \(\+\)<\/span>/);
@@ -55,8 +55,8 @@ test("subview panel renders unified toolbar with parameter labels after entering
   assert.match(html, /data-subview-remove-type="candidate"/);
   assert.match(html, /data-subview-remove-role="support"/);
   assert.match(html, /data-subview-remove-contig-id="30"/);
-  assert.match(html, /比对长度\(bp\)/);
-  assert.match(html, /一致性\(%\)/);
+  assert.match(html, /比对长度 \(bp\)/);
+  assert.match(html, /一致性 \(%\)/);
   assert.match(html, /id="subview-track-alignment-length"/);
   assert.match(html, /id="subview-track-identity-pct"/);
   assert.match(html, /class="assembly-track-layout subview-track-layout"/);
@@ -404,14 +404,14 @@ test("subview track-pair mode renders both ds track labels and local delete cont
     }),
   );
 
-  assert.match(html, /主\(hifiasm\)/);
-  assert.match(html, /辅\(flye\)/);
+  assert.match(html, /主数据集轨道（hifiasm）/);
+  assert.match(html, /辅助数据集轨道（flye）/);
   assert.match(html, /data-subview-track-pair-role="support"/);
   assert.match(html, /data-subview-track-pair-contig-id="30"/);
   assert.match(html, /data-subview-track-pair-dataset-id="22"/);
   assert.match(html, /data-subview-track-pair-is-mirror="0"/);
   assert.match(html, /data-subview-remove-type="track"/);
-  assert.doesNotMatch(html, /尚未选择候选 ctg/);
+  assert.doesNotMatch(html, /尚未选择候选 Contig/);
   assert.doesNotMatch(html, /轨道模式：/);
 });
 
@@ -521,8 +521,8 @@ test("subview track-pair strips chr suffix in labels and keeps full hover titles
 
   assert.match(html, /data-subview-label-slot="top"[^>]*data-subview-label-role="support"[^>]*data-subview-label-contig-id="30"[^>]*>Ctg1617 \(-\)<\/text>/);
   assert.match(html, /data-subview-label-slot="bottom"[^>]*data-subview-label-role="primary"[^>]*data-subview-label-contig-id="2"[^>]*>ptg000009l \(\+\)<\/text>/);
-  assert.match(html, /<title>Ctg1617@Chr22 \(-\) \| start=/);
-  assert.match(html, /<title>ptg000009l@Chr22 \(\+\) \| start=/);
+  assert.match(html, /<title>Ctg1617@Chr22 \(-\) \| Start: /);
+  assert.match(html, /<title>ptg000009l@Chr22 \(\+\) \| Start: /);
   assert.doesNotMatch(html, /data-subview-label-slot="top"[^>]*>Ctg1617@Chr22 \(-\)<\/text>/);
   assert.doesNotMatch(html, /data-subview-label-slot="bottom"[^>]*>ptg000009l@Chr22 \(\+\)<\/text>/);
 });
@@ -1235,7 +1235,7 @@ test("context menu on blank area exposes batch subview delete for box-selected t
   });
 
   assert.ok(
-    items.some((item) => item.label === "删除 contig（局部已选 2）"),
+    items.some((item) => item.label === "删除 Contig（局部已选 2）"),
   );
 });
 

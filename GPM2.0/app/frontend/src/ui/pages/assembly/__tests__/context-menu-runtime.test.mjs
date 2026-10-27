@@ -91,8 +91,8 @@ test("renderContextMenuItems renders nested items while preserving flat action i
     {
       label: "Add Gap",
       children: [
-        { label: "Add Gap Left", run() {} },
-        { label: "Add Gap Right", run() {} },
+        { label: "Add gap left", run() {} },
+        { label: "Add gap right", run() {} },
       ],
     },
   ], createRuntimeDeps());
@@ -443,7 +443,7 @@ test("bindAssemblyContextMenu renders fragment menu entries for subview fragment
   }
 
   assert.match(menuState.innerHTML, /加入 Final Path/);
-  assert.match(menuState.innerHTML, /翻转 contig/);
+  assert.match(menuState.innerHTML, /翻转 Contig/);
   assert.doesNotMatch(menuState.innerHTML, /进入 Ctg8 菜单/);
 });
 
@@ -646,8 +646,8 @@ test("bindAssemblyContextMenu renders track-pair fragment local actions", () => 
   }
 
   assert.match(menuState.innerHTML, /加入 Final Path/);
-  assert.match(menuState.innerHTML, /翻转 contig/);
-  assert.match(menuState.innerHTML, /删除 contig/);
+  assert.match(menuState.innerHTML, /翻转 Contig/);
+  assert.match(menuState.innerHTML, /删除 Contig/);
   assert.doesNotMatch(menuState.innerHTML, /进入 Ctg30 菜单/);
 });
 

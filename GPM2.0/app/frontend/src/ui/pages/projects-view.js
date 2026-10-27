@@ -6,10 +6,10 @@ import { importParserWorkerChoices, normalizeImportParserWorkers, recommendedImp
 
 export function projectLabels(state) {
   return state.locale === "en" ? {
-    import: "Import", open: "Open", importTitle: "Import project", recent: "Projects",
+    import: "Import", open: "Open", importTitle: "Import Project", recent: "Projects",
     empty: "No projects yet", emptyHint: "Import a delivery bundle or open an existing project directory.",
     name: "Project name (optional)", nameDefault: "Use directory name", location: "Project directory",
-    zip: "Bundle (ZIP / tar.gz)", extracted: "Extracted directory", source: "Source", browse: "Browse",
+    zip: "Bundle (ZIP / tar.gz)", extracted: "Extracted directory", extractedOption: "Extracted Directory", source: "Source", browse: "Browse",
     cancel: "Cancel", submit: "Import",
     newDirectory: "Project directory (will be created)",
     directoryHint: "You may edit this path. Existing directories will not be overwritten.",
@@ -21,12 +21,12 @@ export function projectLabels(state) {
     noOpen: "No project open", opened: "Open", rename: "Rename project", saved: "Save name",
     lastOpened: "Last opened", created: "Created",
     importThreads: "Parallel import workers", importThreadsHint: "Shared by archive extraction and PAF parsing during import; SQLite still uses one writer.",
-    recommendedThreads: "{number} (recommended)",
+    recommendedThreads: "{number} (Recommended)",
   } : {
     import: "导入", open: "打开", importTitle: "导入项目", recent: "项目库",
     empty: "尚未添加项目", emptyHint: "导入交付包，或打开已有项目目录。",
     name: "项目名称（可选）", nameDefault: "使用目录名称", location: "项目目录",
-    zip: "交付包（ZIP / tar.gz）", extracted: "已解压目录", source: "来源", browse: "选择",
+    zip: "交付包（ZIP / tar.gz）", extracted: "已解压目录", extractedOption: "已解压目录", source: "来源", browse: "选择",
     cancel: "取消", submit: "导入",
     newDirectory: "工作目录（将新建）",
     directoryHint: "可修改此路径；不会覆盖已有目录。",
@@ -101,7 +101,7 @@ export function renderProjectImportDialog(state, messages) {
       <h3 id="project-import-title">${labels.importTitle}</h3>
       <fieldset class="project-source-switch"><legend>${labels.source}</legend>
         <label><input type="radio" name="project-source" value="zip" ${extracted ? "" : "checked"} />${labels.zip}</label>
-        <label><input type="radio" name="project-source" value="extracted" ${extracted ? "checked" : ""} />${labels.extracted}</label>
+        <label><input type="radio" name="project-source" value="extracted" ${extracted ? "checked" : ""} />${labels.extractedOption}</label>
       </fieldset>
       <label for="${extracted ? "extracted-path-input" : "zip-path-input"}">${extracted ? labels.extracted : labels.zip}</label>
       <div class="inline-input">
@@ -165,7 +165,7 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
       <header class="project-recents-header"><h4 id="project-recents-title" title="${labels.recent}"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count">${records.length}</span></h4>
         ${records.length ? `<div class="project-library-actions">
           <button id="validate-history-button" class="button ghost project-history-action" title="${html(validation.accessibleLabel)}" aria-label="${html(validation.accessibleLabel)}" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button>
-          <button id="delete-failed-history-button" class="button ghost project-history-action" title="${html(messages.page.deleteFailedConfirmTitle)}" aria-label="${html(messages.page.deleteFailedConfirmTitle)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button>
+          <button id="delete-failed-history-button" class="button ghost project-history-action" title="${html(messages.buttons.confirmDeleteFailed)}" aria-label="${html(messages.buttons.confirmDeleteFailed)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button>
         </div>` : ""}
       </header>
       <div class="project-recent-list">${rows}</div>

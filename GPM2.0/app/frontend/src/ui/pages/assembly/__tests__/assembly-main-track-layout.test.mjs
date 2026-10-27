@@ -755,7 +755,7 @@ test("support mirror tracks keep filled bars, share drag offset, and reserve equ
     /data-track-contig-id="30" data-track-role="support"[^>]*data-track-is-mirror="1"[^>]*data-track-ref-orient="-"/,
   );
   assert.doesNotMatch(baseHtml, /data-band-track-role="support"[^>]*data-band-contig-id="330"/);
-  const primaryLabelIndex = baseHtml.indexOf("主(hifiasm)");
+  const primaryLabelIndex = baseHtml.indexOf("主数据集轨道（hifiasm）");
   const firstMirrorLabelIndex = baseHtml.indexOf("wtdbg2-镜像轨道");
   const secondMirrorLabelIndex = baseHtml.indexOf("flye-镜像轨道");
   assert.ok(primaryLabelIndex >= 0 && firstMirrorLabelIndex >= 0 && secondMirrorLabelIndex >= 0);
@@ -874,7 +874,7 @@ test("mirror track label is selectable and support mother selection does not aut
   );
   assert.match(
     selectedHtml,
-    /<div class="assembly-track-label-row[^"]*is-companion[^"]*is-subview-track-selected[^"]*"[^>]*>[\s\S]*辅\(flye\)/,
+    /<div class="assembly-track-label-row[^"]*is-companion[^"]*is-subview-track-selected[^"]*"[^>]*>[\s\S]*辅助数据集轨道（flye）/,
   );
   assert.doesNotMatch(
     selectedHtml,
@@ -933,7 +933,7 @@ test("subview support track selection highlights only the matching dataset/sourc
 
   assert.match(
     html,
-    /<div class="assembly-track-label-row[^"]*is-companion[^"]*is-subview-track-selected[^"]*"[^>]*data-track-label-source="mother"[^>]*data-track-label-dataset-id="22"[^>]*>[\s\S]*辅\(flye\)/,
+    /<div class="assembly-track-label-row[^"]*is-companion[^"]*is-subview-track-selected[^"]*"[^>]*data-track-label-source="mother"[^>]*data-track-label-dataset-id="22"[^>]*>[\s\S]*辅助数据集轨道（flye）/,
   );
   assert.doesNotMatch(
     html,

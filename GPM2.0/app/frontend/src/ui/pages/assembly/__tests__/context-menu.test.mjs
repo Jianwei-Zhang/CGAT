@@ -231,8 +231,8 @@ test("buildAssemblyContextMenuItems exposes move and remove for every Subview mo
     assert.deepEqual(items.map((item) => item.label), [
       "加入 Final Path",
       "移至另一轨",
-      "翻转 contig",
-      "删除 contig",
+      "翻转 Contig",
+      "删除 Contig",
     ]);
     await items[1].run();
     assert.equal(calls.at(-1).name, "moveContextSubviewMemberToOtherLane");
@@ -588,10 +588,10 @@ test("buildAssemblyContextMenuItems shows batch actions when multiple primary tr
     actions: createContextMenuActionsCapture(calls),
   });
 
-  assert.ok(items.some((item) => item.label === "隐藏已框选 contig（2）"));
-  assert.ok(items.some((item) => item.label === "解除隐藏已框选 contig（2）"));
-  assert.ok(items.some((item) => item.label === "删除已框选 contig（2）"));
-  const deleteItem = items.find((item) => item.label === "删除已框选 contig（2）");
+  assert.ok(items.some((item) => item.label === "隐藏已框选 Contig（2）"));
+  assert.ok(items.some((item) => item.label === "解除隐藏已框选 Contig（2）"));
+  assert.ok(items.some((item) => item.label === "删除已框选 Contig（2）"));
+  const deleteItem = items.find((item) => item.label === "删除已框选 Contig（2）");
   await deleteItem.run();
   assert.deepEqual(calls.at(-1), {
     name: "deleteSelectedTrackCtgs",
@@ -632,7 +632,7 @@ test("buildAssemblyContextMenuItems deletes primary track ctgs shorter than prom
     actions,
   });
 
-  const item = items.find((entry) => entry.label === "删除小于指定长度的 contig...");
+  const item = items.find((entry) => entry.label === "删除小于指定长度的 Contig...");
   assert.ok(item);
   await item.run();
 
@@ -640,7 +640,7 @@ test("buildAssemblyContextMenuItems deletes primary track ctgs shorter than prom
     {
       name: "deleteSelectedTrackCtgs",
       args: [host, store, [2, 13], {
-        confirmMessage: "将删除当前 chr 中 2 个小于 100000 bp 的主 ds contig，是否继续？",
+        confirmMessage: "将删除当前染色体中 2 个小于 100000 bp 的主数据集 Contig，是否继续？",
       }],
     },
   ]);
@@ -682,7 +682,7 @@ test("buildAssemblyContextMenuItems waits for async shorter-than threshold input
     actions,
   });
 
-  const item = items.find((entry) => entry.label === "删除小于指定长度的 contig...");
+  const item = items.find((entry) => entry.label === "删除小于指定长度的 Contig...");
   assert.ok(item);
   const pending = item.run();
   await Promise.resolve();
@@ -694,7 +694,7 @@ test("buildAssemblyContextMenuItems waits for async shorter-than threshold input
     {
       name: "deleteSelectedTrackCtgs",
       args: [host, store, [2, 13], {
-        confirmMessage: "将删除当前 chr 中 2 个小于 100000 bp 的主 ds contig，是否继续？",
+        confirmMessage: "将删除当前染色体中 2 个小于 100000 bp 的主数据集 Contig，是否继续？",
       }],
     },
   ]);
@@ -732,7 +732,7 @@ test("buildAssemblyContextMenuItems reports when no primary ctgs are shorter tha
     actions,
   });
 
-  const item = items.find((entry) => entry.label === "删除小于指定长度的 contig...");
+  const item = items.find((entry) => entry.label === "删除小于指定长度的 Contig...");
   assert.ok(item);
   await item.run();
 
@@ -740,7 +740,7 @@ test("buildAssemblyContextMenuItems reports when no primary ctgs are shorter tha
     {
       name: "setAssemblyActionFeedback",
       args: [host, store, {
-        actionStatus: "没有小于 100000 bp 的主 ds contig。",
+        actionStatus: "没有小于 100000 bp 的主数据集 Contig。",
       }],
     },
   ]);
@@ -785,10 +785,10 @@ test("buildAssemblyContextMenuItems exposes track-pair move, flip, and remove ac
   });
 
   assert.ok(items.some((item) => item.label === "移至另一轨"));
-  assert.ok(items.some((item) => item.label === "翻转 contig"));
-  assert.ok(items.some((item) => item.label === "删除 contig"));
-  const flipItem = items.find((item) => item.label === "翻转 contig");
-  const removeItem = items.find((item) => item.label === "删除 contig");
+  assert.ok(items.some((item) => item.label === "翻转 Contig"));
+  assert.ok(items.some((item) => item.label === "删除 Contig"));
+  const flipItem = items.find((item) => item.label === "翻转 Contig");
+  const removeItem = items.find((item) => item.label === "删除 Contig");
   await flipItem.run();
   assert.deepEqual(calls.at(-1), {
     name: "toggleSubviewContigFlip",
@@ -822,7 +822,7 @@ test("buildAssemblyContextMenuItems shows restore action for deleted contig sele
     actions: createContextMenuActionsCapture(calls),
   });
 
-  const item = items.find((entry) => entry.label === "撤销删除已框选 contig（1）");
+  const item = items.find((entry) => entry.label === "撤销删除已框选 Contig（1）");
   assert.ok(item);
   await item.run();
   assert.deepEqual(calls.at(-1), {
@@ -857,7 +857,7 @@ test("buildAssemblyContextMenuItems does not show enter-subview-ctg when two con
     actions: createContextMenuActionsCapture(),
   });
 
-  assert.ok(items.every((item) => item.label !== "进入局部视图 · ctg"));
+  assert.ok(items.every((item) => item.label !== "进入局部视图 · Contig"));
 });
 
 test("buildAssemblyContextMenuItems does not show track-mode Subview entry in main-view context menu", () => {
@@ -968,8 +968,8 @@ test("buildAssemblyContextMenuItems exposes unified fragment actions in 2-contig
   assert.deepEqual(items.map((item) => item.label), [
     "加入 Final Path",
     "移至另一轨",
-    "翻转 contig",
-    "删除 contig",
+    "翻转 Contig",
+    "删除 Contig",
   ]);
 
   await items[0].run();
@@ -1231,8 +1231,8 @@ test("buildAssemblyContextMenuItems exposes fragment-local subview actions in tr
   assert.deepEqual(items.map((item) => item.label), [
     "加入 Final Path",
     "移至另一轨",
-    "翻转 contig",
-    "删除 contig",
+    "翻转 Contig",
+    "删除 Contig",
   ]);
 
   for (const item of items.slice(1)) {
@@ -1264,10 +1264,10 @@ test("buildAssemblyContextMenuItems exposes final-path graph ctg actions", async
 
   assert.deepEqual(
     items.map((item) => item.label),
-    ["删除", "翻转", "添加 Gap", "添加 Ctg"],
+    ["删除", "翻转", "添加 Gap", "添加 Contig"],
   );
   assert.deepEqual(items[2].children.map((item) => item.label), ["左侧添加 Gap", "右侧添加 Gap"]);
-  assert.deepEqual(items[3].children.map((item) => item.label), ["左侧添加 ctg", "右侧添加 ctg"]);
+  assert.deepEqual(items[3].children.map((item) => item.label), ["左侧添加 Contig", "右侧添加 Contig"]);
 
   await items[2].children[0].run();
   assert.deepEqual(calls.at(-1), {
@@ -1384,7 +1384,7 @@ test("buildAssemblyContextMenuItems exposes TelSeeker only for terminal contigs"
   });
 
   const leftItems = buildItems("left");
-  assert.deepEqual(leftItems.map((item) => item.label), ["删除", "翻转", "添加 Gap", "添加 Ctg", "DEGAP"]);
+  assert.deepEqual(leftItems.map((item) => item.label), ["删除", "翻转", "添加 Gap", "添加 Contig", "DEGAP"]);
   assert.deepEqual(leftItems.at(-1).children.map((item) => item.label), ["TelSeeker", "设置"]);
   await leftItems.at(-1).children[0].run();
   assert.deepEqual(calls.at(-1), {
@@ -1512,7 +1512,7 @@ test("buildAssemblyContextMenuItems routes main-view flip through local editor r
     actions: createContextMenuActionsCapture(calls),
   });
 
-  const item = items.find((entry) => entry.label === "翻转 contig");
+  const item = items.find((entry) => entry.label === "翻转 Contig");
   assert.ok(item);
   await item.run();
   assert.deepEqual(calls.at(-1), {
@@ -1600,9 +1600,9 @@ test("buildAssemblyContextMenuItems renders english labels when locale is en", (
     actions: createContextMenuActionsCapture([]),
   });
 
-  assert.ok(items.some((item) => item.label === "Hide Selected Contigs (2)"));
-  assert.ok(items.some((item) => item.label === "Show Selected Contigs (2)"));
-  assert.ok(items.some((item) => item.label === "Delete Selected Contigs (2)"));
+  assert.ok(items.some((item) => item.label === "Hide selected contigs (2)"));
+  assert.ok(items.some((item) => item.label === "Show selected contigs (2)"));
+  assert.ok(items.some((item) => item.label === "Delete selected contigs (2)"));
 
   const subviewItems = buildAssemblyContextMenuItems({
     subviewTrackPairContext: {
@@ -1627,7 +1627,7 @@ test("buildAssemblyContextMenuItems renders english labels when locale is en", (
     host: {},
     actions: createContextMenuActionsCapture([]),
   });
-  assert.ok(subviewItems.some((item) => item.label === "Move to Other Track"));
+  assert.ok(subviewItems.some((item) => item.label === "Move to other track"));
   assert.ok(subviewItems.some((item) => item.label === "Delete contig"));
 });
 

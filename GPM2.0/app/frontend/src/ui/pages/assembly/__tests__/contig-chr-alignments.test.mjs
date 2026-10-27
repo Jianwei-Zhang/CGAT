@@ -100,8 +100,8 @@ test("cross-chr feedback directs undo to the destination, not the source", async
   const done=openContigChrAlignments(h.host,{load:async()=>report(),add:async args=>{writes.push(args);return {changed:true};}});
   await tick();h.clickAction(0);await tick();
   assert.equal(writes[0].sourceChrName,"chrA");
-  assert.match(h.el("status").textContent,/目标 chr 撤销/);
-  assert.doesNotMatch(h.el("status").textContent,/当前 chr 撤销/);
+  assert.match(h.el("status").textContent,/目标染色体撤销/);
+  assert.doesNotMatch(h.el("status").textContent,/当前染色体撤销/);
   h.el("close").fire("click");await done;
 });
 

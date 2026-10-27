@@ -50,7 +50,7 @@ export function buildFinalPathTooltip(segment, { sourceCtgs = [], labels = {} } 
   return [
     resolveFinalPathSegmentDisplayName(segment),
     `${labels.finalPathAdoptedLength || "Adopted length"}: ${number(adopted)} bp`,
-    ...(range.sourceLength ? [`${labels.finalPathSourceLength || "Source Contig length"}: ${number(range.sourceLength)} bp`] : []),
+    ...(range.sourceLength ? [`${labels.finalPathSourceLength || "Source contig length"}: ${number(range.sourceLength)} bp`] : []),
     `${labels.finalPathSourceInterval || "Source interval"}: ${number(range.sourceStart)}–${number(range.sourceEnd)} bp`,
     `${labels.finalPathOrientation || "Orientation"}: ${range.orient}`,
   ].join("\n");

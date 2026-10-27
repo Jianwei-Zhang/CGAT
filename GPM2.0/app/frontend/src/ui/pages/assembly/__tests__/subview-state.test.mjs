@@ -61,7 +61,7 @@ test("selectSubviewCandidate toggles a selected candidate off", () => {
     {
       selectedAContigId: 11,
       selectedARole: "primary",
-      message: "已选 1/2 个ctg。",
+      message: "已选 1/2 个 Contig。",
       summary: null,
       error: "",
     },
@@ -99,7 +99,7 @@ test("selectSubviewTrack creates a track-pair summary after primary and support 
   });
 
   assert.equal(afterPrimary.summary, null);
-  assert.equal(afterPrimary.message, "已选 1/2 条ds轨道。");
+  assert.equal(afterPrimary.message, "已选 1/2 条数据集轨道。");
 
   const afterSupport = selectSubviewTrack({
     subview: afterPrimary,
@@ -165,7 +165,7 @@ test("buildSubviewSummaryFromCandidates rejects same-dataset contigs when self a
   });
 
   assert.equal(result.ok, false);
-  assert.equal(result.error, "该数据集未包含自比对，不能在同一 ds 的 ctg 间进入局部视图。");
+  assert.equal(result.error, "该数据集未包含自比对，不能在同一数据集的 Contig 间进入局部视图。");
 });
 
 test("buildSubviewSummaryFromCandidates allows ref plus ds candidates", () => {
@@ -238,7 +238,7 @@ test("buildSubviewSummaryFromTrackSelections rejects fewer than two selections",
   });
 
   assert.equal(result.ok, false);
-  assert.equal(result.error, "请先选中两条 ds 轨道。");
+  assert.equal(result.error, "请先选中两条数据集轨道。");
 });
 
 test("selectSubviewTrack allows the ref track as a normal selectable track", () => {
@@ -250,7 +250,7 @@ test("selectSubviewTrack allows the ref track as a normal selectable track", () 
     { role: "ref", source: "mother", datasetId: null, isMirror: false },
   ]);
   assert.equal(afterRef.summary, null);
-  assert.equal(afterRef.message, "已选 1/2 条ds轨道。");
+  assert.equal(afterRef.message, "已选 1/2 条数据集轨道。");
 
   const afterPrimary = selectSubviewTrack({
     subview: afterRef,
@@ -630,7 +630,7 @@ test("removeSubviewTrackSelection removes a support track selection by source an
     { role: "primary", source: "mother", datasetId: null, isMirror: false },
   ]);
   assert.equal(removed.summary, null);
-  assert.equal(removed.message, "已选 1/2 条ds轨道。");
+  assert.equal(removed.message, "已选 1/2 条数据集轨道。");
   assert.equal(removed.error, "");
 });
 

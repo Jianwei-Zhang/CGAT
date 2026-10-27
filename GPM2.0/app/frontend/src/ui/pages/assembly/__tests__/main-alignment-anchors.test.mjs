@@ -75,8 +75,8 @@ test("main hit and edge menus exclude contig actions even when the band also res
   assert.deepEqual(menu("left").map((i) => i.label), ["关闭锚点"]);
   const contigMenu = __testBuildAssemblyContextMenuItems({ host: {}, store, ctgContext,
     actions: { canEditTrackCtg: () => true } });
-  assert.ok(contigMenu.some((item) => item.label === "分割 contig"));
-  assert.ok(contigMenu.some((item) => item.label === "重命名 contig..."));
+  assert.ok(contigMenu.some((item) => item.label === "分割 Contig"));
+  assert.ok(contigMenu.some((item) => item.label === "重命名 Contig..."));
   assert.ok(!contigMenu.some((item) => item.label.includes("侧锚点")));
   const edgeNode = { getAttribute: (key) => ({ "data-main-alignment-key": hitKey, "data-main-anchor-edge": "right" })[key] };
   assert.deepEqual(resolveMainAlignmentContextTarget({ closest: () => edgeNode }), { hitKey, edge: "right" });
@@ -203,7 +203,7 @@ test("main fallback alignment boundary remains actionable in the menu and reject
   const menu = __testBuildAssemblyContextMenuItems({ store, host: {},
     ctgContext: { assemblyCtgId: 6, trackRole: "primary", sourceBp: 400 },
     actions: { canEditTrackCtg: () => true, splitContigAtAnchor: async (_host, _store, anchor) => calls.push(anchor) } });
-  const split = menu.find((item) => item.label === "分割 contig");
+  const split = menu.find((item) => item.label === "分割 Contig");
   assert.equal(split.children[1].disabled, false); assert.equal(split.children[2].disabled, false);
   await split.children[2].run(); assert.equal(calls[0].cutAfter, 800);
   assert.equal(isCurrentContigSplitAnchor(enable(assembly, 1, "left"), fallback), false);

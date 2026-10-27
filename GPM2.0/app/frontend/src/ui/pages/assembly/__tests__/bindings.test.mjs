@@ -1974,7 +1974,7 @@ test("confirmation dialog confirm button passes prompt input value", async () =>
   ]);
 });
 
-test("confirmation dialog confirm button passes anchor offset fields together", async () => {
+test("confirmation dialog confirm button passes Anchor offset fields together", async () => {
   const listeners = new Map();
   const confirmButton = {
     dataset: {
@@ -2056,7 +2056,7 @@ test("confirmation dialog confirm button passes anchor offset fields together", 
   ]);
 });
 
-test("anchor offset dialog validates both endpoints while the automatic value is edited", async () => {
+test("Anchor offset dialog validates both endpoints while the automatic value is edited", async () => {
   const confirmListeners = new Map();
   const inputListeners = new Map();
   const directionListeners = new Map();
@@ -2171,7 +2171,7 @@ test("anchor offset dialog validates both endpoints while the automatic value is
 
   inputListeners.get("input")?.();
   assert.equal(confirmButton.disabled, true);
-  assert.match(errorNode.textContent, /超出 contig 范围/);
+  assert.match(errorNode.textContent, /超出 Contig 范围/);
   assert.equal(errorHidden, false);
 
   promptInput.value = "50";

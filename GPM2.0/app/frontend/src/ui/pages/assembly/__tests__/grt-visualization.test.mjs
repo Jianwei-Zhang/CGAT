@@ -183,7 +183,7 @@ test("renders passive GRT placement status and a current-path baseline reset", (
   assert.doesNotMatch(html, /data-grt-trace-kind=/);
   assert.doesNotMatch(html, /data-grt-locate-/);
   assert.match(html, /grt_promoted/);
-  assert.match(html, /Ref status: no_hit/);
+  assert.match(html, /Reference status: no_hit/);
   assert.match(html, /Anchor source: GRT Final Path/);
   assert.match(html, /class="grt-status-badge is-grt_promoted"/);
   assert.doesNotMatch(html, /class="grt-status-badge is-grt_promoted"[^>]*role="button"/);

@@ -66,7 +66,7 @@ test("validateSubviewSelection rejects missing contig selections with Chinese er
   });
 
   assert.equal(result.ok, false);
-  assert.equal(result.error, "双 contig 模式需要同时选择 A / B contig");
+  assert.equal(result.error, "双 Contig 模式需要同时选择 A / B Contig");
 });
 
 test("validateSubviewSelection rejects slot-dataset mismatches with Chinese error", () => {
@@ -81,7 +81,7 @@ test("validateSubviewSelection rejects slot-dataset mismatches with Chinese erro
   });
 
   assert.equal(result.ok, false);
-  assert.equal(result.error, "A 必须来自主 ds，B 必须来自辅 ds");
+  assert.equal(result.error, "A 必须来自主数据集，B 必须来自辅助数据集");
 });
 
 test("validateSubviewSelection returns english errors when locale is en", () => {

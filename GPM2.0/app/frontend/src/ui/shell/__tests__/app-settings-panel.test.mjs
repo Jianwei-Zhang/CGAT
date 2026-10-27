@@ -40,7 +40,7 @@ for (const locale of ["zh", "en"]) {
       assert.match(html, new RegExp(`<select id="settings-${id}" name="${name}" hidden`));
       assert.match(html, new RegExp(`id="settings-${id}-menu"[^>]+role="listbox"`));
     }
-    assert.match(html, /value="" selected>Follow interface|value="" selected>跟随界面/);
+    assert.match(html, /value="" selected>Follow Interface|value="" selected>跟随界面/);
     assert.match(html, /class="assembly-track-combo-menu settings-options"/);
     assert.match(html, /name="historyCapacity"[^>]+role="combobox"/);
   });

@@ -97,9 +97,9 @@ test("composition canvas renders each effective direction once in labels and hov
   });
   const html = renderAssemblyPage(compositionState(composition, candidates));
 
-  assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*?<title>ctg1@Chr01 \(-\) \| start=0 \| len=1000 \|/);
+  assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*?<title>ctg1@Chr01 \(-\) \| Start: 0 bp \| Length: 1000 bp \|/);
   assert.match(html, /data-subview-composition-entity-key="assembly:1"[\s\S]*?>ctg1 \(-\)<\/text>/);
-  assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*?<title>ctg2@Chr01 \(\+\) \| start=0 \| len=1000 \|/);
+  assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*?<title>ctg2@Chr01 \(\+\) \| Start: 0 bp \| Length: 1000 bp \|/);
   assert.match(html, /data-subview-composition-entity-key="assembly:2"[\s\S]*?>ctg2 \(\+\)<\/text>/);
   assert.doesNotMatch(html, />ctg1@Chr01 \(-\)<\/text>|>ctg2@Chr01 \(\+\)<\/text>/);
   assert.doesNotMatch(html, /ctg1@Chr01 \(\+\) \(-\)|ctg2@Chr01 \(-\) \(\+\)/);

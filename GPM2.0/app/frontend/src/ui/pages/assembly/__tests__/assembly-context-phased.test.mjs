@@ -158,15 +158,15 @@ test("context menu opens for track contig glyphs and legacy ctg nodes", () => {
   });
 
   assert.equal(preventDefaultCalls.length, 1);
-  assert.match(menuState.innerHTML, /翻转 contig/);
-  assert.match(menuState.innerHTML, /重命名 contig/);
-  assert.match(menuState.innerHTML, /镜像 contig/);
-  assert.doesNotMatch(menuState.innerHTML, /撤销镜像 contig/);
-  assert.doesNotMatch(menuState.innerHTML, /隐藏 contig/);
-  assert.doesNotMatch(menuState.innerHTML, /解除隐藏 contig/);
-  assert.doesNotMatch(menuState.innerHTML, /删除 contig/);
+  assert.match(menuState.innerHTML, /翻转 Contig/);
+  assert.match(menuState.innerHTML, /重命名 Contig/);
+  assert.match(menuState.innerHTML, /镜像 Contig/);
+  assert.doesNotMatch(menuState.innerHTML, /撤销镜像 Contig/);
+  assert.doesNotMatch(menuState.innerHTML, /隐藏 Contig/);
+  assert.doesNotMatch(menuState.innerHTML, /解除隐藏 Contig/);
+  assert.doesNotMatch(menuState.innerHTML, /删除 Contig/);
   assert.doesNotMatch(menuState.innerHTML, /查看\/编辑成员/);
-  assert.doesNotMatch(menuState.innerHTML, /更多 contig 操作/);
+  assert.doesNotMatch(menuState.innerHTML, /更多 Contig 操作/);
   assert.doesNotMatch(menuState.innerHTML, /移动锚点/);
   assert.doesNotMatch(menuState.innerHTML, /当前版本未接入/);
 });
@@ -203,10 +203,10 @@ test("primary track context menu toggles hide/unhide contig label by hidden stat
     host,
   });
 
-  assert.ok(visibleItems.some((item) => item.label === "隐藏 contig"));
-  assert.ok(visibleItems.every((item) => item.label !== "解除隐藏 contig"));
-  assert.ok(hiddenItems.some((item) => item.label === "解除隐藏 contig"));
-  assert.ok(hiddenItems.every((item) => item.label !== "隐藏 contig"));
+  assert.ok(visibleItems.some((item) => item.label === "隐藏 Contig"));
+  assert.ok(visibleItems.every((item) => item.label !== "解除隐藏 Contig"));
+  assert.ok(hiddenItems.some((item) => item.label === "解除隐藏 Contig"));
+  assert.ok(hiddenItems.every((item) => item.label !== "隐藏 Contig"));
 });
 
 test("support and mirror menus expose cross-chr inspection while mirror editing stays restricted", () => {
@@ -266,15 +266,15 @@ test("support and mirror menus expose cross-chr inspection while mirror editing 
     host,
   }).map((item) => item.label);
 
-  assert.ok(supportItems.includes("翻转 contig"));
-  assert.ok(supportItems.includes("重命名 contig..."));
+  assert.ok(supportItems.includes("翻转 Contig"));
+  assert.ok(supportItems.includes("重命名 Contig..."));
   assert.ok(supportItems.includes("加入 Final Path"));
-  assert.ok(supportItems.includes("撤销镜像 contig"));
+  assert.ok(supportItems.includes("撤销镜像 Contig"));
   assert.deepEqual(mirrorItems, [
     "加入 Final Path",
     "加入局部视图",
-    "跨 chr 比对…",
-    "撤销镜像 contig",
+    "跨染色体比对…",
+    "撤销镜像 Contig",
   ]);
 });
 
@@ -557,11 +557,11 @@ test("phased track item context menu appends, flips, and removes only that phase
     "加入 Final Path A",
     "加入 Final Path B",
     "加入局部视图",
-    "翻转 contig",
+    "翻转 Contig",
     "从该分型组删除",
   ]);
   await items.find((item) => item.label === "加入 Final Path B").run();
-  await items.find((item) => item.label === "翻转 contig").run();
+  await items.find((item) => item.label === "翻转 Contig").run();
   await items.find((item) => item.label === "从该分型组删除").run();
   assert.deepEqual(calls, [
     {
@@ -940,8 +940,8 @@ test("ds-backed track label context menu exposes add new ctg with clicked target
     },
   });
 
-  const primaryAdd = primaryItems.find((item) => item.label === "添加新 ctg...");
-  const supportAdd = supportItems.find((item) => item.label === "添加新 ctg...");
+  const primaryAdd = primaryItems.find((item) => item.label === "添加新 Contig...");
+  const supportAdd = supportItems.find((item) => item.label === "添加新 Contig...");
   assert.ok(primaryAdd, "expected primary add new ctg menu item");
   assert.ok(supportAdd, "expected support add new ctg menu item");
   await primaryAdd.run();
@@ -993,8 +993,8 @@ test("phased and mirror track labels do not expose direct add new ctg", () => {
     store,
     host,
   });
-  assert.equal(phasedItems.some((item) => item.label === "添加新 ctg..."), false);
-  assert.equal(mirrorItems.some((item) => item.label === "添加新 ctg..."), false);
+  assert.equal(phasedItems.some((item) => item.label === "添加新 Contig..."), false);
+  assert.equal(mirrorItems.some((item) => item.label === "添加新 Contig..."), false);
 });
 
 test("phased track label context menu exposes delete track action", async () => {

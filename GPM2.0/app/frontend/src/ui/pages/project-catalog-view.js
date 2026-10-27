@@ -13,9 +13,9 @@ const messages = {
     failure: "读取数据集失败", saveFailure: "保存失败", empty: "没有数据集", bp: "bp", pending: "正在保存…",
   },
   en: {
-    datasets: "Datasets", name: "Name", role: "Data type", count: "Sequences", details: "Dataset details", more: "More information", close: "Close",
+    datasets: "Datasets", name: "Name", role: "Data type", count: "Sequences", details: "Dataset Details", more: "More information", close: "Close",
     total: "Total length", note: "Note", actions: "Actions", primary: "Primary", support: "Auxiliary", derived: "Derived", includesDerived: "Includes derived sequences",
-    reference: "Reference genome", edit: "View details and edit name or note", emptyNote: "Add note",
+    reference: "Reference Genome", edit: "View details and edit name or note", emptyNote: "Add note",
     reset: "Restore initial name", location: "Local location", missing: "Sequence files not included or unavailable",
     partial: "Some sequence files are available", open: "Open folder",
     save: "Save", cancel: "Cancel", loading: "Loading datasets…", retry: "Retry",

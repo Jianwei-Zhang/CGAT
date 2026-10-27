@@ -41,7 +41,7 @@ test("assembly main view renders the persisted final path card for the current c
     }),
   );
 
-  assert.match(html, /projA_Chr01 path/);
+  assert.match(html, /projA_Chr01 Final Path/);
   assert.doesNotMatch(html, /data-view-tick-control|data-view-tick-interval/);
   assert.doesNotMatch(html, /data-track-combo-field="(?:minTickUnitKb|maxTickCount)"/);
   assert.match(html, /assembly-final-path-layout/);
@@ -221,7 +221,7 @@ test("assembly main view renders an empty final path card for the current chr wi
     }),
   );
 
-  assert.match(html, /projA_Chr01 path/);
+  assert.match(html, /projA_Chr01 Final Path/);
   assert.match(html, /data-final-path-view-mode="graph"/);
   assert.match(html, /assembly-final-path-svg-wrap/);
   assert.match(html, /data-final-path-export-toggle="true"/);
@@ -265,7 +265,7 @@ test("phased mode final path card defaults to all haplotypes and omits the paren
   assert.match(html, /data-phased-final-path-current-key="__all__"/);
   assert.match(html, />All <span aria-hidden="true">/);
   assert.match(html, /data-final-path-all-card="Chr01A"[\s\S]*data-final-path-all-card="Chr01B"/);
-  assert.doesNotMatch(html, /projA_Chr01 path/);
+  assert.doesNotMatch(html, /projA_Chr01 Final Path/);
   assert.match(html, /data-phased-final-path-key="A"/);
   assert.match(html, /data-phased-final-path-key="B"/);
   assert.match(html, /data-phased-final-path-chr-name="Chr01B"/);
@@ -312,8 +312,8 @@ test("phased mode final path card can select one haplotype independently of the 
 
   assert.match(html, /data-phased-final-path-current-key="B"/);
   assert.match(html, />B <span aria-hidden="true">/);
-  assert.match(html, /projA_Chr01B path/);
-  assert.doesNotMatch(html, /projA_Chr01A path/);
+  assert.match(html, /projA_Chr01B Final Path/);
+  assert.doesNotMatch(html, /projA_Chr01A Final Path/);
   assert.match(html, /data-final-path-remove-row="hap-b"/);
 });
 
@@ -556,7 +556,7 @@ test("assembly main view renders a placeholder row for an empty final path in ta
     }),
   );
 
-  assert.match(html, /projA_Chr01 path/);
+  assert.match(html, /projA_Chr01 Final Path/);
   assert.match(html, /data-final-path-view-mode="table"/);
   assert.match(html, /data-final-path-empty-row="true"/);
   assert.match(html, /data-final-path-export-toggle="true"/);
@@ -710,7 +710,7 @@ test("add_ctg import progress meter includes frontend stages after backend compl
             "add_ctg_zip_path=/tmp/add.zip",
             "调用后端 import_add_ctg_package",
             ...backendStages,
-            "刷新当前 chr 视图",
+            "刷新当前染色体视图",
           ],
         },
       },
@@ -718,7 +718,7 @@ test("add_ctg import progress meter includes frontend stages after backend compl
   );
 
   assert.match(html, /class="import-progress-meter" aria-label="51\/51"/);
-  assert.match(html, /刷新当前 chr 视图 \(51\/51\)/);
+  assert.match(html, /刷新当前染色体视图 \(51\/51\)/);
 });
 
 test("derived ctg source tags render in track labels and primary member cards", () => {

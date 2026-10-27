@@ -65,14 +65,14 @@ const segment = { type: "ctg", assemblyCtgId: 1, datasetName: "Data", ctgName: "
 
 test("tooltip leads with adopted length, not the full Contig length", () => {
   assert.equal(buildFinalPathTooltip(segment),
-    "Data_ctg1\nAdopted length: 5,000 bp\nSource Contig length: 10,000 bp\nSource interval: 5,001–10,000 bp\nOrientation: +");
+    "Data_ctg1\nAdopted length: 5,000 bp\nSource contig length: 10,000 bp\nSource interval: 5,001–10,000 bp\nOrientation: +");
 });
 
 test("fragment source offset and source total remain distinct from adopted coordinates", () => {
   const sources = [{ assemblyCtgId: 1, sourceFragment: { sourceStart: 2001, sourceEnd: 6000, sourceLength: 10000 } }];
   const value = { ...segment, overallLen: 4000, start: 3000, end: 1001 };
   assert.match(buildFinalPathTooltip(value, { sourceCtgs: sources }),
-    /Adopted length: 2,000 bp\nSource Contig length: 10,000 bp\nSource interval: 3,001–5,000 bp\nOrientation: -/);
+    /Adopted length: 2,000 bp\nSource contig length: 10,000 bp\nSource interval: 3,001–5,000 bp\nOrientation: -/);
 });
 
 test("source-provenance coordinates do not override committed edits or get double-offset", () => {

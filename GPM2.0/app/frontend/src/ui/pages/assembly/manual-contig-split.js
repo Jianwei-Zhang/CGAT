@@ -2,9 +2,9 @@ const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&":
 const bp = (value) => Number(value).toLocaleString("en-US");
 const X = 64, WIDTH = 632, REF_Y = 44, CTG_Y = 116, BAR_HEIGHT = 16;
 const copy = {
-  zh: { title: "手动分割 contig", position: "在原始位置", after: "bp 后分割", left: "左段", right: "右段",
-    cancel: "取消", split: "分割", reverse: "反向显示", forward: "正向显示", invalid: "请输入 {start}–{end} 的整数。", failed: "分割失败，请重试。", stale: "contig 已变化，请重新打开面板。" },
-  en: { title: "Manual contig split", position: "Split after source base", after: "bp", left: "Left", right: "Right",
+  zh: { title: "手动分割 Contig", position: "在原始位置", after: "bp 后分割", left: "左段", right: "右段",
+    cancel: "取消", split: "分割", reverse: "反向显示", forward: "正向显示", invalid: "请输入 {start}–{end} 的整数。", failed: "分割失败，请重试。", stale: "Contig 已变化，请重新打开面板。" },
+  en: { title: "Manual Contig Split", position: "Split after source base", after: "bp", left: "Left", right: "Right",
     cancel: "Cancel", split: "Split", reverse: "Reverse display", forward: "Forward display", invalid: "Enter an integer from {start} to {end}.", failed: "Split failed. Try again.", stale: "Contig changed. Reopen the panel." },
 };
 

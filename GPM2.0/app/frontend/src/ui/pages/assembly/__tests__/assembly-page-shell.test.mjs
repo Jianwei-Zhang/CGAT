@@ -60,7 +60,7 @@ test("check new sequences tab renders API-backed items as rows", () => {
   assert.match(html, /已隐藏/);
   assert.doesNotMatch(html, /data-new-seq-action="add-seq-to-ctg"/);
   assert.match(html, /data-new-seq-action="locate-seq"/);
-  assert.doesNotMatch(html, /纳入当前 contig/);
+  assert.doesNotMatch(html, /纳入当前 Contig/);
   assert.match(html, /定位到当前序列/);
   assert.doesNotMatch(html, /后续接入/);
 });
@@ -68,14 +68,14 @@ test("check new sequences tab renders API-backed items as rows", () => {
 test("contig list tab renders sorted Chinese columns and jump affordance", () => {
   const html = renderAssemblyPage(createState({ activeTab: "contig-list" }));
 
-  assert.match(html, /contig 列表/);
+  assert.match(html, /Contig 列表/);
   assert.match(html, /染色体/);
   assert.match(html, /总长度/);
   assert.match(html, /定位起点/);
   assert.match(html, /跳转/);
   assert.ok(html.indexOf("ctg-alpha") < html.indexOf("ctg-beta"));
   assert.ok(html.indexOf("ctg-beta") < html.indexOf("ctg-zeta"));
-  assert.match(html, /跳转到该 contig/);
+  assert.match(html, /跳转到该 Contig/);
   assert.match(html, /data-assembly-ctg-id="2"/);
 });
 
@@ -121,10 +121,10 @@ test("stats tab shows Chinese core assembly metrics", () => {
 
   assert.match(html, /参考基因组 ID/);
   assert.match(html, /染色体数/);
-  assert.match(html, /已放置 contig 数/);
-  assert.match(html, /未放置 contig 数/);
+  assert.match(html, /已放置 Contig 数/);
+  assert.match(html, /未放置 Contig 数/);
   assert.match(html, /未放置总长度/);
-  assert.match(html, /当前 contig/);
+  assert.match(html, /当前 Contig/);
   assert.match(html, /4/);
 });
 
@@ -142,12 +142,12 @@ test("assembly tab renders english labels when locale is en", () => {
   assert.match(html, /Chromosome Chr01/);
   assert.doesNotMatch(html, />Download</);
   assert.match(html, /class="assembly-view-title" data-main-track-control-title>Main View</);
-  assert.match(html, /aria-label="Main View Controls"/);
-  assert.match(html, />Auxiliary Dataset</);
+  assert.match(html, /aria-label="Main View controls"/);
+  assert.match(html, />Auxiliary dataset</);
   assert.doesNotMatch(html, />Tick interval \(kb\)</);
   assert.doesNotMatch(html, /view-display-settings/);
-  assert.doesNotMatch(html, />Max Visible Count</);
-  assert.match(html, /_Chr01 Primary ds track members/);
+  assert.doesNotMatch(html, />Maximum visible count</);
+  assert.match(html, /_Chr01 Primary Dataset Members/);
 });
 
 test("assembly page shell does not render an extra outer card frame", () => {
@@ -225,7 +225,7 @@ test("assembly english view renders localized track labels and mirror empty stat
 
   assert.match(html, />Primary Dataset Track</);
   assert.match(html, />flye Mirror Track</);
-  assert.doesNotMatch(html, /主 ds 轨道|辅 ds 轨道|mirror 轨道/);
+  assert.doesNotMatch(html, /主数据集轨道|辅助数据集轨道|mirror 轨道/);
 });
 
 test("assembly main view marks empty track content as unavailable for navigation", () => {
@@ -250,9 +250,9 @@ test("assembly main view renders unified single-card track container", () => {
   assert.match(html, /assembly-track-label-column/);
   assert.match(html, /data-focus-start="/);
   assert.match(html, /ref_chr1/);
-  assert.match(html, /主 ds 轨道/);
+  assert.match(html, /主数据集轨道/);
   assert.doesNotMatch(html, /block_length/);
-  assert.doesNotMatch(html, /<h4>ctg 操作<\/h4>/);
+  assert.doesNotMatch(html, /<h4>Contig 操作<\/h4>/);
   assert.doesNotMatch(html, /<h4>sequence 操作<\/h4>/);
   assert.doesNotMatch(html, /assembly-action-feedback/);
   assert.doesNotMatch(html, /Junction 检查/);
@@ -343,8 +343,8 @@ test("assembly main view inserts phased rows after primary and before mirror row
     html.matchAll(/<div class="assembly-track-label-row[^"]*"[^>]*title="([^"]+)"/g),
     (match) => match[1],
   );
-  const supportIndex = trackLabels.indexOf("辅(flye)");
-  const primaryIndex = trackLabels.findIndex((label) => label === "主 ds 轨道" || label.startsWith("主("));
+  const supportIndex = trackLabels.indexOf("辅助数据集轨道（flye）");
+  const primaryIndex = trackLabels.findIndex((label) => label === "主数据集轨道" || label.startsWith("主数据集轨道（"));
   const phasedAIndex = trackLabels.indexOf("主分型 Chr01A");
   const phasedBIndex = trackLabels.indexOf("主分型 Chr01B");
   const mirrorIndex = trackLabels.indexOf("flye-镜像轨道");
@@ -355,13 +355,13 @@ test("assembly main view inserts phased rows after primary and before mirror row
   assert.ok(phasedBIndex > phasedAIndex, "expected phased B after A");
   assert.ok(mirrorIndex > phasedBIndex, "expected mirror after phased rows");
   assert.match(html, /class="track-ctg[^"]*is-phased-track/);
-  assert.match(html, /该分型轨道暂无 contig/);
+  assert.match(html, /该分型轨道暂无 Contig/);
 
   const emptyTrackLabelTop = html.match(
     /<div class="assembly-track-label-row[^"]*is-phased-track[^"]*" style="top:([\d.]+)px"[^>]*title="主分型 Chr01B"/,
   );
   const emptyTrackMessageY = html.match(
-    /<text class="track-row-empty-label" x="12" y="([\d.]+)">该分型轨道暂无 contig。<\/text>/,
+    /<text class="track-row-empty-label" x="12" y="([\d.]+)">该分型轨道暂无 Contig。<\/text>/,
   );
   assert.ok(emptyTrackLabelTop, "expected empty phased-track label geometry");
   assert.ok(emptyTrackMessageY, "expected empty phased-track message geometry");
@@ -597,7 +597,7 @@ test("assembly page renders an app-level bp threshold prompt dialog", () => {
           open: true,
           id: "delete-shorter-than",
           mode: "prompt",
-          message: "删除小于多少 bp 的主 ds contig？",
+          message: "删除小于多少 bp 的主数据集 Contig？",
           defaultValue: "100000",
         },
       },
@@ -605,12 +605,12 @@ test("assembly page renders an app-level bp threshold prompt dialog", () => {
   );
 
   assert.match(html, /data-assembly-confirm-dialog="delete-shorter-than"/);
-  assert.match(html, /删除小于多少 bp 的主 ds contig？/);
+  assert.match(html, /删除小于多少 bp 的主数据集 Contig？/);
   assert.match(html, /data-assembly-confirm-input="delete-shorter-than"/);
   assert.match(html, /value="100000"/);
 });
 
-test("assembly page renders anchor offset direction and bp in one dialog", () => {
+test("assembly page renders Anchor offset direction and bp in one dialog", () => {
   const html = renderAssemblyPage(
     createState({
       assembly: {
@@ -647,7 +647,7 @@ test("assembly page renders anchor offset direction and bp in one dialog", () =>
   assert.doesNotMatch(html, /data-assembly-confirm-action="confirm"[^>]*disabled/);
 });
 
-test("assembly anchor offset dialog keeps ambiguous defaults empty and disables confirmation", () => {
+test("assembly Anchor offset dialog keeps ambiguous defaults empty and disables confirmation", () => {
   const html = renderAssemblyPage(
     createState({
       assembly: {
@@ -679,10 +679,10 @@ test("assembly anchor offset dialog keeps ambiguous defaults empty and disables 
   assert.match(html, /data-assembly-confirm-input="anchor-offset-empty"/);
   assert.match(html, /data-assembly-confirm-action="confirm"[^>]*disabled/);
   assert.match(html, /data-assembly-anchor-offset-error="anchor-offset-empty"/);
-  assert.doesNotMatch(html, /偏移后锚点超出 contig 范围/);
+  assert.doesNotMatch(html, /偏移后锚点超出 Contig 范围/);
 });
 
-test("assembly anchor offset dialog preserves an automatic out-of-range value with an inline error", () => {
+test("assembly Anchor offset dialog preserves an automatic out-of-range value with an inline error", () => {
   const html = renderAssemblyPage(
     createState({
       assembly: {
@@ -711,7 +711,7 @@ test("assembly anchor offset dialog preserves an automatic out-of-range value wi
   );
 
   assert.match(html, /value="200"/);
-  assert.match(html, /偏移后锚点超出 contig 范围，未创建。/);
+  assert.match(html, /偏移后锚点超出 Contig 范围，未创建。/);
   assert.match(html, /data-assembly-confirm-action="confirm"[^>]*disabled/);
 });
 
@@ -734,7 +734,7 @@ test("assembly tab renders a project-chr members card above main track with name
   assert.match(html, /assembly-members-panel/);
   assert.match(html, /<div class="chr-strip has-members-panel">[\s\S]*assembly-members-panel-inline is-collapsed/);
   assert.doesNotMatch(html, /<\/div>\s*<article class="card assembly-members-panel"/);
-  assert.match(html, /project1_Chr01 主ds轨道成员/);
+  assert.match(html, /project1_Chr01 主数据集成员/);
   assert.match(
     html,
     /<button[^>]*data-members-card-toggle="1"[^>]*aria-expanded="false"[^>]*>/,
@@ -760,14 +760,14 @@ test("assembly tab expands the members card body when membersCardCollapsed is fa
     }),
   );
 
-  assert.match(html, /project1_Chr01 主ds轨道成员/);
+  assert.match(html, /project1_Chr01 主数据集成员/);
   assert.match(
     html,
     /<button[^>]*data-members-card-toggle="1"[^>]*aria-expanded="true"[^>]*>/,
   );
   assert.match(
     html,
-    /<span class="assembly-members-panel-title-inline">\s*<strong>project1_Chr01 主ds轨道成员<\/strong>\s*<button[^>]*data-reset-members-state="1"[^>]*aria-label="重置：撤销删除、撤销隐藏"/,
+    /<span class="assembly-members-panel-title-inline">\s*<strong>project1_Chr01 主数据集成员<\/strong>\s*<button[^>]*data-reset-members-state="1"[^>]*aria-label="重置：撤销删除、撤销隐藏"/,
   );
   assert.match(html, /ctg-beta/);
   assert.match(html, /600 bp/);

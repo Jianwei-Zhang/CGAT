@@ -20,7 +20,7 @@ function setup() {
       focus() { doc.activeElement = this; },
     };
   };
-  const toggle = node({ supportDatasetLabel: "辅 ds" });
+  const toggle = node({ supportDatasetLabel: "辅助数据集" });
   const options = [22, 33, 44].map(id => node({ supportDatasetOption: String(id) }, `ds-${id}`));
   const select = node(); select.value = "22";
   const combo = node();
@@ -48,7 +48,7 @@ test("dataset choices reuse the select change contract, update the caption, and 
   h.options[1].emit("click");
   assert.deepEqual(h.changes, [{ value: "33", bubbles: true }]);
   assert.equal(h.toggle.textContent, "ds-33");
-  assert.equal(h.toggle.attributes["aria-label"], "辅 ds: ds-33");
+  assert.equal(h.toggle.attributes["aria-label"], "辅助数据集: ds-33");
   assert.equal(h.options[1].attributes["aria-selected"], "true");
   assert.equal(h.options[0].attributes["aria-selected"], "false");
   assert.equal(h.toggle.attributes["aria-expanded"], "false");
