@@ -4,7 +4,7 @@
 
 ## Quick start
 
-On your Linux server, download the GPM Server tools (source package) from [Release v2.0.15](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.15), or the [official docs](https://riceome.hzau.edu.cn/cgat/en/downloads), then verify, extract into the default or custom directory, and install:
+On your Linux server, download the GPM Server tools (source package) from [Release v2.0.15](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.15), or the [official docs](https://riceome.hzau.edu.cn/cgat/downloads), then verify, extract into the default or custom directory, and install:
 
 ```bash
 # 1. Download into the tools directory; keep your project working directory
@@ -129,7 +129,7 @@ This entrypoint requires a source package containing `update.sh`. If an older pa
 For custom installations use the actual path. Run it from the project root or a
 child directory to align that project's `.prepare_lib/` with tools. Outside a
 project, other projects are not scanned. Checks/downloads prefer the
-[official docs](https://riceome.hzau.edu.cn/cgat/en/downloads), falling back to
+[official docs](https://riceome.hzau.edu.cn/cgat/downloads), falling back to
 [GitHub Release](https://github.com/Jianwei-Zhang/CGAT/releases/latest) on failure.
 Size, SHA-256 and the source file manifest are verified. Tools and skill come from
 one release bundle; refreshed same-version assets are detected too.

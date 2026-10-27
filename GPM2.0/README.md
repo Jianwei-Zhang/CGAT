@@ -11,7 +11,7 @@ GPM2.0 combines reference-anchored results from multiple de novo assemblies in o
 | **GPM2.0 Server** | Linux | Runs reference alignment, chromosome assignment, GRT automated repair, and HTML reporting, then builds Full and Light delivery archives. |
 | **GPM2.0 Desktop** | Windows / macOS | Imports a delivery archive and provides chromosome **Preview**, **Assembly** & **Subview** collinearity inspection, **Final Path** editing, `DEGAP-JOBS` generation, and export. |
 
-Installers for `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64` are available on [CGAT Downloads](https://riceome.hzau.edu.cn/cgat/en/downloads) (direct mirror) and [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases). Development and release checks are documented in [Quality gates](QUALITY.md).
+Installers for `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64` are available on [CGAT Downloads](https://riceome.hzau.edu.cn/cgat/downloads) (direct mirror) and [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases). Development and release checks are documented in [Quality gates](QUALITY.md).
 
 ## Server Workflow
 
@@ -19,7 +19,7 @@ Installers for `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64` are available 
 
 ### 1. Download the tools and create the environment
 
-On your Linux server, download the Server tools (source package) from [Release v2.0.15](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.15), or the [official docs](https://riceome.hzau.edu.cn/cgat/en/downloads), then verify, extract into the default or custom directory, and install:
+On your Linux server, download the Server tools (source package) from [Release v2.0.15](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.15), or the [official docs](https://riceome.hzau.edu.cn/cgat/downloads), then verify, extract into the default or custom directory, and install:
 
 New installations default to `~/bin/GPM_Server`; existing installations keep their actual paths. The subshell below does not change your working directory, so project outputs stay outside the tools directory. Without AI, use the commands below; the [Server README](server/README.md#installation-prompt-for-your-ai-agent) also provides an agent installation prompt.
 
@@ -78,7 +78,7 @@ bash ~/bin/GPM_Server/update.sh
 
 This entrypoint requires a source package containing `update.sh`. If an older package lacks it, follow the Server/skill one-time adoption instructions rather than overwriting the installation.
 
-Checks and downloads use the [official docs](https://riceome.hzau.edu.cn/cgat/en/downloads) first, falling back to GitHub Release on failure.
+Checks and downloads use the [official docs](https://riceome.hzau.edu.cn/cgat/downloads) first, falling back to GitHub Release on failure.
 Tools and skill come from the same release bundle. If everything matches, it reports
 already up to date; otherwise it lists changes and asks `[y/N]`. Only `Y/y` proceeds;
 `N/n`, Enter, or no interactive terminal cancels. There are no extra flags.

@@ -6,7 +6,7 @@
 
 **English** | [中文](README_zh.md)
 
-[![CGAT Docs](https://img.shields.io/badge/Docs_%26_Direct_Downloads-riceome.hzau.edu.cn-0f766e)](https://riceome.hzau.edu.cn/cgat/en/)
+[![CGAT Docs](https://img.shields.io/badge/Docs_%26_Direct_Downloads-riceome.hzau.edu.cn-0f766e)](https://riceome.hzau.edu.cn/cgat/)
 [![GitHub Releases](https://img.shields.io/badge/Releases-v2.0.12-2563eb)](https://github.com/Jianwei-Zhang/CGAT/releases)
 
 **CGAT** is an integrated toolkit for chromosome-scale genome assembly, multi-assembly collinearity review, and targeted long-read sequence refinement. It connects automated processing on Linux (**GPM2.0 Server**), interactive visual curation on Windows and macOS (**GPM2.0 Desktop**), and long-read gap filling and telomere extension (**DEGAP2.0**).
@@ -20,8 +20,8 @@
 | Component | Platform | Role | Documentation |
 | --- | --- | --- | --- |
 | **GPM2.0 Server** | Linux | Aligns multiple *de novo* assemblies to a reference genome, assigns chromosomes, runs automated GRT repair, and packages results (`Full` / `Light` archives + self-contained `report.html`). | [GPM2.0 Guide](GPM2.0/README.md) · [Server Manual](GPM2.0/server/README.md) |
-| **GPM2.0 Desktop** | Windows / macOS | Imports Server delivery archives for chromosome-level source **Preview**, **Assembly** & **Subview** alignment inspection, **Final Path** editing, `DEGAP-JOBS` generation, and multi-format export. | [GPM2.0 Guide](GPM2.0/README.md#desktop-app) · [Online Docs](https://riceome.hzau.edu.cn/cgat/en/guide/getting-started) |
-| **DEGAP2.0** | Linux | Resolves remaining assembly gaps, links contigs, and extends chromosome ends toward telomeres using HiFi and/or ONT long reads. | [DEGAP2.0 Guide](DEGAP2.0/README.md) · [Online Docs](https://riceome.hzau.edu.cn/cgat/en/guide/degap) |
+| **GPM2.0 Desktop** | Windows / macOS | Imports Server delivery archives for chromosome-level source **Preview**, **Assembly** & **Subview** alignment inspection, **Final Path** editing, `DEGAP-JOBS` generation, and multi-format export. | [GPM2.0 Guide](GPM2.0/README.md#desktop-app) · [Online Docs](https://riceome.hzau.edu.cn/cgat/guide/getting-started) |
+| **DEGAP2.0** | Linux | Resolves remaining assembly gaps, links contigs, and extends chromosome ends toward telomeres using HiFi and/or ONT long reads. | [DEGAP2.0 Guide](DEGAP2.0/README.md) · [Online Docs](https://riceome.hzau.edu.cn/cgat/guide/degap) |
 
 ---
 
@@ -62,7 +62,7 @@ This produces `gpm_server.tar.gz` (Full package), `gpm_server.light.tar.gz` (Lig
 
 ### 2. Inspect and Edit in GPM2.0 Desktop (Windows / macOS)
 
-1. Download the installer for your platform (`win-x86`, `win-arm64`, `mac-arm64`, or `mac-x86`) from [CGAT Downloads](https://riceome.hzau.edu.cn/cgat/en/downloads) or [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases).
+1. Download the installer for your platform (`win-x86`, `win-arm64`, `mac-arm64`, or `mac-x86`) from [CGAT Downloads](https://riceome.hzau.edu.cn/cgat/downloads) or [GitHub Releases](https://github.com/Jianwei-Zhang/CGAT/releases).
 2. Import `gpm_server.tar.gz`, `gpm_server.light.tar.gz`, or the precomputed demo package `test_data.zip`.
 3. Review chromosome sources in **Preview**, inspect collinearity evidence in **Assembly** and **Subview**, edit the **Final Path**, and export PNG, TSV, LOG, or FASTA files.
 
