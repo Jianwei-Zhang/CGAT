@@ -18,7 +18,10 @@
 .settings-section > h3 { margin: 0 0 12px; color: var(--theme-muted-ink, #718094); font-size: var(--font-caption); font-weight: 650; letter-spacing: .04em; }
 .settings-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 12rem); gap: 16px; align-items: center; margin-top: 12px; }
 .settings-row label { color: var(--theme-ink, #364152); font-size: var(--font-body); font-weight: 500; }
-.settings-row select { width: 100%; min-width: 0; padding: 6px 9px; border: 1px solid var(--theme-line, #d7dde5); border-radius: 6px; background: var(--surface-panel, #fff); color: var(--theme-ink, #26374d); font-size: var(--font-body); font-weight: 500; }
+/* Reuse the header language picker; only its width follows the settings grid. */
+.settings-row .shell-select { display: flex; width: 100%; }
+.settings-row .shell-select-toggle { width: 100%; max-width: none; }
+.settings-row .shell-select-menu { max-width: 100%; }
 .settings-field-label { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .settings-help { display: inline-flex; flex: 0 0 auto; }
 .settings-help-button { width: 1.3em; min-height: 1.3em; padding: 0; border: 1px solid var(--theme-line, #b8c2ce); border-radius: 50%; background: transparent; color: var(--theme-muted-ink, #7a8898); font-size: var(--font-caption); line-height: 1.15; cursor: help; }
@@ -36,26 +39,22 @@
 .settings-preview-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .settings-preview svg { display: block; width: 100%; max-width: 320px; margin-top: 8px; }
 .settings-combobox { position: relative; min-width: 0; }
-.settings-combobox-field { display: flex; align-items: center; border: 1px solid var(--theme-line, #d7dde5); border-radius: 6px; background: var(--surface-panel, #fff); }
-.settings-combobox-field:focus-within { border-color: var(--theme-line, #6f91b9); box-shadow: 0 0 0 2px #6f91b91f; }
-.settings-combobox input { width: 100%; min-width: 0; padding: 6px 0 6px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--theme-ink, #26374d); font-size: var(--font-body); font-weight: 500; font-variant-numeric: tabular-nums; outline: none; }
+.settings-combobox-field { display: flex; align-items: center; border: 1px solid var(--border-default, #cbd5e1); border-radius: var(--control-radius, 5px); background: var(--surface-panel, #fff); }
+.settings-combobox-field:focus-within { outline: 2px solid var(--focus-ring, #4f82b5); outline-offset: -2px; }
+.settings-combobox input { width: 100%; min-width: 0; padding: 4px 0 4px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary, #1e293b); font: inherit; font-variant-numeric: tabular-nums; outline: none; }
 .settings-combobox input[aria-invalid="true"] { color: var(--theme-red-ink, #ad3434); box-shadow: inset 0 -2px #c45555; }
 .settings-unit { flex: 0 0 auto; padding-left: 5px; color: var(--theme-muted-ink, #8591a1); font-size: var(--font-caption); pointer-events: none; }
 .settings-unit[hidden], .settings-options[hidden] { display: none; }
-.settings-combobox-toggle { flex: 0 0 1.9em; align-self: stretch; min-height: 0; border: 0; border-radius: 0 6px 6px 0; padding: 0; background: transparent; color: var(--theme-muted-ink, #697c92); cursor: pointer; }
-.settings-combobox-toggle svg { width: 12px; height: 12px; vertical-align: middle; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.settings-combobox-toggle:hover { background: var(--theme-surface-subtle, #f0f4f8); }
-.settings-options { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 6; padding: 4px; border: 1px solid var(--theme-line, #d7dde5); border-radius: 8px; background: var(--surface-panel, #fff); box-shadow: 0 6px 24px #22374e26; }
-.settings-options [role="option"] { padding: 7px 9px; border-radius: 4px; color: var(--theme-ink, #364152); font-size: var(--font-body); cursor: pointer; }
-.settings-options [aria-selected="true"] { color: var(--theme-blue-ink, #285c91); font-weight: 600; }
-.settings-options .is-highlighted, .settings-options [role="option"]:hover { background: var(--theme-blue-surface, #edf3fa); }
-.settings-options [data-history-option="custom"] { border-top: 1px solid var(--theme-line, #edf0f3); margin-top: 4px; border-radius: 0 0 4px 4px; color: var(--theme-muted-ink, #6a7d93); font-size: var(--font-small); }
+.settings-combobox-toggle { flex: 0 0 22px; align-self: stretch; min-height: 0; border: 0; border-left: 1px solid var(--border-subtle, #dbe3ec); border-radius: 0; padding: 0; background: var(--surface-subtle, #f8fafc); color: var(--text-secondary, #334155); font: inherit; cursor: pointer; }
+.settings-options { top: auto; bottom: calc(100% + 2px); left: 0; right: 0; z-index: 46; max-height: min(240px, 50vh); overflow: auto; }
+.settings-options .is-highlighted, .settings-options [aria-selected="true"] { background: var(--theme-surface-subtle, #efefef); }
+.settings-options [data-history-option="custom"] { color: var(--theme-muted-ink, #6a7d93); }
 .settings-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--theme-line, #edf0f3); }
 .settings-status { min-width: 0; color: var(--theme-muted-ink, #8894a3); font-size: var(--font-caption); font-weight: 400; line-height: 1.55; }
 .settings-status.is-error { color: var(--theme-red-ink, #b04444); }
 .settings-reset { flex: 0 0 auto; min-height: 0; padding: 3px 0; border: 0; background: transparent; color: var(--theme-muted-ink, #6a7d93); font-size: var(--font-small); font-weight: 400; cursor: pointer; }
 .settings-reset:hover { color: var(--theme-blue-ink, #284f7c); text-decoration: underline; }
-.app-settings-dialog :focus-visible { outline: 2px solid var(--theme-line, #6f91b9); outline-offset: 2px; }
+.app-settings-dialog :focus-visible:not(.shell-select-toggle):not(.assembly-track-combo-option) { outline: 2px solid var(--theme-line, #6f91b9); outline-offset: 2px; }
 .app-settings-dialog .settings-combobox input:focus-visible { outline: none; }
 .app-nav { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .app-settings-button { white-space: nowrap; }

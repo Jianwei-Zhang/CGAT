@@ -5,11 +5,11 @@ const bindings = new WeakMap();
 const escape = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;")
   .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 
-export function renderShellSelect(id, label, options) {
+export function renderShellSelect(id, label, options, { name = "" } = {}) {
   const selected = options.find(option => option.selected) || options[0];
   return `<span class="shell-select" data-shell-select>
     <button type="button" id="${id}-toggle" class="shell-select-toggle" data-shell-select-toggle aria-label="${escape(label)}: ${escape(selected.label)}" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}-menu"><span data-shell-select-caption>${escape(selected.label)}</span><span class="shell-select-marker" aria-hidden="true">▾</span></button>
-    <select id="${id}" hidden aria-hidden="true" tabindex="-1" aria-label="${escape(label)}">${options.map(option => `<option value="${escape(option.value)}" ${option.selected ? "selected" : ""}>${escape(option.label)}</option>`).join("")}</select>
+    <select id="${id}"${name ? ` name="${escape(name)}"` : ""} hidden aria-hidden="true" tabindex="-1" aria-label="${escape(label)}">${options.map(option => `<option value="${escape(option.value)}" ${option.selected ? "selected" : ""}>${escape(option.label)}</option>`).join("")}</select>
     <span id="${id}-menu" class="assembly-track-combo-menu shell-select-menu is-hidden" role="listbox" aria-label="${escape(label)}" data-shell-select-menu></span>
   </span>`;
 }
@@ -97,5 +97,7 @@ export function bindShellSelects(root) {
     listen(select, "change", sync);
     select[SYNC] = sync; cleanups.push(() => { close(); delete select[SYNC]; }); sync();
   }
-  bindings.set(root, () => cleanups.splice(0).forEach(cleanup => cleanup()));
+  const dispose = () => cleanups.splice(0).forEach(cleanup => cleanup());
+  bindings.set(root, dispose);
+  return dispose;
 }

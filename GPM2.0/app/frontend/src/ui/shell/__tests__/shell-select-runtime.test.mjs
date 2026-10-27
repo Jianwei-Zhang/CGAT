@@ -101,3 +101,15 @@ test("shell popups share support-dataset option tokens rather than OS light/dark
   assert.match(assembly, /\.assembly-track-combo-menu\s*\{[^}]*background:\s*var\(--surface-panel, #fff\)/);
   assert.match(assembly, /\.assembly-track-combo-option\s*\{[^}]*color:\s*var\(--theme-ink/);
 });
+
+test("shell picker supports named settings fields and explicit idempotent disposal", () => {
+  const html = renderShellSelect("settings-theme", "Theme", [{ value: "dark", label: "Dark", selected: true }], { name: "theme" });
+  assert.match(html, /<select id="settings-theme" name="theme" hidden/);
+  const h = fixture();
+  const dispose = bindShellSelects(h.root);
+  h.toggle.emit("click");
+  dispose(); dispose();
+  assert.equal(h.doc.handlers.get("pointerdown").size, 0);
+  assert.equal(h.toggle.handlers.get("click").size, 0);
+  assert.equal(h.menu.classList.contains("is-hidden"), true);
+});

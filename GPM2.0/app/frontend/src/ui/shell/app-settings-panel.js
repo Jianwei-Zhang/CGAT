@@ -1,3 +1,4 @@
+import { bindShellSelects, renderShellSelect } from "./shell-select-runtime.js";
 import { renderUpdateSettings } from "./app-update-panel.js";
 import { requestAppConfirm } from "./app-dialog.js";
 import { DEFAULT_APP_SETTINGS, getAppSettings, setAppSettings } from "../../services/app-settings.js";
@@ -35,21 +36,22 @@ function help(id, label, text, above = false) {
 
 export function renderSettingsContent(locale, settings = getAppSettings()) {
   const c = APP_SETTINGS_COPY[locale === "en" ? "en" : "zh"];
-  const options = (values, selected) => values.map(value => `<option value="${value}" ${value === selected ? "selected" : ""}>${value} px</option>`).join("");
+  const sizes = (values, selected) => values.map(value => ({ value, label: `${value} px`, selected: value === selected }));
+  const select = (id, name, label, options) => renderShellSelect(id, label, options, { name });
   const capacity = settings.historyCapacity;
   return `<header class="settings-heading"><h2 id="app-settings-title">${c.title}</h2><button type="button" class="settings-close" data-settings-close aria-label="${c.close}">×</button></header>
     <section class="settings-section" aria-labelledby="settings-appearance-title">
       <h3 id="settings-appearance-title">${c.display}</h3>
-      <div class="settings-row"><label for="settings-theme">${c.theme}</label><select id="settings-theme" name="theme">${["system", "light", "dark"].map(theme => `<option value="${theme}" ${theme === (settings.theme || "system") ? "selected" : ""}>${c[theme]}</option>`).join("")}</select></div>
-      <div class="settings-row"><label for="settings-font-size">${c.size}</label><select id="settings-font-size" name="fontSize">${options([12, 14, 16, 18], settings.fontSize)}</select></div>
-      <div class="settings-row"><div class="settings-field-label"><label for="settings-graph-size">${c.graph}</label>${help("settings-graph-help", c.graph, c.graphHint)}</div><select id="settings-graph-size" name="graphFontSize"><option value="" ${settings.graphFontSize === null ? "selected" : ""}>${c.follow}</option>${options([10, 12, 14, 16], settings.graphFontSize)}</select></div>
-      <div class="settings-row"><label for="settings-language">${c.language}</label><select id="settings-language" name="language"><option value="zh" ${locale !== "en" ? "selected" : ""}>中文</option><option value="en" ${locale === "en" ? "selected" : ""}>English</option></select></div>
+      <div class="settings-row"><label for="settings-theme-toggle">${c.theme}</label>${select("settings-theme", "theme", c.theme, ["system", "light", "dark"].map(theme => ({ value: theme, label: c[theme], selected: theme === (settings.theme || "system") })))}</div>
+      <div class="settings-row"><label for="settings-font-size-toggle">${c.size}</label>${select("settings-font-size", "fontSize", c.size, sizes([12, 14, 16, 18], settings.fontSize))}</div>
+      <div class="settings-row"><div class="settings-field-label"><label for="settings-graph-size-toggle">${c.graph}</label>${help("settings-graph-help", c.graph, c.graphHint)}</div>${select("settings-graph-size", "graphFontSize", c.graph, [{ value: "", label: c.follow, selected: settings.graphFontSize === null }, ...sizes([10, 12, 14, 16], settings.graphFontSize)])}</div>
+      <div class="settings-row"><label for="settings-language-toggle">${c.language}</label>${select("settings-language", "language", c.language, [{ value: "zh", label: "中文", selected: locale !== "en" }, { value: "en", label: "English", selected: locale === "en" }])}</div>
       <details class="settings-preview"><summary>${c.preview}</summary><div class="settings-preview-content"><h4>${c.previewTitle}</h4><p>${c.previewBody}</p><p class="settings-hint">${c.previewHint}</p><div class="settings-preview-actions"><button type="button" class="button">${c.button}</button><button type="button" class="button tiny">${c.smallButton}</button></div><svg viewBox="0 0 320 54" role="img" aria-label="contig / bp"><rect x="8" y="28" width="295" height="14" rx="2" fill="var(--ctg-primary-fill)"/><text class="track-ctg-label" x="12" y="23">contig_001</text><text class="track-tick-label" x="230" y="23">100 kb</text></svg></div></details>
     </section>
     <section class="settings-section" aria-labelledby="settings-editing-title"><h3 id="settings-editing-title">${c.history}</h3>
       <div class="settings-row"><div class="settings-field-label"><label for="settings-history-input">${c.capacity}</label>${help("settings-history-help", c.capacity, c.historyHint, true)}</div>
-        <div class="settings-combobox"><div class="settings-combobox-field"><input id="settings-history-input" name="historyCapacity" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="settings-history-options" aria-describedby="settings-history-help settings-status" placeholder="${c.enterSteps}" value="${capacity === 0 ? c.unlimited : capacity}"><span class="settings-unit" ${capacity === 0 ? "hidden" : ""}>${c.steps}</span><button type="button" class="settings-combobox-toggle" data-history-toggle aria-label="${c.choose}" tabindex="-1"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></button></div>
-          <div id="settings-history-options" class="settings-options" role="listbox" aria-label="${c.capacity}" hidden>${[0, 50, 100, 200, "custom"].map(value => `<div id="settings-history-option-${value}" role="option" aria-selected="${value === capacity}" data-history-option="${value}">${value === "custom" ? c.custom : value === 0 ? c.unlimited : `${value} ${c.steps}`}</div>`).join("")}</div>
+        <div class="settings-combobox"><div class="settings-combobox-field"><input id="settings-history-input" name="historyCapacity" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="settings-history-options" aria-describedby="settings-history-help settings-status" placeholder="${c.enterSteps}" value="${capacity === 0 ? c.unlimited : capacity}"><span class="settings-unit" ${capacity === 0 ? "hidden" : ""}>${c.steps}</span><button type="button" class="settings-combobox-toggle" data-history-toggle aria-label="${c.choose}" tabindex="-1"><span aria-hidden="true">▾</span></button></div>
+          <div id="settings-history-options" class="assembly-track-combo-menu settings-options" role="listbox" aria-label="${c.capacity}" hidden>${[0, 50, 100, 200, "custom"].map(value => `<div id="settings-history-option-${value}" class="assembly-track-combo-option" role="option" aria-selected="${value === capacity}" data-history-option="${value}">${value === "custom" ? c.custom : value === 0 ? c.unlimited : `${value} ${c.steps}`}</div>`).join("")}</div>
         </div>
       </div>
     </section>
@@ -62,7 +64,7 @@ export function bindAppSettings(root, { getLocale, onTypographyChange, onLanguag
     const dialog = document.createElement("dialog");
     dialog.className = "app-settings-dialog";
     dialog.setAttribute("aria-labelledby", "app-settings-title");
-    const labels = () => copy[getLocale() === "en" ? "en" : "zh"];
+    const labels = () => APP_SETTINGS_COPY[getLocale() === "en" ? "en" : "zh"];
     const input = () => dialog.querySelector("[name=historyCapacity]");
     const list = () => dialog.querySelector(".settings-options");
     let activeOption = -1;
@@ -76,7 +78,14 @@ export function bindAppSettings(root, { getLocale, onTypographyChange, onLanguag
         if (selector) section.querySelector(selector)?.focus();
       }
     };
-    const render = () => { dialog.innerHTML = renderSettingsContent(getLocale()); activeOption = -1; refreshUpdate(); };
+    let disposeSelects;
+    const render = () => {
+      disposeSelects?.();
+      dialog.innerHTML = renderSettingsContent(getLocale());
+      disposeSelects = bindShellSelects(dialog);
+      activeOption = -1;
+      refreshUpdate();
+    };
     const unsubscribeUpdate = updater?.subscribe(refreshUpdate);
     const status = (message, error = false) => {
       const node = dialog.querySelector(".settings-status");
@@ -147,7 +156,7 @@ export function bindAppSettings(root, { getLocale, onTypographyChange, onLanguag
     };
     render();
     document.body.append(dialog);
-    dialog.addEventListener("close", () => { unsubscribeUpdate?.(); dialog.remove(); root.querySelector("[data-app-settings]")?.focus(); }, { once: true });
+    dialog.addEventListener("close", () => { disposeSelects?.(); unsubscribeUpdate?.(); dialog.remove(); root.querySelector("[data-app-settings]")?.focus(); }, { once: true });
     dialog.addEventListener("input", event => {
       if (event.target.name !== "historyCapacity") return;
       closeOptions();
