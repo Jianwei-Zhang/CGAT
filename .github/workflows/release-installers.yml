@@ -169,6 +169,7 @@ jobs:
   build-windows:
     name: Build Windows ${{ matrix.asset_platform }}
     needs: prepare-release
+    if: ${{ always() && !cancelled() && needs.prepare-release.result == 'success' }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -301,6 +302,7 @@ jobs:
   build-macos:
     name: Build macOS ${{ matrix.asset_platform }}
     needs: prepare-release
+    if: ${{ always() && !cancelled() && needs.prepare-release.result == 'success' }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -490,6 +492,7 @@ jobs:
   update-feed:
     name: Generate signed App update feed
     needs: [prepare-release, build-windows, build-macos]
+    if: ${{ always() && !cancelled() && needs.prepare-release.result == 'success' && needs.build-windows.result == 'success' && needs.build-macos.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

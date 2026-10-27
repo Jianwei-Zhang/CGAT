@@ -53,6 +53,16 @@ class ReusedQualityTests(unittest.TestCase):
         self.assertTrue(calls[0].endswith("page=1"))
         self.assertTrue(calls[1].endswith("page=2"))
 
+    def test_packaging_explicitly_overrides_transitive_skipped_quality(self):
+        workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/release-installers.yml").read_text()
+        for job in ("build-windows", "build-macos", "update-feed"):
+            section = workflow.split("  " + job + ":\n", 1)[1].split("    steps:", 1)[0]
+            self.assertIn("if: ${{ always() && !cancelled()", section)
+            self.assertIn("needs.prepare-release.result == 'success'", section)
+        update = workflow.split("  update-feed:\n", 1)[1]
+        self.assertIn("needs.build-windows.result == 'success'", update)
+        self.assertIn("needs.build-macos.result == 'success'", update)
+
     def test_default_full_gate_and_pinned_package_checkouts_remain_in_workflow(self):
         workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/release-installers.yml").read_text()
         self.assertIn("if: ${{ !inputs.quality_run_id }}", workflow)
