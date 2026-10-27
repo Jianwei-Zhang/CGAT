@@ -1,3 +1,4 @@
+import { collectFinalPathSourceCtgs } from "./final-path-presentation.js";
 import { normalizeSupportDatasetId } from "./selection-state.js";
 import { renderFinalPathCard } from "./final-path-card.js";
 import { renderDegapJobCard, renderDegapRuntime } from "./degap-card.js";
@@ -211,7 +212,8 @@ export function renderAssemblyFinalPathCard(state, deps = {}) {
       trackView: assembly.finalPathTrackView,
       trackViewportPx: getMeasuredTrackViewportPx("final-path"),
       primaryDatasetName,
-      ctgColorContext: { primaryCtgs: assembly.chrCtgs, supportCtgs: assembly.supportChrCtgs },
+      ctgColorContext: { primaryCtgs: assembly.chrCtgs, supportCtgs: assembly.supportChrCtgs,
+        supportMirroredCtgs: assembly.supportMirroredCtgs, sourceCtgs: collectFinalPathSourceCtgs(assembly) },
       graphPreviewSegmentOrder,
       graphAddonByChr,
       degapRuntimeBody: renderDegapRuntime({ degap: assembly.degap }, degapRenderDeps),
@@ -221,6 +223,7 @@ export function renderAssemblyFinalPathCard(state, deps = {}) {
       phasedFinalPathOptions,
       finalPathEntries: finalPathEntriesWithLog,
       grtBaselineRestore,
+      controlledTooltips: true,
     },
     {
       escapeAttr,

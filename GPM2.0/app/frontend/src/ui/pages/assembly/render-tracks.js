@@ -1,3 +1,4 @@
+import { sourceIntervalProjectionAttrs } from "./source-interval-projection.js";
 import { renderMainAnchorFragments } from "./main-anchor-fragments.js";
 import { mainAlignmentKey, mainAlignmentEndpointKey, mainActiveAnchorKeys, renderMainAlignmentAnchors } from "./main-alignment-anchors.js";
 import { describeMainMemberLocalState, resolveMainMemberSourceRange, resolveMainMemberCardName } from "./main-member-local-state.js";
@@ -1772,6 +1773,9 @@ function renderAssemblyTracks(args) {
           class="track-ctg-group${slotClass}"
           data-track-contig-id="${member.assemblyCtgId}"
           data-track-role="ref"
+          ${sourceIntervalProjectionAttrs({ ...member, sourceKind: "ref_segment", referenceChrName: member.referenceChrName || selectedChrName }, escapeAttr, member.refOrient)}
+          data-track-rect-x="${rect.x.toFixed(2)}" data-track-rect-y="${refRowLayout.barY.toFixed(2)}"
+          data-track-rect-width="${rect.width.toFixed(2)}" data-track-rect-height="${TRACK_BAR_HEIGHT}"
           data-track-is-mirror="0"
           data-track-dataset-id="0"
           data-track-source-kind="${escapeAttr(String(member.sourceKind || "ref_segment"))}"
@@ -2297,7 +2301,7 @@ function renderAssemblyTracks(args) {
             ? ` data-track-label-phased-track-id="${phasedTrackId || 0}" data-track-label-phased-track-item-id="${phasedTrackItemId || 0}" data-track-label-phased-haplotype-key="${escapeAttr(phasedHaplotypeKey)}"`
             : "";
           const groupAttrs = layout.selectable
-            ? `data-source-gap-drag-key="${escapeAttr(`main:${layout.id}:${ctg.assemblyCtgId}:${ctg.phasedTrackItemId || 0}`)}" ${sourceFragmentDragAttrs(ctg, escapeAttr)} data-track-contig-id="${ctg.assemblyCtgId}" data-track-role="${layout.interactiveRole || layout.role}" data-track-contig-name="${escapeAttr(ctg.name)}" data-track-is-mirror="${layout.isMirror ? "1" : "0"}" data-track-dataset-id="${Number(layout.datasetId || 0)}" data-track-ref-orient="${escapeAttr(resolveTrackCtgOrient(ctg))}"${phasedAttrs} ${rectMetricsAttrs}`
+            ? `data-source-gap-drag-key="${escapeAttr(`main:${layout.id}:${ctg.assemblyCtgId}:${ctg.phasedTrackItemId || 0}`)}" ${sourceFragmentDragAttrs(ctg, escapeAttr)} ${sourceIntervalProjectionAttrs(ctg, escapeAttr, resolveTrackCtgOrient(ctg))} data-track-contig-id="${ctg.assemblyCtgId}" data-track-role="${layout.interactiveRole || layout.role}" data-track-contig-name="${escapeAttr(ctg.name)}" data-track-is-mirror="${layout.isMirror ? "1" : "0"}" data-track-dataset-id="${Number(layout.datasetId || 0)}" data-track-ref-orient="${escapeAttr(resolveTrackCtgOrient(ctg))}"${phasedAttrs} ${rectMetricsAttrs}`
             : "";
           const labelAttrs = layout.selectable
             ? ` data-track-label-for-contig-id="${ctg.assemblyCtgId}" data-track-label-role="${escapeAttr(layout.interactiveRole || layout.role)}" data-track-label-is-mirror="${layout.isMirror ? "1" : "0"}"${phasedLabelAttrs}`

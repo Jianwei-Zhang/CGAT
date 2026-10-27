@@ -1,5 +1,5 @@
 import { renderImporterPage } from "../pages/importer-page.js";
-import { bindAssemblyPage, renderAssemblyPage, syncAssemblySubviewTools } from "../pages/assembly-page.js";
+import { bindAssemblyPage, renderAssemblyPage, syncAssemblySubviewTools, syncAssemblyTransientInteractions } from "../pages/assembly-page.js";
 import { bindImporterPage } from "../pages/importer-page.js";
 import { bindProjectExportPage, renderProjectExportPage } from "../pages/project-export-page.js";
 import { bindProjectPreviewPage, renderProjectPreviewPage } from "../pages/project-preview-page.js";
@@ -85,7 +85,10 @@ export function renderCurrentRoute(root, store) {
     } else {
       setRouteHostDataset(host, state.activeRoute, nextAssemblyDomCacheKey);
       if (restoredPreviewDom) bindProjectPreviewPage(host, store);
-      else syncAssemblySubviewTools(host, store);
+      else {
+        syncAssemblySubviewTools(host, store);
+        syncAssemblyTransientInteractions(host, store);
+      }
     }
   } catch (error) {
     const message = String(error?.stack || error?.message || error || "unknown route render error");

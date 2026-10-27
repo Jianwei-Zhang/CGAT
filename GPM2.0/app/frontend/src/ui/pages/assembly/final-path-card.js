@@ -1,3 +1,4 @@
+import { buildFinalPathTooltip } from "./final-path-presentation.js";
 import { createContigColorResolver } from "./contig-colors.js";
 import { FINAL_PATH_SEGMENT_MIN_WIDTH_PX, resolveFinalPathVisualLayouts } from "./final-path-visual-layout.js";
 import { renderViewTickControl } from "./view-navigation-ui.js";
@@ -962,6 +963,8 @@ export function renderFinalPathGraph({
   rightLengthLabel = "",
   targetChrName = "",
   allGraphLabel = "",
+  labels = {},
+  controlledTooltips = false,
 }) {
   const resolveColorRole = createContigColorResolver({ ...ctgColorContext, primaryDatasetName });
   const segments = resolveGraphSegmentsForRender(finalPathEntry, previewSegmentOrder);
@@ -1175,8 +1178,10 @@ export function renderFinalPathGraph({
       if (!displayCtgName || item.segmentLength <= 0) {
         return "";
       }
-      const orient = resolveFinalPathSegmentOrient(segment);
-      const tooltipText = `${displayCtgName} | len=${String(segment?.overallLen || 0)} | start=${String(segment?.start || "")} | end=${String(segment?.end || "")} | orient=${orient}`;
+      const tooltipText = buildFinalPathTooltip(segment, {
+        labels, sourceCtgs: ctgColorContext.sourceCtgs || [...(ctgColorContext.primaryCtgs || []),
+          ...(ctgColorContext.supportCtgs || []), ...(ctgColorContext.supportMirroredCtgs || [])],
+      });
       const colorRole = resolveColorRole(segment);
       const toneClass = colorRole === "ref" ? " is-ref" : (colorRole === "companion" ? " is-companion" : "");
       const groupClass = `track-ctg-group${toneClass}`;
@@ -1198,6 +1203,8 @@ export function renderFinalPathGraph({
           class="${groupClass}"
           data-final-path-segment-id="${escapeAttr(segmentId)}"
           data-final-path-segment-type="ctg"
+          aria-label="${escapeAttr(tooltipText)}"
+          ${controlledTooltips ? `data-final-path-tooltip="${escapeAttr(tooltipText)}"` : ""}
          ${targetChrAttr}
           data-final-path-source-kind="${escapeAttr(String(segment?.sourceKind || "assembly_ctg"))}"
           data-final-path-contig-id="${escapeAttr(String(segment?.assemblyCtgId || ""))}"
@@ -1214,7 +1221,7 @@ export function renderFinalPathGraph({
             rx="${graphMetrics.barRadius}"
             ry="${graphMetrics.barRadius}"
           >
-            <title>${escapeHtml(tooltipText)}</title>
+            ${controlledTooltips ? `<desc>${escapeHtml(tooltipText)}</desc>` : `<title>${escapeHtml(tooltipText)}</title>`}
           </rect>
           ${labelPlacement && !labelPlacement.hidden
             ? `<text class="track-ctg-label${toneClass}${labelPlacement.classSuffix}" x="${labelPlacement.x.toFixed(2)}" y="${labelPlacement.y.toFixed(2)}"${labelPlacement.transformAttr} text-anchor="${labelPlacement.textAnchor}">${escapeHtml(graphLabelText)}</text>`
@@ -1550,6 +1557,7 @@ export function renderFinalPathCard(
     phasedFinalPathOptions = [],
     finalPathEntries = [],
     grtBaselineRestore = null,
+    controlledTooltips = false,
   },
   deps = {},
 ) {
@@ -1707,6 +1715,8 @@ export function renderFinalPathCard(
           previewSegmentOrder: allMode ? entry.graphPreviewSegmentOrder : graphPreviewSegmentOrder,
           targetChrName: allMode ? entry.chrName : "",
           allGraphLabel: allMode ? entry.label : "",
+          labels,
+          controlledTooltips,
         });
     const graphAddon = normalizedViewMode === "graph"
       && graphAddonByChr

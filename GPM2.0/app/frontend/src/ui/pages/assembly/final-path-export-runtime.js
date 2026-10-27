@@ -1,3 +1,5 @@
+import { collectFinalPathSourceCtgs } from "./final-path-presentation.js";
+import { snapshotWithoutFinalPathSelection } from "./final-path-selection-runtime.js";
 import { getContigPalette } from "./contig-colors.js";
 import { getGraphFontSize } from "../../../services/app-settings.js";
 import {
@@ -190,7 +192,7 @@ export function resolveFinalPathViewportSnapshot({ viewportNode, svgNode }) {
     height: Number(viewportNode?.clientHeight || 0),
     scrollLeft: Number(viewportNode?.scrollLeft || 0),
     scrollTop: Number(viewportNode?.scrollTop || 0),
-    svgMarkup: String(svgNode?.outerHTML || ""),
+    svgMarkup: snapshotWithoutFinalPathSelection(svgNode),
   };
 }
 
@@ -356,7 +358,8 @@ function buildFallbackFinalPathGraphCardHtml({ state, finalPathEntry, trackViewp
       trackView: assembly.finalPathTrackView,
       trackViewportPx,
       primaryDatasetName,
-      ctgColorContext: { primaryCtgs: assembly.chrCtgs, supportCtgs: assembly.supportChrCtgs },
+      ctgColorContext: { primaryCtgs: assembly.chrCtgs, supportCtgs: assembly.supportChrCtgs,
+        supportMirroredCtgs: assembly.supportMirroredCtgs, sourceCtgs: collectFinalPathSourceCtgs(assembly) },
     },
     {
       escapeAttr,

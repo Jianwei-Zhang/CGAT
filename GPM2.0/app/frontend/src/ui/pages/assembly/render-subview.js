@@ -1,3 +1,4 @@
+import { sourceIntervalProjectionAttrs } from "./source-interval-projection.js";
 import { setSubviewDragGroupOffsets, moveSubviewCompositionDrag } from "./source-fragment-drag.js";
 import { resolveFullRangeVisibleSpan } from "./view-navigation-state.js";
 import { renderViewTickControl } from "./view-navigation-ui.js";
@@ -1923,7 +1924,7 @@ function renderSubviewAlignmentCard(
               data-subview-track-slot="top"
               data-subview-track-ref-orient="${escapeAttr(resolveTrackCtgOrient(topCtg))}"
               data-subview-track-role="${escapeAttr(topSelection.role)}"
-              data-subview-contig-id="${topSelection.contigId}" ${sourceFragmentDragAttrs(topCtg, escapeAttr)}
+              data-subview-contig-id="${topSelection.contigId}" ${sourceFragmentDragAttrs(topCtg, escapeAttr)} ${sourceIntervalProjectionAttrs(topCtg, escapeAttr, resolveTrackCtgOrient(topCtg))}
               data-grt-result-entry-key="top"
               data-subview-rect-x="${svgModel.topBarX.toFixed(2)}"
               data-subview-rect-y="${svgModel.topBarY.toFixed(2)}"
@@ -1987,7 +1988,7 @@ function renderSubviewAlignmentCard(
               data-subview-track-slot="bottom"
               data-subview-track-ref-orient="${escapeAttr(resolveTrackCtgOrient(bottomCtg))}"
               data-subview-track-role="${escapeAttr(bottomSelection.role)}"
-              data-subview-contig-id="${bottomSelection.contigId}" ${sourceFragmentDragAttrs(bottomCtg, escapeAttr)}
+              data-subview-contig-id="${bottomSelection.contigId}" ${sourceFragmentDragAttrs(bottomCtg, escapeAttr)} ${sourceIntervalProjectionAttrs(bottomCtg, escapeAttr, resolveTrackCtgOrient(bottomCtg))}
               data-grt-result-entry-key="bottom"
               data-subview-rect-x="${svgModel.bottomBarX.toFixed(2)}"
               data-subview-rect-y="${svgModel.bottomBarY.toFixed(2)}"
@@ -3089,7 +3090,7 @@ function renderSubviewTrackPairAlignmentCard(
               data-subview-track-ref-orient="${escapeAttr(resolveTrackCtgOrient(ctg))}"
               data-subview-track-slot="${escapeAttr(resolveLayoutSlot(layout.id))}"
               data-subview-track-role="${escapeAttr(layout.role)}"
-              data-subview-contig-id="${contigId}" ${sourceFragmentDragAttrs(ctg, escapeAttr)}
+              data-subview-contig-id="${contigId}" ${sourceFragmentDragAttrs(ctg, escapeAttr)} ${sourceIntervalProjectionAttrs(ctg, escapeAttr, resolveTrackCtgOrient(ctg))}
               data-source-gap-drag-key="subview:${escapeAttr(resolveLayoutSlot(layout.id))}:${contigId}"
               data-grt-result-entry-key="${escapeAttr(grtOverlayKey)}"
               data-subview-rect-x="${rect.x.toFixed(2)}"

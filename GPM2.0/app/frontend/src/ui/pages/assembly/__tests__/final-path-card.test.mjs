@@ -582,7 +582,7 @@ test("renderFinalPathCard graph mode renders ctg + gap segments", () => {
   );
   assert.match(
     html,
-    /data-final-path-segment-id="seg-1"[\s\S]*?<title>hifiasm_Ctg9 \| len=1200 \| start=1 \| end=1200 \| orient=\+<\/title>/,
+    /data-final-path-segment-id="seg-1"[\s\S]*?<title>hifiasm_Ctg9\nAdopted length: 1,200 bp\nSource Contig length: 1,200 bp\nSource interval: 1–1,200 bp\nOrientation: \+<\/title>/,
   );
   assert.match(html, /data-final-path-segment-id="seg-1"[^>]*data-final-path-slot-left="[^"]+"/);
   assert.match(html, /data-final-path-segment-id="seg-1"[^>]*data-final-path-slot-right="[^"]+"/);
@@ -869,7 +869,7 @@ test("renderFinalPathCard strips chr suffix from visible ctg names while keeping
   );
   assert.match(
     graphHtml,
-    /data-final-path-segment-id="seg-1"[\s\S]*?<title>hifiasm_ptg000009l@Chr22 \| len=1200 \| start=1 \| end=1200 \| orient=\+<\/title>/,
+    /data-final-path-segment-id="seg-1"[\s\S]*?<title>hifiasm_ptg000009l@Chr22\nAdopted length: 1,200 bp\nSource Contig length: 1,200 bp\nSource interval: 1–1,200 bp\nOrientation: \+<\/title>/,
   );
   assert.doesNotMatch(graphHtml, />hifiasm_ptg000009l@Chr22 \(\+\)<\/text>/);
   assert.match(
@@ -1147,7 +1147,7 @@ test("renderFinalPathCard graph mode hides overflowing ctg labels and keeps tool
   const segmentHtml = extractFinalPathSegmentHtml(html, "seg-1");
   assert.match(
     segmentHtml,
-    /<title>hifiasm_LongLongLongLongLongLongLongLongLongLongCtg2 \| len=100 \| start=1 \| end=100 \| orient=\+<\/title>/,
+    /<title>hifiasm_LongLongLongLongLongLongLongLongLongLongCtg2\nAdopted length: 100 bp\nSource Contig length: 100 bp\nSource interval: 1–100 bp\nOrientation: \+<\/title>/,
   );
   assert.doesNotMatch(
     segmentHtml,
@@ -1216,11 +1216,11 @@ test("renderFinalPathCard graph mode hides adjacent overflowing ctg labels", () 
   const secondSegmentHtml = extractFinalPathSegmentHtml(html, "seg-3");
   assert.match(
     firstSegmentHtml,
-    /<title>hifiasm_VeryLongVeryLongVeryLongVeryLongCtg1948 \| len=150000 \| start=1 \| end=150000 \| orient=\+<\/title>/,
+    /<title>hifiasm_VeryLongVeryLongVeryLongVeryLongCtg1948\nAdopted length: 150,000 bp\nSource Contig length: 150,000 bp\nSource interval: 1–150,000 bp\nOrientation: \+<\/title>/,
   );
   assert.match(
     secondSegmentHtml,
-    /<title>hifiasm_VeryLongVeryLongVeryLongVeryLongCtg1949 \| len=150000 \| start=1 \| end=150000 \| orient=\+<\/title>/,
+    /<title>hifiasm_VeryLongVeryLongVeryLongVeryLongCtg1949\nAdopted length: 150,000 bp\nSource Contig length: 150,000 bp\nSource interval: 1–150,000 bp\nOrientation: \+<\/title>/,
   );
   assert.doesNotMatch(firstSegmentHtml, /<text class="track-ctg-label/);
   assert.doesNotMatch(secondSegmentHtml, /<text class="track-ctg-label/);
@@ -1539,7 +1539,7 @@ test("renderFinalPathCard graph mode keeps a GAP label when the adjacent ctg lab
   assert.match(gapSegmentHtml, /<text class="final-path-gap-label"[\s\S]*?>GAP<\/text>/);
   assert.match(
     ctgSegmentHtml,
-    /<title>hifiasm_Ctg3 \| len=405280 \| start=1 \| end=405280 \| orient=\+<\/title>/,
+    /<title>hifiasm_Ctg3\nAdopted length: 405,280 bp\nSource Contig length: 405,280 bp\nSource interval: 1–405,280 bp\nOrientation: \+<\/title>/,
   );
   assert.doesNotMatch(ctgSegmentHtml, /<text class="track-ctg-label/);
 });

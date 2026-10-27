@@ -1,3 +1,5 @@
+import { bindFinalPathSelection } from "./assembly/final-path-selection-runtime.js";
+import { bindFinalPathTooltips, hideFinalPathTooltips } from "./assembly/final-path-tooltip-runtime.js";
 import { createAssemblyContigSplitRuntime } from "./assembly/contig-split-runtime.js";
 import { patchMainAnchorFragments } from "./assembly/main-anchor-fragments.js";
 import { toggleMainAlignmentAnchorState, patchMainAlignmentAnchors } from "./assembly/main-alignment-anchors.js";
@@ -828,6 +830,15 @@ export function bindAssemblyPage(host, store, options = {}) {
   }
   syncAssemblySubviewTools(host, store);
   return result;
+}
+
+// Cached DOM is already bound, but its temporary paint may predate a project
+// switch. Reconcile it before exposing the restored page, without rebinding
+// business handlers or reviving the cached hover panel.
+export function syncAssemblyTransientInteractions(host, store) {
+  bindFinalPathSelection(host, store);
+  bindFinalPathTooltips(host);
+  hideFinalPathTooltips(host);
 }
 
 export function syncAssemblySubviewTools(host, store) {

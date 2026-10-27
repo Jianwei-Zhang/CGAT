@@ -58,7 +58,7 @@ test("assembly main view renders the persisted final path card for the current c
   assert.match(html, /data-final-path-export-action="all"/);
 });
 
-test("final path graph hides labels that do not fit inside bars and keeps hover titles", () => {
+test("final path graph hides overflowing labels and keeps immediate controlled tooltip descriptions", () => {
   const html = renderAssemblyPage(
     createState({
       session: {
@@ -95,7 +95,9 @@ test("final path graph hides labels that do not fit inside bars and keeps hover 
   );
 
   assert.doesNotMatch(html, /<text class="track-ctg-label[^"]*"[^>]*>final-path-very-long-segment-label \(\+\)<\/text>/);
-  assert.match(html, /<title>final-path-very-long-segment-label \|/);
+  assert.match(html, /data-final-path-tooltip="final-path-very-long-segment-label\n/);
+  assert.match(html, /<desc>final-path-very-long-segment-label\n/);
+  assert.doesNotMatch(html, /<title>final-path-very-long-segment-label/);
 });
 
 test("assembly main view keeps final path all export while hiding fasta when project dataset fasta is unavailable", () => {

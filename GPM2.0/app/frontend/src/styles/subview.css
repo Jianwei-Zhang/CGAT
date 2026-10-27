@@ -1077,7 +1077,8 @@
 
 /* Shared panel for all alignment hover payloads; never use native SVG title
    tooltips for bands. Fixed coordinates also escape the track's scroll clip. */
-.alignment-band-tooltip {
+.alignment-band-tooltip,
+.final-path-tooltip {
   position: fixed;
   z-index: 45;
   max-width: min(460px, calc(100vw - 16px));

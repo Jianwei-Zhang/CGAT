@@ -1,3 +1,5 @@
+import { bindFinalPathSelection } from "./final-path-selection-runtime.js";
+import { bindFinalPathTooltips } from "./final-path-tooltip-runtime.js";
 import { FLOATING_MENU_CLOSE_DELAY_MS } from "../floating-menu-runtime.js";
 import { bindSupportDatasetPicker } from "./support-dataset-picker-runtime.js";
 import { bindAssemblyViewNavigation } from "./view-navigation-runtime.js";
@@ -1145,6 +1147,8 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     moveFinalPathRow,
     rerender: rerenderFinalPathCard,
   });
+  bindFinalPathTooltips(host);
+  bindFinalPathSelection(host, store);
   (deps.bindFinalPathExport || bindFinalPathExport)(host, store, deps);
   deps.bindDegapCard?.(host, store);
 

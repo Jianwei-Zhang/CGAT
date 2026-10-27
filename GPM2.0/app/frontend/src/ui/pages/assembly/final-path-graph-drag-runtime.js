@@ -269,10 +269,10 @@ export function bindFinalPathGraphDrag(host, store, deps = {}) {
     const onPointerUp = async () => {
       windowObject?.removeEventListener?.("pointermove", onPointerMove, true);
       windowObject?.removeEventListener?.("pointerup", onPointerUp, true);
+      // A click has no preview to clean up. Rebuilding here erased selection,
+      // focus and hover state even though no drag had actually started.
+      if (!dragging) return;
       try {
-        if (!dragging) {
-          return;
-        }
         const payload = resolveGraphDragCommitMove({
           originalSegmentIds: initialLayout.segmentIds,
           previewSegmentIds,

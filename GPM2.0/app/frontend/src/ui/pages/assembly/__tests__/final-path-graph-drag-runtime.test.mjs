@@ -467,3 +467,27 @@ test("bindFinalPathGraphDrag does not commit when the dragged segment never cros
     globalThis.window = originalWindow;
   }
 });
+
+
+test("plain click and sub-threshold pointer movement never rerender or commit drag state", async () => {
+  const originalWindow = globalThis.window;
+  try {
+    const win = createWindowStub(); globalThis.window = win;
+    const events = new Map(), node = createSegmentNode("seg1", 100);
+    assignSlots(new Map([["seg1", node]]), ["seg1"]);
+    const scroll = { scrollLeft: 0, getBoundingClientRect: () => ({ left: 0 }) };
+    const host = { addEventListener: (type, fn) => events.set(type, fn),
+      querySelector: selector => selector === ".assembly-final-path-svg-wrap" ? scroll : null,
+      querySelectorAll: () => [node] };
+    const store = { getState: () => ({ assembly: { activeTab: "assembly", finalPathViewMode: "graph", selectedChrName: "Chr1" } }) };
+    let renders = 0, commits = 0;
+    bindFinalPathGraphDrag(host, store, { rerender: () => renders++, moveFinalPathRow: () => commits++ });
+    for (const move of [false, true]) {
+      events.get("pointerdown")({ button: 0, clientX: 20, clientY: 40, target: node, preventDefault() {} });
+      if (move) win.listeners.get("pointermove")({ clientX: 22, clientY: 41 });
+      await win.listeners.get("pointerup")({});
+      assert.equal(renders, 0); assert.equal(commits, 0);
+      assert.equal(win.listeners.size, 0);
+    }
+  } finally { globalThis.window = originalWindow; }
+});

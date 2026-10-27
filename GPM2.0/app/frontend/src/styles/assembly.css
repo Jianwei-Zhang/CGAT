@@ -2319,3 +2319,26 @@
 .contig-chr-filter { color: var(--theme-muted-ink, #777); font-size: .8em; margin: .3rem 0; }
 .contig-chr-dialog [data-chr-error] { color: var(--theme-red-ink, #a22); font-size: .9em; margin: .3rem 0; }
 .contig-chr-dialog [data-chr-status] { color: var(--theme-green-ink, #35724c); font-size: .85em; margin: .3rem 0; }
+
+/* Read-only adopted-source correlation; not an editing/multiselect class. */
+[data-final-path-selected="1"] > .track-ctg {
+  stroke: var(--theme-accent, #e0a23a);
+  stroke-width: 2.5;
+}
+.final-path-sort-row[data-final-path-selected="1"] {
+  outline: 2px solid var(--theme-accent, #e0a23a);
+  outline-offset: -2px;
+}
+.final-path-source-highlight {
+  fill: rgba(244, 181, 54, 0.35);
+  stroke: #e0a23a;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+/* Only Final Path labels join their fragment's controlled hover/selection
+   target; Main/Local label hit policies remain owned by their runtimes. */
+.assembly-final-path-svg [data-final-path-tooltip] > .track-ctg-label {
+  pointer-events: all;
+}
