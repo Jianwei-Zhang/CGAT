@@ -76,6 +76,7 @@ def render_pages(releases):
     output = {}
     for locale in LANGUAGES:
         zh = locale == "zh"
+        prefix = "/zh" if zh else ""
         title = "更新日志" if zh else "Changelog"
         index = [frontmatter(title), f"# {title}", "",
                  "按版本查阅已发布的 Server 与 App 更新。" if zh else "Released Server and App updates, grouped by version.", "",
@@ -84,16 +85,16 @@ def render_pages(releases):
         for release in releases:
             version = release["version"]
             summary = release["summary_" + locale].replace("|", "\\|")
-            index.append(f'| [{version}](/{locale}/changelog/{version}) | {release["published"]} | {summary} |')
+            index.append(f'| [{version}]({prefix}/changelog/{version}) | {release["published"]} | {summary} |')
             text = [frontmatter("GPM " + version, release["sha256"]), f"# GPM {version}", "",
                     (f'发布：{release["published"]}（UTC） · 更新至：{release["updated"]}' if zh else
                      f'Released: {release["published"]} (UTC) · Updated through: {release["updated"]}'), "",
                     release[locale], "",
                     (f"[更新日志](/{locale}/changelog/) · [下载](/{locale}/downloads)" if zh else
-                     f"[Changelog](/{locale}/changelog/) · [Downloads](/{locale}/downloads)"), "",
+                     f"[Changelog]({prefix}/changelog/) · [Downloads]({prefix}/downloads)"), "",
                     f'[GitHub Release](https://github.com/Jianwei-Zhang/CGAT/releases/tag/{version})', ""]
             output[f"{locale}/changelog/{version}.md"] = "\n".join(text)
-        index += ["", (f"[下载](/{locale}/downloads) · " if zh else f"[Downloads](/{locale}/downloads) · ") +
+        index += ["", (f"[下载]({prefix}/downloads) · " if zh else f"[Downloads]({prefix}/downloads) · ") +
                   ("[更早版本](https://github.com/Jianwei-Zhang/CGAT/releases)" if zh else
                    "[Earlier releases](https://github.com/Jianwei-Zhang/CGAT/releases)"), ""]
         output[f"{locale}/changelog/index.md"] = "\n".join(index)
@@ -104,12 +105,13 @@ def page_entries(releases):
     entries = []
     for locale in LANGUAGES:
         prefix = "en-" if locale == "en" else ""
+        route_prefix = "" if locale == "en" else "/zh"
         entries.append({"id": prefix + "changelog", "group": "reference", "title": "Changelog" if locale == "en" else "更新日志",
-                        "route": f"/{locale}/changelog/", "source": f"{locale}/changelog/index.md", "sidebar": True, "locale": locale})
+                        "route": f"{route_prefix}/changelog/", "source": f"{locale}/changelog/index.md", "sidebar": True, "locale": locale})
         for release in releases:
             version = release["version"]
             entries.append({"id": prefix + "changelog-" + version, "group": "reference", "title": "GPM " + version,
-                            "route": f"/{locale}/changelog/{version}", "source": f"{locale}/changelog/{version}.md", "sidebar": False, "locale": locale})
+                            "route": f"{route_prefix}/changelog/{version}", "source": f"{locale}/changelog/{version}.md", "sidebar": False, "locale": locale})
     return entries
 
 
