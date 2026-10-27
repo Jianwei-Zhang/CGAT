@@ -7,7 +7,7 @@
 **English** | [中文](README_zh.md)
 
 [![CGAT Docs](https://img.shields.io/badge/Docs_%26_Direct_Downloads-riceome.hzau.edu.cn-0f766e)](https://riceome.hzau.edu.cn/cgat/)
-[![GitHub Releases](https://img.shields.io/badge/Releases-v2.0.12-2563eb)](https://github.com/Jianwei-Zhang/CGAT/releases)
+[![GitHub Releases](https://img.shields.io/badge/Releases-v2.0.15-2563eb)](https://github.com/Jianwei-Zhang/CGAT/releases)
 
 **CGAT** is an integrated toolkit for chromosome-scale genome assembly, multi-assembly collinearity review, and targeted long-read sequence refinement. It connects automated processing on Linux (**GPM2.0 Server**), interactive visual curation on Windows and macOS (**GPM2.0 Desktop**), and long-read gap filling and telomere extension (**DEGAP2.0**).
 
@@ -37,11 +37,11 @@ SERVER="$HOME/bin/GPM_Server"
 (
   set -euo pipefail
   mkdir -p "$(dirname "$SERVER")" && mkdir "$SERVER" && cd "$SERVER"
-  archive=GPM_Server_2.0.12_source.tar.gz
+  archive=GPM_Server_2.0.15_source.tar.gz
   curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.12/$archive" ||
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.15/$archive" ||
     curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.12/$archive"
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.15/$archive"
   tar -xzf "$archive" --strip-components=1
   bash ./install.sh
 )
