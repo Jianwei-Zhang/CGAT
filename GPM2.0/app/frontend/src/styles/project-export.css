@@ -12,8 +12,8 @@
   gap: 16px;
 }
 
-.project-export-page > h3,
-.project-export-head h3 {
+.project-export-page > h2,
+.project-export-head h2 {
   margin: 0;
   font-family: inherit;
   font-size: var(--font-heading);
@@ -605,3 +605,6 @@
   font-size: var(--font-body);
   white-space: nowrap;
 }
+
+[data-overview-summary] { display: grid; gap: 14px; min-width: 0; }
+[data-overview-preview] { min-width: 0; }

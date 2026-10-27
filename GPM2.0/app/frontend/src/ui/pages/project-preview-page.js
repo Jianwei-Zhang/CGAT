@@ -18,6 +18,7 @@ import { buildProjectPreviewModel, previewProjectKey, requestPreviewChromosome }
 const requests = new WeakMap();
 const BOUND = Symbol("projectPreviewBound");
 const nodeModels = new WeakMap();
+const isPreviewRoute = state => ["projectExport", "projectPreview"].includes(state.activeRoute);
 const html = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;")
   .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 const number = value => Number(value).toLocaleString("en-US");
@@ -108,7 +109,8 @@ function renderCard(card, labels) {
   </article>`;
 }
 
-export function renderProjectPreviewPage(state) {
+export function renderProjectPreviewPage(state, options = {}) {
+  const heading = options.embedded ? "h3" : "h2";
   const labels = getMessages(state, "projectPreview"), key = previewProjectKey(state);
   const preview = state.projectPreview?.key === key ? state.projectPreview : {};
   const content = !key ? `<p class="muted">${html(labels.noProject)}</p>`
@@ -116,7 +118,7 @@ export function renderProjectPreviewPage(state) {
     : !preview.loaded || (preview.localSignature !== undefined && !previewStateIsApplicable(state)) ? `<p class="muted" role="status">${html(labels.loading)}</p>`
     : preview.cards?.length ? `<div class="project-preview-cards">${preview.cards.map(card => renderCard(card, labels)).join("")}</div>`
     : `<p class="muted">${html(labels.empty)}</p>`;
-  return `<section class="project-preview-page" data-preview-project="${html(key)}" data-preview-locale="${html(state.locale)}" aria-busy="${Boolean(preview.loading)}"><header class="project-preview-heading"><h2>${html(labels.title)}</h2><span class="project-preview-subtitle" title="${html(labels.subtitle)}">${html(labels.subtitle)}</span>
+  return `<section class="project-preview-page" data-preview-project="${html(key)}" data-preview-locale="${html(state.locale)}" aria-busy="${Boolean(preview.loading)}"><header class="project-preview-heading"><${heading}>${html(labels.title)}</${heading}><span class="project-preview-subtitle" title="${html(labels.subtitle)}">${html(labels.subtitle)}</span>
     <details class="project-preview-legend"><summary aria-label="${html(labels.legend)}" title="${html(labels.legend)}">i</summary><div class="project-preview-hint">${html(labels.hint)}</div></details>
     <button type="button" class="button project-preview-refresh" data-preview-refresh title="${html(labels.refresh)}" aria-label="${html(labels.refresh)}" ${!key || preview.loading ? "disabled" : ""}>${projectIcon("refresh")}</button></header>
     ${content}</section>`;
@@ -145,7 +147,7 @@ function updatePreviewDom(host, state) {
       if (current !== node) container.insertBefore(node, current || null);
     });
   } else {
-    host.innerHTML = renderProjectPreviewPage(state);
+    host.innerHTML = renderProjectPreviewPage(state, { embedded: host.hasAttribute?.("data-overview-preview") === true });
     for (const node of host.querySelectorAll?.("[data-preview-chr]") || []) {
       const card = preview?.cards?.find(card => card.chrName === node.dataset.previewChr);
       if (card) nodeModels.set(node, card);
@@ -206,7 +208,7 @@ export function loadProjectPreviewData(host, store, deps = {}, options = {}) {
   }) && pending.localSignature === previewSemanticSignature(previewLocalSignatures(initial))) return pending.promise;
   const token = {}; requests.set(store, token);
   const isCurrent = () => requests.get(store) === token && previewProjectKey(store.getState()) === key
-    && (options.background || store.getState().activeRoute === "projectPreview")
+    && (options.background || (isPreviewRoute(store.getState()) && host?.isConnected !== false && host?.[BOUND]?.active !== false))
     && (options.shouldContinue?.() ?? true);
   const args = { workspaceRoot: initial.session.workspacePath, projectId: initial.session.projectId };
   const getCache = deps.getProjectPreviewCache || getProjectPreviewCache;
@@ -347,10 +349,16 @@ export function loadProjectPreviewData(host, store, deps = {}, options = {}) {
 
 export function bindProjectPreviewPage(host, store, deps = {}) {
   const binding = host[BOUND] || {};
-  binding.store = store; binding.deps = deps;
+  if (binding.store && binding.store !== store) { binding.unsubscribe?.(); binding.unsubscribe = null; }
+  if (binding.active === false) {
+    binding.resize?.observe?.(host);
+    if (binding.onResize) host.ownerDocument?.defaultView?.addEventListener?.("resize", binding.onResize);
+  }
+  binding.deps = binding.store === store ? { ...binding.deps, ...deps } : deps;
+  binding.store = store; binding.active = true;
   if (!host[BOUND]) {
     host.addEventListener("click", event => {
-      if (binding.store.getState().activeRoute !== "projectPreview") return;
+      if (!binding.active || !isPreviewRoute(binding.store.getState())) return;
       const card = event.target?.closest?.("[data-preview-chr]");
       if (card && host.contains(card)) {
         requestPreviewChromosome(binding.store, card.dataset.previewChr);
@@ -363,16 +371,24 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
     const Observer = win?.ResizeObserver;
     if (Observer) {
       binding.resize = new Observer(() => {
-        if (binding.store.getState().activeRoute === "projectPreview") syncFinalPathStripGeometry(host);
+        if (binding.active && isPreviewRoute(binding.store.getState())) syncFinalPathStripGeometry(host);
       });
       binding.resize.observe(host);
     } else {
-      win?.addEventListener?.("resize", () => {
-        if (binding.store.getState().activeRoute === "projectPreview") syncFinalPathStripGeometry(host);
-      });
+      binding.onResize = () => {
+        if (binding.active && isPreviewRoute(binding.store.getState())) syncFinalPathStripGeometry(host);
+      };
+      win?.addEventListener?.("resize", binding.onResize);
     }
     host[BOUND] = binding;
   }
+  if (!binding.unsubscribe && store.subscribe) binding.unsubscribe = store.subscribe(() => {
+    if (!binding.active || host.isConnected === false || !isPreviewRoute(binding.store.getState())) return;
+    const state = binding.store.getState();
+    if (state.projectPreview?.loaded && !state.projectPreview.loading && !previewStateIsApplicable(state)) {
+      void loadProjectPreviewData(host, binding.store, binding.deps);
+    }
+  });
   if (previewStateIsApplicable(store.getState())) {
     for (const node of host.querySelectorAll?.("[data-preview-chr]") || []) {
       const card = store.getState().projectPreview.cards.find(card => card.chrName === node.dataset.previewChr);
@@ -381,5 +397,14 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
     markPreviewDom(host, store.getState());
     syncFinalPathStripGeometry(host);
   }
-  void loadProjectPreviewData(host, store, deps);
+  void loadProjectPreviewData(host, store, binding.deps);
+}
+
+export function unbindProjectPreviewPage(host) {
+  const binding = host?.[BOUND];
+  if (!binding) return;
+  binding.active = false;
+  binding.unsubscribe?.(); binding.unsubscribe = null;
+  binding.resize?.disconnect?.();
+  host.ownerDocument?.defaultView?.removeEventListener?.("resize", binding.onResize);
 }

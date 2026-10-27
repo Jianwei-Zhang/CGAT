@@ -1,7 +1,8 @@
+import { previewMutationStamp } from "../../../services/preview-content-events.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { renderCurrentRoute } from "../router.js";
+import { renderCurrentRoute, registerRoutes, normalizeAppRoute } from "../router.js";
 import { clearAssemblySessionCache } from "../assembly-session-cache.js";
 
 function createRouteButton(route) {
@@ -310,5 +311,43 @@ test("router skips cached assembly DOM when project export requests chr jump scr
     assert.equal(routeHost.renderCount, 3);
   } finally {
     globalThis.window = previousWindow;
+  }
+});
+
+function overviewRouteHarness(route) {
+  let state = createRoutableState(route);
+  state.initializer.datasets = [{ datasetId: 1, name: "Source" }];
+  state.initializer.existingProjects = [{ projectId: 7, primaryDatasetId: 1 }];
+  state.projectExport = { projectId: 7, workspacePath: "D:/ws", loaded: true, mutationStamp: previewMutationStamp({ workspaceRoot: "D:/ws", projectId: 7 }), chromosomes: [], finalPathByChr: {}, job: null };
+  const host = createRouteHost(), root = createRoot(host), subscribers = [];
+  const store = { getState: () => state, setState: patch => { state = { ...state, ...patch }; subscribers.forEach(fn => fn(state)); } };
+  return { host, root, store, subscribe: fn => subscribers.push(fn) };
+}
+
+test("legacy Preview and Overview aliases resolve to the one composite Overview surface without recursive duplicate rendering", () => {
+  for (const route of ["projectPreview", "overview", "projectExport"]) {
+    const f = overviewRouteHarness(route);
+    f.subscribe(() => renderCurrentRoute(f.root, f.store));
+    renderCurrentRoute(f.root, f.store);
+    assert.equal(f.store.getState().activeRoute, "projectExport");
+    assert.equal(f.host.renderCount, 1);
+    assert.match(f.host.innerHTML, /<h2>Overview<\/h2>/);
+    assert.match(f.host.innerHTML, /data-overview-summary[\s\S]*data-overview-preview[\s\S]*Project Preview/);
+    assert.doesNotMatch(f.host.innerHTML, /project-export-final-path-list/);
+  }
+  assert.equal(normalizeAppRoute("assembly"), "assembly");
+});
+
+test("route-button callback renders once with or without the production store subscription", () => {
+  for (const subscribed of [false, true]) {
+    const f = overviewRouteHarness("assembly"), button = createRouteButton("projectPreview");
+    let clicked, callbacks = 0;
+    button.addEventListener = (_type, fn) => { clicked = fn; };
+    f.root.querySelectorAll = selector => selector === ".route-button" ? [button] : [];
+    if (subscribed) f.subscribe(() => renderCurrentRoute(f.root, f.store));
+    registerRoutes(f.root, f.store, () => { callbacks++; renderCurrentRoute(f.root, f.store); });
+    clicked();
+    assert.equal(f.store.getState().activeRoute, "projectExport");
+    assert.equal(f.host.renderCount, 1); assert.equal(callbacks, subscribed ? 0 : 1);
   }
 });

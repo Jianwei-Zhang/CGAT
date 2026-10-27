@@ -1,3 +1,4 @@
+import { previewMutationStamp } from "../../../services/preview-content-events.js";
 import { renderFinalPathCard } from "../../pages/assembly/final-path-card.js";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -97,7 +98,7 @@ for (const locale of ["en", "zh"]) {
     const state = { locale, session: { workspacePath: "raw_PATH", projectId: 7, projectName: "MiXeD_Project" },
       initializer: { datasets: [{ datasetId: 1, name: "Primary_RAW", fastaAvailable: true }],
         existingProjects: [{ projectId: 7, primaryDatasetId: 1 }] }, assembly: { finalPathTrackView: {} },
-      projectExport: { loading: false, projectId: 7, chromosomes: [{ chrName: entry.chrName }],
+      projectExport: { loading: false, loaded: true, workspacePath: "raw_PATH", mutationStamp: previewMutationStamp({ workspaceRoot: "raw_PATH", projectId: 7 }), projectId: 7, chromosomes: [{ chrName: entry.chrName }],
         primaryCtgsByChr: { [entry.chrName]: [{ assemblyCtgId: 1, datasetName: "Primary_RAW", name: "main", totalLength: 100 }] },
         finalPathByChr: { [entry.chrName]: entry } } };
     const html = renderProjectExportPage(state), labels = exportTest.getLabels(state);

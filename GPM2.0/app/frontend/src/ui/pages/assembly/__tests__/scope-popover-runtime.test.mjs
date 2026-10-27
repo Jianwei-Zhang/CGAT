@@ -75,3 +75,12 @@ test("member marquee owns departure until release, then the ordinary 400ms close
   assert.equal([...timers.values()][0].delay, 400);
   [...timers.values()][0].fn(); assert.equal(f.panels.members.hidden, true);
 }));
+
+test("an obsolete leave timer cannot close or persist another project's panel before its next bind", () => withPopoverClock(timers => {
+  const f = fixture(); f.owner.setOpen("members", true);
+  f.emit("pointerout", f.child("members"), { relatedTarget: null });
+  const expire = [...timers.values()][0].fn;
+  f.store.setState({ session: { workspacePath: "/other", projectId: 2 }, assembly: { membersCardCollapsed: false } });
+  const current = f.store.getState();
+  expire(); assert.equal(f.store.getState(), current); assert.equal(current.assembly.membersCardCollapsed, false);
+}));

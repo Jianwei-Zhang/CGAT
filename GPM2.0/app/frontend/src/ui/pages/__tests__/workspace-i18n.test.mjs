@@ -1,3 +1,5 @@
+import { previewMutationStamp } from "../../../services/preview-content-events.js";
+import { projectCatalogKey } from "../project-catalog-view.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -972,5 +974,27 @@ test("server-owned create-project chr threshold input ignores typing", async () 
     assert.equal(host.renderCount, 0);
   } finally {
     globalThis.document = previousDocument;
+  }
+});
+
+test("selected-project right side contains Project Information first and the migrated Path Overview second", () => {
+  for (const locale of ["zh", "en"]) {
+    const value = createState({ locale, session: { projectId: 7, projectName: "Keep_MiXeD" }, initializer: {
+      existingProjects: [{ projectId: 7, projectName: "Keep_MiXeD", primaryDatasetId: 1 }], datasets: [{ datasetId: 1, name: "Source" }],
+    } });
+    value.initializer.projectCatalog = { key: projectCatalogKey(value), data: { references: [], datasets: [] } };
+    value.projectExport = { projectId: 7, workspacePath: "D:/ws", loaded: true, mutationStamp: previewMutationStamp({ workspaceRoot: "D:/ws", projectId: 7 }), chromosomes: [{ chrName: "Chr01" }], finalPathByChr: { Chr01: { chrName: "Chr01", mode: "segments", segments: [
+      { segmentId: "part", type: "ctg", assemblyCtgId: 1, datasetName: "Source", ctgName: "MiXeD_ctg", overallLen: 1000, start: 1, end: 1000 },
+    ] } } };
+    const before = JSON.stringify(value), html = renderWorkspacePage(value);
+    assert.match(html, locale === "en" ? /<h3 id="project-information-title">Project Information/ : /<h3 id="project-information-title">项目信息/);
+    assert.match(html, locale === "en" ? /<h3 id="project-path-overview-title">Path Overview/ : /<h3 id="project-path-overview-title">路径概览/);
+    assert.ok(html.indexOf('id="project-information-title"') < html.indexOf('id="project-data-catalog"'));
+    assert.ok(html.indexOf('id="project-data-catalog"') < html.indexOf('id="project-path-overview-title"'));
+    assert.match(html, /data-project-export-jump-chr="Chr01"/); assert.match(html, /Keep_MiXeD/);
+    assert.match(html, /MiXeD_ctg/); assert.equal(JSON.stringify(value), before);
+    value.projectExport = { ...value.projectExport, workspacePath: "D:/other" };
+    const changed = renderWorkspacePage(value); assert.doesNotMatch(changed, /data-project-export-jump-chr/);
+    assert.match(changed, locale === "en" ? /Loading overview data/ : /正在加载概览数据/);
   }
 });

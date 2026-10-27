@@ -1,3 +1,4 @@
+import { hasRunningProjectExports } from "./project-export-jobs.js";
 export const UPDATE_SNOOZE_KEY = "gpm_next:update_snooze_until";
 export const UPDATE_SNOOZE_MS = 24 * 60 * 60 * 1000;
 const ACTIVE = new Set(["checking", "downloading", "installing"]);
@@ -85,7 +86,7 @@ export function createAppUpdater({ invoke, listen = async () => () => {}, storag
 
 export function updateWorkBusy(state = {}, pendingCommands = 0) {
   const i = state.importer || {}, init = state.initializer || {}, a = state.assembly || {};
-  return Boolean(pendingCommands || i.inFlight || i.restoringSession || i.entryResolving
+  return Boolean(hasRunningProjectExports() || pendingCommands || i.inFlight || i.restoringSession || i.entryResolving
     || i.copyDialog?.inFlight || init.loading || init.creating || init.updating || init.autoPipelineRunning
     || a.loading || a.bootstrapping || a.mainViewHistory?.inFlight || state.projectExport?.loading
     || state.projectExport?.job?.status === "running");

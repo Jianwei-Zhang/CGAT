@@ -1,3 +1,5 @@
+import { bindImmediateTooltips } from "../immediate-tooltip-runtime.js";
+import { rememberAssemblyDom, restoreAssemblyDom, clearAssemblySessionCache } from "../../../shell/assembly-session-cache.js";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -115,4 +117,38 @@ test("Final Path bar and label are hit-testable as one group without changing ot
   const css = readFileSync(new URL("../../../../styles/assembly.css", import.meta.url), "utf8");
   assert.match(css, /\.assembly-final-path-svg \[data-final-path-tooltip\] > \.track-ctg-label\s*\{\s*pointer-events: all;/);
   assert.match(css, /\.track-ctg-label\s*\{[^}]*pointer-events: none;/);
+});
+
+
+test("Assembly cache capture and restoration hide both controlled hover kinds without replacing owners", () => {
+  clearAssemblySessionCache();
+  const h = fixture();
+  const finalPanel = h.panel();
+  bindImmediateTooltips(h.host, { attribute: "data-member-tooltip", className: "member-tooltip" });
+  const memberPanel = h.panel();
+  h.host.dataset = {};
+  Object.defineProperty(h.host, "childNodes", { get() { return this.children; } });
+  h.host.replaceChildren = function (...nodes) { this.children = nodes; };
+  const state = { locale: "en", session: { workspacePath: "D:/cache-hover", projectId: 1 } };
+  const member = h.group("member details");
+  h.fire("pointerover", member);
+  assert.equal(finalPanel.attrs["aria-hidden"], "false");
+  assert.equal(memberPanel.attrs["aria-hidden"], "false");
+  const handlers = h.events.get("pointerover").length;
+  assert.equal(rememberAssemblyDom(h.host, state), true);
+  assert.equal(finalPanel.attrs["aria-hidden"], "true");
+  assert.equal(memberPanel.attrs["aria-hidden"], "true");
+  h.host.replaceChildren({ id: "overview" });
+  assert.equal(restoreAssemblyDom(h.host, state), true);
+  bindFinalPathTooltips(h.host);
+  bindImmediateTooltips(h.host, { attribute: "data-member-tooltip", className: "member-tooltip" });
+  assert.equal(h.events.get("pointerover").length, handlers);
+  assert.equal(memberPanel.attrs["aria-hidden"], "true");
+  h.fire("pointerover", member);
+  assert.equal(memberPanel.attrs["aria-hidden"], "false", "a new pointer hover still works");
+  // Even if the live root has another tooltip visible at restoration, hide it.
+  assert.equal(restoreAssemblyDom(h.host, state), true);
+  assert.equal(finalPanel.attrs["aria-hidden"], "true");
+  assert.equal(memberPanel.attrs["aria-hidden"], "true");
+  clearAssemblySessionCache();
 });

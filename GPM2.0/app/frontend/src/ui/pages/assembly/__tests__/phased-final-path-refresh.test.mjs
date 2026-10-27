@@ -1,3 +1,4 @@
+import { clearAssemblySessionCache, rememberAssemblyDom, restoreAssemblyDom } from "../../../shell/assembly-session-cache.js";
 import { createProjectViewMutationCoordinator } from "../project-view-mutation-coordinator.js";
 import { beginAssemblyViewRequest } from "../assembly-view-request.js";
 import test from "node:test";
@@ -358,4 +359,29 @@ test("a committed deletion reconciles surviving selection keys even when navigat
   assert.equal(a.activePhasedTrackKeyByChr.Chr01, "A");
   assert.deepEqual(f.renders, []);
   assert.equal(f.persists, 1);
+});
+
+
+for (const listingFails of [false, true]) test(`off-route committed phase deletion invalidates both locale caches even when listing fails: ${listingFails}`, async () => {
+  clearAssemblySessionCache();
+  const pending = deferred();
+  const f = fixture({ initialTracks: [track(1, "A")], activeKey: "A", remove: () => pending.promise,
+    list: async () => { if (listingFails) throw new Error("listing failed after committed deletion"); return { tracks: [] }; } });
+  const state = f.store.getState();
+  const host = { dataset: {}, childNodes: [{ id: "old-phase" }], replaceChildren(...nodes) { this.childNodes = nodes; } };
+  const deletion = f.controller.deletePhasedTrack(host, f.store, { phasedTrackId: 1, haplotypeKey: "A" });
+  for (const locale of ["en", "zh"]) rememberAssemblyDom({ ...host, dataset: {} }, { ...state, locale });
+  const other = { ...state, session: { ...state.session, projectId: 8 } };
+  rememberAssemblyDom({ ...host, dataset: {} }, other);
+  f.store.setState({ activeRoute: "projectExport" });
+  pending.resolve({}); await deletion;
+  assert.equal(f.listCalls, 1);
+  assert.equal(f.persists, 1, "committed cleanup is persisted even after listing fails");
+  if (listingFails) assert.ok(f.feedback.some(args => args[2]?.actionError === "listing failed after committed deletion"));
+  assert.equal(f.store.getState().assembly.isChrPhased, false);
+  for (const locale of ["en", "zh"]) assert.equal(restoreAssemblyDom(host, { ...f.store.getState(), locale }), false);
+  assert.equal(restoreAssemblyDom(host, other), true);
+  assert.match(f.render(), restoreAction);
+  assert.equal(f.store.getState().assembly.finalPathByChr.Chr01, f.mainPath);
+  clearAssemblySessionCache();
 });

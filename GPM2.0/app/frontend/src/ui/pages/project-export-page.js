@@ -1,3 +1,9 @@
+import { previewMutationStamp } from "../../services/preview-content-events.js";
+import { exportJobScope, currentProjectExportJob, beginProjectExportJob, ownsCurrentProjectExport,
+  updateProjectExportJob, syncCurrentProjectExportJob, finishProjectExportJob } from "../../services/project-export-jobs.js";
+import { renderProjectPreviewPage, bindProjectPreviewPage, unbindProjectPreviewPage } from "./project-preview-page.js";
+import { rememberProjectPreviewDom, restoreProjectPreviewDom } from "./project-preview-cache.js";
+import { previewProjectKey } from "./project-preview-state.js";
 import { createContigColorResolver, getContigPalette } from "./assembly/contig-colors.js";
 import { layoutFinalPathStrip, syncFinalPathStripGeometry } from "./assembly/final-path-visual-layout.js";
 import { getGraphFontSize, estimateGraphTextWidth } from "../../services/app-settings.js";
@@ -34,8 +40,11 @@ import { normalizeHiddenPrimaryCtgIds } from "./assembly/selection-state.js";
 import { buildProjectExportLogText, buildProjectExportStatsModel } from "./project-export-state.js";
 import { buildEmptyProjectExportState } from "../shell/session-switchers.js";
 
+const OVERVIEW_PREVIEW_BOUND = Symbol("overviewPreviewBound");
+const PROJECT_DATA_FRESHNESS_BOUND = Symbol("projectDataFreshnessBound");
+const PROJECT_PATH_OVERVIEW_BOUND = Symbol("projectPathOverviewBound");
+const projectDataRequests = new WeakMap();
 const PROJECT_EXPORT_BOUND = Symbol("projectExportBound");
-const PROJECT_EXPORT_RESIZE_BOUND = Symbol("projectExportResizeBound");
 const PROJECT_EXPORT_MENU_CLOSE_TIMER = "__projectExportMenuCloseTimer";
 const PROJECT_EXPORT_DETAIL_FILTER_KEYS = new Set(["type", "chr", "dataset"]);
 const PROJECT_EXPORT_DETAIL_FILTER_NONE = "__project_export_filter_none__";
@@ -110,6 +119,14 @@ function getScopedProjectExportState(state) {
   return isProjectExportStateForCurrentSession(state)
     ? (state?.projectExport || {})
     : buildEmptyProjectExportState();
+}
+
+function projectDataMutationStamp(state) {
+  return previewMutationStamp({ workspaceRoot: state.session?.workspacePath, projectId: state.session?.projectId });
+}
+function isProjectOverviewDataFresh(state) {
+  const data = getScopedProjectExportState(state);
+  return data.loaded === true && data.mutationStamp === projectDataMutationStamp(state);
 }
 
 function mergePositiveIntegerLists(...sources) {
@@ -433,12 +450,16 @@ function expandPrimaryCtgsByChrForPhasedTracks(state, primaryCtgsByChr = {}) {
 function getLabels(state) {
   if (state?.locale === "en") {
     return {
-      title: "Project Export",
+      title: "Overview",
+      pathOverviewTitle: "Path Overview",
+      pathOverviewEmpty: "No Final Path available for this project.",
+      contentChanged: "Project content changed while loading. Refresh after the operation finishes.",
       noProject: "Select a project first.",
       project: "Project",
       primaryDataset: "Primary dataset",
-      loadFailed: "Failed to load project export data.",
-      loading: "Loading project export data...",
+      reference: "Reference",
+      loadFailed: "Failed to load overview data.",
+      loading: "Loading overview data...",
       refresh: "Refresh",
       export: "Export",
       exportAll: "All",
@@ -489,12 +510,16 @@ function getLabels(state) {
     };
   }
   return {
-    title: "项目导出",
+    title: "概览",
+    pathOverviewTitle: "路径概览",
+    pathOverviewEmpty: "当前项目暂无可用的 Final Path。",
+    contentChanged: "加载期间项目内容发生变化，请在操作结束后刷新。",
     noProject: "请先选择项目。",
     project: "项目",
     primaryDataset: "主数据集",
-    loadFailed: "项目导出数据加载失败。",
-    loading: "正在加载项目导出数据...",
+    reference: "参考",
+    loadFailed: "概览数据加载失败。",
+    loading: "正在加载概览数据...",
     refresh: "刷新",
     export: "导出",
     exportAll: "全部",
@@ -1406,6 +1431,111 @@ function renderFinalPathPreviewRows(state, { primaryDatasetName }) {
   `;
 }
 
+export function renderProjectPathOverview(state) {
+  const labels = getLabels(state), currentProject = getCurrentProject(state), data = getScopedProjectExportState(state);
+  const scope = previewProjectKey(state);
+  const fresh = isProjectOverviewDataFresh(state);
+  const rows = currentProject && fresh
+    ? renderFinalPathPreviewRows(state, { primaryDatasetName: getDatasetNameById(state.initializer?.datasets || [], currentProject.primaryDatasetId) }) : "";
+  const body = !currentProject ? `<p class="muted">${escapeHtml(labels.noProject)}</p>`
+    : data.error ? `<p class="error-text" role="alert">${escapeHtml(data.error)}</p><button type="button" class="button ghost tiny" data-project-path-refresh>${escapeHtml(labels.refresh)}</button>`
+    : data.loading || !fresh ? `<p class="muted" role="status">${escapeHtml(labels.loading)}</p>`
+    : rows || `<p class="muted">${escapeHtml(labels.pathOverviewEmpty)}</p>`;
+  return `<section class="project-path-overview" data-project-path-overview="${escapeAttr(scope)}" aria-labelledby="project-path-overview-title">
+    <h3 id="project-path-overview-title">${escapeHtml(labels.pathOverviewTitle)}</h3>${body}</section>`;
+}
+
+function projectSurfaceRoot(host) {
+  const root = host?.closest?.("#route-host") || host;
+  return root?.isConnected === false ? host?.ownerDocument?.querySelector?.("#route-host") || root : root;
+}
+
+function refreshProjectDataSurface(host, store) {
+  const root = projectSurfaceRoot(host), state = store.getState();
+  if (!root || root.isConnected === false) return;
+  if (state.activeRoute === "importer") {
+    const current = root.querySelector?.("[data-project-path-overview]");
+    if (!current || current.dataset.projectPathOverview !== previewProjectKey(state)) return;
+    const doc = root.ownerDocument;
+    if (!doc?.createElement) return;
+    const template = doc.createElement("template"); template.innerHTML = renderProjectPathOverview(state);
+    current.replaceWith(template.content.firstElementChild);
+    syncProjectExportPreviewLabels(root);
+  } else rerender(root, store);
+}
+
+function ensureProjectOverviewData(host, store, deps = {}) {
+  const state = store.getState(), data = getScopedProjectExportState(state);
+  const changed = data.mutationStamp !== projectDataMutationStamp(state);
+  if (getCurrentProject(state) && !isProjectOverviewDataFresh(state) && !data.loading && (!data.error || changed)) void loadProjectExportData(host, store, deps);
+}
+
+function bindProjectDataFreshness(host, store, deps = {}) {
+  const root = projectSurfaceRoot(host);
+  if (!root || !store.subscribe) return;
+  const current = root[PROJECT_DATA_FRESHNESS_BOUND];
+  if (current?.store === store) { current.deps = { ...current.deps, ...deps }; return; }
+  releaseProjectDataFreshness(root);
+  const binding = { store, deps };
+  root[PROJECT_DATA_FRESHNESS_BOUND] = binding;
+  binding.unsubscribe = store.subscribe(() => {
+    if (root.isConnected === false) { releaseProjectDataFreshness(root); return; }
+    const state = binding.store.getState(), key = previewProjectKey(state);
+    const surface = state.activeRoute === "importer" ? root.querySelector?.("[data-project-path-overview]")
+      : state.activeRoute === "projectExport" ? root.querySelector?.("[data-overview-project]") : null;
+    const scope = state.activeRoute === "importer" ? surface?.dataset?.projectPathOverview : surface?.dataset?.overviewProject;
+    if (!surface || scope !== key) return;
+    ensureProjectOverviewData(root, binding.store, binding.deps);
+  });
+}
+function releaseProjectDataFreshness(host) {
+  const root = host?.closest?.("#route-host") || host;
+  root?.[PROJECT_DATA_FRESHNESS_BOUND]?.unsubscribe?.();
+  if (root) delete root[PROJECT_DATA_FRESHNESS_BOUND];
+}
+
+export function bindProjectPathOverview(host, store, deps = {}) {
+  const root = projectSurfaceRoot(host);
+  if (!root?.querySelector?.("[data-project-path-overview]")) return;
+  let binding = root[PROJECT_PATH_OVERVIEW_BOUND];
+  if (!binding) {
+    binding = { store, deps };
+    const handle = async event => {
+      const state = binding.store.getState();
+      if (state.activeRoute !== "importer" || !event.target?.closest?.("[data-project-path-overview]")) return;
+      const row = event.target.closest("[data-project-export-jump-chr]");
+      if (event.type === "keydown") {
+        if (!row || !["Enter", " "].includes(event.key)) return;
+        event.preventDefault();
+      }
+      if (row) jumpToAssemblyChr(binding.store, { parentChrName: row.dataset.projectExportJumpParentChr || "",
+        chrName: row.dataset.projectExportJumpChr || "", activePhasedTrackKey: row.dataset.projectExportJumpPhasedKey || "" });
+      else if (event.target.closest("[data-project-path-refresh]")) await loadProjectExportData(root, binding.store, binding.deps);
+    };
+    binding.onClick = handle; binding.onKeyDown = handle;
+    binding.onResize = () => { if (binding.store.getState().activeRoute === "importer") syncProjectExportPreviewLabels(root); };
+    root.addEventListener("click", handle); root.addEventListener("keydown", handle);
+    const win = root.ownerDocument?.defaultView;
+    if (win?.ResizeObserver) { binding.observer = new win.ResizeObserver(binding.onResize); binding.observer.observe(root); }
+    else win?.addEventListener?.("resize", binding.onResize);
+    root[PROJECT_PATH_OVERVIEW_BOUND] = binding;
+  }
+  binding.store = store; binding.deps = { ...binding.deps, ...deps };
+  bindProjectDataFreshness(root, store, binding.deps);
+  syncProjectExportPreviewLabels(root);
+  ensureProjectOverviewData(root, store, binding.deps);
+}
+
+export function releaseProjectPathOverview(host) {
+  releaseProjectDataFreshness(host);
+  const root = host?.closest?.("#route-host") || host, binding = root?.[PROJECT_PATH_OVERVIEW_BOUND];
+  if (!binding) return;
+  binding.observer?.disconnect?.();
+  root.ownerDocument?.defaultView?.removeEventListener?.("resize", binding.onResize);
+  root.removeEventListener?.("click", binding.onClick); root.removeEventListener?.("keydown", binding.onKeyDown);
+  delete root[PROJECT_PATH_OVERVIEW_BOUND];
+}
+
 function resolveProjectExportJumpTarget(state, target) {
   const source = target && typeof target === "object"
     ? target
@@ -1602,7 +1732,7 @@ function renderProjectExportJobModal(job, labels) {
   `;
 }
 
-function renderProjectExportMenu({ labels, canExportFasta = true, canExportLog = true }) {
+function renderProjectExportMenu({ labels, canExportFasta = true, canExportLog = true, disabled = false }) {
   const fastaItem = canExportFasta
     ? `<button type="button" class="final-path-export-item" data-project-export-action="fasta">${escapeHtml(labels.exportFasta)}</button>`
     : "";
@@ -1615,6 +1745,7 @@ function renderProjectExportMenu({ labels, canExportFasta = true, canExportLog =
         type="button"
         class="button ghost tiny final-path-export-toggle"
         data-project-export-toggle="true"
+        ${disabled ? "disabled" : ""}
         aria-expanded="false"
       >${escapeHtml(labels.export)}</button>
       <div class="final-path-export-menu is-hidden" data-project-export-menu>
@@ -1628,44 +1759,54 @@ function renderProjectExportMenu({ labels, canExportFasta = true, canExportLog =
   `;
 }
 
-export function renderProjectExportPage(state) {
+function renderProjectOverviewSummary(state) {
   const labels = getLabels(state);
   const currentProject = getCurrentProject(state);
   const exportState = getScopedProjectExportState(state);
   if (!currentProject) {
-    return `<section class="page project-export-page"><h3>${escapeHtml(labels.title)}</h3><p class="muted">${escapeHtml(labels.noProject)}</p></section>`;
+    return "";
   }
-  const model = buildProjectExportDataModel(state);
-  const primaryDatasetName = model.primaryDatasetName || "-";
-  const summaryLine = model.refChrNames.length
-    ? `<div class="project-export-summary-line"><span>ref: <strong>${escapeHtml(model.refChrNames.join(", "))}</strong></span></div>`
+  const fresh = isProjectOverviewDataFresh(state);
+  const model = fresh ? buildProjectExportDataModel(state) : null;
+  const primaryDatasetName = model?.primaryDatasetName || getDatasetNameById(state.initializer?.datasets || [], currentProject.primaryDatasetId) || "-";
+  const summaryLine = model?.refChrNames.length
+    ? `<div class="project-export-summary-line"><span>${escapeHtml(labels.reference)}: <strong>${escapeHtml(model.refChrNames.join(", "))}</strong></span></div>`
     : "";
   return `
-    <section class="page project-export-page">
+      <section data-overview-summary>
       <div class="project-export-head">
         <div class="project-export-title-row">
-          <h3>${escapeHtml(labels.title)}</h3>
+          <h2>${escapeHtml(labels.title)}</h2>
           <p class="muted">${escapeHtml(labels.project)}: ${escapeHtml(state.session?.projectName || currentProject.projectName || "-")} · ${escapeHtml(labels.primaryDataset)}: ${escapeHtml(primaryDatasetName)}</p>
         </div>
         ${renderProjectExportMenu({
           labels,
-          canExportFasta: canProjectExportFasta(state),
-          canExportLog: model.canExportLog,
+          canExportFasta: fresh && canProjectExportFasta(state),
+          canExportLog: Boolean(model?.canExportLog),
+          disabled: !fresh,
         })}
       </div>
-      ${exportState.loading ? `<p class="muted">${escapeHtml(labels.loading)}</p>` : ""}
+      ${exportState.loading || (!fresh && !exportState.error) ? `<p class="muted">${escapeHtml(labels.loading)}</p>` : ""}
       ${exportState.error ? `
         <div class="project-export-load-error" role="alert">
           <p class="error-text">${escapeHtml(labels.loadFailed)} ${escapeHtml(exportState.error)}</p>
           <button type="button" class="button ghost tiny" data-project-export-refresh="1">${escapeHtml(labels.refresh)}</button>
         </div>
       ` : ""}
-      ${summaryLine}
+      ${fresh ? summaryLine : ""}
       ${renderProjectExportJobModal(exportState.job, labels)}
-      ${renderStats(model, labels, normalizeDetailTableState(state))}
-      ${renderFinalPathPreviewRows(state, { primaryDatasetName })}
-    </section>
+      ${fresh ? renderStats(model, labels, normalizeDetailTableState(state)) : ""}
+      </section>
   `;
+}
+
+export function renderProjectExportPage(state) {
+  const labels = getLabels(state);
+  if (!getCurrentProject(state)) return `<section class="page project-export-page"><h2>${escapeHtml(labels.title)}</h2><p class="muted">${escapeHtml(labels.noProject)}</p></section>`;
+  return `<section class="page project-export-page" data-overview-project="${escapeAttr(previewProjectKey(state))}">
+    ${renderProjectOverviewSummary(state)}
+    <div data-overview-preview>${renderProjectPreviewPage(state, { embedded: true })}</div>
+  </section>`;
 }
 
 function jumpToAssemblyChr(store, target) {
@@ -1726,19 +1867,50 @@ function jumpToAssemblyChr(store, target) {
   return true;
 }
 
+export function releaseProjectOverviewPreview(host) {
+  releaseProjectDataFreshness(host);
+  const previewHost = host?.querySelector?.("[data-overview-preview]");
+  if (!previewHost) return;
+  rememberProjectPreviewDom(previewHost);
+  unbindProjectPreviewPage(previewHost);
+}
+
+function mountOverviewPreview(host, store, deps = {}) {
+  const previewHost = host?.querySelector?.("[data-overview-preview]");
+  if (!previewHost?.addEventListener || previewHost[OVERVIEW_PREVIEW_BOUND]) return;
+  previewHost[OVERVIEW_PREVIEW_BOUND] = true;
+  restoreProjectPreviewDom(previewHost, store.getState());
+  (deps.bindProjectPreviewPage || bindProjectPreviewPage)(previewHost, store, deps.preview || {});
+}
+
 function rerender(host, store) {
+  host = projectSurfaceRoot(host);
+  if (!host || host.isConnected === false) return;
   const state = store.getState();
-  if (state.activeRoute && state.activeRoute !== "projectExport") {
-    return;
+  if (state.activeRoute && state.activeRoute !== "projectExport") return;
+  const page = host.querySelector?.("[data-overview-project]");
+  const summary = page?.querySelector?.("[data-overview-summary]");
+  const doc = host.ownerDocument;
+  if (summary && getCurrentProject(state) && page.dataset.overviewProject === previewProjectKey(state) && doc?.createElement) {
+    // Export progress/filter/statistics patches must not erase the independently
+    // owned Preview component, its cache foundation, focus or pending request.
+    const template = doc.createElement("template");
+    template.innerHTML = renderProjectOverviewSummary(state);
+    const next = template.content.querySelector("[data-overview-summary]");
+    if (next) summary.replaceWith(next);
+  } else {
+    releaseProjectOverviewPreview(host);
+    host.innerHTML = renderProjectExportPage(state);
   }
-  host.innerHTML = renderProjectExportPage(state);
   bindProjectExportPage(host, store);
   syncProjectExportDetailFilterControls(host);
   syncProjectExportPreviewLabels(host);
 }
 
-function setProjectExportJob(host, store, nextJob) {
+function setProjectExportJob(host, store, nextJob, owner) {
+  updateProjectExportJob(owner, nextJob);
   const state = store.getState();
+  if (!ownsCurrentProjectExport(store, owner) || !isProjectExportStateForCurrentSession(state)) return;
   store.setState({
     ...state,
     projectExport: {
@@ -1780,7 +1952,8 @@ function syncProjectExportDetailFilterControls(host) {
 }
 
 function syncProjectExportPreviewLabels(host) {
-  syncFinalPathStripGeometry(host);
+  const summary = host?.querySelector?.("[data-overview-summary]");
+  syncFinalPathStripGeometry(summary || host);
   if (!host?.querySelectorAll) {
     return;
   }
@@ -1893,7 +2066,7 @@ function toggleProjectExportDetailSort(host, store, sortKey) {
   return true;
 }
 
-async function loadProjectExportData(host, store, deps = {}) {
+async function loadProjectExportData(host, store, deps = {}, attempt = 0) {
   const state = store.getState();
   const currentProject = getCurrentProject(state);
   if (!currentProject || !state.session?.workspacePath || !state.session?.projectId) {
@@ -1901,22 +2074,37 @@ async function loadProjectExportData(host, store, deps = {}) {
   }
   const requestedWorkspacePath = normalizeString(state.session.workspacePath);
   const requestedProjectId = Number(state.session.projectId);
-  const previousProjectExport = state.projectExport || {};
+  const mutationStamp = projectDataMutationStamp(state);
+  const token = {}; projectDataRequests.set(store, token);
+  const isCurrent = () => projectDataRequests.get(store) === token
+    && normalizeString(store.getState().session?.workspacePath) === requestedWorkspacePath
+    && Number(store.getState().session?.projectId || 0) === requestedProjectId;
+  const retryMutation = () => {
+    if (!isCurrent()) return false;
+    if (attempt < 2) return loadProjectExportData(host, store, deps, attempt + 1);
+    const current = store.getState();
+    store.setState({ ...current, projectExport: { ...current.projectExport,
+      loading: false, loaded: false, mutationStamp: projectDataMutationStamp(current), error: getLabels(current).contentChanged } });
+    refreshProjectDataSurface(host, store); return false;
+  };
+  const previousProjectExport = getScopedProjectExportState(state);
   store.setState({
     ...state,
     projectExport: {
       ...buildEmptyProjectExportState(),
+      job: currentProjectExportJob(store) || (isProjectExportStateForCurrentSession(state) ? previousProjectExport.job : null),
       detailTableFilters: previousProjectExport.detailTableFilters,
       detailTableSort: previousProjectExport.detailTableSort,
       detailTableCollapsed: previousProjectExport.detailTableCollapsed,
       loading: true,
       loaded: false,
+      mutationStamp,
       error: "",
       projectId: requestedProjectId,
       workspacePath: requestedWorkspacePath,
     },
   });
-  rerender(host, store);
+  refreshProjectDataSurface(host, store);
   try {
     const listChromosomes = deps.listProjectChromosomes || listProjectChromosomes;
     const listCtgs = deps.listChrViewCtgs || listChrViewCtgs;
@@ -1979,6 +2167,8 @@ async function loadProjectExportData(host, store, deps = {}) {
         }
       }
     }
+    if (!isCurrent()) return false;
+    if (mutationStamp !== projectDataMutationStamp(store.getState())) return retryMutation();
     const mergedFinalPathByChr = canonicalizeFinalPathOverallLengths(
       mergeFinalPathByChr(
         viewState.finalPathByChr,
@@ -1988,8 +2178,7 @@ async function loadProjectExportData(host, store, deps = {}) {
     );
     const latestState = store.getState();
     if (
-      normalizeString(latestState.session?.workspacePath) !== requestedWorkspacePath
-      || Number(latestState.session?.projectId || 0) !== requestedProjectId
+      !isCurrent()
     ) {
       return false;
     }
@@ -2027,13 +2216,13 @@ async function loadProjectExportData(host, store, deps = {}) {
         primaryCtgsByChr,
       },
     });
-    rerender(host, store);
+    refreshProjectDataSurface(host, store);
     return true;
   } catch (error) {
+    if (isCurrent() && mutationStamp !== projectDataMutationStamp(store.getState())) return retryMutation();
     const latestState = store.getState();
     if (
-      normalizeString(latestState.session?.workspacePath) !== requestedWorkspacePath
-      || Number(latestState.session?.projectId || 0) !== requestedProjectId
+      !isCurrent()
     ) {
       return false;
     }
@@ -2046,7 +2235,7 @@ async function loadProjectExportData(host, store, deps = {}) {
         error: String(error?.message || error || ""),
       },
     });
-    rerender(host, store);
+    refreshProjectDataSurface(host, store);
     return false;
   }
 }
@@ -2130,9 +2319,9 @@ function planProjectExportSteps({
 
 async function runProjectExport(host, store, kind, deps = {}) {
   const currentState = store.getState();
+  if (currentProjectExportJob(store)?.status === "running") return false;
   if (
-    !currentState.projectExport?.projectId
-    || Number(currentState.projectExport.projectId) !== Number(currentState.session?.projectId || 0)
+    !isProjectOverviewDataFresh(currentState)
   ) {
     const loaded = await loadProjectExportData(host, store, deps);
     if (!loaded) {
@@ -2156,6 +2345,7 @@ async function runProjectExport(host, store, kind, deps = {}) {
     buildProjectFinalPathExportBaseName(projectName),
     exportTimestamp,
   );
+  const scope = exportJobScope(state);
   const resolveTarget = deps.resolveProjectExportTarget || resolveProjectExportTarget;
   let targetPath = await resolveTarget({
     state,
@@ -2163,7 +2353,7 @@ async function runProjectExport(host, store, kind, deps = {}) {
     baseName,
     deps,
   });
-  if (!targetPath) {
+  if (!targetPath || exportJobScope(store.getState()) !== scope) {
     return false;
   }
   if (normalizedKind !== "all") {
@@ -2192,19 +2382,24 @@ async function runProjectExport(host, store, kind, deps = {}) {
     targetPath,
     steps,
   };
-  setProjectExportJob(host, store, job);
+  const owner = beginProjectExportJob(store, state, job);
+  if (!owner) return false;
+  const publish = next => setProjectExportJob(host, store, next, owner);
+  const readJob = () => ownsCurrentProjectExport(store, owner) && isProjectExportStateForCurrentSession(store.getState())
+    ? store.getState().projectExport?.job || owner.job : owner.job;
   const writeText = deps.writeFinalPathExportTextFile || writeFinalPathExportTextFile;
   const writeBinary = deps.writeFinalPathExportBinaryFile || writeFinalPathExportBinaryFile;
   const exportFasta = deps.exportProjectFinalPathFasta || exportProjectFinalPathFasta;
   const renderPng = deps.renderFinalPathViewportPng || renderFinalPathViewportPng;
   const completedOutputs = [];
   try {
+    publish(job);
     const exportEntries = enrichProjectFinalPathEntriesForExport(entries, state);
     const finalPathByChr = buildProjectFinalPathByChr(exportEntries);
     for (const step of steps) {
-      let currentJob = store.getState().projectExport?.job || job;
+      let currentJob = readJob();
       if (currentJob.cancelRequested) {
-        setProjectExportJob(host, store, {
+        publish({
           ...currentJob,
           status: "canceled",
           completedOutputs: [...completedOutputs],
@@ -2212,7 +2407,7 @@ async function runProjectExport(host, store, kind, deps = {}) {
         });
         return false;
       }
-      setProjectExportJob(host, store, {
+      publish({
         ...currentJob,
         status: "running",
         currentStep: step.label || step.kind,
@@ -2252,9 +2447,9 @@ async function runProjectExport(host, store, kind, deps = {}) {
         });
       }
       completedOutputs.push(step.outputPath);
-      currentJob = store.getState().projectExport?.job || job;
+      currentJob = readJob();
       if (currentJob.cancelRequested) {
-        setProjectExportJob(host, store, {
+        publish({
           ...currentJob,
           status: "canceled",
           completedOutputs: [...completedOutputs],
@@ -2263,8 +2458,8 @@ async function runProjectExport(host, store, kind, deps = {}) {
         return false;
       }
     }
-    setProjectExportJob(host, store, {
-      ...(store.getState().projectExport?.job || job),
+    publish({
+      ...readJob(),
       status: "success",
       currentStep: "",
       completedOutputs,
@@ -2272,42 +2467,31 @@ async function runProjectExport(host, store, kind, deps = {}) {
     });
     return true;
   } catch (error) {
-    setProjectExportJob(host, store, {
-      ...(store.getState().projectExport?.job || job),
+    publish({
+      ...readJob(),
       status: "error",
       currentStep: "",
       completedOutputs,
       error: String(error?.message || error || ""),
     });
     return false;
-  }
+  } finally { finishProjectExportJob(store, owner); }
 }
 
 export function bindProjectExportPage(host, store, deps = {}) {
-  if (!host || host[PROJECT_EXPORT_BOUND]) {
+  if (!host) return;
+  mountOverviewPreview(host, store, deps);
+  bindProjectDataFreshness(host, store, deps);
+  if (host[PROJECT_EXPORT_BOUND]) {
+    ensureProjectOverviewData(host, store, deps);
     syncProjectExportDetailFilterControls(host);
     syncProjectExportPreviewLabels(host);
     return;
   }
   host[PROJECT_EXPORT_BOUND] = true;
+  ensureProjectOverviewData(host, store, deps);
   syncProjectExportDetailFilterControls(host);
   syncProjectExportPreviewLabels(host);
-  if (!host[PROJECT_EXPORT_RESIZE_BOUND] && typeof window !== "undefined" && window?.addEventListener) {
-    host[PROJECT_EXPORT_RESIZE_BOUND] = true;
-    window.addEventListener("resize", () => syncProjectExportPreviewLabels(host));
-    if (typeof window.ResizeObserver === "function") {
-      const observer = new window.ResizeObserver(() => syncProjectExportPreviewLabels(host));
-      observer.observe(host);
-    }
-  }
-  const state = store.getState();
-  if (
-    state.session?.projectId
-    && (!state.projectExport?.projectId || Number(state.projectExport.projectId) !== Number(state.session.projectId))
-    && !(isProjectExportStateForCurrentSession(state) && state.projectExport?.loading)
-  ) {
-    void loadProjectExportData(host, store, deps);
-  }
   const setExportMenuOpen = (exportRoot, shouldOpen) => {
     const menuNode = exportRoot?.querySelector?.("[data-project-export-menu]");
     const toggleNode = exportRoot?.querySelector?.("[data-project-export-toggle]");
@@ -2320,6 +2504,7 @@ export function bindProjectExportPage(host, store, deps = {}) {
     }
   };
   host.addEventListener("click", async (event) => {
+    if (store.getState().activeRoute && store.getState().activeRoute !== "projectExport") return;
     const closeNode = event.target?.closest?.("[data-project-export-close]");
     if (closeNode) {
       const currentState = store.getState();
@@ -2327,6 +2512,7 @@ export function bindProjectExportPage(host, store, deps = {}) {
       const nextProjectExport = projectExport.job?.status === "running"
         ? requestCancelProjectExport(projectExport)
         : closeProjectExportDialog(projectExport);
+      syncCurrentProjectExportJob(store, nextProjectExport.job);
       store.setState({
         ...currentState,
         projectExport: nextProjectExport,
@@ -2390,6 +2576,7 @@ export function bindProjectExportPage(host, store, deps = {}) {
     close: (exportRoot) => setExportMenuOpen(exportRoot, false),
   });
   host.addEventListener("change", (event) => {
+    if (store.getState().activeRoute && store.getState().activeRoute !== "projectExport") return;
     const filterNode = event.target?.closest?.("[data-project-export-detail-filter]");
     if (!filterNode) {
       return;
@@ -2403,12 +2590,14 @@ export function bindProjectExportPage(host, store, deps = {}) {
     );
   });
   host.addEventListener("pointerover", (event) => {
+    if (store.getState().activeRoute && store.getState().activeRoute !== "projectExport") return;
     const detailsNode = event.target?.closest?.(".project-export-detail-filter");
     if (detailsNode) {
       clearProjectExportDetailFilterCloseTimer(detailsNode);
     }
   });
   host.addEventListener("pointerout", (event) => {
+    if (store.getState().activeRoute && store.getState().activeRoute !== "projectExport") return;
     const detailsNode = event.target?.closest?.(".project-export-detail-filter");
     if (!detailsNode || detailsNode.contains?.(event.relatedTarget)) {
       return;
@@ -2416,6 +2605,7 @@ export function bindProjectExportPage(host, store, deps = {}) {
     scheduleProjectExportDetailFilterClose(detailsNode);
   });
   host.addEventListener("keydown", (event) => {
+    if (store.getState().activeRoute && store.getState().activeRoute !== "projectExport") return;
     if (event.key !== "Enter" && event.key !== " ") {
       return;
     }

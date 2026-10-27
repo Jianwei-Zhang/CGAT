@@ -1,9 +1,10 @@
+import { beginPreviewContentOperation, finishPreviewContentOperation } from "../../../services/preview-content-events.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createStore } from "../../../state/store.js";
 import { buildProjectPreviewModel, previewProjectKey } from "../project-preview-state.js";
-import { loadProjectPreviewData, renderProjectPreviewPage } from "../project-preview-page.js";
+import { loadProjectPreviewData, renderProjectPreviewPage, bindProjectPreviewPage, unbindProjectPreviewPage } from "../project-preview-page.js";
 
 function state() {
   return { locale: "zh", activeRoute: "projectPreview", session: { workspacePath: "/ws", projectId: 1 },
@@ -149,8 +150,8 @@ test("preview and project-export heading typography matches the Assembly chromos
   const preview = readFileSync(new URL("../../../styles/project-preview.css", import.meta.url), "utf8");
   const exported = readFileSync(new URL("../../../styles/project-export.css", import.meta.url), "utf8");
   const assembly = readFileSync(new URL("../../../styles/assembly.css", import.meta.url), "utf8");
-  for (const rule of [preview.match(/\.project-preview-heading h2\s*\{([^}]*)\}/)?.[1],
-    exported.match(/\.project-export-head h3\s*\{([^}]*)\}/)?.[1],
+  for (const rule of [preview.match(/\.project-preview-heading h3\s*\{([^}]*)\}/)?.[1],
+    exported.match(/\.project-export-head h2\s*\{([^}]*)\}/)?.[1],
     assembly.match(/\.chr-title\s*\{([^}]*)\}/)?.[1]]) {
     assert.ok(rule);
     assert.match(rule, /font-size:\s*var\(--font-heading\)/);
@@ -205,4 +206,56 @@ test("preview clips a donor to the adopted interval even before measured geometr
   const source = output.match(/class="project-preview-contig is-adopted"[^>]+/)[0];
   assert.match(source, /left:0\.00000%;width:0\.02744%/);
   assert.match(source, /title="donor · 采用区间: dsA \/ donor: 17,930,989–17,953,329 \(\+\) · 22,341 bp"/);
+});
+
+test("embedded Preview loads in Overview, keeps its heading level, and cannot overwrite the surrounding statistics/export owners", async () => {
+  const value = state(); value.activeRoute = "projectExport";
+  const store = createStore(value), node = host(), summary = { sentinel: "stats and export task" };
+  node.hasAttribute = name => name === "data-overview-preview";
+  node.parentElement = { summary, set innerHTML(_value) { assert.fail("Preview must never replace its Overview parent"); } };
+  assert.equal(await loadProjectPreviewData(node, store, { ...deps(), getProjectPreviewCache: async () => ({ available: false }), putProjectPreviewCache: async () => ({ stored: false }) }), true);
+  assert.equal(node.parentElement.summary, summary);
+  assert.match(node.innerHTML, /<h3>项目预览<\/h3>/); assert.match(node.innerHTML, /project-preview-card/);
+  assert.equal(store.getState().projectPreview.loaded, true);
+});
+
+test("unmount invalidates pending embedded Preview paint and disconnects/reuses its observer without adding owners", async () => {
+  const value = state(); value.activeRoute = "projectExport";
+  const store = createStore(value), node = host(); let release, observed = 0, disconnected = 0;
+  node.ownerDocument = { defaultView: { ResizeObserver: class { observe() { observed++; } disconnect() { disconnected++; } } } };
+  const metadata = new Promise(resolve => { release = resolve; });
+  const options = { ...deps(), getProjectPreviewCache: () => metadata, putProjectPreviewCache: async () => ({ stored: false }) };
+  bindProjectPreviewPage(node, store, options);
+  const loading = loadProjectPreviewData(node, store, options);
+  unbindProjectPreviewPage(node); release({ available: false });
+  assert.equal(await loading, false); assert.equal(disconnected, 1); assert.equal(node.innerHTML, "");
+  assert.equal(store.getState().projectPreview?.loaded, undefined);
+  bindProjectPreviewPage(node, store, { ...deps(), getProjectPreviewCache: async () => ({ available: false }), putProjectPreviewCache: async () => ({ stored: false }) });
+  assert.equal(observed, 2, "reactivating reuses the observer rather than making a second owner");
+  unbindProjectPreviewPage(node);
+});
+
+test("mounted Overview Preview refreshes after committed content changes, not on export progress, and unsubscribes on departure", async () => {
+  const value = state(); value.activeRoute = "projectExport";
+  const store = createStore(value), node = host(); let metadataReads = 0, subscriptions = 0;
+  node.hasAttribute = name => name === "data-overview-preview";
+  const subscribe = store.subscribe; store.subscribe = fn => {
+    subscriptions++; const remove = subscribe(fn); return () => { subscriptions--; remove(); };
+  };
+  const options = { ...deps(), getProjectPreviewCache: async () => { metadataReads++; return { available: false }; }, putProjectPreviewCache: async () => ({ stored: false }) };
+  bindProjectPreviewPage(node, store, options);
+  assert.equal(await loadProjectPreviewData(node, store, options), true);
+  assert.equal(metadataReads, 1); assert.equal(subscriptions, 1);
+  for (let i = 0; i < 5; i++) store.setState({ projectExport: { job: { status: "running", currentStep: String(i) } } });
+  assert.equal(metadataReads, 1);
+  const args = { workspaceRoot: "/ws", projectId: 1 };
+  const operation = beginPreviewContentOperation("create_phased_chr_track", args);
+  finishPreviewContentOperation(operation, "create_phased_chr_track", {}, true);
+  store.setState({ assembly: { ...store.getState().assembly, actionStatus: "phase committed" } });
+  assert.equal(await loadProjectPreviewData(node, store, options), true);
+  assert.equal(metadataReads, 2); assert.match(node.innerHTML, /<h3>项目预览<\/h3>/);
+  unbindProjectPreviewPage(node); assert.equal(subscriptions, 0);
+  const next = beginPreviewContentOperation("delete_phased_chr_track", args);
+  finishPreviewContentOperation(next, "delete_phased_chr_track", {}, true);
+  store.setState({ assembly: { ...store.getState().assembly } }); assert.equal(metadataReads, 2);
 });

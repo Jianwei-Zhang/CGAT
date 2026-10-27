@@ -1,3 +1,4 @@
+import { hideImmediateTooltips } from "../pages/assembly/immediate-tooltip-runtime.js";
 import { getGraphFontSize } from "../../services/app-settings.js";
 const DEFAULT_MAX_CACHE_ENTRIES = 3;
 
@@ -97,7 +98,16 @@ export function restoreAssemblyState(state, fallbackAssembly = {}) {
   return cloneValue(cached);
 }
 
+export function invalidateAssemblyDomCache(state) {
+  const base = buildAssemblyCacheKey(state);
+  if (!base) return;
+  for (const key of assemblyDomCache.keys()) {
+    if (key.startsWith(`${base}::`)) assemblyDomCache.delete(key);
+  }
+}
+
 export function rememberAssemblyDom(host, state, options = {}) {
+  hideImmediateTooltips(host);
   const key = String(host?.dataset?.assemblyDomCacheKey || buildAssemblyDomCacheKey(state));
   const nodes = Array.from(host?.childNodes || []);
   if (!key || !nodes.length) {
@@ -112,6 +122,7 @@ export function restoreAssemblyDom(host, state) {
   if (!host || cached?.graphFontSize !== getGraphFontSize() || !cached?.nodes?.length || typeof host.replaceChildren !== "function") {
     return false;
   }
+  hideImmediateTooltips(host);
   host.replaceChildren(...cached.nodes);
   if (host.dataset) {
     host.dataset.route = "assembly";

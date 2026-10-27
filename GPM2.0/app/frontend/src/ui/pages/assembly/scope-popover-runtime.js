@@ -57,9 +57,11 @@ export function bindAssemblyScopePopovers(host, store, { persistMembers } = {}) 
   const schedule = kind => {
     cancel(kind);
     if (!isOpen(kind)) return;
+    const scheduledScope = JSON.stringify([store.getState().session?.workspacePath, store.getState().session?.projectId]);
     timers.set(kind, setTimeout(() => {
       timers.delete(kind);
-      if (host.isConnected !== false) setOpen(kind, false);
+      const currentScope = JSON.stringify([store.getState().session?.workspacePath, store.getState().session?.projectId]);
+      if (host.isConnected !== false && currentScope === scheduledScope) setOpen(kind, false);
     }, FLOATING_MENU_CLOSE_DELAY_MS));
   };
   const refresh = () => {

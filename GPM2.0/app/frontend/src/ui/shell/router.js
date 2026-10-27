@@ -1,9 +1,7 @@
 import { renderImporterPage } from "../pages/importer-page.js";
 import { bindAssemblyPage, renderAssemblyPage, syncAssemblySubviewTools, syncAssemblyTransientInteractions } from "../pages/assembly-page.js";
 import { bindImporterPage } from "../pages/importer-page.js";
-import { bindProjectExportPage, renderProjectExportPage } from "../pages/project-export-page.js";
-import { bindProjectPreviewPage, renderProjectPreviewPage } from "../pages/project-preview-page.js";
-import { rememberProjectPreviewDom, restoreProjectPreviewDom } from "../pages/project-preview-cache.js";
+import { bindProjectExportPage, renderProjectExportPage, releaseProjectOverviewPreview, releaseProjectPathOverview } from "../pages/project-export-page.js";
 import { getMessages, t } from "../i18n/index.js";
 import {
   buildAssemblyDomCacheKey,
@@ -14,7 +12,6 @@ import {
 const routeRenderers = {
   importer: renderImporterPage,
   workspace: renderImporterPage,
-  projectPreview: renderProjectPreviewPage,
   assembly: renderAssemblyPage,
   projectExport: renderProjectExportPage,
 };
@@ -22,24 +19,39 @@ const routeRenderers = {
 const routeBinders = {
   importer: bindImporterPage,
   workspace: bindImporterPage,
-  projectPreview: bindProjectPreviewPage,
   assembly: bindAssemblyPage,
   projectExport: bindProjectExportPage,
 };
+
+const RENDERING = Symbol("routeRendering");
+const RENDER_REVISION = Symbol("routeRenderRevision");
+export const normalizeAppRoute = route => ["projectPreview", "overview"].includes(route) ? "projectExport" : route;
 
 export function registerRoutes(root, store, onRouteChanged) {
   const buttons = root.querySelectorAll(".route-button");
   for (const button of buttons) {
     button.addEventListener("click", () => {
-      const route = button.dataset.route;
+      const route = normalizeAppRoute(button.dataset.route);
+      const revision = root[RENDER_REVISION] || 0;
       store.setState({ activeRoute: route });
-      onRouteChanged();
+      // Production store subscriptions already render changed routes. Keep the
+      // callback contract for standalone callers without rendering twice.
+      if ((root[RENDER_REVISION] || 0) === revision) onRouteChanged();
     });
   }
 }
 
 export function renderCurrentRoute(root, store) {
+  if (root[RENDERING]) return;
+  root[RENDERING] = true;
+  try { return renderRoute(root, store); }
+  finally { root[RENDERING] = false; root[RENDER_REVISION] = (root[RENDER_REVISION] || 0) + 1; }
+}
+
+function renderRoute(root, store) {
   let state = store.getState();
+  const canonical = normalizeAppRoute(state.activeRoute);
+  if (canonical !== state.activeRoute) { store.setState({ activeRoute: canonical }); state = store.getState(); }
   const requiresProject = ["projectPreview", "assembly", "projectExport"].includes(state.activeRoute);
   if (state.activeRoute === "workspace" || (requiresProject && (!state.session?.workspacePath || !state.session?.projectId))) {
     store.setState({ activeRoute: "importer" });
@@ -47,12 +59,13 @@ export function renderCurrentRoute(root, store) {
   }
   const host = root.querySelector("#route-host");
   const previousRoute = String(host?.dataset?.route || "");
+  if (["importer", "workspace"].includes(previousRoute)) releaseProjectPathOverview(host);
   if (state.activeRoute === "importer" && previousRoute && previousRoute !== "importer" && state.initializer?.projectCatalog) {
     store.setState({ initializer: { ...state.initializer, projectCatalog: null } });
     state = store.getState();
   }
   const previousAssemblyDomCacheKey = String(host?.dataset?.assemblyDomCacheKey || "");
-  if (previousRoute === "projectPreview") rememberProjectPreviewDom(host);
+  if (["projectExport", "projectPreview"].includes(previousRoute)) releaseProjectOverviewPreview(host);
   if (previousRoute === "assembly") {
     rememberAssemblyDom(host, state);
   }
@@ -74,8 +87,7 @@ export function renderCurrentRoute(root, store) {
       && previousRoute
       && previousAssemblyDomCacheKey !== nextAssemblyDomCacheKey
       && restoreAssemblyDom(host, state);
-    const restoredPreviewDom = state.activeRoute === "projectPreview" && restoreProjectPreviewDom(host, state);
-    if (!restoredAssemblyDom && !restoredPreviewDom) {
+    if (!restoredAssemblyDom) {
       host.innerHTML = renderer(state);
       setRouteHostDataset(host, state.activeRoute, nextAssemblyDomCacheKey);
       const binder = routeBinders[state.activeRoute];
@@ -84,11 +96,8 @@ export function renderCurrentRoute(root, store) {
       }
     } else {
       setRouteHostDataset(host, state.activeRoute, nextAssemblyDomCacheKey);
-      if (restoredPreviewDom) bindProjectPreviewPage(host, store);
-      else {
-        syncAssemblySubviewTools(host, store);
-        syncAssemblyTransientInteractions(host, store);
-      }
+      syncAssemblySubviewTools(host, store);
+      syncAssemblyTransientInteractions(host, store);
     }
   } catch (error) {
     const message = String(error?.stack || error?.message || error || "unknown route render error");

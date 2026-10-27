@@ -6,6 +6,7 @@ import { importParserWorkerChoices, normalizeImportParserWorkers, recommendedImp
 
 export function projectLabels(state) {
   return state.locale === "en" ? {
+    projectInformation: "Project Information",
     import: "Import", open: "Open", importTitle: "Import Project", recent: "Projects",
     empty: "No projects yet", emptyHint: "Import a delivery bundle or open an existing project directory.",
     name: "Project name (optional)", nameDefault: "Use directory name", location: "Project directory",
@@ -23,6 +24,7 @@ export function projectLabels(state) {
     importThreads: "Parallel import workers", importThreadsHint: "Shared by archive extraction and PAF parsing during import; SQLite still uses one writer.",
     recommendedThreads: "{number} (Recommended)",
   } : {
+    projectInformation: "项目信息",
     import: "导入", open: "打开", importTitle: "导入项目", recent: "项目库",
     empty: "尚未添加项目", emptyHint: "导入交付包，或打开已有项目目录。",
     name: "项目名称（可选）", nameDefault: "使用目录名称", location: "项目目录",

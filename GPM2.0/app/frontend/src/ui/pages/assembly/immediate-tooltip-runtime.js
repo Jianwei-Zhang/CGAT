@@ -70,7 +70,9 @@ export function bindImmediateTooltips(host, { attribute, className }) {
 }
 
 export function hideImmediateTooltips(host, attribute) {
-  (host?.closest?.("#route-host") || host)?.[BOUND]?.get(attribute)?.hide();
+  const owners = (host?.closest?.("#route-host") || host)?.[BOUND];
+  if (attribute) owners?.get(attribute)?.hide();
+  else for (const owner of owners?.values() || []) owner.hide();
 }
 
 export function destroyImmediateTooltips(host) {

@@ -1,3 +1,4 @@
+import { releaseProjectOverviewPreview, releaseProjectPathOverview } from "./ui/pages/project-export-page.js";
 import { retagAssemblyDomLocale } from "./ui/shell/assembly-session-cache.js";
 import { patchLocaleMarkup } from "./ui/i18n/presentation-patch.js";
 import { renderAssemblyPage, syncAssemblyTransientInteractions, disposeAssemblyTransientInteractions } from "./ui/pages/assembly-page.js";
@@ -451,6 +452,8 @@ function bindGlobalLanguageSwitch(root, storeRef) {
       return;
     }
     disposeAssemblyTransientInteractions(root.querySelector("#route-host"));
+    releaseProjectOverviewPreview(root.querySelector("#route-host"));
+    releaseProjectPathOverview(root.querySelector("#route-host"));
     root.innerHTML = renderAppShell(storeRef.getState());
     bindSettings(root, storeRef);
     bindGlobalLanguageSwitch(root, storeRef);

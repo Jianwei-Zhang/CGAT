@@ -52,7 +52,6 @@ export function renderAppShell(state) {
       <nav class="panel app-nav">
         <nav class="route-nav">
           <button class="route-button" data-route="importer">${labels.project}</button>
-          <button class="route-button" data-route="projectPreview">${labels.projectPreview}</button>
           <button class="route-button" data-route="assembly">${labels.assembly}</button>
           <button class="route-button" data-route="projectExport">${labels.projectExport}</button>
         </nav>

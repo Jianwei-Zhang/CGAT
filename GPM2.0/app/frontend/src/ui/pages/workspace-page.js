@@ -1,3 +1,4 @@
+import { renderProjectPathOverview, bindProjectPathOverview } from "./project-export-page.js";
 import {
   autoAssignChr,
   autoOrientContigs,
@@ -153,14 +154,15 @@ export function renderWorkspacePage(state) {
       <select id="legacy-project-select" ${busy ? "disabled" : ""}><option value="">${labels.legacyProjects}</option>
         ${initializer.existingProjects.map(project => `<option value="${project.projectId}" ${selectedProject?.projectId === project.projectId ? "selected" : ""}>${escapeHtml(project.projectName)}</option>`).join("")}
       </select></label>` : ""}
-    ${selectedProject ? `${renderProjectCatalog(state)}
-      <p class="project-catalog-created">${labels.created} ${escapeHtml(formatCreatedAt(selectedProject.createdAt, state.locale))}</p>` : ""}
+    ${selectedProject ? `<section class="project-information" aria-labelledby="project-information-title"><h3 id="project-information-title">${labels.projectInformation}</h3>${renderProjectCatalog(state)}
+      <p class="project-catalog-created">${labels.created} ${escapeHtml(formatCreatedAt(selectedProject.createdAt, state.locale))}</p></section>${renderProjectPathOverview(state)}` : ""}
     ${initializer.optionsError ? `<p class="error-text" role="alert">${escapeHtml(initializer.optionsError)}</p>` : ""}
   </section>
   ${initializer.autoPipelineModalOpen ? renderAutoPipelineModal(initializer, messages) : ""}`;
 }
 
 export function bindWorkspacePage(host, store) {
+  bindProjectPathOverview(host, store);
   bindProjectCatalog(host, store, rerender);
   const state = store.getState();
   const initializer = state.initializer;

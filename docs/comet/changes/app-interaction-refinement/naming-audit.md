@@ -49,7 +49,7 @@ The first-phased-track GRT notice also uses Title Case for its primary heading a
 - Existing TSV schemas retain `Ctg`, `overall_len`, `Ctg_start`, `Chr_start` and related wire headers byte-for-byte. Export/log data, filenames, coordinates, field ordering and user strings are not presentation aliases.
 - Numeric values and canonical units are not title-cased. Lowercase `steps` remains a unit fragment; ordinary prose is not converted wholesale into a heading.
 - Raw user names, identifiers, paths and caller-provided confirmation-message data remain verbatim. The regressions include mixed-case `ds`/`ctg`/`LEN` names and chromosome version suffixes.
-- Project Export's route/title rename and the new Project Information / Path Overview / Project Preview sections remain B5 work; this audit does not claim the page migration is complete.
+- The original inventory is the B3 snapshot. B5 migration copy and its unchanged internal route boundary are recorded separately below.
 
 ## Verification
 
@@ -61,3 +61,11 @@ The first-phased-track GRT notice also uses Title Case for its primary heading a
 ### B4 terminology addition
 
 The inventory above records the B3 source snapshot (`4166bee`), not a live post-B4 census. B4 adds one matching path, `page.memberContigLength`, in each locale for immediate member-card details (Contig length / Contig 长度). Existing translation keys, user names and biological/export schemas remain unchanged.
+
+### B5 information-architecture copy
+
+B5 retains the existing `shell.projectExport` key but presents Overview / 概览. The independent Preview navigation button is removed; `projectPreview` and `overview` navigation aliases resolve to the unchanged `projectExport` canonical route. Neither serialized route/job keys nor project identities are renamed. `projectPreview.title` now reads Project Preview / 项目预览. `projects.projectInformation` adds Project Information / 项目信息; the existing selected-project table remains intact beneath it.
+
+The inline Overview owner adds four matching bilingual paths: `pathOverviewTitle` (Path Overview / 路径概览), `pathOverviewEmpty`, `reference` and `contentChanged`. Its existing title/loading/failure copy now describes Overview rather than Project Export. Titles use Title Case; loading/error prose and action labels retain sentence case. The new Reference caption replaces literal `ref:` only in presentation. Original names, TSV headers, export formats, paths, data/filter keys and scientific values remain unchanged.
+
+B5 final integrated Windows-host frontend tests passed 2,113/2,113 (no failures/skips/cancellations); production build passed with 2,025 modules and the existing chunk-size warning. This is Builder evidence; independent Runtime verification and native acceptance are separate.

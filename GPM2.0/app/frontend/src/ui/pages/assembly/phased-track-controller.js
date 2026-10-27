@@ -1,3 +1,4 @@
+import { invalidateAssemblyDomCache } from "../../shell/assembly-session-cache.js";
 import { currentAssemblyViewRequest } from "./assembly-view-request.js";
 import { tAssembly } from "./i18n.js";
 import { FINAL_PATH_ALL_KEY } from "./final-path-state.js";
@@ -234,6 +235,9 @@ export function createPhasedTrackController({
     const currentFinalKey = String(current.activeFinalPathKeyByChr?.[parentChrName]
       || current.activeFinalPathKey || "").trim();
     const patch = reconcileTrackState(current, previousTracks, phasedChrTracks, parentChrName, { deletedKey });
+    // A mutation may complete after route departure. Never restore an earlier
+    // topology/item snapshot on return, including another locale of this scope.
+    invalidateAssemblyDomCache(state);
     store.setState({ assembly: { ...current, ...patch } });
     // Main patches exclude Final Path. Refresh it for changed track topology or
     // path context, but keep item-only edits from needlessly rebuilding the card.
@@ -420,6 +424,8 @@ export function createPhasedTrackController({
         phasedTrackId: normalizedTrackId,
       });
       if (!isCurrentProject(store, state)) return;
+      // Deletion is already committed, even if the following list fails.
+      invalidateAssemblyDomCache(state);
       const nextFinalPathByChr = compactFinalPathByDeletedPhasedTrack(
         store.getState().assembly?.finalPathByChr,
         {

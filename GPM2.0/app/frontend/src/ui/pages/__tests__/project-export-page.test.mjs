@@ -1,14 +1,21 @@
+import { previewMutationStamp, beginPreviewContentOperation, finishPreviewContentOperation } from "../../../services/preview-content-events.js";
+import { currentProjectExportJob } from "../../../services/project-export-jobs.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 
 import { FLOATING_MENU_CLOSE_DELAY_MS } from "../floating-menu-runtime.js";
-import { __test, bindProjectExportPage, renderProjectExportPage } from "../project-export-page.js";
+import { __test, bindProjectExportPage, renderProjectExportPage, renderProjectPathOverview, bindProjectPathOverview, releaseProjectPathOverview } from "../project-export-page.js";
 import { readStylesheetTree } from "../../../styles/__tests__/style-test-support.mjs";
 
 const componentsCss = readStylesheetTree(new URL("../../../styles/components.css", import.meta.url));
 
+function renderLoadedPathOverview(state) {
+  return renderProjectPathOverview({ ...state, projectExport: { ...state.projectExport,
+    loaded: true, workspacePath: state.session.workspacePath, mutationStamp: previewMutationStamp({ workspaceRoot: state.session.workspacePath, projectId: state.session.projectId }) } });
+}
+
 function createState(overrides = {}) {
-  return {
+  const value = {
     locale: "zh",
     session: {
       workspacePath: "/tmp/ws",
@@ -30,6 +37,8 @@ function createState(overrides = {}) {
       finalPathTrackView: {},
     },
     projectExport: {
+      loaded: true,
+      workspacePath: "/tmp/ws",
       loading: false,
       projectId: 7,
       chromosomes: [{ chrName: "Chr01" }],
@@ -68,14 +77,19 @@ function createState(overrides = {}) {
       job: null,
     },
     ...overrides,
+  };  if (value.projectExport) value.projectExport = {
+    loaded: true, workspacePath: value.session.workspacePath,
+    mutationStamp: previewMutationStamp({ workspaceRoot: value.session.workspacePath, projectId: value.session.projectId }),
+    ...value.projectExport,
   };
+  return value;
 }
 
 test("project export page renders assignment bars before placed statistics with a final-path style export menu", () => {
   const html = renderProjectExportPage(createState());
 
-  assert.match(html, />项目导出</);
-  assert.match(html, /<div class="project-export-title-row">[\s\S]*<h3>项目导出<\/h3>[\s\S]*项目: p1 · 主数据集: hifiasm/);
+  assert.match(html, />概览</);
+  assert.match(html, /<div class="project-export-title-row">[\s\S]*<h2>概览<\/h2>[\s\S]*项目: p1 · 主数据集: hifiasm/);
   assert.doesNotMatch(html, /card project-export-card/);
   assert.doesNotMatch(html, /data-project-export-refresh/);
   assert.match(html, /class="button ghost tiny final-path-export-toggle"[\s\S]*data-project-export-toggle="true"[\s\S]*>导出<\/button>/);
@@ -110,14 +124,17 @@ test("project export page renders assignment bars before placed statistics with 
   assert.match(html, /实际追加/);
   assert.match(html, /主图已隐藏/);
   assert.match(html, /<div class="project-export-used-metrics">[\s\S]*class="project-export-used-row"[\s\S]*class="project-export-used-row"/);
-  assert.match(html, /class="project-export-final-path-list"/);
-  assert.match(html, /class="project-export-final-path-row"[\s\S]*data-project-export-jump-chr="Chr01"/);
-  assert.match(html, /class="project-export-final-path-row-label">Chr01<\/strong>/);
-  assert.match(html, /class="project-export-final-path-preview-track"/);
-  assert.match(html, /class="project-export-final-path-preview-ctg"[\s\S]*?width: 100\.0000%;/);
-  assert.match(html, /class="project-export-final-path-preview-length">1,000 bp<\/span>/);
-  assert.doesNotMatch(html, /track-ruler-line/);
-  assert.doesNotMatch(html, /final-path-card-toggle/);
+  assert.doesNotMatch(html, /class="project-export-final-path-list"/);
+  assert.match(html, /data-overview-preview[\s\S]*project-preview-page/);
+  const pathHtml = renderLoadedPathOverview(createState());
+  assert.match(pathHtml, /class="project-export-final-path-list"/);
+  assert.match(pathHtml, /class="project-export-final-path-row"[\s\S]*data-project-export-jump-chr="Chr01"/);
+  assert.match(pathHtml, /class="project-export-final-path-row-label">Chr01<\/strong>/);
+  assert.match(pathHtml, /class="project-export-final-path-preview-track"/);
+  assert.match(pathHtml, /class="project-export-final-path-preview-ctg"[\s\S]*?width: 100\.0000%;/);
+  assert.match(pathHtml, /class="project-export-final-path-preview-length">1,000 bp<\/span>/);
+  assert.doesNotMatch(pathHtml, /track-ruler-line/);
+  assert.doesNotMatch(pathHtml, /final-path-card-toggle/);
 });
 
 test("project export menu closes after leaving the export root", () => {
@@ -387,7 +404,7 @@ test("project export load failure settles with an error and explicit refresh", a
   assert.equal(state.projectExport.loaded, false);
   assert.equal(state.projectExport.error, "workspace missing project.sqlite");
   assert.doesNotMatch(host.innerHTML, /正在加载项目导出数据/);
-  assert.match(host.innerHTML, /项目导出数据加载失败/);
+  assert.match(host.innerHTML, /概览数据加载失败/);
   assert.match(host.innerHTML, /data-project-export-refresh="1"[^>]*>刷新<\/button>/);
 });
 
@@ -658,7 +675,7 @@ test("project export page hides log action and stats when any final path contain
   assert.match(html, /data-project-export-action="fasta"/);
   assert.match(html, /data-project-export-action="all"/);
   assert.doesNotMatch(html, /data-project-export-action="log"/);
-  assert.match(html, /<div class="project-export-summary-line"><span>ref: <strong>Chr01<\/strong><\/span><\/div>/);
+  assert.match(html, /<div class="project-export-summary-line"><span>参考: <strong>Chr01<\/strong><\/span><\/div>/);
   assert.match(html, /项目统计和日志导出已关闭/);
   assert.doesNotMatch(html, /已使用主组装 Contig 数量/);
 });
@@ -990,7 +1007,7 @@ test("project export final path rows use natural order before project export chr
   const expectedNames = ["Chr1", "Chr2", "Chr3", "Chr10"];
   assert.deepEqual(entries.map((entry) => entry.chrName), expectedNames);
 
-  const htmlNames = [...renderProjectExportPage(state).matchAll(/data-project-export-jump-chr="([^"]+)"/g)]
+  const htmlNames = [...renderLoadedPathOverview(state).matchAll(/data-project-export-jump-chr="([^"]+)"/g)]
     .map(([, chrName]) => chrName);
   assert.deepEqual(htmlNames, expectedNames);
 
@@ -1129,7 +1146,7 @@ test("project export final path rows expand phased chromosomes and omit the pare
   assert.equal(model.statsDisabledByRef, false);
   assert.equal(model.finalPathChrCount, 3);
   assert.match(
-    renderProjectExportPage(state),
+    renderLoadedPathOverview(state),
     /data-project-export-jump-parent-chr="Chr01"[\s\S]*data-project-export-jump-phased-key="A"[\s\S]*data-project-export-jump-chr="Chr01A"/,
   );
 });
@@ -1539,7 +1556,7 @@ test("project export all sends phased haplotypes to fasta and omits phased paren
 });
 
 test("project export final path preview uses the longest chr as the shared scale", () => {
-  const html = renderProjectExportPage(createState({
+  const html = renderLoadedPathOverview(createState({
     projectExport: {
       ...createState().projectExport,
       chromosomes: [{ chrName: "Chr02" }, { chrName: "Chr01" }],
@@ -1589,7 +1606,7 @@ test("project export final path preview uses the longest chr as the shared scale
 });
 
 test("project export final path preview clamps edge gap markers inside the track", () => {
-  const html = renderProjectExportPage(createState({
+  const html = renderLoadedPathOverview(createState({
     projectExport: {
       ...createState().projectExport,
       finalPathByChr: {
@@ -1973,7 +1990,7 @@ test("project export preview tags both gaps and contigs for shared minimum-pixel
     { type: "gap", gapSizeBp: 1 },
     { type: "ctg", assemblyCtgId: 2, datasetName: "primary", ctgName: "tiny", overallLen: 1, start: 1, end: 1 },
   ] } };
-  const output = renderProjectExportPage(value);
+  const output = renderLoadedPathOverview(value);
   assert.match(output, /data-final-path-strip="1"/);
   assert.match(output, /data-final-path-kind="gap" data-final-path-length="1"/);
   assert.match(output, /data-final-path-kind="ctg" data-final-path-length="1"/);
@@ -1987,4 +2004,158 @@ test("project export SVG keeps white gap markers and tooltips without GAP text",
       { type: "ctg", start: 1, end: 2, overallLen: 2, ctgName: "a" }] } }], projectName: "test" });
   assert.match(svgMarkup, /fill="#ffffff"[^>]*><title>GAP 100 bp<\/title>/);
   assert.doesNotMatch(svgMarkup, /<text[^>]*>GAP<\/text>/);
+});
+
+function exportDeferred() { let resolve, reject; const promise = new Promise((r, j) => { resolve = r; reject = j; }); return { promise, resolve, reject }; }
+function exportHarness(initial = createState()) {
+  let state = { ...initial, activeRoute: "projectExport" }, paints = 0;
+  const listeners = new Set();
+  const host = { addEventListener() {}, querySelectorAll: () => [], querySelector: () => null,
+    get innerHTML() { return ""; }, set innerHTML(_html) { paints++; } };
+  const store = { getState: () => state, setState: patch => { state = { ...state, ...patch }; listeners.forEach(fn => fn()); },
+    subscribe: fn => { listeners.add(fn); return () => listeners.delete(fn); } };
+  return { host, store, get paints() { return paints; }, get subscriptions() { return listeners.size; } };
+}
+const exportDataDeps = paths => ({ listProjectChromosomes: async () => ({ items: [] }),
+  getProjectAssemblyViewState: async () => ({ finalPathByChr: paths }), getGrtProjectView: async () => ({}) });
+
+test("background export completes its original snapshot without overwriting another project's job, and restores its result on return", async () => {
+  const h = exportHarness(), a = h.store.getState(), started = exportDeferred(), writing = exportDeferred(), writes = [];
+  const running = __test.runProjectExport(h.host, h.store, "tsv", {
+    getExportTimestamp: () => "20261028030000", resolveProjectExportTarget: async () => "/exports/A.tsv",
+    writeFinalPathExportTextFile: async payload => { writes.push(payload); started.resolve(); await writing.promise; },
+  });
+  await started.promise;
+  const bJob = { projectName: "B", status: "running", marker: "must remain B" };
+  h.store.setState({ session: { workspacePath: "/b", projectId: 8, projectName: "B" },
+    projectExport: { projectId: 8, workspacePath: "/b", loaded: true, job: bJob } });
+  const bData = h.store.getState().projectExport, paints = h.paints;
+  writing.resolve(); assert.equal(await running, true);
+  assert.equal(h.store.getState().projectExport, bData); assert.equal(h.store.getState().projectExport.job, bJob);
+  assert.equal(h.paints, paints, "A completion cannot repaint B");
+  assert.equal(writes.length, 1); assert.match(writes[0].text, /Chr01/);
+  h.store.setState({ ...a, projectExport: { projectId: null, loaded: false, loading: false } });
+  assert.equal(currentProjectExportJob(h.store).status, "success");
+  const loading = __test.loadProjectExportData(h.host, h.store, exportDataDeps(a.projectExport.finalPathByChr));
+  assert.equal(h.store.getState().projectExport.job.status, "success");
+  assert.equal(await loading, true);
+  assert.deepEqual(h.store.getState().projectExport.job.completedOutputs, ["/exports/A_20261028030000.tsv"]);
+});
+
+test("one running export per project prevents duplicate pickers/writers without blocking other project ownership", async () => {
+  const h = exportHarness(), started = exportDeferred(), writing = exportDeferred(); let picks = 0, writes = 0;
+  const deps = { resolveProjectExportTarget: async () => { picks++; return "/exports/snapshot.tsv"; },
+    writeFinalPathExportTextFile: async () => { writes++; started.resolve(); await writing.promise; } };
+  const first = __test.runProjectExport(h.host, h.store, "tsv", deps); await started.promise;
+  assert.equal(await __test.runProjectExport(h.host, h.store, "tsv", deps), false);
+  assert.equal(picks, 1); assert.equal(writes, 1); writing.resolve(); assert.equal(await first, true);
+});
+
+test("project data generations reject obsolete success/failure after A-B-A, without mixing local paths or repainting", async () => {
+  for (const fail of [false, true]) {
+    const h = exportHarness(), original = h.store.getState(), firstList = exportDeferred();
+    const first = __test.loadProjectExportData(h.host, h.store, { ...exportDataDeps({ Old: { chrName: "Old", segments: [] } }),
+      listProjectChromosomes: () => firstList.promise });
+    h.store.setState({ session: { workspacePath: "/b", projectId: 8 } });
+    h.store.setState({ ...original, projectExport: { projectId: null, loaded: false } });
+    const second = __test.loadProjectExportData(h.host, h.store, exportDataDeps({ Fresh: { chrName: "Fresh", mode: "segments", segments: [] } }));
+    assert.equal(await second, true); const current = h.store.getState(), paints = h.paints;
+    if (fail) firstList.reject(Error("obsolete failure")); else firstList.resolve({ items: [] });
+    assert.equal(await first, false); assert.equal(h.store.getState(), current); assert.equal(h.paints, paints);
+    assert.equal(current.projectExport.error, ""); assert.equal(current.projectExport.finalPathByChr.Old, undefined);
+    assert.ok(current.projectExport.finalPathByChr.Fresh);
+  }
+});
+
+function mutateProjectData(store, command = "bootstrap_project_assembly") {
+  const state = store.getState(), args = { workspaceRoot: state.session.workspacePath, projectId: state.session.projectId };
+  const operation = beginPreviewContentOperation(command, args);
+  finishPreviewContentOperation(operation, command, {}, true);
+}
+const freshOverviewPaths = () => ({ Fresh: { chrName: "Fresh", mode: "segments", segments: [
+  { segmentId: "fresh", type: "ctg", assemblyCtgId: 2, datasetName: "hifiasm", ctgName: "fresh_ctg", originId: "fresh_origin", overallLen: 1000, start: 1, end: 500 },
+] } });
+
+test("Project preload invalidates after bootstrap/content mutation and reloads rather than retaining a pre-bootstrap empty path", async () => {
+  const h = exportHarness();
+  h.store.setState({ activeRoute: "importer", projectExport: { ...h.store.getState().projectExport, chromosomes: [], finalPathByChr: {} } });
+  assert.match(renderProjectPathOverview(h.store.getState()), /暂无可用的 Final Path/);
+  const job = { status: "running", marker: "keep existing snapshot job" };
+  h.store.setState({ projectExport: { ...h.store.getState().projectExport, job } });
+  mutateProjectData(h.store);
+  let reads = 0;
+  const root = { addEventListener() {}, querySelectorAll: () => [], querySelector: selector => selector === "[data-project-path-overview]"
+    ? { dataset: { projectPathOverview: JSON.stringify(["/tmp/ws", 7]) } } : null };
+  bindProjectPathOverview(root, h.store, { ...exportDataDeps(freshOverviewPaths()), listProjectChromosomes: async () => { reads++; return { items: [] }; } });
+  for (let i = 0; i < 30 && h.store.getState().projectExport.loading; i++) await new Promise(resolve => setImmediate(resolve));
+  const data = h.store.getState().projectExport;
+  assert.equal(reads, 1); assert.equal(data.loaded, true); assert.equal(data.job, job);
+  assert.equal(data.mutationStamp, previewMutationStamp({ workspaceRoot: "/tmp/ws", projectId: 7 }));
+  assert.match(renderProjectPathOverview(h.store.getState()), /data-project-export-jump-chr="Fresh"/);
+  assert.equal(h.subscriptions, 1);
+  for (let i = 0; i < 5; i++) h.store.setState({ projectExport: { ...h.store.getState().projectExport, job: { ...job, currentStep: String(i) } } });
+  assert.equal(reads, 1, "job progress cannot reload content with an unchanged mutation stamp");
+  mutateProjectData(h.store, "auto_assign_chr");
+  h.store.setState({ assembly: { ...h.store.getState().assembly, summary: "mutation finished while Project stays open" } });
+  for (let i = 0; i < 30 && h.store.getState().projectExport.loading; i++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(reads, 2, "a completed mutation updates the mounted path surface without requiring route reentry");
+  releaseProjectPathOverview(root); assert.equal(h.subscriptions, 0);
+  mutateProjectData(h.store); h.store.setState({ assembly: { ...h.store.getState().assembly } });
+  assert.equal(reads, 2, "unmounted surfaces have no retained data subscription");
+});
+
+test("data responses spanning a content mutation are discarded and retried before any loaded publication", async () => {
+  const h = exportHarness(), first = exportDeferred(), published = [];
+  const originalSet = h.store.setState; h.store.setState = patch => {
+    originalSet(patch); if (patch.projectExport?.loaded) published.push(Object.keys(patch.projectExport.finalPathByChr));
+  };
+  let reads = 0, views = 0;
+  const loading = __test.loadProjectExportData(h.host, h.store, { ...exportDataDeps({}),
+    listProjectChromosomes: async () => { reads++; return reads === 1 ? first.promise : { items: [] }; },
+    getProjectAssemblyViewState: async () => ({ finalPathByChr: ++views === 1 ? { Old: { chrName: "Old", segments: [] } } : freshOverviewPaths() }),
+  });
+  mutateProjectData(h.store, "auto_assign_chr"); first.resolve({ items: [] });
+  assert.equal(await loading, true); assert.equal(reads, 2);
+  assert.deepEqual(published, [["Fresh"]]);
+  assert.equal(h.store.getState().projectExport.finalPathByChr.Old, undefined);
+});
+
+test("continuous content mutation settles with a bounded retry/error and can be explicitly refreshed", async () => {
+  const h = exportHarness(); let reads = 0;
+  assert.equal(await __test.loadProjectExportData(h.host, h.store, { ...exportDataDeps(freshOverviewPaths()),
+    listProjectChromosomes: async () => { reads++; mutateProjectData(h.store, "auto_orient_contigs"); return { items: [] }; },
+  }), false);
+  assert.equal(reads, 3); assert.equal(h.store.getState().projectExport.loading, false);
+  assert.match(h.store.getState().projectExport.error, /项目内容发生变化/);
+  assert.equal(await __test.loadProjectExportData(h.host, h.store, exportDataDeps(freshOverviewPaths())), true);
+  assert.equal(h.store.getState().projectExport.error, "");
+});
+
+test("export entry requires the same content freshness as the composite surface, not just matching project identity", async () => {
+  const h = exportHarness(); mutateProjectData(h.store, "run_ctg_editor_action");
+  let reads = 0; const outputs = [];
+  const result = await __test.runProjectExport(h.host, h.store, "tsv", { ...exportDataDeps(freshOverviewPaths()),
+    listProjectChromosomes: async () => { reads++; return { items: [] }; },
+    resolveProjectExportTarget: async () => "/output/fresh.tsv",
+    writeFinalPathExportTextFile: async payload => outputs.push(payload.text),
+  });
+  assert.equal(result, true, h.store.getState().projectExport.job?.error); assert.equal(reads, 1);
+  assert.match(outputs[0], /fresh_ctg/); assert.doesNotMatch(outputs[0], /ptg1/);
+});
+
+test("Overview progress patches only the summary and neither renders nor replaces its independent Preview owner", () => {
+  let value = createState(), previewReadsForbidden = false, previewsBound = 0, replaced = 0, parsed = "";
+  const scoped = new Proxy(value, { get(target, key) { if (previewReadsForbidden && key === "projectPreview") assert.fail("summary patches must not render/read Preview models"); return target[key]; } });
+  const preview = { addEventListener() {} }, nextSummary = {}, summary = { querySelectorAll: () => [], replaceWith(next) { assert.equal(next, nextSummary); replaced++; } };
+  const page = { dataset: { overviewProject: JSON.stringify(["/tmp/ws", 7]) }, querySelector: selector => selector === "[data-overview-summary]" ? summary : null };
+  const host = { addEventListener() {}, querySelectorAll: () => [],
+    querySelector: selector => selector === "[data-overview-project]" ? page : selector === "[data-overview-summary]" ? summary : selector === "[data-overview-preview]" ? preview : null,
+    set innerHTML(_html) { assert.fail("progress must not replace the composite route"); },
+    ownerDocument: { createElement: () => ({ content: { querySelector: () => nextSummary }, set innerHTML(html) { parsed = html; } }) } };
+  const store = { getState: () => scoped, setState() { assert.fail("already-fresh bind/paint should not mutate data"); } };
+  bindProjectExportPage(host, store, { bindProjectPreviewPage() { previewsBound++; } });
+  previewReadsForbidden = true;
+  __test.rerender(host, store);
+  assert.equal(replaced, 1); assert.equal(previewsBound, 1); assert.equal(host.querySelector("[data-overview-preview]"), preview);
+  assert.match(parsed, /data-overview-summary/); assert.doesNotMatch(parsed, /data-overview-preview|project-preview-page/);
 });

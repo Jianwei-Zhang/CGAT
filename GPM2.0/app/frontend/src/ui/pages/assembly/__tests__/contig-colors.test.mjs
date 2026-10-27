@@ -1,3 +1,4 @@
+import { previewMutationStamp } from "../../../../services/preview-content-events.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -9,7 +10,7 @@ import {
 } from "../contig-colors.js";
 import { renderFinalPathGraph } from "../final-path-card.js";
 import { buildViewportScopedSvgMarkup } from "../final-path-export-runtime.js";
-import { __test, renderProjectExportPage } from "../../project-export-page.js";
+import { __test, renderProjectPathOverview } from "../../project-export-page.js";
 
 const css = (file) => readFileSync(new URL(`../../../../styles/${file}`, import.meta.url), "utf8");
 const palette = DEFAULT_CONTIG_PALETTE;
@@ -68,7 +69,7 @@ test("missing primary dataset metadata does not classify every ctg as a companio
   }
 });
 
-test("Final Path and Project Export render the same stable tone for each ctg without forced selection", () => {
+test("Final Path and Project Path Overview render the same stable tone for each ctg without forced selection", () => {
   const entry = { chrName: "Chr02", mode: "segments", segments };
   const graph = renderFinalPathGraph({
     escapeAttr: String, escapeHtml: String, finalPathEntry: entry,
@@ -78,10 +79,10 @@ test("Final Path and Project Export render the same stable tone for each ctg wit
     session: { workspacePath: "/tmp/ws", projectId: 7, projectName: "p1" },
     initializer: { datasets: [{ datasetId: 1, name: "hifiasm" }], existingProjects: [{ projectId: 7, primaryDatasetId: 1 }] },
     assembly: { chrCtgs: [colorContext.primaryCtgs[0]], supportChrCtgs: colorContext.supportCtgs },
-    projectExport: { projectId: 7, primaryCtgsByChr: { Chr02: colorContext.primaryCtgs }, finalPathByChr: { Chr02: entry } },
+    projectExport: { projectId: 7, loaded: true, mutationStamp: previewMutationStamp({ workspaceRoot: "/tmp/ws", projectId: 7 }), workspacePath: "/tmp/ws", primaryCtgsByChr: { Chr02: colorContext.primaryCtgs }, finalPathByChr: { Chr02: entry } },
   };
   const before = JSON.stringify(state);
-  const html = renderProjectExportPage(state);
+  const html = renderProjectPathOverview(state);
   const roles = ["", " is-companion", " is-ref", "", " is-companion", ""];
   assert.deepEqual([...graph.matchAll(/<rect\s+class="(track-ctg[^"]*)"/g)].map(m => m[1]), roles.map(role => `track-ctg${role}`));
   assert.doesNotMatch(graph, /class="track-ctg(?:-group)? is-active/);
