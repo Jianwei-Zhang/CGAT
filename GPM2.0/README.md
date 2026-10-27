@@ -85,6 +85,7 @@ already up to date; otherwise it lists changes and asks `[y/N]`. Only `Y/y` proc
 Inside a project it also aligns `.prepare_lib/`; outside a project it does not scan other projects.
 Preserves skill `local/`, actual paths, logs, results, caches, and the environment; never starts analysis.
 Stop all affected jobs, including other nodes, before updating. Backups support rollback.
+For a Step2 `missing its output gap interval` failure, update both tools and the affected workspace runtime before resuming; preserve logs, results, and raw-alignment caches.
 See [Server update details](server/README.md#update-tools-skill-and-project-runtime) for legacy adoption and limits.
 
 ### 2. Run the full workflow

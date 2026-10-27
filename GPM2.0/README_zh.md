@@ -84,6 +84,7 @@ bash ~/bin/GPM_Server/update.sh
 在项目内执行会同时对齐 `.prepare_lib/`；不在项目内则不扫描其他项目。
 保留 skill `local/`、实际路径、日志、结果、缓存与依赖环境，不自动重跑分析。
 更新前停止所有受影响任务（含其他节点），失败可用备份回滚。
+遇到 Step2 `missing its output gap interval` 时，先同时更新工具和受影响工作区运行库，再恢复运行；保留日志、结果与原始比对缓存。
 旧安装首次接入和限制见[Server 更新说明](server/README_zh.md#更新工具skill-与项目运行库)。
 
 ### 2. 运行完整流程

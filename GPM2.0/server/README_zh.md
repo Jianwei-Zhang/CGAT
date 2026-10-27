@@ -159,6 +159,8 @@ bash ~/bin/GPM_Server/update.sh
 
 已有工作区不会随外部工具自动修改；如需对齐旧项目的运行库，请在停止任务后进入该项目目录显式执行 `update.sh`。
 
+遇到 Step2 `missing its output gap interval` 时，先同时更新工具和受影响工作区运行库，再恢复运行。结构修复现会登记向前、向后吸收的全部 GAP；部分切入或来源映射歧义将明确拒绝。保留日志、结果和原始比对缓存，无需重装依赖。
+
 ## 可选的 AI agent skill
 
 ### 给 AI agent 的安装提示词

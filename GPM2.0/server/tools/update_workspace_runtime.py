@@ -210,7 +210,8 @@ def update(source: Path, workspace: Path, tools_root: Path, revision: str, *, ap
     validate_targets(workspace, tools_root, source)
     runtime = workspace / ".prepare_lib"
     selected = {relative: record for relative, record in manifest.items()
-                if relative in ENTRYPOINTS or relative.startswith("tools/grt_core/")}
+                if relative == "SOURCE.json" or relative in ENTRYPOINTS
+                or relative.startswith("tools/grt_core/")}
     # Old untracked Python modules would contaminate the content fingerprint.
     for target in (tools_root / "tools", runtime / "tools"):
         extra = {p.relative_to(target.parent).as_posix() for p in (target / "grt_core").rglob("*.py")} - set(selected)

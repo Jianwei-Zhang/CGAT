@@ -174,6 +174,8 @@ To fall back to the unscreened baseline profile when preparing a **new** workspa
 
 Existing workspace scripts and embedded runtimes are not modified automatically; run `update.sh` inside a stopped project workspace when you want to synchronize its `.prepare_lib/` runtime.
 
+For a Step2 `missing its output gap interval` failure, update both tools and the affected workspace runtime before resuming. Structural edits now register absorbed GAPs on both sides; partial or ambiguous origin mappings fail explicitly. Preserve logs, results, and raw-alignment caches; dependency reinstallation is not required.
+
 ## Optional AI agent skill
 
 ### Installation prompt for your AI agent

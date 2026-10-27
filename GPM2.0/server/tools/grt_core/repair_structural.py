@@ -1020,13 +1020,33 @@ def apply_corrections(
         cursor = 0
         output_cursor = 0
         result_path: list[dict[str, object]] = []
-        accepted_by_object = {
-            str(object_id): row
-            for row in accepted
-            for object_id in row.get(
-                "covered_object_ids", [str(row["object_id"])]
-            )
-        }
+        # This writer is shared by Step2 and Step3. Reject incomplete or
+        # ambiguous provenance before creating paths/origins, rather than
+        # silently overwriting a repaired GAP with a supposedly untouched one.
+        accepted_by_object: dict[str, dict[str, object]] = {}
+        for candidate in accepted:
+            primary = str(candidate["object_id"])
+            start, end = int(candidate["input_start"]), int(candidate["input_end"])
+            associated_gap = gaps_by_object.get(primary)
+            if associated_gap is None:
+                fail(f"Step3 correction references an unknown q2 gap: {candidate['candidate_id']}")
+            if start > int(associated_gap["start0"]) + 1 or end < int(associated_gap["end0"]):
+                fail(f"Step3 correction edit does not cover associated q2 gap: {candidate['candidate_id']}")
+            actual = []
+            for gap in chromosome_gaps:
+                if not intervals_overlap(start, end, int(gap["start0"]) + 1, int(gap["end0"])):
+                    continue
+                if start > int(gap["start0"]) + 1 or end < int(gap["end0"]):
+                    fail(f"correction partially overlaps origin gap: {candidate['candidate_id']}:{gap['object_id']}")
+                actual.append(str(gap["object_id"]))
+            declared = [str(value) for value in candidate.get("covered_object_ids", [primary])]
+            if len(declared) != len(set(declared)) or set(declared) != set(actual):
+                fail(f"invalid correction gap coverage: {candidate['candidate_id']}; declared={declared}; actual={actual}")
+            for object_id in declared:
+                if object_id in accepted_by_object:
+                    fail(f"multiple accepted corrections claim origin gap: {object_id}")
+                accepted_by_object[object_id] = candidate
+        edit_deltas: list[tuple[int, int]] = []
         for candidate in accepted:
             start0 = int(candidate["input_start"]) - 1
             end0 = int(candidate["input_end"])
@@ -1036,14 +1056,8 @@ def apply_corrections(
                     "covered_object_ids", [str(candidate["object_id"])]
                 )
             ]
-            associated_gap = gaps_by_object.get(str(candidate["object_id"]))
-            if associated_gap is None:
-                fail(f"Step3 correction references an unknown q2 gap: {candidate['candidate_id']}")
-            if start0 > int(associated_gap["start0"]) or end0 < int(associated_gap["end0"]):
-                fail(
-                    "Step3 correction edit does not cover associated q2 gap: "
-                    f"{candidate['candidate_id']}"
-                )
+            primary = str(candidate["object_id"])
+            covered_object_ids = [primary, *[value for value in covered_object_ids if value != primary]]
             if start0 < cursor or end0 < start0 or end0 > len(sequence):
                 fail(f"overlapping or invalid Step3 correction edit: {candidate['candidate_id']}")
             result_path.extend(slice_path(path, cursor, start0))
@@ -1053,6 +1067,7 @@ def apply_corrections(
                 DOMINATED_COMPONENT_POLICY,
             }
             replacement_length = 0 if gapless_junction else NORMALIZED_GAP_LENGTH
+            edit_deltas.append((end0, replacement_length - (end0 - start0)))
             output_start = output_cursor + 1
             if gapless_junction:
                 # Anchor at the first retained right-side base, or the last
@@ -1096,7 +1111,10 @@ def apply_corrections(
             }
             prototypes.append(prototype)
             if not gapless_junction:
-                gap_origin_by_output[(chromosome, output_start - 1, output_end)] = {
+                key = (chromosome, output_start - 1, output_end)
+                if key in gap_origin_by_output:
+                    fail(f"correction output gap origins collide: {key}")
+                gap_origin_by_output[key] = {
                     "object_id": candidate["object_id"],
                     "q2_start": int(candidate["input_start"]),
                     "q2_end": int(candidate["input_end"]),
@@ -1109,15 +1127,15 @@ def apply_corrections(
         for gap in chromosome_gaps:
             if str(gap["object_id"]) in accepted_by_object:
                 continue
-            shift = 0
-            for candidate in accepted:
-                if int(candidate["input_end"]) < int(gap["start0"]) + 1:
-                    shift += int(candidate.get("fill_length", NORMALIZED_GAP_LENGTH)) - (
-                        int(candidate["input_end"]) - int(candidate["input_start"]) + 1
-                    )
+            # Use the bytes actually emitted above, not a candidate's fill
+            # hint (which can differ for gapless/normalized structural edits).
+            shift = sum(delta for end, delta in edit_deltas if end <= int(gap["start0"]))
             output_start0 = int(gap["start0"]) + shift
             output_end0 = int(gap["end0"]) + shift
-            gap_origin_by_output[(chromosome, output_start0, output_end0)] = {
+            key = (chromosome, output_start0, output_end0)
+            if key in gap_origin_by_output:
+                fail(f"correction output gap origins collide: {key}")
+            gap_origin_by_output[key] = {
                 "object_id": gap["object_id"],
                 "q2_start": int(gap["start0"]) + 1,
                 "q2_end": int(gap["end0"]),

@@ -82,6 +82,16 @@ class WorkspaceRuntimeUpdateTests(unittest.TestCase):
         self.assertEqual(before, tuple(self.snapshot(p) for p in (self.source, self.tools, self.workspace)))
         self.assertFalse((self.workspace / ".run_all").exists())
 
+    def test_runtime_source_metadata_tracks_update_and_rollback(self):
+        metadata = self.workspace / ".prepare_lib/SOURCE.json"
+        metadata.write_bytes(b'{"git_revision":"previous-runtime"}\n')
+        before = metadata.read_bytes()
+        result = self.update()
+        self.assertEqual(metadata.read_bytes(), (self.source / "SOURCE.json").read_bytes())
+        self.assertEqual(json.loads(metadata.read_text())["git_revision"], self.REVISION)
+        updater.rollback(Path(result["backup"]))
+        self.assertEqual(metadata.read_bytes(), before)
+
     def test_updates_both_roots_preserves_inputs_logs_binding_and_supports_rollback(self):
         source_before, tools_before, workspace_before = (self.snapshot(p) for p in
                                                          (self.source, self.tools, self.workspace))

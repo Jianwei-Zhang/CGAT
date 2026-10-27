@@ -381,6 +381,9 @@ def arbitrate_structural_candidates(
         gaps,
         key=lambda row: (str(row["chr"]), int(row["start0"]), str(row["object_id"])),
     )
+    gaps_by_chr: dict[str, list[dict[str, object]]] = defaultdict(list)
+    for gap in ordered_gaps:
+        gaps_by_chr[str(gap["chr"])].append(gap)
     for gap in ordered_gaps:
         chromosome = str(gap["chr"])
         object_id = str(gap["object_id"])
@@ -421,6 +424,23 @@ def arbitrate_structural_candidates(
                 str(row["candidate_id"]),
             ),
         )
+        # A structural edit can absorb whole GAPs in either direction, but
+        # must never cut through another GAP and leave an unmappable N fragment.
+        for row in eligible:
+            partial = next((
+                other for other in gaps_by_chr[chromosome]
+                if intervals_overlap(
+                    int(row["input_start"]), int(row["input_end"]),
+                    int(other["start0"]) + 1, int(other["end0"]),
+                ) and not (
+                    int(row["input_start"]) <= int(other["start0"]) + 1
+                    and int(row["input_end"]) >= int(other["end0"])
+                )
+            ), None)
+            if partial is not None:
+                row["outcome"] = "rejected"
+                row["reason"] = f"structural_edit_partially_overlaps_gap:{partial['object_id']}"
+        eligible = [row for row in eligible if row.get("outcome") == "candidate"]
         selected = next(
             (
                 row
@@ -442,7 +462,16 @@ def arbitrate_structural_candidates(
                 row["outcome"] = "accepted"
                 row["reason"] = "accepted_by_structural_gap_order"
                 row["source_consumable"] = False
-                row["covered_object_ids"] = [object_id]
+                # Register ALL covered origins now, including earlier GAPs
+                # whose own candidates were absent/rejected. Keep the selected
+                # object's identity first, even when it is not the leftmost GAP.
+                row["covered_object_ids"] = [object_id, *[
+                    str(other["object_id"])
+                    for other in gaps_by_chr[chromosome]
+                    if str(other["object_id"]) != object_id
+                    and int(row["input_start"]) <= int(other["start0"]) + 1
+                    and int(row["input_end"]) >= int(other["end0"])
+                ]]
                 accepted_by_chr[chromosome].append(row)
             else:
                 row["outcome"] = "conflicted" if selected is None else "rejected"
@@ -1238,6 +1267,8 @@ def build_step2_structural_events(
             for object_id in candidate.get(
                 "covered_object_ids", [str(candidate["object_id"])]
             ):
+                if str(object_id) in accepted_by_object:
+                    fail(f"multiple accepted structural candidates claim gap: {object_id}")
                 accepted_by_object[str(object_id)] = candidate
     prototype_by_candidate = {
         str(row["candidate"]["candidate_id"]): row for row in prototypes
@@ -1248,6 +1279,8 @@ def build_step2_structural_events(
             str(origin["object_id"]),
             *[str(value) for value in origin.get("coalesced_object_ids", [])],
         ]:
+            if object_id in output_interval_by_object:
+                fail(f"ambiguous structural gap output origin: {object_id}")
             output_interval_by_object[object_id] = (start0 + 1, end0)
     events: list[dict[str, object]] = []
     attempts: list[dict[str, object]] = []
