@@ -1,0 +1,549 @@
+schema: comet.native.v4
+name: app-interaction-refinement
+language: en
+phase: shape
+status: await-user
+state_version: 2
+brief: brief.md
+shape_confirmation_hash: 5ec5c485e3bbd9df9898233e1bb1d0e85aa67f45aacff7cde8be242ad3c996aa
+spec_changes:
+  - capability: app-interaction-surfaces
+    operation: create
+    source: specs/app-interaction-surfaces/spec.md
+workspace:
+  isolation: current
+  change_branch: master
+  target_branch: master
+  finish: null
+loop:
+  stage: await-user
+  goal_cycle: 1
+  iteration: 0
+  attempt: 0
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: confirm-shape
+acceptance:
+  - id: A1
+    source: brief.md
+    text: "A1: Creating the first phased track successfully refreshes Final Path
+      context and hides the precomputed-path action immediately, without route
+      switching or reload."
+    result: pending
+    reason: null
+  - id: A2
+    source: brief.md
+    text: "A2: Adding another phased track or deleting a non-last track reconciles
+      active paths and keeps the phased-state action visibility correct."
+    result: pending
+    reason: null
+  - id: A3
+    source: brief.md
+    text: "A3: Deleting the last phased track restores the main-path context and
+      applicable precomputed-path action, clearing only invalid phased
+      selections."
+    result: pending
+    reason: null
+  - id: A4
+    source: brief.md
+    text: "A4: The precomputed action is absent without an available baseline and
+      remains disabled when already current; showing it never executes
+      restoration or overwrites the user main path."
+    result: pending
+    reason: null
+  - id: A5
+    source: brief.md
+    text: "A5: Failed phase mutations publish no success state; reconciliation
+      remains chromosome scoped, preserves unrelated viewport/edits, and
+      respects existing dependent-data deletion contracts."
+    result: pending
+    reason: null
+  - id: A6
+    source: brief.md
+    text: "A6: Right-clicking the horizontal navigation thumb, track, or
+      non-business background exposes no Reload/web-page menu and does not
+      reload the application on Windows or macOS."
+    result: pending
+    reason: null
+  - id: A7
+    source: brief.md
+    text: "A7: Existing Contig, track, and Final Path business context menus and
+      input copy/paste remain usable; no app-wide indiscriminate context-menu
+      ban is introduced."
+    result: pending
+    reason: null
+  - id: A8
+    source: brief.md
+    text: "A8: Menu handling preserves navigation dragging, wheel and zoom behavior;
+      diagnosis distinguishes an application-added menu from a native default
+      menu instead of asserting an unverified root cause."
+    result: pending
+    reason: null
+  - id: A9
+    source: brief.md
+    text: "A9: Final Path Contig hover displays an application-controlled tooltip on
+      the next paint without deliberate delay or prior selection, consistently
+      on Windows and macOS."
+    result: pending
+    reason: null
+  - id: A10
+    source: brief.md
+    text: "A10: Moving inside one fragment between its bar and label keeps the
+      tooltip stable; entering a different fragment updates immediately, with no
+      duplicate native title popup."
+    result: pending
+    reason: null
+  - id: A11
+    source: brief.md
+    text: "A11: Final Path tooltip includes full identity, source interval and
+      orientation, with adopted fragment length primary and source Contig total
+      length separately labeled and semantically accurate."
+    result: pending
+    reason: null
+  - id: A12
+    source: brief.md
+    text: "A12: Tooltips are viewport-clamped, offset from the pointer, read-only
+      and non-intercepting; they neither move layout nor change selection or
+      trigger graph/page reconstruction."
+    result: pending
+    reason: null
+  - id: A13
+    source: brief.md
+    text: "A13: Leave, drag start, scroll, context-menu opening or route switching
+      hides stale tooltips; accessible names and standalone SVG source
+      information are preserved."
+    result: pending
+    reason: null
+  - id: A14
+    source: brief.md
+    text: "A14: Member cards also expose complete source/local/state details through
+      immediate controlled tooltips, stable within the card; unrelated
+      alignment-band tooltip delays remain unchanged."
+    result: pending
+    reason: null
+  - id: A15
+    source: brief.md
+    text: "A15: Audit both application locales: major headings use English Title
+      Case, minor headings/field labels use sentence case, and system-provided
+      option values use Title Case."
+    result: pending
+    reason: null
+  - id: A16
+    source: brief.md
+    text: "A16: Buttons and action/context-menu entries use sentence case while
+      standard proper names, GRT/FASTA and bp/Mb retain their canonical forms."
+    result: pending
+    reason: null
+  - id: A17
+    source: brief.md
+    text: "A17: Remove redundant ds from Contig-length labels, expand ctg/len, and
+      use Auxiliary contig length (bp)/辅助组装 Contig 长度 (bp), Auxiliary
+      dataset/辅助数据集, and Primary Dataset Members/主数据集成员 in their approved
+      contexts."
+    result: pending
+    reason: null
+  - id: A18
+    source: brief.md
+    text: "A18: User project/dataset names, Contig identifiers and chromosome
+      suffixes, paths, internal keys/enums and serialized data are not recased
+      or renamed by the terminology audit."
+    result: pending
+    reason: null
+  - id: A19
+    source: brief.md
+    text: "A19: Main View title stays on its own row; marker display, auxiliary
+      dataset, Contig length, alignment length, identity, history, precomputed
+      results and phased-track action are peer groups in fixed reading order."
+    result: pending
+    reason: null
+  - id: A20
+    source: brief.md
+    text: "A20: Each label/control/unit/closely related action group remains intact,
+      with common control height and vertical alignment, consistent gaps and
+      left-aligned wrapped rows; control semantics and content-based widths
+      remain distinct."
+    result: pending
+    reason: null
+  - id: A21
+    source: brief.md
+    text: "A21: CSS-driven wrapping replaces measurement-driven single/split/stacked
+      reparenting; resize, locale changes and long names do not cause threshold
+      oscillation, DOM reconstruction or loss of focus/menu/selection/viewport."
+    result: pending
+    reason: null
+  - id: A22
+    source: brief.md
+    text: "A22: Long selected names ellipsize inside controls with access to
+      complete values, without forcing other controls or the page outside the
+      available width."
+    result: pending
+    reason: null
+  - id: A23
+    source: brief.md
+    text: "A23: No new application minimum width is imposed: normal shrink wraps
+      intact groups, and only below a single readable group width the toolbar
+      scrolls internally horizontally, without smaller fonts, splitting groups,
+      global page overflow or chart navigation changes."
+    result: pending
+    reason: null
+  - id: A24
+    source: brief.md
+    text: "A24: Project page retains the existing project list and project selection
+      duties; its right side first shows 项目信息/Project Information with the
+      existing selected-project table and operations."
+    result: pending
+    reason: null
+  - id: A25
+    source: brief.md
+    text: "A25: The right side second shows 路径概览/Path Overview with the compact
+      Final Path strip migrated from the former export page, preserving
+      applicable geometry, role colors, gaps and existing navigation behavior."
+    result: pending
+    reason: null
+  - id: A26
+    source: brief.md
+    text: "A26: Both sections describe the same selected project; rendering cannot
+      silently activate another project or mutate a path, and rapid project
+      switching cannot publish obsolete results."
+    result: pending
+    reason: null
+  - id: A27
+    source: brief.md
+    text: "A27: Missing path data produces an honest empty state, never stale strips
+      from the previous project; table and strip controls remain correctly
+      scoped after refresh."
+    result: pending
+    reason: null
+  - id: A28
+    source: brief.md
+    text: "A28: Top navigation is 项目/装配/概览, preserving existing English
+      project/assembly labels and replacing Project Export with Overview;
+      independent Preview entry is removed and prior application Preview jumps
+      resolve to the new destination."
+    result: pending
+    reason: null
+  - id: A29
+    source: brief.md
+    text: "A29: 概览/Overview retains project identification, statistics and an
+      explicit 导出/Export operation; exporter formats, data, range, job progress
+      and error states remain intact."
+    result: pending
+    reason: null
+  - id: A30
+    source: brief.md
+    text: "A30: The lower 项目预览/Project Preview area embeds the full former Preview
+      module instead of the compact strip, preserving legend, refresh,
+      chromosome cards, applicable jumps and loading/error/retry/empty states."
+    result: pending
+    reason: null
+  - id: A31
+    source: brief.md
+    text: "A31: Preview asynchronous/model/DOM refresh is contained to its component
+      and cannot erase statistics/export UI or mix projects; applicable
+      memory/disk cache validity, explicit refresh and obsolete-request
+      rejection contracts remain preserved."
+    result: pending
+    reason: null
+  - id: A32
+    source: brief.md
+    text: "A32: Navigation and project switching preserve authoritative edits and
+      export tasks and do not alter biological coordinates/results; repeated
+      visits keep handler/observer ownership bounded and valid preview state
+      reusable."
+    result: pending
+    reason: null
+  - id: A33
+    source: brief.md
+    text: "A33: The Primary Dataset Members trigger opens an anchored member popover
+      without squeezing or increasing Main View layout height; it fits the
+      viewport and scrolls internally for many members."
+    result: pending
+    reason: null
+  - id: A34
+    source: brief.md
+    text: "A34: Every normal/derived/split member card has exactly two equal-height
+      rows: identity first, length plus necessary concise state markers second;
+      cards have consistent line height/padding and no redundant 78px/blank-row
+      reservation."
+    result: pending
+    reason: null
+  - id: A35
+    source: brief.md
+    text: "A35: Member card width follows readable content without equal grid-column
+      stretching, forced half-row sizing or fixed two-column layout; order is
+      stable, long names remain distinguishable and complete values are
+      accessible."
+    result: pending
+    reason: null
+  - id: A36
+    source: brief.md
+    text: "A36: Source interval, full name and local-use details move to complete
+      hover details; overflow states may use explained summaries without a third
+      row, silent information loss or unbounded card widening."
+    result: pending
+    reason: null
+  - id: A37
+    source: brief.md
+    text: "A37: Member click keeps the panel open and preserves existing
+      single-selection/focus behavior, Ctrl/Cmd multiselection, box selection
+      and business context menus."
+    result: pending
+    reason: null
+  - id: A38
+    source: brief.md
+    text: "A38: Trigger toggle, outside click and Escape close the member panel;
+      leaving the combined trigger/panel/owned-menu region closes after the
+      existing 400ms grace period, with reentry canceling it and no premature
+      close between related surfaces."
+    result: pending
+    reason: null
+  - id: A39
+    source: brief.md
+    text: "A39: Member selection updates only necessary DOM/state and related views,
+      retaining panel openness, internal scroll, focus and unaffected viewport;
+      existing explicit focus behavior is not silently removed."
+    result: pending
+    reason: null
+  - id: A40
+    source: brief.md
+    text: "A40: Member selected styling preserves role colors and outer
+      dimensions/padding/weight so selection cannot change wrapping; hover and
+      selection do not rebuild the popover/page or hide flicker with animation."
+    result: pending
+    reason: null
+  - id: A41
+    source: brief.md
+    text: "A41: Final Path graph click or table-row selection selects one
+      path-segment instance; graph/table share valid selection across mode
+      changes, with no new Ctrl/Cmd multiselection and no loss of existing
+      Main/Local multi-selection contracts."
+    result: pending
+    reason: null
+  - id: A42
+    source: brief.md
+    text: "A42: Clicking or keyboard-focusing a row editor selects its row and links
+      the highlight without saving, rerendering, stealing editor focus,
+      intercepting text selection or changing drag/right-click behavior."
+    result: pending
+    reason: null
+  - id: A43
+    source: brief.md
+    text: "A43: Editing uses the last successfully committed source interval until
+      new values validate and save successfully; incomplete/invalid/failed
+      values cannot alter the effective highlight and no per-keystroke preview
+      is introduced."
+    result: pending
+    reason: null
+  - id: A44
+    source: brief.md
+    text: "A44: Main View and an already-open Local View highlight only the selected
+      adopted source interval intersected with each displayed matching source
+      object, not the whole Contig; closed/missing Local objects are not opened,
+      inserted or regrouped."
+    result: pending
+    reason: null
+  - id: A45
+    source: brief.md
+    text: "A45: For ctg1 length 10000 and adopted source interval [5001,10000],
+      complete Main ctg1 highlights [5001,10000], and a Local source interval
+      [4001,8000] highlights only [5001,8000], with data-layer endpoint
+      conventions explicitly normalized."
+    result: pending
+    reason: null
+  - id: A46
+    source: brief.md
+    text: "A46: Reverse orientation maps the same source interval to its actual
+      visual position, which may be screen-left; source, path-cumulative and
+      reference coordinates are not conflated."
+    result: pending
+    reason: null
+  - id: A47
+    source: brief.md
+    text: "A47: Source dataset/Contig identity, path/chromosome scope and
+      path-segment instance distinguish repeated occurrences and same-parent
+      splits; each target fragment highlights only its intersection, with
+      empty/single-base/boundary cases correct."
+    result: pending
+    reason: null
+  - id: A48
+    source: brief.md
+    text: "A48: Unknown mappings and GAPs never fall back to whole-Contig
+      correlation; missing intersections stay unhighlighted and source/sequence
+      data is not physically split for visualization."
+    result: pending
+    reason: null
+  - id: A49
+    source: brief.md
+    text: "A49: Clicking another path fragment replaces selection; clicking
+      path-plot background clears only that path selection/correlation, while
+      hover alone changes no selection and no automatic scroll/zoom/locate
+      occurs."
+    result: pending
+    reason: null
+  - id: A50
+    source: brief.md
+    text: "A50: Actively selecting an object in Main/Local clears prior Final Path
+      selection/correlation, while hover/scroll/zoom does not; visual
+      correlation never expands delete/move/edit selection sets."
+    result: pending
+    reason: null
+  - id: A51
+    source: brief.md
+    text: "A51: Same project/chromosome/path survives temporary route departure;
+      path/chromosome/project switches, deletion/invalidity and app restart
+      clear rather than restore obsolete temporary selection."
+    result: pending
+    reason: null
+  - id: A52
+    source: brief.md
+    text: "A52: Plain pointer clicks below the drag threshold do not invoke
+      drag-cleanup unconditional card redraw; genuine drag sorting still commits
+      and cleans up according to the existing gesture contract."
+    result: pending
+    reason: null
+  - id: A53
+    source: brief.md
+    text: "A53: Highlighter updates stable fragment-local overlays/outlines without
+      changing original role fills, coordinates, geometry, labels, card size or
+      scroll/zoom and without rebuilding/blanking the graph, Main/Local view or
+      page."
+    result: pending
+    reason: null
+  - id: A54
+    source: brief.md
+    text: "A54: PNG/SVG exports exclude the newly added temporary
+      selection/correlation/hover layers without first clearing visible user
+      selection; original colors, data, range and standalone source tooltip
+      information remain intact."
+    result: pending
+    reason: null
+  - id: A55
+    source: brief.md
+    text: "A55: One clearly clickable current-chromosome/name-and-arrow trigger
+      toggles the anchored panel; only collapsed/expanded states exist, with no
+      nested small/large selector, duplicate toolbar/title, separate maximize or
+      close buttons."
+    result: pending
+    reason: null
+  - id: A56
+    source: brief.md
+    text: "A56: The floating panel does not squeeze Main View or cover its own
+      trigger; it uses adaptive columns of compact equal-height two-line buttons
+      with original full chromosome identity and a Contig-count/length summary."
+    result: pending
+    reason: null
+  - id: A57
+    source: brief.md
+    text: "A57: Current item has stable selected appearance distinct from hover;
+      names/version suffixes and ordering are preserved, compact Mb summaries
+      expose exact bp details and do not change the placedBp statistic."
+    result: pending
+    reason: null
+  - id: A58
+    source: brief.md
+    text: "A58: All selectable chromosomes share one non-paginated panel, internally
+      scrollable for large sets; no unrequested search/groups are added and
+      narrow windows reduce columns rather than font size."
+    result: pending
+    reason: null
+  - id: A59
+    source: brief.md
+    text: "A59: Chromosome selection keeps the panel open for consecutive choices;
+      trigger toggle, outside click or Escape collapses it, and combined
+      trigger/panel departure retains the global 400ms grace/reentry-cancel
+      behavior across mounting boundaries."
+    result: pending
+    reason: null
+  - id: A60
+    source: brief.md
+    text: "A60: Expand/collapse never loads or changes a chromosome or reconstructs
+      the page; actual selection retains asynchronous validity checks,
+      successful identity/active-item updates and honest failure behavior;
+      project switch clears old options without new cross-session persistence."
+    result: pending
+    reason: null
+  - id: A61
+    source: brief.md
+    text: "A61: Keyboard can reach options, the trigger declares expansion/panel
+      association, Escape restores trigger focus, and repeated renders do not
+      multiply handlers or leave close timers targeting obsolete panels."
+    result: pending
+    reason: null
+  - id: A62
+    source: brief.md
+    text: "A62: After updater initialization succeeds and it is enabled, schedule
+      the first automatic check at 3000ms instead of 10000ms, never earlier or
+      twice; disabled updater schedules no startup check."
+    result: pending
+    reason: null
+  - id: A63
+    source: brief.md
+    text: "A63: Keep the existing six-hour recurring check and 30-second
+      deferred-offer notify cadence, silent current-version/error behavior,
+      busy/hidden/modal deferral and persisted snooze/manual-check semantics
+      unchanged."
+    result: pending
+    reason: null
+  - id: A64
+    source: brief.md
+    text: "A64: Keep docs-first sequential GitHub-release fallback,
+      signature/version validation and install/save safety unchanged; the
+      request changes startup delay, not request timeout or update sources."
+    result: pending
+    reason: null
+  - id: A65
+    source: brief.md
+    text: "A65: Existing Main/Local navigation, scientific data,
+      sequence/orientation/intervals, anchors, Final Path order, undo/redo and
+      project/cache formats are unchanged except for explicit confirmed
+      mutation/selection behavior; no release/installers/deployment are
+      implicitly authorized."
+    result: pending
+    reason: null
+  - id: A66
+    source: brief.md
+    text: "A66: Each staged implementation has targeted regression checks and
+      path-limited reviewed commits/pushes without absorbing unrelated changes;
+      applicable integrated frontend tests and a Windows-host production build
+      pass, generated dist is cleaned and Windows-only dependencies are not
+      reused by WSL Node."
+    result: pending
+    reason: null
+  - id: A67
+    source: brief.md
+    text: "A67: No browser is launched by default; necessary visual validation is
+      explained first. Evidence names actual checks and distinguishes
+      source/unit/browser/static proof from Windows/macOS native hover, Reload,
+      click-flicker and resize acceptance, with unexecuted native checks left
+      unverified."
+    result: pending
+    reason: null
+  - id: A68
+    source: brief.md
+    text: "A68: Comet stages, candidate review and independent verifier are obeyed
+      through public Runtime commands; implementation is serial in the current
+      master checkout, with no subagents unless the user explicitly authorizes
+      only the required independent read-only review/verifier executions."
+    result: pending
+    reason: null
+builder_handoff: null
+blockers: []
+verification: null
+history: []
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pending
+verification_report: null
+archived: false
+created_at: 2026-10-27T14:10:16.278Z
