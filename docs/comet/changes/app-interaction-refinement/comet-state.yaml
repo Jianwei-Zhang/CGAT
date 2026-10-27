@@ -1,11 +1,11 @@
 schema: comet.native.v4
 name: app-interaction-refinement
 language: en
-phase: build
-status: active
-state_version: 3
+phase: shape
+status: await-user
+state_version: 5
 brief: brief.md
-shape_confirmation_hash: 5ec5c485e3bbd9df9898233e1bb1d0e85aa67f45aacff7cde8be242ad3c996aa
+shape_confirmation_hash: 4905b2ee94eef6afeee85d6da19f94ccf50c21e37f951322353e099d3795b374
 spec_changes:
   - capability: app-interaction-surfaces
     operation: create
@@ -16,16 +16,16 @@ workspace:
   target_branch: master
   finish: null
 loop:
-  stage: building
-  goal_cycle: 1
-  iteration: 1
+  stage: await-user
+  goal_cycle: 2
+  iteration: 0
   attempt: 0
   retry_epoch: 0
   failed_iteration_count: 0
   no_progress_count: 0
   execution_failure_count: 0
   previous_unresolved_ids: []
-  next_action: submit-builder-candidate
+  next_action: confirm-shape
 acceptance:
   - id: A1
     source: brief.md
@@ -532,7 +532,16 @@ acceptance:
 builder_handoff: null
 blockers: []
 verification: null
-history: []
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native Shape artifacts changed
+      truncated: false
+    completed_at: 2026-10-27T23:44:16.095Z
 history_overflow:
   dropped_entries: 0
   first_dropped_at: null
