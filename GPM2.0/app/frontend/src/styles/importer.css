@@ -422,16 +422,22 @@
 }
 
 .project-recents-header {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
-.project-recents-header h4 { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; white-space: nowrap; font-size: var(--font-body); font-weight: 600; color: var(--text-secondary, #334155); }
-.project-count { color: var(--text-muted, #64748b); font-variant-numeric: tabular-nums; }
-.project-library-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; max-width: 100%; margin-left: auto; }
+.project-recents-header h4 { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; font-size: var(--font-body); font-weight: 600; color: var(--text-secondary, #334155); }
+.project-recents-title-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.project-count { flex: 0 0 auto; color: var(--text-muted, #64748b); font-size: var(--font-small); font-variant-numeric: tabular-nums; }
+.project-library-actions { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; min-width: 0; }
+/* Keep the failed-action slot even when its button is hidden. Validation must
+   not move the title, count, buttons, list, or the current project detail. */
+.project-history-action-slot { display: inline-grid; }
+.project-history-action-slot::before { content: attr(data-label); visibility: hidden; }
+.project-history-action-slot::before, .project-history-action-slot > .button { grid-area: 1 / 1; }
 .projects-page .project-library-actions [hidden], .project-recent-error[hidden] { display: none; }
 .project-entry-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .project-icon { flex: 0 0 auto; vertical-align: middle; }
@@ -459,7 +465,9 @@
 .projects-page :is(button, summary, input, select):focus-visible { outline: 2px solid var(--focus-ring, #4f82b5); outline-offset: 2px; }
 .projects-page .project-icon-button { width: 32px; min-height: 32px; height: 32px; padding: 0; border-color: transparent; flex: 0 0 auto; }
 .projects-page .project-icon-button:not(.project-primary) { color: var(--text-muted, #64748b); }
-.projects-page .project-history-action { flex: 0 0 auto; min-height: 30px; padding: 5px 6px; font-size: var(--font-small); white-space: nowrap; }
+.projects-page .project-history-action, .project-history-action-slot::before { flex: 0 0 auto; box-sizing: border-box; min-height: 30px; padding: 5px 3px; border: 1px solid transparent; font-size: var(--font-small); font-weight: 500; line-height: 1.4; white-space: nowrap; }
+.projects-page .project-history-action { border-color: var(--border-default, #cbd5e1); }
+.projects-page #validate-history-button[aria-busy="true"]:disabled { opacity: 1; transition: none; background: var(--surface-panel, #fff); }
 
 .project-empty {
   flex: 1;

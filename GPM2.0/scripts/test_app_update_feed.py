@@ -42,10 +42,10 @@ class FeedTests(unittest.TestCase):
         bundles = args[args.index("--bundles") + 1].split(",")
         self.assertEqual(set(bundles), {"app", "dmg"})
 
-    def test_dispatched_builds_checkout_the_immutable_release_tag(self):
+    def test_dispatched_builds_checkout_the_immutable_packaging_commit(self):
         workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
-        self.assertEqual(workflow.count("uses: actions/checkout@v4"), 4)
-        self.assertEqual(workflow.count("ref: ${{ inputs.tag || github.ref }}"), 4)
+        self.assertEqual(workflow.count("uses: actions/checkout@v4"), 5)
+        self.assertEqual(workflow.count("ref: ${{ github.sha }}"), 5)
         self.assertIn('TAURI_CLI_VERSION: "2.12.4"', workflow)
         self.assertEqual(workflow.count("@tauri-apps/cli@${{ env.TAURI_CLI_VERSION }}"), 2)
         self.assertNotIn("@tauri-apps/cli@^2", workflow)

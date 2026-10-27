@@ -253,7 +253,8 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(en.progressStages.extract_native_archive, "Extract delivery bundle with the system extractor");
   assert.equal(en.runtime.importPhaseProgress, "Phase {current}/{total}");
   assert.equal(en.runtime.importPhaseProgressEntries, "Phase {current}/{total} · {entries} entries extracted");
-  assert.equal(en.buttons.validateHistory, "Validate projects");
+  assert.equal(en.buttons.validateHistory, "Validate");
+  assert.equal(en.buttons.validateHistoryLabel, "Validate projects");
   assert.equal(en.buttons.deleteFailedRecords, "Delete failed");
   assert.equal(en.page.deleteFailedConfirmTitle, "Delete failed projects");
   assert.equal(en.page.deleteWithFiles, "Also delete files on disk (irreversible).");
@@ -406,7 +407,7 @@ test("importer bulk delete removes only current failed history records", async (
     const store = createStore(state);
 
     const initialHtml = renderImporterPage(store.getState());
-    assert.match(initialHtml, /id="validate-history-button"[^>]*>校验项目<\/button>\s*<button id="delete-failed-history-button"[^>]*>删除失败<\/button>/);
+    assert.match(initialHtml, /id="validate-history-button"[^>]*>校验项目<\/button>\s*<span[^>]*><button id="delete-failed-history-button"[^>]*>删除失败<\/button>/);
     assert.doesNotMatch(initialHtml, /id="delete-failed-history-button"[^>]*hidden/);
 
     bindImporterPage(host, store);
@@ -725,7 +726,7 @@ test("project validation updates in place and preserves the rename draft across 
     assert.equal(store.getState().importer.inFlight, false);
     assert.equal(store.getState().importer.deleteConfirmOpen, false);
     assert.equal(validate.disabled, true);
-    assert.equal(validate.textContent, "校验中…");
+    assert.equal(validate.textContent, "校验项目");
     assert.equal(remove.hidden, true);
     timers[0]();
     assert.equal(toast.removed, true);
@@ -746,7 +747,7 @@ test("project validation updates in place and preserves the rename draft across 
 
     repaired = true;
     const retry = validate.click();
-    assert.equal(remove.hidden, true);
+    assert.equal(remove.hidden, false); // Keep the prior failure action mounted but disabled during retry.
     await retry;
     assert.match(page.toastHtml, /校验完成：通过 3 个，失败 0 个。/);
     assert.equal(remove.hidden, true);

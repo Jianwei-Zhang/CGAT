@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { renderProjectsBody, syncProjectValidation } from "../projects-view.js";
@@ -30,7 +31,7 @@ test("recent projects and current detail share the browser layout without duplic
   assert.match(html, /project-recent-name[\s\S]*>Rice<\/strong>/);
   assert.match(html, /project-recent-name[\s\S]*>Other<\/strong>/);
   assert.doesNotMatch(html, /<span class="project-path muted">|project-recent-time|project-open-status|data-project-validation-path/);
-  assert.match(html, />Project library<span class="project-count">2<\/span>/);
+  assert.match(html, />Projects<\/span><span class="project-count">2<\/span>/);
   assert.match(html, /project-recents-header[\s\S]*id="validate-history-button"[\s\S]*project-recent-list/);
   assert.doesNotMatch(html, /data-project-remove|Remove from recent/);
   assert.doesNotMatch(html, /No projects yet|No project open/);
@@ -87,7 +88,8 @@ test("bulk deletion is exposed only after explicit validation completes with cur
   assert.match(render({ records, importer }), /id="delete-failed-history-button"[^>]*title="Delete failed projects"[^>]*aria-label="Delete failed projects"[^>]*>Delete failed<\/button>/);
   assert.doesNotMatch(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);
   importer.historyValidating = true;
-  assert.match(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);
+  assert.doesNotMatch(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);
+  assert.match(render({ records, importer }), /id="delete-failed-history-button"[^>]*disabled/);
   importer.historyValidating = false;
   importer.historyValidation["/rice"] = { ok: true };
   assert.match(render({ records, importer }), /id="delete-failed-history-button"[^>]*hidden/);
@@ -160,4 +162,36 @@ test("validation sync updates existing rows and clears recovered or removed fail
   state.importer.historyValidation = {};
   syncProjectValidation(host, state, records);
   assert.ok(rows.every(row => !row.classList.contains("has-validation-error")));
+});
+
+for (const locale of ["en", "zh"]) {
+  test(`${locale} library actions keep their text and failure slot across idle, busy and failed states`, () => {
+    const records = [{ path: "/rice" }], state = { locale, importer: {}, initializer: {} };
+    const messages = getMessages(state, "importer");
+    const renderState = () => renderProjectsBody(state, { records, messages, summaryHtml: "" });
+    const label = locale === "en" ? "Validate" : "校验项目";
+    const idle = renderState();
+    state.importer.historyValidating = true;
+    const busy = renderState();
+    state.importer = { historyValidatedPaths: ["/rice"], historyValidation: { "/rice": { ok: false } } };
+    const failed = renderState();
+    for (const markup of [idle, busy, failed]) {
+      assert.match(markup, new RegExp(`id="validate-history-button"[^>]*>${label}</button>`));
+      assert.match(markup, /class="project-history-action-slot" data-label="[^"]+"/);
+      assert.match(markup, /class="project-recents-title-label"/);
+    }
+    assert.match(idle, new RegExp(`aria-label="${locale === "en" ? "Validate projects" : label}"`));
+    assert.match(busy, /aria-busy="true" disabled/);
+    assert.doesNotMatch(failed, /id="delete-failed-history-button"[^>]*hidden/);
+  });
+}
+
+test("library header is a non-wrapping grid with a shrinkable caption, stable failure slot and busy appearance", () => {
+  const css = readFileSync(new URL("../../../styles/importer.css", import.meta.url), "utf8");
+  assert.match(css, /\.project-recents-header\s*\{[^}]*display: grid;[^}]*grid-template-columns: minmax\(0, 1fr\) auto;/);
+  assert.match(css, /\.project-recents-title-label[^}]*text-overflow: ellipsis/);
+  assert.match(css, /\.project-count[^}]*flex: 0 0 auto/);
+  assert.match(css, /\.project-library-actions[^}]*flex-wrap: nowrap/);
+  assert.match(css, /\.project-history-action-slot::before[^}]*content: attr\(data-label\);[^}]*visibility: hidden/);
+  assert.match(css, /#validate-history-button\[aria-busy="true"\]:disabled[^}]*opacity: 1;[^}]*transition: none/);
 });

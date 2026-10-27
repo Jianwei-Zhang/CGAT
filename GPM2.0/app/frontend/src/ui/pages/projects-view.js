@@ -6,7 +6,7 @@ import { importParserWorkerChoices, normalizeImportParserWorkers, recommendedImp
 
 export function projectLabels(state) {
   return state.locale === "en" ? {
-    import: "Import", open: "Open", importTitle: "Import project", recent: "Project library",
+    import: "Import", open: "Open", importTitle: "Import project", recent: "Projects",
     empty: "No projects yet", emptyHint: "Import a delivery bundle or open an existing project directory.",
     name: "Project name (optional)", nameDefault: "Use directory name", location: "Project directory",
     zip: "Bundle (ZIP / tar.gz)", extracted: "Extracted directory", source: "Source", browse: "Browse",
@@ -49,12 +49,13 @@ function projectValidationView(state, records) {
   const messages = getMessages(state, "importer");
   const importer = state.importer;
   const validatedPaths = new Set(importer.historyValidatedPaths || []);
-  const failed = !importer.historyValidating && records.some(record =>
+  const failed = records.some(record =>
     validatedPaths.has(record.path) && importer.historyValidation?.[record.path]?.ok === false);
   return {
     failed,
     disabled: Boolean(importer.inFlight || importer.historyValidating || state.initializer?.autoPipelineRunning),
-    label: importer.historyValidating ? messages.buttons.validatingProjects : messages.buttons.validateHistory,
+    label: messages.buttons.validateHistory,
+    accessibleLabel: importer.historyValidating ? messages.buttons.validatingProjects : messages.buttons.validateHistoryLabel,
   };
 }
 
@@ -67,7 +68,9 @@ export function syncProjectValidation(host, state, records) {
   const validate = host.querySelector("#validate-history-button");
   if (validate) {
     validate.disabled = view.disabled;
-    validate.textContent = view.label;
+    if (validate.textContent !== view.label) validate.textContent = view.label;
+    validate.setAttribute("title", view.accessibleLabel);
+    validate.setAttribute("aria-label", view.accessibleLabel);
     validate.setAttribute("aria-busy", String(Boolean(state.importer.historyValidating)));
   }
   const remove = host.querySelector("#delete-failed-history-button");
@@ -159,10 +162,10 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
   </section>` : `<div class="project-browser">
     <section class="project-recents" aria-labelledby="project-recents-title">
       ${actions}
-      <header class="project-recents-header"><h4 id="project-recents-title">${labels.recent}<span class="project-count">${records.length}</span></h4>
+      <header class="project-recents-header"><h4 id="project-recents-title" title="${labels.recent}"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count">${records.length}</span></h4>
         ${records.length ? `<div class="project-library-actions">
-          <button id="validate-history-button" class="button ghost project-history-action" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button>
-          <button id="delete-failed-history-button" class="button ghost project-history-action" title="${html(messages.page.deleteFailedConfirmTitle)}" aria-label="${html(messages.page.deleteFailedConfirmTitle)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button>
+          <button id="validate-history-button" class="button ghost project-history-action" title="${html(validation.accessibleLabel)}" aria-label="${html(validation.accessibleLabel)}" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button>
+          <span class="project-history-action-slot" data-label="${html(messages.buttons.deleteFailedRecords)}"><button id="delete-failed-history-button" class="button ghost project-history-action" title="${html(messages.page.deleteFailedConfirmTitle)}" aria-label="${html(messages.page.deleteFailedConfirmTitle)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button></span>
         </div>` : ""}
       </header>
       <div class="project-recent-list">${rows}</div>

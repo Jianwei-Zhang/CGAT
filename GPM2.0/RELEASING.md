@@ -35,6 +35,29 @@ Before creating a new version tag:
 4. Freeze the expected asset inventory before publication: four platform installers, the matching `GPM_Server_<version>_source.tar.gz`, and every retained/approved supplemental attachment. A workflow that builds only installers does not satisfy this inventory by itself.
 5. Keep the new Release as a draft until the required jobs succeed and the expected assets and bilingual notes are ready. After publication, independently download every asset and compare name, size and SHA-256 with the uploaded file and GitHub metadata. Recheck the original dataset asset as well. Do not report release completion while any expected attachment or public-download check is missing.
 
+## Explicit UI/docs-only Quality reuse
+
+The default installer workflow still runs full Quality. When the release owner
+explicitly approves avoiding a duplicate gate after a successful full run, use
+`workflow_dispatch` with `quality_run_id` to reuse that run's two completed,
+successful `Quality gate / Windows app` and `Quality gate / Linux server` jobs.
+The verifier requires this repository's full release workflow, an ancestor
+baseline, and a restricted UI/docs-only delta. Backend, Tauri, Server runtime,
+dependency and Quality-workflow changes are rejected. A cancelled packaging run
+may supply a baseline only when both full Quality jobs had already succeeded.
+
+Run the final UI tests and Windows frontend build locally before dispatch. The
+final commit must already contain every approved fix, README update and canonical
+note. Dispatch from that commit's version tag; every packaging checkout is pinned
+to `github.sha`, not a tag that could move during a build. The workflow archives
+both the reused Quality revision/run and the final packaging revision. Do not
+claim that the earlier run tested the final source. Version, signing, draft,
+artifact verification and final docs-alignment gates remain unchanged.
+
+For an explicitly approved reuse, the final commit may use `[skip ci]` to avoid
+redundant push-triggered CI; dispatch the packaging workflow manually. Do not use
+this exception for ordinary changes or to bypass a failed/missing full gate.
+
 ## Release notes
 
 For drafting, updating, condensing or reviewing Release Notes, use the project

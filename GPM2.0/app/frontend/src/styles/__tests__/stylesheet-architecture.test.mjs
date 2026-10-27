@@ -97,20 +97,20 @@ test("project library actions share the title row without squeezing button label
   const headerRule = importerCss.match(/\.project-recents-header\s*\{([^}]*)\}/);
   const titleRule = importerCss.match(/\.project-recents-header h4\s*\{([^}]*)\}/);
   const actionsRule = importerCss.match(/\.project-library-actions\s*\{([^}]*)\}/);
-  const buttonRule = importerCss.match(/\.projects-page \.project-history-action\s*\{([^}]*)\}/);
+  const buttonRule = importerCss.match(/\.projects-page \.project-history-action, \.project-history-action-slot::before\s*\{([^}]*)\}/);
 
   assert.ok(headerRule);
-  assert.match(headerRule[1], /display:\s*flex;/);
-  assert.match(headerRule[1], /flex-wrap:\s*wrap;/);
+  assert.match(headerRule[1], /display:\s*grid;/);
+  assert.match(headerRule[1], /grid-template-columns:\s*minmax\(0, 1fr\) auto;/);
   assert.match(headerRule[1], /align-items:\s*center;/);
   assert.ok(titleRule);
-  assert.match(titleRule[1], /flex:\s*0 0 auto;/);
+  assert.match(titleRule[1], /min-width:\s*0;/);
   assert.match(titleRule[1], /white-space:\s*nowrap;/);
   assert.ok(actionsRule);
-  assert.match(actionsRule[1], /flex-wrap:\s*wrap;/);
-  assert.match(actionsRule[1], /margin-left:\s*auto;/);
-  assert.match(actionsRule[1], /flex:\s*0 0 auto;/);
-  assert.match(actionsRule[1], /max-width:\s*100%;/);
+  assert.match(actionsRule[1], /flex-wrap:\s*nowrap;/);
+  assert.match(actionsRule[1], /gap:\s*4px;/);
+  assert.match(actionsRule[1], /display:\s*flex;/);
+  assert.match(actionsRule[1], /min-width:\s*0;/);
   assert.ok(buttonRule);
   assert.match(buttonRule[1], /flex:\s*0 0 auto;/);
   assert.match(buttonRule[1], /white-space:\s*nowrap;/);

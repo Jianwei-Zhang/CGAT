@@ -10,6 +10,11 @@ on:
         description: "Release tag to update or create, for example v2.0.1."
         required: false
         type: string
+      quality_run_id:
+        description: "Explicit UI/docs-only reuse of successful full Quality jobs from this release workflow."
+        required: false
+        default: ""
+        type: string
 
 env:
   GPM_UPDATER_PUBLIC_KEY: ${{ vars.GPM_UPDATER_PUBLIC_KEY }}
@@ -17,6 +22,7 @@ env:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: release-installers-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
@@ -25,13 +31,37 @@ concurrency:
 jobs:
   quality:
     name: Quality gate
+    if: ${{ !inputs.quality_run_id }}
     uses: ./.github/workflows/quality.yml
     with:
       full: true
 
+  verify-reused-quality:
+    name: Verify reused full Quality
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.quality_run_id != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Verify baseline, successful jobs and restricted source delta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUALITY_RUN_ID: ${{ inputs.quality_run_id }}
+        run: >-
+          python3 GPM2.0/scripts/reuse-release-quality.py
+          --repo "$GITHUB_REPOSITORY" --run-id "$QUALITY_RUN_ID"
+          --revision "$GITHUB_SHA" --output reused-quality.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GPM reused quality provenance
+          path: reused-quality.json
+
   prepare-release:
     name: Prepare release
-    needs: quality
+    needs: [quality, verify-reused-quality]
+    if: ${{ always() && !cancelled() && (needs.quality.result == 'success' || needs.verify-reused-quality.result == 'success') }}
     runs-on: ubuntu-latest
     outputs:
       tag_name: ${{ steps.release-vars.outputs.tag_name }}
@@ -41,7 +71,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ github.sha }}
 
       - name: Require updater signing configuration
         env:
@@ -156,7 +186,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -288,7 +318,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -464,7 +494,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
