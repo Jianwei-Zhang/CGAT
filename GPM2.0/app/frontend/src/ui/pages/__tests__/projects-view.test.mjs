@@ -165,11 +165,11 @@ test("validation sync updates existing rows and clears recovered or removed fail
 });
 
 for (const locale of ["en", "zh"]) {
-  test(`${locale} library actions keep their text and failure slot across idle, busy and failed states`, () => {
+  test(`${locale} library actions keep their text and hide failed actions without a reserved slot across idle, busy and failed states`, () => {
     const records = [{ path: "/rice" }], state = { locale, importer: {}, initializer: {} };
     const messages = getMessages(state, "importer");
     const renderState = () => renderProjectsBody(state, { records, messages, summaryHtml: "" });
-    const label = locale === "en" ? "Validate" : "校验项目";
+    const label = locale === "en" ? "Validate" : "校验";
     const idle = renderState();
     state.importer.historyValidating = true;
     const busy = renderState();
@@ -177,21 +177,24 @@ for (const locale of ["en", "zh"]) {
     const failed = renderState();
     for (const markup of [idle, busy, failed]) {
       assert.match(markup, new RegExp(`id="validate-history-button"[^>]*>${label}</button>`));
-      assert.match(markup, /class="project-history-action-slot" data-label="[^"]+"/);
+      assert.doesNotMatch(markup, /project-history-action-slot/);
       assert.match(markup, /class="project-recents-title-label"/);
     }
-    assert.match(idle, new RegExp(`aria-label="${locale === "en" ? "Validate projects" : label}"`));
+    assert.match(idle, new RegExp(`aria-label="${locale === "en" ? "Validate projects" : "校验项目"}"`));
+    assert.match(idle, /id="delete-failed-history-button"[^>]*hidden/);
+    assert.match(busy, /id="delete-failed-history-button"[^>]*hidden/);
     assert.match(busy, /aria-busy="true" disabled/);
     assert.doesNotMatch(failed, /id="delete-failed-history-button"[^>]*hidden/);
   });
 }
 
-test("library header is a non-wrapping grid with a shrinkable caption, stable failure slot and busy appearance", () => {
+test("library header is a non-wrapping grid with a shrinkable caption, right-aligned actions without an invisible slot and stable busy appearance", () => {
   const css = readFileSync(new URL("../../../styles/importer.css", import.meta.url), "utf8");
   assert.match(css, /\.project-recents-header\s*\{[^}]*display: grid;[^}]*grid-template-columns: minmax\(0, 1fr\) auto;/);
   assert.match(css, /\.project-recents-title-label[^}]*text-overflow: ellipsis/);
   assert.match(css, /\.project-count[^}]*flex: 0 0 auto/);
   assert.match(css, /\.project-library-actions[^}]*flex-wrap: nowrap/);
-  assert.match(css, /\.project-history-action-slot::before[^}]*content: attr\(data-label\);[^}]*visibility: hidden/);
+  assert.doesNotMatch(css, /project-history-action-slot/);
+  assert.match(css, /\.projects-page \.project-library-actions \[hidden\][^{]*\{[^}]*display: none/);
   assert.match(css, /#validate-history-button\[aria-busy="true"\]:disabled[^}]*opacity: 1;[^}]*transition: none/);
 });

@@ -97,7 +97,7 @@ test("project library actions share the title row without squeezing button label
   const headerRule = importerCss.match(/\.project-recents-header\s*\{([^}]*)\}/);
   const titleRule = importerCss.match(/\.project-recents-header h4\s*\{([^}]*)\}/);
   const actionsRule = importerCss.match(/\.project-library-actions\s*\{([^}]*)\}/);
-  const buttonRule = importerCss.match(/\.projects-page \.project-history-action, \.project-history-action-slot::before\s*\{([^}]*)\}/);
+  const buttonRule = importerCss.match(/\.projects-page \.project-history-action\s*\{([^}]*)\}/);
 
   assert.ok(headerRule);
   assert.match(headerRule[1], /display:\s*grid;/);

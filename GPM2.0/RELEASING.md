@@ -157,7 +157,9 @@ version locations unchanged; record the actual rebuild revision in the notes.
 1. Back up the Release metadata, bilingual notes and existing assets, verifying
    their size and SHA-256 so the previous downloads can be restored.
 2. Create a temporary **draft** Release and dispatch `release-installers.yml`
-   from the reviewed, pushed source branch with that draft as its `tag` input.
+   from the reviewed, pushed source branch with an
+   `installer-staging-vX.Y.Z-<unique-id>` draft tag as its `tag` input. The
+   embedded version, canonical notes and guides still use `vX.Y.Z`.
    Do not publish the draft. This isolates the workflow's installer-deletion
    step from the official Release and keeps existing downloads available.
 3. Wait for the full quality gate and all four installer jobs to succeed.

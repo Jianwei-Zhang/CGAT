@@ -62,7 +62,7 @@ of older builds that have no updater.
 2. Run the approved installer workflow. Windows produces NSIS `.exe` + `.sig`;
    macOS retains the manual `.dmg` and adds `.app.tar.gz` + `.sig`. The final job
    independently verifies each signature against the configured public key using
-   Minisign, then generates `latest.json` and `GPM_X.Y.Z_notes_en.txt` / `_zh.txt` from the single
+   Minisign, then generates `latest.json` and content-addressed `GPM_X.Y.Z_notes_<locale>_<hash>.txt` files from the single
    canonical notes source. It requires exactly one package per OS/architecture and
    embeds all four signatures in `latest.json`. CI then uploads a workflow artifact
    containing the four update packages, both localized notes and `latest.json` for

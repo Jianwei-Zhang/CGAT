@@ -88,8 +88,10 @@ def build(version, assets, output, notes_root=None, verifier=None):
             raise ValueError(f"Missing signed version in {package.name}. Use a current Tauri CLI.")
         manifest["platforms"][target] = {**file_info(package, version), "signature": signature}
     for locale in ("en", "zh"):
-        path = output / f"GPM_{version}_notes_{locale}.txt"
-        path.write_text(localized_notes(release, locale), encoding="utf-8", newline="\n")
+        content = localized_notes(release, locale).encode("utf-8")
+        revision = hashlib.sha256(content).hexdigest()[:16]
+        path = output / f"GPM_{version}_notes_{locale}_{revision}.txt"
+        path.write_bytes(content)
         manifest["release_notes"][locale] = file_info(path, version, limit=256 * 1024)
     (output / "latest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     return manifest

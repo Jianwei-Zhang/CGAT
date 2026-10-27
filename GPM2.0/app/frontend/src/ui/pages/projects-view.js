@@ -165,7 +165,7 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
       <header class="project-recents-header"><h4 id="project-recents-title" title="${labels.recent}"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count">${records.length}</span></h4>
         ${records.length ? `<div class="project-library-actions">
           <button id="validate-history-button" class="button ghost project-history-action" title="${html(validation.accessibleLabel)}" aria-label="${html(validation.accessibleLabel)}" aria-busy="${Boolean(importer.historyValidating)}" ${validation.disabled ? "disabled" : ""}>${validation.label}</button>
-          <span class="project-history-action-slot" data-label="${html(messages.buttons.deleteFailedRecords)}"><button id="delete-failed-history-button" class="button ghost project-history-action" title="${html(messages.page.deleteFailedConfirmTitle)}" aria-label="${html(messages.page.deleteFailedConfirmTitle)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button></span>
+          <button id="delete-failed-history-button" class="button ghost project-history-action" title="${html(messages.page.deleteFailedConfirmTitle)}" aria-label="${html(messages.page.deleteFailedConfirmTitle)}" ${validation.disabled || !validation.failed ? "disabled" : ""} ${validation.failed ? "" : "hidden"}>${messages.buttons.deleteFailedRecords}</button>
         </div>` : ""}
       </header>
       <div class="project-recent-list">${rows}</div>

@@ -3,6 +3,7 @@ import base64
 import copy
 import importlib.util
 import json
+import hashlib
 import shutil
 from pathlib import Path
 import tempfile
@@ -31,6 +32,46 @@ class FeedTests(unittest.TestCase):
             Path(str(path) + ".sig").write_text(base64.b64encode(b"trusted comment: timestamp:1\tversion:2.0.12\n").decode())
         self.manifest = feed.build("2.0.12", self.assets, self.assets)
         self.public = self.root / "public"
+
+    def note_name(self, locale):
+        return self.manifest["release_notes"][locale]["url"].rsplit("/", 1)[-1]
+
+    def test_same_version_refresh_keeps_existing_note_assets_immutable(self):
+        feed.stage(self.assets, self.public)
+        previous_names = {locale: self.note_name(locale) for locale in ("en", "zh")}
+        notes = self.root / "notes"
+        notes.mkdir()
+        original = (feed.ROOT / "GPM2.0/releases/v2.0.12.md").read_text()
+        (notes / "v2.0.12.md").write_text(original.replace("### App\n", "### App\n\n- Refreshed project layout.\n"))
+        self.manifest = feed.build("2.0.12", self.assets, self.assets, notes_root=notes)
+        feed.stage(self.assets, self.public)
+        for locale, previous in previous_names.items():
+            current = self.note_name(locale)
+            self.assertNotEqual(current, previous)
+            self.assertTrue((self.public / "downloads/v2.0.12" / previous).is_file())
+            raw = (self.public / "downloads/v2.0.12" / current).read_bytes()
+            self.assertIn(hashlib.sha256(raw).hexdigest()[:16], current)
+        self.assertEqual(json.loads((self.public / "downloads/updates/latest.json").read_text()), self.manifest)
+
+    def test_staging_tags_are_version_bound_and_require_explicit_dispatch(self):
+        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
+        block = workflow.split('          case "$tag" in', 1)[1].split('          build_timestamp=', 1)[0]
+        for event, tag, good in [
+            ("workflow_dispatch", "v2.0.15", True),
+            ("push", "v2.0.15", True),
+            ("workflow_dispatch", "installer-staging-v2.0.15-test", True),
+            ("push", "installer-staging-v2.0.15-test", False),
+            ("workflow_dispatch", "installer-staging-v2.0.14-test", False),
+            ("workflow_dispatch", "installer-staging-v2.0.15-", False),
+            ("workflow_dispatch", "v2.0.14", False),
+        ]:
+            script = 'version=2.0.15\ntag="' + tag + '"\ncase "$tag" in' + block.split("          esac", 1)[0] + "          esac\n"
+            script = script.replace("${{ github.event_name }}", event)
+            with self.subTest(event=event, tag=tag):
+                result = subprocess.run(["bash", "-c", script], capture_output=True)
+                self.assertEqual(result.returncode == 0, good)
+        self.assertIn('GPM2.0/releases/v${version}.md', block)
+        self.assertIn('check_release_guides.py --version "v${version}"', block)
 
     def test_macos_build_includes_both_manual_and_updater_targets(self):
         import shlex
@@ -84,6 +125,10 @@ class FeedTests(unittest.TestCase):
         self.assertEqual(signatures, {name for name in names if name.endswith(".sig")})
         internal = cleanup.internal_asset_names(changed, names, "v2.0.12")
         self.assertEqual(len(internal), 9)
+        self.assertEqual(cleanup.internal_asset_names(changed, names, "installer-staging-v2.0.12-test"), internal)
+        for invalid_tag in ("installer-staging-v2.0.11-test", "installer-staging-v2.0.12-", "v2.0.11"):
+            with self.assertRaises(AssertionError):
+                cleanup.internal_asset_names(changed, names, invalid_tag)
         self.assertTrue(any(name.endswith("_win-x86_setup.exe") for name in names - internal))
         self.assertTrue(any(name.endswith("_win-arm64_setup.exe") for name in names - internal))
         bad = next(iter(changed["platforms"].values()))
@@ -107,12 +152,12 @@ class FeedTests(unittest.TestCase):
         spec.loader.exec_module(bundle)
         feed_dir = self.root / "feed-only"
         feed_dir.mkdir()
-        for name in ("latest.json", "GPM_2.0.12_notes_en.txt", "GPM_2.0.12_notes_zh.txt"):
+        for name in ("latest.json", self.note_name("en"), self.note_name("zh")):
             shutil.copy2(self.assets / name, feed_dir / name)
             (self.assets / name).unlink()
         result = bundle.prepare(self.assets, feed_dir, self.root / "bundle")
         self.assertEqual(len(result["files"]), 7)
-        self.assertIn("GPM_2.0.12_notes_en.txt", result["files"])
+        self.assertIn(self.note_name("en"), result["files"])
         self.assertIn("latest.json", result["files"])
         workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
         self.assertIn("prepare-update-bundle.py --assets update-assets --feed update-feed --output update-bundle", workflow)
@@ -124,7 +169,7 @@ class FeedTests(unittest.TestCase):
         spec.loader.exec_module(bundle)
         feed_dir = self.root / "missing-feed"
         feed_dir.mkdir()
-        for name in ("latest.json", "GPM_2.0.12_notes_zh.txt"):
+        for name in ("latest.json", self.note_name("zh")):
             shutil.copy2(self.assets / name, feed_dir / name)
         with self.assertRaisesRegex(AssertionError, "Missing updater staging input"):
             bundle.prepare(self.assets, feed_dir, self.root / "missing-bundle")
@@ -162,8 +207,8 @@ class FeedTests(unittest.TestCase):
             self.assertEqual(len(info["sha256"]), 64)
 
     def test_notes_are_localized_and_app_first(self):
-        en = (self.assets / "GPM_2.0.12_notes_en.txt").read_text(encoding="utf-8")
-        zh = (self.assets / "GPM_2.0.12_notes_zh.txt").read_text(encoding="utf-8")
+        en = (self.assets / self.note_name("en")).read_text(encoding="utf-8")
+        zh = (self.assets / self.note_name("zh")).read_text(encoding="utf-8")
         for text in (en, zh):
             self.assertTrue(text.startswith("App\n"))
             self.assertGreater(text.index("Server\n"), text.index("App\n"))
@@ -186,7 +231,7 @@ class FeedTests(unittest.TestCase):
         self.assertEqual(previous, (self.public / "downloads/updates/latest.json").read_bytes())
 
     def test_missing_asset_never_creates_latest(self):
-        (self.assets / "GPM_2.0.12_notes_zh.txt").unlink()
+        (self.assets / self.note_name("zh")).unlink()
         with self.assertRaises(FileNotFoundError): feed.stage(self.assets, self.public)
         self.assertFalse((self.public / "downloads/updates/latest.json").exists())
 

@@ -28,7 +28,9 @@ def gh(*args: str) -> str:
 
 def embedded_signatures(manifest: dict, asset_names: set[str], tag: str) -> set[str]:
     version = manifest.get("version", "")
-    assert re.fullmatch(r"\d+\.\d+\.\d+", version) and tag == "v" + version
+    assert re.fullmatch(r"\d+\.\d+\.\d+", version)
+    assert tag == "v" + version or re.fullmatch(
+        rf"installer-staging-v{re.escape(version)}-[A-Za-z0-9._-]+", tag)
     assert manifest.get("schema_version") == 1
     assert set(manifest.get("platforms", {})) == set(SUFFIX)
     expected = set()

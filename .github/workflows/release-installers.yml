@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to update or create, for example v2.0.1."
+        description: "Stable version tag, or installer-staging-vX.Y.Z-<unique-id> for an authorized refresh."
         required: false
         type: string
       quality_run_id:
@@ -111,9 +111,16 @@ jobs:
             exit 1
           fi
 
-          test "$tag" = "v${version}" || { echo "Release tag must match the compiled App version" >&2; exit 1; }
-          test -f "GPM2.0/releases/${tag}.md" || { echo "Canonical release notes are missing" >&2; exit 1; }
-          python3 GPM2.0/scripts/check_release_guides.py --version "$tag" || {
+          case "$tag" in
+            "v${version}") ;;
+            "installer-staging-v${version}-"*)
+              test "${{ github.event_name }}" = workflow_dispatch || { echo "Staging requires an explicit dispatch" >&2; exit 1; }
+              test "$tag" != "installer-staging-v${version}-" || { echo "Staging requires a unique suffix" >&2; exit 1; }
+              ;;
+            *) echo "Release tag must match the compiled App version (or its installer-staging prefix)" >&2; exit 1 ;;
+          esac
+          test -f "GPM2.0/releases/v${version}.md" || { echo "Canonical release notes are missing" >&2; exit 1; }
+          python3 GPM2.0/scripts/check_release_guides.py --version "v${version}" || {
             echo "Every release guide must advertise the Server archive and badge of ${tag}." >&2
             exit 1
           }
