@@ -43,6 +43,16 @@ def verify_changed_paths(paths):
         raise ValueError("Quality reuse is restricted to reviewed UI/docs changes: " + ", ".join(rejected))
 
 
+def request_run_jobs(repo, run_id, request):
+    jobs, page = [], 1
+    while True:
+        batch = request(f"repos/{repo}/actions/runs/{run_id}/jobs?filter=latest&per_page=100&page={page}")["jobs"]
+        jobs.extend(batch)
+        if len(batch) < 100:
+            return jobs
+        page += 1
+
+
 def git(*args):
     return subprocess.check_output(["git", *args], text=True).strip()
 
@@ -59,10 +69,10 @@ def main():
     revision = git("rev-parse", args.revision + "^{commit}")
     if revision != git("rev-parse", "HEAD"):
         raise ValueError("Checkout does not match the final packaging revision")
-    run = json.loads(subprocess.check_output(["gh", "api", f"repos/{args.repo}/actions/runs/{args.run_id}"]))
-    pages = json.loads(subprocess.check_output(["gh", "api", "--paginate", "--slurp",
-        f"repos/{args.repo}/actions/runs/{args.run_id}/jobs?filter=latest&per_page=100"]))
-    jobs = [job for page in pages for job in page["jobs"]]
+    def request(endpoint):
+        return json.loads(subprocess.check_output(["gh", "api", endpoint]))
+    run = request(f"repos/{args.repo}/actions/runs/{args.run_id}")
+    jobs = request_run_jobs(args.repo, args.run_id, request)
     baseline = run.get("head_sha", "")
     if not re.fullmatch(r"[0-9a-f]{40}", baseline):
         raise ValueError("Invalid baseline revision")

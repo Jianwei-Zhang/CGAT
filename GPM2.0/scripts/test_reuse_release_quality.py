@@ -43,6 +43,16 @@ class ReusedQualityTests(unittest.TestCase):
                      "GPM2.0/scripts/quality-gate-server.sh", ".github/workflows/quality.yml"):
             with self.assertRaises(ValueError): reuse.verify_changed_paths([path])
 
+    def test_job_pagination_works_without_new_gh_cli_flags(self):
+        calls = []
+        def request(endpoint):
+            calls.append(endpoint)
+            return {"jobs": [{"id": i} for i in range(100)] if len(calls) == 1 else [{"id": 100}]}
+        jobs = reuse.request_run_jobs(self.repo, 123, request)
+        self.assertEqual(len(jobs), 101)
+        self.assertTrue(calls[0].endswith("page=1"))
+        self.assertTrue(calls[1].endswith("page=2"))
+
     def test_default_full_gate_and_pinned_package_checkouts_remain_in_workflow(self):
         workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/release-installers.yml").read_text()
         self.assertIn("if: ${{ !inputs.quality_run_id }}", workflow)
