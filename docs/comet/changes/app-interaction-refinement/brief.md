@@ -393,15 +393,19 @@ Each nonempty source line is an explicit unit. Executable `covered` units map to
 # Decisions
 
 - User completed grill-me questions Q1–Q12, including two-row compact cards, interval-only correlation and extreme-narrow toolbar scrolling. No product-design clarification remains.
-- Current user requests implementation of the whole scope using Comet and a 10s-to-3s startup check. Formal Runtime Shape confirmation remains required before project implementation.
+- User explicitly resumed and confirmed the complete Shape and necessary permissions. Runtime accepted confirmation and entered Build. The current session implements serially; Comet-required independent read-only review and Verifier executions are authorized, without general parallel implementation.
 - Use one ordinary Native Change, not a Supervisor: shared assembly state/render/selection/tooltip files and common provenance/UI lifecycle contracts make artificial independent child slices costly. Ordered batches permit focused regressions without extra worktrees or coordination.
 - Ordered batches: B0 startup timing; B1 Jobs 1/2/3; B2 Jobs 4/11; B3 Job 5; B4 Jobs 6/10/12; B5 Jobs 7/8/9. All belong to one acceptance target. Intermediate commits do not imply final Verify success.
 - Startup baseline verified in frontend/src/main.js: initialization, enabled guard, 10000ms first timer, 6h recurring check, 30s notification retry. Only first delay changes.
 - macOS-specific findings remain hypotheses until native evidence exists. No source/unit checks are represented as native acceptance.
 
+## Builder batch evidence
+
+- B0 (startup timing, A62-A64): changed only the production startup timeout from 10000ms to 3000ms. Added four deterministic regressions executing the actual bootstrap scheduling block. Windows-host startup/updater/update-panel tests passed 28/28. Independent read-only review execution `01a17dd5-386b-7341-923f-8bb1c400eebe` found no issues in this batch. Fake-timer/source review is not native wall-clock or final all-68 verification evidence; remaining jobs are not complete.
+
 # Open questions
 
-No unresolved product questions. Final Shape and narrow permission for independent read-only candidate review/Verifier are requested at the Runtime confirmation boundary. No subordinate execution is permitted before explicit authorization.
+No unresolved product questions. Complete Shape and the narrow independent read-only review/Verifier permission have been explicitly confirmed by the user and accepted by Runtime.
 
 # Verification expectations
 
