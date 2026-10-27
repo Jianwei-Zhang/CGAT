@@ -207,3 +207,25 @@ test("destination mutation status never overwrites the source chromosome history
   const onDestination=resolveMainViewHistoryAfterMutation(source,destination,"chr2");
   assert.equal(onDestination.chrName,"chr2");assert.equal(onDestination.appliedOperationCount,5);assert.equal(onDestination.undoOperation.kind,"add-contig-to-chr");
 });
+
+for (const action of ["undo", "redo", "reset"]) {
+  test(`main ${action} refreshes Final Path and Local View exactly once after the silent reload`, async () => {
+    const store = createStore({ mainViewHistory: { chrName: "Chr01", canUndo: true, canRedo: true, canReset: true,
+      appliedOperationCount: 1, undoOperation: { kind: "split-manual-contig", targetCount: 1 },
+      redoOperation: { kind: "split-manual-contig", targetCount: 1 } } });
+    const calls = [];
+    let reloaded = false;
+    assert.equal(await runMainViewHistoryControlAction({}, store, action, {
+      confirm: async () => true,
+      executeMainViewHistoryAction: async () => ({ changed: true, affectedCtgIds: [],
+        operation: { kind: "split-manual-contig" }, status: { chrName: "Chr01" } }),
+      loadAssemblyView: async (_host, _store, options) => { assert.equal(options.renderResult, false); reloaded = true; calls.push("reload"); },
+      refreshSubviewPairwiseEvidence: async () => { assert.equal(reloaded, true); calls.push("evidence"); },
+      rerender: () => calls.push("main"),
+      rerenderSubviewPanel: () => { assert.equal(reloaded, true); calls.push("local"); },
+      rerenderFinalPathCard: () => { assert.equal(reloaded, true); calls.push("final-path"); },
+      mapAssemblyError: ({ error }) => ({ userMessage: error.message }),
+    }), true);
+    assert.deepEqual(calls, ["main", "reload", "evidence", "main", "local", "final-path"]);
+  });
+}

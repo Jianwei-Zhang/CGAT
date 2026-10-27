@@ -1,3 +1,4 @@
+import { createAssemblyContigSplitRuntime } from "./assembly/contig-split-runtime.js";
 import { patchMainAnchorFragments } from "./assembly/main-anchor-fragments.js";
 import { toggleMainAlignmentAnchorState, patchMainAlignmentAnchors } from "./assembly/main-alignment-anchors.js";
 import { openManualContigSplit } from "./assembly/manual-contig-split.js";
@@ -11,7 +12,7 @@ import { clearOtherViewSelection } from "./assembly/selection-state.js";
 import { bindAlignmentTooltips } from "./assembly/alignment-tooltip-runtime.js";
 import { buildSupportDatasetOptions } from "./assembly/support-dataset-options.js";
 import { openContigChrAlignments, chrAlignmentCopy, resolveContigChrAlignmentModel } from "./assembly/contig-chr-alignments.js";
-import { normalizeMainViewHistoryStatus, resolveMainViewHistoryAfterMutation } from "./assembly/main-view-history-state.js";
+import { normalizeMainViewHistoryStatus } from "./assembly/main-view-history-state.js";
 import { splitCopy, resolveContigUnsplitModel, resolveContigSplitModel, isCurrentContigSplitAnchor } from "./assembly/contig-split-boundary.js";
 import { setTrackDragGroupOffsets, setSubviewDragGroupOffsets, moveSubviewCompositionDrag } from "./assembly/source-fragment-drag.js";
 import { requestAppPrompt } from "../shell/app-dialog.js";
@@ -452,6 +453,20 @@ const {
   moveContextSubviewMemberToOtherLane,
   removeContextSubviewMember,
 } = subviewToolsContentController;
+const commitAssemblyContigSplit = createAssemblyContigSplitRuntime({
+  prepareSourceOwnedSubviewHistory,
+  resolveCurrentSubviewCompositionViewport,
+  projectHistorical: (state) => projectRenderedSubviewToComposition(state, renderAssemblySubviewPanelImpl(state, renderTracksDeps)),
+  flushAssemblyProjectState,
+  runSerializedProjectViewMutation,
+  runMainViewEditorAction,
+  loadAssemblyView,
+  refreshSubviewPairwiseEvidence,
+  setAssemblyActionFeedback,
+  rerenderAssemblyMainTab,
+  rerenderSubviewPanel,
+  rerenderFinalPathCard,
+});
 const synchronizeLocalFragment = createSubviewFragmentSyncRuntime({
   inspectMainViewDelete,
   confirm: (message, context) => requestAssemblyConfirm(context.host, context.store, message, context),
@@ -463,6 +478,7 @@ const synchronizeLocalFragment = createSubviewFragmentSyncRuntime({
   persistNow: persistAssemblyProjectStateChecked,
   rerenderMain: rerenderAssemblyMainTab,
   rerenderSubviewPanel,
+  rerenderFinalPathCard,
   refreshSubviewPairwiseEvidence,
 });
 const subviewFragmentController = createSubviewFragmentController({
@@ -1124,6 +1140,8 @@ const mainViewHistoryRuntimeDeps = {
   runSerializedProjectViewMutation: (store, task) =>
     runSerializedProjectViewMutation(store, task),
   rerender: rerenderAssemblyMainTab,
+  rerenderSubviewPanel,
+  rerenderFinalPathCard,
   refreshSubviewPairwiseEvidence,
   setPendingTrackAutoFocusMode: (mode) => {
     assemblyPageSession.pendingTrackAutoFocusMode = mode;
@@ -3065,55 +3083,4 @@ async function openAssemblyContigChrAlignments(host,store,context) {
       await selectCtg(host,store,item.existingCtgId,{focusMode:"center"});
     },
   });
-}
-
-async function commitAssemblyContigSplit(host, store, action, args, doneMessage = null) {
-  const state = store.getState();
-  if (state.assembly?.mainViewHistory?.inFlight || state.assembly?.loading) return false;
-  const labels = splitCopy[state.locale === "en" ? "en" : "zh"];
-  const payload = { workspaceRoot: state.session.workspacePath, projectId: state.session.projectId,
-    chrName: state.assembly.selectedChrName, action, args };
-  store.setState({ assembly: { ...state.assembly, mainViewHistory: { ...state.assembly.mainViewHistory, inFlight: true } } });
-  try {
-    const summary = state.assembly.subview?.summary;
-    const splitsMain = action === "split-manual-contig" || (action === "edit-local-fragment" && args?.action === "split");
-    if (splitsMain && summary && summary.mode !== "composition") {
-      // Capture legacy pair/track geometry while the parent IDs still exist.
-      // Otherwise a two-contig view cannot resolve a retired parent at reload.
-      const prepared = prepareSourceOwnedSubviewHistory(state, host, {
-        preserveLegacy: true,
-        viewport: resolveCurrentSubviewCompositionViewport(state, host),
-        projectHistorical: (historical) => projectRenderedSubviewToComposition(historical,
-          renderAssemblySubviewPanelImpl(historical, renderTracksDeps)),
-      });
-      store.setState({ assembly: { ...prepared, mainViewHistory: store.getState().assembly.mainViewHistory } });
-    }
-    await flushAssemblyProjectState(host, store);
-    if (store.getState().session.workspacePath !== payload.workspaceRoot || store.getState().session.projectId !== payload.projectId
-      || store.getState().assembly.selectedChrName !== payload.chrName) return false;
-    return await runSerializedProjectViewMutation(store, async (isCurrent) => {
-      if (!isCurrent() || store.getState().assembly.selectedChrName !== payload.chrName) return false;
-      const result = await runMainViewEditorAction(payload);
-      if (!isCurrent()) return false;
-      await loadAssemblyView(host, store, { keepCurrentChr: true, keepCurrentCtg: false,
-        renderLoading: false, renderResult: false });
-      if (!isCurrent()) return false;
-      await refreshSubviewPairwiseEvidence(host, store, { rerenderLoading: false, rerenderLoaded: false });
-      if (!isCurrent()) return false;
-      store.setState({ assembly: { ...store.getState().assembly,
-        mainViewHistory: resolveMainViewHistoryAfterMutation(store.getState().assembly.mainViewHistory, result.status, payload.chrName),
-        trackSelectedCtgIds: [], actionError: "", actionStatus: action === "add-contig-to-chr" && !result.changed
-          ? chrAlignmentCopy[state.locale === "en" ? "en" : "zh"].existing : doneMessage || labels.done } });
-      rerenderAssemblyMainTab(host, store);
-      rerenderSubviewPanel(host, store);
-      return action === "add-contig-to-chr" ? result : true;
-    });
-  } catch (error) {
-    setAssemblyActionFeedback(host, store, { actionError: String(error.message || error) }); return false;
-  } finally {
-    if (store.getState().session.workspacePath === payload.workspaceRoot && store.getState().session.projectId === payload.projectId) {
-      store.setState({ assembly: { ...store.getState().assembly,
-        mainViewHistory: { ...store.getState().assembly.mainViewHistory, inFlight: false } } });
-    }
-  }
 }

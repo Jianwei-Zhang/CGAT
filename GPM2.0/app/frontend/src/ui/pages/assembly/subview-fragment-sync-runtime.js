@@ -131,6 +131,7 @@ export function createSubviewFragmentSyncRuntime(deps) {
           store.setState({ assembly: { ...store.getState().assembly,
             mainViewHistory: { ...store.getState().assembly.mainViewHistory, inFlight: false } } });
           deps.rerenderMain(host, store); deps.rerenderSubviewPanel(host, store);
+          deps.rerenderFinalPathCard(host, store);
           return true;
         } catch (error) {
           if (isCurrent() && sameIdentity(store.getState(), before) && !nativeCommitted) {

@@ -76,6 +76,7 @@ function runtime(store, overrides = {}) {
     persistNow: async () => { assert.equal(inside, true); calls.push(["persist"]); persisted.push(JSON.parse(JSON.stringify(store.getState().assembly))); },
     rerenderMain() { calls.push(["render-main"]); },
     rerenderSubviewPanel() { calls.push(["render-subview"]); },
+    rerenderFinalPathCard() { calls.push(["render-final-path"]); },
     async refreshSubviewPairwiseEvidence(_host, _store, options) {
       calls.push(["evidence-start", options]);
       await Promise.resolve();
@@ -101,7 +102,7 @@ for (const mode of ["composition", "2-contig", "track-pair"]) {
     });
     assert.deepEqual(api.calls.map(([name]) => name), [
       "inspect", "confirm", "flush", "native", "reload", "evidence-start", "evidence-ready",
-      "persist", "render-main", "render-subview",
+      "persist", "render-main", "render-subview", "render-final-path",
     ], "no loader page replacement or loading-state card replacement may precede the final render");
   });
 }
@@ -133,7 +134,7 @@ for (const mode of ["2-contig", "track-pair", "composition"]) for (const action 
     assert.equal(after.mainViewHistory.appliedOperationCount, 1);
     assert.equal(after.mainViewHistory.inFlight, false);
     assert.equal(after.chrCtgs.length, action === "split" ? 4 : 2);
-    assert.deepEqual(api.calls.map(([kind]) => kind), ["inspect", "confirm", "flush", "native", "reload", "evidence-start", "evidence-ready", "persist", "render-main", "render-subview"]);
+    assert.deepEqual(api.calls.map(([kind]) => kind), ["inspect", "confirm", "flush", "native", "reload", "evidence-start", "evidence-ready", "persist", "render-main", "render-subview", "render-final-path"]);
     assert.match(api.calls[1][1], /不可变源区间/);
     const request = api.calls.find(([kind]) => kind === "native")[1];
     assert.equal(request.action, "edit-local-fragment");

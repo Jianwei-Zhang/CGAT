@@ -140,6 +140,8 @@ export async function runMainViewHistoryControlAction(host, store, action, deps,
         deps.setPendingTrackAutoFocusMode("start");
       }
       deps.rerender(host, store);
+      deps.rerenderSubviewPanel?.(host, store);
+      deps.rerenderFinalPathCard?.(host, store);
       if (shouldLocate && typeof deps.scheduleHighlightClear === "function") {
         deps.scheduleHighlightClear(host, store, affectedCtgIds[0]);
       }
