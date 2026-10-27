@@ -771,7 +771,7 @@ export async function selectChromosome(host, store, chrName, deps) {
       ...state.assembly,
       loading: true,
       error: "",
-      chrPickerOpen: false,
+      chrPickerOpen: state.assembly.chrPickerOpen === true,
       selectedChrName: chrName,
       mainViewHistory: createEmptyMainViewHistoryStatus(chrName),
       historyHighlightCtgId: null,
@@ -950,6 +950,8 @@ export async function selectChromosome(host, store, chrName, deps) {
   deps.rerender(host, store);
 }
 
+const contigDetailRequests = new WeakMap();
+
 export async function selectCtg(host, store, assemblyCtgId, options = {}, deps) {
   assertDataRuntimeDeps(deps, [
     "loadSideDataForCtg",
@@ -962,22 +964,46 @@ export async function selectCtg(host, store, assemblyCtgId, options = {}, deps) 
   if (!state.session.workspacePath || !state.session.projectId) {
     return;
   }
+  // Member selection is a paint/detail operation, not an Assembly reload. Keep
+  // the mounted plots, popovers, focus and viewport while side data is pending.
+  const quiet = options.quiet === true && typeof deps.patchSelection === "function";
+  if (quiet && state.assembly.loading) return;
+  const request = {};
+  contigDetailRequests.set(store, request);
+  const viewRequest = currentAssemblyViewRequest(store);
+  const isCurrentRequest = () => {
+    const current = store.getState();
+    return contigDetailRequests.get(store) === request
+      && currentAssemblyViewRequest(store) === viewRequest
+      && current.session?.workspacePath === state.session.workspacePath
+      && current.session?.projectId === state.session.projectId
+      && current.activeRoute === state.activeRoute
+      && current.assembly?.selectedChrName === state.assembly.selectedChrName
+      && current.assembly?.selectedCtgId === assemblyCtgId;
+  };
   deps.setPendingTrackAutoFocusMode(
     options?.preserveViewport === true
       ? null
       : deps.normalizeTrackFocusMode(options.focusMode),
   );
+  const refresh = (focus = false) => quiet
+    ? deps.patchSelection(host, store, { focus })
+    : deps.rerender(host, store);
   store.setState({
     assembly: {
       ...state.assembly,
-      loading: true,
+      loading: !quiet,
+      error: "",
       selectedCtgId: assemblyCtgId,
       trackSelectedCtgIds: [],
       selectedDeletedCtgRecordIds: [],
+      ctgDetail: null,
+      editCandidates: createEmptySideData().candidates,
+      selectedMemberSeqId: null,
       summary: tAssembly(state, "runtime.loadCtgDetailSummary", { assemblyCtgId }),
     },
   });
-  deps.rerender(host, store);
+  refresh(true);
 
   try {
     const sideData = await deps.loadSideDataForCtg(
@@ -985,6 +1011,7 @@ export async function selectCtg(host, store, assemblyCtgId, options = {}, deps) 
       state.session.projectId,
       assemblyCtgId,
     );
+    if (!isCurrentRequest()) return;
     store.setState({
       assembly: {
         ...store.getState().assembly,
@@ -996,6 +1023,7 @@ export async function selectCtg(host, store, assemblyCtgId, options = {}, deps) 
       },
     });
   } catch (error) {
+    if (!isCurrentRequest()) return;
     const mappedError = deps.mapAssemblyError({ error, stateOrLocale: store.getState() });
     store.setState({
       assembly: {
@@ -1007,7 +1035,7 @@ export async function selectCtg(host, store, assemblyCtgId, options = {}, deps) 
     });
   }
 
-  deps.rerender(host, store);
+  refresh();
 }
 
 export async function runCtgSearch(host, store, rawKeyword, deps) {

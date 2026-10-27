@@ -1,4 +1,4 @@
-import { currentAssemblyViewRequest } from "../assembly-view-request.js";
+import { beginAssemblyViewRequest, currentAssemblyViewRequest } from "../assembly-view-request.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -2231,4 +2231,69 @@ test("only the latest chromosome selection loads after the shared mutation barri
   f.release(); await Promise.all([first, second]);
   assert.deepEqual(f.reads, ["Chr03"]);
   assert.equal(f.store.getState().assembly.selectedChrName, "Chr03");
+});
+
+function quietSelectionFixture() {
+  let state = { activeRoute: "assembly", session: { workspacePath: "/ws", projectId: 1 },
+    assembly: { selectedChrName: "Chr01", selectedCtgId: 7, loading: false,
+      ctgDetail: { assemblyCtgId: 7 }, editCandidates: { old: true }, trackSelectedCtgIds: [7], selectedDeletedCtgRecordIds: [3] } };
+  const store = { getState: () => state, setState: patch => { state = { ...state, ...patch }; } };
+  const calls = [], pending = [];
+  const deps = { loadSideDataForCtg: (_ws, _pid, id) => new Promise((resolve, reject) => pending.push({ id, resolve, reject })),
+    mapAssemblyError: ({ error }) => { calls.push("mapError"); return { userMessage: error.message }; },
+    normalizeTrackFocusMode: value => value || "center", setPendingTrackAutoFocusMode: mode => calls.push(["focus", mode]),
+    patchSelection: (_host, _store, options) => calls.push(["paint", options.focus]),
+    rerender: () => { throw Error("quiet selection must not reconstruct the page"); } };
+  return { store, calls, pending, select: id => selectCtg({}, store, id, { quiet: true, focusMode: "start" }, deps) };
+}
+
+test("member selection paints immediately without global loading and clears old edit data", async () => {
+  const f = quietSelectionFixture(); const selecting = f.select(10);
+  assert.equal(f.store.getState().assembly.loading, false);
+  assert.equal(f.store.getState().assembly.selectedCtgId, 10);
+  assert.equal(f.store.getState().assembly.ctgDetail, null);
+  assert.deepEqual(f.store.getState().assembly.trackSelectedCtgIds, []);
+  assert.deepEqual(f.calls, [["focus", "start"], ["paint", true]]);
+  f.pending[0].resolve({ detail: { assemblyCtgId: 10, members: [] }, candidates: { fresh: true } });
+  await selecting;
+  assert.equal(f.store.getState().assembly.ctgDetail.assemblyCtgId, 10);
+  assert.deepEqual(f.calls.at(-1), ["paint", false]);
+});
+
+test("rapid A to B to A member selection rejects obsolete successful and failed detail responses", async () => {
+  const f = quietSelectionFixture(); const a = f.select(10), b = f.select(20), a2 = f.select(10);
+  f.pending[2].resolve({ detail: { assemblyCtgId: 10, version: "latest", members: [] }, candidates: {} }); await a2;
+  const calls = f.calls.length;
+  f.pending[0].resolve({ detail: { version: "obsolete", members: [] }, candidates: {} }); await a;
+  f.pending[1].reject(Error("late failure")); await b;
+  assert.equal(f.store.getState().assembly.ctgDetail.version, "latest");
+  assert.equal(f.calls.length, calls);
+  assert.equal(f.store.getState().assembly.error, "");
+});
+
+test("member detail responses cannot publish into another project, chromosome, route or view generation", async () => {
+  for (const change of [
+    s => ({ session: { ...s.session, projectId: 2 } }),
+    s => ({ assembly: { ...s.assembly, selectedChrName: "Chr02" } }),
+    () => ({ activeRoute: "projects" }),
+    () => null,
+  ]) {
+    const f = quietSelectionFixture(), selecting = f.select(10), patch = change(f.store.getState());
+    if (patch) f.store.setState(patch); else beginAssemblyViewRequest(f.store);
+    const state = f.store.getState(), calls = f.calls.length;
+    f.pending[0].resolve({ detail: { members: [] }, candidates: {} }); await selecting;
+    assert.equal(f.store.getState(), state); assert.equal(f.calls.length, calls);
+  }
+});
+
+test("chromosome selection leaves the chooser open during and after loading, but respects an explicit pending close", async () => {
+  for (const closeDuringLoad of [false, true]) {
+    const pending = deferred(), f = createChromosomeLoadHarness({ listChrViewCtgs: () => pending.promise });
+    f.store.setState({ assembly: { ...f.store.getState().assembly, chrPickerOpen: true } });
+    const loading = f.select("Chr02"); assert.equal(f.store.getState().assembly.chrPickerOpen, true);
+    if (closeDuringLoad) f.store.setState({ assembly: { ...f.store.getState().assembly, chrPickerOpen: false } });
+    pending.resolve({ items: [{ assemblyCtgId: 8 }] }); await loading;
+    assert.equal(f.store.getState().assembly.chrPickerOpen, !closeDuringLoad);
+    assert.equal(f.store.getState().assembly.selectedChrName, "Chr02");
+  }
 });

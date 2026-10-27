@@ -1,3 +1,4 @@
+import { createScopePopoverFixture, withPopoverClock } from "./scope-popover-fixture.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -906,146 +907,31 @@ test("cold project entry loads saved support and offsets before any support-sele
   assert.deepEqual(persisted.trackDragOffsets, persistedOffsets);
 });
 
-test("bindings close the chromosome picker after pointer leaves the picker area", () => {
-  const listeners = new Map();
-  const pickerArea = {
-    addEventListener(type, handler) {
-      listeners.set(type, handler);
-    },
-  };
-  const toggleButton = {
-    disabled: false,
-    addEventListener() {},
-    closest(selector) {
-      return selector === ".chr-picker-inline" ? pickerArea : null;
-    },
-  };
-  const host = {
-    querySelector(selector) {
-      return selector === "#assembly-chr-picker-toggle" ? toggleButton : null;
-    },
-    querySelectorAll() {
-      return [];
-    },
-    addEventListener() {},
-  };
-  const store = createStore({
-    ...createState(),
-    assembly: {
-      ...createState().assembly,
-      chrPickerOpen: true,
-      chromosomes: [{ chrName: "1" }, { chrName: "2" }],
-    },
-  });
-  let nextTimerId = 1;
-  const timers = new Map();
-  const originalSetTimeout = globalThis.setTimeout;
-  const originalClearTimeout = globalThis.clearTimeout;
-  globalThis.setTimeout = (callback, delayMs) => {
-    const timerId = nextTimerId;
-    nextTimerId += 1;
-    timers.set(timerId, { callback, delayMs });
-    return timerId;
-  };
-  globalThis.clearTimeout = (timerId) => {
-    timers.delete(timerId);
-  };
-  let rerenderCount = 0;
-  const deps = createBindingDeps({
-    rerender() {
-      rerenderCount += 1;
-    },
-  });
-
-  try {
-    bindAssemblyPageImpl(host, store, deps);
-    assert.equal(typeof listeners.get("pointerleave"), "function");
-
-    listeners.get("pointerleave")();
-
+test("bindings close the chromosome picker 400ms after leaving, without rerendering", () => {
+  withPopoverClock(timers => {
+    const f = createScopePopoverFixture();
+    const store = createStore({ ...createState(), assembly: { ...createState().assembly, chrPickerOpen: true } });
+    let rerenderCount = 0;
+    bindAssemblyPageImpl(f.host, store, createBindingDeps({ rerender: () => rerenderCount++ }));
+    f.emit("pointerout", f.triggers.chromosomes, { relatedTarget: null });
     assert.equal(timers.size, 1);
-    const [timer] = Array.from(timers.values());
-    assert.equal(timer.delayMs, 400);
+    const [timer] = timers.values(); assert.equal(timer.delay, 400);
     assert.equal(store.getState().assembly.chrPickerOpen, true);
-
-    timer.callback();
-
+    timer.fn();
     assert.equal(store.getState().assembly.chrPickerOpen, false);
-    assert.equal(rerenderCount, 1);
-  } finally {
-    globalThis.setTimeout = originalSetTimeout;
-    globalThis.clearTimeout = originalClearTimeout;
-  }
+    assert.equal(f.panels.chromosomes.hidden, true);
+    assert.equal(rerenderCount, 0);
+  });
 });
 
-test("bindings cancel chromosome picker auto-close when pointer re-enters the picker area", () => {
-  const listeners = new Map();
-  const pickerArea = {
-    addEventListener(type, handler) {
-      listeners.set(type, handler);
-    },
-  };
-  const toggleButton = {
-    disabled: false,
-    addEventListener() {},
-    closest(selector) {
-      return selector === ".chr-picker-inline" ? pickerArea : null;
-    },
-  };
-  const host = {
-    querySelector(selector) {
-      return selector === "#assembly-chr-picker-toggle" ? toggleButton : null;
-    },
-    querySelectorAll() {
-      return [];
-    },
-    addEventListener() {},
-  };
-  const store = createStore({
-    ...createState(),
-    assembly: {
-      ...createState().assembly,
-      chrPickerOpen: true,
-      chromosomes: [{ chrName: "1" }, { chrName: "2" }],
-    },
-  });
-  let nextTimerId = 1;
-  const timers = new Map();
-  const originalSetTimeout = globalThis.setTimeout;
-  const originalClearTimeout = globalThis.clearTimeout;
-  globalThis.setTimeout = (callback, delayMs) => {
-    const timerId = nextTimerId;
-    nextTimerId += 1;
-    timers.set(timerId, { callback, delayMs });
-    return timerId;
-  };
-  globalThis.clearTimeout = (timerId) => {
-    timers.delete(timerId);
-  };
-  let rerenderCount = 0;
-  const deps = createBindingDeps({
-    rerender() {
-      rerenderCount += 1;
-    },
-  });
-
-  try {
-    bindAssemblyPageImpl(host, store, deps);
-    assert.equal(typeof listeners.get("pointerleave"), "function");
-    assert.equal(typeof listeners.get("pointerenter"), "function");
-
-    listeners.get("pointerleave")();
-    assert.equal(timers.size, 1);
-
-    listeners.get("pointerenter")();
-
-    assert.equal(timers.size, 0);
+test("bindings cancel chromosome auto-close on reentry across the trigger/panel", () => {
+  withPopoverClock(timers => {
+    const f = createScopePopoverFixture(), store = createStore({ ...createState(), assembly: { ...createState().assembly, chrPickerOpen: true } });
+    bindAssemblyPageImpl(f.host, store, createBindingDeps({ rerender() { throw Error("no redraw"); } }));
+    f.emit("pointerout", f.triggers.chromosomes, { relatedTarget: null }); assert.equal(timers.size, 1);
+    f.emit("pointerover", f.child("chromosomes")); assert.equal(timers.size, 0);
     assert.equal(store.getState().assembly.chrPickerOpen, true);
-    assert.equal(rerenderCount, 0);
-  } finally {
-    globalThis.setTimeout = originalSetTimeout;
-    globalThis.clearTimeout = originalClearTimeout;
-  }
+  });
 });
 
 test("bindings keep the final-path add button visible after appending a table row", async () => {
@@ -1264,7 +1150,7 @@ test("ordinary track contig clicks do not load details, alter state or rerender"
   assert.equal(prevented.length, 0);
 });
 
-test("member chip clicks preserve the scrolled position of the members panel after rerender", async () => {
+test("quiet member selection never rewinds user scrolling performed while details load", async () => {
   const listenerMap = new Map();
   let currentRegion = {
     scrollTop: 184,
@@ -1301,71 +1187,41 @@ test("member chip clicks preserve the scrolled position of the members panel aft
     addEventListener() {},
   };
   const store = createStore(createState());
+  let release; const pending = new Promise(resolve => { release = resolve; });
   const deps = createBindingDeps({
     normalizeTrackFocusMode(value) {
       return value;
     },
-    async selectCtg() {
-      currentRegion = {
-        scrollTop: 0,
-        scrollLeft: 0,
-      };
+    async selectCtg(_host, _store, _id, options) {
+      assert.equal(options.quiet, true); await pending;
     },
     updateDeletedCtgSelection() {},
   });
 
   bindAssemblyPageImpl(host, store, deps);
-  await listenerMap.get("click")?.({
+  const selecting = listenerMap.get("click")?.({
     ctrlKey: false,
     metaKey: false,
     preventDefault() {},
   });
 
-  assert.equal(currentRegion.scrollTop, 184);
+  currentRegion.scrollTop = 260; release(); await selecting;
+  assert.equal(currentRegion.scrollTop, 260);
   assert.equal(currentRegion.scrollLeft, 12);
 });
 
-test("bindings toggle the members card collapsed state and persist it", async () => {
-  const toggleListeners = new Map();
-  const toggleButton = {
-    addEventListener(type, handler) {
-      toggleListeners.set(type, handler);
-    },
-  };
-  const host = {
-    querySelector(selector) {
-      if (selector === "[data-members-card-toggle='1']") {
-        return toggleButton;
-      }
-      return null;
-    },
-    querySelectorAll() {
-      return [];
-    },
-    addEventListener() {},
-  };
-  const store = createStore(createState());
-  let rerenderCount = 0;
+test("bindings toggle and persist members openness without replacing the mounted panel", () => {
+  const f = createScopePopoverFixture(), store = createStore(createState());
   const persistCalls = [];
-  const deps = createBindingDeps({
-    rerender() {
-      rerenderCount += 1;
-    },
-    persistMainTrackViewState: async (_host, currentStore) => {
-      persistCalls.push({
-        membersCardCollapsed: currentStore.getState().assembly.membersCardCollapsed,
-      });
-    },
-  });
-
-  bindAssemblyPageImpl(host, store, deps);
-  await toggleListeners.get("click")?.({
-    preventDefault() {},
-  });
-
+  bindAssemblyPageImpl(f.host, store, createBindingDeps({
+    rerender() { throw Error("a toggle must not rebuild the page"); },
+    persistMainTrackViewState: async (_host, currentStore) => persistCalls.push(currentStore.getState().assembly.membersCardCollapsed),
+  }));
+  f.emit("click", f.triggers.members);
   assert.equal(store.getState().assembly.membersCardCollapsed, false);
-  assert.equal(rerenderCount, 1);
-  assert.deepEqual(persistCalls, [{ membersCardCollapsed: false }]);
+  assert.equal(f.panels.members.hidden, false);
+  assert.equal(f.panels.members.scrollTop, 75);
+  assert.deepEqual(persistCalls, [false]);
 });
 
 test("typing main alignment length then entering subview-ctg commits the latest main-track value first", async () => {

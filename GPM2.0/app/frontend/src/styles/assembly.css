@@ -97,7 +97,9 @@
 }
 
 .chr-strip.has-members-panel {
-  align-items: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .chr-title {
@@ -134,8 +136,8 @@
   position: absolute;
   left: 0;
   top: calc(100% + 4px);
-  width: 260px;
-  max-height: 320px;
+  width: min(720px, calc(100vw - 16px));
+  max-height: min(480px, calc(100vh - 80px));
   overflow: auto;
   border: 1px solid var(--border-default, #cbd5e1);
   border-radius: var(--card-radius);
@@ -270,103 +272,41 @@
   line-height: 1.45;
 }
 
-.assembly-track-panel-head[data-main-track-control-layout] {
-  min-width: 0;
-}
-
-.assembly-track-panel-head[data-main-track-control-layout] > strong {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-.assembly-track-panel-actions {
+.assembly-track-panel-head[data-main-view-header] {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.assembly-track-panel-head[data-main-track-control-layout] .assembly-track-panel-actions {
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
-.assembly-track-panel-quick-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-.assembly-track-panel-quick-actions:empty {
-  display: none;
-}
-
-.assembly-track-panel-head[data-main-track-control-layout="single"] {
-  flex-wrap: nowrap;
-}
-
-.assembly-track-panel-head[data-main-track-control-layout="single"] .assembly-track-panel-actions {
-  flex: 1 1 auto;
-  flex-wrap: nowrap;
-}
-
-.assembly-track-panel-head[data-main-track-control-layout="single"] .assembly-track-inline-controls {
-  flex-wrap: nowrap;
-}
-
-.assembly-track-panel-head[data-main-track-control-layout="split"] {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-}
-
-.assembly-track-panel-head[data-main-track-control-layout="split"] > strong {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.assembly-track-panel-head[data-main-track-control-layout="split"] .assembly-track-panel-actions {
-  display: contents;
-}
-
-.assembly-track-panel-head[data-main-track-control-layout="split"] .assembly-track-panel-quick-actions {
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
-}
-
-.assembly-track-panel-head[data-main-track-control-layout="split"] .assembly-track-inline-controls {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  justify-content: flex-start;
-  width: 100%;
-  flex-wrap: wrap;
-}
-
-.assembly-track-panel-head[data-main-track-control-layout="stacked"] {
   flex-direction: column;
   align-items: stretch;
-  flex-wrap: nowrap;
+  gap: 8px;
+  min-width: 0;
 }
 
-.assembly-track-panel-head[data-main-track-control-layout="stacked"] .assembly-track-panel-actions {
+.assembly-track-panel-head[data-main-view-header] > strong {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* All parameter/action groups are peers. A whole field wraps as one unit.
+   Only a field wider than the toolbar creates an internal horizontal scroll. */
+.assembly-track-inline-controls[data-main-track-toolbar] {
   width: 100%;
-  flex-direction: row;
-  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   justify-content: flex-start;
   flex-wrap: wrap;
+  overflow-x: auto;
 }
 
-.assembly-track-panel-head[data-main-track-control-layout="stacked"] .assembly-track-panel-quick-actions,
-.assembly-track-panel-head[data-main-track-control-layout="stacked"] .assembly-track-inline-controls {
-  display: contents;
-}
-
-.assembly-track-panel-quick-actions > [data-create-phased-track] {
+[data-main-track-toolbar] > * {
+  flex: 0 0 auto;
+  box-sizing: border-box;
   height: 2.1429rem;
   min-height: 2.1429rem;
+  white-space: nowrap;
+}
+
+[data-main-track-toolbar] > [data-create-phased-track] {
+  height: 2.1429rem;
 }
 
 .assembly-marker-display > [data-marker-display-toggle] {
@@ -787,142 +727,100 @@
   color: var(--theme-ink, #444);
 }
 
-.assembly-members-panel {
-  --member-chip-row-height: 78px;
-  margin-bottom: 8px;
+.assembly-scope-popover {
+  position: fixed;
+  z-index: 35;
+  box-sizing: border-box;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: var(--card-radius);
+  background: var(--surface-panel, #fff);
+  box-shadow: var(--shadow-md);
+  padding: 8px;
 }
 
-.assembly-members-panel-inline {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin-bottom: 0;
+.assembly-scope-popover[hidden] { display: none; }
+
+.chr-picker-menu {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 6px;
+  align-content: start;
 }
 
-.assembly-members-panel-inline.is-collapsed {
-  align-self: center;
-  padding: 2px 8px;
-}
-
-.assembly-members-panel-inline.is-collapsed .assembly-members-panel-head {
-  margin-bottom: 0;
-}
-
-.assembly-members-panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-
-.assembly-members-panel-title-inline {
+.chr-title-wrap, .chr-title-and-picker, .chr-picker-inline { min-width: 0; max-width: 100%; }
+.chr-picker-trigger, .assembly-members-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+  max-width: 100%;
   min-width: 0;
 }
-
-.assembly-members-icon-action {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  padding: 0 2px;
-  line-height: 1;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.assembly-members-icon-action:hover {
-  color: var(--theme-ink, #111);
-}
-
-.assembly-members-panel .ctg-chip-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
-  align-items: stretch;
-  position: relative;
-  max-height: calc(var(--member-chip-row-height) * 3 + 12px);
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 2px;
-}
-
-.assembly-member-chip-region,
-.assembly-member-chip-region * {
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.assembly-members-panel .ctg-chip {
-  align-items: stretch;
-  min-width: 0;
-  min-height: var(--member-chip-row-height);
-  justify-content: flex-start;
-  gap: 3px;
-}
-
-.assembly-members-panel .ctg-chip-heading {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  min-width: 0;
-}
-
-.assembly-members-panel .ctg-chip-name {
-  flex: 1;
-  min-width: 0;
+.chr-picker-current, .assembly-members-trigger > strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+[data-popup-chevron] { flex: none; }
 
+.assembly-members-panel-inline { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.assembly-members-panel-head { display: flex; align-items: center; justify-content: space-between; }
+.assembly-members-trigger { width: 100%; justify-content: space-between; text-align: left; }
+.assembly-members-popover { width: min(820px, calc(100vw - 16px)); max-height: min(440px, calc(100vh - 80px)); }
+.assembly-members-popover-tools { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+
+.assembly-members-panel .ctg-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  position: relative;
+  max-height: 320px;
+  overflow: auto;
+  gap: 6px;
+  padding: 1px 2px 1px 1px;
+}
+.assembly-member-chip-region, .assembly-member-chip-region * { user-select: none; -webkit-user-select: none; }
+
+/* Every type is exactly two rows. Width follows content, never a half-row or
+   stretched grid fraction. Selection paints inside the existing dimensions. */
+.assembly-members-panel .ctg-chip {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-rows: 1.4em 1.4em;
+  align-items: center;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 0;
+  max-width: min(100%, 30ch);
+  padding: 5px 8px;
+  gap: 2px;
+  font-size: var(--font-body);
+  line-height: 1.4;
+}
+.assembly-members-panel .ctg-chip-heading {
+  display: block;
+  min-width: 0;
+  line-height: inherit;
+}
+.assembly-members-panel .ctg-chip-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.assembly-members-panel .ctg-chip-details { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
 .assembly-members-panel .ctg-chip-length {
   flex: none;
-  font-size: 12px;
   font-weight: 400;
   color: var(--theme-muted-ink, #666);
   font-variant-numeric: tabular-nums;
-}
-
-.assembly-members-panel .ctg-chip-source-range {
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  font-variant-numeric: tabular-nums;
 }
-
-.assembly-members-panel .ctg-chip-local-row {
-  display: block;
-  min-height: 17px;
-  font-size: 11px;
-  line-height: 17px;
-}
-
-.assembly-members-panel .ctg-chip-local-badge {
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0 5px;
-  border: 1px solid currentColor;
-  border-radius: 4px;
-  color: var(--theme-muted-ink, #666);
-}
-
-.assembly-members-panel .ctg-chip-tags {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-}
-
-.assembly-members-panel .chip-group-separator {
-  grid-column: 1 / -1;
-  flex-basis: 100%;
-  margin-top: 4px;
-  margin-bottom: 2px;
-}
+.assembly-members-panel .ctg-chip-tags { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 16ch; overflow: hidden; }
+.assembly-members-panel .ctg-chip-tags > :first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assembly-members-panel .ctg-chip-tags > :not(:first-child):not(.ctg-chip-more-states) { display: none; }
+.assembly-members-panel .ctg-chip-more-states { flex: none; }
+.assembly-members-panel .ctg-chip-local-badge { color: var(--theme-muted-ink, #666); white-space: nowrap; }
+.assembly-members-panel .chip-group-separator { flex-basis: 100%; width: 100%; margin: 4px 0 2px; }
 
 .assembly-status-toast-wrap {
   position: absolute;
@@ -2005,13 +1903,20 @@
   display: grid;
   gap: 2px;
   cursor: pointer;
-  margin-bottom: 6px;
+  min-width: 0;
+  margin-bottom: 0;
   transition: border-color 120ms ease, background-color 120ms ease;
 }
 
 .chr-picker-option:hover {
   border-color: var(--border-strong, #94a3b8);
   background: var(--surface-app, #f1f5f9);
+}
+
+.chr-picker-option strong, .chr-picker-option span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chr-picker-option span {

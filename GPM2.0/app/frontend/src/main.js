@@ -1,3 +1,6 @@
+import { retagAssemblyDomLocale } from "./ui/shell/assembly-session-cache.js";
+import { patchLocaleMarkup } from "./ui/i18n/presentation-patch.js";
+import { renderAssemblyPage, syncAssemblyTransientInteractions, disposeAssemblyTransientInteractions } from "./ui/pages/assembly-page.js";
 import { createAppUpdater, updateWorkBusy } from "./services/app-update.js";
 import { invokeCommand, listenBackendEvent, getPendingBackendCommands } from "./services/backend-api.js";
 import { openUpdateDialog } from "./ui/shell/app-update-panel.js";
@@ -434,7 +437,20 @@ function bindGlobalLanguageSwitch(root, storeRef) {
   const select = root.querySelector("#app-language-select");
   select?.addEventListener("change", () => {
     const value = select.value === "en" ? "en" : "zh";
-    storeRef.setState(relocalizeAppState(storeRef.getState(), value));
+    const previous = storeRef.getState();
+    const next = relocalizeAppState(previous, value);
+    storeRef.setState(next);
+    if (previous.activeRoute === "assembly") {
+      patchLocaleMarkup(root, renderAppShell(previous), renderAppShell(next));
+      const routeHost = root.querySelector("#route-host");
+      patchLocaleMarkup(routeHost, renderAssemblyPage(previous), renderAssemblyPage(next));
+      retagAssemblyDomLocale(routeHost, next);
+      syncAssemblyTransientInteractions(routeHost, storeRef);
+      syncSessionHeader(next);
+      syncLanguageSwitch(next);
+      return;
+    }
+    disposeAssemblyTransientInteractions(root.querySelector("#route-host"));
     root.innerHTML = renderAppShell(storeRef.getState());
     bindSettings(root, storeRef);
     bindGlobalLanguageSwitch(root, storeRef);

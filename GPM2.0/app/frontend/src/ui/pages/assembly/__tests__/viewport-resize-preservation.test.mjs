@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createAssemblyViewportController } from "../viewport-runtime.js";
-import { buildSubviewTrackViewportKey } from "../scroll-position-state.js";
+import { buildSubviewTrackViewportKey, buildFinalPathTrackViewportKey } from "../scroll-position-state.js";
 
 function harness(mode = "composition") {
   const session = { measuredTrackViewportPxByRole: { primary: 1000, subview: 1000, finalPath: 1000 } };
@@ -71,4 +71,31 @@ test("composition restored scroll events retain precise world left and real move
   assert.equal(h.store.getState().assembly.subviewCompositionViewport.leftBp, -1003.25);
   scroll.scrollLeft += 5; listeners.get("scroll")();
   assert.equal(h.store.getState().assembly.subviewCompositionViewport.leftBp, -950);
+});
+
+test("resize uses the explicit geometry callback after rebasing, and disposal removes its listener", () => {
+  const session = { measuredTrackViewportPxByRole: { primary: 1000, subview: 1000, finalPath: 1000 } };
+  const events = new Map(); let width = 1000, refreshed = 0;
+  const win = { addEventListener: (name, fn) => events.set(name, fn), removeEventListener: (name, fn) => { assert.equal(events.get(name), fn); events.delete(name); } };
+  const state = { activeRoute: "assembly", assembly: { subview: { summary: { mode: "pair" } } } };
+  const host = { isConnected: true, closest() { return this; }, querySelector: () => ({ clientWidth: width }) };
+  const store = { getState: () => state };
+  const controller = createAssemblyViewportController({ session, getWindow: () => win,
+    rerender() { assert.fail("resize must not invoke the route renderer"); },
+    refreshViewportGeometry(current) { assert.equal(current, host); assert.equal(session.measuredTrackViewportPxByRole.primary, width); refreshed++; } });
+  controller.bindTrackViewportResize(host, store); width = 700; events.get("resize")(); assert.equal(refreshed, 1);
+  host.isConnected = false; events.get("resize")(); assert.equal(events.has("resize"), false); assert.equal(refreshed, 1);
+});
+
+test("binding a Final Path scroller itself restores nonzero scroll and tracks subsequent movement", () => {
+  const events = new Map(), state = { session: { projectId: 1 }, assembly: { selectedChrName: "Chr1" } };
+  state.assembly.finalPathTrackScrollState = { viewportKey: buildFinalPathTrackViewportKey(state), scrollLeft: 317 };
+  const session = { measuredTrackViewportPxByRole: { primary: 1000, subview: 1000, finalPath: 1000 } };
+  const store = { getState: () => state, setState: patch => Object.assign(state, patch) };
+  const host = { dataset: {}, clientWidth: 1000, scrollLeft: 0, isConnected: true, matches: () => true,
+    querySelector: () => null, querySelectorAll: () => [], addEventListener: (key, fn) => events.set(key, fn) };
+  const controller = createAssemblyViewportController({ session, rerender() {}, persistProjectAssemblyViewStateFromStore() {} });
+  controller.bindTrackScrollSync(host, store, { scope: "final-path", schedulePersistAssemblyScrollState() {} });
+  assert.equal(host.scrollLeft, 317); assert.equal(typeof events.get("scroll"), "function");
+  host.scrollLeft = 422; events.get("scroll")(); assert.equal(state.assembly.finalPathTrackScrollState.scrollLeft, 422);
 });

@@ -384,22 +384,33 @@ function createRenderTracksRenderer(deps = {}) {
     const range = resolveMainMemberSourceRange(ctg);
     return range ? i18n.page.memberSourceRange.replace("{start}", range.sourceStart.toLocaleString()).replace("{end}", range.sourceEnd.toLocaleString()) : "";
   }
-  function memberLocalAnnotation(ctg, assembly, i18n) {
+  function memberLocalDetail(ctg, assembly, i18n) {
     const detail = describeMainMemberLocalState(ctg, assembly);
-    if (!detail) return '<span class="ctg-chip-local-row" aria-hidden="true"></span>';
+    if (!detail) return null;
     const label = i18n.page.localMemberNotes[detail.kind].replace("{count}", detail.count)
       .replace("{retained}", Number(detail.retainedBp || 0).toLocaleString()).replace("{total}", Number(detail.totalBp || 0).toLocaleString());
     const ranges = detail.ranges.map(([start, end]) => `${start.toLocaleString()}–${end.toLocaleString()}`).join(", ");
-    const shortLabel = detail.kind === "partial" ? i18n.page.localMemberPartialShort : label;
-    const tooltip = `${label}\n${i18n.page.localMemberNotes.detail}${ranges ? ` ${ranges}` : ""}`;
-    return `<span class="ctg-chip-local-row"><span class="ctg-chip-local-badge" data-main-member-local-state="${escapeAttr(detail.kind)}" title="${escapeAttr(tooltip)}" aria-label="${escapeAttr(tooltip)}">${escapeHtml(shortLabel)}</span></span>`;
+    return { kind: detail.kind, label: detail.kind === "partial" ? i18n.page.localMemberPartialShort : label,
+      tooltip: `${label}\n${i18n.page.localMemberNotes.detail}${ranges ? ` ${ranges}` : ""}` };
   }
-  function memberChipBody(ctg, visibleName, i18n, { nameClass = "", nameTitle = "", tags = "", localAnnotation = "" } = {}) {
-    const range = memberSourceRangeText(ctg, i18n);
+  function memberLocalAnnotation(ctg, assembly, i18n) {
+    const detail = memberLocalDetail(ctg, assembly, i18n);
+    return detail ? `<span class="ctg-chip-local-badge" data-main-member-local-state="${escapeAttr(detail.kind)}">${escapeHtml(detail.label)}</span>` : "";
+  }
+  function memberTooltip(ctg, assembly, i18n, name, extra = []) {
+    const sourceLength = Number(ctg.sourceFragment?.sourceLength || ctg.sourceRange?.sourceLength || 0);
+    return [name, `${i18n.page.memberContigLength}: ${formatBp(ctg.totalLength)}`,
+      sourceLength > 0 ? `${i18n.page.finalPathSourceLength}: ${formatBp(sourceLength)}` : "",
+      memberSourceRangeText(ctg, i18n), resolveDerivedSourceLabel(ctg),
+      memberLocalDetail(ctg, assembly, i18n)?.tooltip,
+      ctg.grtSourceCardKey ? `${i18n.grt.refStatus}: ${ctg.grtRefAlignmentStatus || "-"}; ${i18n.grt.anchorSource}: ${i18n.grt.grtFinalPathAnchor}; ${ctg.grtPlacementMode || "normal"}` : "",
+      ...extra].filter(Boolean).join("\n");
+  }
+  function memberChipBody(ctg, visibleName, i18n, { nameClass = "", tags = [], localAnnotation = "" } = {}) {
     const shortName = resolveMainMemberCardName(ctg, visibleName);
-    return `<strong class="ctg-chip-heading"><span class="ctg-chip-name ${nameClass}" title="${escapeAttr(nameTitle).replaceAll("\n", "&#10;")}">${escapeHtml(shortName)}</span><span class="ctg-chip-length">${formatBp(ctg.totalLength)}</span></strong>
-      <span class="ctg-chip-meta ctg-chip-source-range" title="${escapeAttr(range)}">${escapeHtml(range) || "&nbsp;"}</span>
-      ${tags ? `<span class="ctg-chip-tags">${tags}</span>` : ""}${localAnnotation || '<span class="ctg-chip-local-row" aria-hidden="true"></span>'}`;
+    const states = [...tags, localAnnotation].filter(Boolean);
+    return `<strong class="ctg-chip-heading"><span class="ctg-chip-name ${nameClass}">${escapeHtml(shortName)}</span></strong>
+      <span class="ctg-chip-details"><span class="ctg-chip-length">${formatBp(ctg.totalLength)}</span>${states.length ? `<span class="ctg-chip-tags" data-member-state-count="${states.length}">${states.join("")}${states.length > 1 ? `<span class="ctg-chip-more-states">+${states.length - 1}</span>` : ""}</span>` : ""}</span>`;
   }
   function buildDeletedCtgChips(items, selectedRecordIds = new Set(), i18n) {
     const list = Array.isArray(items) ? items : [];
@@ -426,7 +437,8 @@ function createRenderTracksRenderer(deps = {}) {
           class="ctg-chip ${selectedClass}"
           data-deleted-ctg-record-id="${deletedCtgRecordId}"
           data-deleted-assembly-ctg-id="${escapeAttr(String(assemblyCtgId))}"
-          title="${escapeAttr(fullName)}"
+          data-member-tooltip="${escapeAttr(memberTooltip({ ...item, totalLength }, {}, i18n, fullName))}"
+          aria-label="${escapeAttr(memberTooltip({ ...item, totalLength }, {}, i18n, fullName))}"
         >
           ${memberChipBody({ ...item, totalLength }, visibleName, i18n, { nameTitle: fullName })}
         </button>
@@ -584,59 +596,42 @@ function createRenderTracksRenderer(deps = {}) {
   }
 
 
+  function renderAssemblyScopeHeader(state, memberChips = "") {
+    const assembly = state.assembly, session = state.session || {}, i18n = getAssemblyI18n(state);
+    const chromosomes = Array.isArray(assembly.chromosomes) ? assembly.chromosomes : [];
+    const chrOpen = assembly.chrPickerOpen === true;
+    const membersOpen = assembly.membersCardCollapsed === false && !assembly.loading;
+    const membersTitle = i18n.page.membersCardTitle
+      .replace("{projectLabel}", String(session.projectName || session.projectId || "Project"))
+      .replace("{currentChrLabel}", String(assembly.selectedChrName || "current-chr"));
+    const chromosomeOptions = chromosomes.map(chr => `<button type="button" class="chr-picker-option ${chr.chrName === assembly.selectedChrName ? "is-active" : ""}" data-chr-name="${escapeAttr(chr.chrName)}" aria-pressed="${chr.chrName === assembly.selectedChrName}" title="${escapeAttr(`${chr.chrName} · ${formatBp(chr.placedBp)}`)}">
+      <strong>${escapeHtml(chr.chrName)}</strong><span>${chr.ctgCount} Contigs · ${(Number(chr.placedBp || 0) / 1e6).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Mb</span></button>`).join("");
+    return `<div class="chr-strip has-members-panel">
+      <div class="chr-title-wrap"><div class="chr-title-and-picker"><div class="chr-picker-inline" data-assembly-popup="chromosomes">
+        <button id="assembly-chr-picker-toggle" type="button" class="button ghost chr-title chr-picker-trigger" aria-controls="assembly-chr-picker-panel" aria-expanded="${chrOpen}" title="${escapeAttr(i18n.page.selectChromosomeTitle)}" ${chromosomes.length ? "" : "disabled"}>
+          <span class="chr-picker-current">${assembly.selectedChrName ? `${i18n.chrTitle} ${escapeHtml(assembly.selectedChrName)}` : escapeHtml(i18n.mainViewTitle)}</span><span data-popup-chevron aria-hidden="true">${chrOpen ? "▴" : "▾"}</span>
+        </button>
+        <div id="assembly-chr-picker-panel" class="chr-picker-menu assembly-scope-popover" ${chrOpen ? "" : "hidden"}>${chromosomeOptions || `<div class="muted">${escapeHtml(i18n.page.noChromosomeData)}</div>`}</div>
+      </div></div></div>
+      <article class="assembly-members-panel assembly-members-panel-inline${membersOpen ? "" : " is-collapsed"}" data-assembly-popup="members">
+        <div class="assembly-members-panel-head"><button type="button" class="button ghost assembly-members-trigger" data-members-card-toggle="1" aria-controls="assembly-members-panel-popover" aria-expanded="${membersOpen}" ${assembly.loading ? "disabled" : ""}>
+          <strong>${escapeHtml(membersTitle)}</strong><span data-popup-chevron aria-hidden="true">${membersOpen ? "▴" : "▾"}</span>
+        </button></div>
+        <div id="assembly-members-panel-popover" class="assembly-members-popover assembly-scope-popover" ${membersOpen ? "" : "hidden"}>
+          <div class="assembly-members-popover-tools"><button type="button" class="button ghost tiny" data-reset-members-state="1" aria-label="${escapeAttr(i18n.page.resetMembersState)}">↺ ${escapeHtml(i18n.page.resetMembersState)}</button></div>
+          <div class="ctg-chip-grid assembly-member-chip-region">${memberChips}</div>
+        </div>
+      </article>
+    </div>`;
+  }
+
   function renderAssemblyMainTab(state, options = {}) {
   const assembly = state.assembly;
   const session = state.session || {};
   const i18n = getAssemblyI18n(state);
   if (assembly.loading) {
-    const projectLabel = String(session.projectName || session.projectId || "Project");
-    const currentChrLabel = String(assembly.selectedChrName || "current-chr");
-    const membersCardTitle = i18n.page.membersCardTitle
-      .replace("{projectLabel}", projectLabel)
-      .replace("{currentChrLabel}", currentChrLabel);
-    const membersCardCollapsed = assembly?.membersCardCollapsed !== false;
-    const membersCardToggleLabel = membersCardCollapsed
-      ? i18n.page.expandMembersCard
-      : i18n.page.collapseMembersCard;
     return `
-      <div class="chr-strip has-members-panel">
-        <div class="chr-title-wrap">
-          <div class="chr-title-and-picker">
-            <div class="chr-title">${
-              assembly.selectedChrName
-                ? `${i18n.chrTitle} ${escapeHtml(assembly.selectedChrName)}`
-                : i18n.mainViewTitle
-            }</div>
-            <div class="chr-picker-inline">
-              <button
-                id="assembly-chr-picker-toggle"
-                class="button ghost tiny"
-                title="${escapeAttr(i18n.page.selectChromosomeTitle)}"
-                aria-expanded="false"
-                disabled
-              >
-                ▾
-              </button>
-            </div>
-          </div>
-        </div>
-        <article class="card assembly-members-panel assembly-members-panel-inline is-collapsed">
-          <div class="assembly-members-panel-head">
-            <strong>${escapeHtml(membersCardTitle)}</strong>
-            <button
-              type="button"
-              class="button ghost tiny"
-              data-members-card-toggle="1"
-              aria-expanded="${membersCardCollapsed ? "false" : "true"}"
-              aria-label="${escapeAttr(membersCardToggleLabel)}"
-              title="${escapeAttr(membersCardToggleLabel)}"
-              disabled
-            >
-              ${membersCardCollapsed ? "▾" : "▴"}
-            </button>
-          </div>
-        </article>
-      </div>
+      ${renderAssemblyScopeHeader(state)}
       <section class="assembly-track-content-stack is-loading">
         <section class="card assembly-main-view">
           ${renderAssemblyStatusToast(assembly)}
@@ -755,17 +750,6 @@ function createRenderTracksRenderer(deps = {}) {
         i18n,
       );
     })();
-  const chromosomeOptions = assembly.chromosomes.length
-    ? assembly.chromosomes
-        .map((chr) => {
-          const active = chr.chrName === assembly.selectedChrName ? "is-active" : "";
-          return `<button class="chr-picker-option ${active}" data-chr-name="${escapeAttr(chr.chrName)}">
-            <strong>${escapeHtml(chr.chrName)}</strong>
-            <span>${chr.ctgCount} Contigs · ${formatBp(chr.placedBp)}</span>
-          </button>`;
-        })
-        .join("")
-    : `<div class="muted">${escapeHtml(i18n.page.noChromosomeData)}</div>`;
   const selectedDeletedRecordIds = new Set(
     normalizeDeletedCtgRecordIds(assembly.selectedDeletedCtgRecordIds),
   );
@@ -793,7 +777,7 @@ function createRenderTracksRenderer(deps = {}) {
           const visibleName = resolveTrackCtgVisibleName(ctg, ctg.assemblyCtgId);
           const sourceTagMarkup = renderDerivedSourceHtmlTag(ctg);
           const grtStatusMarkup = ctg.grtSourceCardKey
-            ? `<span class="grt-status-badge is-${escapeAttr(ctg.grtPlacementMode || "normal")}" title="${escapeAttr(`${i18n.grt.refStatus}: ${ctg.grtRefAlignmentStatus || "-"}; ${i18n.grt.anchorSource}: ${i18n.grt.grtFinalPathAnchor}`)}">${escapeHtml(ctg.grtPlacementMode || "normal")}</span>`
+            ? `<span class="grt-status-badge is-${escapeAttr(ctg.grtPlacementMode || "normal")}">${escapeHtml(ctg.grtPlacementMode || "normal")}</span>`
             : "";
           const coAssignedChrNames = Array.isArray(ctg.coAssignedChrNames)
             ? ctg.coAssignedChrNames
@@ -804,91 +788,20 @@ function createRenderTracksRenderer(deps = {}) {
             ? i18n.page.coAssignedChrTooltip.replace("{chrNames}", coAssignedChrNames.join(", "))
             : "";
           const nameTitle = [fullName, coAssignedTooltip].filter(Boolean).join("\n");
-          return `<button class="ctg-chip ${active}${selectedClass}${hiddenClass}${historyHighlightClass}" data-assembly-ctg-id="${ctg.assemblyCtgId}" data-track-focus-mode="start" type="button" title="${escapeAttr(nameTitle).replaceAll("\n", "&#10;")}" aria-label="${escapeAttr(nameTitle).replaceAll("\n", "&#10;")}">
+          return `<button class="ctg-chip ${active}${selectedClass}${hiddenClass}${historyHighlightClass}" data-assembly-ctg-id="${ctg.assemblyCtgId}" data-track-focus-mode="start" type="button" data-member-tooltip="${escapeAttr(memberTooltip(ctg, assembly, i18n, nameTitle, hiddenClass ? [i18n.page.deletedHiddenTag] : []))}" aria-label="${escapeAttr(nameTitle).replaceAll("\n", "&#10;")}">
             ${memberChipBody(ctg, visibleName, i18n, { nameClass: coAssignedTooltip ? "is-coassigned" : "",
-              nameTitle, tags: sourceTagMarkup + grtStatusMarkup + hiddenTag, localAnnotation })}
+              tags: [sourceTagMarkup, grtStatusMarkup, hiddenTag], localAnnotation })}
           </button>`;
         })
         .join("")
     : `<div class="muted">${escapeHtml(i18n.noContigsInChr)}</div>`;
   const deletedCtgChips = buildDeletedCtgChips(assembly.deletedCtgs, selectedDeletedRecordIds, i18n);
   const combinedMemberChips = `${ctgChips}${deletedCtgChips}`;
-  const projectLabel = String(session.projectName || session.projectId || "Project");
-  const currentChrLabel = String(assembly.selectedChrName || "current-chr");
-  const membersCardTitle = i18n.page.membersCardTitle
-    .replace("{projectLabel}", projectLabel)
-    .replace("{currentChrLabel}", currentChrLabel);
-  const membersCardCollapsed = assembly?.membersCardCollapsed !== false;
-  const membersCardToggleLabel = membersCardCollapsed
-    ? i18n.page.expandMembersCard
-    : i18n.page.collapseMembersCard;
-  const membersPanelClassName = membersCardCollapsed
-    ? "card assembly-members-panel assembly-members-panel-inline is-collapsed"
-    : "card assembly-members-panel assembly-members-panel-inline";
   const finalPathCard = options.includeFinalPath === false
     ? ""
     : renderAssemblyFinalPathCardImpl(state, deps);
   return `
-      <div class="chr-strip has-members-panel">
-        <div class="chr-title-wrap">
-          <div class="chr-title-and-picker">
-            <div class="chr-title">${
-              assembly.selectedChrName
-                ? `${i18n.chrTitle} ${escapeHtml(assembly.selectedChrName)}`
-                : i18n.mainViewTitle
-            }</div>
-            <div class="chr-picker-inline">
-              <button
-                id="assembly-chr-picker-toggle"
-                class="button ghost tiny"
-                title="${escapeAttr(i18n.page.selectChromosomeTitle)}"
-                aria-expanded="${assembly.chrPickerOpen ? "true" : "false"}"
-                ${assembly.chromosomes.length ? "" : "disabled"}
-              >
-                ${assembly.chrPickerOpen ? "▴" : "▾"}
-              </button>
-              ${
-                assembly.chrPickerOpen
-                  ? `<div class="chr-picker-menu ${assembly.chromosomes.length ? "" : "muted"}">
-                      ${chromosomeOptions}
-                    </div>`
-                  : ""
-              }
-            </div>
-          </div>
-        </div>
-        <article class="${membersPanelClassName}">
-          <div class="assembly-members-panel-head">
-            <span class="assembly-members-panel-title-inline">
-              <strong>${escapeHtml(membersCardTitle)}</strong>
-              <button
-                type="button"
-                class="assembly-members-icon-action"
-                data-reset-members-state="1"
-                aria-label="${escapeAttr(i18n.page.resetMembersState)}"
-                title="${escapeAttr(i18n.page.resetMembersState)}"
-              >
-                ↺
-              </button>
-            </span>
-            <button
-              type="button"
-              class="button ghost tiny"
-              data-members-card-toggle="1"
-              aria-expanded="${membersCardCollapsed ? "false" : "true"}"
-              aria-label="${escapeAttr(membersCardToggleLabel)}"
-              title="${escapeAttr(membersCardToggleLabel)}"
-            >
-              ${membersCardCollapsed ? "▾" : "▴"}
-            </button>
-          </div>
-          ${
-            membersCardCollapsed
-              ? ""
-              : `<div class="ctg-chip-grid assembly-member-chip-region">${combinedMemberChips}</div>`
-          }
-        </article>
-      </div>
+      ${renderAssemblyScopeHeader(state, combinedMemberChips)}
       <section class="assembly-track-content-stack">
         <section class="card assembly-main-view">
           ${renderAssemblyStatusToast(assembly)}
@@ -1103,6 +1016,7 @@ function renderAssemblyTrackInlineControls({
   selectedChrName,
   mainViewHistory,
   i18n,
+  trailingControls = "",
 }) {
   const supportDatasetSelect = supportDatasetOptions.length
     ? renderSupportDatasetSelect({
@@ -1145,7 +1059,7 @@ function renderAssemblyTrackInlineControls({
     i18n,
   });
   return `
-    <div class="assembly-track-inline-controls" data-main-track-inline-controls role="group" aria-label="${escapeAttr(i18n.page.primaryAlignmentViewControlsAria)}">
+    <div class="assembly-track-inline-controls" data-main-track-inline-controls data-main-track-toolbar role="group" aria-label="${escapeAttr(i18n.page.primaryAlignmentViewControlsAria)}">
       <div class="assembly-marker-display">
         <button type="button" class="button ghost tiny" data-marker-display-toggle aria-expanded="false" aria-controls="assembly-marker-display-menu">${escapeHtml(i18n.trackControls.markerDisplay)}</button>
         <div id="assembly-marker-display-menu" class="assembly-marker-display-menu" role="group" aria-label="${escapeAttr(i18n.trackControls.markerDisplay)}" hidden>
@@ -1175,6 +1089,7 @@ function renderAssemblyTrackInlineControls({
         ${identityInput}
       </label>
       ${mainViewHistoryControls}
+      ${trailingControls}
     </div>
   `;
 }
@@ -2407,16 +2322,6 @@ function renderAssemblyTracks(args) {
     ${refMemberBlocks}
   `;
 
-  const inlineControls = renderAssemblyTrackInlineControls({
-    trackPrefs,
-    supportDsCtgLenRules,
-    chrLength,
-    supportDatasetOptions,
-    supportDatasetId,
-    selectedChrName,
-    mainViewHistory,
-    i18n,
-  });
   const createPhasedTrackButton = renderCreatePhasedTrackButton({
     phasedAssemblyEnabled,
     phasedTrackCount: phasedChrTracks.length,
@@ -2428,6 +2333,17 @@ function renderAssemblyTracks(args) {
     i18n,
     escapeHtml,
     escapeAttr,
+  });
+  const inlineControls = renderAssemblyTrackInlineControls({
+    trackPrefs,
+    supportDsCtgLenRules,
+    chrLength,
+    supportDatasetOptions,
+    supportDatasetId,
+    selectedChrName,
+    mainViewHistory,
+    i18n,
+    trailingControls: `${grtResultControls}${createPhasedTrackButton}`,
   });
   const grtResultToastMarkup = grtResultToast?.scope === "main"
     && grtResultToast?.chrName === selectedChrName
@@ -2443,12 +2359,9 @@ function renderAssemblyTracks(args) {
     : "";
   return `
     <div class="assembly-track-unified assembly-track-panel" data-show-telomeres="${trackPrefs.showTelomeres ? "true" : "false"}" data-show-centromeres="${trackPrefs.showCentromeres ? "true" : "false"}">
-      <div class="assembly-track-panel-head" data-main-track-control-layout="auto" data-grt-result-card="main" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
+      <div class="assembly-track-panel-head" data-main-view-header data-grt-result-card="main" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
         <strong class="assembly-view-title" data-main-track-control-title>${escapeHtml(i18n.page.primaryAlignmentViewSingleCardTitle)}</strong>
-        <div class="assembly-track-panel-actions" data-main-track-control-actions>
-          <div class="assembly-track-panel-quick-actions" data-main-track-quick-actions>${grtResultControls}${createPhasedTrackButton}</div>
-          ${inlineControls}
-        </div>
+        ${inlineControls}
       </div>
       ${grtResultToastMarkup}
       <div class="assembly-track-layout">

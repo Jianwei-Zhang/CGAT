@@ -2695,6 +2695,11 @@ test("assembly page public binder wires host-level listeners once for the same h
   assert.deepEqual(listenerTypes, [
     "pointerdown",
     "pointermove",
+    "click",
+    "keydown",
+    "pointerover",
+    "pointerout",
+    "scroll",
     "pointerdown",
     "pointerdown",
     "pointerdown",

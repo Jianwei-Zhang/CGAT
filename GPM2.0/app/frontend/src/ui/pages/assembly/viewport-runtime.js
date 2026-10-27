@@ -114,6 +114,7 @@ export function createAssemblyViewportController({
   getWindow = () => globalThis.window,
   persistProjectAssemblyViewStateFromStore,
   rerender,
+  refreshViewportGeometry = rerender,
 }) {
   const scrollBindings = new WeakMap();
 
@@ -145,7 +146,7 @@ export function createAssemblyViewportController({
   function readAssemblyTrackViewportWidths(host) {
     const primaryScroll = host?.querySelector?.(".assembly-track-scroll[data-track-role='primary']") || null;
     const subviewScroll = host?.querySelector?.(".assembly-track-scroll.subview-track-scroll") || null;
-    const finalPathScroll =
+    const finalPathScroll = host?.matches?.("[data-final-path-graph-viewport], .assembly-final-path-svg-wrap") ? host :
       host?.querySelector?.("[data-final-path-graph-viewport]")
       || host?.querySelector?.(".assembly-final-path-svg-wrap")
       || null;
@@ -173,6 +174,14 @@ export function createAssemblyViewportController({
     return true;
   }
 
+  function disposeTrackViewportResize(host) {
+    host = host?.closest?.("#route-host") || host;
+    const binding = host?.[ASSEMBLY_TRACK_RESIZE_BOUND];
+    if (!binding) return;
+    getWindow()?.removeEventListener?.("resize", binding.onResize);
+    delete host[ASSEMBLY_TRACK_RESIZE_BOUND];
+  }
+
   function bindTrackViewportResize(host, store) {
     const routeHost = host?.closest?.("#route-host") || null;
     if (routeHost && routeHost !== host) {
@@ -190,10 +199,12 @@ export function createAssemblyViewportController({
       getMeasuredWidths: () => session.measuredTrackViewportPxByRole,
       setMeasuredWidths: (nextWidths) => { updateMeasuredWidths(store, nextWidths); },
       onViewportResize: () => {
-        rerender(host, store);
+        refreshViewportGeometry(host, store);
       },
     });
     const onResize = () => {
+      if (host.isConnected === false) return disposeTrackViewportResize(host);
+      if (store.getState().activeRoute && store.getState().activeRoute !== "assembly") return;
       coordinator.onResize();
     };
     windowObject.addEventListener("resize", onResize);
@@ -295,7 +306,7 @@ export function createAssemblyViewportController({
     const shouldBindSubview = scope === "all" || scope === "subview";
     const shouldBindFinalPath = scope === "all" || scope === "final-path";
     const hasTemporaryLoadingMarkup = Boolean(store.getState().assembly?.loading);
-    const shouldClearMissing = scope === "all" && !hasTemporaryLoadingMarkup;
+    const shouldClearMissing = scope === "all" && !hasTemporaryLoadingMarkup && deps.preserveMissing !== true;
     let viewportChanged = false;
     const nextMeasuredTrackViewportWidths = resolveMeasuredTrackViewportWidths(
       readAssemblyTrackViewportWidths(host),
@@ -503,7 +514,7 @@ export function createAssemblyViewportController({
     }
 
     if (shouldBindFinalPath) {
-      const finalPathScrollEl =
+      const finalPathScrollEl = host?.matches?.("[data-final-path-graph-viewport], .assembly-final-path-svg-wrap") ? host :
         host?.querySelector?.("[data-final-path-graph-viewport]")
         || host?.querySelector?.(".assembly-final-path-svg-wrap")
         || null;
@@ -571,6 +582,7 @@ export function createAssemblyViewportController({
   return {
     bindTrackScrollSync,
     bindTrackViewportResize,
+    disposeTrackViewportResize,
     getMeasuredTrackViewportPx,
     readAssemblyTrackViewportWidths,
     rememberTrackViewportAnchor,

@@ -215,7 +215,31 @@ export function createAssemblyDomPatchController({
   }
 
   function patchMemberChipHiddenState(chip, shouldHide, hiddenTagText) {
+    const wasHidden = chip?.classList?.contains?.("is-hidden-contig") === true;
     chip?.classList?.toggle?.("is-hidden-contig", shouldHide);
+    const details = chip?.querySelector?.(".ctg-chip-details");
+    if (details) {
+      if (wasHidden === shouldHide) return;
+      const tooltip = chip.getAttribute("data-member-tooltip") || "";
+      const lines = tooltip.split("\n").filter(line => line !== hiddenTagText);
+      if (shouldHide) lines.push(hiddenTagText);
+      chip.setAttribute("data-member-tooltip", lines.join("\n"));
+      let tags = details.querySelector(".ctg-chip-tags");
+      if (!tags && shouldHide) {
+        details.insertAdjacentHTML("beforeend", `<span class="ctg-chip-tags" data-member-state-count="1"><span class="ctg-chip-hidden-tag">${escapeHtml(hiddenTagText)}</span></span>`);
+      } else if (tags) {
+        if (shouldHide && !tags.querySelector(".ctg-chip-hidden-tag")) tags.insertAdjacentHTML("beforeend", `<span class="ctg-chip-hidden-tag">${escapeHtml(hiddenTagText)}</span>`);
+        const count = Math.max(0, Number(tags.dataset.memberStateCount || 1) + (shouldHide ? 1 : -1));
+        tags.dataset.memberStateCount = String(count);
+        const more = tags.querySelector(".ctg-chip-more-states");
+        if (count > 1 && more) more.textContent = `+${count - 1}`;
+        else if (count > 1) tags.insertAdjacentHTML("beforeend", `<span class="ctg-chip-more-states">+${count - 1}</span>`);
+        else more?.remove();
+        if (!shouldHide) tags.querySelector(".ctg-chip-hidden-tag")?.remove();
+        if (!count) tags.remove();
+      }
+      return;
+    }
     const existingTag = chip?.querySelector?.(".ctg-chip-hidden-tag") || null;
     if (!shouldHide) {
       existingTag?.remove?.();

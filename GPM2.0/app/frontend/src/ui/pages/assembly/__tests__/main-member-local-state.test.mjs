@@ -8,7 +8,7 @@ import { commitSubviewHistoryOperation, rollbackSubviewHistory } from "../subvie
 import { describeMainMemberLocalState, resolveMainMemberSourceRange, resolveMainMemberCardName } from "../main-member-local-state.js";
 import { createEditingOperations } from "../../../../dev-bridge/operations/editing.js";
 
-const memberPanel = (html) => html.match(/<article class="card assembly-members-panel[^]*?<\/article>/)?.[0] || "";
+const memberPanel = (html) => html.match(/<article class="assembly-members-panel[^]*?<\/article>/)?.[0] || "";
 test("Main DS chips keep real membership and total lengths while annotating local split/delete/undo", () => {
   const state = createIdentityRenderState("composition"); state.assembly.membersCardCollapsed = false;
   const real = state.assembly.chrCtgs;
@@ -94,13 +94,13 @@ test("member card separates short title, real length, current source range and c
   assert.match(partial, /ctg-chip-heading/);
   assert.match(partial, /ctg-chip-length[^>]*>16,000 bp/);
   assert.match(partial, /data-main-member-local-state="partial"[^>]*>局部部分保留<\/span>/);
-  assert.match(partial, /title="局部保留 8,000\/16,000 bp · 1 个对象/);
+  assert.match(partial, /data-member-tooltip="[^"\n]*\nContig 长度: 16,000 bp\n局部保留 8,000\/16,000 bp · 1 个对象/);
   state.assembly.chrCtgs = [{ ...original, name: "Chr01[42739070-59056711].2", totalLength: 12775756,
     sourceFragment: { sourceSeqId: 1, groupKey: "manual-fragment:2", sourceStart: 46280956, sourceEnd: 59056711 } }];
   const html = memberPanel(renderAssemblyPage(state));
-  assert.match(html, /title="Chr01\[42739070-59056711\]\.2"/);
+  assert.match(html, /data-member-tooltip="Chr01\[42739070-59056711\]\.2\nContig 长度: 12,775,756 bp/);
   assert.match(html, />Chr01\.2<\/span>/);
-  assert.match(html, /ctg-chip-source-range[^>]*>源 46,280,956–59,056,711<\/span>/);
+  assert.match(html, /data-member-tooltip="[^"]*源 46,280,956–59,056,711/);
   assert.equal((html.match(/data-assembly-ctg-id=/g) || []).length, 1);
   assert.equal(state.assembly.chrCtgs[0].name, "Chr01[42739070-59056711].2", "presentation never renames the source entity");
 });

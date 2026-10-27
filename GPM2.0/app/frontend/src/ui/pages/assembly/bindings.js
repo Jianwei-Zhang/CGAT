@@ -1,3 +1,4 @@
+import { bindAssemblyScopePopovers } from "./scope-popover-runtime.js";
 import { bindFinalPathSelection } from "./final-path-selection-runtime.js";
 import { bindFinalPathTooltips } from "./final-path-tooltip-runtime.js";
 import { FLOATING_MENU_CLOSE_DELAY_MS } from "../floating-menu-runtime.js";
@@ -27,7 +28,8 @@ import {
   setGrtResultLayerEnabled,
 } from "./grt-result-state.js";
 import { assemblyPageSession } from "./page-session.js";
-import { bindMainTrackControlLayout } from "./main-track-control-layout-runtime.js";
+import { bindMainTrackToolbarPopups } from "./main-track-toolbar-runtime.js";
+import { placeAnchoredPanel, clearAnchoredPanelPlacement } from "./anchored-panel-placement.js";
 import { bindMarkerDisplayMenus } from "./marker-display-menu-runtime.js";
 import { updateSubviewCompositionViewport } from "./subview-history-state.js";
 import { resolveSubviewCompositionScaleViewport } from "./subview-composition-layout.js";
@@ -120,6 +122,7 @@ function setTrackComboOpenState(comboNode, isOpen) {
     if (isOpen) {
       syncTrackComboMenuPlacement(comboNode);
     } else {
+      if (comboNode.closest?.("[data-main-track-toolbar]")) clearAnchoredPanelPlacement(menu);
       menu.style.top = "";
       menu.style.bottom = "";
       menu.style.maxHeight = "";
@@ -136,6 +139,7 @@ function syncTrackComboMenuPlacement(comboNode) {
   if (!menu || typeof menu.getBoundingClientRect !== "function") {
     return;
   }
+  if (comboNode.closest?.("[data-main-track-toolbar]") && placeAnchoredPanel(comboNode, menu)) return;
   const viewportHeight =
     Number(globalThis.window?.innerHeight)
     || Number(globalThis.document?.documentElement?.clientHeight)
@@ -379,7 +383,7 @@ function getCreateEmptyFinalPathRow(deps) {
 
 export function bindAssemblyPage(host, store, deps, options = {}) {
   assertAssemblyBindingDeps(deps);
-  bindMainTrackControlLayout(host);
+  bindMainTrackToolbarPopups(host);
   const requestedScope = String(options?.scope || "all").trim().toLowerCase();
   const bindingScope = ["main", "subview", "final-path"].includes(requestedScope)
     ? requestedScope
@@ -492,7 +496,6 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   const exportChrCtgPmoButton = queryHost("#assembly-export-chr-ctg-pmolecule-button");
   const exportAgpButton = queryHost("#assembly-export-agp-button");
   const chrPickerToggleButton = queryHost("#assembly-chr-picker-toggle");
-  const chrPickerInline = chrPickerToggleButton?.closest?.(".chr-picker-inline");
   const quickActionButtons = queryHostAll("[data-assembly-quick-action]");
   const chrPickerButtons = queryHostAll(".chr-picker-option[data-chr-name]");
   const ctgButtons = queryHostAll("[data-assembly-ctg-id]");
@@ -519,7 +522,6 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
   const subviewTrackIdentityInput = queryHost("#subview-track-identity-pct");
   const finalPathTrackMinTickUnitKbInput = queryHost("#final-path-track-min-tick-unit-kb");
   const finalPathTrackMaxTickCountInput = queryHost("#final-path-track-max-tick-count");
-  const membersCardToggleButton = queryHost("[data-members-card-toggle='1']");
   const restoreAllDeletedCtgsButton = queryHost("[data-restore-all-deleted-ctgs='1']");
   const resetMembersStateButton = queryHost("[data-reset-members-state='1']");
   const assemblyConfirmButtons = queryHostAll("[data-assembly-confirm-action][data-assembly-confirm-id]");
@@ -1018,20 +1020,7 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
       closeTimer = setTimeout(close, FLOATING_MENU_CLOSE_DELAY_MS);
     });
   });
-  membersCardToggleButton?.addEventListener("click", async (event) => {
-    event.preventDefault();
-    const state = store.getState();
-    const membersCardCollapsed = state.assembly?.membersCardCollapsed !== false;
-    store.setState({
-      ...state,
-      assembly: {
-        ...state.assembly,
-        membersCardCollapsed: !membersCardCollapsed,
-      },
-    });
-    rerender(host, store);
-    await persistMainTrackViewState(host, store);
-  });
+  bindAssemblyScopePopovers(host, store, { persistMembers: persistMainTrackViewState });
   restoreAllDeletedCtgsButton?.addEventListener("click", async (event) => {
     event.preventDefault();
     const state = store.getState();
@@ -1156,46 +1145,6 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     void loadNewSequencesTab(host, store);
   }
 
-  chrPickerToggleButton?.addEventListener("click", () => {
-    const state = store.getState();
-    store.setState({
-      assembly: {
-        ...state.assembly,
-        chrPickerOpen: !state.assembly.chrPickerOpen,
-      },
-    });
-    rerender(host, store);
-  });
-
-  if (chrPickerInline) {
-    let closeTimer = null;
-    const close = () => {
-      closeTimer = null;
-      const state = store.getState();
-      if (!state.assembly?.chrPickerOpen) {
-        return;
-      }
-      store.setState({
-        assembly: {
-          ...state.assembly,
-          chrPickerOpen: false,
-        },
-      });
-      rerender(host, store);
-    };
-    const cancelClose = () => {
-      if (closeTimer !== null) {
-        clearTimeout(closeTimer);
-        closeTimer = null;
-      }
-    };
-    chrPickerInline.addEventListener?.("pointerenter", cancelClose);
-    chrPickerInline.addEventListener?.("pointerleave", () => {
-      cancelClose();
-      closeTimer = setTimeout(close, FLOATING_MENU_CLOSE_DELAY_MS);
-    });
-  }
-
   chrPickerButtons.forEach((button) => {
     button.addEventListener("click", async () => {
       const chrName = button.dataset.chrName || "";
@@ -1210,20 +1159,16 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
         return;
       }
       const isMemberChip = Boolean(button.closest?.(".assembly-member-chip-region"));
-      const restoreMemberChipScroll = isMemberChip
-        ? captureScrollableRegionState(host, ".assembly-member-chip-region")
-        : () => {};
       if (isMemberChip && (event.ctrlKey || event.metaKey)) {
         event.preventDefault();
         togglePrimaryTrackSelection(host, store, assemblyCtgId);
-        restoreMemberChipScroll();
         return;
       }
       updateDeletedCtgSelection(host, store, []);
       await selectCtg(host, store, assemblyCtgId, {
         focusMode: normalizeTrackFocusMode(button.dataset.trackFocusMode),
+        quiet: isMemberChip,
       });
-      restoreMemberChipScroll();
     });
   });
   deletedCtgButtons.forEach((button) => {
@@ -1565,16 +1510,18 @@ export function bindAssemblyPage(host, store, deps, options = {}) {
     bindTrackSelectionHotkeys(host, store);
   }
 
-  const viewportChanged = bindTrackScrollSync(host, store, { scope: bindingScope });
-  if (viewportChanged) {
-    rerender(host, store);
-    return;
+  if (!options.deferViewportSync) {
+    const viewportChanged = bindTrackScrollSync(host, store, { scope: bindingScope });
+    if (viewportChanged) {
+      rerender(host, store);
+      return;
+    }
+    bindAssemblyViewNavigation(host, store, {
+      rerenderAssemblyMainTab, rerenderSubviewPanel, rerenderFinalPathCard,
+      persistMainTrackViewState, persistProjectAssemblyViewStateFromStore,
+      rememberTrackViewportAnchor, markNextTrackAutoFocusSuppressed,
+    });
   }
-  bindAssemblyViewNavigation(host, store, {
-    rerenderAssemblyMainTab, rerenderSubviewPanel, rerenderFinalPathCard,
-    persistMainTrackViewState, persistProjectAssemblyViewStateFromStore,
-    rememberTrackViewportAnchor, markNextTrackAutoFocusSuppressed,
-  });
   bindSubviewRulerRuntime(host);
   bindStickyCtgLabels(host);
 

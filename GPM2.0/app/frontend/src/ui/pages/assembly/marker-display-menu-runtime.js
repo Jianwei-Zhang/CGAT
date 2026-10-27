@@ -1,3 +1,4 @@
+import { placeAnchoredPanel, clearAnchoredPanelPlacement } from "./anchored-panel-placement.js";
 import { cancelDelayedFloatingClose, scheduleDelayedFloatingClose } from "../floating-menu-runtime.js";
 
 const BOUND = Symbol("markerDisplayMenuBound");
@@ -24,6 +25,10 @@ export function bindMarkerDisplayMenus(host, options = {}) {
     if (!button || !panel) return;
     cancel(root);
     panel.hidden = !open;
+    if (root.closest?.("[data-main-track-toolbar]")) {
+      if (open) placeAnchoredPanel(button, panel);
+      else clearAnchoredPanelPlacement(panel);
+    }
     button.setAttribute("aria-expanded", String(open));
   };
   const schedule = (root) => scheduleDelayedFloatingClose(root, CLOSE_TIMER, () => setOpen(root, false), timerOptions);

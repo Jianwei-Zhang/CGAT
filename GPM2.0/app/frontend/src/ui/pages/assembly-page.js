@@ -1,3 +1,9 @@
+import { refreshViewportGeometry } from "./assembly/viewport-geometry-refresh.js";
+import { syncExistingAssemblyViewNavigation } from "./assembly/view-navigation-runtime.js";
+import { destroyImmediateTooltips } from "./assembly/immediate-tooltip-runtime.js";
+import { bindAssemblyScopePopovers, destroyAssemblyScopePopovers } from "./assembly/scope-popover-runtime.js";
+import { bindMainTrackToolbarPopups, destroyMainTrackToolbarPopups } from "./assembly/main-track-toolbar-runtime.js";
+import { paintMainSelection } from "./assembly/main-selection-paint.js";
 import { bindFinalPathSelection } from "./assembly/final-path-selection-runtime.js";
 import { bindFinalPathTooltips, hideFinalPathTooltips } from "./assembly/final-path-tooltip-runtime.js";
 import { createAssemblyContigSplitRuntime } from "./assembly/contig-split-runtime.js";
@@ -311,6 +317,7 @@ const endTypeOptions = ["normal", "gap", "telomere"];
 const {
   bindTrackScrollSync,
   bindTrackViewportResize,
+  disposeTrackViewportResize,
   getMeasuredTrackViewportPx,
   rememberTrackViewportAnchor,
 } = createAssemblyViewportController({
@@ -319,7 +326,9 @@ const {
   getTimerApi: () => resolveTimerApi(),
   persistProjectAssemblyViewStateFromStore: (host, store, deps) =>
     persistProjectAssemblyViewStateFromStore(host, store, deps),
-  rerender: (host, store) => rerender(host, store),
+  // A viewport scale change may refresh plot geometry, never the controls,
+  // member/chr panels, focused editors or the route/page that own that state.
+  refreshViewportGeometry: (host, store) => refreshAssemblyViewportGeometry(host, store),
 });
 const renderTracksDeps = {
   escapeAttr,
@@ -567,6 +576,7 @@ const {
   buildDualTrackModel,
   getDatasetNameById,
   patchPrimaryHiddenCtgDom,
+  patchSelection: (host, store) => paintMainSelection(host, store.getState()),
   persistProjectAssemblyViewStateFromStore: (host, store, overrides) =>
     persistProjectAssemblyViewStateFromStore(
       host,
@@ -823,7 +833,7 @@ export function bindAssemblyPage(host, store, options = {}) {
     host,
     store,
     createAssemblyPageBindingDeps(options),
-    { scope: options.scope },
+    { scope: options.scope, deferViewportSync: options.deferViewportSync },
   );
   if (!options.scope) {
     scrollAssemblyToBottomIfRequested(host, store);
@@ -835,7 +845,17 @@ export function bindAssemblyPage(host, store, options = {}) {
 // Cached DOM is already bound, but its temporary paint may predate a project
 // switch. Reconcile it before exposing the restored page, without rebinding
 // business handlers or reviving the cached hover panel.
+export function disposeAssemblyTransientInteractions(host) {
+  disposeTrackViewportResize(host);
+  destroyImmediateTooltips(host);
+  destroyAssemblyScopePopovers(host);
+  destroyMainTrackToolbarPopups(host);
+}
+
 export function syncAssemblyTransientInteractions(host, store) {
+  syncExistingAssemblyViewNavigation(host);
+  bindAssemblyScopePopovers(host, store);
+  bindMainTrackToolbarPopups(host);
   bindFinalPathSelection(host, store);
   bindFinalPathTooltips(host);
   hideFinalPathTooltips(host);
@@ -1065,6 +1085,18 @@ const assemblyDataLoaderDeps = {
   normalizeSupportDatasetId,
 };
 
+function patchMemberSelection(host, store, options = {}) {
+  const root = host?.closest?.("#route-host") || host;
+  if (!paintMainSelection(root, store.getState(), options)) return;
+  if (options.focus) bindTrackScrollSync(root, store, { scope: "main" });
+  const doc = root.ownerDocument;
+  if (doc?.createElement) {
+    const template = doc.createElement("template");
+    template.innerHTML = `<section class="assembly-main-view">${renderAssemblyStatusToastImpl(store.getState(), renderTracksDeps)}</section>`;
+    patchAssemblyStatusToast(root, template.content);
+  }
+}
+
 const assemblyDataRuntimeDeps = {
   waitForProjectViewMutations: () => assemblyPageSession.projectViewMutationCoordinator.whenIdle(),
   activateSubviewCompositionHistory,
@@ -1090,6 +1122,7 @@ const assemblyDataRuntimeDeps = {
   loadDatasetChrCtgs,
   loadDeletedCtgsForChr,
   loadSideDataForCtg,
+  patchSelection: patchMemberSelection,
   mapAssemblyError,
   normalizeDeletedCtgRecordIds,
   normalizeGrtProjectView,
@@ -1568,6 +1601,18 @@ function rerender(host, store) {
   }
   routeHost.innerHTML = renderAssemblyPage(state);
   bindAssemblyPage(routeHost, store);
+}
+
+function refreshAssemblyViewportGeometry(host, store) {
+  return refreshViewportGeometry(host, store, {
+    resolveRouteHost: resolveCurrentRouteHost,
+    renderPage: renderAssemblyPage,
+    bindGraph: (node, currentStore, scope) => bindAssemblyPage(node, currentStore, {
+      scope, deferViewportSync: true, rerender: scope === "final-path" ? rerenderFinalPathCard : rerenderAssemblyMainTab,
+    }),
+    syncViewport: (root, currentStore) => bindTrackScrollSync(root, currentStore, { preserveMissing: true }),
+    syncInteractions: syncAssemblyTransientInteractions,
+  });
 }
 
 function rerenderAssemblyConfirmModal(host, store) {

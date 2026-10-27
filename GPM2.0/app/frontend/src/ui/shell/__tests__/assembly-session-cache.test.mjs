@@ -9,6 +9,7 @@ import {
   rememberAssemblyState,
   restoreAssemblyDom,
   restoreAssemblyState,
+  retagAssemblyDomLocale,
 } from "../assembly-session-cache.js";
 
 function createState({ workspacePath = "D:/ws", projectId = 7, locale = "zh", assembly = {} } = {}) {
@@ -118,4 +119,17 @@ test("GRT result switches and transient toast do not survive a project-session r
   const restored = restoreAssemblyState(createState({ projectId: 7 }), {});
   assert.equal(restored.grtResultDisplayByChr, undefined);
   assert.equal(restored.grtResultToast, undefined);
+});
+
+test("in-place locale changes remove old-locale aliases to the same cached nodes", () => {
+  clearAssemblySessionCache();
+  const zh = createState({ locale: "zh" }), en = createState({ locale: "en" });
+  const node = {}, host = { childNodes: [node], dataset: {}, replaceChildren(...nodes) { this.childNodes = nodes; } };
+  rememberAssemblyDom(host, zh); assert.equal(restoreAssemblyDom(host, zh), true);
+  retagAssemblyDomLocale(host, en);
+  assert.equal(host.dataset.assemblyDomCacheKey, buildAssemblyDomCacheKey(en));
+  const destination = { dataset: {}, replaceChildren() {} };
+  assert.equal(restoreAssemblyDom(destination, zh), false);
+  rememberAssemblyDom(host, en); assert.equal(restoreAssemblyDom(destination, en), true);
+  clearAssemblySessionCache();
 });

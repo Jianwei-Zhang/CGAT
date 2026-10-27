@@ -125,3 +125,13 @@ export function clearAssemblySessionCache() {
   assemblyStateCache.clear();
   assemblyDomCache.clear();
 }
+
+// Locale is patched on the mounted nodes. A previously restored cache entry can
+// reference those same nodes; remove its old-locale alias before retagging them.
+export function retagAssemblyDomLocale(host, state) {
+  const liveNodes = new Set(Array.from(host?.childNodes || []));
+  for (const [key, entry] of assemblyDomCache) {
+    if (entry.nodes.some(node => liveNodes.has(node))) assemblyDomCache.delete(key);
+  }
+  if (host?.dataset) host.dataset.assemblyDomCacheKey = buildAssemblyDomCacheKey(state);
+}

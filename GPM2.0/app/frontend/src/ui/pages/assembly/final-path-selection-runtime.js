@@ -9,7 +9,7 @@ const OVERLAY = "[data-final-path-selection-overlay]";
 const scopeKey = state => JSON.stringify([state.session?.workspacePath, state.session?.projectId,
   state.assembly?.selectedChrName, state.assembly?.activeFinalPathKeyByChr?.[state.assembly?.selectedChrName]
     || state.assembly?.activeFinalPathKey || ""]);
-const editingSelectionKey = state => JSON.stringify([state.assembly?.trackSelectedCtgIds || [],
+const editingSelectionKey = state => JSON.stringify([state.assembly?.selectedCtgId, state.assembly?.trackSelectedCtgIds || [],
   state.assembly?.subview?.trackPairSelectedCtgs || []]);
 const sourceCtgs = state => collectFinalPathSourceCtgs(state.assembly);
 
@@ -100,7 +100,7 @@ export function bindFinalPathSelection(host, store) {
         owner.scope = scopeKey(state); owner.editing = editingSelectionKey(state);
         paint(owner);
       } else if (event.type === "pointerdown" && (event.target?.closest?.(
-        "[data-track-contig-id], [data-track-label-for-contig-id], [data-subview-contig-id], [data-subview-label-contig-id]")
+        "[data-assembly-ctg-id], [data-deleted-ctg-record-id], [data-track-contig-id], [data-track-label-for-contig-id], [data-subview-contig-id], [data-subview-label-contig-id]")
         || event.target?.closest?.(".assembly-final-path-svg-wrap"))) {
         owner.selected = null; paint(owner);
       }

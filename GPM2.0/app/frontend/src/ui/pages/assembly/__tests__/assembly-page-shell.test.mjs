@@ -739,9 +739,9 @@ test("assembly tab renders a project-chr members card above main track with name
     html,
     /<button[^>]*data-members-card-toggle="1"[^>]*aria-expanded="false"[^>]*>/,
   );
-  assert.doesNotMatch(html, /assembly-member-chip-region/);
-  assert.doesNotMatch(html, /data-track-focus-mode="start"/);
-  assert.equal(ctgGridCount, 0);
+  assert.match(html, /id="assembly-members-panel-popover"[^>]*hidden/);
+  assert.match(html, /data-track-focus-mode="start"/);
+  assert.equal(ctgGridCount, 1);
   assert.ok(membersCardIndex >= 0);
   assert.ok(mainTrackIndex >= 0);
   assert.ok(membersCardIndex < mainTrackIndex);
@@ -767,7 +767,7 @@ test("assembly tab expands the members card body when membersCardCollapsed is fa
   );
   assert.match(
     html,
-    /<span class="assembly-members-panel-title-inline">\s*<strong>project1_Chr01 主数据集成员<\/strong>\s*<button[^>]*data-reset-members-state="1"[^>]*aria-label="重置：撤销删除、撤销隐藏"/,
+    /<strong>project1_Chr01 主数据集成员<\/strong>[\s\S]*assembly-members-popover-tools[\s\S]*data-reset-members-state="1"[^>]*aria-label="重置：撤销删除、撤销隐藏"/,
   );
   assert.match(html, /ctg-beta/);
   assert.match(html, /600 bp/);
@@ -1037,11 +1037,11 @@ test("member cards mark primary ctgs assigned to other chromosome groups", () =>
   assert.doesNotMatch(html, /class="ctg-chip-coassigned-tag"/);
   assert.match(
     html,
-    /title="ptg000001l@Chr01&#10;同时被分配到：Chr02, Chr05"/,
+    /data-member-tooltip="ptg000001l@Chr01\n同时被分配到：Chr02, Chr05\nContig 长度: 1,200 bp"/,
   );
   assert.match(
     html,
-    /<span class="ctg-chip-name is-coassigned" title="ptg000001l@Chr01&#10;同时被分配到：Chr02, Chr05">ptg000001l<\/span>/,
+    /<span class="ctg-chip-name is-coassigned">ptg000001l<\/span>/,
   );
 });
 

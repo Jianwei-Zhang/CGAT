@@ -233,3 +233,19 @@ test("Subview panel patch preserves the mounted panel and viewport while replaci
   assert.equal(routeHost.querySelector("[data-subview-panel='1']"), panel, "panel identity stays mounted");
   assert.equal(nextScroll.scrollLeft, 18817); assert.equal(nextScroll.scrollTop, 73);
 });
+
+test("hidden-state paint stays on the second member row and keeps immediate tooltip/status count current", () => {
+  const values = new Set(), attrs = { "data-member-tooltip": "name\nContig length: 5,000 bp" }, inserted = [];
+  const tags = { dataset: { memberStateCount: "2" }, querySelector: () => null,
+    insertAdjacentHTML: (_where, html) => inserted.push(html) };
+  const details = { querySelector: () => tags };
+  const chip = { dataset: { assemblyCtgId: "2" }, classList: { contains: key => values.has(key), toggle: (key, on) => on ? values.add(key) : values.delete(key) },
+    getAttribute: key => attrs[key], setAttribute: (key, value) => { attrs[key] = value; },
+    querySelector: selector => selector === ".ctg-chip-details" ? details : null };
+  const host = { closest() { return this; }, querySelectorAll: selector => selector === ".assembly-member-chip-region [data-assembly-ctg-id]" ? [chip] : [] };
+  const { patchPrimaryHiddenCtgDom } = createController();
+  patchPrimaryHiddenCtgDom(host, { getState: () => ({ assembly: {} }) }, [2], { changedIds: [2] });
+  assert.equal(tags.dataset.memberStateCount, "3");
+  assert.match(attrs["data-member-tooltip"], /\n<hidden>$/);
+  assert.match(inserted.join(""), /ctg-chip-hidden-tag/); assert.match(inserted.join(""), />\+2<\/span>/);
+});

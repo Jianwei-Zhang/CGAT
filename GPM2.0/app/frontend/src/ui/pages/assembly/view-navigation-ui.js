@@ -49,3 +49,22 @@ export function renderViewNavigation(role, locale, mode = "mouse") {
     <span class="view-nav-span">${t.span}${locale === "en" ? ":" : "："}<span data-view-nav-span aria-label="${t.window}">—</span></span>
   </div>`;
 }
+
+// Locale is presentation-only: retain the navigation owner, gesture state and
+// focused elements instead of rebuilding its runtime-created sibling toolbar.
+export function localizeViewNavigation(bar, locale, mode = "mouse") {
+  const t = viewNavText(locale);
+  const attrs = (node, values) => { for (const [key, value] of Object.entries(values)) node?.setAttribute?.(key, value); };
+  attrs(bar, { "aria-label": t.group });
+  attrs(bar.querySelector("[data-view-nav-action='toggle-mode']"), { "aria-label": t.mode, title: mode === "hand" ? t.hand : t.mouse });
+  for (const key of ["left", "right"]) attrs(bar.querySelector(`[data-view-nav-action='${key}']`), { "aria-label": t[key], title: t[key] });
+  attrs(bar.querySelector("[data-view-nav-axis]"), { title: t.axis, "aria-label": t.axis });
+  attrs(bar.querySelector("[data-view-nav-window]"), { "aria-label": t.window });
+  attrs(bar.querySelector("[data-view-nav-edge='left']"), { "aria-label": t.edgeLeft });
+  attrs(bar.querySelector("[data-view-nav-edge='right']"), { "aria-label": t.edgeRight });
+  const fit = bar.querySelector("[data-view-nav-action='fit']");
+  if (fit) { attrs(fit, { title: t.fitHint }); fit.textContent = t.fit; }
+  const span = bar.querySelector("[data-view-nav-span]");
+  attrs(span, { "aria-label": t.window });
+  if (span?.previousSibling?.nodeType === 3) span.previousSibling.nodeValue = `${t.span}${locale === "en" ? ":" : "："}`;
+}

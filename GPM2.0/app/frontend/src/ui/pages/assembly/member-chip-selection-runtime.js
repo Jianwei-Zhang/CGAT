@@ -149,6 +149,9 @@ export function bindDeletedMemberChipBoxSelection(host, store, deps) {
       return;
     }
 
+    regionEl.dataset ||= {};
+    regionEl.dataset.memberMarqueeActive = "1";
+    const selectionScope = JSON.stringify([state.session?.workspacePath, state.session?.projectId, state.assembly.selectedChrName]);
     const boxEl = ensureMemberChipSelectionBox(regionEl);
     const startPoint = resolveMemberChipPointerContentPoint(event, regionEl);
     let currentPoint = startPoint;
@@ -176,11 +179,16 @@ export function bindDeletedMemberChipBoxSelection(host, store, deps) {
       }
     };
 
-    const finishSelection = () => {
+    const finishSelection = (cancelled = false) => {
       const windowObject = getWindowObject();
       windowObject?.removeEventListener?.("pointermove", onPointerMove, true);
       windowObject?.removeEventListener?.("pointerup", onPointerUp, true);
+      windowObject?.removeEventListener?.("pointercancel", onPointerCancel, true);
+      delete regionEl.dataset.memberMarqueeActive;
       boxEl.classList.add("is-hidden");
+      const current = store.getState();
+      if (cancelled || regionEl.isConnected === false || selectionScope !== JSON.stringify([
+        current.session?.workspacePath, current.session?.projectId, current.assembly.selectedChrName])) return;
       if (!dragging) {
         deps.updateTrackSelection(host, store, []);
         deps.updateDeletedCtgSelection(host, store, []);
@@ -205,9 +213,11 @@ export function bindDeletedMemberChipBoxSelection(host, store, deps) {
       finishSelection();
     };
 
+    const onPointerCancel = () => finishSelection(true);
     const windowObject = getWindowObject();
     windowObject?.addEventListener?.("pointermove", onPointerMove, true);
     windowObject?.addEventListener?.("pointerup", onPointerUp, true);
+    windowObject?.addEventListener?.("pointercancel", onPointerCancel, true);
   });
 
   host[ASSEMBLY_MEMBER_CHIP_BOX_SELECT_BOUND] = true;

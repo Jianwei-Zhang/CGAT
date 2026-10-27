@@ -57,3 +57,7 @@ The first-phased-track GRT notice also uses Title Case for its primary heading a
 - Updated existing literal presentation expectations without changing their interaction, coordinate, persistence, deletion or export assertions. Raw protocol stimuli and the caller-supplied confirmation-message regression remain unchanged.
 - Windows-host full frontend suite: 2,060/2,060 passed, zero skipped/cancelled, at this Builder checkpoint. Final batch build/review evidence is recorded in `brief.md` after it is available.
 - No browser/native-window acceptance is inferred from this textual/source evidence. The complete change's Windows/macOS menu, tooltip, flicker and resize gates remain separate.
+
+### B4 terminology addition
+
+The inventory above records the B3 source snapshot (`4166bee`), not a live post-B4 census. B4 adds one matching path, `page.memberContigLength`, in each locale for immediate member-card details (Contig length / Contig 长度). Existing translation keys, user names and biological/export schemas remain unchanged.

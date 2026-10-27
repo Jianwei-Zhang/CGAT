@@ -358,6 +358,7 @@ export function bindAssemblyContextMenu(host, store, deps) {
       return;
     }
     menu.classList.add("is-hidden");
+    menu.removeAttribute?.("data-members-popover-owner");
     menu.innerHTML = "";
   };
 
@@ -417,6 +418,8 @@ export function bindAssemblyContextMenu(host, store, deps) {
     submenuCleanup?.();
     clearItemPreview();
     setSubviewFragmentMenuHighlight(target);
+    if ((memberNode || target)?.closest?.(".assembly-member-chip-region")) menu.setAttribute?.("data-members-popover-owner", "1");
+    else menu.removeAttribute?.("data-members-popover-owner");
     menu.innerHTML = renderContextMenuItems(items, runtimeDeps);
     menu.classList.remove("is-hidden");
     positionContextMenuWithinViewport(menu, clientX, clientY);

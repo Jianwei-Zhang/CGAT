@@ -2,7 +2,7 @@ import { bindDelegatedDelayedFloatingClose, cancelDelayedFloatingClose } from ".
 import { resolveTrackPrefs } from "./track-prefs.js";
 import { readTrackViewportMetrics } from "./track-viewport.js";
 import { clampViewRange, zoomViewRange, moveViewRange, parseViewSpan, formatViewSpan, readViewNavigationGeometry } from "./view-navigation-state.js";
-import { renderViewNavigation, viewNavText, isViewNavigationContextMenuTarget } from "./view-navigation-ui.js";
+import { renderViewNavigation, localizeViewNavigation, viewNavText, isViewNavigationContextMenuTarget } from "./view-navigation-ui.js";
 import { assemblyPageSession } from "./page-session.js";
 import { updateSubviewCompositionViewport } from "./subview-history-state.js";
 
@@ -22,6 +22,10 @@ export function bindAssemblyViewNavigation(host, store, deps = {}) {
   const controller = root[BOUND];
   controller.deps = deps;
   controller.mount();
+}
+
+export function syncExistingAssemblyViewNavigation(host) {
+  (host?.closest?.("#route-host") || host)?.[BOUND]?.mount();
 }
 
 export function unbindAssemblyViewNavigation(host) {
@@ -466,8 +470,11 @@ function createController(root, store, window) {
         scroll.scrollTop = scrollTop;
       }
       let bar = layout.previousElementSibling;
-      if (bar?.dataset?.viewNavigation !== role || bar.dataset.navLocale !== localeKey) {
-        if (bar?.dataset?.viewNavigation === role) bar.remove();
+      if (bar?.dataset?.viewNavigation === role && bar.dataset.navLocale !== localeKey) {
+        localizeViewNavigation(bar, localeKey, current.mode);
+        bar.dataset.navLocale = localeKey;
+      }
+      if (bar?.dataset?.viewNavigation !== role) {
         const wrapper = root.ownerDocument.createElement("div"); wrapper.innerHTML = renderViewNavigation(role, localeKey, current.mode);
         bar = wrapper.firstElementChild; bar.dataset.navLocale = localeKey;
         layout.parentNode.insertBefore(bar, layout);

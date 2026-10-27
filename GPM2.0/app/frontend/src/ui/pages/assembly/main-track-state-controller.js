@@ -25,6 +25,7 @@ export function createMainTrackStateController({
   buildDualTrackModel,
   getDatasetNameById,
   patchPrimaryHiddenCtgDom,
+  patchSelection,
   persistProjectAssemblyViewStateFromStore,
   runMainViewLayoutAction,
   refreshFinalPathLogAfterPrimaryHiddenPatch,
@@ -68,7 +69,7 @@ export function createMainTrackStateController({
         trackSelectedCtgIds: normalized,
       },
     });
-    rerender(host, store);
+    if (!patchSelection?.(host, store)) rerender(host, store);
   }
 
   function togglePrimaryTrackSelection(host, store, assemblyCtgId) {
@@ -106,7 +107,7 @@ export function createMainTrackStateController({
         selectedDeletedCtgRecordIds: normalized,
       },
     });
-    rerender(host, store);
+    if (!patchSelection?.(host, store)) rerender(host, store);
   }
 
   function buildHiddenPrimaryCtgState(state, nextHiddenIds, actionStatus) {
