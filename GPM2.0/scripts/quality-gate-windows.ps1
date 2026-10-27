@@ -48,6 +48,12 @@ Invoke-Checked "Tracked LF line endings" $ProjectRoot "python" @(
 Invoke-Checked "App update feed tests" $ProjectRoot "python" @(
     "-m", "unittest", "discover", "-s", "scripts", "-p", "test_app_update_feed.py"
 )
+Invoke-Checked "Release guide version tests" $ProjectRoot "python" @(
+    "-m", "unittest", "discover", "-s", "scripts", "-p", "test_check_release_guides.py"
+)
+Invoke-Checked "Release guide versions" $ProjectRoot "python" @(
+    "scripts/check_release_guides.py"
+)
 Invoke-Checked "Frontend tests" $FrontendRoot "npm.cmd" @("test")
 Invoke-Checked "Frontend production build" $FrontendRoot "npm.cmd" @("run", "build")
 

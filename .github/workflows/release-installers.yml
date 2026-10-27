@@ -113,6 +113,10 @@ jobs:
 
           test "$tag" = "v${version}" || { echo "Release tag must match the compiled App version" >&2; exit 1; }
           test -f "GPM2.0/releases/${tag}.md" || { echo "Canonical release notes are missing" >&2; exit 1; }
+          python3 GPM2.0/scripts/check_release_guides.py --version "$tag" || {
+            echo "Every release guide must advertise the Server archive and badge of ${tag}." >&2
+            exit 1
+          }
           build_timestamp="$(TZ=Asia/Shanghai date +%Y%m%d%H%M%S)"
 
           echo "tag_name=${tag}" >> "$GITHUB_OUTPUT"
