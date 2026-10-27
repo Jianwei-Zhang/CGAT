@@ -3,6 +3,7 @@ import base64
 import copy
 import importlib.util
 import json
+import os
 import hashlib
 import shutil
 from pathlib import Path
@@ -41,8 +42,8 @@ class FeedTests(unittest.TestCase):
         previous_names = {locale: self.note_name(locale) for locale in ("en", "zh")}
         notes = self.root / "notes"
         notes.mkdir()
-        original = (feed.ROOT / "GPM2.0/releases/v2.0.12.md").read_text()
-        (notes / "v2.0.12.md").write_text(original.replace("### App\n", "### App\n\n- Refreshed project layout.\n"))
+        original = (feed.ROOT / "GPM2.0/releases/v2.0.12.md").read_text(encoding="utf-8")
+        (notes / "v2.0.12.md").write_text(original.replace("### App\n", "### App\n\n- Refreshed project layout.\n"), encoding="utf-8", newline="\n")
         self.manifest = feed.build("2.0.12", self.assets, self.assets, notes_root=notes)
         feed.stage(self.assets, self.public)
         for locale, previous in previous_names.items():
@@ -51,11 +52,13 @@ class FeedTests(unittest.TestCase):
             self.assertTrue((self.public / "downloads/v2.0.12" / previous).is_file())
             raw = (self.public / "downloads/v2.0.12" / current).read_bytes()
             self.assertIn(hashlib.sha256(raw).hexdigest()[:16], current)
-        self.assertEqual(json.loads((self.public / "downloads/updates/latest.json").read_text()), self.manifest)
+        self.assertEqual(json.loads((self.public / "downloads/updates/latest.json").read_text(encoding="utf-8")), self.manifest)
 
     def test_staging_tags_are_version_bound_and_require_explicit_dispatch(self):
-        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
+        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text(encoding="utf-8")
         block = workflow.split('          case "$tag" in', 1)[1].split('          build_timestamp=', 1)[0]
+        # Windows system32/bash.exe is a WSL launcher, not the runner shell.
+        bash = str(Path(shutil.which("git")).resolve().parents[1] / "bin/bash.exe") if os.name == "nt" else "bash"
         for event, tag, good in [
             ("workflow_dispatch", "v2.0.15", True),
             ("push", "v2.0.15", True),
@@ -68,14 +71,14 @@ class FeedTests(unittest.TestCase):
             script = 'version=2.0.15\ntag="' + tag + '"\ncase "$tag" in' + block.split("          esac", 1)[0] + "          esac\n"
             script = script.replace("${{ github.event_name }}", event)
             with self.subTest(event=event, tag=tag):
-                result = subprocess.run(["bash", "-c", script], capture_output=True)
-                self.assertEqual(result.returncode == 0, good)
+                result = subprocess.run([bash, "--noprofile", "--norc", "-c", script], capture_output=True)
+                self.assertEqual(result.returncode == 0, good, result.stderr.decode(errors="replace"))
         self.assertIn('GPM2.0/releases/v${version}.md', block)
         self.assertIn('check_release_guides.py --version "v${version}"', block)
 
     def test_macos_build_includes_both_manual_and_updater_targets(self):
         import shlex
-        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
+        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text(encoding="utf-8")
         macos = workflow.split("  build-macos:\n", 1)[1].split("  update-feed:\n", 1)[0]
         command = next(line.strip().removeprefix("run: ") for line in macos.splitlines()
                        if "run: tauri build " in line)
@@ -84,7 +87,7 @@ class FeedTests(unittest.TestCase):
         self.assertEqual(set(bundles), {"app", "dmg"})
 
     def test_dispatched_builds_checkout_the_immutable_packaging_commit(self):
-        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
+        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text(encoding="utf-8")
         self.assertEqual(workflow.count("uses: actions/checkout@v4"), 5)
         self.assertEqual(workflow.count("ref: ${{ github.sha }}"), 5)
         self.assertIn('TAURI_CLI_VERSION: "2.12.4"', workflow)
@@ -92,7 +95,7 @@ class FeedTests(unittest.TestCase):
         self.assertNotIn("@tauri-apps/cli@^2", workflow)
 
     def test_installer_builds_supply_public_key_to_the_tauri_bundler(self):
-        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
+        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text(encoding="utf-8")
         self.assertEqual(workflow.count("- name: Prepare updater signing config"), 2)
         self.assertEqual(workflow.count("pubkey: process.env.GPM_UPDATER_PUBLIC_KEY"), 2)
         self.assertEqual(workflow.count("fs.writeFileSync('tauri.updater.build.conf.json'"), 2)
@@ -135,7 +138,7 @@ class FeedTests(unittest.TestCase):
         bad["signature"] = signature("2.0.11")
         with self.assertRaises((AssertionError, ValueError)):
             cleanup.embedded_signatures(changed, names, "v2.0.12")
-        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
+        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text(encoding="utf-8")
         self.assertNotIn("update-feed/GPM_*_notes_*.txt update-feed/latest.json", workflow)
         build = workflow.index("app-update-feed.py build")
         artifact = workflow.index("name: Retain updater files for docs staging", build)
@@ -159,7 +162,7 @@ class FeedTests(unittest.TestCase):
         self.assertEqual(len(result["files"]), 7)
         self.assertIn(self.note_name("en"), result["files"])
         self.assertIn("latest.json", result["files"])
-        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text()
+        workflow = (feed.ROOT / ".github/workflows/release-installers.yml").read_text(encoding="utf-8")
         self.assertIn("prepare-update-bundle.py --assets update-assets --feed update-feed --output update-bundle", workflow)
 
     def test_update_bundle_rejects_missing_feed_notes(self):
