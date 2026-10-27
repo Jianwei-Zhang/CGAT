@@ -1,3 +1,11 @@
+// Navigation has no business right-click actions. Editable descendants keep
+// their native copy/paste menu, and plot/Contig targets remain out of scope.
+export function isViewNavigationContextMenuTarget(target) {
+  const role = target?.closest?.("[data-view-navigation]")?.dataset?.viewNavigation;
+  if (role !== "primary" && role !== "subview") return false;
+  return !target.closest?.('input,select,textarea,[contenteditable]:not([contenteditable="false"])');
+}
+
 export const VIEW_NAV_TEXT = {
   zh: { group: "查看范围", mode: "手形导航模式（拖动平移、滚轮缩放；关闭时选择和编辑）", mouse: "鼠标模式：选择和编辑，滚轮滚动页面", hand: "手形模式：拖动平移，滚轮缩放", left: "左移半屏", right: "右移半屏", fit: "全览", fitHint: "显示当前视图的全部范围", span: "窗口", axis: "总览范围；拖动范围框平移，手形模式下滚轮缩放", window: "当前查看窗口", edgeLeft: "调整窗口左边界", edgeRight: "调整窗口右边界", tick: "刻度间隔", tickOptions: "选择刻度间隔", tickInvalid: "请输入 Auto 或有效的正数；单位为 kb。" },
   en: { group: "Viewing range", mode: "Hand navigation mode (pan and wheel zoom; off: select and edit)", mouse: "Mouse mode: select and edit; wheel scrolls the page", hand: "Hand mode: drag to pan; wheel to zoom", left: "Move left half a window", right: "Move right half a window", fit: "Full range", fitHint: "Display the complete viewing range", span: "Window", axis: "Overview range; drag the window to pan, wheel to zoom in hand mode", window: "Current viewing window", edgeLeft: "Resize left window edge", edgeRight: "Resize right window edge", tick: "Tick interval", tickOptions: "Choose tick interval", tickInvalid: "Enter Auto or a positive tick interval in kb." },

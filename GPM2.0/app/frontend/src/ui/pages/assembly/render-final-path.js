@@ -192,7 +192,7 @@ export function renderAssemblyFinalPathCard(state, deps = {}) {
       ),
     ]),
   );
-  const grtBaselineEntry = finalPathEntriesWithLog.length === 1
+  const grtBaselineEntry = !assembly.isChrPhased && finalPathEntriesWithLog.length === 1
     ? assembly.grtProjectView?.baselineFinalPathByChr?.[currentFinalPathChrName] || null
     : null;
   const grtBaselineRestore = grtBaselineEntry

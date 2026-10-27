@@ -2,7 +2,7 @@ import { bindDelegatedDelayedFloatingClose, cancelDelayedFloatingClose } from ".
 import { resolveTrackPrefs } from "./track-prefs.js";
 import { readTrackViewportMetrics } from "./track-viewport.js";
 import { clampViewRange, zoomViewRange, moveViewRange, parseViewSpan, formatViewSpan, readViewNavigationGeometry } from "./view-navigation-state.js";
-import { renderViewNavigation, viewNavText } from "./view-navigation-ui.js";
+import { renderViewNavigation, viewNavText, isViewNavigationContextMenuTarget } from "./view-navigation-ui.js";
 import { assemblyPageSession } from "./page-session.js";
 import { updateSubviewCompositionViewport } from "./subview-history-state.js";
 
@@ -281,6 +281,12 @@ function createController(root, store, window) {
   }
   function onPointerUp(event) { if (event.pointerId === controller.gesture?.pointerId) endGesture(); }
   function onPointerCancel(event) { if (event.pointerId === controller.gesture?.pointerId) endGesture(true); }
+  // Capture the cancellable DOM menu event on custom navigation surfaces,
+  // including an otherwise unhandled axis/background in macOS WebView.
+  listen(root, "contextmenu", (event) => {
+    if (isViewNavigationContextMenuTarget(event.target)) event.preventDefault();
+  }, true);
+
   listen(root, "pointerdown", (event) => {
     // Keep focus and drafts on the combobox until a choice is explicitly committed.
     if (event.button === 0 && event.target?.closest?.("[data-view-tick-toggle],[data-view-tick-option]")) { event.preventDefault(); return; }

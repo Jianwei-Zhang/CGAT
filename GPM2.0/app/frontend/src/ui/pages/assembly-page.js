@@ -534,11 +534,13 @@ const {
   deletePhasedChrTrack: deletePhasedChrTrackApi,
   listPhasedChrTracks,
   mapAssemblyError,
-  persistMainTrackViewState: (host, store) => persistMainTrackViewState(host, store),
+  persistMainTrackViewState: (host, store) => persistAssemblyProjectStateChecked(host, store),
   persistTrackDragOffsets: (host, store) => persistTrackDragOffsets(host, store),
   removePhasedChrTrackItem: removePhasedChrTrackItemApi,
   requestAssemblyNotice,
+  runSerializedProjectViewMutation,
   rerenderAssemblyMainTab: (host, store) => rerenderAssemblyMainTab(host, store),
+  rerenderFinalPathCard: (host, store) => rerenderFinalPathCard(host, store),
   setAssemblyActionFeedbackInMainTab: (host, store, feedback) =>
     setAssemblyActionFeedbackInMainTab(host, store, feedback),
 });
@@ -1053,6 +1055,7 @@ const assemblyDataLoaderDeps = {
 };
 
 const assemblyDataRuntimeDeps = {
+  waitForProjectViewMutations: () => assemblyPageSession.projectViewMutationCoordinator.whenIdle(),
   activateSubviewCompositionHistory,
   refreshSubviewPairwiseEvidence,
   applyEditorAction: (host, store, payload) => editorActionRuntimeAdapters.applyEditorAction(host, store, payload),

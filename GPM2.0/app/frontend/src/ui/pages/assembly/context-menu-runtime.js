@@ -1,3 +1,4 @@
+import { isViewNavigationContextMenuTarget } from "./view-navigation-ui.js";
 import { resolveMainAlignmentContextTarget, resolveMainContigSourcePosition } from "./main-alignment-anchors.js";
 import { bindDelayedFloatingClose, bindDelegatedDelayedFloatingClose, cancelDelayedFloatingClose } from "../floating-menu-runtime.js";
 import { requestAppConfirm } from "../../shell/app-dialog.js";
@@ -460,6 +461,11 @@ export function bindAssemblyContextMenu(host, store, deps) {
   }, true);
 
   host.addEventListener("contextmenu", (event) => {
+    if (isViewNavigationContextMenuTarget(event.target)) {
+      event.preventDefault();
+      closeMenu();
+      return;
+    }
     const menu = host.querySelector("#assembly-context-menu");
     if (!menu) {
       return;

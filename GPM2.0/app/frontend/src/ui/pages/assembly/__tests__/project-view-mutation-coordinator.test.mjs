@@ -53,3 +53,21 @@ test("invalidating the project-view coordinator skips queued stale work", async 
   assert.equal(staleRan, false);
   assert.equal(await coordinator.enqueue(async () => "fresh"), "fresh");
 });
+
+test("whenIdle also drains saves appended after navigation started waiting", async () => {
+  const coordinator = createProjectViewMutationCoordinator();
+  let finishMutation, finishSave;
+  const mutation = coordinator.enqueue(async () => {
+    await new Promise(resolve => { finishMutation = resolve; });
+    void coordinator.enqueue(() => new Promise(resolve => { finishSave = resolve; }));
+  });
+  let idle = false;
+  const drained = coordinator.whenIdle().then(() => { idle = true; });
+  await Promise.resolve();
+  finishMutation(); await mutation;
+  await Promise.resolve();
+  assert.equal(idle, false);
+  assert.equal(typeof finishSave, "function");
+  finishSave(); await drained;
+  assert.equal(idle, true);
+});

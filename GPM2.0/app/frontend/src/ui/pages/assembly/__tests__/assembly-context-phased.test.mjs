@@ -399,7 +399,7 @@ test("phased mode support contig context menu offers grouped per-haplotype appen
   ]);
 });
 
-test("creating a phased track refreshes only the main assembly card", async () => {
+test("creating a phased track refreshes main and Final Path cards without a full-page render", async () => {
   const previousWindow = globalThis.window;
   try {
     globalThis.window = {};
@@ -430,7 +430,9 @@ test("creating a phased track refreshes only the main assembly card", async () =
     }));
     let fullPageRenderCount = 0;
     let replacedCount = 0;
-    const makeNode = () => ({
+    let finalPathReplacedCount = 0;
+    const makeNode = (kind = "") => ({
+      matches(selector) { return selector === kind; },
       addEventListener() {},
       querySelector() {
         return null;
@@ -440,22 +442,29 @@ test("creating a phased track refreshes only the main assembly card", async () =
       },
       replaceWith() {
         replacedCount += 1;
+        if (kind === ".final-path-card") finalPathReplacedCount += 1;
       },
     });
     const currentSections = new Map([
       [".chr-strip.has-members-panel", makeNode()],
       [".assembly-track-unified", makeNode()],
+      [".final-path-card", makeNode(".final-path-card")],
     ]);
     const nextSections = new Map([
       [".chr-strip.has-members-panel", makeNode()],
       [".assembly-track-unified", makeNode()],
+      [".final-path-card", makeNode(".final-path-card")],
     ]);
     const fakeDocument = {
       createElement(tagName) {
         assert.equal(tagName, "template");
+        let markup = "";
         return {
-          set innerHTML(_value) {},
+          set innerHTML(value) { markup = String(value); },
           content: {
+            get firstElementChild() {
+              return markup.includes("final-path-card") ? nextSections.get(".final-path-card") : null;
+            },
             querySelector(selector) {
               return nextSections.get(selector) || null;
             },
@@ -494,6 +503,7 @@ test("creating a phased track refreshes only the main assembly card", async () =
     await __testCreatePhasedChrTrack(routeHost, store);
 
     assert.equal(fullPageRenderCount, 0);
+    assert.equal(finalPathReplacedCount, 1, "Final Path must refresh with phase topology");
     assert.ok(replacedCount >= 2, "expected main-card sections to be replaced");
     assert.equal(store.getState().assembly.phasedChrTracks[0]?.haplotypeKey, "A");
   } finally {

@@ -23,8 +23,14 @@ export function createProjectViewMutationCoordinator() {
       generation += 1;
       tail = Promise.resolve();
     },
-    whenIdle() {
-      return tail;
+    async whenIdle() {
+      // A running mutation can append another save after a caller starts
+      // draining. Do not let navigation race that newly queued work.
+      for (;;) {
+        const observed = tail;
+        await observed;
+        if (observed === tail) return;
+      }
     },
     get generation() {
       return generation;

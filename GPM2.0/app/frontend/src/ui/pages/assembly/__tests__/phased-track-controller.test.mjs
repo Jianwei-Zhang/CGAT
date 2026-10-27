@@ -58,6 +58,7 @@ function createController({ tracksAfter, createError = null, notices }) {
       return Promise.resolve(true);
     },
     rerenderAssemblyMainTab: () => {},
+    rerenderFinalPathCard: () => {},
     setAssemblyActionFeedbackInMainTab: () => {},
   });
 }

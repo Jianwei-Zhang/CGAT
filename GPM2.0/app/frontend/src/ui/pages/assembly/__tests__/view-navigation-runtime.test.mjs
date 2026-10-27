@@ -668,3 +668,42 @@ test("tick options close after 400ms, cancel on return, and dispose pending clos
     h.dispose(); assert.equal(timers.size, 0);
   } finally { h.dispose(); globalThis.setTimeout = originalSet; globalThis.clearTimeout = originalClear; }
 });
+
+for (const role of ["primary", "subview"]) {
+  test(`${role} navigation suppresses default menus without altering view state or gesture owners`, () => {
+    const h = harness();
+    try {
+      const view = h.views[role];
+      const before = h.store.getState(), writes = h.writes;
+      const background = { closest: selector => selector === "[data-view-navigation]" ? view.bar : null };
+      for (const target of [background, view.axis, view.selection, view.grip, view.action("left")]) {
+        const event = h.event(target, { button: 2 });
+        h.root.emit("contextmenu", event);
+        assert.equal(event.defaultPrevented, true);
+      }
+      assert.equal(h.store.getState(), before);
+      assert.equal(h.writes, writes);
+      assert.equal(h.renders, 0);
+      for (let i = 0; i < 5; i++) h.bind();
+      assert.equal(h.root.count("contextmenu"), 1);
+    } finally { h.dispose(); }
+    assert.equal(h.root.count("contextmenu"), 0);
+  });
+}
+
+test("navigation menu guard leaves editable controls and unrelated business targets alone", () => {
+  const h = harness();
+  try {
+    const field = { closest(selector) {
+      return selector === "[data-view-navigation]" ? h.views.primary.bar : this;
+    } };
+    const contig = { closest() { return null; } };
+    const otherRole = { closest: selector => selector === "[data-view-navigation]"
+      ? { dataset: { viewNavigation: "final-path" } } : null };
+    for (const target of [field, contig, otherRole]) {
+      const event = h.event(target, { button: 2 });
+      h.root.emit("contextmenu", event);
+      assert.notEqual(event.defaultPrevented, true);
+    }
+  } finally { h.dispose(); }
+});

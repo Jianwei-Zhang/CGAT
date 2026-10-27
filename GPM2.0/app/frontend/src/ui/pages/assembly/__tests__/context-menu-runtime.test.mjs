@@ -709,3 +709,23 @@ test("anchor submenu hover/focus previews clean up on leave, blur, Escape, scrol
   button=open();fire("pointerenter");await fire("click");assert.equal(groups.filter(g=>!g.removed).length,0);
   assert.deepEqual(calls.map(c=>c.cutAfter),[100]);
 });
+
+test("right-clicking navigation never opens a selected Contig business menu and closes the old menu", () => {
+  const handlers = new Map(), classes = new Set();
+  const menu = { innerHTML: "old menu", classList: { add: name => classes.add(name) } };
+  const host = {
+    querySelector: selector => selector === "#assembly-context-menu" ? menu : null,
+    querySelectorAll: () => [],
+    addEventListener: (type, fn) => handlers.set(type, fn),
+  };
+  const state = createState({ assembly: { activeTab: "assembly", trackSelectedCtgIds: [1] } });
+  const store = { getState: () => state };
+  bindAssemblyContextMenu(host, store, createRuntimeDeps());
+  const target = { closest: selector => selector === "[data-view-navigation]"
+    ? { dataset: { viewNavigation: "primary" } } : null };
+  let prevented = false;
+  handlers.get("contextmenu")({ target, preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(menu.innerHTML, "");
+  assert.equal(classes.has("is-hidden"), true);
+});

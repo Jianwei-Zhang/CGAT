@@ -1,3 +1,4 @@
+import { beginAssemblyViewRequest, currentAssemblyViewRequest } from "./assembly-view-request.js";
 import { reconcileLocalSubviewWithMain } from "./subview-fragment-reconcile.js";
 function normalizeFinalPathViewMode(value) {
   return normalizeFinalPathViewModeState(value);
@@ -389,11 +390,10 @@ export async function loadAssemblyView(host, store, options, deps) {
   if (!state.session.workspacePath || !state.session.projectId) {
     return;
   }
-  const request = {};
-  chromosomeRequests.set(store, request);
+  const request = beginAssemblyViewRequest(store);
   const isCurrentRequest = () => {
     const current = store.getState();
-    return chromosomeRequests.get(store) === request
+    return currentAssemblyViewRequest(store) === request
       && current.session.workspacePath === state.session.workspacePath
       && current.session.projectId === state.session.projectId;
   };
@@ -728,8 +728,6 @@ export async function loadAssemblyView(host, store, options, deps) {
   if (renderResult) deps.rerender(host, store);
 }
 
-const chromosomeRequests = new WeakMap();
-
 export async function selectChromosome(host, store, chrName, deps) {
   assertDataRuntimeDeps(deps, [
     "buildClearedSubviewState",
@@ -742,15 +740,24 @@ export async function selectChromosome(host, store, chrName, deps) {
     "normalizeSupportDatasetId",
     "rerender",
   ]);
-  const state = store.getState();
+  let state = store.getState();
   if (!state.session.workspacePath || !state.session.projectId) {
     return;
   }
-  const request = {};
-  chromosomeRequests.set(store, request);
+  const request = beginAssemblyViewRequest(store);
+  if (typeof deps.waitForProjectViewMutations === "function") {
+    await deps.waitForProjectViewMutations();
+    const latest = store.getState();
+    if (currentAssemblyViewRequest(store) !== request
+      || latest.session?.workspacePath !== state.session.workspacePath
+      || latest.session?.projectId !== state.session.projectId) return;
+    // A completed phase mutation may have compacted Final Path entries while
+    // navigation waited. Never spread the older pre-barrier assembly snapshot.
+    state = latest;
+  }
   const isCurrentRequest = () => {
     const current = store.getState();
-    return chromosomeRequests.get(store) === request
+    return currentAssemblyViewRequest(store) === request
       && current.session.workspacePath === state.session.workspacePath
       && current.session.projectId === state.session.projectId
       && current.assembly.selectedChrName === chrName;

@@ -1,3 +1,4 @@
+import { currentAssemblyViewRequest } from "../assembly-view-request.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -146,6 +147,7 @@ test("selectChromosome clears stale data while loading and restores target histo
   const pending = new Promise((resolve) => {
     resolveChrCtgs = resolve;
   });
+  const previousViewRequest = currentAssemblyViewRequest(store);
   const loadPromise = selectChromosome(host, store, "Chr10", {
     buildClearedSubviewState() {
       return { summary: null, trackPairHiddenCtgs: [], trackPairSelectedCtgs: [] };
@@ -210,6 +212,7 @@ test("selectChromosome clears stale data while loading and restores target histo
   store.setState({ assembly: { ...state.assembly, trackDragOffsets: latestOffsets } });
 
   resolveChrCtgs({ items: [{ assemblyCtgId: 8, name: "ptg000008l@Chr10" }] });
+  assert.notEqual(currentAssemblyViewRequest(store), previousViewRequest);
   await loadPromise;
   assert.deepEqual(state.assembly.trackDragOffsets, latestOffsets);
   assert.deepEqual(state.assembly.chrCtgs, [{ assemblyCtgId: 8, name: "ptg000008l@Chr10" }]);
@@ -353,6 +356,7 @@ test("loadAssemblyView accepts object assemblyStatus deps and loads chromosome d
   };
   const rerenders = [];
 
+  const previousViewRequest = currentAssemblyViewRequest(store);
   await loadAssemblyView(host, store, { keepCurrentChr: true, keepCurrentCtg: false }, {
     assemblyStatus: {
       loadingChromosomes: "loading...",
@@ -441,6 +445,7 @@ test("loadAssemblyView accepts object assemblyStatus deps and loads chromosome d
   assert.equal(state.assembly.selectedCtgId, 7);
   assert.equal(state.assembly.selectedMemberSeqId, 88);
   assert.equal(rerenders.length, 2);
+  assert.notEqual(currentAssemblyViewRequest(store), previousViewRequest);
 });
 
 test("loadAssemblyView selects first support dataset when a project gains its first support ds", async () => {
@@ -2181,3 +2186,49 @@ for (const mode of ["composition", "track-pair", "2-contig"]) for (const mainSpl
     }
   });
 }
+
+function waitingNavigationFixture() {
+  let release;
+  const barrier = new Promise(resolve => { release = resolve; });
+  let state = { locale: "en", session: { workspacePath: "D:/project", projectId: 7 },
+    assembly: { selectedChrName: "Chr01", chrCtgs: [], supportDatasetId: null,
+      finalPathByChr: normalizeFinalPathByChr({ Chr01B: { chrName: "Chr01B", mode: "segments", segments: [] } }) } };
+  const store = { getState: () => state, setState: next => { state = { ...state, ...next }; } };
+  const reads = []; let renders = 0;
+  const deps = {
+    waitForProjectViewMutations: () => barrier,
+    buildClearedSubviewState: () => ({ summary: null }),
+    getCurrentProject: () => ({ primaryDatasetId: 1, supportDatasetIds: [], phasedAssemblyEnabled: false }),
+    listChrViewCtgs: async args => { reads.push(args.chrName); return { items: [] }; },
+    loadDatasetChrCtgs: async () => [], loadDeletedCtgsForChr: async () => [],
+    loadSideDataForCtg: async () => ({ detail: null, candidates: { moveTargetCtgs: [], addSeqCandidates: [] } }),
+    mapAssemblyError: ({ error }) => ({ userMessage: error.message }),
+    normalizeSupportDatasetId: value => value == null ? null : Number(value),
+    rerender: () => { renders++; },
+  };
+  return { store, deps, reads, release, get renders() { return renders; } };
+}
+
+test("chromosome navigation waits for pending project data mutations and uses their latest path cleanup", async () => {
+  const f = waitingNavigationFixture();
+  const selecting = selectChromosome({}, f.store, "Chr02", f.deps);
+  assert.equal(f.store.getState().assembly.selectedChrName, "Chr01");
+  assert.deepEqual(f.reads, []);
+  assert.equal(f.renders, 0);
+  const corrected = normalizeFinalPathByChr({ Chr01A: { chrName: "Chr01A", mode: "segments", segments: [] } });
+  f.store.setState({ assembly: { ...f.store.getState().assembly, finalPathByChr: corrected } });
+  f.release(); await selecting;
+  assert.equal(f.store.getState().assembly.selectedChrName, "Chr02");
+  assert.deepEqual(f.reads, ["Chr02"]);
+  assert.equal(f.store.getState().assembly.finalPathByChr.Chr01B, undefined);
+  assert.ok(f.store.getState().assembly.finalPathByChr.Chr01A);
+});
+
+test("only the latest chromosome selection loads after the shared mutation barrier releases", async () => {
+  const f = waitingNavigationFixture();
+  const first = selectChromosome({}, f.store, "Chr02", f.deps);
+  const second = selectChromosome({}, f.store, "Chr03", f.deps);
+  f.release(); await Promise.all([first, second]);
+  assert.deepEqual(f.reads, ["Chr03"]);
+  assert.equal(f.store.getState().assembly.selectedChrName, "Chr03");
+});

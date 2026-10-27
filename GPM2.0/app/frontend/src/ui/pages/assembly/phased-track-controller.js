@@ -1,4 +1,6 @@
+import { currentAssemblyViewRequest } from "./assembly-view-request.js";
 import { tAssembly } from "./i18n.js";
+import { FINAL_PATH_ALL_KEY } from "./final-path-state.js";
 import {
   areTrackDragOffsetsEqual,
   buildTrackDragOffsetKey,
@@ -56,9 +58,75 @@ export function createPhasedTrackController({
   persistTrackDragOffsets,
   removePhasedChrTrackItem,
   requestAssemblyNotice = () => Promise.resolve(true),
+  runSerializedProjectViewMutation = (_store, task) => task(() => true),
   rerenderAssemblyMainTab,
+  rerenderFinalPathCard,
   setAssemblyActionFeedbackInMainTab,
 }) {
+  const refreshRequests = new WeakMap();
+
+  function isCurrentProject(store, expected) {
+    const current = store.getState();
+    return current.session?.workspacePath === expected.session?.workspacePath
+      && current.session?.projectId === expected.session?.projectId;
+  }
+
+  function isCurrentScope(store, expected, viewRequest) {
+    return currentAssemblyViewRequest(store) === viewRequest
+      && isCurrentProject(store, expected)
+      && store.getState().assembly?.selectedChrName === expected.assembly?.selectedChrName;
+  }
+
+  function serialized(action) {
+    return (host, store, payload) => runSerializedProjectViewMutation(store, () => {
+      // Any earlier list belongs to the pre-mutation topology, even if its
+      // response arrives before this mutation starts the replacement refresh.
+      refreshRequests.set(store, {});
+      return action(host, store, payload);
+    });
+  }
+
+  function retainedTrackKey(previousTracks, tracks, key) {
+    const previous = previousTracks.find((track) => track.haplotypeKey === key);
+    if (previous) {
+      return tracks.find((track) => track.phasedTrackId === previous.phasedTrackId)?.haplotypeKey || "";
+    }
+    return tracks.some((track) => track.haplotypeKey === key) ? key : "";
+  }
+
+  function reconcileTrackState(current, previousTracks, tracks, parentChrName, {
+    deletedKey = "", fallback = current,
+  } = {}) {
+    const visible = current.selectedChrName === parentChrName;
+    const mainKey = current.activePhasedTrackKeyByChr?.[parentChrName]
+      || (visible ? current.activePhasedTrackKey : fallback.activePhasedTrackKey) || "";
+    const nextActiveKey = retainedTrackKey(previousTracks, tracks, mainKey)
+      || (deletedKey ? resolveActivePhasedKeyAfterDelete({
+        currentKey: "", tracksAfter: tracks, deletedKey,
+      }) : tracks[0]?.haplotypeKey || "");
+    const finalKey = String(current.activeFinalPathKeyByChr?.[parentChrName]
+      || (visible ? current.activeFinalPathKey : fallback.activeFinalPathKey) || "").trim();
+    const nextFinalKey = !tracks.length ? ""
+      : (finalKey === FINAL_PATH_ALL_KEY ? FINAL_PATH_ALL_KEY
+        : retainedTrackKey(previousTracks, tracks, finalKey) || FINAL_PATH_ALL_KEY);
+    return {
+      ...(visible ? { phasedChrTracks: tracks, isChrPhased: Boolean(tracks.length),
+        activePhasedTrackKey: nextActiveKey, activeFinalPathKey: nextFinalKey } : {}),
+      activePhasedTrackKeyByChr: { ...(current.activePhasedTrackKeyByChr || {}), [parentChrName]: nextActiveKey },
+      activeFinalPathKeyByChr: { ...(current.activeFinalPathKeyByChr || {}), [parentChrName]: nextFinalKey },
+    };
+  }
+
+  function topologyAfterDelete(tracks, deletedId, parentChrName) {
+    return tracks.filter((track) => normalizeSupportDatasetId(track.phasedTrackId) !== deletedId)
+      .slice().sort((a, b) => Number(a.displayOrder) - Number(b.displayOrder)
+        || Number(a.phasedTrackId) - Number(b.phasedTrackId))
+      .map((track, index) => {
+        const key = String.fromCharCode("A".charCodeAt(0) + index);
+        return { ...track, displayOrder: index, haplotypeKey: key, label: `${parentChrName}${key}` };
+      });
+  }
+
   function hydratePhasedTracksForCurrentAssembly(tracks, assembly) {
     const primaryById = new Map(
       (Array.isArray(assembly?.chrCtgs) ? assembly.chrCtgs : [])
@@ -145,46 +213,47 @@ export function createPhasedTrackController({
     return true;
   }
 
-  async function refreshPhasedTracksForCurrentChr(host, store) {
+  async function refreshPhasedTracksForCurrentChr(host, store, { deletedKey = "", forceFinalPathRefresh = false } = {}) {
     const state = store.getState();
+    const viewRequest = currentAssemblyViewRequest(store);
     const workspaceRoot = state.session?.workspacePath;
     const projectId = state.session?.projectId;
     const parentChrName = String(state.assembly?.selectedChrName || "").trim();
     if (!workspaceRoot || !projectId || !parentChrName) {
-      return [];
+      return null;
     }
-    const result = await listPhasedChrTracks({
-      workspaceRoot,
-      projectId,
-      parentChrName,
-    });
-    const phasedChrTracks = hydratePhasedTracksForCurrentAssembly(
-      result?.tracks,
-      store.getState().assembly,
-    );
-    const nextActiveKey = phasedChrTracks.some((track) =>
-      track.haplotypeKey === store.getState().assembly?.activePhasedTrackKey,
-    )
-      ? store.getState().assembly.activePhasedTrackKey
-      : (phasedChrTracks[0]?.haplotypeKey || "");
-    store.setState({
-      assembly: {
-        ...store.getState().assembly,
-        phasedChrTracks,
-        isChrPhased: Boolean(phasedChrTracks.length),
-        activePhasedTrackKey: nextActiveKey,
-        activePhasedTrackKeyByChr: {
-          ...(store.getState().assembly?.activePhasedTrackKeyByChr || {}),
-          [parentChrName]: nextActiveKey,
-        },
-      },
-    });
+    const request = {};
+    refreshRequests.set(store, request);
+    const result = await listPhasedChrTracks({ workspaceRoot, projectId, parentChrName });
+    if (refreshRequests.get(store) !== request || !isCurrentScope(store, state, viewRequest)) {
+      return null;
+    }
+    const current = store.getState().assembly;
+    const previousTracks = Array.isArray(current.phasedChrTracks) ? current.phasedChrTracks : [];
+    const phasedChrTracks = hydratePhasedTracksForCurrentAssembly(result?.tracks, current);
+    const currentFinalKey = String(current.activeFinalPathKeyByChr?.[parentChrName]
+      || current.activeFinalPathKey || "").trim();
+    const patch = reconcileTrackState(current, previousTracks, phasedChrTracks, parentChrName, { deletedKey });
+    store.setState({ assembly: { ...current, ...patch } });
+    // Main patches exclude Final Path. Refresh it for changed track topology or
+    // path context, but keep item-only edits from needlessly rebuilding the card.
+    const topologyChanged = previousTracks.length !== phasedChrTracks.length
+      || previousTracks.some((track, index) => {
+        const next = phasedChrTracks[index];
+        return normalizeSupportDatasetId(track.phasedTrackId) !== next?.phasedTrackId
+          || track.haplotypeKey !== next?.haplotypeKey || track.label !== next?.label;
+      });
+    const previousFinalKey = previousTracks.length ? currentFinalKey || FINAL_PATH_ALL_KEY : "";
     rerenderAssemblyMainTab(host, store);
+    if (forceFinalPathRefresh || topologyChanged || previousFinalKey !== patch.activeFinalPathKey) {
+      rerenderFinalPathCard(host, store);
+    }
     return phasedChrTracks;
   }
 
   async function createPhasedChrTrack(host, store) {
     const state = store.getState();
+    const viewRequest = currentAssemblyViewRequest(store);
     const workspaceRoot = state.session?.workspacePath;
     const projectId = state.session?.projectId;
     const parentChrName = String(state.assembly?.selectedChrName || "").trim();
@@ -199,7 +268,9 @@ export function createPhasedTrackController({
         projectId,
         parentChrName,
       });
+      if (!isCurrentScope(store, state, viewRequest)) return;
       const phasedChrTracks = await refreshPhasedTracksForCurrentChr(host, store);
+      if (!phasedChrTracks) return;
       setAssemblyActionFeedbackInMainTab(host, store, {
         actionError: "",
         actionStatus: tAssembly(store.getState(), "runtime.phasedTrackCreated"),
@@ -212,6 +283,7 @@ export function createPhasedTrackController({
         });
       }
     } catch (error) {
+      if (!isCurrentScope(store, state, viewRequest)) return;
       const mappedError = mapAssemblyError({ error, stateOrLocale: store.getState() });
       setAssemblyActionFeedbackInMainTab(host, store, {
         actionError: mappedError.userMessage,
@@ -226,6 +298,7 @@ export function createPhasedTrackController({
     { phasedTrackId, assemblyCtgId, haplotypeKey = "" },
   ) {
     const state = store.getState();
+    const viewRequest = currentAssemblyViewRequest(store);
     const workspaceRoot = state.session?.workspacePath;
     const projectId = state.session?.projectId;
     const normalizedTrackId = normalizeSupportDatasetId(phasedTrackId);
@@ -241,6 +314,7 @@ export function createPhasedTrackController({
         phasedTrackId: normalizedTrackId,
         assemblyCtgId: normalizedCtgId,
       });
+      if (!isCurrentScope(store, state, viewRequest)) return;
       const inheritedDragOffset = inheritPrimaryTrackDragOffsetForPhasedItem(store, {
         assemblyCtgId: normalizedCtgId,
         phasedTrackId: normalizedTrackId,
@@ -258,7 +332,7 @@ export function createPhasedTrackController({
           },
         });
       }
-      await refreshPhasedTracksForCurrentChr(host, store);
+      if (!await refreshPhasedTracksForCurrentChr(host, store)) return;
       if (inheritedDragOffset) {
         void persistTrackDragOffsets(host, store);
       }
@@ -269,6 +343,7 @@ export function createPhasedTrackController({
         }),
       });
     } catch (error) {
+      if (!isCurrentScope(store, state, viewRequest)) return;
       const mappedError = mapAssemblyError({ error, stateOrLocale: store.getState() });
       setAssemblyActionFeedbackInMainTab(host, store, {
         actionError: mappedError.userMessage,
@@ -279,6 +354,7 @@ export function createPhasedTrackController({
 
   async function removePhasedTrackItem(host, store, { phasedTrackItemId }) {
     const state = store.getState();
+    const viewRequest = currentAssemblyViewRequest(store);
     const workspaceRoot = state.session?.workspacePath;
     const projectId = state.session?.projectId;
     const normalizedItemId = normalizeSupportDatasetId(phasedTrackItemId);
@@ -291,12 +367,14 @@ export function createPhasedTrackController({
         projectId,
         phasedTrackItemId: normalizedItemId,
       });
-      await refreshPhasedTracksForCurrentChr(host, store);
+      if (!isCurrentScope(store, state, viewRequest)) return;
+      if (!await refreshPhasedTracksForCurrentChr(host, store)) return;
       setAssemblyActionFeedbackInMainTab(host, store, {
         actionError: "",
         actionStatus: tAssembly(store.getState(), "runtime.phasedTrackItemRemoved"),
       });
     } catch (error) {
+      if (!isCurrentScope(store, state, viewRequest)) return;
       const mappedError = mapAssemblyError({ error, stateOrLocale: store.getState() });
       setAssemblyActionFeedbackInMainTab(host, store, {
         actionError: mappedError.userMessage,
@@ -323,6 +401,7 @@ export function createPhasedTrackController({
 
   async function deletePhasedTrack(host, store, { phasedTrackId, haplotypeKey = "" }) {
     const state = store.getState();
+    const viewRequest = currentAssemblyViewRequest(store);
     const workspaceRoot = state.session?.workspacePath;
     const projectId = state.session?.projectId;
     const parentChrName = String(state.assembly?.selectedChrName || "").trim();
@@ -340,8 +419,9 @@ export function createPhasedTrackController({
         projectId,
         phasedTrackId: normalizedTrackId,
       });
+      if (!isCurrentProject(store, state)) return;
       const nextFinalPathByChr = compactFinalPathByDeletedPhasedTrack(
-        state.assembly?.finalPathByChr,
+        store.getState().assembly?.finalPathByChr,
         {
           parentChrName,
           tracksBefore,
@@ -351,27 +431,39 @@ export function createPhasedTrackController({
       store.setState({
         assembly: {
           ...store.getState().assembly,
+          ...reconcileTrackState(store.getState().assembly, tracksBefore,
+            topologyAfterDelete(tracksBefore, normalizedTrackId, parentChrName), parentChrName,
+            { deletedKey: normalizedKey, fallback: state.assembly }),
           finalPathByChr: nextFinalPathByChr,
         },
       });
-      const tracksAfter = await refreshPhasedTracksForCurrentChr(host, store);
-      const nextActiveKey = resolveActivePhasedKeyAfterDelete({
-        currentKey: state.assembly?.activePhasedTrackKey,
-        tracksAfter,
-        deletedKey: normalizedKey,
-      });
-      store.setState({
-        assembly: {
-          ...store.getState().assembly,
-          activePhasedTrackKey: nextActiveKey,
-          activePhasedTrackKeyByChr: {
-            ...(store.getState().assembly?.activePhasedTrackKeyByChr || {}),
-            [parentChrName]: nextActiveKey,
-          },
-        },
-      });
-      rerenderAssemblyMainTab(host, store);
-      await persistMainTrackViewState(host, store);
+      let refreshed = null;
+      try {
+        if (isCurrentScope(store, state, viewRequest)) {
+          refreshed = await refreshPhasedTracksForCurrentChr(host, store, {
+            deletedKey: normalizedKey, forceFinalPathRefresh: true,
+          });
+        }
+      } catch (error) {
+        // Listing failure cannot undo a committed deletion. Paint the reliable
+        // locally compacted topology before reporting the refresh error.
+        if (isCurrentScope(store, state, viewRequest)) {
+          rerenderAssemblyMainTab(host, store);
+          rerenderFinalPathCard(host, store);
+        }
+        throw error;
+      } finally {
+        // The backend deletion has committed. Its original-chromosome path
+        // cleanup must be saved even if navigation supersedes the UI refresh.
+        // Production wraps this entire mutation in the project coordinator;
+        // project-switch flushes drain it before replacing the owning session.
+        if (isCurrentProject(store, state)) await persistMainTrackViewState(host, store);
+      }
+      if (!isCurrentScope(store, state, viewRequest)) return;
+      // A newer item-only list can supersede our response after the model was
+      // compacted. It cannot see the consumed topology change, so the committed
+      // deletion still owes the mounted Final Path card a redraw.
+      if (!refreshed) rerenderFinalPathCard(host, store);
       setAssemblyActionFeedbackInMainTab(host, store, {
         actionError: "",
         actionStatus: tAssembly(store.getState(), "runtime.phasedTrackDeleted", {
@@ -379,6 +471,7 @@ export function createPhasedTrackController({
         }),
       });
     } catch (error) {
+      if (!isCurrentScope(store, state, viewRequest)) return;
       const mappedError = mapAssemblyError({ error, stateOrLocale: store.getState() });
       setAssemblyActionFeedbackInMainTab(host, store, {
         actionError: mappedError.userMessage,
@@ -388,11 +481,11 @@ export function createPhasedTrackController({
   }
 
   return {
-    addTrackContigToPhasedTrack,
-    createPhasedChrTrack,
-    deletePhasedTrack,
+    addTrackContigToPhasedTrack: serialized(addTrackContigToPhasedTrack),
+    createPhasedChrTrack: serialized(createPhasedChrTrack),
+    deletePhasedTrack: serialized(deletePhasedTrack),
     inheritPrimaryTrackDragOffsetForPhasedItem,
     refreshPhasedTracksForCurrentChr,
-    removePhasedTrackItem,
+    removePhasedTrackItem: serialized(removePhasedTrackItem),
   };
 }
