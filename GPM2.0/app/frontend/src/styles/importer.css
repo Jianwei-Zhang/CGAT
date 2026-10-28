@@ -511,7 +511,7 @@
 .projects-page .project-row-actions .project-icon-button:hover:not(:disabled) { background: var(--theme-surface-subtle, #e2e8f0); border-color: transparent; color: var(--theme-ink, #0f172a); }
 
 .project-current { min-width: 0; align-self: start; padding: 24px 32px 32px; }
-.project-detail-overview { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border-subtle, #dbe3ec); }
+.project-detail-overview { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border-subtle, #dbe3ec); }
 .project-identity { min-width: 0; }
 .project-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; }
 .project-heading-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; font-size: var(--font-small); font-weight: 400; }
@@ -520,7 +520,7 @@
 .project-title-row { display: flex; align-items: start; gap: 8px; min-width: 0; font-size: var(--font-hero); font-weight: 600; line-height: 1.35; }
 .project-title-row h2 { min-width: 0; margin: 0; font: inherit; overflow-wrap: anywhere; }
 .project-title-row .project-icon-button { margin-top: 1px; }
-.project-location-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; min-width: 0; margin-top: 8px; }
+.project-location-row { grid-column: 1 / -1; width: 100%; box-sizing: border-box; display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; min-width: 0; margin-top: 0; }
 .project-detail-path { flex: 1 1 240px; min-width: 0; margin: 0; color: var(--text-muted, #64748b); font-size: var(--font-body); overflow-wrap: anywhere; }
 .projects-page .button.project-enter-assembly {
   min-width: 156px;

@@ -46,7 +46,7 @@ Complete target behavior for the confirmed GPM application interaction and infor
 
 - The project-library validation button visibly reads 校验项目 in Chinese while preserving its existing validation scope, disabled/progress states and behavior.
 
-- Project page retains the existing project list and project selection duties; its right side first shows the existing selected-project information table and operations without a visible 项目信息/Project Information subtitle. Creation time appears once on the right of the workspace-path row above the table, not below the table.
+- Project page retains the existing project list and project selection duties; its right side first shows the existing selected-project information table and operations without a visible 项目信息/Project Information subtitle. Creation time appears once on the right of the workspace-path row above the table, not below the table. The path/timestamp row spans the full detail-header width, including the assembly-entry action column, so the complete Created/date-time text aligns with the detail area right edge while retaining locale formatting and narrow-width wrapping.
 - The right side second shows the compact Final Path strip migrated from the former export page without a visible 路径概览/Path Overview subtitle, preserving applicable geometry, role colors, gaps and existing navigation behavior.
 - Both sections describe the same selected project; rendering cannot silently activate another project or mutate a path, and rapid project switching cannot publish obsolete results.
 - Missing path data produces an honest empty state, never stale strips from the previous project; table and strip controls remain correctly scoped after refresh.
@@ -70,9 +70,9 @@ Complete target behavior for the confirmed GPM application interaction and infor
 
 ## Compact equal-height member popover
 
-- The Primary Dataset Members trigger opens an anchored member popover without squeezing or increasing Main View layout height; it fits the viewport and scrolls internally for many members.
+- The generic Primary Dataset Members/主数据集成员 trigger omits project/chromosome prefixes and opens an anchored member popover without squeezing or increasing Main View layout height. Its left-aligned header repeats that generic title, immediately followed by Reset/重置; the existing full reset description remains in the tooltip and accessible name, without changing restoration scope. The panel fits the viewport and scrolls internally for many members.
 - Every normal/derived/split member card has exactly two equal-height rows: identity first, length plus necessary concise state markers second; cards have consistent line height/padding and no redundant 78px/blank-row reservation.
-- Member card width follows readable content without equal grid-column stretching, forced half-row sizing or fixed two-column layout; order is stable, long names remain distinguishable and complete values are accessible.
+- Member card width follows readable content without equal grid-column stretching, forced half-row sizing or fixed two-column layout; order is stable, long names remain distinguishable and complete values are accessible. After width-limited wrapping, the popover trims unused right-side space to the widest occupied card/header row, excluding full-width group separators and preserving padding, scrollbar space, card dimensions and scroll position; resizing can grow it again up to the normal viewport-clamped limit.
 - Source interval, full name and local-use details move to complete hover details; overflow states may use explained summaries without a third row, silent information loss or unbounded card widening.
 - Member click keeps the panel open and preserves existing single-selection/focus behavior, Ctrl/Cmd multiselection, box selection and business context menus.
 - Trigger toggle, outside click and Escape close the member panel; leaving the combined trigger/panel/owned-menu region closes after the existing 400ms grace period, with reentry canceling it and no premature close between related surfaces.

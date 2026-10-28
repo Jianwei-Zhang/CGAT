@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { bindAssemblyScopePopovers } from "../scope-popover-runtime.js";
+import { bindAssemblyScopePopovers, resolveMembersPopoverWidth } from "../scope-popover-runtime.js";
 import { createScopePopoverFixture, withPopoverClock } from "./scope-popover-fixture.mjs";
 
 function fixture() {
@@ -84,3 +84,39 @@ test("an obsolete leave timer cannot close or persist another project's panel be
   const current = f.store.getState();
   expire(); assert.equal(f.store.getState(), current); assert.equal(current.assembly.membersCardCollapsed, false);
 }));
+
+test("member width trims only unoccupied trailing space and reserves scrollbar/header space", () => {
+  const layout = { panelRect: { left: 100, width: 820 }, gridRect: { left: 109 },
+    contentRects: [{ right: 280 }, { right: 456 }, { right: 632 }, { right: 808 }, { right: 350 }] };
+  assert.equal(resolveMembersPopoverWidth(layout), 719);
+  assert.equal(resolveMembersPopoverWidth({ ...layout, scrollbarWidth: 17 }), 736);
+  assert.equal(resolveMembersPopoverWidth({ ...layout, contentRects: [{ right: 350 }] }), 261);
+  assert.equal(resolveMembersPopoverWidth({ ...layout, contentRects: [] }), 820);
+  assert.equal(resolveMembersPopoverWidth({ ...layout, panelRect: { left: 100, width: 300 } }), 300);
+  assert.equal(resolveMembersPopoverWidth({ panelRect: { left: 0, width: 0 } }), null);
+});
+
+test("member sizing preserves content widths, excludes full-width separators and recovers after resize", () => {
+  const f = fixture(), panel = f.panels.members, win = f.host.ownerDocument.defaultView;
+  panel.getBoundingClientRect = () => {
+    const left = Number.parseFloat(panel.style.left) || 100;
+    const width = Number.parseFloat(panel.style.width) || 820;
+    return { left, right: left + width, width, height: 200 };
+  };
+  const grid = { offsetWidth: 800, clientWidth: 800,
+    getBoundingClientRect: () => ({ left: panel.getBoundingClientRect().left + 9 }) };
+  panel.querySelector = selector => selector === ".ctg-chip-grid" ? grid : null;
+  panel.querySelectorAll = selector => {
+    assert.equal(selector, ".ctg-chip, .assembly-members-popover-tools > *");
+    return [180, 356, 532, 708, 250].map(right => ({
+      getBoundingClientRect: () => ({ right: panel.getBoundingClientRect().left + right }),
+    }));
+  };
+  f.owner.setOpen("members", true);
+  assert.equal(panel.style.width, "719px");
+  f.owner.refresh(); assert.equal(panel.style.width, "719px");
+  win.innerWidth = 320; f.owner.refresh(); assert.equal(panel.style.width, "304px");
+  win.innerWidth = 1000; f.owner.refresh(); assert.equal(panel.style.width, "719px");
+  assert.equal(panel.scrollTop, 75);
+  f.owner.setOpen("members", false); assert.equal(panel.style.width, "");
+});

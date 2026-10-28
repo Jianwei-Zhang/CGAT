@@ -146,12 +146,12 @@ export function renderWorkspacePage(state) {
         </div>`}
         ${selectedProject ? renderProjectHeaderMetadata(initializer, state) : ""}
         </div>
-        <div class="project-location-row">
-          <p class="project-path project-detail-path" title="${escapeAttr(state.session.workspacePath)}">${escapeHtml(state.session.workspacePath)}</p>
-          ${selectedProject ? `<p class="project-detail-created">${labels.created}${state.locale === "en" ? ": " : "："}${escapeHtml(formatCreatedAt(selectedProject.createdAt, state.locale))}</p>` : ""}
-        </div>
       </div>
       <button id="initializer-enter-assembly-button" class="button project-primary project-enter-assembly" ${!selectedProject || busy ? "disabled" : ""}>${messages.buttons.enterAssembly}${projectIcon("arrow")}</button>
+      <div class="project-location-row">
+        <p class="project-path project-detail-path" title="${escapeAttr(state.session.workspacePath)}">${escapeHtml(state.session.workspacePath)}</p>
+        ${selectedProject ? `<p class="project-detail-created">${labels.created}${state.locale === "en" ? ": " : "："}${escapeHtml(formatCreatedAt(selectedProject.createdAt, state.locale))}</p>` : ""}
+      </div>
     </div>
     ${initializer.existingProjects.length > 1 ? `<label class="project-legacy-picker">${labels.legacy}
       <select id="legacy-project-select" ${busy ? "disabled" : ""}><option value="">${labels.legacyProjects}</option>

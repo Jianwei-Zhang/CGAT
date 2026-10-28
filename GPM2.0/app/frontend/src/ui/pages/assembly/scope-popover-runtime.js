@@ -8,6 +8,36 @@ const config = {
   members: { trigger: "[data-members-card-toggle='1']", panel: "#assembly-members-panel-popover", width: 820 },
 };
 
+// Trim only unused trailing space after the normal width-limited flex layout.
+// Measuring the widest occupied row preserves card widths, order and wrapping;
+// never use the full-width deleted-group separator as an occupied card edge.
+export function resolveMembersPopoverWidth({ panelRect, gridRect, contentRects = [], scrollbarWidth = 0 }) {
+  const width = Number(panelRect?.width), left = Number(panelRect?.left);
+  if (!(width > 0) || !Number.isFinite(left)) return null;
+  const right = contentRects.reduce((edge, rect) => {
+    const value = Number(rect?.right);
+    return Number.isFinite(value) ? Math.max(edge, value) : edge;
+  }, left);
+  if (right <= left) return width;
+  const inset = Math.max(0, (Number(gridRect?.left) || left) - left);
+  return Math.min(width, Math.ceil(right - left + inset
+    + Math.max(0, Number(scrollbarWidth) || 0) + 2));
+}
+
+function fitMembersPopover(trigger, panel, initialWidth) {
+  const grid = panel.querySelector?.(".ctg-chip-grid");
+  const content = panel.querySelectorAll?.(".ctg-chip, .assembly-members-popover-tools > *");
+  if (!grid?.getBoundingClientRect || !content?.length) return;
+  const width = resolveMembersPopoverWidth({ panelRect: panel.getBoundingClientRect(),
+    gridRect: grid.getBoundingClientRect(),
+    contentRects: [...content].map(node => node.getBoundingClientRect()),
+    scrollbarWidth: Math.max(0, (grid.offsetWidth || 0) - (grid.clientWidth || 0)),
+  });
+  if (width && width < initialWidth) {
+    placeAnchoredPanel(trigger, panel, { preferredWidth: width, matchAnchorWidth: false });
+  }
+}
+
 // One delegated owner survives section patches. Toggles only hidden/aria/state;
 // they never re-render, reparent content, load a chromosome or move a plot.
 export function bindAssemblyScopePopovers(host, store, { persistMembers } = {}) {
@@ -35,8 +65,10 @@ export function bindAssemblyScopePopovers(host, store, { persistMembers } = {}) 
     const chevron = trigger.querySelector?.("[data-popup-chevron]");
     if (chevron) chevron.textContent = open ? "▴" : "▾";
     if (kind === "members") trigger.closest?.(".assembly-members-panel")?.classList.toggle("is-collapsed", !open);
-    if (open) placeAnchoredPanel(trigger, panel, { preferredWidth: c.width, matchAnchorWidth: false });
-    else clearAnchoredPanelPlacement(panel);
+    if (open) {
+      const placed = placeAnchoredPanel(trigger, panel, { preferredWidth: c.width, matchAnchorWidth: false });
+      if (kind === "members" && placed) fitMembersPopover(trigger, panel, placed.width);
+    } else clearAnchoredPanelPlacement(panel);
   };
   const setOpen = (kind, open, restoreFocus = false) => {
     cancel(kind);

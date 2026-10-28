@@ -147,7 +147,7 @@ test("assembly tab renders english labels when locale is en", () => {
   assert.doesNotMatch(html, />Tick interval \(kb\)</);
   assert.doesNotMatch(html, /view-display-settings/);
   assert.doesNotMatch(html, />Maximum visible count</);
-  assert.match(html, /_Chr01 Primary Dataset Members/);
+  assert.match(html, /Primary Dataset Members/);
 });
 
 test("assembly page shell does not render an extra outer card frame", () => {
@@ -734,7 +734,7 @@ test("assembly tab renders a project-chr members card above main track with name
   assert.match(html, /assembly-members-panel/);
   assert.match(html, /<div class="chr-strip has-members-panel">[\s\S]*assembly-members-panel-inline is-collapsed/);
   assert.doesNotMatch(html, /<\/div>\s*<article class="card assembly-members-panel"/);
-  assert.match(html, /project1_Chr01 主数据集成员/);
+  assert.match(html, /主数据集成员/);
   assert.match(
     html,
     /<button[^>]*data-members-card-toggle="1"[^>]*aria-expanded="false"[^>]*>/,
@@ -760,14 +760,14 @@ test("assembly tab expands the members card body when membersCardCollapsed is fa
     }),
   );
 
-  assert.match(html, /project1_Chr01 主数据集成员/);
+  assert.match(html, /主数据集成员/);
   assert.match(
     html,
     /<button[^>]*data-members-card-toggle="1"[^>]*aria-expanded="true"[^>]*>/,
   );
   assert.match(
     html,
-    /<strong>project1_Chr01 主数据集成员<\/strong>[\s\S]*assembly-members-popover-tools[\s\S]*data-reset-members-state="1"[^>]*aria-label="重置：撤销删除、撤销隐藏"/,
+    /<strong>主数据集成员<\/strong>[\s\S]*assembly-members-popover-tools[\s\S]*data-reset-members-state="1"[^>]*aria-label="重置：撤销删除、撤销隐藏"/,
   );
   assert.match(html, /ctg-beta/);
   assert.match(html, /600 bp/);

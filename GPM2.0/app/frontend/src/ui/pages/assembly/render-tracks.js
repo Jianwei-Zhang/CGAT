@@ -597,13 +597,11 @@ function createRenderTracksRenderer(deps = {}) {
 
 
   function renderAssemblyScopeHeader(state, memberChips = "") {
-    const assembly = state.assembly, session = state.session || {}, i18n = getAssemblyI18n(state);
+    const assembly = state.assembly, i18n = getAssemblyI18n(state);
     const chromosomes = Array.isArray(assembly.chromosomes) ? assembly.chromosomes : [];
     const chrOpen = assembly.chrPickerOpen === true;
     const membersOpen = assembly.membersCardCollapsed === false && !assembly.loading;
-    const membersTitle = i18n.page.membersCardTitle
-      .replace("{projectLabel}", String(session.projectName || session.projectId || "Project"))
-      .replace("{currentChrLabel}", String(assembly.selectedChrName || "current-chr"));
+    const membersTitle = i18n.page.membersCardTitle;
     const chromosomeOptions = chromosomes.map(chr => `<button type="button" class="chr-picker-option ${chr.chrName === assembly.selectedChrName ? "is-active" : ""}" data-chr-name="${escapeAttr(chr.chrName)}" aria-pressed="${chr.chrName === assembly.selectedChrName}" title="${escapeAttr(`${chr.chrName} · ${formatBp(chr.placedBp)}`)}">
       <strong>${escapeHtml(chr.chrName)}</strong><span>${chr.ctgCount} Contigs · ${(Number(chr.placedBp || 0) / 1e6).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Mb</span></button>`).join("");
     return `<div class="chr-strip has-members-panel">
@@ -617,8 +615,8 @@ function createRenderTracksRenderer(deps = {}) {
         <div class="assembly-members-panel-head"><button type="button" class="button ghost assembly-members-trigger" data-members-card-toggle="1" aria-controls="assembly-members-panel-popover" aria-expanded="${membersOpen}" ${assembly.loading ? "disabled" : ""}>
           <strong>${escapeHtml(membersTitle)}</strong><span data-popup-chevron aria-hidden="true">${membersOpen ? "▴" : "▾"}</span>
         </button></div>
-        <div id="assembly-members-panel-popover" class="assembly-members-popover assembly-scope-popover" ${membersOpen ? "" : "hidden"}>
-          <div class="assembly-members-popover-tools"><button type="button" class="button ghost tiny" data-reset-members-state="1" aria-label="${escapeAttr(i18n.page.resetMembersState)}">↺ ${escapeHtml(i18n.page.resetMembersState)}</button></div>
+        <div id="assembly-members-panel-popover" class="assembly-members-popover assembly-scope-popover" role="region" aria-labelledby="assembly-members-popover-title" ${membersOpen ? "" : "hidden"}>
+          <div class="assembly-members-popover-tools"><strong id="assembly-members-popover-title">${escapeHtml(membersTitle)}</strong><button type="button" class="button ghost tiny" data-reset-members-state="1" aria-label="${escapeAttr(i18n.page.resetMembersState)}" title="${escapeAttr(i18n.page.resetMembersState)}">↺ ${escapeHtml(i18n.page.resetMembersStateLabel)}</button></div>
           <div class="ctg-chip-grid assembly-member-chip-region">${memberChips}</div>
         </div>
       </article>

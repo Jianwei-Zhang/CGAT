@@ -31,3 +31,24 @@ test("member cards use content-fit flex widths and fixed two-row typography, not
   assert.doesNotMatch(css, /member-chip-row-height|290px|78px/);
   assert.match(css, /ctg-chip-tags > :not\(:first-child\):not\(\.ctg-chip-more-states\)/);
 });
+
+for (const locale of ["zh", "en"]) test(`member trigger and panel use generic titles with a compact reset action (${locale})`, () => {
+  const name = "ProjectNameThatMustNotAppearInTheMemberTrigger";
+  const html = renderAssemblyPage({ ...createState({ session: { projectName: name }, assembly: { membersCardCollapsed: false } }), locale });
+  const panel = html.match(/<article class="assembly-members-panel[^]*?<\/article>/)[0];
+  const title = locale === "zh" ? "主数据集成员" : "Primary Dataset Members";
+  const reset = locale === "zh" ? "重置" : "Reset";
+  const full = locale === "zh" ? "重置：撤销删除、撤销隐藏" : "Reset: restore deletions and hidden contigs";
+  assert.ok(!panel.includes(name));
+  assert.match(panel, new RegExp(`<strong>${title}<\\/strong>`));
+  assert.ok(panel.includes(`aria-labelledby="assembly-members-popover-title"`));
+  const tools = panel.match(/<div class="assembly-members-popover-tools">[^]*?<\/div>/)[0];
+  assert.ok(tools.includes(`<strong id="assembly-members-popover-title">${title}</strong>`));
+  assert.ok(tools.includes(`aria-label="${full}" title="${full}">↺ ${reset}</button>`));
+  assert.ok(tools.indexOf("<strong") < tools.indexOf("data-reset-members-state"));
+});
+
+test("member panel heading and compact reset share the leading edge like deleted-member headings", () => {
+  const css = readFileSync(new URL("../../../../styles/assembly.css", import.meta.url), "utf8");
+  assert.match(css, /\.assembly-members-popover-tools\s*\{[^}]*align-items: center;[^}]*justify-content: flex-start;[^}]*gap: 6px;[^}]*flex-wrap: wrap;/);
+});

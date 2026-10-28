@@ -773,7 +773,7 @@
 .assembly-members-panel-head { display: flex; align-items: center; justify-content: space-between; }
 .assembly-members-trigger { width: 100%; justify-content: space-between; text-align: left; }
 .assembly-members-popover { width: min(820px, calc(100vw - 16px)); max-height: min(440px, calc(100vh - 80px)); }
-.assembly-members-popover-tools { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+.assembly-members-popover-tools { display: flex; align-items: center; justify-content: flex-start; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
 
 .assembly-members-panel .ctg-chip-grid {
   display: flex;

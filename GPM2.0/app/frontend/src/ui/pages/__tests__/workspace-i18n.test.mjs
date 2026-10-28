@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { previewMutationStamp } from "../../../services/preview-content-events.js";
 import { projectCatalogKey } from "../project-catalog-view.js";
 import test from "node:test";
@@ -1012,4 +1013,12 @@ for (const locale of ["zh", "en"]) test(`creation time appears once to the right
   assert.match(output, new RegExp(`class="project-location-row">[\\s\\S]*class="project-path project-detail-path"[^>]*>[\\s\\S]*class="project-detail-created">${locale === "zh" ? "创建时间：" : "Created: "}`));
   assert.ok(output.indexOf('class="project-detail-created"') < output.indexOf('class="project-information"'));
   assert.doesNotMatch(output, /project-catalog-created/);
+});
+
+test("project creation time occupies the full detail width and stays right aligned beside the path", () => {
+  const css = readFileSync(new URL("../../../styles/importer.css", import.meta.url), "utf8");
+  assert.match(css, /\.project-location-row\s*\{[^}]*grid-column: 1 \/ -1;[^}]*width: 100%;[^}]*flex-wrap: wrap;/);
+  assert.match(css, /\.project-detail-created\s*\{[^}]*margin: 0 0 0 auto;[^}]*text-align: right;/);
+  const source = readFileSync(new URL("../workspace-page.js", import.meta.url), "utf8");
+  assert.ok(source.indexOf('id="initializer-enter-assembly-button"') < source.indexOf('class="project-location-row"'));
 });
