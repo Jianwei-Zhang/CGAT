@@ -26,7 +26,7 @@ function deps() {
   };
 }
 
-test("preview uses single-line heading, icon refresh, hides unpositioned information, and keeps gaps without text", () => {
+test("preview uses a download icon, identifies unpositioned sources and keeps gaps without text", () => {
   const value = state();
   const cards = buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }], referenceGenomeId: 1,
     ctgs: [{ assemblyCtgId: 2, datasetName: "dsA", name: "unknown", totalLength: 100,
@@ -36,9 +36,9 @@ test("preview uses single-line heading, icon refresh, hides unpositioned informa
   const output = renderProjectPreviewPage(value);
   assert.match(output, /class="project-preview-card"/);
   assert.doesNotMatch(output, /<button[^>]*class="project-preview-card"/);
-  assert.match(output, /project-preview-refresh[^>]*aria-label="刷新"[^>]*>[\s\S]*?<svg/);
-  assert.doesNotMatch(output, /project-preview-refresh[^>]*>刷新/);
-  assert.doesNotMatch(output, /project-preview-unpositioned|data-preview-unpositioned|未定位/);
+  assert.match(output, /project-preview-download[^>]*aria-label="下载预览图"[^>]*>[\s\S]*?<svg/);
+  assert.doesNotMatch(output, /data-preview-refresh/);
+  assert.match(output, /project-preview-unpositioned[\s\S]*未定位/);
   assert.doesNotMatch(output, /data-final-path-gap-label|project-preview-gap-label|>Gap<\/span>/);
   assert.match(output, /data-final-path-kind="gap"[^>]*background:var\(--gap-marker-fill, #ffffff\)/);
   assert.match(output, /title="Gap: 1 bp/);
@@ -170,7 +170,7 @@ test("rendered reference carries its adopted-path anchor rather than a fixed zer
     finalPathByChr: { Chr1: { segments: [segment] } } });
   value.projectPreview = { key: previewProjectKey(value), loaded: true, cards };
   const output = renderProjectPreviewPage(value);
-  assert.match(output, /class="project-preview-reference"[^>]*data-preview-reference-path="Chr1"[^>]*data-preview-reference-index="0"[^>]*data-preview-reference-offset="500"[^>]*style="left:20\.00000%;width:80\.00000%/);
+  assert.match(output, /class="project-preview-reference"[^>]*style="left:20\.00000%;width:80\.00000%/);
   assert.match(output, /data-final-path-domain="2500"/);
 });
 
@@ -189,13 +189,13 @@ test("preview source and Final Path strips have identical thickness and centered
       cards: buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }],
         finalPathByChr: { Chr1: { segments: [segment, ...gaps] } } }) };
     const output = renderProjectPreviewPage(value);
-    assert.match(output, /data-final-path-domain="[^"]+" style="height:20px"/);
+    assert.match(output, /data-final-path-domain="[^"]+" data-preview-linear="1" data-preview-domain-start="[^"]+" style="height:20px"/);
     assert.doesNotMatch(output, /has-gaps|data-final-path-gap-label/);
   }
 });
 
 
-test("preview clips a donor to the adopted interval even before measured geometry runs", () => {
+test("preview shows the full donor with a separate small adopted interval without fragment-floor inflation", () => {
   const value = state();
   value.projectPreview = { key: previewProjectKey(value), loaded: true,
     cards: buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 81415375 }],
@@ -204,8 +204,14 @@ test("preview clips a donor to the adopted interval even before measured geometr
         source: { dataset: "dsA", contig: "donor", start: 17930989, end: 17953329, orientation: "+" } }] } } }) };
   const output = renderProjectPreviewPage(value);
   const source = output.match(/class="project-preview-contig is-adopted"[^>]+/)[0];
-  assert.match(source, /left:0\.00000%;width:0\.02744%/);
-  assert.match(source, /title="donor · 采用区间: dsA \/ donor: 17,930,989–17,953,329 \(\+\) · 22,341 bp"/);
+  assert.match(source, /data-preview-source-length="31678158"/);
+  const [card] = value.projectPreview.cards;
+  const span = card.domain.end - card.domain.start;
+  const fullWidth = (31678158 / span * 100).toFixed(5);
+  assert.ok(source.includes(`width:${fullWidth}%`));
+  assert.doesNotMatch(source, /data-final-path-aligned-source/);
+  assert.match(output, /project-preview-used[^>]*width:0\.07052%/);
+  assert.match(source, /title="donor · 31,678,158 bp · 采用区间: dsA \/ donor: 17,930,989–17,953,329 \(\+\)"/);
 });
 
 test("embedded Preview loads in Overview, keeps its heading level, and cannot overwrite the surrounding statistics/export owners", async () => {
@@ -215,7 +221,7 @@ test("embedded Preview loads in Overview, keeps its heading level, and cannot ov
   node.parentElement = { summary, set innerHTML(_value) { assert.fail("Preview must never replace its Overview parent"); } };
   assert.equal(await loadProjectPreviewData(node, store, { ...deps(), getProjectPreviewCache: async () => ({ available: false }), putProjectPreviewCache: async () => ({ stored: false }) }), true);
   assert.equal(node.parentElement.summary, summary);
-  assert.match(node.innerHTML, /<h3>项目预览<\/h3>/); assert.match(node.innerHTML, /project-preview-card/);
+  assert.match(node.innerHTML, /<h3>预览<\/h3>/); assert.match(node.innerHTML, /project-preview-card/);
   assert.equal(store.getState().projectPreview.loaded, true);
 });
 
@@ -253,9 +259,25 @@ test("mounted Overview Preview refreshes after committed content changes, not on
   finishPreviewContentOperation(operation, "create_phased_chr_track", {}, true);
   store.setState({ assembly: { ...store.getState().assembly, actionStatus: "phase committed" } });
   assert.equal(await loadProjectPreviewData(node, store, options), true);
-  assert.equal(metadataReads, 2); assert.match(node.innerHTML, /<h3>项目预览<\/h3>/);
+  assert.equal(metadataReads, 2); assert.match(node.innerHTML, /<h3>预览<\/h3>/);
   unbindProjectPreviewPage(node); assert.equal(subscriptions, 0);
   const next = beginPreviewContentOperation("delete_phased_chr_track", args);
   finishPreviewContentOperation(next, "delete_phased_chr_track", {}, true);
   store.setState({ assembly: { ...store.getState().assembly } }); assert.equal(metadataReads, 2);
+});
+
+
+test("Preview download click delegates to whole-image export without navigating or requiring manual refresh", async () => {
+  const store = createStore(state()), node = host(), options = deps(), writes = [];
+  options.pickSaveFilePath = async () => "D:/preview.png";
+  options.renderProjectPreviewPng = async snapshot => { assert.match(snapshot.svgMarkup, />Chr1</); return "PNG"; };
+  options.writeFinalPathExportBinaryFile = async args => writes.push(args);
+  await loadProjectPreviewData(node, store, options);
+  bindProjectPreviewPage(node, store, options);
+  await loadProjectPreviewData(node, store, options);
+  node.click({ target: { closest: selector => selector === "[data-preview-download]" ? {} : null } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(writes.length, 1); assert.equal(writes[0].outputPath, "D:/preview.png");
+  assert.equal(store.getState().activeRoute, "projectPreview");
+  unbindProjectPreviewPage(node);
 });

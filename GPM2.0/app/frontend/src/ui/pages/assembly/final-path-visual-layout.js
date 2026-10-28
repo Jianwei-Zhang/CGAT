@@ -109,6 +109,15 @@ export function layoutFinalPathStrip(items, viewportWidth, domainLengthBp) {
   })), budget);
 }
 
+// Source context stays linear. Only the independent Final Path strip receives
+// minimum-pixel widths, without extrapolating a tiny donor's scale to its body.
+export function layoutProjectPreviewPath(items, viewportWidth, domain) {
+  const span = Math.max(1, domain.end - domain.start), width = Math.max(0, viewportWidth);
+  const offset = Math.max(0, Math.min(width, -domain.start / span * width));
+  return layoutFinalPathStrip(items, width - offset, domain.end)
+    .map(layout => ({ x: offset + layout.x, width: layout.width }));
+}
+
 function syncFullLabelVisibility(label) {
   if (!label?.style) return;
   const needed = Number(label.scrollWidth || 0);
@@ -123,7 +132,11 @@ export function syncFinalPathStripGeometry(host) {
     const nodes = [...strip.querySelectorAll("[data-final-path-segment]")];
     const items = nodes.map(node => ({ segment: { type: node.dataset.finalPathKind },
       length: Math.max(0, Number(node.dataset.finalPathLength) || 0) }));
-    const layouts = layoutFinalPathStrip(items, strip.clientWidth, strip.dataset.finalPathDomain);
+    const linearPreview = strip.dataset.previewLinear === "1";
+    const domainStart = Number(strip.dataset.previewDomainStart) || 0;
+    const layouts = linearPreview
+      ? layoutProjectPreviewPath(items, strip.clientWidth, { start: domainStart, end: domainStart + Number(strip.dataset.finalPathDomain) })
+      : layoutFinalPathStrip(items, strip.clientWidth, strip.dataset.finalPathDomain);
     nodes.forEach((node, index) => {
       const layout = layouts[index];
       node.style.left = `${layout.x}px`;
@@ -132,6 +145,9 @@ export function syncFinalPathStripGeometry(host) {
       // a few clipped letters on a short contig or gap. Re-evaluate on resize.
       syncFullLabelVisibility(node.querySelector?.("[data-final-path-fit-label]"));
     });
+    // Sources and Ref keep their own complete linear geometry. Do not align
+    // their whole bodies through the strip's minimum-pixel fragment scale.
+    if (linearPreview) continue;
     const card = strip.closest?.(".project-preview-card");
     if (!card) continue;
     for (const reference of card.querySelectorAll("[data-preview-reference-path]")) {

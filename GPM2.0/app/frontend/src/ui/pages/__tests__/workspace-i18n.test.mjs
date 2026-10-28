@@ -977,7 +977,7 @@ test("server-owned create-project chr threshold input ignores typing", async () 
   }
 });
 
-test("selected-project right side contains Project Information first and the migrated Path Overview second", () => {
+test("selected-project table and paths retain accessible section names without visible subtitles", () => {
   for (const locale of ["zh", "en"]) {
     const value = createState({ locale, session: { projectId: 7, projectName: "Keep_MiXeD" }, initializer: {
       existingProjects: [{ projectId: 7, projectName: "Keep_MiXeD", primaryDatasetId: 1 }], datasets: [{ datasetId: 1, name: "Source" }],
@@ -987,10 +987,11 @@ test("selected-project right side contains Project Information first and the mig
       { segmentId: "part", type: "ctg", assemblyCtgId: 1, datasetName: "Source", ctgName: "MiXeD_ctg", overallLen: 1000, start: 1, end: 1000 },
     ] } } };
     const before = JSON.stringify(value), html = renderWorkspacePage(value);
-    assert.match(html, locale === "en" ? /<h3 id="project-information-title">Project Information/ : /<h3 id="project-information-title">项目信息/);
-    assert.match(html, locale === "en" ? /<h3 id="project-path-overview-title">Path Overview/ : /<h3 id="project-path-overview-title">路径概览/);
-    assert.ok(html.indexOf('id="project-information-title"') < html.indexOf('id="project-data-catalog"'));
-    assert.ok(html.indexOf('id="project-data-catalog"') < html.indexOf('id="project-path-overview-title"'));
+    assert.doesNotMatch(html, /<h[1-6][^>]*>(?:项目信息|路径概览|Project Information|Path Overview)/);
+    assert.match(html, locale === "en" ? /class="project-information" aria-label="Project Information"/ : /class="project-information" aria-label="项目信息"/);
+    assert.match(html, locale === "en" ? /class="project-path-overview"[^>]*aria-label="Path Overview"/ : /class="project-path-overview"[^>]*aria-label="路径概览"/);
+    assert.ok(html.indexOf('class="project-information"') < html.indexOf('id="project-data-catalog"'));
+    assert.ok(html.indexOf('id="project-data-catalog"') < html.indexOf('class="project-path-overview"'));
     assert.match(html, /data-project-export-jump-chr="Chr01"/); assert.match(html, /Keep_MiXeD/);
     assert.match(html, /MiXeD_ctg/); assert.equal(JSON.stringify(value), before);
     value.projectExport = { ...value.projectExport, workspacePath: "D:/other" };

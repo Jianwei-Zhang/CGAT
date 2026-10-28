@@ -45,7 +45,7 @@ export const zh = {
     openCopiedProject: "打开副本",
     retryCopy: "重新尝试",
     openWorkspace: "加载项目",
-    validateHistory: "校验",
+    validateHistory: "校验项目",
     validateHistoryLabel: "校验项目",
     validatingProjects: "校验中…",
     deleteFailedRecords: "删除失败",

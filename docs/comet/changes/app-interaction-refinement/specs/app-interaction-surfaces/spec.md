@@ -36,7 +36,7 @@ Complete target behavior for the confirmed GPM application interaction and infor
 
 ## Stable Main View parameter layout
 
-- Main View title stays on its own row; marker display, auxiliary dataset, Contig length, alignment length, identity, history, precomputed results and phased-track action are peer groups in fixed reading order.
+- Main View title and tools share a row when space permits. Precomputed results (including settings) and the phased-track action lead the tools, followed by marker display, auxiliary dataset, Contig length, alignment length, identity and history; intact groups wrap left-aligned when space is insufficient.
 - Each label/control/unit/closely related action group remains intact, with common control height and vertical alignment, consistent gaps and left-aligned wrapped rows; control semantics and content-based widths remain distinct.
 - CSS-driven wrapping replaces measurement-driven single/split/stacked reparenting; resize, locale changes and long names do not cause threshold oscillation, DOM reconstruction or loss of focus/menu/selection/viewport.
 - Long selected names ellipsize inside controls with access to complete values, without forcing other controls or the page outside the available width.
@@ -44,8 +44,10 @@ Complete target behavior for the confirmed GPM application interaction and infor
 
 ## Project-page information and compact paths
 
-- Project page retains the existing project list and project selection duties; its right side first shows 项目信息/Project Information with the existing selected-project table and operations.
-- The right side second shows 路径概览/Path Overview with the compact Final Path strip migrated from the former export page, preserving applicable geometry, role colors, gaps and existing navigation behavior.
+- The project-library validation button visibly reads 校验项目 in Chinese while preserving its existing validation scope, disabled/progress states and behavior.
+
+- Project page retains the existing project list and project selection duties; its right side first shows the existing selected-project information table and operations without a visible 项目信息/Project Information subtitle.
+- The right side second shows the compact Final Path strip migrated from the former export page without a visible 路径概览/Path Overview subtitle, preserving applicable geometry, role colors, gaps and existing navigation behavior.
 - Both sections describe the same selected project; rendering cannot silently activate another project or mutate a path, and rapid project switching cannot publish obsolete results.
 - Missing path data produces an honest empty state, never stale strips from the previous project; table and strip controls remain correctly scoped after refresh.
 
@@ -53,9 +55,18 @@ Complete target behavior for the confirmed GPM application interaction and infor
 
 - Top navigation is 项目/装配/概览, preserving existing English project/assembly labels and replacing Project Export with Overview; independent Preview entry is removed and prior application Preview jumps resolve to the new destination.
 - 概览/Overview retains project identification, statistics and an explicit 导出/Export operation; exporter formats, data, range, job progress and error states remain intact.
-- The lower 项目预览/Project Preview area embeds the full former Preview module instead of the compact strip, preserving legend, refresh, chromosome cards, applicable jumps and loading/error/retry/empty states.
-- Preview asynchronous/model/DOM refresh is contained to its component and cannot erase statistics/export UI or mix projects; applicable memory/disk cache validity, explicit refresh and obsolete-request rejection contracts remain preserved.
+- The lower 预览/Preview area embeds the full Preview module instead of the compact strip, preserving legend, chromosome cards, applicable jumps and loading/error/retry/empty states; an image-download button replaces the manual refresh button.
+- Preview automatic asynchronous/model/DOM refresh is contained to its component and cannot erase statistics/export UI or mix projects; applicable memory/disk cache validity, load-error retry and obsolete-request rejection contracts remain preserved without a header manual-refresh operation.
 - Navigation and project switching preserve authoritative edits and export tasks and do not alter biological coordinates/results; repeated visits keep handler/observer ownership bounded and valid preview state reusable.
+
+## Complete Preview sources and image download
+
+- Preview source tracks for both primary and auxiliary datasets show complete source Contigs associated with the chromosome, including unused portions and reliably positioned unused Contigs, rather than cropping adopted Contigs to Final Path fragments; missing placements are explicitly unpositioned rather than fabricated.
+- Used source intervals remain separately identifiable with exact source identity, orientation and interval mapping. Repeated/reversed uses, split fragments and overlapping Contigs retain truthful context without duplicate whole-Contig bars for each adopted use, whole-source inflation from short-fragment minimum widths, or changes to saved source/path data.
+- The Preview heading download action saves one PNG containing every chromosome preview card, including offscreen cards, with chromosome headings/lengths, Ref, dataset source tracks and Final Path; it excludes upper statistics/project details and interactive action buttons, and is not a screenshot of only the viewport.
+- Preview image export preserves the current project and complete rendered data, does not navigate or mutate selection/data, has honest loading/empty/error/disabled and cancellation/failure behavior, and coexists with automatic preview invalidation and load-error retry without the removed header refresh action.
+
+- The heading is 预览/Preview. A labeled image-download icon replaces the header refresh icon; automatic updates and load-error retry remain, and the upper Overview export action keeps its existing scope.
 
 ## Compact equal-height member popover
 

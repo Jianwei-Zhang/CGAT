@@ -169,7 +169,7 @@ for (const locale of ["en", "zh"]) {
     const records = [{ path: "/rice" }], state = { locale, importer: {}, initializer: {} };
     const messages = getMessages(state, "importer");
     const renderState = () => renderProjectsBody(state, { records, messages, summaryHtml: "" });
-    const label = locale === "en" ? "Validate" : "校验";
+    const label = locale === "en" ? "Validate" : "校验项目";
     const idle = renderState();
     state.importer.historyValidating = true;
     const busy = renderState();

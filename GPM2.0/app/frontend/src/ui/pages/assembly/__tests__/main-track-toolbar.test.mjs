@@ -19,7 +19,7 @@ function parseHeader(html) {
   return root.children[0];
 }
 
-for (const locale of ["zh", "en"]) test(`title is a separate row and all eight intact control groups are peers (${locale})`, () => {
+for (const locale of ["zh", "en"]) test(`precomputed and phase actions lead peer groups after the title (${locale})`, () => {
   const entry = { chrName: "Chr01", mode: "segments", segments: [], grtDisplayAvailable: true };
   const html = renderAssemblyPage({ ...createState({ initializer: {
     datasets: [{ datasetId: 11, name: "primary" }, { datasetId: 22, name: "A very long auxiliary dataset name" }],
@@ -33,16 +33,17 @@ for (const locale of ["zh", "en"]) test(`title is a separate row and all eight i
   assert.ok(Object.hasOwn(toolbar.attrs, "data-main-track-toolbar"));
   assert.deepEqual(toolbar.children.map(node => node.attrs["data-grt-result-controls"] ? "precomputed"
     : node.attrs["data-create-phased-track"] ? "phase" : node.attrs.class), [
-    "assembly-marker-display", "assembly-track-inline-field", "assembly-track-inline-field",
-    "assembly-track-inline-field", "assembly-track-inline-field", "main-view-history-controls", "precomputed", "phase",
+    "precomputed", "phase", "assembly-marker-display", "assembly-track-inline-field", "assembly-track-inline-field",
+    "assembly-track-inline-field", "assembly-track-inline-field", "main-view-history-controls",
   ]);
   assert.doesNotMatch(html, /data-main-track-control-layout|data-main-track-quick-actions|assembly-track-panel-quick-actions/);
 });
 
 test("CSS owns stable whole-group wrapping and the extreme-width scrollport, not a resize classifier", () => {
   const css = readStylesheetTree(new URL("../../../../styles/assembly.css", import.meta.url));
-  assert.match(css, /\.assembly-track-panel-head\[data-main-view-header\]\s*\{[^}]*flex-direction: column;[^}]*align-items: stretch;/);
+  assert.match(css, /\.assembly-track-panel-head\[data-main-view-header\]\s*\{[^}]*flex-wrap: wrap;[^}]*align-items: center;[^}]*justify-content: flex-start;/);
   assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\]\s*\{[^}]*justify-content: flex-start;[^}]*flex-wrap: wrap;[^}]*overflow-x: auto;/);
+  assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\]\s*\{[^}]*flex: 1 1 max-content;[^}]*width: max-content;/);
   assert.match(css, /\[data-main-track-toolbar\] > \*\s*\{[^}]*flex: 0 0 auto;[^}]*white-space: nowrap;/);
   assert.doesNotMatch(css, /data-main-track-control-layout|assembly-track-panel-quick-actions/);
   assert.equal(existsSync(new URL("../main-track-control-layout-runtime.js", import.meta.url)), false);

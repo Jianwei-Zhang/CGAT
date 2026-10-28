@@ -1016,7 +1016,7 @@ function renderAssemblyTrackInlineControls({
   selectedChrName,
   mainViewHistory,
   i18n,
-  trailingControls = "",
+  leadingControls = "",
 }) {
   const supportDatasetSelect = supportDatasetOptions.length
     ? renderSupportDatasetSelect({
@@ -1060,6 +1060,7 @@ function renderAssemblyTrackInlineControls({
   });
   return `
     <div class="assembly-track-inline-controls" data-main-track-inline-controls data-main-track-toolbar role="group" aria-label="${escapeAttr(i18n.page.primaryAlignmentViewControlsAria)}">
+      ${leadingControls}
       <div class="assembly-marker-display">
         <button type="button" class="button ghost tiny" data-marker-display-toggle aria-expanded="false" aria-controls="assembly-marker-display-menu">${escapeHtml(i18n.trackControls.markerDisplay)}</button>
         <div id="assembly-marker-display-menu" class="assembly-marker-display-menu" role="group" aria-label="${escapeAttr(i18n.trackControls.markerDisplay)}" hidden>
@@ -1089,7 +1090,6 @@ function renderAssemblyTrackInlineControls({
         ${identityInput}
       </label>
       ${mainViewHistoryControls}
-      ${trailingControls}
     </div>
   `;
 }
@@ -2343,7 +2343,7 @@ function renderAssemblyTracks(args) {
     selectedChrName,
     mainViewHistory,
     i18n,
-    trailingControls: `${grtResultControls}${createPhasedTrackButton}`,
+    leadingControls: `${grtResultControls}${createPhasedTrackButton}`,
   });
   const grtResultToastMarkup = grtResultToast?.scope === "main"
     && grtResultToast?.chrName === selectedChrName

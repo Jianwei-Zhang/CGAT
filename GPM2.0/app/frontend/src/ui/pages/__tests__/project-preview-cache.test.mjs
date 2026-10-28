@@ -399,3 +399,27 @@ test("an invalidated import preparation cannot publish a pending stale model or 
   assert.equal(value.metrics.writes, 0);
   assert.equal(previewSession(value.store).entries.size, 0);
 });
+
+
+test("whole-source snapshots persist unpositioned context and dependencies and reject malformed context", async () => {
+  const value = fixture();
+  const original = value.deps.listChrViewCtgs;
+  value.deps.listChrViewCtgs = async args => {
+    const result = await original(args);
+    result.items.push({ assemblyCtgId: 99, datasetId: 1, datasetName: "ds", name: "unlocated", totalLength: 123,
+      assignedChrName: "Chr1", anchorStart: null });
+    return result;
+  };
+  await load(value);
+  const payload = value.db.snapshot, track = payload.cards[0].tracks[0];
+  assert.equal(track.unpositioned[0].name, "unlocated");
+  assert.equal(track.unpositioned[0].start, null);
+  assert.ok(payload.dependencies[0].ctgIds.includes(99));
+  assert.equal(isPreviewSnapshot(payload), true);
+  const stale = structuredClone(payload); stale.modelVersion = PREVIEW_MODEL_VERSION - 1;
+  assert.equal(isPreviewSnapshot(stale), false);
+  const broken = structuredClone(payload); broken.cards[0].tracks[0].unpositioned[0].start = 100;
+  assert.equal(isPreviewSnapshot(broken), false);
+  value.store = createStore(value.state);
+  assert.equal((await load(value)).cards[0].tracks[0].unpositioned[0].name, "unlocated");
+});

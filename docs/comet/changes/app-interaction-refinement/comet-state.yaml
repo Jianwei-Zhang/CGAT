@@ -1,11 +1,11 @@
 schema: comet.native.v4
 name: app-interaction-refinement
 language: en
-phase: verify
-status: await-user
-state_version: 9
+phase: build
+status: active
+state_version: 14
 brief: brief.md
-shape_confirmation_hash: 4905b2ee94eef6afeee85d6da19f94ccf50c21e37f951322353e099d3795b374
+shape_confirmation_hash: be9e3a3e30e7041fabfa585b3767405ebed784066baa47c0162fe98a9dc48e91
 spec_changes:
   - capability: app-interaction-surfaces
     operation: create
@@ -16,873 +16,490 @@ workspace:
   target_branch: master
   finish: null
 loop:
-  stage: await-user
-  goal_cycle: 2
+  stage: building
+  goal_cycle: 4
   iteration: 1
-  attempt: 1
+  attempt: 0
   retry_epoch: 0
   failed_iteration_count: 0
   no_progress_count: 0
   execution_failure_count: 0
-  previous_unresolved_ids:
-    - A6
-    - A9
-    - A10
-    - A12
-    - A14
-    - A21
-    - A23
-    - A33
-    - A38
-    - A39
-    - A40
-    - A53
-    - A56
-    - A59
-  next_action: resolve-verifier-blocker
+  previous_unresolved_ids: []
+  next_action: submit-builder-candidate
 acceptance:
   - id: A1
     source: brief.md
     text: "A1: Creating the first phased track successfully refreshes Final Path
       context and hides the precomputed-path action immediately, without route
       switching or reload."
-    result: passed
-    reason:
-      text: phased-track-controller.js refreshPhasedTracksForCurrentChr explicitly
-        redraws Main and Final Path on first topology transition, without
-        calling baseline restoration. Runtime TAP first-track regressions cover
-        graph/table/log and main-path object preservation.
-      truncated: false
+    result: pending
+    reason: null
   - id: A2
     source: brief.md
     text: "A2: Adding another phased track or deleting a non-last track reconciles
       active paths and keeps the phased-state action visibility correct."
-    result: passed
-    reason:
-      text: phased-track-controller.js retainedTrackKey reconciles by stable
-        phasedTrackId rather than renamed labels; additional-track, non-last
-        deletion, deleted-selection and All-mode regressions pass in the Runtime
-        suite.
-      truncated: false
+    result: pending
+    reason: null
   - id: A3
     source: brief.md
     text: "A3: Deleting the last phased track restores the main-path context and
       applicable precomputed-path action, clearing only invalid phased
       selections."
-    result: passed
-    reason:
-      text: deletePhasedTrack compacts only dependent phased paths, resets the
-        last-phase path keys, persists committed deletion and redraws Final
-        Path. Runtime test 1285 verifies restored action/main context without
-        replacing the user main path or unrelated chromosome.
-      truncated: false
+    result: pending
+    reason: null
   - id: A4
     source: brief.md
     text: "A4: The precomputed action is absent without an available baseline and
       remains disabled when already current; showing it never executes
       restoration or overwrites the user main path."
-    result: passed
-    reason:
-      text: Existing GRT availability/current-path gates remain in
-        render-tracks.js/Final Path context; reconciliation never executes
-        restoration. Runtime tests 1296-1297 establish absent-baseline,
-        already-current disabled and phased-path suppression cases.
-      truncated: false
+    result: pending
+    reason: null
   - id: A5
     source: brief.md
     text: "A5: Failed phase mutations publish no success state; reconciliation
       remains chromosome scoped, preserves unrelated viewport/edits, and
       respects existing dependent-data deletion contracts."
-    result: passed
-    reason:
-      text: Phase controller request generations, project/chromosome guards and
-        project-view mutation draining preserve owner scope.
-        Failure/queued-delete regressions cover no false success, concurrent
-        main-path edits, persistence despite listing failure and off-route
-        invalidation of both locale caches (Runtime 1291-1292, 1307-1308).
-      truncated: false
+    result: pending
+    reason: null
   - id: A6
     source: brief.md
     text: "A6: Right-clicking the horizontal navigation thumb, track, or
       non-business background exposes no Reload/web-page menu and does not
       reload the application on Windows or macOS."
-    result: blocked
-    reason:
-      text: Native Windows AND macOS Tauri right-click/Reload acceptance is not
-        performed. The navigation-only preventDefault helper and passing target
-        tests do not prove WebView2/WKWebView thumb/track/background
-        default-menu behavior or absence of reload; macOS menu origin remains an
-        unverified native diagnosis.
-      truncated: false
+    result: pending
+    reason: null
   - id: A7
     source: brief.md
     text: "A7: Existing Contig, track, and Final Path business context menus and
       input copy/paste remain usable; no app-wide indiscriminate context-menu
       ban is introduced."
-    result: passed
-    reason:
-      text: view-navigation-ui.js isViewNavigationContextMenuTarget confines
-        prevention to primary/subview navigation, explicitly excludes
-        input/select/textarea/contenteditable, and leaves existing
-        business-target dispatch in context-menu-runtime.js intact. Boundary and
-        business-menu regressions pass; no new global contextmenu ban exists in
-        this diff.
-      truncated: false
+    result: pending
+    reason: null
   - id: A8
     source: brief.md
     text: "A8: Menu handling preserves navigation dragging, wheel and zoom behavior;
       diagnosis distinguishes an application-added menu from a native default
       menu instead of asserting an unverified root cause."
-    result: passed
-    reason:
-      text: New menu handling is contextmenu-only; it does not alter pointer drag,
-        wheel or zoom handlers. Target-boundary/navigation regressions pass. The
-        approved source and reviewed evidence distinguish a possible
-        native-default leak from application-added menus and do not claim a
-        native root-cause reproduction.
-      truncated: false
+    result: pending
+    reason: null
   - id: A9
     source: brief.md
     text: "A9: Final Path Contig hover displays an application-controlled tooltip on
       the next paint without deliberate delay or prior selection, consistently
       on Windows and macOS."
-    result: blocked
-    reason:
-      text: The controlled tooltip source has no dwell timer and synchronous unit
-        tests pass, but neither Windows nor macOS Tauri first-hover/next-paint
-        acceptance was performed. Cross-platform immediate appearance without
-        prior selection cannot be passed from source, fake DOM or Chrome
-        evidence.
-      truncated: false
+    result: pending
+    reason: null
   - id: A10
     source: brief.md
     text: "A10: Moving inside one fragment between its bar and label keeps the
       tooltip stable; entering a different fragment updates immediately, with no
       duplicate native title popup."
-    result: blocked
-    reason:
-      text: Shared fragment group/label markup, no duplicate live native title and
-        delegated stability tests are present. Native Windows/macOS
-        bar-to-label, first-hover and cross-fragment motion have not been
-        observed, so actual stable/no-duplicate tooltip behavior remains
-        unverified.
-      truncated: false
+    result: pending
+    reason: null
   - id: A11
     source: brief.md
     text: "A11: Final Path tooltip includes full identity, source interval and
       orientation, with adopted fragment length primary and source Contig total
       length separately labeled and semantically accurate."
-    result: passed
-    reason:
-      text: final-path-presentation.js computes inclusive adopted start/end,
-        orientation and fragment offset separately from sourceLength; tooltip
-        leads with adopted length and separately labels source Contig total.
-        Actual rendering/projection regressions include reverse, split and
-        mirrored provenance (Runtime 1139-1140 and source-interval-rendering
-        tests).
-      truncated: false
+    result: pending
+    reason: null
   - id: A12
     source: brief.md
     text: "A12: Tooltips are viewport-clamped, offset from the pointer, read-only
       and non-intercepting; they neither move layout nor change selection or
       trigger graph/page reconstruction."
-    result: blocked
-    reason:
-      text: Tooltip code/CSS and synthetic edge tests support fixed, offset, clamped,
-        pointer-transparent read-only placement. Actual native
-        viewport-edge/large-content hit-testing and layout/selection stability
-        were not exercised on Windows or macOS; the requested native hover
-        acceptance is missing.
-      truncated: false
+    result: pending
+    reason: null
   - id: A13
     source: brief.md
     text: "A13: Leave, drag start, scroll, context-menu opening or route switching
       hides stale tooltips; accessible names and standalone SVG source
       information are preserved."
-    result: passed
-    reason:
-      text: immediate-tooltip-runtime.js hides on leave, pointerdown/cancel, scroll,
-        contextmenu and viewport change; cache capture/restoration hides both
-        tooltip owners. Final Path groups retain aria-label/desc; snapshot clone
-        restores standalone SVG titles. Runtime 1123, 1146 and tooltip lifecycle
-        tests pass.
-      truncated: false
+    result: pending
+    reason: null
   - id: A14
     source: brief.md
     text: "A14: Member cards also expose complete source/local/state details through
       immediate controlled tooltips, stable within the card; unrelated
       alignment-band tooltip delays remain unchanged."
-    result: blocked
-    reason:
-      text: Member controlled details and stable delegated handlers are implemented,
-        and unrelated alignment-band 500ms delay is preserved/tested. Actual
-        immediate/stable member hover through name/length/state surfaces has no
-        native Windows/macOS receipt; mock/source evidence cannot close that
-        platform gate.
-      truncated: false
+    result: pending
+    reason: null
   - id: A15
     source: brief.md
     text: "A15: Audit both application locales: major headings use English Title
       Case, minor headings/field labels use sentence case, and system-provided
       option values use Title Case."
-    result: passed
-    reason:
-      text: "Independently inspected bilingual catalogues, direct copy consumers and
-        naming-contract.test.mjs: major headings, minor captions and genuine
-        option values have distinct authored roles. Runtime naming regressions
-        cover all five catalogues, key/placeholder parity and representative
-        actual EN/ZH renderers; no runtime blanket recasing is introduced."
-      truncated: false
+    result: pending
+    reason: null
   - id: A16
     source: brief.md
     text: "A16: Buttons and action/context-menu entries use sentence case while
       standard proper names, GRT/FASTA and bp/Mb retain their canonical forms."
-    result: passed
-    reason:
-      text: Authored action/menu strings use sentence case, with separate Title Case
-        copies for genuine options/dialog titles. Naming-contract and actual
-        context-menu/detail rendering tests preserve Final Path, Local View,
-        GRT, FASTA and canonical bp/Mb forms.
-      truncated: false
+    result: pending
+    reason: null
   - id: A17
     source: brief.md
     text: "A17: Remove redundant ds from Contig-length labels, expand ctg/len, and
       use Auxiliary contig length (bp)/辅助组装 Contig 长度 (bp), Auxiliary
       dataset/辅助数据集, and Primary Dataset Members/主数据集成员 in their approved
       contexts."
-    result: passed
-    reason:
-      text: Both locale catalogues contain the exact approved Auxiliary contig length
-        (bp), 辅助组装 Contig 长度 (bp), Auxiliary dataset/辅助数据集 and Primary Dataset
-        Members/主数据集成员 strings. Naming regressions verify these and expanded
-        human-facing shorthand.
-      truncated: false
+    result: pending
+    reason: null
   - id: A18
     source: brief.md
     text: "A18: User project/dataset names, Contig identifiers and chromosome
       suffixes, paths, internal keys/enums and serialized data are not recased
       or renamed by the terminology audit."
-    result: passed
-    reason:
-      text: The terminology diff changes presentation literals/captions, not internal
-        dispatch keys, enums or persisted fields. Actual mixed-case
-        project/dataset/Contig/version-suffix rendering and both unchanged TSV
-        headers are checked by passing naming-contract regressions.
-      truncated: false
+    result: pending
+    reason: null
   - id: A19
     source: brief.md
-    text: "A19: Main View title stays on its own row; marker display, auxiliary
-      dataset, Contig length, alignment length, identity, history, precomputed
-      results and phased-track action are peer groups in fixed reading order."
-    result: passed
-    reason:
-      text: render-tracks.js places the Main View title outside the peer toolbar and
-        renders the required control/action groups in fixed reading order.
-        main-track-toolbar.test.mjs parses the actual EN/ZH markup and verifies
-        the independent title and eight peer groups.
-      truncated: false
+    text: "A19: Main View title and tools share a row when space permits.
+      Precomputed results (including settings) and the phased-track action lead
+      the tools, followed by marker display, auxiliary dataset, Contig length,
+      alignment length, identity and history; intact groups wrap left-aligned
+      when space is insufficient."
+    result: pending
+    reason: null
   - id: A20
     source: brief.md
     text: "A20: Each label/control/unit/closely related action group remains intact,
       with common control height and vertical alignment, consistent gaps and
       left-aligned wrapped rows; control semantics and content-based widths
       remain distinct."
-    result: passed
-    reason:
-      text: assembly.css makes toolbar groups atomic nonwrapping flex items with
-        common 2.1429rem control height, consistent gaps and left-aligned
-        wrapped rows, while retaining checkbox/select/button semantics and
-        content-dependent widths. Actual-markup/CSS toolbar regressions pass;
-        this is not native resize acceptance.
-      truncated: false
+    result: pending
+    reason: null
   - id: A21
     source: brief.md
     text: "A21: CSS-driven wrapping replaces measurement-driven single/split/stacked
       reparenting; resize, locale changes and long names do not cause threshold
       oscillation, DOM reconstruction or loss of focus/menu/selection/viewport."
-    result: blocked
-    reason:
-      text: The measured single/split/stacked classifier is removed, CSS wrapping owns
-        the toolbar, and locale/geometry regressions plus an isolated Chrome
-        sweep preserve controls/focus. Required native Windows/macOS
-        shrink/grow, locale/long-name threshold stability and
-        viewport/menu/focus acceptance are absent.
-      truncated: false
+    result: pending
+    reason: null
   - id: A22
     source: brief.md
     text: "A22: Long selected names ellipsize inside controls with access to
       complete values, without forcing other controls or the page outside the
       available width."
-    result: passed
-    reason:
-      text: Auxiliary selector and scope-trigger text use bounded controls with
-        ellipsis rather than page-width growth. renderSupportDatasetSelect
-        retains full selected labels in title and aria-label, and options keep
-        full values. Long-name toolbar/locale regressions and the recorded
-        isolated mock-data Chrome fixture support the presentation contract, not
-        native acceptance.
-      truncated: false
+    result: pending
+    reason: null
   - id: A23
     source: brief.md
     text: "A23: No new application minimum width is imposed: normal shrink wraps
       intact groups, and only below a single readable group width the toolbar
       scrolls internally horizontally, without smaller fonts, splitting groups,
       global page overflow or chart navigation changes."
-    result: blocked
-    reason:
-      text: CSS provides whole-group wrapping and toolbar-local horizontal overflow
-        without a new App minimum width; source and mock-browser evidence are
-        supportive. Extreme-narrow native Windows/macOS checks for readable
-        intact groups, no global overflow and unaffected chart navigation were
-        not performed.
-      truncated: false
+    result: pending
+    reason: null
   - id: A24
     source: brief.md
     text: "A24: Project page retains the existing project list and project selection
-      duties; its right side first shows 项目信息/Project Information with the
-      existing selected-project table and operations."
-    result: passed
-    reason:
-      text: workspace-page.js wraps the unchanged selected-project
-        catalog/table/operations in Project Information before Path Overview.
-        projects-view.js retains the existing left list and selection duties.
-        EN/ZH workspace/projects/Overview regressions pass in the Runtime suite.
-      truncated: false
+      duties; its right side first shows the existing selected-project
+      information table and operations without a visible 项目信息/Project
+      Information subtitle."
+    result: pending
+    reason: null
   - id: A25
     source: brief.md
-    text: "A25: The right side second shows 路径概览/Path Overview with the compact
-      Final Path strip migrated from the former export page, preserving
-      applicable geometry, role colors, gaps and existing navigation behavior."
-    result: passed
-    reason:
-      text: renderProjectPathOverview reuses the compact Final Path row/track
-        renderer, including role colors, gaps, phased/natural ordering and
-        chromosome jump targets, on the Project page rather than Overview.
-        Existing strip/export geometry and new migration regressions pass.
-      truncated: false
+    text: "A25: The right side second shows the compact Final Path strip migrated
+      from the former export page without a visible 路径概览/Path Overview subtitle,
+      preserving applicable geometry, role colors, gaps and existing navigation
+      behavior."
+    result: pending
+    reason: null
   - id: A26
     source: brief.md
     text: "A26: Both sections describe the same selected project; rendering cannot
       silently activate another project or mutate a path, and rapid project
       switching cannot publish obsolete results."
-    result: passed
-    reason:
-      text: Project surfaces are tagged with previewProjectKey, data requests have
-        per-store generation and workspace/project guards, and render-only paths
-        do not activate projects or mutate paths. Runtime test 309 explicitly
-        rejects obsolete A-B-A success/failure and prevents mixed local
-        paths/publication.
-      truncated: false
+    result: pending
+    reason: null
   - id: A27
     source: brief.md
     text: "A27: Missing path data produces an honest empty state, never stale strips
       from the previous project; table and strip controls remain correctly
       scoped after refresh."
-    result: passed
-    reason:
-      text: renderProjectPathOverview suppresses nonfresh rows, renders scoped
-        loading/error/retry/empty states, and refreshProjectDataSurface replaces
-        only the matching keyed section. Runtime preload/content-mutation
-        regressions 310-312 prevent a stale previous/pre-bootstrap strip from
-        being published as current.
-      truncated: false
+    result: pending
+    reason: null
   - id: A28
     source: brief.md
     text: "A28: Top navigation is 项目/装配/概览, preserving existing English
       project/assembly labels and replacing Project Export with Overview;
       independent Preview entry is removed and prior application Preview jumps
       resolve to the new destination."
-    result: passed
-    reason:
-      text: app-shell.js exposes Project/Assembly/Overview only; bilingual shell copy
-        presents Overview/概览. router.js normalizes projectPreview and overview
-        aliases to projectExport, and route regressions verify old entry
-        migration without duplicate rendering.
-      truncated: false
+    result: pending
+    reason: null
   - id: A29
     source: brief.md
     text: "A29: 概览/Overview retains project identification, statistics and an
       explicit 导出/Export operation; exporter formats, data, range, job progress
       and error states remain intact."
-    result: passed
-    reason:
-      text: renderProjectOverviewSummary retains project identification, statistics,
-        filters/sort and explicit export controls/job modal. runProjectExport
-        retains TSV/log/FASTA/PNG planning and writes, cancellation, completed
-        outputs and errors. Runtime export regressions pass, including
-        background ownership and immutable original-snapshot completion.
-      truncated: false
+    result: pending
+    reason: null
   - id: A30
     source: brief.md
-    text: "A30: The lower 项目预览/Project Preview area embeds the full former Preview
-      module instead of the compact strip, preserving legend, refresh,
-      chromosome cards, applicable jumps and loading/error/retry/empty states."
-    result: passed
-    reason:
-      text: renderProjectExportPage embeds renderProjectPreviewPage with embedded
-        heading under its own data-overview-preview host, not the compact strip.
-        Actual Preview card/legend/refresh/navigation/loading/error/retry/empty
-        render/binding regressions pass and the independent Preview navigation
-        entry is removed.
-      truncated: false
+    text: "A30: The lower 预览/Preview area embeds the full Preview module instead of
+      the compact strip, preserving legend, chromosome cards, applicable jumps
+      and loading/error/retry/empty states; an image-download button replaces
+      the manual refresh button."
+    result: pending
+    reason: null
   - id: A31
     source: brief.md
-    text: "A31: Preview asynchronous/model/DOM refresh is contained to its component
-      and cannot erase statistics/export UI or mix projects; applicable
-      memory/disk cache validity, explicit refresh and obsolete-request
-      rejection contracts remain preserved."
-    result: passed
-    reason:
-      text: project-preview-page.js updates only its embedded host; Overview summary
-        patches never construct or replace Preview. Preview request ownership,
-        cache signatures/revision checks and observer/subscription teardown
-        remain active. Runtime test 314 and Preview
-        warm/disk-cache/freshness/race regressions pass.
-      truncated: false
+    text: "A31: Preview automatic asynchronous/model/DOM refresh is contained to its
+      component and cannot erase statistics/export UI or mix projects;
+      applicable memory/disk cache validity, load-error retry and
+      obsolete-request rejection contracts remain preserved without a header
+      manual-refresh operation."
+    result: pending
+    reason: null
   - id: A32
     source: brief.md
     text: "A32: Navigation and project switching preserve authoritative edits and
       export tasks and do not alter biological coordinates/results; repeated
       visits keep handler/observer ownership bounded and valid preview state
       reusable."
-    result: passed
-    reason:
-      text: project-export-jobs.js keeps running snapshots/receipts in per-store
-        workspace/project owners across navigation, while Preview and Project
-        observers are explicitly released/reused. Runtime 307-308,
-        unacknowledged-receipt, cache and request-generation tests support
-        preservation of edits/export tasks and bounded live ownership; no
-        biological/schema mutation is added.
-      truncated: false
+    result: pending
+    reason: null
   - id: A33
     source: brief.md
     text: "A33: The Primary Dataset Members trigger opens an anchored member popover
       without squeezing or increasing Main View layout height; it fits the
       viewport and scrolls internally for many members."
-    result: blocked
-    reason:
-      text: Anchored member panel source and placement tests/mock-browser reports
-        support viewport fitting and internal scrolling without normal-flow
-        growth. Actual native Windows/macOS panel opening,
-        bottom-edge/narrow-window fit and Main View non-displacement acceptance
-        is missing.
-      truncated: false
+    result: pending
+    reason: null
   - id: A34
     source: brief.md
     text: "A34: Every normal/derived/split member card has exactly two equal-height
       rows: identity first, length plus necessary concise state markers second;
       cards have consistent line height/padding and no redundant 78px/blank-row
       reservation."
-    result: passed
-    reason:
-      text: memberChipBody produces identity plus length/state rows for every
-        normal/derived/deleted member, and assembly.css fixes two 1.4em rows
-        with uniform padding instead of 78px reservation. Actual EN/ZH
-        member-card-layout tests and the recorded Chrome fixture support equal
-        row structure; no native visual pass is inferred.
-      truncated: false
+    result: pending
+    reason: null
   - id: A35
     source: brief.md
     text: "A35: Member card width follows readable content without equal grid-column
       stretching, forced half-row sizing or fixed two-column layout; order is
       stable, long names remain distinguishable and complete values are
       accessible."
-    result: passed
-    reason:
-      text: Member layout uses flex wrapping, width:max-content and a readable
-        maximum, not 1fr/half-row/two-column stretching. Source order is
-        retained; compact identities are derived only from authoritative
-        generated suffixes, with full names retained in controlled details.
-        Member naming/layout regressions pass.
-      truncated: false
+    result: pending
+    reason: null
   - id: A36
     source: brief.md
     text: "A36: Source interval, full name and local-use details move to complete
       hover details; overflow states may use explained summaries without a third
       row, silent information loss or unbounded card widening."
-    result: passed
-    reason:
-      text: memberTooltip includes full name, exact bp length, source interval/total,
-        derived provenance, local-use ranges and state details. memberChipBody
-        confines concise state markers and explained +N overflow to row two.
-        Actual rendering and hidden-state/local-annotation regressions pass
-        without silently adding a third row.
-      truncated: false
+    result: pending
+    reason: null
   - id: A37
     source: brief.md
     text: "A37: Member click keeps the panel open and preserves existing
       single-selection/focus behavior, Ctrl/Cmd multiselection, box selection
       and business context menus."
-    result: passed
-    reason:
-      text: Member clicks do not toggle/close the panel; normal selection uses quiet
-        selectCtg, Ctrl/Cmd uses existing togglePrimaryTrackSelection, and
-        box-selection/business-menu ownership remains separate. Passing
-        binding/member-marquee/context-menu regressions exercise those
-        contracts.
-      truncated: false
+    result: pending
+    reason: null
   - id: A38
     source: brief.md
     text: "A38: Trigger toggle, outside click and Escape close the member panel;
       leaving the combined trigger/panel/owned-menu region closes after the
       existing 400ms grace period, with reentry canceling it and no premature
       close between related surfaces."
-    result: blocked
-    reason:
-      text: The combined member trigger/panel/owned-menu region uses the unchanged
-        400ms timer, cancels reentry and preserves active marquee gestures in
-        deterministic tests. Native transitions through real pointer hit
-        regions/menus and gap crossing were not exercised on either desktop
-        platform.
-      truncated: false
+    result: pending
+    reason: null
   - id: A39
     source: brief.md
     text: "A39: Member selection updates only necessary DOM/state and related views,
       retaining panel openness, internal scroll, focus and unaffected viewport;
       existing explicit focus behavior is not silently removed."
-    result: blocked
-    reason:
-      text: Quiet member selection uses mounted-node paint with stale-response guards
-        and preserves explicit focus semantics in tests/mock Chrome. Native
-        Windows/macOS repeated-click, scroll/focus preservation and no-flicker
-        acceptance was not performed; the requested interaction criterion cannot
-        be certified from DOM mocks.
-      truncated: false
+    result: pending
+    reason: null
   - id: A40
     source: brief.md
     text: "A40: Member selected styling preserves role colors and outer
       dimensions/padding/weight so selection cannot change wrapping; hover and
       selection do not rebuild the popover/page or hide flicker with animation."
-    result: blocked
-    reason:
-      text: Member CSS retains role styling and constant two-row box metrics;
-        source/node-identity tests and recorded Chrome measurements support
-        in-place selection. Actual native hover/selection wrapping and
-        click-flicker behavior remains untested on Windows/macOS, so no native
-        no-flicker pass is asserted.
-      truncated: false
+    result: pending
+    reason: null
   - id: A41
     source: brief.md
     text: "A41: Final Path graph click or table-row selection selects one
       path-segment instance; graph/table share valid selection across mode
       changes, with no new Ctrl/Cmd multiselection and no loss of existing
       Main/Local multi-selection contracts."
-    result: passed
-    reason:
-      text: final-path-selection-runtime.js has one nonpersisted owner per store and
-        selects a single segmentId plus owning chromosome/path; graph and table
-        share it without adding Ctrl/Cmd selection. Runtime 1110 and 1120 verify
-        graph/table agreement and repeated IDs in All mode, without expanding
-        Main/Local edit selections.
-      truncated: false
+    result: pending
+    reason: null
   - id: A42
     source: brief.md
     text: "A42: Clicking or keyboard-focusing a row editor selects its row and links
       the highlight without saving, rerendering, stealing editor focus,
       intercepting text selection or changing drag/right-click behavior."
-    result: passed
-    reason:
-      text: The delegated focusin/primary pointer handler resolves the existing row
-        without saving, rerendering, focusing another element or intercepting
-        text editing. Runtime 1111 preserves an invalid typed draft with zero
-        store notifications; existing drag/context handlers remain separate.
-      truncated: false
+    result: pending
+    reason: null
   - id: A43
     source: brief.md
     text: "A43: Editing uses the last successfully committed source interval until
       new values validate and save successfully; incomplete/invalid/failed
       values cannot alter the effective highlight and no per-keystroke preview
       is introduced."
-    result: passed
-    reason:
-      text: final-path-runtime.js validates and awaits persistence before publishing
-        finalPathByChr, while the highlighter reads only committed model ranges.
-        Runtime 1116 and 1119 explicitly retain old effective intervals during
-        pending/invalid/failed saves and update only after successful
-        persistence.
-      truncated: false
+    result: pending
+    reason: null
   - id: A44
     source: brief.md
     text: "A44: Main View and an already-open Local View highlight only the selected
       adopted source interval intersected with each displayed matching source
       object, not the whole Contig; closed/missing Local objects are not opened,
       inserted or regrouped."
-    result: passed
-    reason:
-      text: Selection paint only visits existing data-source-interval-projection nodes
-        and intersects the adopted source range; it never opens/inserts/regroups
-        Local objects. Actual Main/Local rendering and Runtime 1110 establish
-        interval-local overlays rather than whole-Contig editable selection.
-      truncated: false
+    result: pending
+    reason: null
   - id: A45
     source: brief.md
     text: "A45: For ctg1 length 10000 and adopted source interval [5001,10000],
       complete Main ctg1 highlights [5001,10000], and a Local source interval
       [4001,8000] highlights only [5001,8000], with data-layer endpoint
       conventions explicitly normalized."
-    result: passed
-    reason:
-      text: source-interval-projection.js explicitly uses inclusive biological
-        coordinates, including +1 span/right endpoint. Projection and Runtime
-        1110 regressions establish full Main [5001,10000] and clipped Local
-        [5001,8000] for the required example.
-      truncated: false
+    result: pending
+    reason: null
   - id: A46
     source: brief.md
     text: "A46: Reverse orientation maps the same source interval to its actual
       visual position, which may be screen-left; source, path-cumulative and
       reference coordinates are not conflated."
-    result: passed
-    reason:
-      text: intersectSourceInterval maps source fractions through target.orient,
-        reversing the visual fractions without changing source coordinates.
-        Reverse/clipped Local tests verify the [5001,8000] intersection can
-        start screen-left; no Final Path cumulative/reference offset is
-        substituted.
-      truncated: false
+    result: pending
+    reason: null
   - id: A47
     source: brief.md
     text: "A47: Source dataset/Contig identity, path/chromosome scope and
       path-segment instance distinguish repeated occurrences and same-parent
       splits; each target fragment highlights only its intersection, with
       empty/single-base/boundary cases correct."
-    result: passed
-    reason:
-      text: Selection scope includes workspace/project/chromosome/active path;
-        selected instance includes owning chromosome and phase identity. Source
-        matching uses known source sequence/reference or exact backing/original
-        identity, then per-target intersection. Passing
-        split/join/repeated-instance, distinct-source, empty and inclusive
-        single-base boundary regressions cover this distinction.
-      truncated: false
+    result: pending
+    reason: null
   - id: A48
     source: brief.md
     text: "A48: Unknown mappings and GAPs never fall back to whole-Contig
       correlation; missing intersections stay unhighlighted and source/sequence
       data is not physically split for visualization."
-    result: passed
-    reason:
-      text: GAP/unresolvable selected ranges are rejected before selection;
-        projection/intersection returns no overlay for unknown identity/range or
-        absent intersection. The paint path only appends transient SVG
-        rectangles, never splits sequence/data. Passing invalid/missing mapping,
-        unequal-source, GAP and no-intersection regressions support fail-closed
-        visualization.
-      truncated: false
+    result: pending
+    reason: null
   - id: A49
     source: brief.md
     text: "A49: Clicking another path fragment replaces selection; clicking
       path-plot background clears only that path selection/correlation, while
       hover alone changes no selection and no automatic scroll/zoom/locate
       occurs."
-    result: passed
-    reason:
-      text: Delegated selection replaces the sole descriptor on another valid
-        fragment, clears it on path-plot background and never selects on hover.
-        Runtime 1117 verifies GAP/hover/background behavior without mutating
-        unrelated editing state; selection paint contains no locate/scroll/zoom
-        call.
-      truncated: false
+    result: pending
+    reason: null
   - id: A50
     source: brief.md
     text: "A50: Actively selecting an object in Main/Local clears prior Final Path
       selection/correlation, while hover/scroll/zoom does not; visual
       correlation never expands delete/move/edit selection sets."
-    result: passed
-    reason:
-      text: Primary Main/Local pointer targets and changes to their editing-selection
-        keys clear Final Path correlation; hover/viewport updates do not.
-        Runtime 1112-1113 show preserved scroll/zoom correlation versus explicit
-        editing selection, with unchanged Main/Local selection arrays.
-      truncated: false
+    result: pending
+    reason: null
   - id: A51
     source: brief.md
     text: "A51: Same project/chromosome/path survives temporary route departure;
       path/chromosome/project switches, deletion/invalidity and app restart
       clear rather than restore obsolete temporary selection."
-    result: passed
-    reason:
-      text: The transient descriptor lives in a WeakMap rather than serialized project
-        state. Scope/phase/segment/range validation clears obsolete selections,
-        while route visibility hides paint but retains valid same-context
-        ownership. Runtime 1112, 1114, 1118, 1122 and 1124 exercise route
-        retention and invalidation.
-      truncated: false
+    result: pending
+    reason: null
   - id: A52
     source: brief.md
     text: "A52: Plain pointer clicks below the drag threshold do not invoke
       drag-cleanup unconditional card redraw; genuine drag sorting still commits
       and cleans up according to the existing gesture contract."
-    result: passed
-    reason:
-      text: final-path-graph-drag-runtime.js now exits before drag cleanup when
-        dragging never began; actual drag preview/commit/final cleanup remains
-        in its prior path. Runtime 1069 explicitly verifies plain/sub-threshold
-        clicks neither rerender nor commit drag state.
-      truncated: false
+    result: pending
+    reason: null
   - id: A53
     source: brief.md
     text: "A53: Highlighter updates stable fragment-local overlays/outlines without
       changing original role fills, coordinates, geometry, labels, card size or
       scroll/zoom and without rebuilding/blanking the graph, Main/Local view or
       page."
-    result: blocked
-    reason:
-      text: Source paint updates existing fragment-local overlay rectangles/outlines
-        without a graph/page rebuild, and regressions preserve
-        geometry/selection owners. Native Windows/macOS repeated graph/table
-        selection and visual no-blank/no-flicker/viewport acceptance was not
-        performed.
-      truncated: false
+    result: pending
+    reason: null
   - id: A54
     source: brief.md
     text: "A54: PNG/SVG exports exclude the newly added temporary
       selection/correlation/hover layers without first clearing visible user
       selection; original colors, data, range and standalone source tooltip
       information remain intact."
-    result: passed
-    reason:
-      text: "snapshotWithoutFinalPathSelection cleans only a cloned SVG: temporary
-        overlays/selected attributes are removed and standalone source titles
-        restored. Live selection is untouched; synthetic fallback renders from
-        model/provenance. Runtime 1115, 1123 and actual PNG
-        snapshot/mirrored-source tests pass."
-      truncated: false
+    result: pending
+    reason: null
   - id: A55
     source: brief.md
     text: "A55: One clearly clickable current-chromosome/name-and-arrow trigger
       toggles the anchored panel; only collapsed/expanded states exist, with no
       nested small/large selector, duplicate toolbar/title, separate maximize or
       close buttons."
-    result: passed
-    reason:
-      text: renderAssemblyScopeHeader has one current-chromosome/name-and-arrow button
-        with aria-controls/expanded and one always-mounted panel.
-        scope-popover-runtime toggles that existing owner only; no nested
-        selector, duplicate title/toolbar, maximize or extra close action is
-        introduced.
-      truncated: false
+    result: pending
+    reason: null
   - id: A56
     source: brief.md
     text: "A56: The floating panel does not squeeze Main View or cover its own
       trigger; it uses adaptive columns of compact equal-height two-line buttons
       with original full chromosome identity and a Contig-count/length summary."
-    result: blocked
-    reason:
-      text: The chromosome panel uses fixed anchored placement, adaptive equal-height
-        two-line options and unchanged identity/count/length data; unit and
-        isolated Chrome evidence support the design. Native Windows/macOS
-        compact-grid/trigger non-occlusion and resize/layout acceptance is
-        missing.
-      truncated: false
+    result: pending
+    reason: null
   - id: A57
     source: brief.md
     text: "A57: Current item has stable selected appearance distinct from hover;
       names/version suffixes and ordering are preserved, compact Mb summaries
       expose exact bp details and do not change the placedBp statistic."
-    result: passed
-    reason:
-      text: Chromosome buttons retain original names/version suffixes/order, distinct
-        is-active/aria-pressed state, and exact-bp title. Compact Mb formatting
-        derives from the unchanged placedBp value. Actual EN/ZH chromosome
-        rendering and selection regressions pass without renaming or recomputing
-        the statistic.
-      truncated: false
+    result: pending
+    reason: null
   - id: A58
     source: brief.md
     text: "A58: All selectable chromosomes share one non-paginated panel, internally
       scrollable for large sets; no unrequested search/groups are added and
       narrow windows reduce columns rather than font size."
-    result: passed
-    reason:
-      text: renderAssemblyScopeHeader maps the complete chromosomes array into one
-        nonpaginated panel. CSS auto-fit/minmax reduces columns and internal
-        overflow scrolls larger sets without font-size reduction or new
-        search/group tools; actual grid/rendering tests and the 28-option Chrome
-        fixture support the source contract.
-      truncated: false
+    result: pending
+    reason: null
   - id: A59
     source: brief.md
     text: "A59: Chromosome selection keeps the panel open for consecutive choices;
       trigger toggle, outside click or Escape collapses it, and combined
       trigger/panel departure retains the global 400ms grace/reentry-cancel
       behavior across mounting boundaries."
-    result: blocked
-    reason:
-      text: Choice preserves panel-open state and delegated
-        trigger/outside/Escape/400ms grace ownership is tested across remounts.
-        Real native trigger-to-panel movement, reentry cancellation and
-        consecutive-choice behavior have not been accepted on Windows/macOS;
-        source/fake-clock tests do not supply that receipt.
-      truncated: false
+    result: pending
+    reason: null
   - id: A60
     source: brief.md
     text: "A60: Expand/collapse never loads or changes a chromosome or reconstructs
       the page; actual selection retains asynchronous validity checks,
       successful identity/active-item updates and honest failure behavior;
       project switch clears old options without new cross-session persistence."
-    result: passed
-    reason:
-      text: Popover open/close changes hidden/aria/state only, with no chromosome
-        load/rerender call. Actual choice still uses selectChromosome request
-        generations, mutation draining and honest loading/error publication,
-        retaining explicit pending closure. Project/session reset clears old
-        options and introduces no chooser persistence; data/runtime regressions
-        pass.
-      truncated: false
+    result: pending
+    reason: null
   - id: A61
     source: brief.md
     text: "A61: Keyboard can reach options, the trigger declares expansion/panel
       association, Escape restores trigger focus, and repeated renders do not
       multiply handlers or leave close timers targeting obsolete panels."
-    result: passed
-    reason:
-      text: Real button options are keyboard-reachable and trigger
-        aria-controls/expanded identifies the panel. Escape restoration,
-        idempotent delegated binding, mounted-boundary grace retention and
-        obsolete-project timer cancellation are exercised by passing
-        scope-popover-runtime tests. This establishes the source/event contract,
-        not native pointer acceptance.
-      truncated: false
+    result: pending
+    reason: null
   - id: A62
     source: brief.md
     text: "A62: After updater initialization succeeds and it is enabled, schedule
       the first automatic check at 3000ms instead of 10000ms, never earlier or
       twice; disabled updater schedules no startup check."
-    result: passed
-    reason:
-      text: main.js changes only the enabled post-initialize first timeout to 3000ms.
-        Runtime tests 22-24 execute the actual bootstrap scheduling block and
-        verify no check at 2999ms, exactly one at 3000ms, no obsolete 10s
-        duplicate and no disabled/pre-initialize schedule.
-      truncated: false
+    result: pending
+    reason: null
   - id: A63
     source: brief.md
     text: "A63: Keep the existing six-hour recurring check and 30-second
       deferred-offer notify cadence, silent current-version/error behavior,
       busy/hidden/modal deferral and persisted snooze/manual-check semantics
       unchanged."
-    result: passed
-    reason:
-      text: The six-hour check and 30-second notify intervals remain unchanged
-        (Runtime 25). Updater state-machine/snooze/manual/error/deferral tests
-        pass. The only service adjustment includes background project exports in
-        the existing busy deferral, preserving install/offer safety across the
-        new Overview ownership model.
-      truncated: false
+    result: pending
+    reason: null
   - id: A64
     source: brief.md
     text: "A64: Keep docs-first sequential GitHub-release fallback,
       signature/version validation and install/save safety unchanged; the
       request changes startup delay, not request timeout or update sources."
-    result: passed
-    reason:
-      text: No updater Rust downloader/source/signature/version/install implementation
-        changed in this candidate; docs-first sequential fallback and privileged
-        validation/save/install paths remain intact. Reviewed frontend diff
-        changes startup timing and background-export busy visibility, not
-        request timeout or source policy; updater regressions pass.
-      truncated: false
+    result: pending
+    reason: null
   - id: A65
     source: brief.md
     text: "A65: Existing Main/Local navigation, scientific data,
@@ -890,16 +507,8 @@ acceptance:
       project/cache formats are unchanged except for explicit confirmed
       mutation/selection behavior; no release/installers/deployment are
       implicitly authorized."
-    result: passed
-    reason:
-      text: Inspected source diff adds presentation/ownership/projection layers
-        without backend/database/cache-format,
-        sequence/coordinate/orientation/anchor-result changes. Phase cleanup
-        uses existing explicit mutation persistence; correlation stays outside
-        editing selection and export snapshots.
-        Scientific/undo/redo/export/provenance regressions pass; no
-        release/installers/deployment changes are in the candidate.
-      truncated: false
+    result: pending
+    reason: null
   - id: A66
     source: brief.md
     text: "A66: Each staged implementation has targeted regression checks and
@@ -907,16 +516,8 @@ acceptance:
       applicable integrated frontend tests and a Windows-host production build
       pass, generated dist is cleaned and Windows-only dependencies are not
       reused by WSL Node."
-    result: passed
-    reason:
-      text: "All six staged implementation commits are ancestors of current master and
-        the checked remote master SHA 00385f2cb69954349ddf77cca341cc7f7a16b3be.
-        Path-scoped history and targeted regressions are present. Runtime-owned
-        Windows check passed exit 0 (57209ms): full parsed TAP 2113/2113, zero
-        failures/skips/cancellations, Windows npm production build 2025 modules.
-        dist is absent and diff check/design hash pass; no WSL Node was used by
-        the check."
-      truncated: false
+    result: pending
+    reason: null
   - id: A67
     source: brief.md
     text: "A67: No browser is launched by default; necessary visual validation is
@@ -924,279 +525,62 @@ acceptance:
       source/unit/browser/static proof from Windows/macOS native hover, Reload,
       click-flicker and resize acceptance, with unexecuted native checks left
       unverified."
-    result: passed
-    reason:
-      text: The inspected Runtime script runs Windows Node tests/build only and
-        explicitly disclaims browser/native/release/deploy proof. Existing
-        isolated Chrome/mock-workflow reports are identified as justified
-        browser evidence, not Tauri/customer proof. This independent review
-        launched no browser and leaves required unperformed native checks
-        blocked rather than asserting acceptance.
-      truncated: false
+    result: pending
+    reason: null
   - id: A68
     source: brief.md
     text: "A68: Comet stages, candidate review and independent verifier are obeyed
       through public Runtime commands; implementation is serial in the current
       master checkout, with no subagents unless the user explicitly authorizes
       only the required independent read-only review/verifier executions."
-    result: passed
-    reason:
-      text: Public Runtime dispatch/status pages and live state bind this distinct
-        read-only Verifier to candidate c67836b9-5cf3-4ac4-bbae-8326542a74fe,
-        stateVersion 8, original 68 IDs and the authorized current-master serial
-        change. Builder/reviewer execution references are distinct; this
-        execution did not delegate or mutate formal artifacts/state. Recovery
-        text and original Spec/criteria remain unchanged.
-      truncated: false
-builder_handoff:
-  candidate_id: c67836b9-5cf3-4ac4-bbae-8326542a74fe
-  identity_provider: skill-coordinated
-  builder_execution_ref: skill-coordinated:builder:56a73d32-11ba-4e8f-901d-ace82a57283a
-  iteration: 1
-  summary:
-    text: Implemented all confirmed 12 UI jobs plus enabled startup updater delay
-      3s, serially in B0-B5 on master (8e986f7, fed26f5, 515c38e, 4166bee,
-      fd8cb54, 80ca043). Includes immediate phase/Final Path reconciliation
-      without baseline overwrite; scoped navigation context-menu handling;
-      controlled immediate tooltips; exact adopted-source correlation; bilingual
-      semantic casing; CSS peer toolbar and compact owned popovers/chr grid;
-      Project Information + Path Overview; Overview with independent full
-      Preview and project-scoped export/freshness ownership. Cross-batch review
-      cache/failure-path findings repaired with regressions. Approved design
-      unchanged. See brief.md and naming-audit.md for batch evidence and review
-      references.
-    truncated: false
-  addressed_acceptance_ids:
-    - A1
-    - A2
-    - A3
-    - A4
-    - A5
-    - A6
-    - A7
-    - A8
-    - A9
-    - A10
-    - A11
-    - A12
-    - A13
-    - A14
-    - A15
-    - A16
-    - A17
-    - A18
-    - A19
-    - A20
-    - A21
-    - A22
-    - A23
-    - A24
-    - A25
-    - A26
-    - A27
-    - A28
-    - A29
-    - A30
-    - A31
-    - A32
-    - A33
-    - A34
-    - A35
-    - A36
-    - A37
-    - A38
-    - A39
-    - A40
-    - A41
-    - A42
-    - A43
-    - A44
-    - A45
-    - A46
-    - A47
-    - A48
-    - A49
-    - A50
-    - A51
-    - A52
-    - A53
-    - A54
-    - A55
-    - A56
-    - A57
-    - A58
-    - A59
-    - A60
-    - A61
-    - A62
-    - A63
-    - A64
-    - A65
-    - A66
-    - A67
-    - A68
-  checks:
-    - name:
-        text: Final Windows-host frontend suite
-        truncated: false
-      result: passed
-      note:
-        text: 2113/2113; no failures/skips/cancellations.
-          /tmp/gpm-b5-builder-2113-full-validation.log
-        truncated: false
-    - name:
-        text: Windows-host production build and cleanup
-        truncated: false
-      result: passed
-      note:
-        text: 2025modules; existing chunk warning only; dist removed; frozen design hash
-          unchanged.
-        truncated: false
-    - name:
-        text: Independent integration review
-        truncated: false
-      result: passed
-      note:
-        text: All actionable findings closed;44/44 independent targeted tests.
-          /tmp/cgat-cache-final-review-tests.tap
-        truncated: false
-    - name:
-        text: Justified B4 isolated production-binder Windows Chrome visual check
-        truncated: false
-      result: passed
-      note:
-        text: Mock workflow data; responsive/owner
-          identity/popover/card/locale/Local/All-mode checks recorded in brief;
-          not native/customer acceptance.
-        truncated: false
-    - name:
-        text: Native Windows/macOS interaction acceptance
-        truncated: false
-      result: not-run
-      note:
-        text: No native Tauri hover/Reload/flicker/resize acceptance performed;
-          source/unit/browser evidence does not establish it.
-        truncated: false
-  checks_truncated: false
-  known_limits:
-    - text: Native Windows/macOS hover, navigation Reload menu, click flicker and
-        resize acceptance remain unverified; do not infer platform success from
-        automated/source/mock-browser checks.
-      truncated: false
-    - text: No release/version bump/installers/deployment authorized or performed.
-        Existing biological/export/persisted formats preserved.
-      truncated: false
-  known_limits_truncated: false
-  review:
-    status: passed
-    summary:
-      text: Independent B0-B4 reviews and full-candidate B5/integration review closed
-        clean. Repaired preload mutation freshness, unacknowledged export
-        receipt eviction, off-route Assembly phase cache invalidation including
-        committed deletion/list failure, and cached member-tooltip revival.
-        Final integration recheck44/44 Windows tests plus diff check; fresh
-        final Verifier remains independent.
-      truncated: false
-    reviewer_execution_ref: 01a17ee2-1f79-7182-84f8-d6e191b355d4
-  submitted_at: 2026-10-28T03:32:44.216Z
-blockers:
-  - owner: user
-    reason:
-      text: "Independent read-only final review of all A1-A68 for the unchanged
-        Runtime dispatch binding c67836b9-5cf3-4ac4-bbae-8326542a74fe /
-        stateVersion 8 / verifierExecutionRef
-        skill-coordinated:verifier:f6a8a6d1-e622-4140-bb8b-42c79e893e7b: 54
-        passed, 14 blocked, 0 failed. No confirmed source-level acceptance
-        failure was found in the inspected candidate, including biological
-        interval, failed-save, phase-deletion, cache/project-generation and
-        export-ownership safety paths. Runtime script/full TAP/build log
-        independently inspected: 2113 passing tests, zero
-        failures/skips/cancellations, Windows build 2025 modules, exit 0;
-        approved source SHA-256 and shaped Spec unchanged, generated dist
-        absent. Overall BLOCKED until required actual native Windows and macOS
-        interaction evidence is supplied. Builder summaries/reviewer identity
-        were not reused to establish semantic acceptance. No repository files or
-        formal state were modified; no browser, release/deploy/commit/push
-        operation or delegation was used by this review."
-      truncated: false
-    acceptance_ids:
-      - A6
-      - A9
-      - A10
-      - A12
-      - A14
-      - A21
-      - A23
-      - A33
-      - A38
-      - A39
-      - A40
-      - A53
-      - A56
-      - A59
-    resolution_action: resolve-verifier-blocker
-verification:
-  candidate_id: c67836b9-5cf3-4ac4-bbae-8326542a74fe
-  identity_provider: skill-coordinated
-  verifier_execution_ref: skill-coordinated:verifier:f6a8a6d1-e622-4140-bb8b-42c79e893e7b
-  iteration: 1
-  attempt: 1
-  assurance: skill-coordinated
-  verdict: blocked
-  checks:
-    - id: windows-frontend-integrated
-      name:
-        text: Windows frontend full regression, production build, cleanup and
-          approved-design integrity
-        truncated: false
-      argv_display:
-        - text: proxy
-          truncated: false
-        - text: python3
-          truncated: false
-        - text: /tmp/gpm-native-verify-frontend.py
-          truncated: false
-      argv_truncated: false
-      cwd_ref: .
-      status: passed
-      exit_code: 0
-      duration_ms: 57209
-  summary:
-    text: "Independent read-only final review of all A1-A68 for the unchanged
-      Runtime dispatch binding c67836b9-5cf3-4ac4-bbae-8326542a74fe /
-      stateVersion 8 / verifierExecutionRef
-      skill-coordinated:verifier:f6a8a6d1-e622-4140-bb8b-42c79e893e7b: 54
-      passed, 14 blocked, 0 failed. No confirmed source-level acceptance failure
-      was found in the inspected candidate, including biological interval,
-      failed-save, phase-deletion, cache/project-generation and export-ownership
-      safety paths. Runtime script/full TAP/build log independently inspected:
-      2113 passing tests, zero failures/skips/cancellations, Windows build 2025
-      modules, exit 0; approved source SHA-256 and shaped Spec unchanged,
-      generated dist absent. Overall BLOCKED until required actual native
-      Windows and macOS interaction evidence is supplied. Builder
-      summaries/reviewer identity were not reused to establish semantic
-      acceptance. No repository files or formal state were modified; no browser,
-      release/deploy/commit/push operation or delegation was used by this
-      review."
-    truncated: false
-  risks:
-    - text: Required native Windows/macOS Tauri hover, navigation Reload-menu,
-        click-flicker, resize and related pointer/geometry acceptance is
-        unperformed. Fourteen corresponding criteria remain blocked; no
-        criterion was rewritten or platform requirement weakened.
-      truncated: false
-    - text: The local verification host is Linux with Windows command tooling but no
-        local macOS/xcrun capability. Windows Node tests and the existing
-        headless Chrome/mock-data reports are not native Tauri acceptance. No
-        supplementary executable check available in this read-only/no-browser
-        scope can honestly supply the missing two-platform interactive receipt.
-      truncated: false
-    - text: The Windows production build succeeds with the existing large-chunk
-        warning. This is nonblocking automated-build evidence, not a native
-        install/restart or release/deployment check.
-      truncated: false
-  risks_truncated: false
-  completed_at: 2026-10-28T03:56:32.596Z
+    result: pending
+    reason: null
+  - id: A69
+    source: brief.md
+    text: "A69: The project-library validation button visibly reads 校验项目 in Chinese
+      while preserving its existing validation scope, disabled/progress states
+      and behavior."
+    result: pending
+    reason: null
+  - id: A70
+    source: brief.md
+    text: "A70: Preview source tracks for both primary and auxiliary datasets show
+      complete source Contigs associated with the chromosome, including unused
+      portions and reliably positioned unused Contigs, rather than cropping
+      adopted Contigs to Final Path fragments; missing placements are explicitly
+      unpositioned rather than fabricated."
+    result: pending
+    reason: null
+  - id: A71
+    source: brief.md
+    text: "A71: Used source intervals remain separately identifiable with exact
+      source identity, orientation and interval mapping. Repeated/reversed uses,
+      split fragments and overlapping Contigs retain truthful context without
+      duplicate whole-Contig bars for each adopted use, whole-source inflation
+      from short-fragment minimum widths, or changes to saved source/path data."
+    result: pending
+    reason: null
+  - id: A72
+    source: brief.md
+    text: "A72: The Preview heading download action saves one PNG containing every
+      chromosome preview card, including offscreen cards, with chromosome
+      headings/lengths, Ref, dataset source tracks and Final Path; it excludes
+      upper statistics/project details and interactive action buttons, and is
+      not a screenshot of only the viewport."
+    result: pending
+    reason: null
+  - id: A73
+    source: brief.md
+    text: "A73: Preview image export preserves the current project and complete
+      rendered data, does not navigate or mutate selection/data, has honest
+      loading/empty/error/disabled and cancellation/failure behavior, and
+      coexists with automatic preview invalidation and load-error retry without
+      the removed header refresh action."
+    result: pending
+    reason: null
+builder_handoff: null
+blockers: []
+verification: null
 history:
   - goal_cycle: 1
     iteration: 1
@@ -1245,6 +629,24 @@ history:
         operation or delegation was used by this review."
       truncated: false
     completed_at: 2026-10-28T03:56:32.596Z
+  - goal_cycle: 2
+    iteration: 1
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: 用户确认修改需求：校验按钮中文改校验项目；主视图预计算结果及分型轨道前置，宽屏标题同行、窄屏左对齐换行；预览展示完整来源Contig并标记采用区间，标题简化预览，刷新按钮改下载全部染色体预览PNG。保留原生验收未完成项，不将本次确认视为通过。
+      truncated: false
+    completed_at: 2026-10-28T04:21:59.452Z
+  - goal_cycle: 3
+    iteration: 0
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native confirmed acceptance criteria changed
+      truncated: false
+    completed_at: 2026-10-28T04:27:28.917Z
 history_overflow:
   dropped_entries: 0
   first_dropped_at: null
@@ -1255,7 +657,7 @@ history_overflow:
     blocked: 0
     execution-error: 0
     recovery: 0
-verification_result: blocked
-verification_report: verification.md
+verification_result: pending
+verification_report: null
 archived: false
 created_at: 2026-10-27T14:10:16.278Z

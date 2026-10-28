@@ -1441,8 +1441,7 @@ export function renderProjectPathOverview(state) {
     : data.error ? `<p class="error-text" role="alert">${escapeHtml(data.error)}</p><button type="button" class="button ghost tiny" data-project-path-refresh>${escapeHtml(labels.refresh)}</button>`
     : data.loading || !fresh ? `<p class="muted" role="status">${escapeHtml(labels.loading)}</p>`
     : rows || `<p class="muted">${escapeHtml(labels.pathOverviewEmpty)}</p>`;
-  return `<section class="project-path-overview" data-project-path-overview="${escapeAttr(scope)}" aria-labelledby="project-path-overview-title">
-    <h3 id="project-path-overview-title">${escapeHtml(labels.pathOverviewTitle)}</h3>${body}</section>`;
+  return `<section class="project-path-overview" data-project-path-overview="${escapeAttr(scope)}" aria-label="${escapeAttr(labels.pathOverviewTitle)}">${body}</section>`;
 }
 
 function projectSurfaceRoot(host) {

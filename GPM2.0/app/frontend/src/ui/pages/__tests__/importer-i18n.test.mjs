@@ -217,7 +217,7 @@ test("importer add-package labels and errors are translated in Chinese and Engli
   assert.equal(zh.progressStages.extract_native_archive, "使用系统解压器展开交付包");
   assert.equal(zh.runtime.importPhaseProgress, "阶段 {current}/{total}");
   assert.equal(zh.runtime.importPhaseProgressEntries, "阶段 {current}/{total} · 已展开 {entries} 个条目");
-  assert.equal(zh.buttons.validateHistory, "校验");
+  assert.equal(zh.buttons.validateHistory, "校验项目");
   assert.equal(zh.buttons.deleteFailedRecords, "删除失败");
   assert.equal(zh.page.deleteFailedConfirmTitle, "删除失败项目");
   assert.equal(zh.page.deleteWithFiles, "是否同步删除对应文件（此操作不可逆，请谨慎操作）");
@@ -407,7 +407,7 @@ test("importer bulk delete removes only current failed history records", async (
     const store = createStore(state);
 
     const initialHtml = renderImporterPage(store.getState());
-    assert.match(initialHtml, /id="validate-history-button"[^>]*>校验<\/button>\s*<button id="delete-failed-history-button"[^>]*>删除失败<\/button>/);
+    assert.match(initialHtml, /id="validate-history-button"[^>]*>校验项目<\/button>\s*<button id="delete-failed-history-button"[^>]*>删除失败<\/button>/);
     assert.doesNotMatch(initialHtml, /id="delete-failed-history-button"[^>]*hidden/);
 
     bindImporterPage(host, store);
@@ -726,7 +726,7 @@ test("project validation updates in place and preserves the rename draft across 
     assert.equal(store.getState().importer.inFlight, false);
     assert.equal(store.getState().importer.deleteConfirmOpen, false);
     assert.equal(validate.disabled, true);
-    assert.equal(validate.textContent, "校验");
+    assert.equal(validate.textContent, "校验项目");
     assert.equal(remove.hidden, true);
     timers[0]();
     assert.equal(toast.removed, true);
@@ -736,7 +736,7 @@ test("project validation updates in place and preserves the rename draft across 
     await pending;
     assert.equal(store.getState().importer.historyValidating, false);
     assert.equal(validate.disabled, false);
-    assert.equal(validate.textContent, "校验");
+    assert.equal(validate.textContent, "校验项目");
     assert.equal(remove.hidden, false);
     assert.equal(remove.disabled, false);
     assert.match(page.toastHtml, /importer-status-toast.*[\s\S]*校验完成：通过 1 个，失败 2 个。/);

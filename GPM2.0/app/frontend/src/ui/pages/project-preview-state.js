@@ -247,53 +247,65 @@ export function buildProjectPreviewModel({ chromosomes = [], referenceGenomeId =
       }
       paths.push({ name, length: cursor, parts });
     }
+    // Keep complete source bodies independent of the path's short-fragment
+    // visual floor. Adopted placements are evidence for choosing ONE origin,
+    // never a reason to duplicate/crop a source for every use of that source.
+    const placements = item => item.highlights.map(patch => {
+      const source = patch.part.source;
+      const localStart = item.reverse ? item.length - patch.end : patch.start;
+      const localEnd = item.reverse ? item.length - patch.start : patch.end;
+      const reverse = source.original ? (source.orient === "-") !== (item.ctg.orient === "-") : source.orient === "-";
+      const usedStart = reverse ? item.length - localEnd : localStart;
+      const usedEnd = reverse ? item.length - localStart : localEnd;
+      const offset = source.orient === "-"
+        ? source.end - (patch.coveredEnd ?? source.end)
+        : (patch.coveredStart ?? source.start) - source.start;
+      return { ...item, reverse, start: patch.part.start + offset - usedStart,
+        alignment: { pathName: patch.part.pathName, index: patch.part.index, offset, usedStart, usedEnd },
+        highlights: [{ ...patch, start: usedStart, end: usedEnd }] };
+    }).sort((a, b) => (b.alignment.usedEnd - b.alignment.usedStart) - (a.alignment.usedEnd - a.alignment.usedStart));
+    const candidates = [...tracks.values()].map(track => ({ positioned: track.items.flatMap(placements) }));
+    const reference = referencePlacement(candidates, refHighlights, chrName, refLength, project.primaryDatasetId);
     const rows = [...tracks.values()].map(track => {
-      const adoptedSources = new Set();
+      const aliases = new Set();
       const items = track.items.flatMap(item => {
-        if (!item.highlights.length) return [item];
-        // Split reused/reordered sources by the actual adopted fragment. A
-        // single whole-contig translation cannot align all of its uses.
-        return item.highlights.flatMap(patch => {
-          const source = patch.part.source;
-          // Mirrored and original instances can resolve to the same adopted
-          // source interval. They are provenance aliases, not extra haplotypes.
-          const key = JSON.stringify([patch.part.pathName, patch.part.index,
-            source.datasetName, source.contigName, source.original ? 0 : source.assemblyCtgId,
-            patch.coveredStart, patch.coveredEnd]);
-          if (adoptedSources.has(key)) return [];
-          adoptedSources.add(key);
-          const localStart = item.reverse ? item.length - patch.end : patch.start;
-          const localEnd = item.reverse ? item.length - patch.start : patch.end;
-          const reverse = source.original ? (source.orient === "-") !== (item.ctg.orient === "-") : source.orient === "-";
-          const usedStart = reverse ? item.length - localEnd : localStart;
-          const usedEnd = reverse ? item.length - localStart : localEnd;
-          const offset = source.orient === "-"
-            ? source.end - (patch.coveredEnd ?? source.end)
-            : (patch.coveredStart ?? source.start) - source.start;
-          return { ...item, reverse, displayOrient: source.orient, start: patch.part.start + offset - usedStart,
-            alignment: { pathName: patch.part.pathName, index: patch.part.index, offset, usedStart, usedEnd },
-            highlights: [{ ...patch, start: usedStart, end: usedEnd }] };
-        });
+        const adopted = placements(item)[0];
+        const placedOnReference = hasReference && item.start !== null;
+        // A hidden source descriptor has interval provenance but no trustworthy
+        // whole-source placement. Keep it explicitly unpositioned.
+        if (!placedOnReference && !item.ghostKey && adopted) {
+          const reversed = item.reverse !== adopted.reverse;
+          item = { ...item, start: adopted.start, reverse: adopted.reverse,
+            highlights: item.highlights.map(patch => reversed
+              ? { ...patch, start: item.length - patch.end, end: item.length - patch.start } : patch) };
+        } else if (placedOnReference) {
+          item = { ...item,
+            start: reference.start + (reference.reverse ? refLength - item.start - item.length : item.start),
+            reverse: item.reverse !== reference.reverse,
+            highlights: item.highlights.map(patch => reference.reverse
+              ? { ...patch, start: item.length - patch.end, end: item.length - patch.start } : patch) };
+        }
+        if (adopted) item.alignment = adopted.alignment;
+        item.displayOrient = (item.ctg.orient === "-") !== item.reverse ? "-" : "+";
+        // Mirrors of the same original interval can be provenance aliases.
+        // Suppress only aliases with identical provenance AND placement;
+        // distinct placements and genuinely different fragments stay.
+        const fragment = item.ctg.sourceFragment;
+        const identity = JSON.stringify([item.datasetName, text(item.ctg.originId || item.name),
+          fragment?.sourceStart, fragment?.sourceEnd, item.length]);
+        const aliasKey = JSON.stringify([identity, item.start, item.reverse]);
+        if (aliases.has(aliasKey)) return [];
+        aliases.add(aliasKey);
+        return [item];
       });
       const positioned = items.filter(item => item.start !== null);
-      const adopted = positioned.filter(item => item.alignment).map(item => ({
-        item, start: item.start + item.alignment.usedStart,
-        length: item.alignment.usedEnd - item.alignment.usedStart,
-      }));
-      const laneCount = assignLanes(adopted);
-      adopted.forEach(({ item, lane }) => { item.lane = lane; });
-      // Unused context is subdued on the same lane; only overlapping adopted
-      // fragments (e.g. alternative haplotypes) need additional rows.
-      positioned.filter(item => !item.alignment).forEach(item => { item.lane = 0; });
+      const laneCount = assignLanes(positioned);
       return { ...track, items, positioned, unpositioned: items.filter(item => item.start === null), laneCount };
     });
-    const reference = referencePlacement(rows, refHighlights, chrName, refLength, project.primaryDatasetId);
-    // Context-only contigs still use reference coordinates; translate them too.
-    if (hasReference) rows.forEach(row => row.positioned.filter(item => !item.alignment).forEach(item => {
-      item.start = reference.start + (reference.reverse ? refLength - item.start - item.length : item.start);
-    }));
-    const start = 0;
-    const end = paths.reduce((max, path) => Math.max(max, path.length), Math.max(1, hasReference ? reference.start + refLength : 0));
+    const extents = rows.flatMap(row => row.positioned);
+    const start = extents.reduce((min, item) => Math.min(min, item.start), Math.min(0, hasReference ? reference.start : 0));
+    const end = extents.reduce((max, item) => Math.max(max, item.start + item.length),
+      paths.reduce((max, path) => Math.max(max, path.length), Math.max(1, hasReference ? reference.start + refLength : 0)));
     return { chrName, refLength, hasReference, reference, refHighlights, tracks: rows, paths,
       domain: { start, end }, unresolvedCount,
       unpositionedCount: rows.reduce((sum, row) => sum + row.unpositioned.length, 0) };

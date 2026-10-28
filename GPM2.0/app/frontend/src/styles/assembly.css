@@ -274,8 +274,9 @@
 
 .assembly-track-panel-head[data-main-view-header] {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
   gap: 8px;
   min-width: 0;
 }
@@ -288,7 +289,8 @@
 /* All parameter/action groups are peers. A whole field wraps as one unit.
    Only a field wider than the toolbar creates an internal horizontal scroll. */
 .assembly-track-inline-controls[data-main-track-toolbar] {
-  width: 100%;
+  flex: 1 1 max-content;
+  width: max-content;
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;

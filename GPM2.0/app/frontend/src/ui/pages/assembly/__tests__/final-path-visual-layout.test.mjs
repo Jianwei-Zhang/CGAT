@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { layoutFinalPathStrip, syncFinalPathStripGeometry } from "../final-path-visual-layout.js";
+import { layoutFinalPathStrip, layoutProjectPreviewPath, syncFinalPathStripGeometry } from "../final-path-visual-layout.js";
 
 const ctg = length => ({ segment: { type: "ctg" }, length });
 const gap = length => ({ segment: { type: "gap" }, length });
@@ -145,4 +145,26 @@ test("a tiny donor is drawn only over its adopted interval, not as a giant whole
     assert.equal(source.style.width, nodes[1].style.width);
     assert.equal(source.style.width, "8px");
   }
+});
+
+
+test("complete-source Preview preserves overhang origin and independent short-fragment floors", () => {
+  const domain = { start: -1000, end: 1000000 };
+  const layouts = layoutProjectPreviewPath([ctg(100000), gap(1), ctg(1), ctg(899998)], 1000, domain);
+  assert.ok(Math.abs(layouts[0].x - 1000 / 1001000 * 1000) < 1e-8);
+  assert.ok(layouts[1].width >= 8); assert.ok(layouts[2].width >= 8);
+  for (let i = 1; i < layouts.length; i++) assert.ok(layouts[i].x >= layouts[i-1].x + layouts[i-1].width - 1e-8);
+  assert.ok(layouts.at(-1).x + layouts.at(-1).width <= 1000 + 1e-8);
+});
+
+test("Preview geometry never rescales complete source bodies using the tiny path-fragment scale", () => {
+  const source = { style: { left: "10%", width: "70%" } };
+  const nodes = [ctg(100000), gap(1)].map(item => ({ dataset: { finalPathKind: item.segment.type, finalPathLength: item.length },
+    style: {}, querySelector: () => null }));
+  const strip = { dataset: { finalPathStrip: "1", previewLinear: "1", previewDomainStart: "-100", finalPathDomain: "1000100" },
+    clientWidth: 1000, querySelectorAll: () => nodes,
+    closest: () => ({ querySelectorAll: () => [source] }) };
+  syncFinalPathStripGeometry({ querySelectorAll: selector => selector === "[data-final-path-strip]" ? [strip] : [] });
+  assert.deepEqual(source.style, { left: "10%", width: "70%" });
+  assert.ok(parseFloat(nodes[1].style.width) >= 8);
 });

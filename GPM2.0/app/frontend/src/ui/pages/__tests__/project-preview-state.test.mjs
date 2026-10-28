@@ -25,15 +25,16 @@ test("original-source fragments are aligned by adopted interval, including rever
   assert.equal(card.tracks.find(track => track.name === "dsB").items.length, 0);
 });
 
-test("reused contigs split into independently aligned parts instead of being matched by name alone", () => {
+test("reused contigs keep one complete body and all adopted intervals", () => {
   const segment = { type: "ctg", assemblyCtgId: 1, datasetName: "dsA", ctgName: "ctgA", overallLen: 1000 };
   const [card] = buildProjectPreviewModel({ ...base, finalPathByChr: { Chr1: { segments: [
     { ...segment, start: 1, end: 100 }, { type: "gap", gapSizeBp: 1 }, { ...segment, start: 601, end: 650 },
   ] } } });
   const row = card.tracks.find(track => track.name === "dsA");
-  assert.equal(row.positioned.length, 2);
-  assert.equal(row.positioned[0].start + row.positioned[0].alignment.usedStart, 0);
-  assert.equal(row.positioned[1].start + row.positioned[1].alignment.usedStart, 101);
+  assert.equal(row.positioned.length, 1);
+  assert.equal(row.positioned[0].length, 1000);
+  assert.deepEqual(row.positioned[0].highlights.map(patch => [patch.start, patch.end]), [[0, 100], [600, 650]]);
+  assert.equal(row.positioned[0].start + row.positioned[0].highlights[0].start, 0);
   assert.equal(row.laneCount, 1);
   assert.equal(card.paths[0].length, 151);
   assert.equal(card.paths[0].parts[1].gap, true);
@@ -43,9 +44,10 @@ test("a hidden source remains traceable without fabricating reference placement"
   const [card] = buildProjectPreviewModel({ ...base, ctgs: [], referenceGenomeId: 0,
     finalPathByChr: { Chr1: { segments: [sourceSegment] } } });
   assert.equal(card.hasReference, false);
-  const item = card.tracks.find(track => track.name === "dsA").positioned[0];
+  const track = card.tracks.find(track => track.name === "dsA"), item = track.unpositioned[0];
+  assert.equal(track.positioned.length, 0);
   assert.ok(item.ghostKey);
-  assert.equal(item.start + item.alignment.usedStart, 0);
+  assert.equal(item.start, null);
   assert.equal(card.paths[0].length, 100);
 });
 
@@ -139,4 +141,55 @@ test("mirrored and original aliases of a tiny donor produce one adopted source, 
   assert.equal(row.laneCount, 1);
   assert.equal(row.positioned[0].alignment.usedEnd - row.positioned[0].alignment.usedStart, 22341);
   assert.equal(card.paths[0].length, 22341);
+});
+
+
+test("full sources include unused portions, overhangs and unused Contigs on separate overlap lanes", () => {
+  const ctg = { ...base.ctgs[0], totalLength: 1000, anchorStart: -100 };
+  const [card] = buildProjectPreviewModel({ ...base, ctgs: [ctg,
+    { ...ctg, assemblyCtgId: 2, name: "unused", originId: "unused", anchorStart: -200, totalLength: 3000 }],
+    finalPathByChr: { Chr1: { segments: [sourceSegment] } } });
+  const track = card.tracks[0];
+  assert.equal(track.positioned.length, 2);
+  assert.equal(track.laneCount, 2);
+  for (const item of track.positioned) {
+    assert.ok(card.domain.start <= item.start);
+    assert.ok(card.domain.end >= item.start + item.length);
+  }
+  assert.ok(card.domain.start <= card.reference.start);
+  assert.ok(card.domain.end >= card.reference.start + card.refLength);
+  assert.notEqual(track.positioned[0].lane, track.positioned[1].lane);
+});
+
+test("overlapping auxiliary whole sources get their own lanes even when used intervals do not overlap", () => {
+  const [card] = buildProjectPreviewModel({ ...base, ctgs: [0,1].map(i => ({ ...base.ctgs[0],
+    assemblyCtgId: i + 1, name: `donor${i}`, originId: `donor${i}`, datasetName: "dsB", datasetId: 2,
+    totalLength: 3000, anchorStart: 0, sourceFragment: null })),
+    finalPathByChr: { Chr1: { segments: [0,1].map(i => ({ type: "ctg", assemblyCtgId: i + 1,
+      datasetName: "dsB", start: i * 100 + 1, end: i * 100 + 50, overallLen: 3000 })) } } });
+  const track = card.tracks.find(track => track.name === "dsB");
+  assert.equal(track.laneCount, 2);
+  assert.ok(track.positioned.every(item => item.length === 3000));
+  assert.ok(track.positioned.every(item => item.highlights[0].end - item.highlights[0].start === 50));
+});
+
+
+test("a reverse-oriented assembly source keeps its complete body and nine adopted intervals", () => {
+  const length = 43923636;
+  const [card] = buildProjectPreviewModel({ chromosomes: [{ chrName: "chr01", chrLength: 43929697 }], referenceGenomeId: 1,
+    datasets: [{ datasetId: 1, name: "pre" }, { datasetId: 2, name: "assembly" }],
+    project: { primaryDatasetId: 1, supportDatasetIds: [2] },
+    ctgs: [{ assemblyCtgId: 90, datasetId: 2, datasetName: "assembly", name: "contig_32@chr01", originId: "contig_32",
+      totalLength: length, assignedChrName: "chr01", anchorStart: -4760, orient: "-", refOrient: null,
+      sourceFragment: { sourceStart: 1, sourceEnd: length } }],
+    finalPathByChr: { chr01: { segments: Array.from({ length: 9 }, (_, i) => ({ type: "ctg",
+      start: 1000000 * (i + 1), end: 1000000 * (i + 1) + 99, orient: "-",
+      source: { dataset: "assembly", contig: "contig_32", start: 1000000 * (i + 1), end: 1000000 * (i + 1) + 99, orientation: "-" } })) } } });
+  const row = card.tracks.find(track => track.name === "assembly");
+  assert.equal(row.positioned.length, 1);
+  const item = row.positioned[0];
+  assert.equal(item.length, length); assert.equal(item.displayOrient, "-");
+  assert.equal(item.highlights.length, 9);
+  assert.equal(item.highlights.reduce((sum, patch) => sum + patch.end - patch.start, 0), 900);
+  assert.ok(card.domain.start <= item.start && card.domain.end >= item.start + length);
 });

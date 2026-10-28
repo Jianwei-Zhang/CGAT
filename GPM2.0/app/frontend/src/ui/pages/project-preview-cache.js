@@ -2,7 +2,7 @@ import { previewSemanticSignature, previewMutationStamp } from "../../services/p
 import { normalizeFinalPathByChr } from "./assembly/final-path-state.js";
 import { previewProjectKey, previewSourceRange } from "./project-preview-state.js";
 
-export const PREVIEW_MODEL_VERSION = 5;
+export const PREVIEW_MODEL_VERSION = 6;
 const sessions = new WeakMap();
 const domEntries = new Map();
 const DOM = Symbol("previewDom");
@@ -90,12 +90,12 @@ export function persistentPreviewPayload(inputs, savedPaths, cards, retainedDepe
     sourceNames: [...new Map(card.paths.flatMap(path => path.parts).filter(part => part.source?.original)
       .map(part => [JSON.stringify([part.source.datasetName, part.source.contigName]),
         { datasetName: part.source.datasetName, contigName: part.source.contigName }])).values()],
-    ctgIds: [...new Set([...(retainedDependencies[card.chrName] || []), ...card.tracks.flatMap(track => track.positioned.map(item => Number(item.ctg?.assemblyCtgId || 0)))
+    ctgIds: [...new Set([...(retainedDependencies[card.chrName] || []), ...card.tracks.flatMap(track => [...track.positioned, ...(track.unpositioned || [])].map(item => Number(item.ctg?.assemblyCtgId || 0)))
       .concat(card.paths.flatMap(path => path.parts.map(part => Number(part.source?.assemblyCtgId || 0)))).filter(id => id > 0)])] }));
   // Remove raw ctg records and duplicate/unrendered item collections; retained
   // source/path descriptors are semantic material, never stored screen widths.
   const compact = JSON.parse(JSON.stringify(cards, (key, value) =>
-    ["ctg", "items", "unpositioned", "unpositionedCount"].includes(key) ? undefined : value));
+    ["ctg", "items"].includes(key) ? undefined : value));
   return { modelVersion: PREVIEW_MODEL_VERSION, chromosomes: inputs.chromosomes,
     savedPathSignatures: pathSignatures(savedPaths), pathParents: previewPathParents(inputs),
     paletteKey: previewPaletteKey(inputs, savedPaths), cards: compact, dependencies };
@@ -114,6 +114,13 @@ export function isPreviewSnapshot(snapshot) {
     && (!value.source || (object(value.source) && typeof value.source.datasetName === "string"
       && typeof value.source.contigName === "string" && finite(value.source.start) && finite(value.source.end)));
   const patch = value => object(value) && finite(value.start) && finite(value.end) && part(value.part);
+  const sourceItem = (item, positioned) => object(item) && typeof item.name === "string"
+    && (positioned ? finite(item.start) : item.start === null)
+    && finite(item.length) && item.length > 0 && typeof item.reverse === "boolean"
+    && (!item.alignment || (object(item.alignment) && typeof item.alignment.pathName === "string"
+      && Number.isInteger(item.alignment.index) && finite(item.alignment.offset)
+      && finite(item.alignment.usedStart) && finite(item.alignment.usedEnd)))
+    && Array.isArray(item.highlights) && item.highlights.every(patch);
   return object(snapshot) && snapshot.modelVersion === PREVIEW_MODEL_VERSION
     && Array.isArray(snapshot.chromosomes) && snapshot.chromosomes.every(chr => object(chr) && typeof chr.chrName === "string")
     && object(snapshot.savedPathSignatures) && Object.values(snapshot.savedPathSignatures).every(value => typeof value === "string")
@@ -123,7 +130,7 @@ export function isPreviewSnapshot(snapshot) {
       && dependency.sourceNames.every(source => object(source) && typeof source.datasetName === "string" && typeof source.contigName === "string"))
     && typeof snapshot.paletteKey === "string"
     && Array.isArray(snapshot.cards) && snapshot.cards.every(card => object(card) && typeof card.chrName === "string"
-      && card.domain?.start === 0 && finite(card.domain.end) && card.domain.end > 0
+      && finite(card.domain?.start) && card.domain.start <= 0 && finite(card.domain.end) && card.domain.end > card.domain.start
       && finite(card.refLength) && typeof card.hasReference === "boolean"
       && object(card.reference) && finite(card.reference.start) && typeof card.reference.reverse === "boolean"
       && (card.reference.alignment === null || (object(card.reference.alignment)
@@ -134,12 +141,8 @@ export function isPreviewSnapshot(snapshot) {
         && finite(path.length) && path.length >= 0 && Array.isArray(path.parts) && path.parts.every(part))
       && Array.isArray(card.tracks) && card.tracks.every(track => object(track) && typeof track.name === "string"
         && color(track.color) && ["primary", "companion"].includes(track.role) && Number.isInteger(track.laneCount) && track.laneCount >= 1
-        && Array.isArray(track.positioned) && track.positioned.every(item => object(item) && typeof item.name === "string"
-          && finite(item.start) && finite(item.length) && item.length > 0
-          && (!item.alignment || (object(item.alignment) && typeof item.alignment.pathName === "string"
-            && Number.isInteger(item.alignment.index) && finite(item.alignment.offset)
-            && finite(item.alignment.usedStart) && finite(item.alignment.usedEnd)))
-          && Array.isArray(item.highlights) && item.highlights.every(patch))))
+        && Array.isArray(track.unpositioned) && track.unpositioned.every(item => sourceItem(item, false))
+        && Array.isArray(track.positioned) && track.positioned.every(item => sourceItem(item, true))))
     && new Set(snapshot.cards.map(card => card.chrName)).size === snapshot.cards.length
     && snapshot.cards.length === snapshot.chromosomes.length
     && snapshot.chromosomes.every(chr => snapshot.cards.some(card => card.chrName === chr.chrName));
