@@ -874,7 +874,7 @@ test("mirror track label is selectable and support mother selection does not aut
   );
   assert.match(
     selectedHtml,
-    /<div class="assembly-track-label-row[^"]*is-companion[^"]*is-subview-track-selected[^"]*"[^>]*>[\s\S]*辅助数据集轨道（flye）/,
+    /<div class="assembly-track-label-row[^"]*is-companion[^"]*is-subview-track-selected[^"]*"[^>]*>\s*<span>\[辅\] flye<\/span>/,
   );
   assert.doesNotMatch(
     selectedHtml,
@@ -933,7 +933,7 @@ test("subview support track selection highlights only the matching dataset/sourc
 
   assert.match(
     html,
-    /<div class="assembly-track-label-row[^"]*is-companion[^"]*is-subview-track-selected[^"]*"[^>]*data-track-label-source="mother"[^>]*data-track-label-dataset-id="22"[^>]*>[\s\S]*辅助数据集轨道（flye）/,
+    /<div class="assembly-track-label-row[^"]*is-companion[^"]*is-subview-track-selected[^"]*"[^>]*data-track-label-source="mother"[^>]*data-track-label-dataset-id="22"[^>]*>\s*<span>\[辅\] flye<\/span>/,
   );
   assert.doesNotMatch(
     html,

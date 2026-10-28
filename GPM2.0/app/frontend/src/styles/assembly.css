@@ -294,7 +294,9 @@
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
-  justify-content: flex-start;
+  justify-content: flex-end;
+  /* An over-wide group must overflow toward the reachable scroll end. */
+  justify-content: safe flex-end;
   flex-wrap: wrap;
   overflow-x: auto;
 }

@@ -1384,6 +1384,9 @@ function renderAssemblyTracks(args) {
       label: supportDatasetName
         ? i18n.trackControls.supportTrackLabelWithName.replace("{name}", supportDatasetName)
         : i18n.trackControls.supportTrackLabel,
+      displayLabel: supportDatasetName
+        ? i18n.trackControls.supportTrackLabelCompactWithName.replace("{name}", supportDatasetName)
+        : i18n.trackControls.supportTrackLabelCompact,
       trackModel: model.companion,
       selectable: true,
       emptyMessage: i18n.trackControls.supportTrackEmpty,
@@ -1399,6 +1402,7 @@ function renderAssemblyTracks(args) {
       interactiveRole: "support",
       dragRole: "support",
       label: i18n.trackControls.supportTrackLabelUnselected,
+      displayLabel: i18n.trackControls.supportTrackLabelCompactUnselected,
       trackModel: { ...model.companion, ctgs: [], laneCount: 1 },
       selectable: false,
       emptyMessage: i18n.trackControls.supportTrackSelectFirst,
@@ -1416,6 +1420,9 @@ function renderAssemblyTracks(args) {
     label: primaryDatasetName
       ? i18n.trackControls.primaryTrackLabelWithName.replace("{name}", primaryDatasetName)
       : i18n.trackControls.primaryTrackLabel,
+    displayLabel: primaryDatasetName
+      ? i18n.trackControls.primaryTrackLabelCompactWithName.replace("{name}", primaryDatasetName)
+      : i18n.trackControls.primaryTrackLabelCompact,
     trackModel: model.primary,
     selectable: true,
     emptyMessage: hasPrimaryData ? i18n.trackControls.primaryTrackEmpty : i18n.noContigsInChr,
@@ -2026,8 +2033,8 @@ function renderAssemblyTracks(args) {
       const trackLabelAttrs = selectableTrackLabel
         ? ` data-track-label-role="${trackLabelRole}" data-track-label-selectable="1" data-track-label-source="${trackLabelSource}" data-track-label-is-mirror="${trackLabelIsMirror}" data-track-label-dataset-id="${trackLabelDatasetId || 0}"${phasedTrackAttrs}`
         : "";
-      return `<div class="assembly-track-label-row${roleClass}" style="top:${labelTop}px"${trackLabelAttrs} title="${escapeAttr(layout.label)}">
-        <span>${escapeHtml(layout.label)}</span>
+      return `<div class="assembly-track-label-row${roleClass}" style="top:${labelTop}px"${trackLabelAttrs} title="${escapeAttr(layout.label)}" aria-label="${escapeAttr(layout.label)}">
+        <span>${escapeHtml(layout.displayLabel ?? layout.label)}</span>
       </div>`;
     })
     .join("");

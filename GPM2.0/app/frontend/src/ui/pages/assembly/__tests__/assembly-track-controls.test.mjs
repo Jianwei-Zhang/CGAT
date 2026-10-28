@@ -497,7 +497,7 @@ test("main primary track label is selectable for track-level context menu action
 
   assert.match(
     html,
-    /class="assembly-track-label-row[^"]*is-track-selectable[^"]*"[^>]*data-track-label-role="primary"[^>]*data-track-label-selectable="1"[^>]*title="主数据集轨道（hifiasm）"[^>]*>\s*<span>主数据集轨道（hifiasm）<\/span>/,
+    /class="assembly-track-label-row[^"]*is-track-selectable[^"]*"[^>]*data-track-label-role="primary"[^>]*data-track-label-selectable="1"[^>]*title="主数据集轨道（hifiasm）"[^>]*>\s*<span>\[主\] hifiasm<\/span>/,
   );
 });
 

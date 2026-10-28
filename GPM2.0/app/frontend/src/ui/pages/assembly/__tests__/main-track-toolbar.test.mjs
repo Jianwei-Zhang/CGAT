@@ -39,10 +39,10 @@ for (const locale of ["zh", "en"]) test(`precomputed and phase actions lead peer
   assert.doesNotMatch(html, /data-main-track-control-layout|data-main-track-quick-actions|assembly-track-panel-quick-actions/);
 });
 
-test("CSS owns stable whole-group wrapping and the extreme-width scrollport, not a resize classifier", () => {
+test("CSS right-aligns whole parameter groups with safe extreme-width scrolling, without a resize classifier", () => {
   const css = readStylesheetTree(new URL("../../../../styles/assembly.css", import.meta.url));
   assert.match(css, /\.assembly-track-panel-head\[data-main-view-header\]\s*\{[^}]*flex-wrap: wrap;[^}]*align-items: center;[^}]*justify-content: flex-start;/);
-  assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\]\s*\{[^}]*justify-content: flex-start;[^}]*flex-wrap: wrap;[^}]*overflow-x: auto;/);
+  assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\]\s*\{[^}]*justify-content: flex-end;[^}]*justify-content: safe flex-end;[^}]*flex-wrap: wrap;[^}]*overflow-x: auto;/);
   assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\]\s*\{[^}]*flex: 1 1 max-content;[^}]*width: max-content;/);
   assert.match(css, /\[data-main-track-toolbar\] > \*\s*\{[^}]*flex: 0 0 auto;[^}]*white-space: nowrap;/);
   assert.doesNotMatch(css, /data-main-track-control-layout|assembly-track-panel-quick-actions/);
