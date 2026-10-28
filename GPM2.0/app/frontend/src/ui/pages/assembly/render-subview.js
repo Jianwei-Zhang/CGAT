@@ -868,8 +868,8 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
   return `
     <article class="subview-selection-panel" data-subview-panel="1">
       <div class="subview-panel-head">
-        <div class="subview-panel-title-row" data-grt-result-card="subview">
-          <h4 class="assembly-view-title">${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
+        <h4 class="assembly-view-title">${escapeHtml(i18n.subview.panelTitle)}${sameContigWarning ? ` <span class="subview-same-contig-warning">${escapeHtml(sameContigWarning)}</span>` : ""}</h4>
+        <div class="subview-panel-title-row assembly-track-inline-controls${alignmentCard ? " subview-track-inline-controls" : ""}" data-subview-toolbar data-grt-result-card="subview" role="group" aria-label="${escapeAttr(i18n.subview.trackControlsAria)}">
           ${renderSubviewToolsToggle(i18n.subview.tools, { escapeHtml, escapeAttr })}
           ${alignmentCard ? `<details class="subview-panel-help">
             <summary class="button ghost tiny" aria-label="${escapeAttr(i18n.subview.helpLabel)}" title="${escapeAttr(i18n.subview.guide)}">?</summary>
@@ -877,8 +877,8 @@ function renderSubviewSelectionPanel(assembly, supportContext, trackPrefs, i18n)
           </details>` : ""}
           ${allBadges ? `<div class="subview-candidate-row">${allBadges}</div>` : ""}
           ${!alignmentCard ? `<p class="muted subview-empty-guide" title="${escapeAttr(i18n.subview.guide)}">${escapeHtml(i18n.subview.guide)}</p>` : ""}
+          ${alignmentCard ? renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext, history) : ""}
         </div>
-        ${alignmentCard ? renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext, history) : ""}
       </div>
       ${grtResultToast}
       ${subview.error ? `<p class="error-text">${escapeHtml(subview.error)}</p>` : ""}
@@ -939,7 +939,6 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
     allowZero: true,
   });
   return `
-    <div class="assembly-track-inline-controls subview-track-inline-controls" role="group" aria-label="${escapeAttr(i18n.subview.trackControlsAria)}">
       ${grtResultControls}
       ${renderViewTickControl(trackPrefs, i18n, "subviewTrackView")}
       <label class="assembly-track-inline-field">
@@ -951,7 +950,6 @@ function renderSubviewTrackInlineControls(trackPrefs, i18n, grtResultContext = n
         ${identityInput}
       </label>
       ${renderSubviewHistoryControls(history, i18n)}
-    </div>
   `;
 }
 

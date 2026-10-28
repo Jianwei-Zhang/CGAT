@@ -272,25 +272,28 @@
   line-height: 1.45;
 }
 
-.assembly-track-panel-head[data-main-view-header] {
+.assembly-track-panel-head[data-main-view-header],
+.subview-panel-head {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  /* Keep the title on the first line; only the parameter region wraps. */
+  flex-wrap: nowrap;
+  align-items: flex-start;
   justify-content: flex-start;
   gap: 8px;
   min-width: 0;
 }
 
-.assembly-track-panel-head[data-main-view-header] > strong {
+:is(.assembly-track-panel-head[data-main-view-header], .subview-panel-head) > .assembly-view-title {
   flex: none;
   white-space: nowrap;
 }
 
 /* All parameter/action groups are peers. A whole field wraps as one unit.
    Only a field wider than the toolbar creates an internal horizontal scroll. */
-.assembly-track-inline-controls[data-main-track-toolbar] {
-  flex: 1 1 max-content;
-  width: max-content;
+.assembly-track-inline-controls[data-main-track-toolbar],
+.assembly-track-inline-controls[data-subview-toolbar] {
+  flex: 1 1 0;
+  width: auto;
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
@@ -301,7 +304,7 @@
   overflow-x: auto;
 }
 
-[data-main-track-toolbar] > * {
+:is([data-main-track-toolbar], [data-subview-toolbar]) > * {
   flex: 0 0 auto;
   box-sizing: border-box;
   height: 2.1429rem;

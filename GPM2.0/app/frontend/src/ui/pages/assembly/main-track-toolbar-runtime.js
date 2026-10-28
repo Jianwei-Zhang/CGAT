@@ -1,7 +1,8 @@
 import { placeAnchoredPanel, clearAnchoredPanelPlacement } from "./anchored-panel-placement.js";
 
 const BOUND = Symbol("mainTrackToolbarPopupsBound");
-const TOOLBAR = "[data-main-track-toolbar]";
+export const ALIGNMENT_TOOLBAR_SELECTOR = ":is([data-main-track-toolbar], [data-subview-toolbar])";
+const TOOLBAR = ALIGNMENT_TOOLBAR_SELECTOR;
 
 // Fixed popups escape the toolbar's extreme-width scrollport. Only popup
 // placement follows resize/scroll; wrapping and reading order remain CSS-owned.
@@ -25,6 +26,12 @@ export function bindMainTrackToolbarPopups(host) {
     for (const root of host.querySelectorAll(`${TOOLBAR} .assembly-marker-display`)) {
       const panel = root.querySelector(".assembly-marker-display-menu");
       if (panel && !panel.hidden) placeAnchoredPanel(root, panel);
+    }
+    for (const root of host.querySelectorAll(`${TOOLBAR} .subview-panel-help`)) {
+      const panel = root.querySelector(".subview-panel-guide");
+      if (root.open) placeAnchoredPanel(root.querySelector("summary") || root, panel,
+        { preferredWidth: 360, matchAnchorWidth: false });
+      else clearAnchoredPanelPlacement(panel);
     }
     for (const root of host.querySelectorAll(`${TOOLBAR} .grt-result-layer-menu`)) {
       const panel = root.querySelector(".grt-result-layer-options");

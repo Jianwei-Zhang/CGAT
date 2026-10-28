@@ -28,7 +28,7 @@ import {
   setGrtResultLayerEnabled,
 } from "./grt-result-state.js";
 import { assemblyPageSession } from "./page-session.js";
-import { bindMainTrackToolbarPopups } from "./main-track-toolbar-runtime.js";
+import { ALIGNMENT_TOOLBAR_SELECTOR, bindMainTrackToolbarPopups } from "./main-track-toolbar-runtime.js";
 import { placeAnchoredPanel, clearAnchoredPanelPlacement } from "./anchored-panel-placement.js";
 import { bindMarkerDisplayMenus } from "./marker-display-menu-runtime.js";
 import { updateSubviewCompositionViewport } from "./subview-history-state.js";
@@ -122,7 +122,7 @@ function setTrackComboOpenState(comboNode, isOpen) {
     if (isOpen) {
       syncTrackComboMenuPlacement(comboNode);
     } else {
-      if (comboNode.closest?.("[data-main-track-toolbar]")) clearAnchoredPanelPlacement(menu);
+      if (comboNode.closest?.(ALIGNMENT_TOOLBAR_SELECTOR)) clearAnchoredPanelPlacement(menu);
       menu.style.top = "";
       menu.style.bottom = "";
       menu.style.maxHeight = "";
@@ -139,7 +139,7 @@ function syncTrackComboMenuPlacement(comboNode) {
   if (!menu || typeof menu.getBoundingClientRect !== "function") {
     return;
   }
-  if (comboNode.closest?.("[data-main-track-toolbar]") && placeAnchoredPanel(comboNode, menu)) return;
+  if (comboNode.closest?.(ALIGNMENT_TOOLBAR_SELECTOR) && placeAnchoredPanel(comboNode, menu)) return;
   const viewportHeight =
     Number(globalThis.window?.innerHeight)
     || Number(globalThis.document?.documentElement?.clientHeight)

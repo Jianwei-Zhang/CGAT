@@ -8,10 +8,13 @@ const localMarkup = (state) => {
     html.indexOf('<article class="card final-path-card"'));
 };
 const ruleBody = (css, selector) => {
-  const start = css.indexOf(`${selector} {`);
+  const start = css.indexOf(`\n${selector} {`);
   assert.ok(start >= 0, `missing CSS rule: ${selector}`);
   return css.slice(css.indexOf("{", start) + 1, css.indexOf("}", start));
 };
+const sharedCss = readFileSync(new URL("../../../../styles/assembly.css", import.meta.url), "utf8");
+const headerSelector = ".assembly-track-panel-head[data-main-view-header],\n.subview-panel-head";
+const toolbarSelector = ".assembly-track-inline-controls[data-main-track-toolbar],\n.assembly-track-inline-controls[data-subview-toolbar]";
 const css = readFileSync(new URL("../../../../styles/subview.css", import.meta.url), "utf8");
 
 for (const mode of ["2-contig", "track-pair", "composition"]) {
@@ -35,6 +38,8 @@ for (const mode of ["2-contig", "track-pair", "composition"]) {
         assert.ok(toolbar.includes(`id="${field}"`));
         assert.ok(!scene.includes(`id="${field}"`));
       }
+      assert.match(toolbar, /class="subview-panel-head">\s*<h4 class="assembly-view-title">[^<]+<\/h4>\s*<div class="subview-panel-title-row assembly-track-inline-controls subview-track-inline-controls" data-subview-toolbar/);
+      assert.equal(toolbar.match(/data-subview-toolbar/g)?.length, 1);
       assert.match(toolbar, /data-subview-tools-toggle="1"/);
       assert.match(toolbar, /class="subview-candidate-row"/);
       assert.match(toolbar, /data-subview-action="history-rollback"/);
@@ -55,7 +60,7 @@ for (const mode of ["2-contig", "track-pair", "composition"]) {
 for (const locale of ["zh", "en"]) {
   test(`empty ${locale} view keeps guidance inside the unified toolbar without inactive controls`, () => {
     const html = localMarkup(createState({ locale }));
-    const titleRow = html.match(/<div class="subview-panel-title-row"[^>]*>[\s\S]*?<\/div>/)?.[0] || "";
+    const titleRow = html.match(/<div class="subview-panel-title-row[^"]*"[^>]*>[\s\S]*?<\/div>/)?.[0] || "";
     assert.match(titleRow, /<p class="muted subview-empty-guide" title="[^"]+">[^<]+<\/p>/);
     assert.match(html, /subview-empty-guide[^>]*>[^<]+<\/p>\s*<\/div>\s*<\/div>/);
     assert.doesNotMatch(html, /subview-panel-help|subview-panel-guide/);
@@ -80,17 +85,17 @@ for (const evidence of [
   });
 }
 
-test("toolbar shrinks names before moving the intact parameter group to another line", () => {
-  assert.match(ruleBody(css, ".subview-panel-head"), /flex-wrap:\s*wrap/);
-  assert.match(ruleBody(css, ".subview-panel-title-row"), /flex:\s*1 1 360px[\s\S]*flex-wrap:\s*nowrap/);
+test("both headers pin their titles to the first line while right-aligned parameter groups wrap inside remaining width", () => {
+  assert.match(ruleBody(sharedCss, headerSelector), /flex-wrap:\s*nowrap[\s\S]*align-items:\s*flex-start/);
+  assert.match(ruleBody(css, ".subview-panel-title-row > .subview-candidate-row"), /flex:\s*0 1 240px[\s\S]*min-width:\s*0/);
   assert.match(ruleBody(css, ".subview-candidate-row"), /min-width:\s*0[\s\S]*flex-wrap:\s*nowrap/);
   assert.match(ruleBody(css, ".subview-candidate-badge"), /flex:\s*0 1 auto[\s\S]*min-width:\s*0/);
   assert.match(ruleBody(css, ".subview-candidate-name"), /text-overflow:\s*ellipsis/);
   assert.match(ruleBody(css, ".subview-candidate-remove"), /flex:\s*0 0 26px/);
-  assert.match(ruleBody(css, ".subview-track-inline-controls"), /flex:\s*0 0 auto[\s\S]*flex-wrap:\s*nowrap/);
+  assert.match(ruleBody(sharedCss, toolbarSelector), /flex:\s*1 1 0[\s\S]*min-width:\s*0[\s\S]*justify-content:\s*safe flex-end[\s\S]*flex-wrap:\s*wrap[\s\S]*overflow-x:\s*auto/);
   assert.match(ruleBody(css, ".subview-track-inline-controls .assembly-track-inline-field"), /flex:\s*0 0 auto/);
-  assert.match(css, /@media \(max-width: 700px\)[\s\S]*flex-basis: 100%[\s\S]*flex-wrap: wrap/);
-  assert.match(css, /@media \(max-width: 520px\)[\s\S]*\.subview-candidate-row[\s\S]*flex-basis: 100%/);
+  assert.doesNotMatch(css, /@media \(max-width: 700px\)|\.subview-track-inline-controls\s*\{/);
+  assert.doesNotMatch(css, /@media \(max-width: 520px\)/);
   assert.doesNotMatch(css, /width: calc\(50% - 6px\)/);
 });
 
@@ -103,6 +108,7 @@ test("help disclosure floats over the view rather than consuming toolbar height"
 
 test("empty guidance shrinks inline without forcing another toolbar row", () => {
   const hint = ruleBody(css, ".subview-empty-guide");
+  assert.match(ruleBody(css, ".subview-panel-title-row > .subview-empty-guide"), /flex:\s*1 1 0/);
   assert.match(hint, /flex:\s*1 1 0/);
   assert.match(hint, /min-width:\s*0/);
   assert.match(hint, /white-space:\s*nowrap/);

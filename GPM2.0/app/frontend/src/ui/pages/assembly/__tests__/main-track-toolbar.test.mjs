@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { renderAssemblyPage, createState, readStylesheetTree } from "./tabs-semantics-harness.mjs";
 import { resolveAnchoredPanelRect, placeAnchoredPanel, clearAnchoredPanelPlacement } from "../anchored-panel-placement.js";
-import { bindMainTrackToolbarPopups } from "../main-track-toolbar-runtime.js";
+import { ALIGNMENT_TOOLBAR_SELECTOR, bindMainTrackToolbarPopups } from "../main-track-toolbar-runtime.js";
 
 // Parse the isolated header, not a mock of its intended hierarchy.
 function parseHeader(html) {
@@ -41,10 +41,11 @@ for (const locale of ["zh", "en"]) test(`precomputed and phase actions lead peer
 
 test("CSS right-aligns whole parameter groups with safe extreme-width scrolling, without a resize classifier", () => {
   const css = readStylesheetTree(new URL("../../../../styles/assembly.css", import.meta.url));
-  assert.match(css, /\.assembly-track-panel-head\[data-main-view-header\]\s*\{[^}]*flex-wrap: wrap;[^}]*align-items: center;[^}]*justify-content: flex-start;/);
-  assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\]\s*\{[^}]*justify-content: flex-end;[^}]*justify-content: safe flex-end;[^}]*flex-wrap: wrap;[^}]*overflow-x: auto;/);
-  assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\]\s*\{[^}]*flex: 1 1 max-content;[^}]*width: max-content;/);
-  assert.match(css, /\[data-main-track-toolbar\] > \*\s*\{[^}]*flex: 0 0 auto;[^}]*white-space: nowrap;/);
+  assert.match(css, /\.assembly-track-panel-head\[data-main-view-header\],\s*\.subview-panel-head\s*\{[^}]*flex-wrap: nowrap;[^}]*align-items: flex-start;[^}]*justify-content: flex-start;/);
+  assert.match(css, /:is\(\.assembly-track-panel-head\[data-main-view-header\], \.subview-panel-head\) > \.assembly-view-title\s*\{[^}]*flex: none;[^}]*white-space: nowrap;/);
+  assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\],\s*\.assembly-track-inline-controls\[data-subview-toolbar\]\s*\{[^}]*justify-content: flex-end;[^}]*justify-content: safe flex-end;[^}]*flex-wrap: wrap;[^}]*overflow-x: auto;/);
+  assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\],\s*\.assembly-track-inline-controls\[data-subview-toolbar\]\s*\{[^}]*flex: 1 1 0;[^}]*width: auto;[^}]*min-width: 0;/);
+  assert.match(css, /:is\(\[data-main-track-toolbar\], \[data-subview-toolbar\]\) > \*\s*\{[^}]*flex: 0 0 auto;[^}]*white-space: nowrap;/);
   assert.doesNotMatch(css, /data-main-track-control-layout|assembly-track-panel-quick-actions/);
   assert.equal(existsSync(new URL("../main-track-control-layout-runtime.js", import.meta.url)), false);
   const runtime = readFileSync(new URL("../main-track-toolbar-runtime.js", import.meta.url), "utf8");
@@ -110,4 +111,38 @@ test("upward popovers measure the reflowed narrow grid before choosing their top
   const result = placeAnchoredPanel(anchor, panel, { preferredWidth: 720, matchAnchorWidth: false });
   assert.equal(result.upward, true); assert.equal(result.width, 304);
   assert.equal(result.top, 36); assert.equal(result.top + 360, 396);
+});
+
+test("both parameter bars share fixed popup placement and local-only hosts can bind", () => {
+  assert.equal(ALIGNMENT_TOOLBAR_SELECTOR, ":is([data-main-track-toolbar], [data-subview-toolbar])");
+  const f = popupFixture();
+  f.host.querySelector = selector => {
+    assert.equal(selector, ALIGNMENT_TOOLBAR_SELECTOR);
+    return {}; // A Local View parameter bar, even without a Main View bar.
+  };
+  const queried = [];
+  const queryAll = f.host.querySelectorAll;
+  f.host.querySelectorAll = selector => { queried.push(selector); return queryAll(selector); };
+  bindMainTrackToolbarPopups(f.host);
+  f.setOpen(true);
+  f.events.get("scroll")();
+  assert.equal(f.panel.style.position, "fixed");
+  assert.ok(queried.every(selector => selector.startsWith(`${ALIGNMENT_TOOLBAR_SELECTOR} `)));
+  const bindings = readFileSync(new URL("../bindings.js", import.meta.url), "utf8");
+  assert.equal(bindings.match(/comboNode\.closest\?\.\(ALIGNMENT_TOOLBAR_SELECTOR\)/g)?.length, 2);
+});
+
+test("Local View help escapes the same scrollport and clears fixed placement when closed", () => {
+  const f = popupFixture();
+  let open = true;
+  const help = { get open() { return open; }, querySelector: selector => selector === "summary" ? f.anchor : f.panel };
+  f.host.querySelectorAll = selector => selector.endsWith(" .subview-panel-help") ? [help] : [];
+  bindMainTrackToolbarPopups(f.host);
+  f.events.get("toggle")();
+  assert.equal(f.panel.style.position, "fixed");
+  assert.equal(f.panel.style.width, "360px");
+  f.setLeft(30); f.events.get("scroll")();
+  assert.equal(f.panel.style.left, "30px");
+  open = false; f.events.get("toggle")();
+  assert.equal(f.panel.style.position, "");
 });

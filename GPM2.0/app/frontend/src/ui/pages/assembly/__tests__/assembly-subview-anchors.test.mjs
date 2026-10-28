@@ -64,7 +64,7 @@ test("subview track controls render independently from main track controls", () 
   assert.match(html, /data-subview-action="swap-track-order"/);
   assert.match(
     html,
-    /<div class="subview-panel-title-row"[^>]*>\s*<h4 class="assembly-view-title">局部视图<\/h4>\s*<button[^>]*data-subview-tools-toggle="1"[^>]*>[\s\S]*?<\/button>\s*<details class="subview-panel-help">[\s\S]*?<p class="subview-panel-guide">Ctrl\/Cmd 选择两个 Contig 或两个轨道进行比较；通过「工具」添加 Contig 进入组合模式。<\/p>\s*<\/details>\s*<div class="subview-candidate-row">/,
+    /<div class="subview-panel-head">\s*<h4 class="assembly-view-title">局部视图<\/h4>\s*<div class="subview-panel-title-row[^\"]*"[^>]*data-subview-toolbar[^>]*>\s*<button[^>]*data-subview-tools-toggle="1"[^>]*>[\s\S]*?<\/button>\s*<details class="subview-panel-help">[\s\S]*?<p class="subview-panel-guide">Ctrl\/Cmd 选择两个 Contig 或两个轨道进行比较；通过「工具」添加 Contig 进入组合模式。<\/p>\s*<\/details>\s*<div class="subview-candidate-row">/,
   );
   assert.doesNotMatch(html, /已选 \d\/2 个 Contig；右键选择“进入Subview-ctg”。/);
   assert.doesNotMatch(html, /已选 \d\/2 条数据集轨道。/);

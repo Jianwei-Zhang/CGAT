@@ -254,12 +254,11 @@ test("subview toolbar keeps title and candidates compact and wraps whole control
     "utf8",
   );
 
-  assert.match(css, /\.subview-panel-title-row\s*\{[^}]*justify-content:\s*flex-start;/);
-  assert.match(css, /\.subview-panel-head\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap;/);
+  assert.match(css, /\.subview-panel-head\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*nowrap;[^}]*align-items:\s*flex-start;/);
   assert.match(css, /\.subview-panel-guide\s*\{[^}]*position:\s*absolute;/);
   assert.match(css, /\.subview-candidate-row\s*\{[^}]*justify-content:\s*flex-start;[^}]*flex:\s*1 1 auto;[^}]*min-width:\s*0;/);
-  assert.match(css, /\.subview-track-inline-controls\s*\{[^}]*flex:\s*0 0 auto;[^}]*flex-wrap:\s*nowrap;/);
-  assert.match(css, /@media \(max-width:\s*700px\)[\s\S]*\.subview-track-inline-controls\s*\{[^}]*flex-basis:\s*100%;[^}]*flex-wrap:\s*wrap;/);
+  assert.match(css, /\.assembly-track-inline-controls\[data-subview-toolbar\]\s*\{[^}]*flex:\s*1 1 0;[^}]*justify-content:\s*safe flex-end;[^}]*flex-wrap:\s*wrap;[^}]*overflow-x:\s*auto;/);
+  assert.doesNotMatch(css, /@media \(max-width:\s*700px\)[\s\S]*\.subview-track-inline-controls\s*\{/);
   assert.match(css, /\.subview-candidate-badge\s*\{[^}]*height:\s*2\.1429rem;[^}]*overflow:\s*hidden;[^}]*border:\s*1px solid var\(--theme-line,\s*#b8c2cc\);[^}]*border-radius:\s*4px;/);
   assert.match(css, /\.subview-candidate-slot\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/);
   assert.match(css, /\.subview-candidate-remove\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/);

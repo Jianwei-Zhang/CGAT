@@ -37,32 +37,18 @@
   position: relative;
 }
 
-.subview-panel-head {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  min-width: 0;
-}
-
 .subview-panel-title-row {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex: 1 1 360px;
+}
+
+/* Candidate names may shrink, but remain one intact peer control group. */
+.subview-panel-title-row > .subview-candidate-row {
+  flex: 0 1 240px;
   min-width: 0;
-  gap: 8px 12px;
-  flex-wrap: nowrap;
 }
 
-.subview-panel-title-row > [data-subview-tools-toggle] {
-  flex: 0 0 auto;
-}
-
-.subview-panel-title-row h4 {
-  flex: 0 0 auto;
-  margin: 0;
+.subview-panel-title-row > .subview-empty-guide {
+  flex: 1 1 0;
 }
 
 .subview-panel-help {
@@ -865,14 +851,6 @@
   z-index: 3;
 }
 
-.subview-track-inline-controls {
-  justify-content: flex-end;
-  flex: 0 0 auto;
-  flex-wrap: nowrap;
-  max-width: 100%;
-  margin-inline-start: auto;
-}
-
 .subview-track-inline-controls .assembly-track-inline-field {
   flex: 0 0 auto;
   width: auto;
@@ -1051,27 +1029,6 @@
 
 .subview-band-tooltip.is-hidden {
   display: none;
-}
-
-/* Move the complete parameter group below the title when space is tight.
-   At phone widths only whole fields wrap, never a label away from its input. */
-@media (max-width: 700px) {
-  .subview-track-inline-controls {
-    flex-basis: 100%;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    margin-inline-start: 0;
-  }
-}
-
-@media (max-width: 520px) {
-  .subview-panel-title-row {
-    flex-wrap: wrap;
-  }
-
-  .subview-candidate-row {
-    flex-basis: 100%;
-  }
 }
 
 

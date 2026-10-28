@@ -239,8 +239,11 @@ test("schema 2 renders independent GRT result switches and exact main-track over
   const subviewToggleIndex = html.indexOf('data-grt-result-toggle="subview"');
   assert.ok(subviewToggleIndex >= 0);
   assert.doesNotMatch(html, /data-view-tick-control|data-view-tick-interval/);
-  const subviewTitleRow = html.match(/<div class="subview-panel-title-row"[^>]*>[\s\S]*?<\/div>/)?.[0] || "";
-  assert.doesNotMatch(subviewTitleRow, /data-grt-result-toggle=/);
+  const localHeader = html.slice(html.indexOf('<div class="subview-panel-head">'));
+  const subviewTitle = localHeader.match(/<h4 class="assembly-view-title">[\s\S]*?<\/h4>/)?.[0];
+  assert.ok(subviewTitle);
+  assert.doesNotMatch(subviewTitle, /data-grt-result-toggle=/);
+  assert.match(localHeader, /data-subview-toolbar/);
   assert.match(html, /data-grt-result-entry-key="support:202:0"/);
   assert.match(html, /data-grt-result-entry-key="top"/);
   assert.match(html, /data-grt-result-entry-key="bottom"/);
