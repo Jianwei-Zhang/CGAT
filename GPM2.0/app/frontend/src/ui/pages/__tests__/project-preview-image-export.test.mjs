@@ -1,3 +1,4 @@
+import { layoutProjectPreviewCard } from "../project-preview-layout.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createStore } from "../../../state/store.js";
@@ -186,4 +187,16 @@ test("PNG keeps one row per dataset, retaining source context without an unposit
   assert.doesNotMatch(before.svgMarkup, /NEVER_POSITIONED|未定位|Unpositioned/);
   card.tracks[1].unpositioned = [];
   assert.equal(buildProjectPreviewSvgSnapshot(f.state).height, before.height);
+});
+
+
+test("image export shares the on-screen Final Path mapping for adopted outlines", () => {
+  const { state } = fixture(1);
+  const geometry = layoutProjectPreviewCard(state.projectPreview.cards[0], 1440 - 176 - 28);
+  const patch = geometry.tracks.flat().flatMap(body => body.highlights)[0];
+  const snapshot = buildProjectPreviewSvgSnapshot(state);
+  const outlines = [...snapshot.svgMarkup.matchAll(/<rect x="([^"]+)" y="[^"]+" width="([^"]+)" height="14" fill="none"/g)];
+  assert.equal(outlines.length, 1);
+  assert.ok(Math.abs(Number(outlines[0][1]) - (176 + patch.x)) < 1e-7);
+  assert.ok(Math.abs(Number(outlines[0][2]) - patch.width) < 1e-7);
 });

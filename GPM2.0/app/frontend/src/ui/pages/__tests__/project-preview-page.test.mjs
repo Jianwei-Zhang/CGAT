@@ -59,8 +59,8 @@ test("hover and keyboard focus promote the whole preview card, not just its head
   const base = readFileSync(new URL("../../../styles/base.css", import.meta.url), "utf8");
   const theme = readFileSync(new URL("../../../styles/theme.css", import.meta.url), "utf8");
 
-  const stateRule = css.match(/\.project-preview-card:hover,\s*\n\.project-preview-card:focus-within\s*\{([^}]*)\}/)?.[1];
-  assert.ok(stateRule, "hover and focus-within must share one rule");
+  const stateRule = css.match(/\.project-preview-card:hover,\s*\n\.project-preview-card:has\(\.project-preview-card-header:focus-visible\)\s*\{([^}]*)\}/)?.[1];
+  assert.ok(stateRule, "hover and keyboard focus-visible must share one rule");
   assert.match(stateRule, /border-color:\s*var\(--preview-card-ring/);
   // The ring is inset and the glow stays narrower than the 16px card gap, so
   // the card never looks inflated and never covers a neighbour's border.
@@ -70,8 +70,8 @@ test("hover and keyboard focus promote the whole preview card, not just its head
   // The title row must carry the same inset ring as the card, otherwise the
   // header's opaque background hides it and the title frame reads thinner than
   // the lower frame. Frame, title divider and lower edges share one 2px weight.
-  const headerStateRule = css.match(/\.project-preview-card:hover \.project-preview-card-header,\s*\n\.project-preview-card:focus-within \.project-preview-card-header\s*\{([^}]*)\}/)?.[1];
-  assert.ok(headerStateRule, "header hover and focus-within must share one rule");
+  const headerStateRule = css.match(/\.project-preview-card:hover \.project-preview-card-header,\s*\n\.project-preview-card:has\(\.project-preview-card-header:focus-visible\) \.project-preview-card-header\s*\{([^}]*)\}/)?.[1];
+  assert.ok(headerStateRule, "header hover and keyboard focus-visible must share one rule");
   assert.match(headerStateRule, /border-bottom-color:\s*var\(--preview-card-ring/);
   assert.match(headerStateRule, /box-shadow:\s*inset 0 0 0 1px var\(--preview-card-ring[^;]*\);/);
   const headerBaseRule = css.match(/^\.project-preview-card-header\s*\{([^}]*)\}/m)?.[1];
@@ -87,7 +87,7 @@ test("hover and keyboard focus promote the whole preview card, not just its head
   assert.match(base, /--preview-card-glow:\s*rgba\(63, 111, 163, 0\.18\);/);
   assert.match(theme, /--preview-card-ring:\s*#8ab6e6;/);
   // Per-source outlines stay scoped to their own interval inside the card.
-  assert.match(css, /\.project-preview-card:hover \.project-preview-source-plots \.project-preview-used/);
+  assert.match(css, /\.project-preview-card:hover \.project-preview-used/);
 });
 
 test("loading preview preserves assembly state and in-memory path edits", async () => {
@@ -123,8 +123,10 @@ test("late preview requests cannot overwrite a different project or a newer requ
 test("source colors follow Assembly roles and adopted interval outlines are card-scoped hover feedback", () => {
   const css = readFileSync(new URL("../../../styles/project-preview.css", import.meta.url), "utf8");
   assert.match(css, /\.project-preview-used[^}]*background:\s*transparent/);
-  assert.match(css, /\.project-preview-card:hover\s+\.project-preview-source-plots\s+\.project-preview-used/);
-  assert.match(css, /border-color:\s*var\(--source-color\)/);
+  assert.match(css, /\.project-preview-card:hover\s+\.project-preview-used/);
+  assert.match(css, /\.project-preview-used\s*\{[^}]*opacity:\s*0/);
+  assert.match(css, /\.project-preview-card:hover \.project-preview-used,[^{]*\{\s*opacity:\s*1/);
+  assert.doesNotMatch(css, /:focus-within/);
   const value = state();
   const cards = buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }], referenceGenomeId: 1,
     datasets: [{ datasetId: 1, name: "dsA" }, { datasetId: 2, name: "dsB" }],

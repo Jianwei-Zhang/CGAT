@@ -2,7 +2,7 @@ import { previewSemanticSignature, previewMutationStamp } from "../../services/p
 import { normalizeFinalPathByChr } from "./assembly/final-path-state.js";
 import { previewProjectKey, previewSourceRange } from "./project-preview-state.js";
 
-export const PREVIEW_MODEL_VERSION = 7;
+export const PREVIEW_MODEL_VERSION = 8;
 const sessions = new WeakMap();
 const domEntries = new Map();
 const DOM = Symbol("previewDom");

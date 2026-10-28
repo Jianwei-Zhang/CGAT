@@ -1,3 +1,4 @@
+import { syncProjectPreviewSources } from "./project-preview-layout.js";
 import { exportProjectPreviewImage, previewImageActionRoot, syncPreviewImageDownloadButton } from "./project-preview-image-export.js";
 import { contigColorToken } from "./assembly/contig-colors.js";
 import { projectIcon } from "./project-icons.js";
@@ -19,6 +20,13 @@ import { buildProjectPreviewModel, previewProjectKey, requestPreviewChromosome }
 const requests = new WeakMap();
 const BOUND = Symbol("projectPreviewBound");
 const nodeModels = new WeakMap();
+function syncPreviewGeometry(host) {
+  syncFinalPathStripGeometry(host);
+  for (const node of host.querySelectorAll?.("[data-preview-chr]") || []) {
+    const card = nodeModels.get(node);
+    if (card) syncProjectPreviewSources(node, card);
+  }
+}
 const isPreviewRoute = state => ["projectExport", "projectPreview"].includes(state.activeRoute);
 const html = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;")
   .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -40,8 +48,8 @@ function renderHighlight(patch, length, labels) {
 }
 
 function renderContig(item, track, domain, labels) {
-  // Full source bodies use their own linear biological extent, not the
-  // path's minimum-pixel fragment widths. Adopted intervals are children.
+  // Initial markup retains complete source bodies. Once measured, source
+  // intervals follow the Final Path display through syncPreviewGeometry.
   const sourceStart = item.start;
   const sourceEnd = item.start + item.length;
   const visibleStart = domain ? Math.max(domain.start, sourceStart) : sourceStart;
@@ -53,7 +61,7 @@ function renderContig(item, track, domain, labels) {
   const width = domain ? visibleLength / (domain.end - domain.start) * 100 : 100;
   const title = `${item.name} · ${number(item.length)} bp${item.highlights.length
     ? ` · ${labels.used}: ${item.highlights.map(patch => partTitle(patch.part, labels)).join("; ")}` : ""}`;
-  return `<span class="project-preview-contig${item.highlights.length ? " is-adopted" : " is-context"}" data-preview-source-length="${item.length}" style="left:${percent(start)}%;width:${percent(width)}%;top:2px;background:${contigColorToken(track.role)};border-color:${contigColorToken(track.role, "stroke")};color:${contigColorToken(track.role, "text")}" title="${html(title)}">
+  return `<span class="project-preview-contig${item.highlights.length ? " is-adopted" : " is-context"}" data-preview-source-length="${item.length}" style="left:${percent(start)}%;width:${percent(width)}%;top:2px;background:${contigColorToken(track.role)};border-color:${contigColorToken(track.role, "stroke")};--preview-source-stroke:${contigColorToken(track.role, "stroke")};color:${contigColorToken(track.role, "text")}" title="${html(title)}">
     ${item.highlights.map(patch => renderHighlight({ ...patch, start: Math.max(0, patch.start - clipped), end: Math.min(visibleLength, patch.end - clipped) }, visibleLength, labels)).join("")}
     <span class="project-preview-contig-label" data-preview-source-fit-label="1">${html(item.name)}${(item.displayOrient || (item.reverse ? "-" : "+")) === "-" ? " (−)" : ""}</span>
   </span>`;
@@ -155,7 +163,7 @@ function updatePreviewDom(host, state, store) {
   const refresh = host.querySelector?.("[data-preview-refresh]");
   if (refresh) refresh.disabled = Boolean(preview?.loading);
   if (store) syncPreviewImageDownloadButton(host, store);
-  syncFinalPathStripGeometry(host);
+  syncPreviewGeometry(host);
   markPreviewDom(host, state);
 }
 
@@ -376,12 +384,12 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
     const Observer = win?.ResizeObserver;
     if (Observer) {
       binding.resize = new Observer(() => {
-        if (binding.active && isPreviewRoute(binding.store.getState())) syncFinalPathStripGeometry(host);
+        if (binding.active && isPreviewRoute(binding.store.getState())) syncPreviewGeometry(host);
       });
       binding.resize.observe(host);
     } else {
       binding.onResize = () => {
-        if (binding.active && isPreviewRoute(binding.store.getState())) syncFinalPathStripGeometry(host);
+        if (binding.active && isPreviewRoute(binding.store.getState())) syncPreviewGeometry(host);
       };
       win?.addEventListener?.("resize", binding.onResize);
     }
@@ -401,7 +409,7 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
       if (card && !nodeModels.has(node)) nodeModels.set(node, card);
     }
     markPreviewDom(host, store.getState());
-    syncFinalPathStripGeometry(host);
+    syncPreviewGeometry(host);
   }
   syncPreviewImageDownloadButton(host, store);
   void loadProjectPreviewData(host, store, binding.deps);

@@ -17,7 +17,7 @@
    than the 16px card gap, so neither the card bounds nor the neighbouring
    card borders ever move or get covered. */
 .project-preview-card:hover,
-.project-preview-card:focus-within {
+.project-preview-card:has(.project-preview-card-header:focus-visible) {
   border-color: var(--preview-card-ring, #3f6fa3);
   box-shadow: inset 0 0 0 1px var(--preview-card-ring, #3f6fa3), 0 2px 8px var(--preview-card-glow, rgba(63, 111, 163, 0.18));
 }
@@ -26,12 +26,12 @@
    inset ring on the header: frame, title divider and lower edges then share one
    2px weight (1px border + 1px inset ring) and line up exactly. */
 .project-preview-card:hover .project-preview-card-header,
-.project-preview-card:focus-within .project-preview-card-header {
+.project-preview-card:has(.project-preview-card-header:focus-visible) .project-preview-card-header {
   border-bottom-color: var(--preview-card-ring, #3f6fa3);
   box-shadow: inset 0 0 0 1px var(--preview-card-ring, #3f6fa3);
 }
 .project-preview-card:hover .project-preview-open,
-.project-preview-card:focus-within .project-preview-open {
+.project-preview-card:has(.project-preview-card-header:focus-visible) .project-preview-open {
   color: var(--preview-card-ring, #2b5784);
 }
 .project-preview-card-header { display: flex; align-items: baseline; gap: 12px; min-width: 0; margin: 0 -16px 10px; width: calc(100% + 32px); padding: 10px 16px; border: 0; border-bottom: 1px solid var(--border-subtle, #dbe3ec); border-radius: calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px) 0 0; background: var(--surface-subtle, #f8fafc); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color 140ms ease; }
@@ -49,13 +49,13 @@
 .project-preview-axis-values { display: flex; justify-content: space-between; min-width: 0; font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--theme-line, #edf0f3); padding-bottom: 2px; }
 .project-preview-plot { display: block; position: relative; min-width: 0; overflow: hidden; background: transparent; border-radius: 2px; }
 .project-preview-source-plots { display: grid; min-width: 0; gap: 3px; }
-.project-preview-contig { position: absolute; display: block; height: 16px; min-width: 2px; overflow: hidden; border: 1px solid var(--theme-line, #c9d0d6); border-radius: 2px; box-shadow: none; background-image: none; }
+.project-preview-contig { position: absolute; display: block; height: 16px; min-width: 2px; overflow: hidden; border: 0; border-radius: 2px; box-shadow: inset 0 0 0 1px var(--preview-source-stroke, #c9d0d6); background-image: none; }
 .project-preview-contig.is-context { z-index: 0; }
 .project-preview-contig.is-context .project-preview-contig-label { visibility: hidden; }
 .project-preview-contig-label { position: relative; z-index: 3; display: block; padding: 0 3px; overflow: hidden; text-overflow: clip; white-space: nowrap; line-height: 14px; color: inherit; font-size: var(--font-graph-small); }
-.project-preview-used { position: absolute; z-index: 2; display: block; top: 0; bottom: 0; min-width: 2px; border: 2px solid var(--source-color); background: transparent; opacity: 1; }
-.project-preview-card:hover .project-preview-source-plots .project-preview-used,
-.project-preview-card:has(.project-preview-card-header:focus-visible) .project-preview-source-plots .project-preview-used { border-color: var(--source-color); }
+.project-preview-used { position: absolute; z-index: 2; display: block; top: 0; bottom: 0; min-width: 0; border: 0; box-shadow: inset 0 0 0 2px var(--source-color); background: transparent; opacity: 0; }
+.project-preview-card:hover .project-preview-used,
+.project-preview-card:has(.project-preview-card-header:focus-visible) .project-preview-used { opacity: 1; }
 .project-preview-contig:has(.project-preview-used) .project-preview-contig-label { color: inherit; }
 /* Same Ref role colour as the Assembly track, plus a 1px role outline: the
    bare fill alone disappears against the dark plot canvas. */

@@ -3,7 +3,7 @@ import { writeFinalPathExportBinaryFile } from "../../services/workflow-api.js";
 import { projectIcon } from "./project-icons.js";
 import { getMessages } from "../i18n/index.js";
 import { getContigPalette } from "./assembly/contig-colors.js";
-import { layoutProjectPreviewPath } from "./assembly/final-path-visual-layout.js";
+import { layoutProjectPreviewCard } from "./project-preview-layout.js";
 import { resolveFinalPathSegmentDisplayName } from "./assembly/final-path-state.js";
 import { previewProjectKey } from "./project-preview-state.js";
 import { previewStateIsApplicable } from "./project-preview-cache.js";
@@ -51,52 +51,45 @@ export function buildProjectPreviewSvgSnapshot(state, { width = 1440, palette = 
     const content = [text(32, y + 23, card.chrName, 'font-size="16" font-weight="700"'),
       text(164, y + 23, summary, 'fill="#64748b"')];
     y += 42;
-    const span = card.domain.end - card.domain.start;
-    const x = position => left + (position - card.domain.start) / span * plotWidth;
+    const geometry = layoutProjectPreviewCard(card, plotWidth);
     content.push(label(y, labels.compositionAxis), text(left, y + 14, bp(card.domain.start)),
       text(right, y + 14, bp(card.domain.end), 'text-anchor="end"'),
       `<path d="M${left} ${y + 21}H${right}" stroke="#cbd5e1"/>`);
     y += 30;
-    const bar = (start, length, yy, role, name = "", height = 16, extra = "") => {
+    const bar = (layout, yy, role, name = "", height = 16, extra = "") => {
       const colors = palette[role] || palette.companion;
-      const sx = Math.max(left, x(start)), end = Math.min(right, x(start + length));
-      if (end <= sx) return;
-      const w = Math.min(right - sx, Math.max(2, end - sx));
+      const sx = left + layout.x, w = layout.width;
+      if (!(w > 0)) return;
       content.push(rect(sx, yy + 2, w, height, colors.fill, colors.stroke, extra));
       // Keep complete labels or omit them; no clipping into neighbouring bars.
       if (name && [...String(name)].length * 8 + 8 <= w) content.push(text(sx + 4, yy + 14, name, `fill="${colors.text}" font-size="12"`));
     };
-    const used = (start, end, yy, role) => {
-      const sx = Math.max(left, x(start)), ex = Math.min(right, x(end));
-      if (ex > sx) content.push(rect(sx, yy + 3, Math.min(right - sx, Math.max(2, ex - sx)), 14, "none", palette[role]?.stroke || palette.companion.stroke, 'stroke-width="2"'));
+    const used = (layout, yy, role, height = 14) => {
+      if (layout.width > 0) content.push(rect(left + layout.x, yy + 3, layout.width, height,
+        "none", palette[role]?.stroke || palette.companion.stroke, 'stroke-width="2"'));
     };
     if (card.hasReference) {
       content.push(label(y, "Ref"));
-      bar(card.reference.start, card.refLength, y + 4, "ref", "", 6);
-      for (const patch of card.refHighlights) {
-        const start = card.reference.reverse ? card.refLength - patch.end : patch.start;
-        const end = card.reference.reverse ? card.refLength - patch.start : patch.end;
-        const sx = x(card.reference.start + start), w = Math.max(2, (end - start) / span * plotWidth);
-        content.push(rect(sx, y + 5, Math.min(right - sx, w), 8, "none", palette[patch.part.role]?.stroke || palette.ref.stroke));
-      }
+      bar(geometry.reference, y + 4, "ref", "", 6);
+      geometry.reference.highlights.forEach(patch => used(patch, y + 2, patch.patch.part.role, 8));
       y += 26;
     }
-    for (const track of card.tracks) {
+    card.tracks.forEach((track, trackIndex) => {
       content.push(label(y, track.name || labels.unknown));
-      for (const item of track.positioned) {
-        const yy = y;
-        bar(item.start, item.length, yy, track.role, `${item.name}${(item.displayOrient || (item.reverse ? "-" : "+")) === "-" ? " (−)" : ""}`,
+      track.positioned.forEach((item, index) => {
+        const layout = geometry.tracks[trackIndex][index];
+        bar(layout, y, track.role, `${item.name}${(item.displayOrient || (item.reverse ? "-" : "+")) === "-" ? " (−)" : ""}`,
           16, `data-source-length="${item.length}"`);
-        item.highlights.forEach(patch => used(item.start + patch.start, item.start + patch.end, yy, track.role));
-      }
+        layout.highlights.forEach(patch => used(patch, y, track.role));
+      });
       if (!track.positioned.length) content.push(text(left, y + 14, "—"));
       y += 26;
-    }
+    });
     content.push(`<path d="M32 ${y}H${right}" stroke="#cbd5e1"/>`); y += 8;
     for (const path of card.paths) {
       content.push(label(y, path.name === card.chrName ? "Final Path" : `Final Path ${path.name}`));
       if (!path.parts.length) content.push(text(left, y + 14, labels.noPath));
-      const layouts = layoutProjectPreviewPath(path.parts, plotWidth, card.domain);
+      const layouts = geometry.paths.get(path.name);
       path.parts.forEach((part, index) => {
         const layout = layouts[index], sx = left + layout.x;
         const colors = part.gap ? { fill: "#ffffff", stroke: "#64748b", text: "#1e293b" } : palette[part.role];
