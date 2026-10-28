@@ -446,12 +446,10 @@ test("creating a phased track refreshes main and Final Path cards without a full
       },
     });
     const currentSections = new Map([
-      [".chr-strip.has-members-panel", makeNode()],
       [".assembly-track-unified", makeNode()],
       [".final-path-card", makeNode(".final-path-card")],
     ]);
     const nextSections = new Map([
-      [".chr-strip.has-members-panel", makeNode()],
       [".assembly-track-unified", makeNode()],
       [".final-path-card", makeNode(".final-path-card")],
     ]);
@@ -776,11 +774,9 @@ test("removing a phased track item refreshes only the main assembly card", async
       },
     });
     const currentSections = new Map([
-      [".chr-strip.has-members-panel", makeNode()],
       [".assembly-track-unified", makeNode()],
     ]);
     const nextSections = new Map([
-      [".chr-strip.has-members-panel", makeNode()],
       [".assembly-track-unified", makeNode()],
     ]);
     const fakeDocument = {

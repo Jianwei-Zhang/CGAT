@@ -2199,3 +2199,45 @@ for (const locale of ["zh", "en"]) test(`Overview has compact identity groups an
   assert.match(toolbar, /<dd title="p1">p1<\/dd>/);
   assert.match(toolbar, /<dd title="hifiasm">hifiasm<\/dd>/);
 });
+
+for (const locale of ["zh", "en"]) test(`Overview includes all configured auxiliary names in its single-line identity (${locale})`, () => {
+  const state = createState({ locale });
+  const name = 'Flye_Very_Long_Auxiliary_Name<&"';
+  state.initializer.datasets.push({ datasetId: 2, name }, { datasetId: 3, name: "RagTag_MiXeD" });
+  state.initializer.existingProjects[0].supportDatasetIds = [2, 3, 2, 1, -1, "invalid", 99];
+  const html = renderProjectExportPage(state);
+  const toolbar = html.slice(0, html.indexOf("data-overview-preview"));
+  const label = locale === "zh" ? "辅助数据集" : "Auxiliary datasets";
+  const names = "Flye_Very_Long_Auxiliary_Name&lt;&amp;&quot;, RagTag_MiXeD, ds-99";
+  assert.ok(toolbar.includes(`<dt>${label}</dt><dd title="${names}">${names.replaceAll("&quot;", '"')}</dd>`));
+  assert.equal((toolbar.match(/class="project-export-identity-item"/g) || []).length, 3);
+  assert.ok(toolbar.indexOf(locale === "zh" ? "<dt>项目" : "<dt>Project") < toolbar.indexOf(locale === "zh" ? "<dt>主数据集" : "<dt>Primary dataset"));
+  assert.ok(toolbar.indexOf(locale === "zh" ? "<dt>主数据集" : "<dt>Primary dataset") < toolbar.indexOf(`<dt>${label}`));
+});
+
+for (const locale of ["zh", "en"]) test(`Overview reports no configured auxiliary datasets honestly (${locale})`, () => {
+  const html = renderProjectExportPage(createState({ locale }));
+  const toolbar = html.slice(0, html.indexOf("data-overview-preview"));
+  assert.ok(toolbar.includes(locale === "zh" ? '<dt>辅助数据集</dt><dd title="未配置">未配置</dd>'
+    : '<dt>Auxiliary datasets</dt><dd title="Not configured">Not configured</dd>'));
+});
+
+test("Overview identity never wraps, ellipsizes names and preserves fixed right-side actions", () => {
+  const rule = selector => {
+    const start = componentsCss.indexOf(`\n${selector} {`);
+    assert.ok(start >= 0, `missing ${selector}`);
+    return componentsCss.slice(componentsCss.indexOf("{", start), componentsCss.indexOf("}", start));
+  };
+  assert.match(rule(".project-export-head"), /flex-wrap:\s*nowrap[\s\S]*min-width:\s*0/);
+  assert.match(rule(".project-export-identity"), /flex:\s*1 1 0[\s\S]*flex-wrap:\s*nowrap[\s\S]*overflow:\s*hidden/);
+  assert.match(rule(".project-export-identity dd"), /overflow:\s*hidden[\s\S]*text-overflow:\s*ellipsis[\s\S]*white-space:\s*nowrap/);
+  assert.match(rule(".project-export-head > .project-export-actions"), /flex:\s*0 0 auto[\s\S]*flex-wrap:\s*nowrap/);
+});
+
+test("Overview image download is borderless, Export-height and has enabled hover/active plus keyboard focus feedback", () => {
+  assert.match(componentsCss, /\.project-export-head :is\(\.project-preview-download, \.final-path-export-toggle\)\s*\{[^}]*height:\s*2\.1429rem;[^}]*min-height:\s*2\.1429rem;/);
+  assert.match(componentsCss, /\.project-export-head \.project-preview-download\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/);
+  assert.match(componentsCss, /\.project-export-head \.project-preview-download:hover:not\(:disabled\)\s*\{[^}]*background:[^}]*color:/);
+  assert.match(componentsCss, /\.project-export-head \.project-preview-download:active:not\(:disabled\)\s*\{/);
+  assert.match(componentsCss, /\.project-export-head \.project-preview-download:focus-visible\s*\{[^}]*outline:\s*2px solid/);
+});

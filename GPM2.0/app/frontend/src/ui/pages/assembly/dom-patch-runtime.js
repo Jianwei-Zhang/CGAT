@@ -1,3 +1,40 @@
+// Scope popovers now live inside the track header. A same-scope graph/member
+// patch retains scroll/focus by owner key: project for the chromosome picker,
+// project plus chromosome for members. Never carry state to another owner.
+function captureScopePopoverState(current, next) {
+  const restorers = [];
+  for (const kind of ["chromosomes", "members"]) {
+    const selector = `[data-assembly-popup="${kind}"]`;
+    const live = current.matches?.(selector) ? current : current.querySelector?.(selector);
+    const replacement = next.matches?.(selector) ? next : next.querySelector?.(selector);
+    const key = live?.getAttribute?.("data-assembly-scope-key");
+    if (!key || key !== replacement?.getAttribute?.("data-assembly-scope-key")) continue;
+    const scrolls = ["#assembly-chr-picker-panel", "#assembly-members-panel-popover", ".assembly-member-chip-region"]
+      .map(selector => ({ live: live.querySelector?.(selector), next: replacement.querySelector?.(selector) }))
+      .filter(pair => pair.live && pair.next)
+      .map(pair => ({ next: pair.next, top: Number(pair.live.scrollTop || 0), left: Number(pair.live.scrollLeft || 0) }));
+    const active = current.ownerDocument?.activeElement;
+    const identity = active && live.contains?.(active)
+      ? ["id", "data-chr-name", "data-assembly-ctg-id", "data-deleted-ctg-record-id",
+        "data-members-card-toggle", "data-reset-members-state", "data-restore-all-deleted-ctgs"]
+        .map(attribute => ({ attribute, value: active.getAttribute?.(attribute) }))
+        .find(item => item.value !== null && item.value !== undefined)
+      : null;
+    restorers.push(() => {
+      if (identity) {
+        const target = [...(replacement.querySelectorAll?.(`[${identity.attribute}]`) || [])]
+          .find(node => node.getAttribute(identity.attribute) === identity.value);
+        if (target && !target.disabled && !target.closest?.("[hidden]")) target.focus?.({ preventScroll: true });
+      }
+      for (const item of scrolls) {
+        item.next.scrollTop = item.top;
+        item.next.scrollLeft = item.left;
+      }
+    });
+  }
+  return () => restorers.forEach(restore => restore());
+}
+
 export function createAssemblyDomPatchController({
   bindBandCanvasRuntime,
   escapeHtml,
@@ -23,7 +60,9 @@ export function createAssemblyDomPatchController({
     if (!current || !next || typeof current.replaceWith !== "function") {
       return null;
     }
+    const restoreScopePopovers = captureScopePopoverState(current, next);
     current.replaceWith(next);
+    restoreScopePopovers();
     return next;
   }
 

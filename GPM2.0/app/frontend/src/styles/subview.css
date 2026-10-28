@@ -37,6 +37,12 @@
   position: relative;
 }
 
+.subview-panel-head > .assembly-view-title {
+  display: flex;
+  align-items: center;
+  min-height: 2.1429rem;
+}
+
 .subview-panel-title-row {
   position: relative;
 }
@@ -49,6 +55,7 @@
 
 .subview-panel-title-row > .subview-empty-guide {
   flex: 1 1 0;
+  line-height: 2.1429rem;
 }
 
 .subview-panel-help {

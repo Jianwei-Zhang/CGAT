@@ -249,3 +249,48 @@ test("hidden-state paint stays on the second member row and keeps immediate tool
   assert.match(attrs["data-member-tooltip"], /\n<hidden>$/);
   assert.match(inserted.join(""), /ctg-chip-hidden-tag/); assert.match(inserted.join(""), />\+2<\/span>/);
 });
+
+for (const mode of ["track", "members-only"]) {
+  for (const changed of [false, true]) {
+    test(`${mode} patch ${changed ? "discards old-owner" : "retains same-owner"} member popup scroll and focus`, () => {
+      let focusOptions = null;
+      const active = { getAttribute: name => name === "data-assembly-ctg-id" ? "11" : null };
+      const nextButton = { getAttribute: active.getAttribute, focus: options => { focusOptions = options; } };
+      const oldScroll = { scrollTop: 145, scrollLeft: 3 }, nextScroll = { scrollTop: 0, scrollLeft: 0 };
+      const oldPanel = { scrollTop: 75, scrollLeft: 0 }, nextPanel = { scrollTop: 0, scrollLeft: 0 };
+      const group = (key, scroll, panel) => ({
+        getAttribute: name => name === "data-assembly-scope-key" ? key : null,
+        querySelector: selector => selector === ".assembly-member-chip-region" ? scroll
+          : selector === "#assembly-members-panel-popover" ? panel : null,
+        querySelectorAll: () => [nextButton], contains: node => node === active,
+        matches: selector => selector === '[data-assembly-popup="members"]',
+      });
+      const liveGroup = group("project-1:chr-1", oldScroll, oldPanel);
+      const nextGroup = group(changed ? "project-2:chr-1" : "project-1:chr-1", nextScroll, nextPanel);
+      const section = value => mode === "members-only" ? value : {
+        querySelector: selector => selector === '[data-assembly-popup="members"]' ? value : null,
+      };
+      const current = section(liveGroup), next = section(nextGroup);
+      current.ownerDocument = { activeElement: active };
+      current.replaceWith = value => { assert.equal(value, next); };
+      const result = createController().replaceRenderedAssemblySection(
+        { querySelector: () => current }, { querySelector: () => next }, mode);
+      assert.equal(result, next);
+      assert.equal(nextScroll.scrollTop, changed ? 0 : 145);
+      assert.equal(nextScroll.scrollLeft, changed ? 0 : 3);
+      assert.equal(nextPanel.scrollTop, changed ? 0 : 75);
+      assert.deepEqual(focusOptions, changed ? null : { preventScroll: true });
+    });
+  }
+}
+
+test("chromosome selection retains the project-owned picker scroll while its selected option changes", () => {
+  const currentPanel = { scrollTop: 280, scrollLeft: 0 }, nextPanel = { scrollTop: 0, scrollLeft: 0 };
+  const group = panel => ({ getAttribute: () => "same-project",
+    querySelector: selector => selector === "#assembly-chr-picker-panel" ? panel : null });
+  const liveGroup = group(currentPanel), nextGroup = group(nextPanel);
+  const current = { replaceWith() {}, querySelector: selector => selector === '[data-assembly-popup="chromosomes"]' ? liveGroup : null };
+  const next = { querySelector: selector => selector === '[data-assembly-popup="chromosomes"]' ? nextGroup : null };
+  createController().replaceRenderedAssemblySection({ querySelector: () => current }, { querySelector: () => next }, "track");
+  assert.equal(nextPanel.scrollTop, 280);
+});

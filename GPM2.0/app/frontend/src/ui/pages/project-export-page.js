@@ -458,6 +458,8 @@ function getLabels(state) {
       noProject: "Select a project first.",
       project: "Project",
       primaryDataset: "Primary dataset",
+      auxiliaryDatasets: "Auxiliary datasets",
+      noAuxiliaryDatasets: "Not configured",
       reference: "Reference",
       loadFailed: "Failed to load overview data.",
       loading: "Loading overview data...",
@@ -518,6 +520,8 @@ function getLabels(state) {
     noProject: "请先选择项目。",
     project: "项目",
     primaryDataset: "主数据集",
+    auxiliaryDatasets: "辅助数据集",
+    noAuxiliaryDatasets: "未配置",
     reference: "参考",
     loadFailed: "概览数据加载失败。",
     loading: "正在加载概览数据...",
@@ -1769,6 +1773,10 @@ function renderProjectOverviewSummary(state) {
   const fresh = isProjectOverviewDataFresh(state);
   const model = fresh ? buildProjectExportDataModel(state) : null;
   const primaryDatasetName = model?.primaryDatasetName || getDatasetNameById(state.initializer?.datasets || [], currentProject.primaryDatasetId) || "-";
+  const auxiliaryIds = [...new Set((Array.isArray(currentProject.supportDatasetIds) ? currentProject.supportDatasetIds : [])
+    .map(normalizeDatasetId).filter(id => id !== null && id !== normalizeDatasetId(currentProject.primaryDatasetId)))];
+  const auxiliaryNames = auxiliaryIds.map(id => getDatasetNameById(state.initializer?.datasets || [], id) || `ds-${id}`)
+    .join(", ") || labels.noAuxiliaryDatasets;
   const summaryLine = model?.refChrNames.length
     ? `<div class="project-export-summary-line"><span>${escapeHtml(labels.reference)}: <strong>${escapeHtml(model.refChrNames.join(", "))}</strong></span></div>`
     : "";
@@ -1778,6 +1786,7 @@ function renderProjectOverviewSummary(state) {
         <dl class="project-export-identity">
           <div class="project-export-identity-item"><dt>${escapeHtml(labels.project)}</dt><dd title="${escapeAttr(state.session?.projectName || currentProject.projectName || "-")}">${escapeHtml(state.session?.projectName || currentProject.projectName || "-")}</dd></div>
           <div class="project-export-identity-item"><dt>${escapeHtml(labels.primaryDataset)}</dt><dd title="${escapeAttr(primaryDatasetName)}">${escapeHtml(primaryDatasetName)}</dd></div>
+          <div class="project-export-identity-item" title="${escapeAttr(`${labels.auxiliaryDatasets}: ${auxiliaryNames}`)}"><dt>${escapeHtml(labels.auxiliaryDatasets)}</dt><dd title="${escapeAttr(auxiliaryNames)}">${escapeHtml(auxiliaryNames)}</dd></div>
         </dl>
         <div class="project-export-actions">
           ${renderPreviewImageDownloadButton(state)}

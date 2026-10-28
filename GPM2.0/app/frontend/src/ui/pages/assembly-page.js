@@ -1648,7 +1648,7 @@ function rerenderAssemblyConfirmModal(host, store) {
 const refreshMainMembersForSubview = createMainMemberAnnotationRefresh({
   rerenderMembers: (host, store) => rerenderAssemblyMainTab(host, store, { membersOnly: true }),
 });
-function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false, trackOnly = false, membersOnly = false } = {}) {
+function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false, membersOnly = false } = {}) {
   cancelDeferredRerender();
   const routeHost = resolveCurrentRouteHost(host);
   if (!routeHost) {
@@ -1665,8 +1665,7 @@ function rerenderAssemblyMainTab(host, store, { preserveTrackGeometry = false, t
   const nextContent = template.content;
   const selectors = membersOnly ? [".assembly-members-panel"] : preserveTrackGeometry
     ? [".main-view-history-controls"]
-    : trackOnly ? [".assembly-track-unified"]
-    : [".chr-strip.has-members-panel", ".assembly-track-unified"];
+    : [".assembly-track-unified"];
   const replacedNodes = selectors.map((selector) =>
     replaceRenderedAssemblySection(routeHost, nextContent, selector),
   ).filter(Boolean);

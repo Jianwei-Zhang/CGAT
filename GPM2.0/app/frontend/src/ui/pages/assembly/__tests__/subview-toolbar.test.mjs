@@ -114,3 +114,10 @@ test("empty guidance shrinks inline without forcing another toolbar row", () => 
   assert.match(hint, /white-space:\s*nowrap/);
   assert.match(hint, /text-overflow:\s*ellipsis/);
 });
+
+test("Local View title, Tools and inline guide use the same first-row height and vertical center", () => {
+  const title = ruleBody(css, ".subview-panel-head > .assembly-view-title");
+  assert.match(title, /display:\s*flex[\s\S]*align-items:\s*center[\s\S]*min-height:\s*2\.1429rem/);
+  assert.match(ruleBody(css, ".subview-panel-title-row > .subview-empty-guide"), /line-height:\s*2\.1429rem/);
+  assert.match(ruleBody(sharedCss, ":is([data-main-track-toolbar], [data-subview-toolbar]) > *"), /height:\s*2\.1429rem/);
+});

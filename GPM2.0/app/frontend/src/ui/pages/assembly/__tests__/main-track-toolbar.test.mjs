@@ -8,18 +8,18 @@ import { ALIGNMENT_TOOLBAR_SELECTOR, bindMainTrackToolbarPopups } from "../main-
 // Parse the isolated header, not a mock of its intended hierarchy.
 function parseHeader(html) {
   const start = html.lastIndexOf("<div", html.indexOf("data-main-view-header"));
-  const text = html.slice(start, html.indexOf('<div class="assembly-track-layout"', start));
+  const text = html.slice(start);
   const root = { children: [] }, stack = [root];
   for (const tag of text.matchAll(/<\/?([\w-]+)\b([^>]*?)>/g)) {
-    if (tag[0].startsWith("</")) { stack.pop(); continue; }
+    if (tag[0].startsWith("</")) { stack.pop(); if (stack.length === 1) break; continue; }
     const attrs = Object.fromEntries([...tag[2].matchAll(/([\w-]+)(?:="([^"]*)")?/g)].map(m => [m[1], m[2] ?? ""]));
     const node = { name: tag[1], attrs, children: [] }; stack.at(-1).children.push(node);
-    if (!["input", "br", "hr", "img", "path", "line", "rect", "circle"].includes(node.name) && !tag[0].endsWith("/>")) stack.push(node);
+    if (!["input", "br", "hr", "img"].includes(node.name) && !tag[0].endsWith("/>")) stack.push(node);
   }
   return root.children[0];
 }
 
-for (const locale of ["zh", "en"]) test(`precomputed and phase actions lead peer groups after the title (${locale})`, () => {
+for (const locale of ["zh", "en"]) test(`chromosome replaces the title and members lead the shared toolbar before parameter actions (${locale})`, () => {
   const entry = { chrName: "Chr01", mode: "segments", segments: [], grtDisplayAvailable: true };
   const html = renderAssemblyPage({ ...createState({ initializer: {
     datasets: [{ datasetId: 11, name: "primary" }, { datasetId: 22, name: "A very long auxiliary dataset name" }],
@@ -27,15 +27,20 @@ for (const locale of ["zh", "en"]) test(`precomputed and phase actions lead peer
   }, assembly: { supportDatasetId: 22, finalPathByChr: { Chr01: entry },
     grtProjectView: { recipe: { finalPathSchemaVersion: "2" }, baselineFinalPathByChr: { Chr01: entry } } } }), locale });
   const header = parseHeader(html);
-  assert.equal(header.children[0].name, "strong");
+  assert.equal(header.children[0].name, "div");
+  assert.equal(header.children[0].attrs["data-assembly-popup"], "chromosomes");
+  assert.ok(Object.hasOwn(header.children[0].attrs, "data-main-track-control-title"));
   const toolbar = header.children[1];
   assert.equal(header.children.length, 2);
   assert.ok(Object.hasOwn(toolbar.attrs, "data-main-track-toolbar"));
-  assert.deepEqual(toolbar.children.map(node => node.attrs["data-grt-result-controls"] ? "precomputed"
+  assert.deepEqual(toolbar.children.map(node => node.attrs["data-assembly-popup"] === "members" ? "members" : node.attrs["data-grt-result-controls"] ? "precomputed"
     : node.attrs["data-create-phased-track"] ? "phase" : node.attrs.class), [
-    "precomputed", "phase", "assembly-marker-display", "assembly-track-inline-field", "assembly-track-inline-field",
+    "members", "precomputed", "phase", "assembly-marker-display", "assembly-track-inline-field", "assembly-track-inline-field",
     "assembly-track-inline-field", "assembly-track-inline-field", "main-view-history-controls",
   ]);
+  assert.doesNotMatch(html, /chr-strip|>Main View<|>主视图</);
+  assert.equal(html.match(/id="assembly-chr-picker-toggle"/g)?.length, 1);
+  assert.equal(html.match(/data-members-card-toggle="1"/g)?.length, 1);
   assert.doesNotMatch(html, /data-main-track-control-layout|data-main-track-quick-actions|assembly-track-panel-quick-actions/);
 });
 
@@ -46,6 +51,8 @@ test("CSS right-aligns whole parameter groups with safe extreme-width scrolling,
   assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\],\s*\.assembly-track-inline-controls\[data-subview-toolbar\]\s*\{[^}]*justify-content: flex-end;[^}]*justify-content: safe flex-end;[^}]*flex-wrap: wrap;[^}]*overflow-x: auto;/);
   assert.match(css, /\.assembly-track-inline-controls\[data-main-track-toolbar\],\s*\.assembly-track-inline-controls\[data-subview-toolbar\]\s*\{[^}]*flex: 1 1 0;[^}]*width: auto;[^}]*min-width: 0;/);
   assert.match(css, /:is\(\[data-main-track-toolbar\], \[data-subview-toolbar\]\) > \*\s*\{[^}]*flex: 0 0 auto;[^}]*white-space: nowrap;/);
+  assert.match(css, /\.assembly-main-scope-title\s*\{[^}]*flex: 0 1 auto;[^}]*min-width: 0;[^}]*max-width: min\(36ch, 50%\);/);
+  assert.match(css, /\.assembly-members-panel-inline\s*\{[^}]*margin-inline-end: auto;/);
   assert.doesNotMatch(css, /data-main-track-control-layout|assembly-track-panel-quick-actions/);
   assert.equal(existsSync(new URL("../main-track-control-layout-runtime.js", import.meta.url)), false);
   const runtime = readFileSync(new URL("../main-track-toolbar-runtime.js", import.meta.url), "utf8");
@@ -146,3 +153,26 @@ test("Local View help escapes the same scrollport and clears fixed placement whe
   open = false; f.events.get("toggle")();
   assert.equal(f.panel.style.position, "");
 });
+
+for (const locale of ["zh", "en"]) for (const mode of ["loaded", "loading", "empty", "unplaced"]) {
+  test(`scope controls occur once inside the main header for ${mode} (${locale})`, () => {
+    const chrName = mode === "unplaced" ? "unplaced" : "Chromosome_with_a_very_long_name.1";
+    const state = { ...createState({ assembly: { selectedChrName: chrName,
+      loading: mode === "loading", chromosomes: mode === "empty" ? [] : [{ chrName, chrLength: 10000, ctgCount: 0, placedBp: 0 }],
+    } }), locale };
+    const html = renderAssemblyPage(state), header = parseHeader(html);
+    assert.equal(header.children.length, 2);
+    assert.equal(header.children[0].attrs["data-assembly-popup"], "chromosomes");
+    assert.equal(header.children[1].children[0].attrs["data-assembly-popup"], "members");
+    assert.equal(html.match(/id="assembly-chr-picker-toggle"/g)?.length, 1);
+    assert.equal(html.match(/data-members-card-toggle="1"/g)?.length, 1);
+    assert.doesNotMatch(html, /chr-strip|>Main View<|>主视图</);
+    assert.ok(html.includes(`: ${chrName}"`)); // Full name survives visual ellipsis in the trigger tooltip.
+    if (mode === "loading") {
+      const members = header.children[1].children[0];
+      assert.ok(Object.hasOwn(members.children[0].children[0].attrs, "disabled"));
+      assert.doesNotMatch(html, /data-track-contig-id=/);
+    }
+    if (mode === "empty") assert.ok(Object.hasOwn(header.children[0].children[0].attrs, "disabled"));
+  });
+}

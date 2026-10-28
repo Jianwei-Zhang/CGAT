@@ -89,19 +89,6 @@
   white-space: nowrap;
 }
 
-.chr-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.chr-strip.has-members-panel {
-  align-items: center;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
 .chr-title {
   font-weight: 700;
   font-size: var(--font-heading);
@@ -286,6 +273,19 @@
 :is(.assembly-track-panel-head[data-main-view-header], .subview-panel-head) > .assembly-view-title {
   flex: none;
   white-space: nowrap;
+}
+
+.assembly-main-scope-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(36ch, 50%);
+}
+
+.assembly-main-scope-title > .chr-picker-trigger {
+  width: 100%;
+  height: 2.1429rem;
+  min-height: 2.1429rem;
+  padding: 0 8px;
 }
 
 /* All parameter/action groups are peers. A whole field wraps as one unit.
@@ -769,9 +769,9 @@
 }
 [data-popup-chevron] { flex: none; }
 
-.assembly-members-panel-inline { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.assembly-members-panel-inline { flex: 0 1 auto; min-width: 0; max-width: 100%; margin-inline-end: auto; }
 .assembly-members-panel-head { display: flex; align-items: center; justify-content: space-between; }
-.assembly-members-trigger { width: 100%; justify-content: space-between; text-align: left; }
+.assembly-members-trigger { width: 100%; height: 2.1429rem; min-height: 2.1429rem; padding: 0 8px; justify-content: space-between; text-align: left; }
 .assembly-members-popover { width: min(820px, calc(100vw - 16px)); max-height: min(440px, calc(100vh - 80px)); }
 .assembly-members-popover-tools { display: flex; align-items: center; justify-content: flex-start; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
 

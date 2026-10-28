@@ -596,22 +596,22 @@ function createRenderTracksRenderer(deps = {}) {
   }
 
 
-  function renderAssemblyScopeHeader(state, memberChips = "") {
+  function renderAssemblyScopeControls(state, memberChips = "") {
     const assembly = state.assembly, i18n = getAssemblyI18n(state);
     const chromosomes = Array.isArray(assembly.chromosomes) ? assembly.chromosomes : [];
     const chrOpen = assembly.chrPickerOpen === true;
     const membersOpen = assembly.membersCardCollapsed === false && !assembly.loading;
     const membersTitle = i18n.page.membersCardTitle;
+    const projectScopeKey = JSON.stringify([state.session?.workspacePath, state.session?.projectId]);
+    const memberScopeKey = JSON.stringify([state.session?.workspacePath, state.session?.projectId, assembly.selectedChrName]);
     const chromosomeOptions = chromosomes.map(chr => `<button type="button" class="chr-picker-option ${chr.chrName === assembly.selectedChrName ? "is-active" : ""}" data-chr-name="${escapeAttr(chr.chrName)}" aria-pressed="${chr.chrName === assembly.selectedChrName}" title="${escapeAttr(`${chr.chrName} · ${formatBp(chr.placedBp)}`)}">
       <strong>${escapeHtml(chr.chrName)}</strong><span>${chr.ctgCount} Contigs · ${(Number(chr.placedBp || 0) / 1e6).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Mb</span></button>`).join("");
-    return `<div class="chr-strip has-members-panel">
-      <div class="chr-title-wrap"><div class="chr-title-and-picker"><div class="chr-picker-inline" data-assembly-popup="chromosomes">
-        <button id="assembly-chr-picker-toggle" type="button" class="button ghost chr-title chr-picker-trigger" aria-controls="assembly-chr-picker-panel" aria-expanded="${chrOpen}" title="${escapeAttr(i18n.page.selectChromosomeTitle)}" ${chromosomes.length ? "" : "disabled"}>
-          <span class="chr-picker-current">${assembly.selectedChrName ? `${i18n.chrTitle} ${escapeHtml(assembly.selectedChrName)}` : escapeHtml(i18n.mainViewTitle)}</span><span data-popup-chevron aria-hidden="true">${chrOpen ? "▴" : "▾"}</span>
+    return { chromosome: `<div class="chr-picker-inline assembly-main-scope-title" data-main-track-control-title data-assembly-popup="chromosomes" data-assembly-scope-key="${escapeAttr(projectScopeKey)}">
+        <button id="assembly-chr-picker-toggle" type="button" class="button ghost chr-title chr-picker-trigger" aria-controls="assembly-chr-picker-panel" aria-expanded="${chrOpen}" title="${escapeAttr(assembly.selectedChrName ? `${i18n.page.selectChromosomeTitle}: ${assembly.selectedChrName}` : i18n.page.selectChromosomeTitle)}" ${chromosomes.length ? "" : "disabled"}>
+          <span class="chr-picker-current">${assembly.selectedChrName ? `${i18n.chrTitle} ${escapeHtml(assembly.selectedChrName)}` : escapeHtml(i18n.page.selectChromosomeTitle)}</span><span data-popup-chevron aria-hidden="true">${chrOpen ? "▴" : "▾"}</span>
         </button>
         <div id="assembly-chr-picker-panel" class="chr-picker-menu assembly-scope-popover" ${chrOpen ? "" : "hidden"}>${chromosomeOptions || `<div class="muted">${escapeHtml(i18n.page.noChromosomeData)}</div>`}</div>
-      </div></div></div>
-      <article class="assembly-members-panel assembly-members-panel-inline${membersOpen ? "" : " is-collapsed"}" data-assembly-popup="members">
+      </div>`, members: `<article class="assembly-members-panel assembly-members-panel-inline${membersOpen ? "" : " is-collapsed"}" data-assembly-popup="members" data-assembly-scope-key="${escapeAttr(memberScopeKey)}">
         <div class="assembly-members-panel-head"><button type="button" class="button ghost assembly-members-trigger" data-members-card-toggle="1" aria-controls="assembly-members-panel-popover" aria-expanded="${membersOpen}" ${assembly.loading ? "disabled" : ""}>
           <strong>${escapeHtml(membersTitle)}</strong><span data-popup-chevron aria-hidden="true">${membersOpen ? "▴" : "▾"}</span>
         </button></div>
@@ -619,8 +619,7 @@ function createRenderTracksRenderer(deps = {}) {
           <div class="assembly-members-popover-tools"><strong id="assembly-members-popover-title">${escapeHtml(membersTitle)}</strong><button type="button" class="button ghost tiny" data-reset-members-state="1" aria-label="${escapeAttr(i18n.page.resetMembersState)}" title="${escapeAttr(i18n.page.resetMembersState)}">↺ ${escapeHtml(i18n.page.resetMembersStateLabel)}</button></div>
           <div class="ctg-chip-grid assembly-member-chip-region">${memberChips}</div>
         </div>
-      </article>
-    </div>`;
+      </article>` };
   }
 
   function renderAssemblyMainTab(state, options = {}) {
@@ -628,12 +627,15 @@ function createRenderTracksRenderer(deps = {}) {
   const session = state.session || {};
   const i18n = getAssemblyI18n(state);
   if (assembly.loading) {
+    const scopeControls = renderAssemblyScopeControls(state);
     return `
-      ${renderAssemblyScopeHeader(state)}
       <section class="assembly-track-content-stack is-loading">
         <section class="card assembly-main-view">
           ${renderAssemblyStatusToast(assembly)}
-          <div class="assembly-track-unified assembly-track-panel assembly-track-loading-shell" aria-hidden="true"></div>
+          <div class="assembly-track-unified assembly-track-panel assembly-track-loading-shell">
+            ${renderAssemblyMainViewHeader({ scopeControls, i18n,
+              inlineControls: renderMainTrackToolbar(scopeControls.members, i18n) })}
+          </div>
         </section>
         ${renderAssemblyLoadingCurtain(assembly, i18n)}
       </section>
@@ -799,11 +801,11 @@ function createRenderTracksRenderer(deps = {}) {
     ? ""
     : renderAssemblyFinalPathCardImpl(state, deps);
   return `
-      ${renderAssemblyScopeHeader(state, combinedMemberChips)}
       <section class="assembly-track-content-stack">
         <section class="card assembly-main-view">
           ${renderAssemblyStatusToast(assembly)}
           ${renderAssemblyTracks({
+            scopeControls: renderAssemblyScopeControls(state, combinedMemberChips),
             model: trackModel,
             mainAnchorKeys: mainActiveAnchorKeys(assembly),
             hasPrimaryData: assembly.chrCtgs.length > 0,
@@ -1056,8 +1058,7 @@ function renderAssemblyTrackInlineControls({
     history: mainViewHistory,
     i18n,
   });
-  return `
-    <div class="assembly-track-inline-controls" data-main-track-inline-controls data-main-track-toolbar role="group" aria-label="${escapeAttr(i18n.page.primaryAlignmentViewControlsAria)}">
+  return renderMainTrackToolbar(`
       ${leadingControls}
       <div class="assembly-marker-display">
         <button type="button" class="button ghost tiny" data-marker-display-toggle aria-expanded="false" aria-controls="assembly-marker-display-menu">${escapeHtml(i18n.trackControls.markerDisplay)}</button>
@@ -1088,8 +1089,18 @@ function renderAssemblyTrackInlineControls({
         ${identityInput}
       </label>
       ${mainViewHistoryControls}
-    </div>
-  `;
+  `, i18n);
+}
+
+function renderMainTrackToolbar(content, i18n) {
+  return `<div class="assembly-track-inline-controls" data-main-track-inline-controls data-main-track-toolbar role="group" aria-label="${escapeAttr(i18n.page.primaryAlignmentViewControlsAria)}">${content}</div>`;
+}
+
+function renderAssemblyMainViewHeader({ scopeControls, inlineControls, i18n, sceneVisible = false }) {
+  return `<div class="assembly-track-panel-head" data-main-view-header data-grt-result-card="main" data-grt-result-scene-visible="${sceneVisible ? "1" : "0"}" role="group" aria-label="${escapeAttr(i18n.page.primaryAlignmentViewSingleCardTitle)}">
+    ${scopeControls.chromosome}
+    ${inlineControls}
+  </div>`;
 }
 
 function replaceMainHistoryTokens(template, values = {}) {
@@ -1273,6 +1284,7 @@ function renderTrackNumberInput({ field, id, label, openOptionLabel = "", value,
 
 function renderAssemblyTracks(args) {
   const {
+    scopeControls,
     model,
     hasPrimaryData,
     hasSupportTrack,
@@ -2348,7 +2360,7 @@ function renderAssemblyTracks(args) {
     selectedChrName,
     mainViewHistory,
     i18n,
-    leadingControls: `${grtResultControls}${createPhasedTrackButton}`,
+    leadingControls: `${scopeControls.members}${grtResultControls}${createPhasedTrackButton}`,
   });
   const grtResultToastMarkup = grtResultToast?.scope === "main"
     && grtResultToast?.chrName === selectedChrName
@@ -2364,10 +2376,8 @@ function renderAssemblyTracks(args) {
     : "";
   return `
     <div class="assembly-track-unified assembly-track-panel" data-show-telomeres="${trackPrefs.showTelomeres ? "true" : "false"}" data-show-centromeres="${trackPrefs.showCentromeres ? "true" : "false"}">
-      <div class="assembly-track-panel-head" data-main-view-header data-grt-result-card="main" data-grt-result-scene-visible="${grtResultScene.hasVisibleResult ? "1" : "0"}">
-        <strong class="assembly-view-title" data-main-track-control-title>${escapeHtml(i18n.page.primaryAlignmentViewSingleCardTitle)}</strong>
-        ${inlineControls}
-      </div>
+      ${renderAssemblyMainViewHeader({ scopeControls, inlineControls, i18n,
+        sceneVisible: grtResultScene.hasVisibleResult })}
       ${grtResultToastMarkup}
       <div class="assembly-track-layout">
         ${renderAlignmentIdentityLegend(i18n.trackControls, escapeAttr)}

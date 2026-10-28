@@ -10,24 +10,54 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .project-export-identity {
   display: flex;
   align-items: baseline;
-  flex-wrap: wrap;
+  flex: 1 1 0;
+  flex-wrap: nowrap;
   min-width: 0;
+  overflow: hidden;
   margin: 0;
   gap: 6px 24px;
   font-size: var(--font-body);
 }
 
-.project-export-identity-item { display: flex; align-items: baseline; min-width: 0; gap: 6px; }
-.project-export-identity dt { flex: 0 0 auto; color: var(--text-muted, #64748b); font-size: var(--font-small); }
-.project-export-identity dd { min-width: 0; margin: 0; color: var(--text-primary, #1e293b); font-weight: 600; overflow-wrap: anywhere; }
-.project-export-head > .project-export-actions { flex: 0 0 auto; max-width: 100%; margin-left: auto; align-items: center; }
-.project-export-head .project-preview-download { width: 32px; height: 32px; min-height: 32px; }
+.project-export-identity-item { display: flex; align-items: baseline; flex: 0 1 auto; min-width: 0; overflow: hidden; gap: 6px; white-space: nowrap; }
+.project-export-identity dt { flex: 0 0 auto; color: var(--text-muted, #64748b); font-size: var(--font-small); white-space: nowrap; }
+.project-export-identity dd { min-width: 0; margin: 0; color: var(--text-primary, #1e293b); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-export-head > .project-export-actions { flex: 0 0 auto; flex-wrap: nowrap; max-width: 100%; margin-left: auto; align-items: center; }
+.project-export-head :is(.project-preview-download, .final-path-export-toggle) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.1429rem;
+  min-height: 2.1429rem;
+  box-sizing: border-box;
+}
+.project-export-head .project-preview-download {
+  width: 2.1429rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-secondary, #334155);
+}
+.project-export-head .project-preview-download:hover:not(:disabled) {
+  background: var(--surface-muted, #eef2f6);
+  color: var(--theme-strong-line, #3f6fa3);
+}
+.project-export-head .project-preview-download:active:not(:disabled) {
+  background: var(--surface-subtle, #e2e8f0);
+  color: var(--text-primary, #1e293b);
+}
+.project-export-head .project-preview-download:focus-visible {
+  outline: 2px solid var(--focus-ring, #4f82b5);
+  outline-offset: 2px;
+}
 
 .project-export-actions,
 .project-export-toolbar {
