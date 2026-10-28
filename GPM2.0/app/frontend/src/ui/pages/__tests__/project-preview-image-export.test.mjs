@@ -5,7 +5,7 @@ import { previewMutationStamp } from "../../../services/preview-content-events.j
 import { buildProjectPreviewModel, previewProjectKey } from "../project-preview-state.js";
 import { PREVIEW_MODEL_VERSION, previewOverrideSignature } from "../project-preview-cache.js";
 import { buildProjectPreviewSvgSnapshot, exportProjectPreviewImage, previewImageExportIsRunning,
-  renderProjectPreviewPng } from "../project-preview-image-export.js";
+  renderProjectPreviewPng, syncPreviewImageDownloadButton } from "../project-preview-image-export.js";
 
 function fixture(count = 12) {
   const chromosomes = Array.from({ length: count }, (_, i) => ({ chrName: `chr${String(i + 1).padStart(2, "0")}`, chrLength: 10000 }));
@@ -33,7 +33,8 @@ function fixture(count = 12) {
 test("complete image includes all offscreen chromosome cards and complete source bodies, without UI actions", () => {
   const { state } = fixture(), before = JSON.stringify(state);
   const snapshot = buildProjectPreviewSvgSnapshot(state);
-  assert.match(snapshot.svgMarkup, /test&lt;project&gt;/);
+  assert.match(snapshot.svgMarkup, /<title>test&lt;project&gt;<\/title>/);
+  assert.doesNotMatch(snapshot.svgMarkup, /<text[^>]*>(?:预览|Preview)(?: ·|<)/);
   for (let i = 1; i <= 12; i++) assert.match(snapshot.svgMarkup, new RegExp(`>chr${String(i).padStart(2, "0")}<`));
   assert.equal((snapshot.svgMarkup.match(/data-source-length="9000"/g) || []).length, 12);
   assert.match(snapshot.svgMarkup, />pre</); assert.match(snapshot.svgMarkup, />assembly</);
@@ -161,4 +162,28 @@ test("default save and binary transports receive the real native command contrac
     assert.deepEqual(calls.map(call => call.command), ["pick_save_file_path", "write_final_path_export_binary_file"]);
     assert.equal(calls[0].args.defaultPath, "test_project__preview.png");
   } finally { globalThis.window = previous; }
+});
+
+
+test("the Overview toolbar action outside Preview follows loading and export lock state", async () => {
+  const f = fixture(1), previewHost = { closest: selector => selector === "[data-overview-project]" ? f.host : null };
+  f.button.disabled = true;
+  syncPreviewImageDownloadButton(previewHost, f.store); assert.equal(f.button.disabled, false);
+  f.store.setState({ projectPreview: { ...f.store.getState().projectPreview, loading: true } });
+  syncPreviewImageDownloadButton(previewHost, f.store); assert.equal(f.button.disabled, true);
+  f.store.setState({ projectPreview: { ...f.store.getState().projectPreview, loading: false } });
+  let release;
+  const pending = exportProjectPreviewImage(f.host, f.store, { pickSaveFilePath: () => new Promise(resolve => { release = resolve; }) });
+  syncPreviewImageDownloadButton(previewHost, f.store); assert.equal(f.button.disabled, true);
+  release(""); await pending;
+  syncPreviewImageDownloadButton(previewHost, f.store); assert.equal(f.button.disabled, false);
+});
+
+test("PNG keeps one row per dataset, retaining source context without an unpositioned text list", () => {
+  const f = fixture(1), card = f.state.projectPreview.cards[0];
+  card.tracks[1].unpositioned.push({ name: "NEVER_POSITIONED", length: 500, start: null, reverse: false, highlights: [] });
+  const before = buildProjectPreviewSvgSnapshot(f.state);
+  assert.doesNotMatch(before.svgMarkup, /NEVER_POSITIONED|未定位|Unpositioned/);
+  card.tracks[1].unpositioned = [];
+  assert.equal(buildProjectPreviewSvgSnapshot(f.state).height, before.height);
 });

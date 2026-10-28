@@ -46,7 +46,7 @@ Complete target behavior for the confirmed GPM application interaction and infor
 
 - The project-library validation button visibly reads 校验项目 in Chinese while preserving its existing validation scope, disabled/progress states and behavior.
 
-- Project page retains the existing project list and project selection duties; its right side first shows the existing selected-project information table and operations without a visible 项目信息/Project Information subtitle.
+- Project page retains the existing project list and project selection duties; its right side first shows the existing selected-project information table and operations without a visible 项目信息/Project Information subtitle. Creation time appears once on the right of the workspace-path row above the table, not below the table.
 - The right side second shows the compact Final Path strip migrated from the former export page without a visible 路径概览/Path Overview subtitle, preserving applicable geometry, role colors, gaps and existing navigation behavior.
 - Both sections describe the same selected project; rendering cannot silently activate another project or mutate a path, and rapid project switching cannot publish obsolete results.
 - Missing path data produces an honest empty state, never stale strips from the previous project; table and strip controls remain correctly scoped after refresh.
@@ -54,19 +54,19 @@ Complete target behavior for the confirmed GPM application interaction and infor
 ## Overview composition and navigation
 
 - Top navigation is 项目/装配/概览, preserving existing English project/assembly labels and replacing Project Export with Overview; independent Preview entry is removed and prior application Preview jumps resolve to the new destination.
-- 概览/Overview retains project identification, statistics and an explicit 导出/Export operation; exporter formats, data, range, job progress and error states remain intact.
-- The lower 预览/Preview area embeds the full Preview module instead of the compact strip, preserving legend, chromosome cards, applicable jumps and loading/error/retry/empty states; an image-download button replaces the manual refresh button.
-- Preview automatic asynchronous/model/DOM refresh is contained to its component and cannot erase statistics/export UI or mix projects; applicable memory/disk cache validity, load-error retry and obsolete-request rejection contracts remain preserved without a header manual-refresh operation.
+- The Overview navigation entry remains, but the page has no visible 概览/Overview heading. Project and primary-dataset identity use two compact label/value groups with muted labels, moderately emphasized names and narrow-width wrapping. The image-download action sits immediately left of 导出/Export; statistics and existing exporter formats, data, range, job progress and errors remain intact.
+- The lower area embeds the complete chromosome preview cards without its own 预览/Preview heading, Final Path subtitle, info/legend control or duplicate download/refresh toolbar. Chromosome navigation and loading/error/retry/empty states remain; its sole image-download action is in the Overview toolbar immediately before Export.
+- Preview automatic asynchronous/model/DOM refresh remains component-owned and cannot erase statistics/export UI or mix projects. Its external Overview download action synchronizes loading, applicability and export-lock states across summary replacement and preview updates; memory/disk validity, error retry and obsolete-request rejection remain without a manual header refresh.
 - Navigation and project switching preserve authoritative edits and export tasks and do not alter biological coordinates/results; repeated visits keep handler/observer ownership bounded and valid preview state reusable.
 
 ## Complete Preview sources and image download
 
-- Preview source tracks for both primary and auxiliary datasets show complete source Contigs associated with the chromosome, including unused portions and reliably positioned unused Contigs, rather than cropping adopted Contigs to Final Path fragments; missing placements are explicitly unpositioned rather than fabricated.
-- Used source intervals remain separately identifiable with exact source identity, orientation and interval mapping. Repeated/reversed uses, split fragments and overlapping Contigs retain truthful context without duplicate whole-Contig bars for each adopted use, whole-source inflation from short-fragment minimum widths, or changes to saved source/path data.
+- Preview source tracks for primary and auxiliary datasets show complete chromosome-associated source Contigs, including unused portions and reliably placed unused Contigs, rather than cropping adopted Contigs to Final Path fragments. Each dataset uses one compact source row, with large backgrounds painted before smaller overlapping sources; no extra overlap lane or visible 未定位/Unpositioned list is added. Unlocated provenance stays unpositioned in semantic metadata and Final Path descriptors, never assigned a fabricated anchor.
+- Used source intervals remain separately identifiable with exact source identity, orientation and mapping. Repeated/reversed uses, split fragments and overlaps retain all truthful source bodies on a single compact strip per dataset, without whole-body duplication per use, extra rows, inflation through short-fragment minimum widths or saved source/path mutations.
 - The Preview heading download action saves one PNG containing every chromosome preview card, including offscreen cards, with chromosome headings/lengths, Ref, dataset source tracks and Final Path; it excludes upper statistics/project details and interactive action buttons, and is not a screenshot of only the viewport.
 - Preview image export preserves the current project and complete rendered data, does not navigate or mutate selection/data, has honest loading/empty/error/disabled and cancellation/failure behavior, and coexists with automatic preview invalidation and load-error retry without the removed header refresh action.
 
-- The heading is 预览/Preview. A labeled image-download icon replaces the header refresh icon; automatic updates and load-error retry remain, and the upper Overview export action keeps its existing scope.
+- Embedded Preview has no heading/subtitle/info toolbar. Its labeled image-download icon lives immediately left of Overview Export, remains independently synchronized and exports the same compact single-row dataset presentation. Automatic updates and load-error retry remain; original Overview export scope is unchanged.
 
 ## Compact equal-height member popover
 

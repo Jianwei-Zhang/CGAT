@@ -520,7 +520,8 @@
 .project-title-row { display: flex; align-items: start; gap: 8px; min-width: 0; font-size: var(--font-hero); font-weight: 600; line-height: 1.35; }
 .project-title-row h2 { min-width: 0; margin: 0; font: inherit; overflow-wrap: anywhere; }
 .project-title-row .project-icon-button { margin-top: 1px; }
-.project-detail-path { margin-top: 8px; color: var(--text-muted, #64748b); font-size: var(--font-body); overflow-wrap: anywhere; }
+.project-location-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; min-width: 0; margin-top: 8px; }
+.project-detail-path { flex: 1 1 240px; min-width: 0; margin: 0; color: var(--text-muted, #64748b); font-size: var(--font-body); overflow-wrap: anywhere; }
 .projects-page .button.project-enter-assembly {
   min-width: 156px;
   min-height: 44px;
@@ -639,7 +640,7 @@
 .project-dataset-editor textarea { resize: vertical; min-height: 76px; }
 .project-dataset-editor-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .project-dataset-editor-actions { flex-shrink: 0; padding-top: 14px; border-top: 1px solid var(--border-subtle, #dbe3ec); background: var(--surface-panel, #fff); }
-.project-catalog-created { margin: 10px 0 0; color: var(--text-muted, #64748b); font-size: var(--font-small); font-weight: 400; text-align: right; }
+.project-detail-created { flex: 0 1 auto; max-width: 100%; margin: 0 0 0 auto; color: var(--text-muted, #64748b); font-size: var(--font-small); font-weight: 400; text-align: right; overflow-wrap: anywhere; }
 .project-dataset-editor .button { font-size: var(--font-body); }
 
 @media (max-width: 1200px) {

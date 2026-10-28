@@ -76,17 +76,6 @@ function localInterval(item, source) {
     coveredEnd: source.original ? coveredEnd : high };
 }
 
-function assignLanes(items) {
-  const ends = [];
-  for (const item of items.sort((a, b) => a.start - b.start || a.length - b.length)) {
-    let lane = ends.findIndex(end => end <= item.start);
-    if (lane < 0) lane = ends.length;
-    ends[lane] = item.start + item.length;
-    item.lane = lane;
-  }
-  return Math.max(1, ends.length);
-}
-
 // Final Path has its own origin. Anchor the reference to the longest adopted
 // interval with known reference placement, not to Final Path coordinate zero.
 // One intact reference cannot follow every rearrangement/reuse independently.
@@ -298,9 +287,13 @@ export function buildProjectPreviewModel({ chromosomes = [], referenceGenomeId =
         aliases.add(aliasKey);
         return [item];
       });
-      const positioned = items.filter(item => item.start !== null);
-      const laneCount = assignLanes(positioned);
-      return { ...track, items, positioned, unpositioned: items.filter(item => item.start === null), laneCount };
+      // The overview is one compact composition strip per dataset, not an
+      // alignment browser. Keep overlaps on that strip instead of adding lanes;
+      // paint large backgrounds first so smaller source boundaries stay visible.
+      const positioned = items.filter(item => item.start !== null)
+        .sort((a, b) => b.length - a.length || a.start - b.start);
+      positioned.forEach(item => { item.lane = 0; });
+      return { ...track, items, positioned, unpositioned: items.filter(item => item.start === null), laneCount: 1 };
     });
     const extents = rows.flatMap(row => row.positioned);
     const start = extents.reduce((min, item) => Math.min(min, item.start), Math.min(0, hasReference ? reference.start : 0));

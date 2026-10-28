@@ -26,7 +26,7 @@ function deps() {
   };
 }
 
-test("preview uses a download icon, identifies unpositioned sources and keeps gaps without text", () => {
+test("standalone preview uses a download icon, hides unpositioned lists and keeps gaps without text", () => {
   const value = state();
   const cards = buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr1", chrLength: 2000 }], referenceGenomeId: 1,
     ctgs: [{ assemblyCtgId: 2, datasetName: "dsA", name: "unknown", totalLength: 100,
@@ -38,7 +38,7 @@ test("preview uses a download icon, identifies unpositioned sources and keeps ga
   assert.doesNotMatch(output, /<button[^>]*class="project-preview-card"/);
   assert.match(output, /project-preview-download[^>]*aria-label="下载预览图"[^>]*>[\s\S]*?<svg/);
   assert.doesNotMatch(output, /data-preview-refresh/);
-  assert.match(output, /project-preview-unpositioned[\s\S]*未定位/);
+  assert.doesNotMatch(output, /project-preview-unpositioned|未定位/);
   assert.doesNotMatch(output, /data-final-path-gap-label|project-preview-gap-label|>Gap<\/span>/);
   assert.match(output, /data-final-path-kind="gap"[^>]*background:var\(--gap-marker-fill, #ffffff\)/);
   assert.match(output, /title="Gap: 1 bp/);
@@ -146,17 +146,18 @@ test("source colors follow Assembly roles and adopted interval outlines are card
   assert.match(output, /--source-color:/);
 });
 
-test("preview and project-export heading typography matches the Assembly chromosome heading", () => {
+test("standalone preview retains heading typography while Overview metadata stays compact", () => {
   const preview = readFileSync(new URL("../../../styles/project-preview.css", import.meta.url), "utf8");
   const exported = readFileSync(new URL("../../../styles/project-export.css", import.meta.url), "utf8");
   const assembly = readFileSync(new URL("../../../styles/assembly.css", import.meta.url), "utf8");
   for (const rule of [preview.match(/\.project-preview-heading h3\s*\{([^}]*)\}/)?.[1],
-    exported.match(/\.project-export-head h2\s*\{([^}]*)\}/)?.[1],
     assembly.match(/\.chr-title\s*\{([^}]*)\}/)?.[1]]) {
     assert.ok(rule);
     assert.match(rule, /font-size:\s*var\(--font-heading\)/);
     assert.match(rule, /font-weight:\s*700/);
   }
+  assert.match(exported, /\.project-export-identity\s*\{[^}]*font-size: var\(--font-body\)/);
+  assert.match(exported, /\.project-export-identity dt\s*\{[^}]*font-size: var\(--font-small\)/);
 });
 
 
@@ -214,14 +215,14 @@ test("preview shows the full donor with a separate small adopted interval withou
   assert.match(source, /title="donor · 31,678,158 bp · 采用区间: dsA \/ donor: 17,930,989–17,953,329 \(\+\)"/);
 });
 
-test("embedded Preview loads in Overview, keeps its heading level, and cannot overwrite the surrounding statistics/export owners", async () => {
+test("embedded Preview contains cards only and cannot overwrite the surrounding statistics/export owners", async () => {
   const value = state(); value.activeRoute = "projectExport";
   const store = createStore(value), node = host(), summary = { sentinel: "stats and export task" };
   node.hasAttribute = name => name === "data-overview-preview";
   node.parentElement = { summary, set innerHTML(_value) { assert.fail("Preview must never replace its Overview parent"); } };
   assert.equal(await loadProjectPreviewData(node, store, { ...deps(), getProjectPreviewCache: async () => ({ available: false }), putProjectPreviewCache: async () => ({ stored: false }) }), true);
   assert.equal(node.parentElement.summary, summary);
-  assert.match(node.innerHTML, /<h3>预览<\/h3>/); assert.match(node.innerHTML, /project-preview-card/);
+  assert.doesNotMatch(node.innerHTML, /project-preview-heading|project-preview-subtitle|project-preview-legend|data-preview-download/); assert.match(node.innerHTML, /project-preview-card/);
   assert.equal(store.getState().projectPreview.loaded, true);
 });
 
@@ -259,7 +260,7 @@ test("mounted Overview Preview refreshes after committed content changes, not on
   finishPreviewContentOperation(operation, "create_phased_chr_track", {}, true);
   store.setState({ assembly: { ...store.getState().assembly, actionStatus: "phase committed" } });
   assert.equal(await loadProjectPreviewData(node, store, options), true);
-  assert.equal(metadataReads, 2); assert.match(node.innerHTML, /<h3>预览<\/h3>/);
+  assert.equal(metadataReads, 2); assert.doesNotMatch(node.innerHTML, /project-preview-heading|project-preview-subtitle|project-preview-legend|data-preview-download/);
   unbindProjectPreviewPage(node); assert.equal(subscriptions, 0);
   const next = beginPreviewContentOperation("delete_phased_chr_track", args);
   finishPreviewContentOperation(next, "delete_phased_chr_track", {}, true);
@@ -280,4 +281,21 @@ test("Preview download click delegates to whole-image export without navigating 
   assert.equal(writes.length, 1); assert.equal(writes[0].outputPath, "D:/preview.png");
   assert.equal(store.getState().activeRoute, "projectPreview");
   unbindProjectPreviewPage(node);
+});
+
+
+test("overlapping sources stay on the same 20px strip and no unpositioned text adds another row", () => {
+  const value = state();
+  value.projectPreview = { loaded: true, key: previewProjectKey(value), cards: buildProjectPreviewModel({
+    chromosomes: [{ chrName: "Chr1", chrLength: 10000 }], referenceGenomeId: 1,
+    ctgs: [{ assemblyCtgId: 1, name: "long", datasetName: "assembly", totalLength: 9000, assignedChrName: "Chr1", anchorStart: 0 },
+      { assemblyCtgId: 2, name: "short", datasetName: "assembly", totalLength: 100, assignedChrName: "Chr1", anchorStart: 50 },
+      { assemblyCtgId: 3, name: "contig_84@chr03", datasetName: "assembly", totalLength: 1000, assignedChrName: "Chr1", anchorStart: null }],
+    finalPathByChr: { Chr1: { segments: [] } } }) };
+  const output = renderProjectPreviewPage(value, { embedded: true });
+  assert.equal((output.match(/class="project-preview-source-plots"/g) || []).length, 1);
+  assert.match(output, /project-preview-source-plots[\s\S]*style="height:20px"/);
+  assert.ok(output.indexOf('data-preview-source-length="9000"') < output.indexOf('data-preview-source-length="100"'));
+  assert.doesNotMatch(output, /top:22px|height:40px|未定位|Unpositioned|contig_84@chr03/);
+  assert.equal(value.projectPreview.cards[0].tracks[0].unpositioned[0].name, "contig_84@chr03", "provenance remains in the model");
 });

@@ -146,7 +146,10 @@ export function renderWorkspacePage(state) {
         </div>`}
         ${selectedProject ? renderProjectHeaderMetadata(initializer, state) : ""}
         </div>
-        <p class="project-path project-detail-path" title="${escapeAttr(state.session.workspacePath)}">${escapeHtml(state.session.workspacePath)}</p>
+        <div class="project-location-row">
+          <p class="project-path project-detail-path" title="${escapeAttr(state.session.workspacePath)}">${escapeHtml(state.session.workspacePath)}</p>
+          ${selectedProject ? `<p class="project-detail-created">${labels.created}${state.locale === "en" ? ": " : "："}${escapeHtml(formatCreatedAt(selectedProject.createdAt, state.locale))}</p>` : ""}
+        </div>
       </div>
       <button id="initializer-enter-assembly-button" class="button project-primary project-enter-assembly" ${!selectedProject || busy ? "disabled" : ""}>${messages.buttons.enterAssembly}${projectIcon("arrow")}</button>
     </div>
@@ -154,8 +157,7 @@ export function renderWorkspacePage(state) {
       <select id="legacy-project-select" ${busy ? "disabled" : ""}><option value="">${labels.legacyProjects}</option>
         ${initializer.existingProjects.map(project => `<option value="${project.projectId}" ${selectedProject?.projectId === project.projectId ? "selected" : ""}>${escapeHtml(project.projectName)}</option>`).join("")}
       </select></label>` : ""}
-    ${selectedProject ? `<section class="project-information" aria-label="${escapeAttr(labels.projectInformation)}">${renderProjectCatalog(state)}
-      <p class="project-catalog-created">${labels.created} ${escapeHtml(formatCreatedAt(selectedProject.createdAt, state.locale))}</p></section>${renderProjectPathOverview(state)}` : ""}
+    ${selectedProject ? `<section class="project-information" aria-label="${escapeAttr(labels.projectInformation)}">${renderProjectCatalog(state)}</section>${renderProjectPathOverview(state)}` : ""}
     ${initializer.optionsError ? `<p class="error-text" role="alert">${escapeHtml(initializer.optionsError)}</p>` : ""}
   </section>
   ${initializer.autoPipelineModalOpen ? renderAutoPipelineModal(initializer, messages) : ""}`;

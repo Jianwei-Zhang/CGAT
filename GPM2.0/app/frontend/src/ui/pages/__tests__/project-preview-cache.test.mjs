@@ -423,3 +423,14 @@ test("whole-source snapshots persist unpositioned context and dependencies and r
   value.store = createStore(value.state);
   assert.equal((await load(value)).cards[0].tracks[0].unpositioned[0].name, "unlocated");
 });
+
+
+test("multi-row source snapshots and nonzero source lanes cannot reintroduce the old layout", async () => {
+  const value = fixture(); await load(value);
+  const old = structuredClone(value.db.snapshot); old.modelVersion = 6;
+  assert.equal(isPreviewSnapshot(old), false);
+  const rows = structuredClone(value.db.snapshot); rows.cards[0].tracks[0].laneCount = 2;
+  assert.equal(isPreviewSnapshot(rows), false);
+  const lane = structuredClone(value.db.snapshot); lane.cards[0].tracks[0].positioned[0].lane = 1;
+  assert.equal(isPreviewSnapshot(lane), false);
+});

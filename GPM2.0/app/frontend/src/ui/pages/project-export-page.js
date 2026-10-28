@@ -3,6 +3,7 @@ import { exportJobScope, currentProjectExportJob, beginProjectExportJob, ownsCur
   updateProjectExportJob, syncCurrentProjectExportJob, finishProjectExportJob } from "../../services/project-export-jobs.js";
 import { renderProjectPreviewPage, bindProjectPreviewPage, unbindProjectPreviewPage } from "./project-preview-page.js";
 import { rememberProjectPreviewDom, restoreProjectPreviewDom } from "./project-preview-cache.js";
+import { exportProjectPreviewImage, renderPreviewImageDownloadButton, syncPreviewImageDownloadButton } from "./project-preview-image-export.js";
 import { previewProjectKey } from "./project-preview-state.js";
 import { createContigColorResolver, getContigPalette } from "./assembly/contig-colors.js";
 import { layoutFinalPathStrip, syncFinalPathStripGeometry } from "./assembly/final-path-visual-layout.js";
@@ -1774,16 +1775,19 @@ function renderProjectOverviewSummary(state) {
   return `
       <section data-overview-summary>
       <div class="project-export-head">
-        <div class="project-export-title-row">
-          <h2>${escapeHtml(labels.title)}</h2>
-          <p class="muted">${escapeHtml(labels.project)}: ${escapeHtml(state.session?.projectName || currentProject.projectName || "-")} · ${escapeHtml(labels.primaryDataset)}: ${escapeHtml(primaryDatasetName)}</p>
+        <dl class="project-export-identity">
+          <div class="project-export-identity-item"><dt>${escapeHtml(labels.project)}</dt><dd title="${escapeAttr(state.session?.projectName || currentProject.projectName || "-")}">${escapeHtml(state.session?.projectName || currentProject.projectName || "-")}</dd></div>
+          <div class="project-export-identity-item"><dt>${escapeHtml(labels.primaryDataset)}</dt><dd title="${escapeAttr(primaryDatasetName)}">${escapeHtml(primaryDatasetName)}</dd></div>
+        </dl>
+        <div class="project-export-actions">
+          ${renderPreviewImageDownloadButton(state)}
+          ${renderProjectExportMenu({
+            labels,
+            canExportFasta: fresh && canProjectExportFasta(state),
+            canExportLog: Boolean(model?.canExportLog),
+            disabled: !fresh,
+          })}
         </div>
-        ${renderProjectExportMenu({
-          labels,
-          canExportFasta: fresh && canProjectExportFasta(state),
-          canExportLog: Boolean(model?.canExportLog),
-          disabled: !fresh,
-        })}
       </div>
       ${exportState.loading || (!fresh && !exportState.error) ? `<p class="muted">${escapeHtml(labels.loading)}</p>` : ""}
       ${exportState.error ? `
@@ -1801,8 +1805,8 @@ function renderProjectOverviewSummary(state) {
 
 export function renderProjectExportPage(state) {
   const labels = getLabels(state);
-  if (!getCurrentProject(state)) return `<section class="page project-export-page"><h2>${escapeHtml(labels.title)}</h2><p class="muted">${escapeHtml(labels.noProject)}</p></section>`;
-  return `<section class="page project-export-page" data-overview-project="${escapeAttr(previewProjectKey(state))}">
+  if (!getCurrentProject(state)) return `<section class="page project-export-page" aria-label="${escapeAttr(labels.title)}"><p class="muted">${escapeHtml(labels.noProject)}</p></section>`;
+  return `<section class="page project-export-page" aria-label="${escapeAttr(labels.title)}" data-overview-project="${escapeAttr(previewProjectKey(state))}">
     ${renderProjectOverviewSummary(state)}
     <div data-overview-preview>${renderProjectPreviewPage(state, { embedded: true })}</div>
   </section>`;
@@ -2480,6 +2484,7 @@ async function runProjectExport(host, store, kind, deps = {}) {
 export function bindProjectExportPage(host, store, deps = {}) {
   if (!host) return;
   mountOverviewPreview(host, store, deps);
+  syncPreviewImageDownloadButton(host, store);
   bindProjectDataFreshness(host, store, deps);
   if (host[PROJECT_EXPORT_BOUND]) {
     ensureProjectOverviewData(host, store, deps);
@@ -2504,6 +2509,14 @@ export function bindProjectExportPage(host, store, deps = {}) {
   };
   host.addEventListener("click", async (event) => {
     if (store.getState().activeRoute && store.getState().activeRoute !== "projectExport") return;
+    const downloadNode = event.target?.closest?.("[data-preview-download]");
+    if (downloadNode) {
+      // Standalone Preview handles its own local action; Overview's action is
+      // outside that component and must not toggle/navigate a chromosome card.
+      if (downloadNode.closest?.("[data-overview-preview]")) return;
+      await exportProjectPreviewImage(host, store, deps.preview || deps);
+      return;
+    }
     const closeNode = event.target?.closest?.("[data-project-export-close]");
     if (closeNode) {
       const currentState = store.getState();

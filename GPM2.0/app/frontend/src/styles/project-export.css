@@ -10,27 +10,24 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
-.project-export-page > h2,
-.project-export-head h2 {
-  margin: 0;
-  font-family: inherit;
-  font-size: var(--font-heading);
-  font-weight: 700;
-  line-height: 1.45;
-}
-
-.project-export-title-row {
+.project-export-identity {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  gap: 6px 24px;
+  font-size: var(--font-body);
 }
 
-.project-export-title-row .muted {
-  margin: 0;
-}
+.project-export-identity-item { display: flex; align-items: baseline; min-width: 0; gap: 6px; }
+.project-export-identity dt { flex: 0 0 auto; color: var(--text-muted, #64748b); font-size: var(--font-small); }
+.project-export-identity dd { min-width: 0; margin: 0; color: var(--text-primary, #1e293b); font-weight: 600; overflow-wrap: anywhere; }
+.project-export-head > .project-export-actions { flex: 0 0 auto; max-width: 100%; margin-left: auto; align-items: center; }
+.project-export-head .project-preview-download { width: 32px; height: 32px; min-height: 32px; }
 
 .project-export-actions,
 .project-export-toolbar {

@@ -343,8 +343,9 @@ test("selected GRT project shows read-only metadata and offers on-demand renamin
   assert.match(html, /id="selected-project-rename-button"/);
   assert.doesNotMatch(html, /id="selected-project-name-input"|id="selected-project-save-button"/);
   assert.doesNotMatch(html, /project-heading-meta|project-qc-tag|Reads QC · Disabled/);
-  assert.match(html, /class="project-catalog-created">Created /);
-  assert.ok(html.indexOf('class="project-catalog-created"') > html.indexOf('id="project-data-catalog"'));
+  assert.match(html, /class="project-location-row">[\s\S]*project-detail-path[\s\S]*class="project-detail-created">Created: /);
+  assert.ok(html.indexOf('class="project-detail-created"') < html.indexOf('id="project-data-catalog"'));
+  assert.doesNotMatch(html, /project-catalog-created/);
   assert.doesNotMatch(html, /project-heading-created/);
   assert.doesNotMatch(html, /workspace-recipe-summary|class="project-metadata"|class="project-created/);
   assert.doesNotMatch(html, /recipe-test/);
@@ -998,4 +999,17 @@ test("selected-project table and paths retain accessible section names without v
     const changed = renderWorkspacePage(value); assert.doesNotMatch(changed, /data-project-export-jump-chr/);
     assert.match(changed, locale === "en" ? /Loading overview data/ : /正在加载概览数据/);
   }
+});
+
+
+for (const locale of ["zh", "en"]) test(`creation time appears once to the right of the path, above the project table (${locale})`, () => {
+  const value = createState({ locale, session: { projectId: 7 }, initializer: {
+    existingProjects: [{ projectId: 7, projectName: "P", primaryDatasetId: 1, createdAt: "1710000000" }],
+    datasets: [{ datasetId: 1, name: "D" }],
+  } });
+  const output = renderWorkspacePage(value);
+  assert.equal((output.match(/class="project-detail-created"/g) || []).length, 1);
+  assert.match(output, new RegExp(`class="project-location-row">[\\s\\S]*class="project-path project-detail-path"[^>]*>[\\s\\S]*class="project-detail-created">${locale === "zh" ? "创建时间：" : "Created: "}`));
+  assert.ok(output.indexOf('class="project-detail-created"') < output.indexOf('class="project-information"'));
+  assert.doesNotMatch(output, /project-catalog-created/);
 });

@@ -1,5 +1,6 @@
 import { pickSaveFilePath } from "../../services/backend-api.js";
 import { writeFinalPathExportBinaryFile } from "../../services/workflow-api.js";
+import { projectIcon } from "./project-icons.js";
 import { getMessages } from "../i18n/index.js";
 import { getContigPalette } from "./assembly/contig-colors.js";
 import { layoutProjectPreviewPath } from "./assembly/final-path-visual-layout.js";
@@ -21,6 +22,18 @@ const exportable = state => state.projectPreview?.loaded && !state.projectPrevie
   && !state.projectPreview.error && state.projectPreview.cards?.length > 0 && previewStateIsApplicable(state);
 export const previewImageExportIsRunning = store => running.has(store);
 
+// The action lives in Overview's toolbar, outside the independently updated
+// Preview subtree. Standalone Preview still uses its own local action root.
+export const previewImageActionRoot = host => host?.closest?.("[data-overview-project]") || host;
+export function renderPreviewImageDownloadButton(state) {
+  const label = xml(getMessages(state, "projectPreview").download);
+  return `<button type="button" class="button project-preview-download" data-preview-download title="${label}" aria-label="${label}" disabled>${projectIcon("imageDownload")}</button>`;
+}
+export function syncPreviewImageDownloadButton(host, store) {
+  const button = previewImageActionRoot(host)?.querySelector?.("[data-preview-download]");
+  if (button) button.disabled = running.has(store) || !exportable(store.getState());
+}
+
 // Build from ALL semantic cards, not the mounted/visible viewport. Native SVG
 // primitives avoid screenshot/foreignObject dependencies and resolve all colors.
 export function buildProjectPreviewSvgSnapshot(state, { width = 1440, palette = getContigPalette() } = {}) {
@@ -28,8 +41,8 @@ export function buildProjectPreviewSvgSnapshot(state, { width = 1440, palette = 
   const labels = getMessages(state, "projectPreview");
   width = Math.round(Math.min(2000, Math.max(1000, Number(width) || 1440)));
   const left = 176, right = width - 28, plotWidth = right - left;
-  let y = 64;
-  const shapes = [text(24, 30, `${labels.title} · ${projectName(state)}`, 'font-size="19" font-weight="700"')];
+  let y = 20;
+  const shapes = [];
   const label = (yy, value) => text(32, yy + 14, value);
   for (const card of state.projectPreview.cards) {
     const top = y;
@@ -71,25 +84,13 @@ export function buildProjectPreviewSvgSnapshot(state, { width = 1440, palette = 
     for (const track of card.tracks) {
       content.push(label(y, track.name || labels.unknown));
       for (const item of track.positioned) {
-        const yy = y + (item.lane || 0) * 20;
+        const yy = y;
         bar(item.start, item.length, yy, track.role, `${item.name}${(item.displayOrient || (item.reverse ? "-" : "+")) === "-" ? " (−)" : ""}`,
           16, `data-source-length="${item.length}"`);
         item.highlights.forEach(patch => used(item.start + patch.start, item.start + patch.end, yy, track.role));
       }
       if (!track.positioned.length) content.push(text(left, y + 14, "—"));
-      y += Math.max(1, track.laneCount) * 20 + 6;
-      // Unpositioned sources are textual, never given a fabricated chart anchor.
-      if (track.unpositioned?.length) {
-        let line = `${labels.unpositioned}: `;
-        for (const item of track.unpositioned) {
-          const token = `${item.name} (${item.ghostKey ? labels.unresolved : bp(item.length)}); `;
-          if ([...line + token].length * 8 > plotWidth && line) {
-            content.push(text(left, y + 14, line, 'fill="#64748b"')); y += 20; line = "";
-          }
-          line += token;
-        }
-        if (line) { content.push(text(left, y + 14, line, 'fill="#64748b"')); y += 24; }
-      }
+      y += 26;
     }
     content.push(`<path d="M32 ${y}H${right}" stroke="#cbd5e1"/>`); y += 8;
     for (const path of card.paths) {
@@ -116,7 +117,7 @@ export function buildProjectPreviewSvgSnapshot(state, { width = 1440, palette = 
   const rasterScale = Math.min(2, 32000 / width, 32000 / height, Math.sqrt(40000000 / (width * height)));
   if (rasterScale < 1) throw new Error(labels.exportTooLarge);
   return { width, height, rasterScale,
-    svgMarkup: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="system-ui, Segoe UI, Microsoft YaHei, sans-serif" font-size="13" fill="#1e293b">${rect(0, 0, width, height, "#ffffff")}${shapes.join("")}</svg>` };
+    svgMarkup: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="system-ui, Segoe UI, Microsoft YaHei, sans-serif" font-size="13" fill="#1e293b"><title>${xml(projectName(state))}</title>${rect(0, 0, width, height, "#ffffff")}${shapes.join("")}</svg>` };
 }
 
 export async function renderProjectPreviewPng(snapshot) {
@@ -147,7 +148,7 @@ export async function exportProjectPreviewImage(host, store, deps = {}) {
   const status = host.querySelector?.("[data-preview-export-error]");
   if (status) { status.hidden = true; status.textContent = ""; }
   running.add(store);
-  const button = host.querySelector?.("[data-preview-download]");
+  const button = previewImageActionRoot(host)?.querySelector?.("[data-preview-download]");
   if (button) button.disabled = true;
   try {
     const snapshot = buildProjectPreviewSvgSnapshot(state, { width: host.querySelector?.(".project-preview-cards")?.clientWidth });
@@ -167,7 +168,6 @@ export async function exportProjectPreviewImage(host, store, deps = {}) {
     return false;
   } finally {
     running.delete(store);
-    const node = host.querySelector?.("[data-preview-download]");
-    if (node) node.disabled = !exportable(store.getState());
+    syncPreviewImageDownloadButton(host, store);
   }
 }

@@ -2,7 +2,7 @@ import { previewSemanticSignature, previewMutationStamp } from "../../services/p
 import { normalizeFinalPathByChr } from "./assembly/final-path-state.js";
 import { previewProjectKey, previewSourceRange } from "./project-preview-state.js";
 
-export const PREVIEW_MODEL_VERSION = 6;
+export const PREVIEW_MODEL_VERSION = 7;
 const sessions = new WeakMap();
 const domEntries = new Map();
 const DOM = Symbol("previewDom");
@@ -115,7 +115,7 @@ export function isPreviewSnapshot(snapshot) {
       && typeof value.source.contigName === "string" && finite(value.source.start) && finite(value.source.end)));
   const patch = value => object(value) && finite(value.start) && finite(value.end) && part(value.part);
   const sourceItem = (item, positioned) => object(item) && typeof item.name === "string"
-    && (positioned ? finite(item.start) : item.start === null)
+    && (positioned ? finite(item.start) && item.lane === 0 : item.start === null)
     && finite(item.length) && item.length > 0 && typeof item.reverse === "boolean"
     && (!item.alignment || (object(item.alignment) && typeof item.alignment.pathName === "string"
       && Number.isInteger(item.alignment.index) && finite(item.alignment.offset)
@@ -140,7 +140,7 @@ export function isPreviewSnapshot(snapshot) {
       && Array.isArray(card.paths) && card.paths.every(path => object(path) && typeof path.name === "string"
         && finite(path.length) && path.length >= 0 && Array.isArray(path.parts) && path.parts.every(part))
       && Array.isArray(card.tracks) && card.tracks.every(track => object(track) && typeof track.name === "string"
-        && color(track.color) && ["primary", "companion"].includes(track.role) && Number.isInteger(track.laneCount) && track.laneCount >= 1
+        && color(track.color) && ["primary", "companion"].includes(track.role) && track.laneCount === 1
         && Array.isArray(track.unpositioned) && track.unpositioned.every(item => sourceItem(item, false))
         && Array.isArray(track.positioned) && track.positioned.every(item => sourceItem(item, true))))
     && new Set(snapshot.cards.map(card => card.chrName)).size === snapshot.cards.length

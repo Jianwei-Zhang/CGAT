@@ -331,8 +331,9 @@ test("legacy Preview and Overview aliases resolve to the one composite Overview 
     renderCurrentRoute(f.root, f.store);
     assert.equal(f.store.getState().activeRoute, "projectExport");
     assert.equal(f.host.renderCount, 1);
-    assert.match(f.host.innerHTML, /<h2>Overview<\/h2>/);
-    assert.match(f.host.innerHTML, /data-overview-summary[\s\S]*data-overview-preview[\s\S]*<h3>Preview<\/h3>/);
+    assert.match(f.host.innerHTML, /class="page project-export-page" aria-label="Overview"/);
+    assert.match(f.host.innerHTML, /data-overview-summary[\s\S]*data-overview-preview[\s\S]*class="project-preview-page"/);
+    assert.doesNotMatch(f.host.innerHTML, /project-preview-heading|project-preview-subtitle|project-preview-legend|<h2>Overview<\/h2>/);
     assert.doesNotMatch(f.host.innerHTML, /project-export-final-path-list/);
   }
   assert.equal(normalizeAppRoute("assembly"), "assembly");

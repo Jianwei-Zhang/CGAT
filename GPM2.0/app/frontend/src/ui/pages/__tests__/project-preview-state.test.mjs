@@ -144,31 +144,33 @@ test("mirrored and original aliases of a tiny donor produce one adopted source, 
 });
 
 
-test("full sources include unused portions, overhangs and unused Contigs on separate overlap lanes", () => {
+test("full sources include unused portions, overhangs and unused Contigs in one compact row", () => {
   const ctg = { ...base.ctgs[0], totalLength: 1000, anchorStart: -100 };
   const [card] = buildProjectPreviewModel({ ...base, ctgs: [ctg,
     { ...ctg, assemblyCtgId: 2, name: "unused", originId: "unused", anchorStart: -200, totalLength: 3000 }],
     finalPathByChr: { Chr1: { segments: [sourceSegment] } } });
   const track = card.tracks[0];
   assert.equal(track.positioned.length, 2);
-  assert.equal(track.laneCount, 2);
+  assert.equal(track.laneCount, 1);
   for (const item of track.positioned) {
     assert.ok(card.domain.start <= item.start);
     assert.ok(card.domain.end >= item.start + item.length);
   }
   assert.ok(card.domain.start <= card.reference.start);
   assert.ok(card.domain.end >= card.reference.start + card.refLength);
-  assert.notEqual(track.positioned[0].lane, track.positioned[1].lane);
+  assert.equal(track.positioned[0].lane, 0);
+  assert.equal(track.positioned[1].lane, 0);
+  assert.ok(track.positioned[0].length >= track.positioned[1].length, "paint large backgrounds before small intervals");
 });
 
-test("overlapping auxiliary whole sources get their own lanes even when used intervals do not overlap", () => {
+test("overlapping auxiliary whole sources retain all bodies on one compact dataset strip", () => {
   const [card] = buildProjectPreviewModel({ ...base, ctgs: [0,1].map(i => ({ ...base.ctgs[0],
     assemblyCtgId: i + 1, name: `donor${i}`, originId: `donor${i}`, datasetName: "dsB", datasetId: 2,
     totalLength: 3000, anchorStart: 0, sourceFragment: null })),
     finalPathByChr: { Chr1: { segments: [0,1].map(i => ({ type: "ctg", assemblyCtgId: i + 1,
       datasetName: "dsB", start: i * 100 + 1, end: i * 100 + 50, overallLen: 3000 })) } } });
   const track = card.tracks.find(track => track.name === "dsB");
-  assert.equal(track.laneCount, 2);
+  assert.equal(track.laneCount, 1);
   assert.ok(track.positioned.every(item => item.length === 3000));
   assert.ok(track.positioned.every(item => item.highlights[0].end - item.highlights[0].start === 50));
 });

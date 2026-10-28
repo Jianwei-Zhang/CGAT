@@ -1,4 +1,4 @@
-import { exportProjectPreviewImage, previewImageExportIsRunning } from "./project-preview-image-export.js";
+import { exportProjectPreviewImage, previewImageActionRoot, syncPreviewImageDownloadButton } from "./project-preview-image-export.js";
 import { contigColorToken } from "./assembly/contig-colors.js";
 import { projectIcon } from "./project-icons.js";
 import { syncFinalPathStripGeometry } from "./assembly/final-path-visual-layout.js";
@@ -53,7 +53,7 @@ function renderContig(item, track, domain, labels) {
   const width = domain ? visibleLength / (domain.end - domain.start) * 100 : 100;
   const title = `${item.name} · ${number(item.length)} bp${item.highlights.length
     ? ` · ${labels.used}: ${item.highlights.map(patch => partTitle(patch.part, labels)).join("; ")}` : ""}`;
-  return `<span class="project-preview-contig${item.highlights.length ? " is-adopted" : " is-context"}" data-preview-source-length="${item.length}" style="left:${percent(start)}%;width:${percent(width)}%;top:${(item.lane || 0) * 20 + 2}px;background:${contigColorToken(track.role)};border-color:${contigColorToken(track.role, "stroke")};color:${contigColorToken(track.role, "text")}" title="${html(title)}">
+  return `<span class="project-preview-contig${item.highlights.length ? " is-adopted" : " is-context"}" data-preview-source-length="${item.length}" style="left:${percent(start)}%;width:${percent(width)}%;top:2px;background:${contigColorToken(track.role)};border-color:${contigColorToken(track.role, "stroke")};color:${contigColorToken(track.role, "text")}" title="${html(title)}">
     ${item.highlights.map(patch => renderHighlight({ ...patch, start: Math.max(0, patch.start - clipped), end: Math.min(visibleLength, patch.end - clipped) }, visibleLength, labels)).join("")}
     <span class="project-preview-contig-label" data-preview-source-fit-label="1">${html(item.name)}${(item.displayOrient || (item.reverse ? "-" : "+")) === "-" ? " (−)" : ""}</span>
   </span>`;
@@ -87,9 +87,9 @@ function renderCard(card, labels) {
   const ref = renderReference(card, labels);
   const rows = card.tracks.map(track => `<div class="project-preview-row"><span class="project-preview-track-label" title="${html(track.name || labels.unknown)}"><span class="project-preview-dataset-dot" style="background:${contigColorToken(track.role, "stroke")}"></span>${html(track.name || labels.unknown)}</span>
     <div class="project-preview-source-plots">
-      ${track.positioned.length ? `<span class="project-preview-plot" style="height:${track.laneCount * 20}px">${track.positioned.slice().sort((a, b) => Number(Boolean(a.alignment)) - Number(Boolean(b.alignment))).map(item => renderContig(item, track, domain, labels)).join("")}</span>` : ""}
-      ${!track.positioned.length && !track.unpositioned?.length ? `<span class="project-preview-empty-track">—</span>` : ""}
-      ${track.unpositioned?.length ? `<span class="project-preview-unpositioned">${html(labels.unpositioned)}: ${track.unpositioned.map(item => `<span title="${html(`${item.name} · ${item.ghostKey ? labels.unresolved : `${number(item.length)} bp`}`)}">${html(item.name)}</span>`).join(" · ")}</span>` : ""}
+      ${track.positioned.length ? `<span class="project-preview-plot" style="height:20px">${track.positioned.map(item => renderContig(item, track, domain, labels)).join("")}</span>` : ""}
+      ${!track.positioned.length ? `<span class="project-preview-empty-track">—</span>` : ""}
+
     </div></div>`).join("");
   const paths = card.paths.map(path => path.parts.length ? `<div class="project-preview-path">
     <div class="project-preview-row"><span class="project-preview-track-label project-preview-final-label" title="${html(path.name)}">Final Path${path.name !== card.chrName ? `<small>${html(path.name)}</small>` : ""}</span>
@@ -115,9 +115,9 @@ export function renderProjectPreviewPage(state, options = {}) {
     : !preview.loaded || (preview.localSignature !== undefined && !previewStateIsApplicable(state)) ? `<p class="muted" role="status">${html(labels.loading)}</p>`
     : preview.cards?.length ? `<div class="project-preview-cards">${preview.cards.map(card => renderCard(card, labels)).join("")}</div>`
     : `<p class="muted">${html(labels.empty)}</p>`;
-  return `<section class="project-preview-page" data-preview-project="${html(key)}" data-preview-locale="${html(state.locale)}" aria-busy="${Boolean(preview.loading)}"><header class="project-preview-heading"><${heading}>${html(labels.title)}</${heading}><span class="project-preview-subtitle" title="${html(labels.subtitle)}">${html(labels.subtitle)}</span>
+  return `<section class="project-preview-page" data-preview-project="${html(key)}" data-preview-locale="${html(state.locale)}" aria-busy="${Boolean(preview.loading)}">${options.embedded ? "" : `<header class="project-preview-heading"><${heading}>${html(labels.title)}</${heading}><span class="project-preview-subtitle" title="${html(labels.subtitle)}">${html(labels.subtitle)}</span>
     <details class="project-preview-legend"><summary aria-label="${html(labels.legend)}" title="${html(labels.legend)}">i</summary><div class="project-preview-hint">${html(labels.hint)}</div></details>
-    <button type="button" class="button project-preview-download" data-preview-download title="${html(labels.download)}" aria-label="${html(labels.download)}" ${!key || preview.loading || !preview.loaded || !preview.cards?.length || preview.error || !previewStateIsApplicable(state) ? "disabled" : ""}>${projectIcon("imageDownload")}</button></header>
+    <button type="button" class="button project-preview-download" data-preview-download title="${html(labels.download)}" aria-label="${html(labels.download)}" ${!key || preview.loading || !preview.loaded || !preview.cards?.length || preview.error || !previewStateIsApplicable(state) ? "disabled" : ""}>${projectIcon("imageDownload")}</button></header>`}
     <p class="error-text" data-preview-export-error role="alert" hidden></p>${content}</section>`;
 }
 
@@ -154,8 +154,7 @@ function updatePreviewDom(host, state, store) {
   currentPage?.setAttribute?.("aria-busy", String(Boolean(preview?.loading)));
   const refresh = host.querySelector?.("[data-preview-refresh]");
   if (refresh) refresh.disabled = Boolean(preview?.loading);
-  const download = host.querySelector?.("[data-preview-download]");
-  if (download) download.disabled = Boolean(preview?.loading || !preview?.loaded || !preview?.cards?.length || preview?.error || !previewStateIsApplicable(state) || (store && previewImageExportIsRunning(store)));
+  if (store) syncPreviewImageDownloadButton(host, store);
   syncFinalPathStripGeometry(host);
   markPreviewDom(host, state);
 }
@@ -278,7 +277,7 @@ export function loadProjectPreviewData(host, store, deps = {}, options = {}) {
           store.setState({ projectPreview: { ...(visible?.key === key ? visible : { loaded: false }), key, loading: true, error: "" } });
           const refresh = host?.querySelector?.("[data-preview-refresh]");
           if (refresh) refresh.disabled = true;
-          const download = host?.querySelector?.("[data-preview-download]");
+          const download = previewImageActionRoot(host)?.querySelector?.("[data-preview-download]");
           if (download) download.disabled = true;
           host?.querySelector?.(".project-preview-page")?.setAttribute?.("aria-busy", "true");
           inputs = await readPreviewSources(store.getState(), args,
@@ -391,8 +390,7 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
   if (!binding.unsubscribe && store.subscribe) binding.unsubscribe = store.subscribe(() => {
     if (!binding.active || host.isConnected === false || !isPreviewRoute(binding.store.getState())) return;
     const state = binding.store.getState();
-    const download = host.querySelector?.("[data-preview-download]");
-    if (download && previewImageExportIsRunning(binding.store)) download.disabled = true;
+    syncPreviewImageDownloadButton(host, binding.store);
     if (state.projectPreview?.loaded && !state.projectPreview.loading && !previewStateIsApplicable(state)) {
       void loadProjectPreviewData(host, binding.store, binding.deps);
     }
@@ -405,6 +403,7 @@ export function bindProjectPreviewPage(host, store, deps = {}) {
     markPreviewDom(host, store.getState());
     syncFinalPathStripGeometry(host);
   }
+  syncPreviewImageDownloadButton(host, store);
   void loadProjectPreviewData(host, store, binding.deps);
 }
 

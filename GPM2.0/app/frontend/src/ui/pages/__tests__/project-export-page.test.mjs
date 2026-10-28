@@ -3,6 +3,8 @@ import { currentProjectExportJob } from "../../../services/project-export-jobs.j
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { buildProjectPreviewModel, previewProjectKey } from "../project-preview-state.js";
+import { PREVIEW_MODEL_VERSION, previewOverrideSignature } from "../project-preview-cache.js";
 import { FLOATING_MENU_CLOSE_DELAY_MS } from "../floating-menu-runtime.js";
 import { __test, bindProjectExportPage, renderProjectExportPage, renderProjectPathOverview, bindProjectPathOverview, releaseProjectPathOverview } from "../project-export-page.js";
 import { readStylesheetTree } from "../../../styles/__tests__/style-test-support.mjs";
@@ -88,8 +90,11 @@ function createState(overrides = {}) {
 test("project export page renders assignment bars before placed statistics with a final-path style export menu", () => {
   const html = renderProjectExportPage(createState());
 
-  assert.match(html, />概览</);
-  assert.match(html, /<div class="project-export-title-row">[\s\S]*<h2>概览<\/h2>[\s\S]*项目: p1 · 主数据集: hifiasm/);
+  assert.doesNotMatch(html, /<h[1-6][^>]*>概览</);
+  assert.match(html, /<dl class="project-export-identity">[\s\S]*<dt>项目<\/dt><dd[^>]*>p1<\/dd>[\s\S]*<dt>主数据集<\/dt><dd[^>]*>hifiasm<\/dd>/);
+  assert.ok(html.indexOf("data-preview-download") < html.indexOf("data-project-export-toggle"));
+  assert.equal((html.match(/data-preview-download/g) || []).length, 1);
+  assert.doesNotMatch(html, /project-preview-heading|project-preview-subtitle|project-preview-legend/);
   assert.doesNotMatch(html, /card project-export-card/);
   assert.doesNotMatch(html, /data-project-export-refresh/);
   assert.match(html, /class="button ghost tiny final-path-export-toggle"[\s\S]*data-project-export-toggle="true"[\s\S]*>导出<\/button>/);
@@ -2158,4 +2163,39 @@ test("Overview progress patches only the summary and neither renders nor replace
   __test.rerender(host, store);
   assert.equal(replaced, 1); assert.equal(previewsBound, 1); assert.equal(host.querySelector("[data-overview-preview]"), preview);
   assert.match(parsed, /data-overview-summary/); assert.doesNotMatch(parsed, /data-overview-preview|project-preview-page/);
+});
+
+
+test("Overview toolbar download exports Preview through its own handler without opening the export menu", async () => {
+  const value = createState();
+  value.projectPreview = { loaded: true, modelVersion: PREVIEW_MODEL_VERSION, key: previewProjectKey(value),
+    mutationStamp: previewMutationStamp({ workspaceRoot: value.session.workspacePath, projectId: value.session.projectId }),
+    localSignature: previewOverrideSignature({}, {}), savedPathSignatures: {},
+    cards: buildProjectPreviewModel({ chromosomes: [{ chrName: "Chr01", chrLength: 1000 }],
+      ctgs: [{ assemblyCtgId: 1, name: "ptg1", datasetName: "hifiasm", totalLength: 1000, assignedChrName: "Chr01", anchorStart: 0 }],
+      finalPathByChr: { Chr01: { segments: [{ type: "ctg", assemblyCtgId: 1, datasetName: "hifiasm", start: 1, end: 1000 }] } } }) };
+  const h = exportHarness(value), listeners = new Map(), writes = [];
+  const button = { disabled: true, closest: selector => selector === "[data-preview-download]" ? button : null };
+  h.host.addEventListener = (name, fn) => listeners.set(name, [...(listeners.get(name) || []), fn]);
+  h.host.querySelector = selector => selector === "[data-preview-download]" ? button : null;
+  bindProjectExportPage(h.host, h.store, { preview: {
+    pickSaveFilePath: async () => "D:/all-chromosomes.png",
+    renderProjectPreviewPng: async snapshot => { assert.match(snapshot.svgMarkup, />Chr01</); return "PNG"; },
+    writeFinalPathExportBinaryFile: async args => writes.push(args),
+  } });
+  assert.equal(button.disabled, false);
+  for (const listener of listeners.get("click") || []) await listener({ target: button });
+  assert.equal(writes.length, 1); assert.equal(writes[0].outputPath, "D:/all-chromosomes.png");
+  assert.equal(h.store.getState().activeRoute, "projectExport"); assert.equal(h.paints, 0);
+});
+
+for (const locale of ["zh", "en"]) test(`Overview has compact identity groups and exactly one download action before Export (${locale})`, () => {
+  const html = renderProjectExportPage(createState({ locale }));
+  const toolbar = html.slice(0, html.indexOf('data-overview-preview'));
+  assert.doesNotMatch(html, /<h[1-6][^>]*>(?:概览|Overview|预览|Preview)<|project-preview-heading|project-preview-subtitle|project-preview-legend/);
+  assert.equal((html.match(/data-preview-download/g) || []).length, 1);
+  assert.ok(toolbar.indexOf("data-preview-download") < toolbar.indexOf("data-project-export-toggle"));
+  assert.match(toolbar, /<dl class="project-export-identity">/);
+  assert.match(toolbar, /<dd title="p1">p1<\/dd>/);
+  assert.match(toolbar, /<dd title="hifiasm">hifiasm<\/dd>/);
 });
