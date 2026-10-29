@@ -514,6 +514,9 @@ def experiment(args) -> dict:
     if args.threads < 1 or args.timeout < 1 or args.memory_gib < 0:
         raise ExperimentError("invalid resource limits")
     make_windows({}, args.core_bases, args.context_bases)  # Validate before writing.
+    candidate_policy = getattr(args, "window_candidate_policy", "native_window_selection")
+    if candidate_policy not in ("native_window_selection", "all_chains_pool"):
+        raise ExperimentError("unsupported experimental window candidate policy")
     executable = shutil.which(args.minimap2)
     if not executable:
         raise ExperimentError("minimap2 unavailable")
@@ -564,8 +567,17 @@ def experiment(args) -> dict:
                       index_scope="original_default_part" if index_context is not None else "full_target_single_part",
                       original_part_index=index_context["part_index"] if index_context is not None else None,
                       inherited_mid_occ=index_context["mid_occ"] if index_context is not None else None)
+        # Branch-only pool: avoid losing a whole-query competitor solely to a
+        # window-local best_n/primary decision. -P is NOT a final output policy:
+        # every row still undergoes base checks, core clipping, deduplication,
+        # stitching and the unchanged guided refusal controls. It cannot prove
+        # that local chaining/DP generated the entire native full-query universe.
+        pool_flags = ["-P"] if candidate_policy == "all_chains_pool" else []
+        report.update(window_candidate_policy=candidate_policy,
+                      window_primary_selection_disabled=bool(pool_flags),
+                      whole_query_candidate_completeness_certified=False)
         raw = root / "raw.windows.paf"
-        run_command([executable, "-c", "--eqx", "-x", args.preset, *mapping_flags, "-t", str(args.threads),
+        run_command([executable, "-c", "--eqx", "-x", args.preset, *mapping_flags, *pool_flags, "-t", str(args.threads),
                      "-o", str(raw), str(index), str(root / "windows.fa")], root, "map", args.timeout, args.memory_gib)
         candidate = root / "owned.pending.paf"
         allow_empty_part = index_context is not None and getattr(args,"allow_empty_index_part",False)

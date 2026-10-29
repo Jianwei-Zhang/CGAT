@@ -285,7 +285,9 @@ def experiment(args):
             report.update(index_catalog_sha256=wa.sha256(root/"index-context.json"),
                           shared_mid_occ=mid_occ,threshold_source=threshold_source,
                           index_part_count=len(catalog["parts"]),risk_parts=[],
-                          index_policy=catalog["index_policy"],global_mapq_restored=False)
+                          index_policy=catalog["index_policy"],global_mapq_restored=False,
+                          risk_window_candidate_policy="all_chains_pool",
+                          whole_query_candidate_completeness_certified=False)
             pafs["risk"] = root/"risk.all-parts.pending.paf"
             with pafs["risk"].open("xb") as aggregate:
                 for part in catalog["parts"]:
@@ -293,7 +295,8 @@ def experiment(args):
                         out=root/f"risk-part-{part['part_index']:04d}",minimap2=mm,
                         preset="asm10",core_bases=50_000_000,context_bases=100_000,guide_slack=1000,
                         threads=args.threads,timeout=args.timeout,memory_gib=args.memory_gib,
-                        require_full_query_coverage=False,index_context=part,allow_empty_index_part=True)
+                        require_full_query_coverage=False,index_context=part,allow_empty_index_part=True,
+                        window_candidate_policy="all_chains_pool")
                     result = ga.experiment(options)
                     count = append_part_candidate(options.out/"guided.experimental.paf",aggregate,part=part,
                         queries=query.records,targets=target.records,risk=risk,expected_sha256=result["output_sha256"])

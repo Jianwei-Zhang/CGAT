@@ -37,7 +37,7 @@ class OriginalIndexPartGuidanceTests(unittest.TestCase):
         args.update(updates)
         return argparse.Namespace(**args)
 
-    def run_guidance(self, *, window_rows=b"", chain_rows=b""):
+    def run_guidance(self, *, window_rows=b"", chain_rows=b"", candidate_policy=None):
         observed = []
         def command(argv,directory,name,*limits):
             observed.append((name,argv))
@@ -48,7 +48,10 @@ class OriginalIndexPartGuidanceTests(unittest.TestCase):
         with patch.object(ga.shutil,"which",return_value=str(self.tool)), \
              patch.object(ga.subprocess,"check_output",return_value="2.31-r1302\n"), \
              patch.object(wa,"run_command",side_effect=command):
-            report = ga.experiment(self.options())
+            options = self.options()
+            if candidate_policy is not None:
+                options.window_candidate_policy = candidate_policy
+            report = ga.experiment(options)
         return report,observed
 
     def test_no_hit_part_is_explicit_and_both_passes_reuse_identical_index(self):
@@ -60,6 +63,34 @@ class OriginalIndexPartGuidanceTests(unittest.TestCase):
         self.assertTrue(all(argv[argv.index("-f")+1] == "500" for _,argv in observed))
         self.assertEqual((self.options().out/"guided.experimental.paf").read_bytes(),b"")
         self.assertFalse(report["production_ready"])
+
+    def test_all_chain_pool_changes_only_window_command_not_whole_query_guidance(self):
+        report,observed = self.run_guidance(candidate_policy="all_chains_pool")
+        self.assertEqual([name for name,_ in observed],["map","whole-query"])
+        self.assertIn("-P",observed[0][1])
+        self.assertNotIn("-P",observed[1][1])
+        self.assertFalse(report["production_ready"])
+        window_report = json.loads((self.options().out/"windows"/"experiment.json").read_text())
+        self.assertEqual(window_report["window_candidate_policy"],"all_chains_pool")
+        self.assertFalse(window_report["whole_query_candidate_completeness_certified"])
+
+    def test_default_does_not_silently_change_window_selection(self):
+        _,observed = self.run_guidance()
+        self.assertTrue(all("-P" not in argv for _,argv in observed))
+
+    def test_unsupported_pool_policy_refused_before_creating_output(self):
+        args = self.options(window_candidate_policy="unverified_guess")
+        with patch.object(wa,"run_command") as run:
+            with self.assertRaisesRegex(wa.ExperimentError,"candidate policy"):
+                wa.experiment(args)
+        run.assert_not_called()
+        self.assertFalse(args.out.exists())
+
+    def test_pool_window_chain_disagreement_still_refuses(self):
+        raw = b"gpm_window_00000000\t5\t0\t5\t+\tchr2\t8\t0\t5\t5\t5\t60\tcg:Z:5=\n"
+        with self.assertRaisesRegex(wa.ExperimentError,"no whole-query candidates"):
+            self.run_guidance(window_rows=raw,candidate_policy="all_chains_pool")
+        self.assertFalse((self.options().out/"guided.experimental.paf").exists())
 
     def test_window_chain_disagreement_is_not_accepted_as_no_hit(self):
         raw = b"gpm_window_00000000\t5\t0\t5\t+\tchr2\t8\t0\t5\t5\t5\t60\tcg:Z:5=\n"

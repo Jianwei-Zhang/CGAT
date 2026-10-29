@@ -137,3 +137,76 @@ whole-record replay precede asserting any customer-specific root cause or repair
 
 A source commit is progress toward delivery, not a claim that all delivery gates
 are met. No test result or production readiness is asserted for this increment.
+
+
+## Window candidate pool and native selection core: implementation only
+
+The selective branch now requests an internal `all_chains_pool` window policy.
+Only the short-window mapping command adds native `-P`; the ordinary whole-record
+route and preliminary whole-query guidance do not. Existing standalone defaults
+also do not change. This avoids pruning competitors solely by each window's
+primary/best_n decision. It does NOT prove full-query candidate completeness:
+local chaining, seed filtering, DP extension and global ranking-score correction
+can still differ. The raw pool is never final PAF or accepted downstream evidence.
+All base checks, coordinate restoration, core ownership, reciprocal-unique
+stitching, and guided coverage/corridor refusals remain in place.
+
+`post_dp_selection.py` implements the pinned v2.31 **post-skeleton** hit sort,
+query-overlap parent assignment and secondary selection for the ordinary asm10
+single-query/index-part case. The module does not parse window PAF into native
+state and is deliberately NOT wired into the recovery output yet. Its boundary:
+
+- Require complete explicit original state after skeleton filters and optional
+  `mm_update_dp_max`, before native hit sorting. No guessed AS/ms/cm/hash or zero
+  defaults for missing pre-DP subsc/n_sub/dp_max2.
+- Sort by native corrected dp_max and original hash. Port the original radix
+  partition order, including hash ties above its 64-record insertion-sort limit;
+  Python stable sort is not silently substituted.
+- Determine parent competition using query overlap and UNION coverage of current
+  primaries, across target IDs/strands. Preserve native strict mask inequality,
+  float32 comparison steps and first-primary versus later-primary counter reset.
+- Preserve upstream differences between identical-DP-hit exclusion when updating
+  dp_max2 and identical-coordinate exclusion when retaining secondary rows.
+- Apply native chain-score ratio OR absolute score difference, with a single
+  query-wide best_n=50 count, then synchronize retained parent IDs. No AS cutoff.
+- Emit a structured selection receipt only, not PAF, native confidence or MAPQ.
+  Keep `production_ready:false`, provenance/completeness unproven and execution
+  validation explicitly false.
+
+Pinned official source hashes are embedded for hit.c/map.c/options.c/misc.c and
+ksort.h; the upstream MIT notices accompany the port. **No minimap2 implementation
+or installed binary is patched.** `post_dp_native_oracle.c` is only a deferred
+verification harness linking a PRIVATE build of unmodified upstream sources. It
+calls native selection functions without running alignment or altering that tool.
+
+### Deferred final-validation checks (NOT run during implementation)
+
+`test_post_dp_selection.py` includes deterministic cases for the score-decoy,
+coverage union, different targets/strands, first/later-primary prior counters,
+identical/nested DP geometry, seed-count/DP competition, query-wide best_n, small
+sort ties and binary32 large-score comparisons. The optional native-source oracle
+covers 0/1/2/63/64/65/100/257/600 candidates, large ties, both strands and prior
+state. Enabling that oracle will compile a fresh private source copy; it requires
+an explicit maintainer-provided `CGAT_MINIMAP2_NATIVE_SOURCE` path and must wait
+for the user-authorized final validation phase. This is NOT customer configuration.
+The original-index guidance checks also cover pool flag isolation, legacy default
+preservation and continued refusal of chain/window disagreement.
+
+Writing these cases and statically parsing Python is NOT a passing test result.
+Do not infer an upstream-equivalence or customer-repair claim from this commit.
+
+### Remaining delivery gates
+
+1. Establish all original candidate/anchor ownership and the actual split/trim
+   state, retaining global native scores and pre-DP parent metadata; handle native
+   DP rejection without demanding fictitious canonical coverage.
+2. Reconstruct and validate native post-skeleton ranking-score adjustment before
+   supplying state to the new selection core; raw all-chain `ms` is insufficient.
+3. Reconstruct/verify whole-query MAPQ, including repetitive length and primary
+   competitors; never inherit window MAPQ or mark unknown as high-confidence.
+4. Connect only the validated reference-alignment path to the existing run.sh/task
+   entry, with atomic final output and original workspace/checkpoint protection.
+5. At final validation, execute the deferred native oracle and small/large/normal
+   controls, then GRT/Final Path comparisons. Customer localization and the real
+   full run remain a separate acceptance gate. No new run.sh flags or manual
+   splitting/configuration should be required from the customer.
