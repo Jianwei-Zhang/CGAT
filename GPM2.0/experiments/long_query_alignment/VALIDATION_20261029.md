@@ -1,5 +1,9 @@
 # Long-query windowing experiment — 2026-10-29
 
+Subsequent, separately scoped GRT/self-alignment checks are recorded in
+`VALIDATION_DOWNSTREAM_20261029.md`. This document preserves the original run's
+scope and evidence rather than relabeling those earlier tests as full GRT.
+
 ## Result and boundary
 
 **The known 270 Mb synthetic failure is bypassed by a functioning prototype,

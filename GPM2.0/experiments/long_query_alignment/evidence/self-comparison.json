@@ -1,0 +1,98 @@
+{
+  "status": "completed_comparisons_not_production_acceptance",
+  "production_ready": false,
+  "customer_validated": false,
+  "tool": {
+    "path": "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+    "version": "2.31-r1302",
+    "sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d"
+  },
+  "alias_writer_sha256": "7479e8b068644b069b6aaa4015f7560c5e68acec6915f9299ce39c88395a1713",
+  "harness_sha256": "43d4f8c1a2fda6d60a4de4dbe9806bab69ffbc6f27fa8df6ca47934d3ebfa6a9",
+  "cases": [
+    {
+      "case": "canonical_order",
+      "pair_sets_equal": true,
+      "pairs": [
+        [
+          "ctg10",
+          "ctg2",
+          "+"
+        ],
+        [
+          "ctg10",
+          "rc_ctg",
+          "-"
+        ],
+        [
+          "ctg2",
+          "rc_ctg",
+          "-"
+        ]
+      ],
+      "relation_equal": true,
+      "baseline_rows": 3,
+      "raw_rows": 12,
+      "stitched_rows": 3,
+      "naive_rows": 0,
+      "original_inputs_unchanged": true,
+      "mapq_ranking_equivalence": "not_established"
+    },
+    {
+      "case": "permuted_input",
+      "pair_sets_equal": true,
+      "pairs": [
+        [
+          "ctg10",
+          "ctg2",
+          "+"
+        ],
+        [
+          "ctg10",
+          "rc_ctg",
+          "-"
+        ],
+        [
+          "ctg2",
+          "rc_ctg",
+          "-"
+        ]
+      ],
+      "relation_equal": true,
+      "baseline_rows": 3,
+      "raw_rows": 12,
+      "stitched_rows": 3,
+      "naive_rows": 0,
+      "original_inputs_unchanged": true,
+      "mapq_ranking_equivalence": "not_established"
+    },
+    {
+      "case": "boundary_indel",
+      "pair_sets_equal": true,
+      "pairs": [
+        [
+          "ctg10",
+          "ctg2",
+          "+"
+        ],
+        [
+          "ctg10",
+          "rc_ctg",
+          "-"
+        ],
+        [
+          "ctg2",
+          "rc_ctg",
+          "-"
+        ]
+      ],
+      "relation_equal": true,
+      "baseline_rows": 3,
+      "raw_rows": 13,
+      "stitched_rows": 3,
+      "naive_rows": 0,
+      "original_inputs_unchanged": true,
+      "mapq_ranking_equivalence": "not_established"
+    }
+  ]
+}

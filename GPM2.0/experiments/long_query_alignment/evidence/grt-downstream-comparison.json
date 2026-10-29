@@ -1,0 +1,4466 @@
+{
+  "summary": {
+    "status": "completed_comparisons_not_production_acceptance",
+    "production_ready": false,
+    "customer_validated": false,
+    "harness_sha256": "2dff2655ddbc4fc9429eb11df4facb12baa220f0241bd0bfc9117178e592c471",
+    "server_prepare_sha256": "76a6f4046a6fd5966fd9600305a0034b4a5d5d3be6fcf4b0dfd088f4cba67964",
+    "scope": "initial reference PAF only; self skipped; independent GRT alignments unchanged; no native App",
+    "tool": {
+      "path": "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+      "sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d",
+      "version": "2.31-r1302"
+    },
+    "cases": [
+      {
+        "case": "identity",
+        "inputs_sha256": [
+          "93697182bcbff1e6e7bc4f613c69cde892e3ae0ad3a5c1ed82faa0ad8c6494c8",
+          "8f2a104a67f762c07ce08dc7e0fc7d4dc92c5c3f358f6cf1c1bea1af20160712"
+        ],
+        "relation_equal": true,
+        "status": "completed",
+        "confidence": {
+          "baseline": {
+            "rows": 1,
+            "mapq_histogram": {
+              "60": 1
+            },
+            "numeric_mapq_ge_20": 1,
+            "known_mapq_ge_20": 1,
+            "unknown_mapq": 0,
+            "primary_tags": 1,
+            "secondary_tags": 0
+          },
+          "stitched": {
+            "rows": 1,
+            "mapq_histogram": {
+              "255": 1
+            },
+            "numeric_mapq_ge_20": 1,
+            "known_mapq_ge_20": 0,
+            "unknown_mapq": 1,
+            "primary_tags": 0,
+            "secondary_tags": 0
+          }
+        },
+        "ranking_equivalence": "not_established",
+        "scientific_projection_equal": true,
+        "all_checks_equal": true,
+        "raw_metadata_equal": false,
+        "raw_different_files": [
+          "metadata/grt_evidence_registry.tsv",
+          "metadata/grt_stage_status.tsv"
+        ],
+        "accepted_event_counts": [
+          0,
+          0
+        ],
+        "accepted_event_actions": [
+          [],
+          []
+        ],
+        "failed_checks": [],
+        "coordinate_and_downstream_equal": true
+      },
+      {
+        "case": "reverse_indel",
+        "inputs_sha256": [
+          "93697182bcbff1e6e7bc4f613c69cde892e3ae0ad3a5c1ed82faa0ad8c6494c8",
+          "b8b443c3cd9719d9983988de272b5afebc08eb0fa687d884b4297263585c91d0"
+        ],
+        "relation_equal": true,
+        "status": "completed",
+        "confidence": {
+          "baseline": {
+            "rows": 1,
+            "mapq_histogram": {
+              "60": 1
+            },
+            "numeric_mapq_ge_20": 1,
+            "known_mapq_ge_20": 1,
+            "unknown_mapq": 0,
+            "primary_tags": 1,
+            "secondary_tags": 0
+          },
+          "stitched": {
+            "rows": 1,
+            "mapq_histogram": {
+              "255": 1
+            },
+            "numeric_mapq_ge_20": 1,
+            "known_mapq_ge_20": 0,
+            "unknown_mapq": 1,
+            "primary_tags": 0,
+            "secondary_tags": 0
+          }
+        },
+        "ranking_equivalence": "not_established",
+        "scientific_projection_equal": true,
+        "all_checks_equal": true,
+        "raw_metadata_equal": false,
+        "raw_different_files": [
+          "metadata/grt_evidence_registry.tsv",
+          "metadata/grt_stage_status.tsv"
+        ],
+        "accepted_event_counts": [
+          0,
+          0
+        ],
+        "accepted_event_actions": [
+          [],
+          []
+        ],
+        "failed_checks": [],
+        "coordinate_and_downstream_equal": true
+      },
+      {
+        "case": "gap_with_donor",
+        "inputs_sha256": [
+          "93697182bcbff1e6e7bc4f613c69cde892e3ae0ad3a5c1ed82faa0ad8c6494c8",
+          "0e72c85d05f374e79510ba38bc00f107ff17180a8a415e1105ba0743e5740dce"
+        ],
+        "relation_equal": true,
+        "status": "completed",
+        "confidence": {
+          "baseline": {
+            "rows": 3,
+            "mapq_histogram": {
+              "60": 3
+            },
+            "numeric_mapq_ge_20": 3,
+            "known_mapq_ge_20": 3,
+            "unknown_mapq": 0,
+            "primary_tags": 3,
+            "secondary_tags": 0
+          },
+          "stitched": {
+            "rows": 3,
+            "mapq_histogram": {
+              "255": 3
+            },
+            "numeric_mapq_ge_20": 3,
+            "known_mapq_ge_20": 0,
+            "unknown_mapq": 3,
+            "primary_tags": 0,
+            "secondary_tags": 0
+          }
+        },
+        "ranking_equivalence": "not_established",
+        "scientific_projection_equal": true,
+        "all_checks_equal": true,
+        "raw_metadata_equal": false,
+        "raw_different_files": [
+          "metadata/grt_evidence_registry.tsv",
+          "metadata/grt_stage_status.tsv"
+        ],
+        "accepted_event_counts": [
+          1,
+          1
+        ],
+        "accepted_event_actions": [
+          [
+            "filter_component"
+          ],
+          [
+            "filter_component"
+          ]
+        ],
+        "failed_checks": [],
+        "coordinate_and_downstream_equal": true
+      },
+      {
+        "case": "reverse_gap_with_donor",
+        "inputs_sha256": [
+          "93697182bcbff1e6e7bc4f613c69cde892e3ae0ad3a5c1ed82faa0ad8c6494c8",
+          "421e736efe791face46bd6bf32f2be2f4c7351c99fe2871a52d3e658f26f0d1a"
+        ],
+        "relation_equal": true,
+        "status": "completed",
+        "confidence": {
+          "baseline": {
+            "rows": 3,
+            "mapq_histogram": {
+              "60": 3
+            },
+            "numeric_mapq_ge_20": 3,
+            "known_mapq_ge_20": 3,
+            "unknown_mapq": 0,
+            "primary_tags": 3,
+            "secondary_tags": 0
+          },
+          "stitched": {
+            "rows": 3,
+            "mapq_histogram": {
+              "255": 3
+            },
+            "numeric_mapq_ge_20": 3,
+            "known_mapq_ge_20": 0,
+            "unknown_mapq": 3,
+            "primary_tags": 0,
+            "secondary_tags": 0
+          }
+        },
+        "ranking_equivalence": "not_established",
+        "scientific_projection_equal": true,
+        "all_checks_equal": true,
+        "raw_metadata_equal": false,
+        "raw_different_files": [
+          "metadata/grt_evidence_registry.tsv",
+          "metadata/grt_stage_status.tsv"
+        ],
+        "accepted_event_counts": [
+          1,
+          1
+        ],
+        "accepted_event_actions": [
+          [
+            "filter_component"
+          ],
+          [
+            "filter_component"
+          ]
+        ],
+        "failed_checks": [],
+        "coordinate_and_downstream_equal": true
+      },
+      {
+        "case": "competing_targets",
+        "inputs_sha256": [
+          "a5517318abea65db7bdb9df9db32b23e0b22786cfd8a35e1dc3c1668206bc380",
+          "8f2a104a67f762c07ce08dc7e0fc7d4dc92c5c3f358f6cf1c1bea1af20160712"
+        ],
+        "relation_equal": true,
+        "status": "completed",
+        "confidence": {
+          "baseline": {
+            "rows": 2,
+            "mapq_histogram": {
+              "0": 2
+            },
+            "numeric_mapq_ge_20": 0,
+            "known_mapq_ge_20": 0,
+            "unknown_mapq": 0,
+            "primary_tags": 1,
+            "secondary_tags": 1
+          },
+          "stitched": {
+            "rows": 2,
+            "mapq_histogram": {
+              "255": 2
+            },
+            "numeric_mapq_ge_20": 2,
+            "known_mapq_ge_20": 0,
+            "unknown_mapq": 2,
+            "primary_tags": 0,
+            "secondary_tags": 0
+          }
+        },
+        "ranking_equivalence": "not_established",
+        "scientific_projection_equal": true,
+        "all_checks_equal": true,
+        "raw_metadata_equal": false,
+        "raw_different_files": [
+          "metadata/grt_evidence_registry.tsv",
+          "metadata/grt_stage_status.tsv"
+        ],
+        "accepted_event_counts": [
+          0,
+          0
+        ],
+        "accepted_event_actions": [
+          [],
+          []
+        ],
+        "failed_checks": [],
+        "coordinate_and_downstream_equal": true
+      },
+      {
+        "case": "local_repeat_competition",
+        "inputs_sha256": [
+          "a1f82ddb16f447ec7729cdd4568e3ac75563d47a4e65f8f69a21894164062688",
+          "8f2a104a67f762c07ce08dc7e0fc7d4dc92c5c3f358f6cf1c1bea1af20160712"
+        ],
+        "relation_equal": false,
+        "status": "completed",
+        "confidence": {
+          "baseline": {
+            "rows": 1,
+            "mapq_histogram": {
+              "60": 1
+            },
+            "numeric_mapq_ge_20": 1,
+            "known_mapq_ge_20": 1,
+            "unknown_mapq": 0,
+            "primary_tags": 1,
+            "secondary_tags": 0
+          },
+          "stitched": {
+            "rows": 2,
+            "mapq_histogram": {
+              "255": 2
+            },
+            "numeric_mapq_ge_20": 2,
+            "known_mapq_ge_20": 0,
+            "unknown_mapq": 2,
+            "primary_tags": 0,
+            "secondary_tags": 0
+          }
+        },
+        "ranking_equivalence": "not_established",
+        "scientific_projection_equal": true,
+        "all_checks_equal": true,
+        "raw_metadata_equal": false,
+        "raw_different_files": [
+          "metadata/grt_evidence_registry.tsv",
+          "metadata/grt_stage_status.tsv"
+        ],
+        "accepted_event_counts": [
+          0,
+          0
+        ],
+        "accepted_event_actions": [
+          [],
+          []
+        ],
+        "failed_checks": [],
+        "coordinate_and_downstream_equal": false
+      },
+      {
+        "case": "repeat_assignment_threshold",
+        "inputs_sha256": [
+          "104c2b9f79a351bbb3347c60c0a117118d23ab831ec06644acdfffb19ed0986c",
+          "8f2a104a67f762c07ce08dc7e0fc7d4dc92c5c3f358f6cf1c1bea1af20160712"
+        ],
+        "relation_equal": false,
+        "status": "completed",
+        "confidence": {
+          "baseline": {
+            "rows": 1,
+            "mapq_histogram": {
+              "60": 1
+            },
+            "numeric_mapq_ge_20": 1,
+            "known_mapq_ge_20": 1,
+            "unknown_mapq": 0,
+            "primary_tags": 1,
+            "secondary_tags": 0
+          },
+          "stitched": {
+            "rows": 2,
+            "mapq_histogram": {
+              "255": 2
+            },
+            "numeric_mapq_ge_20": 2,
+            "known_mapq_ge_20": 0,
+            "unknown_mapq": 2,
+            "primary_tags": 0,
+            "secondary_tags": 0
+          }
+        },
+        "ranking_equivalence": "not_established",
+        "scientific_projection_equal": false,
+        "all_checks_equal": false,
+        "raw_metadata_equal": false,
+        "raw_different_files": [
+          "metadata/grt_evidence_registry.tsv",
+          "metadata/grt_stage_status.tsv"
+        ],
+        "accepted_event_counts": [
+          0,
+          0
+        ],
+        "accepted_event_actions": [
+          [],
+          []
+        ],
+        "failed_checks": [
+          "chromosome assignments"
+        ],
+        "coordinate_and_downstream_equal": false
+      },
+      {
+        "case": "gap_with_external_donor",
+        "inputs_sha256": [
+          "93697182bcbff1e6e7bc4f613c69cde892e3ae0ad3a5c1ed82faa0ad8c6494c8",
+          "5a110f9194fc70d5cda3ceecf69d87f7849fdb1566303acac3c8ad0200c83ab4",
+          "6795a7f3c960b617b1f9d2a6125a6aa44bf11366984a792d0989e151c04d4ab2"
+        ],
+        "relation_equal": true,
+        "status": "completed",
+        "confidence": {
+          "baseline": {
+            "rows": 2,
+            "mapq_histogram": {
+              "60": 2
+            },
+            "numeric_mapq_ge_20": 2,
+            "known_mapq_ge_20": 2,
+            "unknown_mapq": 0,
+            "primary_tags": 2,
+            "secondary_tags": 0
+          },
+          "stitched": {
+            "rows": 2,
+            "mapq_histogram": {
+              "255": 2
+            },
+            "numeric_mapq_ge_20": 2,
+            "known_mapq_ge_20": 0,
+            "unknown_mapq": 2,
+            "primary_tags": 0,
+            "secondary_tags": 0
+          }
+        },
+        "ranking_equivalence": "not_established",
+        "scientific_projection_equal": true,
+        "all_checks_equal": true,
+        "raw_metadata_equal": false,
+        "raw_different_files": [
+          "metadata/grt_evidence_registry.tsv",
+          "metadata/grt_stage_status.tsv"
+        ],
+        "accepted_event_counts": [
+          1,
+          1
+        ],
+        "accepted_event_actions": [
+          [
+            "patch"
+          ],
+          [
+            "patch"
+          ]
+        ],
+        "failed_checks": [],
+        "coordinate_and_downstream_equal": true
+      },
+      {
+        "case": "reverse_gap_with_external_donor",
+        "inputs_sha256": [
+          "93697182bcbff1e6e7bc4f613c69cde892e3ae0ad3a5c1ed82faa0ad8c6494c8",
+          "ea9876f3f2fc8aafdae3cf5ef51a3ba311e83dcaba6d9d2b4fbaa77c6e54c6c8",
+          "6795a7f3c960b617b1f9d2a6125a6aa44bf11366984a792d0989e151c04d4ab2"
+        ],
+        "relation_equal": true,
+        "status": "completed",
+        "confidence": {
+          "baseline": {
+            "rows": 2,
+            "mapq_histogram": {
+              "60": 2
+            },
+            "numeric_mapq_ge_20": 2,
+            "known_mapq_ge_20": 2,
+            "unknown_mapq": 0,
+            "primary_tags": 2,
+            "secondary_tags": 0
+          },
+          "stitched": {
+            "rows": 2,
+            "mapq_histogram": {
+              "255": 2
+            },
+            "numeric_mapq_ge_20": 2,
+            "known_mapq_ge_20": 0,
+            "unknown_mapq": 2,
+            "primary_tags": 0,
+            "secondary_tags": 0
+          }
+        },
+        "ranking_equivalence": "not_established",
+        "scientific_projection_equal": true,
+        "all_checks_equal": true,
+        "raw_metadata_equal": false,
+        "raw_different_files": [
+          "metadata/grt_evidence_registry.tsv",
+          "metadata/grt_stage_status.tsv"
+        ],
+        "accepted_event_counts": [
+          1,
+          1
+        ],
+        "accepted_event_actions": [
+          [
+            "patch"
+          ],
+          [
+            "patch"
+          ]
+        ],
+        "failed_checks": [],
+        "coordinate_and_downstream_equal": true
+      }
+    ]
+  },
+  "case_reports": {
+    "identity": {
+      "checks": [
+        {
+          "label": "chromosome assignments",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "4abf2d60f87b5a56da881e69b8a71dc3d7c301c5f460637fd471c4a46ce84012",
+            "4abf2d60f87b5a56da881e69b8a71dc3d7c301c5f460637fd471c4a46ce84012"
+          ]
+        },
+        {
+          "label": "q0 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q1 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q2 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q3 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q4 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "complete ordered event semantics except generated trace IDs",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "e26363aac5c6d09903c102ba94f31ec0d08a601d1fbacc3aca07e144a654d406",
+            "e26363aac5c6d09903c102ba94f31ec0d08a601d1fbacc3aca07e144a654d406"
+          ]
+        },
+        {
+          "label": "all Q versions ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "ed87e73410b460b8febe6c24521fa8446cfdc9b2e55d0672f0a55b6db19a725a",
+            "ed87e73410b460b8febe6c24521fa8446cfdc9b2e55d0672f0a55b6db19a725a"
+          ]
+        },
+        {
+          "label": "all Q versions source card lineage",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "ab7d626a018d25ccb1fbe2d0cc4954de21c0b121a2091ee25691e6797936820b",
+            "ab7d626a018d25ccb1fbe2d0cc4954de21c0b121a2091ee25691e6797936820b"
+          ]
+        },
+        {
+          "label": "strict grt_donor_fragments.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "strict grt_donor_members.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "strict grt_contig_roles.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "c2c1d344c8f1448e4b7234b1c1b6c1511f94bd802556d0da82d4c6abb14ef216",
+            "c2c1d344c8f1448e4b7234b1c1b6c1511f94bd802556d0da82d4c6abb14ef216"
+          ]
+        },
+        {
+          "label": "final events semantic projection",
+          "category": "audit_projection",
+          "equal": true,
+          "sha256": [
+            "33e888b1b92df4289b6166907a7a30dd02e46615bac7965a8c6e4b4a39542ab0",
+            "33e888b1b92df4289b6166907a7a30dd02e46615bac7965a8c6e4b4a39542ab0"
+          ]
+        },
+        {
+          "label": "final accepted events semantic projection",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "cb432c6b49fe8d30973c84b5c4a1c45ab6e307c7d04fd18ed625057e1663563f",
+            "cb432c6b49fe8d30973c84b5c4a1c45ab6e307c7d04fd18ed625057e1663563f"
+          ]
+        },
+        {
+          "label": "step2 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict strategies",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "54566a4b2dcf68a241f21a99e9b84c7f26e7caf8c65c1a3301dd6d556aaee49c",
+            "54566a4b2dcf68a241f21a99e9b84c7f26e7caf8c65c1a3301dd6d556aaee49c"
+          ]
+        },
+        {
+          "label": "step2 strict candidates.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict rejections.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "74058011009744296d14019ca648bca789d398aa426d71ad8f1989e4bda7468d",
+            "74058011009744296d14019ca648bca789d398aa426d71ad8f1989e4bda7468d"
+          ]
+        },
+        {
+          "label": "step3 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict classification_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "Final Path ordered kinds sources orientations DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "c90063be5b17b177e274057256bd7ff41e0be8377cf3b6e3255ea41d254f093a",
+            "c90063be5b17b177e274057256bd7ff41e0be8377cf3b6e3255ea41d254f093a"
+          ]
+        },
+        {
+          "label": "baseline Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "candidate Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        }
+      ],
+      "raw_metadata": [
+        {
+          "path": "metadata/grt_contig_quality.tsv",
+          "equal": true,
+          "sha256": [
+            "84929dc5aa0355957b7e13ddf56db90140a42770bbc6661a3fdc72f4b5051b3e",
+            "84929dc5aa0355957b7e13ddf56db90140a42770bbc6661a3fdc72f4b5051b3e"
+          ]
+        },
+        {
+          "path": "metadata/grt_contig_roles.tsv",
+          "equal": true,
+          "sha256": [
+            "f22913f4eef0332afff76943a69f4b3928352eddc04b68ad082d7ea6dea153fc",
+            "f22913f4eef0332afff76943a69f4b3928352eddc04b68ad082d7ea6dea153fc"
+          ]
+        },
+        {
+          "path": "metadata/grt_contract_summary.json",
+          "equal": true,
+          "sha256": [
+            "6967812c55f3df5774f112ef483870bd4a2ac17436ea6f9eb8dd9904d48899b3",
+            "6967812c55f3df5774f112ef483870bd4a2ac17436ea6f9eb8dd9904d48899b3"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_fragments.tsv",
+          "equal": true,
+          "sha256": [
+            "9143bda2cb1687d95ad329f4b82a3c1479e2072c92d7debe4bb4972a28adcea4",
+            "9143bda2cb1687d95ad329f4b82a3c1479e2072c92d7debe4bb4972a28adcea4"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_members.tsv",
+          "equal": true,
+          "sha256": [
+            "398e0c31345fd6071e4ee1a600aec00bae19bc8646ade8b0ddfadd01798a150d",
+            "398e0c31345fd6071e4ee1a600aec00bae19bc8646ade8b0ddfadd01798a150d"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_sets.tsv",
+          "equal": true,
+          "sha256": [
+            "0fc76f4103e06d0afca6a58715bb4d32b15066564344efe45b554d1a03bdeb26",
+            "0fc76f4103e06d0afca6a58715bb4d32b15066564344efe45b554d1a03bdeb26"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_usage.tsv",
+          "equal": true,
+          "sha256": [
+            "fd7d2b0133e05886b633d589078d9f0b8ded36d4430f1ea004f768a3284f1f91",
+            "fd7d2b0133e05886b633d589078d9f0b8ded36d4430f1ea004f768a3284f1f91"
+          ]
+        },
+        {
+          "path": "metadata/grt_events.jsonl",
+          "equal": true,
+          "sha256": [
+            "09cf249407068f29838ff5d76ebcb8fca724fdbf52726fb94a26bab9ce1eeff2",
+            "09cf249407068f29838ff5d76ebcb8fca724fdbf52726fb94a26bab9ce1eeff2"
+          ]
+        },
+        {
+          "path": "metadata/grt_evidence_registry.tsv",
+          "equal": false,
+          "sha256": [
+            "6f7fd28425ea9e54ee3604575b770fadbad98863a533cf9236bf16df8fef0de3",
+            "80801792e490ccfa4d2a013a034d5af579a2ef7a43f542b55854f0724c61345f"
+          ]
+        },
+        {
+          "path": "metadata/grt_final_path.json",
+          "equal": true,
+          "sha256": [
+            "69752dfd7f34672f4077c194cfe9f49f93596cd8c22288ce0d4bee617833d937",
+            "69752dfd7f34672f4077c194cfe9f49f93596cd8c22288ce0d4bee617833d937"
+          ]
+        },
+        {
+          "path": "metadata/grt_gap_attempts.tsv",
+          "equal": true,
+          "sha256": [
+            "ceffed7bfefbfd5750b5c2731bf94ac1f3ae518ae550f8e0d4a115e6f303eb29",
+            "ceffed7bfefbfd5750b5c2731bf94ac1f3ae518ae550f8e0d4a115e6f303eb29"
+          ]
+        },
+        {
+          "path": "metadata/grt_q_segments.tsv",
+          "equal": true,
+          "sha256": [
+            "4631227d41291d9fa36e3df169f4e21d8f92be8af539f0cb4401a28bd03f2e4c",
+            "4631227d41291d9fa36e3df169f4e21d8f92be8af539f0cb4401a28bd03f2e4c"
+          ]
+        },
+        {
+          "path": "metadata/grt_recipe.tsv",
+          "equal": true,
+          "sha256": [
+            "1b7ad85f6be574b926b23e29372f597bbd554480b2fe5e1f922845395b00aecd",
+            "1b7ad85f6be574b926b23e29372f597bbd554480b2fe5e1f922845395b00aecd"
+          ]
+        },
+        {
+          "path": "metadata/grt_stage_status.tsv",
+          "equal": false,
+          "sha256": [
+            "de540b91f3818d4638f77611a8f7d94b42f1cd8449b9c8d46c374282203c202b",
+            "9223f1aaba1fa5f62f3ee699bd660bfe091ddea330ca6d8d3650bfad5e7a1c00"
+          ]
+        },
+        {
+          "path": "metadata/grt_step2_strategies.tsv",
+          "equal": true,
+          "sha256": [
+            "ddeb1088e820b0829e5d2a58755b72fc8f468549a0c66e64169a4ae8e2419af3",
+            "ddeb1088e820b0829e5d2a58755b72fc8f468549a0c66e64169a4ae8e2419af3"
+          ]
+        },
+        {
+          "path": "metadata/grt_step3_classifications.tsv",
+          "equal": true,
+          "sha256": [
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b",
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b"
+          ]
+        },
+        {
+          "path": "metadata/grt_telomere_rules.tsv",
+          "equal": true,
+          "sha256": [
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496",
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496"
+          ]
+        },
+        {
+          "path": "metadata/grt_tool_versions.tsv",
+          "equal": true,
+          "sha256": [
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d",
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d"
+          ]
+        },
+        {
+          "path": "metadata/grt_used_contigs.tsv",
+          "equal": true,
+          "sha256": [
+            "f07fd2d9423af4358277085e8e0133f6735dde23eec0112ec8a67cff4661f9cf",
+            "f07fd2d9423af4358277085e8e0133f6735dde23eec0112ec8a67cff4661f9cf"
+          ]
+        }
+      ],
+      "scientific_projection_equal": true,
+      "all_checks_equal": true,
+      "raw_metadata_equal": false,
+      "raw_different_files": [
+        "metadata/grt_evidence_registry.tsv",
+        "metadata/grt_stage_status.tsv"
+      ],
+      "accepted_event_counts": [
+        0,
+        0
+      ],
+      "accepted_event_actions": [
+        [],
+        []
+      ]
+    },
+    "reverse_indel": {
+      "checks": [
+        {
+          "label": "chromosome assignments",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "afe26fba8be7e546b946c7e01fbaaa0140ed77e795a330fa3b505ec6aeb989b7",
+            "afe26fba8be7e546b946c7e01fbaaa0140ed77e795a330fa3b505ec6aeb989b7"
+          ]
+        },
+        {
+          "label": "q0 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "035d0fcaafffde2a396e2d73166815688b120810a841ae512f3275f06cf259e4",
+            "035d0fcaafffde2a396e2d73166815688b120810a841ae512f3275f06cf259e4"
+          ]
+        },
+        {
+          "label": "q1 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "035d0fcaafffde2a396e2d73166815688b120810a841ae512f3275f06cf259e4",
+            "035d0fcaafffde2a396e2d73166815688b120810a841ae512f3275f06cf259e4"
+          ]
+        },
+        {
+          "label": "q2 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "035d0fcaafffde2a396e2d73166815688b120810a841ae512f3275f06cf259e4",
+            "035d0fcaafffde2a396e2d73166815688b120810a841ae512f3275f06cf259e4"
+          ]
+        },
+        {
+          "label": "q3 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "035d0fcaafffde2a396e2d73166815688b120810a841ae512f3275f06cf259e4",
+            "035d0fcaafffde2a396e2d73166815688b120810a841ae512f3275f06cf259e4"
+          ]
+        },
+        {
+          "label": "q4 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "035d0fcaafffde2a396e2d73166815688b120810a841ae512f3275f06cf259e4",
+            "035d0fcaafffde2a396e2d73166815688b120810a841ae512f3275f06cf259e4"
+          ]
+        },
+        {
+          "label": "complete ordered event semantics except generated trace IDs",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "e5b4ae5181b298d55de257be1fd7f3783cae8a3d1fa809f8a9b5edb7fdd30e76",
+            "e5b4ae5181b298d55de257be1fd7f3783cae8a3d1fa809f8a9b5edb7fdd30e76"
+          ]
+        },
+        {
+          "label": "all Q versions ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "23877f0df0053b95764082ff74f2e1f178b194bcea2260e6dd6071430bf6167b",
+            "23877f0df0053b95764082ff74f2e1f178b194bcea2260e6dd6071430bf6167b"
+          ]
+        },
+        {
+          "label": "all Q versions source card lineage",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "a4bfbf51e87d0743bb634ac755509e4bf9c82444f604b693c3582f588e716551",
+            "a4bfbf51e87d0743bb634ac755509e4bf9c82444f604b693c3582f588e716551"
+          ]
+        },
+        {
+          "label": "strict grt_donor_fragments.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "strict grt_donor_members.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "strict grt_contig_roles.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "c2c1d344c8f1448e4b7234b1c1b6c1511f94bd802556d0da82d4c6abb14ef216",
+            "c2c1d344c8f1448e4b7234b1c1b6c1511f94bd802556d0da82d4c6abb14ef216"
+          ]
+        },
+        {
+          "label": "final events semantic projection",
+          "category": "audit_projection",
+          "equal": true,
+          "sha256": [
+            "3d210487adf1d4a23a7190c091fdd7c03106a8f56f86f7c5c024d294fad9f000",
+            "3d210487adf1d4a23a7190c091fdd7c03106a8f56f86f7c5c024d294fad9f000"
+          ]
+        },
+        {
+          "label": "final accepted events semantic projection",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "f883f923553add241dc639a7b781add9c2ba3a45061146058b249bbeec77a18c",
+            "f883f923553add241dc639a7b781add9c2ba3a45061146058b249bbeec77a18c"
+          ]
+        },
+        {
+          "label": "step2 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict strategies",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "54566a4b2dcf68a241f21a99e9b84c7f26e7caf8c65c1a3301dd6d556aaee49c",
+            "54566a4b2dcf68a241f21a99e9b84c7f26e7caf8c65c1a3301dd6d556aaee49c"
+          ]
+        },
+        {
+          "label": "step2 strict candidates.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict rejections.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "d4a7d5d07a3f2e0e041c9ed1441aee76f78ac1409ce199574fb66e63979d9aec",
+            "d4a7d5d07a3f2e0e041c9ed1441aee76f78ac1409ce199574fb66e63979d9aec"
+          ]
+        },
+        {
+          "label": "step3 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict classification_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "Final Path ordered kinds sources orientations DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "2b97d6f12dcc2e4ca534d874d940617e566e7e02cd4a0f515eee7347ca0f572f",
+            "2b97d6f12dcc2e4ca534d874d940617e566e7e02cd4a0f515eee7347ca0f572f"
+          ]
+        },
+        {
+          "label": "baseline Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "035d0fcaafffde2a396e2d73166815688b120810a841ae512f3275f06cf259e4",
+            "035d0fcaafffde2a396e2d73166815688b120810a841ae512f3275f06cf259e4"
+          ]
+        },
+        {
+          "label": "candidate Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "035d0fcaafffde2a396e2d73166815688b120810a841ae512f3275f06cf259e4",
+            "035d0fcaafffde2a396e2d73166815688b120810a841ae512f3275f06cf259e4"
+          ]
+        }
+      ],
+      "raw_metadata": [
+        {
+          "path": "metadata/grt_contig_quality.tsv",
+          "equal": true,
+          "sha256": [
+            "bf832d213f9d9ef8483029f1d90c07d0101f4692d2d176fa1c0f58a63f5433be",
+            "bf832d213f9d9ef8483029f1d90c07d0101f4692d2d176fa1c0f58a63f5433be"
+          ]
+        },
+        {
+          "path": "metadata/grt_contig_roles.tsv",
+          "equal": true,
+          "sha256": [
+            "f22913f4eef0332afff76943a69f4b3928352eddc04b68ad082d7ea6dea153fc",
+            "f22913f4eef0332afff76943a69f4b3928352eddc04b68ad082d7ea6dea153fc"
+          ]
+        },
+        {
+          "path": "metadata/grt_contract_summary.json",
+          "equal": true,
+          "sha256": [
+            "c16a46acfdce76ffa405b0d0ce569e0a909da3b191f7f2c2d64c0efdb04c9e5b",
+            "c16a46acfdce76ffa405b0d0ce569e0a909da3b191f7f2c2d64c0efdb04c9e5b"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_fragments.tsv",
+          "equal": true,
+          "sha256": [
+            "9143bda2cb1687d95ad329f4b82a3c1479e2072c92d7debe4bb4972a28adcea4",
+            "9143bda2cb1687d95ad329f4b82a3c1479e2072c92d7debe4bb4972a28adcea4"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_members.tsv",
+          "equal": true,
+          "sha256": [
+            "398e0c31345fd6071e4ee1a600aec00bae19bc8646ade8b0ddfadd01798a150d",
+            "398e0c31345fd6071e4ee1a600aec00bae19bc8646ade8b0ddfadd01798a150d"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_sets.tsv",
+          "equal": true,
+          "sha256": [
+            "0fc76f4103e06d0afca6a58715bb4d32b15066564344efe45b554d1a03bdeb26",
+            "0fc76f4103e06d0afca6a58715bb4d32b15066564344efe45b554d1a03bdeb26"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_usage.tsv",
+          "equal": true,
+          "sha256": [
+            "fd7d2b0133e05886b633d589078d9f0b8ded36d4430f1ea004f768a3284f1f91",
+            "fd7d2b0133e05886b633d589078d9f0b8ded36d4430f1ea004f768a3284f1f91"
+          ]
+        },
+        {
+          "path": "metadata/grt_events.jsonl",
+          "equal": true,
+          "sha256": [
+            "2c13e0398f3144660a3e91acd34e9dfffad7877ce56f0b13ae534c4653e4c386",
+            "2c13e0398f3144660a3e91acd34e9dfffad7877ce56f0b13ae534c4653e4c386"
+          ]
+        },
+        {
+          "path": "metadata/grt_evidence_registry.tsv",
+          "equal": false,
+          "sha256": [
+            "e290ee530d1393fbdaf512f8ecea4e288f0d14d4b7b4af767a751e1ed784fea1",
+            "4d7ae7bd5ef3141ae3afda0eea141e04ac9c97b676c9e8c2fadb9f6148e63a80"
+          ]
+        },
+        {
+          "path": "metadata/grt_final_path.json",
+          "equal": true,
+          "sha256": [
+            "a6232da778b392a62f6c6e1af4969fc45136b5f6b0451cc24b820886fd7c072d",
+            "a6232da778b392a62f6c6e1af4969fc45136b5f6b0451cc24b820886fd7c072d"
+          ]
+        },
+        {
+          "path": "metadata/grt_gap_attempts.tsv",
+          "equal": true,
+          "sha256": [
+            "7bc9f248d1ca8997c781992d8565e7b4e025eaaa4df13691d867c47a9348caaf",
+            "7bc9f248d1ca8997c781992d8565e7b4e025eaaa4df13691d867c47a9348caaf"
+          ]
+        },
+        {
+          "path": "metadata/grt_q_segments.tsv",
+          "equal": true,
+          "sha256": [
+            "cf125f7672405cc39e9a8a93745a68146e8924f2043b4a08a234fdfe657de003",
+            "cf125f7672405cc39e9a8a93745a68146e8924f2043b4a08a234fdfe657de003"
+          ]
+        },
+        {
+          "path": "metadata/grt_recipe.tsv",
+          "equal": true,
+          "sha256": [
+            "d6121888c182bf91795f83110ff480db22026c2da1e0fa8f911dbb7b3eeae085",
+            "d6121888c182bf91795f83110ff480db22026c2da1e0fa8f911dbb7b3eeae085"
+          ]
+        },
+        {
+          "path": "metadata/grt_stage_status.tsv",
+          "equal": false,
+          "sha256": [
+            "c1864aeffafbf5e8eb9333d58854146ffe1c5fbaaca932809469efc58cba0e53",
+            "be1b786835fde53831053e075a4c15a37d8917cbf9bb1ee5f8607f33ce782eb0"
+          ]
+        },
+        {
+          "path": "metadata/grt_step2_strategies.tsv",
+          "equal": true,
+          "sha256": [
+            "ddeb1088e820b0829e5d2a58755b72fc8f468549a0c66e64169a4ae8e2419af3",
+            "ddeb1088e820b0829e5d2a58755b72fc8f468549a0c66e64169a4ae8e2419af3"
+          ]
+        },
+        {
+          "path": "metadata/grt_step3_classifications.tsv",
+          "equal": true,
+          "sha256": [
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b",
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b"
+          ]
+        },
+        {
+          "path": "metadata/grt_telomere_rules.tsv",
+          "equal": true,
+          "sha256": [
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496",
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496"
+          ]
+        },
+        {
+          "path": "metadata/grt_tool_versions.tsv",
+          "equal": true,
+          "sha256": [
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d",
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d"
+          ]
+        },
+        {
+          "path": "metadata/grt_used_contigs.tsv",
+          "equal": true,
+          "sha256": [
+            "f07fd2d9423af4358277085e8e0133f6735dde23eec0112ec8a67cff4661f9cf",
+            "f07fd2d9423af4358277085e8e0133f6735dde23eec0112ec8a67cff4661f9cf"
+          ]
+        }
+      ],
+      "scientific_projection_equal": true,
+      "all_checks_equal": true,
+      "raw_metadata_equal": false,
+      "raw_different_files": [
+        "metadata/grt_evidence_registry.tsv",
+        "metadata/grt_stage_status.tsv"
+      ],
+      "accepted_event_counts": [
+        0,
+        0
+      ],
+      "accepted_event_actions": [
+        [],
+        []
+      ]
+    },
+    "gap_with_donor": {
+      "checks": [
+        {
+          "label": "chromosome assignments",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "659b5376e360b8974aaa126db0c48307b10951f91957f2f9d28feab26bb3467b",
+            "659b5376e360b8974aaa126db0c48307b10951f91957f2f9d28feab26bb3467b"
+          ]
+        },
+        {
+          "label": "q0 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "78dcbde121faa2bc6cb8c5c430d75718492960234f9d6cbe6cd6894f52f4cac6",
+            "78dcbde121faa2bc6cb8c5c430d75718492960234f9d6cbe6cd6894f52f4cac6"
+          ]
+        },
+        {
+          "label": "q1 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "78dcbde121faa2bc6cb8c5c430d75718492960234f9d6cbe6cd6894f52f4cac6",
+            "78dcbde121faa2bc6cb8c5c430d75718492960234f9d6cbe6cd6894f52f4cac6"
+          ]
+        },
+        {
+          "label": "q2 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "78dcbde121faa2bc6cb8c5c430d75718492960234f9d6cbe6cd6894f52f4cac6",
+            "78dcbde121faa2bc6cb8c5c430d75718492960234f9d6cbe6cd6894f52f4cac6"
+          ]
+        },
+        {
+          "label": "q3 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd",
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd"
+          ]
+        },
+        {
+          "label": "q4 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd",
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd"
+          ]
+        },
+        {
+          "label": "complete ordered event semantics except generated trace IDs",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "624a41300a56fe7b3440c639b4fba981044ae6fc943068ba730e6d1c8174674d",
+            "624a41300a56fe7b3440c639b4fba981044ae6fc943068ba730e6d1c8174674d"
+          ]
+        },
+        {
+          "label": "all Q versions ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "fd302d3cfc38ece171fd3a9ae1be8b20efe0a5624b54fb15ef94482c784b9247",
+            "fd302d3cfc38ece171fd3a9ae1be8b20efe0a5624b54fb15ef94482c784b9247"
+          ]
+        },
+        {
+          "label": "all Q versions source card lineage",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "69bbc83e64751054e8179f0045291f4c74e69b6a00fa5b0b79a8de14372c3c9a",
+            "69bbc83e64751054e8179f0045291f4c74e69b6a00fa5b0b79a8de14372c3c9a"
+          ]
+        },
+        {
+          "label": "strict grt_donor_fragments.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "strict grt_donor_members.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "strict grt_contig_roles.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "d0a93b92eb571a43d0322953cb95dc6fcc309e3fac529fabdcbec824ef58902f",
+            "d0a93b92eb571a43d0322953cb95dc6fcc309e3fac529fabdcbec824ef58902f"
+          ]
+        },
+        {
+          "label": "final events semantic projection",
+          "category": "audit_projection",
+          "equal": true,
+          "sha256": [
+            "9732d0792b7125b70d54f17b7322574b732f0aaf1626aa5291993167d284a578",
+            "9732d0792b7125b70d54f17b7322574b732f0aaf1626aa5291993167d284a578"
+          ]
+        },
+        {
+          "label": "final accepted events semantic projection",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "86f5bd8896474943fb89daebbf160b45e7ff7257d7387a509f58feba15928f15",
+            "86f5bd8896474943fb89daebbf160b45e7ff7257d7387a509f58feba15928f15"
+          ]
+        },
+        {
+          "label": "step2 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "92cbc3b81d7036e158e1fd99f5236047cb1a86cd62f36cd991714cc539efe58e",
+            "92cbc3b81d7036e158e1fd99f5236047cb1a86cd62f36cd991714cc539efe58e"
+          ]
+        },
+        {
+          "label": "step2 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "68c9957018919b03acf4fdb122d69b6b7fc6648b5e7fb51ebe40cef5b565e00d",
+            "68c9957018919b03acf4fdb122d69b6b7fc6648b5e7fb51ebe40cef5b565e00d"
+          ]
+        },
+        {
+          "label": "step2 strict strategies",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "17399f9f936b62de517c420eb2bd5717aebf56f077df1f9320c3b0b79b89c6b4",
+            "17399f9f936b62de517c420eb2bd5717aebf56f077df1f9320c3b0b79b89c6b4"
+          ]
+        },
+        {
+          "label": "step2 strict candidates.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict rejections.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "6e8e330d9e978ceb597b196c8402242768656c3a7a67dc364c988cd1d37a4317",
+            "6e8e330d9e978ceb597b196c8402242768656c3a7a67dc364c988cd1d37a4317"
+          ]
+        },
+        {
+          "label": "step3 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "f70cde7cd59dea155d74c2712c4a95e529a052567ec61ff5e6e4f499d875f4b0",
+            "f70cde7cd59dea155d74c2712c4a95e529a052567ec61ff5e6e4f499d875f4b0"
+          ]
+        },
+        {
+          "label": "step3 strict classification_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "Final Path ordered kinds sources orientations DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "41a8952b09f414f6a03af6ea947ab0ab0436f29073c0b7e2c86acdaeeeacedca",
+            "41a8952b09f414f6a03af6ea947ab0ab0436f29073c0b7e2c86acdaeeeacedca"
+          ]
+        },
+        {
+          "label": "baseline Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd",
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd"
+          ]
+        },
+        {
+          "label": "candidate Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd",
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd"
+          ]
+        }
+      ],
+      "raw_metadata": [
+        {
+          "path": "metadata/grt_contig_quality.tsv",
+          "equal": true,
+          "sha256": [
+            "df1dc1f94eabf0c5d88d0bfda48e1dcf83a13ebf4c44bcd9465214c2b0a7ce94",
+            "df1dc1f94eabf0c5d88d0bfda48e1dcf83a13ebf4c44bcd9465214c2b0a7ce94"
+          ]
+        },
+        {
+          "path": "metadata/grt_contig_roles.tsv",
+          "equal": true,
+          "sha256": [
+            "ec6d30ee0188c57eeb821459cadbb5afc19b657ebfbd6734d78e0ffdc61b6f19",
+            "ec6d30ee0188c57eeb821459cadbb5afc19b657ebfbd6734d78e0ffdc61b6f19"
+          ]
+        },
+        {
+          "path": "metadata/grt_contract_summary.json",
+          "equal": true,
+          "sha256": [
+            "c36010e98c830e8cc1e9093ebb9f1df3f07fdb2050884b8de1d6ac8ecf8ab8bc",
+            "c36010e98c830e8cc1e9093ebb9f1df3f07fdb2050884b8de1d6ac8ecf8ab8bc"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_fragments.tsv",
+          "equal": true,
+          "sha256": [
+            "9143bda2cb1687d95ad329f4b82a3c1479e2072c92d7debe4bb4972a28adcea4",
+            "9143bda2cb1687d95ad329f4b82a3c1479e2072c92d7debe4bb4972a28adcea4"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_members.tsv",
+          "equal": true,
+          "sha256": [
+            "398e0c31345fd6071e4ee1a600aec00bae19bc8646ade8b0ddfadd01798a150d",
+            "398e0c31345fd6071e4ee1a600aec00bae19bc8646ade8b0ddfadd01798a150d"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_sets.tsv",
+          "equal": true,
+          "sha256": [
+            "0fc76f4103e06d0afca6a58715bb4d32b15066564344efe45b554d1a03bdeb26",
+            "0fc76f4103e06d0afca6a58715bb4d32b15066564344efe45b554d1a03bdeb26"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_usage.tsv",
+          "equal": true,
+          "sha256": [
+            "fd7d2b0133e05886b633d589078d9f0b8ded36d4430f1ea004f768a3284f1f91",
+            "fd7d2b0133e05886b633d589078d9f0b8ded36d4430f1ea004f768a3284f1f91"
+          ]
+        },
+        {
+          "path": "metadata/grt_events.jsonl",
+          "equal": true,
+          "sha256": [
+            "98e5cfb66654ae587695ffcb843dca6d759a6e46e87208039ebdfeff6181b712",
+            "98e5cfb66654ae587695ffcb843dca6d759a6e46e87208039ebdfeff6181b712"
+          ]
+        },
+        {
+          "path": "metadata/grt_evidence_registry.tsv",
+          "equal": false,
+          "sha256": [
+            "ecd0bbd388a875f52ad5e0d32258d28fd42c13e5522b73ecb1030d55996422e8",
+            "1506f3ebcc28fbdce337f5438f6fa15798421536900f23120243cebf831ef89f"
+          ]
+        },
+        {
+          "path": "metadata/grt_final_path.json",
+          "equal": true,
+          "sha256": [
+            "f06a4c2e7d1e568ffc5a031ee6ab572c9f16556d62561c9318512bce6e085609",
+            "f06a4c2e7d1e568ffc5a031ee6ab572c9f16556d62561c9318512bce6e085609"
+          ]
+        },
+        {
+          "path": "metadata/grt_gap_attempts.tsv",
+          "equal": true,
+          "sha256": [
+            "42c3b1cf4b15d9048025d5126d97c3464e865f5228b84feaecb7fd824ace321b",
+            "42c3b1cf4b15d9048025d5126d97c3464e865f5228b84feaecb7fd824ace321b"
+          ]
+        },
+        {
+          "path": "metadata/grt_q_segments.tsv",
+          "equal": true,
+          "sha256": [
+            "f35f591e8fbf8b7d0d23e93b811dd8d9164fdb116578e7039f8d95995c0be32a",
+            "f35f591e8fbf8b7d0d23e93b811dd8d9164fdb116578e7039f8d95995c0be32a"
+          ]
+        },
+        {
+          "path": "metadata/grt_recipe.tsv",
+          "equal": true,
+          "sha256": [
+            "0f1e48e4873cbd06fe15aa2d438b5738b5e6ae56165ebaf8acffbdc172194ea2",
+            "0f1e48e4873cbd06fe15aa2d438b5738b5e6ae56165ebaf8acffbdc172194ea2"
+          ]
+        },
+        {
+          "path": "metadata/grt_stage_status.tsv",
+          "equal": false,
+          "sha256": [
+            "61c32eba61a5b2bc2f40d96fb3076b0b44f70240e02aef7a7c32eb3dd5f5f6c6",
+            "b613a1e09bb8f48a2776c5c0dda1bc85d44ae77a8b1b073e98c04f3a9578bc40"
+          ]
+        },
+        {
+          "path": "metadata/grt_step2_strategies.tsv",
+          "equal": true,
+          "sha256": [
+            "76abffc081bd3841001e1ea85d9dd3606631ede23e876e09a8addcd49819ca05",
+            "76abffc081bd3841001e1ea85d9dd3606631ede23e876e09a8addcd49819ca05"
+          ]
+        },
+        {
+          "path": "metadata/grt_step3_classifications.tsv",
+          "equal": true,
+          "sha256": [
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b",
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b"
+          ]
+        },
+        {
+          "path": "metadata/grt_telomere_rules.tsv",
+          "equal": true,
+          "sha256": [
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496",
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496"
+          ]
+        },
+        {
+          "path": "metadata/grt_tool_versions.tsv",
+          "equal": true,
+          "sha256": [
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d",
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d"
+          ]
+        },
+        {
+          "path": "metadata/grt_used_contigs.tsv",
+          "equal": true,
+          "sha256": [
+            "f07fd2d9423af4358277085e8e0133f6735dde23eec0112ec8a67cff4661f9cf",
+            "f07fd2d9423af4358277085e8e0133f6735dde23eec0112ec8a67cff4661f9cf"
+          ]
+        }
+      ],
+      "scientific_projection_equal": true,
+      "all_checks_equal": true,
+      "raw_metadata_equal": false,
+      "raw_different_files": [
+        "metadata/grt_evidence_registry.tsv",
+        "metadata/grt_stage_status.tsv"
+      ],
+      "accepted_event_counts": [
+        1,
+        1
+      ],
+      "accepted_event_actions": [
+        [
+          "filter_component"
+        ],
+        [
+          "filter_component"
+        ]
+      ]
+    },
+    "reverse_gap_with_donor": {
+      "checks": [
+        {
+          "label": "chromosome assignments",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "66786d41b5579e6e6f66b33fc5c8faa4b4b8f8f177301044fbe06ff97d9fe13d",
+            "66786d41b5579e6e6f66b33fc5c8faa4b4b8f8f177301044fbe06ff97d9fe13d"
+          ]
+        },
+        {
+          "label": "q0 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "78dcbde121faa2bc6cb8c5c430d75718492960234f9d6cbe6cd6894f52f4cac6",
+            "78dcbde121faa2bc6cb8c5c430d75718492960234f9d6cbe6cd6894f52f4cac6"
+          ]
+        },
+        {
+          "label": "q1 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "78dcbde121faa2bc6cb8c5c430d75718492960234f9d6cbe6cd6894f52f4cac6",
+            "78dcbde121faa2bc6cb8c5c430d75718492960234f9d6cbe6cd6894f52f4cac6"
+          ]
+        },
+        {
+          "label": "q2 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "78dcbde121faa2bc6cb8c5c430d75718492960234f9d6cbe6cd6894f52f4cac6",
+            "78dcbde121faa2bc6cb8c5c430d75718492960234f9d6cbe6cd6894f52f4cac6"
+          ]
+        },
+        {
+          "label": "q3 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd",
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd"
+          ]
+        },
+        {
+          "label": "q4 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd",
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd"
+          ]
+        },
+        {
+          "label": "complete ordered event semantics except generated trace IDs",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "624a41300a56fe7b3440c639b4fba981044ae6fc943068ba730e6d1c8174674d",
+            "624a41300a56fe7b3440c639b4fba981044ae6fc943068ba730e6d1c8174674d"
+          ]
+        },
+        {
+          "label": "all Q versions ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "bd21382c4aaa2433e0ff61b4c6021bbc230ff89d1e985d06eaaae89206438e84",
+            "bd21382c4aaa2433e0ff61b4c6021bbc230ff89d1e985d06eaaae89206438e84"
+          ]
+        },
+        {
+          "label": "all Q versions source card lineage",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "169fe4bd9a55545e46971e22bebabf75a2b287cb306db6729815d1a598785aad",
+            "169fe4bd9a55545e46971e22bebabf75a2b287cb306db6729815d1a598785aad"
+          ]
+        },
+        {
+          "label": "strict grt_donor_fragments.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "strict grt_donor_members.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "strict grt_contig_roles.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "d0a93b92eb571a43d0322953cb95dc6fcc309e3fac529fabdcbec824ef58902f",
+            "d0a93b92eb571a43d0322953cb95dc6fcc309e3fac529fabdcbec824ef58902f"
+          ]
+        },
+        {
+          "label": "final events semantic projection",
+          "category": "audit_projection",
+          "equal": true,
+          "sha256": [
+            "9732d0792b7125b70d54f17b7322574b732f0aaf1626aa5291993167d284a578",
+            "9732d0792b7125b70d54f17b7322574b732f0aaf1626aa5291993167d284a578"
+          ]
+        },
+        {
+          "label": "final accepted events semantic projection",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "86f5bd8896474943fb89daebbf160b45e7ff7257d7387a509f58feba15928f15",
+            "86f5bd8896474943fb89daebbf160b45e7ff7257d7387a509f58feba15928f15"
+          ]
+        },
+        {
+          "label": "step2 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "8b5bc76c2f302c040dd83ef3bb839a2e82035ba659547ceb881dd7bc54e6f876",
+            "8b5bc76c2f302c040dd83ef3bb839a2e82035ba659547ceb881dd7bc54e6f876"
+          ]
+        },
+        {
+          "label": "step2 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "2b7fe6395e9581e16829f20bd4829b29abcf1e7f3e487578ee49f1fcce16cf30",
+            "2b7fe6395e9581e16829f20bd4829b29abcf1e7f3e487578ee49f1fcce16cf30"
+          ]
+        },
+        {
+          "label": "step2 strict strategies",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "17399f9f936b62de517c420eb2bd5717aebf56f077df1f9320c3b0b79b89c6b4",
+            "17399f9f936b62de517c420eb2bd5717aebf56f077df1f9320c3b0b79b89c6b4"
+          ]
+        },
+        {
+          "label": "step2 strict candidates.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict rejections.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "0b5c4bf95882d300eba4cc2917a971d9e1b46f6ddfc4fe21df23363348870d15",
+            "0b5c4bf95882d300eba4cc2917a971d9e1b46f6ddfc4fe21df23363348870d15"
+          ]
+        },
+        {
+          "label": "step3 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "7f7a77af5589d5ba53a5d169f4f9e0887024355db204c8d5f50d628566a4eff7",
+            "7f7a77af5589d5ba53a5d169f4f9e0887024355db204c8d5f50d628566a4eff7"
+          ]
+        },
+        {
+          "label": "step3 strict classification_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "Final Path ordered kinds sources orientations DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "fbe979a100c10c2aab1a2fa135437d9b39be1751524379a880debe40aab3f2a6",
+            "fbe979a100c10c2aab1a2fa135437d9b39be1751524379a880debe40aab3f2a6"
+          ]
+        },
+        {
+          "label": "baseline Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd",
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd"
+          ]
+        },
+        {
+          "label": "candidate Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd",
+            "2354fc133b067796432f919b402e384fcab46989d45eb28ce8a723cef6fb7fcd"
+          ]
+        }
+      ],
+      "raw_metadata": [
+        {
+          "path": "metadata/grt_contig_quality.tsv",
+          "equal": true,
+          "sha256": [
+            "df1dc1f94eabf0c5d88d0bfda48e1dcf83a13ebf4c44bcd9465214c2b0a7ce94",
+            "df1dc1f94eabf0c5d88d0bfda48e1dcf83a13ebf4c44bcd9465214c2b0a7ce94"
+          ]
+        },
+        {
+          "path": "metadata/grt_contig_roles.tsv",
+          "equal": true,
+          "sha256": [
+            "ec6d30ee0188c57eeb821459cadbb5afc19b657ebfbd6734d78e0ffdc61b6f19",
+            "ec6d30ee0188c57eeb821459cadbb5afc19b657ebfbd6734d78e0ffdc61b6f19"
+          ]
+        },
+        {
+          "path": "metadata/grt_contract_summary.json",
+          "equal": true,
+          "sha256": [
+            "c36010e98c830e8cc1e9093ebb9f1df3f07fdb2050884b8de1d6ac8ecf8ab8bc",
+            "c36010e98c830e8cc1e9093ebb9f1df3f07fdb2050884b8de1d6ac8ecf8ab8bc"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_fragments.tsv",
+          "equal": true,
+          "sha256": [
+            "9143bda2cb1687d95ad329f4b82a3c1479e2072c92d7debe4bb4972a28adcea4",
+            "9143bda2cb1687d95ad329f4b82a3c1479e2072c92d7debe4bb4972a28adcea4"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_members.tsv",
+          "equal": true,
+          "sha256": [
+            "398e0c31345fd6071e4ee1a600aec00bae19bc8646ade8b0ddfadd01798a150d",
+            "398e0c31345fd6071e4ee1a600aec00bae19bc8646ade8b0ddfadd01798a150d"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_sets.tsv",
+          "equal": true,
+          "sha256": [
+            "0fc76f4103e06d0afca6a58715bb4d32b15066564344efe45b554d1a03bdeb26",
+            "0fc76f4103e06d0afca6a58715bb4d32b15066564344efe45b554d1a03bdeb26"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_usage.tsv",
+          "equal": true,
+          "sha256": [
+            "fd7d2b0133e05886b633d589078d9f0b8ded36d4430f1ea004f768a3284f1f91",
+            "fd7d2b0133e05886b633d589078d9f0b8ded36d4430f1ea004f768a3284f1f91"
+          ]
+        },
+        {
+          "path": "metadata/grt_events.jsonl",
+          "equal": true,
+          "sha256": [
+            "b614618343a244e43ad75bac76dd6cc37c26445cc2059f68c5bf3feaeaa85ebd",
+            "b614618343a244e43ad75bac76dd6cc37c26445cc2059f68c5bf3feaeaa85ebd"
+          ]
+        },
+        {
+          "path": "metadata/grt_evidence_registry.tsv",
+          "equal": false,
+          "sha256": [
+            "25043af9b1ff19b01b889286c9e0fdb3c2d3a3874cb8213d4b251bc6bbadf408",
+            "5edf6c6485ee8f28c6c4379e1467dd98a8f303127fbcb13e78ade6b3bebd136f"
+          ]
+        },
+        {
+          "path": "metadata/grt_final_path.json",
+          "equal": true,
+          "sha256": [
+            "0ce58d63a0f8ed19203c1d09fcd801ee2b68291dd1a1d6950f4908d677e2173e",
+            "0ce58d63a0f8ed19203c1d09fcd801ee2b68291dd1a1d6950f4908d677e2173e"
+          ]
+        },
+        {
+          "path": "metadata/grt_gap_attempts.tsv",
+          "equal": true,
+          "sha256": [
+            "bdda5f2f9e8af6a946f091af206ef40a29d1e5aa9e7fca38de6ac9bee7c3e2a6",
+            "bdda5f2f9e8af6a946f091af206ef40a29d1e5aa9e7fca38de6ac9bee7c3e2a6"
+          ]
+        },
+        {
+          "path": "metadata/grt_q_segments.tsv",
+          "equal": true,
+          "sha256": [
+            "d15b72baf0a721606297829c757643c99274cd7f12665c03541965831047170a",
+            "d15b72baf0a721606297829c757643c99274cd7f12665c03541965831047170a"
+          ]
+        },
+        {
+          "path": "metadata/grt_recipe.tsv",
+          "equal": true,
+          "sha256": [
+            "7fb9c2b56a4b5f2530e69c18483b57e2be6ac728b37d898ce8a549600b81f78d",
+            "7fb9c2b56a4b5f2530e69c18483b57e2be6ac728b37d898ce8a549600b81f78d"
+          ]
+        },
+        {
+          "path": "metadata/grt_stage_status.tsv",
+          "equal": false,
+          "sha256": [
+            "6b4f509f1eba42f5284970d51569c0c572babd5bcf18fe7e0c790a37c607e72b",
+            "fee2bcfa039673ea4d8c68bbb6c9abddbd66be6491a396c10d2cc902e6064683"
+          ]
+        },
+        {
+          "path": "metadata/grt_step2_strategies.tsv",
+          "equal": true,
+          "sha256": [
+            "76abffc081bd3841001e1ea85d9dd3606631ede23e876e09a8addcd49819ca05",
+            "76abffc081bd3841001e1ea85d9dd3606631ede23e876e09a8addcd49819ca05"
+          ]
+        },
+        {
+          "path": "metadata/grt_step3_classifications.tsv",
+          "equal": true,
+          "sha256": [
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b",
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b"
+          ]
+        },
+        {
+          "path": "metadata/grt_telomere_rules.tsv",
+          "equal": true,
+          "sha256": [
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496",
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496"
+          ]
+        },
+        {
+          "path": "metadata/grt_tool_versions.tsv",
+          "equal": true,
+          "sha256": [
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d",
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d"
+          ]
+        },
+        {
+          "path": "metadata/grt_used_contigs.tsv",
+          "equal": true,
+          "sha256": [
+            "f07fd2d9423af4358277085e8e0133f6735dde23eec0112ec8a67cff4661f9cf",
+            "f07fd2d9423af4358277085e8e0133f6735dde23eec0112ec8a67cff4661f9cf"
+          ]
+        }
+      ],
+      "scientific_projection_equal": true,
+      "all_checks_equal": true,
+      "raw_metadata_equal": false,
+      "raw_different_files": [
+        "metadata/grt_evidence_registry.tsv",
+        "metadata/grt_stage_status.tsv"
+      ],
+      "accepted_event_counts": [
+        1,
+        1
+      ],
+      "accepted_event_actions": [
+        [
+          "filter_component"
+        ],
+        [
+          "filter_component"
+        ]
+      ]
+    },
+    "competing_targets": {
+      "checks": [
+        {
+          "label": "chromosome assignments",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "d620e031a60ae8ce82ea74bf52eb79bb9974cf7d3f3f016206064af88c37b454",
+            "d620e031a60ae8ce82ea74bf52eb79bb9974cf7d3f3f016206064af88c37b454"
+          ]
+        },
+        {
+          "label": "q0 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q1 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q2 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q3 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q4 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "complete ordered event semantics except generated trace IDs",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "e26363aac5c6d09903c102ba94f31ec0d08a601d1fbacc3aca07e144a654d406",
+            "e26363aac5c6d09903c102ba94f31ec0d08a601d1fbacc3aca07e144a654d406"
+          ]
+        },
+        {
+          "label": "all Q versions ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "ed87e73410b460b8febe6c24521fa8446cfdc9b2e55d0672f0a55b6db19a725a",
+            "ed87e73410b460b8febe6c24521fa8446cfdc9b2e55d0672f0a55b6db19a725a"
+          ]
+        },
+        {
+          "label": "all Q versions source card lineage",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "ab7d626a018d25ccb1fbe2d0cc4954de21c0b121a2091ee25691e6797936820b",
+            "ab7d626a018d25ccb1fbe2d0cc4954de21c0b121a2091ee25691e6797936820b"
+          ]
+        },
+        {
+          "label": "strict grt_donor_fragments.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "strict grt_donor_members.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "strict grt_contig_roles.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "c2c1d344c8f1448e4b7234b1c1b6c1511f94bd802556d0da82d4c6abb14ef216",
+            "c2c1d344c8f1448e4b7234b1c1b6c1511f94bd802556d0da82d4c6abb14ef216"
+          ]
+        },
+        {
+          "label": "final events semantic projection",
+          "category": "audit_projection",
+          "equal": true,
+          "sha256": [
+            "33e888b1b92df4289b6166907a7a30dd02e46615bac7965a8c6e4b4a39542ab0",
+            "33e888b1b92df4289b6166907a7a30dd02e46615bac7965a8c6e4b4a39542ab0"
+          ]
+        },
+        {
+          "label": "final accepted events semantic projection",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "cb432c6b49fe8d30973c84b5c4a1c45ab6e307c7d04fd18ed625057e1663563f",
+            "cb432c6b49fe8d30973c84b5c4a1c45ab6e307c7d04fd18ed625057e1663563f"
+          ]
+        },
+        {
+          "label": "step2 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict strategies",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "54566a4b2dcf68a241f21a99e9b84c7f26e7caf8c65c1a3301dd6d556aaee49c",
+            "54566a4b2dcf68a241f21a99e9b84c7f26e7caf8c65c1a3301dd6d556aaee49c"
+          ]
+        },
+        {
+          "label": "step2 strict candidates.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict rejections.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "74058011009744296d14019ca648bca789d398aa426d71ad8f1989e4bda7468d",
+            "74058011009744296d14019ca648bca789d398aa426d71ad8f1989e4bda7468d"
+          ]
+        },
+        {
+          "label": "step3 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict classification_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "Final Path ordered kinds sources orientations DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "c90063be5b17b177e274057256bd7ff41e0be8377cf3b6e3255ea41d254f093a",
+            "c90063be5b17b177e274057256bd7ff41e0be8377cf3b6e3255ea41d254f093a"
+          ]
+        },
+        {
+          "label": "baseline Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "candidate Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        }
+      ],
+      "raw_metadata": [
+        {
+          "path": "metadata/grt_contig_quality.tsv",
+          "equal": true,
+          "sha256": [
+            "84929dc5aa0355957b7e13ddf56db90140a42770bbc6661a3fdc72f4b5051b3e",
+            "84929dc5aa0355957b7e13ddf56db90140a42770bbc6661a3fdc72f4b5051b3e"
+          ]
+        },
+        {
+          "path": "metadata/grt_contig_roles.tsv",
+          "equal": true,
+          "sha256": [
+            "f22913f4eef0332afff76943a69f4b3928352eddc04b68ad082d7ea6dea153fc",
+            "f22913f4eef0332afff76943a69f4b3928352eddc04b68ad082d7ea6dea153fc"
+          ]
+        },
+        {
+          "path": "metadata/grt_contract_summary.json",
+          "equal": true,
+          "sha256": [
+            "6967812c55f3df5774f112ef483870bd4a2ac17436ea6f9eb8dd9904d48899b3",
+            "6967812c55f3df5774f112ef483870bd4a2ac17436ea6f9eb8dd9904d48899b3"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_fragments.tsv",
+          "equal": true,
+          "sha256": [
+            "9143bda2cb1687d95ad329f4b82a3c1479e2072c92d7debe4bb4972a28adcea4",
+            "9143bda2cb1687d95ad329f4b82a3c1479e2072c92d7debe4bb4972a28adcea4"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_members.tsv",
+          "equal": true,
+          "sha256": [
+            "398e0c31345fd6071e4ee1a600aec00bae19bc8646ade8b0ddfadd01798a150d",
+            "398e0c31345fd6071e4ee1a600aec00bae19bc8646ade8b0ddfadd01798a150d"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_sets.tsv",
+          "equal": true,
+          "sha256": [
+            "0fc76f4103e06d0afca6a58715bb4d32b15066564344efe45b554d1a03bdeb26",
+            "0fc76f4103e06d0afca6a58715bb4d32b15066564344efe45b554d1a03bdeb26"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_usage.tsv",
+          "equal": true,
+          "sha256": [
+            "fd7d2b0133e05886b633d589078d9f0b8ded36d4430f1ea004f768a3284f1f91",
+            "fd7d2b0133e05886b633d589078d9f0b8ded36d4430f1ea004f768a3284f1f91"
+          ]
+        },
+        {
+          "path": "metadata/grt_events.jsonl",
+          "equal": true,
+          "sha256": [
+            "09cf249407068f29838ff5d76ebcb8fca724fdbf52726fb94a26bab9ce1eeff2",
+            "09cf249407068f29838ff5d76ebcb8fca724fdbf52726fb94a26bab9ce1eeff2"
+          ]
+        },
+        {
+          "path": "metadata/grt_evidence_registry.tsv",
+          "equal": false,
+          "sha256": [
+            "87bd73e5a181142b1bf7cea8773ea7a1cf5d452bce8ddbd6884c5d46ba0aa6cb",
+            "b9724c5e0a1441dc9a11237b925795541d0d26b38b00c3b9629ed30acb849372"
+          ]
+        },
+        {
+          "path": "metadata/grt_final_path.json",
+          "equal": true,
+          "sha256": [
+            "69752dfd7f34672f4077c194cfe9f49f93596cd8c22288ce0d4bee617833d937",
+            "69752dfd7f34672f4077c194cfe9f49f93596cd8c22288ce0d4bee617833d937"
+          ]
+        },
+        {
+          "path": "metadata/grt_gap_attempts.tsv",
+          "equal": true,
+          "sha256": [
+            "ceffed7bfefbfd5750b5c2731bf94ac1f3ae518ae550f8e0d4a115e6f303eb29",
+            "ceffed7bfefbfd5750b5c2731bf94ac1f3ae518ae550f8e0d4a115e6f303eb29"
+          ]
+        },
+        {
+          "path": "metadata/grt_q_segments.tsv",
+          "equal": true,
+          "sha256": [
+            "4631227d41291d9fa36e3df169f4e21d8f92be8af539f0cb4401a28bd03f2e4c",
+            "4631227d41291d9fa36e3df169f4e21d8f92be8af539f0cb4401a28bd03f2e4c"
+          ]
+        },
+        {
+          "path": "metadata/grt_recipe.tsv",
+          "equal": true,
+          "sha256": [
+            "1b7ad85f6be574b926b23e29372f597bbd554480b2fe5e1f922845395b00aecd",
+            "1b7ad85f6be574b926b23e29372f597bbd554480b2fe5e1f922845395b00aecd"
+          ]
+        },
+        {
+          "path": "metadata/grt_stage_status.tsv",
+          "equal": false,
+          "sha256": [
+            "ff98dbd36c0126a9e062feebebbd4b6ce3eb771cce7cc45eeebd28b3676a0249",
+            "4d01c0b884be89c3a454510c7af84909da9dd31f6a7753c26d48639789d9c825"
+          ]
+        },
+        {
+          "path": "metadata/grt_step2_strategies.tsv",
+          "equal": true,
+          "sha256": [
+            "ddeb1088e820b0829e5d2a58755b72fc8f468549a0c66e64169a4ae8e2419af3",
+            "ddeb1088e820b0829e5d2a58755b72fc8f468549a0c66e64169a4ae8e2419af3"
+          ]
+        },
+        {
+          "path": "metadata/grt_step3_classifications.tsv",
+          "equal": true,
+          "sha256": [
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b",
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b"
+          ]
+        },
+        {
+          "path": "metadata/grt_telomere_rules.tsv",
+          "equal": true,
+          "sha256": [
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496",
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496"
+          ]
+        },
+        {
+          "path": "metadata/grt_tool_versions.tsv",
+          "equal": true,
+          "sha256": [
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d",
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d"
+          ]
+        },
+        {
+          "path": "metadata/grt_used_contigs.tsv",
+          "equal": true,
+          "sha256": [
+            "f07fd2d9423af4358277085e8e0133f6735dde23eec0112ec8a67cff4661f9cf",
+            "f07fd2d9423af4358277085e8e0133f6735dde23eec0112ec8a67cff4661f9cf"
+          ]
+        }
+      ],
+      "scientific_projection_equal": true,
+      "all_checks_equal": true,
+      "raw_metadata_equal": false,
+      "raw_different_files": [
+        "metadata/grt_evidence_registry.tsv",
+        "metadata/grt_stage_status.tsv"
+      ],
+      "accepted_event_counts": [
+        0,
+        0
+      ],
+      "accepted_event_actions": [
+        [],
+        []
+      ]
+    },
+    "local_repeat_competition": {
+      "checks": [
+        {
+          "label": "chromosome assignments",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "4abf2d60f87b5a56da881e69b8a71dc3d7c301c5f460637fd471c4a46ce84012",
+            "4abf2d60f87b5a56da881e69b8a71dc3d7c301c5f460637fd471c4a46ce84012"
+          ]
+        },
+        {
+          "label": "q0 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q1 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q2 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q3 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q4 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "complete ordered event semantics except generated trace IDs",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "e26363aac5c6d09903c102ba94f31ec0d08a601d1fbacc3aca07e144a654d406",
+            "e26363aac5c6d09903c102ba94f31ec0d08a601d1fbacc3aca07e144a654d406"
+          ]
+        },
+        {
+          "label": "all Q versions ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "ed87e73410b460b8febe6c24521fa8446cfdc9b2e55d0672f0a55b6db19a725a",
+            "ed87e73410b460b8febe6c24521fa8446cfdc9b2e55d0672f0a55b6db19a725a"
+          ]
+        },
+        {
+          "label": "all Q versions source card lineage",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "ab7d626a018d25ccb1fbe2d0cc4954de21c0b121a2091ee25691e6797936820b",
+            "ab7d626a018d25ccb1fbe2d0cc4954de21c0b121a2091ee25691e6797936820b"
+          ]
+        },
+        {
+          "label": "strict grt_donor_fragments.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "strict grt_donor_members.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "strict grt_contig_roles.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "c2c1d344c8f1448e4b7234b1c1b6c1511f94bd802556d0da82d4c6abb14ef216",
+            "c2c1d344c8f1448e4b7234b1c1b6c1511f94bd802556d0da82d4c6abb14ef216"
+          ]
+        },
+        {
+          "label": "final events semantic projection",
+          "category": "audit_projection",
+          "equal": true,
+          "sha256": [
+            "33e888b1b92df4289b6166907a7a30dd02e46615bac7965a8c6e4b4a39542ab0",
+            "33e888b1b92df4289b6166907a7a30dd02e46615bac7965a8c6e4b4a39542ab0"
+          ]
+        },
+        {
+          "label": "final accepted events semantic projection",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "cb432c6b49fe8d30973c84b5c4a1c45ab6e307c7d04fd18ed625057e1663563f",
+            "cb432c6b49fe8d30973c84b5c4a1c45ab6e307c7d04fd18ed625057e1663563f"
+          ]
+        },
+        {
+          "label": "step2 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict strategies",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "54566a4b2dcf68a241f21a99e9b84c7f26e7caf8c65c1a3301dd6d556aaee49c",
+            "54566a4b2dcf68a241f21a99e9b84c7f26e7caf8c65c1a3301dd6d556aaee49c"
+          ]
+        },
+        {
+          "label": "step2 strict candidates.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict rejections.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "74058011009744296d14019ca648bca789d398aa426d71ad8f1989e4bda7468d",
+            "74058011009744296d14019ca648bca789d398aa426d71ad8f1989e4bda7468d"
+          ]
+        },
+        {
+          "label": "step3 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict classification_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "Final Path ordered kinds sources orientations DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "c90063be5b17b177e274057256bd7ff41e0be8377cf3b6e3255ea41d254f093a",
+            "c90063be5b17b177e274057256bd7ff41e0be8377cf3b6e3255ea41d254f093a"
+          ]
+        },
+        {
+          "label": "baseline Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "candidate Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        }
+      ],
+      "raw_metadata": [
+        {
+          "path": "metadata/grt_contig_quality.tsv",
+          "equal": true,
+          "sha256": [
+            "84929dc5aa0355957b7e13ddf56db90140a42770bbc6661a3fdc72f4b5051b3e",
+            "84929dc5aa0355957b7e13ddf56db90140a42770bbc6661a3fdc72f4b5051b3e"
+          ]
+        },
+        {
+          "path": "metadata/grt_contig_roles.tsv",
+          "equal": true,
+          "sha256": [
+            "f22913f4eef0332afff76943a69f4b3928352eddc04b68ad082d7ea6dea153fc",
+            "f22913f4eef0332afff76943a69f4b3928352eddc04b68ad082d7ea6dea153fc"
+          ]
+        },
+        {
+          "path": "metadata/grt_contract_summary.json",
+          "equal": true,
+          "sha256": [
+            "6967812c55f3df5774f112ef483870bd4a2ac17436ea6f9eb8dd9904d48899b3",
+            "6967812c55f3df5774f112ef483870bd4a2ac17436ea6f9eb8dd9904d48899b3"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_fragments.tsv",
+          "equal": true,
+          "sha256": [
+            "9143bda2cb1687d95ad329f4b82a3c1479e2072c92d7debe4bb4972a28adcea4",
+            "9143bda2cb1687d95ad329f4b82a3c1479e2072c92d7debe4bb4972a28adcea4"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_members.tsv",
+          "equal": true,
+          "sha256": [
+            "398e0c31345fd6071e4ee1a600aec00bae19bc8646ade8b0ddfadd01798a150d",
+            "398e0c31345fd6071e4ee1a600aec00bae19bc8646ade8b0ddfadd01798a150d"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_sets.tsv",
+          "equal": true,
+          "sha256": [
+            "0fc76f4103e06d0afca6a58715bb4d32b15066564344efe45b554d1a03bdeb26",
+            "0fc76f4103e06d0afca6a58715bb4d32b15066564344efe45b554d1a03bdeb26"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_usage.tsv",
+          "equal": true,
+          "sha256": [
+            "fd7d2b0133e05886b633d589078d9f0b8ded36d4430f1ea004f768a3284f1f91",
+            "fd7d2b0133e05886b633d589078d9f0b8ded36d4430f1ea004f768a3284f1f91"
+          ]
+        },
+        {
+          "path": "metadata/grt_events.jsonl",
+          "equal": true,
+          "sha256": [
+            "09cf249407068f29838ff5d76ebcb8fca724fdbf52726fb94a26bab9ce1eeff2",
+            "09cf249407068f29838ff5d76ebcb8fca724fdbf52726fb94a26bab9ce1eeff2"
+          ]
+        },
+        {
+          "path": "metadata/grt_evidence_registry.tsv",
+          "equal": false,
+          "sha256": [
+            "658e1e7c8d846814c55bc2ecf76c6bf8a653bc0edcc8e6c4f7e2b7dc39ca4400",
+            "5d1833a32c8dbdee1b7cef2e30fe56d4de7aab4a485c5e425512f7db0d6d1406"
+          ]
+        },
+        {
+          "path": "metadata/grt_final_path.json",
+          "equal": true,
+          "sha256": [
+            "69752dfd7f34672f4077c194cfe9f49f93596cd8c22288ce0d4bee617833d937",
+            "69752dfd7f34672f4077c194cfe9f49f93596cd8c22288ce0d4bee617833d937"
+          ]
+        },
+        {
+          "path": "metadata/grt_gap_attempts.tsv",
+          "equal": true,
+          "sha256": [
+            "ceffed7bfefbfd5750b5c2731bf94ac1f3ae518ae550f8e0d4a115e6f303eb29",
+            "ceffed7bfefbfd5750b5c2731bf94ac1f3ae518ae550f8e0d4a115e6f303eb29"
+          ]
+        },
+        {
+          "path": "metadata/grt_q_segments.tsv",
+          "equal": true,
+          "sha256": [
+            "4631227d41291d9fa36e3df169f4e21d8f92be8af539f0cb4401a28bd03f2e4c",
+            "4631227d41291d9fa36e3df169f4e21d8f92be8af539f0cb4401a28bd03f2e4c"
+          ]
+        },
+        {
+          "path": "metadata/grt_recipe.tsv",
+          "equal": true,
+          "sha256": [
+            "1b7ad85f6be574b926b23e29372f597bbd554480b2fe5e1f922845395b00aecd",
+            "1b7ad85f6be574b926b23e29372f597bbd554480b2fe5e1f922845395b00aecd"
+          ]
+        },
+        {
+          "path": "metadata/grt_stage_status.tsv",
+          "equal": false,
+          "sha256": [
+            "9326e2229d62299e64fdab502bbd658284f807ebb929ab5f4477f5767f3ee703",
+            "58917a89404d4e436c3dd6a8a97bb795d759624696e0307e00fb34b4a731be56"
+          ]
+        },
+        {
+          "path": "metadata/grt_step2_strategies.tsv",
+          "equal": true,
+          "sha256": [
+            "ddeb1088e820b0829e5d2a58755b72fc8f468549a0c66e64169a4ae8e2419af3",
+            "ddeb1088e820b0829e5d2a58755b72fc8f468549a0c66e64169a4ae8e2419af3"
+          ]
+        },
+        {
+          "path": "metadata/grt_step3_classifications.tsv",
+          "equal": true,
+          "sha256": [
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b",
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b"
+          ]
+        },
+        {
+          "path": "metadata/grt_telomere_rules.tsv",
+          "equal": true,
+          "sha256": [
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496",
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496"
+          ]
+        },
+        {
+          "path": "metadata/grt_tool_versions.tsv",
+          "equal": true,
+          "sha256": [
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d",
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d"
+          ]
+        },
+        {
+          "path": "metadata/grt_used_contigs.tsv",
+          "equal": true,
+          "sha256": [
+            "f07fd2d9423af4358277085e8e0133f6735dde23eec0112ec8a67cff4661f9cf",
+            "f07fd2d9423af4358277085e8e0133f6735dde23eec0112ec8a67cff4661f9cf"
+          ]
+        }
+      ],
+      "scientific_projection_equal": true,
+      "all_checks_equal": true,
+      "raw_metadata_equal": false,
+      "raw_different_files": [
+        "metadata/grt_evidence_registry.tsv",
+        "metadata/grt_stage_status.tsv"
+      ],
+      "accepted_event_counts": [
+        0,
+        0
+      ],
+      "accepted_event_actions": [
+        [],
+        []
+      ]
+    },
+    "repeat_assignment_threshold": {
+      "checks": [
+        {
+          "label": "chromosome assignments",
+          "category": "scientific",
+          "equal": false,
+          "sha256": [
+            "4abf2d60f87b5a56da881e69b8a71dc3d7c301c5f460637fd471c4a46ce84012",
+            "77768b48fe2fd5a44bca2dd546eaec3a203e49e5880228b144ddb15bb63ac572"
+          ],
+          "values": [
+            [
+              {
+                "dataset_name": "assembly",
+                "seq_name": "query",
+                "seq_length_bp": "800000",
+                "assigned_chr_name": "chr1",
+                "source_orientation": "+",
+                "orientation_source": "ref_alignment",
+                "support_bp": "800000",
+                "support_percent": "100.000",
+                "anchor_start": "1"
+              }
+            ],
+            [
+              {
+                "dataset_name": "assembly",
+                "seq_name": "query",
+                "seq_length_bp": "800000",
+                "assigned_chr_name": "chr1",
+                "source_orientation": "+",
+                "orientation_source": "ref_alignment",
+                "support_bp": "800000",
+                "support_percent": "100.000",
+                "anchor_start": "1"
+              },
+              {
+                "dataset_name": "assembly",
+                "seq_name": "query",
+                "seq_length_bp": "800000",
+                "assigned_chr_name": "chr2",
+                "source_orientation": "+",
+                "orientation_source": "ref_alignment",
+                "support_bp": "600000",
+                "support_percent": "75.000",
+                "anchor_start": "1"
+              }
+            ]
+          ]
+        },
+        {
+          "label": "q0 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q1 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q2 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q3 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q4 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "complete ordered event semantics except generated trace IDs",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "e26363aac5c6d09903c102ba94f31ec0d08a601d1fbacc3aca07e144a654d406",
+            "e26363aac5c6d09903c102ba94f31ec0d08a601d1fbacc3aca07e144a654d406"
+          ]
+        },
+        {
+          "label": "all Q versions ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "ed87e73410b460b8febe6c24521fa8446cfdc9b2e55d0672f0a55b6db19a725a",
+            "ed87e73410b460b8febe6c24521fa8446cfdc9b2e55d0672f0a55b6db19a725a"
+          ]
+        },
+        {
+          "label": "all Q versions source card lineage",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "ab7d626a018d25ccb1fbe2d0cc4954de21c0b121a2091ee25691e6797936820b",
+            "ab7d626a018d25ccb1fbe2d0cc4954de21c0b121a2091ee25691e6797936820b"
+          ]
+        },
+        {
+          "label": "strict grt_donor_fragments.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "strict grt_donor_members.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "strict grt_contig_roles.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "c2c1d344c8f1448e4b7234b1c1b6c1511f94bd802556d0da82d4c6abb14ef216",
+            "c2c1d344c8f1448e4b7234b1c1b6c1511f94bd802556d0da82d4c6abb14ef216"
+          ]
+        },
+        {
+          "label": "final events semantic projection",
+          "category": "audit_projection",
+          "equal": true,
+          "sha256": [
+            "33e888b1b92df4289b6166907a7a30dd02e46615bac7965a8c6e4b4a39542ab0",
+            "33e888b1b92df4289b6166907a7a30dd02e46615bac7965a8c6e4b4a39542ab0"
+          ]
+        },
+        {
+          "label": "final accepted events semantic projection",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "cb432c6b49fe8d30973c84b5c4a1c45ab6e307c7d04fd18ed625057e1663563f",
+            "cb432c6b49fe8d30973c84b5c4a1c45ab6e307c7d04fd18ed625057e1663563f"
+          ]
+        },
+        {
+          "label": "step2 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict strategies",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "54566a4b2dcf68a241f21a99e9b84c7f26e7caf8c65c1a3301dd6d556aaee49c",
+            "54566a4b2dcf68a241f21a99e9b84c7f26e7caf8c65c1a3301dd6d556aaee49c"
+          ]
+        },
+        {
+          "label": "step2 strict candidates.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step2 strict rejections.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "74058011009744296d14019ca648bca789d398aa426d71ad8f1989e4bda7468d",
+            "74058011009744296d14019ca648bca789d398aa426d71ad8f1989e4bda7468d"
+          ]
+        },
+        {
+          "label": "step3 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict classification_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "Final Path ordered kinds sources orientations DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "c90063be5b17b177e274057256bd7ff41e0be8377cf3b6e3255ea41d254f093a",
+            "c90063be5b17b177e274057256bd7ff41e0be8377cf3b6e3255ea41d254f093a"
+          ]
+        },
+        {
+          "label": "baseline Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "candidate Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        }
+      ],
+      "raw_metadata": [
+        {
+          "path": "metadata/grt_contig_quality.tsv",
+          "equal": true,
+          "sha256": [
+            "84929dc5aa0355957b7e13ddf56db90140a42770bbc6661a3fdc72f4b5051b3e",
+            "84929dc5aa0355957b7e13ddf56db90140a42770bbc6661a3fdc72f4b5051b3e"
+          ]
+        },
+        {
+          "path": "metadata/grt_contig_roles.tsv",
+          "equal": true,
+          "sha256": [
+            "f22913f4eef0332afff76943a69f4b3928352eddc04b68ad082d7ea6dea153fc",
+            "f22913f4eef0332afff76943a69f4b3928352eddc04b68ad082d7ea6dea153fc"
+          ]
+        },
+        {
+          "path": "metadata/grt_contract_summary.json",
+          "equal": true,
+          "sha256": [
+            "6967812c55f3df5774f112ef483870bd4a2ac17436ea6f9eb8dd9904d48899b3",
+            "6967812c55f3df5774f112ef483870bd4a2ac17436ea6f9eb8dd9904d48899b3"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_fragments.tsv",
+          "equal": true,
+          "sha256": [
+            "9143bda2cb1687d95ad329f4b82a3c1479e2072c92d7debe4bb4972a28adcea4",
+            "9143bda2cb1687d95ad329f4b82a3c1479e2072c92d7debe4bb4972a28adcea4"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_members.tsv",
+          "equal": true,
+          "sha256": [
+            "398e0c31345fd6071e4ee1a600aec00bae19bc8646ade8b0ddfadd01798a150d",
+            "398e0c31345fd6071e4ee1a600aec00bae19bc8646ade8b0ddfadd01798a150d"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_sets.tsv",
+          "equal": true,
+          "sha256": [
+            "0fc76f4103e06d0afca6a58715bb4d32b15066564344efe45b554d1a03bdeb26",
+            "0fc76f4103e06d0afca6a58715bb4d32b15066564344efe45b554d1a03bdeb26"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_usage.tsv",
+          "equal": true,
+          "sha256": [
+            "fd7d2b0133e05886b633d589078d9f0b8ded36d4430f1ea004f768a3284f1f91",
+            "fd7d2b0133e05886b633d589078d9f0b8ded36d4430f1ea004f768a3284f1f91"
+          ]
+        },
+        {
+          "path": "metadata/grt_events.jsonl",
+          "equal": true,
+          "sha256": [
+            "09cf249407068f29838ff5d76ebcb8fca724fdbf52726fb94a26bab9ce1eeff2",
+            "09cf249407068f29838ff5d76ebcb8fca724fdbf52726fb94a26bab9ce1eeff2"
+          ]
+        },
+        {
+          "path": "metadata/grt_evidence_registry.tsv",
+          "equal": false,
+          "sha256": [
+            "31ac5389b08f2bec833cbb0c8d9ab3b98b11e9f05e306182605a517ab6752dbd",
+            "d540471a401e0742c9b3a1b1761291fbf765d4ffde0b5d4142b1571797991534"
+          ]
+        },
+        {
+          "path": "metadata/grt_final_path.json",
+          "equal": true,
+          "sha256": [
+            "69752dfd7f34672f4077c194cfe9f49f93596cd8c22288ce0d4bee617833d937",
+            "69752dfd7f34672f4077c194cfe9f49f93596cd8c22288ce0d4bee617833d937"
+          ]
+        },
+        {
+          "path": "metadata/grt_gap_attempts.tsv",
+          "equal": true,
+          "sha256": [
+            "ceffed7bfefbfd5750b5c2731bf94ac1f3ae518ae550f8e0d4a115e6f303eb29",
+            "ceffed7bfefbfd5750b5c2731bf94ac1f3ae518ae550f8e0d4a115e6f303eb29"
+          ]
+        },
+        {
+          "path": "metadata/grt_q_segments.tsv",
+          "equal": true,
+          "sha256": [
+            "4631227d41291d9fa36e3df169f4e21d8f92be8af539f0cb4401a28bd03f2e4c",
+            "4631227d41291d9fa36e3df169f4e21d8f92be8af539f0cb4401a28bd03f2e4c"
+          ]
+        },
+        {
+          "path": "metadata/grt_recipe.tsv",
+          "equal": true,
+          "sha256": [
+            "1b7ad85f6be574b926b23e29372f597bbd554480b2fe5e1f922845395b00aecd",
+            "1b7ad85f6be574b926b23e29372f597bbd554480b2fe5e1f922845395b00aecd"
+          ]
+        },
+        {
+          "path": "metadata/grt_stage_status.tsv",
+          "equal": false,
+          "sha256": [
+            "d885964908123909095ede0e22ca9e54e92ff3d82d14bcbc9d36810d84ff324f",
+            "87c7edf9b990dfe8a80138d838d76009e955408b0ee842899075004230be73b0"
+          ]
+        },
+        {
+          "path": "metadata/grt_step2_strategies.tsv",
+          "equal": true,
+          "sha256": [
+            "ddeb1088e820b0829e5d2a58755b72fc8f468549a0c66e64169a4ae8e2419af3",
+            "ddeb1088e820b0829e5d2a58755b72fc8f468549a0c66e64169a4ae8e2419af3"
+          ]
+        },
+        {
+          "path": "metadata/grt_step3_classifications.tsv",
+          "equal": true,
+          "sha256": [
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b",
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b"
+          ]
+        },
+        {
+          "path": "metadata/grt_telomere_rules.tsv",
+          "equal": true,
+          "sha256": [
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496",
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496"
+          ]
+        },
+        {
+          "path": "metadata/grt_tool_versions.tsv",
+          "equal": true,
+          "sha256": [
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d",
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d"
+          ]
+        },
+        {
+          "path": "metadata/grt_used_contigs.tsv",
+          "equal": true,
+          "sha256": [
+            "f07fd2d9423af4358277085e8e0133f6735dde23eec0112ec8a67cff4661f9cf",
+            "f07fd2d9423af4358277085e8e0133f6735dde23eec0112ec8a67cff4661f9cf"
+          ]
+        }
+      ],
+      "scientific_projection_equal": false,
+      "all_checks_equal": false,
+      "raw_metadata_equal": false,
+      "raw_different_files": [
+        "metadata/grt_evidence_registry.tsv",
+        "metadata/grt_stage_status.tsv"
+      ],
+      "accepted_event_counts": [
+        0,
+        0
+      ],
+      "accepted_event_actions": [
+        [],
+        []
+      ]
+    },
+    "gap_with_external_donor": {
+      "checks": [
+        {
+          "label": "chromosome assignments",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "b7571b8dcce280b580d579aaeb05a4ee067f8fa30b31510ee6980819a1904228",
+            "b7571b8dcce280b580d579aaeb05a4ee067f8fa30b31510ee6980819a1904228"
+          ]
+        },
+        {
+          "label": "q0 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "aef12e4a90e7561363946e678d177df6deafa15b70aaf0759e6d96800f872dcc",
+            "aef12e4a90e7561363946e678d177df6deafa15b70aaf0759e6d96800f872dcc"
+          ]
+        },
+        {
+          "label": "q1 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "aef12e4a90e7561363946e678d177df6deafa15b70aaf0759e6d96800f872dcc",
+            "aef12e4a90e7561363946e678d177df6deafa15b70aaf0759e6d96800f872dcc"
+          ]
+        },
+        {
+          "label": "q2 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q3 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q4 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "complete ordered event semantics except generated trace IDs",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "0f4153c2e2b3e073d8a94952a5d9d4141c92802b335737854951553e91ebceaa",
+            "0f4153c2e2b3e073d8a94952a5d9d4141c92802b335737854951553e91ebceaa"
+          ]
+        },
+        {
+          "label": "all Q versions ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "84eae84e9a2f9c188664aa9a1f7812420f2abed4598ef9091703dac139e1196c",
+            "84eae84e9a2f9c188664aa9a1f7812420f2abed4598ef9091703dac139e1196c"
+          ]
+        },
+        {
+          "label": "all Q versions source card lineage",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "b1976e688f83f56c30f86411769d85ee9ea16c5f5aca1f72415d3c63eb0cedfb",
+            "b1976e688f83f56c30f86411769d85ee9ea16c5f5aca1f72415d3c63eb0cedfb"
+          ]
+        },
+        {
+          "label": "strict grt_donor_fragments.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "413b2b06b40220bfd577952263320331fe112c6e0b5f29ef31d9931292caaf49",
+            "413b2b06b40220bfd577952263320331fe112c6e0b5f29ef31d9931292caaf49"
+          ]
+        },
+        {
+          "label": "strict grt_donor_members.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "0f487185df3aebb57ca67b08388239e00d13442f5994c3ec942cbd5ab6d4afe1",
+            "0f487185df3aebb57ca67b08388239e00d13442f5994c3ec942cbd5ab6d4afe1"
+          ]
+        },
+        {
+          "label": "strict grt_contig_roles.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "2bbf75fa99ef93d68ec296a2deb3ffa501453843272b751f256b0ee1b0921989",
+            "2bbf75fa99ef93d68ec296a2deb3ffa501453843272b751f256b0ee1b0921989"
+          ]
+        },
+        {
+          "label": "final events semantic projection",
+          "category": "audit_projection",
+          "equal": true,
+          "sha256": [
+            "472aea8dbb6bba178c6b18d68bc1fecf1532f7bf86ec8dbc56abad030bc9a8d4",
+            "472aea8dbb6bba178c6b18d68bc1fecf1532f7bf86ec8dbc56abad030bc9a8d4"
+          ]
+        },
+        {
+          "label": "final accepted events semantic projection",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "0d40fe62f3aa0dd4919050979b18f1f7fdb58a119ada2c61330099f9f21a48f9",
+            "0d40fe62f3aa0dd4919050979b18f1f7fdb58a119ada2c61330099f9f21a48f9"
+          ]
+        },
+        {
+          "label": "step2 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "63a7e3c45f1e4445b8799275093fffbd3e1f342eb78b712c1cc93dce0afb17fd",
+            "63a7e3c45f1e4445b8799275093fffbd3e1f342eb78b712c1cc93dce0afb17fd"
+          ]
+        },
+        {
+          "label": "step2 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "dfb3ccd7e39e9692b18561d238e47a01ee3f73abc24f971c918171d3a386b14a",
+            "dfb3ccd7e39e9692b18561d238e47a01ee3f73abc24f971c918171d3a386b14a"
+          ]
+        },
+        {
+          "label": "step2 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "df7f56c13132d73da769ebad243ecb40ae98d078957138cff6d7688938d040e5",
+            "df7f56c13132d73da769ebad243ecb40ae98d078957138cff6d7688938d040e5"
+          ]
+        },
+        {
+          "label": "step2 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "da15450cfb3647f064411fbdf382a0ed858bf1ea5c1dc35d79560ce2f503903a",
+            "da15450cfb3647f064411fbdf382a0ed858bf1ea5c1dc35d79560ce2f503903a"
+          ]
+        },
+        {
+          "label": "step2 strict strategies",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "af0152136aa7dd90f64eabfefba88fd34590997d62af66db2c87fe56b5637011",
+            "af0152136aa7dd90f64eabfefba88fd34590997d62af66db2c87fe56b5637011"
+          ]
+        },
+        {
+          "label": "step2 strict candidates.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "506ad69ba3fa3e6a65dcd07315db7400b59b952510caab8c8a2952428ab7799d",
+            "506ad69ba3fa3e6a65dcd07315db7400b59b952510caab8c8a2952428ab7799d"
+          ]
+        },
+        {
+          "label": "step2 strict rejections.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "77c2a3ef51556383425bd642633e2655e043018893f2eeaa6d8a994c75eded5b",
+            "77c2a3ef51556383425bd642633e2655e043018893f2eeaa6d8a994c75eded5b"
+          ]
+        },
+        {
+          "label": "step3 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict classification_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "Final Path ordered kinds sources orientations DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "c82e3cd22ee5a39d2f7acefcc3a9528341f14de12bb47088eadede573a6aece6",
+            "c82e3cd22ee5a39d2f7acefcc3a9528341f14de12bb47088eadede573a6aece6"
+          ]
+        },
+        {
+          "label": "baseline Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "candidate Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        }
+      ],
+      "raw_metadata": [
+        {
+          "path": "metadata/grt_contig_quality.tsv",
+          "equal": true,
+          "sha256": [
+            "a0dcd7aef69728cff36ecc1efae46e246e04544acef53783e672d4112e9df26b",
+            "a0dcd7aef69728cff36ecc1efae46e246e04544acef53783e672d4112e9df26b"
+          ]
+        },
+        {
+          "path": "metadata/grt_contig_roles.tsv",
+          "equal": true,
+          "sha256": [
+            "5be838a9bff166270bd7eb942aa1c63bc8133075a74ffd9a366af8b4400225e7",
+            "5be838a9bff166270bd7eb942aa1c63bc8133075a74ffd9a366af8b4400225e7"
+          ]
+        },
+        {
+          "path": "metadata/grt_contract_summary.json",
+          "equal": true,
+          "sha256": [
+            "1f69dace87285815ffb409b2bcd36800e22de1cb91a64c6fca665984b1e7e036",
+            "1f69dace87285815ffb409b2bcd36800e22de1cb91a64c6fca665984b1e7e036"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_fragments.tsv",
+          "equal": true,
+          "sha256": [
+            "5c342009c59158b58f9b3d155747fabea2bc0e23227c36d3e320e8c94a91bea7",
+            "5c342009c59158b58f9b3d155747fabea2bc0e23227c36d3e320e8c94a91bea7"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_members.tsv",
+          "equal": true,
+          "sha256": [
+            "f64f342cdef7bd15ae600084a626043ec683ecf63c9bc21758f37b1ed5c7fce8",
+            "f64f342cdef7bd15ae600084a626043ec683ecf63c9bc21758f37b1ed5c7fce8"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_sets.tsv",
+          "equal": true,
+          "sha256": [
+            "33a29fdcf59dcb5341d0f8a5ccd019f6258dbd47c08848f06d8d494caaf80e58",
+            "33a29fdcf59dcb5341d0f8a5ccd019f6258dbd47c08848f06d8d494caaf80e58"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_usage.tsv",
+          "equal": true,
+          "sha256": [
+            "cd583b66793006ed30657ebcb61a47b4a27df3528b7a3927401f8af1ebf4d864",
+            "cd583b66793006ed30657ebcb61a47b4a27df3528b7a3927401f8af1ebf4d864"
+          ]
+        },
+        {
+          "path": "metadata/grt_events.jsonl",
+          "equal": true,
+          "sha256": [
+            "478b0d7bce6a080c89f3f78815fbe80e75f44a7f2b00228624217e3ded0e0b57",
+            "478b0d7bce6a080c89f3f78815fbe80e75f44a7f2b00228624217e3ded0e0b57"
+          ]
+        },
+        {
+          "path": "metadata/grt_evidence_registry.tsv",
+          "equal": false,
+          "sha256": [
+            "0aeac49dc7f431d70e6622f4561793031b58f778395a1be0c2c6f3f06f8f4e81",
+            "bddfb83d54731d087e4694e603e6c763dfb2a8a01b6190104d8609d62f9dc712"
+          ]
+        },
+        {
+          "path": "metadata/grt_final_path.json",
+          "equal": true,
+          "sha256": [
+            "a299bb8c4e1bfb8450eced734717b0bb8e253e7fb8b0dd3a71d8d50a1d639939",
+            "a299bb8c4e1bfb8450eced734717b0bb8e253e7fb8b0dd3a71d8d50a1d639939"
+          ]
+        },
+        {
+          "path": "metadata/grt_gap_attempts.tsv",
+          "equal": true,
+          "sha256": [
+            "85112b9ad22bc9991e9eca49158b772ff9e9ccbba2cbe50f1053e039366dad41",
+            "85112b9ad22bc9991e9eca49158b772ff9e9ccbba2cbe50f1053e039366dad41"
+          ]
+        },
+        {
+          "path": "metadata/grt_q_segments.tsv",
+          "equal": true,
+          "sha256": [
+            "92e925fef149a0c19b1e99ce34142fd37f9ccc1a9772fb9e52c73a5322b9570d",
+            "92e925fef149a0c19b1e99ce34142fd37f9ccc1a9772fb9e52c73a5322b9570d"
+          ]
+        },
+        {
+          "path": "metadata/grt_recipe.tsv",
+          "equal": true,
+          "sha256": [
+            "f53a062b1aef3dd54d68c449044e45b8e94f444ca318a9f6e4032402786a7dfa",
+            "f53a062b1aef3dd54d68c449044e45b8e94f444ca318a9f6e4032402786a7dfa"
+          ]
+        },
+        {
+          "path": "metadata/grt_stage_status.tsv",
+          "equal": false,
+          "sha256": [
+            "6c9495d67d283d10e58e6a51e60582b04f5643756317a60be752e5f9a725fcdc",
+            "66f9ec250abf9db3783e65f23c6626d70f2d4081ec4e70cb6eece156593182cc"
+          ]
+        },
+        {
+          "path": "metadata/grt_step2_strategies.tsv",
+          "equal": true,
+          "sha256": [
+            "fcbf77178c0a6fe7ded411609ba3acda5abfc9d511f25d600c904cb7714ee4d3",
+            "fcbf77178c0a6fe7ded411609ba3acda5abfc9d511f25d600c904cb7714ee4d3"
+          ]
+        },
+        {
+          "path": "metadata/grt_step3_classifications.tsv",
+          "equal": true,
+          "sha256": [
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b",
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b"
+          ]
+        },
+        {
+          "path": "metadata/grt_telomere_rules.tsv",
+          "equal": true,
+          "sha256": [
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496",
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496"
+          ]
+        },
+        {
+          "path": "metadata/grt_tool_versions.tsv",
+          "equal": true,
+          "sha256": [
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d",
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d"
+          ]
+        },
+        {
+          "path": "metadata/grt_used_contigs.tsv",
+          "equal": true,
+          "sha256": [
+            "53d7324c523f7b2021ba3d8f0272948dec1e1ed7a1467313e7383d7d42860117",
+            "53d7324c523f7b2021ba3d8f0272948dec1e1ed7a1467313e7383d7d42860117"
+          ]
+        }
+      ],
+      "scientific_projection_equal": true,
+      "all_checks_equal": true,
+      "raw_metadata_equal": false,
+      "raw_different_files": [
+        "metadata/grt_evidence_registry.tsv",
+        "metadata/grt_stage_status.tsv"
+      ],
+      "accepted_event_counts": [
+        1,
+        1
+      ],
+      "accepted_event_actions": [
+        [
+          "patch"
+        ],
+        [
+          "patch"
+        ]
+      ]
+    },
+    "reverse_gap_with_external_donor": {
+      "checks": [
+        {
+          "label": "chromosome assignments",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "0421464a2755452cfa7a4d7b0a7eacaeb051ca5bd00c3127359283ece9b64413",
+            "0421464a2755452cfa7a4d7b0a7eacaeb051ca5bd00c3127359283ece9b64413"
+          ]
+        },
+        {
+          "label": "q0 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "aef12e4a90e7561363946e678d177df6deafa15b70aaf0759e6d96800f872dcc",
+            "aef12e4a90e7561363946e678d177df6deafa15b70aaf0759e6d96800f872dcc"
+          ]
+        },
+        {
+          "label": "q1 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "aef12e4a90e7561363946e678d177df6deafa15b70aaf0759e6d96800f872dcc",
+            "aef12e4a90e7561363946e678d177df6deafa15b70aaf0759e6d96800f872dcc"
+          ]
+        },
+        {
+          "label": "q2 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q3 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "q4 ordered DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "complete ordered event semantics except generated trace IDs",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "63a37914d99a86cc705a5f76998940c9912d3e2db04eaed440f4025e3ab374ef",
+            "63a37914d99a86cc705a5f76998940c9912d3e2db04eaed440f4025e3ab374ef"
+          ]
+        },
+        {
+          "label": "all Q versions ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "12edddb24b9a05316c03a2a803241f9096c9031a3303595a697debf9ede68419",
+            "12edddb24b9a05316c03a2a803241f9096c9031a3303595a697debf9ede68419"
+          ]
+        },
+        {
+          "label": "all Q versions source card lineage",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "71a084408ec74a633d722ddfb908e3a56569566d5a164a3c05a3643526a5fb8c",
+            "71a084408ec74a633d722ddfb908e3a56569566d5a164a3c05a3643526a5fb8c"
+          ]
+        },
+        {
+          "label": "strict grt_donor_fragments.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "413b2b06b40220bfd577952263320331fe112c6e0b5f29ef31d9931292caaf49",
+            "413b2b06b40220bfd577952263320331fe112c6e0b5f29ef31d9931292caaf49"
+          ]
+        },
+        {
+          "label": "strict grt_donor_members.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "0f487185df3aebb57ca67b08388239e00d13442f5994c3ec942cbd5ab6d4afe1",
+            "0f487185df3aebb57ca67b08388239e00d13442f5994c3ec942cbd5ab6d4afe1"
+          ]
+        },
+        {
+          "label": "strict grt_contig_roles.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "2bbf75fa99ef93d68ec296a2deb3ffa501453843272b751f256b0ee1b0921989",
+            "2bbf75fa99ef93d68ec296a2deb3ffa501453843272b751f256b0ee1b0921989"
+          ]
+        },
+        {
+          "label": "final events semantic projection",
+          "category": "audit_projection",
+          "equal": true,
+          "sha256": [
+            "e3902038b606e68cd17a39d63159607815aaf73143b3eb2678430df941e9e55e",
+            "e3902038b606e68cd17a39d63159607815aaf73143b3eb2678430df941e9e55e"
+          ]
+        },
+        {
+          "label": "final accepted events semantic projection",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "f573418ada4156afd3796c8b5f6e635f65acfbf48be504d2b5f44ac65cf55ff4",
+            "f573418ada4156afd3796c8b5f6e635f65acfbf48be504d2b5f44ac65cf55ff4"
+          ]
+        },
+        {
+          "label": "step2 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "11b2bcfb2ebd694f62d3d7ac95b471c7827e9eac7d2c503212653679ac3e310c",
+            "11b2bcfb2ebd694f62d3d7ac95b471c7827e9eac7d2c503212653679ac3e310c"
+          ]
+        },
+        {
+          "label": "step2 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "dfb3ccd7e39e9692b18561d238e47a01ee3f73abc24f971c918171d3a386b14a",
+            "dfb3ccd7e39e9692b18561d238e47a01ee3f73abc24f971c918171d3a386b14a"
+          ]
+        },
+        {
+          "label": "step2 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "51e88d6772a57600005927ad520fd794d284180ad102a24fe51c9e8c0ab27b81",
+            "51e88d6772a57600005927ad520fd794d284180ad102a24fe51c9e8c0ab27b81"
+          ]
+        },
+        {
+          "label": "step2 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "3c46b890d670a0c835844ffc76a40e205ac4cd630189f6e20f1cb4fa5d91e158",
+            "3c46b890d670a0c835844ffc76a40e205ac4cd630189f6e20f1cb4fa5d91e158"
+          ]
+        },
+        {
+          "label": "step2 strict strategies",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "af0152136aa7dd90f64eabfefba88fd34590997d62af66db2c87fe56b5637011",
+            "af0152136aa7dd90f64eabfefba88fd34590997d62af66db2c87fe56b5637011"
+          ]
+        },
+        {
+          "label": "step2 strict candidates.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "23c53ba900d066235d98b6b073cddde41da9ae20afec365eb1ac7ec8c6dba48d",
+            "23c53ba900d066235d98b6b073cddde41da9ae20afec365eb1ac7ec8c6dba48d"
+          ]
+        },
+        {
+          "label": "step2 strict rejections.tsv",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 ordered source paths",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "f10324c3c2141096d75cddecd16522983bfba48c44f4b4eb4f324f812cd00d6a",
+            "f10324c3c2141096d75cddecd16522983bfba48c44f4b4eb4f324f812cd00d6a"
+          ]
+        },
+        {
+          "label": "step3 strict accepted_intervals",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict usage_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict attempts",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "step3 strict classification_rows",
+          "category": "strict_audit",
+          "equal": true,
+          "sha256": [
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          ]
+        },
+        {
+          "label": "Final Path ordered kinds sources orientations DNA",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "e0416d975dc50481e43867e4059e0d8ade16f73ffadb20b87f62bcaf43013ad5",
+            "e0416d975dc50481e43867e4059e0d8ade16f73ffadb20b87f62bcaf43013ad5"
+          ]
+        },
+        {
+          "label": "baseline Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        },
+        {
+          "label": "candidate Final Path export equals q4",
+          "category": "scientific",
+          "equal": true,
+          "sha256": [
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2",
+            "48ebf0e21a8ae3b11dc45579f11a4dc361765c1aee19a1e0723160f8bbf4c4a2"
+          ]
+        }
+      ],
+      "raw_metadata": [
+        {
+          "path": "metadata/grt_contig_quality.tsv",
+          "equal": true,
+          "sha256": [
+            "a0dcd7aef69728cff36ecc1efae46e246e04544acef53783e672d4112e9df26b",
+            "a0dcd7aef69728cff36ecc1efae46e246e04544acef53783e672d4112e9df26b"
+          ]
+        },
+        {
+          "path": "metadata/grt_contig_roles.tsv",
+          "equal": true,
+          "sha256": [
+            "5be838a9bff166270bd7eb942aa1c63bc8133075a74ffd9a366af8b4400225e7",
+            "5be838a9bff166270bd7eb942aa1c63bc8133075a74ffd9a366af8b4400225e7"
+          ]
+        },
+        {
+          "path": "metadata/grt_contract_summary.json",
+          "equal": true,
+          "sha256": [
+            "1f69dace87285815ffb409b2bcd36800e22de1cb91a64c6fca665984b1e7e036",
+            "1f69dace87285815ffb409b2bcd36800e22de1cb91a64c6fca665984b1e7e036"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_fragments.tsv",
+          "equal": true,
+          "sha256": [
+            "5c342009c59158b58f9b3d155747fabea2bc0e23227c36d3e320e8c94a91bea7",
+            "5c342009c59158b58f9b3d155747fabea2bc0e23227c36d3e320e8c94a91bea7"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_members.tsv",
+          "equal": true,
+          "sha256": [
+            "f64f342cdef7bd15ae600084a626043ec683ecf63c9bc21758f37b1ed5c7fce8",
+            "f64f342cdef7bd15ae600084a626043ec683ecf63c9bc21758f37b1ed5c7fce8"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_sets.tsv",
+          "equal": true,
+          "sha256": [
+            "33a29fdcf59dcb5341d0f8a5ccd019f6258dbd47c08848f06d8d494caaf80e58",
+            "33a29fdcf59dcb5341d0f8a5ccd019f6258dbd47c08848f06d8d494caaf80e58"
+          ]
+        },
+        {
+          "path": "metadata/grt_donor_usage.tsv",
+          "equal": true,
+          "sha256": [
+            "667cc452a44916a1fc93d29ebe410b5fa992aef61eefee4d0038ecdb141db026",
+            "667cc452a44916a1fc93d29ebe410b5fa992aef61eefee4d0038ecdb141db026"
+          ]
+        },
+        {
+          "path": "metadata/grt_events.jsonl",
+          "equal": true,
+          "sha256": [
+            "3f047e26a3dc289e1eece8629dcfb4a0490d7d11d74d2b21ff4d8b0e7c300c4a",
+            "3f047e26a3dc289e1eece8629dcfb4a0490d7d11d74d2b21ff4d8b0e7c300c4a"
+          ]
+        },
+        {
+          "path": "metadata/grt_evidence_registry.tsv",
+          "equal": false,
+          "sha256": [
+            "0ff9ac3fa241f40c1bd155c71111e2b7e9f01359549356587a4557667d25cc96",
+            "d3e207bd25d7af2894b69ac6aea893a7ac4b7b69df4289cb8b5a31c6c5f01a3e"
+          ]
+        },
+        {
+          "path": "metadata/grt_final_path.json",
+          "equal": true,
+          "sha256": [
+            "9ea0c4dc9fb2f26980d59e5457471934e907435162072a8102d89ba4472031b1",
+            "9ea0c4dc9fb2f26980d59e5457471934e907435162072a8102d89ba4472031b1"
+          ]
+        },
+        {
+          "path": "metadata/grt_gap_attempts.tsv",
+          "equal": true,
+          "sha256": [
+            "f48df84e7f449c99d1187c295ba3d2ab1be49defd70b7687ee876cda1a291c61",
+            "f48df84e7f449c99d1187c295ba3d2ab1be49defd70b7687ee876cda1a291c61"
+          ]
+        },
+        {
+          "path": "metadata/grt_q_segments.tsv",
+          "equal": true,
+          "sha256": [
+            "9569a7acad4b4b4c3a47ad3f3ef0b90644b7960e999d9a29819be32d62ae46c9",
+            "9569a7acad4b4b4c3a47ad3f3ef0b90644b7960e999d9a29819be32d62ae46c9"
+          ]
+        },
+        {
+          "path": "metadata/grt_recipe.tsv",
+          "equal": true,
+          "sha256": [
+            "89474d61e81d427773b28d8ad5e7da7421053f13f70eea049503f0adef6426bb",
+            "89474d61e81d427773b28d8ad5e7da7421053f13f70eea049503f0adef6426bb"
+          ]
+        },
+        {
+          "path": "metadata/grt_stage_status.tsv",
+          "equal": false,
+          "sha256": [
+            "db0b93656a61af3081b54249f23e9c5c005977c17334ec53a62c1b68edec9aef",
+            "06d735b90f20f711d2c46580296c14fc52848f7a3d33657a72ea205a7cb515b1"
+          ]
+        },
+        {
+          "path": "metadata/grt_step2_strategies.tsv",
+          "equal": true,
+          "sha256": [
+            "fcbf77178c0a6fe7ded411609ba3acda5abfc9d511f25d600c904cb7714ee4d3",
+            "fcbf77178c0a6fe7ded411609ba3acda5abfc9d511f25d600c904cb7714ee4d3"
+          ]
+        },
+        {
+          "path": "metadata/grt_step3_classifications.tsv",
+          "equal": true,
+          "sha256": [
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b",
+            "48cb57abde70602590a948de9f66623b4d3df28e6ddd717b8391bff868324a7b"
+          ]
+        },
+        {
+          "path": "metadata/grt_telomere_rules.tsv",
+          "equal": true,
+          "sha256": [
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496",
+            "d462c345aae1f9c62417f3995c319a0fef36458c0a9dea17e9e81cf658304496"
+          ]
+        },
+        {
+          "path": "metadata/grt_tool_versions.tsv",
+          "equal": true,
+          "sha256": [
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d",
+            "0314c9e6894901058c2550bfe73cc9b58b04d1419177d2f660b06521246f8b2d"
+          ]
+        },
+        {
+          "path": "metadata/grt_used_contigs.tsv",
+          "equal": true,
+          "sha256": [
+            "571f712f6901cdfc856d4a3c3fe401c1ab995e01880ace654de98d5403c6f2b8",
+            "571f712f6901cdfc856d4a3c3fe401c1ab995e01880ace654de98d5403c6f2b8"
+          ]
+        }
+      ],
+      "scientific_projection_equal": true,
+      "all_checks_equal": true,
+      "raw_metadata_equal": false,
+      "raw_different_files": [
+        "metadata/grt_evidence_registry.tsv",
+        "metadata/grt_stage_status.tsv"
+      ],
+      "accepted_event_counts": [
+        1,
+        1
+      ],
+      "accepted_event_actions": [
+        [
+          "patch"
+        ],
+        [
+          "patch"
+        ]
+      ]
+    }
+  },
+  "local_evidence_root": "/tmp/cgat-windowed-grt-contract-20261029",
+  "repeat_assignment_counterexample": {
+    "baseline_paf": "query\t800000\t0\t800000\t+\tchr1\t800000\t0\t800000\t800000\t800000\t60\tNM:i:0\tms:i:800000\tAS:i:800000\tnn:i:0\ttp:A:P\tcm:i:80009\ts1:i:799980\ts2:i:599984\tde:f:0\trl:i:0\tcg:Z:800000=\n",
+    "stitched_paf": "query\t800000\t0\t800000\t+\tchr1\t800000\t0\t800000\t800000\t800000\t255\tcg:Z:800000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000000\tzp:Z:experimental-stitched\tzc:i:4\nquery\t800000\t0\t600000\t+\tchr2\t600000\t0\t600000\t600000\t600000\t255\tcg:Z:600000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000000\tzp:Z:experimental-stitched\tzc:i:3\n",
+    "baseline_assignment": "dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsource_orientation\torientation_source\tsupport_bp\tsupport_percent\tanchor_start\nassembly\tquery\t800000\tchr1\t+\tref_alignment\t800000\t100.000\t1\n",
+    "stitched_assignment": "dataset_name\tseq_name\tseq_length_bp\tassigned_chr_name\tsource_orientation\torientation_source\tsupport_bp\tsupport_percent\tanchor_start\nassembly\tquery\t800000\tchr1\t+\tref_alignment\t800000\t100.000\t1\nassembly\tquery\t800000\tchr2\t+\tref_alignment\t600000\t75.000\t1\n"
+  }
+}

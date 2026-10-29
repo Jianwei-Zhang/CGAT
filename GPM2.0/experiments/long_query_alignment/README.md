@@ -41,7 +41,8 @@
 
 当前不支持或未验收：
 
-- CGAT 的同数据集自比对、canonical alias 与去对角线语义。
+- 主原型入口仍不支持自比对。独立 `compare_self.py` 已对 canonical alias、去对角线和去双向重复做了有限合成验证，
+  不是生产自比对适配器。
 - 全 contig 主次比对/评分/MAPQ 重建，以及复杂重复、多倍体中的候选竞争。
 - 没有输出映射的窗口不会被假装覆盖；它们会出现在覆盖报告中。完整覆盖只适用于
   明确要求该条件的合成验收，不是生物数据总应对齐的假设。
@@ -50,7 +51,8 @@
 - 插入-only owned 片段目前明确拒绝，不静默删除。
 - 多段 target 索引不接受。大参考的单段索引可能需要很多内存；`--memory-gib`
   是地址空间上限，默认 10 GiB，不能据此假定小麦全参考可在该限制内运行。
-- GRT Step1–Step4、Final Path 和原生 App 的最终等价性；客户小麦数据也尚未验证。
+- 全流程等价性仍未成立。`compare_grt.py` 已对初始参考 PAF 替换做真实 GRT Step1–Step4 / Final Path 对照，但发现重复候选差异；
+  自比对仍跳过，GRT 内部独立比对未分窗，原生 App 和客户小麦未验收。
 
 因此产物始终标记 `experimental_only: true`、`production_ready: false`。
 本目录不进入正式 Server 源码包，不更改既有 Release 或生产参数。
@@ -115,3 +117,29 @@ python3 GPM2.0/experiments/long_query_alignment/reproduce_large.py \
 即使这些检查通过，`ranking_equivalence` 和 `full_grt_tested` 仍不标为已通过。
 
 本次实测见 `VALIDATION_20261029.md` 和 `evidence/` 中的小型 JSON 回执。
+
+## 后续下游、自比对和重复候选审计
+
+完整记录见 `VALIDATION_DOWNSTREAM_20261029.md`。这些脚本仍只接受**新建实验目录**，
+不得指定客户工作区；对照有差异仍保存报告，不把退出码 0 当作等价性验收。
+需要检查 `relation_equal`、各项 `checks` 和独立的原始 metadata 差异。
+
+```bash
+# 在正常 Server 环境中运行，PATH minimap2 必须与显式二进制完全一致。
+# 真实执行准备、GRT Step1–Step4、染色体内数据集比对、证据汇总与 Final Path 导出；
+# 仅替换 primary dataset 的初始 ref PAF，其他比对和生产代码不改。
+python3 GPM2.0/experiments/long_query_alignment/compare_grt.py \
+  --minimap2 /absolute/path/to/minimap2 \
+  --server-dir GPM2.0/server --out /tmp/new-window-grt-audit
+
+# 独立检查 -X 下原始无序 contig 对和窗口别名；不是上面流程的自比对集成。
+python3 GPM2.0/experiments/long_query_alignment/compare_self.py \
+  --minimap2 /absolute/path/to/minimap2 \
+  --server-dir GPM2.0/server --out /tmp/new-window-self-audit
+```
+
+注意：即使 `scientific_projection_equal` 为真，初始 PAF 仍可能新增候选位置；
+`coordinate_and_downstream_equal` 还要求关系对照与所有 downstream checks 相同，
+但仍**不包含**整条 MAPQ/主次评分等价性，更不是生产放行字段。所有运行始终
+`production_ready: false`。不能为了让测试通过删除重复候选、覆盖原始差异或把
+MAPQ=255 改成一个任意“安全分数”。当前 FASTA 存储器只接受 ASCII 序列 ID。
