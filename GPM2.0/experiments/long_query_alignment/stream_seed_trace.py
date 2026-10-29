@@ -1,4 +1,7 @@
-"""Bounded CN evidence reader for the same-strand/two-fragment score witness.
+"""Bounded CN evidence reader for same-strand split-score witnesses.
+
+Default remains exactly two fragments. Multi-fragment collection is explicit
+and bounded to 64; it does not establish a general recovery algorithm.
 
 Pinned diagnostic subset: one query, thread zero, increasing contiguous CN chain
 IDs as emitted by minimap2 v2.31 map.c. No alignment, candidate selection or MAPQ.
@@ -53,11 +56,15 @@ def oriented_query_interval(row):
     raise ExperimentError("unknown strand in split witness")
 
 
-def ordered_fragments(coarse, fragments):
+def ordered_fragments(coarse, fragments, *, max_fragments=2):
     """Keep split accounting in chain/target order, NOT forward query order."""
-    if (len(fragments) != 2 or coarse["strand"] not in ("+", "-")
+    if type(max_fragments) is not int or not 2 <= max_fragments <= 64:
+        raise ExperimentError("fragment planning ceiling must be 2..64")
+    if (not 2 <= len(fragments) <= max_fragments or coarse["strand"] not in ("+", "-")
             or any(row["strand"] != coarse["strand"] for row in fragments)):
-        raise ExperimentError("witness only supports one same-strand chain split into two fragments")
+        if max_fragments == 2:
+            raise ExperimentError("witness only supports one same-strand chain split into two fragments")
+        raise ExperimentError("witness requires 2..max_fragments on one same-strand chain")
     for row in [coarse, *fragments]:
         if not (0 <= row["query_start"] < row["query_end"] <= row["query_length"]
                 and 0 <= row["target_start"] < row["target_end"] <= row["target_length"]):
@@ -65,25 +72,28 @@ def ordered_fragments(coarse, fragments):
         if any(row[k] != coarse[k] for k in ("query", "query_length", "target", "target_length")):
             raise ExperimentError("trace/DP query or target identity or length does not match the coarse candidate")
     ordered = sorted(fragments, key=lambda row: row["target_start"])
-    if (ordered[0]["target_start"] >= ordered[1]["target_start"]
-            or oriented_query_interval(ordered[0])[0] >= oriented_query_interval(ordered[1])[0]):
+    if any(left["target_start"] >= right["target_start"] or
+           oriented_query_interval(left)[0] >= oriented_query_interval(right)[0]
+           for left, right in zip(ordered, ordered[1:])):
         raise ExperimentError("fragment order is not collinear with the original chain")
     return ordered
 
 
 def collect_split_counts(path: Path, coarse: dict, fragments: list[dict],
-                         budget: TraceBudget | None = None):
-    """Validate a same-strand two-fragment geometry and scan oriented CN anchors.
+                         budget: TraceBudget | None = None, *, max_fragments=2,
+                         require_query_end=False):
+    """Validate a bounded same-strand geometry and scan oriented CN anchors.
 
     A bounded binary read/hash pass validates every CN row, including irrelevant
     chains. Ownership/monotonicity errors on a nonmatching chain are ignored just
     as in the previous collector; errors on the uniquely matching chain fail.
-    A QR-only synthetic excerpt is accepted as before; QT, if present, is checked.
-    The enclosing audit separately requires successful trace-producer execution.
+    A QR-only synthetic excerpt is accepted only in the legacy/default path; the
+    sequential witness requires QT. The enclosing audit separately validates the
+    trace producer exit, input identity and executable identity.
     """
     budget = budget or TraceBudget()
     budget.validate()
-    fragments = ordered_fragments(coarse, fragments)
+    fragments = ordered_fragments(coarse, fragments, max_fragments=max_fragments)
     query_intervals = [oriented_query_interval(row) for row in fragments]
     start = time.monotonic()
     deadline = start + budget.timeout_seconds
@@ -107,7 +117,8 @@ def collect_split_counts(path: Path, coarse: dict, fragments: list[dict],
         if match is not None:
             raise ExperimentError("no unique original seed chain matches coarse PAF")
         match = {"counts": list(group["counts"]), "count": group["count"],
-                 "non_monotonic": group["non_monotonic"], "bad_ownership": group["bad_ownership"]}
+                 "non_monotonic": group["non_monotonic"], "bad_ownership": group["bad_ownership"],
+                 "non_contiguous_ownership": group["non_contiguous_ownership"]}
 
     # NONBLOCK prevents a FIFO from hanging before we can reject nonregular input.
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
@@ -170,7 +181,8 @@ def collect_split_counts(path: Path, coarse: dict, fragments: list[dict],
                     raise ExperimentError("non-contiguous or unordered CN chain IDs unsupported")
                 finish(current)
                 current = {"key": key, "first": (t, q, span), "last": None,
-                           "count": 0, "counts": [0, 0], "non_monotonic": False, "bad_ownership": False}
+                           "count": 0, "counts": [0] * len(fragments), "non_monotonic": False,
+                           "bad_ownership": False, "last_owner": -1, "non_contiguous_ownership": False}
                 group_count += 1
             last = current["last"]
             if last and (t <= last[0] or q <= last[1]):
@@ -189,6 +201,9 @@ def collect_split_counts(path: Path, coarse: dict, fragments: list[dict],
                 if owner is None:
                     current["bad_ownership"] = True
                 else:
+                    if owner < current["last_owner"]:
+                        current["non_contiguous_ownership"] = True
+                    current["last_owner"] = owner
                     current["counts"][owner] += 1
         finish(current)
         after = os.fstat(stream.fileno())
@@ -198,12 +213,16 @@ def collect_split_counts(path: Path, coarse: dict, fragments: list[dict],
             raise ExperimentError("trace length changed during streaming scan")
     if not query_seen:
         raise ExperimentError("trace/DP query identity or length does not match the coarse candidate")
+    if require_query_end and not query_done:
+        raise ExperimentError("complete query-end marker required for sequential split witness")
     if match is None:
         raise ExperimentError("no unique original seed chain matches coarse PAF")
     if match["non_monotonic"]:
         raise ExperimentError("non-monotonic seed chain unsupported by witness")
     if match["bad_ownership"]:
         raise ExperimentError("seed missing from or shared by DP fragments")
+    if match["non_contiguous_ownership"]:
+        raise ExperimentError("fragment seed ownership is not a contiguous chain partition")
     if time.monotonic() > deadline:
         raise ExperimentError("trace processing time budget exceeded")
     return {"fragment_anchor_counts": match["counts"], "original_anchor_count": match["count"],

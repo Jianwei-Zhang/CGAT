@@ -215,15 +215,18 @@ python3 GPM2.0/experiments/long_query_alignment/guided_alignment.py \
 这不是整套 CGAT 的内存调度器，也不保证整个小麦比对能在任意内存下运行。
 实测、模拟预算的区别与复现命令见 `VALIDATION_REVERSE_ADAPTIVE_20261029.md`。
 
-## 作业内存预算与排队规划（实验层）
+## 连续多片段得分证据（实验层）
 
-`job_memory.py` 增加只读 Slurm/cgroup v2 预算发现：检查可见祖先限制及当前占用，
-不拿整机 RAM 代替作业额度。纯函数规划器结合显式 CPU、基线、余量和任务峰值预算，
-预算小时暂缓新任务，预算大时允许更多拟并发；不跳过数据，也不自动启动任务。
-当前没有接入生产调度器，未知峰值、cgroup v1、未确认的 Slurm per-CPU 额度等明确拒绝。
+`sequential_split_witness.py` 按 minimap2 连续“头部 + 剩余尾部”的切分及逐次 binary32
+舍入恢复同链多片段 seed/chain score 账本；要求完整、唯一、连续的原始 seed 归属。
+它不恢复候选全集、MAPQ、主次关系或最终结果，未知 join/inversion/混合方向明确拒绝。
+设计边界和未执行用例见 `SEQUENTIAL_SPLIT_DESIGN_20261030.md`。
 
-用户已要求将后续测试统一留到收尾；此前完成的结果与尚未运行的验收项分开记录于
-`VALIDATION_JOB_MEMORY_20261030.md`。客户正在跑的诊断包及原流程不受影响。
+## 参数与正常输入回归准备
+
+`compare_parameter_controls.py` 为收尾阶段准备正常输入参数对照：同时比较坐标/CIGAR
+关系、候选 pair/strand、多重性、MAPQ、主次标签和空输出。通过正常输入对照也只允许
+进入长序列评估，不会自动成为客户修复；见 `PARAMETER_ACCEPTANCE_PLAN_20261030.md`。
 
 ## 回传证据审阅准备（实现完成，执行验证待收尾）
 
