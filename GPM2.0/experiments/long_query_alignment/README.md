@@ -235,3 +235,13 @@ python3 GPM2.0/experiments/long_query_alignment/guided_alignment.py \
 当前不得替换用户正在运行的工具包，也不得作为已验收工具交付。
 边界与操作分支见 `CUSTOMER_FEEDBACK_REVIEW.md`；整体待办和收尾队列见
 `PREFEEDBACK_WORK_20261030.md`。
+
+## 超长 CIGAR 假设开发分支
+
+`fix/minimap2-long-cigar-recovery` 增加 `selective_reference_alignment.py`：正常长度
+query 保留整条原比对，超长 query 才进入既有分窗/坐标恢复；混合输出仅作为实验候选，
+不写正式 `result.paf`，不启动下游。默认只预览，新增用例未执行。
+
+本阶段尚未接入 Server `run.sh`；客户多段参考索引、全局候选与 MAPQ 仍是阻断项。
+最终目标仍是用户沿用原命令，无需手工切序列或增加配置。当前能力与下一步见
+`BRANCH_LONG_CIGAR_RECOVERY.md`，不要把创建分支或生成候选视为已修复。
