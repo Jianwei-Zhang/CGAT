@@ -214,3 +214,13 @@ python3 GPM2.0/experiments/long_query_alignment/guided_alignment.py \
 未知进程上限采用标明来源的保守规划值，不冒称已识别 Slurm/cgroup 的共享可用内存。
 这不是整套 CGAT 的内存调度器，也不保证整个小麦比对能在任意内存下运行。
 实测、模拟预算的区别与复现命令见 `VALIDATION_REVERSE_ADAPTIVE_20261029.md`。
+
+## 作业内存预算与排队规划（实验层）
+
+`job_memory.py` 增加只读 Slurm/cgroup v2 预算发现：检查可见祖先限制及当前占用，
+不拿整机 RAM 代替作业额度。纯函数规划器结合显式 CPU、基线、余量和任务峰值预算，
+预算小时暂缓新任务，预算大时允许更多拟并发；不跳过数据，也不自动启动任务。
+当前没有接入生产调度器，未知峰值、cgroup v1、未确认的 Slurm per-CPU 额度等明确拒绝。
+
+用户已要求将后续测试统一留到收尾；此前完成的结果与尚未运行的验收项分开记录于
+`VALIDATION_JOB_MEMORY_20261030.md`。客户正在跑的诊断包及原流程不受影响。
