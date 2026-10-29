@@ -14,6 +14,7 @@ import shutil
 import subprocess
 
 import windowed_alignment as wa
+import guided_alignment as ga
 
 
 def main():
@@ -21,6 +22,7 @@ def main():
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--minimap2", required=True)
     parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument("--guide-chains", action="store_true", help="Also require provisional whole-query chain guidance")
     parser.add_argument("--memory-gib", type=int, default=10)
     args = parser.parse_args()
     mm = shutil.which(args.minimap2)
@@ -48,7 +50,8 @@ def main():
     results = {"baseline_error": baseline_error, "baseline_execution": json.loads((baseline / "map.execution.json").read_text()),
                "same_assertion_reproduced": "mm_update_extra" in (baseline / "map.stderr").read_text(errors="replace")
                    and "qoff" in (baseline / "map.stderr").read_text(errors="replace"),
-               "synthetic_only": True, "production_ready": False, "cases": []}
+               "synthetic_only": True, "production_ready": False,
+               "harness_sha256": wa.sha256(Path(__file__)), "guided": args.guide_chains, "cases": []}
     wa.write_json(root / "large-summary.json", results)
     for label in ("plus", "reverse"):
         if label == "plus":
@@ -70,10 +73,14 @@ def main():
         options = argparse.Namespace(target=reference, query=query, out=root / label, minimap2=mm, preset="asm10",
                                      core_bases=50000000, context_bases=100000, threads=2, timeout=args.timeout,
                                      memory_gib=args.memory_gib, require_full_query_coverage=True)
-        report = wa.experiment(options)
+        if args.guide_chains:
+            options.guide_slack = 1000
+            report = ga.experiment(options)
+        else:
+            report = wa.experiment(options)
         results["cases"].append({"name": label, "experiment": report})
         wa.write_json(root / "large-summary.json", results)
-        print(label, report["status"], report["stitching"], flush=True)
+        print(label, report["status"], report["selection"] if args.guide_chains else report["stitching"], flush=True)
     print("Complete. Check baseline assertion and both coverage reports; customer biology remains unvalidated.")
 
 

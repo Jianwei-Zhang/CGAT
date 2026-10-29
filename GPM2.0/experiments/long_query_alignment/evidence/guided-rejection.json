@@ -1,0 +1,175 @@
+{
+  "local_evidence_root": "/tmp/cgat-guided-rejection-final-20261029",
+  "report": {
+    "status": "failed",
+    "experimental_only": true,
+    "production_ready": false,
+    "customer_validated": false,
+    "harness_sha256": "2465cd041b80623996ae5f515e232dc02b71722862f03405cd865a1094c928c5",
+    "guide_slack": 1000,
+    "caveat": "Whole-query chain selection is provisional, not post-DP ranking/MAPQ equivalence. No production import.",
+    "windowed_report_sha256": "fab56fdf45783880b1d1bcd8ef566c5c47bb3152e746947227562b5c606af639",
+    "error": "ExperimentError: whole-query candidate not completely recovered; inspect chain coverage"
+  },
+  "chain_coverage": [
+    {
+      "chain": {
+        "row": 1,
+        "query": "query",
+        "qlen": 200000,
+        "qs": 16,
+        "qe": 199989,
+        "strand": "+",
+        "target": "exact",
+        "tlen": 200000,
+        "ts": 16,
+        "te": 199989,
+        "chain_mapq": 4,
+        "kind": "P",
+        "score": 199973,
+        "minimizers": 20033
+      },
+      "supported_rows": 1,
+      "query_coverage": {
+        "covered_bases": 200000,
+        "intervals": [
+          [
+            0,
+            200000
+          ]
+        ]
+      },
+      "target_coverage": {
+        "covered_bases": 200000,
+        "intervals": [
+          [
+            0,
+            200000
+          ]
+        ]
+      },
+      "uncovered_intervals": [],
+      "uncovered_canonical_bases": 0,
+      "target_endpoints_recovered": true
+    },
+    {
+      "chain": {
+        "row": 2,
+        "query": "query",
+        "qlen": 200000,
+        "qs": 16,
+        "qe": 199989,
+        "strand": "+",
+        "target": "decoy",
+        "tlen": 200000,
+        "ts": 16,
+        "te": 199989,
+        "chain_mapq": 0,
+        "kind": "S",
+        "score": 197958,
+        "minimizers": 19833
+      },
+      "supported_rows": 2,
+      "query_coverage": {
+        "covered_bases": 198001,
+        "intervals": [
+          [
+            0,
+            99001
+          ],
+          [
+            101000,
+            200000
+          ]
+        ]
+      },
+      "target_coverage": {
+        "covered_bases": 198001,
+        "intervals": [
+          [
+            0,
+            99001
+          ],
+          [
+            101000,
+            200000
+          ]
+        ]
+      },
+      "uncovered_intervals": [
+        [
+          99001,
+          101000
+        ]
+      ],
+      "uncovered_canonical_bases": 1999,
+      "target_endpoints_recovered": true
+    }
+  ],
+  "baseline_paf": "query\t200000\t0\t200000\t+\texact\t200000\t0\t200000\t200000\t200000\t60\tNM:i:0\tms:i:200000\tAS:i:200000\tnn:i:0\ttp:A:P\tcm:i:20033\ts1:i:199973\ts2:i:197958\tde:f:0\trl:i:0\tcg:Z:200000=\n",
+  "whole_query_chains": "query\t200000\t16\t199989\t+\texact\t200000\t16\t199989\t199973\t199973\t4\ttp:A:P\tcm:i:20033\ts1:i:199973\ts2:i:197958\tdv:f:0\trl:i:0\nquery\t200000\t16\t199989\t+\tdecoy\t200000\t16\t199989\t197958\t199973\t0\ttp:A:S\tcm:i:19833\ts1:i:197958\tdv:f:0.0005\trl:i:0\n",
+  "raw_windowed_paf": "query\t200000\t0\t99001\t+\tdecoy\t200000\t0\t99001\t99001\t99001\t255\tcg:Z:99001=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000000\tzp:Z:experimental-stitched\tzc:i:2\nquery\t200000\t0\t200000\t+\texact\t200000\t0\t200000\t200000\t200000\t255\tcg:Z:200000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000000\tzp:Z:experimental-stitched\tzc:i:4\nquery\t200000\t101000\t200000\t+\tdecoy\t200000\t101000\t200000\t99000\t99000\t255\tcg:Z:99000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000002\tzp:Z:experimental-stitched\tzc:i:2\n",
+  "row_provenance": [
+    {
+      "stitched_row": 1,
+      "pair": [
+        "query",
+        "decoy",
+        "+"
+      ],
+      "bounds": [
+        0,
+        99001,
+        0,
+        99001
+      ],
+      "compatible_chain_rows": [
+        2
+      ],
+      "status": "supported",
+      "guided_row": 1
+    },
+    {
+      "stitched_row": 2,
+      "pair": [
+        "query",
+        "exact",
+        "+"
+      ],
+      "bounds": [
+        0,
+        200000,
+        0,
+        200000
+      ],
+      "compatible_chain_rows": [
+        1
+      ],
+      "status": "supported",
+      "guided_row": 2
+    },
+    {
+      "stitched_row": 3,
+      "pair": [
+        "query",
+        "decoy",
+        "+"
+      ],
+      "bounds": [
+        101000,
+        200000,
+        101000,
+        200000
+      ],
+      "compatible_chain_rows": [
+        2
+      ],
+      "status": "supported",
+      "guided_row": 3
+    }
+  ],
+  "target_sha256": "b1a501b4f82c8ee2202ee77fc64397d604cfed909b7765a413c0cf56c098c22c",
+  "query_sha256": "69abc586bd8df922c529285c759717bcf2fbc7e560873f2920a8581a2e2bd36c",
+  "guided_final_exists": false,
+  "production_ready": false
+}

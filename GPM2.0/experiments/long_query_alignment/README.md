@@ -143,3 +143,28 @@ python3 GPM2.0/experiments/long_query_alignment/compare_self.py \
 但仍**不包含**整条 MAPQ/主次评分等价性，更不是生产放行字段。所有运行始终
 `production_ready: false`。不能为了让测试通过删除重复候选、覆盖原始差异或把
 MAPQ=255 改成一个任意“安全分数”。当前 FASTA 存储器只接受 ASCII 序列 ID。
+
+
+## 整条候选约束分窗（第二阶段，仍为实验）
+
+`guided_alignment.py` 增加独立的整条 query 链预比对，用作候选位置约束；
+**最终输出仍必须具有逐碱基验证的 CIGAR**，不是去掉 `-c` 的替代方案。
+原始分窗输出不删除，新增候选的排除原因、候选归属及恢复覆盖都单独留档。
+所有选中的主/次级候选都必须恢复；候选丢失、路径超出已支持的几何范围或归属
+不唯一会停止，不会不断放宽参数。MAPQ 仍未知，不冒用预比对的评分。
+
+```bash
+python3 GPM2.0/experiments/long_query_alignment/guided_alignment.py \
+  --minimap2 /absolute/path/to/minimap2 \
+  --target /path/to/synthetic-reference.fa --query /path/to/synthetic-query.fa \
+  --out /tmp/new-guided-window-experiment
+```
+
+新的 9 组 GRT 对照中，先前两个重复候选反例已纠正；2.7 亿碱基的正反向恢复
+也通过。但新增的真实 decoy 反例证明链预比对与最终 DP 候选/MAPQ 并不等价，
+当前实现会明确拒绝该案例。因此**仍不进入正式 Server 或原生 App**。
+
+详见 `VALIDATION_GUIDED_20261029.md`。在上述 `compare_grt.py` 或
+`reproduce_large.py` 命令中增加 `--guide-chains` 才启用新实验路径；默认仍是
+未约束的原对照。成功结果为顶层 `guided.experimental.paf`，预比对
+`whole-query.chains.paf` 以及子目录中的原始分窗结果均不得当成已验收结果导入。

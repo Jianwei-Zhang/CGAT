@@ -1,5 +1,9 @@
 # Long-query windowing: downstream and self-alignment audit, 2026-10-29
 
+A subsequent provisional-guidance implementation is measured in
+`VALIDATION_GUIDED_20261029.md`. The failing unguided results below remain intact;
+they are not retroactively counted as successful guided runs.
+
 ## Decision
 
 **Do not integrate the current windowed PAF as a transparent Server fallback.**

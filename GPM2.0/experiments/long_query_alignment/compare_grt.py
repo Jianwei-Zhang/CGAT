@@ -18,6 +18,7 @@ import shutil
 import subprocess
 
 import windowed_alignment as wa
+import guided_alignment as ga
 from compare_small_fixtures import relation_signature, write_fasta
 
 
@@ -199,6 +200,7 @@ def main():
     parser.add_argument("--server-dir", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--case", action="append")
+    parser.add_argument("--guide-chains", action="store_true", help="Isolated whole-query chain guidance; still NOT DP ranking equivalence")
     args = parser.parse_args()
     mm = shutil.which(args.minimap2)
     if not mm or Path(shutil.which("minimap2") or "").resolve() != Path(mm).resolve():
@@ -211,6 +213,7 @@ def main():
     summary = {"status": "running", "production_ready": False, "customer_validated": False,
                "harness_sha256": wa.sha256(Path(__file__)),
                "server_prepare_sha256": wa.sha256(server / "prepare.sh"),
+               "candidate_mode": "whole_query_chain_guidance" if args.guide_chains else "unguided_windows",
                "scope": "initial reference PAF only; self skipped; independent GRT alignments unchanged; no native App",
                "tool": {"path": mm, "sha256": wa.sha256(Path(mm)), "version": subprocess.check_output([mm, "--version"], text=True).strip()},
                "cases": []}
@@ -234,14 +237,23 @@ def main():
             paf = baseline / "initial.paf"
             wa.run_command([mm, "-c", "--eqx", "-x", "asm10", "-t", "2", "-o", str(paf), str(target), str(query)], baseline, "map", 60, 6)
             windowed = directory / "windowed"
-            wa.experiment(argparse.Namespace(target=target, query=query, out=windowed, minimap2=mm, preset="asm10",
-                                            core_bases=200_000, context_bases=10_000, threads=2, timeout=60,
-                                            memory_gib=6, require_full_query_coverage=False))
-            stitched = windowed / "stitched.experimental.paf"
+            options = argparse.Namespace(target=target, query=query, out=windowed, minimap2=mm, preset="asm10",
+                                         core_bases=200_000, context_bases=10_000, threads=2, timeout=60,
+                                         memory_gib=6, require_full_query_coverage=False)
+            if args.guide_chains:
+                options.guide_slack = 1000
+                alignment = ga.experiment(options)
+                stitched = windowed / "guided.experimental.paf"
+            else:
+                wa.experiment(options)
+                stitched = windowed / "stitched.experimental.paf"
             record = {"case": name, "inputs_sha256": before_hashes,
                       "relation_equal": relation_signature(paf) == relation_signature(stitched), "status": "running",
                       "confidence": {"baseline": confidence_summary(paf), "stitched": confidence_summary(stitched)},
                       "ranking_equivalence": "not_established"}
+            if args.guide_chains:
+                record["unfiltered_relation_equal"] = relation_signature(paf) == relation_signature(Path(alignment["unfiltered_paf"]))
+                record["guide_counts"] = {k: v for k, v in alignment["selection"].items() if k != "candidate_coverage"}
             summary["cases"].append(record)
             wa.write_json(root / "comparison.json", summary)
             workspaces = [run_grt(server, d, target, query, p, donor) for d, p in ((baseline, paf), (candidate, stitched))]

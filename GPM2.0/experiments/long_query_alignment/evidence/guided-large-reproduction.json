@@ -1,0 +1,322 @@
+{
+  "baseline_error": "map failed; evidence retained in /tmp/cgat-guided-270m-final-20261029/baseline",
+  "baseline_execution": {
+    "command": [
+      "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+      "-c",
+      "-x",
+      "asm10",
+      "-t",
+      "2",
+      "-o",
+      "/tmp/cgat-guided-270m-final-20261029/baseline/result.paf",
+      "/tmp/cgat-guided-270m-final-20261029/reference.fa",
+      "/tmp/cgat-guided-270m-final-20261029/reference.fa"
+    ],
+    "returncode": -6,
+    "seconds": 85.992
+  },
+  "same_assertion_reproduced": true,
+  "synthetic_only": true,
+  "production_ready": false,
+  "harness_sha256": "5309729fbdc6146816090cefb234b2c21b291f17b97ba3751d915b7ae1fafce0",
+  "guided": true,
+  "cases": [
+    {
+      "name": "plus",
+      "experiment": {
+        "status": "validated_experimental_guidance",
+        "experimental_only": true,
+        "production_ready": false,
+        "customer_validated": false,
+        "harness_sha256": "2465cd041b80623996ae5f515e232dc02b71722862f03405cd865a1094c928c5",
+        "guide_slack": 1000,
+        "caveat": "Whole-query chain selection is provisional, not post-DP ranking/MAPQ equivalence. No production import.",
+        "windowed_report_sha256": "4457e74cfa8d81643e81546fb2c8d40dc8c25f26ac42fa7e97129152ee051a58",
+        "selection": {
+          "input_rows": 1,
+          "kept_rows": 1,
+          "excluded_rows": 0,
+          "whole_query_candidates": 1,
+          "candidate_coverage": [
+            {
+              "chain": {
+                "row": 1,
+                "query": "synthetic_270M",
+                "qlen": 270000000,
+                "qs": 0,
+                "qe": 269999987,
+                "strand": "+",
+                "target": "synthetic_270M",
+                "tlen": 270000000,
+                "ts": 0,
+                "te": 269999987,
+                "chain_mapq": 60,
+                "kind": "P",
+                "score": 269999987,
+                "minimizers": 27000622
+              },
+              "supported_rows": 1,
+              "query_coverage": {
+                "covered_bases": 270000000,
+                "intervals": [
+                  [
+                    0,
+                    270000000
+                  ]
+                ]
+              },
+              "target_coverage": {
+                "covered_bases": 270000000,
+                "intervals": [
+                  [
+                    0,
+                    270000000
+                  ]
+                ]
+              },
+              "uncovered_intervals": [],
+              "uncovered_canonical_bases": 0,
+              "target_endpoints_recovered": true
+            }
+          ],
+          "queries": {
+            "synthetic_270M": {
+              "length": 270000000,
+              "covered_bases": 270000000,
+              "intervals": [
+                [
+                  0,
+                  270000000
+                ]
+              ]
+            }
+          },
+          "targets": {
+            "synthetic_270M": {
+              "length": 270000000,
+              "covered_bases": 270000000,
+              "intervals": [
+                [
+                  0,
+                  270000000
+                ]
+              ]
+            }
+          },
+          "dp_ranking_reconstructed": false,
+          "mapq": "unknown_255"
+        },
+        "output_sha256": "866ca5fe54d9e502f6ce0c503ef597153f686738918f45ac7ba5017acd77a76a",
+        "unfiltered_paf": "/tmp/cgat-guided-270m-final-20261029/plus/windows/stitched.experimental.paf",
+        "unfiltered_sha256": "19a1d2ad446fd61412c352847607dbd569b9f185aa04ac3e2702d5c594f94f56",
+        "index_sha256": "7ad7c901efec562a3844d3d557d8897f2fd77385bd0e5061addcce18a1e8ca87",
+        "chain_paf_sha256": "b668fd432ec487b8c5ce2b3986e269d83bc2cb5bec3109835e28fe7680168408",
+        "tool": {
+          "path": "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+          "version": "2.31-r1302",
+          "sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d"
+        },
+        "target": {
+          "source": "/tmp/cgat-guided-270m-final-20261029/reference.fa",
+          "size": 273375016,
+          "mtime_ns": 1793269619492336700,
+          "ctime_ns": 1793269619492336700,
+          "inode": 611454,
+          "sha256": "0fbc225dfa32c1e4e99ed4cfb611f5023768423fbc5c4f6ec789342aff1e6fc4"
+        },
+        "query": {
+          "source": "/tmp/cgat-guided-270m-final-20261029/reference.fa",
+          "size": 273375016,
+          "mtime_ns": 1793269619492336700,
+          "ctime_ns": 1793269619492336700,
+          "inode": 611454,
+          "sha256": "0fbc225dfa32c1e4e99ed4cfb611f5023768423fbc5c4f6ec789342aff1e6fc4"
+        },
+        "original_inputs_unchanged": true
+      },
+      "paf": "synthetic_270M\t270000000\t0\t270000000\t+\tsynthetic_270M\t270000000\t0\t270000000\t270000000\t270000000\t255\tcg:Z:268435455=1564545=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000000\tzc:i:6\tzp:Z:experimental-chain-guided\tzg:i:1\n",
+      "whole_query_execution": {
+        "command": [
+          "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+          "-x",
+          "asm10",
+          "-t",
+          "2",
+          "-o",
+          "/tmp/cgat-guided-270m-final-20261029/plus/whole-query.chains.paf",
+          "/tmp/cgat-guided-270m-final-20261029/plus/windows/target.mmi",
+          "/tmp/cgat-guided-270m-final-20261029/reference.fa"
+        ],
+        "returncode": 0,
+        "seconds": 20.614
+      },
+      "window_map_execution": {
+        "command": [
+          "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+          "-c",
+          "--eqx",
+          "-x",
+          "asm10",
+          "-t",
+          "2",
+          "-o",
+          "/tmp/cgat-guided-270m-final-20261029/plus/windows/raw.windows.paf",
+          "/tmp/cgat-guided-270m-final-20261029/plus/windows/target.mmi",
+          "/tmp/cgat-guided-270m-final-20261029/plus/windows/windows.fa"
+        ],
+        "returncode": 0,
+        "seconds": 27.479
+      }
+    },
+    {
+      "name": "reverse",
+      "experiment": {
+        "status": "validated_experimental_guidance",
+        "experimental_only": true,
+        "production_ready": false,
+        "customer_validated": false,
+        "harness_sha256": "2465cd041b80623996ae5f515e232dc02b71722862f03405cd865a1094c928c5",
+        "guide_slack": 1000,
+        "caveat": "Whole-query chain selection is provisional, not post-DP ranking/MAPQ equivalence. No production import.",
+        "windowed_report_sha256": "245f09f4dd8f30e44b3919071871abf7e10155ef64b64cc7743b20a7a8b175e1",
+        "selection": {
+          "input_rows": 1,
+          "kept_rows": 1,
+          "excluded_rows": 0,
+          "whole_query_candidates": 1,
+          "candidate_coverage": [
+            {
+              "chain": {
+                "row": 1,
+                "query": "reverse_270M",
+                "qlen": 270000000,
+                "qs": 13,
+                "qe": 270000000,
+                "strand": "-",
+                "target": "synthetic_270M",
+                "tlen": 270000000,
+                "ts": 0,
+                "te": 269999987,
+                "chain_mapq": 60,
+                "kind": "P",
+                "score": 269999987,
+                "minimizers": 27000622
+              },
+              "supported_rows": 1,
+              "query_coverage": {
+                "covered_bases": 270000000,
+                "intervals": [
+                  [
+                    0,
+                    270000000
+                  ]
+                ]
+              },
+              "target_coverage": {
+                "covered_bases": 270000000,
+                "intervals": [
+                  [
+                    0,
+                    270000000
+                  ]
+                ]
+              },
+              "uncovered_intervals": [],
+              "uncovered_canonical_bases": 0,
+              "target_endpoints_recovered": true
+            }
+          ],
+          "queries": {
+            "reverse_270M": {
+              "length": 270000000,
+              "covered_bases": 270000000,
+              "intervals": [
+                [
+                  0,
+                  270000000
+                ]
+              ]
+            }
+          },
+          "targets": {
+            "synthetic_270M": {
+              "length": 270000000,
+              "covered_bases": 270000000,
+              "intervals": [
+                [
+                  0,
+                  270000000
+                ]
+              ]
+            }
+          },
+          "dp_ranking_reconstructed": false,
+          "mapq": "unknown_255"
+        },
+        "output_sha256": "9843f8e4a613245b3b9e94ef5580f130bbe44332d51ad64494793f61ff074ccd",
+        "unfiltered_paf": "/tmp/cgat-guided-270m-final-20261029/reverse/windows/stitched.experimental.paf",
+        "unfiltered_sha256": "021319840d3987cb59aa005e2778d8d36fb547e0445da0568bb5d7772ae4b934",
+        "index_sha256": "7ad7c901efec562a3844d3d557d8897f2fd77385bd0e5061addcce18a1e8ca87",
+        "chain_paf_sha256": "b35ec5490b86ade86c865898c5fca104e86c5c200ffe1c083e40c820fc04a379",
+        "tool": {
+          "path": "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+          "version": "2.31-r1302",
+          "sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d"
+        },
+        "target": {
+          "source": "/tmp/cgat-guided-270m-final-20261029/reference.fa",
+          "size": 273375016,
+          "mtime_ns": 1793269619492336700,
+          "ctime_ns": 1793269619492336700,
+          "inode": 611454,
+          "sha256": "0fbc225dfa32c1e4e99ed4cfb611f5023768423fbc5c4f6ec789342aff1e6fc4"
+        },
+        "query": {
+          "source": "/tmp/cgat-guided-270m-final-20261029/reverse.fa",
+          "size": 270000272,
+          "mtime_ns": 1793269785844934056,
+          "ctime_ns": 1793269785844934056,
+          "inode": 631896,
+          "sha256": "fd4ee254159d37657d3574135350050322e566351ba5104e8edce5cae61f6203"
+        },
+        "original_inputs_unchanged": true
+      },
+      "paf": "reverse_270M\t270000000\t0\t270000000\t-\tsynthetic_270M\t270000000\t0\t270000000\t270000000\t270000000\t255\tcg:Z:268435455=1564545=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000005\tzc:i:6\tzp:Z:experimental-chain-guided\tzg:i:1\n",
+      "whole_query_execution": {
+        "command": [
+          "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+          "-x",
+          "asm10",
+          "-t",
+          "2",
+          "-o",
+          "/tmp/cgat-guided-270m-final-20261029/reverse/whole-query.chains.paf",
+          "/tmp/cgat-guided-270m-final-20261029/reverse/windows/target.mmi",
+          "/tmp/cgat-guided-270m-final-20261029/reverse.fa"
+        ],
+        "returncode": 0,
+        "seconds": 20.473
+      },
+      "window_map_execution": {
+        "command": [
+          "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+          "-c",
+          "--eqx",
+          "-x",
+          "asm10",
+          "-t",
+          "2",
+          "-o",
+          "/tmp/cgat-guided-270m-final-20261029/reverse/windows/raw.windows.paf",
+          "/tmp/cgat-guided-270m-final-20261029/reverse/windows/target.mmi",
+          "/tmp/cgat-guided-270m-final-20261029/reverse/windows/windows.fa"
+        ],
+        "returncode": 0,
+        "seconds": 28.688
+      }
+    }
+  ],
+  "local_evidence_root": "/tmp/cgat-guided-270m-final-20261029",
+  "baseline_stderr_tail": "[M::main::4.557*1.20] loaded/built the index for 1 target sequence(s)\n[M::mm_mapopt_update::4.864*1.19] mid_occ = 50\n[M::mm_idx_stat] kmer size: 19; skip: 19; is_hpc: 0; #seq: 1\n[M::mm_idx_stat::5.081*1.18] distinct minimizers: 26991944 (99.97% are singletons); average occurrences: 1.000; average spacing: 10.000; total length: 270000000\nminimap2: align.c:301: mm_update_extra: Assertion `qoff == r->qe - r->qs && toff == r->re - r->rs' failed."
+}
