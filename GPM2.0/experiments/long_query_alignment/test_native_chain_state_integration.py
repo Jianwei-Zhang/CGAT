@@ -87,14 +87,7 @@ class NativeChainStateIntegrationTests(unittest.TestCase):
                      ("three_split_decoy",{"exact":dna,"decoy":bytes(decoy)},dna),
                      ("three_split_reverse",{"exact":dna,"decoy":bytes(decoy)},dna.translate(wa.RC)[::-1]),
                      ("three_split_without_exact_parent",{"decoy":bytes(decoy)},dna)]
-        def signature(path):
-            result = []
-            for line in path.read_text().splitlines():
-                fields = line.split("\t")
-                tags = {t.split(":",1)[0]:t for t in fields[12:]}
-                known = tuple(tags.get(k) for k in ("cg","NM","nn","ms","cm","s1","s2","tp","rl","zd"))
-                result.append((tuple(fields[:12]),known))
-            return result
+        import native_evaluation as ne
         with tempfile.TemporaryDirectory(prefix="cgat-native-bridge-controls-") as tmp:
             for name,targets,query_bases in fixtures:
                 with self.subTest(case=name):
@@ -115,7 +108,7 @@ class NativeChainStateIntegrationTests(unittest.TestCase):
                         window_candidate_policy="all_chains_pool",recover_path_scores=True,native_state_bundle=Path(self.bundle))
                     report = ga.experiment(args)
                     evaluated = Path(report["native_recovery"]["native_evaluated_paf"])
-                    self.assertEqual(signature(evaluated),signature(baseline))
+                    self.assertEqual(ne.comparison_signature(evaluated),ne.comparison_signature(baseline))
                     self.assertTrue(report["native_recovery"]["selection"]["native_decisions_applied"])
                     public = root/"recovery"/"guided.experimental.paf"
                     self.assertTrue(all(row.split("\t")[11]=="255" for row in public.read_text().splitlines()))

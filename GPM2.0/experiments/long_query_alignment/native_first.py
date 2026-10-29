@@ -283,6 +283,7 @@ class CellMerger:
         self.cells = {}
         self.sources = []
         self.shard_digests = {}
+        self.evaluated_cells = {}
         self.failed = False
 
     def _prefix(self,raw,allowed,part_index):
@@ -310,8 +311,24 @@ class CellMerger:
             raise wa.ExperimentError("failed or partial native PAF cannot enter result assembly")
         return self._add(Path(receipt["path"]),receipt["paf_sha256"],names,"native",part_index=part_index)
 
-    def add_recovered(self,path,sha256,name,part_index,validator):
-        return self._add(Path(path),sha256,[name],"recovered",part_index=part_index,validator=validator)
+    def add_recovered(self,path,sha256,name,part_index,validator,*,native_evaluated=None):
+        # Keep native rows only once. The private evaluation output reuses their
+        # existing checked shards and substitutes ONLY paired recovered cells.
+        try:
+            pair = None
+            if native_evaluated is not None:
+                import native_evaluation as ne
+                pair = ne.validate_pair(path,native_evaluated["path"],public_sha256=sha256,
+                    evaluated_sha256=native_evaluated["sha256"],validator=validator)
+            count = self._add(Path(path),sha256,[name],"recovered",part_index=part_index,validator=validator)
+            if pair is not None:
+                if count!=pair["rows"]:
+                    raise wa.ExperimentError("paired recovery candidate count changed during assembly")
+                self.evaluated_cells[(part_index,name)] = {"part_index":part_index,"query":name,**pair}
+            return count
+        except BaseException:
+            self.failed = True
+            raise
 
     def _add(self,path,expected_sha,names,route,*,part_index,validator=None):
         if self.failed:
@@ -387,29 +404,48 @@ class CellMerger:
         part,name = key
         return self.root/f"{part:04d}-{self.query_ids[name]:08d}.paf"
 
-    def finish(self,path):
+    def finish(self,path,*,native_evaluated=False):
         expected = {(i,name) for i in self.parts for name in self.queries}
         if self.failed or set(self.cells)!=expected:
             raise wa.ExperimentError("native-first assembly omits original query/index-part cells")
-        with Path(path).open("xb") as out:
-            for part in self.parts:
-                for name in self.queries:
-                    key = (part,name)
-                    shard = self._shard(key)
-                    if key in self.shard_digests:
-                        digest = hashlib.sha256()
-                        with shard.open("rb") as source:
-                            while raw := source.read(wa.CHUNK):
-                                out.write(raw); digest.update(raw)
-                        if digest.digest()!=self.shard_digests[key].digest():
-                            raise wa.ExperimentError("native/recovered shard changed before final assembly")
-                    elif shard.exists():
-                        raise wa.ExperimentError("unregistered shard appeared for a completed empty cell")
+        recovered = {key for key,value in self.cells.items() if value["route"]=="recovered"}
+        if native_evaluated and set(self.evaluated_cells)!=recovered:
+            raise wa.ExperimentError("private evaluation view lacks a paired recovered cell")
+        try:
+            with Path(path).open("xb") as out:
+                for part in self.parts:
+                    for name in self.queries:
+                        key = (part,name)
+                        shard = self._shard(key)
+                        replacement = self.evaluated_cells.get(key) if native_evaluated else None
+                        if replacement is not None:
+                            if (replacement["public_sha256"]!=self.cells[key]["source_sha256"]
+                                    or replacement["rows"]!=self.cells[key]["rows"]):
+                                raise wa.ExperimentError("private evaluation replacement lost its public cell binding")
+                            shard = Path(replacement["path"])
+                            expected_sha256 = replacement["sha256"]
+                        else:
+                            expected_sha256 = self.shard_digests[key].hexdigest() if key in self.shard_digests else None
+                        if expected_sha256 is not None:
+                            digest = hashlib.sha256()
+                            with shard.open("rb") as source:
+                                while raw := source.read(wa.CHUNK):
+                                    out.write(raw); digest.update(raw)
+                            if digest.hexdigest()!=expected_sha256:
+                                raise wa.ExperimentError("native/recovered shard changed before final assembly")
+                        elif shard.exists():
+                            raise wa.ExperimentError("unregistered shard appeared for a completed empty cell")
+        except BaseException:
+            self.failed = True
+            raise
         return {"original_cells":len(expected),"native_cells":sum(v["route"]=="native" for v in self.cells.values()),
                 "recovered_cells":sum(v["route"]=="recovered" for v in self.cells.values()),
                 "rows_by_query":{n:sum(self.cells[(i,n)]["rows"] for i in self.parts) for n in self.queries},
                 "output_order":"original_part_then_original_query","native_row_bytes_preserved":True,
-                "all_cells_completed":True,"partial_PAF_reused":False,"sources":self.sources}
+                "all_cells_completed":True,"partial_PAF_reused":False,"sources":self.sources,
+                "candidate_view":"private_native_evaluation" if native_evaluated else "public_unknown_recovery_confidence",
+                "evaluated_replacements":[self.evaluated_cells[k] for k in sorted(self.evaluated_cells)] if native_evaluated else [],
+                "native_confidence_promoted":False}
 
 
 def long_operation_witness(guidance_root,result,query_name,validator):

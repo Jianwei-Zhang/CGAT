@@ -104,6 +104,9 @@ class SelectiveReferenceTests(unittest.TestCase):
         self.assertEqual(run.call_count,1)
         self.assertEqual(result["routing_mode"],"native_complete_unchanged")
         self.assertFalse(result["companion_required"])
+        self.assertEqual(result["native_evaluation"]["scope"],"unchanged_native_complete_output")
+        self.assertEqual(Path(result["native_evaluation"]["path"]),self.args().out/"reference.candidate.experimental.paf")
+        self.assertFalse((self.args().out/"reference.native-evaluated.experimental.paf").exists())
         self.assertEqual((self.args().out/"reference.candidate.experimental.paf").read_bytes(),native_data)
         self.assertFalse(result["production_ready"])
         self.assertFalse(result["server_result_published"])
@@ -153,12 +156,17 @@ class SelectiveReferenceTests(unittest.TestCase):
         self.assertTrue((self.args().out/"original-native"/"native.partial.paf").is_file())
 
     def test_isolated_native_and_recovery_results_combine_without_failed_partial_rows(self):
-        recovered = paf("long",mapq=255,cigar="8=",tags="")
+        common = "\tnn:i:0\tNM:i:0\tzg:i:1"
+        recovered = paf("long",mapq=255,cigar="8=",tags=common+"\tzp:Z:experimental-native-selected-unknown-confidence")
+        evaluated = paf("long",mapq=60,cigar="8=",tags=common+"\tzp:Z:experimental-native-evaluated\tcm:i:3\ts1:i:8\tms:i:8\trl:i:0\ttp:A:P\ts2:i:0")
         def guidance(options):
             options.out.mkdir()
             (options.out/"guided.experimental.paf").write_bytes(recovered)
+            private = options.out/"native-evaluated.experimental.paf"
+            private.write_bytes(evaluated)
             wa.write_json(options.out/"guidance.json",{"status":"mock for orchestration only"})
-            return {"output_sha256":wa.sha256(options.out/"guided.experimental.paf")}
+            return {"output_sha256":wa.sha256(options.out/"guided.experimental.paf"),
+                    "native_recovery":{"native_evaluated_paf":str(private),"native_evaluated_sha256":wa.sha256(private)}}
         bundle = {"manifest_path":str(self.root/"mock-bundle"/"chain-state-helper.json")}
         with self.tools(self.assertion_run),patch.object(sr,"build_default_index",side_effect=self.build_index), \
              patch.object(sr.nst,"validate_bundle",return_value=bundle), \
@@ -166,6 +174,10 @@ class SelectiveReferenceTests(unittest.TestCase):
              patch.object(sr.nf,"long_operation_witness",return_value={"status":"mocked witness; NOT alignment evidence"}):
             result = sr.experiment(self.args())
         self.assertEqual((self.args().out/"reference.candidate.experimental.paf").read_bytes(),paf()+recovered)
+        self.assertEqual((self.args().out/"reference.native-evaluated.experimental.paf").read_bytes(),paf()+evaluated)
+        self.assertTrue(result["native_evaluation"]["ordered_candidate_path_equal"])
+        self.assertFalse(result["native_evaluation"]["whole_query_dp_equivalence_certified"])
+        self.assertFalse(result["native_evaluation"]["native_confidence_promoted"])
         self.assertEqual(result["combination"]["native_cells"],1)
         self.assertEqual(result["combination"]["recovered_cells"],1)
         self.assertEqual(result["parts"][0]["assertion_leaves"],1)

@@ -55,8 +55,10 @@ an alternate way to window every long record.
    Stream native optional bodies opaquely, validate recovered rows strictly, check
    hashes while assembling and again on shards, preserve multiplicity and emit in
    original part/query order. A rejected source invalidates that assembly.
-9. Emit only `reference.candidate.experimental.paf` and non-production receipts.
-   No `result.paf`, success checkpoint or downstream acceptance marker is emitted.
+9. Emit `reference.candidate.experimental.paf` and non-production receipts. A
+   separate complete private native-evaluated view is available for maintainer
+   comparisons only; neither file is `result.paf`, a success checkpoint or a
+   downstream acceptance marker.
    If no singleton assertion reproduces, refuse to call a rerun a recovery.
 
 `native_first.py` contains the classifier, raw record catalog, bounded bisection,
@@ -167,6 +169,8 @@ whole-record replay precede asserting any customer-specific root cause or repair
   emission order: implemented; static syntax/diff reviewed, execution deferred.
 - Native-first preservation, actual-assertion whole-record isolation and
   long-operation witness: implemented; execution deferred.
+- Complete public/private candidate pairing, unchanged native-cell reuse and
+  native-metadata/GRT comparison entry: implemented; execution deferred.
 - Native-state/path association, native selection and supplied-state MAPQ:
   implemented in the experimental branch; execution/equivalence unverified.
   Public confidence promotion and full-query DP-state completeness remain open.
@@ -475,6 +479,87 @@ Native functions being evaluated correctly on supplied metadata does not prove
 that window-derived paths/fragments are the complete native whole-query DP set.
 Formal confidence promotion, Server run.sh integration, packaging/rollback and
 scientific/customer acceptance remain required. The goal is NOT complete.
+
+### Complete evaluated view and real downstream comparison: implementation only
+
+The selective native-first entry now assembles TWO deliberately separate views:
+
+- Public: `reference.candidate.experimental.paf`; native-success cells retain
+  their original rows, while recovered cells retain unknown MAPQ=255/no native
+  score claims as before.
+- Private: `reference.native-evaluated.experimental.paf`; the EXACT SAME ordered
+  candidate paths, with supplied-state native API metadata on recovered cells.
+  Native-success cells reuse the existing checked shards unchanged; no second
+  native-cell spool/copy is created just to construct this view. On an entirely
+  native-success run, the evaluation receipt refers to the unchanged public
+  native file; no extra parser, companion or duplicate output is needed.
+
+`native_evaluation.py` pairs each recovered cell against its actual producer
+hashes. It requires identical first eleven PAF fields, CIGAR, NM/nn and original
+chain provenance, identical candidate order/count, the documented metadata tags,
+known native MAPQ (0..60), and coherent primary/subscore/secondary metadata.
+It rejects guessed AS, missing/extra candidates, duplicate tags, changed private
+files and a missing evaluated replacement. Pair failure invalidates assembly.
+The evaluated output is reread and hashed when combining; missing pairs can
+NEVER silently reuse a public row's sentinel 255.
+
+This makes native confidence available for verification, NOT automatically safe
+for production. `whole_query_dp_equivalence_certified` and `production_ready`
+remain false. Matching public/private geometry only proves that metadata is
+being compared on the same candidate set, not that this is the original DP set.
+
+Why this matters for the actual call chain: `assign_chr_groups.py` exports initial
+PAF MAPQ, `grt_prepare_inputs.parse_assignment_paf` retains it, and
+`grt_evidence_package.parse_source_paf`/`build_ref_evidence` use the initial PAF core counts and MAPQ to choose/display source
+evidence. The current inspected initial-PAF parsers use core fields rather than
+AS. This is a source-level dependency observation, NOT proof of complete GRT
+acceptance, a promise about future consumers or permission to fabricate AS.
+Independent GRT flank/validation alignments and their confidence are unchanged.
+
+`compare_grt.py --native-bridge` is a MAINTAINER-ONLY final-validation mode. It
+forces the bridge on the existing nine SMALL synthetic controls (even though
+native -c succeeds), and adds a mapped-plus-N-only-unmapped query-member control.
+The ten-case mode cannot accidentally validate only the native-first fast path. It preserves original default MMI parts/shared threshold, validates
+real native-complete no-hit cells, pairs complete public/private outputs and
+substitutes ONLY the private evaluated initial PAF into fresh isolated GRT
+workspaces. All other GRT alignments are genuine unchanged native commands.
+It compares the ordered native metadata contract AND assignment/GRT/final
+sequence/orientation/coordinates/events/Final Path checks. A MAPQ/tag difference
+cannot be hidden by similar geometry or a coincidentally equal final sequence.
+Source/companion/input receipts are retained; changed comparison/Server sources
+invalidate attribution. The native-bridge CLI returns nonzero on any compared
+metadata/downstream mismatch, even if geometry and final sequence look equal.
+Exit 0 means requested comparisons equal, NOT production acceptance or complete
+suite coverage; requested-case equality is distinct from full-suite coverage. All outputs still say production_ready:false; no actual assertion or
+customer-scale recovery is claimed by these small controls.
+
+For the later authorized final-testing phase ONLY (not executed now):
+
+```bash
+python3 GPM2.0/experiments/long_query_alignment/compare_grt.py \
+  --native-bridge \
+  --minimap2 /path/to/unchanged/pinned/minimap2 \
+  --server-dir "$PWD/GPM2.0/server" \
+  --out /tmp/NEW_CGAT_NATIVE_GRT_COMPARISON
+```
+
+The maintainer-built pinned companion must already be packaged at its default
+platform location, or selected by the harness-only `--native-state-bundle` override.
+These are NOT additional customer run.sh flags or customer build/config duties.
+The default native-first production-intended trigger is NOT weakened: this forced
+small-fixture path exists only in the isolated comparison harness.
+
+`test_native_evaluation.py`, updated selective-driver mocks and the existing
+native-DP integration definitions cover pair bindings, metadata differences,
+complete mixed views, private replacement mutation/missing-pair refusal, native
+byte preservation and the forced comparison path. They have **not run**. The new
+GRT mode has **not run**; no helper has been compiled. Old GRT/Final Path receipts
+cannot certify this new view. Real >28-bit forward/reverse selective entry,
+context/candidate completeness and unsupported-path audits remain mandatory for
+a runnable hypothesis-branch delivery or formal confidence promotion. Actual
+customer-flow acceptance is a separate requirement before claiming the customer's
+problem has been resolved; it must not be substituted by these local controls.
+
 
 ### Additional unsupported evidence patterns remain explicit
 

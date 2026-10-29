@@ -19,6 +19,7 @@ import guided_alignment as ga
 import minimap_index_context as mic
 import native_chain_state as nst
 import native_first as nf
+import native_evaluation as ne
 import windowed_alignment as wa
 
 MAX_PAF_LINE = 32*1024**2
@@ -126,7 +127,7 @@ def experiment(args):
         report.update(tool={"path":mm,"sha256":tool_hash,"version":version},
                       reference=target_identity,query=query_identity,
                       helper_sha256={Path(module.__file__).name:wa.sha256(Path(module.__file__))
-                                     for module in (ga,wa,mic,nst,nf)})
+                                     for module in (ga,wa,mic,nst,nf,ne)})
 
         def unchanged():
             if (not nf.identity_unchanged(target_path,target_identity)
@@ -139,6 +140,7 @@ def experiment(args):
         report["original_native"] = native
         unchanged()
         pending = root/"reference.candidate.pending.paf"
+        evaluated_pending = None
         if native["status"]=="native_success":
             # No FASTA normalization, length routing, MMI split, companion lookup,
             # PAF parsing/tag policy or windowing on the normal native path.
@@ -199,10 +201,13 @@ def experiment(args):
                 wa.write_json(options.out/"long-operation-witness.json",witness)
                 unchanged()
                 count = merger.add_recovered(options.out/"guided.experimental.paf",result["output_sha256"],
-                                             name,part["part_index"],validator)
+                    name,part["part_index"],validator,native_evaluated={
+                        "path":result["native_recovery"]["native_evaluated_paf"],
+                        "sha256":result["native_recovery"]["native_evaluated_sha256"]})
                 return {"query":name,"rows":count,"guidance_sha256":wa.sha256(options.out/"guidance.json"),
                         "long_operation_witness_sha256":wa.sha256(options.out/"long-operation-witness.json"),
-                        "long_operation_witness":witness,"native_confidence_promoted":False}
+                        "long_operation_witness":witness,"native_confidence_promoted":False,
+                        "native_evaluation_pair":merger.evaluated_cells[(part["part_index"],name)]}
 
             for part in catalog["parts"]:
                 unchanged()
@@ -216,6 +221,10 @@ def experiment(args):
                 raise wa.ExperimentError("original assertion did not reproduce in any singleton; recovery hypothesis unverified")
             unchanged()
             report["combination"] = merger.finish(pending)
+            evaluated_pending = root/"reference.native-evaluated.pending.paf"
+            report["native_evaluation_combination"] = merger.finish(evaluated_pending,native_evaluated=True)
+            if report["combination"]["rows_by_query"]!=report["native_evaluation_combination"]["rows_by_query"]:
+                raise wa.ExperimentError("public/private complete candidate sets differ")
             report.update(recovered_query_part_cells=report["combination"]["recovered_cells"],
                           native_row_bytes_preserved=True,partial_PAF_reused=False,
                           recovered_confidence="unknown; native-evaluated confidence remains private",
@@ -223,6 +232,16 @@ def experiment(args):
         unchanged()
         output = root/"reference.candidate.experimental.paf"
         output_sha256 = wa.sha256(pending)
+        if evaluated_pending is None:
+            report["native_evaluation"] = {"path":str(output),"sha256":output_sha256,
+                "scope":"unchanged_native_complete_output","native_confidence_promoted":False,"production_ready":False}
+        else:
+            evaluated_output = root/"reference.native-evaluated.experimental.paf"
+            evaluated_sha256 = wa.sha256(evaluated_pending)
+            evaluated_pending.rename(evaluated_output)
+            report["native_evaluation"] = {"path":str(evaluated_output),"sha256":evaluated_sha256,
+                "scope":"private_native_API_on_supplied_recovered_state_only","ordered_candidate_path_equal":True,
+                "native_confidence_promoted":False,"whole_query_dp_equivalence_certified":False,"production_ready":False}
         pending.rename(output)
         report.update(status="experimental_candidate_only",output_sha256=output_sha256,
                       original_inputs_unchanged=True,ordinary_rows_keep_original_tags=True)
