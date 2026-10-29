@@ -224,3 +224,11 @@ python3 GPM2.0/experiments/long_query_alignment/guided_alignment.py \
 
 用户已要求将后续测试统一留到收尾；此前完成的结果与尚未运行的验收项分开记录于
 `VALIDATION_JOB_MEMORY_20261030.md`。客户正在跑的诊断包及原流程不受影响。
+
+## 回传证据审阅准备（实现完成，执行验证待收尾）
+
+`review_isolation.py` 只读检查隔离诊断归档及独立回放/参数对照的身份一致性，
+不解压落盘、不执行包内命令、不把退出 0 当作修复。对应测试用例已编写但**未运行**。
+当前不得替换用户正在运行的工具包，也不得作为已验收工具交付。
+边界与操作分支见 `CUSTOMER_FEEDBACK_REVIEW.md`；整体待办和收尾队列见
+`PREFEEDBACK_WORK_20261030.md`。
