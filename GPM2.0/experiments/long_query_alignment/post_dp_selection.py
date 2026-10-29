@@ -63,7 +63,7 @@ class NativePostDpState:
     original_chain_score: int      # score0, NOT fragment score or DP score.
     anchor_count: int              # cnt from original whole-query anchors.
     matches: int                   # Native mlen, not an AS-derived substitute.
-    block_length: int              # Native blen (may include ambiguous bases).
+    block_length: int              # Native blen (ambiguous positions excluded).
     dp_max: int                    # AFTER skeleton's optional global correction.
     previous_subscore: int         # subsc carried over from pre-DP state.
     previous_subcount: int         # n_sub carried over from pre-DP state.

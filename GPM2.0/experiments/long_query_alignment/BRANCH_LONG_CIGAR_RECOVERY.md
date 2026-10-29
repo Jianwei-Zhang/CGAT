@@ -129,7 +129,9 @@ whole-record replay precede asserting any customer-specific root cause or repair
 - Original multipart index bytes, membership, shared first-part threshold and
   emission order: implemented; static syntax/diff reviewed, execution deferred.
 - Ordinary-only native PAF preservation: implemented; execution deferred.
-- Post-DP candidate selection and global MAPQ: still incomplete.
+- Native-state/path association, native selection and supplied-state MAPQ:
+  implemented in the experimental branch; execution/equivalence unverified.
+  Public confidence promotion and full-query DP-state completeness remain open.
 - Transparent `run.sh` integration, distributable branch package and rollback:
   still incomplete; no official Release refresh is authorized by this branch work.
 - Final automated/scientific validation: deferred under the existing user request.
@@ -371,3 +373,108 @@ then reconstruct MAPQ and integrate the verified path transparently with run.sh.
 The old canonical-coverage refusal is still in force until that replacement has
 an evidence-backed implementation. All final tests and real customer acceptance
 remain outstanding, as do formal package/rollback verification.
+
+
+## Native state/path/selection bridge: implementation only, not delivery acceptance
+
+`native_recovery.py` now connects the original-chain ledger to recovered paths,
+whole-path score calculation and native post-DP selection. The branch native
+route no longer relies on the legacy demand that every canonical base of every
+preliminary chain be covered. It has NOT simply deleted that guard:
+
+1. Bind all source coarse rows, query receipts, native binary/manifest, original
+   index part, window FASTA/manifest, raw PAF and stitched PAF by identity/hash.
+2. `batch_seed_ownership.py` scans each original query's complete native CN trace
+   ONCE for all retained coarse chains. Match original groups by full geometry
+   and count; require a complete sequential partition of the original counts on
+   either strand. Native cuts count ORIGINAL anchor endpoints before each aligned
+   head end, including bad-end/ignored seeds, not just seeds inside final path
+   rectangles. Unsplit records retain original cnt/score even after normal end
+   trimming. Use original counts, never local cm/s1. No arrays of all anchors.
+3. Candidate association permits genuine cancelling I/D paths rather than an
+   endpoint-interpolated diagonal corridor. Only outer extension is bounded by
+   pinned asm10 max_gap plus non-HPC k; actual anchor/path evidence must follow.
+   Nearby window alternatives need actual original-anchor placement on CIGAR =
+   runs, not rectangle containment alone. A positive fragment needs exact support;
+   original seeds not on the final path remain in native count accounting (they
+   are not erased as if DP never saw the chain). Unsupported competing paths are
+   refused; zero-support alternatives are recorded and not promoted.
+4. A gap between windows is NOT evidence of a native DP split. For every claimed
+   split require a same-window, distinct native head/tail pair with zd flags,
+   exact target/oriented-query endpoints and agreeing shared CIGAR path. Rebuild
+   source count/score partitions with sequential binary32 tail accounting. All
+   source counts must be conserved before filtering; no invented gap coverage.
+   A local split showing an unrepresented original-anchor head/tail is refused,
+   rather than silently treating its surviving path as an unsplit chain.
+5. In original chain/target order apply the pinned first filter (cnt/mlen/DP),
+   full-query rank adjustment, then its second DP threshold. Preserve score0,
+   native hash, subsc/n_sub and source order through splits. A new native DP extra
+   starts with dp_max2=0 by original allocation semantics, not a missing-field
+   default. Keep per-fragment score/filter provenance, including rejected rows.
+6. `native_selection.py` feeds only complete numerical metadata to the companion
+   --select mode. It calls the UNMODIFIED library's hit sort, parent assignment,
+   secondary selection and mm_set_mapq2. No CIGAR is encoded, normalized, packed or
+   passed back to minimap2. An independent parent/retention replay must agree;
+   MAPQ itself comes from the native library, not window MAPQ or Python log math.
+   Unsupported native integer/float conversion ranges are refused, not patched
+   or replaced with invented confidence.
+
+### Deliberately distinct output levels
+
+- `guided.experimental.paf` and the selective aggregate still withhold confidence
+  (MAPQ=255, no native AS/ms/s1/s2/tp claims). They now use the source-backed native
+  candidate decisions when the bridge is active; this is NOT final result.paf.
+- `native-recovery/native-evaluated.experimental.paf` separately records actual
+  native-API MAPQ and computed supplied-state tags for **explicit maintainer
+  comparison only**. AS is not reconstructed or emitted. It must not be imported
+  or promoted as biologically equivalent merely because the native API exits 0.
+- The complete private evaluated file is renamed only after all query decisions
+  and input checks finish. Partial files remain pending/error evidence. Reports
+  keep whole_query_dp_equivalence_certified:false and production_ready:false.
+
+Native functions being evaluated correctly on supplied metadata does not prove
+that window-derived paths/fragments are the complete native whole-query DP set.
+Formal confidence promotion, Server run.sh integration, packaging/rollback and
+scientific/customer acceptance remain required. The goal is NOT complete.
+
+### Additional unsupported evidence patterns remain explicit
+
+Ambiguous CN signatures or unsupported/nonsequential original target-end cuts,
+missing anchor-supported paths or unrepresented split children, unobserved split boundaries, native inversion rescue, >64 positive split fragments, a split
+tail below the native min_cnt, and unsupported normalization/numeric ranges are
+refused rather than dropped or silently reinterpreted. The raw candidate pool is
+bounded at 100000 fragments/chain; zero-seed alternatives do not consume the
+64-positive-fragment partition ceiling. These are unvalidated experimental
+boundaries, not a claim that all customer wheat patterns have been covered.
+
+### Deferred oracle scope (NOT executed)
+
+New protocol/ownership cases cover one/three fragments, both strands, seedless
+canonical gaps, nearby alternative diagonals, ambiguous/shared/missing anchors,
+missing source fields, native selection output, split observations and withheld
+public confidence. The real integration gate now defines EIGHT comparisons
+against unchanged whole-query -c --eqx minimap2: identity, two decoy cases,
+cancelling indels forward/reverse, three-split decoy forward/reverse and a
+three-split case without an exact parent. Compare complete ordered geometry,
+CIGAR, MAPQ, cm/s1/s2/ms/tp, NM/nn/rl and split flags; exit success is insufficient.
+AS is explicitly absent rather than claimed equal.
+
+These cases have NOT run. The updated companion has NOT been compiled. A rebuild
+from the unchanged pinned source is mandatory before enabling final native tests
+because its own companion source hash changed. Existing large guided evidence is
+NOT evidence for this new bridge: final validation must also execute the selective
+entry with the new companion on real >268435455-bp forward/reverse fixtures, audit
+all unsupported-path refusals, then run GRT/Final Path and the real customer flow.
+No testing, compilation, mapping, job submission or Release change occurred in
+this implementation increment. The existing customer run.sh/sbatch interface has
+not acquired any configuration obligation.
+
+
+Known context boundary, not a hidden success claim: an all-chain window pool may
+change local chaining/frequency and nearby-seed DP extension context relative to
+the original preselected whole-query set. Replaying native ranking/MAPQ cannot
+undo a different base path. Before delivery, retain native-successful long records
+unchanged (native-first routing is still to implement), audit path/context
+counterexamples and prove the fallback's accepted scope with the named controls
+and actual customer input. Do not treat a native-API MAPQ receipt alone as proof
+of original DP/path equivalence or an excuse to skip these gates.

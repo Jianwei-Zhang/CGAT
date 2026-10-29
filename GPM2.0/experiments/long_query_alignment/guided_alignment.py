@@ -244,6 +244,7 @@ def experiment(args):
         mapping_flags = ["-f",str(inherited["mid_occ"])] if inherited is not None else []
         wa.run_command([mm, "-x", args.preset, *mapping_flags, "-t", str(args.threads), "-o", str(chain_path), str(index), str(args.query.resolve())],
                        root, "whole-query", args.timeout, args.memory_gib)
+        chain_hash = wa.sha256(chain_path)
         original = options.out / "stitched.experimental.paf"
         if (getattr(args,"allow_empty_index_part",False) and chain_path.stat().st_size == 0
                 and original.stat().st_size == 0):
@@ -251,7 +252,7 @@ def experiment(args):
             # chain/window disagreement or assume every query must map here.
             if (not all(s.unchanged() for s in stores) or wa.sha256(index) != index_hash
                     or wa.sha256(Path(mm)) != windowed["tool"]["sha256"]
-                    or wa.sha256(original) != windowed["stitched_sha256"]):
+                    or wa.sha256(original) != windowed["stitched_sha256"] or wa.sha256(chain_path) != chain_hash):
                 raise wa.ExperimentError("input/index/tool changed in no-hit target part")
             final = root / "guided.experimental.paf"
             final.open("xb").close()
@@ -270,8 +271,16 @@ def experiment(args):
         pending = root / "guided.pending.paf"
         if wa.sha256(original) != windowed["stitched_sha256"]:
             raise wa.ExperimentError("validated stitched input changed")
-        report["selection"] = select_guided(original, chains, pending, root / "guide-provenance.jsonl",
-                                             root / "chain-coverage.json", query, target, args.guide_slack)
+        if native_bundle is not None:
+            import native_recovery as nr
+            report["native_recovery"] = nr.recover(original,chains,pending,query=query,target=target,
+                context=inherited,native_receipt=report["native_chain_state"],bundle=native_bundle,chain_paf=chain_path,
+                window_root=options.out,window_report=windowed,root=root/"native-recovery",
+                timeout=args.timeout,memory_gib=args.memory_gib)
+            report["selection"] = report["native_recovery"]["selection"]
+        else:
+            report["selection"] = select_guided(original, chains, pending, root / "guide-provenance.jsonl",
+                                                 root / "chain-coverage.json", query, target, args.guide_slack)
         if args.require_full_query_coverage:
             require_full_query_coverage(report["selection"])
         if getattr(args,"recover_path_scores",False):
@@ -279,13 +288,13 @@ def experiment(args):
             report["path_scoring"] = wqs.write_guided_path_scores(
                 pending,root/"guided.path-scores.jsonl",query,target,index_sha256=index_hash)
         if (not all(s.unchanged() for s in stores) or wa.sha256(index) != index_hash
-                or wa.sha256(Path(mm)) != windowed["tool"]["sha256"] or wa.sha256(original) != windowed["stitched_sha256"]):
+                or wa.sha256(Path(mm)) != windowed["tool"]["sha256"] or wa.sha256(original) != windowed["stitched_sha256"] or wa.sha256(chain_path) != chain_hash):
             raise wa.ExperimentError("input/index/tool changed during guided recovery")
         final = root / "guided.experimental.paf"
         os.replace(pending, final)
         report.update(status="validated_experimental_guidance", output_sha256=wa.sha256(final),
                       unfiltered_paf=str(original), unfiltered_sha256=windowed["stitched_sha256"],
-                      index_sha256=index_hash, chain_paf_sha256=wa.sha256(chain_path),
+                      index_sha256=index_hash, chain_paf_sha256=chain_hash,
                       tool=windowed["tool"], target=target.identity, query=query.identity,
                       original_inputs_unchanged=True)
     except BaseException as exc:

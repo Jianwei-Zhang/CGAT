@@ -8,6 +8,7 @@ actually enabling this gate plus large/customer/downstream acceptance.
 from __future__ import annotations
 
 import os
+import argparse
 from pathlib import Path
 import random
 import subprocess
@@ -69,6 +70,56 @@ class NativeChainStateIntegrationTests(unittest.TestCase):
             with self.assertRaisesRegex(wa.ExperimentError,"differs from"):
                 nst.collect(query_store,target_store,context,before_tool,self.bundle,bad,root/"refused",timeout=120,memory_gib=0)
             self.assertFalse((root/"refused"/"original-chain-state.jsonl").exists())
+
+
+    def test_native_bridge_matches_whole_query_DP_controls_not_only_exit_success(self):
+        import audit_post_dp as audit
+        import guided_alignment as ga
+        fixtures = audit.fixtures()
+        rng = random.Random(2311303)
+        dna = bytes(rng.choices(b"ACGT",k=200000))
+        decoy = bytearray(dna)
+        decoy[60000:61000] = bytes(rng.choices(b"ACGT",k=1000))
+        decoy[130000:131000] = bytes(rng.choices(b"ACGT",k=1000))
+        cancelled = dna[:60000]+bytes(rng.choices(b"ACGT",k=2000))+dna[60000:130000]+dna[132000:]
+        fixtures += [("cancelled_indels",{"target":cancelled},dna),
+                     ("cancelled_indels_reverse",{"target":cancelled},dna.translate(wa.RC)[::-1]),
+                     ("three_split_decoy",{"exact":dna,"decoy":bytes(decoy)},dna),
+                     ("three_split_reverse",{"exact":dna,"decoy":bytes(decoy)},dna.translate(wa.RC)[::-1]),
+                     ("three_split_without_exact_parent",{"decoy":bytes(decoy)},dna)]
+        def signature(path):
+            result = []
+            for line in path.read_text().splitlines():
+                fields = line.split("\t")
+                tags = {t.split(":",1)[0]:t for t in fields[12:]}
+                known = tuple(tags.get(k) for k in ("cg","NM","nn","ms","cm","s1","s2","tp","rl","zd"))
+                result.append((tuple(fields[:12]),known))
+            return result
+        with tempfile.TemporaryDirectory(prefix="cgat-native-bridge-controls-") as tmp:
+            for name,targets,query_bases in fixtures:
+                with self.subTest(case=name):
+                    root = Path(tmp)/name
+                    root.mkdir()
+                    target,query,index,baseline = root/"ref.fa",root/"query.fa",root/"original.mmi",root/"baseline.paf"
+                    target.write_bytes(b"".join(b">"+key.encode()+b"\n"+sequence+b"\n" for key,sequence in targets.items()))
+                    query.write_bytes(b">query\n"+query_bases+b"\n")
+                    wa.run_command([self.mm,"-x","asm10","-t","1","-d",str(index),str(target)],root,"index",120,0)
+                    wa.run_command([self.mm,"-c","--eqx","-x","asm10","-t","1","-o",str(baseline),str(index),str(query)],root,"baseline",120,0)
+                    context = {"part_index":0,"path":str(index),"sha256":wa.sha256(index),"preset":"asm10",
+                        "tool_sha256":wa.sha256(Path(self.mm)),"reference_sha256":wa.sha256(target),
+                        "mid_occ":sr.read_shared_mid_occ(root/"baseline.stderr",1),
+                        "records":[{"name":key,"length":len(sequence)} for key,sequence in targets.items()]}
+                    args = argparse.Namespace(target=target,query=query,out=root/"recovery",minimap2=self.mm,preset="asm10",
+                        core_bases=50000,context_bases=4000,guide_slack=1000,threads=2,timeout=120,memory_gib=0,
+                        require_full_query_coverage=False,index_context=context,allow_empty_index_part=False,
+                        window_candidate_policy="all_chains_pool",recover_path_scores=True,native_state_bundle=Path(self.bundle))
+                    report = ga.experiment(args)
+                    evaluated = Path(report["native_recovery"]["native_evaluated_paf"])
+                    self.assertEqual(signature(evaluated),signature(baseline))
+                    self.assertTrue(report["native_recovery"]["selection"]["native_decisions_applied"])
+                    public = root/"recovery"/"guided.experimental.paf"
+                    self.assertTrue(all(row.split("\t")[11]=="255" for row in public.read_text().splitlines()))
+                    self.assertFalse(report["production_ready"])
 
 
 if __name__ == "__main__":

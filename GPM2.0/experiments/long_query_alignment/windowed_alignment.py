@@ -550,6 +550,8 @@ def experiment(args) -> dict:
         write_json(root / "windows.json", [asdict(window) for window in windows])
         write_json(root / "input_records.json", {"target": target.records, "query": query.records})
         write_windows(root / "windows.fa", query, windows)
+        window_manifest_hash = sha256(root/"windows.json")
+        window_fasta_hash = sha256(root/"windows.fa")
         index_context = getattr(args,"index_context",None)
         if index_context is None:
             index = root / "target.mmi"
@@ -586,6 +588,7 @@ def experiment(args) -> dict:
         raw = root / "raw.windows.paf"
         run_command([executable, "-c", "--eqx", "-x", args.preset, *mapping_flags, *pool_flags, "-t", str(args.threads),
                      "-o", str(raw), str(index), str(root / "windows.fa")], root, "map", args.timeout, args.memory_gib)
+        raw_hash = sha256(raw)
         candidate = root / "owned.pending.paf"
         allow_empty_part = index_context is not None and getattr(args,"allow_empty_index_part",False)
         summary = recover(raw, candidate, root / "provenance.jsonl", windows, query, target,
@@ -597,13 +600,15 @@ def experiment(args) -> dict:
         if args.require_full_query_coverage and any(row["covered_bases"] != row["length"] for row in summary["queries"].values()):
             raise ExperimentError("full-query-coverage acceptance failed; do not treat partial mappings as complete")
         if (not all(store.unchanged() for store in stores) or sha256(Path(executable)) != binary_hash
-                or sha256(index) != index_hash):
-            raise ExperimentError("input, index or minimap2 binary changed during experiment")
+                or sha256(index) != index_hash or sha256(raw) != raw_hash
+                or sha256(root/"windows.json") != window_manifest_hash or sha256(root/"windows.fa") != window_fasta_hash):
+            raise ExperimentError("input, window evidence, index or minimap2 binary changed during experiment")
         final_candidate = root / "owned.experimental.paf"
         os.replace(candidate, final_candidate)
         final_stitched = root / "stitched.experimental.paf"
         os.replace(stitched, final_stitched)
         report.update(status="validated_experimental_candidate", output_sha256=sha256(final_candidate), stitched_sha256=sha256(final_stitched),
+                      raw_sha256=raw_hash,windows_manifest_sha256=window_manifest_hash,windows_fasta_sha256=window_fasta_hash,
                       original_inputs_unchanged=True,
                       caveat="Coordinate/CIGAR checks passed, NOT whole-contig alignment or downstream biological equivalence. "
                              "MAPQ is unknown (255), score/tp tags are not inherited; distinct placements are retained.")
