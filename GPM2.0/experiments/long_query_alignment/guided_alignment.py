@@ -212,6 +212,9 @@ def experiment(args):
         raise wa.ExperimentError("require 0 <= guide slack <= context; no automatic widening")
     if getattr(args,"recover_path_scores",False) and args.preset != "asm10":
         raise wa.ExperimentError("branch full-path scoring is pinned to asm10")
+    native_bundle = getattr(args,"native_state_bundle",None)
+    if native_bundle is not None and (args.preset != "asm10" or getattr(args,"index_context",None) is None):
+        raise wa.ExperimentError("native chain-state recovery requires pinned asm10 original-part context")
     root = args.out.resolve()
     root.mkdir(parents=True, exist_ok=False)
     report = {"status": "running", "experimental_only": True, "production_ready": False, "customer_validated": False,
@@ -258,6 +261,12 @@ def experiment(args):
             return report
         chains = read_chains(chain_path, query.records, target.records)
         wa.write_json(root / "chains.json", [asdict(c) for c in chains])
+        if native_bundle is not None:
+            if windowed["tool"]["version"] != "2.31-r1302":
+                raise wa.ExperimentError("native chain-state companion is pinned to minimap2 2.31-r1302")
+            import native_chain_state as nst
+            report["native_chain_state"] = nst.collect(query,target,inherited,windowed["tool"]["sha256"],
+                native_bundle,chain_path,root/"native-chains",timeout=args.timeout,memory_gib=args.memory_gib)
         pending = root / "guided.pending.paf"
         if wa.sha256(original) != windowed["stitched_sha256"]:
             raise wa.ExperimentError("validated stitched input changed")

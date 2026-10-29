@@ -132,11 +132,27 @@ class SelectiveReferenceTests(unittest.TestCase):
              patch.object(sr.subprocess,"check_output",return_value="2.31-r1302\n"), \
              patch.object(wa,"sha256",side_effect=tool_or_file_hash), \
              patch.object(wa,"run_command",side_effect=mapping), \
-             patch.object(sr.ga,"experiment",side_effect=AssertionError("no windows for ordinary records")):
+             patch.object(sr.ga,"experiment",side_effect=AssertionError("no windows for ordinary records")), \
+             patch.object(sr.nst,"validate_bundle",side_effect=AssertionError("ordinary records need no companion")):
             result = sr.experiment(self.args())
         self.assertEqual(result["status"],"experimental_candidate_only")
         self.assertFalse(result["production_ready"])
         self.assertFalse(result["server_result_published"])
+
+    def test_risk_route_requires_prebundled_helper_before_any_alignment(self):
+        real_hash = wa.sha256
+        def tool_or_file_hash(path):
+            return "a"*64 if str(path) == "/tool/minimap2" else real_hash(path)
+        with patch.object(sr.shutil,"which",return_value="/tool/minimap2"), \
+             patch.object(sr.subprocess,"check_output",return_value="2.31-r1302\n"), \
+             patch.object(wa,"sha256",side_effect=tool_or_file_hash), \
+             patch.object(sr,"partition_records",return_value=(["short"],["long"])), \
+             patch.object(sr.nst,"validate_bundle",side_effect=wa.ExperimentError("maintainer bundle required")), \
+             patch.object(wa,"run_command") as run:
+            with self.assertRaisesRegex(wa.ExperimentError,"maintainer"):
+                sr.experiment(self.args())
+        run.assert_not_called()
+        self.assertFalse((self.args().out/"reference.candidate.experimental.paf").exists())
 
     def test_default_index_builder_does_not_override_I_or_reference_order(self):
         class Target:

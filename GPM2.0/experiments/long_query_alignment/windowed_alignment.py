@@ -480,9 +480,16 @@ def stitch_owned(source: Path, output: Path, provenance: Path, windows: list[Win
             "fork_endpoints_not_joined": forks, "ranking_reconstructed": False}
 
 
-def run_command(command: list[str], directory: Path, name: str, timeout: int, memory_gib: int) -> dict:
+def run_command(command: list[str], directory: Path, name: str, timeout: int, memory_gib: int, *, max_file_bytes=None) -> dict:
+    if max_file_bytes is not None and (type(max_file_bytes) is not int or max_file_bytes < 1):
+        raise ExperimentError("child file-size limit must be a positive integer")
     def limits():
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        if max_file_bytes is not None:
+            soft,hard = resource.getrlimit(resource.RLIMIT_FSIZE)
+            finite = [n for n in (soft,hard) if n != resource.RLIM_INFINITY]
+            cap = min([max_file_bytes,*finite])
+            resource.setrlimit(resource.RLIMIT_FSIZE, (cap, hard))
         if memory_gib:
             cap = memory_gib * 1024**3
             resource.setrlimit(resource.RLIMIT_AS, (cap, cap))

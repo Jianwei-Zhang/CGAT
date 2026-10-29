@@ -19,6 +19,7 @@ import subprocess
 
 import guided_alignment as ga
 import minimap_index_context as mic
+import native_chain_state as nst
 import windowed_alignment as wa
 
 MAX_PAF_LINE = 32*1024**2
@@ -251,7 +252,7 @@ def experiment(args):
         version = subprocess.check_output([mm,"--version"],text=True,timeout=5).strip()
         report.update(tool={"path":mm,"sha256":tool_hash,"version":version},
                       reference=target.identity, query=query.identity,
-                      helper_sha256={Path(module.__file__).name:wa.sha256(Path(module.__file__)) for module in (ga,wa,mic)})
+                      helper_sha256={Path(module.__file__).name:wa.sha256(Path(module.__file__)) for module in (ga,wa,mic,nst)})
         if version != "2.31-r1302":
             raise wa.ExperimentError("this branch experiment is pinned to customer minimap2 2.31-r1302")
         ordinary,risk = partition_records(query.records)
@@ -259,6 +260,11 @@ def experiment(args):
                              "risk_is_not_root_cause_confirmation":True}
         subsets = split_record_files(query_path,query.records,ordinary,risk,root,query.identity["sha256"]) if risk else {"ordinary":query_path}
         report["subset_sha256"] = {key:wa.sha256(path) for key,path in subsets.items()}
+        # The branch artifact, not the customer, must carry the companion.
+        # Preflight before starting ANY alignment; ordinary-only keeps its path.
+        native_bundle = nst.validate_bundle(getattr(args,"native_state_bundle",None)) if risk else None
+        if native_bundle:
+            report["original_chain_state_helper"] = native_bundle
         pafs = {}
         if ordinary:
             pafs["ordinary"] = root/"ordinary.paf"
@@ -296,7 +302,8 @@ def experiment(args):
                         preset="asm10",core_bases=50_000_000,context_bases=100_000,guide_slack=1000,
                         threads=args.threads,timeout=args.timeout,memory_gib=args.memory_gib,
                         require_full_query_coverage=False,index_context=part,allow_empty_index_part=True,
-                        window_candidate_policy="all_chains_pool",recover_path_scores=True)
+                        window_candidate_policy="all_chains_pool",recover_path_scores=True,
+                        native_state_bundle=Path(native_bundle["manifest_path"]).parent)
                     result = ga.experiment(options)
                     count = append_part_candidate(options.out/"guided.experimental.paf",aggregate,part=part,
                         queries=query.records,targets=target.records,risk=risk,expected_sha256=result["output_sha256"])
@@ -333,6 +340,8 @@ def main(argv=None):
     parser.add_argument("--threads",type=int,default=2)
     parser.add_argument("--timeout",type=int,default=21600)
     parser.add_argument("--memory-gib",type=int,default=0,help="developer experiment child address-space cap; 0 keeps inherited limit")
+    parser.add_argument("--native-state-bundle",type=Path,default=None,
+                        help="Maintainer harness only; defaults to the prebundled platform companion. Not a run.sh option.")
     parser.add_argument("--execute",action="store_true")
     args = parser.parse_args(argv)
     if not args.execute:
