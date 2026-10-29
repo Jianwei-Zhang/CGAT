@@ -34,7 +34,7 @@ test("major titles, minor labels, actions and real system options have distinct 
   const assembly = getMessages("en", "assembly"), workspace = getMessages("en", "workspace");
   assert.equal(assembly.page.primaryAlignmentViewTitle, "Main View");
   assert.equal(assembly.page.phasedTrackGrtNoticeTitle, "GRT Results Are Temporarily Unavailable");
-  assert.equal(assembly.page.membersCardTitle, "{projectLabel}_{currentChrLabel} Primary Dataset Members");
+  assert.equal(assembly.page.membersCardTitle, "Primary Dataset Members");
   assert.equal(assembly.trackControls.supportDatasetLengthRulesTitle, "Auxiliary Contig Length Rules");
   assert.equal(assembly.trackControls.supportDatasetLengthBp, "Auxiliary contig length (bp)");
   assert.equal(assembly.trackControls.supportDataset, "Auxiliary dataset");
@@ -58,7 +58,7 @@ test("Chinese controls use the approved full names rather than exposing source-f
   const assembly = getMessages("zh", "assembly");
   assert.equal(assembly.trackControls.supportDataset, "辅助数据集");
   assert.equal(assembly.trackControls.supportDatasetLengthBp, "辅助组装 Contig 长度 (bp)");
-  assert.equal(assembly.page.membersCardTitle, "{projectLabel}_{currentChrLabel} 主数据集成员");
+  assert.equal(assembly.page.membersCardTitle, "主数据集成员");
   assert.equal(assembly.page.finalPathOverallLenCol, "Contig 长度");
   assert.equal(assembly.page.finalPathOriginIdCol, "来源 ID");
   assert.equal(assembly.page.finalPathDetailUsedBy, "使用染色体");
