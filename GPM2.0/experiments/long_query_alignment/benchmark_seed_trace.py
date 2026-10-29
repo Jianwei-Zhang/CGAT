@@ -49,7 +49,7 @@ def generate(root, name, seeds, extra_groups=0):
     return metadata
 
 
-def worker(meta_path, baseline_path, mode, memory_mib):
+def worker(meta_path, baseline_path, mode, memory_mib, read_buffer_kib):
     # Load both modules for equal interpreter/module baseline before the cap.
     spec = importlib.util.spec_from_file_location("frozen_audit", baseline_path)
     old = importlib.util.module_from_spec(spec)
@@ -63,12 +63,14 @@ def worker(meta_path, baseline_path, mode, memory_mib):
     status = "success"
     try:
         reconstruct = old.reconstruct_split_scores if mode == "legacy" else audit.reconstruct_split_scores
-        result = reconstruct(Path(meta["trace"]), [meta["coarse"]], meta["fragments"])
+        options = {} if mode == "legacy" else {"trace_budget": st.TraceBudget(read_buffer_bytes=read_buffer_kib * 1024 if read_buffer_kib else None)}
+        result = reconstruct(Path(meta["trace"]), [meta["coarse"]], meta["fragments"], **options)
     except MemoryError:
         status = "memory_budget_exceeded"
     except Exception as exc:
         status = type(exc).__name__ + ": " + str(exc)
     output = {"mode": mode, "status": status, "memory_cap_mib": memory_mib,
+              "read_buffer_kib": read_buffer_kib if mode == "stream" else None,
               "elapsed_seconds": round(time.monotonic()-started, 6),
               "peak_rss_kib": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
               "result": result}
@@ -80,6 +82,7 @@ def main():
     parser.add_argument("--out", type=Path)
     parser.add_argument("--memory-mib", type=int, default=128)
     parser.add_argument("--large-seeds", type=int, default=1_000_000)
+    parser.add_argument("--read-buffer-kib", type=int, choices=(0, 8, 64, 1024, 16384), default=0, help="0=budget-adaptive; otherwise explicit target buffer")
     parser.add_argument("--worker", choices=["legacy", "stream"])
     parser.add_argument("--metadata", type=Path)
     parser.add_argument("--baseline", type=Path)
@@ -89,7 +92,7 @@ def main():
     if args.worker:
         if args.metadata is None or args.baseline is None:
             parser.error("worker requires metadata and frozen baseline")
-        worker(args.metadata, args.baseline, args.worker, args.memory_mib)
+        worker(args.metadata, args.baseline, args.worker, args.memory_mib, args.read_buffer_kib)
         return
     if args.out is None:
         parser.error("--out is required")
@@ -101,7 +104,7 @@ def main():
     baseline.write_bytes(content)
     report = {"synthetic_trace_only": True, "production_ready": False, "customer_validated": False,
               "baseline_revision": BASELINE_REVISION, "baseline_sha256": hashlib.sha256(content).hexdigest(),
-              "source_sha256": {Path(p).name: wa.sha256(Path(p)) for p in (__file__, audit.__file__, st.__file__, wa.__file__)},
+              "source_sha256": {Path(p).name: wa.sha256(Path(p)) for p in (__file__, audit.__file__, st.__file__, st.tm.__file__, wa.__file__)},
               "cases": []}
     wa.write_json(root / "benchmark.json", report)
     for name, seeds, groups in [("small", 10_000, 0), ("large", args.large_seeds, 0), ("many_groups", 5, 100_000)]:
@@ -111,7 +114,8 @@ def main():
                 "selected_seeds": seeds, "extra_groups": groups, "runs": []}
         for mode in ("legacy", "stream"):
             command = [sys.executable, str(Path(__file__).resolve()), "--worker", mode,
-                       "--metadata", str(metadata), "--baseline", str(baseline), "--memory-mib", str(args.memory_mib)]
+                       "--metadata", str(metadata), "--baseline", str(baseline), "--memory-mib", str(args.memory_mib),
+                       "--read-buffer-kib", str(args.read_buffer_kib)]
             log = root / (name + "." + mode)
             with log.with_suffix(log.suffix + ".stdout").open("xb") as stdout, log.with_suffix(log.suffix + ".stderr").open("xb") as stderr:
                 completed = subprocess.run(command, stdout=stdout, stderr=stderr, timeout=180)

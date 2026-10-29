@@ -2,6 +2,11 @@
 
 ## Scope
 
+Follow-up: `VALIDATION_REVERSE_ADAPTIVE_20261029.md` extends the restricted reader
+to reverse two-fragment evidence and process-budget adaptation. The measurements
+and positive-only boundary below describe this earlier phase and are not relabelled
+as the newer implementation's validation.
+
 Replaces only the original CN trace collector used by the bounded post-DP score
 witness. No minimap2 modification, production Server/App change, customer job,
 isolation-tool update, automatic fallback or release asset change. Existing

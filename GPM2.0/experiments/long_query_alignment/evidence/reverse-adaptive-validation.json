@@ -1,0 +1,1038 @@
+{
+  "scope": "reverse two-fragment evidence and process-budget adaptation only",
+  "source_sha256": {
+    "stream_seed_trace.py": "0c93da5afd80aabc205ee0abb7561543f8e28c197eccc5714cc2f2e4c8492383",
+    "trace_memory.py": "b5336cd4d177bae908fd9d112d706c4613153455bba9f07f59dc3f0056c9b259",
+    "audit_post_dp.py": "a3f02bd4d485f148c253f46b901d314905af7da1ad1f3c0ef68d243d4b46894a",
+    "benchmark_seed_trace.py": "efe05ccb935acef31361688621c9a138da5d8282e81f1c2bbc7eed6d312289a9",
+    "test_reverse_split_witness.py": "ce670546bfa6493c7b741e4dc704f6411569554ad5d154705a71363a1f65f319",
+    "test_trace_memory.py": "3cec17d354fe1c0cb2e226cd8a731ca296f14c4061374766f1bec7c1d44f2a29"
+  },
+  "production_ready": false,
+  "customer_validated": false,
+  "whole_job_memory_adaptation_implemented": false,
+  "tests": {
+    "226": {
+      "passed": 85,
+      "log_sha256": "ee9e1571e39c5b3a0737c8765587ac6cbf28dda660dd81c1b86f097cf9a33f83"
+    },
+    "231": {
+      "passed": 85,
+      "log_sha256": "c19a787ffe8c01c6a8067802332f0b667f59d9817de604e85a00ce2a54aa4244"
+    }
+  },
+  "resource_runs": [
+    {
+      "retained_evidence": "/tmp/cgat-adaptive-64m-final-20261029",
+      "report_sha256": "64fa8c4bd1661262e57d605b6c766b49d82d3a998ef96118f1372088f252b34c",
+      "baseline_revision": "2bb61fafa0063067b88310b7938267f8d469a134",
+      "cases": [
+        {
+          "case": "small",
+          "trace_bytes": 308915,
+          "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+          "selected_seeds": 10000,
+          "extra_groups": 0,
+          "runs": [
+            {
+              "mode": "legacy",
+              "status": "success",
+              "memory_cap_mib": 64,
+              "read_buffer_kib": null,
+              "elapsed_seconds": 0.013081,
+              "peak_rss_kib": 23416,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+                "original_chain_score": 20000,
+                "original_anchor_count": 10000,
+                "fragment_anchor_counts": [
+                  6000,
+                  4000
+                ],
+                "reconstructed_chain_scores": [
+                  12000,
+                  8000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            },
+            {
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 64,
+              "read_buffer_kib": 0,
+              "elapsed_seconds": 0.020724,
+              "peak_rss_kib": 20680,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+                "original_chain_score": 20000,
+                "original_anchor_count": 10000,
+                "fragment_anchor_counts": [
+                  6000,
+                  4000
+                ],
+                "reconstructed_chain_scores": [
+                  12000,
+                  8000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              },
+              "memory_plan": {
+                "scope": "trace_reader_process_planning_only",
+                "sources": {
+                  "RLIMIT_AS": 67108864
+                },
+                "process_virtual_bytes": 26877952,
+                "effective_budget_bytes": 67108864,
+                "reserve_bytes": 8388608,
+                "allocation_headroom_bytes": 31842304,
+                "requested_buffer_bytes": null,
+                "selected_buffer_bytes": 65536,
+                "buffer_downshifted": false,
+                "fallback_used": false,
+                "hard_limit_changed": false,
+                "job_memory_reserved": false,
+                "slurm_cgroup_allocation_discovery_implemented": false
+              }
+            }
+          ]
+        },
+        {
+          "case": "large",
+          "trace_bytes": 34888917,
+          "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+          "selected_seeds": 1000000,
+          "extra_groups": 0,
+          "runs": [
+            {
+              "mode": "legacy",
+              "status": "memory_budget_exceeded",
+              "memory_cap_mib": 64,
+              "read_buffer_kib": null,
+              "elapsed_seconds": 0.016402,
+              "peak_rss_kib": 53940
+            },
+            {
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 64,
+              "read_buffer_kib": 0,
+              "elapsed_seconds": 2.04488,
+              "peak_rss_kib": 21704,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+                "original_chain_score": 2000000,
+                "original_anchor_count": 1000000,
+                "fragment_anchor_counts": [
+                  600000,
+                  400000
+                ],
+                "reconstructed_chain_scores": [
+                  1200000,
+                  800000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              },
+              "memory_plan": {
+                "scope": "trace_reader_process_planning_only",
+                "sources": {
+                  "RLIMIT_AS": 67108864
+                },
+                "process_virtual_bytes": 26877952,
+                "effective_budget_bytes": 67108864,
+                "reserve_bytes": 8388608,
+                "allocation_headroom_bytes": 31842304,
+                "requested_buffer_bytes": null,
+                "selected_buffer_bytes": 65536,
+                "buffer_downshifted": false,
+                "fallback_used": false,
+                "hard_limit_changed": false,
+                "job_memory_reserved": false,
+                "slurm_cgroup_allocation_discovery_implemented": false
+              }
+            }
+          ]
+        },
+        {
+          "case": "many_groups",
+          "trace_bytes": 2489056,
+          "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+          "selected_seeds": 5,
+          "extra_groups": 100000,
+          "runs": [
+            {
+              "mode": "legacy",
+              "status": "memory_budget_exceeded",
+              "memory_cap_mib": 64,
+              "read_buffer_kib": null,
+              "elapsed_seconds": 0.120579,
+              "peak_rss_kib": 58564
+            },
+            {
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 64,
+              "read_buffer_kib": 0,
+              "elapsed_seconds": 0.190423,
+              "peak_rss_kib": 21964,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+                "original_chain_score": 10,
+                "original_anchor_count": 5,
+                "fragment_anchor_counts": [
+                  3,
+                  2
+                ],
+                "reconstructed_chain_scores": [
+                  6,
+                  4
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              },
+              "memory_plan": {
+                "scope": "trace_reader_process_planning_only",
+                "sources": {
+                  "RLIMIT_AS": 67108864
+                },
+                "process_virtual_bytes": 26877952,
+                "effective_budget_bytes": 67108864,
+                "reserve_bytes": 8388608,
+                "allocation_headroom_bytes": 31842304,
+                "requested_buffer_bytes": null,
+                "selected_buffer_bytes": 65536,
+                "buffer_downshifted": false,
+                "fallback_used": false,
+                "hard_limit_changed": false,
+                "job_memory_reserved": false,
+                "slurm_cgroup_allocation_discovery_implemented": false
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "retained_evidence": "/tmp/cgat-adaptive-128m-final-20261029",
+      "report_sha256": "9fc466a573a8df767335c9a451393bd905e747f8f89d97a014cee84de33482fc",
+      "baseline_revision": "2bb61fafa0063067b88310b7938267f8d469a134",
+      "cases": [
+        {
+          "case": "small",
+          "trace_bytes": 308915,
+          "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+          "selected_seeds": 10000,
+          "extra_groups": 0,
+          "runs": [
+            {
+              "mode": "legacy",
+              "status": "success",
+              "memory_cap_mib": 128,
+              "read_buffer_kib": null,
+              "elapsed_seconds": 0.011727,
+              "peak_rss_kib": 23368,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+                "original_chain_score": 20000,
+                "original_anchor_count": 10000,
+                "fragment_anchor_counts": [
+                  6000,
+                  4000
+                ],
+                "reconstructed_chain_scores": [
+                  12000,
+                  8000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            },
+            {
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 128,
+              "read_buffer_kib": 0,
+              "elapsed_seconds": 0.01851,
+              "peak_rss_kib": 21020,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+                "original_chain_score": 20000,
+                "original_anchor_count": 10000,
+                "fragment_anchor_counts": [
+                  6000,
+                  4000
+                ],
+                "reconstructed_chain_scores": [
+                  12000,
+                  8000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              },
+              "memory_plan": {
+                "scope": "trace_reader_process_planning_only",
+                "sources": {
+                  "RLIMIT_AS": 134217728
+                },
+                "process_virtual_bytes": 26882048,
+                "effective_budget_bytes": 134217728,
+                "reserve_bytes": 16777216,
+                "allocation_headroom_bytes": 90558464,
+                "requested_buffer_bytes": null,
+                "selected_buffer_bytes": 65536,
+                "buffer_downshifted": false,
+                "fallback_used": false,
+                "hard_limit_changed": false,
+                "job_memory_reserved": false,
+                "slurm_cgroup_allocation_discovery_implemented": false
+              }
+            }
+          ]
+        },
+        {
+          "case": "large",
+          "trace_bytes": 34888917,
+          "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+          "selected_seeds": 1000000,
+          "extra_groups": 0,
+          "runs": [
+            {
+              "mode": "legacy",
+              "status": "memory_budget_exceeded",
+              "memory_cap_mib": 128,
+              "read_buffer_kib": null,
+              "elapsed_seconds": 0.090457,
+              "peak_rss_kib": 124272
+            },
+            {
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 128,
+              "read_buffer_kib": 0,
+              "elapsed_seconds": 1.789024,
+              "peak_rss_kib": 22044,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+                "original_chain_score": 2000000,
+                "original_anchor_count": 1000000,
+                "fragment_anchor_counts": [
+                  600000,
+                  400000
+                ],
+                "reconstructed_chain_scores": [
+                  1200000,
+                  800000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              },
+              "memory_plan": {
+                "scope": "trace_reader_process_planning_only",
+                "sources": {
+                  "RLIMIT_AS": 134217728
+                },
+                "process_virtual_bytes": 26882048,
+                "effective_budget_bytes": 134217728,
+                "reserve_bytes": 16777216,
+                "allocation_headroom_bytes": 90558464,
+                "requested_buffer_bytes": null,
+                "selected_buffer_bytes": 65536,
+                "buffer_downshifted": false,
+                "fallback_used": false,
+                "hard_limit_changed": false,
+                "job_memory_reserved": false,
+                "slurm_cgroup_allocation_discovery_implemented": false
+              }
+            }
+          ]
+        },
+        {
+          "case": "many_groups",
+          "trace_bytes": 2489056,
+          "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+          "selected_seeds": 5,
+          "extra_groups": 100000,
+          "runs": [
+            {
+              "mode": "legacy",
+              "status": "success",
+              "memory_cap_mib": 128,
+              "read_buffer_kib": null,
+              "elapsed_seconds": 0.148097,
+              "peak_rss_kib": 65684,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+                "original_chain_score": 10,
+                "original_anchor_count": 5,
+                "fragment_anchor_counts": [
+                  3,
+                  2
+                ],
+                "reconstructed_chain_scores": [
+                  6,
+                  4
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            },
+            {
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 128,
+              "read_buffer_kib": 0,
+              "elapsed_seconds": 0.170668,
+              "peak_rss_kib": 22044,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+                "original_chain_score": 10,
+                "original_anchor_count": 5,
+                "fragment_anchor_counts": [
+                  3,
+                  2
+                ],
+                "reconstructed_chain_scores": [
+                  6,
+                  4
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              },
+              "memory_plan": {
+                "scope": "trace_reader_process_planning_only",
+                "sources": {
+                  "RLIMIT_AS": 134217728
+                },
+                "process_virtual_bytes": 26882048,
+                "effective_budget_bytes": 134217728,
+                "reserve_bytes": 16777216,
+                "allocation_headroom_bytes": 90558464,
+                "requested_buffer_bytes": null,
+                "selected_buffer_bytes": 65536,
+                "buffer_downshifted": false,
+                "fallback_used": false,
+                "hard_limit_changed": false,
+                "job_memory_reserved": false,
+                "slurm_cgroup_allocation_discovery_implemented": false
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "retained_evidence": "/tmp/cgat-adaptive-512m-final-20261029",
+      "report_sha256": "c326e63db7ebb11bfa47648883878d629fec468378bb80cc402551a32631a2ea",
+      "baseline_revision": "2bb61fafa0063067b88310b7938267f8d469a134",
+      "cases": [
+        {
+          "case": "small",
+          "trace_bytes": 308915,
+          "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+          "selected_seeds": 10000,
+          "extra_groups": 0,
+          "runs": [
+            {
+              "mode": "legacy",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "read_buffer_kib": null,
+              "elapsed_seconds": 0.01044,
+              "peak_rss_kib": 23396,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+                "original_chain_score": 20000,
+                "original_anchor_count": 10000,
+                "fragment_anchor_counts": [
+                  6000,
+                  4000
+                ],
+                "reconstructed_chain_scores": [
+                  12000,
+                  8000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            },
+            {
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "read_buffer_kib": 0,
+              "elapsed_seconds": 0.0179,
+              "peak_rss_kib": 20828,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+                "original_chain_score": 20000,
+                "original_anchor_count": 10000,
+                "fragment_anchor_counts": [
+                  6000,
+                  4000
+                ],
+                "reconstructed_chain_scores": [
+                  12000,
+                  8000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              },
+              "memory_plan": {
+                "scope": "trace_reader_process_planning_only",
+                "sources": {
+                  "RLIMIT_AS": 536870912
+                },
+                "process_virtual_bytes": 26882048,
+                "effective_budget_bytes": 536870912,
+                "reserve_bytes": 33554432,
+                "allocation_headroom_bytes": 476434432,
+                "requested_buffer_bytes": null,
+                "selected_buffer_bytes": 1048576,
+                "buffer_downshifted": false,
+                "fallback_used": false,
+                "hard_limit_changed": false,
+                "job_memory_reserved": false,
+                "slurm_cgroup_allocation_discovery_implemented": false
+              }
+            }
+          ]
+        },
+        {
+          "case": "large",
+          "trace_bytes": 34888917,
+          "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+          "selected_seeds": 1000000,
+          "extra_groups": 0,
+          "runs": [
+            {
+              "mode": "legacy",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "read_buffer_kib": null,
+              "elapsed_seconds": 1.151459,
+              "peak_rss_kib": 239392,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+                "original_chain_score": 2000000,
+                "original_anchor_count": 1000000,
+                "fragment_anchor_counts": [
+                  600000,
+                  400000
+                ],
+                "reconstructed_chain_scores": [
+                  1200000,
+                  800000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            },
+            {
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "read_buffer_kib": 0,
+              "elapsed_seconds": 1.769075,
+              "peak_rss_kib": 21852,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+                "original_chain_score": 2000000,
+                "original_anchor_count": 1000000,
+                "fragment_anchor_counts": [
+                  600000,
+                  400000
+                ],
+                "reconstructed_chain_scores": [
+                  1200000,
+                  800000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              },
+              "memory_plan": {
+                "scope": "trace_reader_process_planning_only",
+                "sources": {
+                  "RLIMIT_AS": 536870912
+                },
+                "process_virtual_bytes": 26882048,
+                "effective_budget_bytes": 536870912,
+                "reserve_bytes": 33554432,
+                "allocation_headroom_bytes": 476434432,
+                "requested_buffer_bytes": null,
+                "selected_buffer_bytes": 1048576,
+                "buffer_downshifted": false,
+                "fallback_used": false,
+                "hard_limit_changed": false,
+                "job_memory_reserved": false,
+                "slurm_cgroup_allocation_discovery_implemented": false
+              }
+            }
+          ]
+        },
+        {
+          "case": "many_groups",
+          "trace_bytes": 2489056,
+          "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+          "selected_seeds": 5,
+          "extra_groups": 100000,
+          "runs": [
+            {
+              "mode": "legacy",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "read_buffer_kib": null,
+              "elapsed_seconds": 0.143729,
+              "peak_rss_kib": 65464,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+                "original_chain_score": 10,
+                "original_anchor_count": 5,
+                "fragment_anchor_counts": [
+                  3,
+                  2
+                ],
+                "reconstructed_chain_scores": [
+                  6,
+                  4
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            },
+            {
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "read_buffer_kib": 0,
+              "elapsed_seconds": 0.183605,
+              "peak_rss_kib": 21948,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+                "original_chain_score": 10,
+                "original_anchor_count": 5,
+                "fragment_anchor_counts": [
+                  3,
+                  2
+                ],
+                "reconstructed_chain_scores": [
+                  6,
+                  4
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              },
+              "memory_plan": {
+                "scope": "trace_reader_process_planning_only",
+                "sources": {
+                  "RLIMIT_AS": 536870912
+                },
+                "process_virtual_bytes": 26882048,
+                "effective_budget_bytes": 536870912,
+                "reserve_bytes": 33554432,
+                "allocation_headroom_bytes": 476434432,
+                "requested_buffer_bytes": null,
+                "selected_buffer_bytes": 1048576,
+                "buffer_downshifted": false,
+                "fallback_used": false,
+                "hard_limit_changed": false,
+                "job_memory_reserved": false,
+                "slurm_cgroup_allocation_discovery_implemented": false
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "retained_evidence": "/tmp/cgat-adaptive-buffer16m-final-20261029",
+      "report_sha256": "2d2177204ceb42a2bb4ae2651a19e640b1569b5c912cd32d860a965ce11a41ec",
+      "baseline_revision": "2bb61fafa0063067b88310b7938267f8d469a134",
+      "cases": [
+        {
+          "case": "small",
+          "trace_bytes": 308915,
+          "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+          "selected_seeds": 10000,
+          "extra_groups": 0,
+          "runs": [
+            {
+              "mode": "legacy",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "read_buffer_kib": null,
+              "elapsed_seconds": 0.01004,
+              "peak_rss_kib": 23448,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+                "original_chain_score": 20000,
+                "original_anchor_count": 10000,
+                "fragment_anchor_counts": [
+                  6000,
+                  4000
+                ],
+                "reconstructed_chain_scores": [
+                  12000,
+                  8000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            },
+            {
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "read_buffer_kib": 16384,
+              "elapsed_seconds": 0.016931,
+              "peak_rss_kib": 20944,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+                "original_chain_score": 20000,
+                "original_anchor_count": 10000,
+                "fragment_anchor_counts": [
+                  6000,
+                  4000
+                ],
+                "reconstructed_chain_scores": [
+                  12000,
+                  8000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              },
+              "memory_plan": {
+                "scope": "trace_reader_process_planning_only",
+                "sources": {
+                  "RLIMIT_AS": 536870912
+                },
+                "process_virtual_bytes": 26882048,
+                "effective_budget_bytes": 536870912,
+                "reserve_bytes": 33554432,
+                "allocation_headroom_bytes": 476434432,
+                "requested_buffer_bytes": 16777216,
+                "selected_buffer_bytes": 16777216,
+                "buffer_downshifted": false,
+                "fallback_used": false,
+                "hard_limit_changed": false,
+                "job_memory_reserved": false,
+                "slurm_cgroup_allocation_discovery_implemented": false
+              }
+            }
+          ]
+        },
+        {
+          "case": "large",
+          "trace_bytes": 34888917,
+          "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+          "selected_seeds": 1000000,
+          "extra_groups": 0,
+          "runs": [
+            {
+              "mode": "legacy",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "read_buffer_kib": null,
+              "elapsed_seconds": 1.150434,
+              "peak_rss_kib": 239584,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+                "original_chain_score": 2000000,
+                "original_anchor_count": 1000000,
+                "fragment_anchor_counts": [
+                  600000,
+                  400000
+                ],
+                "reconstructed_chain_scores": [
+                  1200000,
+                  800000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            },
+            {
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "read_buffer_kib": 16384,
+              "elapsed_seconds": 1.823572,
+              "peak_rss_kib": 36304,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+                "original_chain_score": 2000000,
+                "original_anchor_count": 1000000,
+                "fragment_anchor_counts": [
+                  600000,
+                  400000
+                ],
+                "reconstructed_chain_scores": [
+                  1200000,
+                  800000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              },
+              "memory_plan": {
+                "scope": "trace_reader_process_planning_only",
+                "sources": {
+                  "RLIMIT_AS": 536870912
+                },
+                "process_virtual_bytes": 26882048,
+                "effective_budget_bytes": 536870912,
+                "reserve_bytes": 33554432,
+                "allocation_headroom_bytes": 476434432,
+                "requested_buffer_bytes": 16777216,
+                "selected_buffer_bytes": 16777216,
+                "buffer_downshifted": false,
+                "fallback_used": false,
+                "hard_limit_changed": false,
+                "job_memory_reserved": false,
+                "slurm_cgroup_allocation_discovery_implemented": false
+              }
+            }
+          ]
+        },
+        {
+          "case": "many_groups",
+          "trace_bytes": 2489056,
+          "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+          "selected_seeds": 5,
+          "extra_groups": 100000,
+          "runs": [
+            {
+              "mode": "legacy",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "read_buffer_kib": null,
+              "elapsed_seconds": 0.137897,
+              "peak_rss_kib": 65508,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+                "original_chain_score": 10,
+                "original_anchor_count": 5,
+                "fragment_anchor_counts": [
+                  3,
+                  2
+                ],
+                "reconstructed_chain_scores": [
+                  6,
+                  4
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            },
+            {
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "read_buffer_kib": 16384,
+              "elapsed_seconds": 0.181506,
+              "peak_rss_kib": 22352,
+              "witness": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+                "original_chain_score": 10,
+                "original_anchor_count": 5,
+                "fragment_anchor_counts": [
+                  3,
+                  2
+                ],
+                "reconstructed_chain_scores": [
+                  6,
+                  4
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              },
+              "memory_plan": {
+                "scope": "trace_reader_process_planning_only",
+                "sources": {
+                  "RLIMIT_AS": 536870912
+                },
+                "process_virtual_bytes": 26882048,
+                "effective_budget_bytes": 536870912,
+                "reserve_bytes": 33554432,
+                "allocation_headroom_bytes": 476434432,
+                "requested_buffer_bytes": 16777216,
+                "selected_buffer_bytes": 16777216,
+                "buffer_downshifted": false,
+                "fallback_used": false,
+                "hard_limit_changed": false,
+                "job_memory_reserved": false,
+                "slurm_cgroup_allocation_discovery_implemented": false
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "simulated_budget_profiles": [
+    {
+      "simulation_only": true,
+      "process_budget_mib": 40,
+      "plan": {
+        "scope": "trace_reader_process_planning_only",
+        "sources": {
+          "explicit_process_budget": 41943040
+        },
+        "process_virtual_bytes": 25165824,
+        "effective_budget_bytes": 41943040,
+        "reserve_bytes": 5242880,
+        "allocation_headroom_bytes": 11534336,
+        "requested_buffer_bytes": null,
+        "selected_buffer_bytes": 8192,
+        "buffer_downshifted": false,
+        "fallback_used": false,
+        "hard_limit_changed": false,
+        "job_memory_reserved": false,
+        "slurm_cgroup_allocation_discovery_implemented": false
+      }
+    },
+    {
+      "simulation_only": true,
+      "process_budget_mib": 64,
+      "plan": {
+        "scope": "trace_reader_process_planning_only",
+        "sources": {
+          "explicit_process_budget": 67108864
+        },
+        "process_virtual_bytes": 25165824,
+        "effective_budget_bytes": 67108864,
+        "reserve_bytes": 8388608,
+        "allocation_headroom_bytes": 33554432,
+        "requested_buffer_bytes": null,
+        "selected_buffer_bytes": 65536,
+        "buffer_downshifted": false,
+        "fallback_used": false,
+        "hard_limit_changed": false,
+        "job_memory_reserved": false,
+        "slurm_cgroup_allocation_discovery_implemented": false
+      }
+    },
+    {
+      "simulation_only": true,
+      "process_budget_mib": 128,
+      "plan": {
+        "scope": "trace_reader_process_planning_only",
+        "sources": {
+          "explicit_process_budget": 134217728
+        },
+        "process_virtual_bytes": 25165824,
+        "effective_budget_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "allocation_headroom_bytes": 92274688,
+        "requested_buffer_bytes": null,
+        "selected_buffer_bytes": 65536,
+        "buffer_downshifted": false,
+        "fallback_used": false,
+        "hard_limit_changed": false,
+        "job_memory_reserved": false,
+        "slurm_cgroup_allocation_discovery_implemented": false
+      }
+    },
+    {
+      "simulation_only": true,
+      "process_budget_mib": 512,
+      "plan": {
+        "scope": "trace_reader_process_planning_only",
+        "sources": {
+          "explicit_process_budget": 536870912
+        },
+        "process_virtual_bytes": 25165824,
+        "effective_budget_bytes": 536870912,
+        "reserve_bytes": 33554432,
+        "allocation_headroom_bytes": 478150656,
+        "requested_buffer_bytes": null,
+        "selected_buffer_bytes": 1048576,
+        "buffer_downshifted": false,
+        "fallback_used": false,
+        "hard_limit_changed": false,
+        "job_memory_reserved": false,
+        "slurm_cgroup_allocation_discovery_implemented": false
+      }
+    },
+    {
+      "simulation_only": true,
+      "process_budget_mib": 4096,
+      "plan": {
+        "scope": "trace_reader_process_planning_only",
+        "sources": {
+          "explicit_process_budget": 4294967296
+        },
+        "process_virtual_bytes": 25165824,
+        "effective_budget_bytes": 4294967296,
+        "reserve_bytes": 33554432,
+        "allocation_headroom_bytes": 4236247040,
+        "requested_buffer_bytes": null,
+        "selected_buffer_bytes": 1048576,
+        "buffer_downshifted": false,
+        "fallback_used": false,
+        "hard_limit_changed": false,
+        "job_memory_reserved": false,
+        "slurm_cgroup_allocation_discovery_implemented": false
+      }
+    },
+    {
+      "simulation_only": true,
+      "process_budget_mib": 512000,
+      "plan": {
+        "scope": "trace_reader_process_planning_only",
+        "sources": {
+          "explicit_process_budget": 536870912000
+        },
+        "process_virtual_bytes": 25165824,
+        "effective_budget_bytes": 536870912000,
+        "reserve_bytes": 33554432,
+        "allocation_headroom_bytes": 536812191744,
+        "requested_buffer_bytes": null,
+        "selected_buffer_bytes": 1048576,
+        "buffer_downshifted": false,
+        "fallback_used": false,
+        "hard_limit_changed": false,
+        "job_memory_reserved": false,
+        "slurm_cgroup_allocation_discovery_implemented": false
+      }
+    }
+  ],
+  "forward_existing_raw_paf_and_refusals_unchanged": true,
+  "forward_audit_sha256": "6967a7f4e1666a407354d0a2d1b130aeefadc4a65b412ffed0d508ec5daafc93",
+  "reverse_audit_sha256": "39591ea4b0e71eef753d362aaeaf80a1dba219f820006f5082a51a7bf36a5004",
+  "reverse_counts": [
+    12927,
+    1319
+  ],
+  "reverse_scores": [
+    146016,
+    14899
+  ],
+  "mapping_guidance_and_customer_isolation_unchanged": true,
+  "explicit_64m_reverse_cli_verified": {
+    "audit_sha256": "92f0b7f9e2783c40fffb8d133e4c1ac2ecaf70e35969b337ce3a132608abb1fe",
+    "both_whole_and_window_witness_receive_budget": true
+  }
+}

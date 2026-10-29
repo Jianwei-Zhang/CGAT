@@ -196,9 +196,21 @@ python3 GPM2.0/experiments/long_query_alignment/guided_alignment.py \
 
 `stream_seed_trace.py` 已替换 score witness 中整份 trace/全部 seed 的内存缓存。
 逐行校验并计算 SHA256，只保留当前 chain 的摘要和一个匹配结果；总字节数、
-行数、行长和时间均有限制。只支持现有单 query、单线程、正向两片段的 witness，
+行数、行长和时间均有限制。只支持现有单 query、单线程、同链向两片段的 witness，
 不恢复通用候选排序/MAPQ，不改变生产参数或客户隔离诊断包。
 
 同一百万 seed trace 的旧/新完整 witness 一致；512 MiB 地址空间上限下峰值 RSS
 约 234 MiB / 21 MiB。解析略慢，不宣称提速；这不是完整小麦流程的内存测量。
 复现实验、协议拒绝项及剩余边界见 `VALIDATION_STREAMING_20261029.md`。
+
+## 反向两片段与不同内存预算
+
+反向 seed/片段关联已加入受限 witness：转换 query 坐标系，并按原 chain/target
+顺序分配切分得分，不能按正向 query 坐标排序。真实反向 DP 和窗口证据对照通过；
+不完整候选仍拒绝，通用候选筛选/MAPQ 仍未完成。
+
+`trace_memory.py` 实现解析进程级预算适配：显式预算和 `RLIMIT_AS` 取较小值，
+扣除当前虚拟内存及余量，再自动选择有界缓冲；预算不足不丢数据而是明确停止。
+未知进程上限采用标明来源的保守规划值，不冒称已识别 Slurm/cgroup 的共享可用内存。
+这不是整套 CGAT 的内存调度器，也不保证整个小麦比对能在任意内存下运行。
+实测、模拟预算的区别与复现命令见 `VALIDATION_REVERSE_ADAPTIVE_20261029.md`。

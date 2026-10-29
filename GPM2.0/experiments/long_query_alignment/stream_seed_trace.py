@@ -1,4 +1,4 @@
-"""Bounded CN evidence reader for the positive/two-fragment score witness.
+"""Bounded CN evidence reader for the same-strand/two-fragment score witness.
 
 Pinned diagnostic subset: one query, thread zero, increasing contiguous CN chain
 IDs as emitted by minimap2 v2.31 map.c. No alignment, candidate selection or MAPQ.
@@ -15,6 +15,7 @@ import stat
 import time
 
 from windowed_alignment import ExperimentError
+import trace_memory as tm
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,8 @@ class TraceBudget:
     max_lines: int = 10_000_000
     max_line_bytes: int = 64 * 1024
     timeout_seconds: float = 120.0
+    read_buffer_bytes: int | None = None
+    process_memory_bytes: int | None = None
 
     def validate(self):
         if any(type(n) is not int or n <= 0 for n in
@@ -31,15 +34,46 @@ class TraceBudget:
         if (type(self.timeout_seconds) not in (int, float)
                 or not math.isfinite(self.timeout_seconds) or self.timeout_seconds <= 0):
             raise ExperimentError("trace time budget must be positive and finite")
+        if self.read_buffer_bytes is not None and (type(self.read_buffer_bytes) is not int or not 8192 <= self.read_buffer_bytes <= 16 * 1024**2):
+            raise ExperimentError("trace read buffer must be 8 KiB..16 MiB")
+        if self.process_memory_bytes is not None and (type(self.process_memory_bytes) is not int or self.process_memory_bytes <= 0):
+            raise ExperimentError("trace process budget must be a positive integer")
 
 
 def stat_identity(st):
     return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
 
 
+def oriented_query_interval(row):
+    """PAF uses forward query coordinates; CN anchors use the aligned orientation."""
+    if row["strand"] == "+":
+        return row["query_start"], row["query_end"]
+    if row["strand"] == "-":
+        return row["query_length"] - row["query_end"], row["query_length"] - row["query_start"]
+    raise ExperimentError("unknown strand in split witness")
+
+
+def ordered_fragments(coarse, fragments):
+    """Keep split accounting in chain/target order, NOT forward query order."""
+    if (len(fragments) != 2 or coarse["strand"] not in ("+", "-")
+            or any(row["strand"] != coarse["strand"] for row in fragments)):
+        raise ExperimentError("witness only supports one same-strand chain split into two fragments")
+    for row in [coarse, *fragments]:
+        if not (0 <= row["query_start"] < row["query_end"] <= row["query_length"]
+                and 0 <= row["target_start"] < row["target_end"] <= row["target_length"]):
+            raise ExperimentError("coarse/fragment coordinates exceed sequence bounds")
+        if any(row[k] != coarse[k] for k in ("query", "query_length", "target", "target_length")):
+            raise ExperimentError("trace/DP query or target identity or length does not match the coarse candidate")
+    ordered = sorted(fragments, key=lambda row: row["target_start"])
+    if (ordered[0]["target_start"] >= ordered[1]["target_start"]
+            or oriented_query_interval(ordered[0])[0] >= oriented_query_interval(ordered[1])[0]):
+        raise ExperimentError("fragment order is not collinear with the original chain")
+    return ordered
+
+
 def collect_split_counts(path: Path, coarse: dict, fragments: list[dict],
                          budget: TraceBudget | None = None):
-    """Caller validates positive-strand two-fragment geometry before entry.
+    """Validate a same-strand two-fragment geometry and scan oriented CN anchors.
 
     A bounded binary read/hash pass validates every CN row, including irrelevant
     chains. Ownership/monotonicity errors on a nonmatching chain are ignored just
@@ -49,10 +83,11 @@ def collect_split_counts(path: Path, coarse: dict, fragments: list[dict],
     """
     budget = budget or TraceBudget()
     budget.validate()
-    if len(fragments) != 2:
-        raise ExperimentError("stream witness requires exactly two validated fragments")
+    fragments = ordered_fragments(coarse, fragments)
+    query_intervals = [oriented_query_interval(row) for row in fragments]
     start = time.monotonic()
     deadline = start + budget.timeout_seconds
+    memory_plan = tm.process_plan(budget.process_memory_bytes, budget.read_buffer_bytes)
     digest = hashlib.sha256()
     byte_count = line_count = seed_count = group_count = 0
     query_seen = query_done = False
@@ -61,12 +96,12 @@ def collect_split_counts(path: Path, coarse: dict, fragments: list[dict],
 
     def finish(group):
         nonlocal match
-        if group is None or group["key"][1:] != (coarse["target"], "+"):
+        if group is None or group["key"][1:] != (coarse["target"], coarse["strand"]):
             return
         first_t, first_q, span = group["first"]
         last_t, last_q, _ = group["last"]
         bounds = (first_q + 1 - span, last_q + 1, first_t + 1 - span, last_t + 1)
-        expected = tuple(coarse[k] for k in ("query_start", "query_end", "target_start", "target_end"))
+        expected = (*oriented_query_interval(coarse), coarse["target_start"], coarse["target_end"])
         if group["count"] != coarse["minimizers"] or bounds != expected:
             return
         if match is not None:
@@ -76,7 +111,7 @@ def collect_split_counts(path: Path, coarse: dict, fragments: list[dict],
 
     # NONBLOCK prevents a FIFO from hanging before we can reject nonregular input.
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
-    with os.fdopen(fd, "rb") as stream:
+    with os.fdopen(fd, "rb", buffering=memory_plan["selected_buffer_bytes"]) as stream:
         before = os.fstat(stream.fileno())
         if not stat.S_ISREG(before.st_mode):
             raise ExperimentError("trace must be a regular file")
@@ -143,10 +178,10 @@ def collect_split_counts(path: Path, coarse: dict, fragments: list[dict],
             current["last"] = (t, q, span)
             current["count"] += 1
             seed_count += 1
-            if key[1:] == (coarse["target"], "+"):
+            if key[1:] == (coarse["target"], coarse["strand"]):
                 owner = None
                 for i, row in enumerate(fragments):
-                    if (row["query_start"] <= q + 1 - span and q < row["query_end"]
+                    if (query_intervals[i][0] <= q + 1 - span and q < query_intervals[i][1]
                             and row["target_start"] <= t + 1 - span and t < row["target_end"]):
                         if owner is not None:
                             current["bad_ownership"] = True
@@ -176,4 +211,5 @@ def collect_split_counts(path: Path, coarse: dict, fragments: list[dict],
             "resources": {"bytes_read": byte_count, "lines_read": line_count, "seed_rows": seed_count,
                           "chain_groups": group_count, "query_end_marker_observed": query_done,
                           "elapsed_seconds": round(time.monotonic() - start, 6), "limits": asdict(budget),
+                          "memory_plan": memory_plan,
                           "storage": "one_chain_summary_plus_one_match; no seed arrays or chain dictionary"}}
