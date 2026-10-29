@@ -1,0 +1,652 @@
+{
+  "scope": "streamed diagnostic seed reader, no production alignment change",
+  "source_sha256": {
+    "stream_seed_trace.py": "77646871dd622e330bb1bfdf49296d24357e2f0142dc4c78d8720884ee3d9d39",
+    "audit_post_dp.py": "7c4f156c8b1a4ddf548c78c247f6eb5dd72d298c4cd4bc6b454c8d68d15693ee",
+    "benchmark_seed_trace.py": "6edd4ca46ee4384cf8576e88731fd1dde6800e6ca87fd21ee0525cb0c2024c63",
+    "test_stream_seed_trace.py": "d154853c992077a710bdc516b9cb7f98a2bf3a37da9c522562e0d895e99de941"
+  },
+  "previous_scientific_evidence_checks": [
+    {
+      "case": "identity",
+      "equal_fields": [
+        "runs",
+        "as_only_probe",
+        "guidance_status",
+        "guidance_error",
+        "guided_final_exists"
+      ]
+    },
+    {
+      "case": "split_decoy",
+      "equal_fields": [
+        "runs",
+        "as_only_probe",
+        "guidance_status",
+        "guidance_error",
+        "guided_final_exists"
+      ]
+    },
+    {
+      "case": "chain_score_not_alignment_score",
+      "equal_fields": [
+        "runs",
+        "as_only_probe",
+        "guidance_status",
+        "guidance_error",
+        "guided_final_exists"
+      ]
+    },
+    {
+      "case": "whole_query_dp",
+      "frozen_baseline_complete_witness_equal_excluding_resource_metrics": true
+    },
+    {
+      "case": "window_recovered",
+      "frozen_baseline_complete_witness_equal_excluding_resource_metrics": true
+    }
+  ],
+  "benchmarks": [
+    {
+      "address_space_cap_mib": 128,
+      "synthetic_trace_only": true,
+      "production_ready": false,
+      "customer_validated": false,
+      "baseline_revision": "2bb61fafa0063067b88310b7938267f8d469a134",
+      "baseline_sha256": "382690eeec1cf809aee5cdd57147bb899c58ddd9e027195beb44cfdd0f25bb33",
+      "source_sha256": {
+        "benchmark_seed_trace.py": "6edd4ca46ee4384cf8576e88731fd1dde6800e6ca87fd21ee0525cb0c2024c63",
+        "audit_post_dp.py": "7c4f156c8b1a4ddf548c78c247f6eb5dd72d298c4cd4bc6b454c8d68d15693ee",
+        "stream_seed_trace.py": "77646871dd622e330bb1bfdf49296d24357e2f0142dc4c78d8720884ee3d9d39",
+        "windowed_alignment.py": "cf413c9336d7611e6094f7711bfc1dd41538713f7eb5ef27c19de999d45d2c12"
+      },
+      "cases": [
+        {
+          "case": "small",
+          "trace_bytes": 308915,
+          "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+          "selected_seeds": 10000,
+          "extra_groups": 0,
+          "runs": [
+            {
+              "command": [
+                "/usr/bin/python3",
+                "/mnt/d/Desktop/CGAT/GPM2.0/experiments/long_query_alignment/benchmark_seed_trace.py",
+                "--worker",
+                "legacy",
+                "--metadata",
+                "/tmp/cgat-stream-trace-final-20261029/small.json",
+                "--baseline",
+                "/tmp/cgat-stream-trace-final-20261029/frozen_audit_post_dp.py",
+                "--memory-mib",
+                "128"
+              ],
+              "mode": "legacy",
+              "status": "success",
+              "memory_cap_mib": 128,
+              "elapsed_seconds": 0.011028,
+              "peak_rss_kib": 23160,
+              "result": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+                "original_chain_score": 20000,
+                "original_anchor_count": 10000,
+                "fragment_anchor_counts": [
+                  6000,
+                  4000
+                ],
+                "reconstructed_chain_scores": [
+                  12000,
+                  8000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            },
+            {
+              "command": [
+                "/usr/bin/python3",
+                "/mnt/d/Desktop/CGAT/GPM2.0/experiments/long_query_alignment/benchmark_seed_trace.py",
+                "--worker",
+                "stream",
+                "--metadata",
+                "/tmp/cgat-stream-trace-final-20261029/small.json",
+                "--baseline",
+                "/tmp/cgat-stream-trace-final-20261029/frozen_audit_post_dp.py",
+                "--memory-mib",
+                "128"
+              ],
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 128,
+              "elapsed_seconds": 0.020532,
+              "peak_rss_kib": 20908,
+              "result": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+                "trace_resources": {
+                  "bytes_read": 308915,
+                  "lines_read": 10002,
+                  "seed_rows": 10000,
+                  "chain_groups": 1,
+                  "query_end_marker_observed": true,
+                  "elapsed_seconds": 0.020471,
+                  "limits": {
+                    "max_bytes": 536870912,
+                    "max_lines": 10000000,
+                    "max_line_bytes": 65536,
+                    "timeout_seconds": 120.0
+                  },
+                  "storage": "one_chain_summary_plus_one_match; no seed arrays or chain dictionary"
+                },
+                "original_chain_score": 20000,
+                "original_anchor_count": 10000,
+                "fragment_anchor_counts": [
+                  6000,
+                  4000
+                ],
+                "reconstructed_chain_scores": [
+                  12000,
+                  8000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            }
+          ]
+        },
+        {
+          "case": "large",
+          "trace_bytes": 34888917,
+          "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+          "selected_seeds": 1000000,
+          "extra_groups": 0,
+          "runs": [
+            {
+              "command": [
+                "/usr/bin/python3",
+                "/mnt/d/Desktop/CGAT/GPM2.0/experiments/long_query_alignment/benchmark_seed_trace.py",
+                "--worker",
+                "legacy",
+                "--metadata",
+                "/tmp/cgat-stream-trace-final-20261029/large.json",
+                "--baseline",
+                "/tmp/cgat-stream-trace-final-20261029/frozen_audit_post_dp.py",
+                "--memory-mib",
+                "128"
+              ],
+              "mode": "legacy",
+              "status": "memory_budget_exceeded",
+              "memory_cap_mib": 128,
+              "elapsed_seconds": 0.087852,
+              "peak_rss_kib": 123992,
+              "result": null
+            },
+            {
+              "command": [
+                "/usr/bin/python3",
+                "/mnt/d/Desktop/CGAT/GPM2.0/experiments/long_query_alignment/benchmark_seed_trace.py",
+                "--worker",
+                "stream",
+                "--metadata",
+                "/tmp/cgat-stream-trace-final-20261029/large.json",
+                "--baseline",
+                "/tmp/cgat-stream-trace-final-20261029/frozen_audit_post_dp.py",
+                "--memory-mib",
+                "128"
+              ],
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 128,
+              "elapsed_seconds": 1.998927,
+              "peak_rss_kib": 21804,
+              "result": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+                "trace_resources": {
+                  "bytes_read": 34888917,
+                  "lines_read": 1000002,
+                  "seed_rows": 1000000,
+                  "chain_groups": 1,
+                  "query_end_marker_observed": true,
+                  "elapsed_seconds": 1.998871,
+                  "limits": {
+                    "max_bytes": 536870912,
+                    "max_lines": 10000000,
+                    "max_line_bytes": 65536,
+                    "timeout_seconds": 120.0
+                  },
+                  "storage": "one_chain_summary_plus_one_match; no seed arrays or chain dictionary"
+                },
+                "original_chain_score": 2000000,
+                "original_anchor_count": 1000000,
+                "fragment_anchor_counts": [
+                  600000,
+                  400000
+                ],
+                "reconstructed_chain_scores": [
+                  1200000,
+                  800000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            }
+          ]
+        },
+        {
+          "case": "many_groups",
+          "trace_bytes": 2489056,
+          "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+          "selected_seeds": 5,
+          "extra_groups": 100000,
+          "runs": [
+            {
+              "command": [
+                "/usr/bin/python3",
+                "/mnt/d/Desktop/CGAT/GPM2.0/experiments/long_query_alignment/benchmark_seed_trace.py",
+                "--worker",
+                "legacy",
+                "--metadata",
+                "/tmp/cgat-stream-trace-final-20261029/many_groups.json",
+                "--baseline",
+                "/tmp/cgat-stream-trace-final-20261029/frozen_audit_post_dp.py",
+                "--memory-mib",
+                "128"
+              ],
+              "mode": "legacy",
+              "status": "success",
+              "memory_cap_mib": 128,
+              "elapsed_seconds": 0.144718,
+              "peak_rss_kib": 65468,
+              "result": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+                "original_chain_score": 10,
+                "original_anchor_count": 5,
+                "fragment_anchor_counts": [
+                  3,
+                  2
+                ],
+                "reconstructed_chain_scores": [
+                  6,
+                  4
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            },
+            {
+              "command": [
+                "/usr/bin/python3",
+                "/mnt/d/Desktop/CGAT/GPM2.0/experiments/long_query_alignment/benchmark_seed_trace.py",
+                "--worker",
+                "stream",
+                "--metadata",
+                "/tmp/cgat-stream-trace-final-20261029/many_groups.json",
+                "--baseline",
+                "/tmp/cgat-stream-trace-final-20261029/frozen_audit_post_dp.py",
+                "--memory-mib",
+                "128"
+              ],
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 128,
+              "elapsed_seconds": 0.204452,
+              "peak_rss_kib": 21924,
+              "result": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+                "trace_resources": {
+                  "bytes_read": 2489056,
+                  "lines_read": 100007,
+                  "seed_rows": 100005,
+                  "chain_groups": 100001,
+                  "query_end_marker_observed": true,
+                  "elapsed_seconds": 0.204392,
+                  "limits": {
+                    "max_bytes": 536870912,
+                    "max_lines": 10000000,
+                    "max_line_bytes": 65536,
+                    "timeout_seconds": 120.0
+                  },
+                  "storage": "one_chain_summary_plus_one_match; no seed arrays or chain dictionary"
+                },
+                "original_chain_score": 10,
+                "original_anchor_count": 5,
+                "fragment_anchor_counts": [
+                  3,
+                  2
+                ],
+                "reconstructed_chain_scores": [
+                  6,
+                  4
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            }
+          ]
+        }
+      ],
+      "status": "completed_resource_and_witness_audit_not_recovery"
+    },
+    {
+      "address_space_cap_mib": 512,
+      "synthetic_trace_only": true,
+      "production_ready": false,
+      "customer_validated": false,
+      "baseline_revision": "2bb61fafa0063067b88310b7938267f8d469a134",
+      "baseline_sha256": "382690eeec1cf809aee5cdd57147bb899c58ddd9e027195beb44cfdd0f25bb33",
+      "source_sha256": {
+        "benchmark_seed_trace.py": "6edd4ca46ee4384cf8576e88731fd1dde6800e6ca87fd21ee0525cb0c2024c63",
+        "audit_post_dp.py": "7c4f156c8b1a4ddf548c78c247f6eb5dd72d298c4cd4bc6b454c8d68d15693ee",
+        "stream_seed_trace.py": "77646871dd622e330bb1bfdf49296d24357e2f0142dc4c78d8720884ee3d9d39",
+        "windowed_alignment.py": "cf413c9336d7611e6094f7711bfc1dd41538713f7eb5ef27c19de999d45d2c12"
+      },
+      "cases": [
+        {
+          "case": "small",
+          "trace_bytes": 308915,
+          "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+          "selected_seeds": 10000,
+          "extra_groups": 0,
+          "runs": [
+            {
+              "command": [
+                "/usr/bin/python3",
+                "/mnt/d/Desktop/CGAT/GPM2.0/experiments/long_query_alignment/benchmark_seed_trace.py",
+                "--worker",
+                "legacy",
+                "--metadata",
+                "/tmp/cgat-stream-trace-512m-20261029/small.json",
+                "--baseline",
+                "/tmp/cgat-stream-trace-512m-20261029/frozen_audit_post_dp.py",
+                "--memory-mib",
+                "512"
+              ],
+              "mode": "legacy",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "elapsed_seconds": 0.010987,
+              "peak_rss_kib": 23268,
+              "result": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+                "original_chain_score": 20000,
+                "original_anchor_count": 10000,
+                "fragment_anchor_counts": [
+                  6000,
+                  4000
+                ],
+                "reconstructed_chain_scores": [
+                  12000,
+                  8000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            },
+            {
+              "command": [
+                "/usr/bin/python3",
+                "/mnt/d/Desktop/CGAT/GPM2.0/experiments/long_query_alignment/benchmark_seed_trace.py",
+                "--worker",
+                "stream",
+                "--metadata",
+                "/tmp/cgat-stream-trace-512m-20261029/small.json",
+                "--baseline",
+                "/tmp/cgat-stream-trace-512m-20261029/frozen_audit_post_dp.py",
+                "--memory-mib",
+                "512"
+              ],
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "elapsed_seconds": 0.018524,
+              "peak_rss_kib": 20708,
+              "result": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "765ce2b3086ca3e44538c23a49856f0e10b22cf85804ee7827f400585f9a582b",
+                "trace_resources": {
+                  "bytes_read": 308915,
+                  "lines_read": 10002,
+                  "seed_rows": 10000,
+                  "chain_groups": 1,
+                  "query_end_marker_observed": true,
+                  "elapsed_seconds": 0.018466,
+                  "limits": {
+                    "max_bytes": 536870912,
+                    "max_lines": 10000000,
+                    "max_line_bytes": 65536,
+                    "timeout_seconds": 120.0
+                  },
+                  "storage": "one_chain_summary_plus_one_match; no seed arrays or chain dictionary"
+                },
+                "original_chain_score": 20000,
+                "original_anchor_count": 10000,
+                "fragment_anchor_counts": [
+                  6000,
+                  4000
+                ],
+                "reconstructed_chain_scores": [
+                  12000,
+                  8000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            }
+          ]
+        },
+        {
+          "case": "large",
+          "trace_bytes": 34888917,
+          "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+          "selected_seeds": 1000000,
+          "extra_groups": 0,
+          "runs": [
+            {
+              "command": [
+                "/usr/bin/python3",
+                "/mnt/d/Desktop/CGAT/GPM2.0/experiments/long_query_alignment/benchmark_seed_trace.py",
+                "--worker",
+                "legacy",
+                "--metadata",
+                "/tmp/cgat-stream-trace-512m-20261029/large.json",
+                "--baseline",
+                "/tmp/cgat-stream-trace-512m-20261029/frozen_audit_post_dp.py",
+                "--memory-mib",
+                "512"
+              ],
+              "mode": "legacy",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "elapsed_seconds": 1.164335,
+              "peak_rss_kib": 239472,
+              "result": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+                "original_chain_score": 2000000,
+                "original_anchor_count": 1000000,
+                "fragment_anchor_counts": [
+                  600000,
+                  400000
+                ],
+                "reconstructed_chain_scores": [
+                  1200000,
+                  800000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            },
+            {
+              "command": [
+                "/usr/bin/python3",
+                "/mnt/d/Desktop/CGAT/GPM2.0/experiments/long_query_alignment/benchmark_seed_trace.py",
+                "--worker",
+                "stream",
+                "--metadata",
+                "/tmp/cgat-stream-trace-512m-20261029/large.json",
+                "--baseline",
+                "/tmp/cgat-stream-trace-512m-20261029/frozen_audit_post_dp.py",
+                "--memory-mib",
+                "512"
+              ],
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "elapsed_seconds": 1.832259,
+              "peak_rss_kib": 21732,
+              "result": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "cd6e4ce30cbb78184e9a7ba368902d37ad88fa0494ec0be6f49adbf7889aa21e",
+                "trace_resources": {
+                  "bytes_read": 34888917,
+                  "lines_read": 1000002,
+                  "seed_rows": 1000000,
+                  "chain_groups": 1,
+                  "query_end_marker_observed": true,
+                  "elapsed_seconds": 1.832123,
+                  "limits": {
+                    "max_bytes": 536870912,
+                    "max_lines": 10000000,
+                    "max_line_bytes": 65536,
+                    "timeout_seconds": 120.0
+                  },
+                  "storage": "one_chain_summary_plus_one_match; no seed arrays or chain dictionary"
+                },
+                "original_chain_score": 2000000,
+                "original_anchor_count": 1000000,
+                "fragment_anchor_counts": [
+                  600000,
+                  400000
+                ],
+                "reconstructed_chain_scores": [
+                  1200000,
+                  800000
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            }
+          ]
+        },
+        {
+          "case": "many_groups",
+          "trace_bytes": 2489056,
+          "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+          "selected_seeds": 5,
+          "extra_groups": 100000,
+          "runs": [
+            {
+              "command": [
+                "/usr/bin/python3",
+                "/mnt/d/Desktop/CGAT/GPM2.0/experiments/long_query_alignment/benchmark_seed_trace.py",
+                "--worker",
+                "legacy",
+                "--metadata",
+                "/tmp/cgat-stream-trace-512m-20261029/many_groups.json",
+                "--baseline",
+                "/tmp/cgat-stream-trace-512m-20261029/frozen_audit_post_dp.py",
+                "--memory-mib",
+                "512"
+              ],
+              "mode": "legacy",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "elapsed_seconds": 0.1409,
+              "peak_rss_kib": 65616,
+              "result": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+                "original_chain_score": 10,
+                "original_anchor_count": 5,
+                "fragment_anchor_counts": [
+                  3,
+                  2
+                ],
+                "reconstructed_chain_scores": [
+                  6,
+                  4
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            },
+            {
+              "command": [
+                "/usr/bin/python3",
+                "/mnt/d/Desktop/CGAT/GPM2.0/experiments/long_query_alignment/benchmark_seed_trace.py",
+                "--worker",
+                "stream",
+                "--metadata",
+                "/tmp/cgat-stream-trace-512m-20261029/many_groups.json",
+                "--baseline",
+                "/tmp/cgat-stream-trace-512m-20261029/frozen_audit_post_dp.py",
+                "--memory-mib",
+                "512"
+              ],
+              "mode": "stream",
+              "status": "success",
+              "memory_cap_mib": 512,
+              "elapsed_seconds": 0.177441,
+              "peak_rss_kib": 21764,
+              "result": {
+                "diagnostic_witness_only": true,
+                "trace_sha256": "4b6cc127d1f443fe37f13dc4cb5e03fd17eac4f98ec6df52dd05797799d0761c",
+                "trace_resources": {
+                  "bytes_read": 2489056,
+                  "lines_read": 100007,
+                  "seed_rows": 100005,
+                  "chain_groups": 100001,
+                  "query_end_marker_observed": true,
+                  "elapsed_seconds": 0.177367,
+                  "limits": {
+                    "max_bytes": 536870912,
+                    "max_lines": 10000000,
+                    "max_line_bytes": 65536,
+                    "timeout_seconds": 120.0
+                  },
+                  "storage": "one_chain_summary_plus_one_match; no seed arrays or chain dictionary"
+                },
+                "original_chain_score": 10,
+                "original_anchor_count": 5,
+                "fragment_anchor_counts": [
+                  3,
+                  2
+                ],
+                "reconstructed_chain_scores": [
+                  6,
+                  4
+                ],
+                "candidate_selection_reconstructed": false,
+                "mapq_reconstructed": false
+              }
+            }
+          ]
+        }
+      ],
+      "status": "completed_resource_and_witness_audit_not_recovery"
+    }
+  ],
+  "tests": {
+    "226": {
+      "passed": 73,
+      "log_sha256": "475548eead7bd8b9493135d6ad8688f0c933b90d6e1a573bdbc986ffdede429e"
+    },
+    "231": {
+      "passed": 73,
+      "log_sha256": "b8cb953083177b29610616c60f29bc8647cd11f86e5dede57e6cb0fd6bc63607"
+    }
+  },
+  "production_ready": false,
+  "customer_validated": false,
+  "isolation_tool_changed": false,
+  "measurement_environment": {
+    "python_version": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+    "architecture": "x86_64",
+    "platform": "linux"
+  }
+}

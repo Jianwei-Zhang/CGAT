@@ -161,6 +161,11 @@ python3 -m unittest discover -s GPM2.0/experiments/long_query_alignment
 
 ## Next integration gate
 
+Follow-up: `VALIDATION_STREAMING_20261029.md` supersedes the CN collector's
+in-memory implementation below with a bounded streaming reader. The original
+measurements in this report remain historical; general provenance/selection and
+customer acceptance are still open.
+
 The current collector intentionally generates only bounded synthetic input. It
 reads the debug trace in memory; the debug protocol is not a stable production API.
 Do not run it as a wheat-scale trace collector. A larger-input implementation needs

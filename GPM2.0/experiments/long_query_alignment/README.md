@@ -191,3 +191,14 @@ python3 GPM2.0/experiments/long_query_alignment/guided_alignment.py \
 回传包只含日志/身份/命令，不含序列、PAF 或 core；没有自动提交、上传或参数重试。
 270 Mb 真实断言定位与独立重放验收见 `VALIDATION_ISOLATION_20261029.md`。
 该工具不进入正式 Server 包，也不代表客户已跑通。
+
+## 流式 seed/chain 证据（仍为受限实验）
+
+`stream_seed_trace.py` 已替换 score witness 中整份 trace/全部 seed 的内存缓存。
+逐行校验并计算 SHA256，只保留当前 chain 的摘要和一个匹配结果；总字节数、
+行数、行长和时间均有限制。只支持现有单 query、单线程、正向两片段的 witness，
+不恢复通用候选排序/MAPQ，不改变生产参数或客户隔离诊断包。
+
+同一百万 seed trace 的旧/新完整 witness 一致；512 MiB 地址空间上限下峰值 RSS
+约 234 MiB / 21 MiB。解析略慢，不宣称提速；这不是完整小麦流程的内存测量。
+复现实验、协议拒绝项及剩余边界见 `VALIDATION_STREAMING_20261029.md`。

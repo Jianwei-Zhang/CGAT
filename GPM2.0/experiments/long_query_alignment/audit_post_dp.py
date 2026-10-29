@@ -13,10 +13,10 @@ import random
 import shutil
 import subprocess
 import struct
-from collections import defaultdict
 
 import guided_alignment as ga
 import windowed_alignment as wa
+import stream_seed_trace as st
 from compare_small_fixtures import relation_signature, write_fasta
 
 
@@ -91,28 +91,13 @@ def score_probe(rows, baseline):
 
 
 
-def reconstruct_split_scores(trace_path, coarse_rows, fragment_rows):
+def reconstruct_split_scores(trace_path, coarse_rows, fragment_rows, *, trace_budget=None):
     """Bounded positive-strand/two-fragment provenance witness, not an aligner.
 
     Validate original CN anchors against coarse PAF and fragment geometry;
     do not consult fragment DP scores or reported seed counts before applying v2.31 mm_split_reg's two-part score accounting.
     Unknown trace format, joins, unsupported geometry or missing seeds fail.
     """
-    groups = defaultdict(list)
-    queries = []
-    for line in trace_path.read_text().splitlines():
-        if line.startswith("QR\t"):
-            queries.append(line.split("\t"))
-        if not line.startswith("CN\t"):
-            continue
-        fields = line.split("\t")
-        if len(fields) != 8:
-            raise wa.ExperimentError("unsupported CN trace format")
-        group = (int(fields[1]), fields[2], fields[4])
-        target_end, query_end, span = int(fields[3]), int(fields[5]), int(fields[6])
-        if not 1 <= span <= 255 or min(target_end, query_end) < span - 1:
-            raise wa.ExperimentError("invalid CN seed coordinates")
-        groups[group].append((target_end, query_end, span))
     candidates = [r for r in coarse_rows if r["target"] == "decoy"]
     fragments = sorted([r for r in fragment_rows if r["target"] == "decoy"], key=lambda r: r["query_start"])
     if len(candidates) != 1 or len(fragments) != 2 or any(r["strand"] != "+" for r in candidates + fragments):
@@ -122,40 +107,20 @@ def reconstruct_split_scores(trace_path, coarse_rows, fragment_rows):
                 and 0 <= row["target_start"] < row["target_end"] <= row["target_length"])
            for row in candidates + fragments):
         raise wa.ExperimentError("coarse/fragment coordinates exceed sequence bounds")
-    if queries != [["QR", coarse["query"], "0", str(coarse["query_length"])]] or any(
-        row["query"] != coarse["query"] or row["query_length"] != coarse["query_length"]
-        or row["target_length"] != coarse["target_length"] for row in fragments
-    ):
+    if any(row["query"] != coarse["query"] or row["query_length"] != coarse["query_length"]
+           or row["target_length"] != coarse["target_length"] for row in fragments):
         raise wa.ExperimentError("trace/DP query identity or length does not match the coarse candidate")
-    matching = []
-    for (_, target, strand), anchors in groups.items():
-        if (target != coarse["target"] or strand != "+" or len(anchors) != coarse["minimizers"]):
-            continue
-        first_t, first_q, span = anchors[0]
-        last_t, last_q, _ = anchors[-1]
-        if (first_q + 1 - span, last_q + 1, first_t + 1 - span, last_t + 1) == tuple(coarse[k] for k in ("query_start", "query_end", "target_start", "target_end")):
-            matching.append(anchors)
-    if len(matching) != 1:
-        raise wa.ExperimentError("no unique original seed chain matches coarse PAF")
-    anchors = matching[0]
-    if any(b[0] <= a[0] or b[1] <= a[1] for a, b in zip(anchors, anchors[1:])):
-        raise wa.ExperimentError("non-monotonic seed chain unsupported by witness")
-    counts = [0, 0]
-    for t, q, span in anchors:
-        owners = [i for i, row in enumerate(fragments)
-                  if row["query_start"] <= q + 1 - span and q < row["query_end"]
-                  and row["target_start"] <= t + 1 - span and t < row["target_end"]]
-        if len(owners) != 1:
-            raise wa.ExperimentError("seed missing from or shared by DP fragments")
-        counts[owners[0]] += 1
+    evidence = st.collect_split_counts(trace_path, coarse, fragments, trace_budget)
+    counts = evidence["fragment_anchor_counts"]
     if sum(counts) != coarse["minimizers"]:
         raise wa.ExperimentError("original seed counts do not cover the split")
     f32 = lambda v: struct.unpack("f", struct.pack("f", v))[0]
     ratio = f32(f32(counts[1]) / f32(sum(counts)))
     tail = int(f32(f32(coarse["chain_score"]) * ratio) + 0.499)
     scores = [coarse["chain_score"] - tail, tail]
-    return {"diagnostic_witness_only": True, "trace_sha256": wa.sha256(trace_path),
-            "original_chain_score": coarse["chain_score"], "original_anchor_count": len(anchors),
+    return {"diagnostic_witness_only": True, "trace_sha256": evidence["trace_sha256"],
+            "trace_resources": evidence["resources"],
+            "original_chain_score": coarse["chain_score"], "original_anchor_count": evidence["original_anchor_count"],
             "fragment_anchor_counts": counts, "reconstructed_chain_scores": scores,
             "candidate_selection_reconstructed": False, "mapq_reconstructed": False}
 
@@ -252,7 +217,8 @@ def experiment(args):
               "new_candidate_filter_implemented": False,
               "scope": "synthetic score diagnostic only; -P output is NOT production PAF or confidence",
               "harness_sha256": wa.sha256(Path(__file__)),
-              "helper_sha256": {"windowed_alignment.py": wa.sha256(Path(wa.__file__)),
+              "helper_sha256": {"stream_seed_trace.py": wa.sha256(Path(st.__file__)),
+                                "windowed_alignment.py": wa.sha256(Path(wa.__file__)),
                                 "guided_alignment.py": wa.sha256(Path(ga.__file__)),
                                 "compare_small_fixtures.py": wa.sha256(Path(write_fasta.__code__.co_filename))},
               "tool": {"path": mm, "version": subprocess.check_output([mm, "--version"], text=True).strip(), "sha256": wa.sha256(Path(mm))},
