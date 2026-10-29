@@ -73,9 +73,10 @@ scientific equivalence. `guided.experimental.paf` remains a conditional candidat
 
 The default CLI is **plan only**, creating nothing and starting no tool. Its
 `--execute` switch is for a developer's final-validation harness, not a new customer
-`run.sh` option. This branch has not connected the prototype to Server `run.sh` yet.
-Do not call the branch deliverable before its explicit correctness, packaging and
-customer acceptance gates are satisfied.
+`run.sh` option. A separate package-overlay/adapter implementation is now present,
+but it has not been executed or installed and recovered publication remains
+closed. Do not call the branch deliverable before its explicit correctness,
+packaging and appropriate acceptance gates are satisfied.
 
 ## Original multipart reference context: implemented, execution unverified
 
@@ -178,8 +179,16 @@ whole-record replay precede asserting any customer-specific root cause or repair
 - Native-state/path association, native selection and supplied-state MAPQ:
   implemented in the experimental branch; execution/equivalence unverified.
   Public confidence promotion and full-query DP-state completeness remain open.
-- Transparent `run.sh` integration, distributable branch package and rollback:
-  still incomplete; no official Release refresh is authorized by this branch work.
+- Transparent initial-reference `run.sh` adapter and separate package overlays:
+  source implementation added; no development package generated or integration
+  executed. Recovered-output admission is still explicitly CLOSED.
+- Distributable accepted branch package/rollback and formal recovered publication:
+  incomplete; no official Release refresh is authorized by this branch work.
+- Existing failed-workspace resume: the current source overlay only covers fresh
+  preparation. A backed-up, provenance-checked internal handoff for the customer's
+  existing original -o command is still required; do not shift a manual runtime
+  edit/configuration obligation onto the customer or mistake this fresh-path
+  slice for complete original-workspace support.
 - Final automated/scientific validation: deferred under the existing user request.
 - Customer-specific root-cause and complete-workflow acceptance: not established.
 
@@ -667,3 +676,105 @@ unchanged (native-first routing is now implemented but unexecuted), audit path/c
 counterexamples and prove the fallback's accepted scope with the named controls
 and actual customer input. Do not treat a native-API MAPQ receipt alone as proof
 of original DP/path equivalence or an excuse to skip these gates.
+
+
+## Branch Server adapter and package preparation: source only, not a repair release
+
+This increment adds `server_alignment.py` and `prepare_branch_server_package.py`
+under experiments ONLY. The tracked published Server, master, official Releases,
+existing customer installation/workspace and running diagnostic remain untouched.
+No package, compiler, helper, command-generation shell or mapping was executed.
+
+### Internal run.sh path without customer configuration
+
+The separate package builder defines two EXACT source overlays in its new copy:
+
+1. `prepare.sh`: keep `run.sh` and all its arguments unchanged; only the
+   `write_ref_command_script` asm10 branch generates an internal Python-adapter
+   call. asm5, self, chromosome-local/pair and independent GRT commands stay native.
+   Copy the complete package runtime into `.prepare_lib/tools/long_cigar_recovery`.
+2. `tools/run_outer_checkpoints.py`: bind the initial-reference checkpoint to
+   the installed branch runtime/companion files, excluding Python caches. A
+   runtime change cannot silently reuse a checkpoint from the same command text.
+   No checkpoint is invented or manually marked successful by the adapter.
+
+The builder refuses source drift, duplicate anchors or hooks outside the named
+functions. It never rewrites the original Server files. Existing prepared
+workspaces are not updated by this development builder. Source inspection shows
+`server_run.py` reuses their old generated commands/staged runtime when already
+prepared: merely selecting a new installation would therefore NOT install this
+adapter into an existing failed -o workspace. Final delivery still needs a
+backed-up, provenance-checked INTERNAL resume handoff without manual customer
+runtime edits/configuration, plus fresh-workspace integration. This limitation
+must not be concealed by demonstrating only a newly prepared workspace.
+Incremental `add_dataset`/`add_ctg` routes are not silently widened by this overlay.
+
+The adapter takes only GENERATED internal arguments. There is no new customer
+run.sh option, JSON obligation, FASTA-splitting step, compiler or binary download.
+It uses the same PATH minimap2 and scheduler-provided `GPM_TASK_THREADS`. The
+ordinary native fast path does not inherit the six-hour experiment timeout or
+an artificial memory cap; job lifetime/allocation remain with the existing job.
+Explicit diagnostic recovery passes retain their current prototype bounds.
+
+A narrowly scoped Python-only `prepared_workspace` keyword allows the selective
+harness to operate inside its adapter-owned fresh attempt under
+`runs/<dataset>_vs_ref/.long-cigar-attempt-*/selective`. Standalone experiment CLI
+still refuses prepared workspaces; no user switch disables that protection.
+
+### Publication/attempt semantics
+
+- Acquire a LIVE per-run advisory lock; a leftover lock file alone is not a job.
+- Create a fresh private attempt on the same filesystem as `result.paf`. Before
+  mapping, move an earlier regular result into that attempt as `prior-result.paf`;
+  do not delete it or restore it automatically after a failed new run.
+- Native complete success can publish its exact PAF bytes, including an empty
+  native-complete file. Hash the exact copied bytes and create `result.paf` via
+  an atomic no-clobber hard link. A concurrent output is never overwritten;
+  unsupported filesystem publication refuses instead of using an unsafe fallback.
+- OOM, unrelated error, cancellation and incomplete/mutated candidates are
+  nonzero. Keep attempt evidence, not a partially written formal result. Signals
+  TERM/HUP enter the existing child process-group cancellation path, rather than
+  abandoning an independently started mapper. No new retry/scheduler logic.
+- A recovered candidate currently ALWAYS refuses formal publication, regardless
+  of public/private PAF presence or supplied-state MAPQ. The admission closure is
+  implemented in code, not a customer-editable manifest/flag/environment option.
+  Candidate/evidence files remain available for final validation; downstream must
+  not treat them as accepted `result.paf`.
+
+**This closed adapter is not the requested finished fix.** Final acceptance still
+has to resolve candidate/path completeness and confidence, then implement the
+accepted recovered-publication branch and prove the generated original workflow.
+Do not relabel a native-only successful run or a prepared archive as completing
+that requirement. The full goal remains active.
+
+### Maintainer package preparation only
+
+The builder's default is plan-only, without scanning sources, validating a binary,
+creating an output tree or starting commands. Later explicit `--execute` requires
+an ALREADY maintainer-built pinned companion; it never compiles/downloads at job
+or package time. This is not a customer build/configuration task.
+
+Its implementation packages the tracked Git Server inventory, excluding tests,
+validation receipts and caches, rather than broad-copying an installation with
+possible customer FASTA/workspace data. Preserve native executable mode and
+licenses; copy the exact named Python dependency closure and own C-client source,
+record runtime/source/helper hashes, then prepare a separate development archive.
+Archive members are re-read and checked against their named file hashes. Both
+`SOURCE.json` and `BRANCH_README.txt` explicitly identify an UNVALIDATED non-official
+branch with closed recovered admission; an earlier SOURCE receipt is retained as
+`SOURCE.base.json`. Git revision is a baseline; actual copied file hashes bind
+any worktree snapshot. No official installer/updater/feed is repointed.
+
+The package is currently NOT customer-deliverable even if this preparation later
+executes successfully. Keep the old installation, use an independent workspace,
+and preserve evidence. Rollback is selecting the untouched installation and its
+own workspace, not mixing branch runtime into existing results/checkpoints.
+
+`test_server_alignment.py`, `test_branch_server_package.py` and updated selective
+scope definitions cover opaque native publication, retained prior results, closed
+recovery admission, no-clobber races, cancellation handlers, live-lock behavior,
+source drift, checkpoint/runtime bindings, tracked-only archive membership,
+companion preflight, import closure and preservation of ordinary Server commands.
+These checks have been WRITTEN ONLY, NOT RUN. Actual generated-shell/runtime,
+archive relocation, loader compatibility, original pipeline and scientific gates
+remain unverified and required before declaring the branch deliverable.

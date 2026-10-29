@@ -92,13 +92,23 @@ def read_shared_mid_occ(path, expected_parts):
     return values[0]
 
 
-def experiment(args):
+def experiment(args,*,prepared_workspace=None):
     root = args.out.resolve()
     if not root.parent.is_dir() or root.exists() or args.out.is_symlink():
         raise wa.ExperimentError("fresh output directory under an existing parent required")
+    if prepared_workspace is not None:
+        # Internal packaged adapter ONLY; no CLI or customer configuration.
+        # It owns a fresh private attempt directly inside an initial-ref run.
+        workspace = Path(prepared_workspace).resolve()
+        run_dir = root.parent.parent
+        if (not (workspace/".prepare_lib").is_dir() or not (workspace/"metadata").is_dir()
+                or run_dir.parent!=workspace/"runs" or not run_dir.name.endswith("_vs_ref")
+                or not root.parent.name.startswith(".long-cigar-attempt-") or root.name!="selective"):
+            raise wa.ExperimentError("managed reference recovery requires its adapter-owned private attempt scope")
     for parent in (root.parent,*root.parent.parents):
         if (parent/".prepare_lib").exists() or (parent/"run_all.sh").exists():
-            raise wa.ExperimentError("branch experiment must be outside a prepared Server workspace")
+            if prepared_workspace is None or parent!=workspace:
+                raise wa.ExperimentError("branch experiment must be outside a prepared Server workspace")
     target_path,query_path = args.target.resolve(),args.query.resolve()
     if target_path==query_path:
         raise wa.ExperimentError("initial reference alignment only; self-alignment is unsupported")
@@ -136,7 +146,12 @@ def experiment(args):
                 raise wa.ExperimentError("original input/tool changed during native-first experiment")
 
         unchanged()
-        native = nf.attempt(mm,target_path,query_path,root/"original-native",args)
+        native_args = argparse.Namespace(**vars(args))
+        if prepared_workspace is not None:
+            # The original Server command has no harness timeout. Preserve that
+            # fast-path behavior; only explicitly diagnostic recovery is bounded.
+            native_args.timeout = None
+        native = nf.attempt(mm,target_path,query_path,root/"original-native",native_args)
         report["original_native"] = native
         unchanged()
         pending = root/"reference.candidate.pending.paf"

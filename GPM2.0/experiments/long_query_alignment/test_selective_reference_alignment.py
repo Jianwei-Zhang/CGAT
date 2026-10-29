@@ -241,6 +241,38 @@ class SelectiveReferenceTests(unittest.TestCase):
         with self.assertRaises(wa.ExperimentError):
             sr.read_shared_mid_occ(log,1)
 
+    def test_managed_adapter_scope_preserves_native_no_timeout_without_exposing_a_CLI_switch(self):
+        workspace = self.root/"prepared"
+        (workspace/".prepare_lib").mkdir(parents=True)
+        (workspace/"metadata").mkdir()
+        parent = workspace/"runs"/"assembly_vs_ref"/".long-cigar-attempt-mock"
+        parent.mkdir(parents=True)
+        observed = []
+        def mapping(command,directory,name,*limits,**kwargs):
+            observed.append(limits)
+            self.assertIsNone(limits[0])  # Native Server fast path inherits job lifetime.
+            self.assertEqual(limits[1],0)  # No new per-customer memory policy/cap.
+            return self.execution(command,directory,name,data=paf())
+        with self.tools(mapping):
+            result = sr.experiment(self.args(out=parent/"selective"),prepared_workspace=workspace)
+        self.assertEqual(result["routing_mode"],"native_complete_unchanged")
+        self.assertEqual(len(observed),1)
+        with redirect_stdout(io.StringIO()),self.assertRaises(SystemExit):
+            sr.main(["--target",str(self.target),"--query",str(self.query),"--out",str(self.root/"not-created"),
+                     "--prepared-workspace",str(workspace)])
+        self.assertFalse((self.root/"not-created").exists())
+
+    def test_managed_keyword_cannot_turn_arbitrary_prepared_paths_into_experiment_outputs(self):
+        workspace = self.root/"prepared"
+        (workspace/".prepare_lib").mkdir(parents=True)
+        (workspace/"metadata").mkdir()
+        for directory in (workspace/"runs"/"assembly_vs_ref"/"ordinary-folder",
+                          workspace/"runs"/"assembly_vs_self"/".long-cigar-attempt-mock"):
+            directory.mkdir(parents=True)
+            with self.assertRaisesRegex(wa.ExperimentError,"adapter-owned"):
+                sr.experiment(self.args(out=directory/"selective"),prepared_workspace=workspace)
+            self.assertFalse((directory/"selective").exists())
+
     def test_existing_or_prepared_workspace_is_not_overwritten(self):
         self.args().out.mkdir()
         with self.assertRaisesRegex(wa.ExperimentError,"fresh output"):
