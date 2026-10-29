@@ -24,6 +24,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from run_progress import ProgressDisplay, plain
+from minimap2_diagnostics import (CIGAR_ASSERTION_CODE, CIGAR_ASSERTION_HINT,
+                                  changed_log_hint, cigar_assertion_hint, log_identity, runtime_snapshot)
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
 from run_orchestration import OrchestrationContractError, atomic_write_json
 from server_report import ReportSession, finalize_delivery_archives_from_staging
@@ -312,6 +314,7 @@ class Runner:
         self.outer_checkpoints = OuterCheckpointManager(server_dir)
         self.child_cache_markers: set[str] = set()
         self.report: ReportSession | None = None
+        self.minimap2_failure_hints: dict[str, str] = {}
 
     def _event(self, event: str, unit: PlanUnit | None, message: str) -> None:
         if unit is None:
@@ -344,6 +347,9 @@ class Runner:
 
     def _child_line(self, unit: PlanUnit, line: str) -> None:
         line = plain(line)
+        hint = cigar_assertion_hint(line)
+        if hint or CIGAR_ASSERTION_CODE in line:
+            self.minimap2_failure_hints[unit.unit_id] = hint or CIGAR_ASSERTION_HINT
         assert self.log_handle is not None
         if self.report is not None:
             self.report.child_output(line, unit.unit_id)
@@ -355,6 +361,18 @@ class Runner:
         self.log_handle.write(rendered + "\n")
         self.log_handle.flush()
         self.progress.child(unit.unit_id, line)
+
+    def _failure_logs(self, unit: PlanUnit, command: Path) -> dict:
+        # Never attribute another parallel unit's assertion from the shared run log.
+        paths = {command.parent / "stderr.log", self.server_dir / unit.detail_log_relpath}
+        return {path: log_identity(path) for path in paths if path.resolve() != self.log_path.resolve()}
+
+    def _failure_hint(self, unit: PlanUnit, logs: dict) -> str:
+        hint = self.minimap2_failure_hints.get(unit.unit_id, "")
+        if not hint:
+            hint = next((hint for path, before in logs.items()
+                         if (hint := changed_log_hint(path, before))), "")
+        return f"; {hint}" if hint else ""
 
     def _handle_signal(self, signal_number: int, _frame: object) -> None:
         if self.received_signal is None:
@@ -418,13 +436,13 @@ class Runner:
                 atomic_write_status(self.status_path, self.status_rows)
                 self._event("START", unit, f"attempt={row['attempt']} command={unit.command_relpath}")
             self._event("TASK_START", unit, f"threads={allocation} command={task.command.relative_to(self.server_dir)}")
-            allocations[task.command] = (allocation, time.monotonic())
+            allocations[task.command] = (allocation, time.monotonic(), self._failure_logs(unit, task.command))
 
         def finish(task, code, cancelling):
             unit = by_id[task.unit_id]
             row = self._row(unit)
             remaining[task.unit_id] -= 1
-            allocation, task_started = allocations.pop(task.command)
+            allocation, task_started, failure_logs = allocations.pop(task.command)
             if code == 0 and dispatcher is not None:
                 dispatcher.complete(task, allocation, time.monotonic() - task_started)
             self._event("TASK_END", unit, f"exit_code={code} command={task.command.relative_to(self.server_dir)}")
@@ -435,7 +453,8 @@ class Runner:
                 row.update(state=state, ended_at=timestamp(), exit_code=str(code),
                            elapsed_seconds=f"{time.monotonic() - started[task.unit_id]:.3f}")
                 atomic_write_status(self.status_path, self.status_rows)
-                self._event(state.upper(), unit, f"exit_code={code} command={task.command.relative_to(self.server_dir)} detail={unit.detail_log_relpath}")
+                self._event(state.upper(), unit, f"exit_code={code} command={task.command.relative_to(self.server_dir)} detail={unit.detail_log_relpath}"
+                            + (self._failure_hint(unit, failure_logs) if state == "failed" else ""))
             elif remaining[task.unit_id] == 0:
                 try:
                     checkpoint = self.outer_checkpoints.commit(prepared[task.unit_id])
@@ -559,6 +578,7 @@ class Runner:
         mode = "resume" if prior or self.log_path.exists() else "fresh"
         self.report = ReportSession(self.server_dir, self.units, self.run_id)
         threads = "unknown"
+        options = {}
         completed = False
         options_path = self.server_dir / "metadata/prepare_options.tsv"
         if options_path.is_file():
@@ -594,6 +614,18 @@ class Runner:
             for signal_number in previous_handlers:
                 signal.signal(signal_number, self._handle_signal)
             try:
+                if options.get("alignment_engine") == "minimap2" or options.get("grt_minimap2"):
+                    snapshot_path = self.server_dir / ".run_all/diagnostics" / self.run_id / "minimap2_runtime.json"
+                    try:
+                        snapshot = runtime_snapshot(self.server_dir, options)
+                        snapshot.update(run_id=self.run_id, recorded_at=timestamp())
+                        atomic_write_json(snapshot_path, snapshot)
+                        long_records = sum(item.get("over_cigar_operation_limit", 0) for item in snapshot["inputs"])
+                        self._event("PREFLIGHT", None,
+                                    f"minimap2 evidence={snapshot_path.relative_to(self.server_dir)} "
+                                    f"long_records={long_records} (risk indicator only; parameters unchanged)")
+                    except (OSError, ValueError) as exc:
+                        self._event("PREFLIGHT", None, f"minimap2 evidence unavailable: {exc}; parameters unchanged")
                 handled: set[str] = set()
                 for unit_index, unit in enumerate(self.units):
                     if unit.unit_id in handled:
@@ -688,6 +720,7 @@ class Runner:
                     atomic_write_status(self.status_path, self.status_rows)
                     self._event("START", unit, f"attempt={attempt} command={unit.command_relpath}")
                     self.child_cache_markers.clear()
+                    failure_logs = self._failure_logs(unit, self.server_dir / unit.command_relpath)
                     child = subprocess.Popen(
                         ["bash", str(self.server_dir / unit.command_relpath)],
                         cwd=self.server_dir,
@@ -740,7 +773,8 @@ class Runner:
                             "FAILED",
                             unit,
                             f"exit_code={exit_code} detail={unit.detail_log_relpath} "
-                            f"rerun='bash {self.server_dir / 'run_all.sh'}'",
+                            f"rerun='bash {self.server_dir / 'run_all.sh'}'"
+                            + self._failure_hint(unit, failure_logs),
                         )
                         return exit_code
                     try:

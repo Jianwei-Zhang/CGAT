@@ -11,6 +11,10 @@ import json
 import os
 import shutil
 import subprocess
+try:
+    from minimap2_diagnostics import cigar_assertion_hint, log_tail
+except ModuleNotFoundError:  # Imported through server.tools.
+    from .minimap2_diagnostics import cigar_assertion_hint, log_tail
 import sys
 import tempfile
 from pathlib import Path
@@ -247,8 +251,14 @@ def run_batch(manifest_path: Path, batch_index: int) -> None:
             "-t", str(min(threads, len(query_lengths))), str(index), str(query),
         ]
         atomic_json(attempt / "command.json", command)
-        with (attempt / "raw.paf").open("wb") as raw, (attempt / "stderr.log").open("wb") as stderr:
-            subprocess.run(command, stdout=raw, stderr=stderr, check=True)
+        try:
+            with (attempt / "raw.paf").open("wb") as raw, (attempt / "stderr.log").open("wb") as stderr:
+                subprocess.run(command, stdout=raw, stderr=stderr, check=True)
+        except subprocess.CalledProcessError:
+            hint = cigar_assertion_hint(log_tail(attempt / "stderr.log"))
+            if hint:
+                print(f"{hint} Evidence: {attempt}", file=sys.stderr)
+            raise
         validate_raw(attempt / "raw.paf", query_lengths, target_lengths)
         with (attempt / "raw.paf").open("rb") as raw, (attempt / "result.paf").open("wb") as result:
             subprocess.run(

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import os
+import contextlib
+import io
+from unittest.mock import patch
 import subprocess
 import sys
 import tempfile
@@ -25,6 +28,38 @@ def load_generator():
 
 
 class SelfAlignmentBatchTests(unittest.TestCase):
+    def test_assertion_preserves_failed_batch_and_never_publishes_success(self):
+        import self_alignment_batches as batches
+        namespace = load_generator()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            run_dir = root / "operation"
+            run_dir.mkdir()
+            binary = root / "minimap2"
+            binary.write_text("#!/bin/sh\nprintf partial\necho 'minimap2: mm_update_extra: Assertion qoff and toff failed.' >&2\nexit 134\n")
+            binary.chmod(0o755)
+            target, query, mapping, restore = [run_dir / name for name in ("target.fa", "query.fa", "names.tsv", "restore.py")]
+            target.write_text(">a\nACGT\n")
+            query.write_text(">b\nACGT\n")
+            mapping.write_text("a\tfirst\nb\tsecond\n")
+            restore.write_text("raise RuntimeError('must not restore a failed alignment')\n")
+            with patch.dict(os.environ, {"PATH": str(root) + os.pathsep + os.environ.get("PATH", "")}):
+                namespace["write_self_batch_scripts"](
+                    run_dir, target, query, mapping, restore, TOOLS / "self_alignment_batches.py",
+                    threads="1", minimap_preset="asm10", self_min_chain_score=200, self_minimizers=100)
+                with patch.object(batches, "ensure_index", return_value=root / "unused.mmi"), contextlib.redirect_stderr(io.StringIO()) as output:
+                    with self.assertRaises(subprocess.CalledProcessError) as caught:
+                        batches.run_batch(run_dir / "self_batch_manifest.json", 0)
+                self.assertEqual(caught.exception.returncode, 134)
+                self.assertIn("MINIMAP2_CIGAR_ASSERTION", output.getvalue())
+            attempts = list((run_dir / "batches").glob("*/attempt-*"))
+            self.assertEqual(len(attempts), 1)
+            self.assertEqual((attempts[0] / "raw.paf").read_text(), "partial")
+            self.assertTrue((attempts[0] / "command.json").is_file())
+            self.assertTrue((attempts[0] / "stderr.log").is_file())
+            self.assertFalse(list((run_dir / "batches").glob("*/complete.json")))
+            self.assertFalse((run_dir / "result.paf").exists())
+
     def test_generated_batches_match_unbatched_and_resume_independently(self):
         namespace = load_generator()
         namespace["threads"] = "4"

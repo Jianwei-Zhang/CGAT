@@ -26,6 +26,7 @@ RUN_STATES = (
 )
 
 LOG_EVENTS = (
+    "PREFLIGHT",
     "START",
     "PARALLEL",
     "TASK_START",

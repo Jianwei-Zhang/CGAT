@@ -6,6 +6,11 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
+try:
+    from minimap2_diagnostics import cigar_assertion_hint, log_tail
+except ModuleNotFoundError:  # Imported through server.tools.
+    from ..minimap2_diagnostics import cigar_assertion_hint, log_tail
 import tempfile
 from collections import defaultdict
 from pathlib import Path
@@ -213,6 +218,7 @@ def run_minimap(
         fail(
             f"minimap2 failed for {stage_dir.name} with exit code {completed.returncode}; "
             f"command={stage_dir / 'command.txt'}, stderr={stage_dir / 'stderr.log'}"
+            + ("; " + hint if (hint := cigar_assertion_hint(log_tail(stage_dir / "stderr.log"))) else "")
         )
     if not paf_path.is_file():
         fail(f"minimap2 did not create the expected PAF: {paf_path}")
@@ -331,8 +337,8 @@ def cached_chromosome_alignment(
         if temporary.exists():
             failed_root = server_dir / "grt/failed"
             failed_root.mkdir(parents=True, exist_ok=True)
-            failed_dir = failed_root / f"{stage}-{chromosome_key}-{os.getpid()}"
-            if failed_dir.exists():
-                shutil.rmtree(failed_dir)
+            # Separate attempts in one process must never overwrite earlier evidence.
+            failed_dir = Path(tempfile.mkdtemp(prefix=f"{stage}-{chromosome_key}-", dir=failed_root))
             os.replace(temporary, failed_dir)
+            print(f"[grt] Failed alignment evidence retained: {failed_dir}", file=sys.stderr)
         raise

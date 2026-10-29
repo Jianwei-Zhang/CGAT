@@ -278,6 +278,25 @@ Old prepared workspaces retain their embedded runtime until explicitly updated.
 Do not replace tools/runtime while a job is running. This presentation change does
 not require deleting caches, repreparing inputs, or changing the dependency environment.
 
+## Minimap2 CIGAR assertion diagnostics
+
+Each run records minimap2 path/version/SHA-256 and existing input-index length
+summaries in `.run_all/diagnostics/<run-id>/minimap2_runtime.json`. A long record
+is a risk indicator, not proof of a CIGAR overflow; the snapshot neither changes
+parameters nor replaces the actual per-command logs or FASTA validation.
+
+`MINIMAP2_CIGAR_ASSERTION` identifies an observed `mm_update_extra`/`mm_fix_cigar`
+span assertion. Preserve `command.sh`/`command.txt`/`command.json`, `stderr.log`,
+`tool_version.txt`, partial outputs and Slurm accounting. Failed work remains
+failed, downstream work does not proceed, and separate GRT failed attempts are
+retained under `grt/failed/` rather than overwriting an earlier attempt.
+
+Do not remove `-c`, filter out long queries, or silently change assembly presets
+as a workaround. The tested minimap2 2.31 tuning flags did not fix a reproducible
+270 Mb single-operation failure; `--max-qlen` only hid it by omitting the query.
+See the [parameter audit](validation/minimap2-long-cigar-20261029.md).
+The installed minimap2 binary and CGAT's alignment defaults are unchanged.
+
 ## File roles
 
 | File | Purpose | When to run it |

@@ -246,6 +246,22 @@ tail -F ./gpm_server/logs/progress.log
 旧项目保留原有内嵌运行库，只有明确更新后才启用新展示。作业运行期间不要替换
 工具或运行库；本次展示调整无需删除缓存、重新准备输入或更换依赖环境。
 
+## Minimap2 CIGAR 断言诊断
+
+每次运行会把 minimap2 的路径、版本、SHA-256 和已有输入索引的长度摘要记录到
+`.run_all/diagnostics/<run-id>/minimap2_runtime.json`。长序列只是风险提示，不等于
+已发生 CIGAR 溢出；此快照不更改参数，也不能替代实际任务日志或 FASTA 内容校验。
+
+`MINIMAP2_CIGAR_ASSERTION` 表示检测到了 `mm_update_extra`/`mm_fix_cigar` 的区间长度
+断言。请保留 `command.sh`/`command.txt`/`command.json`、`stderr.log`、
+`tool_version.txt`、部分输出和 Slurm 资源记录。失败任务不会被当成成功继续下游；
+GRT 的多次失败分别保留在 `grt/failed/`，不会覆盖同一进程之前的失败证据。
+
+不要通过删除 `-c`、过滤超长查询或静默更改组装预设来绕过失败。对 minimap2 2.31
+的 270 Mb 合成序列测试中，已测试的调参不能解决该单操作长度问题；`--max-qlen`
+只是丢掉了查询。详见[参数验证记录](validation/minimap2-long-cigar-20261029.md)。
+本次不修改 minimap2 二进制或 CGAT 的默认比对参数，也不宣称客户问题已解决。
+
 ## 文件用途
 
 | 文件 | 用途 | 何时执行 |

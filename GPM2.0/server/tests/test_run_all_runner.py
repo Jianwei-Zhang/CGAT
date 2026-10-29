@@ -127,6 +127,47 @@ Path('result.paf').write_text('query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t
             self.assertEqual([r["state"] for r in read_status(server / "logs/status.tsv")],
                              ["failed", "interrupted"])
 
+    def test_minimap2_assertion_keeps_failure_and_partial_paf_in_serial_and_parallel(self):
+        assertion = "minimap2: align.c:301: mm_update_extra: Assertion qoff == r->qe - r->qs && toff == r->re - r->rs failed."
+        for parallel in (False, True):
+            with self.subTest(parallel=parallel), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                server = self.make_workspace(root, [("ref:ds", "exit 134"), ("last", "touch should_not_run")])
+                environment = self.configure_reference_inputs(server, root, ["ds"])
+                command = server / "commands/ref:ds.sh"
+                partial = server / "partial.paf"
+                stderr = command.parent / "stderr.log"
+                command.write_text(f"#!/bin/bash\nprintf partial > '{partial}'\n"
+                                   f"printf '%s\\n' '{assertion}' > '{stderr}'\nexit 134\n")
+                if parallel:
+                    (command.parent / "alignment_tasks.json").write_text(json.dumps({"version": 1, "tasks": [
+                        {"command": command.relative_to(server).as_posix(), "max_threads": 1}]}))
+                result = self.run_runner(server, env=environment)
+                self.assertEqual(result.returncode, 134, result.stdout + result.stderr)
+                self.assertIn("MINIMAP2_CIGAR_ASSERTION", result.stdout)
+                self.assertIn("not a confirmed diagnosis", result.stdout)
+                self.assertEqual(partial.read_text(), "partial")
+                self.assertEqual([row["state"] for row in read_status(server / "logs/status.tsv")], ["failed", "pending"])
+                self.assertFalse((server / "should_not_run").exists())
+                self.assertFalse(list((server / ".run_all/checkpoints").glob("*.json")))
+                snapshots = list((server / ".run_all/diagnostics").glob("*/minimap2_runtime.json"))
+                self.assertEqual(len(snapshots), 1)
+                snapshot = json.loads(snapshots[0].read_text())
+                self.assertFalse(snapshot["parameters_changed"])
+                self.assertFalse(snapshot["automatic_retry"])
+
+    def test_old_assertion_in_shared_or_unchanged_log_is_not_reused(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            server = self.make_workspace(root, [("first", "exit 7"), ("last", "exit 0")])
+            assertion = "minimap2: mm_update_extra: Assertion qoff && toff failed.\n"
+            (server / "commands/stderr.log").write_text(assertion)
+            (server / "logs").mkdir()
+            (server / "logs/run_all.log").write_text(assertion)
+            result = self.run_runner(server)
+            self.assertEqual(result.returncode, 7, result.stdout + result.stderr)
+            self.assertNotIn("MINIMAP2_CIGAR_ASSERTION", result.stdout)
+
     def make_workspace(
         self,
         root: Path,
