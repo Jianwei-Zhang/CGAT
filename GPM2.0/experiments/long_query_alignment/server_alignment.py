@@ -31,7 +31,7 @@ RUNTIME_FILES = (
     "native_first.py","native_evaluation.py","native_chain_state.py","build_native_chain_state.py",
     "native_recovery.py","native_selection.py","post_dp_selection.py","whole_query_scores.py",
     "batch_seed_ownership.py","stream_seed_trace.py","trace_memory.py","sequential_split_witness.py",
-    "minimap_index_context.py","seam_witness.py","native_chain_state.c","MINIMAP2_LICENSE.txt",
+    "minimap_index_context.py","seam_witness.py","resume_reference.py","native_chain_state.c","MINIMAP2_LICENSE.txt",
 )
 HASH = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -61,7 +61,8 @@ def validate_runtime(root):
             or value.get("files_sha256")!=runtime_files(root)):
         raise wa.ExperimentError("branch runtime source/contract mismatch")
     return {"path":str(path),"sha256":hashlib.sha256(raw).hexdigest(),"files_sha256":value["files_sha256"],
-            "recovered_output_admission":"closed_pending_final_acceptance","production_ready":False}
+            "recovered_output_admission":"closed_pending_final_acceptance",
+            "handoff_base_sha256":value.get("handoff_base_sha256"),"production_ready":False}
 
 
 @contextmanager

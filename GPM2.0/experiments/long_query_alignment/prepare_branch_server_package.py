@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path,PurePosixPath
 import shutil
 import subprocess
@@ -22,6 +23,7 @@ sys.dont_write_bytecode = True
 import build_native_chain_state as build
 import native_chain_state as nst
 import server_alignment as adapter
+import resume_reference as resume
 import windowed_alignment as wa
 
 REF_ANCHOR = '  write_alignment_command_script "${run_dir}/command.sh" "$run_dir" "$ref_fa" "$ds_fa" false\n'
@@ -63,7 +65,8 @@ def overlay_prepare(text):
 
 CHECKPOINT_ANCHOR = '        manifest = (self.server_dir / command_relpath).parent / "alignment_tasks.json"\n'
 CHECKPOINT_OVERLAY = '        branch_runtime = self.server_dir / ".prepare_lib/tools/long_cigar_recovery"\n' + (
-    '        if branch_runtime.is_dir():\n'
+    '        if (branch_runtime.is_dir() and "long_cigar_recovery/server_alignment.py"\n'
+    '                in (self.server_dir / command_relpath).read_text(encoding="utf-8")):\n'
     '            paths.extend(sorted(p for p in branch_runtime.rglob("*")\n'
     '                                if p.is_file() and "__pycache__" not in p.parts))\n'
 )
@@ -79,6 +82,27 @@ def overlay_checkpoint(text):
     if not text[previous:].startswith("    def _reference_inputs("):
         raise wa.ExperimentError("runtime checkpoint hook no longer belongs to initial-reference inputs")
     return text.replace(CHECKPOINT_ANCHOR,CHECKPOINT_OVERLAY+CHECKPOINT_ANCHOR)
+
+
+RUN_ANCHOR = '        if not ready:\n'
+RUN_OVERLAY = (
+    '        if ready:\n'
+    '            sys.path.insert(0, str(server_source / "tools/long_cigar_recovery"))\n'
+    '            from resume_reference import handoff\n'
+    '            from run_outer_checkpoints import OuterCheckpointManager\n'
+    '            handoff_report = handoff(root, server_source, run_id, load_plan(root), OuterCheckpointManager(root))\n'
+    '            print("[REFERENCE HANDOFF] " + json.dumps(handoff_report, ensure_ascii=True), flush=True)\n'
+)
+
+
+def overlay_server_run(text):
+    if "from resume_reference import handoff" in text or text.count(RUN_ANCHOR)!=1:
+        raise wa.ExperimentError("Server resume entry changed or already overlaid; refusing guessed handoff")
+    at = text.index(RUN_ANCHOR)
+    function = text.rfind("def execute(",0,at)
+    if function<0 or not function<text.find("        lock.acquire()",function)<at:
+        raise wa.ExperimentError("reference handoff hook must follow actual workspace lock acquisition")
+    return text.replace(RUN_ANCHOR,RUN_OVERLAY+RUN_ANCHOR)
 
 
 def source_inventory(source):
@@ -108,6 +132,38 @@ def source_inventory(source):
     revision = subprocess.check_output(["git","-C",str(source),"rev-parse","HEAD"],text=True).strip()
     return sorted(names),{"repository_revision":revision,"commit_is_baseline_only":True,
                           "worktree_source_bound_by_file_hashes":True}
+
+
+def resume_source_profile(source,revision):
+    """Maintainer prebinds immutable old source; this is not customer config."""
+    if type(revision) is not str or re.fullmatch(r"[0-9a-f]{40}",revision) is None:
+        raise wa.ExperimentError("resume source profile requires a full immutable Git revision")
+    repository = subprocess.check_output(["git","-C",str(source),"rev-parse","--show-toplevel"],text=True).strip()
+    prefix = subprocess.check_output(["git","-C",str(source),"rev-parse","--show-prefix"],text=True).strip()
+    resolved = subprocess.check_output(["git","-C",repository,"rev-parse",revision+"^{commit}"],text=True).strip()
+    if resolved!=revision:
+        raise wa.ExperimentError("resume source revision cannot be resolved exactly")
+    def blob(name):
+        return subprocess.check_output(["git","-C",repository,"show",revision+":"+prefix+name])
+    # These define command ownership, the launch lock and checkpoint/manifest
+    # contract. Do not silently migrate a different recipe/schema/API.
+    for name in ("prepare.sh","tools/server_run.py","tools/run_outer_checkpoints.py","tools/alignment_tasks.py"):
+        if blob(name)!=(source/name).read_bytes():
+            raise wa.ExperimentError(f"resume source profile has a different reference/launch/checkpoint recipe: {name}")
+    raw = subprocess.check_output(["git","-C",repository,"ls-tree","-r","--name-only","-z",revision,"--",prefix+"tools/"])
+    hashes = {}
+    for name in raw.decode("utf-8").split("\0"):
+        if not name:
+            continue
+        if not name.startswith(prefix+"tools/"):
+            raise wa.ExperimentError("resume source profile inventory escaped Server tools")
+        relative = name[len(prefix):]
+        if relative.endswith(".py") and not any(p in EXCLUDE for p in PurePosixPath(relative).parts):
+            hashes[relative] = hashlib.sha256(blob(relative)).hexdigest()
+    if not hashes:
+        raise wa.ExperimentError("resume source profile contains no original Server tool modules")
+    return {"revision":revision,"base_tools_files_sha256":hashes,
+            "reference_launch_checkpoint_recipe_equal":True}
 
 
 def copy_regular_tree(source,destination,names):
@@ -176,9 +232,11 @@ def prepare_package(args):
     native_files = {build.BINARY:bundle["sha256"],build.MANIFEST:bundle["manifest_sha256"]}
     inventory,source_revision = source_inventory(source)
     runtime_hashes = adapter.runtime_files(runtime_source)
+    resume_profiles = [resume_source_profile(source,revision) for revision in getattr(args,"resume_source_revision",[])]
     prepare_original = (source/"prepare.sh").read_text()
     patched_prepare = overlay_prepare(prepare_original)
     patched_checkpoint = overlay_checkpoint((source/"tools/run_outer_checkpoints.py").read_text())
+    patched_server_run = overlay_server_run((source/"tools/server_run.py").read_text())
     output.mkdir(mode=0o700)
     report = {"schema":1,"status":"preparing_unvalidated_development_package","production_ready":False,
               "customer_deliverable":False,"recovered_output_admission":"closed_pending_final_acceptance",
@@ -200,13 +258,21 @@ def prepare_package(args):
             shutil.copy2(Path(bundle["manifest_path"]).parent/name,platform_dir/name)
             if wa.sha256(platform_dir/name)!=expected:
                 raise wa.ExperimentError("prebuilt companion changed during development packaging")
+        base_tools = {name:digest for name,digest in base_hashes.items()
+                      if name.startswith("tools/") and name.endswith(".py")}
+        wa.write_json(runtime/resume.BASE,{"schema":1,
+            "source_profiles":[{"revision":"package_base","base_tools_files_sha256":base_tools,
+                                "reference_launch_checkpoint_recipe_equal":True},*resume_profiles],
+            "base_prepare_sha256":base_hashes["prepare.sh"],"source_revision":source_revision})
         runtime_receipt = {"schema":1,"status":"unvalidated_branch_runtime","scope":"initial_reference_asm10_only",
             "files_sha256":runtime_hashes,"recovered_output_admission":"closed_pending_final_acceptance",
             "native_companion_platform":bundle["platform"],"native_companion_sha256":bundle["sha256"],
+            "handoff_base_sha256":wa.sha256(runtime/resume.BASE),
             "production_ready":False,"customer_configuration_required":False}
         wa.write_json(runtime/adapter.MANIFEST,runtime_receipt)
         (server/"prepare.sh").write_text(patched_prepare)
         (server/"tools/run_outer_checkpoints.py").write_text(patched_checkpoint)
+        (server/"tools/server_run.py").write_text(patched_server_run)
         if (server/"SOURCE.json").exists():
             if (server/"SOURCE.base.json").exists():
                 raise wa.ExperimentError("source already contains a saved baseline receipt; refusing to overwrite provenance")
@@ -258,12 +324,15 @@ def main(argv=None):
     parser.add_argument("--server-source",type=Path,default=Path(__file__).resolve().parents[2]/"server")
     parser.add_argument("--out",type=Path,required=True)
     parser.add_argument("--native-state-bundle",type=Path,default=None)
+    parser.add_argument("--resume-source-revision",action="append",default=[],
+                        help="Maintainer-only immutable prior Server revision with the same original reference/launch/checkpoint recipe")
     parser.add_argument("--execute",action="store_true")
     args = parser.parse_args(argv)
     if not args.execute:
         print(json.dumps({"status":"plan_only","production_ready":False,"customer_deliverable":False,
             "server_source":str(args.server_source),"output":str(args.out),
             "native_companion_required_from_maintainer":True,"no_files_or_commands_started":True,
+            "resume_source_revisions":args.resume_source_revision,
             "recovered_output_admission":"closed_pending_final_acceptance"},indent=2))
         return 0
     try:

@@ -30,7 +30,7 @@ class BranchServerPackageTests(unittest.TestCase):
         (self.source/"prepare.sh").write_bytes((official/"prepare.sh").read_bytes())
         (self.source/"tools/run_outer_checkpoints.py").write_bytes((official/"tools/run_outer_checkpoints.py").read_bytes())
         (self.source/"run.sh").write_bytes(b"#!/bin/bash\n# never execute test file\n")
-        (self.source/"tools/server_run.py").write_text("# mock only\n")
+        (self.source/"tools/server_run.py").write_bytes((official/"tools/server_run.py").read_bytes())
         (self.source/"lib/incremental_common.sh").write_text("# mock only\n")
         (self.source/"SOURCE.json").write_text('{"baseline":"preserve me"}\n')
         self.inventory = sorted(p.relative_to(self.source).as_posix() for p in self.source.rglob("*") if p.is_file())
@@ -91,6 +91,45 @@ class BranchServerPackageTests(unittest.TestCase):
                      original.replace("def _reference_inputs(","def _another_unit("),patched):
             with self.assertRaises(wa.ExperimentError):
                 package.overlay_checkpoint(text)
+
+    def test_existing_workspace_hook_is_inside_the_original_lock_and_does_not_replace_run_sh(self):
+        original = (self.source/"tools/server_run.py").read_text()
+        patched = package.overlay_server_run(original)
+        ast.parse(patched)
+        self.assertEqual(patched.replace(package.RUN_OVERLAY,""),original)
+        self.assertLess(patched.index("lock.acquire()"),patched.index("handoff_report = handoff"))
+        self.assertLess(patched.index("handoff_report = handoff"),patched.index("return Runner(root, units, run_id).run()"))
+        for text in (original.replace(package.RUN_ANCHOR,""),patched):
+            with self.assertRaises(wa.ExperimentError):
+                package.overlay_server_run(text)
+
+    def test_maintainer_prior_profile_uses_immutable_git_bytes_with_the_same_original_recipe(self):
+        (self.source/"tools/alignment_tasks.py").write_bytes(b"# fixture task schema\n")
+        revision = "d"*40
+        def git(command,**kwargs):
+            if "--show-toplevel" in command:
+                return "/readonly-repository\n"
+            if "--show-prefix" in command:
+                return "GPM2.0/server/\n"
+            if "rev-parse" in command:
+                return revision+"\n"
+            if "show" in command:
+                name = command[-1].split(":",1)[1].removeprefix("GPM2.0/server/")
+                return (self.source/name).read_bytes()
+            return b"GPM2.0/server/tools/server_run.py\0GPM2.0/server/tools/run_outer_checkpoints.py\0GPM2.0/server/tools/alignment_tasks.py\0"
+        with patch.object(package.subprocess,"check_output",side_effect=git):
+            profile = package.resume_source_profile(self.source,revision)
+        self.assertEqual(profile["revision"],revision)
+        self.assertTrue(profile["reference_launch_checkpoint_recipe_equal"])
+        self.assertEqual(profile["base_tools_files_sha256"]["tools/server_run.py"],wa.sha256(self.source/"tools/server_run.py"))
+        with self.assertRaisesRegex(wa.ExperimentError,"full immutable"):
+            package.resume_source_profile(self.source,"latest")
+        def changed(command,**kwargs):
+            if "show" in command and command[-1].endswith(":GPM2.0/server/prepare.sh"):
+                return b"different generated reference recipe"
+            return git(command,**kwargs)
+        with patch.object(package.subprocess,"check_output",side_effect=changed),self.assertRaisesRegex(wa.ExperimentError,"different reference"):
+            package.resume_source_profile(self.source,revision)
 
     def test_runtime_import_closure_is_packaged_including_lazy_native_and_seam_imports(self):
         root = Path(sa.__file__).resolve().parent

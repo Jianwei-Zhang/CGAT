@@ -184,11 +184,12 @@ whole-record replay precede asserting any customer-specific root cause or repair
   executed. Recovered-output admission is still explicitly CLOSED.
 - Distributable accepted branch package/rollback and formal recovered publication:
   incomplete; no official Release refresh is authorized by this branch work.
-- Existing failed-workspace resume: the current source overlay only covers fresh
-  preparation. A backed-up, provenance-checked internal handoff for the customer's
-  existing original -o command is still required; do not shift a manual runtime
-  edit/configuration obligation onto the customer or mistake this fresh-path
-  slice for complete original-workspace support.
+- Existing failed-workspace resume: internal lock/provenance/checkpoint-bound
+  handoff and transactional command backup/rollback are source-implemented, not
+  executed. Supported old source inventories are prebound by the maintainer;
+  actual old/current run.sh resume, compatibility and interruption acceptance
+  remain open. No customer edit/configuration or manual migration is required
+  by the implemented supported path; unknown/custom recipes refuse untouched.
 - Final automated/scientific validation: deferred under the existing user request.
 - Customer-specific root-cause and complete-workflow acceptance: not established.
 
@@ -687,26 +688,28 @@ No package, compiler, helper, command-generation shell or mapping was executed.
 
 ### Internal run.sh path without customer configuration
 
-The separate package builder defines two EXACT source overlays in its new copy:
+The separate package builder now defines three EXACT source overlays in its new copy:
 
 1. `prepare.sh`: keep `run.sh` and all its arguments unchanged; only the
    `write_ref_command_script` asm10 branch generates an internal Python-adapter
    call. asm5, self, chromosome-local/pair and independent GRT commands stay native.
    Copy the complete package runtime into `.prepare_lib/tools/long_cigar_recovery`.
 2. `tools/run_outer_checkpoints.py`: bind the initial-reference checkpoint to
-   the installed branch runtime/companion files, excluding Python caches. A
-   runtime change cannot silently reuse a checkpoint from the same command text.
-   No checkpoint is invented or manually marked successful by the adapter.
+   the installed branch runtime/companion files, excluding Python caches, ONLY
+   when that reference command actually uses the branch adapter. Installing code
+   for a failed reference therefore does NOT invalidate a completed original
+   native command's checkpoint. A branch runtime change cannot silently reuse
+   an adapted command's checkpoint. No checkpoint success is invented.
+3. `tools/server_run.py`: on an already-prepared original -o workspace, call the
+   internal handoff after the existing workspace lock/launch-option checks and
+   before the original Runner. Fresh preparation keeps the prepare-overlay route.
 
 The builder refuses source drift, duplicate anchors or hooks outside the named
-functions. It never rewrites the original Server files. Existing prepared
-workspaces are not updated by this development builder. Source inspection shows
-`server_run.py` reuses their old generated commands/staged runtime when already
-prepared: merely selecting a new installation would therefore NOT install this
-adapter into an existing failed -o workspace. Final delivery still needs a
-backed-up, provenance-checked INTERNAL resume handoff without manual customer
-runtime edits/configuration, plus fresh-workspace integration. This limitation
-must not be concealed by demonstrating only a newly prepared workspace.
+functions. It never rewrites the original Server files. The builder itself does not touch an existing prepared
+workspace. The new internal resume hook defines a narrowly scoped handoff when
+the user later launches the original run.sh -o command against the branch package;
+see the following section. Merely demonstrating fresh preparation would still
+be insufficient: the same-existing-workspace route has NOT been executed.
 Incremental `add_dataset`/`add_ctg` routes are not silently widened by this overlay.
 
 The adapter takes only GENERATED internal arguments. There is no new customer
@@ -778,3 +781,98 @@ companion preflight, import closure and preservation of ordinary Server commands
 These checks have been WRITTEN ONLY, NOT RUN. Actual generated-shell/runtime,
 archive relocation, loader compatibility, original pipeline and scientific gates
 remain unverified and required before declaring the branch deliverable.
+
+
+## Existing original -o resume handoff: implemented, never run in this phase
+
+`resume_reference.py` is internal package runtime, not a user updater/config CLI.
+It complements the adapter without replacing GRT modules, libraries or the
+workspace's other generated commands. No existing customer workspace, dependency
+environment, running job or diagnostic was changed during implementation.
+
+### Supported handoff and unchanged completed work
+
+1. Enter only inside the existing run.sh workspace lock owned by the current
+   process/run ID/host. Retain the normal saved-launch/input/option checks.
+   Supplement that lock with local /proc checks for direct standalone workspace
+   scripts/minimap2 and the reference adapter's per-run locks. This is not a
+   cross-host scan or a promise to identify unregistered remote standalone jobs.
+2. Read the prepared metadata and exact original reference plan. Accept only the
+   standard initial-reference asm10 command template/one-task manifest. Bash
+   printf %q formats DATA arguments in a fixed builtin-only child; saved scripts
+   are never evaluated to infer their arguments. Custom options, foreign paths,
+   symlinked code/metadata and incompatible recipes refuse before mutation.
+3. Ask the actual outer checkpoint manager whether each original reference is
+   complete. Keep validated completed command/result/checkpoint/logs untouched.
+   Prior status text alone never establishes completion; conversely a recorded
+   success whose checkpoint is now incompatible is not quietly reclassified as
+   the reported failed task. No GRT or completed-reference rerun is requested by
+   the handoff. The original Runner remains responsible for subsequent execution.
+4. For unfinished standard commands only, verify a WHOLE package-bound staged
+   source inventory. Do not mix arbitrary per-file versions or call a differing
+   source tree a wrong minimap2 version. A maintained alternate old profile may
+   differ in diagnostics while retaining the exact reference/launch/checkpoint
+   recipe. Unknown/user-edited source is preserved and refused, not overwritten.
+5. Retain original command bytes/modes and stdout.log/stderr.log/tool_version.txt
+   in a new `.run_all/long-cigar-handoff-*` backup/journal. Data, original partial
+   PAF, checkpoints, other staged Python/GRT files and logs remain in place. The
+   adapter later preserves any old PAF in its own mapping attempt as documented.
+6. Install only the named package runtime subdirectory, verified by source/helper
+   hashes/modes; do not replace a different shared branch runtime silently. Write
+   only selected reference command.sh files with atomic file replacement and
+   recheck owner/metadata/source bindings. The report states analysis_started:false:
+   the handoff itself starts NO analysis. After a successful handoff, run.sh's
+   original Runner proceeds under the user's existing execution request.
+7. On failed/interrupted application, restore only command files that still match
+   this transaction's exact new hash. Never overwrite a concurrent user edit or
+   restore/delete user data. Keep backups and verified installed code for retry.
+   An incomplete durable journal is recognized on the next same run.sh command;
+   restore its backed-up command state before planning a fresh transaction.
+   Unknown/tampered/conflicting journal state refuses instead of guessing success.
+   Successful and rolled-back journals are retained, not cleaned out automatically.
+
+This provides a source implementation of the original-workspace entry, NOT an
+accepted customer repair. Source-only checks and transaction mocks cannot prove
+actual cancellation, filesystem semantics or generated-shell/runtime equivalence.
+The recovered-output admission closure remains UNCHANGED: adapted jobs cannot
+publish recovered PAF or report recovery success before final acceptance.
+
+### Prebinding the customer's collected source without customer configuration
+
+The already-collected diagnostic identifies installed v2.0.15 source revision
+`d1519a76ce1f1df37c9186db1edb26e03a51ab26` and includes its original launch.json
+and standard initial-reference command. This turn re-read that existing evidence,
+not a new customer result. Git source inspection shows that revision and branch
+base retain identical prepare.sh, server_run.py, run_outer_checkpoints.py and
+alignment_tasks.py; several diagnostic/retained-failure modules differ. It would
+therefore be incorrect to require every staged module to equal the newest tree
+or to treat those differences as evidence of the minimap2 failure's root cause.
+Only a subset of that customer's staged modules was in the diagnostic; a full
+customer-side staged-source match is still UNVERIFIED.
+
+The development builder now accepts maintainer-only
+`--resume-source-revision <full immutable Git SHA>`. It reads original module bytes
+from the Git object (never executes/materializes old code), requires the same
+original prepare/launch/reference-checkpoint/task recipe and binds the COMPLETE
+old tool-module inventory into `resume-base.json`, itself hashed by the runtime
+receipt. This is generated package provenance, NOT a file/flag the customer must
+write. The maintainer can include the collected d1519a76 revision for the eventual
+customer build. Missing objects, different recipes, partial/mixed profiles and
+unbound staged code refuse rather than adding a manual customer configuration
+step. This flag does NOT approve scientific compatibility or enable recovery.
+
+The customer's collected launch manifest supports the normal saved-launch route.
+Unsupported legacy workspaces without that recorded launch still retain the
+original Server's launch-option restrictions; no general legacy migration is
+claimed. Actual acceptance must use the customer's same original command/out
+workspace, validate its staged-source profile, retain failed evidence and prove
+that already-completed work is not recomputed. The actual failing query/FASTA and
+complete recovery remain unconfirmed; this plumbing does not change that boundary.
+
+`test_resume_reference.py` and added package/source-profile definitions cover
+checkpoint-preserving selective handoff, no-op/retry, whole old-source profiles,
+custom recipe/source refusal, lock/process guards, log/PAF/GRT preservation,
+mid-transaction rollback, stopped-journal recovery and concurrent-user-edit
+refusal. All are WRITTEN ONLY, NOT RUN. Mocked source/binary/process fixtures are
+not native/customer evidence. No helper was compiled, package generated, original
+run.sh executed, customer job submitted or Release changed in this increment.
