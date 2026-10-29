@@ -50,7 +50,9 @@ an alternate way to window every long record.
    long query or a long path lacking original-chain support is insufficient. A
    supported overflowing path that would later be filtered can supply the witness.
    This evidence supports the hypothesis; it does not prove historical crashed DP.
-8. Merge only completed `(original part, original query)` cells. Explicit native
+8. Within recovery, joins require actual native shared-overlap CIGAR evidence,
+   not merely touching endpoints; see the raw-seam section below. Merge only
+   completed `(original part, original query)` cells. Explicit native
    no-hit cells count as completed; absent, overlapping or foreign cells do not.
    Stream native optional bodies opaquely, validate recovered rows strictly, check
    hashes while assembling and again on shards, preserve multiplicity and emit in
@@ -169,6 +171,8 @@ whole-record replay precede asserting any customer-specific root cause or repair
   emission order: implemented; static syntax/diff reviewed, execution deferred.
 - Native-first preservation, actual-assertion whole-record isolation and
   long-operation witness: implemented; execution deferred.
+- Native shared-overlap seam evidence and evidence-compatible fork resolution
+  without dropping owned candidates: implemented; execution deferred.
 - Complete public/private candidate pairing, unchanged native-cell reuse and
   native-metadata/GRT comparison entry: implemented; execution deferred.
 - Native-state/path association, native selection and supplied-state MAPQ:
@@ -559,6 +563,67 @@ context/candidate completeness and unsupported-path audits remain mandatory for
 a runnable hypothesis-branch delivery or formal confidence promotion. Actual
 customer-flow acceptance is a separate requirement before claiming the customer's
 problem has been resolved; it must not be substituted by these local controls.
+
+
+### Native raw-overlap seams: implementation only, no second normalization
+
+The earlier stitch graph tested reciprocal-unique endpoint adjacency. That alone
+cannot establish that two native windows agree on the path around the seam: two
+base-valid rows can share endpoint coordinates but disagree on an indel placement.
+The branch now adds `seam_witness.py`, with no change to minimap2 or its parameters:
+
+- Recovery records exact raw byte extents and SHA-256 for every source PAF row.
+  This is binary `tell`/`readline`, not guessed offsets through text translation.
+  Retained and exact-duplicate rows both preserve their original source mappings.
+- Every owned candidate must still clip exactly from a recorded original raw row,
+  including candidates not used by any join. For each potential join, use the
+  entire actual shared query overlap and require it to **strictly straddle** the
+  core seam. Compare both target intervals and the explicit =XID paths.
+- Endpoint-compatible but overlap-conflicting edges do not join. In a fork,
+  remove only unsupported JOIN EDGES, then require reciprocal uniqueness among
+  the supported edges. A uniquely supported continuation can therefore be joined
+  instead of being lost to an endpoint-only fork. Every other owned candidate
+  remains an explicit row; this is not score selection or candidate filtering.
+- Exact duplicate cores can have different surrounding raw paths. Preserve all
+  origins and accept only a real agreeing source pair, rather than trusting the
+  first duplicate's context or inventing a path through it.
+- Do not apply another whole-path left-normalization pass to already processed
+  native-window paths. No coordinates/bases/CIGAR are rewritten by this check.
+  The selected join witness records source raw rows, the straddling overlap and
+  its exact shared-path digest in `stitch-provenance.jsonl`.
+- The native companion route and `all_chains_pool` request these witnesses
+  automatically; there is no customer option to disable them. A native-guided
+  run refuses an endpoint-only window report. Standalone legacy endpoint-only
+  experiment mode remains explicitly labelled as such, not promoted to native
+  recovery evidence.
+- Hash and recheck raw PAF, ownership/stitch provenance and the seam implementation
+  through guided/native recovery. Pending output cannot be renamed to a candidate
+  after source evidence changes, even when a changed raw row was context-only.
+
+The extra raw paths are read by offset on demand, not loaded as another complete
+raw PAF in memory. A comparison retains a pair and its bounded overlap clips;
+the existing owned-path graph is still in memory, so this is NOT a claim that all recovery
+memory is constant or automatically fits every allocation. Explicit prototype
+bounds are 1M provenance rows, 32 MiB/raw row, 4 MiB/provenance row, 100000 candidate
+edges/origin pairs and 16 GiB of source-row read work. Exceeding a bound refuses;
+it never skips data, retries parameters or presents partial coverage as success.
+These are internal evidence-work bounds, not Slurm/cgroup policy or new user
+configuration. Runtime/resource qualification remains part of final acceptance.
+
+`test_seam_witness.py` defines forward/reverse joins, boundary insertion/deletion,
+conflicting overlap despite equal endpoints, false-fork resolution with all rows
+retained, duplicate-origin choice, partial straddling overlap, no-overlap refusal,
+CRLF offsets, tampered owned/raw/provenance records, unused context-row identity
+and explicit work-bound controls. Existing native-DP integration definitions now
+require the overlap check as well. **None have run**, including the synthetic
+mock checks. Their constructed paths are NOT native DP oracle receipts.
+
+This improves local continuity evidence. It does NOT prove whole-query DP path
+choice, complete candidate discovery or equality of window/full-query extension
+contexts. Original-state association, native selection, the actual eight native
+controls, ten GRT controls and >28-bit forward/reverse selective-entry validation
+still have to be executed before a runnable branch can be accepted. No Server
+entry, customer command/job, compiler, installed minimap2 or Release was changed.
 
 
 ### Additional unsupported evidence patterns remain explicit

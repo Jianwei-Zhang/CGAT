@@ -110,6 +110,7 @@ class NativeChainStateIntegrationTests(unittest.TestCase):
                     evaluated = Path(report["native_recovery"]["native_evaluated_paf"])
                     self.assertEqual(ne.comparison_signature(evaluated),ne.comparison_signature(baseline))
                     self.assertTrue(report["native_recovery"]["selection"]["native_decisions_applied"])
+                    self.assertTrue(report["native_recovery"]["raw_overlap_consistency_checked"])
                     public = root/"recovery"/"guided.experimental.paf"
                     self.assertTrue(all(row.split("\t")[11]=="255" for row in public.read_text().splitlines()))
                     self.assertFalse(report["production_ready"])

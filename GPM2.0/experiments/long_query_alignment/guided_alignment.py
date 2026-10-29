@@ -225,6 +225,8 @@ def experiment(args):
         options = argparse.Namespace(**vars(args))
         options.out = root / "windows"
         windowed = wa.experiment(options)
+        if native_bundle is not None and not windowed.get("stitching",{}).get("overlap_consistency_required",False):
+            raise wa.ExperimentError("native recovery requires original raw overlap witnesses, not endpoint-only stitching")
         report["windowed_report_sha256"] = wa.sha256(options.out / "experiment.json")
         target = wa.FastaStore(args.target, root / "target.bases")
         stores.append(target)

@@ -196,10 +196,19 @@ def recover(stitched,chains,output,*,query,target,context,native_receipt,bundle,
               "chain_paf":(chain_paf,native_receipt["chain_paf_sha256"]),
               "helper_binary":(Path(native_receipt["helper"]["path"]),native_receipt["helper"]["sha256"]),
               "helper_manifest":(Path(native_receipt["helper"]["manifest_path"]),native_receipt["helper"]["manifest_sha256"])}
+    overlap = window_report.get("stitching",{})
+    if (overlap.get("overlap_consistency_required") is not True
+            or overlap.get("overlap_policy")!="native_raw_shared_path"):
+        raise wa.ExperimentError("native recovery refuses missing raw overlap seam evidence")
+    import seam_witness as seam
+    inputs.update(owned_provenance=(window_root/"provenance.jsonl",window_report["owned_provenance_sha256"]),
+        stitch_provenance=(window_root/"stitch-provenance.jsonl",window_report["stitch_provenance_sha256"]),
+        seam_implementation=(Path(seam.__file__),overlap["implementation_sha256"]))
     if any(wa.sha256(path)!=digest for path,digest in inputs.values()):
         raise wa.ExperimentError("native recovery evidence changed before bridge")
     report = {"status":"running","production_ready":False,"execution_validated":False,
-              "customer_validated":False,"whole_query_dp_equivalence_certified":False}
+              "customer_validated":False,"whole_query_dp_equivalence_certified":False,
+              "raw_overlap_consistency_checked":bool(overlap.get("overlap_consistency_required",False))}
     try:
         originals,query_states,directories = _load_original(native_receipt,chains,query,target,context)
         whole = {name:wa.Window(name,name,r["length"],0,r["length"],0,r["length"]) for name,r in query.records.items()}

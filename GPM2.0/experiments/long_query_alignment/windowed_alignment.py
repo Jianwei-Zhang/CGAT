@@ -328,10 +328,17 @@ def recover(raw: Path, output: Path, provenance: Path, windows: list[Window], qu
     seen_windows = set()
     counts = {"raw_rows": 0, "owned_rows": 0, "context_only_rows": 0, "exact_duplicate_rows": 0}
     temporary = output.with_suffix(".paf.partial")
-    with raw.open() as source, temporary.open("x") as out, provenance.open("x") as audit:
-        for number, line in enumerate(source, 1):
-            if not line.endswith("\n"):
+    with raw.open("rb") as source, temporary.open("x") as out, provenance.open("x") as audit:
+        number = 0
+        while True:
+            raw_start = source.tell()
+            data = source.readline()
+            if not data:
+                break
+            number += 1
+            if not data.endswith(b"\n"):
                 raise ExperimentError("incomplete last PAF line")
+            line = data.decode("ascii")
             raw_hit = parse_hit(line, by_alias, target.records)
             window = by_alias[raw_hit.query]
             seen_windows.add(window.alias)
@@ -341,7 +348,9 @@ def recover(raw: Path, output: Path, provenance: Path, windows: list[Window], qu
             if (matches, block) != (raw_hit.matches, raw_hit.block):
                 raise ExperimentError("raw PAF match/block counts disagree with original bases")
             counts["raw_rows"] += 1
-            record = {"raw_line": number, "window": asdict(window), "raw_mapq": raw_hit.mapq,
+            record = {"raw_line": number,"raw_byte_start":raw_start,"raw_byte_end":source.tell(),
+                      "raw_sha256":hashlib.sha256(data).hexdigest(),
+                      "window": asdict(window), "raw_mapq": raw_hit.mapq,
                       "lifted": [hit.qs, hit.qe, hit.strand, hit.target, hit.ts, hit.te]}
             clipped = clip_to_core(hit, window)
             if clipped is None:
@@ -398,86 +407,129 @@ def join_operations(operations) -> tuple[tuple[int, str], ...]:
     return tuple(result)
 
 
-def stitch_owned(source: Path, output: Path, provenance: Path, windows: list[Window], query: FastaStore, target: FastaStore, *, allow_empty_original_part=False) -> dict:
-    """Reciprocal-unique EXACT adjacency only; no gap filling or placement choice.
-
-    Chains may cross adjacent owned cores, never an original within-window split.
-    Forks and disjoint/reversed paths remain separate. This recovers simple row
-    continuity, not minimap2's whole-contig scoring/ranking semantics.
-    """
-    by_alias = {w.alias: w for w in windows}
-    records = []
-    entries, exits = defaultdict(list), defaultdict(list)
-    for number, line in enumerate(source.read_text().splitlines(), 1):
-        fields = line.split("\t")
-        original = fields[0]
-        length = query.records[original]["length"]
-        whole = Window(original, original, length, 0, length, 0, length)
-        hit = parse_hit(line, {original: whole}, target.records)
-        tags = [tag[5:] for tag in fields[12:] if tag.startswith("zw:Z:")]
-        if len(tags) != 1 or tags[0] not in by_alias:
-            raise ExperimentError("missing window provenance during stitching")
-        w = by_alias[tags[0]]
-        if hit.query != w.query or not w.core_start <= hit.qs < hit.qe <= w.core_end:
-            raise ExperimentError("owned row escaped its original core")
-        startq, endq = (hit.qs, hit.qe) if hit.strand == "+" else (hit.qe, hit.qs)
-        base = (hit.query, hit.target, hit.strand)
-        entry, exit_key = (*base, startq, hit.ts), (*base, endq, hit.te)
-        records.append((hit, w, entry, exit_key))
-        entries[entry].append(number - 1)
-        exits[exit_key].append(number - 1)
-    following, preceding = {}, {}
+def _stitch_links(records,entries,exits,seam):
+    following,preceding = {},{}
     forks = 0
-    for index, (hit, w, _entry, end) in enumerate(records):
-        next_rows = entries.get(end, [])
-        if len(next_rows) != 1 or len(exits[end]) != 1:
+    outgoing,incoming = defaultdict(list),defaultdict(list)
+    for index,(hit,window,_entry,end) in enumerate(records):
+        if seam is not None and (hit.qe if hit.strand=="+" else hit.qs)!=(window.core_end if hit.strand=="+" else window.core_start):
+            continue
+        next_rows = entries.get(end,[])
+        if seam is None and (len(next_rows)!=1 or len(exits[end])!=1):
             forks += bool(next_rows)
             continue
-        successor = next_rows[0]
-        other, other_window, *_ = records[successor]
-        adjacent = w.core_end == other_window.core_start if hit.strand == "+" else w.core_start == other_window.core_end
-        if adjacent and hit.qlen == other.qlen and hit.tlen == other.tlen:
-            following[index] = successor
-            preceding[successor] = index
-    emitted = set()
-    temporary = output.with_suffix(".paf.partial")
-    chain_count = joined_count = 0
-    with temporary.open("x") as handle, provenance.open("x") as audit:
-        for root in range(len(records)):
-            if root in preceding:
+        for successor in next_rows:
+            other,other_window,*_ = records[successor]
+            adjacent = (window.core_end==other_window.core_start if hit.strand=="+"
+                        else window.core_start==other_window.core_end)
+            if not adjacent or hit.qlen!=other.qlen or hit.tlen!=other.tlen:
                 continue
-            chain = [root]
-            while chain[-1] in following:
-                following_index = following[chain[-1]]
-                if following_index in chain:
-                    raise ExperimentError("cycle in candidate stitch graph")
-                chain.append(following_index)
-            if emitted.intersection(chain):
-                raise ExperimentError("owned row used in multiple stitched chains")
-            emitted.update(chain)
-            hits = [records[i][0] for i in chain]
-            combined = replace(hits[0], qs=min(h.qs for h in hits), qe=max(h.qe for h in hits),
-                               te=hits[-1].te, ops=join_operations(op for h in hits for op in h.ops), mapq=255)
-            if (sum(n for n, op in combined.ops if op in Q_OPS) != combined.qe - combined.qs
-                    or sum(n for n, op in combined.ops if op in T_OPS) != combined.te - combined.ts):
-                raise ExperimentError("stitched CIGAR does not match combined span")
-            matches, block, ambiguous = checked_statistics(combined, query, target)
-            if matches != sum(h.matches for h in hits) or block != sum(h.block for h in hits):
-                raise ExperimentError("stitched counts changed")
-            combined = replace(combined, matches=matches, block=block)
-            text = paf_line(combined, records[root][1], ambiguous).rstrip("\n")
-            text = text.replace("zp:Z:experimental-owned", "zp:Z:experimental-stitched")
-            handle.write(text + f"\tzc:i:{len(chain)}\n")
-            chain_count += 1
-            joined_count += len(chain) - 1
-            audit.write(json.dumps({"stitched_row": chain_count, "owned_rows": [i+1 for i in chain],
-                                    "windows": [records[i][1].alias for i in chain],
-                                    "join_rule": "reciprocal_unique_exact_query_and_target_adjacency"}) + "\n")
-    if len(emitted) != len(records) or (not records and not allow_empty_original_part):
-        raise ExperimentError("not all owned rows were represented by stitch chains")
-    os.replace(temporary, output)
-    return {"input_owned_rows": len(records), "stitched_rows": chain_count, "exact_joins": joined_count,
-            "fork_endpoints_not_joined": forks, "ranking_reconstructed": False}
+            if seam is not None and not seam.compatible(index,successor):
+                continue
+            outgoing[index].append(successor)
+            incoming[successor].append(index)
+    for index,targets in outgoing.items():
+        if len(targets)==1 and len(incoming[targets[0]])==1:
+            following[index] = targets[0]
+            preceding[targets[0]] = index
+        elif seam is not None:
+            forks += 1
+    return following,preceding,forks
+
+
+def stitch_owned(source: Path, output: Path, provenance: Path, windows: list[Window], query: FastaStore,
+                 target: FastaStore, *, allow_empty_original_part=False,raw_source=None,owned_provenance=None,
+                 raw_sha256=None,owned_provenance_sha256=None) -> dict:
+    """No gap filling/score choice/row dropping. Native branch requires raw overlap.
+
+    A native overlap can disambiguate which endpoint-compatible edges really
+    share a local path. Only reciprocal-unique supported edges join; all other
+    candidates remain explicit rows. This is NOT global DP/context equality.
+    """
+    if (raw_source is None)!=(owned_provenance is None):
+        raise ExperimentError("raw overlap source and ownership provenance are required together")
+    by_alias = {w.alias:w for w in windows}
+    records = []
+    entries,exits = defaultdict(list),defaultdict(list)
+    with source.open("rb") as stream:
+        number = 0
+        while data := stream.readline(32*1024**2+1 if raw_source is not None else -1):
+            number += 1
+            if not data.endswith(b"\n") or (raw_source is not None and len(data)>32*1024**2):
+                raise ExperimentError("owned stitch input has an incomplete/oversized row")
+            line = data.decode("ascii")
+            fields = line.rstrip("\r\n").split("\t")
+            original = fields[0]
+            length = query.records[original]["length"]
+            whole = Window(original,original,length,0,length,0,length)
+            hit = parse_hit(line,{original:whole},target.records)
+            tags = [tag[5:] for tag in fields[12:] if tag.startswith("zw:Z:")]
+            if len(tags)!=1 or tags[0] not in by_alias:
+                raise ExperimentError("missing window provenance during stitching")
+            window = by_alias[tags[0]]
+            if hit.query!=window.query or not window.core_start<=hit.qs<hit.qe<=window.core_end:
+                raise ExperimentError("owned row escaped its original core")
+            startq,endq = (hit.qs,hit.qe) if hit.strand=="+" else (hit.qe,hit.qs)
+            base = (hit.query,hit.target,hit.strand)
+            entry,exit_key = (*base,startq,hit.ts),(*base,endq,hit.te)
+            records.append((hit,window,entry,exit_key))
+            entries[entry].append(number-1); exits[exit_key].append(number-1)
+    seam = None
+    if raw_source is not None:
+        from seam_witness import SeamSources
+        seam = SeamSources(raw_source,owned_provenance,records,by_alias,target.records,
+                           raw_sha256=raw_sha256,proof_sha256=owned_provenance_sha256)
+    try:
+        following,preceding,forks = _stitch_links(records,entries,exits,seam)
+        emitted = set()
+        temporary = output.with_suffix(".paf.partial")
+        chain_count = joined_count = 0
+        with temporary.open("x") as handle, provenance.open("x") as audit:
+            for root in range(len(records)):
+                if root in preceding:
+                    continue
+                chain = [root]
+                while chain[-1] in following:
+                    following_index = following[chain[-1]]
+                    if following_index in chain:
+                        raise ExperimentError("cycle in candidate stitch graph")
+                    chain.append(following_index)
+                if emitted.intersection(chain):
+                    raise ExperimentError("owned row used in multiple stitched chains")
+                emitted.update(chain)
+                hits = [records[i][0] for i in chain]
+                combined = replace(hits[0], qs=min(h.qs for h in hits), qe=max(h.qe for h in hits),
+                                   te=hits[-1].te, ops=join_operations(op for h in hits for op in h.ops), mapq=255)
+                if (sum(n for n, op in combined.ops if op in Q_OPS) != combined.qe - combined.qs
+                        or sum(n for n, op in combined.ops if op in T_OPS) != combined.te - combined.ts):
+                    raise ExperimentError("stitched CIGAR does not match combined span")
+                matches, block, ambiguous = checked_statistics(combined, query, target)
+                if matches != sum(h.matches for h in hits) or block != sum(h.block for h in hits):
+                    raise ExperimentError("stitched counts changed")
+                combined = replace(combined, matches=matches, block=block)
+                text = paf_line(combined, records[root][1], ambiguous).rstrip("\n")
+                text = text.replace("zp:Z:experimental-owned", "zp:Z:experimental-stitched")
+                handle.write(text + f"\tzc:i:{len(chain)}\n")
+                chain_count += 1
+                joined_count += len(chain) - 1
+                evidence = {"stitched_row":chain_count,"owned_rows":[i+1 for i in chain],
+                            "windows":[records[i][1].alias for i in chain],
+                            "join_rule":"reciprocal_unique_exact_query_and_target_adjacency"}
+                if seam is not None:
+                    evidence["join_rule"] = "reciprocal_unique_exact_adjacency_with_native_raw_overlap"
+                    evidence["raw_overlap_witnesses"] = [seam.witnesses[pair] for pair in zip(chain,chain[1:])]
+                audit.write(json.dumps(evidence)+"\n")
+        if len(emitted) != len(records) or (not records and not allow_empty_original_part):
+            raise ExperimentError("not all owned rows were represented by stitch chains")
+        overlap = seam.receipt() if seam is not None else {
+            "overlap_consistency_required":False,"overlap_policy":"legacy_endpoint_only",
+            "whole_query_dp_equivalence_certified":False}
+        os.replace(temporary,output)
+        return {"input_owned_rows":len(records),"stitched_rows":chain_count,"exact_joins":joined_count,
+                "fork_endpoints_not_joined":forks,"ranking_reconstructed":False,**overlap}
+    finally:
+        if seam is not None:
+            seam.close()
 
 
 def run_command(command: list[str], directory: Path, name: str, timeout: int, memory_gib: int, *, max_file_bytes=None, allow_failure=False) -> dict:
@@ -595,14 +647,20 @@ def experiment(args) -> dict:
         summary = recover(raw, candidate, root / "provenance.jsonl", windows, query, target,
                           allow_empty_original_part=allow_empty_part)
         report["coverage"] = summary
+        owned_proof_hash = sha256(root/"provenance.jsonl")
+        require_overlap = candidate_policy=="all_chains_pool" or getattr(args,"native_state_bundle",None) is not None
+        overlap_options = {"raw_source":raw,"owned_provenance":root/"provenance.jsonl","raw_sha256":raw_hash,
+                           "owned_provenance_sha256":owned_proof_hash} if require_overlap else {}
         stitched = root / "stitched.pending.paf"
         report["stitching"] = stitch_owned(candidate, stitched, root / "stitch-provenance.jsonl", windows, query, target,
-                                          allow_empty_original_part=allow_empty_part)
+                                          allow_empty_original_part=allow_empty_part,**overlap_options)
+        stitch_proof_hash = sha256(root/"stitch-provenance.jsonl")
         if args.require_full_query_coverage and any(row["covered_bases"] != row["length"] for row in summary["queries"].values()):
             raise ExperimentError("full-query-coverage acceptance failed; do not treat partial mappings as complete")
         if (not all(store.unchanged() for store in stores) or sha256(Path(executable)) != binary_hash
                 or sha256(index) != index_hash or sha256(raw) != raw_hash
-                or sha256(root/"windows.json") != window_manifest_hash or sha256(root/"windows.fa") != window_fasta_hash):
+                or sha256(root/"windows.json") != window_manifest_hash or sha256(root/"windows.fa") != window_fasta_hash
+                or sha256(root/"provenance.jsonl")!=owned_proof_hash or sha256(root/"stitch-provenance.jsonl")!=stitch_proof_hash):
             raise ExperimentError("input, window evidence, index or minimap2 binary changed during experiment")
         final_candidate = root / "owned.experimental.paf"
         os.replace(candidate, final_candidate)
@@ -610,6 +668,7 @@ def experiment(args) -> dict:
         os.replace(stitched, final_stitched)
         report.update(status="validated_experimental_candidate", output_sha256=sha256(final_candidate), stitched_sha256=sha256(final_stitched),
                       raw_sha256=raw_hash,windows_manifest_sha256=window_manifest_hash,windows_fasta_sha256=window_fasta_hash,
+                      owned_provenance_sha256=owned_proof_hash,stitch_provenance_sha256=stitch_proof_hash,
                       original_inputs_unchanged=True,
                       caveat="Coordinate/CIGAR checks passed, NOT whole-contig alignment or downstream biological equivalence. "
                              "MAPQ is unknown (255), score/tp tags are not inherited; distinct placements are retained.")

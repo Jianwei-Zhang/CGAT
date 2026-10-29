@@ -74,6 +74,8 @@ class OriginalIndexPartGuidanceTests(unittest.TestCase):
         self.assertFalse(report["production_ready"])
         window_report = json.loads((self.options().out/"windows"/"experiment.json").read_text())
         self.assertEqual(window_report["window_candidate_policy"],"all_chains_pool")
+        self.assertTrue(window_report["stitching"]["overlap_consistency_required"])
+        self.assertEqual(window_report["stitching"]["overlap_policy"],"native_raw_shared_path")
         self.assertFalse(window_report["whole_query_candidate_completeness_certified"])
 
     def test_default_does_not_silently_change_window_selection(self):
