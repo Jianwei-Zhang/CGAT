@@ -230,14 +230,32 @@ def experiment(args):
         mm = str(Path(shutil.which(args.minimap2)).resolve())
         if wa.sha256(Path(mm)) != windowed["tool"]["sha256"]:
             raise wa.ExperimentError("minimap2 changed before whole-query pass")
-        index = options.out / "target.mmi"
+        index = Path(windowed["index_path"])
         index_hash = wa.sha256(index)
+        if index_hash != windowed["index_sha256"]:
+            raise wa.ExperimentError("index changed between window and whole-query guidance passes")
         chain_path = root / "whole-query.chains.paf"
-        wa.run_command([mm, "-x", args.preset, "-t", str(args.threads), "-o", str(chain_path), str(index), str(args.query.resolve())],
+        inherited = getattr(args,"index_context",None)
+        mapping_flags = ["-f",str(inherited["mid_occ"])] if inherited is not None else []
+        wa.run_command([mm, "-x", args.preset, *mapping_flags, "-t", str(args.threads), "-o", str(chain_path), str(index), str(args.query.resolve())],
                        root, "whole-query", args.timeout, args.memory_gib)
+        original = options.out / "stitched.experimental.paf"
+        if (getattr(args,"allow_empty_index_part",False) and chain_path.stat().st_size == 0
+                and original.stat().st_size == 0):
+            # Legitimate no-hit original target part. Never use this to hide a
+            # chain/window disagreement or assume every query must map here.
+            if (not all(s.unchanged() for s in stores) or wa.sha256(index) != index_hash
+                    or wa.sha256(Path(mm)) != windowed["tool"]["sha256"]
+                    or wa.sha256(original) != windowed["stitched_sha256"]):
+                raise wa.ExperimentError("input/index/tool changed in no-hit target part")
+            final = root / "guided.experimental.paf"
+            final.open("xb").close()
+            report.update(status="no_candidates_in_original_part",output_sha256=wa.sha256(final),
+                          index_sha256=index_hash,index_path=str(index),tool=windowed["tool"],
+                          original_inputs_unchanged=True,candidate_rows=0)
+            return report
         chains = read_chains(chain_path, query.records, target.records)
         wa.write_json(root / "chains.json", [asdict(c) for c in chains])
-        original = options.out / "stitched.experimental.paf"
         pending = root / "guided.pending.paf"
         if wa.sha256(original) != windowed["stitched_sha256"]:
             raise wa.ExperimentError("validated stitched input changed")

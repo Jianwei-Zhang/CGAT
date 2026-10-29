@@ -74,6 +74,29 @@ class SelectiveReferenceTests(unittest.TestCase):
         self.assertFalse(report["full_query_coverage_claimed"])
         self.assertFalse((self.root/"result.paf").exists())
 
+    def test_mixed_result_keeps_part_major_order_not_query_major_order(self):
+        normal1 = paf().replace(b"\tt\t",b"\tt1\t")
+        normal2 = paf().replace(b"\tt\t",b"\tt2\t")
+        risk1 = paf(query="long",mapq=255,cigar="8=",tags="").replace(b"\tt\t",b"\tt1\t")
+        risk2 = paf(query="long",mapq=255,cigar="8=",tags="").replace(b"\tt\t",b"\tt2\t")
+        normal_path,risk_path = self.root/"normal.paf",self.root/"risk.paf"
+        normal_path.write_bytes(normal1+normal2); risk_path.write_bytes(risk1+risk2)
+        records = {"long":{"length":8},"short":{"length":8}}
+        targets = {"t1":{"length":8},"t2":{"length":8}}
+        parts = [{"part_index":0,"records":[{"name":"t1"}]},{"part_index":1,"records":[{"name":"t2"}]}]
+        output,report = sr.combine_candidates(self.root,records,targets,["short"],["long"],
+            {"ordinary":normal_path,"risk":risk_path},index_parts=parts)
+        self.assertEqual(output.read_bytes(),risk1+normal1+risk2+normal2)
+        self.assertEqual(report["output_order"],"original_part_then_original_query")
+
+    def test_normal_only_combination_preserves_native_row_order_byte_for_byte(self):
+        native = paf(query="second")+paf(query="first")
+        source = self.root/"normal.paf"; source.write_bytes(native)
+        records = {"first":{"length":8},"second":{"length":8}}
+        output,report = sr.combine_candidates(self.root,records,{"t":{"length":8}},list(records),[],{"ordinary":source})
+        self.assertEqual(output.read_bytes(),native)
+        self.assertEqual(report["output_order"],"native_minimap2_unchanged")
+
     def test_row_route_span_and_risk_confidence_guards(self):
         query = {"short":{"length":8},"long":{"length":8}}
         target = {"t":{"length":8}}
@@ -115,23 +138,55 @@ class SelectiveReferenceTests(unittest.TestCase):
         self.assertFalse(result["production_ready"])
         self.assertFalse(result["server_result_published"])
 
-    def test_multipart_reference_is_not_silently_reindexed(self):
-        class Store:
-            def __init__(inner,source,spool):
-                inner.identity = {"sha256":"a"*64}
-                inner.records = {"t":{"length":sr.DEFAULT_INDEX_BASES+1}} if source == self.target else {"long":{"length":wa.LIMIT+1}}
-            def close(inner): pass
-        with patch.object(wa,"FastaStore",Store), \
-             patch.object(sr.shutil,"which",return_value="/tool/minimap2"), \
-             patch.object(sr.subprocess,"check_output",return_value="2.31-r1302\n"), \
-             patch.object(wa,"sha256",return_value="a"*64), \
-             patch.object(wa,"run_command",side_effect=AssertionError("mapping must not start")), \
-             patch.object(sr.ga,"experiment",side_effect=AssertionError("single-index prototype must not start")):
-            with self.assertRaisesRegex(wa.ExperimentError,"multipart-reference"):
-                sr.experiment(self.args())
-        report = json.loads((self.args().out/"selective-reference.json").read_text())
-        self.assertEqual(report["status"],"refused_or_failed")
-        self.assertFalse((self.args().out/"reference.candidate.experimental.paf").exists())
+    def test_default_index_builder_does_not_override_I_or_reference_order(self):
+        class Target:
+            source = self.target
+            records = {"t":{"length":8}}
+            identity = {"sha256":"r"*64}
+        observed = []
+        def build(command,*args):
+            observed.append(command)
+        catalog = {"parts":[{"part_index":0,"path":"/parts/0.mmi","sha256":"p"*64,"records":[{"name":"t","length":8}]}]}
+        with patch.object(wa,"run_command",side_effect=build), \
+             patch.object(sr.mic,"copy_parts",return_value=catalog):
+            result = sr.build_default_index("/tool/minimap2",Target(),self.root,self.args(),"m"*64)
+        self.assertEqual(len(observed),1)
+        self.assertNotIn("-I",observed[0])
+        self.assertEqual(observed[0][-1],str(self.target))
+        self.assertEqual(result["index_policy"],"original_default_no_I_override")
+        self.assertEqual(result["parts"][0]["reference_sha256"],"r"*64)
+        self.assertFalse(result["production_ready"])
+
+    def test_part_rows_cannot_claim_another_parts_target(self):
+        source = self.root/"part.paf"
+        row = paf(query="long",mapq=255,cigar="8=",tags="")
+        source.write_bytes(row)
+        part = {"records":[{"name":"other","length":8}]}
+        with (self.root/"aggregate.paf").open("xb") as out:
+            with self.assertRaisesRegex(wa.ExperimentError,"another original index part"):
+                sr.append_part_candidate(source,out,part=part,queries={"long":{"length":8}},
+                    targets={"t":{"length":8}},risk=["long"],expected_sha256=hashlib.sha256(row).hexdigest())
+        self.assertEqual((self.root/"aggregate.paf").read_bytes(),b"")
+
+    def test_empty_original_part_is_recorded_not_silently_a_full_recovery(self):
+        source = self.root/"empty.paf"
+        source.write_bytes(b"")
+        with (self.root/"empty.aggregate.paf").open("xb") as out:
+            count = sr.append_part_candidate(source,out,part={"records":[{"name":"t","length":8}]},
+                queries={"long":{"length":8}},targets={"t":{"length":8}},risk=["long"],
+                expected_sha256=hashlib.sha256(b"").hexdigest())
+        self.assertEqual(count,0)
+
+    def test_shared_threshold_must_match_every_original_part(self):
+        log = self.root/"mapping.stderr"
+        log.write_bytes(b"[M::mm_mapopt_update::1.0*1.0] mid_occ = 500\n"*2)
+        self.assertEqual(sr.read_shared_mid_occ(log,2),500)
+        log.write_bytes(b"[M::mm_mapopt_update::1.0*1.0] mid_occ = 500\n[M::mm_mapopt_update::2.0*1.0] mid_occ = 200\n")
+        with self.assertRaisesRegex(wa.ExperimentError,"inconsistent"):
+            sr.read_shared_mid_occ(log,2)
+        log.write_bytes(b"no threshold evidence\n")
+        with self.assertRaises(wa.ExperimentError):
+            sr.read_shared_mid_occ(log,1)
 
     def test_existing_or_prepared_workspace_is_not_overwritten(self):
         self.args().out.mkdir()

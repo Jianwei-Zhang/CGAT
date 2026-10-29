@@ -18,9 +18,9 @@ import shutil
 import subprocess
 
 import guided_alignment as ga
+import minimap_index_context as mic
 import windowed_alignment as wa
 
-DEFAULT_INDEX_BASES = 8_000_000_000
 MAX_PAF_LINE = 32*1024**2
 CIGAR = re.compile(r"([1-9][0-9]*)([M=XID])")
 
@@ -105,16 +105,38 @@ def validate_row(raw, queries, targets, allowed, route):
     return fields[0]
 
 
-def combine_candidates(root, query_records, target_records, ordinary, risk, route_pafs):
-    """Disk-backed routing in original query order; retain rows, not just unions.
+def combine_candidates(root, query_records, target_records, ordinary, risk, route_pafs, *, index_parts=None):
+    """Preserve original index-part order, then source query order within each part.
 
-    Do not silently deduplicate alternative placements or mark an unaligned record
-    covered. All final output remains experimental, including unchanged short rows.
+    A normal-only run copies native PAF order exactly, even for multipart indices.
+    Mixed runs use part-owned disk shards; grouping all parts by query first would
+    change the original multipart emission order and downstream tie-breaking.
     """
-    shards = root/"rows_by_query"
-    shards.mkdir()
-    shard_paths = {name:shards/f"{i:08d}.paf" for i,name in enumerate(query_records)}
     counts = {name:0 for name in query_records}
+    pending = root/"reference.candidate.pending.paf"
+    if not risk:
+        allowed = set(ordinary)
+        with route_pafs["ordinary"].open("rb") as inp,pending.open("xb") as out:
+            while raw := inp.readline(MAX_PAF_LINE+1):
+                name = validate_row(raw,query_records,target_records,allowed,"ordinary")
+                out.write(raw); counts[name] += 1
+        return pending,{"rows_by_query":counts,"queries_without_alignment":[name for name,n in counts.items() if not n],
+                        "row_bytes_preserved":True,"output_order":"native_minimap2_unchanged",
+                        "full_query_coverage_claimed":False}
+    if index_parts is None:
+        index_parts = [{"part_index":0,"records":[{"name":name} for name in target_records]}]
+    part_order,target_parts = [],{}
+    for part in index_parts:
+        part_order.append(part["part_index"])
+        for record in part["records"]:
+            if record["name"] in target_parts:
+                raise wa.ExperimentError("target occurs in multiple original index parts")
+            target_parts[record["name"]] = part["part_index"]
+    if set(target_parts) != set(target_records) or len(set(part_order)) != len(part_order):
+        raise wa.ExperimentError("original index part membership omits or duplicates reference records")
+    shards = root/"rows_by_part_query"; shards.mkdir()
+    query_ids = {name:i for i,name in enumerate(query_records)}
+    part_counts = {str(i):0 for i in part_order}
     for route,names in (("ordinary",ordinary),("risk",risk)):
         if not names:
             continue
@@ -122,18 +144,79 @@ def combine_candidates(root, query_records, target_records, ordinary, risk, rout
         with route_pafs[route].open("rb") as inp:
             while raw := inp.readline(MAX_PAF_LINE+1):
                 name = validate_row(raw,query_records,target_records,allowed,route)
-                with shard_paths[name].open("ab") as out:
+                target = raw.split(b"\t",6)[5].decode("ascii")
+                part_index = target_parts[target]
+                shard = shards/f"{part_index:04d}-{query_ids[name]:08d}.paf"
+                with shard.open("ab") as out:
                     out.write(raw)
                 counts[name] += 1
-    pending = root/"reference.candidate.pending.paf"
+                part_counts[str(part_index)] += 1
     with pending.open("xb") as out:
-        for name in query_records:
-            if counts[name]:
-                with shard_paths[name].open("rb") as inp:
-                    shutil.copyfileobj(inp,out,length=wa.CHUNK)
-    return pending, {"rows_by_query":counts, "queries_without_alignment":[name for name,n in counts.items() if not n],
-                     "row_bytes_preserved":True, "output_grouped_in_original_query_order":True,
+        for part_index in part_order:
+            for name in query_records:
+                shard = shards/f"{part_index:04d}-{query_ids[name]:08d}.paf"
+                if shard.is_file():
+                    with shard.open("rb") as inp:
+                        shutil.copyfileobj(inp,out,length=wa.CHUNK)
+    return pending, {"rows_by_query":counts,"rows_by_index_part":part_counts,
+                     "queries_without_alignment":[name for name,n in counts.items() if not n],
+                     "row_bytes_preserved":True,"output_order":"original_part_then_original_query",
                      "full_query_coverage_claimed":False}
+
+
+def build_default_index(mm, target, root, args, tool_hash):
+    """Build with the SAME default partition policy as original reference mapping."""
+    index = root/"target.default.mmi"
+    wa.run_command([mm,"-x","asm10","-t",str(args.threads),"-d",str(index),str(target.source)],
+                   root,"default-index",args.timeout,args.memory_gib)
+    try:
+        catalog = mic.copy_parts(index,root/"index-parts",target.records)
+    except mic.IndexContextError as exc:
+        raise wa.ExperimentError(str(exc)) from exc
+    for part in catalog["parts"]:
+        part.update(reference_sha256=target.identity["sha256"],tool_sha256=tool_hash,preset="asm10")
+    catalog.update(reference_sha256=target.identity["sha256"],tool_sha256=tool_hash,
+                   index_policy="original_default_no_I_override",production_ready=False)
+    wa.write_json(root/"index-context.json",catalog)
+    return catalog
+
+
+def read_shared_mid_occ(path, expected_parts):
+    """Read the threshold retained by upstream mm_mapopt_update across parts."""
+    pattern = re.compile(rb"\[M::mm_mapopt_update::[^\]]+\] mid_occ = ([0-9]+)\s*$")
+    values,total = [],0
+    with Path(path).open("rb") as stream:
+        while raw := stream.readline(65537):
+            total += len(raw)
+            if len(raw)>65536 or total>16*1024**2:
+                raise wa.ExperimentError("minimizer-threshold log exceeds bounded metadata scan")
+            match = pattern.search(raw)
+            if match:
+                value = match[1]
+                if len(value)>10 or not 1 <= int(value) <= wa.INT32_MAX:
+                    raise wa.ExperimentError("invalid minimizer threshold")
+                values.append(int(value))
+    if len(values) != expected_parts or len(set(values)) != 1:
+        raise wa.ExperimentError("missing or inconsistent original first-part minimizer threshold")
+    return values[0]
+
+
+def append_part_candidate(source, destination, *, part, queries, targets, risk, expected_sha256):
+    """Validate every part-owned row and keep original part order, not global MAPQ."""
+    allowed = set(risk)
+    target_names = {row["name"] for row in part["records"]}
+    count,digest = 0,hashlib.sha256()
+    with Path(source).open("rb") as inp:
+        while raw := inp.readline(MAX_PAF_LINE+1):
+            validate_row(raw,queries,targets,allowed,"risk")
+            if raw.split(b"\t",6)[5].decode("ascii") not in target_names:
+                raise wa.ExperimentError("risk PAF target belongs to another original index part")
+            destination.write(raw)
+            digest.update(raw)
+            count += 1
+    if digest.hexdigest() != expected_sha256:
+        raise wa.ExperimentError("guided PAF changed before combining original index parts")
+    return count
 
 
 def experiment(args):
@@ -168,15 +251,12 @@ def experiment(args):
         version = subprocess.check_output([mm,"--version"],text=True,timeout=5).strip()
         report.update(tool={"path":mm,"sha256":tool_hash,"version":version},
                       reference=target.identity, query=query.identity,
-                      helper_sha256={Path(module.__file__).name:wa.sha256(Path(module.__file__)) for module in (ga,wa)})
+                      helper_sha256={Path(module.__file__).name:wa.sha256(Path(module.__file__)) for module in (ga,wa,mic)})
         if version != "2.31-r1302":
             raise wa.ExperimentError("this branch experiment is pinned to customer minimap2 2.31-r1302")
         ordinary,risk = partition_records(query.records)
         report["routing"] = {"ordinary":ordinary,"risk":risk,"length_threshold":wa.LIMIT,
                              "risk_is_not_root_cause_confirmation":True}
-        if risk and sum(row["length"] for row in target.records.values()) > DEFAULT_INDEX_BASES:
-            report["promotion_blockers"].append("customer multipart-index context not supported by current guidance")
-            raise wa.ExperimentError("multipart-reference context unsupported: do not silently replace it by a larger single index")
         subsets = split_record_files(query_path,query.records,ordinary,risk,root,query.identity["sha256"]) if risk else {"ordinary":query_path}
         report["subset_sha256"] = {key:wa.sha256(path) for key,path in subsets.items()}
         pafs = {}
@@ -185,12 +265,45 @@ def experiment(args):
             wa.run_command([mm,"-c","-x","asm10","-t",str(args.threads),"-o",str(pafs["ordinary"]),
                             str(target_path),str(subsets["ordinary"])],root,"ordinary",args.timeout,args.memory_gib)
         if risk:
-            options = argparse.Namespace(target=target_path, query=subsets["risk"], out=root/"risk-windows", minimap2=mm,
-                preset="asm10", core_bases=50_000_000, context_bases=100_000, guide_slack=1000,
-                threads=args.threads,timeout=args.timeout,memory_gib=args.memory_gib,require_full_query_coverage=False)
-            report["risk_experiment"] = ga.experiment(options)
-            pafs["risk"] = options.out/"guided.experimental.paf"
-        pending,report["combination"] = combine_candidates(root,query.records,target.records,ordinary,risk,pafs)
+            catalog = build_default_index(mm,target,root,args,tool_hash)
+            if ordinary:
+                mid_occ = read_shared_mid_occ(root/"ordinary.stderr",len(catalog["parts"]))
+                threshold_source = "ordinary_original_multipart_mapping"
+            else:
+                # No -c: obtains native first-part filtering state without the
+                # failing base-alignment path. Keep preliminary evidence.
+                first_index = catalog["parts"][0]["path"]
+                wa.run_command([mm,"-x","asm10","-t",str(args.threads),"-o",
+                    str(root/"first-part.preliminary.paf"),first_index,str(subsets["risk"])],
+                    root,"first-part-threshold",args.timeout,args.memory_gib)
+                mid_occ = read_shared_mid_occ(root/"first-part-threshold.stderr",1)
+                threshold_source = "first_original_part_chain_only_pass"
+            for part in catalog["parts"]:
+                part["mid_occ"] = mid_occ
+            catalog.update(shared_mid_occ=mid_occ,threshold_source=threshold_source)
+            wa.write_json(root/"index-context.json",catalog)
+            report.update(index_catalog_sha256=wa.sha256(root/"index-context.json"),
+                          shared_mid_occ=mid_occ,threshold_source=threshold_source,
+                          index_part_count=len(catalog["parts"]),risk_parts=[],
+                          index_policy=catalog["index_policy"],global_mapq_restored=False)
+            pafs["risk"] = root/"risk.all-parts.pending.paf"
+            with pafs["risk"].open("xb") as aggregate:
+                for part in catalog["parts"]:
+                    options = argparse.Namespace(target=target_path, query=subsets["risk"],
+                        out=root/f"risk-part-{part['part_index']:04d}",minimap2=mm,
+                        preset="asm10",core_bases=50_000_000,context_bases=100_000,guide_slack=1000,
+                        threads=args.threads,timeout=args.timeout,memory_gib=args.memory_gib,
+                        require_full_query_coverage=False,index_context=part,allow_empty_index_part=True)
+                    result = ga.experiment(options)
+                    count = append_part_candidate(options.out/"guided.experimental.paf",aggregate,part=part,
+                        queries=query.records,targets=target.records,risk=risk,expected_sha256=result["output_sha256"])
+                    report["risk_parts"].append({"part_index":part["part_index"],"rows":count,
+                        "index_sha256":part["sha256"],"guidance_sha256":wa.sha256(options.out/"guidance.json")})
+                    wa.write_json(root/"selective-reference.json",report)
+            if not any(row["rows"] for row in report["risk_parts"]):
+                raise wa.ExperimentError("no risk-query candidate in any original index part; not a recovery")
+        pending,report["combination"] = combine_candidates(root,query.records,target.records,ordinary,risk,pafs,
+            index_parts=catalog["parts"] if risk else None)
         if not all(store.unchanged() for store in stores) or wa.sha256(Path(mm)) != tool_hash:
             raise wa.ExperimentError("input/tool changed during selective experiment")
         output = root/"reference.candidate.experimental.paf"

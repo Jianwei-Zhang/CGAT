@@ -320,7 +320,7 @@ def coverage(intervals: list[tuple[int, int]]) -> dict:
     return {"covered_bases": sum(end - start for start, end in merged), "intervals": merged}
 
 
-def recover(raw: Path, output: Path, provenance: Path, windows: list[Window], query: FastaStore, target: FastaStore) -> dict:
+def recover(raw: Path, output: Path, provenance: Path, windows: list[Window], query: FastaStore, target: FastaStore, *, allow_empty_original_part=False) -> dict:
     by_alias = {window.alias: window for window in windows}
     query_intervals = defaultdict(list)
     target_intervals = defaultdict(list)
@@ -366,7 +366,7 @@ def recover(raw: Path, output: Path, provenance: Path, windows: list[Window], qu
                     query_intervals[clipped.query].append((clipped.qs, clipped.qe))
                     target_intervals[clipped.target].append((clipped.ts, clipped.te))
             audit.write(json.dumps(record) + "\n")
-    if not counts["owned_rows"]:
+    if not counts["owned_rows"] and not (allow_empty_original_part and counts["raw_rows"] == 0):
         raise ExperimentError("no owned alignments: empty output is not a successful workaround")
     summary = {**counts, "windows": len(windows), "windows_without_raw_hits": sorted(set(by_alias) - seen_windows),
                "queries": {name: {"length": record["length"], **coverage(query_intervals[name])}
@@ -398,7 +398,7 @@ def join_operations(operations) -> tuple[tuple[int, str], ...]:
     return tuple(result)
 
 
-def stitch_owned(source: Path, output: Path, provenance: Path, windows: list[Window], query: FastaStore, target: FastaStore) -> dict:
+def stitch_owned(source: Path, output: Path, provenance: Path, windows: list[Window], query: FastaStore, target: FastaStore, *, allow_empty_original_part=False) -> dict:
     """Reciprocal-unique EXACT adjacency only; no gap filling or placement choice.
 
     Chains may cross adjacent owned cores, never an original within-window split.
@@ -473,7 +473,7 @@ def stitch_owned(source: Path, output: Path, provenance: Path, windows: list[Win
             audit.write(json.dumps({"stitched_row": chain_count, "owned_rows": [i+1 for i in chain],
                                     "windows": [records[i][1].alias for i in chain],
                                     "join_rule": "reciprocal_unique_exact_query_and_target_adjacency"}) + "\n")
-    if len(emitted) != len(records) or not records:
+    if len(emitted) != len(records) or (not records and not allow_empty_original_part):
         raise ExperimentError("not all owned rows were represented by stitch chains")
     os.replace(temporary, output)
     return {"input_owned_rows": len(records), "stitched_rows": chain_count, "exact_joins": joined_count,
@@ -540,25 +540,46 @@ def experiment(args) -> dict:
         write_json(root / "windows.json", [asdict(window) for window in windows])
         write_json(root / "input_records.json", {"target": target.records, "query": query.records})
         write_windows(root / "windows.fa", query, windows)
-        index = root / "target.mmi"
-        # One index over the FULL target: do not partition placements or trust a foreign cache.
-        index_bases = max(8_000_000_000, sum(record["length"] for record in target.records.values()) + 1)
-        run_command([executable, "-x", args.preset, "-I", str(index_bases), "-t", str(args.threads),
-                     "-d", str(index), str(target.source)], root, "index", args.timeout, args.memory_gib)
-        if (root / "index.stderr").read_text(errors="replace").count("distinct minimizers:") != 1:
-            raise ExperimentError("expected exactly one full-target index; cannot trust multipart ranking")
+        index_context = getattr(args,"index_context",None)
+        if index_context is None:
+            index = root / "target.mmi"
+            # Legacy standalone experiment: one FULL-target index.
+            index_bases = max(8_000_000_000, sum(record["length"] for record in target.records.values()) + 1)
+            run_command([executable, "-x", args.preset, "-I", str(index_bases), "-t", str(args.threads),
+                         "-d", str(index), str(target.source)], root, "index", args.timeout, args.memory_gib)
+            if (root / "index.stderr").read_text(errors="replace").count("distinct minimizers:") != 1:
+                raise ExperimentError("expected exactly one full-target index; cannot trust multipart ranking")
+        else:
+            # Branch-internal context: an ORIGINAL serialized index part, not a
+            # freshly re-indexed subset or an unverified foreign cache.
+            import minimap_index_context as mic
+            try:
+                index = mic.validate_part_context(index_context,reference_sha256=target.identity["sha256"],
+                    tool_sha256=binary_hash,preset=args.preset,target_records=target.records)
+            except mic.IndexContextError as exc:
+                raise ExperimentError(str(exc)) from exc
+        index_hash = sha256(index)
+        mapping_flags = ["-f",str(index_context["mid_occ"])] if index_context is not None else []
+        report.update(index_path=str(index),index_sha256=index_hash,
+                      index_scope="original_default_part" if index_context is not None else "full_target_single_part",
+                      original_part_index=index_context["part_index"] if index_context is not None else None,
+                      inherited_mid_occ=index_context["mid_occ"] if index_context is not None else None)
         raw = root / "raw.windows.paf"
-        run_command([executable, "-c", "--eqx", "-x", args.preset, "-t", str(args.threads),
+        run_command([executable, "-c", "--eqx", "-x", args.preset, *mapping_flags, "-t", str(args.threads),
                      "-o", str(raw), str(index), str(root / "windows.fa")], root, "map", args.timeout, args.memory_gib)
         candidate = root / "owned.pending.paf"
-        summary = recover(raw, candidate, root / "provenance.jsonl", windows, query, target)
+        allow_empty_part = index_context is not None and getattr(args,"allow_empty_index_part",False)
+        summary = recover(raw, candidate, root / "provenance.jsonl", windows, query, target,
+                          allow_empty_original_part=allow_empty_part)
         report["coverage"] = summary
         stitched = root / "stitched.pending.paf"
-        report["stitching"] = stitch_owned(candidate, stitched, root / "stitch-provenance.jsonl", windows, query, target)
+        report["stitching"] = stitch_owned(candidate, stitched, root / "stitch-provenance.jsonl", windows, query, target,
+                                          allow_empty_original_part=allow_empty_part)
         if args.require_full_query_coverage and any(row["covered_bases"] != row["length"] for row in summary["queries"].values()):
             raise ExperimentError("full-query-coverage acceptance failed; do not treat partial mappings as complete")
-        if not all(store.unchanged() for store in stores) or sha256(Path(executable)) != binary_hash:
-            raise ExperimentError("input or minimap2 binary changed during experiment")
+        if (not all(store.unchanged() for store in stores) or sha256(Path(executable)) != binary_hash
+                or sha256(index) != index_hash):
+            raise ExperimentError("input, index or minimap2 binary changed during experiment")
         final_candidate = root / "owned.experimental.paf"
         os.replace(candidate, final_candidate)
         final_stitched = root / "stitched.experimental.paf"

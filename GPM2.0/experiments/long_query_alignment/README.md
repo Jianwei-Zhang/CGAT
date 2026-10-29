@@ -242,6 +242,7 @@ python3 GPM2.0/experiments/long_query_alignment/guided_alignment.py \
 query 保留整条原比对，超长 query 才进入既有分窗/坐标恢复；混合输出仅作为实验候选，
 不写正式 `result.paf`，不启动下游。默认只预览，新增用例未执行。
 
-本阶段尚未接入 Server `run.sh`；客户多段参考索引、全局候选与 MAPQ 仍是阻断项。
+本阶段已补默认多段参考索引的原字节/顺序复用路径，但未执行验证；全局候选与 MAPQ
+仍是阻断项，尚未接入 Server `run.sh`。
 最终目标仍是用户沿用原命令，无需手工切序列或增加配置。当前能力与下一步见
 `BRANCH_LONG_CIGAR_RECOVERY.md`，不要把创建分支或生成候选视为已修复。
