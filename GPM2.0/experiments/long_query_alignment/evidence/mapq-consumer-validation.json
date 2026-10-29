@@ -1,0 +1,78 @@
+{
+  "scope": "App split-confidence source fix plus isolated score audit; no production Server fallback",
+  "app_fix_commit": "c8e3a4fabc951bf7e6c7c49f716e70f58154603b",
+  "app_source_sha256": {
+    "GPM2.0/app/backend/src/contig_split/mod.rs": "cb9c2bce501585eb9c38b4f6356d9e329b54615344e61938f33f1074cbce8e9b",
+    "GPM2.0/app/backend/src/contig_split/tests.rs": "5dc63ffdc9fc05e32cff1739c17c98cd9be8925bb95464e2b6f6101867bd8a28"
+  },
+  "windows_toolchain": {
+    "cargo": "1.92.0 (344c4567c 2025-10-21)",
+    "rustc": "1.92.0 (ded5c06cf 2025-12-08)",
+    "rustfmt": "1.8.0-stable (ded5c06cf2 2025-12-08)",
+    "clippy": "0.1.92 (ded5c06cf2 2025-12-08)"
+  },
+  "before_targeted_tests": {
+    "passed": 24,
+    "failed": 4,
+    "exit_code": 101,
+    "failure_expected": true
+  },
+  "after_windows_backend_tests": {
+    "passed": 312,
+    "failed": 0,
+    "ignored": 2,
+    "exit_code": 0,
+    "ignored_names": [
+      "grt_package::tests::validation::benchmark_q4_validation",
+      "importer::alignment::bulk_load_performance_tests::benchmark_pairwise_query_indexes"
+    ]
+  },
+  "windows_fmt_and_clippy": {
+    "passed": true,
+    "clippy_flags": [
+      "--all-targets",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  "experimental_tests": {
+    "cases": 53,
+    "minimap_versions": [
+      "2.26-r1175",
+      "2.31-r1302"
+    ],
+    "passed": true
+  },
+  "logs": {
+    "before": {
+      "local_path": "/tmp/cgat-mapq255-before-20261029.log",
+      "sha256": "8559adb1e97ab8d57ce1bb7f8c69ad5016c70bac6757a30da23e7b683d028123"
+    },
+    "after": {
+      "local_path": "/tmp/cgat-mapq255-after-20261029.log",
+      "sha256": "c9b794eff1b2b0295e82e025c7a9060819c148fef63fce90fc50a61984094fde"
+    },
+    "fmt_clippy": {
+      "local_path": "/tmp/cgat-mapq255-clippy-20261029.log",
+      "sha256": "655886d7d20333806fec450ad73d06252a1d5f0f6f8585c24ee0ac7020a7b733"
+    },
+    "experimental_mm226": {
+      "local_path": "/tmp/cgat-post-dp-finaltests-mm226.log",
+      "sha256": "f1735be9a38cb9fbd59a94209e1bc0791a0cd8259caa5408c6bc8e4ae810d6a4"
+    },
+    "experimental_mm231": {
+      "local_path": "/tmp/cgat-post-dp-finaltests-mm231.log",
+      "sha256": "47fafeebed974b9f636a198d9b0e661b5f81be00c4b892a16aa9b6adbd7fb907"
+    }
+  },
+  "raw_mapq_preserved": true,
+  "unknown_mapq_high_quality": false,
+  "native_ui_exercised": false,
+  "installers_published": false,
+  "server_runtime_changed": false,
+  "minimap2_changed": false,
+  "customer_validated": false,
+  "general_long_query_recovery_ready": false
+}

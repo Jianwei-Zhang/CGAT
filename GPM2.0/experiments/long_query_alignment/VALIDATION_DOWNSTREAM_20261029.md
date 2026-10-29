@@ -4,6 +4,10 @@ A subsequent provisional-guidance implementation is measured in
 `VALIDATION_GUIDED_20261029.md`. The failing unguided results below remain intact;
 they are not retroactively counted as successful guided runs.
 
+The MAPQ consumer inspection below describes the original audit snapshot. The
+subsequent App-only sentinel fix and score-provenance work are documented in
+`VALIDATION_POST_DP_20261029.md`; this does not enable guided Server integration.
+
 ## Decision
 
 **Do not integrate the current windowed PAF as a transparent Server fallback.**

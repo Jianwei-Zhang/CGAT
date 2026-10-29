@@ -168,3 +168,16 @@ python3 GPM2.0/experiments/long_query_alignment/guided_alignment.py \
 `reproduce_large.py` 命令中增加 `--guide-chains` 才启用新实验路径；默认仍是
 未约束的原对照。成功结果为顶层 `guided.experimental.paf`，预比对
 `whole-query.chains.paf` 以及子目录中的原始分窗结果均不得当成已验收结果导入。
+
+
+## 原始链得分来源与未知 MAPQ 消费修复
+
+后续记录见 `VALIDATION_POST_DP_20261029.md`：
+
+- App 拆分预览已单独修复 MAPQ=255 被误计为高质量的问题，保留原始未知值和
+  普通覆盖证据。这不等于接受实验 PAF，也没有发布新安装包或改动 Server。
+- 真实反例证明仅使用 AS 会保留错误候选。受限诊断已通过原版 minimap2 的
+  seed/chain 记录，为分窗恢复的片段复算出正确链得分；完整候选选择与 MAPQ
+  尚未恢复，原 guided 模式的拒绝条件不变。
+- `audit_post_dp.py` 只生成 200 kb 合成输入，诊断 `-P`/seed trace 不作为正式
+  参数建议或输出。不要将当前内存型 trace 解析器直接用于小麦规模数据。
