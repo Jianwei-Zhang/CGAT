@@ -1065,3 +1065,113 @@ fn unsplit_final_path_export_dna_is_unchanged_for_partial_reverse_adoptions() ->
     assert_eq!(export("redo-unsplit.fa")?, before);
     Ok(())
 }
+
+#[test]
+fn unknown_mapq_preserves_hits_but_never_supplies_high_quality_or_recommendations() -> Result<()> {
+    let (_dir, db) = seed()?;
+    let conn = Connection::open(&db)?;
+    conn.execute("UPDATE ref_alignment_hit SET mapq=255", [])?;
+    drop(conn);
+    let before = std::fs::read(&db)?;
+    let p = preview(&db, vec![60000])?;
+    assert_eq!(std::fs::read(&db)?, before);
+    assert!(!p.hits.is_empty());
+    assert!(p.hits.iter().all(|hit| hit.mapq == 255));
+    assert!(p.recommendations.is_empty());
+    for part in &p.parts {
+        assert!(!part.candidates.is_empty());
+        assert!(part.candidates.iter().all(|candidate| {
+            candidate.coverage_bp > 0
+                && candidate.high_quality_coverage_percent == 0.0
+                && candidate.min_mapq == 255
+        }));
+    }
+    let wire = serde_json::to_value(&p)?;
+    assert_eq!(wire["hits"][0]["mapq"], 255);
+    assert_eq!(wire["parts"][0]["candidates"][0]["minMapq"], 255);
+    Ok(())
+}
+
+#[test]
+fn mapq_threshold_accepts_known_values_not_the_missing_sentinel_or_invalid_values() -> Result<()> {
+    let (_dir, db) = seed()?;
+    let conn = Connection::open(&db)?;
+    for (mapq, high_quality) in [
+        (-1, false),
+        (0, false),
+        (19, false),
+        (20, true),
+        (60, true),
+        (254, true),
+        (255, false),
+        (256, false),
+    ] {
+        conn.execute("UPDATE ref_alignment_hit SET mapq=?1", [mapq])?;
+        let p = preview(&db, vec![60000])?;
+        assert_eq!(!p.recommendations.is_empty(), high_quality, "MAPQ {mapq}");
+        assert_eq!(
+            p.parts[1].candidates[0].high_quality_coverage_percent > 0.0,
+            high_quality,
+            "MAPQ {mapq}"
+        );
+        assert!(p.hits.iter().all(|hit| hit.mapq == mapq));
+    }
+    Ok(())
+}
+
+#[test]
+fn missing_mapq_cannot_form_one_side_of_a_recommended_boundary() -> Result<()> {
+    let (_dir, db) = seed()?;
+    let conn = Connection::open(&db)?;
+    conn.execute(
+        "UPDATE ref_alignment_hit SET mapq=255 WHERE reference_chr_id=1",
+        [],
+    )?;
+    let p = preview(&db, vec![60000])?;
+    assert!(p.recommendations.is_empty());
+    assert!(p.parts[0].candidates.iter().any(|c| c.chr_name == "ChrA"
+        && c.coverage_percent == 100.0
+        && c.high_quality_coverage_percent == 0.0));
+    assert!(
+        p.parts[1]
+            .candidates
+            .iter()
+            .any(|c| c.chr_name == "ChrB" && c.high_quality_coverage_percent == 100.0)
+    );
+    Ok(())
+}
+
+#[test]
+fn missing_mapq_does_not_inflate_mixed_quality_coverage_or_outrank_known_support() -> Result<()> {
+    let hit = |id, chr: &str, start, end, mapq| SplitHit {
+        id,
+        chr_name: chr.into(),
+        strand: "+".into(),
+        query_start: start,
+        query_end: end,
+        ref_start: start,
+        ref_end: end,
+        match_length: end - start + 1,
+        block_length: end - start + 1,
+        mapq,
+        cigar: Some(format!("{}M", end - start + 1)),
+    };
+    let candidates = rank_candidates(
+        &[hit(1, "unknown", 1, 100, 255), hit(2, "known", 1, 80, 20)],
+        1,
+        100,
+    )?;
+    assert_eq!(candidates[0].chr_name, "known");
+    assert_eq!(candidates[0].high_quality_coverage_percent, 80.0);
+    assert_eq!(candidates[1].coverage_percent, 100.0);
+    assert_eq!(candidates[1].high_quality_coverage_percent, 0.0);
+    let mixed = rank_candidates(
+        &[hit(1, "ChrA", 1, 60, 255), hit(2, "ChrA", 41, 100, 60)],
+        1,
+        100,
+    )?;
+    assert_eq!(mixed[0].coverage_bp, 100);
+    assert_eq!(mixed[0].high_quality_coverage_percent, 60.0);
+    assert_eq!(mixed[0].min_mapq, 60);
+    Ok(())
+}

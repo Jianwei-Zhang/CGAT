@@ -81,6 +81,7 @@ pub struct SplitCandidate {
     pub high_quality_coverage_percent: f64,
     /// Weighted whole-hit identity, not a claim of per-base identity for the clipped interval.
     pub identity_percent: f64,
+    /// Minimum raw PAF value; 255 remains the missing-value sentinel, not confidence.
     pub min_mapq: i64,
     pub hit_count: usize,
     pub orient: String,
@@ -263,6 +264,12 @@ fn union_coverage(mut intervals: Vec<(i64, i64)>) -> i64 {
     total
 }
 
+// PAF reserves 255 for unavailable mapping quality. Keep the raw value in
+// storage/preview, but never count it (or invalid values) as known high quality.
+fn has_high_quality_mapq(mapq: i64) -> bool {
+    (20..=254).contains(&mapq)
+}
+
 pub(crate) fn rank_candidates(
     hits: &[SplitHit],
     start: i64,
@@ -299,7 +306,7 @@ pub(crate) fn rank_candidates(
         let coverage_bp = union_coverage(rows.iter().map(|r| (r.1, r.2)).collect());
         let hq = union_coverage(
             rows.iter()
-                .filter(|r| r.0.mapq >= 20)
+                .filter(|r| has_high_quality_mapq(r.0.mapq))
                 .map(|r| (r.1, r.2))
                 .collect(),
         );
@@ -375,7 +382,10 @@ pub(crate) fn rank_candidates(
 fn recommend(source: &SplitSource, hits: &[SplitHit]) -> Result<Vec<SplitRecommendation>> {
     let strong: Vec<_> = hits
         .iter()
-        .filter(|h| h.mapq >= 20 && h.query_end - h.query_start + 1 >= MIN_RECOMMENDED_FRAGMENT_BP)
+        .filter(|h| {
+            has_high_quality_mapq(h.mapq)
+                && h.query_end - h.query_start + 1 >= MIN_RECOMMENDED_FRAGMENT_BP
+        })
         .collect();
     let mut recommendations = Vec::new();
     let mut seen = BTreeSet::new();
