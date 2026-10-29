@@ -1,0 +1,666 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-29",
+  "tool": {
+    "path": "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+    "sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d",
+    "version": "2.31-r1302"
+  },
+  "production_ready": false,
+  "full_grt_tested": false,
+  "execution_reports": [
+    "/tmp/cgat-windowed-small-stitched-20261029/comparison.json",
+    "/tmp/cgat-windowed-small-reverse-indels-20261029/comparison.json"
+  ],
+  "cases": [
+    {
+      "case": "identity",
+      "target_sha256": "3019b022027222219df24be6e80e6c20489557c99f171a32a3a4e97c4df4d5be",
+      "query_sha256": "0abda898bd90336e0b2124c6c317a8edcea039ea57d2b351f0ec4f2751d8ba3a",
+      "query_length": 2000000,
+      "baseline_rows": 1,
+      "windowed_rows": 4,
+      "covered_query_bases": 2000000,
+      "path_relation_equal": true,
+      "stitched_relation_equal": true,
+      "stitched_rows": 1,
+      "baseline_signature_sha256": "2c2fcbc11c9f33df87aa796d19c3be06dcabac4f265c13099c863ae5d353a59b",
+      "windowed_signature_sha256": "2c2fcbc11c9f33df87aa796d19c3be06dcabac4f265c13099c863ae5d353a59b",
+      "ranking_equivalence": "not_established",
+      "assignment_equal": true,
+      "stitched_assignment_equal": true,
+      "baseline_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "windowed_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "stitched_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ]
+    },
+    {
+      "case": "reverse",
+      "target_sha256": "3019b022027222219df24be6e80e6c20489557c99f171a32a3a4e97c4df4d5be",
+      "query_sha256": "e910156a6de6b3ae147cb03c05f4d87774e112097cb11e03600786f41334f3b0",
+      "query_length": 2000000,
+      "baseline_rows": 1,
+      "windowed_rows": 4,
+      "covered_query_bases": 2000000,
+      "path_relation_equal": true,
+      "stitched_relation_equal": true,
+      "stitched_rows": 1,
+      "baseline_signature_sha256": "485706afcc0f71252d6ea3b7b884be531ecb9a3c06ff868702969c5f225037d4",
+      "windowed_signature_sha256": "485706afcc0f71252d6ea3b7b884be531ecb9a3c06ff868702969c5f225037d4",
+      "ranking_equivalence": "not_established",
+      "assignment_equal": true,
+      "stitched_assignment_equal": true,
+      "baseline_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "-",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "windowed_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "-",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "stitched_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "-",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ]
+    },
+    {
+      "case": "insertion_across_core",
+      "target_sha256": "3019b022027222219df24be6e80e6c20489557c99f171a32a3a4e97c4df4d5be",
+      "query_sha256": "7bbc0af99a38e07a59acb11b046c68e502d47e72d259014ea5ea3966aef2ba4c",
+      "query_length": 2002048,
+      "baseline_rows": 1,
+      "windowed_rows": 5,
+      "covered_query_bases": 2002048,
+      "path_relation_equal": true,
+      "stitched_relation_equal": true,
+      "stitched_rows": 1,
+      "baseline_signature_sha256": "282b238541b07c7e32837ad4b24d33c3ead68594b58d285d76c976117dcf6f2a",
+      "windowed_signature_sha256": "282b238541b07c7e32837ad4b24d33c3ead68594b58d285d76c976117dcf6f2a",
+      "ranking_equivalence": "not_established",
+      "assignment_equal": false,
+      "stitched_assignment_equal": true,
+      "baseline_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2002048",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2002048",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "windowed_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2002048",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2002048",
+          "support_percent": "100.000",
+          "anchor_start": "-2047"
+        }
+      ],
+      "stitched_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2002048",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2002048",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ]
+    },
+    {
+      "case": "deletion_at_core",
+      "target_sha256": "3019b022027222219df24be6e80e6c20489557c99f171a32a3a4e97c4df4d5be",
+      "query_sha256": "f794b8c1756429b77ac1e6e18be0d0c122a493ec4385d67d87e338a2288dd520",
+      "query_length": 1997000,
+      "baseline_rows": 1,
+      "windowed_rows": 4,
+      "covered_query_bases": 1997000,
+      "path_relation_equal": true,
+      "stitched_relation_equal": true,
+      "stitched_rows": 1,
+      "baseline_signature_sha256": "36b769d6e90c4f601a4bb206edbc2fe023be73e7f6a30ba6670eceac2df0a3ba",
+      "windowed_signature_sha256": "36b769d6e90c4f601a4bb206edbc2fe023be73e7f6a30ba6670eceac2df0a3ba",
+      "ranking_equivalence": "not_established",
+      "assignment_equal": false,
+      "stitched_assignment_equal": true,
+      "baseline_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "1997000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "1997000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "windowed_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "1997000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "1997000",
+          "support_percent": "100.000",
+          "anchor_start": "3001"
+        }
+      ],
+      "stitched_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "1997000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "1997000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ]
+    },
+    {
+      "case": "mismatch_at_core",
+      "target_sha256": "3019b022027222219df24be6e80e6c20489557c99f171a32a3a4e97c4df4d5be",
+      "query_sha256": "1b98d779f6276f582369940ec7c22d6f615f5a3c5b09e726bec480a0f68fa48e",
+      "query_length": 2000000,
+      "baseline_rows": 1,
+      "windowed_rows": 4,
+      "covered_query_bases": 2000000,
+      "path_relation_equal": true,
+      "stitched_relation_equal": true,
+      "stitched_rows": 1,
+      "baseline_signature_sha256": "e4af6ac7b4073fc6bbb7dd5ca7abecf7e32d997c7330ebbf937a1aff60113bb7",
+      "windowed_signature_sha256": "e4af6ac7b4073fc6bbb7dd5ca7abecf7e32d997c7330ebbf937a1aff60113bb7",
+      "ranking_equivalence": "not_established",
+      "assignment_equal": true,
+      "stitched_assignment_equal": true,
+      "baseline_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "windowed_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "stitched_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ]
+    },
+    {
+      "case": "ambiguous_across_core",
+      "target_sha256": "996a15f08c6efb5528bbd8e48123ccb82fe8ceb98565870281b42609de76359d",
+      "query_sha256": "cb9de232cc5e3210ee0ca8d010e11546dfaf359b11e0e306892e78e5fcf301f6",
+      "query_length": 2000000,
+      "baseline_rows": 2,
+      "windowed_rows": 4,
+      "covered_query_bases": 1999600,
+      "path_relation_equal": true,
+      "stitched_relation_equal": true,
+      "stitched_rows": 2,
+      "baseline_signature_sha256": "76ef9587b10e48112198c4420e4db5dc0c11f6dda7b86897ffd8c6dc2d4093f7",
+      "windowed_signature_sha256": "76ef9587b10e48112198c4420e4db5dc0c11f6dda7b86897ffd8c6dc2d4093f7",
+      "ranking_equivalence": "not_established",
+      "assignment_equal": true,
+      "stitched_assignment_equal": true,
+      "baseline_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "1999600",
+          "support_percent": "99.980",
+          "anchor_start": "1"
+        }
+      ],
+      "windowed_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "1999600",
+          "support_percent": "99.980",
+          "anchor_start": "1"
+        }
+      ],
+      "stitched_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "1999600",
+          "support_percent": "99.980",
+          "anchor_start": "1"
+        }
+      ]
+    },
+    {
+      "case": "repeat_deletion_at_core",
+      "target_sha256": "067f868455aa91ffd265772ec7963f4f3d6692ce250681d2ee57abd6f110aa41",
+      "query_sha256": "4c766956959acb2e988eb72ed79a80cf8be12bcfec78e4f73eb59dd721b19966",
+      "query_length": 1999970,
+      "baseline_rows": 1,
+      "windowed_rows": 4,
+      "covered_query_bases": 1999970,
+      "path_relation_equal": true,
+      "stitched_relation_equal": true,
+      "stitched_rows": 1,
+      "baseline_signature_sha256": "fa5f171b2694ab011e6cd19584c63cf0992ad062c0cd5824c3f279b896c5c6ae",
+      "windowed_signature_sha256": "fa5f171b2694ab011e6cd19584c63cf0992ad062c0cd5824c3f279b896c5c6ae",
+      "ranking_equivalence": "not_established",
+      "assignment_equal": false,
+      "stitched_assignment_equal": true,
+      "baseline_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "1999970",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "1999970",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "windowed_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "1999970",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "1999970",
+          "support_percent": "100.000",
+          "anchor_start": "31"
+        }
+      ],
+      "stitched_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "1999970",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "1999970",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ]
+    },
+    {
+      "case": "inversion_at_core",
+      "target_sha256": "3019b022027222219df24be6e80e6c20489557c99f171a32a3a4e97c4df4d5be",
+      "query_sha256": "29aaebf7161cb5eae8c0aa2d8cd09980c7631ebf5e3e77073b35639c7b413dcb",
+      "query_length": 2000000,
+      "baseline_rows": 3,
+      "windowed_rows": 5,
+      "covered_query_bases": 2000000,
+      "path_relation_equal": true,
+      "stitched_relation_equal": true,
+      "stitched_rows": 3,
+      "baseline_signature_sha256": "902827eea673de6dad5103791e472c5d8269157b8c17bfaaccade8475f385737",
+      "windowed_signature_sha256": "902827eea673de6dad5103791e472c5d8269157b8c17bfaaccade8475f385737",
+      "ranking_equivalence": "not_established",
+      "assignment_equal": true,
+      "stitched_assignment_equal": true,
+      "baseline_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "windowed_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "stitched_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ]
+    },
+    {
+      "case": "duplicated_target",
+      "target_sha256": "672beaaef72828d64ff1142850009ddb13df6b354a6d76bc51ed6a95e481aace",
+      "query_sha256": "0abda898bd90336e0b2124c6c317a8edcea039ea57d2b351f0ec4f2751d8ba3a",
+      "query_length": 2000000,
+      "baseline_rows": 2,
+      "windowed_rows": 8,
+      "covered_query_bases": 2000000,
+      "path_relation_equal": true,
+      "stitched_relation_equal": true,
+      "stitched_rows": 2,
+      "baseline_signature_sha256": "ada5e7fb3ec3a6a9916111072b007b87b913e3ab0c454c664dc8a970416f6961",
+      "windowed_signature_sha256": "ada5e7fb3ec3a6a9916111072b007b87b913e3ab0c454c664dc8a970416f6961",
+      "ranking_equivalence": "not_established",
+      "assignment_equal": true,
+      "stitched_assignment_equal": true,
+      "baseline_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        },
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr2",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "windowed_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        },
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr2",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "stitched_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        },
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2000000",
+          "assigned_chr_name": "chr2",
+          "source_orientation": "+",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2000000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ]
+    },
+    {
+      "case": "reverse_insertion_across_core",
+      "target_sha256": "3019b022027222219df24be6e80e6c20489557c99f171a32a3a4e97c4df4d5be",
+      "query_sha256": "ea4b9d086d5c1a1cb9f4696078bc91cabb0ed629e3278b02f7813bea2d967bba",
+      "query_length": 2002048,
+      "baseline_rows": 1,
+      "windowed_rows": 5,
+      "covered_query_bases": 2002048,
+      "path_relation_equal": true,
+      "stitched_relation_equal": true,
+      "stitched_rows": 1,
+      "baseline_signature_sha256": "056d3cc373492eb5b27109a866cf816ff462b0c84850517e9eec2622da728847",
+      "windowed_signature_sha256": "056d3cc373492eb5b27109a866cf816ff462b0c84850517e9eec2622da728847",
+      "ranking_equivalence": "not_established",
+      "assignment_equal": false,
+      "stitched_assignment_equal": true,
+      "baseline_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2002048",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "-",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2002048",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "windowed_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2002048",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "-",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2002048",
+          "support_percent": "100.000",
+          "anchor_start": "-2047"
+        }
+      ],
+      "stitched_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "2002048",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "-",
+          "orientation_source": "ref_alignment",
+          "support_bp": "2002048",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ]
+    },
+    {
+      "case": "reverse_deletion_near_core",
+      "target_sha256": "3019b022027222219df24be6e80e6c20489557c99f171a32a3a4e97c4df4d5be",
+      "query_sha256": "30dfb25c90319951348d7a424199b90e4bb7acfba40e32cfda8801d6d08dcb96",
+      "query_length": 1997000,
+      "baseline_rows": 1,
+      "windowed_rows": 4,
+      "covered_query_bases": 1997000,
+      "path_relation_equal": true,
+      "stitched_relation_equal": true,
+      "stitched_rows": 1,
+      "baseline_signature_sha256": "df3a6e70fdbb8484c294f35d8449258597f712b444daf4f7b34e6d59706de5a1",
+      "windowed_signature_sha256": "df3a6e70fdbb8484c294f35d8449258597f712b444daf4f7b34e6d59706de5a1",
+      "ranking_equivalence": "not_established",
+      "assignment_equal": false,
+      "stitched_assignment_equal": true,
+      "baseline_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "1997000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "-",
+          "orientation_source": "ref_alignment",
+          "support_bp": "1997000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ],
+      "windowed_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "1997000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "-",
+          "orientation_source": "ref_alignment",
+          "support_bp": "1997000",
+          "support_percent": "100.000",
+          "anchor_start": "3001"
+        }
+      ],
+      "stitched_assignment": [
+        {
+          "dataset_name": "assembly",
+          "seq_name": "query",
+          "seq_length_bp": "1997000",
+          "assigned_chr_name": "chr1",
+          "source_orientation": "-",
+          "orientation_source": "ref_alignment",
+          "support_bp": "1997000",
+          "support_percent": "100.000",
+          "anchor_start": "1"
+        }
+      ]
+    }
+  ]
+}

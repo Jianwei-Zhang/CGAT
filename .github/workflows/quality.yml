@@ -108,3 +108,6 @@ jobs:
       - name: Run server quality gate
         working-directory: GPM2.0
         run: bash scripts/quality-gate-server.sh
+
+      - name: Check experimental long-query coordinate contracts
+        run: python3 -m unittest discover -s GPM2.0/experiments/long_query_alignment -p 'test_*.py'

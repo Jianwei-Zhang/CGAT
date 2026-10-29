@@ -1,0 +1,267 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-29",
+  "command": "python3 GPM2.0/experiments/long_query_alignment/reproduce_large.py --minimap2 /home/xbzhang/micromamba/envs/cgat-server/bin/minimap2 --out /tmp/cgat-windowed-repro-final-20261029",
+  "production_ready": false,
+  "customer_validated": false,
+  "baseline": {
+    "command": [
+      "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+      "-c",
+      "-x",
+      "asm10",
+      "-t",
+      "2",
+      "-o",
+      "/tmp/cgat-windowed-repro-final-20261029/baseline/result.paf",
+      "/tmp/cgat-windowed-repro-final-20261029/reference.fa",
+      "/tmp/cgat-windowed-repro-final-20261029/reference.fa"
+    ],
+    "returncode": -6,
+    "seconds": 68.79
+  },
+  "baseline_stderr": "[M::mm_idx_gen::3.727*1.05] collected minimizers\n[M::mm_idx_gen::4.431*1.21] sorted minimizers\n[M::main::4.431*1.21] loaded/built the index for 1 target sequence(s)\n[M::mm_mapopt_update::4.738*1.20] mid_occ = 50\n[M::mm_idx_stat] kmer size: 19; skip: 19; is_hpc: 0; #seq: 1\n[M::mm_idx_stat::4.959*1.19] distinct minimizers: 26991944 (99.97% are singletons); average occurrences: 1.000; average spacing: 10.000; total length: 270000000\nminimap2: align.c:301: mm_update_extra: Assertion `qoff == r->qe - r->qs && toff == r->re - r->rs' failed.\n",
+  "same_assertion_reproduced": true,
+  "cases": [
+    {
+      "name": "plus",
+      "experiment": {
+        "schema_version": 1,
+        "status": "validated_experimental_candidate",
+        "experimental_only": true,
+        "production_ready": false,
+        "customer_validated": false,
+        "not_supported": [
+          "self-alignment",
+          "whole-contig ranking equivalence",
+          "automatic Server integration"
+        ],
+        "parameters": {
+          "target": "/tmp/cgat-windowed-repro-final-20261029/reference.fa",
+          "query": "/tmp/cgat-windowed-repro-final-20261029/reference.fa",
+          "out": "/tmp/cgat-windowed-repro-final-20261029/plus",
+          "minimap2": "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+          "preset": "asm10",
+          "core_bases": 50000000,
+          "context_bases": 100000,
+          "threads": 2,
+          "timeout": 600,
+          "memory_gib": 10,
+          "require_full_query_coverage": true
+        },
+        "tool": {
+          "path": "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+          "version": "2.31-r1302",
+          "sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d"
+        },
+        "target": {
+          "source": "/tmp/cgat-windowed-repro-final-20261029/reference.fa",
+          "size": 273375016,
+          "mtime_ns": 1793267401503535238,
+          "ctime_ns": 1793267401503535238,
+          "inode": 351960,
+          "sha256": "0fbc225dfa32c1e4e99ed4cfb611f5023768423fbc5c4f6ec789342aff1e6fc4"
+        },
+        "query": {
+          "source": "/tmp/cgat-windowed-repro-final-20261029/reference.fa",
+          "size": 273375016,
+          "mtime_ns": 1793267401503535238,
+          "ctime_ns": 1793267401503535238,
+          "inode": 351960,
+          "sha256": "0fbc225dfa32c1e4e99ed4cfb611f5023768423fbc5c4f6ec789342aff1e6fc4"
+        },
+        "coverage": {
+          "raw_rows": 6,
+          "owned_rows": 6,
+          "context_only_rows": 0,
+          "exact_duplicate_rows": 0,
+          "windows": 6,
+          "windows_without_raw_hits": [],
+          "queries": {
+            "synthetic_270M": {
+              "length": 270000000,
+              "covered_bases": 270000000,
+              "intervals": [
+                [
+                  0,
+                  270000000
+                ]
+              ]
+            }
+          },
+          "targets": {
+            "synthetic_270M": {
+              "length": 270000000,
+              "covered_bases": 270000000,
+              "intervals": [
+                [
+                  0,
+                  270000000
+                ]
+              ]
+            }
+          }
+        },
+        "stitching": {
+          "input_owned_rows": 6,
+          "stitched_rows": 1,
+          "exact_joins": 5,
+          "fork_endpoints_not_joined": 0,
+          "ranking_reconstructed": false
+        },
+        "output_sha256": "00be67956e19b3ef05bb43b93b613591be60225e0ab32dca9b9eb81f6b563883",
+        "stitched_sha256": "19a1d2ad446fd61412c352847607dbd569b9f185aa04ac3e2702d5c594f94f56",
+        "original_inputs_unchanged": true,
+        "caveat": "Coordinate/CIGAR checks passed, NOT whole-contig alignment or downstream biological equivalence. MAPQ is unknown (255), score/tp tags are not inherited; distinct placements are retained."
+      },
+      "map_execution": {
+        "command": [
+          "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+          "-c",
+          "--eqx",
+          "-x",
+          "asm10",
+          "-t",
+          "2",
+          "-o",
+          "/tmp/cgat-windowed-repro-final-20261029/plus/raw.windows.paf",
+          "/tmp/cgat-windowed-repro-final-20261029/plus/target.mmi",
+          "/tmp/cgat-windowed-repro-final-20261029/plus/windows.fa"
+        ],
+        "returncode": 0,
+        "seconds": 28.639
+      },
+      "map_stderr": "[M::main::1.129*1.02] loaded/built the index for 1 target sequence(s)\n[M::mm_mapopt_update::1.418*1.01] mid_occ = 50\n[M::mm_idx_stat] kmer size: 19; skip: 19; is_hpc: 0; #seq: 1\n[M::mm_idx_stat::1.668*1.01] distinct minimizers: 26991944 (99.97% are singletons); average occurrences: 1.000; average spacing: 10.000; total length: 270000000\n[M::worker_pipeline::28.594*1.83] mapped 6 sequences\n[M::main] Version: 2.31-r1302\n[M::main] CMD: /home/xbzhang/micromamba/envs/cgat-server/bin/minimap2 -c --eqx -x asm10 -t 2 -o /tmp/cgat-windowed-repro-final-20261029/plus/raw.windows.paf /tmp/cgat-windowed-repro-final-20261029/plus/target.mmi /tmp/cgat-windowed-repro-final-20261029/plus/windows.fa\n[M::main] Real time: 28.606 sec; CPU: 52.335 sec; Peak RSS: 2.411 GB\n",
+      "owned_paf": "synthetic_270M\t270000000\t0\t50000000\t+\tsynthetic_270M\t270000000\t0\t50000000\t50000000\t50000000\t255\tcg:Z:50000000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000000\tzp:Z:experimental-owned\nsynthetic_270M\t270000000\t50000000\t100000000\t+\tsynthetic_270M\t270000000\t50000000\t100000000\t50000000\t50000000\t255\tcg:Z:50000000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000001\tzp:Z:experimental-owned\nsynthetic_270M\t270000000\t100000000\t150000000\t+\tsynthetic_270M\t270000000\t100000000\t150000000\t50000000\t50000000\t255\tcg:Z:50000000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000002\tzp:Z:experimental-owned\nsynthetic_270M\t270000000\t150000000\t200000000\t+\tsynthetic_270M\t270000000\t150000000\t200000000\t50000000\t50000000\t255\tcg:Z:50000000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000003\tzp:Z:experimental-owned\nsynthetic_270M\t270000000\t200000000\t250000000\t+\tsynthetic_270M\t270000000\t200000000\t250000000\t50000000\t50000000\t255\tcg:Z:50000000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000004\tzp:Z:experimental-owned\nsynthetic_270M\t270000000\t250000000\t270000000\t+\tsynthetic_270M\t270000000\t250000000\t270000000\t20000000\t20000000\t255\tcg:Z:20000000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000005\tzp:Z:experimental-owned\n",
+      "stitched_paf": "synthetic_270M\t270000000\t0\t270000000\t+\tsynthetic_270M\t270000000\t0\t270000000\t270000000\t270000000\t255\tcg:Z:268435455=1564545=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000000\tzp:Z:experimental-stitched\tzc:i:6\n",
+      "server_paf_validator": {
+        "owned_rows": 6,
+        "stitched_rows": 1,
+        "require_cigar": true
+      }
+    },
+    {
+      "name": "reverse",
+      "experiment": {
+        "schema_version": 1,
+        "status": "validated_experimental_candidate",
+        "experimental_only": true,
+        "production_ready": false,
+        "customer_validated": false,
+        "not_supported": [
+          "self-alignment",
+          "whole-contig ranking equivalence",
+          "automatic Server integration"
+        ],
+        "parameters": {
+          "target": "/tmp/cgat-windowed-repro-final-20261029/reference.fa",
+          "query": "/tmp/cgat-windowed-repro-final-20261029/reverse.fa",
+          "out": "/tmp/cgat-windowed-repro-final-20261029/reverse",
+          "minimap2": "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+          "preset": "asm10",
+          "core_bases": 50000000,
+          "context_bases": 100000,
+          "threads": 2,
+          "timeout": 600,
+          "memory_gib": 10,
+          "require_full_query_coverage": true
+        },
+        "tool": {
+          "path": "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+          "version": "2.31-r1302",
+          "sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d"
+        },
+        "target": {
+          "source": "/tmp/cgat-windowed-repro-final-20261029/reference.fa",
+          "size": 273375016,
+          "mtime_ns": 1793267401503535238,
+          "ctime_ns": 1793267401503535238,
+          "inode": 351960,
+          "sha256": "0fbc225dfa32c1e4e99ed4cfb611f5023768423fbc5c4f6ec789342aff1e6fc4"
+        },
+        "query": {
+          "source": "/tmp/cgat-windowed-repro-final-20261029/reverse.fa",
+          "size": 270000272,
+          "mtime_ns": 1793267520301689962,
+          "ctime_ns": 1793267520301689962,
+          "inode": 352891,
+          "sha256": "fd4ee254159d37657d3574135350050322e566351ba5104e8edce5cae61f6203"
+        },
+        "coverage": {
+          "raw_rows": 6,
+          "owned_rows": 6,
+          "context_only_rows": 0,
+          "exact_duplicate_rows": 0,
+          "windows": 6,
+          "windows_without_raw_hits": [],
+          "queries": {
+            "reverse_270M": {
+              "length": 270000000,
+              "covered_bases": 270000000,
+              "intervals": [
+                [
+                  0,
+                  270000000
+                ]
+              ]
+            }
+          },
+          "targets": {
+            "synthetic_270M": {
+              "length": 270000000,
+              "covered_bases": 270000000,
+              "intervals": [
+                [
+                  0,
+                  270000000
+                ]
+              ]
+            }
+          }
+        },
+        "stitching": {
+          "input_owned_rows": 6,
+          "stitched_rows": 1,
+          "exact_joins": 5,
+          "fork_endpoints_not_joined": 0,
+          "ranking_reconstructed": false
+        },
+        "output_sha256": "6337f2143708833ff3655c7b3190ad56cb4f1ebfbdfd6b3b8b60b9c300e68b69",
+        "stitched_sha256": "021319840d3987cb59aa005e2778d8d36fb547e0445da0568bb5d7772ae4b934",
+        "original_inputs_unchanged": true,
+        "caveat": "Coordinate/CIGAR checks passed, NOT whole-contig alignment or downstream biological equivalence. MAPQ is unknown (255), score/tp tags are not inherited; distinct placements are retained."
+      },
+      "map_execution": {
+        "command": [
+          "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+          "-c",
+          "--eqx",
+          "-x",
+          "asm10",
+          "-t",
+          "2",
+          "-o",
+          "/tmp/cgat-windowed-repro-final-20261029/reverse/raw.windows.paf",
+          "/tmp/cgat-windowed-repro-final-20261029/reverse/target.mmi",
+          "/tmp/cgat-windowed-repro-final-20261029/reverse/windows.fa"
+        ],
+        "returncode": 0,
+        "seconds": 29.896
+      },
+      "map_stderr": "[M::main::1.274*0.99] loaded/built the index for 1 target sequence(s)\n[M::mm_mapopt_update::1.572*1.00] mid_occ = 50\n[M::mm_idx_stat] kmer size: 19; skip: 19; is_hpc: 0; #seq: 1\n[M::mm_idx_stat::1.786*1.01] distinct minimizers: 26991944 (99.97% are singletons); average occurrences: 1.000; average spacing: 10.000; total length: 270000000\n[M::worker_pipeline::31.222*1.75] mapped 6 sequences\n[M::main] Version: 2.31-r1302\n[M::main] CMD: /home/xbzhang/micromamba/envs/cgat-server/bin/minimap2 -c --eqx -x asm10 -t 2 -o /tmp/cgat-windowed-repro-final-20261029/reverse/raw.windows.paf /tmp/cgat-windowed-repro-final-20261029/reverse/target.mmi /tmp/cgat-windowed-repro-final-20261029/reverse/windows.fa\n[M::main] Real time: 31.235 sec; CPU: 54.733 sec; Peak RSS: 2.411 GB\n",
+      "owned_paf": "reverse_270M\t270000000\t0\t50000000\t-\tsynthetic_270M\t270000000\t220000000\t270000000\t50000000\t50000000\t255\tcg:Z:50000000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000000\tzp:Z:experimental-owned\nreverse_270M\t270000000\t50000000\t100000000\t-\tsynthetic_270M\t270000000\t170000000\t220000000\t50000000\t50000000\t255\tcg:Z:50000000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000001\tzp:Z:experimental-owned\nreverse_270M\t270000000\t100000000\t150000000\t-\tsynthetic_270M\t270000000\t120000000\t170000000\t50000000\t50000000\t255\tcg:Z:50000000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000002\tzp:Z:experimental-owned\nreverse_270M\t270000000\t150000000\t200000000\t-\tsynthetic_270M\t270000000\t70000000\t120000000\t50000000\t50000000\t255\tcg:Z:50000000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000003\tzp:Z:experimental-owned\nreverse_270M\t270000000\t200000000\t250000000\t-\tsynthetic_270M\t270000000\t20000000\t70000000\t50000000\t50000000\t255\tcg:Z:50000000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000004\tzp:Z:experimental-owned\nreverse_270M\t270000000\t250000000\t270000000\t-\tsynthetic_270M\t270000000\t0\t20000000\t20000000\t20000000\t255\tcg:Z:20000000=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000005\tzp:Z:experimental-owned\n",
+      "stitched_paf": "reverse_270M\t270000000\t0\t270000000\t-\tsynthetic_270M\t270000000\t0\t270000000\t270000000\t270000000\t255\tcg:Z:268435455=1564545=\tNM:i:0\tnn:i:0\tzw:Z:gpm_window_00000005\tzp:Z:experimental-stitched\tzc:i:6\n",
+      "server_paf_validator": {
+        "owned_rows": 6,
+        "stitched_rows": 1,
+        "require_cigar": true
+      }
+    }
+  ],
+  "source_sha256": {
+    "compare_small_fixtures.py": "2ac937faa164d5503ddd11f22693d474d19c14677d37d9cd9b6d85be1487554b",
+    "reproduce_large.py": "f76195becd756b345237d82ec72cd41bcc3425c1f0409867d6a1abb5b783f49a",
+    "test_windowed_alignment.py": "4f8935a6225fc81ba27c9bab803e4f21b2de4cca97554bb81e275c9e2afb6306",
+    "windowed_alignment.py": "cf413c9336d7611e6094f7711bfc1dd41538713f7eb5ef27c19de999d45d2c12"
+  }
+}
