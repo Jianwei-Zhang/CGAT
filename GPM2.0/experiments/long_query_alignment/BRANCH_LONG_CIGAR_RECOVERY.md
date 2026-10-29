@@ -210,3 +210,76 @@ Do not infer an upstream-equivalence or customer-repair claim from this commit.
    controls, then GRT/Final Path comparisons. Customer localization and the real
    full run remain a separate acceptance gate. No new run.sh flags or manual
    splitting/configuration should be required from the customer.
+
+
+## Full recovered-path statistics and rank adjustment: implementation only
+
+`whole_query_scores.py` now supplies the score/statistic part of the earlier
+selection-state boundary. It reads the **complete recovered path** against
+original query/target bases, with at most a 1 MiB sequence fetch per side:
+
+- Base-check =/X on either strand; reproduce native mlen/blen/nn accounting,
+  including IUPAC-as-N, insertion/deletion ambiguity and negative ambiguous-base
+  scores. Recover the zero-reset local maximum `dp_max0`, without trusting any
+  window AS/ms/cm/s1/MAPQ. No AS claim is produced.
+- Coalesce adjacent textual pieces of one logical operation with Python integer
+  lengths. A serialized >268435455 bp exact run is never encoded into minimap2's
+  internal CIGAR, and a gap split across ownership/text boundaries is charged
+  only once. Whole-query scoring is not the sum of window scores.
+- Port the pinned binary32 `mg_log2` approximation and asm10 gap penalties, not
+  math.log2. Preserve ambiguous-base ordering within matches and the native
+  truncation model. Refuse unsupported leading-gap normalization, false =/X,
+  inconsistent coordinates/counts or native field/arithmetic overflow.
+- Implement `mm_update_dp_max`'s query-coverage/runner-up gates, first-equal-best
+  convention, event-identity reference, global mismatch/gap factor and corrected
+  scores over a caller-supplied **first-filtered** query/index-part candidate set.
+  Original anchor counts and that set's completeness remain mandatory separate
+  provenance. Mixed or unbound original index parts are refused. This function does NOT discover or certify that set.
+
+The selective branch internally enables `recover_path_scores` (no customer CLI
+flag). Guided recovery writes `guided.path-scores.jsonl` before its final private
+candidate is promoted, and records the sidecar hash, PAF source hash, input hashes
+original index-part hash and implementation identities in guidance.json. Existing normal records and legacy
+standalone defaults are unchanged. Sidecar scoring failure prevents candidate
+promotion; it cannot bless a partial/incorrect result. The PAF itself still has
+unknown MAPQ and no invented native score/type tags.
+
+**Global correction is deliberately NOT applied automatically to the provisional
+guided set.** Original anchor ownership and post-DP filtering are not yet proven;
+pretending that the set already passed those gates would supply wrong competitors
+to ranking. The new functions are score-state implementation, not a bypass of the
+existing guided refusals or an assertion of complete whole-query DP equivalence.
+
+### Original chain-state evidence boundary
+
+Pinned map.c/hit.c show that the native hash uses encoded anchor data, including
+seed flags; the CN columns currently collected do not print all those bits. It is
+not sound to hash just the printed coordinates, to hash window names, or to set
+missing pre-DP subsc/n_sub to zero. Remaining work must acquire that state without
+changing minimap2, then bind it to actual recovered paths/splits and the new score
+outputs before connecting the post-DP selector. No conditional hash guess has
+been added to make the branch appear complete.
+
+### Deferred validation additions (none executed)
+
+- `test_whole_query_scores.py`: competing exact/decoy/deletion paths, global
+  correction, ambiguity, local resets, gap coalescing, different read-chunk sizes,
+  reverse orientation, a >28-bit virtual exact path with bounded reads, native
+  threshold/source-identity guards, invalid paths and immutable sidecar input.
+- The optional native oracle now includes the **unmodified** pinned align.c only
+  in its isolated test translation unit. It can call native static score logic
+  and public rank correction without patching/rebuilding the installed minimap2.
+  It verifies normalized controlled paths and rejects any oracle input whose
+  native normalization changes its coordinates or CIGAR. This is not an aligner.
+- Native-source checks compare mlen/blen/nn, local and globally corrected scores,
+  event identity, forward/reverse gaps and ambiguous bases. The native source hash
+  pins now also cover align.c. Compiler/FMA behavior of the actual pinned tool
+  remains a final-oracle acceptance concern, not a claimed bitwise result.
+- Original-part guidance mock checks now include binding the path-score receipt
+  to the unchanged private PAF; neither AS nor MAPQ is silently promoted.
+
+All these are written, not passed tests. No minimap2 execution, native build,
+customer job, downstream run, formal result.paf, Release artifact or new customer
+configuration was produced by this implementation increment. Final automated and
+scientific acceptance, original-chain-state recovery, MAPQ, transparent run.sh
+integration and customer acceptance remain open.

@@ -37,7 +37,7 @@ class OriginalIndexPartGuidanceTests(unittest.TestCase):
         args.update(updates)
         return argparse.Namespace(**args)
 
-    def run_guidance(self, *, window_rows=b"", chain_rows=b"", candidate_policy=None):
+    def run_guidance(self, *, window_rows=b"", chain_rows=b"", candidate_policy=None, recover_path_scores=False):
         observed = []
         def command(argv,directory,name,*limits):
             observed.append((name,argv))
@@ -51,6 +51,7 @@ class OriginalIndexPartGuidanceTests(unittest.TestCase):
             options = self.options()
             if candidate_policy is not None:
                 options.window_candidate_policy = candidate_policy
+            options.recover_path_scores = recover_path_scores
             report = ga.experiment(options)
         return report,observed
 
@@ -85,6 +86,23 @@ class OriginalIndexPartGuidanceTests(unittest.TestCase):
                 wa.experiment(args)
         run.assert_not_called()
         self.assertFalse(args.out.exists())
+
+    def test_branch_path_score_sidecar_is_bound_to_the_unchanged_guided_paf(self):
+        raw = (b"gpm_window_00000000\t5\t0\t5\t+\tchr2\t8\t0\t5\t5\t5\t60\tcg:Z:5=\n"
+               b"gpm_window_00000001\t5\t0\t5\t+\tchr2\t8\t3\t8\t5\t5\t60\tcg:Z:5=\n")
+        chain = b"q\t8\t0\t8\t+\tchr2\t8\t0\t8\t8\t8\t60\ttp:A:P\tcm:i:3\ts1:i:8\trl:i:0\n"
+        report,_ = self.run_guidance(window_rows=raw,chain_rows=chain,
+                                    candidate_policy="all_chains_pool",recover_path_scores=True)
+        self.assertEqual(report["path_scoring"]["source_sha256"],report["output_sha256"])
+        self.assertEqual(report["path_scoring"]["rows"],1)
+        self.assertFalse(report["path_scoring"]["AS_reconstructed"])
+        self.assertFalse(report["path_scoring"]["mapq_reconstructed"])
+        score = json.loads((self.options().out/"guided.path-scores.jsonl").read_text())
+        self.assertEqual(score["dp_max0"],8)
+        paf = (self.options().out/"guided.experimental.paf").read_text()
+        self.assertIn("\t255\t",paf)
+        self.assertNotIn("\tAS:i:",paf)
+        self.assertNotIn("\tms:i:",paf)
 
     def test_pool_window_chain_disagreement_still_refuses(self):
         raw = b"gpm_window_00000000\t5\t0\t5\t+\tchr2\t8\t0\t5\t5\t5\t60\tcg:Z:5=\n"

@@ -190,6 +190,55 @@ class NativeSourceOracleTests(unittest.TestCase):
                      r["subcount"],r["dp_max2"],int(r["sam_primary"])) for r in report["retained_candidates"]]
         self.assertEqual(actual,expected)
 
+    def compare_native_paths(self,query,target,hits):
+        import whole_query_scores as ws
+        import windowed_alignment as wa
+        scores = [ws.score_path(hit,query,target,key=f"path-{i}",index_sha256="d"*64) for i,hit in enumerate(hits)]
+        qlen = query.records["q"]["length"]
+        replay = ws.replay_native_rank_adjustment(scores,query_length=qlen)
+        text = f"{len(hits)} {qlen}\n"
+        for hit in hits:
+            qseq = query.fetch(hit.query,hit.qs,hit.qe).translate(wa.NT)
+            if hit.strand == "-":
+                qseq = qseq.translate(wa.RC)[::-1]
+            tseq = target.fetch(hit.target,hit.ts,hit.te).translate(wa.NT)
+            operations = []
+            for length,op in hit.ops:
+                opcode = 0 if op in "=X" else 1 if op == "I" else 2
+                if operations and operations[-1][1] == opcode:
+                    operations[-1] = (operations[-1][0]+length,opcode)
+                else:
+                    operations.append((length,opcode))
+            self.assertTrue(all(n <= wa.LIMIT for n,_ in operations))
+            text += f"{hit.qs} {hit.qe} {hit.ts} {hit.te} {int(hit.strand == '-')} {len(operations)}\n"
+            text += qseq.decode()+"\n"+tseq.decode()+"\n"
+            text += "".join(f"{length} {op}\n" for length,op in operations)
+        done = subprocess.run([str(self.exe),"--path-rank"],input=text,text=True,
+                              capture_output=True,check=True,timeout=30)
+        lines = done.stdout.splitlines()
+        self.assertEqual(int(lines[0]),len(scores))
+        self.assertEqual(len(lines)-1,len(scores))
+        for i,line in enumerate(lines[1:]):
+            fields = line.split()
+            score = scores[i]
+            self.assertEqual(tuple(map(int,fields[:6])),(i,score.matches,score.block_length,
+                score.ambiguous,score.dp_max0,replay["scores"][i]["dp_max"]))
+            self.assertEqual(float(fields[6]),score.event_identity)
+
+    def test_native_local_scores_gap_events_reverse_ambiguity_and_global_correction(self):
+        import windowed_alignment as wa
+        from test_whole_query_scores import Store,checked_hit,competing_paths
+        self.compare_native_paths(*competing_paths())
+        for strand in ("+","-"):
+            oriented = b"ACGT"*75+b"CCC"+b"ACGT"*75
+            query = Store({"q":oriented if strand == "+" else oriented.translate(wa.RC)[::-1]})
+            target = Store({"t":b"ACGT"*150})
+            hit = checked_hit(query,target,[(300,"="),(1,"I"),(2,"I"),(300,"=")],strand=strand)
+            self.compare_native_paths(query,target,[hit])
+        query = Store({"q":b"A"*300+b"NNNN"+b"A"*300})
+        target = Store({"t":b"A"*300+b"NNNN"+b"A"*300})
+        self.compare_native_paths(query,target,[checked_hit(query,target,[(604,"=")])])
+
     def test_large_ties_both_strands_prior_state_and_float_boundaries(self):
         rng = random.Random(2311302)
         for count in (0,1,2,63,64,65,100,257,600):

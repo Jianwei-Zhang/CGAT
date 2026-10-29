@@ -210,6 +210,8 @@ def require_full_query_coverage(selection):
 def experiment(args):
     if args.guide_slack < 0 or args.guide_slack > args.context_bases:
         raise wa.ExperimentError("require 0 <= guide slack <= context; no automatic widening")
+    if getattr(args,"recover_path_scores",False) and args.preset != "asm10":
+        raise wa.ExperimentError("branch full-path scoring is pinned to asm10")
     root = args.out.resolve()
     root.mkdir(parents=True, exist_ok=False)
     report = {"status": "running", "experimental_only": True, "production_ready": False, "customer_validated": False,
@@ -263,6 +265,10 @@ def experiment(args):
                                              root / "chain-coverage.json", query, target, args.guide_slack)
         if args.require_full_query_coverage:
             require_full_query_coverage(report["selection"])
+        if getattr(args,"recover_path_scores",False):
+            import whole_query_scores as wqs
+            report["path_scoring"] = wqs.write_guided_path_scores(
+                pending,root/"guided.path-scores.jsonl",query,target,index_sha256=index_hash)
         if (not all(s.unchanged() for s in stores) or wa.sha256(index) != index_hash
                 or wa.sha256(Path(mm)) != windowed["tool"]["sha256"] or wa.sha256(original) != windowed["stitched_sha256"]):
             raise wa.ExperimentError("input/index/tool changed during guided recovery")

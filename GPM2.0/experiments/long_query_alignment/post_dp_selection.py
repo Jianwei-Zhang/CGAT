@@ -24,6 +24,7 @@ from windowed_alignment import ExperimentError
 
 UPSTREAM = {
     "version": "2.31-r1302",
+    "align.c_sha256": "8abb12d446f372afe11a511bf0fc12da47ed077600543851d4b6ad6282a51389",
     "hit.c_sha256": "157c06aa2c40c1684985465bac64f57b2da5c84657d12483bc77ee5a35279fac",
     "ksort.h_sha256": "2ed9cf5fc6bcae55ee961df7222fe1ef0ea8f5dc93156990f5ab0c277e0026e0",
     "misc.c_sha256": "c4cb4bc5cf4048220417b6b3c1be9bf46902a945abe3879ab507e61e12b642ef",

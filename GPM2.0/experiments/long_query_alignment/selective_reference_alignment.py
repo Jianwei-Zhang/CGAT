@@ -296,7 +296,7 @@ def experiment(args):
                         preset="asm10",core_bases=50_000_000,context_bases=100_000,guide_slack=1000,
                         threads=args.threads,timeout=args.timeout,memory_gib=args.memory_gib,
                         require_full_query_coverage=False,index_context=part,allow_empty_index_part=True,
-                        window_candidate_policy="all_chains_pool")
+                        window_candidate_policy="all_chains_pool",recover_path_scores=True)
                     result = ga.experiment(options)
                     count = append_part_candidate(options.out/"guided.experimental.paf",aggregate,part=part,
                         queries=query.records,targets=target.records,risk=risk,expected_sha256=result["output_sha256"])
