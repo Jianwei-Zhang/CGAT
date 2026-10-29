@@ -238,9 +238,15 @@ python3 GPM2.0/experiments/long_query_alignment/guided_alignment.py \
 
 ## 超长 CIGAR 假设开发分支
 
-`fix/minimap2-long-cigar-recovery` 增加 `selective_reference_alignment.py`：正常长度
-query 保留整条原比对，超长 query 才进入既有分窗/坐标恢复；混合输出仅作为实验候选，
-不写正式 `result.paf`，不启动下游。默认只预览，新增用例未执行。
+`fix/minimap2-long-cigar-recovery` 的 `selective_reference_alignment.py` 现改为原生优先：
+先跑完整原命令，成功则完整保留 PAF，不因长度改变已经能成功处理的记录。仅在实际出现
+目标断言后，按原始索引分段、完整 query 记录做有界定位；只有确实触发断言的单条记录
+才进入分窗恢复，并须有原始链支持的超长逻辑 CIGAR 证据。长度不是恢复开关，失败批次的
+部分 PAF 不复用，其他错误不触发分窗。成功的长记录也不要求 companion 或额外配置。
+
+`native_first.py` 接上分类、无标准化副本的原始记录目录、有界二分、完成单元合并和溢出
+证据检查；新增及更新的用例**仅编写，尚未运行**。输出仍仅为实验候选，不写正式
+`result.paf`，不启动下游；默认只预览。
 
 本阶段已补默认多段参考索引的原字节/顺序复用路径，但未执行验证；全局候选与 MAPQ
 仍是阻断项，尚未接入 Server `run.sh`。

@@ -480,7 +480,8 @@ def stitch_owned(source: Path, output: Path, provenance: Path, windows: list[Win
             "fork_endpoints_not_joined": forks, "ranking_reconstructed": False}
 
 
-def run_command(command: list[str], directory: Path, name: str, timeout: int, memory_gib: int, *, max_file_bytes=None) -> dict:
+def run_command(command: list[str], directory: Path, name: str, timeout: int, memory_gib: int, *, max_file_bytes=None, allow_failure=False) -> dict:
+    """Run once; only an explicit native-failure classifier may inspect nonzero evidence."""
     if max_file_bytes is not None and (type(max_file_bytes) is not int or max_file_bytes < 1):
         raise ExperimentError("child file-size limit must be a positive integer")
     def limits():
@@ -510,7 +511,7 @@ def run_command(command: list[str], directory: Path, name: str, timeout: int, me
             report.update(returncode=process.returncode, interrupted=type(exc).__name__)
         report["seconds"] = round(time.monotonic() - started, 3)
     write_json(directory / f"{name}.execution.json", report)
-    if report["returncode"] or "interrupted" in report:
+    if not allow_failure and (report["returncode"] or "interrupted" in report):
         raise ExperimentError(f"{name} failed; evidence retained in {directory}")
     return report
 

@@ -13,37 +13,65 @@ existing `run.sh`/`sbatch` interface and must not ask the customer to split FAST
 write JSON or estimate memory. Do not change master, Release assets, the running
 customer diagnostic or existing workspaces.
 
-## First branch slice implemented
+## Current branch entry: native first, exact-assertion recovery only
 
-`selective_reference_alignment.py` composes the existing window/guidance prototype
-with ordinary whole-record mapping for a mixed query dataset:
+`selective_reference_alignment.py` now composes the unchanged native command with
+an actual-failure isolation path. This supersedes the initial length-first route;
+the obsolete length partition/two-route merge helpers were removed, not left as
+an alternate way to window every long record.
 
-1. Validate original plain FASTA and retain identities, order and original IDs.
-2. Route only queries **longer than 268435455 bp** to the risk path. Length is
-   merely a conservative routing condition, not proof of an overflowing operation.
-3. Copy complete records to two private files without rewriting case, comments or
-   line wrapping. No query record is discarded. When all records are ordinary,
-   use the original query file directly.
-4. Run ordinary records with the existing `-c -x asm10` command shape; keep their
-   PAF row bytes, tags and MAPQ rather than recomputing them from windows.
-5. Run risk-only input through existing 50 Mb cores, 100 kb context on each side,
-   full-target mapping, base-checked clipping/stitching and provisional whole-query
-   guidance. Existing refusal controls remain in force.
-6. Validate route ownership, original names/lengths, coordinate bounds and CIGAR
-   consumption. Group rows by original query order through disk-backed row files;
-   retain candidate multiplicity and explicit records with no alignment.
-7. Emit only `reference.candidate.experimental.paf` and a non-production receipt.
+1. Capture source/tool identity and run the original `-c -x asm10 -t ... -o ...`
+   shape against the original complete target/query. No FASTA normalization,
+   length scan, extra MMI, companion lookup or PAF parser precedes native success.
+2. On native exit 0, preserve the complete PAF byte-for-byte, including native
+   tags/confidence, long successful records and native-complete zero-byte output.
+   The harness does not introduce new cg/AS/line-size requirements on this path.
+3. Recovery requires BOTH an abort exit and the exact `mm_update_extra` predicate
+   from the customer's assertion. OOM/kill, timeout, unrelated assertion, ordinary
+   nonzero or a masked assertion with exit 0 stop. Failed partial PAF is evidence
+   only: **no failed-batch prefix is reused**, even if it contains valid-looking rows.
+4. Only after this failure, catalog raw FASTA byte ranges without normalized
+   sequence spools, rebuild the original default-partition MMI and retain its
+   serialized original parts/order. Inherit `mid_occ` from the failed original
+   mapping's completed log prefix, not a fresh per-part threshold calculation.
+5. Run original-order whole-record groups against each original index part. Keep
+   every successful native group unchanged. Divide ONLY an actually asserting
+   group into two nonempty halves; recover ONLY an actually asserting singleton.
+   Each group is attempted once, with at most `2*N-1` attempts per original part.
+   This is not a parameter sweep or an unlimited retry. **Length is not a trigger**:
+   a short query may have a target-consuming long D; unsupported paths still refuse.
+6. The prebuilt pinned companion is required only at the actual recovery leaf.
+   Existing 50 Mb cores, 100 kb context, original-part whole-query guidance,
+   base checks, anchor/state association and native selection remain mandatory.
+   The maintainer, not the customer, must build/package the companion.
+7. A recovered leaf additionally needs an original-chain-supported **pre-filter**
+   path with a logical CIGAR operation longer than 268435455. Adjacent textual
+   chunks are coalesced in Python; `=` and `X` both belong to native `-c` M. A merely
+   long query or a long path lacking original-chain support is insufficient. A
+   supported overflowing path that would later be filtered can supply the witness.
+   This evidence supports the hypothesis; it does not prove historical crashed DP.
+8. Merge only completed `(original part, original query)` cells. Explicit native
+   no-hit cells count as completed; absent, overlapping or foreign cells do not.
+   Stream native optional bodies opaquely, validate recovered rows strictly, check
+   hashes while assembling and again on shards, preserve multiplicity and emit in
+   original part/query order. A rejected source invalidates that assembly.
+9. Emit only `reference.candidate.experimental.paf` and non-production receipts.
    No `result.paf`, success checkpoint or downstream acceptance marker is emitted.
+   If no singleton assertion reproduces, refuse to call a rerun a recovery.
 
-Risk rows keep unknown MAPQ and must not carry recovered `AS/ms/s1/s2/tp` claims.
-Ordinary rows retaining native tags does not establish equality of the whole mixed
-workflow. `guided.experimental.paf` is still a conditional diagnostic candidate.
+`native_first.py` contains the classifier, raw record catalog, bounded bisection,
+completed-cell merger and logical-operation witness. These are implementation
+only, including the mock cases: **no new code has run in this phase**.
+
+Recovered rows still keep unknown MAPQ and omit `AS/ms/s1/s2/tp` claims. Native rows
+retain their original bytes/tags; that alone does not establish whole-workflow
+scientific equivalence. `guided.experimental.paf` remains a conditional candidate.
 
 The default CLI is **plan only**, creating nothing and starting no tool. Its
 `--execute` switch is for a developer's final-validation harness, not a new customer
 `run.sh` option. This branch has not connected the prototype to Server `run.sh` yet.
-That is deliberate until the correctness gates below are resolved, not an assertion
-that the branch is a working customer repair.
+Do not call the branch deliverable before its explicit correctness, packaging and
+customer acceptance gates are satisfied.
 
 ## Original multipart reference context: implemented, execution unverified
 
@@ -54,7 +82,7 @@ checks little-endian format, supported flags, record IDs/lengths/order, partitio
 boundaries, file identity and byte hashes. Missing target sequences/names, HPC,
 unknown format/flags, duplicates, truncation or a foreign context are refused.
 
-For risk-query experiments, build the reference index with the normal `asm10`
+For target-assertion recovery experiments, build the reference index with the normal `asm10`
 **default partition policy** (no `-I` override). Copy each serialized part
 byte-for-byte into a private index file; do not guess FASTA chunk boundaries or
 re-index subsets. Pass that same verified part to both whole-query guidance and
@@ -65,9 +93,11 @@ for the customer's multipart context anymore.
 An additional upstream state must be preserved: v2.31 `mm_mapopt_update` computes
 `mid_occ` on the first index part only while its value is unset; subsequent parts
 retain it. Independent part invocations would otherwise recalculate it and could
-change seed filtering. The branch takes the shared value from the ordinary
-multipart mapping log when available; with risk-only input, it runs a chain-only
-pass against the first original part. Both window and whole-query guidance pass
+change seed filtering. The native-first branch takes the shared value from the original failed
+mapping's completed log prefix. One completed first-part update is sufficient if
+the job aborted before later parts; all observed updates must agree and fit the
+known original part count. The separate complete-pass helper remains only for
+native comparison controls. Both window and whole-query guidance pass
 that measured integer via `-f`, after the preset. This is preservation of original
 filtering state, not a parameter-workaround sweep or an arbitrary new threshold.
 Missing, inconsistent or out-of-range threshold evidence is refused.
@@ -78,10 +108,11 @@ a mixed run uses original part-major order followed by original query order,
 not query-major concatenation across parts. A row cannot migrate to another
 part's target. Original target records/order and reference bytes are unchanged.
 
-A part with both no whole-query candidates and no window rows may be recorded as
-no-hit. A disagreement remains a refusal. If every part produces no risk-query
-candidate, the driver still refuses rather than presenting empty recovery as a
-repair. The ordinary standalone empty-output refusal is unchanged.
+A successful native group with zero rows supplies explicit complete no-hit cells.
+An actually asserting singleton cannot be reclassified as an empty/no-hit success:
+its guided recovery must produce a supported retained result and the long-operation
+witness. The standalone guided empty-output refusal remains; the top-level native
+success path accepts native-complete empty output without invoking guidance.
 
 **This addresses index-context handling, not MAPQ or candidate reconciliation.**
 No global MAPQ is fabricated from part-local output. The added implementation and
@@ -106,11 +137,17 @@ its memory/time/disk allocation.
 
 ## Deferred validation
 
-`test_selective_reference_alignment.py` defines routing-boundary, raw-record copy,
-normal-record command, byte-preserving PAF merge, bad provenance/span/confidence,
-plan-only, fresh-output, original index-part ownership/order and normal-only native
-row preservation cases. These have **not run**, including
-mock-only checks. Old validation receipts do not certify the newly added code.
+`test_native_first.py` defines exact abort/predicate classification, masked-zero
+and non-target refusal, failed-prefix threshold capture, raw-record bytes/order,
+bounded bisection (including short-query assertion), no-hit completed cells,
+opaque/large native PAF bodies, cell ownership/order/duplication, poisoned or
+changed shards and source-supported overflowing M/D witness controls.
+`test_selective_reference_alignment.py` defines the original native command,
+no-scan/no-spool/no-companion native success, opaque and empty output preservation,
+lazy companion lookup, partial-output exclusion, deferred witness orchestration,
+non-reproduction refusal, identity checks, plan-only and fresh-output controls.
+These have **not run**, including mock-only checks. Old validation receipts do
+not certify the newly added code or supply scientific evidence for mocked paths.
 
 Additional deferred modules:
 
@@ -128,7 +165,8 @@ whole-record replay precede asserting any customer-specific root cause or repair
 
 - Original multipart index bytes, membership, shared first-part threshold and
   emission order: implemented; static syntax/diff reviewed, execution deferred.
-- Ordinary-only native PAF preservation: implemented; execution deferred.
+- Native-first preservation, actual-assertion whole-record isolation and
+  long-operation witness: implemented; execution deferred.
 - Native-state/path association, native selection and supplied-state MAPQ:
   implemented in the experimental branch; execution/equivalence unverified.
   Public confidence promotion and full-query DP-state completeness remain open.
@@ -312,9 +350,10 @@ foreign query/part, protocol error or PAF difference stops recovery. A matching
 coarse PAF is a necessary cross-producer check, NOT proof that the provisional
 window candidate set equals native post-DP output.
 
-The branch selective entry now requires this companion for risk queries and
-checks its bundle before starting any alignment. Ordinary-only input does not
-need the companion and keeps the native command path. The guided branch acquires
+The branch selective entry requires this companion only for an actually asserting
+singleton recovery, never merely for a long query. It checks the bundle before
+starting the recovery passes, NOT before the initial or successful native passes.
+Native-successful input does not need the companion. The guided branch acquires
 `native-chains/original-chain-state.jsonl` before provisional candidate selection.
 The ledger preserves original chain-Paf row numbers, input/index/binary hashes,
 full-query sequence digest, per-query raw state and trace receipts. This is usable
@@ -355,9 +394,9 @@ sequence digests/trace in chunks rather than retaining all bases/anchors.
 - Protocol/metadata preservation, missing fields, differing PAF, original IDs,
   empty query, trace scope/footer, artifact identity, no runtime compiler, default
   plan-only behavior and inherited file limit checks have been written.
-- Ordinary-route checks reject any attempt to require a companion unnecessarily;
-  risk-route checks require packaging preflight before any alignment. Guidance
-  checks refuse a native/coarse mismatch before producing a final private PAF.
+- Native-success checks reject unnecessary companion lookup. An actually
+  asserting singleton requires the packaged companion before recovery alignment.
+  Guidance checks refuse a native/coarse mismatch before producing a private PAF.
 - `test_native_chain_state_integration.py` requires an explicitly maintainer-built
   `CGAT_NATIVE_CHAIN_STATE_BUNDLE` and unchanged `CGAT_MINIMAP2_BINARY`. It defines
   real forward/reverse duplicate-target and mismatching-PAF controls, without
@@ -474,7 +513,7 @@ Known context boundary, not a hidden success claim: an all-chain window pool may
 change local chaining/frequency and nearby-seed DP extension context relative to
 the original preselected whole-query set. Replaying native ranking/MAPQ cannot
 undo a different base path. Before delivery, retain native-successful long records
-unchanged (native-first routing is still to implement), audit path/context
+unchanged (native-first routing is now implemented but unexecuted), audit path/context
 counterexamples and prove the fallback's accepted scope with the named controls
 and actual customer input. Do not treat a native-API MAPQ receipt alone as proof
 of original DP/path equivalence or an excuse to skip these gates.
