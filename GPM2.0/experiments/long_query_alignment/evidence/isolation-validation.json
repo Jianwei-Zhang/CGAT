@@ -1,0 +1,241 @@
+{
+  "scope": "standalone diagnostic, not production recovery",
+  "harness_sha256": "5785801571a79ecfec754267fb9e146df9a7d32af9add398ff35661429089304",
+  "customer_input_used": false,
+  "production_ready": false,
+  "minimap2_modified": false,
+  "server_modified": false,
+  "cases": [
+    {
+      "case": "localize",
+      "report": {
+        "status": "diagnostic_completed",
+        "production_ready": false,
+        "customer_recovered": false,
+        "harness_sha256": "5785801571a79ecfec754267fb9e146df9a7d32af9add398ff35661429089304",
+        "plan": {
+          "command": [
+            "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+            "-c",
+            "-x",
+            "asm10",
+            "-t",
+            "1",
+            "--print-qname",
+            "-o",
+            "/tmp/cgat-isolate-final-20261029/alignment.diagnostic.partial.paf",
+            "/tmp/cgat-guided-270m-final-20261029/reference.fa",
+            "/tmp/cgat-isolate-fixture-20261029/query.fa"
+          ],
+          "reference": "/tmp/cgat-guided-270m-final-20261029/reference.fa",
+          "query": "/tmp/cgat-isolate-fixture-20261029/query.fa",
+          "output": "/tmp/cgat-isolate-final-20261029",
+          "query_id": null,
+          "case": "locate",
+          "timeout_seconds": 600,
+          "memory_gib": 10,
+          "max_file_gib": 8,
+          "min_free_gib": 4,
+          "expected_version": "2.31-r1302",
+          "execute": true,
+          "production_ready": false,
+          "automatic_retry": false,
+          "note": "One mapping thread; original target FASTA/order and default index partitioning retained. No data skipping."
+        },
+        "tool": {
+          "path": "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+          "version": "2.31-r1302",
+          "sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d"
+        },
+        "execution": {
+          "returncode": -6,
+          "stopped": null,
+          "elapsed_seconds": 66.262
+        },
+        "trace": {
+          "same_assertion": true,
+          "completed_query_events": 1,
+          "index_parts_seen": 1,
+          "trace_well_formed": true,
+          "active_query_at_assertion": {
+            "query_id": "synthetic_270M",
+            "thread_id": 0,
+            "length": 270000000,
+            "target_index_part": 1
+          },
+          "independent_replay_required": true
+        },
+        "input_stats_unchanged": true,
+        "tool_unchanged": true,
+        "alignment_exit_zero": false,
+        "outcome": "alignment_assertion",
+        "elapsed_seconds": 70.064
+      },
+      "inputs": {
+        "reference": {
+          "path": "/tmp/cgat-guided-270m-final-20261029/reference.fa",
+          "stat": {
+            "size": 273375016,
+            "mtime_ns": 1793269619492336700,
+            "ctime_ns": 1793269619492336700,
+            "inode": 611454
+          },
+          "sha256": "0fbc225dfa32c1e4e99ed4cfb611f5023768423fbc5c4f6ec789342aff1e6fc4",
+          "records": {
+            "synthetic_270M": 270000000
+          },
+          "total_bases": 270000000,
+          "max_length": 270000000,
+          "content_scanned": true
+        },
+        "query": {
+          "path": "/tmp/cgat-isolate-fixture-20261029/query.fa",
+          "stat": {
+            "size": 274387532,
+            "mtime_ns": 1793277310280587803,
+            "ctime_ns": 1793277310280587803,
+            "inode": 709453
+          },
+          "sha256": "38c6bf88ecc9679615b940f46cd082cbbaad975f1dc9130cf292d5be53059b87",
+          "records": {
+            "prefix_control": 1000000,
+            "synthetic_270M": 270000000
+          },
+          "total_bases": 271000000,
+          "max_length": 270000000,
+          "content_scanned": true
+        }
+      },
+      "archive_sha256": "0d64017ecbe37633763c8705ed99d8941f7b5d850ca9d0f975cbb9d7c177c1d7",
+      "archive_members": [
+        "plan.json",
+        "report.json",
+        "inputs.json",
+        "stdout.log",
+        "stderr.log"
+      ],
+      "stderr_sha256": "c969167fbe4954a1813e42eada825c223cd9fe7f9a17355c7ebc8a3217a319f2"
+    },
+    {
+      "case": "independent_replay",
+      "report": {
+        "status": "diagnostic_completed",
+        "production_ready": false,
+        "customer_recovered": false,
+        "harness_sha256": "5785801571a79ecfec754267fb9e146df9a7d32af9add398ff35661429089304",
+        "plan": {
+          "command": [
+            "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+            "-c",
+            "-x",
+            "asm10",
+            "-t",
+            "1",
+            "--print-qname",
+            "-o",
+            "/tmp/cgat-isolate-replay-final-20261029/alignment.diagnostic.partial.paf",
+            "/tmp/cgat-guided-270m-final-20261029/reference.fa",
+            "/tmp/cgat-isolate-replay-final-20261029/selected.query.fa"
+          ],
+          "reference": "/tmp/cgat-guided-270m-final-20261029/reference.fa",
+          "query": "/tmp/cgat-isolate-fixture-20261029/query.fa",
+          "output": "/tmp/cgat-isolate-replay-final-20261029",
+          "query_id": "synthetic_270M",
+          "case": "locate",
+          "timeout_seconds": 600,
+          "memory_gib": 10,
+          "max_file_gib": 8,
+          "min_free_gib": 4,
+          "expected_version": "2.31-r1302",
+          "execute": true,
+          "production_ready": false,
+          "automatic_retry": false,
+          "note": "One mapping thread; original target FASTA/order and default index partitioning retained. No data skipping."
+        },
+        "tool": {
+          "path": "/home/xbzhang/micromamba/envs/cgat-server/bin/minimap2",
+          "version": "2.31-r1302",
+          "sha256": "b6c81294dc0b68b2f54f8e2f6f3ad6be71a40bccc47a6e244ecebc73bae9501d"
+        },
+        "execution": {
+          "returncode": -6,
+          "stopped": null,
+          "elapsed_seconds": 71.268
+        },
+        "trace": {
+          "same_assertion": true,
+          "completed_query_events": 0,
+          "index_parts_seen": 1,
+          "trace_well_formed": true,
+          "active_query_at_assertion": {
+            "query_id": "synthetic_270M",
+            "thread_id": 0,
+            "length": 270000000,
+            "target_index_part": 1
+          },
+          "independent_replay_required": true
+        },
+        "input_stats_unchanged": true,
+        "tool_unchanged": true,
+        "alignment_exit_zero": false,
+        "outcome": "alignment_assertion",
+        "elapsed_seconds": 76.455
+      },
+      "inputs": {
+        "reference": {
+          "path": "/tmp/cgat-guided-270m-final-20261029/reference.fa",
+          "stat": {
+            "size": 273375016,
+            "mtime_ns": 1793269619492336700,
+            "ctime_ns": 1793269619492336700,
+            "inode": 611454
+          },
+          "sha256": "0fbc225dfa32c1e4e99ed4cfb611f5023768423fbc5c4f6ec789342aff1e6fc4",
+          "records": {
+            "synthetic_270M": 270000000
+          },
+          "total_bases": 270000000,
+          "max_length": 270000000,
+          "content_scanned": true
+        },
+        "query": {
+          "path": "/tmp/cgat-isolate-fixture-20261029/query.fa",
+          "stat": {
+            "size": 274387532,
+            "mtime_ns": 1793277310280587803,
+            "ctime_ns": 1793277310280587803,
+            "inode": 709453
+          },
+          "sha256": "38c6bf88ecc9679615b940f46cd082cbbaad975f1dc9130cf292d5be53059b87",
+          "records": {
+            "prefix_control": 1000000,
+            "synthetic_270M": 270000000
+          },
+          "total_bases": 271000000,
+          "max_length": 270000000,
+          "content_scanned": true
+        },
+        "selected_query_sha256": "0fbc225dfa32c1e4e99ed4cfb611f5023768423fbc5c4f6ec789342aff1e6fc4"
+      },
+      "archive_sha256": "641fb5ff008b62b6f7be9883938d1616d5fb43a57ccc899018ee2244a3efa19d",
+      "archive_members": [
+        "plan.json",
+        "report.json",
+        "inputs.json",
+        "stdout.log",
+        "stderr.log"
+      ],
+      "stderr_sha256": "d29b8f0ccbaed19d8e7106e55ae0365a2fc074d22d2623f2d802eb424332aaac"
+    }
+  ],
+  "tests": {
+    "226": {
+      "passed": 64,
+      "log_sha256": "02f9fa3e29cb2e8a9b57282fff22305d08d7f04dc38733ec7cbce9f5e940da3c"
+    },
+    "231": {
+      "passed": 64,
+      "log_sha256": "4e07f735b45c7451852c727bb56bf7e574ad415dd4517c7557c3536e1dda08df"
+    }
+  }
+}

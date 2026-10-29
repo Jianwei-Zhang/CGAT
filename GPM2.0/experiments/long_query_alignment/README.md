@@ -181,3 +181,13 @@ python3 GPM2.0/experiments/long_query_alignment/guided_alignment.py \
   尚未恢复，原 guided 模式的拒绝条件不变。
 - `audit_post_dp.py` 只生成 200 kb 合成输入，诊断 `-P`/seed trace 不作为正式
   参数建议或输出。不要将当前内存型 trace 解析器直接用于小麦规模数据。
+
+## 客户侧隔离定位（非生产修复）
+
+`isolate_minimap2.py` 是独立、标准库实现的显式诊断入口，见 `ISOLATION.md`。
+默认仅预览；只有 `--execute` 才启动一次有时间/内存/文件上限的比对。
+单线程 QR/QT 配对定位活动 query，不能用最后一条 PAF 猜测触发序列。
+可在新目录提取指定整条 query 独立重放，原参考、原 FASTA 和工作区不改。
+回传包只含日志/身份/命令，不含序列、PAF 或 core；没有自动提交、上传或参数重试。
+270 Mb 真实断言定位与独立重放验收见 `VALIDATION_ISOLATION_20261029.md`。
+该工具不进入正式 Server 包，也不代表客户已跑通。
