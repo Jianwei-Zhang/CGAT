@@ -38,22 +38,23 @@ class ServerAlignmentTests(unittest.TestCase):
         self.args = argparse.Namespace(server_dir=self.workspace,run_dir=self.run,target=self.target,query=self.query,
                                        result="result.paf",preset="asm10",threads=3)
 
-    def native(self,options,*,prepared_workspace):
+    def native(self,options,*,prepared_workspace,admit_output):
         self.assertEqual(prepared_workspace,self.workspace)
         self.assertEqual(options.threads,3)
         self.assertEqual(options.memory_gib,0)
-        self.assertIsNone(options.native_state_bundle)
+        self.assertEqual(options.native_state_bundle,self.runtime/"native"/sa.nst.build.host_platform())
+        self.assertFalse(admit_output)
         options.out.mkdir()
         data = b"opaque complete native PAF bytes\n"
         (options.out/"reference.candidate.experimental.paf").write_bytes(data)
-        report = {"status":"experimental_candidate_only","routing_mode":"native_complete_unchanged",
+        report = {"status":"proactive_candidate_complete","routing_mode":"native_complete_unchanged",
                   "original_inputs_unchanged":True,"partial_PAF_reused":False,"recovered_query_part_cells":0,
-                  "native_confidence_unchanged":True,"output_sha256":wa.sha256(options.out/"reference.candidate.experimental.paf")}
-        wa.write_json(options.out/"selective-reference.json",report)
+                  "native_confidence_unchanged":True,"output_path":str(options.out/"reference.candidate.experimental.paf"),"output_sha256":wa.sha256(options.out/"reference.candidate.experimental.paf")}
+        wa.write_json(options.out/"proactive-candidate.json",report)
         return report
 
     def execute(self,side_effect=None):
-        with patch.object(sa.sr,"experiment",side_effect=side_effect or self.native),redirect_stderr(io.StringIO()):
+        with patch.object(sa.pa,"experiment",side_effect=side_effect or self.native),redirect_stderr(io.StringIO()):
             return sa.run_reference(self.args,runtime_root=self.runtime)
 
     def test_native_complete_output_publishes_without_rewriting_or_recovery(self):
@@ -67,7 +68,7 @@ class ServerAlignmentTests(unittest.TestCase):
         self.assertTrue((Path(result["attempt"])/"publication.complete.paf").is_file())
 
     def test_source_checked_native_success_stays_opaque_without_recovery_lookup(self):
-        self.manifest.update(status="source_checked_recovery_runtime",recovered_output_admission=sa.rp.POLICY,
+        self.manifest.update(status="source_checked_recovery_runtime",recovered_output_admission=sa.pub.POLICY,
                              native_companion_sha256="a"*64,native_companion_platform="linux-x86_64")
         wa.write_json(self.runtime/sa.MANIFEST,self.manifest)
         with patch.object(sa.nst,"validate_bundle",side_effect=AssertionError("normal native output must stay lazy")):
@@ -83,7 +84,7 @@ class ServerAlignmentTests(unittest.TestCase):
             report.update(reference=sa.nf.source_identity(self.target),query=sa.nf.source_identity(self.query),
                           tool={"path":str(tool),**sa.nf.source_identity(tool)})
             self.query.write_bytes(b">q\nTTTT\n")
-            wa.write_json(options.out/"selective-reference.json",report)
+            wa.write_json(options.out/"proactive-candidate.json",report)
             return report
         with self.assertRaisesRegex(wa.ExperimentError,"input/tool changed"):
             self.execute(changed)
@@ -104,7 +105,7 @@ class ServerAlignmentTests(unittest.TestCase):
         self.assertTrue((attempt/"publication.complete.paf").exists())
 
     def test_policy_label_alone_cannot_enable_an_unvalidated_runtime(self):
-        self.manifest["recovered_output_admission"]=sa.rp.POLICY
+        self.manifest["recovered_output_admission"]=sa.pub.POLICY
         wa.write_json(self.runtime/sa.MANIFEST,self.manifest)
         with self.assertRaisesRegex(wa.ExperimentError,"source/contract"):
             self.execute()
@@ -120,9 +121,9 @@ class ServerAlignmentTests(unittest.TestCase):
         (self.run/"result.paf").write_bytes(b"prior result must not look current")
         def recovered(options,**kwargs):
             report = self.native(options,**kwargs)
-            report.update(routing_mode="exact_assertion_whole_record_isolation",recovered_query_part_cells=1)
+            report.update(routing_mode="proactive_query_length",recovered_query_part_cells=1)
             (options.out/"reference.native-evaluated.experimental.paf").write_bytes(b"private candidate")
-            wa.write_json(options.out/"selective-reference.json",report)
+            wa.write_json(options.out/"proactive-candidate.json",report)
             return report
         with self.assertRaisesRegex(wa.ExperimentError,"admission is CLOSED"):
             self.execute(recovered)
@@ -169,7 +170,7 @@ class ServerAlignmentTests(unittest.TestCase):
         destination = self.root/"protected-result"
         destination.write_bytes(b"untouched")
         (self.run/"result.paf").symlink_to(destination)
-        with patch.object(sa.sr,"experiment") as mapping,redirect_stderr(io.StringIO()):
+        with patch.object(sa.pa,"experiment") as mapping,redirect_stderr(io.StringIO()):
             with self.assertRaisesRegex(wa.ExperimentError,"not a regular file"):
                 sa.run_reference(self.args,runtime_root=self.runtime)
         mapping.assert_not_called()

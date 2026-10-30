@@ -2,9 +2,10 @@
 """Direct length routing with original index context; private candidates only.
 
 No whole-input trial, failure-driven bisection, singleton assertion replay or
-parameter retries. This maintainer entrypoint is NOT yet the Server adapter:
-private-source admission is checked here, while formal Server publication and
-durable group resume remain separate integration gates.
+parameter retries. The standalone CLI remains PLAN ONLY by default; the internal
+Server adapter owns prepared-workspace permission and atomic publication. This
+module only produces candidates and optional private-source admission. Durable
+group resume remains a separate integration gate.
 """
 from __future__ import annotations
 
@@ -80,13 +81,13 @@ def add_empty_cell(merger, root, result, name, part):
     return pair
 
 
-def experiment(args):
+def experiment(args, *, prepared_workspace=None, admit_output=True):
+    args = argparse.Namespace(**vars(args))
+    args.target, args.query = args.target.resolve(), args.query.resolve()
     root = args.out.resolve()
     if root.exists() or args.out.is_symlink() or not root.parent.is_dir():
         raise wa.ExperimentError("fresh private proactive output directory required")
-    if any((p / ".prepare_lib").exists() or (p / "run_all.sh").exists()
-           for p in (root.parent, *root.parent.parents)):
-        raise wa.ExperimentError("proactive candidate harness cannot run inside a prepared workspace")
+    pp.check_prepared_scope(root, prepared_workspace)
     if args.target.resolve() == args.query.resolve():
         raise wa.ExperimentError("initial reference mapping only; self-alignment is unsupported")
     if args.threads < 1 or args.timeout < 1 or args.memory_gib < 0:
@@ -103,16 +104,19 @@ def experiment(args):
     try:
         catalog = pp.scan_query(args.query)
         plan = pp.make_plan(catalog)
-        groups = pp.materialize(catalog, plan, root / "inputs")
+        groups = pp.materialize(catalog, plan, root / "inputs", prepared_workspace=prepared_workspace)
         wa.write_json(root / "query-catalog.json", {"source": catalog.source,
             "source_sha256": catalog.source_sha256, "records": [pp.asdict(r) for r in catalog.records]})
         wa.write_json(root / "routing-plan.json", plan)
         tool = nf.source_identity(Path(mm))
         report.update(query=query_identity(catalog), plan=plan, groups=groups, tool={"path": mm, **tool})
+        native_args = argparse.Namespace(**vars(args))
+        if prepared_workspace is not None:
+            native_args.timeout = None  # Preserve the original Server native command's unlimited wall time.
         # Normal-only: no reference normalization, MMI preprocessing or companion.
         if not plan["long_queries"]:
             reference = nf.source_identity(args.target.resolve())
-            native = nf.attempt(mm, args.target.resolve(), args.query.resolve(), root / "ordinary-native", args)
+            native = nf.attempt(mm, args.target.resolve(), args.query.resolve(), root / "ordinary-native", native_args)
             if native["status"] != "native_success":
                 raise wa.ExperimentError("ordinary native mapping failed; no automatic failure recovery")
             catalog.require_unchanged()
@@ -121,7 +125,7 @@ def experiment(args):
             report.update(status="proactive_candidate_complete", routing_mode="native_complete_unchanged",
                 reference=reference, native=native, output_path=native["path"], output_sha256=native["paf_sha256"],
                 native_row_bytes_preserved=True, original_inputs_unchanged=True, recovered_query_part_cells=0,
-                companion_required=False)
+                companion_required=False, native_confidence_unchanged=True)
             return report
         if subprocess.check_output([mm, "--version"], text=True, timeout=5).strip() != "2.31-r1302":
             raise wa.ExperimentError("long-query original-state recovery requires minimap2 2.31-r1302")
@@ -135,7 +139,7 @@ def experiment(args):
             merger = nf.CellMerger(root / "cells", queries, target.records, index["parts"])
             ordinary = next((g for g in groups["groups"] if g["route"] == "native"), None)
             if ordinary is not None:
-                native = nf.attempt(mm, root / "target.default.mmi", Path(ordinary["path"]), root / "ordinary-native", args)
+                native = nf.attempt(mm, root / "target.default.mmi", Path(ordinary["path"]), root / "ordinary-native", native_args)
                 if native["status"] != "native_success":
                     raise wa.ExperimentError("ordinary group failed; no bisection or failed PAF reuse")
                 merger.add_native(native, ordinary["queries"])
@@ -195,11 +199,16 @@ def experiment(args):
             report.update(status="proactive_candidate_complete", output_path=str(output), output_sha256=wa.sha256(output),
                 private_path=str(private), private_sha256=wa.sha256(private), original_inputs_unchanged=True,
                 native_row_bytes_preserved=True, recovered_query_part_cells=report["combination"]["recovered_cells"])
-            report["admission"] = pub.admit(report, root, bundle=bundle)
+            if admit_output:
+                report["admission"] = pub.admit(report, root, bundle=bundle)
+                current_bundle = nst.validate_bundle(Path(bundle["manifest_path"]).parent)
+                if any(current_bundle[k] != bundle[k] for k in ("sha256", "manifest_sha256", "platform")):
+                    raise wa.ExperimentError("native companion changed during proactive execution")
             catalog.require_unchanged()
             if not target.unchanged() or not nf.identity_unchanged(Path(mm), tool):
                 raise wa.ExperimentError("source/tool changed during proactive admission")
-            report["publication_admission"] = "private_source_checked_not_published"
+            report["publication_admission"] = ("private_source_checked_not_published" if admit_output
+                                                 else "awaiting_adapter_proactive_admission")
         finally:
             target.close()
     except BaseException as exc:

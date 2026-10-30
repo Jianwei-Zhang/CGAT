@@ -3,7 +3,7 @@
 
 Not a customer command/configuration surface. Native success publishes unchanged.
 An eligible portable package can publish recovered known native-API metadata ONLY
-with complete per-result original-cell, actual-abort, evidence and native input/
+with complete per-result original-cell, proactive eligibility, evidence and native input/
 stdout binding. Package/product acceptance remains a separate requirement.
 No compiler/download, scheduler policy, user data skip or minimap2 modification.
 """
@@ -24,6 +24,8 @@ import sys
 import tempfile
 
 import selective_reference_alignment as sr
+import proactive_reference_alignment as pa
+import proactive_publication as pub
 import native_chain_state as nst
 import native_first as nf
 import recovery_publication as rp
@@ -31,6 +33,7 @@ import windowed_alignment as wa
 
 MANIFEST = "branch-runtime.json"
 RUNTIME_FILES = (
+    "proactive_reference_plan.py","proactive_reference_alignment.py","proactive_publication.py",
     "server_alignment.py","selective_reference_alignment.py","guided_alignment.py","windowed_alignment.py",
     "native_first.py","native_evaluation.py","native_chain_state.py","build_native_chain_state.py","recovery_publication.py",
     "native_recovery.py","native_selection.py","post_dp_selection.py","whole_query_scores.py",
@@ -61,9 +64,9 @@ def validate_runtime(root):
     if (type(value) is not dict or value.get("schema")!=1
             or (value.get("status"),value.get("recovered_output_admission")) not in (
                 ("unvalidated_branch_runtime","closed_pending_final_acceptance"),
-                ("source_checked_recovery_runtime",rp.POLICY))
+                ("source_checked_recovery_runtime",pub.POLICY))
             or value.get("scope")!="initial_reference_asm10_only"
-            or value.get("recovered_output_admission")==rp.POLICY and (
+            or value.get("recovered_output_admission")==pub.POLICY and (
                 type(value.get("native_companion_sha256")) is not str
                 or not HASH.fullmatch(value["native_companion_sha256"])
                 or value.get("native_companion_platform") not in ("linux-x86_64","linux-aarch64"))
@@ -111,28 +114,27 @@ def cancellation_scope():
 
 
 def publication_source(report,attempt,*,runtime=None,runtime_root=None):
-    if (report.get("status")!="experimental_candidate_only"
+    if (report.get("status")!="proactive_candidate_complete"
             or report.get("original_inputs_unchanged") is not True
             or report.get("partial_PAF_reused") is not False):
-        raise wa.ExperimentError("native-first result lacks complete unchanged-input evidence")
+        raise wa.ExperimentError("proactive result lacks complete unchanged-input evidence")
     if report.get("routing_mode")!="native_complete_unchanged":
-        if not runtime or runtime.get("recovered_output_admission")!=rp.POLICY:
+        if not runtime or runtime.get("recovered_output_admission")!=pub.POLICY:
             raise wa.ExperimentError("recovery candidate retained, but formal output admission is CLOSED pending final acceptance; no result.paf or success may be emitted")
         bundle = nst.validate_bundle(Path(runtime_root)/"native"/nst.build.host_platform())
         if (bundle["sha256"]!=runtime.get("native_companion_sha256")
                 or bundle["platform"]!=runtime.get("native_companion_platform")
                 or (bundle.get("runtime_abi") or {}).get("legacy_2_17_checked") is not True):
-            raise wa.ExperimentError("recovery publication requires its package-bound portable native companion")
-        admitted = rp.admit(report,attempt/"selective",bundle=bundle,row_validator=sr.validate_row)
+            raise wa.ExperimentError("proactive publication requires its package-bound portable native companion")
+        admitted = pub.admit(report,attempt/"selective",bundle=bundle)
         admitted.update(helper_sha256=bundle["sha256"],helper_manifest_sha256=bundle["manifest_sha256"])
         wa.write_json(attempt/"recovery-admission.json",admitted)
         return Path(admitted["path"]),admitted["sha256"]
     if report.get("recovered_query_part_cells")!=0 or report.get("native_confidence_unchanged") is not True:
         raise wa.ExperimentError("native-only publication cannot include recovered confidence")
-    path = attempt/"selective"/"reference.candidate.experimental.paf"
+    path = rp.regular_under(report["output_path"],attempt/"selective")
     digest = report.get("output_sha256")
-    if (type(digest) is not str or not HASH.fullmatch(digest) or not path.is_file()
-            or path.is_symlink() or wa.sha256(path)!=digest):
+    if type(digest) is not str or not HASH.fullmatch(digest) or wa.sha256(path)!=digest:
         raise wa.ExperimentError("complete native candidate changed before result publication")
     return path,digest
 
@@ -193,14 +195,16 @@ def run_reference(args,*,runtime_root=None):
                 output.rename(previous)
                 report["previous_result"] = {"path":str(previous),"sha256":wa.sha256(previous),"restored_automatically":False}
             options = argparse.Namespace(target=args.target,query=args.query,out=attempt/"selective",
-                minimap2="minimap2",threads=args.threads,timeout=21600,memory_gib=0,native_state_bundle=None)
-            result = sr.experiment(options,prepared_workspace=workspace)
-            report["candidate_receipt_sha256"] = wa.sha256(options.out/"selective-reference.json")
+                minimap2="minimap2",threads=args.threads,timeout=21600,memory_gib=0,
+                native_state_bundle=runtime_root/"native"/nst.build.host_platform())
+            result = pa.experiment(options,prepared_workspace=workspace,admit_output=False)
+            report["candidate_receipt_sha256"] = wa.sha256(options.out/"proactive-candidate.json")
             source,digest = publication_source(result,attempt,runtime=runtime,runtime_root=runtime_root)
             if validate_runtime(runtime_root)!=runtime:
                 raise wa.ExperimentError("branch runtime changed while mapping")
             recovered = result.get("recovered_query_part_cells",0)>0
-            admission = json.loads((attempt/"recovery-admission.json").read_text()) if recovered else None
+            proactive = result.get("routing_mode")!="native_complete_unchanged"
+            admission = json.loads((attempt/"recovery-admission.json").read_text()) if proactive else None
             def unchanged():
                 if all(name in result for name in ("reference","query","tool")):
                     for name in ("reference","query","tool"):
@@ -216,8 +220,8 @@ def run_reference(args,*,runtime_root=None):
                             or current["manifest_sha256"]!=admission["helper_manifest_sha256"]):
                         raise wa.ExperimentError("native companion changed before atomic result publication")
             report["publication"] = publish_atomic(source,digest,output,attempt,check_unchanged=unchanged)
-            report.update(status="recovered_complete_published" if recovered else "native_complete_published",
-                          result_published=True,recovered_query_part_cells=result.get("recovered_query_part_cells",0),
+            report.update(status="proactive_complete_published" if proactive else "native_complete_published",
+                          result_published=True,proactive_routing=proactive,recovered_query_part_cells=result.get("recovered_query_part_cells",0),
                           recovered_output_admission=runtime["recovered_output_admission"],
                           recovered_native_confidence_published=recovered,
                           whole_query_dp_equivalence_certified=False,AS_reconstructed=False)

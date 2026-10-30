@@ -215,7 +215,31 @@ def make_plan(catalog, policy=WindowPolicy()):
             "failed_PAF_reuse": False, "result_published": False}
 
 
-def materialize(catalog, plan, destination):
+def check_prepared_scope(destination, prepared_workspace=None, *, leaf="selective"):
+    """Internal adapter-only exception to the standalone prepared-workspace ban.
+
+    Only runs/<name>_vs_ref/.long-cigar-attempt-*/selective[/inputs] is writable.
+    No CLI option exposes this permission, and no data/cache/runtime path qualifies.
+    """
+    destination = Path(destination).absolute()
+    workspace = Path(prepared_workspace).resolve() if prepared_workspace is not None else None
+    if workspace is not None:
+        try:
+            relative = destination.resolve().relative_to(workspace).parts
+        except ValueError as exc:
+            raise PlanError("managed proactive output escaped its prepared workspace") from exc
+        suffix = ("selective",) if leaf == "selective" else ("selective", "inputs")
+        if (destination != destination.resolve() or len(relative) != 3 + len(suffix)
+                or relative[0] != "runs" or not relative[1].endswith("_vs_ref")
+                or not relative[2].startswith(".long-cigar-attempt-") or relative[3:] != suffix
+                or not (workspace / ".prepare_lib").is_dir() or not (workspace / "metadata").is_dir()):
+            raise PlanError("managed proactive output requires an adapter-owned private attempt")
+    for parent in (destination.parent, *destination.parent.parents):
+        if ((parent / ".prepare_lib").exists() or (parent / "run_all.sh").exists()) and parent != workspace:
+            raise PlanError("prototype output cannot be inside a prepared workspace")
+
+
+def materialize(catalog, plan, destination, *, prepared_workspace=None):
     """Only whole-record partitioning, never base/window splitting or mapping.
 
     At most two output handles (ordinary group + current long record). All output
@@ -235,9 +259,7 @@ def materialize(catalog, plan, destination):
     destination = Path(destination).absolute()
     if destination.exists() or destination.is_symlink() or not destination.parent.is_dir():
         raise PlanError("fresh private materialization directory required")
-    if any((parent/".prepare_lib").exists() or (parent/"run_all.sh").exists()
-           for parent in (destination.parent, *destination.parent.parents)):
-        raise PlanError("prototype output cannot be inside a prepared workspace")
+    check_prepared_scope(destination, prepared_workspace, leaf="inputs")
     # Only metadata is created on a one-route one-original-input fast path.
     destination.mkdir(mode=0o700)
     report = {"status": "materializing", "analysis_started": False, "result_published": False,

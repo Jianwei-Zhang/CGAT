@@ -307,7 +307,7 @@ def prepare_package(args):
     patched_checkpoint = overlay_checkpoint((source/"tools/run_outer_checkpoints.py").read_text())
     patched_server_run = overlay_server_run((source/"tools/server_run.py").read_text())
     supported = (bundle.get("runtime_abi") or {}).get("legacy_2_17_checked") is True
-    admission = adapter.rp.POLICY if supported else "closed_pending_final_acceptance"
+    admission = adapter.pub.POLICY if supported else "closed_pending_final_acceptance"
     accepted = validation_receipt(getattr(args,"validation_receipt",None),runtime_hashes=runtime_hashes,
                                   base_hashes={name:wa.sha256(source/name) for name in inventory},bundle=bundle)
     output.mkdir(mode=0o700)

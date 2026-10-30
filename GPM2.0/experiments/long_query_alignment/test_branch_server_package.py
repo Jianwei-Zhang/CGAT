@@ -71,7 +71,7 @@ class BranchServerPackageTests(unittest.TestCase):
         source=json.loads((server/"SOURCE.json").read_bytes())
         self.assertEqual(source["local_acceptance_sha256"],wa.sha256(server/"LOCAL_ACCEPTANCE.json"))
         self.assertIn("CUSTOMER ORIGINAL-DATA VALIDATION PENDING",(server/"BRANCH_README.txt").read_text())
-        self.assertEqual(sa.validate_runtime(server/"tools/long_cigar_recovery")["recovered_output_admission"],sa.rp.POLICY)
+        self.assertEqual(sa.validate_runtime(server/"tools/long_cigar_recovery")["recovered_output_admission"],sa.pub.POLICY)
 
     def test_stale_incomplete_or_overclaimed_local_acceptance_refuses_before_writing_package(self):
         self.args.validation_receipt=self.root/"acceptance.json"
@@ -251,10 +251,10 @@ class BranchServerPackageTests(unittest.TestCase):
         report=self.prepare()
         self.assertFalse(report["customer_deliverable"])
         self.assertFalse(report["production_ready"])
-        self.assertEqual(report["recovered_output_admission"],sa.rp.POLICY)
+        self.assertEqual(report["recovered_output_admission"],sa.pub.POLICY)
         runtime=self.args.out/"GPM_Server/tools/long_cigar_recovery"
         validated=sa.validate_runtime(runtime)
-        self.assertEqual(validated["recovered_output_admission"],sa.rp.POLICY)
+        self.assertEqual(validated["recovered_output_admission"],sa.pub.POLICY)
         self.assertEqual(validated["native_companion_sha256"],self.native["sha256"])
         self.assertIn("INTEGRATION CANDIDATE",(self.args.out/"GPM_Server/BRANCH_README.txt").read_text())
 

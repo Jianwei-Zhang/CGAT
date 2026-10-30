@@ -197,3 +197,45 @@ query 一次扫描 → 长度、记录范围、身份、分流计划
 3. 新主动入口的真实默认多分段大参考、完整 Server 下游和导出验收。
 4. 最终候选包、update.sh/run_all.sh 自动更新接线及官方 Release 源码包更新与回滚验证。
 5. 客户原始全数据仍未执行；不能拿本地控制替代客户生物学结果验收。
+
+
+## 第三轮推进：候选 Server 实际入口（2026-10-30）
+
+- `server_alignment.py` 已改用主动分流驱动，不再调用原 native-first experiment。
+  包内 manifest 使用独立的 `proactive-original-chain-native-selection-v1` 策略，
+  新的三个 runtime 模块全部纳入逐文件来源校验；旧策略标签不能启用新入口。
+- prepared workspace 只向内部 adapter 开放严格的
+  `runs/*_vs_ref/.long-cigar-attempt-*/selective[/inputs]` 私有位置，
+  无用户 CLI/配置开关，不允许覆盖 data、`.prepare_lib` 或其他运行目录。
+- 正常路径仍原样发布 native 字节，不查 helper；prepared 正常命令保持原来的
+  无额外 wall-time 上限。混合普通组同样保留这一点。
+- 先完成所有单元并通过新的独立准入，再原子发布；adapter 与驱动不会各做一遍
+  准入。全长但全部无候选的输入可发布经过校验的零字节 PAF，不误冒充普通路径。
+- adapter 的日志、原子 no-clobber、旧结果隔离、信号/子进程组取消和最终源身份
+  复核保持生效。此时正式 Server 源码的生成接线尚未改；仅候选打包工具启用新 adapter。
+
+验证：整套 **400 项通过，无跳过**（`adapter-all-tests.log`）。其中新增 4 项实际
+prepared-workspace/scope 检查，包含正常 PAF 逐字节对照、混合恢复发布、全长 N-only
+零结果发布；实际 mapper/helper 均启用。另有 18 项打包测试通过。
+
+真实 270 Mb 混合输入通过**已打包 adapter 子进程**，在隔离 prepared workspace
+生成正式形态的 `result.paf`，与前轮已独立检查的私有结果逐字节相同；9 普通 + 1 长，
+6 个原生子进程全部成功，只构建 1 次索引，无先失败的原始整批调用。
+这仍不是完整 run.sh 下游或客户数据验收。
+
+证据位于 `/tmp/cgat-proactive-integration-20261030/`：
+
+- `adapter-all-tests.log`：400 项通过。
+- `adapter-package-tests.log`：18 项打包检查。
+- `adapter-dev/CGAT-minimap2-branch-unvalidated.tar.gz`：开发快照，**不是客户交付包**。
+- `adapter-large/adapter-control.json`：实际打包 adapter 的校验记录。
+- `adapter-large/runs/mixed_vs_ref/.long-cigar-attempt-1ph2fhrc/server-alignment.json`。
+
+打包大用例绑定 runtime SHA
+`ace8d4018a4c9b33f4901c74ea9204122edc619ceff1e7d15141ffdebda399f5`，
+结果 SHA `612ac26152badf5c3ee15f89c3b4cef4aa286b523419ce638420ba068a40ce77`。
+该快照打包后工作树补充了输入路径规范化及 standalone helper 终检，均由本轮
+400 项重新覆盖；不能把上述大用例当作未来最终源码包的完整验收。
+
+下一步：窄范围的同一参考任务失败后分组复用（输入/tool/runtime 身份失效即不复用），
+然后完整新流程与最终发布包验收；不引入通用调度/内存框架或让用户编写配置。
