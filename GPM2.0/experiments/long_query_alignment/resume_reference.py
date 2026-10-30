@@ -150,6 +150,7 @@ def runtime_tree(root):
     native = nst.validate_bundle(root/"native"/build.host_platform())
     names = [*sa.RUNTIME_FILES,sa.MANIFEST,BASE,
              f"native/{native['platform']}/{build.BINARY}",f"native/{native['platform']}/{build.MANIFEST}"]
+    names += [f"native/{native['platform']}/{name}" for name in native.get("third_party_licenses_sha256",{})]
     files = {name:{"sha256":wa.sha256(regular(root,name)),"mode":stat.S_IMODE((root/name).stat().st_mode)} for name in names}
     return checked,json_file(root,BASE),files
 
@@ -322,7 +323,7 @@ def handoff(workspace,server_source,run_id,units,manager):
     if any(wa.sha256(regular(workspace,n))!=h for n,h in snapshots.items()):
         raise wa.ExperimentError("workspace metadata changed during reference handoff planning")
     report = {"schema":1,"scope":"unfinished_initial_reference_only","analysis_started":False,
-              "production_ready":False,"recovered_output_admission":"closed_pending_final_acceptance",
+              "production_ready":False,"recovered_output_admission":checked["recovered_output_admission"],
               "preserved_completed_units":[],"already_adapted_units":[],"prior_recoveries":recovered}
     if target is None:
         return {**report,"status":"not_applicable_preset_unchanged"}

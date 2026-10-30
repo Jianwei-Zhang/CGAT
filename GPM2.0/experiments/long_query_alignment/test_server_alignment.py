@@ -1,4 +1,4 @@
-"""Deferred packaged-adapter checks. Written only; no checks executed this phase."""
+"""Adapter publication/lifecycle units; real acceptance has separate receipts."""
 from __future__ import annotations
 
 import argparse
@@ -65,6 +65,49 @@ class ServerAlignmentTests(unittest.TestCase):
         self.assertFalse(result["customer_configuration_required"])
         self.assertEqual(result["publication"]["sha256"],wa.sha256(self.run/"result.paf"))
         self.assertTrue((Path(result["attempt"])/"publication.complete.paf").is_file())
+
+    def test_source_checked_native_success_stays_opaque_without_recovery_lookup(self):
+        self.manifest.update(status="source_checked_recovery_runtime",recovered_output_admission=sa.rp.POLICY,
+                             native_companion_sha256="a"*64,native_companion_platform="linux-x86_64")
+        wa.write_json(self.runtime/sa.MANIFEST,self.manifest)
+        with patch.object(sa.nst,"validate_bundle",side_effect=AssertionError("normal native output must stay lazy")):
+            report = self.execute()
+        self.assertEqual(report["status"],"native_complete_published")
+        self.assertFalse(report["recovered_native_confidence_published"])
+        self.assertEqual((self.run/"result.paf").read_bytes(),b"opaque complete native PAF bytes\n")
+
+    def test_original_source_change_after_mapping_prevents_publication(self):
+        tool=self.root/"mock-tool";tool.write_bytes(b"mock identity only")
+        def changed(options,**kwargs):
+            report=self.native(options,**kwargs)
+            report.update(reference=sa.nf.source_identity(self.target),query=sa.nf.source_identity(self.query),
+                          tool={"path":str(tool),**sa.nf.source_identity(tool)})
+            self.query.write_bytes(b">q\nTTTT\n")
+            wa.write_json(options.out/"selective-reference.json",report)
+            return report
+        with self.assertRaisesRegex(wa.ExperimentError,"input/tool changed"):
+            self.execute(changed)
+        self.assertFalse((self.run/"result.paf").exists())
+
+    def test_source_guard_is_rechecked_after_copy_before_the_atomic_link(self):
+        attempt=self.run/"guarded-attempt";attempt.mkdir()
+        source=attempt/"source.paf";source.write_bytes(b"complete bytes")
+        calls=[]
+        def guard():
+            calls.append(True)
+            if len(calls)==2:
+                raise wa.ExperimentError("source changed during copy")
+        with self.assertRaisesRegex(wa.ExperimentError,"source changed during copy"):
+            sa.publish_atomic(source,wa.sha256(source),self.run/"result.paf",attempt,check_unchanged=guard)
+        self.assertEqual(len(calls),2)
+        self.assertFalse((self.run/"result.paf").exists())
+        self.assertTrue((attempt/"publication.complete.paf").exists())
+
+    def test_policy_label_alone_cannot_enable_an_unvalidated_runtime(self):
+        self.manifest["recovered_output_admission"]=sa.rp.POLICY
+        wa.write_json(self.runtime/sa.MANIFEST,self.manifest)
+        with self.assertRaisesRegex(wa.ExperimentError,"source/contract"):
+            self.execute()
 
     def test_previous_output_is_quarantined_not_destroyed_or_reused(self):
         (self.run/"result.paf").write_bytes(b"prior complete result")

@@ -1,4 +1,4 @@
-"""Deferred handoff/rollback checks. NOT RUN; mocks are not customer acceptance."""
+"""Handoff/rollback unit tests; mocks are not customer-data acceptance."""
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -108,6 +108,17 @@ class ReferenceResumeTests(unittest.TestCase):
 
     def assert_preserved(self):
         self.assertEqual({n:(self.ws/n).read_bytes() for n in self.preserved},self.preserved)
+
+    def test_runtime_handoff_inventory_preserves_bundled_static_zlib_license(self):
+        relative=f"native/{self.platform}/ZLIB_LICENSE_AND_HEADER.txt"
+        path=self.runtime/relative;path.write_text("fixture license only\n")
+        native={"platform":self.platform,"third_party_licenses_sha256":{path.name:wa.sha256(path)}}
+        with patch.object(rr.build,"host_platform",return_value=self.platform), \
+             patch.object(rr.nst,"validate_bundle",return_value=native):
+            checked,base,files=rr.runtime_tree(self.runtime)
+        self.assertIn(relative,files)
+        self.assertEqual(files[relative]["sha256"],wa.sha256(path))
+        self.assertTrue(rr.compare_tree(self.runtime,files))
 
     def test_only_unfinished_command_is_adapted_and_original_logs_data_results_GRT_are_preserved(self):
         result = self.execute(complete={"ref:a"})

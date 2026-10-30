@@ -1,4 +1,4 @@
-"""Deferred branch overlay/package definitions. NOT executed in implementation."""
+"""Source-overlay, package-integrity and validation-attestation unit tests."""
 from __future__ import annotations
 
 import argparse
@@ -48,6 +48,55 @@ class BranchServerPackageTests(unittest.TestCase):
         with patch.object(package.nst,"validate_bundle",return_value=self.native), \
              patch.object(package,"source_inventory",return_value=(self.inventory,{"mock":True})):
             return package.prepare_package(self.args)
+
+    def acceptance(self):
+        self.native["runtime_abi"]={"legacy_2_17_checked":True}
+        return {"schema":1,"status":"local_acceptance_passed_customer_validation_pending",
+            "customer_original_data_validated":False,"runtime_files_sha256":sa.runtime_files(Path(sa.__file__).parent),
+            "base_server_files_sha256":dict(self.before),"native_companion_sha256":self.native["sha256"],
+            "native_companion_manifest_sha256":self.native["manifest_sha256"],
+            "checks":{name:{"passed":True,"receipt_sha256":"a"*64} for name in package.VALIDATION_CHECKS}}
+
+    def test_customer_candidate_requires_exact_source_bound_complete_local_receipt(self):
+        self.args.validation_receipt=self.root/"acceptance.json"
+        wa.write_json(self.args.validation_receipt,self.acceptance())
+        report=self.prepare()
+        self.assertTrue(report["customer_deliverable"])
+        self.assertFalse(report["production_ready"])
+        self.assertTrue(report["customer_validation_pending"])
+        self.assertEqual(report["status"],"locally_validated_customer_candidate_prepared")
+        self.assertIn("candidate-linux-x86_64",report["archive"])
+        server=self.args.out/"GPM_Server"
+        self.assertEqual(json.loads((server/"LOCAL_ACCEPTANCE.json").read_bytes()),self.acceptance())
+        source=json.loads((server/"SOURCE.json").read_bytes())
+        self.assertEqual(source["local_acceptance_sha256"],wa.sha256(server/"LOCAL_ACCEPTANCE.json"))
+        self.assertIn("CUSTOMER ORIGINAL-DATA VALIDATION PENDING",(server/"BRANCH_README.txt").read_text())
+        self.assertEqual(sa.validate_runtime(server/"tools/long_cigar_recovery")["recovered_output_admission"],sa.rp.POLICY)
+
+    def test_stale_incomplete_or_overclaimed_local_acceptance_refuses_before_writing_package(self):
+        self.args.validation_receipt=self.root/"acceptance.json"
+        changes=(lambda v:v["runtime_files_sha256"].update({"server_alignment.py":"0"*64}),
+            lambda v:v["base_server_files_sha256"].update({"prepare.sh":"0"*64}),
+            lambda v:v.update(native_companion_sha256="0"*64),
+            lambda v:v.update(native_companion_manifest_sha256="0"*64),
+            lambda v:v.update(customer_original_data_validated=True),
+            lambda v:v["checks"].pop("same_command_resume"),
+            lambda v:v["checks"]["server_quality"].update(passed=False),
+            lambda v:v["checks"]["app_import_export"].update(receipt_sha256="not-a-sha"))
+        for change in changes:
+            with self.subTest(change=change):
+                value=self.acceptance();change(value);wa.write_json(self.args.validation_receipt,value)
+                with self.assertRaisesRegex(wa.ExperimentError,"validation receipt"):self.prepare()
+                self.assertFalse(self.args.out.exists())
+
+    def test_delivery_attestation_cannot_relabel_an_untested_platform_or_host_only_build(self):
+        self.args.validation_receipt=self.root/"acceptance.json"
+        for platform,abi in (("linux-aarch64",True),("linux-x86_64",False)):
+            value=self.acceptance();wa.write_json(self.args.validation_receipt,value)
+            self.native.update(platform=platform,runtime_abi={"legacy_2_17_checked":abi})
+            with self.assertRaisesRegex(wa.ExperimentError,"validation receipt"):self.prepare()
+            self.assertFalse(self.args.out.exists())
+        self.native["platform"]="linux-x86_64"
 
     def test_plan_only_requires_no_companion_read_source_scan_or_file_creation(self):
         with patch.object(package.nst,"validate_bundle",side_effect=AssertionError("must not inspect companion")), \
@@ -181,6 +230,18 @@ class BranchServerPackageTests(unittest.TestCase):
         relative = "tools/long_cigar_recovery/native/linux-x86_64/"+license_path.name
         self.assertEqual(report["packaged_files_sha256"][relative],wa.sha256(license_path))
         self.assertEqual((self.args.out/"GPM_Server"/relative).read_bytes(),license_path.read_bytes())
+
+    def test_portable_artifact_enables_only_source_checked_per_result_admission_not_delivery_claims(self):
+        self.native["runtime_abi"]={"legacy_2_17_checked":True,"maximum_glibc":"2.14"}
+        report=self.prepare()
+        self.assertFalse(report["customer_deliverable"])
+        self.assertFalse(report["production_ready"])
+        self.assertEqual(report["recovered_output_admission"],sa.rp.POLICY)
+        runtime=self.args.out/"GPM_Server/tools/long_cigar_recovery"
+        validated=sa.validate_runtime(runtime)
+        self.assertEqual(validated["recovered_output_admission"],sa.rp.POLICY)
+        self.assertEqual(validated["native_companion_sha256"],self.native["sha256"])
+        self.assertIn("INTEGRATION CANDIDATE",(self.args.out/"GPM_Server/BRANCH_README.txt").read_text())
 
     def test_missing_prebuilt_companion_does_not_create_an_artifact_or_compile(self):
         self.args.native_state_bundle = None

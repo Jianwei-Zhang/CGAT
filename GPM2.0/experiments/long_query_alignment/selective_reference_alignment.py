@@ -19,6 +19,7 @@ import guided_alignment as ga
 import minimap_index_context as mic
 import native_chain_state as nst
 import native_first as nf
+import recovery_publication as rp
 import native_evaluation as ne
 import windowed_alignment as wa
 
@@ -134,10 +135,10 @@ def experiment(args,*,prepared_workspace=None):
         tool_identity = nf.source_identity(Path(mm))
         tool_hash = tool_identity["sha256"]
         version = subprocess.check_output([mm,"--version"],text=True,timeout=5).strip()
-        report.update(tool={"path":mm,"sha256":tool_hash,"version":version},
+        report.update(tool={"path":mm,**tool_identity,"version":version},
                       reference=target_identity,query=query_identity,
                       helper_sha256={Path(module.__file__).name:wa.sha256(Path(module.__file__))
-                                     for module in (ga,wa,mic,nst,nf,ne)})
+                                     for module in (ga,wa,mic,nst,nf,ne,rp)})
 
         def unchanged():
             if (not nf.identity_unchanged(target_path,target_identity)
@@ -219,7 +220,15 @@ def experiment(args,*,prepared_workspace=None):
                     name,part["part_index"],validator,native_evaluated={
                         "path":result["native_recovery"]["native_evaluated_paf"],
                         "sha256":result["native_recovery"]["native_evaluated_sha256"]})
-                return {"query":name,"rows":count,"guidance_sha256":wa.sha256(options.out/"guidance.json"),
+                publication = {}
+                if (native_bundle.get("runtime_abi") or {}).get("legacy_2_17_checked") is True:
+                    proof = rp.capture_leaf(name,part,options.out,result,witness,
+                        merger.evaluated_cells[(part["part_index"],name)],query_sha256=query.identity["sha256"],
+                        reference_sha256=target.identity["sha256"],bundle=native_bundle)
+                    proof_path = options.out/rp.PROOF
+                    wa.write_json(proof_path,proof)
+                    publication = {"publication_proof_path":str(proof_path),"publication_proof_sha256":wa.sha256(proof_path)}
+                return {"query":name,"rows":count,**publication,"guidance_sha256":wa.sha256(options.out/"guidance.json"),
                         "long_operation_witness_sha256":wa.sha256(options.out/"long-operation-witness.json"),
                         "long_operation_witness":witness,"native_confidence_promoted":False,
                         "native_evaluation_pair":merger.evaluated_cells[(part["part_index"],name)]}

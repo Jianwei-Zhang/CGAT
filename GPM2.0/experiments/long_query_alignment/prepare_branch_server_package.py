@@ -4,7 +4,8 @@
 Copy a fresh Server tree and overlay initial-reference command generation there.
 Never edits published Server sources, current workspaces, install/update scripts
 or official Release assets. No compile, download, test, job or customer config.
-The development package CANNOT publish recovered output until final acceptance.
+A customer-validation artifact additionally requires a source-bound maintainer
+acceptance receipt. This does not certify the unavailable customer FASTA.
 """
 from __future__ import annotations
 
@@ -208,6 +209,49 @@ def verify_archive(archive,expected):
     return {"verified_regular_files":len(seen),"member_hashes_equal":True}
 
 
+VALIDATION_CHECKS = frozenset((
+    "unit_suite", "native_contract", "grt_final_path", "long_identity", "default_multipart",
+    "publication_controls", "legacy_runtime", "packaged_lifecycle", "packaged_full_workflow",
+    "same_command_resume", "server_quality", "merge_compatibility", "app_import_export",
+))
+
+
+def validation_receipt(path,*,runtime_hashes,base_hashes,bundle):
+    """Maintainer attestation of completed checks, bound to exact shipped inputs.
+
+    Not a customer config or a cryptographic test runner. Individual raw receipt
+    hashes remain auditable; labels alone never enable recovered PAF admission.
+    """
+    if path is None:
+        return None
+    path = Path(path)
+    if (not path.is_file() or path.is_symlink() or path.stat().st_size>1024*1024):
+        raise wa.ExperimentError("validation receipt must be a bounded regular JSON file")
+    try:
+        value = json.loads(path.read_bytes())
+    except (ValueError,UnicodeError) as exc:
+        raise wa.ExperimentError("invalid validation receipt JSON") from exc
+    if (type(value) is not dict or value.get("schema")!=1
+            or value.get("status")!="local_acceptance_passed_customer_validation_pending"
+            or value.get("customer_original_data_validated") is not False
+            or value.get("runtime_files_sha256")!=runtime_hashes
+            or value.get("base_server_files_sha256")!=base_hashes
+            or bundle.get("platform")!="linux-x86_64"
+            or value.get("native_companion_sha256")!=bundle["sha256"]
+            or value.get("native_companion_manifest_sha256")!=bundle["manifest_sha256"]
+            or (bundle.get("runtime_abi") or {}).get("legacy_2_17_checked") is not True):
+        raise wa.ExperimentError("validation receipt does not bind this exact runtime/Server/portable companion")
+    checks = value.get("checks")
+    if type(checks) is not dict or set(checks)!=VALIDATION_CHECKS:
+        raise wa.ExperimentError("validation receipt omits required local acceptance checks")
+    for name,row in checks.items():
+        if (type(row) is not dict or row.get("passed") is not True
+                or type(row.get("receipt_sha256")) is not str
+                or adapter.HASH.fullmatch(row["receipt_sha256"]) is None):
+            raise wa.ExperimentError("validation receipt has an incomplete check: "+name)
+    return value
+
+
 def prepare_package(args):
     output = args.out.resolve()
     source = args.server_source.resolve()
@@ -238,9 +282,13 @@ def prepare_package(args):
     patched_prepare = overlay_prepare(prepare_original)
     patched_checkpoint = overlay_checkpoint((source/"tools/run_outer_checkpoints.py").read_text())
     patched_server_run = overlay_server_run((source/"tools/server_run.py").read_text())
+    supported = (bundle.get("runtime_abi") or {}).get("legacy_2_17_checked") is True
+    admission = adapter.rp.POLICY if supported else "closed_pending_final_acceptance"
+    accepted = validation_receipt(getattr(args,"validation_receipt",None),runtime_hashes=runtime_hashes,
+                                  base_hashes={name:wa.sha256(source/name) for name in inventory},bundle=bundle)
     output.mkdir(mode=0o700)
     report = {"schema":1,"status":"preparing_unvalidated_development_package","production_ready":False,
-              "customer_deliverable":False,"recovered_output_admission":"closed_pending_final_acceptance",
+              "customer_deliverable":accepted is not None,"customer_validation_pending":True,"recovered_output_admission":admission,
               "official_release_modified":False,"original_sources_modified":False,"tests_executed":False,
               "compilation_performed":False,"customer_configuration_required":False,"native_companion":bundle,
               "package_builder_sha256":wa.sha256(Path(__file__)),"source_revision":source_revision}
@@ -265,8 +313,9 @@ def prepare_package(args):
             "source_profiles":[{"revision":"package_base","base_tools_files_sha256":base_tools,
                                 "reference_launch_checkpoint_recipe_equal":True},*resume_profiles],
             "base_prepare_sha256":base_hashes["prepare.sh"],"source_revision":source_revision})
-        runtime_receipt = {"schema":1,"status":"unvalidated_branch_runtime","scope":"initial_reference_asm10_only",
-            "files_sha256":runtime_hashes,"recovered_output_admission":"closed_pending_final_acceptance",
+        runtime_receipt = {"schema":1,"status":"source_checked_recovery_runtime" if supported else "unvalidated_branch_runtime",
+            "scope":"initial_reference_asm10_only",
+            "files_sha256":runtime_hashes,"recovered_output_admission":admission,
             "native_companion_platform":bundle["platform"],"native_companion_sha256":bundle["sha256"],
             "handoff_base_sha256":wa.sha256(runtime/resume.BASE),
             "production_ready":False,"customer_configuration_required":False}
@@ -278,20 +327,32 @@ def prepare_package(args):
             if (server/"SOURCE.base.json").exists():
                 raise wa.ExperimentError("source already contains a saved baseline receipt; refusing to overwrite provenance")
             (server/"SOURCE.json").rename(server/"SOURCE.base.json")
-        wa.write_json(server/"SOURCE.json",{"schema":1,"kind":"unvalidated_minimap2_hypothesis_branch",
-            "official_release":False,"production_ready":False,"base_server_files_sha256":base_hashes,
+        if accepted is not None:
+            wa.write_json(server/"LOCAL_ACCEPTANCE.json",accepted)
+        wa.write_json(server/"SOURCE.json",{"schema":1,"kind":"locally_validated_minimap2_recovery_candidate" if accepted else "unvalidated_minimap2_hypothesis_branch",
+            "official_release":False,"production_ready":False,"customer_deliverable":accepted is not None,
+            "local_acceptance_sha256":wa.sha256(server/"LOCAL_ACCEPTANCE.json") if accepted else None,
+            "base_server_files_sha256":base_hashes,
             "source_revision":source_revision,
             "branch_runtime_sha256":wa.sha256(runtime/adapter.MANIFEST),
             "prepare_before_sha256":base_hashes["prepare.sh"],"prepare_after_sha256":wa.sha256(server/"prepare.sh"),
-            "recovered_output_admission":"closed_pending_final_acceptance"})
+            "recovered_output_admission":admission})
         (server/"BRANCH_README.txt").write_text(
-            "UNVALIDATED DEVELOPMENT PACKAGE - NOT A CUSTOMER REPAIR RELEASE\n"
+            ("LOCALLY VALIDATED RECOVERY CANDIDATE - CUSTOMER ORIGINAL-DATA VALIDATION PENDING\n" if accepted else
+             "RECOVERY INTEGRATION CANDIDATE - CUSTOMER DELIVERY ACCEPTANCE STILL REQUIRED\n" if supported else
+             "UNVALIDATED DEVELOPMENT PACKAGE - NOT A CUSTOMER REPAIR RELEASE\n")+
             "Existing run.sh interface is unchanged. Only initial-reference asm10 calls use the internal adapter.\n"
-            "Native-complete output is published unchanged. Recovery candidates remain private and exit nonzero;\n"
-            "formal recovered output admission is CLOSED pending final correctness/confidence acceptance.\n"
+            "Native-complete output is published unchanged. " +
+            ("Supported recovery requires complete original cells, actual singleton aborts, source-supported long-operation evidence,\n"
+             "paired paths and metadata bound to actual native selector input/stdout. Unknown recovery MAPQ is never published.\n"
+             if supported else
+             "Recovery candidates remain private and exit nonzero; formal recovered output admission is CLOSED.\n")+
             "No user configuration, compiler, download or FASTA splitting is required.\n"
-            "Do not replace an existing installation/workspace or official Release asset with this package.\n"
-            "Rollback: retain the old installation; create an independent workspace for this development package.\n"
+            "Extract into a separate installation directory; never overwrite the old installation or official Release.\n"
+            "Use its run.sh with the original arguments. Known failed-workspace handoff is source-checked and transactional.\n"
+            "Keep the old installation, workspace, logs and .run_all/long-cigar-handoff-* backups. No FASTA is deleted.\n"
+            "Switching the installation alone does NOT undo an adapted workspace. For a pure old-code rollback,\n"
+            "use the old installation with a new output directory; the original minimap2 limitation remains.\n"
         )
         if adapter.runtime_files(runtime)!=runtime_hashes or adapter.runtime_files(runtime_source)!=runtime_hashes:
             raise wa.ExperimentError("runtime source attribution changed while packaging")
@@ -300,7 +361,7 @@ def prepare_package(args):
                 raise wa.ExperimentError("original Server source changed while packaging")
         adapter.validate_runtime(runtime)
         packaged_files = {p.relative_to(server).as_posix():wa.sha256(p) for p in sorted(server.rglob("*")) if p.is_file()}
-        archive = output/"CGAT-minimap2-branch-unvalidated.tar.gz"
+        archive = output/("CGAT-minimap2-recovery-candidate-linux-x86_64.tar.gz" if accepted else "CGAT-minimap2-branch-unvalidated.tar.gz")
         with tarfile.open(archive,"w:gz",format=tarfile.PAX_FORMAT) as tar:
             # Add named regular members only. No broad recursive traversal can
             # absorb a cache, new binary or concurrent unrecorded source file.
@@ -309,7 +370,8 @@ def prepare_package(args):
         if any(wa.sha256(server/name)!=digest for name,digest in packaged_files.items()):
             raise wa.ExperimentError("packaged source tree changed while archiving")
         integrity = verify_archive(archive,packaged_files)
-        report.update(status="unvalidated_development_package_prepared",archive=str(archive),archive_integrity=integrity,
+        report.update(status="locally_validated_customer_candidate_prepared" if accepted else "unvalidated_development_package_prepared",
+                      local_acceptance_sha256=wa.sha256(server/"LOCAL_ACCEPTANCE.json") if accepted else None,archive=str(archive),archive_integrity=integrity,
                       archive_sha256=wa.sha256(archive),archive_bytes=archive.stat().st_size,
                       packaged_files_sha256=packaged_files,original_sources_unchanged=True)
     except BaseException as exc:
@@ -327,6 +389,8 @@ def main(argv=None):
     parser.add_argument("--native-state-bundle",type=Path,default=None)
     parser.add_argument("--resume-source-revision",action="append",default=[],
                         help="Maintainer-only immutable prior Server revision with the same original reference/launch/checkpoint recipe")
+    parser.add_argument("--validation-receipt",type=Path,default=None,
+                        help="Maintainer-only source-bound local acceptance attestation; never customer configuration")
     parser.add_argument("--execute",action="store_true")
     args = parser.parse_args(argv)
     if not args.execute:
@@ -334,7 +398,7 @@ def main(argv=None):
             "server_source":str(args.server_source),"output":str(args.out),
             "native_companion_required_from_maintainer":True,"no_files_or_commands_started":True,
             "resume_source_revisions":args.resume_source_revision,
-            "recovered_output_admission":"closed_pending_final_acceptance"},indent=2))
+            "recovered_output_admission":"requires_portable_artifact_and_per_result_proof"},indent=2))
         return 0
     try:
         report = prepare_package(args)
@@ -342,7 +406,7 @@ def main(argv=None):
         print(json.dumps({"status":"refused_or_failed","error":str(exc),"production_ready":False}))
         return 2
     print(json.dumps({"status":report["status"],"archive":report["archive"],"sha256":report["archive_sha256"],
-                      "production_ready":False,"customer_deliverable":False},indent=2))
+                      "production_ready":False,"customer_deliverable":report["customer_deliverable"]},indent=2))
     return 0
 
 
