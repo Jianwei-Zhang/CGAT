@@ -173,6 +173,15 @@ class BranchServerPackageTests(unittest.TestCase):
         self.assertEqual({name:wa.sha256(self.source/name) for name in self.inventory},self.before)
         self.assertIn("NOT A CUSTOMER REPAIR RELEASE",(server/"BRANCH_README.txt").read_text())
 
+    def test_static_zlib_license_is_preserved_in_customer_platform_bundle(self):
+        license_path = self.bundle/"ZLIB_LICENSE_AND_HEADER.txt"
+        license_path.write_text("fixture license only\n")
+        self.native["third_party_licenses_sha256"] = {license_path.name:wa.sha256(license_path)}
+        report = self.prepare()
+        relative = "tools/long_cigar_recovery/native/linux-x86_64/"+license_path.name
+        self.assertEqual(report["packaged_files_sha256"][relative],wa.sha256(license_path))
+        self.assertEqual((self.args.out/"GPM_Server"/relative).read_bytes(),license_path.read_bytes())
+
     def test_missing_prebuilt_companion_does_not_create_an_artifact_or_compile(self):
         self.args.native_state_bundle = None
         with patch.object(package.subprocess,"Popen",side_effect=AssertionError("no compiler allowed")), \

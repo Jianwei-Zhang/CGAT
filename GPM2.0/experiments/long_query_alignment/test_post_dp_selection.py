@@ -169,7 +169,7 @@ class NativeSourceOracleTests(unittest.TestCase):
         subprocess.run(["make","-C",str(copied),"-j2","libminimap2.a"],check=True,
                        capture_output=True,timeout=180)
         cls.exe = cls.root/"post-dp-native-oracle"
-        subprocess.run(["cc","-O2","-ffp-contract=off","-I",str(copied),
+        subprocess.run(["cc","-O2","-ffp-contract=off","-DHAVE_KALLOC","-I",str(copied),
                         str(Path(__file__).with_name("post_dp_native_oracle.c")),
                         str(copied/"libminimap2.a"),"-lz","-lm","-lpthread","-o",str(cls.exe)],
                        check=True,capture_output=True,timeout=60)

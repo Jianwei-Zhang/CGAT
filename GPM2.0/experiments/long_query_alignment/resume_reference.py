@@ -109,7 +109,12 @@ def direct_process_guard(workspace,*,proc_root=None):
         if not args:
             continue
         mapper = Path(args[0]).name=="minimap2"
-        for arg in args:
+        for position,arg in enumerate(args):
+            # A bare executable/option value is not a path relative to cwd.
+            # In particular "minimap2", "2" (-t) and "asm10" must not invent
+            # files inside runs/ and falsely block a completely unrelated job.
+            if mapper and position==0:
+                continue
             if arg.startswith("-") or "\n" in arg:
                 continue
             if not mapper and not arg.endswith((".sh",".py")):
@@ -119,6 +124,9 @@ def direct_process_guard(workspace,*,proc_root=None):
                 if not path.is_absolute():
                     path = (process/"cwd").resolve(strict=True)/path
                 path = path.resolve()
+                if (mapper and not Path(arg).is_absolute() and "/" not in arg
+                        and not path.exists() and args[position-1] not in ("-o","-d")):
+                    continue
             except (FileNotFoundError,ProcessLookupError):
                 continue
             except (OSError,RuntimeError):

@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import platform
+import re
 import shlex
 import shutil
 import subprocess
@@ -80,6 +81,50 @@ def export_pinned_source(repository, destination):
     return receipt
 
 
+
+def portable_options(args):
+    """Maintainer-only build inputs; never add customer compiler/configuration."""
+    flags = [*FLAGS,"-std=gnu17"]
+    cppflags = ["-DHAVE_KALLOC"]
+    libraries = ["-lz"]
+    dependencies = {}
+    sysroot = getattr(args,"sysroot",None)
+    if sysroot is not None:
+        sysroot = Path(sysroot).resolve()
+        if not all((sysroot/name).is_file() for name in ("usr/include/features.h","usr/lib64/Scrt1.o","lib64/libc.so.6")):
+            raise wa.ExperimentError("maintainer sysroot lacks canonical glibc headers/startup/runtime files")
+        flags += ["--sysroot="+str(sysroot),"-B"+str(sysroot/"usr/lib64")+"/"]
+        dependencies["sysroot_features_sha256"] = wa.sha256(sysroot/"usr/include/features.h")
+    prefix = getattr(args,"zlib_prefix",None)
+    if prefix is not None:
+        prefix = Path(prefix).resolve()
+        paths = {name:prefix/name for name in ("include/zlib.h","include/zconf.h","lib/libz.a")}
+        if not all(path.is_file() for path in paths.values()):
+            raise wa.ExperimentError("maintainer static-zlib prefix lacks headers or libz.a")
+        cppflags += ["-I"+str(prefix/"include")]
+        libraries = [str(paths["lib/libz.a"])]
+        dependencies["static_zlib_files_sha256"] = {name:wa.sha256(path) for name,path in paths.items()}
+    return flags,cppflags,libraries,dependencies
+
+
+def inspect_elf(binary,*,legacy=False):
+    reader = shutil.which("readelf")
+    if not reader:
+        raise wa.ExperimentError("maintainer ELF inspector is unavailable")
+    symbols = subprocess.check_output([reader,"-W","--dyn-syms",str(binary)],text=True,timeout=30)
+    dynamic = subprocess.check_output([reader,"-d",str(binary)],text=True,timeout=30)
+    versions = sorted({tuple(map(int,v.split("."))) for v in re.findall(r"GLIBC_([0-9]+(?:\.[0-9]+)+)",symbols)})
+    other_versions = sorted({name for name in re.findall(r"\bGLIBC_[A-Za-z0-9_.]+",symbols)
+                             if not re.fullmatch(r"GLIBC_[0-9]+(?:\.[0-9]+)+",name)})
+    paths = re.findall(r"\((?:RPATH|RUNPATH)\).*?\[([^\]]*)\]",dynamic)
+    needed = re.findall(r"\(NEEDED\).*?\[([^\]]*)\]",dynamic)
+    if legacy and (not versions or versions[-1]>(2,17) or any(paths) or other_versions
+                   or set(needed)-{"libm.so.6","libpthread.so.0","libc.so.6","librt.so.1","libdl.so.2"}):
+        raise wa.ExperimentError("legacy companion must require at most glibc 2.17 and have no embedded RPATH")
+    return {"maximum_glibc":".".join(map(str,versions[-1])) if versions else None,
+            "needed_libraries":needed,"runtime_paths":paths,"other_glibc_requirements":other_versions,"legacy_2_17_checked":legacy}
+
+
 def build(args):
     output = args.out.resolve()
     if output.exists() or args.jobs < 1 or args.jobs > 64:
@@ -91,6 +136,7 @@ def build(args):
     if not compiler or not make or not archiver:
         raise wa.ExperimentError("maintainer build toolchain is unavailable; do not ask the customer to build")
     compiler,make,archiver = (str(Path(p).resolve()) for p in (compiler,make,archiver))
+    flags,cppflags,libraries,dependencies = portable_options(args)
     output.mkdir(parents=True,exist_ok=False)
     report = {"schema":1,"status":"building","protocol":1,"version":VERSION,"preset":"asm10",
               "upstream_commit":UPSTREAM_COMMIT,"platform":architecture,"binary":BINARY,
@@ -106,14 +152,20 @@ def build(args):
         helper_source = Path(__file__).with_name("native_chain_state.c")
         shutil.copyfile(helper_source,output/"native_chain_state.c")
         shutil.copyfile(source/"LICENSE.txt",output/"MINIMAP2_LICENSE.txt")
+        third_party_licenses = {}
+        if getattr(args,"zlib_prefix",None) is not None:
+            # The full upstream header includes the unmodified zlib license.
+            license_path = output/"ZLIB_LICENSE_AND_HEADER.txt"
+            shutil.copyfile(Path(args.zlib_prefix)/"include/zlib.h",license_path)
+            third_party_licenses[license_path.name] = wa.sha256(license_path)
         environment = {key:os.environ[key] for key in ("PATH","HOME","TMPDIR") if key in os.environ}
         environment.update(LC_ALL="C",TZ="UTC")
         commands = [[make,"-C",str(source),f"-j{args.jobs}","libminimap2.a",
-                     "CC="+shlex.quote(compiler),"AR="+shlex.quote(archiver),"CFLAGS="+" ".join(FLAGS)]]
+                     "CC="+shlex.quote(compiler),"AR="+shlex.quote(archiver),"CFLAGS="+shlex.join(flags),"CPPFLAGS="+shlex.join(cppflags)]]
         if architecture == "linux-aarch64":
             commands[0].append("aarch64=1")
-        commands.append([compiler,*FLAGS,"-I",str(source),str(output/"native_chain_state.c"),
-                         str(source/"libminimap2.a"),"-lz","-lm","-lpthread","-o",str(output/BINARY)])
+        commands.append([compiler,*flags,*cppflags,"-I",str(source),str(output/"native_chain_state.c"),
+                         str(source/"libminimap2.a"),*libraries,"-lm","-lpthread","-o",str(output/BINARY)])
         wa.write_json(output/"build.commands.json",commands)
         for number,command in enumerate(commands):
             with (output/f"build-{number}.stdout").open("xb") as stdout,(output/f"build-{number}.stderr").open("xb") as stderr:
@@ -125,7 +177,9 @@ def build(args):
         report.update(status="built_unvalidated",binary_sha256=wa.sha256(output/BINARY),
                       helper_source_sha256=wa.sha256(output/"native_chain_state.c"),
                       builder_sha256=wa.sha256(Path(__file__)),source_files_sha256=source_hashes,
-                      static_library_sha256=wa.sha256(source/"libminimap2.a"),cflags=FLAGS,
+                      static_library_sha256=wa.sha256(source/"libminimap2.a"),cflags=flags,cppflags=cppflags,
+                      dependencies=dependencies,third_party_licenses_sha256=third_party_licenses,
+                      runtime_abi=inspect_elf(output/BINARY,legacy=getattr(args,"sysroot",None) is not None),
                       compiler={"path":compiler,"sha256":wa.sha256(Path(compiler))},
                       archiver={"path":archiver,"sha256":wa.sha256(Path(archiver))},
                       make={"path":make,"sha256":wa.sha256(Path(make))})
@@ -143,6 +197,8 @@ def main():
     parser.add_argument("--out",type=Path,default=None)
     parser.add_argument("--compiler",default="cc")
     parser.add_argument("--jobs",type=int,default=2)
+    parser.add_argument("--sysroot",type=Path,default=None,help="Maintainer legacy glibc sysroot; verifies maximum ABI 2.17")
+    parser.add_argument("--zlib-prefix",type=Path,default=None,help="Maintainer static zlib headers/library; bundled license, no runtime zlib dependency")
     parser.add_argument("--execute",action="store_true",help="Explicit maintainer build, not a test or a customer command")
     args = parser.parse_args()
     args.out = args.out or default_bundle()

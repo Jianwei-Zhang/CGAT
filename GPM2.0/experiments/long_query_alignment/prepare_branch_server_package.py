@@ -229,7 +229,8 @@ def prepare_package(args):
     if args.native_state_bundle is None:
         raise wa.ExperimentError("maintainer must build the pinned companion before development packaging; never delegate this to the customer")
     bundle = nst.validate_bundle(args.native_state_bundle)
-    native_files = {build.BINARY:bundle["sha256"],build.MANIFEST:bundle["manifest_sha256"]}
+    native_files = {build.BINARY:bundle["sha256"],build.MANIFEST:bundle["manifest_sha256"],
+                    **bundle.get("third_party_licenses_sha256",{})}
     inventory,source_revision = source_inventory(source)
     runtime_hashes = adapter.runtime_files(runtime_source)
     resume_profiles = [resume_source_profile(source,revision) for revision in getattr(args,"resume_source_revision",[])]

@@ -46,7 +46,7 @@ class OriginalIndexPartGuidanceTests(unittest.TestCase):
             Path(argv[argv.index("-o")+1]).write_bytes(window_rows if name == "map" else chain_rows)
             return {"returncode":0}
         with patch.object(ga.shutil,"which",return_value=str(self.tool)), \
-             patch.object(ga.subprocess,"check_output",return_value="2.31-r1302\n"), \
+             patch.object(wa.subprocess,"check_output",return_value="2.31-r1302\n"), \
              patch.object(wa,"run_command",side_effect=command):
             options = self.options()
             if candidate_policy is not None:
@@ -132,7 +132,7 @@ class OriginalIndexPartGuidanceTests(unittest.TestCase):
     def test_ordinary_standalone_empty_mapping_remains_refused(self):
         with self.assertRaisesRegex(wa.ExperimentError,"no owned alignments"):
             with patch.object(ga.shutil,"which",return_value=str(self.tool)), \
-                 patch.object(ga.subprocess,"check_output",return_value="2.31-r1302\n"), \
+                 patch.object(wa.subprocess,"check_output",return_value="2.31-r1302\n"), \
                  patch.object(wa,"run_command",side_effect=lambda argv,*args:Path(argv[argv.index("-o")+1]).write_bytes(b"")):
                 wa.experiment(self.options(out=self.root/"legacy",allow_empty_index_part=False))
 

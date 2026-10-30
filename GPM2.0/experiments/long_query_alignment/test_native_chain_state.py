@@ -114,6 +114,26 @@ class NativeChainStateTests(unittest.TestCase):
         with self.assertRaisesRegex(wa.ExperimentError,"maintainer"):
             nst.validate_bundle(self.root/"missing")
 
+    def test_bundled_static_zlib_license_is_bound_and_cannot_be_omitted(self):
+        bundle,binary,manifest = self.bundle()
+        license_path = bundle/"ZLIB_LICENSE_AND_HEADER.txt"
+        license_path.write_text("fixture license only\n")
+        manifest["third_party_licenses_sha256"] = {license_path.name:wa.sha256(license_path)}
+        wa.write_json(bundle/build.MANIFEST,manifest)
+        with patch.object(build,"host_platform",return_value="fixture-platform"):
+            report = nst.validate_bundle(bundle)
+            self.assertEqual(report["third_party_licenses_sha256"],manifest["third_party_licenses_sha256"])
+            license_path.write_text("changed license\n")
+            with self.assertRaisesRegex(wa.ExperimentError,"license"):
+                nst.validate_bundle(bundle)
+
+    def test_foreign_license_path_is_rejected_not_followed(self):
+        bundle,binary,manifest = self.bundle()
+        manifest["third_party_licenses_sha256"] = {"../foreign.txt":"0"*64}
+        wa.write_json(bundle/build.MANIFEST,manifest)
+        with patch.object(build,"host_platform",return_value="fixture-platform"),self.assertRaisesRegex(wa.ExperimentError,"license"):
+            nst.validate_bundle(bundle)
+
     def test_builder_default_is_plan_only_even_without_source_checkout(self):
         output = self.root/"not-created"
         with patch("sys.argv",["build","--source",str(self.root/"absent"),"--out",str(output)]), \

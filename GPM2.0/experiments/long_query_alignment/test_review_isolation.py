@@ -1,4 +1,4 @@
-"""Deferred final-validation cases. NOT executed during implementation phase."""
+"""Synthetic archive contract tests; not scientific recovery acceptance."""
 from __future__ import annotations
 
 import copy
@@ -114,9 +114,17 @@ class ReviewIsolationTests(unittest.TestCase):
         with self.assertRaisesRegex(ri.ReviewError, "tool identity"):
             self.review(data)
         data = self.evidence()
-        data["plan.json"]["query"] = "/changed.fa"
-        with self.assertRaisesRegex(ri.ReviewError, "disagrees"):
+        # Leave scanned input identity valid so this isolates the plan comparison.
+        data["report.json"]["plan"]["query"] = "/changed.fa"
+        with self.assertRaisesRegex(ri.ReviewError, "plan.json disagrees with report plan"):
             self.review(data)
+
+    def test_query_scan_identity_is_rejected_before_stderr_attribution(self):
+        data = self.evidence()
+        data["inputs.json"]["query"]["path"] = "/changed.fa"
+        with patch.object(ri.TraceReview, "consume", side_effect=AssertionError("must validate input identity before attributing stderr")):
+            with self.assertRaisesRegex(ri.ReviewError, "input scan identity is missing or inconsistent"):
+                self.review(data)
 
     def test_unknown_duplicate_traversal_and_link_members_rejected(self):
         for name, kind in (("query.fa", tarfile.REGTYPE), ("../outside", tarfile.REGTYPE),

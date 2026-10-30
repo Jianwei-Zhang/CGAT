@@ -250,8 +250,11 @@ class ReferenceResumeTests(unittest.TestCase):
         (pid/"cwd").symlink_to(self.ws/"runs/a_vs_ref",target_is_directory=True)
         with self.assertRaisesRegex(wa.ExperimentError,"active standalone"):
             rr.direct_process_guard(self.ws,proc_root=proc)
-        (pid/"cmdline").write_bytes(b"minimap2\0/elsewhere/ref.fa\0/elsewhere/query.fa\0")
+        (pid/"cmdline").write_bytes(b"minimap2\0-t\0"+b"2\0-x\0asm10\0-o\0/elsewhere/out.paf\0/elsewhere/ref.fa\0/elsewhere/query.fa\0")
         rr.direct_process_guard(self.ws,proc_root=proc)
+        (pid/"cmdline").write_bytes(b"minimap2\0-o\0new-result.paf\0/elsewhere/ref.fa\0/elsewhere/query.fa\0")
+        with self.assertRaisesRegex(wa.ExperimentError,"active standalone"):
+            rr.direct_process_guard(self.ws,proc_root=proc)
 
 
 if __name__=="__main__":

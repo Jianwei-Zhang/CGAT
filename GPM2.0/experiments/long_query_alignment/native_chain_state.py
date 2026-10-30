@@ -58,9 +58,17 @@ def validate_bundle(directory=None):
             or not os.access(binary,os.X_OK) or wa.sha256(binary) != info.get("binary_sha256")
             or wa.sha256(Path(__file__).with_suffix(".c")) != info.get("helper_source_sha256")):
         raise wa.ExperimentError("native-state companion missing, stale, non-executable or changed")
+    licenses = info.get("third_party_licenses_sha256",{})
+    if type(licenses) is not dict or set(licenses)-{"ZLIB_LICENSE_AND_HEADER.txt"}:
+        raise wa.ExperimentError("native-state companion has unsupported third-party license files")
+    for name,digest in licenses.items():
+        path = directory/name
+        if not path.is_file() or path.is_symlink() or wa.sha256(path)!=digest:
+            raise wa.ExperimentError("native-state companion third-party license is missing or changed")
     return {"path":str(binary.resolve()),"sha256":info["binary_sha256"],"manifest_path":str(manifest.resolve()),
             "manifest_sha256":hashlib.sha256(raw).hexdigest(),"upstream_commit":build.UPSTREAM_COMMIT,
-            "platform":info["platform"],"production_ready":False,"execution_validated":False}
+            "platform":info["platform"],"production_ready":False,"execution_validated":False,
+            "third_party_licenses_sha256":licenses,"runtime_abi":info.get("runtime_abi")}
 
 
 def _lines(handle):
