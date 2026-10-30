@@ -1,0 +1,2 @@
+# Maintainer-built companion artifacts; never commit unvalidated native output.
+/native/

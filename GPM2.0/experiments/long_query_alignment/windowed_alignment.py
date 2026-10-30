@@ -8,6 +8,7 @@ CGAT, the original inputs, or an existing workspace. See README.md for limitatio
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager, ExitStack
 from collections import defaultdict
 from dataclasses import asdict, dataclass, replace
 import hashlib
@@ -108,7 +109,9 @@ class FastaStore:
         if fingerprint(self.source) != before:
             raise ExperimentError("FASTA changed during scan")
         self.identity = {"source": str(self.source), **before, "sha256": raw_hash.hexdigest()}
-        self.handle = spool.open("rb")
+        self.spool = spool.resolve()
+        self.spool_identity = fingerprint(self.spool)
+        self.handle = self.spool.open("rb")
 
     def fetch(self, name: str, start: int, end: int) -> bytes:
         record = self.records[name]
@@ -123,9 +126,52 @@ class FastaStore:
     def close(self):
         self.handle.close()
 
+    def check_binding(self, source):
+        """Borrow only a live store for exactly this unchanged source/spool.
+
+        Cheap metadata checks at stage boundaries avoid a new full hash pass.
+        Each stage still performs its existing source SHA verification at exit.
+        """
+        if (Path(source).resolve() != self.source or self.handle.closed
+                or self.spool.is_symlink() or fingerprint(self.spool) != self.spool_identity
+                or os.fstat(self.handle.fileno()).st_ino != self.spool_identity["inode"]
+                or any(fingerprint(self.source)[key] != self.identity[key]
+                       for key in ("size", "mtime_ns", "ctime_ns", "inode"))):
+            raise ExperimentError("shared sequence store changed, closed or belongs to another source")
+
     def unchanged(self):
+        try:
+            self.check_binding(self.source)
+        except (OSError, ExperimentError):
+            return False
         return all(fingerprint(self.source)[key] == self.identity[key]
                    for key in ("size", "mtime_ns", "ctime_ns", "inode")) and sha256(self.source) == self.identity["sha256"]
+
+
+@contextmanager
+def sequence_stores(target_path, query_path, root, *, shared_target=None, shared_query=None):
+    """Single owner, read-only sequential borrowers; never close borrowed handles.
+
+    Keyword-only stores are internal Python dependencies, not customer options.
+    No global cache, symlink alias, on-disk resume, or concurrent cursor sharing.
+    """
+    stores, owned = [], []
+    try:
+        for source, name, borrowed in ((target_path, "target", shared_target),
+                                        (query_path, "query", shared_query)):
+            if borrowed is None:
+                store = FastaStore(source, root / (name + ".bases"))
+                owned.append(store)
+            else:
+                if not isinstance(borrowed, FastaStore):
+                    raise ExperimentError("invalid shared sequence store")
+                borrowed.check_binding(source)
+                store = borrowed
+            stores.append(store)
+        yield stores
+    finally:
+        for store in owned:
+            store.close()
 
 
 @dataclass(frozen=True)
@@ -320,7 +366,7 @@ def coverage(intervals: list[tuple[int, int]]) -> dict:
     return {"covered_bases": sum(end - start for start, end in merged), "intervals": merged}
 
 
-def recover(raw: Path, output: Path, provenance: Path, windows: list[Window], query: FastaStore, target: FastaStore) -> dict:
+def recover(raw: Path, output: Path, provenance: Path, windows: list[Window], query: FastaStore, target: FastaStore, *, allow_empty_original_part=False) -> dict:
     by_alias = {window.alias: window for window in windows}
     query_intervals = defaultdict(list)
     target_intervals = defaultdict(list)
@@ -328,10 +374,17 @@ def recover(raw: Path, output: Path, provenance: Path, windows: list[Window], qu
     seen_windows = set()
     counts = {"raw_rows": 0, "owned_rows": 0, "context_only_rows": 0, "exact_duplicate_rows": 0}
     temporary = output.with_suffix(".paf.partial")
-    with raw.open() as source, temporary.open("x") as out, provenance.open("x") as audit:
-        for number, line in enumerate(source, 1):
-            if not line.endswith("\n"):
+    with raw.open("rb") as source, temporary.open("x") as out, provenance.open("x") as audit:
+        number = 0
+        while True:
+            raw_start = source.tell()
+            data = source.readline()
+            if not data:
+                break
+            number += 1
+            if not data.endswith(b"\n"):
                 raise ExperimentError("incomplete last PAF line")
+            line = data.decode("ascii")
             raw_hit = parse_hit(line, by_alias, target.records)
             window = by_alias[raw_hit.query]
             seen_windows.add(window.alias)
@@ -341,7 +394,9 @@ def recover(raw: Path, output: Path, provenance: Path, windows: list[Window], qu
             if (matches, block) != (raw_hit.matches, raw_hit.block):
                 raise ExperimentError("raw PAF match/block counts disagree with original bases")
             counts["raw_rows"] += 1
-            record = {"raw_line": number, "window": asdict(window), "raw_mapq": raw_hit.mapq,
+            record = {"raw_line": number,"raw_byte_start":raw_start,"raw_byte_end":source.tell(),
+                      "raw_sha256":hashlib.sha256(data).hexdigest(),
+                      "window": asdict(window), "raw_mapq": raw_hit.mapq,
                       "lifted": [hit.qs, hit.qe, hit.strand, hit.target, hit.ts, hit.te]}
             clipped = clip_to_core(hit, window)
             if clipped is None:
@@ -366,7 +421,7 @@ def recover(raw: Path, output: Path, provenance: Path, windows: list[Window], qu
                     query_intervals[clipped.query].append((clipped.qs, clipped.qe))
                     target_intervals[clipped.target].append((clipped.ts, clipped.te))
             audit.write(json.dumps(record) + "\n")
-    if not counts["owned_rows"]:
+    if not counts["owned_rows"] and not (allow_empty_original_part and counts["raw_rows"] == 0):
         raise ExperimentError("no owned alignments: empty output is not a successful workaround")
     summary = {**counts, "windows": len(windows), "windows_without_raw_hits": sorted(set(by_alias) - seen_windows),
                "queries": {name: {"length": record["length"], **coverage(query_intervals[name])}
@@ -398,91 +453,142 @@ def join_operations(operations) -> tuple[tuple[int, str], ...]:
     return tuple(result)
 
 
-def stitch_owned(source: Path, output: Path, provenance: Path, windows: list[Window], query: FastaStore, target: FastaStore) -> dict:
-    """Reciprocal-unique EXACT adjacency only; no gap filling or placement choice.
-
-    Chains may cross adjacent owned cores, never an original within-window split.
-    Forks and disjoint/reversed paths remain separate. This recovers simple row
-    continuity, not minimap2's whole-contig scoring/ranking semantics.
-    """
-    by_alias = {w.alias: w for w in windows}
-    records = []
-    entries, exits = defaultdict(list), defaultdict(list)
-    for number, line in enumerate(source.read_text().splitlines(), 1):
-        fields = line.split("\t")
-        original = fields[0]
-        length = query.records[original]["length"]
-        whole = Window(original, original, length, 0, length, 0, length)
-        hit = parse_hit(line, {original: whole}, target.records)
-        tags = [tag[5:] for tag in fields[12:] if tag.startswith("zw:Z:")]
-        if len(tags) != 1 or tags[0] not in by_alias:
-            raise ExperimentError("missing window provenance during stitching")
-        w = by_alias[tags[0]]
-        if hit.query != w.query or not w.core_start <= hit.qs < hit.qe <= w.core_end:
-            raise ExperimentError("owned row escaped its original core")
-        startq, endq = (hit.qs, hit.qe) if hit.strand == "+" else (hit.qe, hit.qs)
-        base = (hit.query, hit.target, hit.strand)
-        entry, exit_key = (*base, startq, hit.ts), (*base, endq, hit.te)
-        records.append((hit, w, entry, exit_key))
-        entries[entry].append(number - 1)
-        exits[exit_key].append(number - 1)
-    following, preceding = {}, {}
+def _stitch_links(records,entries,exits,seam):
+    following,preceding = {},{}
     forks = 0
-    for index, (hit, w, _entry, end) in enumerate(records):
-        next_rows = entries.get(end, [])
-        if len(next_rows) != 1 or len(exits[end]) != 1:
+    outgoing,incoming = defaultdict(list),defaultdict(list)
+    for index,(hit,window,_entry,end) in enumerate(records):
+        if seam is not None and (hit.qe if hit.strand=="+" else hit.qs)!=(window.core_end if hit.strand=="+" else window.core_start):
+            continue
+        next_rows = entries.get(end,[])
+        if seam is None and (len(next_rows)!=1 or len(exits[end])!=1):
             forks += bool(next_rows)
             continue
-        successor = next_rows[0]
-        other, other_window, *_ = records[successor]
-        adjacent = w.core_end == other_window.core_start if hit.strand == "+" else w.core_start == other_window.core_end
-        if adjacent and hit.qlen == other.qlen and hit.tlen == other.tlen:
-            following[index] = successor
-            preceding[successor] = index
-    emitted = set()
-    temporary = output.with_suffix(".paf.partial")
-    chain_count = joined_count = 0
-    with temporary.open("x") as handle, provenance.open("x") as audit:
-        for root in range(len(records)):
-            if root in preceding:
+        for successor in next_rows:
+            other,other_window,*_ = records[successor]
+            adjacent = (window.core_end==other_window.core_start if hit.strand=="+"
+                        else window.core_start==other_window.core_end)
+            if not adjacent or hit.qlen!=other.qlen or hit.tlen!=other.tlen:
                 continue
-            chain = [root]
-            while chain[-1] in following:
-                following_index = following[chain[-1]]
-                if following_index in chain:
-                    raise ExperimentError("cycle in candidate stitch graph")
-                chain.append(following_index)
-            if emitted.intersection(chain):
-                raise ExperimentError("owned row used in multiple stitched chains")
-            emitted.update(chain)
-            hits = [records[i][0] for i in chain]
-            combined = replace(hits[0], qs=min(h.qs for h in hits), qe=max(h.qe for h in hits),
-                               te=hits[-1].te, ops=join_operations(op for h in hits for op in h.ops), mapq=255)
-            if (sum(n for n, op in combined.ops if op in Q_OPS) != combined.qe - combined.qs
-                    or sum(n for n, op in combined.ops if op in T_OPS) != combined.te - combined.ts):
-                raise ExperimentError("stitched CIGAR does not match combined span")
-            matches, block, ambiguous = checked_statistics(combined, query, target)
-            if matches != sum(h.matches for h in hits) or block != sum(h.block for h in hits):
-                raise ExperimentError("stitched counts changed")
-            combined = replace(combined, matches=matches, block=block)
-            text = paf_line(combined, records[root][1], ambiguous).rstrip("\n")
-            text = text.replace("zp:Z:experimental-owned", "zp:Z:experimental-stitched")
-            handle.write(text + f"\tzc:i:{len(chain)}\n")
-            chain_count += 1
-            joined_count += len(chain) - 1
-            audit.write(json.dumps({"stitched_row": chain_count, "owned_rows": [i+1 for i in chain],
-                                    "windows": [records[i][1].alias for i in chain],
-                                    "join_rule": "reciprocal_unique_exact_query_and_target_adjacency"}) + "\n")
-    if len(emitted) != len(records) or not records:
-        raise ExperimentError("not all owned rows were represented by stitch chains")
-    os.replace(temporary, output)
-    return {"input_owned_rows": len(records), "stitched_rows": chain_count, "exact_joins": joined_count,
-            "fork_endpoints_not_joined": forks, "ranking_reconstructed": False}
+            if seam is not None and not seam.compatible(index,successor):
+                continue
+            outgoing[index].append(successor)
+            incoming[successor].append(index)
+    for index,targets in outgoing.items():
+        if len(targets)==1 and len(incoming[targets[0]])==1:
+            following[index] = targets[0]
+            preceding[targets[0]] = index
+        elif seam is not None:
+            forks += 1
+    return following,preceding,forks
 
 
-def run_command(command: list[str], directory: Path, name: str, timeout: int, memory_gib: int) -> dict:
+def stitch_owned(source: Path, output: Path, provenance: Path, windows: list[Window], query: FastaStore,
+                 target: FastaStore, *, allow_empty_original_part=False,raw_source=None,owned_provenance=None,
+                 raw_sha256=None,owned_provenance_sha256=None) -> dict:
+    """No gap filling/score choice/row dropping. Native branch requires raw overlap.
+
+    A native overlap can disambiguate which endpoint-compatible edges really
+    share a local path. Only reciprocal-unique supported edges join; all other
+    candidates remain explicit rows. This is NOT global DP/context equality.
+    """
+    if (raw_source is None)!=(owned_provenance is None):
+        raise ExperimentError("raw overlap source and ownership provenance are required together")
+    by_alias = {w.alias:w for w in windows}
+    records = []
+    entries,exits = defaultdict(list),defaultdict(list)
+    with source.open("rb") as stream:
+        number = 0
+        while data := stream.readline(32*1024**2+1 if raw_source is not None else -1):
+            number += 1
+            if not data.endswith(b"\n") or (raw_source is not None and len(data)>32*1024**2):
+                raise ExperimentError("owned stitch input has an incomplete/oversized row")
+            line = data.decode("ascii")
+            fields = line.rstrip("\r\n").split("\t")
+            original = fields[0]
+            length = query.records[original]["length"]
+            whole = Window(original,original,length,0,length,0,length)
+            hit = parse_hit(line,{original:whole},target.records)
+            tags = [tag[5:] for tag in fields[12:] if tag.startswith("zw:Z:")]
+            if len(tags)!=1 or tags[0] not in by_alias:
+                raise ExperimentError("missing window provenance during stitching")
+            window = by_alias[tags[0]]
+            if hit.query!=window.query or not window.core_start<=hit.qs<hit.qe<=window.core_end:
+                raise ExperimentError("owned row escaped its original core")
+            startq,endq = (hit.qs,hit.qe) if hit.strand=="+" else (hit.qe,hit.qs)
+            base = (hit.query,hit.target,hit.strand)
+            entry,exit_key = (*base,startq,hit.ts),(*base,endq,hit.te)
+            records.append((hit,window,entry,exit_key))
+            entries[entry].append(number-1); exits[exit_key].append(number-1)
+    seam = None
+    if raw_source is not None:
+        from seam_witness import SeamSources
+        seam = SeamSources(raw_source,owned_provenance,records,by_alias,target.records,
+                           raw_sha256=raw_sha256,proof_sha256=owned_provenance_sha256)
+    try:
+        following,preceding,forks = _stitch_links(records,entries,exits,seam)
+        emitted = set()
+        temporary = output.with_suffix(".paf.partial")
+        chain_count = joined_count = 0
+        with temporary.open("x") as handle, provenance.open("x") as audit:
+            for root in range(len(records)):
+                if root in preceding:
+                    continue
+                chain = [root]
+                while chain[-1] in following:
+                    following_index = following[chain[-1]]
+                    if following_index in chain:
+                        raise ExperimentError("cycle in candidate stitch graph")
+                    chain.append(following_index)
+                if emitted.intersection(chain):
+                    raise ExperimentError("owned row used in multiple stitched chains")
+                emitted.update(chain)
+                hits = [records[i][0] for i in chain]
+                combined = replace(hits[0], qs=min(h.qs for h in hits), qe=max(h.qe for h in hits),
+                                   te=hits[-1].te, ops=join_operations(op for h in hits for op in h.ops), mapq=255)
+                if (sum(n for n, op in combined.ops if op in Q_OPS) != combined.qe - combined.qs
+                        or sum(n for n, op in combined.ops if op in T_OPS) != combined.te - combined.ts):
+                    raise ExperimentError("stitched CIGAR does not match combined span")
+                matches, block, ambiguous = checked_statistics(combined, query, target)
+                if matches != sum(h.matches for h in hits) or block != sum(h.block for h in hits):
+                    raise ExperimentError("stitched counts changed")
+                combined = replace(combined, matches=matches, block=block)
+                text = paf_line(combined, records[root][1], ambiguous).rstrip("\n")
+                text = text.replace("zp:Z:experimental-owned", "zp:Z:experimental-stitched")
+                handle.write(text + f"\tzc:i:{len(chain)}\n")
+                chain_count += 1
+                joined_count += len(chain) - 1
+                evidence = {"stitched_row":chain_count,"owned_rows":[i+1 for i in chain],
+                            "windows":[records[i][1].alias for i in chain],
+                            "join_rule":"reciprocal_unique_exact_query_and_target_adjacency"}
+                if seam is not None:
+                    evidence["join_rule"] = "reciprocal_unique_exact_adjacency_with_native_raw_overlap"
+                    evidence["raw_overlap_witnesses"] = [seam.witnesses[pair] for pair in zip(chain,chain[1:])]
+                audit.write(json.dumps(evidence)+"\n")
+        if len(emitted) != len(records) or (not records and not allow_empty_original_part):
+            raise ExperimentError("not all owned rows were represented by stitch chains")
+        overlap = seam.receipt() if seam is not None else {
+            "overlap_consistency_required":False,"overlap_policy":"legacy_endpoint_only",
+            "whole_query_dp_equivalence_certified":False}
+        os.replace(temporary,output)
+        return {"input_owned_rows":len(records),"stitched_rows":chain_count,"exact_joins":joined_count,
+                "fork_endpoints_not_joined":forks,"ranking_reconstructed":False,**overlap}
+    finally:
+        if seam is not None:
+            seam.close()
+
+
+def run_command(command: list[str], directory: Path, name: str, timeout: int, memory_gib: int, *, max_file_bytes=None, allow_failure=False) -> dict:
+    """Run once; only an explicit native-failure classifier may inspect nonzero evidence."""
+    if max_file_bytes is not None and (type(max_file_bytes) is not int or max_file_bytes < 1):
+        raise ExperimentError("child file-size limit must be a positive integer")
     def limits():
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        if max_file_bytes is not None:
+            soft,hard = resource.getrlimit(resource.RLIMIT_FSIZE)
+            finite = [n for n in (soft,hard) if n != resource.RLIM_INFINITY]
+            cap = min([max_file_bytes,*finite])
+            resource.setrlimit(resource.RLIMIT_FSIZE, (cap, hard))
         if memory_gib:
             cap = memory_gib * 1024**3
             resource.setrlimit(resource.RLIMIT_AS, (cap, cap))
@@ -503,17 +609,20 @@ def run_command(command: list[str], directory: Path, name: str, timeout: int, me
             report.update(returncode=process.returncode, interrupted=type(exc).__name__)
         report["seconds"] = round(time.monotonic() - started, 3)
     write_json(directory / f"{name}.execution.json", report)
-    if report["returncode"] or "interrupted" in report:
+    if not allow_failure and (report["returncode"] or "interrupted" in report):
         raise ExperimentError(f"{name} failed; evidence retained in {directory}")
     return report
 
 
-def experiment(args) -> dict:
+def experiment(args, *, shared_target=None, shared_query=None) -> dict:
     if not args.target.is_file() or not args.query.is_file():
         raise ExperimentError("target/query input missing")
     if args.threads < 1 or args.timeout < 1 or args.memory_gib < 0:
         raise ExperimentError("invalid resource limits")
     make_windows({}, args.core_bases, args.context_bases)  # Validate before writing.
+    candidate_policy = getattr(args, "window_candidate_policy", "native_window_selection")
+    if candidate_policy not in ("native_window_selection", "all_chains_pool"):
+        raise ExperimentError("unsupported experimental window candidate policy")
     executable = shutil.which(args.minimap2)
     if not executable:
         raise ExperimentError("minimap2 unavailable")
@@ -525,12 +634,13 @@ def experiment(args) -> dict:
               "not_supported": ["self-alignment", "whole-contig ranking equivalence", "automatic Server integration"],
               "parameters": {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}}
     write_json(root / "experiment.json", report)
-    stores = []
+    ownership = ExitStack()
     try:
-        target = FastaStore(args.target, root / "target.bases")
-        stores.append(target)
-        query = FastaStore(args.query, root / "query.bases")
-        stores.append(query)
+        stores = ownership.enter_context(sequence_stores(args.target, args.query, root,
+            shared_target=shared_target, shared_query=shared_query))
+        target, query = stores
+        report["sequence_storage"] = {"target_shared": shared_target is not None,
+                                      "query_shared": shared_query is not None}
         binary_hash = sha256(Path(executable))
         version = subprocess.check_output([executable, "--version"], text=True, timeout=5).strip()
         report.update(tool={"path": executable, "version": version, "sha256": binary_hash},
@@ -540,30 +650,72 @@ def experiment(args) -> dict:
         write_json(root / "windows.json", [asdict(window) for window in windows])
         write_json(root / "input_records.json", {"target": target.records, "query": query.records})
         write_windows(root / "windows.fa", query, windows)
-        index = root / "target.mmi"
-        # One index over the FULL target: do not partition placements or trust a foreign cache.
-        index_bases = max(8_000_000_000, sum(record["length"] for record in target.records.values()) + 1)
-        run_command([executable, "-x", args.preset, "-I", str(index_bases), "-t", str(args.threads),
-                     "-d", str(index), str(target.source)], root, "index", args.timeout, args.memory_gib)
-        if (root / "index.stderr").read_text(errors="replace").count("distinct minimizers:") != 1:
-            raise ExperimentError("expected exactly one full-target index; cannot trust multipart ranking")
+        window_manifest_hash = sha256(root/"windows.json")
+        window_fasta_hash = sha256(root/"windows.fa")
+        index_context = getattr(args,"index_context",None)
+        if index_context is None:
+            index = root / "target.mmi"
+            # Legacy standalone experiment: one FULL-target index.
+            index_bases = max(8_000_000_000, sum(record["length"] for record in target.records.values()) + 1)
+            run_command([executable, "-x", args.preset, "-I", str(index_bases), "-t", str(args.threads),
+                         "-d", str(index), str(target.source)], root, "index", args.timeout, args.memory_gib)
+            if (root / "index.stderr").read_text(errors="replace").count("distinct minimizers:") != 1:
+                raise ExperimentError("expected exactly one full-target index; cannot trust multipart ranking")
+        else:
+            # Branch-internal context: an ORIGINAL serialized index part, not a
+            # freshly re-indexed subset or an unverified foreign cache.
+            import minimap_index_context as mic
+            try:
+                index = mic.validate_part_context(index_context,reference_sha256=target.identity["sha256"],
+                    tool_sha256=binary_hash,preset=args.preset,target_records=target.records)
+            except mic.IndexContextError as exc:
+                raise ExperimentError(str(exc)) from exc
+        index_hash = sha256(index)
+        mapping_flags = ["-f",str(index_context["mid_occ"])] if index_context is not None else []
+        report.update(index_path=str(index),index_sha256=index_hash,
+                      index_scope="original_default_part" if index_context is not None else "full_target_single_part",
+                      original_part_index=index_context["part_index"] if index_context is not None else None,
+                      inherited_mid_occ=index_context["mid_occ"] if index_context is not None else None)
+        # Branch-only pool: avoid losing a whole-query competitor solely to a
+        # window-local best_n/primary decision. -P is NOT a final output policy:
+        # every row still undergoes base checks, core clipping, deduplication,
+        # stitching and the unchanged guided refusal controls. It cannot prove
+        # that local chaining/DP generated the entire native full-query universe.
+        pool_flags = ["-P"] if candidate_policy == "all_chains_pool" else []
+        report.update(window_candidate_policy=candidate_policy,
+                      window_primary_selection_disabled=bool(pool_flags),
+                      whole_query_candidate_completeness_certified=False)
         raw = root / "raw.windows.paf"
-        run_command([executable, "-c", "--eqx", "-x", args.preset, "-t", str(args.threads),
+        run_command([executable, "-c", "--eqx", "-x", args.preset, *mapping_flags, *pool_flags, "-t", str(args.threads),
                      "-o", str(raw), str(index), str(root / "windows.fa")], root, "map", args.timeout, args.memory_gib)
+        raw_hash = sha256(raw)
         candidate = root / "owned.pending.paf"
-        summary = recover(raw, candidate, root / "provenance.jsonl", windows, query, target)
+        allow_empty_part = index_context is not None and getattr(args,"allow_empty_index_part",False)
+        summary = recover(raw, candidate, root / "provenance.jsonl", windows, query, target,
+                          allow_empty_original_part=allow_empty_part)
         report["coverage"] = summary
+        owned_proof_hash = sha256(root/"provenance.jsonl")
+        require_overlap = candidate_policy=="all_chains_pool" or getattr(args,"native_state_bundle",None) is not None
+        overlap_options = {"raw_source":raw,"owned_provenance":root/"provenance.jsonl","raw_sha256":raw_hash,
+                           "owned_provenance_sha256":owned_proof_hash} if require_overlap else {}
         stitched = root / "stitched.pending.paf"
-        report["stitching"] = stitch_owned(candidate, stitched, root / "stitch-provenance.jsonl", windows, query, target)
+        report["stitching"] = stitch_owned(candidate, stitched, root / "stitch-provenance.jsonl", windows, query, target,
+                                          allow_empty_original_part=allow_empty_part,**overlap_options)
+        stitch_proof_hash = sha256(root/"stitch-provenance.jsonl")
         if args.require_full_query_coverage and any(row["covered_bases"] != row["length"] for row in summary["queries"].values()):
             raise ExperimentError("full-query-coverage acceptance failed; do not treat partial mappings as complete")
-        if not all(store.unchanged() for store in stores) or sha256(Path(executable)) != binary_hash:
-            raise ExperimentError("input or minimap2 binary changed during experiment")
+        if (not all(store.unchanged() for store in stores) or sha256(Path(executable)) != binary_hash
+                or sha256(index) != index_hash or sha256(raw) != raw_hash
+                or sha256(root/"windows.json") != window_manifest_hash or sha256(root/"windows.fa") != window_fasta_hash
+                or sha256(root/"provenance.jsonl")!=owned_proof_hash or sha256(root/"stitch-provenance.jsonl")!=stitch_proof_hash):
+            raise ExperimentError("input, window evidence, index or minimap2 binary changed during experiment")
         final_candidate = root / "owned.experimental.paf"
         os.replace(candidate, final_candidate)
         final_stitched = root / "stitched.experimental.paf"
         os.replace(stitched, final_stitched)
         report.update(status="validated_experimental_candidate", output_sha256=sha256(final_candidate), stitched_sha256=sha256(final_stitched),
+                      raw_sha256=raw_hash,windows_manifest_sha256=window_manifest_hash,windows_fasta_sha256=window_fasta_hash,
+                      owned_provenance_sha256=owned_proof_hash,stitch_provenance_sha256=stitch_proof_hash,
                       original_inputs_unchanged=True,
                       caveat="Coordinate/CIGAR checks passed, NOT whole-contig alignment or downstream biological equivalence. "
                              "MAPQ is unknown (255), score/tp tags are not inherited; distinct placements are retained.")
@@ -571,8 +723,7 @@ def experiment(args) -> dict:
         report.update(status="failed", error=f"{type(exc).__name__}: {exc}")
         raise
     finally:
-        for store in stores:
-            store.close()
+        ownership.close()
         write_json(root / "experiment.json", report)
     return report
 

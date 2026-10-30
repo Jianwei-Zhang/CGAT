@@ -207,60 +207,104 @@ def require_full_query_coverage(selection):
         raise wa.ExperimentError("full-query-coverage acceptance failed after chain guidance")
 
 
-def experiment(args):
+def experiment(args, *, shared_target=None, shared_query=None):
     if args.guide_slack < 0 or args.guide_slack > args.context_bases:
         raise wa.ExperimentError("require 0 <= guide slack <= context; no automatic widening")
+    if getattr(args,"recover_path_scores",False) and args.preset != "asm10":
+        raise wa.ExperimentError("branch full-path scoring is pinned to asm10")
+    native_bundle = getattr(args,"native_state_bundle",None)
+    if native_bundle is not None and (args.preset != "asm10" or getattr(args,"index_context",None) is None):
+        raise wa.ExperimentError("native chain-state recovery requires pinned asm10 original-part context")
     root = args.out.resolve()
     root.mkdir(parents=True, exist_ok=False)
     report = {"status": "running", "experimental_only": True, "production_ready": False, "customer_validated": False,
               "harness_sha256": wa.sha256(Path(__file__)), "guide_slack": args.guide_slack,
               "caveat": "Whole-query chain selection is provisional, not post-DP ranking/MAPQ equivalence. No production import."}
-    stores = []
+    ownership = wa.ExitStack()
     try:
+        stores = ownership.enter_context(wa.sequence_stores(args.target, args.query, root,
+            shared_target=shared_target, shared_query=shared_query))
+        target, query = stores
+        report["sequence_storage"] = {"target_shared": shared_target is not None,
+            "query_shared": shared_query is not None, "window_stores_reused": True}
         options = argparse.Namespace(**vars(args))
         options.out = root / "windows"
-        windowed = wa.experiment(options)
+        windowed = wa.experiment(options, shared_target=target, shared_query=query)
+        if native_bundle is not None and not windowed.get("stitching",{}).get("overlap_consistency_required",False):
+            raise wa.ExperimentError("native recovery requires original raw overlap witnesses, not endpoint-only stitching")
         report["windowed_report_sha256"] = wa.sha256(options.out / "experiment.json")
-        target = wa.FastaStore(args.target, root / "target.bases")
-        stores.append(target)
-        query = wa.FastaStore(args.query, root / "query.bases")
-        stores.append(query)
         if target.identity["sha256"] != windowed["target"]["sha256"] or query.identity["sha256"] != windowed["query"]["sha256"]:
             raise wa.ExperimentError("inputs differ between windowed and whole-query passes")
         mm = str(Path(shutil.which(args.minimap2)).resolve())
         if wa.sha256(Path(mm)) != windowed["tool"]["sha256"]:
             raise wa.ExperimentError("minimap2 changed before whole-query pass")
-        index = options.out / "target.mmi"
+        index = Path(windowed["index_path"])
         index_hash = wa.sha256(index)
+        if index_hash != windowed["index_sha256"]:
+            raise wa.ExperimentError("index changed between window and whole-query guidance passes")
         chain_path = root / "whole-query.chains.paf"
-        wa.run_command([mm, "-x", args.preset, "-t", str(args.threads), "-o", str(chain_path), str(index), str(args.query.resolve())],
+        inherited = getattr(args,"index_context",None)
+        mapping_flags = ["-f",str(inherited["mid_occ"])] if inherited is not None else []
+        wa.run_command([mm, "-x", args.preset, *mapping_flags, "-t", str(args.threads), "-o", str(chain_path), str(index), str(args.query.resolve())],
                        root, "whole-query", args.timeout, args.memory_gib)
+        chain_hash = wa.sha256(chain_path)
+        original = options.out / "stitched.experimental.paf"
+        if (getattr(args,"allow_empty_index_part",False) and chain_path.stat().st_size == 0
+                and original.stat().st_size == 0):
+            # Legitimate no-hit original target part. Never use this to hide a
+            # chain/window disagreement or assume every query must map here.
+            if (not all(s.unchanged() for s in stores) or wa.sha256(index) != index_hash
+                    or wa.sha256(Path(mm)) != windowed["tool"]["sha256"]
+                    or wa.sha256(original) != windowed["stitched_sha256"] or wa.sha256(chain_path) != chain_hash):
+                raise wa.ExperimentError("input/index/tool changed in no-hit target part")
+            final = root / "guided.experimental.paf"
+            final.open("xb").close()
+            report.update(status="no_candidates_in_original_part",output_sha256=wa.sha256(final),
+                          index_sha256=index_hash,index_path=str(index),tool=windowed["tool"],
+                          original_inputs_unchanged=True,candidate_rows=0)
+            return report
         chains = read_chains(chain_path, query.records, target.records)
         wa.write_json(root / "chains.json", [asdict(c) for c in chains])
-        original = options.out / "stitched.experimental.paf"
+        if native_bundle is not None:
+            if windowed["tool"]["version"] != "2.31-r1302":
+                raise wa.ExperimentError("native chain-state companion is pinned to minimap2 2.31-r1302")
+            import native_chain_state as nst
+            report["native_chain_state"] = nst.collect(query,target,inherited,windowed["tool"]["sha256"],
+                native_bundle,chain_path,root/"native-chains",timeout=args.timeout,memory_gib=args.memory_gib)
         pending = root / "guided.pending.paf"
         if wa.sha256(original) != windowed["stitched_sha256"]:
             raise wa.ExperimentError("validated stitched input changed")
-        report["selection"] = select_guided(original, chains, pending, root / "guide-provenance.jsonl",
-                                             root / "chain-coverage.json", query, target, args.guide_slack)
+        if native_bundle is not None:
+            import native_recovery as nr
+            report["native_recovery"] = nr.recover(original,chains,pending,query=query,target=target,
+                context=inherited,native_receipt=report["native_chain_state"],bundle=native_bundle,chain_paf=chain_path,
+                window_root=options.out,window_report=windowed,root=root/"native-recovery",
+                timeout=args.timeout,memory_gib=args.memory_gib)
+            report["selection"] = report["native_recovery"]["selection"]
+        else:
+            report["selection"] = select_guided(original, chains, pending, root / "guide-provenance.jsonl",
+                                                 root / "chain-coverage.json", query, target, args.guide_slack)
         if args.require_full_query_coverage:
             require_full_query_coverage(report["selection"])
+        if getattr(args,"recover_path_scores",False):
+            import whole_query_scores as wqs
+            report["path_scoring"] = wqs.write_guided_path_scores(
+                pending,root/"guided.path-scores.jsonl",query,target,index_sha256=index_hash)
         if (not all(s.unchanged() for s in stores) or wa.sha256(index) != index_hash
-                or wa.sha256(Path(mm)) != windowed["tool"]["sha256"] or wa.sha256(original) != windowed["stitched_sha256"]):
+                or wa.sha256(Path(mm)) != windowed["tool"]["sha256"] or wa.sha256(original) != windowed["stitched_sha256"] or wa.sha256(chain_path) != chain_hash):
             raise wa.ExperimentError("input/index/tool changed during guided recovery")
         final = root / "guided.experimental.paf"
         os.replace(pending, final)
         report.update(status="validated_experimental_guidance", output_sha256=wa.sha256(final),
                       unfiltered_paf=str(original), unfiltered_sha256=windowed["stitched_sha256"],
-                      index_sha256=index_hash, chain_paf_sha256=wa.sha256(chain_path),
+                      index_sha256=index_hash, chain_paf_sha256=chain_hash,
                       tool=windowed["tool"], target=target.identity, query=query.identity,
                       original_inputs_unchanged=True)
     except BaseException as exc:
         report.update(status="failed", error=f"{type(exc).__name__}: {exc}")
         raise
     finally:
-        for store in stores:
-            store.close()
+        ownership.close()
         wa.write_json(root / "guidance.json", report)
     return report
 

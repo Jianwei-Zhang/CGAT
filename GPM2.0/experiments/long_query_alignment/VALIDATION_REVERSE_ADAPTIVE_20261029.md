@@ -1,5 +1,12 @@
 # Reverse split evidence and memory-budget adaptation — 2026-10-29
 
+> Historical snapshot, not validation of the current branch. On 2026-10-30 the
+> unknown-limit 128 MiB planning ceiling described below was removed: only a
+> small read buffer is selected, while total budget/headroom remain unknown.
+> Existing measurements and raw evidence are preserved unchanged; they do NOT
+> validate that source correction or the current native recovery bridge. See
+> `BRANCH_LONG_CIGAR_RECOVERY.md` for the unexecuted current implementation.
+
 ## Goal and scope
 
 Adapt to different memory conditions, **not fill a particular customer's 500 GB**.

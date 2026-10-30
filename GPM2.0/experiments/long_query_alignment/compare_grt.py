@@ -19,6 +19,10 @@ import subprocess
 
 import windowed_alignment as wa
 import guided_alignment as ga
+import native_chain_state as nst
+import native_evaluation as ne
+import native_first as nf
+import selective_reference_alignment as sr
 from compare_small_fixtures import relation_signature, write_fasta
 
 
@@ -29,7 +33,7 @@ def load_module(path: Path, name: str):
     return module
 
 
-def fixtures():
+def fixtures(*,include_no_hit=False):
     rng = random.Random(29102027)
     ref = bytes(rng.choice(b"ACGT") for _ in range(800_000))
     insert = bytes(rng.choice(b"ACGT") for _ in range(2048))
@@ -46,10 +50,15 @@ def fixtures():
         ("local_repeat_competition", {"chr1": ref, "chr2": ref[200_000:600_000]}, {"query": ref}),
         ("repeat_assignment_threshold", {"chr1": ref, "chr2": ref[:600_000]}, {"query": ref}),
     ]
-    return [(name, targets, queries, None) for name, targets, queries in cases] + [
+    result = [(name, targets, queries, None) for name, targets, queries in cases] + [
         ("gap_with_external_donor", {"chr1": ref}, {"query": gap}, {"donor": donor}),
         ("reverse_gap_with_external_donor", {"chr1": ref}, {"query": gap.translate(wa.RC)[::-1]}, {"donor": donor}),
     ]
+    if include_no_hit:
+        # N-only input has no minimizers; retain the actual no-hit query member
+        # in both complete datasets instead of silently treating it as missing.
+        result.append(("unmapped_query_member",{"chr1":ref},{"query":ref,"unmapped":b"N"*2000},None))
+    return result
 
 
 def confidence_summary(path):
@@ -194,6 +203,71 @@ def compare(server, roots, directories):
             "accepted_event_actions": [[r.get("action") for r in rows if r.get("status") == "accepted"] for rows in events]}
 
 
+def native_bridge_candidate(mm,target_path,query_path,directory,baseline_log,bundle):
+    """Force the bounded bridge on SMALL controls, never a production trigger.
+
+    Real native -c completion backs no-hit cells. Nonempty cells deliberately
+    use windows even if native succeeded, so downstream testing actually covers
+    recovered confidence rather than merely rerunning the native-first fast path.
+    This harness is private and cannot change Server run.sh/default routing.
+    """
+    directory.mkdir()
+    target,query = nf.RawFastaCatalog(target_path),nf.RawFastaCatalog(query_path)
+    tool_hash = wa.sha256(Path(mm))
+    if subprocess.check_output([mm,"--version"],text=True,timeout=5).strip()!="2.31-r1302":
+        raise wa.ExperimentError("native-bridge downstream controls require pinned minimap2 2.31-r1302")
+    bounds = argparse.Namespace(threads=2,timeout=120,memory_gib=6)
+    catalog = sr.build_default_index(mm,target,directory,bounds,tool_hash)
+    mid_occ = sr.read_shared_mid_occ(baseline_log,len(catalog["parts"]))
+    for part in catalog["parts"]:
+        part["mid_occ"] = mid_occ
+    catalog.update(shared_mid_occ=mid_occ,threshold_source="unchanged_whole_query_baseline")
+    wa.write_json(directory/"index-context.json",catalog)
+    merger = nf.CellMerger(directory/"complete-cells",query.records,target.records,catalog["parts"])
+    report = {"scope":"maintainer_forced_small_fixture_bridge_only","production_ready":False,
+              "actual_assertion_recovery_tested":False,"parts":[],"AS_reconstructed":False,
+              "index_catalog_sha256":wa.sha256(directory/"index-context.json")}
+    for part in catalog["parts"]:
+        for i,name in enumerate(query.records):
+            cell = directory/f"part-{part['part_index']:04d}-query-{i:06d}"
+            cell.mkdir()
+            source = query.copy_group([name],cell/"query.fa")
+            native = nf.attempt(mm,Path(part["path"]),Path(source["path"]),cell/"native",bounds,mid_occ=mid_occ)
+            if (wa.sha256(Path(source["path"]))!=source["sha256"] or not query.unchanged() or not target.unchanged()):
+                raise wa.ExperimentError("whole-record comparison source changed during native mapping")
+            if native["status"]!="native_success":
+                raise wa.ExperimentError("small native-bridge control failed its native cell mapping")
+            if Path(native["path"]).stat().st_size==0:
+                merger.add_native(native,[name],part_index=part["part_index"])
+                report["parts"].append({"part_index":part["part_index"],"query":name,"route":"complete_native_no_hit"})
+                continue
+            options = argparse.Namespace(target=target_path,query=Path(source["path"]),out=cell/"recovery",
+                minimap2=mm,preset="asm10",core_bases=200000,context_bases=10000,guide_slack=1000,
+                threads=2,timeout=120,memory_gib=6,require_full_query_coverage=False,index_context=part,
+                allow_empty_index_part=False,window_candidate_policy="all_chains_pool",recover_path_scores=True,
+                native_state_bundle=Path(bundle["manifest_path"]).parent)
+            guided = ga.experiment(options)
+            if (wa.sha256(Path(source["path"]))!=source["sha256"] or not query.unchanged() or not target.unchanged()):
+                raise wa.ExperimentError("whole-record comparison source changed during native bridge")
+            recovered = guided["native_recovery"]
+            validator = lambda raw:sr.validate_row(raw,query.records,target.records,{name},"risk")
+            merger.add_recovered(options.out/"guided.experimental.paf",guided["output_sha256"],name,part["part_index"],
+                validator,native_evaluated={"path":recovered["native_evaluated_paf"],"sha256":recovered["native_evaluated_sha256"]})
+            report["parts"].append({"part_index":part["part_index"],"query":name,"route":"forced_native_bridge",
+                                   "guidance_sha256":wa.sha256(options.out/"guidance.json")})
+        if wa.sha256(Path(part["path"]))!=part["sha256"]:
+            raise wa.ExperimentError("original index part changed during downstream bridge controls")
+    public,private = directory/"public.experimental.paf",directory/"native-evaluated.experimental.paf"
+    report["public_combination"] = merger.finish(public)
+    report["private_combination"] = merger.finish(private,native_evaluated=True)
+    if not target.unchanged() or not query.unchanged() or wa.sha256(Path(mm))!=tool_hash:
+        raise wa.ExperimentError("downstream bridge control inputs/tool changed")
+    report.update(public_paf=str(public),public_sha256=wa.sha256(public),native_evaluated_paf=str(private),
+                  native_evaluated_sha256=wa.sha256(private),native_confidence_promoted=False)
+    wa.write_json(directory/"native-bridge-downstream.json",report)
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--minimap2", required=True)
@@ -201,11 +275,19 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--case", action="append")
     parser.add_argument("--guide-chains", action="store_true", help="Isolated whole-query chain guidance; still NOT DP ranking equivalence")
+    parser.add_argument("--native-bridge",action="store_true",
+                        help="Maintainer-only recovered native metadata/GRT comparison; NOT production recovery authorization")
+    parser.add_argument("--native-state-bundle",type=Path,default=None,
+                        help="Maintainer override for the prebuilt pinned companion; never a customer run.sh option")
     args = parser.parse_args()
+    if args.native_state_bundle is not None and not args.native_bridge:
+        parser.error("--native-state-bundle belongs only to --native-bridge controls")
+    bundle = nst.validate_bundle(args.native_state_bundle) if args.native_bridge else None
     mm = shutil.which(args.minimap2)
     if not mm or Path(shutil.which("minimap2") or "").resolve() != Path(mm).resolve():
         parser.error("PATH minimap2 must match the explicit experimental binary for real GRT comparisons")
-    cases = fixtures()
+    mm = str(Path(mm).resolve())
+    cases = fixtures(include_no_hit=args.native_bridge)
     if args.case and set(args.case) - {c[0] for c in cases}:
         parser.error("unknown fixture")
     root, server = args.out.resolve(), args.server_dir.resolve()
@@ -213,7 +295,10 @@ def main():
     summary = {"status": "running", "production_ready": False, "customer_validated": False,
                "harness_sha256": wa.sha256(Path(__file__)),
                "server_prepare_sha256": wa.sha256(server / "prepare.sh"),
-               "candidate_mode": "whole_query_chain_guidance" if args.guide_chains else "unguided_windows",
+               "native_bridge_helper":bundle,
+               "experiment_sources_sha256":{p.name:wa.sha256(p) for p in sorted(Path(__file__).parent.glob("*.py"))},
+               "server_tools_sha256":{str(p.relative_to(server)):wa.sha256(p) for p in sorted((server/"tools").rglob("*.py"))},
+               "candidate_mode": "private_native_bridge" if args.native_bridge else "whole_query_chain_guidance" if args.guide_chains else "unguided_windows",
                "scope": "initial reference PAF only; self skipped; independent GRT alignments unchanged; no native App",
                "tool": {"path": mm, "sha256": wa.sha256(Path(mm)), "version": subprocess.check_output([mm, "--version"], text=True).strip()},
                "cases": []}
@@ -240,7 +325,10 @@ def main():
             options = argparse.Namespace(target=target, query=query, out=windowed, minimap2=mm, preset="asm10",
                                          core_bases=200_000, context_bases=10_000, threads=2, timeout=60,
                                          memory_gib=6, require_full_query_coverage=False)
-            if args.guide_chains:
+            if args.native_bridge:
+                alignment = native_bridge_candidate(mm,target,query,windowed,baseline/"map.stderr",bundle)
+                stitched = Path(alignment["native_evaluated_paf"])
+            elif args.guide_chains:
                 options.guide_slack = 1000
                 alignment = ga.experiment(options)
                 stitched = windowed / "guided.experimental.paf"
@@ -251,7 +339,14 @@ def main():
                       "relation_equal": relation_signature(paf) == relation_signature(stitched), "status": "running",
                       "confidence": {"baseline": confidence_summary(paf), "stitched": confidence_summary(stitched)},
                       "ranking_equivalence": "not_established"}
-            if args.guide_chains:
+            if args.native_bridge:
+                record["native_metadata_equal"] = ne.comparison_signature(paf)==ne.comparison_signature(stitched)
+                record["ranking_equivalence"] = ("native_metadata_contract_equal_on_fixture" if record["native_metadata_equal"]
+                                                  else "native_metadata_difference")
+                record["bridge_receipt_sha256"] = wa.sha256(windowed/"native-bridge-downstream.json")
+                record["public_unknown_confidence"] = confidence_summary(Path(alignment["public_paf"]))
+                record["actual_assertion_recovery_tested"] = False
+            elif args.guide_chains:
                 record["unfiltered_relation_equal"] = relation_signature(paf) == relation_signature(Path(alignment["unfiltered_paf"]))
                 record["guide_counts"] = {k: v for k, v in alignment["selection"].items() if k != "candidate_coverage"}
             summary["cases"].append(record)
@@ -262,16 +357,30 @@ def main():
             record.update(status="completed", **{k: v for k, v in result.items() if k not in ("checks", "raw_metadata")},
                           failed_checks=[c["label"] for c in result["checks"] if not c["equal"]])
             record["coordinate_and_downstream_equal"] = record["relation_equal"] and record["all_checks_equal"]
+            if args.native_bridge:
+                record["native_bridge_downstream_equal"] = record["coordinate_and_downstream_equal"] and record["native_metadata_equal"]
             if before_hashes != [wa.sha256(p) for p in input_paths]:
                 raise wa.ExperimentError("fixture inputs changed")
             print(json.dumps(record), flush=True)
         summary["status"] = "completed_comparisons_not_production_acceptance"
+        if args.native_bridge:
+            if (summary["experiment_sources_sha256"]!={p.name:wa.sha256(p) for p in sorted(Path(__file__).parent.glob("*.py"))}
+                    or summary["server_tools_sha256"]!={str(p.relative_to(server)):wa.sha256(p) for p in sorted((server/"tools").rglob("*.py"))}
+                    or summary["server_prepare_sha256"]!=wa.sha256(server/"prepare.sh")):
+                raise wa.ExperimentError("comparison source changed; do not attribute these results to its initial receipt")
+            summary["native_bridge_requested_cases_equal"] = bool(summary["cases"]) and all(r["native_bridge_downstream_equal"] for r in summary["cases"])
+            summary["full_fixture_suite_covered"] = {r["case"] for r in summary["cases"]}=={c[0] for c in cases}
+            summary["native_confidence_promoted"] = False
+            summary["actual_assertion_recovery_tested"] = False
     except BaseException as exc:
         summary.update(status="failed", error=f"{type(exc).__name__}: {exc}")
         raise
     finally:
         wa.write_json(root / "comparison.json", summary)
+    # Legacy modes are diagnostic comparisons. The new native bridge mode is
+    # also a gate: a metadata/downstream mismatch must not look like CLI success.
+    return 1 if args.native_bridge and not summary["native_bridge_requested_cases_equal"] else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
