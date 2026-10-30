@@ -14,6 +14,9 @@ import re
 import windowed_alignment as wa
 
 MAX_LINE = 32*1024**2
+CORE_FIELDS = ("query","query_length","query_start","query_end","strand","target","target_length",
+               "target_start","target_end","matches","block_length","mapq")
+COMPARISON_TAGS = ("cg","NM","nn","ms","cm","s1","s2","tp","rl","zd")
 HASH = re.compile(r"[0-9a-f]{64}\Z")
 INTEGER = re.compile(r"(?:0|[1-9][0-9]*)\Z")
 COMMON = {"cg","nn","NM","zg"}
@@ -120,9 +123,8 @@ def comparison_signature(path):
     intentionally not reconstructed; never call this a byte-equality check.
     """
     result = []
-    keys = ("cg","NM","nn","ms","cm","s1","s2","tp","rl","zd")
     with Path(path).open("rb") as source:
         while raw := source.readline(MAX_LINE+1):
             fields,tags = _fields(raw)
-            result.append((tuple(fields[:12]),tuple(tags.get(k) for k in keys)))
+            result.append((tuple(fields[:12]),tuple(tags.get(k) for k in COMPARISON_TAGS)))
     return result

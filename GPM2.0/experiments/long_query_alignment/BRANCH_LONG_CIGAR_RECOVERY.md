@@ -190,6 +190,9 @@ whole-record replay precede asserting any customer-specific root cause or repair
   actual old/current run.sh resume, compatibility and interruption acceptance
   remain open. No customer edit/configuration or manual migration is required
   by the implemented supported path; unknown/custom recipes refuse untouched.
+- Persistent forced-native control reporter: source-implemented; the original
+  eight cases plus a 70-target split/competition case are defined, NOT executed.
+  No new native comparison receipt or gate pass has been generated.
 - Final automated/scientific validation: deferred under the existing user request.
 - Customer-specific root-cause and complete-workflow acceptance: not established.
 
@@ -630,8 +633,8 @@ mock checks. Their constructed paths are NOT native DP oracle receipts.
 
 This improves local continuity evidence. It does NOT prove whole-query DP path
 choice, complete candidate discovery or equality of window/full-query extension
-contexts. Original-state association, native selection, the actual eight native
-controls, ten GRT controls and >28-bit forward/reverse selective-entry validation
+contexts. Original-state association, native selection, the actual nine native
+controls (original eight retained), ten GRT controls and >28-bit forward/reverse selective-entry validation
 still have to be executed before a runnable branch can be accepted. No Server
 entry, customer command/job, compiler, installed minimap2 or Release was changed.
 
@@ -651,10 +654,10 @@ boundaries, not a claim that all customer wheat patterns have been covered.
 New protocol/ownership cases cover one/three fragments, both strands, seedless
 canonical gaps, nearby alternative diagonals, ambiguous/shared/missing anchors,
 missing source fields, native selection output, split observations and withheld
-public confidence. The real integration gate now defines EIGHT comparisons
-against unchanged whole-query -c --eqx minimap2: identity, two decoy cases,
-cancelling indels forward/reverse, three-split decoy forward/reverse and a
-three-split case without an exact parent. Compare complete ordered geometry,
+public confidence. The real integration gate now defines NINE comparisons
+against unchanged whole-query -c --eqx minimap2: the original identity, two decoy
+cases, cancelling indels forward/reverse, three-split decoy forward/reverse,
+three-split case without an exact parent, plus a 70-target split/competition pool. Compare complete ordered geometry,
 CIGAR, MAPQ, cm/s1/s2/ms/tp, NM/nn/rl and split flags; exit success is insufficient.
 AS is explicitly absent rather than claimed equal.
 
@@ -876,3 +879,75 @@ mid-transaction rollback, stopped-journal recovery and concurrent-user-edit
 refusal. All are WRITTEN ONLY, NOT RUN. Mocked source/binary/process fixtures are
 not native/customer evidence. No helper was compiled, package generated, original
 run.sh executed, customer job submitted or Release changed in this increment.
+
+
+## Persistent native-DP comparison entry: source only, no acceptance receipts
+
+The existing native integration test uses TemporaryDirectory. It is useful as a
+future assertion gate, but it cannot by itself leave the full native PAF, state,
+raw-overlap and score evidence available after cleanup. This increment adds
+`compare_native_controls.py` as a separate MAINTAINER final-validation entry.
+It defaults to PLAN ONLY: no output directory, fixture generation, companion
+lookup, tool/version command, compile, mapping or job is started in that mode.
+This increment has NOT executed even that preview command.
+
+On a later explicitly authorized --execute run, its implementation:
+
+- Requires an already-built pinned companion and unchanged minimap2 2.31-r1302;
+  never builds/downloads a binary, reinstalls dependencies or changes minimap2.
+- Generates only deterministic SMALL synthetic fixtures under a new private
+  directory outside any prepared workspace; uses the same default asm10 index
+  policy without -I overrides. These controls are single-part by design and do
+  NOT certify the customer's real default multipart context.
+- Keeps the native baseline -c --eqx PAF, original index/threshold/input hashes,
+  original chain state and traces, raw windows, stitching witnesses, scoring,
+  public unknown-confidence and private native-evaluated outputs. Refused/failed
+  cases and their full directory are retained rather than deleted or relabelled
+  as an accepted workaround.
+- Pairs public/private paths using the actual producer hashes, then compares
+  the complete ORDERED native contract: all twelve core fields including MAPQ,
+  plus cg/NM/nn/ms/cm/s1/s2/tp/rl/zd. Both row multiplicity and candidate order
+  matter. Missing/extra rows, a MAPQ difference or a CIGAR/native-tag difference
+  are failures even if broad geometry looks similar. AS remains explicitly
+  uncomputed/uncompared; full original PAF bytes are retained for investigation.
+- Writes per-case field-level differences and an overall source/tool/helper-bound
+  receipt. Limit displayed differing rows to 100 but count/compare ALL differing
+  rows; a display limit never turns additional differences into equality.
+- Retains the original eight controls through shared `native_controls.py` and
+  adds `many_equal_split_targets`: seventy identical split-capable target copies
+  exercise real pre/post-DP candidate competition and larger split pools, not
+  merely an in-memory sort replay or primary-only example. It is an unexecuted
+  stress control, NOT a claim that the bridge currently passes it.
+- Continues ordinary refused/different cases to retain the other requested
+  comparisons. Source/tool/helper mutation invalidates attribution and stops;
+  cancellation stops before another case even when the child runner has already
+  retained a cancellation receipt. No automatic mapping retry/parameter sweep.
+- Distinguishes requested-subset equality from full nine-case coverage/equality.
+  Exit 0 means only the requested comparisons are equal. Every output retains
+  production_ready:false, customer_validated:false, no promoted confidence and
+  no whole-query-DP equivalence certificate. No report unlocks Server admission.
+
+`native_controls.py` is shared with the existing integration definition, avoiding
+independently drifting fixture lists. `native_evaluation.py` exposes the same
+core/tag key constants to the signature comparison and detailed reporter.
+`test_compare_native_controls.py` defines plan-only, field/order/multiplicity,
+report-limit, subset/full-matrix, retained-refusal, mutation and cancellation
+checks. Those mocks are NOT native evidence. No new definitions, original native
+integration, expanded matrix, compiler, package or mapping have run in this phase.
+
+A later final-validation invocation (not executed now) is:
+
+```bash
+python3 GPM2.0/experiments/long_query_alignment/compare_native_controls.py \
+  --out /tmp/NEW_CGAT_NATIVE_CONTROLS \
+  --minimap2 /path/to/unchanged/pinned/minimap2 \
+  --native-state-bundle /path/to/maintainer-built/companion \
+  --execute
+```
+
+These are maintainer validation arguments, NOT customer run.sh options/config.
+Actual >28-bit forward/reverse selective recovery, default multipart semantics,
+unsupported-path audits, GRT/Final Path, original-command fresh/resume packaging,
+and customer-specific acceptance remain separate required gates. Passing a small
+matrix cannot substitute for them or prove that window-derived paths comprise
+all native whole-query DP candidates. The goal is not complete.

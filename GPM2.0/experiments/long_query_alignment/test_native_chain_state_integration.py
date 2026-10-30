@@ -73,20 +73,9 @@ class NativeChainStateIntegrationTests(unittest.TestCase):
 
 
     def test_native_bridge_matches_whole_query_DP_controls_not_only_exit_success(self):
-        import audit_post_dp as audit
+        import native_controls as controls
         import guided_alignment as ga
-        fixtures = audit.fixtures()
-        rng = random.Random(2311303)
-        dna = bytes(rng.choices(b"ACGT",k=200000))
-        decoy = bytearray(dna)
-        decoy[60000:61000] = bytes(rng.choices(b"ACGT",k=1000))
-        decoy[130000:131000] = bytes(rng.choices(b"ACGT",k=1000))
-        cancelled = dna[:60000]+bytes(rng.choices(b"ACGT",k=2000))+dna[60000:130000]+dna[132000:]
-        fixtures += [("cancelled_indels",{"target":cancelled},dna),
-                     ("cancelled_indels_reverse",{"target":cancelled},dna.translate(wa.RC)[::-1]),
-                     ("three_split_decoy",{"exact":dna,"decoy":bytes(decoy)},dna),
-                     ("three_split_reverse",{"exact":dna,"decoy":bytes(decoy)},dna.translate(wa.RC)[::-1]),
-                     ("three_split_without_exact_parent",{"decoy":bytes(decoy)},dna)]
+        fixtures = controls.fixtures()
         import native_evaluation as ne
         with tempfile.TemporaryDirectory(prefix="cgat-native-bridge-controls-") as tmp:
             for name,targets,query_bases in fixtures:
