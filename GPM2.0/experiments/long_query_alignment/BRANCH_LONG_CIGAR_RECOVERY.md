@@ -951,3 +951,29 @@ unsupported-path audits, GRT/Final Path, original-command fresh/resume packaging
 and customer-specific acceptance remain separate required gates. Passing a small
 matrix cannot substitute for them or prove that window-derived paths comprise
 all native whole-query DP candidates. The goal is not complete.
+
+
+## Remove an invented trace-reader ceiling: source correction only
+
+A scoped audit found a recovery-path refusal unrelated to native alignment
+correctness: when neither an explicit reader-process budget nor finite RLIMIT_AS
+was present, `trace_memory.choose_buffer` inserted an artificial 128 MiB TOTAL
+process budget. Its current-VMS/reserve check could therefore reject a larger
+Python parent without any evidence of that actual limit. This is a source-derived
+failure condition, NOT a reproduced customer failure or the original assertion's
+root cause.
+
+Unknown-limit handling now chooses only a conservative 64 KiB read buffer (or an
+already supported bounded explicit buffer request). Effective process budget,
+reserve and headroom are null, with explicit unknown flags and no synthetic
+source. It neither claims sufficient physical memory nor discovers/reserves
+node/job/cgroup memory. Finite RLIMIT_AS and existing explicit process budgets
+still use their minimum and refuse insufficient headroom; no real limit is
+relaxed. Native child bounds, candidate counts, anchor ownership, byte/line/time
+limits, MAPQ policy and recovered-output admission are unchanged. This is not a
+new scheduler/resource-management feature or a new customer configuration.
+
+Deferred definitions cover small/large mocked VMS with no limit, bounded buffer
+requests, real-limit preservation, and the actual batch anchor-reader path on
+both strands. All are WRITTEN ONLY, NOT RUN. Static source parsing/diff review is
+not a runtime or scientific acceptance result; the delivery gates remain unmet.

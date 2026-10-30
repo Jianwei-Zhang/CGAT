@@ -8,12 +8,14 @@ from pathlib import Path
 from types import SimpleNamespace
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import batch_seed_ownership as bo
 import native_recovery as nr
 import native_selection as ns
 import post_dp_selection as ps
 import windowed_alignment as wa
+import trace_memory as tm
 from test_post_dp_selection import state
 
 
@@ -53,6 +55,22 @@ class NativeRecoveryTests(unittest.TestCase):
                     self.assertEqual(result["chains"][7]["anchor_counts"],[3,3,3] if split else [9])
                     self.assertEqual(result["chains"][7]["exact_path_anchor_counts"],[3,3,3] if split else [9])
                     self.assertFalse(result["native_dp_split_events_certified"])
+
+    def test_actual_anchor_reader_does_not_invent_128_MiB_limit_for_large_parent(self):
+        for strand in ("+","-"):
+            with self.subTest(strand=strand):
+                plans,trace = source_plan(strand,split=True)
+                with patch.object(tm,"current_virtual_bytes",return_value=4096*tm.MIB), \
+                     patch.object(tm.resource,"getrlimit",return_value=(tm.resource.RLIM_INFINITY,)*2):
+                    result = self.ownership(plans,trace)
+                self.assertEqual(result["chains"][7]["anchor_counts"],[3,3,3])
+                self.assertEqual(result["chains"][7]["exact_path_anchor_counts"],[3,3,3])
+                self.assertEqual(result["source_scans"],1)
+                self.assertIsNone(result["memory_plan"]["effective_budget_bytes"])
+                self.assertFalse(result["memory_plan"]["process_budget_known"])
+                self.assertEqual(result["memory_plan"]["selected_buffer_bytes"],65536)
+                self.assertEqual((self.root/"trace.stderr").read_text(),trace)
+                self.assertFalse(result["production_ready"])
 
     def test_nearby_overlapping_window_alternative_requires_real_seed_diagonal(self):
         plans,trace = source_plan(split=False)

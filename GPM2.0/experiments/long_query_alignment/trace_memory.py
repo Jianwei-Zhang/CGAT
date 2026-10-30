@@ -3,6 +3,7 @@
 Only explicit process budgets and RLIMIT_AS are used. Never treat host RAM or a
 shared Slurm/cgroup job allocation as memory exclusively available to this reader.
 The plan is a pre-allocation snapshot, not a reservation or a physical-RAM limit.
+An unknown limit selects a small buffer; it MUST NOT invent a total process cap.
 """
 from __future__ import annotations
 
@@ -29,26 +30,32 @@ def choose_buffer(virtual_bytes, address_space_limit=None, explicit_bytes=None, 
         if type(address_space_limit) is not int or address_space_limit <= 0:
             raise ExperimentError("invalid process address-space limit")
         limits.append(("RLIMIT_AS", address_space_limit))
-    fallback = not limits
-    if fallback:
-        limits.append(("conservative_process_planning_default", 128*MIB))
-    budget = min(limit for _, limit in limits)
-    reserve = max(2*MIB, min(32*MIB, budget//8))
-    headroom = budget - virtual_bytes - reserve
-    if headroom < BUFFERS[0]:
-        raise ExperimentError("trace process budget insufficient after current virtual size and safety reserve; no data skipped")
     if requested_bytes is not None and (type(requested_bytes) is not int or not 8192 <= requested_bytes <= 16*MIB):
         raise ExperimentError("trace read buffer must be 8 KiB..16 MiB")
-    if requested_bytes is None:
-        # Auto remains conservative: no evidence justifies huge buffers merely
-        # because a machine/job is large. Explicit requests may go up to16 MiB.
-        preferred = MIB if headroom >= 128*MIB else 65536 if headroom >= 16*MIB else 8192
+    fallback = not limits
+    if fallback:
+        # Unknown is NOT 128 MiB (or any other invented process ceiling).
+        # A large inherited interpreter address space is not proof of an OOM.
+        # Keep only this read allocation conservative; the real job/OS limits
+        # remain in charge, with no claim to know available/reserved memory.
+        budget = reserve = headroom = None
+        preferred = 65536 if requested_bytes is None else requested_bytes
+        fitting = [size for size in BUFFERS if size <= preferred]
     else:
-        preferred = requested_bytes
-    fitting = [size for size in BUFFERS if size <= min(preferred, headroom)]
+        budget = min(limit for _, limit in limits)
+        reserve = max(2*MIB, min(32*MIB, budget//8))
+        headroom = budget - virtual_bytes - reserve
+        if headroom < BUFFERS[0]:
+            raise ExperimentError("trace process budget insufficient after current virtual size and safety reserve; no data skipped")
+        if requested_bytes is None:
+            preferred = MIB if headroom >= 128*MIB else 65536 if headroom >= 16*MIB else 8192
+        else:
+            preferred = requested_bytes
+        fitting = [size for size in BUFFERS if size <= min(preferred, headroom)]
     selected = max(fitting)
     return {"scope": "trace_reader_process_planning_only", "sources": dict(limits),
             "process_virtual_bytes": virtual_bytes, "effective_budget_bytes": budget,
+            "process_budget_known": not fallback, "allocation_headroom_known": not fallback,
             "reserve_bytes": reserve, "allocation_headroom_bytes": headroom,
             "requested_buffer_bytes": requested_bytes, "selected_buffer_bytes": selected,
             "buffer_downshifted": selected < preferred, "fallback_used": fallback,

@@ -32,14 +32,42 @@ class TraceMemoryTests(unittest.TestCase):
         roomy = tm.choose_buffer(24*tm.MIB, 512*tm.MIB, requested_bytes=16*tm.MIB)
         self.assertEqual(roomy["selected_buffer_bytes"], 16*tm.MIB)
 
-    def test_unknown_job_allocation_uses_declared_fallback_not_host_or_slurm_memory(self):
-        with patch.object(tm, "current_virtual_bytes", return_value=24*tm.MIB), \
-             patch.object(tm.resource, "getrlimit", return_value=(-1,-1)), \
-             patch.dict("os.environ", {"SLURM_JOB_ID":"test-only", "SLURM_MEM_PER_NODE":"999999999"}):
-            plan = tm.process_plan()
-        self.assertEqual(plan["effective_budget_bytes"], 128*tm.MIB)
-        self.assertTrue(plan["fallback_used"])
-        self.assertFalse(plan["slurm_cgroup_allocation_discovery_implemented"])
+    def test_unknown_limit_uses_small_buffer_without_an_invented_process_ceiling(self):
+        # These are mocked VIRTUAL sizes, not allocated arrays or RAM probes.
+        for mib in (24,128,512,4096,512000):
+            with self.subTest(virtual_mib=mib):
+                with patch.object(tm, "current_virtual_bytes", return_value=mib*tm.MIB), \
+                     patch.object(tm.resource, "getrlimit", return_value=(tm.resource.RLIM_INFINITY,)*2), \
+                     patch.dict("os.environ", {"SLURM_JOB_ID":"test-only", "SLURM_MEM_PER_NODE":"999999999"}):
+                    plan = tm.process_plan()
+                self.assertEqual(plan["sources"], {})
+                for key in ("effective_budget_bytes","reserve_bytes","allocation_headroom_bytes"):
+                    self.assertIsNone(plan[key])
+                self.assertFalse(plan["process_budget_known"])
+                self.assertFalse(plan["allocation_headroom_known"])
+                self.assertEqual(plan["selected_buffer_bytes"],65536)
+                self.assertTrue(plan["fallback_used"])
+                self.assertFalse(plan["hard_limit_changed"])
+                self.assertFalse(plan["job_memory_reserved"])
+                self.assertFalse(plan["slurm_cgroup_allocation_discovery_implemented"])
+
+    def test_unknown_limit_still_bounds_explicit_buffer_requests_without_guessing_headroom(self):
+        for requested in tm.BUFFERS:
+            with self.subTest(requested=requested):
+                plan = tm.choose_buffer(4096*tm.MIB,requested_bytes=requested)
+                self.assertEqual(plan["selected_buffer_bytes"],requested)
+                self.assertIsNone(plan["allocation_headroom_bytes"])
+        self.assertLessEqual(tm.choose_buffer(4096*tm.MIB,requested_bytes=20000)["selected_buffer_bytes"],20000)
+
+    def test_real_limit_is_not_ignored_for_a_large_interpreter_or_a_missing_explicit_budget(self):
+        with self.assertRaisesRegex(wa.ExperimentError,"insufficient.*no data skipped"):
+            tm.choose_buffer(512*tm.MIB,address_space_limit=256*tm.MIB)
+        plan = tm.choose_buffer(4096*tm.MIB,address_space_limit=8192*tm.MIB)
+        self.assertEqual(plan["sources"],{"RLIMIT_AS":8192*tm.MIB})
+        self.assertTrue(plan["process_budget_known"])
+        self.assertTrue(plan["allocation_headroom_known"])
+        self.assertFalse(plan["fallback_used"])
+        self.assertEqual(plan["selected_buffer_bytes"],tm.MIB)
 
     def test_invalid_or_insufficient_budget_fails_without_data_skipping(self):
         with self.assertRaisesRegex(wa.ExperimentError, "insufficient.*no data skipped"):
