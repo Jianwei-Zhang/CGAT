@@ -183,6 +183,48 @@ def view_rows(path,fixture,*,private,ordinary_native):
             "long_identity_rows":details,"sha256":wa.sha256(Path(path))}
 
 
+
+def audit_original_root_reuse(isolation,root):
+    """Acceptance entry only: verified root reuse cannot stand in for a singleton."""
+    original = root/"original-native"
+    part_root = root/"part-0000"
+    attempts = isolation.get("attempts",[])
+    proof = isolation.get("initial_assertion_evidence",{})
+    receipt_path = original/"native-attempt.json"
+    if (isolation.get("part_index")!=0 or isolation.get("original_root_assertion_reused") is not True
+            or len(attempts)!=2*len(QUERY_ORDER)-1
+            or isolation.get("native_attempts_started")!=len(attempts)-1
+            or [row.get("group") for row in attempts if row.get("reused_original_assertion")]!=[0]
+            or attempts[0].get("group")!=0 or attempts[0].get("parent_group") is not None
+            or attempts[0].get("reused_original_assertion") is not True
+            or attempts[0].get("queries")!=list(QUERY_ORDER) or attempts[0].get("status")!="target_assertion"
+            or Path(attempts[0]["attempt_receipt"]).resolve()!=receipt_path.resolve()
+            or proof.get("rule")!="verified_original_first_part_whole_group_assertion_only"
+            or proof.get("part_index")!=0 or proof.get("failed_PAF_reused") is not False
+            or proof.get("singleton_replay_still_required") is not True
+            or proof.get("attempt_receipt")!=str(receipt_path)):
+        raise wa.ExperimentError("real long control did not reuse ONLY its verified original root assertion")
+    reused_path = part_root/"group-000000/reused-original-assertion.json"
+    files = ("native-attempt.json","native.command.json","native.execution.json","native.stderr")
+    parsed = nf.inspect_stderr(original/"native.stderr")
+    if (proof.get("evidence_files_sha256")!={name:wa.sha256(original/name) for name in files}
+            or proof.get("index_sequence_counts")!=[1] or parsed["index_sequence_counts"]!=[1]
+            or parsed["index_metadata_complete"] is not True
+            or parsed["threshold_metadata_complete"] is not True
+            or parsed["mid_occ_updates"]!=[proof.get("mid_occ")]
+            or json.loads(reused_path.read_text())!=proof
+            or (part_root/"group-000000/native").exists()):
+        raise wa.ExperimentError("root reuse evidence changed or a duplicate root execution was created")
+    for row in attempts[1:]:
+        expected = part_root/f"group-{row['group']:06d}"/"native/native-attempt.json"
+        if (row.get("reused_original_assertion") is not False
+                or Path(row["attempt_receipt"]).resolve()!=expected.resolve()):
+            raise wa.ExperimentError("original assertion was reused for a child or singleton")
+    return {"original_root_assertion_reused":True,"redundant_root_attempts_avoided":1,
+            "native_attempts_started":isolation["native_attempts_started"],
+            "singleton_replay_still_required":True}
+
+
 def audit_selective(report,root,fixture,bundle,ordinary_native):
     if fixture["length"]!=LENGTH or LENGTH<=wa.LIMIT:
         raise wa.ExperimentError("real long control cannot accept a shortened fixture")
@@ -205,6 +247,7 @@ def audit_selective(report,root,fixture,bundle,ordinary_native):
             raise wa.ExperimentError("native/empty/recovered query cells are missing, duplicated or skipped")
     if len(report["parts"])!=1 or report["parts"][0]["status"]!="all_groups_completed":
         raise wa.ExperimentError("real long control did not complete its original index part")
+    root_reuse = audit_original_root_reuse(report["parts"][0],root)
     recovered,native = {},{}
     for row in report["parts"][0]["attempts"]:
         receipt = audit_attempt(row["attempt_receipt"],row["status"])
@@ -265,7 +308,7 @@ def audit_selective(report,root,fixture,bundle,ordinary_native):
                 or private_view["long_identity_rows"][name]["row_sha256"]!=source["private_sha256"]):
             raise wa.ExperimentError("merged long PAF bytes differ from their paired source cells")
     return {"recovered":recovered,"native":native,"public":public_view,"private":private_view,
-        "helper_sha256":bundle["sha256"],"actual_assertion_recovery_executed":True,
+        "helper_sha256":bundle["sha256"],"original_root_reuse":root_reuse,"actual_assertion_recovery_executed":True,
         "both_long_strands_equal_simple_identity_contract":True,"native_ordinary_and_empty_cells_preserved":True}
 
 

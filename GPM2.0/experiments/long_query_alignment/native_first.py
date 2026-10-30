@@ -6,6 +6,7 @@ No parameter sweep, tool update, source patch, runtime build or new customer fla
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path
@@ -21,6 +22,7 @@ PREDICATE = b"qoff == r->qe - r->qs && toff == r->re - r->rs"
 ASSERTION = re.compile(rb"(?:^|[ /])align\.c:[0-9]+: mm_update_extra: Assertion [`'\"]"+
                        re.escape(PREDICATE)+rb"['\"] failed\.")
 MID_OCC = re.compile(rb"\[M::mm_mapopt_update::[^\]]+\] mid_occ = ([0-9]+)\s*$")
+INDEX_LOAD = re.compile(rb"\[M::main::[^\]]+\] loaded/built the index for ([1-9][0-9]*) target sequence\(s\)\s*$")
 
 
 class RawFastaCatalog:
@@ -97,6 +99,17 @@ class RawFastaCatalog:
                 "source_sha256":self.identity["sha256"],"raw_records_preserved":True}
 
 
+@dataclass(frozen=True)
+class OriginalAttemptContext:
+    """Internal original-run context, NOT a verified assertion or customer option.
+
+    Reuse verifies the actual command/exit/log against these current sources.
+    No archive, caller-provided outcome flag or failed PAF can seed recovery.
+    """
+    directory: Path
+    reference: RawFastaCatalog
+
+
 def source_identity(path):
     path = Path(path)
     if not path.is_file():
@@ -116,12 +129,13 @@ def inspect_stderr(path):
     """Bounded memory, not a new success-path file/line size restriction.
 
     Unusually long log lines can still contain the assertion. Only recovery's
-    threshold metadata becomes ineligible if a line/update bound was exceeded.
+    threshold/part-attribution metadata becomes ineligible if a line/update
+    bound was exceeded.
     A successful opaque native result must not fail merely for a long log.
     """
     matched = False
-    mid_occ = []
-    metadata_complete = True
+    mid_occ,index_counts = [],[]
+    metadata_complete = index_complete = True
     total = 0
     tail = b""
     continuing = False
@@ -131,7 +145,16 @@ def inspect_stderr(path):
             matched = matched or ASSERTION.search(tail+raw) is not None
             whole_line = not continuing and raw.endswith(b"\n")
             if not whole_line:
-                metadata_complete = False
+                metadata_complete = index_complete = False
+            index_load = INDEX_LOAD.search(raw) if whole_line else None
+            if index_load:
+                count = index_load[1]
+                if len(count)>10 or not 1<=int(count)<=wa.INT32_MAX or len(index_counts)>=MAX_MID_OCC_UPDATES:
+                    index_complete = False
+                else:
+                    index_counts.append(int(count))
+            elif b"loaded/built the index for" in raw:
+                index_complete = False
             value = MID_OCC.search(raw) if whole_line else None
             if value:
                 text = value[1]
@@ -142,7 +165,8 @@ def inspect_stderr(path):
             tail = b"" if raw.endswith(b"\n") else (tail+raw)[-512:]
             continuing = not raw.endswith(b"\n")
     return {"target_assertion_observed":matched,"mid_occ_updates":mid_occ,
-            "threshold_metadata_complete":metadata_complete,"stderr_bytes":total}
+            "threshold_metadata_complete":metadata_complete,"stderr_bytes":total,
+            "index_sequence_counts":index_counts,"index_metadata_complete":index_complete}
 
 
 def classify(execution,log):
@@ -187,27 +211,112 @@ def shared_mid_occ(failed_attempt,parts):
     return values[0]
 
 
-def isolate_part(mm,part,query,root,args,*,on_native,on_assertion,check_unchanged=None):
+def _reuse_original_first_part(mm,part,query,context,args):
+    """Verify an ACTUAL first-part whole-group failure; never reuse PAF bodies.
+
+    Missing/ambiguous metadata declines this optimization. Contradictory or
+    changed evidence refuses; actual singleton attempts are STILL mandatory.
+    """
+    if context is None or part["part_index"]!=0 or len(query.records)<2:
+        return None
+    if type(context) is not OriginalAttemptContext:
+        raise wa.ExperimentError("initial assertion requires an internal original-run context")
+    directory = context.directory.resolve()
+    paths = {name:directory/name for name in ("native-attempt.json","native.command.json","native.execution.json","native.stderr")}
+    if not all(path.is_file() for path in paths.values()):
+        return None
+    snapshots,documents = {},{}
+    for name,path in paths.items():
+        before = wa.fingerprint(path)
+        if name.endswith(".json"):
+            with path.open("rb") as source:
+                raw = source.read(1024**2+1)
+            if len(raw)>1024**2:
+                raise wa.ExperimentError("initial assertion metadata exceeds bounded receipt size")
+            documents[name] = json.loads(raw)
+            digest = hashlib.sha256(raw).hexdigest()
+        else:
+            digest = wa.sha256(path)
+        if wa.fingerprint(path)!=before:
+            raise wa.ExperimentError("initial assertion evidence changed during capture")
+        snapshots[name] = {"path":str(path),"identity":before,"sha256":digest}
+    receipt,execution = documents["native-attempt.json"],documents["native.execution.json"]
+    reference = context.reference
+    expected_command = [mm,"-c","-x","asm10","-t",str(args.threads),"-o",
+                        str(directory/"native.partial.paf"),str(reference.source),str(query.source)]
+    parsed = inspect_stderr(paths["native.stderr"])
+    if (type(receipt) is not dict or type(execution) is not dict
+            or type(execution.get("returncode")) is not int
+            or receipt.get("execution")!=execution or execution.get("command")!=expected_command
+            or documents["native.command.json"]!=expected_command
+            or receipt.get("status")!="target_assertion" or classify(execution,parsed)!="target_assertion"
+            or receipt.get("paf_usable") is not False or receipt.get("partial_PAF_reused") is not False
+            or receipt.get("path")!=str(directory/"native.partial.paf")
+            or receipt.get("stderr_sha256")!=snapshots["native.stderr"]["sha256"]
+            or any(receipt.get(key)!=value for key,value in parsed.items())):
+        raise wa.ExperimentError("original assertion command/exit/log evidence is contradictory or changed")
+    if (not parsed["index_metadata_complete"] or not parsed["threshold_metadata_complete"]
+            or parsed["index_sequence_counts"]!=[len(part["records"])]
+            or parsed["mid_occ_updates"]!=[part["mid_occ"]]):
+        return None
+    prefix = [{"name":name,"length":row["length"]} for name,row in reference.records.items()][:len(part["records"])]
+    if (not reference.unchanged() or not query.unchanged() or part.get("preset")!="asm10"
+            or part.get("reference_sha256")!=reference.identity["sha256"] or part["records"]!=prefix
+            or part.get("tool_sha256")!=wa.sha256(Path(mm))):
+        raise wa.ExperimentError("initial assertion does not match original reference/query/tool/index context")
+    proof = {"rule":"verified_original_first_part_whole_group_assertion_only",
+        "attempt_receipt":str(paths["native-attempt.json"]),"part_index":0,
+        "reference_sha256":reference.identity["sha256"],"query_sha256":query.identity["sha256"],
+        "tool_sha256":part["tool_sha256"],"index_part_sha256":part["sha256"],
+        "index_sequence_counts":parsed["index_sequence_counts"],"mid_occ":part["mid_occ"],
+        "evidence_files_sha256":{name:row["sha256"] for name,row in snapshots.items()},
+        "failed_PAF_reused":False,"singleton_replay_still_required":True}
+    seed = {"receipt":receipt,"proof":proof,"files":snapshots,"reference":reference}
+    _check_original_assertion(seed,query)
+    return seed
+
+
+def _check_original_assertion(seed,query,*,rehash=False):
+    if seed is None:
+        return
+    if (not query.unchanged() or not seed["reference"].unchanged()
+            or any(wa.fingerprint(Path(row["path"]))!=row["identity"]
+                   or rehash and wa.sha256(Path(row["path"]))!=row["sha256"] for row in seed["files"].values())):
+        raise wa.ExperimentError("reused original assertion evidence or input changed during isolation")
+
+
+def isolate_part(mm,part,query,root,args,*,on_native,on_assertion,check_unchanged=None,initial_assertion=None):
     """Binary isolation of ACTUAL target assertions, never a length-based retry.
 
     Each group is attempted once. A target-asserting non-singleton is divided
     into two nonempty original-order whole-record groups; only an actually
     asserting singleton invokes recovery. Non-target failures stop immediately.
     The bound 2*N-1 is a structural limit, not an unbounded parameter retry loop.
+    An independently verified ORIGINAL first-part whole-group abort may replace
+    ONLY the redundant root attempt. No failed output is accepted; all asserting
+    singletons still execute a native attempt before any recovery callback.
     """
     root = Path(root)
     root.mkdir(exist_ok=False)
     names = list(query.records)
     report = {"status":"running","part_index":part["part_index"],"attempts":[],
               "attempt_bound":2*len(names)-1,"native_groups":0,"assertion_leaves":0,
-              "length_is_not_a_recovery_trigger":True,"partial_PAF_reused":False}
+              "length_is_not_a_recovery_trigger":True,"partial_PAF_reused":False,
+              "native_attempts_started":0,"original_root_assertion_reused":False}
     pending = [(names,None)]
     index = Path(part["path"])
     index_identity = wa.fingerprint(index)
     try:
-        while pending:
+        seed = _reuse_original_first_part(mm,part,query,initial_assertion,args)
+        report["original_root_assertion_reused"] = seed is not None
+        if seed is not None:
+            report["initial_assertion_evidence"] = seed["proof"]
+        def guard():
             if check_unchanged is not None:
                 check_unchanged()
+            _check_original_assertion(seed,query)
+        while pending:
+            guard()
             group,parent = pending.pop()
             number = len(report["attempts"])
             if number>=report["attempt_bound"]:
@@ -223,13 +332,20 @@ def isolate_part(mm,part,query,root,args,*,on_native,on_assertion,check_unchange
             before = wa.fingerprint(query_file)
             if not query.unchanged() or wa.fingerprint(index)!=index_identity:
                 raise wa.ExperimentError("original query/index changed before native assertion isolation")
-            result = attempt(mm,index,query_file,directory/"native",args,mid_occ=part["mid_occ"])
+            reused = seed is not None and number==0 and parent is None and group==names
+            if reused:
+                result = seed["receipt"]
+                attempt_receipt = seed["proof"]["attempt_receipt"]
+                wa.write_json(directory/"reused-original-assertion.json",seed["proof"])
+            else:
+                report["native_attempts_started"] += 1
+                result = attempt(mm,index,query_file,directory/"native",args,mid_occ=part["mid_occ"])
+                attempt_receipt = str(directory/"native"/"native-attempt.json")
             row = {"group":number,"parent_group":parent,"queries":group,"source":source,
-                   "attempt_receipt":str(directory/"native"/"native-attempt.json"),"status":result["status"]}
+                   "attempt_receipt":attempt_receipt,"status":result["status"],"reused_original_assertion":reused}
             report["attempts"].append(row)
             wa.write_json(root/"isolation.json",report)
-            if check_unchanged is not None:
-                check_unchanged()
+            guard()
             if (not query.unchanged() or wa.fingerprint(index)!=index_identity
                     or wa.fingerprint(query_file)!=before):
                 raise wa.ExperimentError("query/index changed during native assertion isolation")
@@ -244,12 +360,12 @@ def isolate_part(mm,part,query,root,args,*,on_native,on_assertion,check_unchange
             else:
                 cut = len(group)//2
                 pending.extend([(group[cut:],number),(group[:cut],number)])
-            if check_unchanged is not None:
-                check_unchanged()
+            guard()
             if (not query.unchanged() or wa.fingerprint(index)!=index_identity
                     or wa.fingerprint(query_file)!=before):
                 raise wa.ExperimentError("query/index changed while accepting a completed isolation group")
             wa.write_json(root/"isolation.json",report)
+        _check_original_assertion(seed,query,rehash=True)
         report["status"] = "all_groups_completed"
     except BaseException as exc:
         report.update(status="refused_or_failed",error=f"{type(exc).__name__}: {exc}")

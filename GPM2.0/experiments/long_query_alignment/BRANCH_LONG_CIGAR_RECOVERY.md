@@ -6,7 +6,7 @@ Status: implementation only; **no tests or experiments executed** in this phase.
 
 ## Authorized objective and constraints
 
-Work ahead of customer feedback assuming a long CIGAR-operation encoding overflow,
+Develop the isolated recovery path assuming a long CIGAR-operation encoding overflow,
 without claiming that assumption is the confirmed customer root cause. Keep
 minimap2 source/binary unchanged. The eventual Server integration must retain the
 existing `run.sh`/`sbatch` interface and must not ask the customer to split FASTA,
@@ -37,7 +37,10 @@ an alternate way to window every long record.
 5. Run original-order whole-record groups against each original index part. Keep
    every successful native group unchanged. Divide ONLY an actually asserting
    group into two nonempty halves; recover ONLY an actually asserting singleton.
-   Each group is attempted once, with at most `2*N-1` attempts per original part.
+   Each group has at most one attempt, with at most `2*N-1` tree nodes per original
+   part. An independently verified original first-part abort may supply ONLY the
+   root node, avoiding its duplicate whole-group run; every asserting singleton
+   still executes natively. Missing/ambiguous attribution retains the normal run.
    This is not a parameter sweep or an unlimited retry. **Length is not a trigger**:
    a short query may have a target-consuming long D; unsupported paths still refuse.
 6. The prebuilt pinned companion is required only at the actual recovery leaf.
@@ -138,7 +141,7 @@ its memory/time/disk allocation.
 - Server command generation/runtime bundling and correct nonzero-exit/checkpoint
   handling, only after there is an accepted recovery result to publish. The branch
   must not quietly run GRT on diagnostic candidates with unknown semantics.
-- End-to-end original workflow/scientific acceptance once customer feedback arrives.
+- End-to-end original workflow/scientific acceptance on repaired customer data.
 
 ## Deferred validation
 
@@ -163,8 +166,9 @@ Additional deferred modules:
 
 Final testing also needs real mixed ordinary/long synthetic inputs, both strands,
 normal-only output comparison, index-part cases, retained decoy negative controls,
-and the existing assignment/GRT/Final Path comparisons. Customer localization and
-whole-record replay precede asserting any customer-specific root cause or repair.
+and the existing assignment/GRT/Final Path comparisons. Returned customer logs now
+establish independent whole-record reproduction (see below), NOT the exact
+overflow mechanism or acceptance of a repaired customer result.
 
 ## Delivery gate status
 
@@ -1040,3 +1044,46 @@ python3 GPM2.0/experiments/long_query_alignment/compare_long_identity.py \
   --native-state-bundle /path/to/maintainer-built/companion \
   --execute
 ```
+
+
+## Verified original first-part assertion reuse: unexecuted implementation
+
+The returned customer localization and selected-record replay logs both show the
+same exact abort on the unchanged pinned minimap2 2.31-r1302. The independent
+selected record is 411,848,600 bp and also aborts on its own. This completes the
+whole-record reproduction step; it does NOT prove which original DP operation
+overflowed, nor that the branch recovers a correct result. No customer sequence or
+PAF was included in the returned log archives, so those logs are not local repair
+acceptance. No customer is asked to repeat this completed diagnostic step.
+
+The native-first driver previously repeated the whole original query group on
+index part zero even when that first-part assertion was already present. It now
+passes an internal original-attempt context, not a new customer flag. Reuse needs
+at least two queries, part zero, exact original argv/preset/thread/input paths,
+matching command/execution/receipt files, SIGABRT plus the exact assertion, an
+unusable failed PAF flag, and current source/tool/default-part bindings. Evidence
+files are hashed and guarded against mutation throughout isolation, with final
+hash checks. The failed PAF BODY is never read for this decision or reused.
+
+Attribution counts actual `loaded/built the index` log entries independently of
+`mid_occ`: upstream may print the threshold only once while loading multiple
+parts. Only one complete first-part load matching its source membership and
+threshold is eligible. Missing files or missing/ambiguous load metadata retain
+the normal root probe; contradictory command/exit/log/context refuses. No
+singleton or later index part may reuse the original group abort.
+
+A reused root has its own evidence link, not invented execution files. Its two
+nonempty children are still mapped; only actual asserting singleton receipts
+enter recovery. Reports distinguish completed tree nodes from actually started
+native attempts. Source mutation and non-target failures still abort, and no
+asserting singleton still means the selective driver refuses recovery.
+
+Deferred definitions in `test_original_assertion_reuse.py` cover attribution,
+root-only reuse, actual singleton replay, no-hit/native child completion,
+non-target refusal, safe fallback, command/tool/source/log integrity and final
+rehashing. The real-long mixed-input acceptance entry now requires exactly one
+verified root reuse and actual remaining attempts; its existing actual receipt,
+both-strand singleton, paired path and ordinary-byte checks remain mandatory.
+These definitions and the modified entry have NOT RUN. No native build, fixture,
+package or mapping was started. Formal recovered-output publication stays CLOSED;
+normal native success and the customer run.sh/sbatch interface are unchanged.

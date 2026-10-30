@@ -126,7 +126,7 @@ def experiment(args,*,prepared_workspace=None):
               "promotion_blockers":["native/recovery path-context equivalence and candidate completeness",
                                     "formal confidence contract","deferred branch validation",
                                     "transparent Server integration and prebuilt bundle",
-                                    "customer reproduction","downstream scientific acceptance"]}
+                                    "customer recovered-result/full-workflow validation","downstream scientific acceptance"]}
     wa.write_json(root/"selective-reference.json",report)
     try:
         target_identity = nf.source_identity(target_path)
@@ -227,7 +227,8 @@ def experiment(args,*,prepared_workspace=None):
             for part in catalog["parts"]:
                 unchanged()
                 isolated = nf.isolate_part(mm,part,query,root/f"part-{part['part_index']:04d}",args,
-                    on_native=accept_native,on_assertion=recover_assertion,check_unchanged=unchanged)
+                    on_native=accept_native,on_assertion=recover_assertion,check_unchanged=unchanged,
+                    initial_assertion=nf.OriginalAttemptContext(root/"original-native",target) if part["part_index"]==0 else None)
                 if wa.sha256(Path(part["path"]))!=part["sha256"]:
                     raise wa.ExperimentError("original index part changed during assertion isolation")
                 report["parts"].append(isolated)
