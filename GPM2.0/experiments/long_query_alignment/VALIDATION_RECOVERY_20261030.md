@@ -4,7 +4,7 @@
 acceptance pending.** This is not an official Release promotion or an assertion
 that the customer's wheat workflow has already finished. The user explicitly
 authorized testing for this acceptance run. The published Server source, master
-and official assets were not changed.
+and official assets were not changed by this fix.
 
 Implementation checkpoint: `a8baea07bcfef7dba2b9e75f9b530191b1ebc42c`.
 The exact shipped runtime/Server/helper file hashes, local acceptance receipt
@@ -55,6 +55,39 @@ Windows directory:
 - Package status: `customer_deliverable:true`, `customer_validation_pending:true`.
   `production_ready:false` deliberately excludes unperformed customer acceptance
   and official Release promotion; it is not a closed per-result recovery switch.
+
+## Latest-main compatibility follow-up (same date)
+
+During closure, an independent main-branch commit advanced `master`/`origin/master`
+from `fcfb161` to **`fe59b81a0a35886ac43ca350b5c3f6639118c70f`** (public
+GRT → LGZ naming). This was not this task modifying master. A clean merge alone
+was insufficient: byte-strict old-recipe prebinding would have refused its known
+help/error-only changes.
+
+- Packaging commit `3cb69d4` accepts only the **three reviewed whole-file SHA-256
+  pairs** for that immutable transition, never arbitrary renamed words, unknown
+  edits, reversed downgrades or altered workspace tools. The complete immutable
+  old tool inventory remains mandatory. No recovery runtime/installed minimap2
+  or App implementation was changed by this compatibility follow-up.
+- Created detached synthetic merge `368748c` with main `fe59b81` and fix `3cb69d4`
+  as parents, without merging/pushing either real branch. On that combined source:
+  **353 experimental tests pass with no skips**; the full Server quality gate
+  passes (**378 Python Server tests**, shell tests and actual LGZ Server-to-App
+  E2E, with Windows Node and compiled backend, no E2E skip).
+- Actual package preparation against the combined LGZ Server successfully
+  prebinds the original customer `d1519a76...` profile and records exactly those
+  three presentation exceptions. A fresh real package `run.sh` completes **all
+  11 stages**. A deliberately prepare.sh-only workspace with no genuine run.sh
+  launch record is correctly refused without installing a handoff runtime; it
+  is a negative guard check, not claimed as a successful old-customer rerun.
+- The earlier genuine old-version failed-workspace **134 → recovery → 11-stage
+  success** receipt remains the actual long handoff evidence. Every shipped
+  recovery-runtime file is **byte-identical** across the customer artifact, fix
+  branch and combined review tree. The extra test/packager compatibility code
+  is not relabelled as having executed in the earlier scientific fixtures.
+- The delivered customer ZIP remains frozen at its verified hash/source `a8baea0`;
+  it was not rewritten to absorb an unrelated public branding change. No new
+  customer configuration or repair flag was introduced.
 
 ## Boundaries / rejected evidence
 
@@ -116,3 +149,7 @@ python3 -m unittest discover -s GPM2.0/experiments/long_query_alignment -p 'test
 | `local-acceptance.json` | `ba496041e4997bd22cc5edd6528e12a28cb263c223ea455ec2c0152d5732b6ce` |
 | `final-artifact-verification.json` | `e7db6cb389489ac47dc2800f47cabf10e364b02fa6b15d6d0b207b58b8351fec` |
 | `customer-handoff.json` | `0c7c9fea6f7961a83bff56c018342218e06f41461b9281bbb3b6ce3d618400e2` |
+| `merged-experiment-unit.log` | `23ffcc0420090deffd6734762faba5257ae54b14c82460c0efd82b48d3f02f2f` |
+| `merged-server-quality.log` | `0605eda5b47c255e59e0044bccd8fea72997d0a247a4e1d20c5409c18945c398` |
+| `merged-packaging-handoff.json` | `b44c627f38949f7d8f43391ddf06c3f9a219c41b002165d754c0774d8d3589de` |
+| `latest-main-acceptance.json` | `65887ec622f55c0f5db0b697a05248d8525935c67e762ebfec03613ae7349ce2` |
