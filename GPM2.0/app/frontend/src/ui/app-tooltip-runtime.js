@@ -103,13 +103,26 @@ export function bindAppTooltips(root = globalThis.document) {
     if (panel.parentElement !== surface) surface.append(panel);
     return surface;
   };
+  const writeText = (node, text) => {
+    const measures = [...text.matchAll(/\b\d[\d,]*(?:\.\d+)?[ \t]*bp\b/g)];
+    if (!measures.length) { node.textContent = text; return; }
+    node.textContent = "";
+    let end = 0;
+    for (const match of measures) {
+      if (match.index > end) node.append(doc.createTextNode(text.slice(end, match.index)));
+      const measure = doc.createElement("span");
+      measure.className = "app-tooltip-measure"; measure.textContent = match[0];
+      node.append(measure); end = match.index + match[0].length;
+    }
+    if (end < text.length) node.append(doc.createTextNode(text.slice(end)));
+  };
   const render = text => {
     panel.style.width = ""; // A new payload must not inherit the previous fitted width.
     const lines = text.split("\n");
-    if (lines.length < 2) { panel.textContent = text; return; }
+    if (lines.length < 2) { writeText(panel, text); return; }
     const title = doc.createElement("strong"), body = doc.createElement("span");
-    title.className = "app-tooltip-heading"; title.textContent = lines.shift();
-    body.className = "app-tooltip-body"; body.textContent = "\n" + lines.join("\n");
+    title.className = "app-tooltip-heading"; writeText(title, lines.shift());
+    body.className = "app-tooltip-body"; writeText(body, "\n" + lines.join("\n"));
     panel.replaceChildren(title, body);
   };
   const fitWidth = () => {
@@ -128,8 +141,11 @@ export function bindAppTooltips(root = globalThis.document) {
     const scrollbar = Math.max(0, panel.offsetWidth - panel.clientWidth - borderLeft - borderRight);
     // max-content capped by max-width can leave a large blank tail after a word
     // wraps. Keep the rendered lines, padding and scrollbar, not the unused cap.
-    // One CSS pixel protects fractional glyph advances from wrapping again.
-    const width = Math.min(panel.offsetWidth, Math.ceil(right + (parseFloat(style.paddingRight) || 0) + borderRight + scrollbar) + 1);
+    // offsetWidth can round DOWN the natural width (399.406px -> 399px),
+    // causing a whole heading to wrap again. Preserve fractional geometry and
+    // round the cap up too; CSS max-width still enforces the viewport limit.
+    const cap = Math.ceil(bounds.width ?? panel.offsetWidth);
+    const width = Math.min(cap, Math.ceil(right + (parseFloat(style.paddingRight) || 0) + borderRight + scrollbar) + 1);
     panel.style.width = `${width}px`;
   };
   const place = (anchor, keyboard = false) => {

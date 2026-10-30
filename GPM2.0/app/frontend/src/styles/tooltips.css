@@ -33,3 +33,9 @@
 .app-tooltip.is-hidden { display: none; }
 .app-tooltip-heading { display: inline; font: inherit; font-weight: 600; }
 .app-tooltip-body { display: inline; }
+
+.app-tooltip-measure {
+  display: inline-block;
+  white-space: pre;
+  overflow-wrap: normal;
+}

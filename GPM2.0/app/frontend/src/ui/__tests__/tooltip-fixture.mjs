@@ -67,6 +67,7 @@ export function tooltipFixture() {
   };
   const doc = { nodeType: 9, defaultView: win, createElement: tag => new Node(tag), createElementNS: (_, tag) => new Node(tag, {}, {}, true),
     addEventListener: (type, fn) => listen(events, type, fn), removeEventListener: (type, fn) => unlisten(events, type, fn) };
+  doc.createTextNode = text => { const node = new Node("#text"); node.nodeType = 3; node.textContent = text; return node; };
   doc.documentElement = new Node("html"); doc.documentElement._root = true;
   doc.body = new Node("body"); doc.documentElement.append(doc.body);
   doc.querySelectorAll = selector => doc.documentElement.querySelectorAll(selector);

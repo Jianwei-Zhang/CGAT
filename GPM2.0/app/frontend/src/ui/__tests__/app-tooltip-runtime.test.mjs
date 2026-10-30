@@ -12,11 +12,16 @@ const target = (h, text = "tip", attribute = "data-app-tooltip") => h.create("bu
 
 // Explicit layout fragments exercise sizing math; they are not browser/native
 // rendering evidence. offsetWidth responds to the fitted border-box width.
-function measuredTooltip(h, fragments, { cap = 480, scrollbar = 0 } = {}) {
+function measuredTooltip(h, fragments, { cap = 480, naturalWidth = cap, scrollbar = 0 } = {}) {
   const measurements = [];
   Object.assign(h.panel.computed, { paddingRight: "8px", borderLeftWidth: "1px", borderRightWidth: "1px" });
-  Object.defineProperty(h.panel, "offsetWidth", { get: () => Math.min(cap, parseFloat(h.panel.style.width) || cap) });
-  Object.defineProperty(h.panel, "clientWidth", { get: () => h.panel.offsetWidth - 2 - scrollbar });
+  const actualWidth = () => Math.min(cap, parseFloat(h.panel.style.width) || naturalWidth);
+  Object.defineProperty(h.panel, "offsetWidth", { get: () => Math.round(actualWidth()) });
+  Object.defineProperty(h.panel, "clientWidth", { get: () => Math.round(actualWidth() - 2 - scrollbar) });
+  h.panel.getBoundingClientRect = () => {
+    const left = parseFloat(h.panel.style.left) || 20, top = parseFloat(h.panel.style.top) || 20;
+    return { left, top, right: left + actualWidth(), bottom: top + h.panel.offsetHeight, width: actualWidth(), height: h.panel.offsetHeight };
+  };
   h.doc.createRange = () => ({
     selectNodeContents(node) { assert.equal(node, h.panel); },
     getClientRects() {
@@ -59,6 +64,35 @@ test("fitted widths retain scrollbar space and fractional glyph safety without e
     assert.equal(h.panel.style.width, expected);
     assert.ok(parseFloat(h.panel.style.width) <= cap);
   }
+});
+
+test("fractional natural ctg widths are never rounded down into a premature heading wrap", () => {
+  // Windows Chromium, app-font-size 16 / 18, screenshot-equivalent ctg title.
+  for (const naturalWidth of [399.40625, 447.15625]) {
+    const h = tooltipFixture(); measuredTooltip(h, [naturalWidth - 18], { naturalWidth });
+    h.fire("pointerover", target(h, "NC_089035.1_RagTag[11596222-15049775]@chr01\nStart: 11596221 bp\nLength: 343554 bp"));
+    assert.equal(parseFloat(h.panel.style.width), Math.ceil(naturalWidth));
+    assert.ok(h.panel.getBoundingClientRect().width >= naturalWidth);
+  }
+});
+
+test("bp remains in the same atomic display span as its value without changing the copied text", () => {
+  const h = tooltipFixture(), text = "ctg\nStart: 11,596,221 bp\nLength: 343554 bp";
+  h.fire("pointerover", target(h, text));
+  assert.equal(h.panel.textContent, text);
+  assert.deepEqual(h.panel.querySelectorAll(".app-tooltip-measure").map(node => node.textContent), ["11,596,221 bp", "343554 bp"]);
+  const css = readFileSync(new URL("../../styles/tooltips.css", import.meta.url), "utf8");
+  assert.match(css, /\.app-tooltip-measure\s*\{[^}]*display:\s*inline-block;[^}]*white-space:\s*pre;[^}]*overflow-wrap:\s*normal;/);
+});
+
+test("unit spans refresh for single-line text and keep HTML-looking payloads literal", () => {
+  const h = tooltipFixture(), node = target(h, "<safe> 12.5 bp");
+  h.fire("pointerover", node);
+  assert.equal(h.panel.textContent, "<safe> 12.5 bp");
+  assert.equal(h.panel.querySelectorAll(".app-tooltip-measure")[0]?.textContent, "12.5 bp");
+  node.setAttribute("data-app-tooltip", "other 1bp and bps"); h.owner.refresh();
+  assert.equal(h.panel.textContent, "other 1bp and bps");
+  assert.deepEqual(h.panel.querySelectorAll(".app-tooltip-measure").map(node => node.textContent), ["1bp"]);
 });
 
 test("new objects and payload updates reset fitted width, while same-object movement never measures again", () => {
