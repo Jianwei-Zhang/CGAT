@@ -104,6 +104,7 @@ export function bindAppTooltips(root = globalThis.document) {
     return surface;
   };
   const render = text => {
+    panel.style.width = ""; // A new payload must not inherit the previous fitted width.
     const lines = text.split("\n");
     if (lines.length < 2) { panel.textContent = text; return; }
     const title = doc.createElement("strong"), body = doc.createElement("span");
@@ -111,11 +112,32 @@ export function bindAppTooltips(root = globalThis.document) {
     body.className = "app-tooltip-body"; body.textContent = "\n" + lines.join("\n");
     panel.replaceChildren(title, body);
   };
+  const fitWidth = () => {
+    if (!doc.createRange || !win?.getComputedStyle) return;
+    const range = doc.createRange();
+    range.selectNodeContents(panel);
+    const bounds = rect(panel);
+    let right = 0;
+    for (const fragment of range.getClientRects()) {
+      if (fragment.width > 0 && fragment.height > 0) right = Math.max(right, fragment.right - bounds.left);
+    }
+    if (!right) return;
+    const style = win.getComputedStyle(panel);
+    const borderLeft = parseFloat(style.borderLeftWidth) || 0;
+    const borderRight = parseFloat(style.borderRightWidth) || 0;
+    const scrollbar = Math.max(0, panel.offsetWidth - panel.clientWidth - borderLeft - borderRight);
+    // max-content capped by max-width can leave a large blank tail after a word
+    // wraps. Keep the rendered lines, padding and scrollbar, not the unused cap.
+    // One CSS pixel protects fractional glyph advances from wrapping again.
+    const width = Math.min(panel.offsetWidth, Math.ceil(right + (parseFloat(style.paddingRight) || 0) + borderRight + scrollbar) + 1);
+    panel.style.width = `${width}px`;
+  };
   const place = (anchor, keyboard = false) => {
     const view = viewport();
     const above = keyboard ? anchor.top - 14 : anchor.y - 22;
     const below = keyboard ? view.height - anchor.bottom - 14 : view.height - anchor.y - 22;
     panel.style.maxHeight = `${Math.max(1, Math.min(view.height - 16, Math.max(above, below)))}px`;
+    fitWidth();
     const width = panel.offsetWidth, height = panel.offsetHeight;
     // Keyboard has no meaningful pointer coordinates; anchor below the control.
     const position = keyboard

@@ -10,6 +10,93 @@ import { renderSettingsContent } from "../shell/app-settings-panel.js";
 const hidden = h => h.panel.getAttribute("aria-hidden") === "true";
 const target = (h, text = "tip", attribute = "data-app-tooltip") => h.create("button", { [attribute]: text });
 
+// Explicit layout fragments exercise sizing math; they are not browser/native
+// rendering evidence. offsetWidth responds to the fitted border-box width.
+function measuredTooltip(h, fragments, { cap = 480, scrollbar = 0 } = {}) {
+  const measurements = [];
+  Object.assign(h.panel.computed, { paddingRight: "8px", borderLeftWidth: "1px", borderRightWidth: "1px" });
+  Object.defineProperty(h.panel, "offsetWidth", { get: () => Math.min(cap, parseFloat(h.panel.style.width) || cap) });
+  Object.defineProperty(h.panel, "clientWidth", { get: () => h.panel.offsetWidth - 2 - scrollbar });
+  h.doc.createRange = () => ({
+    selectNodeContents(node) { assert.equal(node, h.panel); },
+    getClientRects() {
+      measurements.push(h.panel.style.width);
+      const { left } = h.panel.getBoundingClientRect();
+      return fragments.map(fragment => {
+        const { width, offset = 0, height = 19 } = typeof fragment === "number" ? { width: fragment } : fragment;
+        return { left: left + 9 + offset, right: left + 9 + offset + width, width, height };
+      });
+    },
+  });
+  return { measurements, setFragments(value) { fragments = value; } };
+}
+
+test("wrapped project paths fit the longest rendered line without altering the full path", () => {
+  const h = tooltipFixture(); measuredTooltip(h, [360, 185]);
+  const path = String.raw`D:\Desktop\cgat-data\GPM_40550763_full-self-m200-n100_20261022_164241`;
+  h.fire("pointerover", target(h, path));
+  assert.equal(h.panel.style.width, "379px");
+  assert.equal(h.panel.textContent, path);
+  assert.equal(hidden(h), false);
+});
+
+test("fitting uses the farthest inline fragment, including its offset within a line", () => {
+  const h = tooltipFixture();
+  measuredTooltip(h, [{ width: 140 }, { width: 130, offset: 140 }, { width: 150 }, { width: 0, offset: 450 }]);
+  h.fire("pointerover", target(h, "heading\nfull detail"));
+  assert.equal(h.panel.style.width, "289px");
+  assert.equal(h.panel.textContent, "heading\nfull detail");
+  assert.equal(h.panel.children.length, 2);
+});
+
+test("fitted widths retain scrollbar space and fractional glyph safety without exceeding the original cap", () => {
+  for (const [cap, scrollbar, fragment, expected] of [
+    [480, 15, 360, "394px"], [480, 0, 360.25, "380px"],
+    [240, 0, 222, "240px"], [80, 0, 62, "80px"], [84, 0, 60, "79px"],
+  ]) {
+    const h = tooltipFixture(); measuredTooltip(h, [fragment], { cap, scrollbar });
+    h.fire("pointerover", target(h));
+    assert.equal(h.panel.style.width, expected);
+    assert.ok(parseFloat(h.panel.style.width) <= cap);
+  }
+});
+
+test("new objects and payload updates reset fitted width, while same-object movement never measures again", () => {
+  const h = tooltipFixture(), layout = measuredTooltip(h, [120]);
+  const first = target(h, "short"); h.fire("pointerover", first);
+  assert.equal(h.panel.style.width, "139px");
+  const left = h.panel.style.left;
+  h.fire("pointermove", first, { clientX: 80, clientY: 45 }); h.owner.refresh();
+  assert.equal(h.panel.style.left, left); assert.equal(layout.measurements.length, 1);
+  layout.setFragments([360, 185]);
+  const second = target(h, "long project path"); h.fire("pointerover", second);
+  assert.equal(h.panel.style.width, "379px");
+  layout.setFragments([200]); second.setAttribute("data-app-tooltip", "完整路径说明"); h.owner.refresh();
+  assert.equal(h.panel.style.width, "219px");
+  assert.deepEqual(layout.measurements, ["", "", ""]);
+  assert.equal(h.panel.textContent, "完整路径说明");
+});
+
+test("absent or empty text measurements keep intrinsic sizing and never retain a stale fitted width", () => {
+  const h = tooltipFixture(), layout = measuredTooltip(h, [120]);
+  h.fire("pointerover", target(h)); assert.equal(h.panel.style.width, "139px");
+  layout.setFragments([{ width: 0 }, { width: 400, height: 0 }]);
+  h.fire("pointerover", target(h, "empty rectangles")); assert.equal(h.panel.style.width, "");
+  delete h.doc.createRange;
+  h.fire("pointerover", target(h, "intrinsic fallback")); assert.equal(h.panel.style.width, "");
+});
+
+test("pointer and keyboard edge placement use the compact width on the first synchronous display", () => {
+  for (const keyboard of [false, true]) {
+    const h = tooltipFixture(); measuredTooltip(h, [120]);
+    const node = target(h); node.box = { left: 860, top: 20, bottom: 50, right: 890 };
+    h.fire(keyboard ? "focusin" : "pointerover", node, { clientX: 890, clientY: 30 });
+    assert.equal(h.panel.style.width, "139px");
+    assert.equal(h.panel.style.left, keyboard ? "753px" : "737px");
+    assert.equal(h.panel.style.top, keyboard ? "56px" : "44px");
+  }
+});
+
 test("all four authored payload types display synchronously under one delegated owner", () => {
   const h = tooltipFixture();
   for (const attribute of ["data-app-tooltip", "data-final-path-tooltip", "data-member-tooltip", "data-subview-band-tooltip"]) {
