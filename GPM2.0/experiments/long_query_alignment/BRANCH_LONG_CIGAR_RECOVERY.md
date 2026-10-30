@@ -193,6 +193,9 @@ whole-record replay precede asserting any customer-specific root cause or repair
 - Persistent forced-native control reporter: source-implemented; the original
   eight cases plus a 70-target split/competition case are defined, NOT executed.
   No new native comparison receipt or gate pass has been generated.
+- Real >28-bit mixed-query selective-entry control: source-defined, NOT executed;
+  both 270 Mb strands plus ordinary and native-empty cells are required. No new
+  actual-assertion recovery receipt has been generated.
 - Final automated/scientific validation: deferred under the existing user request.
 - Customer-specific root-cause and complete-workflow acceptance: not established.
 
@@ -977,3 +980,63 @@ Deferred definitions cover small/large mocked VMS with no limit, bounded buffer
 requests, real-limit preservation, and the actual batch anchor-reader path on
 both strands. All are WRITTEN ONLY, NOT RUN. Static source parsing/diff review is
 not a runtime or scientific acceptance result; the delivery gates remain unmet.
+
+
+## Real long mixed-input selective-entry control: unexecuted source
+
+`compare_long_identity.py` closes a final-validation ENTRY gap, not the native
+algorithm's proof gap. Default PLAN ONLY performs no fixture generation, binary
+lookup, version call, mapping, compiler/download or filesystem creation. This
+increment has not executed even its preview command.
+
+Later explicit --execute uses the unchanged pinned 2.31-r1302 tool and an already
+built companion. A bounded-memory writer creates a deterministic 270,000,000 bp
+reference, full forward/reverse exact queries, a 60 kb ordinary exact query and a
+3 kb N-only unmapped query. Query order deliberately differs from lexical order;
+each binary half contains an asserting long member. More than 810 MB of INPUT
+alone is generated, with additional retained index/spool/evidence space required.
+There is no CLI length reduction or forced -I override.
+
+The actual existing selective-reference driver is used with its production-
+intended 50 Mb cores/100 kb contexts, not forced-small windows or a mock mapper.
+A later accepted report checks the actual command/execution files (no dropped
+-c, preset switch or skip-length option), real native SIGABRT+the exact assertion, actual
+asserting singleton receipts for BOTH long strands, source-supported >28-bit
+logical-M witnesses, native shared-overlap evidence and native selection. Both
+ordinary and empty cells require completed native-success receipts, never missing
+output treated as success. An independent ordinary native -c pass retains the
+same default index part and inherited threshold. Its PAF must be byte-identical
+to both assembled views; ordinary geometry is also checked against fixture bases.
+
+The long paths must each span the full exact interval, have the expected strand,
+full mlen/blen, zero NM/nn and bounded numeric CIGAR chunks forming one long = run.
+The private clean-identity MAPQ must be 60 and ms the exact match length, while
+public confidence remains 255 without promoted score/parent tags. Public/private
+paths are re-paired against producer hashes, and merged rows must remain byte-
+identical to those paired source cells. Extra/missing/duplicate candidates,
+query reordering, skipped empty cells, source/tool/helper/index/input mutation or
+masked/native-success-without-assertion cannot count as an accepted control.
+All receipts, failed partials and source evidence remain on disk; cancellation
+must stop before the independent ordinary baseline. Nothing retries parameters.
+
+This is single-part simple-identity evidence ONLY, not full arbitrary whole-query
+DP equivalence, native-AS reconstruction, actual default multipart validation,
+GRT/Final Path, customer run.sh resume or customer root-cause confirmation. Every
+report remains production_ready:false/customer_validated:false, with no automatic
+Server admission. The current hard-closed recovered-publication policy is unchanged.
+
+Deferred unit definitions cover no-work previews, tiny chunked writer geometry,
+both-strand analytic row checks, metadata/order/multiplicity/path/ordinary-byte
+refusals, exit+assertion verification, missing prebuilt artifact preflight,
+nonasserting native success and cancellation. Mocks/tiny inputs are NOT passing
+real-long receipts; none of these definitions or any native execution has run.
+
+Later maintainer invocation (NOT executed in this phase):
+
+```bash
+python3 GPM2.0/experiments/long_query_alignment/compare_long_identity.py \
+  --out /tmp/NEW_CGAT_REAL_LONG_CONTROL \
+  --minimap2 /path/to/unchanged/pinned/minimap2 \
+  --native-state-bundle /path/to/maintainer-built/companion \
+  --execute
+```
