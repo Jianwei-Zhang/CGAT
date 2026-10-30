@@ -83,7 +83,22 @@ export function resolveTooltipColors(node, { getStyle, dark = false } = {}) {
   // ancestor surfaces. Reusing the same alpha over a floating panel is wrong.
   for (let current = paint; current; current = current.parentElement) {
     const currentStyle = read(current) || {};
-    if (current !== paint) color = compositeTooltipColor(color, parseTooltipColor(currentStyle.backgroundColor));
+    if (current !== paint) {
+      // GRT result intervals are painted over an optional mask and the source
+      // ctg, not directly over the page. These sibling SVG paints are not CSS
+      // backgroundColor, so resolve them explicitly in their stacking order.
+      if (paint.matches?.(".grt-result-interval") && String(current.tagName).toLowerCase() === "g") {
+        const layer = current.querySelector?.(":scope > .grt-result-mask") || current.querySelector?.(":scope > .track-ctg");
+        if (layer) {
+          const layerStyle = read(layer) || {}, underlay = parseTooltipColor(layerStyle.fill || layer.getAttribute?.("fill"));
+          if (underlay) {
+            underlay[3] *= number(layerStyle.fillOpacity) * number(layerStyle.opacity);
+            color = compositeTooltipColor(color, underlay);
+          }
+        }
+      }
+      color = compositeTooltipColor(color, parseTooltipColor(currentStyle.backgroundColor));
+    }
     if (!(current === paint && proxy)) color[3] *= number(currentStyle.opacity);
   }
   color = compositeTooltipColor(color, dark ? [23, 33, 46, 1] : [255, 255, 255, 1]);

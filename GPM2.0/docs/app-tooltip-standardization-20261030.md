@@ -213,7 +213,7 @@ D1 的配色规则、D2 的单一规格、D3 的即时触发/定位/关闭/长�
 
 - `app/frontend/src/ui/app-tooltip-runtime.js`：全 App 单一事件委托 owner；普通控件、Final Path、成员及比对/GRT 共用一个激活提示。原生 dialog 内部挂载，切回页面时迁回 body，不依赖跨 top-layer 的 z-index。
 - `app/frontend/src/styles/tooltips.css`：统一字体、尺寸、行高、内边距、圆角、阴影、换行与可滚动内容；无触发等待和淡入/淡出动画。
-- `app/frontend/src/ui/tooltip-colors.js`：对象实际 fill/background/stroke 及深浅；透明证据与祖先表面合成；Canvas 命中代理读取实际 paint 变量，ctg 透明片段命中区关联其源图形。中性普通控件使用默认配色，有明确对象色时覆盖。
+- `app/frontend/src/ui/tooltip-colors.js`：对象实际 fill/background/stroke 及深浅；透明证据与祖先表面合成，GRT 结果进一步叠加实际 SVG 遮罩和源 ctg 底色；Canvas 命中代理读取实际 paint 变量，ctg 透明片段命中区关联其源图形。中性普通控件使用默认配色，有明确对象色时覆盖。
 - 普通控件及动态更新来源显式迁移到 `data-app-tooltip`；SVG 交互对象改用 `desc[data-app-tooltip-source]`，保留完整文本和可访问名称，不用全页 title 删除观察器掩盖遗漏。
 - 旧 Final Path/成员/比对绑定入口改为共享 owner 的薄适配器；移除原比对 dwell 配置、旧页面占位节点和角色固定底色 CSS，不改其他业务菜单的计时器。
 - 按确认方案稳定定位、翻转/避让和窗口边距；跨间隙用几何关联区域而非关闭计时器；支持移入选择文字、内部滚动、键盘 focus/Esc、外部操作关闭及失效 owner 清理。
@@ -225,7 +225,7 @@ D1 的配色规则、D2 的单一规格、D3 的即时触发/定位/关闭/长�
 ### 7.2 验证证据
 
 - 新增共享 Tooltip 的行为、颜色、生命周期、原生来源迁移及导出隔离定向测试；同步更新原生 title / 500ms 旧契约的渲染断言和 DOM 测试桩，不删减数据/几何/来源校验。
-- Windows Node 全量前端测试：2204/2204 通过，0 失败、0 跳过；其中新增共享 Tooltip 的 29 个定向案例覆盖即时触发、嵌套命中、固定定位、跨间隙、选择/内部滚动、键盘、disabled、dialog、缓存/路由、ctg/Canvas 色阶/透明合成、默认配色和导出隔离。
+- Windows Node 全量前端测试：2205/2205 通过，0 失败、0 跳过；其中新增共享 Tooltip 的 30 个定向案例覆盖即时触发、嵌套命中、固定定位、跨间隙、选择/内部滚动、键盘、disabled、dialog、缓存/路由、ctg/Canvas 色阶/透明合成、GRT 遮罩启用/关闭及不同源色、默认配色和导出隔离。
 - Windows Node / npm.cmd 生产构建：通过，2031 modules transformed；主 JS chunk 大于 500kB 的提示保留，非构建失败。本次生成的 `dist/` 已删除。
 - `git diff --check`、新增模块与变更 JS 的 Windows Node 语法检查：通过；最终暂存区检查随提交执行。
 - 未启动浏览器，未声称实际桌面截图或原生交互已经验收；本次不构建/发布安装包，不改变版本号。

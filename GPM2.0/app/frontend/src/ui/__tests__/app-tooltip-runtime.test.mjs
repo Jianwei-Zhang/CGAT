@@ -304,3 +304,24 @@ test("nested targets select the innermost object and SVG sibling labels retain t
   const left = h.panel.style.left; h.fire("pointerover", label, { clientX: 10, clientY: 15 });
   assert.equal(h.panel.style.left, left);
 });
+
+
+test("GRT interval shades composite the actual SVG mask and source ctg, not just the page background", () => {
+  for (const masked of [false, true]) for (const sourceFill of [[210, 223, 239, 1], [90, 110, 130, 1]]) {
+    const h = tooltipFixture(), sourceGroup = h.create("g", {}, {}, true);
+    const source = h.create("rect", { class: "track-ctg" }, { fill: `rgb(${sourceFill.slice(0, 3).join(", ")})` }, true);
+    const overlay = h.create("g", { class: "grt-result-overlay" }, {}, true);
+    const intervalGroup = h.create("g", { class: "grt-result-interval-group" }, {}, true);
+    const interval = h.create("rect", { class: "grt-result-interval" }, { fill: "rgba(47, 158, 68, .72)" }, true);
+    const proxy = h.create("rect", { class: "grt-result-hover-proxy", "data-subview-band-tooltip": "GRT" }, { fill: "transparent" }, true);
+    sourceGroup.append(source, overlay); overlay.append(intervalGroup); intervalGroup.append(interval, proxy);
+    if (masked) {
+      const mask = h.create("rect", { class: "grt-result-mask" }, { fill: "rgba(224, 229, 225, .76)" }, true);
+      overlay.replaceChildren(mask, intervalGroup);
+    }
+    const back = masked ? compositeTooltipColor([224, 229, 225, .76], sourceFill) : sourceFill;
+    const expected = compositeTooltipColor([47, 158, 68, .72], back);
+    h.fire("pointerover", proxy);
+    assert.equal(h.panel.style.background, `rgb(${expected.slice(0, 3).map(Math.round).join(", ")})`);
+  }
+});
