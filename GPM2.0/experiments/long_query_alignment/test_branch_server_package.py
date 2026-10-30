@@ -11,7 +11,7 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import prepare_branch_server_package as package
 import server_alignment as sa
@@ -179,6 +179,21 @@ class BranchServerPackageTests(unittest.TestCase):
             return git(command,**kwargs)
         with patch.object(package.subprocess,"check_output",side_effect=changed),self.assertRaisesRegex(wa.ExperimentError,"different reference"):
             package.resume_source_profile(self.source,revision)
+
+    def test_presentation_recipe_compatibility_is_exact_hash_pinned_not_word_normalization(self):
+        # Protocol test only: actual immutable Git bytes are checked separately
+        # by merged-source package preparation, not a shallow-clone dependency.
+        for name,pair in package.PRESENTATION_RECIPE_PAIRS.items():
+            self.assertTrue(all(sa.HASH.fullmatch(value) for value in pair))
+            values=lambda hashes:[Mock(hexdigest=Mock(return_value=value)) for value in hashes]
+            with patch.object(package.hashlib,"sha256",side_effect=values(pair)):
+                self.assertTrue(package.equivalent_recipe(name,b"old fixture",b"new fixture"))
+            with patch.object(package.hashlib,"sha256",side_effect=values(pair[::-1])):
+                self.assertFalse(package.equivalent_recipe(name,b"new fixture",b"old fixture"))
+            with patch.object(package.hashlib,"sha256",side_effect=values(pair)):
+                self.assertFalse(package.equivalent_recipe("unknown.py",b"old fixture",b"new fixture"))
+            self.assertFalse(package.equivalent_recipe(name,b"example GRT text",b"example LGZ text"))
+            self.assertTrue(package.equivalent_recipe(name,b"same",b"same"))
 
     def test_runtime_import_closure_is_packaged_including_lazy_native_and_seam_imports(self):
         root = Path(sa.__file__).resolve().parent

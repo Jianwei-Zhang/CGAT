@@ -135,6 +135,24 @@ def source_inventory(source):
                           "worktree_source_bound_by_file_hashes":True}
 
 
+# Immutable fc.. -> fe59b81 public GRT-to-LGZ presentation rename. Reviewed:
+# help/progress/error text only; reference commands, locking and checkpoint
+# schemas stay unchanged. Do NOT normalize arbitrary future text or source.
+PRESENTATION_RECIPE_PAIRS = {
+    "prepare.sh": ("76a6f4046a6fd5966fd9600305a0034b4a5d5d3be6fcf4b0dfd088f4cba67964",
+                   "e9c005073c8ad297af893fe36f564cd6c80bf45a30d5ec29ecd7c930386f54cd"),
+    "tools/server_run.py": ("6fad0772c02799ce6f49f45b7fe428623a9bd39b993f377575e02c1fe953ab6f",
+                            "891828998f27b5cd8dfd67ec9d5a519725e3bfdb713e5e35e1e4d36474f1c07c"),
+    "tools/run_outer_checkpoints.py": ("ccf52177a8e569c489a5458aa98f1e0e9841a7c06b9b6880f91c4810ce404eb0",
+                                       "aa084b93655ce5073bd0c70ebc8150f5fe68dbd582576e4a0d8f0748d40301d9"),
+}
+
+
+def equivalent_recipe(name,old,current):
+    return old==current or PRESENTATION_RECIPE_PAIRS.get(name)==(
+        hashlib.sha256(old).hexdigest(),hashlib.sha256(current).hexdigest())
+
+
 def resume_source_profile(source,revision):
     """Maintainer prebinds immutable old source; this is not customer config."""
     if type(revision) is not str or re.fullmatch(r"[0-9a-f]{40}",revision) is None:
@@ -147,10 +165,15 @@ def resume_source_profile(source,revision):
     def blob(name):
         return subprocess.check_output(["git","-C",repository,"show",revision+":"+prefix+name])
     # These define command ownership, the launch lock and checkpoint/manifest
-    # contract. Do not silently migrate a different recipe/schema/API.
+    # contract. Only exact bytes or the hash-pinned presentation-only pair
+    # above is accepted. Never infer semantic equivalence from renamed words.
+    presentation_equivalence = []
     for name in ("prepare.sh","tools/server_run.py","tools/run_outer_checkpoints.py","tools/alignment_tasks.py"):
-        if blob(name)!=(source/name).read_bytes():
+        old,current = blob(name),(source/name).read_bytes()
+        if not equivalent_recipe(name,old,current):
             raise wa.ExperimentError(f"resume source profile has a different reference/launch/checkpoint recipe: {name}")
+        if old!=current:
+            presentation_equivalence.append(name)
     raw = subprocess.check_output(["git","-C",repository,"ls-tree","-r","--name-only","-z",revision,"--",prefix+"tools/"])
     hashes = {}
     for name in raw.decode("utf-8").split("\0"):
@@ -164,7 +187,8 @@ def resume_source_profile(source,revision):
     if not hashes:
         raise wa.ExperimentError("resume source profile contains no original Server tool modules")
     return {"revision":revision,"base_tools_files_sha256":hashes,
-            "reference_launch_checkpoint_recipe_equal":True}
+            "reference_launch_checkpoint_recipe_equal":True,
+            "pinned_presentation_equivalence_files":presentation_equivalence}
 
 
 def copy_regular_tree(source,destination,names):

@@ -111,7 +111,11 @@ python3 GPM2.0/experiments/long_query_alignment/prepare_branch_server_package.py
 ```
 
 The old-source profile must match the original reference/launch/checkpoint
-recipes byte-for-byte. An archive includes only named regular source/artifact
+recipes byte-for-byte, except the explicitly reviewed **hash-pinned** public
+GRT-to-LGZ presentation-only transition `fcfb161` → `fe59b81`. The three approved
+whole-file hash pairs are recorded by the packager; arbitrary word replacement,
+unknown edits or reverse downgrades are not equivalence. The old workspace must
+still match its complete immutable tool profile. An archive includes only named regular source/artifact
 members, is reopened and hashed against the packaged inventory, and carries
 `LOCAL_ACCEPTANCE.json`, `SOURCE.json`, base provenance and licenses. Test the
 extracted archive, not only the source tree. Publish neither master nor an
