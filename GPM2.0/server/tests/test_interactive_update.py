@@ -467,6 +467,42 @@ class CoordinatedUpdateTests(unittest.TestCase):
             exe.assert_called_once()
         self.assertEqual((self.work / ".prepare_lib" / name).read_bytes(), b"new nested runtime")
 
+    def test_old_updater_missing_runtime_is_repaired_offline_from_installed_tools(self):
+        name = "tools/long_cigar_recovery/server_alignment.py"
+        path = self.source / name
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"verified nested runtime")
+        self.make_manifest(self.source, "b" * 40, "2026-10-26T00:00:00+00:00")
+        update.apply(self.plan(workspace=False))
+        # Exact old updater behavior: copies new top-level files/SOURCE but not
+        # nested runtime. The current tools installation already has everything.
+        for rel in ("lib/incremental_common.sh", "tools/grt_step2.py", "SOURCE.json"):
+            (self.work / ".prepare_lib" / rel).write_bytes((self.source / rel).read_bytes())
+        self.assertFalse((self.work / ".prepare_lib" / name).exists())
+        with mock.patch.object(downloads, "discover", side_effect=OSError("compute node offline")), mock.patch.object(update.os, "execv") as exe:
+            update.launch(self.tools, "--launch-run", ["-o", str(self.work)])
+            exe.assert_called_once()
+        self.assertEqual((self.work / ".prepare_lib" / name).read_bytes(), b"verified nested runtime")
+        update.verify_installed(self.tools, self.work)
+        self.assertEqual(len(list((self.work / ".run_all").glob("server-update-*/journal.json"))), 1)
+
+    def test_offline_local_alignment_preserves_modified_runtime_and_refuses(self):
+        update.apply(self.plan(workspace=False))
+        changed = self.work / ".prepare_lib/tools/grt_step2.py"
+        changed.write_bytes(b"customer custom code")
+        with mock.patch.object(downloads, "discover", side_effect=OSError("offline")), mock.patch.object(update.os, "execv") as exe:
+            with self.assertRaisesRegex(ValueError, "Locally modified"):
+                update.launch(self.tools, "--launch-run", ["-o", str(self.work)])
+            exe.assert_not_called()
+        self.assertEqual(changed.read_bytes(), b"customer custom code")
+
+    def test_offline_local_alignment_write_failure_cannot_start_analysis(self):
+        update.apply(self.plan(workspace=False))
+        with mock.patch.object(update, "apply", side_effect=OSError("local write failed")), mock.patch.object(update.os, "execv") as exe:
+            with self.assertRaisesRegex(OSError, "local write failed"):
+                update.launch(self.tools, "--launch-run", ["-o", str(self.work)])
+            exe.assert_not_called()
+
     def test_offline_startup_never_executes_corrupted_installed_code(self):
         (self.tools / "tools/server_run.py").write_bytes(b"damaged")
         with mock.patch.object(downloads, "discover", side_effect=OSError("offline")), mock.patch.object(update.os, "execv") as exe:

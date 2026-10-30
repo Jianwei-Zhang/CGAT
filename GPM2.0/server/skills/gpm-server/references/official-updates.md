@@ -64,7 +64,7 @@ plan is backed up and applied without Y/N interaction, including with closed std
 Temporary verified downloads are discarded after checking. New run.sh/run_all.sh
 launchers invoke this check before analysis, then exec fresh code; they do not
 retain a pre-update imported Runner. Git/development and help-only calls skip it.
-A pre-write check failure may continue with the integrity-verified installed code;
+A stopped prepared runtime can first be aligned from the integrity-verified local installation without downloading; this repairs nested modules omitted by an older updater even on an offline compute node. Custom modifications are still protected. A pre-write check failure may continue with the integrity-verified installed code;
 write/rollback failures stop startup. No process-inspection exemptions are added.
 
 The updater preserves both bundled and registered skills' entire `local/` trees

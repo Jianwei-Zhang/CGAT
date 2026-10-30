@@ -308,10 +308,54 @@ def rollback(backup):
         core.write_atomic(backup / "journal.json", (json.dumps(journal, indent=2) + "\n").encode())
 
 
+def align_installed_runtime(tools, workspace):
+    """Repair a stopped prepared runtime from verified local tools, offline.
+
+    Older updaters copy the new SOURCE.json but omit nested runtime modules.
+    A compute node may have no network: do not require a second download or a
+    customer-written copy/config step. Unknown/custom files still fail closed.
+    """
+    if workspace is None:
+        return
+    info = metadata(tools)
+    try:
+        manifest = core.verified_source(tools, info["git_revision"])
+    except (OSError, ValueError, KeyError, TypeError):
+        # An incomplete installation is not a repair source; a verified network
+        # payload may still repair missing files. Offline verification will stop.
+        return
+    runtime = workspace / ".prepare_lib"
+    old = metadata(runtime)
+    wanted = {name: record for name, record in manifest.items() if runtime_file(name)}
+    equal = old.get("git_revision") == info["git_revision"]
+    for name, record in wanted.items():
+        path = core.regular_path(runtime, name)
+        if not path.is_file() or core.digest(path.read_bytes()) != record["sha256"]:
+            equal = False
+            break
+    if equal:
+        return
+    with tempfile.TemporaryDirectory(prefix="gpm-local-runtime-") as temporary:
+        source = Path(temporary) / "GPM_Server"
+        for name, record in manifest.items():
+            data = core.regular_path(tools, name).read_bytes()
+            if core.digest(data) != record["sha256"]:
+                raise ValueError("Installed source changed while preparing offline runtime update: " + name)
+            core.write_atomic(source / name, data, record["mode"])
+        plan = prepare(source, tools, workspace, {"tag": info["release"]})
+        if plan["unknown_baselines"]:
+            raise ValueError("Local runtime update has unknown baselines; explicit update.sh adoption is required")
+        if plan["files"]:
+            backup = apply(plan)  # No exception swallowing after writes/rollback.
+            print("[UPDATE] Prepared runtime aligned from verified installed source (no download). Backup: " + str(backup))
+
+
 def run(tools, *, startup=False, workspace=None):
     tools = paths.validate_tools(tools)
     if not startup:
         workspace = project_at(Path.cwd())
+    else:
+        align_installed_runtime(tools, workspace)
     print("Server tools: " + str(tools))
     print("Current project: " + (str(workspace) if workspace else "none (other projects will not be scanned)"))
     print("Checking CGAT docs first, GitHub Release on failure (tools and skill share one verified source)...")

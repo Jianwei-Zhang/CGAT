@@ -61,7 +61,7 @@
         "tools/server_report_io.py": "0ea82f297c9c5961aa12606de37b09dd9ac49d31f5d00267ce1d548c128cbe5d",
         "tools/server_run.py": "f5fa2e074a37a6e44e043d8e28bb3d44f7867b8ba48e5b79060fef22d8623ab2",
         "tools/track_member_order.py": "179ad2199581a95beb617a75deb4978b9b4f903a32149c1843943f985b7483c4",
-        "tools/update_server.py": "53c745133f7f02ca41030199f66add1ac1f5d74e6ec95a525327d4381b34fc98",
+        "tools/update_server.py": "7cd960a1c67a9875891716c7183d1d03eb0a102650327aa91c19ff2c8c140d30",
         "tools/update_workspace_runtime.py": "651ab52418acdb461cb707cc7768bbd4e5f1b3cf9d873531fc16aa4b549e19c6",
         "tools/validate_add_dataset_stage.py": "bf08c056a9a1618873802bd8e4d89addbf8c01f02a31d0eba2e6a8c9f511404d",
         "tools/view_run_log.py": "311e3a941bd67c7cb64217e895defdf15862c546c9b2e4d40dd57a0b3d59d91b"
