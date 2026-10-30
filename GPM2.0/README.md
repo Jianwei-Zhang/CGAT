@@ -82,8 +82,11 @@ This entrypoint requires a source package containing `update.sh`. If an older pa
 
 Checks and downloads use the [official docs](https://riceome.hzau.edu.cn/cgat/downloads) first, falling back to GitHub Release on failure.
 Tools and skill come from the same release bundle. If everything matches, it reports
-already up to date; otherwise it lists changes and asks `[y/N]`. Only `Y/y` proceeds;
-`N/n`, Enter, or no interactive terminal cancels. There are no extra flags.
+already up to date; otherwise it lists changes, backs up originals, and updates
+without a Y/N prompt, including with closed stdin. There are no extra flags.
+An older installed updater may still prompt once while upgrading itself.
+New `run.sh` and generated `run_all.sh` check updates before analysis; a stopped
+prepared runtime can also be synchronized from verified local tools while offline.
 Inside a project it also aligns `.prepare_lib/`; outside a project it does not scan other projects.
 Preserves skill `local/`, actual paths, logs, results, caches, and the environment; never starts analysis.
 Stop all affected jobs, including other nodes, before updating. Backups support rollback.
