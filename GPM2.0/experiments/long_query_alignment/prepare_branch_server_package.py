@@ -87,7 +87,7 @@ def overlay_checkpoint(text):
 
 RUN_ANCHOR = '        if not ready:\n'
 RUN_OVERLAY = (
-    '        if ready:\n'
+    '        if ready and any(unit.unit_id.startswith("ref:") for unit in load_plan(root)):\n'
     '            sys.path.insert(0, str(server_source / "tools/long_cigar_recovery"))\n'
     '            from resume_reference import handoff\n'
     '            from run_outer_checkpoints import OuterCheckpointManager\n'

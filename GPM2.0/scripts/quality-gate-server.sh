@@ -34,6 +34,8 @@ run_group "Tracked LF line endings" python3 scripts/check_line_endings.py
 
 run_group "Release guide versions" python3 scripts/check_release_guides.py
 
+run_group "Generated long-query runtime integrity" python3 -B experiments/long_query_alignment/sync_server_runtime.py
+
 printf '::group::Shell syntax\n'
 while IFS= read -r -d '' script; do
   bash -n "$script"

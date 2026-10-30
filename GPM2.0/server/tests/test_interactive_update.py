@@ -427,6 +427,22 @@ class CoordinatedUpdateTests(unittest.TestCase):
         update.rollback(backup)
         self.assertTrue(all(not (root / name).exists() for root in (self.tools, self.work / ".prepare_lib") for name in names))
 
+    def test_only_known_generated_launcher_is_upgraded_and_rollback_restores_it(self):
+        name = "lib/run_all_launcher.sh"
+        (self.source / name).write_bytes((update.ROOT / name).read_bytes())
+        self.make_manifest(self.source, "b" * 40, "2026-10-26T00:00:00+00:00")
+        launcher = self.work / "run_all.sh"
+        custom = launcher.read_bytes()
+        plan = self.plan()
+        self.assertFalse(any(p["kind"] == "workspace" for p in plan["files"]))
+        self.assertEqual(launcher.read_bytes(), custom)
+        launcher.write_bytes(update.LEGACY_RUN_ALL)
+        backup = update.apply(self.plan())
+        self.assertEqual(launcher.read_bytes(), (self.source / name).read_bytes())
+        self.assertEqual(launcher.stat().st_mode & 0o777, 0o755)
+        update.rollback(backup)
+        self.assertEqual(launcher.read_bytes(), update.LEGACY_RUN_ALL)
+
     def test_startup_failure_before_mutation_keeps_installed_code(self):
         before = [self.snapshot(root) for root in (self.tools, self.work)]
         with mock.patch.object(downloads, "discover", side_effect=OSError("offline")), mock.patch.object(update, "apply") as apply:
@@ -434,23 +450,47 @@ class CoordinatedUpdateTests(unittest.TestCase):
             apply.assert_not_called()
         self.assertEqual([self.snapshot(root) for root in (self.tools, self.work)], before)
 
+    def test_startup_repairs_missing_nested_runtime_left_by_older_updater(self):
+        name = "tools/long_cigar_recovery/server_alignment.py"
+        path = self.source / name
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"new nested runtime")
+        self.make_manifest(self.source, "b" * 40, "2026-10-26T00:00:00+00:00")
+        # Simulate old runtime_file selection: newest SOURCE, no nested module.
+        for root in (self.tools, self.work / ".prepare_lib"):
+            (root / "SOURCE.json").write_bytes((self.source / "SOURCE.json").read_bytes())
+            for rel in ("lib/incremental_common.sh", "tools/grt_step2.py"):
+                (root / rel).write_bytes((self.source / rel).read_bytes())
+        (self.tools / "skills/gpm-server/SKILL.md").write_bytes((self.source / "skills/gpm-server/SKILL.md").read_bytes())
+        with mock.patch.object(downloads, "discover", return_value=self.release), mock.patch.object(downloads, "extract", return_value=self.source), mock.patch.object(update.os, "execv") as exe:
+            update.launch(self.tools, "--launch-run", ["-o", str(self.work)])
+            exe.assert_called_once()
+        self.assertEqual((self.work / ".prepare_lib" / name).read_bytes(), b"new nested runtime")
+
+    def test_offline_startup_never_executes_corrupted_installed_code(self):
+        (self.tools / "tools/server_run.py").write_bytes(b"damaged")
+        with mock.patch.object(downloads, "discover", side_effect=OSError("offline")), mock.patch.object(update.os, "execv") as exe:
+            with self.assertRaisesRegex(ValueError, "integrity"):
+                update.launch(self.tools, "--launch-run", ["-o", str(self.work)])
+            exe.assert_not_called()
+
     def test_startup_never_swallows_apply_or_rollback_failure(self):
         with mock.patch.object(downloads, "discover", return_value=self.release), mock.patch.object(downloads, "extract", return_value=self.source), mock.patch.object(update, "apply", side_effect=OSError("write failed")):
             with self.assertRaisesRegex(OSError, "write failed"):
                 update.run(self.tools, startup=True, workspace=self.work)
 
-    def test_launch_verifies_then_updates_then_execs_fresh_code(self):
+    def test_launch_updates_then_verifies_then_execs_fresh_code(self):
         calls = []
         with mock.patch.object(update, "verify_installed", side_effect=lambda *a: calls.append("verify")), mock.patch.object(update, "run", side_effect=lambda *a, **kw: calls.append(("update", kw))), mock.patch.object(update.os, "execv", side_effect=lambda *a: calls.append(("exec", a))):
             update.launch(self.tools, "--launch-run", ["-o", str(self.work)])
-        self.assertEqual(calls[0], "verify")
-        self.assertEqual(calls[1], ("update", {"startup": True, "workspace": self.work}))
+        self.assertEqual(calls[0], ("update", {"startup": True, "workspace": self.work}))
+        self.assertEqual(calls[1], "verify")
         self.assertEqual(calls[2][1][1][2:], [str(self.tools / "tools/server_run.py"), "-o", str(self.work)])
 
     def test_workspace_launch_preserves_runner_arguments_and_rejects_foreign_binding(self):
         with mock.patch.object(update, "verify_installed"), mock.patch.object(update, "run") as run, mock.patch.object(update.os, "execv") as exe:
-            update.launch(self.tools, "--launch-workspace", [str(self.work), "--from", "step2"])
-            self.assertEqual(exe.call_args.args[1][2:], [str(self.work / ".prepare_lib/tools/run_all_runner.py"), "--server-dir", str(self.work), "--from", "step2"])
+            update.launch(self.tools, "--launch-workspace", [str(self.work), "--log-style", "detailed"])
+            self.assertEqual(exe.call_args.args[1][2:], [str(self.work / ".prepare_lib/tools/run_all_runner.py"), "--server-dir", str(self.work), "--log-style", "detailed"])
             run.assert_called_once_with(self.tools, startup=True, workspace=self.work)
             (self.work / ".prepare_lib/server-tools.path").write_text(str(self.source)+"\n")
             with self.assertRaisesRegex(ValueError, "different Server"):

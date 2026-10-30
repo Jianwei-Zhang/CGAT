@@ -341,6 +341,11 @@ class OuterCheckpointManager:
             self.server_dir / dataset["fasta_relpath"],
             self.server_dir / dataset["fai_relpath"],
         ]
+        branch_runtime = self.server_dir / ".prepare_lib/tools/long_cigar_recovery"
+        if (branch_runtime.is_dir() and "long_cigar_recovery/server_alignment.py"
+                in (self.server_dir / command_relpath).read_text(encoding="utf-8")):
+            paths.extend(sorted(p for p in branch_runtime.rglob("*")
+                                if p.is_file() and "__pycache__" not in p.parts))
         manifest = (self.server_dir / command_relpath).parent / "alignment_tasks.json"
         if manifest.is_file():
             paths.append(manifest)

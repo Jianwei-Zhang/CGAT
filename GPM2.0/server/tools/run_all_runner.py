@@ -884,6 +884,14 @@ def main() -> int:
     try:
         units = load_plan(server_dir)
         lock.acquire()
+        runtime = server_dir / ".prepare_lib/tools/long_cigar_recovery"
+        if runtime.is_dir() and any(unit.unit_id.startswith("ref:") for unit in units):
+            # run.sh uses its own locked handoff; direct run_all.sh reaches this
+            # entry instead. Do not perform the handoff twice in Runner.run().
+            sys.path.insert(0, str(runtime))
+            from resume_reference import handoff
+            report = handoff(server_dir, server_dir / ".prepare_lib", run_id, units, OuterCheckpointManager(server_dir))
+            print("[REFERENCE HANDOFF] " + json.dumps(report, ensure_ascii=True), flush=True)
         return Runner(server_dir, units, run_id, log_style=args.log_style, color=args.color).run()
     except (OSError, ValueError, RunnerError, OrchestrationContractError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

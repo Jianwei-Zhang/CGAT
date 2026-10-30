@@ -27,10 +27,10 @@ class BranchServerPackageTests(unittest.TestCase):
         (self.source/"tools").mkdir(parents=True)
         (self.source/"lib").mkdir()
         official = Path(__file__).resolve().parents[2]/"server"
-        (self.source/"prepare.sh").write_bytes((official/"prepare.sh").read_bytes())
-        (self.source/"tools/run_outer_checkpoints.py").write_bytes((official/"tools/run_outer_checkpoints.py").read_bytes())
+        (self.source/"prepare.sh").write_bytes((official/"prepare.sh").read_text().replace(package.REF_OVERLAY, "").replace(package.COPY_OVERLAY, "").encode())
+        (self.source/"tools/run_outer_checkpoints.py").write_bytes((official/"tools/run_outer_checkpoints.py").read_text().replace(package.CHECKPOINT_OVERLAY, "").encode())
         (self.source/"run.sh").write_bytes(b"#!/bin/bash\n# never execute test file\n")
-        (self.source/"tools/server_run.py").write_bytes((official/"tools/server_run.py").read_bytes())
+        (self.source/"tools/server_run.py").write_bytes((official/"tools/server_run.py").read_text().replace(package.RUN_OVERLAY, "").encode())
         (self.source/"lib/incremental_common.sh").write_text("# mock only\n")
         (self.source/"SOURCE.json").write_text('{"baseline":"preserve me"}\n')
         self.inventory = sorted(p.relative_to(self.source).as_posix() for p in self.source.rglob("*") if p.is_file())

@@ -8,7 +8,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, Mock
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import server_run
@@ -38,7 +39,10 @@ class ServerRunTests(unittest.TestCase):
                 self.assertTrue((target / ".run_all/lock").is_dir())
                 shutil.copytree(template, target, dirs_exist_ok=True)
                 return 0
-            with patch.dict(os.environ, env), patch.object(server_run, "prepare_workspace", side_effect=prepare) as preparation, contextlib.redirect_stdout(io.StringIO()):
+            # This unit fixture has custom commands and no real Server source.
+            # Real production handoff is covered separately with generated commands.
+            handoff = Mock(return_value={"status": "fixture_no_handoff"})
+            with patch.dict(sys.modules, {"resume_reference": SimpleNamespace(handoff=handoff)}), patch.dict(os.environ, env), patch.object(server_run, "prepare_workspace", side_effect=prepare) as preparation, contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(server_run.execute(argv, root), 7)
                 self.assertFalse((output / ".run_all/lock").exists())
                 original_metadata = (output / "metadata/prepare_options.tsv").read_bytes()
@@ -49,6 +53,7 @@ class ServerRunTests(unittest.TestCase):
                 self.assertEqual((output / "metadata/prepare_options.tsv").read_bytes(), original_metadata)
                 self.assertIn("[SKIP_VALID] [ref:ds]", (output / "logs/run_all.log").read_text())
                 self.assertEqual(server_run.execute(["-o", str(output)], root), 0)
+                self.assertEqual(handoff.call_count, 2)
                 ref.write_text(">r\nACGTACGT\n")
                 with self.assertRaisesRegex(server_run.RunnerError, "Input changed"):
                     server_run.execute(argv, root)

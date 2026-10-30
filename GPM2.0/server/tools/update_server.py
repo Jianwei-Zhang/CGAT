@@ -23,6 +23,12 @@ import server_paths as paths
 import update_workspace_runtime as core
 
 SKILL_PREFIX = "skills/gpm-server/"
+LEGACY_RUN_ALL = b'''#!/usr/bin/env bash
+set -euo pipefail
+
+server_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+exec python3 "${server_dir}/.prepare_lib/tools/run_all_runner.py" --server-dir "$server_dir" "$@"
+'''
 
 
 def project_at(cwd):
@@ -184,6 +190,20 @@ def prepare(source, tools, workspace, release):
             actual = {p.relative_to(root).as_posix() for p in (root / "tools/grt_core").rglob("*.py")}
             if actual - expected - set(old_files):
                 raise ValueError("Unrecognized old core modules; inspect before updating: " + str(sorted(actual - expected - set(old_files))))
+    if workspace and "lib/run_all_launcher.sh" in source_files:
+        # Only a byte-recognized generated launcher is upgraded. Custom scripts
+        # stay untouched. This is journaled with the code update, not a shell edit.
+        launcher = core.regular_path(workspace, "run_all.sh")
+        template = core.regular_path(source, "lib/run_all_launcher.sh")
+        known = {LEGACY_RUN_ALL, template.read_bytes()}
+        old_template = core.regular_path(workspace / ".prepare_lib", "lib/run_all_launcher.sh")
+        old_record = metadata(workspace / ".prepare_lib").get("files", {}).get("lib/run_all_launcher.sh")
+        if old_template.is_file() and old_record and core.digest(old_template.read_bytes()) == old_record.get("sha256"):
+            known.add(old_template.read_bytes())
+        if launcher.is_file() and launcher.read_bytes() in known:
+            roots["workspace"] = workspace
+            add("workspace", "run_all.sh", template.read_bytes(), 0o755,
+                {"sha256": core.digest(launcher.read_bytes())})
     observe("tools", paths.REGISTRY)
     if workspace:
         add("runtime", "server-tools.path", (str(tools) + "\n").encode(), 0o644)
@@ -307,6 +327,7 @@ def run(tools, *, startup=False, workspace=None):
         except (OSError, ValueError, RuntimeError, KeyError, TypeError, tarfile.TarError) as exc:
             if not startup:
                 raise
+            verify_installed(tools, workspace)
             print("[UPDATE] Check unavailable; keeping the verified installed runtime: " + str(exc), file=sys.stderr)
             return 0
         if not plan["files"]:
@@ -373,8 +394,11 @@ def launch(tools, mode, argv):
         raise ValueError("Unknown internal launch mode")
     info = metadata(tools)
     if not help_only and info.get("release") and info.get("official_release") is not False:
-        verify_installed(tools, workspace)
+        # An older updater may have copied SOURCE.json but omitted newly nested
+        # runtime files. Let the verified update fill missing files first. Only
+        # continue (online or offline) after the installed tree is complete.
         run(tools, startup=True, workspace=workspace)
+        verify_installed(tools, workspace)
     elif not help_only:
         print("[UPDATE] Development/legacy source without an official release manifest: automatic update skipped.", flush=True)
     sys.stdout.flush()

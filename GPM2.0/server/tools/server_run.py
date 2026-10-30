@@ -165,6 +165,12 @@ def execute(argv: list[str], server_source: Path) -> int:
             check_resume_options(options, saved["options"], saved["inputs"])
         elif ready and any(key not in {"--out", "--max-fill"} for key in options):
             raise RunnerError("Resume this existing workspace with run.sh -o <workspace>; its original launch settings were not recorded by run.sh.")
+        if ready and any(unit.unit_id.startswith("ref:") for unit in load_plan(root)):
+            sys.path.insert(0, str(server_source / "tools/long_cigar_recovery"))
+            from resume_reference import handoff
+            from run_outer_checkpoints import OuterCheckpointManager
+            handoff_report = handoff(root, server_source, run_id, load_plan(root), OuterCheckpointManager(root))
+            print("[REFERENCE HANDOFF] " + json.dumps(handoff_report, ensure_ascii=True), flush=True)
         if not ready:
             if saved is None and ("--ref" not in options or "--ds" not in options):
                 raise RunnerError("A new workspace requires --ref and --ds; see run.sh --help")

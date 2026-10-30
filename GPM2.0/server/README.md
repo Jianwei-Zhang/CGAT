@@ -140,7 +140,7 @@ one release bundle; refreshed same-version assets are detected too.
 - New files or an outdated runtime: lists changes, backs up originals, and updates without a Y/N prompt.
 - Works with closed stdin and batch jobs. No `--check`/`--yes` flags are needed.
 - Preserves the whole skill `local/`, valid bindings, inputs, results, logs, caches,
-  generated scripts and dependency environment.
+  custom generated scripts and dependency environment. Byte-recognized old `run_all.sh` launchers are upgraded with a rollback backup.
 - Separately installed skills registered with `server_tools_path.sh --set` are
   updated too; agent configuration is not scanned.
 
@@ -173,7 +173,7 @@ To fall back to the unscreened baseline profile when preparing a **new** workspa
 --grt-execution-profile baseline --grt-step3-mummer-scope full
 ```
 
-New `run.sh` and generated `run_all.sh` launchers check for a code-only update before analysis and before acquiring the run lock. They reload code after updating, without user configuration. If the check fails before any mutation, an integrity-verified installed runtime can still run offline; a write/rollback failure stops startup. Git/development packages and help-only calls do not contact the update service. Old generated launchers must first be aligned through an explicit `update.sh` invocation; arbitrary generated scripts are not overwritten.
+New `run.sh` and generated `run_all.sh` launchers check for a code-only update before analysis and before acquiring the run lock. They reload code after updating, without user configuration. If the check fails before any mutation, an integrity-verified installed runtime can still run offline; a write/rollback failure stops startup. Git/development packages and help-only calls do not contact the update service. An explicit `update.sh` also upgrades byte-recognized old `run_all.sh` launchers with a rollback backup; customized scripts are not overwritten.
 
 For a Step2 `missing its output gap interval` failure, update both tools and the affected workspace runtime before resuming. Structural edits now register absorbed GAPs on both sides; partial or ambiguous origin mappings fail explicitly. Preserve logs, results, and raw-alignment caches; dependency reinstallation is not required.
 
@@ -315,3 +315,24 @@ Rerun the same `run.sh` command, or use `bash "$SERVER/run.sh" -o ./gpm_server` 
 
 
 See the parent repository's `README.md` for the complete options and desktop workflow.
+
+### Ultra-long initial-reference alignments
+
+Initial-reference `asm10` mapping inspects query lengths before mapping. Ordinary
+queries keep the native minimap2 path; queries longer than 268,435,455 bases use
+overlapping windows, original-coordinate reconstruction and checked candidate/
+confidence evidence. The whole batch is not deliberately run until it crashes,
+and ordinary queries are not split. No FASTA splitting or user configuration is
+needed. The installed minimap2 executable is never patched or replaced.
+
+Long-query reconstruction currently requires minimap2 `2.31-r1302` and the bundled
+Linux x86_64 companion (glibc 2.17-compatible). Ordinary mapping does not require
+the companion. Unsupported or ambiguous reconstruction fails explicitly without
+publishing partial output or inventing MAPQ. Same-task verified completed groups
+can be reused on the next run; input/tool/runtime changes invalidate reuse.
+
+Keep original inputs and failed-job evidence. Resume a stopped supported workspace
+with the same `run.sh` command or its `run_all.sh`; only source-checked unfinished
+reference commands are migrated, with a rollback journal. A compatible completed
+reference checkpoint stays intact. Local synthetic validation is not a claim that
+a customer's unavailable whole wheat assembly has been biologically validated.

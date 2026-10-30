@@ -57,7 +57,7 @@ supported; projects overlapping managed code directories are refused. New worksp
 A conflicting binding stops the update; a legacy missing binding is shown in the
 plan and recorded only during the backed-up update. Legacy merged-Step2/3 plans are not
 migrated. All prepared `lib/`, Python tools/core, long-CIGAR runtime/companion and JSON contracts are aligned;
-generated scripts, inputs, caches, outputs and logs are not rewritten.
+inputs, caches, outputs and logs are not rewritten. Only byte-recognized generated run_all.sh launchers are backed up and upgraded; customized launchers stay intact.
 
 No user arguments are required. A matching installation is reported; otherwise the
 plan is backed up and applied without Y/N interaction, including with closed stdin.

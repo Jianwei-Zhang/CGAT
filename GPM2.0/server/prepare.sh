@@ -324,6 +324,7 @@ write_prepare_lib() {
   cp -R "$lib_src" "$lib_dst"
   cp -f "$tools_src"/*.py "$tools_dst"/
   cp -R "$tools_src/grt_core" "$tools_dst/grt_core"
+  cp -R "$tools_src/long_cigar_recovery" "$tools_dst/long_cigar_recovery"
   find "$tools_dst/grt_core" -type d -name '__pycache__' -prune -exec rm -rf {} +
   cp -f "$contracts_src"/*.json "$contracts_dst"/
   # Record the actual installation, not a guessed default, for later updates.
@@ -481,6 +482,19 @@ write_ref_command_script() {
   local ds_fa="$3"
 
   write_alignment_command_script "${run_dir}/command.sh" "$run_dir" "$ref_fa" "$ds_fa" false
+  if [[ "$MINIMAP_PRESET" == "asm10" ]]; then
+    local runtime_threads="\"\${GPM_TASK_THREADS:-${THREADS}}\""
+    {
+      printf '#!/usr/bin/env bash\nset -euo pipefail\n'
+      printf 'cd %s\n' "$(shell_quote "$run_dir")"
+      printf '(minimap2 --version > tool_version.txt 2>&1 || printf %s > tool_version.txt)\n' "$(shell_quote $'unknown\n')"
+      printf 'exec python3 %s --server-dir %s --run-dir %s --target %s --query %s --threads %s --preset asm10 --result result.paf > stdout.log 2> stderr.log\n' \
+        "$(shell_quote "${WORK_ROOT}/.prepare_lib/tools/long_cigar_recovery/server_alignment.py")" \
+        "$(shell_quote "$WORK_ROOT")" "$(shell_quote "$run_dir")" \
+        "$(shell_quote "$ref_fa")" "$(shell_quote "$ds_fa")" "$runtime_threads"
+    } > "${run_dir}/command.sh"
+    make_executable_if_supported "${run_dir}/command.sh"
+  fi
   python3 "${SCRIPT_DIR}/tools/alignment_tasks.py" --root "$WORK_ROOT" \
     --command "${run_dir}/command.sh" --query "$ds_fa" --engine minimap2 \
     --threads "$THREADS"
@@ -1038,21 +1052,7 @@ if [[ -z "${GPM_SERVER_PREPARE_RUN_ID:-}" ]]; then
   rm -rf "$RUN_ALL_STATE_DIR" "${WORK_ROOT}/logs"
 fi
 mkdir -p "$RUN_ALL_STATE_DIR"
-{
-  printf '#!/usr/bin/env bash\n'
-  printf 'set -euo pipefail\n'
-  printf '\n'
-  printf 'server_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"\n'
-  printf 'tools_dir=""\n'
-  printf 'if [[ -f "${server_dir}/.prepare_lib/server-tools.path" ]]; then\n'
-  printf '  IFS= read -r tools_dir < "${server_dir}/.prepare_lib/server-tools.path" || true\n'
-  printf 'fi\n'
-  printf 'if [[ -n "$tools_dir" && -f "$tools_dir/update.sh" ]]; then\n'
-  printf '  exec bash "$tools_dir/update.sh" --launch-workspace "$server_dir" "$@"\n'
-  printf 'fi\n'
-  printf 'printf "[UPDATE] Original installation unavailable; using the prepared runtime.\\n" >&2\n'
-  printf 'exec python3 "${server_dir}/.prepare_lib/tools/run_all_runner.py" --server-dir "$server_dir" "$@"\n'
-} > "$RUN_ALL"
+cp -f "${SCRIPT_DIR}/lib/run_all_launcher.sh" "$RUN_ALL"
 printf 'unit_id\tcommand_relpath\tdetail_log_relpath\n' > "$RUN_ALL_PLAN"
 
 DATASET_COUNT=${#DATASET_NAMES[@]}

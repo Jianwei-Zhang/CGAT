@@ -414,11 +414,14 @@ test_alignment_engine_defaults_and_validation() {
     --ref ref_aligner "$ref" \
     --ds ds_a "$ds" \
     -o "$default_root" >/dev/null
-  grep -F 'minimap2 -c -x asm10 -t "${GPM_TASK_THREADS:-10}" -o result.paf' "${default_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
-    echo "expected default minimap2 command to emit CIGAR (-c) and use 10 threads" >&2
+  grep -F 'long_cigar_recovery/server_alignment.py' "${default_root}/runs/ds_a_vs_ref/command.sh" >/dev/null
+  grep -F -- '--threads "${GPM_TASK_THREADS:-10}" --preset asm10 --result result.paf' "${default_root}/runs/ds_a_vs_ref/command.sh" >/dev/null || {
+    echo "expected proactive initial-reference adapter with native asm10 and 10 threads" >&2
     cat "${default_root}/runs/ds_a_vs_ref/command.sh" >&2
     exit 1
   }
+  assert_file "${default_root}/.prepare_lib/tools/long_cigar_recovery/branch-runtime.json"
+  cmp "${default_root}/run_all.sh" "${REPO_ROOT}/server/lib/run_all_launcher.sh"
   assert_prepare_option "${default_root}/metadata/prepare_options.tsv" alignment_engine minimap2
   assert_prepare_option "${default_root}/metadata/prepare_options.tsv" threads 10
 
